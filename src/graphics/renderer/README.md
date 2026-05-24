@@ -118,6 +118,7 @@ implementation.
 - `Extrinsic.Graphics.Pass.Shadows`
 - `Extrinsic.Graphics.Pass.ImGui`
 - `Extrinsic.Graphics.Pass.Present`
+- `Extrinsic.Graphics.Pass.TransientDebug.Surface`
 
 ## Ownership contract
 
@@ -680,6 +681,48 @@ Concretely:
   (render-graph validation negative test) remain open under the same
   GRAPHICS-076 task and are required before GRAPHICS-081 can delete
   the MinimalDebug scaffold.
+- GRAPHICS-077 Slice A scaffolds the default-recipe
+  `TransientDebugSurfacePass` (`Extrinsic.Graphics.Pass.TransientDebug.Surface`)
+  recipe + executor shape on the CPU/null path. Recipe-side,
+  `FrameRecipeFeatures::EnableTransientDebugSurface` is derived from
+  `!world.DebugPrimitives.Lines.empty() ||
+  !world.DebugPrimitives.Points.empty() ||
+  !world.DebugPrimitives.Triangles.empty()` so the pass is omitted
+  entirely from `CommandRecords` on frames with no transient debug
+  payload. When enabled, `DescribeDefaultFrameRecipe` declares the pass
+  between the lit-composition family (`SurfacePass` /
+  `CompositionPass` / `LinePass` / `PointPass`) and the postprocess
+  chain with `Reads = {SceneColorHDR, SceneDepth}` and
+  `Writes = {SceneColorHDR}`; `BuildDefaultFrameRecipe` adds the
+  ordered pass with `Read(SceneDepth, DepthRead) + Write(SceneColorHDR,
+  ColorAttachmentWrite) + SetRenderPass(LOAD-store color, depth-load
+  /dontcare-store)` so the framegraph compiler emits a real
+  `CompiledRenderPassAttachment` pair (mirrors the canonical
+  `Pass.Present` wiring rationale — without `SetRenderPass` the future
+  bind/draw would land outside a render-pass scope, invalid on Vulkan).
+  Renderer-side, `NullRenderer` owns a plain `m_TransientDebugSurfacePass`
+  member (no system dependency) and a new `"TransientDebugSurfacePass"`
+  executor branch routes through `RecordTransientDebugSurfacePass(...)`
+  with the `SkippedNonOperational` / `SkippedUnavailable` taxonomy used
+  by the other default-recipe helpers. The new
+  `TransientDebugUploadDiagnostics` struct lives on
+  `RenderGraphFrameStats::TransientDebugUpload` and exposes eight
+  counters (`UploadOverflowCount`, `{Line,Point,Triangle}RecordsSubmitted`,
+  `{Line,Point,Triangle}RecordsRecorded`, `MissingPipelineSkipCount`).
+  Slice A pins all counters at zero except `MissingPipelineSkipCount`,
+  which increments by one each frame the executor reaches the branch
+  with an operational device but no pipeline (the
+  scaffold-only signal that distinguishes "feature on" from
+  "feature off"). Slice B begins populating the triangle counters
+  once the per-lane pipelines + `TransientDebugUploadHelper` land;
+  Slice C extends to line + point lanes. The contract pin is
+  `tests/contract/graphics/Test.TransientDebugSurfacePass.cpp`
+  (recipe declaration with/without transient primitives, executor
+  `SkippedUnavailable` with `MissingPipelineSkipCount` increment,
+  executor `SkippedNonOperational` short-circuit before the pipeline
+  check). Slice D (the opt-in `gpu;vulkan` pixel-readback smoke)
+  remains deferred behind the same Vulkan-capable-host gate as
+  GRAPHICS-076 Slice D.
 - `TransformSyncSystem`, `LightSystem`, and `VisualizationSyncSystem` consume
   graphics-owned snapshot records (`TransformSyncRecord`, `LightSnapshot`, and
   `VisualizationSyncRecord`) instead of querying live ECS registries. Runtime is

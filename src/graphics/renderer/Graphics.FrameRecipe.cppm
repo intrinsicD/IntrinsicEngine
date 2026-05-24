@@ -55,6 +55,17 @@ namespace Extrinsic::Graphics
         DebugView,
         ImGui,
         Present,
+        // GRAPHICS-077 Slice A — scaffold-only `TransientDebugSurfacePass`
+        // that the recipe declares between the lit-composition family and
+        // `PostProcessHistogramPass` when `EnableTransientDebugSurface` is
+        // set. Slice A holds no pipelines and no helper; the executor
+        // branch routes through `RecordTransientDebugSurfacePass(...)` and
+        // reports `SkippedUnavailable` on operational devices,
+        // `SkippedNonOperational` otherwise. Slice B wires the triangle
+        // lane, Slice C wires line + point, Slice D is the opt-in
+        // `gpu;vulkan` smoke. Append-only at the end of the enum to keep
+        // prior numeric values stable.
+        TransientDebugSurface,
     };
 
     export enum class FrameRecipeResourceKind : std::uint8_t
@@ -127,6 +138,17 @@ namespace Extrinsic::Graphics
         // this flag from `PostProcessSystem::GetSettings().AntiAliasing`.
         bool EnableAntiAliasing{false};
         bool EnableImGui{true};
+        // GRAPHICS-077 Slice A — recipe-side gate for the new
+        // `TransientDebugSurfacePass`. Derived in
+        // `DeriveDefaultFrameRecipeFeatures(...)` from
+        // `!world.DebugPrimitives.Lines.empty() ||
+        // !world.DebugPrimitives.Points.empty() ||
+        // !world.DebugPrimitives.Triangles.empty()` so the pass is
+        // omitted entirely from `RenderGraphFrameStats::CommandRecords`
+        // when no transient debug primitives exist for the frame. Slice A
+        // has no pipelines and no helper; Slices B/C wire the per-lane
+        // pipelines + upload + recording paths.
+        bool EnableTransientDebugSurface{false};
     };
 
     export struct FrameRecipeSizing

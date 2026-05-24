@@ -68,6 +68,12 @@ import Extrinsic.Graphics.Pass.Present;
 // holds a reference and does not re-export the system module).
 import Extrinsic.Graphics.Pass.DebugView;
 import Extrinsic.Graphics.DebugViewSystem;
+// GRAPHICS-077 Slice A — scaffold-only `TransientDebugSurfacePass`.
+// Owned as a plain member (no system dependency) alongside the canonical
+// present + debug-view passes; Slice A holds no pipelines so the
+// executor branch reports `SkippedUnavailable` on the operational path
+// and `SkippedNonOperational` otherwise.
+import Extrinsic.Graphics.Pass.TransientDebug.Surface;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.CameraSnapshots;
@@ -1864,6 +1870,32 @@ namespace Extrinsic::Graphics
                         // None`).
                         const RenderCommandPassStatus status =
                             RecordPostProcessAAResolvePass(graphicsContext, camera);
+                        AccumulateCommandRecordStatus(passName, status);
+                    }
+                    else if (passName == std::string_view{"TransientDebugSurfacePass"})
+                    {
+                        // GRAPHICS-077 Slice A — scaffold-only branch for
+                        // the new transient-debug surface overlay. The
+                        // recipe declares this pass only when at least
+                        // one transient debug primitive packet exists
+                        // (`features.EnableTransientDebugSurface` derived
+                        // from per-lane span emptiness in
+                        // `DeriveDefaultFrameRecipeFeatures`), so this
+                        // branch is reached only when the world has
+                        // submitted transient debug payload for the
+                        // frame. Slice A holds no pipelines and no
+                        // helper — `RecordTransientDebugSurfacePass`
+                        // returns `SkippedNonOperational` for a
+                        // non-operational device and
+                        // `SkippedUnavailable` otherwise, mirroring the
+                        // taxonomy the other default-recipe helpers use
+                        // before their pipeline leases land. Slice B
+                        // wires the triangle lane (executor flips from
+                        // `SkippedUnavailable` to `Recorded` when at
+                        // least one triangle packet records); Slice C
+                        // extends to line + point lanes.
+                        const RenderCommandPassStatus status =
+                            RecordTransientDebugSurfacePass(graphicsContext);
                         AccumulateCommandRecordStatus(passName, status);
                     }
                     else if (passName == std::string_view{"Present"})
@@ -5274,6 +5306,32 @@ namespace Extrinsic::Graphics
             return RenderCommandPassStatus::Recorded;
         }
 
+        // GRAPHICS-077 Slice A — scaffold-only executor helper for the new
+        // `TransientDebugSurfacePass`. Mirrors `RecordPresentPass` for the
+        // operational gate. Slice A has no pipelines and no helper, so the
+        // operational path always returns `SkippedUnavailable`; Slice B
+        // begins reporting `Recorded` once the triangle-lane pipelines +
+        // upload helper land. `MissingPipelineSkipCount` increments on the
+        // operational-but-not-pipelined path so the diagnostic counter
+        // distinguishes "feature on, scaffold-only" from "feature off"
+        // (the latter does not reach this branch at all).
+        [[nodiscard]] RenderCommandPassStatus RecordTransientDebugSurfacePass(RHI::ICommandContext& cmd)
+        {
+            (void)cmd;
+            if (m_Device == nullptr || !m_Device->IsOperational())
+            {
+                return RenderCommandPassStatus::SkippedNonOperational;
+            }
+            if (!m_TransientDebugSurfacePass.GetPipeline().IsValid())
+            {
+                ++m_LastRenderGraphStats.TransientDebugUpload.MissingPipelineSkipCount;
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            m_TransientDebugSurfacePass.Execute(cmd);
+            return RenderCommandPassStatus::Recorded;
+        }
+
         std::optional<RHI::BufferManager>   m_BufferManager;
         std::optional<RHI::SamplerManager>  m_SamplerManager;
         std::optional<RHI::TextureManager>  m_TextureManager;
@@ -5331,6 +5389,17 @@ namespace Extrinsic::Graphics
         // recipe-side enablement.
         std::optional<DebugViewSystem>       m_DebugViewSystem;
         std::optional<DebugViewPass>         m_DebugViewPass;
+        // GRAPHICS-077 Slice A — scaffold-only `TransientDebugSurfacePass`.
+        // Default-constructible (no system dependency), held as a plain
+        // member so it lives for the renderer's full lifetime. Slice A
+        // never publishes a pipeline through `SetPipeline(...)`, so
+        // `GetPipeline().IsValid()` stays false and
+        // `RecordTransientDebugSurfacePass` always returns
+        // `SkippedUnavailable` on the operational path. Slice B/C
+        // introduce the per-lane pipeline leases (`m_TransientDebug*PipelineLease*`)
+        // and the renderer-side backend-local upload helper that
+        // `Execute(...)` consumes.
+        TransientDebugSurfacePass            m_TransientDebugSurfacePass;
         // GRAPHICS-070 — default-recipe forward surface pass. Owned as an
         // `optional` so the explicit `ForwardSystem&` constructor invariant is
         // preserved: emplaced in `Initialize()` immediately after the

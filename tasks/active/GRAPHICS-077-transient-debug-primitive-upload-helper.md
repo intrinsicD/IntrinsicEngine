@@ -2,23 +2,29 @@
 
 ## Status
 
-- Status: in-progress (planning landed; Slice A not started). Promoted from
-  `tasks/backlog/rendering/` on 2026-05-23 because GRAPHICS-076 Slice D is
-  parked on a Vulkan-capable host blocker and GRAPHICS-077 is the next
-  earliest unblocked Theme A leaf per `tasks/backlog/README.md` (all of its
-  rendering-DAG upstream gates — GRAPHICS-010Q, GRAPHICS-072, GRAPHICS-031A —
-  are retired in `tasks/done/`).
-- Owner/agent: unassigned; next pick-up by any agent. Branch for the
-  promotion: `claude/intrinsicengine-agent-onboarding-utAFW`.
-- Branch: subsequent slices will be developed on new
-  `claude/intrinsicengine-agent-onboarding-*` branches.
-- Started: 2026-05-23 (promotion only; no implementation yet).
-- Next verification step: when Slice A is picked up, configure with the
+- Status: in-progress (Slice A landed; Slice B not started). Slice A
+  scaffolded the recipe + executor shape on
+  `claude/intrinsicengine-agent-onboarding-p1J2P` on 2026-05-23 and
+  verified through the contract CPU/null gate (224/224 graphics
+  contract tests pass).
+- Owner/agent: unassigned for Slice B; next pick-up by any agent on any
+  host (Slices B and C are CPU-testable; Slice D requires a
+  Vulkan-capable host).
+- Branch: Slice A landed on
+  `claude/intrinsicengine-agent-onboarding-p1J2P`; subsequent slices
+  will be developed on new `claude/intrinsicengine-agent-onboarding-*`
+  branches.
+- Started: 2026-05-23.
+- Next verification step: when Slice B is picked up, configure with the
   `ci` preset, build `IntrinsicGraphicsContractTests`
-  + `IntrinsicGraphicsContractCpuTests`, and run the contract CPU/null
-  gate (`ctest --test-dir build/ci -L contract -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`).
-  See Slice A in `## Slice plan` and `## Verification` for the exact
-  test/file additions to validate against.
+  + `IntrinsicGraphicsContractCpuTests`
+  + `IntrinsicGraphicsVulkanContractTests`, and run the contract
+  CPU/null gate (`ctest --test-dir build/ci -L contract -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`).
+  Slice A's pin is `Test.TransientDebugSurfacePass.cpp` (four
+  contract tests; see `## Tests`). Slice B adds the triangle-lane
+  pipelines + `TransientDebugUploadHelper` interface + recording
+  body; see Slice B in `## Slice plan` and `## Verification` for the
+  exact test/file additions to validate against.
 
 ## Slice plan
 
@@ -31,7 +37,7 @@ pipelines total, (c) a new pass that draws after lit composition into
 reviewable and preserves the CPU/null correctness gate; only the final
 slice exercises an opt-in `gpu;vulkan` smoke.
 
-- **Slice A (next pick-up).** Pin the recipe/executor scaffold for the
+- **Slice A (landed 2026-05-23 on `claude/intrinsicengine-agent-onboarding-p1J2P`).** Pin the recipe/executor scaffold for the
   new `TransientDebugSurfacePass` without committing to pipelines or the
   helper yet. Adds `FrameRecipePassKind::TransientDebugSurface` plus the
   matching `features.EnableTransientDebugSurface` derivation
@@ -134,36 +140,46 @@ slice exercises an opt-in `gpu;vulkan` smoke.
 
 ## Required changes
 
-Slice A (next pick-up):
-- [ ] Add `FrameRecipePassKind::TransientDebugSurface` to
-      `src/graphics/renderer/Graphics.FrameRecipe.cppm` (append at the
-      end of the enum to keep prior values stable).
-- [ ] Add `bool EnableTransientDebugSurface{false}` field to
+Slice A (landed 2026-05-23):
+- [x] Add `FrameRecipePassKind::TransientDebugSurface` to
+      `src/graphics/renderer/Graphics.FrameRecipe.cppm` (appended at
+      the end of the enum to keep prior values stable).
+- [x] Add `bool EnableTransientDebugSurface{false}` field to
       `FrameRecipeFeatures` in the same file.
-- [ ] In `DeriveDefaultFrameRecipeFeatures(...)`, derive
+- [x] In `DeriveDefaultFrameRecipeFeatures(...)`, derive
       `features.EnableTransientDebugSurface =
       !world.DebugPrimitives.Lines.empty() ||
       !world.DebugPrimitives.Points.empty() ||
       !world.DebugPrimitives.Triangles.empty()` so the pass is
       omitted entirely from `RenderGraphFrameStats::CommandRecords`
       when no transient debug primitives exist for the frame.
-- [ ] In `DescribeDefaultFrameRecipe(...)`, add
+- [x] In `DescribeDefaultFrameRecipe(...)`, add
       `AddPass(out, FrameRecipePassKind::TransientDebugSurface,
       "TransientDebugSurfacePass", features.EnableTransientDebugSurface,
       false, {"SceneColorHDR", "SceneDepth"}, {"SceneColorHDR"})`
-      placed between the lit-composition family and
-      `PostProcessHistogramPass`.
-- [ ] In `BuildDefaultFrameRecipe(...)`, when
+      placed between `PointPass` and `PostProcessHistogramPass`.
+- [x] In `BuildDefaultFrameRecipe(...)`, when
       `features.EnableTransientDebugSurface` is set, declare the pass
-      node with `Read(SceneColorHDR, TextureUsage::ColorAttachmentReadWrite)
-      + Read(SceneDepth, TextureUsage::DepthRead) +
+      node with `Read(SceneDepth, TextureUsage::DepthRead) +
       Write(SceneColorHDR, TextureUsage::ColorAttachmentWrite) +
-      SetRenderPass(builder.BuildColorAttachmentRenderPass({SceneColorHDR}, SceneDepth))`
-      (LOAD-store, depth-read-only) so the framegraph compiler emits a
-      real render-pass attachment set even though Slice A records no
-      commands inside it. Use the existing helper pattern from
-      `"PostProcessPass"` for ordering.
-- [ ] Add a `TransientDebugSurfacePass` shell class at
+      SetRenderPass(...)`. The render-pass desc uses a new
+      `kTransientDebugSurfaceRenderPassColorAttachments` LOAD-store
+      template (preserves lit color) paired with a LOAD/dontcare depth
+      attachment. Deviations from the original spec text: (a) the spec
+      named `TextureUsage::ColorAttachmentReadWrite` which does not
+      exist in `Graphics.RenderGraph:Pass`; the LOAD-store color
+      attachment + `Write(SceneColorHDR, ColorAttachmentWrite)`
+      idiomatically expresses the same blended-overlay semantics
+      (matches `LinePass`/`PointPass` and the canonical
+      `Pass.Present` LOAD-store wiring rationale documented inline);
+      (b) the spec named `builder.BuildColorAttachmentRenderPass(...)`
+      which does not exist; the recipe instead constructs the
+      `RHI::RenderPassDesc` inline with the LOAD-store color +
+      LOAD/dontcare depth attachment template, mirroring how
+      `Pass.Present` declares its color attachment with the
+      `RenderPassAttachmentToken()` placeholder the compiler resolves
+      from the compiled-graph attachment metadata.
+- [x] Add a `TransientDebugSurfacePass` shell class at
       `src/graphics/renderer/Passes/Pass.TransientDebug.Surface.{cppm,cpp}`
       mirroring the `PresentPass` / `MinimalDebugPresentPass` shape:
       default-constructible, `SetPipeline(RHI::PipelineHandle)`,
@@ -171,23 +187,31 @@ Slice A (next pick-up):
       bound, and a `GetPipeline()` accessor for the renderer's
       fail-closed prerequisite check. Module name
       `Extrinsic.Graphics.Pass.TransientDebug.Surface`.
-- [ ] Add `m_TransientDebugSurfacePass` member to `NullRenderer`
+- [x] Add `m_TransientDebugSurfacePass` member to `NullRenderer`
       (no pipeline lease yet in Slice A — that lands in Slice B).
-- [ ] Add executor branch `else if (passName == std::string_view{"TransientDebugSurfacePass"})`
+- [x] Add executor branch `else if (passName == std::string_view{"TransientDebugSurfacePass"})`
       routing to a new `RecordTransientDebugSurfacePass(...)` helper
       that returns `SkippedNonOperational` when the device is not
-      operational and `SkippedUnavailable` otherwise (no pipelines
-      yet in Slice A). Place the branch between the
-      `"PostProcessAAResolvePass"` branch and the `"DebugViewPass"`
-      branch so executor branch order matches recipe order.
-- [ ] Add a `TransientDebugUploadDiagnostics` struct on the renderer
+      operational and `SkippedUnavailable` otherwise (with
+      `MissingPipelineSkipCount` increment on the
+      operational-no-pipeline path so the diagnostic distinguishes
+      "scaffold-only" from "feature off"). Branch placed immediately
+      after `"PostProcessAAResolvePass"` and before `"Present"` so it
+      sits between AAResolve and DebugView in source order per the
+      spec.
+- [x] Add a `TransientDebugUploadDiagnostics` struct on the renderer
       diagnostics aggregate with fields `UploadOverflowCount`,
       `LineRecordsSubmitted`, `PointRecordsSubmitted`,
       `TriangleRecordsSubmitted`, `LineRecordsRecorded`,
       `PointRecordsRecorded`, `TriangleRecordsRecorded`,
       `MissingPipelineSkipCount` (all `std::uint64_t`, zeroed in
-      Slice A — Slice B begins incrementing the triangle counters and
-      Slice C begins incrementing the line + point counters).
+      Slice A except `MissingPipelineSkipCount` which increments
+      once per operational-scaffold frame — Slice B begins
+      incrementing the triangle counters and Slice C begins
+      incrementing the line + point counters). Exposed through the
+      new `RenderGraphFrameStats::TransientDebugUpload` field; reset
+      per-frame through the existing `m_LastRenderGraphStats = {}`
+      cadence.
 
 Slice B (triangle lane, future slice):
 - [ ] Add `BuildTransientDebugTrianglePipelineDesc(depthTested)` helper
@@ -246,28 +270,39 @@ Slice D (optional `gpu;vulkan` smoke, deferred):
 
 ## Tests
 
-Slice A (next pick-up):
-- [ ] `contract;graphics` — `TransientDebugSurfacePassContract.RecipeDeclaresPassWhenTransientPrimitivesExist`:
+Slice A (landed 2026-05-23):
+- [x] `contract;graphics` — `TransientDebugSurfacePassContract.RecipeDeclaresPassWhenTransientPrimitivesExist`:
       `RenderWorld::DebugPrimitives.Triangles` populated with one
       triangle packet, `DescribeDefaultFrameRecipe(DeriveDefaultFrameRecipeFeatures(world))`
       includes `"TransientDebugSurfacePass"` exactly once with the
-      correct reads/writes/render-pass shape.
-- [ ] `contract;graphics` — `TransientDebugSurfacePassContract.RecipeOmitsPassWhenNoTransientPrimitives`:
-      empty debug primitive spans → recipe omits the pass entirely;
-      executor never sees the branch.
-- [ ] `contract;graphics` — `TransientDebugSurfacePassContract.ExecutorReportsSkippedUnavailableWithoutPipelines`:
+      correct reads/writes shape.
+- [x] `contract;graphics` — `TransientDebugSurfacePassContract.RecipeOmitsPassWhenNoTransientPrimitives`:
+      empty debug primitive spans → recipe declares the pass with
+      `Enabled=false` (compiled graph omits it entirely from
+      `CommandRecords`); executor never sees the branch.
+- [x] `contract;graphics` — `TransientDebugSurfacePassContract.ExecutorReportsSkippedUnavailableWithoutPipelines`:
       transient primitives populated, executor records the pass with
       `Status = SkippedUnavailable` (pipelines not yet created in
-      Slice A), and the `TransientDebugUploadDiagnostics` counters
-      stay at zero in this slice.
-- [ ] `contract;graphics` — `TransientDebugSurfacePassContract.NonOperationalDeviceSkipsNonOperational`:
+      Slice A); the `TransientDebugUpload` counters stay at zero
+      except `MissingPipelineSkipCount = 1` (operational-scaffold
+      signal).
+- [x] `contract;graphics` — `TransientDebugSurfacePassContract.NonOperationalDeviceSkipsNonOperational`:
       `device.Operational = false` → executor records `SkippedNonOperational`
-      taxonomy on the new pass, mirroring the symmetric shape from
-      `PresentPass` and `DebugViewPass`.
-- [ ] `contract;graphics` — `Test.RendererFrameLifecycle` refreshed:
-      `kSoftSkippedPasses` gains `"TransientDebugSurfacePass"` so the
-      baseline lifecycle assertion stays deterministic; no
-      `BindPipelineCalls` delta in Slice A.
+      taxonomy on the new pass before the pipeline check, mirroring
+      the symmetric shape from `PresentPass` and `DebugViewPass`;
+      `MissingPipelineSkipCount` stays at zero.
+- [-] `contract;graphics` — `Test.RendererFrameLifecycle` baseline
+      assertion. Deviation from the spec: the test's `RenderWorld`
+      submits no transient debug primitives, so
+      `EnableTransientDebugSurface` derives to `false`, the recipe
+      omits the new pass entirely from `CommandRecords`, and
+      `FindCommandPass(stats, "TransientDebugSurfacePass")` returns
+      `nullptr`. Adding `"TransientDebugSurfacePass"` to
+      `kSoftSkippedPasses` would make the lifecycle test fail on the
+      `ASSERT_NE(FindCommandPass(...), nullptr)` precondition.
+      `Test.TransientDebugSurfacePass.cpp` covers the deterministic
+      behaviour for both the populated and empty cases, so the
+      lifecycle baseline stays clean without modification.
 
 Slice B (triangle lane, future slice):
 - [ ] `contract;graphics` — `TransientDebugSurfacePassContract.RecordsTriangleBindPipelineAndDraw`:
@@ -299,16 +334,18 @@ Slice D (optional `gpu;vulkan` smoke, deferred):
 
 ## Docs
 
-Slice A (next pick-up):
-- [ ] Update `src/graphics/renderer/README.md` to record the new
+Slice A (landed 2026-05-23):
+- [x] Update `src/graphics/renderer/README.md` to record the new
       `TransientDebugSurfacePass` recipe placement and the
       `TransientDebugUploadDiagnostics` counters (scaffolded; behavior
       added in Slice B/C).
-- [ ] Update `tasks/active/README.md` to reflect Slice A status after
-      Slice A lands.
-- [ ] Keep `tasks/backlog/rendering/README.md` pointing at the
+- [x] Update `tasks/active/README.md` to reflect Slice A status.
+- [x] Keep `tasks/backlog/rendering/README.md` pointing at the
       active task location (already done as part of the promotion
-      slice that lands this planning artifact).
+      slice that landed the planning artifact).
+- [x] Regenerated `docs/api/generated/module_inventory.md` (441
+      modules, the new `Extrinsic.Graphics.Pass.TransientDebug.Surface`
+      module surface appears).
 
 Slice B (triangle lane, future slice):
 - [ ] Extend `src/graphics/renderer/README.md` with the triangle lane
@@ -322,16 +359,19 @@ Slice C (line + point lanes, future slice):
 
 ## Acceptance criteria
 
-Slice A (next pick-up):
-- [ ] Recipe declares `"TransientDebugSurfacePass"` exactly when at
+Slice A (landed 2026-05-23):
+- [x] Recipe declares `"TransientDebugSurfacePass"` exactly when at
       least one transient debug primitive exists for the frame.
-- [ ] Executor records `SkippedNonOperational` /
+- [x] Executor records `SkippedNonOperational` /
       `SkippedUnavailable` taxonomy on the new pass; no `BindPipeline`
       or `Draw` calls land in this slice.
-- [ ] `TransientDebugUploadDiagnostics` exists, is wired on the
-      renderer diagnostics aggregate, and stays zero in this slice.
-- [ ] Default CPU/null gate stays green; no `gpu`/`vulkan` test
-      additions in this slice.
+- [x] `TransientDebugUploadDiagnostics` exists, is wired on the
+      renderer diagnostics aggregate as `RenderGraphFrameStats::TransientDebugUpload`,
+      and stays zero in this slice except `MissingPipelineSkipCount`
+      which serves as the operational-scaffold diagnostic signal.
+- [x] Default CPU/null gate stays green (224/224 graphics contract
+      tests pass on `claude/intrinsicengine-agent-onboarding-p1J2P`);
+      no `gpu`/`vulkan` test additions in this slice.
 
 Full task (after Slice C):
 - [ ] Submitted debug primitives across all three lanes produce
@@ -390,10 +430,16 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -LE 'slow|flaky-qu
   independently of pipeline/helper work.
 
 ## Next verification step
-- Slice A pick-up: configure with the `ci` preset on a `clang-20`
-  host, build `IntrinsicGraphicsContractTests` +
-  `IntrinsicGraphicsContractCpuTests`, and run the contract CPU/null
-  gate (`ctest --test-dir build/ci -L contract -LE 'gpu|vulkan|slow|flaky-quarantine'`).
+- Slice A landed 2026-05-23 on
+  `claude/intrinsicengine-agent-onboarding-p1J2P`. Verification: `cmake
+  --preset ci`, `cmake --build --preset ci --target
+  IntrinsicGraphicsContractTests IntrinsicGraphicsContractCpuTests`,
+  `ctest --test-dir build/ci -L contract -LE
+  'gpu|vulkan|slow|flaky-quarantine' --timeout 60` — 224/224 graphics
+  contract tests passed; `python3 tools/repo/check_layering.py --root
+  src --strict`, `python3 tools/repo/check_test_layout.py --root .
+  --strict`, `python3 tools/docs/check_doc_links.py --root .`, `python3
+  tools/agents/check_task_policy.py --root . --strict` all clean.
 - Slice B/C pick-up: as Slice A, plus rebuild
   `IntrinsicGraphicsVulkanContractTests` so the helper's
   backend-local CPU-mock surface is exercised.

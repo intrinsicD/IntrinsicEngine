@@ -15,7 +15,7 @@ Root scanned: `src`
 | `geometry` | 82 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
-| `graphics/renderer` | 52 |
+| `graphics/renderer` | 53 |
 | `graphics/rhi` | 17 |
 | `graphics/vulkan` | 13 |
 | `legacy` | 182 |
@@ -241,6 +241,7 @@ Root scanned: `src`
 | `Extrinsic.Graphics.Pass.Selection.PointId` | `src/graphics/renderer/Passes/Pass.Selection.PointId.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Pass.Shadows` | `src/graphics/renderer/Passes/Pass.Shadows.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Pass.Surface.MinimalDebug` | `src/graphics/renderer/Passes/Pass.Surface.MinimalDebug.cppm` | `graphics/renderer` |
+| `Extrinsic.Graphics.Pass.TransientDebug.Surface` | `src/graphics/renderer/Passes/Pass.TransientDebug.Surface.cppm` | `graphics/renderer` |
 | `Extrinsic.RHI.Bindless` | `src/graphics/rhi/RHI.Bindless.cppm` | `graphics/rhi` |
 | `Extrinsic.RHI.BufferManager` | `src/graphics/rhi/RHI.BufferManager.cppm` | `graphics/rhi` |
 | `Extrinsic.RHI.BufferView` | `src/graphics/rhi/RHI.BufferView.cppm` | `graphics/rhi` |
@@ -467,4 +468,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.RenderExtraction` | `src/runtime/Runtime.RenderExtraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 
-Total modules: **440**
+Total modules: **441**

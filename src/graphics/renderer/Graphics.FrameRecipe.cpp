@@ -114,6 +114,21 @@ namespace Extrinsic::Graphics
             },
         };
 
+        // GRAPHICS-077 Slice A — LOAD-store color attachment template for
+        // the `TransientDebugSurfacePass` render-pass desc. The lit
+        // composition must survive into the postprocess chain, so the
+        // load op is `Load` (not `Clear`). Single color target binds
+        // against `SceneColorHDR`; the executor resolves the
+        // `RenderPassAttachmentToken` to the compiled `SceneColorHDR`
+        // handle through `CompiledRenderPassAttachment::ResourceIndex`.
+        constexpr RHI::ColorAttachment kTransientDebugSurfaceRenderPassColorAttachments[] = {
+            RHI::ColorAttachment{
+                .Target = RenderPassAttachmentToken(),
+                .Load = RHI::LoadOp::Load,
+                .Store = RHI::StoreOp::Store,
+            },
+        };
+
     }
 
     [[nodiscard]] FrameRecipeFeatures DeriveDefaultFrameRecipeFeatures(const RenderWorld& world)
@@ -134,6 +149,19 @@ namespace Extrinsic::Graphics
         features.EnableDebugView = world.DebugOverlayEnabled || world.DebugPrimitives.HasTransientDebug;
         features.EnablePostProcess = true;
         features.EnableImGui = true;
+        // GRAPHICS-077 Slice A — enable the `TransientDebugSurfacePass`
+        // only when at least one transient debug primitive packet exists
+        // for the frame. The recipe omits the pass entirely when all three
+        // lanes are empty so `CommandRecords` stays clean on frames where
+        // the world has no transient debug payload. The world-side gate
+        // checks each lane span directly (rather than
+        // `HasTransientDebug`) because the latter is also set by
+        // `DebugOverlayEnabled` upstream, and the new pass must remain
+        // span-driven independent of the overlay toggle.
+        features.EnableTransientDebugSurface =
+            !world.DebugPrimitives.Lines.empty() ||
+            !world.DebugPrimitives.Points.empty() ||
+            !world.DebugPrimitives.Triangles.empty();
         return features;
     }
 
@@ -193,6 +221,21 @@ namespace Extrinsic::Graphics
                 {"SceneDepth", "Cull.Lines.IndexedArgs", "Cull.Lines.Count"}, {"SceneColorHDR"});
         AddPass(out, FrameRecipePassKind::Point, "PointPass", true, false,
                 {"SceneDepth", "Cull.Points.NonIndexedArgs", "Cull.Points.Count"}, {"SceneColorHDR"});
+        // GRAPHICS-077 Slice A — transient-debug surface overlay. Placed
+        // between the lit-composition family (`SurfacePass` /
+        // `CompositionPass` / `LinePass` / `PointPass`) and the
+        // postprocess chain (`PostProcessHistogramPass` is first under
+        // `EnablePostProcess`) so transient primitives reach postprocess
+        // inputs deterministically when present. The pass reads
+        // `SceneDepth` (depth-test variant per packet `DepthTested`
+        // field, lands in Slice B/C), reads + writes `SceneColorHDR`
+        // (LOAD-store color attachment so the lit color survives), and
+        // is omitted entirely when no transient debug primitives exist
+        // for the frame. Slice A is scaffold-only — the executor branch
+        // reports `SkippedUnavailable` because no pipelines exist yet.
+        AddPass(out, FrameRecipePassKind::TransientDebugSurface, "TransientDebugSurfacePass",
+                features.EnableTransientDebugSurface, false,
+                {"SceneColorHDR", "SceneDepth"}, {"SceneColorHDR"});
         // GRAPHICS-075 Slice C — postprocess chain is split across two
         // graph passes so the FXAA/SMAA legs can sample the
         // freshly-written `SceneColorLDR` through a proper framegraph
@@ -767,6 +810,46 @@ namespace Extrinsic::Graphics
             builder.Read(pointDrawCount, BufferUsage::IndirectRead);
             builder.Write(hdr, TextureUsage::ColorAttachmentWrite);
         });
+
+        // GRAPHICS-077 Slice A — scaffold-only `TransientDebugSurfacePass`.
+        // The recipe declares the pass after the lit composition / Line /
+        // Point passes so transient debug primitives reach the postprocess
+        // chain inputs when present. `SetRenderPass(...)` is required so
+        // the framegraph compiler emits a real `CompiledRenderPassAttachment`
+        // pair (one color + one depth) — without it the executor would
+        // record any future bind/draw outside an active render-pass scope,
+        // which is invalid Vulkan command-buffer usage and mirrors the same
+        // wiring rationale documented on the canonical `Pass.Present`
+        // (GRAPHICS-076 Slice A follow-up). The LOAD-store color
+        // attachment preserves the lit color from the prior passes; the
+        // depth attachment is depth-read-only (Slice B/C variants test
+        // against the prepass depth without overwriting it). The depth
+        // `StoreOp` is `Store` (not `DontCare`) because downstream
+        // passes that still read `SceneDepth` — `SelectionOutlinePass`
+        // when `EnableSelectionOutline` is set declares
+        // `Read(depth, TextureUsage::DepthRead)` — must see the same
+        // depth contents the prepass populated; `DontCare` would let
+        // Vulkan discard the depth contents at the end of this pass
+        // and produce undefined outline/depth-based results when both
+        // transient debug primitives and selection outlining are
+        // active in the same frame. Slice A records no commands
+        // inside the pass body — the executor branch returns
+        // `SkippedUnavailable` because no pipelines exist yet.
+        if (features.EnableTransientDebugSurface)
+        {
+            addOrderedPass("TransientDebugSurfacePass", [=](RenderGraphBuilder& builder) {
+                builder.Read(depth, TextureUsage::DepthRead);
+                builder.Write(hdr, TextureUsage::ColorAttachmentWrite);
+                builder.SetRenderPass(RHI::RenderPassDesc{
+                    .ColorTargets = kTransientDebugSurfaceRenderPassColorAttachments,
+                    .Depth = RHI::DepthAttachment{
+                        .Target = RenderPassAttachmentToken(),
+                        .Load = RHI::LoadOp::Load,
+                        .Store = RHI::StoreOp::Store,
+                    },
+                });
+            });
+        }
 
         TextureRef presentSource = hdr;
         if (features.EnablePostProcess)
