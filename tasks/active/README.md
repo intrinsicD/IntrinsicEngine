@@ -55,6 +55,22 @@ Each active task should include:
   optional `gpu;vulkan` smoke (D, deferred behind the same
   Vulkan-host gate as GRAPHICS-076 Slice D). The task now sits at
   `CPUContracted` on CPU-only hosts.
+- [`GRAPHICS-078`](GRAPHICS-078-visualization-overlay-upload-helper.md) —
+  Backend visualization-overlay upload helper (vector field +
+  isoline). Status: in-progress (Slice A — scaffold-only —
+  landing on `claude/intrinsicengine-agent-onboarding-3dLeQ` on
+  2026-05-24). Owner: in-progress for Slice A; Slices B/C/D
+  unassigned. Promoted from `tasks/backlog/rendering/` on
+  2026-05-24 as the next earliest unblocked Theme A leaf once
+  GRAPHICS-076 and GRAPHICS-077 each parked on their Vulkan-host
+  blockers (only their respective Slice D opt-in `gpu;vulkan`
+  smokes remain). Four-slice plan mirrors GRAPHICS-077 exactly:
+  recipe/executor scaffold (A, this slice), vector-field lane
+  operational wiring (B; pipelines at call indices #32 + #33),
+  isoline lane operational wiring (C; pipelines at call indices
+  #34 + #35), and the optional `gpu;vulkan` smoke (D, deferred
+  behind the same Vulkan-host gate as GRAPHICS-076 / 077 Slice
+  D).
 
 Previously-active
 [`GEOM-015`](../done/GEOM-015-gjk-termination-diagnostics.md) — GJK
