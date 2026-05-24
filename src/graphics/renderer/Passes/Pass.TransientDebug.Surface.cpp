@@ -19,6 +19,26 @@ namespace Extrinsic::Graphics
         m_TriangleAlwaysOnTopPipeline = pipeline;
     }
 
+    void TransientDebugSurfacePass::SetLineDepthTestedPipeline(const RHI::PipelineHandle pipeline) noexcept
+    {
+        m_LineDepthTestedPipeline = pipeline;
+    }
+
+    void TransientDebugSurfacePass::SetLineAlwaysOnTopPipeline(const RHI::PipelineHandle pipeline) noexcept
+    {
+        m_LineAlwaysOnTopPipeline = pipeline;
+    }
+
+    void TransientDebugSurfacePass::SetPointDepthTestedPipeline(const RHI::PipelineHandle pipeline) noexcept
+    {
+        m_PointDepthTestedPipeline = pipeline;
+    }
+
+    void TransientDebugSurfacePass::SetPointAlwaysOnTopPipeline(const RHI::PipelineHandle pipeline) noexcept
+    {
+        m_PointAlwaysOnTopPipeline = pipeline;
+    }
+
     void TransientDebugSurfacePass::ExecuteTriangles(
         RHI::ICommandContext& cmd,
         const std::span<const DebugTrianglePacket> triangles,
@@ -70,5 +90,100 @@ namespace Extrinsic::Graphics
         }
 
         diagnostics.TriangleRecordsRecorded += recordedPackets;
+    }
+
+    void TransientDebugSurfacePass::ExecuteLines(
+        RHI::ICommandContext& cmd,
+        const std::span<const DebugLinePacket> lines,
+        const TransientDebugLineUploadResult& uploadResult,
+        TransientDebugUploadDiagnostics& diagnostics)
+    {
+        diagnostics.LineRecordsSubmitted += static_cast<std::uint64_t>(lines.size());
+
+        if (lines.empty() || !uploadResult.Uploaded)
+        {
+            if (uploadResult.Overflow)
+            {
+                ++diagnostics.UploadOverflowCount;
+            }
+            return;
+        }
+
+        int lastDepthTested = -1;
+        std::uint32_t recordedPackets = 0u;
+        for (std::size_t packetIndex = 0; packetIndex < lines.size(); ++packetIndex)
+        {
+            const DebugLinePacket& packet = lines[packetIndex];
+            const int packetDepthTested = packet.DepthTested ? 1 : 0;
+            if (packetDepthTested != lastDepthTested)
+            {
+                const RHI::PipelineHandle pipeline = packet.DepthTested
+                    ? m_LineDepthTestedPipeline
+                    : m_LineAlwaysOnTopPipeline;
+                cmd.BindPipeline(pipeline);
+                lastDepthTested = packetDepthTested;
+            }
+
+            TransientDebugLinePushConstants pc{};
+            pc.VertexBufferBDA = uploadResult.VertexBufferBDA;
+            pc.FirstVertex = static_cast<std::uint32_t>(packetIndex * 2u);
+            pc.Reserved = 0u;
+            cmd.PushConstants(&pc, static_cast<std::uint32_t>(sizeof(pc)));
+
+            // `Draw(2, 1, 0, 0)` per packet — one line segment is two
+            // vertices fetched via BDA at `FirstVertex + gl_VertexIndex`.
+            cmd.Draw(2u, 1u, 0u, 0u);
+            ++recordedPackets;
+        }
+
+        diagnostics.LineRecordsRecorded += recordedPackets;
+    }
+
+    void TransientDebugSurfacePass::ExecutePoints(
+        RHI::ICommandContext& cmd,
+        const std::span<const DebugPointPacket> points,
+        const TransientDebugPointUploadResult& uploadResult,
+        TransientDebugUploadDiagnostics& diagnostics)
+    {
+        diagnostics.PointRecordsSubmitted += static_cast<std::uint64_t>(points.size());
+
+        if (points.empty() || !uploadResult.Uploaded)
+        {
+            if (uploadResult.Overflow)
+            {
+                ++diagnostics.UploadOverflowCount;
+            }
+            return;
+        }
+
+        int lastDepthTested = -1;
+        std::uint32_t recordedPackets = 0u;
+        for (std::size_t packetIndex = 0; packetIndex < points.size(); ++packetIndex)
+        {
+            const DebugPointPacket& packet = points[packetIndex];
+            const int packetDepthTested = packet.DepthTested ? 1 : 0;
+            if (packetDepthTested != lastDepthTested)
+            {
+                const RHI::PipelineHandle pipeline = packet.DepthTested
+                    ? m_PointDepthTestedPipeline
+                    : m_PointAlwaysOnTopPipeline;
+                cmd.BindPipeline(pipeline);
+                lastDepthTested = packetDepthTested;
+            }
+
+            TransientDebugPointPushConstants pc{};
+            pc.VertexBufferBDA = uploadResult.VertexBufferBDA;
+            pc.FirstVertex = static_cast<std::uint32_t>(packetIndex);
+            pc.Reserved = 0u;
+            cmd.PushConstants(&pc, static_cast<std::uint32_t>(sizeof(pc)));
+
+            // `Draw(1, 1, 0, 0)` per packet — one point is one vertex
+            // fetched via BDA at `FirstVertex + gl_VertexIndex` (with
+            // `gl_VertexIndex = 0` on this single-vertex draw).
+            cmd.Draw(1u, 1u, 0u, 0u);
+            ++recordedPackets;
+        }
+
+        diagnostics.PointRecordsRecorded += recordedPackets;
     }
 }
