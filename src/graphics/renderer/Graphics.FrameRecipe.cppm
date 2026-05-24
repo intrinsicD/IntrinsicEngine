@@ -66,6 +66,20 @@ namespace Extrinsic::Graphics
         // `gpu;vulkan` smoke. Append-only at the end of the enum to keep
         // prior numeric values stable.
         TransientDebugSurface,
+        // GRAPHICS-078 Slice A — scaffold-only `VisualizationOverlayPass`
+        // that the recipe declares immediately after
+        // `TransientDebugSurfacePass` (and before
+        // `PostProcessHistogramPass`) when `EnableVisualizationOverlay`
+        // is set. Same fail-closed shape as the GRAPHICS-077 transient-
+        // debug pass: Slice A holds no pipelines and no helper; the
+        // executor branch routes through
+        // `RecordVisualizationOverlayPass(...)` and reports
+        // `SkippedUnavailable` on operational devices,
+        // `SkippedNonOperational` otherwise. Slice B wires the
+        // vector-field lane, Slice C wires the isoline lane, Slice D is
+        // the opt-in `gpu;vulkan` smoke. Append-only at the end of the
+        // enum to keep prior numeric values stable.
+        VisualizationOverlay,
     };
 
     export enum class FrameRecipeResourceKind : std::uint8_t
@@ -149,6 +163,16 @@ namespace Extrinsic::Graphics
         // has no pipelines and no helper; Slices B/C wire the per-lane
         // pipelines + upload + recording paths.
         bool EnableTransientDebugSurface{false};
+        // GRAPHICS-078 Slice A — recipe-side gate for the new
+        // `VisualizationOverlayPass`. Derived in
+        // `DeriveDefaultFrameRecipeFeatures(...)` from
+        // `!world.Visualization.VectorFields.empty() ||
+        // !world.Visualization.Isolines.empty()` so the pass is omitted
+        // entirely from `RenderGraphFrameStats::CommandRecords` when no
+        // visualization overlay packets exist for the frame. Slice A
+        // has no pipelines and no helper; Slices B/C wire the per-kind
+        // pipelines + upload + recording paths.
+        bool EnableVisualizationOverlay{false};
     };
 
     export struct FrameRecipeSizing

@@ -41,6 +41,14 @@ import Extrinsic.Graphics.RenderGraph;
 // `TransientDebugTriangleUploadResult`) ride along for the same
 // consumers but are not part of the renderer's narrow public API.
 export import Extrinsic.Graphics.TransientDebugUploadHelper;
+// GRAPHICS-078 Slice A — re-export the visualization-overlay pass
+// module so consumers of `RenderGraphFrameStats::VisualizationOverlayUpload`
+// (e.g. contract tests, editor diagnostics) reach the
+// `VisualizationOverlayUploadDiagnostics` struct without separately
+// importing this internal renderer module. The `VisualizationOverlayPass`
+// class itself rides along for the same consumers but is not part of
+// the renderer's narrow public API.
+export import Extrinsic.Graphics.Pass.VisualizationOverlay;
 import Extrinsic.Core.Config.Render;
 
 namespace Extrinsic::Graphics
@@ -163,6 +171,17 @@ namespace Extrinsic::Graphics
         // Reset per-frame through the existing
         // `m_LastRenderGraphStats = {}` cadence in `ExecuteFrame()`.
         TransientDebugUploadDiagnostics TransientDebugUpload{};
+        // GRAPHICS-078 Slice A — aggregate diagnostics for the
+        // `VisualizationOverlayPass` upload + recording path. All
+        // counters stay at zero in Slice A (no pipelines, scaffold
+        // executor branch only) except `MissingPipelineSkipCount` which
+        // increments once per operational-scaffold frame to distinguish
+        // "feature on but pipeline missing" from "feature off". Slice B
+        // starts populating the vector-field counters; Slice C starts
+        // populating the isoline counters. Reset per-frame through the
+        // existing `m_LastRenderGraphStats = {}` cadence in
+        // `ExecuteFrame()`.
+        VisualizationOverlayUploadDiagnostics VisualizationOverlayUpload{};
     };
 
     export struct RuntimeRenderSnapshotBatch

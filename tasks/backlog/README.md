@@ -76,7 +76,7 @@ Triangle-path implementation children (newly opened — pick the next in depende
 
 Beyond-triangle full-graphics implementation tasks (Theme B′ in the rendering DAG; gated by Theme A's triangle landing):
 - Default-recipe pass operational wiring: [`GRAPHICS-070..076`](rendering/) — forward surface, line/point, deferred GBuffer + lighting, shadows, selection/outline + picking readback, postprocess chain, debug view + canonical present.
-- Backend transient/visualization upload helpers: [`GRAPHICS-077`](../active/GRAPHICS-077-transient-debug-primitive-upload-helper.md) (active), [`GRAPHICS-078`](rendering/GRAPHICS-078-visualization-overlay-upload-helper.md).
+- Backend transient/visualization upload helpers: [`GRAPHICS-077`](../active/GRAPHICS-077-transient-debug-primitive-upload-helper.md) (active), [`GRAPHICS-078`](../active/GRAPHICS-078-visualization-overlay-upload-helper.md) (active).
 - Default-recipe ImGui pass: [`GRAPHICS-079`](rendering/GRAPHICS-079-default-recipe-imgui-pass-wiring.md).
 - Runtime adapter umbrellas (clarified by `Q` follow-ups): [`runtime/RUNTIME-080..084`, `RUNTIME-090`](runtime/) — texture asset bridge, camera controllers, spatial-debug adapters, visualization adapters, gizmo interaction, ImGui adapter.
 - Bootstrap scaffold retirement: [`rendering/GRAPHICS-081`](rendering/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md) — once `GRAPHICS-070..076` are retired and the default recipe renders the reference triangle, the `MinimalDebugSurface` recipe + `Pass.Surface/Present.MinimalDebug` classes + three diagnostics counters introduced by `GRAPHICS-032`/`033` are deleted. The scaffold exists only to derisk the triangle path; it must not outlive the operational default recipe.

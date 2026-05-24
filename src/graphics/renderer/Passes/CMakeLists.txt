@@ -25,6 +25,7 @@ target_sources(${target_name}
 		Pass.Selection.PointId.cppm
 		Pass.Shadows.cppm
 		Pass.TransientDebug.Surface.cppm
+		Pass.VisualizationOverlay.cppm
 		PRIVATE
 		Pass.Culling.cpp
 		Pass.DepthPrepass.cpp
@@ -50,4 +51,5 @@ target_sources(${target_name}
 		Pass.Selection.PointId.cpp
 		Pass.Shadows.cpp
 		Pass.TransientDebug.Surface.cpp
+		Pass.VisualizationOverlay.cpp
 )

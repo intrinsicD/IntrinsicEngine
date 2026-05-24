@@ -658,8 +658,13 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   optional `gpu;vulkan` smoke). Slice A (scaffold-only) is the next
   pick-up; Slices A–C are CPU-testable and only Slice D requires a
   Vulkan-capable host.
-- [GRAPHICS-078 — Backend visualization-overlay upload helper](GRAPHICS-078-visualization-overlay-upload-helper.md):
+- [GRAPHICS-078 — Backend visualization-overlay upload helper](../../active/GRAPHICS-078-visualization-overlay-upload-helper.md):
   depends on GRAPHICS-077 (mirrors helper pattern) and GRAPHICS-072.
+  Promoted to `tasks/active/` on 2026-05-24 with a four-slice plan
+  (recipe/executor scaffold → vector-field lane → isoline lane →
+  optional `gpu;vulkan` smoke), mirroring GRAPHICS-077 exactly. Slice
+  A (scaffold-only) is in-progress; Slices A–C are CPU-testable and
+  only Slice D requires a Vulkan-capable host.
 - [GRAPHICS-079 — Default-recipe `Pass.ImGui` wiring](GRAPHICS-079-default-recipe-imgui-pass-wiring.md):
   depends on GRAPHICS-076 (PresentSource finalization) and `runtime/RUNTIME-090`
   (ImGui adapter producer).

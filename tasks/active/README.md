@@ -55,6 +55,32 @@ Each active task should include:
   optional `gpu;vulkan` smoke (D, deferred behind the same
   Vulkan-host gate as GRAPHICS-076 Slice D). The task now sits at
   `CPUContracted` on CPU-only hosts.
+- [`GRAPHICS-078`](GRAPHICS-078-visualization-overlay-upload-helper.md) —
+  Backend visualization-overlay upload helper (vector field +
+  isoline). Status: in-progress (Slice A — scaffold-only — landed
+  on `claude/intrinsicengine-agent-onboarding-3dLeQ` 2026-05-24;
+  209/209 graphics contract tests pass). Owner: unassigned for
+  Slices B/C/D; next pick-up by any CPU-only agent for Slice B
+  (vector-field operational wiring). Promoted from
+  `tasks/backlog/rendering/` on 2026-05-24 as the next earliest
+  unblocked Theme A leaf once GRAPHICS-076 and GRAPHICS-077 each
+  parked on their Vulkan-host blockers (only their respective
+  Slice D opt-in `gpu;vulkan` smokes remain). Four-slice plan
+  mirrors GRAPHICS-077 exactly: recipe/executor scaffold (A,
+  scaffold-only — landed; adds
+  `FrameRecipePassKind::VisualizationOverlay`,
+  `Extrinsic.Graphics.Pass.VisualizationOverlay` module, a
+  `VisualizationOverlayPass` shell class, a six-counter
+  `VisualizationOverlayUploadDiagnostics` on the renderer
+  diagnostics aggregate, and a new
+  `"VisualizationOverlayPass"` executor branch reporting
+  `SkippedNonOperational`/`SkippedUnavailable`), vector-field lane
+  operational wiring (B; pipelines at call indices #32 + #33),
+  isoline lane operational wiring (C; pipelines at call indices
+  #34 + #35), and the optional `gpu;vulkan` smoke (D, deferred
+  behind the same Vulkan-host gate as GRAPHICS-076 / 077 Slice
+  D). The task sits at `Scaffolded` on CPU-only hosts after
+  Slice A and reaches `CPUContracted` once Slice C lands.
 
 Previously-active
 [`GEOM-015`](../done/GEOM-015-gjk-termination-diagnostics.md) — GJK
