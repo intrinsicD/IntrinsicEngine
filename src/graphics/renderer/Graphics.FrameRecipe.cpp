@@ -129,6 +129,23 @@ namespace Extrinsic::Graphics
             },
         };
 
+        // GRAPHICS-078 Slice A — LOAD-store color attachment template for
+        // the `VisualizationOverlayPass` render-pass desc, mirroring the
+        // GRAPHICS-077 transient-debug shape. The pass runs immediately
+        // after `TransientDebugSurfacePass` so the lit + transient-debug
+        // composition must survive into the postprocess chain (load op
+        // `Load`, not `Clear`). Single color target binds against
+        // `SceneColorHDR`; the executor resolves the
+        // `RenderPassAttachmentToken` to the compiled `SceneColorHDR`
+        // handle through `CompiledRenderPassAttachment::ResourceIndex`.
+        constexpr RHI::ColorAttachment kVisualizationOverlayRenderPassColorAttachments[] = {
+            RHI::ColorAttachment{
+                .Target = RenderPassAttachmentToken(),
+                .Load = RHI::LoadOp::Load,
+                .Store = RHI::StoreOp::Store,
+            },
+        };
+
     }
 
     [[nodiscard]] FrameRecipeFeatures DeriveDefaultFrameRecipeFeatures(const RenderWorld& world)
@@ -162,6 +179,19 @@ namespace Extrinsic::Graphics
             !world.DebugPrimitives.Lines.empty() ||
             !world.DebugPrimitives.Points.empty() ||
             !world.DebugPrimitives.Triangles.empty();
+        // GRAPHICS-078 Slice A — enable the `VisualizationOverlayPass`
+        // only when at least one visualization-overlay packet (vector
+        // field or isoline) exists for the frame. The recipe omits the
+        // pass entirely when both kinds are empty so `CommandRecords`
+        // stays clean on frames where the world has no overlay payload.
+        // The gate is span-driven (mirroring GRAPHICS-077) so the new
+        // pass remains independent of any UI toggle. Htex /
+        // fragment-bake atlases stay out of scope per the task
+        // non-goals (they remain consumed by other paths, not produced
+        // by this pass).
+        features.EnableVisualizationOverlay =
+            !world.Visualization.VectorFields.empty() ||
+            !world.Visualization.Isolines.empty();
         return features;
     }
 
@@ -235,6 +265,21 @@ namespace Extrinsic::Graphics
         // reports `SkippedUnavailable` because no pipelines exist yet.
         AddPass(out, FrameRecipePassKind::TransientDebugSurface, "TransientDebugSurfacePass",
                 features.EnableTransientDebugSurface, false,
+                {"SceneColorHDR", "SceneDepth"}, {"SceneColorHDR"});
+        // GRAPHICS-078 Slice A — visualization-overlay pass. Placed
+        // immediately after `TransientDebugSurfacePass` (same "post-lit,
+        // pre-postprocess" band) and before the postprocess chain so
+        // vector-field glyphs / isoline polylines reach postprocess
+        // inputs deterministically when present. The pass reads
+        // `SceneDepth` (depth-test variant per packet `DepthTested`
+        // field, lands in Slice B/C), reads + writes `SceneColorHDR`
+        // (LOAD-store color attachment so the lit + transient-debug
+        // composition survives), and is omitted entirely when no
+        // visualization overlay packets exist for the frame. Slice A
+        // is scaffold-only — the executor branch reports
+        // `SkippedUnavailable` because no pipelines exist yet.
+        AddPass(out, FrameRecipePassKind::VisualizationOverlay, "VisualizationOverlayPass",
+                features.EnableVisualizationOverlay, false,
                 {"SceneColorHDR", "SceneDepth"}, {"SceneColorHDR"});
         // GRAPHICS-075 Slice C — postprocess chain is split across two
         // graph passes so the FXAA/SMAA legs can sample the
@@ -842,6 +887,31 @@ namespace Extrinsic::Graphics
                 builder.Write(hdr, TextureUsage::ColorAttachmentWrite);
                 builder.SetRenderPass(RHI::RenderPassDesc{
                     .ColorTargets = kTransientDebugSurfaceRenderPassColorAttachments,
+                    .Depth = RHI::DepthAttachment{
+                        .Target = RenderPassAttachmentToken(),
+                        .Load = RHI::LoadOp::Load,
+                        .Store = RHI::StoreOp::Store,
+                    },
+                });
+            });
+        }
+
+        // GRAPHICS-078 Slice A — scaffold-only `VisualizationOverlayPass`.
+        // Same shape as `TransientDebugSurfacePass`: declared with a
+        // real LOAD-store color attachment + LOAD/Store depth attachment
+        // so the framegraph compiler emits a valid render-pass scope
+        // before the executor records anything inside. Slice A records
+        // no commands inside the pass body — the executor branch
+        // returns `SkippedUnavailable` because no pipelines exist yet.
+        // Slice B wires the vector-field lane; Slice C wires the
+        // isoline lane.
+        if (features.EnableVisualizationOverlay)
+        {
+            addOrderedPass("VisualizationOverlayPass", [=](RenderGraphBuilder& builder) {
+                builder.Read(depth, TextureUsage::DepthRead);
+                builder.Write(hdr, TextureUsage::ColorAttachmentWrite);
+                builder.SetRenderPass(RHI::RenderPassDesc{
+                    .ColorTargets = kVisualizationOverlayRenderPassColorAttachments,
                     .Depth = RHI::DepthAttachment{
                         .Target = RenderPassAttachmentToken(),
                         .Load = RHI::LoadOp::Load,

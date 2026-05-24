@@ -593,6 +593,7 @@ set(_graphics_contract_cpu_test_files
     Test.SelectionSystemContracts.cpp
     Test.SurfacePassContracts.cpp
     Test.TransientDebugSurfacePass.cpp
+    Test.VisualizationOverlayPass.cpp
 )
 intrinsic_resolve_test_sources(_graphics_contract_cpu_test_sources
     SEARCH_DIRS contract/graphics

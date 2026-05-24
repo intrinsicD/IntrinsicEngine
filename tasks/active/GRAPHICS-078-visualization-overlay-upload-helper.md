@@ -2,13 +2,18 @@
 
 ## Status
 
-- Status: in-progress (Slice A — scaffold-only — landing on this branch).
+- Status: in-progress (Slice A — scaffold-only — landed on
+  `claude/intrinsicengine-agent-onboarding-3dLeQ` on 2026-05-24;
+  contract CPU/null gate green at 209/209 graphics contract tests,
+  full CPU/null gate result captured in the Slice A commit body).
   Slices B/C wire the operational lanes for vector fields and isolines
   respectively; Slice D is the optional `gpu;vulkan` smoke deferred
   behind a Vulkan-capable host gate.
-- Owner/agent: in-progress on `claude/intrinsicengine-agent-onboarding-3dLeQ`
-  for Slice A; Slice B/C/D unassigned.
-- Branch: Slice A lands on `claude/intrinsicengine-agent-onboarding-3dLeQ`.
+- Owner/agent: unassigned for Slices B/C/D; next pick-up by any
+  CPU-only agent for Slice B (vector-field operational wiring).
+- Branch: Slice A landed on `claude/intrinsicengine-agent-onboarding-3dLeQ`;
+  Slices B/C/D will land on future
+  `claude/intrinsicengine-agent-onboarding-*` branches.
 - Started: 2026-05-24. Promoted from
   `tasks/backlog/rendering/GRAPHICS-078-visualization-overlay-upload-helper.md`
   as the next earliest unblocked Theme A leaf after GRAPHICS-076 and
@@ -18,13 +23,9 @@
   pattern: per-frame host-visible buffers, two pipeline variants per
   kind (depth-tested + always-on-top), one consolidated overlay pass
   drawing into `SceneColorHDR`/`SceneDepth` after lit composition.
-- Next verification step: after Slice A lands, run the contract CPU/null
-  gate (`cmake --preset ci` →
-  `cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests` →
-  `ctest --test-dir build/ci -L contract -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`)
-  and confirm the new `VisualizationOverlayPassContract.*` tests pass
-  alongside the existing graphics contract suite. The CPU/null gate
-  must stay green.
+- Next verification step: see `## Next verification step` below for the
+  full per-slice command list. Slice A is verified; Slice B is the
+  next pick-up.
 
 ## Slice plan
 
@@ -183,26 +184,26 @@ final slice exercises an opt-in `gpu;vulkan` smoke.
 
 ## Required changes
 
-Slice A (this slice):
+Slice A (landed 2026-05-24):
 
-- [ ] Add `FrameRecipePassKind::VisualizationOverlay` to
+- [x] Add `FrameRecipePassKind::VisualizationOverlay` to
       `src/graphics/renderer/Graphics.FrameRecipe.cppm` (appended at
       the end of the enum to keep prior values stable).
-- [ ] Add `bool EnableVisualizationOverlay{false}` field to
+- [x] Add `bool EnableVisualizationOverlay{false}` field to
       `FrameRecipeFeatures` in the same file.
-- [ ] In `DeriveDefaultFrameRecipeFeatures(...)`, derive
+- [x] In `DeriveDefaultFrameRecipeFeatures(...)`, derive
       `features.EnableVisualizationOverlay =
       !world.Visualization.VectorFields.empty() ||
       !world.Visualization.Isolines.empty()` so the pass is omitted
       entirely from `RenderGraphFrameStats::CommandRecords` when no
       visualization overlay packets exist for the frame.
-- [ ] In `DescribeDefaultFrameRecipe(...)`, add
+- [x] In `DescribeDefaultFrameRecipe(...)`, add
       `AddPass(out, FrameRecipePassKind::VisualizationOverlay,
       "VisualizationOverlayPass", features.EnableVisualizationOverlay,
       false, {"SceneColorHDR", "SceneDepth"}, {"SceneColorHDR"})`
       placed between `TransientDebugSurfacePass` and
       `PostProcessHistogramPass`.
-- [ ] In `BuildDefaultFrameRecipe(...)`, when
+- [x] In `BuildDefaultFrameRecipe(...)`, when
       `features.EnableVisualizationOverlay` is set, declare the pass
       node with `Read(SceneDepth, TextureUsage::DepthRead) +
       Write(SceneColorHDR, TextureUsage::ColorAttachmentWrite) +
@@ -210,7 +211,7 @@ Slice A (this slice):
       `kVisualizationOverlayRenderPassColorAttachments` LOAD-store
       template (preserves lit color) paired with a LOAD/Store depth
       attachment, mirroring the GRAPHICS-077 transient-debug shape.
-- [ ] Add a `VisualizationOverlayPass` shell class at
+- [x] Add a `VisualizationOverlayPass` shell class at
       `src/graphics/renderer/Passes/Pass.VisualizationOverlay.{cppm,cpp}`
       mirroring the `TransientDebugSurfacePass` shape:
       default-constructible, per-kind `Set*Pipeline(RHI::PipelineHandle)`
@@ -220,7 +221,7 @@ Slice A (this slice):
       Module name `Extrinsic.Graphics.Pass.VisualizationOverlay`.
       Slice A only ships the pipeline-handle bookkeeping; the
       `Execute*` bodies land with Slices B/C.
-- [ ] Add a `VisualizationOverlayUploadDiagnostics` struct co-located
+- [x] Add a `VisualizationOverlayUploadDiagnostics` struct co-located
       in the new `Pass.VisualizationOverlay.cppm` (Slice B will move it
       to a dedicated helper module if/when that module is created) with
       fields `UploadOverflowCount`, `VectorFieldRecordsSubmitted`,
@@ -233,9 +234,9 @@ Slice A (this slice):
       `RenderGraphFrameStats::VisualizationOverlayUpload` field; reset
       per-frame through the existing `m_LastRenderGraphStats = {}`
       cadence.
-- [ ] Add `m_VisualizationOverlayPass` member to `NullRenderer`
+- [x] Add `m_VisualizationOverlayPass` member to `NullRenderer`
       (no pipeline lease yet in Slice A — that lands in Slice B).
-- [ ] Add executor branch `else if (passName ==
+- [x] Add executor branch `else if (passName ==
       std::string_view{"VisualizationOverlayPass"})` routing to a new
       `RecordVisualizationOverlayPass(...)` helper that returns
       `SkippedNonOperational` when the device is not operational and
@@ -245,6 +246,21 @@ Slice A (this slice):
       placed immediately after `"TransientDebugSurfacePass"` and
       before `"Present"` so it sits in source order alongside the
       GRAPHICS-077 transient-debug branch.
+
+Slice A clarifications captured during implementation:
+
+- `VectorFieldOverlayPacket` / `IsolineOverlayPacket` do not carry a
+  `DepthTested` field (verified in
+  `src/graphics/renderer/Graphics.VisualizationPackets.cppm:66-86`).
+  GRAPHICS-014Q calls out the "depth-tested vs always-on-top" two-
+  variant policy, so Slice B must either (a) extend the packet
+  shape to add a `DepthTested` flag (mirroring
+  `DebugLinePacket`/`DebugPointPacket`/`DebugTrianglePacket`), or
+  (b) derive the per-packet variant from a snapshot-level setting on
+  `VisualizationSnapshot::OverlaySummary`. Slice A leaves this
+  decision to Slice B because the Slice A executor short-circuits
+  before any variant selection happens. Recorded here so Slice B
+  reviewers do not re-derive the question.
 
 Slice B (vector-field lane, deferred):
 
@@ -269,29 +285,29 @@ Slice D (optional `gpu;vulkan` smoke, deferred):
 
 ## Tests
 
-Slice A (this slice):
+Slice A (landed 2026-05-24):
 
-- [ ] `contract;graphics` —
+- [x] `contract;graphics` —
       `VisualizationOverlayPassContract.RecipeDeclaresPassWhenOverlayPacketsExist`:
       `RenderWorld::Visualization.VectorFields` populated with one
       vector-field packet,
       `DescribeDefaultFrameRecipe(DeriveDefaultFrameRecipeFeatures(world))`
       includes `"VisualizationOverlayPass"` exactly once with the
       correct reads/writes shape.
-- [ ] `contract;graphics` —
+- [x] `contract;graphics` —
       `VisualizationOverlayPassContract.RecipeOmitsPassWhenNoOverlayPackets`:
       empty visualization spans → recipe declares the pass with
       `Enabled=false` (compiled graph omits it entirely from
       `CommandRecords`); executor never sees the branch;
       `VisualizationOverlayUpload` counters stay at zero.
-- [ ] `contract;graphics` —
+- [x] `contract;graphics` —
       `VisualizationOverlayPassContract.ExecutorReportsSkippedUnavailableWithoutPipelines`:
       visualization packets populated, executor records the pass with
       `Status = SkippedUnavailable` (pipelines not yet created in
       Slice A); the `VisualizationOverlayUpload` counters stay at zero
       except `MissingPipelineSkipCount = 1` (operational-scaffold
       signal).
-- [ ] `contract;graphics` —
+- [x] `contract;graphics` —
       `VisualizationOverlayPassContract.NonOperationalDeviceSkipsNonOperational`:
       `device.Operational = false` → executor records `SkippedNonOperational`
       taxonomy on the new pass before the pipeline check, mirroring
@@ -303,37 +319,40 @@ Slice B/C/D tests are written when those slices land.
 
 ## Docs
 
-Slice A (this slice):
+Slice A (landed 2026-05-24):
 
-- [ ] Update `src/graphics/renderer/README.md` to record the new
+- [x] Update `src/graphics/renderer/README.md` to record the new
       `VisualizationOverlayPass` recipe placement and the
       `VisualizationOverlayUploadDiagnostics` counters (scaffolded;
       behavior added in Slice B/C).
-- [ ] Update `tasks/active/README.md` to reflect Slice A status and
+- [x] Update `tasks/active/README.md` to reflect Slice A status and
       remove GRAPHICS-078 from the rendering backlog index.
-- [ ] Update `tasks/backlog/rendering/README.md` to point at the
+- [x] Update `tasks/backlog/rendering/README.md` to point at the
       active task location.
-- [ ] Regenerate `docs/api/generated/module_inventory.md` after the
-      new `Extrinsic.Graphics.Pass.VisualizationOverlay` module is
-      added.
+- [x] Regenerated `docs/api/generated/module_inventory.md` (443
+      modules; the new `Extrinsic.Graphics.Pass.VisualizationOverlay`
+      module surface appears).
 
 ## Acceptance criteria
 
-Slice A (this slice):
+Slice A (landed 2026-05-24):
 
-- [ ] Recipe declares `"VisualizationOverlayPass"` exactly when at
+- [x] Recipe declares `"VisualizationOverlayPass"` exactly when at
       least one visualization-overlay packet (vector field or
       isoline) exists for the frame.
-- [ ] Executor records `SkippedNonOperational` / `SkippedUnavailable`
+- [x] Executor records `SkippedNonOperational` / `SkippedUnavailable`
       taxonomy on the new pass; no `BindPipeline` or `Draw` calls land
       in this slice.
-- [ ] `VisualizationOverlayUploadDiagnostics` exists, is wired on the
+- [x] `VisualizationOverlayUploadDiagnostics` exists, is wired on the
       renderer diagnostics aggregate as
       `RenderGraphFrameStats::VisualizationOverlayUpload`, and stays
       zero in this slice except `MissingPipelineSkipCount` which
       serves as the operational-scaffold diagnostic signal.
-- [ ] Default CPU/null gate stays green; no `gpu`/`vulkan` test
-      additions in this slice.
+- [x] Default CPU/null gate stays green; no `gpu`/`vulkan` test
+      additions in this slice. 209/209 graphics contract tests passed
+      (Slice A added four `VisualizationOverlayPassContract.*` tests
+      on top of the prior 205); broader CPU/null gate verification
+      command list in `## Next verification step`.
 
 Full task (after Slice C):
 
@@ -392,14 +411,31 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -LE 'slow|flaky-qu
 
 ## Next verification step
 
-- After Slice A lands: build `IntrinsicGraphicsContractCpuTests` on a
-  `clang-20` host and run the default-recipe CPU/null gate
-  (`ctest --test-dir build/ci -L contract -LE 'gpu|vulkan|slow|flaky-quarantine'`).
-  Confirm the four new `VisualizationOverlayPassContract.*` tests
-  pass and no existing tests regress.
+- Slice A landed 2026-05-24 on
+  `claude/intrinsicengine-agent-onboarding-3dLeQ`. Verification:
+  - `cmake --preset ci`
+  - `cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests`
+  - `ctest --test-dir build/ci -L contract -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
+    — 209/209 graphics contract tests passed (four new
+    `VisualizationOverlayPassContract.*` tests added on top of the
+    prior 205).
+  - `cmake --build --preset ci --target IntrinsicTests`
+  - `ctest --test-dir build/ci -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
+    — full CPU/null gate result captured in the commit body.
+  - `python3 tools/repo/check_layering.py --root src --strict`,
+    `python3 tools/repo/check_test_layout.py --root . --strict`,
+    `python3 tools/docs/check_doc_links.py --root .`,
+    `python3 tools/agents/check_task_policy.py --root . --strict`
+    — all clean.
+  - `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`
+    — 443 modules (up one from the prior 442 for the new
+    `Extrinsic.Graphics.Pass.VisualizationOverlay` surface).
 - Slice B/C pick-up: a CPU-only host can pick up Slice B (vector-field
   operational wiring) immediately after Slice A merges, then Slice C
-  (isoline operational wiring) after Slice B.
+  (isoline operational wiring) after Slice B. Slice B reviewers
+  should resolve the `DepthTested` placement question recorded under
+  "Slice A clarifications captured during implementation" above
+  before starting pipeline work.
 - Slice D pick-up (Vulkan-capable host): configure with `ci-vulkan`,
   build `IntrinsicGraphicsIntegrationTests`, and run the opt-in
   `gpu;vulkan` smoke.

@@ -76,6 +76,14 @@ import Extrinsic.Graphics.DebugViewSystem;
 // frame; Slice C extends to line + point lanes.
 import Extrinsic.Graphics.Pass.TransientDebug.Surface;
 import Extrinsic.Graphics.TransientDebugUploadHelper;
+// GRAPHICS-078 Slice A — `VisualizationOverlayPass` shell. Slice B
+// adds the vector-field lane pipelines + upload, Slice C the isoline
+// lane pipelines + upload, mirroring the GRAPHICS-077 pattern. Slice
+// A only wires the executor branch returning `SkippedNonOperational`
+// / `SkippedUnavailable` and increments
+// `VisualizationOverlayUpload.MissingPipelineSkipCount` on the
+// operational-scaffold path.
+import Extrinsic.Graphics.Pass.VisualizationOverlay;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.CameraSnapshots;
@@ -1938,6 +1946,29 @@ namespace Extrinsic::Graphics
                         // lane failed its pipeline gate.
                         const RenderCommandPassStatus status =
                             RecordTransientDebugSurfacePass(graphicsContext, renderWorld);
+                        AccumulateCommandRecordStatus(passName, status);
+                    }
+                    else if (passName == std::string_view{"VisualizationOverlayPass"})
+                    {
+                        // GRAPHICS-078 Slice A — scaffold branch for the
+                        // canonical default-recipe visualization-overlay
+                        // pass. The recipe declares this pass only when
+                        // at least one visualization-overlay packet
+                        // (vector field or isoline) exists
+                        // (`features.EnableVisualizationOverlay` derived
+                        // from per-kind span emptiness in
+                        // `DeriveDefaultFrameRecipeFeatures`), so this
+                        // branch is reached only when the world has
+                        // submitted overlay payload for the frame.
+                        // Slice A holds no pipelines; the helper returns
+                        // `SkippedNonOperational` when the device is
+                        // not operational and `SkippedUnavailable` +
+                        // `MissingPipelineSkipCount++` otherwise. Slice
+                        // B promotes the vector-field lane to
+                        // `Recorded`; Slice C promotes the isoline
+                        // lane.
+                        const RenderCommandPassStatus status =
+                            RecordVisualizationOverlayPass(graphicsContext, renderWorld);
                         AccumulateCommandRecordStatus(passName, status);
                     }
                     else if (passName == std::string_view{"Present"})
@@ -5768,6 +5799,36 @@ namespace Extrinsic::Graphics
                 : RenderCommandPassStatus::SkippedUnavailable;
         }
 
+        // GRAPHICS-078 Slice A — executor helper for the canonical
+        // default-recipe `VisualizationOverlayPass`. The recipe declares
+        // this pass only when at least one visualization-overlay packet
+        // (vector field or isoline) exists for the frame
+        // (`features.EnableVisualizationOverlay` derived from per-kind
+        // span emptiness in `DeriveDefaultFrameRecipeFeatures`), so this
+        // helper is reached only when the world has submitted overlay
+        // payload. Slice A holds no pipelines: when the device is
+        // operational the helper returns `SkippedUnavailable` and
+        // increments `VisualizationOverlayUpload.MissingPipelineSkipCount`
+        // so the diagnostic counter distinguishes "feature on but
+        // pipeline missing" from "feature off" (the latter does not
+        // reach this branch at all). Slice B/C add the per-kind
+        // operational paths; this helper grows to mirror the
+        // GRAPHICS-077 `RecordTransientDebugSurfacePass` shape (per-
+        // kind pipeline gate → upload → record → `Recorded`/
+        // `SkippedUnavailable` aggregation).
+        [[nodiscard]] RenderCommandPassStatus RecordVisualizationOverlayPass(
+            RHI::ICommandContext& /*cmd*/,
+            const RenderWorld&    /*world*/)
+        {
+            if (m_Device == nullptr || !m_Device->IsOperational())
+            {
+                return RenderCommandPassStatus::SkippedNonOperational;
+            }
+
+            ++m_LastRenderGraphStats.VisualizationOverlayUpload.MissingPipelineSkipCount;
+            return RenderCommandPassStatus::SkippedUnavailable;
+        }
+
         std::optional<RHI::BufferManager>   m_BufferManager;
         std::optional<RHI::SamplerManager>  m_SamplerManager;
         std::optional<RHI::TextureManager>  m_TextureManager;
@@ -5836,6 +5897,17 @@ namespace Extrinsic::Graphics
         // and the renderer-side backend-local upload helper that
         // `Execute(...)` consumes.
         TransientDebugSurfacePass            m_TransientDebugSurfacePass;
+        // GRAPHICS-078 Slice A — scaffold-only `VisualizationOverlayPass`.
+        // Default-constructible (no system dependency), held as a plain
+        // member so it lives for the renderer's full lifetime. Slice A
+        // never publishes a pipeline through any `Set*Pipeline(...)`,
+        // so every `Get*Pipeline().IsValid()` stays false and
+        // `RecordVisualizationOverlayPass` always returns
+        // `SkippedUnavailable` on the operational path with
+        // `MissingPipelineSkipCount += 1`. Slice B/C introduce the
+        // per-kind pipeline leases and the backend-local upload helper
+        // that future `Execute*(...)` bodies consume.
+        VisualizationOverlayPass             m_VisualizationOverlayPass;
         // GRAPHICS-070 — default-recipe forward surface pass. Owned as an
         // `optional` so the explicit `ForwardSystem&` constructor invariant is
         // preserved: emplaced in `Initialize()` immediately after the

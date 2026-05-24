@@ -791,6 +791,46 @@ Concretely:
   per-frame buffer-recycling invariant across multiple frames, a
   mixed-lane all-three-record acceptance test, and a per-lane
   partial-skip test pinning the gate's per-lane independence).
+- GRAPHICS-078 Slice A scaffolds the default-recipe
+  `VisualizationOverlayPass` (`Extrinsic.Graphics.Pass.VisualizationOverlay`)
+  recipe + executor shape on the CPU/null path. Recipe-side,
+  `FrameRecipeFeatures::EnableVisualizationOverlay` is derived from
+  `!world.Visualization.VectorFields.empty() ||
+  !world.Visualization.Isolines.empty()` so the pass is omitted
+  entirely from `CommandRecords` on frames with no overlay payload.
+  When enabled, `DescribeDefaultFrameRecipe` declares the pass
+  immediately after `TransientDebugSurfacePass` (same "post-lit,
+  pre-postprocess" band) with `Reads = {SceneColorHDR, SceneDepth}`
+  and `Writes = {SceneColorHDR}`; `BuildDefaultFrameRecipe` adds the
+  ordered pass with `Read(SceneDepth, DepthRead) + Write(SceneColorHDR,
+  ColorAttachmentWrite) + SetRenderPass(LOAD-store color, LOAD/Store
+  depth)` so the framegraph compiler emits a real
+  `CompiledRenderPassAttachment` pair before any future Slice B/C
+  bind/draw lands. Renderer-side, `NullRenderer` owns a plain
+  `m_VisualizationOverlayPass` member (no system dependency) and a
+  new `"VisualizationOverlayPass"` executor branch routes through
+  `RecordVisualizationOverlayPass(...)` with the
+  `SkippedNonOperational` / `SkippedUnavailable` taxonomy used by the
+  other default-recipe helpers. The new
+  `VisualizationOverlayUploadDiagnostics` struct lives on
+  `RenderGraphFrameStats::VisualizationOverlayUpload` and exposes
+  six counters (`UploadOverflowCount`,
+  `{VectorField,Isoline}RecordsSubmitted`,
+  `{VectorField,Isoline}RecordsRecorded`,
+  `MissingPipelineSkipCount`). Slice A pins all counters at zero
+  except `MissingPipelineSkipCount`, which increments by one each
+  frame the executor reaches the branch with an operational device
+  but no pipeline (the scaffold-only signal that distinguishes
+  "feature on" from "feature off"). Slice B promotes the
+  vector-field lane to `Recorded` with two pipelines at call indices
+  #32 + #33; Slice C extends to the isoline lane with two pipelines
+  at call indices #34 + #35; Slice D adds the opt-in `gpu;vulkan`
+  pixel-readback smoke. The contract pin is
+  `tests/contract/graphics/Test.VisualizationOverlayPass.cpp`
+  (recipe declaration with/without overlay packets, executor
+  `SkippedNonOperational` short-circuit, executor
+  `SkippedUnavailable` with `MissingPipelineSkipCount` increment on
+  the operational-no-pipeline path).
 - `TransformSyncSystem`, `LightSystem`, and `VisualizationSyncSystem` consume
   graphics-owned snapshot records (`TransformSyncRecord`, `LightSnapshot`, and
   `VisualizationSyncRecord`) instead of querying live ECS registries. Runtime is
