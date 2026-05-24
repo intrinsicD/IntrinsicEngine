@@ -443,6 +443,15 @@ Slice C (line + point lanes, landed 2026-05-24):
       increments `LineRecordsRecorded` to 1, and increments
       `MissingPipelineSkipCount` by exactly 1 for the skipped point
       lane.
+- [x] `contract;graphics` —
+      `TransientDebugSurfacePassContract.UploadOverflowSkipsUnavailableWithoutFalseRecorded`:
+      regression pin for the upload-vs-pipeline gate split.
+      Submitting 87 382 triangle packets (> the per-lane vertex cap
+      of `1 << 18`) trips `UploadOverflowCount` and yields
+      `SkippedUnavailable` rather than masking the failure as
+      `Recorded`. `MissingPipelineSkipCount` stays at zero — the
+      lane's pipelines are healthy and the upload gate is
+      independent of the pipeline gate.
 
 Slice D (optional `gpu;vulkan` smoke, deferred):
 - [ ] `gpu;vulkan;graphics` — pixel-readback assertion that the

@@ -5679,6 +5679,22 @@ namespace Extrinsic::Graphics
             const auto hasLines = !world.DebugPrimitives.Lines.empty();
             const auto hasPoints = !world.DebugPrimitives.Points.empty();
 
+            // `recordedAnyLane` flips true ONLY when `Execute*` actually
+            // emitted draw calls for the lane — i.e. when the upload
+            // helper successfully packed the lane's packets into a
+            // host-visible vertex buffer (`uploadResult.Uploaded`).
+            // An upload that fails (overflow past the per-lane vertex
+            // cap or a `BufferManager::Create` failure) leaves the
+            // lane silent: `Execute*` short-circuits, no draws land,
+            // and `UploadOverflowCount` ticks. The lane's pipeline
+            // gate is independent — upload failures do NOT increment
+            // `MissingPipelineSkipCount` (the pipelines are healthy;
+            // the transient buffer is not). When all submitted lanes
+            // either skip their pipeline gate or fail upload, the
+            // pass returns `SkippedUnavailable` so the
+            // "feature on but nothing recorded" path is observable
+            // through the status taxonomy rather than masked as
+            // `Recorded`.
             bool recordedAnyLane = false;
 
             if (hasTriangles)
@@ -5692,7 +5708,10 @@ namespace Extrinsic::Graphics
                         world.DebugPrimitives.Triangles,
                         uploadResult,
                         m_LastRenderGraphStats.TransientDebugUpload);
-                    recordedAnyLane = true;
+                    if (uploadResult.Uploaded)
+                    {
+                        recordedAnyLane = true;
+                    }
                 }
                 else
                 {
@@ -5711,7 +5730,10 @@ namespace Extrinsic::Graphics
                         world.DebugPrimitives.Lines,
                         uploadResult,
                         m_LastRenderGraphStats.TransientDebugUpload);
-                    recordedAnyLane = true;
+                    if (uploadResult.Uploaded)
+                    {
+                        recordedAnyLane = true;
+                    }
                 }
                 else
                 {
@@ -5730,7 +5752,10 @@ namespace Extrinsic::Graphics
                         world.DebugPrimitives.Points,
                         uploadResult,
                         m_LastRenderGraphStats.TransientDebugUpload);
-                    recordedAnyLane = true;
+                    if (uploadResult.Uploaded)
+                    {
+                        recordedAnyLane = true;
+                    }
                 }
                 else
                 {

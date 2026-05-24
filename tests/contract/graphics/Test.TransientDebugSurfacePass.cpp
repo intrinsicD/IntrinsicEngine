@@ -21,9 +21,11 @@
 // `gpu;vulkan` pixel-readback smoke.
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include <glm/glm.hpp>
 
@@ -1003,6 +1005,73 @@ TEST(TransientDebugSurfacePassContract, RecordsAllThreeLanesWhenAllSubmitted)
     EXPECT_EQ(stats.TransientDebugUpload.PointRecordsSubmitted, 1u);
     EXPECT_EQ(stats.TransientDebugUpload.PointRecordsRecorded, 1u);
     EXPECT_EQ(stats.TransientDebugUpload.UploadOverflowCount, 0u);
+    EXPECT_EQ(stats.TransientDebugUpload.MissingPipelineSkipCount, 0u);
+
+    renderer->Shutdown();
+}
+
+TEST(TransientDebugSurfacePassContract, UploadOverflowSkipsUnavailableWithoutFalseRecorded)
+{
+    // GRAPHICS-077 Slice C — when the upload helper rejects a lane
+    // because the requested vertex count exceeds the per-lane cap
+    // (`kMaxTriangleVertexCount = 1 << 18`), `ExecuteTriangles`
+    // short-circuits, no draws land, and `UploadOverflowCount`
+    // increments. The pass MUST NOT report `Recorded` in this case —
+    // the per-lane recorded counter stays at zero and the executor's
+    // status taxonomy surfaces the failure as `SkippedUnavailable`
+    // when no other lane recorded. Regression pin: an earlier draft
+    // of `RecordTransientDebugSurfacePass` flipped `recordedAnyLane`
+    // true whenever a lane's pipelines were valid, masking upload
+    // failures as `Recorded`.
+    constexpr std::size_t kOverflowPacketCount = 87382;  // 87382 * 3 = 262146 verts (> 1 << 18 cap).
+    std::vector<Graphics::DebugTrianglePacket> overflowingTriangles;
+    overflowingTriangles.reserve(kOverflowPacketCount);
+    for (std::size_t i = 0; i < kOverflowPacketCount; ++i)
+    {
+        overflowingTriangles.push_back(Graphics::DebugTrianglePacket{
+            .A = glm::vec3{0.0f, 0.5f, 0.0f},
+            .B = glm::vec3{-0.5f, -0.5f, 0.0f},
+            .C = glm::vec3{0.5f, -0.5f, 0.0f},
+            .Color = glm::vec4{1.0f, 1.0f, 1.0f, 1.0f},
+            .DepthTested = true,
+        });
+    }
+
+    MockDevice device;
+    device.BackbufferHandle = RHI::TextureHandle{718u, 1u};
+
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    renderer->SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{
+        .DebugTriangles = std::span<const Graphics::DebugTrianglePacket>{
+            overflowingTriangles.data(), overflowingTriangles.size()},
+    });
+
+    const Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 128},
+    };
+    Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.DeviceOperational);
+
+    const auto* pass = FindCommandPass(stats, "TransientDebugSurfacePass");
+    ASSERT_NE(pass, nullptr);
+    EXPECT_EQ(pass->Status, Graphics::RenderCommandPassStatus::SkippedUnavailable)
+        << "upload overflow must surface as SkippedUnavailable, not Recorded";
+
+    EXPECT_EQ(stats.TransientDebugUpload.TriangleRecordsSubmitted, kOverflowPacketCount);
+    EXPECT_EQ(stats.TransientDebugUpload.TriangleRecordsRecorded, 0u);
+    EXPECT_EQ(stats.TransientDebugUpload.UploadOverflowCount, 1u);
+    // Pipeline gate is independent of upload — the lane's pipelines
+    // are healthy, so the missing-pipeline counter stays untouched.
     EXPECT_EQ(stats.TransientDebugUpload.MissingPipelineSkipCount, 0u);
 
     renderer->Shutdown();
