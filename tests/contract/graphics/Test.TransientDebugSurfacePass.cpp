@@ -361,6 +361,20 @@ TEST(TransientDebugSurfacePassContract, RecordsTriangleBindPipelineAndDraw)
         << "expected at least one " << expectedPushSize
         << "-byte push for the transient-debug triangle packet";
 
+    // Note: BDA-value correctness on a real Vulkan device requires
+    // `BufferUsage::Storage` on the helper's vertex buffer (per
+    // `RHI.Device.cppm` and `Backends.Vulkan.Device.cpp` `HasBDA`
+    // gate). The CPU/null gate cannot uniquely identify the
+    // transient-debug push from MockDevice's command context here
+    // because (a) `BufferManager` returns a pool handle whose index
+    // diverges from the device handle index used by MockDevice's
+    // BDA bookkeeping (`BufferManager::Create` uses its own
+    // slot.size(); MockDevice uses `m_NextBuffer`), and (b) other
+    // 16-byte push consumers (`DebugViewPushConstants`) share the
+    // same payload size. The operational BDA validation is owned by
+    // the GRAPHICS-077 Slice D `gpu;vulkan` smoke; this contract
+    // test pins the bind/push/draw command shape only.
+
     renderer->Shutdown();
 }
 

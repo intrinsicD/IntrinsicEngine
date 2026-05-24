@@ -105,7 +105,21 @@ namespace Extrinsic::Graphics
 
             RHI::BufferDesc desc{};
             desc.SizeBytes = newCapacityBytes;
-            desc.Usage = RHI::BufferUsage::Vertex | RHI::BufferUsage::TransferDst;
+            // GRAPHICS-077 Slice B — `BufferUsage::Storage` is required
+            // alongside `Vertex` + `TransferDst` because the
+            // `transient_debug_triangle.vert` shader fetches per-vertex
+            // data via BDA (push-constant carries the buffer-device
+            // address); per `RHI.Device.cppm` `GetBufferDeviceAddress`
+            // contract and the Vulkan backend's
+            // `Backends.Vulkan.Device.cpp` `HasBDA` gate, only buffers
+            // created with `Storage` participate in BDA — without it
+            // `GetBufferDeviceAddress(...)` returns 0 and the shader
+            // would read from an invalid address even though the
+            // CPU/null contract tests still pass (MockDevice ignores
+            // the BDA value).
+            desc.Usage = RHI::BufferUsage::Vertex |
+                         RHI::BufferUsage::Storage |
+                         RHI::BufferUsage::TransferDst;
             desc.HostVisible = true;
             desc.DebugName = "TransientDebug.TriangleVertices";
 
