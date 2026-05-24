@@ -31,19 +31,25 @@ Each active task should include:
   scaffolding Slice D without the ability to verify it.
 - [`GRAPHICS-077`](GRAPHICS-077-transient-debug-primitive-upload-helper.md) —
   Backend transient-debug-primitive upload helper. Status:
-  in-progress (Slice A landed on
-  `claude/intrinsicengine-agent-onboarding-p1J2P` 2026-05-23; Slice B
-  not started). Owner: unassigned for Slice B; next pick-up by any
-  agent on any host (Slices B and C are CPU-testable; only the
-  optional Slice D requires a Vulkan-capable host). Promoted from
+  in-progress (Slices A + B landed; Slice C not started). Slice A
+  landed on `claude/intrinsicengine-agent-onboarding-p1J2P`
+  2026-05-23; Slice B landed on
+  `claude/intrinsicengine-agent-onboarding-MnHl0` 2026-05-24.
+  Owner: unassigned for Slice C; next pick-up by any agent on any
+  host (Slice C is CPU-testable; only the optional Slice D requires
+  a Vulkan-capable host). Promoted from
   `tasks/backlog/rendering/` on 2026-05-23 on
   `claude/intrinsicengine-agent-onboarding-utAFW` as the next
   earliest unblocked Theme A leaf once GRAPHICS-076 parked on its
   Vulkan-host blocker. Four-slice plan: recipe/executor scaffold
   (A, scaffold-only — landed), triangle lane operational wiring
-  (B, next pick-up), line + point lane operational wiring (C), and
-  the optional `gpu;vulkan` smoke (D, deferred behind the same
-  Vulkan-host gate as GRAPHICS-076 Slice D).
+  (B, landed; introduces the `ITransientDebugUploadHelper` virtual
+  interface + concrete default helper in
+  `Extrinsic.Graphics.TransientDebugUploadHelper` and two triangle
+  pipelines at call indices #26 + #27), line + point lane
+  operational wiring (C, next pick-up), and the optional
+  `gpu;vulkan` smoke (D, deferred behind the same Vulkan-host gate
+  as GRAPHICS-076 Slice D).
 
 Previously-active
 [`GEOM-015`](../done/GEOM-015-gjk-termination-diagnostics.md) — GJK
