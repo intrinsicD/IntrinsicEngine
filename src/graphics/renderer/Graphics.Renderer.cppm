@@ -41,13 +41,19 @@ import Extrinsic.Graphics.RenderGraph;
 // `TransientDebugTriangleUploadResult`) ride along for the same
 // consumers but are not part of the renderer's narrow public API.
 export import Extrinsic.Graphics.TransientDebugUploadHelper;
-// GRAPHICS-078 Slice A — re-export the visualization-overlay pass
-// module so consumers of `RenderGraphFrameStats::VisualizationOverlayUpload`
-// (e.g. contract tests, editor diagnostics) reach the
+// GRAPHICS-078 Slice B — re-export the visualization-overlay upload
+// helper module so consumers of
+// `RenderGraphFrameStats::VisualizationOverlayUpload` (e.g. contract
+// tests, editor diagnostics) reach the
 // `VisualizationOverlayUploadDiagnostics` struct without separately
-// importing this internal renderer module. The `VisualizationOverlayPass`
-// class itself rides along for the same consumers but is not part of
-// the renderer's narrow public API.
+// importing this internal renderer module. The helper interfaces
+// themselves (`IVisualizationOverlayUploadHelper`,
+// `VisualizationVectorFieldUploadResult`) ride along for the same
+// consumers but are not part of the renderer's narrow public API. The
+// `VisualizationOverlayPass` class is also re-exported so contract
+// tests that name the pass type (e.g. for push-constant size checks)
+// keep their import shape unchanged.
+export import Extrinsic.Graphics.VisualizationOverlayUploadHelper;
 export import Extrinsic.Graphics.Pass.VisualizationOverlay;
 import Extrinsic.Core.Config.Render;
 

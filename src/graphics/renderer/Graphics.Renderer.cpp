@@ -266,6 +266,19 @@ namespace Extrinsic::Graphics
             // GRAPHICS-077 Slice D.
             m_TransientDebugUploadHelper =
                 std::make_unique<TransientDebugUploadHelper>(device, *m_BufferManager);
+            // GRAPHICS-078 Slice B — backend-local visualization-overlay
+            // upload helper. Same lifetime contract as the transient-
+            // debug helper above: constructed alongside the
+            // BufferManager so per-frame `UploadVectorFields(...)` can
+            // lease a single growing host-visible vertex buffer; reset
+            // in `Shutdown()` before the BufferManager so the helper's
+            // internal `BufferLease` destructor observes a live
+            // manager. The default in-renderer implementation is
+            // CPU-functional against `MockDevice` for the contract
+            // gate; the Vulkan-tuned concrete implementation lands
+            // with GRAPHICS-078 Slice D.
+            m_VisualizationOverlayUploadHelper =
+                std::make_unique<VisualizationOverlayUploadHelper>(device, *m_BufferManager);
             m_BackbufferFormat = device.GetBackbufferFormat();
             m_GpuWorld.emplace();
             m_GpuWorld->Initialize(device, *m_BufferManager);
@@ -617,6 +630,14 @@ namespace Extrinsic::Graphics
             m_TransientDebugLinePipelineLeaseAlwaysOnTop.reset();
             m_TransientDebugPointPipelineLeaseDepthTested.reset();
             m_TransientDebugPointPipelineLeaseAlwaysOnTop.reset();
+            // GRAPHICS-078 Slice B — drop the canonical default-recipe
+            // visualization-overlay pipeline leases (vector-field
+            // lane, depth-tested + always-on-top) alongside the
+            // transient-debug leases above; same teardown ordering
+            // contract (leases reset before `m_PipelineManager` is
+            // destroyed below).
+            m_VisualizationOverlayVectorFieldPipelineLeaseDepthTested.reset();
+            m_VisualizationOverlayVectorFieldPipelineLeaseAlwaysOnTop.reset();
             m_ForwardSurfacePipelineLease.reset();
             m_ForwardLinePipelineLease.reset();
             m_ForwardPointPipelineLease.reset();
@@ -694,6 +715,13 @@ namespace Extrinsic::Graphics
             m_TransientDebugSurfacePass.SetLineAlwaysOnTopPipeline(RHI::PipelineHandle{});
             m_TransientDebugSurfacePass.SetPointDepthTestedPipeline(RHI::PipelineHandle{});
             m_TransientDebugSurfacePass.SetPointAlwaysOnTopPipeline(RHI::PipelineHandle{});
+            // GRAPHICS-078 Slice B — zero the visualization-overlay
+            // pass's cached vector-field pipeline handles alongside
+            // the transient-debug handles above so a later
+            // `Initialize(device)` starts from a clean fail-closed
+            // state.
+            m_VisualizationOverlayPass.SetVectorFieldDepthTestedPipeline(RHI::PipelineHandle{});
+            m_VisualizationOverlayPass.SetVectorFieldAlwaysOnTopPipeline(RHI::PipelineHandle{});
             m_PipelineManager.reset();
             m_TextureManager .reset();
             m_SamplerManager .reset();
@@ -702,6 +730,12 @@ namespace Extrinsic::Graphics
             // helper's internal `BufferManager::BufferLease` destructor
             // observes a live manager.
             m_TransientDebugUploadHelper.reset();
+            // GRAPHICS-078 Slice B — drop the visualization-overlay
+            // upload helper alongside the transient-debug helper above;
+            // same teardown ordering contract so its internal
+            // `BufferManager::BufferLease` destructor observes a live
+            // manager.
+            m_VisualizationOverlayUploadHelper.reset();
             m_BufferManager  .reset();
             m_CullingOutputAvailable = false;
             // GRAPHICS-033D — drop the smoke's readback handle so a later
@@ -1950,23 +1984,29 @@ namespace Extrinsic::Graphics
                     }
                     else if (passName == std::string_view{"VisualizationOverlayPass"})
                     {
-                        // GRAPHICS-078 Slice A — scaffold branch for the
-                        // canonical default-recipe visualization-overlay
-                        // pass. The recipe declares this pass only when
-                        // at least one visualization-overlay packet
-                        // (vector field or isoline) exists
-                        // (`features.EnableVisualizationOverlay` derived
-                        // from per-kind span emptiness in
+                        // GRAPHICS-078 Slice B — operational branch for
+                        // the canonical default-recipe visualization-
+                        // overlay pass. The recipe declares this pass
+                        // only when at least one visualization-overlay
+                        // packet (vector field or isoline) exists
+                        // (`features.EnableVisualizationOverlay`
+                        // derived from per-kind span emptiness in
                         // `DeriveDefaultFrameRecipeFeatures`), so this
                         // branch is reached only when the world has
                         // submitted overlay payload for the frame.
-                        // Slice A holds no pipelines; the helper returns
-                        // `SkippedNonOperational` when the device is
-                        // not operational and `SkippedUnavailable` +
-                        // `MissingPipelineSkipCount++` otherwise. Slice
-                        // B promotes the vector-field lane to
-                        // `Recorded`; Slice C promotes the isoline
-                        // lane.
+                        // Vector-field lane is operational: the helper
+                        // packs each packet's `2 * ElementCount` glyph
+                        // endpoints into a host-visible vertex buffer
+                        // through `m_VisualizationOverlayUploadHelper`,
+                        // and `ExecuteVectorFields(...)` records the
+                        // per-packet `BindPipeline + PushConstants +
+                        // Draw(2 * ElementCount, 1, 0, 0)` shape.
+                        // Isoline lane still increments
+                        // `MissingPipelineSkipCount` until Slice C
+                        // wires its operational path. `Recorded` when
+                        // at least one lane recorded its draws,
+                        // `SkippedUnavailable` when every submitted
+                        // lane failed its pipeline gate.
                         const RenderCommandPassStatus status =
                             RecordVisualizationOverlayPass(graphicsContext, renderWorld);
                         AccumulateCommandRecordStatus(passName, status);
@@ -3584,6 +3624,56 @@ namespace Extrinsic::Graphics
             return desc;
         }
 
+        // GRAPHICS-078 Slice B — visualization-overlay vector-field
+        // pipelines. Two variants per kind (depth-tested + always-on-
+        // top) so packets with `DepthTested = true` rasterize against
+        // the prepass depth and packets with `DepthTested = false`
+        // overlay on top regardless of occlusion. Both variants share
+        // the same shader pair
+        // (`assets/shaders/visualization_vector_field.{vert,frag}`),
+        // a BDA-fetch vertex layout (positions + packed RGBA8 color
+        // pulled from the helper's host-visible vertex buffer), and
+        // the 16-byte `VisualizationVectorFieldPushConstants` push
+        // block (BDA + per-draw `FirstVertex`). Color target pinned to
+        // `RGBA16_FLOAT` because the pass writes the `SceneColorHDR`
+        // resource declared by `BuildDefaultFrameRecipe(...)`.
+        // `DepthTargetFormat` is `D32_FLOAT` matching the prepass
+        // depth; the always-on-top variant disables `DepthTestEnable`
+        // so it ignores occlusion while still consuming the same
+        // render-pass attachment layout. `ColorBlend[0].Enable = false`
+        // matches the GRAPHICS-078 task non-goal of "no third pipeline
+        // variant per kind" — opaque overlay is the canonical
+        // CPUContracted form; alpha-blended glyphs are reserved for a
+        // follow-up task. Topology is `LineList` because each glyph is
+        // expanded into a single anchor→tip line segment by the
+        // helper (two vertices per glyph).
+        [[nodiscard]] static RHI::PipelineDesc BuildVisualizationVectorFieldPipelineDesc(
+            const bool depthTested) noexcept
+        {
+            RHI::PipelineDesc desc{};
+            desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/visualization_vector_field.vert.spv");
+            desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/visualization_vector_field.frag.spv");
+            desc.PrimitiveTopology = RHI::Topology::LineList;
+            desc.Rasterizer.Culling = RHI::CullMode::None;
+            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
+            desc.Rasterizer.Fill = RHI::FillMode::Solid;
+            desc.DepthStencil.DepthTestEnable = depthTested;
+            desc.DepthStencil.DepthWriteEnable = false;
+            desc.DepthStencil.StencilEnable = false;
+            desc.ColorBlend[0].Enable = false;
+            desc.ColorTargetCount = 1u;
+            desc.ColorTargetFormats[0] = RHI::Format::RGBA16_FLOAT;
+            desc.DepthTargetFormat = RHI::Format::D32_FLOAT;
+            desc.PushConstantSize =
+                static_cast<std::uint32_t>(sizeof(VisualizationVectorFieldPushConstants));
+            desc.DebugName = depthTested
+                ? "Renderer.VisualizationOverlay.VectorField.DepthTested"
+                : "Renderer.VisualizationOverlay.VectorField.AlwaysOnTop";
+            return desc;
+        }
+
         [[nodiscard]] bool InitializeOperationalPassResources(RHI::IDevice& device)
         {
             if (!device.IsOperational() || !m_CullingSystem || !m_BufferManager || !m_PipelineManager)
@@ -4418,12 +4508,22 @@ namespace Extrinsic::Graphics
             m_TransientDebugLinePipelineLeaseAlwaysOnTop.reset();
             m_TransientDebugPointPipelineLeaseDepthTested.reset();
             m_TransientDebugPointPipelineLeaseAlwaysOnTop.reset();
+            // GRAPHICS-078 Slice B — visualization-overlay vector-
+            // field pipelines. Created after the GRAPHICS-077 point-
+            // lane pipelines so call indices stay stable: vector-field
+            // DepthTested at call #32 (immediately after point
+            // AlwaysOnTop at #31), vector-field AlwaysOnTop at #33.
+            // The Slice C isoline lane will append at #34 + #35.
+            m_VisualizationOverlayVectorFieldPipelineLeaseDepthTested.reset();
+            m_VisualizationOverlayVectorFieldPipelineLeaseAlwaysOnTop.reset();
             m_TransientDebugSurfacePass.SetTriangleDepthTestedPipeline(RHI::PipelineHandle{});
             m_TransientDebugSurfacePass.SetTriangleAlwaysOnTopPipeline(RHI::PipelineHandle{});
             m_TransientDebugSurfacePass.SetLineDepthTestedPipeline(RHI::PipelineHandle{});
             m_TransientDebugSurfacePass.SetLineAlwaysOnTopPipeline(RHI::PipelineHandle{});
             m_TransientDebugSurfacePass.SetPointDepthTestedPipeline(RHI::PipelineHandle{});
             m_TransientDebugSurfacePass.SetPointAlwaysOnTopPipeline(RHI::PipelineHandle{});
+            m_VisualizationOverlayPass.SetVectorFieldDepthTestedPipeline(RHI::PipelineHandle{});
+            m_VisualizationOverlayPass.SetVectorFieldAlwaysOnTopPipeline(RHI::PipelineHandle{});
 
             const RHI::PipelineDesc triangleDepthTestedDesc =
                 BuildTransientDebugTrianglePipelineDesc(true);
@@ -4537,6 +4637,55 @@ namespace Extrinsic::Graphics
                     "[Graphics] TransientDebug.Point.AlwaysOnTop pipeline unavailable; "
                     "default-recipe transient-debug recording will be skipped: error={}",
                     static_cast<int>(pointAlwaysOnTopPipeline.error()));
+            }
+
+            // GRAPHICS-078 Slice B — visualization-overlay vector-
+            // field pipelines (call indices #32 + #33). Same
+            // reset/republish + fail-closed pattern as the transient-
+            // debug pipelines above so a failed `Create()` leaves
+            // `m_VisualizationOverlayPass` in the fail-closed state
+            // that `RecordVisualizationOverlayPass` interprets as
+            // `SkippedUnavailable` for the vector-field lane (with
+            // `MissingPipelineSkipCount += 1` on the operational-no-
+            // pipeline path).
+            const RHI::PipelineDesc vectorFieldDepthTestedDesc =
+                BuildVisualizationVectorFieldPipelineDesc(true);
+            auto vectorFieldDepthTestedPipeline =
+                m_PipelineManager->Create(vectorFieldDepthTestedDesc);
+            if (vectorFieldDepthTestedPipeline.has_value())
+            {
+                m_VisualizationOverlayVectorFieldPipelineLeaseDepthTested.emplace(
+                    std::move(*vectorFieldDepthTestedPipeline));
+                m_VisualizationOverlayPass.SetVectorFieldDepthTestedPipeline(
+                    m_PipelineManager->GetDeviceHandle(
+                        m_VisualizationOverlayVectorFieldPipelineLeaseDepthTested->GetHandle()));
+            }
+            else
+            {
+                Core::Log::Warn(
+                    "[Graphics] VisualizationOverlay.VectorField.DepthTested pipeline unavailable; "
+                    "default-recipe visualization-overlay recording will be skipped: error={}",
+                    static_cast<int>(vectorFieldDepthTestedPipeline.error()));
+            }
+
+            const RHI::PipelineDesc vectorFieldAlwaysOnTopDesc =
+                BuildVisualizationVectorFieldPipelineDesc(false);
+            auto vectorFieldAlwaysOnTopPipeline =
+                m_PipelineManager->Create(vectorFieldAlwaysOnTopDesc);
+            if (vectorFieldAlwaysOnTopPipeline.has_value())
+            {
+                m_VisualizationOverlayVectorFieldPipelineLeaseAlwaysOnTop.emplace(
+                    std::move(*vectorFieldAlwaysOnTopPipeline));
+                m_VisualizationOverlayPass.SetVectorFieldAlwaysOnTopPipeline(
+                    m_PipelineManager->GetDeviceHandle(
+                        m_VisualizationOverlayVectorFieldPipelineLeaseAlwaysOnTop->GetHandle()));
+            }
+            else
+            {
+                Core::Log::Warn(
+                    "[Graphics] VisualizationOverlay.VectorField.AlwaysOnTop pipeline unavailable; "
+                    "default-recipe visualization-overlay recording will be skipped: error={}",
+                    static_cast<int>(vectorFieldAlwaysOnTopPipeline.error()));
             }
 
             return m_CullingOutputAvailable && m_DepthPrepassPipelineLease.has_value() &&
@@ -5799,34 +5948,120 @@ namespace Extrinsic::Graphics
                 : RenderCommandPassStatus::SkippedUnavailable;
         }
 
-        // GRAPHICS-078 Slice A — executor helper for the canonical
-        // default-recipe `VisualizationOverlayPass`. The recipe declares
-        // this pass only when at least one visualization-overlay packet
-        // (vector field or isoline) exists for the frame
-        // (`features.EnableVisualizationOverlay` derived from per-kind
-        // span emptiness in `DeriveDefaultFrameRecipeFeatures`), so this
-        // helper is reached only when the world has submitted overlay
-        // payload. Slice A holds no pipelines: when the device is
-        // operational the helper returns `SkippedUnavailable` and
-        // increments `VisualizationOverlayUpload.MissingPipelineSkipCount`
-        // so the diagnostic counter distinguishes "feature on but
-        // pipeline missing" from "feature off" (the latter does not
-        // reach this branch at all). Slice B/C add the per-kind
-        // operational paths; this helper grows to mirror the
-        // GRAPHICS-077 `RecordTransientDebugSurfacePass` shape (per-
-        // kind pipeline gate → upload → record → `Recorded`/
-        // `SkippedUnavailable` aggregation).
+        // GRAPHICS-078 Slice B — operational executor helper for the
+        // canonical default-recipe `VisualizationOverlayPass`. The
+        // recipe declares this pass only when at least one
+        // visualization-overlay packet (vector field or isoline)
+        // exists for the frame (`features.EnableVisualizationOverlay`
+        // derived from per-kind span emptiness in
+        // `DeriveDefaultFrameRecipeFeatures`), so this helper is
+        // reached only when the world has submitted overlay payload.
+        // Mirrors `RecordTransientDebugSurfacePass(...)`: each lane
+        // (vector-field in Slice B, isoline in Slice C) is gated
+        // independently on its own pipeline pair (depth-tested +
+        // always-on-top); a lane with packets but a missing or
+        // invalid pipeline pair increments `MissingPipelineSkipCount`
+        // and is skipped, while other lanes that have both packets
+        // and valid pipelines still record. The pass status is
+        // `Recorded` when at least one lane recorded its draws, and
+        // `SkippedUnavailable` when every lane that had packets
+        // failed its pipeline gate (the recipe-side
+        // `EnableVisualizationOverlay` derivation guarantees at least
+        // one lane has packets when this branch is reached, so this
+        // is an exhaustive cover of "feature on but everything
+        // failed"). `MissingPipelineSkipCount` continues to
+        // distinguish "feature on, pipeline missing" from "feature
+        // off" (the latter does not reach this branch at all).
         [[nodiscard]] RenderCommandPassStatus RecordVisualizationOverlayPass(
-            RHI::ICommandContext& /*cmd*/,
-            const RenderWorld&    /*world*/)
+            RHI::ICommandContext& cmd,
+            const RenderWorld&    world)
         {
             if (m_Device == nullptr || !m_Device->IsOperational())
             {
                 return RenderCommandPassStatus::SkippedNonOperational;
             }
 
-            ++m_LastRenderGraphStats.VisualizationOverlayUpload.MissingPipelineSkipCount;
-            return RenderCommandPassStatus::SkippedUnavailable;
+            // The helper is constructed alongside `m_BufferManager` in
+            // `Initialize(...)`; on a successful operational gate it
+            // is always present. Defensive nullopt gate left in place
+            // so a future refactor that defers helper construction
+            // (e.g. behind a Vulkan-specific impl) cannot silently
+            // regress to a no-op. When the helper is missing every
+            // submitted lane counts as "pipeline missing" because the
+            // pass cannot upload or record anything.
+            if (!m_VisualizationOverlayUploadHelper)
+            {
+                ++m_LastRenderGraphStats.VisualizationOverlayUpload.MissingPipelineSkipCount;
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            const auto vectorFieldPipelinesValid =
+                m_VisualizationOverlayVectorFieldPipelineLeaseDepthTested.has_value() &&
+                m_VisualizationOverlayVectorFieldPipelineLeaseDepthTested->IsValid() &&
+                m_VisualizationOverlayVectorFieldPipelineLeaseAlwaysOnTop.has_value() &&
+                m_VisualizationOverlayVectorFieldPipelineLeaseAlwaysOnTop->IsValid() &&
+                m_VisualizationOverlayPass.GetVectorFieldDepthTestedPipeline().IsValid() &&
+                m_VisualizationOverlayPass.GetVectorFieldAlwaysOnTopPipeline().IsValid();
+
+            const auto hasVectorFields = !world.Visualization.VectorFields.empty();
+            const auto hasIsolines = !world.Visualization.Isolines.empty();
+
+            // `recordedAnyLane` flips true ONLY when `Execute*`
+            // actually emitted draw calls for the lane — i.e. when
+            // the upload helper successfully packed the lane's
+            // packets into a host-visible vertex buffer
+            // (`uploadResult.Uploaded`). An upload that fails
+            // (overflow past the per-lane vertex cap or a
+            // `BufferManager::Create` failure) leaves the lane
+            // silent: `Execute*` short-circuits, no draws land, and
+            // `UploadOverflowCount` ticks. The lane's pipeline gate
+            // is independent — upload failures do NOT increment
+            // `MissingPipelineSkipCount` (the pipelines are healthy;
+            // the transient buffer is not). When all submitted lanes
+            // either skip their pipeline gate or fail upload, the
+            // pass returns `SkippedUnavailable` so the "feature on
+            // but nothing recorded" path is observable through the
+            // status taxonomy rather than masked as `Recorded`.
+            bool recordedAnyLane = false;
+
+            if (hasVectorFields)
+            {
+                if (vectorFieldPipelinesValid)
+                {
+                    const VisualizationVectorFieldUploadResult uploadResult =
+                        m_VisualizationOverlayUploadHelper->UploadVectorFields(
+                            world.Visualization.VectorFields);
+                    m_VisualizationOverlayPass.ExecuteVectorFields(
+                        cmd,
+                        world.Visualization.VectorFields,
+                        uploadResult,
+                        m_LastRenderGraphStats.VisualizationOverlayUpload);
+                    if (uploadResult.Uploaded)
+                    {
+                        recordedAnyLane = true;
+                    }
+                }
+                else
+                {
+                    ++m_LastRenderGraphStats.VisualizationOverlayUpload.MissingPipelineSkipCount;
+                }
+            }
+
+            // GRAPHICS-078 Slice C — isoline lane wiring. Until Slice
+            // C lands, an isoline-only frame trips the
+            // `MissingPipelineSkipCount` increment because the lane's
+            // pipelines do not exist yet, mirroring the Slice A
+            // operational-scaffold diagnostic signal. A mixed frame
+            // with vector fields + isolines still records `Recorded`
+            // because the vector-field lane succeeds.
+            if (hasIsolines)
+            {
+                ++m_LastRenderGraphStats.VisualizationOverlayUpload.MissingPipelineSkipCount;
+            }
+
+            return recordedAnyLane
+                ? RenderCommandPassStatus::Recorded
+                : RenderCommandPassStatus::SkippedUnavailable;
         }
 
         std::optional<RHI::BufferManager>   m_BufferManager;
@@ -6033,6 +6268,23 @@ namespace Extrinsic::Graphics
         std::optional<RHI::PipelineManager::PipelineLease> m_TransientDebugLinePipelineLeaseAlwaysOnTop;
         std::optional<RHI::PipelineManager::PipelineLease> m_TransientDebugPointPipelineLeaseDepthTested;
         std::optional<RHI::PipelineManager::PipelineLease> m_TransientDebugPointPipelineLeaseAlwaysOnTop;
+        // GRAPHICS-078 Slice B — visualization-overlay vector-field
+        // pipelines. Two variants per kind (depth-tested + always-
+        // on-top); same reset/republish pattern as the transient-
+        // debug leases above so a failed `Create()` leaves
+        // `m_VisualizationOverlayPass` in the fail-closed state that
+        // `RecordVisualizationOverlayPass` interprets as
+        // `SkippedUnavailable` (with `MissingPipelineSkipCount += 1`
+        // per operational-no-pipeline frame). Created after the
+        // GRAPHICS-077 point-lane pipelines inside
+        // `InitializeOperationalPassResources()` — depth-tested at
+        // call #32 (immediately after point AlwaysOnTop at #31) and
+        // always-on-top at call #33 — so the existing
+        // `FailPipelineCreateCall` indices (1-31) used by other
+        // lifecycle tests remain stable. The Slice C isoline lane
+        // will append at call indices #34 + #35.
+        std::optional<RHI::PipelineManager::PipelineLease> m_VisualizationOverlayVectorFieldPipelineLeaseDepthTested;
+        std::optional<RHI::PipelineManager::PipelineLease> m_VisualizationOverlayVectorFieldPipelineLeaseAlwaysOnTop;
         // GRAPHICS-077 Slice B — backend-local transient-debug upload
         // helper. Held as `unique_ptr<ITransientDebugUploadHelper>` so
         // Slice D can swap in a Vulkan-tuned concrete implementation
@@ -6041,6 +6293,18 @@ namespace Extrinsic::Graphics
         // in `Shutdown()` before the `BufferManager` so the helper's
         // internal lease destructor observes a live manager.
         std::unique_ptr<ITransientDebugUploadHelper> m_TransientDebugUploadHelper;
+        // GRAPHICS-078 Slice B — backend-local visualization-overlay
+        // upload helper. Same lifetime contract as the transient-
+        // debug helper above: held as
+        // `unique_ptr<IVisualizationOverlayUploadHelper>` so Slice D
+        // can swap in a Vulkan-tuned concrete implementation (that
+        // expands actual per-glyph endpoints from the source BDAs)
+        // without disturbing the renderer-side wiring. Constructed
+        // in `Initialize(device)` against the live `BufferManager`;
+        // reset in `Shutdown()` before the `BufferManager` so the
+        // helper's internal lease destructor observes a live
+        // manager.
+        std::unique_ptr<IVisualizationOverlayUploadHelper> m_VisualizationOverlayUploadHelper;
         std::optional<RHI::PipelineManager::PipelineLease> m_ForwardSurfacePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_ForwardLinePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_ForwardPointPipelineLease;

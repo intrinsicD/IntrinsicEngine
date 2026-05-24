@@ -30,10 +30,12 @@ target_sources(${target_name}
         Graphics.ShadowSystem.cppm
         Graphics.TransformSyncSystem.cppm
         Graphics.TransientDebugUploadHelper.cppm
+        Graphics.VisualizationOverlayUploadHelper.cppm
         PRIVATE
         Graphics.Renderer.cpp
         Graphics.FrameRecipe.cpp
         Graphics.TransientDebugUploadHelper.cpp
+        Graphics.VisualizationOverlayUploadHelper.cpp
         Graphics.GpuWorld.cpp
         Graphics.MaterialSystem.cpp
         Graphics.ColormapSystem.cpp

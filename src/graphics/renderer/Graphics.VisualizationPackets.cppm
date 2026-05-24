@@ -72,6 +72,13 @@ export namespace Extrinsic::Graphics
         std::uint64_t VectorBufferBDA{0u};
         float Scale{1.f};
         glm::vec4 Color{1.f};
+        // GRAPHICS-078 Slice B — depth-tested vs always-on-top variant per packet,
+        // resolved by the `VisualizationOverlayPass` to the matching pipeline
+        // lease at record time. Mirrors the `DepthTested` field on
+        // `DebugLinePacket`/`DebugPointPacket`/`DebugTrianglePacket`
+        // (GRAPHICS-010Q two-variant policy). Default true preserves the
+        // existing scene-depth-respecting glyph behavior.
+        bool DepthTested{true};
     };
 
     struct IsolineOverlayPacket

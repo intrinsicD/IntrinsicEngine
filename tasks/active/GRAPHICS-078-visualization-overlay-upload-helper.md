@@ -2,18 +2,27 @@
 
 ## Status
 
-- Status: in-progress (Slice A — scaffold-only — landed on
-  `claude/intrinsicengine-agent-onboarding-3dLeQ` on 2026-05-24;
-  contract CPU/null gate green at 209/209 graphics contract tests,
-  full CPU/null gate result captured in the Slice A commit body).
-  Slices B/C wire the operational lanes for vector fields and isolines
-  respectively; Slice D is the optional `gpu;vulkan` smoke deferred
-  behind a Vulkan-capable host gate.
-- Owner/agent: unassigned for Slices B/C/D; next pick-up by any
-  CPU-only agent for Slice B (vector-field operational wiring).
-- Branch: Slice A landed on `claude/intrinsicengine-agent-onboarding-3dLeQ`;
-  Slices B/C/D will land on future
-  `claude/intrinsicengine-agent-onboarding-*` branches.
+- Status: in-progress (Slices A + B landed; Slice C wires the
+  isoline lane and Slice D is the optional `gpu;vulkan` smoke
+  deferred behind a Vulkan-capable host gate).
+  Slice A scaffolded the recipe + executor shape on
+  `claude/intrinsicengine-agent-onboarding-3dLeQ` 2026-05-24
+  (209/209 graphics contract tests pass). Slice B promoted the
+  vector-field lane from `SkippedUnavailable` to `Recorded` on
+  `claude/intrinsicengine-agent-onboarding-7IOiJ` 2026-05-24 and
+  verified through the contract CPU/null gate (212/212 graphics
+  contract tests pass; full CPU/null gate result captured in the
+  Slice B commit body). The task now sits at `CPUContracted` on
+  CPU-only hosts for the vector-field lane; only the optional
+  Slice C isoline-lane operational wiring and the optional Slice D
+  `gpu;vulkan` smoke remain.
+- Owner/agent: unassigned for Slices C/D; next pick-up by any
+  CPU-only agent for Slice C (isoline operational wiring).
+- Branch: Slice A landed on
+  `claude/intrinsicengine-agent-onboarding-3dLeQ`; Slice B landed
+  on `claude/intrinsicengine-agent-onboarding-7IOiJ`; Slices C/D
+  will land on future `claude/intrinsicengine-agent-onboarding-*`
+  branches.
 - Started: 2026-05-24. Promoted from
   `tasks/backlog/rendering/GRAPHICS-078-visualization-overlay-upload-helper.md`
   as the next earliest unblocked Theme A leaf after GRAPHICS-076 and
@@ -23,9 +32,9 @@
   pattern: per-frame host-visible buffers, two pipeline variants per
   kind (depth-tested + always-on-top), one consolidated overlay pass
   drawing into `SceneColorHDR`/`SceneDepth` after lit composition.
-- Next verification step: see `## Next verification step` below for the
-  full per-slice command list. Slice A is verified; Slice B is the
-  next pick-up.
+- Next verification step: see `## Next verification step` below for
+  the full per-slice command list. Slices A + B are verified; Slice
+  C is the next pick-up for CPU-only hosts.
 
 ## Slice plan
 
@@ -64,29 +73,45 @@ final slice exercises an opt-in `gpu;vulkan` smoke.
   files in Slice A. Mirrors GRAPHICS-077 Slice A in every structural
   detail except the lane membership (two visualization-overlay kinds
   instead of three transient-debug lanes).
-- **Slice B.** Vector-field lane operational wiring. Adds two
-  vector-field pipelines (`DepthTested` + `AlwaysOnTop`) via a
-  `BuildVisualizationVectorFieldPipelineDesc(depthTested)` helper, two
-  pipeline-lease members on `NullRenderer` (created at call indices
-  after the GRAPHICS-077 point lane at #31, so #32 + #33), the new
-  shader pair `assets/shaders/visualization_vector_field.{vert,frag}`
-  (BDA-fetched glyph vertices via push constants, drawn into
-  `SceneColorHDR`), and the per-frame vector-field-lane upload through
-  a new `VisualizationOverlayUploadHelper` (declared as the virtual
+- **Slice B (landed 2026-05-24 on `claude/intrinsicengine-agent-onboarding-7IOiJ`).**
+  Vector-field lane operational wiring. Adds two vector-field
+  pipelines (`DepthTested` + `AlwaysOnTop`) via a
+  `BuildVisualizationVectorFieldPipelineDesc(depthTested)` helper,
+  two pipeline-lease members on `NullRenderer` (created at call
+  indices #32 + #33 after the GRAPHICS-077 point lane at #31), the
+  new shader pair
+  `assets/shaders/visualization_vector_field.{vert,frag}` (BDA-fetched
+  glyph vertices via push constants, drawn into `SceneColorHDR`), and
+  the per-frame vector-field-lane upload through a new
+  `VisualizationOverlayUploadHelper` (declared as the virtual
   `IVisualizationOverlayUploadHelper` in
   `Extrinsic.Graphics.VisualizationOverlayUploadHelper` so contract
-  tests can substitute; the default concrete impl lives in the renderer
-  module and uses `BufferManager` + `IDevice::WriteBuffer(...)` —
-  the Vulkan-tuned variant is deferred to Slice D per the
-  backend-locality non-goal that GRAPHICS-077 Slice D inherits).
-  Records `BindPipeline(variant) + PushConstants(16) + Draw(N, 1, 0,
-  0)` per vector-field packet (N = glyph vertex count per packet, BDA-
-  based vertex fetch via push constants). Per-packet `DepthTested`
-  selects the matching pipeline variant;
-  `RecordVisualizationOverlayPass` flips from `SkippedUnavailable` to
-  `Recorded` when at least one vector-field packet records. Increments
-  `VectorFieldRecordsSubmitted` / `VectorFieldRecordsRecorded`
-  deterministically.
+  tests can substitute; the default concrete impl lives in the
+  renderer module and uses `BufferManager` +
+  `IDevice::WriteBuffer(...)` — the Vulkan-tuned variant is deferred
+  to Slice D per the backend-locality non-goal that GRAPHICS-077
+  Slice D inherits). The `DepthTested` placement question recorded
+  under "Slice A clarifications captured during implementation" was
+  resolved option (a): `VectorFieldOverlayPacket` grew a
+  `bool DepthTested{true}` field mirroring
+  `DebugLinePacket`/`DebugPointPacket`/`DebugTrianglePacket`.
+  Records `BindPipeline(variant) + PushConstants(16) +
+  Draw(2 * ElementCount, 1, 0, 0)` per vector-field packet (one
+  glyph = one line segment = two vertices, BDA-based vertex fetch
+  via push constants). Per-packet `DepthTested` selects the matching
+  pipeline variant; `RecordVisualizationOverlayPass` flips from
+  `SkippedUnavailable` to `Recorded` when at least one vector-field
+  packet records. Increments `VectorFieldRecordsSubmitted` /
+  `VectorFieldRecordsRecorded` deterministically.
+  Slice B-specific deviation from the original spec text:
+  `kVisualizationOverlayRenderPassColorAttachments` is already in
+  place from Slice A; no further recipe-side LOAD-store template
+  changes were required. CPU/null contract note: the helper does not
+  have CPU access to `PositionBufferBDA` / `VectorBufferBDA` (those
+  are GPU pointers), so the CPU/null path writes zero positions and
+  the packet's packed color into each packed vertex; per-pixel
+  correctness on a real Vulkan device is owned by the optional
+  Slice D `gpu;vulkan` smoke and the Vulkan-tuned helper variant.
 - **Slice C.** Isoline lane operational wiring. Mirrors Slice B for
   isoline polylines: two more pipelines (`Isoline.DepthTested`,
   `Isoline.AlwaysOnTop`, call indices #34 + #35), the matching
@@ -125,6 +150,9 @@ final slice exercises an opt-in `gpu;vulkan` smoke.
   promotes it to `CPUContracted` is named and in-scope. Slice B is
   named here and remains in-scope for this task, so the closure rule
   is honored.
+- Slice B (landed) closes vector-field lane `Scaffolded →
+  CPUContracted`. The isoline lane is still `Scaffolded`-only
+  (Slice C remains in-scope to close it).
 - Slice C closes both lanes at `CPUContracted` and closes the task at
   `CPUContracted` on CPU-only hosts.
 - Slice D closes `CPUContracted → Operational` on Vulkan-capable
@@ -262,12 +290,55 @@ Slice A clarifications captured during implementation:
   before any variant selection happens. Recorded here so Slice B
   reviewers do not re-derive the question.
 
-Slice B (vector-field lane, deferred):
+Slice B (vector-field lane, landed 2026-05-24):
 
-- [ ] Vector-field upload helper interface + concrete impl, two
-      pipelines (`VectorField.DepthTested`, `VectorField.AlwaysOnTop`)
-      at call indices #32 + #33, shader pair
-      `assets/shaders/visualization_vector_field.{vert,frag}`.
+- [x] Added `bool DepthTested{true}` to
+      `VectorFieldOverlayPacket` in
+      `src/graphics/renderer/Graphics.VisualizationPackets.cppm`
+      (resolving the Slice A clarification option (a) — packet-level
+      flag mirroring the transient-debug packets).
+- [x] Added `IVisualizationOverlayUploadHelper` virtual interface +
+      default concrete `VisualizationOverlayUploadHelper` in
+      `src/graphics/renderer/Graphics.VisualizationOverlayUploadHelper.{cppm,cpp}`
+      (CPU-mockable interface for contract tests; default impl pairs
+      `RHI::BufferManager` with `IDevice::WriteBuffer(...)` against a
+      single growing host-visible vertex buffer per lane, geometric
+      growth ×2 up to per-lane cap `1 << 18` vertices). Moved
+      `VisualizationOverlayUploadDiagnostics` from
+      `Pass.VisualizationOverlay.cppm` to the new helper module
+      (mirroring the GRAPHICS-077 Slice B helper-module placement).
+- [x] Added two vector-field pipelines (`VectorField.DepthTested`,
+      `VectorField.AlwaysOnTop`) at call indices #32 + #33 in
+      `InitializeOperationalPassResources(...)` via a new
+      `BuildVisualizationVectorFieldPipelineDesc(depthTested)` helper.
+      Pinned to `RGBA16_FLOAT` (the `SceneColorHDR` format) +
+      `D32_FLOAT` depth, `LineList` topology,
+      `Rasterizer.Culling = None`, `ColorBlend[0].Enable = false`,
+      `PushConstantSize = sizeof(VisualizationVectorFieldPushConstants)`
+      (16 bytes carrying BDA + per-draw `FirstVertex`).
+- [x] Added shader pair
+      `assets/shaders/visualization_vector_field.{vert,frag}`
+      (BDA-fetch per-vertex layout matching the transient-debug
+      shaders, 16-byte push block carrying
+      `VertexBufferBDA + FirstVertex + Reserved`).
+- [x] Added `m_VisualizationOverlayVectorFieldPipelineLeaseDepthTested`
+      and `…LeaseAlwaysOnTop` members on `NullRenderer`, plus the
+      `m_VisualizationOverlayUploadHelper` member; constructed
+      alongside the GRAPHICS-077 helper in `Initialize(...)`; reset
+      in `Shutdown()` before `m_BufferManager` so the helper's
+      internal lease destructor observes a live manager.
+- [x] Added `VisualizationVectorFieldPushConstants` struct +
+      `ExecuteVectorFields(...)` body to `VisualizationOverlayPass`
+      (per-packet `BindPipeline(variant) + PushConstants(16) +
+      Draw(2 * ElementCount, 1, 0, 0)` with per-packet `DepthTested`
+      variant selection and deterministic per-lane diagnostics
+      increments).
+- [x] Extended `RecordVisualizationOverlayPass(cmd, world)` to gate
+      the vector-field lane on its pipeline-pair validity, upload
+      through the helper, record per-packet draws, and flip the pass
+      status to `Recorded` when at least one packet's draw lands
+      (`SkippedUnavailable` + `MissingPipelineSkipCount += 1` when the
+      lane's pipelines are missing).
 
 Slice C (isoline lane, deferred):
 
@@ -315,7 +386,39 @@ Slice A (landed 2026-05-24):
       `TransientDebugSurfacePass`; `MissingPipelineSkipCount` stays at
       zero.
 
-Slice B/C/D tests are written when those slices land.
+Slice B (vector-field lane, landed 2026-05-24):
+
+- [x] `contract;graphics` —
+      `VisualizationOverlayPassContract.MissingVectorFieldPipelineLeaseSkipsUnavailable`:
+      `FailPipelineCreateCall = 32` (vector-field DepthTested) yields
+      `SkippedUnavailable` and `MissingPipelineSkipCount += 1`.
+      Upstream `SurfacePass` still records `Recorded`. Replaces the
+      Slice A `ExecutorReportsSkippedUnavailableWithoutPipelines`
+      test whose premise (no pipelines wired) no longer holds in
+      Slice B.
+- [x] `contract;graphics` —
+      `VisualizationOverlayPassContract.RecordsVectorFieldBindPipelineAndDraw`:
+      one `VectorFieldOverlayPacket{ElementCount=1, DepthTested=true}`
+      records `BindPipeline(DepthTested) + PushConstants(16) +
+      Draw(2, 1, 0, 0)`, `VectorFieldRecordsRecorded == 1`, and pass
+      status is `Recorded`. At least one 16-byte push reaches the
+      device command context (assertion uses `>= 1` for the same
+      shared-push-size caveat as the transient-debug tests).
+- [x] `contract;graphics` —
+      `VisualizationOverlayPassContract.SelectsVectorFieldAlwaysOnTopVariantPerPacket`:
+      three packets with alternating `DepthTested` flags flip the
+      variant correctly (`VectorFieldRecordsRecorded == 3`; at least
+      three 16-byte pushes reach the device).
+- [x] `contract;graphics` —
+      `VisualizationOverlayPassContract.PerFrameBufferRecyclingDoesNotLeakVectorField`:
+      across 5 frames with a constant 4-element packet payload,
+      `CreateBufferCount` stays at the post-frame-1 baseline (no
+      per-frame leak), `UploadOverflowCount` stays at zero, and
+      per-frame `VectorFieldRecordsSubmitted` /
+      `VectorFieldRecordsRecorded` reflect the final frame's payload
+      (renderer resets per `ExecuteFrame()`).
+
+Slice C/D tests are written when those slices land.
 
 ## Docs
 
@@ -332,6 +435,26 @@ Slice A (landed 2026-05-24):
 - [x] Regenerated `docs/api/generated/module_inventory.md` (443
       modules; the new `Extrinsic.Graphics.Pass.VisualizationOverlay`
       module surface appears).
+
+Slice B (landed 2026-05-24):
+
+- [x] Extend `src/graphics/renderer/README.md` with the vector-field
+      lane bind/draw shape, per-lane pipeline call indices #32 + #33,
+      the helper module placement
+      (`Extrinsic.Graphics.VisualizationOverlayUploadHelper`), and
+      the CPU/null-path data-substitution note (zero positions +
+      packet color, Vulkan-tuned expansion deferred to Slice D).
+- [-] `src/graphics/vulkan/README.md` row for the
+      `VisualizationOverlayUploadHelper` is deferred to Slice D —
+      the Slice B helper lives in the renderer module (CPU-functional
+      via `BufferManager`); the Vulkan-tuned concrete impl that
+      lands with Slice D is what justifies a vulkan-README entry,
+      mirroring the GRAPHICS-077 Slice B/C convention.
+- [x] Regenerated `docs/api/generated/module_inventory.md` (444
+      modules; the new
+      `Extrinsic.Graphics.VisualizationOverlayUploadHelper` module
+      surface appears).
+- [x] Update `tasks/active/README.md` to reflect Slice B status.
 
 ## Acceptance criteria
 
@@ -353,6 +476,26 @@ Slice A (landed 2026-05-24):
       (Slice A added four `VisualizationOverlayPassContract.*` tests
       on top of the prior 205); broader CPU/null gate verification
       command list in `## Next verification step`.
+
+Slice B (landed 2026-05-24):
+
+- [x] Vector-field lane records deterministic
+      `BindPipeline + PushConstants(16) +
+      Draw(2 * ElementCount, 1, 0, 0)` per submitted packet in the
+      operational state (verified by
+      `RecordsVectorFieldBindPipelineAndDraw`).
+- [x] Per-packet `DepthTested` selects the matching pipeline variant
+      for the vector-field lane (verified by
+      `SelectsVectorFieldAlwaysOnTopVariantPerPacket`).
+- [x] No retained GPU resources on `GpuWorld`; no RHI/renderer
+      surface change beyond the per-pass `Get*Pipeline()` accessors
+      and the new helper module re-export.
+- [x] No regression in `ValidateVisualizationPackets` /
+      `VisualizationDiagnostics` (the new packet field defaults to
+      `true` and does not affect validity).
+- [x] Default CPU/null gate stays green: 212/212 graphics contract
+      tests pass (net +3 from Slice A: rename one + add three new
+      vector-field tests).
 
 Full task (after Slice C):
 
@@ -430,12 +573,37 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -LE 'slow|flaky-qu
   - `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`
     — 443 modules (up one from the prior 442 for the new
     `Extrinsic.Graphics.Pass.VisualizationOverlay` surface).
-- Slice B/C pick-up: a CPU-only host can pick up Slice B (vector-field
-  operational wiring) immediately after Slice A merges, then Slice C
-  (isoline operational wiring) after Slice B. Slice B reviewers
-  should resolve the `DepthTested` placement question recorded under
-  "Slice A clarifications captured during implementation" above
-  before starting pipeline work.
+- Slice B landed 2026-05-24 on
+  `claude/intrinsicengine-agent-onboarding-7IOiJ`. Verification:
+  - `cmake --preset ci`
+  - `cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests`
+  - `ctest --test-dir build/ci -L contract -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
+    — 212/212 graphics contract tests passed (net +3 from Slice A:
+    rename `ExecutorReportsSkippedUnavailableWithoutPipelines` to
+    `MissingVectorFieldPipelineLeaseSkipsUnavailable` and add three
+    new vector-field operational tests:
+    `RecordsVectorFieldBindPipelineAndDraw`,
+    `SelectsVectorFieldAlwaysOnTopVariantPerPacket`,
+    `PerFrameBufferRecyclingDoesNotLeakVectorField`).
+  - `cmake --build --preset ci --target IntrinsicTests`
+  - `ctest --test-dir build/ci -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
+    — full CPU/null gate result captured in the Slice B commit body.
+  - `python3 tools/repo/check_layering.py --root src --strict`,
+    `python3 tools/repo/check_test_layout.py --root . --strict`,
+    `python3 tools/docs/check_doc_links.py --root .`,
+    `python3 tools/agents/check_task_policy.py --root . --strict`
+    — all clean.
+  - `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`
+    — 444 modules (up one from Slice A's 443 for the new
+    `Extrinsic.Graphics.VisualizationOverlayUploadHelper` surface).
+- Slice C pick-up: a CPU-only host can pick up Slice C (isoline
+  operational wiring) immediately after Slice B merges. Slice C
+  extends the helper interface with `UploadIsolines(...)`, adds
+  `bool DepthTested{true}` to `IsolineOverlayPacket`, two more
+  pipelines at call indices #34 + #35, the shader pair
+  `assets/shaders/visualization_isoline.{vert,frag}` (`LineList`
+  topology), and per-lane gating semantics matching GRAPHICS-077
+  Slice C.
 - Slice D pick-up (Vulkan-capable host): configure with `ci-vulkan`,
   build `IntrinsicGraphicsIntegrationTests`, and run the opt-in
   `gpu;vulkan` smoke.
