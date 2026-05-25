@@ -16,6 +16,7 @@ target_sources(${target_name}
         Runtime.ReferenceScene.cppm
         Runtime.RenderExtraction.cppm
         Runtime.StreamingExecutor.cppm
+        SpatialDebug/Runtime.SpatialDebugAdapters.cppm
         PRIVATE
         Runtime.EcsSystemBundle.cpp
         Runtime.Engine.cpp
@@ -24,6 +25,7 @@ target_sources(${target_name}
         Runtime.ReferenceScene.cpp
         Runtime.RenderExtraction.cpp
         Runtime.StreamingExecutor.cpp
+        SpatialDebug/Runtime.SpatialDebugAdapters.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)
@@ -36,6 +38,7 @@ target_link_libraries(${target_name}
         ExtrinsicGraphics
         ExtrinsicGraphicsAssets
         ExtrinsicPlatform
+        IntrinsicGeometry
         EnTT::EnTT
         glm::glm
 )

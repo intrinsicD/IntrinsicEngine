@@ -55,6 +55,26 @@ Each active task should include:
   optional `gpu;vulkan` smoke (D, deferred behind the same
   Vulkan-host gate as GRAPHICS-076 Slice D). The task now sits at
   `CPUContracted` on CPU-only hosts.
+- [`RUNTIME-082`](RUNTIME-082-spatial-debug-adapters.md) —
+  `Extrinsic.Runtime.SpatialDebugAdapters` umbrella. Status:
+  in-progress (Slice A scaffolding the umbrella + BvhAdapter
+  + value types + contract tests on
+  `claude/intrinsicengine-agent-onboarding-k31Vm` 2026-05-25;
+  Slices B–D remain). Owner: unassigned after Slice A.
+  Promoted from
+  `tasks/backlog/runtime/RUNTIME-082-spatial-debug-adapters.md`
+  on 2026-05-25 as the next earliest unblocked Theme A leaf
+  after GRAPHICS-076, GRAPHICS-077, GRAPHICS-078 each parked on
+  their Vulkan-host blockers and RUNTIME-080 was deferred behind
+  its undeclared dependency on ASSETIO-001's CPU texture payload
+  type (recorded inline on the RUNTIME-080 backlog file). Pure
+  CPU/null translation seam between geometry trees and the
+  existing graphics-side `Extrinsic.Graphics.SpatialDebugVisualizers`
+  builder functions; no graphics surface change and no
+  RHI/Vulkan dependency. Four-slice plan: umbrella + BvhAdapter +
+  value types (A, this slice) → KdTree + Octree adapters (B) →
+  ConvexHull adapter + registry (C) → `RenderExtractionCache`
+  wiring + extraction stats (D).
 - [`GRAPHICS-078`](GRAPHICS-078-visualization-overlay-upload-helper.md) —
   Backend visualization-overlay upload helper (vector field +
   isoline). Status: in-progress (Slices A + B + C landed; only the

@@ -678,7 +678,7 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
 Cross-layer Theme B′ leaves outside `rendering/`:
 - [`runtime/RUNTIME-080` — Texture asset bridge](../runtime/RUNTIME-080-asset-bridges-texture.md).
 - [`RUNTIME-081` — Camera controllers](../../done/RUNTIME-081-camera-controllers.md).
-- [`runtime/RUNTIME-082` — Spatial debug adapters](../runtime/RUNTIME-082-spatial-debug-adapters.md).
+- [`runtime/RUNTIME-082` — Spatial debug adapters](../../active/RUNTIME-082-spatial-debug-adapters.md) (active 2026-05-25).
 - [`runtime/RUNTIME-083` — Visualization adapters](../runtime/RUNTIME-083-visualization-adapters.md).
 - [`runtime/RUNTIME-084` — Gizmo interaction](../runtime/RUNTIME-084-gizmo-interaction.md).
 - [`runtime/RUNTIME-090` — Dear ImGui platform/renderer adapter](../runtime/RUNTIME-090-imgui-platform-renderer-adapter.md).
