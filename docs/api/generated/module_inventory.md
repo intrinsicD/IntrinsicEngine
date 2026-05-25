@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `legacy` | 182 |
 | `platform` | 5 |
-| `runtime` | 8 |
+| `runtime` | 9 |
 
 ## Modules
 
@@ -470,5 +470,6 @@ Root scanned: `src`
 | `Extrinsic.Runtime.ReferenceScene` | `src/runtime/Runtime.ReferenceScene.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderExtraction` | `src/runtime/Runtime.RenderExtraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
+| `Extrinsic.Runtime.SpatialDebugAdapters` | `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` | `runtime` |
 
-Total modules: **444**
+Total modules: **445**
