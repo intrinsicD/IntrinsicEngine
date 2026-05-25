@@ -458,6 +458,80 @@ TEST(VisualizationOverlayPassContract, SelectsVectorFieldAlwaysOnTopVariantPerPa
     renderer->Shutdown();
 }
 
+TEST(VisualizationOverlayPassContract, UploadOverflowSkipsUnavailableWithoutFalseRecorded)
+{
+    // GRAPHICS-078 Slice B — adversarial-input pin. A single
+    // `VectorFieldOverlayPacket` whose `2 * ElementCount` exceeds the
+    // per-lane cap (`kMaxVectorFieldVertexCount = 1 << 18 = 262144`)
+    // must fail-close BEFORE the helper's staging-buffer allocation —
+    // otherwise the per-frame `std::vector<PackedOverlayVertex>` of
+    // size `2 * ElementCount` would attempt a multi-GiB host
+    // allocation (or throw `bad_alloc`) for an adversarial
+    // `ElementCount = UINT32_MAX`. The pass MUST report
+    // `SkippedUnavailable` rather than masking the failure as
+    // `Recorded`. `UploadOverflowCount` ticks once;
+    // `MissingPipelineSkipCount` stays at zero (the pipelines are
+    // healthy, the upload gate is independent of the pipeline gate);
+    // `VectorFieldRecordsRecorded` stays at zero.
+    //
+    // 200 000 * 2 = 400 000 > 262 144 → over the cap by ~140k verts
+    // (~2.1 MiB if the allocation succeeded). Picked deliberately
+    // large enough to overflow the cap but small enough that a buggy
+    // pre-fix run that DOES allocate the buffer still does not OOM
+    // the CI host (so the regression failure mode is "Recorded /
+    // unbounded allocation" rather than "process killed", which
+    // would make the regression hard to diagnose).
+    static const std::array<Graphics::VectorFieldOverlayPacket, 1> kVectorFields{{
+        Graphics::VectorFieldOverlayPacket{
+            .Name         = "Test.VectorField.Overflow",
+            .Domain       = Graphics::VisualizationAttributeDomain::Vertex,
+            .ElementCount = 200000u,
+            .Scale        = 1.0f,
+            .Color        = glm::vec4{1.0f, 1.0f, 1.0f, 1.0f},
+            .DepthTested  = true,
+        },
+    }};
+
+    MockDevice device;
+    device.BackbufferHandle = RHI::TextureHandle{787u, 1u};
+
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    renderer->SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{
+        .VisualizationVectorFields = std::span<const Graphics::VectorFieldOverlayPacket>{
+            kVectorFields.data(), kVectorFields.size()},
+    });
+
+    const Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 128},
+    };
+    Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.DeviceOperational);
+
+    const auto* pass = FindCommandPass(stats, "VisualizationOverlayPass");
+    ASSERT_NE(pass, nullptr);
+    EXPECT_EQ(pass->Status, Graphics::RenderCommandPassStatus::SkippedUnavailable)
+        << "upload overflow must surface as SkippedUnavailable, not Recorded";
+
+    EXPECT_EQ(stats.VisualizationOverlayUpload.VectorFieldRecordsSubmitted, 1u);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.VectorFieldRecordsRecorded, 0u);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.UploadOverflowCount, 1u);
+    // Pipeline gate is independent of upload — the lane's pipelines
+    // are healthy, so the missing-pipeline counter stays untouched.
+    EXPECT_EQ(stats.VisualizationOverlayUpload.MissingPipelineSkipCount, 0u);
+
+    renderer->Shutdown();
+}
+
 TEST(VisualizationOverlayPassContract, PerFrameBufferRecyclingDoesNotLeakVectorField)
 {
     // GRAPHICS-078 Slice B — across N frames with a constant vector-

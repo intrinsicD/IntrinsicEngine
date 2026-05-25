@@ -188,6 +188,24 @@ namespace Extrinsic::Graphics
             return result;
         }
 
+        // Fail-close BEFORE allocating staging when a packet (or the
+        // accumulated lane payload) would push the helper past
+        // `kMaxVectorFieldVertexCount`. The cap check inside
+        // `UploadPackedVertices(...)` would otherwise run only after
+        // the `std::vector<PackedOverlayVertex>` allocation, so a
+        // single `ElementCount = UINT32_MAX` packet (or any
+        // accumulated payload above the cap) could throw `bad_alloc`
+        // — or attempt a multi-GiB host allocation — before the
+        // overflow gate fires. Mirror the
+        // `UploadPackedVertices(...)` overflow signaling so the
+        // executor records `Overflow = true` and the pass reports
+        // `SkippedUnavailable` deterministically.
+        if (totalEndpointCount > kMaxVectorFieldVertexCount)
+        {
+            result.Overflow = true;
+            return result;
+        }
+
         std::vector<PackedOverlayVertex> staging(static_cast<std::size_t>(totalEndpointCount));
         std::size_t writeIndex = 0;
         for (const VectorFieldOverlayPacket& packet : vectorFields)
