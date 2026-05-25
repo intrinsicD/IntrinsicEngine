@@ -33,6 +33,14 @@ namespace Extrinsic::Graphics
 
         constexpr std::uint64_t kInitialVectorFieldVertexCount = 256u;
         constexpr std::uint64_t kMaxVectorFieldVertexCount = 1u << 18; // 262 144 verts (~4 MiB)
+        // GRAPHICS-078 Slice C — isoline lane shares the per-vertex
+        // format and the geometric-growth shape. Caps are independent
+        // per lane so a heavy isoline submission does not squeeze the
+        // vector-field lane's allocation policy and vice versa,
+        // mirroring the GRAPHICS-077 Slice C triangle/line/point per-
+        // lane independence.
+        constexpr std::uint64_t kInitialIsolineVertexCount = 256u;
+        constexpr std::uint64_t kMaxIsolineVertexCount = 1u << 18;
 
         [[nodiscard]] std::uint32_t PackUnorm4x8(const glm::vec4& color) noexcept
         {
@@ -240,6 +248,99 @@ namespace Extrinsic::Graphics
             kInitialVectorFieldVertexCount,
             kMaxVectorFieldVertexCount,
             "VisualizationOverlay.VectorFieldVertices");
+        if (laneOutput.Overflow)
+        {
+            result.Overflow = true;
+            return result;
+        }
+        if (!laneOutput.Uploaded)
+        {
+            return result;
+        }
+
+        result.VertexBuffer = laneOutput.Handle;
+        result.VertexBufferBDA = laneOutput.BDA;
+        result.VertexCount = static_cast<std::uint32_t>(totalEndpointCount);
+        result.Uploaded = true;
+        return result;
+    }
+
+    VisualizationIsolineUploadResult VisualizationOverlayUploadHelper::UploadIsolines(
+        const std::span<const IsolineOverlayPacket> isolines)
+    {
+        VisualizationIsolineUploadResult result{};
+        result.PacketCount = static_cast<std::uint32_t>(isolines.size());
+
+        if (isolines.empty() || m_Device == nullptr || m_BufferManager == nullptr ||
+            !m_Device->IsOperational())
+        {
+            return result;
+        }
+
+        // CPU/null contract: each iso value contributes one placeholder
+        // `LineList` segment (two packed vertices) per packet so the
+        // pass can issue `Draw(2 * IsoValueCount, 1, 0, 0)` per packet.
+        // The Vulkan-tuned variant in Slice D substitutes an actual
+        // scalar-field-derived polyline expansion that emits per-iso
+        // contour vertices.
+        std::uint64_t totalEndpointCount = 0u;
+        for (const IsolineOverlayPacket& packet : isolines)
+        {
+            totalEndpointCount += static_cast<std::uint64_t>(packet.IsoValueCount) * 2u;
+        }
+
+        if (totalEndpointCount == 0u)
+        {
+            return result;
+        }
+
+        // Fail-close BEFORE allocating staging when a packet (or the
+        // accumulated lane payload) would push the helper past
+        // `kMaxIsolineVertexCount`. Mirrors the vector-field overflow
+        // gate so an adversarial `IsoValueCount = UINT32_MAX` (or any
+        // accumulated payload above the cap) cannot trigger a multi-
+        // GiB host allocation or throw `bad_alloc` before the overflow
+        // gate fires.
+        if (totalEndpointCount > kMaxIsolineVertexCount)
+        {
+            result.Overflow = true;
+            return result;
+        }
+
+        std::vector<PackedOverlayVertex> staging(static_cast<std::size_t>(totalEndpointCount));
+        std::size_t writeIndex = 0;
+        for (const IsolineOverlayPacket& packet : isolines)
+        {
+            const std::uint32_t packedColor = PackUnorm4x8(packet.Color);
+            const std::uint64_t endpointCount =
+                static_cast<std::uint64_t>(packet.IsoValueCount) * 2u;
+            for (std::uint64_t endpoint = 0; endpoint < endpointCount; ++endpoint)
+            {
+                // CPU/null path: the helper does not have CPU access
+                // to the source scalar field (its values + topology
+                // are GPU-side), so the packed-vertex position stays
+                // zero. The Vulkan-tuned variant (Slice D) substitutes
+                // backend-locally-resolved iso-contour vertices per
+                // packet. Per-packet color packing is identical
+                // across both paths.
+                PackedOverlayVertex& vertex = staging[writeIndex++];
+                vertex.Position[0] = 0.0f;
+                vertex.Position[1] = 0.0f;
+                vertex.Position[2] = 0.0f;
+                vertex.PackedColor = packedColor;
+            }
+        }
+
+        const LaneUploadOutput laneOutput = UploadPackedVertices(
+            *m_Device,
+            *m_BufferManager,
+            m_IsolineVertexBuffer,
+            m_IsolineVertexBufferCapacityBytes,
+            m_BufferAllocationCount,
+            std::span<const PackedOverlayVertex>{staging.data(), staging.size()},
+            kInitialIsolineVertexCount,
+            kMaxIsolineVertexCount,
+            "VisualizationOverlay.IsolineVertices");
         if (laneOutput.Overflow)
         {
             result.Overflow = true;

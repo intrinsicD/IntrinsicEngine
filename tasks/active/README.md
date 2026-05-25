@@ -57,42 +57,40 @@ Each active task should include:
   `CPUContracted` on CPU-only hosts.
 - [`GRAPHICS-078`](GRAPHICS-078-visualization-overlay-upload-helper.md) —
   Backend visualization-overlay upload helper (vector field +
-  isoline). Status: in-progress (Slices A + B landed; Slice C
-  isoline-lane operational wiring and the optional Slice D
-  `gpu;vulkan` smoke remain). Slice A scaffolded the recipe +
-  executor shape on `claude/intrinsicengine-agent-onboarding-3dLeQ`
-  2026-05-24 (209/209 graphics contract tests pass). Slice B
-  promoted the vector-field lane from `SkippedUnavailable` to
-  `Recorded` on `claude/intrinsicengine-agent-onboarding-7IOiJ`
-  2026-05-24 and verified through the contract CPU/null gate
-  (212/212 graphics contract tests pass; full CPU/null gate result
-  captured in the Slice B commit body). Slice B introduces the
-  `IVisualizationOverlayUploadHelper` virtual interface +
-  concrete default helper in
-  `Extrinsic.Graphics.VisualizationOverlayUploadHelper`, two
-  vector-field pipelines at call indices #32 + #33, the new
-  shader pair `assets/shaders/visualization_vector_field.{vert,frag}`,
-  and a `bool DepthTested{true}` field on
-  `VectorFieldOverlayPacket` (resolving the Slice A clarification
-  via option (a) — packet-level flag mirroring the transient-debug
-  packets). Owner: unassigned for Slices C/D; next pick-up by any
-  CPU-only agent for Slice C (isoline operational wiring).
+  isoline). Status: in-progress (Slices A + B + C landed; only the
+  optional Slice D `gpu;vulkan` smoke remains, blocked on a Vulkan-
+  capable host). Slice A scaffolded the recipe + executor shape on
+  `claude/intrinsicengine-agent-onboarding-3dLeQ` 2026-05-24
+  (209/209 graphics contract tests pass). Slice B promoted the
+  vector-field lane from `SkippedUnavailable` to `Recorded` on
+  `claude/intrinsicengine-agent-onboarding-7IOiJ` 2026-05-24 and
+  verified through the contract CPU/null gate (212/212 graphics
+  contract tests pass). Slice C promoted the isoline lane from
+  `SkippedUnavailable` to `Recorded` on
+  `claude/intrinsicengine-agent-onboarding-2P6pn` 2026-05-25 and
+  verified through the contract CPU/null gate (219/219 graphics
+  contract tests pass; net +7 from Slice B: six new isoline
+  contract tests + one prior baseline addition outside this task).
+  Slice C introduces two isoline pipelines at call indices #34 +
+  #35 via `BuildVisualizationIsolinePipelineDesc`, the new shader
+  pair `assets/shaders/visualization_isoline.{vert,frag}`, an
+  `UploadIsolines(...)` method on the helper with an independent
+  per-lane host-visible vertex buffer, a `VisualizationIsolinePushConstants`
+  push block (16 bytes carrying BDA + per-draw `FirstVertex`), a
+  `bool DepthTested{true}` field on `IsolineOverlayPacket`, and
+  per-lane gating semantics in `RecordVisualizationOverlayPass`
+  matching GRAPHICS-077 Slice C exactly. Owner: unassigned for
+  Slice D; next pick-up by any agent on a Vulkan-capable host.
   Promoted from `tasks/backlog/rendering/` on 2026-05-24 as the
   next earliest unblocked Theme A leaf once GRAPHICS-076 and
-  GRAPHICS-077 each parked on their Vulkan-host blockers (only
-  their respective Slice D opt-in `gpu;vulkan` smokes remain).
-  Four-slice plan mirrors GRAPHICS-077 exactly: recipe/executor
+  GRAPHICS-077 each parked on their Vulkan-host blockers. Four-
+  slice plan mirrors GRAPHICS-077 exactly: recipe/executor
   scaffold (A, landed), vector-field lane operational wiring (B,
-  landed; introduces the `IVisualizationOverlayUploadHelper`
-  virtual interface + concrete default helper in
-  `Extrinsic.Graphics.VisualizationOverlayUploadHelper` and two
-  vector-field pipelines at call indices #32 + #33), isoline lane
-  operational wiring (C; pipelines at call indices #34 + #35),
-  and the optional `gpu;vulkan` smoke (D, deferred behind the
-  same Vulkan-host gate as GRAPHICS-076 / 077 Slice D). The task
-  now sits at `CPUContracted` for the vector-field lane on
-  CPU-only hosts; the isoline lane is still `Scaffolded` until
-  Slice C lands.
+  landed), isoline lane operational wiring (C, landed), and the
+  optional `gpu;vulkan` smoke (D, deferred behind the same Vulkan-
+  host gate as GRAPHICS-076 / 077 Slice D). The task now sits at
+  `CPUContracted` on CPU-only hosts for the full two-lane
+  visualization overlay.
 
 Previously-active
 [`GEOM-015`](../done/GEOM-015-gjk-termination-diagnostics.md) — GJK

@@ -854,15 +854,48 @@ Concretely:
   device is owned by the optional Slice D `gpu;vulkan` smoke and the
   Vulkan-tuned helper variant that expands actual per-glyph
   endpoints from the source BDAs.
-- Slice C extends to the isoline lane with two pipelines at call
-  indices #34 + #35; Slice D adds the opt-in `gpu;vulkan` pixel-
-  readback smoke. The contract pin is
-  `tests/contract/graphics/Test.VisualizationOverlayPass.cpp` (recipe
-  declaration with/without overlay packets, executor
-  `SkippedNonOperational` short-circuit, per-lane
-  `Missing*PipelineLeaseSkipsUnavailable`, per-packet `Records*` /
-  `Selects*AlwaysOnTop` shape, and per-frame buffer-recycling
-  invariant for the vector-field lane).
+- GRAPHICS-078 Slice C promotes the isoline lane from
+  `SkippedUnavailable` to `Recorded` on the CPU/null path.
+  `IsolineOverlayPacket` grows a `bool DepthTested{true}` field
+  mirroring the GRAPHICS-010Q two-variant policy. The
+  `VisualizationOverlayUploadHelper` extends to a second per-lane
+  buffer lease (independent geometric growth, same per-lane cap as
+  the vector-field lane) and exposes `UploadIsolines(...)`. Two new
+  pipelines land at call indices #34 (isoline DepthTested) and #35
+  (isoline AlwaysOnTop), keyed by
+  `BuildVisualizationIsolinePipelineDesc(depthTested)` against the new
+  shader pair `assets/shaders/visualization_isoline.{vert,frag}` (same
+  BDA-fetch vertex layout as the vector-field + transient-debug
+  shaders, dedicated 16-byte `VisualizationIsolinePushConstants` push
+  block). The pass's new `ExecuteIsolines(...)` body iterates the
+  sanitized packet span and records `BindPipeline(variant) +
+  PushConstants(16) + Draw(2 * IsoValueCount, 1, 0, 0)` per packet
+  (each iso value is a `LineList` placeholder segment of two
+  vertices on the CPU/null path), switching the variant whenever
+  consecutive packets disagree on `DepthTested`. Per-lane gating in
+  `RecordVisualizationOverlayPass` flips the placeholder
+  `MissingPipelineSkipCount` increment for the isoline lane into the
+  same gate-and-record path the vector-field lane uses: a lane with
+  packets but a missing pipeline pair increments
+  `MissingPipelineSkipCount` and is skipped, while a sibling lane
+  with valid pipelines still records. Pass status is `Recorded` when
+  at least one lane recorded; `SkippedUnavailable` when every
+  submitted lane failed its gate. CPU/null contract note: the helper
+  does not have CPU access to the source scalar field (its values +
+  topology are GPU-side), so the CPU/null path writes zero positions
+  + the packet color into each packed vertex; per-pixel correctness
+  on a real Vulkan device is owned by the optional Slice D
+  `gpu;vulkan` smoke and the Vulkan-tuned helper variant that
+  expands scalar-field-derived contour vertices.
+- Slice D adds the opt-in `gpu;vulkan` pixel-readback smoke. The
+  contract pin is
+  `tests/contract/graphics/Test.VisualizationOverlayPass.cpp`
+  (14 tests on CPU/null hosts after Slice C: recipe declaration
+  with/without overlay packets, executor `SkippedNonOperational`
+  short-circuit, per-lane `Missing*PipelineLeaseSkipsUnavailable`,
+  per-packet `Records*` / `Selects*AlwaysOnTop` shape, per-frame
+  buffer-recycling invariant per lane, mixed-lane both-record
+  acceptance test, and the per-lane partial-skip independence pin).
 - `TransformSyncSystem`, `LightSystem`, and `VisualizationSyncSystem` consume
   graphics-owned snapshot records (`TransformSyncRecord`, `LightSnapshot`, and
   `VisualizationSyncRecord`) instead of querying live ECS registries. Runtime is

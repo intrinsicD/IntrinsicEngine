@@ -12,17 +12,17 @@ import Extrinsic.RHI.Handles;
 
 namespace Extrinsic::Graphics
 {
-    // GRAPHICS-078 Slice B — operational shell class for the canonical
-    // default-recipe `VisualizationOverlayPass`. Mirrors the
+    // GRAPHICS-078 Slices B + C — operational shell class for the
+    // canonical default-recipe `VisualizationOverlayPass`. Mirrors the
     // `TransientDebugSurfacePass` shape: default-constructible (no
     // system dependency), per-kind pipeline accessors for fail-closed
-    // prerequisite checks, and (Slice B) an `ExecuteVectorFields(...)`
-    // body that iterates the vector-field packet span and records
-    // `BindPipeline + PushConstants(BDA) + Draw(2 * ElementCount, 1, 0, 0)`
-    // per packet. Each packet independently switches between the
-    // depth-tested and always-on-top variants based on its
-    // `DepthTested` flag. Slice C adds the matching `ExecuteIsolines`
-    // body.
+    // prerequisite checks, and per-lane `Execute*(...)` bodies that
+    // iterate each lane's packet span and record `BindPipeline +
+    // PushConstants(BDA) + Draw(N, 1, 0, 0)` per packet (N =
+    // 2 * ElementCount for vector-field glyphs, 2 * IsoValueCount for
+    // isoline polylines on the CPU/null path). Each packet
+    // independently switches between the depth-tested and always-on-
+    // top variants based on its `DepthTested` flag.
     //
     // Push constant layout: 16 bytes packing the helper's vertex buffer
     // BDA + a per-draw `FirstVertex` index so the BDA-fetch vertex
@@ -31,6 +31,13 @@ namespace Extrinsic::Graphics
     // per kind keep room for per-kind evolution (e.g. per-glyph width
     // or per-iso polyline expansion push fields in a follow-up task).
     export struct VisualizationVectorFieldPushConstants
+    {
+        std::uint64_t VertexBufferBDA;
+        std::uint32_t FirstVertex;
+        std::uint32_t Reserved;
+    };
+
+    export struct VisualizationIsolinePushConstants
     {
         std::uint64_t VertexBufferBDA;
         std::uint32_t FirstVertex;
@@ -83,6 +90,20 @@ namespace Extrinsic::Graphics
                                  std::span<const VectorFieldOverlayPacket> vectorFields,
                                  const VisualizationVectorFieldUploadResult& uploadResult,
                                  VisualizationOverlayUploadDiagnostics& diagnostics);
+
+        // GRAPHICS-078 Slice C — records the per-packet `BindPipeline +
+        // PushConstants + Draw(2 * IsoValueCount, 1, 0, 0)` shape
+        // against `cmd` for the isoline lane. Same per-packet variant
+        // selection (`DepthTested`) and per-lane diagnostic counter
+        // semantics as `ExecuteVectorFields`. `uploadResult` carries
+        // the isoline-lane vertex buffer handle/BDA and total endpoint
+        // count for the frame. The caller has already validated that
+        // both pipeline handles are valid (see the renderer-side gate
+        // in `RecordVisualizationOverlayPass`).
+        void ExecuteIsolines(RHI::ICommandContext& cmd,
+                             std::span<const IsolineOverlayPacket> isolines,
+                             const VisualizationIsolineUploadResult& uploadResult,
+                             VisualizationOverlayUploadDiagnostics& diagnostics);
 
     private:
         RHI::PipelineHandle m_VectorFieldDepthTestedPipeline{};
