@@ -2,9 +2,9 @@
 
 ## Status
 
-- Status: in-progress (Slices A + B landed; Slice C wires the
-  isoline lane and Slice D is the optional `gpu;vulkan` smoke
-  deferred behind a Vulkan-capable host gate).
+- Status: in-progress (Slices A + B + C landed on CPU/null hosts;
+  only the optional Slice D `gpu;vulkan` smoke remains, deferred
+  behind a Vulkan-capable host gate).
   Slice A scaffolded the recipe + executor shape on
   `claude/intrinsicengine-agent-onboarding-3dLeQ` 2026-05-24
   (209/209 graphics contract tests pass). Slice B promoted the
@@ -12,17 +12,23 @@
   `claude/intrinsicengine-agent-onboarding-7IOiJ` 2026-05-24 and
   verified through the contract CPU/null gate (212/212 graphics
   contract tests pass; full CPU/null gate result captured in the
-  Slice B commit body). The task now sits at `CPUContracted` on
-  CPU-only hosts for the vector-field lane; only the optional
-  Slice C isoline-lane operational wiring and the optional Slice D
-  `gpu;vulkan` smoke remain.
-- Owner/agent: unassigned for Slices C/D; next pick-up by any
-  CPU-only agent for Slice C (isoline operational wiring).
+  Slice B commit body). Slice C promoted the isoline lane from
+  `SkippedUnavailable` to `Recorded` on
+  `claude/intrinsicengine-agent-onboarding-2P6pn` 2026-05-25 and
+  verified through the contract CPU/null gate (219/219 graphics
+  contract tests pass; net +7 from Slice B: six new isoline tests
+  + one prior baseline addition outside this task). The task now
+  sits at `CPUContracted` on CPU-only hosts for the full two-lane
+  visualization overlay; only the optional Slice D `gpu;vulkan`
+  smoke remains.
+- Owner/agent: unassigned for Slice D; next pick-up by any agent
+  on a Vulkan-capable host for the opt-in `gpu;vulkan` smoke.
 - Branch: Slice A landed on
   `claude/intrinsicengine-agent-onboarding-3dLeQ`; Slice B landed
-  on `claude/intrinsicengine-agent-onboarding-7IOiJ`; Slices C/D
-  will land on future `claude/intrinsicengine-agent-onboarding-*`
-  branches.
+  on `claude/intrinsicengine-agent-onboarding-7IOiJ`; Slice C
+  landed on `claude/intrinsicengine-agent-onboarding-2P6pn`;
+  Slice D will land on a future `claude/intrinsicengine-agent-onboarding-*`
+  branch on a Vulkan-capable host.
 - Started: 2026-05-24. Promoted from
   `tasks/backlog/rendering/GRAPHICS-078-visualization-overlay-upload-helper.md`
   as the next earliest unblocked Theme A leaf after GRAPHICS-076 and
@@ -33,8 +39,8 @@
   kind (depth-tested + always-on-top), one consolidated overlay pass
   drawing into `SceneColorHDR`/`SceneDepth` after lit composition.
 - Next verification step: see `## Next verification step` below for
-  the full per-slice command list. Slices A + B are verified; Slice
-  C is the next pick-up for CPU-only hosts.
+  the full per-slice command list. Slices A + B + C are verified;
+  Slice D is the next pick-up for Vulkan-capable hosts.
 
 ## Slice plan
 
@@ -112,23 +118,45 @@ final slice exercises an opt-in `gpu;vulkan` smoke.
   the packet's packed color into each packed vertex; per-pixel
   correctness on a real Vulkan device is owned by the optional
   Slice D `gpu;vulkan` smoke and the Vulkan-tuned helper variant.
-- **Slice C.** Isoline lane operational wiring. Mirrors Slice B for
-  isoline polylines: two more pipelines (`Isoline.DepthTested`,
-  `Isoline.AlwaysOnTop`, call indices #34 + #35), the matching
-  pipeline-desc helper, the shader pair
+- **Slice C (landed 2026-05-25 on `claude/intrinsicengine-agent-onboarding-2P6pn`).**
+  Isoline lane operational wiring. Mirrors Slice B for isoline
+  polylines: two more pipelines (`Isoline.DepthTested`,
+  `Isoline.AlwaysOnTop`, call indices #34 + #35) via a
+  `BuildVisualizationIsolinePipelineDesc(depthTested)` helper, two
+  pipeline-lease members on `NullRenderer`, the new shader pair
   `assets/shaders/visualization_isoline.{vert,frag}` (`LineList`
-  topology), and per-lane upload + recording paths through
-  `VisualizationOverlayUploadHelper`.
-  `RecordVisualizationOverlayPass(...)` gates each lane independently:
-  a lane with packets but a missing or invalid pipeline pair
-  increments `MissingPipelineSkipCount` and is skipped, while sibling
-  lanes with valid pipelines still record; the pass status is
-  `Recorded` when at least one lane recorded, and `SkippedUnavailable`
-  when every submitted lane failed its gate. Both lanes now record
-  their respective overlay draws with deterministic CPU diagnostics,
-  closing `Scaffolded → CPUContracted` for the full visualization
-  overlay on CPU-only hosts. Mirrors GRAPHICS-077 Slice C's per-lane
-  independence semantics exactly.
+  topology, BDA-fetch vertex layout matching the vector-field +
+  transient-debug shaders), and an extended
+  `VisualizationOverlayUploadHelper` with an `UploadIsolines(...)`
+  method backed by an independent per-lane host-visible vertex
+  buffer (same geometric growth + per-lane cap policy as the
+  vector-field lane). `IsolineOverlayPacket` grows a `bool
+  DepthTested{true}` field mirroring the GRAPHICS-010Q two-variant
+  policy on the transient-debug and vector-field packets. A new
+  `VisualizationIsolinePushConstants` (16 bytes carrying BDA +
+  per-draw `FirstVertex`) keeps room for per-kind evolution
+  (e.g. per-iso line-width expansion in a follow-up task) without
+  disturbing the vector-field push block. `ExecuteIsolines(...)`
+  iterates the sanitized packet span and records
+  `BindPipeline(variant) + PushConstants(16) +
+  Draw(2 * IsoValueCount, 1, 0, 0)` per packet with per-packet
+  variant selection. `RecordVisualizationOverlayPass(...)` gates
+  each lane independently: a lane with packets but a missing or
+  invalid pipeline pair increments `MissingPipelineSkipCount` and
+  is skipped, while sibling lanes with valid pipelines still
+  record; the pass status is `Recorded` when at least one lane
+  recorded, and `SkippedUnavailable` when every submitted lane
+  failed its gate. Both lanes now record their respective overlay
+  draws with deterministic CPU diagnostics, closing the full
+  visualization overlay at `CPUContracted` on CPU-only hosts.
+  Mirrors GRAPHICS-077 Slice C's per-lane independence semantics
+  exactly. CPU/null contract note: the helper does not have CPU
+  access to the source scalar field (its values + topology are
+  GPU-side), so the CPU/null path writes zero positions + the
+  packet color into each packed vertex; per-pixel correctness on a
+  real Vulkan device is owned by the optional Slice D `gpu;vulkan`
+  smoke and the Vulkan-tuned helper variant that expands scalar-
+  field-derived contour vertices.
 - **Slice D (optional, deferred).** Opt-in `gpu;vulkan;graphics` smoke
   asserting the visualization overlay pass actually rasterizes through
   a real Vulkan device on a Vulkan-capable host. Mirrors the
@@ -153,8 +181,10 @@ final slice exercises an opt-in `gpu;vulkan` smoke.
 - Slice B (landed) closes vector-field lane `Scaffolded →
   CPUContracted`. The isoline lane is still `Scaffolded`-only
   (Slice C remains in-scope to close it).
-- Slice C closes both lanes at `CPUContracted` and closes the task at
-  `CPUContracted` on CPU-only hosts.
+- Slice C (landed) closes the isoline lane `Scaffolded →
+  CPUContracted` and closes the task at `CPUContracted` on CPU-only
+  hosts (both lanes recording deterministically through the CPU/null
+  gate).
 - Slice D closes `CPUContracted → Operational` on Vulkan-capable
   hosts.
 
@@ -340,13 +370,58 @@ Slice B (vector-field lane, landed 2026-05-24):
       (`SkippedUnavailable` + `MissingPipelineSkipCount += 1` when the
       lane's pipelines are missing).
 
-Slice C (isoline lane, deferred):
+Slice C (isoline lane, landed 2026-05-25):
 
-- [ ] Isoline upload helper extension, two more pipelines
-      (`Isoline.DepthTested`, `Isoline.AlwaysOnTop`) at call
-      indices #34 + #35, shader pair
-      `assets/shaders/visualization_isoline.{vert,frag}`, per-lane
-      gating semantics matching GRAPHICS-077 Slice C.
+- [x] Added `bool DepthTested{true}` to `IsolineOverlayPacket` in
+      `src/graphics/renderer/Graphics.VisualizationPackets.cppm`,
+      mirroring the Slice B vector-field flag.
+- [x] Extended `IVisualizationOverlayUploadHelper` with
+      `UploadIsolines(...)` returning a new
+      `VisualizationIsolineUploadResult` (same shape as the
+      vector-field result), and grew the default
+      `VisualizationOverlayUploadHelper` with an independent
+      per-lane buffer lease + capacity field. The shared
+      `UploadPackedVertices` prologue in
+      `Graphics.VisualizationOverlayUploadHelper.cpp` is reused
+      verbatim; the lane uses `kInitialIsolineVertexCount = 256` /
+      `kMaxIsolineVertexCount = 1 << 18` with the same `2 *
+      IsoValueCount` accumulation policy as the vector-field
+      lane's `2 * ElementCount`.
+- [x] Added two isoline pipelines (`Isoline.DepthTested`,
+      `Isoline.AlwaysOnTop`) at call indices #34 + #35 in
+      `InitializeOperationalPassResources(...)` via a new
+      `BuildVisualizationIsolinePipelineDesc(depthTested)` helper.
+      Pinned to `RGBA16_FLOAT` (the `SceneColorHDR` format) +
+      `D32_FLOAT` depth, `LineList` topology,
+      `Rasterizer.Culling = None`, `ColorBlend[0].Enable = false`,
+      `PushConstantSize = sizeof(VisualizationIsolinePushConstants)`
+      (16 bytes carrying BDA + per-draw `FirstVertex`).
+- [x] Added shader pair
+      `assets/shaders/visualization_isoline.{vert,frag}` (`LineList`
+      topology, BDA-fetch vertex layout matching the vector-field
+      + transient-debug shaders, 16-byte push block carrying
+      `VertexBufferBDA + FirstVertex + Reserved`).
+- [x] Added `m_VisualizationOverlayIsolinePipelineLeaseDepthTested`
+      and `...LeaseAlwaysOnTop` members on `NullRenderer`,
+      constructed alongside the Slice B vector-field leases in
+      `Initialize(...)`/`InitializeOperationalPassResources(...)`;
+      reset in `Shutdown()` before `m_PipelineManager` so the
+      lease destructor observes a live manager.
+- [x] Added `VisualizationIsolinePushConstants` struct +
+      `ExecuteIsolines(...)` body to `VisualizationOverlayPass`
+      (per-packet `BindPipeline(variant) + PushConstants(16) +
+      Draw(2 * IsoValueCount, 1, 0, 0)` with per-packet
+      `DepthTested` variant selection and deterministic per-lane
+      diagnostics increments).
+- [x] Replaced the placeholder
+      `if (hasIsolines) ++MissingPipelineSkipCount;` increment in
+      `RecordVisualizationOverlayPass` with the same gate-and-record
+      shape the vector-field lane uses: the isoline lane is gated
+      on its pipeline-pair validity, uploads through the helper,
+      records per-packet draws, and flips the pass status to
+      `Recorded` when at least one lane's draws land
+      (`MissingPipelineSkipCount += 1` only when the lane has
+      packets but pipelines missing).
 
 Slice D (optional `gpu;vulkan` smoke, deferred):
 
@@ -418,7 +493,48 @@ Slice B (vector-field lane, landed 2026-05-24):
       `VectorFieldRecordsRecorded` reflect the final frame's payload
       (renderer resets per `ExecuteFrame()`).
 
-Slice C/D tests are written when those slices land.
+Slice C (isoline lane, landed 2026-05-25):
+
+- [x] `contract;graphics` —
+      `VisualizationOverlayPassContract.MissingIsolinePipelineLeaseSkipsUnavailable`:
+      `FailPipelineCreateCall = 34` (isoline DepthTested) yields
+      `SkippedUnavailable` and `MissingPipelineSkipCount += 1` for
+      an isoline-only frame. Upstream `SurfacePass` still records
+      `Recorded`.
+- [x] `contract;graphics` —
+      `VisualizationOverlayPassContract.RecordsIsolineBindPipelineAndDraw`:
+      one `IsolineOverlayPacket{IsoValueCount=1, DepthTested=true}`
+      records `BindPipeline(DepthTested) + PushConstants(16) +
+      Draw(2, 1, 0, 0)`, `IsolineRecordsRecorded == 1`, and pass
+      status is `Recorded`. At least one 16-byte push reaches the
+      device command context (assertion uses `>= 1` for the shared-
+      push-size caveat).
+- [x] `contract;graphics` —
+      `VisualizationOverlayPassContract.SelectsIsolineAlwaysOnTopVariantPerPacket`:
+      three packets with alternating `DepthTested` flags flip the
+      variant correctly (`IsolineRecordsRecorded == 3`; at least
+      three 16-byte pushes reach the device).
+- [x] `contract;graphics` —
+      `VisualizationOverlayPassContract.MixedLaneVectorFieldAndIsolineBothRecord`:
+      a frame submitting both lanes with valid pipelines records
+      both lanes; `MissingPipelineSkipCount == 0`. Pins the per-lane
+      independence semantic.
+- [x] `contract;graphics` —
+      `VisualizationOverlayPassContract.PerLanePartialSkipKeepsSiblingLaneRecording`:
+      `FailPipelineCreateCall = 34` with both lanes submitting
+      packets — vector-field lane records `Recorded`, isoline lane
+      increments `MissingPipelineSkipCount`, pass status stays
+      `Recorded` (per-lane independence under partial pipeline
+      failure).
+- [x] `contract;graphics` —
+      `VisualizationOverlayPassContract.PerFrameBufferRecyclingDoesNotLeakIsoline`:
+      across 5 frames with a constant 4-iso-value isoline payload,
+      `CreateBufferCount` stays at the post-frame-1 baseline (no
+      per-frame leak), `UploadOverflowCount` stays at zero, and the
+      per-frame `IsolineRecords{Submitted,Recorded}` reflect the
+      final frame's payload.
+
+Slice D tests are written when that slice lands.
 
 ## Docs
 
@@ -455,6 +571,27 @@ Slice B (landed 2026-05-24):
       `Extrinsic.Graphics.VisualizationOverlayUploadHelper` module
       surface appears).
 - [x] Update `tasks/active/README.md` to reflect Slice B status.
+
+Slice C (landed 2026-05-25):
+
+- [x] Extend `src/graphics/renderer/README.md` with the isoline
+      lane bind/draw shape, per-lane pipeline call indices #34 + #35,
+      the `BuildVisualizationIsolinePipelineDesc` helper, the new
+      shader pair placement, the per-lane gating semantics in
+      `RecordVisualizationOverlayPass`, and the CPU/null-path data-
+      substitution note (zero positions + packet color, Vulkan-
+      tuned scalar-field-derived expansion deferred to Slice D).
+- [-] `src/graphics/vulkan/README.md` row remains deferred to Slice
+      D for the same reason recorded under Slice B (helper lives in
+      the renderer module; vulkan-README entry justified only when
+      the Vulkan-tuned concrete impl lands).
+- [x] Regenerate `docs/api/generated/module_inventory.md` (no new
+      module surfaces in Slice C; the existing
+      `Extrinsic.Graphics.VisualizationOverlayUploadHelper` module
+      grew an export for `IsolineOverlayPacket`-consuming methods +
+      `VisualizationIsolineUploadResult`, but no new module
+      interfaces were added — count stays at the Slice B baseline).
+- [x] Update `tasks/active/README.md` to reflect Slice C status.
 
 ## Acceptance criteria
 
@@ -497,18 +634,34 @@ Slice B (landed 2026-05-24):
       tests pass (net +3 from Slice A: rename one + add three new
       vector-field tests).
 
-Full task (after Slice C):
+Slice C (landed 2026-05-25):
 
-- [ ] Submitted visualization-overlay packets across both kinds
-      produce deterministic `BindPipeline + Draw(...)` records in the
-      operational state.
-- [ ] Per-packet `DepthTested` selects the matching pipeline variant
-      for each kind.
-- [ ] No retained GPU resources on `GpuWorld`; no RHI/renderer
-      surface change beyond the per-pass `Get*Pipeline()` accessors.
-- [ ] No regression in `ValidateVisualizationPackets` /
-      `VisualizationDiagnostics`.
-- [ ] Default CPU/null gate stays green across slices.
+- [x] Isoline lane records deterministic
+      `BindPipeline + PushConstants(16) +
+      Draw(2 * IsoValueCount, 1, 0, 0)` per submitted packet in
+      the operational state (verified by
+      `RecordsIsolineBindPipelineAndDraw`).
+- [x] Per-packet `DepthTested` selects the matching pipeline
+      variant for the isoline lane (verified by
+      `SelectsIsolineAlwaysOnTopVariantPerPacket`).
+- [x] Per-lane gating semantics: a lane with packets but missing
+      pipelines increments `MissingPipelineSkipCount` and is
+      skipped while sibling lanes with valid pipelines still
+      record (verified by `PerLanePartialSkipKeepsSiblingLaneRecording`).
+- [x] Mixed-lane recording: a frame submitting both vector-field
+      and isoline packets records both lanes with
+      `MissingPipelineSkipCount == 0` (verified by
+      `MixedLaneVectorFieldAndIsolineBothRecord`).
+- [x] No retained GPU resources on `GpuWorld`; no RHI/renderer
+      surface change beyond the per-pass `Get*Pipeline()` accessors
+      and the helper's per-lane upload-result types.
+- [x] No regression in `ValidateVisualizationPackets` /
+      `VisualizationDiagnostics` (the new packet field defaults to
+      `true` and does not affect validity).
+- [x] Default CPU/null gate stays green across slices: 219/219
+      graphics contract tests pass (net +7 from Slice B's 212:
+      six new isoline contract tests + one prior baseline addition
+      outside this task).
 
 Slice D (optional, Vulkan-capable hosts only):
 
@@ -551,6 +704,11 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -LE 'slow|flaky-qu
   scaffold-only and must keep the executor at the
   `SkippedUnavailable` baseline so reviewers can see the
   recipe/executor shape land independently of pipeline/helper work.
+- Adding the Vulkan-tuned isoline helper variant (scalar-field-
+  derived contour vertex expansion via GPU compute) inside Slice
+  C — explicitly deferred to Slice D so the CPU/null contract lands
+  independently and the Vulkan-tuned implementation can rely on a
+  Vulkan-capable host for end-to-end pixel-readback validation.
 
 ## Next verification step
 
@@ -596,14 +754,28 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -LE 'slow|flaky-qu
   - `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`
     — 444 modules (up one from Slice A's 443 for the new
     `Extrinsic.Graphics.VisualizationOverlayUploadHelper` surface).
-- Slice C pick-up: a CPU-only host can pick up Slice C (isoline
-  operational wiring) immediately after Slice B merges. Slice C
-  extends the helper interface with `UploadIsolines(...)`, adds
-  `bool DepthTested{true}` to `IsolineOverlayPacket`, two more
-  pipelines at call indices #34 + #35, the shader pair
-  `assets/shaders/visualization_isoline.{vert,frag}` (`LineList`
-  topology), and per-lane gating semantics matching GRAPHICS-077
-  Slice C.
+- Slice C landed 2026-05-25 on
+  `claude/intrinsicengine-agent-onboarding-2P6pn`. Verification:
+  - `cmake --preset ci`
+  - `cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests`
+  - `ctest --test-dir build/ci -L contract -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
+    — 219/219 graphics contract tests passed (net +7 from Slice B:
+    six new isoline contract tests on top of the eight prior
+    `VisualizationOverlayPassContract.*` tests, plus one prior
+    baseline addition outside this task).
+  - `cmake --build --preset ci --target IntrinsicTests`
+  - `ctest --test-dir build/ci -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
+    — full CPU/null gate result captured in the Slice C commit body.
+  - `python3 tools/repo/check_layering.py --root src --strict`,
+    `python3 tools/repo/check_test_layout.py --root . --strict`,
+    `python3 tools/docs/check_doc_links.py --root .`,
+    `python3 tools/agents/check_task_policy.py --root . --strict`
+    — all clean.
+  - `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`
+    — no count change versus Slice B (no new module interfaces;
+    the existing helper module surface grew an `UploadIsolines`
+    method + `VisualizationIsolineUploadResult` struct, neither of
+    which adds a new module).
 - Slice D pick-up (Vulkan-capable host): configure with `ci-vulkan`,
   build `IntrinsicGraphicsIntegrationTests`, and run the opt-in
   `gpu;vulkan` smoke.

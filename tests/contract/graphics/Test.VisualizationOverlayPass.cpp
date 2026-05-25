@@ -17,8 +17,10 @@
 // Draw(2 * ElementCount, 1, 0, 0)` per submitted vector-field packet
 // (switching pipeline variants on each `DepthTested` flip).
 //
-// Slice C extends to the isoline lane; Slice D adds the opt-in
-// `gpu;vulkan` pixel-readback smoke.
+// Slice C extends to the isoline lane (call indices #34 + #35) and
+// adds per-lane independence + mixed-lane recording coverage that
+// mirrors GRAPHICS-077 Slice C; Slice D adds the opt-in `gpu;vulkan`
+// pixel-readback smoke.
 
 #include <array>
 #include <cstddef>
@@ -84,6 +86,33 @@ namespace
         renderer.SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{
             .VisualizationVectorFields =
                 std::span<const Graphics::VectorFieldOverlayPacket>{sPackets, 1u},
+        });
+    }
+
+    void SubmitOneIsoline(Graphics::IRenderer& renderer, const bool depthTested = true)
+    {
+        // A single non-empty isoline-overlay packet span flips
+        // `features.EnableVisualizationOverlay` for the isoline lane.
+        // `IsoValueCount = 1` produces a single placeholder line
+        // segment = 2 packed vertices in the helper's host-visible
+        // buffer; the pass records `Draw(2, 1, 0, 0)` per packet.
+        static Graphics::IsolineOverlayPacket sPackets[1] = {
+            Graphics::IsolineOverlayPacket{
+                .SourceScalarName = "Test.Iso",
+                .Domain           = Graphics::VisualizationAttributeDomain::Face,
+                .IsoValueCount    = 1u,
+                .RangeMin         = 0.0f,
+                .RangeMax         = 1.0f,
+                .LineWidth        = 1.0f,
+                .Color            = glm::vec4{1.0f, 1.0f, 1.0f, 1.0f},
+                .DepthTested      = true,
+            },
+        };
+        sPackets[0].DepthTested = depthTested;
+
+        renderer.SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{
+            .VisualizationIsolines =
+                std::span<const Graphics::IsolineOverlayPacket>{sPackets, 1u},
         });
     }
 }
@@ -602,6 +631,424 @@ TEST(VisualizationOverlayPassContract, PerFrameBufferRecyclingDoesNotLeakVectorF
     // `ExecuteFrame()`).
     EXPECT_EQ(stats.VisualizationOverlayUpload.VectorFieldRecordsSubmitted, 1u);
     EXPECT_EQ(stats.VisualizationOverlayUpload.VectorFieldRecordsRecorded, 1u);
+
+    renderer->Shutdown();
+}
+
+// -----------------------------------------------------------------------------
+// Slice C — isoline lane executor + helper contract.
+// -----------------------------------------------------------------------------
+
+TEST(VisualizationOverlayPassContract, MissingIsolinePipelineLeaseSkipsUnavailable)
+{
+    // GRAPHICS-078 Slice C — failing the isoline DepthTested pipeline
+    // create (call #34, immediately after vector-field AlwaysOnTop at
+    // #33) yields `"VisualizationOverlayPass" = SkippedUnavailable`
+    // for an isoline-only frame, with every upstream pipeline lease
+    // keeping the rest of the default recipe recording.
+    // `MissingPipelineSkipCount` increments by exactly 1 so the
+    // diagnostic counter distinguishes "isoline lane on, pipeline
+    // missing" from "feature off".
+    MockDevice device;
+    device.FailPipelineCreateCall = 34;
+    device.BackbufferHandle = RHI::TextureHandle{790u, 1u};
+
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    SubmitOneIsoline(*renderer);
+
+    const Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 128},
+    };
+    Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.DeviceOperational);
+
+    const auto* pass = FindCommandPass(stats, "VisualizationOverlayPass");
+    ASSERT_NE(pass, nullptr);
+    EXPECT_EQ(pass->Status, Graphics::RenderCommandPassStatus::SkippedUnavailable);
+
+    // Isoline pipeline suppressed; the helper's upload path never runs
+    // because the pipeline gate fails first. Submitted/recorded stay
+    // at zero on the per-kind counters; only `MissingPipelineSkipCount`
+    // ticks. Vector-field counters stay at zero too because this
+    // frame submits no vector-field packets.
+    EXPECT_EQ(stats.VisualizationOverlayUpload.UploadOverflowCount, 0u);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.VectorFieldRecordsSubmitted, 0u);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.IsolineRecordsSubmitted, 0u);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.VectorFieldRecordsRecorded, 0u);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.IsolineRecordsRecorded, 0u);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.MissingPipelineSkipCount, 1u);
+
+    // Upstream passes still record — verify a representative one.
+    const auto* surfacePass = FindCommandPass(stats, "SurfacePass");
+    ASSERT_NE(surfacePass, nullptr);
+    EXPECT_EQ(surfacePass->Status, Graphics::RenderCommandPassStatus::Recorded);
+
+    renderer->Shutdown();
+}
+
+TEST(VisualizationOverlayPassContract, RecordsIsolineBindPipelineAndDraw)
+{
+    // GRAPHICS-078 Slice C — a single sanitized `IsolineOverlayPacket`
+    // (`IsoValueCount = 1`, `DepthTested = true`) records the canonical
+    // per-packet `BindPipeline(depth-tested) + PushConstants(16) +
+    // Draw(2 * IsoValueCount, 1, 0, 0)` shape and increments
+    // `IsolineRecordsSubmitted` + `IsolineRecordsRecorded` by exactly 1.
+    MockDevice device;
+    device.BackbufferHandle = RHI::TextureHandle{791u, 1u};
+
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    SubmitOneIsoline(*renderer, /*depthTested=*/true);
+
+    const Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 128},
+    };
+    Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.DeviceOperational);
+
+    const auto* pass = FindCommandPass(stats, "VisualizationOverlayPass");
+    ASSERT_NE(pass, nullptr);
+    EXPECT_EQ(pass->Status, Graphics::RenderCommandPassStatus::Recorded);
+
+    EXPECT_EQ(stats.VisualizationOverlayUpload.IsolineRecordsSubmitted, 1u);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.IsolineRecordsRecorded, 1u);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.UploadOverflowCount, 0u);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.MissingPipelineSkipCount, 0u);
+
+    // A 16-byte `VisualizationIsolinePushConstants` payload must reach
+    // the device command context as part of the per-packet recording
+    // sequence. The assertion is "at least one 16-byte push reached
+    // the context" — sufficient to pin the contract without coupling
+    // to the exact ordering of other 16-byte-push consumers (see the
+    // matching note on `RecordsVectorFieldBindPipelineAndDraw`).
+    const auto expectedPushSize =
+        static_cast<std::uint32_t>(sizeof(Graphics::VisualizationIsolinePushConstants));
+    std::size_t sizedPushCount = 0;
+    for (const std::uint32_t size : device.CommandContext.PushConstantSizes)
+    {
+        if (size == expectedPushSize) { ++sizedPushCount; }
+    }
+    EXPECT_GE(sizedPushCount, 1u)
+        << "expected at least one " << expectedPushSize
+        << "-byte push for the visualization-overlay isoline packet";
+
+    renderer->Shutdown();
+}
+
+TEST(VisualizationOverlayPassContract, SelectsIsolineAlwaysOnTopVariantPerPacket)
+{
+    // GRAPHICS-078 Slice C — mixed `DepthTested` flags across isoline
+    // packets cause the correct pipeline variant to bind per packet.
+    // Three packets [depth-tested, always-on-top, depth-tested] flips
+    // the variant twice, so the executor emits 3 BindPipelines + 3
+    // PushConstants + 3 Draws under this pass. Counts the 16-byte
+    // pushes attributable to the lane at >= 3.
+    static const std::array<Graphics::IsolineOverlayPacket, 3> kIsolines{{
+        Graphics::IsolineOverlayPacket{
+            .SourceScalarName = "Test.Iso.A",
+            .Domain           = Graphics::VisualizationAttributeDomain::Face,
+            .IsoValueCount    = 2u,
+            .RangeMin         = 0.0f,
+            .RangeMax         = 1.0f,
+            .LineWidth        = 1.0f,
+            .Color            = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
+            .DepthTested      = true,
+        },
+        Graphics::IsolineOverlayPacket{
+            .SourceScalarName = "Test.Iso.B",
+            .Domain           = Graphics::VisualizationAttributeDomain::Face,
+            .IsoValueCount    = 3u,
+            .RangeMin         = 0.0f,
+            .RangeMax         = 1.0f,
+            .LineWidth        = 1.0f,
+            .Color            = glm::vec4{0.0f, 1.0f, 0.0f, 1.0f},
+            .DepthTested      = false,
+        },
+        Graphics::IsolineOverlayPacket{
+            .SourceScalarName = "Test.Iso.C",
+            .Domain           = Graphics::VisualizationAttributeDomain::Face,
+            .IsoValueCount    = 1u,
+            .RangeMin         = 0.0f,
+            .RangeMax         = 1.0f,
+            .LineWidth        = 1.0f,
+            .Color            = glm::vec4{0.0f, 0.0f, 1.0f, 1.0f},
+            .DepthTested      = true,
+        },
+    }};
+
+    MockDevice device;
+    device.BackbufferHandle = RHI::TextureHandle{792u, 1u};
+
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    renderer->SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{
+        .VisualizationIsolines = std::span<const Graphics::IsolineOverlayPacket>{
+            kIsolines.data(), kIsolines.size()},
+    });
+
+    const Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 128},
+    };
+    Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+
+    const auto* pass = FindCommandPass(stats, "VisualizationOverlayPass");
+    ASSERT_NE(pass, nullptr);
+    EXPECT_EQ(pass->Status, Graphics::RenderCommandPassStatus::Recorded);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.IsolineRecordsSubmitted, 3u);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.IsolineRecordsRecorded, 3u);
+
+    const auto expectedPushSize =
+        static_cast<std::uint32_t>(sizeof(Graphics::VisualizationIsolinePushConstants));
+    std::size_t sizedPushCount = 0;
+    for (const std::uint32_t size : device.CommandContext.PushConstantSizes)
+    {
+        if (size == expectedPushSize) { ++sizedPushCount; }
+    }
+    EXPECT_GE(sizedPushCount, 3u)
+        << "expected at least 3 " << expectedPushSize
+        << "-byte pushes for the three visualization-overlay isoline packets";
+
+    renderer->Shutdown();
+}
+
+TEST(VisualizationOverlayPassContract, MixedLaneVectorFieldAndIsolineBothRecord)
+{
+    // GRAPHICS-078 Slice C — a frame that submits both vector-field and
+    // isoline packets must record both lanes independently with valid
+    // pipelines: the pass status is `Recorded`, each lane increments
+    // its own submitted/recorded counters, and
+    // `MissingPipelineSkipCount` stays at zero. This pins the per-lane
+    // independence semantic that the GRAPHICS-077 transient-debug
+    // pattern enforces.
+    static const Graphics::VectorFieldOverlayPacket kVectorFields[1] = {
+        Graphics::VectorFieldOverlayPacket{
+            .Name         = "Test.VF",
+            .Domain       = Graphics::VisualizationAttributeDomain::Vertex,
+            .ElementCount = 2u,
+            .Scale        = 1.0f,
+            .Color        = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
+            .DepthTested  = true,
+        },
+    };
+    static const Graphics::IsolineOverlayPacket kIsolines[1] = {
+        Graphics::IsolineOverlayPacket{
+            .SourceScalarName = "Test.Iso",
+            .Domain           = Graphics::VisualizationAttributeDomain::Face,
+            .IsoValueCount    = 3u,
+            .RangeMin         = 0.0f,
+            .RangeMax         = 1.0f,
+            .LineWidth        = 1.0f,
+            .Color            = glm::vec4{0.0f, 1.0f, 0.0f, 1.0f},
+            .DepthTested      = true,
+        },
+    };
+
+    MockDevice device;
+    device.BackbufferHandle = RHI::TextureHandle{793u, 1u};
+
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    renderer->SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{
+        .VisualizationVectorFields =
+            std::span<const Graphics::VectorFieldOverlayPacket>{kVectorFields, 1u},
+        .VisualizationIsolines =
+            std::span<const Graphics::IsolineOverlayPacket>{kIsolines, 1u},
+    });
+
+    const Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 128},
+    };
+    Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+
+    const auto* pass = FindCommandPass(stats, "VisualizationOverlayPass");
+    ASSERT_NE(pass, nullptr);
+    EXPECT_EQ(pass->Status, Graphics::RenderCommandPassStatus::Recorded);
+
+    EXPECT_EQ(stats.VisualizationOverlayUpload.VectorFieldRecordsSubmitted, 1u);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.VectorFieldRecordsRecorded, 1u);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.IsolineRecordsSubmitted, 1u);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.IsolineRecordsRecorded, 1u);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.UploadOverflowCount, 0u);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.MissingPipelineSkipCount, 0u);
+
+    renderer->Shutdown();
+}
+
+TEST(VisualizationOverlayPassContract, PerLanePartialSkipKeepsSiblingLaneRecording)
+{
+    // GRAPHICS-078 Slice C — when one lane's pipelines are missing but
+    // the other lane's pipelines are healthy AND both lanes have
+    // packets, the missing lane increments `MissingPipelineSkipCount`
+    // while the sibling lane still records. The pass status is
+    // `Recorded` because at least one lane succeeded. Mirrors
+    // GRAPHICS-077 Slice C's per-lane independence pin.
+    //
+    // FailPipelineCreateCall = 34 suppresses isoline DepthTested only;
+    // vector-field pipelines (#32 + #33) are healthy.
+    static const Graphics::VectorFieldOverlayPacket kVectorFields[1] = {
+        Graphics::VectorFieldOverlayPacket{
+            .Name         = "Test.VF",
+            .Domain       = Graphics::VisualizationAttributeDomain::Vertex,
+            .ElementCount = 1u,
+            .Scale        = 1.0f,
+            .Color        = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
+            .DepthTested  = true,
+        },
+    };
+    static const Graphics::IsolineOverlayPacket kIsolines[1] = {
+        Graphics::IsolineOverlayPacket{
+            .SourceScalarName = "Test.Iso",
+            .Domain           = Graphics::VisualizationAttributeDomain::Face,
+            .IsoValueCount    = 2u,
+            .RangeMin         = 0.0f,
+            .RangeMax         = 1.0f,
+            .LineWidth        = 1.0f,
+            .Color            = glm::vec4{0.0f, 1.0f, 0.0f, 1.0f},
+            .DepthTested      = true,
+        },
+    };
+
+    MockDevice device;
+    device.FailPipelineCreateCall = 34;
+    device.BackbufferHandle = RHI::TextureHandle{794u, 1u};
+
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    renderer->SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{
+        .VisualizationVectorFields =
+            std::span<const Graphics::VectorFieldOverlayPacket>{kVectorFields, 1u},
+        .VisualizationIsolines =
+            std::span<const Graphics::IsolineOverlayPacket>{kIsolines, 1u},
+    });
+
+    const Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 128},
+    };
+    Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+
+    const auto* pass = FindCommandPass(stats, "VisualizationOverlayPass");
+    ASSERT_NE(pass, nullptr);
+    // Vector-field lane recorded; isoline lane skipped → status is
+    // `Recorded` (per-lane independence).
+    EXPECT_EQ(pass->Status, Graphics::RenderCommandPassStatus::Recorded);
+
+    EXPECT_EQ(stats.VisualizationOverlayUpload.VectorFieldRecordsSubmitted, 1u);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.VectorFieldRecordsRecorded, 1u);
+    // Isoline lane's pipeline gate failed first, so neither submitted
+    // nor recorded counters tick for that lane — only
+    // `MissingPipelineSkipCount` does.
+    EXPECT_EQ(stats.VisualizationOverlayUpload.IsolineRecordsSubmitted, 0u);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.IsolineRecordsRecorded, 0u);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.MissingPipelineSkipCount, 1u);
+
+    renderer->Shutdown();
+}
+
+TEST(VisualizationOverlayPassContract, PerFrameBufferRecyclingDoesNotLeakIsoline)
+{
+    // GRAPHICS-078 Slice C — across N frames with a constant isoline
+    // payload the upload helper's underlying host-visible vertex
+    // buffer must not leak. Mirrors the vector-field recycling test:
+    // after the first operational frame the helper's allocation is
+    // in-flight, and subsequent frames must not increase the buffer-
+    // create count attributable to the visualization-overlay pass.
+    static const Graphics::IsolineOverlayPacket kIsolines[1] = {
+        Graphics::IsolineOverlayPacket{
+            .SourceScalarName = "Test.Iso",
+            .Domain           = Graphics::VisualizationAttributeDomain::Face,
+            .IsoValueCount    = 4u,
+            .RangeMin         = 0.0f,
+            .RangeMax         = 1.0f,
+            .LineWidth        = 1.0f,
+            .Color            = glm::vec4{1.0f},
+            .DepthTested      = true,
+        },
+    };
+
+    MockDevice device;
+    device.BackbufferHandle = RHI::TextureHandle{795u, 1u};
+
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    int createBufferCountAfterFrame1 = 0;
+    for (int frameIndex = 1; frameIndex <= 5; ++frameIndex)
+    {
+        RHI::FrameHandle frame{};
+        ASSERT_TRUE(renderer->BeginFrame(frame));
+        renderer->SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{
+            .VisualizationIsolines = std::span<const Graphics::IsolineOverlayPacket>{
+                kIsolines, 1u},
+        });
+        const Graphics::RenderFrameInput input{
+            .Viewport = {.Width = 64, .Height = 64},
+        };
+        Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+        renderer->PrepareFrame(world);
+        renderer->ExecuteFrame(frame, world);
+        (void)renderer->EndFrame(frame);
+
+        if (frameIndex == 1)
+        {
+            createBufferCountAfterFrame1 = device.CreateBufferCount;
+        }
+        else
+        {
+            EXPECT_EQ(device.CreateBufferCount, createBufferCountAfterFrame1)
+                << "frame " << frameIndex;
+        }
+    }
+
+    const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_EQ(stats.VisualizationOverlayUpload.UploadOverflowCount, 0u);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.IsolineRecordsSubmitted, 1u);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.IsolineRecordsRecorded, 1u);
 
     renderer->Shutdown();
 }

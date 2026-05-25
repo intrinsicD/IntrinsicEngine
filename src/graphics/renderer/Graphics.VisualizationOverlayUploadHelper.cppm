@@ -12,12 +12,12 @@ import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 
-// GRAPHICS-078 Slice B — per-frame host-visible upload helper for the
-// visualization overlay pass. The helper packs sanitized
+// GRAPHICS-078 Slices B + C — per-frame host-visible upload helper for
+// the visualization overlay pass. The helper packs sanitized
 // `VectorFieldOverlayPacket` (Slice B) and `IsolineOverlayPacket`
-// (Slice C, deferred) spans into per-lane host-visible vertex buffers
-// that survive across frames (geometric growth on demand) and reports
-// per-lane upload results so the executor's
+// (Slice C) spans into per-lane host-visible vertex buffers that
+// survive across frames (geometric growth on demand) and reports per-
+// lane upload results so the executor's
 // `RecordVisualizationOverlayPass(...)` helper can record deterministic
 // `BindPipeline + PushConstants + Draw(N, 1, 0, 0)` shapes.
 //
@@ -25,7 +25,10 @@ import Extrinsic.RHI.Handles;
 // substituting visualization lanes for transient-debug lanes:
 //   - Slice B wires the vector-field lane (one glyph = one line
 //     segment = two packed vertices).
-//   - Slice C extends the interface to the isoline lane.
+//   - Slice C wires the isoline lane (each iso value contributes a
+//     `LineList` placeholder segment of two packed vertices on the
+//     CPU/null path; the Vulkan-tuned variant in Slice D expands
+//     actual isoline contour polylines from a GPU scalar field).
 // All lanes share the `position(vec3) + packed RGBA8 color(uint32)`
 // 16-byte packed-vertex layout consumed by the matching
 // `assets/shaders/visualization_*.{vert,frag}` shader pairs.
@@ -85,6 +88,23 @@ export namespace Extrinsic::Graphics
         bool              Overflow{false};
     };
 
+    // GRAPHICS-078 Slice C — isoline lane upload result. Mirrors the
+    // vector-field upload result shape. On the CPU/null contract path,
+    // each iso value contributes a single placeholder line segment
+    // (two packed vertices) so the pass can issue
+    // `Draw(2 * IsoValueCount, 1, 0, 0)` per packet via `LineList`
+    // topology. The Vulkan-tuned variant in Slice D substitutes an
+    // actual scalar-field-derived polyline expansion.
+    struct VisualizationIsolineUploadResult
+    {
+        RHI::BufferHandle VertexBuffer{};
+        std::uint64_t     VertexBufferBDA{0u};
+        std::uint32_t     VertexCount{0u};
+        std::uint32_t     PacketCount{0u};
+        bool              Uploaded{false};
+        bool              Overflow{false};
+    };
+
     class IVisualizationOverlayUploadHelper
     {
     public:
@@ -97,6 +117,15 @@ export namespace Extrinsic::Graphics
 
         [[nodiscard]] virtual VisualizationVectorFieldUploadResult UploadVectorFields(
             std::span<const VectorFieldOverlayPacket> vectorFields) = 0;
+
+        // GRAPHICS-078 Slice C — isoline-lane upload. Same per-lane
+        // buffer-lease + geometric-growth shape as the vector-field
+        // lane. Returns `Uploaded = false` when the lane has no
+        // packets, the device is non-operational, or no manager is
+        // attached; `Overflow = true` when the requested vertex count
+        // exceeds the per-lane cap or buffer creation fails.
+        [[nodiscard]] virtual VisualizationIsolineUploadResult UploadIsolines(
+            std::span<const IsolineOverlayPacket> isolines) = 0;
 
         [[nodiscard]] virtual std::uint64_t GetBufferAllocationCount() const noexcept = 0;
 
@@ -144,6 +173,9 @@ export namespace Extrinsic::Graphics
         [[nodiscard]] VisualizationVectorFieldUploadResult UploadVectorFields(
             std::span<const VectorFieldOverlayPacket> vectorFields) override;
 
+        [[nodiscard]] VisualizationIsolineUploadResult UploadIsolines(
+            std::span<const IsolineOverlayPacket> isolines) override;
+
         [[nodiscard]] std::uint64_t GetBufferAllocationCount() const noexcept override
         {
             return m_BufferAllocationCount;
@@ -155,6 +187,14 @@ export namespace Extrinsic::Graphics
 
         std::optional<RHI::BufferManager::BufferLease> m_VectorFieldVertexBuffer{};
         std::uint64_t  m_VectorFieldVertexBufferCapacityBytes{0u};
+
+        // GRAPHICS-078 Slice C — independent per-lane buffer lease for
+        // the isoline lane. Grows independently of the vector-field
+        // lane and is reset before the `BufferManager` in the
+        // renderer's `Shutdown()` (via `m_VisualizationOverlayUploadHelper.reset()`
+        // before `m_BufferManager.reset()`).
+        std::optional<RHI::BufferManager::BufferLease> m_IsolineVertexBuffer{};
+        std::uint64_t  m_IsolineVertexBufferCapacityBytes{0u};
 
         std::uint64_t  m_BufferAllocationCount{0u};
     };

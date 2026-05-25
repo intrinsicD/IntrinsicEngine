@@ -90,6 +90,13 @@ export namespace Extrinsic::Graphics
         float RangeMax{1.f};
         float LineWidth{1.f};
         glm::vec4 Color{1.f};
+        // GRAPHICS-078 Slice C — depth-tested vs always-on-top variant per packet,
+        // resolved by the `VisualizationOverlayPass` to the matching pipeline
+        // lease at record time. Mirrors the `DepthTested` field on
+        // `VectorFieldOverlayPacket` (Slice B) and on the transient-debug
+        // packets (GRAPHICS-010Q two-variant policy). Default true preserves
+        // the existing scene-depth-respecting isoline behavior.
+        bool DepthTested{true};
     };
 
     struct HtexPatchPreviewAtlasPacket
