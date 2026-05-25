@@ -812,25 +812,57 @@ Concretely:
   `RecordVisualizationOverlayPass(...)` with the
   `SkippedNonOperational` / `SkippedUnavailable` taxonomy used by the
   other default-recipe helpers. The new
-  `VisualizationOverlayUploadDiagnostics` struct lives on
-  `RenderGraphFrameStats::VisualizationOverlayUpload` and exposes
-  six counters (`UploadOverflowCount`,
+  `VisualizationOverlayUploadDiagnostics` struct (moved to
+  `Extrinsic.Graphics.VisualizationOverlayUploadHelper` in Slice B)
+  lives on `RenderGraphFrameStats::VisualizationOverlayUpload` and
+  exposes six counters (`UploadOverflowCount`,
   `{VectorField,Isoline}RecordsSubmitted`,
   `{VectorField,Isoline}RecordsRecorded`,
-  `MissingPipelineSkipCount`). Slice A pins all counters at zero
-  except `MissingPipelineSkipCount`, which increments by one each
-  frame the executor reaches the branch with an operational device
-  but no pipeline (the scaffold-only signal that distinguishes
-  "feature on" from "feature off"). Slice B promotes the
-  vector-field lane to `Recorded` with two pipelines at call indices
-  #32 + #33; Slice C extends to the isoline lane with two pipelines
-  at call indices #34 + #35; Slice D adds the opt-in `gpu;vulkan`
-  pixel-readback smoke. The contract pin is
-  `tests/contract/graphics/Test.VisualizationOverlayPass.cpp`
-  (recipe declaration with/without overlay packets, executor
-  `SkippedNonOperational` short-circuit, executor
-  `SkippedUnavailable` with `MissingPipelineSkipCount` increment on
-  the operational-no-pipeline path).
+  `MissingPipelineSkipCount`).
+- GRAPHICS-078 Slice B promotes the vector-field lane from
+  `SkippedUnavailable` to `Recorded` on the CPU/null path.
+  `VectorFieldOverlayPacket` grows a `bool DepthTested{true}` field
+  mirroring the GRAPHICS-010Q two-variant policy on the transient-
+  debug packets. The renderer constructs a
+  `VisualizationOverlayUploadHelper` alongside the
+  `TransientDebugUploadHelper` (default in-renderer concrete impl
+  pairs `RHI::BufferManager` with `IDevice::WriteBuffer(...)` against
+  a single growing host-visible vertex buffer per lane, geometric
+  growth ×2 up to a per-lane cap of `1 << 18` vertices). Two new
+  pipelines land at call indices #32 (vector-field DepthTested) and
+  #33 (vector-field AlwaysOnTop), keyed by
+  `BuildVisualizationVectorFieldPipelineDesc(depthTested)` against
+  the new shader pair
+  `assets/shaders/visualization_vector_field.{vert,frag}` (BDA-fetch
+  vertex layout matching the transient-debug shaders, 16-byte
+  `VisualizationVectorFieldPushConstants` push block carrying
+  `VertexBufferBDA + FirstVertex + Reserved`). The pass's new
+  `ExecuteVectorFields(...)` body iterates the sanitized packet span
+  and records `BindPipeline(variant) + PushConstants(16) +
+  Draw(2 * ElementCount, 1, 0, 0)` per packet (one glyph = one line
+  segment = two vertices), switching the variant whenever consecutive
+  packets disagree on `DepthTested`. Per-lane gating in
+  `RecordVisualizationOverlayPass` increments
+  `MissingPipelineSkipCount` when the vector-field pipelines are
+  missing, increments `VectorFieldRecordsSubmitted/Recorded`
+  deterministically per packet, and flips the pass status to
+  `Recorded` when at least one packet's draw lands.
+  CPU/null contract note: the helper does not have CPU access to
+  `PositionBufferBDA` / `VectorBufferBDA` (those are GPU pointers),
+  so the CPU/null path writes zero positions and the packet color
+  into each packed vertex; per-pixel correctness on a real Vulkan
+  device is owned by the optional Slice D `gpu;vulkan` smoke and the
+  Vulkan-tuned helper variant that expands actual per-glyph
+  endpoints from the source BDAs.
+- Slice C extends to the isoline lane with two pipelines at call
+  indices #34 + #35; Slice D adds the opt-in `gpu;vulkan` pixel-
+  readback smoke. The contract pin is
+  `tests/contract/graphics/Test.VisualizationOverlayPass.cpp` (recipe
+  declaration with/without overlay packets, executor
+  `SkippedNonOperational` short-circuit, per-lane
+  `Missing*PipelineLeaseSkipsUnavailable`, per-packet `Records*` /
+  `Selects*AlwaysOnTop` shape, and per-frame buffer-recycling
+  invariant for the vector-field lane).
 - `TransformSyncSystem`, `LightSystem`, and `VisualizationSyncSystem` consume
   graphics-owned snapshot records (`TransformSyncRecord`, `LightSnapshot`, and
   `VisualizationSyncRecord`) instead of querying live ECS registries. Runtime is

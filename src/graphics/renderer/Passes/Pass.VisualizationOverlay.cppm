@@ -1,53 +1,42 @@
 module;
 
 #include <cstdint>
+#include <span>
 
 export module Extrinsic.Graphics.Pass.VisualizationOverlay;
 
+import Extrinsic.Graphics.VisualizationOverlayUploadHelper;
+import Extrinsic.Graphics.VisualizationPackets;
+import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Handles;
 
 namespace Extrinsic::Graphics
 {
-    // GRAPHICS-078 Slice A — deterministic CPU diagnostics for the
-    // `VisualizationOverlayPass` upload + recording path. All counters
-    // stay at zero in Slice A (no pipelines, scaffold executor branch
-    // only). Slice B populates the vector-field counters; Slice C
-    // populates the isoline counters. `MissingPipelineSkipCount`
-    // increments when the executor reaches the pass branch with the
-    // device operational but at least one required pipeline lease is
-    // missing (so the pass returns `SkippedUnavailable`); useful for
-    // distinguishing "feature off" (counter stays zero, pass not in
-    // stats) from "feature on but pipeline missing" (counter
-    // increments). `UploadOverflowCount` reports transient-buffer
-    // allocator capacity exhaustion from the upload helper landing in
-    // Slice B/C.
-    //
-    // Reset per-frame through the renderer's existing
-    // `m_LastRenderGraphStats = {}` cadence in `ExecuteFrame()`.
-    //
-    // Co-located with the pass module in Slice A to keep the new
-    // module surface small; Slice B can move this struct into a
-    // dedicated `Extrinsic.Graphics.VisualizationOverlayUploadHelper`
-    // module if/when the helper interface lands, mirroring the
-    // GRAPHICS-077 Slice B placement of
-    // `TransientDebugUploadDiagnostics`.
-    export struct VisualizationOverlayUploadDiagnostics
-    {
-        std::uint64_t UploadOverflowCount = 0;
-        std::uint64_t VectorFieldRecordsSubmitted = 0;
-        std::uint64_t IsolineRecordsSubmitted = 0;
-        std::uint64_t VectorFieldRecordsRecorded = 0;
-        std::uint64_t IsolineRecordsRecorded = 0;
-        std::uint64_t MissingPipelineSkipCount = 0;
-    };
-
-    // GRAPHICS-078 Slice A — scaffold shell class for the canonical
+    // GRAPHICS-078 Slice B — operational shell class for the canonical
     // default-recipe `VisualizationOverlayPass`. Mirrors the
     // `TransientDebugSurfacePass` shape: default-constructible (no
     // system dependency), per-kind pipeline accessors for fail-closed
-    // prerequisite checks. Slice A only ships the pipeline-handle
-    // bookkeeping; `Execute*` bodies land in Slices B/C alongside the
-    // pipeline-desc helpers and upload-helper wiring.
+    // prerequisite checks, and (Slice B) an `ExecuteVectorFields(...)`
+    // body that iterates the vector-field packet span and records
+    // `BindPipeline + PushConstants(BDA) + Draw(2 * ElementCount, 1, 0, 0)`
+    // per packet. Each packet independently switches between the
+    // depth-tested and always-on-top variants based on its
+    // `DepthTested` flag. Slice C adds the matching `ExecuteIsolines`
+    // body.
+    //
+    // Push constant layout: 16 bytes packing the helper's vertex buffer
+    // BDA + a per-draw `FirstVertex` index so the BDA-fetch vertex
+    // shader can address the right packet in the shared upload buffer.
+    // Both kinds share the same 16-byte payload shape; separate types
+    // per kind keep room for per-kind evolution (e.g. per-glyph width
+    // or per-iso polyline expansion push fields in a follow-up task).
+    export struct VisualizationVectorFieldPushConstants
+    {
+        std::uint64_t VertexBufferBDA;
+        std::uint32_t FirstVertex;
+        std::uint32_t Reserved;
+    };
+
     export class VisualizationOverlayPass
     {
     public:
@@ -77,6 +66,23 @@ namespace Extrinsic::Graphics
         {
             return m_IsolineAlwaysOnTopPipeline;
         }
+
+        // GRAPHICS-078 Slice B — records the per-packet `BindPipeline +
+        // PushConstants + Draw(2 * ElementCount, 1, 0, 0)` shape
+        // against `cmd`. `uploadResult` carries the helper's vertex
+        // buffer handle/BDA and total endpoint count for the frame.
+        // The caller has already validated that both pipeline handles
+        // are valid (see `Graphics.Renderer.cpp`'s
+        // `RecordVisualizationOverlayPass` gate). Increments
+        // `diagnostics.VectorFieldRecordsSubmitted` per submitted
+        // packet and `diagnostics.VectorFieldRecordsRecorded` per
+        // packet whose draw record actually lands; sets
+        // `diagnostics.UploadOverflowCount` when the upload helper
+        // reported an overflow.
+        void ExecuteVectorFields(RHI::ICommandContext& cmd,
+                                 std::span<const VectorFieldOverlayPacket> vectorFields,
+                                 const VisualizationVectorFieldUploadResult& uploadResult,
+                                 VisualizationOverlayUploadDiagnostics& diagnostics);
 
     private:
         RHI::PipelineHandle m_VectorFieldDepthTestedPipeline{};
