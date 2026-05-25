@@ -55,6 +55,10 @@ export namespace Extrinsic::Runtime
     public:
         explicit BvhAdapter(const Geometry::BVH& bvh) noexcept;
 
+        // BvhAdapter stores a non-owning pointer; binding to a temporary
+        // would leave m_Bvh dangling at the end of the full expression.
+        BvhAdapter(const Geometry::BVH&&) = delete;
+
         void Append(SpatialDebugSnapshotBatch&        out,
                     const SpatialDebugAdapterOptions& options,
                     SpatialDebugAdapterStats&         stats) const override;

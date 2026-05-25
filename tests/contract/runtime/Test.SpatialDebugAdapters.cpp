@@ -1,5 +1,6 @@
 #include <array>
 #include <cstdint>
+#include <type_traits>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -19,6 +20,18 @@ using Extrinsic::Runtime::BvhAdapter;
 using Extrinsic::Runtime::SpatialDebugAdapterOptions;
 using Extrinsic::Runtime::SpatialDebugAdapterStats;
 using Extrinsic::Runtime::SpatialDebugSnapshotBatch;
+
+// BvhAdapter is non-owning; the public surface must reject temporaries so
+// callers cannot leave m_Bvh dangling. lvalue construction must stay
+// constructible.
+static_assert(!std::is_constructible_v<BvhAdapter, Geometry::BVH&&>,
+              "BvhAdapter must not bind to an rvalue Geometry::BVH (non-owning pointer would dangle)");
+static_assert(!std::is_constructible_v<BvhAdapter, const Geometry::BVH&&>,
+              "BvhAdapter must not bind to a const rvalue Geometry::BVH");
+static_assert(std::is_constructible_v<BvhAdapter, Geometry::BVH&>,
+              "BvhAdapter must remain constructible from a mutable lvalue Geometry::BVH");
+static_assert(std::is_constructible_v<BvhAdapter, const Geometry::BVH&>,
+              "BvhAdapter must remain constructible from a const lvalue Geometry::BVH");
 
 namespace
 {
