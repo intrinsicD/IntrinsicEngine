@@ -57,11 +57,12 @@ Each active task should include:
   `CPUContracted` on CPU-only hosts.
 - [`RUNTIME-082`](RUNTIME-082-spatial-debug-adapters.md) —
   `Extrinsic.Runtime.SpatialDebugAdapters` umbrella. Status:
-  in-progress (Slice A scaffolding the umbrella + BvhAdapter
-  + value types + contract tests on
-  `claude/intrinsicengine-agent-onboarding-k31Vm` 2026-05-25;
-  Slices B–D remain). Owner: unassigned after Slice A.
-  Promoted from
+  in-progress (Slice A landed 2026-05-25 via PR #933 on
+  `claude/intrinsicengine-agent-onboarding-k31Vm`; Slice B landing
+  on `claude/intrinsicengine-agent-onboarding-Yrfon` 2026-05-26
+  introduces `KdTreeAdapter` + `OctreeAdapter`; Slices C–D remain).
+  Owner: unassigned after Slice B; next pick-up by any agent for
+  Slice C (ConvexHull adapter + registry). Promoted from
   `tasks/backlog/runtime/RUNTIME-082-spatial-debug-adapters.md`
   on 2026-05-25 as the next earliest unblocked Theme A leaf
   after GRAPHICS-076, GRAPHICS-077, GRAPHICS-078 each parked on
@@ -72,7 +73,11 @@ Each active task should include:
   existing graphics-side `Extrinsic.Graphics.SpatialDebugVisualizers`
   builder functions; no graphics surface change and no
   RHI/Vulkan dependency. Four-slice plan: umbrella + BvhAdapter +
-  value types (A, this slice) → KdTree + Octree adapters (B) →
+  value types (A, landed) → KdTree + Octree adapters
+  (B, landing on `claude/intrinsicengine-agent-onboarding-Yrfon`;
+  KdTreeAdapter mirrors BVH 1:1, OctreeAdapter emits three
+  perpendicular SplitPlanes per inner at the parent AABB center
+  with an explicit non-Center-policy approximation note) →
   ConvexHull adapter + registry (C) → `RenderExtractionCache`
   wiring + extraction stats (D).
 - [`GRAPHICS-078`](GRAPHICS-078-visualization-overlay-upload-helper.md) —

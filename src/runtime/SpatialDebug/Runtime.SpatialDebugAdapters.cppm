@@ -8,6 +8,8 @@ module;
 export module Extrinsic.Runtime.SpatialDebugAdapters;
 
 import Geometry.BVH;
+import Geometry.KDTree;
+import Geometry.Octree;
 import Extrinsic.Graphics.SpatialDebugVisualizers;
 
 export namespace Extrinsic::Runtime
@@ -65,5 +67,39 @@ export namespace Extrinsic::Runtime
 
     private:
         const Geometry::BVH* m_Bvh{nullptr};
+    };
+
+    class KdTreeAdapter final : public ISpatialDebugAdapter
+    {
+    public:
+        explicit KdTreeAdapter(const Geometry::KDTree& kdTree) noexcept;
+
+        // KdTreeAdapter stores a non-owning pointer; binding to a temporary
+        // would leave m_KdTree dangling at the end of the full expression.
+        KdTreeAdapter(const Geometry::KDTree&&) = delete;
+
+        void Append(SpatialDebugSnapshotBatch&        out,
+                    const SpatialDebugAdapterOptions& options,
+                    SpatialDebugAdapterStats&         stats) const override;
+
+    private:
+        const Geometry::KDTree* m_KdTree{nullptr};
+    };
+
+    class OctreeAdapter final : public ISpatialDebugAdapter
+    {
+    public:
+        explicit OctreeAdapter(const Geometry::Octree& octree) noexcept;
+
+        // OctreeAdapter stores a non-owning pointer; binding to a temporary
+        // would leave m_Octree dangling at the end of the full expression.
+        OctreeAdapter(const Geometry::Octree&&) = delete;
+
+        void Append(SpatialDebugSnapshotBatch&        out,
+                    const SpatialDebugAdapterOptions& options,
+                    SpatialDebugAdapterStats&         stats) const override;
+
+    private:
+        const Geometry::Octree* m_Octree{nullptr};
     };
 }

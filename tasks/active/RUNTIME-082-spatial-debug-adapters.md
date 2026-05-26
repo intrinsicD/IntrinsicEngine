@@ -2,11 +2,13 @@
 
 ## Status
 
-- Status: in-progress (Slice A landing on
-  `claude/intrinsicengine-agent-onboarding-k31Vm`; Slices B–D remain).
-- Owner/agent: unassigned after Slice A; next pick-up by any agent for
-  Slice B (KdTree + Octree adapters).
-- Branch: `claude/intrinsicengine-agent-onboarding-k31Vm` for Slice A.
+- Status: in-progress (Slice A landed 2026-05-25 via PR #933 on
+  `claude/intrinsicengine-agent-onboarding-k31Vm`; Slice B landing on
+  `claude/intrinsicengine-agent-onboarding-Yrfon` 2026-05-26 adds
+  `KdTreeAdapter` + `OctreeAdapter`; Slices C–D remain).
+- Owner/agent: unassigned after Slice B; next pick-up by any agent for
+  Slice C (ConvexHull adapter + registry).
+- Branch: `claude/intrinsicengine-agent-onboarding-Yrfon` for Slice B.
 - Started: 2026-05-25. Promoted from
   `tasks/backlog/runtime/RUNTIME-082-spatial-debug-adapters.md` as the
   next earliest unblocked Theme A leaf after GRAPHICS-076, GRAPHICS-077,
@@ -80,7 +82,15 @@ gate.
   `Scaffolded` until Slice C completes. Per the `Scaffolded` closure
   rule (see `docs/agent/task-maturity.md`), Slices B/C are named here
   and remain in-scope, so the rule is honored.
-- Slice B closes the KdTree + Octree adapters at `CPUContracted`.
+- Slice B (this slice) closes the KdTree + Octree adapters at
+  `CPUContracted`: both compile against the existing umbrella,
+  emit deterministic snapshot output through the same
+  `ISpatialDebugAdapter::Append` shape, and are exercised by
+  six new contract tests on the 4-AABB KDTree and 8-AABB Octree
+  fixtures. The parent task itself stays at `Scaffolded` until
+  Slice C lands the ConvexHull adapter + registry (per the
+  `Scaffolded` closure rule, Slice C is still in-scope and
+  named).
 - Slice C closes the ConvexHull adapter + the registry at
   `CPUContracted` and closes the task at `CPUContracted` if Slice D is
   separately deferred; otherwise the task closes at `Operational` once
@@ -204,10 +214,44 @@ Slice A (this slice):
       via `ExtrinsicGraphics`). The new adapter module imports
       `Geometry.BVH`, so the direct edge must be declared.
 
-Slice B:
+Slice B (this slice):
 
-- [ ] Add `KdTreeAdapter` and `OctreeAdapter` to the umbrella module
-      with parallel contract tests.
+- [x] Extend `Runtime.SpatialDebugAdapters.cppm` with two new
+      concrete adapter classes:
+  - `class KdTreeAdapter final : public ISpatialDebugAdapter` —
+    stores a non-owning `const Geometry::KDTree*`; mirrors the
+    `BvhAdapter` shape (rvalue temporary constructor deleted).
+  - `class OctreeAdapter final : public ISpatialDebugAdapter` —
+    stores a non-owning `const Geometry::Octree*`; same rvalue
+    rejection rule.
+- [x] Extend `Runtime.SpatialDebugAdapters.cpp` with
+      `KdTreeAdapter::Append` and `OctreeAdapter::Append`:
+  - `KdTreeAdapter`: walks `kdTree.Nodes()` with an iterative DFS
+    carrying depth (root at index 0); emits one
+    `SpatialDebugSplitPlane{Bounds, Axis, Position}` per inner
+    node using `node.SplitAxis` + `node.SplitValue`; honors
+    `LeafOnly`, `OccupancyOnly` (`NumElements == 0u`), and
+    `MaxDepth` truncation with the same semantics as
+    `BvhAdapter`.
+  - `OctreeAdapter`: walks `octree.m_Nodes` with an iterative DFS
+    carrying depth (root at index 0); resolves child indices
+    via `BaseChildIndex + presentOffset` per
+    `Geometry::Octree::Node::ChildExists`, pushing children in
+    reverse so octant 0 is popped first for deterministic
+    ascending-octant DFS order. For each non-leaf node, emits
+    *three* perpendicular `SpatialDebugSplitPlane`s — one per
+    axis (X, Y, Z) at the parent AABB center. This is exact
+    for `SplitPoint::Center` and an explicit approximation for
+    `Mean`/`Median`, since `Geometry::Octree::Node` does not
+    record the chosen split point. Honors `LeafOnly`,
+    `OccupancyOnly` (`NumElements == 0u`), and `MaxDepth`
+    truncation with the same semantics as `BvhAdapter`. Each
+    truncated subtree root contributes
+    `SplitPlaneCount += 3u` (planes were already emitted before
+    the depth-cap check fires, matching the `BvhAdapter` ordering).
+- [x] No new CMake entries; the new sources are part of the
+      existing `Extrinsic.Runtime.SpatialDebugAdapters` module
+      already registered by `src/runtime/CMakeLists.txt`.
 
 Slice C:
 
@@ -256,6 +300,51 @@ Slice A (this slice):
       populate every span field in a `SpatialDebugSnapshotBatch`,
       call `Clear()`, assert every span is empty.
 
+Slice B (this slice):
+
+- [x] `contract;runtime` —
+      `SpatialDebugAdapters.KdTreeAdapterAppendsDeterministicNodesAndPlanes`:
+      mirrors the BVH-default test on a 4-AABB KDTree fixture
+      with `KDTreeBuildParams{.LeafSize = 1u}`; asserts
+      `HierarchyNodes.size() == kdTree.Nodes().size()`,
+      `Bounds.size() == total`, `SplitPlanes.size() == InnerNodeCount`,
+      and pins the root split plane's `(Axis, Position)` to
+      `kdTree.Nodes()[0].SplitAxis`/`SplitValue`.
+- [x] `contract;runtime` —
+      `SpatialDebugAdapters.KdTreeAdapterLeafOnlyFilterDropsInnerNodes`:
+      same fixture, `options.LeafOnly = true`; asserts only leaf
+      hierarchy nodes are emitted and `SplitPlanes` is empty.
+- [x] `contract;runtime` —
+      `SpatialDebugAdapters.KdTreeAdapterDepthCapTruncatesAndCounts`:
+      same fixture, `options.MaxDepth = 0u`; asserts only the
+      root is emitted (`HierarchyNodes.size() == 1`,
+      `SplitPlanes.size() == 1`) and
+      `stats.DepthCapTruncationCount == 1u`.
+- [x] `contract;runtime` —
+      `SpatialDebugAdapters.OctreeAdapterAppendsDeterministicNodesAndPlanes`:
+      8-AABB Octree fixture (one box per octant) built with
+      `SplitPolicy{.SplitPoint = Center, .TightChildren = false}`
+      at `maxPerNode = 1u`, `maxDepth = 8u`; asserts
+      `HierarchyNodes.size() == octree.m_Nodes.size()`,
+      `SplitPlanes.size() == InnerNodeCount * 3u`,
+      `stats.SplitPlaneCount == InnerNodeCount * 3u`, and pins
+      the root's three split planes' `(Axis, Position)` to the
+      root AABB center.
+- [x] `contract;runtime` —
+      `SpatialDebugAdapters.OctreeAdapterLeafOnlyFilterDropsInnerNodes`:
+      same fixture, `options.LeafOnly = true`; asserts only leaf
+      hierarchy nodes are emitted and `SplitPlanes` is empty.
+- [x] `contract;runtime` —
+      `SpatialDebugAdapters.OctreeAdapterDepthCapTruncatesAndCounts`:
+      same fixture, `options.MaxDepth = 0u`; asserts only the
+      root is emitted (`HierarchyNodes.size() == 1`,
+      `SplitPlanes.size() == 3u`) and
+      `stats.DepthCapTruncationCount == 1u`.
+- [x] Compile-time `static_assert` block extending the Slice A
+      lvalue/rvalue construction contract to `KdTreeAdapter` and
+      `OctreeAdapter` (rvalue constructors deleted; const-lvalue
+      construction preserved).
+
 ## Docs
 
 Slice A (this slice):
@@ -270,6 +359,20 @@ Slice A (this slice):
       active task location (move the entry from the backlog list).
 - [x] Regenerate `docs/api/generated/module_inventory.md` after
       adding the module.
+
+Slice B (this slice):
+
+- [x] Update the `Extrinsic.Runtime.SpatialDebugAdapters` row in
+      `src/runtime/README.md` to record the new
+      `KdTreeAdapter` / `OctreeAdapter` concretes, including the
+      OctreeAdapter's three-plane-per-inner-node visualization
+      choice and the `Center`-policy exactness note.
+- [x] Update the `RUNTIME-082` entry in
+      `tasks/active/README.md` so the slice plan reflects Slice A
+      landed and Slice B in-progress.
+- [x] Regenerate `docs/api/generated/module_inventory.md` —
+      no new module surface but the slice touches the file
+      anyway for consistency with Slice A's regenerate command.
 
 ## Acceptance criteria
 
@@ -289,7 +392,28 @@ Slice A (this slice):
 - [x] Default CPU/null gate stays green; no `gpu`/`vulkan` test
       additions.
 
-Slices B–D acceptance criteria are recorded inside each slice's row
+Slice B (this slice):
+
+- [x] `Extrinsic.Runtime.SpatialDebugAdapters` exports both new
+      adapter classes alongside the existing `BvhAdapter`.
+- [x] `KdTreeAdapter` produces deterministic snapshot counts for
+      the 4-AABB KDTree fixture across default, leaf-only, and
+      depth-cap=0 options configurations; the root split-plane
+      pin matches the KDTree's own `(SplitAxis, SplitValue)`.
+- [x] `OctreeAdapter` produces deterministic snapshot counts for
+      the 8-AABB Octree fixture across default, leaf-only, and
+      depth-cap=0 options configurations; `SplitPlaneCount` is
+      exactly `InnerNodeCount * 3u` in the default case and the
+      three root planes pin to the root AABB center.
+- [x] No new graphics imports beyond the existing
+      `runtime → graphics/renderer` edge; no `Geometry::Octree`
+      / `Geometry::KDTree` references leak past
+      `Runtime.SpatialDebugAdapters` (verified by
+      `python3 tools/repo/check_layering.py --root src --strict`).
+- [x] Default CPU/null gate stays green; no `gpu`/`vulkan` test
+      additions.
+
+Slices C–D acceptance criteria are recorded inside each slice's row
 under `## Required changes` once that slice is in-progress.
 
 ## Verification
@@ -325,8 +449,11 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
 
 ## Next verification step
 
-- Slice A: complete the umbrella + BvhAdapter scaffold on
-  `claude/intrinsicengine-agent-onboarding-k31Vm`; run
+- Slice A: completed 2026-05-25 via PR #933 on
+  `claude/intrinsicengine-agent-onboarding-k31Vm`.
+- Slice B (this slice): complete the
+  `KdTreeAdapter` + `OctreeAdapter` extension on
+  `claude/intrinsicengine-agent-onboarding-Yrfon`; run
   `cmake --preset ci`,
   `cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicTests`,
   `ctest --test-dir build/ci -L contract -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`,
@@ -336,9 +463,6 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
   `python3 tools/agents/check_task_policy.py --root . --strict`,
   and `python3 tools/repo/generate_module_inventory.py --root src
   --out docs/api/generated/module_inventory.md` before commit.
-- Slice B pick-up: add `KdTreeAdapter` + `OctreeAdapter` mirroring
-  the Slice A `BvhAdapter` shape; reuse the contract-test fixture
-  scaffolding.
 - Slice C pick-up: add `ConvexHullAdapter` + registry; close the
   task at `CPUContracted` if Slice D is independently deferred.
 - Slice D pick-up: pin the renderable↔geometry-tree binding via a
