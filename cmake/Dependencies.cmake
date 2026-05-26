@@ -41,13 +41,59 @@ if(UNIX AND NOT APPLE AND NOT EXISTS "/usr/include/X11/extensions/Xrandr.h")
     set(INTRINSIC_HEADLESS_NO_GLFW ON CACHE BOOL "" FORCE)
 endif()
 
+#
+# INFRA Option A — trust a populated cache by default.
+#
+# Historically every configure re-validated, re-checked, and occasionally
+# *deleted* the dependency cache on the slightest filesystem race, leading to
+# 4-minute configures and "phantom" cache-corruption rebuilds. The new policy:
+#
+#   * If the cache directory already contains any `*-src/` tree, we assume it
+#     is good and run fully disconnected by default (no network calls, no
+#     update probes). Set `INTRINSIC_UPDATE_DEPS=ON` to opt back into update
+#     probes, or `INTRINSIC_OFFLINE_DEPS=ON` to enforce strict offline checks.
+#   * `INTRINSIC_DEPS_SEAL=ON` (default ON whenever the cache is hot) makes
+#     `intrinsic_validate_dependency_source` non-destructive: a missing file
+#     becomes a hard error with a manual-recovery hint, never a silent
+#     `file(REMOVE_RECURSE)` on the cached source tree.
+#
+# Run `tools/setup/populate_deps.sh` once on a fresh checkout to hydrate the
+# cache online; every subsequent configure is offline and fast.
+file(GLOB _intrinsic_cached_dep_sources LIST_DIRECTORIES true
+        "${FETCHCONTENT_BASE_DIR}/*-src")
+list(LENGTH _intrinsic_cached_dep_sources _intrinsic_cached_dep_count)
+unset(_intrinsic_cached_dep_sources)
+
+if(_intrinsic_cached_dep_count GREATER 0)
+    set(_intrinsic_cache_hot TRUE)
+else()
+    set(_intrinsic_cache_hot FALSE)
+endif()
+
+if(NOT DEFINED INTRINSIC_DEPS_SEAL)
+    set(INTRINSIC_DEPS_SEAL ${_intrinsic_cache_hot} CACHE BOOL
+        "Treat the populated dependency cache as authoritative; never auto-delete on a validation miss" FORCE)
+endif()
+
 if(INTRINSIC_OFFLINE_DEPS)
     set(FETCHCONTENT_FULLY_DISCONNECTED ON CACHE BOOL "Disable all FetchContent network updates" FORCE)
     message(STATUS "INTRINSIC_OFFLINE_DEPS=ON: using only local dependency sources")
-elseif(NOT INTRINSIC_UPDATE_DEPS)
+elseif(INTRINSIC_UPDATE_DEPS)
+    # Explicit opt-in to update probes; FetchContent runs normally.
+    message(STATUS "INTRINSIC_UPDATE_DEPS=ON: FetchContent may contact remotes for updates")
+elseif(_intrinsic_cache_hot)
+    # Cache already hydrated → no network at all. Configure is a no-op.
+    set(FETCHCONTENT_FULLY_DISCONNECTED ON CACHE BOOL
+        "Cache is hot; skip all FetchContent network activity" FORCE)
+    message(STATUS "FetchContent fully disconnected (cache hot at ${FETCHCONTENT_BASE_DIR}). "
+                   "Set -DINTRINSIC_UPDATE_DEPS=ON to refresh.")
+else()
     set(FETCHCONTENT_UPDATES_DISCONNECTED ON CACHE BOOL
         "Skip network update checks for already-populated FetchContent sources" FORCE)
 endif()
+
+unset(_intrinsic_cached_dep_count)
+unset(_intrinsic_cache_hot)
 
 macro(intrinsic_lock_dependency dep_name)
     set(lock_path "${FETCHCONTENT_BASE_DIR}/.locks/${dep_name}.lock")
@@ -134,26 +180,65 @@ function(intrinsic_validate_dependency_source dep_name phase)
     endif()
 
     string(REPLACE ";" "\n  - " missing_file_list "${missing_files}")
-    if(phase STREQUAL "pre" AND NOT INTRINSIC_OFFLINE_DEPS)
+    # INFRA Option A — never auto-delete a cached source tree. A missing
+    # file is almost always a transient stat() race under parallel scan-deps;
+    # silently wiping the cache turned blips into 4-minute re-fetches. Demand
+    # explicit manual recovery instead.
+    if(phase STREQUAL "pre" AND NOT INTRINSIC_OFFLINE_DEPS AND NOT INTRINSIC_DEPS_SEAL)
         message(WARNING
-            "Dependency cache for '${dep_name}' is incomplete at: ${dep_source_dir}\n"
+            "Dependency cache for '${dep_name}' appears incomplete at: ${dep_source_dir}\n"
             "Missing required file(s):\n  - ${missing_file_list}\n"
-            "Removing the partial source/build trees before FetchContent repopulates them."
+            "FetchContent will be allowed to attempt re-population. If you see this repeatedly, "
+            "manually `rm -rf ${dep_source_dir} ${FETCHCONTENT_BASE_DIR}/${dep_name}-build "
+            "${FETCHCONTENT_BASE_DIR}/${dep_name}-subbuild` and re-run configure with network access."
         )
-        file(REMOVE_RECURSE "${dep_source_dir}")
-        file(REMOVE_RECURSE "${FETCHCONTENT_BASE_DIR}/${dep_name}-build")
-        file(REMOVE_RECURSE "${FETCHCONTENT_BASE_DIR}/${dep_name}-subbuild")
         return()
     endif()
 
     message(FATAL_ERROR
         "Dependency cache for '${dep_name}' is incomplete at: ${dep_source_dir}\n"
         "Missing required file(s):\n  - ${missing_file_list}\n"
-        "Recovery: remove ${dep_source_dir} and rerun configure with network access, or repopulate external/cache before configuring with INTRINSIC_OFFLINE_DEPS=ON."
+        "Recovery: manually `rm -rf ${dep_source_dir} ${FETCHCONTENT_BASE_DIR}/${dep_name}-build "
+        "${FETCHCONTENT_BASE_DIR}/${dep_name}-subbuild` then rerun configure with network access "
+        "(or with `-DINTRINSIC_UPDATE_DEPS=ON`)."
     )
 endfunction()
 
+# INFRA Option A — fast-path: when the cache is sealed and the
+# required marker files are present, we can skip the locking + validation
+# dance entirely on the hot path. Pre-validate quickly without touching
+# the filesystem more than necessary.
+function(_intrinsic_cache_is_hydrated out_var dep_name)
+    get_property(required_files GLOBAL PROPERTY "INTRINSIC_DEP_REQUIRED_FILES_${dep_name}")
+    if(NOT required_files)
+        set(${out_var} FALSE PARENT_SCOPE)
+        return()
+    endif()
+    intrinsic_dependency_source_dir(dep_source_dir ${dep_name})
+    if(NOT IS_DIRECTORY "${dep_source_dir}")
+        set(${out_var} FALSE PARENT_SCOPE)
+        return()
+    endif()
+    foreach(required_file IN LISTS required_files)
+        if(NOT EXISTS "${dep_source_dir}/${required_file}")
+            set(${out_var} FALSE PARENT_SCOPE)
+            return()
+        endif()
+    endforeach()
+    set(${out_var} TRUE PARENT_SCOPE)
+endfunction()
+
 function(intrinsic_make_available dep_name)
+    if(INTRINSIC_DEPS_SEAL)
+        _intrinsic_cache_is_hydrated(_hydrated ${dep_name})
+        if(_hydrated)
+            # Trust the cache. Still call FetchContent_MakeAvailable so the
+            # dependency's add_subdirectory() runs and defines its targets, but
+            # skip the lock + validation passes that dominate configure time.
+            FetchContent_MakeAvailable(${dep_name})
+            return()
+        endif()
+    endif()
     intrinsic_lock_dependency(${dep_name})
     if(INTRINSIC_OFFLINE_DEPS)
         intrinsic_require_offline_source(${dep_name})
@@ -164,6 +249,23 @@ function(intrinsic_make_available dep_name)
 endfunction()
 
 function(intrinsic_populate_source dep_name)
+    if(INTRINSIC_DEPS_SEAL)
+        _intrinsic_cache_is_hydrated(_hydrated ${dep_name})
+        if(_hydrated)
+            FetchContent_GetProperties(${dep_name})
+            intrinsic_dependency_source_dir(dep_source_dir ${dep_name})
+            if(NOT ${dep_name}_POPULATED)
+                # Tell FetchContent the source is already on disk so it skips
+                # any download/extract; we just need the *_SOURCE_DIR var set.
+                FetchContent_Populate(${dep_name})
+            endif()
+            FetchContent_GetProperties(${dep_name})
+            set(${dep_name}_SOURCE_DIR "${${dep_name}_SOURCE_DIR}" PARENT_SCOPE)
+            set(${dep_name}_BINARY_DIR "${${dep_name}_BINARY_DIR}" PARENT_SCOPE)
+            set(${dep_name}_POPULATED "${${dep_name}_POPULATED}" PARENT_SCOPE)
+            return()
+        endif()
+    endif()
     intrinsic_lock_dependency(${dep_name})
     if(INTRINSIC_OFFLINE_DEPS)
         intrinsic_require_offline_source(${dep_name})
