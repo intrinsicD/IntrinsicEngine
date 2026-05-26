@@ -163,6 +163,32 @@
   MinimalDebug smokes pass with no upload-rejection warnings); CPU gate
   2286/2286.
 
+## Nonblocking clarification (2026-05-27)
+
+- Re-verified on the same NVIDIA RTX 3050 / Vulkan 1.4.309 / driver
+  590.48.01 host after HARDEN-071 (RHI handle identity) and HARDEN-072
+  (RHI push-constant cap + virtual default-arg removal) landed on
+  `main`:
+    - The `SMAA AreaTex upload rejected` warning is gone (HARDEN-071
+      cleared the upload-identity bug).
+    - The `SelectionOutline pipeline unavailable; error=403` warning
+      is gone (HARDEN-072 raised `RHI::MaxPushConstantBytes` to 256 B
+      and `RendererFrameLifecycle.SelectionOutlinePipelineSurvivesOperationalRebuild`
+      passes).
+    - When the cold-gate bootstrap pre-check in this fixture is
+      temporarily bypassed and `engine.Run()` is allowed to proceed,
+      the only remaining failure is the `vkCmdPipelineBarrier2` SEGV
+      inside `libnvidia-glcore.so.590.48.01+0xe8251d` reached via
+      `VulkanCommandContext::SubmitBarriers`
+      (`src/graphics/vulkan/Backends.Vulkan.CommandContext.cpp:574`).
+- This single barrier defect is the **only** remaining upstream
+  blocker for graduating this fixture from `Skipped` to `Passed`. It
+  is captured as
+  [`BUG-012`](../backlog/bugs/BUG-012-default-recipe-vkcmdpipelinebarrier2-segv-nvidia.md)
+  with a full reproducer, stack trace, and acceptance criteria. The
+  GRAPHICS-076 Slice D `Operational` close depends only on BUG-012
+  landing.
+
 ## Slice plan
 
 The task spans canonical `Pass.Present` wiring, canonical `Pass.DebugView`
