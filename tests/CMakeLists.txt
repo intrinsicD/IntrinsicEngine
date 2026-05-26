@@ -452,6 +452,7 @@ endif()
 
 if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQUAL "Glfw")
     set(_graphics_vulkan_smoke_test_files
+        Test.DefaultRecipeSurfaceGpuSmoke.cpp
         Test.MinimalDebugSurfaceGpuSmoke.cpp
         Test.VulkanBootstrapSmoke.cpp
     )

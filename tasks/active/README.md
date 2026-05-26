@@ -13,22 +13,19 @@ Each active task should include:
 
 - [`GRAPHICS-076`](GRAPHICS-076-default-recipe-debug-view-and-present-wiring.md) —
   Default-recipe `Pass.DebugView` and canonical `Pass.Present` wiring.
-  Status: blocked on Vulkan-capable host (Slices A–C landed via PRs
-  #921 + #922 (Slice A follow-up), #923, and #924; Slice D remains and
-  is a `gpu;vulkan` smoke that cannot run without a working Vulkan
-  driver). Owner: unassigned; next pick-up by any agent on a
-  Vulkan-capable host. Headers last refreshed on
-  `claude/intrinsicengine-agent-onboarding-vGJrv`. Promoted from
-  `tasks/backlog/rendering/` on 2026-05-23 with a four-slice plan
-  covering canonical present wiring (A, landed via PR #921 + Slice A
-  follow-up PR #922), canonical debug-view wiring (B, landed via
-  PR #923), the non-present-write `Backbuffer` negative test (C,
-  landed via PR #924), and the scaffold-retirement-obligation
-  `gpu;vulkan` default-recipe smoke (D, blocked on Vulkan-capable
-  host) that unblocks `GRAPHICS-081`. CPU-only environments should
-  pick the next earliest unblocked Theme A leaf from
-  [`tasks/backlog/README.md`](../backlog/README.md) rather than
-  scaffolding Slice D without the ability to verify it.
+  Status: blocked on operational default-recipe Vulkan bring-up
+  (Slices A–C landed via PRs #921 + #922 (Slice A follow-up), #923,
+  and #924; Slice D's recipe-selector fixture skeleton + build wiring
+  landed 2026-05-26 on the current onboarding branch, but the
+  fixture `GTEST_SKIP`s on a Vulkan-capable host because the default
+  recipe currently fails the operational gate during
+  `Engine::Initialize()` — SMAA AreaTex upload, SelectionOutline
+  pipeline creation, and the barrier validator all fail. See the
+  2026-05-26 nonblocking clarification on the task file for the
+  exact symptoms, the LSan leak finding, and the upstream tickets
+  needed to graduate the fixture from SKIP to PASS). Owner:
+  unassigned; next pick-up by any agent willing to triage the
+  upstream Vulkan default-recipe bring-up issues.
 - [`GRAPHICS-077`](GRAPHICS-077-transient-debug-primitive-upload-helper.md) —
   Backend transient-debug-primitive upload helper. Status:
   in-progress (Slices A + B + C landed; only the optional Slice D

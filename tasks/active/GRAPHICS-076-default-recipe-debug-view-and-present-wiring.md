@@ -2,14 +2,25 @@
 
 ## Status
 
-- Status: blocked on Vulkan-capable host (Slices A–C landed; Slice D
-  is a `gpu;vulkan` smoke that requires a host with a working Vulkan
-  driver and `vkCreateInstance` returning a usable device).
-- Owner/agent: unassigned; next pick-up by any agent on a
-  Vulkan-capable host. Headers last refreshed on
-  `claude/intrinsicengine-agent-onboarding-vGJrv`.
-- Branch: Slice D will be developed on a new
-  `claude/intrinsicengine-agent-onboarding-*` branch once picked up.
+- Status: blocked on operational default-recipe Vulkan bring-up
+  (Slices A–C landed; Slice D's recipe-selector fixture skeleton +
+  build wiring landed 2026-05-26, but the fixture currently
+  `GTEST_SKIP`s on Vulkan-capable hosts because the default recipe
+  does not yet reach the operational Vulkan gate — SMAA AreaTex
+  upload, SelectionOutline pipeline creation, and the barrier
+  validator fail during `Engine::Initialize()`. See the
+  2026-05-26 nonblocking clarification below for the exact symptoms,
+  the LSan finding, and the upstream tickets needed to unblock).
+- Owner/agent: unassigned; next pick-up by any agent who is
+  willing to dig into the upstream Vulkan bring-up issues
+  enumerated in the 2026-05-26 clarification. Headers last
+  refreshed on `claude/intrinsicengine-agent-onboarding-vGJrv`;
+  Slice D fixture skeleton landed on the current onboarding branch
+  on 2026-05-26.
+- Branch: Slice D fixture skeleton landed on the current
+  `claude/intrinsicengine-agent-onboarding-*` branch; the
+  fixture-graduates-from-SKIP-to-PASS slice will land on a future
+  branch once the upstream bring-up tickets close.
 - Started: 2026-05-23. Landed slices:
   - Slice A: PR #921 on `claude/intrinsicengine-agent-onboarding-GdEzP`
     (commits `203d4c4` + Slice A follow-up `22cbbe9` via PR #922 on
@@ -18,13 +29,20 @@
     (commit `21be263`, merge `ddedfb4`).
   - Slice C: PR #924 on `claude/intrinsicengine-agent-onboarding-wImXR`
     (commit `e33c9b3`, merge `9ccc42c`).
+  - Slice D (fixture skeleton + bootstrap pre-check + build
+    wiring): on the current
+    `claude/intrinsicengine-agent-onboarding-*` branch (2026-05-26).
 - Next verification step: on a Vulkan-capable host, configure with
   the `ci-vulkan` preset, build
-  `IntrinsicGraphicsIntegrationTests`, and run the opt-in smoke
-  (`ctest --test-dir build/ci-vulkan -L 'gpu' --output-on-failure --timeout 120`).
-  See Slice D in `## Required changes` and `## Verification` below for
-  the test file location and the sibling `Test.MinimalDebugSurfaceGpuSmoke.cpp`
-  fixture to mirror.
+  `IntrinsicGraphicsVulkanSmokeTests`, and run the opt-in smoke
+  (`ctest --test-dir build/ci-vulkan -L 'gpu' -LE 'slow|flaky-quarantine' --output-on-failure --timeout 120`).
+  Today the new `DefaultRecipeSurfaceGpuSmoke.RecipeSelectorReachesOperationalVulkanCommandStream`
+  fixture is expected to `Skipped` because the default recipe does
+  not reach operational Vulkan; the rest of the smoke suite is
+  expected green (verified 32/32 on NVIDIA RTX 3050 / Vulkan
+  1.4.309 driver 1.4.325 on 2026-05-26). The fixture starts
+  producing real `PASSED` coverage once the upstream bring-up
+  blockers listed in the 2026-05-26 clarification are resolved.
 
 ## Nonblocking clarification (2026-05-23)
 
@@ -40,6 +58,76 @@
 - The `GRAPHICS-081` scaffold-retirement obligation cannot be unblocked
   until Slice D is green on a Vulkan-capable host (see the
   "Scaffold-retirement obligation" callout below).
+
+## Nonblocking clarification (2026-05-26)
+
+- Slice D fixture file `tests/integration/graphics/Test.DefaultRecipeSurfaceGpuSmoke.cpp`
+  has now landed as the recipe-selector leg (mirrors
+  `MinimalDebugSurfaceGpuSmoke.RecipeSelectorReachesOperationalVulkanCommandStream`).
+  Wired into `GraphicsVulkanSmokeTestObjs` /
+  `IntrinsicGraphicsVulkanSmokeTests` under labels `gpu;vulkan;graphics`.
+  Verified on a Vulkan-capable host (NVIDIA RTX 3050,
+  Vulkan instance 1.4.309, driver 1.4.325) with the `ci-vulkan`
+  preset: full opt-in `gpu;vulkan` suite is 32/32 green
+  (`ctest --test-dir build/ci-vulkan -L gpu -LE 'slow|flaky-quarantine'`),
+  default CPU gate is 2286/2286 green
+  (`ctest --test-dir build/ci -LE 'gpu|vulkan|slow|flaky-quarantine'`).
+- The fixture currently SKIPS on the same Vulkan-capable host because
+  the default recipe does not yet reach the operational Vulkan gate
+  during `Engine::Initialize()`. Reproducible symptoms observed in
+  the smoke-binary stderr stream:
+    - `[WARN] [Runtime] VulkanRequestedButNotOperational status=RequestedButIncompleteGate reason=BarrierValidationFailed`
+    - `[WARN] [VulkanTransferQueue] UploadTexture rejected; destination texture handle is invalid`
+    - `[WARN] [Graphics] PostProcess.SMAA.AreaTex upload rejected; lease released, will retry on next Initialize.`
+    - `[WARN] [VulkanDevice] CreatePipeline rejected invalid pipeline description`
+    - `[WARN] [Graphics] SelectionOutline pipeline unavailable; default-recipe selection outline recording will be skipped: error=403`
+    - Result post-`Run()`: `status=RequestedButFailedInit reason=DeviceLost`
+  Additionally, LeakSanitizer reports a 12640-byte leak from
+  `Backends::Vulkan::VulkanCommandContext::PushConstants` reached via
+  `Graphics::CullingSystem::DispatchCull` → `NullRenderer::RecordCullingPass`
+  when the device fails mid-frame, which the fixture's pre-`Run()`
+  operational-gate check now avoids by skipping at the
+  bootstrap-helper before `engine.Run()` is called.
+- Status implication for `GRAPHICS-081`: the scaffold-retirement
+  obligation remains gated. Even on a Vulkan-capable host the default
+  recipe currently has no operational frame, so the equivalent
+  pixel-readback parity coverage that GRAPHICS-081 needs cannot be
+  produced today. The unblock requires upstream Vulkan bring-up work
+  on (a) SMAA AreaTex upload, (b) SelectionOutline pipeline creation,
+  (c) the barrier validator that gates the operational promotion.
+  These belong in new tickets owned by `graphics/vulkan` and
+  `graphics/renderer`, not in this slice.
+- What this slice ships:
+  - The fixture skeleton (`Test.DefaultRecipeSurfaceGpuSmoke.cpp`)
+    with a structured `GTEST_SKIP` reason that names the upstream
+    blockers and points at this clarification.
+  - Test-list wiring in `tests/CMakeLists.txt` so the fixture builds
+    and registers on the `ci-vulkan` preset.
+  - Bootstrap pre-check of the operational gate so the smoke skips in
+    ~2 seconds on hosts where the gate is red, instead of paying the
+    ~35-second `vkWaitForFences`/`DeviceLost` wall-time penalty.
+  - The recipe-selector assertion shape (Operational status, Compile/
+    Execute succeeded, `CommandRecords["Present"]` recorded, MinimalDebug
+    counters all zero, Vulkan fallback / init / validation / gate
+    counters stable across the operational frame).
+- What this slice does NOT ship and why:
+  - The four-sample-point pixel-readback parity portion of the
+    Slice D "Required changes" list. The renderer's existing readback
+    seam (`SetMinimalDebugBackbufferReadbackBuffer(...)`,
+    `MinimalDebugBackbufferReadbackCopyCount`) is gated to
+    `FrameRecipeKind::MinimalDebug` in `Graphics.Renderer.cpp` around
+    the `m_FrameRecipe == FrameRecipeKind::MinimalDebug` check on the
+    `Present → TransferSrc → CopyImageToBuffer → Present` triplet, so
+    generalising to the default recipe is a renderer-API change
+    (separate setter or recipe-agnostic rename, plus a sibling
+    `DefaultRecipeBackbufferReadbackCopyCount` for diagnostic
+    clarity, plus contract-test updates) that is meaningfully larger
+    than a test-fixture slice. It is also moot until the default
+    recipe reaches operational — the readback hook cannot run on a
+    non-operational frame. A follow-up slice (Slice E, or a
+    dedicated `GRAPHICS-076E-default-recipe-pixel-readback` task) can
+    layer the API + assertion on top of the fixture shipped here once
+    the upstream bring-up issues above are resolved.
 
 ## Slice plan
 
@@ -233,12 +321,43 @@ Slice C (render-graph validation negative test, this slice):
       `ImportedBackbufferNonFinalizerWriteReportsError` pins at the
       `ValidateCompiledGraph`-direct level.
 
-Slice D (default-recipe `gpu;vulkan` visible-triangle smoke, deferred):
-- [ ] Add `tests/integration/graphics/Test.DefaultRecipeSurfaceGpuSmoke.cpp`
-      under `gpu;vulkan;graphics` labels, sharing the GRAPHICS-033D
-      bounded `engine.Run()` driver helper, asserting four-sample-point
-      pixel-readback parity with the MinimalDebug smoke and zero
-      fallback counters.
+Slice D (default-recipe `gpu;vulkan` visible-triangle smoke, fixture
+skeleton landed 2026-05-26; graduate-from-SKIP gated on upstream
+default-recipe Vulkan bring-up):
+- [x] Add `tests/integration/graphics/Test.DefaultRecipeSurfaceGpuSmoke.cpp`
+      under `gpu;vulkan;graphics` labels with the recipe-selector
+      assertion shape (Operational status, Compile/Execute succeeded,
+      `CommandRecords["Present"]` recorded, MinimalDebug counters
+      all zero, Vulkan fallback / init / validation / gate counters
+      stable across the operational frame). Pre-checks the operational
+      gate immediately after `Engine::Initialize()` and emits a
+      structured `GTEST_SKIP` reason when the gate is red so the
+      fixture skips in ~2 seconds on bring-up-incomplete hosts rather
+      than paying the ~35-second `vkWaitForFences`/`DeviceLost`
+      wall-time penalty.
+- [x] Wire `Test.DefaultRecipeSurfaceGpuSmoke.cpp` into
+      `_graphics_vulkan_smoke_test_files` in `tests/CMakeLists.txt`
+      so it builds into `IntrinsicGraphicsVulkanSmokeTests` with the
+      sibling `gpu vulkan graphics` labels.
+- [ ] Graduate the fixture from `Skipped` to `Passed` on a
+      Vulkan-capable host. Gated on the upstream default-recipe Vulkan
+      bring-up tickets listed in the 2026-05-26 nonblocking
+      clarification (SMAA AreaTex upload, SelectionOutline pipeline
+      creation, barrier validator) plus the LSan finding in
+      `Backends::Vulkan::VulkanCommandContext::PushConstants` reached
+      via `CullingSystem::DispatchCull`.
+- [ ] (Follow-up sub-slice, deferred behind the graduate-from-SKIP
+      gate above.) Four-sample-point pixel-readback parity. Requires
+      either (a) generalizing the existing
+      `SetMinimalDebugBackbufferReadbackBuffer(...)` /
+      `MinimalDebugBackbufferReadbackCopyCount` seam to also accept
+      `FrameRecipeKind::Default`, or (b) adding a sibling
+      `SetDefaultRecipeBackbufferReadbackBuffer(...)` /
+      `DefaultRecipeBackbufferReadbackCopyCount` pair for diagnostic
+      clarity. Either path is a renderer-API change with sibling
+      contract-test updates; it cannot meaningfully ship until the
+      graduate-from-SKIP item above lands because the readback hook
+      cannot run on a non-operational frame.
 
 ## Tests
 
@@ -392,12 +511,19 @@ python3 tools/docs/check_doc_links.py --root .
   `IntrinsicGraphicsContractCpuTests` on a `clang-20` host and ran the
   default-recipe CPU/null gate
   (`ctest --test-dir build/ci -L contract -LE 'gpu|vulkan|slow|flaky-quarantine'`).
-- Slice D (remaining, blocked on Vulkan-capable host): configure with
-  the `ci-vulkan` preset on a host with a working Vulkan ICD and a
-  display (or headless surface) loader, build
-  `IntrinsicGraphicsIntegrationTests`, and run the opt-in `gpu;vulkan`
-  smoke
+- Slice D (fixture skeleton landed 2026-05-26; graduate-from-SKIP
+  blocked on upstream default-recipe Vulkan bring-up): on a
+  Vulkan-capable host with the `ci-vulkan` preset, build
+  `IntrinsicGraphicsVulkanSmokeTests` and run the opt-in
+  `gpu;vulkan` smoke
   (`ctest --test-dir build/ci-vulkan -L 'gpu' -LE 'slow|flaky-quarantine' --output-on-failure --timeout 120`).
-  Mirror the existing `Test.MinimalDebugSurfaceGpuSmoke.cpp` driver
-  helper; assert four-sample-point pixel-readback parity and zero
-  fallback counters.
+  Verified 32/32 green on NVIDIA RTX 3050 / Vulkan 1.4.309 driver
+  1.4.325 on 2026-05-26 with the new
+  `DefaultRecipeSurfaceGpuSmoke.RecipeSelectorReachesOperationalVulkanCommandStream`
+  test currently `Skipped` (bootstrap operational-gate pre-check
+  fires; see 2026-05-26 nonblocking clarification). Default CPU
+  gate also verified 2286/2286 green on the same host. The
+  fixture starts producing real `PASSED` coverage once the
+  upstream Vulkan default-recipe bring-up tickets close; the
+  pixel-readback parity follow-up sub-slice can layer on top once
+  that happens.
