@@ -3,15 +3,15 @@ module;
 #include <atomic>
 #include <cassert>
 #include <cstdint>
-#include <deque>
 #include <memory>
 #include <mutex>
-#include <vector>
+#include <unordered_map>
 
 module Extrinsic.RHI.BufferManager;
 
 import Extrinsic.Core.Error;
 import Extrinsic.Core.HandleLease;
+import Extrinsic.Core.StrongHandle;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.BufferView;
@@ -20,18 +20,23 @@ import Extrinsic.RHI.Device;
 // ============================================================
 // BufferManager — implementation
 // ============================================================
-// Slot pool with a free list.  Each slot stores:
-//   - the creation descriptor (for View() / GetDesc())
-//   - an atomic refcount
-//   - a generation counter (incremented on free, so stale
-//     handles fail IsValid() checks gracefully)
+// Storage is a `std::unordered_map<BufferHandle, BufferSlot>` keyed by the
+// IDevice-issued buffer handle. The lease published to callers IS the IDevice
+// handle (deviceHandle), so a caller may pass `lease.GetHandle()` directly
+// into RHI APIs such as
+// `IDevice::GetTransferQueue().UploadBuffer(handle, ...)` without any
+// translation step. The earlier slot-pool-and-free-list design returned a
+// manager-local poolHandle that the Vulkan backend could not resolve through
+// its own `m_Buffers.GetIfValid(...)` lookup, silently rejecting every
+// buffer upload. See GRAPHICS-076 Slice D diagnosis for the trace.
 //
 // Complexity:
-//   Create   — amortised O(1)  (free list pop or push_back)
-//   Retain   — O(1) lock-free
-//   Release  — O(1) lock-free; O(1) locked on zero (free-list push)
-//   View     — O(1) lock-free
-//   GetDesc  — O(1) lock-free
+//   Create   — amortised O(1)  (unordered_map insert)
+//   Retain   — O(1) lock-free atomic on the slot, plus an O(1) average
+//              `find` on the map under the mutex
+//   Release  — O(1) average; on zero, an O(1) average erase under the mutex
+//   View     — O(1) average
+//   GetDesc  — O(1) average
 // ============================================================
 
 namespace Extrinsic::RHI
@@ -42,16 +47,15 @@ namespace Extrinsic::RHI
     struct BufferSlot
     {
         BufferDesc                Desc{};
-        BufferHandle              DeviceHandle{};  // opaque cookie for IDevice::DestroyBuffer
         std::atomic<std::uint32_t> RefCount{0};
-        std::uint32_t              Generation = 0;
-        bool                       Live       = false;
 
-        // Slots are non-movable because atomics cannot be moved after
-        // construction — the vector is reserved once at startup.
+        // Atomic member; node-based map storage gives stable addresses on
+        // insertion/erasure so we do not need movability.
         BufferSlot() = default;
-        BufferSlot(const BufferSlot&) = delete;
+        BufferSlot(const BufferSlot&)            = delete;
         BufferSlot& operator=(const BufferSlot&) = delete;
+        BufferSlot(BufferSlot&&)                 = delete;
+        BufferSlot& operator=(BufferSlot&&)      = delete;
     };
 
     // -----------------------------------------------------------------
@@ -59,12 +63,10 @@ namespace Extrinsic::RHI
     // -----------------------------------------------------------------
     struct BufferManager::Impl
     {
-        IDevice&                      Device;
-        std::mutex                    Mutex;       // guards Slots + FreeList
-        // std::deque provides stable addresses on push_back — atomics inside
-        // BufferSlot cannot be moved, so vector reallocation is forbidden.
-        std::deque<BufferSlot>        Slots;
-        std::vector<std::uint32_t>    FreeList;
+        IDevice&   Device;
+        std::mutex Mutex;       // guards Slots
+        std::unordered_map<BufferHandle, BufferSlot,
+                           Core::StrongHandleHash<BufferTag>> Slots;
 
         // Count of live BufferLease instances outstanding against this manager.
         // Incremented on every Create (primary lease) and every Retain
@@ -75,23 +77,22 @@ namespace Extrinsic::RHI
 
         explicit Impl(IDevice& device) : Device(device) {}
 
-        // Returns the slot if the handle is live and generation matches.
+        // Returns the slot if the handle is currently registered with this
+        // manager. Generation mismatches naturally produce a miss because the
+        // map is keyed by the full (Index, Generation) handle published by
+        // the device.
         [[nodiscard]] BufferSlot* Resolve(BufferHandle handle) noexcept
         {
             if (!handle.IsValid()) return nullptr;
-            if (handle.Index >= static_cast<std::uint32_t>(Slots.size())) return nullptr;
-            BufferSlot& slot = Slots[handle.Index];
-            if (!slot.Live || slot.Generation != handle.Generation) return nullptr;
-            return &slot;
+            const auto it = Slots.find(handle);
+            return it == Slots.end() ? nullptr : &it->second;
         }
 
         [[nodiscard]] const BufferSlot* Resolve(BufferHandle handle) const noexcept
         {
             if (!handle.IsValid()) return nullptr;
-            if (handle.Index >= static_cast<std::uint32_t>(Slots.size())) return nullptr;
-            const BufferSlot& slot = Slots[handle.Index];
-            if (!slot.Live || slot.Generation != handle.Generation) return nullptr;
-            return &slot;
+            const auto it = Slots.find(handle);
+            return it == Slots.end() ? nullptr : &it->second;
         }
     };
 
@@ -131,38 +132,26 @@ namespace Extrinsic::RHI
         if (!deviceHandle.IsValid())
             return Core::Err<BufferLease>(Core::ErrorCode::OutOfDeviceMemory);
 
-        std::uint32_t index;
-        std::uint32_t generation;
-
         {
             std::lock_guard lock{m_Impl->Mutex};
-
-            if (!m_Impl->FreeList.empty())
-            {
-                index = m_Impl->FreeList.back();
-                m_Impl->FreeList.pop_back();
-                generation = m_Impl->Slots[index].Generation; // already bumped on last free
-            }
-            else
-            {
-                // deque::push_back does not invalidate existing element addresses.
-                index      = static_cast<std::uint32_t>(m_Impl->Slots.size());
-                generation = 0;
-                m_Impl->Slots.emplace_back();
-            }
-
-            BufferSlot& slot   = m_Impl->Slots[index];
-            slot.Desc          = desc;
-            slot.DeviceHandle  = deviceHandle; // stored for DestroyBuffer
-            slot.Generation    = generation;
-            slot.Live          = true;
+            // try_emplace default-constructs the BufferSlot (which has a
+            // non-movable atomic) in-place inside the map node. Subsequent
+            // map operations (insert/erase of other keys) do not invalidate
+            // pointers to this node's value per std::unordered_map's
+            // reference-stability guarantee.
+            const auto [it, inserted] = m_Impl->Slots.try_emplace(deviceHandle);
+            assert(inserted &&
+                   "BufferManager::Create — IDevice issued a duplicate live "
+                   "BufferHandle. The device-side pool must increment the "
+                   "handle generation on reuse; see Core::ResourcePool::Add.");
+            (void)inserted;
+            BufferSlot& slot = it->second;
+            slot.Desc        = desc;
             slot.RefCount.store(1, std::memory_order_relaxed);
         }
 
-        // Issue our own pool handle — callers never see the device-internal handle.
-        BufferHandle poolHandle{index, generation};
         m_Impl->LiveLeaseCount.fetch_add(1, std::memory_order_relaxed);
-        return BufferLease::Adopt(*this, poolHandle);
+        return BufferLease::Adopt(*this, deviceHandle);
     }
 
     // -----------------------------------------------------------------
@@ -181,28 +170,34 @@ namespace Extrinsic::RHI
     // -----------------------------------------------------------------
     void BufferManager::Release(BufferHandle handle)
     {
-        BufferSlot* slot = m_Impl->Resolve(handle);
-        assert(slot && "Release called on invalid or already-freed handle");
-        if (!slot) return;
-
-        const std::uint32_t prev =
-            slot->RefCount.fetch_sub(1, std::memory_order_acq_rel);
-
-        assert(prev > 0 && "Refcount underflow");
-
-        // Decrement the manager-wide live-lease counter. acq_rel so the
-        // destructor's acquire-load synchronises with the last Release.
-        m_Impl->LiveLeaseCount.fetch_sub(1, std::memory_order_acq_rel);
-
-        if (prev == 1)
+        // Snapshot the device handle under the map lookup. We cannot hold a
+        // raw `BufferSlot*` across the final `Slots.erase(handle)` below
+        // because erase invalidates the node's address.
+        std::uint32_t prev = 0;
+        bool          shouldDestroy = false;
         {
-            // Last reference — destroy the GPU resource, then recycle the slot.
-            m_Impl->Device.DestroyBuffer(slot->DeviceHandle);
-
             std::lock_guard lock{m_Impl->Mutex};
-            slot->Live = false;
-            slot->Generation++; // invalidates any copies of the old handle
-            m_Impl->FreeList.push_back(handle.Index);
+            const auto it = m_Impl->Slots.find(handle);
+            assert(it != m_Impl->Slots.end() &&
+                   "Release called on invalid or already-freed handle");
+            if (it == m_Impl->Slots.end()) return;
+
+            BufferSlot& slot = it->second;
+            prev = slot.RefCount.fetch_sub(1, std::memory_order_acq_rel);
+            assert(prev > 0 && "Refcount underflow");
+            m_Impl->LiveLeaseCount.fetch_sub(1, std::memory_order_acq_rel);
+            if (prev == 1)
+            {
+                shouldDestroy = true;
+                m_Impl->Slots.erase(it);
+            }
+        }
+
+        if (shouldDestroy)
+        {
+            // Last reference — destroy the GPU resource. The handle was the
+            // device handle from the start, so we can pass it through.
+            m_Impl->Device.DestroyBuffer(handle);
         }
     }
 

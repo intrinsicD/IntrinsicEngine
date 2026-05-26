@@ -129,6 +129,40 @@
     layer the API + assertion on top of the fixture shipped here once
     the upstream bring-up issues above are resolved.
 
+## Nonblocking clarification (2026-05-26, follow-up)
+
+- Upstream root cause for the SMAA / texture-upload portion of the
+  bring-up blockers above turned out to be an RHI-side handle-identity
+  bug in `RHI::TextureManager` and `RHI::BufferManager`: both managers
+  published their own manager-local pool handle as the lease handle
+  rather than the `IDevice`-issued handle, so every
+  `IDevice::GetTransferQueue().UploadTexture()` /
+  `UploadBuffer()` call was silently rejected by the Vulkan backend's
+  `m_Images.GetIfValid(handle)` / `m_Buffers.GetIfValid(handle)` lookup.
+  Fix landed as a sibling slice on the same branch and is recorded
+  under `tasks/done/HARDEN-071-rhi-manager-handle-identity.md`.
+- Effect on this fixture: SMAA AreaTex / SearchTex uploads now succeed
+  silently on the same host. The default recipe progresses past the
+  upload-rejection step into actual frame execution. The fixture still
+  skips with a structured reason on this host because the *next*
+  upstream blockers remain:
+    - `[VulkanDevice] CreatePipeline rejected invalid pipeline description`
+      → SelectionOutline pipeline unavailable (error 403).
+    - When the smoke is allowed to proceed past Initialize regardless,
+      `vkCmdPipelineBarrier` SEGVs inside the NVIDIA driver
+      (`libnvidia-glcore.so.590.48.01+0xe8251d`) reached via
+      `Backends::Vulkan::VulkanCommandContext::SubmitBarriers`.
+  These two are real subsequent bring-up tickets owned by
+  `graphics/vulkan` / `graphics/renderer` (see HARDEN-071 Follow-ups
+  section). The Slice D fixture-skeleton + RHI-fix combination is the
+  current best-available CPU-side evidence; flipping the fixture from
+  Skipped to Passed requires those upstream tickets to land.
+- Verification on this branch (post-fix): `ctest --test-dir build/ci-vulkan
+  -L gpu -LE 'slow|flaky-quarantine' --output-on-failure --timeout 120`
+  → 32/32 (DefaultRecipeSurfaceGpuSmoke still Skipped, baseline
+  MinimalDebug smokes pass with no upload-rejection warnings); CPU gate
+  2286/2286.
+
 ## Slice plan
 
 The task spans canonical `Pass.Present` wiring, canonical `Pass.DebugView`

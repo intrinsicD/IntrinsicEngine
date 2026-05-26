@@ -3,15 +3,15 @@ module;
 #include <atomic>
 #include <cassert>
 #include <cstdint>
-#include <deque>
 #include <memory>
 #include <mutex>
-#include <vector>
+#include <unordered_map>
 
 module Extrinsic.RHI.TextureManager;
 
 import Extrinsic.Core.Error;
 import Extrinsic.Core.HandleLease;
+import Extrinsic.Core.StrongHandle;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Bindless;
@@ -20,12 +20,20 @@ import Extrinsic.RHI.Device;
 // ============================================================
 // TextureManager — implementation
 // ============================================================
-// Same slot-pool / free-list / deque layout as BufferManager.
-// Two extra fields per slot:
-//   DeviceHandle  — the IDevice-issued cookie for DestroyTexture
-//   BindlessSlot  — the IBindlessHeap slot (kInvalidBindlessIndex if none)
+// Storage is a `std::unordered_map<TextureHandle, TextureSlot>` keyed by the
+// IDevice-issued texture handle. The lease published to callers IS the
+// IDevice handle (deviceHandle), so a caller may pass `lease.GetHandle()`
+// directly into RHI APIs such as
+// `IDevice::GetTransferQueue().UploadTexture(handle, ...)` without any
+// translation step. The earlier slot-pool-and-free-list design returned a
+// manager-local poolHandle that the Vulkan backend could not resolve through
+// its own `m_Images.GetIfValid(...)` lookup, silently rejecting every
+// texture upload. See GRAPHICS-076 Slice D diagnosis for the trace.
 //
-// Complexity: identical to BufferManager (all O(1)).
+// Complexity remains amortised O(1) for Create/Retain/Release because
+// `std::unordered_map` insert/find/erase are average O(1). The map's node
+// allocation also gives us stable addresses for the per-slot atomic refcount
+// without needing the previous deque-based stable-address trick.
 // ============================================================
 
 namespace Extrinsic::RHI
@@ -35,18 +43,22 @@ namespace Extrinsic::RHI
     // -----------------------------------------------------------------
     struct TextureSlot
     {
-        TextureDesc               Desc{};
-        TextureHandle             DeviceHandle{};             // IDevice cookie
-        SamplerHandle             Sampler{};                  // stored for Reupload; not owned
-        BindlessIndex             BindlessSlot = kInvalidBindlessIndex;
+        TextureDesc                Desc{};
+        SamplerHandle              Sampler{};                  // stored for Reupload; not owned
+        BindlessIndex              BindlessSlot = kInvalidBindlessIndex;
+        // Updated by Reupload to point at a new IDevice texture (e.g. mip
+        // streaming); distinct from the slot key, which stays at the
+        // originally-published deviceHandle so existing leases keep working.
+        TextureHandle              CurrentDeviceHandle{};
         std::atomic<std::uint32_t> RefCount{0};
-        std::uint32_t              Generation  = 0;
-        bool                       Live        = false;
 
-        // Non-movable — atomic member + deque gives stable addresses.
+        // Atomic member; node-based map storage gives stable addresses on
+        // insertion/erasure so we do not need movability.
         TextureSlot() = default;
         TextureSlot(const TextureSlot&)            = delete;
         TextureSlot& operator=(const TextureSlot&) = delete;
+        TextureSlot(TextureSlot&&)                 = delete;
+        TextureSlot& operator=(TextureSlot&&)      = delete;
     };
 
     // -----------------------------------------------------------------
@@ -54,11 +66,11 @@ namespace Extrinsic::RHI
     // -----------------------------------------------------------------
     struct TextureManager::Impl
     {
-        IDevice&                   Device;
-        IBindlessHeap&             Bindless;
-        std::mutex                 Mutex;       // guards Slots + FreeList
-        std::deque<TextureSlot>    Slots;       // stable addresses on growth
-        std::vector<std::uint32_t> FreeList;
+        IDevice&       Device;
+        IBindlessHeap& Bindless;
+        std::mutex     Mutex;       // guards Slots
+        std::unordered_map<TextureHandle, TextureSlot,
+                           Core::StrongHandleHash<TextureTag>> Slots;
 
         // Outstanding TextureLease instances. See BufferManager.cpp for the
         // F2 rationale — the destructor asserts this is zero to catch
@@ -68,22 +80,22 @@ namespace Extrinsic::RHI
         Impl(IDevice& device, IBindlessHeap& bindless)
             : Device(device), Bindless(bindless) {}
 
+        // Returns the slot if the handle is currently registered with this
+        // manager. Generation mismatches naturally produce a miss because the
+        // map is keyed by the full (Index, Generation) handle published by
+        // the device.
         [[nodiscard]] TextureSlot* Resolve(TextureHandle handle) noexcept
         {
             if (!handle.IsValid()) return nullptr;
-            if (handle.Index >= static_cast<std::uint32_t>(Slots.size())) return nullptr;
-            TextureSlot& slot = Slots[handle.Index];
-            if (!slot.Live || slot.Generation != handle.Generation) return nullptr;
-            return &slot;
+            const auto it = Slots.find(handle);
+            return it == Slots.end() ? nullptr : &it->second;
         }
 
         [[nodiscard]] const TextureSlot* Resolve(TextureHandle handle) const noexcept
         {
             if (!handle.IsValid()) return nullptr;
-            if (handle.Index >= static_cast<std::uint32_t>(Slots.size())) return nullptr;
-            const TextureSlot& slot = Slots[handle.Index];
-            if (!slot.Live || slot.Generation != handle.Generation) return nullptr;
-            return &slot;
+            const auto it = Slots.find(handle);
+            return it == Slots.end() ? nullptr : &it->second;
         }
     };
 
@@ -120,44 +132,35 @@ namespace Extrinsic::RHI
         if (!deviceHandle.IsValid())
             return Core::Err<TextureLease>(Core::ErrorCode::OutOfDeviceMemory);
 
-        // Register into the bindless heap before we publish the pool handle
-        // so that GetBindlessIndex() is always valid once the lease is returned.
+        // Register into the bindless heap before we publish the lease so that
+        // GetBindlessIndex() is always valid once the lease is returned.
         BindlessIndex bindlessSlot = kInvalidBindlessIndex;
         if (sampler.IsValid())
             bindlessSlot = m_Impl->Bindless.AllocateTextureSlot(deviceHandle, sampler);
 
-        std::uint32_t index;
-        std::uint32_t generation;
-
         {
             std::lock_guard lock{m_Impl->Mutex};
-
-            if (!m_Impl->FreeList.empty())
-            {
-                index      = m_Impl->FreeList.back();
-                m_Impl->FreeList.pop_back();
-                generation = m_Impl->Slots[index].Generation;
-            }
-            else
-            {
-                index      = static_cast<std::uint32_t>(m_Impl->Slots.size());
-                generation = 0;
-                m_Impl->Slots.emplace_back();
-            }
-
-            TextureSlot& slot  = m_Impl->Slots[index];
-            slot.Desc          = desc;
-            slot.DeviceHandle  = deviceHandle;
-            slot.Sampler       = sampler;
-            slot.BindlessSlot  = bindlessSlot;
-            slot.Generation    = generation;
-            slot.Live          = true;
+            // try_emplace default-constructs the TextureSlot (which has a
+            // non-movable atomic) in-place inside the map node. Subsequent
+            // map operations (insert/erase of other keys) do not invalidate
+            // pointers to this node's value per std::unordered_map's
+            // reference-stability guarantee.
+            const auto [it, inserted] = m_Impl->Slots.try_emplace(deviceHandle);
+            assert(inserted &&
+                   "TextureManager::Create — IDevice issued a duplicate live "
+                   "TextureHandle. The device-side pool must increment the "
+                   "handle generation on reuse; see Core::ResourcePool::Add.");
+            (void)inserted;
+            TextureSlot& slot         = it->second;
+            slot.Desc                 = desc;
+            slot.Sampler              = sampler;
+            slot.BindlessSlot         = bindlessSlot;
+            slot.CurrentDeviceHandle  = deviceHandle;
             slot.RefCount.store(1, std::memory_order_relaxed);
         }
 
-        TextureHandle poolHandle{index, generation};
         m_Impl->LiveLeaseCount.fetch_add(1, std::memory_order_relaxed);
-        return TextureLease::Adopt(*this, poolHandle);
+        return TextureLease::Adopt(*this, deviceHandle);
     }
 
     // -----------------------------------------------------------------
@@ -175,34 +178,45 @@ namespace Extrinsic::RHI
     // -----------------------------------------------------------------
     void TextureManager::Release(TextureHandle handle)
     {
-        TextureSlot* slot = m_Impl->Resolve(handle);
-        assert(slot && "Release called on invalid or already-freed handle");
-        if (!slot) return;
+        // Snapshot the bindless slot + current device handle under the map
+        // lookup, then drop them in the same shape as the previous slot-pool
+        // implementation. We cannot hold a raw `TextureSlot*` across the
+        // final `Slots.erase(handle)` below because erase invalidates the
+        // node's address.
+        std::uint32_t prev = 0;
+        BindlessIndex bindlessSlot = kInvalidBindlessIndex;
+        TextureHandle deviceHandleToDestroy{};
+        bool          shouldDestroy = false;
+        {
+            std::lock_guard lock{m_Impl->Mutex};
+            const auto it = m_Impl->Slots.find(handle);
+            assert(it != m_Impl->Slots.end() &&
+                   "Release called on invalid or already-freed handle");
+            if (it == m_Impl->Slots.end()) return;
 
-        const std::uint32_t prev =
-            slot->RefCount.fetch_sub(1, std::memory_order_acq_rel);
+            TextureSlot& slot = it->second;
+            prev = slot.RefCount.fetch_sub(1, std::memory_order_acq_rel);
+            assert(prev > 0 && "Refcount underflow");
+            m_Impl->LiveLeaseCount.fetch_sub(1, std::memory_order_acq_rel);
+            if (prev == 1)
+            {
+                bindlessSlot          = slot.BindlessSlot;
+                deviceHandleToDestroy = slot.CurrentDeviceHandle;
+                shouldDestroy         = true;
+                m_Impl->Slots.erase(it);
+            }
+        }
 
-        assert(prev > 0 && "Refcount underflow");
-
-        // Decrement manager-wide live-lease counter, paired with the
-        // destructor's acquire-load.
-        m_Impl->LiveLeaseCount.fetch_sub(1, std::memory_order_acq_rel);
-
-        if (prev == 1)
+        if (shouldDestroy)
         {
             // Free the bindless slot first so the GPU heap reverts to the
             // default/error descriptor before the texture VkImage is destroyed.
-            if (slot->BindlessSlot != kInvalidBindlessIndex)
-                m_Impl->Bindless.FreeSlot(slot->BindlessSlot);
+            if (bindlessSlot != kInvalidBindlessIndex)
+                m_Impl->Bindless.FreeSlot(bindlessSlot);
 
             // Destroy the GPU resource.  Sampler is NOT destroyed — it is
             // externally owned and may be shared across many textures.
-            m_Impl->Device.DestroyTexture(slot->DeviceHandle);
-
-            std::lock_guard lock{m_Impl->Mutex};
-            slot->Live = false;
-            slot->Generation++;
-            m_Impl->FreeList.push_back(handle.Index);
+            m_Impl->Device.DestroyTexture(deviceHandleToDestroy);
         }
     }
 
@@ -238,8 +252,8 @@ namespace Extrinsic::RHI
         // UpdateTextureSlot is thread-safe per the IBindlessHeap contract;
         // it queues the descriptor update and applies it on FlushPending().
         m_Impl->Bindless.UpdateTextureSlot(slot->BindlessSlot, newDeviceHandle, newSampler);
-        slot->DeviceHandle = newDeviceHandle;
-        slot->Sampler      = newSampler;
+        slot->CurrentDeviceHandle = newDeviceHandle;
+        slot->Sampler             = newSampler;
     }
 
 } // namespace Extrinsic::RHI
