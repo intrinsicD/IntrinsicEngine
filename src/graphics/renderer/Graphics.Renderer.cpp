@@ -2125,7 +2125,13 @@ namespace Extrinsic::Graphics
                                                         RHI::TextureLayout::TransferSrc,
                                                         0u, 0u,
                                                         m_MinimalDebugReadbackBuffer,
-                                                        0u);
+                                                        0u,
+                                                        // HARDEN-072: pass the explicit "whole mip
+                                                        // extent" sentinel (0,0,0,0) instead of
+                                                        // relying on default arguments — defaults on
+                                                        // this virtual function tripped a Clang 20
+                                                        // C++23-modules vtable mangling bug.
+                                                        0u, 0u, 0u, 0u);
                     graphicsContext.TextureBarrier(backbuffer,
                                                     RHI::TextureLayout::TransferSrc,
                                                     RHI::TextureLayout::Present);

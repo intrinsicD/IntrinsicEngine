@@ -289,16 +289,27 @@ namespace Extrinsic::RHI
         // The default body is a no-op so existing CPU contract mocks remain
         // unaffected; the Vulkan backend overrides it to issue
         // `vkCmdCopyImageToBuffer`.
+        //
+        // HARDEN-072 — default arguments on this virtual function previously
+        // tripped a Clang 20 C++23-modules bug where the consumer's vtable
+        // slot mangled the symbol without the defaulted parameters
+        // (six-arg form) while the exporting module emitted the full
+        // ten-arg definition, leaving every downstream class with an
+        // unresolved vtable entry at link time (e.g.
+        // `Test.DebugViewContract.cpp`'s `RecordingCommandContext`,
+        // `Backends.Null.cpp`'s `NullCommandContext`). The defaults are
+        // removed; callers that want the "whole mip extent" semantics now
+        // pass `0u, 0u, 0u, 0u` explicitly. See HARDEN-072 task notes.
         virtual void CopyTextureToBuffer(TextureHandle src,
                                          TextureLayout srcLayout,
                                          std::uint32_t mipLevel,
                                          std::uint32_t arrayLayer,
                                          BufferHandle  dst,
                                          std::uint64_t dstOffset,
-                                         std::uint32_t srcOffsetX = 0u,
-                                         std::uint32_t srcOffsetY = 0u,
-                                         std::uint32_t srcWidth   = 0u,
-                                         std::uint32_t srcHeight  = 0u)
+                                         std::uint32_t srcOffsetX,
+                                         std::uint32_t srcOffsetY,
+                                         std::uint32_t srcWidth,
+                                         std::uint32_t srcHeight)
         {
             (void)src;
             (void)srcLayout;

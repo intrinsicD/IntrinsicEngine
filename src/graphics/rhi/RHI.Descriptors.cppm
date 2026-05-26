@@ -258,7 +258,27 @@ export namespace Extrinsic::RHI
 
     // Maximum counts — kept small for now; increase as needed.
     constexpr uint32_t MaxColorTargets      = 8;
-    constexpr uint32_t MaxPushConstantBytes = 128;
+    // Push-constant capacity exposed to all RHI clients.
+    //
+    // Raised from the Vulkan portability floor (128 B) to 256 B so the
+    // default-recipe `SelectionOutline` pipeline — whose push block is
+    // `SelectionOutlinePushConstants` (144 B: vec4 OutlineColor + vec4
+    // HoverColor + 12 floats/uints + uint[16] SelectedIds, see
+    // `src/graphics/renderer/Passes/Pass.Selection.Outline.cppm`) — is
+    // accepted by `VulkanDevice::ValidatePipelineDesc` instead of being
+    // silently rejected (`CreatePipeline rejected invalid pipeline
+    // description`) on every Vulkan host. The renderer + contract tests
+    // (`SelectionOutlinePipelineSurvivesOperationalRebuild`) already
+    // assert `PushConstantSize == 144u` intentionally.
+    //
+    // 256 B is the *de facto* Vulkan desktop baseline — `maxPushConstantsSize`
+    // is ≥ 256 on every shipping AMD/NVIDIA/Intel desktop driver and on
+    // MoltenVK (Apple silicon exposes 4096 B). The Vulkan 1.3+ spec floor
+    // remains 128 B, so genuine portability-floor hosts (rare; mostly
+    // mobile / portability subset) will still need a runtime
+    // device-limit check or a UBO/SSBO spill for the SelectedIds[] tail —
+    // tracked as a future portability ticket. See HARDEN-072.
+    constexpr uint32_t MaxPushConstantBytes = 256;
 
     struct PipelineDesc
     {
@@ -287,7 +307,7 @@ export namespace Extrinsic::RHI
         Format ColorTargetFormats[MaxColorTargets]{};
         Format DepthTargetFormat = Format::Undefined;
 
-        // Push-constant size in bytes.  Must be <= MaxPushConstantBytes (128).
+        // Push-constant size in bytes.  Must be <= MaxPushConstantBytes (256).
         uint32_t PushConstantSize = 0;
 
         const char* DebugName = nullptr;
