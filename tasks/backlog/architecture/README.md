@@ -28,6 +28,13 @@ map.
 - [HARDEN-069 — Rebind legacy layering allowlist entries to active retirement tasks](HARDEN-069-rebind-legacy-layering-allowlist-to-active-retirement-tasks.md):
   metadata-only rebinding of legacy allowlist rows from the retired `HARDEN-010`
   ID to current legacy-retirement task IDs, preserving the allowlisted edge set.
+- [HARDEN-070 — Drop dead null guards on reference-initialised helpers](HARDEN-070-drop-dead-null-guards-on-reference-initialised-helpers.md):
+  hygiene cleanup of ~7 internal-boundary `m_X == nullptr` guards in
+  `SpatialDebugAdapters`, `TransientDebugUploadHelper`, and
+  `VisualizationOverlayUploadHelper` whose constructor-reference precondition
+  already makes the null branch unreachable. Filed from
+  [`docs/reports/2026-05-26-agent-output-audit.md`](../../../docs/reports/2026-05-26-agent-output-audit.md)
+  Row 5.
 - [DOCS-001 — Reduce `docs/architecture/graphics.md` to contract + status](../../done/DOCS-001-reduce-graphics-architecture-prose.md)
   (done 2026-05-17): shrank the 793-line `graphics.md` to 118 lines by
   extracting 15 embedded decision records into ADRs `0004..0018` and adding a
