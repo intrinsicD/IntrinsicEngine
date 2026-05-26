@@ -1,7 +1,9 @@
 module;
 
 #include <array>
+#include <cmath>
 #include <cstdint>
+#include <utility>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -10,8 +12,10 @@ module Extrinsic.Runtime.SpatialDebugAdapters;
 
 import Geometry.AABB;
 import Geometry.BVH;
+import Geometry.ConvexHull;
 import Geometry.KDTree;
 import Geometry.Octree;
+import Geometry.Plane;
 import Extrinsic.Graphics.SpatialDebugVisualizers;
 
 namespace Extrinsic::Runtime
@@ -371,5 +375,140 @@ namespace Extrinsic::Runtime
 
             pushChildren(node, entry.Depth, stack);
         }
+    }
+
+    ConvexHullAdapter::ConvexHullAdapter(const Geometry::ConvexHull& hull,
+                                         float                       incidenceEpsilon) noexcept
+        : m_Hull(&hull),
+          m_IncidenceEpsilon(incidenceEpsilon)
+    {
+    }
+
+    void ConvexHullAdapter::Append(SpatialDebugSnapshotBatch&        out,
+                                   const SpatialDebugAdapterOptions& /*options*/,
+                                   SpatialDebugAdapterStats&         /*stats*/) const
+    {
+        if (m_Hull == nullptr)
+            return;
+
+        const auto& vertices = m_Hull->Vertices;
+        const auto& planes   = m_Hull->Planes;
+        if (vertices.empty())
+            return;
+
+        // Capture the starting vertex offset so derived edge indices stay
+        // valid across multi-Append batches (subsequent ConvexHullAdapter
+        // calls append into the same ConvexHullVertices span and must remap
+        // their local indices into the global span).
+        const auto vertexOffset = static_cast<std::uint32_t>(out.ConvexHullVertices.size());
+
+        out.ConvexHullVertices.insert(out.ConvexHullVertices.end(),
+                                       vertices.begin(), vertices.end());
+
+        if (planes.size() < 2u)
+            return; // Need at least two planes for any pair to share two faces.
+
+        const std::uint32_t vertexCount = static_cast<std::uint32_t>(vertices.size());
+
+        // Compute per-vertex plane-incidence sets. A vertex lies on a face
+        // plane when its signed distance to that plane is within
+        // m_IncidenceEpsilon. For a well-formed convex polytope each hull
+        // vertex lies on >= 3 face planes; pairs of vertices sharing >= 2
+        // face planes are exactly the polytope's edges.
+        std::vector<std::vector<std::uint32_t>> incidence(vertexCount);
+        for (std::uint32_t vi = 0u; vi < vertexCount; ++vi)
+        {
+            const glm::vec3& v = vertices[vi];
+            for (std::uint32_t pi = 0u; pi < planes.size(); ++pi)
+            {
+                const double d = Geometry::SignedDistance(planes[pi], v);
+                if (std::abs(d) <= static_cast<double>(m_IncidenceEpsilon))
+                    incidence[vi].push_back(pi);
+            }
+        }
+
+        // Emit edges deterministically in (i,j) ascending order.
+        for (std::uint32_t i = 0u; i + 1u < vertexCount; ++i)
+        {
+            const auto& planesI = incidence[i];
+            if (planesI.size() < 2u)
+                continue;
+            for (std::uint32_t j = i + 1u; j < vertexCount; ++j)
+            {
+                const auto& planesJ = incidence[j];
+                if (planesJ.size() < 2u)
+                    continue;
+
+                // Both incidence vectors are sorted in increasing plane index
+                // order by construction, so a linear merge counts shared
+                // planes in O(|I| + |J|) without allocations.
+                std::uint32_t shared = 0u;
+                std::size_t   a = 0u;
+                std::size_t   b = 0u;
+                while (a < planesI.size() && b < planesJ.size())
+                {
+                    if (planesI[a] == planesJ[b])
+                    {
+                        ++shared;
+                        if (shared >= 2u)
+                            break;
+                        ++a;
+                        ++b;
+                    }
+                    else if (planesI[a] < planesJ[b])
+                    {
+                        ++a;
+                    }
+                    else
+                    {
+                        ++b;
+                    }
+                }
+
+                if (shared >= 2u)
+                {
+                    out.ConvexHullEdges.push_back(Extrinsic::Graphics::SpatialDebugWireEdge{
+                        .A = vertexOffset + i,
+                        .B = vertexOffset + j,
+                    });
+                }
+            }
+        }
+    }
+
+    void SpatialDebugAdapterRegistry::Register(Key key, const ISpatialDebugAdapter& adapter)
+    {
+        m_Adapters[key] = &adapter;
+    }
+
+    bool SpatialDebugAdapterRegistry::Unregister(Key key) noexcept
+    {
+        return m_Adapters.erase(key) != 0u;
+    }
+
+    const ISpatialDebugAdapter* SpatialDebugAdapterRegistry::Find(Key key) const noexcept
+    {
+        const auto it = m_Adapters.find(key);
+        return it == m_Adapters.end() ? nullptr : it->second;
+    }
+
+    bool SpatialDebugAdapterRegistry::Contains(Key key) const noexcept
+    {
+        return m_Adapters.contains(key);
+    }
+
+    std::size_t SpatialDebugAdapterRegistry::Size() const noexcept
+    {
+        return m_Adapters.size();
+    }
+
+    bool SpatialDebugAdapterRegistry::Empty() const noexcept
+    {
+        return m_Adapters.empty();
+    }
+
+    void SpatialDebugAdapterRegistry::Clear() noexcept
+    {
+        m_Adapters.clear();
     }
 }

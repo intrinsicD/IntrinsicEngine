@@ -8,8 +8,10 @@
 
 import Geometry.AABB;
 import Geometry.BVH;
+import Geometry.ConvexHull;
 import Geometry.KDTree;
 import Geometry.Octree;
+import Geometry.Plane;
 import Extrinsic.Graphics.SpatialDebugVisualizers;
 import Extrinsic.Runtime.SpatialDebugAdapters;
 
@@ -19,9 +21,12 @@ using Extrinsic::Graphics::SpatialDebugSplitAxis;
 using Extrinsic::Graphics::SpatialDebugSplitPlane;
 using Extrinsic::Graphics::SpatialDebugWireEdge;
 using Extrinsic::Runtime::BvhAdapter;
+using Extrinsic::Runtime::ConvexHullAdapter;
+using Extrinsic::Runtime::ISpatialDebugAdapter;
 using Extrinsic::Runtime::KdTreeAdapter;
 using Extrinsic::Runtime::OctreeAdapter;
 using Extrinsic::Runtime::SpatialDebugAdapterOptions;
+using Extrinsic::Runtime::SpatialDebugAdapterRegistry;
 using Extrinsic::Runtime::SpatialDebugAdapterStats;
 using Extrinsic::Runtime::SpatialDebugSnapshotBatch;
 
@@ -50,6 +55,14 @@ static_assert(!std::is_constructible_v<OctreeAdapter, const Geometry::Octree&&>,
               "OctreeAdapter must not bind to a const rvalue Geometry::Octree");
 static_assert(std::is_constructible_v<OctreeAdapter, const Geometry::Octree&>,
               "OctreeAdapter must remain constructible from a const lvalue Geometry::Octree");
+
+// ConvexHullAdapter inherits the same non-owning contract.
+static_assert(!std::is_constructible_v<ConvexHullAdapter, Geometry::ConvexHull&&>,
+              "ConvexHullAdapter must not bind to an rvalue Geometry::ConvexHull");
+static_assert(!std::is_constructible_v<ConvexHullAdapter, const Geometry::ConvexHull&&>,
+              "ConvexHullAdapter must not bind to a const rvalue Geometry::ConvexHull");
+static_assert(std::is_constructible_v<ConvexHullAdapter, const Geometry::ConvexHull&>,
+              "ConvexHullAdapter must remain constructible from a const lvalue Geometry::ConvexHull");
 
 namespace
 {
@@ -454,3 +467,188 @@ TEST(SpatialDebugAdapters, SnapshotBatchClearResetsAllSpans)
     EXPECT_TRUE(batch.ConvexHullEdges.empty());
     EXPECT_TRUE(batch.PointMarkers.empty());
 }
+
+namespace
+{
+    // Unit cube centered at the origin: eight vertices, six axis-aligned face
+    // planes, twelve edges. Vertex ordering matches the lexicographic (x, y, z)
+    // octant enumeration so the expected edge pairs are deterministic.
+    [[nodiscard]] Geometry::ConvexHull MakeUnitCubeHullFixture()
+    {
+        Geometry::ConvexHull hull{};
+        hull.Vertices.reserve(8u);
+        for (int z = 0; z < 2; ++z)
+            for (int y = 0; y < 2; ++y)
+                for (int x = 0; x < 2; ++x)
+                    hull.Vertices.push_back(glm::vec3{
+                        x == 0 ? -1.0f : 1.0f,
+                        y == 0 ? -1.0f : 1.0f,
+                        z == 0 ? -1.0f : 1.0f,
+                    });
+
+        // Face planes with outward normals; SignedDistance = dot(N, v) + D.
+        // For each face, D = -dot(N, point-on-face).
+        hull.Planes.push_back({{-1.0f, 0.0f, 0.0f}, -1.0f}); // x == -1
+        hull.Planes.push_back({{ 1.0f, 0.0f, 0.0f}, -1.0f}); // x ==  1
+        hull.Planes.push_back({{0.0f, -1.0f, 0.0f}, -1.0f}); // y == -1
+        hull.Planes.push_back({{0.0f,  1.0f, 0.0f}, -1.0f}); // y ==  1
+        hull.Planes.push_back({{0.0f, 0.0f, -1.0f}, -1.0f}); // z == -1
+        hull.Planes.push_back({{0.0f, 0.0f,  1.0f}, -1.0f}); // z ==  1
+        return hull;
+    }
+}
+
+TEST(SpatialDebugAdapters, ConvexHullAdapterEmitsVerticesAndDerivedEdges)
+{
+    const Geometry::ConvexHull hull = MakeUnitCubeHullFixture();
+
+    SpatialDebugSnapshotBatch batch{};
+    SpatialDebugAdapterStats  stats{};
+    ConvexHullAdapter         adapter{hull};
+
+    adapter.Append(batch, SpatialDebugAdapterOptions{}, stats);
+
+    // All eight hull vertices are copied verbatim into the batch span.
+    ASSERT_EQ(batch.ConvexHullVertices.size(), hull.Vertices.size());
+    for (std::size_t vi = 0u; vi < hull.Vertices.size(); ++vi)
+    {
+        EXPECT_FLOAT_EQ(batch.ConvexHullVertices[vi].x, hull.Vertices[vi].x);
+        EXPECT_FLOAT_EQ(batch.ConvexHullVertices[vi].y, hull.Vertices[vi].y);
+        EXPECT_FLOAT_EQ(batch.ConvexHullVertices[vi].z, hull.Vertices[vi].z);
+    }
+
+    // A unit cube has exactly twelve edges; pairs (i, j) with i < j and
+    // exactly one differing bit in the octant index encode adjacency.
+    EXPECT_EQ(batch.ConvexHullEdges.size(), 12u);
+    for (const auto& edge : batch.ConvexHullEdges)
+    {
+        ASSERT_LT(edge.A, edge.B);
+        const std::uint32_t diff = edge.A ^ edge.B;
+        EXPECT_TRUE(diff == 1u || diff == 2u || diff == 4u)
+            << "edge {" << edge.A << "," << edge.B
+            << "} should differ in exactly one cube-octant bit";
+    }
+
+    // Tree-shaped accumulators stay untouched for a flat hull.
+    EXPECT_EQ(stats.LeafNodeCount,           0u);
+    EXPECT_EQ(stats.InnerNodeCount,          0u);
+    EXPECT_EQ(stats.SplitPlaneCount,         0u);
+    EXPECT_EQ(stats.EmptyNodeSkippedCount,   0u);
+    EXPECT_EQ(stats.DepthCapTruncationCount, 0u);
+
+    // Tree-shaped spans stay untouched by the hull adapter.
+    EXPECT_TRUE(batch.Bounds.empty());
+    EXPECT_TRUE(batch.HierarchyNodes.empty());
+    EXPECT_TRUE(batch.SplitPlanes.empty());
+    EXPECT_TRUE(batch.PointMarkers.empty());
+}
+
+TEST(SpatialDebugAdapters, ConvexHullAdapterRemapsIndicesAcrossMultiAppend)
+{
+    const Geometry::ConvexHull hull = MakeUnitCubeHullFixture();
+
+    SpatialDebugSnapshotBatch batch{};
+    SpatialDebugAdapterStats  stats{};
+    ConvexHullAdapter         adapter{hull};
+
+    adapter.Append(batch, SpatialDebugAdapterOptions{}, stats);
+    const auto firstVertexCount = batch.ConvexHullVertices.size();
+    const auto firstEdgeCount   = batch.ConvexHullEdges.size();
+
+    // Second Append from the same hull must add another vertex block and
+    // emit edges whose indices reference the second block, not the first.
+    adapter.Append(batch, SpatialDebugAdapterOptions{}, stats);
+
+    ASSERT_EQ(batch.ConvexHullVertices.size(), firstVertexCount * 2u);
+    ASSERT_EQ(batch.ConvexHullEdges.size(),    firstEdgeCount   * 2u);
+
+    const auto offset = static_cast<std::uint32_t>(firstVertexCount);
+    for (std::size_t ei = firstEdgeCount; ei < batch.ConvexHullEdges.size(); ++ei)
+    {
+        const auto& edge = batch.ConvexHullEdges[ei];
+        EXPECT_GE(edge.A, offset);
+        EXPECT_GE(edge.B, offset);
+        EXPECT_LT(edge.A, offset + firstVertexCount);
+        EXPECT_LT(edge.B, offset + firstVertexCount);
+    }
+}
+
+TEST(SpatialDebugAdapters, ConvexHullAdapterHandlesEmptyHull)
+{
+    Geometry::ConvexHull hull{}; // Default: no vertices, no planes.
+
+    SpatialDebugSnapshotBatch batch{};
+    SpatialDebugAdapterStats  stats{};
+    ConvexHullAdapter         adapter{hull};
+
+    adapter.Append(batch, SpatialDebugAdapterOptions{}, stats);
+
+    EXPECT_TRUE(batch.ConvexHullVertices.empty());
+    EXPECT_TRUE(batch.ConvexHullEdges.empty());
+}
+
+TEST(SpatialDebugAdapters, RegistryRegistersFindsAndUnregistersAdapters)
+{
+    const Geometry::BVH        bvh    = MakeFourBoxFixture();
+    const Geometry::KDTree     kdTree = MakeFourBoxKdTreeFixture();
+    const Geometry::ConvexHull hull   = MakeUnitCubeHullFixture();
+
+    BvhAdapter        bvhAdapter{bvh};
+    KdTreeAdapter     kdAdapter{kdTree};
+    ConvexHullAdapter hullAdapter{hull};
+
+    SpatialDebugAdapterRegistry registry{};
+    EXPECT_TRUE(registry.Empty());
+    EXPECT_EQ(registry.Size(), 0u);
+    EXPECT_EQ(registry.Find(7u), nullptr);
+
+    registry.Register(1u, bvhAdapter);
+    registry.Register(2u, kdAdapter);
+    registry.Register(3u, hullAdapter);
+
+    EXPECT_FALSE(registry.Empty());
+    EXPECT_EQ(registry.Size(), 3u);
+    EXPECT_TRUE(registry.Contains(1u));
+    EXPECT_EQ(registry.Find(1u), static_cast<const ISpatialDebugAdapter*>(&bvhAdapter));
+    EXPECT_EQ(registry.Find(2u), static_cast<const ISpatialDebugAdapter*>(&kdAdapter));
+    EXPECT_EQ(registry.Find(3u), static_cast<const ISpatialDebugAdapter*>(&hullAdapter));
+    EXPECT_EQ(registry.Find(99u), nullptr);
+
+    // Re-registering an existing key replaces the entry without growing
+    // the table.
+    BvhAdapter replacementAdapter{bvh};
+    registry.Register(1u, replacementAdapter);
+    EXPECT_EQ(registry.Size(), 3u);
+    EXPECT_EQ(registry.Find(1u),
+              static_cast<const ISpatialDebugAdapter*>(&replacementAdapter));
+
+    EXPECT_TRUE(registry.Unregister(2u));
+    EXPECT_FALSE(registry.Contains(2u));
+    EXPECT_EQ(registry.Find(2u), nullptr);
+    EXPECT_EQ(registry.Size(), 2u);
+    EXPECT_FALSE(registry.Unregister(2u)); // Already removed.
+
+    registry.Clear();
+    EXPECT_TRUE(registry.Empty());
+    EXPECT_EQ(registry.Find(1u), nullptr);
+}
+
+TEST(SpatialDebugAdapters, RegistryResolvedAdapterRoundTripsThroughISpatialDebugAdapter)
+{
+    const Geometry::ConvexHull hull = MakeUnitCubeHullFixture();
+    ConvexHullAdapter          hullAdapter{hull};
+
+    SpatialDebugAdapterRegistry registry{};
+    registry.Register(42u, hullAdapter);
+
+    const ISpatialDebugAdapter* resolved = registry.Find(42u);
+    ASSERT_NE(resolved, nullptr);
+
+    SpatialDebugSnapshotBatch batch{};
+    SpatialDebugAdapterStats  stats{};
+    resolved->Append(batch, SpatialDebugAdapterOptions{}, stats);
+
+    EXPECT_EQ(batch.ConvexHullVertices.size(), hull.Vertices.size());
+    EXPECT_EQ(batch.ConvexHullEdges.size(),    12u);
+}
+

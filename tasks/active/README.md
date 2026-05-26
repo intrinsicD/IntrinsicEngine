@@ -58,11 +58,15 @@ Each active task should include:
 - [`RUNTIME-082`](RUNTIME-082-spatial-debug-adapters.md) —
   `Extrinsic.Runtime.SpatialDebugAdapters` umbrella. Status:
   in-progress (Slice A landed 2026-05-25 via PR #933 on
-  `claude/intrinsicengine-agent-onboarding-k31Vm`; Slice B landing
-  on `claude/intrinsicengine-agent-onboarding-Yrfon` 2026-05-26
-  introduces `KdTreeAdapter` + `OctreeAdapter`; Slices C–D remain).
-  Owner: unassigned after Slice B; next pick-up by any agent for
-  Slice C (ConvexHull adapter + registry). Promoted from
+  `claude/intrinsicengine-agent-onboarding-k31Vm`; Slice B landed
+  2026-05-26 via PR #934 on
+  `claude/intrinsicengine-agent-onboarding-Yrfon`; Slice C landing
+  2026-05-26 on the current onboarding branch introduces
+  `ConvexHullAdapter` + `SpatialDebugAdapterRegistry`; only Slice D
+  remains). Owner: unassigned after Slice C; next pick-up by any
+  agent for Slice D (renderable↔geometry-tree binding pin + the
+  `ExtractAndSubmit` snapshot pump + `RuntimeRenderExtractionStats`
+  folding). Promoted from
   `tasks/backlog/runtime/RUNTIME-082-spatial-debug-adapters.md`
   on 2026-05-25 as the next earliest unblocked Theme A leaf
   after GRAPHICS-076, GRAPHICS-077, GRAPHICS-078 each parked on
@@ -74,12 +78,15 @@ Each active task should include:
   builder functions; no graphics surface change and no
   RHI/Vulkan dependency. Four-slice plan: umbrella + BvhAdapter +
   value types (A, landed) → KdTree + Octree adapters
-  (B, landing on `claude/intrinsicengine-agent-onboarding-Yrfon`;
-  KdTreeAdapter mirrors BVH 1:1, OctreeAdapter emits three
-  perpendicular SplitPlanes per inner at the parent AABB center
-  with an explicit non-Center-policy approximation note) →
-  ConvexHull adapter + registry (C) → `RenderExtractionCache`
-  wiring + extraction stats (D).
+  (B, landed) → ConvexHull adapter + registry (C, landed; the
+  `ConvexHullAdapter` derives `SpatialDebugWireEdge` records via
+  plane-incidence on the unit-cube fixture's six axis-aligned
+  faces, and the `SpatialDebugAdapterRegistry` exposes
+  `Register`/`Unregister`/`Find`/`Contains`/`Size`/`Empty`/`Clear`
+  keyed on `std::uint64_t`) → `RenderExtractionCache` wiring
+  + extraction stats (D). With Slice C landed the task sits at
+  `CPUContracted` on every host for all four adapter kinds plus
+  the registry; Slice D is the `Operational` close.
 - [`GRAPHICS-078`](GRAPHICS-078-visualization-overlay-upload-helper.md) —
   Backend visualization-overlay upload helper (vector field +
   isoline). Status: in-progress (Slices A + B + C landed; only the
