@@ -69,7 +69,7 @@ cmake --preset "${preset}" --fresh "${extra_args[@]}"
 # Sanity check: every declared dependency that the codebase relies on must
 # now have a non-empty `<dep>-src/` directory in the cache.
 cache_dir="${repo_root}/external/cache"
-required_deps=(glm googletest stb entt json draco tinygltf imgui)
+required_deps=(glm eigen googletest stb entt json draco tinygltf imgui)
 missing=0
 for dep in "${required_deps[@]}"; do
     src_dir="${cache_dir}/${dep}-src"

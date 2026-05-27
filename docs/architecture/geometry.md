@@ -10,8 +10,29 @@
 
 ## Dependencies
 
-- Allowed: `core`.
+- Allowed: `core`, GLM, and Eigen3 for geometry-owned CPU numerical kernels.
 - Disallowed: runtime/app-specific ownership and rendering backend internals.
+
+## Linear algebra policy
+
+- GLM remains the public storage vocabulary for geometry containers, primitive
+  records, and renderer-facing data.
+- Eigen3 is available only behind geometry-owned numerical modules. The broad
+  `Geometry` umbrella exports `Geometry.Sparse` because sparse CSR builders and
+  diagnostics are engine-facing geometry utilities, but it does not re-export the
+  Eigen-backed `Geometry.Linalg` module; callers that need fixed-size
+  GLM/Eigen adapters or dense decompositions must import `Geometry.Linalg`
+  explicitly.
+- `Geometry.Linalg` is the narrow advanced numerical surface for CPU kernels. It
+  exposes GLM round-trip adapters, explicit row-major `Eigen::Map` helpers for
+  contiguous scalar buffers, and dense decomposition wrappers that return
+  geometry-owned diagnostics rather than raw Eigen solver state.
+- `Geometry.Sparse` owns reusable CSR storage, COO-to-CSR building, matrix
+  diagnostics, and conjugate-gradient diagnostics. `Geometry.DEC` aliases these
+  sparse records so existing DEC/geodesic/parameterization callers keep their
+  names while sharing the common implementation.
+- Optional Spectra or SuiteSparse/CHOLMOD seams are deferred until CPU reference
+  parity and benchmark manifests justify a second backend.
 
 ## API style, diagnostics, and numeric policy
 

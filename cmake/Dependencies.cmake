@@ -312,6 +312,38 @@ if(TARGET glm)
     target_compile_options(glm PRIVATE -w)
 endif()
 
+# --- Eigen3 ---
+set(EIGEN_BUILD_DOC OFF CACHE BOOL "" FORCE)
+set(EIGEN_BUILD_TESTING OFF CACHE BOOL "" FORCE)
+set(EIGEN_MPL2_ONLY ON CACHE BOOL "Restrict Eigen to MPL2-licensed code paths" FORCE)
+FetchContent_Declare(
+        eigen
+        GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
+        GIT_TAG 3.4.0
+)
+intrinsic_set_dependency_required_files(eigen
+        CMakeLists.txt
+        Eigen/Core
+        Eigen/Dense
+        Eigen/Sparse
+        Eigen/SVD
+)
+intrinsic_populate_source(eigen)
+if("${eigen_SOURCE_DIR}" STREQUAL "")
+    set(eigen_SOURCE_DIR "${FETCHCONTENT_BASE_DIR}/eigen-src")
+endif()
+if(NOT IS_DIRECTORY "${eigen_SOURCE_DIR}" OR NOT EXISTS "${eigen_SOURCE_DIR}/Eigen/Core")
+    message(FATAL_ERROR
+        "Eigen sources not found. Expected at: ${eigen_SOURCE_DIR}\n"
+        "Missing file: ${eigen_SOURCE_DIR}/Eigen/Core\n"
+        "Run tools/setup/populate_deps.sh --refresh or ensure external/cache/eigen-src is populated."
+    )
+endif()
+add_library(eigen INTERFACE)
+add_library(Eigen3::Eigen ALIAS eigen)
+target_include_directories(eigen INTERFACE "${eigen_SOURCE_DIR}")
+target_compile_definitions(eigen INTERFACE EIGEN_MPL2_ONLY)
+
 # --- GTest ---
 FetchContent_Declare(
         googletest

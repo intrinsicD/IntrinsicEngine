@@ -68,20 +68,23 @@ Some containers do not provide X11 RandR headers; CMake enables `INTRINSIC_HEADL
 
 The repository centralizes FetchContent checkouts under `external/cache/`. CMake
 serializes dependency population with per-dependency locks and validates required
-marker files before reusing an existing `<name>-src` directory.
+marker files before reusing an existing `<name>-src` directory. A hot cache is
+treated as sealed by default, so normal configures run without network access.
 
-If an interrupted configure leaves a partial checkout, an online configure removes
-the incomplete source tree before repopulating it. Offline configures fail closed
-with a deterministic message because `INTRINSIC_OFFLINE_DEPS=ON` must not use the
-network.
+If an interrupted configure leaves a partial checkout, the validator fails closed
+with a deterministic recovery message instead of deleting dependency sources.
+Repopulate missing entries online with `tools/setup/populate_deps.sh --refresh`,
+or manually remove the affected `<name>-src`, `<name>-build`, and
+`<name>-subbuild` directories before refreshing.
 
 Safe manual recovery steps:
 
 ```bash
 rm -rf external/cache/glm-src external/cache/glm-build external/cache/glm-subbuild
+rm -rf external/cache/eigen-src external/cache/eigen-build external/cache/eigen-subbuild
 rm -rf external/cache/json-src external/cache/json-build external/cache/json-subbuild
 rm -rf external/cache/volk-src external/cache/volk-build external/cache/volk-subbuild
-cmake --preset ci
+tools/setup/populate_deps.sh --refresh
 ```
 
 For offline workflows, repopulate the missing dependency directories first, then

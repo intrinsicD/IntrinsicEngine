@@ -11,6 +11,16 @@ Each active task should include:
 
 ## Currently active
 
+- [`GEOM-008`](GEOM-008-linear-algebra-solver-infrastructure.md) — Geometry
+  linear algebra and solver infrastructure. Status: implementation complete for
+  Slice A; pending commit/PR retirement to `tasks/done/`. Promoted from
+  `tasks/backlog/geometry/` on 2026-05-27 for the Eigen3 + reusable sparse/dense
+  CPU numerical infrastructure slice. Owner: GitHub Copilot; branch: `main`
+  working tree. Verification completed 2026-05-27: `tools/setup/populate_deps.sh --refresh`,
+  `cmake --preset ci`, `cmake --build --preset ci --target IntrinsicGeometryTests`,
+  focused geometry CTest filter, module-inventory regeneration, layering/test-layout,
+  docs-link, task-policy checks, `cmake --build --preset ci --target IntrinsicTests`,
+  and the default CPU-supported CTest gate.
 - [`GRAPHICS-076`](GRAPHICS-076-default-recipe-debug-view-and-present-wiring.md) —
   Default-recipe `Pass.DebugView` and canonical `Pass.Present` wiring.
   Status: blocked on operational default-recipe Vulkan bring-up

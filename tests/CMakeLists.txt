@@ -363,6 +363,8 @@ set(_geometry_test_files
     Test.IntersectionClassification.cpp
     Test.RaycastClassify.cpp
     Test.RobustPredicates.cpp
+    Test.LinearAlgebra.cpp
+    Test.Sparse.cpp
     Test_SubmeshView.cpp
 )
 intrinsic_resolve_test_sources(_geometry_test_sources

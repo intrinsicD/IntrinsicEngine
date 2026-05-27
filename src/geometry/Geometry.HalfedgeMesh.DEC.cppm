@@ -10,6 +10,7 @@ export module Geometry.DEC;
 
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
+import Geometry.Sparse;
 
 export namespace Geometry::DEC
 {
@@ -58,49 +59,13 @@ export namespace Geometry::DEC
     // For d0: rows = #edges, cols = #vertices  (maps 0-forms to 1-forms)
     // For d1: rows = #faces, cols = #edges     (maps 1-forms to 2-forms)
 
-    struct SparseMatrix
-    {
-        std::size_t Rows{0};
-        std::size_t Cols{0};
-
-        // CSR storage: Values[RowOffsets[i] .. RowOffsets[i+1]) are nonzeros in row i,
-        //              with column indices ColIndices[k] and values Values[k].
-        std::vector<std::size_t> RowOffsets;  // Size = Rows + 1
-        std::vector<std::size_t> ColIndices;  // Size = nnz
-        std::vector<double> Values;           // Size = nnz
-
-        [[nodiscard]] std::size_t NonZeros() const noexcept { return Values.size(); }
-
-        [[nodiscard]] bool IsEmpty() const noexcept { return Rows == 0 && Cols == 0; }
-
-        // Sparse matrix-vector product: y = A * x
-        // x.size() must equal Cols, y.size() must equal Rows.
-        void Multiply(std::span<const double> x, std::span<double> y) const;
-
-        // Sparse matrix-transpose-vector product: y = Aᵀ * x
-        // x.size() must equal Rows, y.size() must equal Cols.
-        void MultiplyTranspose(std::span<const double> x, std::span<double> y) const;
-    };
+    using SparseMatrix = Geometry::Sparse::SparseMatrix;
 
     // -------------------------------------------------------------------------
     // DiagonalMatrix — for Hodge star operators (always diagonal for DEC)
     // -------------------------------------------------------------------------
 
-    struct DiagonalMatrix
-    {
-        std::size_t Size{0};
-        std::vector<double> Diagonal;  // Size = Size
-
-        [[nodiscard]] bool IsEmpty() const noexcept { return Size == 0; }
-
-        // Diagonal matrix-vector product: y_i = D_ii * x_i
-        void Multiply(std::span<const double> x, std::span<double> y) const;
-
-        // Inverse diagonal: y_i = (1 / D_ii) * x_i
-        // Entries with |D_ii| < epsilon are treated as zero (y_i = 0).
-        void MultiplyInverse(std::span<const double> x, std::span<double> y,
-                             double epsilon = 1e-12) const;
-    };
+    using DiagonalMatrix = Geometry::Sparse::DiagonalMatrix;
 
     // -------------------------------------------------------------------------
     // DECOperators — the complete set of DEC operators built from a mesh
@@ -234,18 +199,9 @@ export namespace Geometry::DEC
     // Solves symmetric positive-definite linear systems arising from DEC
     // operators (e.g., Poisson equations, heat diffusion).
 
-    struct CGParams
-    {
-        std::size_t MaxIterations{1000};
-        double Tolerance{1e-8};
-    };
-
-    struct CGResult
-    {
-        std::size_t Iterations{0};
-        double ResidualNorm{0.0};
-        bool Converged{false};
-    };
+    using CGConvergenceReason = Geometry::Sparse::CGConvergenceReason;
+    using CGParams = Geometry::Sparse::CGParams;
+    using CGResult = Geometry::Sparse::CGResult;
 
     // Solve A*x = b where A is a symmetric positive-definite SparseMatrix.
     // Uses Jacobi (diagonal) preconditioning.

@@ -122,11 +122,12 @@ randomness, or dependence on traversal order unless that order is specified.
   incircle/insphere are out of the current slice plan and tracked as a
   follow-up; adaptive-exact escalation is Slice 4.
 
-The preferred numerical direction is a hybrid GLM + Eigen3 policy: GLM remains the
-public geometry storage vocabulary, while Eigen may be introduced behind
-geometry-owned adapters for CPU linear-algebra kernels when a task adds that
-infrastructure. Eigen types should not leak through broad geometry APIs unless a
-future task deliberately defines a public advanced numerical surface.
+The geometry numerical policy is hybrid GLM + Eigen3: GLM remains the public
+geometry storage vocabulary, while Eigen is available behind geometry-owned
+adapters for CPU linear-algebra kernels. `Geometry.Linalg` is the explicit narrow
+import for Eigen-backed fixed-size adapters, row-major map helpers, and dense
+decomposition wrappers. Do not expose Eigen types through the broad `Geometry`
+umbrella or existing geometry containers without a separate API-review task.
 
 ## `Geometry.LinearSolver` policy
 
@@ -136,10 +137,9 @@ re-exported by the broad `Geometry` umbrella. Treat it as an advanced narrow
 import for the current small fixed-size solver helper, not as the canonical public
 solver infrastructure.
 
-Future solver work should happen under a dedicated task such as `GEOM-008`. That
-work may either promote a documented solver API and umbrella-export decision or
-hide/replace the current helper behind implementation details. Do not broaden or
-remove the module as part of unrelated algorithm changes.
+Reusable sparse solver work lives in `Geometry.Sparse`, with `Geometry.DEC`
+aliases preserving the existing DEC names. Do not broaden or remove
+`Geometry.LinearSolver` as part of unrelated algorithm changes.
 
 ## Compatibility and migration
 

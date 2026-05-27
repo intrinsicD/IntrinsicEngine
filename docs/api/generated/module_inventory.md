@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 7 |
 | `core` | 39 |
 | `ecs` | 26 |
-| `geometry` | 82 |
+| `geometry` | 84 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 56 |
@@ -146,6 +146,7 @@ Root scanned: `src`
 | `Geometry.IntersectionClassification` | `src/geometry/Geometry.IntersectionClassification.cppm` | `geometry` |
 | `Geometry.KDTree` | `src/geometry/Geometry.KDTree.cppm` | `geometry` |
 | `Geometry.KMeans` | `src/geometry/Geometry.KMeans.cppm` | `geometry` |
+| `Geometry.Linalg` | `src/geometry/Geometry.Linalg.cppm` | `geometry` |
 | `Geometry.LinearSolver` | `src/geometry/Geometry.LinearSolver.cppm` | `geometry` |
 | `Geometry.MarchingCubes` | `src/geometry/Geometry.MarchingCubes.cppm` | `geometry` |
 | `Geometry.Mesh.Conversion` | `src/geometry/Geometry.Mesh.Conversion.cppm` | `geometry` |
@@ -173,6 +174,7 @@ Root scanned: `src`
 | `Geometry.SDF` | `src/geometry/Geometry.SDF.cppm` | `geometry` |
 | `Geometry.SDFContact` | `src/geometry/Geometry.SDFContact.cppm` | `geometry` |
 | `Geometry.Segment` | `src/geometry/Geometry.Segment.cppm` | `geometry` |
+| `Geometry.Sparse` | `src/geometry/Geometry.Sparse.cppm` | `geometry` |
 | `Geometry.SpatialQueries` | `src/geometry/Geometry.SpatialQueries.cppm` | `geometry` |
 | `Geometry.Sphere.Sampling` | `src/geometry/Geometry.Sphere.Sampling.cppm` | `geometry` |
 | `Geometry.Sphere` | `src/geometry/Geometry.Sphere.cppm` | `geometry` |
@@ -472,4 +474,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 | `Extrinsic.Runtime.SpatialDebugAdapters` | `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` | `runtime` |
 
-Total modules: **445**
+Total modules: **447**

@@ -39,6 +39,7 @@ export import Geometry.Graph.IO;
 export import Geometry.SDF;
 export import Geometry.SDFContact;
 export import Geometry.Support;
+export import Geometry.Sparse;
 export import Geometry.Validation;
 export import Geometry.DEC;
 export import Geometry.Curvature;

@@ -49,6 +49,7 @@ target_sources(${target_name}
         Geometry.IntersectionClassification.cppm
         Geometry.KDTree.cppm
         Geometry.KMeans.cppm
+        Geometry.Linalg.cppm
         Geometry.LinearSolver.cppm
         Geometry.MarchingCubes.cppm
         Geometry.Mesh.Conversion.cppm
@@ -75,6 +76,7 @@ target_sources(${target_name}
         Geometry.SDF.cppm
         Geometry.SDFContact.cppm
         Geometry.Segment.cppm
+        Geometry.Sparse.cppm
         Geometry.SpatialQueries.cppm
         Geometry.Sphere.Sampling.cppm
         Geometry.Sphere.cppm
@@ -115,6 +117,7 @@ target_sources(${target_name}
         Geometry.ImplicitPlaneField.cpp
         Geometry.KDTree.cpp
         Geometry.KMeans.cpp
+        Geometry.Linalg.cpp
         Geometry.MarchingCubes.cpp
         Geometry.Mesh.Conversion.cpp
         Geometry.NormalEstimation.cpp
@@ -130,6 +133,7 @@ target_sources(${target_name}
         Geometry.SDF.cpp
         Geometry.Sphere.Sampling.cpp
         Geometry.Sphere.cpp
+        Geometry.Sparse.cpp
         Geometry.SurfaceReconstruction.cpp
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
@@ -144,4 +148,7 @@ target_link_libraries(${target_name}
         PUBLIC
         IntrinsicCore
         glm::glm
+        Eigen3::Eigen
 )
+
+target_compile_definitions(${target_name} PUBLIC EIGEN_MPL2_ONLY)
