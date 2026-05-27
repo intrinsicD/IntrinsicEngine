@@ -9,16 +9,31 @@
 - No broad rewrite of existing DEC/geodesic/parameterization algorithms in the dependency-introduction patch.
 - No performance claims without benchmark baselines.
 
+## Status
+- Status: done.
+- Completed: 2026-05-27.
+- Commit: `c1aeafb` — Slice A: add Eigen3 dependency; introduce
+  `Geometry.Linalg` (narrow, explicit-import Eigen-backed dense/adapter
+  module) and `Geometry.Sparse` (reusable CSR/builder/diagnostics/CG
+  module); bridge `Geometry.DEC` CSR/CG to the new sparse layer; unit
+  coverage for adapters, dense decompositions, sparse builder, and CG
+  breakdown; docs and generated module inventory updates. Merged into
+  the working tree via `cfe2f0c`.
+- PR: pending — retirement commit lands on
+  `claude/intelligent-dirac-1Kerw` together with this task move.
+- Branch (retirement): `claude/intelligent-dirac-1Kerw`.
+- Closes maturity at `CPUContracted`: the geometry numerical
+  infrastructure seam is covered by deterministic CPU/null unit tests
+  (`Test.LinearAlgebra.cpp`, `Test.Sparse.cpp`, the existing DEC /
+  Geodesic / VectorHeatMethod / Parameterization batteries) that run in
+  the default CPU gate. Per Non-goals, no optional GPU / SuiteSparse /
+  CHOLMOD backend is owed by this task; Spectra and SuiteSparse seams
+  are recorded as later optional follow-ups in `docs/architecture/geometry.md`.
+
 ## Context
-- Status: in-progress.
 - Owner/agent: GitHub Copilot.
-- Branch: `main` working tree.
-- Promoted from `tasks/backlog/geometry/` on 2026-05-27.
-- Current maturity: `CPUContracted` for the CPU geometry numerical infrastructure
-  seam. The task remains active until commit/PR retirement; no GPU/backend
-  operational claim is made.
-- Next verification step: commit/PR review and retirement to `tasks/done/` after
-  a commit/PR reference exists.
+- Promoted from `tasks/backlog/geometry/` on 2026-05-27 (work landed on
+  `main` before the retirement commit on `claude/intelligent-dirac-1Kerw`).
 - Owning subsystem/layer: `geometry` (`geometry -> core` plus declared third-party numerical dependency).
 - Seeded by [`docs/reviews/2026-05-12-src-geometry-gap-analysis.md`](../../docs/reviews/2026-05-12-src-geometry-gap-analysis.md).
 - Current dependency configuration wires GLM but not Eigen3. The review recommends a hybrid policy: GLM remains engine-facing storage; Eigen3 provides mature dense/sparse numerical kernels internally.
