@@ -15,7 +15,7 @@
 - Method package: `methods/geometry/cross_field/`.
 - Seeded by [`docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md`](../../../docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md) Tier 2 #6.
 - Gap analysis explicitly lists "vector-field design, cross fields, frame fields, and singularity indexing" as a P1 missing capability.
-- Reuses `Geometry.HalfedgeMesh.Curvature` (principal curvature alignment), `Geometry.HalfedgeMesh.DEC` (Laplacian), `Geometry.HalfedgeMesh.VectorHeatMethod` (parallel transport on the surface), and the sparse-solver seam from [`GEOM-008`](../geometry/GEOM-008-linear-algebra-solver-infrastructure.md).
+- Reuses `Geometry.HalfedgeMesh.Curvature` (principal curvature alignment), `Geometry.HalfedgeMesh.DEC` (Laplacian), `Geometry.HalfedgeMesh.VectorHeatMethod` (parallel transport on the surface), and the CSR builder / CG iterative solver from retired [`GEOM-008`](../../done/GEOM-008-linear-algebra-solver-infrastructure.md). **Solver gap (Step 4):** variant B's generalized smallest-eigenvalue problem `A z = λ M z` needs a sparse symmetric eigensolver (LOBPCG / shift-invert). That seam is **not** shipped by GEOM-008 (which ships only CG / shifted CG) and is **not** owned by the LDLT follow-up [`GEOM-020`](../geometry/GEOM-020-sparse-direct-factorization-seam.md). A separate eigensolver follow-up (likely adding Spectra as a dependency) must be filed and retired before this task can promote on variant B; on variants A / C / D the gap may differ.
 
 ## Variants and default selection
 
@@ -66,7 +66,7 @@ Default recommendation: **B** (Knöppel et al. globally-optimal direction fields
 - [ ] Step 1: build per-face local frames using `Geometry.HalfedgeMesh.Curvature` tangent basis.
 - [ ] Step 2: compute edge-based parallel-transport rotations between adjacent face frames (reuse `Geometry.HalfedgeMesh.VectorHeatMethod` connection internals).
 - [ ] Step 3: assemble Dirichlet energy in `z = e^{iNθ}` per face; alignment constraints become soft / hard pins.
-- [ ] Step 4: solve the smallest-eigenvalue generalized eigenproblem `A z = λ M z` via the iterative seam from `GEOM-008` (LOBPCG or shift-invert).
+- [ ] Step 4: solve the smallest-eigenvalue generalized eigenproblem `A z = λ M z` via a sparse symmetric (generalized) eigensolver (LOBPCG or shift-invert). Neither retired GEOM-008 nor follow-up GEOM-020 ship this seam; this step is blocked on a separate sparse-eigensolver follow-up (Spectra-backed) that must be filed before this slice is implementable.
 - [ ] Step 5: compute singularity indices by accumulating period jumps around each vertex.
 
 ## Tests

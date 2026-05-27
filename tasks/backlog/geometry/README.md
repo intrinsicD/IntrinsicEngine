@@ -12,7 +12,7 @@ map.
 - [GEOIO-002 — Geometry IO parity hardening and exporters](../../done/GEOIO-002-geometry-io-parity-hardening.md) (done).
 - [GEOM-006 — Indexed mesh/soup container and conversion contracts](../../done/GEOM-006-indexed-mesh-soup-conversion-contracts.md) (done).
 - [GEOM-007 — Robust predicates and intersection classification foundation](../../done/GEOM-007-robust-predicates-intersection-classification.md) (done).
-- [GEOM-008 — Geometry linear algebra and solver infrastructure](../../active/GEOM-008-linear-algebra-solver-infrastructure.md) (active).
+- [GEOM-008 — Geometry linear algebra and solver infrastructure](../../done/GEOM-008-linear-algebra-solver-infrastructure.md) (done).
 - [GEOM-009 — Geometry benchmark manifests, fixtures, and smoke benchmark](../../done/GEOM-009-benchmark-manifests-fixtures-smoke.md) (done).
 - [GEOM-010 — Point-cloud algorithm pack roadmap](../../done/GEOM-010-point-cloud-algorithm-pack-roadmap.md) (done; roadmap: [`docs/architecture/point-cloud-algorithm-roadmap.md`](../../../docs/architecture/point-cloud-algorithm-roadmap.md)).
 - [GEOM-011 — Parameterization and mapping roadmap](../../done/GEOM-011-parameterization-mapping-roadmap.md) (done; roadmap: [`docs/architecture/parameterization-mapping-roadmap.md`](../../../docs/architecture/parameterization-mapping-roadmap.md)).
@@ -24,6 +24,9 @@ map.
 - [GEOM-017 — Point-cloud descriptors and registration seams](GEOM-017-point-cloud-descriptors-registration-seams.md).
 - [GEOM-018 — Parameterization distortion and map-quality diagnostics](GEOM-018-parameterization-distortion-map-quality-diagnostics.md).
 - [GEOM-019 — Harmonic/Tutte parameterization and boundary constraints](GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md).
+- [GEOM-020 — Sparse direct factorization solver seam (LDLT/LLT)](GEOM-020-sparse-direct-factorization-seam.md)
+  (follow-up to retired `GEOM-008`; gates `methods/METHOD-002` /
+  `METHOD-003` LDLT paths).
 - [RORG-031E — Geometry and method-readiness backlog seed](RORG-031-geometry-method-readiness.md).
 
 ## Convergence
@@ -54,6 +57,11 @@ map.
   Its first implementation packs are GEOM-018 (distortion/map-quality
   diagnostics) and GEOM-019 (harmonic/Tutte parameterization and boundary
   constraints).
+- GEOM-020 is the named follow-up to retired GEOM-008 for the direct
+  sparse SPD factorization (LDLT/LLT) seam that GEOM-008 deferred but
+  that methods/METHOD-002 (step 2) and METHOD-003 (step 5) already
+  reference as "the LDLT path from GEOM-008". Method tasks gated on the
+  LDLT path must wait on GEOM-020, not on retired GEOM-008.
 - GEOM-012 ensures mesh, graph, and point-cloud algorithms can share compatible
   property storage through explicit borrowed views instead of accidental copies.
 - GEOM-013 and GEOM-014 are seeded by the geometry paper survey
