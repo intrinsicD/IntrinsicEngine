@@ -2,15 +2,27 @@
 
 ## Status
 
-- Status: in-progress (Slice A landed 2026-05-25 via PR #933 on
-  `claude/intrinsicengine-agent-onboarding-k31Vm`; Slice B landed
-  2026-05-26 via PR #934 on
-  `claude/intrinsicengine-agent-onboarding-Yrfon`; Slice C landing
-  2026-05-26 on the current branch adds `ConvexHullAdapter` +
-  `SpatialDebugAdapterRegistry`; Slice D remains).
-- Owner/agent: unassigned after Slice C; next pick-up by any agent for
-  Slice D (extraction wiring + ECS↔geometry-tree binding).
-- Branch: current onboarding branch for Slice C.
+- Status: done (all four slices landed). Retired to `tasks/done/` on
+  2026-05-27 after Slice D landed on the current onboarding branch
+  `claude/intrinsicengine-agent-onboarding-xnNIW`
+  (`ECS::Components::SpatialDebugBinding` + cache-owned adapters +
+  `RuntimeRenderSnapshotBatch::SpatialDebug*` spans + per-frame stats;
+  five new integration tests pass under the default CPU/null gate,
+  2245/2247 overall — the two pre-existing
+  `IntrinsicBenchmarkSmoke.HalfedgeSmoke.{Run,Validate}` "Not Run"
+  failures persist unchanged from prior commits and trace to the
+  benchmark binary not being built by `IntrinsicTests`).
+- Owner/agent: closed.
+- Branches: `claude/intrinsicengine-agent-onboarding-k31Vm` (Slice A),
+  `claude/intrinsicengine-agent-onboarding-Yrfon` (Slice B), prior
+  onboarding branch (Slice C), and
+  `claude/intrinsicengine-agent-onboarding-xnNIW` (Slice D).
+- Slice A PR: #933. Slice B PR: #934. Slice C commit:
+  `2697f86` on the prior onboarding branch
+  (`RUNTIME-082 Slice C: add ConvexHullAdapter + adapter registry`).
+  Slice D commit: see git log on
+  `claude/intrinsicengine-agent-onboarding-xnNIW` for the
+  `RUNTIME-082 Slice D` commit that retires this task.
 - Started: 2026-05-25. Promoted from
   `tasks/backlog/runtime/RUNTIME-082-spatial-debug-adapters.md` as the
   next earliest unblocked Theme A leaf after GRAPHICS-076, GRAPHICS-077,
@@ -60,16 +72,33 @@ gate.
   remaining contract tests on a small fixture hull. (Landed
   2026-05-26 on the current onboarding branch; five new contract
   tests bring the suite to 15/15 passing.)
-- **Slice D.** Wire `RenderExtractionCache::ExtractAndSubmit` to
-  invoke the active adapter for entities that carry the relevant
-  geometry-tree binding, accumulate snapshots into a new
-  `RuntimeRenderSnapshotBatch::SpatialDebug*` span family, and report
-  adapter-side stats in `RuntimeRenderExtractionStats`. This slice
-  introduces the renderable↔geometry-tree binding mechanism (ECS
-  component or runtime sidecar — design choice pinned at slice start
-  via a focused grilling pass on the user, since it crosses the ECS
-  boundary). Owns the integration test against
-  `Test.RuntimeRenderExtraction`.
+- **Slice D (this slice — landed 2026-05-27).** Wires
+  `RenderExtractionCache::ExtractAndSubmit` to invoke the active
+  adapter for entities that carry an `ECS::Components::SpatialDebugBinding`,
+  accumulate snapshots into a shared `SpatialDebugSnapshotBatch`,
+  attach the resulting spans to a new
+  `RuntimeRenderSnapshotBatch::SpatialDebug{Bounds,HierarchyNodes,SplitPlanes,ConvexHullVertices,ConvexHullEdges,PointMarkers}`
+  span family, and fold per-frame counters onto
+  `RuntimeRenderExtractionStats`'s `SpatialDebug{BindingsObserved,
+  AdaptersInvoked, MissingAdapterCount, BoundsCount, HierarchyNodeCount,
+  SplitPlaneCount, ConvexHullVertexCount, ConvexHullEdgeCount,
+  PointMarkerCount, LeafNodeAccumulator, InnerNodeAccumulator,
+  EmptyNodeSkippedAccumulator, DepthCapTruncationAccumulator}` fields.
+  The renderable↔geometry-tree binding is the new ECS component
+  `ECS::Components::SpatialDebugBinding{Kind, RegistryKey, LeafOnly,
+  OccupancyOnly, MaxDepth}` (pinned 2026-05-27 via a focused grilling
+  pass on the user: option A1 — ECS component carrying typed kind +
+  registry key — was selected over a runtime-only sidecar map).
+  Adapter ownership is the cache via `std::unique_ptr`
+  (`RenderExtractionCache::RegisterSpatialDebugAdapter` /
+  `UnregisterSpatialDebugAdapter`; the prior raw-pointer
+  `SpatialDebugAdapterRegistry` is now an embedded mirror the cache
+  refreshes on every register/unregister). Five new integration tests
+  in `tests/integration/runtime/Test.RuntimeRenderExtraction.cpp`
+  cover the resolve-and-pump, missing-adapter, unregistration,
+  re-registration replace, and per-binding LeafOnly/MaxDepth-cap
+  paths against a deterministic 4-AABB BVH and a unit-cube
+  ConvexHull fixture.
 
 ## Maturity
 
@@ -100,8 +129,13 @@ gate.
   Slice D (extraction wiring) is separately deferred behind the
   renderable↔geometry-tree binding pinning pass; the task therefore
   promotes from `Scaffolded` to `CPUContracted` with Slice C.
-- Slice D closes the extraction wiring at `Operational` via a runtime
-  integration test (no `gpu`/`vulkan` requirement).
+- Slice D (landed 2026-05-27) closes the extraction wiring at
+  `Operational` via five new integration tests in
+  `tests/integration/runtime/Test.RuntimeRenderExtraction.cpp` that
+  exercise the full
+  `RenderExtractionCache::ExtractAndSubmit` pump against a Null
+  renderer; no `gpu`/`vulkan` test additions. The parent task
+  promotes from `CPUContracted` to `Operational` with Slice D.
 
 ## Goal
 
@@ -288,15 +322,62 @@ Slice C:
       wiring — the registry is the data-only seam Slice D will
       consume.
 
-Slice D:
+Slice D (landed 2026-05-27):
 
-- [ ] Wire `RenderExtractionCache::ExtractAndSubmit` to invoke the
-      active adapter per relevant entity, accumulate snapshots into a
-      new `RuntimeRenderSnapshotBatch::SpatialDebug*` span family,
-      and surface per-frame adapter stats on
-      `RuntimeRenderExtractionStats`. Introduces the renderable↔
-      geometry-tree binding (ECS component or runtime sidecar — pin
-      at slice start).
+- [x] Add `src/ecs/Components/ECS.Component.SpatialDebugBinding.cppm`
+      exporting `Extrinsic.ECS.Component.SpatialDebugBinding` with
+      `enum class SpatialDebugGeometryKind : std::uint8_t {Bvh,
+      KdTree, Octree, ConvexHull}` and
+      `struct SpatialDebugBinding{Kind, RegistryKey (uint64_t),
+      LeafOnly, OccupancyOnly, MaxDepth}`. The component imports
+      `<cstdint>` only — no runtime/graphics imports — so the new
+      ECS surface respects `ecs -> {core, geometry}` per `AGENTS.md`
+      §2. Registered in `src/ecs/Components/CMakeLists.txt`.
+- [x] Extend `Extrinsic::Graphics::RuntimeRenderSnapshotBatch`
+      (`src/graphics/renderer/Graphics.Renderer.cppm`) with six new
+      span fields:
+      `SpatialDebugBounds`, `SpatialDebugHierarchyNodes`,
+      `SpatialDebugSplitPlanes`, `SpatialDebugConvexHullVertices`,
+      `SpatialDebugConvexHullEdges`, `SpatialDebugPointMarkers`.
+      The renderer module gains a local (non-export)
+      `import Extrinsic.Graphics.SpatialDebugVisualizers` so the
+      packet types are visible to the span declarations.
+- [x] Extend `Runtime::RuntimeRenderExtractionStats`
+      (`src/runtime/Runtime.RenderExtraction.cppm`) with the
+      `SpatialDebug{BindingsObserved, AdaptersInvoked,
+      MissingAdapterCount, BoundsCount, HierarchyNodeCount,
+      SplitPlaneCount, ConvexHullVertexCount, ConvexHullEdgeCount,
+      PointMarkerCount, LeafNodeAccumulator, InnerNodeAccumulator,
+      EmptyNodeSkippedAccumulator, DepthCapTruncationAccumulator}`
+      fields. Per-batch counts come from the submitted batch span
+      sizes; accumulator fields are summed from
+      `SpatialDebugAdapterStats` across every invoked adapter.
+- [x] Extend `RenderExtractionCache` with the adapter-ownership
+      surface: `RegisterSpatialDebugAdapter(uint64_t,
+      std::unique_ptr<ISpatialDebugAdapter>)`,
+      `UnregisterSpatialDebugAdapter(uint64_t) noexcept`,
+      `GetSpatialDebugAdapterCount()`, and
+      `GetSpatialDebugRegistryForTest()`. The cache holds an owning
+      `std::unordered_map<uint64_t, std::unique_ptr<ISpatialDebugAdapter>>`
+      plus an embedded `SpatialDebugAdapterRegistry` mirror that is
+      refreshed on every register (the registry's raw pointer is
+      replaced atomically: erase-then-insert ordering guarantees no
+      dangling pointer between the unique_ptr swap and the registry
+      re-register on collision).
+- [x] Wire `RenderExtractionCache::ExtractAndSubmit` to walk the
+      `ECS::Components::SpatialDebugBinding` view independently of
+      `HasRenderableHint` (a binding may attach to a renderable
+      entity or to a debug-only entity), resolve the adapter through
+      the cache-owned registry, call `Append` against the
+      per-frame-cleared `m_SpatialDebugBatch`, fold per-adapter
+      stats, count missing-adapter cases, fill the batch-derived
+      stat counts, and attach the batch spans to
+      `RuntimeRenderSnapshotBatch::SpatialDebug*` on the
+      `SubmitRuntimeSnapshots` call.
+- [x] Extend `RenderExtractionCache::Shutdown` to clear the registry
+      mirror before destroying the owned-adapter map (so the
+      registry never observes a dangling raw pointer mid-shutdown)
+      and to `Clear()` the snapshot batch.
 
 ## Tests
 
@@ -500,6 +581,37 @@ Slice B (this slice):
 Slices C–D acceptance criteria are recorded inside each slice's row
 under `## Required changes` once that slice is in-progress.
 
+Slice D (landed 2026-05-27):
+
+- [x] `Extrinsic.ECS.Component.SpatialDebugBinding` compiles and
+      exports the `SpatialDebugGeometryKind` discriminator + the
+      `SpatialDebugBinding` POD; no runtime/graphics imports
+      (verified by `python3 tools/repo/check_layering.py --root src
+      --strict`).
+- [x] `Extrinsic::Graphics::RuntimeRenderSnapshotBatch` exports the
+      six new `SpatialDebug*` span fields; backends and tests that
+      do not exercise the pump keep their default-empty span
+      behavior unchanged.
+- [x] `Extrinsic::Runtime::RuntimeRenderExtractionStats` exports the
+      thirteen new spatial-debug counters; existing
+      callers continue to compile because the additions are pure
+      additions with default initializers.
+- [x] `RenderExtractionCache` exposes the four new adapter-ownership
+      accessors and clears adapter ownership + the registry mirror
+      in `Shutdown`.
+- [x] The five new `RuntimeRenderExtraction.SpatialDebug*` tests in
+      `tests/integration/runtime/Test.RuntimeRenderExtraction.cpp`
+      pass under the default CPU/null gate (
+      `./build/ci/bin/IntrinsicRuntimeGraphicsCpuTests
+      --gtest_filter='*SpatialDebug*'` → 5/5 pass).
+- [x] Default CPU/null gate stays green (2245/2247 with the two
+      pre-existing `IntrinsicBenchmarkSmoke.HalfedgeSmoke.{Run,
+      Validate}` "Not Run" failures unchanged); no `gpu`/`vulkan`
+      test additions.
+- [x] `docs/api/generated/module_inventory.md` regenerated; total
+      module count rises from 445 → 446 because of the new ECS
+      component module.
+
 Slice C (this slice):
 
 - [x] `Extrinsic.Runtime.SpatialDebugAdapters` exports
@@ -568,13 +680,22 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
   `claude/intrinsicengine-agent-onboarding-k31Vm`.
 - Slice B: completed 2026-05-26 via PR #934 on
   `claude/intrinsicengine-agent-onboarding-Yrfon`.
-- Slice C (this slice): completed 2026-05-26 on the current
-  onboarding branch (`ConvexHullAdapter` + `SpatialDebugAdapterRegistry`,
-  five new contract tests, 2286/2286 default CPU gate pass with
+- Slice C: completed 2026-05-26 on the prior onboarding branch
+  (`ConvexHullAdapter` + `SpatialDebugAdapterRegistry`, five new
+  contract tests, 2286/2286 default CPU gate pass with
   `CCACHE_DISABLE=1` — see Notes below).
-- Slice D pick-up: pin the renderable↔geometry-tree binding via a
-  focused grilling pass, then wire `ExtractAndSubmit` + integration
-  test.
+- Slice D: completed 2026-05-27 on
+  `claude/intrinsicengine-agent-onboarding-xnNIW`
+  (`ECS::Components::SpatialDebugBinding` + cache-owned adapters
+  + `RuntimeRenderSnapshotBatch::SpatialDebug*` spans + per-frame
+  stats + five integration tests). Default CPU/null gate:
+  `cmake --preset ci`, `cmake --build --preset ci --target
+  IntrinsicTests`, `ctest --test-dir build/ci --output-on-failure
+  -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60` → 2245/2247
+  pass (two pre-existing `IntrinsicBenchmarkSmoke.HalfedgeSmoke`
+  failures unchanged). Layering / test-layout / doc-link /
+  task-policy validators all clean.
+- Task retired to `tasks/done/`.
 
 ## Notes
 

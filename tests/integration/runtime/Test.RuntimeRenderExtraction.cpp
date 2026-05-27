@@ -11,6 +11,7 @@ import Extrinsic.Asset.Registry;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.AssetInstance;
 import Extrinsic.ECS.Component.DirtyTags;
+import Extrinsic.ECS.Component.SpatialDebugBinding;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Component.Light;
 import Extrinsic.Graphics.GpuAssetCache;
@@ -22,6 +23,11 @@ import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.TransferQueue;
 import Extrinsic.RHI.Types;
 import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.SpatialDebugAdapters;
+import Geometry.AABB;
+import Geometry.BVH;
+import Geometry.ConvexHull;
+import Geometry.Plane;
 
 #include "MockRHI.hpp"
 
@@ -409,5 +415,218 @@ TEST(RuntimeRenderExtraction, ExtractAndSubmitDoesNotAutoAcknowledgeRebinds)
     EXPECT_EQ(second.SourceAssetRebindRequiredCount, 1u);
     EXPECT_EQ(second.SourceAssetUpToDateCount, 0u);
     EXPECT_EQ(second.SourceAssetRebindAcknowledgedCount, 0u);
+}
+
+// ============================================================================
+// RUNTIME-082 Slice D — spatial-debug adapter pump integration.
+//
+// These tests exercise the runtime extraction wiring end-to-end against the
+// Null renderer: entities carry a `SpatialDebugBinding` component, adapters
+// are registered into the cache (which owns them via `unique_ptr`), and
+// `ExtractAndSubmit` looks up + invokes the active adapter, folds per-frame
+// stats onto `RuntimeRenderExtractionStats`, and attaches the resulting
+// snapshot spans to `RuntimeRenderSnapshotBatch`.
+// ============================================================================
+
+namespace
+{
+    [[nodiscard]] Geometry::BVH MakeFourBoxBvh()
+    {
+        std::vector<Geometry::AABB> boxes{
+            Geometry::AABB{{-4.0f, -1.0f, -1.0f}, {-3.0f, 1.0f, 1.0f}},
+            Geometry::AABB{{-1.0f, -1.0f, -1.0f}, { 0.0f, 1.0f, 1.0f}},
+            Geometry::AABB{{ 1.0f, -1.0f, -1.0f}, { 2.0f, 1.0f, 1.0f}},
+            Geometry::AABB{{ 3.0f, -1.0f, -1.0f}, { 4.0f, 1.0f, 1.0f}},
+        };
+        Geometry::BVH bvh;
+        Geometry::BVHBuildParams params{};
+        params.LeafSize = 1;
+        EXPECT_TRUE(bvh.Build(boxes, params).has_value());
+        return bvh;
+    }
+
+    [[nodiscard]] Geometry::ConvexHull MakeUnitCubeHull()
+    {
+        Geometry::ConvexHull hull{};
+        hull.Vertices = {
+            glm::vec3{0.f, 0.f, 0.f},
+            glm::vec3{1.f, 0.f, 0.f},
+            glm::vec3{0.f, 1.f, 0.f},
+            glm::vec3{1.f, 1.f, 0.f},
+            glm::vec3{0.f, 0.f, 1.f},
+            glm::vec3{1.f, 0.f, 1.f},
+            glm::vec3{0.f, 1.f, 1.f},
+            glm::vec3{1.f, 1.f, 1.f},
+        };
+        hull.Planes = {
+            Geometry::Plane{glm::vec3{-1.f, 0.f, 0.f}, 0.f},
+            Geometry::Plane{glm::vec3{ 1.f, 0.f, 0.f}, -1.f},
+            Geometry::Plane{glm::vec3{0.f, -1.f, 0.f}, 0.f},
+            Geometry::Plane{glm::vec3{0.f,  1.f, 0.f}, -1.f},
+            Geometry::Plane{glm::vec3{0.f, 0.f, -1.f}, 0.f},
+            Geometry::Plane{glm::vec3{0.f, 0.f,  1.f}, -1.f},
+        };
+        return hull;
+    }
+}
+
+TEST(RuntimeRenderExtraction, SpatialDebugBindingResolvesAndPumpsBvhAdapter)
+{
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+    auto& registry = scene.Raw();
+
+    const Geometry::BVH bvh = MakeFourBoxBvh();
+    constexpr std::uint64_t kKey = 0xB7u;
+    fixture.Extraction.RegisterSpatialDebugAdapter(
+        kKey, std::make_unique<Runtime::BvhAdapter>(bvh));
+    ASSERT_EQ(fixture.Extraction.GetSpatialDebugAdapterCount(), 1u);
+
+    const auto entity = scene.Create();
+    auto& binding = registry.emplace<ECS::Components::SpatialDebugBinding>(entity);
+    binding.Kind        = ECS::Components::SpatialDebugGeometryKind::Bvh;
+    binding.RegistryKey = kKey;
+
+    const auto stats = fixture.Extract(scene);
+
+    EXPECT_EQ(stats.SpatialDebugBindingsObserved, 1u);
+    EXPECT_EQ(stats.SpatialDebugAdaptersInvoked, 1u);
+    EXPECT_EQ(stats.SpatialDebugMissingAdapterCount, 0u);
+    EXPECT_EQ(stats.SpatialDebugBoundsCount,
+              static_cast<std::uint32_t>(bvh.Nodes().size()));
+    EXPECT_EQ(stats.SpatialDebugHierarchyNodeCount, stats.SpatialDebugBoundsCount);
+
+    std::uint32_t expectedLeafCount   = 0u;
+    std::uint32_t expectedInnerCount  = 0u;
+    for (const auto& node : bvh.Nodes())
+    {
+        if (node.IsLeaf) ++expectedLeafCount;
+        else             ++expectedInnerCount;
+    }
+    EXPECT_EQ(stats.SpatialDebugLeafNodeAccumulator,  expectedLeafCount);
+    EXPECT_EQ(stats.SpatialDebugInnerNodeAccumulator, expectedInnerCount);
+    EXPECT_EQ(stats.SpatialDebugSplitPlaneCount,       expectedInnerCount);
+    EXPECT_EQ(stats.SpatialDebugConvexHullVertexCount, 0u);
+    EXPECT_EQ(stats.SpatialDebugConvexHullEdgeCount,   0u);
+    EXPECT_EQ(stats.SpatialDebugPointMarkerCount,      0u);
+}
+
+TEST(RuntimeRenderExtraction, SpatialDebugBindingMissingAdapterIsCounted)
+{
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+    auto& registry = scene.Raw();
+
+    const auto entity = scene.Create();
+    auto& binding = registry.emplace<ECS::Components::SpatialDebugBinding>(entity);
+    binding.Kind        = ECS::Components::SpatialDebugGeometryKind::Bvh;
+    binding.RegistryKey = 42u;
+
+    const auto stats = fixture.Extract(scene);
+
+    EXPECT_EQ(stats.SpatialDebugBindingsObserved, 1u);
+    EXPECT_EQ(stats.SpatialDebugAdaptersInvoked, 0u);
+    EXPECT_EQ(stats.SpatialDebugMissingAdapterCount, 1u);
+    EXPECT_EQ(stats.SpatialDebugBoundsCount, 0u);
+    EXPECT_EQ(stats.SpatialDebugHierarchyNodeCount, 0u);
+    EXPECT_EQ(stats.SpatialDebugSplitPlaneCount, 0u);
+}
+
+TEST(RuntimeRenderExtraction, SpatialDebugAdapterUnregistrationDrainsPump)
+{
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+    auto& registry = scene.Raw();
+
+    const Geometry::BVH bvh = MakeFourBoxBvh();
+    constexpr std::uint64_t kKey = 7u;
+    fixture.Extraction.RegisterSpatialDebugAdapter(
+        kKey, std::make_unique<Runtime::BvhAdapter>(bvh));
+
+    const auto entity = scene.Create();
+    auto& binding = registry.emplace<ECS::Components::SpatialDebugBinding>(entity);
+    binding.RegistryKey = kKey;
+
+    const auto firstStats = fixture.Extract(scene);
+    ASSERT_GT(firstStats.SpatialDebugHierarchyNodeCount, 0u);
+
+    EXPECT_TRUE(fixture.Extraction.UnregisterSpatialDebugAdapter(kKey));
+    EXPECT_FALSE(fixture.Extraction.UnregisterSpatialDebugAdapter(kKey));
+    EXPECT_EQ(fixture.Extraction.GetSpatialDebugAdapterCount(), 0u);
+
+    const auto secondStats = fixture.Extract(scene);
+
+    EXPECT_EQ(secondStats.SpatialDebugBindingsObserved, 1u);
+    EXPECT_EQ(secondStats.SpatialDebugAdaptersInvoked, 0u);
+    EXPECT_EQ(secondStats.SpatialDebugMissingAdapterCount, 1u);
+    EXPECT_EQ(secondStats.SpatialDebugBoundsCount, 0u);
+    EXPECT_EQ(secondStats.SpatialDebugHierarchyNodeCount, 0u);
+}
+
+TEST(RuntimeRenderExtraction, SpatialDebugReRegisterReplacesAdapterAndPreservesPump)
+{
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+    auto& registry = scene.Raw();
+
+    const Geometry::BVH bvh = MakeFourBoxBvh();
+    const Geometry::ConvexHull hull = MakeUnitCubeHull();
+    constexpr std::uint64_t kKey = 99u;
+
+    fixture.Extraction.RegisterSpatialDebugAdapter(
+        kKey, std::make_unique<Runtime::BvhAdapter>(bvh));
+
+    const auto entity = scene.Create();
+    auto& binding = registry.emplace<ECS::Components::SpatialDebugBinding>(entity);
+    binding.Kind        = ECS::Components::SpatialDebugGeometryKind::Bvh;
+    binding.RegistryKey = kKey;
+
+    const auto bvhStats = fixture.Extract(scene);
+    ASSERT_GT(bvhStats.SpatialDebugHierarchyNodeCount, 0u);
+    EXPECT_EQ(bvhStats.SpatialDebugConvexHullVertexCount, 0u);
+
+    // Replace the BVH adapter with a ConvexHull adapter at the same key.
+    // The cache must drop the prior unique_ptr, install the new one, and
+    // refresh the registry slot without leaving a dangling raw pointer.
+    fixture.Extraction.RegisterSpatialDebugAdapter(
+        kKey, std::make_unique<Runtime::ConvexHullAdapter>(hull));
+    binding.Kind = ECS::Components::SpatialDebugGeometryKind::ConvexHull;
+    EXPECT_EQ(fixture.Extraction.GetSpatialDebugAdapterCount(), 1u);
+
+    const auto hullStats = fixture.Extract(scene);
+
+    EXPECT_EQ(hullStats.SpatialDebugAdaptersInvoked, 1u);
+    EXPECT_EQ(hullStats.SpatialDebugHierarchyNodeCount, 0u);
+    EXPECT_EQ(hullStats.SpatialDebugConvexHullVertexCount, 8u);
+    EXPECT_EQ(hullStats.SpatialDebugConvexHullEdgeCount, 12u);
+}
+
+TEST(RuntimeRenderExtraction, SpatialDebugBindingHonorsLeafOnlyAndDepthCap)
+{
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+    auto& registry = scene.Raw();
+
+    const Geometry::BVH bvh = MakeFourBoxBvh();
+    constexpr std::uint64_t kKey = 1234u;
+    fixture.Extraction.RegisterSpatialDebugAdapter(
+        kKey, std::make_unique<Runtime::BvhAdapter>(bvh));
+
+    const auto entity = scene.Create();
+    auto& binding = registry.emplace<ECS::Components::SpatialDebugBinding>(entity);
+    binding.RegistryKey = kKey;
+    binding.LeafOnly    = true;
+
+    const auto leafOnlyStats = fixture.Extract(scene);
+    EXPECT_EQ(leafOnlyStats.SpatialDebugSplitPlaneCount, 0u);
+    EXPECT_EQ(leafOnlyStats.SpatialDebugInnerNodeAccumulator, 0u);
+    EXPECT_GT(leafOnlyStats.SpatialDebugLeafNodeAccumulator, 0u);
+
+    binding.LeafOnly = false;
+    binding.MaxDepth = 0u;
+
+    const auto depthCapStats = fixture.Extract(scene);
+    EXPECT_EQ(depthCapStats.SpatialDebugHierarchyNodeCount, 1u);
+    EXPECT_EQ(depthCapStats.SpatialDebugDepthCapTruncationAccumulator, 1u);
 }
 

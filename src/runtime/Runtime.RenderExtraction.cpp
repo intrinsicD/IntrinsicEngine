@@ -21,6 +21,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.AssetInstance;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Component.ProceduralGeometryRef;
+import Extrinsic.ECS.Component.SpatialDebugBinding;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Component.Culling.World;
@@ -41,6 +42,7 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.RHI.Types;
 import Extrinsic.Runtime.ProceduralGeometry;
 import Extrinsic.Runtime.ProceduralGeometryPacker;
+import Extrinsic.Runtime.SpatialDebugAdapters;
 
 namespace Extrinsic::Runtime
 {
@@ -75,6 +77,36 @@ namespace Extrinsic::Runtime
     const ProceduralGeometryCache& RenderExtractionCache::GetProceduralGeometryCacheForTest() const noexcept
     {
         return m_ProceduralGeometry;
+    }
+
+    void RenderExtractionCache::RegisterSpatialDebugAdapter(std::uint64_t key,
+                                                            std::unique_ptr<ISpatialDebugAdapter> adapter)
+    {
+        // Replace-on-collision: clear the registry slot before destroying
+        // the prior adapter so the registry never observes a dangling raw
+        // pointer between erase and re-register.
+        m_SpatialDebugRegistry.Unregister(key);
+        auto [it, inserted] = m_SpatialDebugAdapters.insert_or_assign(key, std::move(adapter));
+        if (it->second)
+        {
+            m_SpatialDebugRegistry.Register(key, *it->second);
+        }
+    }
+
+    bool RenderExtractionCache::UnregisterSpatialDebugAdapter(std::uint64_t key) noexcept
+    {
+        m_SpatialDebugRegistry.Unregister(key);
+        return m_SpatialDebugAdapters.erase(key) != 0u;
+    }
+
+    std::size_t RenderExtractionCache::GetSpatialDebugAdapterCount() const noexcept
+    {
+        return m_SpatialDebugAdapters.size();
+    }
+
+    const SpatialDebugAdapterRegistry& RenderExtractionCache::GetSpatialDebugRegistryForTest() const noexcept
+    {
+        return m_SpatialDebugRegistry;
     }
 }
 
@@ -522,6 +554,61 @@ namespace Extrinsic::Runtime
 
         RetireMissingRenderables(liveRenderableKeys, renderer, stats);
 
+        // RUNTIME-082 Slice D — spatial-debug adapter pump. Iterated
+        // independently of `HasRenderableHint`: a SpatialDebugBinding may
+        // attach to a renderable entity (to visualize its acceleration
+        // structure) or to a debug-only entity that owns no surface/line/
+        // point hint. The pump walks the binding view, looks up the active
+        // adapter through the cache-owned registry, accumulates a single
+        // shared `SpatialDebugSnapshotBatch`, and reports per-frame stats.
+        m_SpatialDebugBatch.Clear();
+        auto spatialDebugView = registry.view<ECS::Components::SpatialDebugBinding>();
+        for (const entt::entity entity : spatialDebugView)
+        {
+            if (!registry.valid(entity))
+            {
+                ++stats.SkippedInvalidEntityCount;
+                continue;
+            }
+
+            const auto& binding = spatialDebugView.get<ECS::Components::SpatialDebugBinding>(entity);
+            ++stats.SpatialDebugBindingsObserved;
+
+            const auto* adapter = m_SpatialDebugRegistry.Find(binding.RegistryKey);
+            if (adapter == nullptr)
+            {
+                ++stats.SpatialDebugMissingAdapterCount;
+                continue;
+            }
+
+            const SpatialDebugAdapterOptions options{
+                .LeafOnly      = binding.LeafOnly,
+                .OccupancyOnly = binding.OccupancyOnly,
+                .MaxDepth      = binding.MaxDepth,
+            };
+            SpatialDebugAdapterStats perAdapter{};
+            adapter->Append(m_SpatialDebugBatch, options, perAdapter);
+            ++stats.SpatialDebugAdaptersInvoked;
+
+            stats.SpatialDebugLeafNodeAccumulator         += perAdapter.LeafNodeCount;
+            stats.SpatialDebugInnerNodeAccumulator        += perAdapter.InnerNodeCount;
+            stats.SpatialDebugEmptyNodeSkippedAccumulator += perAdapter.EmptyNodeSkippedCount;
+            stats.SpatialDebugDepthCapTruncationAccumulator += perAdapter.DepthCapTruncationCount;
+        }
+
+        stats.SpatialDebugBoundsCount =
+            static_cast<std::uint32_t>(m_SpatialDebugBatch.Bounds.size());
+        stats.SpatialDebugHierarchyNodeCount =
+            static_cast<std::uint32_t>(m_SpatialDebugBatch.HierarchyNodes.size());
+        stats.SpatialDebugSplitPlaneCount =
+            static_cast<std::uint32_t>(m_SpatialDebugBatch.SplitPlanes.size());
+        stats.SpatialDebugConvexHullVertexCount =
+            static_cast<std::uint32_t>(m_SpatialDebugBatch.ConvexHullVertices.size());
+        stats.SpatialDebugConvexHullEdgeCount =
+            static_cast<std::uint32_t>(m_SpatialDebugBatch.ConvexHullEdges.size());
+        stats.SpatialDebugPointMarkerCount =
+            static_cast<std::uint32_t>(m_SpatialDebugBatch.PointMarkers.size());
+
         stats.SubmittedTransformCount = static_cast<std::uint32_t>(m_Transforms.size());
         stats.SubmittedVisualizationCount = static_cast<std::uint32_t>(m_Visualizations.size());
         stats.SubmittedLightCount = static_cast<std::uint32_t>(m_Lights.size());
@@ -543,9 +630,15 @@ namespace Extrinsic::Runtime
         m_PrevProceduralStats = postCacheStats;
 
         renderer.SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{
-            .Transforms = m_Transforms,
-            .Lights = m_Lights,
-            .Visualizations = m_Visualizations,
+            .Transforms                     = m_Transforms,
+            .Lights                         = m_Lights,
+            .Visualizations                 = m_Visualizations,
+            .SpatialDebugBounds             = m_SpatialDebugBatch.Bounds,
+            .SpatialDebugHierarchyNodes     = m_SpatialDebugBatch.HierarchyNodes,
+            .SpatialDebugSplitPlanes        = m_SpatialDebugBatch.SplitPlanes,
+            .SpatialDebugConvexHullVertices = m_SpatialDebugBatch.ConvexHullVertices,
+            .SpatialDebugConvexHullEdges    = m_SpatialDebugBatch.ConvexHullEdges,
+            .SpatialDebugPointMarkers       = m_SpatialDebugBatch.PointMarkers,
         });
 
         m_LastStats = stats;
@@ -579,6 +672,14 @@ namespace Extrinsic::Runtime
         m_Transforms.clear();
         m_Visualizations.clear();
         m_Lights.clear();
+
+        // RUNTIME-082 Slice D — drop owned adapters + clear the registry
+        // mirror. The registry must drop its raw pointers before the
+        // unique_ptr map destroys the adapter instances.
+        m_SpatialDebugRegistry.Clear();
+        m_SpatialDebugAdapters.clear();
+        m_SpatialDebugBatch.Clear();
+
         renderer.SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{});
         m_LastStats = stats;
     }
