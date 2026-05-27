@@ -21,6 +21,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.AssetInstance;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Component.ProceduralGeometryRef;
+import Extrinsic.ECS.Component.SpatialDebugBinding;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Component.Culling.World;
@@ -41,6 +42,7 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.RHI.Types;
 import Extrinsic.Runtime.ProceduralGeometry;
 import Extrinsic.Runtime.ProceduralGeometryPacker;
+import Extrinsic.Runtime.SpatialDebugAdapters;
 
 export namespace Extrinsic::Runtime
 {
@@ -100,6 +102,27 @@ export namespace Extrinsic::Runtime
         std::uint32_t ProceduralGeometryFreeRetires{0};
         std::uint32_t ProceduralGeometryRetireCancellations{0};
         std::uint32_t ProceduralGeometryRefCountSaturated{0};
+
+        // RUNTIME-082 Slice D — spatial-debug adapter pump counters. Folded
+        // per-frame from the active adapter set against the entity view of
+        // `ECS::Components::SpatialDebugBinding`. The accumulator fields
+        // mirror `SpatialDebugAdapterStats` summed across every invoked
+        // adapter; the count fields mirror the per-frame submitted batch
+        // span sizes (so they remain consistent with what the renderer
+        // sees in `RuntimeRenderSnapshotBatch`).
+        std::uint32_t SpatialDebugBindingsObserved{0};
+        std::uint32_t SpatialDebugAdaptersInvoked{0};
+        std::uint32_t SpatialDebugMissingAdapterCount{0};
+        std::uint32_t SpatialDebugBoundsCount{0};
+        std::uint32_t SpatialDebugHierarchyNodeCount{0};
+        std::uint32_t SpatialDebugSplitPlaneCount{0};
+        std::uint32_t SpatialDebugConvexHullVertexCount{0};
+        std::uint32_t SpatialDebugConvexHullEdgeCount{0};
+        std::uint32_t SpatialDebugPointMarkerCount{0};
+        std::uint32_t SpatialDebugLeafNodeAccumulator{0};
+        std::uint32_t SpatialDebugInnerNodeAccumulator{0};
+        std::uint32_t SpatialDebugEmptyNodeSkippedAccumulator{0};
+        std::uint32_t SpatialDebugDepthCapTruncationAccumulator{0};
     };
 
     [[nodiscard]] RuntimeRenderableAssetGenerationObservation ObserveRenderableAssetGeneration(
@@ -152,6 +175,26 @@ export namespace Extrinsic::Runtime
 
         [[nodiscard]] const ProceduralGeometryCache& GetProceduralGeometryCacheForTest() const noexcept;
 
+        // RUNTIME-082 Slice D — adapter-ownership surface.
+        //
+        // The cache owns adapter instances via `std::unique_ptr` and mirrors
+        // each registration into an embedded `SpatialDebugAdapterRegistry`
+        // that the extraction pump consults per
+        // `ECS::Components::SpatialDebugBinding`. Callers transfer adapter
+        // ownership at registration time; `Unregister` destroys the adapter
+        // instance and clears the registry slot. Re-registering an existing
+        // key replaces (and destroys) the prior adapter.
+        //
+        // The source geometry tree the adapter wraps remains caller-owned;
+        // callers must `UnregisterSpatialDebugAdapter` before the source tree
+        // is destroyed to avoid the adapter dereferencing freed memory on
+        // the next `ExtractAndSubmit`.
+        void RegisterSpatialDebugAdapter(std::uint64_t key,
+                                          std::unique_ptr<ISpatialDebugAdapter> adapter);
+        bool UnregisterSpatialDebugAdapter(std::uint64_t key) noexcept;
+        [[nodiscard]] std::size_t GetSpatialDebugAdapterCount() const noexcept;
+        [[nodiscard]] const SpatialDebugAdapterRegistry& GetSpatialDebugRegistryForTest() const noexcept;
+
     private:
         struct RenderableSidecar
         {
@@ -182,6 +225,15 @@ export namespace Extrinsic::Runtime
         ProceduralGeometryCache m_ProceduralGeometry{};
         ProceduralGeometryPackBuffer m_ProceduralPack{};
         ProceduralGeometryCacheStats m_PrevProceduralStats{};
+
+        // RUNTIME-082 Slice D — owned adapter instances + a registry mirror
+        // resolved per-entity by `ExtractAndSubmit`. The batch buffer is
+        // cleared per frame and its spans are attached to
+        // `RuntimeRenderSnapshotBatch::SpatialDebug*` for the renderer.
+        std::unordered_map<std::uint64_t, std::unique_ptr<ISpatialDebugAdapter>> m_SpatialDebugAdapters{};
+        SpatialDebugAdapterRegistry m_SpatialDebugRegistry{};
+        SpatialDebugSnapshotBatch m_SpatialDebugBatch{};
+
         RuntimeRenderExtractionStats m_LastStats{};
     };
 }

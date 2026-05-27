@@ -39,12 +39,13 @@ done-task `Q` follow-ups. Each unblocks one or more rendering pass families.
 - [RUNTIME-080 — `Extrinsic.Runtime.AssetBridges.Texture`](RUNTIME-080-asset-bridges-texture.md):
   texture-typed asset event subscriber producing `GpuAssetCache::RequestUpload`
   calls (clarified by GRAPHICS-015Q).
-- [RUNTIME-082 — `Extrinsic.Runtime.SpatialDebugAdapters`](../../active/RUNTIME-082-spatial-debug-adapters.md)
-  (active 2026-05-25): BVH / KD-tree / Octree / ConvexHull adapters producing
-  spatial-debug snapshot records (clarified by GRAPHICS-011Q). Promoted to
-  active with a four-slice plan (umbrella + BvhAdapter → KdTree + Octree
-  adapters → ConvexHull adapter + registry → extraction wiring); Slice A
-  in-progress on `claude/intrinsicengine-agent-onboarding-k31Vm`.
+- [RUNTIME-082 — `Extrinsic.Runtime.SpatialDebugAdapters`](../../done/RUNTIME-082-spatial-debug-adapters.md)
+  (done 2026-05-27): BVH / KD-tree / Octree / ConvexHull adapters producing
+  spatial-debug snapshot records (clarified by GRAPHICS-011Q). All four
+  slices landed (umbrella + BvhAdapter → KdTree + Octree adapters →
+  ConvexHull adapter + registry → `ExtractAndSubmit` wiring +
+  `ECS::Components::SpatialDebugBinding` + cache-owned adapters); retired
+  to `tasks/done/`.
 - [RUNTIME-083 — `Extrinsic.Runtime.VisualizationAdapters`](RUNTIME-083-visualization-adapters.md):
   PropertySet / KMeans / Isoline / VectorField / HtexMetadata adapters producing
   visualization packet spans (clarified by GRAPHICS-014Q).
