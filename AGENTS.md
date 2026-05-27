@@ -122,6 +122,9 @@ Every new dependency edge must be justifiable by layer policy and reflected in d
   other modules only needed by the implementation rather than the public API.
 - FetchContent dependencies are centralized through `cmake/Dependencies.cmake` and `external/cache/`; use
   `INTRINSIC_OFFLINE_DEPS=ON` only when the cache is already populated.
+- CUDA compute support is optional and off by default (`INTRINSIC_ENABLE_CUDA=OFF` in `ci`/`dev` presets); enable it
+  only for tasks that explicitly require CUDA seams, using `dev-cuda` or an equivalent configure with a valid
+  `CUDAToolkit` install.
 
 ## 6. Method implementation protocol
 
@@ -142,15 +145,20 @@ For each change:
 - Run the strongest relevant subset of repository verification commands.
 - Add/update tests for behavior changes.
 - Preserve or improve pass rate unless a temporary shim is documented.
-- Label tests using the documented CTest allow-list in `tests/README.md` and `tests/CMakeLists.txt` (`unit`, `contract`,
-  `integration`, `regression`, `benchmark`, subsystem labels, backend/capability labels such as `gpu`/`vulkan`, and
-  opt-in labels such as `slow`/`flaky-quarantine`). New labels must update both files in the same change.
+- Label tests using the documented CTest allow-list in `tests/README.md` and `tests/CMakeLists.txt` (categories:
+  `unit`, `contract`, `integration`, `regression`, `benchmark`, `slo`; ownership labels:
+  `assets`, `build`, `core`, `ecs`, `geometry`, `graphics`, `headless`, `platform`, `runtime`; capabilities:
+  `glfw`, `gpu`, `vulkan`; opt-in labels: `slow`, `flaky-quarantine`). New labels must update both files in the same
+  change.
 - New C++ test files use `Test.<Name>.cpp`; existing `Test_*.cpp` files are compatibility carryover and should only be
   renamed by explicit mechanical cleanup tasks.
 - Verification hygiene:
     - Prefer configured presets and task-specific focused targets before broad or long-running targets.
     - Treat non-default build trees as valid evidence only after confirming their compiler/toolchain satisfies the
       repository C++23 requirements; stale trees with older compilers are not valid verification.
+    - For local iteration on changed paths, use `python3 tools/ci/touched_scope.py --root . --base-ref origin/main
+      --build-dir <configured-build> --print` (or `--run`) to plan conservative touched-scope build/test/structural
+      checks; this helper is not a substitute for the full PR/merge gate.
     - Treat `Testing/Temporary/LastTestsFailed.log` as historical state only; current pass/fail state comes from the
       CTest command just run.
     - For noisy commands, capture full output with `tee`, display a bounded tail, and use `set -o pipefail` so filtering
@@ -162,6 +170,13 @@ For each change:
   ```
 
   GPU/Vulkan, slow, and explicitly quarantined tests are opt-in and must be justified by label policy.
+- Promoted Vulkan opt-in verification uses the `ci-vulkan` preset plus GPU/Vulkan label intersection, for example:
+
+  ```bash
+  cmake --preset ci-vulkan
+  cmake --build --preset ci-vulkan --target IntrinsicTests
+  ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' --timeout 120
+  ```
 - `CMakePresets.json` defines configure/build presets but no CTest presets; invoke CTest with `--test-dir build/ci`
   rather than `ctest --preset ci`.
 
@@ -257,4 +272,5 @@ Read this `AGENTS.md` file at the start of every session/task; it is the authori
 | `docs/agent/benchmark-review-checklist.md`    | Reviewing benchmark changes or performance claims before commit or PR.                                                                                                                                                  |
 | `docs/agent/docs-sync-policy.md`              | Moving files, changing public APIs/module surfaces, updating docs, or deciding whether generated inventories/manifests must be refreshed.                                                                               |
 | `docs/agent/roles.md`                         | Clarifying agent responsibilities, handoff expectations, or role-specific workflow questions.                                                                                                                           |
+| `docs/agent/agent-output-review-checklist.md` | Running the weekly human-led audit of recent agent-authored slices for cross-PR scope drift, documented-but-untested claims, and process anti-patterns not visible in a single PR review.                               |
 | `docs/agent/task-maturity.md`                 | Closing a task whose stop-state is ambiguous, especially rendering, Vulkan, asset ingest, hot reload, pass command bodies, runtime composition, or legacy retirement; reviewers checking the `Scaffolded` closure rule. |
