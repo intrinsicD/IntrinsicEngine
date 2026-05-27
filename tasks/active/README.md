@@ -92,6 +92,27 @@ Each active task should include:
   host gate as GRAPHICS-076 / 077 Slice D). The task now sits at
   `CPUContracted` on CPU-only hosts for the full two-lane
   visualization overlay.
+- [`RUNTIME-085`](RUNTIME-085-geometrysources-mesh-residency.md) —
+  `GeometrySources` mesh residency bridge. Status: in-progress
+  (Slice A landed on `claude/optimistic-hypatia-yJ5qw`; Slices B + C
+  remain). Promoted from `tasks/backlog/runtime/` on 2026-05-27 as
+  the earliest unblocked Theme A working-sandbox leaf (all three
+  active Theme B' rendering tasks GRAPHICS-076/077/078 parked on
+  Vulkan-host blockers; HARDEN-065, GRAPHICS-030B, GRAPHICS-070/071
+  all retired in `tasks/done/`). Owner: unassigned. Slice A adds
+  the new module `Extrinsic.Runtime.MeshGeometryPacker` that
+  converts a mesh `GeometrySources` `ConstSourceView` into a
+  triangle-list `GpuWorld::GeometryUploadDesc` with deterministic
+  local-sphere bounds and a fail-closed `MeshPackStatus` taxonomy
+  (`Success`/`WrongDomain`/`MissingPositions`/
+  `MissingHalfedgeTopology`/`MissingFaceTopology`/`EmptyMesh`/
+  `InvalidTopology`/`NonFinitePosition`/`DegenerateAllFaces`),
+  together with 20 `contract;runtime` tests covering the happy
+  path (single triangle + quad fan triangulation), determinism,
+  scratch-buffer reuse, and every failure mode. No changes to
+  `Runtime.RenderExtraction` and no `RuntimeRenderExtractionStats`
+  counter additions yet — those land in Slice B. Next verification
+  step: `ctest --test-dir build/ci --output-on-failure -L 'contract' -L 'runtime' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`.
 
 Previously-active
 [`GEOM-015`](../done/GEOM-015-gjk-termination-diagnostics.md) — GJK

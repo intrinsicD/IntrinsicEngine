@@ -1,5 +1,18 @@
 # RUNTIME-085 — `GeometrySources` mesh residency bridge
 
+## Status
+- Status: in-progress (Slice A in flight)
+- Owner: unassigned
+- Branch: `claude/optimistic-hypatia-yJ5qw`
+- Promoted from `tasks/backlog/runtime/` on 2026-05-27 as the earliest unblocked Theme A working-sandbox leaf (all three active Theme B' rendering tasks GRAPHICS-076/077/078 parked on Vulkan-host blockers; HARDEN-065, GRAPHICS-030B, GRAPHICS-070/071 all retired in `tasks/done/`).
+- Next verification step after Slice A: `ctest --test-dir build/ci --output-on-failure -L 'contract' -L 'runtime' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`.
+
+## Slice plan
+- **Slice A — Mesh packer module (this slice).** Add `Extrinsic.Runtime.MeshGeometryPacker` providing `PackMesh(ConstSourceView, MeshPackBuffer&) -> MeshPackResult` with deterministic triangle-list output, local-space sphere bounds, and a fail-closed `MeshPackStatus` enum covering wrong-domain, missing positions, missing halfedge/face topology, out-of-range indices, non-finite positions, empty meshes, and degenerate face fans. CPU-only unit tests cover happy-path triangle + quad + ngon fan-triangulation, scratch-buffer reuse, determinism, and every failure mode. No changes to `Runtime.RenderExtraction` and no new `RuntimeRenderExtractionStats` counters yet; that is Slice B.
+- **Slice B — Extraction wiring.** Detect mesh-domain entities with `RenderSurface` and neither `ProceduralGeometryRef` nor an `AssetInstance::Source` in `RenderExtractionCache::ExtractAndSubmit`, call the Slice A packer, upload to `GpuWorld`, store the resulting `GpuGeometryHandle` in a new mesh-residency `RenderableSidecar` field distinct from `ProceduralKey` / `HasSourceAsset`, call `SetInstanceGeometry`, and add the `MeshGeometryUploads` / `MeshGeometryReuseHits` / `MeshGeometryFailedPack` / `MeshGeometryMissingPositions` / `MeshGeometryInvalidTopology` / `MeshGeometryReleases` counters to `RuntimeRenderExtractionStats`.
+- **Slice C — Dirty-domain reupload + retire ordering.** Drain `DirtyVertexPositions` / `DirtyFaceTopology` / `DirtyEdgeTopology` / `GpuDirty` tags for processed mesh entities; reupload (or free + re-upload) the mesh geometry on change with deterministic `MeshGeometryReuploads` counters; release and deferred-retire mesh geometry through the same `framesInFlight` window the procedural cache uses.
+- **Slice D — Optional acceptance consolidation.** Close the task at `CPUContracted` once Slices A–C have landed and the verification gate is green; defer `Operational` visual proof to `RUNTIME-095`.
+
 ## Goal
 - Implement the runtime-owned bridge that converts promoted ECS mesh `GeometrySources` (`Vertices`/`Edges`/`Halfedges`/`Faces`) plus `Graphics::Components::RenderSurface` into retained `GpuWorld` geometry records and bound renderable instances, independent of asset-file ingest.
 

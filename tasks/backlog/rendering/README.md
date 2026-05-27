@@ -684,7 +684,7 @@ Cross-layer Theme B′ leaves outside `rendering/`:
 - [`runtime/RUNTIME-090` — Dear ImGui platform/renderer adapter](../runtime/RUNTIME-090-imgui-platform-renderer-adapter.md).
 
 Cross-layer Theme A leaves newly opened for the full working sandbox path:
-- [`runtime/RUNTIME-085` — `GeometrySources` mesh residency bridge](../runtime/RUNTIME-085-geometrysources-mesh-residency.md).
+- [`RUNTIME-085` — `GeometrySources` mesh residency bridge](../../active/RUNTIME-085-geometrysources-mesh-residency.md) (active; Slice A landed the mesh packer module).
 - [`runtime/RUNTIME-086` — `GeometrySources` graph residency bridge](../runtime/RUNTIME-086-geometrysources-graph-residency.md).
 - [`runtime/RUNTIME-087` — `GeometrySources` point-cloud residency bridge](../runtime/RUNTIME-087-geometrysources-pointcloud-residency.md).
 - [`runtime/RUNTIME-088` — Mesh primitive view lifecycle](../runtime/RUNTIME-088-mesh-primitive-view-lifecycle.md).
