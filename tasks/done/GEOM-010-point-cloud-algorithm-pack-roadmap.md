@@ -12,7 +12,7 @@
 ## Status
 - Status: done.
 - Completed: 2026-05-27.
-- Commit: pending in current working tree.
+- Commit: `98cc6b34` (landing commit for the retirement and follow-up pack promotion).
 - PR: TBD.
 - Owner/agent: GitHub Copilot on `main` working tree.
 - Closure maturity: `Retired` for this roadmap-only task; implementation is
