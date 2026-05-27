@@ -19,6 +19,7 @@ This directory contains the `Components` module/files.
 - `ECS.Component.ProceduralGeometryRef.cppm`
 - `ECS.Component.Selection.cppm`
 - `ECS.Component.ShadowCaster.cppm`
+- `ECS.Component.SpatialDebugBinding.cppm`
 - `ECS.Component.StableId.cppm`
 - `ECS.Component.Transform.Local.cppm`
 - `ECS.Component.Transform.World.cppm`
@@ -80,6 +81,16 @@ runtime-owned procedural geometry sources (kind + POD parameters) per the
 GRAPHICS-030 planning contract. It imports `Extrinsic.Core.*` only; the runtime
 descriptor/cache/packer that consumes it lives in `src/runtime/` and is the only
 writer of the GPU-side residency handles.
+
+`ECS.Component.SpatialDebugBinding` (`RUNTIME-082` Slice D) carries the
+runtime spatial-debug adapter pump's renderable↔geometry-tree binding:
+`Kind` (BVH / KDTree / Octree / ConvexHull) plus a `RegistryKey`
+(`std::uint64_t`) resolved per frame through the
+`SpatialDebugAdapterRegistry` owned by `RenderExtractionCache`, plus the
+per-binding adapter options (`LeafOnly` / `OccupancyOnly` / `MaxDepth`).
+The component is plain-old-data and imports nothing beyond `<cstdint>`; the
+adapter instances themselves live in runtime under
+`Extrinsic.Runtime.SpatialDebugAdapters` per the layering contract.
 
 ## Geometry dirty-domain stamping
 

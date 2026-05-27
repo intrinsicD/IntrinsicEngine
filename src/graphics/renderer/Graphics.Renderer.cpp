@@ -885,6 +885,99 @@ namespace Extrinsic::Graphics
                 m_DebugTrianglePackets.push_back(triangle);
             }
 
+            // RUNTIME-082 Slice D follow-up — consume the snapshot batch's
+            // SpatialDebug* spans by routing them through the existing
+            // wireframe builders and merging the produced Debug{Line,Point,
+            // Triangle}Packet records into the debug primitive collections
+            // that ExtractRenderWorld surfaces as
+            // `RenderWorld::DebugPrimitives`. Without this routing the
+            // runtime adapter pump submits non-empty SpatialDebug* spans but
+            // the renderer never builds the wireframe geometry, so no
+            // visible debug output reaches the canonical debug-primitive
+            // pass — the failure mode the original Slice D shipped with.
+            //
+            // Bounds vs HierarchyNodes: tree adapters (BVH/KDTree/Octree)
+            // populate the two spans 1:1 with the same AABB list,
+            // HierarchyNodes carrying additional `Depth` + `IsLeaf` for
+            // depth-coded coloring. To avoid double-rendering the same
+            // wireframe twice per node we prefer HierarchyNodes when both
+            // are non-empty; bare-AABB adapters that emit only Bounds
+            // still get a flat-color wireframe via the fallback branch.
+            auto appendSpatialDebugPackets = [&](const SpatialDebugPacketResult& result) {
+                for (DebugLinePacket line : result.Lines)
+                {
+                    if (!IsValidDebugLine(line))
+                    {
+                        ++m_InvalidSnapshotRecordCount;
+                        continue;
+                    }
+                    line.Width = std::clamp(line.Width, kMinLineWidth, kMaxLineWidth);
+                    m_DebugLinePackets.push_back(line);
+                }
+                for (DebugPointPacket point : result.Points)
+                {
+                    if (!IsValidDebugPoint(point))
+                    {
+                        ++m_InvalidSnapshotRecordCount;
+                        continue;
+                    }
+                    point.Radius = std::clamp(point.Radius, kMinPointRadius, kMaxPointRadius);
+                    m_DebugPointPackets.push_back(point);
+                }
+                for (const DebugTrianglePacket& triangle : result.Triangles)
+                {
+                    if (!IsValidDebugTriangle(triangle))
+                    {
+                        ++m_InvalidSnapshotRecordCount;
+                        continue;
+                    }
+                    m_DebugTrianglePackets.push_back(triangle);
+                }
+            };
+
+            const SpatialDebugVisualizerOptions spatialDebugOptions{};
+
+            if (!snapshots.SpatialDebugHierarchyNodes.empty())
+            {
+                appendSpatialDebugPackets(
+                    BuildSpatialDebugHierarchyWireframes(
+                        snapshots.SpatialDebugHierarchyNodes,
+                        spatialDebugOptions));
+            }
+            else if (!snapshots.SpatialDebugBounds.empty())
+            {
+                appendSpatialDebugPackets(
+                    BuildSpatialDebugBoundsWireframes(
+                        snapshots.SpatialDebugBounds,
+                        spatialDebugOptions));
+            }
+
+            if (!snapshots.SpatialDebugSplitPlanes.empty())
+            {
+                appendSpatialDebugPackets(
+                    BuildSpatialDebugSplitPlaneWireframes(
+                        snapshots.SpatialDebugSplitPlanes,
+                        spatialDebugOptions));
+            }
+
+            if (!snapshots.SpatialDebugConvexHullVertices.empty()
+                && !snapshots.SpatialDebugConvexHullEdges.empty())
+            {
+                appendSpatialDebugPackets(
+                    BuildSpatialDebugConvexHullWireframe(
+                        snapshots.SpatialDebugConvexHullVertices,
+                        snapshots.SpatialDebugConvexHullEdges,
+                        spatialDebugOptions));
+            }
+
+            if (!snapshots.SpatialDebugPointMarkers.empty())
+            {
+                appendSpatialDebugPackets(
+                    BuildSpatialDebugPointMarkers(
+                        snapshots.SpatialDebugPointMarkers,
+                        spatialDebugOptions));
+            }
+
             for (TransformGizmoRenderPacket gizmo : snapshots.TransformGizmos)
             {
                 if (!IsValidTransformGizmo(gizmo))

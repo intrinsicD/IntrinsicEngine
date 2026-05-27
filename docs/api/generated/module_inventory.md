@@ -11,7 +11,7 @@ Root scanned: `src`
 | `app` | 1 |
 | `assets` | 7 |
 | `core` | 39 |
-| `ecs` | 26 |
+| `ecs` | 27 |
 | `geometry` | 84 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
@@ -87,6 +87,7 @@ Root scanned: `src`
 | `Extrinsic.ECS.Component.ProceduralGeometryRef` | `src/ecs/Components/ECS.Component.ProceduralGeometryRef.cppm` | `ecs` |
 | `Extrinsic.ECS.Components.Selection` | `src/ecs/Components/ECS.Component.Selection.cppm` | `ecs` |
 | `Extrinsic.ECS.Component.ShadowCaster` | `src/ecs/Components/ECS.Component.ShadowCaster.cppm` | `ecs` |
+| `Extrinsic.ECS.Component.SpatialDebugBinding` | `src/ecs/Components/ECS.Component.SpatialDebugBinding.cppm` | `ecs` |
 | `Extrinsic.ECS.Component.StableId` | `src/ecs/Components/ECS.Component.StableId.cppm` | `ecs` |
 | `Extrinsic.ECS.Component.Transform` | `src/ecs/Components/ECS.Component.Transform.Local.cppm` | `ecs` |
 | `Extrinsic.ECS.Component.Transform.WorldMatrix` | `src/ecs/Components/ECS.Component.Transform.World.cppm` | `ecs` |
@@ -474,4 +475,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 | `Extrinsic.Runtime.SpatialDebugAdapters` | `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` | `runtime` |
 
-Total modules: **447**
+Total modules: **448**

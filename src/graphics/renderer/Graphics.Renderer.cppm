@@ -6,6 +6,8 @@ module;
 #include <string>
 #include <vector>
 
+#include <glm/glm.hpp>
+
 export module Extrinsic.Graphics.Renderer;
 
 import Extrinsic.RHI.Device;
@@ -55,6 +57,13 @@ export import Extrinsic.Graphics.TransientDebugUploadHelper;
 // keep their import shape unchanged.
 export import Extrinsic.Graphics.VisualizationOverlayUploadHelper;
 export import Extrinsic.Graphics.Pass.VisualizationOverlay;
+// RUNTIME-082 Slice D — `RuntimeRenderSnapshotBatch` carries spans of
+// `SpatialDebugAabb` / `SpatialDebugHierarchyNode` / `SpatialDebugSplitPlane`
+// / `SpatialDebugWireEdge` produced by the runtime spatial-debug adapter
+// pump. The types live in `Extrinsic.Graphics.SpatialDebugVisualizers`; the
+// import is local (non-export) because the existing graphics consumers that
+// build the matching wireframe packets already import the module directly.
+import Extrinsic.Graphics.SpatialDebugVisualizers;
 import Extrinsic.Core.Config.Render;
 
 namespace Extrinsic::Graphics
@@ -206,6 +215,22 @@ namespace Extrinsic::Graphics
         std::span<const DebugPointPacket>        DebugPoints{};
         std::span<const DebugTrianglePacket>     DebugTriangles{};
         std::span<const TransformGizmoRenderPacket> TransformGizmos{};
+
+        // RUNTIME-082 Slice D — spatial-debug snapshot spans produced by
+        // the runtime adapter pump. Aggregated by
+        // `RenderExtractionCache::ExtractAndSubmit` from per-entity
+        // `ECS::Components::SpatialDebugBinding` lookups through the
+        // cache-owned `SpatialDebugAdapterRegistry`. Consumers that build
+        // wireframe packets feed these into
+        // `BuildSpatialDebug{Bounds,Hierarchy,SplitPlane,ConvexHull,...}Wireframes`.
+        // Default-empty for backends and tests that do not exercise the
+        // pump.
+        std::span<const SpatialDebugAabb>          SpatialDebugBounds{};
+        std::span<const SpatialDebugHierarchyNode> SpatialDebugHierarchyNodes{};
+        std::span<const SpatialDebugSplitPlane>    SpatialDebugSplitPlanes{};
+        std::span<const glm::vec3>                 SpatialDebugConvexHullVertices{};
+        std::span<const SpatialDebugWireEdge>      SpatialDebugConvexHullEdges{};
+        std::span<const glm::vec3>                 SpatialDebugPointMarkers{};
     };
 
     export class IRenderer
