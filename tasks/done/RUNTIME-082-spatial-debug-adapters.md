@@ -378,6 +378,29 @@ Slice D (landed 2026-05-27):
       mirror before destroying the owned-adapter map (so the
       registry never observes a dangling raw pointer mid-shutdown)
       and to `Clear()` the snapshot batch.
+- [x] **Slice D follow-up (same PR #936)**: route the submitted
+      `RuntimeRenderSnapshotBatch::SpatialDebug*` spans through the
+      existing `Extrinsic.Graphics.SpatialDebugVisualizers` builders
+      inside `Graphics::Renderer::SubmitRuntimeSnapshots` and merge
+      the produced `Debug{Line,Point,Triangle}Packet` records into
+      the renderer's debug-primitive collections so they reach
+      `RenderWorld::DebugPrimitives` via `ExtractRenderWorld`. The
+      original Slice D landing wired the pump and the stats but the
+      renderer dropped the spans — counters were nonzero but no
+      visible debug geometry reached the canonical debug-primitive
+      pass. The follow-up: invoke `BuildSpatialDebugHierarchyWireframes`
+      when `SpatialDebugHierarchyNodes` is non-empty (else
+      `BuildSpatialDebugBoundsWireframes` over `SpatialDebugBounds`
+      as a fallback — tree adapters populate both 1:1, preferring
+      hierarchy avoids double-rendering; bare-AABB adapters still
+      get a flat-color wireframe via the fallback),
+      `BuildSpatialDebugSplitPlaneWireframes` for split planes,
+      `BuildSpatialDebugConvexHullWireframe` when both
+      `ConvexHullVertices` + `ConvexHullEdges` are non-empty, and
+      `BuildSpatialDebugPointMarkers` for the marker span. Each
+      produced packet goes through the same `IsValidDebug{Line,Point,
+      Triangle}` + clamp loop the explicit `DebugLines/Points/Triangles`
+      spans already use.
 
 ## Tests
 
@@ -599,15 +622,19 @@ Slice D (landed 2026-05-27):
 - [x] `RenderExtractionCache` exposes the four new adapter-ownership
       accessors and clears adapter ownership + the registry mirror
       in `Shutdown`.
-- [x] The five new `RuntimeRenderExtraction.SpatialDebug*` tests in
-      `tests/integration/runtime/Test.RuntimeRenderExtraction.cpp`
-      pass under the default CPU/null gate (
-      `./build/ci/bin/IntrinsicRuntimeGraphicsCpuTests
-      --gtest_filter='*SpatialDebug*'` → 5/5 pass).
-- [x] Default CPU/null gate stays green (2245/2247 with the two
+- [x] The five original `RuntimeRenderExtraction.SpatialDebug*`
+      counter tests plus the three follow-up regression tests
+      (`SpatialDebugBindingProducesVisibleDebugPrimitivesInRenderWorld`,
+      `SpatialDebugMissingAdapterProducesNoDebugPrimitives`, and
+      `SpatialDebugConvexHullBindingProducesEdgeLines` — each asserts
+      `world.DebugPrimitives.LineCount` after
+      `Renderer->ExtractRenderWorld({})`) pass under the default
+      CPU/null gate (`./build/ci/bin/IntrinsicRuntimeGraphicsCpuTests
+      --gtest_filter='*SpatialDebug*'` → 8/8 pass).
+- [x] Default CPU/null gate stays green (2248/2250 with the two
       pre-existing `IntrinsicBenchmarkSmoke.HalfedgeSmoke.{Run,
-      Validate}` "Not Run" failures unchanged); no `gpu`/`vulkan`
-      test additions.
+      Validate}` "Not Run" failures unchanged from prior commits and
+      unrelated to this slice); no `gpu`/`vulkan` test additions.
 - [x] `docs/api/generated/module_inventory.md` regenerated; total
       module count rises from 445 → 446 because of the new ECS
       component module.
@@ -685,7 +712,7 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
   contract tests, 2286/2286 default CPU gate pass with
   `CCACHE_DISABLE=1` — see Notes below).
 - Slice D: completed 2026-05-27 on
-  `claude/intrinsicengine-agent-onboarding-xnNIW`
+  `claude/intrinsicengine-agent-onboarding-xnNIW` (PR #936)
   (`ECS::Components::SpatialDebugBinding` + cache-owned adapters
   + `RuntimeRenderSnapshotBatch::SpatialDebug*` spans + per-frame
   stats + five integration tests). Default CPU/null gate:
@@ -695,6 +722,17 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
   pass (two pre-existing `IntrinsicBenchmarkSmoke.HalfedgeSmoke`
   failures unchanged). Layering / test-layout / doc-link /
   task-policy validators all clean.
+- Slice D follow-up (same PR #936): renderer-side routing of
+  `RuntimeRenderSnapshotBatch::SpatialDebug*` spans through the
+  existing wireframe builders inside
+  `Graphics::Renderer::SubmitRuntimeSnapshots`, plus three new
+  regression tests that observe `world.DebugPrimitives.LineCount`
+  after `Renderer->ExtractRenderWorld({})`. Without this follow-up
+  the pump shipped counters but no visible geometry — a "documented
+  but not tested" failure that the original Slice D commit missed.
+  Default CPU/null gate after the follow-up: 2248/2250 pass (same
+  two pre-existing benchmark-binary-path failures unchanged); 8/8
+  `*SpatialDebug*` integration tests pass.
 - Task retired to `tasks/done/`.
 
 ## Notes

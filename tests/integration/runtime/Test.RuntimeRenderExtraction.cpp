@@ -19,6 +19,8 @@ import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.GpuSceneSlot;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.Renderer;
+import Extrinsic.Graphics.RenderFrameInput;
+import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.TransferQueue;
 import Extrinsic.RHI.Types;
@@ -599,6 +601,96 @@ TEST(RuntimeRenderExtraction, SpatialDebugReRegisterReplacesAdapterAndPreservesP
     EXPECT_EQ(hullStats.SpatialDebugHierarchyNodeCount, 0u);
     EXPECT_EQ(hullStats.SpatialDebugConvexHullVertexCount, 8u);
     EXPECT_EQ(hullStats.SpatialDebugConvexHullEdgeCount, 12u);
+}
+
+TEST(RuntimeRenderExtraction, SpatialDebugBindingProducesVisibleDebugPrimitivesInRenderWorld)
+{
+    // Regression for the original Slice D landing: the runtime pump filled
+    // RuntimeRenderSnapshotBatch::SpatialDebug* spans, but the renderer
+    // dropped them — counters were nonzero while no debug geometry reached
+    // RenderWorld::DebugPrimitives. This test asserts the full pipe: a
+    // SpatialDebugBinding + registered BVH adapter must end up producing a
+    // non-zero line count in the extracted RenderWorld.
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+    auto& registry = scene.Raw();
+
+    const Geometry::BVH bvh = MakeFourBoxBvh();
+    constexpr std::uint64_t kKey = 0xBADCAB1Eu;
+    fixture.Extraction.RegisterSpatialDebugAdapter(
+        kKey, std::make_unique<Runtime::BvhAdapter>(bvh));
+
+    const auto entity = scene.Create();
+    auto& binding = registry.emplace<ECS::Components::SpatialDebugBinding>(entity);
+    binding.RegistryKey = kKey;
+
+    const auto stats = fixture.Extract(scene);
+    ASSERT_GT(stats.SpatialDebugHierarchyNodeCount, 0u);
+    ASSERT_GT(stats.SpatialDebugSplitPlaneCount, 0u);
+
+    const Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
+
+    EXPECT_TRUE(world.DebugPrimitives.HasTransientDebug);
+    EXPECT_GT(world.DebugPrimitives.LineCount, 0u);
+    EXPECT_EQ(world.DebugPrimitives.Lines.size(), world.DebugPrimitives.LineCount);
+
+    // BVH wireframe + split-plane wireframe both emit cuboid line packets;
+    // 12 lines per AABB box and 12 lines per split-plane bounding box. We
+    // only sanity-check that the merged count meets the minimum for a
+    // single visualized node so the assertion is robust against future
+    // visualizer-options or renderer-side budgeting changes.
+    EXPECT_GE(world.DebugPrimitives.LineCount, 12u);
+}
+
+TEST(RuntimeRenderExtraction, SpatialDebugMissingAdapterProducesNoDebugPrimitives)
+{
+    // Control case for the routing regression above: when a binding has no
+    // adapter, the pump submits empty SpatialDebug* spans and the renderer
+    // must not synthesise any debug geometry.
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+    auto& registry = scene.Raw();
+
+    const auto entity = scene.Create();
+    auto& binding = registry.emplace<ECS::Components::SpatialDebugBinding>(entity);
+    binding.RegistryKey = 0xFFFFFFFFu;
+
+    const auto stats = fixture.Extract(scene);
+    ASSERT_EQ(stats.SpatialDebugMissingAdapterCount, 1u);
+
+    const Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
+
+    EXPECT_EQ(world.DebugPrimitives.LineCount, 0u);
+    EXPECT_EQ(world.DebugPrimitives.PointCount, 0u);
+    EXPECT_EQ(world.DebugPrimitives.TriangleCount, 0u);
+}
+
+TEST(RuntimeRenderExtraction, SpatialDebugConvexHullBindingProducesEdgeLines)
+{
+    // Convex-hull pump must reach RenderWorld too. A unit cube hull yields
+    // 12 edges → at least 12 debug lines after the renderer-side build.
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+    auto& registry = scene.Raw();
+
+    const Geometry::ConvexHull hull = MakeUnitCubeHull();
+    constexpr std::uint64_t kKey = 0xC0DEu;
+    fixture.Extraction.RegisterSpatialDebugAdapter(
+        kKey, std::make_unique<Runtime::ConvexHullAdapter>(hull));
+
+    const auto entity = scene.Create();
+    auto& binding = registry.emplace<ECS::Components::SpatialDebugBinding>(entity);
+    binding.Kind        = ECS::Components::SpatialDebugGeometryKind::ConvexHull;
+    binding.RegistryKey = kKey;
+
+    const auto stats = fixture.Extract(scene);
+    ASSERT_EQ(stats.SpatialDebugConvexHullVertexCount, 8u);
+    ASSERT_EQ(stats.SpatialDebugConvexHullEdgeCount, 12u);
+
+    const Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
+
+    EXPECT_GE(world.DebugPrimitives.LineCount, 12u);
+    EXPECT_TRUE(world.DebugPrimitives.HasTransientDebug);
 }
 
 TEST(RuntimeRenderExtraction, SpatialDebugBindingHonorsLeafOnlyAndDepthCap)
