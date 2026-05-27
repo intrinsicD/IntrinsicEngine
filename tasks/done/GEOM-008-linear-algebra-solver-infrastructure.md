@@ -26,9 +26,25 @@
   infrastructure seam is covered by deterministic CPU/null unit tests
   (`Test.LinearAlgebra.cpp`, `Test.Sparse.cpp`, the existing DEC /
   Geodesic / VectorHeatMethod / Parameterization batteries) that run in
-  the default CPU gate. Per Non-goals, no optional GPU / SuiteSparse /
-  CHOLMOD backend is owed by this task; Spectra and SuiteSparse seams
-  are recorded as later optional follow-ups in `docs/architecture/geometry.md`.
+  the default CPU gate.
+- Follow-ups owning capability NOT delivered by this slice (named per
+  the `CPUContracted` closure rule so reviewers can see which method
+  seams remain gated):
+  - [`GEOM-016`](../backlog/geometry/GEOM-016-sparse-direct-factorization-seam.md)
+    owns the direct sparse SPD factorization seam (`SimplicialLDLT` /
+    `SimplicialLLT`) that `tasks/backlog/methods/METHOD-002` (step 2)
+    and `METHOD-003` (step 5) name as "the LDLT path from `GEOM-008`".
+    Until GEOM-016 lands, those method packages must not be promoted
+    on the assumption that the LDLT seam is available from this task.
+  - The sparse symmetric (generalized) eigensolver seam referenced by
+    `tasks/backlog/methods/METHOD-006` step 4 (LOBPCG / shift-invert)
+    is **not** owned by this task and is **not** owned by GEOM-016.
+    It needs Spectra (an Eigen-companion library) and a different API
+    surface; a separate follow-up task should be filed when METHOD-006
+    becomes the next-priority method.
+  - Optional SuiteSparse / CHOLMOD / Pardiso backends remain deferred
+    as documented in `docs/architecture/geometry.md` and are not owed
+    by GEOM-016 either.
 
 ## Context
 - Owner/agent: GitHub Copilot.

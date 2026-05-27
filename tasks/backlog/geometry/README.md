@@ -20,6 +20,9 @@ map.
 - [GEOM-013 — Feature-preserving dual contouring](GEOM-013-feature-preserving-dual-contouring.md).
 - [GEOM-014 — Feature-aware quadric error mesh simplification](GEOM-014-feature-aware-quadric-error-simplification.md).
 - [GEOM-015 — GJK termination diagnostics and scale-aware tolerance policy](../../done/GEOM-015-gjk-termination-diagnostics.md) (done).
+- [GEOM-016 — Sparse direct factorization solver seam (LDLT/LLT)](GEOM-016-sparse-direct-factorization-seam.md)
+  (follow-up to retired `GEOM-008`; gates `methods/METHOD-002` /
+  `METHOD-003` LDLT paths).
 - [RORG-031E — Geometry and method-readiness backlog seed](RORG-031-geometry-method-readiness.md).
 
 ## Convergence
@@ -39,6 +42,11 @@ map.
   [`tasks/done/`](../../done/GEOM-009-benchmark-manifests-fixtures-smoke.md)
   and provides the manifest-driven smoke harness future geometry method
   packages plug into.
+- GEOM-016 is the named follow-up to retired GEOM-008 for the direct
+  sparse SPD factorization (LDLT/LLT) seam that GEOM-008 deferred but
+  that methods/METHOD-002 (step 2) and METHOD-003 (step 5) already
+  reference as "the LDLT path from GEOM-008". Method tasks gated on the
+  LDLT path must wait on GEOM-016, not on retired GEOM-008.
 - GEOM-010 and GEOM-011 turn point-cloud and parameterization gaps into
   method-compliant roadmap packs before algorithm implementation begins.
 - GEOM-012 ensures mesh, graph, and point-cloud algorithms can share compatible
