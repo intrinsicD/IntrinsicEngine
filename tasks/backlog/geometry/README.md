@@ -14,12 +14,16 @@ map.
 - [GEOM-007 — Robust predicates and intersection classification foundation](../../done/GEOM-007-robust-predicates-intersection-classification.md) (done).
 - [GEOM-008 — Geometry linear algebra and solver infrastructure](../../active/GEOM-008-linear-algebra-solver-infrastructure.md) (active).
 - [GEOM-009 — Geometry benchmark manifests, fixtures, and smoke benchmark](../../done/GEOM-009-benchmark-manifests-fixtures-smoke.md) (done).
-- [GEOM-010 — Point-cloud algorithm pack roadmap](GEOM-010-point-cloud-algorithm-pack-roadmap.md).
-- [GEOM-011 — Parameterization and mapping roadmap](GEOM-011-parameterization-mapping-roadmap.md).
+- [GEOM-010 — Point-cloud algorithm pack roadmap](../../done/GEOM-010-point-cloud-algorithm-pack-roadmap.md) (done; roadmap: [`docs/architecture/point-cloud-algorithm-roadmap.md`](../../../docs/architecture/point-cloud-algorithm-roadmap.md)).
+- [GEOM-011 — Parameterization and mapping roadmap](../../done/GEOM-011-parameterization-mapping-roadmap.md) (done; roadmap: [`docs/architecture/parameterization-mapping-roadmap.md`](../../../docs/architecture/parameterization-mapping-roadmap.md)).
 - [GEOM-012 — Symmetric mesh, graph, and point-cloud domain views](GEOM-012-symmetric-domain-views-property-sharing.md).
 - [GEOM-013 — Feature-preserving dual contouring](GEOM-013-feature-preserving-dual-contouring.md).
 - [GEOM-014 — Feature-aware quadric error mesh simplification](GEOM-014-feature-aware-quadric-error-simplification.md).
 - [GEOM-015 — GJK termination diagnostics and scale-aware tolerance policy](../../done/GEOM-015-gjk-termination-diagnostics.md) (done).
+- [GEOM-016 — Point-cloud filtering and density diagnostics contracts](GEOM-016-point-cloud-filtering-density-contracts.md).
+- [GEOM-017 — Point-cloud descriptors and registration seams](GEOM-017-point-cloud-descriptors-registration-seams.md).
+- [GEOM-018 — Parameterization distortion and map-quality diagnostics](GEOM-018-parameterization-distortion-map-quality-diagnostics.md).
+- [GEOM-019 — Harmonic/Tutte parameterization and boundary constraints](GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md).
 - [RORG-031E — Geometry and method-readiness backlog seed](RORG-031-geometry-method-readiness.md).
 
 ## Convergence
@@ -39,8 +43,17 @@ map.
   [`tasks/done/`](../../done/GEOM-009-benchmark-manifests-fixtures-smoke.md)
   and provides the manifest-driven smoke harness future geometry method
   packages plug into.
-- GEOM-010 and GEOM-011 turn point-cloud and parameterization gaps into
-  method-compliant roadmap packs before algorithm implementation begins.
+- GEOM-010 is retired in [`tasks/done`](../../done/GEOM-010-point-cloud-algorithm-pack-roadmap.md)
+  and records the point-cloud method-compliant roadmap in
+  [`docs/architecture/point-cloud-algorithm-roadmap.md`](../../../docs/architecture/point-cloud-algorithm-roadmap.md).
+  Its first implementation packs are GEOM-016 (filtering/density diagnostics)
+  and GEOM-017 (descriptors/registration seams).
+- GEOM-011 is retired in [`tasks/done`](../../done/GEOM-011-parameterization-mapping-roadmap.md)
+  and records the parameterization/mapping method-compliant roadmap in
+  [`docs/architecture/parameterization-mapping-roadmap.md`](../../../docs/architecture/parameterization-mapping-roadmap.md).
+  Its first implementation packs are GEOM-018 (distortion/map-quality
+  diagnostics) and GEOM-019 (harmonic/Tutte parameterization and boundary
+  constraints).
 - GEOM-012 ensures mesh, graph, and point-cloud algorithms can share compatible
   property storage through explicit borrowed views instead of accidental copies.
 - GEOM-013 and GEOM-014 are seeded by the geometry paper survey

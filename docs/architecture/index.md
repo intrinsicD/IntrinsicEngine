@@ -9,6 +9,8 @@ Status labels:
 - `migration`: temporary document used during repository/source migration.
 - `archival`: preserved reference not used for active design guidance.
 - `generated`: machine-generated inventory/report.
+- `roadmap`: planning document for scoped future work; not a claim that the
+  listed capability is implemented.
 
 ## Canonical architecture set
 
@@ -60,7 +62,9 @@ Status labels:
 | `ground-up-redesign-blueprint-2026.md` | archival | Vision/blueprint context. |
 | `ground-up-redesign-vision.md` | archival | Vision narrative; non-normative. |
 | `htex-halfedge-patch-system.md` | legacy-background | Geometry method background. |
+| `parameterization-mapping-roadmap.md` | roadmap | GEOM-011 planning note for parameterization, atlas, distortion, and surface-map packs. |
 | `post-merge-audit-checklist.md` | migration | Temporary migration review artifact. |
+| `point-cloud-algorithm-roadmap.md` | roadmap | GEOM-010 planning note for point-cloud algorithm packs and method boundaries. |
 | `rendering-three-pass.md` | legacy-background | Rendering strategy context. |
 | `retained-geometry-lifecycle-consolidation-plan.md` | migration | Migration planning note. |
 | `runtime-subsystem-boundaries.md` | legacy-background | Detailed runtime background. |

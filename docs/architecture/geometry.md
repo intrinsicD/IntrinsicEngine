@@ -302,4 +302,12 @@ As of RORG-093, canonical Geometry code is promoted to `src/geometry`. Remaining
 ## Related reviews
 
 - [`src/geometry` gap analysis](../reviews/2026-05-12-src-geometry-gap-analysis.md) records current style/API inconsistencies, missing reusable data structures, and algorithm gaps for modern geometry-processing paper work.
+- [`Point-cloud algorithm roadmap`](point-cloud-algorithm-roadmap.md) splits the
+  point-cloud gaps into method-compliant filtering, descriptor/registration,
+  fitting, smoothing, and reconstruction packs without claiming those packs are
+  already implemented.
+- [`Parameterization and mapping roadmap`](parameterization-mapping-roadmap.md)
+  splits UV parameterization, atlas, distortion, and surface-map gaps into
+  method-compliant diagnostics, harmonic/Tutte, ARAP/SLIM, charting, and map
+  representation packs without claiming those packs are already implemented.
 
