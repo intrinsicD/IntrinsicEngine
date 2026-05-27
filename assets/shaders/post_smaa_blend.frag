@@ -7,9 +7,7 @@
 layout(location = 0) in vec2 vUV;
 layout(location = 0) out vec4 outWeights;
 
-layout(set = 0, binding = 0) uniform sampler2D uEdges;
-layout(set = 0, binding = 1) uniform sampler2D uAreaTex;
-layout(set = 0, binding = 2) uniform sampler2D uSearchTex;
+layout(set = 0, binding = 0) uniform sampler2D uTextures[];
 
 layout(push_constant) uniform Push
 {
@@ -38,7 +36,7 @@ float SearchLength(vec2 e, float offset)
     bias  += vec2(0.5, -0.5);
     scale *= 1.0 / SMAA_SEARCHTEX_SIZE;
     bias  *= 1.0 / SMAA_SEARCHTEX_SIZE;
-    return textureLod(uSearchTex, scale * e + bias, 0.0).r;
+    return textureLod(uTextures[0], scale * e + bias, 0.0).r;
 }
 
 // --------------------------------------------------------------------------
@@ -53,7 +51,7 @@ float SearchXLeft(vec2 texcoord, float end)
     {
         if (texcoord.x <= end || e.y <= 0.0 || e.x > 0.0)
             break;
-        e = textureLod(uEdges, texcoord, 0.0).rg;
+        e = textureLod(uTextures[0], texcoord, 0.0).rg;
         texcoord -= vec2(2.0, 0.0) * rcp;
     }
     float offset = -(255.0 / 127.0) * SearchLength(e, 0.0) + 3.25;
@@ -68,7 +66,7 @@ float SearchXRight(vec2 texcoord, float end)
     {
         if (texcoord.x >= end || e.y <= 0.0 || e.x > 0.0)
             break;
-        e = textureLod(uEdges, texcoord, 0.0).rg;
+        e = textureLod(uTextures[0], texcoord, 0.0).rg;
         texcoord += vec2(2.0, 0.0) * rcp;
     }
     float offset = -(255.0 / 127.0) * SearchLength(e, 0.5) + 3.25;
@@ -83,7 +81,7 @@ float SearchYUp(vec2 texcoord, float end)
     {
         if (texcoord.y <= end || e.r <= 0.0 || e.g > 0.0)
             break;
-        e = textureLod(uEdges, texcoord, 0.0).rg;
+        e = textureLod(uTextures[0], texcoord, 0.0).rg;
         texcoord -= vec2(0.0, 2.0) * rcp;
     }
     float offset = -(255.0 / 127.0) * SearchLength(e.gr, 0.0) + 3.25;
@@ -98,7 +96,7 @@ float SearchYDown(vec2 texcoord, float end)
     {
         if (texcoord.y >= end || e.r <= 0.0 || e.g > 0.0)
             break;
-        e = textureLod(uEdges, texcoord, 0.0).rg;
+        e = textureLod(uTextures[0], texcoord, 0.0).rg;
         texcoord += vec2(0.0, 2.0) * rcp;
     }
     float offset = -(255.0 / 127.0) * SearchLength(e.gr, 0.5) + 3.25;
@@ -113,7 +111,7 @@ vec2 Area(vec2 dist, float e1, float e2)
     vec2 texcoord = float(SMAA_AREATEX_MAX_DISTANCE) * round(4.0 * vec2(e1, e2)) + dist;
     texcoord = SMAA_AREATEX_PIXEL_SIZE * texcoord + 0.5 * SMAA_AREATEX_PIXEL_SIZE;
     // Note: area texture uses second row group for subpixel offsets (0.0 for no subpixel).
-    return textureLod(uAreaTex, texcoord, 0.0).rg;
+    return textureLod(uTextures[0], texcoord, 0.0).rg;
 }
 
 void main()
@@ -122,7 +120,7 @@ void main()
     vec2 rcp = pc.InvResolution;
 
     vec4 weights = vec4(0.0);
-    vec2 e = texture(uEdges, uv).rg;
+    vec2 e = texture(uTextures[0], uv).rg;
 
     if (e.g > 0.0) // Horizontal edge (top edge exists)
     {
@@ -137,7 +135,7 @@ void main()
         coords.y = uv.y - 0.25 * rcp.y;
         d.x = coords.x;
 
-        float e1 = textureLod(uEdges, coords, 0.0).r;
+        float e1 = textureLod(uTextures[0], coords, 0.0).r;
 
         coords.x = SearchXRight(uv + vec2(1.25, -0.125) * rcp, 1.0 + 0.5 * rcp.x);
         d.y = coords.x;
@@ -146,7 +144,7 @@ void main()
         d = abs(round(d / rcp.x - uv.x / rcp.x));
 
         // Right endpoint: +1 texel in X, same bilinear Y offset.
-        float e2 = textureLod(uEdges, vec2(coords.x + 0.5 * rcp.x, uv.y - 0.25 * rcp.y), 0.0).r;
+        float e2 = textureLod(uTextures[0], vec2(coords.x + 0.5 * rcp.x, uv.y - 0.25 * rcp.y), 0.0).r;
 
         weights.rg = Area(sqrt(d), e1, e2);
     }
@@ -163,7 +161,7 @@ void main()
         coords.x = uv.x - 0.25 * rcp.x;
         d.x = coords.y;
 
-        float e1 = textureLod(uEdges, coords, 0.0).g;
+        float e1 = textureLod(uTextures[0], coords, 0.0).g;
 
         coords.y = SearchYDown(uv + vec2(-0.125, 1.25) * rcp, 1.0 + 0.5 * rcp.y);
         d.y = coords.y;
@@ -171,7 +169,7 @@ void main()
         d = abs(round(d / rcp.y - uv.y / rcp.y));
 
         // Bottom endpoint: +1 texel in Y, same bilinear X offset.
-        float e2 = textureLod(uEdges, vec2(uv.x - 0.25 * rcp.x, coords.y + 0.5 * rcp.y), 0.0).g;
+        float e2 = textureLod(uTextures[0], vec2(uv.x - 0.25 * rcp.x, coords.y + 0.5 * rcp.y), 0.0).g;
 
         weights.ba = Area(sqrt(d), e1, e2);
     }

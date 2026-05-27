@@ -5,14 +5,6 @@
 
 #include "common/gpu_scene.glsl"
 
-layout(set = 0, binding = 0) uniform CameraBuffer {
-    mat4 view;
-    mat4 proj;
-    vec4 lightDirAndIntensity;
-    vec4 lightColor;
-    vec4 ambientColorAndIntensity;
-} camera;
-
 layout(push_constant, scalar) uniform ScenePC {
     uint64_t SceneTableBDA;
     uint FrameIndex;
@@ -48,8 +40,7 @@ void main() {
     PackedVertexRef vertices = PackedVertexRef(geo.VertexBufferBDA);
     const PackedVertex pv = vertices.Data[geo.VertexOffset + vertexId];
 
-    vec4 worldPos = dyn.Model * vec4(pv.px, pv.py, pv.pz, 1.0);
-    gl_Position = camera.proj * camera.view * worldPos;
+    gl_Position = dyn.Model * vec4(pv.px, pv.py, pv.pz, 1.0);
 
     vColor = vec4(1.0);
 }

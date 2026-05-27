@@ -61,29 +61,32 @@ namespace Extrinsic::RHI
     };
 
     // ----------------------------------------------------------
-    // MemoryAccess — coarse access scope for buffer barriers.
+    // MemoryAccess — coarse access scope for explicit barriers.
     //
-    // Tells the backend what pipeline stages and access types
-    // bracket a buffer barrier so it can emit the correct
-    // VkBufferMemoryBarrier2 srcStage/dstStage masks.
+    // Tells the backend what pipeline stages and access types bracket a buffer,
+    // texture, or memory barrier so it can emit the correct Sync2 masks.
     // ----------------------------------------------------------
-    export enum class MemoryAccess : std::uint8_t
+    export enum class MemoryAccess : std::uint16_t
     {
-        None          = 0,
-        IndirectRead  = 1 << 0,   // VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT
-        IndexRead     = 1 << 1,   // VK_ACCESS_2_INDEX_READ_BIT
-        ShaderRead    = 1 << 2,   // VK_ACCESS_2_SHADER_READ_BIT (storage / uniform)
-        ShaderWrite   = 1 << 3,   // VK_ACCESS_2_SHADER_WRITE_BIT (storage write)
-        TransferRead  = 1 << 4,   // VK_ACCESS_2_TRANSFER_READ_BIT
-        TransferWrite = 1 << 5,   // VK_ACCESS_2_TRANSFER_WRITE_BIT
-        HostRead      = 1 << 6,   // VK_ACCESS_2_HOST_READ_BIT
-        HostWrite     = 1 << 7,   // VK_ACCESS_2_HOST_WRITE_BIT
+        None                  = 0,
+        IndirectRead          = 1 << 0,   // VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT
+        IndexRead             = 1 << 1,   // VK_ACCESS_2_INDEX_READ_BIT
+        ShaderRead            = 1 << 2,   // VK_ACCESS_2_SHADER_READ_BIT (storage / uniform)
+        ShaderWrite           = 1 << 3,   // VK_ACCESS_2_SHADER_WRITE_BIT (storage write)
+        TransferRead          = 1 << 4,   // VK_ACCESS_2_TRANSFER_READ_BIT
+        TransferWrite         = 1 << 5,   // VK_ACCESS_2_TRANSFER_WRITE_BIT
+        HostRead              = 1 << 6,   // VK_ACCESS_2_HOST_READ_BIT
+        HostWrite             = 1 << 7,   // VK_ACCESS_2_HOST_WRITE_BIT
+        ColorAttachmentRead   = 1 << 8,   // VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT
+        ColorAttachmentWrite  = 1 << 9,   // VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT
+        DepthStencilRead      = 1 << 10,  // VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT
+        DepthStencilWrite     = 1 << 11,  // VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
     };
 
-    [[nodiscard]] constexpr MemoryAccess operator|(MemoryAccess a, MemoryAccess b) noexcept
+    export [[nodiscard]] constexpr MemoryAccess operator|(MemoryAccess a, MemoryAccess b) noexcept
     {
         return static_cast<MemoryAccess>(
-            static_cast<std::uint8_t>(a) | static_cast<std::uint8_t>(b));
+            static_cast<std::uint16_t>(a) | static_cast<std::uint16_t>(b));
     }
 
     // ----------------------------------------------------------

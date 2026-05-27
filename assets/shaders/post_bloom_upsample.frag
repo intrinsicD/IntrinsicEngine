@@ -7,8 +7,7 @@
 layout(location = 0) in vec2 vUV;
 layout(location = 0) out vec4 outColor;
 
-layout(set = 0, binding = 0) uniform sampler2D uCoarser;  // Coarser (upsampled) bloom mip
-layout(set = 0, binding = 1) uniform sampler2D uCurrent;   // Current downsample mip at output res
+layout(set = 0, binding = 0) uniform sampler2D uTextures[];
 
 layout(push_constant) uniform Push
 {
@@ -28,18 +27,18 @@ void main()
     //   1  2  1
     // Total weight = 16
     vec3 result = vec3(0.0);
-    result += texture(uCoarser, uv + vec2(-1.0, -1.0) * ts).rgb * 1.0;
-    result += texture(uCoarser, uv + vec2( 0.0, -1.0) * ts).rgb * 2.0;
-    result += texture(uCoarser, uv + vec2( 1.0, -1.0) * ts).rgb * 1.0;
-    result += texture(uCoarser, uv + vec2(-1.0,  0.0) * ts).rgb * 2.0;
-    result += texture(uCoarser, uv                          ).rgb * 4.0;
-    result += texture(uCoarser, uv + vec2( 1.0,  0.0) * ts).rgb * 2.0;
-    result += texture(uCoarser, uv + vec2(-1.0,  1.0) * ts).rgb * 1.0;
-    result += texture(uCoarser, uv + vec2( 0.0,  1.0) * ts).rgb * 2.0;
-    result += texture(uCoarser, uv + vec2( 1.0,  1.0) * ts).rgb * 1.0;
+    result += texture(uTextures[0], uv + vec2(-1.0, -1.0) * ts).rgb * 1.0;
+    result += texture(uTextures[0], uv + vec2( 0.0, -1.0) * ts).rgb * 2.0;
+    result += texture(uTextures[0], uv + vec2( 1.0, -1.0) * ts).rgb * 1.0;
+    result += texture(uTextures[0], uv + vec2(-1.0,  0.0) * ts).rgb * 2.0;
+    result += texture(uTextures[0], uv                          ).rgb * 4.0;
+    result += texture(uTextures[0], uv + vec2( 1.0,  0.0) * ts).rgb * 2.0;
+    result += texture(uTextures[0], uv + vec2(-1.0,  1.0) * ts).rgb * 1.0;
+    result += texture(uTextures[0], uv + vec2( 0.0,  1.0) * ts).rgb * 2.0;
+    result += texture(uTextures[0], uv + vec2( 1.0,  1.0) * ts).rgb * 1.0;
     result /= 16.0;
 
     // Accumulate: upsampled coarser mip + current downsample level
-    vec3 current = texture(uCurrent, uv).rgb;
+    vec3 current = texture(uTextures[0], uv).rgb;
     outColor = vec4(current + result, 1.0);
 }

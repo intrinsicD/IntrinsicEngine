@@ -66,8 +66,46 @@
   Without those two the SEGV would still be masked by the earlier
   blockers; with those landed the SEGV is the *only* thing left.
 
+## Progress notes
+
+- 2026-05-27 (`ci-vulkan`, NVIDIA RTX 3050 / driver 590.48.01): added an
+  explicit diagnostic-only fixture override,
+  `INTRINSIC_DEFAULT_RECIPE_SMOKE_BYPASS_COLD_GATE=1`, so the normal smoke still
+  skips fail-closed while BUG-012 can reproduce the pre-check-bypassed path.
+- Captured the first validation message before the original SEGV class:
+  `VUID-VkImageMemoryBarrier2-oldLayout-01209`, where a color image with usage
+  `TRANSFER_SRC|TRANSFER_DST|COLOR_ATTACHMENT` was transitioned to
+  `VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL`.
+- Root cause for that barrier: framegraph transient texture/buffer handles were
+  synthetic (`TextureHandle{1,1}`, etc.) and collided with real Vulkan device
+  handles such as the swapchain image. The renderer now replaces compiled
+  transient handles with real per-frame RHI texture/buffer allocations, cached by
+  frame slot and descriptor, before recording graph barriers or render passes.
+- The renderer also now supplies texture-barrier access scopes through RHI, and
+  Vulkan maps color/depth attachment access bits to Sync2 masks. Transfer-queue
+  upload final-layout transitions no longer use shader stages on transfer-only
+  command buffers.
+- Current state after these fixes: the original color-image-to-depth-layout
+  validation message no longer appears, and CPU contract coverage is green. The
+  pre-check-bypassed smoke still reaches later Vulkan bring-up blockers:
+  pipeline-layout validation errors for default-recipe shaders and a subsequent
+  command-buffer invalidation (`vkBeginCommandBuffer-commandBuffer-00049` plus
+  `bound VkBuffer ... was destroyed`) before the NVIDIA driver SEGV. Keep the
+  normal fixture skip in place until those follow-up blockers are fixed.
+- 2026-05-27 follow-up: the pipeline-layout, command-buffer lifetime, and
+  render-pass-scope blockers are fixed under the diagnostic bypass. Evidence:
+  `LSAN_OPTIONS=suppressions=/home/alex/Documents/IntrinsicEngine/lsan.supp INTRINSIC_DEFAULT_RECIPE_SMOKE_BYPASS_COLD_GATE=1 VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation ctest --test-dir build/ci-vulkan --output-on-failure -R 'DefaultRecipeSurfaceGpuSmoke' --timeout 60`
+  passes 1/1 with no Vulkan validation errors before completion. The fix set
+  moved synchronous staging uploads to a dedicated serialized one-shot command
+  buffer, enabled `drawIndirectCount`, added default-recipe render-pass
+  declarations for draw passes, and corrected renderer pass-name routing. The
+  remaining graduation step is to remove/revise the smoke's cold-gate pre-check
+  and decide whether the default-recipe Slice D acceptance needs the same
+  readback parity harness as MinimalDebug or only the current recipe-selector
+  command-stream proof.
+
 ## Required changes
-- [ ] Run the reproducer with `VK_LAYER_KHRONOS_validation`
+- [x] Run the reproducer with `VK_LAYER_KHRONOS_validation`
       (`-DINTRINSIC_VK_ENABLE_VALIDATION_LAYERS=ON` or equivalent
       runtime env: `VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation` +
       `VK_LAYER_PATH`). Capture the first validation message that
@@ -80,20 +118,27 @@
       the batch. The crash is processing one specific barrier; isolate
       which one and tag it back to the originating render-graph pass /
       resource handle.
-- [ ] If the offending barrier references an image whose
+- [x] If the offending barrier references an image whose
       `VkImage` is `VK_NULL_HANDLE` or whose
       `VulkanImagePool::Entry::CurrentLayout` was never initialized
       (cold-pool defaults), fix the entry creation path in
       `src/graphics/vulkan/Backends.Vulkan.ImagePool.*` / the texture
       manager so the entry is fully populated before any barrier
-      references it.
-- [ ] If the offending barrier has a layout transition the driver
+      references it. 2026-05-27 update: the concrete fault was not a
+      `VK_NULL_HANDLE`; it was a synthetic framegraph transient handle
+      colliding with a live color image. The renderer now allocates real RHI
+      transient resources for compiled graph transients before barrier
+      submission.
+- [x] If the offending barrier has a layout transition the driver
       cannot satisfy (e.g. `UNDEFINED → SHADER_READ_ONLY_OPTIMAL`
       without prior write, or a queue-family ownership transfer with
       mismatched src/dst stages), fix either the render-graph compile
       step that emits the barrier packet (in
       `src/graphics/framegraph/`) or the renderer's barrier-packet
       translation in `Graphics.Renderer.cpp:179` (`SubmitBarrierPacket`).
+      2026-05-27 update: the first crashing barrier class was removed by
+      replacing synthetic transient handles with real RHI transients and by
+      preserving attachment access bits through RHI/Vulkan barrier translation.
 - [ ] Extend `ValidateRecipeCompiledGraph` (callsite at
       `Graphics.Renderer.cpp:1363`) so it would have caught the
       malformed barrier and kept `m_LatestRecipeValidationClean = false`
@@ -119,6 +164,17 @@
       Null backend (the Null backend's `SubmitBarriers` is a no-op so
       it cannot crash, but the contract assertions against the
       compiled barrier packets do not need a real GPU).
+  - 2026-05-27 coverage added in `tests/contract/graphics/` instead of a
+    regression directory because the seam is CPU-visible contract state:
+    `FrameRecipeContract.DefaultRecipeDoesNotDepthTransitionColorResources`
+    asserts depth barriers only target `SceneDepth`/`ShadowAtlas`, and
+    `RHICommandContext.MemoryAccessCombinesAttachmentBitsWithoutTruncation`
+    pins the new attachment access bits used by the Vulkan translation.
+  - 2026-05-27 follow-up coverage added
+    `FrameRecipeContract.DefaultRecipeDrawPassesDeclareRenderPassAttachments`,
+    pinning that default-recipe graphics draw passes compile with at least one
+    dynamic-rendering attachment so Vulkan draws cannot be routed outside a
+    render pass again.
 
 ## Docs
 - [ ] Update `tasks/active/GRAPHICS-076-default-recipe-debug-view-and-present-wiring.md`

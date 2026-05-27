@@ -3,8 +3,7 @@
 layout(location = 0) in vec2 vUV;
 layout(location = 0) out vec4 outColor;
 
-layout(set = 0, binding = 0) uniform sampler2D uSceneColor;
-layout(set = 0, binding = 1) uniform sampler2D uBloomColor;
+layout(set = 0, binding = 0) uniform sampler2D uTextures[];
 
 layout(push_constant) uniform Push
 {
@@ -102,12 +101,12 @@ vec3 LiftGammaGain(vec3 color, vec3 lift, vec3 gamma, vec3 gain)
 
 void main()
 {
-    vec3 hdr = texture(uSceneColor, vUV).rgb;
+    vec3 hdr = texture(uTextures[0], vUV).rgb;
 
     // Composite bloom (additive, in HDR space before tone mapping)
     if (pc.BloomIntensity > 0.0)
     {
-        vec3 bloom = texture(uBloomColor, vUV).rgb;
+        vec3 bloom = texture(uTextures[0], vUV).rgb;
         hdr += bloom * pc.BloomIntensity;
     }
 

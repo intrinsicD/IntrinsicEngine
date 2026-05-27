@@ -241,6 +241,10 @@ namespace Extrinsic::Backends::Vulkan
         uint64_t m_GlobalFrameNumber = 0;
 
         std::array<VulkanCommandContext, kMaxFramesInFlight> m_CmdContexts;
+        VkCommandPool   m_OneShotCmdPool   = VK_NULL_HANDLE;
+        VkCommandBuffer m_OneShotCmdBuffer = VK_NULL_HANDLE;
+        bool            m_OneShotRecording = false;
+        std::mutex      m_OneShotMutex;
 
         Core::ResourcePool<VulkanBuffer,   RHI::BufferHandle,   kMaxFramesInFlight> m_Buffers;
         Core::ResourcePool<VulkanImage,    RHI::TextureHandle,  kMaxFramesInFlight> m_Images;

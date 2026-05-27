@@ -359,8 +359,8 @@ RHI::TransferToken VulkanTransferQueue::UploadTexture(RHI::TextureHandle dst,
     VkImageMemoryBarrier2 toRead = toXfer;
     toRead.srcStageMask   = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
     toRead.srcAccessMask  = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-    toRead.dstStageMask   = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-    toRead.dstAccessMask  = VK_ACCESS_2_SHADER_READ_BIT;
+    toRead.dstStageMask   = VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT;
+    toRead.dstAccessMask  = 0;
     toRead.oldLayout      = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     toRead.newLayout      = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     dep.pImageMemoryBarriers = &toRead;
@@ -517,8 +517,8 @@ RHI::TransferToken VulkanTransferQueue::UploadTextureFullChain(RHI::TextureHandl
     VkImageMemoryBarrier2 toRead = toXfer;
     toRead.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
     toRead.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-    toRead.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
-    toRead.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+    toRead.dstStageMask = VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT;
+    toRead.dstAccessMask = 0;
     toRead.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     toRead.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     dep.pImageMemoryBarriers = &toRead;

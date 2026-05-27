@@ -128,6 +128,23 @@ namespace Extrinsic::Graphics
             return RHI::TextureLayout::Undefined;
         }
 
+        [[nodiscard]] RHI::MemoryAccess ToMemoryAccess(const TextureBarrierState state)
+        {
+            switch (state)
+            {
+            case TextureBarrierState::Undefined:            return RHI::MemoryAccess::None;
+            case TextureBarrierState::ColorAttachmentWrite: return RHI::MemoryAccess::ColorAttachmentWrite;
+            case TextureBarrierState::DepthRead:            return RHI::MemoryAccess::DepthStencilRead;
+            case TextureBarrierState::DepthWrite:           return RHI::MemoryAccess::DepthStencilWrite;
+            case TextureBarrierState::ShaderRead:           return RHI::MemoryAccess::ShaderRead;
+            case TextureBarrierState::ShaderWrite:          return RHI::MemoryAccess::ShaderWrite;
+            case TextureBarrierState::TransferSrc:          return RHI::MemoryAccess::TransferRead;
+            case TextureBarrierState::TransferDst:          return RHI::MemoryAccess::TransferWrite;
+            case TextureBarrierState::Present:              return RHI::MemoryAccess::None;
+            }
+            return RHI::MemoryAccess::None;
+        }
+
         [[nodiscard]] RHI::MemoryAccess ToMemoryAccess(const BufferBarrierState state)
         {
             switch (state)
@@ -157,6 +174,8 @@ namespace Extrinsic::Graphics
                     .Texture = graph.TextureHandles[barrier.TextureIndex],
                     .BeforeLayout = ToTextureLayout(barrier.Before),
                     .AfterLayout = ToTextureLayout(barrier.After),
+                    .BeforeAccess = ToMemoryAccess(barrier.Before),
+                    .AfterAccess = ToMemoryAccess(barrier.After),
                 });
             }
 
@@ -676,6 +695,7 @@ namespace Extrinsic::Graphics
             // is torn down below since the lease destructor calls back
             // through the manager.
             m_PostProcessHistogramPipelineLease.reset();
+            ReleaseAllFrameTransientResources();
             // GRAPHICS-074 Slice D.1 — drop the renderer-owned
             // `Picking.Readback` lease before the BufferManager is torn
             // down so the lease's destructor still observes a live manager
@@ -1360,8 +1380,14 @@ namespace Extrinsic::Graphics
             }
             const RenderGraphValidationResult recipeValidation =
                 ValidateRecipeCompiledGraph(recipeIntrospection, *compiled);
+            const bool transientResourcesReady = AllocateFrameTransientResources(*compiled, frame.FrameIndex);
             const bool recipeValidationClean =
-                recipeValidation.CountBySeverity(RenderGraphValidationSeverity::Error) == 0u;
+                recipeValidation.CountBySeverity(RenderGraphValidationSeverity::Error) == 0u && transientResourcesReady;
+            if (!transientResourcesReady)
+            {
+                m_LastRenderGraphStats.Diagnostic = "RenderGraph transient RHI resource allocation failed.";
+                Core::Log::Error("[Graphics] RenderGraph transient RHI resource allocation failed");
+            }
             m_Device->NoteRecipeGraphValidation(recipeValidationClean);
 
             m_LastRenderGraphStats.Compile.Succeeded = true;
@@ -1376,13 +1402,9 @@ namespace Extrinsic::Graphics
             const auto executeBegin = std::chrono::steady_clock::now();
             auto& graphicsContext = m_Device->GetGraphicsContext(frame.FrameIndex);
             std::vector<std::string_view> passNameByIndex(compiled->PassDeclarations.size());
-            for (std::size_t orderIndex = 0; orderIndex < compiled->TopologicalOrder.size(); ++orderIndex)
+            for (std::size_t passIndex = 0; passIndex < passNameByIndex.size() && passIndex < compiled->PassNames.size(); ++passIndex)
             {
-                const std::uint32_t passIndex = compiled->TopologicalOrder[orderIndex];
-                if (passIndex < passNameByIndex.size() && orderIndex < compiled->PassNames.size())
-                {
-                    passNameByIndex[passIndex] = compiled->PassNames[orderIndex];
-                }
+                passNameByIndex[passIndex] = compiled->PassNames[passIndex];
             }
 
             const RHI::CameraUBO camera = BuildCameraUbo(renderWorld, frame.FrameIndex);
@@ -2685,9 +2707,9 @@ namespace Extrinsic::Graphics
         {
             RHI::PipelineDesc desc{};
             desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
-                "shaders/line.vert.spv");
+                "shaders/forward/line.vert.spv");
             desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
-                "shaders/line.frag.spv");
+                "shaders/forward/line.frag.spv");
             desc.PrimitiveTopology = RHI::Topology::LineList;
             desc.Rasterizer.Culling = RHI::CullMode::None;
             desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
@@ -2717,9 +2739,9 @@ namespace Extrinsic::Graphics
         {
             RHI::PipelineDesc desc{};
             desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
-                "shaders/point.vert.spv");
+                "shaders/forward/point.vert.spv");
             desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
-                "shaders/point_retained.frag.spv");
+                "shaders/forward/point.frag.spv");
             desc.PrimitiveTopology = RHI::Topology::PointList;
             desc.Rasterizer.Culling = RHI::CullMode::None;
             desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
@@ -4850,6 +4872,154 @@ namespace Extrinsic::Graphics
             return out;
         }
 
+        [[nodiscard]] static bool CompatibleTextureDesc(const RHI::TextureDesc& lhs,
+                                                        const RHI::TextureDesc& rhs) noexcept
+        {
+            return lhs.Width == rhs.Width && lhs.Height == rhs.Height &&
+                lhs.DepthOrArrayLayers == rhs.DepthOrArrayLayers && lhs.MipLevels == rhs.MipLevels &&
+                lhs.Fmt == rhs.Fmt && lhs.Dimension == rhs.Dimension && lhs.Usage == rhs.Usage &&
+                lhs.InitialLayout == rhs.InitialLayout && lhs.SampleCount == rhs.SampleCount;
+        }
+
+        [[nodiscard]] static bool CompatibleBufferDesc(const RHI::BufferDesc& lhs,
+                                                       const RHI::BufferDesc& rhs) noexcept
+        {
+            return lhs.SizeBytes == rhs.SizeBytes && lhs.Usage == rhs.Usage && lhs.HostVisible == rhs.HostVisible;
+        }
+
+        void ReleaseFrameTransientResources(const std::uint32_t slot)
+        {
+            if (m_Device == nullptr || slot >= m_FrameTransientTextures.size() || slot >= m_FrameTransientBuffers.size())
+            {
+                return;
+            }
+            for (const RHI::TextureHandle handle : m_FrameTransientTextures[slot])
+            {
+                m_Device->DestroyTexture(handle);
+            }
+            for (const RHI::BufferHandle handle : m_FrameTransientBuffers[slot])
+            {
+                m_Device->DestroyBuffer(handle);
+            }
+            m_FrameTransientTextures[slot].clear();
+            m_FrameTransientBuffers[slot].clear();
+            if (slot < m_FrameTransientTextureDescs.size())
+            {
+                m_FrameTransientTextureDescs[slot].clear();
+            }
+            if (slot < m_FrameTransientBufferDescs.size())
+            {
+                m_FrameTransientBufferDescs[slot].clear();
+            }
+        }
+
+        void ReleaseAllFrameTransientResources()
+        {
+            for (std::uint32_t slot = 0; slot < m_FrameTransientTextures.size(); ++slot)
+            {
+                ReleaseFrameTransientResources(slot);
+            }
+            m_FrameTransientTextures.clear();
+            m_FrameTransientBuffers.clear();
+            m_FrameTransientTextureDescs.clear();
+            m_FrameTransientBufferDescs.clear();
+        }
+
+        [[nodiscard]] bool AllocateFrameTransientResources(CompiledRenderGraph& compiled,
+                                                           const std::uint32_t frameIndex)
+        {
+            if (m_Device == nullptr)
+            {
+                return false;
+            }
+
+            const std::uint32_t framesInFlight = std::max(1u, m_Device->GetFramesInFlight());
+            if (m_FrameTransientTextures.size() != framesInFlight || m_FrameTransientBuffers.size() != framesInFlight)
+            {
+                ReleaseAllFrameTransientResources();
+                m_FrameTransientTextures.resize(framesInFlight);
+                m_FrameTransientBuffers.resize(framesInFlight);
+                m_FrameTransientTextureDescs.resize(framesInFlight);
+                m_FrameTransientBufferDescs.resize(framesInFlight);
+            }
+
+            const std::uint32_t slot = frameIndex % framesInFlight;
+            m_FrameTransientTextures[slot].resize(compiled.TextureHandles.size());
+            m_FrameTransientTextureDescs[slot].resize(compiled.TextureHandles.size());
+            m_FrameTransientBuffers[slot].resize(compiled.BufferHandles.size());
+            m_FrameTransientBufferDescs[slot].resize(compiled.BufferHandles.size());
+
+            for (std::uint32_t index = 0; index < compiled.TextureHandles.size(); ++index)
+            {
+                if (index >= compiled.TextureImported.size() || index >= compiled.TextureLifetimes.size() ||
+                    compiled.TextureImported[index] || !compiled.TextureLifetimes[index].HasUse)
+                {
+                    continue;
+                }
+
+                const TextureResourceDesc* desc = m_RenderGraph.GetTextureDescByIndex(index);
+                if (desc == nullptr)
+                {
+                    return false;
+                }
+                if (m_FrameTransientTextures[slot][index].IsValid() &&
+                    CompatibleTextureDesc(m_FrameTransientTextureDescs[slot][index], desc->Desc))
+                {
+                    compiled.TextureHandles[index] = m_FrameTransientTextures[slot][index];
+                    continue;
+                }
+                if (m_FrameTransientTextures[slot][index].IsValid())
+                {
+                    m_Device->DestroyTexture(m_FrameTransientTextures[slot][index]);
+                    m_FrameTransientTextures[slot][index] = RHI::TextureHandle{};
+                }
+                const RHI::TextureHandle handle = m_Device->CreateTexture(desc->Desc);
+                if (!handle.IsValid())
+                {
+                    return false;
+                }
+                compiled.TextureHandles[index] = handle;
+                m_FrameTransientTextures[slot][index] = handle;
+                m_FrameTransientTextureDescs[slot][index] = desc->Desc;
+            }
+
+            for (std::uint32_t index = 0; index < compiled.BufferHandles.size(); ++index)
+            {
+                if (index >= compiled.BufferImported.size() || index >= compiled.BufferLifetimes.size() ||
+                    compiled.BufferImported[index] || !compiled.BufferLifetimes[index].HasUse)
+                {
+                    continue;
+                }
+
+                const BufferResourceDesc* desc = m_RenderGraph.GetBufferDescByIndex(index);
+                if (desc == nullptr)
+                {
+                    return false;
+                }
+                if (m_FrameTransientBuffers[slot][index].IsValid() &&
+                    CompatibleBufferDesc(m_FrameTransientBufferDescs[slot][index], desc->Desc))
+                {
+                    compiled.BufferHandles[index] = m_FrameTransientBuffers[slot][index];
+                    continue;
+                }
+                if (m_FrameTransientBuffers[slot][index].IsValid())
+                {
+                    m_Device->DestroyBuffer(m_FrameTransientBuffers[slot][index]);
+                    m_FrameTransientBuffers[slot][index] = RHI::BufferHandle{};
+                }
+                const RHI::BufferHandle handle = m_Device->CreateBuffer(desc->Desc);
+                if (!handle.IsValid())
+                {
+                    return false;
+                }
+                compiled.BufferHandles[index] = handle;
+                m_FrameTransientBuffers[slot][index] = handle;
+                m_FrameTransientBufferDescs[slot][index] = desc->Desc;
+            }
+
+            return true;
+        }
+
         // GRAPHICS-074 Slice D.3 — drain any picking-readback slot whose
         // issuing frame has completed since its copy was recorded. Called at
         // the top of `BeginFrame()` so the `SelectionSystem` observes the
@@ -6212,6 +6382,10 @@ namespace Extrinsic::Graphics
         RHI::IDevice*                        m_Device{nullptr};
         RenderGraph                          m_RenderGraph;
         RenderGraphExecutor                  m_RenderGraphExecutor;
+        std::vector<std::vector<RHI::TextureHandle>> m_FrameTransientTextures{};
+        std::vector<std::vector<RHI::BufferHandle>>  m_FrameTransientBuffers{};
+        std::vector<std::vector<RHI::TextureDesc>>   m_FrameTransientTextureDescs{};
+        std::vector<std::vector<RHI::BufferDesc>>    m_FrameTransientBufferDescs{};
         Core::Dag::TaskGraph                 m_RenderPrepGraph{Core::Dag::QueueDomain::Cpu};
         DepthPrepassPass                     m_DepthPrepassPass;
         MinimalDebugSurfacePass              m_MinimalDebugSurfacePass;

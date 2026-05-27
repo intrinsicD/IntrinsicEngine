@@ -84,12 +84,17 @@ namespace
         bool Synchronization2Supported = false;
         bool ScalarBlockLayoutSupported = false;
         bool ShaderInt64Supported = false;
+        bool GeometryShaderSupported = false;
+        bool RuntimeDescriptorArraySupported = false;
+        bool SampledImageArrayNonUniformIndexingSupported = false;
+        bool DrawIndirectCountSupported = false;
 
         [[nodiscard]] bool AllRequiredSupported() const noexcept
         {
             return DescriptorIndexingSupported && TimelineSemaphoreSupported && DynamicRenderingSupported &&
                    BufferDeviceAddressSupported && Synchronization2Supported && ScalarBlockLayoutSupported &&
-                   ShaderInt64Supported;
+                   ShaderInt64Supported && GeometryShaderSupported && RuntimeDescriptorArraySupported &&
+                   SampledImageArrayNonUniformIndexingSupported && DrawIndirectCountSupported;
         }
     };
 
@@ -278,6 +283,11 @@ namespace
         probe.Synchronization2Supported = features13.synchronization2 == VK_TRUE;
         probe.ScalarBlockLayoutSupported = features12.scalarBlockLayout == VK_TRUE;
         probe.ShaderInt64Supported = features2.features.shaderInt64 == VK_TRUE;
+        probe.GeometryShaderSupported = features2.features.geometryShader == VK_TRUE;
+        probe.RuntimeDescriptorArraySupported = features12.runtimeDescriptorArray == VK_TRUE;
+        probe.SampledImageArrayNonUniformIndexingSupported =
+            features12.shaderSampledImageArrayNonUniformIndexing == VK_TRUE;
+        probe.DrawIndirectCountSupported = features12.drawIndirectCount == VK_TRUE;
         return probe;
     }
 
@@ -404,6 +414,9 @@ namespace
         enabled12.timelineSemaphore = VK_TRUE;
         enabled12.bufferDeviceAddress = VK_TRUE;
         enabled12.scalarBlockLayout = VK_TRUE;
+        enabled12.runtimeDescriptorArray = VK_TRUE;
+        enabled12.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+        enabled12.drawIndirectCount = VK_TRUE;
 
         VkPhysicalDeviceFeatures2 enabledFeatures{};
         enabledFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
@@ -415,6 +428,12 @@ namespace
                 *outSamplerAnisotropySupported = true;
         }
         enabledFeatures.features.shaderInt64 = VK_TRUE;
+        // Selection/picking fragment shaders use gl_PrimitiveID, which glslang
+        // emits with SPIR-V Capability Geometry even though no geometry stage is
+        // present. Enable the feature up front so pipeline bring-up fails at
+        // the explicit required-feature gate rather than later at
+        // vkCreateShaderModule validation.
+        enabledFeatures.features.geometryShader = VK_TRUE;
 
         const char* deviceExtensions[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
@@ -1601,6 +1620,34 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
                                           m_TransferFamily);
         }
 
+        VkCommandPoolCreateInfo oneShotPoolInfo{};
+        oneShotPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        oneShotPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT |
+                                VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+        oneShotPoolInfo.queueFamilyIndex = m_GraphicsFamily;
+        result = vkCreateCommandPool(m_Device, &oneShotPoolInfo, nullptr, &m_OneShotCmdPool);
+        diagnostics.LastVkResult = static_cast<std::int32_t>(result);
+        if (result != VK_SUCCESS || m_OneShotCmdPool == VK_NULL_HANDLE)
+        {
+            Core::Log::Error("[VulkanDevice::Initialize] vkCreateCommandPool failed for one-shot Vulkan uploads; promoted Vulkan device remains non-operational.");
+            fail(VulkanBootstrapStatus::FailedPerFrameResourceCreation, result);
+            return;
+        }
+
+        VkCommandBufferAllocateInfo oneShotCommandBufferInfo{};
+        oneShotCommandBufferInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        oneShotCommandBufferInfo.commandPool = m_OneShotCmdPool;
+        oneShotCommandBufferInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        oneShotCommandBufferInfo.commandBufferCount = 1u;
+        result = vkAllocateCommandBuffers(m_Device, &oneShotCommandBufferInfo, &m_OneShotCmdBuffer);
+        diagnostics.LastVkResult = static_cast<std::int32_t>(result);
+        if (result != VK_SUCCESS || m_OneShotCmdBuffer == VK_NULL_HANDLE)
+        {
+            Core::Log::Error("[VulkanDevice::Initialize] vkAllocateCommandBuffers failed for one-shot Vulkan uploads; promoted Vulkan device remains non-operational.");
+            fail(VulkanBootstrapStatus::FailedPerFrameResourceCreation, result);
+            return;
+        }
+
         diagnostics.PerFrameResourcesCreated =
             diagnostics.FrameCommandPoolCount == kMaxFramesInFlight &&
             diagnostics.FrameCommandBufferCount == kMaxFramesInFlight &&
@@ -2038,6 +2085,12 @@ void VulkanDevice::Shutdown()
     m_GlobalPipelineLayout = VK_NULL_HANDLE;
     m_SamplerAnisotropySupported = false;
 
+    if (device != VK_NULL_HANDLE && m_OneShotCmdPool != VK_NULL_HANDLE)
+        vkDestroyCommandPool(device, m_OneShotCmdPool, nullptr);
+    m_OneShotCmdPool = VK_NULL_HANDLE;
+    m_OneShotCmdBuffer = VK_NULL_HANDLE;
+    m_OneShotRecording = false;
+
     for (std::uint32_t frameSlot = 0; frameSlot < kMaxFramesInFlight; ++frameSlot)
     {
         PerFrame& frame = m_Frames[frameSlot];
@@ -2179,6 +2232,8 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
         Core::Log::Error("[VulkanDevice::BeginFrame] vkWaitForFences failed; guarded Vulkan frame acquire skipped");
         return false;
     }
+
+    FlushDeletionQueue(m_FrameSlot);
 
     result = vkResetCommandPool(m_Device, frame.CmdPool, 0u);
     if (result != VK_SUCCESS)
@@ -3027,19 +3082,25 @@ void VulkanDevice::WriteBuffer(RHI::BufferHandle handle, const void* data,
     // 2. Copy data into the staging buffer.
     std::memcpy(stagingInfo.pMappedData, data, static_cast<size_t>(size));
 
-    // 3. Record and submit a one-shot vkCmdCopyBuffer.
-    VkCommandBuffer cmd = BeginOneShot();
-    if (cmd == VK_NULL_HANDLE)
+    // 3. Record and submit a one-shot vkCmdCopyBuffer. The renderer may issue
+    // device-local buffer uploads from task workers during PrepareFrame(); the
+    // one-shot pool owns a single transient command buffer, so serialize the
+    // whole begin/record/end sequence rather than only the queue submit.
+    bool uploadComplete = false;
     {
-        vmaDestroyBuffer(m_Vma, stagingBuf, stagingAlloc);
-        return;
+        std::scoped_lock oneShotLock{m_OneShotMutex};
+        VkCommandBuffer cmd = BeginOneShot();
+        if (cmd != VK_NULL_HANDLE)
+        {
+            VkBufferCopy region{};
+            region.srcOffset = 0;
+            region.dstOffset = offset;
+            region.size      = size;
+            vkCmdCopyBuffer(cmd, stagingBuf, buf->Buffer, 1, &region);
+            uploadComplete = EndOneShot(cmd);  // submits + vkQueueWaitIdle → GPU work is complete when true
+        }
     }
-    VkBufferCopy region{};
-    region.srcOffset = 0;
-    region.dstOffset = offset;
-    region.size      = size;
-    vkCmdCopyBuffer(cmd, stagingBuf, buf->Buffer, 1, &region);
-    (void)EndOneShot(cmd);  // submits + vkQueueWaitIdle → GPU work is complete when true
+    (void)uploadComplete;
 
     // 4. The GPU has finished reading from the staging buffer — safe to destroy.
     vmaDestroyBuffer(m_Vma, stagingBuf, stagingAlloc);
@@ -3780,34 +3841,43 @@ void VulkanDevice::DestroyPipeline(RHI::PipelineHandle handle)
 
 VkCommandBuffer VulkanDevice::BeginOneShot()
 {
-    if (!HasLiveOperationalPrerequisites() || m_FrameSlot >= kMaxFramesInFlight)
+    if (!HasLiveOperationalPrerequisites() || m_OneShotCmdPool == VK_NULL_HANDLE ||
+        m_OneShotCmdBuffer == VK_NULL_HANDLE || m_OneShotRecording)
         return VK_NULL_HANDLE;
 
-    const VkCommandBuffer cmd = m_Frames[m_FrameSlot].CmdBuffer;
-    if (cmd == VK_NULL_HANDLE)
-        return VK_NULL_HANDLE;
-
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    VkResult result = vkBeginCommandBuffer(cmd, &beginInfo);
+    VkResult result = vkResetCommandPool(m_Device, m_OneShotCmdPool, 0u);
     if (result != VK_SUCCESS)
     {
         NoteDeviceLostIfNeeded(result);
         return VK_NULL_HANDLE;
     }
-    return cmd;
+
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    result = vkBeginCommandBuffer(m_OneShotCmdBuffer, &beginInfo);
+    if (result != VK_SUCCESS)
+    {
+        NoteDeviceLostIfNeeded(result);
+        return VK_NULL_HANDLE;
+    }
+    m_OneShotRecording = true;
+    return m_OneShotCmdBuffer;
 }
 
 bool VulkanDevice::EndOneShot(VkCommandBuffer cmd)
 {
-    if (!HasLiveOperationalPrerequisites() || cmd == VK_NULL_HANDLE)
+    if (!HasLiveOperationalPrerequisites() || cmd == VK_NULL_HANDLE || cmd != m_OneShotCmdBuffer ||
+        !m_OneShotRecording)
         return false;
 
     VkResult result = vkEndCommandBuffer(cmd);
+    m_OneShotRecording = false;
     if (result != VK_SUCCESS)
     {
         NoteDeviceLostIfNeeded(result);
+        if (m_Device != VK_NULL_HANDLE && m_OneShotCmdPool != VK_NULL_HANDLE)
+            (void)vkResetCommandPool(m_Device, m_OneShotCmdPool, 0u);
         return false;
     }
 
@@ -3822,12 +3892,16 @@ bool VulkanDevice::EndOneShot(VkCommandBuffer cmd)
         if (result != VK_SUCCESS)
         {
             NoteDeviceLostIfNeeded(result);
+            if (m_Device != VK_NULL_HANDLE && m_OneShotCmdPool != VK_NULL_HANDLE)
+                (void)vkResetCommandPool(m_Device, m_OneShotCmdPool, 0u);
             return false;
         }
         result = vkQueueWaitIdle(m_GraphicsQueue);
         if (result != VK_SUCCESS)
         {
             NoteDeviceLostIfNeeded(result);
+            if (m_Device != VK_NULL_HANDLE && m_OneShotCmdPool != VK_NULL_HANDLE)
+                (void)vkResetCommandPool(m_Device, m_OneShotCmdPool, 0u);
             return false;
         }
         return true;
@@ -3840,7 +3914,8 @@ void VulkanDevice::DeferDelete(VulkanDeferredDelete fn)
     if (!fn)
         return;
 
-    if (!m_Operational || m_FrameSlot >= kMaxFramesInFlight)
+    if (m_Device == VK_NULL_HANDLE || m_FrameSlot >= kMaxFramesInFlight ||
+        m_Frames[m_FrameSlot].Fence == VK_NULL_HANDLE)
     {
         fn();
         return;

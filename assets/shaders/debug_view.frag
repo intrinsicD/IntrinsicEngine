@@ -17,9 +17,7 @@
 layout(location = 0) in vec2 vUV;
 layout(location = 0) out vec4 outColor;
 
-layout(set = 0, binding = 0) uniform sampler2D uSrcFloat;
-layout(set = 0, binding = 1) uniform usampler2D uSrcUint;
-layout(set = 0, binding = 2) uniform sampler2D uSrcDepth;
+layout(set = 0, binding = 0) uniform sampler2D uTextures[];
 
 // 16-byte push-constant block matching
 // `Extrinsic::Graphics::DebugViewPushConstants` (4 × uint32). Keep the
@@ -81,14 +79,14 @@ void main()
 
     if (pc.ResourceClass == kResourceClassDepthTexture)
     {
-        ivec2 size = textureSize(uSrcDepth, 0);
+        ivec2 size = textureSize(uTextures[0], 0);
         if (size.x <= 0 || size.y <= 0)
         {
             outColor = vec4(0.0, 0.0, 0.0, 1.0);
             return;
         }
 
-        float z = texelFetch(uSrcDepth, SampleCoords(vUV, size), 0).r;
+        float z = texelFetch(uTextures[0], SampleCoords(vUV, size), 0).r;
         outColor = vec4(vec3(clamp(z, 0.0, 1.0)), 1.0);
         return;
     }
@@ -98,13 +96,13 @@ void main()
     // but a `Backbuffer`-class resource that *is* previewable (the
     // imported swapchain target itself) sees the same direct color
     // path.
-    ivec2 size = textureSize(uSrcFloat, 0);
+    ivec2 size = textureSize(uTextures[0], 0);
     if (size.x <= 0 || size.y <= 0)
     {
         outColor = vec4(0.0, 0.0, 0.0, 1.0);
         return;
     }
 
-    vec3 c = texelFetch(uSrcFloat, SampleCoords(vUV, size), 0).rgb;
+    vec3 c = texelFetch(uTextures[0], SampleCoords(vUV, size), 0).rgb;
     outColor = vec4(clamp(c, 0.0, 1.0), 1.0);
 }

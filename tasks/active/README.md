@@ -18,12 +18,16 @@ Each active task should include:
   and #924; Slice D's recipe-selector fixture skeleton + build wiring
   landed 2026-05-26 on the current onboarding branch, but the
   fixture `GTEST_SKIP`s on a Vulkan-capable host because the default
-  recipe currently fails the operational gate during
-  `Engine::Initialize()` — SMAA AreaTex upload, SelectionOutline
-  pipeline creation, and the barrier validator all fail. See the
-  2026-05-26 nonblocking clarification on the task file for the
-  exact symptoms, the LSan leak finding, and the upstream tickets
-  needed to graduate the fixture from SKIP to PASS). Owner:
+  recipe still fails the operational Vulkan gate. The 2026-05-27
+  BUG-012 slices fixed the synthetic-transient-handle/color-image
+  depth-transition barrier, transfer-queue upload barrier stage masks,
+  shader/pipeline-layout mismatches, per-frame command-buffer reuse by
+  one-shot uploads, and missing default-recipe render-pass scopes. The
+  diagnostic bypassed smoke now passes on the NVIDIA validation host;
+  the remaining GRAPHICS-076 Slice D work is to intentionally remove or
+  revise the cold-gate pre-check and decide the final default-recipe
+  readback/parity acceptance. See the 2026-05-27 BUG-012 clarifications
+  on the task file for exact evidence). Owner:
   unassigned; next pick-up by any agent willing to triage the
   upstream Vulkan default-recipe bring-up issues.
 - [`GRAPHICS-077`](GRAPHICS-077-transient-debug-primitive-upload-helper.md) —

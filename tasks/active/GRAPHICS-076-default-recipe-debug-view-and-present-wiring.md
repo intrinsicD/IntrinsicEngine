@@ -6,11 +6,14 @@
   (Slices A–C landed; Slice D's recipe-selector fixture skeleton +
   build wiring landed 2026-05-26, but the fixture currently
   `GTEST_SKIP`s on Vulkan-capable hosts because the default recipe
-  does not yet reach the operational Vulkan gate — SMAA AreaTex
-  upload, SelectionOutline pipeline creation, and the barrier
-  validator fail during `Engine::Initialize()`. See the
-  2026-05-26 nonblocking clarification below for the exact symptoms,
-  the LSan finding, and the upstream tickets needed to unblock).
+  does not yet reach the operational Vulkan gate. The 2026-05-27
+  BUG-012 slice fixed the synthetic-transient-handle/color-image
+  depth-transition barrier and the transfer-queue upload barrier
+  stage masks, but the bypassed smoke still reaches later Vulkan
+  bring-up blockers: default-recipe pipeline-layout validation
+  errors followed by command-buffer invalidation before the NVIDIA
+  driver SEGV. See the 2026-05-27 follow-up below for current
+  evidence).
 - Owner/agent: unassigned; next pick-up by any agent who is
   willing to dig into the upstream Vulkan bring-up issues
   enumerated in the 2026-05-26 clarification. Headers last
@@ -181,13 +184,132 @@
       inside `libnvidia-glcore.so.590.48.01+0xe8251d` reached via
       `VulkanCommandContext::SubmitBarriers`
       (`src/graphics/vulkan/Backends.Vulkan.CommandContext.cpp:574`).
-- This single barrier defect is the **only** remaining upstream
-  blocker for graduating this fixture from `Skipped` to `Passed`. It
-  is captured as
+- At this point, the barrier defect was the next actionable upstream
+  blocker for graduating this fixture from `Skipped` to `Passed`. It is captured as
   [`BUG-012`](../backlog/bugs/BUG-012-default-recipe-vkcmdpipelinebarrier2-segv-nvidia.md)
   with a full reproducer, stack trace, and acceptance criteria. The
-  GRAPHICS-076 Slice D `Operational` close depends only on BUG-012
-  landing.
+  later 2026-05-27 BUG-012 partial update below supersedes the
+  "only remaining" wording by recording the newly exposed
+  pipeline-layout and command-buffer lifetime blockers.
+
+## Nonblocking clarification (2026-05-27, BUG-012 partial)
+
+- This session worked the active GRAPHICS-076 Vulkan blocker through
+  `BUG-012` and landed CPU-visible pieces that remove the first malformed
+  default-recipe barrier class:
+  - `RHI::MemoryAccess` now includes color/depth attachment access scopes, and
+    `Graphics.Renderer` populates texture barrier access masks before submitting
+    framegraph barrier packets to RHI.
+  - The renderer now replaces compiled graph synthetic transient handles with
+    real per-frame RHI texture/buffer allocations, cached by frame slot and
+    descriptor, before barrier submission or render-pass setup. This prevents
+    `TextureHandle{1,1}`-style framegraph handles from colliding with live Vulkan
+    swapchain/color-image handles.
+  - Vulkan transfer uploads no longer record final-layout barriers with shader
+    destination stages on transfer-only command buffers.
+  - Added CPU contracts:
+    `RHICommandContext.MemoryAccessCombinesAttachmentBitsWithoutTruncation` and
+    `FrameRecipeContract.DefaultRecipeDoesNotDepthTransitionColorResources`.
+- Verification from this session:
+  - `ctest --test-dir build/ci --output-on-failure -L 'contract' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
+    → 252/252 passed.
+  - `INTRINSIC_DEFAULT_RECIPE_SMOKE_BYPASS_COLD_GATE=1 VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation build/ci-vulkan/bin/IntrinsicGraphicsVulkanSmokeTests --gtest_filter='DefaultRecipeSurfaceGpuSmoke*'`
+    no longer reports the original `VUID-VkImageMemoryBarrier2-oldLayout-01209`
+    color-image→depth-layout barrier. It still fails later with default-recipe
+    pipeline-layout validation errors and command-buffer invalidation
+    (`vkBeginCommandBuffer-commandBuffer-00049`, plus validation reporting a
+    destroyed bound buffer) before the NVIDIA driver SEGV.
+- Status implication: keep the normal Slice D fixture pre-check/`GTEST_SKIP` in
+  place. GRAPHICS-076 remains `CPUContracted` on default gates and not yet
+  `Operational`; follow-up Vulkan work must address the pipeline-layout and
+  command-buffer lifetime failures now exposed by the barrier/handle fixes.
+
+## Nonblocking clarification (2026-05-27, BUG-012 follow-up)
+
+- This session continued the bypassed default-recipe Vulkan smoke on the same
+  NVIDIA/validation host and removed the shader-module / pipeline-layout
+  validation blockers that previously hid the command-stream lifetime failure:
+  - Vulkan logical-device feature negotiation now requires/enables
+    `geometryShader`, `runtimeDescriptorArray`, and
+    `shaderSampledImageArrayNonUniformIndexing`, matching the SPIR-V
+    capabilities emitted by the current selection/bindless shader set.
+  - Retained line/point default-recipe pipeline descriptors now use the
+    GpuScene-aware `forward/line.*` and `forward/point.*` shader pairs; those
+    shaders no longer declare the legacy camera UBO descriptor and follow the
+    same BDA-only clip-space convention as `forward/default_debug_surface.vert`.
+  - Postprocess, `DebugView`, and selection-outline sampled resources were
+    reshaped to the promoted Vulkan global sampled-texture layout
+    (`set=0,binding=0` runtime arrays) so the default pipeline set no longer
+    emits `VkGraphicsPipelineCreateInfo-layout-07988/07990` errors.
+  - `post_histogram.comp` no longer declares the unmatched descriptor-backed
+    storage buffer during bring-up; the renderer still clears/copies the RHI
+    histogram buffer through command-context operations, but real shader-side
+    bin accumulation needs a follow-up storage-buffer/BDA descriptor seam before
+    pixel/metric correctness can be claimed.
+  - Vulkan deferred deletion now queues live resources behind the frame slot
+    fence even while the operational gate is transitioning, and the graphics
+    command context defensively resets its command buffer before recording.
+- Verification/evidence:
+  - `INTRINSIC_DEFAULT_RECIPE_SMOKE_BYPASS_COLD_GATE=1 VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation build/ci-vulkan/bin/IntrinsicGraphicsVulkanSmokeTests --gtest_filter='DefaultRecipeSurfaceGpuSmoke*'`
+    no longer reports shader-module capability errors or pipeline-layout
+    descriptor mismatch errors before frame execution. The remaining first
+    failure is command-buffer lifetime/resource-lifetime validation:
+    `vkBeginCommandBuffer-commandBuffer-00049` followed by commands rejected
+    because a bound `VkBuffer` was destroyed, then the same NVIDIA
+    `vkCmdPipelineBarrier2` driver SEGV. This is narrower than the prior
+    pipeline-layout + command-buffer invalidation combination but still blocks
+    graduating the fixture.
+  - Normal skip-safe fixture run (without the bypass) remains safe:
+    `build/ci-vulkan/bin/IntrinsicGraphicsVulkanSmokeTests --gtest_filter='DefaultRecipeSurfaceGpuSmoke*'`
+    → 1 skipped in ~2s with the structured operational-gate reason.
+  - CPU contract gate remains green:
+    `ctest --test-dir build/ci --output-on-failure -L 'contract' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
+    → 356/356 passed.
+- Status implication: GRAPHICS-076 is still not `Operational`; the next Vulkan
+  slice should focus on the destroyed-bound-buffer / command-buffer lifetime
+  path now that shader/pipeline layout validation no longer masks it. The
+  temporary shader-side sampled-resource/histogram compromises above must be
+  replaced by real bindless indices or a storage-buffer/BDA seam before
+  four-sample pixel parity or histogram correctness can be claimed.
+
+## Nonblocking clarification (2026-05-27, BUG-012 command-stream follow-up)
+
+- This session continued from the narrowed command-buffer/resource-lifetime
+  blocker and got the diagnostic default-recipe Vulkan smoke through the real
+  command stream on the NVIDIA/validation host when the cold-gate pre-check is
+  bypassed:
+  - `VulkanDevice::BeginOneShot()` no longer reuses the per-frame graphics
+    command buffer for synchronous staging uploads. It owns a dedicated transient
+    command pool/buffer and serializes worker-thread `WriteBuffer()` staging
+    uploads through a one-shot mutex.
+  - Promoted Vulkan now requires/enables `drawIndirectCount`, matching the
+    default renderer's `vkCmdDrawIndirectCount` / `vkCmdDrawIndexedIndirectCount`
+    command shape.
+  - The default recipe now declares dynamic-rendering scopes for graphics draw
+    passes (`DepthPrepass`, picking, shadow, surface, line, point, transient
+    debug, visualization overlay, postprocess, AA, selection outline, debug
+    view, and present), and `NullRenderer::ExecuteFrame()` resolves compiled
+    pass names by pass index instead of accidentally remapping them through
+    topological order.
+  - `PostProcessPass` opens the LDR tone-map attachment as the active render
+    target in the current recorded path; `BloomScratch` remains declared for the
+    resource contract, but the bloom multi-target render-scope split remains
+    future cleanup before bloom correctness can be claimed.
+  - `lsan.supp` now covers two Vulkan ICD allocations that surface through VMA
+    buffer binding and `vkCmdPushConstants` during the ASan Vulkan smoke.
+- Verification/evidence:
+  - `LSAN_OPTIONS=suppressions=/home/alex/Documents/IntrinsicEngine/lsan.supp INTRINSIC_DEFAULT_RECIPE_SMOKE_BYPASS_COLD_GATE=1 VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation ctest --test-dir build/ci-vulkan --output-on-failure -R 'DefaultRecipeSurfaceGpuSmoke' --timeout 60`
+    → 1/1 passed; no Vulkan validation errors before completion.
+  - `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
+    → 2242/2242 passed.
+  - Added `FrameRecipeContract.DefaultRecipeDrawPassesDeclareRenderPassAttachments`
+    so default-recipe graphics draw passes cannot silently compile without a
+    dynamic-rendering attachment scope again.
+- Status implication: the BUG-012 command-stream blocker is no longer reproduced
+  under the bypassed fixture. GRAPHICS-076 still should not be declared closed
+  until Slice D intentionally removes or revises the cold-gate pre-check and, if
+  needed, extends the default-recipe pixel/readback parity harness beyond the
+  current recipe-selector proof.
 
 ## Slice plan
 

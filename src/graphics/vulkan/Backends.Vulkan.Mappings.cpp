@@ -265,36 +265,46 @@ VkImageUsageFlags ToVkTextureUsage(RHI::TextureUsage u)
 VkAccessFlags2 ToVkAccess(RHI::MemoryAccess a)
 {
     VkAccessFlags2 flags = 0;
-    const auto u = static_cast<uint8_t>(a);
-    if (u & static_cast<uint8_t>(RHI::MemoryAccess::IndirectRead))  flags |= VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT;
-    if (u & static_cast<uint8_t>(RHI::MemoryAccess::IndexRead))     flags |= VK_ACCESS_2_INDEX_READ_BIT;
-    if (u & static_cast<uint8_t>(RHI::MemoryAccess::ShaderRead))    flags |= VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_UNIFORM_READ_BIT;
-    if (u & static_cast<uint8_t>(RHI::MemoryAccess::ShaderWrite))   flags |= VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
-    if (u & static_cast<uint8_t>(RHI::MemoryAccess::TransferRead))  flags |= VK_ACCESS_2_TRANSFER_READ_BIT;
-    if (u & static_cast<uint8_t>(RHI::MemoryAccess::TransferWrite)) flags |= VK_ACCESS_2_TRANSFER_WRITE_BIT;
-    if (u & static_cast<uint8_t>(RHI::MemoryAccess::HostRead))      flags |= VK_ACCESS_2_HOST_READ_BIT;
-    if (u & static_cast<uint8_t>(RHI::MemoryAccess::HostWrite))     flags |= VK_ACCESS_2_HOST_WRITE_BIT;
+    const auto u = static_cast<uint16_t>(a);
+    if (u & static_cast<uint16_t>(RHI::MemoryAccess::IndirectRead))         flags |= VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT;
+    if (u & static_cast<uint16_t>(RHI::MemoryAccess::IndexRead))            flags |= VK_ACCESS_2_INDEX_READ_BIT;
+    if (u & static_cast<uint16_t>(RHI::MemoryAccess::ShaderRead))           flags |= VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_UNIFORM_READ_BIT;
+    if (u & static_cast<uint16_t>(RHI::MemoryAccess::ShaderWrite))          flags |= VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+    if (u & static_cast<uint16_t>(RHI::MemoryAccess::TransferRead))         flags |= VK_ACCESS_2_TRANSFER_READ_BIT;
+    if (u & static_cast<uint16_t>(RHI::MemoryAccess::TransferWrite))        flags |= VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    if (u & static_cast<uint16_t>(RHI::MemoryAccess::HostRead))             flags |= VK_ACCESS_2_HOST_READ_BIT;
+    if (u & static_cast<uint16_t>(RHI::MemoryAccess::HostWrite))            flags |= VK_ACCESS_2_HOST_WRITE_BIT;
+    if (u & static_cast<uint16_t>(RHI::MemoryAccess::ColorAttachmentRead))  flags |= VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT;
+    if (u & static_cast<uint16_t>(RHI::MemoryAccess::ColorAttachmentWrite)) flags |= VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+    if (u & static_cast<uint16_t>(RHI::MemoryAccess::DepthStencilRead))     flags |= VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+    if (u & static_cast<uint16_t>(RHI::MemoryAccess::DepthStencilWrite))    flags |= VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
     return flags;
 }
 
 VkPipelineStageFlags2 ToVkStage(RHI::MemoryAccess a)
 {
-    const auto u = static_cast<uint8_t>(a);
+    const auto u = static_cast<uint16_t>(a);
     if (u == 0) return VK_PIPELINE_STAGE_2_NONE;
     VkPipelineStageFlags2 flags = 0;
-    if (u & static_cast<uint8_t>(RHI::MemoryAccess::IndirectRead))  flags |= VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT;
-    if (u & static_cast<uint8_t>(RHI::MemoryAccess::IndexRead))     flags |= VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT;
-    if (u & (static_cast<uint8_t>(RHI::MemoryAccess::ShaderRead) |
-             static_cast<uint8_t>(RHI::MemoryAccess::ShaderWrite)))
+    if (u & static_cast<uint16_t>(RHI::MemoryAccess::IndirectRead)) flags |= VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT;
+    if (u & static_cast<uint16_t>(RHI::MemoryAccess::IndexRead))    flags |= VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT;
+    if (u & (static_cast<uint16_t>(RHI::MemoryAccess::ShaderRead) |
+             static_cast<uint16_t>(RHI::MemoryAccess::ShaderWrite)))
         flags |= VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT
                | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT
                | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
-    if (u & (static_cast<uint8_t>(RHI::MemoryAccess::TransferRead) |
-             static_cast<uint8_t>(RHI::MemoryAccess::TransferWrite)))
+    if (u & (static_cast<uint16_t>(RHI::MemoryAccess::TransferRead) |
+             static_cast<uint16_t>(RHI::MemoryAccess::TransferWrite)))
         flags |= VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-    if (u & (static_cast<uint8_t>(RHI::MemoryAccess::HostRead) |
-             static_cast<uint8_t>(RHI::MemoryAccess::HostWrite)))
+    if (u & (static_cast<uint16_t>(RHI::MemoryAccess::HostRead) |
+             static_cast<uint16_t>(RHI::MemoryAccess::HostWrite)))
         flags |= VK_PIPELINE_STAGE_2_HOST_BIT;
+    if (u & (static_cast<uint16_t>(RHI::MemoryAccess::ColorAttachmentRead) |
+             static_cast<uint16_t>(RHI::MemoryAccess::ColorAttachmentWrite)))
+        flags |= VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    if (u & (static_cast<uint16_t>(RHI::MemoryAccess::DepthStencilRead) |
+             static_cast<uint16_t>(RHI::MemoryAccess::DepthStencilWrite)))
+        flags |= VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
     return flags;
 }
 

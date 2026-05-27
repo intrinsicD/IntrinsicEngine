@@ -92,10 +92,19 @@ void VulkanCommandContext::Begin()
     if (!CanBegin())
         return;
 
+    VkResult result = vkResetCommandBuffer(m_Cmd, 0u);
+    if (result != VK_SUCCESS)
+    {
+        NoteFallbackCommandRecordingAttempt();
+        Core::Log::Error("[VulkanCommandContext] vkResetCommandBuffer failed; recording skipped");
+        m_Recording = false;
+        return;
+    }
+
     VkCommandBufferBeginInfo ci{};
     ci.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     ci.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    const VkResult result = vkBeginCommandBuffer(m_Cmd, &ci);
+    result = vkBeginCommandBuffer(m_Cmd, &ci);
     if (result != VK_SUCCESS)
     {
         NoteFallbackCommandRecordingAttempt();

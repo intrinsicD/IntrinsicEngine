@@ -1,5 +1,5 @@
 #include <algorithm>
-#include <cstdint>
+#include <cstdlib>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -30,6 +30,12 @@ using Extrinsic::Core::Config::FrameRecipeKind;
 using Extrinsic::Graphics::RenderCommandPassStatus;
 using Extrinsic::Runtime::Engine;
 using Extrinsic::Runtime::IApplication;
+
+[[nodiscard]] bool BypassColdOperationalGateForDiagnosis() noexcept
+{
+    const char* value = std::getenv("INTRINSIC_DEFAULT_RECIPE_SMOKE_BYPASS_COLD_GATE");
+    return value != nullptr && std::string_view{value} == "1";
+}
 
 // GRAPHICS-076 Slice D — bounded `engine.Run()` driver mirroring the
 // MinimalDebug fixture's `ExitAfterFramesApp`. The smoke drives a small fixed
@@ -135,21 +141,24 @@ struct DefaultRecipeBootstrap
     // GRAPHICS-076 Slice D — additional default-recipe-specific gate. The
     // MinimalDebug bootstrap only checks logical-device/swapchain/command-sync
     // readiness because the minimal recipe needs nothing else; the default
-    // recipe additionally requires SMAA AreaTex upload + SelectionOutline +
-    // post-process pipelines to complete during Initialize before the
-    // operational gate flips. If those fail, the device remains non-
+    // recipe additionally requires all default-recipe uploads, pipelines,
+    // transient RHI resources, barriers, and frame-command lifetime rules to
+    // reconcile before the operational gate flips. If those fail, the device remains non-
     // operational and `engine.Run()` will spend ~30 seconds hitting the
     // slow `vkWaitForFences` / DeviceLost path before each frame, exceeding
     // the default 30s test timeout. Pre-check the operational status here so
-    // a non-operational host skips this fixture in <2 seconds instead.
+    // a non-operational host skips this fixture in <2 seconds instead. BUG-012
+    // diagnosis can opt into the pre-check-bypassed path with the environment
+    // variable below; default CI behavior stays fail-closed/skip-safe.
     const auto initStatus = EvaluateVulkanDeviceOperationalStatus(&enginePtr->GetDevice());
-    if (initStatus.Code != Extrinsic::Backends::Vulkan::VulkanOperationalStatusCode::Operational)
+    if (initStatus.Code != Extrinsic::Backends::Vulkan::VulkanOperationalStatusCode::Operational &&
+        !BypassColdOperationalGateForDiagnosis())
     {
         std::string reason = "Promoted Vulkan operational gate did not flip for the default recipe on this host: status=";
         reason.append(ToString(initStatus.Code));
         reason.append(" reason=");
         reason.append(ToString(initStatus.Reason));
-        reason.append(". The default recipe needs SMAA AreaTex upload + SelectionOutline pipeline + the rest of the post-process pipeline pack to land cleanly during Initialize; the MinimalDebug recipe does not. This skip is the expected state on hosts where any one of those bring-up steps fails. See GRAPHICS-076 Slice D notes for the running list of bring-up issues that gate this fixture from running for real.");
+        reason.append(". The default recipe needs all default-recipe uploads, pipelines, transient RHI resources, barriers, and frame-command lifetime rules to reconcile; the MinimalDebug recipe does not. This skip is the expected state on hosts where any one of those bring-up steps fails. See GRAPHICS-076 Slice D notes for the current blocker list and the opt-in BUG-012 diagnostic bypass.");
         enginePtr->Shutdown();
         return DefaultRecipeBootstrap{
             .EnginePtr = nullptr,

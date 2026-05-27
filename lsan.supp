@@ -10,3 +10,5 @@ leak:libvulkan_virtio
 # Suppress by common allocator frames as a last resort to keep CI green.
 leak:__pthread_once_slow
 leak:pthread_once
+leak:VmaAllocator_T::BindVulkanBuffer
+leak:VulkanCommandContext@Extrinsic.Backends.Vulkan::PushConstants

@@ -114,6 +114,33 @@ namespace Extrinsic::Graphics
             },
         };
 
+        constexpr RHI::ColorAttachment kDefaultClearColorAttachments[] = {
+            RHI::ColorAttachment{
+                .Target = RenderPassAttachmentToken(),
+                .Load = RHI::LoadOp::Clear,
+                .Store = RHI::StoreOp::Store,
+            },
+        };
+
+        constexpr RHI::ColorAttachment kDefaultLoadColorAttachments[] = {
+            RHI::ColorAttachment{
+                .Target = RenderPassAttachmentToken(),
+                .Load = RHI::LoadOp::Load,
+                .Store = RHI::StoreOp::Store,
+            },
+        };
+
+        constexpr RHI::ColorAttachment kDefaultClearTwoColorAttachments[] = {
+            RHI::ColorAttachment{.Target = RenderPassAttachmentToken(), .Load = RHI::LoadOp::Clear, .Store = RHI::StoreOp::Store},
+            RHI::ColorAttachment{.Target = RenderPassAttachmentToken(), .Load = RHI::LoadOp::Clear, .Store = RHI::StoreOp::Store},
+        };
+
+        constexpr RHI::ColorAttachment kDefaultClearThreeColorAttachments[] = {
+            RHI::ColorAttachment{.Target = RenderPassAttachmentToken(), .Load = RHI::LoadOp::Clear, .Store = RHI::StoreOp::Store},
+            RHI::ColorAttachment{.Target = RenderPassAttachmentToken(), .Load = RHI::LoadOp::Clear, .Store = RHI::StoreOp::Store},
+            RHI::ColorAttachment{.Target = RenderPassAttachmentToken(), .Load = RHI::LoadOp::Clear, .Store = RHI::StoreOp::Store},
+        };
+
         // GRAPHICS-077 Slice A — LOAD-store color attachment template for
         // the `TransientDebugSurfacePass` render-pass desc. The lit
         // composition must survive into the postprocess chain, so the
@@ -733,6 +760,13 @@ namespace Extrinsic::Graphics
                 builder.Read(drawIndirect, BufferUsage::IndirectRead);
                 builder.Read(drawCount, BufferUsage::IndirectRead);
                 builder.Write(depth, TextureUsage::DepthWrite);
+                builder.SetRenderPass(RHI::RenderPassDesc{
+                    .Depth = RHI::DepthAttachment{
+                        .Target = RenderPassAttachmentToken(),
+                        .Load = RHI::LoadOp::Clear,
+                        .Store = RHI::StoreOp::Store,
+                    },
+                });
             });
         }
 
@@ -760,6 +794,14 @@ namespace Extrinsic::Graphics
                 builder.Write(entityId, TextureUsage::ColorAttachmentWrite);
                 builder.Write(primitiveId, TextureUsage::ColorAttachmentWrite);
                 builder.Write(pickingReadback, BufferUsage::TransferDst);
+                builder.SetRenderPass(RHI::RenderPassDesc{
+                    .ColorTargets = kDefaultClearTwoColorAttachments,
+                    .Depth = RHI::DepthAttachment{
+                        .Target = RenderPassAttachmentToken(),
+                        .Load = RHI::LoadOp::Load,
+                        .Store = RHI::StoreOp::Store,
+                    },
+                });
                 builder.SideEffect();
             });
         }
@@ -770,6 +812,13 @@ namespace Extrinsic::Graphics
                 builder.Read(drawIndirect, BufferUsage::IndirectRead);
                 builder.Read(drawCount, BufferUsage::IndirectRead);
                 builder.Write(shadowAtlas, TextureUsage::DepthWrite);
+                builder.SetRenderPass(RHI::RenderPassDesc{
+                    .Depth = RHI::DepthAttachment{
+                        .Target = RenderPassAttachmentToken(),
+                        .Load = RHI::LoadOp::Clear,
+                        .Store = RHI::StoreOp::Store,
+                    },
+                });
             });
         }
 
@@ -810,6 +859,25 @@ namespace Extrinsic::Graphics
             {
                 builder.Write(hdr, TextureUsage::ColorAttachmentWrite);
             }
+            const RHI::DepthAttachment surfaceDepthAttachment{
+                .Target = RenderPassAttachmentToken(),
+                .Load = features.EnableDepthPrepass ? RHI::LoadOp::Load : RHI::LoadOp::Clear,
+                .Store = RHI::StoreOp::Store,
+            };
+            if (usesDeferred)
+            {
+                builder.SetRenderPass(RHI::RenderPassDesc{
+                    .ColorTargets = kDefaultClearThreeColorAttachments,
+                    .Depth = surfaceDepthAttachment,
+                });
+            }
+            else
+            {
+                builder.SetRenderPass(RHI::RenderPassDesc{
+                    .ColorTargets = kDefaultClearColorAttachments,
+                    .Depth = surfaceDepthAttachment,
+                });
+            }
         });
 
         if (usesDeferred)
@@ -839,6 +907,9 @@ namespace Extrinsic::Graphics
                     builder.Read(shadowAtlas, TextureUsage::ShaderRead);
                 }
                 builder.Write(hdr, TextureUsage::ColorAttachmentWrite);
+                builder.SetRenderPass(RHI::RenderPassDesc{
+                    .ColorTargets = kDefaultClearColorAttachments,
+                });
             });
         }
 
@@ -847,6 +918,14 @@ namespace Extrinsic::Graphics
             builder.Read(lineDrawIndirect, BufferUsage::IndirectRead);
             builder.Read(lineDrawCount, BufferUsage::IndirectRead);
             builder.Write(hdr, TextureUsage::ColorAttachmentWrite);
+            builder.SetRenderPass(RHI::RenderPassDesc{
+                .ColorTargets = kDefaultLoadColorAttachments,
+                .Depth = RHI::DepthAttachment{
+                    .Target = RenderPassAttachmentToken(),
+                    .Load = RHI::LoadOp::Load,
+                    .Store = RHI::StoreOp::Store,
+                },
+            });
         });
 
         addOrderedPass("PointPass", [=](RenderGraphBuilder& builder) {
@@ -854,6 +933,14 @@ namespace Extrinsic::Graphics
             builder.Read(pointDrawIndirect, BufferUsage::IndirectRead);
             builder.Read(pointDrawCount, BufferUsage::IndirectRead);
             builder.Write(hdr, TextureUsage::ColorAttachmentWrite);
+            builder.SetRenderPass(RHI::RenderPassDesc{
+                .ColorTargets = kDefaultLoadColorAttachments,
+                .Depth = RHI::DepthAttachment{
+                    .Target = RenderPassAttachmentToken(),
+                    .Load = RHI::LoadOp::Load,
+                    .Store = RHI::StoreOp::Store,
+                },
+            });
         });
 
         // GRAPHICS-077 Slice A — scaffold-only `TransientDebugSurfacePass`.
@@ -976,21 +1063,33 @@ namespace Extrinsic::Graphics
             });
             addOrderedPass("PostProcessPass", [=](RenderGraphBuilder& builder) {
                 builder.Read(hdr, TextureUsage::ShaderRead);
-                builder.Write(postProcessBloomScratch, TextureUsage::ColorAttachmentWrite);
                 builder.Write(ldr, TextureUsage::ColorAttachmentWrite);
+                builder.Write(postProcessBloomScratch, TextureUsage::ColorAttachmentWrite);
+                builder.SetRenderPass(RHI::RenderPassDesc{
+                    .ColorTargets = kDefaultClearColorAttachments,
+                });
             });
             addOrderedPass("PostProcessAAEdgePass", [=](RenderGraphBuilder& builder) {
                 builder.Read(ldr, TextureUsage::ShaderRead);
                 builder.Write(postProcessAATempEdges, TextureUsage::ColorAttachmentWrite);
+                builder.SetRenderPass(RHI::RenderPassDesc{
+                    .ColorTargets = kDefaultClearColorAttachments,
+                });
             });
             addOrderedPass("PostProcessAABlendPass", [=](RenderGraphBuilder& builder) {
                 builder.Read(postProcessAATempEdges, TextureUsage::ShaderRead);
                 builder.Write(postProcessAATempWeights, TextureUsage::ColorAttachmentWrite);
+                builder.SetRenderPass(RHI::RenderPassDesc{
+                    .ColorTargets = kDefaultClearColorAttachments,
+                });
             });
             addOrderedPass("PostProcessAAResolvePass", [=](RenderGraphBuilder& builder) {
                 builder.Read(ldr, TextureUsage::ShaderRead);
                 builder.Read(postProcessAATempWeights, TextureUsage::ShaderRead);
                 builder.Write(postProcessAATempResolved, TextureUsage::ColorAttachmentWrite);
+                builder.SetRenderPass(RHI::RenderPassDesc{
+                    .ColorTargets = kDefaultClearColorAttachments,
+                });
             });
             presentSource = features.EnableAntiAliasing ? postProcessAATempResolved : ldr;
         }
@@ -1003,6 +1102,14 @@ namespace Extrinsic::Graphics
                 builder.Read(entityId, TextureUsage::ShaderRead);
                 builder.Read(depth, TextureUsage::DepthRead);
                 builder.Write(selectionOutline, TextureUsage::ColorAttachmentWrite);
+                builder.SetRenderPass(RHI::RenderPassDesc{
+                    .ColorTargets = kDefaultClearColorAttachments,
+                    .Depth = RHI::DepthAttachment{
+                        .Target = RenderPassAttachmentToken(),
+                        .Load = RHI::LoadOp::Load,
+                        .Store = RHI::StoreOp::Store,
+                    },
+                });
             });
             presentSource = selectionOutline;
         }
@@ -1013,6 +1120,9 @@ namespace Extrinsic::Graphics
             addOrderedPass("DebugViewPass", [=](RenderGraphBuilder& builder) {
                 builder.Read(input, TextureUsage::ShaderRead);
                 builder.Write(debugView, TextureUsage::ColorAttachmentWrite);
+                builder.SetRenderPass(RHI::RenderPassDesc{
+                    .ColorTargets = kDefaultClearColorAttachments,
+                });
             });
             presentSource = debugView;
         }

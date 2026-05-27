@@ -87,7 +87,11 @@ available through the Vulkan 1.2/1.3 feature chain.
   pointers, sizes, buffer ranges, texture mip/layer bounds, transfer-dst usage,
   and staging allocation before recording commands. Submitted command buffers are
   retained until the timeline semaphore reports completion, then reclaimed by
-  `CollectCompleted()` with the staging-belt allocation.
+  `CollectCompleted()` with the staging-belt allocation. Texture-upload final
+  layout transitions are recorded on the transfer command pool, so their
+  destination stage/access scopes must remain transfer-queue-valid; shader-stage
+  visibility is established later by graphics/renderer-side use barriers rather
+  than by naming fragment/compute stages on a transfer-only command buffer.
 - `VulkanDevice::CreatePipeline()` now has a guarded concrete Vulkan path once
   bootstrap has produced a logical device and global pipeline layout. It reads
   SPIR-V shader files from `RHI::PipelineDesc`, creates shader modules, and builds

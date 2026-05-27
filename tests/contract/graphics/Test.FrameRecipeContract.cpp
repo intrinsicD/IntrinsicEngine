@@ -87,6 +87,24 @@ namespace
     {
         return std::ranges::find(values, value) != values.end();
     }
+
+    [[nodiscard]] bool IsDepthBarrierState(const TextureBarrierState state) noexcept
+    {
+        return state == TextureBarrierState::DepthRead || state == TextureBarrierState::DepthWrite;
+    }
+
+    [[nodiscard]] bool HasCompiledRenderPassAttachment(const CompiledRenderGraph& compiled,
+                                                       const std::string_view passName)
+    {
+        for (const CompiledRenderPassAttachment& attachment : compiled.RenderPassAttachments)
+        {
+            if (attachment.PassIndex < compiled.PassNames.size() && compiled.PassNames[attachment.PassIndex] == passName)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
 }
 
 TEST(FrameRecipeContract, DefaultRecipeBuildsCanonicalPassOrder)
@@ -97,7 +115,6 @@ TEST(FrameRecipeContract, DefaultRecipeBuildsCanonicalPassOrder)
         FrameRecipeFeatures{},
         MakeImports(),
         FrameRecipeSizing{.Width = 1280u, .Height = 720u});
-
     ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
 
     const auto compiled = graph.Compile();
@@ -139,6 +156,47 @@ TEST(FrameRecipeContract, DefaultRecipeBuildsCanonicalPassOrder)
     EXPECT_EQ(build.DeclaredPassCount, expected.size());
 }
 
+TEST(FrameRecipeContract, DefaultRecipeDoesNotDepthTransitionColorResources)
+{
+    RenderGraph graph;
+    FrameRecipeFeatures features{};
+    features.EnablePicking = true;
+    features.EnableShadows = true;
+    features.EnableSelectionOutline = true;
+    features.EnablePostProcess = true;
+    features.EnableAntiAliasing = true;
+    features.EnableTransientDebugSurface = true;
+    features.EnableVisualizationOverlay = true;
+
+    const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
+        graph,
+        features,
+        MakeImports(),
+        FrameRecipeSizing{.Width = 256u, .Height = 256u});
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+
+    for (const BarrierPacket& packet : compiled->BarrierPackets)
+    {
+        for (const TextureBarrierPacket& barrier : packet.TextureBarriers)
+        {
+            if (!IsDepthBarrierState(barrier.Before) && !IsDepthBarrierState(barrier.After))
+            {
+                continue;
+            }
+
+            ASSERT_LT(barrier.TextureIndex, compiled->TextureNames.size());
+            const std::string& name = compiled->TextureNames[barrier.TextureIndex];
+            EXPECT_TRUE(name == "SceneDepth" || name == "ShadowAtlas")
+                << "Texture \"" << name << "\" received a depth barrier in pass index "
+                << packet.PassIndex << ": before=" << static_cast<int>(barrier.Before)
+                << " after=" << static_cast<int>(barrier.After);
+        }
+    }
+}
+
 TEST(FrameRecipeContract, DefaultRecipeCompiledGraphHasNoValidationFindings)
 {
     RenderGraph graph;
@@ -165,6 +223,54 @@ TEST(FrameRecipeContract, DefaultRecipeCompiledGraphHasNoValidationFindings)
     EXPECT_EQ(validation.CountBySeverity(RenderGraphValidationSeverity::Error), 0u);
     EXPECT_EQ(validation.CountBySeverity(RenderGraphValidationSeverity::Warning), 0u);
     EXPECT_TRUE(validation.Findings.empty());
+}
+
+TEST(FrameRecipeContract, DefaultRecipeDrawPassesDeclareRenderPassAttachments)
+{
+    RenderGraph graph;
+    FrameRecipeFeatures features{};
+    features.EnablePicking = true;
+    features.EnableShadows = true;
+    features.EnableSelectionOutline = true;
+    features.EnableDebugView = true;
+    features.EnableAntiAliasing = true;
+    features.EnableTransientDebugSurface = true;
+    features.EnableVisualizationOverlay = true;
+
+    const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
+        graph,
+        features,
+        MakeImports(),
+        FrameRecipeSizing{.Width = 1280u, .Height = 720u});
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+
+    const std::vector<std::string_view> drawPasses{
+        "DepthPrepass",
+        "PickingPass",
+        "ShadowPass",
+        "SurfacePass",
+        "LinePass",
+        "PointPass",
+        "TransientDebugSurfacePass",
+        "VisualizationOverlayPass",
+        "PostProcessPass",
+        "PostProcessAAEdgePass",
+        "PostProcessAABlendPass",
+        "PostProcessAAResolvePass",
+        "SelectionOutlinePass",
+        "DebugViewPass",
+        "Present",
+    };
+
+    for (const std::string_view passName : drawPasses)
+    {
+        EXPECT_TRUE(HasCompiledRenderPassAttachment(*compiled, passName))
+            << "Default-recipe graphics pass \"" << passName
+            << "\" compiled without a render-pass attachment; Vulkan draw commands would record outside dynamic rendering.";
+    }
 }
 
 TEST(FrameRecipeContract, OptionalResourcesAreGatedByFeatures)

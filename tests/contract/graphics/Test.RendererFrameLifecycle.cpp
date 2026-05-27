@@ -916,9 +916,9 @@ TEST(RendererFrameLifecycle, ForwardLinePointPipelinesSurviveOperationalRebuild)
     EXPECT_TRUE(initialPointPipeline.IsValid());
 
     const Extrinsic::RHI::PipelineDesc initialLineDesc = renderer->GetForwardLinePipelineDesc();
-    EXPECT_TRUE(initialLineDesc.VertexShaderPath.ends_with("shaders/line.vert.spv"))
+    EXPECT_TRUE(initialLineDesc.VertexShaderPath.ends_with("shaders/forward/line.vert.spv"))
         << initialLineDesc.VertexShaderPath;
-    EXPECT_TRUE(initialLineDesc.FragmentShaderPath.ends_with("shaders/line.frag.spv"))
+    EXPECT_TRUE(initialLineDesc.FragmentShaderPath.ends_with("shaders/forward/line.frag.spv"))
         << initialLineDesc.FragmentShaderPath;
     EXPECT_EQ(initialLineDesc.PrimitiveTopology, Extrinsic::RHI::Topology::LineList);
     EXPECT_EQ(initialLineDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::None);
@@ -931,9 +931,9 @@ TEST(RendererFrameLifecycle, ForwardLinePointPipelinesSurviveOperationalRebuild)
     EXPECT_EQ(initialLineDesc.PushConstantSize, sizeof(Extrinsic::RHI::GpuScenePushConstants));
 
     const Extrinsic::RHI::PipelineDesc initialPointDesc = renderer->GetForwardPointPipelineDesc();
-    EXPECT_TRUE(initialPointDesc.VertexShaderPath.ends_with("shaders/point.vert.spv"))
+    EXPECT_TRUE(initialPointDesc.VertexShaderPath.ends_with("shaders/forward/point.vert.spv"))
         << initialPointDesc.VertexShaderPath;
-    EXPECT_TRUE(initialPointDesc.FragmentShaderPath.ends_with("shaders/point_retained.frag.spv"))
+    EXPECT_TRUE(initialPointDesc.FragmentShaderPath.ends_with("shaders/forward/point.frag.spv"))
         << initialPointDesc.FragmentShaderPath;
     EXPECT_EQ(initialPointDesc.PrimitiveTopology, Extrinsic::RHI::Topology::PointList);
     EXPECT_EQ(initialPointDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::None);

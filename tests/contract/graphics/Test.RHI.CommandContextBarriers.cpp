@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <array>
+#include <cstdint>
 
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Handles;
@@ -110,4 +111,16 @@ TEST(RHICommandContext, SubmitBarriersFallbackRoutesTextureAndBufferBarriers)
     EXPECT_EQ(context.BufferCalls[0].Buffer.Index, 9u);
     EXPECT_EQ(context.BufferCalls[0].Before, Extrinsic::RHI::MemoryAccess::ShaderWrite);
     EXPECT_EQ(context.BufferCalls[0].After, Extrinsic::RHI::MemoryAccess::IndirectRead);
+}
+
+TEST(RHICommandContext, MemoryAccessCombinesAttachmentBitsWithoutTruncation)
+{
+    const auto combined = Extrinsic::RHI::MemoryAccess::ColorAttachmentWrite |
+                          Extrinsic::RHI::MemoryAccess::DepthStencilRead |
+                          Extrinsic::RHI::MemoryAccess::TransferWrite;
+    const auto bits = static_cast<std::uint16_t>(combined);
+
+    EXPECT_NE(bits & static_cast<std::uint16_t>(Extrinsic::RHI::MemoryAccess::ColorAttachmentWrite), 0u);
+    EXPECT_NE(bits & static_cast<std::uint16_t>(Extrinsic::RHI::MemoryAccess::DepthStencilRead), 0u);
+    EXPECT_NE(bits & static_cast<std::uint16_t>(Extrinsic::RHI::MemoryAccess::TransferWrite), 0u);
 }

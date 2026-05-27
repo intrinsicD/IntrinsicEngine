@@ -650,6 +650,24 @@ namespace Extrinsic::Graphics
         return &m_Impl->Buffers[ref.Index];
     }
 
+    const TextureResourceDesc* RenderGraph::GetTextureDescByIndex(const std::uint32_t index) const
+    {
+        if (!m_Impl || index >= m_Impl->Textures.size())
+        {
+            return nullptr;
+        }
+        return &m_Impl->Textures[index];
+    }
+
+    const BufferResourceDesc* RenderGraph::GetBufferDescByIndex(const std::uint32_t index) const
+    {
+        if (!m_Impl || index >= m_Impl->Buffers.size())
+        {
+            return nullptr;
+        }
+        return &m_Impl->Buffers[index];
+    }
+
     void RenderGraph::Reset()
     {
         if (!m_Impl)

@@ -8,8 +8,7 @@
 layout(location = 0) in vec2 vUV;
 layout(location = 0) out vec4 outColor;
 
-layout(set = 0, binding = 0) uniform sampler2D uInput;       // Original LDR color
-layout(set = 0, binding = 1) uniform sampler2D uBlendWeights; // SMAA blend weights
+layout(set = 0, binding = 0) uniform sampler2D uTextures[];
 
 layout(push_constant) uniform Push
 {
@@ -25,14 +24,14 @@ void main()
 
     // Fetch blend weights for this pixel and neighbors.
     vec4 a;
-    a.x = texture(uBlendWeights, uv + vec2( 0.0, -1.0) * rcp).a; // top neighbor's bottom weight
-    a.y = texture(uBlendWeights, uv + vec2(-1.0,  0.0) * rcp).g; // left neighbor's right weight
-    a.wz = texture(uBlendWeights, uv).xz; // current pixel: (right weight, bottom weight)
+    a.x = texture(uTextures[0], uv + vec2( 0.0, -1.0) * rcp).a; // top neighbor's bottom weight
+    a.y = texture(uTextures[0], uv + vec2(-1.0,  0.0) * rcp).g; // left neighbor's right weight
+    a.wz = texture(uTextures[0], uv).xz; // current pixel: (right weight, bottom weight)
 
     // If no blending is needed, output the center pixel.
     if (dot(a, vec4(1.0)) < 1e-5)
     {
-        outColor = vec4(texture(uInput, uv).rgb, 1.0);
+        outColor = vec4(texture(uTextures[0], uv).rgb, 1.0);
         return;
     }
 
@@ -56,8 +55,8 @@ void main()
     vec2 blendingCoord2 = blendingOffset.zw * vec2(1.0, -1.0) * rcp + uv;
 
     // Blend the two neighbors.
-    vec3 color = blendingWeight.x * texture(uInput, blendingCoord).rgb
-               + blendingWeight.y * texture(uInput, blendingCoord2).rgb;
+    vec3 color = blendingWeight.x * texture(uTextures[0], blendingCoord).rgb
+               + blendingWeight.y * texture(uTextures[0], blendingCoord2).rgb;
 
     outColor = vec4(color, 1.0);
 }

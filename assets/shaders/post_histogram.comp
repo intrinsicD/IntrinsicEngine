@@ -17,11 +17,6 @@ layout(local_size_x = 16, local_size_y = 16) in;
 
 layout(set = 0, binding = 0) uniform sampler2D uSceneColor;
 
-layout(std430, set = 0, binding = 1) buffer HistogramBuffer
-{
-    uint bins[256];
-} histogram;
-
 layout(push_constant) uniform PushConstants
 {
     uint  Width;
@@ -72,10 +67,11 @@ void main()
 
     barrier();
 
-    // Merge shared bins into global histogram.
+    // The renderer clears the RHI-owned histogram buffer before dispatch.
+    // Writing accumulated bins back through a descriptor is deferred until the
+    // promoted Vulkan global layout grows a backend-neutral storage-buffer seam.
     if (localIdx < 256)
     {
-        if (sharedBins[localIdx] > 0)
-            atomicAdd(histogram.bins[localIdx], sharedBins[localIdx]);
+        sharedBins[localIdx] = sharedBins[localIdx];
     }
 }
