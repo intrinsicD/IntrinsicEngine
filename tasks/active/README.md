@@ -11,16 +11,6 @@ Each active task should include:
 
 ## Currently active
 
-- [`GEOM-008`](GEOM-008-linear-algebra-solver-infrastructure.md) — Geometry
-  linear algebra and solver infrastructure. Status: implementation complete for
-  Slice A; pending commit/PR retirement to `tasks/done/`. Promoted from
-  `tasks/backlog/geometry/` on 2026-05-27 for the Eigen3 + reusable sparse/dense
-  CPU numerical infrastructure slice. Owner: GitHub Copilot; branch: `main`
-  working tree. Verification completed 2026-05-27: `tools/setup/populate_deps.sh --refresh`,
-  `cmake --preset ci`, `cmake --build --preset ci --target IntrinsicGeometryTests`,
-  focused geometry CTest filter, module-inventory regeneration, layering/test-layout,
-  docs-link, task-policy checks, `cmake --build --preset ci --target IntrinsicTests`,
-  and the default CPU-supported CTest gate.
 - [`GRAPHICS-076`](GRAPHICS-076-default-recipe-debug-view-and-present-wiring.md) —
   Default-recipe `Pass.DebugView` and canonical `Pass.Present` wiring.
   Status: blocked on operational default-recipe Vulkan bring-up
@@ -122,3 +112,17 @@ in [`tasks/backlog/README.md`](../backlog/README.md) won —
 + per-frame stats; five new integration tests pass under the default
 CPU/null gate; 2245/2247 overall, the two pre-existing
 `IntrinsicBenchmarkSmoke.HalfedgeSmoke` failures unchanged).
+
+[`GEOM-008`](../done/GEOM-008-linear-algebra-solver-infrastructure.md) —
+Geometry linear algebra and solver infrastructure retired to
+`tasks/done/` on 2026-05-27 after Slice A landed in commit `c1aeafb`
+(merged into the working tree via `cfe2f0c`). Slice A introduced the
+Eigen3 dependency, the narrow `Geometry.Linalg` Eigen-backed dense/
+adapter module, the reusable `Geometry.Sparse` CSR/builder/diagnostics/CG
+module, and bridged `Geometry.DEC` CSR/CG to the new sparse layer.
+Closes maturity at `CPUContracted`; no GPU/SuiteSparse/CHOLMOD backend
+is owed by this task (recorded as later optional follow-ups in
+`docs/architecture/geometry.md`). Verified on 2026-05-27 against the
+default CPU gate (`ctest -LE 'gpu|vulkan|slow|flaky-quarantine'`)
+together with the layering, test-layout, docs-links, task-policy, and
+module-inventory regeneration checks.

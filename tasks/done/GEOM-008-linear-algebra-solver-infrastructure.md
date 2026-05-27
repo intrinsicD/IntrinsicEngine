@@ -9,16 +9,47 @@
 - No broad rewrite of existing DEC/geodesic/parameterization algorithms in the dependency-introduction patch.
 - No performance claims without benchmark baselines.
 
+## Status
+- Status: done.
+- Completed: 2026-05-27.
+- Commit: `c1aeafb` — Slice A: add Eigen3 dependency; introduce
+  `Geometry.Linalg` (narrow, explicit-import Eigen-backed dense/adapter
+  module) and `Geometry.Sparse` (reusable CSR/builder/diagnostics/CG
+  module); bridge `Geometry.DEC` CSR/CG to the new sparse layer; unit
+  coverage for adapters, dense decompositions, sparse builder, and CG
+  breakdown; docs and generated module inventory updates. Merged into
+  the working tree via `cfe2f0c`.
+- PR: pending — retirement commit lands on
+  `claude/intelligent-dirac-1Kerw` together with this task move.
+- Branch (retirement): `claude/intelligent-dirac-1Kerw`.
+- Closes maturity at `CPUContracted`: the geometry numerical
+  infrastructure seam is covered by deterministic CPU/null unit tests
+  (`Test.LinearAlgebra.cpp`, `Test.Sparse.cpp`, the existing DEC /
+  Geodesic / VectorHeatMethod / Parameterization batteries) that run in
+  the default CPU gate.
+- Follow-ups owning capability NOT delivered by this slice (named per
+  the `CPUContracted` closure rule so reviewers can see which method
+  seams remain gated):
+  - [`GEOM-016`](../backlog/geometry/GEOM-016-sparse-direct-factorization-seam.md)
+    owns the direct sparse SPD factorization seam (`SimplicialLDLT` /
+    `SimplicialLLT`) that `tasks/backlog/methods/METHOD-002` (step 2)
+    and `METHOD-003` (step 5) name as "the LDLT path from `GEOM-008`".
+    Until GEOM-016 lands, those method packages must not be promoted
+    on the assumption that the LDLT seam is available from this task.
+  - The sparse symmetric (generalized) eigensolver seam referenced by
+    `tasks/backlog/methods/METHOD-006` step 4 (LOBPCG / shift-invert)
+    is **not** owned by this task and is **not** owned by GEOM-016.
+    It needs Spectra (an Eigen-companion library) and a different API
+    surface; a separate follow-up task should be filed when METHOD-006
+    becomes the next-priority method.
+  - Optional SuiteSparse / CHOLMOD / Pardiso backends remain deferred
+    as documented in `docs/architecture/geometry.md` and are not owed
+    by GEOM-016 either.
+
 ## Context
-- Status: in-progress.
 - Owner/agent: GitHub Copilot.
-- Branch: `main` working tree.
-- Promoted from `tasks/backlog/geometry/` on 2026-05-27.
-- Current maturity: `CPUContracted` for the CPU geometry numerical infrastructure
-  seam. The task remains active until commit/PR retirement; no GPU/backend
-  operational claim is made.
-- Next verification step: commit/PR review and retirement to `tasks/done/` after
-  a commit/PR reference exists.
+- Promoted from `tasks/backlog/geometry/` on 2026-05-27 (work landed on
+  `main` before the retirement commit on `claude/intelligent-dirac-1Kerw`).
 - Owning subsystem/layer: `geometry` (`geometry -> core` plus declared third-party numerical dependency).
 - Seeded by [`docs/reviews/2026-05-12-src-geometry-gap-analysis.md`](../../docs/reviews/2026-05-12-src-geometry-gap-analysis.md).
 - Current dependency configuration wires GLM but not Eigen3. The review recommends a hybrid policy: GLM remains engine-facing storage; Eigen3 provides mature dense/sparse numerical kernels internally.

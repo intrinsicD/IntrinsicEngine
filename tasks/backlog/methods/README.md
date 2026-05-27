@@ -41,10 +41,19 @@ map.
   [`docs/reviews/2026-05-12-src-geometry-gap-analysis.md`](../../../docs/reviews/2026-05-12-src-geometry-gap-analysis.md).
   Each task lists explicit algorithm variants and requires the maintainer to mark
   one as the public-facing default backend before implementation begins.
-- Ordering: METHOD-002, METHOD-003, METHOD-004 can proceed in parallel once
-  [`geometry/GEOM-008`](../geometry/GEOM-008-linear-algebra-solver-infrastructure.md)
-  exposes the sparse-solver seam. METHOD-005 and METHOD-007 both wait on
+- Ordering: [`geometry/GEOM-008`](../../done/GEOM-008-linear-algebra-solver-infrastructure.md)
+  retired 2026-05-27 at `CPUContracted` shipping the CSR builder + CG /
+  shifted-CG iterative solver. The direct sparse SPD factorization
+  (LDLT/LLT) path that METHOD-002 (step 2) and METHOD-003 (step 5)
+  name is owed by the follow-up
+  [`geometry/GEOM-016`](../geometry/GEOM-016-sparse-direct-factorization-seam.md);
+  METHOD-002 and METHOD-003 must wait on `GEOM-016`, not on retired
+  `GEOM-008`. METHOD-004 needs no LDLT path and may proceed against
+  retired `GEOM-008` directly. METHOD-005 and METHOD-007 both wait on
   [`geometry/GEOM-007`](../geometry/GEOM-007-robust-predicates-intersection-classification.md).
-  METHOD-006 has no hard gate beyond `GEOM-008`.
+  METHOD-006 step 4 needs a sparse symmetric generalized eigensolver
+  (LOBPCG / shift-invert) which is shipped by neither GEOM-008 nor
+  GEOM-016; a separate eigensolver follow-up must be filed before
+  METHOD-006 can promote on variant B.
 - Forbidden: importing runtime, graphics, platform, app, or live ECS ownership
   into a method package; claiming performance wins without a baseline.

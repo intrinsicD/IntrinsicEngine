@@ -12,7 +12,7 @@ map.
 - [GEOIO-002 — Geometry IO parity hardening and exporters](../../done/GEOIO-002-geometry-io-parity-hardening.md) (done).
 - [GEOM-006 — Indexed mesh/soup container and conversion contracts](../../done/GEOM-006-indexed-mesh-soup-conversion-contracts.md) (done).
 - [GEOM-007 — Robust predicates and intersection classification foundation](../../done/GEOM-007-robust-predicates-intersection-classification.md) (done).
-- [GEOM-008 — Geometry linear algebra and solver infrastructure](../../active/GEOM-008-linear-algebra-solver-infrastructure.md) (active).
+- [GEOM-008 — Geometry linear algebra and solver infrastructure](../../done/GEOM-008-linear-algebra-solver-infrastructure.md) (done).
 - [GEOM-009 — Geometry benchmark manifests, fixtures, and smoke benchmark](../../done/GEOM-009-benchmark-manifests-fixtures-smoke.md) (done).
 - [GEOM-010 — Point-cloud algorithm pack roadmap](GEOM-010-point-cloud-algorithm-pack-roadmap.md).
 - [GEOM-011 — Parameterization and mapping roadmap](GEOM-011-parameterization-mapping-roadmap.md).
@@ -20,6 +20,9 @@ map.
 - [GEOM-013 — Feature-preserving dual contouring](GEOM-013-feature-preserving-dual-contouring.md).
 - [GEOM-014 — Feature-aware quadric error mesh simplification](GEOM-014-feature-aware-quadric-error-simplification.md).
 - [GEOM-015 — GJK termination diagnostics and scale-aware tolerance policy](../../done/GEOM-015-gjk-termination-diagnostics.md) (done).
+- [GEOM-016 — Sparse direct factorization solver seam (LDLT/LLT)](GEOM-016-sparse-direct-factorization-seam.md)
+  (follow-up to retired `GEOM-008`; gates `methods/METHOD-002` /
+  `METHOD-003` LDLT paths).
 - [RORG-031E — Geometry and method-readiness backlog seed](RORG-031-geometry-method-readiness.md).
 
 ## Convergence
@@ -39,6 +42,11 @@ map.
   [`tasks/done/`](../../done/GEOM-009-benchmark-manifests-fixtures-smoke.md)
   and provides the manifest-driven smoke harness future geometry method
   packages plug into.
+- GEOM-016 is the named follow-up to retired GEOM-008 for the direct
+  sparse SPD factorization (LDLT/LLT) seam that GEOM-008 deferred but
+  that methods/METHOD-002 (step 2) and METHOD-003 (step 5) already
+  reference as "the LDLT path from GEOM-008". Method tasks gated on the
+  LDLT path must wait on GEOM-016, not on retired GEOM-008.
 - GEOM-010 and GEOM-011 turn point-cloud and parameterization gaps into
   method-compliant roadmap packs before algorithm implementation begins.
 - GEOM-012 ensures mesh, graph, and point-cloud algorithms can share compatible

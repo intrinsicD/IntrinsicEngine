@@ -15,7 +15,7 @@
 - Method package: `methods/geometry/closest_point_pde/`.
 - Paper: see Variants below.
 - Seeded by [`docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md`](../../../docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md) Tier 1 #2.
-- Reuses `Geometry.Grid`, `Geometry.SDF`, `Geometry.KDTree` / `Geometry.BVH` (closest-point oracle), and the sparse-solver seam from [`GEOM-008`](../geometry/GEOM-008-linear-algebra-solver-infrastructure.md).
+- Reuses `Geometry.Grid`, `Geometry.SDF`, `Geometry.KDTree` / `Geometry.BVH` (closest-point oracle), the CSR builder / CG iterative solver from retired [`GEOM-008`](../../done/GEOM-008-linear-algebra-solver-infrastructure.md), and the direct sparse SPD factorization (LDLT/LLT) seam owed by follow-up [`GEOM-016`](../geometry/GEOM-016-sparse-direct-factorization-seam.md). The `L_band` operator assembled in Step 5 is non-symmetric for the closest-point-extension formulation, so the practical solver path is BiCGSTAB / GMRES — neither is shipped today; a separate non-symmetric sparse-solver follow-up may be required before this task can promote. Capture that decision in the slice plan before promoting.
 - Symmetric-domain-views work in [`GEOM-012`](../geometry/GEOM-012-symmetric-domain-views-property-sharing.md) is a soft prerequisite: this method must accept a `ClosestPoint` interface backed by any of: halfedge mesh, point cloud, or implicit SDF.
 
 ## Variants and default selection
@@ -67,7 +67,7 @@ Default recommendation: **A**.
 - [ ] Step 2: assemble Laplacian on the grid using standard 7-point stencil (3D) restricted to the band.
 - [ ] Step 3: implement the closest-point extension operator (barycentric / Lagrange interpolation at closest points).
 - [ ] Step 4: variant A — partition stencils across interior BC curves following §3 of arXiv:2305.04711.
-- [ ] Step 5: solve `L_band X = b` via the LDLT / iterative path from `GEOM-008`.
+- [ ] Step 5: solve `L_band X = b`. If `L_band` is SPD for the chosen formulation, use the LDLT path from [`GEOM-016`](../geometry/GEOM-016-sparse-direct-factorization-seam.md) (`Geometry.Sparse::SparseLDLT`). Otherwise use the CG path from retired [`GEOM-008`](../../done/GEOM-008-linear-algebra-solver-infrastructure.md) only when it converges in the test cases — a non-symmetric iterative solver (BiCGSTAB / GMRES) is **not** shipped by either GEOM-008 or GEOM-016 and a separate follow-up task must be filed before promotion if the variant chosen above requires one.
 
 ### Closest-point oracle adapters
 - [ ] Add adapter `Geometry::ClosestPointPDE::OracleFromHalfedgeMesh` using existing `Geometry.BVH`.
