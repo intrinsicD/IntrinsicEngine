@@ -368,6 +368,7 @@ set(_geometry_test_files
     Test.LinearAlgebra.cpp
     Test.Sparse.cpp
     Test_SubmeshView.cpp
+    Test.SubmeshViewDomainBorrows.cpp
 )
 intrinsic_resolve_test_sources(_geometry_test_sources
     SEARCH_DIRS unit/geometry integration/geometry regression/numerical

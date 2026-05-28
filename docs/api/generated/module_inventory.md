@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 7 |
 | `core` | 39 |
 | `ecs` | 27 |
-| `geometry` | 84 |
+| `geometry` | 85 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 56 |
@@ -109,6 +109,7 @@ Root scanned: `src`
 | `Geometry.ConvexHull` | `src/geometry/Geometry.ConvexHull.cppm` | `geometry` |
 | `Geometry.ConvexHullBuilder` | `src/geometry/Geometry.ConvexHullBuilder.cppm` | `geometry` |
 | `Geometry.Cylinder` | `src/geometry/Geometry.Cylinder.cppm` | `geometry` |
+| `Geometry.DomainViews` | `src/geometry/Geometry.DomainViews.cppm` | `geometry` |
 | `Geometry.EPA` | `src/geometry/Geometry.EPA.cppm` | `geometry` |
 | `Geometry.Ellipsoid` | `src/geometry/Geometry.Ellipsoid.cppm` | `geometry` |
 | `Geometry.Frustum` | `src/geometry/Geometry.Frustum.cppm` | `geometry` |
@@ -476,4 +477,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 | `Extrinsic.Runtime.SpatialDebugAdapters` | `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` | `runtime` |
 
-Total modules: **449**
+Total modules: **450**
