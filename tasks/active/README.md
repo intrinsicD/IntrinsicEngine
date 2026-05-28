@@ -94,25 +94,50 @@ Each active task should include:
   visualization overlay.
 - [`RUNTIME-085`](RUNTIME-085-geometrysources-mesh-residency.md) —
   `GeometrySources` mesh residency bridge. Status: in-progress
-  (Slice A landed on `claude/optimistic-hypatia-yJ5qw`; Slices B + C
-  remain). Promoted from `tasks/backlog/runtime/` on 2026-05-27 as
-  the earliest unblocked Theme A working-sandbox leaf (all three
-  active Theme B' rendering tasks GRAPHICS-076/077/078 parked on
-  Vulkan-host blockers; HARDEN-065, GRAPHICS-030B, GRAPHICS-070/071
-  all retired in `tasks/done/`). Owner: unassigned. Slice A adds
-  the new module `Extrinsic.Runtime.MeshGeometryPacker` that
-  converts a mesh `GeometrySources` `ConstSourceView` into a
-  triangle-list `GpuWorld::GeometryUploadDesc` with deterministic
-  local-sphere bounds and a fail-closed `MeshPackStatus` taxonomy
+  (Slices A + B landed; Slice C remains). Slice A landed on
+  `claude/optimistic-hypatia-yJ5qw`; Slice B landed on
+  `claude/intrinsicengine-agent-onboarding-FLLuF` 2026-05-28
+  (11 new `contract;runtime` mesh-extraction tests pass; 115/115
+  contract;runtime gate green; full default CPU gate 2339/2341
+  with the two pre-existing `IntrinsicBenchmarkSmoke.HalfedgeSmoke`
+  failures unchanged). Promoted from `tasks/backlog/runtime/` on
+  2026-05-27 as the earliest unblocked Theme A working-sandbox
+  leaf (all three active Theme B' rendering tasks
+  GRAPHICS-076/077/078 parked on Vulkan-host blockers; HARDEN-065,
+  GRAPHICS-030B, GRAPHICS-070/071 all retired in `tasks/done/`).
+  Owner: unassigned for Slice C. Slice A added the new module
+  `Extrinsic.Runtime.MeshGeometryPacker` that converts a mesh
+  `GeometrySources` `ConstSourceView` into a triangle-list
+  `GpuWorld::GeometryUploadDesc` with deterministic local-sphere
+  bounds and a fail-closed `MeshPackStatus` taxonomy
   (`Success`/`WrongDomain`/`MissingPositions`/
   `MissingHalfedgeTopology`/`MissingFaceTopology`/`EmptyMesh`/
   `InvalidTopology`/`NonFinitePosition`/`DegenerateAllFaces`),
   together with 20 `contract;runtime` tests covering the happy
   path (single triangle + quad fan triangulation), determinism,
-  scratch-buffer reuse, and every failure mode. No changes to
-  `Runtime.RenderExtraction` and no `RuntimeRenderExtractionStats`
-  counter additions yet — those land in Slice B. Next verification
-  step: `ctest --test-dir build/ci --output-on-failure -L 'contract' -L 'runtime' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`.
+  scratch-buffer reuse, and every failure mode. Slice B wired
+  `RenderExtractionCache::ExtractAndSubmit` to detect mesh-domain
+  entities with `RenderSurface` and neither `ProceduralGeometryRef`
+  nor an `AssetInstance::Source`, route them through the Slice A
+  packer against a sidecar-owned `MeshPackBuffer`, upload via
+  `GpuWorld::UploadGeometry`, store the resulting handle in a new
+  sidecar `MeshGeometry` field, call
+  `GpuWorld::SetInstanceGeometry`, and fold per-status counters
+  into `RuntimeRenderExtractionStats` (`MeshGeometryUploads`,
+  `MeshGeometryReuseHits`, `MeshGeometryFailedPack`,
+  `MeshGeometryMissingPositions`, `MeshGeometryInvalidTopology`,
+  `MeshGeometryReleases`). Subsequent extractions short-circuit
+  to the cached handle (`MeshGeometryReuseHits`); retirement and
+  shutdown free the runtime-owned upload through
+  `GpuWorld::FreeGeometry` and increment `MeshGeometryReleases`.
+  `RenderableSidecarView` gains `MeshGeometry`/`HasMeshResidency`
+  so tests can confirm the right slot bound the entity. Slice C
+  will drain `DirtyVertexPositions` / `DirtyFaceTopology` /
+  `DirtyEdgeTopology` / `GpuDirty` for processed mesh entities,
+  add `MeshGeometryReuploads`, and route the release through the
+  same `framesInFlight` deferred-retire window the procedural
+  cache uses. Next verification step:
+  `ctest --test-dir build/ci --output-on-failure -L 'contract' -L 'runtime' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`.
 
 Previously-active
 [`GEOM-015`](../done/GEOM-015-gjk-termination-diagnostics.md) — GJK

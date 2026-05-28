@@ -19,6 +19,7 @@ module Extrinsic.Runtime.RenderExtraction;
 
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.AssetInstance;
+import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Component.ProceduralGeometryRef;
 import Extrinsic.ECS.Component.SpatialDebugBinding;
@@ -40,6 +41,7 @@ import Extrinsic.Graphics.Component.Material;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.RHI.Types;
+import Extrinsic.Runtime.MeshGeometryPacker;
 import Extrinsic.Runtime.ProceduralGeometry;
 import Extrinsic.Runtime.ProceduralGeometryPacker;
 import Extrinsic.Runtime.SpatialDebugAdapters;
@@ -71,6 +73,8 @@ namespace Extrinsic::Runtime
             .HasSourceAsset = it->second.GpuSlot.HasSourceAsset(),
             .GeometrySlot = it->second.GpuSlot.GeometrySlot,
             .GeometryGeneration = it->second.GpuSlot.GeometryGeneration,
+            .MeshGeometry = it->second.MeshGeometry,
+            .HasMeshResidency = it->second.MeshGeometry.IsValid(),
         };
     }
 
@@ -406,6 +410,63 @@ namespace Extrinsic::Runtime
         return true;
     }
 
+    bool RenderExtractionCache::BindMeshGeometry(const ECS::Components::GeometrySources::ConstSourceView& view,
+                                                  RenderableSidecar& sidecar,
+                                                  Graphics::IRenderer& renderer,
+                                                  RuntimeRenderExtractionStats& stats)
+    {
+        // Reuse path: once we have packed and uploaded a mesh for this
+        // entity, subsequent extractions reuse the same handle until
+        // Slice C drains the relevant dirty-domain tags and triggers a
+        // reupload. This keeps Slice B's upload counter at exactly one
+        // per entity and matches the procedural cache's per-frame reuse
+        // shape without tying mesh entities into the shared procedural
+        // refcount table.
+        if (sidecar.MeshGeometry.IsValid())
+        {
+            ++stats.MeshGeometryReuseHits;
+            sidecar.Geometry = sidecar.MeshGeometry;
+            sidecar.GpuSlot.SetGeometryHandle(sidecar.MeshGeometry);
+            sidecar.GpuSlot.ClearSourceAsset();
+            renderer.GetGpuWorld().SetInstanceGeometry(sidecar.Instance, sidecar.MeshGeometry);
+            return true;
+        }
+
+        MeshPackResult packResult = PackMesh(view, m_MeshPack);
+        if (packResult.Status != MeshPackStatus::Success)
+        {
+            switch (packResult.Status)
+            {
+            case MeshPackStatus::MissingPositions:
+                ++stats.MeshGeometryMissingPositions;
+                break;
+            case MeshPackStatus::InvalidTopology:
+                ++stats.MeshGeometryInvalidTopology;
+                break;
+            default:
+                ++stats.MeshGeometryFailedPack;
+                break;
+            }
+            return false;
+        }
+
+        const Graphics::GpuGeometryHandle handle =
+            renderer.GetGpuWorld().UploadGeometry(*packResult.Upload);
+        if (!handle.IsValid())
+        {
+            ++stats.MeshGeometryFailedPack;
+            return false;
+        }
+
+        ++stats.MeshGeometryUploads;
+        sidecar.MeshGeometry = handle;
+        sidecar.Geometry = handle;
+        sidecar.GpuSlot.SetGeometryHandle(handle);
+        sidecar.GpuSlot.ClearSourceAsset();
+        renderer.GetGpuWorld().SetInstanceGeometry(sidecar.Instance, handle);
+        return true;
+    }
+
     void RenderExtractionCache::RetireMissingRenderables(const std::unordered_set<std::uint32_t>& liveKeys,
                                                          Graphics::IRenderer& renderer,
                                                          RuntimeRenderExtractionStats& stats)
@@ -421,6 +482,15 @@ namespace Extrinsic::Runtime
             if (it->second.ProceduralKey.has_value())
             {
                 m_ProceduralGeometry.Release(*it->second.ProceduralKey);
+            }
+            if (it->second.MeshGeometry.IsValid())
+            {
+                // Slice B frees the runtime-owned mesh upload immediately
+                // on retirement; Slice C will route this through the same
+                // framesInFlight deferred-retire window the procedural
+                // cache uses.
+                renderer.GetGpuWorld().FreeGeometry(it->second.MeshGeometry);
+                ++stats.MeshGeometryReleases;
             }
             renderer.GetGpuWorld().FreeInstance(it->second.Instance);
             it = m_Renderables.erase(it);
@@ -520,6 +590,26 @@ namespace Extrinsic::Runtime
                 }
             }
 
+            // RUNTIME-085 Slice B — runtime-authored mesh-source residency.
+            // Mesh path runs only when the entity has stated no procedural
+            // intent and no asset source at all; both are treated as
+            // declared alternatives that the mesh bridge must not race
+            // against. Domain detection uses the same `BuildConstView`
+            // path the rest of the engine uses, so `Vertices`+`Halfedges`+
+            // `Faces` (or the `HasMeshTopology` marker) decides whether
+            // the entity is a mesh.
+            const bool meshEligible = !proceduralBound
+                && proceduralRef == nullptr
+                && assetSource == nullptr;
+            if (meshEligible)
+            {
+                const auto view = ECS::Components::GeometrySources::BuildConstView(registry, entity);
+                if (view.ActiveDomain == ECS::Components::GeometrySources::Domain::Mesh)
+                {
+                    (void)BindMeshGeometry(view, *sidecar, renderer, stats);
+                }
+            }
+
             if (!proceduralBound && assetSource != nullptr)
             {
                 ++stats.SourceAssetObservationCount;
@@ -529,7 +619,7 @@ namespace Extrinsic::Runtime
                     gpuAssets);
                 AccumulateAssetObservationStats(observation, stats);
             }
-            else if (!proceduralBound)
+            else if (!proceduralBound && !sidecar->MeshGeometry.IsValid())
             {
                 sidecar->GpuSlot.ClearSourceAsset();
             }
@@ -664,6 +754,11 @@ namespace Extrinsic::Runtime
             if (sidecar.ProceduralKey.has_value())
             {
                 m_ProceduralGeometry.Release(*sidecar.ProceduralKey);
+            }
+            if (sidecar.MeshGeometry.IsValid())
+            {
+                renderer.GetGpuWorld().FreeGeometry(sidecar.MeshGeometry);
+                ++stats.MeshGeometryReleases;
             }
             renderer.GetGpuWorld().FreeInstance(sidecar.Instance);
             ++stats.FreedInstanceCount;

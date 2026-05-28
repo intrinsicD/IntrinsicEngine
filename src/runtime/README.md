@@ -144,7 +144,8 @@ report pending/up-to-date/rebind-required states without performing the later
 GPU geometry or material rebind.
 
 `RenderExtractionCache` also owns the procedural-source residency bridge
-(GRAPHICS-030B). When a renderable candidate carries
+(GRAPHICS-030B) and the runtime-authored mesh `GeometrySources` residency bridge
+(RUNTIME-085). When a renderable candidate carries
 `ECS::Components::ProceduralGeometryRef`, `ExtractAndSubmit()` derives the
 `ProceduralGeometryKey` from `(Kind, Hash(Params))`, drives
 `ProceduralGeometryCache::EnsureResident(key, desc, upload)` against the
@@ -157,7 +158,34 @@ refcount-only work. If a renderable also carries a non-default
 `AssetInstance::Source`, the procedural path is skipped for that entity and
 `ProceduralAndAssetSourceConflict` is incremented while the existing asset
 observation continues. Retired or shutdown sidecars call
-`ProceduralGeometryCache::Release(key)`. When `Release` brings the refcount to
+`ProceduralGeometryCache::Release(key)`.
+
+When a renderable candidate has no `ProceduralGeometryRef` and no
+`AssetInstance::Source` attached, `ExtractAndSubmit()` then builds an
+`ECS::Components::GeometrySources::ConstSourceView` for the entity (RUNTIME-085
+Slice B). If `BuildConstView` resolves `Domain::Mesh`, the cache routes the view
+through `Extrinsic.Runtime.MeshGeometryPacker::PackMesh` against a runtime-owned
+`MeshPackBuffer` scratch reused across ticks, calls
+`GpuWorld::UploadGeometry(desc)`, records the resulting `GpuGeometryHandle` in a
+new sidecar-owned `MeshGeometry` field (distinct from `ProceduralKey` /
+`HasSourceAsset`), calls `GpuWorld::SetInstanceGeometry(instance, geometry)`,
+and clears the slot's source-asset sentinel. Subsequent extractions for the same
+entity short-circuit through the `MeshGeometry` handle and increment
+`MeshGeometryReuseHits` without re-packing; dirty-domain reupload
+(`DirtyVertexPositions` / `DirtyFaceTopology` / `DirtyEdgeTopology` / `GpuDirty`
+draining and the `MeshGeometryReuploads` counter) is owned by Slice C. The bridge
+is fail-closed: `MeshPackStatus::MissingPositions` and `InvalidTopology` each have
+their own counters; every other non-`Success` status
+(`MissingHalfedgeTopology`, `MissingFaceTopology`, `EmptyMesh`,
+`NonFinitePosition`, `DegenerateAllFaces`, `WrongDomain`) folds into
+`MeshGeometryFailedPack`. A failed pack does not bind stale geometry, leaves the
+slot's source-asset sentinel cleared, and does not allocate a `GpuGeometryHandle`.
+Mesh-source residency does not share `GpuGeometryHandle`s across entities — each
+mesh entity owns its own upload. `RetireMissingRenderables` and `Shutdown` free
+the runtime-owned mesh upload through `GpuWorld::FreeGeometry` and increment
+`MeshGeometryReleases`; Slice B frees immediately, Slice C will route the free
+through the same `framesInFlight` deferred-retire window the procedural cache
+uses. When `Release` brings the refcount to
 zero the entry is appended to an in-cache retire queue but the underlying
 `GpuGeometryHandle` is **not** freed inline; it is freed by
 `ProceduralGeometryCache::Tick(currentFrame, framesInFlight, freeFn)` after
@@ -182,8 +210,18 @@ fields on `RuntimeRenderExtractionStats` are
 GRAPHICS-034), and the per-tick deltas of the cache's retire counters:
 `ProceduralGeometryReleases`, `ProceduralGeometryFreeRetires`,
 `ProceduralGeometryRetireCancellations`, and
-`ProceduralGeometryRefCountSaturated`. `FindRenderableSidecarForTest(stableId)`
-and `GetProceduralGeometryCacheForTest()` are read-only test seams used by the
+`ProceduralGeometryRefCountSaturated`. The mesh-source residency bridge adds
+`MeshGeometryUploads`, `MeshGeometryReuseHits`, `MeshGeometryFailedPack`,
+`MeshGeometryMissingPositions`, `MeshGeometryInvalidTopology`, and
+`MeshGeometryReleases` (RUNTIME-085 Slice B); the `MeshGeometryReuploads`
+counter for dirty-domain reupload is owned by Slice C.
+`FindRenderableSidecarForTest(stableId)` returns a `RenderableSidecarView`
+exposing the per-entity `Instance`, currently bound `Geometry`,
+`ProceduralKey`, source-asset and geometry-slot metadata, and the mesh-
+residency fields (`MeshGeometry` handle + `HasMeshResidency` flag) so
+`contract;runtime` mesh-extraction tests can confirm the mesh path picked
+the right slot without exposing the private sidecar layout.
+`GetProceduralGeometryCacheForTest()` is a read-only test seam used by the
 `contract;runtime` procedural-geometry tests; `PrimeRefCountForTest` on the
 cache is a test-only refcount setter that lets saturation coverage exercise
 the rejection path without `2^32` `EnsureResident` calls.
