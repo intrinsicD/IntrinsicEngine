@@ -92,6 +92,9 @@ Agents must enforce ownership and dependency flow:
 - `platform` exposes window/input ports and explicit backends; it must not import `graphics`, `ecs`, or `runtime`.
 - Platform backend selection is explicit: `INTRINSIC_PLATFORM_BACKEND=Auto|Null|Glfw`; use `Null`/
   `INTRINSIC_HEADLESS_NO_GLFW=ON` for headless work unless a task specifically needs GLFW/Vulkan surface coverage.
+  Under `Auto`, `src/platform/CMakeLists.txt` resolves to `Glfw` only when `EXTRINSIC_PLATFORM=Linux` and
+  `EXTRINSIC_BACKEND=Vulkan` (both default) and `INTRINSIC_HEADLESS_NO_GLFW=OFF`; otherwise it resolves to `Null`. The
+  `ci-vulkan` preset pins `EXTRINSIC_BACKEND=Vulkan`.
 - Runtime owns graphics backend selection. Promoted Vulkan is opt-in only when
   `INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN=ON` and `RenderConfig::EnablePromotedVulkanDevice` are both enabled;
   otherwise Vulkan requests fall back to the Null device. Renderer/runtime code must gate on
@@ -121,7 +124,9 @@ Every new dependency edge must be justifiable by layer policy and reflected in d
   allocation-heavy work, topology/container traversal, backend calls, diagnostics assembly, file/IO handling, or imports
   other modules only needed by the implementation rather than the public API.
 - FetchContent dependencies are centralized through `cmake/Dependencies.cmake` and `external/cache/`; use
-  `INTRINSIC_OFFLINE_DEPS=ON` only when the cache is already populated.
+  `INTRINSIC_OFFLINE_DEPS=ON` only when the cache is already populated. By default FetchContent does not probe remotes
+  for updates; set `INTRINSIC_UPDATE_DEPS=ON` to re-enable update probes, or `INTRINSIC_OFFLINE_DEPS=ON` to enforce
+  strict offline use of the cache. The cache root is `INTRINSIC_DEPS_CACHE_DIR` (default `external/cache/`).
 - CUDA compute support is optional and off by default (`INTRINSIC_ENABLE_CUDA=OFF` in `ci`/`dev` presets); enable it
   only for tasks that explicitly require CUDA seams, using `dev-cuda` or an equivalent configure with a valid
   `CUDAToolkit` install.
@@ -137,6 +142,9 @@ Method/paper work must follow this order:
 5. Add optimized CPU backend.
 6. Add GPU backend only after reference parity exists.
 7. Document numerical limitations and diagnostics.
+
+Method manifests live at `methods/**/method.yaml` and are validated by
+`python3 tools/agents/validate_method_manifests.py`.
 
 ## 7. Testing protocol
 
@@ -186,6 +194,8 @@ For each change:
 - Distinguish smoke checks from heavy/nightly runs.
 - Record metrics and diagnostics in machine-readable output.
 - Do not claim performance wins without baseline comparison.
+- Validate manifests and result payloads with `python3 tools/benchmark/validate_benchmark_manifests.py` and
+  `python3 tools/benchmark/validate_benchmark_results.py`.
 
 ## 9. Documentation sync protocol
 
@@ -209,7 +219,8 @@ When code, structure, or policy changes:
 - Touched-scope structural checks use the repository tools, for example
   `python3 tools/agents/check_task_policy.py --root . --strict`, `python3 tools/docs/check_doc_links.py --root .`,
   `python3 tools/repo/check_layering.py --root src --strict`, and
-  `python3 tools/repo/check_test_layout.py --root . --strict`.
+  `python3 tools/repo/check_test_layout.py --root . --strict`. Repository-root and PR-contract hygiene are enforced by
+  `python3 tools/repo/check_root_hygiene.py --root .` and `python3 tools/repo/check_pr_contract.py`.
 
 ## 11. Task execution workflow
 
