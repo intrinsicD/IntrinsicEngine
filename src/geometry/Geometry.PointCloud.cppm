@@ -22,6 +22,16 @@ export namespace Geometry::PointCloud
     public:
         Cloud();
         Cloud(PropertySet &Vertices, size_t &DeletedVertices);
+
+        // Borrow vertex storage from an external `PropertySet` (e.g. a
+        // `HalfedgeMesh::Mesh`'s vertex `PropertySet`) while owning the
+        // cloud's own deletion counter. The cloud's `p:deleted` marker is
+        // allocated lazily on the shared `PropertySet`; deletes through this
+        // cloud never increment the source container's deletion counter, so
+        // the source container's `VertexCount()` / `HasGarbage()` semantics
+        // are unaffected by cloud-side deletes.
+        explicit Cloud(PropertySet &Vertices);
+
         Cloud(const Cloud &other);
         ~Cloud();
 

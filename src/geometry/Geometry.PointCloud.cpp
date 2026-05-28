@@ -24,6 +24,13 @@ namespace Geometry::PointCloud
         EnsureProperties();
     }
 
+    Cloud::Cloud(PropertySet& Vertices) : m_Properties(std::make_shared<Properties>()),
+                                          m_Vertices(Vertices),
+                                          m_DeletedVertices(m_Properties->DeletedVertices)
+    {
+        EnsureProperties();
+    }
+
     Cloud::Cloud(const Cloud& rhs)
         : m_Properties(std::make_shared<Properties>())
           , m_Vertices(m_Properties->Vertices)
@@ -41,16 +48,23 @@ namespace Geometry::PointCloud
     {
         assert(source.m_Properties && "Cannot create a view from a non-owning cloud");
 
+        // Clamp and bind against `source.m_Vertices` / `source.m_DeletedVertices`
+        // (the actually-bound storage) rather than `source.m_Properties->Vertices`.
+        // For an owned cloud the bound references alias the shared `Properties`,
+        // so the behavior is unchanged. For a cloud borrowed from a mesh, the
+        // owning `Properties` is empty and only the bound references point at
+        // the mesh's vertex storage; clamping against `m_Properties->Vertices`
+        // would otherwise truncate the view to size 0.
         auto clamp = [](ElementRange r, std::size_t total) -> ElementRange {
             if (r.Offset >= total) return {0, 0};
             if (r.Size == 0 || r.Offset + r.Size > total)
                 r.Size = total - r.Offset;
             return r;
         };
-        vertexRange = clamp(vertexRange, source.m_Properties->Vertices.Size());
+        vertexRange = clamp(vertexRange, source.m_Vertices.Size());
 
-        Cloud view(source.m_Properties->Vertices,
-                   source.m_Properties->DeletedVertices);
+        Cloud view(source.m_Vertices,
+                   source.m_DeletedVertices);
         view.m_Properties    = source.m_Properties;
         view.m_IsSubmeshView = true;
         view.m_VertexRange   = vertexRange;

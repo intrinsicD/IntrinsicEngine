@@ -18,4 +18,13 @@ namespace Geometry::DomainViews
                             mut.DeletedVertexCount(),
                             mut.DeletedEdgeCount());
     }
+
+    PointCloud::Cloud BorrowMeshAsCloud(HalfedgeMesh::Mesh& mesh)
+    {
+        // Share the mesh's vertex `PropertySet` only; the cloud owns its own
+        // deletion counter so `Cloud::DeletePoint` cannot increment
+        // `mesh.DeletedVertexCount()` and desynchronize it from the mesh's
+        // `v:deleted` marker.
+        return PointCloud::Cloud(mesh.VertexProperties());
+    }
 }
