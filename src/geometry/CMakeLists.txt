@@ -13,6 +13,7 @@ target_sources(${target_name}
         Geometry.ConvexHull.cppm
         Geometry.ConvexHullBuilder.cppm
         Geometry.Cylinder.cppm
+        Geometry.DomainViews.cppm
         Geometry.EPA.cppm
         Geometry.Ellipsoid.cppm
         Geometry.Frustum.cppm
@@ -88,6 +89,7 @@ target_sources(${target_name}
         PRIVATE
         Geometry.BVH.cpp
         Geometry.ConvexHullBuilder.cpp
+        Geometry.DomainViews.cpp
         Geometry.EPA.cpp
         Geometry.Graph.IO.cpp
         Geometry.Graph.ShortestPath.cpp
