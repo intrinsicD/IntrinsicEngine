@@ -10,6 +10,7 @@
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.ECS.Components.AssetInstance;
 import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Component.ProceduralGeometryRef;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Scene.Handle;
@@ -17,6 +18,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.GpuSceneSlot;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.RenderExtraction;
 import Geometry.Properties;
@@ -229,7 +231,7 @@ TEST(MeshGeometryExtraction, TwoMeshEntitiesAllocateIndependentMeshUploads)
     engine.Shutdown();
 }
 
-TEST(MeshGeometryExtraction, EntityDestructionFreesMeshGeometryAndIncrementsRelease)
+TEST(MeshGeometryExtraction, EntityDestructionRetiresMeshGeometryAfterDeferredWindow)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
@@ -253,9 +255,30 @@ TEST(MeshGeometryExtraction, EntityDestructionFreesMeshGeometryAndIncrementsRele
                                          &engine.GetGpuAssetCache());
     EXPECT_EQ(stats.FreedInstanceCount, 1u);
     EXPECT_EQ(stats.MeshGeometryReleases, 1u);
-    // Slice B frees immediately; the deferred-retire window is Slice C.
-    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 0u);
+    EXPECT_EQ(stats.MeshGeometryFreeRetires, 0u);
+    // Slice C — release is deferred through the same framesInFlight
+    // window the procedural cache uses; the upload is still live until
+    // TickMeshGeometry fires past the deadline.
+    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
     EXPECT_EQ(gpuWorld.GetLiveInstanceCount(), 0u);
+
+    constexpr std::uint32_t framesInFlight = 2u;
+    constexpr std::uint64_t baseFrame = 200u;
+    for (std::uint32_t i = 0; i <= framesInFlight; ++i)
+    {
+        extraction.TickMeshGeometry(baseFrame + i, framesInFlight, engine.GetRenderer());
+        if (i < framesInFlight)
+        {
+            EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
+        }
+    }
+    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 0u);
+
+    // The next ExtractAndSubmit surfaces the FreeRetires delta.
+    stats = extraction.ExtractAndSubmit(scene,
+                                         engine.GetRenderer(),
+                                         &engine.GetGpuAssetCache());
+    EXPECT_EQ(stats.MeshGeometryFreeRetires, 1u);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();
@@ -522,6 +545,7 @@ TEST(MeshGeometryExtraction, AddingProceduralRefAfterMeshUploadReleasesMeshResid
     EXPECT_EQ(stats.MeshGeometryUploads, 0u);
     EXPECT_EQ(stats.MeshGeometryReuseHits, 0u);
     EXPECT_EQ(stats.MeshGeometryReleases, 1u);
+    EXPECT_EQ(stats.MeshGeometryFreeRetires, 0u);
     EXPECT_EQ(stats.ProceduralGeometryUploads, 1u);
 
     const auto view = extraction.FindRenderableSidecarForTest(
@@ -529,11 +553,25 @@ TEST(MeshGeometryExtraction, AddingProceduralRefAfterMeshUploadReleasesMeshResid
     ASSERT_TRUE(view.has_value());
     EXPECT_FALSE(view->HasMeshResidency);
     ASSERT_TRUE(view->ProceduralKey.has_value());
-    // Instance is bound to the procedural handle, not a freed mesh slot.
+    // Instance is bound to the procedural handle, not the queued mesh slot.
     EXPECT_TRUE(view->Geometry.IsValid());
     EXPECT_EQ(gpuWorld.GetInstanceGeometry(view->Instance), view->Geometry);
-    // Only the procedural geometry remains live.
+    // Slice C — the old mesh slot is queued for deferred retire and
+    // remains live until TickMeshGeometry fires past the deadline. So
+    // both the procedural slot AND the queued mesh slot are live now.
+    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 2u);
+
+    constexpr std::uint32_t framesInFlight = 2u;
+    constexpr std::uint64_t baseFrame = 400u;
+    for (std::uint32_t i = 0; i <= framesInFlight; ++i)
+    {
+        extraction.TickMeshGeometry(baseFrame + i, framesInFlight, engine.GetRenderer());
+    }
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
+    stats = extraction.ExtractAndSubmit(scene,
+                                         engine.GetRenderer(),
+                                         &engine.GetGpuAssetCache());
+    EXPECT_EQ(stats.MeshGeometryFreeRetires, 1u);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();
@@ -570,16 +608,30 @@ TEST(MeshGeometryExtraction, AddingAssetSourceAfterMeshUploadReleasesMeshResiden
                                          &engine.GetGpuAssetCache());
     EXPECT_EQ(stats.MeshGeometryReleases, 1u);
     EXPECT_EQ(stats.MeshGeometryReuseHits, 0u);
+    EXPECT_EQ(stats.MeshGeometryFreeRetires, 0u);
     EXPECT_EQ(stats.SourceAssetObservationCount, 1u);
 
     const auto view = extraction.FindRenderableSidecarForTest(
         static_cast<std::uint32_t>(entity));
     ASSERT_TRUE(view.has_value());
     EXPECT_FALSE(view->HasMeshResidency);
-    // The mesh handle has been freed; the instance no longer points at
-    // any live geometry slot.
+    // Slice C — the instance is explicitly detached from the queued
+    // mesh slot, but the slot itself is still live until
+    // TickMeshGeometry fires past the deadline.
     EXPECT_FALSE(gpuWorld.GetInstanceGeometry(view->Instance).IsValid());
+    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
+
+    constexpr std::uint32_t framesInFlight = 2u;
+    constexpr std::uint64_t baseFrame = 500u;
+    for (std::uint32_t i = 0; i <= framesInFlight; ++i)
+    {
+        extraction.TickMeshGeometry(baseFrame + i, framesInFlight, engine.GetRenderer());
+    }
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 0u);
+    stats = extraction.ExtractAndSubmit(scene,
+                                         engine.GetRenderer(),
+                                         &engine.GetGpuAssetCache());
+    EXPECT_EQ(stats.MeshGeometryFreeRetires, 1u);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();
@@ -618,12 +670,23 @@ TEST(MeshGeometryExtraction, LosingMeshDomainTopologyReleasesMeshResidency)
     EXPECT_EQ(stats.MeshGeometryUploads, 0u);
     EXPECT_EQ(stats.MeshGeometryReuseHits, 0u);
     EXPECT_EQ(stats.MeshGeometryReleases, 1u);
+    EXPECT_EQ(stats.MeshGeometryFreeRetires, 0u);
 
     const auto view = extraction.FindRenderableSidecarForTest(
         static_cast<std::uint32_t>(entity));
     ASSERT_TRUE(view.has_value());
     EXPECT_FALSE(view->HasMeshResidency);
     EXPECT_FALSE(gpuWorld.GetInstanceGeometry(view->Instance).IsValid());
+    // Slice C — released mesh slot is still live during the deferred-
+    // retire window.
+    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
+
+    constexpr std::uint32_t framesInFlight = 2u;
+    constexpr std::uint64_t baseFrame = 600u;
+    for (std::uint32_t i = 0; i <= framesInFlight; ++i)
+    {
+        extraction.TickMeshGeometry(baseFrame + i, framesInFlight, engine.GetRenderer());
+    }
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 0u);
 
     extraction.Shutdown(engine.GetRenderer());
@@ -662,6 +725,224 @@ TEST(MeshGeometryExtraction, NonMeshDomainEntityIsIgnoredByMeshPath)
         static_cast<std::uint32_t>(entity));
     ASSERT_TRUE(view.has_value());
     EXPECT_FALSE(view->HasMeshResidency);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
+namespace
+{
+    // Drive the deferred-retire window on the runtime mesh queue past the
+    // anchor deadline so queued handles are actually freed. Mirrors the
+    // helper pattern used in `Test.ProceduralGeometryExtraction.cpp`.
+    void DriveMeshDeferredRetireWindow(Extrinsic::Runtime::RenderExtractionCache& extraction,
+                                       Extrinsic::Graphics::IRenderer& renderer,
+                                       std::uint64_t baseFrame,
+                                       std::uint32_t framesInFlight)
+    {
+        for (std::uint32_t i = 0; i <= framesInFlight; ++i)
+        {
+            extraction.TickMeshGeometry(baseFrame + i, framesInFlight, renderer);
+        }
+    }
+}
+
+// RUNTIME-085 Slice C — dirty-domain reupload coverage. Each fine-grained
+// dirty tag and the coarse `GpuDirty` must individually trigger a repack +
+// upload, queue the old handle for deferred retire, surface the change as
+// `MeshGeometryReuploads` + `MeshGeometryReleases`, and drain the tag(s) so
+// subsequent clean ticks return to the `MeshGeometryReuseHits` path.
+class MeshGeometryExtractionDirtyTag
+    : public ::testing::TestWithParam<const char*>
+{
+};
+
+TEST_P(MeshGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
+{
+    namespace D = Extrinsic::ECS::Components::DirtyTags;
+
+    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.Initialize();
+
+    auto& scene = engine.GetScene();
+    auto& raw = scene.Raw();
+    const EntityHandle entity = MakeMeshRenderable(scene);
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    auto stats = extraction.ExtractAndSubmit(scene,
+                                              engine.GetRenderer(),
+                                              &engine.GetGpuAssetCache());
+    ASSERT_EQ(stats.MeshGeometryUploads, 1u);
+    ASSERT_EQ(stats.MeshGeometryReuploads, 0u);
+
+    const auto firstView =
+        extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(entity));
+    ASSERT_TRUE(firstView.has_value());
+    const auto firstHandle = firstView->MeshGeometry;
+    ASSERT_TRUE(firstHandle.IsValid());
+
+    // Stamp exactly one dirty domain on the entity.
+    const std::string param{GetParam()};
+    if (param == "GpuDirty")
+        D::MarkGpuDirty(raw, entity);
+    else if (param == "DirtyVertexPositions")
+        D::MarkVertexPositionsDirty(raw, entity);
+    else if (param == "DirtyFaceTopology")
+        D::MarkFaceTopologyDirty(raw, entity);
+    else if (param == "DirtyEdgeTopology")
+        D::MarkEdgeTopologyDirty(raw, entity);
+    else
+        FAIL() << "Unhandled dirty-tag parameterization: " << param;
+
+    stats = extraction.ExtractAndSubmit(scene,
+                                         engine.GetRenderer(),
+                                         &engine.GetGpuAssetCache());
+    EXPECT_EQ(stats.MeshGeometryUploads, 0u);
+    EXPECT_EQ(stats.MeshGeometryReuploads, 1u);
+    EXPECT_EQ(stats.MeshGeometryReuseHits, 0u);
+    EXPECT_EQ(stats.MeshGeometryReleases, 1u);
+    EXPECT_EQ(stats.MeshGeometryFreeRetires, 0u);
+
+    const auto secondView =
+        extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(entity));
+    ASSERT_TRUE(secondView.has_value());
+    EXPECT_TRUE(secondView->HasMeshResidency);
+    EXPECT_NE(secondView->MeshGeometry, firstHandle);
+    EXPECT_EQ(secondView->Geometry, secondView->MeshGeometry);
+
+    auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
+    // Both the old (queued) and the new (live) handle are alive until
+    // the deferred-retire window fires.
+    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 2u);
+    EXPECT_EQ(gpuWorld.GetInstanceGeometry(secondView->Instance), secondView->MeshGeometry);
+
+    // The dirty tag has been drained, so a third tick returns to the
+    // reuse path with no reupload.
+    EXPECT_FALSE((raw.any_of<D::GpuDirty,
+                              D::DirtyVertexPositions,
+                              D::DirtyFaceTopology,
+                              D::DirtyEdgeTopology>(entity)));
+
+    stats = extraction.ExtractAndSubmit(scene,
+                                         engine.GetRenderer(),
+                                         &engine.GetGpuAssetCache());
+    EXPECT_EQ(stats.MeshGeometryReuploads, 0u);
+    EXPECT_EQ(stats.MeshGeometryReuseHits, 1u);
+    EXPECT_EQ(stats.MeshGeometryReleases, 0u);
+
+    // Drive the deferred-retire window: the old handle finally fires.
+    constexpr std::uint32_t framesInFlight = 2u;
+    DriveMeshDeferredRetireWindow(extraction,
+                                   engine.GetRenderer(),
+                                   /*baseFrame=*/700u,
+                                   framesInFlight);
+    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
+
+    stats = extraction.ExtractAndSubmit(scene,
+                                         engine.GetRenderer(),
+                                         &engine.GetGpuAssetCache());
+    EXPECT_EQ(stats.MeshGeometryFreeRetires, 1u);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
+INSTANTIATE_TEST_SUITE_P(AllDirtyDomains,
+                          MeshGeometryExtractionDirtyTag,
+                          ::testing::Values("GpuDirty",
+                                            "DirtyVertexPositions",
+                                            "DirtyFaceTopology",
+                                            "DirtyEdgeTopology"));
+
+TEST(MeshGeometryExtraction, MultipleDirtyTagsCoalesceIntoSingleReupload)
+{
+    namespace D = Extrinsic::ECS::Components::DirtyTags;
+
+    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.Initialize();
+
+    auto& scene = engine.GetScene();
+    auto& raw = scene.Raw();
+    const EntityHandle entity = MakeMeshRenderable(scene);
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    auto stats = extraction.ExtractAndSubmit(scene,
+                                              engine.GetRenderer(),
+                                              &engine.GetGpuAssetCache());
+    ASSERT_EQ(stats.MeshGeometryUploads, 1u);
+
+    // Stamp every dirty tag at once. The reupload semantics are
+    // pack-and-replace, not per-tag re-upload, so the per-frame
+    // reupload count must remain 1 regardless of how many tags fire.
+    D::MarkGpuDirty(raw, entity);
+    D::MarkVertexPositionsDirty(raw, entity);
+    D::MarkFaceTopologyDirty(raw, entity);
+    D::MarkEdgeTopologyDirty(raw, entity);
+
+    stats = extraction.ExtractAndSubmit(scene,
+                                         engine.GetRenderer(),
+                                         &engine.GetGpuAssetCache());
+    EXPECT_EQ(stats.MeshGeometryReuploads, 1u);
+    EXPECT_EQ(stats.MeshGeometryReleases, 1u);
+    EXPECT_EQ(stats.MeshGeometryReuseHits, 0u);
+
+    EXPECT_FALSE((raw.any_of<D::GpuDirty,
+                              D::DirtyVertexPositions,
+                              D::DirtyFaceTopology,
+                              D::DirtyEdgeTopology>(entity)));
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
+TEST(MeshGeometryExtraction, ReuploadFailureKeepsExistingResidencyAndPreservesDirtyTag)
+{
+    namespace D = Extrinsic::ECS::Components::DirtyTags;
+
+    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.Initialize();
+
+    auto& scene = engine.GetScene();
+    auto& raw = scene.Raw();
+    const EntityHandle entity = MakeMeshRenderable(scene);
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    auto stats = extraction.ExtractAndSubmit(scene,
+                                              engine.GetRenderer(),
+                                              &engine.GetGpuAssetCache());
+    ASSERT_EQ(stats.MeshGeometryUploads, 1u);
+
+    const auto firstView =
+        extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(entity));
+    ASSERT_TRUE(firstView.has_value());
+    const auto firstHandle = firstView->MeshGeometry;
+
+    // Corrupt the mesh so the next pack returns `InvalidTopology` (face
+    // points at an out-of-range halfedge), then mark the entity dirty.
+    auto& faces = raw.get<gs::Faces>(entity);
+    auto faceHe = faces.Properties.GetOrAdd<std::uint32_t>(std::string{pn::kFaceHalfedge}, kInvalidIndex);
+    faceHe.Vector() = {99u};
+    D::MarkFaceTopologyDirty(raw, entity);
+
+    stats = extraction.ExtractAndSubmit(scene,
+                                         engine.GetRenderer(),
+                                         &engine.GetGpuAssetCache());
+    EXPECT_EQ(stats.MeshGeometryReuploads, 0u);
+    EXPECT_EQ(stats.MeshGeometryInvalidTopology, 1u);
+    EXPECT_EQ(stats.MeshGeometryReleases, 0u);
+    EXPECT_EQ(stats.MeshGeometryReuseHits, 0u);
+
+    // Old residency stays bound; dirty tag is preserved so the caller
+    // has a chance to fix the input before a later frame retries.
+    const auto secondView =
+        extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(entity));
+    ASSERT_TRUE(secondView.has_value());
+    EXPECT_TRUE(secondView->HasMeshResidency);
+    EXPECT_EQ(secondView->MeshGeometry, firstHandle);
+    EXPECT_TRUE(raw.any_of<D::DirtyFaceTopology>(entity));
+
+    auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
+    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();
