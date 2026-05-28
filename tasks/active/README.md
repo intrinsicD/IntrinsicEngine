@@ -99,19 +99,27 @@ Each active task should include:
   `tasks/backlog/geometry/` on 2026-05-28 as the next unblocked
   geometry task once GEOM-008 (Geometry.Linalg / Geometry.Sparse
   foundation) retired. Slice A adds the new `Geometry.DomainViews`
-  module with `Geometry::DomainViews::BorrowMeshAsGraph` — a public
-  factory that returns a `Graph::Graph` sharing the source mesh's
-  vertex/halfedge/edge `PropertySet`s, deletion counters, and the
-  canonical `v:point`/`v:connectivity`/`h:connectivity`/`v:deleted`/
-  `e:deleted` slots with no compatibility-copy allocations. The
+  module with
+  `Geometry::DomainViews::BorrowMeshAsGraphReadOnly(const HalfedgeMesh::Mesh&)`
+  — a public factory that returns a `Graph::Graph` sharing the source
+  mesh's vertex/halfedge/edge `PropertySet`s, the deleted-vertex/edge
+  counters, and the canonical `v:point`/`v:connectivity`/`h:connectivity`/
+  `v:deleted`/`e:deleted` slots with no compatibility-copy allocations.
+  Face storage (`h:face`/`f:connectivity`/`f:deleted`/`FacesSize`/
+  `DeletedFaceCount`) is deliberately excluded from the view: the
+  const-reference parameter is the safety signal that topology
+  mutation through the returned graph is UB on face-bearing meshes
+  (graph methods cannot update face incidence); graph-domain reads
+  and vertex-position writes are explicitly allowed. The
   `MakeMeshBackedGraphView` helper that previously lived in
   `tests/unit/geometry/Test_ShortestPath.cpp` is retired and all
   callers route through the public API. Six new tests in
   `Test_SubmeshViewDomainBorrows.cpp` cover shared-property
-  identity, absence of `*_graph_*` shadow slots, deletion-counter
-  sharing through direct counter mutation, mesh→view position-edit
-  visibility, view→mesh position-edit visibility, and the
-  empty-mesh case. Slice B (mesh-backed point-cloud) and Slice C
+  identity, absence of `*_graph_*` shadow slots, size sharing with
+  face-state isolation (FacesSize/DeletedFaceCount untouched,
+  `h:face`/`f:connectivity` preserved on the source mesh), mesh→
+  view position-edit visibility, view→mesh position-edit visibility,
+  and the empty-mesh case. Slice B (mesh-backed point-cloud) and Slice C
   (graph-backed point-cloud) follow the same factory pattern;
   Slice D introduces distinct const-view types; Slice E reviews
   the conversion/move/consume policy and closes at

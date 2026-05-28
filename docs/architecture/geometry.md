@@ -92,22 +92,35 @@ borrowed view.
 
 The named bridge for symmetric, no-copy domain views lives in
 `Geometry.DomainViews`. It depends on `Geometry.HalfedgeMesh` and
-`Geometry.Graph` (point-cloud directions land in later GEOM-012 slices) and
-exposes mutable-borrow factories:
+`Geometry.Graph` (point-cloud directions land in later GEOM-012 slices):
 
-- `Geometry::DomainViews::BorrowMeshAsGraph(HalfedgeMesh::Mesh&) -> Graph::Graph`
+- `Geometry::DomainViews::BorrowMeshAsGraphReadOnly(const HalfedgeMesh::Mesh&) -> Graph::Graph`
   returns a `Graph::Graph` sharing the source mesh's vertex, halfedge, and edge
-  `PropertySet`s and deletion counters. The canonical `v:point`,
+  `PropertySet`s and the deleted-vertex/edge counters. The canonical `v:point`,
   `v:connectivity`, `h:connectivity`, `v:deleted`, and `e:deleted` slots are
-  reused — no `*_graph_*` compatibility-copy slots are allocated. The source
-  mesh must outlive the view; lifetime is the caller's responsibility and
-  mirrors `HalfedgeMesh::Mesh::CreateView`.
+  reused — no `*_graph_*` compatibility-copy slots are allocated. Face storage
+  (`h:face`, `f:connectivity`, `f:deleted`, `Mesh::FacesSize()`, and
+  `Mesh::DeletedFaceCount()`) is **not** part of the view.
 
-Mutable borrows are the default surface until GEOM-012 Slice D adds distinct
-read-only view types. Callsites that intend read-only behavior should consume
-the result through `const Graph::Graph&` (or the equivalent const reference for
-later mesh-backed/graph-backed point-cloud factories) and follow the
-mutable-borrow rule recorded above.
+The factory accepts face-bearing meshes for graph-domain reads and vertex-
+position writes (e.g. `Geometry::ShortestPath::Dijkstra`, `SetVertexPosition`).
+Topology mutation through the returned graph — `AddVertex`, `AddEdge`,
+`DeleteVertex`, `DeleteEdge`, `GarbageCollection`, `Clear`, `SetNextHalfedge`,
+`SetPrevHalfedge`, `SetVertex`, and `SetHalfedge` — updates only the
+vertex/halfedge/edge property sets and the deleted-vertex/edge counters; it
+cannot observe or update face incidence and would corrupt a face-bearing
+source mesh by leaving `h:face`/`f:connectivity`/`f:deleted`/`FacesSize()`
+stale. Route topology changes through the mesh's own
+`Mesh::DeleteEdge`/`DeleteVertex`/`DeleteFace`/`GarbageCollection`
+operations, which cascade through face incidence. Vertex-position writes do
+not change topology and are explicitly allowed.
+
+The const-reference parameter is the safety intent signal; the returned
+`Graph::Graph` is mutable because position writes go through the same type. A
+compile-time-checked distinct read-only view type, and any future
+face-free-only mutable-borrow factory, are owned by later GEOM-012 slices
+(D and B/C respectively). The source mesh must outlive the view, mirroring
+`HalfedgeMesh::Mesh::CreateView`.
 
 ## Indexed mesh and polygon-soup staging
 
