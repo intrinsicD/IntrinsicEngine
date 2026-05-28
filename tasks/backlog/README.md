@@ -82,7 +82,7 @@ Beyond-triangle full-graphics implementation tasks (Theme B′ in the rendering 
 - Bootstrap scaffold retirement: [`rendering/GRAPHICS-081`](rendering/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md) — once `GRAPHICS-070..076` are retired and the default recipe renders the reference triangle, the `MinimalDebugSurface` recipe + `Pass.Surface/Present.MinimalDebug` classes + three diagnostics counters introduced by `GRAPHICS-032`/`033` are deleted. The scaffold exists only to derisk the triangle path; it must not outlive the operational default recipe.
 
 Runtime/UI implementation leaves for the full sandbox app path:
-- [`runtime/RUNTIME-085`](runtime/RUNTIME-085-geometrysources-mesh-residency.md) — runtime-authored mesh `GeometrySources` to retained `GpuWorld` surface geometry.
+- [`RUNTIME-085` (done)](../done/RUNTIME-085-geometrysources-mesh-residency.md) — runtime-authored mesh `GeometrySources` to retained `GpuWorld` surface geometry (retired 2026-05-28 at `CPUContracted`).
 - [`runtime/RUNTIME-086`](runtime/RUNTIME-086-geometrysources-graph-residency.md) — graph nodes/edges to retained point/line geometry.
 - [`runtime/RUNTIME-087`](runtime/RUNTIME-087-geometrysources-pointcloud-residency.md) — point-cloud vertices to retained point geometry.
 - [`runtime/RUNTIME-088`](runtime/RUNTIME-088-mesh-primitive-view-lifecycle.md) — mesh edge/vertex render views for primitive visualization and selection.
