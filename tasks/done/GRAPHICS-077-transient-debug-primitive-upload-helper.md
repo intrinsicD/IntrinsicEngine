@@ -2,11 +2,14 @@
 
 ## Status
 
-- Status: in-progress (Slices A + B + C landed; only the optional
-  Slice D remains. The shared GRAPHICS-076/BUG-012 default-recipe Vulkan
-  command-stream blocker is cleared as of 2026-05-28; the next slice is now
-  a dedicated transient-debug `gpu;vulkan` smoke rather than upstream Vulkan
-  bring-up).
+- Status: done locally (Slices A + B + C landed; Slice D command-stream
+  smoke passes on the Vulkan-capable host as of 2026-05-28. The shared
+  GRAPHICS-076/BUG-012 default-recipe Vulkan command-stream blocker is cleared,
+  and the dedicated transient-debug `gpu;vulkan` smoke now records all three
+  lanes on the operational Vulkan command stream. Pixel-readback parity is
+  explicitly deferred to
+  [`GRAPHICS-077E`](../backlog/rendering/GRAPHICS-077E-transient-debug-pixel-readback.md)
+  rather than expanding this Slice D into a renderer readback API change).
   Slice A scaffolded the recipe + executor shape on
   `claude/intrinsicengine-agent-onboarding-p1J2P` on 2026-05-23
   (224/224 graphics contract tests pass). Slice B promoted the
@@ -20,23 +23,24 @@
   and verified through the contract CPU/null gate (235/235
   graphics contract tests pass; 2209/2209 full CPU/null gate
   green). The task is now at `CPUContracted` on CPU-only hosts;
-  only the optional Slice D `gpu;vulkan` smoke remains.
-- Owner/agent: unassigned for Slice D; next pick-up by any agent
-  on a Vulkan-capable host.
+  Slice D closes the task at command-stream `Operational` maturity on
+  Vulkan-capable hosts.
+- Owner/agent: local agent workflow for Slice D graduation/retirement.
 - Branch: Slice A landed on
   `claude/intrinsicengine-agent-onboarding-p1J2P`; Slice B landed on
   `claude/intrinsicengine-agent-onboarding-MnHl0`; Slice C landed
   on `claude/intrinsicengine-agent-onboarding-WbeR9`;
-  Slice D will land on a future
-  `claude/intrinsicengine-agent-onboarding-*` branch.
+  Slice D command-stream smoke landed locally on `main` after `35bbf0ce`.
 - Started: 2026-05-23.
-- Next verification step: when the optional Slice D is picked up
-  on a Vulkan-capable host, configure with the `ci-vulkan` preset,
-  build the relevant graphics smoke/integration target, and run the opt-in
-  transient-debug `gpu;vulkan` smoke. The default-recipe baseline is now green
-  (`DefaultRecipeSurfaceGpuSmoke` passed normally on 2026-05-28), so failures in
-  this Slice D should be attributed to transient-debug upload/recording unless
-  evidence shows otherwise. The CPU-only Slice C
+- Completed: 2026-05-28.
+- Commit/PR: pending local commit.
+- Next verification step: none for this task; pixel-readback parity is tracked
+  by
+  [`GRAPHICS-077E`](../backlog/rendering/GRAPHICS-077E-transient-debug-pixel-readback.md).
+  2026-05-28
+  focused Slice D verification under `build/ci-vulkan`:
+  `TransientDebugSurfaceGpuSmoke.MixedLanesRecordOnOperationalVulkanCommandStream`
+  passed 1/1. The CPU-only Slice C
   pin is `Test.TransientDebugSurfacePass.cpp` (now fifteen contract
   tests covering recipe declaration, executor taxonomy, all three
   lanes' bind/draw shapes, per-packet variant selection per lane,
@@ -129,13 +133,18 @@ slice exercises an opt-in `gpu;vulkan` smoke.
   deterministic CPU diagnostics, closing `Scaffolded →
   CPUContracted` for the full transient-debug surface on CPU-only
   hosts.
-- **Slice D (optional, deferred).** Opt-in `gpu;vulkan;graphics` smoke
-  asserting the transient-debug surface pass actually rasterizes
-  through a real Vulkan device on a Vulkan-capable host. Mirrors the
-  GRAPHICS-033D bounded `engine.Run()` driver helper and the
-  GRAPHICS-076 Slice D pattern. Deferred behind the same Vulkan-host
-  gate as GRAPHICS-076 Slice D; CPU-only hosts ship A/B/C and leave
-  this slice for a later agent.
+- **Slice D (landed locally 2026-05-28).** Opt-in `gpu;vulkan;graphics`
+  command-stream smoke asserting the transient-debug surface pass records through
+  a real Vulkan device on a Vulkan-capable host. The smoke warms the canonical
+  default recipe through the bounded `engine.Run()` driver, then submits one
+  triangle, one line, and one point packet through a manually driven renderer
+  frame so runtime extraction does not overwrite the test snapshots. It asserts
+  `TransientDebugSurfacePass` is `Recorded`, all three submitted/recorded lane
+  counters are `1`, `UploadOverflowCount` / `MissingPipelineSkipCount` stay
+  zero, and Vulkan fallback counters stay stable. Pixel-readback parity is
+  deferred to
+  [`GRAPHICS-077E`](../backlog/rendering/GRAPHICS-077E-transient-debug-pixel-readback.md)
+  because the current public readback seam is MinimalDebug-only.
 
 ## Maturity
 
@@ -335,13 +344,16 @@ Slice C (line + point lanes, landed 2026-05-24):
       `MissingPipelineSkipCount = 1`).
 
 Slice D (optional `gpu;vulkan` smoke, deferred):
-- [ ] Add `tests/integration/graphics/Test.TransientDebugSurfaceGpuSmoke.cpp`
+- [x] Add `tests/integration/graphics/Test.TransientDebugSurfaceGpuSmoke.cpp`
       under `gpu;vulkan;graphics` labels, sharing the GRAPHICS-033D
       bounded `engine.Run()` driver helper. Asserts that submitting a
-      mixed-lane debug primitive set through `RenderFrameInput` results
-      in a frame where pixel-readback shows the expected debug
-      triangle/line/point colors, and `TransientDebugUploadDiagnostics`
+      mixed-lane debug primitive set through `RuntimeRenderSnapshotBatch`
+      on a manually driven renderer frame records `TransientDebugSurfacePass`
+      on a real Vulkan command stream and that `TransientDebugUploadDiagnostics`
       counters match the submitted counts. Requires Vulkan-capable host.
+- [x] Defer pixel-readback color assertions to
+      [`GRAPHICS-077E`](../backlog/rendering/GRAPHICS-077E-transient-debug-pixel-readback.md)
+      instead of reusing the MinimalDebug-only readback seam.
 
 ## Tests
 
@@ -459,9 +471,11 @@ Slice C (line + point lanes, landed 2026-05-24):
       independent of the pipeline gate.
 
 Slice D (optional `gpu;vulkan` smoke, deferred):
-- [ ] `gpu;vulkan;graphics` — pixel-readback assertion that the
-      transient triangle/line/point primitives reach the swapchain
-      with the expected colors when promoted Vulkan is enabled.
+- [x] `gpu;vulkan;graphics` — command-stream/counter assertion that the
+      transient triangle/line/point lanes record on an operational Vulkan
+      frame with submitted/recorded counters equal to one per lane.
+- [x] Pixel-readback assertion is deferred to
+      [`GRAPHICS-077E`](../backlog/rendering/GRAPHICS-077E-transient-debug-pixel-readback.md).
 
 ## Docs
 
@@ -508,6 +522,15 @@ Slice C (line + point lanes, landed 2026-05-24):
       modules; no new module surfaces — Slice C extends existing
       modules with new exported types).
 
+Slice D (command-stream smoke, landed locally 2026-05-28):
+- [x] Update `tests/CMakeLists.txt` to include
+      `Test.TransientDebugSurfaceGpuSmoke.cpp` in `GraphicsVulkanSmokeTestObjs`
+      / `IntrinsicGraphicsVulkanSmokeTests` under existing `gpu;vulkan;graphics`
+      labels.
+- [x] Record the command-stream smoke graduation in this task file and move
+      transient-debug pixel-readback parity into
+      [`GRAPHICS-077E`](../backlog/rendering/GRAPHICS-077E-transient-debug-pixel-readback.md).
+
 ## Acceptance criteria
 
 Slice A (landed 2026-05-23):
@@ -542,9 +565,11 @@ Full task (after Slice C, landed 2026-05-24):
       CPU/null gate green; see `## Next verification step`).
 
 Slice D (optional, Vulkan-capable hosts only):
-- [ ] `gpu;vulkan` smoke green with non-zero per-lane recorded
-      counters and pixel-readback confirming the transient primitives
-      reach the swapchain.
+- [x] `gpu;vulkan` smoke green with non-zero per-lane recorded
+      counters on an operational Vulkan command stream.
+- [x] Pixel-readback confirmation is deferred to
+      [`GRAPHICS-077E`](../backlog/rendering/GRAPHICS-077E-transient-debug-pixel-readback.md)
+      because the existing readback hook/counter is MinimalDebug-only.
 
 ## Verification
 
@@ -626,6 +651,8 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -LE 'slow|flaky-qu
   - `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`
     — 442 modules (no new module surfaces; Slice C extends existing
     modules with new exported types).
-- Slice D pick-up (Vulkan-capable host): configure with `ci-vulkan`,
-  build `IntrinsicGraphicsIntegrationTests`, and run the opt-in
-  `gpu;vulkan` smoke.
+- Slice D command-stream smoke (landed locally 2026-05-28):
+  - `cmake --build --preset ci-vulkan --target IntrinsicGraphicsVulkanSmokeTests`
+    — succeeded.
+  - `LSAN_OPTIONS=suppressions=/home/alex/Documents/IntrinsicEngine/lsan.supp ctest --test-dir build/ci-vulkan --output-on-failure -R 'TransientDebugSurfaceGpuSmoke' --timeout 120`
+    — 1/1 passed.

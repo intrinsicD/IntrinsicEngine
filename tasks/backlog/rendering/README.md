@@ -656,20 +656,28 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   follow-up to GRAPHICS-076 Slice D. Adds default-recipe four-sample readback
   parity without reusing MinimalDebug-only diagnostics; optional before or
   during GRAPHICS-081 depending on scaffold-retirement reviewer requirements.
-- [GRAPHICS-077 — Backend transient-debug-primitive upload helper](../../active/GRAPHICS-077-transient-debug-primitive-upload-helper.md):
+- [GRAPHICS-077 — Backend transient-debug-primitive upload helper](../../done/GRAPHICS-077-transient-debug-primitive-upload-helper.md):
   depends on GRAPHICS-072 (uses `SceneColorHDR`/`SceneDepth` LOAD-store).
   Promoted to `tasks/active/` on 2026-05-23 with a four-slice plan
   (recipe/executor scaffold → triangle lane → line + point lanes →
   optional `gpu;vulkan` smoke). Slices A–C are landed/CPUContracted and Slice D
-  is now unblocked from the shared default-recipe Vulkan bring-up by
-  GRAPHICS-076/BUG-012.
-- [GRAPHICS-078 — Backend visualization-overlay upload helper](../../active/GRAPHICS-078-visualization-overlay-upload-helper.md):
+  command-stream smoke passed locally on 2026-05-28 with
+  `TransientDebugSurfaceGpuSmoke` recording triangle/line/point lanes on an
+  operational Vulkan frame.
+- [GRAPHICS-077E — Transient-debug pixel-readback parity harness](GRAPHICS-077E-transient-debug-pixel-readback.md):
+  follow-up to GRAPHICS-077 Slice D. Adds opt-in Vulkan readback/sample-color
+  parity without reusing MinimalDebug-only diagnostics.
+- [GRAPHICS-078 — Backend visualization-overlay upload helper](../../done/GRAPHICS-078-visualization-overlay-upload-helper.md):
   depends on GRAPHICS-077 (mirrors helper pattern) and GRAPHICS-072.
   Promoted to `tasks/active/` on 2026-05-24 with a four-slice plan
   (recipe/executor scaffold → vector-field lane → isoline lane →
   optional `gpu;vulkan` smoke), mirroring GRAPHICS-077 exactly. Slices A–C are
-  landed/CPUContracted and Slice D is now unblocked from the shared
-  default-recipe Vulkan bring-up by GRAPHICS-076/BUG-012.
+  landed/CPUContracted and Slice D command-stream smoke passed locally on
+  2026-05-28 with `VisualizationOverlaySurfaceGpuSmoke` recording vector-field
+  and isoline lanes on an operational Vulkan frame.
+- [GRAPHICS-078E — Visualization-overlay pixel-readback parity harness](GRAPHICS-078E-visualization-overlay-pixel-readback.md):
+  follow-up to GRAPHICS-078 Slice D. Adds opt-in Vulkan readback/sample-color
+  parity without reusing MinimalDebug-only diagnostics.
 - [GRAPHICS-079 — Default-recipe `Pass.ImGui` wiring](GRAPHICS-079-default-recipe-imgui-pass-wiring.md):
   depends on GRAPHICS-076 (PresentSource finalization) and `runtime/RUNTIME-090`
   (ImGui adapter producer).

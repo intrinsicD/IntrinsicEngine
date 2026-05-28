@@ -11,72 +11,6 @@ Each active task should include:
 
 ## Currently active
 
-- [`GRAPHICS-077`](GRAPHICS-077-transient-debug-primitive-upload-helper.md) —
-  Backend transient-debug-primitive upload helper. Status:
-  in-progress (Slices A + B + C landed; only the optional Slice D
-  remains. The shared GRAPHICS-076/BUG-012 default-recipe Vulkan blocker is
-  cleared as of 2026-05-28, so Slice D now needs a dedicated transient-debug
-  `gpu;vulkan` smoke). Slice A landed on
-  `claude/intrinsicengine-agent-onboarding-p1J2P` 2026-05-23;
-  Slice B landed on `claude/intrinsicengine-agent-onboarding-MnHl0`
-  2026-05-24; Slice C landed on
-  `claude/intrinsicengine-agent-onboarding-WbeR9` 2026-05-24
-  (235/235 graphics contract tests pass; 2209/2209 full CPU/null
-  gate green). Owner: unassigned for Slice D; next pick-up by any
-  agent on a Vulkan-capable host. Promoted from
-  `tasks/backlog/rendering/` on 2026-05-23 on
-  `claude/intrinsicengine-agent-onboarding-utAFW` as the next
-  earliest unblocked Theme A leaf once GRAPHICS-076 parked on its
-  Vulkan-host blocker. Four-slice plan: recipe/executor scaffold
-  (A, scaffold-only — landed), triangle lane operational wiring
-  (B, landed; introduces the `ITransientDebugUploadHelper` virtual
-  interface + concrete default helper in
-  `Extrinsic.Graphics.TransientDebugUploadHelper` and two triangle
-  pipelines at call indices #26 + #27), line + point lane
-  operational wiring (C, landed; adds four pipelines at call
-  indices #28-#31, per-lane upload/record paths, and per-lane
-  pipeline gating in `RecordTransientDebugSurfacePass`), and the
-  optional `gpu;vulkan` smoke (D, deferred behind the same
-  Vulkan-host gate as GRAPHICS-076 Slice D). The task now sits at
-  `CPUContracted` on CPU-only hosts.
-- [`GRAPHICS-078`](GRAPHICS-078-visualization-overlay-upload-helper.md) —
-  Backend visualization-overlay upload helper (vector field +
-  isoline). Status: in-progress (Slices A + B + C landed; only the
-  optional Slice D `gpu;vulkan` smoke remains. The shared
-  GRAPHICS-076/BUG-012 default-recipe Vulkan blocker is cleared as of
-  2026-05-28, so Slice D now needs a dedicated visualization-overlay smoke).
-  Slice A scaffolded the recipe + executor shape on
-  `claude/intrinsicengine-agent-onboarding-3dLeQ` 2026-05-24
-  (209/209 graphics contract tests pass). Slice B promoted the
-  vector-field lane from `SkippedUnavailable` to `Recorded` on
-  `claude/intrinsicengine-agent-onboarding-7IOiJ` 2026-05-24 and
-  verified through the contract CPU/null gate (212/212 graphics
-  contract tests pass). Slice C promoted the isoline lane from
-  `SkippedUnavailable` to `Recorded` on
-  `claude/intrinsicengine-agent-onboarding-2P6pn` 2026-05-25 and
-  verified through the contract CPU/null gate (219/219 graphics
-  contract tests pass; net +7 from Slice B: six new isoline
-  contract tests + one prior baseline addition outside this task).
-  Slice C introduces two isoline pipelines at call indices #34 +
-  #35 via `BuildVisualizationIsolinePipelineDesc`, the new shader
-  pair `assets/shaders/visualization_isoline.{vert,frag}`, an
-  `UploadIsolines(...)` method on the helper with an independent
-  per-lane host-visible vertex buffer, a `VisualizationIsolinePushConstants`
-  push block (16 bytes carrying BDA + per-draw `FirstVertex`), a
-  `bool DepthTested{true}` field on `IsolineOverlayPacket`, and
-  per-lane gating semantics in `RecordVisualizationOverlayPass`
-  matching GRAPHICS-077 Slice C exactly. Owner: unassigned for
-  Slice D; next pick-up by any agent on a Vulkan-capable host.
-  Promoted from `tasks/backlog/rendering/` on 2026-05-24 as the
-  next earliest unblocked Theme A leaf once GRAPHICS-076 and
-  GRAPHICS-077 each parked on their Vulkan-host blockers. Four-
-  slice plan mirrors GRAPHICS-077 exactly: recipe/executor
-  scaffold (A, landed), vector-field lane operational wiring (B,
-  landed), isoline lane operational wiring (C, landed), and the
-  optional `gpu;vulkan` smoke (D, deferred behind the same Vulkan-
-  host gate as GRAPHICS-076 / 077 Slice D). The task now sits at
-  `CPUContracted` on CPU-only hosts for the full two-lane
-  visualization overlay.
 - [`RUNTIME-085`](RUNTIME-085-geometrysources-mesh-residency.md) —
   `GeometrySources` mesh residency bridge. Status: in-progress
   (Slices A + B landed; Slice C remains). Slice A landed on
@@ -125,6 +59,20 @@ Each active task should include:
   `ctest --test-dir build/ci --output-on-failure -L 'contract' -L 'runtime' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`.
 
 Previously-active
+[`GRAPHICS-077`](../done/GRAPHICS-077-transient-debug-primitive-upload-helper.md) —
+transient-debug upload helper retired to `tasks/done/` on 2026-05-28 after
+Slice D added `TransientDebugSurfaceGpuSmoke`; maturity is `CPUContracted` on
+CPU-only hosts and command-stream `Operational` on Vulkan-capable hosts. Pixel
+readback parity is tracked by
+[`GRAPHICS-077E`](../backlog/rendering/GRAPHICS-077E-transient-debug-pixel-readback.md).
+
+[`GRAPHICS-078`](../done/GRAPHICS-078-visualization-overlay-upload-helper.md) —
+visualization-overlay upload helper retired to `tasks/done/` on 2026-05-28 after
+Slice D added `VisualizationOverlaySurfaceGpuSmoke`; maturity is
+`CPUContracted` on CPU-only hosts and command-stream `Operational` on
+Vulkan-capable hosts. Pixel readback parity is tracked by
+[`GRAPHICS-078E`](../backlog/rendering/GRAPHICS-078E-visualization-overlay-pixel-readback.md).
+
 [`GEOM-015`](../done/GEOM-015-gjk-termination-diagnostics.md) — GJK
 termination diagnostics and scale-aware tolerance policy retired to
 `tasks/done/` on 2026-05-22 after all four slices landed (PRs #915,

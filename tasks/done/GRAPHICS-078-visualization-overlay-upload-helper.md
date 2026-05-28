@@ -2,11 +2,14 @@
 
 ## Status
 
-- Status: in-progress (Slices A + B + C landed on CPU/null hosts;
-  only the optional Slice D `gpu;vulkan` smoke remains. The shared
-  GRAPHICS-076/BUG-012 default-recipe Vulkan command-stream blocker is cleared
-  as of 2026-05-28, so the next slice is a dedicated visualization-overlay
-  smoke rather than upstream Vulkan bring-up).
+- Status: done locally (Slices A + B + C landed on CPU/null hosts; Slice D
+  command-stream smoke passes on the Vulkan-capable host as of 2026-05-28. The
+  shared GRAPHICS-076/BUG-012 default-recipe Vulkan command-stream blocker is
+  cleared, and the dedicated visualization-overlay `gpu;vulkan` smoke now
+  records both lanes on the operational Vulkan command stream. Pixel-readback
+  parity is explicitly deferred to
+  [`GRAPHICS-078E`](../backlog/rendering/GRAPHICS-078E-visualization-overlay-pixel-readback.md)
+  rather than expanding this Slice D into a renderer readback API change).
   Slice A scaffolded the recipe + executor shape on
   `claude/intrinsicengine-agent-onboarding-3dLeQ` 2026-05-24
   (209/209 graphics contract tests pass). Slice B promoted the
@@ -21,17 +24,16 @@
   contract tests pass; net +7 from Slice B: six new isoline tests
   + one prior baseline addition outside this task). The task now
   sits at `CPUContracted` on CPU-only hosts for the full two-lane
-  visualization overlay; only the optional Slice D `gpu;vulkan`
-  smoke remains.
-- Owner/agent: unassigned for Slice D; next pick-up by any agent
-  on a Vulkan-capable host for the opt-in visualization-overlay `gpu;vulkan`
-  smoke.
+  visualization overlay; Slice D closes the task at command-stream
+  `Operational` maturity on Vulkan-capable hosts.
+- Owner/agent: local agent workflow for Slice D graduation/retirement.
 - Branch: Slice A landed on
   `claude/intrinsicengine-agent-onboarding-3dLeQ`; Slice B landed
   on `claude/intrinsicengine-agent-onboarding-7IOiJ`; Slice C
   landed on `claude/intrinsicengine-agent-onboarding-2P6pn`;
-  Slice D will land on a future `claude/intrinsicengine-agent-onboarding-*`
-  branch on a Vulkan-capable host.
+  Slice D command-stream smoke landed locally on `main` after `35bbf0ce`.
+- Completed: 2026-05-28.
+- Commit/PR: pending local commit.
 - Started: 2026-05-24. Promoted from
   `tasks/backlog/rendering/GRAPHICS-078-visualization-overlay-upload-helper.md`
   as the next earliest unblocked Theme A leaf after GRAPHICS-076 and
@@ -41,11 +43,13 @@
   pattern: per-frame host-visible buffers, two pipeline variants per
   kind (depth-tested + always-on-top), one consolidated overlay pass
   drawing into `SceneColorHDR`/`SceneDepth` after lit composition.
-- Next verification step: see `## Next verification step` below for
-  the full per-slice command list. Slices A + B + C are verified;
-  Slice D is the next pick-up for Vulkan-capable hosts, with the
-  default-recipe baseline now green (`DefaultRecipeSurfaceGpuSmoke` passed
-  normally on 2026-05-28).
+- Next verification step: none for this task; pixel-readback parity is tracked
+  by
+  [`GRAPHICS-078E`](../backlog/rendering/GRAPHICS-078E-visualization-overlay-pixel-readback.md).
+  2026-05-28
+  focused Slice D verification under `build/ci-vulkan`:
+  `VisualizationOverlaySurfaceGpuSmoke.MixedLanesRecordOnOperationalVulkanCommandStream`
+  passed 1/1.
 
 ## Slice plan
 
@@ -162,13 +166,18 @@ final slice exercises an opt-in `gpu;vulkan` smoke.
   real Vulkan device is owned by the optional Slice D `gpu;vulkan`
   smoke and the Vulkan-tuned helper variant that expands scalar-
   field-derived contour vertices.
-- **Slice D (optional, deferred).** Opt-in `gpu;vulkan;graphics` smoke
-  asserting the visualization overlay pass actually rasterizes through
-  a real Vulkan device on a Vulkan-capable host. Mirrors the
-  GRAPHICS-033D bounded `engine.Run()` driver helper and the
-  GRAPHICS-076 Slice D / GRAPHICS-077 Slice D pattern. Deferred behind
-  the same Vulkan-host gate as GRAPHICS-076 Slice D; CPU-only hosts
-  ship A/B/C and leave this slice for a later agent.
+- **Slice D (landed locally 2026-05-28).** Opt-in `gpu;vulkan;graphics`
+  command-stream smoke asserting the visualization overlay pass records through
+  a real Vulkan device on a Vulkan-capable host. The smoke warms the canonical
+  default recipe through the bounded `engine.Run()` driver, then submits one
+  vector-field packet and one isoline packet through a manually driven renderer
+  frame so runtime extraction does not overwrite the test snapshots. It asserts
+  `VisualizationOverlayPass` is `Recorded`, both submitted/recorded lane
+  counters are `1`, `UploadOverflowCount` / `MissingPipelineSkipCount` stay
+  zero, and Vulkan fallback counters stay stable. Pixel-readback parity is
+  deferred to
+  [`GRAPHICS-078E`](../backlog/rendering/GRAPHICS-078E-visualization-overlay-pixel-readback.md)
+  because the current public readback seam is MinimalDebug-only.
 
 ## Maturity
 
@@ -430,9 +439,16 @@ Slice C (isoline lane, landed 2026-05-25):
 
 Slice D (optional `gpu;vulkan` smoke, deferred):
 
-- [ ] Add `tests/integration/graphics/Test.VisualizationOverlaySurfaceGpuSmoke.cpp`
+- [x] Add `tests/integration/graphics/Test.VisualizationOverlaySurfaceGpuSmoke.cpp`
       under `gpu;vulkan;graphics` labels, sharing the GRAPHICS-033D
-      bounded `engine.Run()` driver helper.
+      bounded `engine.Run()` driver helper. Asserts that submitting vector-field
+      and isoline packets through `RuntimeRenderSnapshotBatch` on a manually
+      driven renderer frame records `VisualizationOverlayPass` on a real Vulkan
+      command stream and that `VisualizationOverlayUploadDiagnostics` counters
+      match the submitted counts.
+- [x] Defer pixel-readback color assertions to
+      [`GRAPHICS-078E`](../backlog/rendering/GRAPHICS-078E-visualization-overlay-pixel-readback.md)
+      instead of reusing the MinimalDebug-only readback seam.
 
 ## Tests
 
@@ -539,7 +555,7 @@ Slice C (isoline lane, landed 2026-05-25):
       per-frame `IsolineRecords{Submitted,Recorded}` reflect the
       final frame's payload.
 
-Slice D tests are written when that slice lands.
+Slice D tests are written and wired.
 
 ## Docs
 
@@ -597,6 +613,15 @@ Slice C (landed 2026-05-25):
       `VisualizationIsolineUploadResult`, but no new module
       interfaces were added — count stays at the Slice B baseline).
 - [x] Update `tasks/active/README.md` to reflect Slice C status.
+
+Slice D (command-stream smoke, landed locally 2026-05-28):
+- [x] Update `tests/CMakeLists.txt` to include
+      `Test.VisualizationOverlaySurfaceGpuSmoke.cpp` in
+      `GraphicsVulkanSmokeTestObjs` / `IntrinsicGraphicsVulkanSmokeTests` under
+      existing `gpu;vulkan;graphics` labels.
+- [x] Record the command-stream smoke graduation in this task file and move
+      visualization-overlay pixel-readback parity into
+      [`GRAPHICS-078E`](../backlog/rendering/GRAPHICS-078E-visualization-overlay-pixel-readback.md).
 
 ## Acceptance criteria
 
@@ -670,9 +695,11 @@ Slice C (landed 2026-05-25):
 
 Slice D (optional, Vulkan-capable hosts only):
 
-- [ ] `gpu;vulkan` smoke green with non-zero per-kind recorded
-      counters and pixel-readback confirming the overlay primitives
-      reach the swapchain.
+- [x] `gpu;vulkan` smoke green with non-zero per-kind recorded
+      counters on an operational Vulkan command stream.
+- [x] Pixel-readback confirmation is deferred to
+      [`GRAPHICS-078E`](../backlog/rendering/GRAPHICS-078E-visualization-overlay-pixel-readback.md)
+      because the existing readback hook/counter is MinimalDebug-only.
 
 ## Verification
 
@@ -781,6 +808,8 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -LE 'slow|flaky-qu
     the existing helper module surface grew an `UploadIsolines`
     method + `VisualizationIsolineUploadResult` struct, neither of
     which adds a new module).
-- Slice D pick-up (Vulkan-capable host): configure with `ci-vulkan`,
-  build `IntrinsicGraphicsIntegrationTests`, and run the opt-in
-  `gpu;vulkan` smoke.
+- Slice D command-stream smoke (landed locally 2026-05-28):
+  - `cmake --build --preset ci-vulkan --target IntrinsicGraphicsVulkanSmokeTests`
+    — succeeded.
+  - `LSAN_OPTIONS=suppressions=/home/alex/Documents/IntrinsicEngine/lsan.supp ctest --test-dir build/ci-vulkan --output-on-failure -R 'VisualizationOverlaySurfaceGpuSmoke' --timeout 120`
+    — 1/1 passed.

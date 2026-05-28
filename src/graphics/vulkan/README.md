@@ -443,6 +443,21 @@ failure rather than a skip. Default-recipe pixel-readback parity is tracked by
 `GRAPHICS-076E` so the command-stream smoke remains separate from the renderer
 API work needed for a default-recipe readback hook/counter.
 
+GRAPHICS-077 and GRAPHICS-078 extend the same operational proof to the default
+recipe's post-lit overlay band. The opt-in `gpu;vulkan;graphics` fixtures
+`TransientDebugSurfaceGpuSmoke.MixedLanesRecordOnOperationalVulkanCommandStream`
+and
+`VisualizationOverlaySurfaceGpuSmoke.MixedLanesRecordOnOperationalVulkanCommandStream`
+warm the default recipe through the bounded runtime driver, then submit their
+test packets through a manually driven renderer frame so runtime extraction does
+not overwrite the snapshot spans. They assert the corresponding pass records on
+the operational Vulkan command stream, per-lane/per-kind submitted and recorded
+counters are non-zero, upload-overflow and missing-pipeline counters stay zero,
+and Vulkan fallback counters remain stable. Pixel-readback parity is tracked by
+`GRAPHICS-077E` and `GRAPHICS-078E`; the current public readback hook/counter is
+MinimalDebug-only and is not reused as evidence for default-recipe overlay
+pixels.
+
 Ordered gate checklist:
 
 1. Build/run gate is reconciled: the Vulkan backend is compiled when requested,

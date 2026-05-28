@@ -458,6 +458,8 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
     set(_graphics_vulkan_smoke_test_files
         Test.DefaultRecipeSurfaceGpuSmoke.cpp
         Test.MinimalDebugSurfaceGpuSmoke.cpp
+        Test.TransientDebugSurfaceGpuSmoke.cpp
+        Test.VisualizationOverlaySurfaceGpuSmoke.cpp
         Test.VulkanBootstrapSmoke.cpp
     )
     intrinsic_resolve_test_sources(_graphics_vulkan_smoke_test_sources
