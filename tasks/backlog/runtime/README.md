@@ -63,9 +63,14 @@ usable sandbox that can show authored mesh, graph, and point-cloud data with
 selection and UI. They are ordered after the visible-triangle foundation and
 compose with the rendering tasks listed in `tasks/backlog/rendering/README.md`.
 
-- [RUNTIME-085 — `GeometrySources` mesh residency bridge](RUNTIME-085-geometrysources-mesh-residency.md):
+- [RUNTIME-085 — `GeometrySources` mesh residency bridge](../../active/RUNTIME-085-geometrysources-mesh-residency.md)
+  (active, in-progress on `claude/optimistic-hypatia-yJ5qw`):
   runtime-authored ECS mesh data (`Vertices`/`Edges`/`Halfedges`/`Faces`) to
-  retained `GpuWorld` surface geometry.
+  retained `GpuWorld` surface geometry. Promoted from backlog 2026-05-27;
+  Slice A landed the `Extrinsic.Runtime.MeshGeometryPacker` module (mesh
+  `GeometrySources` → `GpuWorld::GeometryUploadDesc` triangle-list shape
+  with fail-closed `MeshPackStatus` taxonomy). Slices B (extraction wiring)
+  and C (dirty-domain reupload + retire ordering) remain.
 - [RUNTIME-086 — `GeometrySources` graph residency bridge](RUNTIME-086-geometrysources-graph-residency.md):
   graph nodes/edges to retained point and line geometry.
 - [RUNTIME-087 — `GeometrySources` point-cloud residency bridge](RUNTIME-087-geometrysources-pointcloud-residency.md):

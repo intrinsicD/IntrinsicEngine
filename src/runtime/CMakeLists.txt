@@ -11,6 +11,7 @@ target_sources(${target_name}
         Runtime.EcsSystemBundle.cppm
         Runtime.Engine.cppm
         Cameras/Runtime.CameraControllers.cppm
+        Runtime.MeshGeometryPacker.cppm
         Runtime.ProceduralGeometry.cppm
         Runtime.ProceduralGeometryPacker.cppm
         Runtime.ReferenceScene.cppm
@@ -20,6 +21,7 @@ target_sources(${target_name}
         PRIVATE
         Runtime.EcsSystemBundle.cpp
         Runtime.Engine.cpp
+        Runtime.MeshGeometryPacker.cpp
         Runtime.ProceduralGeometry.cpp
         Runtime.ProceduralGeometryPacker.cpp
         Runtime.ReferenceScene.cpp
