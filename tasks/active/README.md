@@ -65,54 +65,20 @@ Each active task should include:
   the conversion/move/consume policy and closes at
   `CPUContracted`. Next verification step:
   `ctest --test-dir build/ci --output-on-failure -R 'SubmeshViewDomainBorrows|ShortestPath|PointCloud|MeshOperations' --timeout 60`.
-- [`RUNTIME-085`](RUNTIME-085-geometrysources-mesh-residency.md) —
-  `GeometrySources` mesh residency bridge. Status: in-progress
-  (Slices A + B landed; Slice C remains). Slice A landed on
-  `claude/optimistic-hypatia-yJ5qw`; Slice B landed on
-  `claude/intrinsicengine-agent-onboarding-FLLuF` 2026-05-28
-  (11 new `contract;runtime` mesh-extraction tests pass; 115/115
-  contract;runtime gate green; full default CPU gate 2339/2341
-  with the two pre-existing `IntrinsicBenchmarkSmoke.HalfedgeSmoke`
-  failures unchanged). Promoted from `tasks/backlog/runtime/` on
-  2026-05-27 as the earliest unblocked Theme A working-sandbox
-  leaf (all three active Theme B' rendering tasks
-  GRAPHICS-076/077/078 parked on Vulkan-host blockers; HARDEN-065,
-  GRAPHICS-030B, GRAPHICS-070/071 all retired in `tasks/done/`).
-  Owner: unassigned for Slice C. Slice A added the new module
-  `Extrinsic.Runtime.MeshGeometryPacker` that converts a mesh
-  `GeometrySources` `ConstSourceView` into a triangle-list
-  `GpuWorld::GeometryUploadDesc` with deterministic local-sphere
-  bounds and a fail-closed `MeshPackStatus` taxonomy
-  (`Success`/`WrongDomain`/`MissingPositions`/
-  `MissingHalfedgeTopology`/`MissingFaceTopology`/`EmptyMesh`/
-  `InvalidTopology`/`NonFinitePosition`/`DegenerateAllFaces`),
-  together with 20 `contract;runtime` tests covering the happy
-  path (single triangle + quad fan triangulation), determinism,
-  scratch-buffer reuse, and every failure mode. Slice B wired
-  `RenderExtractionCache::ExtractAndSubmit` to detect mesh-domain
-  entities with `RenderSurface` and neither `ProceduralGeometryRef`
-  nor an `AssetInstance::Source`, route them through the Slice A
-  packer against a sidecar-owned `MeshPackBuffer`, upload via
-  `GpuWorld::UploadGeometry`, store the resulting handle in a new
-  sidecar `MeshGeometry` field, call
-  `GpuWorld::SetInstanceGeometry`, and fold per-status counters
-  into `RuntimeRenderExtractionStats` (`MeshGeometryUploads`,
-  `MeshGeometryReuseHits`, `MeshGeometryFailedPack`,
-  `MeshGeometryMissingPositions`, `MeshGeometryInvalidTopology`,
-  `MeshGeometryReleases`). Subsequent extractions short-circuit
-  to the cached handle (`MeshGeometryReuseHits`); retirement and
-  shutdown free the runtime-owned upload through
-  `GpuWorld::FreeGeometry` and increment `MeshGeometryReleases`.
-  `RenderableSidecarView` gains `MeshGeometry`/`HasMeshResidency`
-  so tests can confirm the right slot bound the entity. Slice C
-  will drain `DirtyVertexPositions` / `DirtyFaceTopology` /
-  `DirtyEdgeTopology` / `GpuDirty` for processed mesh entities,
-  add `MeshGeometryReuploads`, and route the release through the
-  same `framesInFlight` deferred-retire window the procedural
-  cache uses. Next verification step:
-  `ctest --test-dir build/ci --output-on-failure -L 'contract' -L 'runtime' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`.
-
 Previously-active
+[`RUNTIME-085`](../done/RUNTIME-085-geometrysources-mesh-residency.md) —
+`GeometrySources` mesh residency bridge retired to `tasks/done/` on
+2026-05-28 after the Slice D closure check. Slices A–C landed on
+`claude/optimistic-hypatia-yJ5qw` / `claude/intrinsicengine-agent-onboarding-FLLuF`
+/ `claude/gallant-knuth-Y4iFV`; Slice D closure ran on
+`claude/serene-albattani-3KDrI`. Maturity is `CPUContracted`: the full
+`IntrinsicTests` build under the `ci` preset and the default CPU gate
+(`ctest -LE 'gpu|vulkan|slow|flaky-quarantine'`) report 2322/2324 passed,
+with only the two pre-existing `IntrinsicBenchmarkSmoke.HalfedgeSmoke.Run`/
+`.Validate` (Not Run) failures unchanged and unrelated to this task; all 44
+`MeshGeometryExtraction`/`MeshGeometryPackerTest` cases pass. `Operational`
+visual proof is deferred to `RUNTIME-095` (final working-sandbox acceptance).
+
 [`GRAPHICS-077`](../done/GRAPHICS-077-transient-debug-primitive-upload-helper.md) —
 transient-debug upload helper retired to `tasks/done/` on 2026-05-28 after
 Slice D added `TransientDebugSurfaceGpuSmoke`; maturity is `CPUContracted` on
