@@ -1534,6 +1534,36 @@ namespace Extrinsic::Graphics
                         return;
                     }
                     const ActiveRenderPassDesc activeRenderPass = BuildActiveRenderPassDesc(*compiled, passIndex);
+                    if (passIndex < compiled->PassDeclarations.size())
+                    {
+                        bool sampledTextureBound = false;
+                        if (passName == std::string_view{"DebugViewPass"} && m_DebugViewSystem.has_value())
+                        {
+                            const DebugViewResolvedSelection selection = m_DebugViewSystem->GetResolvedSelection();
+                            const auto selected = std::find(compiled->TextureNames.begin(),
+                                                            compiled->TextureNames.end(),
+                                                            selection.SelectedResourceName);
+                            if (selection.Enabled && selected != compiled->TextureNames.end())
+                            {
+                                const std::size_t textureIndex = static_cast<std::size_t>(
+                                    std::distance(compiled->TextureNames.begin(), selected));
+                                if (textureIndex < compiled->TextureHandles.size())
+                                {
+                                    graphicsContext.BindFrameSampledTexture(compiled->TextureHandles[textureIndex]);
+                                    sampledTextureBound = true;
+                                }
+                            }
+                        }
+                        const CompiledPassDeclarations& declarations = compiled->PassDeclarations[passIndex];
+                        if (!sampledTextureBound && !declarations.ReadTextures.empty())
+                        {
+                            const std::uint32_t textureIndex = declarations.ReadTextures.front();
+                            if (textureIndex < compiled->TextureHandles.size())
+                            {
+                                graphicsContext.BindFrameSampledTexture(compiled->TextureHandles[textureIndex]);
+                            }
+                        }
+                    }
                     if (activeRenderPass.HasAttachments)
                     {
                         graphicsContext.BeginRenderPass(RHI::RenderPassDesc{
@@ -2253,6 +2283,35 @@ namespace Extrinsic::Graphics
                     ++m_LastRenderGraphStats.MinimalDebugBackbufferReadbackCopyCount;
                 }
             }
+            // GRAPHICS-076E — default-recipe sibling to the MinimalDebug
+            // readback triplet above. Keep the hook and counter separate so
+            // default-recipe pixel parity never reuses the scaffold-only
+            // MinimalDebug diagnostic as evidence. The triplet is identical:
+            // copy after the executor's final Present transition and restore
+            // Present layout before the command buffer closes.
+            if (executeResult.has_value() &&
+                m_FrameRecipe == Core::Config::FrameRecipeKind::Default &&
+                m_DefaultRecipeReadbackBuffer.IsValid() &&
+                m_Device != nullptr && m_Device->IsOperational())
+            {
+                const RHI::TextureHandle backbuffer = m_Device->GetBackbufferHandle(frame);
+                if (backbuffer.IsValid())
+                {
+                    graphicsContext.TextureBarrier(backbuffer,
+                                                    RHI::TextureLayout::Present,
+                                                    RHI::TextureLayout::TransferSrc);
+                    graphicsContext.CopyTextureToBuffer(backbuffer,
+                                                        RHI::TextureLayout::TransferSrc,
+                                                        0u, 0u,
+                                                        m_DefaultRecipeReadbackBuffer,
+                                                        0u,
+                                                        0u, 0u, 0u, 0u);
+                    graphicsContext.TextureBarrier(backbuffer,
+                                                    RHI::TextureLayout::TransferSrc,
+                                                    RHI::TextureLayout::Present);
+                    ++m_LastRenderGraphStats.DefaultRecipeBackbufferReadbackCopyCount;
+                }
+            }
             graphicsContext.End();
             const auto executeEnd = std::chrono::steady_clock::now();
             m_LastRenderGraphStats.Execute.TimeMicros = static_cast<std::uint64_t>(
@@ -2658,6 +2717,16 @@ namespace Extrinsic::Graphics
         [[nodiscard]] RHI::BufferHandle GetMinimalDebugBackbufferReadbackBuffer() const noexcept override
         {
             return m_MinimalDebugReadbackBuffer;
+        }
+
+        void SetDefaultRecipeBackbufferReadbackBuffer(RHI::BufferHandle handle) noexcept override
+        {
+            m_DefaultRecipeReadbackBuffer = handle;
+        }
+
+        [[nodiscard]] RHI::BufferHandle GetDefaultRecipeBackbufferReadbackBuffer() const noexcept override
+        {
+            return m_DefaultRecipeReadbackBuffer;
         }
 
         // GRAPHICS-076 Slice B — public seam for the renderer-owned
@@ -6860,6 +6929,11 @@ namespace Extrinsic::Graphics
         // caller. Retired together with the MinimalDebug recipe by
         // GRAPHICS-081.
         RHI::BufferHandle                    m_MinimalDebugReadbackBuffer{};
+        // GRAPHICS-076E — opt-in default-recipe readback target. Invalid
+        // handle = disabled (default). Separate from MinimalDebug so scaffold
+        // retirement can verify default-recipe pixel parity with independent
+        // diagnostics.
+        RHI::BufferHandle                    m_DefaultRecipeReadbackBuffer{};
         RenderGraphFrameStats                m_LastRenderGraphStats;
     };
 

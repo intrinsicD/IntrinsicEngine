@@ -39,7 +39,9 @@ void VulkanCommandContext::Bind(VkDevice device, VkCommandBuffer cmd,
                                  VkDescriptorSet  bindlessSet,
                                  Core::ResourcePool<VulkanBuffer,   RHI::BufferHandle,   kMaxFramesInFlight>* buffers,
                                  Core::ResourcePool<VulkanImage,    RHI::TextureHandle,  kMaxFramesInFlight>* images,
+                                 Core::ResourcePool<VulkanSampler,  RHI::SamplerHandle,  kMaxFramesInFlight>* samplers,
                                  Core::ResourcePool<VulkanPipeline, RHI::PipelineHandle, kMaxFramesInFlight>* pipelines,
+                                 RHI::SamplerHandle defaultSampler,
                                  uint32_t graphicsQueueFamily,
                                  uint32_t presentQueueFamily,
                                  uint32_t transferQueueFamily)
@@ -50,7 +52,9 @@ void VulkanCommandContext::Bind(VkDevice device, VkCommandBuffer cmd,
     m_BindlessSet   = bindlessSet;
     m_Buffers       = buffers;
     m_Images        = images;
+    m_Samplers      = samplers;
     m_Pipelines     = pipelines;
+    m_DefaultSampler = defaultSampler;
     m_GraphicsQueueFamily = graphicsQueueFamily;
     m_PresentQueueFamily  = presentQueueFamily;
     m_TransferQueueFamily = transferQueueFamily;
@@ -84,6 +88,50 @@ bool VulkanCommandContext::CanRecord(const char* operation) const
         return false;
     }
     return true;
+}
+
+void VulkanCommandContext::UpdateFrameSampledDescriptor(RHI::TextureHandle texture,
+                                                        VkImageLayout layout)
+{
+    if (layout != VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+    {
+        return;
+    }
+    if (m_Device == VK_NULL_HANDLE || m_BindlessSet == VK_NULL_HANDLE ||
+        m_Images == nullptr || m_Samplers == nullptr || !m_DefaultSampler.IsValid())
+    {
+        return;
+    }
+    const VulkanImage* image = m_Images->GetIfValid(texture);
+    const VulkanSampler* sampler = m_Samplers->GetIfValid(m_DefaultSampler);
+    if (image == nullptr || sampler == nullptr ||
+        image->View == VK_NULL_HANDLE || sampler->Sampler == VK_NULL_HANDLE)
+    {
+        return;
+    }
+
+    // GRAPHICS-076E — temporary promoted-Vulkan sampled-present bridge.
+    // The canonical postprocess/present shaders currently read their single
+    // framegraph input from set 0 / binding 0 / element 0. Until a wider
+    // renderer descriptor-binding API lands, refresh that slot whenever the
+    // framegraph transitions a texture into ShaderReadOnly. The next pass that
+    // binds the global set then samples the texture the graph just made
+    // readable (SceneColorHDR for tonemap, SceneColorLDR for present). This is
+    // backend-local and leaves the public RHI/renderer API unchanged.
+    VkDescriptorImageInfo info{};
+    info.imageView = image->View;
+    info.sampler = sampler->Sampler;
+    info.imageLayout = layout;
+
+    VkWriteDescriptorSet write{};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = m_BindlessSet;
+    write.dstBinding = 0u;
+    write.dstArrayElement = 0u;
+    write.descriptorCount = 1u;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    write.pImageInfo = &info;
+    vkUpdateDescriptorSets(m_Device, 1u, &write, 0u, nullptr);
 }
 
 void VulkanCommandContext::Begin()
@@ -254,6 +302,11 @@ void VulkanCommandContext::BindPipeline(RHI::PipelineHandle handle)
     // Always bind the global bindless descriptor set at set 0.
     vkCmdBindDescriptorSets(m_Cmd, m_BindPoint, m_GlobalLayout,
                             0, 1, &m_BindlessSet, 0, nullptr);
+}
+
+void VulkanCommandContext::BindFrameSampledTexture(RHI::TextureHandle texture)
+{
+    UpdateFrameSampledDescriptor(texture, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
 
 void VulkanCommandContext::PushConstants(const void* data, uint32_t size, uint32_t offset)
@@ -441,6 +494,7 @@ void VulkanCommandContext::TextureBarrier(RHI::TextureHandle tex,
     vkCmdPipelineBarrier2(m_Cmd, &dep);
 
     img->CurrentLayout = newLayout;
+    UpdateFrameSampledDescriptor(tex, newLayout);
 }
 
 void VulkanCommandContext::BufferBarrier(RHI::BufferHandle buf,
@@ -483,11 +537,13 @@ void VulkanCommandContext::SubmitBarriers(const RHI::BarrierBatchDesc& batch)
 
     std::vector<VkImageMemoryBarrier2> imageBarriers{};
     std::vector<VulkanImage*> imageBarrierTargets{};
+    std::vector<RHI::TextureHandle> imageBarrierHandles{};
     std::vector<VkBufferMemoryBarrier2> bufferBarriers{};
     std::vector<VkMemoryBarrier2> memoryBarriers{};
 
     imageBarriers.reserve(batch.TextureBarriers.size());
     imageBarrierTargets.reserve(batch.TextureBarriers.size());
+    imageBarrierHandles.reserve(batch.TextureBarriers.size());
     bufferBarriers.reserve(batch.BufferBarriers.size());
     memoryBarriers.reserve(batch.MemoryBarriers.size());
 
@@ -529,6 +585,7 @@ void VulkanCommandContext::SubmitBarriers(const RHI::BarrierBatchDesc& batch)
         barrier.subresourceRange = {AspectFromFormat(image->Format), 0, image->MipLevels, 0, image->ArrayLayers};
         imageBarriers.push_back(barrier);
         imageBarrierTargets.push_back(image);
+        imageBarrierHandles.push_back(desc.Texture);
     }
 
     for (const RHI::BufferBarrierDesc& desc : batch.BufferBarriers)
@@ -586,11 +643,19 @@ void VulkanCommandContext::SubmitBarriers(const RHI::BarrierBatchDesc& batch)
     // tracking the recorded layout here lets subsequent barriers/uploads pick a
     // correct oldLayout without the renderer/RHI seam having to know which
     // backend recorded the prior transition.
+    bool frameSampledDescriptorUpdated = false;
     for (std::size_t barrierIndex = 0; barrierIndex < imageBarriers.size(); ++barrierIndex)
     {
         if (imageBarrierTargets[barrierIndex] != nullptr)
         {
             imageBarrierTargets[barrierIndex]->CurrentLayout = imageBarriers[barrierIndex].newLayout;
+            if (!frameSampledDescriptorUpdated && barrierIndex < imageBarrierHandles.size() &&
+                imageBarriers[barrierIndex].newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+            {
+                UpdateFrameSampledDescriptor(imageBarrierHandles[barrierIndex],
+                                             imageBarriers[barrierIndex].newLayout);
+                frameSampledDescriptorUpdated = true;
+            }
         }
     }
 }

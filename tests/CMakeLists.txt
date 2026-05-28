@@ -578,6 +578,7 @@ endif()
 
 set(_graphics_contract_cpu_test_files
     Test.CullingPassContracts.cpp
+    Test.DefaultRecipeBackbufferReadback.cpp
     Test.DebugViewContract.cpp
     Test.DebugViewPass.cpp
     Test.FrameRecipeContract.cpp

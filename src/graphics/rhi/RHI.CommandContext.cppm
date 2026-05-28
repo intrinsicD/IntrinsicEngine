@@ -155,6 +155,12 @@ namespace Extrinsic::RHI
         // ---- Pipeline binding ----------------------------------------
         virtual void BindPipeline(PipelineHandle pipeline) = 0;
 
+        // Optional backend hook for the current pass's primary sampled
+        // framegraph texture. Backends that use fixed/global sampled slots may
+        // publish this texture before fullscreen postprocess/present draws;
+        // backends with explicit descriptor binding can ignore it.
+        virtual void BindFrameSampledTexture(TextureHandle texture) { (void)texture; }
+
         // ---- Push constants ------------------------------------------
         virtual void BindIndexBuffer(BufferHandle  buffer,
                                      std::uint64_t offset,

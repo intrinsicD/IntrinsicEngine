@@ -1614,7 +1614,9 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
                                           VK_NULL_HANDLE,
                                           &m_Buffers,
                                           &m_Images,
+                                          &m_Samplers,
                                           &m_Pipelines,
+                                          m_DefaultSamplerHandle,
                                           m_GraphicsFamily,
                                           m_PresentFamily,
                                           m_TransferFamily);
@@ -1949,6 +1951,29 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
         m_TransferQueue->m_Buffers = &m_Buffers;
         m_TransferQueue->m_Images = &m_Images;
 
+        // GRAPHICS-076E — backend-owned sampler for the temporary
+        // sampled-framegraph descriptor slot used by postprocess/present
+        // shaders. The command context updates set 0 / binding 0 / element 0
+        // to the texture most recently transitioned to ShaderReadOnly; this
+        // sampler supplies stable sampling state for those transient
+        // framegraph textures without widening the public RHI API.
+        if (!m_DefaultSamplerHandle.IsValid())
+        {
+            m_DefaultSamplerHandle = CreateSampler(RHI::SamplerDesc{
+                .MagFilter = RHI::FilterMode::Linear,
+                .MinFilter = RHI::FilterMode::Linear,
+                .MipFilter = RHI::MipmapMode::Linear,
+                .AddressU = RHI::AddressMode::ClampToEdge,
+                .AddressV = RHI::AddressMode::ClampToEdge,
+                .AddressW = RHI::AddressMode::ClampToEdge,
+                .DebugName = "Vulkan.FramegraphSampledPresentSampler",
+            });
+            if (!m_DefaultSamplerHandle.IsValid())
+            {
+                Core::Log::Warn("[VulkanDevice::Initialize] Failed to create framegraph sampled-present sampler; sampled postprocess/present paths may read the fallback descriptor.");
+            }
+        }
+
         for (std::uint32_t frameSlot = 0; frameSlot < kMaxFramesInFlight; ++frameSlot)
         {
             m_CmdContexts[frameSlot].Bind(m_Device,
@@ -1957,7 +1982,9 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
                                           m_BindlessHeap->GetSet(),
                                           &m_Buffers,
                                           &m_Images,
+                                          &m_Samplers,
                                           &m_Pipelines,
+                                          m_DefaultSamplerHandle,
                                           m_GraphicsFamily,
                                           m_PresentFamily,
                                           m_TransferFamily);
@@ -2122,7 +2149,9 @@ void VulkanDevice::Shutdown()
                                       VK_NULL_HANDLE,
                                       nullptr,
                                       nullptr,
-                                      nullptr);
+                                      nullptr,
+                                      nullptr,
+                                      RHI::SamplerHandle{});
     }
 
     if (m_Vma != VK_NULL_HANDLE)
@@ -2321,7 +2350,9 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
                                     m_BindlessHeap ? m_BindlessHeap->GetSet() : VK_NULL_HANDLE,
                                     &m_Buffers,
                                     &m_Images,
+                                    &m_Samplers,
                                     &m_Pipelines,
+                                    m_DefaultSamplerHandle,
                                     m_GraphicsFamily,
                                     m_PresentFamily,
                                     m_TransferFamily);

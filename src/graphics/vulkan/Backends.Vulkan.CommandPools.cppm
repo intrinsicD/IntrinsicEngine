@@ -27,7 +27,9 @@ namespace Extrinsic::Backends::Vulkan
                   VkDescriptorSet  bindlessSet,
                   Core::ResourcePool<VulkanBuffer,   RHI::BufferHandle,   kMaxFramesInFlight>* buffers,
                   Core::ResourcePool<VulkanImage,    RHI::TextureHandle,  kMaxFramesInFlight>* images,
+                  Core::ResourcePool<VulkanSampler,  RHI::SamplerHandle,  kMaxFramesInFlight>* samplers,
                   Core::ResourcePool<VulkanPipeline, RHI::PipelineHandle, kMaxFramesInFlight>* pipelines,
+                  RHI::SamplerHandle defaultSampler,
                   uint32_t graphicsQueueFamily = VK_QUEUE_FAMILY_IGNORED,
                   uint32_t presentQueueFamily  = VK_QUEUE_FAMILY_IGNORED,
                   uint32_t transferQueueFamily = VK_QUEUE_FAMILY_IGNORED);
@@ -56,6 +58,7 @@ namespace Extrinsic::Backends::Vulkan
         void SetScissor(int32_t x, int32_t y, uint32_t w, uint32_t h) override;
 
         void BindPipeline(RHI::PipelineHandle pipeline) override;
+        void BindFrameSampledTexture(RHI::TextureHandle texture) override;
         void BindIndexBuffer(RHI::BufferHandle buffer, uint64_t offset,
                              RHI::IndexType indexType) override;
         void PushConstants(const void* data, uint32_t size, uint32_t offset) override;
@@ -103,6 +106,7 @@ namespace Extrinsic::Backends::Vulkan
     private:
         [[nodiscard]] bool CanBegin() const;
         [[nodiscard]] bool CanRecord(const char* operation) const;
+        void UpdateFrameSampledDescriptor(RHI::TextureHandle texture, VkImageLayout layout);
 
         VkDevice         m_Device        = VK_NULL_HANDLE;
         VkCommandBuffer  m_Cmd           = VK_NULL_HANDLE;
@@ -113,7 +117,9 @@ namespace Extrinsic::Backends::Vulkan
 
         Core::ResourcePool<VulkanBuffer,   RHI::BufferHandle,   kMaxFramesInFlight>* m_Buffers   = nullptr;
         Core::ResourcePool<VulkanImage,    RHI::TextureHandle,  kMaxFramesInFlight>* m_Images    = nullptr;
+        Core::ResourcePool<VulkanSampler,  RHI::SamplerHandle,  kMaxFramesInFlight>* m_Samplers  = nullptr;
         Core::ResourcePool<VulkanPipeline, RHI::PipelineHandle, kMaxFramesInFlight>* m_Pipelines = nullptr;
+        RHI::SamplerHandle m_DefaultSampler{};
         uint32_t         m_GraphicsQueueFamily = VK_QUEUE_FAMILY_IGNORED;
         uint32_t         m_PresentQueueFamily  = VK_QUEUE_FAMILY_IGNORED;
         uint32_t         m_TransferQueueFamily = VK_QUEUE_FAMILY_IGNORED;

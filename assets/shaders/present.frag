@@ -12,10 +12,10 @@
 layout(location = 0) in vec2 vUV;
 layout(location = 0) out vec4 outColor;
 
-layout(set = 0, binding = 0) uniform sampler2D uPresentSource;
+layout(set = 0, binding = 0) uniform sampler2D uTextures[];
 
 void main()
 {
-    vec3 color = texture(uPresentSource, vUV).rgb;
+    vec3 color = texture(uTextures[0], vUV).rgb;
     outColor = vec4(color, 1.0);
 }

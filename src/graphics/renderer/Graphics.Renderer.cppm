@@ -135,6 +135,16 @@ namespace Extrinsic::Graphics
         // asserts this is 1 after a single operational frame so the readback
         // wiring cannot silently regress to a no-op.
         std::uint32_t MinimalDebugBackbufferReadbackCopyCount = 0;
+        // GRAPHICS-076E — count of frames in which the opt-in default-recipe
+        // backbuffer-to-host readback seam recorded the
+        // `Present → TransferSrc → CopyImageToBuffer → Present` triplet.
+        // This is intentionally separate from the MinimalDebug counter so the
+        // canonical default recipe can prove pixel parity without reusing the
+        // scaffold-only diagnostic. Stays at zero unless
+        // `SetDefaultRecipeBackbufferReadbackBuffer()` was configured with a
+        // valid HostVisible+TransferDst buffer and the default recipe + device
+        // are operational during the frame.
+        std::uint32_t DefaultRecipeBackbufferReadbackCopyCount = 0;
         // GRAPHICS-074 Slice D.2 — count of frames in which the default
         // recipe's PickingPass executor branch recorded the picking-readback
         // copy pair (EntityId + PrimitiveId → renderer-owned
@@ -620,6 +630,18 @@ namespace Extrinsic::Graphics
         virtual void SetMinimalDebugBackbufferReadbackBuffer(RHI::BufferHandle handle) noexcept = 0;
 
         [[nodiscard]] virtual RHI::BufferHandle GetMinimalDebugBackbufferReadbackBuffer() const noexcept = 0;
+
+        // GRAPHICS-076E — opt-in backbuffer-to-host readback wiring for the
+        // canonical default recipe's visible-triangle parity harness. The
+        // caller owns the buffer lifetime and passes a raw HostVisible +
+        // TransferDst handle. The renderer records the same
+        // Present→TransferSrc→CopyTextureToBuffer→Present triplet as the
+        // MinimalDebug seam, but only when `FrameRecipeKind::Default` is
+        // selected and the device is operational. Calling with an invalid
+        // handle disables the path (default post-Initialize state).
+        virtual void SetDefaultRecipeBackbufferReadbackBuffer(RHI::BufferHandle handle) noexcept = 0;
+
+        [[nodiscard]] virtual RHI::BufferHandle GetDefaultRecipeBackbufferReadbackBuffer() const noexcept = 0;
 
         // GRAPHICS-076 Slice B — public seam for the renderer-owned
         // `DebugViewSystem`'s `RequestedResourceName` setting. Runtime /

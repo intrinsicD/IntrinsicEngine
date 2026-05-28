@@ -1,24 +1,38 @@
 #include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
+
+#include <glm/glm.hpp>
 
 #include <gtest/gtest.h>
 
+#include "MinimalTriangleReadback.hpp"
 #include "OperationalCounterStability.hpp"
 
 import Extrinsic.Backends.Vulkan;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Render;
 import Extrinsic.Graphics.Renderer;
+import Extrinsic.Graphics.RenderFrameInput;
+import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Platform.Backend.Glfw;
 import Extrinsic.RHI.Descriptors;
+import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.Handles;
+import Extrinsic.RHI.TextureUpload;
 import Extrinsic.Runtime.Engine;
 
 namespace
 {
+namespace Readback = Extrinsic::Tests::Support::MinimalTriangleReadback;
 namespace Counters = Extrinsic::Tests::Support::OperationalCounterStability;
 
 using Extrinsic::Backends::Vulkan::EvaluateVulkanDeviceOperationalStatus;
@@ -29,6 +43,57 @@ using Extrinsic::Core::Config::FrameRecipeKind;
 using Extrinsic::Graphics::RenderCommandPassStatus;
 using Extrinsic::Runtime::Engine;
 using Extrinsic::Runtime::IApplication;
+
+[[nodiscard]] Readback::ExpectedPixel ReorderToRgba(
+    const Extrinsic::RHI::Format format,
+    const std::uint8_t b0,
+    const std::uint8_t b1,
+    const std::uint8_t b2,
+    const std::uint8_t b3) noexcept
+{
+    switch (format)
+    {
+    case Extrinsic::RHI::Format::BGRA8_UNORM:
+    case Extrinsic::RHI::Format::BGRA8_SRGB:
+        return Readback::ExpectedPixel{.R = b2, .G = b1, .B = b0, .A = b3};
+    case Extrinsic::RHI::Format::RGBA8_UNORM:
+    case Extrinsic::RHI::Format::RGBA8_SRGB:
+    default:
+        return Readback::ExpectedPixel{.R = b0, .G = b1, .B = b2, .A = b3};
+    }
+}
+
+[[nodiscard]] constexpr bool IsSrgbFormat(const Extrinsic::RHI::Format format) noexcept
+{
+    return format == Extrinsic::RHI::Format::RGBA8_SRGB ||
+           format == Extrinsic::RHI::Format::BGRA8_SRGB;
+}
+
+[[nodiscard]] std::uint8_t SrgbByteToLinearByte(const std::uint8_t srgb) noexcept
+{
+    const float s = static_cast<float>(srgb) / 255.0f;
+    const float linear = (s <= 0.04045f)
+                             ? (s / 12.92f)
+                             : std::pow((s + 0.055f) / 1.055f, 2.4f);
+    const float clamped = linear < 0.0f ? 0.0f : (linear > 1.0f ? 1.0f : linear);
+    return static_cast<std::uint8_t>(clamped * 255.0f + 0.5f);
+}
+
+[[nodiscard]] Readback::ExpectedPixel SrgbToLinearPixel(
+    const Extrinsic::RHI::Format format,
+    const Readback::ExpectedPixel& srgbPixel) noexcept
+{
+    if (!IsSrgbFormat(format))
+    {
+        return srgbPixel;
+    }
+    return Readback::ExpectedPixel{
+        .R = SrgbByteToLinearByte(srgbPixel.R),
+        .G = SrgbByteToLinearByte(srgbPixel.G),
+        .B = SrgbByteToLinearByte(srgbPixel.B),
+        .A = srgbPixel.A,
+    };
+}
 
 // GRAPHICS-076 Slice D — bounded `engine.Run()` driver mirroring the
 // MinimalDebug fixture's `ExitAfterFramesApp`. The smoke drives a small fixed
@@ -103,8 +168,8 @@ struct DefaultRecipeBootstrap
     // Match the MinimalDebug fixture's small fixed framebuffer so backbuffer
     // sizing/format negotiation paths are exercised identically across both
     // recipes on this host.
-    config.Window.Width = 256u;
-    config.Window.Height = 256u;
+    config.Window.Width = Readback::kFramebufferWidth;
+    config.Window.Height = Readback::kFramebufferHeight;
     config.Window.Resizable = false;
     config.Render.EnableValidation = false;
     config.Render.EnableVSync = false;
@@ -157,6 +222,65 @@ struct DefaultRecipeRunCapture
     return capture;
 }
 
+[[nodiscard]] DefaultRecipeRunCapture DriveDefaultRecipeDebugViewFrameAndCapture(Engine& engine)
+{
+    DefaultRecipeRunCapture capture;
+    auto& renderer = engine.GetRenderer();
+    auto& device = engine.GetDevice();
+
+    renderer.SetDebugViewRequestedResourceName("SceneColorHDR");
+    capture.Before = ToCounterSnapshot(GetVulkanOperationalDiagnosticsSnapshot());
+
+    Extrinsic::RHI::FrameHandle frame{};
+    if (!renderer.BeginFrame(frame))
+    {
+        capture.Status = EvaluateVulkanDeviceOperationalStatus(&device);
+        capture.DeviceOperational = device.IsOperational();
+        capture.Stats = renderer.GetLastRenderGraphStats();
+        capture.FrameRecipe = renderer.GetFrameRecipe();
+        capture.After = ToCounterSnapshot(GetVulkanOperationalDiagnosticsSnapshot());
+        return capture;
+    }
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = Readback::kFramebufferWidth,
+                     .Height = Readback::kFramebufferHeight},
+        .DebugOverlayEnabled = true,
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer.ExtractRenderWorld(input);
+    renderer.PrepareFrame(world);
+    renderer.ExecuteFrame(frame, world);
+    (void)renderer.EndFrame(frame);
+    device.Present(frame);
+
+    capture.Status = EvaluateVulkanDeviceOperationalStatus(&device);
+    capture.DeviceOperational = device.IsOperational();
+    capture.Stats = renderer.GetLastRenderGraphStats();
+    capture.FrameRecipe = renderer.GetFrameRecipe();
+    capture.After = ToCounterSnapshot(GetVulkanOperationalDiagnosticsSnapshot());
+    return capture;
+}
+
+[[nodiscard]] bool SubmitReadbackTriangle(Extrinsic::Graphics::IRenderer& renderer)
+{
+    static const std::array<Extrinsic::Graphics::DebugTrianglePacket, 1> kTriangles{{
+        Extrinsic::Graphics::DebugTrianglePacket{
+            .A = glm::vec3{Readback::kTriangleNdc[0][0], Readback::kTriangleNdc[0][1], 0.0f},
+            .B = glm::vec3{Readback::kTriangleNdc[1][0], Readback::kTriangleNdc[1][1], 0.0f},
+            .C = glm::vec3{Readback::kTriangleNdc[2][0], Readback::kTriangleNdc[2][1], 0.0f},
+            .Color = glm::vec4{Readback::kTriangleR,
+                               Readback::kTriangleG,
+                               Readback::kTriangleB,
+                               Readback::kTriangleA},
+            .DepthTested = false,
+        },
+    }};
+    renderer.SubmitRuntimeSnapshots(Extrinsic::Graphics::RuntimeRenderSnapshotBatch{
+        .DebugTriangles = std::span<const Extrinsic::Graphics::DebugTrianglePacket>{kTriangles.data(), kTriangles.size()},
+    });
+    return true;
+}
+
 [[nodiscard]] RenderCommandPassStatus FindPassStatus(
     const Extrinsic::Graphics::RenderGraphFrameStats& stats,
     const std::string_view passName) noexcept
@@ -185,6 +309,34 @@ struct DefaultRecipeRunCapture
         stats.CommandRecords.Passes.end(),
         [passName](const auto& pass) { return pass.Name == passName; });
 }
+
+[[nodiscard]] std::string BuildPassStatusSummary(
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats)
+{
+    std::string summary;
+    for (const auto& pass : stats.CommandRecords.Passes)
+    {
+        if (!summary.empty())
+        {
+            summary += ", ";
+        }
+        summary += pass.Name;
+        summary += "=";
+        switch (pass.Status)
+        {
+        case RenderCommandPassStatus::Recorded:
+            summary += "Recorded";
+            break;
+        case RenderCommandPassStatus::SkippedNonOperational:
+            summary += "SkippedNonOperational";
+            break;
+        case RenderCommandPassStatus::SkippedUnavailable:
+            summary += "SkippedUnavailable";
+            break;
+        }
+    }
+    return summary;
+}
 } // namespace
 
 // GRAPHICS-076 Slice D — recipe-selector smoke for the canonical default
@@ -197,16 +349,8 @@ struct DefaultRecipeRunCapture
 // counters did not increment across the operational frame.
 //
 // This fixture is the default-recipe leg of GRAPHICS-076 Slice D. The
-// pixel-readback parity portion noted in `## Required changes` of the task
-// file is intentionally NOT exercised here: the renderer's
-// `SetMinimalDebugBackbufferReadbackBuffer(...)` seam is currently gated to
-// the MinimalDebug recipe (see `Graphics.Renderer.cpp` around the
-// `m_FrameRecipe == FrameRecipeKind::MinimalDebug` check on the backbuffer
-// copy triplet), so extending it to the default recipe is a renderer-API
-// change that lives in a follow-up sub-slice. The recipe-selector evidence
-// shipped here is sufficient to satisfy the Slice D acceptance criterion
-// "Default-recipe gpu;vulkan smoke green on Vulkan-capable hosts with zero
-// fallback counters".
+// pixel-readback parity path remains a separate GRAPHICS-076E test below so
+// the command-stream proof cannot be weakened by readback harness changes.
 TEST(DefaultRecipeSurfaceGpuSmoke, RecipeSelectorReachesOperationalVulkanCommandStream)
 {
     auto bootstrap = BootstrapEngineForDefaultRecipe();
@@ -266,6 +410,151 @@ TEST(DefaultRecipeSurfaceGpuSmoke, RecipeSelectorReachesOperationalVulkanCommand
         << ", initFailure " << run.Before.InitFailure << " -> " << run.After.InitFailure
         << ", validationError " << run.Before.ValidationError << " -> " << run.After.ValidationError
         << ", gateFailure " << run.Before.OperationalGateFailure << " -> " << run.After.OperationalGateFailure;
+
+    engine.Shutdown();
+}
+
+TEST(DefaultRecipeSurfaceGpuSmoke, ReferenceTriangleDebugViewReadbackMatchesMinimalHarnessSamples)
+{
+    auto bootstrap = BootstrapEngineForDefaultRecipe(
+        4u, "Intrinsic Default-recipe gpu;vulkan readback smoke");
+    if (bootstrap.Skipped)
+    {
+        GTEST_SKIP() << bootstrap.SkipReason;
+    }
+    Engine& engine = *bootstrap.EnginePtr;
+
+    const auto warmup = DriveDefaultRecipeAndCapture(engine);
+    if (!warmup.DeviceOperational)
+    {
+        engine.Shutdown();
+        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during default-recipe readback warmup: status="
+                      << ToString(warmup.Status.Code) << " reason=" << ToString(warmup.Status.Reason)
+                      << ". Host capability checks passed, so this is a GRAPHICS-076E regression, not a skip condition.";
+        return;
+    }
+
+    auto& renderer = engine.GetRenderer();
+    auto& device   = engine.GetDevice();
+    ASSERT_TRUE(SubmitReadbackTriangle(renderer))
+        << "Failed to seed the deterministic GRAPHICS-076E readback triangle.";
+    const Extrinsic::RHI::Format backbufferFormat = device.GetBackbufferFormat();
+    const std::uint32_t bytesPerPixel = Extrinsic::RHI::BytesPerBlock(backbufferFormat);
+    if (bytesPerPixel == 0u)
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Backbuffer format has no host-uploadable layout on this host; readback skipped.";
+    }
+
+    const std::uint64_t readbackSize =
+        static_cast<std::uint64_t>(bytesPerPixel) *
+        static_cast<std::uint64_t>(Readback::kFramebufferWidth) *
+        static_cast<std::uint64_t>(Readback::kFramebufferHeight);
+    Extrinsic::RHI::BufferHandle readbackBuffer = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
+        .SizeBytes = readbackSize,
+        .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
+        .HostVisible = true,
+        .DebugName = "DefaultRecipe.Readback",
+    });
+    if (!readbackBuffer.IsValid())
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Readback buffer allocation failed; gpu;vulkan smoke is opt-in.";
+    }
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(readbackBuffer);
+
+    const auto run = DriveDefaultRecipeDebugViewFrameAndCapture(engine);
+
+    if (!run.DeviceOperational)
+    {
+        renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+        device.DestroyBuffer(readbackBuffer);
+        engine.Shutdown();
+        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip after running the default recipe readback smoke: status="
+                      << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
+                      << ". Host capability checks passed, so this is a GRAPHICS-076E regression, not a skip condition.";
+        return;
+    }
+
+    EXPECT_EQ(run.Status.Code, Extrinsic::Backends::Vulkan::VulkanOperationalStatusCode::Operational);
+    EXPECT_EQ(run.Status.Reason, Extrinsic::Backends::Vulkan::VulkanOperationalReason::None);
+
+    const auto& stats = run.Stats;
+    EXPECT_EQ(run.FrameRecipe, FrameRecipeKind::Default);
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.DeviceOperational);
+    EXPECT_EQ(FindPassStatus(stats, "DebugViewPass"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(stats);
+    EXPECT_EQ(FindPassStatus(stats, "DepthPrepass"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(stats);
+    EXPECT_EQ(FindPassStatus(stats, "SurfacePass"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(stats);
+    EXPECT_EQ(FindPassStatus(stats, "Present"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(stats);
+    EXPECT_EQ(stats.MinimalDebugBackbufferReadbackCopyCount, 0u)
+        << "Default-recipe readback must not reuse the MinimalDebug diagnostic counter.";
+    EXPECT_GE(stats.DefaultRecipeBackbufferReadbackCopyCount, 1u)
+        << "Default-recipe readback triplet did not record on any operational frame.";
+
+    EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
+        << "Vulkan fallback counters incremented across an operational default-recipe readback frame: "
+        << "fallbackToNull " << run.Before.FallbackToNull << " -> " << run.After.FallbackToNull
+        << ", initFailure " << run.Before.InitFailure << " -> " << run.After.InitFailure
+        << ", validationError " << run.Before.ValidationError << " -> " << run.After.ValidationError
+        << ", gateFailure " << run.Before.OperationalGateFailure << " -> " << run.After.OperationalGateFailure;
+
+    static_assert(Readback::kSamplePoints.size() == 4u,
+                  "GRAPHICS-076E pixel readback requires exactly four deterministic sample points");
+
+    std::vector<std::uint8_t> readbackBytes(static_cast<std::size_t>(readbackSize), 0u);
+    device.ReadBuffer(readbackBuffer, readbackBytes.data(), readbackSize, 0u);
+
+    const std::uint64_t rowStride =
+        static_cast<std::uint64_t>(bytesPerPixel) *
+        static_cast<std::uint64_t>(Readback::kFramebufferWidth);
+
+    for (const Readback::SamplePoint& sample : Readback::kSamplePoints)
+    {
+        const std::uint64_t pixelOffset =
+            static_cast<std::uint64_t>(sample.PixelY) * rowStride +
+            static_cast<std::uint64_t>(sample.PixelX) * static_cast<std::uint64_t>(bytesPerPixel);
+        ASSERT_LE(pixelOffset + 4u, readbackSize)
+            << "Sample point " << sample.Label << " is outside the readback buffer.";
+
+        const std::uint8_t b0 = readbackBytes[static_cast<std::size_t>(pixelOffset + 0u)];
+        const std::uint8_t b1 = readbackBytes[static_cast<std::size_t>(pixelOffset + 1u)];
+        const std::uint8_t b2 = readbackBytes[static_cast<std::size_t>(pixelOffset + 2u)];
+        const std::uint8_t b3 = readbackBytes[static_cast<std::size_t>(pixelOffset + 3u)];
+
+        const Readback::ExpectedPixel actualSrgb = ReorderToRgba(backbufferFormat, b0, b1, b2, b3);
+        const Readback::ExpectedPixel actualLinear = SrgbToLinearPixel(backbufferFormat, actualSrgb);
+        const Readback::ExpectedPixel expected = Readback::ExpectedAt(sample);
+        EXPECT_TRUE(Readback::ChannelsWithinTolerance(expected, actualLinear))
+            << "Sample " << sample.Label
+            << " (pixel " << sample.PixelX << "," << sample.PixelY
+            << ", inside=" << (sample.InsideTriangle ? "true" : "false") << ")"
+            << " expected linear RGBA=("
+            << static_cast<int>(expected.R) << ","
+            << static_cast<int>(expected.G) << ","
+            << static_cast<int>(expected.B) << ","
+            << static_cast<int>(expected.A) << ")"
+            << " actual linear RGBA=("
+            << static_cast<int>(actualLinear.R) << ","
+            << static_cast<int>(actualLinear.G) << ","
+            << static_cast<int>(actualLinear.B) << ","
+            << static_cast<int>(actualLinear.A) << ")"
+            << " raw bytes=("
+            << static_cast<int>(b0) << ","
+            << static_cast<int>(b1) << ","
+            << static_cast<int>(b2) << ","
+            << static_cast<int>(b3) << ")"
+            << " backbuffer format=" << static_cast<int>(backbufferFormat)
+            << " pass statuses=[" << BuildPassStatusSummary(stats) << "]";
+    }
+
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+    device.DestroyBuffer(readbackBuffer);
 
     engine.Shutdown();
 }
