@@ -1,4 +1,4 @@
-// tests/unit/geometry/Test_SubmeshViewDomainBorrows.cpp
+// tests/unit/geometry/Test.SubmeshViewDomainBorrows.cpp
 // GEOM-012 Slice A: mesh-backed graph borrow adaptor contract.
 // Covers shared property identity, deletion-counter sharing, absence of
 // compatibility-copy properties, position-write propagation in both
