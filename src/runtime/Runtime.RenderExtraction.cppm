@@ -19,6 +19,7 @@ export module Extrinsic.Runtime.RenderExtraction;
 
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.AssetInstance;
+import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Component.ProceduralGeometryRef;
 import Extrinsic.ECS.Component.SpatialDebugBinding;
@@ -40,6 +41,7 @@ import Extrinsic.Graphics.Component.Material;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.RHI.Types;
+import Extrinsic.Runtime.MeshGeometryPacker;
 import Extrinsic.Runtime.ProceduralGeometry;
 import Extrinsic.Runtime.ProceduralGeometryPacker;
 import Extrinsic.Runtime.SpatialDebugAdapters;
@@ -102,6 +104,26 @@ export namespace Extrinsic::Runtime
         std::uint32_t ProceduralGeometryFreeRetires{0};
         std::uint32_t ProceduralGeometryRetireCancellations{0};
         std::uint32_t ProceduralGeometryRefCountSaturated{0};
+
+        // RUNTIME-085 Slice B — runtime-authored mesh `GeometrySources`
+        // residency counters. `Uploads` is incremented exactly once per
+        // entity on the first frame the mesh is packed and uploaded;
+        // subsequent frames hit `ReuseHits` until Slice C drains dirty-
+        // domain tags and reuploads. `FailedPack` aggregates non-input-
+        // shape pack rejections (`InvalidTopology`, `DegenerateAllFaces`,
+        // `EmptyMesh`, `NonFinitePosition`, `MissingHalfedgeTopology`,
+        // `MissingFaceTopology`, `WrongDomain`); `MissingPositions` and
+        // `InvalidTopology` get their own counters because they are the
+        // two most likely structural authoring bugs in mesh sources.
+        // `Releases` is incremented per entity whose mesh residency was
+        // freed because the entity disappeared or no longer qualifies as
+        // a mesh renderable.
+        std::uint32_t MeshGeometryUploads{0};
+        std::uint32_t MeshGeometryReuseHits{0};
+        std::uint32_t MeshGeometryFailedPack{0};
+        std::uint32_t MeshGeometryMissingPositions{0};
+        std::uint32_t MeshGeometryInvalidTopology{0};
+        std::uint32_t MeshGeometryReleases{0};
 
         // RUNTIME-082 Slice D — spatial-debug adapter pump counters. Folded
         // per-frame from the active adapter set against the entity view of
@@ -168,6 +190,13 @@ export namespace Extrinsic::Runtime
             bool HasSourceAsset = false;
             std::uint32_t GeometrySlot = 0;
             std::uint32_t GeometryGeneration = 0;
+            // RUNTIME-085 Slice B — runtime-authored mesh-source residency.
+            // `MeshGeometry` is the handle the cache owns and frees on
+            // retirement; it is distinct from the procedural cache's
+            // refcounted handle and from any asset-backed geometry that
+            // `GpuSlot.SourceAsset` may later wire in.
+            Graphics::GpuGeometryHandle MeshGeometry{};
+            bool HasMeshResidency = false;
         };
 
         [[nodiscard]] std::optional<RenderableSidecarView> FindRenderableSidecarForTest(
@@ -205,6 +234,11 @@ export namespace Extrinsic::Runtime
             bool HasVisualization{false};
             Graphics::GpuGeometryHandle Geometry{};
             std::optional<ProceduralGeometryKey> ProceduralKey{};
+            // RUNTIME-085 Slice B — owned mesh-source residency handle.
+            // Distinct from `Geometry` (which mirrors the currently bound
+            // instance geometry) so retirement can free the runtime-owned
+            // upload even after a Slice C reupload swaps `Geometry`.
+            Graphics::GpuGeometryHandle MeshGeometry{};
         };
 
         [[nodiscard]] RenderableSidecar* EnsureRenderable(std::uint32_t stableId,
@@ -217,6 +251,10 @@ export namespace Extrinsic::Runtime
                                                    RenderableSidecar& sidecar,
                                                    Graphics::IRenderer& renderer,
                                                    RuntimeRenderExtractionStats& stats);
+        [[nodiscard]] bool BindMeshGeometry(const ECS::Components::GeometrySources::ConstSourceView& view,
+                                             RenderableSidecar& sidecar,
+                                             Graphics::IRenderer& renderer,
+                                             RuntimeRenderExtractionStats& stats);
 
         std::unordered_map<std::uint32_t, RenderableSidecar> m_Renderables{};
         std::vector<Graphics::TransformSyncRecord> m_Transforms{};
@@ -225,6 +263,7 @@ export namespace Extrinsic::Runtime
         ProceduralGeometryCache m_ProceduralGeometry{};
         ProceduralGeometryPackBuffer m_ProceduralPack{};
         ProceduralGeometryCacheStats m_PrevProceduralStats{};
+        MeshPackBuffer m_MeshPack{};
 
         // RUNTIME-082 Slice D — owned adapter instances + a registry mirror
         // resolved per-entity by `ExtractAndSubmit`. The batch buffer is
