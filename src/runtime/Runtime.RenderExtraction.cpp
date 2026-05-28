@@ -410,19 +410,25 @@ namespace Extrinsic::Runtime
         return true;
     }
 
-    bool RenderExtractionCache::BindMeshGeometry(const ECS::Components::GeometrySources::ConstSourceView& view,
+    bool RenderExtractionCache::BindMeshGeometry(entt::registry& registry,
+                                                  entt::entity entity,
+                                                  const ECS::Components::GeometrySources::ConstSourceView& view,
                                                   RenderableSidecar& sidecar,
                                                   Graphics::IRenderer& renderer,
                                                   RuntimeRenderExtractionStats& stats)
     {
-        // Reuse path: once we have packed and uploaded a mesh for this
-        // entity, subsequent extractions reuse the same handle until
-        // Slice C drains the relevant dirty-domain tags and triggers a
-        // reupload. This keeps Slice B's upload counter at exactly one
-        // per entity and matches the procedural cache's per-frame reuse
-        // shape without tying mesh entities into the shared procedural
-        // refcount table.
-        if (sidecar.MeshGeometry.IsValid())
+        namespace D = ECS::Components::DirtyTags;
+        const bool dirty = registry.any_of<D::GpuDirty,
+                                            D::DirtyVertexPositions,
+                                            D::DirtyFaceTopology,
+                                            D::DirtyEdgeTopology>(entity);
+        const bool hadResidency = sidecar.MeshGeometry.IsValid();
+
+        // Reuse path: clean entity with a cached upload. The procedural-
+        // cache analogue is a refcount-only `EnsureResident` hit; for mesh
+        // residency the per-entity handle is single-owner so the reuse is
+        // a direct rebind without any cache lookup.
+        if (hadResidency && !dirty)
         {
             ++stats.MeshGeometryReuseHits;
             sidecar.Geometry = sidecar.MeshGeometry;
@@ -447,6 +453,10 @@ namespace Extrinsic::Runtime
                 ++stats.MeshGeometryFailedPack;
                 break;
             }
+            // Fail-closed: leave the dirty tags in place so the caller has
+            // a chance to recover the input on a later frame, and keep any
+            // prior residency handle bound (don't release on transient
+            // pack failures of a re-upload attempt).
             return false;
         }
 
@@ -458,13 +468,49 @@ namespace Extrinsic::Runtime
             return false;
         }
 
-        ++stats.MeshGeometryUploads;
+        if (hadResidency)
+        {
+            // Dirty reupload: queue the prior handle for the same
+            // `framesInFlight` deferred-retire window the procedural cache
+            // uses, then swap to the new handle. The new
+            // `SetInstanceGeometry` below detaches the instance from the
+            // old slot before the slot is freed.
+            EnqueueMeshRetire(sidecar.MeshGeometry);
+            ++stats.MeshGeometryReuploads;
+            ++stats.MeshGeometryReleases;
+        }
+        else
+        {
+            ++stats.MeshGeometryUploads;
+        }
+
+        // Drain the dirty tags consumed by this (re)upload. Tags are
+        // additive (set by `MarkVertex*/Face*/Edge*/GpuDirty` producers)
+        // so this matches the existing `DirtyTransform` drain pattern in
+        // `ExtractAndSubmit`.
+        if (dirty)
+        {
+            registry.remove<D::GpuDirty,
+                            D::DirtyVertexPositions,
+                            D::DirtyFaceTopology,
+                            D::DirtyEdgeTopology>(entity);
+        }
+
         sidecar.MeshGeometry = handle;
         sidecar.Geometry = handle;
         sidecar.GpuSlot.SetGeometryHandle(handle);
         sidecar.GpuSlot.ClearSourceAsset();
         renderer.GetGpuWorld().SetInstanceGeometry(sidecar.Instance, handle);
         return true;
+    }
+
+    void RenderExtractionCache::EnqueueMeshRetire(Graphics::GpuGeometryHandle handle)
+    {
+        if (!handle.IsValid())
+        {
+            return;
+        }
+        m_MeshRetire.push_back(MeshRetireRecord{handle, 0, false});
     }
 
     void RenderExtractionCache::RetireMissingRenderables(const std::unordered_set<std::uint32_t>& liveKeys,
@@ -485,11 +531,12 @@ namespace Extrinsic::Runtime
             }
             if (it->second.MeshGeometry.IsValid())
             {
-                // Slice B frees the runtime-owned mesh upload immediately
-                // on retirement; Slice C will route this through the same
-                // framesInFlight deferred-retire window the procedural
-                // cache uses.
-                renderer.GetGpuWorld().FreeGeometry(it->second.MeshGeometry);
+                // Slice C — route through the same framesInFlight
+                // deferred-retire window the procedural cache uses.
+                // `FreeInstance` (below) detaches the instance from the
+                // queued slot so the still-live mesh slot is not
+                // observable via any live instance during the window.
+                EnqueueMeshRetire(it->second.MeshGeometry);
                 ++stats.MeshGeometryReleases;
             }
             renderer.GetGpuWorld().FreeInstance(it->second.Instance);
@@ -602,29 +649,46 @@ namespace Extrinsic::Runtime
                 && proceduralRef == nullptr
                 && assetSource == nullptr;
             bool meshBoundThisFrame = false;
+            bool meshDomainThisFrame = false;
             if (meshEligible)
             {
                 const auto view = ECS::Components::GeometrySources::BuildConstView(registry, entity);
                 if (view.ActiveDomain == ECS::Components::GeometrySources::Domain::Mesh)
                 {
-                    meshBoundThisFrame = BindMeshGeometry(view, *sidecar, renderer, stats);
+                    meshDomainThisFrame = true;
+                    meshBoundThisFrame = BindMeshGeometry(registry,
+                                                          entity,
+                                                          view,
+                                                          *sidecar,
+                                                          renderer,
+                                                          stats);
                 }
             }
 
             // Eligibility-flip release: if mesh was uploaded on a prior
             // frame but the entity no longer selects the mesh source this
             // frame (gained `ProceduralGeometryRef` / `AssetInstance::Source`,
-            // lost mesh-domain `GeometrySources`, or was rejected by the
-            // packer), free the cached upload immediately and increment
-            // `MeshGeometryReleases`. `GpuWorld::FreeGeometry` auto-
-            // detaches every instance referencing the slot, so any
-            // procedural binding made earlier this frame is preserved
-            // (procedural's `SetInstanceGeometry` happened before this
-            // release and pointed the instance at a different slot, which
-            // the detach loop does not touch).
-            if (!meshBoundThisFrame && sidecar->MeshGeometry.IsValid())
+            // or lost mesh-domain `GeometrySources` topology), enqueue the
+            // cached upload for the same `framesInFlight` deferred-retire
+            // window the procedural cache uses and increment
+            // `MeshGeometryReleases`. When no other path re-bound the
+            // instance this frame, detach the instance from the queued
+            // mesh slot explicitly so the instance does not observe a
+            // still-live but doomed slot during the retire window (the
+            // procedural path's `SetInstanceGeometry` already covers the
+            // procedural-replacement case). Transient pack failures on a
+            // still-mesh-domain entity do NOT release: the old residency
+            // remains bound so a later frame can recover, mirroring the
+            // dirty-reupload fail-closed contract inside `BindMeshGeometry`.
+            const bool stillMeshAttached = meshEligible && meshDomainThisFrame;
+            if (!stillMeshAttached && sidecar->MeshGeometry.IsValid())
             {
-                renderer.GetGpuWorld().FreeGeometry(sidecar->MeshGeometry);
+                EnqueueMeshRetire(sidecar->MeshGeometry);
+                if (!proceduralBound)
+                {
+                    renderer.GetGpuWorld().SetInstanceGeometry(sidecar->Instance,
+                                                                Graphics::GpuGeometryHandle{});
+                }
                 sidecar->MeshGeometry = {};
                 ++stats.MeshGeometryReleases;
             }
@@ -738,6 +802,16 @@ namespace Extrinsic::Runtime
             postCacheStats.RefCountSaturated - m_PrevProceduralStats.RefCountSaturated;
         m_PrevProceduralStats = postCacheStats;
 
+        // RUNTIME-085 Slice C — mesh deferred-retire FreeRetires delta is
+        // surfaced via the same release/tick cadence the procedural cache
+        // uses. The releases-this-frame counter is folded inline
+        // (`stats.MeshGeometryReleases` is bumped on each enqueue or
+        // reupload), so only the actual-free count needs the snapshot
+        // diff here.
+        stats.MeshGeometryFreeRetires =
+            m_MeshFreeRetires - m_PrevMeshFreeRetires;
+        m_PrevMeshFreeRetires = m_MeshFreeRetires;
+
         renderer.SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{
             .Transforms                     = m_Transforms,
             .Lights                         = m_Lights,
@@ -765,6 +839,42 @@ namespace Extrinsic::Runtime
                                    });
     }
 
+    void RenderExtractionCache::TickMeshGeometry(std::uint64_t currentFrame,
+                                                  std::uint32_t framesInFlight,
+                                                  Graphics::IRenderer& renderer)
+    {
+        // Mirror `ProceduralGeometryCache::Tick`: anchor deadlines on
+        // newly-enqueued records the first time the tick observes them,
+        // then free entries whose deadline has been reached.
+        const std::uint64_t deadline = currentFrame + std::uint64_t{framesInFlight};
+        for (auto& rec : m_MeshRetire)
+        {
+            if (!rec.DeadlineSet)
+            {
+                rec.Deadline = deadline;
+                rec.DeadlineSet = true;
+            }
+        }
+
+        auto it = m_MeshRetire.begin();
+        while (it != m_MeshRetire.end())
+        {
+            if (it->DeadlineSet && it->Deadline <= currentFrame)
+            {
+                if (it->Handle.IsValid())
+                {
+                    renderer.GetGpuWorld().FreeGeometry(it->Handle);
+                    ++m_MeshFreeRetires;
+                }
+                it = m_MeshRetire.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
+    }
+
     void RenderExtractionCache::Shutdown(Graphics::IRenderer& renderer)
     {
         RuntimeRenderExtractionStats stats{};
@@ -783,6 +893,19 @@ namespace Extrinsic::Runtime
             ++stats.FreedInstanceCount;
         }
         m_Renderables.clear();
+
+        // RUNTIME-085 Slice C — drain any pending mesh deferred-retire
+        // records inline. Shutdown is a hard teardown, so the
+        // `framesInFlight` window is collapsed and the handles are freed
+        // directly rather than waiting on `TickMeshGeometry`.
+        for (auto& rec : m_MeshRetire)
+        {
+            if (rec.Handle.IsValid())
+            {
+                renderer.GetGpuWorld().FreeGeometry(rec.Handle);
+            }
+        }
+        m_MeshRetire.clear();
         m_Transforms.clear();
         m_Visualizations.clear();
         m_Lights.clear();

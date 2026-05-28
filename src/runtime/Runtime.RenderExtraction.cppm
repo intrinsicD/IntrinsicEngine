@@ -105,25 +105,34 @@ export namespace Extrinsic::Runtime
         std::uint32_t ProceduralGeometryRetireCancellations{0};
         std::uint32_t ProceduralGeometryRefCountSaturated{0};
 
-        // RUNTIME-085 Slice B — runtime-authored mesh `GeometrySources`
+        // RUNTIME-085 Slices B/C — runtime-authored mesh `GeometrySources`
         // residency counters. `Uploads` is incremented exactly once per
         // entity on the first frame the mesh is packed and uploaded;
-        // subsequent frames hit `ReuseHits` until Slice C drains dirty-
-        // domain tags and reuploads. `FailedPack` aggregates non-input-
-        // shape pack rejections (`InvalidTopology`, `DegenerateAllFaces`,
-        // `EmptyMesh`, `NonFinitePosition`, `MissingHalfedgeTopology`,
+        // subsequent clean frames hit `ReuseHits`; subsequent dirty
+        // frames hit `Reuploads` after Slice C drains the dirty-domain
+        // tags (`DirtyVertexPositions`, `DirtyFaceTopology`,
+        // `DirtyEdgeTopology`, `GpuDirty`) and repacks the mesh.
+        // `FailedPack` aggregates non-input-shape pack rejections
+        // (`InvalidTopology`, `DegenerateAllFaces`, `EmptyMesh`,
+        // `NonFinitePosition`, `MissingHalfedgeTopology`,
         // `MissingFaceTopology`, `WrongDomain`); `MissingPositions` and
         // `InvalidTopology` get their own counters because they are the
         // two most likely structural authoring bugs in mesh sources.
-        // `Releases` is incremented per entity whose mesh residency was
-        // freed because the entity disappeared or no longer qualifies as
-        // a mesh renderable.
+        // `Releases` is incremented per release-initiated event: entity
+        // destruction, eligibility flip away from mesh, or dirty
+        // reupload superseding an older handle; the actual free runs
+        // through the `framesInFlight` deferred-retire window driven by
+        // `TickMeshGeometry`, which surfaces `FreeRetires` as a per-frame
+        // delta on the next `ExtractAndSubmit` (mirroring
+        // `ProceduralGeometryFreeRetires`).
         std::uint32_t MeshGeometryUploads{0};
         std::uint32_t MeshGeometryReuseHits{0};
+        std::uint32_t MeshGeometryReuploads{0};
         std::uint32_t MeshGeometryFailedPack{0};
         std::uint32_t MeshGeometryMissingPositions{0};
         std::uint32_t MeshGeometryInvalidTopology{0};
         std::uint32_t MeshGeometryReleases{0};
+        std::uint32_t MeshGeometryFreeRetires{0};
 
         // RUNTIME-082 Slice D — spatial-debug adapter pump counters. Folded
         // per-frame from the active adapter set against the entity view of
@@ -178,6 +187,17 @@ export namespace Extrinsic::Runtime
         void TickProceduralGeometry(std::uint64_t currentFrame,
                                     std::uint32_t framesInFlight,
                                     Graphics::IRenderer& renderer);
+
+        // RUNTIME-085 Slice C — drives the deferred-retire window of the
+        // runtime-owned mesh-residency retire queue, mirroring
+        // `TickProceduralGeometry`. Handles enqueued by entity destruction,
+        // eligibility flip, or dirty reupload are freed via
+        // `GpuWorld::FreeGeometry` once `framesInFlight` ticks have elapsed
+        // since the release tick. Subsequent `ExtractAndSubmit` calls surface
+        // the per-tick delta as `MeshGeometryFreeRetires`.
+        void TickMeshGeometry(std::uint64_t currentFrame,
+                              std::uint32_t framesInFlight,
+                              Graphics::IRenderer& renderer);
 
         [[nodiscard]] const RuntimeRenderExtractionStats& GetLastStats() const noexcept;
         [[nodiscard]] std::uint32_t GetTrackedRenderableCount() const noexcept;
@@ -251,10 +271,28 @@ export namespace Extrinsic::Runtime
                                                    RenderableSidecar& sidecar,
                                                    Graphics::IRenderer& renderer,
                                                    RuntimeRenderExtractionStats& stats);
-        [[nodiscard]] bool BindMeshGeometry(const ECS::Components::GeometrySources::ConstSourceView& view,
+        [[nodiscard]] bool BindMeshGeometry(entt::registry& registry,
+                                             entt::entity entity,
+                                             const ECS::Components::GeometrySources::ConstSourceView& view,
                                              RenderableSidecar& sidecar,
                                              Graphics::IRenderer& renderer,
                                              RuntimeRenderExtractionStats& stats);
+
+        // RUNTIME-085 Slice C — runtime-owned deferred-retire queue for mesh
+        // upload handles. Mirrors the shape of
+        // `ProceduralGeometryCache::RetireRecord` but without a refcounted key
+        // because mesh uploads are not shared across entities. A record is
+        // enqueued with `DeadlineSet = false`; the next `TickMeshGeometry`
+        // anchors `Deadline = currentFrame + framesInFlight` and frees the
+        // handle once `Deadline <= currentFrame`.
+        struct MeshRetireRecord
+        {
+            Graphics::GpuGeometryHandle Handle{};
+            std::uint64_t Deadline = 0;
+            bool DeadlineSet = false;
+        };
+
+        void EnqueueMeshRetire(Graphics::GpuGeometryHandle handle);
 
         std::unordered_map<std::uint32_t, RenderableSidecar> m_Renderables{};
         std::vector<Graphics::TransformSyncRecord> m_Transforms{};
@@ -264,6 +302,14 @@ export namespace Extrinsic::Runtime
         ProceduralGeometryPackBuffer m_ProceduralPack{};
         ProceduralGeometryCacheStats m_PrevProceduralStats{};
         MeshPackBuffer m_MeshPack{};
+
+        // RUNTIME-085 Slice C — deferred-retire queue + running FreeRetires
+        // accumulator. `m_PrevMeshFreeRetires` lets `ExtractAndSubmit` emit
+        // `MeshGeometryFreeRetires` as a per-tick delta, matching the
+        // `ProceduralGeometryFreeRetires` accounting path.
+        std::vector<MeshRetireRecord> m_MeshRetire{};
+        std::uint32_t m_MeshFreeRetires{0};
+        std::uint32_t m_PrevMeshFreeRetires{0};
 
         // RUNTIME-082 Slice D — owned adapter instances + a registry mirror
         // resolved per-entity by `ExtractAndSubmit`. The batch buffer is

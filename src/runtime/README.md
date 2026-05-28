@@ -108,7 +108,7 @@ freshly-constructed subsystems):
 8. Render prepare.
 9. Render execute.
 10. End frame + present.
-11. Maintenance: transfer retirement, streaming drain/apply/pump, asset service tick, `GpuAssetCache::Tick`, and `RenderExtractionCache::TickProceduralGeometry` (procedural geometry deferred-retire window).
+11. Maintenance: transfer retirement, streaming drain/apply/pump, asset service tick, `GpuAssetCache::Tick`, `RenderExtractionCache::TickProceduralGeometry` (procedural geometry deferred-retire window), and `RenderExtractionCache::TickMeshGeometry` (runtime-owned mesh-residency deferred-retire window).
 12. Frame clock finalize.
 
 `Engine::RunFrame()` consumes `Extrinsic.Core.FrameClock` for wall-clock frame
@@ -169,31 +169,37 @@ through `Extrinsic.Runtime.MeshGeometryPacker::PackMesh` against a runtime-owned
 `GpuWorld::UploadGeometry(desc)`, records the resulting `GpuGeometryHandle` in a
 new sidecar-owned `MeshGeometry` field (distinct from `ProceduralKey` /
 `HasSourceAsset`), calls `GpuWorld::SetInstanceGeometry(instance, geometry)`,
-and clears the slot's source-asset sentinel. Subsequent extractions for the same
+and clears the slot's source-asset sentinel. Subsequent clean extractions for the same
 entity short-circuit through the `MeshGeometry` handle and increment
-`MeshGeometryReuseHits` without re-packing; dirty-domain reupload
+`MeshGeometryReuseHits` without re-packing. Subsequent dirty extractions
 (`DirtyVertexPositions` / `DirtyFaceTopology` / `DirtyEdgeTopology` / `GpuDirty`
-draining and the `MeshGeometryReuploads` counter) is owned by Slice C. The bridge
+any-of tag set on the entity by an ECS producer) repack the mesh, upload a fresh
+`GpuGeometryHandle`, swap the instance binding via `SetInstanceGeometry`,
+enqueue the prior handle into the same `framesInFlight` deferred-retire window
+the procedural cache uses, drain the dirty tags from the entity, and increment
+`MeshGeometryReuploads` + `MeshGeometryReleases` (RUNTIME-085 Slice C). The bridge
 is fail-closed: `MeshPackStatus::MissingPositions` and `InvalidTopology` each have
 their own counters; every other non-`Success` status
 (`MissingHalfedgeTopology`, `MissingFaceTopology`, `EmptyMesh`,
 `NonFinitePosition`, `DegenerateAllFaces`, `WrongDomain`) folds into
 `MeshGeometryFailedPack`. A failed pack does not bind stale geometry, leaves the
 slot's source-asset sentinel cleared, and does not allocate a `GpuGeometryHandle`.
+A dirty-reupload pack failure preserves the prior residency and the dirty tags so
+the caller can recover the input on a later frame; no release fires on transient
+pack failures of a still-mesh-domain entity.
 Mesh-source residency does not share `GpuGeometryHandle`s across entities — each
 mesh entity owns its own upload. If a previously-uploaded entity stops selecting
 the mesh source on a later frame (it gained `ProceduralGeometryRef` or
 `AssetInstance::Source`, or it lost mesh-domain `GeometrySources` topology so
-`BuildConstView` no longer resolves `Domain::Mesh`), the cache frees the cached
-upload that same frame and increments `MeshGeometryReleases`;
-`GpuWorld::FreeGeometry` auto-detaches every instance referencing the freed
-slot, so any procedural rebinding made earlier in the same frame is preserved
-and any instance that lost its source is left at the invalid-geometry sentinel
-until a future frame rebinds. `RetireMissingRenderables` and `Shutdown` free
-the runtime-owned mesh upload through `GpuWorld::FreeGeometry` and increment
-`MeshGeometryReleases`; Slice B frees immediately, Slice C will route the free
-through the same `framesInFlight` deferred-retire window the procedural cache
-uses. When `Release` brings the refcount to
+`BuildConstView` no longer resolves `Domain::Mesh`), the cache enqueues the
+cached upload into the mesh-residency retire queue, increments
+`MeshGeometryReleases`, and — when no other path re-bound the instance this
+frame — calls `SetInstanceGeometry(instance, {})` to detach the instance from the
+queued (still live, but doomed) slot so the renderer never observes a dangling
+binding during the retire window. `RetireMissingRenderables` and `Shutdown` route
+the runtime-owned mesh upload through the same queue and increment
+`MeshGeometryReleases` (Shutdown then drains the queue inline because hard
+teardown collapses the deferred window). When `Release` brings the refcount to
 zero the entry is appended to an in-cache retire queue but the underlying
 `GpuGeometryHandle` is **not** freed inline; it is freed by
 `ProceduralGeometryCache::Tick(currentFrame, framesInFlight, freeFn)` after
@@ -202,7 +208,12 @@ zero the entry is appended to an in-cache retire queue but the underlying
 Decision 4). `Engine::RunFrame()` drives the procedural cache from the
 maintenance phase alongside `GpuAssetCache::Tick` via
 `RenderExtractionCache::TickProceduralGeometry(currentFrame, framesInFlight,
-renderer)`, which closes over `GpuWorld::FreeGeometry`. If an entity is
+renderer)`, which closes over `GpuWorld::FreeGeometry`. The runtime mesh-
+residency retire queue is driven from the same maintenance phase by
+`RenderExtractionCache::TickMeshGeometry(currentFrame, framesInFlight, renderer)`,
+which uses the same anchor-on-first-observation/free-on-deadline semantics; the
+per-tick free-count delta surfaces as `MeshGeometryFreeRetires` on the next
+`ExtractAndSubmit` call, mirroring `ProceduralGeometryFreeRetires`. If an entity is
 re-attached to the same `(Kind, Hash(Params))` inside the retire window,
 `EnsureResident` resurrects the queued entry (cancelling the pending free),
 returns the bit-identical `GpuGeometryHandle`, and increments
@@ -219,10 +230,15 @@ GRAPHICS-034), and the per-tick deltas of the cache's retire counters:
 `ProceduralGeometryReleases`, `ProceduralGeometryFreeRetires`,
 `ProceduralGeometryRetireCancellations`, and
 `ProceduralGeometryRefCountSaturated`. The mesh-source residency bridge adds
-`MeshGeometryUploads`, `MeshGeometryReuseHits`, `MeshGeometryFailedPack`,
-`MeshGeometryMissingPositions`, `MeshGeometryInvalidTopology`, and
-`MeshGeometryReleases` (RUNTIME-085 Slice B); the `MeshGeometryReuploads`
-counter for dirty-domain reupload is owned by Slice C.
+`MeshGeometryUploads`, `MeshGeometryReuseHits`, `MeshGeometryReuploads`,
+`MeshGeometryFailedPack`, `MeshGeometryMissingPositions`,
+`MeshGeometryInvalidTopology`, `MeshGeometryReleases`, and
+`MeshGeometryFreeRetires` (RUNTIME-085 Slices B + C). `Uploads` counts first-time
+per-entity uploads, `ReuseHits` counts clean-frame rebinds, `Reuploads` counts
+dirty-frame repack-and-replace events (a Reupload also increments `Releases`
+because the prior handle is queued for retire), and `FreeRetires` is the per-
+tick delta of actual `GpuWorld::FreeGeometry` calls fired by `TickMeshGeometry`
+once the `framesInFlight` window elapses.
 `FindRenderableSidecarForTest(stableId)` returns a `RenderableSidecarView`
 exposing the per-entity `Instance`, currently bound `Geometry`,
 `ProceduralKey`, source-asset and geometry-slot metadata, and the mesh-
