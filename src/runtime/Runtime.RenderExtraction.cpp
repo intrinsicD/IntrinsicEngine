@@ -601,13 +601,32 @@ namespace Extrinsic::Runtime
             const bool meshEligible = !proceduralBound
                 && proceduralRef == nullptr
                 && assetSource == nullptr;
+            bool meshBoundThisFrame = false;
             if (meshEligible)
             {
                 const auto view = ECS::Components::GeometrySources::BuildConstView(registry, entity);
                 if (view.ActiveDomain == ECS::Components::GeometrySources::Domain::Mesh)
                 {
-                    (void)BindMeshGeometry(view, *sidecar, renderer, stats);
+                    meshBoundThisFrame = BindMeshGeometry(view, *sidecar, renderer, stats);
                 }
+            }
+
+            // Eligibility-flip release: if mesh was uploaded on a prior
+            // frame but the entity no longer selects the mesh source this
+            // frame (gained `ProceduralGeometryRef` / `AssetInstance::Source`,
+            // lost mesh-domain `GeometrySources`, or was rejected by the
+            // packer), free the cached upload immediately and increment
+            // `MeshGeometryReleases`. `GpuWorld::FreeGeometry` auto-
+            // detaches every instance referencing the slot, so any
+            // procedural binding made earlier this frame is preserved
+            // (procedural's `SetInstanceGeometry` happened before this
+            // release and pointed the instance at a different slot, which
+            // the detach loop does not touch).
+            if (!meshBoundThisFrame && sidecar->MeshGeometry.IsValid())
+            {
+                renderer.GetGpuWorld().FreeGeometry(sidecar->MeshGeometry);
+                sidecar->MeshGeometry = {};
+                ++stats.MeshGeometryReleases;
             }
 
             if (!proceduralBound && assetSource != nullptr)
@@ -619,7 +638,7 @@ namespace Extrinsic::Runtime
                     gpuAssets);
                 AccumulateAssetObservationStats(observation, stats);
             }
-            else if (!proceduralBound && !sidecar->MeshGeometry.IsValid())
+            else if (!proceduralBound && !meshBoundThisFrame)
             {
                 sidecar->GpuSlot.ClearSourceAsset();
             }

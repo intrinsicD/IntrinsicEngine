@@ -181,7 +181,15 @@ their own counters; every other non-`Success` status
 `MeshGeometryFailedPack`. A failed pack does not bind stale geometry, leaves the
 slot's source-asset sentinel cleared, and does not allocate a `GpuGeometryHandle`.
 Mesh-source residency does not share `GpuGeometryHandle`s across entities — each
-mesh entity owns its own upload. `RetireMissingRenderables` and `Shutdown` free
+mesh entity owns its own upload. If a previously-uploaded entity stops selecting
+the mesh source on a later frame (it gained `ProceduralGeometryRef` or
+`AssetInstance::Source`, or it lost mesh-domain `GeometrySources` topology so
+`BuildConstView` no longer resolves `Domain::Mesh`), the cache frees the cached
+upload that same frame and increments `MeshGeometryReleases`;
+`GpuWorld::FreeGeometry` auto-detaches every instance referencing the freed
+slot, so any procedural rebinding made earlier in the same frame is preserved
+and any instance that lost its source is left at the invalid-geometry sentinel
+until a future frame rebinds. `RetireMissingRenderables` and `Shutdown` free
 the runtime-owned mesh upload through `GpuWorld::FreeGeometry` and increment
 `MeshGeometryReleases`; Slice B frees immediately, Slice C will route the free
 through the same `framesInFlight` deferred-retire window the procedural cache

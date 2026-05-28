@@ -492,6 +492,144 @@ TEST(MeshGeometryExtraction, DegenerateAllFacesIncrementsFailedPackCounter)
     engine.Shutdown();
 }
 
+TEST(MeshGeometryExtraction, AddingProceduralRefAfterMeshUploadReleasesMeshResidency)
+{
+    namespace E = Extrinsic::ECS::Components;
+
+    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.Initialize();
+
+    auto& scene = engine.GetScene();
+    const EntityHandle entity = MakeMeshRenderable(scene);
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    auto stats = extraction.ExtractAndSubmit(scene,
+                                              engine.GetRenderer(),
+                                              &engine.GetGpuAssetCache());
+    ASSERT_EQ(stats.MeshGeometryUploads, 1u);
+
+    auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
+    ASSERT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
+
+    // Eligibility flip: a procedural ref appears on the same entity. The
+    // mesh path must release its cached upload this frame and the
+    // procedural path must take over the instance binding.
+    scene.Raw().emplace<E::ProceduralGeometryRef>(entity);
+
+    stats = extraction.ExtractAndSubmit(scene,
+                                         engine.GetRenderer(),
+                                         &engine.GetGpuAssetCache());
+    EXPECT_EQ(stats.MeshGeometryUploads, 0u);
+    EXPECT_EQ(stats.MeshGeometryReuseHits, 0u);
+    EXPECT_EQ(stats.MeshGeometryReleases, 1u);
+    EXPECT_EQ(stats.ProceduralGeometryUploads, 1u);
+
+    const auto view = extraction.FindRenderableSidecarForTest(
+        static_cast<std::uint32_t>(entity));
+    ASSERT_TRUE(view.has_value());
+    EXPECT_FALSE(view->HasMeshResidency);
+    ASSERT_TRUE(view->ProceduralKey.has_value());
+    // Instance is bound to the procedural handle, not a freed mesh slot.
+    EXPECT_TRUE(view->Geometry.IsValid());
+    EXPECT_EQ(gpuWorld.GetInstanceGeometry(view->Instance), view->Geometry);
+    // Only the procedural geometry remains live.
+    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
+TEST(MeshGeometryExtraction, AddingAssetSourceAfterMeshUploadReleasesMeshResidency)
+{
+    namespace E = Extrinsic::ECS::Components;
+
+    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.Initialize();
+
+    auto& scene = engine.GetScene();
+    const EntityHandle entity = MakeMeshRenderable(scene);
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    auto stats = extraction.ExtractAndSubmit(scene,
+                                              engine.GetRenderer(),
+                                              &engine.GetGpuAssetCache());
+    ASSERT_EQ(stats.MeshGeometryUploads, 1u);
+
+    auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
+    ASSERT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
+
+    // Eligibility flip: an asset source appears on the same entity. The
+    // mesh upload is released; the asset observation path runs in its
+    // place. Asset observation never sets instance geometry, so the
+    // instance is left detached (no live geometry) until later asset
+    // wiring takes over (out of scope for Slice B).
+    scene.Raw().emplace<E::AssetInstance::Source>(entity).AssetId = 17u;
+
+    stats = extraction.ExtractAndSubmit(scene,
+                                         engine.GetRenderer(),
+                                         &engine.GetGpuAssetCache());
+    EXPECT_EQ(stats.MeshGeometryReleases, 1u);
+    EXPECT_EQ(stats.MeshGeometryReuseHits, 0u);
+    EXPECT_EQ(stats.SourceAssetObservationCount, 1u);
+
+    const auto view = extraction.FindRenderableSidecarForTest(
+        static_cast<std::uint32_t>(entity));
+    ASSERT_TRUE(view.has_value());
+    EXPECT_FALSE(view->HasMeshResidency);
+    // The mesh handle has been freed; the instance no longer points at
+    // any live geometry slot.
+    EXPECT_FALSE(gpuWorld.GetInstanceGeometry(view->Instance).IsValid());
+    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 0u);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
+TEST(MeshGeometryExtraction, LosingMeshDomainTopologyReleasesMeshResidency)
+{
+    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.Initialize();
+
+    auto& scene = engine.GetScene();
+    const EntityHandle entity = MakeMeshRenderable(scene);
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    auto stats = extraction.ExtractAndSubmit(scene,
+                                              engine.GetRenderer(),
+                                              &engine.GetGpuAssetCache());
+    ASSERT_EQ(stats.MeshGeometryUploads, 1u);
+
+    auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
+    ASSERT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
+
+    // Eligibility flip: the entity drops its mesh-domain topology
+    // (e.g., upstream code re-populated as a point cloud). `DetectDomain`
+    // no longer resolves `Domain::Mesh`, so the mesh path must release
+    // the cached upload even though no procedural / asset path has
+    // taken over.
+    auto& raw = scene.Raw();
+    raw.remove<gs::Halfedges>(entity);
+    raw.remove<gs::Faces>(entity);
+    raw.remove<gs::Edges>(entity);
+
+    stats = extraction.ExtractAndSubmit(scene,
+                                         engine.GetRenderer(),
+                                         &engine.GetGpuAssetCache());
+    EXPECT_EQ(stats.MeshGeometryUploads, 0u);
+    EXPECT_EQ(stats.MeshGeometryReuseHits, 0u);
+    EXPECT_EQ(stats.MeshGeometryReleases, 1u);
+
+    const auto view = extraction.FindRenderableSidecarForTest(
+        static_cast<std::uint32_t>(entity));
+    ASSERT_TRUE(view.has_value());
+    EXPECT_FALSE(view->HasMeshResidency);
+    EXPECT_FALSE(gpuWorld.GetInstanceGeometry(view->Instance).IsValid());
+    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 0u);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
 TEST(MeshGeometryExtraction, NonMeshDomainEntityIsIgnoredByMeshPath)
 {
     namespace E = Extrinsic::ECS::Components;
