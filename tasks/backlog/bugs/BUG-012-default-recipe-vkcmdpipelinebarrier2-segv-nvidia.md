@@ -202,7 +202,7 @@
     render pass again.
 
 ## Docs
-- [x] Update `tasks/active/GRAPHICS-076-default-recipe-debug-view-and-present-wiring.md`
+- [x] Update `tasks/done/GRAPHICS-076-default-recipe-debug-view-and-present-wiring.md`
       to retire the `vkCmdPipelineBarrier SEGV` line from the upstream
       blocker list once the fix lands; flip the fixture's status from
       `Skipped` to `Passed` and graduate the maturity rung from

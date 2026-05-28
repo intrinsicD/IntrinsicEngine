@@ -2,20 +2,19 @@
 
 ## Status
 
-- Status: in-progress (Slices A–D landed locally; Slice D
-  recipe-selector smoke now passes instead of `GTEST_SKIP` on the
-  Vulkan-capable host after the 2026-05-27 BUG-012 command-stream
-  fixes. The default-recipe pixel-readback parity harness is
-  explicitly deferred to
+- Status: done. Slices A–D landed; Slice D recipe-selector smoke now passes
+  instead of `GTEST_SKIP` on the Vulkan-capable host after the 2026-05-27
+  BUG-012 command-stream fixes. Maturity reached: `Operational` for the
+  default-recipe command-stream / recipe-selector smoke on Vulkan-capable hosts,
+  with CPU/null contracts preserving the default gate. The default-recipe
+  pixel-readback parity harness is explicitly deferred to
   [`GRAPHICS-076E`](../backlog/rendering/GRAPHICS-076E-default-recipe-pixel-readback.md)
-  rather than silently expanding this Slice D fixture into a renderer
-  API change).
-- Owner/agent: current agent for Slice D graduation; next pick-up is
-  either retirement after review/commit or `GRAPHICS-081` once the
-  scaffold-retirement reviewer accepts the command-stream proof as
-  sufficient.
-- Branch: current working tree on `main` after merge `fb81eb95`;
-  Slice D graduate-from-SKIP change is ready for commit/retirement.
+  rather than silently expanding this Slice D fixture into a renderer API change.
+- Completed: 2026-05-28. Final graduation commit: `37c53a94`
+  (`GRAPHICS-076: graduate default-recipe Vulkan smoke`); retirement file move
+  recorded in the follow-up task-retirement commit.
+- Owner/agent: local agent workflow.
+- Branch: local `main` after merge `fb81eb95`.
 - Started: 2026-05-23. Landed slices:
   - Slice A: PR #921 on `claude/intrinsicengine-agent-onboarding-GdEzP`
     (commits `203d4c4` + Slice A follow-up `22cbbe9` via PR #922 on
@@ -27,7 +26,7 @@
   - Slice D (fixture skeleton + bootstrap pre-check + build
     wiring): on the current
     `claude/intrinsicengine-agent-onboarding-*` branch (2026-05-26).
-- Next verification step: review/commit and retire the task. 2026-05-28
+- Completion verification: 2026-05-28
   verification completed under `ci` / `ci-vulkan` trees configured with
   `/usr/bin/clang-22` / `clang-scan-deps-22`: focused `DefaultRecipeSurfaceGpuSmoke`
   passed normally (not skipped), full opt-in GPU smoke passed 4/4, focused

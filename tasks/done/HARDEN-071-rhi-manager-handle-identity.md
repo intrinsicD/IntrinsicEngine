@@ -137,7 +137,7 @@
 - [x] Inline `.cpp` comments updated as part of the required changes
       (above): new storage-shape paragraph + handle-identity guarantee +
       cross-reference to GRAPHICS-076 Slice D diagnosis.
-- [x] `tasks/active/GRAPHICS-076-default-recipe-debug-view-and-present-wiring.md`
+- [x] `tasks/done/GRAPHICS-076-default-recipe-debug-view-and-present-wiring.md`
       carries a 2026-05-26 follow-up clarification pointing at this task
       for the upstream fix that retired the upload-rejection symptom.
 - [x] `src/graphics/rhi/README.md` does not currently call out either

@@ -11,21 +11,6 @@ Each active task should include:
 
 ## Currently active
 
-- [`GRAPHICS-076`](GRAPHICS-076-default-recipe-debug-view-and-present-wiring.md) —
-  Default-recipe `Pass.DebugView` and canonical `Pass.Present` wiring.
-  Status: in-progress, Slice D graduation verified on 2026-05-28
-  (Slices A–C landed via PRs #921 + #922 (Slice A follow-up), #923,
-  and #924; Slice D's recipe-selector fixture skeleton + build wiring
-  landed 2026-05-26; BUG-012 command-stream fixes landed 2026-05-27;
-  the 2026-05-28 local slice removed the default-recipe cold-gate pre-check and
-  the fixture now passes normally rather than `GTEST_SKIP`ing on this Vulkan
-  host. Focused `DefaultRecipeSurfaceGpuSmoke` passed 1/1, the opt-in GPU
-  smoke selection passed 4/4 under `build/ci-vulkan`, focused
-  `contract;graphics` passed 253/253, and the default CPU gate
-  passed 2297/2297 after building `IntrinsicBenchmarkSmoke`. Default-recipe
-  pixel readback parity is deferred to
-  [`GRAPHICS-076E`](../backlog/rendering/GRAPHICS-076E-default-recipe-pixel-readback.md)).
-  Owner: current agent for final CPU/docs verification and retirement.
 - [`GRAPHICS-077`](GRAPHICS-077-transient-debug-primitive-upload-helper.md) —
   Backend transient-debug-primitive upload helper. Status:
   in-progress (Slices A + B + C landed; only the optional Slice D

@@ -16,8 +16,8 @@ window".
   (retired 2026-05-21 after Slice D.4),
   [`GRAPHICS-075`](../../tasks/done/GRAPHICS-075-default-recipe-postprocess-chain-wiring.md)
   (retired 2026-05-22 after Slice E.2 fixup),
-  [`GRAPHICS-076`](../../tasks/active/GRAPHICS-076-default-recipe-debug-view-and-present-wiring.md)
-  (active; Slices A/B/C landed, Slice D blocked on Vulkan host),
+  [`GRAPHICS-076`](../../tasks/done/GRAPHICS-076-default-recipe-debug-view-and-present-wiring.md)
+  (now retired; at audit time Slices A/B/C had landed and Slice D was blocked on Vulkan host),
   [`GRAPHICS-077`](../../tasks/active/GRAPHICS-077-transient-debug-primitive-upload-helper.md)
   (active; Slices A/B/C landed, Slice D blocked on Vulkan host),
   [`GRAPHICS-078`](../../tasks/active/GRAPHICS-078-visualization-overlay-upload-helper.md)

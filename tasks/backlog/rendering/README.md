@@ -644,7 +644,7 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   claim and the bloom per-mip subresource barriers are tracked as standing
   follow-ups via the opt-in `gpu;vulkan` smoke and the `ICommandContext::TextureBarrier`
   RHI extension respectively, intentionally out-of-scope of this task.
-- [GRAPHICS-076 — Default-recipe `Pass.DebugView` and canonical `Pass.Present` wiring](../../active/GRAPHICS-076-default-recipe-debug-view-and-present-wiring.md):
+- [GRAPHICS-076 — Default-recipe `Pass.DebugView` and canonical `Pass.Present` wiring](../../done/GRAPHICS-076-default-recipe-debug-view-and-present-wiring.md):
   depends on GRAPHICS-075 (done). Promoted to `tasks/active/` on 2026-05-23
   with a four-slice plan (canonical present → canonical debug-view →
   non-present-`Backbuffer`-write negative test → default-recipe
