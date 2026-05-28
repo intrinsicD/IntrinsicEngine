@@ -92,6 +92,31 @@ Each active task should include:
   host gate as GRAPHICS-076 / 077 Slice D). The task now sits at
   `CPUContracted` on CPU-only hosts for the full two-lane
   visualization overlay.
+- [`GEOM-012`](GEOM-012-symmetric-domain-views-property-sharing.md) —
+  Symmetric mesh, graph, and point-cloud domain views. Status:
+  in-progress (Slice A landed). Owner: unassigned. Branch: Slice A
+  on `claude/funny-pascal-kTHxz`. Promoted from
+  `tasks/backlog/geometry/` on 2026-05-28 as the next unblocked
+  geometry task once GEOM-008 (Geometry.Linalg / Geometry.Sparse
+  foundation) retired. Slice A adds the new `Geometry.DomainViews`
+  module with `Geometry::DomainViews::BorrowMeshAsGraph` — a public
+  factory that returns a `Graph::Graph` sharing the source mesh's
+  vertex/halfedge/edge `PropertySet`s, deletion counters, and the
+  canonical `v:point`/`v:connectivity`/`h:connectivity`/`v:deleted`/
+  `e:deleted` slots with no compatibility-copy allocations. The
+  `MakeMeshBackedGraphView` helper that previously lived in
+  `tests/unit/geometry/Test_ShortestPath.cpp` is retired and all
+  callers route through the public API. Six new tests in
+  `Test_SubmeshViewDomainBorrows.cpp` cover shared-property
+  identity, absence of `*_graph_*` shadow slots, deletion-counter
+  sharing through direct counter mutation, mesh→view position-edit
+  visibility, view→mesh position-edit visibility, and the
+  empty-mesh case. Slice B (mesh-backed point-cloud) and Slice C
+  (graph-backed point-cloud) follow the same factory pattern;
+  Slice D introduces distinct const-view types; Slice E reviews
+  the conversion/move/consume policy and closes at
+  `CPUContracted`. Next verification step:
+  `ctest --test-dir build/ci --output-on-failure -R 'SubmeshView|ShortestPath|PointCloud|RuntimeGraph|MeshOperations' --timeout 60`.
 - [`RUNTIME-085`](RUNTIME-085-geometrysources-mesh-residency.md) —
   `GeometrySources` mesh residency bridge. Status: in-progress
   (Slices A + B landed; Slice C remains). Slice A landed on

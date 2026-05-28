@@ -35,6 +35,7 @@ export import Geometry.IO;
 export import Geometry.HalfedgeMesh.IO;
 export import Geometry.Graph;
 export import Geometry.Graph.Utils;
+export import Geometry.DomainViews;
 export import Geometry.Graph.IO;
 export import Geometry.SDF;
 export import Geometry.SDFContact;

@@ -88,6 +88,27 @@ Mesh, graph, and point-cloud vertex positions use the canonical `v:point`
 must be handled by an explicit compatibility/conversion path rather than by a
 borrowed view.
 
+### Domain-view module: `Geometry.DomainViews`
+
+The named bridge for symmetric, no-copy domain views lives in
+`Geometry.DomainViews`. It depends on `Geometry.HalfedgeMesh` and
+`Geometry.Graph` (point-cloud directions land in later GEOM-012 slices) and
+exposes mutable-borrow factories:
+
+- `Geometry::DomainViews::BorrowMeshAsGraph(HalfedgeMesh::Mesh&) -> Graph::Graph`
+  returns a `Graph::Graph` sharing the source mesh's vertex, halfedge, and edge
+  `PropertySet`s and deletion counters. The canonical `v:point`,
+  `v:connectivity`, `h:connectivity`, `v:deleted`, and `e:deleted` slots are
+  reused — no `*_graph_*` compatibility-copy slots are allocated. The source
+  mesh must outlive the view; lifetime is the caller's responsibility and
+  mirrors `HalfedgeMesh::Mesh::CreateView`.
+
+Mutable borrows are the default surface until GEOM-012 Slice D adds distinct
+read-only view types. Callsites that intend read-only behavior should consume
+the result through `const Graph::Graph&` (or the equivalent const reference for
+later mesh-backed/graph-backed point-cloud factories) and follow the
+mutable-borrow rule recorded above.
+
 ## Indexed mesh and polygon-soup staging
 
 `Geometry::MeshSoup::IndexedMesh` is the lightweight owning container for
