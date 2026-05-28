@@ -813,6 +813,9 @@ namespace Extrinsic::Runtime
                 // framesInFlight the asset cache uses.  Final FreeGeometry
                 // calls fall through to GpuWorld here.
                 Extraction.TickProceduralGeometry(currentFrame, framesInFlight, Renderer);
+                // RUNTIME-085 Slice C — mirror the same window for the
+                // runtime-owned mesh-residency retire queue.
+                Extraction.TickMeshGeometry(currentFrame, framesInFlight, Renderer);
             }
         };
 
