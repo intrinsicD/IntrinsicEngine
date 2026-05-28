@@ -166,7 +166,10 @@ Reproducible correctness/regression fixes only. Origin:
 [`bugs/index.md`](bugs/index.md).
 
 Members:
-- Currently no active reproducible issues are tracked.
+- [`bugs/BUG-013-backbuffer-readback-contract-vtable-segv.md`](bugs/BUG-013-backbuffer-readback-contract-vtable-segv.md)
+  — default-recipe + minimal-debug backbuffer readback contract tests SEGV
+  under clang-20 modules. Blocks `GRAPHICS-076E` CPU contract closure and
+  `GRAPHICS-081` scaffold retirement.
 
 ## Cross-domain dependency anchors
 
