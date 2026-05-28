@@ -424,6 +424,97 @@ TEST(MeshGeometryPackerTest, AllInvalidFaceHalfedgesYieldDegenerateAllFaces)
     EXPECT_FALSE(result.Upload.has_value());
 }
 
+TEST(MeshGeometryPackerTest, MissingHalfedgeFacePropertyIsRejected)
+{
+    // `PopulateFromMesh` always writes `h:face`; missing it is treated as
+    // missing halfedge topology so callers can distinguish a wrong-shape
+    // source from an internally inconsistent mesh.
+    MeshScratch mesh = BuildSingleTriangle();
+    auto& registry = mesh.HalfedgeSource.Properties.Registry();
+    const auto id = registry.Find(pn::kHalfedgeFace);
+    ASSERT_TRUE(id.has_value());
+    EXPECT_TRUE(registry.Remove(*id));
+    MeshPackBuffer scratch;
+
+    const MeshPackResult result = PackMesh(mesh.View(), scratch);
+    EXPECT_EQ(result.Status, MeshPackStatus::MissingHalfedgeTopology);
+}
+
+TEST(MeshGeometryPackerTest, DeletedFaceSlotIsSkippedNotTriangulated)
+{
+    // Simulate `HalfedgeMesh::DeleteFace`: the face's interior halfedges had
+    // their `h:face` invalidated, but `f:halfedge` still points to the
+    // formerly-walkable ring. The packer must rely on `h:face` ownership to
+    // skip this slot rather than fan-triangulating it.
+    MeshScratch mesh = BuildSingleTriangle();
+    mesh.FaceSource.NumDeleted = 1u;
+    auto faceProp = mesh.HalfedgeSource.Properties.Get<std::uint32_t>(pn::kHalfedgeFace);
+    ASSERT_TRUE(faceProp);
+    faceProp.Vector()[0] = kInvalidIndex;
+    faceProp.Vector()[1] = kInvalidIndex;
+    faceProp.Vector()[2] = kInvalidIndex;
+    MeshPackBuffer scratch;
+
+    const MeshPackResult result = PackMesh(mesh.View(), scratch);
+    EXPECT_EQ(result.Status, MeshPackStatus::DegenerateAllFaces);
+    EXPECT_FALSE(result.Upload.has_value());
+}
+
+TEST(MeshGeometryPackerTest, AliveFaceSurvivesAlongsideDeletedFaceSlot)
+{
+    // Two face slots: slot 0 alive (halfedges 0..2), slot 1 deleted (its
+    // ring of halfedges 3..5 has been kept walkable by stale `h:next` but
+    // its halfedges' `h:face` was cleared). Only slot 0 must be packed.
+    MeshScratch mesh{};
+    SetPositions(mesh.VertexSource, {
+        {0.0f, 0.0f, 0.0f},
+        {1.0f, 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f},
+        {2.0f, 0.0f, 0.0f},
+        {3.0f, 0.0f, 0.0f},
+        {2.0f, 1.0f, 0.0f},
+    });
+    SetEdges(mesh.EdgeSource, {0u, 1u, 2u, 3u, 4u, 5u}, {1u, 2u, 0u, 4u, 5u, 3u});
+    // halfedges 0..2 belong to live face 0; 3..5 form a still-walkable ring
+    // but their `h:face` has been cleared by a (simulated) DeleteFace.
+    SetHalfedges(mesh.HalfedgeSource,
+                 /*toVertex*/ {1u, 2u, 0u, 4u, 5u, 3u},
+                 /*next*/     {1u, 2u, 0u, 4u, 5u, 3u},
+                 /*face*/     {0u, 0u, 0u, kInvalidIndex, kInvalidIndex, kInvalidIndex});
+    // Both face slots still have a `f:halfedge` pointing at their original
+    // ring (deletion does not clear it).
+    SetFaces(mesh.FaceSource, {0u, 3u});
+    mesh.FaceSource.NumDeleted = 1u;
+
+    MeshPackBuffer scratch;
+    const MeshPackResult result = PackMesh(mesh.View(), scratch);
+    ASSERT_EQ(result.Status, MeshPackStatus::Success);
+    ASSERT_TRUE(result.Upload.has_value());
+    EXPECT_EQ(result.Upload->VertexCount, 6u);
+    ASSERT_EQ(result.Upload->SurfaceIndices.size(), 3u);
+    // Only the live face's ring (halfedge targets 1, 2, 0) is emitted.
+    EXPECT_EQ(result.Upload->SurfaceIndices[0], 1u);
+    EXPECT_EQ(result.Upload->SurfaceIndices[1], 2u);
+    EXPECT_EQ(result.Upload->SurfaceIndices[2], 0u);
+}
+
+TEST(MeshGeometryPackerTest, RingHalfedgeClaimingDifferentFaceIsRejected)
+{
+    // The first halfedge claims face 0 (passes the ownership check), but a
+    // mid-ring halfedge claims face 5 — the mesh's topology is corrupt
+    // (mixed-owner ring) and must fail closed rather than silently emit a
+    // misattributed triangle.
+    MeshScratch mesh = BuildSingleTriangle();
+    auto faceProp = mesh.HalfedgeSource.Properties.Get<std::uint32_t>(pn::kHalfedgeFace);
+    ASSERT_TRUE(faceProp);
+    faceProp.Vector()[1] = 5u; // out of range w.r.t. face count, but the
+                               // ownership check fires first.
+    MeshPackBuffer scratch;
+
+    const MeshPackResult result = PackMesh(mesh.View(), scratch);
+    EXPECT_EQ(result.Status, MeshPackStatus::InvalidTopology);
+}
+
 TEST(MeshGeometryPackerTest, DebugNameForStatusReturnsStableStrings)
 {
     EXPECT_STREQ(Extrinsic::Runtime::DebugNameForMeshPackStatus(MeshPackStatus::Success),

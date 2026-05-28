@@ -70,17 +70,26 @@ export namespace Extrinsic::Runtime
     // Pack a promoted ECS mesh `GeometrySources` view into the canonical
     // `Graphics::GpuWorld::GeometryUploadDesc` triangle-list shape.
     //
-    // Algorithm: validate `v:position`, `h:to_vertex`, `h:next`, `f:halfedge`;
-    // for each face walk its halfedge ring (capped at `halfedgeCount` to fail
-    // closed on cycles), fan-triangulate from the first ring vertex, and emit
-    // (ring[0], ring[i], ring[i+1]) surface indices. Vertex bytes are written
-    // in input order so surface indices index directly into the source
-    // `Vertices` PropertySet. `LocalSphere` is filled from the local AABB
-    // center and half-diagonal so downstream culling/transform sync has a
-    // deterministic non-empty local bound even before `RUNTIME-082`-style
-    // adapters publish a tighter sphere; `WorldSphere`/`WorldAabb*` remain
-    // zero — runtime extraction overwrites them with the per-frame world
-    // transform via `ExtractBounds` (see `Runtime.RenderExtraction`).
+    // Algorithm: validate `v:position`, `h:to_vertex`, `h:next`, `h:face`,
+    // `f:halfedge`; for each face slot resolve its first halfedge and skip
+    // the slot when that halfedge's `h:face` no longer claims the face
+    // (`PopulateFromMesh` writes `f:halfedge` for every slot including
+    // deleted faces, while `HalfedgeMesh::DeleteFace` clears only the
+    // halfedges' `h:face` — so the deleted-face ring is still walkable and
+    // must be detected via `h:face` ownership). For live face slots walk
+    // the ring (capped at `halfedgeCount` to fail closed on malformed
+    // `h:next` cycles), fan-triangulate from the first ring vertex, and
+    // emit (ring[0], ring[i], ring[i+1]) surface indices. A ring halfedge
+    // whose `h:face` disagrees with the current face after the first
+    // halfedge has passed the ownership check indicates a corrupt mesh and
+    // is rejected as `InvalidTopology`. Vertex bytes are written in input
+    // order so surface indices index directly into the source `Vertices`
+    // PropertySet. `LocalSphere` is filled from the local AABB center and
+    // half-diagonal so downstream culling/transform sync has a deterministic
+    // non-empty local bound even before `RUNTIME-082`-style adapters publish
+    // a tighter sphere; `WorldSphere`/`WorldAabb*` remain zero — runtime
+    // extraction overwrites them with the per-frame world transform via
+    // `ExtractBounds` (see `Runtime.RenderExtraction`).
     //
     // `outBuffer` is cleared on entry. The returned `Upload.PackedVertexBytes`
     // and `Upload.SurfaceIndices` view into `outBuffer`; callers must hand the

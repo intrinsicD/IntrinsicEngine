@@ -90,18 +90,21 @@ namespace Extrinsic::Runtime
             PropertyNames::kHalfedgeToVertex);
         const auto nextProp = view.HalfedgeSource->Properties.Get<std::uint32_t>(
             PropertyNames::kHalfedgeNext);
-        if (!toVertexProp || !nextProp)
+        const auto faceProp = view.HalfedgeSource->Properties.Get<std::uint32_t>(
+            PropertyNames::kHalfedgeFace);
+        if (!toVertexProp || !nextProp || !faceProp)
         {
             return Failure(MeshPackStatus::MissingHalfedgeTopology, outBuffer);
         }
         const auto& toVertex = toVertexProp.Vector();
         const auto& nextHe = nextProp.Vector();
+        const auto& halfedgeFace = faceProp.Vector();
         const std::size_t halfedgeCount = toVertex.size();
         if (halfedgeCount == 0)
         {
             return Failure(MeshPackStatus::EmptyMesh, outBuffer);
         }
-        if (nextHe.size() != halfedgeCount)
+        if (nextHe.size() != halfedgeCount || halfedgeFace.size() != halfedgeCount)
         {
             return Failure(MeshPackStatus::InvalidTopology, outBuffer);
         }
@@ -128,16 +131,41 @@ namespace Extrinsic::Runtime
         std::vector<std::uint32_t> ringScratch;
         ringScratch.reserve(8);
 
+        const std::uint32_t faceCountU32 = static_cast<std::uint32_t>(faceCount);
+
         for (std::size_t f = 0; f < faceCount; ++f)
         {
             const std::uint32_t first = faceHe[f];
             if (first == kInvalidIndex)
             {
-                continue; // boundary / deleted face slot
+                continue; // boundary / unpopulated face slot
             }
             if (first >= halfedgeCount)
             {
                 return Failure(MeshPackStatus::InvalidTopology, outBuffer);
+            }
+
+            // Deleted-face guard: `GeometrySources::PopulateFromMesh` writes
+            // `f:halfedge` for every face slot via `mesh.Halfedge(fh)`, but
+            // `HalfedgeMesh::DeleteFace` invalidates only `h:face` on the
+            // ring's halfedges — it does not clear the face's own
+            // `f:halfedge` pointer. So a deleted face slot still has a
+            // walkable `h:next` ring, and we must rely on `h:face` to detect
+            // that the ring no longer claims this face. We use the first
+            // halfedge as the witness: if it does not own this face, the
+            // entire ring belonged to a now-deleted face and is skipped
+            // rather than fan-triangulated.
+            const std::uint32_t firstOwner = halfedgeFace[first];
+            if (firstOwner == kInvalidIndex || firstOwner >= faceCountU32)
+            {
+                continue;
+            }
+            if (firstOwner != static_cast<std::uint32_t>(f))
+            {
+                // The halfedge a deleted face's `f:halfedge` points at may
+                // also have been re-bound to a different live face by later
+                // topology edits; in both cases this face slot is stale.
+                continue;
             }
 
             ringScratch.clear();
@@ -145,6 +173,14 @@ namespace Extrinsic::Runtime
             for (std::size_t step = 0; step <= halfedgeCount; ++step)
             {
                 if (h >= halfedgeCount)
+                {
+                    return Failure(MeshPackStatus::InvalidTopology, outBuffer);
+                }
+                // The first halfedge already passed the ownership check; any
+                // later ring halfedge whose `h:face` disagrees with `f`
+                // indicates a corrupt mesh (mixed-owner ring) — fail closed.
+                const std::uint32_t owner = halfedgeFace[h];
+                if (owner != static_cast<std::uint32_t>(f))
                 {
                     return Failure(MeshPackStatus::InvalidTopology, outBuffer);
                 }
