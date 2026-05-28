@@ -5,7 +5,7 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- 2026-05-28: [`BUG-013` — Default-recipe + minimal-debug backbuffer readback contract tests SEGV under clang-20 modules](BUG-013-backbuffer-readback-contract-vtable-segv.md). Both `MinimalDebugBackbufferReadbackContract.ConfiguredHandleRecordsReadbackTripletOnce` and `DefaultRecipeBackbufferReadbackContract.ConfiguredHandleRecordsReadbackTripletOnce` SEGV (PC = 0x0) in the renderer's per-recipe `graphicsContext.CopyTextureToBuffer(...)` call against `MockCommandContext`. Likely manifestation of the same clang-20 / C++23-modules vtable layout bug HARDEN-072 worked around, re-triggered by commit `cc06edef` adding the non-pure-virtual `RHI::ICommandContext::BindFrameSampledTexture` with an inline body. Blocks `GRAPHICS-076E` CPU contract closure and `GRAPHICS-081` scaffold retirement.
+- 2026-05-28: [`BUG-013` — Default-recipe + minimal-debug backbuffer readback contract tests SEGV under clang-20 modules](../../active/BUG-013-backbuffer-readback-contract-vtable-segv.md). Both `MinimalDebugBackbufferReadbackContract.ConfiguredHandleRecordsReadbackTripletOnce` and `DefaultRecipeBackbufferReadbackContract.ConfiguredHandleRecordsReadbackTripletOnce` SEGV (PC = 0x0) in the renderer's per-recipe `graphicsContext.CopyTextureToBuffer(...)` call against `MockCommandContext`. Likely manifestation of the same clang-20 / C++23-modules vtable layout bug HARDEN-072 worked around, re-triggered by commit `cc06edef` adding the non-pure-virtual `RHI::ICommandContext::BindFrameSampledTexture` with an inline body. Promoted to `tasks/active/` 2026-05-28; blocks `GRAPHICS-076E` CPU contract closure and `GRAPHICS-081` scaffold retirement.
 
 ---
 

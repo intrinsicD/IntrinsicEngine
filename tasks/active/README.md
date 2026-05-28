@@ -11,6 +11,18 @@ Each active task should include:
 
 ## Currently active
 
+- [`BUG-013`](BUG-013-backbuffer-readback-contract-vtable-segv.md) —
+  Default-recipe + minimal-debug backbuffer readback contract tests SEGV
+  under clang-20 modules. Status: in-progress. Owner: local agent.
+  Branch: local `main` (committed `7e00f5f9` filed the bug; fix in
+  progress on the same branch). Promoted from `tasks/backlog/bugs/` on
+  2026-05-28 because the regression blocks `GRAPHICS-076E` CPU contract
+  closure and `GRAPHICS-081` scaffold retirement, and "reproducible
+  regressions trump feature work" per the agent prompt. Next
+  verification step: `cmake --build --preset ci --target
+  IntrinsicGraphicsContractCpuTests && build/ci/bin/IntrinsicGraphicsContractCpuTests
+  --gtest_filter='*BackbufferReadbackContract*'` must report 8/8 passing.
+
 - [`GEOM-012`](GEOM-012-symmetric-domain-views-property-sharing.md) —
   Symmetric mesh, graph, and point-cloud domain views. Status:
   in-progress (Slices A + B landed). Owner: unassigned. Branch:
