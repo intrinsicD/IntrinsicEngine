@@ -13,37 +13,45 @@ Each active task should include:
 
 - [`GEOM-012`](GEOM-012-symmetric-domain-views-property-sharing.md) —
   Symmetric mesh, graph, and point-cloud domain views. Status:
-  in-progress (Slice A landed). Owner: unassigned. Branch: Slice A
-  on `claude/funny-pascal-kTHxz`. Promoted from
+  in-progress (Slices A + B landed). Owner: unassigned. Branch:
+  Slice A on `claude/funny-pascal-kTHxz`; Slice B on
+  `claude/eloquent-sagan-WhPAe`. Promoted from
   `tasks/backlog/geometry/` on 2026-05-28 as the next unblocked
   geometry task once GEOM-008 (Geometry.Linalg / Geometry.Sparse
-  foundation) retired. Slice A adds the new `Geometry.DomainViews`
+  foundation) retired. Slice A added the new `Geometry.DomainViews`
   module with
   `Geometry::DomainViews::BorrowMeshAsGraphReadOnly(const HalfedgeMesh::Mesh&)`
   — a public factory that returns a `Graph::Graph` sharing the source
   mesh's vertex/halfedge/edge `PropertySet`s, the deleted-vertex/edge
   counters, and the canonical `v:point`/`v:connectivity`/`h:connectivity`/
   `v:deleted`/`e:deleted` slots with no compatibility-copy allocations.
-  Face storage (`h:face`/`f:connectivity`/`f:deleted`/`FacesSize`/
-  `DeletedFaceCount`) is deliberately excluded from the view: the
-  const-reference parameter is the safety signal that topology
-  mutation through the returned graph is UB on face-bearing meshes
-  (graph methods cannot update face incidence); graph-domain reads
-  and vertex-position writes are explicitly allowed. The
-  `MakeMeshBackedGraphView` helper that previously lived in
-  `tests/unit/geometry/Test_ShortestPath.cpp` is retired and all
-  callers route through the public API. Six new tests in
-  `Test_SubmeshViewDomainBorrows.cpp` cover shared-property
-  identity, absence of `*_graph_*` shadow slots, size sharing with
-  face-state isolation (FacesSize/DeletedFaceCount untouched,
-  `h:face`/`f:connectivity` preserved on the source mesh), mesh→
-  view position-edit visibility, view→mesh position-edit visibility,
-  and the empty-mesh case. Slice B (mesh-backed point-cloud) and Slice C
-  (graph-backed point-cloud) follow the same factory pattern;
+  Face storage is deliberately excluded; topology mutation through the
+  returned graph is UB on face-bearing meshes (graph methods cannot
+  update face incidence) and the const-reference parameter is the
+  safety signal. Slice B adds
+  `Geometry::DomainViews::BorrowMeshAsCloud(HalfedgeMesh::Mesh&) ->
+  PointCloud::Cloud`, which routes through the existing
+  `PointCloud::Cloud(PropertySet&, size_t&)` borrow constructor and
+  shares the source mesh's vertex `PropertySet` and
+  `DeletedVertexCount()`; the canonical `v:point` slot is reused with
+  no `p:position` compatibility copy, and existing per-vertex
+  attributes (e.g. `v:normal`) stay reachable through
+  `Cloud::GetVertexProperty<T>`. `Cloud::AddPoint` through the view
+  appends to the shared vertex `PropertySet` and is safe on
+  face-bearing meshes because the new vertex is isolated (no incident
+  halfedges); the cloud's `p:deleted` deletion marker is allocated
+  lazily on first borrow and is independent from the mesh's
+  topology-aware `v:deleted`, so topology-aware deletion must still
+  route through `Mesh::DeleteVertex` / `Mesh::GarbageCollection`.
+  Seven new tests in `Test.SubmeshViewDomainBorrows.cpp` cover
+  `v:point` slot identity, absence of `p:position`, `v:normal` reuse,
+  bidirectional position-edit visibility, point-addition propagation
+  with face state untouched, and the empty-mesh case. Slice C
+  (graph-backed point-cloud) follows the same factory pattern;
   Slice D introduces distinct const-view types; Slice E reviews
   the conversion/move/consume policy and closes at
   `CPUContracted`. Next verification step:
-  `ctest --test-dir build/ci --output-on-failure -R 'SubmeshView|ShortestPath|PointCloud|RuntimeGraph|MeshOperations' --timeout 60`.
+  `ctest --test-dir build/ci --output-on-failure -R 'SubmeshViewDomainBorrows|ShortestPath|PointCloud|MeshOperations' --timeout 60`.
 - [`RUNTIME-085`](RUNTIME-085-geometrysources-mesh-residency.md) —
   `GeometrySources` mesh residency bridge. Status: in-progress
   (Slices A + B landed; Slice C remains). Slice A landed on

@@ -4,6 +4,7 @@ export module Geometry.DomainViews;
 
 export import Geometry.HalfedgeMesh;
 export import Geometry.Graph;
+export import Geometry.PointCloud;
 
 export namespace Geometry::DomainViews
 {
@@ -41,4 +42,32 @@ export namespace Geometry::DomainViews
     // graph supports the in-place mutations listed above. A distinct
     // compile-time-checked read-only view type is owned by GEOM-012 Slice D.
     [[nodiscard]] Graph::Graph BorrowMeshAsGraphReadOnly(const HalfedgeMesh::Mesh& mesh);
+
+    // Borrow a `HalfedgeMesh::Mesh`'s vertex storage as a `PointCloud::Cloud`
+    // so point-cloud algorithms can consume the mesh's vertex domain without
+    // copying positions or attributes. The returned cloud shares the source
+    // mesh's vertex `PropertySet` and `DeletedVertexCount()` counter and
+    // reuses the canonical `v:point` slot; no `p:position` compatibility-copy
+    // property is allocated. Any existing per-vertex attributes on the mesh
+    // (for example `v:normal`) are reachable through the cloud's
+    // `GetVertexProperty<T>` accessor over the same shared `PropertySet`.
+    //
+    // `PointCloud::Cloud::AddPoint` appends a row to the shared vertex
+    // `PropertySet`, so a point added through the returned view becomes a
+    // new vertex slot on the source mesh; this is safe on face-bearing meshes
+    // because face/halfedge/edge storage is not modified and the new vertex
+    // is left isolated (no incident halfedges). `PointCloud::Cloud` owns its
+    // own deletion marker (`p:deleted`) which `EnsureProperties` allocates on
+    // the shared vertex `PropertySet` on first borrow; the mesh's own
+    // `v:deleted` marker is independent. Removing a point through the cloud
+    // therefore marks `p:deleted` and increments the shared
+    // `DeletedVertexCount()` but does **not** update mesh-side topology;
+    // route topology-aware deletion through `Mesh::DeleteVertex` /
+    // `Mesh::GarbageCollection`.
+    //
+    // Lifetime: the source mesh must outlive the returned view, mirroring
+    // `HalfedgeMesh::Mesh::CreateView` and `BorrowMeshAsGraphReadOnly`. A
+    // distinct compile-time-checked read-only cloud-view type is owned by
+    // GEOM-012 Slice D.
+    [[nodiscard]] PointCloud::Cloud BorrowMeshAsCloud(HalfedgeMesh::Mesh& mesh);
 }

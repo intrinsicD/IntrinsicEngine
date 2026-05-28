@@ -18,4 +18,10 @@ namespace Geometry::DomainViews
                             mut.DeletedVertexCount(),
                             mut.DeletedEdgeCount());
     }
+
+    PointCloud::Cloud BorrowMeshAsCloud(HalfedgeMesh::Mesh& mesh)
+    {
+        return PointCloud::Cloud(mesh.VertexProperties(),
+                                 mesh.DeletedVertexCount());
+    }
 }
