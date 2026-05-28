@@ -33,7 +33,7 @@
   Slice D command-stream smoke landed locally on `main` after `35bbf0ce`.
 - Started: 2026-05-23.
 - Completed: 2026-05-28.
-- Commit/PR: pending local commit.
+- Commit/PR: local commit `032b8ab7` (`GRAPHICS-077/078: add overlay Vulkan smokes`).
 - Next verification step: none for this task; pixel-readback parity is tracked
   by
   [`GRAPHICS-077E`](../backlog/rendering/GRAPHICS-077E-transient-debug-pixel-readback.md).

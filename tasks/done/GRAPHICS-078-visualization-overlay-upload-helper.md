@@ -33,7 +33,7 @@
   landed on `claude/intrinsicengine-agent-onboarding-2P6pn`;
   Slice D command-stream smoke landed locally on `main` after `35bbf0ce`.
 - Completed: 2026-05-28.
-- Commit/PR: pending local commit.
+- Commit/PR: local commit `032b8ab7` (`GRAPHICS-077/078: add overlay Vulkan smokes`).
 - Started: 2026-05-24. Promoted from
   `tasks/backlog/rendering/GRAPHICS-078-visualization-overlay-upload-helper.md`
   as the next earliest unblocked Theme A leaf after GRAPHICS-076 and
