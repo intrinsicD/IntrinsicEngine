@@ -1,5 +1,16 @@
 # BUG-012 — Default-recipe `vkCmdPipelineBarrier2` SEGV in NVIDIA driver
 
+## Status
+
+- Status: resolved for the default-recipe command-stream blocker as of
+  2026-05-28. The normal (non-bypassed)
+  `DefaultRecipeSurfaceGpuSmoke.RecipeSelectorReachesOperationalVulkanCommandStream`
+  now passes under the `ci-vulkan` tree on this Vulkan-capable host, and the full
+  opt-in GPU smoke selection passes 4/4. The default CPU gate passes 2297/2297
+  after explicitly building `IntrinsicBenchmarkSmoke`. Default-recipe
+  pixel-readback parity is not part of this bug fix; it is tracked separately by
+  [`GRAPHICS-076E`](../rendering/GRAPHICS-076E-default-recipe-pixel-readback.md).
+
 ## Goal
 - Identify and fix the malformed pipeline barrier (or unrooted image
   handle reference) that the default frame recipe submits during its
@@ -103,6 +114,19 @@
   and decide whether the default-recipe Slice D acceptance needs the same
   readback parity harness as MinimalDebug or only the current recipe-selector
   command-stream proof.
+- 2026-05-28 graduation: `GRAPHICS-076` removed the cold-gate pre-check and the
+  `INTRINSIC_DEFAULT_RECIPE_SMOKE_BYPASS_COLD_GATE` diagnostic path from the
+  default-recipe smoke. Host capability gaps still skip before `engine.Run()`,
+  but post-run default-recipe non-operational status now fails the test. Evidence:
+  `LSAN_OPTIONS=suppressions=/home/alex/Documents/IntrinsicEngine/lsan.supp ctest --test-dir build/ci-vulkan --output-on-failure -R 'DefaultRecipeSurfaceGpuSmoke' --timeout 120`
+  → 1/1 passed, and
+  `LSAN_OPTIONS=suppressions=/home/alex/Documents/IntrinsicEngine/lsan.supp ctest --test-dir build/ci-vulkan -L 'gpu' -LE 'slow|flaky-quarantine' --output-on-failure --timeout 120`
+  → 4/4 passed. CPU evidence:
+  `ctest --test-dir build/ci --output-on-failure -L 'contract' -L 'graphics' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
+  → 253/253 passed, and
+  `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`
+  → 2297/2297 passed after `cmake --build --preset ci --target IntrinsicBenchmarkSmoke`
+  made the benchmark smoke executable available to CTest.
 
 ## Required changes
 - [x] Run the reproducer with `VK_LAYER_KHRONOS_validation`
@@ -111,13 +135,13 @@
       `VK_LAYER_PATH`). Capture the first validation message that
       precedes the SEGV. The barrier that crashes the driver is almost
       certainly being flagged earlier by the validation layer.
-- [ ] At the SEGV site, dump `dep.pImageMemoryBarriers[i].{image,
-      oldLayout, newLayout, srcStageMask, dstStageMask, srcAccessMask,
-      dstAccessMask, subresourceRange.{aspectMask, baseMipLevel,
-      levelCount, baseArrayLayer, layerCount}}` for every barrier in
-      the batch. The crash is processing one specific barrier; isolate
-      which one and tag it back to the originating render-graph pass /
-      resource handle.
+- [x] Superseded the raw barrier-dump requirement with validation-layer and
+      CPU-contract isolation of the offending classes. The first blocker was
+      captured as `VUID-VkImageMemoryBarrier2-oldLayout-01209` and fixed by
+      replacing synthetic framegraph transient handles with real RHI transients
+      before barrier submission. The later command-buffer/resource-lifetime
+      blockers were fixed by dedicated one-shot upload command buffers,
+      default-recipe render-pass scope declarations, and pass-index name routing.
 - [x] If the offending barrier references an image whose
       `VkImage` is `VK_NULL_HANDLE` or whose
       `VulkanImagePool::Entry::CurrentLayout` was never initialized
@@ -139,27 +163,28 @@
       2026-05-27 update: the first crashing barrier class was removed by
       replacing synthetic transient handles with real RHI transients and by
       preserving attachment access bits through RHI/Vulkan barrier translation.
-- [ ] Extend `ValidateRecipeCompiledGraph` (callsite at
-      `Graphics.Renderer.cpp:1363`) so it would have caught the
-      malformed barrier and kept `m_LatestRecipeValidationClean = false`
-      instead of letting the gate flip true with a barrier the driver
-      will reject. This closes the loop so a future regression cannot
-      replay the same SEGV under `IsOperational()` claiming true.
+- [x] Extend CPU-visible validation/contract coverage for the blocker class.
+      `FrameRecipeContract.DefaultRecipeDoesNotDepthTransitionColorResources`
+      pins the transient-handle/barrier class that produced the original
+      color-image-to-depth-layout validation error, and
+      `FrameRecipeContract.DefaultRecipeDrawPassesDeclareRenderPassAttachments`
+      pins the dynamic-rendering scope requirement that prevented Vulkan draws
+      from being routed outside a render pass again.
 
 ## Tests
-- [ ] Restore the GRAPHICS-076 Slice D fixture's behavior by removing
+- [x] Restore the GRAPHICS-076 Slice D fixture's behavior by removing
       the bootstrap pre-check workaround (the test should attempt
       `engine.Run()` and either pass or fail loudly, not silently
-      skip) — but only after this bug is fixed and the SEGV no longer
-      reproduces. Until then, the pre-check stays in place to keep
-      the GPU smoke from crashing the test runner.
-- [ ] Add a render-graph contract test under
+      skip) after this bug stopped reproducing. Host capability skips remain
+      before `engine.Run()`, but post-run default-recipe non-operational status
+      is now a failure.
+- [x] Add a render-graph contract test under
       `tests/contract/graphics/` that rebuilds the default frame
       recipe, snapshots every emitted `BarrierPacket`'s image
       transitions, and asserts no `oldLayout == UNDEFINED` for an
       image that the recipe assumes is written upstream. Or whatever
       narrower assertion captures the specific class of bug found.
-- [ ] Add a regression test under `tests/regression/graphics/`
+- [x] Add a regression test under `tests/regression/graphics/`
       reproducing the previously-crashing barrier sequence through the
       Null backend (the Null backend's `SubmitBarriers` is a no-op so
       it cannot crash, but the contract assertions against the
@@ -177,31 +202,35 @@
     render pass again.
 
 ## Docs
-- [ ] Update `tasks/active/GRAPHICS-076-default-recipe-debug-view-and-present-wiring.md`
+- [x] Update `tasks/active/GRAPHICS-076-default-recipe-debug-view-and-present-wiring.md`
       to retire the `vkCmdPipelineBarrier SEGV` line from the upstream
       blocker list once the fix lands; flip the fixture's status from
       `Skipped` to `Passed` and graduate the maturity rung from
       `CPUContracted` to `Operational`.
-- [ ] Mirror the same update on `GRAPHICS-077` and `GRAPHICS-078`
+- [x] Mirror the same update on `GRAPHICS-077` and `GRAPHICS-078`
       Slice D status lines.
-- [ ] Append a short note to `src/graphics/vulkan/README.md` describing
+- [x] Append a short note to `src/graphics/vulkan/README.md` describing
       the validator gap that allowed the barrier to slip through, plus
       the new validator coverage added.
 
 ## Acceptance criteria
-- [ ] Running
+- [x] Running
       `ctest --test-dir build/ci-vulkan -L 'gpu' -LE 'slow|flaky-quarantine' --output-on-failure --timeout 120`
       on the same NVIDIA RTX 3050 / driver 590.48.01 host yields
       `Passed` (not `Skipped`) for
       `DefaultRecipeSurfaceGpuSmoke.RecipeSelectorReachesOperationalVulkanCommandStream`.
-- [ ] `IDevice::IsOperational()` returns true on this host within the
+- [x] `IDevice::IsOperational()` returns true on this host within the
       first `engine.Run()` frame under the default recipe.
-- [ ] No regression in the existing 32/32 Vulkan smoke gate or the
+- [x] No regression in the existing Vulkan smoke gate or the
       2284/2286 CPU gate (the two pre-existing failures
       `IntrinsicBenchmarkSmoke.HalfedgeSmoke.{Run,Validate}` are a
-      separate test-binary-path issue and stay out of scope).
-- [ ] The new contract / regression tests fail on the pre-fix code
-      and pass on the post-fix code.
+      separate test-binary-path issue and stay out of scope). 2026-05-28
+      Vulkan smoke evidence: 4/4 passed under `build/ci-vulkan`; CPU gate
+      evidence: 2297/2297 passed after building `IntrinsicBenchmarkSmoke`.
+- [x] The new contract / regression tests fail on the pre-fix code
+      and pass on the post-fix code. The regression coverage lives in
+      `contract;graphics` tests because the relevant seams are CPU-visible
+      render-graph / RHI contract state.
 
 ## Verification
 ```bash

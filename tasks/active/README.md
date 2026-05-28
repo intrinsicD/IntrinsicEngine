@@ -13,27 +13,25 @@ Each active task should include:
 
 - [`GRAPHICS-076`](GRAPHICS-076-default-recipe-debug-view-and-present-wiring.md) —
   Default-recipe `Pass.DebugView` and canonical `Pass.Present` wiring.
-  Status: blocked on operational default-recipe Vulkan bring-up
+  Status: in-progress, Slice D graduation verified on 2026-05-28
   (Slices A–C landed via PRs #921 + #922 (Slice A follow-up), #923,
   and #924; Slice D's recipe-selector fixture skeleton + build wiring
-  landed 2026-05-26 on the current onboarding branch, but the
-  fixture `GTEST_SKIP`s on a Vulkan-capable host because the default
-  recipe still fails the operational Vulkan gate. The 2026-05-27
-  BUG-012 slices fixed the synthetic-transient-handle/color-image
-  depth-transition barrier, transfer-queue upload barrier stage masks,
-  shader/pipeline-layout mismatches, per-frame command-buffer reuse by
-  one-shot uploads, and missing default-recipe render-pass scopes. The
-  diagnostic bypassed smoke now passes on the NVIDIA validation host;
-  the remaining GRAPHICS-076 Slice D work is to intentionally remove or
-  revise the cold-gate pre-check and decide the final default-recipe
-  readback/parity acceptance. See the 2026-05-27 BUG-012 clarifications
-  on the task file for exact evidence). Owner:
-  unassigned; next pick-up by any agent willing to triage the
-  upstream Vulkan default-recipe bring-up issues.
+  landed 2026-05-26; BUG-012 command-stream fixes landed 2026-05-27;
+  the 2026-05-28 local slice removed the default-recipe cold-gate pre-check and
+  the fixture now passes normally rather than `GTEST_SKIP`ing on this Vulkan
+  host. Focused `DefaultRecipeSurfaceGpuSmoke` passed 1/1, the opt-in GPU
+  smoke selection passed 4/4 under `build/ci-vulkan`, focused
+  `contract;graphics` passed 253/253, and the default CPU gate
+  passed 2297/2297 after building `IntrinsicBenchmarkSmoke`. Default-recipe
+  pixel readback parity is deferred to
+  [`GRAPHICS-076E`](../backlog/rendering/GRAPHICS-076E-default-recipe-pixel-readback.md)).
+  Owner: current agent for final CPU/docs verification and retirement.
 - [`GRAPHICS-077`](GRAPHICS-077-transient-debug-primitive-upload-helper.md) —
   Backend transient-debug-primitive upload helper. Status:
   in-progress (Slices A + B + C landed; only the optional Slice D
-  remains, blocked on a Vulkan-capable host). Slice A landed on
+  remains. The shared GRAPHICS-076/BUG-012 default-recipe Vulkan blocker is
+  cleared as of 2026-05-28, so Slice D now needs a dedicated transient-debug
+  `gpu;vulkan` smoke). Slice A landed on
   `claude/intrinsicengine-agent-onboarding-p1J2P` 2026-05-23;
   Slice B landed on `claude/intrinsicengine-agent-onboarding-MnHl0`
   2026-05-24; Slice C landed on
@@ -59,8 +57,10 @@ Each active task should include:
 - [`GRAPHICS-078`](GRAPHICS-078-visualization-overlay-upload-helper.md) —
   Backend visualization-overlay upload helper (vector field +
   isoline). Status: in-progress (Slices A + B + C landed; only the
-  optional Slice D `gpu;vulkan` smoke remains, blocked on a Vulkan-
-  capable host). Slice A scaffolded the recipe + executor shape on
+  optional Slice D `gpu;vulkan` smoke remains. The shared
+  GRAPHICS-076/BUG-012 default-recipe Vulkan blocker is cleared as of
+  2026-05-28, so Slice D now needs a dedicated visualization-overlay smoke).
+  Slice A scaffolded the recipe + executor shape on
   `claude/intrinsicengine-agent-onboarding-3dLeQ` 2026-05-24
   (209/209 graphics contract tests pass). Slice B promoted the
   vector-field lane from `SkippedUnavailable` to `Recorded` on

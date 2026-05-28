@@ -422,6 +422,27 @@ invariants of the helpers and the renderer wiring run in the default gate via
 `IntrinsicGraphicsContractCpuTests`
 (`Test.MinimalTriangleReadbackHarness.cpp` and `Test.MinimalDebugBackbufferReadback.cpp`).
 
+GRAPHICS-076 / BUG-012 extends the operational proof to the canonical default
+recipe. The original default-recipe Vulkan bring-up exposed a validator gap: the
+recipe-aware graph validation was clean, but renderer-side barrier translation
+could still submit a malformed image transition after synthetic framegraph
+transient handles collided with live Vulkan images. The fix set allocates real
+per-frame RHI transients before barrier submission, preserves attachment access
+bits through RHI/Vulkan Sync2 mappings, records synchronous staging uploads on a
+dedicated one-shot command buffer instead of the per-frame graphics command
+buffer, enables the `drawIndirectCount` feature required by the default command
+shape, and declares dynamic-rendering scopes for every default-recipe draw pass.
+CPU contracts pin the two classes that allowed the fault to escape:
+`FrameRecipeContract.DefaultRecipeDoesNotDepthTransitionColorResources` and
+`FrameRecipeContract.DefaultRecipeDrawPassesDeclareRenderPassAttachments`. The
+opt-in `gpu;vulkan;graphics` fixture
+`DefaultRecipeSurfaceGpuSmoke.RecipeSelectorReachesOperationalVulkanCommandStream`
+now runs the default recipe without a cold-gate diagnostic bypass; after host
+capability checks pass, a non-operational post-`engine.Run()` status is a test
+failure rather than a skip. Default-recipe pixel-readback parity is tracked by
+`GRAPHICS-076E` so the command-stream smoke remains separate from the renderer
+API work needed for a default-recipe readback hook/counter.
+
 Ordered gate checklist:
 
 1. Build/run gate is reconciled: the Vulkan backend is compiled when requested,

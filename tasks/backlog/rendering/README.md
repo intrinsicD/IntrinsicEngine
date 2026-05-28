@@ -649,27 +649,34 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   with a four-slice plan (canonical present → canonical debug-view →
   non-present-`Backbuffer`-write negative test → default-recipe
   `gpu;vulkan` visible-triangle smoke). Slices A–C landed via PRs
-  #921 + #922 (Slice A follow-up), #923, and #924; Slice D is
-  blocked on a Vulkan-capable host.
+  #921 + #922 (Slice A follow-up), #923, and #924; Slice D graduated locally
+  on 2026-05-28 with `DefaultRecipeSurfaceGpuSmoke` passing normally on a
+  Vulkan-capable host after the BUG-012 command-stream fixes.
+- [GRAPHICS-076E — Default-recipe pixel-readback parity harness](GRAPHICS-076E-default-recipe-pixel-readback.md):
+  follow-up to GRAPHICS-076 Slice D. Adds default-recipe four-sample readback
+  parity without reusing MinimalDebug-only diagnostics; optional before or
+  during GRAPHICS-081 depending on scaffold-retirement reviewer requirements.
 - [GRAPHICS-077 — Backend transient-debug-primitive upload helper](../../active/GRAPHICS-077-transient-debug-primitive-upload-helper.md):
   depends on GRAPHICS-072 (uses `SceneColorHDR`/`SceneDepth` LOAD-store).
   Promoted to `tasks/active/` on 2026-05-23 with a four-slice plan
   (recipe/executor scaffold → triangle lane → line + point lanes →
-  optional `gpu;vulkan` smoke). Slice A (scaffold-only) is the next
-  pick-up; Slices A–C are CPU-testable and only Slice D requires a
-  Vulkan-capable host.
+  optional `gpu;vulkan` smoke). Slices A–C are landed/CPUContracted and Slice D
+  is now unblocked from the shared default-recipe Vulkan bring-up by
+  GRAPHICS-076/BUG-012.
 - [GRAPHICS-078 — Backend visualization-overlay upload helper](../../active/GRAPHICS-078-visualization-overlay-upload-helper.md):
   depends on GRAPHICS-077 (mirrors helper pattern) and GRAPHICS-072.
   Promoted to `tasks/active/` on 2026-05-24 with a four-slice plan
   (recipe/executor scaffold → vector-field lane → isoline lane →
-  optional `gpu;vulkan` smoke), mirroring GRAPHICS-077 exactly. Slice
-  A (scaffold-only) is in-progress; Slices A–C are CPU-testable and
-  only Slice D requires a Vulkan-capable host.
+  optional `gpu;vulkan` smoke), mirroring GRAPHICS-077 exactly. Slices A–C are
+  landed/CPUContracted and Slice D is now unblocked from the shared
+  default-recipe Vulkan bring-up by GRAPHICS-076/BUG-012.
 - [GRAPHICS-079 — Default-recipe `Pass.ImGui` wiring](GRAPHICS-079-default-recipe-imgui-pass-wiring.md):
   depends on GRAPHICS-076 (PresentSource finalization) and `runtime/RUNTIME-090`
   (ImGui adapter producer).
 - [GRAPHICS-081 — Retire `FrameRecipe::MinimalDebugSurface` scaffold once default recipe is operational](GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md):
-  depends on GRAPHICS-031A/B and GRAPHICS-070..076; deletes the
+  depends on GRAPHICS-031A/B and GRAPHICS-070..076; may also consume
+  GRAPHICS-076E if reviewers require default-recipe pixel-readback parity before
+  deletion. Deletes the
   `MinimalDebug` recipe, pass classes, executor branches, diagnostics
   counters, CMake entries, tests, and doc rows once the default recipe
   records all canonical pass bodies and the default-recipe equivalent of the

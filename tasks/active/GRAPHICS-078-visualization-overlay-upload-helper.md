@@ -3,8 +3,10 @@
 ## Status
 
 - Status: in-progress (Slices A + B + C landed on CPU/null hosts;
-  only the optional Slice D `gpu;vulkan` smoke remains, deferred
-  behind a Vulkan-capable host gate).
+  only the optional Slice D `gpu;vulkan` smoke remains. The shared
+  GRAPHICS-076/BUG-012 default-recipe Vulkan command-stream blocker is cleared
+  as of 2026-05-28, so the next slice is a dedicated visualization-overlay
+  smoke rather than upstream Vulkan bring-up).
   Slice A scaffolded the recipe + executor shape on
   `claude/intrinsicengine-agent-onboarding-3dLeQ` 2026-05-24
   (209/209 graphics contract tests pass). Slice B promoted the
@@ -22,7 +24,8 @@
   visualization overlay; only the optional Slice D `gpu;vulkan`
   smoke remains.
 - Owner/agent: unassigned for Slice D; next pick-up by any agent
-  on a Vulkan-capable host for the opt-in `gpu;vulkan` smoke.
+  on a Vulkan-capable host for the opt-in visualization-overlay `gpu;vulkan`
+  smoke.
 - Branch: Slice A landed on
   `claude/intrinsicengine-agent-onboarding-3dLeQ`; Slice B landed
   on `claude/intrinsicengine-agent-onboarding-7IOiJ`; Slice C
@@ -40,7 +43,9 @@
   drawing into `SceneColorHDR`/`SceneDepth` after lit composition.
 - Next verification step: see `## Next verification step` below for
   the full per-slice command list. Slices A + B + C are verified;
-  Slice D is the next pick-up for Vulkan-capable hosts.
+  Slice D is the next pick-up for Vulkan-capable hosts, with the
+  default-recipe baseline now green (`DefaultRecipeSurfaceGpuSmoke` passed
+  normally on 2026-05-28).
 
 ## Slice plan
 

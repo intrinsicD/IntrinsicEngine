@@ -3,7 +3,10 @@
 ## Status
 
 - Status: in-progress (Slices A + B + C landed; only the optional
-  Slice D remains, blocked on a Vulkan-capable host).
+  Slice D remains. The shared GRAPHICS-076/BUG-012 default-recipe Vulkan
+  command-stream blocker is cleared as of 2026-05-28; the next slice is now
+  a dedicated transient-debug `gpu;vulkan` smoke rather than upstream Vulkan
+  bring-up).
   Slice A scaffolded the recipe + executor shape on
   `claude/intrinsicengine-agent-onboarding-p1J2P` on 2026-05-23
   (224/224 graphics contract tests pass). Slice B promoted the
@@ -29,9 +32,11 @@
 - Started: 2026-05-23.
 - Next verification step: when the optional Slice D is picked up
   on a Vulkan-capable host, configure with the `ci-vulkan` preset,
-  build `IntrinsicGraphicsIntegrationTests`, and run the opt-in
-  `gpu;vulkan` smoke (`ctest --test-dir build/ci-vulkan -L gpu -LE
-  'slow|flaky-quarantine' --timeout 120`). The CPU-only Slice C
+  build the relevant graphics smoke/integration target, and run the opt-in
+  transient-debug `gpu;vulkan` smoke. The default-recipe baseline is now green
+  (`DefaultRecipeSurfaceGpuSmoke` passed normally on 2026-05-28), so failures in
+  this Slice D should be attributed to transient-debug upload/recording unless
+  evidence shows otherwise. The CPU-only Slice C
   pin is `Test.TransientDebugSurfacePass.cpp` (now fifteen contract
   tests covering recipe declaration, executor taxonomy, all three
   lanes' bind/draw shapes, per-packet variant selection per lane,
