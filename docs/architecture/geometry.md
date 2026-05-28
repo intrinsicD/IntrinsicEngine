@@ -103,19 +103,27 @@ GEOM-012 Slice C):
   (`h:face`, `f:connectivity`, `f:deleted`, `Mesh::FacesSize()`, and
   `Mesh::DeletedFaceCount()`) is **not** part of the view.
 - `Geometry::DomainViews::BorrowMeshAsCloud(HalfedgeMesh::Mesh&) -> PointCloud::Cloud`
-  returns a `PointCloud::Cloud` sharing the source mesh's vertex `PropertySet`
-  and the deleted-vertex counter. The canonical `v:point` slot is reused — no
-  `p:position` compatibility-copy slot is allocated. Existing per-vertex
-  attributes (for example `v:normal`) are reachable through the cloud's
-  `GetVertexProperty<T>` accessor over the shared `PropertySet`. The cloud's
-  own deletion marker (`p:deleted`) is allocated lazily on first borrow
-  through the shared vertex `PropertySet` and is independent from the mesh's
-  topology-aware `v:deleted` marker; `Cloud::DeletePoint` therefore marks
-  `p:deleted` and increments the shared `DeletedVertexCount()` but does not
-  update mesh halfedge/edge/face state. Route topology-aware deletion through
-  `Mesh::DeleteVertex` / `Mesh::GarbageCollection`. `Cloud::AddPoint` appends
-  a row to the shared vertex `PropertySet`; the new vertex is isolated (no
-  incident halfedges) so face-bearing source meshes are not corrupted.
+  returns a `PointCloud::Cloud` sharing the source mesh's vertex
+  `PropertySet`. The canonical `v:point` slot is reused — no `p:position`
+  compatibility-copy slot is allocated. Existing per-vertex attributes (for
+  example `v:normal`) are reachable through the cloud's `GetVertexProperty<T>`
+  accessor over the shared `PropertySet`. The returned cloud owns its own
+  deletion counter; cloud-side deletes mark `p:deleted` on the shared
+  `PropertySet` but do **not** increment `mesh.DeletedVertexCount()`, so the
+  mesh's `VertexCount()` and `HasGarbage()` continue to reflect only
+  mesh-side `v:deleted` semantics. The cloud's `p:deleted` marker is
+  independent from the mesh's `v:deleted` and the mesh never reads
+  `p:deleted`. Route topology-aware deletion through `Mesh::DeleteVertex` /
+  `Mesh::GarbageCollection`; calling `Cloud::GarbageCollection` on a
+  mesh-backed borrow is undefined behavior on face-bearing source meshes
+  because it physically reshuffles and resizes vertex slots and would
+  invalidate mesh halfedge/edge connectivity that references vertex indices.
+  `Cloud::AddPoint` appends a row to the shared vertex `PropertySet`; the
+  new vertex is isolated (no incident halfedges) so face-bearing source
+  meshes are not corrupted. `Cloud::CreateView` is well-defined on the
+  returned cloud: subrange clamping and the returned view's bound storage
+  both follow the mesh-backed `v:point` data rather than the cloud's empty
+  owning `Properties`.
 
 The factory accepts face-bearing meshes for graph-domain reads and vertex-
 position writes (e.g. `Geometry::ShortestPath::Dijkstra`, `SetVertexPosition`).

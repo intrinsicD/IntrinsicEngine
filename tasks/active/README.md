@@ -30,23 +30,36 @@ Each active task should include:
   update face incidence) and the const-reference parameter is the
   safety signal. Slice B adds
   `Geometry::DomainViews::BorrowMeshAsCloud(HalfedgeMesh::Mesh&) ->
-  PointCloud::Cloud`, which routes through the existing
-  `PointCloud::Cloud(PropertySet&, size_t&)` borrow constructor and
-  shares the source mesh's vertex `PropertySet` and
-  `DeletedVertexCount()`; the canonical `v:point` slot is reused with
-  no `p:position` compatibility copy, and existing per-vertex
+  PointCloud::Cloud`, which routes through a new
+  `PointCloud::Cloud(PropertySet&)` constructor that shares the
+  source mesh's vertex `PropertySet` while owning the cloud's own
+  deletion counter; cloud-side deletes mark `p:deleted` on the
+  shared `PropertySet` but do not increment
+  `mesh.DeletedVertexCount()`, so the mesh's `VertexCount()` /
+  `HasGarbage()` continue to reflect only mesh-side `v:deleted`
+  semantics. The canonical `v:point` slot is reused with no
+  `p:position` compatibility copy, and existing per-vertex
   attributes (e.g. `v:normal`) stay reachable through
   `Cloud::GetVertexProperty<T>`. `Cloud::AddPoint` through the view
   appends to the shared vertex `PropertySet` and is safe on
-  face-bearing meshes because the new vertex is isolated (no incident
-  halfedges); the cloud's `p:deleted` deletion marker is allocated
-  lazily on first borrow and is independent from the mesh's
-  topology-aware `v:deleted`, so topology-aware deletion must still
-  route through `Mesh::DeleteVertex` / `Mesh::GarbageCollection`.
-  Seven new tests in `Test.SubmeshViewDomainBorrows.cpp` cover
-  `v:point` slot identity, absence of `p:position`, `v:normal` reuse,
-  bidirectional position-edit visibility, point-addition propagation
-  with face state untouched, and the empty-mesh case. Slice C
+  face-bearing meshes because the new vertex is isolated (no
+  incident halfedges); topology-aware deletion must still route
+  through `Mesh::DeleteVertex` / `Mesh::GarbageCollection`, and
+  `Cloud::GarbageCollection` on a mesh-backed borrow is documented
+  UB on face-bearing meshes (it physically reshuffles vertex slots).
+  Slice B also fixes the pre-existing `Cloud::CreateView` to clamp
+  and bind against the cloud's bound `m_Vertices` /
+  `m_DeletedVertices` rather than the owning `Properties`, so
+  subviews of a mesh-backed borrow see the mesh's rows rather than
+  clamping to size 0 (no-op rebinding for owned clouds).
+  Eleven new tests in `Test.SubmeshViewDomainBorrows.cpp` cover
+  `v:point` slot identity, absence of `p:position`, `v:normal`
+  reuse, bidirectional position-edit visibility, point-addition
+  propagation with face state untouched, the empty-mesh case,
+  `Cloud::CreateView` over a mesh-borrowed cloud, the empty-mesh
+  `CreateView` clamp, cloud-side `DeletePoint` not touching the
+  mesh's deletion counter, and a follow-up mesh `GarbageCollection`
+  after a cloud-side delete being a consistent no-op. Slice C
   (graph-backed point-cloud) follows the same factory pattern;
   Slice D introduces distinct const-view types; Slice E reviews
   the conversion/move/consume policy and closes at

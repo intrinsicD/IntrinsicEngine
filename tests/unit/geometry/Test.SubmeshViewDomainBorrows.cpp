@@ -260,4 +260,98 @@ TEST(SubmeshViewDomainBorrows, EmptyMeshBorrowsAsEmptyCloud)
     EXPECT_EQ(mesh.FacesSize(), 0u);
 }
 
+TEST(SubmeshViewDomainBorrows, CloudSubviewOfMeshBorrowSeesMeshBackedRows)
+{
+    // `Cloud::CreateView` is documented to return a subrange view over the
+    // source cloud's vertex storage. For a mesh-backed borrow, the bound
+    // storage is the mesh's vertex `PropertySet`, not the cloud's own
+    // (empty) owning `Properties`; the subview must see the mesh's rows.
+    auto mesh = MakeTwoTriangleSquare();
+    ASSERT_GE(mesh.VerticesSize(), 4u);
+
+    Geometry::PointCloud::Cloud borrowed = BorrowMeshAsCloud(mesh);
+    ASSERT_EQ(borrowed.VerticesSize(), mesh.VerticesSize());
+
+    Geometry::PointCloud::Cloud sub =
+        Geometry::PointCloud::Cloud::CreateView(borrowed,
+                                                Geometry::ElementRange{1u, 2u});
+
+    EXPECT_TRUE(sub.IsSubmeshView());
+    EXPECT_EQ(sub.VertexRange().Offset, 1u);
+    EXPECT_EQ(sub.VertexRange().Size, 2u);
+    EXPECT_EQ(sub.Positions().size(), 2u);
+
+    const Geometry::VertexHandle v1{1};
+    const Geometry::VertexHandle v2{2};
+    EXPECT_EQ(sub.Position(v1), mesh.Position(v1));
+    EXPECT_EQ(sub.Position(v2), mesh.Position(v2));
+}
+
+TEST(SubmeshViewDomainBorrows, CloudSubviewOfEmptyMeshBorrowClampsToZero)
+{
+    Geometry::HalfedgeMesh::Mesh mesh;
+    Geometry::PointCloud::Cloud borrowed = BorrowMeshAsCloud(mesh);
+
+    Geometry::PointCloud::Cloud sub =
+        Geometry::PointCloud::Cloud::CreateView(borrowed,
+                                                Geometry::ElementRange{0u, 8u});
+
+    EXPECT_TRUE(sub.IsSubmeshView());
+    EXPECT_EQ(sub.VertexRange().Offset, 0u);
+    EXPECT_EQ(sub.VertexRange().Size, 0u);
+    EXPECT_TRUE(sub.IsEmpty());
+}
+
+TEST(SubmeshViewDomainBorrows, CloudDeleteThroughMeshBorrowDoesNotTouchMeshDeletionCounter)
+{
+    // Cloud and mesh use independent deletion markers (`p:deleted` vs
+    // `v:deleted`); cloud-side deletes must not corrupt the mesh's deletion
+    // counter or the mesh's view of which vertices are alive.
+    auto mesh = MakeTwoTriangleSquare();
+    const std::size_t verticesBefore = mesh.VerticesSize();
+    const std::size_t meshDeletedBefore = mesh.DeletedVertexCount();
+    ASSERT_GE(verticesBefore, 4u);
+
+    Geometry::PointCloud::Cloud borrowed = BorrowMeshAsCloud(mesh);
+    EXPECT_EQ(borrowed.VertexCount(), verticesBefore - meshDeletedBefore);
+
+    const Geometry::VertexHandle v0{0};
+    borrowed.DeletePoint(v0);
+
+    // Cloud sees its own deleted point.
+    EXPECT_TRUE(borrowed.IsDeleted(v0));
+    EXPECT_EQ(borrowed.VertexCount(), verticesBefore - meshDeletedBefore - 1u);
+
+    // Mesh state is unchanged: deletion counter untouched, IsDeleted is
+    // false, no mesh-side garbage reported.
+    EXPECT_EQ(mesh.DeletedVertexCount(), meshDeletedBefore);
+    EXPECT_EQ(mesh.VerticesSize(), verticesBefore);
+    EXPECT_FALSE(mesh.IsDeleted(v0));
+    EXPECT_FALSE(mesh.HasGarbage());
+}
+
+TEST(SubmeshViewDomainBorrows, MeshGarbageCollectionAfterCloudDeleteIsConsistent)
+{
+    // After a cloud-side delete the mesh must still be safe to mutate
+    // topology and garbage-collect on its own terms — i.e. cloud-side
+    // `p:deleted` markers must not interfere with the mesh's `v:deleted`
+    // / topology-aware GC pass.
+    auto mesh = MakeTwoTriangleSquare();
+    const std::size_t verticesBefore = mesh.VerticesSize();
+
+    Geometry::PointCloud::Cloud borrowed = BorrowMeshAsCloud(mesh);
+    const Geometry::VertexHandle v0{0};
+    borrowed.DeletePoint(v0);
+
+    // Mesh-side state is unaffected.
+    EXPECT_EQ(mesh.VerticesSize(), verticesBefore);
+    EXPECT_EQ(mesh.DeletedVertexCount(), 0u);
+    EXPECT_FALSE(mesh.HasGarbage());
+
+    // A mesh GC pass is a no-op (nothing is deleted from the mesh's PoV).
+    mesh.GarbageCollection();
+    EXPECT_EQ(mesh.VerticesSize(), verticesBefore);
+    EXPECT_EQ(mesh.DeletedVertexCount(), 0u);
+}
+
 } // namespace
