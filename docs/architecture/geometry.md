@@ -139,8 +139,9 @@ and `Geometry.PointCloud`:
   through the cloud — including via `Cloud::Clear()`/`Cloud::GarbageCollection()`
   — is undefined behavior on an edge-bearing source graph, the same
   topology-mutation boundary as the other borrows. Type-level prevention of
-  reaching graph-domain slots is owned by Slice D's restricted const-view
-  types. The returned cloud owns its own deletion counter;
+  reaching graph-domain slots is provided by the Slice D `ConstGraphBackedCloudView`
+  read-only view type described below, which exposes no mutable property
+  access. The returned cloud owns its own deletion counter;
   cloud-side deletes mark `p:deleted` on the shared `PropertySet` but do
   **not** touch the graph's `v:deleted` counter, so the graph's
   `VertexCount()` and `HasGarbage()` continue to reflect only graph-side
@@ -167,11 +168,52 @@ operations, which cascade through face incidence. Vertex-position writes do
 not change topology and are explicitly allowed.
 
 The const-reference parameter is the safety intent signal; the returned
-`Graph::Graph` is mutable because position writes go through the same type. A
-compile-time-checked distinct read-only view type, and any future
-face-free-only mutable-borrow factory, are owned by later GEOM-012 slices
-(D and B/C respectively). The source mesh must outlive the view, mirroring
+`Graph::Graph` is mutable because position writes go through the same type. The
+compile-time-checked distinct read-only view types are provided by Slice D (see
+below). A future face-free-only mutable-borrow factory remains owned by a later
+GEOM-012 slice or follow-up. The source mesh must outlive the view, mirroring
 `HalfedgeMesh::Mesh::CreateView`.
+
+#### Read-only view types (`Const*View`)
+
+GEOM-012 Slice D promotes the mutable-borrow rule from convention to type with
+three read-only wrappers in `Geometry.DomainViews`:
+
+- `Geometry::DomainViews::ConstMeshBackedGraphView` (constructed from a
+  `HalfedgeMesh::Mesh&`),
+- `Geometry::DomainViews::ConstMeshBackedCloudView` (constructed from a
+  `HalfedgeMesh::Mesh&`),
+- `Geometry::DomainViews::ConstGraphBackedCloudView` (constructed from a
+  `Graph::Graph&`).
+
+Each wraps the same shared-storage borrow produced by its mutable factory
+(`BorrowMeshAsGraphReadOnly`, `BorrowMeshAsCloud`, `BorrowGraphAsCloud`) — reads
+observe live source edits — but exposes **only** `const`-returning accessors.
+There is no `Add*`, `Delete*`, `SetVertexPosition`, `Clear`,
+`GarbageCollection`, `GetOrAdd*Property`, or mutable element-access member, so
+mutating the borrowed source storage through these types is ill-formed at
+compile time (asserted by the `static_assert` block in
+`tests/unit/geometry/Test.SubmeshViewDomainBorrows.cpp`). Each exposes an
+`AsGraph()` / `AsCloud()` accessor returning the underlying container as a
+`const` reference for interop with algorithms that accept `const Graph::Graph&`
+/ `const PointCloud::Cloud&`; the container's mutating methods are not reachable
+through the const reference. Algorithms that allocate scratch properties on the
+container (e.g. `ShortestPath::Dijkstra`, which takes a mutable
+`Graph::Graph&`) are not const consumers and must use the mutable borrow.
+
+Because `ConstGraphBackedCloudView` exposes no mutable property access and no
+`Clear`/`GarbageCollection`, the shared graph-domain `v:connectivity` slot that
+remains physically reachable through the mutable `BorrowGraphAsCloud` borrow
+cannot be mutated or cleared through the read-only view: that documented-UB
+boundary is closed by construction. The views are non-copyable and
+non-movable — each is a borrow bound to its source at construction — and the
+source must outlive the view. The constructors take a **mutable** source
+reference: construction routes through the matching mutable `Borrow*` factory,
+which lazily materializes the shared `v:point`/`p:deleted`/connectivity columns
+via `EnsureProperties`/`GetOrAdd` on the source property set. A genuinely
+`const`-qualified source is rejected at compile time rather than `const_cast`
+into that mutating path (which would be undefined behavior); the view surface is
+read-only once constructed.
 
 ## Indexed mesh and polygon-soup staging
 

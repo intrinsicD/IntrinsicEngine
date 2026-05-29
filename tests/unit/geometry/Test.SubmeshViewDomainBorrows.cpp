@@ -9,8 +9,16 @@
 //    copy, halfedge/edge-PropertySet non-exposure, the shared v:connectivity
 //    slot pinned as a documented UB boundary, v:normal reuse, deletion
 //    isolation).
+//  - Slice D: type-enforced read-only view types (ConstMeshBackedGraphView,
+//    ConstMeshBackedCloudView, ConstGraphBackedCloudView) — compile-time proof
+//    that mutation through the view is ill-formed, plus runtime proof that the
+//    views share source storage and observe live edits.
 
 #include <gtest/gtest.h>
+
+#include <concepts>
+#include <cstddef>
+#include <type_traits>
 
 #include <glm/glm.hpp>
 
@@ -24,6 +32,9 @@ namespace
 using Geometry::DomainViews::BorrowGraphAsCloud;
 using Geometry::DomainViews::BorrowMeshAsCloud;
 using Geometry::DomainViews::BorrowMeshAsGraphReadOnly;
+using Geometry::DomainViews::ConstGraphBackedCloudView;
+using Geometry::DomainViews::ConstMeshBackedCloudView;
+using Geometry::DomainViews::ConstMeshBackedGraphView;
 
 // Build a small standalone graph (a single edge between two positioned
 // vertices) for the graph-backed point-cloud borrow tests.
@@ -565,6 +576,227 @@ TEST(SubmeshViewDomainBorrows, CloudDeleteThroughGraphBorrowDoesNotTouchGraphDel
     EXPECT_EQ(graph.VertexCount(), graphCountBefore);
     EXPECT_FALSE(graph.IsDeleted(v0));
     EXPECT_FALSE(graph.HasGarbage());
+}
+
+// ---------------------------------------------------------------------------
+// GEOM-012 Slice D: type-enforced read-only view types.
+//
+// Compile-time contract: each const-view type must expose ONLY const-returning
+// accessors. The mutating operations of the borrowed container (`Add*`,
+// `Delete*`, `SetVertexPosition`, `Clear`, `GarbageCollection`,
+// `GetOrAdd*Property`, mutable element access) must be ill-formed both on the
+// view itself and through its `As*()` const-reference accessor. The detection
+// concepts below are required to be FALSE for the mutating probes and TRUE for
+// the read probes; the `static_assert`s fail the build if the surface drifts.
+// ---------------------------------------------------------------------------
+
+// --- Mutating probes: must be FALSE for every const-view type. ---
+template <class V>
+concept HasAddVertex = requires(V& v) { v.AddVertex(); };
+template <class V>
+concept HasAddEdge =
+    requires(V& v) { v.AddEdge(Geometry::VertexHandle{}, Geometry::VertexHandle{}); };
+template <class V>
+concept HasAddPoint = requires(V& v) { v.AddPoint(glm::vec3{}); };
+template <class V>
+concept HasDeleteVertex = requires(V& v) { v.DeleteVertex(Geometry::VertexHandle{}); };
+template <class V>
+concept HasDeleteEdge = requires(V& v) { v.DeleteEdge(Geometry::EdgeHandle{}); };
+template <class V>
+concept HasDeletePoint = requires(V& v) { v.DeletePoint(Geometry::VertexHandle{}); };
+template <class V>
+concept HasClear = requires(V& v) { v.Clear(); };
+template <class V>
+concept HasGarbageCollection = requires(V& v) { v.GarbageCollection(); };
+template <class V>
+concept HasSetVertexPosition =
+    requires(V& v) { v.SetVertexPosition(Geometry::VertexHandle{}, glm::vec3{}); };
+template <class V>
+concept HasGetOrAddVertexProperty =
+    requires(V& v) { v.template GetOrAddVertexProperty<int>("x"); };
+// Mutable element access: assigning through `Position(h)` must be ill-formed
+// (the view returns a const reference / by value).
+template <class V>
+concept HasMutablePositionAssign =
+    requires(V& v) { v.Position(Geometry::VertexHandle{}) = glm::vec3{}; };
+// Mutation reachable through the `As*()` interop escape hatch must also fail
+// (the underlying container is handed out as a const reference).
+template <class V>
+concept HasAddVertexViaAsGraph = requires(V& v) { v.AsGraph().AddVertex(); };
+template <class V>
+concept HasAddPointViaAsCloud = requires(V& v) { v.AsCloud().AddPoint(glm::vec3{}); };
+
+// --- Read probes: must be TRUE for every const-view type. ---
+template <class V>
+concept HasVerticesSize =
+    requires(const V& v) { { v.VerticesSize() } -> std::convertible_to<std::size_t>; };
+template <class V>
+concept HasGetVertexProperty =
+    requires(const V& v) { v.template GetVertexProperty<glm::vec3>("v:point"); };
+template <class V>
+concept HasReadViaAsGraph = requires(const V& v) { v.AsGraph().VerticesSize(); };
+template <class V>
+concept HasReadViaAsCloud = requires(const V& v) { v.AsCloud().VerticesSize(); };
+
+// Positive controls: the mutating probes MUST detect the real mutating members
+// of the underlying mutable containers. Without these, a malformed probe could
+// silently make every `!Has*<ConstView>` assertion below pass vacuously.
+static_assert(HasAddVertex<Geometry::Graph::Graph>);
+static_assert(HasAddEdge<Geometry::Graph::Graph>);
+static_assert(HasDeleteVertex<Geometry::Graph::Graph>);
+static_assert(HasDeleteEdge<Geometry::Graph::Graph>);
+static_assert(HasClear<Geometry::Graph::Graph>);
+static_assert(HasGarbageCollection<Geometry::Graph::Graph>);
+static_assert(HasSetVertexPosition<Geometry::Graph::Graph>);
+static_assert(HasGetOrAddVertexProperty<Geometry::Graph::Graph>);
+static_assert(HasAddPoint<Geometry::PointCloud::Cloud>);
+static_assert(HasDeletePoint<Geometry::PointCloud::Cloud>);
+static_assert(HasClear<Geometry::PointCloud::Cloud>);
+static_assert(HasGarbageCollection<Geometry::PointCloud::Cloud>);
+static_assert(HasGetOrAddVertexProperty<Geometry::PointCloud::Cloud>);
+static_assert(HasMutablePositionAssign<Geometry::PointCloud::Cloud>);
+
+// ConstMeshBackedGraphView: no graph-topology mutation, no scratch-property
+// allocation, no position writes; reads are available directly and via AsGraph.
+static_assert(!HasAddVertex<ConstMeshBackedGraphView>);
+static_assert(!HasAddEdge<ConstMeshBackedGraphView>);
+static_assert(!HasDeleteVertex<ConstMeshBackedGraphView>);
+static_assert(!HasDeleteEdge<ConstMeshBackedGraphView>);
+static_assert(!HasClear<ConstMeshBackedGraphView>);
+static_assert(!HasGarbageCollection<ConstMeshBackedGraphView>);
+static_assert(!HasSetVertexPosition<ConstMeshBackedGraphView>);
+static_assert(!HasGetOrAddVertexProperty<ConstMeshBackedGraphView>);
+static_assert(!HasAddVertexViaAsGraph<ConstMeshBackedGraphView>);
+static_assert(HasVerticesSize<ConstMeshBackedGraphView>);
+static_assert(HasGetVertexProperty<ConstMeshBackedGraphView>);
+static_assert(HasReadViaAsGraph<ConstMeshBackedGraphView>);
+static_assert(!std::is_copy_constructible_v<ConstMeshBackedGraphView>);
+static_assert(!std::is_move_constructible_v<ConstMeshBackedGraphView>);
+
+// ConstMeshBackedCloudView: no point add/delete, no GC/clear, no scratch-
+// property allocation, no mutable position; reads available directly and via
+// AsCloud.
+static_assert(!HasAddPoint<ConstMeshBackedCloudView>);
+static_assert(!HasDeletePoint<ConstMeshBackedCloudView>);
+static_assert(!HasClear<ConstMeshBackedCloudView>);
+static_assert(!HasGarbageCollection<ConstMeshBackedCloudView>);
+static_assert(!HasGetOrAddVertexProperty<ConstMeshBackedCloudView>);
+static_assert(!HasMutablePositionAssign<ConstMeshBackedCloudView>);
+static_assert(!HasAddPointViaAsCloud<ConstMeshBackedCloudView>);
+static_assert(HasVerticesSize<ConstMeshBackedCloudView>);
+static_assert(HasGetVertexProperty<ConstMeshBackedCloudView>);
+static_assert(HasReadViaAsCloud<ConstMeshBackedCloudView>);
+static_assert(!std::is_copy_constructible_v<ConstMeshBackedCloudView>);
+static_assert(!std::is_move_constructible_v<ConstMeshBackedCloudView>);
+
+// ConstGraphBackedCloudView: same read-only cloud surface; in particular it
+// exposes no mutable property access, so the shared graph-domain
+// `v:connectivity` slot cannot be mutated/cleared through it (closing the
+// Slice C documented-UB boundary by construction).
+static_assert(!HasAddPoint<ConstGraphBackedCloudView>);
+static_assert(!HasDeletePoint<ConstGraphBackedCloudView>);
+static_assert(!HasClear<ConstGraphBackedCloudView>);
+static_assert(!HasGarbageCollection<ConstGraphBackedCloudView>);
+static_assert(!HasGetOrAddVertexProperty<ConstGraphBackedCloudView>);
+static_assert(!HasMutablePositionAssign<ConstGraphBackedCloudView>);
+static_assert(!HasAddPointViaAsCloud<ConstGraphBackedCloudView>);
+static_assert(HasVerticesSize<ConstGraphBackedCloudView>);
+static_assert(HasGetVertexProperty<ConstGraphBackedCloudView>);
+static_assert(HasReadViaAsCloud<ConstGraphBackedCloudView>);
+static_assert(!std::is_copy_constructible_v<ConstGraphBackedCloudView>);
+static_assert(!std::is_move_constructible_v<ConstGraphBackedCloudView>);
+
+// Construction requires a MUTABLE source. The borrow factories call
+// EnsureProperties()/GetOrAdd(), which lazily materialize the shared
+// v:point/p:deleted/connectivity columns on the source property set; accepting
+// a const source would force a const_cast into that mutating path, which is
+// undefined behavior on a genuinely const object. The constructors therefore
+// take `Mesh&`/`Graph&` and a const source is rejected at compile time.
+static_assert(std::is_constructible_v<ConstMeshBackedGraphView, Geometry::HalfedgeMesh::Mesh&>);
+static_assert(!std::is_constructible_v<ConstMeshBackedGraphView, const Geometry::HalfedgeMesh::Mesh&>);
+static_assert(std::is_constructible_v<ConstMeshBackedCloudView, Geometry::HalfedgeMesh::Mesh&>);
+static_assert(!std::is_constructible_v<ConstMeshBackedCloudView, const Geometry::HalfedgeMesh::Mesh&>);
+static_assert(std::is_constructible_v<ConstGraphBackedCloudView, Geometry::Graph::Graph&>);
+static_assert(!std::is_constructible_v<ConstGraphBackedCloudView, const Geometry::Graph::Graph&>);
+
+TEST(SubmeshViewDomainBorrows, ConstViewsAreReadOnlyAtCompileTime)
+{
+    // The read-only contract is enforced by the file-scope `static_assert`s
+    // above (this build would fail if any mutating member became reachable, or
+    // if a read accessor or the non-copyable/non-movable binding regressed).
+    // This case documents that the compile-time gate is part of the suite.
+    SUCCEED();
+}
+
+TEST(SubmeshViewDomainBorrows, ConstMeshGraphViewSharesStorageAndSeesLiveEdits)
+{
+    auto mesh = MakeSingleTriangle();
+    const auto meshPoint = mesh.VertexProperties().Get<glm::vec3>("v:point");
+    ASSERT_TRUE(meshPoint.IsValid());
+
+    ConstMeshBackedGraphView view(mesh);
+
+    // Shares the canonical v:point storage and the source sizes.
+    const auto viewPoint = view.VertexProperties().Get<glm::vec3>("v:point");
+    ASSERT_TRUE(viewPoint.IsValid());
+    EXPECT_EQ(meshPoint.Handle().Id(), viewPoint.Handle().Id());
+    EXPECT_EQ(view.VerticesSize(), mesh.VerticesSize());
+    EXPECT_EQ(view.EdgesSize(), mesh.EdgesSize());
+
+    // A mesh-side position edit is visible through the read-only view, both via
+    // the direct accessor and via the const AsGraph() reference.
+    const Geometry::VertexHandle v0{0};
+    const glm::vec3 newPosition{5.0f, -1.0f, 3.0f};
+    mesh.Position(v0) = newPosition;
+    EXPECT_EQ(view.VertexPosition(v0), newPosition);
+    EXPECT_EQ(view.AsGraph().VertexPosition(v0), newPosition);
+}
+
+TEST(SubmeshViewDomainBorrows, ConstMeshCloudViewSharesStorageAndSeesLiveEdits)
+{
+    auto mesh = MakeSingleTriangle();
+    const auto meshPoint = mesh.VertexProperties().Get<glm::vec3>("v:point");
+    ASSERT_TRUE(meshPoint.IsValid());
+
+    ConstMeshBackedCloudView view(mesh);
+
+    const auto viewPoint = view.PointProperties().Get<glm::vec3>("v:point");
+    ASSERT_TRUE(viewPoint.IsValid());
+    EXPECT_EQ(meshPoint.Handle().Id(), viewPoint.Handle().Id());
+    EXPECT_EQ(view.VerticesSize(), mesh.VerticesSize());
+    EXPECT_FALSE(view.PointProperties().Exists("p:position"));
+
+    const Geometry::VertexHandle v0{0};
+    const glm::vec3 newPosition{7.0f, -3.0f, 2.0f};
+    mesh.Position(v0) = newPosition;
+    EXPECT_EQ(view.Position(v0), newPosition);
+    EXPECT_EQ(view.AsCloud().Position(v0), newPosition);
+}
+
+TEST(SubmeshViewDomainBorrows, ConstGraphCloudViewSharesStorageAndSeesLiveEdits)
+{
+    auto graph = MakeTwoVertexEdgeGraph();
+    const auto graphPoint = graph.VertexProperties().Get<glm::vec3>("v:point");
+    ASSERT_TRUE(graphPoint.IsValid());
+    const std::size_t edgesBefore = graph.EdgesSize();
+
+    ConstGraphBackedCloudView view(graph);
+
+    const auto viewPoint = view.PointProperties().Get<glm::vec3>("v:point");
+    ASSERT_TRUE(viewPoint.IsValid());
+    EXPECT_EQ(graphPoint.Handle().Id(), viewPoint.Handle().Id());
+    EXPECT_EQ(view.VerticesSize(), graph.VerticesSize());
+
+    const Geometry::VertexHandle v0{0};
+    const glm::vec3 newPosition{-4.0f, 6.0f, 1.5f};
+    graph.SetVertexPosition(v0, newPosition);
+    EXPECT_EQ(view.Position(v0), newPosition);
+    EXPECT_EQ(view.AsCloud().Position(v0), newPosition);
+
+    // The read-only cloud view never exposes the graph's edge/halfedge storage
+    // and leaves edge state untouched.
+    EXPECT_FALSE(view.PointProperties().Exists("h:connectivity"));
+    EXPECT_EQ(graph.EdgesSize(), edgesBefore);
 }
 
 } // namespace

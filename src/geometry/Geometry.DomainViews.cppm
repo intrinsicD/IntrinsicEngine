@@ -1,10 +1,18 @@
 module;
 
+#include <cstddef>
+#include <span>
+#include <string_view>
+
+#include <glm/glm.hpp>
+
 export module Geometry.DomainViews;
 
 export import Geometry.HalfedgeMesh;
 export import Geometry.Graph;
 export import Geometry.PointCloud;
+
+import Geometry.Properties;
 
 export namespace Geometry::DomainViews
 {
@@ -139,4 +147,176 @@ export namespace Geometry::DomainViews
     // `BorrowMeshAsCloud`. A distinct compile-time-checked read-only cloud-view
     // type is owned by GEOM-012 Slice D.
     [[nodiscard]] PointCloud::Cloud BorrowGraphAsCloud(Graph::Graph& graph);
+
+    // -----------------------------------------------------------------------
+    // GEOM-012 Slice D: type-enforced read-only borrow surfaces.
+    //
+    // Each `Const*View` wraps the same shared-storage borrow produced by its
+    // mutable factory above, but exposes **only** `const`-returning accessors:
+    // there is no `Add*`, `Delete*`, `SetVertexPosition`, `Clear`,
+    // `GarbageCollection`, or `GetOrAdd*Property` member. Mutating the borrowed
+    // source storage through these types is therefore ill-formed at compile
+    // time, promoting the documented mutable-borrow rule ("read-only algorithms
+    // must not mutate source storage") from convention to type.
+    //
+    // Each view shares storage with its source (reads observe live source
+    // edits) and is non-copyable / non-movable: it is a borrow bound to its
+    // source at construction, and the source must outlive it. The constructors
+    // take a **mutable** source reference because construction routes through
+    // the corresponding mutable `Borrow*` factory, which lazily materializes
+    // the shared property columns (`v:point`, the cloud's `p:deleted`,
+    // connectivity records) via `EnsureProperties`/`GetOrAdd` on the source
+    // property set. A genuinely const-qualified source is therefore rejected at
+    // compile time rather than const_cast into the mutating borrow (which would
+    // be undefined behavior); the view surface is read-only once constructed.
+    // -----------------------------------------------------------------------
+
+    // Read-only graph-domain borrow of a `HalfedgeMesh::Mesh`. Wraps the
+    // `BorrowMeshAsGraphReadOnly` borrow (see that factory for the
+    // storage-sharing and face-state-isolation contract).
+    //
+    // `AsGraph()` returns the underlying `const Graph::Graph&` for interop with
+    // algorithms that accept `const Graph::Graph&`; the graph's mutating
+    // methods are not reachable through the const reference. Algorithms that
+    // allocate scratch properties on the graph (e.g. `ShortestPath::Dijkstra`,
+    // which takes a mutable `Graph::Graph&`) are not const consumers and must
+    // use the mutable `BorrowMeshAsGraphReadOnly` borrow instead.
+    class ConstMeshBackedGraphView
+    {
+    public:
+        explicit ConstMeshBackedGraphView(HalfedgeMesh::Mesh& mesh);
+
+        ConstMeshBackedGraphView(const ConstMeshBackedGraphView&) = delete;
+        ConstMeshBackedGraphView& operator=(const ConstMeshBackedGraphView&) = delete;
+        ConstMeshBackedGraphView(ConstMeshBackedGraphView&&) = delete;
+        ConstMeshBackedGraphView& operator=(ConstMeshBackedGraphView&&) = delete;
+
+        // Full read-only interop surface for const-taking graph algorithms.
+        [[nodiscard]] const Graph::Graph& AsGraph() const noexcept { return m_Graph; }
+
+        [[nodiscard]] std::size_t VerticesSize()  const noexcept { return m_Graph.VerticesSize(); }
+        [[nodiscard]] std::size_t HalfedgesSize() const noexcept { return m_Graph.HalfedgesSize(); }
+        [[nodiscard]] std::size_t EdgesSize()     const noexcept { return m_Graph.EdgesSize(); }
+        [[nodiscard]] std::size_t VertexCount()   const noexcept { return m_Graph.VertexCount(); }
+        [[nodiscard]] std::size_t EdgeCount()     const noexcept { return m_Graph.EdgeCount(); }
+
+        [[nodiscard]] bool IsValid(VertexHandle v)   const { return m_Graph.IsValid(v); }
+        [[nodiscard]] bool IsValid(EdgeHandle e)     const { return m_Graph.IsValid(e); }
+        [[nodiscard]] bool IsValid(HalfedgeHandle h) const { return m_Graph.IsValid(h); }
+
+        [[nodiscard]] bool IsDeleted(VertexHandle v)   const { return m_Graph.IsDeleted(v); }
+        [[nodiscard]] bool IsDeleted(EdgeHandle e)     const { return m_Graph.IsDeleted(e); }
+        [[nodiscard]] bool IsDeleted(HalfedgeHandle h) const { return m_Graph.IsDeleted(h); }
+
+        [[nodiscard]] bool HasGarbage() const noexcept { return m_Graph.HasGarbage(); }
+
+        [[nodiscard]] glm::vec3 VertexPosition(VertexHandle v) const { return m_Graph.VertexPosition(v); }
+
+        [[nodiscard]] ConstPropertySet VertexProperties()   const noexcept { return m_Graph.VertexProperties(); }
+        [[nodiscard]] ConstPropertySet EdgeProperties()     const noexcept { return m_Graph.EdgeProperties(); }
+        [[nodiscard]] ConstPropertySet HalfedgeProperties() const noexcept { return m_Graph.HalfedgeProperties(); }
+
+        template <class T>
+        [[nodiscard]] ConstProperty<T> GetVertexProperty(std::string_view name) const
+        {
+            return m_Graph.VertexProperties().Get<T>(name);
+        }
+
+    private:
+        Graph::Graph m_Graph;
+    };
+
+    // Read-only point-cloud borrow of a `HalfedgeMesh::Mesh`. Wraps the
+    // `BorrowMeshAsCloud` borrow (see that factory for the storage-sharing and
+    // deletion-counter-isolation contract). `AsCloud()` returns the underlying
+    // `const PointCloud::Cloud&` for interop with const-taking cloud
+    // algorithms. Because the view exposes no mutable property access, the
+    // shared `v:point`/attribute storage cannot be mutated through it.
+    class ConstMeshBackedCloudView
+    {
+    public:
+        explicit ConstMeshBackedCloudView(HalfedgeMesh::Mesh& mesh);
+
+        ConstMeshBackedCloudView(const ConstMeshBackedCloudView&) = delete;
+        ConstMeshBackedCloudView& operator=(const ConstMeshBackedCloudView&) = delete;
+        ConstMeshBackedCloudView(ConstMeshBackedCloudView&&) = delete;
+        ConstMeshBackedCloudView& operator=(ConstMeshBackedCloudView&&) = delete;
+
+        [[nodiscard]] const PointCloud::Cloud& AsCloud() const noexcept { return m_Cloud; }
+
+        [[nodiscard]] std::size_t VerticesSize() const noexcept { return m_Cloud.VerticesSize(); }
+        [[nodiscard]] std::size_t VertexCount()  const noexcept { return m_Cloud.VertexCount(); }
+        [[nodiscard]] bool        IsEmpty()      const noexcept { return m_Cloud.IsEmpty(); }
+
+        [[nodiscard]] bool IsValid(VertexHandle v)   const          { return m_Cloud.IsValid(v); }
+        [[nodiscard]] bool IsDeleted(VertexHandle v) const          { return m_Cloud.IsDeleted(v); }
+        [[nodiscard]] bool HasGarbage()              const noexcept { return m_Cloud.HasGarbage(); }
+
+        [[nodiscard]] const glm::vec3&           Position(VertexHandle v) const { return m_Cloud.Position(v); }
+        [[nodiscard]] std::span<const glm::vec3> Positions()             const { return m_Cloud.Positions(); }
+
+        [[nodiscard]] bool HasNormals() const noexcept { return m_Cloud.HasNormals(); }
+        [[nodiscard]] bool HasColors()  const noexcept { return m_Cloud.HasColors(); }
+        [[nodiscard]] bool HasRadii()   const noexcept { return m_Cloud.HasRadii(); }
+
+        [[nodiscard]] ConstPropertySet PointProperties() const noexcept { return m_Cloud.PointProperties(); }
+
+        template <class T>
+        [[nodiscard]] ConstProperty<T> GetVertexProperty(std::string_view name) const
+        {
+            return m_Cloud.GetVertexProperty<T>(name);
+        }
+
+    private:
+        PointCloud::Cloud m_Cloud;
+    };
+
+    // Read-only point-cloud borrow of a `Graph::Graph`. Wraps the
+    // `BorrowGraphAsCloud` borrow (see that factory for the storage-sharing,
+    // edge/halfedge non-exposure, and deletion-counter-isolation contract).
+    //
+    // Unlike the mutable `BorrowGraphAsCloud` borrow, this read-only view
+    // exposes no mutable property access and no `Clear`/`GarbageCollection`, so
+    // the graph-domain `v:connectivity` slot that lives on the shared vertex
+    // `PropertySet` cannot be mutated or cleared through this type: the
+    // documented-UB boundary that `BorrowGraphAsCloud` could only describe is
+    // closed by construction here.
+    class ConstGraphBackedCloudView
+    {
+    public:
+        explicit ConstGraphBackedCloudView(Graph::Graph& graph);
+
+        ConstGraphBackedCloudView(const ConstGraphBackedCloudView&) = delete;
+        ConstGraphBackedCloudView& operator=(const ConstGraphBackedCloudView&) = delete;
+        ConstGraphBackedCloudView(ConstGraphBackedCloudView&&) = delete;
+        ConstGraphBackedCloudView& operator=(ConstGraphBackedCloudView&&) = delete;
+
+        [[nodiscard]] const PointCloud::Cloud& AsCloud() const noexcept { return m_Cloud; }
+
+        [[nodiscard]] std::size_t VerticesSize() const noexcept { return m_Cloud.VerticesSize(); }
+        [[nodiscard]] std::size_t VertexCount()  const noexcept { return m_Cloud.VertexCount(); }
+        [[nodiscard]] bool        IsEmpty()      const noexcept { return m_Cloud.IsEmpty(); }
+
+        [[nodiscard]] bool IsValid(VertexHandle v)   const          { return m_Cloud.IsValid(v); }
+        [[nodiscard]] bool IsDeleted(VertexHandle v) const          { return m_Cloud.IsDeleted(v); }
+        [[nodiscard]] bool HasGarbage()              const noexcept { return m_Cloud.HasGarbage(); }
+
+        [[nodiscard]] const glm::vec3&           Position(VertexHandle v) const { return m_Cloud.Position(v); }
+        [[nodiscard]] std::span<const glm::vec3> Positions()             const { return m_Cloud.Positions(); }
+
+        [[nodiscard]] bool HasNormals() const noexcept { return m_Cloud.HasNormals(); }
+        [[nodiscard]] bool HasColors()  const noexcept { return m_Cloud.HasColors(); }
+        [[nodiscard]] bool HasRadii()   const noexcept { return m_Cloud.HasRadii(); }
+
+        [[nodiscard]] ConstPropertySet PointProperties() const noexcept { return m_Cloud.PointProperties(); }
+
+        template <class T>
+        [[nodiscard]] ConstProperty<T> GetVertexProperty(std::string_view name) const
+        {
+            return m_Cloud.GetVertexProperty<T>(name);
+        }
+
+    private:
+        PointCloud::Cloud m_Cloud;
+    };
 }

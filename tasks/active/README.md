@@ -32,10 +32,11 @@ Each active task should include:
   `ctest --test-dir build/ci --output-on-failure -R 'GraphGeometryPacker|MeshGeometry' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`.
 - [`GEOM-012`](GEOM-012-symmetric-domain-views-property-sharing.md) —
   Symmetric mesh, graph, and point-cloud domain views. Status:
-  in-progress (Slices A + B + C landed). Owner: unassigned. Branch:
+  in-progress (Slices A + B + C + D landed). Owner: unassigned. Branch:
   Slice A on `claude/funny-pascal-kTHxz`; Slice B on
   `claude/eloquent-sagan-WhPAe`; Slice C on
-  `claude/practical-hamilton-9jmca`. Promoted from
+  `claude/practical-hamilton-9jmca`; Slice D on
+  `claude/happy-newton-KToPC`. Promoted from
   `tasks/backlog/geometry/` on 2026-05-28 as the next unblocked
   geometry task once GEOM-008 (Geometry.Linalg / Geometry.Sparse
   foundation) retired. Slice A added the new `Geometry.DomainViews`
@@ -103,7 +104,24 @@ Each active task should include:
   position-edit visibility, point-addition propagation with the new
   vertex isolated, the empty-graph case, and cloud-side
   `DeletePoint` not touching the graph's deletion view. Slice D
-  introduces distinct const-view types; Slice E
+  adds the read-only `ConstMeshBackedGraphView` /
+  `ConstMeshBackedCloudView` / `ConstGraphBackedCloudView` view
+  types: each wraps the matching shared-storage borrow (sharing
+  preserved via guaranteed copy elision), exposes only
+  `const`-returning accessors plus an `AsGraph()`/`AsCloud()`
+  const-reference interop accessor, and is non-copyable /
+  non-movable — so `Add*`/`Delete*`/`Set*`/`Clear`/
+  `GarbageCollection`/`GetOrAdd*Property` are ill-formed through the
+  view (proven by a compile-time `static_assert` block with
+  non-vacuous positive controls, plus four runtime
+  shared-storage/live-edit tests). Each constructor takes a
+  *mutable* source reference because construction lazily
+  materializes the shared `v:point`/`p:deleted`/connectivity
+  columns, so a `const` source is rejected at compile time rather
+  than `const_cast` into a mutating borrow (undefined behavior).
+  `ConstGraphBackedCloudView`
+  closes the Slice C `v:connectivity` documented-UB boundary by
+  construction (no mutable property access). Slice E
   reviews the conversion/move/consume policy and closes at
   `CPUContracted`. Next verification step:
   `ctest --test-dir build/ci --output-on-failure -R 'SubmeshViewDomainBorrows|ShortestPath|PointCloud|MeshOperations' --timeout 60`.
