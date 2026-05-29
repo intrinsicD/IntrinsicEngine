@@ -667,7 +667,14 @@ Concretely:
   fallback). `IRenderer::SetDebugViewRequestedResourceName(...)` and
   the matching getter are the public seam runtime / editor use to
   drive the requested resource (the `Enabled` field is driven
-  per-frame from the world). The Slice B contract pin is
+  per-frame from the world). On promoted Vulkan, the executor publishes
+  the selected debug-view texture through the slot-explicit
+  `ICommandContext::BindFrameSampledTextureAt(..., 1)` hook, while the
+  canonical `Present` pass publishes `FrameRecipe.PresentSource` at
+  descriptor slot 2. The shader pair samples those reserved slots so the
+  two fullscreen passes do not overwrite the same global sampled descriptor
+  element before a single command-buffer submit; older postprocess bridges
+  continue to use slot 0. The Slice B contract pin is
   `tests/contract/graphics/Test.DebugViewPass.cpp` (BindPipeline +
   PushConstants(16) + Draw(3, 1, 0, 0) routing under the default
   recipe; missing pipeline lease `SkippedUnavailable` at call #25;

@@ -1,5 +1,23 @@
 # GRAPHICS-076F — Default-recipe debug-view readback returns black
 
+## Status
+
+- Status: done on 2026-05-29. The failure reproduced before the fix with the
+  known black interior sample. The root cause was twofold: the fixture submitted
+  its transient debug triangle before `BeginFrame()` cleared per-frame snapshot
+  state, and promoted Vulkan's temporary sampled-framegraph descriptor bridge
+  rewrote bindless slot 0 for both `DebugViewPass` and `Present` before the
+  command buffer submitted. The fix seeds the triangle after `BeginFrame()` and
+  reserves slot 1 for DebugView plus slot 2 for Present through
+  `ICommandContext::BindFrameSampledTextureAt(...)`; postprocess keeps slot 0.
+- Verification: `cmake --build --preset ci-vulkan --target
+  IntrinsicGraphicsVulkanSmokeTests`; `ctest --test-dir build/ci-vulkan
+  --output-on-failure -R 'DefaultRecipeSurfaceGpuSmoke' --timeout 120`; `cmake
+  --build --preset ci --target IntrinsicGraphicsContractTests`; `ctest
+  --test-dir build/ci --output-on-failure -R
+  'DefaultRecipeBackbufferReadbackContract' -LE
+  'gpu|vulkan|slow|flaky-quarantine' --timeout 60`.
+
 ## Goal
 - Fix the promoted-Vulkan default-recipe debug-view pixel-readback path so `DefaultRecipeSurfaceGpuSmoke.ReferenceTriangleDebugViewReadbackMatchesMinimalHarnessSamples` returns the MinimalDebug reference-triangle sample colors instead of the cleared backbuffer.
 
@@ -33,26 +51,26 @@
   - A likely root cause is that the submitted `DebugTrianglePacket` only drives the transient-debug surface overlay, while the test currently asks `DebugViewPass` to preview `SceneColorHDR`; if the lit/default surface path has no renderable geometry and/or the descriptor slot is overwritten by unrelated read-texture binding, `SceneColorHDR` remains black.
 
 ## Required changes
-- [ ] Reproduce the failure under `gdb` or an equivalent debugger and preserve a concise before/after finding in the commit/PR notes.
-- [ ] Identify whether the root cause is missing source pixels (`SceneColorHDR` never receives the submitted triangle), descriptor-slot overwrite/staleness, present-source alias selection, or synchronization/layout ordering.
-- [ ] Apply the smallest fix that keeps default-recipe readback independent from the MinimalDebug scaffold.
-- [ ] Remove any temporary debugger/log instrumentation before completion.
+- [x] Reproduce the failure under `gdb` or an equivalent debugger and preserve a concise before/after finding in the commit/PR notes.
+- [x] Identify whether the root cause is missing source pixels (`SceneColorHDR` never receives the submitted triangle), descriptor-slot overwrite/staleness, present-source alias selection, or synchronization/layout ordering.
+- [x] Apply the smallest fix that keeps default-recipe readback independent from the MinimalDebug scaffold.
+- [x] Remove any temporary debugger/log instrumentation before completion.
 
 ## Tests
-- [ ] `ctest --test-dir build/ci-vulkan --output-on-failure -R 'DefaultRecipeSurfaceGpuSmoke.ReferenceTriangleDebugViewReadbackMatchesMinimalHarnessSamples' --timeout 120` passes on a Vulkan-capable host.
-- [ ] `ctest --test-dir build/ci-vulkan --output-on-failure -R 'DefaultRecipeSurfaceGpuSmoke' --timeout 120` preserves the existing recipe-selector smoke.
-- [ ] `ctest --test-dir build/ci --output-on-failure -R 'DefaultRecipeBackbufferReadbackContract' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60` remains green for the CPU/null contract seam.
+- [x] `ctest --test-dir build/ci-vulkan --output-on-failure -R 'DefaultRecipeSurfaceGpuSmoke.ReferenceTriangleDebugViewReadbackMatchesMinimalHarnessSamples' --timeout 120` passes on a Vulkan-capable host.
+- [x] `ctest --test-dir build/ci-vulkan --output-on-failure -R 'DefaultRecipeSurfaceGpuSmoke' --timeout 120` preserves the existing recipe-selector smoke.
+- [x] `ctest --test-dir build/ci --output-on-failure -R 'DefaultRecipeBackbufferReadbackContract' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60` remains green for the CPU/null contract seam.
 
 ## Docs
-- [ ] Update `tasks/backlog/rendering/GRAPHICS-076E-default-recipe-pixel-readback.md` or retire it only after the readback smoke is green.
-- [ ] Update renderer/Vulkan docs if the fix changes the supported default-recipe readback or descriptor-binding behavior.
+- [x] Update `tasks/backlog/rendering/GRAPHICS-076E-default-recipe-pixel-readback.md` or retire it only after the readback smoke is green.
+- [x] Update renderer/Vulkan docs if the fix changes the supported default-recipe readback or descriptor-binding behavior.
 
 ## Acceptance criteria
-- [ ] The interior sample matches the MinimalDebug reference-triangle color within `MinimalTriangleReadback` tolerance.
-- [ ] The exterior sample points still match the clear color.
-- [ ] `DefaultRecipeBackbufferReadbackCopyCount` increments only for the armed default-recipe readback path.
-- [ ] `MinimalDebugBackbufferReadbackCopyCount` remains zero under the default recipe.
-- [ ] The focused Vulkan smoke is no longer known-red.
+- [x] The interior sample matches the MinimalDebug reference-triangle color within `MinimalTriangleReadback` tolerance.
+- [x] The exterior sample points still match the clear color.
+- [x] `DefaultRecipeBackbufferReadbackCopyCount` increments only for the armed default-recipe readback path.
+- [x] `MinimalDebugBackbufferReadbackCopyCount` remains zero under the default recipe.
+- [x] The focused Vulkan smoke is no longer known-red.
 
 ## Verification
 ```bash
@@ -73,4 +91,4 @@ ctest --test-dir build/ci --output-on-failure -R 'DefaultRecipeBackbufferReadbac
 
 ## Maturity
 - Target: `Operational` on Vulkan-capable hosts for the default-recipe pixel-readback path; `CPUContracted` everywhere else.
-- Current state at filing: `CPUContracted` seam exists, but promoted-Vulkan parity is known-red and blocked on this bug.
+- Final state: `Operational` on the verified Vulkan-capable host for the default-recipe pixel-readback path; `CPUContracted` on CPU/null hosts.

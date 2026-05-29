@@ -2,7 +2,8 @@
 
 // GRAPHICS-076 Slice B — canonical default-recipe `Pass.DebugView`
 // fragment. Pairs with `debug_view.vert` (fullscreen-triangle UVs) and
-// the canonical 16-byte `DebugViewPushConstants` packing
+// the renderer-reserved frame-sampled descriptor slot 1 and the canonical
+// 16-byte `DebugViewPushConstants` packing
 // (`ResourceKind`, `ResourceClass`, `UsedFallback`, `Reserved`) from
 // `Graphics.DebugViewSystem.cppm`, per the GRAPHICS-013BQ decision that
 // visualization mode is derived deterministically from the resolved
@@ -18,6 +19,7 @@ layout(location = 0) in vec2 vUV;
 layout(location = 0) out vec4 outColor;
 
 layout(set = 0, binding = 0) uniform sampler2D uTextures[];
+const uint kDebugViewFrameSampledDescriptorSlot = 1u;
 
 // 16-byte push-constant block matching
 // `Extrinsic::Graphics::DebugViewPushConstants` (4 × uint32). Keep the
@@ -79,14 +81,14 @@ void main()
 
     if (pc.ResourceClass == kResourceClassDepthTexture)
     {
-        ivec2 size = textureSize(uTextures[0], 0);
+        ivec2 size = textureSize(uTextures[kDebugViewFrameSampledDescriptorSlot], 0);
         if (size.x <= 0 || size.y <= 0)
         {
             outColor = vec4(0.0, 0.0, 0.0, 1.0);
             return;
         }
 
-        float z = texelFetch(uTextures[0], SampleCoords(vUV, size), 0).r;
+        float z = texelFetch(uTextures[kDebugViewFrameSampledDescriptorSlot], SampleCoords(vUV, size), 0).r;
         outColor = vec4(vec3(clamp(z, 0.0, 1.0)), 1.0);
         return;
     }
@@ -96,13 +98,13 @@ void main()
     // but a `Backbuffer`-class resource that *is* previewable (the
     // imported swapchain target itself) sees the same direct color
     // path.
-    ivec2 size = textureSize(uTextures[0], 0);
+    ivec2 size = textureSize(uTextures[kDebugViewFrameSampledDescriptorSlot], 0);
     if (size.x <= 0 || size.y <= 0)
     {
         outColor = vec4(0.0, 0.0, 0.0, 1.0);
         return;
     }
 
-    vec3 c = texelFetch(uTextures[0], SampleCoords(vUV, size), 0).rgb;
+    vec3 c = texelFetch(uTextures[kDebugViewFrameSampledDescriptorSlot], SampleCoords(vUV, size), 0).rgb;
     outColor = vec4(clamp(c, 0.0, 1.0), 1.0);
 }

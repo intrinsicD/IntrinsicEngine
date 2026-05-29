@@ -110,6 +110,9 @@ namespace Extrinsic::Graphics
         // each in-flight frame copies into its own slot without aliasing.
         constexpr std::uint64_t kHistogramReadbackSlotBytes =
             256ull * sizeof(std::uint32_t);
+        constexpr std::uint32_t kFrameSampledDescriptorSlotDefault = 0u;
+        constexpr std::uint32_t kFrameSampledDescriptorSlotDebugView = 1u;
+        constexpr std::uint32_t kFrameSampledDescriptorSlotPresent = 2u;
 
         [[nodiscard]] RHI::TextureLayout ToTextureLayout(const TextureBarrierState state)
         {
@@ -1549,7 +1552,9 @@ namespace Extrinsic::Graphics
                                     std::distance(compiled->TextureNames.begin(), selected));
                                 if (textureIndex < compiled->TextureHandles.size())
                                 {
-                                    graphicsContext.BindFrameSampledTexture(compiled->TextureHandles[textureIndex]);
+                                    graphicsContext.BindFrameSampledTextureAt(
+                                        compiled->TextureHandles[textureIndex],
+                                        kFrameSampledDescriptorSlotDebugView);
                                     sampledTextureBound = true;
                                 }
                             }
@@ -1560,7 +1565,12 @@ namespace Extrinsic::Graphics
                             const std::uint32_t textureIndex = declarations.ReadTextures.front();
                             if (textureIndex < compiled->TextureHandles.size())
                             {
-                                graphicsContext.BindFrameSampledTexture(compiled->TextureHandles[textureIndex]);
+                                const std::uint32_t descriptorSlot =
+                                    passName == std::string_view{"Present"}
+                                        ? kFrameSampledDescriptorSlotPresent
+                                        : kFrameSampledDescriptorSlotDefault;
+                                graphicsContext.BindFrameSampledTextureAt(
+                                    compiled->TextureHandles[textureIndex], descriptorSlot);
                             }
                         }
                     }

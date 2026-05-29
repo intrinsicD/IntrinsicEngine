@@ -222,7 +222,11 @@ struct DefaultRecipeRunCapture
     return capture;
 }
 
-[[nodiscard]] DefaultRecipeRunCapture DriveDefaultRecipeDebugViewFrameAndCapture(Engine& engine)
+[[nodiscard]] bool SubmitReadbackTriangle(Extrinsic::Graphics::IRenderer& renderer);
+
+[[nodiscard]] DefaultRecipeRunCapture DriveDefaultRecipeDebugViewFrameAndCapture(
+    Engine& engine,
+    const bool seedReadbackTriangle = false)
 {
     DefaultRecipeRunCapture capture;
     auto& renderer = engine.GetRenderer();
@@ -240,6 +244,11 @@ struct DefaultRecipeRunCapture
         capture.FrameRecipe = renderer.GetFrameRecipe();
         capture.After = ToCounterSnapshot(GetVulkanOperationalDiagnosticsSnapshot());
         return capture;
+    }
+
+    if (seedReadbackTriangle)
+    {
+        (void)SubmitReadbackTriangle(renderer);
     }
 
     const Extrinsic::Graphics::RenderFrameInput input{
@@ -436,8 +445,6 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ReferenceTriangleDebugViewReadbackMatchesMini
 
     auto& renderer = engine.GetRenderer();
     auto& device   = engine.GetDevice();
-    ASSERT_TRUE(SubmitReadbackTriangle(renderer))
-        << "Failed to seed the deterministic GRAPHICS-076E readback triangle.";
     const Extrinsic::RHI::Format backbufferFormat = device.GetBackbufferFormat();
     const std::uint32_t bytesPerPixel = Extrinsic::RHI::BytesPerBlock(backbufferFormat);
     if (bytesPerPixel == 0u)
@@ -463,7 +470,7 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ReferenceTriangleDebugViewReadbackMatchesMini
     }
     renderer.SetDefaultRecipeBackbufferReadbackBuffer(readbackBuffer);
 
-    const auto run = DriveDefaultRecipeDebugViewFrameAndCapture(engine);
+    const auto run = DriveDefaultRecipeDebugViewFrameAndCapture(engine, true);
 
     if (!run.DeviceOperational)
     {
@@ -489,6 +496,8 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ReferenceTriangleDebugViewReadbackMatchesMini
     EXPECT_EQ(FindPassStatus(stats, "DepthPrepass"), RenderCommandPassStatus::Recorded)
         << BuildPassStatusSummary(stats);
     EXPECT_EQ(FindPassStatus(stats, "SurfacePass"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(stats);
+    EXPECT_EQ(FindPassStatus(stats, "TransientDebugSurfacePass"), RenderCommandPassStatus::Recorded)
         << BuildPassStatusSummary(stats);
     EXPECT_EQ(FindPassStatus(stats, "Present"), RenderCommandPassStatus::Recorded)
         << BuildPassStatusSummary(stats);

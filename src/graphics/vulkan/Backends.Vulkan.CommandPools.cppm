@@ -1,6 +1,8 @@
 module;
 
 
+#include <cstdint>
+
 #include "Vulkan.hpp"
 
 export module Extrinsic.Backends.Vulkan:CommandPools;
@@ -59,6 +61,7 @@ namespace Extrinsic::Backends::Vulkan
 
         void BindPipeline(RHI::PipelineHandle pipeline) override;
         void BindFrameSampledTexture(RHI::TextureHandle texture) override;
+        void BindFrameSampledTextureAt(RHI::TextureHandle texture, std::uint32_t descriptorIndex) override;
         void BindIndexBuffer(RHI::BufferHandle buffer, uint64_t offset,
                              RHI::IndexType indexType) override;
         void PushConstants(const void* data, uint32_t size, uint32_t offset) override;
@@ -106,7 +109,7 @@ namespace Extrinsic::Backends::Vulkan
     private:
         [[nodiscard]] bool CanBegin() const;
         [[nodiscard]] bool CanRecord(const char* operation) const;
-        void UpdateFrameSampledDescriptor(RHI::TextureHandle texture, VkImageLayout layout);
+        void UpdateFrameSampledDescriptor(RHI::TextureHandle texture, VkImageLayout layout, std::uint32_t descriptorIndex);
 
         VkDevice         m_Device        = VK_NULL_HANDLE;
         VkCommandBuffer  m_Cmd           = VK_NULL_HANDLE;

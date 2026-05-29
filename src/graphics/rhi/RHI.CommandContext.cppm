@@ -159,7 +159,7 @@ namespace Extrinsic::RHI
         // framegraph texture. Backends that use fixed/global sampled slots may
         // publish this texture before fullscreen postprocess/present draws;
         // backends with explicit descriptor binding can ignore it.
-        virtual void BindFrameSampledTexture(TextureHandle texture) { (void)texture; }
+        virtual void BindFrameSampledTexture(TextureHandle texture) { BindFrameSampledTextureAt(texture, 0u); }
 
         // ---- Push constants ------------------------------------------
         virtual void BindIndexBuffer(BufferHandle  buffer,
@@ -330,6 +330,17 @@ namespace Extrinsic::RHI
             (void)srcOffsetY;
             (void)srcWidth;
             (void)srcHeight;
+        }
+
+        // Optional slot-explicit sibling for passes that must keep multiple
+        // sampled framegraph inputs live in the same submitted command buffer.
+        // Backends that do not use fixed/global sampled slots can ignore it.
+        // Kept at the end of this exported polymorphic interface to minimise
+        // vtable slot churn for downstream module BMIs.
+        virtual void BindFrameSampledTextureAt(TextureHandle texture, std::uint32_t descriptorIndex)
+        {
+            (void)texture;
+            (void)descriptorIndex;
         }
     };
 }

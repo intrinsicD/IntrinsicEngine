@@ -32,7 +32,7 @@
 
 ## Prerequisite: the default-recipe equivalent of the GRAPHICS-033D smoke must already be green
 
-Before this task can begin its deletions, the `gpu;vulkan` visible-triangle assertion from `GRAPHICS-033D` must be **ported to the default recipe** (or a sibling fixture authored alongside it) and reach the same pixel-readback assertions. That port is part of the upstream gate `GRAPHICS-076` (canonical `Pass.Present` operationally wired). This task verifies the port exists and is passing as its first action; it does not author the port itself.
+Before this task can begin its deletions, the `gpu;vulkan` visible-triangle assertion from `GRAPHICS-033D` must be **ported to the default recipe** (or a sibling fixture authored alongside it) and reach the same pixel-readback assertions. That port is now satisfied by `GRAPHICS-076E` plus the `GRAPHICS-076F` descriptor-slot fix: `DefaultRecipeSurfaceGpuSmoke.ReferenceTriangleDebugViewReadbackMatchesMinimalHarnessSamples` reads back the default-recipe backbuffer and checks the four `MinimalTriangleReadback` samples. This task verifies the port remains passing as its first action; it does not re-author the port.
 
 ## Companion intermediate-solution audit
 

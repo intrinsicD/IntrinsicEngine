@@ -45,6 +45,11 @@ any other exported polymorphic RHI interface):
 - Prefer adding new non-pure virtuals **at the end** of the interface and keep
   bodies in the `.cpp` module implementation unit where the body is non-trivial
   (AGENTS.md §5), to minimise layout churn for existing slots.
+- `BindFrameSampledTextureAt(TextureHandle, std::uint32_t)` is the
+  slot-explicit sibling of `BindFrameSampledTexture(TextureHandle)`. Backends
+  that bridge framegraph sampled inputs through a global bindless array use it
+  when two fullscreen passes in one command buffer must keep distinct sampled
+  descriptors alive; backends with explicit descriptor binding may ignore it.
 
 History: HARDEN-072 (`tasks/done/HARDEN-072-rhi-surface-fixes-for-default-recipe-pipeline-bringup.md`)
 removed default arguments from `CopyTextureToBuffer` after they tripped a related

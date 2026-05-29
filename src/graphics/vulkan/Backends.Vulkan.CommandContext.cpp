@@ -91,7 +91,8 @@ bool VulkanCommandContext::CanRecord(const char* operation) const
 }
 
 void VulkanCommandContext::UpdateFrameSampledDescriptor(RHI::TextureHandle texture,
-                                                        VkImageLayout layout)
+                                                        VkImageLayout layout,
+                                                        const std::uint32_t descriptorIndex)
 {
     if (layout != VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
     {
@@ -110,14 +111,12 @@ void VulkanCommandContext::UpdateFrameSampledDescriptor(RHI::TextureHandle textu
         return;
     }
 
-    // GRAPHICS-076E — temporary promoted-Vulkan sampled-present bridge.
+    // GRAPHICS-076E/076F — temporary promoted-Vulkan sampled-present bridge.
     // The canonical postprocess/present shaders currently read their single
-    // framegraph input from set 0 / binding 0 / element 0. Until a wider
-    // renderer descriptor-binding API lands, refresh that slot whenever the
-    // framegraph transitions a texture into ShaderReadOnly. The next pass that
-    // binds the global set then samples the texture the graph just made
-    // readable (SceneColorHDR for tonemap, SceneColorLDR for present). This is
-    // backend-local and leaves the public RHI/renderer API unchanged.
+    // framegraph input from set 0 / binding 0 / a renderer-selected element.
+    // Slot 0 preserves the older postprocess bridge. Slots 1 and 2 are
+    // reserved by the renderer for DebugView and Present so they do not race by
+    // rewriting the same descriptor element before one command-buffer submit.
     VkDescriptorImageInfo info{};
     info.imageView = image->View;
     info.sampler = sampler->Sampler;
@@ -127,7 +126,7 @@ void VulkanCommandContext::UpdateFrameSampledDescriptor(RHI::TextureHandle textu
     write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     write.dstSet = m_BindlessSet;
     write.dstBinding = 0u;
-    write.dstArrayElement = 0u;
+    write.dstArrayElement = descriptorIndex;
     write.descriptorCount = 1u;
     write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     write.pImageInfo = &info;
@@ -306,7 +305,12 @@ void VulkanCommandContext::BindPipeline(RHI::PipelineHandle handle)
 
 void VulkanCommandContext::BindFrameSampledTexture(RHI::TextureHandle texture)
 {
-    UpdateFrameSampledDescriptor(texture, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    UpdateFrameSampledDescriptor(texture, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0u);
+}
+
+void VulkanCommandContext::BindFrameSampledTextureAt(RHI::TextureHandle texture, const std::uint32_t descriptorIndex)
+{
+    UpdateFrameSampledDescriptor(texture, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, descriptorIndex);
 }
 
 void VulkanCommandContext::PushConstants(const void* data, uint32_t size, uint32_t offset)
@@ -494,7 +498,7 @@ void VulkanCommandContext::TextureBarrier(RHI::TextureHandle tex,
     vkCmdPipelineBarrier2(m_Cmd, &dep);
 
     img->CurrentLayout = newLayout;
-    UpdateFrameSampledDescriptor(tex, newLayout);
+    UpdateFrameSampledDescriptor(tex, newLayout, 0u);
 }
 
 void VulkanCommandContext::BufferBarrier(RHI::BufferHandle buf,
@@ -653,7 +657,8 @@ void VulkanCommandContext::SubmitBarriers(const RHI::BarrierBatchDesc& batch)
                 imageBarriers[barrierIndex].newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
             {
                 UpdateFrameSampledDescriptor(imageBarrierHandles[barrierIndex],
-                                             imageBarriers[barrierIndex].newLayout);
+                                             imageBarriers[barrierIndex].newLayout,
+                                             0u);
                 frameSampledDescriptorUpdated = true;
             }
         }

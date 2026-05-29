@@ -171,7 +171,7 @@ Members:
   reproducible on a clean `ci` preset build — a stale incremental module-BMI
   artifact, not a source defect. See [`bugs/index.md`](bugs/index.md) and
   `src/graphics/rhi/README.md` for the clean-rebuild prevention. `GRAPHICS-076E`
-  CPU contract closure is unblocked.
+  is now green after the GRAPHICS-076F descriptor-slot fix.
 
 ## Cross-domain dependency anchors
 

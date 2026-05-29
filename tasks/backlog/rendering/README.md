@@ -653,9 +653,10 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   on 2026-05-28 with `DefaultRecipeSurfaceGpuSmoke` passing normally on a
   Vulkan-capable host after the BUG-012 command-stream fixes.
 - [GRAPHICS-076E — Default-recipe pixel-readback parity harness](GRAPHICS-076E-default-recipe-pixel-readback.md):
-  follow-up to GRAPHICS-076 Slice D. Adds default-recipe four-sample readback
-  parity without reusing MinimalDebug-only diagnostics; optional before or
-  during GRAPHICS-081 depending on scaffold-retirement reviewer requirements.
+  done 2026-05-29. Follow-up to GRAPHICS-076 Slice D. Adds default-recipe
+  four-sample readback parity without reusing MinimalDebug-only diagnostics;
+  the GRAPHICS-076F descriptor-slot fix made the opt-in Vulkan pixel smoke
+  green.
 - [GRAPHICS-077 — Backend transient-debug-primitive upload helper](../../done/GRAPHICS-077-transient-debug-primitive-upload-helper.md):
   depends on GRAPHICS-072 (uses `SceneColorHDR`/`SceneDepth` LOAD-store).
   Promoted to `tasks/active/` on 2026-05-23 with a four-slice plan
@@ -682,9 +683,9 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   depends on GRAPHICS-076 (PresentSource finalization) and `runtime/RUNTIME-090`
   (ImGui adapter producer).
 - [GRAPHICS-081 — Retire `FrameRecipe::MinimalDebugSurface` scaffold once default recipe is operational](GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md):
-  depends on GRAPHICS-031A/B and GRAPHICS-070..076; may also consume
-  GRAPHICS-076E if reviewers require default-recipe pixel-readback parity before
-  deletion. Deletes the
+  depends on GRAPHICS-031A/B and GRAPHICS-070..076; consumes the now-green
+  GRAPHICS-076E default-recipe pixel-readback parity evidence before deletion.
+  Deletes the
   `MinimalDebug` recipe, pass classes, executor branches, diagnostics
   counters, CMake entries, tests, and doc rows once the default recipe
   records all canonical pass bodies and the default-recipe equivalent of the

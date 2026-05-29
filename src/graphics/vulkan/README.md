@@ -308,6 +308,14 @@ available through the Vulkan 1.2/1.3 feature chain.
   pair, soft-skipped passes report structured `RenderGraphCommandPassStats`
   entries, recorded barriers translate through `vkCmdPipelineBarrier2`, and
   buffer/texture sharing mode handles graphics/transfer queue-family separation.
+  The temporary framegraph sampled-texture bridge writes postprocess sampled
+  inputs to bindless descriptor slot 0, default `Pass.DebugView`'s selected
+  texture to slot 1, and canonical `Pass.Present`'s `FrameRecipe.PresentSource`
+  to slot 2 via `VulkanCommandContext::BindFrameSampledTextureAt(...)`. The
+  split slots keep debug-view and present fullscreen draws from racing on one
+  mutable descriptor element inside the same submitted command buffer, which is
+  what the `DefaultRecipeSurfaceGpuSmoke.ReferenceTriangleDebugViewReadbackMatchesMinimalHarnessSamples`
+  fixture covers.
   The opt-in `VulkanBootstrapSmoke` test is labeled `gpu;vulkan` and verifies
   bootstrap state plus the guarded acquire/command-record/submit/present path
   on hosts where the operational gate is not satisfied. The GRAPHICS-033D
