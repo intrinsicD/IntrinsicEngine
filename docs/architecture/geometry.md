@@ -180,11 +180,11 @@ GEOM-012 Slice D promotes the mutable-borrow rule from convention to type with
 three read-only wrappers in `Geometry.DomainViews`:
 
 - `Geometry::DomainViews::ConstMeshBackedGraphView` (constructed from a
-  `const HalfedgeMesh::Mesh&`),
+  `HalfedgeMesh::Mesh&`),
 - `Geometry::DomainViews::ConstMeshBackedCloudView` (constructed from a
-  `const HalfedgeMesh::Mesh&`),
+  `HalfedgeMesh::Mesh&`),
 - `Geometry::DomainViews::ConstGraphBackedCloudView` (constructed from a
-  `const Graph::Graph&`).
+  `Graph::Graph&`).
 
 Each wraps the same shared-storage borrow produced by its mutable factory
 (`BorrowMeshAsGraphReadOnly`, `BorrowMeshAsCloud`, `BorrowGraphAsCloud`) — reads
@@ -207,9 +207,13 @@ remains physically reachable through the mutable `BorrowGraphAsCloud` borrow
 cannot be mutated or cleared through the read-only view: that documented-UB
 boundary is closed by construction. The views are non-copyable and
 non-movable — each is a borrow bound to its source at construction — and the
-source must outlive the view. As with the mutable factories, the source object
-must not be a `const`-qualified object (construction routes through the
-matching `Borrow*` factory).
+source must outlive the view. The constructors take a **mutable** source
+reference: construction routes through the matching mutable `Borrow*` factory,
+which lazily materializes the shared `v:point`/`p:deleted`/connectivity columns
+via `EnsureProperties`/`GetOrAdd` on the source property set. A genuinely
+`const`-qualified source is rejected at compile time rather than `const_cast`
+into that mutating path (which would be undefined behavior); the view surface is
+read-only once constructed.
 
 ## Indexed mesh and polygon-soup staging
 

@@ -95,7 +95,12 @@ Each active task should include:
   `GarbageCollection`/`GetOrAdd*Property` are ill-formed through the
   view (proven by a compile-time `static_assert` block with
   non-vacuous positive controls, plus four runtime
-  shared-storage/live-edit tests). `ConstGraphBackedCloudView`
+  shared-storage/live-edit tests). Each constructor takes a
+  *mutable* source reference because construction lazily
+  materializes the shared `v:point`/`p:deleted`/connectivity
+  columns, so a `const` source is rejected at compile time rather
+  than `const_cast` into a mutating borrow (undefined behavior).
+  `ConstGraphBackedCloudView`
   closes the Slice C `v:connectivity` documented-UB boundary by
   construction (no mutable property access). Slice E
   reviews the conversion/move/consume policy and closes at

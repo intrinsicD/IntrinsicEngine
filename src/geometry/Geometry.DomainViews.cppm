@@ -161,9 +161,14 @@ export namespace Geometry::DomainViews
     //
     // Each view shares storage with its source (reads observe live source
     // edits) and is non-copyable / non-movable: it is a borrow bound to its
-    // source at construction, and the source must outlive it. As with the
-    // mutable factories, the source object must not be a const-qualified object
-    // (construction routes through the corresponding `Borrow*` factory).
+    // source at construction, and the source must outlive it. The constructors
+    // take a **mutable** source reference because construction routes through
+    // the corresponding mutable `Borrow*` factory, which lazily materializes
+    // the shared property columns (`v:point`, the cloud's `p:deleted`,
+    // connectivity records) via `EnsureProperties`/`GetOrAdd` on the source
+    // property set. A genuinely const-qualified source is therefore rejected at
+    // compile time rather than const_cast into the mutating borrow (which would
+    // be undefined behavior); the view surface is read-only once constructed.
     // -----------------------------------------------------------------------
 
     // Read-only graph-domain borrow of a `HalfedgeMesh::Mesh`. Wraps the
@@ -179,7 +184,7 @@ export namespace Geometry::DomainViews
     class ConstMeshBackedGraphView
     {
     public:
-        explicit ConstMeshBackedGraphView(const HalfedgeMesh::Mesh& mesh);
+        explicit ConstMeshBackedGraphView(HalfedgeMesh::Mesh& mesh);
 
         ConstMeshBackedGraphView(const ConstMeshBackedGraphView&) = delete;
         ConstMeshBackedGraphView& operator=(const ConstMeshBackedGraphView&) = delete;
@@ -230,7 +235,7 @@ export namespace Geometry::DomainViews
     class ConstMeshBackedCloudView
     {
     public:
-        explicit ConstMeshBackedCloudView(const HalfedgeMesh::Mesh& mesh);
+        explicit ConstMeshBackedCloudView(HalfedgeMesh::Mesh& mesh);
 
         ConstMeshBackedCloudView(const ConstMeshBackedCloudView&) = delete;
         ConstMeshBackedCloudView& operator=(const ConstMeshBackedCloudView&) = delete;
@@ -279,7 +284,7 @@ export namespace Geometry::DomainViews
     class ConstGraphBackedCloudView
     {
     public:
-        explicit ConstGraphBackedCloudView(const Graph::Graph& graph);
+        explicit ConstGraphBackedCloudView(Graph::Graph& graph);
 
         ConstGraphBackedCloudView(const ConstGraphBackedCloudView&) = delete;
         ConstGraphBackedCloudView& operator=(const ConstGraphBackedCloudView&) = delete;

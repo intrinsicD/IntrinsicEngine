@@ -42,23 +42,25 @@ namespace Geometry::DomainViews
     // directly from the prvalue returned by the corresponding `Borrow*`
     // factory; guaranteed copy elision means no copy/move of the borrowed
     // container occurs, so the view shares the source's storage rather than
-    // deep-copying it. The cloud views route through the mutable
-    // `BorrowMeshAsCloud`/`BorrowGraphAsCloud` factories (which lazily allocate
-    // the cloud's `p:deleted` marker on the shared vertex `PropertySet`), so
-    // they `const_cast` the source the same way `BorrowMeshAsGraphReadOnly`
-    // does internally; the post-construction surface remains read-only.
-    ConstMeshBackedGraphView::ConstMeshBackedGraphView(const HalfedgeMesh::Mesh& mesh)
+    // deep-copying it. The sources are taken by mutable reference because the
+    // borrow factories call `EnsureProperties`/`GetOrAdd`, which lazily
+    // materialize the shared `v:point`/`p:deleted`/connectivity columns on the
+    // source property set; const_cast-ing a genuinely const source into that
+    // mutating path would be undefined behavior. Passing a mutable source also
+    // makes the internal const_cast inside `BorrowMeshAsGraphReadOnly`
+    // well-defined. The post-construction view surface is read-only regardless.
+    ConstMeshBackedGraphView::ConstMeshBackedGraphView(HalfedgeMesh::Mesh& mesh)
         : m_Graph(BorrowMeshAsGraphReadOnly(mesh))
     {
     }
 
-    ConstMeshBackedCloudView::ConstMeshBackedCloudView(const HalfedgeMesh::Mesh& mesh)
-        : m_Cloud(BorrowMeshAsCloud(const_cast<HalfedgeMesh::Mesh&>(mesh)))
+    ConstMeshBackedCloudView::ConstMeshBackedCloudView(HalfedgeMesh::Mesh& mesh)
+        : m_Cloud(BorrowMeshAsCloud(mesh))
     {
     }
 
-    ConstGraphBackedCloudView::ConstGraphBackedCloudView(const Graph::Graph& graph)
-        : m_Cloud(BorrowGraphAsCloud(const_cast<Graph::Graph&>(graph)))
+    ConstGraphBackedCloudView::ConstGraphBackedCloudView(Graph::Graph& graph)
+        : m_Cloud(BorrowGraphAsCloud(graph))
     {
     }
 }

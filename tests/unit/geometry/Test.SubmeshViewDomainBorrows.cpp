@@ -706,6 +706,19 @@ static_assert(HasReadViaAsCloud<ConstGraphBackedCloudView>);
 static_assert(!std::is_copy_constructible_v<ConstGraphBackedCloudView>);
 static_assert(!std::is_move_constructible_v<ConstGraphBackedCloudView>);
 
+// Construction requires a MUTABLE source. The borrow factories call
+// EnsureProperties()/GetOrAdd(), which lazily materialize the shared
+// v:point/p:deleted/connectivity columns on the source property set; accepting
+// a const source would force a const_cast into that mutating path, which is
+// undefined behavior on a genuinely const object. The constructors therefore
+// take `Mesh&`/`Graph&` and a const source is rejected at compile time.
+static_assert(std::is_constructible_v<ConstMeshBackedGraphView, Geometry::HalfedgeMesh::Mesh&>);
+static_assert(!std::is_constructible_v<ConstMeshBackedGraphView, const Geometry::HalfedgeMesh::Mesh&>);
+static_assert(std::is_constructible_v<ConstMeshBackedCloudView, Geometry::HalfedgeMesh::Mesh&>);
+static_assert(!std::is_constructible_v<ConstMeshBackedCloudView, const Geometry::HalfedgeMesh::Mesh&>);
+static_assert(std::is_constructible_v<ConstGraphBackedCloudView, Geometry::Graph::Graph&>);
+static_assert(!std::is_constructible_v<ConstGraphBackedCloudView, const Geometry::Graph::Graph&>);
+
 TEST(SubmeshViewDomainBorrows, ConstViewsAreReadOnlyAtCompileTime)
 {
     // The read-only contract is enforced by the file-scope `static_assert`s
