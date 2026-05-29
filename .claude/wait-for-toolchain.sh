@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Block until the session-start hook (.claude/setup.sh) finishes provisioning
-# the clang-20+ toolchain. Returns 0 on success, non-zero if provisioning
+# the Clang 20+ toolchain. Returns 0 on success, non-zero if provisioning
 # failed or the timeout elapses.
 #
 # Usage:
 #   .claude/wait-for-toolchain.sh                 # 30 min default timeout
 #   .claude/wait-for-toolchain.sh --timeout 600   # 10 min override
 #
-# Intended for agents that are about to run a clang-20-gated build/test
+# Intended for agents that are about to run a Clang 20+-gated build/test
 # (e.g. `cmake --preset ci`) and want to fail fast if provisioning is broken.
 set -euo pipefail
 
@@ -28,7 +28,7 @@ FAIL_MARKER="/tmp/intrinsic-session-setup.failed"
 LOG="/tmp/intrinsic-session-setup.log"
 
 # Fast-fast path: toolchain already present means provisioning was a no-op.
-for ver in 22 21 20; do
+for ver in $(seq 99 -1 20); do
     if command -v "clang-${ver}" >/dev/null 2>&1 \
         && command -v "clang++-${ver}" >/dev/null 2>&1 \
         && command -v "clang-scan-deps-${ver}" >/dev/null 2>&1; then

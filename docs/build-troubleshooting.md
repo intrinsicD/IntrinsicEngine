@@ -16,14 +16,20 @@ Intrinsic uses C++23 modules and relies on CMake's module dependency scanning.
 
 When CMake auto-selects **GCC** (`/usr/bin/c++`), module scanning is unavailable/incomplete for this project configuration, so generation fails before compilation starts.
 
-In contrast, `clang++-20` with `clang-scan-deps-20` supports the required dependency scanning flow used by this build.
+In contrast, Clang 20 or newer with matching `clang-scan-deps` supports the required dependency scanning flow used by this build. The repository presets select the highest complete installed Clang 20+ toolchain automatically.
 
 ## Verify quickly
 
 ```bash
 cmake --version
 c++ --version
-clang++-20 --version
+for v in $(seq 99 -1 20); do
+  if command -v "clang++-$v" >/dev/null && command -v "clang-scan-deps-$v" >/dev/null; then
+    "clang++-$v" --version
+    "clang-scan-deps-$v" --version
+    break
+  fi
+done
 cmake --preset dev
 ```
 
@@ -31,34 +37,38 @@ If configure output shows `The CXX compiler identification is GNU ...` and then 
 
 ## Working options
 
-### Option A (recommended): configure with Clang 20 explicitly
+### Option A (recommended): use the repository preset
 
 ```bash
-CC=clang-20 CXX=clang++-20 cmake -S . -B build/dev-clang -G Ninja \
-  -DCMAKE_BUILD_TYPE=Debug \
-  -DINTRINSIC_BUILD_SANDBOX=ON \
-  -DINTRINSIC_BUILD_TESTS=ON \
-  -DINTRINSIC_ENABLE_SANITIZERS=ON \
-  -DINTRINSIC_ENABLE_CUDA=OFF
-
-cmake --build build/dev-clang --target IntrinsicCore IntrinsicGeometry IntrinsicECS
-cmake --build build/dev-clang --target IntrinsicCoreTests IntrinsicECSTests IntrinsicGeometryTests
-ctest --test-dir build/dev-clang --output-on-failure
-```
-
-### Option B: keep presets, but force compiler once per shell
-
-```bash
-export CC=clang-20
-export CXX=clang++-20
 cmake --preset dev
 cmake --build --preset dev --target IntrinsicCore IntrinsicGeometry IntrinsicECS
+cmake --build --preset dev --target IntrinsicCoreTests IntrinsicECSTests IntrinsicGeometryTests
 ctest --test-dir build/dev --output-on-failure
 ```
 
-### Option C: use a toolchain file / preset inheritance for team consistency
+`cmake/IntrinsicClangToolchain.cmake` chooses the highest complete installed
+toolchain at major version 20 or newer. A complete toolchain means matching
+`clang`, `clang++`, and `clang-scan-deps` binaries, such as
+`clang-22`/`clang++-22`/`clang-scan-deps-22`.
 
-Create a preset/toolchain that pins Clang 20 so developer machines and CI select the same compiler deterministically.
+### Option B: override the compiler explicitly for one configure
+
+```bash
+cmake --preset dev \
+  -DCMAKE_C_COMPILER=/usr/bin/clang-20 \
+  -DCMAKE_CXX_COMPILER=/usr/bin/clang++-20 \
+  -DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=/usr/bin/clang-scan-deps-20
+```
+
+Use this only when reproducing an issue against a specific Clang version. The
+root CMake configure still rejects Clang older than 20 and warns when the
+scanner major version does not match the selected compiler major version.
+
+### Option C: install the minimum toolchain
+
+If no complete Clang 20+ toolchain is installed, install at least Clang 20 and
+its tools package (for example `clang-20`, `clang++-20`, and
+`clang-scan-deps-20`). Newer complete toolchains are preferred automatically.
 
 ## Additional container caveat (non-blocking for libs/tests)
 

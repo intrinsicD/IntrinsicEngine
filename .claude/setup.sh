@@ -7,9 +7,8 @@
 # session is incremental.
 #
 # Behavior:
-#   * Fast path: if `clang-20` (or any newer) and `clang-scan-deps-20` are
-#     already present, the hook returns immediately and the agent loop starts
-#     with a fully provisioned toolchain.
+#   * Fast path: if a complete Clang 20+ toolchain is already present, the hook
+#     returns immediately and the agent loop starts fully provisioned.
 #   * Slow path: otherwise the hook emits the async marker
 #     `{"async": true, "asyncTimeout": ...}` and detaches; provisioning
 #     continues in the background while the agent works in parallel.
@@ -61,7 +60,7 @@ toolchain_present() {
         libxkbcommon-dev
         libgl1-mesa-dev
     )
-    for ver in 22 21 20; do
+    for ver in $(seq 99 -1 20); do
         command -v "clang-${ver}"            >/dev/null 2>&1 || continue
         command -v "clang++-${ver}"          >/dev/null 2>&1 || continue
         command -v "clang-scan-deps-${ver}"  >/dev/null 2>&1 || continue
@@ -160,12 +159,14 @@ install_system_deps() {
 # --------------------------------------------------------------------------
 detect_clang() {
     local ver
-    for ver in 22 21 20; do
-        if command -v "clang++-${ver}" &>/dev/null; then
+    for ver in $(seq 99 -1 20); do
+        if command -v "clang-${ver}" &>/dev/null \
+            && command -v "clang++-${ver}" &>/dev/null \
+            && command -v "clang-scan-deps-${ver}" &>/dev/null; then
             CLANG_VER="$ver"
             CC="clang-${ver}"
             CXX="clang++-${ver}"
-            SCAN_DEPS="$(command -v "clang-scan-deps-${ver}" 2>/dev/null || echo "")"
+            SCAN_DEPS="$(command -v "clang-scan-deps-${ver}")"
             return 0
         fi
     done

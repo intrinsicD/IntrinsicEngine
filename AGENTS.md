@@ -113,9 +113,9 @@ Every new dependency edge must be justifiable by layer policy and reflected in d
 - Prefer deterministic, testable APIs with explicit ownership and failure states.
 - Use out-of-source CMake presets only; `CMakeLists.txt` rejects in-source configure. Default agent build setup is
   `cmake --preset ci` followed by `cmake --build --preset ci --target IntrinsicTests`.
-- Presets pin `clang-20` / `clang++-20`; C++ module configuration also requires a matching `clang-scan-deps` (
-  `clang-scan-deps-20` or newer). Do not treat GCC or stale non-preset build trees as valid verification for module
-  changes.
+- Presets require Clang 20 as the minimum supported major version and auto-select the highest complete installed
+  Clang toolchain (`clang`, `clang++`, and matching `clang-scan-deps`) at version 20 or newer. Do not treat GCC or
+  stale non-preset build trees as valid verification for module changes.
 - Add C++23 module libraries with `intrinsic_add_module_library(...)` from `cmake/IntrinsicModule.cmake` and declare
   module interfaces via `target_sources(... FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ...)`.
 - Keep `.cppm` module interfaces focused on exported types, declarations, small inline accessors, and templates that

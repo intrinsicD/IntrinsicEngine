@@ -81,7 +81,8 @@ The GpuScene-aware shader inventory under `assets/shaders/forward/` and
 - If `tools/ci/touched_scope.py` was used, its selected commands are recorded
   and any broad fallback/full-gate requirements are still addressed.
 - Build trees used for evidence were confirmed current and compatible with
-  C++23/toolchain requirements (clang-20 / clang-scan-deps-20).
+  C++23/toolchain requirements (highest complete Clang 20+ toolchain selected
+  by the preset, or an explicitly verified equivalent).
 - Current CTest output, not stale `LastTestsFailed.log` contents, was used to
   assess pass/fail state.
 - Noisy command output was captured to a log and filtered with

@@ -20,21 +20,48 @@ project(IntrinsicEngine
         LANGUAGES CXX C
 )
 
+include(cmake/ClangToolchainSelection.cmake)
+
+if(NOT CMAKE_C_COMPILER_ID STREQUAL "Clang"
+    OR NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    message(FATAL_ERROR
+        "IntrinsicEngine requires LLVM Clang ${INTRINSIC_MINIMUM_CLANG_MAJOR}+ "
+        "for C++23 module dependency scanning. Configure with the provided "
+        "CMake presets or set both CMAKE_C_COMPILER and CMAKE_CXX_COMPILER to "
+        "compatible Clang binaries.")
+endif()
+
+set(_INTRINSIC_MINIMUM_CLANG_VERSION "${INTRINSIC_MINIMUM_CLANG_MAJOR}.0")
+if(CMAKE_C_COMPILER_VERSION VERSION_LESS "${_INTRINSIC_MINIMUM_CLANG_VERSION}"
+    OR CMAKE_CXX_COMPILER_VERSION VERSION_LESS "${_INTRINSIC_MINIMUM_CLANG_VERSION}")
+    message(FATAL_ERROR
+        "IntrinsicEngine requires Clang ${INTRINSIC_MINIMUM_CLANG_MAJOR}+; "
+        "detected C=${CMAKE_C_COMPILER_VERSION} "
+        "and CXX=${CMAKE_CXX_COMPILER_VERSION}.")
+endif()
+
+string(REGEX MATCH "^[0-9]+" INTRINSIC_SELECTED_CLANG_MAJOR
+    "${CMAKE_CXX_COMPILER_VERSION}")
+message(STATUS
+    "IntrinsicEngine Clang requirement: using C=${CMAKE_C_COMPILER_VERSION} "
+    "and CXX=${CMAKE_CXX_COMPILER_VERSION}; minimum is "
+    "${INTRINSIC_MINIMUM_CLANG_MAJOR}.0")
+
 # ------------------------------------------------------------------------------
 # Manually point CMake to the dependency scanner
 # ------------------------------------------------------------------------------
 # Check if the user/IDE provided a scanner, otherwise try to find one
 if(NOT CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS)
-    # Search for versioned binaries first, then generic
-    find_program(CLANG_SCAN_DEPS_PATH
-            NAMES
-            clang-scan-deps-23
-            clang-scan-deps-22
-            clang-scan-deps-20
-            clang-scan-deps
-            HINTS
-            $ENV{LLVM_DIR}/bin
+    intrinsic_find_matching_clang_scan_deps(
+        CLANG_SCAN_DEPS_PATH
+        "${INTRINSIC_SELECTED_CLANG_MAJOR}"
     )
+    if(NOT CLANG_SCAN_DEPS_PATH)
+        intrinsic_find_highest_clang_scan_deps(
+            CLANG_SCAN_DEPS_PATH
+            CLANG_SCAN_DEPS_MAJOR
+        )
+    endif()
 
     if(CLANG_SCAN_DEPS_PATH)
         message(STATUS "Found clang-scan-deps: ${CLANG_SCAN_DEPS_PATH}")
@@ -50,6 +77,24 @@ if(NOT CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS)
             message(FATAL_ERROR "Could not find clang-scan-deps. Ensure Clang Tools 20+ are in your PATH.")
         endif()
     endif()
+endif()
+
+intrinsic_clang_major(
+    _INTRINSIC_SCAN_DEPS_MAJOR
+    "${CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS}"
+)
+if(NOT _INTRINSIC_SCAN_DEPS_MAJOR
+    OR _INTRINSIC_SCAN_DEPS_MAJOR LESS "${INTRINSIC_MINIMUM_CLANG_MAJOR}")
+    message(FATAL_ERROR
+        "IntrinsicEngine requires clang-scan-deps-${INTRINSIC_MINIMUM_CLANG_MAJOR} "
+        "or newer; detected '${CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS}'.")
+endif()
+if(NOT _INTRINSIC_SCAN_DEPS_MAJOR STREQUAL "${INTRINSIC_SELECTED_CLANG_MAJOR}")
+    message(WARNING
+        "clang-scan-deps major (${_INTRINSIC_SCAN_DEPS_MAJOR}) does not match "
+        "the selected Clang major (${INTRINSIC_SELECTED_CLANG_MAJOR}). Prefer "
+        "installing clang-scan-deps-${INTRINSIC_SELECTED_CLANG_MAJOR} for "
+        "module-scan compatibility.")
 endif()
 
 # ------------------------------------------------------------------------------

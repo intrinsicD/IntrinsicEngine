@@ -66,9 +66,10 @@ Cross-layer convenience imports that violate this table are prohibited.
 - Keep patches small and scoped to one task unless explicitly batched.
 - Prefer deterministic, testable APIs with explicit ownership and failure states.
 - Out-of-source CMake presets only; `CMakeLists.txt` rejects in-source configure.
-- Presets pin `clang-20` / `clang++-20`; C++ module configuration also requires a matching
-  `clang-scan-deps` (`clang-scan-deps-20` or newer). **GCC and stale non-preset build trees
-  are not valid verification for module changes.**
+- Presets require Clang 20 as the minimum supported major version and auto-select the highest
+  complete installed Clang toolchain (`clang`, `clang++`, and matching `clang-scan-deps`) at
+  version 20 or newer. **GCC and stale non-preset build trees are not valid verification for
+  module changes.**
 - Declare module libraries with `intrinsic_add_module_library(...)` from
   `cmake/IntrinsicModule.cmake`, and module interfaces via
   `target_sources(... FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ...)`.
