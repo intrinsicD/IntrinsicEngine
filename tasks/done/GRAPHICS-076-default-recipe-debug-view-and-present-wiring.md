@@ -8,7 +8,7 @@
   default-recipe command-stream / recipe-selector smoke on Vulkan-capable hosts,
   with CPU/null contracts preserving the default gate. The default-recipe
   pixel-readback parity harness is explicitly deferred to
-  [`GRAPHICS-076E`](../backlog/rendering/GRAPHICS-076E-default-recipe-pixel-readback.md)
+  [`GRAPHICS-076E`](GRAPHICS-076E-default-recipe-pixel-readback.md)
   rather than silently expanding this Slice D fixture into a renderer API change.
 - Completed: 2026-05-28. Final graduation commit: `37c53a94`
   (`GRAPHICS-076: graduate default-recipe Vulkan smoke`); retirement file move
@@ -320,7 +320,7 @@
   is the `GRAPHICS-076` Slice D closure gate. The four-sample default-recipe
   pixel-readback parity harness remains valuable, but requires a renderer API /
   diagnostic-counter extension beyond this fixture. It is tracked explicitly as
-  [`GRAPHICS-076E`](../backlog/rendering/GRAPHICS-076E-default-recipe-pixel-readback.md)
+  [`GRAPHICS-076E`](GRAPHICS-076E-default-recipe-pixel-readback.md)
   instead of remaining as an unchecked item inside this task.
 
 ## Slice plan
@@ -540,7 +540,7 @@ default-recipe Vulkan bring-up):
       7.17s under `build/ci-vulkan`.
 - [x] Defer four-sample-point default-recipe pixel-readback parity to a named
       follow-up instead of leaving it as an ambiguous Slice D blocker:
-      [`GRAPHICS-076E`](../backlog/rendering/GRAPHICS-076E-default-recipe-pixel-readback.md).
+      [`GRAPHICS-076E`](GRAPHICS-076E-default-recipe-pixel-readback.md).
       That follow-up owns either (a) generalizing the existing
       `SetMinimalDebugBackbufferReadbackBuffer(...)` /
       `MinimalDebugBackbufferReadbackCopyCount` seam to accept
@@ -631,7 +631,7 @@ Slice C–D tests are written and wired.
       public seam.
 - [x] (Slice D) Record the default-recipe smoke graduation in this task file
       and move default-recipe pixel-readback parity into
-      [`GRAPHICS-076E`](../backlog/rendering/GRAPHICS-076E-default-recipe-pixel-readback.md).
+      [`GRAPHICS-076E`](GRAPHICS-076E-default-recipe-pixel-readback.md).
 
 ## Acceptance criteria
 

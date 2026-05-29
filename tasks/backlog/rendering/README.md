@@ -652,7 +652,7 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   #921 + #922 (Slice A follow-up), #923, and #924; Slice D graduated locally
   on 2026-05-28 with `DefaultRecipeSurfaceGpuSmoke` passing normally on a
   Vulkan-capable host after the BUG-012 command-stream fixes.
-- [GRAPHICS-076E — Default-recipe pixel-readback parity harness](GRAPHICS-076E-default-recipe-pixel-readback.md):
+- [GRAPHICS-076E — Default-recipe pixel-readback parity harness](../../done/GRAPHICS-076E-default-recipe-pixel-readback.md):
   done 2026-05-29. Follow-up to GRAPHICS-076 Slice D. Adds default-recipe
   four-sample readback parity without reusing MinimalDebug-only diagnostics;
   the GRAPHICS-076F descriptor-slot fix made the opt-in Vulkan pixel smoke

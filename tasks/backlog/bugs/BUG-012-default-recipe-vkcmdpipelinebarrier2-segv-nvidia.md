@@ -9,7 +9,7 @@
   opt-in GPU smoke selection passes 4/4. The default CPU gate passes 2297/2297
   after explicitly building `IntrinsicBenchmarkSmoke`. Default-recipe
   pixel-readback parity is not part of this bug fix; it is tracked separately by
-  [`GRAPHICS-076E`](../rendering/GRAPHICS-076E-default-recipe-pixel-readback.md).
+  [`GRAPHICS-076E`](../../done/GRAPHICS-076E-default-recipe-pixel-readback.md).
 
 ## Goal
 - Identify and fix the malformed pipeline barrier (or unrooted image

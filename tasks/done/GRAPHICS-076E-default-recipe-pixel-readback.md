@@ -9,6 +9,7 @@
   smoke reads the canonical default-recipe backbuffer and matches the four
   `MinimalTriangleReadback` samples without using the MinimalDebug readback
   hook or counter.
+- Completion commit: `3c1888c5` (`GRAPHICS-076F: fix default debug-view readback`).
 
 ## Goal
 - Add a default-recipe backbuffer readback harness that proves the canonical default recipe renders the reference triangle with deterministic sample-point parity, without relying on the `MinimalDebugSurface` readback seam.
@@ -25,7 +26,7 @@
 - The existing readback hook, `IRenderer::SetMinimalDebugBackbufferReadbackBuffer(...)`, and the diagnostic counter `RenderGraphFrameStats::MinimalDebugBackbufferReadbackCopyCount` are intentionally scoped to `FrameRecipeKind::MinimalDebug`.
 - This task exists so `GRAPHICS-076` can close without silently expanding Slice D into a renderer API change while preserving a named follow-up for default-recipe pixel parity before or during `GRAPHICS-081` scaffold retirement.
 - 2026-05-28 status: the renderer API (`IRenderer::SetDefaultRecipeBackbufferReadbackBuffer(...)` + `RenderGraphFrameStats::DefaultRecipeBackbufferReadbackCopyCount`), recording wiring (`Graphics.Renderer.cpp` lines ~2286–2314), `tests/contract/graphics/Test.DefaultRecipeBackbufferReadback.cpp`, and the `DefaultRecipeSurfaceGpuSmoke.ReferenceTriangleDebugViewReadbackMatchesMinimalHarnessSamples` opt-in Vulkan fixture all landed via commit `cc06edef` ("Add default recipe readback seam"). The Vulkan readback parity (the `ReferenceTriangleDebugViewReadbackMatchesMinimalHarnessSamples` smoke returning black at the interior sample) is also tracked separately as `GRAPHICS-076F` per the cc06edef commit message.
-- 2026-05-29 status: [`BUG-013`](../../done/BUG-013-backbuffer-readback-contract-vtable-segv.md) is **resolved (not reproducible on a clean `ci` build)** — both `DefaultRecipeBackbufferReadbackContract.ConfiguredHandleRecordsReadbackTripletOnce` and `MinimalDebugBackbufferReadbackContract.ConfiguredHandleRecordsReadbackTripletOnce` pass on the default CPU gate (CTest #25/#87, label `contract`; 225/225 in `IntrinsicGraphicsContractCpuTests`). The reported SEGV was a stale incremental module-BMI artifact; see `src/graphics/rhi/README.md` for the clean-rebuild rule. The CPU contract gate is **no longer blocked**; the remaining open work here is the default-recipe pixel-parity assertions below.
+- 2026-05-29 status: [`BUG-013`](BUG-013-backbuffer-readback-contract-vtable-segv.md) is **resolved (not reproducible on a clean `ci` build)** — both `DefaultRecipeBackbufferReadbackContract.ConfiguredHandleRecordsReadbackTripletOnce` and `MinimalDebugBackbufferReadbackContract.ConfiguredHandleRecordsReadbackTripletOnce` pass on the default CPU gate (CTest #25/#87, label `contract`; 225/225 in `IntrinsicGraphicsContractCpuTests`). The reported SEGV was a stale incremental module-BMI artifact; see `src/graphics/rhi/README.md` for the clean-rebuild rule. The CPU contract gate is **no longer blocked**; the remaining open work here is the default-recipe pixel-parity assertions below.
 
 ## Required changes
 - [x] Add a default-recipe readback hook, or generalize the existing readback hook with recipe-specific diagnostics, so a caller can arm a host-visible backbuffer copy under `FrameRecipeKind::Default` only.

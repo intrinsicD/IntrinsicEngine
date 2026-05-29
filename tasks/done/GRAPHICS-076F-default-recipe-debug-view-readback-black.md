@@ -10,6 +10,7 @@
   command buffer submitted. The fix seeds the triangle after `BeginFrame()` and
   reserves slot 1 for DebugView plus slot 2 for Present through
   `ICommandContext::BindFrameSampledTextureAt(...)`; postprocess keeps slot 0.
+- Completion commit: `3c1888c5` (`GRAPHICS-076F: fix default debug-view readback`).
 - Verification: `cmake --build --preset ci-vulkan --target
   IntrinsicGraphicsVulkanSmokeTests`; `ctest --test-dir build/ci-vulkan
   --output-on-failure -R 'DefaultRecipeSurfaceGpuSmoke' --timeout 120`; `cmake
@@ -62,7 +63,7 @@
 - [x] `ctest --test-dir build/ci --output-on-failure -R 'DefaultRecipeBackbufferReadbackContract' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60` remains green for the CPU/null contract seam.
 
 ## Docs
-- [x] Update `tasks/backlog/rendering/GRAPHICS-076E-default-recipe-pixel-readback.md` or retire it only after the readback smoke is green.
+- [x] Retire `GRAPHICS-076E-default-recipe-pixel-readback.md` after the readback smoke is green.
 - [x] Update renderer/Vulkan docs if the fix changes the supported default-recipe readback or descriptor-binding behavior.
 
 ## Acceptance criteria
