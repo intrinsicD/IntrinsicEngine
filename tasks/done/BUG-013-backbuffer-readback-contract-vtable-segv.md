@@ -28,8 +28,12 @@
   build, the area is known-fragile (the strategy-1 attempt below surfaced a
   secondary slot mismatch on an already-incremental tree), and clean-rebuild
   discipline (now documented) is the authoritative prevention. If a future
-  reviewer wants the structural anchor regardless, it should be its own scoped
-  task, not folded into a bug closure.
+  reviewer wants the structural anchor regardless, it is captured as its own
+  scoped task `HARDEN-073`
+  (`tasks/backlog/rendering/HARDEN-073-rhi-command-context-vtable-key-function.md`),
+  which records the honest assessment that it does **not** prevent the stale-BMI
+  recurrence and exists only for AGENTS.md §5 hygiene and compiler-bug-variant
+  defense.
 
 ## Context
 - Original symptom (as filed 2026-05-28): `IntrinsicGraphicsContractCpuTests --gtest_filter='*BackbufferReadbackContract.ConfiguredHandleRecordsReadbackTripletOnce'` SEGV (PC = 0x0) inside `NullRenderer::ExecuteFrame` at the per-recipe `graphicsContext.CopyTextureToBuffer(...)` call against a `MockCommandContext`.
