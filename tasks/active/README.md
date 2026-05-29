@@ -11,6 +11,25 @@ Each active task should include:
 
 ## Currently active
 
+- [`RUNTIME-086`](RUNTIME-086-geometrysources-graph-residency.md) —
+  `GeometrySources` graph residency bridge (Theme A working-sandbox path).
+  Status: in-progress (Slice A landed). Owner: unassigned. Branch: TBD.
+  Promoted from `tasks/backlog/runtime/` on 2026-05-29 as the next unblocked
+  Theme A leaf after `RUNTIME-085` (mesh residency) retired; cross-domain
+  anchors `HARDEN-065`, `GRAPHICS-030B`, `GRAPHICS-070/071` are all in
+  `tasks/done/`. Slice A added the standalone
+  `Extrinsic.Runtime.GraphGeometryPacker` module
+  (`PackGraph(ConstSourceView, wantLines, wantPoints, GraphPackBuffer&)`)
+  that converts a graph-domain view into one canonical
+  `GpuWorld::GeometryUploadDesc` — node `v:position` rows as the shared
+  point-lane vertex buffer plus optional validated `(e:v0, e:v1)`
+  line-list indices — with fail-closed `GraphPackStatus` codes
+  (`WrongDomain`, `NoRenderLane`, `MissingNodes`, `EmptyGraph`,
+  `MissingEdgeTopology`, `InvalidEdge`, `NonFinitePosition`) and twelve
+  `contract;runtime` packer unit tests in `Test.GraphGeometryPacker.cpp`.
+  `Runtime.RenderExtraction` wiring + `GraphGeometry*` diagnostics + dirty
+  reupload are Slices B and C. Next verification step:
+  `ctest --test-dir build/ci --output-on-failure -R 'GraphGeometryPacker|MeshGeometry' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`.
 - [`GEOM-012`](GEOM-012-symmetric-domain-views-property-sharing.md) —
   Symmetric mesh, graph, and point-cloud domain views. Status:
   in-progress (Slices A + B + C landed). Owner: unassigned. Branch:

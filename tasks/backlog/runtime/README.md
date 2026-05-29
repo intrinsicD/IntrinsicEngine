@@ -72,8 +72,9 @@ compose with the rendering tasks listed in `tasks/backlog/rendering/README.md`.
   with fail-closed `MeshPackStatus` taxonomy), Slice B the extraction wiring,
   and Slice C the dirty-domain reupload + deferred-retire ordering.
   `Operational` visual proof is deferred to `RUNTIME-095`.
-- [RUNTIME-086 — `GeometrySources` graph residency bridge](RUNTIME-086-geometrysources-graph-residency.md):
-  graph nodes/edges to retained point and line geometry.
+- [RUNTIME-086 — `GeometrySources` graph residency bridge](../../active/RUNTIME-086-geometrysources-graph-residency.md):
+  graph nodes/edges to retained point and line geometry. _(in-progress in
+  `tasks/active/`; Slice A — graph packer — landed.)_
 - [RUNTIME-087 — `GeometrySources` point-cloud residency bridge](RUNTIME-087-geometrysources-pointcloud-residency.md):
   point-cloud vertices to retained point geometry.
 - [RUNTIME-088 — Mesh primitive view lifecycle](RUNTIME-088-mesh-primitive-view-lifecycle.md):

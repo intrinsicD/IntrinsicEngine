@@ -275,6 +275,7 @@ if(TARGET ExtrinsicRuntime)
         Test.GpuAssetCacheFallbackBootstrap.cpp
         Test.MeshGeometryExtraction.cpp
         Test.MeshGeometryPacker.cpp
+        Test.GraphGeometryPacker.cpp
         Test.ProceduralGeometryCache.cpp
         Test.ProceduralGeometryExtraction.cpp
         Test.RuntimeCameraControllers.cpp
