@@ -37,4 +37,28 @@ namespace Geometry::DomainViews
         // graph's `v:deleted` marker; see the .cppm doc for the full contract.
         return PointCloud::Cloud(graph.VertexProperties());
     }
+
+    // GEOM-012 Slice D read-only view constructors. Each member is initialized
+    // directly from the prvalue returned by the corresponding `Borrow*`
+    // factory; guaranteed copy elision means no copy/move of the borrowed
+    // container occurs, so the view shares the source's storage rather than
+    // deep-copying it. The cloud views route through the mutable
+    // `BorrowMeshAsCloud`/`BorrowGraphAsCloud` factories (which lazily allocate
+    // the cloud's `p:deleted` marker on the shared vertex `PropertySet`), so
+    // they `const_cast` the source the same way `BorrowMeshAsGraphReadOnly`
+    // does internally; the post-construction surface remains read-only.
+    ConstMeshBackedGraphView::ConstMeshBackedGraphView(const HalfedgeMesh::Mesh& mesh)
+        : m_Graph(BorrowMeshAsGraphReadOnly(mesh))
+    {
+    }
+
+    ConstMeshBackedCloudView::ConstMeshBackedCloudView(const HalfedgeMesh::Mesh& mesh)
+        : m_Cloud(BorrowMeshAsCloud(const_cast<HalfedgeMesh::Mesh&>(mesh)))
+    {
+    }
+
+    ConstGraphBackedCloudView::ConstGraphBackedCloudView(const Graph::Graph& graph)
+        : m_Cloud(BorrowGraphAsCloud(const_cast<Graph::Graph&>(graph)))
+    {
+    }
 }
