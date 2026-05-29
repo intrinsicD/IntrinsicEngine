@@ -13,6 +13,11 @@
 //    ConstMeshBackedCloudView, ConstGraphBackedCloudView) — compile-time proof
 //    that mutation through the view is ill-formed, plus runtime proof that the
 //    views share source storage and observe live edits.
+//  - Slice E: conversion/move/consume policy — copy-constructing a borrowed
+//    Graph/Cloud is the explicit hard-copy ownership seam; the resulting owning
+//    container outlives and decouples from the source. (Cross-format To*/From*
+//    lifetime + move-assign ownership transfer are pinned in Test.MeshConversion
+//    and Test.PointCloudConversion.)
 
 #include <gtest/gtest.h>
 
@@ -797,6 +802,82 @@ TEST(SubmeshViewDomainBorrows, ConstGraphCloudViewSharesStorageAndSeesLiveEdits)
     // and leaves edge state untouched.
     EXPECT_FALSE(view.PointProperties().Exists("h:connectivity"));
     EXPECT_EQ(graph.EdgesSize(), edgesBefore);
+}
+
+// ---------------------------------------------------------------------------
+// Slice E — conversion/move/consume policy.
+//
+// A borrowed Graph/Cloud shares its source's storage (proven above). The
+// explicit hard-copy ownership seam for taking independent ownership of that
+// borrowed domain is the container copy constructor / copy assignment, which
+// always allocates a fresh owning PropertySet and deep-copies. These tests pin
+// that copying a borrow yields an owning container that (a) does not observe
+// later source mutations and (b) outlives source destruction.
+// ---------------------------------------------------------------------------
+
+TEST(SubmeshViewDomainBorrows, HardCopyOfMeshBackedGraphBorrowOwnsIndependentStorage)
+{
+    Geometry::Graph::Graph owned; // owning container; receives the hard copy
+    {
+        auto mesh = MakeSingleTriangle();
+        Geometry::Graph::Graph borrow = BorrowMeshAsGraphReadOnly(mesh); // shares mesh storage
+        owned = borrow; // copy-assign = explicit hard copy into an owning graph
+        ASSERT_EQ(owned.VerticesSize(), mesh.VerticesSize());
+
+        // A source mutation is visible through the shared borrow but NOT through
+        // the hard copy: the copy owns independent storage.
+        const Geometry::VertexHandle v0{0};
+        mesh.Position(v0) = glm::vec3{9.0f, 9.0f, 9.0f};
+        EXPECT_EQ(borrow.VertexPosition(v0), (glm::vec3{9.0f, 9.0f, 9.0f}));
+        EXPECT_EQ(owned.VertexPosition(v0), (glm::vec3{0.0f, 0.0f, 0.0f}));
+    } // mesh + borrow destroyed
+
+    // The hard copy outlives its source unchanged.
+    EXPECT_EQ(owned.VerticesSize(), 3u);
+    EXPECT_EQ(owned.VertexPosition(Geometry::VertexHandle{0}), (glm::vec3{0.0f, 0.0f, 0.0f}));
+    EXPECT_EQ(owned.VertexPosition(Geometry::VertexHandle{1}), (glm::vec3{1.0f, 0.0f, 0.0f}));
+}
+
+TEST(SubmeshViewDomainBorrows, HardCopyOfMeshBackedCloudBorrowOwnsIndependentStorage)
+{
+    Geometry::PointCloud::Cloud owned;
+    {
+        auto mesh = MakeSingleTriangle();
+        Geometry::PointCloud::Cloud borrow = BorrowMeshAsCloud(mesh); // shares mesh vertex storage
+        owned = borrow; // copy-assign = explicit hard copy
+
+        ASSERT_EQ(owned.VerticesSize(), mesh.VerticesSize());
+
+        const Geometry::VertexHandle v0{0};
+        mesh.Position(v0) = glm::vec3{9.0f, 9.0f, 9.0f};
+        EXPECT_EQ(borrow.Position(v0), (glm::vec3{9.0f, 9.0f, 9.0f}));
+        EXPECT_EQ(owned.Position(v0), (glm::vec3{0.0f, 0.0f, 0.0f}));
+    }
+
+    EXPECT_EQ(owned.VerticesSize(), 3u);
+    EXPECT_EQ(owned.Position(Geometry::VertexHandle{0}), (glm::vec3{0.0f, 0.0f, 0.0f}));
+    EXPECT_EQ(owned.Position(Geometry::VertexHandle{1}), (glm::vec3{1.0f, 0.0f, 0.0f}));
+}
+
+TEST(SubmeshViewDomainBorrows, HardCopyOfGraphBackedCloudBorrowOwnsIndependentStorage)
+{
+    Geometry::PointCloud::Cloud owned;
+    {
+        auto graph = MakeTwoVertexEdgeGraph();
+        Geometry::PointCloud::Cloud borrow = BorrowGraphAsCloud(graph); // shares graph vertex storage
+        owned = borrow; // copy-assign = explicit hard copy
+
+        ASSERT_EQ(owned.VerticesSize(), graph.VerticesSize());
+
+        const Geometry::VertexHandle v0{0};
+        graph.SetVertexPosition(v0, glm::vec3{9.0f, 9.0f, 9.0f});
+        EXPECT_EQ(borrow.Position(v0), (glm::vec3{9.0f, 9.0f, 9.0f}));
+        EXPECT_EQ(owned.Position(v0), (glm::vec3{0.0f, 0.0f, 0.0f}));
+    }
+
+    EXPECT_EQ(owned.VerticesSize(), 2u);
+    EXPECT_EQ(owned.Position(Geometry::VertexHandle{0}), (glm::vec3{0.0f, 0.0f, 0.0f}));
+    EXPECT_EQ(owned.Position(Geometry::VertexHandle{1}), (glm::vec3{1.0f, 0.0f, 0.0f}));
 }
 
 } // namespace

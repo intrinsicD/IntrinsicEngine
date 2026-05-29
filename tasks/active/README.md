@@ -30,102 +30,23 @@ Each active task should include:
   `Runtime.RenderExtraction` wiring + `GraphGeometry*` diagnostics + dirty
   reupload are Slices B and C. Next verification step:
   `ctest --test-dir build/ci --output-on-failure -R 'GraphGeometryPacker|MeshGeometry' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`.
-- [`GEOM-012`](GEOM-012-symmetric-domain-views-property-sharing.md) —
-  Symmetric mesh, graph, and point-cloud domain views. Status:
-  in-progress (Slices A + B + C + D landed). Owner: unassigned. Branch:
-  Slice A on `claude/funny-pascal-kTHxz`; Slice B on
-  `claude/eloquent-sagan-WhPAe`; Slice C on
-  `claude/practical-hamilton-9jmca`; Slice D on
-  `claude/happy-newton-KToPC`. Promoted from
-  `tasks/backlog/geometry/` on 2026-05-28 as the next unblocked
-  geometry task once GEOM-008 (Geometry.Linalg / Geometry.Sparse
-  foundation) retired. Slice A added the new `Geometry.DomainViews`
-  module with
-  `Geometry::DomainViews::BorrowMeshAsGraphReadOnly(const HalfedgeMesh::Mesh&)`
-  — a public factory that returns a `Graph::Graph` sharing the source
-  mesh's vertex/halfedge/edge `PropertySet`s, the deleted-vertex/edge
-  counters, and the canonical `v:point`/`v:connectivity`/`h:connectivity`/
-  `v:deleted`/`e:deleted` slots with no compatibility-copy allocations.
-  Face storage is deliberately excluded; topology mutation through the
-  returned graph is UB on face-bearing meshes (graph methods cannot
-  update face incidence) and the const-reference parameter is the
-  safety signal. Slice B adds
-  `Geometry::DomainViews::BorrowMeshAsCloud(HalfedgeMesh::Mesh&) ->
-  PointCloud::Cloud`, which routes through a new
-  `PointCloud::Cloud(PropertySet&)` constructor that shares the
-  source mesh's vertex `PropertySet` while owning the cloud's own
-  deletion counter; cloud-side deletes mark `p:deleted` on the
-  shared `PropertySet` but do not increment
-  `mesh.DeletedVertexCount()`, so the mesh's `VertexCount()` /
-  `HasGarbage()` continue to reflect only mesh-side `v:deleted`
-  semantics. The canonical `v:point` slot is reused with no
-  `p:position` compatibility copy, and existing per-vertex
-  attributes (e.g. `v:normal`) stay reachable through
-  `Cloud::GetVertexProperty<T>`. `Cloud::AddPoint` through the view
-  appends to the shared vertex `PropertySet` and is safe on
-  face-bearing meshes because the new vertex is isolated (no
-  incident halfedges); topology-aware deletion must still route
-  through `Mesh::DeleteVertex` / `Mesh::GarbageCollection`, and
-  `Cloud::GarbageCollection` on a mesh-backed borrow is documented
-  UB on face-bearing meshes (it physically reshuffles vertex slots).
-  Slice B also fixes the pre-existing `Cloud::CreateView` to clamp
-  and bind against the cloud's bound `m_Vertices` /
-  `m_DeletedVertices` rather than the owning `Properties`, so
-  subviews of a mesh-backed borrow see the mesh's rows rather than
-  clamping to size 0 (no-op rebinding for owned clouds).
-  Eleven new tests in `Test.SubmeshViewDomainBorrows.cpp` cover
-  `v:point` slot identity, absence of `p:position`, `v:normal`
-  reuse, bidirectional position-edit visibility, point-addition
-  propagation with face state untouched, the empty-mesh case,
-  `Cloud::CreateView` over a mesh-borrowed cloud, the empty-mesh
-  `CreateView` clamp, cloud-side `DeletePoint` not touching the
-  mesh's deletion counter, and a follow-up mesh `GarbageCollection`
-  after a cloud-side delete being a consistent no-op. Slice C adds
-  `Geometry::DomainViews::BorrowGraphAsCloud(Graph::Graph&) ->
-  PointCloud::Cloud`, the symmetric companion that shares only the
-  graph's vertex `PropertySet` (reusing `v:point`, no `p:position`
-  copy), owns its own deletion counter, and does not hold the
-  graph's halfedge/edge `PropertySet`s (`h:connectivity`,
-  `e:deleted`) so those are unreachable through the cloud surface.
-  The graph-domain `v:connectivity` slot, however, lives on the
-  shared vertex `PropertySet` and stays physically reachable
-  through generic `PointProperties()` access; the `Cloud` owns no
-  connectivity accessor and never touches it, but mutating or
-  clearing it through the cloud (including via `Cloud::Clear()`/
-  `Cloud::GarbageCollection()`) is documented UB on an edge-bearing
-  source graph — the same topology-mutation boundary as the other
-  borrows. Type-level prevention of reaching graph-domain slots is
-  deferred to Slice D's restricted const-view types.
-  `Cloud::AddPoint` appends an isolated vertex slot to the source
-  graph. Ten new tests cover `v:point` identity, absence of
-  `p:position`, halfedge/edge-`PropertySet` non-exposure with graph
-  sizes untouched, the shared `v:connectivity` slot pinned as a
-  reachable documented-UB boundary, `v:normal` reuse, bidirectional
-  position-edit visibility, point-addition propagation with the new
-  vertex isolated, the empty-graph case, and cloud-side
-  `DeletePoint` not touching the graph's deletion view. Slice D
-  adds the read-only `ConstMeshBackedGraphView` /
-  `ConstMeshBackedCloudView` / `ConstGraphBackedCloudView` view
-  types: each wraps the matching shared-storage borrow (sharing
-  preserved via guaranteed copy elision), exposes only
-  `const`-returning accessors plus an `AsGraph()`/`AsCloud()`
-  const-reference interop accessor, and is non-copyable /
-  non-movable — so `Add*`/`Delete*`/`Set*`/`Clear`/
-  `GarbageCollection`/`GetOrAdd*Property` are ill-formed through the
-  view (proven by a compile-time `static_assert` block with
-  non-vacuous positive controls, plus four runtime
-  shared-storage/live-edit tests). Each constructor takes a
-  *mutable* source reference because construction lazily
-  materializes the shared `v:point`/`p:deleted`/connectivity
-  columns, so a `const` source is rejected at compile time rather
-  than `const_cast` into a mutating borrow (undefined behavior).
-  `ConstGraphBackedCloudView`
-  closes the Slice C `v:connectivity` documented-UB boundary by
-  construction (no mutable property access). Slice E
-  reviews the conversion/move/consume policy and closes at
-  `CPUContracted`. Next verification step:
-  `ctest --test-dir build/ci --output-on-failure -R 'SubmeshViewDomainBorrows|ShortestPath|PointCloud|MeshOperations' --timeout 60`.
+
 Previously-active
+[`GEOM-012`](../done/GEOM-012-symmetric-domain-views-property-sharing.md) —
+symmetric mesh/graph/point-cloud domain views retired to `tasks/done/` on
+2026-05-29 after Slice E (conversion/move/consume policy) landed on
+`claude/intrinsicengine-agent-onboarding-YjhiR`. Maturity `CPUContracted`. Slice E
+reviewed the conversion coverage and added no new APIs: the container copy
+constructor/assignment is the same-domain borrow→owning hard-copy seam,
+`Geometry.Mesh.Conversion`/`Geometry.PointCloud.Conversion` own the cross-domain
+hard copies, move-assign is the ownership-transfer seam, and the Slice D
+`Const*View` types are already non-copyable/non-movable. Five new tests pin the
+policy (three `SubmeshViewDomainBorrows.HardCopyOf*BorrowOwnsIndependentStorage`
+cases plus `MeshConversion.ConvertedHalfedgeMeshOutlivesSourceViaMoveOwnershipTransfer`
+and `PointCloudConversion.ConvertedCloudOutlivesAndDecouplesFromSource`); the
+focused geometry suite passed 180/180 with the layering, test-layout, doc-links,
+and module-inventory (no diff) checks clean.
+
 [`BUG-013`](../done/BUG-013-backbuffer-readback-contract-vtable-segv.md) —
 backbuffer readback contract SEGV retired to `tasks/done/` on 2026-05-29 as
 **not reproducible on a clean `ci` preset build**. On a freshly-cloned tree the
