@@ -1,0 +1,19 @@
+{
+  "goal_id": "poisson_progressive_v1",
+  "research_goal": "Find a GPU Poisson-disk sampler with a better blue-noise spectrum (low low-frequency energy, isotropic) while preserving the conflict-radius guarantee, suitable for progressive sampling in IntrinsicEngine.",
+  "task": "poisson",
+  "candidate_kind": "shader",
+  "task_params": {
+    "domain": [0.0, 0.0, 1.0, 1.0],
+    "radius": 0.02,
+    "periodic": false,
+    "target_count": 4096,
+    "seed": 1
+  },
+  "rounds": 6,
+  "candidates_per_round": 4,
+  "evolve_top_k": 2,
+  "offline": true,
+  "harness_cmd": "",
+  "harness_timeout_ms": 15000
+}

@@ -1,0 +1,9 @@
+{
+  "goal_id": "demo_v1",
+  "research_goal": "Maximize the demo objective (smoke test of the whole loop).",
+  "task": "demo",
+  "rounds": 4,
+  "candidates_per_round": 4,
+  "evolve_top_k": 2,
+  "offline": true
+}

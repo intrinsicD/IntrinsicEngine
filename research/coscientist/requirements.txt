@@ -1,0 +1,6 @@
+# Core framework: standard library only.
+# Live (non-offline) runs:
+anthropic>=0.40
+# Poisson example task (tasks/poisson) only:
+numpy>=1.26
+scipy>=1.11
