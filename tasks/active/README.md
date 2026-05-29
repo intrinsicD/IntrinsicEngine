@@ -11,18 +11,6 @@ Each active task should include:
 
 ## Currently active
 
-- [`BUG-013`](BUG-013-backbuffer-readback-contract-vtable-segv.md) —
-  Default-recipe + minimal-debug backbuffer readback contract tests SEGV
-  under clang-20 modules. Status: in-progress. Owner: local agent.
-  Branch: local `main` (committed `7e00f5f9` filed the bug; fix in
-  progress on the same branch). Promoted from `tasks/backlog/bugs/` on
-  2026-05-28 because the regression blocks `GRAPHICS-076E` CPU contract
-  closure and `GRAPHICS-081` scaffold retirement, and "reproducible
-  regressions trump feature work" per the agent prompt. Next
-  verification step: `cmake --build --preset ci --target
-  IntrinsicGraphicsContractCpuTests && build/ci/bin/IntrinsicGraphicsContractCpuTests
-  --gtest_filter='*BackbufferReadbackContract*'` must report 8/8 passing.
-
 - [`GEOM-012`](GEOM-012-symmetric-domain-views-property-sharing.md) —
   Symmetric mesh, graph, and point-cloud domain views. Status:
   in-progress (Slices A + B landed). Owner: unassigned. Branch:
@@ -78,6 +66,16 @@ Each active task should include:
   `CPUContracted`. Next verification step:
   `ctest --test-dir build/ci --output-on-failure -R 'SubmeshViewDomainBorrows|ShortestPath|PointCloud|MeshOperations' --timeout 60`.
 Previously-active
+[`BUG-013`](../done/BUG-013-backbuffer-readback-contract-vtable-segv.md) —
+backbuffer readback contract SEGV retired to `tasks/done/` on 2026-05-29 as
+**not reproducible on a clean `ci` preset build**. On a freshly-cloned tree the
+two `ConfiguredHandleRecordsReadbackTripletOnce` cases pass through the default
+CPU gate (CTest #25/#87, label `contract`; 225/225 in
+`IntrinsicGraphicsContractCpuTests`). The reported SEGV was a stale incremental
+module-BMI artifact after `cc06edef`; the lasting prevention is the
+clean-rebuild rule documented in `src/graphics/rhi/README.md`. Unblocks
+`GRAPHICS-076E` CPU contract closure; no engine/test source was changed.
+
 [`RUNTIME-085`](../done/RUNTIME-085-geometrysources-mesh-residency.md) —
 `GeometrySources` mesh residency bridge retired to `tasks/done/` on
 2026-05-28 after the Slice D closure check. Slices A–C landed on

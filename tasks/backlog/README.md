@@ -166,11 +166,12 @@ Reproducible correctness/regression fixes only. Origin:
 [`bugs/index.md`](bugs/index.md).
 
 Members:
-- [`active/BUG-013-backbuffer-readback-contract-vtable-segv.md`](../active/BUG-013-backbuffer-readback-contract-vtable-segv.md)
-  — default-recipe + minimal-debug backbuffer readback contract tests SEGV
-  under clang-20 modules. Promoted to `tasks/active/` 2026-05-28; blocks
-  `GRAPHICS-076E` CPU contract closure and `GRAPHICS-081` scaffold
-  retirement.
+- _None currently open._ [`BUG-013`](../done/BUG-013-backbuffer-readback-contract-vtable-segv.md)
+  (backbuffer readback contract SEGV) was closed 2026-05-29 as not
+  reproducible on a clean `ci` preset build — a stale incremental module-BMI
+  artifact, not a source defect. See [`bugs/index.md`](bugs/index.md) and
+  `src/graphics/rhi/README.md` for the clean-rebuild prevention. `GRAPHICS-076E`
+  CPU contract closure is unblocked.
 
 ## Cross-domain dependency anchors
 

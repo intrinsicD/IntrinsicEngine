@@ -23,3 +23,34 @@ This directory contains the `RHI` module/files.
   the layer-major / mip-minor `TextureUploadLayout` used by future batched
   transfer submissions.
 
+## Module ABI hygiene (clang-20 / C++23 modules)
+
+`RHI::ICommandContext` (`RHI.CommandContext.cppm`) is an **exported polymorphic
+interface** consumed across many translation units — the renderer, the Null and
+Vulkan backends, and every test `RecordingCommandContext` / `MockCommandContext`
+double. Its vtable layout is part of the cross-TU ABI.
+
+When you add, remove, or reorder any `virtual` member on `ICommandContext` (or
+any other exported polymorphic RHI interface):
+
+- **A clean preset rebuild is mandatory** — `rm -rf build/ci && cmake --preset
+  ci && cmake --build --preset ci --target IntrinsicTests`. Do **not** trust an
+  incremental build. Under clang-20's C++23-modules implementation, an
+  incremental tree can retain a **stale module BMI** for a dependent TU that was
+  not recompiled after the interface changed, so different TUs disagree on the
+  vtable slot ordering. The result is a runtime SEGV (PC = 0x0) when a virtual
+  is dispatched through a base `ICommandContext&` to the wrong/null slot — not a
+  link error. This matches AGENTS.md §7: stale non-preset/incremental module
+  trees are not valid verification for module changes.
+- Prefer adding new non-pure virtuals **at the end** of the interface and keep
+  bodies in the `.cpp` module implementation unit where the body is non-trivial
+  (AGENTS.md §5), to minimise layout churn for existing slots.
+
+History: HARDEN-072 (`tasks/done/HARDEN-072-rhi-surface-fixes-for-default-recipe-pipeline-bringup.md`)
+removed default arguments from `CopyTextureToBuffer` after they tripped a related
+clang-20 vtable-mangling bug. BUG-013
+(`tasks/done/BUG-013-backbuffer-readback-contract-vtable-segv.md`) was a
+backbuffer-readback contract SEGV traced to stale BMIs after `BindFrameSampledTexture`
+was added; it did **not** reproduce on a clean build — the contract suite is
+green (225/225 in `IntrinsicGraphicsContractCpuTests`) once BMIs are consistent.
+
