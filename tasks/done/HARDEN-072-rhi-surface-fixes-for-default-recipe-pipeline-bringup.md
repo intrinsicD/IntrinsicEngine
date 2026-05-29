@@ -198,5 +198,17 @@ build/ci/bin/IntrinsicGraphicsVulkanSmokeTests \
   and clearing the remaining barrier SEGV — owned by GRAPHICS-076 Slice
   D.
 
+## Follow-on note
+- 2026-05-29: `BUG-013`
+  (`tasks/done/BUG-013-backbuffer-readback-contract-vtable-segv.md`) was filed
+  as a follow-on manifestation of the same clang-20 / C++23-modules vtable
+  hazard — a backbuffer-readback contract SEGV after `cc06edef` added the
+  inline-bodied `ICommandContext::BindFrameSampledTexture` virtual. Unlike the
+  symptom this task fixed (a genuine default-argument mangling that failed at
+  *link* time), BUG-013 did **not** reproduce on a clean `ci` preset build: it
+  was a stale incremental module-BMI artifact, and the contract suite is green
+  (225/225) once BMIs are consistent. The lasting prevention is the
+  clean-rebuild rule now documented in `src/graphics/rhi/README.md`.
+
 
 
