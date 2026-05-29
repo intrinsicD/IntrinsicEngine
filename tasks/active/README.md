@@ -64,18 +64,27 @@ Each active task should include:
   `Geometry::DomainViews::BorrowGraphAsCloud(Graph::Graph&) ->
   PointCloud::Cloud`, the symmetric companion that shares only the
   graph's vertex `PropertySet` (reusing `v:point`, no `p:position`
-  copy), owns its own deletion counter, and does not expose the
-  graph's halfedge/edge storage (`h:connectivity`, `e:deleted`) or
-  the graph-domain `v:connectivity` slot through the cloud surface;
+  copy), owns its own deletion counter, and does not hold the
+  graph's halfedge/edge `PropertySet`s (`h:connectivity`,
+  `e:deleted`) so those are unreachable through the cloud surface.
+  The graph-domain `v:connectivity` slot, however, lives on the
+  shared vertex `PropertySet` and stays physically reachable
+  through generic `PointProperties()` access; the `Cloud` owns no
+  connectivity accessor and never touches it, but mutating or
+  clearing it through the cloud (including via `Cloud::Clear()`/
+  `Cloud::GarbageCollection()`) is documented UB on an edge-bearing
+  source graph — the same topology-mutation boundary as the other
+  borrows. Type-level prevention of reaching graph-domain slots is
+  deferred to Slice D's restricted const-view types.
   `Cloud::AddPoint` appends an isolated vertex slot to the source
-  graph and `Cloud::GarbageCollection` on a graph-backed borrow is
-  documented UB on edge-bearing graphs. Nine new tests cover
-  `v:point` identity, absence of `p:position`, edge/halfedge
-  non-exposure with graph sizes untouched, `v:normal` reuse,
-  bidirectional position-edit visibility, point-addition
-  propagation with the new vertex isolated, the empty-graph case,
-  and cloud-side `DeletePoint` not touching the graph's deletion
-  view. Slice D introduces distinct const-view types; Slice E
+  graph. Ten new tests cover `v:point` identity, absence of
+  `p:position`, halfedge/edge-`PropertySet` non-exposure with graph
+  sizes untouched, the shared `v:connectivity` slot pinned as a
+  reachable documented-UB boundary, `v:normal` reuse, bidirectional
+  position-edit visibility, point-addition propagation with the new
+  vertex isolated, the empty-graph case, and cloud-side
+  `DeletePoint` not touching the graph's deletion view. Slice D
+  introduces distinct const-view types; Slice E
   reviews the conversion/move/consume policy and closes at
   `CPUContracted`. Next verification step:
   `ctest --test-dir build/ci --output-on-failure -R 'SubmeshViewDomainBorrows|ShortestPath|PointCloud|MeshOperations' --timeout 60`.

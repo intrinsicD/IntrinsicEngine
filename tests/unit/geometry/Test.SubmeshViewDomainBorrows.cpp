@@ -6,7 +6,9 @@
 //  - Slice B: mesh-backed point-cloud borrow (shared v:point, no p:position
 //    copy, v:normal reuse, deletion-counter isolation, subview correctness).
 //  - Slice C: graph-backed point-cloud borrow (shared v:point, no p:position
-//    copy, edge/halfedge non-exposure, v:normal reuse, deletion isolation).
+//    copy, halfedge/edge-PropertySet non-exposure, the shared v:connectivity
+//    slot pinned as a documented UB boundary, v:normal reuse, deletion
+//    isolation).
 
 #include <gtest/gtest.h>
 
@@ -403,7 +405,7 @@ TEST(SubmeshViewDomainBorrows, GraphAsCloudDoesNotAllocatePPositionCompatibility
     EXPECT_FALSE(view.PointProperties().Exists("p:position"));
 }
 
-TEST(SubmeshViewDomainBorrows, GraphAsCloudDoesNotExposeEdgeOrHalfedgeData)
+TEST(SubmeshViewDomainBorrows, GraphAsCloudDoesNotExposeHalfedgeOrEdgePropertySets)
 {
     auto graph = MakeTwoVertexEdgeGraph();
     const std::size_t edgesBefore = graph.EdgesSize();
@@ -412,17 +414,43 @@ TEST(SubmeshViewDomainBorrows, GraphAsCloudDoesNotExposeEdgeOrHalfedgeData)
 
     Geometry::PointCloud::Cloud view = BorrowGraphAsCloud(graph);
 
-    // Only the vertex `PropertySet` is borrowed: edge/halfedge connectivity
-    // slots live on property sets the cloud does not hold, so they are not
-    // reachable through the cloud's vertex-domain accessor. The graph-domain
-    // `v:connectivity` slot remains on the shared vertex set but the cloud
-    // exposes no connectivity surface for it.
+    // Only the vertex `PropertySet` is borrowed: the halfedge/edge connectivity
+    // slots live on separate `PropertySet`s the cloud never holds, so they are
+    // unreachable through the cloud's vertex-domain accessor.
     EXPECT_FALSE(view.PointProperties().Exists("h:connectivity"));
     EXPECT_FALSE(view.PointProperties().Exists("e:deleted"));
 
     // The graph's edge/halfedge storage is untouched by the borrow.
     EXPECT_EQ(graph.EdgesSize(), edgesBefore);
     EXPECT_EQ(graph.HalfedgesSize(), halfedgesBefore);
+}
+
+TEST(SubmeshViewDomainBorrows, GraphAsCloudSharesVertexConnectivitySlotAsDocumentedUbBoundary)
+{
+    // Honest contract: because the cloud borrows the *entire* graph vertex
+    // `PropertySet`, the graph-domain `v:connectivity` slot remains physically
+    // reachable through generic point-property access. The `Cloud` type owns no
+    // connectivity accessor and never reads/writes it, but generic code that
+    // enumerates or clears point properties can still reach the shared slot.
+    // Mutating or clearing it through the cloud is undefined behavior on an
+    // edge-bearing graph (it desynchronizes graph topology); type-level
+    // prevention is Slice D's restricted const-view work. This test pins the
+    // reachability so the boundary is explicit rather than silently assumed
+    // hidden.
+    auto graph = MakeTwoVertexEdgeGraph();
+    Geometry::PointCloud::Cloud view = BorrowGraphAsCloud(graph);
+
+    EXPECT_TRUE(view.PointProperties().Exists("v:connectivity"));
+
+    const auto cloudConn =
+        view.PointProperties().Get<Geometry::Graph::VertexConnectivity>("v:connectivity");
+    const auto graphConn =
+        graph.VertexProperties().Get<Geometry::Graph::VertexConnectivity>("v:connectivity");
+    ASSERT_TRUE(cloudConn.IsValid());
+    ASSERT_TRUE(graphConn.IsValid());
+
+    // The reachable slot is the graph's shared storage, not a cloud-side copy.
+    EXPECT_EQ(cloudConn.Handle().Id(), graphConn.Handle().Id());
 }
 
 TEST(SubmeshViewDomainBorrows, GraphAsCloudReusesExistingVertexNormalProperty)

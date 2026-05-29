@@ -129,10 +129,18 @@ and `Geometry.PointCloud`:
   no `p:position` compatibility-copy slot is allocated — and existing per-vertex
   attributes (for example `v:normal`) are reachable through the cloud's
   `GetVertexProperty<T>` accessor. Only the vertex `PropertySet` is borrowed:
-  the graph's halfedge/edge storage (`h:connectivity`, `e:deleted`) and the
-  graph-domain `v:connectivity` slot are **not** exposed through the cloud
-  surface, and the graph's `EdgesSize()`/`HalfedgesSize()` are untouched by
-  cloud-side operations. The returned cloud owns its own deletion counter;
+  the graph's halfedge/edge storage (`h:connectivity`, `e:deleted`) lives on
+  separate `PropertySet`s the cloud never holds, so it is unreachable through
+  the cloud surface and the graph's `EdgesSize()`/`HalfedgesSize()` are
+  untouched by cloud-side operations. The graph-domain `v:connectivity` slot,
+  however, lives on the **shared** vertex `PropertySet` and stays physically
+  reachable through generic `PointProperties()` access; the `Cloud` owns no
+  connectivity accessor and never touches it, but mutating or clearing it
+  through the cloud — including via `Cloud::Clear()`/`Cloud::GarbageCollection()`
+  — is undefined behavior on an edge-bearing source graph, the same
+  topology-mutation boundary as the other borrows. Type-level prevention of
+  reaching graph-domain slots is owned by Slice D's restricted const-view
+  types. The returned cloud owns its own deletion counter;
   cloud-side deletes mark `p:deleted` on the shared `PropertySet` but do
   **not** touch the graph's `v:deleted` counter, so the graph's
   `VertexCount()` and `HasGarbage()` continue to reflect only graph-side

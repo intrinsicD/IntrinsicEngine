@@ -94,12 +94,26 @@ export namespace Geometry::DomainViews
     // `PropertySet`.
     //
     // Only the graph's vertex `PropertySet` is borrowed. The graph's
-    // halfedge/edge storage (`h:connectivity`, `e:deleted`, and the
-    // `v:connectivity` graph-domain slot that remains on the shared vertex
-    // `PropertySet`) is **not** exposed through the cloud surface: the cloud
-    // has no edge/halfedge accessors and never reads `v:connectivity`. The
-    // source graph's `EdgesSize()`/`HalfedgesSize()`/`EdgeCount()` and its
-    // edge/halfedge property sets are untouched by cloud-side operations.
+    // halfedge/edge storage (`h:connectivity`, `e:deleted`) lives on separate
+    // `PropertySet`s that the cloud does not hold, so it is not reachable
+    // through the cloud surface at all, and the source graph's
+    // `EdgesSize()`/`HalfedgesSize()`/`EdgeCount()` are untouched by cloud-side
+    // operations.
+    //
+    // The graph-domain `v:connectivity` slot, by contrast, lives on the
+    // **shared** vertex `PropertySet` and therefore remains physically
+    // reachable through generic `Cloud::PointProperties()` /
+    // `GetVertexProperty<T>` access. The `Cloud` type itself owns no
+    // connectivity accessor and never reads or writes `v:connectivity`, but
+    // generic point-property code that enumerates, copies, clears, or edits the
+    // shared set can still reach it. **Mutating or clearing `v:connectivity`
+    // through a graph-backed borrow — including via `Cloud::Clear()` or
+    // `Cloud::GarbageCollection()` — is undefined behavior on an edge-bearing
+    // source graph**, the same topology-mutation boundary documented for the
+    // other borrows: it desynchronizes the graph's halfedge/edge connectivity
+    // from its vertex records. Route topology changes through the graph's own
+    // APIs. Type-level prevention of reaching graph-domain slots through the
+    // borrow is owned by GEOM-012 Slice D's restricted const-view types.
     //
     // The returned cloud owns its own deletion counter; cloud-side deletes
     // mark the cloud's `p:deleted` marker but do **not** increment the graph's
