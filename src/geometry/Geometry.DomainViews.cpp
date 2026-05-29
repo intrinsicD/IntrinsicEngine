@@ -27,4 +27,14 @@ namespace Geometry::DomainViews
         // `v:deleted` marker.
         return PointCloud::Cloud(mesh.VertexProperties());
     }
+
+    PointCloud::Cloud BorrowGraphAsCloud(Graph::Graph& graph)
+    {
+        // Share the graph's vertex `PropertySet` only. The graph's
+        // halfedge/edge property sets are not borrowed, so edge/halfedge data
+        // is not reachable through the cloud surface. The cloud owns its own
+        // deletion counter so `Cloud::DeletePoint` cannot desynchronize the
+        // graph's `v:deleted` marker; see the .cppm doc for the full contract.
+        return PointCloud::Cloud(graph.VertexProperties());
+    }
 }

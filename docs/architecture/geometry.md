@@ -92,8 +92,7 @@ borrowed view.
 
 The named bridge for symmetric, no-copy domain views lives in
 `Geometry.DomainViews`. It depends on `Geometry.HalfedgeMesh`, `Geometry.Graph`,
-and `Geometry.PointCloud` (the graph-backed cloud direction lands in
-GEOM-012 Slice C):
+and `Geometry.PointCloud`:
 
 - `Geometry::DomainViews::BorrowMeshAsGraphReadOnly(const HalfedgeMesh::Mesh&) -> Graph::Graph`
   returns a `Graph::Graph` sharing the source mesh's vertex, halfedge, and edge
@@ -124,6 +123,27 @@ GEOM-012 Slice C):
   returned cloud: subrange clamping and the returned view's bound storage
   both follow the mesh-backed `v:point` data rather than the cloud's empty
   owning `Properties`.
+- `Geometry::DomainViews::BorrowGraphAsCloud(Graph::Graph&) -> PointCloud::Cloud`
+  is the symmetric companion that returns a `PointCloud::Cloud` sharing the
+  source graph's vertex `PropertySet`. The canonical `v:point` slot is reused —
+  no `p:position` compatibility-copy slot is allocated — and existing per-vertex
+  attributes (for example `v:normal`) are reachable through the cloud's
+  `GetVertexProperty<T>` accessor. Only the vertex `PropertySet` is borrowed:
+  the graph's halfedge/edge storage (`h:connectivity`, `e:deleted`) and the
+  graph-domain `v:connectivity` slot are **not** exposed through the cloud
+  surface, and the graph's `EdgesSize()`/`HalfedgesSize()` are untouched by
+  cloud-side operations. The returned cloud owns its own deletion counter;
+  cloud-side deletes mark `p:deleted` on the shared `PropertySet` but do
+  **not** touch the graph's `v:deleted` counter, so the graph's
+  `VertexCount()` and `HasGarbage()` continue to reflect only graph-side
+  semantics. Route topology-aware deletion through `Graph::DeleteVertex` /
+  `Graph::GarbageCollection`; calling `Cloud::GarbageCollection` on a
+  graph-backed borrow is undefined behavior on an edge-bearing source graph
+  because it physically reshuffles and resizes vertex slots and would
+  invalidate graph halfedge/edge connectivity that references vertex indices.
+  `Cloud::AddPoint` appends a row to the shared vertex `PropertySet`; the new
+  vertex is isolated (no incident halfedges) so edge-bearing source graphs are
+  not corrupted.
 
 The factory accepts face-bearing meshes for graph-domain reads and vertex-
 position writes (e.g. `Geometry::ShortestPath::Dijkstra`, `SetVertexPosition`).

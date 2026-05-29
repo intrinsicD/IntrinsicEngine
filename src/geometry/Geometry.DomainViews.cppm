@@ -82,4 +82,47 @@ export namespace Geometry::DomainViews
     // distinct compile-time-checked read-only cloud-view type is owned by
     // GEOM-012 Slice D.
     [[nodiscard]] PointCloud::Cloud BorrowMeshAsCloud(HalfedgeMesh::Mesh& mesh);
+
+    // Borrow a `Graph::Graph`'s vertex storage as a `PointCloud::Cloud` so
+    // point-cloud algorithms can consume the graph's vertex domain without
+    // copying positions or attributes. This is the symmetric companion to
+    // `BorrowMeshAsCloud`: the returned cloud shares the source graph's vertex
+    // `PropertySet` and reuses the canonical `v:point` slot; no `p:position`
+    // compatibility-copy property is allocated. Any existing per-vertex
+    // attributes on the graph (for example `v:normal`) are reachable through
+    // the cloud's `GetVertexProperty<T>` accessor over the same shared
+    // `PropertySet`.
+    //
+    // Only the graph's vertex `PropertySet` is borrowed. The graph's
+    // halfedge/edge storage (`h:connectivity`, `e:deleted`, and the
+    // `v:connectivity` graph-domain slot that remains on the shared vertex
+    // `PropertySet`) is **not** exposed through the cloud surface: the cloud
+    // has no edge/halfedge accessors and never reads `v:connectivity`. The
+    // source graph's `EdgesSize()`/`HalfedgesSize()`/`EdgeCount()` and its
+    // edge/halfedge property sets are untouched by cloud-side operations.
+    //
+    // The returned cloud owns its own deletion counter; cloud-side deletes
+    // mark the cloud's `p:deleted` marker but do **not** increment the graph's
+    // deleted-vertex counter, so the graph's `VertexCount()` and `HasGarbage()`
+    // continue to reflect only graph-side `v:deleted` semantics. The cloud's
+    // `p:deleted` marker is allocated lazily by `Cloud::EnsureProperties` on
+    // the shared vertex `PropertySet`; it is independent from the graph's
+    // topology-aware `v:deleted` and the graph never reads `p:deleted`. Route
+    // topology-aware deletion through `Graph::DeleteVertex` /
+    // `Graph::GarbageCollection`; calling `Cloud::GarbageCollection` on a
+    // graph-backed borrow is undefined behavior on an edge-bearing source
+    // graph because it physically reshuffles and resizes vertex slots and would
+    // invalidate graph halfedge/edge connectivity that references vertex
+    // indices.
+    //
+    // `PointCloud::Cloud::AddPoint` appends a row to the shared vertex
+    // `PropertySet`, so a point added through the returned view becomes a new
+    // vertex slot on the source graph; this is safe on edge-bearing graphs
+    // because halfedge/edge storage is not modified and the new vertex is left
+    // isolated (no incident halfedges).
+    //
+    // Lifetime: the source graph must outlive the returned view, mirroring
+    // `BorrowMeshAsCloud`. A distinct compile-time-checked read-only cloud-view
+    // type is owned by GEOM-012 Slice D.
+    [[nodiscard]] PointCloud::Cloud BorrowGraphAsCloud(Graph::Graph& graph);
 }
