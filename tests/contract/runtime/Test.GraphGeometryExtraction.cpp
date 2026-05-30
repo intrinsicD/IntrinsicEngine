@@ -648,6 +648,120 @@ TEST(GraphGeometryExtraction, LosingGraphHintReleasesGraphResidency)
     engine.Shutdown();
 }
 
+// RUNTIME-086 — a change in requested render lanes must repack even when no
+// geometry dirty tag is set, because the line lane's presence changes the
+// packed upload. A points-only graph that later gains `RenderLines` must
+// repack (with line indices) rather than rebind the lineless cached upload.
+TEST(GraphGeometryExtraction, GainingLineHintRepacksGraphWithoutDirtyTag)
+{
+    namespace E = Extrinsic::ECS::Components;
+    namespace G = Extrinsic::Graphics::Components;
+    namespace D = Extrinsic::ECS::Components::DirtyTags;
+
+    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.Initialize();
+
+    auto& scene = engine.GetScene();
+    auto& raw = scene.Raw();
+    const EntityHandle entity = scene.Create();
+    raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
+    raw.emplace<G::RenderPoints>(entity);
+    // Graph sources include Edges so a later line hint can pack, but only
+    // RenderPoints is requested for the first upload (points-only lane mask).
+    AttachLineGraphSources(scene, entity);
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    auto stats = extraction.ExtractAndSubmit(scene,
+                                             engine.GetRenderer(),
+                                             &engine.GetGpuAssetCache());
+    ASSERT_EQ(stats.GraphGeometryUploads, 1u);
+    ASSERT_EQ(stats.GraphGeometryReuploads, 0u);
+
+    const auto stableId = static_cast<std::uint32_t>(entity);
+    const auto firstView = extraction.FindRenderableSidecarForTest(stableId);
+    ASSERT_TRUE(firstView.has_value());
+    const auto firstHandle = firstView->GraphGeometry;
+    ASSERT_TRUE(firstHandle.IsValid());
+
+    // Gain a line hint. No geometry dirty tag is set, so the old reuse guard
+    // would have rebound the lineless upload.
+    raw.emplace<G::RenderLines>(entity);
+    ASSERT_FALSE((raw.any_of<D::GpuDirty,
+                             D::DirtyVertexPositions,
+                             D::DirtyVertexAttributes,
+                             D::DirtyEdgeTopology>(entity)));
+
+    stats = extraction.ExtractAndSubmit(scene,
+                                        engine.GetRenderer(),
+                                        &engine.GetGpuAssetCache());
+    EXPECT_EQ(stats.GraphGeometryUploads, 0u);
+    EXPECT_EQ(stats.GraphGeometryReuploads, 1u);
+    EXPECT_EQ(stats.GraphGeometryReuseHits, 0u);
+    EXPECT_EQ(stats.GraphGeometryReleases, 1u);
+
+    auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
+    const auto secondView = extraction.FindRenderableSidecarForTest(stableId);
+    ASSERT_TRUE(secondView.has_value());
+    EXPECT_TRUE(secondView->HasGraphResidency);
+    EXPECT_NE(secondView->GraphGeometry, firstHandle);
+    EXPECT_EQ(gpuWorld.GetInstanceGeometry(secondView->Instance), secondView->GraphGeometry);
+
+    // The lane mask is now stable, so a clean re-extraction returns to reuse.
+    stats = extraction.ExtractAndSubmit(scene,
+                                        engine.GetRenderer(),
+                                        &engine.GetGpuAssetCache());
+    EXPECT_EQ(stats.GraphGeometryReuploads, 0u);
+    EXPECT_EQ(stats.GraphGeometryReuseHits, 1u);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
+TEST(GraphGeometryExtraction, LosingLineHintRepacksGraphWithoutDirtyTag)
+{
+    namespace G = Extrinsic::Graphics::Components;
+    namespace D = Extrinsic::ECS::Components::DirtyTags;
+
+    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.Initialize();
+
+    auto& scene = engine.GetScene();
+    const EntityHandle entity = MakeLineAndPointGraphRenderable(scene);
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    auto stats = extraction.ExtractAndSubmit(scene,
+                                             engine.GetRenderer(),
+                                             &engine.GetGpuAssetCache());
+    ASSERT_EQ(stats.GraphGeometryUploads, 1u);
+
+    const auto stableId = static_cast<std::uint32_t>(entity);
+    const auto firstHandle =
+        extraction.FindRenderableSidecarForTest(stableId)->GraphGeometry;
+
+    // Drop the line lane; RenderPoints keeps the entity a graph renderable.
+    auto& raw = scene.Raw();
+    raw.remove<G::RenderLines>(entity);
+    ASSERT_FALSE((raw.any_of<D::GpuDirty,
+                             D::DirtyVertexPositions,
+                             D::DirtyVertexAttributes,
+                             D::DirtyEdgeTopology>(entity)));
+
+    stats = extraction.ExtractAndSubmit(scene,
+                                        engine.GetRenderer(),
+                                        &engine.GetGpuAssetCache());
+    EXPECT_EQ(stats.GraphGeometryUploads, 0u);
+    EXPECT_EQ(stats.GraphGeometryReuploads, 1u);
+    EXPECT_EQ(stats.GraphGeometryReuseHits, 0u);
+
+    const auto secondView = extraction.FindRenderableSidecarForTest(stableId);
+    ASSERT_TRUE(secondView.has_value());
+    EXPECT_TRUE(secondView->HasGraphResidency);
+    EXPECT_NE(secondView->GraphGeometry, firstHandle);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
 namespace
 {
     void DriveGraphDeferredRetireWindow(Extrinsic::Runtime::RenderExtractionCache& extraction,

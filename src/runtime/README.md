@@ -256,6 +256,11 @@ hit `GraphGeometryReuseHits`; dirty re-extractions (`DirtyVertexPositions` /
 entity) repack, upload a fresh handle, enqueue the prior handle into a
 graph-residency deferred-retire queue, drain the dirty tags, and increment
 `GraphGeometryReuploads` + `GraphGeometryReleases` (RUNTIME-086 Slice C). The
+sidecar also records the render-lane mask (`RenderLines` / `RenderPoints`) the
+resident upload was packed for; a change in requested lanes — e.g. a points-only
+graph that later gains `RenderLines` — repacks through the same reupload path
+even when no geometry dirty tag is set, because the line lane's presence changes
+the packed line indices. The
 bridge is fail-closed: `GraphPackStatus::MissingNodes`/`EmptyGraph` fold into
 `GraphGeometryMissingNodes`, `InvalidEdge` into `GraphGeometryInvalidEdges`, and
 every other non-`Success` status (`WrongDomain`, `NoRenderLane`,

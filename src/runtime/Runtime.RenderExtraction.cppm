@@ -313,6 +313,15 @@ export namespace Extrinsic::Runtime
             // the handles are tracked separately so an entity that flips
             // domain releases the stale handle while the other path uploads.
             Graphics::GpuGeometryHandle GraphGeometry{};
+            // RUNTIME-086 — the render-lane hints (`RenderLines` /
+            // `RenderPoints`) the resident `GraphGeometry` upload was packed
+            // for. The line lane's presence changes the packed upload (line
+            // indices), so a change in requested lanes must force a repack even
+            // when no geometry dirty tag is set — otherwise a points-only graph
+            // that later gains `RenderLines` would rebind a lineless upload and
+            // draw no lines until an unrelated dirty tag forced a repack.
+            bool GraphPackedLines{false};
+            bool GraphPackedPoints{false};
         };
 
         [[nodiscard]] RenderableSidecar* EnsureRenderable(std::uint32_t stableId,

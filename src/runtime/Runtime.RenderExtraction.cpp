@@ -528,10 +528,18 @@ namespace Extrinsic::Runtime
                                             D::DirtyVertexAttributes,
                                             D::DirtyEdgeTopology>(entity);
         const bool hadResidency = sidecar.GraphGeometry.IsValid();
+        // A change in requested render lanes repacks: the cached upload was
+        // packed for a specific lane mask, and the line lane in particular
+        // changes the packed line indices. Without this, gaining/losing a
+        // line hint on an otherwise-clean graph would rebind a stale upload.
+        const bool lanesChanged = hadResidency
+            && (sidecar.GraphPackedLines != wantLines
+                || sidecar.GraphPackedPoints != wantPoints);
 
-        // Reuse path: clean graph entity with a cached upload. Mirrors the
-        // single-owner mesh reuse — a direct rebind without any repack.
-        if (hadResidency && !dirty)
+        // Reuse path: clean graph entity, unchanged lanes, and a cached
+        // upload. Mirrors the single-owner mesh reuse — a direct rebind
+        // without any repack.
+        if (hadResidency && !dirty && !lanesChanged)
         {
             ++stats.GraphGeometryReuseHits;
             sidecar.Geometry = sidecar.GraphGeometry;
@@ -596,6 +604,8 @@ namespace Extrinsic::Runtime
         }
 
         sidecar.GraphGeometry = handle;
+        sidecar.GraphPackedLines = wantLines;
+        sidecar.GraphPackedPoints = wantPoints;
         sidecar.Geometry = handle;
         sidecar.GpuSlot.SetGeometryHandle(handle);
         sidecar.GpuSlot.ClearSourceAsset();
@@ -840,6 +850,8 @@ namespace Extrinsic::Runtime
                                                                 Graphics::GpuGeometryHandle{});
                 }
                 sidecar->GraphGeometry = {};
+                sidecar->GraphPackedLines = false;
+                sidecar->GraphPackedPoints = false;
                 ++stats.GraphGeometryReleases;
             }
 

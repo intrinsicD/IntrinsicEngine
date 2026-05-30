@@ -4,6 +4,13 @@
 - Commits: Slice A landed earlier on merged Theme A history
   (`fade19e` runtime graph geometry packer); Slices B + C on branch
   `claude/intrinsicengine-agent-onboarding-c9ql3` (this PR). PR: _TBD_.
+- 2026-05-30 (post-review fix, same PR): the `BindGraphGeometry` reuse guard
+  now tracks the packed render-lane mask (`RenderLines` / `RenderPoints`) and
+  repacks when the requested lanes change even without a geometry dirty tag —
+  otherwise a points-only graph that later gains `RenderLines` would rebind a
+  lineless upload. Covered by
+  `GainingLineHintRepacksGraphWithoutDirtyTag` /
+  `LosingLineHintRepacksGraphWithoutDirtyTag`.
 - `done` (retired 2026-05-30, maturity `CPUContracted`). Branch
   `claude/intrinsicengine-agent-onboarding-c9ql3`. Verified against the default
   CPU gate: `IntrinsicTests` builds clean under the `ci` preset; the focused
