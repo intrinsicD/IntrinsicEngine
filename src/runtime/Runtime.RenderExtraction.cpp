@@ -431,6 +431,29 @@ namespace Extrinsic::Runtime
                                             D::DirtyEdgeTopology>(entity);
         const bool hadResidency = sidecar.MeshGeometry.IsValid();
 
+        // Fail-closed release for a dirty-reupload pack/upload failure. When the
+        // entity already has a valid upload and a later dirty update makes the
+        // source unrenderable (empty / non-finite positions, broken topology),
+        // the stale geometry must not keep rendering authoritative-but-invalid
+        // data. The caller's eligibility-flip release cannot cover this because
+        // the entity is still mesh-domain, so this is the only place a
+        // dirty-reupload failure can release. The dirty tags are intentionally
+        // left in place so a later frame re-attempts and uploads fresh once the
+        // input recovers. Within this bridge no other domain/procedural path
+        // can have re-bound the instance this frame (the domain branches are
+        // mutually exclusive and run only when no procedural/asset source is
+        // present), so the detach is unconditional.
+        const auto releaseStaleResidency = [&]() {
+            if (!sidecar.MeshGeometry.IsValid())
+            {
+                return;
+            }
+            EnqueueMeshRetire(sidecar.MeshGeometry);
+            renderer.GetGpuWorld().SetInstanceGeometry(sidecar.Instance, Graphics::GpuGeometryHandle{});
+            sidecar.MeshGeometry = {};
+            ++stats.MeshGeometryReleases;
+        };
+
         // Reuse path: clean entity with a cached upload. The procedural-
         // cache analogue is a refcount-only `EnsureResident` hit; for mesh
         // residency the per-entity handle is single-owner so the reuse is
@@ -460,10 +483,10 @@ namespace Extrinsic::Runtime
                 ++stats.MeshGeometryFailedPack;
                 break;
             }
-            // Fail-closed: leave the dirty tags in place so the caller has
-            // a chance to recover the input on a later frame, and keep any
-            // prior residency handle bound (don't release on transient
-            // pack failures of a re-upload attempt).
+            // Fail-closed: release any prior residency so invalid source data
+            // does not keep stale geometry bound; the dirty tags stay set so a
+            // later frame can recover the input.
+            releaseStaleResidency();
             return false;
         }
 
@@ -472,6 +495,7 @@ namespace Extrinsic::Runtime
         if (!handle.IsValid())
         {
             ++stats.MeshGeometryFailedPack;
+            releaseStaleResidency();
             return false;
         }
 
@@ -540,6 +564,24 @@ namespace Extrinsic::Runtime
             && (sidecar.GraphPackedLines != wantLines
                 || sidecar.GraphPackedPoints != wantPoints);
 
+        // Fail-closed release for a dirty-reupload pack/upload failure — see the
+        // mesh bridge for the rationale. The caller's eligibility-flip release
+        // cannot cover this because the entity is still graph-domain. Clears the
+        // packed-lane flags alongside the handle so a later fresh upload re-sets
+        // them.
+        const auto releaseStaleResidency = [&]() {
+            if (!sidecar.GraphGeometry.IsValid())
+            {
+                return;
+            }
+            EnqueueGraphRetire(sidecar.GraphGeometry);
+            renderer.GetGpuWorld().SetInstanceGeometry(sidecar.Instance, Graphics::GpuGeometryHandle{});
+            sidecar.GraphGeometry = {};
+            sidecar.GraphPackedLines = false;
+            sidecar.GraphPackedPoints = false;
+            ++stats.GraphGeometryReleases;
+        };
+
         // Reuse path: clean graph entity, unchanged lanes, and a cached
         // upload. Mirrors the single-owner mesh reuse — a direct rebind
         // without any repack.
@@ -571,8 +613,10 @@ namespace Extrinsic::Runtime
                 ++stats.GraphGeometryFailedPack;
                 break;
             }
-            // Fail-closed: keep any prior residency bound and leave the dirty
-            // tags in place so a later frame can recover the input.
+            // Fail-closed: release any prior residency so invalid source data
+            // does not keep stale geometry bound; the dirty tags stay set so a
+            // later frame can recover the input.
+            releaseStaleResidency();
             return false;
         }
 
@@ -581,6 +625,7 @@ namespace Extrinsic::Runtime
         if (!handle.IsValid())
         {
             ++stats.GraphGeometryFailedPack;
+            releaseStaleResidency();
             return false;
         }
 
@@ -627,6 +672,22 @@ namespace Extrinsic::Runtime
         namespace D = ECS::Components::DirtyTags;
         namespace G = Graphics::Components;
 
+        // Fail-closed release for an unsupported-size-source or dirty-reupload
+        // pack/upload failure — see the mesh bridge for the rationale. The
+        // caller's eligibility-flip release cannot cover this because the entity
+        // is still point-cloud-domain, so this is the only place such a failure
+        // can release a previously-resident cloud.
+        const auto releaseStaleResidency = [&]() {
+            if (!sidecar.PointCloudGeometry.IsValid())
+            {
+                return;
+            }
+            EnqueuePointCloudRetire(sidecar.PointCloudGeometry);
+            renderer.GetGpuWorld().SetInstanceGeometry(sidecar.Instance, Graphics::GpuGeometryHandle{});
+            sidecar.PointCloudGeometry = {};
+            ++stats.PointCloudGeometryReleases;
+        };
+
         // Size-source policy for this slice: only a uniform world-space radius
         // (the `float` alternative of `RenderPoints::SizeSource`) is supported.
         // A per-point size buffer (the `std::string` alternative) requires a
@@ -639,9 +700,11 @@ namespace Extrinsic::Runtime
             points != nullptr && std::holds_alternative<std::string>(points->SizeSource))
         {
             ++stats.PointCloudGeometryFailedPack;
-            // Fail-closed: keep any prior residency bound and leave the dirty
-            // tags in place so a later frame can recover once the size source
-            // becomes supported.
+            // Fail-closed: release any prior residency (a resident cloud that
+            // switches to an unsupported size source stops rendering) and leave
+            // the dirty tags in place so a later frame can recover once the size
+            // source becomes supported.
+            releaseStaleResidency();
             return false;
         }
 
@@ -679,8 +742,10 @@ namespace Extrinsic::Runtime
                 ++stats.PointCloudGeometryFailedPack;
                 break;
             }
-            // Fail-closed: keep any prior residency bound and leave the dirty
-            // tags in place so a later frame can recover the input.
+            // Fail-closed: release any prior residency so invalid source data
+            // does not keep stale geometry bound; the dirty tags stay set so a
+            // later frame can recover the input.
+            releaseStaleResidency();
             return false;
         }
 
@@ -689,6 +754,7 @@ namespace Extrinsic::Runtime
         if (!handle.IsValid())
         {
             ++stats.PointCloudGeometryFailedPack;
+            releaseStaleResidency();
             return false;
         }
 

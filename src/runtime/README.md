@@ -186,9 +186,11 @@ their own counters; every other non-`Success` status
 `NonFinitePosition`, `DegenerateAllFaces`, `WrongDomain`) folds into
 `MeshGeometryFailedPack`. A failed pack does not bind stale geometry, leaves the
 slot's source-asset sentinel cleared, and does not allocate a `GpuGeometryHandle`.
-A dirty-reupload pack failure preserves the prior residency and the dirty tags so
-the caller can recover the input on a later frame; no release fires on transient
-pack failures of a still-mesh-domain entity.
+A dirty-reupload pack failure releases the prior residency (fail-closed: the
+stale upload is queued for the deferred-retire window, the instance is detached,
+and `MeshGeometryReleases` increments) so invalid source data does not keep
+rendering the last-good frame; the dirty tags are left set so the entity
+re-attempts and uploads fresh once the input recovers.
 Mesh-source residency does not share `GpuGeometryHandle`s across entities — each
 mesh entity owns its own upload. If a previously-uploaded entity stops selecting
 the mesh source on a later frame (it gained `ProceduralGeometryRef` or
@@ -266,9 +268,12 @@ bridge is fail-closed: `GraphPackStatus::MissingNodes`/`EmptyGraph` fold into
 `GraphGeometryMissingNodes`, `InvalidEdge` into `GraphGeometryInvalidEdges`, and
 every other non-`Success` status (`WrongDomain`, `NoRenderLane`,
 `MissingEdgeTopology`, `NonFinitePosition`) into `GraphGeometryFailedPack`; a
-failed pack binds no stale geometry and a dirty-reupload failure preserves the
-prior residency and dirty tags. Eligibility flips (the entity gains a
-procedural/asset source or loses graph-domain topology), `RetireMissingRenderables`,
+first-attempt failed pack binds no stale geometry, and a dirty-reupload failure
+releases the prior residency (queued for the deferred-retire window, instance
+detached, `GraphGeometryReleases` incremented) so invalid node data does not keep
+rendering, while the dirty tags stay set for later recovery. Eligibility flips
+(the entity gains a procedural/asset source or loses graph-domain topology),
+`RetireMissingRenderables`,
 and `Shutdown` route the graph upload through the same deferred-retire window,
 incrementing `GraphGeometryReleases`; the per-tick free-count delta surfaces as
 `GraphGeometryFreeRetires` on the next `ExtractAndSubmit`. The retire queue is
@@ -306,9 +311,13 @@ drain the dirty tags, and increment `PointCloudGeometryReuploads` +
 `PointCloudPackStatus::MissingPositions`/`EmptyCloud` fold into
 `PointCloudGeometryMissingPositions`, `NonFinitePosition` into
 `PointCloudGeometryInvalidPoints`, and `WrongDomain` plus the unsupported
-size-source variant into `PointCloudGeometryFailedPack`; a failed pack binds no
-stale geometry and a dirty-reupload failure preserves the prior residency and
-dirty tags. Eligibility flips (the entity gains a procedural/asset source, loses
+size-source variant into `PointCloudGeometryFailedPack`; a first-attempt failed
+pack binds no stale geometry, and a dirty-reupload failure — or a resident cloud
+switching to an unsupported per-point size source — releases the prior residency
+(queued for the deferred-retire window, instance detached,
+`PointCloudGeometryReleases` incremented) so invalid point data does not keep
+rendering, while the dirty tags stay set for later recovery. Eligibility flips
+(the entity gains a procedural/asset source, loses
 point-cloud-domain topology, drops `RenderPoints`, or flips to mesh/graph
 domain), `RetireMissingRenderables`, and `Shutdown` route the point-cloud upload
 through the same deferred-retire window, incrementing

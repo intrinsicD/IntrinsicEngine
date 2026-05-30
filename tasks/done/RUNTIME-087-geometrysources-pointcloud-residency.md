@@ -30,6 +30,18 @@
   pre-existing unrelated `IntrinsicBenchmarkSmoke.HalfedgeSmoke` Run/Validate
   Not-Run failures remain. Layering, test-layout, doc-links, task-policy, and
   module-inventory (regenerated) checks all clean.
+- 2026-05-30 (post-review fix, same PR): tightened the shared fail-closed
+  contract across all three residency bridges (mesh/graph/point-cloud). A
+  dirty-reupload pack/upload failure — or, for point clouds, switching a resident
+  cloud to an unsupported per-point size source — now releases the prior
+  residency (deferred-retire + instance detach + `*GeometryReleases`) instead of
+  leaving stale geometry bound; the dirty tags stay set for later recovery. This
+  touches the retired `RUNTIME-085`/`RUNTIME-086` bridges for consistency: the
+  prior "preserve stale residency on dirty-reupload failure" behavior rendered
+  authoritative-but-invalid data until the input recovered. `src/runtime/README.md`
+  prose and the mesh/graph/point-cloud regression tests
+  (`ReuploadFailureReleasesStaleResidency*`,
+  `SwitchingToUnsupportedSizeSourceReleasesResidency`) updated to match.
 - `Operational` visual proof is owned by the final working-sandbox acceptance
   task (`RUNTIME-095`) after default point and present wiring complete.
 

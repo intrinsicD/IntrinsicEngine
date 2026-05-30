@@ -691,3 +691,120 @@ INSTANTIATE_TEST_SUITE_P(AllDirtyDomains,
                          ::testing::Values("GpuDirty",
                                            "DirtyVertexPositions",
                                            "DirtyVertexAttributes"));
+
+// RUNTIME-087 follow-up — a dirty-reupload pack failure on a cloud that already
+// has a valid upload must release the stale residency (fail-closed) so invalid
+// point data does not keep rendering the last-good positions, while leaving the
+// dirty tag set for later recovery.
+TEST(PointCloudGeometryExtraction, ReuploadFailureReleasesStaleResidencyAndPreservesDirtyTag)
+{
+    namespace D = Extrinsic::ECS::Components::DirtyTags;
+
+    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.Initialize();
+
+    auto& scene = engine.GetScene();
+    auto& raw = scene.Raw();
+    const EntityHandle entity = MakePointCloudRenderable(scene);
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    auto stats = extraction.ExtractAndSubmit(scene,
+                                             engine.GetRenderer(),
+                                             &engine.GetGpuAssetCache());
+    ASSERT_EQ(stats.PointCloudGeometryUploads, 1u);
+
+    auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
+    ASSERT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
+
+    // Corrupt a point position to non-finite, then mark vertex positions dirty
+    // so the next PackCloud returns NonFinitePosition.
+    auto& vertices = raw.get<gs::Vertices>(entity);
+    SetPositions(vertices, {
+        {0.0f, 0.0f, 0.0f},
+        {std::numeric_limits<float>::infinity(), 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f},
+    });
+    D::MarkVertexPositionsDirty(raw, entity);
+
+    stats = extraction.ExtractAndSubmit(scene,
+                                        engine.GetRenderer(),
+                                        &engine.GetGpuAssetCache());
+    EXPECT_EQ(stats.PointCloudGeometryReuploads, 0u);
+    EXPECT_EQ(stats.PointCloudGeometryInvalidPoints, 1u);
+    EXPECT_EQ(stats.PointCloudGeometryReuseHits, 0u);
+    EXPECT_EQ(stats.PointCloudGeometryReleases, 1u);
+    EXPECT_EQ(stats.PointCloudGeometryFreeRetires, 0u);
+
+    const auto view =
+        extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(entity));
+    ASSERT_TRUE(view.has_value());
+    EXPECT_FALSE(view->HasPointCloudResidency);
+    EXPECT_FALSE(gpuWorld.GetInstanceGeometry(view->Instance).IsValid());
+    EXPECT_TRUE(raw.any_of<D::DirtyVertexPositions>(entity));
+    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
+
+    constexpr std::uint32_t framesInFlight = 2u;
+    DrivePointCloudDeferredRetireWindow(extraction,
+                                        engine.GetRenderer(),
+                                        /*baseFrame=*/900u,
+                                        framesInFlight);
+    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 0u);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
+// RUNTIME-087 follow-up — switching a resident cloud to an unsupported per-point
+// size-source buffer (the `std::string` alternative) must also release the
+// stale residency, since the size-source check fails closed before the reuse
+// path.
+TEST(PointCloudGeometryExtraction, SwitchingToUnsupportedSizeSourceReleasesResidency)
+{
+    namespace G = Extrinsic::Graphics::Components;
+
+    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.Initialize();
+
+    auto& scene = engine.GetScene();
+    auto& raw = scene.Raw();
+    const EntityHandle entity = MakePointCloudRenderable(scene);  // default uniform float size.
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    auto stats = extraction.ExtractAndSubmit(scene,
+                                             engine.GetRenderer(),
+                                             &engine.GetGpuAssetCache());
+    ASSERT_EQ(stats.PointCloudGeometryUploads, 1u);
+
+    auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
+    ASSERT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
+
+    // Switch to a per-point size buffer. No dirty tag is needed — the
+    // size-source check runs before the reuse path.
+    raw.get<G::RenderPoints>(entity).SizeSource = std::string{"v:radius"};
+
+    stats = extraction.ExtractAndSubmit(scene,
+                                        engine.GetRenderer(),
+                                        &engine.GetGpuAssetCache());
+    EXPECT_EQ(stats.PointCloudGeometryUploads, 0u);
+    EXPECT_EQ(stats.PointCloudGeometryReuseHits, 0u);
+    EXPECT_EQ(stats.PointCloudGeometryFailedPack, 1u);
+    EXPECT_EQ(stats.PointCloudGeometryReleases, 1u);
+    EXPECT_EQ(stats.PointCloudGeometryFreeRetires, 0u);
+
+    const auto view =
+        extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(entity));
+    ASSERT_TRUE(view.has_value());
+    EXPECT_FALSE(view->HasPointCloudResidency);
+    EXPECT_FALSE(gpuWorld.GetInstanceGeometry(view->Instance).IsValid());
+    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
+
+    constexpr std::uint32_t framesInFlight = 2u;
+    DrivePointCloudDeferredRetireWindow(extraction,
+                                        engine.GetRenderer(),
+                                        /*baseFrame=*/950u,
+                                        framesInFlight);
+    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 0u);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
