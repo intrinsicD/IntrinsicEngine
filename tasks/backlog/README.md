@@ -43,7 +43,9 @@ remaining path is (1) default-recipe renderer completion, (2) runtime
 `GeometrySources` residency for mesh/graph/point-cloud content, (3) runtime
 selection/refinement handoff, (4) ImGui/editor UI panels, and (5) the final
 `ExtrinsicSandbox` acceptance task. Keep this path in backlog tasks rather than
-`Sandbox::App`, which remains policy-light and imports runtime only.
+`Sandbox::App`, which remains policy-light and imports runtime only. The current
+verified remaining-gate inventory for this path is in
+[2026-05-30 working sandbox app — remaining gates](../../docs/reviews/2026-05-30-sandbox-app-remaining-gates.md).
 
 Planning parents (retired):
 - [`rendering/GRAPHICS-029` (done)](../done/GRAPHICS-029-runtime-reference-scene-bootstrap.md)
