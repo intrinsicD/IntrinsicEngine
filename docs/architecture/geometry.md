@@ -252,6 +252,48 @@ the source soup. Renderer-upload staging remains a planned geometry-owned
 data-shape contract; geometry must not import assets, graphics, runtime, ECS,
 platform, or app layers to satisfy renderer staging needs.
 
+### Hard-copy, move, and consume policy
+
+The domain-view borrows above share storage; taking *independent ownership* of a
+borrowed (or any) domain is a separate, explicit choice. GEOM-012 Slice E pins
+the seams; no new conversion APIs are required because the existing surface
+already covers every direction:
+
+- **Same-domain hard copy:** the container **copy constructor**
+  (`HalfedgeMesh::Mesh`, `Graph::Graph`, `PointCloud::Cloud`) is the canonical
+  hard-copy seam. The copy constructor unconditionally allocates a fresh owning
+  `PropertySet` and deep-copies, so copy-constructing a *borrowed* container
+  (`Graph owned(borrow);` or `Graph owned = borrow;` from an lvalue) always
+  produces an owning result that no longer observes source mutations and safely
+  outlives source destruction. This is the supported way to "promote" a borrowed
+  view into an independent container — there is no separate `BorrowX → ownedX`
+  API to add. **Copy assignment** yields an independent owner *only when the
+  destination already owns its storage* (e.g. a default-constructed container):
+  the assignment operators copy into the destination's currently-bound reference
+  members rather than reallocating, so copy-assigning *into a borrowed or
+  submesh-view destination* writes through to the shared source storage
+  (overwriting and resizing it) instead of producing an independent owner.
+  Promote via copy construction, or assign only into a container you know owns
+  its storage.
+- **Cross-domain hard copy:** `Geometry.Mesh.Conversion` and
+  `Geometry.PointCloud.Conversion` (the `To*`/`From*` result objects above) own
+  the explicit cross-format hard copies that change topology/cardinality or the
+  attribute layout, and report structured diagnostics.
+- **Move / consume:** ownership transfer into a caller-owned result container
+  uses move assignment (and, where declared, the move constructor). Move/consume
+  is reserved for ownership transfer — never for temporary algorithm adaptation,
+  for which a borrowed view is the correct tool. Because `Graph::Graph` and
+  `PointCloud::Cloud` expose reference members and a user-declared copy
+  constructor, move *construction* falls back to a deep copy; this is
+  intentional and harmless (it never silently steals storage). Do **not**
+  move-assign *from* a borrowed container: that would move the contents out of
+  the shared source `PropertySet`, mutating the source. Move only owning
+  containers.
+- The read-only `Const*View` types are non-copyable and non-movable by
+  construction (see above), so a read-only borrow can never be accidentally
+  copied or consumed; promote through `AsGraph()`/`AsCloud()` plus copy
+  construction of an owning container when independent ownership is needed.
+
 ## Robust predicates
 
 `Geometry.RobustPredicates` is the narrow predicate foundation introduced by

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <utility>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -83,4 +84,23 @@ TEST(MeshConversion, ConvertsHalfedgeMeshToIndexedSoupAndBack)
     ASSERT_TRUE(roundTrip.Succeeded());
     EXPECT_EQ(roundTrip.Mesh.VertexCount(), 4u);
     EXPECT_EQ(roundTrip.Mesh.FaceCount(), 1u);
+}
+
+// GEOM-012 Slice E: the To* conversion seam produces an owning, independent
+// result. Move-assigning that result into a caller-owned container is the
+// ownership-transfer pattern; the converted mesh outlives the soup source.
+TEST(MeshConversion, ConvertedHalfedgeMeshOutlivesSourceViaMoveOwnershipTransfer)
+{
+    Geometry::HalfedgeMesh::Mesh converted; // caller-owned result container
+    {
+        const IndexedMesh soup = MakeTriangleSoup();
+        auto result = Geometry::Mesh::Conversion::ToHalfedgeMesh(soup);
+        ASSERT_TRUE(result.Succeeded());
+        converted = std::move(result.Mesh); // move ownership transfer into the result container
+    } // soup + intermediate conversion result destroyed
+
+    EXPECT_EQ(converted.VertexCount(), 3u);
+    EXPECT_EQ(converted.FaceCount(), 1u);
+    EXPECT_EQ(converted.Position(Geometry::VertexHandle{0u}), (glm::vec3{0.0f, 0.0f, 0.0f}));
+    EXPECT_EQ(converted.Position(Geometry::VertexHandle{1u}), (glm::vec3{1.0f, 0.0f, 0.0f}));
 }

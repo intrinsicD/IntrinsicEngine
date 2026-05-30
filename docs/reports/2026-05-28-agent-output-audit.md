@@ -13,8 +13,9 @@ window closed.
 - Tasks covered (11):
   [`GEOM-008`](../../tasks/done/GEOM-008-linear-algebra-solver-infrastructure.md)
   (retired; Slice A linear-algebra + sparse-solver infrastructure),
-  [`GEOM-012`](../../tasks/active/GEOM-012-symmetric-domain-views-property-sharing.md)
-  (active; Slices A + B landed — `Geometry.DomainViews`),
+  [`GEOM-012`](../../tasks/done/GEOM-012-symmetric-domain-views-property-sharing.md)
+  (active at the time of this audit; Slices A + B landed — `Geometry.DomainViews`;
+  retired to `tasks/done/` on 2026-05-29 after Slice E),
   [`GEOM-016`](../../tasks/backlog/geometry/GEOM-016-point-cloud-filtering-density-contracts.md)
   (backlog filing + LDLT follow-up gating METHOD-002/003),
   [`RUNTIME-082`](../../tasks/active/RUNTIME-082-spatial-debug-adapters.md)

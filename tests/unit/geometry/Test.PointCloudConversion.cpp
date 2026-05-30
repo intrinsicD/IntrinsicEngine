@@ -89,6 +89,31 @@ TEST(PointCloudConversion, CloudPositionsRoundTripPreservesOrder)
     }
 }
 
+// GEOM-012 Slice E: the To* conversion seam produces an owning, independent
+// cloud. Move-assigning that result into a caller-owned container is the
+// ownership-transfer pattern; the converted cloud decouples from later source
+// mutation and outlives source destruction.
+TEST(PointCloudConversion, ConvertedCloudOutlivesAndDecouplesFromSource)
+{
+    Cloud converted; // caller-owned result container
+    {
+        Cloud original = MakeFourPointCloud();
+        const auto soup = Geometry::PointCloud::Conversion::ToIndexedMesh(original);
+        ASSERT_TRUE(soup.Succeeded());
+
+        auto cloudResult = Geometry::PointCloud::Conversion::ToPointCloud(soup.Mesh);
+        ASSERT_TRUE(cloudResult.Succeeded());
+        converted = std::move(cloudResult.Cloud); // move ownership transfer into the result container
+
+        // Mutating the source after conversion does not affect the owning copy.
+        original.Position(Cloud::Handle(0u)) = glm::vec3{9.0f, 9.0f, 9.0f};
+    } // original + soup + intermediate result destroyed
+
+    ASSERT_EQ(converted.VertexCount(), 4u);
+    EXPECT_EQ(converted.Position(Cloud::Handle(0u)), (glm::vec3{0.0f, 0.0f, 0.0f}));
+    EXPECT_EQ(converted.Position(Cloud::Handle(2u)), (glm::vec3{1.0f, 1.0f, 0.0f}));
+}
+
 TEST(PointCloudConversion, DeletedPointsAreOmittedWithDiagnostic)
 {
     Cloud cloud = MakeFourPointCloud();
