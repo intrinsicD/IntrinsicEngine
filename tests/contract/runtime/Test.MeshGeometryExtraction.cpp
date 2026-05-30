@@ -895,7 +895,7 @@ TEST(MeshGeometryExtraction, MultipleDirtyTagsCoalesceIntoSingleReupload)
     engine.Shutdown();
 }
 
-TEST(MeshGeometryExtraction, ReuploadFailureKeepsExistingResidencyAndPreservesDirtyTag)
+TEST(MeshGeometryExtraction, ReuploadFailureReleasesStaleResidencyAndPreservesDirtyTag)
 {
     namespace D = Extrinsic::ECS::Components::DirtyTags;
 
@@ -912,10 +912,10 @@ TEST(MeshGeometryExtraction, ReuploadFailureKeepsExistingResidencyAndPreservesDi
                                               &engine.GetGpuAssetCache());
     ASSERT_EQ(stats.MeshGeometryUploads, 1u);
 
+    auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
     const auto firstView =
         extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(entity));
     ASSERT_TRUE(firstView.has_value());
-    const auto firstHandle = firstView->MeshGeometry;
 
     // Corrupt the mesh so the next pack returns `InvalidTopology` (face
     // points at an out-of-range halfedge), then mark the entity dirty.
@@ -929,20 +929,28 @@ TEST(MeshGeometryExtraction, ReuploadFailureKeepsExistingResidencyAndPreservesDi
                                          &engine.GetGpuAssetCache());
     EXPECT_EQ(stats.MeshGeometryReuploads, 0u);
     EXPECT_EQ(stats.MeshGeometryInvalidTopology, 1u);
-    EXPECT_EQ(stats.MeshGeometryReleases, 0u);
     EXPECT_EQ(stats.MeshGeometryReuseHits, 0u);
+    // Fail-closed: the stale upload is released (deferred) rather than left
+    // bound, so invalid topology does not keep rendering the last-good frame.
+    EXPECT_EQ(stats.MeshGeometryReleases, 1u);
+    EXPECT_EQ(stats.MeshGeometryFreeRetires, 0u);
 
-    // Old residency stays bound; dirty tag is preserved so the caller
-    // has a chance to fix the input before a later frame retries.
     const auto secondView =
         extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(entity));
     ASSERT_TRUE(secondView.has_value());
-    EXPECT_TRUE(secondView->HasMeshResidency);
-    EXPECT_EQ(secondView->MeshGeometry, firstHandle);
+    EXPECT_FALSE(secondView->HasMeshResidency);
+    EXPECT_FALSE(gpuWorld.GetInstanceGeometry(secondView->Instance).IsValid());
+    // Dirty tag is preserved so a later frame re-attempts once the input is
+    // fixed; the released slot stays live through the deferred-retire window.
     EXPECT_TRUE(raw.any_of<D::DirtyFaceTopology>(entity));
-
-    auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
+
+    constexpr std::uint32_t framesInFlight = 2u;
+    DriveMeshDeferredRetireWindow(extraction,
+                                  engine.GetRenderer(),
+                                  /*baseFrame=*/800u,
+                                  framesInFlight);
+    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 0u);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();

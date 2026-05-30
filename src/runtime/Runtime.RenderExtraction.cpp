@@ -9,6 +9,7 @@ module;
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <entt/entity/entity.hpp>
@@ -43,6 +44,7 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.RHI.Types;
 import Extrinsic.Runtime.GraphGeometryPacker;
 import Extrinsic.Runtime.MeshGeometryPacker;
+import Extrinsic.Runtime.PointCloudGeometryPacker;
 import Extrinsic.Runtime.ProceduralGeometry;
 import Extrinsic.Runtime.ProceduralGeometryPacker;
 import Extrinsic.Runtime.SpatialDebugAdapters;
@@ -78,6 +80,8 @@ namespace Extrinsic::Runtime
             .HasMeshResidency = it->second.MeshGeometry.IsValid(),
             .GraphGeometry = it->second.GraphGeometry,
             .HasGraphResidency = it->second.GraphGeometry.IsValid(),
+            .PointCloudGeometry = it->second.PointCloudGeometry,
+            .HasPointCloudResidency = it->second.PointCloudGeometry.IsValid(),
         };
     }
 
@@ -427,6 +431,29 @@ namespace Extrinsic::Runtime
                                             D::DirtyEdgeTopology>(entity);
         const bool hadResidency = sidecar.MeshGeometry.IsValid();
 
+        // Fail-closed release for a dirty-reupload pack/upload failure. When the
+        // entity already has a valid upload and a later dirty update makes the
+        // source unrenderable (empty / non-finite positions, broken topology),
+        // the stale geometry must not keep rendering authoritative-but-invalid
+        // data. The caller's eligibility-flip release cannot cover this because
+        // the entity is still mesh-domain, so this is the only place a
+        // dirty-reupload failure can release. The dirty tags are intentionally
+        // left in place so a later frame re-attempts and uploads fresh once the
+        // input recovers. Within this bridge no other domain/procedural path
+        // can have re-bound the instance this frame (the domain branches are
+        // mutually exclusive and run only when no procedural/asset source is
+        // present), so the detach is unconditional.
+        const auto releaseStaleResidency = [&]() {
+            if (!sidecar.MeshGeometry.IsValid())
+            {
+                return;
+            }
+            EnqueueMeshRetire(sidecar.MeshGeometry);
+            renderer.GetGpuWorld().SetInstanceGeometry(sidecar.Instance, Graphics::GpuGeometryHandle{});
+            sidecar.MeshGeometry = {};
+            ++stats.MeshGeometryReleases;
+        };
+
         // Reuse path: clean entity with a cached upload. The procedural-
         // cache analogue is a refcount-only `EnsureResident` hit; for mesh
         // residency the per-entity handle is single-owner so the reuse is
@@ -456,10 +483,10 @@ namespace Extrinsic::Runtime
                 ++stats.MeshGeometryFailedPack;
                 break;
             }
-            // Fail-closed: leave the dirty tags in place so the caller has
-            // a chance to recover the input on a later frame, and keep any
-            // prior residency handle bound (don't release on transient
-            // pack failures of a re-upload attempt).
+            // Fail-closed: release any prior residency so invalid source data
+            // does not keep stale geometry bound; the dirty tags stay set so a
+            // later frame can recover the input.
+            releaseStaleResidency();
             return false;
         }
 
@@ -468,6 +495,7 @@ namespace Extrinsic::Runtime
         if (!handle.IsValid())
         {
             ++stats.MeshGeometryFailedPack;
+            releaseStaleResidency();
             return false;
         }
 
@@ -536,6 +564,24 @@ namespace Extrinsic::Runtime
             && (sidecar.GraphPackedLines != wantLines
                 || sidecar.GraphPackedPoints != wantPoints);
 
+        // Fail-closed release for a dirty-reupload pack/upload failure — see the
+        // mesh bridge for the rationale. The caller's eligibility-flip release
+        // cannot cover this because the entity is still graph-domain. Clears the
+        // packed-lane flags alongside the handle so a later fresh upload re-sets
+        // them.
+        const auto releaseStaleResidency = [&]() {
+            if (!sidecar.GraphGeometry.IsValid())
+            {
+                return;
+            }
+            EnqueueGraphRetire(sidecar.GraphGeometry);
+            renderer.GetGpuWorld().SetInstanceGeometry(sidecar.Instance, Graphics::GpuGeometryHandle{});
+            sidecar.GraphGeometry = {};
+            sidecar.GraphPackedLines = false;
+            sidecar.GraphPackedPoints = false;
+            ++stats.GraphGeometryReleases;
+        };
+
         // Reuse path: clean graph entity, unchanged lanes, and a cached
         // upload. Mirrors the single-owner mesh reuse — a direct rebind
         // without any repack.
@@ -567,8 +613,10 @@ namespace Extrinsic::Runtime
                 ++stats.GraphGeometryFailedPack;
                 break;
             }
-            // Fail-closed: keep any prior residency bound and leave the dirty
-            // tags in place so a later frame can recover the input.
+            // Fail-closed: release any prior residency so invalid source data
+            // does not keep stale geometry bound; the dirty tags stay set so a
+            // later frame can recover the input.
+            releaseStaleResidency();
             return false;
         }
 
@@ -577,6 +625,7 @@ namespace Extrinsic::Runtime
         if (!handle.IsValid())
         {
             ++stats.GraphGeometryFailedPack;
+            releaseStaleResidency();
             return false;
         }
 
@@ -613,6 +662,132 @@ namespace Extrinsic::Runtime
         return true;
     }
 
+    bool RenderExtractionCache::BindPointCloudGeometry(entt::registry& registry,
+                                                       entt::entity entity,
+                                                       const ECS::Components::GeometrySources::ConstSourceView& view,
+                                                       RenderableSidecar& sidecar,
+                                                       Graphics::IRenderer& renderer,
+                                                       RuntimeRenderExtractionStats& stats)
+    {
+        namespace D = ECS::Components::DirtyTags;
+        namespace G = Graphics::Components;
+
+        // Fail-closed release for an unsupported-size-source or dirty-reupload
+        // pack/upload failure — see the mesh bridge for the rationale. The
+        // caller's eligibility-flip release cannot cover this because the entity
+        // is still point-cloud-domain, so this is the only place such a failure
+        // can release a previously-resident cloud.
+        const auto releaseStaleResidency = [&]() {
+            if (!sidecar.PointCloudGeometry.IsValid())
+            {
+                return;
+            }
+            EnqueuePointCloudRetire(sidecar.PointCloudGeometry);
+            renderer.GetGpuWorld().SetInstanceGeometry(sidecar.Instance, Graphics::GpuGeometryHandle{});
+            sidecar.PointCloudGeometry = {};
+            ++stats.PointCloudGeometryReleases;
+        };
+
+        // Size-source policy for this slice: only a uniform world-space radius
+        // (the `float` alternative of `RenderPoints::SizeSource`) is supported.
+        // A per-point size buffer (the `std::string` alternative) requires a
+        // per-point radius upload that is not implemented here, so it fails
+        // closed rather than silently rendering with a default radius. The
+        // render-type enum (`Flat`/`Sphere`/`Surfel`) only selects the
+        // downstream point shader and does not affect the position-only upload,
+        // so all three are accepted by the geometry-residency bridge.
+        if (const auto* points = registry.try_get<G::RenderPoints>(entity);
+            points != nullptr && std::holds_alternative<std::string>(points->SizeSource))
+        {
+            ++stats.PointCloudGeometryFailedPack;
+            // Fail-closed: release any prior residency (a resident cloud that
+            // switches to an unsupported size source stops rendering) and leave
+            // the dirty tags in place so a later frame can recover once the size
+            // source becomes supported.
+            releaseStaleResidency();
+            return false;
+        }
+
+        const bool dirty = registry.any_of<D::GpuDirty,
+                                            D::DirtyVertexPositions,
+                                            D::DirtyVertexAttributes>(entity);
+        const bool hadResidency = sidecar.PointCloudGeometry.IsValid();
+
+        // Reuse path: clean point-cloud entity with a cached upload. Mirrors
+        // the single-owner mesh reuse — a direct rebind without any repack.
+        if (hadResidency && !dirty)
+        {
+            ++stats.PointCloudGeometryReuseHits;
+            sidecar.Geometry = sidecar.PointCloudGeometry;
+            sidecar.GpuSlot.SetGeometryHandle(sidecar.PointCloudGeometry);
+            sidecar.GpuSlot.ClearSourceAsset();
+            renderer.GetGpuWorld().SetInstanceGeometry(sidecar.Instance, sidecar.PointCloudGeometry);
+            return true;
+        }
+
+        PointCloudPackResult packResult = PackCloud(view, m_PointCloudPack);
+        if (packResult.Status != PointCloudPackStatus::Success)
+        {
+            switch (packResult.Status)
+            {
+            case PointCloudPackStatus::MissingPositions:
+            case PointCloudPackStatus::EmptyCloud:
+                ++stats.PointCloudGeometryMissingPositions;
+                break;
+            case PointCloudPackStatus::NonFinitePosition:
+                ++stats.PointCloudGeometryInvalidPoints;
+                break;
+            default:
+                // `WrongDomain`.
+                ++stats.PointCloudGeometryFailedPack;
+                break;
+            }
+            // Fail-closed: release any prior residency so invalid source data
+            // does not keep stale geometry bound; the dirty tags stay set so a
+            // later frame can recover the input.
+            releaseStaleResidency();
+            return false;
+        }
+
+        const Graphics::GpuGeometryHandle handle =
+            renderer.GetGpuWorld().UploadGeometry(*packResult.Upload);
+        if (!handle.IsValid())
+        {
+            ++stats.PointCloudGeometryFailedPack;
+            releaseStaleResidency();
+            return false;
+        }
+
+        if (hadResidency)
+        {
+            // Dirty reupload: queue the prior handle for the same
+            // `framesInFlight` deferred-retire window, then swap. The new
+            // `SetInstanceGeometry` below detaches the instance from the old
+            // slot before it is freed.
+            EnqueuePointCloudRetire(sidecar.PointCloudGeometry);
+            ++stats.PointCloudGeometryReuploads;
+            ++stats.PointCloudGeometryReleases;
+        }
+        else
+        {
+            ++stats.PointCloudGeometryUploads;
+        }
+
+        if (dirty)
+        {
+            registry.remove<D::GpuDirty,
+                            D::DirtyVertexPositions,
+                            D::DirtyVertexAttributes>(entity);
+        }
+
+        sidecar.PointCloudGeometry = handle;
+        sidecar.Geometry = handle;
+        sidecar.GpuSlot.SetGeometryHandle(handle);
+        sidecar.GpuSlot.ClearSourceAsset();
+        renderer.GetGpuWorld().SetInstanceGeometry(sidecar.Instance, handle);
+        return true;
+    }
+
     void RenderExtractionCache::EnqueueMeshRetire(Graphics::GpuGeometryHandle handle)
     {
         if (!handle.IsValid())
@@ -629,6 +804,15 @@ namespace Extrinsic::Runtime
             return;
         }
         m_GraphRetire.push_back(GeometryRetireRecord{handle, 0, false});
+    }
+
+    void RenderExtractionCache::EnqueuePointCloudRetire(Graphics::GpuGeometryHandle handle)
+    {
+        if (!handle.IsValid())
+        {
+            return;
+        }
+        m_PointCloudRetire.push_back(GeometryRetireRecord{handle, 0, false});
     }
 
     void RenderExtractionCache::RetireMissingRenderables(const std::unordered_set<std::uint32_t>& liveKeys,
@@ -663,6 +847,13 @@ namespace Extrinsic::Runtime
                 // runtime-owned graph upload.
                 EnqueueGraphRetire(it->second.GraphGeometry);
                 ++stats.GraphGeometryReleases;
+            }
+            if (it->second.PointCloudGeometry.IsValid())
+            {
+                // RUNTIME-087 — same deferred-retire window for the
+                // runtime-owned point-cloud upload.
+                EnqueuePointCloudRetire(it->second.PointCloudGeometry);
+                ++stats.PointCloudGeometryReleases;
             }
             renderer.GetGpuWorld().FreeInstance(it->second.Instance);
             it = m_Renderables.erase(it);
@@ -777,6 +968,8 @@ namespace Extrinsic::Runtime
             bool meshDomainThisFrame = false;
             bool graphBoundThisFrame = false;
             bool graphDomainThisFrame = false;
+            bool pointCloudBoundThisFrame = false;
+            bool pointCloudDomainThisFrame = false;
             if (sourceEligible)
             {
                 namespace GS = ECS::Components::GeometrySources;
@@ -801,6 +994,25 @@ namespace Extrinsic::Runtime
                                                             renderer,
                                                             stats);
                 }
+                else if (view.ActiveDomain == GS::Domain::PointCloud
+                         && registry.all_of<Graphics::Components::RenderPoints>(entity))
+                {
+                    // A point cloud is only a renderable in this slice through
+                    // the `RenderPoints` hint — `RenderSurface`/`RenderLines`
+                    // have no faces/edges to draw from a cloud. A point-cloud-
+                    // domain entity without `RenderPoints` therefore is not a
+                    // point-cloud renderable (it falls through and any prior
+                    // point-cloud residency is released by the eligibility-flip
+                    // block below), so a mesh that loses its topology back to a
+                    // bare vertex set does not get silently re-bound as points.
+                    pointCloudDomainThisFrame = true;
+                    pointCloudBoundThisFrame = BindPointCloudGeometry(registry,
+                                                                      entity,
+                                                                      view,
+                                                                      *sidecar,
+                                                                      renderer,
+                                                                      stats);
+                }
             }
 
             // Eligibility-flip release: if mesh was uploaded on a prior
@@ -823,9 +1035,9 @@ namespace Extrinsic::Runtime
             {
                 EnqueueMeshRetire(sidecar->MeshGeometry);
                 // Only detach if nothing else re-bound the instance this frame
-                // (procedural take-over, or a graph rebind after a mesh→graph
-                // domain flip).
-                if (!proceduralBound && !graphBoundThisFrame)
+                // (procedural take-over, or a graph/point-cloud rebind after a
+                // mesh→graph / mesh→point-cloud domain flip).
+                if (!proceduralBound && !graphBoundThisFrame && !pointCloudBoundThisFrame)
                 {
                     renderer.GetGpuWorld().SetInstanceGeometry(sidecar->Instance,
                                                                 Graphics::GpuGeometryHandle{});
@@ -844,7 +1056,7 @@ namespace Extrinsic::Runtime
             if (!stillGraphAttached && sidecar->GraphGeometry.IsValid())
             {
                 EnqueueGraphRetire(sidecar->GraphGeometry);
-                if (!proceduralBound && !meshBoundThisFrame)
+                if (!proceduralBound && !meshBoundThisFrame && !pointCloudBoundThisFrame)
                 {
                     renderer.GetGpuWorld().SetInstanceGeometry(sidecar->Instance,
                                                                 Graphics::GpuGeometryHandle{});
@@ -853,6 +1065,26 @@ namespace Extrinsic::Runtime
                 sidecar->GraphPackedLines = false;
                 sidecar->GraphPackedPoints = false;
                 ++stats.GraphGeometryReleases;
+            }
+
+            // RUNTIME-087 — point-cloud-residency eligibility flip, mirroring
+            // the mesh/graph releases above. Fires when a previously-uploaded
+            // point-cloud entity gains a procedural/asset source, loses
+            // point-cloud-domain topology, or flips to mesh/graph domain. A
+            // transient pack failure on a still-point-cloud-domain entity does
+            // NOT release (old residency stays bound), matching the
+            // dirty-reupload fail-closed contract.
+            const bool stillPointCloudAttached = sourceEligible && pointCloudDomainThisFrame;
+            if (!stillPointCloudAttached && sidecar->PointCloudGeometry.IsValid())
+            {
+                EnqueuePointCloudRetire(sidecar->PointCloudGeometry);
+                if (!proceduralBound && !meshBoundThisFrame && !graphBoundThisFrame)
+                {
+                    renderer.GetGpuWorld().SetInstanceGeometry(sidecar->Instance,
+                                                                Graphics::GpuGeometryHandle{});
+                }
+                sidecar->PointCloudGeometry = {};
+                ++stats.PointCloudGeometryReleases;
             }
 
             if (!proceduralBound && assetSource != nullptr)
@@ -864,7 +1096,8 @@ namespace Extrinsic::Runtime
                     gpuAssets);
                 AccumulateAssetObservationStats(observation, stats);
             }
-            else if (!proceduralBound && !meshBoundThisFrame && !graphBoundThisFrame)
+            else if (!proceduralBound && !meshBoundThisFrame && !graphBoundThisFrame
+                     && !pointCloudBoundThisFrame)
             {
                 sidecar->GpuSlot.ClearSourceAsset();
             }
@@ -980,6 +1213,12 @@ namespace Extrinsic::Runtime
             m_GraphFreeRetires - m_PrevGraphFreeRetires;
         m_PrevGraphFreeRetires = m_GraphFreeRetires;
 
+        // RUNTIME-087 — point-cloud deferred-retire FreeRetires delta,
+        // mirroring the graph accounting above.
+        stats.PointCloudGeometryFreeRetires =
+            m_PointCloudFreeRetires - m_PrevPointCloudFreeRetires;
+        m_PrevPointCloudFreeRetires = m_PointCloudFreeRetires;
+
         renderer.SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{
             .Transforms                     = m_Transforms,
             .Lights                         = m_Lights,
@@ -1079,6 +1318,42 @@ namespace Extrinsic::Runtime
         }
     }
 
+    void RenderExtractionCache::TickPointCloudGeometry(std::uint64_t currentFrame,
+                                                       std::uint32_t framesInFlight,
+                                                       Graphics::IRenderer& renderer)
+    {
+        // Mirror `TickGraphGeometry`: anchor deadlines on newly-enqueued
+        // records the first time the tick observes them, then free entries
+        // whose deadline has been reached.
+        const std::uint64_t deadline = currentFrame + std::uint64_t{framesInFlight};
+        for (auto& rec : m_PointCloudRetire)
+        {
+            if (!rec.DeadlineSet)
+            {
+                rec.Deadline = deadline;
+                rec.DeadlineSet = true;
+            }
+        }
+
+        auto it = m_PointCloudRetire.begin();
+        while (it != m_PointCloudRetire.end())
+        {
+            if (it->DeadlineSet && it->Deadline <= currentFrame)
+            {
+                if (it->Handle.IsValid())
+                {
+                    renderer.GetGpuWorld().FreeGeometry(it->Handle);
+                    ++m_PointCloudFreeRetires;
+                }
+                it = m_PointCloudRetire.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
+    }
+
     void RenderExtractionCache::Shutdown(Graphics::IRenderer& renderer)
     {
         RuntimeRenderExtractionStats stats{};
@@ -1097,6 +1372,11 @@ namespace Extrinsic::Runtime
             {
                 renderer.GetGpuWorld().FreeGeometry(sidecar.GraphGeometry);
                 ++stats.GraphGeometryReleases;
+            }
+            if (sidecar.PointCloudGeometry.IsValid())
+            {
+                renderer.GetGpuWorld().FreeGeometry(sidecar.PointCloudGeometry);
+                ++stats.PointCloudGeometryReleases;
             }
             renderer.GetGpuWorld().FreeInstance(sidecar.Instance);
             ++stats.FreedInstanceCount;
@@ -1126,6 +1406,17 @@ namespace Extrinsic::Runtime
             }
         }
         m_GraphRetire.clear();
+
+        // RUNTIME-087 — drain the point-cloud deferred-retire queue inline,
+        // mirroring the graph teardown above.
+        for (auto& rec : m_PointCloudRetire)
+        {
+            if (rec.Handle.IsValid())
+            {
+                renderer.GetGpuWorld().FreeGeometry(rec.Handle);
+            }
+        }
+        m_PointCloudRetire.clear();
         m_Transforms.clear();
         m_Visualizations.clear();
         m_Lights.clear();

@@ -277,6 +277,8 @@ if(TARGET ExtrinsicRuntime)
         Test.MeshGeometryPacker.cpp
         Test.GraphGeometryExtraction.cpp
         Test.GraphGeometryPacker.cpp
+        Test.PointCloudGeometryExtraction.cpp
+        Test.PointCloudGeometryPacker.cpp
         Test.ProceduralGeometryCache.cpp
         Test.ProceduralGeometryExtraction.cpp
         Test.RuntimeCameraControllers.cpp

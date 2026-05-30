@@ -77,8 +77,11 @@ compose with the rendering tasks listed in `tasks/backlog/rendering/README.md`.
   `tasks/done/` on 2026-05-30 at maturity `CPUContracted`; Slice A — graph
   packer — plus Slices B + C — `RenderExtractionCache` residency wiring — all
   landed.)_
-- [RUNTIME-087 — `GeometrySources` point-cloud residency bridge](RUNTIME-087-geometrysources-pointcloud-residency.md):
-  point-cloud vertices to retained point geometry.
+- [RUNTIME-087 — `GeometrySources` point-cloud residency bridge](../../done/RUNTIME-087-geometrysources-pointcloud-residency.md):
+  point-cloud vertices to retained point geometry. _(retired to `tasks/done/` on
+  2026-05-30 at maturity `CPUContracted`; standalone point-cloud packer plus
+  `RenderExtractionCache` residency wiring, deferred-retire, and shutdown drain
+  landed together.)_
 - [RUNTIME-088 — Mesh primitive view lifecycle](RUNTIME-088-mesh-primitive-view-lifecycle.md):
   optional mesh edge/vertex render views for primitive visualization and later
   primitive selection.

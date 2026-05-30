@@ -43,6 +43,7 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.RHI.Types;
 import Extrinsic.Runtime.GraphGeometryPacker;
 import Extrinsic.Runtime.MeshGeometryPacker;
+import Extrinsic.Runtime.PointCloudGeometryPacker;
 import Extrinsic.Runtime.ProceduralGeometry;
 import Extrinsic.Runtime.ProceduralGeometryPacker;
 import Extrinsic.Runtime.SpatialDebugAdapters;
@@ -165,6 +166,37 @@ export namespace Extrinsic::Runtime
         std::uint32_t GraphGeometryReleases{0};
         std::uint32_t GraphGeometryFreeRetires{0};
 
+        // RUNTIME-087 — runtime-authored point-cloud `GeometrySources`
+        // residency counters, mirroring the mesh/graph accounting above. A
+        // point-cloud entity carrying `RenderPoints` packs its `v:position`
+        // rows into one `GpuGeometryHandle` (positions only — no index buffer,
+        // no line lane). `Uploads` is incremented once per entity on the first
+        // frame the cloud is packed and uploaded; clean frames hit `ReuseHits`;
+        // dirty frames hit `Reuploads` after the cloud dirty-domain tags
+        // (`DirtyVertexPositions`, `DirtyVertexAttributes`, `GpuDirty`) are
+        // drained and the cloud is repacked. `MissingPositions` aggregates the
+        // two position-shape pack rejections (`MissingPositions`, `EmptyCloud`)
+        // and `InvalidPoints` the non-finite-position rejection because those
+        // are the likeliest structural authoring bugs in cloud sources; every
+        // other bind-level rejection (`WrongDomain`, plus an unsupported
+        // per-point `RenderPoints::SizeSource` buffer variant — only a uniform
+        // float radius is supported in this slice) folds into `FailedPack`.
+        // `Releases` is incremented per release-initiated event (entity
+        // destruction, eligibility flip away from point-cloud, or dirty
+        // reupload superseding an older handle); the actual free runs through
+        // the `framesInFlight` deferred-retire window driven by
+        // `TickPointCloudGeometry`, which surfaces `FreeRetires` as a per-frame
+        // delta on the next `ExtractAndSubmit` (mirroring
+        // `GraphGeometryFreeRetires`).
+        std::uint32_t PointCloudGeometryUploads{0};
+        std::uint32_t PointCloudGeometryReuseHits{0};
+        std::uint32_t PointCloudGeometryReuploads{0};
+        std::uint32_t PointCloudGeometryFailedPack{0};
+        std::uint32_t PointCloudGeometryMissingPositions{0};
+        std::uint32_t PointCloudGeometryInvalidPoints{0};
+        std::uint32_t PointCloudGeometryReleases{0};
+        std::uint32_t PointCloudGeometryFreeRetires{0};
+
         // RUNTIME-082 Slice D — spatial-debug adapter pump counters. Folded
         // per-frame from the active adapter set against the entity view of
         // `ECS::Components::SpatialDebugBinding`. The accumulator fields
@@ -241,6 +273,17 @@ export namespace Extrinsic::Runtime
                                std::uint32_t framesInFlight,
                                Graphics::IRenderer& renderer);
 
+        // RUNTIME-087 — drives the deferred-retire window of the runtime-owned
+        // point-cloud-residency retire queue, mirroring `TickGraphGeometry`.
+        // Handles enqueued by entity destruction, eligibility flip, or dirty
+        // reupload are freed via `GpuWorld::FreeGeometry` once `framesInFlight`
+        // ticks have elapsed since the release tick. Subsequent
+        // `ExtractAndSubmit` calls surface the per-tick delta as
+        // `PointCloudGeometryFreeRetires`.
+        void TickPointCloudGeometry(std::uint64_t currentFrame,
+                                    std::uint32_t framesInFlight,
+                                    Graphics::IRenderer& renderer);
+
         [[nodiscard]] const RuntimeRenderExtractionStats& GetLastStats() const noexcept;
         [[nodiscard]] std::uint32_t GetTrackedRenderableCount() const noexcept;
 
@@ -266,6 +309,13 @@ export namespace Extrinsic::Runtime
             // `MeshGeometry` so the two domain bridges never alias.
             Graphics::GpuGeometryHandle GraphGeometry{};
             bool HasGraphResidency = false;
+            // RUNTIME-087 — runtime-authored point-cloud-source residency. The
+            // single handle the cache owns and frees on retirement for a
+            // point-cloud-domain entity (point positions as the vertex buffer);
+            // distinct from `MeshGeometry`/`GraphGeometry` so the three domain
+            // bridges never alias.
+            Graphics::GpuGeometryHandle PointCloudGeometry{};
+            bool HasPointCloudResidency = false;
         };
 
         [[nodiscard]] std::optional<RenderableSidecarView> FindRenderableSidecarForTest(
@@ -322,6 +372,13 @@ export namespace Extrinsic::Runtime
             // draw no lines until an unrelated dirty tag forced a repack.
             bool GraphPackedLines{false};
             bool GraphPackedPoints{false};
+            // RUNTIME-087 Slice B — owned point-cloud-source residency handle.
+            // Mesh, graph, and point-cloud domains are mutually exclusive per
+            // entity, but the handles are tracked separately so an entity that
+            // flips domain releases the stale handle while the other path
+            // uploads. Point clouds carry no lane mask (positions only), so no
+            // packed-lane tracking is needed.
+            Graphics::GpuGeometryHandle PointCloudGeometry{};
         };
 
         [[nodiscard]] RenderableSidecar* EnsureRenderable(std::uint32_t stableId,
@@ -346,6 +403,12 @@ export namespace Extrinsic::Runtime
                                              RenderableSidecar& sidecar,
                                              Graphics::IRenderer& renderer,
                                              RuntimeRenderExtractionStats& stats);
+        [[nodiscard]] bool BindPointCloudGeometry(entt::registry& registry,
+                                                  entt::entity entity,
+                                                  const ECS::Components::GeometrySources::ConstSourceView& view,
+                                                  RenderableSidecar& sidecar,
+                                                  Graphics::IRenderer& renderer,
+                                                  RuntimeRenderExtractionStats& stats);
 
         // RUNTIME-085 Slice C — runtime-owned deferred-retire queue for mesh
         // upload handles. Mirrors the shape of
@@ -370,6 +433,9 @@ export namespace Extrinsic::Runtime
         // RUNTIME-086 Slice B — graph-residency retire enqueue, mirroring
         // `EnqueueMeshRetire`.
         void EnqueueGraphRetire(Graphics::GpuGeometryHandle handle);
+        // RUNTIME-087 — point-cloud-residency retire enqueue, mirroring
+        // `EnqueueGraphRetire`.
+        void EnqueuePointCloudRetire(Graphics::GpuGeometryHandle handle);
 
         std::unordered_map<std::uint32_t, RenderableSidecar> m_Renderables{};
         std::vector<Graphics::TransformSyncRecord> m_Transforms{};
@@ -394,6 +460,13 @@ export namespace Extrinsic::Runtime
         std::vector<GeometryRetireRecord> m_GraphRetire{};
         std::uint32_t m_GraphFreeRetires{0};
         std::uint32_t m_PrevGraphFreeRetires{0};
+
+        // RUNTIME-087 — point-cloud-residency scratch buffer + deferred-retire
+        // queue, mirroring the graph-residency members above.
+        PointCloudPackBuffer m_PointCloudPack{};
+        std::vector<GeometryRetireRecord> m_PointCloudRetire{};
+        std::uint32_t m_PointCloudFreeRetires{0};
+        std::uint32_t m_PrevPointCloudFreeRetires{0};
 
         // RUNTIME-082 Slice D — owned adapter instances + a registry mirror
         // resolved per-entity by `ExtractAndSubmit`. The batch buffer is

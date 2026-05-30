@@ -876,3 +876,66 @@ INSTANTIATE_TEST_SUITE_P(AllDirtyDomains,
                                            "DirtyVertexPositions",
                                            "DirtyVertexAttributes",
                                            "DirtyEdgeTopology"));
+
+// RUNTIME-087 follow-up — a dirty-reupload pack failure on a graph entity that
+// already has a valid upload must release the stale residency (fail-closed) so
+// invalid node data does not keep rendering the last-good frame, while leaving
+// the dirty tag set for later recovery.
+TEST(GraphGeometryExtraction, ReuploadFailureReleasesStaleResidencyAndPreservesDirtyTag)
+{
+    namespace D = Extrinsic::ECS::Components::DirtyTags;
+
+    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.Initialize();
+
+    auto& scene = engine.GetScene();
+    auto& raw = scene.Raw();
+    const EntityHandle entity = MakeLineGraphRenderable(scene);
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    auto stats = extraction.ExtractAndSubmit(scene,
+                                             engine.GetRenderer(),
+                                             &engine.GetGpuAssetCache());
+    ASSERT_EQ(stats.GraphGeometryUploads, 1u);
+
+    auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
+    ASSERT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
+
+    // Corrupt a node position to non-finite, then mark vertex positions dirty so
+    // the next PackGraph returns NonFinitePosition (folded into FailedPack).
+    auto& nodes = raw.get<gs::Nodes>(entity);
+    auto pos = nodes.Properties.GetOrAdd<glm::vec3>(std::string{pn::kPosition}, glm::vec3(0.0f));
+    pos.Vector() = {
+        {0.0f, 0.0f, 0.0f},
+        {std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f},
+    };
+    D::MarkVertexPositionsDirty(raw, entity);
+
+    stats = extraction.ExtractAndSubmit(scene,
+                                        engine.GetRenderer(),
+                                        &engine.GetGpuAssetCache());
+    EXPECT_EQ(stats.GraphGeometryReuploads, 0u);
+    EXPECT_EQ(stats.GraphGeometryFailedPack, 1u);
+    EXPECT_EQ(stats.GraphGeometryReuseHits, 0u);
+    EXPECT_EQ(stats.GraphGeometryReleases, 1u);
+    EXPECT_EQ(stats.GraphGeometryFreeRetires, 0u);
+
+    const auto view =
+        extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(entity));
+    ASSERT_TRUE(view.has_value());
+    EXPECT_FALSE(view->HasGraphResidency);
+    EXPECT_FALSE(gpuWorld.GetInstanceGeometry(view->Instance).IsValid());
+    EXPECT_TRUE(raw.any_of<D::DirtyVertexPositions>(entity));
+    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
+
+    constexpr std::uint32_t framesInFlight = 2u;
+    DriveGraphDeferredRetireWindow(extraction,
+                                   engine.GetRenderer(),
+                                   /*baseFrame=*/900u,
+                                   framesInFlight);
+    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 0u);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
