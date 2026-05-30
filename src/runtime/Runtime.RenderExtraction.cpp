@@ -41,6 +41,7 @@ import Extrinsic.Graphics.Component.Material;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.RHI.Types;
+import Extrinsic.Runtime.GraphGeometryPacker;
 import Extrinsic.Runtime.MeshGeometryPacker;
 import Extrinsic.Runtime.ProceduralGeometry;
 import Extrinsic.Runtime.ProceduralGeometryPacker;
@@ -75,6 +76,8 @@ namespace Extrinsic::Runtime
             .GeometryGeneration = it->second.GpuSlot.GeometryGeneration,
             .MeshGeometry = it->second.MeshGeometry,
             .HasMeshResidency = it->second.MeshGeometry.IsValid(),
+            .GraphGeometry = it->second.GraphGeometry,
+            .HasGraphResidency = it->second.GraphGeometry.IsValid(),
         };
     }
 
@@ -504,13 +507,128 @@ namespace Extrinsic::Runtime
         return true;
     }
 
+    bool RenderExtractionCache::BindGraphGeometry(entt::registry& registry,
+                                                  entt::entity entity,
+                                                  const ECS::Components::GeometrySources::ConstSourceView& view,
+                                                  RenderableSidecar& sidecar,
+                                                  Graphics::IRenderer& renderer,
+                                                  RuntimeRenderExtractionStats& stats)
+    {
+        namespace D = ECS::Components::DirtyTags;
+        namespace G = Graphics::Components;
+
+        // The render hints select the lanes: `RenderLines` packs edge line
+        // indices, `RenderPoints` packs the node point lane. Both share the
+        // single node-position vertex buffer (one handle per graph entity).
+        const bool wantLines = registry.all_of<G::RenderLines>(entity);
+        const bool wantPoints = registry.all_of<G::RenderPoints>(entity);
+
+        const bool dirty = registry.any_of<D::GpuDirty,
+                                            D::DirtyVertexPositions,
+                                            D::DirtyVertexAttributes,
+                                            D::DirtyEdgeTopology>(entity);
+        const bool hadResidency = sidecar.GraphGeometry.IsValid();
+        // A change in requested render lanes repacks: the cached upload was
+        // packed for a specific lane mask, and the line lane in particular
+        // changes the packed line indices. Without this, gaining/losing a
+        // line hint on an otherwise-clean graph would rebind a stale upload.
+        const bool lanesChanged = hadResidency
+            && (sidecar.GraphPackedLines != wantLines
+                || sidecar.GraphPackedPoints != wantPoints);
+
+        // Reuse path: clean graph entity, unchanged lanes, and a cached
+        // upload. Mirrors the single-owner mesh reuse — a direct rebind
+        // without any repack.
+        if (hadResidency && !dirty && !lanesChanged)
+        {
+            ++stats.GraphGeometryReuseHits;
+            sidecar.Geometry = sidecar.GraphGeometry;
+            sidecar.GpuSlot.SetGeometryHandle(sidecar.GraphGeometry);
+            sidecar.GpuSlot.ClearSourceAsset();
+            renderer.GetGpuWorld().SetInstanceGeometry(sidecar.Instance, sidecar.GraphGeometry);
+            return true;
+        }
+
+        GraphPackResult packResult = PackGraph(view, wantLines, wantPoints, m_GraphPack);
+        if (packResult.Status != GraphPackStatus::Success)
+        {
+            switch (packResult.Status)
+            {
+            case GraphPackStatus::MissingNodes:
+            case GraphPackStatus::EmptyGraph:
+                ++stats.GraphGeometryMissingNodes;
+                break;
+            case GraphPackStatus::InvalidEdge:
+                ++stats.GraphGeometryInvalidEdges;
+                break;
+            default:
+                // `WrongDomain`, `NoRenderLane` (graph entity with no
+                // line/point hint), `MissingEdgeTopology`, `NonFinitePosition`.
+                ++stats.GraphGeometryFailedPack;
+                break;
+            }
+            // Fail-closed: keep any prior residency bound and leave the dirty
+            // tags in place so a later frame can recover the input.
+            return false;
+        }
+
+        const Graphics::GpuGeometryHandle handle =
+            renderer.GetGpuWorld().UploadGeometry(*packResult.Upload);
+        if (!handle.IsValid())
+        {
+            ++stats.GraphGeometryFailedPack;
+            return false;
+        }
+
+        if (hadResidency)
+        {
+            // Dirty reupload: queue the prior handle for the same
+            // `framesInFlight` deferred-retire window, then swap. The new
+            // `SetInstanceGeometry` below detaches the instance from the old
+            // slot before it is freed.
+            EnqueueGraphRetire(sidecar.GraphGeometry);
+            ++stats.GraphGeometryReuploads;
+            ++stats.GraphGeometryReleases;
+        }
+        else
+        {
+            ++stats.GraphGeometryUploads;
+        }
+
+        if (dirty)
+        {
+            registry.remove<D::GpuDirty,
+                            D::DirtyVertexPositions,
+                            D::DirtyVertexAttributes,
+                            D::DirtyEdgeTopology>(entity);
+        }
+
+        sidecar.GraphGeometry = handle;
+        sidecar.GraphPackedLines = wantLines;
+        sidecar.GraphPackedPoints = wantPoints;
+        sidecar.Geometry = handle;
+        sidecar.GpuSlot.SetGeometryHandle(handle);
+        sidecar.GpuSlot.ClearSourceAsset();
+        renderer.GetGpuWorld().SetInstanceGeometry(sidecar.Instance, handle);
+        return true;
+    }
+
     void RenderExtractionCache::EnqueueMeshRetire(Graphics::GpuGeometryHandle handle)
     {
         if (!handle.IsValid())
         {
             return;
         }
-        m_MeshRetire.push_back(MeshRetireRecord{handle, 0, false});
+        m_MeshRetire.push_back(GeometryRetireRecord{handle, 0, false});
+    }
+
+    void RenderExtractionCache::EnqueueGraphRetire(Graphics::GpuGeometryHandle handle)
+    {
+        if (!handle.IsValid())
+        {
+            return;
+        }
+        m_GraphRetire.push_back(GeometryRetireRecord{handle, 0, false});
     }
 
     void RenderExtractionCache::RetireMissingRenderables(const std::unordered_set<std::uint32_t>& liveKeys,
@@ -538,6 +656,13 @@ namespace Extrinsic::Runtime
                 // observable via any live instance during the window.
                 EnqueueMeshRetire(it->second.MeshGeometry);
                 ++stats.MeshGeometryReleases;
+            }
+            if (it->second.GraphGeometry.IsValid())
+            {
+                // RUNTIME-086 Slice B — same deferred-retire window for the
+                // runtime-owned graph upload.
+                EnqueueGraphRetire(it->second.GraphGeometry);
+                ++stats.GraphGeometryReleases;
             }
             renderer.GetGpuWorld().FreeInstance(it->second.Instance);
             it = m_Renderables.erase(it);
@@ -637,23 +762,26 @@ namespace Extrinsic::Runtime
                 }
             }
 
-            // RUNTIME-085 Slice B — runtime-authored mesh-source residency.
-            // Mesh path runs only when the entity has stated no procedural
-            // intent and no asset source at all; both are treated as
-            // declared alternatives that the mesh bridge must not race
-            // against. Domain detection uses the same `BuildConstView`
-            // path the rest of the engine uses, so `Vertices`+`Halfedges`+
-            // `Faces` (or the `HasMeshTopology` marker) decides whether
-            // the entity is a mesh.
-            const bool meshEligible = !proceduralBound
+            // RUNTIME-085 Slice B / RUNTIME-086 Slice B — runtime-authored
+            // `GeometrySources` residency. The mesh and graph bridges run only
+            // when the entity has stated no procedural intent and no asset
+            // source at all; both are treated as declared alternatives the
+            // residency bridges must not race against. Domain detection uses
+            // the same `BuildConstView` path the rest of the engine uses, and
+            // the resolved `ActiveDomain` selects exactly one bridge (mesh and
+            // graph domains are mutually exclusive per entity).
+            const bool sourceEligible = !proceduralBound
                 && proceduralRef == nullptr
                 && assetSource == nullptr;
             bool meshBoundThisFrame = false;
             bool meshDomainThisFrame = false;
-            if (meshEligible)
+            bool graphBoundThisFrame = false;
+            bool graphDomainThisFrame = false;
+            if (sourceEligible)
             {
-                const auto view = ECS::Components::GeometrySources::BuildConstView(registry, entity);
-                if (view.ActiveDomain == ECS::Components::GeometrySources::Domain::Mesh)
+                namespace GS = ECS::Components::GeometrySources;
+                const auto view = GS::BuildConstView(registry, entity);
+                if (view.ActiveDomain == GS::Domain::Mesh)
                 {
                     meshDomainThisFrame = true;
                     meshBoundThisFrame = BindMeshGeometry(registry,
@@ -662,6 +790,16 @@ namespace Extrinsic::Runtime
                                                           *sidecar,
                                                           renderer,
                                                           stats);
+                }
+                else if (view.ActiveDomain == GS::Domain::Graph)
+                {
+                    graphDomainThisFrame = true;
+                    graphBoundThisFrame = BindGraphGeometry(registry,
+                                                            entity,
+                                                            view,
+                                                            *sidecar,
+                                                            renderer,
+                                                            stats);
                 }
             }
 
@@ -680,17 +818,41 @@ namespace Extrinsic::Runtime
             // still-mesh-domain entity do NOT release: the old residency
             // remains bound so a later frame can recover, mirroring the
             // dirty-reupload fail-closed contract inside `BindMeshGeometry`.
-            const bool stillMeshAttached = meshEligible && meshDomainThisFrame;
+            const bool stillMeshAttached = sourceEligible && meshDomainThisFrame;
             if (!stillMeshAttached && sidecar->MeshGeometry.IsValid())
             {
                 EnqueueMeshRetire(sidecar->MeshGeometry);
-                if (!proceduralBound)
+                // Only detach if nothing else re-bound the instance this frame
+                // (procedural take-over, or a graph rebind after a mesh→graph
+                // domain flip).
+                if (!proceduralBound && !graphBoundThisFrame)
                 {
                     renderer.GetGpuWorld().SetInstanceGeometry(sidecar->Instance,
                                                                 Graphics::GpuGeometryHandle{});
                 }
                 sidecar->MeshGeometry = {};
                 ++stats.MeshGeometryReleases;
+            }
+
+            // RUNTIME-086 Slice B — graph-residency eligibility flip, mirroring
+            // the mesh release above. Fires when a previously-uploaded graph
+            // entity gains a procedural/asset source, loses graph-domain
+            // topology, or flips to mesh domain. A transient pack failure on a
+            // still-graph-domain entity does NOT release (old residency stays
+            // bound), matching the dirty-reupload fail-closed contract.
+            const bool stillGraphAttached = sourceEligible && graphDomainThisFrame;
+            if (!stillGraphAttached && sidecar->GraphGeometry.IsValid())
+            {
+                EnqueueGraphRetire(sidecar->GraphGeometry);
+                if (!proceduralBound && !meshBoundThisFrame)
+                {
+                    renderer.GetGpuWorld().SetInstanceGeometry(sidecar->Instance,
+                                                                Graphics::GpuGeometryHandle{});
+                }
+                sidecar->GraphGeometry = {};
+                sidecar->GraphPackedLines = false;
+                sidecar->GraphPackedPoints = false;
+                ++stats.GraphGeometryReleases;
             }
 
             if (!proceduralBound && assetSource != nullptr)
@@ -702,7 +864,7 @@ namespace Extrinsic::Runtime
                     gpuAssets);
                 AccumulateAssetObservationStats(observation, stats);
             }
-            else if (!proceduralBound && !meshBoundThisFrame)
+            else if (!proceduralBound && !meshBoundThisFrame && !graphBoundThisFrame)
             {
                 sidecar->GpuSlot.ClearSourceAsset();
             }
@@ -812,6 +974,12 @@ namespace Extrinsic::Runtime
             m_MeshFreeRetires - m_PrevMeshFreeRetires;
         m_PrevMeshFreeRetires = m_MeshFreeRetires;
 
+        // RUNTIME-086 Slice B — graph deferred-retire FreeRetires delta,
+        // mirroring the mesh accounting above.
+        stats.GraphGeometryFreeRetires =
+            m_GraphFreeRetires - m_PrevGraphFreeRetires;
+        m_PrevGraphFreeRetires = m_GraphFreeRetires;
+
         renderer.SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{
             .Transforms                     = m_Transforms,
             .Lights                         = m_Lights,
@@ -875,6 +1043,42 @@ namespace Extrinsic::Runtime
         }
     }
 
+    void RenderExtractionCache::TickGraphGeometry(std::uint64_t currentFrame,
+                                                  std::uint32_t framesInFlight,
+                                                  Graphics::IRenderer& renderer)
+    {
+        // Mirror `TickMeshGeometry`: anchor deadlines on newly-enqueued
+        // records the first time the tick observes them, then free entries
+        // whose deadline has been reached.
+        const std::uint64_t deadline = currentFrame + std::uint64_t{framesInFlight};
+        for (auto& rec : m_GraphRetire)
+        {
+            if (!rec.DeadlineSet)
+            {
+                rec.Deadline = deadline;
+                rec.DeadlineSet = true;
+            }
+        }
+
+        auto it = m_GraphRetire.begin();
+        while (it != m_GraphRetire.end())
+        {
+            if (it->DeadlineSet && it->Deadline <= currentFrame)
+            {
+                if (it->Handle.IsValid())
+                {
+                    renderer.GetGpuWorld().FreeGeometry(it->Handle);
+                    ++m_GraphFreeRetires;
+                }
+                it = m_GraphRetire.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
+    }
+
     void RenderExtractionCache::Shutdown(Graphics::IRenderer& renderer)
     {
         RuntimeRenderExtractionStats stats{};
@@ -888,6 +1092,11 @@ namespace Extrinsic::Runtime
             {
                 renderer.GetGpuWorld().FreeGeometry(sidecar.MeshGeometry);
                 ++stats.MeshGeometryReleases;
+            }
+            if (sidecar.GraphGeometry.IsValid())
+            {
+                renderer.GetGpuWorld().FreeGeometry(sidecar.GraphGeometry);
+                ++stats.GraphGeometryReleases;
             }
             renderer.GetGpuWorld().FreeInstance(sidecar.Instance);
             ++stats.FreedInstanceCount;
@@ -906,6 +1115,17 @@ namespace Extrinsic::Runtime
             }
         }
         m_MeshRetire.clear();
+
+        // RUNTIME-086 Slice B — drain the graph deferred-retire queue inline,
+        // mirroring the mesh teardown above.
+        for (auto& rec : m_GraphRetire)
+        {
+            if (rec.Handle.IsValid())
+            {
+                renderer.GetGpuWorld().FreeGeometry(rec.Handle);
+            }
+        }
+        m_GraphRetire.clear();
         m_Transforms.clear();
         m_Visualizations.clear();
         m_Lights.clear();

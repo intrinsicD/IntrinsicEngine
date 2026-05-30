@@ -11,25 +11,31 @@ Each active task should include:
 
 ## Currently active
 
-- [`RUNTIME-086`](RUNTIME-086-geometrysources-graph-residency.md) —
-  `GeometrySources` graph residency bridge (Theme A working-sandbox path).
-  Status: in-progress (Slice A landed). Owner: unassigned. Branch: TBD.
-  Promoted from `tasks/backlog/runtime/` on 2026-05-29 as the next unblocked
-  Theme A leaf after `RUNTIME-085` (mesh residency) retired; cross-domain
-  anchors `HARDEN-065`, `GRAPHICS-030B`, `GRAPHICS-070/071` are all in
-  `tasks/done/`. Slice A added the standalone
-  `Extrinsic.Runtime.GraphGeometryPacker` module
-  (`PackGraph(ConstSourceView, wantLines, wantPoints, GraphPackBuffer&)`)
-  that converts a graph-domain view into one canonical
-  `GpuWorld::GeometryUploadDesc` — node `v:position` rows as the shared
-  point-lane vertex buffer plus optional validated `(e:v0, e:v1)`
-  line-list indices — with fail-closed `GraphPackStatus` codes
-  (`WrongDomain`, `NoRenderLane`, `MissingNodes`, `EmptyGraph`,
-  `MissingEdgeTopology`, `InvalidEdge`, `NonFinitePosition`) and twelve
-  `contract;runtime` packer unit tests in `Test.GraphGeometryPacker.cpp`.
-  `Runtime.RenderExtraction` wiring + `GraphGeometry*` diagnostics + dirty
-  reupload are Slices B and C. Next verification step:
-  `ctest --test-dir build/ci --output-on-failure -R 'GraphGeometryPacker|MeshGeometry' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`.
+- _(none)_
+
+Previously-active
+[`RUNTIME-086`](../done/RUNTIME-086-geometrysources-graph-residency.md) —
+`GeometrySources` graph residency bridge (Theme A working-sandbox path) retired
+to `tasks/done/` on 2026-05-30 at maturity `CPUContracted`. Slice A (standalone
+`Extrinsic.Runtime.GraphGeometryPacker`) landed earlier; Slices B and C landed
+together on `claude/intrinsicengine-agent-onboarding-c9ql3` because the
+extraction upload path is not leak-free without the retire/shutdown lifecycle,
+so the smallest robust slice is the full residency mirror of `RUNTIME-085`.
+`RenderExtractionCache` now routes `Domain::Graph` entities carrying
+`RenderLines`/`RenderPoints` through `BindGraphGeometry` (upload/reuse/
+dirty-reupload), owns the per-entity `GraphGeometry` handle, drains the graph
+dirty-domain tags, releases on eligibility flip / destruction / shutdown through
+`EnqueueGraphRetire` + the `TickGraphGeometry` deferred-retire window
+(maintenance-phase wired in `Engine::RunFrame`), and reports eight
+`GraphGeometry*` counters. Fourteen new `contract;runtime` cases in
+`Test.GraphGeometryExtraction.cpp` cover line/point/both-lane uploads, reuse,
+two-entity independence, deferred-retire on destruction, shutdown, procedural
+preemption, fail-closed counters, eligibility flips, and parameterized dirty-tag
+reupload. Default CPU gate: focused `-R 'GraphGeometry|MeshGeometry'` 73/73;
+full gate 2371/2373 (only the two pre-existing unrelated
+`IntrinsicBenchmarkSmoke.HalfedgeSmoke` Not-Run failures); layering/test-layout/
+doc-links/task-policy/module-inventory checks clean. `Operational` visual proof
+is owned by the final working-sandbox acceptance task.
 
 Previously-active
 [`GEOM-012`](../done/GEOM-012-symmetric-domain-views-property-sharing.md) —
