@@ -114,13 +114,19 @@ upstream these runtime gates consume.
 3. **RUNTIME-089 → RUNTIME-092 → RUNTIME-093** (selection controller, stable
    lookup, primitive refinement) — the selection acceptance chain; `RUNTIME-088`
    feeds primitive selection.
-4. **RUNTIME-090 + GRAPHICS-079 → UI-001** (ImGui adapter, default-recipe ImGui
+4. **RUNTIME-080 + ASSETIO-001** (texture asset bridge, asset model/texture
+   ingest ownership) — the asset-plumbing seams RUNTIME-095 names as required
+   upstreams. These can land in parallel with the selection chain.
+5. **RUNTIME-090 + GRAPHICS-079 → UI-001** (ImGui adapter, default-recipe ImGui
    pass routing, then editor panels) — the UI acceptance chain.
-5. **GRAPHICS-081** (retire MinimalDebug) — closure gate once the default recipe
+6. **GRAPHICS-081** (retire MinimalDebug) — closure gate once the default recipe
    carries the sandbox.
-6. **RUNTIME-095** — author the CPU/null + opt-in Vulkan acceptance once A–D land.
+7. **RUNTIME-095** — author the CPU/null + opt-in Vulkan acceptance once A–E land.
 
-`RUNTIME-080` (texture bridge) and `ASSETIO-001` (asset ingest) are needed only
-for textured/file-backed content; the deterministic acceptance scene can be
-authored procedurally without them, so they are not on the critical path for a
-first passing acceptance run.
+All four asset/UI-plumbing gates (`RUNTIME-080`, `ASSETIO-001`, `RUNTIME-090`,
+`UI-001`) are **required upstreams** per RUNTIME-095's Context section, so they
+stay on the acceptance path: do not retire RUNTIME-095 until each is complete.
+A procedurally authored acceptance scene can reduce how much *content* breadth
+each seam must cover (RUNTIME-095 explicitly does not require every asset format
+or visualization mode), but it does not remove the requirement that the texture
+asset bridge and asset/texture ingest ownership seams exist and are wired.
