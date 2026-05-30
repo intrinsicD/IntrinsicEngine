@@ -1,5 +1,12 @@
 # Sandbox & Graphics Gap Analysis (2026-05-11)
 
+> **Superseded (2026-05-30).** The visible-triangle "cannot render a single
+> pixel" framing below is historical. The triangle scaffold landed and the
+> default recipe gained operational pass routing; the current gate set for a
+> working sandbox is tracked in
+> [2026-05-30 working sandbox app — remaining gates](2026-05-30-sandbox-app-remaining-gates.md).
+> Read this document for the original gap history only.
+
 ## Scope
 
 This review records the implementation gap between the planning-only retired
