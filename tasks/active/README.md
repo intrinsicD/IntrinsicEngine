@@ -14,6 +14,35 @@ Each active task should include:
 - _(none)_
 
 Previously-active
+[`RUNTIME-087`](../done/RUNTIME-087-geometrysources-pointcloud-residency.md) —
+`GeometrySources` point-cloud residency bridge (Theme A working-sandbox path)
+retired to `tasks/done/` on 2026-05-30 at maturity `CPUContracted`. Landed as
+one robust slice mirroring `RUNTIME-086`: standalone
+`Extrinsic.Runtime.PointCloudGeometryPacker` plus `RenderExtractionCache`
+residency wiring, deferred-retire window, and shutdown drain landed together
+because the upload path is not leak-free without the retire/shutdown lifecycle.
+`RenderExtractionCache` now routes `Domain::PointCloud` entities carrying
+`RenderPoints` through `BindPointCloudGeometry` (upload/reuse/dirty-reupload),
+owns the per-entity `PointCloudGeometry` handle, drains the cloud dirty-domain
+tags (`DirtyVertexPositions`/`DirtyVertexAttributes`/`GpuDirty`), releases on
+eligibility flip / destruction / shutdown through `EnqueuePointCloudRetire` +
+the `TickPointCloudGeometry` deferred-retire window (maintenance-phase wired in
+`Engine::RunFrame`), and reports eight `PointCloudGeometry*` counters. Only a
+uniform float `RenderPoints::SizeSource` is supported (per-point size buffers
+fail closed); a point-cloud-domain entity without `RenderPoints` is not a
+renderable, so a mesh that loses topology to a bare vertex set is not re-bound
+as points. New `contract;runtime` cases in `Test.PointCloudGeometryExtraction.cpp`
+and `Test.PointCloudGeometryPacker.cpp` cover upload/reuse, `PopulateFromCloud`,
+two-entity independence, deferred-retire on destruction, shutdown, procedural
+preemption, fail-closed counters (missing positions, non-finite, unsupported
+size source), eligibility flips, and parameterized dirty-tag reupload. Default
+CPU gate: focused `-R 'PointCloudGeometry|GraphGeometry|MeshGeometry'` 96/96;
+full gate 2394/2396 (only the two pre-existing unrelated
+`IntrinsicBenchmarkSmoke.HalfedgeSmoke` Not-Run failures); layering/test-layout/
+doc-links/task-policy/module-inventory checks clean. `Operational` visual proof
+is owned by the final working-sandbox acceptance task (`RUNTIME-095`).
+
+Previously-active
 [`RUNTIME-086`](../done/RUNTIME-086-geometrysources-graph-residency.md) —
 `GeometrySources` graph residency bridge (Theme A working-sandbox path) retired
 to `tasks/done/` on 2026-05-30 at maturity `CPUContracted`. Slice A (standalone

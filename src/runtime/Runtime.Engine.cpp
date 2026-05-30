@@ -818,6 +818,8 @@ namespace Extrinsic::Runtime
                 Extraction.TickMeshGeometry(currentFrame, framesInFlight, Renderer);
                 // RUNTIME-086 Slice B — and for the graph-residency queue.
                 Extraction.TickGraphGeometry(currentFrame, framesInFlight, Renderer);
+                // RUNTIME-087 — and for the point-cloud-residency queue.
+                Extraction.TickPointCloudGeometry(currentFrame, framesInFlight, Renderer);
             }
         };
 

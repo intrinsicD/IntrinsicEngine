@@ -13,6 +13,7 @@ target_sources(${target_name}
         Cameras/Runtime.CameraControllers.cppm
         Runtime.GraphGeometryPacker.cppm
         Runtime.MeshGeometryPacker.cppm
+        Runtime.PointCloudGeometryPacker.cppm
         Runtime.ProceduralGeometry.cppm
         Runtime.ProceduralGeometryPacker.cppm
         Runtime.ReferenceScene.cppm
@@ -24,6 +25,7 @@ target_sources(${target_name}
         Runtime.Engine.cpp
         Runtime.GraphGeometryPacker.cpp
         Runtime.MeshGeometryPacker.cpp
+        Runtime.PointCloudGeometryPacker.cpp
         Runtime.ProceduralGeometry.cpp
         Runtime.ProceduralGeometryPacker.cpp
         Runtime.ReferenceScene.cpp
