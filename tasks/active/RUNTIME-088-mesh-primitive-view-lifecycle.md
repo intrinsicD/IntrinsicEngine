@@ -1,5 +1,53 @@
 # RUNTIME-088 — Mesh primitive view lifecycle for vertices and edges
 
+## Status
+- State: `in-progress`.
+- Owner/branch: `claude/intrinsicengine-agent-onboarding-m6JHG`.
+- Maturity reached: Slice A landed at `Scaffolded` (standalone derivation packers
+  + control-surface vocabulary, CPU contract-tested in isolation). `CPUContracted`
+  for the full lifecycle is owned by Slice B (extraction-cache residency wiring).
+- Next verification step: Slice B — wire `MeshPrimitiveViewSettings` consumption
+  into `RenderExtractionCache::ExtractAndSubmit`, owning per-view residency,
+  dirty-domain reupload, deferred-retire, and `contract;runtime` extraction tests.
+
+## Slice plan
+- **Slice A (landed).** Standalone `Extrinsic.Runtime.MeshPrimitiveViewPacker`:
+  the runtime/editor control-surface type `MeshPrimitiveViewSettings`
+  (`EnableEdgeView` / `EnableVertexView`), the 20-byte `MeshPrimitiveVertex`
+  layout shared with the mesh/graph/point packers, the reusable
+  `MeshPrimitiveViewBuffer` scratch, the fail-closed `MeshPrimitiveViewStatus`
+  taxonomy, and the two derivation entry points: `PackMeshEdgeView`
+  (line-list from `Vertices` positions + `Edges` `e:v0/e:v1`, endpoint-range
+  validated, mirroring the graph line lane) and `PackMeshVertexView`
+  (point list from `Vertices` positions, mirroring the point-cloud packer).
+  Both read only the authoritative mesh `GeometrySources` — no CPU data
+  duplication, no graphics imports beyond the existing `GpuWorld` value-type
+  edge. Pure-CPU `contract;runtime` packer tests cover success lanes,
+  zero-edge validity, and every fail-closed status. Preserves the CPU gate.
+  Defers all residency/binding wiring to Slice B.
+- **Slice B (next).** Wire the views into `RenderExtractionCache`. Each enabled
+  view binds through its own `GpuWorld` instance + `GpuGeometryHandle` recorded
+  in the parent mesh's sidecar (the runtime-sidecar model — see the deferred
+  decision below), reusing the retained line/point pipelines. Owns
+  dirty-domain reupload (positions update both views; edge-topology updates the
+  edge view's line indices), view enable/disable create/release, eligibility
+  flips, deferred-retire + shutdown drain, and `MeshPrimitiveView*` diagnostics
+  counters. Lands the `contract;runtime` extraction tests required below. Closes
+  `Scaffolded → CPUContracted`. `Operational` visual proof stays owned by
+  `RUNTIME-095`.
+
+## Deferred decision (nonblocking — robust default recorded, revisit at Slice B)
+- **Representation model.** Slice B will represent edge/vertex views as
+  **runtime sidecars** attached to the parent mesh renderable (additional
+  per-view `GpuGeometryHandle`s + `GpuWorld` instances owned by
+  `RenderExtractionCache`), *not* as child ECS entities. Rationale: it mirrors
+  the existing mesh/graph/point residency sidecar pattern, keeps all
+  graphics-handle ownership in runtime (honoring "no ECS storage of
+  graphics/RHI handles"), and has the smaller blast radius (no ECS scene
+  mutation, parenting, or stable-identity duplication from runtime). The
+  child-entity alternative is recorded here so a reviewer can override before
+  Slice B lands if cross-entity authoring identity becomes a hard requirement.
+
 ## Goal
 - Add runtime-owned lifecycle support that derives optional retained edge and vertex render views from a mesh entity so sandbox users can render/select mesh edges and vertices in addition to filled faces.
 

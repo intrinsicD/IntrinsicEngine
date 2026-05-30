@@ -11,7 +11,14 @@ Each active task should include:
 
 ## Currently active
 
-- _(none)_
+- [`RUNTIME-088`](RUNTIME-088-mesh-primitive-view-lifecycle.md) — mesh primitive
+  view lifecycle (Theme A working-sandbox path). `in-progress` on
+  `claude/intrinsicengine-agent-onboarding-m6JHG`. Slice A landed the standalone
+  `Extrinsic.Runtime.MeshPrimitiveViewPacker` (edge line-list + vertex point
+  derivation packers, `MeshPrimitiveViewSettings` control surface, fail-closed
+  status taxonomy, pure-CPU `contract;runtime` packer tests) at `Scaffolded`.
+  Next: Slice B wires per-view residency into `RenderExtractionCache`
+  (`CPUContracted`).
 
 Previously-active
 [`RUNTIME-087`](../done/RUNTIME-087-geometrysources-pointcloud-residency.md) —

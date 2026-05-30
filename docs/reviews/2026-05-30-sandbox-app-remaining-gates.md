@@ -72,7 +72,7 @@ sandbox can claim acceptance on the default recipe.
 |---|---|---|---|
 | Graph residency extraction wiring | [`RUNTIME-086`](../../tasks/active/RUNTIME-086-geometrysources-graph-residency.md) | **IN PROGRESS** | Slice A packer `Extrinsic.Runtime.GraphGeometryPacker` exists but is **not** imported by `Runtime.RenderExtraction.cpp`. Slice B (extraction wiring) and Slice C (dirty/retire) remain. |
 | Point-cloud residency | [`RUNTIME-087`](../../tasks/backlog/runtime/RUNTIME-087-geometrysources-pointcloud-residency.md) | **OPEN** | No point-cloud packer module exists in `src/runtime/`. |
-| Mesh primitive view lifecycle | [`RUNTIME-088`](../../tasks/backlog/runtime/RUNTIME-088-mesh-primitive-view-lifecycle.md) | **OPEN** | No edge/vertex render-view module; required for primitive visualization and primitive selection. |
+| Mesh primitive view lifecycle | [`RUNTIME-088`](../../tasks/active/RUNTIME-088-mesh-primitive-view-lifecycle.md) | **IN PROGRESS** | Slice A landed the standalone edge/vertex derivation packers + control surface; Slice B owns the extraction-cache residency wiring. |
 
 ### C. Runtime selection
 

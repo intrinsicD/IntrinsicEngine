@@ -275,6 +275,7 @@ if(TARGET ExtrinsicRuntime)
         Test.GpuAssetCacheFallbackBootstrap.cpp
         Test.MeshGeometryExtraction.cpp
         Test.MeshGeometryPacker.cpp
+        Test.MeshPrimitiveViewPacker.cpp
         Test.GraphGeometryExtraction.cpp
         Test.GraphGeometryPacker.cpp
         Test.PointCloudGeometryExtraction.cpp
