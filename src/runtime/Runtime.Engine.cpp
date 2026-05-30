@@ -816,6 +816,8 @@ namespace Extrinsic::Runtime
                 // RUNTIME-085 Slice C — mirror the same window for the
                 // runtime-owned mesh-residency retire queue.
                 Extraction.TickMeshGeometry(currentFrame, framesInFlight, Renderer);
+                // RUNTIME-086 Slice B — and for the graph-residency queue.
+                Extraction.TickGraphGeometry(currentFrame, framesInFlight, Renderer);
             }
         };
 

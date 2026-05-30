@@ -41,6 +41,7 @@ import Extrinsic.Graphics.Component.Material;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.RHI.Types;
+import Extrinsic.Runtime.GraphGeometryPacker;
 import Extrinsic.Runtime.MeshGeometryPacker;
 import Extrinsic.Runtime.ProceduralGeometry;
 import Extrinsic.Runtime.ProceduralGeometryPacker;
@@ -134,6 +135,36 @@ export namespace Extrinsic::Runtime
         std::uint32_t MeshGeometryReleases{0};
         std::uint32_t MeshGeometryFreeRetires{0};
 
+        // RUNTIME-086 Slices B/C — runtime-authored graph `GeometrySources`
+        // residency counters, mirroring the mesh accounting above. A graph
+        // entity carrying `RenderLines` and/or `RenderPoints` packs its node
+        // positions (shared vertex buffer) plus optional `(e:v0, e:v1)` line
+        // indices into one `GpuGeometryHandle`. `Uploads` is incremented once
+        // per entity on the first frame the graph is packed and uploaded;
+        // clean frames hit `ReuseHits`; dirty frames hit `Reuploads` after the
+        // graph dirty-domain tags (`DirtyVertexPositions`,
+        // `DirtyVertexAttributes`, `DirtyEdgeTopology`, `GpuDirty`) are drained
+        // and the graph is repacked. `MissingNodes` aggregates the two
+        // node-shape pack rejections (`MissingNodes`, `EmptyGraph`) and
+        // `InvalidEdges` the out-of-range edge endpoint rejection because those
+        // are the likeliest structural authoring bugs in graph sources; every
+        // other non-`Success` status (`WrongDomain`, `NoRenderLane`,
+        // `MissingEdgeTopology`, `NonFinitePosition`) folds into `FailedPack`.
+        // `Releases` is incremented per release-initiated event (entity
+        // destruction, eligibility flip away from graph, or dirty reupload
+        // superseding an older handle); the actual free runs through the
+        // `framesInFlight` deferred-retire window driven by `TickGraphGeometry`,
+        // which surfaces `FreeRetires` as a per-frame delta on the next
+        // `ExtractAndSubmit` (mirroring `MeshGeometryFreeRetires`).
+        std::uint32_t GraphGeometryUploads{0};
+        std::uint32_t GraphGeometryReuseHits{0};
+        std::uint32_t GraphGeometryReuploads{0};
+        std::uint32_t GraphGeometryFailedPack{0};
+        std::uint32_t GraphGeometryMissingNodes{0};
+        std::uint32_t GraphGeometryInvalidEdges{0};
+        std::uint32_t GraphGeometryReleases{0};
+        std::uint32_t GraphGeometryFreeRetires{0};
+
         // RUNTIME-082 Slice D — spatial-debug adapter pump counters. Folded
         // per-frame from the active adapter set against the entity view of
         // `ECS::Components::SpatialDebugBinding`. The accumulator fields
@@ -199,6 +230,17 @@ export namespace Extrinsic::Runtime
                               std::uint32_t framesInFlight,
                               Graphics::IRenderer& renderer);
 
+        // RUNTIME-086 Slices B/C — drives the deferred-retire window of the
+        // runtime-owned graph-residency retire queue, mirroring
+        // `TickMeshGeometry`. Handles enqueued by entity destruction,
+        // eligibility flip, or dirty reupload are freed via
+        // `GpuWorld::FreeGeometry` once `framesInFlight` ticks have elapsed
+        // since the release tick. Subsequent `ExtractAndSubmit` calls surface
+        // the per-tick delta as `GraphGeometryFreeRetires`.
+        void TickGraphGeometry(std::uint64_t currentFrame,
+                               std::uint32_t framesInFlight,
+                               Graphics::IRenderer& renderer);
+
         [[nodiscard]] const RuntimeRenderExtractionStats& GetLastStats() const noexcept;
         [[nodiscard]] std::uint32_t GetTrackedRenderableCount() const noexcept;
 
@@ -217,6 +259,13 @@ export namespace Extrinsic::Runtime
             // `GpuSlot.SourceAsset` may later wire in.
             Graphics::GpuGeometryHandle MeshGeometry{};
             bool HasMeshResidency = false;
+            // RUNTIME-086 Slice B — runtime-authored graph-source residency.
+            // `GraphGeometry` is the single handle the cache owns and frees on
+            // retirement for a graph-domain entity (node positions as the
+            // shared vertex buffer, optional edge line indices); distinct from
+            // `MeshGeometry` so the two domain bridges never alias.
+            Graphics::GpuGeometryHandle GraphGeometry{};
+            bool HasGraphResidency = false;
         };
 
         [[nodiscard]] std::optional<RenderableSidecarView> FindRenderableSidecarForTest(
@@ -259,6 +308,11 @@ export namespace Extrinsic::Runtime
             // instance geometry) so retirement can free the runtime-owned
             // upload even after a Slice C reupload swaps `Geometry`.
             Graphics::GpuGeometryHandle MeshGeometry{};
+            // RUNTIME-086 Slice B — owned graph-source residency handle.
+            // Mesh and graph domains are mutually exclusive per entity, but
+            // the handles are tracked separately so an entity that flips
+            // domain releases the stale handle while the other path uploads.
+            Graphics::GpuGeometryHandle GraphGeometry{};
         };
 
         [[nodiscard]] RenderableSidecar* EnsureRenderable(std::uint32_t stableId,
@@ -277,6 +331,12 @@ export namespace Extrinsic::Runtime
                                              RenderableSidecar& sidecar,
                                              Graphics::IRenderer& renderer,
                                              RuntimeRenderExtractionStats& stats);
+        [[nodiscard]] bool BindGraphGeometry(entt::registry& registry,
+                                             entt::entity entity,
+                                             const ECS::Components::GeometrySources::ConstSourceView& view,
+                                             RenderableSidecar& sidecar,
+                                             Graphics::IRenderer& renderer,
+                                             RuntimeRenderExtractionStats& stats);
 
         // RUNTIME-085 Slice C — runtime-owned deferred-retire queue for mesh
         // upload handles. Mirrors the shape of
@@ -285,7 +345,12 @@ export namespace Extrinsic::Runtime
         // enqueued with `DeadlineSet = false`; the next `TickMeshGeometry`
         // anchors `Deadline = currentFrame + framesInFlight` and frees the
         // handle once `Deadline <= currentFrame`.
-        struct MeshRetireRecord
+        // A record is enqueued with `DeadlineSet = false`; the next
+        // `TickMeshGeometry` / `TickGraphGeometry` anchors
+        // `Deadline = currentFrame + framesInFlight` and frees the handle once
+        // `Deadline <= currentFrame`. The record is domain-agnostic (handle +
+        // deadline only), so the graph-residency retire queue reuses it.
+        struct GeometryRetireRecord
         {
             Graphics::GpuGeometryHandle Handle{};
             std::uint64_t Deadline = 0;
@@ -293,6 +358,9 @@ export namespace Extrinsic::Runtime
         };
 
         void EnqueueMeshRetire(Graphics::GpuGeometryHandle handle);
+        // RUNTIME-086 Slice B — graph-residency retire enqueue, mirroring
+        // `EnqueueMeshRetire`.
+        void EnqueueGraphRetire(Graphics::GpuGeometryHandle handle);
 
         std::unordered_map<std::uint32_t, RenderableSidecar> m_Renderables{};
         std::vector<Graphics::TransformSyncRecord> m_Transforms{};
@@ -307,9 +375,16 @@ export namespace Extrinsic::Runtime
         // accumulator. `m_PrevMeshFreeRetires` lets `ExtractAndSubmit` emit
         // `MeshGeometryFreeRetires` as a per-tick delta, matching the
         // `ProceduralGeometryFreeRetires` accounting path.
-        std::vector<MeshRetireRecord> m_MeshRetire{};
+        std::vector<GeometryRetireRecord> m_MeshRetire{};
         std::uint32_t m_MeshFreeRetires{0};
         std::uint32_t m_PrevMeshFreeRetires{0};
+
+        // RUNTIME-086 Slices B/C — graph-residency scratch buffer + deferred-
+        // retire queue, mirroring the mesh-residency members above.
+        GraphPackBuffer m_GraphPack{};
+        std::vector<GeometryRetireRecord> m_GraphRetire{};
+        std::uint32_t m_GraphFreeRetires{0};
+        std::uint32_t m_PrevGraphFreeRetires{0};
 
         // RUNTIME-082 Slice D — owned adapter instances + a registry mirror
         // resolved per-entity by `ExtractAndSubmit`. The batch buffer is
