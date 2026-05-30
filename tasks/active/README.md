@@ -37,14 +37,17 @@ symmetric mesh/graph/point-cloud domain views retired to `tasks/done/` on
 2026-05-29 after Slice E (conversion/move/consume policy) landed on
 `claude/intrinsicengine-agent-onboarding-YjhiR`. Maturity `CPUContracted`. Slice E
 reviewed the conversion coverage and added no new APIs: the container copy
-constructor/assignment is the same-domain borrow→owning hard-copy seam,
+constructor is the same-domain borrow→owning hard-copy seam (copy-assigning into
+a borrowed destination instead writes through to the source, so promotion uses
+copy construction or assignment into an owning destination),
 `Geometry.Mesh.Conversion`/`Geometry.PointCloud.Conversion` own the cross-domain
 hard copies, move-assign is the ownership-transfer seam, and the Slice D
-`Const*View` types are already non-copyable/non-movable. Five new tests pin the
+`Const*View` types are already non-copyable/non-movable. Six new tests pin the
 policy (three `SubmeshViewDomainBorrows.HardCopyOf*BorrowOwnsIndependentStorage`
-cases plus `MeshConversion.ConvertedHalfedgeMeshOutlivesSourceViaMoveOwnershipTransfer`
+cases, `SubmeshViewDomainBorrows.CopyAssignIntoBorrowedDestinationWritesThroughToSource`,
+plus `MeshConversion.ConvertedHalfedgeMeshOutlivesSourceViaMoveOwnershipTransfer`
 and `PointCloudConversion.ConvertedCloudOutlivesAndDecouplesFromSource`); the
-focused geometry suite passed 180/180 with the layering, test-layout, doc-links,
+focused geometry suite passed 181/181 with the layering, test-layout, doc-links,
 and module-inventory (no diff) checks clean.
 
 [`BUG-013`](../done/BUG-013-backbuffer-readback-contract-vtable-segv.md) —

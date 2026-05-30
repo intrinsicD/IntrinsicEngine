@@ -808,16 +808,22 @@ TEST(SubmeshViewDomainBorrows, ConstGraphCloudViewSharesStorageAndSeesLiveEdits)
 // Slice E — conversion/move/consume policy.
 //
 // A borrowed Graph/Cloud shares its source's storage (proven above). The
-// explicit hard-copy ownership seam for taking independent ownership of that
-// borrowed domain is the container copy constructor / copy assignment, which
-// always allocates a fresh owning PropertySet and deep-copies. These tests pin
-// that copying a borrow yields an owning container that (a) does not observe
-// later source mutations and (b) outlives source destruction.
+// explicit hard-copy ownership seam for taking independent ownership of a
+// borrowed domain is the container COPY CONSTRUCTOR, which unconditionally
+// allocates a fresh owning PropertySet and deep-copies. Copy ASSIGNMENT yields
+// an independent owner only when the destination already owns its storage
+// (e.g. a default-constructed container): the assignment operators copy into
+// the destination's currently-bound reference members, so assigning into a
+// borrowed destination writes through to the shared source instead
+// (CopyAssignIntoBorrowedDestinationWritesThroughToSource pins that boundary).
+// These tests assign into a default-constructed (owning) destination and pin
+// that the result (a) does not observe later source mutations and (b) outlives
+// source destruction.
 // ---------------------------------------------------------------------------
 
 TEST(SubmeshViewDomainBorrows, HardCopyOfMeshBackedGraphBorrowOwnsIndependentStorage)
 {
-    Geometry::Graph::Graph owned; // owning container; receives the hard copy
+    Geometry::Graph::Graph owned; // default-constructed owning destination (safe copy-assign target)
     {
         auto mesh = MakeSingleTriangle();
         Geometry::Graph::Graph borrow = BorrowMeshAsGraphReadOnly(mesh); // shares mesh storage
@@ -878,6 +884,31 @@ TEST(SubmeshViewDomainBorrows, HardCopyOfGraphBackedCloudBorrowOwnsIndependentSt
     EXPECT_EQ(owned.VerticesSize(), 2u);
     EXPECT_EQ(owned.Position(Geometry::VertexHandle{0}), (glm::vec3{0.0f, 0.0f, 0.0f}));
     EXPECT_EQ(owned.Position(Geometry::VertexHandle{1}), (glm::vec3{1.0f, 0.0f, 0.0f}));
+}
+
+// Boundary case for the hard-copy guarantee: copy CONSTRUCTION always promotes a
+// borrow to an independent owner, but copy ASSIGNMENT copies into the
+// destination's currently-bound storage. Copy-assigning INTO a borrowed
+// destination therefore writes through to the shared source instead of producing
+// an independent owner — so the "promote a borrow" path must use copy
+// construction, or assign only into a destination known to own its storage.
+TEST(SubmeshViewDomainBorrows, CopyAssignIntoBorrowedDestinationWritesThroughToSource)
+{
+    auto sourceGraph = MakeTwoVertexEdgeGraph(); // owning; v0=(0,0,0), v1=(1,0,0)
+    Geometry::PointCloud::Cloud borrowedDst = BorrowGraphAsCloud(sourceGraph); // shares source vertex storage
+    ASSERT_EQ(borrowedDst.VerticesSize(), 2u);
+
+    Geometry::PointCloud::Cloud payload; // independent owning cloud holding different data
+    static_cast<void>(payload.AddPoint(glm::vec3{7.0f, 7.0f, 7.0f}));
+
+    borrowedDst = payload; // copy-assign INTO a borrow: writes through to sourceGraph's vertex storage
+
+    // A fresh borrow re-resolves its property handles against the source's
+    // current storage and observes the write-through: the source was overwritten
+    // and resized, NOT left intact — proving this is not a safe promote path.
+    Geometry::PointCloud::Cloud reborrow = BorrowGraphAsCloud(sourceGraph);
+    EXPECT_EQ(reborrow.VerticesSize(), 1u);
+    EXPECT_EQ(reborrow.Position(Geometry::VertexHandle{0}), (glm::vec3{7.0f, 7.0f, 7.0f}));
 }
 
 } // namespace
