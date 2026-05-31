@@ -1,18 +1,57 @@
 # RUNTIME-089 — Runtime selection controller and snapshot handoff
 
 ## Status
-- State: `in-progress`.
+- State: `done` — retired 2026-05-31 at maturity `CPUContracted`.
 - Owner/agent: `claude` (onboarding session).
-- Branch: `claude/intrinsicengine-agent-onboarding-Vyaea`.
-- Maturity reached: `Scaffolded` (Slice A) — standalone
+- Branch: Slice A landed on `claude/intrinsicengine-agent-onboarding-Vyaea`
+  (merged via PR #955); Slice B landed on
+  `claude/intrinsicengine-agent-onboarding-VBuRD`.
+- PR/commit: Slice A — commit `e246880` + `05b71fb` (PR #955). Slice B —
+  commit: _pending push to `claude/intrinsicengine-agent-onboarding-VBuRD`_.
+  PR: _TBD_.
+- Maturity reached: `CPUContracted`. Slice A landed the standalone
   `Extrinsic.Runtime.SelectionController` module + pure-CPU `contract;runtime`
-  tests landed; no `Engine::RunFrame` / `RenderExtractionCache` wiring yet.
-- Next verification step: Slice B — wire the controller into `Engine::RunFrame`
-  (coalesce into `RenderFrameInput::Pick` / `SelectionSystem::RequestPick`
-  before extraction; drain `SelectionSystem::GetLastPickResult()` after
-  readback) and populate `RenderWorld.Selection.{SelectedStableIds,
-  HoveredStableId,HasHovered}` from the controller snapshot during
-  `RenderExtractionCache::ExtractAndSubmit`, closing `Scaffolded → CPUContracted`.
+  tests (`Scaffolded`). Slice B wired the controller into the real runtime frame
+  path (`Engine::RunFrame` pick drain → `SelectionSystem::RequestPick` before
+  extraction, readback consume in the maintenance phase, and the controller
+  snapshot mirror into `RenderWorld.Selection` via
+  `RenderExtractionCache::ExtractAndSubmit(..., const SelectionController*)`),
+  closing `Scaffolded → CPUContracted`.
+- Verification (Slice B session): `cmake --preset ci`;
+  `cmake --build --preset ci --target IntrinsicRuntimeContractTests
+  IntrinsicGraphicsContractTests`;
+  `ctest --test-dir build/ci -L contract -LE 'gpu|vulkan|slow|flaky-quarantine'
+  --timeout 60` → 253/253 (221 runtime + 32 graphics), including 28
+  `SelectionController`/`SelectionSnapshotExtraction` cases; layering,
+  test-layout, doc-links, task-policy, and module-inventory (no diff) checks
+  clean.
+- `Operational` outline/pick proof remains owned by `GRAPHICS-074` plus the
+  final working-sandbox acceptance task (`RUNTIME-095`); the real input→pick
+  binding (mouse button/modifier policy) is owned by a later editor/UI task.
+
+### Post-retirement hardening (2026-05-31, `VBuRD`)
+- Per-pick readback correlation fix. The Slice B bridge originally consumed a
+  single `SelectionSystem::GetLastPickResult()` via the oldest-first
+  `ConsumeHit`/`ConsumeNoHit` overloads. With more than one frame in flight,
+  `DrainCompletedPickingSlots()` can publish several completed slots into the
+  single last-result holder in one `BeginFrame` (dropping all but the newest),
+  and oldest-first correlation mis-applies a hover/click or Add/Toggle result to
+  the wrong in-flight request (and is unsound when a slot recycles before its
+  result is drained). Fixed by: (1) `SelectionSystem` now holds completed
+  readbacks in a **FIFO queue** drained by `PopPickResult()` (no result dropped;
+  `GetLastPickResult()` kept as a non-destructive peek); (2) the controller
+  correlation `Sequence` is threaded end-to-end — `PickPixelRequest` →
+  `RenderWorld::PickRequest` → the renderer per-slot `m_PickingSlotSequence`
+  bookkeeping → `PickReadbackResult`; (3) `Engine::RunFrame` drains the whole
+  FIFO each frame and resolves each result by its `Sequence`
+  (`ConsumeHit`/`ConsumeNoHit(reg, seq)`), falling back to oldest-first only for
+  uncorrelated (`Sequence == 0`) results. New coverage:
+  `GraphicsSelectionSystemContracts.QueuesCompletedReadbacksFifoWithSequence`,
+  `RendererFrameLifecycle.PickingReadbackPreservesCorrelationSequence`, and
+  `contract;runtime` `Test.SelectionReadbackCorrelation.cpp` (out-of-order and
+  missing-oldest scenarios). Full contract gate 482/482 (259 graphics + 223
+  runtime); layering/test-layout/doc-links/task-policy/module-inventory (no diff)
+  clean.
 
 ## Goal
 - Implement runtime/editor-owned selection control that converts platform/editor input into graphics pick requests, consumes graphics pick results, mutates runtime/editor selected/hovered state, and submits `RenderWorld.Selection` snapshots for outline rendering.
@@ -32,10 +71,10 @@
 
 ## Required changes
 - [x] _(Slice A)_ Add a runtime `SelectionController` module with input-facing APIs for hover pick, click pick, additive/toggle selection, clear selection, and programmatic selection by stable/entity ID.
-- [ ] _(Slice B)_ Wire runtime frame code to coalesce accepted pointer picks into `RenderFrameInput::Pick` / `HasPendingPick` before `IRenderer::ExtractRenderWorld()`.
-- [ ] _(Slice B)_ After renderer readback drains, consume `SelectionSystem::GetLastPickResult()` and resolve stable/entity IDs through a runtime-owned lookup seam (using `entt::entity` initially if `RUNTIME-092` is not landed, and upgrading to stable IDs when available).
+- [x] _(Slice B)_ Wire runtime frame code to coalesce accepted pointer picks into `RenderFrameInput::Pick` / `HasPendingPick` before `IRenderer::ExtractRenderWorld()`.
+- [x] _(Slice B)_ After renderer readback drains, consume `SelectionSystem::GetLastPickResult()` and resolve stable/entity IDs through a runtime-owned lookup seam (using `entt::entity` initially if `RUNTIME-092` is not landed, and upgrading to stable IDs when available).
 - [x] _(Slice A)_ Mutate runtime/ECS/editor selection state only in runtime/editor code: update `SelectedTag` / `HoveredTag` or an editor-owned sidecar according to documented policy.
-- [ ] _(Slice B)_ Extend runtime snapshot submission to populate `RenderWorld.Selection.SelectedStableIds`, `HoveredStableId`, and `HasHovered` without graphics reading live ECS. _(Slice A produces the controller-owned snapshot buffers consumed here.)_
+- [x] _(Slice B)_ Extend runtime snapshot submission to populate `RenderWorld.Selection.SelectedStableIds`, `HoveredStableId`, and `HasHovered` without graphics reading live ECS. _(Slice A produces the controller-owned snapshot buffers consumed here.)_
 - [x] _(Slice A)_ Add diagnostics: pick requests submitted, readbacks consumed, hits, no-hits, stale entity hits, non-selectable hits rejected, selection changes emitted.
 - [x] _(Slice A)_ Define default sandbox policy: single-select click, hover outline, additive modifier if input port exposes one, clear on background click.
 
@@ -45,18 +84,18 @@
 - [x] _(Slice A)_ Add `contract;runtime` coverage for background/no-hit clearing hover and optionally selection per documented policy.
 - [x] _(Slice A)_ Add stale/non-selectable hit rejection coverage.
 - [x] _(Slice A)_ Add coalescing coverage so multiple same-frame pointer events produce the documented single pending-pick shape.
-- [ ] _(Slice B)_ Add `contract;runtime` coverage that the populated `RenderWorld.Selection` snapshot mirrors controller state through `ExtractAndSubmit`.
+- [x] _(Slice B)_ Add `contract;runtime` coverage that the populated `RenderWorld.Selection` snapshot mirrors controller state through `ExtractAndSubmit` (`Test.SelectionSnapshotExtraction.cpp`: selected/hovered/additive mirror, null-controller empty, cleared-empty).
 - [x] _(Slice A)_ No `gpu`/`vulkan` test in this slice; graphics readback command coverage is `GRAPHICS-074`.
 
 ## Docs
-- [ ] Update `src/runtime/README.md` with selection-controller ownership, policy defaults, and diagnostics.
-- [ ] Update `docs/architecture/rendering-three-pass.md` only if the graphics/runtime selection boundary changes.
-- [ ] Refresh `docs/api/generated/module_inventory.md` if new modules are added.
+- [x] Update `src/runtime/README.md` with selection-controller ownership, policy defaults, and diagnostics. _(Slice A added the module-table row; Slice B updated it plus the canonical frame-loop phases with the pick drain / readback consume / snapshot mirror handoff points.)_
+- [x] Update `docs/architecture/rendering-three-pass.md` only if the graphics/runtime selection boundary changes. _(No change: the boundary — runtime owns mutation, graphics reporting-only — is the design GRAPHICS-012/074 already documented; Slice B implements it without moving the boundary.)_
+- [x] Refresh `docs/api/generated/module_inventory.md` if new modules are added. _(No new modules; regenerated, no diff.)_
 
 ## Acceptance criteria
-- [ ] Runtime owns the complete selection mutation path; graphics remains reporting-only.
-- [ ] `RenderWorld.Selection` is populated from runtime/editor state and can drive `SelectionOutlinePass` once `GRAPHICS-074` records it.
-- [ ] Pick request coalescing and stale/non-selectable rejection are deterministic and tested.
+- [x] Runtime owns the complete selection mutation path; graphics remains reporting-only.
+- [x] `RenderWorld.Selection` is populated from runtime/editor state and can drive `SelectionOutlinePass` once `GRAPHICS-074` records it.
+- [x] Pick request coalescing and stale/non-selectable rejection are deterministic and tested.
 
 ## Slice plan
 - **Slice A (landed).** Standalone `Extrinsic.Runtime.SelectionController`
@@ -116,10 +155,13 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
 - Adding editor UI widgets or ImGui dependencies to the controller core.
 
 ## Maturity
-- Target: `CPUContracted` for runtime selection policy and snapshot handoff.
-- Slice A closes `Scaffolded`: the standalone controller exists and is
-  CPU-tested in isolation, but is not yet wired into a real runtime frame path,
-  so it does not yet prove the engine performs selection end-to-end. Slice B
-  owns `Scaffolded → CPUContracted`.
+- Target: `CPUContracted` for runtime selection policy and snapshot handoff. **Reached.**
+- Slice A closed `Scaffolded`: the standalone controller exists and is
+  CPU-tested in isolation, but was not yet wired into a real runtime frame path.
+- Slice B closed `Scaffolded → CPUContracted`: the controller is wired into
+  `Engine::RunFrame` and `RenderExtractionCache::ExtractAndSubmit`, and the
+  `contract;runtime` snapshot-mirror coverage proves the runtime drives the
+  selected/hovered handoff end-to-end through the extraction path on the default
+  CPU/null gate (graphics reporting-only, no live ECS read from graphics).
 - `Operational` outline/pick proof requires `GRAPHICS-074` plus the final sandbox acceptance task (`RUNTIME-095`).
 

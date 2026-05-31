@@ -47,6 +47,7 @@ import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.PointCloudGeometryPacker;
 import Extrinsic.Runtime.ProceduralGeometry;
 import Extrinsic.Runtime.ProceduralGeometryPacker;
+import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SpatialDebugAdapters;
 
 export namespace Extrinsic::Runtime
@@ -278,9 +279,15 @@ export namespace Extrinsic::Runtime
         RenderExtractionCache(const RenderExtractionCache&) = delete;
         RenderExtractionCache& operator=(const RenderExtractionCache&) = delete;
 
+        // `selection`, when non-null, supplies the runtime-owned selection
+        // snapshot (RUNTIME-089 Slice B): its `SelectedStableIds()` /
+        // `HoveredStableId()` / `HasHovered()` are attached to the submitted
+        // `RuntimeRenderSnapshotBatch` so the renderer surfaces them on
+        // `RenderWorld::Selection`. Null leaves the selection snapshot empty.
         [[nodiscard]] RuntimeRenderExtractionStats ExtractAndSubmit(ECS::Scene::Registry& scene,
                                                                     Graphics::IRenderer& renderer,
-                                                                    Graphics::GpuAssetCache* gpuAssets = nullptr);
+                                                                    Graphics::GpuAssetCache* gpuAssets = nullptr,
+                                                                    const SelectionController* selection = nullptr);
         void Shutdown(Graphics::IRenderer& renderer);
 
         // Maintenance-phase hook called by Engine::RunFrame after

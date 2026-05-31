@@ -1,5 +1,7 @@
 module;
 
+#include <cstddef>
+#include <deque>
 #include <memory>
 #include <optional>
 
@@ -7,10 +9,19 @@ module Extrinsic.Graphics.SelectionSystem;
 
 namespace Extrinsic::Graphics
 {
+	namespace
+	{
+		// Upper bound on un-drained completed readbacks. The runtime drains the
+		// queue every frame, so it normally holds at most frames-in-flight
+		// entries; the cap only guards a never-draining consumer from unbounded
+		// growth by dropping the oldest result.
+		constexpr std::size_t kMaxCompletedPicks = 64u;
+	}
+
 	struct SelectionSystem::Impl
 	{
 		std::optional<PickRequest>           PendingPick;
-		std::optional<PickReadbackResult>    LastPick;
+		std::deque<PickReadbackResult>       CompletedPicks;
 		SelectionSystemDiagnostics           Diagnostics{};
 		bool                                 Initialized{false};
 	};
@@ -29,7 +40,7 @@ namespace Extrinsic::Graphics
 	void SelectionSystem::Shutdown()
 	{
 		m_Impl->PendingPick.reset();
-		m_Impl->LastPick.reset();
+		m_Impl->CompletedPicks.clear();
 		m_Impl->Diagnostics = {};
 		m_Impl->Initialized = false;
 	}
@@ -103,7 +114,11 @@ namespace Extrinsic::Graphics
 	void SelectionSystem::PublishPickResult(PickReadbackResult result) noexcept
 	{
 		result.Hit = result.Hit && result.EncodedId.IsHit();
-		m_Impl->LastPick = result;
+		m_Impl->CompletedPicks.push_back(result);
+		while (m_Impl->CompletedPicks.size() > kMaxCompletedPicks)
+		{
+			m_Impl->CompletedPicks.pop_front();
+		}
 		if (result.Hit)
 		{
 			++m_Impl->Diagnostics.PickHitCount;
@@ -119,14 +134,29 @@ namespace Extrinsic::Graphics
 		PublishPickResult(PickReadbackResult{});
 	}
 
+	std::optional<PickReadbackResult> SelectionSystem::PopPickResult() noexcept
+	{
+		if (m_Impl->CompletedPicks.empty())
+		{
+			return std::nullopt;
+		}
+		const PickReadbackResult front = m_Impl->CompletedPicks.front();
+		m_Impl->CompletedPicks.pop_front();
+		return front;
+	}
+
 	std::optional<PickReadbackResult> SelectionSystem::GetLastPickResult() const noexcept
 	{
-		return m_Impl->LastPick;
+		if (m_Impl->CompletedPicks.empty())
+		{
+			return std::nullopt;
+		}
+		return m_Impl->CompletedPicks.back();
 	}
 
 	void SelectionSystem::ClearLastPickResult() noexcept
 	{
-		m_Impl->LastPick.reset();
+		m_Impl->CompletedPicks.clear();
 	}
 
 	SelectionSystemDiagnostics SelectionSystem::GetDiagnostics() const noexcept

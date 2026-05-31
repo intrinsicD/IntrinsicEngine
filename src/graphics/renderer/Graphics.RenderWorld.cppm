@@ -49,6 +49,9 @@ namespace Extrinsic::Graphics
         glm::vec3 RayOrigin{0.f};
         glm::vec3 RayDirection{0.f, 0.f, -1.f};
         bool HasRay{false};
+        // RUNTIME-089 — selection correlation token carried from
+        // RenderFrameInput::Pick to the picking slot (see PickPixelRequest).
+        std::uint64_t Sequence{0u};
     };
 
     export struct SelectionSnapshot

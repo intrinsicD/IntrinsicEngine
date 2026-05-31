@@ -1125,7 +1125,8 @@ namespace Extrinsic::Runtime
 
     RuntimeRenderExtractionStats RenderExtractionCache::ExtractAndSubmit(ECS::Scene::Registry& scene,
                                                                          Graphics::IRenderer& renderer,
-                                                                         Graphics::GpuAssetCache* gpuAssets)
+                                                                         Graphics::GpuAssetCache* gpuAssets,
+                                                                         const SelectionController* selection)
     {
         RuntimeRenderExtractionStats stats{};
         auto& registry = scene.Raw();
@@ -1551,7 +1552,12 @@ namespace Extrinsic::Runtime
             m_MeshPrimitiveViewFreeRetires - m_PrevMeshPrimitiveViewFreeRetires;
         m_PrevMeshPrimitiveViewFreeRetires = m_MeshPrimitiveViewFreeRetires;
 
-        renderer.SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{
+        // RUNTIME-089 Slice B — attach the runtime selection snapshot when a
+        // controller is wired. The controller owns the backing storage for
+        // `SelectedStableIds()`; the renderer copies it during
+        // `SubmitRuntimeSnapshots`, so the span only needs to be valid for the
+        // duration of this call.
+        Graphics::RuntimeRenderSnapshotBatch batch{
             .Transforms                     = m_Transforms,
             .Lights                         = m_Lights,
             .Visualizations                 = m_Visualizations,
@@ -1561,7 +1567,14 @@ namespace Extrinsic::Runtime
             .SpatialDebugConvexHullVertices = m_SpatialDebugBatch.ConvexHullVertices,
             .SpatialDebugConvexHullEdges    = m_SpatialDebugBatch.ConvexHullEdges,
             .SpatialDebugPointMarkers       = m_SpatialDebugBatch.PointMarkers,
-        });
+        };
+        if (selection != nullptr)
+        {
+            batch.SelectionSelectedStableIds = selection->SelectedStableIds();
+            batch.SelectionHoveredStableId   = selection->HoveredStableId();
+            batch.SelectionHasHovered        = selection->HasHovered();
+        }
+        renderer.SubmitRuntimeSnapshots(batch);
 
         m_LastStats = stats;
         return m_LastStats;

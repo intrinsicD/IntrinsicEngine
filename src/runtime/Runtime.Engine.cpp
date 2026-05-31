@@ -34,6 +34,8 @@ import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
+import Extrinsic.Graphics.CameraSnapshots;
+import Extrinsic.Graphics.SelectionSystem;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Core.FrameLoop;
 import Extrinsic.Runtime.EcsSystemBundle;
@@ -679,6 +681,32 @@ namespace Extrinsic::Runtime
             }
         }
 
+        // ── RUNTIME-089 Slice B: drain the coalesced selection pick ───────
+        // Input ports / editor tools submit hover/click picks onto the
+        // controller (GetSelectionController()); here we drain the single
+        // coalesced survivor into the frame input and the renderer's
+        // SelectionSystem so graphics issues the pick this frame. The
+        // controller tracks the drained pick as in-flight; the matching
+        // readback is consumed in the maintenance phase below. Graphics stays
+        // reporting-only — it never reads live ECS or runtime selection state.
+        if (const std::optional<PendingSelectionPick> pick =
+                m_SelectionController.ConsumePendingPick())
+        {
+            renderInput.HasPendingPick = true;
+            renderInput.Pick = Graphics::PickPixelRequest{
+                .X        = pick->PixelX,
+                .Y        = pick->PixelY,
+                .Pending  = true,
+                // Carry the controller's correlation token so the readback
+                // resolves this exact request, not whichever pick is oldest.
+                .Sequence = pick->Sequence,
+            };
+            m_Renderer->GetSelectionSystem().RequestPick(Graphics::PickRequest{
+                .PixelX = pick->PixelX,
+                .PixelY = pick->PixelY,
+            });
+        }
+
         // ── Phases 5–9: promoted render-frame contract ───────────────────
         RHI::FrameHandle frame{};
         Graphics::RenderWorld renderWorld{};
@@ -689,6 +717,7 @@ namespace Extrinsic::Runtime
             ECS::Scene::Registry& Scene;
             RenderExtractionCache& Extraction;
             Graphics::GpuAssetCache* GpuAssetCache;
+            const SelectionController& Selection;
             RHI::FrameHandle& Frame;
             const Graphics::RenderFrameInput& Input;
             Graphics::RenderWorld& World;
@@ -697,6 +726,7 @@ namespace Extrinsic::Runtime
                              ECS::Scene::Registry& scene,
                              RenderExtractionCache& extraction,
                              Graphics::GpuAssetCache* gpuAssetCache,
+                             const SelectionController& selection,
                              RHI::FrameHandle& frame,
                              const Graphics::RenderFrameInput& input,
                              Graphics::RenderWorld& world)
@@ -704,6 +734,7 @@ namespace Extrinsic::Runtime
                 , Scene(scene)
                 , Extraction(extraction)
                 , GpuAssetCache(gpuAssetCache)
+                , Selection(selection)
                 , Frame(frame)
                 , Input(input)
                 , World(world)
@@ -713,8 +744,10 @@ namespace Extrinsic::Runtime
             bool BeginFrame() override { return Renderer.BeginFrame(Frame); }
             void ExtractRenderWorld() override
             {
+                // RUNTIME-089 Slice B — mirror the runtime selection snapshot
+                // into RenderWorld::Selection via the extraction batch.
                 [[maybe_unused]] const RuntimeRenderExtractionStats stats =
-                    Extraction.ExtractAndSubmit(Scene, Renderer, GpuAssetCache);
+                    Extraction.ExtractAndSubmit(Scene, Renderer, GpuAssetCache, &Selection);
                 World = Renderer.ExtractRenderWorld(Input);
             }
             void PrepareFrame() override { Renderer.PrepareFrame(World); }
@@ -726,6 +759,7 @@ namespace Extrinsic::Runtime
                                      *m_Scene,
                                      m_RenderExtraction,
                                      m_GpuAssetCache.get(),
+                                     m_SelectionController,
                                      frame,
                                      renderInput,
                                      renderWorld);
@@ -834,6 +868,40 @@ namespace Extrinsic::Runtime
                               m_RenderExtraction,
                               *m_Renderer);
         Core::ExecuteMaintenanceContract(transferHooks, streamingHooks, assetHooks, 8);
+
+        // ── RUNTIME-089 Slice B: consume the completed pick readbacks ──────
+        // DrainCompletedPickingSlots can publish several completed picking
+        // slots into the SelectionSystem during the render/transfer phases, so
+        // drain the whole FIFO — not just the newest — and resolve each result
+        // by its correlation Sequence. ConsumeHit/ConsumeNoHit(reg, seq) replay
+        // the exact in-flight request's kind/mode (hover vs click, Replace/Add/
+        // Toggle) even when picks complete out of issue order or a slot is
+        // recycled. A result with no Sequence (uncorrelated; e.g. a pick issued
+        // outside the controller bridge) falls back to the oldest in-flight
+        // pick. The controller resolves the stable id, rejects stale/
+        // non-selectable hits, and mutates ECS Selected/Hovered tags.
+        {
+            Graphics::SelectionSystem& selectionSystem = m_Renderer->GetSelectionSystem();
+            while (const std::optional<Graphics::PickReadbackResult> result =
+                       selectionSystem.PopPickResult())
+            {
+                if (result->Sequence != 0u)
+                {
+                    if (result->Hit)
+                        m_SelectionController.ConsumeHit(*m_Scene, result->StableEntityId, result->Sequence);
+                    else
+                        m_SelectionController.ConsumeNoHit(*m_Scene, result->Sequence);
+                }
+                else
+                {
+                    if (result->Hit)
+                        m_SelectionController.ConsumeHit(*m_Scene, result->StableEntityId);
+                    else
+                        m_SelectionController.ConsumeNoHit(*m_Scene);
+                }
+            }
+        }
+
         // completedGpuValue is the renderer's per-frame timeline value.  The
         // GpuAssetCache currently retires on the CPU frame counter (which is
         // a conservative proxy for GPU completion); a follow-up may key
@@ -855,6 +923,7 @@ namespace Extrinsic::Runtime
     Assets::AssetService& Engine::GetAssetService()  noexcept { return *m_AssetService;  }
     Graphics::GpuAssetCache& Engine::GetGpuAssetCache() noexcept { return *m_GpuAssetCache; }
     ECS::Scene::Registry& Engine::GetScene()         noexcept { return *m_Scene;         }
+    SelectionController&  Engine::GetSelectionController() noexcept { return m_SelectionController; }
     Core::FrameGraph&     Engine::GetFrameGraph()    noexcept { return *m_FrameGraph;    }
     Core::Dag::TaskGraph& Engine::GetStreamingGraph() noexcept { return *m_StreamingGraph; }
 

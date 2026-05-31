@@ -11,20 +11,35 @@ Each active task should include:
 
 ## Currently active
 
-- [`RUNTIME-089`](RUNTIME-089-selection-controller.md) — runtime selection
-  controller and snapshot handoff (Theme A working-sandbox path). Status
-  `in-progress` on `claude/intrinsicengine-agent-onboarding-Vyaea`. Slice A
-  landed the standalone `Extrinsic.Runtime.SelectionController` module
-  (input-facing hover/click/programmatic APIs, per-frame pick coalescing,
-  readback consumption, Replace/Add/Toggle `SelectedTag`/`HoveredTag` mutation,
-  stale/non-selectable rejection, the `uint32 ↔ entt::entity` lookup seam,
-  controller-owned selection-snapshot buffers, and the diagnostics block) with
-  pure-CPU `contract;runtime` tests in `Test.SelectionController.cpp`, at
-  maturity `Scaffolded`. Next verification step: Slice B wires the controller
-  into `Engine::RunFrame` (coalesce into `RenderFrameInput::Pick` /
-  `SelectionSystem::RequestPick`; drain `GetLastPickResult()`) and populates
-  `RenderWorld.Selection` from the controller snapshot during
-  `RenderExtractionCache::ExtractAndSubmit`, closing `Scaffolded → CPUContracted`.
+_None._
+
+Previously-active
+[`RUNTIME-089`](../done/RUNTIME-089-selection-controller.md) — runtime selection
+controller and snapshot handoff (Theme A working-sandbox path) retired to
+`tasks/done/` on 2026-05-31 at maturity `CPUContracted`. Slice A landed the
+standalone `Extrinsic.Runtime.SelectionController` module (input-facing
+hover/click/programmatic APIs, per-frame pick coalescing, sequence-tracked
+in-flight readback consumption, Replace/Add/Toggle `SelectedTag`/`HoveredTag`
+mutation, stale/non-selectable rejection, the `uint32 ↔ entt::entity` lookup
+seam, controller-owned selection-snapshot buffers, and the diagnostics block)
+with pure-CPU `contract;runtime` tests in `Test.SelectionController.cpp`
+(`Scaffolded`). Slice B (`claude/intrinsicengine-agent-onboarding-VBuRD`) closed
+`Scaffolded → CPUContracted` by wiring the controller into the real runtime
+frame path: `Engine` now owns a `SelectionController` (`GetSelectionController()`),
+drains the coalesced pick into `RenderFrameInput::Pick`/`HasPendingPick` and
+`SelectionSystem::RequestPick` before `ExtractRenderWorld`, consumes
+`SelectionSystem::GetLastPickResult()` (oldest in-flight pick) in the maintenance
+phase and clears it, and mirrors the controller snapshot into
+`RenderWorld.Selection` through a new `const SelectionController*` argument to
+`RenderExtractionCache::ExtractAndSubmit` → `RuntimeRenderSnapshotBatch::Selection*`
+→ renderer stable storage → `ExtractRenderWorld` (graphics reporting-only, no
+live ECS read). Five new `Test.SelectionSnapshotExtraction.cpp` `contract;runtime`
+cases (selected/hovered/additive mirror, null-controller empty, cleared-empty)
+plus the 23 Slice A cases pass; full contract gate 253/253 (221 runtime + 32
+graphics); layering/test-layout/doc-links/task-policy/module-inventory (no diff)
+checks clean. `Operational` outline/pick proof stays owned by `GRAPHICS-074` plus
+the final working-sandbox acceptance task (`RUNTIME-095`); the real input→pick
+binding is owned by a later editor/UI task.
 
 Previously-active
 [`RUNTIME-088`](../done/RUNTIME-088-mesh-primitive-view-lifecycle.md) — mesh

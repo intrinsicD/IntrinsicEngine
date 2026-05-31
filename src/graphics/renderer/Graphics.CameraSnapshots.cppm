@@ -45,6 +45,14 @@ namespace Extrinsic::Graphics
         std::uint32_t X{0u};
         std::uint32_t Y{0u};
         bool Pending{false};
+        // RUNTIME-089 — runtime selection correlation token. The runtime
+        // SelectionController assigns each drained pick a unique monotonic
+        // Sequence; it is threaded here -> RenderWorld::PickRequest -> the GPU
+        // picking slot -> PickReadbackResult so the readback resolves the exact
+        // in-flight request even when several picks are in flight and the
+        // renderer publishes completed slots out of issue order. 0 means the
+        // pick is uncorrelated (no runtime controller wired).
+        std::uint64_t Sequence{0u};
     };
 
     export struct CameraViewSnapshot
