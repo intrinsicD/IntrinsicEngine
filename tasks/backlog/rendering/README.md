@@ -703,7 +703,7 @@ Cross-layer Theme A leaves newly opened for the full working sandbox path:
 - [`RUNTIME-085` — `GeometrySources` mesh residency bridge](../../done/RUNTIME-085-geometrysources-mesh-residency.md) (retired 2026-05-28 at `CPUContracted`; Slices A–C landed the mesh packer, extraction wiring, and dirty-domain reupload/retire ordering).
 - [`runtime/RUNTIME-086` — `GeometrySources` graph residency bridge](../../done/RUNTIME-086-geometrysources-graph-residency.md) (retired 2026-05-30 at `CPUContracted`; Slice A graph packer plus Slices B + C extraction residency wiring landed).
 - [`runtime/RUNTIME-087` — `GeometrySources` point-cloud residency bridge](../../done/RUNTIME-087-geometrysources-pointcloud-residency.md) (retired 2026-05-30 at `CPUContracted`).
-- [`runtime/RUNTIME-088` — Mesh primitive view lifecycle](../runtime/RUNTIME-088-mesh-primitive-view-lifecycle.md).
+- [`runtime/RUNTIME-088` — Mesh primitive view lifecycle](../../active/RUNTIME-088-mesh-primitive-view-lifecycle.md) (active).
 - [`runtime/RUNTIME-089` — Runtime selection controller and snapshot handoff](../runtime/RUNTIME-089-selection-controller.md).
 - [`runtime/RUNTIME-092` — Runtime stable entity lookup sidecar](../runtime/RUNTIME-092-stable-entity-lookup.md).
 - [`runtime/RUNTIME-093` — Primitive selection refinement](../runtime/RUNTIME-093-primitive-selection-refinement.md).

@@ -87,7 +87,7 @@ Runtime/UI implementation leaves for the full sandbox app path:
 - [`RUNTIME-085` (done)](../done/RUNTIME-085-geometrysources-mesh-residency.md) — runtime-authored mesh `GeometrySources` to retained `GpuWorld` surface geometry (retired 2026-05-28 at `CPUContracted`).
 - [`runtime/RUNTIME-086` (done)](../done/RUNTIME-086-geometrysources-graph-residency.md) — graph nodes/edges to retained point/line geometry (retired 2026-05-30 at `CPUContracted`).
 - [`runtime/RUNTIME-087` (done)](../done/RUNTIME-087-geometrysources-pointcloud-residency.md) — point-cloud vertices to retained point geometry (retired 2026-05-30 at `CPUContracted`).
-- [`runtime/RUNTIME-088`](runtime/RUNTIME-088-mesh-primitive-view-lifecycle.md) — mesh edge/vertex render views for primitive visualization and selection.
+- [`runtime/RUNTIME-088`](../active/RUNTIME-088-mesh-primitive-view-lifecycle.md) (active) — mesh edge/vertex render views for primitive visualization and selection.
 - [`runtime/RUNTIME-089`](runtime/RUNTIME-089-selection-controller.md) — runtime selection controller, pick-request policy, and `RenderWorld.Selection` handoff.
 - [`runtime/RUNTIME-092`](runtime/RUNTIME-092-stable-entity-lookup.md) — runtime stable entity lookup sidecar identified by `HARDEN-068`.
 - [`runtime/RUNTIME-093`](runtime/RUNTIME-093-primitive-selection-refinement.md) — mesh/graph/point-cloud primitive refinement from graphics ID hints and authoritative CPU geometry.
