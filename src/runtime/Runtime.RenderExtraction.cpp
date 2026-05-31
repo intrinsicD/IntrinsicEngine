@@ -82,12 +82,36 @@ namespace Extrinsic::Runtime
             .HasGraphResidency = it->second.GraphGeometry.IsValid(),
             .PointCloudGeometry = it->second.PointCloudGeometry,
             .HasPointCloudResidency = it->second.PointCloudGeometry.IsValid(),
+            .MeshEdgeViewInstance = it->second.MeshEdgeViewInstance,
+            .MeshEdgeViewGeometry = it->second.MeshEdgeViewGeometry,
+            .HasMeshEdgeView = it->second.MeshEdgeViewGeometry.IsValid(),
+            .MeshVertexViewInstance = it->second.MeshVertexViewInstance,
+            .MeshVertexViewGeometry = it->second.MeshVertexViewGeometry,
+            .HasMeshVertexView = it->second.MeshVertexViewGeometry.IsValid(),
         };
     }
 
     const ProceduralGeometryCache& RenderExtractionCache::GetProceduralGeometryCacheForTest() const noexcept
     {
         return m_ProceduralGeometry;
+    }
+
+    void RenderExtractionCache::SetMeshPrimitiveViewSettings(std::uint32_t stableEntityId,
+                                                             MeshPrimitiveViewSettings settings)
+    {
+        m_MeshPrimitiveViewSettings.insert_or_assign(stableEntityId, settings);
+    }
+
+    void RenderExtractionCache::ClearMeshPrimitiveViewSettings(std::uint32_t stableEntityId) noexcept
+    {
+        m_MeshPrimitiveViewSettings.erase(stableEntityId);
+    }
+
+    MeshPrimitiveViewSettings RenderExtractionCache::GetMeshPrimitiveViewSettings(
+        std::uint32_t stableEntityId) const noexcept
+    {
+        const auto it = m_MeshPrimitiveViewSettings.find(stableEntityId);
+        return it != m_MeshPrimitiveViewSettings.end() ? it->second : MeshPrimitiveViewSettings{};
     }
 
     void RenderExtractionCache::RegisterSpatialDebugAdapter(std::uint64_t key,
@@ -815,6 +839,237 @@ namespace Extrinsic::Runtime
         m_PointCloudRetire.push_back(GeometryRetireRecord{handle, 0, false});
     }
 
+    void RenderExtractionCache::EnqueueMeshPrimitiveViewRetire(Graphics::GpuGeometryHandle handle)
+    {
+        if (!handle.IsValid())
+        {
+            return;
+        }
+        m_MeshPrimitiveViewRetire.push_back(GeometryRetireRecord{handle, 0, false});
+    }
+
+    void RenderExtractionCache::ReleaseMeshPrimitiveView(MeshPrimitiveViewKind kind,
+                                                         RenderableSidecar& sidecar,
+                                                         Graphics::IRenderer& renderer,
+                                                         RuntimeRenderExtractionStats& stats)
+    {
+        const bool isEdge = kind == MeshPrimitiveViewKind::Edge;
+        Graphics::GpuInstanceHandle& instance =
+            isEdge ? sidecar.MeshEdgeViewInstance : sidecar.MeshVertexViewInstance;
+        Graphics::GpuGeometryHandle& geometry =
+            isEdge ? sidecar.MeshEdgeViewGeometry : sidecar.MeshVertexViewGeometry;
+
+        if (geometry.IsValid())
+        {
+            // Route the runtime-owned view upload through the same
+            // `framesInFlight` deferred-retire window the surface mesh uses.
+            EnqueueMeshPrimitiveViewRetire(geometry);
+            geometry = {};
+            if (isEdge)
+            {
+                ++stats.MeshEdgeViewReleases;
+            }
+            else
+            {
+                ++stats.MeshVertexViewReleases;
+            }
+        }
+        if (instance.IsValid())
+        {
+            // The view instance owns nothing the retire window guards, so free
+            // it immediately (GpuWorld defers the slot reuse internally). Count
+            // it so `FreedInstanceCount` balances the `AllocatedInstanceCount`
+            // bump the reconcile path makes when the view instance is created.
+            renderer.GetGpuWorld().FreeInstance(instance);
+            instance = {};
+            ++stats.FreedInstanceCount;
+        }
+    }
+
+    void RenderExtractionCache::ReconcileMeshPrimitiveView(
+        MeshPrimitiveViewKind kind,
+        const ECS::Components::GeometrySources::ConstSourceView& view,
+        RenderableSidecar& sidecar,
+        const glm::mat4& model,
+        std::uint32_t materialSlot,
+        const RHI::GpuBounds& bounds,
+        std::uint32_t stableId,
+        bool desired,
+        bool meshDirty,
+        Graphics::IRenderer& renderer,
+        RuntimeRenderExtractionStats& stats)
+    {
+        const bool isEdge = kind == MeshPrimitiveViewKind::Edge;
+        Graphics::GpuInstanceHandle& instance =
+            isEdge ? sidecar.MeshEdgeViewInstance : sidecar.MeshVertexViewInstance;
+        Graphics::GpuGeometryHandle& geometry =
+            isEdge ? sidecar.MeshEdgeViewGeometry : sidecar.MeshVertexViewGeometry;
+
+        // Disabled (or parent no longer resident): release any existing view.
+        if (!desired)
+        {
+            ReleaseMeshPrimitiveView(kind, sidecar, renderer, stats);
+            return;
+        }
+
+        const bool hadView = geometry.IsValid();
+
+        // Append the per-frame transform/render record so the view lane renders
+        // with the parent surface's transform/bounds/material but its own
+        // line/point render flag. Called for every resident-and-bound frame
+        // (upload, reupload, and reuse), mirroring the surface mesh which is
+        // re-submitted to `m_Transforms` every frame.
+        const auto submitTransform = [&]() {
+            const std::uint32_t laneFlag = isEdge
+                ? (RHI::GpuRender_Line | RHI::GpuRender_Unlit)
+                : (RHI::GpuRender_Point | RHI::GpuRender_Unlit);
+            m_Transforms.push_back(Graphics::TransformSyncRecord{
+                .StableId = stableId,
+                .Instance = instance,
+                .Model = model,
+                .RenderFlags = RHI::GpuRender_Visible | RHI::GpuRender_Opaque | laneFlag,
+                .Bounds = bounds,
+                .MaterialSlot = materialSlot,
+                .HasMaterialSlot = true,
+            });
+        };
+
+        // Reuse path: resident view, parent clean. Direct re-submit, no repack.
+        if (hadView && !meshDirty)
+        {
+            if (isEdge)
+            {
+                ++stats.MeshEdgeViewReuseHits;
+            }
+            else
+            {
+                ++stats.MeshVertexViewReuseHits;
+            }
+            submitTransform();
+            return;
+        }
+
+        // Pack (first upload, or parent-dirty reupload). The shared scratch
+        // buffer is reused serially; the returned descriptor views into it, so
+        // upload happens before the next view packs.
+        const MeshPrimitiveViewResult packResult = isEdge
+            ? PackMeshEdgeView(view, m_MeshPrimitiveViewPack)
+            : PackMeshVertexView(view, m_MeshPrimitiveViewPack);
+        if (packResult.Status != MeshPrimitiveViewStatus::Success)
+        {
+            switch (packResult.Status)
+            {
+            case MeshPrimitiveViewStatus::MissingPositions:
+            case MeshPrimitiveViewStatus::EmptyMesh:
+                if (isEdge)
+                {
+                    ++stats.MeshEdgeViewMissingPositions;
+                }
+                else
+                {
+                    ++stats.MeshVertexViewMissingPositions;
+                }
+                break;
+            case MeshPrimitiveViewStatus::MissingEdgeTopology:
+                // Edge-only status (the vertex view never requests edges).
+                ++stats.MeshEdgeViewMissingEdgeTopology;
+                break;
+            case MeshPrimitiveViewStatus::InvalidEdge:
+                ++stats.MeshEdgeViewInvalidEdges;
+                break;
+            default:
+                // `WrongDomain`, `NonFinitePosition`.
+                if (isEdge)
+                {
+                    ++stats.MeshEdgeViewFailedPack;
+                }
+                else
+                {
+                    ++stats.MeshVertexViewFailedPack;
+                }
+                break;
+            }
+            // Fail-closed: drop any stale view so invalid source data does not
+            // keep rendering. The parent surface owns its own fail-closed path;
+            // a missing/invalid edge view simply disappears until the source
+            // recovers on a later dirty frame.
+            ReleaseMeshPrimitiveView(kind, sidecar, renderer, stats);
+            return;
+        }
+
+        const Graphics::GpuGeometryHandle handle =
+            renderer.GetGpuWorld().UploadGeometry(*packResult.Upload);
+        if (!handle.IsValid())
+        {
+            if (isEdge)
+            {
+                ++stats.MeshEdgeViewFailedPack;
+            }
+            else
+            {
+                ++stats.MeshVertexViewFailedPack;
+            }
+            ReleaseMeshPrimitiveView(kind, sidecar, renderer, stats);
+            return;
+        }
+
+        // Ensure the view has its own instance. Allocated lazily on first
+        // upload and kept until the view is released. If the instance pool is
+        // exhausted, free the just-uploaded geometry to avoid a leak and bail.
+        if (!instance.IsValid())
+        {
+            instance = renderer.GetGpuWorld().AllocateInstance(stableId);
+            if (!instance.IsValid())
+            {
+                renderer.GetGpuWorld().FreeGeometry(handle);
+                if (isEdge)
+                {
+                    ++stats.MeshEdgeViewFailedPack;
+                }
+                else
+                {
+                    ++stats.MeshVertexViewFailedPack;
+                }
+                ReleaseMeshPrimitiveView(kind, sidecar, renderer, stats);
+                return;
+            }
+            ++stats.AllocatedInstanceCount;
+        }
+
+        if (hadView)
+        {
+            // Parent-dirty reupload: queue the prior view handle for deferred
+            // retire, then swap. The `SetInstanceGeometry` below rebinds the
+            // existing view instance to the fresh upload.
+            EnqueueMeshPrimitiveViewRetire(geometry);
+            if (isEdge)
+            {
+                ++stats.MeshEdgeViewReuploads;
+                ++stats.MeshEdgeViewReleases;
+            }
+            else
+            {
+                ++stats.MeshVertexViewReuploads;
+                ++stats.MeshVertexViewReleases;
+            }
+        }
+        else
+        {
+            if (isEdge)
+            {
+                ++stats.MeshEdgeViewUploads;
+            }
+            else
+            {
+                ++stats.MeshVertexViewUploads;
+            }
+        }
+
+        geometry = handle;
+        renderer.GetGpuWorld().SetInstanceGeometry(instance, handle);
+        submitTransform();
+    }
+
     void RenderExtractionCache::RetireMissingRenderables(const std::unordered_set<std::uint32_t>& liveKeys,
                                                          Graphics::IRenderer& renderer,
                                                          RuntimeRenderExtractionStats& stats)
@@ -855,6 +1110,13 @@ namespace Extrinsic::Runtime
                 EnqueuePointCloudRetire(it->second.PointCloudGeometry);
                 ++stats.PointCloudGeometryReleases;
             }
+            // RUNTIME-088 Slice B — retire the edge/vertex view sidecars: enqueue
+            // their geometry for the deferred-retire window and free their own
+            // instances. Also drop the entity's view settings so the cache-owned
+            // control surface does not accumulate stale entries.
+            ReleaseMeshPrimitiveView(MeshPrimitiveViewKind::Edge, it->second, renderer, stats);
+            ReleaseMeshPrimitiveView(MeshPrimitiveViewKind::Vertex, it->second, renderer, stats);
+            m_MeshPrimitiveViewSettings.erase(it->first);
             renderer.GetGpuWorld().FreeInstance(it->second.Instance);
             it = m_Renderables.erase(it);
             ++stats.FreedInstanceCount;
@@ -970,19 +1232,70 @@ namespace Extrinsic::Runtime
             bool graphDomainThisFrame = false;
             bool pointCloudBoundThisFrame = false;
             bool pointCloudDomainThisFrame = false;
+            // RUNTIME-088 Slice B — captured before `BindMeshGeometry` drains
+            // the mesh dirty tags so the edge/vertex views can repack on the
+            // same dirty frame; `meshViewsResident` records whether the views
+            // were reconciled in the mesh branch (otherwise the post-flip block
+            // releases any lingering views).
+            bool meshDirtyThisFrame = false;
+            bool meshViewsResident = false;
             if (sourceEligible)
             {
                 namespace GS = ECS::Components::GeometrySources;
                 const auto view = GS::BuildConstView(registry, entity);
                 if (view.ActiveDomain == GS::Domain::Mesh)
                 {
+                    namespace D = ECS::Components::DirtyTags;
                     meshDomainThisFrame = true;
+                    // Snapshot the mesh dirty state before BindMeshGeometry
+                    // drains the tags; the views key their reupload off the
+                    // same coalesced signal the surface mesh repacks on.
+                    meshDirtyThisFrame = registry.any_of<D::GpuDirty,
+                                                         D::DirtyVertexPositions,
+                                                         D::DirtyFaceTopology,
+                                                         D::DirtyEdgeTopology>(entity);
                     meshBoundThisFrame = BindMeshGeometry(registry,
                                                           entity,
                                                           view,
                                                           *sidecar,
                                                           renderer,
                                                           stats);
+
+                    // RUNTIME-088 Slice B — reconcile optional edge/vertex views
+                    // while the parent surface is resident. A transient surface
+                    // pack failure keeps the prior surface upload bound
+                    // (fail-closed), so the views follow `MeshGeometry`
+                    // validity, not `meshBoundThisFrame`.
+                    if (sidecar->MeshGeometry.IsValid())
+                    {
+                        meshViewsResident = true;
+                        const MeshPrimitiveViewSettings viewSettings =
+                            GetMeshPrimitiveViewSettings(stableId);
+                        const RHI::GpuBounds viewBounds =
+                            ExtractBounds(registry, entity, world.Matrix);
+                        ReconcileMeshPrimitiveView(MeshPrimitiveViewKind::Edge,
+                                                   view,
+                                                   *sidecar,
+                                                   world.Matrix,
+                                                   sidecar->Material.EffectiveSlot,
+                                                   viewBounds,
+                                                   stableId,
+                                                   viewSettings.EnableEdgeView,
+                                                   meshDirtyThisFrame,
+                                                   renderer,
+                                                   stats);
+                        ReconcileMeshPrimitiveView(MeshPrimitiveViewKind::Vertex,
+                                                   view,
+                                                   *sidecar,
+                                                   world.Matrix,
+                                                   sidecar->Material.EffectiveSlot,
+                                                   viewBounds,
+                                                   stableId,
+                                                   viewSettings.EnableVertexView,
+                                                   meshDirtyThisFrame,
+                                                   renderer,
+                                                   stats);
+                    }
                 }
                 else if (view.ActiveDomain == GS::Domain::Graph)
                 {
@@ -1085,6 +1398,18 @@ namespace Extrinsic::Runtime
                 }
                 sidecar->PointCloudGeometry = {};
                 ++stats.PointCloudGeometryReleases;
+            }
+
+            // RUNTIME-088 Slice B — when the entity is not a resident mesh this
+            // frame (never mesh-domain, flipped to procedural/asset/another
+            // domain, or its surface residency was released above), drop any
+            // edge/vertex views it may have carried. The in-branch reconcile
+            // above already handles per-view disable while the parent stays a
+            // resident mesh; this covers the parent-level flips.
+            if (!meshViewsResident)
+            {
+                ReleaseMeshPrimitiveView(MeshPrimitiveViewKind::Edge, *sidecar, renderer, stats);
+                ReleaseMeshPrimitiveView(MeshPrimitiveViewKind::Vertex, *sidecar, renderer, stats);
             }
 
             if (!proceduralBound && assetSource != nullptr)
@@ -1218,6 +1543,13 @@ namespace Extrinsic::Runtime
         stats.PointCloudGeometryFreeRetires =
             m_PointCloudFreeRetires - m_PrevPointCloudFreeRetires;
         m_PrevPointCloudFreeRetires = m_PointCloudFreeRetires;
+
+        // RUNTIME-088 Slice B — mesh-primitive-view deferred-retire FreeRetires
+        // delta, mirroring the per-domain accounting above. Edge and vertex
+        // view frees share this one counter (one retire queue, one tick).
+        stats.MeshPrimitiveViewFreeRetires =
+            m_MeshPrimitiveViewFreeRetires - m_PrevMeshPrimitiveViewFreeRetires;
+        m_PrevMeshPrimitiveViewFreeRetires = m_MeshPrimitiveViewFreeRetires;
 
         renderer.SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{
             .Transforms                     = m_Transforms,
@@ -1354,6 +1686,43 @@ namespace Extrinsic::Runtime
         }
     }
 
+    void RenderExtractionCache::TickMeshPrimitiveViewGeometry(std::uint64_t currentFrame,
+                                                              std::uint32_t framesInFlight,
+                                                              Graphics::IRenderer& renderer)
+    {
+        // Mirror `TickMeshGeometry`: anchor deadlines on newly-enqueued records
+        // the first time the tick observes them, then free entries whose
+        // deadline has been reached. Edge and vertex view handles share this
+        // queue and the shared `m_MeshPrimitiveViewFreeRetires` accumulator.
+        const std::uint64_t deadline = currentFrame + std::uint64_t{framesInFlight};
+        for (auto& rec : m_MeshPrimitiveViewRetire)
+        {
+            if (!rec.DeadlineSet)
+            {
+                rec.Deadline = deadline;
+                rec.DeadlineSet = true;
+            }
+        }
+
+        auto it = m_MeshPrimitiveViewRetire.begin();
+        while (it != m_MeshPrimitiveViewRetire.end())
+        {
+            if (it->DeadlineSet && it->Deadline <= currentFrame)
+            {
+                if (it->Handle.IsValid())
+                {
+                    renderer.GetGpuWorld().FreeGeometry(it->Handle);
+                    ++m_MeshPrimitiveViewFreeRetires;
+                }
+                it = m_MeshPrimitiveViewRetire.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
+    }
+
     void RenderExtractionCache::Shutdown(Graphics::IRenderer& renderer)
     {
         RuntimeRenderExtractionStats stats{};
@@ -1377,6 +1746,33 @@ namespace Extrinsic::Runtime
             {
                 renderer.GetGpuWorld().FreeGeometry(sidecar.PointCloudGeometry);
                 ++stats.PointCloudGeometryReleases;
+            }
+            // RUNTIME-088 Slice B — hard teardown of the edge/vertex view
+            // sidecars: free geometry directly (the deferred window is collapsed
+            // at shutdown) and free their own instances.
+            if (sidecar.MeshEdgeViewGeometry.IsValid())
+            {
+                renderer.GetGpuWorld().FreeGeometry(sidecar.MeshEdgeViewGeometry);
+                sidecar.MeshEdgeViewGeometry = {};
+                ++stats.MeshEdgeViewReleases;
+            }
+            if (sidecar.MeshEdgeViewInstance.IsValid())
+            {
+                renderer.GetGpuWorld().FreeInstance(sidecar.MeshEdgeViewInstance);
+                sidecar.MeshEdgeViewInstance = {};
+                ++stats.FreedInstanceCount;
+            }
+            if (sidecar.MeshVertexViewGeometry.IsValid())
+            {
+                renderer.GetGpuWorld().FreeGeometry(sidecar.MeshVertexViewGeometry);
+                sidecar.MeshVertexViewGeometry = {};
+                ++stats.MeshVertexViewReleases;
+            }
+            if (sidecar.MeshVertexViewInstance.IsValid())
+            {
+                renderer.GetGpuWorld().FreeInstance(sidecar.MeshVertexViewInstance);
+                sidecar.MeshVertexViewInstance = {};
+                ++stats.FreedInstanceCount;
             }
             renderer.GetGpuWorld().FreeInstance(sidecar.Instance);
             ++stats.FreedInstanceCount;
@@ -1417,6 +1813,18 @@ namespace Extrinsic::Runtime
             }
         }
         m_PointCloudRetire.clear();
+
+        // RUNTIME-088 Slice B — drain the mesh-primitive-view deferred-retire
+        // queue inline and drop the cache-owned view settings.
+        for (auto& rec : m_MeshPrimitiveViewRetire)
+        {
+            if (rec.Handle.IsValid())
+            {
+                renderer.GetGpuWorld().FreeGeometry(rec.Handle);
+            }
+        }
+        m_MeshPrimitiveViewRetire.clear();
+        m_MeshPrimitiveViewSettings.clear();
         m_Transforms.clear();
         m_Visualizations.clear();
         m_Lights.clear();

@@ -43,6 +43,7 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.RHI.Types;
 import Extrinsic.Runtime.GraphGeometryPacker;
 import Extrinsic.Runtime.MeshGeometryPacker;
+import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.PointCloudGeometryPacker;
 import Extrinsic.Runtime.ProceduralGeometry;
 import Extrinsic.Runtime.ProceduralGeometryPacker;
@@ -197,6 +198,46 @@ export namespace Extrinsic::Runtime
         std::uint32_t PointCloudGeometryReleases{0};
         std::uint32_t PointCloudGeometryFreeRetires{0};
 
+        // RUNTIME-088 Slice B — runtime-owned mesh *primitive view* residency
+        // counters. A mesh entity that opts into edge and/or vertex views (via
+        // the cache-owned `MeshPrimitiveViewSettings`, set by runtime/editor
+        // state — the flags never live in ECS components) derives one extra
+        // retained renderable per enabled view from the *same* authoritative
+        // mesh `GeometrySources`: the edge view binds a line-list
+        // (`GpuRender_Line`) and the vertex view a point list
+        // (`GpuRender_Point`), each through its own `GpuWorld` instance +
+        // `GpuGeometryHandle` recorded in the parent mesh's sidecar. Each view
+        // is a single-owner residency stream mirroring the surface-mesh
+        // accounting: `Uploads` once on the frame a view is first created,
+        // `ReuseHits` on clean frames, `Reuploads` when the parent mesh is
+        // dirty (every mesh dirty domain is coalesced — views repack whenever
+        // the surface repacks), `Releases` per release-initiated event (view
+        // disabled, parent flips away from a resident mesh, dirty reupload
+        // superseding an older handle, entity destruction, or shutdown). The
+        // edge view folds `MissingPositions`/`EmptyMesh` into
+        // `MissingPositions`, reports `MissingEdgeTopology` and out-of-range
+        // endpoints in their own counters, and folds every other rejection into
+        // `FailedPack`; the vertex view has no edge topology, so only
+        // `MissingPositions` and `FailedPack` apply. Both views share one
+        // `framesInFlight` deferred-retire queue driven by
+        // `TickMeshPrimitiveViewGeometry`, which surfaces the per-tick free
+        // delta as the shared `MeshPrimitiveViewFreeRetires`.
+        std::uint32_t MeshEdgeViewUploads{0};
+        std::uint32_t MeshEdgeViewReuseHits{0};
+        std::uint32_t MeshEdgeViewReuploads{0};
+        std::uint32_t MeshEdgeViewReleases{0};
+        std::uint32_t MeshEdgeViewFailedPack{0};
+        std::uint32_t MeshEdgeViewMissingPositions{0};
+        std::uint32_t MeshEdgeViewMissingEdgeTopology{0};
+        std::uint32_t MeshEdgeViewInvalidEdges{0};
+        std::uint32_t MeshVertexViewUploads{0};
+        std::uint32_t MeshVertexViewReuseHits{0};
+        std::uint32_t MeshVertexViewReuploads{0};
+        std::uint32_t MeshVertexViewReleases{0};
+        std::uint32_t MeshVertexViewFailedPack{0};
+        std::uint32_t MeshVertexViewMissingPositions{0};
+        std::uint32_t MeshPrimitiveViewFreeRetires{0};
+
         // RUNTIME-082 Slice D — spatial-debug adapter pump counters. Folded
         // per-frame from the active adapter set against the entity view of
         // `ECS::Components::SpatialDebugBinding`. The accumulator fields
@@ -284,6 +325,31 @@ export namespace Extrinsic::Runtime
                                     std::uint32_t framesInFlight,
                                     Graphics::IRenderer& renderer);
 
+        // RUNTIME-088 Slice B — drives the deferred-retire window of the
+        // runtime-owned mesh-primitive-view residency retire queue, mirroring
+        // `TickMeshGeometry`. Edge and vertex view geometry handles enqueued by
+        // view disable, parent eligibility flip, dirty reupload, entity
+        // destruction, or shutdown are freed via `GpuWorld::FreeGeometry` once
+        // `framesInFlight` ticks have elapsed. Subsequent `ExtractAndSubmit`
+        // calls surface the per-tick delta as `MeshPrimitiveViewFreeRetires`.
+        void TickMeshPrimitiveViewGeometry(std::uint64_t currentFrame,
+                                           std::uint32_t framesInFlight,
+                                           Graphics::IRenderer& renderer);
+
+        // RUNTIME-088 Slice B — runtime/editor control surface for optional
+        // mesh edge/vertex primitive views. The settings live here (cache-owned
+        // runtime state), never in ECS components and never carrying graphics
+        // handles; `ExtractAndSubmit` consults them when a mesh entity is
+        // resident. `Set` upserts, `Clear` removes (disabling both views on the
+        // next extraction), and `Get` returns the stored settings or a
+        // both-disabled default when none are recorded. Keyed by the same
+        // stable entity id the renderable sidecars use.
+        void SetMeshPrimitiveViewSettings(std::uint32_t stableEntityId,
+                                          MeshPrimitiveViewSettings settings);
+        void ClearMeshPrimitiveViewSettings(std::uint32_t stableEntityId) noexcept;
+        [[nodiscard]] MeshPrimitiveViewSettings GetMeshPrimitiveViewSettings(
+            std::uint32_t stableEntityId) const noexcept;
+
         [[nodiscard]] const RuntimeRenderExtractionStats& GetLastStats() const noexcept;
         [[nodiscard]] std::uint32_t GetTrackedRenderableCount() const noexcept;
 
@@ -316,6 +382,17 @@ export namespace Extrinsic::Runtime
             // bridges never alias.
             Graphics::GpuGeometryHandle PointCloudGeometry{};
             bool HasPointCloudResidency = false;
+            // RUNTIME-088 Slice B — optional mesh primitive view sidecars.
+            // Each enabled view owns a *separate* `GpuWorld` instance + geometry
+            // handle (distinct from the parent surface instance/geometry above)
+            // so faces, edges, and vertices render as independent lanes over the
+            // one authoritative mesh data source.
+            Graphics::GpuInstanceHandle MeshEdgeViewInstance{};
+            Graphics::GpuGeometryHandle MeshEdgeViewGeometry{};
+            bool HasMeshEdgeView = false;
+            Graphics::GpuInstanceHandle MeshVertexViewInstance{};
+            Graphics::GpuGeometryHandle MeshVertexViewGeometry{};
+            bool HasMeshVertexView = false;
         };
 
         [[nodiscard]] std::optional<RenderableSidecarView> FindRenderableSidecarForTest(
@@ -379,6 +456,27 @@ export namespace Extrinsic::Runtime
             // uploads. Point clouds carry no lane mask (positions only), so no
             // packed-lane tracking is needed.
             Graphics::GpuGeometryHandle PointCloudGeometry{};
+            // RUNTIME-088 Slice B — optional mesh edge/vertex primitive view
+            // sidecars attached to this mesh renderable. Each enabled view owns
+            // its own `GpuWorld` instance (rendered as an extra line/point lane
+            // with the same transform/bounds as the parent surface) plus a
+            // single-owner geometry handle the cache frees on retirement.
+            // Mutually independent of the surface `MeshGeometry`; both views are
+            // released whenever the parent stops being a resident mesh.
+            Graphics::GpuInstanceHandle MeshEdgeViewInstance{};
+            Graphics::GpuGeometryHandle MeshEdgeViewGeometry{};
+            Graphics::GpuInstanceHandle MeshVertexViewInstance{};
+            Graphics::GpuGeometryHandle MeshVertexViewGeometry{};
+        };
+
+        // RUNTIME-088 Slice B — selects which primitive view a reconcile/release
+        // call operates on. The lifecycle is identical for both; the kind only
+        // changes the pack function, the render-lane flag, the sidecar
+        // instance/geometry fields, and which counters move.
+        enum class MeshPrimitiveViewKind : std::uint8_t
+        {
+            Edge,
+            Vertex,
         };
 
         [[nodiscard]] RenderableSidecar* EnsureRenderable(std::uint32_t stableId,
@@ -410,6 +508,36 @@ export namespace Extrinsic::Runtime
                                                   Graphics::IRenderer& renderer,
                                                   RuntimeRenderExtractionStats& stats);
 
+        // RUNTIME-088 Slice B — reconcile one mesh primitive view against its
+        // desired state for the frame. `desired` already folds the parent's
+        // residency and the per-entity `MeshPrimitiveViewSettings` flag; when
+        // true the view is created/reused/repacked (driven by `meshDirty`) and
+        // a `TransformSyncRecord` is appended so it renders as an extra
+        // line/point lane, and when false any existing view is released. `view`
+        // must resolve `Domain::Mesh` (the caller only invokes this for a
+        // resident mesh). `model`/`bounds`/`materialSlot` mirror the parent
+        // surface so the view tracks the same transform.
+        void ReconcileMeshPrimitiveView(MeshPrimitiveViewKind kind,
+                                        const ECS::Components::GeometrySources::ConstSourceView& view,
+                                        RenderableSidecar& sidecar,
+                                        const glm::mat4& model,
+                                        std::uint32_t materialSlot,
+                                        const RHI::GpuBounds& bounds,
+                                        std::uint32_t stableId,
+                                        bool desired,
+                                        bool meshDirty,
+                                        Graphics::IRenderer& renderer,
+                                        RuntimeRenderExtractionStats& stats);
+
+        // RUNTIME-088 Slice B — release one mesh primitive view sidecar: enqueue
+        // its geometry handle for deferred retire, free its instance, reset the
+        // sidecar fields, and (when a handle was live) bump the view's
+        // `Releases`. No-op when the view is not resident.
+        void ReleaseMeshPrimitiveView(MeshPrimitiveViewKind kind,
+                                      RenderableSidecar& sidecar,
+                                      Graphics::IRenderer& renderer,
+                                      RuntimeRenderExtractionStats& stats);
+
         // RUNTIME-085 Slice C — runtime-owned deferred-retire queue for mesh
         // upload handles. Mirrors the shape of
         // `ProceduralGeometryCache::RetireRecord` but without a refcounted key
@@ -436,6 +564,11 @@ export namespace Extrinsic::Runtime
         // RUNTIME-087 — point-cloud-residency retire enqueue, mirroring
         // `EnqueueGraphRetire`.
         void EnqueuePointCloudRetire(Graphics::GpuGeometryHandle handle);
+        // RUNTIME-088 Slice B — mesh-primitive-view retire enqueue. Edge and
+        // vertex view geometry share one queue (both are mesh-domain residency
+        // freed on the same `framesInFlight` window), mirroring the per-domain
+        // enqueues above.
+        void EnqueueMeshPrimitiveViewRetire(Graphics::GpuGeometryHandle handle);
 
         std::unordered_map<std::uint32_t, RenderableSidecar> m_Renderables{};
         std::vector<Graphics::TransformSyncRecord> m_Transforms{};
@@ -467,6 +600,18 @@ export namespace Extrinsic::Runtime
         std::vector<GeometryRetireRecord> m_PointCloudRetire{};
         std::uint32_t m_PointCloudFreeRetires{0};
         std::uint32_t m_PrevPointCloudFreeRetires{0};
+
+        // RUNTIME-088 Slice B — mesh-primitive-view scratch buffer (reused
+        // serially across the edge then vertex pack each frame), shared
+        // deferred-retire queue for both view lanes, and the FreeRetires
+        // accumulator/prev-snapshot the per-tick delta is derived from.
+        // `m_MeshPrimitiveViewSettings` is the cache-owned runtime/editor
+        // control surface keyed by stable entity id.
+        MeshPrimitiveViewBuffer m_MeshPrimitiveViewPack{};
+        std::vector<GeometryRetireRecord> m_MeshPrimitiveViewRetire{};
+        std::uint32_t m_MeshPrimitiveViewFreeRetires{0};
+        std::uint32_t m_PrevMeshPrimitiveViewFreeRetires{0};
+        std::unordered_map<std::uint32_t, MeshPrimitiveViewSettings> m_MeshPrimitiveViewSettings{};
 
         // RUNTIME-082 Slice D — owned adapter instances + a registry mirror
         // resolved per-entity by `ExtractAndSubmit`. The batch buffer is

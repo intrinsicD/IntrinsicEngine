@@ -820,6 +820,9 @@ namespace Extrinsic::Runtime
                 Extraction.TickGraphGeometry(currentFrame, framesInFlight, Renderer);
                 // RUNTIME-087 — and for the point-cloud-residency queue.
                 Extraction.TickPointCloudGeometry(currentFrame, framesInFlight, Renderer);
+                // RUNTIME-088 Slice B — and for the mesh edge/vertex primitive
+                // view residency queue (one queue for both view lanes).
+                Extraction.TickMeshPrimitiveViewGeometry(currentFrame, framesInFlight, Renderer);
             }
         };
 
