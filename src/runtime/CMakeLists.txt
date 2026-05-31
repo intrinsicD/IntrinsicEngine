@@ -20,6 +20,7 @@ target_sources(${target_name}
         Runtime.ReferenceScene.cppm
         Runtime.RenderExtraction.cppm
         Runtime.SelectionController.cppm
+        Runtime.StableEntityLookup.cppm
         Runtime.StreamingExecutor.cppm
         SpatialDebug/Runtime.SpatialDebugAdapters.cppm
         PRIVATE
@@ -34,6 +35,7 @@ target_sources(${target_name}
         Runtime.ReferenceScene.cpp
         Runtime.RenderExtraction.cpp
         Runtime.SelectionController.cpp
+        Runtime.StableEntityLookup.cpp
         Runtime.StreamingExecutor.cpp
         SpatialDebug/Runtime.SpatialDebugAdapters.cpp
 )

@@ -87,9 +87,9 @@ Runtime/UI implementation leaves for the full sandbox app path:
 - [`RUNTIME-085` (done)](../done/RUNTIME-085-geometrysources-mesh-residency.md) — runtime-authored mesh `GeometrySources` to retained `GpuWorld` surface geometry (retired 2026-05-28 at `CPUContracted`).
 - [`runtime/RUNTIME-086` (done)](../done/RUNTIME-086-geometrysources-graph-residency.md) — graph nodes/edges to retained point/line geometry (retired 2026-05-30 at `CPUContracted`).
 - [`runtime/RUNTIME-087` (done)](../done/RUNTIME-087-geometrysources-pointcloud-residency.md) — point-cloud vertices to retained point geometry (retired 2026-05-30 at `CPUContracted`).
-- [`runtime/RUNTIME-088`](../active/RUNTIME-088-mesh-primitive-view-lifecycle.md) (active) — mesh edge/vertex render views for primitive visualization and selection.
+- [`runtime/RUNTIME-088` (done)](../done/RUNTIME-088-mesh-primitive-view-lifecycle.md) — mesh edge/vertex render views for primitive visualization and selection (retired 2026-05-31 at `CPUContracted`).
 - [`runtime/RUNTIME-089` (done)](../done/RUNTIME-089-selection-controller.md) — runtime selection controller, pick-request policy, and `RenderWorld.Selection` handoff (retired 2026-05-31 at `CPUContracted`; Slice A standalone `SelectionController` module, Slice B `Engine::RunFrame` + `ExtractAndSubmit` wiring).
-- [`runtime/RUNTIME-092`](runtime/RUNTIME-092-stable-entity-lookup.md) — runtime stable entity lookup sidecar identified by `HARDEN-068`.
+- [`runtime/RUNTIME-092`](../active/RUNTIME-092-stable-entity-lookup.md) (active) — runtime stable entity lookup sidecar identified by `HARDEN-068`. Slice A landed the standalone `Extrinsic.Runtime.StableEntityLookup` sidecar at `Scaffolded`; Slice B (frame/extraction wiring + `SelectionController` seam swap) closes `CPUContracted`.
 - [`runtime/RUNTIME-093`](runtime/RUNTIME-093-primitive-selection-refinement.md) — mesh/graph/point-cloud primitive refinement from graphics ID hints and authoritative CPU geometry.
 - [`ui/UI-001`](ui/UI-001-sandbox-editor-shell-panels.md) — sandbox editor shell and core panels on top of the ImGui adapter/pass.
 - [`runtime/RUNTIME-095`](runtime/RUNTIME-095-working-sandbox-acceptance.md) — final CPU/null + opt-in Vulkan acceptance for mesh, graph, point cloud, cameras, selection, outline, and UI.

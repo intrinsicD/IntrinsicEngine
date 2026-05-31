@@ -291,6 +291,7 @@ if(TARGET ExtrinsicRuntime)
         Test.SelectionReadbackCorrelation.cpp
         Test.SelectionSnapshotExtraction.cpp
         Test.SpatialDebugAdapters.cpp
+        Test.StableEntityLookup.cpp
     )
     intrinsic_resolve_test_sources(_runtime_contract_test_sources
         SEARCH_DIRS contract/runtime
