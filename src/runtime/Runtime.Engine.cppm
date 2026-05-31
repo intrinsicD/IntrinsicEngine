@@ -19,6 +19,7 @@ import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.ReferenceScene;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Asset.EventBus;
@@ -241,6 +242,11 @@ namespace Extrinsic::Runtime
         // RUNTIME-089 Slice B — selection authority; persists across frames so
         // in-flight picks correlate with their later readbacks.
         SelectionController                   m_SelectionController{};
+        // RUNTIME-092 Slice B — runtime-owned StableId/render-id lookup sidecar.
+        // Rebuilt each frame before readback consumption and attached to the
+        // controller in Initialize() so selection resolves durable ids through
+        // the single runtime authority (ECS/graphics hold no lookup state).
+        StableEntityLookup                    m_StableEntityLookup{};
 
         // CPU task graph — ECS system scheduling
         std::unique_ptr<Core::FrameGraph>      m_FrameGraph;

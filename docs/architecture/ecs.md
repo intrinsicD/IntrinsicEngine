@@ -54,6 +54,11 @@ selection path is that consumer: `RUNTIME-092` Slice A realised the
 Decision-3 sidecar as `Extrinsic.Runtime.StableEntityLookup`
 (`src/runtime/Runtime.StableEntityLookup.cppm`), a runtime-owned
 `StableId -> entt::entity` winner-map with deterministic
-smallest-render-id duplicate policy and lazy stale invalidation. ECS
-still owns only the value type; the lookup map lives entirely in
-`runtime/`. See `src/runtime/README.md` for the duplicate/stale policy.
+smallest-render-id duplicate policy and lazy stale invalidation.
+`RUNTIME-092` Slice B then wired that sidecar into the runtime frame
+path: `Engine` owns the lookup, rebuilds it each frame before the
+selection pick-readback drain, and routes `SelectionController`
+render-id resolution through it, so durable selection survives
+`entt::entity` recycling. ECS still owns only the value type; the lookup
+map lives entirely in `runtime/`. See `src/runtime/README.md` for the
+duplicate/stale policy and frame-wiring notes.

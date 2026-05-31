@@ -40,6 +40,35 @@ namespace Extrinsic::Runtime
         }
     }
 
+    // RUNTIME-092 Slice B: render-id -> live entity resolution seam.
+    SelectionController::EntityHandle SelectionController::ResolveStableEntityId(
+        Registry& registry, std::uint32_t stableEntityId)
+    {
+        if (m_StableLookup != nullptr)
+        {
+            // The runtime-owned authority decodes the handle and validates it
+            // against the registry, rejecting a recycled/destroyed slot and
+            // recording the rejection in the lookup diagnostics.
+            const std::optional<EntityHandle> resolved =
+                m_StableLookup->ResolveByRenderId(registry, stableEntityId);
+            return resolved.value_or(Extrinsic::ECS::InvalidEntityHandle);
+        }
+
+        const EntityHandle entity = ToEntityHandle(stableEntityId);
+        return IsValidEntity(registry.Raw(), entity) ? entity
+                                                      : Extrinsic::ECS::InvalidEntityHandle;
+    }
+
+    void SelectionController::SetStableEntityLookup(StableEntityLookup* lookup) noexcept
+    {
+        m_StableLookup = lookup;
+    }
+
+    const StableEntityLookup* SelectionController::GetStableEntityLookup() const noexcept
+    {
+        return m_StableLookup;
+    }
+
     SelectionController::SelectionController(const SelectionControllerConfig& config) noexcept
         : m_Config(config)
     {
@@ -270,7 +299,7 @@ namespace Extrinsic::Runtime
 
         const PendingSelectionPick pick = TakeInFlightPick(pickSequence);
 
-        const EntityHandle entity = ToEntityHandle(stableEntityId);
+        const EntityHandle entity = ResolveStableEntityId(registry, stableEntityId);
         if (!IsValidEntity(registry.Raw(), entity))
         {
             ++m_Diagnostics.StaleEntityHits;
@@ -347,7 +376,7 @@ namespace Extrinsic::Runtime
 
     bool SelectionController::SetSelectedByStableEntityId(Registry& registry, std::uint32_t stableEntityId)
     {
-        return SetSelectedEntity(registry, ToEntityHandle(stableEntityId));
+        return SetSelectedEntity(registry, ResolveStableEntityId(registry, stableEntityId));
     }
 
     // --- snapshot / introspection accessors --------------------------------

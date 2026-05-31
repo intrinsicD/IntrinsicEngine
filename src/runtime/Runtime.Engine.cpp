@@ -324,6 +324,13 @@ namespace Extrinsic::Runtime
         // ── 6. ECS scene ──────────────────────────────────────────────────
         m_Scene = std::make_unique<ECS::Scene::Registry>();
 
+        // RUNTIME-092 Slice B — attach the runtime-owned stable-entity lookup
+        // to the selection authority so render-id resolution flows through the
+        // single runtime sidecar (which decodes + validates against the
+        // registry) rather than a bare cast. The lookup is rebuilt each frame
+        // in RunFrame before the pick-readback drain.
+        m_SelectionController.SetStableEntityLookup(&m_StableEntityLookup);
+
         // ── 6b. Reference scene bootstrap (GRAPHICS-029A/B) ───────────────
         // Opt-in: only fires when EngineConfig::ReferenceScene::Enabled is
         // true. The default-off path leaves m_ReferenceScenePopulation
@@ -868,6 +875,17 @@ namespace Extrinsic::Runtime
                               m_RenderExtraction,
                               *m_Renderer);
         Core::ExecuteMaintenanceContract(transferHooks, streamingHooks, assetHooks, 8);
+
+        // ── RUNTIME-092 Slice B: refresh the stable-entity lookup ──────────
+        // Rebuild the runtime-owned StableId winner-map from the live registry
+        // before consuming pick readbacks, so durable-id resolution and the
+        // editor/serialization-facing ResolveByStableId/ResolveSelected APIs
+        // observe this frame's entity set. Render-id resolution (the path the
+        // controller takes for a pick hit) decodes + validates against the live
+        // registry directly and does not depend on the map, so a recycled slot
+        // is rejected regardless; the rebuild keeps the durable map coherent for
+        // the other consumers and is the single per-frame maintenance point.
+        m_StableEntityLookup.Rebuild(*m_Scene);
 
         // ── RUNTIME-089 Slice B: consume the completed pick readbacks ──────
         // DrainCompletedPickingSlots can publish several completed picking

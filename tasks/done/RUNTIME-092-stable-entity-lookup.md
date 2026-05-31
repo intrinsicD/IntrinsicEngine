@@ -1,14 +1,18 @@
 # RUNTIME-092 — Runtime stable entity lookup sidecar
 
 ## Status
-- State: in-progress.
+- State: done.
 - Owner/agent: claude.
-- Branch: `claude/intrinsicengine-agent-onboarding-k69pL`.
-- Maturity reached: `Scaffolded` (Slice A standalone sidecar + contract tests).
-- Next verification step: Slice B wires `StableEntityLookup::Rebuild` into the
-  runtime frame/extraction lifecycle before selection consumption and swaps the
-  `SelectionController` `entt`-cast seam onto the sidecar, then re-runs the
-  default CPU gate to close `CPUContracted`.
+- Branch: `claude/intrinsicengine-agent-onboarding-8y1qR`.
+- Maturity reached: `CPUContracted` (Slice A standalone sidecar + Slice B frame
+  wiring and `SelectionController` composition).
+- Completion date: 2026-05-31.
+- PR/commit: Slice A — commits `4885933` + `55a4a65` (PR #957). Slice B —
+  commit: _pending push to `claude/intrinsicengine-agent-onboarding-8y1qR`_.
+  PR: _TBD_.
+- Next verification step: none. `Operational` user-visible selection durability
+  stays owned by `RUNTIME-089`, UI tasks, and final sandbox acceptance
+  (`RUNTIME-095`).
 
 ## Slice plan
 - **Slice A (this slice, done).** Standalone `Extrinsic.Runtime.StableEntityLookup`
@@ -20,14 +24,22 @@
   promoted ECS registry/handle + the `StableId` value type; adds no lookup state
   to ECS or graphics. Closes `Scaffolded`. Defers all frame/extraction wiring to
   Slice B.
-- **Slice B.** Wire the lookup update into the runtime frame/extraction
-  lifecycle before selection consumption (rebuild/maintain in `Engine::RunFrame`
-  or `RenderExtractionCache`), and swap the `SelectionController`
-  `ToStableEntityId`/`ToEntityHandle` seam onto `StableEntityLookup` so durable
-  selection resolves through the sidecar. Decide and document whether
-  reference-scene entities receive generated stable ids (current default:
-  transient, none). Adds integration coverage that selection survives entity
-  recycling. Closes `Scaffolded → CPUContracted`.
+- **Slice B (this slice, done).** Wired the lookup update into the runtime frame
+  lifecycle before selection consumption: `Engine` owns a `StableEntityLookup`,
+  attaches it to the `SelectionController` in `Initialize()`
+  (`SetStableEntityLookup`), and calls `Rebuild(scene)` in `RunFrame` immediately
+  before the pick-readback drain. Swapped the `SelectionController` render-id
+  resolution seam (`ConsumeHit`, `SetSelectedByStableEntityId`) onto the sidecar's
+  `ResolveByRenderId` (decode + live-registry validation) via an opt-in,
+  non-owning `StableEntityLookup*`; with no lookup attached the controller falls
+  back to the bare `ToEntityHandle` decode so standalone callers are unaffected.
+  Documented the sandbox default: reference-scene entities remain transient and
+  receive no generated `StableId` (the render-id path needs none). Added five
+  `contract;runtime` composition cases in
+  `Test.SelectionStableLookupComposition.cpp` (hit-resolves-through-lookup,
+  recycled-slot-rejected-not-misapplied, programmatic-select-routes-through-lookup,
+  no-lookup-fallback, rebuilt-durable-map-tracks-recycled-owner). Closes
+  `Scaffolded → CPUContracted`.
 
 ## Goal
 - Add a runtime-owned scene-local lookup sidecar that maps optional ECS `StableId` values and current `entt::entity` handles so selection, serialization-adjacent tooling, and sandbox UI can resolve durable IDs without widening ECS dependencies or putting lookup state in graphics.
@@ -48,11 +60,12 @@
 - [x] Add a runtime `StableEntityLookup` module that can rebuild or incrementally maintain maps from `ECS::Components::StableId` to live `entt::entity` and from render/extraction stable IDs to live entities. _(Slice A: `StableId` winner-map + reversible render-id decode.)_
 - [x] Define duplicate `StableId` policy: reject, pick first deterministically with diagnostics, or keep all and require disambiguation; implement the selected policy. _(Slice A: keep one deterministic winner — smallest `ToRenderId` wins — with `DuplicateStableIds` diagnostics.)_
 - [x] Provide APIs for selection/runtime consumers: resolve by `StableId`, resolve by extracted stable render ID, enumerate selected live entities from stored stable IDs, and invalidate stale entries. _(Slice A: `ResolveByStableId`/`ResolveByRenderId`/`ResolveSelected`/`PruneStale` + lazy heal.)_
-- [ ] Wire the lookup update into the runtime frame or extraction lifecycle before selection consumption. _(Slice B.)_
+- [x] Wire the lookup update into the runtime frame or extraction lifecycle before selection consumption. _(Slice B: `Engine` rebuilds the lookup each frame in `RunFrame` before the pick-readback drain; `SelectionController` render-id resolution routes through the attached sidecar.)_
 - [x] Add diagnostics for duplicate stable IDs, missing IDs, stale entity handles, and rebuild/update counts. _(Slice A: `StableEntityLookupDiagnostics`.)_
-- [ ] Decide whether reference-scene entities receive generated stable IDs in runtime or remain transient; document the sandbox default. _(Slice B; current documented default: transient, none.)_
+- [x] Decide whether reference-scene entities receive generated stable IDs in runtime or remain transient; document the sandbox default. _(Slice B decision: remain transient, no generated `StableId`. The sandbox selection render-id path decodes + validates the live handle and needs no `StableId`, so the default path stays allocation-free; durable `StableId` assignment lands with the first serializer/editor consumer. Documented in `src/runtime/README.md`.)_
 
 ## Tests
+- [x] Add `contract;runtime` integration coverage that selection survives entity recycling. _(Slice B: `Test.SelectionStableLookupComposition.cpp` — recycled-slot render id rejected as stale not misapplied; rebuilt durable map tracks the recycled-id owner.)_
 - [x] Add `contract;runtime` coverage for resolving an entity with a valid `StableId`.
 - [x] Add duplicate-ID coverage matching the selected policy and diagnostics.
 - [x] Add stale entity destruction coverage proving lookups invalidate deterministically.
@@ -67,7 +80,7 @@
 ## Acceptance criteria
 - [x] Runtime provides a deterministic lookup seam for selection/UI consumers without adding lookup state to ECS or graphics. _(Slice A module; frame wiring in Slice B.)_
 - [x] Duplicate and stale stable-ID states are diagnosed and tested.
-- [ ] The sidecar composes with `RUNTIME-089` selection and later serialization/editor work. _(Slice B proves selection composition via integration coverage.)_
+- [x] The sidecar composes with `RUNTIME-089` selection and later serialization/editor work. _(Slice B: `Engine` attaches the lookup to the `SelectionController` and rebuilds it each frame; render-id resolution routes through `ResolveByRenderId`; proven by `Test.SelectionStableLookupComposition.cpp`.)_
 
 ## Verification
 ```bash
@@ -87,13 +100,12 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
 - Widening `ecs -> assets` or adding asset-service coupling.
 
 ## Maturity
-- Target: `CPUContracted` runtime lookup sidecar.
-- Slice A (this slice) closes `Scaffolded`: the standalone sidecar + APIs +
-  `contract;runtime` coverage exist, but nothing in the runtime frame path yet
-  consumes the sidecar, so the seam is reachable without proving the engine uses
-  it.
-- Slice B closes `Scaffolded → CPUContracted` by wiring the rebuild into the
-  frame/extraction lifecycle and routing `SelectionController` resolution through
-  the sidecar.
-- `Operational` user-visible selection durability is owned by `RUNTIME-089`, UI tasks, and final sandbox acceptance.
+- Target: `CPUContracted` runtime lookup sidecar. **Reached.**
+- Slice A closed `Scaffolded`: the standalone sidecar + APIs + `contract;runtime`
+  coverage exist, but nothing in the runtime frame path yet consumed the sidecar.
+- Slice B closed `Scaffolded → CPUContracted` by wiring the rebuild into the
+  frame lifecycle (`Engine::RunFrame`) and routing `SelectionController` render-id
+  resolution through the sidecar, with composition coverage proving selection
+  survives entity recycling.
+- `Operational` user-visible selection durability is owned by `RUNTIME-089`, UI tasks, and final sandbox acceptance (`RUNTIME-095`).
 
