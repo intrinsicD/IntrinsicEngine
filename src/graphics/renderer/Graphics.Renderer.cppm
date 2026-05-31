@@ -241,6 +241,19 @@ namespace Extrinsic::Graphics
         std::span<const glm::vec3>                 SpatialDebugConvexHullVertices{};
         std::span<const SpatialDebugWireEdge>      SpatialDebugConvexHullEdges{};
         std::span<const glm::vec3>                 SpatialDebugPointMarkers{};
+
+        // RUNTIME-089 Slice B — runtime/editor selection snapshot identity,
+        // aggregated by `RenderExtractionCache::ExtractAndSubmit` from the
+        // runtime-owned `SelectionController`. `SubmitRuntimeSnapshots` copies
+        // these into stable renderer storage and `ExtractRenderWorld` surfaces
+        // them as `RenderWorld::Selection` so `SelectionOutlinePass` can outline
+        // selected/hovered renderables without graphics reading live ECS. The
+        // identity-only fields (selected ids, hovered id, has-hovered) are
+        // filled here; the outline styling on `SelectionSnapshot` keeps its
+        // recipe defaults. Default-empty when no controller is wired.
+        std::span<const std::uint32_t> SelectionSelectedStableIds{};
+        std::uint32_t                  SelectionHoveredStableId{0u};
+        bool                           SelectionHasHovered{false};
     };
 
     export class IRenderer

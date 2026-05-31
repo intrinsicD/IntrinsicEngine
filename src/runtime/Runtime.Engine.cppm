@@ -18,6 +18,7 @@ import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.ReferenceScene;
+import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Asset.EventBus;
@@ -202,6 +203,12 @@ namespace Extrinsic::Runtime
         [[nodiscard]] Assets::AssetService&   GetAssetService()  noexcept;
         [[nodiscard]] Graphics::GpuAssetCache& GetGpuAssetCache() noexcept;
         [[nodiscard]] ECS::Scene::Registry&   GetScene()         noexcept;
+        // RUNTIME-089 Slice B — runtime/editor-owned selection authority.
+        // Input ports / editor tools submit hover/click picks here; RunFrame
+        // drains the coalesced pick into the renderer's SelectionSystem before
+        // extraction, consumes the readback after present, and mirrors the
+        // controller snapshot into RenderWorld::Selection.
+        [[nodiscard]] SelectionController&    GetSelectionController() noexcept;
         [[nodiscard]] Core::FrameGraph&       GetFrameGraph()    noexcept;
         [[deprecated("Use Runtime.StreamingExecutor integration; TaskGraph bridge is temporary.")]]
         [[nodiscard]] Core::Dag::TaskGraph&   GetStreamingGraph() noexcept;
@@ -231,6 +238,9 @@ namespace Extrinsic::Runtime
         std::unique_ptr<RHI::IDevice>        m_Device;
         std::unique_ptr<Graphics::IRenderer> m_Renderer;
         RenderExtractionCache                 m_RenderExtraction;
+        // RUNTIME-089 Slice B — selection authority; persists across frames so
+        // in-flight picks correlate with their later readbacks.
+        SelectionController                   m_SelectionController{};
 
         // CPU task graph — ECS system scheduling
         std::unique_ptr<Core::FrameGraph>      m_FrameGraph;

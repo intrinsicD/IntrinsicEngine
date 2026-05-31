@@ -830,6 +830,13 @@ namespace Extrinsic::Graphics
             m_VisualizationIsolines.assign(snapshots.VisualizationIsolines.begin(), snapshots.VisualizationIsolines.end());
             m_VisualizationHtexAtlases.assign(snapshots.VisualizationHtexAtlases.begin(), snapshots.VisualizationHtexAtlases.end());
             m_VisualizationFragmentBakeAtlases.assign(snapshots.VisualizationFragmentBakeAtlases.begin(), snapshots.VisualizationFragmentBakeAtlases.end());
+            // RUNTIME-089 Slice B — copy the runtime selection snapshot identity
+            // into stable storage; ExtractRenderWorld surfaces it as
+            // RenderWorld::Selection.
+            m_SelectionSelectedStableIds.assign(snapshots.SelectionSelectedStableIds.begin(),
+                                                snapshots.SelectionSelectedStableIds.end());
+            m_SelectionHoveredStableId = snapshots.SelectionHoveredStableId;
+            m_SelectionHasHovered      = snapshots.SelectionHasHovered;
             const VisualizationPacketBatch visualizationBatch{
                 .AttributeBuffers = m_VisualizationAttributeBuffers,
                 .Scalars = m_VisualizationScalars,
@@ -1070,6 +1077,14 @@ namespace Extrinsic::Graphics
                     .RayOrigin = camera.PickRayOrigin,
                     .RayDirection = camera.PickRayDirection,
                     .HasRay = camera.HasPickRay,
+                },
+                .Selection = SelectionSnapshot{
+                    // RUNTIME-089 Slice B — identity from the runtime selection
+                    // controller; outline styling keeps SelectionSnapshot's
+                    // recipe defaults.
+                    .SelectedStableIds = m_SelectionSelectedStableIds,
+                    .HoveredStableId   = m_SelectionHoveredStableId,
+                    .HasHovered        = m_SelectionHasHovered,
                 },
                 .DebugPrimitives = DebugPrimitiveSnapshot{
                     .Lines = m_DebugLinePackets,
@@ -6920,6 +6935,12 @@ namespace Extrinsic::Graphics
         std::vector<DebugTrianglePacket>     m_DebugTrianglePackets;
         std::vector<TransformGizmoRenderPacket> m_TransformGizmoPackets;
         std::vector<RenderableSnapshot>      m_RenderableSnapshots;
+        // RUNTIME-089 Slice B — stable storage for the runtime selection
+        // snapshot copied out of the submitted batch so the spans surfaced on
+        // RenderWorld::Selection outlive ExtractRenderWorld.
+        std::vector<std::uint32_t>           m_SelectionSelectedStableIds;
+        std::uint32_t                        m_SelectionHoveredStableId{0u};
+        bool                                 m_SelectionHasHovered{false};
         std::uint32_t                        m_InvalidSnapshotRecordCount{0};
         bool                                 m_EnableRenderPrepTaskGraph{true};
         bool                                 m_CullingOutputAvailable{false};

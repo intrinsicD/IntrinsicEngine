@@ -288,6 +288,7 @@ if(TARGET ExtrinsicRuntime)
         Test.RuntimeReferenceScene.cpp
         Test.RuntimeVulkanBreadcrumb.cpp
         Test.SelectionController.cpp
+        Test.SelectionSnapshotExtraction.cpp
         Test.SpatialDebugAdapters.cpp
     )
     intrinsic_resolve_test_sources(_runtime_contract_test_sources
