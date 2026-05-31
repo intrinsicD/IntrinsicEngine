@@ -94,8 +94,13 @@ compose with the rendering tasks listed in `tasks/backlog/rendering/README.md`.
   `Scaffolded`; Slice B wired `Engine::RunFrame` (pick drain + readback consume)
   and `RenderExtractionCache::ExtractAndSubmit` (`RenderWorld.Selection` mirror)
   to close `CPUContracted`.
-- [RUNTIME-092 — Runtime stable entity lookup sidecar](RUNTIME-092-stable-entity-lookup.md):
-  runtime-owned `StableId`/live-entity lookup for selection and editor tooling.
+- [RUNTIME-092 — Runtime stable entity lookup sidecar](../../active/RUNTIME-092-stable-entity-lookup.md)
+  _(active; Slice A landed at `Scaffolded`)_: runtime-owned `StableId`/live-entity
+  lookup for selection and editor tooling. Slice A landed the standalone
+  `Extrinsic.Runtime.StableEntityLookup` module (`HARDEN-068` Decision-3 deferred
+  sidecar) with deterministic smallest-render-id duplicate policy and lazy stale
+  invalidation; Slice B wires it into the frame/extraction lifecycle and the
+  `SelectionController` seam to close `CPUContracted`.
 - [RUNTIME-093 — Primitive selection refinement](RUNTIME-093-primitive-selection-refinement.md):
   mesh face/edge/vertex, graph edge/node, and point-cloud point refinement from
   graphics primitive hints plus authoritative `GeometrySources`.

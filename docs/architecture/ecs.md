@@ -48,6 +48,12 @@ shared `ecs -> {core, geometry}` import constraint. CPU-only
 construction, sentinel equality, `operator<=>`, hashability across the
 module boundary, swapped-halves hash distinguishability, and the
 trivially-copyable / standard-layout / 16-byte size invariants.
-Generator helpers and the optional `Runtime::StableIdRegistry` lookup
-sidecar land in **HARDEN-068-Impl-B**, only when a concrete
-serializer/selection consumer demands them.
+Generator helpers and the optional runtime lookup sidecar land
+when a concrete serializer/selection consumer demands them. The
+selection path is that consumer: `RUNTIME-092` Slice A realised the
+Decision-3 sidecar as `Extrinsic.Runtime.StableEntityLookup`
+(`src/runtime/Runtime.StableEntityLookup.cppm`), a runtime-owned
+`StableId -> entt::entity` winner-map with deterministic
+smallest-render-id duplicate policy and lazy stale invalidation. ECS
+still owns only the value type; the lookup map lives entirely in
+`runtime/`. See `src/runtime/README.md` for the duplicate/stale policy.

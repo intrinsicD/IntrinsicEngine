@@ -11,7 +11,23 @@ Each active task should include:
 
 ## Currently active
 
-_None._
+[`RUNTIME-092`](RUNTIME-092-stable-entity-lookup.md) — runtime stable entity
+lookup sidecar (Theme A working-sandbox path). Status `in-progress` on
+`claude/intrinsicengine-agent-onboarding-k69pL`, maturity `Scaffolded`. Slice A
+landed the standalone `Extrinsic.Runtime.StableEntityLookup` module: a
+runtime-owned `StableId -> entt::entity` winner-map (`Rebuild`/`Track`/`Forget`)
+realising the `HARDEN-068` Decision-3 deferred lookup, reversible render-id
+(`static_cast<uint32>(entt::entity)`) resolution validated against the registry,
+`ResolveByStableId`/`ResolveByRenderId`/`ResolveSelected`/`PruneStale`, a
+deterministic smallest-render-id duplicate policy, lazy + bulk stale
+invalidation, and the `StableEntityLookupDiagnostics` block. Imports only the
+promoted ECS registry/handle + the `StableId` value type — no lookup state in
+ECS or graphics. Thirteen `contract;runtime` cases in
+`Test.StableEntityLookup.cpp` pass (focused `-R StableEntityLookup` 13/13);
+layering/test-layout checks clean; module inventory regenerated. Next
+verification step (Slice B): wire `Rebuild` into the runtime frame/extraction
+lifecycle before selection consumption and swap the `SelectionController`
+`entt`-cast seam onto the sidecar to close `CPUContracted`.
 
 Previously-active
 [`RUNTIME-089`](../done/RUNTIME-089-selection-controller.md) — runtime selection
