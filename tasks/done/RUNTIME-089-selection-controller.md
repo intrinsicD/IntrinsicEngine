@@ -29,6 +29,30 @@
   final working-sandbox acceptance task (`RUNTIME-095`); the real input→pick
   binding (mouse button/modifier policy) is owned by a later editor/UI task.
 
+### Post-retirement hardening (2026-05-31, `VBuRD`)
+- Per-pick readback correlation fix. The Slice B bridge originally consumed a
+  single `SelectionSystem::GetLastPickResult()` via the oldest-first
+  `ConsumeHit`/`ConsumeNoHit` overloads. With more than one frame in flight,
+  `DrainCompletedPickingSlots()` can publish several completed slots into the
+  single last-result holder in one `BeginFrame` (dropping all but the newest),
+  and oldest-first correlation mis-applies a hover/click or Add/Toggle result to
+  the wrong in-flight request (and is unsound when a slot recycles before its
+  result is drained). Fixed by: (1) `SelectionSystem` now holds completed
+  readbacks in a **FIFO queue** drained by `PopPickResult()` (no result dropped;
+  `GetLastPickResult()` kept as a non-destructive peek); (2) the controller
+  correlation `Sequence` is threaded end-to-end — `PickPixelRequest` →
+  `RenderWorld::PickRequest` → the renderer per-slot `m_PickingSlotSequence`
+  bookkeeping → `PickReadbackResult`; (3) `Engine::RunFrame` drains the whole
+  FIFO each frame and resolves each result by its `Sequence`
+  (`ConsumeHit`/`ConsumeNoHit(reg, seq)`), falling back to oldest-first only for
+  uncorrelated (`Sequence == 0`) results. New coverage:
+  `GraphicsSelectionSystemContracts.QueuesCompletedReadbacksFifoWithSequence`,
+  `RendererFrameLifecycle.PickingReadbackPreservesCorrelationSequence`, and
+  `contract;runtime` `Test.SelectionReadbackCorrelation.cpp` (out-of-order and
+  missing-oldest scenarios). Full contract gate 482/482 (259 graphics + 223
+  runtime); layering/test-layout/doc-links/task-policy/module-inventory (no diff)
+  clean.
+
 ## Goal
 - Implement runtime/editor-owned selection control that converts platform/editor input into graphics pick requests, consumes graphics pick results, mutates runtime/editor selected/hovered state, and submits `RenderWorld.Selection` snapshots for outline rendering.
 

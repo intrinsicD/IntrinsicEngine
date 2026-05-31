@@ -68,6 +68,69 @@ TEST(GraphicsSelectionSystemContracts, TracksPendingPickReadbackAndDiagnostics)
     EXPECT_FALSE(selection.IsInitialized());
 }
 
+// RUNTIME-089 — several picking slots can complete in one BeginFrame() drain,
+// so completed readbacks are held in a FIFO queue (not a single last-result
+// holder that drops all but the newest). PopPickResult drains them oldest-first
+// with their correlation Sequence intact; GetLastPickResult stays a
+// non-destructive peek at the most recent result.
+TEST(GraphicsSelectionSystemContracts, QueuesCompletedReadbacksFifoWithSequence)
+{
+    Graphics::SelectionSystem selection;
+    selection.Initialize();
+
+    selection.PublishPickResult(Graphics::PickReadbackResult{
+        .EncodedId = Graphics::EncodeSelectionId(Graphics::SelectionPrimitiveDomain::Entity, 1u),
+        .StableEntityId = 11u,
+        .Hit = true,
+        .Sequence = 101u,
+    });
+    selection.PublishPickResult(Graphics::PickReadbackResult{
+        .StableEntityId = 0u,
+        .Hit = false,
+        .Sequence = 202u,
+    });
+    selection.PublishPickResult(Graphics::PickReadbackResult{
+        .EncodedId = Graphics::EncodeSelectionId(Graphics::SelectionPrimitiveDomain::Entity, 3u),
+        .StableEntityId = 33u,
+        .Hit = true,
+        .Sequence = 303u,
+    });
+
+    // GetLastPickResult peeks the most recent without consuming.
+    const auto peek = selection.GetLastPickResult();
+    ASSERT_TRUE(peek.has_value());
+    EXPECT_EQ(peek->Sequence, 303u);
+    EXPECT_EQ(peek->StableEntityId, 33u);
+
+    // PopPickResult drains in FIFO (publish) order — nothing dropped.
+    const auto first = selection.PopPickResult();
+    ASSERT_TRUE(first.has_value());
+    EXPECT_EQ(first->Sequence, 101u);
+    EXPECT_TRUE(first->Hit);
+    EXPECT_EQ(first->StableEntityId, 11u);
+
+    const auto second = selection.PopPickResult();
+    ASSERT_TRUE(second.has_value());
+    EXPECT_EQ(second->Sequence, 202u);
+    EXPECT_FALSE(second->Hit);
+
+    const auto third = selection.PopPickResult();
+    ASSERT_TRUE(third.has_value());
+    EXPECT_EQ(third->Sequence, 303u);
+    EXPECT_TRUE(third->Hit);
+    EXPECT_EQ(third->StableEntityId, 33u);
+
+    EXPECT_FALSE(selection.PopPickResult().has_value());
+    EXPECT_FALSE(selection.GetLastPickResult().has_value());
+
+    // Diagnostics count every publish (2 hits + 1 no-hit), independent of drain.
+    const auto diagnostics = selection.GetDiagnostics();
+    EXPECT_EQ(diagnostics.PickHitCount, 2u);
+    EXPECT_EQ(diagnostics.PickNoHitCount, 1u);
+
+    selection.Shutdown();
+}
+
 TEST(GraphicsSelectionSystemContracts, PreservesPointPickCompatibilityWrappers)
 {
     Graphics::SelectionSystem selection;

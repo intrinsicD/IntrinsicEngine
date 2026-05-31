@@ -1555,8 +1555,17 @@ Concretely:
   pixel into the graphics-owned host-visible `Picking.Readback` buffer at
   frame-record time and drains it on the next `BeginFrame()` after the
   issuing frame's fences complete, calling `PublishPickResult` for valid
-  samples and `PublishNoHit` for `EntityId == 0` / invalidated requests /
-  deterministic readback failures. Backends never invoke `RequestPick` /
+  samples (and an explicit no-hit `PickReadbackResult` for `EntityId == 0` /
+  invalidated requests / deterministic readback failures). Because several
+  picking slots can complete in one `BeginFrame()`, `PublishPickResult`
+  appends to a **FIFO queue** of completed readbacks (not a single
+  last-result holder) so no result is dropped; consumers drain it in order
+  via `SelectionSystem::PopPickResult()`, while `GetLastPickResult()` remains
+  a non-destructive peek at the most recent result. Each published result
+  carries the issuing pick's correlation `Sequence` (RUNTIME-089), threaded
+  from `RenderWorld::PickRequest` through the per-slot `m_PickingSlotSequence`
+  bookkeeping, so the runtime resolves the exact in-flight request even when
+  slots publish out of issue order. Backends never invoke `RequestPick` /
   `ConsumePick` themselves, and the CPU/null backend simulates the same
   drain without Vulkan-specific code so it stays the correctness gate. Per
   `GRAPHICS-012Q`, runtime owns `StableEntityId` -> live ECS resolution,

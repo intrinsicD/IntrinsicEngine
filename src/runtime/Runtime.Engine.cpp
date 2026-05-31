@@ -694,9 +694,12 @@ namespace Extrinsic::Runtime
         {
             renderInput.HasPendingPick = true;
             renderInput.Pick = Graphics::PickPixelRequest{
-                .X       = pick->PixelX,
-                .Y       = pick->PixelY,
-                .Pending = true,
+                .X        = pick->PixelX,
+                .Y        = pick->PixelY,
+                .Pending  = true,
+                // Carry the controller's correlation token so the readback
+                // resolves this exact request, not whichever pick is oldest.
+                .Sequence = pick->Sequence,
             };
             m_Renderer->GetSelectionSystem().RequestPick(Graphics::PickRequest{
                 .PixelX = pick->PixelX,
@@ -866,26 +869,36 @@ namespace Extrinsic::Runtime
                               *m_Renderer);
         Core::ExecuteMaintenanceContract(transferHooks, streamingHooks, assetHooks, 8);
 
-        // ── RUNTIME-089 Slice B: consume the completed pick readback ───────
-        // The renderer's SelectionSystem holds at most one published result
-        // (DrainCompletedPickingSlots publishes per-slot into its single
-        // last-result holder during the render/transfer phases). Drain it into
-        // the runtime controller — which resolves the stable id, rejects
-        // stale/non-selectable hits, and mutates ECS Selected/Hovered tags per
-        // the documented policy — then clear it so the result is applied
-        // exactly once. The no-sequence overloads correlate to the oldest
-        // in-flight pick, which is the seam available until graphics threads
-        // the pick Sequence through the readback (GRAPHICS-074).
+        // ── RUNTIME-089 Slice B: consume the completed pick readbacks ──────
+        // DrainCompletedPickingSlots can publish several completed picking
+        // slots into the SelectionSystem during the render/transfer phases, so
+        // drain the whole FIFO — not just the newest — and resolve each result
+        // by its correlation Sequence. ConsumeHit/ConsumeNoHit(reg, seq) replay
+        // the exact in-flight request's kind/mode (hover vs click, Replace/Add/
+        // Toggle) even when picks complete out of issue order or a slot is
+        // recycled. A result with no Sequence (uncorrelated; e.g. a pick issued
+        // outside the controller bridge) falls back to the oldest in-flight
+        // pick. The controller resolves the stable id, rejects stale/
+        // non-selectable hits, and mutates ECS Selected/Hovered tags.
         {
             Graphics::SelectionSystem& selectionSystem = m_Renderer->GetSelectionSystem();
-            if (const std::optional<Graphics::PickReadbackResult> result =
-                    selectionSystem.GetLastPickResult())
+            while (const std::optional<Graphics::PickReadbackResult> result =
+                       selectionSystem.PopPickResult())
             {
-                if (result->Hit)
-                    m_SelectionController.ConsumeHit(*m_Scene, result->StableEntityId);
+                if (result->Sequence != 0u)
+                {
+                    if (result->Hit)
+                        m_SelectionController.ConsumeHit(*m_Scene, result->StableEntityId, result->Sequence);
+                    else
+                        m_SelectionController.ConsumeNoHit(*m_Scene, result->Sequence);
+                }
                 else
-                    m_SelectionController.ConsumeNoHit(*m_Scene);
-                selectionSystem.ClearLastPickResult();
+                {
+                    if (result->Hit)
+                        m_SelectionController.ConsumeHit(*m_Scene, result->StableEntityId);
+                    else
+                        m_SelectionController.ConsumeNoHit(*m_Scene);
+                }
             }
         }
 

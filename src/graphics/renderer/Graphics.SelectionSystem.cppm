@@ -54,6 +54,10 @@ export namespace Extrinsic::Graphics
 		EncodedSelectionId EncodedId{};
 		std::uint32_t StableEntityId{0u};
 		bool Hit{false};
+		// RUNTIME-089 — correlation token copied from the issuing pick's
+		// PickPixelRequest::Sequence so the runtime resolves the exact in-flight
+		// request. 0 means "uncorrelated".
+		std::uint64_t Sequence{0u};
 	};
 
 	struct SelectionSystemDiagnostics
@@ -102,6 +106,15 @@ export namespace Extrinsic::Graphics
 
 		void PublishPickResult(PickReadbackResult result) noexcept;
 		void PublishNoHit() noexcept;
+		// Completed readbacks are held in a FIFO queue, not a single slot: the
+		// renderer's BeginFrame drain can publish several completed picking
+		// slots in one call, and the prior single-holder model silently dropped
+		// all but the newest (losing per-pick correlation). PopPickResult drains
+		// the oldest queued result so the runtime can apply every readback;
+		// GetLastPickResult is a non-destructive peek at the most recent result
+		// (used by diagnostics and the legacy point-id wrappers), and
+		// ClearLastPickResult discards all queued results.
+		[[nodiscard]] std::optional<PickReadbackResult> PopPickResult() noexcept;
 		[[nodiscard]] std::optional<PickReadbackResult> GetLastPickResult() const noexcept;
 		void ClearLastPickResult() noexcept;
 		[[nodiscard]] SelectionSystemDiagnostics GetDiagnostics() const noexcept;

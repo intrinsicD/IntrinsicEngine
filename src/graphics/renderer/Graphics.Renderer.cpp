@@ -714,6 +714,7 @@ namespace Extrinsic::Graphics
             m_PickingSlotIssuedFrame.clear();
             m_PickingSlotRequest.clear();
             m_PickingSlotInvalidated.clear();
+            m_PickingSlotSequence.clear();
             // GRAPHICS-075 Slice E.2 — drop the renderer-owned
             // `Histogram.Readback` lease + per-slot metadata before the
             // BufferManager is torn down, mirroring the picking pattern.
@@ -1077,6 +1078,9 @@ namespace Extrinsic::Graphics
                     .RayOrigin = camera.PickRayOrigin,
                     .RayDirection = camera.PickRayDirection,
                     .HasRay = camera.HasPickRay,
+                    // RUNTIME-089 — carry the runtime selection correlation
+                    // token to the picking slot.
+                    .Sequence = pick.Sequence,
                 },
                 .Selection = SelectionSnapshot{
                     // RUNTIME-089 Slice B — identity from the runtime selection
@@ -1866,6 +1870,10 @@ namespace Extrinsic::Graphics
                                         .Pending = true,
                                     };
                                     m_PickingSlotInvalidated[slot] = false;
+                                    // RUNTIME-089 — record the runtime
+                                    // correlation token for this slot so the
+                                    // drain can replay it on the readback.
+                                    m_PickingSlotSequence[slot] = renderWorld.PickRequest.Sequence;
                                 }
                             }
                         }
@@ -4241,13 +4249,20 @@ namespace Extrinsic::Graphics
                 {
                     if (m_PickingSlotPending[slot] && m_SelectionSystem)
                     {
-                        m_SelectionSystem->PublishNoHit();
+                        // RUNTIME-089 — resolve the truncated pending pick as a
+                        // NoHit carrying its correlation Sequence so the runtime
+                        // releases the exact in-flight request, not the oldest.
+                        m_SelectionSystem->PublishPickResult(PickReadbackResult{
+                            .Hit      = false,
+                            .Sequence = m_PickingSlotSequence[slot],
+                        });
                     }
                 }
                 m_PickingSlotPending.resize(newSlotCount);
                 m_PickingSlotIssuedFrame.resize(newSlotCount);
                 m_PickingSlotRequest.resize(newSlotCount);
                 m_PickingSlotInvalidated.resize(newSlotCount);
+                m_PickingSlotSequence.resize(newSlotCount);
             }
             for (std::size_t slot = 0; slot < m_PickingSlotPending.size(); ++slot)
             {
@@ -4262,6 +4277,7 @@ namespace Extrinsic::Graphics
                 m_PickingSlotIssuedFrame.resize(newSlotCount, 0u);
                 m_PickingSlotRequest.resize(newSlotCount, PickPixelRequest{});
                 m_PickingSlotInvalidated.resize(newSlotCount, false);
+                m_PickingSlotSequence.resize(newSlotCount, 0u);
             }
 
             // GRAPHICS-075 Slice E.2 — renderer-owned host-visible
@@ -5271,9 +5287,17 @@ namespace Extrinsic::Graphics
                     m_Device->ReadBuffer(bufferHandle, &encodedBits, sizeof(encodedBits), slotOffset + 4ull);
                 }
                 const EncodedSelectionId encoded{.Value = encodedBits};
+                // RUNTIME-089 — replay the slot's correlation Sequence on the
+                // published readback (hit or no-hit) so the runtime resolves the
+                // exact in-flight request even when several slots complete in
+                // this one drain and publish out of issue order.
+                const std::uint64_t slotSequence = m_PickingSlotSequence[slot];
                 if (m_PickingSlotInvalidated[slot] || entityId == 0u)
                 {
-                    m_SelectionSystem->PublishNoHit();
+                    m_SelectionSystem->PublishPickResult(PickReadbackResult{
+                        .Hit      = false,
+                        .Sequence = slotSequence,
+                    });
                 }
                 else
                 {
@@ -5281,12 +5305,14 @@ namespace Extrinsic::Graphics
                         .EncodedId      = encoded,
                         .StableEntityId = entityId,
                         .Hit            = true,
+                        .Sequence       = slotSequence,
                     });
                 }
                 m_PickingSlotPending[slot] = false;
                 m_PickingSlotInvalidated[slot] = false;
                 m_PickingSlotIssuedFrame[slot] = 0u;
                 m_PickingSlotRequest[slot] = PickPixelRequest{};
+                m_PickingSlotSequence[slot] = 0u;
             }
         }
 
@@ -6898,6 +6924,10 @@ namespace Extrinsic::Graphics
         std::vector<std::uint64_t>                     m_PickingSlotIssuedFrame;
         std::vector<PickPixelRequest>                  m_PickingSlotRequest;
         std::vector<bool>                              m_PickingSlotInvalidated;
+        // RUNTIME-089 — per-slot runtime correlation Sequence, recorded at issue
+        // and replayed on the published PickReadbackResult so the runtime
+        // resolves the exact in-flight pick regardless of slot publish order.
+        std::vector<std::uint64_t>                     m_PickingSlotSequence;
         // GRAPHICS-075 Slice E.2 — renderer-owned host-visible
         // `Histogram.Readback` buffer + per-slot drain metadata. Sized for
         // `kHistogramReadbackSlotBytes * frames-in-flight` bytes (256 uint32

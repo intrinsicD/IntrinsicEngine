@@ -3241,6 +3241,67 @@ TEST(RendererFrameLifecycle, PickingReadbackPublishesPickResultForHitPixel)
     renderer->Shutdown();
 }
 
+// RUNTIME-089 — the runtime correlation `Sequence` on the issuing pick must
+// survive the full round-trip: RenderFrameInput::Pick -> RenderWorld.PickRequest
+// -> the picking slot bookkeeping -> the published PickReadbackResult. Without
+// it the runtime cannot tell which in-flight request a readback belongs to.
+TEST(RendererFrameLifecycle, PickingReadbackPreservesCorrelationSequence)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{298u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const Extrinsic::RHI::BufferHandle pickingBuffer = renderer->GetPickingReadbackBuffer();
+    ASSERT_TRUE(pickingBuffer.IsValid());
+    const std::uint64_t pickingBufferSize = renderer->GetPickingReadbackBufferSize();
+    ASSERT_GE(pickingBufferSize, 8u);
+
+    constexpr std::uint64_t correlationSequence = 0xABCDEF01ull;
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 320, .Height = 240},
+        .HasPendingPick = true,
+        .Pick = Extrinsic::Graphics::PickPixelRequest{
+            .X = 17u, .Y = 23u, .Pending = true, .Sequence = correlationSequence},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    ASSERT_TRUE(world.PickRequest.Pending);
+    EXPECT_EQ(world.PickRequest.Sequence, correlationSequence)
+        << "ExtractRenderWorld must carry the pick Sequence onto RenderWorld.";
+
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+    ASSERT_EQ(renderer->GetLastRenderGraphStats().PickingReadbackCopyCount, 1u);
+    [[maybe_unused]] const std::uint64_t completedFrame = renderer->EndFrame(frame);
+
+    constexpr std::uint32_t hitStableEntityId = 42u;
+    const Extrinsic::Graphics::EncodedSelectionId hitEncoded =
+        Extrinsic::Graphics::EncodeSelectionId(
+            Extrinsic::Graphics::SelectionPrimitiveDomain::Entity, 0u);
+    SeedPickingReadbackSlot(device, pickingBuffer, pickingBufferSize,
+                            /*slot=*/0u, hitStableEntityId, hitEncoded);
+
+    device.NextFrame.FrameIndex = 1u;
+    Extrinsic::RHI::FrameHandle nextFrame{};
+    ASSERT_TRUE(renderer->BeginFrame(nextFrame));
+
+    const Extrinsic::Graphics::SelectionSystem& selection = renderer->GetSelectionSystem();
+    const std::optional<Extrinsic::Graphics::PickReadbackResult> last = selection.GetLastPickResult();
+    ASSERT_TRUE(last.has_value());
+    EXPECT_TRUE(last->Hit);
+    EXPECT_EQ(last->StableEntityId, hitStableEntityId);
+    EXPECT_EQ(last->Sequence, correlationSequence)
+        << "The drained readback must replay the issuing pick's Sequence.";
+
+    renderer->Shutdown();
+}
+
 TEST(RendererFrameLifecycle, PickingReadbackPublishesNoHitForMissPixel)
 {
     Extrinsic::Tests::MockDevice device;
