@@ -170,6 +170,11 @@ Duplicate / stale policy:
   `StaleEntityResolves` + `StaleEntriesPruned`) or in bulk by `PruneStale`.
 - **Missing id:** a resolve for an untracked or sentinel id returns `nullopt`
   and bumps `MissingStableIdLookups`.
+- **Reassignment:** when an entity's `StableId` component is replaced and the
+  sidecar is updated incrementally with `Track` (hot-reload / undo / editor
+  reassignment, rather than a full `Rebuild`), `Track` first drops the entity's
+  prior winner entry so the old durable id stops resolving to it and a later
+  `Forget` does not leak a stale entry.
 
 Sandbox default (deferred to Slice B wiring): reference-scene entities remain
 transient and receive no generated `StableId`; durable ids are emplaced only by

@@ -84,6 +84,25 @@ namespace Extrinsic::Runtime
             return false;
 
         ++m_Diagnostics.IncrementalTracks;
+
+        // If this entity was previously the winner for a *different* durable id
+        // (its StableId component was reassigned via hot-reload / undo / editor
+        // edit), drop that stale winner entry so the old id stops resolving to
+        // this entity. The reverse mirror holds winners only, so a reverse entry
+        // for this render id means this entity currently owns `previousId`. A
+        // full Rebuild would re-derive winners, but the incremental path must
+        // reconcile on its own.
+        const std::uint32_t renderId   = ToRenderId(entity);
+        const auto          reverseIt  = m_RenderIdToStableId.find(renderId);
+        if (reverseIt != m_RenderIdToStableId.end() && reverseIt->second != id)
+        {
+            const StableId previousId = reverseIt->second;
+            const auto     prevIt     = m_StableIdToEntity.find(previousId);
+            if (prevIt != m_StableIdToEntity.end() && prevIt->second == entity)
+                m_StableIdToEntity.erase(prevIt);
+            m_RenderIdToStableId.erase(reverseIt);
+        }
+
         InsertWinner(entity, id);
         m_Diagnostics.TrackedStableIds = static_cast<std::uint32_t>(m_StableIdToEntity.size());
 

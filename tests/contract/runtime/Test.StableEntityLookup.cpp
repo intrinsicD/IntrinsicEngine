@@ -105,6 +105,52 @@ TEST(StableEntityLookup, TrackFoldsSingleEntityAndForgetDropsIt)
     EXPECT_EQ(lookup.GetDiagnostics().IncrementalForgets, 1u);
 }
 
+TEST(StableEntityLookup, TrackAfterStableIdReassignmentDropsOldWinnerEntry)
+{
+    Registry           registry;
+    StableEntityLookup lookup;
+    const StableId     oldId{0x100u, 0u};
+    const StableId     newId{0x200u, 0u};
+    const EntityHandle entity = MakeWithStableId(registry, oldId);
+
+    EXPECT_TRUE(lookup.Track(registry, entity));
+    ASSERT_TRUE(lookup.ResolveByStableId(registry, oldId).has_value());
+
+    // Hot-reload / undo / editor reassigns the durable id, then incrementally
+    // re-tracks (rather than doing a full Rebuild).
+    registry.Raw().emplace_or_replace<StableId>(entity, newId);
+    EXPECT_TRUE(lookup.Track(registry, entity));
+
+    // The old id must no longer resolve to this entity, and only the new id
+    // remains tracked.
+    EXPECT_FALSE(lookup.ResolveByStableId(registry, oldId).has_value());
+    const std::optional<EntityHandle> resolved = lookup.ResolveByStableId(registry, newId);
+    ASSERT_TRUE(resolved.has_value());
+    EXPECT_EQ(*resolved, entity);
+    EXPECT_EQ(lookup.StableIdCount(), 1u);
+    EXPECT_FALSE(lookup.ContainsStableId(oldId));
+}
+
+TEST(StableEntityLookup, ForgetAfterReassignmentLeavesNoStaleEntry)
+{
+    Registry           registry;
+    StableEntityLookup lookup;
+    const StableId     oldId{11u, 0u};
+    const StableId     newId{22u, 0u};
+    const EntityHandle entity = MakeWithStableId(registry, oldId);
+
+    lookup.Track(registry, entity);
+    registry.Raw().emplace_or_replace<StableId>(entity, newId);
+    lookup.Track(registry, entity);
+
+    // Forget must reach the (single, reconciled) winner entry and leave nothing
+    // behind for either id.
+    lookup.Forget(entity);
+    EXPECT_EQ(lookup.StableIdCount(), 0u);
+    EXPECT_FALSE(lookup.ResolveByStableId(registry, oldId).has_value());
+    EXPECT_FALSE(lookup.ResolveByStableId(registry, newId).has_value());
+}
+
 TEST(StableEntityLookup, TrackIgnoresEntityWithoutValidStableId)
 {
     Registry           registry;
