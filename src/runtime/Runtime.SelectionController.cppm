@@ -2,6 +2,7 @@ module;
 
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <optional>
 #include <span>
 #include <vector>
@@ -35,12 +36,24 @@ export namespace Extrinsic::Runtime
     // Coalesced pixel-space pick the controller emits at most once per frame.
     // Slice B maps this onto `Graphics::PickRequest` / `RenderFrameInput::Pick`
     // before `IRenderer::ExtractRenderWorld()`.
+    //
+    // `Sequence` is the correlation token: it is `0` while the pick is the
+    // (not-yet-drained) coalescing slot and is assigned a unique, monotonically
+    // increasing value by `ConsumePendingPick`. Because GPU picking runs several
+    // frames in flight, more than one pick can be outstanding before the first
+    // readback is published; Slice B threads this token from the drained pick
+    // through to the matching readback so `ConsumeHit` / `ConsumeNoHit` replay
+    // the correct request's kind / mode instead of whichever pick was drained
+    // last. (The renderer's `DrainCompletedPickingSlots` publishes per-slot
+    // results into `SelectionSystem`'s single last-result holder and is not
+    // guaranteed to publish in issue order, so positional correlation is unsafe.)
     struct PendingSelectionPick
     {
-        std::uint32_t     PixelX = 0u;
-        std::uint32_t     PixelY = 0u;
-        SelectionPickKind Kind   = SelectionPickKind::Click;
-        SelectionPickMode Mode   = SelectionPickMode::Replace;
+        std::uint64_t     Sequence = 0u;
+        std::uint32_t     PixelX   = 0u;
+        std::uint32_t     PixelY   = 0u;
+        SelectionPickKind Kind     = SelectionPickKind::Click;
+        SelectionPickMode Mode     = SelectionPickMode::Replace;
     };
 
     // Default sandbox selection policy knobs (RUNTIME-089 required policy:
@@ -56,6 +69,13 @@ export namespace Extrinsic::Runtime
         bool ClearSelectionOnBackgroundClick = true;
         // Clear the hovered entity when a hover pick resolves to the background.
         bool ClearHoverOnBackgroundHover = true;
+        // Upper bound on picks tracked as in-flight (drained but not yet
+        // resolved by a readback). When a new drain would exceed this, the
+        // oldest tracked pick is dropped and `InFlightPicksDropped` is bumped,
+        // so a readback that is never published (e.g. a recycled / invalidated
+        // GPU slot) cannot grow the queue without bound. The default comfortably
+        // exceeds any realistic frames-in-flight depth.
+        std::size_t MaxTrackedInFlightPicks = 16u;
     };
 
     // Counters the controller surfaces for diagnostics / editor overlays. Every
@@ -74,6 +94,8 @@ export namespace Extrinsic::Runtime
         std::uint32_t NonSelectableHitsRejected = 0u; // hit entity lacks SelectableTag
         std::uint32_t SelectionChangesEmitted   = 0u;
         std::uint32_t HoverChangesEmitted       = 0u;
+        std::uint32_t InFlightPicksDropped      = 0u; // tracked picks evicted unresolved (capacity)
+        std::uint32_t UntrackedReadbacks        = 0u; // readbacks with no matching in-flight pick
     };
 
     // Runtime / editor-owned selection controller (RUNTIME-089, Slice A).
@@ -111,16 +133,27 @@ export namespace Extrinsic::Runtime
         // --- coalesced pick drain (Slice B feeds the renderer / SelectionSystem) ---
         [[nodiscard]] bool                                HasPendingPick() const noexcept;
         [[nodiscard]] std::optional<PendingSelectionPick> PeekPendingPick() const noexcept;
-        // Removes and returns the pending pick, recording it as in-flight so the
-        // matching readback applies the correct (hover vs click) mutation.
+        // Removes and returns the pending pick, assigning it a unique `Sequence`
+        // and tracking it as in-flight so the matching readback can replay the
+        // correct (hover vs click) mutation. Returns the drained pick (with its
+        // assigned `Sequence`) so the caller can correlate the eventual readback.
         std::optional<PendingSelectionPick> ConsumePendingPick() noexcept;
 
         // --- readback consumption (Slice B feeds SelectionSystem::GetLastPickResult) ---
-        // Apply a hit readback for the in-flight pick. `stableEntityId` is the
-        // runtime stable entity id (see the lookup seam). If there is no
-        // in-flight pick the readback is treated as a click using the configured
-        // ClickMode. Stale (no longer valid) and non-selectable hits are
-        // rejected without mutating state.
+        // Apply a hit / miss readback for a specific in-flight pick identified by
+        // its `pickSequence` (the value `ConsumePendingPick` returned). The
+        // matching tracked pick supplies the kind / mode and is then released. A
+        // sequence that is not tracked (already resolved, evicted, or `0`) is
+        // treated as an untracked readback: the result is applied as a click in
+        // the configured `ClickMode` and `UntrackedReadbacks` is bumped. Hits
+        // resolve `stableEntityId` through the lookup seam; stale (no longer
+        // valid) and non-selectable hits are rejected without mutating state.
+        void ConsumeHit(Registry& registry, std::uint32_t stableEntityId, std::uint64_t pickSequence);
+        void ConsumeNoHit(Registry& registry, std::uint64_t pickSequence);
+        // Convenience overloads for callers with at most one pick outstanding (or
+        // that resolve strictly in drain order): they consume the oldest tracked
+        // in-flight pick. Prefer the sequence-correlated overloads whenever more
+        // than one pick can be in flight.
         void ConsumeHit(Registry& registry, std::uint32_t stableEntityId);
         void ConsumeNoHit(Registry& registry);
 
@@ -138,6 +171,8 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] std::size_t  SelectedCount() const noexcept;
         [[nodiscard]] bool         IsSelected(EntityHandle entity) const noexcept;
         [[nodiscard]] EntityHandle HoveredEntity() const noexcept;
+        [[nodiscard]] std::size_t                  InFlightPickCount() const noexcept;
+        [[nodiscard]] std::optional<std::uint64_t> OldestInFlightSequence() const noexcept;
 
         [[nodiscard]] const SelectionControllerDiagnostics& GetDiagnostics() const noexcept;
         [[nodiscard]] SelectionControllerConfig&            GetConfig() noexcept;
@@ -166,12 +201,24 @@ export namespace Extrinsic::Runtime
         void ApplyHover(Registry& registry, EntityHandle entity);
         void ClearHover(Registry& registry);
         void RebuildSnapshot();
+        // Release the tracked in-flight pick matching `pickSequence` (or the
+        // oldest when `pickSequence` is empty) and return its kind / mode. Falls
+        // back to a click in the configured mode (bumping `UntrackedReadbacks`)
+        // when nothing matches.
+        [[nodiscard]] PendingSelectionPick TakeInFlightPick(std::optional<std::uint64_t> pickSequence) noexcept;
+        void ApplyHitReadback(Registry& registry, std::uint32_t stableEntityId,
+                              std::optional<std::uint64_t> pickSequence);
+        void ApplyNoHitReadback(Registry& registry, std::optional<std::uint64_t> pickSequence);
 
         SelectionControllerConfig      m_Config{};
         SelectionControllerDiagnostics m_Diagnostics{};
 
         std::optional<PendingSelectionPick> m_PendingPick{};
-        std::optional<PendingSelectionPick> m_InFlightPick{};
+        // Drained-but-unresolved picks, ordered oldest-first. Tracked by unique
+        // `Sequence` so a readback resolves the exact request that produced it,
+        // even with several picks in flight and out-of-order publication.
+        std::deque<PendingSelectionPick> m_InFlightPicks{};
+        std::uint64_t                    m_NextPickSequence = 1u;
 
         // Insertion-ordered authoritative selection set; `m_SelectedStableIds`
         // mirrors it for the snapshot span and is rebuilt on every change.

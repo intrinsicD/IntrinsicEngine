@@ -62,8 +62,13 @@
 - **Slice A (landed).** Standalone `Extrinsic.Runtime.SelectionController`
   module (`.cppm` + `.cpp`) under `src/runtime/`: input-facing hover/click/
   programmatic APIs, per-frame pick coalescing into one pending pixel pick
-  (click supersedes hover; latest position wins), readback consumption
-  (`ConsumeHit`/`ConsumeNoHit`) keyed by the in-flight pick kind, ECS
+  (click supersedes hover; latest position wins), a bounded FIFO of
+  `Sequence`-tagged in-flight picks so multiple readbacks in flight
+  (frames-in-flight GPU picking) each replay their own request's kind/mode —
+  `ConsumeHit`/`ConsumeNoHit` correlate by `Sequence` (with oldest-first
+  convenience overloads and an untracked-readback fallback), since
+  `Graphics.Renderer::DrainCompletedPickingSlots` publishes per-slot into the
+  single-result `SelectionSystem` holder and is not issue-ordered, ECS
   `SelectedTag`/`HoveredTag` mutation via the documented Replace/Add/Toggle
   policy, stale-entity and non-selectable rejection, the runtime-owned
   `uint32 ↔ entt::entity` lookup seam (cast, RUNTIME-092 upgrade point),

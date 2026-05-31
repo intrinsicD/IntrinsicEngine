@@ -13,6 +13,7 @@ using Extrinsic::ECS::EntityHandle;
 using Extrinsic::ECS::Scene::Registry;
 using Extrinsic::Runtime::PendingSelectionPick;
 using Extrinsic::Runtime::SelectionController;
+using Extrinsic::Runtime::SelectionControllerConfig;
 using Extrinsic::Runtime::SelectionPickKind;
 using Extrinsic::Runtime::SelectionPickMode;
 
@@ -374,6 +375,144 @@ TEST(SelectionController, ProgrammaticSelectRejectsInvalidEntity)
 
     EXPECT_FALSE(controller.SetSelectedByStableEntityId(registry, id));
     EXPECT_EQ(controller.SelectedCount(), 0u);
+}
+
+// --- multiple in-flight picks (correlation) ------------------------------
+
+TEST(SelectionController, DrainedPickCarriesMonotonicSequence)
+{
+    Registry           registry;
+    SelectionController controller;
+
+    controller.RequestClickPick(0u, 0u);
+    const auto first = controller.ConsumePendingPick();
+    controller.RequestHoverPick(0u, 0u);
+    const auto second = controller.ConsumePendingPick();
+
+    ASSERT_TRUE(first.has_value());
+    ASSERT_TRUE(second.has_value());
+    EXPECT_NE(first->Sequence, 0u);
+    EXPECT_LT(first->Sequence, second->Sequence);
+    EXPECT_EQ(controller.InFlightPickCount(), 2u);
+    EXPECT_EQ(controller.OldestInFlightSequence(), first->Sequence);
+}
+
+// Regression: two picks drained before any readback must each replay their own
+// kind/mode. Previously a single in-flight slot was overwritten, so the click's
+// result would be replayed with the hover's kind (selecting nothing) and the
+// hover's result would fall back to the default click (wrongly selecting).
+TEST(SelectionController, MultipleInFlightPicksReplayOwnKindBySequence)
+{
+    Registry           registry;
+    SelectionController controller;
+    const EntityHandle a = MakeSelectable(registry);
+    const EntityHandle b = MakeSelectable(registry);
+
+    controller.RequestClickPick(1u, 1u); // click on a
+    const auto clickPick = controller.ConsumePendingPick();
+    controller.RequestHoverPick(2u, 2u); // hover over b
+    const auto hoverPick = controller.ConsumePendingPick();
+    ASSERT_TRUE(clickPick.has_value());
+    ASSERT_TRUE(hoverPick.has_value());
+    EXPECT_EQ(controller.InFlightPickCount(), 2u);
+
+    // Resolve the click first: a is selected, nothing hovered.
+    controller.ConsumeHit(registry, StableId(a), clickPick->Sequence);
+    EXPECT_TRUE(controller.IsSelected(a));
+    EXPECT_FALSE(controller.HasHovered());
+
+    // Resolve the hover: b becomes hovered, selection unchanged (still {a}).
+    controller.ConsumeHit(registry, StableId(b), hoverPick->Sequence);
+    EXPECT_TRUE(controller.IsSelected(a));
+    EXPECT_FALSE(controller.IsSelected(b));
+    EXPECT_TRUE(controller.HasHovered());
+    EXPECT_EQ(controller.HoveredStableId(), StableId(b));
+    EXPECT_EQ(controller.InFlightPickCount(), 0u);
+}
+
+TEST(SelectionController, InFlightPicksResolveCorrectlyOutOfOrder)
+{
+    Registry           registry;
+    SelectionController controller;
+    const EntityHandle a = MakeSelectable(registry);
+    const EntityHandle b = MakeSelectable(registry);
+
+    controller.RequestHoverPick(1u, 1u); // hover over a
+    const auto hoverPick = controller.ConsumePendingPick();
+    controller.RequestClickPick(2u, 2u); // click on b
+    const auto clickPick = controller.ConsumePendingPick();
+    ASSERT_TRUE(hoverPick.has_value());
+    ASSERT_TRUE(clickPick.has_value());
+
+    // Publish the younger (click) result before the older (hover) result.
+    controller.ConsumeHit(registry, StableId(b), clickPick->Sequence);
+    EXPECT_TRUE(controller.IsSelected(b));
+    EXPECT_FALSE(controller.HasHovered());
+
+    controller.ConsumeHit(registry, StableId(a), hoverPick->Sequence);
+    EXPECT_TRUE(controller.HasHovered());
+    EXPECT_EQ(controller.HoveredStableId(), StableId(a));
+    EXPECT_TRUE(controller.IsSelected(b)); // click selection preserved
+    EXPECT_FALSE(controller.IsSelected(a));
+}
+
+TEST(SelectionController, ConvenienceOverloadConsumesOldestInFlight)
+{
+    Registry           registry;
+    SelectionController controller;
+    const EntityHandle a = MakeSelectable(registry);
+    const EntityHandle b = MakeSelectable(registry);
+
+    controller.RequestClickPick(0u, 0u); // a (oldest)
+    controller.ConsumePendingPick();
+    controller.RequestHoverPick(0u, 0u); // b
+    controller.ConsumePendingPick();
+
+    // No-sequence overload resolves the oldest tracked pick first (the click).
+    controller.ConsumeHit(registry, StableId(a));
+    EXPECT_TRUE(controller.IsSelected(a));
+    EXPECT_FALSE(controller.HasHovered());
+
+    controller.ConsumeHit(registry, StableId(b));
+    EXPECT_TRUE(controller.HasHovered());
+    EXPECT_EQ(controller.HoveredStableId(), StableId(b));
+    EXPECT_EQ(controller.InFlightPickCount(), 0u);
+}
+
+TEST(SelectionController, InFlightCapacityEvictsOldestUnresolved)
+{
+    Registry                  registry;
+    SelectionControllerConfig config{};
+    config.MaxTrackedInFlightPicks = 2u;
+    SelectionController controller(config);
+
+    controller.RequestClickPick(0u, 0u);
+    const auto first = controller.ConsumePendingPick();
+    controller.RequestClickPick(0u, 0u);
+    controller.ConsumePendingPick();
+    controller.RequestClickPick(0u, 0u);
+    const auto third = controller.ConsumePendingPick();
+    ASSERT_TRUE(first.has_value());
+    ASSERT_TRUE(third.has_value());
+
+    EXPECT_EQ(controller.InFlightPickCount(), 2u);
+    EXPECT_EQ(controller.GetDiagnostics().InFlightPicksDropped, 1u);
+    // The first (oldest) pick was evicted; resolving its sequence is untracked.
+    const EntityHandle a = MakeSelectable(registry);
+    controller.ConsumeHit(registry, StableId(a), first->Sequence);
+    EXPECT_EQ(controller.GetDiagnostics().UntrackedReadbacks, 1u);
+}
+
+TEST(SelectionController, UntrackedReadbackAppliesAsClick)
+{
+    Registry           registry;
+    SelectionController controller;
+    const EntityHandle a = MakeSelectable(registry);
+
+    // No pick was drained: a stray readback is applied as a click.
+    controller.ConsumeHit(registry, StableId(a));
+    EXPECT_TRUE(controller.IsSelected(a));
+    EXPECT_EQ(controller.GetDiagnostics().UntrackedReadbacks, 1u);
 }
 
 // --- diagnostics reconcile ----------------------------------------------

@@ -1,7 +1,9 @@
 module;
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <optional>
 #include <span>
 #include <vector>
@@ -105,11 +107,56 @@ namespace Extrinsic::Runtime
         if (!m_PendingPick.has_value())
             return std::nullopt;
 
-        const PendingSelectionPick pick = *m_PendingPick;
-        m_InFlightPick                  = pick;
+        PendingSelectionPick pick = *m_PendingPick;
+        pick.Sequence             = m_NextPickSequence++;
         m_PendingPick.reset();
+
+        m_InFlightPicks.push_back(pick);
+        // Bound the tracking queue so a pick whose readback is never published
+        // (recycled / invalidated GPU slot) cannot grow it without limit.
+        while (m_Config.MaxTrackedInFlightPicks != 0u
+               && m_InFlightPicks.size() > m_Config.MaxTrackedInFlightPicks)
+        {
+            m_InFlightPicks.pop_front();
+            ++m_Diagnostics.InFlightPicksDropped;
+        }
+
         ++m_Diagnostics.PicksDrained;
         return pick;
+    }
+
+    PendingSelectionPick SelectionController::TakeInFlightPick(
+        std::optional<std::uint64_t> pickSequence) noexcept
+    {
+        if (pickSequence.has_value())
+        {
+            const auto it = std::find_if(
+                m_InFlightPicks.begin(), m_InFlightPicks.end(),
+                [seq = *pickSequence](const PendingSelectionPick& p) { return p.Sequence == seq; });
+            if (it != m_InFlightPicks.end())
+            {
+                const PendingSelectionPick pick = *it;
+                m_InFlightPicks.erase(it);
+                return pick;
+            }
+        }
+        else if (!m_InFlightPicks.empty())
+        {
+            const PendingSelectionPick pick = m_InFlightPicks.front();
+            m_InFlightPicks.pop_front();
+            return pick;
+        }
+
+        // No tracked pick matched: treat as an untracked readback applied as a
+        // click in the configured mode.
+        ++m_Diagnostics.UntrackedReadbacks;
+        return PendingSelectionPick{
+            .Sequence = 0u,
+            .PixelX   = 0u,
+            .PixelY   = 0u,
+            .Kind     = SelectionPickKind::Click,
+            .Mode     = m_Config.ClickMode,
+        };
     }
 
     // --- snapshot ----------------------------------------------------------
@@ -214,14 +261,14 @@ namespace Extrinsic::Runtime
 
     // --- readback consumption ----------------------------------------------
 
-    void SelectionController::ConsumeHit(Registry& registry, std::uint32_t stableEntityId)
+    void SelectionController::ApplyHitReadback(Registry&                    registry,
+                                               std::uint32_t                stableEntityId,
+                                               std::optional<std::uint64_t> pickSequence)
     {
         ++m_Diagnostics.ReadbacksConsumed;
         ++m_Diagnostics.Hits;
 
-        const SelectionPickKind kind = m_InFlightPick ? m_InFlightPick->Kind : SelectionPickKind::Click;
-        const SelectionPickMode mode = m_InFlightPick ? m_InFlightPick->Mode : m_Config.ClickMode;
-        m_InFlightPick.reset();
+        const PendingSelectionPick pick = TakeInFlightPick(pickSequence);
 
         const EntityHandle entity = ToEntityHandle(stableEntityId);
         if (!IsValidEntity(registry.Raw(), entity))
@@ -235,30 +282,51 @@ namespace Extrinsic::Runtime
             return;
         }
 
-        if (kind == SelectionPickKind::Hover)
+        if (pick.Kind == SelectionPickKind::Hover)
             ApplyHover(registry, entity);
         else
-            ApplyClickSelection(registry, entity, mode);
+            ApplyClickSelection(registry, entity, pick.Mode);
     }
 
-    void SelectionController::ConsumeNoHit(Registry& registry)
+    void SelectionController::ApplyNoHitReadback(Registry&                    registry,
+                                                 std::optional<std::uint64_t> pickSequence)
     {
         ++m_Diagnostics.ReadbacksConsumed;
         ++m_Diagnostics.NoHits;
 
-        const SelectionPickKind kind = m_InFlightPick ? m_InFlightPick->Kind : SelectionPickKind::Click;
-        const SelectionPickMode mode = m_InFlightPick ? m_InFlightPick->Mode : m_Config.ClickMode;
-        m_InFlightPick.reset();
+        const PendingSelectionPick pick = TakeInFlightPick(pickSequence);
 
-        if (kind == SelectionPickKind::Hover)
+        if (pick.Kind == SelectionPickKind::Hover)
         {
             if (m_Config.ClearHoverOnBackgroundHover)
                 ClearHover(registry);
             return;
         }
 
-        if (mode == SelectionPickMode::Replace && m_Config.ClearSelectionOnBackgroundClick)
+        if (pick.Mode == SelectionPickMode::Replace && m_Config.ClearSelectionOnBackgroundClick)
             SetSelectionSet(registry, {});
+    }
+
+    void SelectionController::ConsumeHit(Registry&     registry,
+                                         std::uint32_t stableEntityId,
+                                         std::uint64_t pickSequence)
+    {
+        ApplyHitReadback(registry, stableEntityId, pickSequence);
+    }
+
+    void SelectionController::ConsumeHit(Registry& registry, std::uint32_t stableEntityId)
+    {
+        ApplyHitReadback(registry, stableEntityId, std::nullopt);
+    }
+
+    void SelectionController::ConsumeNoHit(Registry& registry, std::uint64_t pickSequence)
+    {
+        ApplyNoHitReadback(registry, pickSequence);
+    }
+
+    void SelectionController::ConsumeNoHit(Registry& registry)
+    {
+        ApplyNoHitReadback(registry, std::nullopt);
     }
 
     // --- programmatic selection -------------------------------------------
@@ -312,6 +380,18 @@ namespace Extrinsic::Runtime
     SelectionController::EntityHandle SelectionController::HoveredEntity() const noexcept
     {
         return m_Hovered;
+    }
+
+    std::size_t SelectionController::InFlightPickCount() const noexcept
+    {
+        return m_InFlightPicks.size();
+    }
+
+    std::optional<std::uint64_t> SelectionController::OldestInFlightSequence() const noexcept
+    {
+        if (m_InFlightPicks.empty())
+            return std::nullopt;
+        return m_InFlightPicks.front().Sequence;
     }
 
     const SelectionControllerDiagnostics& SelectionController::GetDiagnostics() const noexcept
