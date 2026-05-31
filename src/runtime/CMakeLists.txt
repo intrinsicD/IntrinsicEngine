@@ -19,6 +19,7 @@ target_sources(${target_name}
         Runtime.ProceduralGeometryPacker.cppm
         Runtime.ReferenceScene.cppm
         Runtime.RenderExtraction.cppm
+        Runtime.SelectionController.cppm
         Runtime.StreamingExecutor.cppm
         SpatialDebug/Runtime.SpatialDebugAdapters.cppm
         PRIVATE
@@ -32,6 +33,7 @@ target_sources(${target_name}
         Runtime.ProceduralGeometryPacker.cpp
         Runtime.ReferenceScene.cpp
         Runtime.RenderExtraction.cpp
+        Runtime.SelectionController.cpp
         Runtime.StreamingExecutor.cpp
         SpatialDebug/Runtime.SpatialDebugAdapters.cpp
 )

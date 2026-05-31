@@ -11,7 +11,20 @@ Each active task should include:
 
 ## Currently active
 
-- _None._ The most recent active task (`RUNTIME-088`) was retired below.
+- [`RUNTIME-089`](RUNTIME-089-selection-controller.md) — runtime selection
+  controller and snapshot handoff (Theme A working-sandbox path). Status
+  `in-progress` on `claude/intrinsicengine-agent-onboarding-Vyaea`. Slice A
+  landed the standalone `Extrinsic.Runtime.SelectionController` module
+  (input-facing hover/click/programmatic APIs, per-frame pick coalescing,
+  readback consumption, Replace/Add/Toggle `SelectedTag`/`HoveredTag` mutation,
+  stale/non-selectable rejection, the `uint32 ↔ entt::entity` lookup seam,
+  controller-owned selection-snapshot buffers, and the diagnostics block) with
+  pure-CPU `contract;runtime` tests in `Test.SelectionController.cpp`, at
+  maturity `Scaffolded`. Next verification step: Slice B wires the controller
+  into `Engine::RunFrame` (coalesce into `RenderFrameInput::Pick` /
+  `SelectionSystem::RequestPick`; drain `GetLastPickResult()`) and populates
+  `RenderWorld.Selection` from the controller snapshot during
+  `RenderExtractionCache::ExtractAndSubmit`, closing `Scaffolded → CPUContracted`.
 
 Previously-active
 [`RUNTIME-088`](../done/RUNTIME-088-mesh-primitive-view-lifecycle.md) — mesh

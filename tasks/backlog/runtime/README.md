@@ -87,9 +87,11 @@ compose with the rendering tasks listed in `tasks/backlog/rendering/README.md`.
   views as runtime sidecars over the authoritative mesh `GeometrySources`,
   wired into `RenderExtractionCache`; `Operational` visual proof owned by
   `RUNTIME-095`.)_
-- [RUNTIME-089 — Runtime selection controller and snapshot handoff](RUNTIME-089-selection-controller.md):
-  input/pick-result policy, selected/hovered state, and `RenderWorld.Selection`
-  submission.
+- [RUNTIME-089 — Runtime selection controller and snapshot handoff](../../active/RUNTIME-089-selection-controller.md)
+  _(active; promoted 2026-05-31)_: input/pick-result policy, selected/hovered
+  state, and `RenderWorld.Selection` submission. Slice A (standalone
+  `Extrinsic.Runtime.SelectionController` module) landed at `Scaffolded`; Slice B
+  wires `Engine::RunFrame` + `RenderWorld.Selection` to reach `CPUContracted`.
 - [RUNTIME-092 — Runtime stable entity lookup sidecar](RUNTIME-092-stable-entity-lookup.md):
   runtime-owned `StableId`/live-entity lookup for selection and editor tooling.
 - [RUNTIME-093 — Primitive selection refinement](RUNTIME-093-primitive-selection-refinement.md):
