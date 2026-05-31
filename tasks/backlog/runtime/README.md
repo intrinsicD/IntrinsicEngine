@@ -82,9 +82,11 @@ compose with the rendering tasks listed in `tasks/backlog/rendering/README.md`.
   2026-05-30 at maturity `CPUContracted`; standalone point-cloud packer plus
   `RenderExtractionCache` residency wiring, deferred-retire, and shutdown drain
   landed together.)_
-- [RUNTIME-088 — Mesh primitive view lifecycle](../../active/RUNTIME-088-mesh-primitive-view-lifecycle.md)
-  (active; Slice A landed): optional mesh edge/vertex render views for primitive
-  visualization and later primitive selection.
+- [RUNTIME-088 — Mesh primitive view lifecycle](../../done/RUNTIME-088-mesh-primitive-view-lifecycle.md)
+  _(done 2026-05-31 at maturity `CPUContracted`: optional mesh edge/vertex render
+  views as runtime sidecars over the authoritative mesh `GeometrySources`,
+  wired into `RenderExtractionCache`; `Operational` visual proof owned by
+  `RUNTIME-095`.)_
 - [RUNTIME-089 — Runtime selection controller and snapshot handoff](RUNTIME-089-selection-controller.md):
   input/pick-result policy, selected/hovered state, and `RenderWorld.Selection`
   submission.

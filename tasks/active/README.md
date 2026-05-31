@@ -11,14 +11,30 @@ Each active task should include:
 
 ## Currently active
 
-- [`RUNTIME-088`](RUNTIME-088-mesh-primitive-view-lifecycle.md) — mesh primitive
-  view lifecycle (Theme A working-sandbox path). `in-progress` on
-  `claude/intrinsicengine-agent-onboarding-m6JHG`. Slice A landed the standalone
-  `Extrinsic.Runtime.MeshPrimitiveViewPacker` (edge line-list + vertex point
-  derivation packers, `MeshPrimitiveViewSettings` control surface, fail-closed
-  status taxonomy, pure-CPU `contract;runtime` packer tests) at `Scaffolded`.
-  Next: Slice B wires per-view residency into `RenderExtractionCache`
-  (`CPUContracted`).
+- _None._ The most recent active task (`RUNTIME-088`) was retired below.
+
+Previously-active
+[`RUNTIME-088`](../done/RUNTIME-088-mesh-primitive-view-lifecycle.md) — mesh
+primitive view lifecycle (Theme A working-sandbox path) retired to `tasks/done/`
+on 2026-05-31 at maturity `CPUContracted`. Slice A landed the standalone
+`Extrinsic.Runtime.MeshPrimitiveViewPacker` (edge line-list + vertex point
+derivation packers, `MeshPrimitiveViewSettings` control surface, fail-closed
+status taxonomy, pure-CPU `contract;runtime` packer tests) at `Scaffolded`.
+Slice B (commit `69b3fb4`, `claude/intrinsicengine-agent-onboarding-RQtst`)
+closed `Scaffolded → CPUContracted` by wiring the `RenderExtractionCache`
+residency: a cache-owned `MeshPrimitiveViewSettings` map (runtime/editor state,
+never in ECS components), per-view `GpuWorld` instance + `GpuGeometryHandle`
+sidecars rendering edges/vertices as extra `GpuRender_Line`/`GpuRender_Point`
+unlit lanes over the one authoritative mesh `GeometrySources`, repack on the
+shared mesh dirty signal, release on disable/eligibility-flip/destruction/
+shutdown through the `TickMeshPrimitiveViewGeometry` deferred-retire window
+(wired in `Engine::RunFrame`), and fifteen `Mesh{Edge,Vertex}View*` +
+`MeshPrimitiveViewFreeRetires` counters. Resolved deferred decisions: views are
+runtime sidecars (not child ECS entities), and the settings live in a
+cache-owned map. `IntrinsicRuntimeContractTests` 193/193 (12 new
+`MeshPrimitiveViewExtraction.*` cases); layering/test-layout/doc-links/
+task-policy/module-inventory checks clean. `Operational` visual proof of the
+three lanes stays owned by `RUNTIME-095`.
 
 Previously-active
 [`RUNTIME-087`](../done/RUNTIME-087-geometrysources-pointcloud-residency.md) —
