@@ -65,7 +65,11 @@ export namespace Extrinsic::Runtime
         std::uint32_t StableId{0u};
 
         // GPU primitive hint (4-bit domain + 28-bit payload). Treated as a hint
-        // only: it is validated against authoritative CPU geometry.
+        // only: it is validated against authoritative CPU geometry. The payload
+        // semantics follow the ID pass — a `Face` payload is the per-draw surface
+        // triangle index (`gl_PrimitiveID`), which refinement maps back to a face
+        // row through the mesh packer's surface-triangle table because n-gon
+        // faces fan-triangulate to multiple GPU triangles.
         Extrinsic::Graphics::EncodedSelectionId Hint{};
 
         // `SelectionController`-signalled liveness. A stale entity is rejected by

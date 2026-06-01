@@ -34,6 +34,96 @@ namespace Extrinsic::Runtime
         {
             return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z);
         }
+
+        // Outcome of walking one face slot's halfedge ring.
+        enum class FaceRingOutcome : std::uint8_t
+        {
+            Triangulate, // `outRing` holds >= 3 fan-order ring vertices.
+            Skip,        // deleted / boundary / sub-triangular slot — emits no triangles.
+            Invalid,     // corrupt topology — caller fails closed.
+        };
+
+        // Single source of truth for which face slots are live and the ring
+        // vertices they fan-triangulate. `PackMesh` (surface triangulation) and
+        // `BuildSurfaceTriangleFaceMap` (the gl_PrimitiveID -> face inverse) both
+        // call this so the emitted surface triangle order and the triangle->face
+        // map can never drift. Mirrors the deleted-face guard and the
+        // step-capped ring walk documented on `PackMesh`.
+        [[nodiscard]] FaceRingOutcome ProduceFaceRing(
+            const std::vector<std::uint32_t>& faceHe,
+            const std::vector<std::uint32_t>& halfedgeFace,
+            const std::vector<std::uint32_t>& nextHe,
+            const std::vector<std::uint32_t>& toVertex,
+            std::uint32_t faceCountU32,
+            std::uint32_t vertexCount,
+            std::size_t f,
+            std::vector<std::uint32_t>& outRing)
+        {
+            outRing.clear();
+
+            const std::size_t halfedgeCount = toVertex.size();
+            const std::uint32_t first = faceHe[f];
+            if (first == kInvalidIndex)
+            {
+                return FaceRingOutcome::Skip; // boundary / unpopulated face slot
+            }
+            if (first >= halfedgeCount)
+            {
+                return FaceRingOutcome::Invalid;
+            }
+
+            // Deleted-face guard via `h:face` ownership of the first ring halfedge.
+            const std::uint32_t firstOwner = halfedgeFace[first];
+            if (firstOwner == kInvalidIndex || firstOwner >= faceCountU32)
+            {
+                return FaceRingOutcome::Skip;
+            }
+            if (firstOwner != static_cast<std::uint32_t>(f))
+            {
+                return FaceRingOutcome::Skip;
+            }
+
+            std::uint32_t h = first;
+            for (std::size_t step = 0; step <= halfedgeCount; ++step)
+            {
+                if (h >= halfedgeCount)
+                {
+                    return FaceRingOutcome::Invalid;
+                }
+                const std::uint32_t owner = halfedgeFace[h];
+                if (owner != static_cast<std::uint32_t>(f))
+                {
+                    return FaceRingOutcome::Invalid; // mixed-owner ring
+                }
+                const std::uint32_t targetV = toVertex[h];
+                if (targetV >= vertexCount)
+                {
+                    return FaceRingOutcome::Invalid;
+                }
+                outRing.push_back(targetV);
+
+                const std::uint32_t nh = nextHe[h];
+                if (nh == first)
+                {
+                    break;
+                }
+                if (nh == kInvalidIndex)
+                {
+                    return FaceRingOutcome::Invalid;
+                }
+                if (step == halfedgeCount)
+                {
+                    return FaceRingOutcome::Invalid; // ring did not close
+                }
+                h = nh;
+            }
+
+            if (outRing.size() < 3)
+            {
+                return FaceRingOutcome::Skip; // degenerate / sub-triangular face
+            }
+            return FaceRingOutcome::Triangulate;
+        }
     }
 
     const char* DebugNameForMeshPackStatus(MeshPackStatus status) noexcept
@@ -133,86 +223,19 @@ namespace Extrinsic::Runtime
 
         const std::uint32_t faceCountU32 = static_cast<std::uint32_t>(faceCount);
 
+        const std::uint32_t vertexCountU32 = static_cast<std::uint32_t>(vertexCount);
+
         for (std::size_t f = 0; f < faceCount; ++f)
         {
-            const std::uint32_t first = faceHe[f];
-            if (first == kInvalidIndex)
-            {
-                continue; // boundary / unpopulated face slot
-            }
-            if (first >= halfedgeCount)
+            const FaceRingOutcome outcome = ProduceFaceRing(
+                faceHe, halfedgeFace, nextHe, toVertex, faceCountU32, vertexCountU32, f, ringScratch);
+            if (outcome == FaceRingOutcome::Invalid)
             {
                 return Failure(MeshPackStatus::InvalidTopology, outBuffer);
             }
-
-            // Deleted-face guard: `GeometrySources::PopulateFromMesh` writes
-            // `f:halfedge` for every face slot via `mesh.Halfedge(fh)`, but
-            // `HalfedgeMesh::DeleteFace` invalidates only `h:face` on the
-            // ring's halfedges — it does not clear the face's own
-            // `f:halfedge` pointer. So a deleted face slot still has a
-            // walkable `h:next` ring, and we must rely on `h:face` to detect
-            // that the ring no longer claims this face. We use the first
-            // halfedge as the witness: if it does not own this face, the
-            // entire ring belonged to a now-deleted face and is skipped
-            // rather than fan-triangulated.
-            const std::uint32_t firstOwner = halfedgeFace[first];
-            if (firstOwner == kInvalidIndex || firstOwner >= faceCountU32)
+            if (outcome == FaceRingOutcome::Skip)
             {
                 continue;
-            }
-            if (firstOwner != static_cast<std::uint32_t>(f))
-            {
-                // The halfedge a deleted face's `f:halfedge` points at may
-                // also have been re-bound to a different live face by later
-                // topology edits; in both cases this face slot is stale.
-                continue;
-            }
-
-            ringScratch.clear();
-            std::uint32_t h = first;
-            for (std::size_t step = 0; step <= halfedgeCount; ++step)
-            {
-                if (h >= halfedgeCount)
-                {
-                    return Failure(MeshPackStatus::InvalidTopology, outBuffer);
-                }
-                // The first halfedge already passed the ownership check; any
-                // later ring halfedge whose `h:face` disagrees with `f`
-                // indicates a corrupt mesh (mixed-owner ring) — fail closed.
-                const std::uint32_t owner = halfedgeFace[h];
-                if (owner != static_cast<std::uint32_t>(f))
-                {
-                    return Failure(MeshPackStatus::InvalidTopology, outBuffer);
-                }
-                const std::uint32_t targetV = toVertex[h];
-                if (targetV >= vertexCount)
-                {
-                    return Failure(MeshPackStatus::InvalidTopology, outBuffer);
-                }
-                ringScratch.push_back(targetV);
-
-                const std::uint32_t nh = nextHe[h];
-                if (nh == first)
-                {
-                    h = nh;
-                    break;
-                }
-                if (nh == kInvalidIndex)
-                {
-                    return Failure(MeshPackStatus::InvalidTopology, outBuffer);
-                }
-                if (step == halfedgeCount)
-                {
-                    // ring did not close within the halfedge count: a malformed
-                    // `h:next` cycle would loop forever here.
-                    return Failure(MeshPackStatus::InvalidTopology, outBuffer);
-                }
-                h = nh;
-            }
-
-            if (ringScratch.size() < 3)
-            {
-                continue; // degenerate / sub-triangular face
             }
 
             for (std::size_t i = 1; i + 1 < ringScratch.size(); ++i)
@@ -259,5 +282,113 @@ namespace Extrinsic::Runtime
         desc.DebugName = kMeshDebugName;
 
         return MeshPackResult{MeshPackStatus::Success, desc};
+    }
+
+    MeshPackStatus BuildSurfaceTriangleFaceMap(
+        const ECS::Components::GeometrySources::ConstSourceView& view,
+        std::vector<std::uint32_t>& outTriangleToFace)
+    {
+        outTriangleToFace.clear();
+
+        using namespace ECS::Components::GeometrySources;
+
+        // Validation mirrors `PackMesh` so the two stay in lockstep; only the
+        // topology needed to reproduce the surface triangle order is read
+        // (positions are needed for the `targetV < vertexCount` ring check).
+        if (view.ActiveDomain != Domain::Mesh)
+        {
+            return MeshPackStatus::WrongDomain;
+        }
+        if (view.VertexSource == nullptr)
+        {
+            return MeshPackStatus::MissingPositions;
+        }
+        const auto posProp = view.VertexSource->Properties.Get<glm::vec3>(PropertyNames::kPosition);
+        if (!posProp)
+        {
+            return MeshPackStatus::MissingPositions;
+        }
+        const std::uint32_t vertexCount = static_cast<std::uint32_t>(posProp.Vector().size());
+        if (vertexCount == 0)
+        {
+            return MeshPackStatus::EmptyMesh;
+        }
+
+        if (view.HalfedgeSource == nullptr)
+        {
+            return MeshPackStatus::MissingHalfedgeTopology;
+        }
+        const auto toVertexProp = view.HalfedgeSource->Properties.Get<std::uint32_t>(
+            PropertyNames::kHalfedgeToVertex);
+        const auto nextProp = view.HalfedgeSource->Properties.Get<std::uint32_t>(
+            PropertyNames::kHalfedgeNext);
+        const auto faceProp = view.HalfedgeSource->Properties.Get<std::uint32_t>(
+            PropertyNames::kHalfedgeFace);
+        if (!toVertexProp || !nextProp || !faceProp)
+        {
+            return MeshPackStatus::MissingHalfedgeTopology;
+        }
+        const auto& toVertex = toVertexProp.Vector();
+        const auto& nextHe = nextProp.Vector();
+        const auto& halfedgeFace = faceProp.Vector();
+        const std::size_t halfedgeCount = toVertex.size();
+        if (halfedgeCount == 0)
+        {
+            return MeshPackStatus::EmptyMesh;
+        }
+        if (nextHe.size() != halfedgeCount || halfedgeFace.size() != halfedgeCount)
+        {
+            return MeshPackStatus::InvalidTopology;
+        }
+
+        if (view.FaceSource == nullptr)
+        {
+            return MeshPackStatus::MissingFaceTopology;
+        }
+        const auto faceHeProp = view.FaceSource->Properties.Get<std::uint32_t>(
+            PropertyNames::kFaceHalfedge);
+        if (!faceHeProp)
+        {
+            return MeshPackStatus::MissingFaceTopology;
+        }
+        const auto& faceHe = faceHeProp.Vector();
+        const std::size_t faceCount = faceHe.size();
+        if (faceCount == 0)
+        {
+            return MeshPackStatus::EmptyMesh;
+        }
+
+        const std::uint32_t faceCountU32 = static_cast<std::uint32_t>(faceCount);
+
+        std::vector<std::uint32_t> ringScratch;
+        ringScratch.reserve(8);
+
+        for (std::size_t f = 0; f < faceCount; ++f)
+        {
+            const FaceRingOutcome outcome = ProduceFaceRing(
+                faceHe, halfedgeFace, nextHe, toVertex, faceCountU32, vertexCount, f, ringScratch);
+            if (outcome == FaceRingOutcome::Invalid)
+            {
+                outTriangleToFace.clear();
+                return MeshPackStatus::InvalidTopology;
+            }
+            if (outcome == FaceRingOutcome::Skip)
+            {
+                continue;
+            }
+            // Fan triangulation emits (ringSize - 2) triangles for this face,
+            // all owned by face row `f` — matching PackMesh's emission count.
+            const std::size_t triangles = ringScratch.size() - 2u;
+            for (std::size_t t = 0; t < triangles; ++t)
+            {
+                outTriangleToFace.push_back(static_cast<std::uint32_t>(f));
+            }
+        }
+
+        if (outTriangleToFace.empty())
+        {
+            return MeshPackStatus::DegenerateAllFaces;
+        }
+        return MeshPackStatus::Success;
     }
 }

@@ -7,6 +7,7 @@
 
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.SelectionSystem;
+import Extrinsic.Runtime.MeshGeometryPacker;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Geometry.Properties;
 
@@ -19,6 +20,10 @@ using Extrinsic::ECS::Components::GeometrySources::Nodes;
 using Extrinsic::ECS::Components::GeometrySources::Vertices;
 using Extrinsic::Graphics::EncodeSelectionId;
 using Extrinsic::Graphics::SelectionPrimitiveDomain;
+using Extrinsic::Runtime::BuildSurfaceTriangleFaceMap;
+using Extrinsic::Runtime::MeshPackBuffer;
+using Extrinsic::Runtime::MeshPackStatus;
+using Extrinsic::Runtime::PackMesh;
 using Extrinsic::Runtime::kInvalidPrimitiveIndex;
 using Extrinsic::Runtime::PrimitiveRefineRequest;
 using Extrinsic::Runtime::PrimitiveRefineStatus;
@@ -82,6 +87,40 @@ namespace
             view.ActiveDomain = Domain::Mesh;
             view.VertexSource = &VertexSource;
             view.EdgeSource = &EdgeSource;
+            view.HalfedgeSource = &HalfedgeSource;
+            view.FaceSource = &FaceSource;
+            return view;
+        }
+    };
+
+    // Mesh with one quad face (rows 0..3, fan-triangulated to 2 triangles) and
+    // one triangle face (rows 4..6, 1 triangle). Surface triangle order is
+    // [quad-tri-0, quad-tri-1, tri], so the gl_PrimitiveID -> face map is
+    // [0, 0, 1] — the case where a raw payload would mis-resolve.
+    struct MeshQuadTriScratch
+    {
+        Vertices VertexSource{};
+        Halfedges HalfedgeSource{};
+        Faces FaceSource{};
+
+        MeshQuadTriScratch()
+        {
+            SetPositions(VertexSource.Properties, {
+                {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f},
+                {5.0f, 0.0f, 0.0f}, {6.0f, 0.0f, 0.0f}, {5.0f, 1.0f, 0.0f},
+            });
+            // h0..h3 = quad ring (face 0), h4..h6 = triangle ring (face 1).
+            SetU32(HalfedgeSource.Properties, pn::kHalfedgeToVertex, {1u, 2u, 3u, 0u, 5u, 6u, 4u}, 7);
+            SetU32(HalfedgeSource.Properties, pn::kHalfedgeNext, {1u, 2u, 3u, 0u, 5u, 6u, 4u}, 7);
+            SetU32(HalfedgeSource.Properties, pn::kHalfedgeFace, {0u, 0u, 0u, 0u, 1u, 1u, 1u}, 7);
+            SetU32(FaceSource.Properties, pn::kFaceHalfedge, {0u, 4u}, 2);
+        }
+
+        [[nodiscard]] ConstSourceView View() const noexcept
+        {
+            ConstSourceView view{};
+            view.ActiveDomain = Domain::Mesh;
+            view.VertexSource = &VertexSource;
             view.HalfedgeSource = &HalfedgeSource;
             view.FaceSource = &FaceSource;
             return view;
@@ -287,6 +326,57 @@ TEST(PrimitiveSelectionRefinement, MeshMissingPositionsFailsClosed)
 
     const PrimitiveSelectionResult result = RefinePrimitiveSelection(view, request);
     EXPECT_EQ(result.Status, PrimitiveRefineStatus::MissingGeometrySource);
+}
+
+TEST(PrimitiveSelectionRefinement, MeshFaceHintMapsTrianglePayloadToFaceRow)
+{
+    const MeshQuadTriScratch mesh;
+
+    // Triangle 0 and triangle 1 are both fan steps of the quad (face 0); the
+    // raw payload 1 used to be rejected (1 >= faceCount of 1) or mis-resolve.
+    for (std::uint32_t triangle = 0; triangle <= 1u; ++triangle)
+    {
+        PrimitiveRefineRequest request = BaseRequest();
+        request.Hint = EncodeSelectionId(SelectionPrimitiveDomain::Face, triangle);
+        const PrimitiveSelectionResult result = RefinePrimitiveSelection(mesh.View(), request);
+        EXPECT_EQ(result.Status, PrimitiveRefineStatus::Success) << "triangle " << triangle;
+        EXPECT_EQ(result.Kind, RefinedPrimitiveKind::Face);
+        EXPECT_EQ(result.FaceId, 0u) << "triangle " << triangle << " should resolve to the quad face";
+    }
+
+    // Triangle 2 is the standalone triangle face (face 1).
+    {
+        PrimitiveRefineRequest request = BaseRequest();
+        request.Hint = EncodeSelectionId(SelectionPrimitiveDomain::Face, 2u);
+        const PrimitiveSelectionResult result = RefinePrimitiveSelection(mesh.View(), request);
+        EXPECT_EQ(result.Status, PrimitiveRefineStatus::Success);
+        EXPECT_EQ(result.FaceId, 1u);
+    }
+
+    // Only three surface triangles exist; payload 3 is out of range.
+    {
+        PrimitiveRefineRequest request = BaseRequest();
+        request.Hint = EncodeSelectionId(SelectionPrimitiveDomain::Face, 3u);
+        const PrimitiveSelectionResult result = RefinePrimitiveSelection(mesh.View(), request);
+        EXPECT_EQ(result.Status, PrimitiveRefineStatus::InvalidPrimitivePayload);
+    }
+}
+
+TEST(PrimitiveSelectionRefinement, SurfaceTriangleFaceMapMatchesPackMeshEmission)
+{
+    const MeshQuadTriScratch mesh;
+
+    std::vector<std::uint32_t> triangleToFace;
+    ASSERT_EQ(BuildSurfaceTriangleFaceMap(mesh.View(), triangleToFace), MeshPackStatus::Success);
+    EXPECT_EQ(triangleToFace, (std::vector<std::uint32_t>{0u, 0u, 1u}));
+
+    // The map must have exactly one entry per triangle PackMesh emits, so a
+    // gl_PrimitiveID can never index outside it.
+    MeshPackBuffer buffer{};
+    const auto pack = PackMesh(mesh.View(), buffer);
+    ASSERT_EQ(pack.Status, MeshPackStatus::Success);
+    ASSERT_TRUE(pack.Upload.has_value());
+    EXPECT_EQ(pack.Upload->SurfaceIndices.size(), triangleToFace.size() * 3u);
 }
 
 // ---- Graph -----------------------------------------------------------------

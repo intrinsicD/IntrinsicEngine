@@ -52,7 +52,7 @@
 
 ## Required changes
 - [x] Define `PrimitiveSelectionResult` with entity ID/stable ID, domain, face/edge/vertex/point IDs, world/local hit positions, and diagnostic status. _(Slice A.)_
-- [x] Implement mesh refinement: face hints anchor face selection; optional ray/local hit refinement computes nearest vertex/edge on the hinted face. _(Slice A; the missing-hint CPU ray fallback is Slice B.)_
+- [x] Implement mesh refinement: face hints anchor face selection; optional ray/local hit refinement computes nearest vertex/edge on the hinted face. _(Slice A; a `Face` payload is the GPU `gl_PrimitiveID` triangle index, mapped to a face row through the shared `MeshGeometryPacker::BuildSurfaceTriangleFaceMap` inverse so n-gon fan-triangulation resolves correctly; the missing-hint CPU ray fallback is Slice B.)_
 - [x] Implement graph refinement: edge hints return edge ID and nearest endpoint/node ID; point hints return node ID. _(Slice A.)_
 - [x] Implement point-cloud refinement: point hints return point ID. _(Slice A; the missing-hint nearest-point-along-ray fallback is Slice B.)_
 - [x] Apply entity transforms so refinement reports both local and world hit data. _(Slice A, via `LocalToWorld`.)_

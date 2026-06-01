@@ -11,6 +11,7 @@ module Extrinsic.Runtime.PrimitiveSelectionRefinement;
 
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.SelectionSystem;
+import Extrinsic.Runtime.MeshGeometryPacker;
 import Geometry.Properties;
 
 namespace Extrinsic::Runtime
@@ -279,13 +280,25 @@ namespace Extrinsic::Runtime
                     {
                         return Reject(view, request, PrimitiveRefineStatus::MissingGeometrySource);
                     }
-                    if (payload >= faceHalfedge->size())
+                    // A `Face` selection-id payload is the GPU per-draw triangle
+                    // index (`gl_PrimitiveID`), not a face row: `PackMesh`
+                    // fan-triangulates each n-gon ring to (n - 2) triangles, so
+                    // we must invert that emission order to recover the face.
+                    // `BuildSurfaceTriangleFaceMap` shares `PackMesh`'s walk, so
+                    // the table matches the surface draw exactly.
+                    std::vector<std::uint32_t> triangleToFace;
+                    if (BuildSurfaceTriangleFaceMap(view, triangleToFace) != MeshPackStatus::Success)
                     {
                         return Reject(view, request, PrimitiveRefineStatus::InvalidPrimitivePayload);
                     }
+                    if (payload >= triangleToFace.size())
+                    {
+                        return Reject(view, request, PrimitiveRefineStatus::InvalidPrimitivePayload);
+                    }
+                    const std::uint32_t faceRow = triangleToFace[payload];
 
                     std::vector<std::uint32_t> ring;
-                    if (!CollectFaceRing(*faceHalfedge, *halfedgeNext, *halfedgeToVertex, payload, ring))
+                    if (!CollectFaceRing(*faceHalfedge, *halfedgeNext, *halfedgeToVertex, faceRow, ring))
                     {
                         return Reject(view, request, PrimitiveRefineStatus::InvalidPrimitivePayload);
                     }
@@ -300,7 +313,7 @@ namespace Extrinsic::Runtime
                     PrimitiveSelectionResult result = MakeBase(view, request);
                     result.Status = PrimitiveRefineStatus::Success;
                     result.Kind = RefinedPrimitiveKind::Face;
-                    result.FaceId = payload;
+                    result.FaceId = faceRow;
 
                     // Face centroid is the representative position when no anchor.
                     glm::vec3 centroid{0.0f};
