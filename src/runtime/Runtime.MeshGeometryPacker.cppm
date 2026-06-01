@@ -99,4 +99,21 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] MeshPackResult PackMesh(
         const ECS::Components::GeometrySources::ConstSourceView& view,
         MeshPackBuffer& outBuffer);
+
+    // Build the inverse of the GPU surface picking payload: for every surface
+    // triangle `PackMesh` emits, record the owning face row (the `Faces`
+    // PropertySet slot index). `outTriangleToFace[t]` is the face that produced
+    // surface triangle `t`, where `t == gl_PrimitiveID` over the `SurfaceOpaque`
+    // draw — exactly the 28-bit payload of an `EncodeSelectionId(Face, ...)`
+    // selection id written by `assets/shaders/selection/face_id.frag`. Because
+    // a face with an n-gon ring fan-triangulates to `n - 2` GPU triangles, the
+    // triangle index is NOT the face row; runtime primitive-selection
+    // refinement must map through this table before treating a Face hint as a
+    // face. The walk replays `PackMesh`'s exact face-skip and ring traversal
+    // (they share one internal helper, so the surface triangle order and this
+    // map cannot drift). `outTriangleToFace` is cleared on entry; a non-Success
+    // status (mirroring `PackMesh`'s validation) leaves it cleared.
+    [[nodiscard]] MeshPackStatus BuildSurfaceTriangleFaceMap(
+        const ECS::Components::GeometrySources::ConstSourceView& view,
+        std::vector<std::uint32_t>& outTriangleToFace);
 }

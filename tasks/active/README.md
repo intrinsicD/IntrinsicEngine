@@ -11,7 +11,18 @@ Each active task should include:
 
 ## Currently active
 
-_None._ The most recently retired task is summarised below.
+[`RUNTIME-093`](RUNTIME-093-primitive-selection-refinement.md) — runtime
+primitive selection refinement for meshes, graphs, and point clouds (Theme A
+working-sandbox path). Status `in-progress` on branch
+`claude/intrinsicengine-agent-onboarding-bUPlk`, maturity target `CPUContracted`.
+Slice A lands the standalone `Extrinsic.Runtime.PrimitiveSelectionRefinement`
+module (result type + fail-closed taxonomy + hint-based mesh/graph/point-cloud
+refinement against authoritative `GeometrySources`, with entity-transform local/
+world hit reporting and `contract;runtime` fixture tests) at `Scaffolded`. Slice
+B integrates refined results into the `SelectionController` and adds the optional
+CPU ray fallback to close `CPUContracted`. Unblocked by the retired
+`RUNTIME-089` and `RUNTIME-085..088`. The most recently retired task is
+summarised below.
 
 Previously-active
 [`RUNTIME-092`](../done/RUNTIME-092-stable-entity-lookup.md) — runtime stable
