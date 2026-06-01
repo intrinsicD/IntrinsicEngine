@@ -83,6 +83,25 @@ export namespace Extrinsic::Runtime
         bool HasLocalHit{false};
         glm::vec3 LocalHit{0.0f};
 
+        // Optional CPU ray fallback for a *missing* hint (`SelectionPrimitiveDomain::None`,
+        // i.e. an `EncodedSelectionId` with no sub-primitive). When `HasPickRay`
+        // is set and the hint carries no usable primitive, refinement searches for
+        // the entity's nearest mesh vertex / graph node / point-cloud point whose
+        // perpendicular distance to the ray is within `FallbackRadius`, reporting
+        // `CpuFallbackResolved` (or `CpuFallbackMiss` when nothing qualifies). The
+        // ray is entity-local space — the runtime caller, which owns the entity
+        // transform, transforms a world-space pick ray into local space so this
+        // entry point stays pure and only ever maps local→world for reporting. A
+        // valid hint always wins over the ray; the fallback never overrides a
+        // resolved `Face`/`Edge`/`Point`/`Entity` hit.
+        bool HasPickRay{false};
+        glm::vec3 RayOrigin{0.0f};
+        glm::vec3 RayDirection{0.0f, 0.0f, -1.0f}; // need not be normalised.
+        // Max perpendicular distance (local units) from the ray for a primitive
+        // to qualify. `<= 0` yields a deterministic `CpuFallbackMiss` unless a
+        // primitive lies exactly on the ray.
+        float FallbackRadius{0.0f};
+
         // Entity local-to-world transform used to report the world-space hit.
         glm::mat4 LocalToWorld{1.0f};
     };
