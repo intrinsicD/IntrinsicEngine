@@ -273,6 +273,7 @@ intrinsic_test_object_lib(EcsContractTestObjs
 if(TARGET ExtrinsicRuntime)
     set(_runtime_contract_test_files
         Test.GpuAssetCacheFallbackBootstrap.cpp
+        Test.ImGuiAdapter.cpp
         Test.MeshGeometryExtraction.cpp
         Test.MeshGeometryPacker.cpp
         Test.MeshPrimitiveViewPacker.cpp
@@ -300,10 +301,12 @@ if(TARGET ExtrinsicRuntime)
         SEARCH_DIRS contract/runtime
         FILES ${_runtime_contract_test_files}
     )
+    # imgui_core_lib (backend-agnostic ImGui, no GLFW/Vulkan) gives
+    # Test.ImGuiAdapter.cpp the imgui.h include path to synthesize a panel draw.
     intrinsic_test_object_lib(RuntimeContractTestObjs
         SOURCES
             ${_runtime_contract_test_sources}
-        DEPS ExtrinsicRuntime
+        DEPS ExtrinsicRuntime imgui_core_lib
     )
 endif()
 

@@ -11,10 +11,20 @@ Each active task should include:
 
 ## Currently active
 
-_None._ Pick the next task from [`tasks/backlog/README.md`](../backlog/README.md)
-per the priority rules (continue Theme A's working-sandbox path: the next
-unblocked leaf after `RUNTIME-093`). The most recently retired tasks are
-summarised below.
+[`RUNTIME-090`](RUNTIME-090-imgui-platform-renderer-adapter.md) — runtime-side
+Dear ImGui platform/renderer adapter (`Extrinsic.Runtime.ImGuiAdapter`, Theme A
+working-sandbox path stage 4, the producer half of the ImGui/UI leaves that
+gate `UI-001`). Status: **in-progress (Slice A)**, owner/branch
+`claude/intrinsicengine-agent-onboarding-qu8wV`. Slice A lands the standalone
+adapter module (ImGui 1.92 context lifecycle with
+`ImGuiBackendFlags_RendererHasTextures`, `Platform::Event`→ImGui-IO pump,
+`ImDrawData`→`ImGuiOverlayFrame` walk, editor hook, diagnostics) with
+`FakeWindow`-driven `contract;runtime` coverage at `Scaffolded→CPUContracted`;
+`imgui_lib` is linked **PRIVATE** to `ExtrinsicRuntime` and `imgui.h` stays out
+of the `.cppm` interface. Slice B (deferred) wires the adapter into
+`Engine::RunFrame` and exposes the editor hook. Next verification step: build
+`IntrinsicTests` and run the `ImGuiAdapter*` `contract;runtime` cases under the
+default CPU gate. The most recently retired tasks are summarised below.
 
 Previously-active
 [`RUNTIME-093`](../done/RUNTIME-093-primitive-selection-refinement.md) — runtime
