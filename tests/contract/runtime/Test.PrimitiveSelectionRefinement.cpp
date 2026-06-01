@@ -463,6 +463,134 @@ TEST(PrimitiveSelectionRefinement, PointCloudEdgeHintIsUnsupported)
     EXPECT_EQ(result.Status, PrimitiveRefineStatus::UnsupportedDomain);
 }
 
+// ---- CPU ray fallback (missing hint) ---------------------------------------
+
+TEST(PrimitiveSelectionRefinement, PointCloudMissingHintRayFallbackResolvesNearestPoint)
+{
+    const CloudScratch cloud; // points (0,0,0),(1,1,1),(2,2,2).
+    PrimitiveRefineRequest request = BaseRequest();
+    // Default Hint is the all-zero (`None` domain) "no hit" encoding.
+    request.HasPickRay = true;
+    request.RayOrigin = glm::vec3(1.0f, 1.0f, -5.0f);
+    request.RayDirection = glm::vec3(0.0f, 0.0f, 1.0f); // line x=1, y=1.
+    request.FallbackRadius = 0.5f;
+
+    const PrimitiveSelectionResult result = RefinePrimitiveSelection(cloud.View(), request);
+
+    EXPECT_EQ(result.Status, PrimitiveRefineStatus::CpuFallbackResolved);
+    EXPECT_TRUE(result.Resolved());
+    EXPECT_EQ(result.Domain, Domain::PointCloud);
+    EXPECT_EQ(result.Kind, RefinedPrimitiveKind::Point);
+    EXPECT_EQ(result.PointId, 1u); // (1,1,1) lies on the ray.
+    EXPECT_EQ(result.VertexId, kInvalidPrimitiveIndex);
+    EXPECT_TRUE(result.HasHitPosition);
+    EXPECT_FLOAT_EQ(result.LocalHit.x, 1.0f);
+    EXPECT_FLOAT_EQ(result.LocalHit.y, 1.0f);
+    EXPECT_FLOAT_EQ(result.LocalHit.z, 1.0f);
+}
+
+TEST(PrimitiveSelectionRefinement, RayFallbackOutsideRadiusMissesClosed)
+{
+    const CloudScratch cloud;
+    PrimitiveRefineRequest request = BaseRequest();
+    request.HasPickRay = true;
+    request.RayOrigin = glm::vec3(10.0f, 10.0f, -5.0f);
+    request.RayDirection = glm::vec3(0.0f, 0.0f, 1.0f);
+    request.FallbackRadius = 0.5f; // every point is far from this ray.
+
+    const PrimitiveSelectionResult result = RefinePrimitiveSelection(cloud.View(), request);
+
+    EXPECT_EQ(result.Status, PrimitiveRefineStatus::CpuFallbackMiss);
+    EXPECT_FALSE(result.Resolved());
+    EXPECT_EQ(result.PointId, kInvalidPrimitiveIndex);
+    EXPECT_FALSE(result.HasHitPosition);
+}
+
+TEST(PrimitiveSelectionRefinement, MissingHintWithoutRayIsUnsupported)
+{
+    const CloudScratch cloud;
+    PrimitiveRefineRequest request = BaseRequest();
+    // None-domain hint and HasPickRay left false: no fallback is configured, so
+    // the deterministic fail-closed outcome is preserved.
+    const PrimitiveSelectionResult result = RefinePrimitiveSelection(cloud.View(), request);
+
+    EXPECT_EQ(result.Status, PrimitiveRefineStatus::UnsupportedDomain);
+    EXPECT_FALSE(result.Resolved());
+}
+
+TEST(PrimitiveSelectionRefinement, DegenerateRayFallbackMissesClosed)
+{
+    const CloudScratch cloud;
+    PrimitiveRefineRequest request = BaseRequest();
+    request.HasPickRay = true;
+    request.RayOrigin = glm::vec3(1.0f, 1.0f, 1.0f); // sits exactly on point 1.
+    request.RayDirection = glm::vec3(0.0f, 0.0f, 0.0f); // degenerate.
+    request.FallbackRadius = 1.0f;
+
+    const PrimitiveSelectionResult result = RefinePrimitiveSelection(cloud.View(), request);
+
+    EXPECT_EQ(result.Status, PrimitiveRefineStatus::CpuFallbackMiss);
+}
+
+TEST(PrimitiveSelectionRefinement, RayFallbackReportsTransformedWorldHit)
+{
+    const CloudScratch cloud;
+    PrimitiveRefineRequest request = BaseRequest();
+    request.HasPickRay = true;
+    request.RayOrigin = glm::vec3(1.0f, 1.0f, -5.0f);
+    request.RayDirection = glm::vec3(0.0f, 0.0f, 1.0f);
+    request.FallbackRadius = 0.5f;
+    glm::mat4 transform(1.0f);
+    transform[3] = glm::vec4(10.0f, 20.0f, 30.0f, 1.0f);
+    request.LocalToWorld = transform;
+
+    const PrimitiveSelectionResult result = RefinePrimitiveSelection(cloud.View(), request);
+
+    ASSERT_EQ(result.Status, PrimitiveRefineStatus::CpuFallbackResolved);
+    EXPECT_EQ(result.PointId, 1u);
+    EXPECT_FLOAT_EQ(result.LocalHit.x, 1.0f);
+    EXPECT_FLOAT_EQ(result.WorldHit.x, 11.0f);
+    EXPECT_FLOAT_EQ(result.WorldHit.y, 21.0f);
+    EXPECT_FLOAT_EQ(result.WorldHit.z, 31.0f);
+}
+
+TEST(PrimitiveSelectionRefinement, MeshMissingHintRayFallbackResolvesNearestVertex)
+{
+    const MeshScratch mesh; // vertices (0,0,0),(1,0,0),(0,1,0).
+    PrimitiveRefineRequest request = BaseRequest();
+    request.HasPickRay = true;
+    request.RayOrigin = glm::vec3(1.0f, 0.0f, -5.0f);
+    request.RayDirection = glm::vec3(0.0f, 0.0f, 1.0f); // line x=1, y=0 -> vertex 1.
+    request.FallbackRadius = 0.5f;
+
+    const PrimitiveSelectionResult result = RefinePrimitiveSelection(mesh.View(), request);
+
+    EXPECT_EQ(result.Status, PrimitiveRefineStatus::CpuFallbackResolved);
+    EXPECT_EQ(result.Domain, Domain::Mesh);
+    EXPECT_EQ(result.Kind, RefinedPrimitiveKind::Vertex);
+    EXPECT_EQ(result.VertexId, 1u);
+    EXPECT_EQ(result.PointId, kInvalidPrimitiveIndex);
+    EXPECT_TRUE(result.HasHitPosition);
+    EXPECT_FLOAT_EQ(result.LocalHit.x, 1.0f);
+}
+
+TEST(PrimitiveSelectionRefinement, GraphMissingHintRayFallbackResolvesNearestNode)
+{
+    const GraphScratch graph; // nodes (0,0,0),(2,0,0).
+    PrimitiveRefineRequest request = BaseRequest();
+    request.HasPickRay = true;
+    request.RayOrigin = glm::vec3(2.0f, 0.0f, -5.0f);
+    request.RayDirection = glm::vec3(0.0f, 0.0f, 1.0f); // line x=2 -> node 1.
+    request.FallbackRadius = 0.5f;
+
+    const PrimitiveSelectionResult result = RefinePrimitiveSelection(graph.View(), request);
+
+    EXPECT_EQ(result.Status, PrimitiveRefineStatus::CpuFallbackResolved);
+    EXPECT_EQ(result.Domain, Domain::Graph);
+    EXPECT_EQ(result.Kind, RefinedPrimitiveKind::Vertex); // graph node -> Vertex.
+    EXPECT_EQ(result.VertexId, 1u);
+}
+
 // ---- Cross-cutting ---------------------------------------------------------
 
 TEST(PrimitiveSelectionRefinement, StaleEntityIsRejectedBeforeGeometry)

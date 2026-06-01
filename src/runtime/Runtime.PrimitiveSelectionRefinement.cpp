@@ -51,6 +51,46 @@ namespace Extrinsic::Runtime
             return glm::vec3(localToWorld * glm::vec4(local, 1.0f));
         }
 
+        // Below this squared direction length the pick ray is treated as
+        // degenerate and the fallback fails closed (`CpuFallbackMiss`) rather
+        // than dividing by ~zero.
+        inline constexpr float kRayDirEpsilonSq = 1.0e-12f;
+
+        // Nearest point index whose perpendicular distance to the pick ray (a
+        // half-line clamped at the origin, t >= 0) is minimal and within
+        // `radius`. Returns kInvalidPrimitiveIndex when nothing qualifies or the
+        // ray is degenerate. Tie-break: smallest index (strict `<` keeps the
+        // first-seen winner).
+        [[nodiscard]] std::uint32_t NearestPointAlongRay(const std::vector<glm::vec3>& positions,
+                                                         const glm::vec3& origin,
+                                                         const glm::vec3& direction,
+                                                         float radius) noexcept
+        {
+            const float dirLenSq = glm::dot(direction, direction);
+            if (dirLenSq <= kRayDirEpsilonSq)
+            {
+                return kInvalidPrimitiveIndex;
+            }
+            const glm::vec3 dir = direction * glm::inversesqrt(dirLenSq);
+            const float radiusSq = radius > 0.0f ? radius * radius : 0.0f;
+
+            std::uint32_t best = kInvalidPrimitiveIndex;
+            float bestSq = 0.0f;
+            for (std::size_t i = 0; i < positions.size(); ++i)
+            {
+                const glm::vec3 p = positions[i];
+                const float t = glm::max(glm::dot(p - origin, dir), 0.0f);
+                const glm::vec3 closest = origin + t * dir;
+                const float sq = SquaredDistance(p, closest);
+                if (sq <= radiusSq && (best == kInvalidPrimitiveIndex || sq < bestSq))
+                {
+                    bestSq = sq;
+                    best = static_cast<std::uint32_t>(i);
+                }
+            }
+            return best;
+        }
+
         // ---- result construction --------------------------------------------
 
         [[nodiscard]] PrimitiveSelectionResult MakeBase(const ConstSourceView& view,
@@ -98,6 +138,41 @@ namespace Extrinsic::Runtime
                 result.LocalHit = local;
                 result.WorldHit = ToWorld(request.LocalToWorld, local);
             }
+        }
+
+        // CPU ray fallback for a missing hint: resolve the nearest mesh vertex /
+        // graph node / point-cloud point along the request's local pick ray. On a
+        // qualifying hit reports `CpuFallbackResolved` with the resolved index in
+        // the field matching `kind` and the primitive's local position transformed
+        // to world; otherwise reports the deterministic `CpuFallbackMiss`.
+        [[nodiscard]] PrimitiveSelectionResult RefineByRayFallback(const ConstSourceView& view,
+                                                                   const PrimitiveRefineRequest& request,
+                                                                   const std::vector<glm::vec3>& positions,
+                                                                   RefinedPrimitiveKind kind) noexcept
+        {
+            const std::uint32_t idx = NearestPointAlongRay(
+                positions, request.RayOrigin, request.RayDirection, request.FallbackRadius);
+            if (idx == kInvalidPrimitiveIndex)
+            {
+                return Reject(view, request, PrimitiveRefineStatus::CpuFallbackMiss);
+            }
+
+            PrimitiveSelectionResult result = MakeBase(view, request);
+            result.Status = PrimitiveRefineStatus::CpuFallbackResolved;
+            result.Kind = kind;
+            if (kind == RefinedPrimitiveKind::Point)
+            {
+                result.PointId = idx;
+            }
+            else
+            {
+                // Mesh vertex / graph node.
+                result.VertexId = idx;
+            }
+            result.HasHitPosition = true;
+            result.LocalHit = positions[idx];
+            result.WorldHit = ToWorld(request.LocalToWorld, positions[idx]);
+            return result;
         }
 
         // ---- property accessors ---------------------------------------------
@@ -379,6 +454,16 @@ namespace Extrinsic::Runtime
                     StampHit(result, request, true, centroid);
                     return result;
                 }
+                case SelectionPrimitiveDomain::None:
+                {
+                    // No usable hint: resolve the nearest mesh vertex along the
+                    // local pick ray when one is supplied, else fail closed.
+                    if (request.HasPickRay)
+                    {
+                        return RefineByRayFallback(view, request, *positions, RefinedPrimitiveKind::Vertex);
+                    }
+                    return Reject(view, request, PrimitiveRefineStatus::UnsupportedDomain);
+                }
                 default:
                     return Reject(view, request, PrimitiveRefineStatus::UnsupportedDomain);
             }
@@ -465,6 +550,17 @@ namespace Extrinsic::Runtime
                     StampHit(result, request, true, 0.5f * (pa + pb));
                     return result;
                 }
+                case SelectionPrimitiveDomain::None:
+                {
+                    // No usable hint: resolve the nearest graph node along the
+                    // local pick ray (reported as `Vertex` kind) when one is
+                    // supplied, else fail closed.
+                    if (request.HasPickRay)
+                    {
+                        return RefineByRayFallback(view, request, *positions, RefinedPrimitiveKind::Vertex);
+                    }
+                    return Reject(view, request, PrimitiveRefineStatus::UnsupportedDomain);
+                }
                 default:
                     return Reject(view, request, PrimitiveRefineStatus::UnsupportedDomain);
             }
@@ -509,6 +605,16 @@ namespace Extrinsic::Runtime
                     result.PointId = payload;
                     StampHit(result, request, true, (*positions)[payload]);
                     return result;
+                }
+                case SelectionPrimitiveDomain::None:
+                {
+                    // No usable hint: resolve the nearest cloud point along the
+                    // local pick ray when one is supplied, else fail closed.
+                    if (request.HasPickRay)
+                    {
+                        return RefineByRayFallback(view, request, *positions, RefinedPrimitiveKind::Point);
+                    }
+                    return Reject(view, request, PrimitiveRefineStatus::UnsupportedDomain);
                 }
                 default:
                     return Reject(view, request, PrimitiveRefineStatus::UnsupportedDomain);
