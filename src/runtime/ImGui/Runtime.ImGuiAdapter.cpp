@@ -140,15 +140,22 @@ namespace Extrinsic::Runtime
                     {
                         io.AddInputCharacter(e.Character);
                     }
-                    else if constexpr (std::is_same_v<T, Platform::WindowResizeEvent>)
-                    {
-                        io.DisplaySize = ImVec2(e.Width > 0 ? static_cast<float>(e.Width) : 0.0f,
-                                                e.Height > 0 ? static_cast<float>(e.Height) : 0.0f);
-                    }
-                    // WindowCloseEvent / KeyEvent / WindowDropEvent are counted as
-                    // pumped but not translated here: GLFW key-code -> ImGuiKey
-                    // mapping is owned by the editor input-binding slice (Slice A
-                    // non-goal), and close/drop have no ImGui IO equivalent.
+                    // WindowResizeEvent is intentionally NOT written into
+                    // io.DisplaySize. Display metrics are refreshed every frame
+                    // from the authoritative window port (logical
+                    // GetWindowExtent + framebuffer GetFramebufferExtent) at the
+                    // top of BeginFrame, keeping io.DisplaySize logical and
+                    // io.DisplayFramebufferScale carrying the pixel ratio. The
+                    // resize payload is in backend-specific framebuffer pixels
+                    // (the GLFW backend emits framebuffer width/height for both
+                    // the resize and content-scale callbacks), so writing it into
+                    // io.DisplaySize would double-scale the overlay frame on
+                    // HiDPI displays (DisplaySize * DisplayFramebufferScale).
+                    // WindowCloseEvent / KeyEvent / WindowDropEvent are likewise
+                    // counted as pumped but not translated: GLFW key-code ->
+                    // ImGuiKey mapping is owned by the editor input-binding slice
+                    // (Slice A non-goal), and close/drop have no ImGui IO
+                    // equivalent.
                 },
                 event);
         }

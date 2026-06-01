@@ -39,6 +39,15 @@ namespace
 
         void QueueEvent(Plat::Event event) { m_Pending.push_back(std::move(event)); }
 
+        // Simulate a resize / DPI change: the window port reports the new logical
+        // window and framebuffer extents (as GLFW's callbacks update them before
+        // events are drained).
+        void SetExtents(const Plat::Extent2D window, const Plat::Extent2D framebuffer)
+        {
+            m_Extent = window;
+            m_Framebuffer = framebuffer;
+        }
+
         void PollEvents() override {}
         [[nodiscard]] bool ShouldClose() const override { return false; }
         [[nodiscard]] bool IsMinimized() const override { return false; }
@@ -176,9 +185,15 @@ TEST(ImGuiAdapter, EditorCallbackInvokedOncePerFramePair)
 
 // --- input pump + resize ------------------------------------------------------
 
-TEST(ImGuiAdapter, PumpsInputEventsAndResizeUpdatesDisplaySize)
+// Input events pump into ImGui IO, and a resize on a HiDPI display reports
+// framebuffer pixels in the overlay frame without double-scaling. The GLFW
+// backend emits WindowResizeEvent in framebuffer pixels while io.DisplaySize
+// must stay logical, so display metrics are sourced from the window port each
+// frame, never from the resize payload.
+TEST(ImGuiAdapter, PumpsInputAndResizeReportsFramebufferPixelsWithoutDoubleScaling)
 {
-    FakeWindow         window(100, 100);
+    FakeWindow window(400, 300);
+    window.SetExtents(Plat::Extent2D{400, 300}, Plat::Extent2D{800, 600}); // HiDPI, scale 2
     ImGuiOverlaySystem overlay;
     ImGuiAdapter       adapter(window, overlay);
 
@@ -188,15 +203,32 @@ TEST(ImGuiAdapter, PumpsInputEventsAndResizeUpdatesDisplaySize)
     window.QueueEvent(Plat::MouseButtonEvent{0, true});
     window.QueueEvent(Plat::ScrollEvent{0.0, 1.0});
     window.QueueEvent(Plat::CharEvent{static_cast<unsigned int>('A')});
-    window.QueueEvent(Plat::WindowResizeEvent{800, 600});
 
     adapter.BeginFrame(kFrameDelta);
     adapter.EndFrame();
+    {
+        const auto& diag = adapter.GetDiagnostics();
+        EXPECT_EQ(diag.PumpedEventCount, 4u);
+        // 400 logical * 2 scale = 800 framebuffer pixels.
+        EXPECT_EQ(diag.DisplayWidth, 800u);
+        EXPECT_EQ(diag.DisplayHeight, 600u);
+    }
 
-    const auto& diag = adapter.GetDiagnostics();
-    EXPECT_EQ(diag.PumpedEventCount, 5u);
-    EXPECT_EQ(diag.DisplayWidth, 800u);  // resize event overrides the window extent
-    EXPECT_EQ(diag.DisplayHeight, 600u);
+    // Resize on the HiDPI display: the window port reports the new logical and
+    // framebuffer extents, and GLFW emits a framebuffer-pixel WindowResizeEvent.
+    window.SetExtents(Plat::Extent2D{800, 600}, Plat::Extent2D{1600, 1200});
+    window.QueueEvent(Plat::WindowResizeEvent{1600, 1200});
+
+    adapter.BeginFrame(kFrameDelta);
+    adapter.EndFrame();
+    {
+        const auto& diag = adapter.GetDiagnostics();
+        EXPECT_EQ(diag.PumpedEventCount, 5u);
+        // Framebuffer pixels (1600x1200), NOT double-scaled (3200x2400) from
+        // writing the framebuffer-pixel resize payload into io.DisplaySize.
+        EXPECT_EQ(diag.DisplayWidth, 1600u);
+        EXPECT_EQ(diag.DisplayHeight, 1200u);
+    }
 }
 
 // --- DPI / font rebuild -------------------------------------------------------
