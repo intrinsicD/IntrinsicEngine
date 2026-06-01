@@ -11,6 +11,7 @@ export module Extrinsic.Runtime.SelectionController;
 
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Runtime.StableEntityLookup;
 
 export namespace Extrinsic::Runtime
 {
@@ -178,12 +179,12 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] SelectionControllerConfig&            GetConfig() noexcept;
         [[nodiscard]] const SelectionControllerConfig&      GetConfig() const noexcept;
 
-        // --- runtime-owned lookup seam (RUNTIME-092 upgrade point) ---
-        // The stable entity id used by extraction / graphics is currently the
+        // --- runtime-owned lookup seam (RUNTIME-092) ---
+        // The stable entity id used by extraction / graphics is the
         // `entt::entity` value cast to uint32, mirroring
-        // `RenderExtractionCache::StableEntityId`. RUNTIME-092 replaces this with
-        // a real `StableId` sidecar; centralising the cast here keeps that swap
-        // to one place.
+        // `RenderExtractionCache::StableEntityId`. The bare cast is the
+        // identity encoding; centralising it here keeps the encode/decode in
+        // one place.
         [[nodiscard]] static std::uint32_t ToStableEntityId(EntityHandle entity) noexcept
         {
             return static_cast<std::uint32_t>(entity);
@@ -192,6 +193,21 @@ export namespace Extrinsic::Runtime
         {
             return static_cast<EntityHandle>(stableEntityId);
         }
+
+        // RUNTIME-092 Slice B: route render-id resolution through the
+        // runtime-owned `StableEntityLookup` sidecar. When a lookup is attached
+        // the controller resolves an incoming render id with
+        // `ResolveByRenderId` (which decodes the handle *and* validates it
+        // against the registry, so a recycled/destroyed slot is rejected by the
+        // single runtime-owned authority and counted in the lookup diagnostics)
+        // instead of the bare cast. When no lookup is attached (the controller's
+        // standalone unit/contract use) resolution falls back to
+        // `ToEntityHandle` + the controller's own validity check, so existing
+        // direct-drive callers are unaffected. The controller does not own the
+        // lookup's lifetime; `Engine` owns it and rebuilds it each frame before
+        // readback consumption.
+        void SetStableEntityLookup(StableEntityLookup* lookup) noexcept;
+        [[nodiscard]] const StableEntityLookup* GetStableEntityLookup() const noexcept;
 
     private:
         // Diff `desired` against the current set, sync `SelectedTag`, refresh the
@@ -209,6 +225,12 @@ export namespace Extrinsic::Runtime
         void ApplyHitReadback(Registry& registry, std::uint32_t stableEntityId,
                               std::optional<std::uint64_t> pickSequence);
         void ApplyNoHitReadback(Registry& registry, std::optional<std::uint64_t> pickSequence);
+        // Resolve an incoming render/extraction stable id to a live entity
+        // through the attached `StableEntityLookup` (if any), else via the bare
+        // decode + the registry validity check. Returns `InvalidEntityHandle`
+        // for a stale / recycled / invalid id.
+        [[nodiscard]] EntityHandle ResolveStableEntityId(Registry& registry,
+                                                         std::uint32_t stableEntityId);
 
         SelectionControllerConfig      m_Config{};
         SelectionControllerDiagnostics m_Diagnostics{};
@@ -227,5 +249,9 @@ export namespace Extrinsic::Runtime
 
         EntityHandle m_Hovered    = Extrinsic::ECS::InvalidEntityHandle;
         bool         m_HasHovered = false;
+
+        // Non-owning. `Engine` owns the lookup and rebuilds it each frame before
+        // readback consumption; null in the controller's standalone use.
+        StableEntityLookup* m_StableLookup = nullptr;
     };
 }

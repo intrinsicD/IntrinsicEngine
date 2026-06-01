@@ -290,6 +290,7 @@ if(TARGET ExtrinsicRuntime)
         Test.SelectionController.cpp
         Test.SelectionReadbackCorrelation.cpp
         Test.SelectionSnapshotExtraction.cpp
+        Test.SelectionStableLookupComposition.cpp
         Test.SpatialDebugAdapters.cpp
         Test.StableEntityLookup.cpp
     )
