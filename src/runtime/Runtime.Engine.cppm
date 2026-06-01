@@ -17,6 +17,7 @@ import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.ReferenceScene;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.StableEntityLookup;
@@ -210,6 +211,15 @@ namespace Extrinsic::Runtime
         // extraction, consumes the readback after present, and mirrors the
         // controller snapshot into RenderWorld::Selection.
         [[nodiscard]] SelectionController&    GetSelectionController() noexcept;
+        // RUNTIME-093 Slice B2 — editor-facing refined-primitive selection cache.
+        // RunFrame refines each pick readback's encoded primitive hint against the
+        // hit entity's authoritative `GeometrySources` (newest pick wins; a
+        // background readback clears it; an empty-drain frame retains the prior
+        // value). Tracks the sub-primitive under the last pick hit, keyed by render
+        // id for correlation with the controller's selection; empty until the first
+        // pick resolves. Graphics never reads this — it only produced the hint.
+        [[nodiscard]] const std::optional<PrimitiveSelectionResult>&
+            GetLastRefinedPrimitiveSelection() const noexcept;
         [[nodiscard]] Core::FrameGraph&       GetFrameGraph()    noexcept;
         [[deprecated("Use Runtime.StreamingExecutor integration; TaskGraph bridge is temporary.")]]
         [[nodiscard]] Core::Dag::TaskGraph&   GetStreamingGraph() noexcept;
@@ -247,6 +257,10 @@ namespace Extrinsic::Runtime
         // controller in Initialize() so selection resolves durable ids through
         // the single runtime authority (ECS/graphics hold no lookup state).
         StableEntityLookup                    m_StableEntityLookup{};
+        // RUNTIME-093 Slice B2 — editor-facing refined sub-primitive of the last
+        // pick hit. Updated from the pick-readback drain in RunFrame; never read
+        // by graphics. Empty until the first pick resolves.
+        std::optional<PrimitiveSelectionResult> m_LastRefinedPrimitive{};
 
         // CPU task graph — ECS system scheduling
         std::unique_ptr<Core::FrameGraph>      m_FrameGraph;
