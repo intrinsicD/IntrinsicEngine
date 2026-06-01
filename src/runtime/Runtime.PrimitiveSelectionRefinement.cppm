@@ -1,12 +1,14 @@
 module;
 
 #include <cstdint>
+#include <optional>
 
 #include <glm/glm.hpp>
 
 export module Extrinsic.Runtime.PrimitiveSelectionRefinement;
 
 import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.SelectionSystem;
 
 export namespace Extrinsic::Runtime
@@ -141,4 +143,24 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] PrimitiveSelectionResult RefinePrimitiveSelection(
         const ECS::Components::GeometrySources::ConstSourceView& view,
         const PrimitiveRefineRequest& request);
+
+    // Frame-loop bridge from a graphics pick readback to an authoritative
+    // primitive selection result, owned by `runtime` (the only layer allowed to
+    // bridge graphics pick output with the CPU `GeometrySources` authority).
+    //
+    // The readback's `StableEntityId` is the *render id* (the `entt::entity`
+    // handle cast to `uint32`, the identity encoding `RenderExtractionCache` /
+    // `SelectionController` share). This function resolves it to a live entity by
+    // decoding + a `registry.valid()` version check, so a stale render id naming a
+    // recycled/destroyed slot reports a deterministic `StaleEntity` result rather
+    // than refining the slot's new occupant. The entity's `Transform::WorldMatrix`
+    // (identity when absent) supplies `LocalToWorld`, the `GeometrySources` view is
+    // built from the live registry, and `RefinePrimitiveSelection` does the rest.
+    //
+    // A background (no-hit) readback resolves to no sub-primitive (`std::nullopt`).
+    // Pure read: it mutates neither the registry nor any selection state — the
+    // caller (`Engine::RunFrame`) owns the editor-facing cache it is stored in.
+    [[nodiscard]] std::optional<PrimitiveSelectionResult> RefinePickReadbackResult(
+        ECS::Scene::Registry& scene,
+        const Extrinsic::Graphics::PickReadbackResult& readback);
 }

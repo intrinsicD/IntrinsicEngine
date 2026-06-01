@@ -2,14 +2,18 @@ module;
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string_view>
 #include <vector>
 
+#include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
 
 module Extrinsic.Runtime.PrimitiveSelectionRefinement;
 
 import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.ECS.Component.Transform.WorldMatrix;
+import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.SelectionSystem;
 import Extrinsic.Runtime.MeshGeometryPacker;
 import Geometry.Properties;
@@ -657,5 +661,47 @@ namespace Extrinsic::Runtime
             default:
                 return Reject(view, request, PrimitiveRefineStatus::UnsupportedDomain);
         }
+    }
+
+    std::optional<PrimitiveSelectionResult> RefinePickReadbackResult(
+        ECS::Scene::Registry& scene,
+        const Extrinsic::Graphics::PickReadbackResult& readback)
+    {
+        // A background (no-hit) readback resolves to no sub-primitive.
+        if (!readback.Hit)
+        {
+            return std::nullopt;
+        }
+
+        PrimitiveRefineRequest request{};
+        // The readback carries the render id (entt handle cast to uint32); echo it
+        // as the result's correlation key. The durable StableId is resolved by the
+        // separate StableEntityLookup path and is left 0 here.
+        request.EntityId = readback.StableEntityId;
+        request.Hint     = readback.EncodedId;
+
+        const auto entity = static_cast<entt::entity>(readback.StableEntityId);
+
+        // Recycling safety: a stale render id naming a destroyed/recycled slot has
+        // a mismatched version, so the live registry rejects it and the bridge
+        // reports a deterministic StaleEntity result (RefinePrimitiveSelection
+        // fail-closes on `!EntityIsLive` before touching any geometry) rather than
+        // refining whatever entity now occupies the slot.
+        if (!scene.Raw().valid(entity))
+        {
+            request.EntityIsLive = false;
+            return RefinePrimitiveSelection(ConstSourceView{}, request);
+        }
+
+        request.EntityIsLive = true;
+        if (const auto* world =
+                scene.Raw().try_get<ECS::Components::Transform::WorldMatrix>(entity))
+        {
+            request.LocalToWorld = world->Matrix;
+        }
+
+        const ConstSourceView view =
+            ECS::Components::GeometrySources::BuildConstView(scene.Raw(), entity);
+        return RefinePrimitiveSelection(view, request);
     }
 }

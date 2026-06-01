@@ -39,6 +39,7 @@ import Extrinsic.Graphics.SelectionSystem;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Core.FrameLoop;
 import Extrinsic.Runtime.EcsSystemBundle;
+import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.ReferenceScene;
 import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.RenderExtraction;
@@ -917,6 +918,15 @@ namespace Extrinsic::Runtime
                     else
                         m_SelectionController.ConsumeNoHit(*m_Scene);
                 }
+
+                // ── RUNTIME-093 Slice B2: refine the pick into a sub-primitive ──
+                // Bridge each readback's encoded primitive hint to the authoritative
+                // CPU GeometrySources of the hit entity and cache the result for the
+                // editor. The whole loop runs oldest→newest, so the last readback's
+                // refinement wins, matching the controller's latest-pick-wins
+                // coalescing; a background (no-hit) readback clears the cache. The
+                // bridge mutates nothing and only ever reads the live registry.
+                m_LastRefinedPrimitive = RefinePickReadbackResult(*m_Scene, *result);
             }
         }
 
@@ -942,6 +952,8 @@ namespace Extrinsic::Runtime
     Graphics::GpuAssetCache& Engine::GetGpuAssetCache() noexcept { return *m_GpuAssetCache; }
     ECS::Scene::Registry& Engine::GetScene()         noexcept { return *m_Scene;         }
     SelectionController&  Engine::GetSelectionController() noexcept { return m_SelectionController; }
+    const std::optional<PrimitiveSelectionResult>&
+    Engine::GetLastRefinedPrimitiveSelection() const noexcept { return m_LastRefinedPrimitive; }
     Core::FrameGraph&     Engine::GetFrameGraph()    noexcept { return *m_FrameGraph;    }
     Core::Dag::TaskGraph& Engine::GetStreamingGraph() noexcept { return *m_StreamingGraph; }
 

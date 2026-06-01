@@ -1,16 +1,53 @@
 # RUNTIME-093 — Primitive selection refinement for meshes, graphs, and point clouds
 
 ## Status
-- State: in-progress.
+- State: done.
 - Owner/agent: claude.
-- Branch: `claude/intrinsicengine-agent-onboarding-KpmSE` (Slice B1).
+- Branch: `claude/intrinsicengine-agent-onboarding-X3GCq` (Slice B2).
+  Slice B1 landed on `claude/intrinsicengine-agent-onboarding-KpmSE` (PR #960).
   Slice A landed on `claude/intrinsicengine-agent-onboarding-bUPlk` (PR #959).
-- Maturity target: `CPUContracted` (Slice A standalone refinement core +
-  Slice B1 CPU ray fallback + Slice B2 `SelectionController` integration).
-- Next verification step: Slice B1 — build `IntrinsicRuntimeTests` and run the
-  `contract;runtime` gate filtered to `PrimitiveSelectionRefinement`, then the
-  full runtime contract gate, plus layering/test-layout/doc-links/
-  module-inventory checks. Slice A already verified and merged.
+- Maturity reached: `CPUContracted` (Slice A standalone refinement core +
+  Slice B1 CPU ray fallback + Slice B2 runtime frame-loop integration).
+- Completion date: 2026-06-01.
+- PR/commit: Slice A — PR #959; Slice B1 — commit `0cacfdf` (PR #960); Slice B2 —
+  commit `752b47f`, _pending push to `claude/intrinsicengine-agent-onboarding-X3GCq`_,
+  PR _TBD_.
+- Next verification step: none. `Operational` interactive selection proof stays
+  owned by `RUNTIME-089`, `GRAPHICS-074`, and final sandbox acceptance
+  (`RUNTIME-095`).
+
+## Slice B2 design decision
+- The readback→refinement bridge is an exported pure function
+  `RefinePickReadbackResult(scene, readback)` on the task-owned
+  `Extrinsic.Runtime.PrimitiveSelectionRefinement` module: it resolves the
+  readback's render id to a live `entt::entity` (decode + `registry.valid()`
+  version check, so a recycled/destroyed slot yields a deterministic
+  `StaleEntity` rather than refining the new occupant), reads the entity
+  `Transform::WorldMatrix` as `LocalToWorld`, builds the authoritative
+  `GeometrySources::ConstSourceView`, and delegates to `RefinePrimitiveSelection`.
+  A background (no-hit) readback resolves to no sub-primitive (`std::nullopt`).
+  It mutates nothing.
+- `Engine` owns the editor-facing cache: a per-`RunFrame`
+  `std::optional<PrimitiveSelectionResult> m_LastRefinedPrimitive`, updated from
+  each pick readback as the existing readback-drain loop consumes it (newest
+  readback wins, matching the controller's latest-pick-wins coalescing; a
+  background readback clears it; an empty-drain frame retains the prior value).
+  Exposed read-only via `Engine::GetLastRefinedPrimitiveSelection()`.
+- This is the "editor-facing selection cache" arm of the original Slice B2
+  scope ("route a refined result into the `SelectionController` / editor-facing
+  selection cache"). It keeps `SelectionController` graphics-free (the controller
+  must not import the refinement module, which imports `Graphics.SelectionSystem`)
+  and preserves the controller's whole-entity authority and the ECS tag model
+  unchanged — no new ECS components, no graphics mutation.
+- The cache tracks the sub-primitive under the *last pick hit*, not the
+  selection set, and is keyed by render id (`EntityId`) for editor correlation
+  with the controller's selection ids; `StableId` (durable id) is left 0 here.
+- Nonblocking clarification (does not block this slice): if a later editor/UI
+  task wants a single combined selection object, the refined-primitive datum can
+  be moved onto `SelectionController` (via a controller-local plain struct to
+  keep it graphics-free) and tied to selectable/selected outcomes; recorded as a
+  possible follow-up rather than implemented now to keep this the smallest robust
+  closing slice.
 
 ## Slice plan
 - **Slice A (this slice).** Standalone `Extrinsic.Runtime.PrimitiveSelectionRefinement`
@@ -74,7 +111,7 @@
 - [x] Implement graph refinement: edge hints return edge ID and nearest endpoint/node ID; point hints return node ID. _(Slice A.)_
 - [x] Implement point-cloud refinement: point hints return point ID. _(Slice A; the missing-hint nearest-point-along-ray fallback is Slice B.)_
 - [x] Apply entity transforms so refinement reports both local and world hit data. _(Slice A, via `LocalToWorld`.)_
-- [ ] Integrate with `RUNTIME-089` so refined primitive results can update selection caches or editor state without graphics mutation. _(Slice B2.)_
+- [x] Integrate with `RUNTIME-089` so refined primitive results can update selection caches or editor state without graphics mutation. _(Slice B2: `RefinePickReadbackResult` bridges each pick readback to a `PrimitiveSelectionResult`; `Engine::RunFrame` caches it in `m_LastRefinedPrimitive` (`GetLastRefinedPrimitiveSelection()`) as the readback-drain loop runs alongside the `SelectionController` whole-entity mutation. No graphics mutation; the controller stays graphics-free.)_
 - [x] Add the optional CPU ray fallback for missing hints (nearest point/vertex along the local pick ray within a configurable radius). _(Slice B1: `HasPickRay`/`RayOrigin`/`RayDirection`/`FallbackRadius` inputs + `NearestPointAlongRay`/`RefineByRayFallback`, triggered on a `None`-domain hint for mesh vertices, graph nodes, and cloud points.)_
 - [x] Add diagnostics for unsupported domain, stale entity, missing geometry source, invalid primitive payload, CPU fallback used, and CPU fallback miss. _(Slice A defines the full `PrimitiveRefineStatus` taxonomy + `DebugNameForPrimitiveRefineStatus`; Slice B1 emits `CpuFallbackResolved`/`CpuFallbackMiss`.)_
 
@@ -88,13 +125,13 @@
 
 ## Docs
 - [x] Update `src/runtime/README.md` with primitive refinement ownership, result shape, and fallback policy. _(Slice A.)_
-- [ ] Update `docs/architecture/rendering-three-pass.md` only if the selection/refinement contract changes. _(No change in Slice A: graphics stays a hint/readback producer; the refinement consumer lives wholly in runtime.)_
+- [x] Update `docs/architecture/rendering-three-pass.md` only if the selection/refinement contract changes. _(No change in Slices A/B1/B2: graphics stays a hint/readback producer; the refinement consumer and its editor-facing cache live wholly in runtime.)_
 - [x] Refresh `docs/api/generated/module_inventory.md` if new modules are added. _(Slice A: regenerated for `Extrinsic.Runtime.PrimitiveSelectionRefinement`.)_
 
 ## Acceptance criteria
-- [ ] Runtime can resolve entity picks into mesh face/edge/vertex, graph edge/node, and cloud point selections using authoritative CPU data.
-- [ ] Graphics remains a producer of encoded ID/readback data only; it never imports geometry or mutates selection state.
-- [ ] Invalid/stale/missing geometry states are deterministic and diagnosed.
+- [x] Runtime can resolve entity picks into mesh face/edge/vertex, graph edge/node, and cloud point selections using authoritative CPU data. _(End-to-end via `RefinePickReadbackResult` wired into `Engine::RunFrame`.)_
+- [x] Graphics remains a producer of encoded ID/readback data only; it never imports geometry or mutates selection state. _(Bridge + cache live wholly in runtime; layering check clean.)_
+- [x] Invalid/stale/missing geometry states are deterministic and diagnosed. _(StaleEntity via recycling-safe `registry.valid()` check, UnsupportedDomain/MissingGeometrySource/InvalidPrimitivePayload from `RefinePrimitiveSelection`; covered by wiring tests.)_
 
 ## Verification
 ```bash
