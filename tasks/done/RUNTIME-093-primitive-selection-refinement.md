@@ -1,17 +1,20 @@
 # RUNTIME-093 — Primitive selection refinement for meshes, graphs, and point clouds
 
 ## Status
-- State: in-progress.
+- State: done.
 - Owner/agent: claude.
 - Branch: `claude/intrinsicengine-agent-onboarding-X3GCq` (Slice B2).
   Slice B1 landed on `claude/intrinsicengine-agent-onboarding-KpmSE` (PR #960).
   Slice A landed on `claude/intrinsicengine-agent-onboarding-bUPlk` (PR #959).
-- Maturity target: `CPUContracted` (Slice A standalone refinement core +
+- Maturity reached: `CPUContracted` (Slice A standalone refinement core +
   Slice B1 CPU ray fallback + Slice B2 runtime frame-loop integration).
-- Next verification step: Slice B2 — build `IntrinsicRuntimeContractTests` and
-  run the `contract;runtime` gate filtered to `PrimitiveSelectionRefinement`,
-  then the full runtime contract gate, plus layering/test-layout/doc-links/
-  module-inventory checks. Slices A and B1 already verified and merged.
+- Completion date: 2026-06-01.
+- PR/commit: Slice A — PR #959; Slice B1 — commit `0cacfdf` (PR #960); Slice B2 —
+  commit `752b47f`, _pending push to `claude/intrinsicengine-agent-onboarding-X3GCq`_,
+  PR _TBD_.
+- Next verification step: none. `Operational` interactive selection proof stays
+  owned by `RUNTIME-089`, `GRAPHICS-074`, and final sandbox acceptance
+  (`RUNTIME-095`).
 
 ## Slice B2 design decision
 - The readback→refinement bridge is an exported pure function

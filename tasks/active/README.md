@@ -11,22 +11,40 @@ Each active task should include:
 
 ## Currently active
 
-[`RUNTIME-093`](RUNTIME-093-primitive-selection-refinement.md) — runtime
+_None._ Pick the next task from [`tasks/backlog/README.md`](../backlog/README.md)
+per the priority rules (continue Theme A's working-sandbox path: the next
+unblocked leaf after `RUNTIME-093`). The most recently retired tasks are
+summarised below.
+
+Previously-active
+[`RUNTIME-093`](../done/RUNTIME-093-primitive-selection-refinement.md) — runtime
 primitive selection refinement for meshes, graphs, and point clouds (Theme A
-working-sandbox path). Status `in-progress`, maturity target `CPUContracted`.
-Slice A (landed on `claude/intrinsicengine-agent-onboarding-bUPlk`, PR #959)
-delivered the standalone `Extrinsic.Runtime.PrimitiveSelectionRefinement`
-module (result type + fail-closed taxonomy + hint-based mesh/graph/point-cloud
-refinement against authoritative `GeometrySources`, with entity-transform local/
-world hit reporting and `contract;runtime` fixture tests) at `Scaffolded`. The
-original Slice B was split into two independently reviewable slices: Slice B1
-(branch `claude/intrinsicengine-agent-onboarding-KpmSE`) adds the optional CPU
-ray fallback for missing (`None`-domain) hints — entity-local pick-ray inputs
-plus nearest mesh-vertex/graph-node/cloud-point resolution emitting
-`CpuFallbackResolved`/`CpuFallbackMiss`, with `contract;runtime` coverage; Slice
-B2 integrates refined results into the `SelectionController` and `Engine::RunFrame`
-to close `CPUContracted`. Unblocked by the retired `RUNTIME-089` and
-`RUNTIME-085..088`. The most recently retired task is summarised below.
+working-sandbox path) retired to `tasks/done/` on 2026-06-01 at maturity
+`CPUContracted`. Slice A (PR #959) delivered the standalone
+`Extrinsic.Runtime.PrimitiveSelectionRefinement` module (result type +
+fail-closed taxonomy + hint-based mesh/graph/point-cloud refinement against
+authoritative `GeometrySources`, entity-transform local/world hit reporting,
+`contract;runtime` fixtures) at `Scaffolded`. Slice B1 (commit `0cacfdf`, PR
+#960) added the optional CPU ray fallback for missing (`None`-domain) hints
+(`CpuFallbackResolved`/`CpuFallbackMiss`). Slice B2
+(`claude/intrinsicengine-agent-onboarding-X3GCq`, commit `752b47f`) closed
+`Scaffolded → CPUContracted` by wiring refinement into the runtime frame loop:
+the new pure `RefinePickReadbackResult(scene, readback)` bridge resolves a pick
+readback's render id to a live entity (decode + recycling-safe `registry.valid()`
+check → deterministic `StaleEntity`), reads `Transform::WorldMatrix` as
+`LocalToWorld`, builds the authoritative `GeometrySources::ConstSourceView`, and
+delegates to `RefinePrimitiveSelection`; `Engine::RunFrame` caches the result in
+`m_LastRefinedPrimitive` (`GetLastRefinedPrimitiveSelection()`) as the existing
+readback-drain loop runs (newest pick wins, background clears, empty-drain
+retains), alongside the unchanged `SelectionController` whole-entity mutation.
+The editor-facing-cache arm was chosen over controller ownership to keep the
+controller graphics-free (controller-owned variant recorded as a nonblocking
+follow-up). No graphics mutation; ECS tag model unchanged. Ten new
+`Test.PrimitiveSelectionRefinementWiring.cpp` `contract;runtime` cases pass;
+`contract;runtime` gate 277/277, `unit;geometry` 1254/1254;
+layering/test-layout/doc-links/task-policy checks clean; module inventory
+regenerated (no diff). `Operational` interactive selection proof stays owned by
+`RUNTIME-089`, `GRAPHICS-074`, and final sandbox acceptance (`RUNTIME-095`).
 
 Previously-active
 [`RUNTIME-092`](../done/RUNTIME-092-stable-entity-lookup.md) — runtime stable
