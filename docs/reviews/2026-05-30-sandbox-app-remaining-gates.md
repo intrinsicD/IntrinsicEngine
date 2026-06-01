@@ -80,7 +80,7 @@ sandbox can claim acceptance on the default recipe.
 |---|---|---|---|
 | Selection controller + snapshot handoff | [`RUNTIME-089`](../../tasks/backlog/runtime/RUNTIME-089-selection-controller.md) | **OPEN** | No runtime selection module; only graphics-side `Graphics.SelectionSystem.cpp` + `ECS.Component.Selection`. |
 | Stable entity lookup sidecar | [`RUNTIME-092`](../../tasks/backlog/runtime/RUNTIME-092-stable-entity-lookup.md) | **OPEN** | No runtime stable-id/live-entity lookup module. |
-| Primitive selection refinement | [`RUNTIME-093`](../../tasks/backlog/runtime/RUNTIME-093-primitive-selection-refinement.md) | **OPEN** | No runtime module refining mesh face/edge/vertex, graph edge/node, point-cloud point from graphics hints. |
+| Primitive selection refinement | [`RUNTIME-093`](../../tasks/active/RUNTIME-093-primitive-selection-refinement.md) | **IN PROGRESS** | Slice A landed the standalone `Extrinsic.Runtime.PrimitiveSelectionRefinement` module (hint-based mesh/graph/point-cloud refinement); `SelectionController` integration owned by Slice B. |
 
 Graphics-side picking readback + outline (`GRAPHICS-074`) is **done** and is the
 upstream these runtime gates consume.

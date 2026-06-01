@@ -706,7 +706,7 @@ Cross-layer Theme A leaves newly opened for the full working sandbox path:
 - [`runtime/RUNTIME-088` — Mesh primitive view lifecycle](../../done/RUNTIME-088-mesh-primitive-view-lifecycle.md) (retired 2026-05-31 at `CPUContracted`; Slice A packers plus Slice B `RenderExtractionCache` sidecar residency wiring landed).
 - [`runtime/RUNTIME-089` — Runtime selection controller and snapshot handoff](../../done/RUNTIME-089-selection-controller.md) (retired 2026-05-31 at `CPUContracted`; Slice A standalone `SelectionController` module, Slice B `Engine::RunFrame` + `RenderExtractionCache::ExtractAndSubmit` wiring).
 - [`runtime/RUNTIME-092` — Runtime stable entity lookup sidecar](../../done/RUNTIME-092-stable-entity-lookup.md) (retired 2026-05-31 at `CPUContracted`; Slice A standalone `StableEntityLookup` module, Slice B `Engine::RunFrame` per-frame rebuild + `SelectionController` render-id seam routing).
-- [`runtime/RUNTIME-093` — Primitive selection refinement](../runtime/RUNTIME-093-primitive-selection-refinement.md).
+- [`runtime/RUNTIME-093` — Primitive selection refinement](../../active/RUNTIME-093-primitive-selection-refinement.md) (active).
 - [`ui/UI-001` — Sandbox editor shell and core panels](../ui/UI-001-sandbox-editor-shell-panels.md).
 - [`runtime/RUNTIME-095` — Working sandbox app acceptance path](../runtime/RUNTIME-095-working-sandbox-acceptance.md).
 

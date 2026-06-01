@@ -102,9 +102,9 @@ compose with the rendering tasks listed in `tasks/backlog/rendering/README.md`.
   invalidation; Slice B wired it into `Engine::RunFrame` (per-frame `Rebuild`
   before the pick-readback drain) and routed the `SelectionController` render-id
   resolution seam through the sidecar to close `CPUContracted`.
-- [RUNTIME-093 — Primitive selection refinement](RUNTIME-093-primitive-selection-refinement.md):
-  mesh face/edge/vertex, graph edge/node, and point-cloud point refinement from
-  graphics primitive hints plus authoritative `GeometrySources`.
+- [RUNTIME-093 — Primitive selection refinement](../../active/RUNTIME-093-primitive-selection-refinement.md)
+  (active): mesh face/edge/vertex, graph edge/node, and point-cloud point
+  refinement from graphics primitive hints plus authoritative `GeometrySources`.
 - [RUNTIME-095 — Working sandbox app acceptance path](RUNTIME-095-working-sandbox-acceptance.md):
   final CPU/null + opt-in Vulkan acceptance for mesh, graph, point cloud,
   camera, selection, outline, and UI.

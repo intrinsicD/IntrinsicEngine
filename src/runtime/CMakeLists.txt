@@ -15,6 +15,7 @@ target_sources(${target_name}
         Runtime.MeshGeometryPacker.cppm
         Runtime.MeshPrimitiveViewPacker.cppm
         Runtime.PointCloudGeometryPacker.cppm
+        Runtime.PrimitiveSelectionRefinement.cppm
         Runtime.ProceduralGeometry.cppm
         Runtime.ProceduralGeometryPacker.cppm
         Runtime.ReferenceScene.cppm
@@ -30,6 +31,7 @@ target_sources(${target_name}
         Runtime.MeshGeometryPacker.cpp
         Runtime.MeshPrimitiveViewPacker.cpp
         Runtime.PointCloudGeometryPacker.cpp
+        Runtime.PrimitiveSelectionRefinement.cpp
         Runtime.ProceduralGeometry.cpp
         Runtime.ProceduralGeometryPacker.cpp
         Runtime.ReferenceScene.cpp
