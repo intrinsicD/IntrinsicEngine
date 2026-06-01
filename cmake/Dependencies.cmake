@@ -545,20 +545,32 @@ if(NOT INTRINSIC_HEADLESS_NO_GLFW)
 endif()
 
 # Create a library for ImGui to make linking easier
-# We also include the backend sources for GLFW and Vulkan
+# `imgui_core_lib` is the backend-agnostic Dear ImGui core (no platform/renderer
+# backends, no glfw/volk). It is always available — including headless-no-glfw
+# builds — so layers that only need the ImGui context + ImDrawData (e.g. the
+# runtime-side `Extrinsic.Runtime.ImGuiAdapter`, RUNTIME-090) can link ImGui
+# without pulling in the windowing/Vulkan backends.
+add_library(imgui_core_lib STATIC
+        ${IMGUI_SOURCE_DIR}/imgui.cpp
+        ${IMGUI_SOURCE_DIR}/imgui_demo.cpp
+        ${IMGUI_SOURCE_DIR}/imgui_draw.cpp
+        ${IMGUI_SOURCE_DIR}/imgui_tables.cpp
+        ${IMGUI_SOURCE_DIR}/imgui_widgets.cpp
+)
+target_include_directories(imgui_core_lib PUBLIC ${IMGUI_SOURCE_DIR} ${IMGUI_SOURCE_DIR}/backends)
+target_compile_definitions(imgui_core_lib PUBLIC IMGUI_IMPL_VULKAN_NO_PROTOTYPES GLFW_INCLUDE_NONE)
+
+# `imgui_lib` adds the GLFW + Vulkan backends on top of the core. It builds on
+# `imgui_core_lib` (rather than recompiling the core sources) so a final binary
+# can link both without duplicate ImGui symbols.
 if(NOT INTRINSIC_HEADLESS_NO_GLFW)
     add_library(imgui_lib STATIC
-            ${IMGUI_SOURCE_DIR}/imgui.cpp
-            ${IMGUI_SOURCE_DIR}/imgui_demo.cpp
-            ${IMGUI_SOURCE_DIR}/imgui_draw.cpp
-            ${IMGUI_SOURCE_DIR}/imgui_tables.cpp
-            ${IMGUI_SOURCE_DIR}/imgui_widgets.cpp
             ${IMGUI_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
             ${IMGUI_SOURCE_DIR}/backends/imgui_impl_vulkan.cpp
     )
     target_include_directories(imgui_lib PUBLIC ${IMGUI_SOURCE_DIR} ${IMGUI_SOURCE_DIR}/backends)
     target_compile_definitions(imgui_lib PUBLIC IMGUI_IMPL_VULKAN_NO_PROTOTYPES GLFW_INCLUDE_NONE)
-    target_link_libraries(imgui_lib PUBLIC glfw volk)
+    target_link_libraries(imgui_lib PUBLIC imgui_core_lib glfw volk)
 
     add_library(imguizmo_lib STATIC
             ${IMGUIZMO_CPP}

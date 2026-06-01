@@ -11,6 +11,7 @@ target_sources(${target_name}
         Runtime.EcsSystemBundle.cppm
         Runtime.Engine.cppm
         Cameras/Runtime.CameraControllers.cppm
+        ImGui/Runtime.ImGuiAdapter.cppm
         Runtime.GraphGeometryPacker.cppm
         Runtime.MeshGeometryPacker.cppm
         Runtime.MeshPrimitiveViewPacker.cppm
@@ -27,6 +28,7 @@ target_sources(${target_name}
         PRIVATE
         Runtime.EcsSystemBundle.cpp
         Runtime.Engine.cpp
+        ImGui/Runtime.ImGuiAdapter.cpp
         Runtime.GraphGeometryPacker.cpp
         Runtime.MeshGeometryPacker.cpp
         Runtime.MeshPrimitiveViewPacker.cpp
@@ -56,6 +58,12 @@ target_link_libraries(${target_name}
         EnTT::EnTT
         glm::glm
 )
+
+# RUNTIME-090: the runtime-side Dear ImGui adapter links the backend-agnostic
+# ImGui core PRIVATE so `imgui.h` (and its transitive deps) stay out of the
+# runtime's public module surface. `imgui_core_lib` is always available, so the
+# adapter builds in headless-no-glfw configs too.
+target_link_libraries(${target_name} PRIVATE imgui_core_lib)
 
 if(INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN)
         if(TARGET ExtrinsicBackendsVulkan)

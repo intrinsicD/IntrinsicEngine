@@ -52,9 +52,10 @@ done-task `Q` follow-ups. Each unblocks one or more rendering pass families.
 - [RUNTIME-084 — `Extrinsic.Runtime.GizmoInteraction`](RUNTIME-084-gizmo-interaction.md):
   transform-gizmo hit testing, interaction state, drag application, undo
   emission (clarified by GRAPHICS-017Q).
-- [RUNTIME-090 — `Extrinsic.Runtime.ImGuiAdapter`](RUNTIME-090-imgui-platform-renderer-adapter.md):
-  Dear ImGui platform/renderer adapter producing `ImGuiOverlayFrame` records for
-  `ImGuiOverlaySystem::SubmitFrame` (clarified by GRAPHICS-013CQ).
+- [RUNTIME-090 — `Extrinsic.Runtime.ImGuiAdapter`](../../active/RUNTIME-090-imgui-platform-renderer-adapter.md)
+  (active, Slice A): Dear ImGui platform/renderer adapter producing
+  `ImGuiOverlayFrame` records for `ImGuiOverlaySystem::SubmitFrame` (clarified by
+  GRAPHICS-013CQ).
 
 ### Working sandbox runtime path
 
