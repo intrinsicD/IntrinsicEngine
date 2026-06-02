@@ -416,6 +416,114 @@ TEST(VisualizationAdapters, VectorFieldAdapterRejectsInvalidSources)
     EXPECT_EQ(stats.NonFiniteValueCount, 1u);
 }
 
+TEST(VisualizationAdapters, IsolineAdapterAppendsIsolinePacket)
+{
+    Geometry::PropertySet properties = MakeScalarProperties();
+    const R::IsolineAdapter adapter{
+        Geometry::ConstPropertySet{properties}};
+
+    R::VisualizationAdapterBatch batch{};
+    R::VisualizationAdapterStats stats{};
+    adapter.Append(batch,
+                   R::VisualizationAdapterOptions{
+                       .SourceName = "curvature",
+                       .OutputName = "curvature_isolines",
+                       .Domain = G::VisualizationAttributeDomain::Vertex,
+                       .IsoValueCount = 3u,
+                       .LineWidth = 2.0f,
+                       .OverlayColor = glm::vec4{0.1f, 0.2f, 0.3f, 1.0f},
+                       .DepthTested = false,
+                   },
+                   stats);
+
+    ASSERT_EQ(batch.Isolines.size(), 1u);
+    const G::IsolineOverlayPacket& packet = batch.Isolines.front();
+    EXPECT_EQ(packet.SourceScalarName, "curvature_isolines");
+    EXPECT_EQ(packet.Domain, G::VisualizationAttributeDomain::Vertex);
+    EXPECT_EQ(packet.IsoValueCount, 3u);
+    EXPECT_FLOAT_EQ(packet.RangeMin, -1.0f);
+    EXPECT_FLOAT_EQ(packet.RangeMax, 2.0f);
+    EXPECT_FLOAT_EQ(packet.LineWidth, 2.0f);
+    EXPECT_EQ(packet.Color, (glm::vec4{0.1f, 0.2f, 0.3f, 1.0f}));
+    EXPECT_FALSE(packet.DepthTested);
+    EXPECT_EQ(stats.AdapterInvocationCount, 1u);
+    EXPECT_EQ(stats.PacketAppendCount, 1u);
+
+    const G::VisualizationDiagnostics diagnostics =
+        G::ValidateVisualizationPackets(batch.AsPacketBatch(
+            true,
+            G::VisualizationAttributeDomain::Vertex));
+    EXPECT_EQ(diagnostics.InputPacketCount, 1u);
+    EXPECT_EQ(diagnostics.AcceptedPacketCount, 1u);
+    EXPECT_FALSE(diagnostics.HasErrors);
+}
+
+TEST(VisualizationAdapters, IsolineAdapterRejectsInvalidSources)
+{
+    Geometry::PropertySet properties = MakeScalarProperties();
+    const R::IsolineAdapter adapter{
+        Geometry::ConstPropertySet{properties}};
+
+    R::VisualizationAdapterBatch batch{};
+    R::VisualizationAdapterStats stats{};
+    adapter.Append(batch,
+                   R::VisualizationAdapterOptions{
+                       .SourceName = "missing",
+                       .IsoValueCount = 2u,
+                   },
+                   stats);
+    adapter.Append(batch,
+                   R::VisualizationAdapterOptions{
+                       .SourceName = "color",
+                       .IsoValueCount = 2u,
+                   },
+                   stats);
+    adapter.Append(batch,
+                   R::VisualizationAdapterOptions{
+                       .SourceName = "curvature",
+                       .IsoValueCount = 0u,
+                   },
+                   stats);
+    adapter.Append(batch,
+                   R::VisualizationAdapterOptions{
+                       .SourceName = "curvature",
+                       .AutoRange = false,
+                       .RangeMin = 3.0f,
+                       .RangeMax = 3.0f,
+                       .IsoValueCount = 2u,
+                   },
+                   stats);
+    adapter.Append(batch,
+                   R::VisualizationAdapterOptions{
+                       .SourceName = "curvature",
+                       .IsoValueCount = 2u,
+                       .LineWidth = 0.0f,
+                   },
+                   stats);
+
+    Geometry::PropertySet badProperties;
+    badProperties.Resize(2u);
+    auto bad = badProperties.Add<double>("curvature", 0.0);
+    bad[0] = 1.0;
+    bad[1] = std::numeric_limits<double>::infinity();
+    const R::IsolineAdapter badAdapter{
+        Geometry::ConstPropertySet{badProperties}};
+    badAdapter.Append(batch,
+                      R::VisualizationAdapterOptions{
+                          .SourceName = "curvature",
+                          .IsoValueCount = 2u,
+                      },
+                      stats);
+
+    EXPECT_TRUE(batch.Isolines.empty());
+    EXPECT_EQ(stats.AdapterInvocationCount, 6u);
+    EXPECT_EQ(stats.MissingSourceCount, 1u);
+    EXPECT_EQ(stats.UnsupportedSourceTypeCount, 1u);
+    EXPECT_EQ(stats.InvalidRangeCount, 3u);
+    EXPECT_EQ(stats.NonFiniteValueCount, 1u);
+    EXPECT_EQ(stats.PacketAppendCount, 0u);
+}
+
 TEST(VisualizationAdapters, BatchClearAndPacketViewReflectAllPacketLanes)
 {
     R::VisualizationAdapterBatch batch{};
@@ -440,6 +548,10 @@ TEST(VisualizationAdapters, BatchClearAndPacketViewReflectAllPacketLanes)
         .PositionBufferBDA = 0x4000u,
         .VectorBufferBDA = 0x5000u,
     });
+    batch.Isolines.push_back(G::IsolineOverlayPacket{
+        .SourceScalarName = "iso",
+        .IsoValueCount = 2u,
+    });
 
     const G::VisualizationPacketBatch packetView =
         batch.AsPacketBatch(true, G::VisualizationAttributeDomain::Vertex);
@@ -447,6 +559,7 @@ TEST(VisualizationAdapters, BatchClearAndPacketViewReflectAllPacketLanes)
     EXPECT_EQ(packetView.Scalars.size(), 1u);
     EXPECT_EQ(packetView.Colors.size(), 1u);
     EXPECT_EQ(packetView.VectorFields.size(), 1u);
+    EXPECT_EQ(packetView.Isolines.size(), 1u);
     EXPECT_TRUE(packetView.EnforceDomain);
 
     batch.Clear();
@@ -454,6 +567,7 @@ TEST(VisualizationAdapters, BatchClearAndPacketViewReflectAllPacketLanes)
     EXPECT_TRUE(batch.Scalars.empty());
     EXPECT_TRUE(batch.Colors.empty());
     EXPECT_TRUE(batch.VectorFields.empty());
+    EXPECT_TRUE(batch.Isolines.empty());
 }
 
 TEST(VisualizationAdapters, RegistryReplacesAndUnregistersAdapters)

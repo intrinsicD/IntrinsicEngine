@@ -50,6 +50,9 @@ export namespace Extrinsic::Runtime
         float RangeMin{0.0f};
         float RangeMax{1.0f};
         Graphics::Colormap::Type Colormap{Graphics::Colormap::Type::Viridis};
+        std::uint32_t IsoValueCount{0u};
+        float LineWidth{1.0f};
+        glm::vec4 OverlayColor{0.0f, 0.0f, 0.0f, 1.0f};
         float VectorScale{1.0f};
         glm::vec4 VectorColor{1.0f};
         bool DepthTested{true};
@@ -110,6 +113,19 @@ export namespace Extrinsic::Runtime
     {
     public:
         explicit VectorFieldAdapter(Geometry::ConstPropertySet properties) noexcept;
+
+        void Append(VisualizationAdapterBatch& out,
+                    const VisualizationAdapterOptions& options,
+                    VisualizationAdapterStats& stats) const override;
+
+    private:
+        Geometry::ConstPropertySet m_Properties{};
+    };
+
+    class IsolineAdapter final : public IVisualizationAdapter
+    {
+    public:
+        explicit IsolineAdapter(Geometry::ConstPropertySet properties) noexcept;
 
         void Append(VisualizationAdapterBatch& out,
                     const VisualizationAdapterOptions& options,

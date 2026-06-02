@@ -181,6 +181,33 @@ namespace Extrinsic::Runtime
             return true;
         }
 
+        template <typename T>
+        [[nodiscard]] bool ValidateFiniteScalarSource(std::span<const T> values,
+                                                      VisualizationAdapterStats& stats) noexcept
+        {
+            if (values.empty())
+            {
+                ++stats.EmptySourceCount;
+                return false;
+            }
+            if (values.size() > std::numeric_limits<std::uint32_t>::max())
+            {
+                ++stats.ElementCountOverflowCount;
+                return false;
+            }
+
+            for (const T value : values)
+            {
+                float converted = 0.0f;
+                if (!ToFiniteFloat(value, converted))
+                {
+                    ++stats.NonFiniteValueCount;
+                    return false;
+                }
+            }
+            return true;
+        }
+
         bool AppendColorPacket(const Geometry::ConstProperty<glm::vec4>& property,
                                VisualizationAdapterBatch& out,
                                const VisualizationAdapterOptions& options,
@@ -201,6 +228,54 @@ namespace Extrinsic::Runtime
                 .Domain = options.Domain,
                 .ElementCount = static_cast<std::uint32_t>(values.size()),
                 .ColorBufferBDA = options.ColorBufferBDA,
+            });
+            ++stats.PacketAppendCount;
+            return true;
+        }
+
+        template <typename T>
+        bool AppendIsolinePacket(const Geometry::ConstProperty<T>& property,
+                                 VisualizationAdapterBatch& out,
+                                 const VisualizationAdapterOptions& options,
+                                 VisualizationAdapterStats& stats)
+        {
+            const std::span<const T> values = property.Span();
+            if (!ValidateFiniteScalarSource(values, stats))
+                return false;
+
+            if (options.IsoValueCount == 0u || !IsFinite(options.LineWidth) ||
+                options.LineWidth <= 0.0f || !IsFinite(options.OverlayColor))
+            {
+                ++stats.InvalidRangeCount;
+                return false;
+            }
+
+            float minValue = options.RangeMin;
+            float maxValue = options.RangeMax;
+            if (options.AutoRange)
+            {
+                if (!ComputeRange(values, minValue, maxValue, stats))
+                    return false;
+            }
+            else
+            {
+                ++stats.ManualRangeCount;
+                if (!ValidRange(minValue, maxValue))
+                {
+                    ++stats.InvalidRangeCount;
+                    return false;
+                }
+            }
+
+            out.Isolines.push_back(Graphics::IsolineOverlayPacket{
+                .SourceScalarName = options.OutputName.empty() ? options.SourceName : options.OutputName,
+                .Domain = options.Domain,
+                .IsoValueCount = options.IsoValueCount,
+                .RangeMin = minValue,
+                .RangeMax = maxValue,
+                .LineWidth = options.LineWidth,
+                .Color = options.OverlayColor,
+                .DepthTested = options.DepthTested,
             });
             ++stats.PacketAppendCount;
             return true;
@@ -374,6 +449,48 @@ namespace Extrinsic::Runtime
             vectors.IsValid())
         {
             (void)AppendVectorFieldPacket(vectors, out, options, stats);
+            return;
+        }
+
+        if (m_Properties.Exists(options.SourceName))
+        {
+            ++stats.UnsupportedSourceTypeCount;
+        }
+        else
+        {
+            ++stats.MissingSourceCount;
+        }
+    }
+
+    IsolineAdapter::IsolineAdapter(
+        Geometry::ConstPropertySet properties) noexcept
+        : m_Properties(std::move(properties))
+    {
+    }
+
+    void IsolineAdapter::Append(VisualizationAdapterBatch& out,
+                                const VisualizationAdapterOptions& options,
+                                VisualizationAdapterStats& stats) const
+    {
+        ++stats.AdapterInvocationCount;
+
+        if (options.SourceName.empty())
+        {
+            ++stats.MissingSourceCount;
+            return;
+        }
+
+        if (const auto floatProperty = m_Properties.Get<float>(options.SourceName);
+            floatProperty.IsValid())
+        {
+            (void)AppendIsolinePacket(floatProperty, out, options, stats);
+            return;
+        }
+
+        if (const auto doubleProperty = m_Properties.Get<double>(options.SourceName);
+            doubleProperty.IsValid())
+        {
+            (void)AppendIsolinePacket(doubleProperty, out, options, stats);
             return;
         }
 

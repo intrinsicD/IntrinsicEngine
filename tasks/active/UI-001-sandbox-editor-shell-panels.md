@@ -6,7 +6,7 @@
 - Branch: `main`.
 - Current slice: blocked after Slice C.2. Remaining file/import execution is
   gated on `ASSETIO-001`; remaining non-scalar visualization adapter packet
-  selection is gated on active `RUNTIME-083` Slices C.2/D.
+  selection is gated on active `RUNTIME-083` Slice D.
 - Next verification step: resume UI-001 after the remaining `RUNTIME-083`
   non-scalar extraction seams and `ASSETIO-001` import command seams exist, then
   run task structural checks plus the runtime contract/default CPU gates.
@@ -63,7 +63,7 @@
 - [x] Implement a selection/primitive details panel that displays current entity/face/edge/vertex/point selection results from `RUNTIME-089` / `RUNTIME-093`. Slice B models selected/hovered entity rows and refined primitive status/domain/kind/id/hit details; richer interaction remains for later command-surface slices.
 - [ ] Implement a file/import entry panel that calls asset/runtime import commands when `ASSETIO-001` is available and otherwise displays a deterministic disabled-state diagnostic. Slice A implements the deterministic disabled diagnostic; command execution remains gated on `ASSETIO-001`.
 - [x] Implement camera/render settings controls for active camera controller selection, debug overlay toggles, and primitive view toggles using runtime-owned APIs. Slice C.1 implements active camera-controller replacement and mesh edge/vertex primitive-view toggles; Slice C.2 implements selected-entity spatial-debug binding controls.
-- [ ] Implement geometry-domain visualization controls that choose scalar/color/vector/isolines as inputs to `RUNTIME-083` adapters without duplicating graphics validation. Slice C.2 implements selected-entity `VisualizationConfig` material/scalar/color command routing; scalar adapter packet production is available through `RUNTIME-083` Slice B, standalone KMeans/color and vector-field adapter contracts are available through Slice C.1, and non-scalar extraction production remains gated on `RUNTIME-083` Slices C.2/D.
+- [ ] Implement geometry-domain visualization controls that choose scalar/color/vector/isolines as inputs to `RUNTIME-083` adapters without duplicating graphics validation. Slice C.2 implements selected-entity `VisualizationConfig` material/scalar/color command routing; scalar adapter packet production is available through `RUNTIME-083` Slice B, standalone KMeans/color and vector-field adapter contracts are available through Slice C.1, standalone isoline adapter contracts are available through Slice C.2, and Htex/fragment-bake plus non-scalar extraction production remain gated on `RUNTIME-083` Slice D.
 - [x] Add UI diagnostics for missing dependencies (no ImGui adapter, no asset ingest, no selected entity, unsupported domain).
 
 ## Tests
@@ -86,7 +86,7 @@
 ## Acceptance criteria
 - [x] The sandbox has a promoted ImGui-based editor shell once `RUNTIME-090` and `GRAPHICS-079` are present.
 - [ ] Core panels expose scene hierarchy, inspector, selection details, file/import entry points, camera/render settings, and visualization controls with deterministic disabled states for missing backends.
-- [ ] UI emits commands/events to runtime/editor owners and does not own engine state directly. Slice A emits selection commands through `SelectionController`; Slice B applies local transform edit commands through a runtime-owned seam and stamps `Transform::IsDirtyTag`; Slice C.1 replaces camera-controller slots and toggles mesh primitive views through runtime-owned engine/extraction seams; Slice C.2 applies selected-entity spatial-debug and visualization-config commands through runtime-owned ECS/graphics data components. Remaining import execution and full `RUNTIME-083` visualization adapter packet production are deferred.
+- [ ] UI emits commands/events to runtime/editor owners and does not own engine state directly. Slice A emits selection commands through `SelectionController`; Slice B applies local transform edit commands through a runtime-owned seam and stamps `Transform::IsDirtyTag`; Slice C.1 replaces camera-controller slots and toggles mesh primitive views through runtime-owned engine/extraction seams; Slice C.2 applies selected-entity spatial-debug and visualization-config commands through runtime-owned ECS/graphics data components. Remaining import execution, Htex/fragment-bake packet production, and non-scalar `RUNTIME-083` extraction selection are deferred.
 
 ## Verification
 ```bash
@@ -115,8 +115,8 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
   tagging. Slice C.1 closes `CPUContracted` for camera-controller replacement
   and mesh primitive-view toggle command routing. Slice C.2 closes
   `CPUContracted` for selected-entity spatial-debug binding and
-  visualization-config command routing. Later slices close remaining non-scalar
-  `RUNTIME-083` adapter packet selection once those adapters exist before
-  retiring the full task.
+  visualization-config command routing. Later slices close remaining Htex /
+  fragment-bake packet production and non-scalar `RUNTIME-083` extraction
+  selection before retiring the full task.
 - `Operational` owned by [`RUNTIME-095`](../backlog/runtime/RUNTIME-095-working-sandbox-acceptance.md)
   final sandbox acceptance after ImGui rendering is wired.
