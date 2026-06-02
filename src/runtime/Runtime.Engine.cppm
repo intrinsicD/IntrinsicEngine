@@ -1,6 +1,7 @@
 module;
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 
@@ -15,8 +16,10 @@ import Extrinsic.RHI.Device;
 import Extrinsic.Platform.Window;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.GpuAssetCache;
+import Extrinsic.Graphics.ImGuiOverlaySystem;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.ImGuiAdapter;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.ReferenceScene;
 import Extrinsic.Runtime.SelectionController;
@@ -240,6 +243,19 @@ namespace Extrinsic::Runtime
         [[nodiscard]] const std::optional<Graphics::CameraViewInput>&
             GetReferenceCameraSeed() const noexcept;
 
+        // ── RUNTIME-090 Slice B — Dear ImGui editor hook ──────────────────
+        // Registers the per-frame editor callback invoked between the
+        // adapter's BeginFrame and EndFrame so editor/UI code can issue ImGui
+        // panel draws without modifying the adapter. May be called before or
+        // after Initialize(); the stored callback is applied to the adapter
+        // when it is constructed. RunFrame brackets OnVariableTick with the
+        // adapter so one ImGuiOverlayFrame is produced per engine frame.
+        void SetImGuiEditorCallback(std::function<void()> callback);
+        // Read-only access to the runtime-side ImGui adapter (valid after
+        // Initialize()). Exposes the produce-path diagnostics for tests; the
+        // Engine owns the BeginFrame/EndFrame cadence.
+        [[nodiscard]] const ImGuiAdapter& GetImGuiAdapter() const noexcept;
+
     private:
         void RunFrame();      // executes one full frame — called by Run()
 
@@ -248,6 +264,20 @@ namespace Extrinsic::Runtime
         std::unique_ptr<Platform::IWindow>   m_Window;
         std::unique_ptr<RHI::IDevice>        m_Device;
         std::unique_ptr<Graphics::IRenderer> m_Renderer;
+        // RUNTIME-090 Slice B — runtime-side Dear ImGui adapter + the graphics
+        // overlay system it produces into. The overlay system instance is
+        // runtime-owned composition (the allowed runtime -> graphics edge) so
+        // the producer (this adapter) and the future Pass.ImGui consumer
+        // (GRAPHICS-079) share one instance. The adapter is constructed in
+        // Initialize() after the Window and Renderer exist and torn down first
+        // in Shutdown() (it references the Window and the overlay system).
+        // Declared after m_Renderer / before m_RenderExtraction so the unique_ptr
+        // adapter is destroyed before the value-typed overlay system and the
+        // Window it borrows. The editor callback is stashed so it can be
+        // registered before Initialize() and re-applied across rebuilds.
+        Graphics::ImGuiOverlaySystem         m_ImGuiOverlay{};
+        std::function<void()>                m_ImGuiEditorCallback{};
+        std::unique_ptr<ImGuiAdapter>        m_ImGuiAdapter{};
         RenderExtractionCache                 m_RenderExtraction;
         // RUNTIME-089 Slice B — selection authority; persists across frames so
         // in-flight picks correlate with their later readbacks.
