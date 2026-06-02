@@ -11,32 +11,39 @@ Each active task should include:
 
 ## Currently active
 
-[`RUNTIME-090`](RUNTIME-090-imgui-platform-renderer-adapter.md) — runtime-side
-Dear ImGui platform/renderer adapter (`Extrinsic.Runtime.ImGuiAdapter`, Theme A
-working-sandbox path stage 4, the producer half of the ImGui/UI leaves that
-gate `UI-001`). Status: **in-progress (Slice B)**, owner/branch
-`claude/intrinsicengine-agent-onboarding-01gFi` (Slice A was
-`claude/intrinsicengine-agent-onboarding-qu8wV`, landed via PR #962). Slice A
-landed the standalone adapter module (ImGui 1.92 context lifecycle with
-`ImGuiBackendFlags_RendererHasTextures`, `Platform::Event`→ImGui-IO pump,
+None. No task is in-progress on a branch right now — pick the next unblocked
+leaf from [`tasks/backlog/README.md`](../backlog/README.md) per the priority
+rules. The most recently retired tasks are summarised below.
+
+Previously-active
+[`RUNTIME-090`](../done/RUNTIME-090-imgui-platform-renderer-adapter.md) —
+runtime-side Dear ImGui platform/renderer adapter
+(`Extrinsic.Runtime.ImGuiAdapter`, Theme A working-sandbox path stage 4, the
+producer half of the ImGui/UI leaves that gate `UI-001`) retired to
+`tasks/done/` on 2026-06-02 at maturity `CPUContracted`. Slice A
+(`claude/intrinsicengine-agent-onboarding-qu8wV`, PR #962, commits `3bd20f2` +
+`4676a1d`) landed the standalone adapter module (ImGui 1.92 context lifecycle
+with `ImGuiBackendFlags_RendererHasTextures`, `Platform::Event`→ImGui-IO pump,
 `ImDrawData`→`ImGuiOverlayFrame` walk, editor hook, diagnostics) with
 `FakeWindow`-driven `contract;runtime` coverage at `Scaffolded→CPUContracted`;
 `imgui_lib` is linked **PRIVATE** to `ExtrinsicRuntime` and `imgui.h` stays out
-of the `.cppm` interface. Slice B (this slice) wires the adapter into
-`Engine`: `Engine` owns the `Graphics::ImGuiOverlaySystem` instance (the allowed
-`runtime -> graphics` edge) and constructs the adapter in `Initialize()` after
-the `Window`/`Renderer`; `RunFrame` calls `BeginFrame(frameDt)` after
-`PollEvents` + the minimize/resize early returns and before `OnVariableTick`,
-and `EndFrame()` after the variable tick and before the render contract's
-`PrepareFrame()`, so exactly one `ImGuiOverlayFrame` is produced per engine
-frame; the editor hook is exposed via `Engine::SetImGuiEditorCallback` with a
-read-only `GetImGuiAdapter()` observer, closing `CPUContracted`. The
-renderer-side `Pass.ImGui` consumption + GPU font-atlas upload remain
-`GRAPHICS-079`; the engine-owned overlay instance is handed to the renderer when
-that lands. Next verification step: build `IntrinsicTests` and run the
-`ImGuiAdapter*` `contract;runtime` cases under the default CPU gate (the new
-engine-wiring loop cases run under a display, e.g. `xvfb-run`, and skip in the
-displayless gate). The most recently retired tasks are summarised below.
+of the `.cppm` interface. Slice B
+(`claude/intrinsicengine-agent-onboarding-01gFi`, PR #963, commit `fdc3165`)
+closed `CPUContracted` by wiring the adapter into `Engine`: `Engine` owns the
+`Graphics::ImGuiOverlaySystem` instance (the allowed `runtime -> graphics` edge)
+and constructs the adapter in `Initialize()` after the `Window`/`Renderer`;
+`RunFrame` calls `BeginFrame(frameDt)` after `PollEvents` + the minimize/resize
+early returns and before `OnVariableTick`, and `EndFrame()` after the variable
+tick and before the render contract's `PrepareFrame()`, so exactly one
+`ImGuiOverlayFrame` is produced per engine frame; the editor hook is exposed via
+`Engine::SetImGuiEditorCallback` with a read-only `GetImGuiAdapter()` observer.
+New `Test.ImGuiAdapterEngineWiring.cpp` `contract;runtime` coverage drives a
+bounded `Engine::Run()` (static wiring cases run displayless; the live per-frame
+loop + editor-hook cases are window-gated and verified under `xvfb-run`). The
+renderer-side `Pass.ImGui` consumption + GPU font-atlas upload (the
+`Operational` proof) remain `GRAPHICS-079`; the engine-owned overlay instance is
+handed to the renderer when that lands. Final working-sandbox acceptance is
+`RUNTIME-095`.
 
 Previously-active
 [`RUNTIME-093`](../done/RUNTIME-093-primitive-selection-refinement.md) — runtime

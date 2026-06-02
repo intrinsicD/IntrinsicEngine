@@ -1,5 +1,22 @@
 # RUNTIME-090 — `Extrinsic.Runtime.ImGuiAdapter` (Dear ImGui platform/renderer adapter)
 
+## Status
+- State: done.
+- Owner/agent: claude.
+- Branch: `claude/intrinsicengine-agent-onboarding-01gFi` (Slice B, PR #963,
+  commit `fdc3165`). Slice A landed on
+  `claude/intrinsicengine-agent-onboarding-qu8wV` (PR #962, commits `3bd20f2` +
+  `4676a1d`).
+- Maturity reached: `CPUContracted` (Slice A standalone adapter module +
+  Slice B `Engine` frame-loop wiring and editor-hook exposure).
+- Completion date: 2026-06-02.
+- PR/commit: Slice A — PR #962 (commits `3bd20f2`, `4676a1d`); Slice B — PR #963
+  (commit `fdc3165`).
+- Next verification step: none for this task. The renderer-side `Pass.ImGui`
+  consumption + GPU font-atlas upload (the `Operational` proof of the produced
+  `ImGuiOverlayFrame` records) remain owned by `GRAPHICS-079`; final
+  working-sandbox acceptance is `RUNTIME-095`.
+
 ## Goal
 - Open the runtime-side Dear ImGui adapter declared by `GRAPHICS-013CQ`: a new module `Extrinsic.Runtime.ImGuiAdapter` (planned home: `src/runtime/ImGui/Runtime.ImGuiAdapter.cppm`) that owns the ImGui context lifecycle, drives the platform input pump (window events / mouse / keyboard), walks `ImDrawData` after `ImGui::Render()`, and constructs `ImGuiOverlayFrame` records submitted via `ImGuiOverlaySystem::SubmitFrame(...)` once per frame after `ImGui::Render()` and before `IRenderer::PrepareFrame()`.
 
@@ -10,9 +27,9 @@
 - No frame buffer copy/blit / present fast path.
 
 ## Context
-- Status: in-progress (Slice B). Slice A landed (PR #962, commits `3bd20f2` +
-  `4676a1d`); this slice wires the adapter into `Engine::RunFrame` and exposes
-  the editor hook.
+- Status: done (see `## Status`). Slice A landed (PR #962, commits `3bd20f2` +
+  `4676a1d`); Slice B (PR #963, commit `fdc3165`) wired the adapter into
+  `Engine::RunFrame` and exposed the editor hook.
 - Owner/agent + branch: `claude/intrinsicengine-agent-onboarding-01gFi` (Slice B;
   Slice A was `claude/intrinsicengine-agent-onboarding-qu8wV`).
 - Next verification step: build `IntrinsicTests` and run the `ImGuiAdapter*`
