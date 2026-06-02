@@ -1,7 +1,7 @@
 # LEGACY-002 — Seed retirement tasks for remaining `src/legacy/` subtrees
 
 ## Goal
-- Open a structured retirement task in `tasks/backlog/architecture/` for each `src/legacy/<Subsystem>/` subtree that does not yet have one, so the layering allowlist (re-bound by [`HARDEN-069`](HARDEN-069-rebind-legacy-layering-allowlist-to-active-retirement-tasks.md)) can name a concrete owning task per subtree.
+- Open a structured retirement task in `tasks/backlog/architecture/` for each `src/legacy/<Subsystem>/` subtree that does not yet have one, so the layering allowlist (re-bound by [`HARDEN-069`](../../done/HARDEN-069-rebind-legacy-layering-allowlist-to-active-retirement-tasks.md)) can name a concrete owning task per subtree.
 
 ## Non-goals
 - Do not delete any code under `src/legacy/` in this task. This is a backlog-seeding task; deletions land under each per-subtree LEGACY-* successor.

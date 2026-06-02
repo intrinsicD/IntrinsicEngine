@@ -8,6 +8,7 @@
 
 - New feature work should target canonical layers, not `src/legacy/`, unless needed for compatibility.
 - Any temporary cross-layer exception inside `src/legacy/` must be tracked in a current task under `tasks/active/` with a removal task ID.
+- Layering allowlist rows must point at an open removal owner. As of `HARDEN-069`, `src/legacy/Interface/**` rows point at [`LEGACY-001`](../../tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md), and the remaining legacy subtree rows point at [`LEGACY-002`](../../tasks/backlog/architecture/LEGACY-002-seed-src-legacy-retirement-backlog.md) until that task seeds per-subtree deletion tasks.
 - Promotion work from `src/legacy/` must keep mechanical path moves separate from semantic refactors.
 
 ## Exit criteria

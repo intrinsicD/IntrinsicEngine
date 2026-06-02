@@ -8,7 +8,7 @@
 
 ## Non-goals
 - Do not rebind allowlist rows in this task; that metadata migration is owned by
-  [`HARDEN-069`](HARDEN-069-rebind-legacy-layering-allowlist-to-active-retirement-tasks.md).
+  [`HARDEN-069`](../../done/HARDEN-069-rebind-legacy-layering-allowlist-to-active-retirement-tasks.md).
 - Do not add, delete, widen, or narrow any allowlisted layering edge.
 - Do not change `tools/repo/check_layering.py` dependency-boundary rules.
 - Do not migrate or delete legacy code.

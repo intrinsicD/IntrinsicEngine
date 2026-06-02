@@ -25,8 +25,8 @@ map.
   inventories promoted modules whose value types, pure data contracts, or
   dependency-free APIs appear to live in higher layers than their true owner and
   creates one scoped follow-up task per accepted move/split.
-- [HARDEN-069 — Rebind legacy layering allowlist entries to active retirement tasks](HARDEN-069-rebind-legacy-layering-allowlist-to-active-retirement-tasks.md):
-  metadata-only rebinding of legacy allowlist rows from the retired `HARDEN-010`
+- [HARDEN-069 — Rebind legacy layering allowlist entries to active retirement tasks](../../done/HARDEN-069-rebind-legacy-layering-allowlist-to-active-retirement-tasks.md)
+  (done 2026-06-02): metadata-only rebinding of legacy allowlist rows from the retired `HARDEN-010`
   ID to current legacy-retirement task IDs, preserving the allowlisted edge set.
 - [HARDEN-070 — Drop dead null guards on reference-initialised helpers](HARDEN-070-drop-dead-null-guards-on-reference-initialised-helpers.md):
   hygiene cleanup of ~7 internal-boundary `m_X == nullptr` guards in
@@ -44,7 +44,7 @@ map.
   keep claiming a task is active/backlog/done when the file lives elsewhere or
   no longer exists.
 - [HARDEN-076 — Enforce open task owners for layering allowlist rows](HARDEN-076-enforce-open-task-layering-allowlist-owners.md):
-  follows [`HARDEN-069`](HARDEN-069-rebind-legacy-layering-allowlist-to-active-retirement-tasks.md)
+  follows [`HARDEN-069`](../../done/HARDEN-069-rebind-legacy-layering-allowlist-to-active-retirement-tasks.md)
   by making `check_layering_allowlist_quality.py` fail strict mode when a
   temporary allowlist exception points at a missing or retired task owner.
 - [HARDEN-077 — Enforce operational follow-ups for ambiguous maturity closures](HARDEN-077-enforce-operational-followups-for-ambiguous-maturity.md):
