@@ -353,7 +353,8 @@ namespace Extrinsic::Graphics
                 {"FrameRecipe.PresentSource", "EntityId", "SceneDepth"}, {"SelectionOutline"});
         AddPass(out, FrameRecipePassKind::DebugView, "DebugViewPass", features.EnableDebugView, false,
                 {"FrameRecipe.PresentSource"}, {"DebugViewRGBA"});
-        AddPass(out, FrameRecipePassKind::ImGui, "ImGuiPass", features.EnableImGui, false, {"FrameRecipe.PresentSource"}, {});
+        AddPass(out, FrameRecipePassKind::ImGui, "ImGuiPass", features.EnableImGui, false,
+                {"FrameRecipe.PresentSource"}, {"FrameRecipe.PresentSource"});
         AddPass(out, FrameRecipePassKind::Present, "Present", true, true, {"FrameRecipe.PresentSource"}, {"Backbuffer"});
 
         AddResource(out, FrameRecipeResourceKind::Backbuffer, "Backbuffer", true, true, true);
@@ -1132,6 +1133,10 @@ namespace Extrinsic::Graphics
             const TextureRef input = presentSource;
             addOrderedPass("ImGuiPass", [=](RenderGraphBuilder& builder) {
                 builder.Read(input, TextureUsage::ShaderRead);
+                builder.Write(input, TextureUsage::ColorAttachmentWrite);
+                builder.SetRenderPass(RHI::RenderPassDesc{
+                    .ColorTargets = kDefaultLoadColorAttachments,
+                });
                 builder.SideEffect();
             });
         }

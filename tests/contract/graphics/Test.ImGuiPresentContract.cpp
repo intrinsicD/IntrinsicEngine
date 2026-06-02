@@ -148,6 +148,7 @@ TEST(GraphicsImGuiPresentContract, FrameRecipeKeepsImGuiOffBackbufferAndPresentF
     EXPECT_TRUE(imgui->Enabled);
     EXPECT_FALSE(imgui->FinalizesBackbuffer);
     EXPECT_TRUE(Contains(imgui->Reads, "FrameRecipe.PresentSource"));
+    EXPECT_TRUE(Contains(imgui->Writes, "FrameRecipe.PresentSource"));
     EXPECT_FALSE(Contains(imgui->Writes, "Backbuffer"));
 
     const auto* present = FindPass(description, Graphics::FrameRecipePassKind::Present);

@@ -2276,33 +2276,24 @@ namespace Extrinsic::Graphics
                     }
                     else if (passName == std::string_view{"ImGuiPass"})
                     {
-                        // GRAPHICS-079 Slice A — default-recipe canonical
+                        // GRAPHICS-079 Slice D.1 — default-recipe canonical
                         // ImGui overlay route. The recipe declares
                         // `"ImGuiPass"` every default-recipe frame
-                        // (`features.EnableImGui` defaults true; it reads
-                        // `FrameRecipe.PresentSource` and side-effects), so
-                        // this branch is reached every frame. Before this
-                        // slice the pass name fell through to the executor's
-                        // soft-skip default branch; it now routes through
-                        // `RecordImGuiPass` which mirrors the present/debug-view
-                        // taxonomy: non-operational device →
-                        // `SkippedNonOperational`; no render-pass attachment /
-                        // no attached overlay system / missing pipeline lease /
-                        // no submitted overlay work → `SkippedUnavailable`;
+                        // (`features.EnableImGui` defaults true) and gives it
+                        // a load/store `FrameRecipe.PresentSource` color
+                        // attachment, so submitted overlay payload records
+                        // inside a real render-pass scope. `RecordImGuiPass`
+                        // mirrors the present/debug-view taxonomy:
+                        // non-operational device → `SkippedNonOperational`;
+                        // no active render pass / no attached overlay system /
+                        // missing pipeline lease / no submitted overlay work /
+                        // failed transient upload → `SkippedUnavailable`;
                         // otherwise the consumer-side `ImGuiPass::Execute`
-                        // records the overlay draw and we return `Recorded`.
-                        // `activeRenderPass.HasAttachments` is passed through
-                        // because the SideEffect-only recipe declaration begins
-                        // no render pass for ImGui yet, and a `BindPipeline +
-                        // DrawIndexed` outside a render pass is invalid on
-                        // Vulkan; the `Recorded` path is gated until Slice D
-                        // promotes ImGui to write `FrameRecipe.PresentSource`.
-                        // The runtime hands the engine-owned overlay system in
-                        // via `SetImGuiOverlaySystem` (`RUNTIME-090` producer ↔
-                        // this consumer); the per-draw-list
-                        // `BindIndexBuffer`/`Draw` blocks + transient
-                        // host-visible upload + font atlas are owned by later
-                        // slices of this task.
+                        // records the per-draw-list `BindIndexBuffer +
+                        // PushConstants + DrawIndexed` blocks and returns
+                        // `Recorded`. The runtime hands the engine-owned
+                        // overlay system in via `SetImGuiOverlaySystem`
+                        // (`RUNTIME-090` producer ↔ this consumer).
                         const RenderCommandPassStatus status =
                             RecordImGuiPass(graphicsContext, activeRenderPass.HasAttachments);
                         AccumulateCommandRecordStatus(passName, status);
@@ -6416,30 +6407,21 @@ namespace Extrinsic::Graphics
             return RenderCommandPassStatus::Recorded;
         }
 
-        // GRAPHICS-079 Slice A — canonical default-recipe `Pass.ImGui`
+        // GRAPHICS-079 Slice D.1 — canonical default-recipe `Pass.ImGui`
         // executor helper. Mirrors `RecordPresentPass` for the operational
         // gate and `RecordDebugViewPass` for the missing-resource taxonomy.
         // The `ImGuiPass` consumer only exists once the runtime hands in the
         // engine-owned `ImGuiOverlaySystem` (`SetImGuiOverlaySystem`), and the
         // pass body short-circuits internally on `!HasOverlayWork()`.
         //
-        // Critically, the overlay draw is a `BindPipeline + DrawIndexed`
-        // sequence that is only valid *inside* a render pass. The default
-        // recipe currently declares `"ImGuiPass"` as a
-        // `Read(FrameRecipe.PresentSource) + SideEffect()` node with no color
-        // attachment, so the executor begins no render pass for it
-        // (`BuildActiveRenderPassDesc(...).HasAttachments == false`); recording
-        // the draw there would be invalid command-buffer usage on Vulkan even
-        // though `MockDevice` tolerates it. The helper therefore gates the
-        // `Recorded` path on `hasActiveRenderPass`: until Slice D promotes
-        // ImGui to write `FrameRecipe.PresentSource` (which gives the pass a
-        // real color attachment and a render-pass scope), an attached overlay
-        // with submitted work still reports `SkippedUnavailable` rather than
-        // recording into no render target. Because the gate is the live
-        // attachment signal (not a hardcoded flag), the `Recorded` path turns
-        // on automatically once the write-topology lands. Slice C adds the
-        // per-draw-list `BindIndexBuffer`/`Draw` blocks + `DrawCalls`
-        // diagnostic behind this same gate.
+        // The overlay draw is a `BindPipeline + DrawIndexed` sequence and must
+        // only run inside a render pass. Slice D.1 promotes the default recipe
+        // to read and write `FrameRecipe.PresentSource`, so
+        // `BuildActiveRenderPassDesc(...).HasAttachments` is the live safety
+        // signal: if it is false, the helper reports `SkippedUnavailable`
+        // rather than recording invalid Vulkan command-buffer usage. With an
+        // attached overlay payload and valid upload/pipeline resources, the
+        // route records and publishes `ImGuiOverlayDiagnostics::DrawCalls`.
         [[nodiscard]] RenderCommandPassStatus RecordImGuiPass(RHI::ICommandContext& cmd,
                                                               const bool hasActiveRenderPass)
         {

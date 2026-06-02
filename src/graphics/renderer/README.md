@@ -903,58 +903,16 @@ Concretely:
   per-packet `Records*` / `Selects*AlwaysOnTop` shape, per-frame
   buffer-recycling invariant per lane, mixed-lane both-record
   acceptance test, and the per-lane partial-skip independence pin).
-- GRAPHICS-079 Slice A wires the canonical default-recipe `Pass.ImGui`
-  (`Extrinsic.Graphics.Pass.ImGui`) executor route on the CPU/null path
-  (`CPUContracted`). The recipe declares `"ImGuiPass"` every default-recipe
-  frame (`features.EnableImGui` defaults true; it reads
-  `FrameRecipe.PresentSource` and side-effects), and before this slice the
-  pass name fell through to the executor soft-skip default. The renderer now
-  owns the consumer side: `IRenderer::SetImGuiOverlaySystem(ImGuiOverlaySystem*)`
-  is the runtime-owned composition handoff edge — the runtime hands in the
-  same engine-owned overlay system the `RUNTIME-090` `ImGuiAdapter` submits to,
-  so producer and consumer share one instance. The renderer holds an
-  `ImGuiOverlaySystem* m_ImGuiOverlaySystem` borrow plus a non-movable
-  `std::optional<ImGuiPass> m_ImGuiPass` (emplaced when the overlay is handed
-  in, before or after `Initialize()`), exposes
-  `IRenderer::HasImGuiOverlaySystem()` as the boolean diagnostics observer used
-  by runtime composition tests, and owns `m_ImGuiPipelineLease`. The ImGui
-  pipeline lives in `BuildImGuiPipelineDesc(m_BackbufferFormat)` — premultiplied-
-  alpha blend (`src=One`, `dst=OneMinusSrcAlpha` for color and alpha), depth
-  test + write disabled, color target pinned to the `FrameRecipe.PresentSource`
-  (backbuffer) format, `PushConstantSize = sizeof(ImGuiOverlayPushConstants)`
-  (BDA + first-vertex + index-count + font-atlas bindless index + transform),
-  pointed at the `assets/shaders/imgui.{vert,frag}` pair — and
-  is created LAST inside the operational publisher (after the visualization-
-  overlay isoline pipelines) so the existing `FailPipelineCreateCall` indices
-  used by other lifecycle tests remain stable. On the executor side, the new
-  `"ImGuiPass"` branch (textually adjacent to `"Present"`, since the overlay
-  composites into `PresentSource` before `Pass.Present` finalizes the
-  backbuffer) routes through `RecordImGuiPass(...)` with the same `Recorded` /
-  `SkippedNonOperational` / `SkippedUnavailable` taxonomy the other default-
-  recipe helpers use: non-operational device → `SkippedNonOperational`;
-  otherwise `SkippedUnavailable` unless every gate passes. Crucially, the
-  overlay draw is a `BindPipeline + DrawIndexed` that is only valid inside a
-  render pass, but the default recipe declares `"ImGuiPass"` as a
-  `Read(FrameRecipe.PresentSource) + SideEffect()` node with NO color
-  attachment, so `BuildActiveRenderPassDesc(...).HasAttachments` is false and
-  the executor begins no render pass for it. `RecordImGuiPass` therefore takes
-  the live `hasActiveRenderPass` signal and keeps the `Recorded` path gated on
-  it (alongside attached overlay system + valid pipeline lease + submitted
-  overlay work): an attached overlay with work still reports
-  `SkippedUnavailable` rather than recording a draw into no render target,
-  which would be invalid command-buffer usage on Vulkan. Because the gate is
-  the live attachment signal (not a hardcoded flag), the `Recorded` path turns
-  on automatically once Slice D promotes ImGui to write
-  `FrameRecipe.PresentSource`. The Slice A contract pin is
-  `tests/contract/graphics/Test.ImGuiPass.cpp` (both attach orders + the
-  post-`RebuildOperationalResources` case skip `SkippedUnavailable` for the
-  missing render target while `Present` keeps recording; no-overlay / no-work /
-  detached `SkippedUnavailable`; non-operational `SkippedNonOperational`). The
-  `Recorded` proof is owned by Slice D. GRAPHICS-079 Slice B wires the runtime
-  `Engine` producer↔consumer handoff so `Engine::Initialize()` passes the
-  engine-owned overlay to the renderer and `Engine::Shutdown()` detaches it
-  before the adapter shuts the overlay down. GRAPHICS-079 Slice C adds the
-  graphics-owned retained font atlas and renderer-owned transient upload path:
+- GRAPHICS-079 wires the canonical default-recipe `Pass.ImGui`
+  (`Extrinsic.Graphics.Pass.ImGui`) executor route on the CPU/null path.
+  Slice A added the explicit `"ImGuiPass"` executor branch, the renderer-owned
+  `std::optional<ImGuiPass>` consumer, the borrowed
+  `ImGuiOverlaySystem* m_ImGuiOverlaySystem`, `IRenderer::SetImGuiOverlaySystem`
+  / `HasImGuiOverlaySystem`, and the `m_ImGuiPipelineLease`. Slice B wires the
+  runtime `Engine` producer↔consumer handoff so `Engine::Initialize()` passes
+  the engine-owned overlay to the renderer and `Engine::Shutdown()` detaches it
+  before the adapter shuts the overlay down. Slice C adds the graphics-owned
+  retained font atlas and renderer-owned transient upload path:
   `ImGuiOverlaySystem::InitializeGpuResources(device, textureManager,
   samplerManager)` allocates the retained atlas texture (`R8_UNORM` fallback,
   `RGBA8_UNORM` for colored atlas payloads) through `RHI::TextureManager` and
@@ -962,12 +920,14 @@ Concretely:
   vertices/indices into one growing host-visible vertex buffer and one growing
   index buffer; `ImGuiPass::Execute(...)` records one
   `BindIndexBuffer + PushConstants + DrawIndexed` block per uploaded draw list
-  and increments `ImGuiOverlayDiagnostics::DrawCalls`. Because the default
-  recipe still gives `"ImGuiPass"` no render-pass attachment, the renderer route
-  remains `SkippedUnavailable` until Slice D changes the write topology. Still
-  deferred to Slice D: `Pass.ImGui` writing `FrameRecipe.PresentSource`,
-  per-command user-texture bindless sampling, the `gpu;vulkan` smoke, and the
-  closing-cleanup assertion.
+  and increments `ImGuiOverlayDiagnostics::DrawCalls`. Slice D.1 promotes the
+  frame recipe's `"ImGuiPass"` node from side-effect-only to a load/store
+  render-pass-scope pass that reads and writes the current
+  `FrameRecipe.PresentSource` color attachment, so an operational device with
+  an attached uploadable overlay frame records under the CPU/null gate. The
+  imported `Backbuffer` remains owned solely by `Pass.Present`; render-graph
+  validation still rejects non-present backbuffer writes. Remaining D.2 work:
+  per-command user-texture bindless sampling and the opt-in `gpu;vulkan` smoke.
 - `TransformSyncSystem`, `LightSystem`, and `VisualizationSyncSystem` consume
   graphics-owned snapshot records (`TransformSyncRecord`, `LightSnapshot`, and
   `VisualizationSyncRecord`) instead of querying live ECS registries. Runtime is
