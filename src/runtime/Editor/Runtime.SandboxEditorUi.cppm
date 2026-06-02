@@ -2,6 +2,7 @@ module;
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <vector>
@@ -11,10 +12,13 @@ module;
 
 export module Extrinsic.Runtime.SandboxEditorUi;
 
+import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.SelectionController;
@@ -39,8 +43,11 @@ export namespace Extrinsic::Runtime
         NoChange,
         MissingScene,
         MissingSelectionController,
+        MissingCameraControllerRegistry,
+        MissingPrimitiveViewCommands,
         StaleEntity,
         MissingTransform,
+        UnsupportedGeometryDomain,
     };
 
     [[nodiscard]] const char* DebugNameForSandboxEditorDiagnosticCode(
@@ -54,6 +61,9 @@ export namespace Extrinsic::Runtime
 
     [[nodiscard]] const char* DebugNameForSandboxEditorPrimitiveKind(
         RefinedPrimitiveKind kind) noexcept;
+
+    [[nodiscard]] const char* DebugNameForSandboxEditorCameraControllerKind(
+        Core::Config::CameraControllerKind kind) noexcept;
 
     struct SandboxEditorDiagnostic
     {
@@ -152,11 +162,42 @@ export namespace Extrinsic::Runtime
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
+    struct SandboxEditorPrimitiveViewSettings
+    {
+        bool EnableEdgeView{false};
+        bool EnableVertexView{false};
+
+        [[nodiscard]] bool AnyEnabled() const noexcept
+        {
+            return EnableEdgeView || EnableVertexView;
+        }
+    };
+
+    struct SandboxEditorPrimitiveViewCommandSurface
+    {
+        std::function<SandboxEditorPrimitiveViewSettings(std::uint32_t)> GetSettings{};
+        std::function<void(std::uint32_t, SandboxEditorPrimitiveViewSettings)> SetSettings{};
+        std::function<void(std::uint32_t)> ClearSettings{};
+
+        [[nodiscard]] bool Available() const noexcept
+        {
+            return static_cast<bool>(GetSettings) &&
+                   static_cast<bool>(SetSettings) &&
+                   static_cast<bool>(ClearSettings);
+        }
+    };
+
     struct SandboxEditorCameraRenderModel
     {
         bool CameraControlsAvailable{false};
         bool RenderSettingsAvailable{false};
         bool PrimitiveViewControlsAvailable{false};
+        bool HasMainCameraController{false};
+        Core::Config::CameraControllerKind MainCameraControllerKind{
+            Core::Config::CameraControllerKind::Orbit};
+        bool HasPrimitiveViewEntity{false};
+        std::uint32_t PrimitiveViewStableId{0u};
+        SandboxEditorPrimitiveViewSettings PrimitiveView{};
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
@@ -182,6 +223,9 @@ export namespace Extrinsic::Runtime
         ECS::Scene::Registry* Scene{nullptr};
         SelectionController*  Selection{nullptr};
         const std::optional<PrimitiveSelectionResult>* LastRefinedPrimitive{nullptr};
+        CameraControllerRegistry* CameraControllers{nullptr};
+        Core::Extent2D CameraViewport{};
+        SandboxEditorPrimitiveViewCommandSurface PrimitiveViewCommands{};
         bool ImGuiAdapterAvailable{false};
         bool AssetImportCommandsAvailable{false};
         bool CameraRenderCommandsAvailable{false};
@@ -199,6 +243,24 @@ export namespace Extrinsic::Runtime
         glm::vec3 Scale{1.0f};
     };
 
+    struct SandboxEditorCameraControllerCommand
+    {
+        CameraControllerSlot Slot{CameraControllerSlot::Main};
+        Core::Config::CameraControllerKind Kind{
+            Core::Config::CameraControllerKind::Orbit};
+        bool PreserveCurrentView{true};
+        Core::Extent2D Viewport{};
+    };
+
+    struct SandboxEditorPrimitiveViewCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        bool SetEdgeView{false};
+        bool EnableEdgeView{false};
+        bool SetVertexView{false};
+        bool EnableVertexView{false};
+    };
+
     [[nodiscard]] SandboxEditorPanelFrame BuildSandboxEditorPanelFrame(
         const SandboxEditorContext& context);
 
@@ -208,6 +270,14 @@ export namespace Extrinsic::Runtime
     SandboxEditorCommandStatus ApplySandboxEditorTransformEdit(
         const SandboxEditorContext& context,
         const SandboxEditorTransformEditCommand& command);
+
+    SandboxEditorCommandStatus ApplySandboxEditorCameraControllerCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorCameraControllerCommand& command);
+
+    SandboxEditorCommandStatus ApplySandboxEditorPrimitiveViewCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorPrimitiveViewCommand& command);
 
     void DrawSandboxEditorPanelFrame(const SandboxEditorPanelFrame& frame);
 

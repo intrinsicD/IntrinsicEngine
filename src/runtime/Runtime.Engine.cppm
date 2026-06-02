@@ -20,6 +20,7 @@ import Extrinsic.Graphics.ImGuiOverlaySystem;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.ImGuiAdapter;
+import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.ReferenceScene;
 import Extrinsic.Runtime.SelectionController;
@@ -242,6 +243,16 @@ namespace Extrinsic::Runtime
         // RenderFrameInput::Camera.
         [[nodiscard]] const std::optional<Graphics::CameraViewInput>&
             GetReferenceCameraSeed() const noexcept;
+        // UI-001 Slice C — editor/runtime command seams. The engine remains
+        // the owner of camera-controller slots and mesh primitive-view state;
+        // editor code can request replacements/toggles without storing
+        // authoritative camera or render state in UI objects.
+        [[nodiscard]] CameraControllerRegistry& GetCameraControllerRegistry() noexcept;
+        void SetMeshPrimitiveViewSettings(std::uint32_t stableEntityId,
+                                          MeshPrimitiveViewSettings settings);
+        void ClearMeshPrimitiveViewSettings(std::uint32_t stableEntityId) noexcept;
+        [[nodiscard]] MeshPrimitiveViewSettings GetMeshPrimitiveViewSettings(
+            std::uint32_t stableEntityId) const noexcept;
 
         // ── RUNTIME-090 Slice B — Dear ImGui editor hook ──────────────────
         // Registers the per-frame editor callback invoked between the

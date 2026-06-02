@@ -12,9 +12,11 @@ not import lower layers directly.
 through application lifecycle hooks. The app remains a runtime-only consumer:
 the editor shell registers with `Engine::SetImGuiEditorCallback`, reads scene
 and selection state through runtime APIs, emits selection and local-transform
-edit commands through runtime-owned seams, and leaves asset import,
-camera/render-setting mutation beyond transform edits, and visualization command
-routing to runtime owners for later UI-001 slices.
+edit commands through runtime-owned seams, replaces runtime camera-controller
+slots through the engine-owned registry, toggles mesh edge/vertex primitive
+views through runtime extraction-cache settings, and leaves asset import, debug
+overlay settings, and full visualization command routing to runtime owners for
+later UI-001 slices.
 
 ## Build presets
 

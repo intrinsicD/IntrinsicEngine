@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <string>
@@ -10,6 +11,7 @@
 #include <glm/gtc/quaternion.hpp>
 
 import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Component.MetaData;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Component.Transform;
@@ -21,6 +23,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.ImGuiOverlaySystem;
 import Extrinsic.Platform.Window;
+import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.ImGuiAdapter;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
@@ -35,9 +38,13 @@ namespace GS = Extrinsic::ECS::Components::GeometrySources;
 namespace Sel = Extrinsic::ECS::Components::Selection;
 namespace G = Extrinsic::Graphics::Components;
 namespace Plat = Extrinsic::Platform;
+namespace PN = Extrinsic::ECS::Components::GeometrySources::PropertyNames;
 
 namespace
 {
+    constexpr std::uint32_t kInvalidIndex =
+        std::numeric_limits<std::uint32_t>::max();
+
     [[nodiscard]] bool HasDiagnostic(
         const std::vector<Runtime::SandboxEditorDiagnostic>& diagnostics,
         const Runtime::SandboxEditorDiagnosticCode code)
@@ -70,6 +77,83 @@ namespace
         auto& vertices = registry.Raw().emplace<GS::Vertices>(entity);
         vertices.Properties.Resize(pointCount);
         registry.Raw().emplace<G::RenderPoints>(entity);
+    }
+
+    void SetPositions(GS::Vertices& vertices,
+                      const std::vector<glm::vec3>& positions)
+    {
+        vertices.Properties.Resize(positions.size());
+        auto pos = vertices.Properties.GetOrAdd<glm::vec3>(
+            std::string{PN::kPosition},
+            glm::vec3{0.0f});
+        pos.Vector() = positions;
+    }
+
+    void SetEdges(GS::Edges& edges,
+                  const std::vector<std::uint32_t>& v0,
+                  const std::vector<std::uint32_t>& v1)
+    {
+        edges.Properties.Resize(v0.size());
+        auto p0 = edges.Properties.GetOrAdd<std::uint32_t>(
+            std::string{PN::kEdgeV0},
+            0u);
+        auto p1 = edges.Properties.GetOrAdd<std::uint32_t>(
+            std::string{PN::kEdgeV1},
+            0u);
+        p0.Vector() = v0;
+        p1.Vector() = v1;
+    }
+
+    void SetHalfedges(GS::Halfedges& halfedges,
+                      const std::vector<std::uint32_t>& toVertex,
+                      const std::vector<std::uint32_t>& next,
+                      const std::vector<std::uint32_t>& face)
+    {
+        halfedges.Properties.Resize(toVertex.size());
+        auto to = halfedges.Properties.GetOrAdd<std::uint32_t>(
+            std::string{PN::kHalfedgeToVertex},
+            kInvalidIndex);
+        auto nx = halfedges.Properties.GetOrAdd<std::uint32_t>(
+            std::string{PN::kHalfedgeNext},
+            kInvalidIndex);
+        auto fa = halfedges.Properties.GetOrAdd<std::uint32_t>(
+            std::string{PN::kHalfedgeFace},
+            kInvalidIndex);
+        to.Vector() = toVertex;
+        nx.Vector() = next;
+        fa.Vector() = face;
+    }
+
+    void SetFaces(GS::Faces& faces,
+                  const std::vector<std::uint32_t>& faceHalfedge)
+    {
+        faces.Properties.Resize(faceHalfedge.size());
+        auto halfedge = faces.Properties.GetOrAdd<std::uint32_t>(
+            std::string{PN::kFaceHalfedge},
+            kInvalidIndex);
+        halfedge.Vector() = faceHalfedge;
+    }
+
+    void AddTriangleMeshSource(ECS::Scene::Registry& registry,
+                               const ECS::EntityHandle entity)
+    {
+        auto& raw = registry.Raw();
+        auto& vertices = raw.emplace<GS::Vertices>(entity);
+        SetPositions(vertices,
+                     {
+                         {0.0f, 0.0f, 0.0f},
+                         {1.0f, 0.0f, 0.0f},
+                         {0.0f, 1.0f, 0.0f},
+                     });
+        auto& edges = raw.emplace<GS::Edges>(entity);
+        SetEdges(edges, {0u, 1u, 2u}, {1u, 2u, 0u});
+        auto& halfedges = raw.emplace<GS::Halfedges>(entity);
+        SetHalfedges(halfedges,
+                     {1u, 2u, 0u, 0u, 2u, 1u},
+                     {1u, 2u, 0u, 5u, 3u, 4u},
+                     {0u, 0u, 0u, kInvalidIndex, kInvalidIndex, kInvalidIndex});
+        auto& faces = raw.emplace<GS::Faces>(entity);
+        SetFaces(faces, {0u});
     }
 
     [[nodiscard]] Runtime::SandboxEditorContext MakeContext(
@@ -375,6 +459,159 @@ TEST(SandboxEditorUi, TransformEditCommandMutatesLocalTransformAndMarksDirty)
                       .Position = glm::vec3{1.0f},
                   }),
               Runtime::SandboxEditorCommandStatus::MissingSelectionController);
+}
+
+TEST(SandboxEditorUi, CameraControllerCommandReplacesMainController)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::CameraControllerRegistry cameraControllers;
+    cameraControllers.Register(
+        Runtime::CameraControllerSlot::Main,
+        Runtime::CreateCameraController(
+            Extrinsic::Core::Config::CameraControllerKind::Orbit));
+
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CameraControllers = &cameraControllers;
+    context.CameraViewport = Extrinsic::Core::Extent2D{640, 40};
+
+    Runtime::SandboxEditorPanelFrame frame =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+    ASSERT_TRUE(frame.CameraRender.CameraControlsAvailable);
+    ASSERT_TRUE(frame.CameraRender.HasMainCameraController);
+    EXPECT_EQ(frame.CameraRender.MainCameraControllerKind,
+              Extrinsic::Core::Config::CameraControllerKind::Orbit);
+
+    const Runtime::SandboxEditorCommandStatus status =
+        Runtime::ApplySandboxEditorCameraControllerCommand(
+            context,
+            Runtime::SandboxEditorCameraControllerCommand{
+                .Kind = Extrinsic::Core::Config::CameraControllerKind::Fly,
+            });
+
+    EXPECT_EQ(status, Runtime::SandboxEditorCommandStatus::Applied);
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorCameraControllerKind(
+                     cameraControllers.Resolve(Runtime::CameraControllerSlot::Main)
+                         .Kind()),
+                 "Fly");
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorCameraControllerCommand(
+                  context,
+                  Runtime::SandboxEditorCameraControllerCommand{
+                      .Kind = Extrinsic::Core::Config::CameraControllerKind::Fly,
+                  }),
+              Runtime::SandboxEditorCommandStatus::NoChange);
+
+    Runtime::SandboxEditorContext missingRegistry = context;
+    missingRegistry.CameraControllers = nullptr;
+    EXPECT_EQ(Runtime::ApplySandboxEditorCameraControllerCommand(
+                  missingRegistry,
+                  Runtime::SandboxEditorCameraControllerCommand{}),
+              Runtime::SandboxEditorCommandStatus::MissingCameraControllerRegistry);
+}
+
+TEST(SandboxEditorUi, PrimitiveViewCommandRoutesThroughRuntimeSettings)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    std::optional<Runtime::SandboxEditorPrimitiveViewSettings> storedSettings;
+    bool hasStoredSettings = false;
+    std::uint32_t setCount = 0u;
+    std::uint32_t clearCount = 0u;
+    const std::uint32_t meshStableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.PrimitiveViewCommands =
+        Runtime::SandboxEditorPrimitiveViewCommandSurface{
+            .GetSettings =
+                [&](const std::uint32_t stableId)
+                {
+                    EXPECT_EQ(stableId, meshStableId);
+                    if (hasStoredSettings && storedSettings.has_value())
+                        return *storedSettings;
+                    return Runtime::SandboxEditorPrimitiveViewSettings{};
+                },
+            .SetSettings =
+                [&](const std::uint32_t stableId,
+                    const Runtime::SandboxEditorPrimitiveViewSettings settings)
+                {
+                    EXPECT_EQ(stableId, meshStableId);
+                    storedSettings = settings;
+                    hasStoredSettings = true;
+                    ++setCount;
+                },
+            .ClearSettings =
+                [&](const std::uint32_t stableId)
+                {
+                    EXPECT_EQ(stableId, meshStableId);
+                    hasStoredSettings = false;
+                    ++clearCount;
+                },
+        };
+
+    Runtime::SandboxEditorPanelFrame frame =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+    ASSERT_TRUE(frame.CameraRender.PrimitiveViewControlsAvailable);
+    ASSERT_TRUE(frame.CameraRender.HasPrimitiveViewEntity);
+    EXPECT_FALSE(frame.CameraRender.PrimitiveView.EnableEdgeView);
+    EXPECT_FALSE(frame.CameraRender.PrimitiveView.EnableVertexView);
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorPrimitiveViewCommand(
+                  context,
+                  Runtime::SandboxEditorPrimitiveViewCommand{
+                      .StableEntityId = meshStableId,
+                      .SetEdgeView = true,
+                      .EnableEdgeView = true,
+                      .SetVertexView = true,
+                      .EnableVertexView = true,
+                  }),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    EXPECT_EQ(setCount, 1u);
+    ASSERT_TRUE(hasStoredSettings);
+    ASSERT_TRUE(storedSettings.has_value());
+    EXPECT_TRUE(storedSettings->EnableEdgeView);
+    EXPECT_TRUE(storedSettings->EnableVertexView);
+
+    frame = Runtime::BuildSandboxEditorPanelFrame(context);
+    EXPECT_TRUE(frame.CameraRender.PrimitiveView.EnableEdgeView);
+    EXPECT_TRUE(frame.CameraRender.PrimitiveView.EnableVertexView);
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorPrimitiveViewCommand(
+                  context,
+                  Runtime::SandboxEditorPrimitiveViewCommand{
+                      .StableEntityId = meshStableId,
+                      .SetEdgeView = true,
+                      .EnableEdgeView = false,
+                      .SetVertexView = true,
+                      .EnableVertexView = false,
+                  }),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    EXPECT_EQ(clearCount, 1u);
+    EXPECT_FALSE(hasStoredSettings);
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorPrimitiveViewCommand(
+                  context,
+                  Runtime::SandboxEditorPrimitiveViewCommand{}),
+              Runtime::SandboxEditorCommandStatus::NoChange);
+
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "Cloud");
+    AddPointCloudSource(registry, cloud, 2u);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
+    const std::uint32_t cloudStableId =
+        Runtime::SelectionController::ToStableEntityId(cloud);
+    EXPECT_EQ(Runtime::ApplySandboxEditorPrimitiveViewCommand(
+                  context,
+                  Runtime::SandboxEditorPrimitiveViewCommand{
+                      .StableEntityId = cloudStableId,
+                      .SetEdgeView = true,
+                      .EnableEdgeView = true,
+                  }),
+              Runtime::SandboxEditorCommandStatus::UnsupportedGeometryDomain);
 }
 
 TEST(SandboxEditorUi, AdapterCallbackDrawsDeterministicDisabledPanelFrame)

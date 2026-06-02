@@ -3,6 +3,7 @@ module;
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 #include <utility>
@@ -16,6 +17,8 @@ module;
 
 module Extrinsic.Runtime.SandboxEditorUi;
 
+import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Component.MetaData;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Component.Transform;
@@ -23,8 +26,11 @@ import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.Graphics.Component.RenderGeometry;
+import Extrinsic.Graphics.CameraSnapshots;
+import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.ImGuiAdapter;
+import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.SelectionController;
 
@@ -36,6 +42,43 @@ namespace Extrinsic::Runtime
         namespace GS = Extrinsic::ECS::Components::GeometrySources;
         namespace Sel = Extrinsic::ECS::Components::Selection;
         namespace G = Extrinsic::Graphics::Components;
+
+        [[nodiscard]] SandboxEditorPrimitiveViewSettings FromRuntimeSettings(
+            const MeshPrimitiveViewSettings settings) noexcept
+        {
+            return SandboxEditorPrimitiveViewSettings{
+                .EnableEdgeView = settings.EnableEdgeView,
+                .EnableVertexView = settings.EnableVertexView,
+            };
+        }
+
+        [[nodiscard]] MeshPrimitiveViewSettings ToRuntimeSettings(
+            const SandboxEditorPrimitiveViewSettings settings) noexcept
+        {
+            return MeshPrimitiveViewSettings{
+                .EnableEdgeView = settings.EnableEdgeView,
+                .EnableVertexView = settings.EnableVertexView,
+            };
+        }
+
+        [[nodiscard]] bool SamePrimitiveViewSettings(
+            const SandboxEditorPrimitiveViewSettings lhs,
+            const SandboxEditorPrimitiveViewSettings rhs) noexcept
+        {
+            return lhs.EnableEdgeView == rhs.EnableEdgeView &&
+                   lhs.EnableVertexView == rhs.EnableVertexView;
+        }
+
+        [[nodiscard]] Core::Extent2D SafeViewport(
+            const Core::Extent2D commandViewport,
+            const Core::Extent2D contextViewport) noexcept
+        {
+            if (!Core::IsEmpty(commandViewport))
+                return commandViewport;
+            if (!Core::IsEmpty(contextViewport))
+                return contextViewport;
+            return Core::Extent2D{1, 1};
+        }
 
         [[nodiscard]] SandboxEditorDiagnostic MakeDiagnostic(
             const SandboxEditorDiagnosticCode code,
@@ -356,14 +399,54 @@ namespace Extrinsic::Runtime
             const SandboxEditorContext& context)
         {
             SandboxEditorCameraRenderModel model{};
-            model.CameraControlsAvailable = context.CameraRenderCommandsAvailable;
-            model.RenderSettingsAvailable = context.CameraRenderCommandsAvailable;
-            model.PrimitiveViewControlsAvailable = context.CameraRenderCommandsAvailable;
-            if (!context.CameraRenderCommandsAvailable)
+            model.CameraControlsAvailable = context.CameraControllers != nullptr;
+            model.RenderSettingsAvailable = context.CameraControllers != nullptr;
+            model.PrimitiveViewControlsAvailable =
+                context.PrimitiveViewCommands.Available();
+
+            if (context.CameraControllers != nullptr)
+            {
+                if (const ICameraController* controller =
+                        context.CameraControllers->ResolveOrNull(CameraControllerSlot::Main);
+                    controller != nullptr)
+                {
+                    model.HasMainCameraController = true;
+                    model.MainCameraControllerKind = controller->Kind();
+                }
+            }
+
+            if (context.Scene != nullptr && context.PrimitiveViewCommands.Available())
+            {
+                if (const std::optional<ECS::EntityHandle> selected =
+                        ResolveFirstSelectedEntity(context);
+                    selected.has_value())
+                {
+                    const GS::ConstSourceView view =
+                        GS::BuildConstView(context.Scene->Raw(), *selected);
+                    if (view.ActiveDomain == GS::Domain::Mesh)
+                    {
+                        model.HasPrimitiveViewEntity = true;
+                        model.PrimitiveViewStableId =
+                            SelectionController::ToStableEntityId(*selected);
+                        model.PrimitiveView =
+                            context.PrimitiveViewCommands.GetSettings(
+                                model.PrimitiveViewStableId);
+                    }
+                    else if (view.ActiveDomain != GS::Domain::None)
+                    {
+                        AddDiagnostic(model.Diagnostics,
+                                      SandboxEditorDiagnosticCode::UnsupportedGeometryDomain,
+                                      "Mesh primitive views require a mesh-domain selection.");
+                    }
+                }
+            }
+
+            if (!model.CameraControlsAvailable &&
+                !model.PrimitiveViewControlsAvailable)
             {
                 AddDiagnostic(model.Diagnostics,
                               SandboxEditorDiagnosticCode::CameraRenderCommandsUnavailable,
-                              "Camera/render setting command seams are not exposed in Slice A.");
+                              "Camera/render setting command seams are unavailable.");
             }
             return model;
         }
@@ -388,9 +471,34 @@ namespace Extrinsic::Runtime
                 .Scene = &engine.GetScene(),
                 .Selection = &engine.GetSelectionController(),
                 .LastRefinedPrimitive = &engine.GetLastRefinedPrimitiveSelection(),
+                .CameraControllers = &engine.GetCameraControllerRegistry(),
+                .CameraViewport = Core::Extent2D{
+                    engine.GetWindow().GetFramebufferExtent().Width,
+                    engine.GetWindow().GetFramebufferExtent().Height},
+                .PrimitiveViewCommands = SandboxEditorPrimitiveViewCommandSurface{
+                    .GetSettings =
+                        [&engine](const std::uint32_t stableEntityId)
+                        {
+                            return FromRuntimeSettings(
+                                engine.GetMeshPrimitiveViewSettings(stableEntityId));
+                        },
+                    .SetSettings =
+                        [&engine](const std::uint32_t stableEntityId,
+                                  const SandboxEditorPrimitiveViewSettings settings)
+                        {
+                            engine.SetMeshPrimitiveViewSettings(
+                                stableEntityId,
+                                ToRuntimeSettings(settings));
+                        },
+                    .ClearSettings =
+                        [&engine](const std::uint32_t stableEntityId)
+                        {
+                            engine.ClearMeshPrimitiveViewSettings(stableEntityId);
+                        },
+                },
                 .ImGuiAdapterAvailable = engine.GetImGuiAdapter().IsInitialized(),
                 .AssetImportCommandsAvailable = false,
-                .CameraRenderCommandsAvailable = false,
+                .CameraRenderCommandsAvailable = true,
                 .VisualizationCommandsAvailable = false,
             };
         }
@@ -606,6 +714,89 @@ namespace Extrinsic::Runtime
 
             if (ImGui::Begin("Camera / Render"))
             {
+                if (frame.CameraRender.HasMainCameraController)
+                {
+                    ImGui::Text("Main camera: %s",
+                                DebugNameForSandboxEditorCameraControllerKind(
+                                    frame.CameraRender.MainCameraControllerKind));
+                }
+                else
+                {
+                    ImGui::TextDisabled("Main camera: not registered");
+                }
+
+                if (context != nullptr &&
+                    frame.CameraRender.CameraControlsAvailable)
+                {
+                    if (ImGui::Button("Orbit"))
+                    {
+                        (void)ApplySandboxEditorCameraControllerCommand(
+                            *context,
+                            SandboxEditorCameraControllerCommand{
+                                .Kind = Core::Config::CameraControllerKind::Orbit,
+                            });
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Fly"))
+                    {
+                        (void)ApplySandboxEditorCameraControllerCommand(
+                            *context,
+                            SandboxEditorCameraControllerCommand{
+                                .Kind = Core::Config::CameraControllerKind::Fly,
+                            });
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Free look"))
+                    {
+                        (void)ApplySandboxEditorCameraControllerCommand(
+                            *context,
+                            SandboxEditorCameraControllerCommand{
+                                .Kind = Core::Config::CameraControllerKind::FreeLook,
+                            });
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Top down"))
+                    {
+                        (void)ApplySandboxEditorCameraControllerCommand(
+                            *context,
+                            SandboxEditorCameraControllerCommand{
+                                .Kind = Core::Config::CameraControllerKind::TopDown,
+                            });
+                    }
+                }
+
+                if (frame.CameraRender.HasPrimitiveViewEntity)
+                {
+                    bool edgeView =
+                        frame.CameraRender.PrimitiveView.EnableEdgeView;
+                    if (context != nullptr &&
+                        ImGui::Checkbox("Mesh edge view", &edgeView))
+                    {
+                        (void)ApplySandboxEditorPrimitiveViewCommand(
+                            *context,
+                            SandboxEditorPrimitiveViewCommand{
+                                .StableEntityId =
+                                    frame.CameraRender.PrimitiveViewStableId,
+                                .SetEdgeView = true,
+                                .EnableEdgeView = edgeView,
+                            });
+                    }
+
+                    bool vertexView =
+                        frame.CameraRender.PrimitiveView.EnableVertexView;
+                    if (context != nullptr &&
+                        ImGui::Checkbox("Mesh vertex view", &vertexView))
+                    {
+                        (void)ApplySandboxEditorPrimitiveViewCommand(
+                            *context,
+                            SandboxEditorPrimitiveViewCommand{
+                                .StableEntityId =
+                                    frame.CameraRender.PrimitiveViewStableId,
+                                .SetVertexView = true,
+                                .EnableVertexView = vertexView,
+                            });
+                    }
+                }
                 DrawDiagnostics(frame.CameraRender.Diagnostics);
             }
             ImGui::End();
@@ -656,10 +847,16 @@ namespace Extrinsic::Runtime
             return "MissingScene";
         case SandboxEditorCommandStatus::MissingSelectionController:
             return "MissingSelectionController";
+        case SandboxEditorCommandStatus::MissingCameraControllerRegistry:
+            return "MissingCameraControllerRegistry";
+        case SandboxEditorCommandStatus::MissingPrimitiveViewCommands:
+            return "MissingPrimitiveViewCommands";
         case SandboxEditorCommandStatus::StaleEntity:
             return "StaleEntity";
         case SandboxEditorCommandStatus::MissingTransform:
             return "MissingTransform";
+        case SandboxEditorCommandStatus::UnsupportedGeometryDomain:
+            return "UnsupportedGeometryDomain";
         }
         return "Unknown";
     }
@@ -700,6 +897,23 @@ namespace Extrinsic::Runtime
             return "Vertex";
         case RefinedPrimitiveKind::Point:
             return "Point";
+        }
+        return "Unknown";
+    }
+
+    const char* DebugNameForSandboxEditorCameraControllerKind(
+        const Core::Config::CameraControllerKind kind) noexcept
+    {
+        switch (kind)
+        {
+        case Core::Config::CameraControllerKind::Orbit:
+            return "Orbit";
+        case Core::Config::CameraControllerKind::Fly:
+            return "Fly";
+        case Core::Config::CameraControllerKind::FreeLook:
+            return "FreeLook";
+        case Core::Config::CameraControllerKind::TopDown:
+            return "TopDown";
         }
         return "Unknown";
     }
@@ -791,6 +1005,72 @@ namespace Extrinsic::Runtime
         if (command.SetScale)
             transform->Scale = command.Scale;
         raw.emplace_or_replace<ECSC::Transform::IsDirtyTag>(entity);
+        return SandboxEditorCommandStatus::Applied;
+    }
+
+    SandboxEditorCommandStatus ApplySandboxEditorCameraControllerCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorCameraControllerCommand& command)
+    {
+        if (context.CameraControllers == nullptr)
+            return SandboxEditorCommandStatus::MissingCameraControllerRegistry;
+
+        ICameraController* existing =
+            context.CameraControllers->ResolveOrNull(command.Slot);
+        if (existing != nullptr && existing->Kind() == command.Kind &&
+            command.PreserveCurrentView)
+        {
+            return SandboxEditorCommandStatus::NoChange;
+        }
+
+        Graphics::CameraViewInput seed{};
+        if (command.PreserveCurrentView && existing != nullptr)
+        {
+            seed = existing->GetView(
+                SafeViewport(command.Viewport, context.CameraViewport));
+        }
+
+        context.CameraControllers->Replace(
+            command.Slot,
+            CreateCameraController(command.Kind, seed));
+        return SandboxEditorCommandStatus::Applied;
+    }
+
+    SandboxEditorCommandStatus ApplySandboxEditorPrimitiveViewCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorPrimitiveViewCommand& command)
+    {
+        if (!command.SetEdgeView && !command.SetVertexView)
+            return SandboxEditorCommandStatus::NoChange;
+        if (context.Scene == nullptr)
+            return SandboxEditorCommandStatus::MissingScene;
+        if (!context.PrimitiveViewCommands.Available())
+            return SandboxEditorCommandStatus::MissingPrimitiveViewCommands;
+
+        entt::registry& raw = context.Scene->Raw();
+        const ECS::EntityHandle entity =
+            SelectionController::ToEntityHandle(command.StableEntityId);
+        if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
+            return SandboxEditorCommandStatus::StaleEntity;
+
+        const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
+        if (view.ActiveDomain != GS::Domain::Mesh)
+            return SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+
+        SandboxEditorPrimitiveViewSettings settings =
+            context.PrimitiveViewCommands.GetSettings(command.StableEntityId);
+        const SandboxEditorPrimitiveViewSettings prior = settings;
+        if (command.SetEdgeView)
+            settings.EnableEdgeView = command.EnableEdgeView;
+        if (command.SetVertexView)
+            settings.EnableVertexView = command.EnableVertexView;
+
+        if (SamePrimitiveViewSettings(prior, settings))
+            return SandboxEditorCommandStatus::NoChange;
+        if (settings.AnyEnabled())
+            context.PrimitiveViewCommands.SetSettings(command.StableEntityId, settings);
+        else
+            context.PrimitiveViewCommands.ClearSettings(command.StableEntityId);
         return SandboxEditorCommandStatus::Applied;
     }
 

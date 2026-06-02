@@ -40,6 +40,7 @@ import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.SelectionSystem;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.ImGuiAdapter;
+import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Core.FrameLoop;
 import Extrinsic.Runtime.EcsSystemBundle;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
@@ -1017,6 +1018,30 @@ namespace Extrinsic::Runtime
     const std::optional<Graphics::CameraViewInput>& Engine::GetReferenceCameraSeed() const noexcept
     {
         return m_ReferenceCamera;
+    }
+
+    CameraControllerRegistry& Engine::GetCameraControllerRegistry() noexcept
+    {
+        return m_CameraControllers;
+    }
+
+    void Engine::SetMeshPrimitiveViewSettings(
+        const std::uint32_t stableEntityId,
+        const MeshPrimitiveViewSettings settings)
+    {
+        m_RenderExtraction.SetMeshPrimitiveViewSettings(stableEntityId, settings);
+    }
+
+    void Engine::ClearMeshPrimitiveViewSettings(
+        const std::uint32_t stableEntityId) noexcept
+    {
+        m_RenderExtraction.ClearMeshPrimitiveViewSettings(stableEntityId);
+    }
+
+    MeshPrimitiveViewSettings Engine::GetMeshPrimitiveViewSettings(
+        const std::uint32_t stableEntityId) const noexcept
+    {
+        return m_RenderExtraction.GetMeshPrimitiveViewSettings(stableEntityId);
     }
 
     void Engine::SetImGuiEditorCallback(std::function<void()> callback)
