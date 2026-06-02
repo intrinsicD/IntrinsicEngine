@@ -697,7 +697,7 @@ Cross-layer Theme B′ leaves outside `rendering/`:
 - [`runtime/RUNTIME-082` — Spatial debug adapters](../../done/RUNTIME-082-spatial-debug-adapters.md) (done 2026-05-27).
 - [`runtime/RUNTIME-083` — Visualization adapters](../runtime/RUNTIME-083-visualization-adapters.md).
 - [`runtime/RUNTIME-084` — Gizmo interaction](../runtime/RUNTIME-084-gizmo-interaction.md).
-- [`runtime/RUNTIME-090` — Dear ImGui platform/renderer adapter](../../active/RUNTIME-090-imgui-platform-renderer-adapter.md) (active, Slice A).
+- [`runtime/RUNTIME-090` — Dear ImGui platform/renderer adapter](../../done/RUNTIME-090-imgui-platform-renderer-adapter.md) (retired 2026-06-02 at `CPUContracted`; Slice A standalone adapter module plus Slice B `Engine` frame-loop wiring landed).
 
 Cross-layer Theme A leaves newly opened for the full working sandbox path:
 - [`RUNTIME-085` — `GeometrySources` mesh residency bridge](../../done/RUNTIME-085-geometrysources-mesh-residency.md) (retired 2026-05-28 at `CPUContracted`; Slices A–C landed the mesh packer, extraction wiring, and dirty-domain reupload/retire ordering).
