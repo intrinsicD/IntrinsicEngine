@@ -12,32 +12,31 @@ Each active task should include:
 ## Currently active
 
 [`UI-001`](UI-001-sandbox-editor-shell-panels.md) — sandbox editor shell and core
-panels on top of the runtime ImGui adapter/pass stack. Status: blocked on
+panels on top of the runtime ImGui adapter/pass stack. Status: in-progress on
 `main` after Slice C.2; the promoted editor shell now covers enriched
 inspector/render-hint fields, selected/hovered entity rows, refined primitive
 id/hit display, a runtime-owned local-transform edit command, camera-controller
 replacement, mesh edge/vertex primitive-view toggle commands, and selected-entity
 spatial-debug / visualization-config command routing with CPU `contract;runtime`
 coverage. Remaining file/import execution is gated on `ASSETIO-001`; remaining
-non-scalar visualization adapter packet selection is gated on active
-`RUNTIME-083` Slice E.
-Next verification: resume UI-001 after those seams exist, then run the task
-structural checks plus the runtime contract/default CPU gates.
-
-[`RUNTIME-083`](RUNTIME-083-visualization-adapters.md) —
-`Extrinsic.Runtime.VisualizationAdapters` runtime producer umbrella. Status:
-in-progress on `main`; Slices A-D add the umbrella module,
-`PropertyScalarAdapter`, `KMeansLabelAdapter`, `VectorFieldAdapter`,
-`IsolineAdapter`, `HtexMetadataAdapter`, mutable visualization packet batch,
-adapter stats, registry contract, and extraction-cache scalar adapter pump into
-`RuntimeRenderSnapshotBatch::Visualization*` spans. This partially unblocks
-UI-001's visualization adapter acceptance; standalone KMeans/color, vector-field,
-isoline, Htex preview, and fragment-bake adapter contracts are available, while
-non-scalar extraction selection remains open. Next verification: build
-`IntrinsicRuntimeContractTests`, run focused non-scalar visualization extraction
-selection tests, refresh the module inventory, and run runtime structural checks.
+visualization-control UI work is unblocked by retired `RUNTIME-083`.
+Next verification: resume UI-001 visualization controls or the ASSETIO-gated
+import panel slice, then run the task structural checks plus the runtime
+contract/default CPU gates.
 
 The most recently retired tasks are summarised below.
+
+Previously-active
+[`RUNTIME-083`](../done/RUNTIME-083-visualization-adapters.md) —
+`Extrinsic.Runtime.VisualizationAdapters` runtime producer umbrella retired to
+`tasks/done/` on 2026-06-02 at maturity `CPUContracted`. Slices A-E landed the
+umbrella module, property-scalar, KMeans/color, vector-field, isoline, Htex
+preview, and fragment-bake adapters, runtime-owned adapter registration/binding
+state, scalar and non-scalar extraction selection into
+`RuntimeRenderSnapshotBatch::Visualization*`, and extraction-side packet/error
+stats with CPU `integration;runtime;graphics` coverage. `Operational`
+visualization proof remains owned by `RUNTIME-095` or a later visualization
+backend smoke.
 
 Previously-active
 [`GRAPHICS-079`](../done/GRAPHICS-079-default-recipe-imgui-pass-wiring.md) —

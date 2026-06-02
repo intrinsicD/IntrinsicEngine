@@ -49,7 +49,7 @@ import Extrinsic.Runtime.ProceduralGeometry;
 import Extrinsic.Runtime.ProceduralGeometryPacker;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SpatialDebugAdapters;
-import Extrinsic.Runtime.VisualizationAdapters;
+export import Extrinsic.Runtime.VisualizationAdapters;
 
 export namespace Extrinsic::Runtime
 {
@@ -261,13 +261,12 @@ export namespace Extrinsic::Runtime
         std::uint32_t SpatialDebugEmptyNodeSkippedAccumulator{0};
         std::uint32_t SpatialDebugDepthCapTruncationAccumulator{0};
 
-        // RUNTIME-083 Slice B — runtime visualization adapter pump counters.
-        // `VisualizationAdapterScalarConfigsObserved` counts renderables whose
-        // `VisualizationConfig` requests `ScalarField` packet production.
-        // Registered adapters and per-renderable bindings are runtime-owned
-        // cache state, while `VisualizationConfig` supplies the source name,
-        // domain, range, and colormap. The packet lane counts mirror the spans
-        // attached to `RuntimeRenderSnapshotBatch::Visualization*`.
+        // RUNTIME-083 Slices B/E — runtime visualization adapter pump counters.
+        // `VisualizationAdapterScalarConfigsObserved` preserves the original
+        // scalar-field config count. Slice E extends the same binding surface to
+        // non-scalar adapter packets; the missing/invalid counters are folded
+        // from `VisualizationAdapterStats`, and packet lane counts mirror the
+        // spans attached to `RuntimeRenderSnapshotBatch::Visualization*`.
         std::uint32_t VisualizationAdapterScalarConfigsObserved{0};
         std::uint32_t VisualizationAdapterBindingsMissing{0};
         std::uint32_t VisualizationAdapterMissingAdapterCount{0};
@@ -303,8 +302,8 @@ export namespace Extrinsic::Runtime
     class RenderExtractionCache
     {
     public:
-        RenderExtractionCache() = default;
-        ~RenderExtractionCache() = default;
+        RenderExtractionCache();
+        ~RenderExtractionCache();
 
         RenderExtractionCache(const RenderExtractionCache&) = delete;
         RenderExtractionCache& operator=(const RenderExtractionCache&) = delete;
@@ -314,10 +313,11 @@ export namespace Extrinsic::Runtime
         // `HoveredStableId()` / `HasHovered()` are attached to the submitted
         // `RuntimeRenderSnapshotBatch` so the renderer surfaces them on
         // `RenderWorld::Selection`. Null leaves the selection snapshot empty.
-        [[nodiscard]] RuntimeRenderExtractionStats ExtractAndSubmit(ECS::Scene::Registry& scene,
-                                                                    Graphics::IRenderer& renderer,
-                                                                    Graphics::GpuAssetCache* gpuAssets = nullptr,
-                                                                    const SelectionController* selection = nullptr);
+        [[nodiscard]] RuntimeRenderExtractionStats ExtractAndSubmit(
+            ECS::Scene::Registry& scene,
+            Graphics::IRenderer& renderer,
+            Graphics::GpuAssetCache* gpuAssets = nullptr,
+            const SelectionController* selection = nullptr);
         void Shutdown(Graphics::IRenderer& renderer);
 
         // Maintenance-phase hook called by Engine::RunFrame after
@@ -457,18 +457,31 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] std::size_t GetSpatialDebugAdapterCount() const noexcept;
         [[nodiscard]] const SpatialDebugAdapterRegistry& GetSpatialDebugRegistryForTest() const noexcept;
 
+        enum class VisualizationAdapterBindingKind : std::uint8_t
+        {
+            Scalar,
+            Color,
+            VectorField,
+            Isoline,
+            HtexMetadata,
+        };
+
         struct VisualizationAdapterBinding
         {
             std::uint64_t AdapterKey{0u};
             std::uint64_t BufferBDA{0u};
+            VisualizationAdapterBindingKind Kind{
+                VisualizationAdapterBindingKind::Scalar};
+            VisualizationAdapterOptions Options{};
         };
 
-        // RUNTIME-083 Slice B — runtime-owned visualization adapter binding
-        // surface. `VisualizationConfig` on the entity declares the requested
-        // scalar source and presentation metadata; this cache-owned binding
-        // supplies the active adapter key plus the externally owned GPU buffer
-        // address the adapter must reference. Bindings are keyed by the same
-        // stable renderable id that extraction sidecars and selection use.
+        // RUNTIME-083 Slices B/E — runtime-owned visualization adapter binding
+        // surface. Scalar/color/isolines may derive source metadata from
+        // `VisualizationConfig`; vector fields and Htex metadata are supplied
+        // through `Options`. Bindings provide the active adapter key and any
+        // externally owned GPU buffer addresses the adapter must reference.
+        // They are keyed by the same stable renderable id that extraction
+        // sidecars and selection use.
         void RegisterVisualizationAdapter(std::uint64_t key,
                                           std::unique_ptr<IVisualizationAdapter> adapter);
         bool UnregisterVisualizationAdapter(std::uint64_t key) noexcept;
@@ -684,13 +697,15 @@ export namespace Extrinsic::Runtime
         SpatialDebugAdapterRegistry m_SpatialDebugRegistry{};
         SpatialDebugSnapshotBatch m_SpatialDebugBatch{};
 
-        // RUNTIME-083 Slice B — owned visualization adapter instances,
+        struct VisualizationAdapterState;
+        // RUNTIME-083 Slices B/E — owned visualization adapter instances,
         // non-owning registry mirror, per-renderable binding table, and a
         // frame-local packet batch attached to `RuntimeRenderSnapshotBatch`.
-        std::unordered_map<std::uint64_t, std::unique_ptr<IVisualizationAdapter>> m_VisualizationAdapters{};
-        VisualizationAdapterRegistry m_VisualizationAdapterRegistry{};
-        std::unordered_map<std::uint32_t, VisualizationAdapterBinding> m_VisualizationAdapterBindings{};
-        VisualizationAdapterBatch m_VisualizationAdapterBatch{};
+        // This is intentionally hidden behind implementation state: the
+        // binding API is public, but the heavy adapter/batch storage imports
+        // visualization packet internals that should not expand this exported
+        // cache object's layout in every importing module.
+        std::unique_ptr<VisualizationAdapterState> m_VisualizationState{};
 
         RuntimeRenderExtractionStats m_LastStats{};
     };

@@ -94,14 +94,14 @@ upstream these runtime gates consume.
 | Gate | Task | State | Evidence |
 |---|---|---|---|
 | Texture asset bridge | [`RUNTIME-080`](../../tasks/backlog/runtime/RUNTIME-080-asset-bridges-texture.md) | **OPEN** | No runtime asset-bridge module. |
-| Runtime ImGui platform/renderer adapter | [`RUNTIME-090`](../../tasks/done/RUNTIME-090-imgui-platform-renderer-adapter.md) | **OPEN** | No runtime ImGui adapter. Graphics-side `Extrinsic.Graphics.ImGuiOverlaySystem` + `Pass.ImGui` exist, but nothing produces `ImGuiOverlayFrame` records from runtime. |
+| Runtime ImGui platform/renderer adapter | [`RUNTIME-090`](../../tasks/done/RUNTIME-090-imgui-platform-renderer-adapter.md) | **DONE** | `Extrinsic.Runtime.ImGuiAdapter` produces `ImGuiOverlayFrame` records from runtime-owned ImGui frames; `GRAPHICS-079` consumes them through the renderer-owned `Pass.ImGui` path. |
 | Asset model/texture ingest ownership | [`ASSETIO-001`](../../tasks/backlog/assets/ASSETIO-001-asset-model-texture-ingest-ownership.md) | **OPEN** | Backlog; no ingest ownership wired. |
-| Sandbox editor shell + core panels | [`UI-001`](../../tasks/active/UI-001-sandbox-editor-shell-panels.md) | **ACTIVE** | Slice C.2 extends `Extrinsic.Runtime.SandboxEditorUi` with selected-entity `SpatialDebugBinding` and `VisualizationConfig` command routing, alongside the Slice B inspector/selection/transform coverage and Slice C.1 camera/primitive-view commands. Asset import execution and non-scalar `RUNTIME-083` extraction selection remain open outside this slice. |
-| Visualization adapter umbrella | [`RUNTIME-083`](../../tasks/active/RUNTIME-083-visualization-adapters.md) | **ACTIVE** | Slices A-D add the runtime `VisualizationAdapters` umbrella, `PropertyScalarAdapter`, `KMeansLabelAdapter`, `VectorFieldAdapter`, `IsolineAdapter`, `HtexMetadataAdapter`, registry contract, runtime-owned extraction-cache adapter bindings, scalar packet handoff into `RuntimeRenderSnapshotBatch::Visualization*`, and deterministic Htex/fragment-bake packet contracts with `RecreateHtex` streaming scheduling. Non-scalar extraction selection is still open. |
+| Sandbox editor shell + core panels | [`UI-001`](../../tasks/active/UI-001-sandbox-editor-shell-panels.md) | **ACTIVE** | Slice C.2 extends `Extrinsic.Runtime.SandboxEditorUi` with selected-entity `SpatialDebugBinding` and `VisualizationConfig` command routing, alongside the Slice B inspector/selection/transform coverage and Slice C.1 camera/primitive-view commands. Asset import execution remains open; expanded visualization-control UI can now use retired `RUNTIME-083` runtime seams. |
+| Visualization adapter umbrella | [`RUNTIME-083`](../../tasks/done/RUNTIME-083-visualization-adapters.md) | **DONE** | Slices A-E add the runtime `VisualizationAdapters` umbrella, `PropertyScalarAdapter`, `KMeansLabelAdapter`, `VectorFieldAdapter`, `IsolineAdapter`, `HtexMetadataAdapter`, registry contract, runtime-owned extraction-cache adapter bindings, scalar/non-scalar packet handoff into `RuntimeRenderSnapshotBatch::Visualization*`, deterministic Htex/fragment-bake packet contracts with `RecreateHtex` streaming scheduling, and extraction-side packet/error stats. |
 
 ### E. Optional / non-blocking
 
-- [`RUNTIME-083`](../../tasks/active/RUNTIME-083-visualization-adapters.md)
+- [`RUNTIME-083`](../../tasks/done/RUNTIME-083-visualization-adapters.md)
   visualization adapters — optional for acceptance (RUNTIME-095 lists
   visualization/spatial-debug adapters as optional).
 

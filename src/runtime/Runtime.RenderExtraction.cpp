@@ -53,6 +53,21 @@ import Extrinsic.Runtime.VisualizationAdapters;
 
 namespace Extrinsic::Runtime
 {
+    struct RenderExtractionCache::VisualizationAdapterState
+    {
+        std::unordered_map<std::uint64_t, std::unique_ptr<IVisualizationAdapter>> Adapters{};
+        VisualizationAdapterRegistry Registry{};
+        std::unordered_map<std::uint32_t, VisualizationAdapterBinding> Bindings{};
+        VisualizationAdapterBatch Batch{};
+    };
+
+    RenderExtractionCache::RenderExtractionCache()
+        : m_VisualizationState(std::make_unique<VisualizationAdapterState>())
+    {
+    }
+
+    RenderExtractionCache::~RenderExtractionCache() = default;
+
     const RuntimeRenderExtractionStats& RenderExtractionCache::GetLastStats() const noexcept
     {
         return m_LastStats;
@@ -155,46 +170,46 @@ namespace Extrinsic::Runtime
             (void)UnregisterVisualizationAdapter(key);
             return;
         }
-        m_VisualizationAdapterRegistry.Register(key, *adapter);
-        m_VisualizationAdapters.insert_or_assign(key, std::move(adapter));
+        m_VisualizationState->Registry.Register(key, *adapter);
+        m_VisualizationState->Adapters.insert_or_assign(key, std::move(adapter));
     }
 
     bool RenderExtractionCache::UnregisterVisualizationAdapter(
         const std::uint64_t key) noexcept
     {
-        m_VisualizationAdapterRegistry.Unregister(key);
-        return m_VisualizationAdapters.erase(key) != 0u;
+        m_VisualizationState->Registry.Unregister(key);
+        return m_VisualizationState->Adapters.erase(key) != 0u;
     }
 
     std::size_t RenderExtractionCache::GetVisualizationAdapterCount() const noexcept
     {
-        return m_VisualizationAdapters.size();
+        return m_VisualizationState->Adapters.size();
     }
 
     const VisualizationAdapterRegistry& RenderExtractionCache::GetVisualizationAdapterRegistryForTest() const noexcept
     {
-        return m_VisualizationAdapterRegistry;
+        return m_VisualizationState->Registry;
     }
 
     void RenderExtractionCache::SetVisualizationAdapterBinding(
         const std::uint32_t stableEntityId,
         VisualizationAdapterBinding binding)
     {
-        m_VisualizationAdapterBindings.insert_or_assign(stableEntityId, binding);
+        m_VisualizationState->Bindings.insert_or_assign(stableEntityId, binding);
     }
 
     void RenderExtractionCache::ClearVisualizationAdapterBinding(
         const std::uint32_t stableEntityId) noexcept
     {
-        m_VisualizationAdapterBindings.erase(stableEntityId);
+        m_VisualizationState->Bindings.erase(stableEntityId);
     }
 
     std::optional<RenderExtractionCache::VisualizationAdapterBinding>
     RenderExtractionCache::GetVisualizationAdapterBinding(
         const std::uint32_t stableEntityId) const noexcept
     {
-        const auto it = m_VisualizationAdapterBindings.find(stableEntityId);
-        if (it == m_VisualizationAdapterBindings.end())
+        const auto it = m_VisualizationState->Bindings.find(stableEntityId);
+        if (it == m_VisualizationState->Bindings.end())
         {
             return std::nullopt;
         }
@@ -231,6 +246,110 @@ namespace Extrinsic::Runtime
                 return Graphics::VisualizationAttributeDomain::Face;
             }
             return Graphics::VisualizationAttributeDomain::Vertex;
+        }
+
+        [[nodiscard]] bool IsScalarVisualizationSource(
+            const Graphics::Components::VisualizationConfig* visualization) noexcept
+        {
+            using ColorSource = Graphics::Components::VisualizationConfig::ColorSource;
+            return visualization != nullptr &&
+                   visualization->Source == ColorSource::ScalarField;
+        }
+
+        [[nodiscard]] bool IsColorBufferVisualizationSource(
+            const Graphics::Components::VisualizationConfig* visualization) noexcept
+        {
+            using ColorSource = Graphics::Components::VisualizationConfig::ColorSource;
+            return visualization != nullptr &&
+                   (visualization->Source == ColorSource::PerVertexBuffer ||
+                    visualization->Source == ColorSource::PerEdgeBuffer ||
+                    visualization->Source == ColorSource::PerFaceBuffer);
+        }
+
+        [[nodiscard]] Graphics::VisualizationAttributeDomain ToColorBufferDomain(
+            const Graphics::Components::VisualizationConfig::ColorSource source) noexcept
+        {
+            using ColorSource = Graphics::Components::VisualizationConfig::ColorSource;
+            switch (source)
+            {
+            case ColorSource::PerVertexBuffer:
+                return Graphics::VisualizationAttributeDomain::Vertex;
+            case ColorSource::PerEdgeBuffer:
+                return Graphics::VisualizationAttributeDomain::Edge;
+            case ColorSource::PerFaceBuffer:
+                return Graphics::VisualizationAttributeDomain::Face;
+            default:
+                return Graphics::VisualizationAttributeDomain::Vertex;
+            }
+        }
+
+        [[nodiscard]] VisualizationAdapterOptions BuildVisualizationAdapterOptions(
+            const RenderExtractionCache::VisualizationAdapterBinding& binding,
+            const Graphics::Components::VisualizationConfig* visualization)
+        {
+            using BindingKind = RenderExtractionCache::VisualizationAdapterBindingKind;
+
+            VisualizationAdapterOptions options = binding.Options;
+            switch (binding.Kind)
+            {
+            case BindingKind::Scalar:
+                if (IsScalarVisualizationSource(visualization))
+                {
+                    options.SourceName = visualization->ScalarFieldName;
+                    options.OutputName = visualization->ScalarFieldName;
+                    options.Domain = ToVisualizationAttributeDomain(
+                        visualization->ScalarDomain);
+                    options.AutoRange = visualization->Scalar.AutoRange;
+                    options.RangeMin = visualization->Scalar.RangeMin;
+                    options.RangeMax = visualization->Scalar.RangeMax;
+                    options.Colormap = visualization->Scalar.Map;
+                }
+                if (options.BufferBDA == 0u)
+                {
+                    options.BufferBDA = binding.BufferBDA;
+                }
+                break;
+            case BindingKind::Color:
+                if (IsColorBufferVisualizationSource(visualization))
+                {
+                    options.SourceName = visualization->ColorBufferName;
+                    options.OutputName = visualization->ColorBufferName;
+                    options.Domain = ToColorBufferDomain(visualization->Source);
+                }
+                if (options.ColorBufferBDA == 0u)
+                {
+                    options.ColorBufferBDA = binding.BufferBDA;
+                }
+                break;
+            case BindingKind::VectorField:
+                if (options.VectorBufferBDA == 0u)
+                {
+                    options.VectorBufferBDA = binding.BufferBDA;
+                }
+                break;
+            case BindingKind::Isoline:
+                if (IsScalarVisualizationSource(visualization))
+                {
+                    options.SourceName = visualization->ScalarFieldName;
+                    options.OutputName = visualization->ScalarFieldName;
+                    options.Domain = ToVisualizationAttributeDomain(
+                        visualization->ScalarDomain);
+                    options.AutoRange = visualization->Scalar.AutoRange;
+                    options.RangeMin = visualization->Scalar.RangeMin;
+                    options.RangeMax = visualization->Scalar.RangeMax;
+                    options.IsoValueCount = visualization->Scalar.Isolines.Num;
+                    options.LineWidth = visualization->Scalar.Isolines.Width;
+                    options.OverlayColor = visualization->Scalar.Isolines.Color;
+                }
+                break;
+            case BindingKind::HtexMetadata:
+                if (options.TexcoordBufferBDA == 0u)
+                {
+                    options.TexcoordBufferBDA = binding.BufferBDA;
+                }
+                break;
+            }
+            return options;
         }
 
         [[nodiscard]] std::uint32_t BuildRenderFlags(const entt::registry& registry, entt::entity entity)
@@ -964,50 +1083,53 @@ namespace Extrinsic::Runtime
         const RenderableSidecar& sidecar,
         RuntimeRenderExtractionStats& stats)
     {
-        using ColorSource = Graphics::Components::VisualizationConfig::ColorSource;
+        const auto* visualization =
+            sidecar.HasVisualization ? &sidecar.Visualization : nullptr;
+        const bool scalarConfigRequested =
+            IsScalarVisualizationSource(visualization);
+        const bool colorConfigRequested =
+            IsColorBufferVisualizationSource(visualization);
+        const auto bindingIt = m_VisualizationState->Bindings.find(stableId);
+        const bool bindingRequested =
+            bindingIt != m_VisualizationState->Bindings.end();
 
-        if (!sidecar.HasVisualization
-            || sidecar.Visualization.Source != ColorSource::ScalarField)
+        if (!scalarConfigRequested && !colorConfigRequested && !bindingRequested)
         {
             return;
         }
 
-        ++stats.VisualizationAdapterScalarConfigsObserved;
+        if (scalarConfigRequested)
+        {
+            ++stats.VisualizationAdapterScalarConfigsObserved;
+        }
 
-        const auto bindingIt = m_VisualizationAdapterBindings.find(stableId);
-        if (bindingIt == m_VisualizationAdapterBindings.end())
+        if (!bindingRequested)
         {
             ++stats.VisualizationAdapterBindingsMissing;
             return;
         }
 
         const IVisualizationAdapter* adapter =
-            m_VisualizationAdapterRegistry.Find(bindingIt->second.AdapterKey);
+            m_VisualizationState->Registry.Find(bindingIt->second.AdapterKey);
         if (adapter == nullptr)
         {
             ++stats.VisualizationAdapterMissingAdapterCount;
             return;
         }
 
-        const auto& visualization = sidecar.Visualization;
         VisualizationAdapterStats perAdapter{};
-        VisualizationAdapterOptions options{};
-        options.SourceName = visualization.ScalarFieldName;
-        options.OutputName = visualization.ScalarFieldName;
-        options.Domain = ToVisualizationAttributeDomain(visualization.ScalarDomain);
-        options.BufferBDA = bindingIt->second.BufferBDA;
-        options.AutoRange = visualization.Scalar.AutoRange;
-        options.RangeMin = visualization.Scalar.RangeMin;
-        options.RangeMax = visualization.Scalar.RangeMax;
-        options.Colormap = visualization.Scalar.Map;
-        adapter->Append(m_VisualizationAdapterBatch, options, perAdapter);
+        const VisualizationAdapterOptions options =
+            BuildVisualizationAdapterOptions(bindingIt->second, visualization);
+        adapter->Append(m_VisualizationState->Batch, options, perAdapter);
 
         ++stats.VisualizationAdapterInvokedCount;
         stats.VisualizationAdapterPacketAppendCount += perAdapter.PacketAppendCount;
-        stats.VisualizationAdapterMissingSourceCount += perAdapter.MissingSourceCount;
+        stats.VisualizationAdapterMissingSourceCount +=
+            perAdapter.MissingSourceCount + perAdapter.MissingTexcoordCount;
         stats.VisualizationAdapterUnsupportedSourceTypeCount += perAdapter.UnsupportedSourceTypeCount;
         stats.VisualizationAdapterEmptySourceCount += perAdapter.EmptySourceCount;
-        stats.VisualizationAdapterInvalidBufferCount += perAdapter.InvalidBufferCount;
+        stats.VisualizationAdapterInvalidBufferCount +=
+            perAdapter.InvalidBufferCount + perAdapter.InvalidResourceCount;
         stats.VisualizationAdapterInvalidRangeCount += perAdapter.InvalidRangeCount;
         stats.VisualizationAdapterNonFiniteValueCount += perAdapter.NonFiniteValueCount;
         stats.VisualizationAdapterElementCountOverflowCount += perAdapter.ElementCountOverflowCount;
@@ -1252,10 +1374,11 @@ namespace Extrinsic::Runtime
         }
     }
 
-    RuntimeRenderExtractionStats RenderExtractionCache::ExtractAndSubmit(ECS::Scene::Registry& scene,
-                                                                         Graphics::IRenderer& renderer,
-                                                                         Graphics::GpuAssetCache* gpuAssets,
-                                                                         const SelectionController* selection)
+    RuntimeRenderExtractionStats RenderExtractionCache::ExtractAndSubmit(
+        ECS::Scene::Registry& scene,
+        Graphics::IRenderer& renderer,
+        Graphics::GpuAssetCache* gpuAssets,
+        const SelectionController* selection)
     {
         RuntimeRenderExtractionStats stats{};
         auto& registry = scene.Raw();
@@ -1264,7 +1387,7 @@ namespace Extrinsic::Runtime
         m_Transforms.clear();
         m_Visualizations.clear();
         m_Lights.clear();
-        m_VisualizationAdapterBatch.Clear();
+        m_VisualizationState->Batch.Clear();
 
         auto transformView = registry.view<ECS::Components::Transform::WorldMatrix>();
         for (const entt::entity entity : transformView)
@@ -1635,19 +1758,19 @@ namespace Extrinsic::Runtime
             static_cast<std::uint32_t>(m_SpatialDebugBatch.PointMarkers.size());
 
         stats.VisualizationAttributeBufferPacketCount =
-            static_cast<std::uint32_t>(m_VisualizationAdapterBatch.AttributeBuffers.size());
+            static_cast<std::uint32_t>(m_VisualizationState->Batch.AttributeBuffers.size());
         stats.VisualizationScalarPacketCount =
-            static_cast<std::uint32_t>(m_VisualizationAdapterBatch.Scalars.size());
+            static_cast<std::uint32_t>(m_VisualizationState->Batch.Scalars.size());
         stats.VisualizationColorPacketCount =
-            static_cast<std::uint32_t>(m_VisualizationAdapterBatch.Colors.size());
+            static_cast<std::uint32_t>(m_VisualizationState->Batch.Colors.size());
         stats.VisualizationVectorFieldPacketCount =
-            static_cast<std::uint32_t>(m_VisualizationAdapterBatch.VectorFields.size());
+            static_cast<std::uint32_t>(m_VisualizationState->Batch.VectorFields.size());
         stats.VisualizationIsolinePacketCount =
-            static_cast<std::uint32_t>(m_VisualizationAdapterBatch.Isolines.size());
+            static_cast<std::uint32_t>(m_VisualizationState->Batch.Isolines.size());
         stats.VisualizationHtexAtlasPacketCount =
-            static_cast<std::uint32_t>(m_VisualizationAdapterBatch.HtexAtlases.size());
+            static_cast<std::uint32_t>(m_VisualizationState->Batch.HtexAtlases.size());
         stats.VisualizationFragmentBakeAtlasPacketCount =
-            static_cast<std::uint32_t>(m_VisualizationAdapterBatch.FragmentBakeAtlases.size());
+            static_cast<std::uint32_t>(m_VisualizationState->Batch.FragmentBakeAtlases.size());
 
         stats.SubmittedTransformCount = static_cast<std::uint32_t>(m_Transforms.size());
         stats.SubmittedVisualizationCount = static_cast<std::uint32_t>(m_Visualizations.size());
@@ -1707,13 +1830,13 @@ namespace Extrinsic::Runtime
             .Transforms                     = m_Transforms,
             .Lights                         = m_Lights,
             .Visualizations                 = m_Visualizations,
-            .VisualizationAttributeBuffers  = m_VisualizationAdapterBatch.AttributeBuffers,
-            .VisualizationScalars           = m_VisualizationAdapterBatch.Scalars,
-            .VisualizationColors            = m_VisualizationAdapterBatch.Colors,
-            .VisualizationVectorFields      = m_VisualizationAdapterBatch.VectorFields,
-            .VisualizationIsolines          = m_VisualizationAdapterBatch.Isolines,
-            .VisualizationHtexAtlases       = m_VisualizationAdapterBatch.HtexAtlases,
-            .VisualizationFragmentBakeAtlases = m_VisualizationAdapterBatch.FragmentBakeAtlases,
+            .VisualizationAttributeBuffers  = m_VisualizationState->Batch.AttributeBuffers,
+            .VisualizationScalars           = m_VisualizationState->Batch.Scalars,
+            .VisualizationColors            = m_VisualizationState->Batch.Colors,
+            .VisualizationVectorFields      = m_VisualizationState->Batch.VectorFields,
+            .VisualizationIsolines          = m_VisualizationState->Batch.Isolines,
+            .VisualizationHtexAtlases       = m_VisualizationState->Batch.HtexAtlases,
+            .VisualizationFragmentBakeAtlases = m_VisualizationState->Batch.FragmentBakeAtlases,
             .SpatialDebugBounds             = m_SpatialDebugBatch.Bounds,
             .SpatialDebugHierarchyNodes     = m_SpatialDebugBatch.HierarchyNodes,
             .SpatialDebugSplitPlanes        = m_SpatialDebugBatch.SplitPlanes,
@@ -2001,10 +2124,10 @@ namespace Extrinsic::Runtime
         m_SpatialDebugRegistry.Clear();
         m_SpatialDebugAdapters.clear();
         m_SpatialDebugBatch.Clear();
-        m_VisualizationAdapterRegistry.Clear();
-        m_VisualizationAdapters.clear();
-        m_VisualizationAdapterBindings.clear();
-        m_VisualizationAdapterBatch.Clear();
+        m_VisualizationState->Registry.Clear();
+        m_VisualizationState->Adapters.clear();
+        m_VisualizationState->Bindings.clear();
+        m_VisualizationState->Batch.Clear();
 
         renderer.SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{});
         m_LastStats = stats;

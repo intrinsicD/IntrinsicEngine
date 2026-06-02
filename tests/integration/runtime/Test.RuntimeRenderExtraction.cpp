@@ -142,6 +142,32 @@ namespace
         return properties;
     }
 
+    [[nodiscard]] Geometry::PropertySet MakeColorProperties()
+    {
+        Geometry::PropertySet properties;
+        properties.Resize(3u);
+
+        auto colors = properties.Add<glm::vec4>("v:kmeans_color", glm::vec4{1.f});
+        colors[0] = {1.f, 0.f, 0.f, 1.f};
+        colors[1] = {0.f, 1.f, 0.f, 1.f};
+        colors[2] = {0.f, 0.f, 1.f, 1.f};
+
+        return properties;
+    }
+
+    [[nodiscard]] Geometry::PropertySet MakeVectorProperties()
+    {
+        Geometry::PropertySet properties;
+        properties.Resize(3u);
+
+        auto vectors = properties.Add<glm::vec3>("velocity", glm::vec3{0.f});
+        vectors[0] = {1.f, 0.f, 0.f};
+        vectors[1] = {0.f, 1.f, 0.f};
+        vectors[2] = {0.f, 0.f, 1.f};
+
+        return properties;
+    }
+
     void ConfigureScalarVisualization(ECS::Scene::Registry& scene,
                                       entt::entity entity)
     {
@@ -154,6 +180,26 @@ namespace
         visualization.ScalarFieldName = "curvature";
         visualization.ScalarDomain = Graphics::Components::VisualizationConfig::Domain::Vertex;
         visualization.Scalar.Map = Graphics::Colormap::Type::Plasma;
+    }
+
+    void ConfigureColorBufferVisualization(ECS::Scene::Registry& scene,
+                                           entt::entity entity)
+    {
+        auto& registry = scene.Raw();
+        registry.emplace<ECS::Components::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
+        registry.emplace<Graphics::Components::RenderPoints>(entity);
+
+        auto& visualization = registry.emplace<Graphics::Components::VisualizationConfig>(entity);
+        visualization.Source = Graphics::Components::VisualizationConfig::ColorSource::PerVertexBuffer;
+        visualization.ColorBufferName = "v:kmeans_color";
+    }
+
+    void ConfigureRenderablePoint(ECS::Scene::Registry& scene,
+                                  entt::entity entity)
+    {
+        auto& registry = scene.Raw();
+        registry.emplace<ECS::Components::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
+        registry.emplace<Graphics::Components::RenderPoints>(entity);
     }
 }
 
@@ -345,6 +391,240 @@ TEST(RuntimeRenderExtraction, VisualizationScalarAdapterInvalidBdaIsCounted)
     EXPECT_EQ(stats.VisualizationScalarPacketCount, 0u);
     EXPECT_TRUE(world.Visualization.Scalars.empty());
     EXPECT_EQ(world.Visualization.Diagnostics.InputPacketCount, 0u);
+}
+
+TEST(RuntimeRenderExtraction, VisualizationNonScalarAdapterBindingsReachRenderWorld)
+{
+    using BindingKind =
+        Runtime::RenderExtractionCache::VisualizationAdapterBindingKind;
+
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+
+    Geometry::PropertySet colorProperties = MakeColorProperties();
+    Geometry::PropertySet vectorProperties = MakeVectorProperties();
+    Geometry::PropertySet scalarProperties = MakeScalarProperties();
+
+    const auto colorEntity = scene.Create();
+    ConfigureColorBufferVisualization(scene, colorEntity);
+
+    const auto vectorEntity = scene.Create();
+    ConfigureRenderablePoint(scene, vectorEntity);
+
+    const auto isolineEntity = scene.Create();
+    ConfigureScalarVisualization(scene, isolineEntity);
+    auto& isolineConfig = scene.Raw().get<Graphics::Components::VisualizationConfig>(isolineEntity);
+    isolineConfig.Scalar.AutoRange = false;
+    isolineConfig.Scalar.RangeMin = -1.0f;
+    isolineConfig.Scalar.RangeMax = 2.0f;
+    isolineConfig.Scalar.Isolines.Num = 3u;
+    isolineConfig.Scalar.Isolines.Width = 2.5f;
+    isolineConfig.Scalar.Isolines.Color = {0.2f, 0.8f, 1.0f, 1.0f};
+
+    const auto htexEntity = scene.Create();
+    ConfigureRenderablePoint(scene, htexEntity);
+
+    constexpr std::uint64_t kColorKey = 0xC010u;
+    constexpr std::uint64_t kVectorKey = 0xBEEF'7001u;
+    constexpr std::uint64_t kIsolineKey = 0x1501u;
+    constexpr std::uint64_t kHtexKey = 0xA71A5u;
+    fixture.Extraction.RegisterVisualizationAdapter(
+        kColorKey,
+        std::make_unique<Runtime::KMeansLabelAdapter>(
+            Geometry::ConstPropertySet{colorProperties}));
+    fixture.Extraction.RegisterVisualizationAdapter(
+        kVectorKey,
+        std::make_unique<Runtime::VectorFieldAdapter>(
+            Geometry::ConstPropertySet{vectorProperties}));
+    fixture.Extraction.RegisterVisualizationAdapter(
+        kIsolineKey,
+        std::make_unique<Runtime::IsolineAdapter>(
+            Geometry::ConstPropertySet{scalarProperties}));
+    fixture.Extraction.RegisterVisualizationAdapter(
+        kHtexKey,
+        std::make_unique<Runtime::HtexMetadataAdapter>());
+
+    fixture.Extraction.SetVisualizationAdapterBinding(
+        StableId(colorEntity),
+        Runtime::RenderExtractionCache::VisualizationAdapterBinding{
+            .AdapterKey = kColorKey,
+            .BufferBDA = 0xC010'0000u,
+            .Kind = BindingKind::Color,
+        });
+    fixture.Extraction.SetVisualizationAdapterBinding(
+        StableId(vectorEntity),
+        Runtime::RenderExtractionCache::VisualizationAdapterBinding{
+            .AdapterKey = kVectorKey,
+            .Kind = BindingKind::VectorField,
+            .Options = Runtime::VisualizationAdapterOptions{
+                .SourceName = "velocity",
+                .OutputName = "velocity_glyphs",
+                .Domain = Graphics::VisualizationAttributeDomain::Vertex,
+                .PositionBufferBDA = 0xAABB'1000u,
+                .VectorBufferBDA = 0xAABB'2000u,
+                .VectorScale = 2.0f,
+                .VectorColor = {1.0f, 0.25f, 0.0f, 1.0f},
+                .DepthTested = false,
+            },
+        });
+    fixture.Extraction.SetVisualizationAdapterBinding(
+        StableId(isolineEntity),
+        Runtime::RenderExtractionCache::VisualizationAdapterBinding{
+            .AdapterKey = kIsolineKey,
+            .Kind = BindingKind::Isoline,
+        });
+    fixture.Extraction.SetVisualizationAdapterBinding(
+        StableId(htexEntity),
+        Runtime::RenderExtractionCache::VisualizationAdapterBinding{
+            .AdapterKey = kHtexKey,
+            .BufferBDA = 0xFEED'CAFEu,
+            .Kind = BindingKind::HtexMetadata,
+            .Options = Runtime::VisualizationAdapterOptions{
+                .SourceName = "curvature",
+                .OutputName = "curvature_uv_bake",
+                .EmitHtexPreview = true,
+                .EmitFragmentBake = true,
+                .SourceAttributeName = "curvature",
+                .FragmentBakeMapping =
+                    Graphics::VisualizationFragmentBakeMapping::ExistingTexcoords,
+                .MeshHasTexcoords = true,
+                .PatchCount = 8u,
+                .FaceCount = 24u,
+                .AtlasWidth = 512u,
+                .AtlasHeight = 256u,
+            },
+        });
+
+    const auto stats = fixture.Extract(scene);
+    const Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
+
+    EXPECT_EQ(stats.VisualizationAdapterScalarConfigsObserved, 1u);
+    EXPECT_EQ(stats.VisualizationAdapterBindingsMissing, 0u);
+    EXPECT_EQ(stats.VisualizationAdapterMissingAdapterCount, 0u);
+    EXPECT_EQ(stats.VisualizationAdapterInvokedCount, 4u);
+    EXPECT_EQ(stats.VisualizationAdapterPacketAppendCount, 5u);
+    EXPECT_EQ(stats.VisualizationColorPacketCount, 1u);
+    EXPECT_EQ(stats.VisualizationVectorFieldPacketCount, 1u);
+    EXPECT_EQ(stats.VisualizationIsolinePacketCount, 1u);
+    EXPECT_EQ(stats.VisualizationHtexAtlasPacketCount, 1u);
+    EXPECT_EQ(stats.VisualizationFragmentBakeAtlasPacketCount, 1u);
+
+    ASSERT_EQ(world.Visualization.Colors.size(), 1u);
+    EXPECT_EQ(world.Visualization.Colors.front().Name, "v:kmeans_color");
+    EXPECT_EQ(world.Visualization.Colors.front().Domain,
+              Graphics::VisualizationAttributeDomain::Vertex);
+    EXPECT_EQ(world.Visualization.Colors.front().ColorBufferBDA, 0xC010'0000u);
+
+    ASSERT_EQ(world.Visualization.VectorFields.size(), 1u);
+    EXPECT_EQ(world.Visualization.VectorFields.front().Name, "velocity_glyphs");
+    EXPECT_EQ(world.Visualization.VectorFields.front().PositionBufferBDA,
+              0xAABB'1000u);
+    EXPECT_EQ(world.Visualization.VectorFields.front().VectorBufferBDA,
+              0xAABB'2000u);
+    EXPECT_FALSE(world.Visualization.VectorFields.front().DepthTested);
+
+    ASSERT_EQ(world.Visualization.Isolines.size(), 1u);
+    EXPECT_EQ(world.Visualization.Isolines.front().SourceScalarName,
+              "curvature");
+    EXPECT_EQ(world.Visualization.Isolines.front().IsoValueCount, 3u);
+    EXPECT_FLOAT_EQ(world.Visualization.Isolines.front().RangeMin, -1.0f);
+    EXPECT_FLOAT_EQ(world.Visualization.Isolines.front().RangeMax, 2.0f);
+    EXPECT_FLOAT_EQ(world.Visualization.Isolines.front().LineWidth, 2.5f);
+
+    ASSERT_EQ(world.Visualization.HtexAtlases.size(), 1u);
+    EXPECT_EQ(world.Visualization.HtexAtlases.front().Name,
+              "curvature_uv_bake");
+    EXPECT_EQ(world.Visualization.HtexAtlases.front().PatchCount, 8u);
+
+    ASSERT_EQ(world.Visualization.FragmentBakeAtlases.size(), 1u);
+    EXPECT_EQ(world.Visualization.FragmentBakeAtlases.front().Name,
+              "curvature_uv_bake");
+    EXPECT_EQ(world.Visualization.FragmentBakeAtlases.front().TexcoordBufferBDA,
+              0xFEED'CAFEu);
+
+    EXPECT_EQ(world.Visualization.Diagnostics.InputPacketCount, 5u);
+    EXPECT_EQ(world.Visualization.Diagnostics.AcceptedPacketCount, 5u);
+    EXPECT_EQ(world.Visualization.Diagnostics.TextureResidencyDeferredCount, 2u);
+    EXPECT_FALSE(world.Visualization.Diagnostics.HasErrors);
+    EXPECT_EQ(world.Visualization.OverlaySummary.VectorFieldCount, 1u);
+    EXPECT_EQ(world.Visualization.OverlaySummary.VectorGlyphCount, 3u);
+    EXPECT_EQ(world.Visualization.OverlaySummary.IsolineLayerCount, 1u);
+    EXPECT_EQ(world.Visualization.OverlaySummary.IsolineValueCount, 3u);
+    EXPECT_EQ(world.Visualization.OverlaySummary.HtexAtlasDescriptorCount, 1u);
+    EXPECT_EQ(world.Visualization.OverlaySummary.UvBakeAtlasDescriptorCount, 1u);
+    EXPECT_TRUE(world.Visualization.HasVisualizationPackets);
+}
+
+TEST(RuntimeRenderExtraction, VisualizationNonScalarAdapterFailuresAreCounted)
+{
+    using BindingKind =
+        Runtime::RenderExtractionCache::VisualizationAdapterBindingKind;
+
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+
+    const auto missingBinding = scene.Create();
+    ConfigureColorBufferVisualization(scene, missingBinding);
+
+    const auto missingAdapter = scene.Create();
+    ConfigureRenderablePoint(scene, missingAdapter);
+    fixture.Extraction.SetVisualizationAdapterBinding(
+        StableId(missingAdapter),
+        Runtime::RenderExtractionCache::VisualizationAdapterBinding{
+            .AdapterKey = 0xDEADu,
+            .Kind = BindingKind::VectorField,
+            .Options = Runtime::VisualizationAdapterOptions{
+                .SourceName = "velocity",
+                .PositionBufferBDA = 0x1000u,
+                .VectorBufferBDA = 0x2000u,
+            },
+        });
+
+    const auto missingTexcoords = scene.Create();
+    ConfigureRenderablePoint(scene, missingTexcoords);
+    constexpr std::uint64_t kHtexKey = 0xBADC0DEu;
+    fixture.Extraction.RegisterVisualizationAdapter(
+        kHtexKey,
+        std::make_unique<Runtime::HtexMetadataAdapter>());
+    fixture.Extraction.SetVisualizationAdapterBinding(
+        StableId(missingTexcoords),
+        Runtime::RenderExtractionCache::VisualizationAdapterBinding{
+            .AdapterKey = kHtexKey,
+            .Kind = BindingKind::HtexMetadata,
+            .Options = Runtime::VisualizationAdapterOptions{
+                .SourceName = "curvature",
+                .EmitFragmentBake = true,
+                .SourceAttributeName = "curvature",
+                .FragmentBakeMapping =
+                    Graphics::VisualizationFragmentBakeMapping::ExistingTexcoords,
+                .MeshHasTexcoords = false,
+                .FaceCount = 24u,
+                .AtlasWidth = 512u,
+                .AtlasHeight = 256u,
+            },
+        });
+
+    const auto stats = fixture.Extract(scene);
+    const Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
+
+    EXPECT_EQ(stats.VisualizationAdapterBindingsMissing, 1u);
+    EXPECT_EQ(stats.VisualizationAdapterMissingAdapterCount, 1u);
+    EXPECT_EQ(stats.VisualizationAdapterInvokedCount, 1u);
+    EXPECT_EQ(stats.VisualizationAdapterMissingSourceCount, 1u);
+    EXPECT_EQ(stats.VisualizationAdapterPacketAppendCount, 0u);
+    EXPECT_EQ(stats.VisualizationColorPacketCount, 0u);
+    EXPECT_EQ(stats.VisualizationVectorFieldPacketCount, 0u);
+    EXPECT_EQ(stats.VisualizationIsolinePacketCount, 0u);
+    EXPECT_EQ(stats.VisualizationHtexAtlasPacketCount, 0u);
+    EXPECT_EQ(stats.VisualizationFragmentBakeAtlasPacketCount, 0u);
+
+    EXPECT_TRUE(world.Visualization.Colors.empty());
+    EXPECT_TRUE(world.Visualization.VectorFields.empty());
+    EXPECT_TRUE(world.Visualization.Isolines.empty());
+    EXPECT_TRUE(world.Visualization.HtexAtlases.empty());
+    EXPECT_TRUE(world.Visualization.FragmentBakeAtlases.empty());
+    EXPECT_EQ(world.Visualization.Diagnostics.InputPacketCount, 0u);
+    EXPECT_FALSE(world.Visualization.HasVisualizationPackets);
 }
 
 TEST(RuntimeRenderExtraction, ObservesAssetSourceAsUnavailableWithoutGpuAssetCache)

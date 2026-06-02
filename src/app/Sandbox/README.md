@@ -17,8 +17,8 @@ slots through the engine-owned registry, toggles mesh edge/vertex primitive
 views through runtime extraction-cache settings, routes selected-entity
 spatial-debug options through `SpatialDebugBinding`, routes material/scalar/color
 visualization choices through `VisualizationConfig`, and leaves asset import
-execution plus the full `RUNTIME-083` visualization-adapter umbrella to runtime
-owners for later tasks.
+execution to `ASSETIO-001` plus expanded visualization-control UI to
+`UI-001` follow-up slices now that `RUNTIME-083` is retired.
 
 ## Build presets
 
