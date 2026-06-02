@@ -14,17 +14,29 @@ Each active task should include:
 [`RUNTIME-090`](RUNTIME-090-imgui-platform-renderer-adapter.md) — runtime-side
 Dear ImGui platform/renderer adapter (`Extrinsic.Runtime.ImGuiAdapter`, Theme A
 working-sandbox path stage 4, the producer half of the ImGui/UI leaves that
-gate `UI-001`). Status: **in-progress (Slice A)**, owner/branch
-`claude/intrinsicengine-agent-onboarding-qu8wV`. Slice A lands the standalone
-adapter module (ImGui 1.92 context lifecycle with
+gate `UI-001`). Status: **in-progress (Slice B)**, owner/branch
+`claude/intrinsicengine-agent-onboarding-01gFi` (Slice A was
+`claude/intrinsicengine-agent-onboarding-qu8wV`, landed via PR #962). Slice A
+landed the standalone adapter module (ImGui 1.92 context lifecycle with
 `ImGuiBackendFlags_RendererHasTextures`, `Platform::Event`→ImGui-IO pump,
 `ImDrawData`→`ImGuiOverlayFrame` walk, editor hook, diagnostics) with
 `FakeWindow`-driven `contract;runtime` coverage at `Scaffolded→CPUContracted`;
 `imgui_lib` is linked **PRIVATE** to `ExtrinsicRuntime` and `imgui.h` stays out
-of the `.cppm` interface. Slice B (deferred) wires the adapter into
-`Engine::RunFrame` and exposes the editor hook. Next verification step: build
-`IntrinsicTests` and run the `ImGuiAdapter*` `contract;runtime` cases under the
-default CPU gate. The most recently retired tasks are summarised below.
+of the `.cppm` interface. Slice B (this slice) wires the adapter into
+`Engine`: `Engine` owns the `Graphics::ImGuiOverlaySystem` instance (the allowed
+`runtime -> graphics` edge) and constructs the adapter in `Initialize()` after
+the `Window`/`Renderer`; `RunFrame` calls `BeginFrame(frameDt)` after
+`PollEvents` + the minimize/resize early returns and before `OnVariableTick`,
+and `EndFrame()` after the variable tick and before the render contract's
+`PrepareFrame()`, so exactly one `ImGuiOverlayFrame` is produced per engine
+frame; the editor hook is exposed via `Engine::SetImGuiEditorCallback` with a
+read-only `GetImGuiAdapter()` observer, closing `CPUContracted`. The
+renderer-side `Pass.ImGui` consumption + GPU font-atlas upload remain
+`GRAPHICS-079`; the engine-owned overlay instance is handed to the renderer when
+that lands. Next verification step: build `IntrinsicTests` and run the
+`ImGuiAdapter*` `contract;runtime` cases under the default CPU gate (the new
+engine-wiring loop cases run under a display, e.g. `xvfb-run`, and skip in the
+displayless gate). The most recently retired tasks are summarised below.
 
 Previously-active
 [`RUNTIME-093`](../done/RUNTIME-093-primitive-selection-refinement.md) — runtime

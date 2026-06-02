@@ -3,6 +3,7 @@ module;
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <limits>
 #include <optional>
@@ -31,12 +32,14 @@ import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.SamplerManager;
 import Extrinsic.RHI.TransferQueue;
 import Extrinsic.Graphics.GpuAssetCache;
+import Extrinsic.Graphics.ImGuiOverlaySystem;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.SelectionSystem;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.ImGuiAdapter;
 import Extrinsic.Core.FrameLoop;
 import Extrinsic.Runtime.EcsSystemBundle;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
@@ -267,6 +270,19 @@ namespace Extrinsic::Runtime
         m_Renderer->SetFrameRecipe(m_Config.Render.FrameRecipe);
         m_RendererOperational = m_Device->IsOperational();
 
+        // ── 2c. Runtime-side Dear ImGui adapter (RUNTIME-090 Slice B) ─────
+        // Constructed after the Window and Renderer exist. The adapter owns the
+        // ImGui context lifecycle and produces exactly one ImGuiOverlayFrame per
+        // engine frame into the runtime-owned overlay system; RunFrame brackets
+        // the variable tick with BeginFrame/EndFrame (the producer half per
+        // GRAPHICS-013CQ). It is CPU-only and backend-agnostic, so it runs on
+        // the Null window/device as well as GLFW/Vulkan. The graphics-owned font
+        // atlas upload and Pass.ImGui execution are GRAPHICS-079, not wired here.
+        m_ImGuiAdapter = std::make_unique<ImGuiAdapter>(*m_Window, m_ImGuiOverlay);
+        m_ImGuiAdapter->Initialize();
+        if (m_ImGuiEditorCallback)
+            m_ImGuiAdapter->SetEditorCallback(m_ImGuiEditorCallback);
+
         // ── 3. CPU task graph (ECS system scheduling) ─────────────────────
         m_FrameGraph = std::make_unique<Core::FrameGraph>();
 
@@ -366,6 +382,12 @@ namespace Extrinsic::Runtime
 
     void Engine::Shutdown()
     {
+        // RUNTIME-090 Slice B — tear the Dear ImGui adapter down first, while
+        // the Window and overlay system it references are still alive. The
+        // adapter destructor shuts the overlay system + ImGui context down; the
+        // overlay system value member is reusable on a later re-Initialize().
+        m_ImGuiAdapter.reset();
+
         struct ShutdownHooks final : Core::IShutdownHooks
         {
             Engine& Owner;
@@ -657,8 +679,27 @@ namespace Extrinsic::Runtime
 
         const double alpha = m_Accumulator / m_FixedDt;
 
+        // ── RUNTIME-090 Slice B: open the Dear ImGui frame ────────────────
+        // BeginFrame runs after Window::PollEvents (Phase 1) and the
+        // minimize/resize early returns, immediately before the variable tick,
+        // so the editor hook and any ImGui draws issued during OnVariableTick
+        // run inside the NewFrame()/Render() scope. Minimized frames return
+        // before this point, so a NewFrame is never left without a matching
+        // Render() in EndFrame.
+        if (m_ImGuiAdapter)
+            m_ImGuiAdapter->BeginFrame(frameDt);
+
         // ── Phase 3: Variable tick ────────────────────────────────────────
         m_Application->OnVariableTick(*this, alpha, frameDt);
+
+        // ── RUNTIME-090 Slice B: close the Dear ImGui frame ───────────────
+        // EndFrame runs after the variable tick and before the render
+        // contract's IRenderer::PrepareFrame(): it invokes the editor hook,
+        // calls ImGui::Render(), walks ImDrawData, and submits one
+        // ImGuiOverlayFrame to the overlay system (per GRAPHICS-013CQ). The
+        // graphics-side Pass.ImGui consumption is GRAPHICS-079.
+        if (m_ImGuiAdapter)
+            m_ImGuiAdapter->EndFrame();
 
         // ── Phase 4: Build render snapshot ────────────────────────────────
         const Platform::Extent2D viewport = m_Window->GetFramebufferExtent();
@@ -970,5 +1011,17 @@ namespace Extrinsic::Runtime
     const std::optional<Graphics::CameraViewInput>& Engine::GetReferenceCameraSeed() const noexcept
     {
         return m_ReferenceCamera;
+    }
+
+    void Engine::SetImGuiEditorCallback(std::function<void()> callback)
+    {
+        m_ImGuiEditorCallback = std::move(callback);
+        if (m_ImGuiAdapter)
+            m_ImGuiAdapter->SetEditorCallback(m_ImGuiEditorCallback);
+    }
+
+    const ImGuiAdapter& Engine::GetImGuiAdapter() const noexcept
+    {
+        return *m_ImGuiAdapter;
     }
 }
