@@ -4,12 +4,11 @@
 - Status: in-progress.
 - Owner/agent: Codex.
 - Branch: `main`.
-- Current slice: ready after Slice C.2. Remaining file/import execution is
-  gated on `ASSETIO-001`; remaining visualization controls can use the completed
-  `RUNTIME-083` runtime adapter/extraction seams.
-- Next verification step: resume UI-001 visualization controls or the
-  ASSETIO-gated import panel slice, then run task structural checks plus the
-  runtime contract/default CPU gates.
+- Current slice: in-progress after Slice C.3. Remaining file/import execution is
+  gated on `ASSETIO-001`; visualization adapter binding controls now route
+  through runtime-owned render-extraction state.
+- Next verification step: resume the ASSETIO-gated import panel slice, then run
+  task structural checks plus the runtime contract/default CPU gates.
 
 ## Slice plan
 - **Slice A.** Add the promoted runtime sandbox editor UI module,
@@ -37,6 +36,12 @@
   `ECS::Components::SpatialDebugBinding` and
   `Graphics::Components::VisualizationConfig`; non-scalar adapter packet
   extraction is now available through retired `RUNTIME-083`.
+- **Slice C.3.** Add a runtime-owned command/model seam for selected-entity
+  visualization adapter bindings. The slice routes through
+  `Engine::{Set,Get,Clear}VisualizationAdapterBinding(...)` and the
+  `RenderExtractionCache::VisualizationAdapterBinding` control surface so UI
+  state remains presentation-only and adapter validation stays in
+  `VisualizationAdapters` / render extraction.
 - **Slice D.** Close `CPUContracted` for all required panels and hand final
   `Operational` proof to `RUNTIME-095`.
 
@@ -62,7 +67,7 @@
 - [x] Implement a selection/primitive details panel that displays current entity/face/edge/vertex/point selection results from `RUNTIME-089` / `RUNTIME-093`. Slice B models selected/hovered entity rows and refined primitive status/domain/kind/id/hit details; richer interaction remains for later command-surface slices.
 - [ ] Implement a file/import entry panel that calls asset/runtime import commands when `ASSETIO-001` is available and otherwise displays a deterministic disabled-state diagnostic. Slice A implements the deterministic disabled diagnostic; command execution remains gated on `ASSETIO-001`.
 - [x] Implement camera/render settings controls for active camera controller selection, debug overlay toggles, and primitive view toggles using runtime-owned APIs. Slice C.1 implements active camera-controller replacement and mesh edge/vertex primitive-view toggles; Slice C.2 implements selected-entity spatial-debug binding controls.
-- [ ] Implement geometry-domain visualization controls that choose scalar/color/vector/isolines as inputs to `RUNTIME-083` adapters without duplicating graphics validation. Slice C.2 implements selected-entity `VisualizationConfig` material/scalar/color command routing; retired `RUNTIME-083` provides scalar/color/vector/isoline/Htex adapter contracts plus scalar and non-scalar extraction selection. Remaining work here is the UI command/control surface for those choices.
+- [x] Implement geometry-domain visualization controls that choose scalar/color/vector/isolines as inputs to `RUNTIME-083` adapters without duplicating graphics validation. Slice C.2 implements selected-entity `VisualizationConfig` material/scalar/color command routing; Slice C.3 implements runtime-owned visualization adapter-binding command/model routing through the engine-owned `RenderExtractionCache`. Retired `RUNTIME-083` provides scalar/color/vector/isoline/Htex adapter contracts plus scalar and non-scalar extraction selection.
 - [x] Add UI diagnostics for missing dependencies (no ImGui adapter, no asset ingest, no selected entity, unsupported domain).
 
 ## Tests
@@ -72,6 +77,7 @@
 - [x] Add tests for selected/hovered entity detail models, refined primitive id/hit detail models, render-hint parameters, and local transform edit command dirty tagging.
 - [x] Add tests for runtime-owned camera-controller replacement and mesh edge/vertex primitive-view toggle command routing.
 - [x] Add tests for selected-entity spatial-debug binding and visualization-config command routing.
+- [x] Add tests for selected-entity visualization adapter-binding command/model routing through runtime extraction state.
 - [x] Add test labels per `tests/README.md`; add a new `ui` label to `tests/README.md` and `tests/CMakeLists.txt` only if it does not already exist.
 - [x] No `gpu`/`vulkan` test in this slice; visual overlay proof is owned by final sandbox acceptance.
 
@@ -79,13 +85,13 @@
 - [x] Update `tasks/backlog/ui/README.md` with UI-001 and its dependency gates.
 - [x] Update runtime/editor docs (`src/runtime/README.md` or a UI README if added) with the UI ownership model and command/event boundaries.
 - [x] Update `docs/migration/nonlegacy-parity-matrix.md` rows for the promoted sandbox/editor UI panels.
-- [x] Update `src/app/Sandbox/README.md` and the working-sandbox gate review with Slice B's runtime-owned transform edit seam, Slice C.1's camera/primitive-view command seams, Slice C.2's spatial-debug/visualization-config seams, and remaining deferred command surfaces.
+- [x] Update `src/app/Sandbox/README.md` and the working-sandbox gate review with Slice B's runtime-owned transform edit seam, Slice C.1's camera/primitive-view command seams, Slice C.2's spatial-debug/visualization-config seams, Slice C.3's visualization adapter-binding seam, and remaining deferred command surfaces.
 - [x] Refresh `docs/api/generated/module_inventory.md` if new modules are added.
 
 ## Acceptance criteria
 - [x] The sandbox has a promoted ImGui-based editor shell once `RUNTIME-090` and `GRAPHICS-079` are present.
 - [ ] Core panels expose scene hierarchy, inspector, selection details, file/import entry points, camera/render settings, and visualization controls with deterministic disabled states for missing backends.
-- [ ] UI emits commands/events to runtime/editor owners and does not own engine state directly. Slice A emits selection commands through `SelectionController`; Slice B applies local transform edit commands through a runtime-owned seam and stamps `Transform::IsDirtyTag`; Slice C.1 replaces camera-controller slots and toggles mesh primitive views through runtime-owned engine/extraction seams; Slice C.2 applies selected-entity spatial-debug and visualization-config commands through runtime-owned ECS/graphics data components. Remaining import execution and expanded visualization-control UI are deferred.
+- [ ] UI emits commands/events to runtime/editor owners and does not own engine state directly. Slice A emits selection commands through `SelectionController`; Slice B applies local transform edit commands through a runtime-owned seam and stamps `Transform::IsDirtyTag`; Slice C.1 replaces camera-controller slots and toggles mesh primitive views through runtime-owned engine/extraction seams; Slice C.2 applies selected-entity spatial-debug and visualization-config commands through runtime-owned ECS/graphics data components; Slice C.3 routes selected-entity visualization adapter bindings through engine-owned render-extraction state. Remaining import execution is deferred until `ASSETIO-001`.
 
 ## Verification
 ```bash
@@ -114,8 +120,8 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
   tagging. Slice C.1 closes `CPUContracted` for camera-controller replacement
   and mesh primitive-view toggle command routing. Slice C.2 closes
   `CPUContracted` for selected-entity spatial-debug binding and
-  visualization-config command routing. Later slices close remaining
-  visualization-control UI and ASSETIO-gated import execution before retiring
-  the full task.
+  visualization-config command routing. Slice C.3 closes `CPUContracted` for
+  selected-entity visualization adapter-binding command/model routing. Later
+  slices close ASSETIO-gated import execution before retiring the full task.
 - `Operational` owned by [`RUNTIME-095`](../backlog/runtime/RUNTIME-095-working-sandbox-acceptance.md)
   final sandbox acceptance after ImGui rendering is wired.

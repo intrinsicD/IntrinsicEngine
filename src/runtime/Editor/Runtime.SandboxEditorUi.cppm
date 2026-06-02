@@ -23,6 +23,7 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
+import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SelectionController;
 
 export namespace Extrinsic::Runtime
@@ -76,6 +77,9 @@ export namespace Extrinsic::Runtime
 
     [[nodiscard]] const char* DebugNameForSandboxEditorVisualizationDomain(
         Graphics::Components::VisualizationConfig::Domain domain) noexcept;
+
+    [[nodiscard]] const char* DebugNameForSandboxEditorVisualizationAdapterBindingKind(
+        RenderExtractionCache::VisualizationAdapterBindingKind kind) noexcept;
 
     struct SandboxEditorDiagnostic
     {
@@ -199,6 +203,22 @@ export namespace Extrinsic::Runtime
         }
     };
 
+    struct SandboxEditorVisualizationAdapterBindingCommandSurface
+    {
+        std::function<std::optional<RenderExtractionCache::VisualizationAdapterBinding>(std::uint32_t)>
+            GetBinding{};
+        std::function<void(std::uint32_t, RenderExtractionCache::VisualizationAdapterBinding)>
+            SetBinding{};
+        std::function<void(std::uint32_t)> ClearBinding{};
+
+        [[nodiscard]] bool Available() const noexcept
+        {
+            return static_cast<bool>(GetBinding) &&
+                   static_cast<bool>(SetBinding) &&
+                   static_cast<bool>(ClearBinding);
+        }
+    };
+
     struct SandboxEditorCameraRenderModel
     {
         bool CameraControlsAvailable{false};
@@ -241,15 +261,27 @@ export namespace Extrinsic::Runtime
         std::uint32_t IsolineCount{0u};
     };
 
+    struct SandboxEditorVisualizationAdapterBindingModel
+    {
+        bool HasBinding{false};
+        std::uint64_t AdapterKey{0u};
+        std::uint64_t BufferBDA{0u};
+        RenderExtractionCache::VisualizationAdapterBindingKind Kind{
+            RenderExtractionCache::VisualizationAdapterBindingKind::Scalar};
+        VisualizationAdapterOptions Options{};
+    };
+
     struct SandboxEditorVisualizationModel
     {
         bool GeometryDomainControlsAvailable{false};
+        bool AdapterBindingControlsAvailable{false};
         bool HasSelectedEntity{false};
         std::uint32_t SelectedStableId{0u};
         ECS::Components::GeometrySources::Domain SelectedDomain{
             ECS::Components::GeometrySources::Domain::None};
         SandboxEditorSpatialDebugBindingModel SpatialDebug{};
         SandboxEditorVisualizationConfigModel Visualization{};
+        SandboxEditorVisualizationAdapterBindingModel AdapterBinding{};
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
@@ -272,6 +304,7 @@ export namespace Extrinsic::Runtime
         CameraControllerRegistry* CameraControllers{nullptr};
         Core::Extent2D CameraViewport{};
         SandboxEditorPrimitiveViewCommandSurface PrimitiveViewCommands{};
+        SandboxEditorVisualizationAdapterBindingCommandSurface VisualizationAdapterBindings{};
         bool ImGuiAdapterAvailable{false};
         bool AssetImportCommandsAvailable{false};
         bool CameraRenderCommandsAvailable{false};
@@ -337,6 +370,17 @@ export namespace Extrinsic::Runtime
         std::uint32_t IsolineCount{0u};
     };
 
+    struct SandboxEditorVisualizationAdapterBindingCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        bool EnableBinding{true};
+        std::uint64_t AdapterKey{0u};
+        std::uint64_t BufferBDA{0u};
+        RenderExtractionCache::VisualizationAdapterBindingKind Kind{
+            RenderExtractionCache::VisualizationAdapterBindingKind::Scalar};
+        VisualizationAdapterOptions Options{};
+    };
+
     [[nodiscard]] SandboxEditorPanelFrame BuildSandboxEditorPanelFrame(
         const SandboxEditorContext& context);
 
@@ -362,6 +406,10 @@ export namespace Extrinsic::Runtime
     SandboxEditorCommandStatus ApplySandboxEditorVisualizationConfigCommand(
         const SandboxEditorContext& context,
         const SandboxEditorVisualizationConfigCommand& command);
+
+    SandboxEditorCommandStatus ApplySandboxEditorVisualizationAdapterBindingCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorVisualizationAdapterBindingCommand& command);
 
     void DrawSandboxEditorPanelFrame(const SandboxEditorPanelFrame& frame);
 

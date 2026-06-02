@@ -5,6 +5,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -29,6 +30,7 @@ import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.ImGuiAdapter;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
+import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxEditorUi;
 import Extrinsic.Runtime.SelectionController;
 import Geometry.Properties;
@@ -762,6 +764,152 @@ TEST(SandboxEditorUi, VisualizationConfigCommandRoutesThroughSelectedEntity)
                   unavailable,
                   scalar),
               Runtime::SandboxEditorCommandStatus::MissingVisualizationCommands);
+}
+
+TEST(SandboxEditorUi, VisualizationAdapterBindingCommandRoutesThroughRuntimeSurface)
+{
+    using Binding = Runtime::RenderExtractionCache::VisualizationAdapterBinding;
+    using Kind = Runtime::RenderExtractionCache::VisualizationAdapterBindingKind;
+
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "AdapterMesh");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+
+    std::optional<Binding> storedBinding{};
+    std::uint32_t storedStableId{0u};
+    std::uint32_t setCount{0u};
+    std::uint32_t clearCount{0u};
+
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.VisualizationCommandsAvailable = true;
+    context.VisualizationAdapterBindings =
+        Runtime::SandboxEditorVisualizationAdapterBindingCommandSurface{
+            .GetBinding =
+                [&](const std::uint32_t queriedStableId) -> std::optional<Binding>
+                {
+                    if (storedBinding.has_value() &&
+                        storedStableId == queriedStableId)
+                    {
+                        return storedBinding;
+                    }
+                    return std::nullopt;
+                },
+            .SetBinding =
+                [&](const std::uint32_t targetStableId, Binding binding)
+                {
+                    storedStableId = targetStableId;
+                    storedBinding = std::move(binding);
+                    ++setCount;
+                },
+            .ClearBinding =
+                [&](const std::uint32_t targetStableId)
+                {
+                    if (storedStableId == targetStableId)
+                    {
+                        storedBinding.reset();
+                    }
+                    ++clearCount;
+                },
+        };
+
+    Runtime::VisualizationAdapterOptions options{};
+    options.SourceName = "velocity";
+    options.OutputName = "velocity_glyphs";
+    options.PositionBufferBDA = 0xAABB'1000u;
+    options.VectorBufferBDA = 0xAABB'2000u;
+    options.VectorScale = 2.0f;
+    options.DepthTested = false;
+
+    const Runtime::SandboxEditorVisualizationAdapterBindingCommand bindVector{
+        .StableEntityId = stableId,
+        .EnableBinding = true,
+        .AdapterKey = 0xF00Du,
+        .BufferBDA = 0xAABB'2000u,
+        .Kind = Kind::VectorField,
+        .Options = options,
+    };
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationAdapterBindingCommand(
+                  context,
+                  bindVector),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    ASSERT_TRUE(storedBinding.has_value());
+    EXPECT_EQ(storedStableId, stableId);
+    EXPECT_EQ(storedBinding->AdapterKey, 0xF00Du);
+    EXPECT_EQ(storedBinding->Kind, Kind::VectorField);
+    EXPECT_EQ(storedBinding->Options.SourceName, "velocity");
+    EXPECT_EQ(storedBinding->Options.VectorBufferBDA, 0xAABB'2000u);
+    EXPECT_FALSE(storedBinding->Options.DepthTested);
+    EXPECT_EQ(setCount, 1u);
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorVisualizationAdapterBindingKind(
+                     storedBinding->Kind),
+                 "VectorField");
+
+    Runtime::SandboxEditorPanelFrame frame =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+    ASSERT_TRUE(frame.Visualization.AdapterBindingControlsAvailable);
+    ASSERT_TRUE(frame.Visualization.AdapterBinding.HasBinding);
+    EXPECT_EQ(frame.Visualization.AdapterBinding.AdapterKey, 0xF00Du);
+    EXPECT_EQ(frame.Visualization.AdapterBinding.Kind, Kind::VectorField);
+    EXPECT_EQ(frame.Visualization.AdapterBinding.Options.OutputName,
+              "velocity_glyphs");
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationAdapterBindingCommand(
+                  context,
+                  bindVector),
+              Runtime::SandboxEditorCommandStatus::NoChange);
+    EXPECT_EQ(setCount, 1u);
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationAdapterBindingCommand(
+                  context,
+                  Runtime::SandboxEditorVisualizationAdapterBindingCommand{
+                      .StableEntityId = stableId,
+                      .EnableBinding = false,
+                  }),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    EXPECT_FALSE(storedBinding.has_value());
+    EXPECT_EQ(clearCount, 1u);
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationAdapterBindingCommand(
+                  context,
+                  Runtime::SandboxEditorVisualizationAdapterBindingCommand{
+                      .StableEntityId = stableId,
+                      .EnableBinding = false,
+                  }),
+              Runtime::SandboxEditorCommandStatus::NoChange);
+    EXPECT_EQ(clearCount, 1u);
+
+    Runtime::SandboxEditorContext missingSurface = context;
+    missingSurface.VisualizationAdapterBindings = {};
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationAdapterBindingCommand(
+                  missingSurface,
+                  bindVector),
+              Runtime::SandboxEditorCommandStatus::MissingVisualizationCommands);
+
+    const ECS::EntityHandle empty = MakeSelectable(registry, "NoGeometry");
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationAdapterBindingCommand(
+                  context,
+                  Runtime::SandboxEditorVisualizationAdapterBindingCommand{
+                      .StableEntityId =
+                          Runtime::SelectionController::ToStableEntityId(empty),
+                      .EnableBinding = true,
+                      .AdapterKey = 0xF00Du,
+                      .Kind = Kind::Scalar,
+                  }),
+              Runtime::SandboxEditorCommandStatus::UnsupportedGeometryDomain);
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationAdapterBindingCommand(
+                  context,
+                  Runtime::SandboxEditorVisualizationAdapterBindingCommand{
+                      .StableEntityId = std::numeric_limits<std::uint32_t>::max(),
+                      .EnableBinding = true,
+                      .AdapterKey = 0xF00Du,
+                  }),
+              Runtime::SandboxEditorCommandStatus::StaleEntity);
 }
 
 TEST(SandboxEditorUi, AdapterCallbackDrawsDeterministicDisabledPanelFrame)

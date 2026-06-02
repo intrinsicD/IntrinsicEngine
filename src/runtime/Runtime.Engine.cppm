@@ -253,6 +253,12 @@ namespace Extrinsic::Runtime
         void ClearMeshPrimitiveViewSettings(std::uint32_t stableEntityId) noexcept;
         [[nodiscard]] MeshPrimitiveViewSettings GetMeshPrimitiveViewSettings(
             std::uint32_t stableEntityId) const noexcept;
+        void SetVisualizationAdapterBinding(
+            std::uint32_t stableEntityId,
+            RenderExtractionCache::VisualizationAdapterBinding binding);
+        void ClearVisualizationAdapterBinding(std::uint32_t stableEntityId) noexcept;
+        [[nodiscard]] std::optional<RenderExtractionCache::VisualizationAdapterBinding>
+            GetVisualizationAdapterBinding(std::uint32_t stableEntityId) const noexcept;
 
         // ── RUNTIME-090 Slice B — Dear ImGui editor hook ──────────────────
         // Registers the per-frame editor callback invoked between the

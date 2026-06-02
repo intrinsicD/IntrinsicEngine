@@ -34,6 +34,7 @@ import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.ImGuiAdapter;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
+import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SelectionController;
 
 namespace Extrinsic::Runtime
@@ -133,6 +134,85 @@ namespace Extrinsic::Runtime
                    lhs.Scalar.RangeMax == rhs.Scalar.RangeMax &&
                    lhs.Scalar.BinCount == rhs.Scalar.BinCount &&
                    lhs.Scalar.Isolines.Num == rhs.Scalar.Isolines.Num;
+        }
+
+        [[nodiscard]] SandboxEditorVisualizationAdapterBindingModel
+        FromVisualizationAdapterBinding(
+            const RenderExtractionCache::VisualizationAdapterBinding& binding)
+        {
+            return SandboxEditorVisualizationAdapterBindingModel{
+                .HasBinding = true,
+                .AdapterKey = binding.AdapterKey,
+                .BufferBDA = binding.BufferBDA,
+                .Kind = binding.Kind,
+                .Options = binding.Options,
+            };
+        }
+
+        [[nodiscard]] RenderExtractionCache::VisualizationAdapterBinding
+        ToVisualizationAdapterBinding(
+            const SandboxEditorVisualizationAdapterBindingCommand& command)
+        {
+            return RenderExtractionCache::VisualizationAdapterBinding{
+                .AdapterKey = command.AdapterKey,
+                .BufferBDA = command.BufferBDA,
+                .Kind = command.Kind,
+                .Options = command.Options,
+            };
+        }
+
+        [[nodiscard]] bool SameVec4(
+            const glm::vec4 lhs,
+            const glm::vec4 rhs) noexcept
+        {
+            return lhs.x == rhs.x &&
+                   lhs.y == rhs.y &&
+                   lhs.z == rhs.z &&
+                   lhs.w == rhs.w;
+        }
+
+        [[nodiscard]] bool SameVisualizationAdapterOptions(
+            const VisualizationAdapterOptions& lhs,
+            const VisualizationAdapterOptions& rhs) noexcept
+        {
+            return lhs.SourceName == rhs.SourceName &&
+                   lhs.OutputName == rhs.OutputName &&
+                   lhs.Domain == rhs.Domain &&
+                   lhs.BufferBDA == rhs.BufferBDA &&
+                   lhs.ColorBufferBDA == rhs.ColorBufferBDA &&
+                   lhs.PositionBufferBDA == rhs.PositionBufferBDA &&
+                   lhs.VectorBufferBDA == rhs.VectorBufferBDA &&
+                   lhs.AutoRange == rhs.AutoRange &&
+                   lhs.RangeMin == rhs.RangeMin &&
+                   lhs.RangeMax == rhs.RangeMax &&
+                   lhs.Colormap == rhs.Colormap &&
+                   lhs.IsoValueCount == rhs.IsoValueCount &&
+                   lhs.LineWidth == rhs.LineWidth &&
+                   SameVec4(lhs.OverlayColor, rhs.OverlayColor) &&
+                   lhs.VectorScale == rhs.VectorScale &&
+                   SameVec4(lhs.VectorColor, rhs.VectorColor) &&
+                   lhs.DepthTested == rhs.DepthTested &&
+                   lhs.EmitHtexPreview == rhs.EmitHtexPreview &&
+                   lhs.EmitFragmentBake == rhs.EmitFragmentBake &&
+                   lhs.SourceAttributeName == rhs.SourceAttributeName &&
+                   lhs.FragmentBakeMapping == rhs.FragmentBakeMapping &&
+                   lhs.MeshHasTexcoords == rhs.MeshHasTexcoords &&
+                   lhs.PatchCount == rhs.PatchCount &&
+                   lhs.FaceCount == rhs.FaceCount &&
+                   lhs.AtlasWidth == rhs.AtlasWidth &&
+                   lhs.AtlasHeight == rhs.AtlasHeight &&
+                   lhs.TexcoordBufferBDA == rhs.TexcoordBufferBDA &&
+                   lhs.HtexRecreatePayloadToken == rhs.HtexRecreatePayloadToken;
+        }
+
+        [[nodiscard]] bool SameVisualizationAdapterBinding(
+            const RenderExtractionCache::VisualizationAdapterBinding& lhs,
+            const RenderExtractionCache::VisualizationAdapterBinding& rhs) noexcept
+        {
+            return lhs.AdapterKey == rhs.AdapterKey &&
+                   lhs.BufferBDA == rhs.BufferBDA &&
+                   lhs.Kind == rhs.Kind &&
+                   SameVisualizationAdapterOptions(lhs.Options, rhs.Options);
         }
 
         [[nodiscard]] SandboxEditorPrimitiveViewSettings FromRuntimeSettings(
@@ -548,6 +628,9 @@ namespace Extrinsic::Runtime
         {
             SandboxEditorVisualizationModel model{};
             model.GeometryDomainControlsAvailable = context.VisualizationCommandsAvailable;
+            model.AdapterBindingControlsAvailable =
+                context.VisualizationCommandsAvailable &&
+                context.VisualizationAdapterBindings.Available();
             if (!context.VisualizationCommandsAvailable)
             {
                 AddDiagnostic(model.Diagnostics,
@@ -594,6 +677,17 @@ namespace Extrinsic::Runtime
                 model.Visualization =
                     FromVisualizationConfig(*visualization);
             }
+            if (model.AdapterBindingControlsAvailable)
+            {
+                const std::optional<RenderExtractionCache::VisualizationAdapterBinding>
+                    binding =
+                    context.VisualizationAdapterBindings.GetBinding(model.SelectedStableId);
+                if (binding.has_value())
+                {
+                    model.AdapterBinding =
+                        FromVisualizationAdapterBinding(*binding);
+                }
+            }
             return model;
         }
 
@@ -626,6 +720,27 @@ namespace Extrinsic::Runtime
                         [&engine](const std::uint32_t stableEntityId)
                         {
                             engine.ClearMeshPrimitiveViewSettings(stableEntityId);
+                        },
+                },
+                .VisualizationAdapterBindings = SandboxEditorVisualizationAdapterBindingCommandSurface{
+                    .GetBinding =
+                        [&engine](const std::uint32_t stableEntityId)
+                        {
+                            return engine.GetVisualizationAdapterBinding(stableEntityId);
+                        },
+                    .SetBinding =
+                        [&engine](
+                            const std::uint32_t stableEntityId,
+                            RenderExtractionCache::VisualizationAdapterBinding binding)
+                        {
+                            engine.SetVisualizationAdapterBinding(
+                                stableEntityId,
+                                std::move(binding));
+                        },
+                    .ClearBinding =
+                        [&engine](const std::uint32_t stableEntityId)
+                        {
+                            engine.ClearVisualizationAdapterBinding(stableEntityId);
                         },
                 },
                 .ImGuiAdapterAvailable = engine.GetImGuiAdapter().IsInitialized(),
@@ -991,6 +1106,24 @@ namespace Extrinsic::Runtime
                         {
                             ImGui::TextDisabled("Visualization: material/default");
                         }
+                        if (frame.Visualization.AdapterBindingControlsAvailable)
+                        {
+                            if (frame.Visualization.AdapterBinding.HasBinding)
+                            {
+                                ImGui::Text(
+                                    "Adapter: %s key=%llu buffer=%llu",
+                                    DebugNameForSandboxEditorVisualizationAdapterBindingKind(
+                                        frame.Visualization.AdapterBinding.Kind),
+                                    static_cast<unsigned long long>(
+                                        frame.Visualization.AdapterBinding.AdapterKey),
+                                    static_cast<unsigned long long>(
+                                        frame.Visualization.AdapterBinding.BufferBDA));
+                            }
+                            else
+                            {
+                                ImGui::TextDisabled("Adapter: no runtime binding");
+                            }
+                        }
 
                         if (ImGui::Button("Uniform color"))
                         {
@@ -1196,6 +1329,26 @@ namespace Extrinsic::Runtime
             return "Edge";
         case G::VisualizationConfig::Domain::Face:
             return "Face";
+        }
+        return "Unknown";
+    }
+
+    const char* DebugNameForSandboxEditorVisualizationAdapterBindingKind(
+        const RenderExtractionCache::VisualizationAdapterBindingKind kind) noexcept
+    {
+        using Kind = RenderExtractionCache::VisualizationAdapterBindingKind;
+        switch (kind)
+        {
+        case Kind::Scalar:
+            return "Scalar";
+        case Kind::Color:
+            return "Color";
+        case Kind::VectorField:
+            return "VectorField";
+        case Kind::Isoline:
+            return "Isoline";
+        case Kind::HtexMetadata:
+            return "HtexMetadata";
         }
         return "Unknown";
     }
@@ -1417,6 +1570,48 @@ namespace Extrinsic::Runtime
             return SandboxEditorCommandStatus::NoChange;
 
         raw.emplace_or_replace<G::VisualizationConfig>(entity, next);
+        return SandboxEditorCommandStatus::Applied;
+    }
+
+    SandboxEditorCommandStatus ApplySandboxEditorVisualizationAdapterBindingCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorVisualizationAdapterBindingCommand& command)
+    {
+        if (!context.VisualizationCommandsAvailable ||
+            !context.VisualizationAdapterBindings.Available())
+            return SandboxEditorCommandStatus::MissingVisualizationCommands;
+        if (context.Scene == nullptr)
+            return SandboxEditorCommandStatus::MissingScene;
+
+        entt::registry& raw = context.Scene->Raw();
+        const ECS::EntityHandle entity =
+            SelectionController::ToEntityHandle(command.StableEntityId);
+        if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
+            return SandboxEditorCommandStatus::StaleEntity;
+
+        if (GS::BuildConstView(raw, entity).ActiveDomain == GS::Domain::None)
+            return SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+
+        const std::optional<RenderExtractionCache::VisualizationAdapterBinding>
+            current =
+            context.VisualizationAdapterBindings.GetBinding(command.StableEntityId);
+        if (!command.EnableBinding)
+        {
+            if (!current.has_value())
+                return SandboxEditorCommandStatus::NoChange;
+            context.VisualizationAdapterBindings.ClearBinding(command.StableEntityId);
+            return SandboxEditorCommandStatus::Applied;
+        }
+
+        const RenderExtractionCache::VisualizationAdapterBinding next =
+            ToVisualizationAdapterBinding(command);
+        if (current.has_value() &&
+            SameVisualizationAdapterBinding(*current, next))
+            return SandboxEditorCommandStatus::NoChange;
+
+        context.VisualizationAdapterBindings.SetBinding(
+            command.StableEntityId,
+            next);
         return SandboxEditorCommandStatus::Applied;
     }
 

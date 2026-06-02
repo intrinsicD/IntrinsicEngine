@@ -13,16 +13,15 @@ Each active task should include:
 
 [`UI-001`](UI-001-sandbox-editor-shell-panels.md) — sandbox editor shell and core
 panels on top of the runtime ImGui adapter/pass stack. Status: in-progress on
-`main` after Slice C.2; the promoted editor shell now covers enriched
+`main` after Slice C.3; the promoted editor shell now covers enriched
 inspector/render-hint fields, selected/hovered entity rows, refined primitive
 id/hit display, a runtime-owned local-transform edit command, camera-controller
 replacement, mesh edge/vertex primitive-view toggle commands, and selected-entity
-spatial-debug / visualization-config command routing with CPU `contract;runtime`
-coverage. Remaining file/import execution is gated on `ASSETIO-001`; remaining
-visualization-control UI work is unblocked by retired `RUNTIME-083`.
-Next verification: resume UI-001 visualization controls or the ASSETIO-gated
-import panel slice, then run the task structural checks plus the runtime
-contract/default CPU gates.
+spatial-debug, visualization-config, and visualization adapter-binding command
+routing with CPU `contract;runtime` coverage. Remaining file/import execution is
+gated on `ASSETIO-001`.
+Next verification: resume the ASSETIO-gated import panel slice, then run the
+task structural checks plus the runtime contract/default CPU gates.
 
 The most recently retired tasks are summarised below.
 

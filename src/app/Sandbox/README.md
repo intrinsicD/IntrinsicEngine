@@ -16,9 +16,9 @@ edit commands through runtime-owned seams, replaces runtime camera-controller
 slots through the engine-owned registry, toggles mesh edge/vertex primitive
 views through runtime extraction-cache settings, routes selected-entity
 spatial-debug options through `SpatialDebugBinding`, routes material/scalar/color
-visualization choices through `VisualizationConfig`, and leaves asset import
-execution to `ASSETIO-001` plus expanded visualization-control UI to
-`UI-001` follow-up slices now that `RUNTIME-083` is retired.
+visualization choices through `VisualizationConfig`, routes visualization
+adapter bindings through runtime extraction-cache state, and leaves asset import
+execution to `ASSETIO-001`.
 
 ## Build presets
 

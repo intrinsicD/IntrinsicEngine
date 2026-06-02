@@ -1044,6 +1044,28 @@ namespace Extrinsic::Runtime
         return m_RenderExtraction.GetMeshPrimitiveViewSettings(stableEntityId);
     }
 
+    void Engine::SetVisualizationAdapterBinding(
+        const std::uint32_t stableEntityId,
+        RenderExtractionCache::VisualizationAdapterBinding binding)
+    {
+        m_RenderExtraction.SetVisualizationAdapterBinding(
+            stableEntityId,
+            std::move(binding));
+    }
+
+    void Engine::ClearVisualizationAdapterBinding(
+        const std::uint32_t stableEntityId) noexcept
+    {
+        m_RenderExtraction.ClearVisualizationAdapterBinding(stableEntityId);
+    }
+
+    std::optional<RenderExtractionCache::VisualizationAdapterBinding>
+    Engine::GetVisualizationAdapterBinding(
+        const std::uint32_t stableEntityId) const noexcept
+    {
+        return m_RenderExtraction.GetVisualizationAdapterBinding(stableEntityId);
+    }
+
     void Engine::SetImGuiEditorCallback(std::function<void()> callback)
     {
         m_ImGuiEditorCallback = std::move(callback);
