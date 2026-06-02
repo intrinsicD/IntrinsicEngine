@@ -39,5 +39,5 @@ Scaffolded, CPUContracted, Operational, ParityProven, Retired. Example:
 ## Maturity
 - Target: Operational on Vulkan-capable hosts; CPUContracted everywhere else.
 - This slice closes Scaffolded → CPUContracted. Operational owned by <TASK-ID>.
+- If CPUContracted is the intended endpoint, state: no Operational follow-up is owed.
 -->
-

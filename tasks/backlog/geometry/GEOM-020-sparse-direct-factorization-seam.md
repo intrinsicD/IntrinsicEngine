@@ -122,4 +122,4 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
   there is no GPU equivalent owed by this task. Optional backend
   promotion (SuiteSparse / CHOLMOD) is explicitly deferred to a
   separate later task and would not change the seam's maturity from
-  the geometry layer's perspective.
+  the geometry layer's perspective. No `Operational` follow-up is owed.

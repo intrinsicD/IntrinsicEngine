@@ -48,7 +48,8 @@ map.
   follows [`HARDEN-069`](../../done/HARDEN-069-rebind-legacy-layering-allowlist-to-active-retirement-tasks.md)
   by making `check_layering_allowlist_quality.py` fail strict mode when a
   temporary allowlist exception points at a missing or retired task owner.
-- [HARDEN-077 — Enforce operational follow-ups for ambiguous maturity closures](HARDEN-077-enforce-operational-followups-for-ambiguous-maturity.md):
+- [HARDEN-077 — Enforce operational follow-ups for ambiguous maturity closures](../../done/HARDEN-077-enforce-operational-followups-for-ambiguous-maturity.md)
+  (done 2026-06-02):
   turns the review-only "CPUContracted is not Operational" rule into a focused
   task-policy check for backend-facing graphics/Vulkan/runtime slices.
 - [DOCS-001 — Reduce `docs/architecture/graphics.md` to contract + status](../../done/DOCS-001-reduce-graphics-architecture-prose.md)

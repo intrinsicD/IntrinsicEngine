@@ -44,10 +44,10 @@
 ## Maturity
 - Target: `Operational` on Vulkan-capable hosts; `CPUContracted` everywhere else.
 - Slice A closes `Scaffolded → CPUContracted` for the renderer-side consumer
-  route (executor branch + handoff seam + pipeline lease). `Operational`
-  (font atlas, transient host-visible upload, per-draw-list `BindIndexBuffer`/
-  `Draw`, `gpu;vulkan` smoke, closing-cleanup assertion) is owned by Slices C/D
-  of this same task.
+  route (executor branch + handoff seam + pipeline lease). `Operational` owned by `GRAPHICS-079`
+  Slices C/D of this same task: font atlas, transient
+  host-visible upload, per-draw-list `BindIndexBuffer`/`Draw`, `gpu;vulkan`
+  smoke, and the closing-cleanup assertion.
 
 ## Slice plan
 - **Slice A (this slice).** Renderer-side `ImGuiPass` executor route +

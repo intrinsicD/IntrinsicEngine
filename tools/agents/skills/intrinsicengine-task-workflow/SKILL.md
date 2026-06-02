@@ -110,7 +110,8 @@ A task that retires to `tasks/done/` at `Scaffolded` maturity must do **one** of
 The same rule applies one level up: a task that retires at `CPUContracted` when
 the seam exists to be operational on a real backend (graphics, Vulkan, CUDA,
 runtime composition) should name the `Operational` follow-up or explicitly
-record the deferral.
+record the deferral. For open task files, the accepted deterministic forms are
+`` `Operational` owned by `<TASK-ID>` `` or `` no `Operational` follow-up is owed ``.
 
 The rule is enforced by review (see `intrinsicengine-review`), not by the
 validator, because "scaffold", "stub", "fail-closed", and "minimal" are domain

@@ -60,12 +60,14 @@ Suggested shape:
 
 - Target: `Operational` on Vulkan-capable hosts; `CPUContracted` everywhere
   else.
-- Slice 1 closes `Scaffolded → CPUContracted`; `Operational` is owned by
-  the follow-up <TASK-ID>.
+- Slice 1 closes `Scaffolded → CPUContracted`; `Operational` owned by `<TASK-ID>`.
+- For CPU/null-only endpoints: no `Operational` follow-up is owed.
 ```
 
 See [`task-maturity.md`](task-maturity.md) for the taxonomy and the
-`Scaffolded` closure rule that applies even when the field is absent.
+`Scaffolded` closure rule that applies even when the field is absent. Open
+backend-facing task files with `CPUContracted` maturity must use one of the
+accepted `Operational` follow-up statements above.
 
 ## Example
 

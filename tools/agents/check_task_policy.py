@@ -87,6 +87,21 @@ def main() -> int:
     else:
         findings.append("tools/agents/validate_tasks.py not found; cannot verify task format")
 
+    maturity_checker = repo_root / "tools" / "agents" / "check_task_maturity_followups.py"
+    if maturity_checker.is_file() and tasks_root.is_dir():
+        cmd = [sys.executable, str(maturity_checker), "--root", str(repo_root)]
+        if args.strict:
+            cmd.append("--strict")
+        result = subprocess.run(cmd, cwd=repo_root)
+        if result.returncode != 0:
+            findings.append(
+                "check_task_maturity_followups.py reported ambiguous maturity follow-up violations"
+            )
+    else:
+        findings.append(
+            "tools/agents/check_task_maturity_followups.py not found; cannot verify maturity follow-ups"
+        )
+
     if findings:
         mode = "ERROR" if args.strict else "WARNING"
         for finding in findings:

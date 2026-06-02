@@ -62,5 +62,5 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
 
 ## Maturity
 - Target: `CPUContracted` panel model/callback coverage plus deterministic disabled states.
-- `Operational` visual proof is owned by final sandbox acceptance after ImGui rendering is wired.
-
+- `Operational` owned by [`RUNTIME-095`](../runtime/RUNTIME-095-working-sandbox-acceptance.md)
+  final sandbox acceptance after ImGui rendering is wired.

@@ -152,6 +152,16 @@ when the seam exists to be operational on a real backend (graphics, Vulkan,
 CUDA, runtime composition) should name the `Operational` follow-up or
 explicitly record the deferral.
 
+For open task files under `tasks/backlog/` and `tasks/active/`,
+`tools/agents/check_task_maturity_followups.py` enforces this rule when a
+backend-facing `## Maturity` section closes at `CPUContracted`. Use one of
+these exact forms:
+
+- `` `Operational` owned by `<TASK-ID>` `` when another task or later slice
+  owns the backend/runtime proof.
+- `` no `Operational` follow-up is owed `` when the CPU/null endpoint is the
+  intended final state.
+
 ## Vocabulary mapping for existing docs
 
 Existing docs already use overlapping vocabulary. Treat the taxonomy as the
