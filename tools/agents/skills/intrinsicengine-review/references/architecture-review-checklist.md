@@ -50,7 +50,7 @@ Use this checklist for architecture-impacting changes (code, build, docs, CI, an
 - [ ] Task tracker is updated for temporary exceptions and blockers.
 - [ ] Mechanical moves are separated from semantic refactors.
 - [ ] Follow-up cleanup tasks are recorded when needed.
-- [ ] The reached maturity level (see [`task-maturity.md`](task-maturity.md):
+- [ ] The reached maturity level (see [`../../../../../docs/agent/task-maturity.md`](../../../../../docs/agent/task-maturity.md):
       `Scaffolded`, `CPUContracted`, `Operational`, `ParityProven`,
       `Retired`) is stated for any architecture-impacting closure so future
       agents do not misread "foundation exists" as "capability shipped".

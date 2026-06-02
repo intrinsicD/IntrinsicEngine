@@ -118,7 +118,7 @@ randomness, or dependence on traversal order unless that order is specified.
   result vocabulary (see [Geometry Architecture → Intersection
   classification records](geometry.md#intersection-classification-records)).
   Incircle/insphere predicates and adaptive-exact escalation remain open
-  under [`GEOM-007`](../../tasks/active/GEOM-007-robust-predicates-intersection-classification.md):
+  under [`GEOM-007`](../../tasks/done/GEOM-007-robust-predicates-intersection-classification.md):
   incircle/insphere are out of the current slice plan and tracked as a
   follow-up; adaptive-exact escalation is Slice 4.
 

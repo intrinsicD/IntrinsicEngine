@@ -37,7 +37,7 @@
 - Branch: main (single-commit slices; promote to a feature branch if a slice batches multiple commits).
 - Next verification step: run focused ctest filter `RobustPredicates|IntersectionClassification|RayTriangleClassify|RaycastClassify` plus the layering / test-layout / doc-links / task-policy structural checks for Slice 3.3.a; extend the filter to `Overlap` / `Containment` (and add the new parity-battery test names) at the corresponding 3.3.b / 3.3.c commits.
 - Owning subsystem/layer: `geometry` (`geometry -> core` only).
-- Seeded by [`docs/reviews/2026-05-12-src-geometry-gap-analysis.md`](../../../docs/reviews/2026-05-12-src-geometry-gap-analysis.md) and called out by [`docs/architecture/geometry-api-style.md`](../../docs/architecture/geometry-api-style.md) §"Numeric policy".
+- Seeded by [`docs/reviews/2026-05-12-src-geometry-gap-analysis.md`](../../docs/reviews/2026-05-12-src-geometry-gap-analysis.md) and called out by [`docs/architecture/geometry-api-style.md`](../../docs/architecture/geometry-api-style.md) §"Numeric policy".
 - Current geometry code has many collision/query algorithms but lacks a common robust predicate policy for degeneracies, nearly coincident elements, and exact/filtered decisions.
 - This task should be completed before expanding booleans, remeshing, tetrahedralization, arrangements, or reconstruction robustness.
 

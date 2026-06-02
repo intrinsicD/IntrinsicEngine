@@ -16,7 +16,7 @@
 - Owning subsystem/layer: documentation tooling under `tools/docs/`, with
   regression coverage under `tests/regression/tooling/`.
 - The repository quality assessment recorded that
-  [`tools/docs/check_doc_links.py`](../../../tools/docs/check_doc_links.py)
+  [`tools/docs/check_doc_links.py`](../../tools/docs/check_doc_links.py)
   strips inline-code spans before applying the markdown-link parser. Links such
   as ``[`GRAPHICS-077`](...)`` can disappear before validation.
 - The same assessment reported stale `tasks/active` links in backlog prose that
@@ -24,47 +24,47 @@
   Recompute the exact failing set during implementation rather than preserving
   the audit's one-off scan output as canonical.
 - Related audit record:
-  [`docs/reviews/2026-06-02-repository-quality-assessment.md`](../../../docs/reviews/2026-06-02-repository-quality-assessment.md).
+  [`docs/reviews/2026-06-02-repository-quality-assessment.md`](../../docs/reviews/2026-06-02-repository-quality-assessment.md).
 
 ## Required changes
-- [ ] Refactor `tools/docs/check_doc_links.py` so markdown links are parsed
+- [x] Refactor `tools/docs/check_doc_links.py` so markdown links are parsed
   before inline-code spans are removed, or otherwise preserve links whose labels
   contain inline-code markup.
-- [ ] Preserve the current exclusions for build trees, external caches,
+- [x] Preserve the current exclusions for build trees, external caches,
   vendored dependencies, and generated artifact roots.
-- [ ] Add regression coverage in `tests/regression/tooling/` proving that a
+- [x] Add regression coverage in `tests/regression/tooling/` proving that a
   missing relative target fails strict mode when the link label is inline-code
   formatted.
-- [ ] Add regression coverage proving that ordinary relative links still pass
+- [x] Add regression coverage proving that ordinary relative links still pass
   and fail exactly as before.
-- [ ] Run the stricter checker on the repository and fix every newly reported
+- [x] Run the stricter checker on the repository and fix every newly reported
   broken relative link in markdown files.
-- [ ] Update `tools/docs/README.md` with the checker's current scope, including
+- [x] Update `tools/docs/README.md` with the checker's current scope, including
   the fact that inline-code labels are validated.
 
 ## Tests
-- [ ] Add a Python regression test, for example
+- [x] Add a Python regression test, for example
   `tests/regression/tooling/Test.CheckDocLinks.py`, that creates a temporary
   markdown fixture tree and runs the checker in strict mode.
-- [ ] The regression test must include one passing inline-code-label link and
+- [x] The regression test must include one passing inline-code-label link and
   one failing inline-code-label link.
-- [ ] `python3 tests/regression/tooling/Test.CheckDocLinks.py` passes.
-- [ ] `python3 tools/docs/check_doc_links.py --root . --strict` passes after
+- [x] `python3 tests/regression/tooling/Test.CheckDocLinks.py` passes.
+- [x] `python3 tools/docs/check_doc_links.py --root . --strict` passes after
   fixing current-tree stale links.
 
 ## Docs
-- [ ] Update `tools/docs/README.md` to document inline-code-label behavior.
-- [ ] If stale task links are fixed, update only the local prose needed to make
+- [x] Update `tools/docs/README.md` to document inline-code-label behavior.
+- [x] If stale task links are fixed, update only the local prose needed to make
   the target factual; avoid rewriting unrelated roadmap sections.
 
 ## Acceptance criteria
-- [ ] A markdown link written as ``[`TASK-ID`](relative/path.md)`` is counted in
+- [x] A markdown link written as ``[`TASK-ID`](relative/path.md)`` is counted in
   the checker's "Checked relative links" total.
-- [ ] A broken inline-code-label relative link fails strict mode with a source
+- [x] A broken inline-code-label relative link fails strict mode with a source
   path and target path in the diagnostic.
-- [ ] The repository strict link check passes after current stale links are
+- [x] The repository strict link check passes after current stale links are
   fixed.
-- [ ] No external-link or anchor-link behavior changes are included.
+- [x] No external-link or anchor-link behavior changes are included.
 
 ## Verification
 ```bash
@@ -81,3 +81,9 @@ python3 tools/docs/check_docs_sync.py --root . --strict
 - Suppressing or warning-only downgrading broken relative links that strict mode
   should catch.
 - Adding broad skip directories that hide repository-owned markdown files.
+
+
+## Completion
+- Completed: 2026-06-02.
+- Status: done.
+- Commit reference: this commit (`HARDEN-074: validate inline-code markdown links`).

@@ -18,15 +18,15 @@ window closed.
   retired to `tasks/done/` on 2026-05-29 after Slice E),
   [`GEOM-016`](../../tasks/backlog/geometry/GEOM-016-point-cloud-filtering-density-contracts.md)
   (backlog filing + LDLT follow-up gating METHOD-002/003),
-  [`RUNTIME-082`](../../tasks/active/RUNTIME-082-spatial-debug-adapters.md)
+  [`RUNTIME-082`](../../tasks/done/RUNTIME-082-spatial-debug-adapters.md)
   (active; Slice C `ConvexHullAdapter` + registry, Slice D extraction pump),
-  [`RUNTIME-085`](../../tasks/active/RUNTIME-085-geometrysources-mesh-residency.md)
+  [`RUNTIME-085`](../../tasks/done/RUNTIME-085-geometrysources-mesh-residency.md)
   (active; Slices A–C — `Runtime.MeshGeometryPacker` + residency),
   [`GRAPHICS-076`](../../tasks/done/GRAPHICS-076-default-recipe-debug-view-and-present-wiring.md)
   (retired; default-recipe Vulkan smoke graduated),
-  [`GRAPHICS-077`](../../tasks/active/GRAPHICS-077-transient-debug-primitive-upload-helper.md)
+  [`GRAPHICS-077`](../../tasks/done/GRAPHICS-077-transient-debug-primitive-upload-helper.md)
   /
-  [`GRAPHICS-078`](../../tasks/active/GRAPHICS-078-visualization-overlay-upload-helper.md)
+  [`GRAPHICS-078`](../../tasks/done/GRAPHICS-078-visualization-overlay-upload-helper.md)
   (overlay Vulkan smokes + retirement commit refs),
   [`HARDEN-071`](../../tasks/done/HARDEN-071-rhi-manager-handle-identity.md)
   (retired; RHI buffer/texture manager handle identity),

@@ -26,7 +26,7 @@
 
 ## Context
 - Owner/layer: `ecs`; allowed dependencies are `core` and explicitly justified CPU-only `geometry` types.
-- Source review: [`docs/reviews/2026-05-13-src-ecs-gap-analysis.md`](../../../docs/reviews/2026-05-13-src-ecs-gap-analysis.md).
+- Source review: [`docs/reviews/2026-05-13-src-ecs-gap-analysis.md`](../../docs/reviews/2026-05-13-src-ecs-gap-analysis.md).
 - Promoted components already include `ECS.Component.Culling.Local`, `ECS.Component.Culling.World`, and `ECS.Component.Transform.WorldMatrix`.
 - Runtime/render extraction can consume `WorldBoundingOBB` / `WorldBoundingSphere`, but no promoted ECS system currently keeps those fields in sync with transforms.
 
@@ -49,8 +49,8 @@
 ## Docs
 - [x] Update `src/ecs/Systems/README.md` with bounds propagation ordering and tag policy.
 - [x] Update `src/ecs/README.md` if the public module surface changes.
-- [x] Update [`docs/migration/nonlegacy-parity-matrix.md`](../../../docs/migration/nonlegacy-parity-matrix.md) if this changes ECS readiness or retirement blockers.
-- [x] Regenerate [`docs/api/generated/module_inventory.md`](../../../docs/api/generated/module_inventory.md) if modules are added, removed, renamed, or moved.
+- [x] Update [`docs/migration/nonlegacy-parity-matrix.md`](../../docs/migration/nonlegacy-parity-matrix.md) if this changes ECS readiness or retirement blockers.
+- [x] Regenerate [`docs/api/generated/module_inventory.md`](../../docs/api/generated/module_inventory.md) if modules are added, removed, renamed, or moved.
 
 ## Acceptance criteria
 - [x] ECS can keep world culling bounds synchronized with promoted transform hierarchy updates without importing graphics/runtime/RHI.

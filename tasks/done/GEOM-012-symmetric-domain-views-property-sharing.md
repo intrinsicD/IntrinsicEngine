@@ -28,7 +28,7 @@
 
 ## Context
 - Owning subsystem/layer: `geometry` (`geometry -> core` only).
-- Seeded by [`docs/reviews/2026-05-12-src-geometry-gap-analysis.md`](../../../docs/reviews/2026-05-12-src-geometry-gap-analysis.md) and the follow-up domain ownership review on 2026-05-12.
+- Seeded by [`docs/reviews/2026-05-12-src-geometry-gap-analysis.md`](../../docs/reviews/2026-05-12-src-geometry-gap-analysis.md) and the follow-up domain ownership review on 2026-05-12.
 - Current mesh-backed graph usage can share vertex, halfedge, and edge property sets because `HalfedgeMesh::VertexConnectivity` and `HalfedgeMesh::HalfedgeConnectivity` alias the canonical `Geometry::Graph` connectivity records.
 - Point-cloud positions are standardized with mesh/graph positions through the canonical `v:point` property. Remaining domain-view work must preserve this invariant and handle any legacy `p:position` data only through explicit compatibility conversions.
 - Future graph, point-cloud, and mesh algorithms should accept the minimal domain they need and should not force data copies when a borrowed view is valid.

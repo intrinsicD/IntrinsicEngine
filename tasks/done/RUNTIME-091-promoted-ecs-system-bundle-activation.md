@@ -21,7 +21,7 @@
 
 ## Context
 - Owner/layer: `runtime`; runtime owns composition and may depend on `ecs`, `core`, `graphics`, and lower layers.
-- Source review: [`docs/reviews/2026-05-13-src-ecs-gap-analysis.md`](../../../docs/reviews/2026-05-13-src-ecs-gap-analysis.md).
+- Source review: [`docs/reviews/2026-05-13-src-ecs-gap-analysis.md`](../../docs/reviews/2026-05-13-src-ecs-gap-analysis.md).
 - `HARDEN-061` promoted `Extrinsic.ECS.System.TransformHierarchy::{OnUpdate,RegisterSystem}` but intentionally deferred runtime activation.
 - `Runtime.Engine` already drives fixed-step `OnSimTick` and a CPU `Core::FrameGraph`; this task decides the runtime-owned bundle/wiring path for baseline ECS systems.
 - ECS must not import runtime; activation belongs here, not in `src/ecs`.
@@ -41,7 +41,7 @@
 ## Docs
 - [x] Update `src/ecs/Systems/README.md` to replace the deferred-activation note with the factual runtime-owned activation path.
 - [x] Update `src/runtime/` or `docs/architecture/runtime.md` documentation if a new runtime bundle API is introduced. (`src/runtime/README.md` adds the `Extrinsic.Runtime.EcsSystemBundle` row and updates the canonical frame-loop description.)
-- [x] Update [`docs/migration/nonlegacy-parity-matrix.md`](../../../docs/migration/nonlegacy-parity-matrix.md) if this removes the ECS transform activation retirement blocker. (The "FrameGraph activation of the promoted `RegisterSystem` from a simulate-phase bundle (deferred...)" gap is replaced with the active `RegisterPromotedEcsSystemBundle` ownership statement.)
+- [x] Update [`docs/migration/nonlegacy-parity-matrix.md`](../../docs/migration/nonlegacy-parity-matrix.md) if this removes the ECS transform activation retirement blocker. (The "FrameGraph activation of the promoted `RegisterSystem` from a simulate-phase bundle (deferred...)" gap is replaced with the active `RegisterPromotedEcsSystemBundle` ownership statement.)
 - [x] Refresh `docs/api/generated/module_inventory.md` for the new `Extrinsic.Runtime.EcsSystemBundle` module surface.
 
 ## Acceptance criteria

@@ -22,10 +22,10 @@ map.
 - [METHOD-003 — Closest Point Method PDE solver reference backend](METHOD-003-closest-point-method-pde-reference-backend.md).
 - [METHOD-004 — Walk on Spheres / Walk on Stars PDE solver reference backend](METHOD-004-walk-on-spheres-reference-backend.md).
 - [METHOD-005 — Robust mesh boolean reference backend](METHOD-005-robust-mesh-boolean-reference-backend.md)
-  (hard-gated by [`geometry/GEOM-007`](../geometry/GEOM-007-robust-predicates-intersection-classification.md)).
+  (hard-gated by [`geometry/GEOM-007`](../../done/GEOM-007-robust-predicates-intersection-classification.md)).
 - [METHOD-006 — Cross-field / frame-field design reference backend](METHOD-006-cross-field-design-reference-backend.md).
 - [METHOD-007 — Constrained Delaunay tetrahedralization reference backend](METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md)
-  (hard-gated by [`geometry/GEOM-007`](../geometry/GEOM-007-robust-predicates-intersection-classification.md)).
+  (hard-gated by [`geometry/GEOM-007`](../../done/GEOM-007-robust-predicates-intersection-classification.md)).
 - [METHOD-008 — Resolve `_example_vector_heat` method manifest placeholders](METHOD-008-example-vector-heat-manifest-placeholders.md)
   (metadata/intake cleanup; no CPU reference backend in this task).
 
@@ -50,7 +50,7 @@ map.
   METHOD-002 and METHOD-003 must wait on `GEOM-020`, not on retired
   `GEOM-008`. METHOD-004 needs no LDLT path and may proceed against
   retired `GEOM-008` directly. METHOD-005 and METHOD-007 both wait on
-  [`geometry/GEOM-007`](../geometry/GEOM-007-robust-predicates-intersection-classification.md).
+  [`geometry/GEOM-007`](../../done/GEOM-007-robust-predicates-intersection-classification.md).
   METHOD-006 step 4 needs a sparse symmetric generalized eigensolver
   (LOBPCG / shift-invert) which is shipped by neither GEOM-008 nor
   GEOM-020; a separate eigensolver follow-up must be filed before

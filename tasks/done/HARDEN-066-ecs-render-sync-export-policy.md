@@ -29,7 +29,7 @@
 
 ## Context
 - Owner/layer: `ecs` for CPU-only component/tag policy, with runtime as the consumer/clearing owner when graphics sidecars are involved.
-- Source review: [`docs/reviews/2026-05-13-src-ecs-gap-analysis.md`](../../../docs/reviews/2026-05-13-src-ecs-gap-analysis.md).
+- Source review: [`docs/reviews/2026-05-13-src-ecs-gap-analysis.md`](../../docs/reviews/2026-05-13-src-ecs-gap-analysis.md).
 - `Extrinsic.ECS.System.RenderSync` previously existed as an empty placeholder; the activated bundle (`RUNTIME-091`) registered only `TransformHierarchy` and `BoundsPropagation`.
 - `Extrinsic.ECS.System.TransformHierarchy` emits `Components::Transform::WorldUpdatedTag` and deliberately does not stamp `Components::DirtyTags::DirtyTransform`.
 - `Runtime.RenderExtraction` consumes ECS/renderable state and owns graphics sidecars, so any ECS export policy must remain CPU-only and data-oriented.
@@ -50,8 +50,8 @@
 ## Docs
 - [x] Update `src/ecs/Systems/README.md` with the factual `RenderSync` decision. (The "Render sync boundary" section now describes the CPU-only tag-forwarding policy, the API surface, and the FrameGraph dependency edges.)
 - [x] Update `src/ecs/README.md` if the public system module surface changes. (Module list unchanged; the dependency note now describes `RenderSync`'s tag-forwarding role explicitly.)
-- [x] Update [`docs/migration/nonlegacy-parity-matrix.md`](../../../docs/migration/nonlegacy-parity-matrix.md) if the render-sync retirement blocker changes. (The `ecs` row now reflects that `DirtyTags::DirtyTransform` is forwarded by `RenderSync` per `HARDEN-066`, and that the bundle covers `TransformHierarchy` + `BoundsPropagation` + `RenderSync`.)
-- [x] Regenerate [`docs/api/generated/module_inventory.md`](../../../docs/api/generated/module_inventory.md) if modules are added, removed, renamed, or moved. (No module surface change — the `Extrinsic.ECS.System.RenderSync` interface module name is unchanged; only its export/implementation contents grew.)
+- [x] Update [`docs/migration/nonlegacy-parity-matrix.md`](../../docs/migration/nonlegacy-parity-matrix.md) if the render-sync retirement blocker changes. (The `ecs` row now reflects that `DirtyTags::DirtyTransform` is forwarded by `RenderSync` per `HARDEN-066`, and that the bundle covers `TransformHierarchy` + `BoundsPropagation` + `RenderSync`.)
+- [x] Regenerate [`docs/api/generated/module_inventory.md`](../../docs/api/generated/module_inventory.md) if modules are added, removed, renamed, or moved. (No module surface change — the `Extrinsic.ECS.System.RenderSync` interface module name is unchanged; only its export/implementation contents grew.)
 
 ## Acceptance criteria
 - [x] The repository has one documented owner for transform GPU-sync dirty handoff from ECS world updates to runtime/graphics extraction. (`Extrinsic.ECS.Systems.RenderSync::OnUpdate` is the single owner; documented in `src/ecs/Systems/README.md` and `docs/migration/nonlegacy-parity-matrix.md`.)

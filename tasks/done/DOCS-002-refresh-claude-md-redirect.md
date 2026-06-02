@@ -22,7 +22,7 @@
   - Listed only 3 of the 13 files in `docs/agent/`. Missing references included `architecture-review-checklist.md`, `benchmark-workflow.md`, `benchmark-review-checklist.md`, `docs-sync-policy.md`, `method-workflow.md`, `method-review-checklist.md`, `roles.md`, `task-maturity.md`, `agent-output-review-checklist.md`.
 
 ## Required changes
-- [x] Update [`CLAUDE.md`](../../../CLAUDE.md) "Agent process references" block to:
+- [x] Update [`CLAUDE.md`](../../CLAUDE.md) "Agent process references" block to:
   - Use repo-relative link form (`docs/agent/<name>.md`, no leading slash).
   - Replace the "may be introduced incrementally" sentence with a one-line pointer to `AGENTS.md` §"Related expanded docs", which is already the authoritative index.
 - [x] Either list every file under `docs/agent/` (mirroring the table in `AGENTS.md`), or, preferably, replace the hand-maintained list with a single sentence: "See `AGENTS.md` §Related expanded docs for the authoritative index of agent process references." Single-pointer form was chosen to avoid future drift.

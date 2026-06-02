@@ -14,7 +14,7 @@
 - Owning subsystem/layer: `geometry` and `methods/geometry`.
 - Method package: `methods/geometry/constrained_delaunay_tet/`.
 - Seeded by [`docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md`](../../../docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md) Tier 1 #4.
-- **Hard prerequisite:** [`GEOM-007`](../geometry/GEOM-007-robust-predicates-intersection-classification.md) (robust 3D orientation + insphere predicates).
+- **Hard prerequisite:** [`GEOM-007`](../../done/GEOM-007-robust-predicates-intersection-classification.md) (robust 3D orientation + insphere predicates).
 - Closes the P1 "volumetric and cell-complex containers" gap from `docs/reviews/2026-05-12-src-geometry-gap-analysis.md`.
 
 ## Variants and default selection

@@ -3,7 +3,7 @@
 ## Goal
 - Add the second frame recipe declared by `GRAPHICS-032`: `FrameRecipe::MinimalDebugSurface` with stable label `"recipe.minimal-debug-surface"`. The recipe declares exactly two passes (`Pass.Surface.MinimalDebug` then `Pass.Present.MinimalDebug`), exposes transient `SceneColorHDR` and `SceneDepth`, finalizes the imported `Backbuffer` through the existing fullscreen-triangle present contract, and exposes the three diagnostic counters (`MinimalSurfacePassExecutions`, `MinimalPresentPassExecutions`, `MinimalRecipeMissingPrerequisiteCount`).
 
-> **Scaffold notice.** Everything authored by this task is bootstrap-only and is removed by [`GRAPHICS-081`](GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md) once the canonical default recipe records every pass body operationally (`GRAPHICS-070..076`). Do not build long-lived call sites on `BuildMinimalDebugSurfaceRecipe`, `FrameRecipeKind::MinimalDebug`, the `MinimalDebugSurface`/`MinimalDebugPresent` pass classes, or the three minimal-recipe diagnostics counters.
+> **Scaffold notice.** Everything authored by this task is bootstrap-only and is removed by [`GRAPHICS-081`](../backlog/rendering/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md) once the canonical default recipe records every pass body operationally (`GRAPHICS-070..076`). Do not build long-lived call sites on `BuildMinimalDebugSurfaceRecipe`, `FrameRecipeKind::MinimalDebug`, the `MinimalDebugSurface`/`MinimalDebugPresent` pass classes, or the three minimal-recipe diagnostics counters.
 
 ## Non-goals
 - No CPU-mock command body for `Pass.Surface.MinimalDebug` (that is `GRAPHICS-032B`).
@@ -15,7 +15,7 @@
 - Status: done.
 - Owner/agent: Claude on branch `claude/setup-agentic-workflow-JrJnr`.
 - Owner/layer: `graphics/framegraph` for the recipe declaration, `graphics/renderer` for the diagnostics counters.
-- Planning parent: [`tasks/done/GRAPHICS-032-minimal-surface-present-command-path.md`](../../done/GRAPHICS-032-minimal-surface-present-command-path.md), Recorded as Impl-A in the parent's Required changes.
+- Planning parent: [`tasks/done/GRAPHICS-032-minimal-surface-present-command-path.md`](GRAPHICS-032-minimal-surface-present-command-path.md), Recorded as Impl-A in the parent's Required changes.
 - Upstream gates: `GRAPHICS-031A` (slot-0 default-debug pipeline must exist) — done.
 - Documentation cross-references already locked the contract in `src/graphics/framegraph/README.md:23–27` and `src/graphics/renderer/README.md:116–130`.
 

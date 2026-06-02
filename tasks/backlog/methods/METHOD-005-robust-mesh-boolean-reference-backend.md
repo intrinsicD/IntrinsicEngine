@@ -14,7 +14,7 @@
 - Owning subsystem/layer: `geometry` and `methods/geometry`.
 - Method package: `methods/geometry/robust_boolean/`.
 - Seeded by [`docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md`](../../../docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md) Tier 2 #5.
-- **Hard prerequisite:** [`GEOM-007`](../geometry/GEOM-007-robust-predicates-intersection-classification.md) (robust predicates + intersection classification) must land first. This task assumes orientation / incircle / segment-triangle classification predicates are available.
+- **Hard prerequisite:** [`GEOM-007`](../../done/GEOM-007-robust-predicates-intersection-classification.md) (robust predicates + intersection classification) must land first. This task assumes orientation / incircle / segment-triangle classification predicates are available.
 - The existing `Geometry.HalfedgeMesh.Boolean` produces wrong results on near-coincident and degenerate inputs from Thingi10k; this is the canonical robustness motivator.
 
 ## Variants and default selection

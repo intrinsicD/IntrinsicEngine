@@ -297,7 +297,7 @@ already covers every direction:
 ## Robust predicates
 
 `Geometry.RobustPredicates` is the narrow predicate foundation introduced by
-[`GEOM-007`](../../tasks/active/GEOM-007-robust-predicates-intersection-classification.md)
+[`GEOM-007`](../../tasks/done/GEOM-007-robust-predicates-intersection-classification.md)
 Slice 1. It is **not** re-exported by the broad `Geometry` umbrella; callers
 must `import Geometry.RobustPredicates;` explicitly. Surface:
 
@@ -393,7 +393,7 @@ Slice 3 pins the contract for that constant:
 ## Intersection classification records
 
 `Geometry.IntersectionClassification` is the records-only sibling module
-introduced by [`GEOM-007`](../../tasks/active/GEOM-007-robust-predicates-intersection-classification.md)
+introduced by [`GEOM-007`](../../tasks/done/GEOM-007-robust-predicates-intersection-classification.md)
 Slice 2. Like `Geometry.RobustPredicates`, it is **not** re-exported by the
 broad `Geometry` umbrella; callers must `import
 Geometry.IntersectionClassification;` explicitly. The module ships data

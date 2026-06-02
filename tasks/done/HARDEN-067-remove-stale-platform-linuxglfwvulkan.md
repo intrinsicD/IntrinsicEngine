@@ -41,7 +41,7 @@
 ## Context
 - Owning subsystem/layer: `src/platform`.
 - Architecture rule: `platform -> core` only (`/AGENTS.md` §2, §4).
-- Predecessor: [`PLATFORM-003`](../../done/PLATFORM-003-explicit-platform-backends.md)
+- Predecessor: [`PLATFORM-003`](PLATFORM-003-explicit-platform-backends.md)
   established `backends/null/`, `backends/glfw/`, and the
   `INTRINSIC_PLATFORM_BACKEND` selection policy. After that task,
   `LinuxGlfwVulkan/` was left behind without being wired into the parent

@@ -3,7 +3,7 @@
 ## Goal
 - Implement Vulkan command-recording bodies for the GRAPHICS-032 minimal-debug-surface recipe so that, on hosts with a Vulkan-capable surface and the GRAPHICS-018R operational-transition reset seam available, `Pass.Surface.MinimalDebug` and `Pass.Present.MinimalDebug` route to real `VulkanCommandContext` calls instead of soft-skipping. Once the GRAPHICS-033 nine-step gate is satisfied for these recording paths, `EvaluateVulkanOperationalStatus(...)` returns `Operational` and `VulkanDevice::IsOperational()` flips to `true`.
 
-> **Scaffold notice.** The two minimal-recipe executor routes wired by this task are removed by [`GRAPHICS-081`](GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md) once the default-recipe equivalents (`GRAPHICS-070`/`076`) are operational. The Vulkan operational gate, the `EvaluateVulkanOperationalStatus` evaluator (`GRAPHICS-033A`), and the operational diagnostics (`GRAPHICS-033B`) all stay — they are canonical. Per `GRAPHICS-081`, if the `MinimalRecipeRecordingMissing` reason is referenced by the `VulkanOperationalReason` taxonomy at retirement time, it is renamed (default-recipe-recording absence reason) rather than deleted to keep that enum append-only.
+> **Scaffold notice.** The two minimal-recipe executor routes wired by this task are removed by [`GRAPHICS-081`](../backlog/rendering/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md) once the default-recipe equivalents (`GRAPHICS-070`/`076`) are operational. The Vulkan operational gate, the `EvaluateVulkanOperationalStatus` evaluator (`GRAPHICS-033A`), and the operational diagnostics (`GRAPHICS-033B`) all stay — they are canonical. Per `GRAPHICS-081`, if the `MinimalRecipeRecordingMissing` reason is referenced by the `VulkanOperationalReason` taxonomy at retirement time, it is renamed (default-recipe-recording absence reason) rather than deleted to keep that enum append-only.
 
 ## Non-goals
 - No `gpu;vulkan` smoke fixture (`GRAPHICS-033D`).
@@ -16,7 +16,7 @@
 - Owner/agent: Claude (session `claude/inspect-engine-state-k3aik`).
 - Next verification step: none — slice landed.
 - Owner/layer: `graphics/vulkan` (command bodies, descriptor flow), `graphics/renderer` (executor route reuse).
-- Planning parent: [`tasks/done/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md`](../../done/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md), Recorded as Impl-C in the parent's Required changes.
+- Planning parent: [`tasks/done/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md`](GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md), Recorded as Impl-C in the parent's Required changes.
 - Upstream gates: `GRAPHICS-032A`/`B`/`C` (recipe + CPU-mock pass bodies must exist), `GRAPHICS-031A`/`B` (slot-0 pipeline + substitution), `GRAPHICS-033A`/`B` (status seam + diagnostics).
 - The barrier translation already lives in `VulkanCommandContext::TextureBarrier`/`SubmitBarriers`; this task wires the recipe's barrier packets through that translation.
 

@@ -25,7 +25,7 @@
   prove that cross-links and lifecycle-state claims agree with the actual
   `tasks/backlog/`, `tasks/active/`, and `tasks/done/` tree.
 - This task complements
-  [`HARDEN-074`](HARDEN-074-doc-link-checker-inline-code-labels.md): link-target
+  [`HARDEN-074`](../../done/HARDEN-074-doc-link-checker-inline-code-labels.md): link-target
   existence and task lifecycle consistency are separate signals.
 - Related audit record:
   [`docs/reviews/2026-06-02-repository-quality-assessment.md`](../../../docs/reviews/2026-06-02-repository-quality-assessment.md).

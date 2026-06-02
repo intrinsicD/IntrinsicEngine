@@ -5,7 +5,7 @@
 - **Owners:** Graphics / Vulkan backend
 - **Related tasks:** [`tasks/done/GRAPHICS-018`](../../tasks/done/GRAPHICS-018-vulkan-renderer-integration.md), [`GRAPHICS-018Q`](../../tasks/done/GRAPHICS-018Q-vulkan-integration-clarifications.md), [`GRAPHICS-018R`](../../tasks/done/GRAPHICS-018R-operational-transition.md), [`GRAPHICS-018T`](../../tasks/done/GRAPHICS-018T-texture-upload-batching.md), [`GRAPHICS-026`](../../tasks/done/GRAPHICS-026-vulkan-renderer-plumbing-followups.md)
 - **Related docs:** [`docs/architecture/graphics.md`](../architecture/graphics.md), [`src/graphics/vulkan/README.md`](../../src/graphics/vulkan/README.md)
-- **Supersedes:** none. Extracted from the `## Renderer/RHI frame lifecycle` mega-paragraph in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/backlog/architecture/DOCS-001-reduce-graphics-architecture-prose.md).
+- **Supersedes:** none. Extracted from the `## Renderer/RHI frame lifecycle` mega-paragraph in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/done/DOCS-001-reduce-graphics-architecture-prose.md).
 
 ## Context
 

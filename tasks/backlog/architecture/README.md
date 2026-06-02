@@ -35,8 +35,8 @@ map.
   already makes the null branch unreachable. Filed from
   [`docs/reports/2026-05-26-agent-output-audit.md`](../../../docs/reports/2026-05-26-agent-output-audit.md)
   Row 5.
-- [HARDEN-074 — Make markdown link checking see inline-code labels](HARDEN-074-doc-link-checker-inline-code-labels.md):
-  fixes the doc-link checker blind spot where links such as
+- [HARDEN-074 — Make markdown link checking see inline-code labels](../../done/HARDEN-074-doc-link-checker-inline-code-labels.md)
+  (done 2026-06-02): fixed the doc-link checker blind spot where links such as
   ``[`TASK-ID`](...)`` can be skipped before validation, then cleans up the
   stale links exposed by the stricter parser.
 - [HARDEN-075 — Validate task-state links and stale status claims](HARDEN-075-task-state-link-consistency-checker.md):

@@ -13,7 +13,7 @@
 - Status: done.
 - Owner/agent: Claude on branch `claude/setup-agentic-workflow-JFf7h`.
 - Owner/layer: `graphics/renderer`.
-- Planning parent: [`tasks/done/GRAPHICS-031-default-debug-surface-material.md`](../../done/GRAPHICS-031-default-debug-surface-material.md), Decisions 7 (substitution path-(b)), 8 (reset cadence), 9 (diagnostics). Recorded as Impl-B in the parent's Required changes.
+- Planning parent: [`tasks/done/GRAPHICS-031-default-debug-surface-material.md`](GRAPHICS-031-default-debug-surface-material.md), Decisions 7 (substitution path-(b)), 8 (reset cadence), 9 (diagnostics). Recorded as Impl-B in the parent's Required changes.
 - Upstream gates: `GRAPHICS-031A` (slot 0 must be the default-debug-surface).
 
 ## Required changes

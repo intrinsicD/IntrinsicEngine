@@ -13,7 +13,7 @@
 - Status: done.
 - Owner/agent: Claude on branch `claude/setup-agentic-workflow-obMTZ`.
 - Owner/layer: `graphics/vulkan` for the evaluator + types.
-- Planning parent: [`tasks/done/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md`](../../done/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md), Recorded as Impl-A in the parent's Required changes.
+- Planning parent: [`tasks/done/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md`](GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md), Recorded as Impl-A in the parent's Required changes.
 - The 9-step gate ordering and the runtime-reconciliation truth table are already locked in `src/graphics/vulkan/README.md:326–386`.
 
 ## Required changes

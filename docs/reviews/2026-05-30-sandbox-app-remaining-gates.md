@@ -70,17 +70,17 @@ sandbox can claim acceptance on the default recipe.
 
 | Gate | Task | State | Evidence |
 |---|---|---|---|
-| Graph residency extraction wiring | [`RUNTIME-086`](../../tasks/active/RUNTIME-086-geometrysources-graph-residency.md) | **IN PROGRESS** | Slice A packer `Extrinsic.Runtime.GraphGeometryPacker` exists but is **not** imported by `Runtime.RenderExtraction.cpp`. Slice B (extraction wiring) and Slice C (dirty/retire) remain. |
-| Point-cloud residency | [`RUNTIME-087`](../../tasks/backlog/runtime/RUNTIME-087-geometrysources-pointcloud-residency.md) | **OPEN** | No point-cloud packer module exists in `src/runtime/`. |
-| Mesh primitive view lifecycle | [`RUNTIME-088`](../../tasks/active/RUNTIME-088-mesh-primitive-view-lifecycle.md) | **IN PROGRESS** | Slice A landed the standalone edge/vertex derivation packers + control surface; Slice B owns the extraction-cache residency wiring. |
+| Graph residency extraction wiring | [`RUNTIME-086`](../../tasks/done/RUNTIME-086-geometrysources-graph-residency.md) | **IN PROGRESS** | Slice A packer `Extrinsic.Runtime.GraphGeometryPacker` exists but is **not** imported by `Runtime.RenderExtraction.cpp`. Slice B (extraction wiring) and Slice C (dirty/retire) remain. |
+| Point-cloud residency | [`RUNTIME-087`](../../tasks/done/RUNTIME-087-geometrysources-pointcloud-residency.md) | **OPEN** | No point-cloud packer module exists in `src/runtime/`. |
+| Mesh primitive view lifecycle | [`RUNTIME-088`](../../tasks/done/RUNTIME-088-mesh-primitive-view-lifecycle.md) | **IN PROGRESS** | Slice A landed the standalone edge/vertex derivation packers + control surface; Slice B owns the extraction-cache residency wiring. |
 
 ### C. Runtime selection
 
 | Gate | Task | State | Evidence |
 |---|---|---|---|
-| Selection controller + snapshot handoff | [`RUNTIME-089`](../../tasks/backlog/runtime/RUNTIME-089-selection-controller.md) | **OPEN** | No runtime selection module; only graphics-side `Graphics.SelectionSystem.cpp` + `ECS.Component.Selection`. |
-| Stable entity lookup sidecar | [`RUNTIME-092`](../../tasks/backlog/runtime/RUNTIME-092-stable-entity-lookup.md) | **OPEN** | No runtime stable-id/live-entity lookup module. |
-| Primitive selection refinement | [`RUNTIME-093`](../../tasks/active/RUNTIME-093-primitive-selection-refinement.md) | **IN PROGRESS** | Slice A landed the standalone `Extrinsic.Runtime.PrimitiveSelectionRefinement` module (hint-based mesh/graph/point-cloud refinement); `SelectionController` integration owned by Slice B. |
+| Selection controller + snapshot handoff | [`RUNTIME-089`](../../tasks/done/RUNTIME-089-selection-controller.md) | **OPEN** | No runtime selection module; only graphics-side `Graphics.SelectionSystem.cpp` + `ECS.Component.Selection`. |
+| Stable entity lookup sidecar | [`RUNTIME-092`](../../tasks/done/RUNTIME-092-stable-entity-lookup.md) | **OPEN** | No runtime stable-id/live-entity lookup module. |
+| Primitive selection refinement | [`RUNTIME-093`](../../tasks/done/RUNTIME-093-primitive-selection-refinement.md) | **IN PROGRESS** | Slice A landed the standalone `Extrinsic.Runtime.PrimitiveSelectionRefinement` module (hint-based mesh/graph/point-cloud refinement); `SelectionController` integration owned by Slice B. |
 
 Graphics-side picking readback + outline (`GRAPHICS-074`) is **done** and is the
 upstream these runtime gates consume.
@@ -90,7 +90,7 @@ upstream these runtime gates consume.
 | Gate | Task | State | Evidence |
 |---|---|---|---|
 | Texture asset bridge | [`RUNTIME-080`](../../tasks/backlog/runtime/RUNTIME-080-asset-bridges-texture.md) | **OPEN** | No runtime asset-bridge module. |
-| Runtime ImGui platform/renderer adapter | [`RUNTIME-090`](../../tasks/backlog/runtime/RUNTIME-090-imgui-platform-renderer-adapter.md) | **OPEN** | No runtime ImGui adapter. Graphics-side `Extrinsic.Graphics.ImGuiOverlaySystem` + `Pass.ImGui` exist, but nothing produces `ImGuiOverlayFrame` records from runtime. |
+| Runtime ImGui platform/renderer adapter | [`RUNTIME-090`](../../tasks/done/RUNTIME-090-imgui-platform-renderer-adapter.md) | **OPEN** | No runtime ImGui adapter. Graphics-side `Extrinsic.Graphics.ImGuiOverlaySystem` + `Pass.ImGui` exist, but nothing produces `ImGuiOverlayFrame` records from runtime. |
 | Asset model/texture ingest ownership | [`ASSETIO-001`](../../tasks/backlog/assets/ASSETIO-001-asset-model-texture-ingest-ownership.md) | **OPEN** | Backlog; no ingest ownership wired. |
 | Sandbox editor shell + core panels | [`UI-001`](../../tasks/backlog/ui/UI-001-sandbox-editor-shell-panels.md) | **OPEN** | No editor-shell/panel modules in `src/runtime` or `src/app`. Depends on `RUNTIME-090` + `GRAPHICS-079`. |
 

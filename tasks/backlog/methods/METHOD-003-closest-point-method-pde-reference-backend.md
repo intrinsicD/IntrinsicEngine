@@ -16,7 +16,7 @@
 - Paper: see Variants below.
 - Seeded by [`docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md`](../../../docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md) Tier 1 #2.
 - Reuses `Geometry.Grid`, `Geometry.SDF`, `Geometry.KDTree` / `Geometry.BVH` (closest-point oracle), the CSR builder / CG iterative solver from retired [`GEOM-008`](../../done/GEOM-008-linear-algebra-solver-infrastructure.md), and the direct sparse SPD factorization (LDLT/LLT) seam owed by follow-up [`GEOM-020`](../geometry/GEOM-020-sparse-direct-factorization-seam.md). The `L_band` operator assembled in Step 5 is non-symmetric for the closest-point-extension formulation, so the practical solver path is BiCGSTAB / GMRES — neither is shipped today; a separate non-symmetric sparse-solver follow-up may be required before this task can promote. Capture that decision in the slice plan before promoting.
-- Symmetric-domain-views work in [`GEOM-012`](../geometry/GEOM-012-symmetric-domain-views-property-sharing.md) is a soft prerequisite: this method must accept a `ClosestPoint` interface backed by any of: halfedge mesh, point cloud, or implicit SDF.
+- Symmetric-domain-views work in [`GEOM-012`](../../done/GEOM-012-symmetric-domain-views-property-sharing.md) is a soft prerequisite: this method must accept a `ClosestPoint` interface backed by any of: halfedge mesh, point cloud, or implicit SDF.
 
 ## Variants and default selection
 

@@ -10,7 +10,6 @@ from pathlib import Path
 
 LINK_PATTERN = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 FENCED_CODE_PATTERN = re.compile(r"```.*?```", re.DOTALL)
-INLINE_CODE_PATTERN = re.compile(r"`[^`]*`")
 IGNORED_TOP_LEVEL_PATTERNS = {
     ".git",
     ".idea",
@@ -48,6 +47,34 @@ def is_ignored_link(link: str) -> bool:
     )
 
 
+def inline_code_spans(content: str) -> list[tuple[int, int]]:
+    spans: list[tuple[int, int]] = []
+    position = 0
+    while position < len(content):
+        if content[position] != "`":
+            position += 1
+            continue
+
+        tick_end = position + 1
+        while tick_end < len(content) and content[tick_end] == "`":
+            tick_end += 1
+
+        fence = content[position:tick_end]
+        close = content.find(fence, tick_end)
+        if close == -1:
+            position = tick_end
+            continue
+
+        spans.append((position, close + len(fence)))
+        position = close + len(fence)
+
+    return spans
+
+
+def is_inside_span(start: int, end: int, spans: list[tuple[int, int]]) -> bool:
+    return any(span_start <= start and end <= span_end for span_start, span_end in spans)
+
+
 def normalize_target(source_file: Path, raw_link: str) -> Path:
     target_text = raw_link.split("#", 1)[0].strip()
     return (source_file.parent / target_text).resolve()
@@ -73,9 +100,11 @@ def main() -> int:
             continue
 
         content_wo_code = FENCED_CODE_PATTERN.sub("", content)
-        content_wo_code = INLINE_CODE_PATTERN.sub("", content_wo_code)
+        inline_spans = inline_code_spans(content_wo_code)
 
         for match in LINK_PATTERN.finditer(content_wo_code):
+            if is_inside_span(match.start(), match.end(), inline_spans):
+                continue
             link = match.group(1).strip()
             if is_ignored_link(link):
                 continue

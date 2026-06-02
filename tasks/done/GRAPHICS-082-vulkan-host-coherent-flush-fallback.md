@@ -36,7 +36,7 @@
 - [x] Outcome A: round-trip coverage added by extending the canonical `VulkanBootstrapSmoke` fixture rather than creating a new contract file; the contract task allowed an extension of an existing fixture and contract-only CPU tests cannot exercise the live VMA flush gate.
 
 ## Docs
-- [x] Added a one-line entry to [`src/graphics/vulkan/README.md`](../../../src/graphics/vulkan/README.md) noting the cached `HOST_COHERENT` flag and the `vmaFlushAllocation` fast-path fallback.
+- [x] Added a one-line entry to [`src/graphics/vulkan/README.md`](../../src/graphics/vulkan/README.md) noting the cached `HOST_COHERENT` flag and the `vmaFlushAllocation` fast-path fallback.
 
 ## Acceptance criteria
 - [x] No bare `TODO for production hardening` text remains in `src/graphics/vulkan/Backends.Vulkan.Device.cpp`.

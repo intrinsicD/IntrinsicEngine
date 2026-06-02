@@ -11,7 +11,7 @@ Use this checklist before commit and PR creation.
 ## Maturity and closure
 
 - [ ] For tasks closing to `tasks/done/`: the reached maturity level is
-      named (see [`task-maturity.md`](task-maturity.md): `Scaffolded`,
+      named (see [`../../../../../docs/agent/task-maturity.md`](../../../../../docs/agent/task-maturity.md): `Scaffolded`,
       `CPUContracted`, `Operational`, `ParityProven`, `Retired`). State it
       in the task `Status` block, retirement commit message, or completion
       summary — pick one and use it consistently.
