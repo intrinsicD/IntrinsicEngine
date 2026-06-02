@@ -73,7 +73,6 @@ TEST(DebugViewPassContract, RendererRoutesAndRecordsDebugViewPass)
 
     std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
     renderer->Initialize(device);
-    EXPECT_EQ(renderer->GetFrameRecipe(), Core::Config::FrameRecipeKind::Default);
 
     RHI::FrameHandle frame{};
     ASSERT_TRUE(renderer->BeginFrame(frame));
@@ -164,14 +163,15 @@ TEST(DebugViewPassContract, MissingDebugViewPipelineLeaseSkipsUnavailable)
 {
     Tests::MockDevice device;
     // GRAPHICS-076 Slice B — the canonical debug-view pipeline is
-    // created LAST inside `InitializeOperationalPassResources()` (call
-    // #25 per the documented ordering, immediately after present at
-    // #24). Failing that create exercises the `SkippedUnavailable`
+    // created immediately after present inside
+    // `InitializeOperationalPassResources()` (call #24 per the documented
+    // ordering, immediately after present at #23). Failing that create
+    // exercises the `SkippedUnavailable`
     // path while every upstream pipeline lease (culling / depth /
     // surface / line / point / shadow / deferred / selection /
     // postprocess / present) keeps the rest of the default recipe
     // recording.
-    device.FailPipelineCreateCall = 25;
+    device.FailPipelineCreateCall = 24;
     device.BackbufferHandle = RHI::TextureHandle{403u, 1u};
 
     std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
@@ -197,9 +197,8 @@ TEST(DebugViewPassContract, MissingDebugViewPipelineLeaseSkipsUnavailable)
     EXPECT_EQ(debugViewPass->Status, Graphics::RenderCommandPassStatus::SkippedUnavailable);
     EXPECT_EQ(stats.DebugViewPassExecutions, 0u);
 
-    // Upstream pipelines must still record — Slice B's added lease is
-    // last in the operational-publisher order, so a targeted failure
-    // at #25 leaves the present (#24) pass operational.
+    // Upstream pipelines must still record — a targeted failure at #24
+    // leaves the present (#23) pass operational.
     const auto* presentPass = FindCommandPass(stats, "Present");
     ASSERT_NE(presentPass, nullptr);
     EXPECT_EQ(presentPass->Status, Graphics::RenderCommandPassStatus::Recorded);

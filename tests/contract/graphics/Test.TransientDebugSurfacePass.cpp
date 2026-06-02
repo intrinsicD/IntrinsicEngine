@@ -292,7 +292,7 @@ TEST(TransientDebugSurfacePassContract, NonOperationalDeviceSkipsNonOperational)
 TEST(TransientDebugSurfacePassContract, MissingTrianglePipelineLeaseSkipsUnavailable)
 {
     // GRAPHICS-077 Slice B — failing the triangle DepthTested
-    // pipeline create (call #26, immediately after debug-view at #25)
+    // pipeline create (call #25, immediately after debug-view at #24)
     // yields `"TransientDebugSurfacePass" = SkippedUnavailable` while
     // every upstream pipeline lease (culling / depth / surface / line /
     // point / shadow / deferred / selection / postprocess / present /
@@ -301,7 +301,7 @@ TEST(TransientDebugSurfacePassContract, MissingTrianglePipelineLeaseSkipsUnavail
     // diagnostic counter distinguishes "feature on, pipeline missing"
     // from "feature off" (the latter does not reach this branch).
     MockDevice device;
-    device.FailPipelineCreateCall = 26;
+    device.FailPipelineCreateCall = 25;
     device.BackbufferHandle = RHI::TextureHandle{703u, 1u};
 
     std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
@@ -721,12 +721,12 @@ TEST(TransientDebugSurfacePassContract, SelectsLineAlwaysOnTopVariantPerPacket)
 TEST(TransientDebugSurfacePassContract, MissingLinePipelineLeaseSkipsUnavailable)
 {
     // GRAPHICS-077 Slice C — failing the line DepthTested pipeline
-    // create (call #28, immediately after triangle AlwaysOnTop at #27)
+    // create (call #27, immediately after triangle AlwaysOnTop at #26)
     // yields `LineRecordsSubmitted/Recorded == 0` and increments
     // `MissingPipelineSkipCount` by exactly 1. With no other lane
     // submissions the pass status is `SkippedUnavailable`.
     MockDevice device;
-    device.FailPipelineCreateCall = 28;
+    device.FailPipelineCreateCall = 27;
     device.BackbufferHandle = RHI::TextureHandle{712u, 1u};
 
     std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
@@ -896,10 +896,10 @@ TEST(TransientDebugSurfacePassContract, SelectsPointAlwaysOnTopVariantPerPacket)
 TEST(TransientDebugSurfacePassContract, MissingPointPipelineLeaseSkipsUnavailable)
 {
     // GRAPHICS-077 Slice C — failing the point DepthTested pipeline
-    // create (call #30) yields `PointRecordsSubmitted/Recorded == 0`
+    // create (call #29) yields `PointRecordsSubmitted/Recorded == 0`
     // and increments `MissingPipelineSkipCount` by exactly 1.
     MockDevice device;
-    device.FailPipelineCreateCall = 30;
+    device.FailPipelineCreateCall = 29;
     device.BackbufferHandle = RHI::TextureHandle{715u, 1u};
 
     std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
@@ -1104,9 +1104,9 @@ TEST(TransientDebugSurfacePassContract, MixedLanePartialPipelineSkipRecordsRemai
     }};
 
     MockDevice device;
-    // Fail point DepthTested (call #30) — line + triangle pipelines
+    // Fail point DepthTested (call #29) — line + triangle pipelines
     // succeed, so triangle has no packets and the line lane records.
-    device.FailPipelineCreateCall = 30;
+    device.FailPipelineCreateCall = 29;
     device.BackbufferHandle = RHI::TextureHandle{717u, 1u};
 
     std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();

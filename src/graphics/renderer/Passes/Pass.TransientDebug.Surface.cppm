@@ -14,10 +14,9 @@ namespace Extrinsic::Graphics
 {
     // GRAPHICS-077 Slices B + C — operational shell class for the
     // canonical default-recipe `TransientDebugSurfacePass`. Mirrors the
-    // `PresentPass` / `MinimalDebugPresentPass` shape: default-
-    // constructible (no system dependency), per-lane pipeline accessors
-    // for fail-closed prerequisite checks, and per-lane
-    // `Execute{Triangles,Lines,Points}(...)` bodies that iterate each
+    // `PresentPass` shape: default-constructible (no system dependency),
+    // per-lane pipeline accessors for fail-closed prerequisite checks, and
+    // per-lane `Execute{Triangles,Lines,Points}(...)` bodies that iterate each
     // lane's packet span and record `BindPipeline + PushConstants(BDA)
     // + Draw(N, 1, 0, 0)` per packet (N = 3 / 2 / 1 for triangles /
     // lines / points). Each lane independently switches between the

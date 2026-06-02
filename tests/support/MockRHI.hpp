@@ -309,6 +309,19 @@ namespace Extrinsic::Tests
         {
             BufferBarrierCalls.push_back({buffer, before, after});
         }
+
+        void SubmitBarriers(const RHI::BarrierBatchDesc& batch) override
+        {
+            for (const RHI::TextureBarrierDesc& barrier : batch.TextureBarriers)
+            {
+                TextureBarrier(barrier.Texture, barrier.BeforeLayout, barrier.AfterLayout);
+            }
+            for (const RHI::BufferBarrierDesc& barrier : batch.BufferBarriers)
+            {
+                BufferBarrier(barrier.Buffer, barrier.BeforeAccess, barrier.AfterAccess);
+            }
+        }
+
         void FillBuffer(RHI::BufferHandle, std::uint64_t, std::uint64_t, std::uint32_t) override
         {
             ++FillBufferCalls;

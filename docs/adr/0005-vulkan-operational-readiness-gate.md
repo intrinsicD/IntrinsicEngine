@@ -30,8 +30,8 @@ This ADR captures the gate enumeration, the single-source-of-truth evaluator, th
 2. **Instance + surface + physical device + queue families live.** volk, `VkInstance`, the platform surface, the selected `VkPhysicalDevice`, and the recorded graphics/present/transfer queue-family indices are present.
 3. **Logical device + features + allocator + heap diagnostics live.** Logical device created with the required Vulkan 1.2/1.3 feature chain, `VK_KHR_swapchain`, VMA allocator initialized, and the documented heap-budget diagnostics populated.
 4. **Swapchain create/acquire/present/resize/recreate satisfies the GRAPHICS-013CQ contract.** Explicit surface format, color space, and present-mode policy are in place, and device-lost handling routes through the documented recreate path.
-5. **Per-frame command + sync objects live for the GRAPHICS-032 minimal recipe.** Per-frame command pools, primary command buffers, fences, binary acquire/render semaphores, and the transfer timeline semaphore path are all live.
-6. **Minimal surface + present recording bodies match the CPU/null command contract.** `Pass.Surface.MinimalDebug` and `Pass.Present.MinimalDebug` execute against the real command context and produce the same pass/resource/command sequence as the CPU/null recipe contract.
+5. **Per-frame command + sync objects live for the default recipe.** Per-frame command pools, primary command buffers, fences, binary acquire/render semaphores, and the transfer timeline semaphore path are all live.
+6. **Default surface + present recording bodies match the CPU/null command contract.** The canonical default-recipe surface/present path executes against the real command context and produces the same pass/resource/command sequence as the CPU/null recipe contract.
 7. **Barrier/layout validation reports no hard errors.** `SceneColorHDR` color-write → sampled, `SceneDepth` depth-attachment lifetime, imported backbuffer finalization, and transfer-queue uploads all pass GRAPHICS-022 structured findings without hard errors.
 8. **Public services agree on the same operational answer.** Bindless heap, transfer queue, pipeline manager, swapchain/backbuffer import, and command context all report one consistent operational answer; no service is operational while another is in fallback.
 9. **Validation-layer policy passes.** Validation-layer policy has run for the gate check and no validation error or required breadcrumb forces a fail-closed status.
@@ -79,7 +79,7 @@ VulkanOperationalReason {
   AllocatorFailed,
   SwapchainFailed,
   CommandSyncFailed,
-  MinimalRecipeRecordingMissing,
+  DefaultRecipeRecordingMissing,
   BarrierValidationFailed,
   PublicServiceReconciliationFailed,
   ValidationLayerError,
@@ -135,7 +135,7 @@ Rejected alternative: treating validation messages as logs only. The operational
 
 ### 7. Required vs optional Vulkan capabilities
 
-**Required** for the minimal operational recipe:
+**Required** for the default operational recipe:
 
 - Vulkan 1.3, or Vulkan 1.2 plus the promoted feature chain already used in [GRAPHICS-018](../../tasks/done/GRAPHICS-018-vulkan-renderer-integration.md).
 - Platform surface extension and `VK_KHR_swapchain`.
@@ -146,7 +146,7 @@ Rejected alternative: treating validation messages as logs only. The operational
 - Supported depth/color attachment formats for `SceneDepth` and `SceneColorHDR`.
 - Presentation support for the chosen queue/surface pair.
 
-**Optional / probed** (recorded, never silently enables a feature outside the declared minimal recipe):
+**Optional / probed** (recorded, never silently enables a feature outside the declared default recipe):
 
 - Sampler anisotropy (governed by [ADR-0004 §10.2](0004-vulkan-backend-bringup-and-fallback.md)).
 - Preferred mailbox / immediate present modes.
@@ -163,7 +163,7 @@ Rejected alternative: enabling every available extension at device creation. Tha
 - Use a distinct transfer family when available and beneficial.
 - Swapchain images use the existing graphics/present sharing policy.
 - Buffers/textures touched by both graphics and transfer queues keep the GRAPHICS-018T concurrent-sharing baseline until a later explicit ownership-transfer optimization task replaces it.
-- The GRAPHICS-032 minimal recipe records graphics-queue commands only; transfer-queue uploads must complete or expose valid timeline waits before the surface pass consumes uploaded resources.
+- The default recipe records graphics-queue commands for the canonical visible path; transfer-queue uploads must complete or expose valid timeline waits before the surface pass consumes uploaded resources.
 
 Rejected alternative: requiring a dedicated transfer queue for operational status. Many valid hosts expose only a unified graphics/present/transfer family and the minimal visible-geometry path must support them.
 
@@ -242,7 +242,7 @@ Follow-up tasks required: none. All planning children identified by `GRAPHICS-03
 - [`tasks/done/GRAPHICS-033`](../../tasks/done/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md) records the 14 planning decisions captured above, including the gate checklist and reconciliation truth table.
 - [`tasks/done/GRAPHICS-033A`](../../tasks/done/GRAPHICS-033A-vulkan-operational-status-evaluator.md) records the evaluator, status/reason enums, and CPU `contract;graphics` tests for gate order and the reconciliation matrix.
 - [`tasks/done/GRAPHICS-033B`](../../tasks/done/GRAPHICS-033B-vulkan-operational-diagnostics-and-breadcrumb.md) records the diagnostics snapshot, counters, histogram, startup breadcrumb wiring, and `contract;runtime` requested-Vulkan → Null fallback tests.
-- [`tasks/done/GRAPHICS-033C`](../../tasks/done/GRAPHICS-033C-vulkan-minimal-recipe-recording.md) records the Vulkan command-recording bodies for the GRAPHICS-032 minimal recipe consumed by gate step 6.
+- [`tasks/done/GRAPHICS-033C`](../../tasks/done/GRAPHICS-033C-vulkan-minimal-recipe-recording.md) recorded the bootstrap recording bodies that originally satisfied gate step 6; [`tasks/done/GRAPHICS-081`](../../tasks/done/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md) retargeted the reason name and gate wording to the canonical default recipe after the bootstrap scaffold retired.
 - [`tasks/done/GRAPHICS-033E`](../../tasks/done/GRAPHICS-033E-vulkan-operational-gate-barrier-validation.md) records the barrier-validation input feeding gate step 7.
 - [`tasks/done/GRAPHICS-033F`](../../tasks/done/GRAPHICS-033F-vulkan-operational-gate-public-service-reconciliation.md) records the public-service reconciliation feeding gate step 8.
 - The retired opt-in `gpu;vulkan` visible-triangle smoke ([`GRAPHICS-033D`](../../tasks/done/GRAPHICS-033D-gpu-vulkan-visible-triangle-smoke.md)) is the canonical end-to-end validation: it asserts `Operational` only after all 9 gate prerequisites are met and that no fallback counters increment during the operational frame.

@@ -7,7 +7,7 @@
 - Do not remove the ability to force order where required.
 - Do not change visual output or resource set intentionally.
 - Do not implement missing command bodies.
-- Do not alter MinimalDebug recipe behavior unless needed for shared helper cleanup.
+- Do not reintroduce the retired bootstrap recipe scaffold while changing default-recipe dependencies.
 
 ## Context
 - The current default recipe uses an `addOrderedPass` helper that chains each pass to the previous pass.

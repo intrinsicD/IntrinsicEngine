@@ -537,7 +537,7 @@ TEST(RendererFrameLifecycle, DepthPrepassPipelineFailureSkipsUnavailableCommandP
     // (`EnableHistogram` defaults to false) → total climbs to 10
     // (4 routed + 1 under PostProcessHistogramPass + 2 under
     // PostProcessPass + 3 under the AA passes). GRAPHICS-076 Slice A —
-    // the canonical present pipeline is created LAST (call #24), well
+    // the canonical present pipeline is created after postprocess (call #23), well
     // after the depth-prepass failure point at call #2, so the
     // `"Present"` graph pass records via `RecordPresentPass` → total
     // climbs to 11.
@@ -623,7 +623,7 @@ TEST(RendererFrameLifecycle, CullingPipelineFailureSkipsRoutedCommandPassesUnava
     // (`EnableHistogram` defaults to false) → total climbs to 6
     // (0 routed + 1 under PostProcessHistogramPass + 2 under
     // PostProcessPass + 3 under the AA passes). GRAPHICS-076 Slice A —
-    // the canonical present pipeline is created LAST (call #24) and is
+    // the canonical present pipeline is created after postprocess (call #23) and is
     // similarly culling-independent (the present helper only checks
     // device-operational + present pipeline lease, never
     // `m_CullingOutputAvailable`); the `"Present"` graph pass records
@@ -1233,13 +1233,13 @@ TEST(RendererFrameLifecycle, DeferredSurfacePassSkipsUnavailableWhenPipelineMiss
     device.Operational = true;
     // The deferred GBuffer pipeline is the eighth (1-indexed) pipeline
     // created by the operational publisher: 1 culling compute, 2 depth
-    // prepass, 3 default debug surface, 4 minimal visible triangle, 5
-    // forward surface, 6 forward line, 7 forward point, 8 shadow,
-    // 9 deferred GBuffer. Fail call #9 so all upstream pipelines succeed
+    // prepass, 3 default debug surface, 4 forward surface, 5 forward line,
+    // 6 forward point, 7 shadow, 8 deferred GBuffer. Fail call #8 so all
+    // upstream pipelines succeed
     // (including culling, which keeps `m_CullingOutputAvailable=true`) but
     // the GBuffer lease is left empty. The `SkippedUnavailable` taxonomy
     // distinguishes this from the `SkippedNonOperational` path.
-    device.FailPipelineCreateCall = 9;
+    device.FailPipelineCreateCall = 8;
     device.BackbufferHandle = Extrinsic::RHI::TextureHandle{283u, 1u};
 
     std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
@@ -1339,12 +1339,11 @@ TEST(RendererFrameLifecycle, DeferredLightingPassSkipsUnavailableWhenPipelineMis
     Extrinsic::Tests::MockDevice device;
     device.Operational = true;
     // Publisher pipeline order (1-indexed): 1 culling compute, 2 depth
-    // prepass, 3 default debug surface, 4 minimal visible triangle,
-    // 5 forward surface, 6 forward line, 7 forward point, 8 shadow,
-    // 9 deferred GBuffer, 10 deferred lighting. Failing call #10 leaves
-    // the lighting lease empty while every upstream pipeline (including
-    // the GBuffer at #9) succeeds.
-    device.FailPipelineCreateCall = 10;
+    // prepass, 3 default debug surface, 4 forward surface, 5 forward line,
+    // 6 forward point, 7 shadow, 8 deferred GBuffer, 9 deferred lighting.
+    // Failing call #9 leaves the lighting lease empty while every upstream
+    // pipeline (including the GBuffer at #8) succeeds.
+    device.FailPipelineCreateCall = 9;
     device.BackbufferHandle = Extrinsic::RHI::TextureHandle{285u, 1u};
 
     std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
@@ -2600,20 +2599,19 @@ TEST(RendererFrameLifecycle, PostProcessSMAALookupTexturesRetryAfterFailedUpload
 // `FailPipelineCreateCall` is a 1-indexed counter of `IDevice` pipeline-
 // create calls. Pipeline creation order inside
 // `InitializeOperationalPassResources` is:
-//   1 culling, 2 depth, 3 defaultDebugSurface, 4 minimalVisibleTriangle,
-//   5 forwardSurface, 6 forwardLine, 7 forwardPoint, 8 shadow,
-//   9 deferredGBuffer, 10 deferredLighting, 11-14 selectionId,
-//   15 selectionOutline, 16 tonemap, 17 bloomDownsample, 18 bloomUpsample,
-//   19 postProcessFXAA, 20 smaaEdge, 21 smaaBlend, 22 smaaResolve,
-//   23 postProcessHistogram, 24 present (GRAPHICS-076 Slice A — created
-//   last so the indices for the older slots remain stable).
+//   1 culling, 2 depth, 3 defaultDebugSurface, 4 forwardSurface,
+//   5 forwardLine, 6 forwardPoint, 7 shadow, 8 deferredGBuffer,
+//   9 deferredLighting, 10-13 selectionId, 14 selectionOutline,
+//   15 tonemap, 16 bloomDownsample, 17 bloomUpsample, 18 postProcessFXAA,
+//   19 smaaEdge, 20 smaaBlend, 21 smaaResolve, 22 postProcessHistogram,
+//   23 present.
 // If a future change reorders pipeline creation, update the constants.
 // ---------------------------------------------------------------------------
 
 namespace
 {
-    constexpr int kPostProcessFXAACreateCallIndex = 19;
-    constexpr int kPostProcessSMAAResolveCreateCallIndex = 22;
+    constexpr int kPostProcessFXAACreateCallIndex = 18;
+    constexpr int kPostProcessSMAAResolveCreateCallIndex = 21;
 }
 
 TEST(RendererFrameLifecycle, FXAASelectedWithoutPipelineKeepsResolveSkippedAndPresentOnSceneColorLDR)
@@ -3000,13 +2998,11 @@ TEST(RendererFrameLifecycle, PickingReadbackBufferReallocatesWhenFramesInFlightC
 // GRAPHICS-074 Slice D.2 — when a pick is pending and the device is
 // operational, the PickingPass executor branch must record the EntityId +
 // PrimitiveId texture-to-buffer copy pair (wrapped by ColorAttachment →
-// TransferSrc → ColorAttachment barriers per the GRAPHICS-033D
-// MinimalDebugReadbackBuffer pattern) into the renderer-owned host-visible
-// `Picking.Readback` buffer at the per-frame slot. The CPU-observable
-// contract for the copy is the per-frame `PickingReadbackCopyCount`
-// counter on `RenderGraphFrameStats`, matching the
-// `MinimalDebugBackbufferReadbackCopyCount` pattern. Slice D.3 will drain
-// the buffer on `BeginFrame()` to publish `PublishPickResult`/`PublishNoHit`.
+// TransferSrc → ColorAttachment barriers) into the renderer-owned host-visible
+// `Picking.Readback` buffer at the per-frame slot. The CPU-observable contract
+// for the copy is the per-frame `PickingReadbackCopyCount` counter on
+// `RenderGraphFrameStats`. Slice D.3 drains the buffer on `BeginFrame()` to
+// publish `PublishPickResult`/`PublishNoHit`.
 TEST(RendererFrameLifecycle, PickingReadbackCopyRecordedWhenPickPending)
 {
     Extrinsic::Tests::MockDevice device;
@@ -3865,4 +3861,3 @@ TEST(RendererFrameLifecycle, PublishHistogramReadbackUpdatesExposureHistory)
 
     renderer->Shutdown();
 }
-

@@ -476,7 +476,6 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
     set(_graphics_vulkan_smoke_test_files
         Test.DefaultRecipeSurfaceGpuSmoke.cpp
         Test.ImGuiSurfaceGpuSmoke.cpp
-        Test.MinimalDebugSurfaceGpuSmoke.cpp
         Test.TransientDebugSurfaceGpuSmoke.cpp
         Test.VisualizationOverlaySurfaceGpuSmoke.cpp
         Test.VulkanBootstrapSmoke.cpp
@@ -608,10 +607,6 @@ set(_graphics_contract_cpu_test_files
     Test.LightingShadowContracts.cpp
     Test.LinePointPassContracts.cpp
     Test.MaterialSubstitutionContract.cpp
-    Test.MinimalDebugBackbufferReadback.cpp
-    Test.MinimalDebugSurfacePass.cpp
-    Test.MinimalDebugPresentPass.cpp
-    Test.MinimalRecipeBackendParity.cpp
     Test.MinimalTriangleReadbackHarness.cpp
     Test.PostProcessChainContract.cpp
     Test.PresentPass.cpp

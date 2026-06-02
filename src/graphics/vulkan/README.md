@@ -64,10 +64,9 @@ available through the Vulkan 1.2/1.3 feature chain.
   Vulkan bring-up: when a device moves from non-operational to operational,
   runtime waits idle and calls `IRenderer::RebuildOperationalResources()` to
   rebuild renderer-owned material, `GpuWorld`, culling, and depth-prepass state
-  through RHI managers. GRAPHICS-033D adds opt-in `gpu;vulkan` coverage for the
-  bootstrap `FrameRecipe::MinimalDebug` path with a backbuffer-only fixed
-  visible-triangle present finalizer; default CPU/null gates still skip Vulkan
-  execution by label.
+  through RHI managers. GRAPHICS-076E adds opt-in `gpu;vulkan` coverage for the
+  canonical default recipe's visible-triangle/readback path; default CPU/null
+  gates still skip Vulkan execution by label.
 - `GetVulkanServiceDiagnosticsSnapshot()` reports guarded post-bootstrap service
   handoff: bindless heap creation, global pipeline-layout creation, transfer
   queue/staging creation, command-context rebinding, bindless capacity, clean
@@ -330,10 +329,10 @@ available through the Vulkan 1.2/1.3 feature chain.
   smoke remains the host-dependent proof for the operational path.
   The opt-in `VulkanBootstrapSmoke` test is labeled `gpu;vulkan` and verifies
   bootstrap state plus the guarded acquire/command-record/submit/present path
-  on hosts where the operational gate is not satisfied. The GRAPHICS-033D
-  `MinimalDebugSurfaceGpuSmoke` fixture is also labeled `gpu;vulkan`; it drives
-  the reference triangle through the bootstrap `FrameRecipe::MinimalDebug` lane
-  after the gate flips, and reports `SKIPPED` when GLFW or Vulkan readiness is
+  on hosts where the operational gate is not satisfied. The default-recipe
+  surface, transient-debug, visualization-overlay, and ImGui smoke fixtures are
+  also labeled `gpu;vulkan`; they drive promoted default-recipe command streams
+  after the gate flips, and report `SKIPPED` when GLFW or Vulkan readiness is
   unavailable on the host.
 - `VulkanDevice::WriteBuffer` caches each host-visible allocation's
   `HOST_COHERENT` flag at creation time (via `vmaGetAllocationMemoryProperties`)
@@ -360,15 +359,12 @@ VulkanOperationalStatus` is now exported from `Extrinsic.Backends.Vulkan`
 non-native booleans / reason bits (no `Vk*` handles). `VulkanDevice::IsOperational()`
 consumes the evaluator through `VulkanDevice::ComputeOperationalPredicate()`;
 runtime startup reconciliation (`GRAPHICS-033B`) consumes the same result.
-Implementation child C landed the minimal-recipe recording bodies
-(`GRAPHICS-033C`): `Pass.Surface.MinimalDebug` and `Pass.Present.MinimalDebug`
-recording bodies execute against the live command context once the device is
-operational, the slot-0 default-debug-surface pipeline lease is rebuilt
-byte-identical by `IRenderer::RebuildOperationalResources()` on the
-false→true transition, and the executor lambda routes the live graphics
-`VulkanCommandContext` to the minimal-recipe pass routes. `BuildOperationalInputs()`
-now reports `MinimalRecipeRecordingPresent = true` because the recording
-bodies are a codebase fact.
+Implementation child C originally proved bootstrap recording bodies. GRAPHICS-081
+retired that scaffold after the default recipe became operational; the gate input
+is now `DefaultRecipeRecordingPresent = true` because promoted default-recipe
+executor routes are present in the renderer and record against the live graphics
+`VulkanCommandContext` when `IDevice::IsOperational()` is true and each pass's
+resources are ready.
 
 Implementation child E landed the gate-7 wiring (`GRAPHICS-033E`):
 `RHI::IDevice::NoteRecipeGraphValidation(bool)` is a backend-neutral CPU-public
@@ -411,36 +407,27 @@ diagnostics block previously assumed `IsOperational()` implied safety
 prereqs. Splitting the inputs removes the implicit assumption without
 relaxing any fail-closed observable.
 
-GRAPHICS-033D adds the opt-in `gpu;vulkan` fixture
-`MinimalDebugSurfaceGpuSmoke.ReferenceTriangleRecordsOnOperationalPromotedVulkan`.
-It uses `CreateReferenceEngineConfig()`, selects `FrameRecipe::MinimalDebug`,
-drives a bounded runtime loop, verifies the operational status and minimal pass
-counters on Vulkan-capable hosts, and remains outside the default CPU gate. It
-consumes the reusable `tests/support/MinimalTriangleReadback.hpp` and
-`tests/support/OperationalCounterStability.hpp` helpers so the sibling
-`GRAPHICS-032D` recipe-selector fixture
-(`MinimalDebugSurfaceGpuSmoke.RecipeSelectorReachesOperationalVulkanCommandStream`,
-landed alongside this one in the same file) and the canonical `GRAPHICS-076` /
-`GRAPHICS-081` default-recipe smoke can reuse the four-sample-point table and
-fallback-counter stability contract byte-identical. The two `MinimalDebugSurfaceGpuSmoke`
-fixtures share one bounded `engine.Run()` driver helper
-(`BootstrapEngineForMinimalDebug` + `DriveOneFrameAndCapture`) so the driver loop
-is not duplicated; the 032D sibling deliberately leaves the readback hook unarmed
-and asserts the recipe-selector counters only. The backbuffer-to-host
-readback seam is provided by `RHI::ICommandContext::CopyTextureToBuffer`
-(Vulkan: `vkCmdCopyImageToBuffer`) plus `RHI::IDevice::ReadBuffer` (Vulkan:
+GRAPHICS-076E adds the opt-in `gpu;vulkan` default-recipe readback fixture in
+`tests/integration/graphics/Test.DefaultRecipeSurfaceGpuSmoke.cpp`. It uses
+`CreateReferenceEngineConfig()`, drives a bounded runtime loop, verifies the
+operational status on Vulkan-capable hosts, and remains outside the default CPU
+gate. It consumes `tests/support/MinimalTriangleReadback.hpp` and
+`tests/support/OperationalCounterStability.hpp` for the four-sample-point table
+and fallback-counter stability contract. The backbuffer-to-host readback seam is
+provided by `RHI::ICommandContext::CopyTextureToBuffer` (Vulkan:
+`vkCmdCopyImageToBuffer`) plus `RHI::IDevice::ReadBuffer` (Vulkan:
 `vkDeviceWaitIdle` + `memcpy` from a HostVisible buffer's persistent map). The
-renderer exposes an opt-in `IRenderer::SetMinimalDebugBackbufferReadbackBuffer`
-hook that, when armed under `FrameRecipeKind::MinimalDebug` on an operational
-device, inserts a `Present → TransferSrc → CopyTextureToBuffer → Present`
-triplet after the executor's final barriers and before the command buffer
-closes; the layout sequencing leaves the backbuffer in `Present` so the
-device's submit + `vkQueuePresentKHR` chain is unchanged. The per-frame
-diagnostic counter `RenderGraphFrameStats::MinimalDebugBackbufferReadbackCopyCount`
-increments per readback frame so the contract cannot silently regress. CPU
-invariants of the helpers and the renderer wiring run in the default gate via
-`IntrinsicGraphicsContractCpuTests`
-(`Test.MinimalTriangleReadbackHarness.cpp` and `Test.MinimalDebugBackbufferReadback.cpp`).
+renderer exposes an opt-in `IRenderer::SetDefaultRecipeBackbufferReadbackBuffer`
+hook that, when armed on an operational device, inserts a
+`Present -> TransferSrc -> CopyTextureToBuffer -> Present` triplet after the
+executor's final barriers and before the command buffer closes; the layout
+sequencing leaves the backbuffer in `Present` so the device's submit +
+`vkQueuePresentKHR` chain is unchanged. The per-frame diagnostic counter
+`RenderGraphFrameStats::DefaultRecipeBackbufferReadbackCopyCount` increments per
+readback frame so the contract cannot silently regress. CPU invariants of the
+helpers and renderer wiring run in the default gate via
+`IntrinsicGraphicsContractCpuTests` (`Test.MinimalTriangleReadbackHarness.cpp`
+and `Test.DefaultRecipeBackbufferReadback.cpp`).
 
 GRAPHICS-076 / BUG-012 extends the operational proof to the canonical default
 recipe. The original default-recipe Vulkan bring-up exposed a validator gap: the
@@ -474,9 +461,8 @@ not overwrite the snapshot spans. They assert the corresponding pass records on
 the operational Vulkan command stream, per-lane/per-kind submitted and recorded
 counters are non-zero, upload-overflow and missing-pipeline counters stay zero,
 and Vulkan fallback counters remain stable. Pixel-readback parity is tracked by
-`GRAPHICS-077E` and `GRAPHICS-078E`; the current public readback hook/counter is
-MinimalDebug-only and is not reused as evidence for default-recipe overlay
-pixels.
+`GRAPHICS-077E` and `GRAPHICS-078E`; those follow-ups add pass-scoped/default-
+recipe readback assertions for overlay pixels without reusing unrelated counters.
 
 Ordered gate checklist:
 
@@ -492,10 +478,9 @@ Ordered gate checklist:
    present-mode, and device-lost policy.
 5. Per-frame command pools, primary command buffers, fences, acquire/render
    semaphores, and the transfer timeline-semaphore path are live for the
-   GRAPHICS-032 minimal recipe.
-6. `Pass.Surface.MinimalDebug` and `Pass.Present.MinimalDebug` recording bodies
-   execute against the real command context and match the CPU/null recipe
-   command contract.
+   canonical default recipe.
+6. Default-recipe recording bodies execute against the real command context and
+   match the CPU/null recipe command contracts.
 7. Barrier/layout validation for `SceneColorHDR`, `SceneDepth`, imported
    backbuffer finalization, and transfer uploads reports no GRAPHICS-022 hard
    errors.
@@ -512,7 +497,7 @@ RequestedButIncompleteGate, Operational }`. `VulkanOperationalReason` records th
 first failing gate (for example `MissingInstance`, `MissingSurface`,
 `NoSuitablePhysicalDevice`, `MissingRequiredExtension`, `MissingRequiredFeature`,
 `LogicalDeviceFailed`, `AllocatorFailed`, `SwapchainFailed`,
-`CommandSyncFailed`, `MinimalRecipeRecordingMissing`, `BarrierValidationFailed`,
+`CommandSyncFailed`, `DefaultRecipeRecordingMissing`, `BarrierValidationFailed`,
 `PublicServiceReconciliationFailed`, `ValidationLayerError`, `DeviceLost`, or
 `SurfaceLost`). Future gates append reasons without rewriting existing values.
 

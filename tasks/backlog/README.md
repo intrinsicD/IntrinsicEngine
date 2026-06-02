@@ -72,8 +72,8 @@ Triangle-path implementation children (newly opened — pick the next in depende
 - [`done/GRAPHICS-029A`](../done/GRAPHICS-029A-reference-scene-skeleton.md) (done; unblocks GRAPHICS-029B), [`done/GRAPHICS-029B`](../done/GRAPHICS-029B-triangle-provider-and-camera.md) (done) — reference scene + camera substitution.
 - [`done/GRAPHICS-030B`](../done/GRAPHICS-030B-extraction-procedural-geometry-binding.md) (done), [`done/GRAPHICS-030C`](../done/GRAPHICS-030C-procedural-geometry-retire-ordering.md) (done) — extraction wiring + retire ordering.
 - [`done/GRAPHICS-031A`](../done/GRAPHICS-031A-default-debug-surface-shaders-and-pipeline.md) (done), [`done/GRAPHICS-031B`](../done/GRAPHICS-031B-default-debug-surface-substitution-and-diagnostics.md) (done) — default debug surface shaders/pipeline + substitution.
-- [`done/GRAPHICS-032A`](../done/GRAPHICS-032A-minimal-debug-surface-recipe.md) (done), [`done/GRAPHICS-032B`](../done/GRAPHICS-032B-minimal-debug-surface-pass-body.md) (done), [`done/GRAPHICS-032C`](../done/GRAPHICS-032C-minimal-debug-present-pass-and-acceptance.md) (done), [`done/GRAPHICS-032D`](../done/GRAPHICS-032D-gpu-vulkan-minimal-recipe-smoke.md) (done) — minimal debug recipe + pass bodies + smoke.
-- [`done/GRAPHICS-033A`](../done/GRAPHICS-033A-vulkan-operational-status-evaluator.md) (done), [`done/GRAPHICS-033B`](../done/GRAPHICS-033B-vulkan-operational-diagnostics-and-breadcrumb.md) (done), [`done/GRAPHICS-033C`](../done/GRAPHICS-033C-vulkan-minimal-recipe-recording.md) (done), [`done/GRAPHICS-033D`](../done/GRAPHICS-033D-gpu-vulkan-visible-triangle-smoke.md) (done), [`done/GRAPHICS-033E`](../done/GRAPHICS-033E-vulkan-operational-gate-barrier-validation.md) (done), [`done/GRAPHICS-033F`](../done/GRAPHICS-033F-vulkan-operational-gate-public-service-reconciliation.md) (done) — Vulkan operational gate + diagnostics + recording bodies + visible-triangle smoke + the two gate-input slices (`BarrierValidationClean`, `PublicServiceReconciled`) that let `IsOperational()` flip to `true`.
+- [`done/GRAPHICS-032A`](../done/GRAPHICS-032A-minimal-debug-surface-recipe.md) (done), [`done/GRAPHICS-032B`](../done/GRAPHICS-032B-minimal-debug-surface-pass-body.md) (done), [`done/GRAPHICS-032C`](../done/GRAPHICS-032C-minimal-debug-present-pass-and-acceptance.md) (done), [`done/GRAPHICS-032D`](../done/GRAPHICS-032D-gpu-vulkan-minimal-recipe-smoke.md) (done) — retired bootstrap visible-recipe contract + pass bodies + smoke; the artifacts were deleted by [`done/GRAPHICS-081`](../done/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md).
+- [`done/GRAPHICS-033A`](../done/GRAPHICS-033A-vulkan-operational-status-evaluator.md) (done), [`done/GRAPHICS-033B`](../done/GRAPHICS-033B-vulkan-operational-diagnostics-and-breadcrumb.md) (done), [`done/GRAPHICS-033C`](../done/GRAPHICS-033C-vulkan-minimal-recipe-recording.md) (done), [`done/GRAPHICS-033D`](../done/GRAPHICS-033D-gpu-vulkan-visible-triangle-smoke.md) (done), [`done/GRAPHICS-033E`](../done/GRAPHICS-033E-vulkan-operational-gate-barrier-validation.md) (done), [`done/GRAPHICS-033F`](../done/GRAPHICS-033F-vulkan-operational-gate-public-service-reconciliation.md) (done) — Vulkan operational gate + diagnostics + recording bodies + visible-triangle smoke + the two gate-input slices (`BarrierValidationClean`, `PublicServiceReconciled`) that let `IsOperational()` flip to `true`; bootstrap recording references were retired by [`done/GRAPHICS-081`](../done/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md).
 - [`done/GRAPHICS-080`](../done/GRAPHICS-080-enable-promoted-vulkan-by-default.md) — flip reference config + add `ci-vulkan` preset (done after full default and promoted Vulkan gate verification on 2026-05-18).
 
 Beyond-triangle full-graphics implementation tasks (Theme B′ in the rendering DAG; gated by Theme A's triangle landing):
@@ -81,7 +81,7 @@ Beyond-triangle full-graphics implementation tasks (Theme B′ in the rendering 
 - Backend transient/visualization upload helpers: [`GRAPHICS-077`](../done/GRAPHICS-077-transient-debug-primitive-upload-helper.md) (done), [`GRAPHICS-078`](../done/GRAPHICS-078-visualization-overlay-upload-helper.md) (done).
 - Default-recipe ImGui pass: [`GRAPHICS-079`](../done/GRAPHICS-079-default-recipe-imgui-pass-wiring.md) (done).
 - Runtime adapter umbrellas (clarified by `Q` follow-ups): [`runtime/RUNTIME-080..084`, `RUNTIME-090`](runtime/) — texture asset bridge, camera controllers, spatial-debug adapters, visualization adapters, gizmo interaction, ImGui adapter.
-- Bootstrap scaffold retirement: [`rendering/GRAPHICS-081`](rendering/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md) — once `GRAPHICS-070..076` are retired and the default recipe renders the reference triangle, the `MinimalDebugSurface` recipe + `Pass.Surface/Present.MinimalDebug` classes + three diagnostics counters introduced by `GRAPHICS-032`/`033` are deleted. The scaffold exists only to derisk the triangle path; it must not outlive the operational default recipe.
+- Bootstrap scaffold retirement: [`done/GRAPHICS-081`](../done/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md) (done 2026-06-02) — the bootstrap visible-recipe classes, selector, diagnostics counters, shaders, tests, and module-inventory entries introduced by `GRAPHICS-032`/`033` are deleted. The canonical visible-triangle path is the default recipe.
 
 Runtime/UI implementation leaves for the full sandbox app path:
 - [`RUNTIME-085` (done)](../done/RUNTIME-085-geometrysources-mesh-residency.md) — runtime-authored mesh `GeometrySources` to retained `GpuWorld` surface geometry (retired 2026-05-28 at `CPUContracted`).
@@ -217,12 +217,14 @@ promoting backlog tasks to active so per-category DAGs do not diverge.
   `VulkanRequestedButNotOperational` startup breadcrumb depend on the
   status / reason enums and the reconciliation matrix wiring.
 - **GRAPHICS-033C ⇐ GRAPHICS-033A (done), GRAPHICS-032 (done), GRAPHICS-031
-  (done), GRAPHICS-018R (done).** Vulkan recording for the minimal
-  recipe needs the gate seam plus the recipe, default material, and
-  operational-transition reset seam already in `tasks/done/`.
+  (done), GRAPHICS-018R (done).** Vulkan recording for the bootstrap
+  visible recipe needed the gate seam plus the recipe, default material, and
+  operational-transition reset seam already in `tasks/done/`; those artifacts
+  are now retired by GRAPHICS-081.
 - **GRAPHICS-033D ⇐ GRAPHICS-033A (done), GRAPHICS-033B, GRAPHICS-033C.**
-  The opt-in `gpu;vulkan` visible-triangle smoke composes all three
-  prior children and runs only on hosts with Vulkan + GLFW.
+  The opt-in `gpu;vulkan` visible-triangle smoke composed all three
+  prior children and runs only on hosts with Vulkan + GLFW; its bootstrap
+  fixture is retired and the default-recipe fixture is canonical.
 
 ## Promotion checklist
 

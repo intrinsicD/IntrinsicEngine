@@ -1,14 +1,13 @@
 // GRAPHICS-076E — CPU-mock contract for the canonical default-recipe
 // backbuffer-to-host readback seam. The opt-in gpu;vulkan smoke in
 // Test.DefaultRecipeSurfaceGpuSmoke.cpp drives the four-sample pixel assertion;
-// this file locks the CPU-observable API, recipe gating, and diagnostic counter.
+// this file locks the CPU-observable API and diagnostic counter.
 
 #include <cstdint>
 #include <memory>
 
 #include <gtest/gtest.h>
 
-import Extrinsic.Core.Config.Render;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
@@ -71,7 +70,6 @@ TEST(DefaultRecipeBackbufferReadbackContract, DefaultStateIsDisabledAndNoCopyRec
     EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
     EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
     EXPECT_EQ(stats.DefaultRecipeBackbufferReadbackCopyCount, 0u);
-    EXPECT_EQ(stats.MinimalDebugBackbufferReadbackCopyCount, 0u);
     EXPECT_FALSE(HasBackbufferBarrier(device, RHI::TextureLayout::Present, RHI::TextureLayout::TransferSrc));
 
     renderer->Shutdown();
@@ -99,8 +97,6 @@ TEST(DefaultRecipeBackbufferReadbackContract, ConfiguredHandleRecordsReadbackTri
     EXPECT_EQ(stats.DefaultRecipeBackbufferReadbackCopyCount, 1u)
         << "Readback triplet must record exactly once per operational default-recipe frame "
            "when a readback handle is configured.";
-    EXPECT_EQ(stats.MinimalDebugBackbufferReadbackCopyCount, 0u)
-        << "Default-recipe readback must not increment the MinimalDebug counter.";
 
     EXPECT_TRUE(HasBackbufferBarrier(device, RHI::TextureLayout::Present, RHI::TextureLayout::TransferSrc))
         << "Present -> TransferSrc transition must precede the copy.";
@@ -109,31 +105,6 @@ TEST(DefaultRecipeBackbufferReadbackContract, ConfiguredHandleRecordsReadbackTri
 
     renderer->Shutdown();
 }
-
-TEST(DefaultRecipeBackbufferReadbackContract, MinimalDebugRecipeIgnoresDefaultRecipeReadbackHandle)
-{
-    MockDevice device;
-    device.BackbufferHandle = RHI::TextureHandle{1621u, 1u};
-
-    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
-    renderer->Initialize(device);
-    renderer->SetFrameRecipe(Core::Config::FrameRecipeKind::MinimalDebug);
-    renderer->SetDefaultRecipeBackbufferReadbackBuffer(RHI::BufferHandle{5999u, 1u});
-
-    DriveOneDefaultFrame(*renderer);
-
-    const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
-    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
-    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
-    EXPECT_EQ(stats.DefaultRecipeBackbufferReadbackCopyCount, 0u)
-        << "MinimalDebug must not record the default-recipe readback triplet even "
-           "when a default-recipe handle was configured.";
-    EXPECT_EQ(stats.MinimalDebugBackbufferReadbackCopyCount, 0u)
-        << "The MinimalDebug readback hook was not armed.";
-
-    renderer->Shutdown();
-}
-
 
 TEST(DefaultRecipeBackbufferReadbackContract, SkipsCopyWhenDeviceIsNonOperational)
 {

@@ -30,8 +30,9 @@ wired. The remaining gates are concentrated in three areas:
 3. **Asset + editor UI plumbing** — texture asset
    bridge, asset ingest ownership, or editor shell/panel modules.
 
-The `MinimalDebug` scaffold is still present and must be retired before the
-sandbox can claim acceptance on the default recipe.
+2026-06-02 update: `GRAPHICS-081` retired the bootstrap recipe scaffold. Sandbox
+acceptance now depends on the canonical default recipe, UI/editor panels, and the
+remaining asset/runtime acceptance gates rather than any bootstrap path.
 
 ## What has landed (no longer a gate)
 
@@ -67,7 +68,7 @@ sandbox can claim acceptance on the default recipe.
 
 | Gate | Task | State | Evidence |
 |---|---|---|---|
-| Retire `MinimalDebug` scaffold | [`GRAPHICS-081`](../../tasks/backlog/rendering/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md) | **OPEN** | `kMinimalDebugSurfaceRecipeLabel`, `Pass.Surface.MinimalDebug`, `Pass.Present.MinimalDebug`, `BuildMinimalDebugSurfaceRecipe(...)` and executor routing still present (`FrameRecipe.cppm`/`.cpp`, `Graphics.Renderer.cpp`). RUNTIME-095 forbids treating MinimalDebug as final acceptance. |
+| Retire bootstrap recipe scaffold | [`GRAPHICS-081`](../../tasks/done/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md) | **DONE** | Scaffold recipe code, pass classes, shaders, tests, and renderer selector/readback hooks removed on 2026-06-02. RUNTIME-095 now depends on the canonical default recipe only. |
 
 ### B. Runtime geometry residency (mesh / graph / point cloud)
 
@@ -122,8 +123,8 @@ upstream these runtime gates consume.
    upstreams. These can land in parallel with the selection chain.
 5. **UI-001** (editor panels on the completed ImGui adapter/pass path) — the UI
    acceptance chain.
-6. **GRAPHICS-081** (retire MinimalDebug) — closure gate once the default recipe
-   carries the sandbox.
+6. **GRAPHICS-081** — completed on 2026-06-02; no bootstrap recipe acceptance
+   path remains.
 7. **RUNTIME-095** — author the CPU/null + opt-in Vulkan acceptance once A–E land.
 
 The remaining asset/UI-plumbing gates (`RUNTIME-080`, `ASSETIO-001`, `UI-001`)

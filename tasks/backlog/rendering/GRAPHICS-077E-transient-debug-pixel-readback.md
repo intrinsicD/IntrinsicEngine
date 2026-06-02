@@ -12,10 +12,10 @@
 ## Context
 - Owner/layer: `graphics/renderer` test seam plus opt-in `gpu;vulkan;graphics` coverage.
 - `GRAPHICS-077` Slice D added `TransientDebugSurfaceGpuSmoke.MixedLanesRecordOnOperationalVulkanCommandStream`, which warms the default recipe, manually submits one triangle/line/point packet, drives a real Vulkan frame, and asserts the pass records with non-zero per-lane counters.
-- The existing public readback seam is `IRenderer::SetMinimalDebugBackbufferReadbackBuffer(...)`, intentionally scoped to `FrameRecipeKind::MinimalDebug`. This follow-up exists so `GRAPHICS-077` can close without silently expanding Slice D into a renderer readback API change.
+- The existing default-recipe readback seam is `IRenderer::SetDefaultRecipeBackbufferReadbackBuffer(...)`, intentionally scoped to the canonical surface/present lane. This follow-up exists so `GRAPHICS-077` can close without silently expanding Slice D into a transient-debug-specific renderer readback API change.
 
 ## Required changes
-- [ ] Add a narrow default-recipe or pass-scoped readback hook/counter suitable for transient-debug assertions without reusing the MinimalDebug-only counter.
+- [ ] Add a narrow default-recipe or pass-scoped readback hook/counter suitable for transient-debug assertions without reusing the canonical surface-readback counter.
 - [ ] Keep the hook fail-closed when no buffer is armed and when the device is non-operational.
 - [ ] Preserve normal renderer behavior when the hook is not armed.
 - [ ] Use deterministic sample points/colors that isolate at least one triangle, one line, and one point contribution.
@@ -48,10 +48,9 @@ LSAN_OPTIONS=suppressions=$PWD/lsan.supp ctest --test-dir build/ci-vulkan --outp
 
 ## Forbidden changes
 - Weakening the existing transient-debug command-stream smoke.
-- Reusing `MinimalDebugBackbufferReadbackCopyCount` as evidence for default-recipe transient-debug pixels.
+- Reusing the canonical surface-readback counter as evidence for default-recipe transient-debug pixels.
 - Mixing mechanical moves with semantic refactors.
 
 ## Maturity
 - Target: `Operational` on Vulkan-capable hosts for transient-debug pixel-readback parity; `CPUContracted` everywhere else.
 - This follow-up is explicitly not required for `GRAPHICS-077` Slice D's command-stream/counter graduation.
-

@@ -1,9 +1,9 @@
 // GRAPHICS-076 Slice A — CPU-mock contract for the canonical default-recipe
 // `PresentPass` and its renderer-integrated `"Present"` executor branch.
 //
-// The pass-class tests mirror `Test.MinimalDebugPresentPass.cpp` (a local
-// `RecordingCommandContext` + a direct `Execute` invocation) to assert the
-// ordered command stream: `BindPipeline` followed by `Draw(3, 1, 0, 0)`.
+// The pass-class tests use a local `RecordingCommandContext` plus a direct
+// `Execute` invocation to assert the ordered command stream: `BindPipeline`
+// followed by `Draw(3, 1, 0, 0)`.
 //
 // The renderer-integrated tests assert that the default recipe routes
 // `"Present"` through `RecordPresentPass(...)` and records `Recorded`
@@ -100,6 +100,7 @@ namespace
         void DispatchIndirect(RHI::BufferHandle, std::uint64_t) override {}
         void TextureBarrier(RHI::TextureHandle, RHI::TextureLayout, RHI::TextureLayout) override {}
         void BufferBarrier(RHI::BufferHandle, RHI::MemoryAccess, RHI::MemoryAccess) override {}
+        void SubmitBarriers(const RHI::BarrierBatchDesc&) override {}
         void FillBuffer(RHI::BufferHandle, std::uint64_t, std::uint64_t, std::uint32_t) override {}
         void CopyBuffer(RHI::BufferHandle, RHI::BufferHandle, std::uint64_t, std::uint64_t, std::uint64_t) override {}
         void CopyBufferToTexture(RHI::BufferHandle, std::uint64_t, RHI::TextureHandle, std::uint32_t, std::uint32_t) override {}
@@ -132,7 +133,7 @@ TEST(PresentPassContract, ExecuteRecordsBindPipelineThenFullscreenDrawInOrder)
     pass.Execute(noPipelineCmd);
     EXPECT_TRUE(noPipelineCmd.Events.empty())
         << "Canonical PresentPass must short-circuit when its pipeline "
-           "lease is unset, mirroring the MinimalDebugPresent contract.";
+           "lease is unset.";
 
     const RHI::PipelineHandle pipeline{1024u, 7u};
     pass.SetPipeline(pipeline);
@@ -162,7 +163,6 @@ TEST(PresentPassContract, RendererRoutesAndRecordsPresentPass)
 
     std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
     renderer->Initialize(device);
-    EXPECT_EQ(renderer->GetFrameRecipe(), Core::Config::FrameRecipeKind::Default);
 
     RHI::FrameHandle frame{};
     ASSERT_TRUE(renderer->BeginFrame(frame));
@@ -198,13 +198,13 @@ TEST(PresentPassContract, MissingPresentPipelineLeaseSkipsUnavailable)
 {
     Tests::MockDevice device;
     // GRAPHICS-076 Slice A — the canonical present pipeline is created
-    // LAST inside `InitializeOperationalPassResources()` (call #24 per
-    // the documented ordering in `Test.RendererFrameLifecycle.cpp`).
+    // after postprocess inside `InitializeOperationalPassResources()` (call
+    // #23 per the documented ordering in `Test.RendererFrameLifecycle.cpp`).
     // Failing that create exercises the `SkippedUnavailable` path while
     // every upstream pipeline lease (culling / depth / surface / line /
     // point / shadow / deferred / selection / postprocess) keeps the
     // rest of the default recipe recording.
-    device.FailPipelineCreateCall = 24;
+    device.FailPipelineCreateCall = 23;
     device.BackbufferHandle = RHI::TextureHandle{302u, 1u};
 
     std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();

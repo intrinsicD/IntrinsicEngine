@@ -392,7 +392,6 @@ TEST(ImGuiPassContract, AttachedOverlayWithWorkRecordsAfterInitialize)
 
     std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
     renderer->Initialize(device);
-    EXPECT_EQ(renderer->GetFrameRecipe(), Core::Config::FrameRecipeKind::Default);
 
     // Engine-owned overlay system handed in AFTER Initialize(): the pipeline
     // lease already exists, so `SetImGuiOverlaySystem` binds it to the freshly

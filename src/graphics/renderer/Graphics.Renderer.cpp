@@ -57,8 +57,6 @@ import Extrinsic.Graphics.Pass.PostProcess.FXAA;
 import Extrinsic.Graphics.Pass.PostProcess.Histogram;
 import Extrinsic.Graphics.Pass.PostProcess.SMAA;
 import Extrinsic.Graphics.Pass.PostProcess.ToneMap;
-import Extrinsic.Graphics.Pass.Surface.MinimalDebug;
-import Extrinsic.Graphics.Pass.Present.MinimalDebug;
 import Extrinsic.Graphics.Pass.Present;
 // GRAPHICS-076 Slice B — canonical default-recipe `Pass.DebugView`.
 // Imported alongside the canonical `Pass.Present` above so the renderer
@@ -658,11 +656,9 @@ namespace Extrinsic::Graphics
             m_MaterialSystem .reset();
             m_DepthPrepassPipelineLease.reset();
             m_DefaultDebugSurfacePipelineLease.reset();
-            m_MinimalDebugPresentPipelineLease.reset();
             // GRAPHICS-076 Slice A — drop the canonical default-recipe
-            // present pipeline lease alongside the MinimalDebug present
-            // lease above; same teardown ordering contract (lease reset
-            // before `m_PipelineManager` is destroyed below).
+            // present pipeline lease before `m_PipelineManager` is destroyed
+            // below.
             m_PresentPipelineLease.reset();
             // GRAPHICS-076 Slice B — drop the canonical default-recipe
             // `Pass.DebugView` pipeline lease alongside the present
@@ -756,12 +752,9 @@ namespace Extrinsic::Graphics
             m_HistogramSlotPending.clear();
             m_HistogramSlotIssuedFrame.clear();
             m_HistogramSlotInvalidated.clear();
-            m_MinimalDebugSurfacePass.SetPipeline(RHI::PipelineHandle{});
-            m_MinimalDebugPresentPass.SetPipeline(RHI::PipelineHandle{});
             // GRAPHICS-076 Slice A — zero the canonical present pass's
-            // cached pipeline handle alongside the MinimalDebug present
-            // pass above so a later `Initialize(device)` starts from a
-            // clean fail-closed state instead of inheriting a stale
+            // cached pipeline handle so a later `Initialize(device)` starts
+            // from a clean fail-closed state instead of inheriting a stale
             // device handle from a previous operational lifecycle.
             m_PresentPass.SetPipeline(RHI::PipelineHandle{});
             // GRAPHICS-077 Slices B + C — zero the transient-debug
@@ -809,10 +802,6 @@ namespace Extrinsic::Graphics
             m_ImGuiUploadHelper.reset();
             m_BufferManager  .reset();
             m_CullingOutputAvailable = false;
-            // GRAPHICS-033D — drop the smoke's readback handle so a later
-            // Initialize starts with the wiring disabled (the smoke fixture
-            // re-arms it after Initialize before Run).
-            m_MinimalDebugReadbackBuffer = RHI::BufferHandle{};
         }
 
         void Resize(std::uint32_t, std::uint32_t) override
@@ -1445,8 +1434,7 @@ namespace Extrinsic::Graphics
             // GRAPHICS-070 — derive default-recipe features once per frame so
             // the executor lambda below can route `"SurfacePass"` through the
             // forward or deferred surface body without re-deriving features
-            // for every pass dispatch. The `MinimalDebug` recipe path keeps
-            // its existing zero-feature fixed structure.
+            // for every pass dispatch.
             // GRAPHICS-072 Slice A — apply the renderer-stored lighting-path
             // override after the per-world derivation so contract tests can
             // drive the deferred surface/composition branches without
@@ -1479,13 +1467,11 @@ namespace Extrinsic::Graphics
             defaultRecipeFeatures.EnableAntiAliasing =
                 m_PostProcessSystem.has_value() &&
                 SelectedAntiAliasingPipelinesAvailable();
-            const FrameRecipeBuildResult recipe = (m_FrameRecipe == Core::Config::FrameRecipeKind::MinimalDebug)
-                ? BuildMinimalDebugSurfaceRecipe(m_RenderGraph, imports, sizing)
-                : BuildDefaultFrameRecipe(m_RenderGraph,
-                                          defaultRecipeFeatures,
-                                          imports,
-                                          sizing,
-                                          shadowSizing);
+            const FrameRecipeBuildResult recipe = BuildDefaultFrameRecipe(m_RenderGraph,
+                                                                          defaultRecipeFeatures,
+                                                                          imports,
+                                                                          sizing,
+                                                                          shadowSizing);
             if (!recipe.Succeeded)
             {
                 m_LastRenderGraphStats.Diagnostic = recipe.Diagnostic;
@@ -1496,15 +1482,6 @@ namespace Extrinsic::Graphics
                 m_Device->NoteRecipeGraphValidation(false);
                 return;
             }
-            if (m_FrameRecipe == Core::Config::FrameRecipeKind::MinimalDebug)
-            {
-                // GRAPHICS-032A seeds the counter from recipe-build-time
-                // prerequisite gaps; GRAPHICS-032B then accumulates record-time
-                // gaps (missing slot-0 lease, SurfaceOpaque bucket, GpuWorld) on
-                // top via RecordMinimalDebugSurfacePass.
-                m_LastRenderGraphStats.MinimalRecipeMissingPrerequisiteCount += recipe.MissingPrerequisiteCount;
-            }
-
             const auto compileBegin = std::chrono::steady_clock::now();
             auto compiled = m_RenderGraph.Compile();
             const auto compileEnd = std::chrono::steady_clock::now();
@@ -1534,9 +1511,7 @@ namespace Extrinsic::Graphics
             // (`BarrierValidationClean`) therefore flips to `true` when the
             // recipe-aware validation reports zero `Error`-severity findings.
             const FrameRecipeIntrospection recipeIntrospection =
-                (m_FrameRecipe == Core::Config::FrameRecipeKind::MinimalDebug)
-                    ? DescribeMinimalDebugSurfaceRecipe()
-                    : DescribeDefaultFrameRecipe(defaultRecipeFeatures);
+                DescribeDefaultFrameRecipe(defaultRecipeFeatures);
             // GRAPHICS-076 Slice B — drive the renderer-owned
             // `DebugViewSystem` from the current frame's world + recipe
             // declarations before the executor records the
@@ -1609,10 +1584,8 @@ namespace Extrinsic::Graphics
             // (GRAPHICS-072 future scope). Mirrors the anonymous-namespace
             // `UsesDeferredResources()` predicate inside
             // `Graphics.FrameRecipe.cpp`: any non-forward lighting path uses
-            // deferred resources. The `MinimalDebug` recipe never declares
-            // `"SurfacePass"`, so this flag is unused there.
+            // deferred resources.
             const bool defaultRecipeUsesDeferred =
-                (m_FrameRecipe != Core::Config::FrameRecipeKind::MinimalDebug) &&
                 (defaultRecipeFeatures.LightingPath != FrameRecipeLightingPath::Forward);
             graphicsContext.Begin();
             const auto executeResult = m_RenderGraphExecutor.Execute(
@@ -1711,12 +1684,6 @@ namespace Extrinsic::Graphics
                     else if (passName == std::string_view{"DepthPrepass"})
                     {
                         const RenderCommandPassStatus status = RecordDepthPrepass(graphicsContext, camera, frame.FrameIndex);
-                        AccumulateCommandRecordStatus(passName, status);
-                    }
-                    else if (passName == kMinimalDebugSurfacePassName)
-                    {
-                        const RenderCommandPassStatus status =
-                            RecordMinimalDebugSurfacePass(graphicsContext, camera, frame.FrameIndex);
                         AccumulateCommandRecordStatus(passName, status);
                     }
                     else if (passName == std::string_view{"SurfacePass"} && !defaultRecipeUsesDeferred)
@@ -1849,10 +1816,9 @@ namespace Extrinsic::Graphics
                         // (`slot * 8` for `EntityId`, `slot * 8 + 4` for the
                         // `EncodedSelectionId`). The two copies are wrapped
                         // by `ColorAttachment → TransferSrc → ColorAttachment`
-                        // transitions per the GRAPHICS-033D
-                        // `MinimalDebugReadbackBuffer` pattern, but executed
-                        // *outside* the render pass — so we end it first and
-                        // let the outer `endActiveRenderPass()` skip via the
+                        // transitions and executed *outside* the render pass
+                        // — so we end it first and let the outer
+                        // `endActiveRenderPass()` skip via the
                         // `renderPassEnded` latch. The copy is gated on:
                         //   (a) operational device,
                         //   (b) renderer's `Picking.Readback` buffer wired,
@@ -2311,11 +2277,7 @@ namespace Extrinsic::Graphics
                         // → `SkippedNonOperational`; missing pipeline lease
                         // → `SkippedUnavailable`; otherwise the canonical
                         // fullscreen `BindPipeline + Draw(3, 1, 0, 0)`
-                        // shape records and we return `Recorded`. The
-                        // MinimalDebug scaffold still routes through the
-                        // adjacent branch below so the two present paths
-                        // remain textually side-by-side until
-                        // `GRAPHICS-081` retires the scaffold.
+                        // shape records and we return `Recorded`.
                         const RenderCommandPassStatus status =
                             RecordPresentPass(graphicsContext);
                         AccumulateCommandRecordStatus(passName, status);
@@ -2349,12 +2311,6 @@ namespace Extrinsic::Graphics
                             RecordDebugViewPass(graphicsContext, camera);
                         AccumulateCommandRecordStatus(passName, status);
                     }
-                    else if (passName == kMinimalDebugPresentPassName)
-                    {
-                        const RenderCommandPassStatus status =
-                            RecordMinimalDebugPresentPass(graphicsContext, camera, frame.FrameIndex);
-                        AccumulateCommandRecordStatus(passName, status);
-                    }
                     else
                     {
                         // GRAPHICS-018 §4: surface/deferred/debug pass command bodies
@@ -2380,54 +2336,10 @@ namespace Extrinsic::Graphics
                 {
                     SubmitBarrierPacket(graphicsContext, *compiled, packet);
                 });
-            // GRAPHICS-033D — opt-in MinimalDebug backbuffer-to-host readback.
-            // Inserted after the executor finalises the
-            // `ColorAttachment → Present` transition and before End() closes
-            // the command buffer so the copy executes on the same submit that
-            // produced the visible-triangle pixels. The triplet leaves the
-            // backbuffer back in Present layout so EndFrame's submit + the
-            // device's Present() call still produce a well-formed
-            // vkQueuePresentKHR. The path is gated on (a) operational device,
-            // (b) MinimalDebug recipe, (c) the smoke wired a valid readback
-            // buffer through SetMinimalDebugBackbufferReadbackBuffer(), and
-            // (d) the executor reports a clean Execute so we never copy from
-            // an undefined backbuffer.
-            if (executeResult.has_value() &&
-                m_FrameRecipe == Core::Config::FrameRecipeKind::MinimalDebug &&
-                m_MinimalDebugReadbackBuffer.IsValid() &&
-                m_Device != nullptr && m_Device->IsOperational())
-            {
-                const RHI::TextureHandle backbuffer = m_Device->GetBackbufferHandle(frame);
-                if (backbuffer.IsValid())
-                {
-                    graphicsContext.TextureBarrier(backbuffer,
-                                                    RHI::TextureLayout::Present,
-                                                    RHI::TextureLayout::TransferSrc);
-                    graphicsContext.CopyTextureToBuffer(backbuffer,
-                                                        RHI::TextureLayout::TransferSrc,
-                                                        0u, 0u,
-                                                        m_MinimalDebugReadbackBuffer,
-                                                        0u,
-                                                        // HARDEN-072: pass the explicit "whole mip
-                                                        // extent" sentinel (0,0,0,0) instead of
-                                                        // relying on default arguments — defaults on
-                                                        // this virtual function tripped a Clang 20
-                                                        // C++23-modules vtable mangling bug.
-                                                        0u, 0u, 0u, 0u);
-                    graphicsContext.TextureBarrier(backbuffer,
-                                                    RHI::TextureLayout::TransferSrc,
-                                                    RHI::TextureLayout::Present);
-                    ++m_LastRenderGraphStats.MinimalDebugBackbufferReadbackCopyCount;
-                }
-            }
-            // GRAPHICS-076E — default-recipe sibling to the MinimalDebug
-            // readback triplet above. Keep the hook and counter separate so
-            // default-recipe pixel parity never reuses the scaffold-only
-            // MinimalDebug diagnostic as evidence. The triplet is identical:
+            // GRAPHICS-076E — default-recipe pixel-readback parity hook:
             // copy after the executor's final Present transition and restore
             // Present layout before the command buffer closes.
             if (executeResult.has_value() &&
-                m_FrameRecipe == Core::Config::FrameRecipeKind::Default &&
                 m_DefaultRecipeReadbackBuffer.IsValid() &&
                 m_Device != nullptr && m_Device->IsOperational())
             {
@@ -2834,26 +2746,6 @@ namespace Extrinsic::Graphics
         [[nodiscard]] FrameRecipeLightingPath GetLightingPath() const noexcept override
         {
             return m_LightingPath;
-        }
-
-        void SetFrameRecipe(Core::Config::FrameRecipeKind kind) noexcept override
-        {
-            m_FrameRecipe = kind;
-        }
-
-        [[nodiscard]] Core::Config::FrameRecipeKind GetFrameRecipe() const noexcept override
-        {
-            return m_FrameRecipe;
-        }
-
-        void SetMinimalDebugBackbufferReadbackBuffer(RHI::BufferHandle handle) noexcept override
-        {
-            m_MinimalDebugReadbackBuffer = handle;
-        }
-
-        [[nodiscard]] RHI::BufferHandle GetMinimalDebugBackbufferReadbackBuffer() const noexcept override
-        {
-            return m_MinimalDebugReadbackBuffer;
         }
 
         void SetDefaultRecipeBackbufferReadbackBuffer(RHI::BufferHandle handle) noexcept override
@@ -3737,30 +3629,6 @@ namespace Extrinsic::Graphics
             return desc;
         }
 
-        [[nodiscard]] static RHI::PipelineDesc BuildMinimalVisibleTrianglePipelineDesc(
-            const RHI::Format colorFormat = RHI::Format::RGBA8_UNORM) noexcept
-        {
-            RHI::PipelineDesc desc{};
-            desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
-                "shaders/minimal_debug_visible_triangle.vert.spv");
-            desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
-                "shaders/minimal_debug_visible_triangle.frag.spv");
-            desc.PrimitiveTopology = RHI::Topology::TriangleList;
-            desc.Rasterizer.Culling = RHI::CullMode::None;
-            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
-            desc.Rasterizer.Fill = RHI::FillMode::Solid;
-            desc.DepthStencil.DepthTestEnable = false;
-            desc.DepthStencil.DepthWriteEnable = false;
-            desc.DepthStencil.StencilEnable = false;
-            desc.ColorBlend[0].Enable = false;
-            desc.ColorTargetCount = 1u;
-            desc.ColorTargetFormats[0] = colorFormat;
-            desc.DepthTargetFormat = RHI::Format::Undefined;
-            desc.PushConstantSize = 0u;
-            desc.DebugName = "Renderer.MinimalVisibleTriangle";
-            return desc;
-        }
-
         // GRAPHICS-076 Slice A — canonical default-recipe present pipeline.
         // Pairs with the new `assets/shaders/present.{vert,frag}` shaders:
         // the vertex stage emits the fullscreen triangle (positions
@@ -3773,10 +3641,7 @@ namespace Extrinsic::Graphics
         // because the canonical `PresentPass::Execute()` records only
         // `BindPipeline + Draw(3, 1, 0, 0)`; no per-frame push data is
         // required (the present source binding is descriptor-side, owned
-        // by the backend's pipeline layout). Distinct from
-        // `BuildMinimalVisibleTrianglePipelineDesc(...)` so the
-        // MinimalDebug scaffold can retire with `GRAPHICS-081` without
-        // disturbing the canonical present pipeline.
+        // by the backend's pipeline layout).
         [[nodiscard]] static RHI::PipelineDesc BuildPresentPipelineDesc(
             const RHI::Format colorFormat = RHI::Format::RGBA8_UNORM) noexcept
         {
@@ -4129,41 +3994,17 @@ namespace Extrinsic::Graphics
             // GRAPHICS-031A: canonical missing-material fallback pipeline.
             // Republished byte-identical from BuildDefaultDebugSurfacePipelineDesc()
             // so the descriptor matches across initial init and rebuilds.
-            // GRAPHICS-032B: the MinimalDebugSurface pass leases the same slot-0
-            // pipeline so its recorded command stream matches the
-            // default-debug-surface pipeline byte-for-byte.
             m_DefaultDebugSurfacePipelineLease.reset();
-            m_MinimalDebugPresentPipelineLease.reset();
-            m_MinimalDebugSurfacePass.SetPipeline(RHI::PipelineHandle{});
-            m_MinimalDebugPresentPass.SetPipeline(RHI::PipelineHandle{});
             const RHI::PipelineDesc defaultDebugSurfaceDesc = BuildDefaultDebugSurfacePipelineDesc(m_BackbufferFormat);
             auto defaultDebugSurfacePipeline = m_PipelineManager->Create(defaultDebugSurfaceDesc);
             if (defaultDebugSurfacePipeline.has_value())
             {
                 m_DefaultDebugSurfacePipelineLease.emplace(std::move(*defaultDebugSurfacePipeline));
-                const RHI::PipelineHandle slotZeroPipeline =
-                    m_PipelineManager->GetDeviceHandle(m_DefaultDebugSurfacePipelineLease->GetHandle());
-                m_MinimalDebugSurfacePass.SetPipeline(slotZeroPipeline);
             }
             else
             {
                 Core::Log::Warn("[Graphics] DefaultDebugSurface pipeline unavailable; fallback recording will be skipped: error={}",
                                 static_cast<int>(defaultDebugSurfacePipeline.error()));
-            }
-
-            const RHI::PipelineDesc minimalVisibleTriangleDesc =
-                BuildMinimalVisibleTrianglePipelineDesc(m_BackbufferFormat);
-            auto minimalVisibleTrianglePipeline = m_PipelineManager->Create(minimalVisibleTriangleDesc);
-            if (minimalVisibleTrianglePipeline.has_value())
-            {
-                m_MinimalDebugPresentPipelineLease.emplace(std::move(*minimalVisibleTrianglePipeline));
-                m_MinimalDebugPresentPass.SetPipeline(
-                    m_PipelineManager->GetDeviceHandle(m_MinimalDebugPresentPipelineLease->GetHandle()));
-            }
-            else
-            {
-                Core::Log::Warn("[Graphics] MinimalVisibleTriangle pipeline unavailable; present recording will be skipped: error={}",
-                                static_cast<int>(minimalVisibleTrianglePipeline.error()));
             }
 
             // GRAPHICS-070 — forward surface pipeline. Drop the lease before
@@ -4843,13 +4684,13 @@ namespace Extrinsic::Graphics
             }
 
             // GRAPHICS-076 Slice A — canonical default-recipe present
-            // pipeline. Created LAST so the test fixtures that target
-            // `FailPipelineCreateCall` against specific upstream pipelines
-            // (culling=1, depth=2, defaultDebugSurface=3,
-            // minimalVisibleTriangle=4, forward/shadow/deferred at 5-10,
-            // selection at 11-15, postprocess at 16-23) keep their
-            // documented call indices unchanged. The present slot is
-            // call #24. Same reset/republish + fail-closed pattern as
+            // pipeline. Created after postprocess so the test fixtures that
+            // target `FailPipelineCreateCall` against specific upstream
+            // pipelines (culling=1, depth=2, defaultDebugSurface=3,
+            // forward/shadow/deferred at 4-9, selection at 10-14,
+            // postprocess at 15-22) keep their documented call indices
+            // explicit. The present slot is call #23. Same reset/republish
+            // + fail-closed pattern as
             // the other leases above so a failed `Create()` leaves
             // `m_PresentPass` in the fail-closed state that
             // `RecordPresentPass` interprets as `SkippedUnavailable`.
@@ -4871,13 +4712,13 @@ namespace Extrinsic::Graphics
             }
 
             // GRAPHICS-076 Slice B — canonical default-recipe `Pass.DebugView`
-            // pipeline. Created LAST so the test fixtures that target
-            // `FailPipelineCreateCall` against specific upstream pipelines
-            // (culling=1, depth=2, defaultDebugSurface=3,
-            // minimalVisibleTriangle=4, forward/shadow/deferred at 5-10,
-            // selection at 11-15, postprocess at 16-23, present=24) keep
-            // their documented call indices unchanged. The DebugView slot
-            // is call #25. Same reset/republish + fail-closed pattern as
+            // pipeline. Created after present so the test fixtures that
+            // target `FailPipelineCreateCall` against specific upstream
+            // pipelines (culling=1, depth=2, defaultDebugSurface=3,
+            // forward/shadow/deferred at 4-9, selection at 10-14,
+            // postprocess at 15-22, present=23) keep their documented call
+            // indices explicit. The DebugView slot is call #24. Same
+            // reset/republish + fail-closed pattern as
             // the other leases above so a failed `Create()` leaves
             // `m_DebugViewPass` in the fail-closed state that
             // `RecordDebugViewPass` interprets as `SkippedUnavailable`.
@@ -4908,16 +4749,15 @@ namespace Extrinsic::Graphics
             // `FailPipelineCreateCall` against specific upstream
             // pipelines keep their documented call indices unchanged
             // (culling=1, depth=2, defaultDebugSurface=3,
-            // minimalVisibleTriangle=4, forward/shadow/deferred=5-10,
-            // selection=11-15, postprocess=16-23, present=24,
-            // debugView=25). Slice B introduced the triangle
-            // DepthTested slot at call #26 and the triangle
-            // AlwaysOnTop slot at call #27. Slice C appends the line
-            // DepthTested slot at call #28, the line AlwaysOnTop slot
-            // at call #29, the point DepthTested slot at call #30,
-            // and the point AlwaysOnTop slot at call #31 — keeping
+            // forward/shadow/deferred=4-9, selection=10-14,
+            // postprocess=15-22, present=23, debugView=24). Slice B
+            // introduced the triangle DepthTested slot at call #25 and the
+            // triangle AlwaysOnTop slot at call #26. Slice C appends the line
+            // DepthTested slot at call #27, the line AlwaysOnTop slot at call
+            // #28, the point DepthTested slot at call #29, and the point
+            // AlwaysOnTop slot at call #30 — keeping
             // the earlier call indices stable so the Slice B contract
-            // tests that pin `FailPipelineCreateCall = 26` still
+            // tests that pin `FailPipelineCreateCall = 25` still
             // exercise the triangle DepthTested gate. Same
             // reset/republish + fail-closed pattern as the other
             // leases above so a failed `Create()` leaves the pass in
@@ -4934,10 +4774,10 @@ namespace Extrinsic::Graphics
             m_TransientDebugPointPipelineLeaseAlwaysOnTop.reset();
             // GRAPHICS-078 Slices B + C — visualization-overlay pipelines.
             // Created after the GRAPHICS-077 point-lane pipelines so call
-            // indices stay stable: vector-field DepthTested at call #32
-            // (immediately after point AlwaysOnTop at #31), vector-field
-            // AlwaysOnTop at #33, isoline DepthTested at #34, isoline
-            // AlwaysOnTop at #35.
+            // indices stay stable: vector-field DepthTested at call #31
+            // (immediately after point AlwaysOnTop at #30), vector-field
+            // AlwaysOnTop at #32, isoline DepthTested at #33, isoline
+            // AlwaysOnTop at #34.
             m_VisualizationOverlayVectorFieldPipelineLeaseDepthTested.reset();
             m_VisualizationOverlayVectorFieldPipelineLeaseAlwaysOnTop.reset();
             m_VisualizationOverlayIsolinePipelineLeaseDepthTested.reset();
@@ -5068,7 +4908,7 @@ namespace Extrinsic::Graphics
             }
 
             // GRAPHICS-078 Slice B — visualization-overlay vector-
-            // field pipelines (call indices #32 + #33). Same
+            // field pipelines (call indices #31 + #32). Same
             // reset/republish + fail-closed pattern as the transient-
             // debug pipelines above so a failed `Create()` leaves
             // `m_VisualizationOverlayPass` in the fail-closed state
@@ -5117,7 +4957,7 @@ namespace Extrinsic::Graphics
             }
 
             // GRAPHICS-078 Slice C — visualization-overlay isoline
-            // pipelines (call indices #34 + #35). Same reset/republish
+            // pipelines (call indices #33 + #34). Same reset/republish
             // + fail-closed pattern as the vector-field pipelines above
             // so a failed `Create()` leaves the isoline lane's accessors
             // at `RHI::PipelineHandle{}`; `RecordVisualizationOverlayPass`
@@ -6294,95 +6134,8 @@ namespace Extrinsic::Graphics
             return RenderCommandPassStatus::Recorded;
         }
 
-        // GRAPHICS-032B — minimal-debug-surface CPU-mock command body. The pass
-        // shares the GRAPHICS-031A slot-0 default-debug-surface pipeline lease
-        // and draws against the SurfaceOpaque cull bucket. Missing prerequisites
-        // (slot-0 lease, SurfaceOpaque bucket residency, or GpuWorld scene table)
-        // soft-skip to SkippedUnavailable and additionally bump
-        // MinimalRecipeMissingPrerequisiteCount so the diagnostic surfaces
-        // record-site gaps in addition to the recipe-build-time count.
-        [[nodiscard]] RenderCommandPassStatus RecordMinimalDebugSurfacePass(RHI::ICommandContext& cmd,
-                                                                            const RHI::CameraUBO& camera,
-                                                                            const std::uint32_t frameIndex)
-        {
-            (void)cmd;
-            (void)camera;
-            (void)frameIndex;
-            if (m_Device == nullptr || !m_Device->IsOperational())
-            {
-                return RenderCommandPassStatus::SkippedNonOperational;
-            }
-
-            const bool pipelineReady = m_DefaultDebugSurfacePipelineLease.has_value() &&
-                                       m_DefaultDebugSurfacePipelineLease->IsValid() &&
-                                       m_MinimalDebugSurfacePass.GetPipeline().IsValid();
-            const bool gpuWorldReady = m_GpuWorld.has_value();
-            // BUG-009: the surface pass records `DrawIndexedIndirectCount`
-            // against the SurfaceOpaque bucket buffers, which are populated by
-            // `RecordCullingPass`. When the culling pipeline failed to build,
-            // `m_CullingOutputAvailable` is false and the culling dispatch is
-            // skipped, so the indirect arg/count buffers — even though their
-            // handles remain allocated by `CullingSystem::AllocateGpuBuffers`
-            // — are never written this frame. Gate the minimal-recipe surface
-            // pass on the same `m_CullingOutputAvailable` flag used by
-            // `RecordCullingPass`/`RecordDepthPrepass` so the prerequisite
-            // check matches the live culling-output contract.
-            bool bucketReady = false;
-            if (m_CullingOutputAvailable && m_CullingSystem.has_value())
-            {
-                const auto& bucket = m_CullingSystem->GetBucket(RHI::GpuDrawBucketKind::SurfaceOpaque);
-                bucketReady = bucket.Indexed && bucket.IndexedArgsBuffer.IsValid() &&
-                              bucket.CountBuffer.IsValid() && bucket.Capacity > 0u;
-            }
-
-            if (!pipelineReady || !gpuWorldReady || !bucketReady)
-            {
-                ++m_LastRenderGraphStats.MinimalRecipeMissingPrerequisiteCount;
-                return RenderCommandPassStatus::SkippedUnavailable;
-            }
-
-            ++m_LastRenderGraphStats.MinimalSurfacePassExecutions;
-            return RenderCommandPassStatus::Recorded;
-        }
-
-        // GRAPHICS-033D prerequisite: once MinimalDebug records against real
-        // Vulkan dynamic rendering, the finalizer must not issue the older
-        // CPU-mock `Draw(3)` with the BDA default-debug-surface pipeline. That
-        // pipeline requires the same scene-table push constants and indexed
-        // reference-triangle inputs as `Pass.Surface.MinimalDebug`; replay that
-        // parameterized draw body into the backbuffer render pass so the smoke
-        // has a legal visible-triangle producer until GRAPHICS-081 removes the
-        // scaffold.
-        [[nodiscard]] RenderCommandPassStatus RecordMinimalDebugPresentPass(RHI::ICommandContext& cmd,
-                                                                            const RHI::CameraUBO& camera,
-                                                                            const std::uint32_t frameIndex)
-        {
-            (void)camera;
-            (void)frameIndex;
-            if (m_Device == nullptr || !m_Device->IsOperational())
-            {
-                return RenderCommandPassStatus::SkippedNonOperational;
-            }
-
-            const bool pipelineReady = m_MinimalDebugPresentPipelineLease.has_value() &&
-                                       m_MinimalDebugPresentPipelineLease->IsValid() &&
-                                       m_MinimalDebugPresentPass.GetPipeline().IsValid();
-            if (!pipelineReady)
-            {
-                ++m_LastRenderGraphStats.MinimalRecipeMissingPrerequisiteCount;
-                return RenderCommandPassStatus::SkippedUnavailable;
-            }
-
-            m_MinimalDebugPresentPass.Execute(cmd);
-            ++m_LastRenderGraphStats.MinimalPresentPassExecutions;
-            return RenderCommandPassStatus::Recorded;
-        }
-
         // GRAPHICS-076 Slice A — canonical default-recipe present executor
-        // helper. Mirrors `RecordMinimalDebugPresentPass` but drives the
-        // canonical `PresentPass` (sampling `FrameRecipe.PresentSource`)
-        // instead of the MinimalDebug scaffold (rendering a fixed-color
-        // triangle). The `PresentPass::Execute()` body records the
+        // helper. The `PresentPass::Execute()` body records the
         // `BindPipeline + Draw(3, 1, 0, 0)` shape unconditionally when its
         // pipeline handle is valid, so the helper only needs the
         // device-operational / pipeline-lease prerequisite checks the rest
@@ -6835,8 +6588,6 @@ namespace Extrinsic::Graphics
         std::vector<std::vector<RHI::BufferDesc>>    m_FrameTransientBufferDescs{};
         Core::Dag::TaskGraph                 m_RenderPrepGraph{Core::Dag::QueueDomain::Cpu};
         DepthPrepassPass                     m_DepthPrepassPass;
-        MinimalDebugSurfacePass              m_MinimalDebugSurfacePass;
-        MinimalDebugPresentPass              m_MinimalDebugPresentPass;
         // GRAPHICS-076 Slice A — canonical default-recipe present pass.
         // Default-constructed (no system dependency); the publisher in
         // `InitializeOperationalPassResources(device)` calls
@@ -6844,9 +6595,8 @@ namespace Extrinsic::Graphics
         // `Execute(cmd)` records the `BindPipeline + Draw(3, 1, 0, 0)`
         // shape unconditionally when its cached pipeline handle is valid,
         // matching the contract enforced by the new `PresentPassContract`
-        // tests. Lifetime contract mirrors `m_MinimalDebugPresentPass`
-        // above: lives for the renderer's full lifetime, pipeline handle
-        // zeroed in `Shutdown()` before `m_PipelineManager` is reset.
+        // tests. Lives for the renderer's full lifetime, with its pipeline
+        // handle zeroed in `Shutdown()` before `m_PipelineManager` is reset.
         PresentPass                          m_PresentPass;
         // GRAPHICS-076 Slice B — canonical default-recipe `DebugViewSystem`
         // + `DebugViewPass`. The system owns resource inspection /
@@ -6985,21 +6735,19 @@ namespace Extrinsic::Graphics
         std::optional<PostProcessHistogramPass> m_PostProcessHistogramPass;
         std::optional<RHI::PipelineManager::PipelineLease> m_DepthPrepassPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_DefaultDebugSurfacePipelineLease;
-        std::optional<RHI::PipelineManager::PipelineLease> m_MinimalDebugPresentPipelineLease;
         // GRAPHICS-076 Slice A — canonical default-recipe present pipeline
-        // lease. Same reset/republish pattern as the MinimalDebug present
-        // lease above so a failed `Create()` leaves `m_PresentPass` in
-        // the fail-closed state that `RecordPresentPass` interprets as
+        // lease. A failed `Create()` leaves `m_PresentPass` in the
+        // fail-closed state that `RecordPresentPass` interprets as
         // `SkippedUnavailable`.
         std::optional<RHI::PipelineManager::PipelineLease> m_PresentPipelineLease;
         // GRAPHICS-076 Slice B — canonical default-recipe `Pass.DebugView`
         // pipeline lease. Same reset/republish pattern as the present
         // lease above so a failed `Create()` leaves `m_DebugViewPass` in
         // the fail-closed state that `RecordDebugViewPass` interprets as
-        // `SkippedUnavailable`. Created LAST inside
-        // `InitializeOperationalPassResources()` (call #25, immediately
-        // after present at #24) so the existing
-        // `FailPipelineCreateCall` indices (1-24) used by other lifecycle
+        // `SkippedUnavailable`. Created after present inside
+        // `InitializeOperationalPassResources()` (call #24, immediately
+        // after present at #23) so the existing
+        // `FailPipelineCreateCall` indices (1-23) used by other lifecycle
         // tests remain stable.
         std::optional<RHI::PipelineManager::PipelineLease> m_DebugViewPipelineLease;
         // GRAPHICS-079 Slice A — canonical default-recipe `Pass.ImGui`
@@ -7019,21 +6767,21 @@ namespace Extrinsic::Graphics
         // the fail-closed state that `RecordTransientDebugSurfacePass`
         // interprets as `SkippedUnavailable` (with
         // `MissingPipelineSkipCount += 1` per operational-no-pipeline
-        // frame). Created LAST inside
+        // frame). Created after debug-view inside
         // `InitializeOperationalPassResources()` — depth-tested at
-        // call #26 (immediately after debug-view at #25) and
-        // always-on-top at call #27 — so the existing
-        // `FailPipelineCreateCall` indices (1-25) used by other
+        // call #25 (immediately after debug-view at #24) and
+        // always-on-top at call #26 — so the existing
+        // `FailPipelineCreateCall` indices (1-24) used by other
         // lifecycle tests remain stable.
         std::optional<RHI::PipelineManager::PipelineLease> m_TransientDebugTrianglePipelineLeaseDepthTested;
         std::optional<RHI::PipelineManager::PipelineLease> m_TransientDebugTrianglePipelineLeaseAlwaysOnTop;
         // GRAPHICS-077 Slice C — transient-debug line + point pipelines.
         // Same reset/republish + fail-closed pattern as the triangle
-        // leases above. Created at call indices #28 (line DepthTested),
-        // #29 (line AlwaysOnTop), #30 (point DepthTested), and #31
+        // leases above. Created at call indices #27 (line DepthTested),
+        // #28 (line AlwaysOnTop), #29 (point DepthTested), and #30
         // (point AlwaysOnTop) inside `InitializeOperationalPassResources()`
         // so the Slice B contract tests that pin
-        // `FailPipelineCreateCall = 26` still exercise the triangle
+        // `FailPipelineCreateCall = 25` still exercise the triangle
         // DepthTested gate without disturbance.
         std::optional<RHI::PipelineManager::PipelineLease> m_TransientDebugLinePipelineLeaseDepthTested;
         std::optional<RHI::PipelineManager::PipelineLease> m_TransientDebugLinePipelineLeaseAlwaysOnTop;
@@ -7049,11 +6797,11 @@ namespace Extrinsic::Graphics
         // per operational-no-pipeline frame). Created after the
         // GRAPHICS-077 point-lane pipelines inside
         // `InitializeOperationalPassResources()` — depth-tested at
-        // call #32 (immediately after point AlwaysOnTop at #31) and
-        // always-on-top at call #33 — so the existing
-        // `FailPipelineCreateCall` indices (1-31) used by other
+        // call #31 (immediately after point AlwaysOnTop at #30) and
+        // always-on-top at call #32 — so the existing
+        // `FailPipelineCreateCall` indices (1-30) used by other
         // lifecycle tests remain stable. The Slice C isoline lane
-        // will append at call indices #34 + #35.
+        // will append at call indices #33 + #34.
         std::optional<RHI::PipelineManager::PipelineLease> m_VisualizationOverlayVectorFieldPipelineLeaseDepthTested;
         std::optional<RHI::PipelineManager::PipelineLease> m_VisualizationOverlayVectorFieldPipelineLeaseAlwaysOnTop;
         // GRAPHICS-078 Slice C — visualization-overlay isoline
@@ -7061,11 +6809,11 @@ namespace Extrinsic::Graphics
         // top); same reset/republish + fail-closed pattern as the
         // vector-field leases above. Created after the vector-field
         // pipelines inside `InitializeOperationalPassResources()` —
-        // depth-tested at call #34 (immediately after vector-field
-        // AlwaysOnTop at #33) and always-on-top at call #35 — so the
-        // existing `FailPipelineCreateCall` indices (1-33) used by
+        // depth-tested at call #33 (immediately after vector-field
+        // AlwaysOnTop at #32) and always-on-top at call #34 — so the
+        // existing `FailPipelineCreateCall` indices (1-32) used by
         // other lifecycle tests remain stable. New Slice C tests
-        // target `FailPipelineCreateCall = 34` for the per-lane
+        // target `FailPipelineCreateCall = 33` for the per-lane
         // missing-pipeline taxonomy.
         std::optional<RHI::PipelineManager::PipelineLease> m_VisualizationOverlayIsolinePipelineLeaseDepthTested;
         std::optional<RHI::PipelineManager::PipelineLease> m_VisualizationOverlayIsolinePipelineLeaseAlwaysOnTop;
@@ -7236,24 +6984,14 @@ namespace Extrinsic::Graphics
         bool                                 m_CullingOutputAvailable{false};
         bool                                 m_HasExtractedRenderWorld{false};
         bool                                 m_HasPreparedFrame{false};
-        Core::Config::FrameRecipeKind        m_FrameRecipe{Core::Config::FrameRecipeKind::Default};
         // GRAPHICS-072 Slice A — renderer-stored lighting-path override
         // applied after `DeriveDefaultFrameRecipeFeatures(world)`. Default is
         // `Forward` so the legacy contract tests stay green; contract tests
         // can flip this to `Deferred` via `SetLightingPath(...)` to drive the
         // `"SurfacePass"` deferred executor branch added in this slice.
         FrameRecipeLightingPath              m_LightingPath{FrameRecipeLightingPath::Forward};
-        // GRAPHICS-033D — opt-in readback target wired by the smoke fixture
-        // through SetMinimalDebugBackbufferReadbackBuffer(). Invalid handle =
-        // readback disabled (default), so the executor's standard
-        // ColorAttachment → Present transition is unchanged for every other
-        // caller. Retired together with the MinimalDebug recipe by
-        // GRAPHICS-081.
-        RHI::BufferHandle                    m_MinimalDebugReadbackBuffer{};
         // GRAPHICS-076E — opt-in default-recipe readback target. Invalid
-        // handle = disabled (default). Separate from MinimalDebug so scaffold
-        // retirement can verify default-recipe pixel parity with independent
-        // diagnostics.
+        // handle = disabled (default).
         RHI::BufferHandle                    m_DefaultRecipeReadbackBuffer{};
         RenderGraphFrameStats                m_LastRenderGraphStats;
     };

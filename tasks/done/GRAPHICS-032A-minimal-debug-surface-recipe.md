@@ -3,7 +3,11 @@
 ## Goal
 - Add the second frame recipe declared by `GRAPHICS-032`: `FrameRecipe::MinimalDebugSurface` with stable label `"recipe.minimal-debug-surface"`. The recipe declares exactly two passes (`Pass.Surface.MinimalDebug` then `Pass.Present.MinimalDebug`), exposes transient `SceneColorHDR` and `SceneDepth`, finalizes the imported `Backbuffer` through the existing fullscreen-triangle present contract, and exposes the three diagnostic counters (`MinimalSurfacePassExecutions`, `MinimalPresentPassExecutions`, `MinimalRecipeMissingPrerequisiteCount`).
 
-> **Scaffold notice.** Everything authored by this task is bootstrap-only and is removed by [`GRAPHICS-081`](../backlog/rendering/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md) once the canonical default recipe records every pass body operationally (`GRAPHICS-070..076`). Do not build long-lived call sites on `BuildMinimalDebugSurfaceRecipe`, `FrameRecipeKind::MinimalDebug`, the `MinimalDebugSurface`/`MinimalDebugPresent` pass classes, or the three minimal-recipe diagnostics counters.
+> **Scaffold notice.** Everything authored by this task was bootstrap-only and was removed by [`GRAPHICS-081`](GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md) after the canonical default recipe recorded every pass body operationally (`GRAPHICS-070..076`). Do not build long-lived call sites on `BuildMinimalDebugSurfaceRecipe`, `FrameRecipeKind::MinimalDebug`, the `MinimalDebugSurface`/`MinimalDebugPresent` pass classes, or the three minimal-recipe diagnostics counters.
+
+## Retirement note
+
+- Retired by [`GRAPHICS-081`](GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md) on 2026-06-02. The bootstrap recipe, selector, diagnostics counters, tests, and module-inventory rows authored by this task are deleted; the default recipe is the canonical visible-triangle path.
 
 ## Non-goals
 - No CPU-mock command body for `Pass.Surface.MinimalDebug` (that is `GRAPHICS-032B`).

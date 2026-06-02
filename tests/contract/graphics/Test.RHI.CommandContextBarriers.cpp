@@ -46,6 +46,18 @@ namespace
             BufferCalls.push_back({buffer, before, after});
         }
 
+        void SubmitBarriers(const Extrinsic::RHI::BarrierBatchDesc& batch) override
+        {
+            for (const Extrinsic::RHI::TextureBarrierDesc& barrier : batch.TextureBarriers)
+            {
+                TextureBarrier(barrier.Texture, barrier.BeforeLayout, barrier.AfterLayout);
+            }
+            for (const Extrinsic::RHI::BufferBarrierDesc& barrier : batch.BufferBarriers)
+            {
+                BufferBarrier(barrier.Buffer, barrier.BeforeAccess, barrier.AfterAccess);
+            }
+        }
+
         void FillBuffer(Extrinsic::RHI::BufferHandle, std::uint64_t, std::uint64_t, std::uint32_t) override {}
         void CopyBuffer(Extrinsic::RHI::BufferHandle, Extrinsic::RHI::BufferHandle, std::uint64_t, std::uint64_t, std::uint64_t) override {}
         void CopyBufferToTexture(Extrinsic::RHI::BufferHandle, std::uint64_t, Extrinsic::RHI::TextureHandle, std::uint32_t, std::uint32_t) override {}

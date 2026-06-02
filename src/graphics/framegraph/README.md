@@ -15,53 +15,36 @@ state, or asset-service traffic.
   emits barrier packets in pass order.
 - `graphics/vulkan` lowers compiled graph resources/barriers/commands to native
   Vulkan objects and owns swapchain/acquire/present mechanics.
-- `runtime` selects recipes and submits immutable render snapshots; graphics never
-  queries live ECS ownership.
+- `runtime` submits immutable render snapshots; graphics never queries live ECS
+  ownership.
 
-## GRAPHICS-032 minimal recipe contract
+## Default Recipe Contract
 
-GRAPHICS-032A records `FrameRecipe::MinimalDebugSurface` as an opt-in
-renderer-owned recipe contract with the stable label
-`recipe.minimal-debug-surface`. The recipe is built by
-`BuildMinimalDebugSurfaceRecipe(graph, imports, sizing)` in
-`Extrinsic.Graphics.FrameRecipe`, declared by `DescribeMinimalDebugSurfaceRecipe()`,
-and reachable from the renderer through the
-`Core::Config::FrameRecipeKind::MinimalDebug` selector wired into
-`IRenderer::SetFrameRecipe()`. The framegraph treats it like any other recipe:
-two pass declarations (`Pass.Surface.MinimalDebug` then
-`Pass.Present.MinimalDebug`), transient `SceneColorHDR` and `SceneDepth`
-resources, and one imported `Backbuffer` writable only by the present declaration.
+The canonical renderer recipe is built by
+`BuildDefaultFrameRecipe(graph, features, imports, sizing, shadowSizing)` in
+`Extrinsic.Graphics.FrameRecipe` and declared by
+`DescribeDefaultFrameRecipe(features)`. The framegraph treats those declarations
+as the single source of truth for imported-resource write authorization,
+transient-resource lifetime, pass ordering, and final backbuffer presentation.
 
-The framegraph compiler infers the required transitions from declared uses:
-`SceneColorHDR` color-attachment write in the surface pass to sampled input in the
-present pass, and a transient depth-attachment lifetime for `SceneDepth`. The
-minimal recipe does not introduce recipe-local barrier annotations or special
-backbuffer-write exceptions.
+The framegraph compiler infers required transitions from declared uses: draw
+passes write `SceneColorHDR` and related intermediate attachments, optional
+postprocess/debug/UI passes move the current `FrameRecipe.PresentSource`, and
+the canonical `Present` declaration writes the imported `Backbuffer`. The
+post-pass `ColorAttachmentWrite -> Present` transition is emitted from
+`RenderGraph::ImportBackbuffer`'s final-state contract; there is no recipe-local
+barrier annotation or special backbuffer-write exception.
 
-Recipe-vs-default isolation is mandatory: compiling the minimal recipe must not
-mutate or globally reconfigure the default recipe's pass set, feature gates,
-validation expectations, or skip/no-op statuses. Tests for the minimal recipe
-should assert compiled graph/resource properties by pass label and resource name,
-not transient allocation IDs or backend-native handles.
+Tests should assert compiled graph/resource properties by pass label and resource
+name, not transient allocation IDs or backend-native handles.
 
-> **Scaffold notice.** `BuildMinimalDebugSurfaceRecipe`, the
-> `MinimalDebug{Surface,Present}` pass labels, and the three minimal-recipe
-> diagnostics counters introduced alongside this recipe are bootstrap-only and
-> are removed by `GRAPHICS-081` once the canonical default recipe records every
-> pass body operationally (`GRAPHICS-070..076`).
+## Default-Recipe `gpu;vulkan` Smoke
 
-## GRAPHICS-032D minimal-recipe `gpu;vulkan` smoke
-
-The opt-in recipe-selector smoke landed via `GRAPHICS-032D` as
-`MinimalDebugSurfaceGpuSmoke.RecipeSelectorReachesOperationalVulkanCommandStream`
-in `tests/integration/graphics/Test.MinimalDebugSurfaceGpuSmoke.cpp`. It drives
-one operational frame of `FrameRecipe::MinimalDebugSurface` and asserts only the
-per-frame recipe-selector counters
-(`MinimalSurfacePassExecutions == 1`, `MinimalPresentPassExecutions == 1`,
-`MinimalRecipeMissingPrerequisiteCount == 0`, and the default-disabled
-`MinimalDebugBackbufferReadbackCopyCount == 0`); pixel readback remains exclusive
-to the sibling `GRAPHICS-033D` fixture in the same file. Both share the bounded
-`engine.Run()` bootstrap so the driver loop is not duplicated. The fixture is
-labelled `gpu;vulkan;graphics` and is selected only via
-`ctest -L 'gpu' -L 'vulkan' …`; the default CPU gate excludes it. Scaffold
-retirement remains owned by `GRAPHICS-081`.
+The opt-in default-recipe smoke coverage lives in
+`tests/integration/graphics/Test.DefaultRecipeSurfaceGpuSmoke.cpp`. It drives the
+canonical recipe on promoted Vulkan hosts, asserts that the operational command
+stream records canonical passes such as `Present`, and keeps the four-sample
+backbuffer-readback parity harness under `gpu;vulkan;graphics`. The fixture is
+selected only via `ctest -L 'gpu' -L 'vulkan' ...`; the default CPU gate excludes
+it and the tests report `SKIPPED` when GLFW or a Vulkan-capable swapchain/device
+is unavailable.

@@ -93,9 +93,9 @@ VulkanOperationalStatus EvaluateVulkanOperationalStatus(
                 VulkanOperationalReason::ValidationLayerError};
 
     // 8. Higher-level operational completeness (incomplete-gate reasons).
-    if (!inputs.MinimalRecipeRecordingPresent)
+    if (!inputs.DefaultRecipeRecordingPresent)
         return {VulkanOperationalStatusCode::RequestedButIncompleteGate,
-                VulkanOperationalReason::MinimalRecipeRecordingMissing};
+                VulkanOperationalReason::DefaultRecipeRecordingMissing};
     if (!inputs.BarrierValidationClean)
         return {VulkanOperationalStatusCode::RequestedButIncompleteGate,
                 VulkanOperationalReason::BarrierValidationFailed};
@@ -135,7 +135,7 @@ std::string_view ToString(const VulkanOperationalReason reason) noexcept
     case VulkanOperationalReason::AllocatorFailed:                   return "AllocatorFailed";
     case VulkanOperationalReason::SwapchainFailed:                   return "SwapchainFailed";
     case VulkanOperationalReason::CommandSyncFailed:                 return "CommandSyncFailed";
-    case VulkanOperationalReason::MinimalRecipeRecordingMissing:     return "MinimalRecipeRecordingMissing";
+    case VulkanOperationalReason::DefaultRecipeRecordingMissing:     return "DefaultRecipeRecordingMissing";
     case VulkanOperationalReason::BarrierValidationFailed:           return "BarrierValidationFailed";
     case VulkanOperationalReason::PublicServiceReconciliationFailed: return "PublicServiceReconciliationFailed";
     case VulkanOperationalReason::ValidationLayerError:              return "ValidationLayerError";

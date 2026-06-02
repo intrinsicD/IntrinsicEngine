@@ -7,17 +7,17 @@
 - Do not implement missing pass command bodies in this task.
 - Do not redesign `ICommandContext`.
 - Do not change the default frame recipe's feature set.
-- Do not remove the MinimalDebug scaffold unless a separate retirement task authorizes it.
+- Do not reintroduce the retired bootstrap recipe scaffold while changing routing.
 
 ## Context
-- Current frame execution compares pass names like `CullingPass`, `DepthPrepass`, and MinimalDebug pass names to decide what command body to record.
+- Current frame execution compares pass names like `CullingPass`, `DepthPrepass`, and canonical default-recipe pass names to decide what command body to record.
 - This is fragile because rename/debug-label changes can affect execution.
 - WORKSHOP-003 provides typed pass identity; this task consumes it.
 
 ## Required changes
 - [ ] Introduce a renderer-owned `RenderCommandRouter` module/class under `src/graphics/renderer/`.
 - [ ] Register command recorders by typed pass ID.
-- [ ] Move current command-recording branches for culling, depth prepass, MinimalDebug surface, and MinimalDebug present into router registrations.
+- [ ] Move current command-recording branches for culling, depth prepass, surface, and present into router registrations.
 - [ ] Preserve current skipped-status behavior:
   - `SkippedNonOperational` when device is missing/non-operational.
   - `SkippedUnavailable` when required pass resources are unavailable.
@@ -31,7 +31,7 @@
 - [ ] Add contract tests proving command routing uses typed pass IDs, not debug string names.
 - [ ] Add a test where a pass debug name changes but the typed ID remains the same and routing still succeeds.
 - [ ] Add tests for unknown/unimplemented typed pass IDs producing `SkippedUnavailable` diagnostics.
-- [ ] Update MinimalDebug and depth/culling pass contract tests to assert router behavior.
+- [ ] Update surface/present and depth/culling pass contract tests to assert router behavior.
 - [ ] Keep renderer frame lifecycle tests passing.
 
 ## Docs

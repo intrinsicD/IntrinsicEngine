@@ -19,11 +19,10 @@ namespace Extrinsic::Graphics
 
         void SetPipeline(RHI::PipelineHandle pipeline) noexcept;
 
-        // GRAPHICS-076 Slice B — accessor mirroring
-        // `PresentPass::GetPipeline()` / `MinimalDebugPresentPass::GetPipeline()`
+        // GRAPHICS-076 Slice B — accessor mirroring `PresentPass::GetPipeline()`
         // so the renderer's fail-closed `RecordDebugViewPass` prerequisite
-        // check observes the same shape on every canonical
-        // default-recipe pass path. The pass body short-circuits on
+        // check observes the same shape on every canonical default-recipe pass
+        // path. The pass body short-circuits on
         // `!m_Pipeline.IsValid()` internally; surfacing the handle lets
         // the executor return `SkippedUnavailable` deterministically
         // instead of silently recording a no-op.
@@ -36,4 +35,3 @@ namespace Extrinsic::Graphics
         RHI::PipelineHandle m_Pipeline{};
     };
 }
-

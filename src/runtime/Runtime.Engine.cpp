@@ -232,11 +232,10 @@ namespace Extrinsic::Runtime
         m_Window   = Platform::CreateWindow(m_Config.Window);
         m_Device   = CreateDevice(m_Config.Render);
         const Platform::Extent2D initialExtent = m_Window->GetFramebufferExtent();
-        m_Device->Initialize(RHI::DeviceCreateDesc{
-            .RenderConfig             = m_Config.Render,
-            .InitialFramebufferExtent = initialExtent,
-            .NativeWindowHandle       = m_Window->GetNativeHandle(),
-        });
+        m_Device->Initialize(RHI::MakeDeviceCreateDesc(
+            m_Config.Render,
+            initialExtent,
+            m_Window->GetNativeHandle()));
 
         // GRAPHICS-033B: emit the Vulkan-requested-but-not-operational
         // breadcrumb and bump the operational diagnostics counters exactly
@@ -267,7 +266,6 @@ namespace Extrinsic::Runtime
 
         m_Renderer = Graphics::CreateRenderer();
         m_Renderer->Initialize(*m_Device);
-        m_Renderer->SetFrameRecipe(m_Config.Render.FrameRecipe);
         m_RendererOperational = m_Device->IsOperational();
 
         // ── 2c. Runtime-side Dear ImGui adapter (RUNTIME-090 / GRAPHICS-079) ─

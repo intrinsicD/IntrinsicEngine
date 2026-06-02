@@ -138,6 +138,17 @@ namespace
             Events.push_back({.Kind = EventKind::BufferBarrier});
             BufferBarrierCalls.push_back({.Buffer = buffer, .Before = before, .After = after});
         }
+        void SubmitBarriers(const RHI::BarrierBatchDesc& batch) override
+        {
+            for (const RHI::TextureBarrierDesc& barrier : batch.TextureBarriers)
+            {
+                TextureBarrier(barrier.Texture, barrier.BeforeLayout, barrier.AfterLayout);
+            }
+            for (const RHI::BufferBarrierDesc& barrier : batch.BufferBarriers)
+            {
+                BufferBarrier(barrier.Buffer, barrier.BeforeAccess, barrier.AfterAccess);
+            }
+        }
         void FillBuffer(RHI::BufferHandle buffer,
                         std::uint64_t offset,
                         std::uint64_t size,
@@ -1396,7 +1407,6 @@ TEST(GraphicsPostProcessChainContract, PassesSkipMissingPipelineOrDisabledChain)
     missingPipeline.Execute(missingPipelineCmd, camera);
     EXPECT_TRUE(missingPipelineCmd.Events.empty());
 }
-
 
 
 

@@ -230,39 +230,10 @@ namespace Extrinsic::RHI
                                    MemoryAccess  before,
                                    MemoryAccess  after) = 0;
 
-        /// Explicit barrier-batch API. Backends that do not support
-        /// fine-grained barrier packets can rely on the default fallback,
-        /// which maps each entry through TextureBarrier/BufferBarrier.
-        /// Memory barriers are ignored by the fallback.
-        virtual void SubmitBarriers(const BarrierBatchDesc& batch)
-        {
-            if (reinterpret_cast<std::uintptr_t>(std::addressof(batch)) % alignof(BarrierBatchDesc) != 0u)
-            {
-                return;
-            }
-
-            if (batch.TextureBarriers.data() != nullptr &&
-                (reinterpret_cast<std::uintptr_t>(batch.TextureBarriers.data()) % alignof(TextureBarrierDesc) != 0u))
-            {
-                return;
-            }
-
-            if (batch.BufferBarriers.data() != nullptr &&
-                (reinterpret_cast<std::uintptr_t>(batch.BufferBarriers.data()) % alignof(BufferBarrierDesc) != 0u))
-            {
-                return;
-            }
-
-            for (const TextureBarrierDesc& barrier : batch.TextureBarriers)
-            {
-                TextureBarrier(barrier.Texture, barrier.BeforeLayout, barrier.AfterLayout);
-            }
-
-            for (const BufferBarrierDesc& barrier : batch.BufferBarriers)
-            {
-                BufferBarrier(barrier.Buffer, barrier.BeforeAccess, barrier.AfterAccess);
-            }
-        }
+        /// Explicit barrier-batch API. Concrete contexts own the batch
+        /// behavior; Vulkan emits Sync2 packets, while CPU/null test contexts
+        /// can route entries through TextureBarrier/BufferBarrier or ignore them.
+        virtual void SubmitBarriers(const BarrierBatchDesc& batch) = 0;
 
         // ---- Copy operations -----------------------------------------
         virtual void FillBuffer(BufferHandle  buffer,
@@ -282,9 +253,8 @@ namespace Extrinsic::RHI
                                          std::uint32_t mipLevel,
                                          std::uint32_t arrayLayer) = 0;
 
-        // GRAPHICS-033D — texture-to-buffer readback used by the opt-in
-        // `gpu;vulkan` MinimalDebug visible-triangle smoke (and the canonical
-        // GRAPHICS-076/081 default-recipe equivalent once those land). The
+        // GRAPHICS-076E — texture-to-buffer readback used by the opt-in
+        // `gpu;vulkan` default-recipe visible-triangle smoke. The
         // caller is responsible for transitioning `src` into TransferSrc layout
         // before this call and back to its prior layout afterwards. The mip-
         // level / array-layer subresource extent specified by

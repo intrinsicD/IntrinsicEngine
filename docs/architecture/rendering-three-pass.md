@@ -58,48 +58,13 @@ Default feature gates:
 
 The imported `Backbuffer` is declared once and finalized only by the `Present` declaration; intermediate passes write transient recipe resources instead of taking backbuffer ownership. At frame execution time the renderer resolves this import through `RHI::IDevice::GetBackbufferHandle(frame)` and never fabricates a placeholder swapchain handle. The renderer owns command-context `Begin()`/`End()` bracketing around render-graph barrier/command recording, while runtime remains responsible for calling `IDevice::Present(frame)` after `IRenderer::EndFrame(frame)`.
 
-### Minimal debug-surface recipe
+### Bootstrap Scaffold Retirement
 
-GRAPHICS-032 records the opt-in `FrameRecipe::MinimalDebugSurface` contract for
-the first visible retained surface path. Its stable diagnostic/test label is
-`recipe.minimal-debug-surface`. The implementation must keep it separate from
-the default recipe and must never mutate default-recipe feature gates, pass
-declarations, or skip/no-op statuses.
-
-The planned recipe declares exactly two passes in order:
-
-1. `Pass.Surface.MinimalDebug` — clears and writes `SceneColorHDR`, clears and
-   writes `SceneDepth`, consumes the `SurfaceOpaque` bucket, and records the
-   GRAPHICS-031 default debug surface material draw.
-2. `Pass.Present.MinimalDebug` — samples `SceneColorHDR` and finalizes the
-   imported `Backbuffer` through the CPU-testable fullscreen-triangle
-   `Pass.Present` form.
-
-There is no depth prepass, shadow, deferred composition, postprocess, debug-view,
-selection-outline, ImGui, copy, or blit path in this contract. `SceneColorHDR` is
-the single transient color target (`R16G16B16A16_SFLOAT`), `SceneDepth` is the
-single transient depth target (device depth format, clear 1.0, `CompareOp =
-Less`, depth-write enabled), and MSAA is fixed at 1×. The imported `Backbuffer`
-is still writable only by the `Present` declaration with `FinalizesBackbuffer =
-true`; backend-native `vkCmdCopyImage` / `vkCmdBlitImage` finalization is not the
-command contract.
-
-The planned recipe uses normal framegraph resource-use declarations and the existing
-compiler barrier inference: `SceneColorHDR` transitions from color-attachment
-write in `Pass.Surface.MinimalDebug` to sampled input in
-`Pass.Present.MinimalDebug`; `SceneDepth` has a transient depth-attachment
-lifetime. Queue-family ownership, acquire, submit, and present synchronization
-remain backend/runtime operational concerns from GRAPHICS-018/033 rather than
-recipe-local policy.
-
-Renderer diagnostics for this recipe contract use three named counters:
-`MinimalSurfacePassExecutions`, `MinimalPresentPassExecutions`, and
-`MinimalRecipeMissingPrerequisiteCount`. Missing default material/pipeline,
-present pipeline, surface residency/bucket, eligible renderable, attachment
-allocation, or imported-backbuffer authorization increments the prerequisite
-counter instead of silently skipping. CPU/null contract tests assert command
-properties (pass labels, resource names, bucket kind, draw kind/count) rather
-than native handles or transient allocation IDs.
+GRAPHICS-081 retired the bootstrap-only recipe scaffold once the canonical
+default recipe recorded the visible-geometry path operationally. The current
+renderer recipe set is the default recipe only: feature gates, pass declarations,
+resource declarations, command-status diagnostics, and backbuffer finalization all
+flow through `BuildDefaultFrameRecipe(...)` and its canonical pass names.
 
 ## Picking and sub-element selection contract
 
@@ -311,15 +276,14 @@ Per `GRAPHICS-017Q`, the camera/gizmo runtime follow-ups to the data-only `GRAPH
 
 Per `GRAPHICS-018Q`, the four remaining Vulkan integration follow-ups to the `GRAPHICS-018` guarded backend bring-up resolve as follows. Texture upload policy keeps the guarded synchronous staging-buffer one-subresource `WriteTexture()` path as the fail-closed correctness baseline; runtime/streaming uploads must use `RHI::ITransferQueue` (the canonical seam declared by `GRAPHICS-026`) rather than the blocking graphics-queue helper. Per-subresource layout tracking stays whole-image for the batched path: backends record one tracked `VulkanImage::CurrentLayout` per texture and transition the whole image around uploads, so callers do not reason about per-mip / per-layer state. Multi-mip, multi-layer, and cubemap batching (`VkBufferImageCopy` region coalescing and async transfer-queue submission) plus opt-in `gpu;vulkan` smoke for those uploads landed with `GRAPHICS-018T`, not with this clarification. No new RHI surface was added by this clarification; `WriteTexture()`, `ITransferQueue`, and `TextureManager::Reupload()` already provided the seams `GRAPHICS-018T` extended. Sampler anisotropy stays expressed through the existing backend-neutral `RHI::SamplerDesc::MaxAnisotropy` float and no new RHI-visible enum, cap query, or backend-feature handle is introduced. The Vulkan backend probes `VkPhysicalDeviceFeatures::samplerAnisotropy` during physical-device selection alongside the existing required Vulkan 1.2 / 1.3 features (descriptor indexing, timeline semaphores, buffer device addresses, dynamic rendering), enables it on the logical device when supported, and records support / enablement on `GetVulkanBootstrapDiagnosticsSnapshot()` next to the other required-feature fields without exposing Vulkan-native types. At sampler creation the backend silently disables anisotropy (`anisotropyEnable = VK_FALSE`) when the feature is unsupported or `MaxAnisotropy <= 1.0`; otherwise it clamps the requested value to `min(MaxAnisotropy, VkPhysicalDeviceLimits::maxSamplerAnisotropy)` and emits one warn breadcrumb when clamping reduces the value. Anisotropy is treated as a quality hint rather than a correctness requirement, so missing support never fails sampler creation, and the renderer / RHI callers stay identical across hosts. `GRAPHICS-018S` already locked in the matching `SamplerBorderColor` pattern (RHI-visible enum, backend-local `VkBorderColor` mapping, no GPU execution required), so anisotropy follows the same fail-soft / diagnostics-only convention. Fallback reason taxonomy on `VulkanDevice` keeps each fail-closed counter and its reason enum 1:1 to its path. The pilot pattern set by `GetLastFallbackPipelineReason()` is canonical: a path-local `FallbackXxxReason` enum is introduced only when a *second* distinct fail-closed reason actually emerges in that path. Future device-loss / extension / feature-negotiation reasons in the pipeline path are appended to the existing `FallbackPipelineReason` enum because they are scoped to that path. Future second reasons in any other counter introduce a *new* path-local enum named after that counter (`FallbackBindlessReason`, `FallbackTransferUploadReason`, `FallbackBeginFrameReason`, …) and a matching `LastXxxReason` field is appended to `FallbackDiagnosticsSnapshot` after the existing eight fields, preserving the established field-order extension convention from prior 018Q resolutions. Counters themselves remain process-monotonic across `Initialize`/`Shutdown` cycles independent of any reason field, as already locked in by `VulkanFailClosedContract.FallbackCountersAreProcessMonotonicAcrossInitializeShutdownCycles`. Per-call breadcrumb logging on bindless / transfer-queue / pipeline-creation fallback paths remains canonical for now (one warn line per call): those callsites fire infrequently while non-operational and the visibility helps catch accidental loops or missing operational gating before bring-up. Frame-loop counters (`BeginFrame`, `EndFrame`, `Present`) keep the existing once-per-fail-closed-cycle rate-limited breadcrumb policy already locked in by 018, with the process-monotonic counter on `FallbackDiagnosticsSnapshot` carrying the precise diagnostic regardless of breadcrumb suppression; `Resize` stays unrate-limited because window-resize events are inherently low-frequency. Migration of any per-call counter to once-per-frame rate-limited breadcrumbs (with a cumulative-skipped count appended to the next emitted breadcrumb) is a separate semantic task scoped to that counter only when operational bring-up demonstrates many-per-frame fallback firing, never a sweeping retrofit, and must keep the underlying counter exact. External diagnostics consumers always read counts from `FallbackDiagnosticsSnapshot`, never from breadcrumb cardinality, so any future rate-limiting change is invisible to CPU contract coverage.
 
-Per `GRAPHICS-033`, Vulkan operational readiness for the minimal visible path is
-not a pass-local decision. The backend may report `Operational` only after the
-GRAPHICS-032 minimal recipe can record `Pass.Surface.MinimalDebug` and
-`Pass.Present.MinimalDebug` against the real Vulkan command context, the
-`SceneColorHDR` color-write → sampled transition and `SceneDepth` attachment
-lifetime pass GRAPHICS-022 validation, imported-backbuffer finalization remains
-owned by `Pass.Present`, and public bindless/transfer/pipeline/backbuffer/command
-services all agree with the same operational status. The minimal recipe does not
-define queue-family ownership, acquire/present, validation-layer, or device-loss
+Per `GRAPHICS-033`, Vulkan operational readiness for the visible default-recipe
+path is not a pass-local decision. The backend may report `Operational` only
+after default-recipe command bodies can record against the real Vulkan command
+context, recipe-aware graph validation passes, imported-backbuffer finalization
+remains owned by `Pass.Present`, and public bindless/transfer/pipeline/
+backbuffer/command services all agree with the same operational status. The
+default recipe does not define queue-family ownership, acquire/present,
+validation-layer, or device-loss
 policy; those are Vulkan/runtime operational-gate inputs.
 
 The planned Vulkan status seam is reasoned and append-only rather than bool-only:

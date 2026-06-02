@@ -2,16 +2,11 @@
 
 #include <cstdint>
 
-// Reusable counter-stability helper for the GRAPHICS-033D MinimalDebug
-// visible-triangle smoke (and any sibling gpu;vulkan fixture that needs the
-// same "fallback counters do not increment across an operational frame"
-// assertion). Header-only and engine-free; callers populate the snapshot
+// Reusable counter-stability helper for gpu;vulkan fixtures that need the same
+// "fallback counters do not increment across an operational frame" assertion.
+// Header-only and engine-free; callers populate the snapshot
 // from `Backends::Vulkan::GetVulkanOperationalDiagnosticsSnapshot()` or any
 // equivalent backend source.
-//
-// GRAPHICS-033D scaffold notice requires this assertion to be authored as a
-// reusable helper so the canonical GRAPHICS-076/081 default-recipe smoke can
-// call it byte-identical.
 
 namespace Extrinsic::Tests::Support::OperationalCounterStability
 {

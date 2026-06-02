@@ -15,7 +15,7 @@
 - The current CPU/null helper writes placeholder vertices because it has no CPU access to source GPU attribute/scalar buffers; pixel parity needs a deliberate Vulkan-capable readback seam and deterministic fixture data.
 
 ## Required changes
-- [ ] Add a narrow default-recipe or pass-scoped readback hook/counter suitable for visualization-overlay assertions without reusing MinimalDebug-only diagnostics.
+- [ ] Add a narrow default-recipe or pass-scoped readback hook/counter suitable for visualization-overlay assertions without reusing the canonical surface-readback diagnostics.
 - [ ] Provide deterministic vector-field and isoline fixture data that can produce stable sample colors on a real Vulkan frame.
 - [ ] Keep the hook fail-closed when no buffer is armed and when the device is non-operational.
 - [ ] Preserve normal renderer behavior when the hook is not armed.
@@ -48,10 +48,9 @@ LSAN_OPTIONS=suppressions=$PWD/lsan.supp ctest --test-dir build/ci-vulkan --outp
 
 ## Forbidden changes
 - Weakening the existing visualization-overlay command-stream smoke.
-- Reusing `MinimalDebugBackbufferReadbackCopyCount` as evidence for default-recipe visualization-overlay pixels.
+- Reusing the canonical surface-readback counter as evidence for default-recipe visualization-overlay pixels.
 - Mixing mechanical moves with semantic refactors.
 
 ## Maturity
 - Target: `Operational` on Vulkan-capable hosts for visualization-overlay pixel-readback parity; `CPUContracted` everywhere else.
 - This follow-up is explicitly not required for `GRAPHICS-078` Slice D's command-stream/counter graduation.
-

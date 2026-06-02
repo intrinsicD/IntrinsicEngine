@@ -65,11 +65,10 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
         Extrinsic::Backends::Vulkan::CreateVulkanDevice();
     ASSERT_NE(device, nullptr);
 
-    device->Initialize(Extrinsic::RHI::DeviceCreateDesc{
-        .RenderConfig             = renderConfig,
-        .InitialFramebufferExtent = window->GetFramebufferExtent(),
-        .NativeWindowHandle       = window->GetNativeHandle(),
-    });
+    device->Initialize(Extrinsic::RHI::MakeDeviceCreateDesc(
+        renderConfig,
+        window->GetFramebufferExtent(),
+        window->GetNativeHandle()));
     EXPECT_FALSE(device->IsOperational())
         << "phase-1 bootstrap must not mark Vulkan operational before swapchain/resource reconciliation";
 
@@ -783,5 +782,4 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
     device->Shutdown();
     EXPECT_FALSE(device->IsOperational());
 }
-
 

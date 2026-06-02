@@ -31,7 +31,7 @@ constexpr VulkanOperationalInputs MakeOperationalInputs() noexcept
     inputs.AllocatorReady                   = true;
     inputs.SwapchainReady                   = true;
     inputs.CommandSyncReady                 = true;
-    inputs.MinimalRecipeRecordingPresent    = true;
+    inputs.DefaultRecipeRecordingPresent    = true;
     inputs.BarrierValidationClean           = true;
     inputs.PublicServiceReconciled          = true;
     inputs.ValidationClean                  = true;
@@ -176,14 +176,14 @@ TEST(VulkanOperationalStatusEvaluator, CommandSyncNotReadyReportsCommandSyncFail
 // -----------------------------------------------------------------------------
 // Higher gates → RequestedButIncompleteGate with the documented reason.
 // -----------------------------------------------------------------------------
-TEST(VulkanOperationalStatusEvaluator, MissingRecipeRecordingReportsIncompleteGate)
+TEST(VulkanOperationalStatusEvaluator, MissingDefaultRecipeRecordingReportsIncompleteGate)
 {
     VulkanOperationalInputs inputs = MakeOperationalInputs();
-    inputs.MinimalRecipeRecordingPresent = false;
+    inputs.DefaultRecipeRecordingPresent = false;
 
     const VulkanOperationalStatus status = EvaluateVulkanOperationalStatus(inputs);
     EXPECT_EQ(status.Code, VulkanOperationalStatusCode::RequestedButIncompleteGate);
-    EXPECT_EQ(status.Reason, VulkanOperationalReason::MinimalRecipeRecordingMissing);
+    EXPECT_EQ(status.Reason, VulkanOperationalReason::DefaultRecipeRecordingMissing);
 }
 
 TEST(VulkanOperationalStatusEvaluator, BarrierValidationDirtyReportsBarrierValidationFailed)
@@ -292,9 +292,9 @@ TEST(VulkanOperationalStatusEvaluator, FlippingAnyGateInputDropsBackToNonOperati
          VulkanOperationalStatusCode::RequestedButFailedInit, VulkanOperationalReason::SwapchainFailed},
         {"!CmdSync", [&]{auto i=baseline;i.CommandSyncReady=false;return i;}(),
          VulkanOperationalStatusCode::RequestedButFailedInit, VulkanOperationalReason::CommandSyncFailed},
-        {"!Recipe", [&]{auto i=baseline;i.MinimalRecipeRecordingPresent=false;return i;}(),
+        {"!Recipe", [&]{auto i=baseline;i.DefaultRecipeRecordingPresent=false;return i;}(),
          VulkanOperationalStatusCode::RequestedButIncompleteGate,
-         VulkanOperationalReason::MinimalRecipeRecordingMissing},
+         VulkanOperationalReason::DefaultRecipeRecordingMissing},
         {"!Barrier", [&]{auto i=baseline;i.BarrierValidationClean=false;return i;}(),
          VulkanOperationalStatusCode::RequestedButIncompleteGate,
          VulkanOperationalReason::BarrierValidationFailed},
@@ -335,7 +335,7 @@ TEST(VulkanOperationalStatusEvaluator, IsTotalAcrossAllBooleanCombinations)
         inputs.AllocatorReady                   = (mask & (1u << 8))  != 0u;
         inputs.SwapchainReady                   = (mask & (1u << 9))  != 0u;
         inputs.CommandSyncReady                 = (mask & (1u << 10)) != 0u;
-        inputs.MinimalRecipeRecordingPresent    = (mask & (1u << 11)) != 0u;
+        inputs.DefaultRecipeRecordingPresent    = (mask & (1u << 11)) != 0u;
         inputs.BarrierValidationClean           = (mask & (1u << 12)) != 0u;
         inputs.PublicServiceReconciled          = (mask & (1u << 13)) != 0u;
         inputs.ValidationClean                  = (mask & (1u << 14)) != 0u;

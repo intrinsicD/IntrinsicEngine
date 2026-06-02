@@ -11,13 +11,13 @@
 //
 // Slice B promotes the vector-field lane from `SkippedUnavailable` to
 // `Recorded` by creating two pipeline variants (depth-tested +
-// always-on-top, calls #32 + #33), driving the renderer-owned
+// always-on-top, calls #31 + #32), driving the renderer-owned
 // `VisualizationOverlayUploadHelper` to pack per-frame vertex data,
 // and recording `BindPipeline + PushConstants(16) +
 // Draw(2 * ElementCount, 1, 0, 0)` per submitted vector-field packet
 // (switching pipeline variants on each `DepthTested` flip).
 //
-// Slice C extends to the isoline lane (call indices #34 + #35) and
+// Slice C extends to the isoline lane (call indices #33 + #34) and
 // adds per-lane independence + mixed-lane recording coverage that
 // mirrors GRAPHICS-077 Slice C; Slice D adds the opt-in `gpu;vulkan`
 // pixel-readback smoke.
@@ -280,8 +280,8 @@ TEST(VisualizationOverlayPassContract, NonOperationalDeviceSkipsNonOperational)
 TEST(VisualizationOverlayPassContract, MissingVectorFieldPipelineLeaseSkipsUnavailable)
 {
     // GRAPHICS-078 Slice B — failing the vector-field DepthTested
-    // pipeline create (call #32, immediately after the GRAPHICS-077
-    // point AlwaysOnTop at #31) yields
+    // pipeline create (call #31, immediately after the GRAPHICS-077
+    // point AlwaysOnTop at #30) yields
     // `"VisualizationOverlayPass" = SkippedUnavailable` while every
     // upstream pipeline lease (culling / depth / surface / line /
     // point / shadow / deferred / selection / postprocess / present /
@@ -291,7 +291,7 @@ TEST(VisualizationOverlayPassContract, MissingVectorFieldPipelineLeaseSkipsUnava
     // pipeline missing" from "feature off" (the latter does not reach
     // this branch).
     MockDevice device;
-    device.FailPipelineCreateCall = 32;
+    device.FailPipelineCreateCall = 31;
     device.BackbufferHandle = RHI::TextureHandle{783u, 1u};
 
     std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
@@ -642,15 +642,15 @@ TEST(VisualizationOverlayPassContract, PerFrameBufferRecyclingDoesNotLeakVectorF
 TEST(VisualizationOverlayPassContract, MissingIsolinePipelineLeaseSkipsUnavailable)
 {
     // GRAPHICS-078 Slice C — failing the isoline DepthTested pipeline
-    // create (call #34, immediately after vector-field AlwaysOnTop at
-    // #33) yields `"VisualizationOverlayPass" = SkippedUnavailable`
+    // create (call #33, immediately after vector-field AlwaysOnTop at
+    // #32) yields `"VisualizationOverlayPass" = SkippedUnavailable`
     // for an isoline-only frame, with every upstream pipeline lease
     // keeping the rest of the default recipe recording.
     // `MissingPipelineSkipCount` increments by exactly 1 so the
     // diagnostic counter distinguishes "isoline lane on, pipeline
     // missing" from "feature off".
     MockDevice device;
-    device.FailPipelineCreateCall = 34;
+    device.FailPipelineCreateCall = 33;
     device.BackbufferHandle = RHI::TextureHandle{790u, 1u};
 
     std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
@@ -920,8 +920,8 @@ TEST(VisualizationOverlayPassContract, PerLanePartialSkipKeepsSiblingLaneRecordi
     // `Recorded` because at least one lane succeeded. Mirrors
     // GRAPHICS-077 Slice C's per-lane independence pin.
     //
-    // FailPipelineCreateCall = 34 suppresses isoline DepthTested only;
-    // vector-field pipelines (#32 + #33) are healthy.
+    // FailPipelineCreateCall = 33 suppresses isoline DepthTested only;
+    // vector-field pipelines (#31 + #32) are healthy.
     static const Graphics::VectorFieldOverlayPacket kVectorFields[1] = {
         Graphics::VectorFieldOverlayPacket{
             .Name         = "Test.VF",
@@ -946,7 +946,7 @@ TEST(VisualizationOverlayPassContract, PerLanePartialSkipKeepsSiblingLaneRecordi
     };
 
     MockDevice device;
-    device.FailPipelineCreateCall = 34;
+    device.FailPipelineCreateCall = 33;
     device.BackbufferHandle = RHI::TextureHandle{794u, 1u};
 
     std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();

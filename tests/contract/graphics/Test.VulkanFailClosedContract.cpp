@@ -62,11 +62,10 @@ TEST(VulkanFailClosedContract, InitializeWithNullWindowSkipsBootstrapWithoutVulk
     std::unique_ptr<Extrinsic::RHI::IDevice> device = Extrinsic::Backends::Vulkan::CreateVulkanDevice();
     ASSERT_NE(device, nullptr);
 
-    device->Initialize(Extrinsic::RHI::DeviceCreateDesc{
-        .RenderConfig             = renderConfig,
-        .InitialFramebufferExtent = window.GetFramebufferExtent(),
-        .NativeWindowHandle       = window.GetNativeHandle(),
-    });
+    device->Initialize(Extrinsic::RHI::MakeDeviceCreateDesc(
+        renderConfig,
+        window.GetFramebufferExtent(),
+        window.GetNativeHandle()));
     EXPECT_FALSE(device->IsOperational());
 
     const Extrinsic::Backends::Vulkan::VulkanBootstrapDiagnosticsSnapshot diagnostics =
@@ -165,11 +164,10 @@ TEST(VulkanFailClosedContract, RecipeGraphValidationSetterFlipsBarrierValidation
     Extrinsic::Core::Config::RenderConfig renderConfig{};
     renderConfig.EnablePromotedVulkanDevice = true;
     renderConfig.EnableValidation = false;
-    device->Initialize(Extrinsic::RHI::DeviceCreateDesc{
-        .RenderConfig             = renderConfig,
-        .InitialFramebufferExtent = window.GetFramebufferExtent(),
-        .NativeWindowHandle       = window.GetNativeHandle(),
-    });
+    device->Initialize(Extrinsic::RHI::MakeDeviceCreateDesc(
+        renderConfig,
+        window.GetFramebufferExtent(),
+        window.GetNativeHandle()));
 
     EXPECT_FALSE(
         Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs(device.get()).BarrierValidationClean);
@@ -207,11 +205,10 @@ TEST(VulkanFailClosedContract, PublicServiceReconciledStaysFalseAfterNullWindowI
     std::unique_ptr<Extrinsic::RHI::IDevice> device = Extrinsic::Backends::Vulkan::CreateVulkanDevice();
     ASSERT_NE(device, nullptr);
 
-    device->Initialize(Extrinsic::RHI::DeviceCreateDesc{
-        .RenderConfig             = renderConfig,
-        .InitialFramebufferExtent = window.GetFramebufferExtent(),
-        .NativeWindowHandle       = window.GetNativeHandle(),
-    });
+    device->Initialize(Extrinsic::RHI::MakeDeviceCreateDesc(
+        renderConfig,
+        window.GetFramebufferExtent(),
+        window.GetNativeHandle()));
     EXPECT_FALSE(device->IsOperational());
     EXPECT_FALSE(
         Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs(device.get()).PublicServiceReconciled);
@@ -587,11 +584,10 @@ TEST(VulkanFailClosedContract, FallbackCountersAreProcessMonotonicAcrossInitiali
             Extrinsic::Backends::Vulkan::CreateVulkanDevice();
         ASSERT_NE(device, nullptr);
 
-        device->Initialize(Extrinsic::RHI::DeviceCreateDesc{
-        .RenderConfig             = renderConfig,
-        .InitialFramebufferExtent = window.GetFramebufferExtent(),
-        .NativeWindowHandle       = window.GetNativeHandle(),
-    });
+        device->Initialize(Extrinsic::RHI::MakeDeviceCreateDesc(
+            renderConfig,
+            window.GetFramebufferExtent(),
+            window.GetNativeHandle()));
         ASSERT_FALSE(device->IsOperational());
         fireFallbackPaths(*device);
         device->Shutdown();
@@ -641,11 +637,10 @@ TEST(VulkanFailClosedContract, FallbackCountersAreProcessMonotonicAcrossInitiali
             Extrinsic::Backends::Vulkan::CreateVulkanDevice();
         ASSERT_NE(device, nullptr);
 
-        device->Initialize(Extrinsic::RHI::DeviceCreateDesc{
-        .RenderConfig             = renderConfig,
-        .InitialFramebufferExtent = window.GetFramebufferExtent(),
-        .NativeWindowHandle       = window.GetNativeHandle(),
-    });
+        device->Initialize(Extrinsic::RHI::MakeDeviceCreateDesc(
+            renderConfig,
+            window.GetFramebufferExtent(),
+            window.GetNativeHandle()));
         ASSERT_FALSE(device->IsOperational());
         fireFallbackPaths(*device);
         device->Shutdown();
@@ -926,11 +921,10 @@ TEST(VulkanFailClosedContract, DeviceLostFlagStaysFalseAcrossInitializeShutdownC
             EXPECT_FALSE(snapshot.DeviceOperational);
         }
 
-        device->Initialize(Extrinsic::RHI::DeviceCreateDesc{
-        .RenderConfig             = renderConfig,
-        .InitialFramebufferExtent = window.GetFramebufferExtent(),
-        .NativeWindowHandle       = window.GetNativeHandle(),
-    });
+        device->Initialize(Extrinsic::RHI::MakeDeviceCreateDesc(
+            renderConfig,
+            window.GetFramebufferExtent(),
+            window.GetNativeHandle()));
         EXPECT_FALSE(device->IsOperational());
 
         Extrinsic::RHI::FrameHandle frame{};

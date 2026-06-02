@@ -1149,14 +1149,11 @@ namespace Extrinsic::Graphics
         // emits zero `CompiledRenderPassAttachment` entries for this
         // pass, `BuildActiveRenderPassDesc` reports `HasAttachments=false`,
         // and the executor issues the present draw outside any render
-        // pass — invalid command-buffer usage on Vulkan that surfaces
-        // as a validation error and a missing final blit to the
-        // backbuffer. Mirrors the `Pass.Present.MinimalDebug` wiring in
-        // `BuildMinimalDebugSurfaceRecipe`; the post-pass
-        // `ColorAttachmentWrite → Present` transition is emitted by the
-        // compiler from the imported backbuffer's `FinalState = Present`
-        // contract (see `RenderGraph::ImportBackbuffer`), so no
-        // `TextureUsage::Present` read is needed on this pass.
+        // pass. The post-pass `ColorAttachmentWrite -> Present`
+        // transition is emitted by the compiler from the imported
+        // backbuffer's `FinalState = Present` contract (see
+        // `RenderGraph::ImportBackbuffer`), so no `TextureUsage::Present`
+        // read is needed on this pass.
         addOrderedPass("Present", [=](RenderGraphBuilder& builder) {
             builder.Read(presentSource, TextureUsage::ShaderRead);
             builder.Write(backbuffer, TextureUsage::ColorAttachmentWrite);
@@ -1187,150 +1184,6 @@ namespace Extrinsic::Graphics
             .Succeeded = true,
             .DeclaredPassCount = enabledPassCount,
             .DeclaredResourceCount = enabledResourceCount,
-        };
-    }
-
-    [[nodiscard]] FrameRecipeIntrospection DescribeMinimalDebugSurfaceRecipe()
-    {
-        FrameRecipeIntrospection out{};
-
-        AddPass(out, FrameRecipePassKind::Surface, kMinimalDebugSurfacePassName, true, false,
-                {"GpuWorld.SceneTable", "Material.Buffer",
-                 "Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count"},
-                {});
-        AddPass(out, FrameRecipePassKind::Present, kMinimalDebugPresentPassName, true, true,
-                {}, {"Backbuffer"});
-
-        AddResource(out, FrameRecipeResourceKind::Backbuffer, "Backbuffer", true, true, true, false, true);
-        AddResource(out, FrameRecipeResourceKind::SceneTable, "GpuWorld.SceneTable", true, true);
-        AddResource(out, FrameRecipeResourceKind::MaterialBuffer, "Material.Buffer", true, true);
-        AddResource(out, FrameRecipeResourceKind::SurfaceOpaqueIndexedArgs, "Cull.SurfaceOpaque.IndexedArgs", true, true, false, false, true);
-        AddResource(out, FrameRecipeResourceKind::SurfaceOpaqueCount, "Cull.SurfaceOpaque.Count", true, true, false, false, true);
-        return out;
-    }
-
-    [[nodiscard]] FrameRecipeBuildResult BuildMinimalDebugSurfaceRecipe(RenderGraph& graph,
-                                                                       const FrameRecipeImports& imports,
-                                                                       const FrameRecipeSizing& sizing)
-    {
-        if (!imports.Backbuffer.IsValid())
-        {
-            return FrameRecipeBuildResult{
-                .Succeeded = false,
-                .Diagnostic = "MinimalDebugSurface recipe requires a valid imported Backbuffer handle.",
-            };
-        }
-
-        (void)sizing;
-        const FrameRecipeIntrospection declaration = DescribeMinimalDebugSurfaceRecipe();
-
-        // GRAPHICS-032 Decision 12: missing surface-pass prerequisites
-        // (material/pipeline residency, surface-opaque bucket) increment a
-        // single counter rather than aborting the build. Pass bodies land in
-        // GRAPHICS-032B/C and consume the same counter.
-        std::uint32_t missingPrerequisites = 0u;
-        if (!imports.MaterialBuffer.IsValid())
-        {
-            ++missingPrerequisites;
-        }
-        if (!imports.SurfaceOpaqueIndexedArgs.IsValid() || !imports.SurfaceOpaqueCount.IsValid())
-        {
-            ++missingPrerequisites;
-        }
-        if (!imports.SceneTable.IsValid())
-        {
-            ++missingPrerequisites;
-        }
-
-        const auto backbuffer = graph.ImportBackbuffer("Backbuffer", imports.Backbuffer);
-        BufferRef sceneTable{};
-        BufferRef materialBuffer{};
-        BufferRef drawIndirect{};
-        BufferRef drawCount{};
-        if (imports.SceneTable.IsValid())
-        {
-            sceneTable = graph.ImportBuffer("GpuWorld.SceneTable", imports.SceneTable,
-                                            BufferState::ShaderRead, BufferState::ShaderRead);
-        }
-        if (imports.MaterialBuffer.IsValid())
-        {
-            materialBuffer = graph.ImportBuffer("Material.Buffer", imports.MaterialBuffer,
-                                                BufferState::ShaderRead, BufferState::ShaderRead);
-        }
-        if (imports.SurfaceOpaqueIndexedArgs.IsValid())
-        {
-            drawIndirect = graph.ImportBuffer("Cull.SurfaceOpaque.IndexedArgs", imports.SurfaceOpaqueIndexedArgs,
-                                              BufferState::ShaderWrite, BufferState::IndirectRead);
-        }
-        if (imports.SurfaceOpaqueCount.IsValid())
-        {
-            drawCount = graph.ImportBuffer("Cull.SurfaceOpaque.Count", imports.SurfaceOpaqueCount,
-                                           BufferState::ShaderWrite, BufferState::IndirectRead);
-        }
-
-        PassRef previous{};
-        auto addOrderedPass = [&graph, &previous](std::string name, auto setup, const bool sideEffect = false) {
-            const PassRef dependency = previous;
-            PassRef pass = graph.AddPass(std::move(name), [dependency, setup](RenderGraphBuilder& builder) mutable {
-                if (dependency.IsValid())
-                {
-                    builder.DependsOn(dependency);
-                }
-                setup(builder);
-            }, sideEffect);
-            previous = pass;
-            return pass;
-        };
-
-        addOrderedPass(std::string{kMinimalDebugSurfacePassName}, [=](RenderGraphBuilder& builder) {
-            if (sceneTable.IsValid())
-            {
-                builder.Read(sceneTable, BufferUsage::ShaderRead);
-            }
-            if (materialBuffer.IsValid())
-            {
-                builder.Read(materialBuffer, BufferUsage::ShaderRead);
-            }
-            if (drawIndirect.IsValid())
-            {
-                builder.Read(drawIndirect, BufferUsage::IndirectRead);
-            }
-            if (drawCount.IsValid())
-            {
-                builder.Read(drawCount, BufferUsage::IndirectRead);
-            }
-        });
-
-        addOrderedPass(std::string{kMinimalDebugPresentPassName}, [=](RenderGraphBuilder& builder) {
-            builder.Write(backbuffer, TextureUsage::ColorAttachmentWrite);
-            builder.SetRenderPass(RHI::RenderPassDesc{
-                .ColorTargets = kMinimalRenderPassColorAttachments,
-            });
-            builder.SideEffect();
-        }, true);
-
-        std::uint32_t enabledPassCount = 0u;
-        std::uint32_t enabledResourceCount = 0u;
-        for (const FrameRecipePassDeclaration& pass : declaration.Passes)
-        {
-            if (pass.Enabled)
-            {
-                ++enabledPassCount;
-            }
-        }
-        for (const FrameRecipeResourceDeclaration& resource : declaration.Resources)
-        {
-            if (resource.Enabled)
-            {
-                ++enabledResourceCount;
-            }
-        }
-
-        return FrameRecipeBuildResult{
-            .Succeeded = true,
-            .DeclaredPassCount = enabledPassCount,
-            .DeclaredResourceCount = enabledResourceCount,
-            .MissingPrerequisiteCount = missingPrerequisites,
         };
     }
 }

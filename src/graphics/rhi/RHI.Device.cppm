@@ -43,6 +43,11 @@ namespace Extrinsic::RHI
         void*                      NativeWindowHandle{nullptr};
     };
 
+    export [[nodiscard]] DeviceCreateDesc MakeDeviceCreateDesc(
+        const Core::Config::RenderConfig& renderConfig,
+        Core::Extent2D initialFramebufferExtent,
+        void* nativeWindowHandle) noexcept;
+
     export class IDevice
     {
     public:

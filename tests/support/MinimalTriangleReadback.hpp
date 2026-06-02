@@ -4,14 +4,12 @@
 #include <cstdint>
 #include <string_view>
 
-// Reusable readback harness for the GRAPHICS-033D MinimalDebug visible-triangle
-// smoke. The harness is intentionally header-only and engine-free so the
-// sibling GRAPHICS-032D recipe-selector fixture and the canonical
-// GRAPHICS-076/081 default-recipe fixture can include and call it
-// byte-identical, satisfying the GRAPHICS-033D scaffold-notice requirement
-// that the pixel-readback driver harness is a reusable helper.
+// Reusable readback harness for the default-recipe visible-triangle smoke. The
+// harness is intentionally header-only and engine-free so GPU fixtures can share
+// the sample points and color quantization without depending on runtime state.
 //
-// Triangle constants mirror assets/shaders/minimal_debug_visible_triangle.{vert,frag}.
+// Triangle constants mirror the explicit debug-triangle packet seeded by
+// Test.DefaultRecipeSurfaceGpuSmoke.cpp.
 
 namespace Extrinsic::Tests::Support::MinimalTriangleReadback
 {
@@ -36,8 +34,7 @@ namespace Extrinsic::Tests::Support::MinimalTriangleReadback
     inline constexpr float kClearB = 0.0f;
     inline constexpr float kClearA = 1.0f;
 
-    // Framebuffer dimensions used by the smoke window
-    // (Test.MinimalDebugSurfaceGpuSmoke.cpp).
+    // Framebuffer dimensions used by the default-recipe smoke window.
     inline constexpr std::uint32_t kFramebufferWidth  = 128u;
     inline constexpr std::uint32_t kFramebufferHeight = 128u;
 

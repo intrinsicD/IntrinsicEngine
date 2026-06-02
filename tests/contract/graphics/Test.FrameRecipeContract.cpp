@@ -456,8 +456,7 @@ TEST(FrameRecipeContract, IntrospectionReportsPassResourceReadsAndWrites)
     ASSERT_NE(present, nullptr);
     // GRAPHICS-076 Slice A follow-up — the default-recipe present pass
     // declares the imported `Backbuffer` as a color-attachment *write*
-    // (mirroring the `Pass.Present.MinimalDebug` finalizer) so the
-    // framegraph compiler emits real render-pass attachments and the
+    // so the framegraph compiler emits real render-pass attachments and the
     // executor's `BindPipeline + Draw(3, 1, 0, 0)` runs inside a
     // `BeginRenderPass/EndRenderPass` scope. Pre-fixup the introspection
     // listed `Backbuffer` under `Reads` because the recipe only
@@ -672,155 +671,6 @@ TEST(FrameRecipeContract, MissingBackbufferReportsDiagnostic)
     EXPECT_EQ(graph.GetPassCount(), 0u);
 }
 
-// GRAPHICS-032A — minimal-debug-surface recipe contract tests. The recipe is
-// opt-in; it declares exactly two passes
-// (`Pass.Surface.MinimalDebug` then `Pass.Present.MinimalDebug`), validates
-// surface prerequisites, finalizes the imported `Backbuffer` through a direct
-// visible-triangle color write, and surfaces a
-// per-build `MissingPrerequisiteCount` (mirrored into the renderer's
-// `MinimalRecipeMissingPrerequisiteCount` counter) when material/pipeline or
-// surface-bucket residency is absent. No pass body lands in this slice
-// (GRAPHICS-032B/C own the bodies).
-
-TEST(FrameRecipeContract, MinimalDebugSurfaceRecipeDeclaresTwoPassesInOrderWithStableLabels)
-{
-    const FrameRecipeIntrospection description = DescribeMinimalDebugSurfaceRecipe();
-    ASSERT_EQ(description.Passes.size(), 2u);
-    EXPECT_EQ(description.Passes[0].Name, kMinimalDebugSurfacePassName);
-    EXPECT_EQ(description.Passes[0].Kind, FrameRecipePassKind::Surface);
-    EXPECT_TRUE(description.Passes[0].Enabled);
-    EXPECT_FALSE(description.Passes[0].FinalizesBackbuffer);
-    EXPECT_TRUE(description.Passes[0].Writes.empty());
-    EXPECT_TRUE(Contains(description.Passes[0].Reads, "Material.Buffer"));
-    EXPECT_TRUE(Contains(description.Passes[0].Reads, "GpuWorld.SceneTable"));
-    EXPECT_TRUE(Contains(description.Passes[0].Reads, "Cull.SurfaceOpaque.IndexedArgs"));
-    EXPECT_TRUE(Contains(description.Passes[0].Reads, "Cull.SurfaceOpaque.Count"));
-
-    EXPECT_EQ(description.Passes[1].Name, kMinimalDebugPresentPassName);
-    EXPECT_EQ(description.Passes[1].Kind, FrameRecipePassKind::Present);
-    EXPECT_TRUE(description.Passes[1].Enabled);
-    EXPECT_TRUE(description.Passes[1].FinalizesBackbuffer);
-    EXPECT_TRUE(description.Passes[1].Reads.empty());
-    EXPECT_TRUE(Contains(description.Passes[1].Writes, "Backbuffer"));
-
-    // The minimal recipe must not declare any default-recipe pass.
-    for (const FrameRecipePassDeclaration& pass : description.Passes)
-    {
-        EXPECT_NE(pass.Name, std::string_view{"CullingPass"});
-        EXPECT_NE(pass.Name, std::string_view{"DepthPrepass"});
-        EXPECT_NE(pass.Name, std::string_view{"SurfacePass"});
-        EXPECT_NE(pass.Name, std::string_view{"CompositionPass"});
-        EXPECT_NE(pass.Name, std::string_view{"LinePass"});
-        EXPECT_NE(pass.Name, std::string_view{"PointPass"});
-        EXPECT_NE(pass.Name, std::string_view{"PostProcessPass"});
-        EXPECT_NE(pass.Name, std::string_view{"PostProcessAAEdgePass"});
-        EXPECT_NE(pass.Name, std::string_view{"PostProcessAABlendPass"});
-        EXPECT_NE(pass.Name, std::string_view{"PostProcessAAResolvePass"});
-        EXPECT_NE(pass.Name, std::string_view{"ImGuiPass"});
-        EXPECT_NE(pass.Name, std::string_view{"Present"});
-    }
-
-    const auto* backbuffer = FindResource(description, FrameRecipeResourceKind::Backbuffer);
-    ASSERT_NE(backbuffer, nullptr);
-    EXPECT_TRUE(backbuffer->Imported);
-    EXPECT_TRUE(backbuffer->Backbuffer);
-    EXPECT_TRUE(backbuffer->ImportedWriteAllowed);
-    EXPECT_FALSE(HasEnabledResource(description, FrameRecipeResourceKind::SceneDepth));
-    EXPECT_FALSE(HasEnabledResource(description, FrameRecipeResourceKind::SceneColorHDR));
-    EXPECT_TRUE(HasEnabledResource(description, FrameRecipeResourceKind::MaterialBuffer));
-    EXPECT_TRUE(HasEnabledResource(description, FrameRecipeResourceKind::SurfaceOpaqueIndexedArgs));
-    EXPECT_TRUE(HasEnabledResource(description, FrameRecipeResourceKind::SurfaceOpaqueCount));
-
-    RenderGraph graph;
-    const FrameRecipeBuildResult build = BuildMinimalDebugSurfaceRecipe(
-        graph,
-        MakeImports(),
-        FrameRecipeSizing{.Width = 640u, .Height = 480u});
-    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
-    EXPECT_EQ(build.DeclaredPassCount, 2u);
-    EXPECT_EQ(build.MissingPrerequisiteCount, 0u);
-
-    const auto compiled = graph.Compile();
-    {
-        const auto& compileResult = graph.GetLastCompileValidationResult();
-        ASSERT_TRUE(compiled.has_value())
-            << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
-    }
-    const std::vector<std::string> expected{
-        std::string{kMinimalDebugSurfacePassName},
-        std::string{kMinimalDebugPresentPassName},
-    };
-    EXPECT_EQ(OrderedPassNames(*compiled), expected);
-}
-
-TEST(FrameRecipeContract, MinimalAndDefaultRecipesAreMutuallyIsolated)
-{
-    const FrameRecipeIntrospection minimal = DescribeMinimalDebugSurfaceRecipe();
-    const FrameRecipeIntrospection defaults = DescribeDefaultFrameRecipe(FrameRecipeFeatures{});
-
-    for (const FrameRecipePassDeclaration& pass : minimal.Passes)
-    {
-        EXPECT_NE(pass.Name, std::string_view{"CullingPass"});
-        EXPECT_NE(pass.Name, std::string_view{"SurfacePass"});
-        EXPECT_NE(pass.Name, std::string_view{"Present"});
-    }
-    for (const FrameRecipePassDeclaration& pass : defaults.Passes)
-    {
-        EXPECT_NE(pass.Name, kMinimalDebugSurfacePassName);
-        EXPECT_NE(pass.Name, kMinimalDebugPresentPassName);
-    }
-}
-
-TEST(FrameRecipeContract, MinimalDebugSurfaceRecipeCountsMissingPrerequisites)
-{
-    // Missing material residency, surface-opaque bucket residency, and
-    // scene-table residency each increment `MissingPrerequisiteCount` even
-    // though the recipe still compiles. Backbuffer must remain valid; an
-    // invalid backbuffer is a hard build failure (mirrors default-recipe).
-    FrameRecipeImports imports = MakeImports();
-    imports.MaterialBuffer = {};
-    imports.SurfaceOpaqueIndexedArgs = {};
-    imports.SurfaceOpaqueCount = {};
-    imports.SceneTable = {};
-
-    RenderGraph graph;
-    const FrameRecipeBuildResult build = BuildMinimalDebugSurfaceRecipe(
-        graph,
-        imports,
-        FrameRecipeSizing{.Width = 320u, .Height = 240u});
-
-    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
-    EXPECT_EQ(build.DeclaredPassCount, 2u);
-    // One increment for material, one for the surface-opaque bucket (counted
-    // jointly because both halves must be present), and one for scene-table.
-    EXPECT_EQ(build.MissingPrerequisiteCount, 3u);
-
-    const auto compiled = graph.Compile();
-    {
-        const auto& compileResult = graph.GetLastCompileValidationResult();
-        ASSERT_TRUE(compiled.has_value())
-            << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
-    }
-    const std::vector<std::string> passNames = OrderedPassNames(*compiled);
-    EXPECT_EQ(passNames.size(), 2u);
-}
-
-TEST(FrameRecipeContract, MinimalDebugSurfaceRecipeRequiresValidBackbuffer)
-{
-    FrameRecipeImports imports = MakeImports();
-    imports.Backbuffer = {};
-
-    RenderGraph graph;
-    const FrameRecipeBuildResult build = BuildMinimalDebugSurfaceRecipe(
-        graph,
-        imports,
-        FrameRecipeSizing{});
-
-    EXPECT_FALSE(build.Succeeded);
-    EXPECT_NE(build.Diagnostic.find("Backbuffer"), std::string::npos);
-    EXPECT_EQ(graph.GetPassCount(), 0u);
-}
-
 // ---------------------------------------------------------------------------
 // GRAPHICS-073 Slice B — `FrameRecipeImports::ShadowAtlas` + the typed
 // `FrameRecipeShadowSizing` seam. The recipe prefers the imported handle
@@ -974,7 +824,6 @@ TEST(FrameRecipeContract, ShadowAtlasTransientPathAcceptsTypedShadowSizing)
     }
     EXPECT_TRUE(foundShadow);
 }
-
 
 
 

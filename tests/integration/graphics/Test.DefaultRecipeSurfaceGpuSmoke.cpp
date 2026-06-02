@@ -19,7 +19,6 @@
 
 import Extrinsic.Backends.Vulkan;
 import Extrinsic.Core.Config.Engine;
-import Extrinsic.Core.Config.Render;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
@@ -39,7 +38,6 @@ using Extrinsic::Backends::Vulkan::EvaluateVulkanDeviceOperationalStatus;
 using Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs;
 using Extrinsic::Backends::Vulkan::GetVulkanOperationalDiagnosticsSnapshot;
 using Extrinsic::Backends::Vulkan::ToString;
-using Extrinsic::Core::Config::FrameRecipeKind;
 using Extrinsic::Graphics::RenderCommandPassStatus;
 using Extrinsic::Runtime::Engine;
 using Extrinsic::Runtime::IApplication;
@@ -95,10 +93,9 @@ using Extrinsic::Runtime::IApplication;
     };
 }
 
-// GRAPHICS-076 Slice D — bounded `engine.Run()` driver mirroring the
-// MinimalDebug fixture's `ExitAfterFramesApp`. The smoke drives a small fixed
-// number of frames so the test cannot hang on a misconfigured swapchain loop
-// even when the operational Vulkan gate flips green.
+// GRAPHICS-076 Slice D — bounded `engine.Run()` driver. The smoke drives a
+// small fixed number of frames so the test cannot hang on a misconfigured
+// swapchain loop even when the operational Vulkan gate flips green.
 class ExitAfterFramesApp final : public IApplication
 {
 public:
@@ -137,12 +134,6 @@ Counters::Snapshot ToCounterSnapshot(
     };
 }
 
-// Default-recipe equivalent of `BootstrapEngineForMinimalDebug` in
-// `Test.MinimalDebugSurfaceGpuSmoke.cpp`. The MinimalDebug bootstrap pinned
-// `config.Render.FrameRecipe = FrameRecipeKind::MinimalDebug`; this helper
-// leaves the field at the constructor default
-// (`FrameRecipeKind::Default` per `Core.Config.Render.cppm`) so the canonical
-// default recipe is what reaches the executor.
 struct DefaultRecipeBootstrap
 {
     std::unique_ptr<Engine> EnginePtr;
@@ -165,22 +156,13 @@ struct DefaultRecipeBootstrap
 
     auto config = Extrinsic::Runtime::CreateReferenceEngineConfig();
     config.Window.Title = windowTitle;
-    // Match the MinimalDebug fixture's small fixed framebuffer so backbuffer
-    // sizing/format negotiation paths are exercised identically across both
-    // recipes on this host.
+    // Fixed framebuffer keeps backbuffer sizing and format negotiation stable
+    // for readback sample points across hosts.
     config.Window.Width = Readback::kFramebufferWidth;
     config.Window.Height = Readback::kFramebufferHeight;
     config.Window.Resizable = false;
     config.Render.EnableValidation = false;
     config.Render.EnableVSync = false;
-    // GRAPHICS-076 Slice D — explicit no-op assignment for reviewer clarity;
-    // `Core.Config.Render.cppm` already defaults `FrameRecipe` to `Default`,
-    // and `CreateReferenceEngineConfig()` does not override it. Pinning the
-    // field here protects this fixture against any future change to either
-    // of those defaults that would silently re-route this smoke onto a
-    // non-canonical recipe.
-    config.Render.FrameRecipe = FrameRecipeKind::Default;
-
     auto enginePtr = std::make_unique<Engine>(
         config, std::make_unique<ExitAfterFramesApp>(targetFrames));
     enginePtr->Initialize();
@@ -205,7 +187,6 @@ struct DefaultRecipeRunCapture
     Counters::Snapshot After{};
     Extrinsic::Backends::Vulkan::VulkanOperationalStatus Status{};
     Extrinsic::Graphics::RenderGraphFrameStats Stats{};
-    Extrinsic::Core::Config::FrameRecipeKind FrameRecipe{Extrinsic::Core::Config::FrameRecipeKind::Default};
     bool DeviceOperational{false};
 };
 
@@ -217,7 +198,6 @@ struct DefaultRecipeRunCapture
     capture.Status = EvaluateVulkanDeviceOperationalStatus(&engine.GetDevice());
     capture.DeviceOperational = engine.GetDevice().IsOperational();
     capture.Stats = engine.GetRenderer().GetLastRenderGraphStats();
-    capture.FrameRecipe = engine.GetRenderer().GetFrameRecipe();
     capture.After = ToCounterSnapshot(GetVulkanOperationalDiagnosticsSnapshot());
     return capture;
 }
@@ -241,7 +221,6 @@ struct DefaultRecipeRunCapture
         capture.Status = EvaluateVulkanDeviceOperationalStatus(&device);
         capture.DeviceOperational = device.IsOperational();
         capture.Stats = renderer.GetLastRenderGraphStats();
-        capture.FrameRecipe = renderer.GetFrameRecipe();
         capture.After = ToCounterSnapshot(GetVulkanOperationalDiagnosticsSnapshot());
         return capture;
     }
@@ -265,7 +244,6 @@ struct DefaultRecipeRunCapture
     capture.Status = EvaluateVulkanDeviceOperationalStatus(&device);
     capture.DeviceOperational = device.IsOperational();
     capture.Stats = renderer.GetLastRenderGraphStats();
-    capture.FrameRecipe = renderer.GetFrameRecipe();
     capture.After = ToCounterSnapshot(GetVulkanOperationalDiagnosticsSnapshot());
     return capture;
 }
@@ -348,14 +326,12 @@ struct DefaultRecipeRunCapture
 }
 } // namespace
 
-// GRAPHICS-076 Slice D — recipe-selector smoke for the canonical default
-// recipe. Mirrors `MinimalDebugSurfaceGpuSmoke.RecipeSelectorReachesOperationalVulkanCommandStream`
-// in spirit: drives one operational frame through the bounded `engine.Run()`
-// helper and asserts that the executor reached the operational Vulkan command
-// stream, that the canonical `"Present"` pass recorded its bind+draw, that
-// the recipe selector did NOT silently fall back to `MinimalDebug`, and that
-// the Vulkan fallback / init-failure / validation-error / operational-gate
-// counters did not increment across the operational frame.
+// GRAPHICS-076 Slice D — canonical default-recipe smoke. It drives one
+// operational frame through the bounded `engine.Run()` helper and asserts that
+// the executor reached the operational Vulkan command stream, that the
+// canonical `"Present"` pass recorded its bind+draw, and that the Vulkan
+// fallback / init-failure / validation-error / operational-gate counters did
+// not increment across the operational frame.
 //
 // This fixture is the default-recipe leg of GRAPHICS-076 Slice D. The
 // pixel-readback parity path remains a separate GRAPHICS-076E test below so
@@ -383,7 +359,6 @@ TEST(DefaultRecipeSurfaceGpuSmoke, RecipeSelectorReachesOperationalVulkanCommand
     EXPECT_EQ(run.Status.Code, Extrinsic::Backends::Vulkan::VulkanOperationalStatusCode::Operational);
     EXPECT_EQ(run.Status.Reason, Extrinsic::Backends::Vulkan::VulkanOperationalReason::None);
 
-    EXPECT_EQ(run.FrameRecipe, FrameRecipeKind::Default);
     EXPECT_TRUE(run.Stats.Compile.Succeeded) << run.Stats.Diagnostic;
     EXPECT_TRUE(run.Stats.Execute.Succeeded) << run.Stats.Diagnostic;
     EXPECT_TRUE(run.Stats.Execute.DeviceOperational);
@@ -401,17 +376,6 @@ TEST(DefaultRecipeSurfaceGpuSmoke, RecipeSelectorReachesOperationalVulkanCommand
     EXPECT_EQ(FindPassStatus(run.Stats, "Present"), RenderCommandPassStatus::Recorded)
         << "Canonical default recipe \"Present\" pass did not record on the operational "
         << "Vulkan command stream.";
-
-    // The recipe selector must not have silently fallen back to MinimalDebug.
-    // Both minimal-recipe execution counters are MinimalDebug-only and must
-    // stay zero under the default recipe.
-    EXPECT_EQ(run.Stats.MinimalSurfacePassExecutions, 0u);
-    EXPECT_EQ(run.Stats.MinimalPresentPassExecutions, 0u);
-    EXPECT_EQ(run.Stats.MinimalRecipeMissingPrerequisiteCount, 0u);
-    // The MinimalDebug readback hook must remain dormant under the default
-    // recipe because this fixture does not arm
-    // `SetMinimalDebugBackbufferReadbackBuffer(...)`.
-    EXPECT_EQ(run.Stats.MinimalDebugBackbufferReadbackCopyCount, 0u);
 
     EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
         << "Vulkan fallback counters incremented across an operational default-recipe frame: "
@@ -487,7 +451,6 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ReferenceTriangleDebugViewReadbackMatchesMini
     EXPECT_EQ(run.Status.Reason, Extrinsic::Backends::Vulkan::VulkanOperationalReason::None);
 
     const auto& stats = run.Stats;
-    EXPECT_EQ(run.FrameRecipe, FrameRecipeKind::Default);
     EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
     EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
     EXPECT_TRUE(stats.Execute.DeviceOperational);
@@ -501,8 +464,6 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ReferenceTriangleDebugViewReadbackMatchesMini
         << BuildPassStatusSummary(stats);
     EXPECT_EQ(FindPassStatus(stats, "Present"), RenderCommandPassStatus::Recorded)
         << BuildPassStatusSummary(stats);
-    EXPECT_EQ(stats.MinimalDebugBackbufferReadbackCopyCount, 0u)
-        << "Default-recipe readback must not reuse the MinimalDebug diagnostic counter.";
     EXPECT_GE(stats.DefaultRecipeBackbufferReadbackCopyCount, 1u)
         << "Default-recipe readback triplet did not record on any operational frame.";
 
@@ -567,7 +528,3 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ReferenceTriangleDebugViewReadbackMatchesMini
 
     engine.Shutdown();
 }
-
-
-
-

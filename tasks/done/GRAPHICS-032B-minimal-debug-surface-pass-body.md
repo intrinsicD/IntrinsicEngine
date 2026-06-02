@@ -3,7 +3,11 @@
 ## Goal
 - Implement the property-based CPU-mock command-recording body for `Pass.Surface.MinimalDebug`: bind the GRAPHICS-031 default-debug-surface pipeline, bind the `GpuWorld` index buffer, push scene-table BDA push constants, and `DrawIndexedIndirectCount` against the `SurfaceOpaque` cull bucket. The pass writes `SceneColorHDR` + `SceneDepth` and consumes `MaterialBuffer` SSBO at `set = 3, binding = 0`.
 
-> **Scaffold notice.** `Pass.Surface.MinimalDebug` is removed by [`GRAPHICS-081`](../backlog/rendering/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md) once `Pass.Forward.Surface` is operationally wired (`GRAPHICS-070`) and the rest of the default recipe lands. The canonical surface lane lives in `Pass.Forward.Surface`; this pass is only the bootstrap derisker.
+> **Scaffold notice.** `Pass.Surface.MinimalDebug` was removed by [`GRAPHICS-081`](GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md) after `Pass.Forward.Surface` became operationally wired (`GRAPHICS-070`) and the rest of the default recipe landed. The canonical surface lane lives in `Pass.Forward.Surface`; this pass was only the bootstrap derisker.
+
+## Retirement note
+
+- Retired by [`GRAPHICS-081`](GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md) on 2026-06-02. The bootstrap surface pass class, renderer route, counters, tests, and module-inventory rows authored by this task are deleted.
 
 ## Non-goals
 - No `Pass.Present.MinimalDebug` body (that is `GRAPHICS-032C`).

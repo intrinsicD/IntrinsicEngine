@@ -50,7 +50,7 @@ constexpr std::array<TruthTableRow, 5> kTruthTableFallbackRows{{
                                      VulkanOperationalReason::ValidationLayerError,
                                      false, true,  false},
     {"RequestedButIncompleteGate",   VulkanOperationalStatusCode::RequestedButIncompleteGate,
-                                     VulkanOperationalReason::MinimalRecipeRecordingMissing,
+                                     VulkanOperationalReason::DefaultRecipeRecordingMissing,
                                      false, false, true },
 }};
 
@@ -156,11 +156,10 @@ TEST(VulkanOperationalDiagnosticsSnapshot, CountersSurviveDeviceInitializeShutdo
             Extrinsic::Backends::Vulkan::CreateVulkanDevice();
         ASSERT_NE(device, nullptr);
 
-        device->Initialize(Extrinsic::RHI::DeviceCreateDesc{
-            .RenderConfig             = renderConfig,
-            .InitialFramebufferExtent = window.GetFramebufferExtent(),
-            .NativeWindowHandle       = window.GetNativeHandle(),
-        });
+        device->Initialize(Extrinsic::RHI::MakeDeviceCreateDesc(
+            renderConfig,
+            window.GetFramebufferExtent(),
+            window.GetNativeHandle()));
         ASSERT_FALSE(device->IsOperational());
 
         // The runtime breadcrumb call site would emit one fallback record per

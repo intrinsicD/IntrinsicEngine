@@ -382,7 +382,7 @@ correctness gate; only Slice D exercises an opt-in `gpu;vulkan` smoke.
 - No buffer-class debug visualization (out-of-scope per `GRAPHICS-013BQ`).
 - No backend-native swapchain blit/copy fast path (rejected per `GRAPHICS-013CQ` for the contract finalization form).
 
-> **Scaffold-retirement obligation.** This task is the last upstream gate before [`GRAPHICS-081`](../backlog/rendering/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md) can begin deleting the `MinimalDebugSurface` recipe scaffold. As part of `GRAPHICS-076`, author the **default-recipe equivalent** of the `GRAPHICS-033D` `gpu;vulkan` visible-triangle smoke (same pixel-readback driver harness, same four-sample-point assertion, same zero-fallback-counter invariant) so that `GRAPHICS-081` can delete the minimal-recipe fixture without reducing `gpu;vulkan` coverage. Owned by Slice D.
+> **Scaffold-retirement obligation.** Fulfilled by [`GRAPHICS-081`](GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md) on 2026-06-02. `GRAPHICS-076` authored the **default-recipe equivalent** of the `GRAPHICS-033D` `gpu;vulkan` visible-triangle smoke, and `GRAPHICS-081` deleted the bootstrap recipe fixture without reducing `gpu;vulkan` coverage.
 
 ## Context
 - Status: Slices A–C landed; Slice D blocked on Vulkan-capable host (see `## Status`).

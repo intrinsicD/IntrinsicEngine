@@ -22,6 +22,7 @@ target_sources(${target_name}
         RHI.PipelineManager.cppm
         RHI.PipelineRegistry.cppm
         PRIVATE
+        RHI.Device.cpp
         RHI.BufferManager.cpp
         RHI.TextureManager.cpp
         RHI.SamplerManager.cpp

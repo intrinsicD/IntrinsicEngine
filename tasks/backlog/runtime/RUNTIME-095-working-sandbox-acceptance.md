@@ -12,7 +12,7 @@
 
 ## Context
 - Owner/layer: `runtime` composition and acceptance harness, with dependencies across rendering, assets, runtime adapters, and UI.
-- This task is the discoverable path from current visible-triangle scaffolding to the working sandbox described in Theme A of `tasks/backlog/README.md`.
+- This task is the discoverable path from the current default-recipe visible-triangle baseline to the working sandbox described in Theme A of `tasks/backlog/README.md`.
 - Required upstreams include default-recipe rendering (`GRAPHICS-072..079`, `GRAPHICS-081`), runtime geometry residency (`RUNTIME-085..088`), selection (`GRAPHICS-074`, `RUNTIME-089`, `RUNTIME-092`, `RUNTIME-093`), asset/UI plumbing (`ASSETIO-001`, `RUNTIME-080`, `RUNTIME-090`, `UI-001`), and optional visualization/spatial-debug adapters (`RUNTIME-082`, `RUNTIME-083`, `GRAPHICS-077`, `GRAPHICS-078`).
 - The sandbox app itself must remain policy-light: composition and test scene setup live in runtime/reference-scene/editor seams, not direct graphics imports from `src/app`.
 
@@ -46,7 +46,7 @@
 - [ ] Entity selection, primitive selection, and selection outline work for the supported geometry domains.
 - [ ] Core UI panels are present and wired to runtime/editor command surfaces.
 - [ ] CPU/null tests prove extraction/residency/selection/UI contracts without GPU.
-- [ ] Opt-in GPU/Vulkan smoke proves the operational default-recipe path without relying on the MinimalDebug scaffold.
+- [ ] Opt-in GPU/Vulkan smoke proves the operational default-recipe path without reintroducing the retired bootstrap recipe scaffold.
 
 ## Verification
 ```bash
@@ -66,11 +66,10 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu|vulkan|integration'
 ## Forbidden changes
 - Reintroducing legacy render orchestration or graphics-owned ECS access to make the sandbox pass.
 - Adding app-layer shortcuts that bypass runtime composition or renderer snapshots.
-- Treating the MinimalDebug recipe as final acceptance for the working sandbox.
+- Treating the retired bootstrap recipe scaffold as final acceptance for the working sandbox.
 - Making GPU/Vulkan tests mandatory in the default CPU gate.
 - Claiming broad performance, PBR, transparency, or serialization parity from this functional acceptance task.
 
 ## Maturity
 - Target: `Operational` on Vulkan-capable hosts for the scoped acceptance scene; `CPUContracted` everywhere else.
-- This task retires the visible-triangle scaffold as a sandbox success metric; `GRAPHICS-081` owns actual MinimalDebug code deletion.
-
+- `GRAPHICS-081` has retired the visible-triangle bootstrap scaffold; this task treats the default recipe as the only rendering acceptance path.

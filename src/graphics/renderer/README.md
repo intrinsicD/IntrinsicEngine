@@ -531,68 +531,10 @@ Concretely:
   bytes exceeds the Vulkan-guaranteed minimum `maxPushConstantsSize`
   of 128 — reducing the block (e.g. moving `SelectedIds[16]` into a
   UBO or bindless buffer) is the tracked portability follow-up.
-- GRAPHICS-032A wires `FrameRecipe::MinimalDebugSurface` as a separate opt-in
-  recipe contract with the stable label `recipe.minimal-debug-surface`. The
-  recipe is built by
-  `BuildMinimalDebugSurfaceRecipe(graph, imports, sizing)` and declared by
-  `DescribeMinimalDebugSurfaceRecipe()` in `Extrinsic.Graphics.FrameRecipe`;
-  callers opt in via `Core::Config::RenderConfig::FrameRecipe =
-  Core::Config::FrameRecipeKind::MinimalDebug` and the
-  `IRenderer::SetFrameRecipe()` setter (default stays `FrameRecipeKind::Default`).
-  The recipe declares only
-  `Pass.Surface.MinimalDebug` and `Pass.Present.MinimalDebug`, writes
-  `SceneColorHDR`/`SceneDepth`, finalizes the imported `Backbuffer` through the
-  existing fullscreen-triangle `Pass.Present` contract, and never mutates the
-  default recipe's feature gates or skip/no-op expectations. Its CPU/null command
-  contract is property-based (`BeginRenderPass`, pipeline/descriptor/index-buffer
-  binds, `DrawIndexedIndirectCount` for `SurfaceOpaque`, then fullscreen
-  `Draw(3, 1, 0, 0)` for present) so tests assert pass labels, resource names,
-  bucket kind, draw kind, and counts rather than transient allocator/native
-  handles. Renderer diagnostics surface three counters on
-  `RenderGraphFrameStats`:
-  - `MinimalSurfacePassExecutions` — increments per successful surface-pass
-    record in `RecordMinimalDebugSurfacePass` (GRAPHICS-032B). The pass body
-    is owned by `Extrinsic.Graphics.Pass.Surface.MinimalDebug` and reuses the
-    GRAPHICS-031A slot-0 default-debug-surface pipeline lease, drawing the
-    SurfaceOpaque cull bucket through `DrawIndexedIndirectCount`.
-  - `MinimalPresentPassExecutions` — increments per successful present-pass
-    record in `RecordMinimalDebugPresentPass` (GRAPHICS-032C). The pass body
-    is owned by `Extrinsic.Graphics.Pass.Present.MinimalDebug` and reuses the
-    GRAPHICS-031A slot-0 default-debug-surface pipeline lease, recording the
-    canonical fullscreen-triangle present form (`BindPipeline` +
-    `Draw(3, 1, 0, 0)`).
-  - `MinimalRecipeMissingPrerequisiteCount` — accumulates per-frame from
-    three sites:
-    - At recipe build time in `Graphics.Renderer.cpp::ExecuteFrame` after
-      `BuildMinimalDebugSurfaceRecipe`, once per missing prerequisite:
-      invalid material buffer residency, invalid surface-opaque bucket
-      residency (counted jointly for the args/count pair), or invalid
-      scene-table residency. The recipe still compiles when prerequisites
-      are missing so the skip is observable rather than silent.
-    - At record time in `RecordMinimalDebugSurfacePass` whenever the slot-0
-      pipeline lease, the SurfaceOpaque cull bucket, or the GpuWorld
-      scene-table state is unavailable; the pass then routes to
-      `SkippedUnavailable` rather than recording an empty draw.
-    - At record time in `RecordMinimalDebugPresentPass` whenever the
-      shared slot-0 pipeline lease is unavailable; the pass then routes to
-      `SkippedUnavailable`. Because the minimal-debug present and surface
-      passes share the same lease, lease-failure scenarios increment the
-      counter from both record sites.
-
-  All three counters reset per-frame through the existing
-  `m_LastRenderGraphStats = {}` cadence in `ResetFrameState()` and
-  `ExecuteFrame()`. The GPU/Vulkan recipe-selector smoke landed with
-  GRAPHICS-032D as
-  `MinimalDebugSurfaceGpuSmoke.RecipeSelectorReachesOperationalVulkanCommandStream`,
-  the sibling of the GRAPHICS-033D pixel-readback fixture; both share the
-  bounded `engine.Run()` driver helper in
-  `tests/integration/graphics/Test.MinimalDebugSurfaceGpuSmoke.cpp` so the
-  driver loop is not duplicated. The entire MinimalDebug scaffold (the
-  recipe, the two passes, and the three counters) is deleted by
-  GRAPHICS-081 once the canonical default recipe records every pass body
-  operationally; the upstream gate for that deletion is GRAPHICS-076 plus
-  its scaffold-retirement-obligation `gpu;vulkan` default-recipe
-  visible-triangle smoke (Slice D).
+- GRAPHICS-081 retired the bootstrap-only recipe scaffold introduced by
+  GRAPHICS-032/033. The renderer now owns only the canonical default recipe
+  path: `BuildDefaultFrameRecipe(...)`, the default pass modules, and the
+  default-recipe diagnostics/readback counters.
 - GRAPHICS-076 Slice A wires the canonical default-recipe `Pass.Present`
   (`Extrinsic.Graphics.Pass.Present`) operationally on the CPU/null path.
   The renderer holds `m_PresentPass` (a default-constructed `PresentPass`)
@@ -602,21 +544,19 @@ Concretely:
   pipeline pointed at the new `assets/shaders/present.{vert,frag}` pair
   with `PushConstantSize = 0`, `Rasterizer.Culling = None`, depth test +
   write disabled, and `ColorTargetFormats[0]` pinned to the backbuffer
-  format. The present pipeline is the LAST pipeline created inside the
-  publisher (call #24 per
+  format. The present pipeline is created after postprocess inside the
+  publisher (call #23 per
   `tests/contract/graphics/Test.RendererFrameLifecycle.cpp`), placed
   after the postprocess histogram pipeline so the existing test
-  fixtures' `FailPipelineCreateCall` indices (1-23) remain stable. On
-  the executor side, the new `"Present"` branch (textually adjacent to
-  the existing `MinimalDebugPresent` branch) routes through
+  fixtures' `FailPipelineCreateCall` indices (1-22) remain explicit. On
+  the executor side, the `"Present"` branch routes through
   `RecordPresentPass(...)` with the same `Recorded` /
   `SkippedNonOperational` / `SkippedUnavailable` taxonomy the other
   default-recipe pass helpers already use; no new per-pass counter is
   introduced. The recipe-side wiring declares
   `Write(backbuffer, ColorAttachmentWrite)` + `SetRenderPass(...)` on
-  the canonical `"Present"` node — matching the
-  `Pass.Present.MinimalDebug` finalizer — so the framegraph compiler
-  emits a real `CompiledRenderPassAttachment` entry for the backbuffer,
+  the canonical `"Present"` node so the framegraph compiler emits a real
+  `CompiledRenderPassAttachment` entry for the backbuffer,
   `BuildActiveRenderPassDesc` reports `HasAttachments = true`, and the
   executor wraps `BindPipeline + Draw(3, 1, 0, 0)` in a
   `BeginRenderPass/EndRenderPass` scope so the draw is well-formed on
@@ -648,12 +588,11 @@ Concretely:
   block aligned to the 16-byte `DebugViewPushConstants` packing per
   GRAPHICS-013BQ §"Shader visualization modes"), pins
   `ColorTargetFormats[0] = RGBA8_UNORM` (the recipe's `DebugViewRGBA`
-  attachment format), and is created LAST inside the operational
-  publisher (call #25, immediately after present at #24) so the
-  existing `FailPipelineCreateCall` indices (1-24) used by other
+  attachment format), and is created after present inside the operational
+  publisher (call #24, immediately after present at #23) so the
+  existing `FailPipelineCreateCall` indices (1-23) used by other
   lifecycle / present tests remain stable. On the executor side, the
-  new `"DebugViewPass"` branch (textually between the `"Present"` and
-  `MinimalDebugPresent` branches) routes through
+  new `"DebugViewPass"` branch routes through
   `RecordDebugViewPass(graphicsContext, camera)` with the
   `Recorded` / `SkippedNonOperational` / `SkippedUnavailable` taxonomy
   the other default-recipe helpers use. Two new diagnostics surface on
@@ -677,17 +616,13 @@ Concretely:
   continue to use slot 0. The Slice B contract pin is
   `tests/contract/graphics/Test.DebugViewPass.cpp` (BindPipeline +
   PushConstants(16) + Draw(3, 1, 0, 0) routing under the default
-  recipe; missing pipeline lease `SkippedUnavailable` at call #25;
+  recipe; missing pipeline lease `SkippedUnavailable` at call #24;
   non-operational-device `SkippedNonOperational`; invalid-resource
   fallback diagnostic counter increments without silent failure; the
   default `"FrameRecipe.PresentSource"` request does not increment the
   counter; default world omits `"DebugViewPass"` from the recipe
   entirely). The renderer-internal `Pass.DebugView::Execute` contract
-  is verified by the existing `Test.DebugViewContract.cpp`. Slice D
-  (default-recipe `gpu;vulkan` visible-triangle smoke) and Slice C
-  (render-graph validation negative test) remain open under the same
-  GRAPHICS-076 task and are required before GRAPHICS-081 can delete
-  the MinimalDebug scaffold.
+  is verified by the existing `Test.DebugViewContract.cpp`.
 - GRAPHICS-077 Slice A scaffolds the default-recipe
   `TransientDebugSurfacePass` (`Extrinsic.Graphics.Pass.TransientDebug.Surface`)
   recipe + executor shape on the CPU/null path. Recipe-side,
@@ -725,8 +660,8 @@ Concretely:
   triangle pipeline leases (`m_TransientDebugTrianglePipelineLeaseDepthTested`
   / `m_TransientDebugTrianglePipelineLeaseAlwaysOnTop`), created via
   `BuildTransientDebugTrianglePipelineDesc(depthTested)` at call indices
-  #26 + #27 inside `InitializeOperationalPassResources()` (immediately
-  after the GRAPHICS-076 debug-view pipeline at #25 so upstream
+  #25 + #26 inside `InitializeOperationalPassResources()` (immediately
+  after the GRAPHICS-076 debug-view pipeline at #24 so upstream
   `FailPipelineCreateCall` indices stay stable). Both pipelines bind
   `assets/shaders/transient_debug_triangle.{vert,frag}`, target the
   `RGBA16_FLOAT` `SceneColorHDR` color attachment with depth attachment
@@ -749,7 +684,7 @@ Concretely:
   `UploadOverflowCount` only ticks if the helper exceeds its
   per-frame vertex-count cap (256 K vertices ≈ 4 MiB).
   `MissingPipelineSkipCount` continues to increment on the
-  operational-no-pipeline path (e.g. `FailPipelineCreateCall = 26`).
+  operational-no-pipeline path (e.g. `FailPipelineCreateCall = 25`).
   GRAPHICS-077 Slice C extends the helper + pass to the line + point
   lanes. `NullRenderer` now owns four additional pipeline leases
   (`m_TransientDebugLinePipelineLeaseDepthTested` /
@@ -758,9 +693,9 @@ Concretely:
   `m_TransientDebugPointPipelineLeaseAlwaysOnTop`), created via
   `BuildTransientDebugLinePipelineDesc(depthTested)` and
   `BuildTransientDebugPointPipelineDesc(depthTested)` at call indices
-  #28-#31 (immediately after the Slice B triangle pipelines at
-  #26+#27 so the Slice B contract tests pinning
-  `FailPipelineCreateCall = 26` still exercise the triangle
+  #27-#30 (immediately after the Slice B triangle pipelines at
+  #25+#26 so the Slice B contract tests pinning
+  `FailPipelineCreateCall = 25` still exercise the triangle
   DepthTested gate without disturbance). The line lane uses
   `Topology = LineList` with the shader pair
   `assets/shaders/transient_debug_line.{vert,frag}`, draws
@@ -836,8 +771,8 @@ Concretely:
   pairs `RHI::BufferManager` with `IDevice::WriteBuffer(...)` against
   a single growing host-visible vertex buffer per lane, geometric
   growth ×2 up to a per-lane cap of `1 << 18` vertices). Two new
-  pipelines land at call indices #32 (vector-field DepthTested) and
-  #33 (vector-field AlwaysOnTop), keyed by
+  pipelines land at call indices #31 (vector-field DepthTested) and
+  #32 (vector-field AlwaysOnTop), keyed by
   `BuildVisualizationVectorFieldPipelineDesc(depthTested)` against
   the new shader pair
   `assets/shaders/visualization_vector_field.{vert,frag}` (BDA-fetch
@@ -868,7 +803,7 @@ Concretely:
   `VisualizationOverlayUploadHelper` extends to a second per-lane
   buffer lease (independent geometric growth, same per-lane cap as
   the vector-field lane) and exposes `UploadIsolines(...)`. Two new
-  pipelines land at call indices #34 (isoline DepthTested) and #35
+  pipelines land at call indices #33 (isoline DepthTested) and #34
   (isoline AlwaysOnTop), keyed by
   `BuildVisualizationIsolinePipelineDesc(depthTested)` against the new
   shader pair `assets/shaders/visualization_isoline.{vert,frag}` (same

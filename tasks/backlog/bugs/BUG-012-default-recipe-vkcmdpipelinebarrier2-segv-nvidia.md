@@ -66,9 +66,9 @@
   view), `GRAPHICS-077` (transient debug primitives), and `GRAPHICS-078`
   (visualization overlay) Slice D `gpu;vulkan` smokes are currently
   parked at `Skipped` on every Vulkan-capable host because of this one
-  SEGV. The CPU-only correctness gate, MinimalDebug smoke, and every
-  other graphics test is unaffected (only the default recipe trips
-  this barrier).
+  SEGV. The CPU-only correctness gate and every other graphics test is
+  unaffected; the old bootstrap smoke has since been retired, and the
+  default-recipe smoke/readback path is the canonical Vulkan coverage.
 - Adjacent already-landed fixes:
   - `HARDEN-071` (RHI buffer/texture manager handle identity) — cleared
     the upstream SMAA AreaTex / SearchTex upload-rejection blocker.
@@ -111,9 +111,8 @@
   buffer, enabled `drawIndirectCount`, added default-recipe render-pass
   declarations for draw passes, and corrected renderer pass-name routing. The
   remaining graduation step is to remove/revise the smoke's cold-gate pre-check
-  and decide whether the default-recipe Slice D acceptance needs the same
-  readback parity harness as MinimalDebug or only the current recipe-selector
-  command-stream proof.
+  and decide whether the default-recipe Slice D acceptance needs readback parity
+  or only the current command-stream proof.
 - 2026-05-28 graduation: `GRAPHICS-076` removed the cold-gate pre-check and the
   `INTRINSIC_DEFAULT_RECIPE_SMOKE_BYPASS_COLD_GATE` diagnostic path from the
   default-recipe smoke. Host capability gaps still skip before `engine.Run()`,
@@ -265,4 +264,3 @@ ctest --test-dir build/ci --output-on-failure \
 - Working around the SEGV by skipping the offending pass at runtime;
   the fix must produce a driver-valid barrier sequence so the default
   recipe runs end-to-end.
-

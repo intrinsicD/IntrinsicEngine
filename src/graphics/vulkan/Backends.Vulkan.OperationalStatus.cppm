@@ -56,7 +56,7 @@ namespace Extrinsic::Backends::Vulkan
         AllocatorFailed                 = 7,
         SwapchainFailed                 = 8,
         CommandSyncFailed               = 9,
-        MinimalRecipeRecordingMissing   = 10,
+        DefaultRecipeRecordingMissing   = 10,
         BarrierValidationFailed         = 11,
         PublicServiceReconciliationFailed = 12,
         ValidationLayerError            = 13,
@@ -90,7 +90,7 @@ namespace Extrinsic::Backends::Vulkan
         bool CommandSyncReady                 = false;
 
         // Higher gates (steps 6-8).
-        bool MinimalRecipeRecordingPresent    = false;
+        bool DefaultRecipeRecordingPresent    = false;
         bool BarrierValidationClean           = false;
         bool PublicServiceReconciled          = false;
 

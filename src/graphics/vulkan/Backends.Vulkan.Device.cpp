@@ -951,14 +951,10 @@ VulkanOperationalInputs VulkanDevice::BuildOperationalInputs() const noexcept
     }
     inputs.CommandSyncReady = commandSyncReady;
 
-    // GRAPHICS-033C: the minimal-recipe recording bodies
-    // (`MinimalDebugSurfacePass::Execute` and
-    // `MinimalDebugPresentPass::Execute`) are present in the renderer and the
-    // executor lambda routes the live `VulkanCommandContext` to them whenever
-    // `IDevice::IsOperational()` is true and the slot-0 / culling / GpuWorld
-    // prerequisites are ready. The presence of the recording bodies is a
-    // codebase fact, so this gate flips to `true` here.
-    inputs.MinimalRecipeRecordingPresent = true;
+    // GRAPHICS-081: the default recipe now owns the canonical operational
+    // command-recording path, so this gate is satisfied by the promoted
+    // default-recipe executor routes.
+    inputs.DefaultRecipeRecordingPresent = true;
     // GRAPHICS-033E: gate 7 is sourced from the renderer-published recipe-aware
     // validation outcome. Cold-start fail-closed (`Initialize()` resets the
     // atomic to `false`); a single `Error`-severity finding flips it back to
@@ -1072,14 +1068,14 @@ VkResult VulkanDevice::CreateSwapchainResources(const std::uint32_t requestedWid
         desiredImageCount = surfaceCapabilities.maxImageCount;
 
     const std::uint32_t queueFamilyIndices[] = {m_GraphicsFamily, m_PresentFamily};
-    // GRAPHICS-033D: opt into TRANSFER_SRC for the swapchain images when the
-    // surface advertises it. The MinimalDebug backbuffer-to-host readback path
-    // records vkCmdCopyImageToBuffer with the backbuffer as the source, which
-    // requires `VK_IMAGE_USAGE_TRANSFER_SRC_BIT` on the image. The flag is
-    // commonly supported but not guaranteed by the Vulkan spec; when the
-    // surface omits it we keep the prior usage set and the renderer's readback
-    // hook degrades to a no-op (the gpu;vulkan smoke would then trip its own
-    // operational-counter assertion instead of producing undefined results).
+    // GRAPHICS-076E: opt into TRANSFER_SRC for the swapchain images when the
+    // surface advertises it. The default-recipe backbuffer-to-host readback
+    // path records vkCmdCopyImageToBuffer with the backbuffer as the source,
+    // which requires `VK_IMAGE_USAGE_TRANSFER_SRC_BIT` on the image. The flag
+    // is commonly supported but not guaranteed by the Vulkan spec; when the
+    // surface omits it we keep the prior usage set and the gpu;vulkan smoke
+    // trips its own operational-counter assertion instead of producing
+    // undefined results.
     VkImageUsageFlags swapchainImageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     if ((surfaceCapabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) != 0u)
     {
@@ -3137,8 +3133,8 @@ void VulkanDevice::WriteBuffer(RHI::BufferHandle handle, const void* data,
     vmaDestroyBuffer(m_Vma, stagingBuf, stagingAlloc);
 }
 
-// GRAPHICS-033D — host-visible buffer drain used by the opt-in
-// `gpu;vulkan` MinimalDebug visible-triangle smoke. Mirrors the host-visible
+// GRAPHICS-076E — host-visible buffer drain used by the opt-in
+// `gpu;vulkan` default-recipe visible-triangle smoke. Mirrors the host-visible
 // fast path of WriteBuffer in reverse: WaitIdle so any prior
 // `vkCmdCopyImageToBuffer` recorded into the in-flight command buffer has
 // finished, then memcpy out of the persistently-mapped pointer. Device-local
@@ -3970,4 +3966,3 @@ void VulkanDevice::FlushDeletionQueue(uint32_t frameSlot)
 }
 
 } // namespace Extrinsic::Backends::Vulkan
-

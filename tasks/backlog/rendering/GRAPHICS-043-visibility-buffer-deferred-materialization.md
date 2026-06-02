@@ -24,7 +24,7 @@ Lock down the contract for an alternative surface-rendering recipe that writes a
 6. **Barycentric reconstruction.** Decide between (a) hardware `BaryCoordKHR` if available, (b) software reconstruction from triangle vertex positions reprojected via index buffer + instance transform. Default: software reconstruction (portable). Record the rule.
 7. **Analytic ddx/ddy.** Differentials are reconstructed analytically from neighboring pixels' barycentrics. Record the rule for edge cases (cross-triangle quad helpers).
 8. **Light + shadow integration.** Materialization kernels read the same clustered light list (`GRAPHICS-039`), shadow atlas (`GRAPHICS-047` when ready), and IBL probes (`GRAPHICS-042`). Record that the lighting code is shared between forward, classic-deferred, and vis-buffer recipes via a Slang module.
-9. **Recipe selection.** `FrameRecipeKind::VisBufferDeferredMaterialization` is the new opt-in. Default recipe is unchanged. Record the rule.
+9. **Recipe selection.** A future explicit opt-in recipe selector/API is required for `VisBufferDeferredMaterialization`; the default recipe is unchanged. Record the rule without depending on the retired `RenderConfig::FrameRecipe` selector.
 10. **Diagnostics.** `VisBufferPixelsPerMaterial[]`, `VisBufferOverdrawCount` (always low — that's the point), `MaterializationKernelDispatchCount`. Atomic increments.
 11. **Test split.** `contract;graphics` for vis-buffer encoding/decoding, tile classification, kernel dispatch shape under null RHI; opt-in `gpu;vulkan` smoke for shading correctness against the forward recipe.
 12. **Layering.** No live ECS. No new RHI surfaces beyond what the existing framegraph supports.

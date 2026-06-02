@@ -764,7 +764,7 @@ TEST(PostProcess, HistogramReadbackDefaultsToInvalid)
 // B6 — FrameRecipe Combination Tests
 // =========================================================================
 
-TEST(RenderResources, MinimalRecipe_NoPasses_EmptyRecipe)
+TEST(RenderResources, DefaultPipeline_NoPasses_EmptyRecipe)
 {
     using namespace Graphics;
 

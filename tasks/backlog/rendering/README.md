@@ -422,7 +422,10 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   `MinimalPresentPassExecutions`, `MinimalRecipeMissingPrerequisiteCount`),
   recipe-vs-default isolation, failure modes, performance bounds, and layering.
   Implementation child slices (`GRAPHICS-032-Impl-A/B/C/D`) are identified but
-  not opened. Vulkan operational-readiness defers to GRAPHICS-033.
+  not opened. Vulkan operational-readiness defers to GRAPHICS-033. The
+  bootstrap implementation artifacts from this planning track were deleted by
+  [GRAPHICS-081](../../done/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md)
+  after the default recipe became canonical.
 - [GRAPHICS-033 — Vulkan operational readiness and runtime fallback diagnostics (planning)](../../done/GRAPHICS-033-vulkan-operational-readiness-and-diagnostics.md):
   retired planning-only operational-gate definition for the promoted Vulkan
   backend; locks the ordered gate checklist, single-source
@@ -458,8 +461,10 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   retired third implementation child. Implemented `Pass.Surface.MinimalDebug` and
   `Pass.Present.MinimalDebug` Vulkan recording bodies through the
   GRAPHICS-018R `RebuildOperationalResources()` seam, asserting CPU-mock
-  parity against the GRAPHICS-032 contract. Cleared the
-  `MinimalRecipeRecordingMissing` gate item; full `Operational` still
+  parity against the GRAPHICS-032 contract. The operational reason row was
+  renamed to `DefaultRecipeRecordingMissing` by
+  [GRAPHICS-081](../../done/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md)
+  when the bootstrap recipe retired; full `Operational` still
   required the follow-up gate items (barrier validation, public service
   reconciliation) before GRAPHICS-033E/F retired. Depends on GRAPHICS-033A,
   GRAPHICS-032 (done), GRAPHICS-031 (done), GRAPHICS-018R (done).
@@ -470,7 +475,10 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   supported hosts the fixture drove one GRAPHICS-032 minimal-recipe
   frame through GLFW + real Vulkan device + surface + swapchain and
   asserted `IsOperational() == true` with no fallback counters or
-  breadcrumbs. Depends on GRAPHICS-033A, GRAPHICS-033B, GRAPHICS-033C.
+  breadcrumbs. The fixture was removed by
+  [GRAPHICS-081](../../done/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md)
+  after the default-recipe smoke/readback path replaced it. Depends on
+  GRAPHICS-033A, GRAPHICS-033B, GRAPHICS-033C.
 - [GRAPHICS-034 — Asset-backed mesh residency from AssetInstance::Source to GpuWorld (planning)](GRAPHICS-034-asset-backed-mesh-residency-bridge.md):
   planning-only design for the asset-source residency path; locks down
   AssetId-normalization placement, separate runtime cache, key + refcount,
@@ -504,8 +512,9 @@ independently testable (CPU/null where possible), and gated as recorded.
 - [GRAPHICS-030B — Wire RenderExtraction to the procedural geometry residency bridge (done)](../../done/GRAPHICS-030B-extraction-procedural-geometry-binding.md):
   landed; depended on GRAPHICS-030A (done) and GRAPHICS-029B (done). First
   task that calls `GpuWorld::UploadGeometry()` and `SetInstanceGeometry()`
-  from extraction. Unblocks GRAPHICS-030C and the GRAPHICS-032B minimal-debug
-  pass body.
+  from extraction. Unblocks GRAPHICS-030C and provided the residency input that
+  the now-retired GRAPHICS-032B bootstrap pass body used before
+  GRAPHICS-081 deleted that scaffold.
 - [GRAPHICS-030C — Procedural geometry refcount/free retire ordering (done)](../../done/GRAPHICS-030C-procedural-geometry-retire-ordering.md):
   landed; deferred-retire window, refcount-cancellation resurrection, and
   `RenderExtractionCache::TickProceduralGeometry` maintenance hook are
@@ -516,20 +525,27 @@ independently testable (CPU/null where possible), and gated as recorded.
 - [GRAPHICS-031B — Default debug surface substitution and diagnostics counters (done)](../../done/GRAPHICS-031B-default-debug-surface-substitution-and-diagnostics.md):
   depends on GRAPHICS-031A. Landed by commit `24ac0b7`.
 - [GRAPHICS-032A — `FrameRecipe::MinimalDebugSurface` recipe and registration (done)](../../done/GRAPHICS-032A-minimal-debug-surface-recipe.md):
-  depends on GRAPHICS-031A. Landed by commit `3931705`.
+  depends on GRAPHICS-031A. Landed by commit `3931705`; artifacts retired by
+  [GRAPHICS-081](../../done/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md).
 - [GRAPHICS-032B — `Pass.Surface.MinimalDebug` CPU-mock command body (done)](../../done/GRAPHICS-032B-minimal-debug-surface-pass-body.md):
-  depends on GRAPHICS-032A and GRAPHICS-030B. Landed by commit `7fff8ca`.
+  depends on GRAPHICS-032A and GRAPHICS-030B. Landed by commit `7fff8ca`;
+  artifacts retired by
+  [GRAPHICS-081](../../done/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md).
 - [GRAPHICS-032C — `Pass.Present.MinimalDebug` body and end-to-end CPU acceptance test (done)](../../done/GRAPHICS-032C-minimal-debug-present-pass-and-acceptance.md):
-  depends on GRAPHICS-032B. Landed by commit `e50c593`.
+  depends on GRAPHICS-032B. Landed by commit `e50c593`; artifacts retired by
+  [GRAPHICS-081](../../done/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md).
 - [GRAPHICS-033A — Vulkan operational-status evaluator surface (done)](../../done/GRAPHICS-033A-vulkan-operational-status-evaluator.md):
   depends on GRAPHICS-033 (planning). Landed by commit `7a5886d`.
 - [GRAPHICS-033B — Vulkan operational diagnostics snapshot and runtime breadcrumb (done)](../../done/GRAPHICS-033B-vulkan-operational-diagnostics-and-breadcrumb.md):
   depends on GRAPHICS-033A. Landed by commit `d736d9b`.
 - [GRAPHICS-033C — Vulkan command-recording for `FrameRecipe::MinimalDebugSurface` (done)](../../done/GRAPHICS-033C-vulkan-minimal-recipe-recording.md):
   depends on GRAPHICS-032C, GRAPHICS-031B, GRAPHICS-033B, and GRAPHICS-018R
-  (done) operational-transition seam.
+  (done) operational-transition seam; bootstrap recording artifacts retired by
+  [GRAPHICS-081](../../done/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md).
 - [GRAPHICS-033D — Opt-in `gpu;vulkan` visible-triangle smoke fixture (done)](../../done/GRAPHICS-033D-gpu-vulkan-visible-triangle-smoke.md):
-  depends on GRAPHICS-033C; owns the pixel-readback driver harness.
+  depends on GRAPHICS-033C; originally owned the bootstrap pixel-readback
+  driver harness, which is now superseded by the default-recipe smoke/readback
+  fixture after GRAPHICS-081.
 - [GRAPHICS-033E — Wire the `BarrierValidationClean` operational gate (done)](../../done/GRAPHICS-033E-vulkan-operational-gate-barrier-validation.md):
   done (slice 2 dropped the over-restrictive compile-time clause from the
   producer publish; CPU gate green). Depends on GRAPHICS-033C (recording
@@ -555,7 +571,8 @@ independently testable (CPU/null where possible), and gated as recorded.
   depended on GRAPHICS-033C and GRAPHICS-033D; landed as the
   `MinimalDebugSurfaceGpuSmoke.RecipeSelectorReachesOperationalVulkanCommandStream`
   sibling sharing the GRAPHICS-033D bounded `engine.Run()` driver helper for
-  recipe-selector coverage.
+  recipe-selector coverage. Fixture and selector artifacts retired by
+  [GRAPHICS-081](../../done/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md).
 - [GRAPHICS-080 — Flip reference config + CI preset to enable promoted Vulkan (done)](../../done/GRAPHICS-080-enable-promoted-vulkan-by-default.md):
   depends on GRAPHICS-033C (done).
   Adds the `ci-vulkan` configure preset and flips
@@ -654,7 +671,7 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   Vulkan-capable host after the BUG-012 command-stream fixes.
 - [GRAPHICS-076E — Default-recipe pixel-readback parity harness](../../done/GRAPHICS-076E-default-recipe-pixel-readback.md):
   done 2026-05-29. Follow-up to GRAPHICS-076 Slice D. Adds default-recipe
-  four-sample readback parity without reusing MinimalDebug-only diagnostics;
+  four-sample readback parity without reusing bootstrap-only diagnostics;
   the GRAPHICS-076F descriptor-slot fix made the opt-in Vulkan pixel smoke
   green.
 - [GRAPHICS-077 — Backend transient-debug-primitive upload helper](../../done/GRAPHICS-077-transient-debug-primitive-upload-helper.md):
@@ -667,7 +684,7 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   operational Vulkan frame.
 - [GRAPHICS-077E — Transient-debug pixel-readback parity harness](GRAPHICS-077E-transient-debug-pixel-readback.md):
   follow-up to GRAPHICS-077 Slice D. Adds opt-in Vulkan readback/sample-color
-  parity without reusing MinimalDebug-only diagnostics.
+  parity without reusing the canonical surface-readback diagnostics.
 - [GRAPHICS-078 — Backend visualization-overlay upload helper](../../done/GRAPHICS-078-visualization-overlay-upload-helper.md):
   depends on GRAPHICS-077 (mirrors helper pattern) and GRAPHICS-072.
   Promoted to `tasks/active/` on 2026-05-24 with a four-slice plan
@@ -678,21 +695,18 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   and isoline lanes on an operational Vulkan frame.
 - [GRAPHICS-078E — Visualization-overlay pixel-readback parity harness](GRAPHICS-078E-visualization-overlay-pixel-readback.md):
   follow-up to GRAPHICS-078 Slice D. Adds opt-in Vulkan readback/sample-color
-  parity without reusing MinimalDebug-only diagnostics.
+  parity without reusing the canonical surface-readback diagnostics.
 - [GRAPHICS-079 — Default-recipe `Pass.ImGui` wiring](../../done/GRAPHICS-079-default-recipe-imgui-pass-wiring.md)
   (done): depends on GRAPHICS-076 (PresentSource finalization) and
   `runtime/RUNTIME-090` (ImGui adapter producer). It wires the renderer
   `ImGuiPass` executor route + consumer handoff seam, retained font atlas,
   transient upload helper, `FrameRecipe.PresentSource` write topology, and
   per-command bindless user-texture sampling.
-- [GRAPHICS-081 — Retire `FrameRecipe::MinimalDebugSurface` scaffold once default recipe is operational](GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md):
-  depends on GRAPHICS-031A/B and GRAPHICS-070..076; consumes the now-green
-  GRAPHICS-076E default-recipe pixel-readback parity evidence before deletion.
-  Deletes the
-  `MinimalDebug` recipe, pass classes, executor branches, diagnostics
-  counters, CMake entries, tests, and doc rows once the default recipe
-  records all canonical pass bodies and the default-recipe equivalent of the
-  GRAPHICS-033D `gpu;vulkan` visible-triangle smoke is green.
+- [GRAPHICS-081 — Retire `FrameRecipe::MinimalDebugSurface` scaffold once default recipe is operational](../../done/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md):
+  done 2026-06-02. Deleted the bootstrap recipe, pass classes, executor
+  branches, diagnostics counters, CMake entries, shaders, tests, and module
+  inventory rows after GRAPHICS-076E/F made the default-recipe visible-triangle
+  readback path canonical.
 
 Cross-layer Theme B′ leaves outside `rendering/`:
 - [`runtime/RUNTIME-080` — Texture asset bridge](../runtime/RUNTIME-080-asset-bridges-texture.md).

@@ -17,7 +17,7 @@ Lock down the contract for a differentiable-rendering execution mode in which th
 - Cross-links: `GRAPHICS-041` (autodiff annotation policy), `GRAPHICS-048` (3DGS fitting is a natural consumer), `GRAPHICS-049` (NRC training is a special case), `methods/` workflow per `docs/agent/method-workflow.md`.
 
 ## Design decisions to record
-1. **Recipe selection.** `FrameRecipeKind::DifferentiableRender` is a separate recipe; production recipes are unchanged. Record the rule that differentiable mode is opt-in per method.
+1. **Recipe selection.** `DifferentiableRender` is a separate future recipe selected through an explicit method/runtime API; production recipes are unchanged. Record the rule that differentiable mode is opt-in per method and does not depend on the retired `RenderConfig::FrameRecipe` selector.
 2. **Forward + backward graph.** Compile produces a paired forward + backward render graph. Backward graph executes in reverse pass order, consuming per-pass adjoints. Record the compile output shape.
 3. **`differentiable` annotation.** Per-pass and per-shader-module annotation declares which inputs participate in autodiff. Annotated passes have backward kernels; non-annotated passes are no-ops on the backward pass (pass-through).
 4. **Adjoint buffer lifetime.** Per-pass adjoint buffers are frame-graph-managed transients with explicit retain across forward → backward. Record the lifetime extension rule.

@@ -278,20 +278,9 @@ namespace Extrinsic::Graphics
         std::string Diagnostic{};
     };
 
-    // GRAPHICS-032A — stable label for the opt-in minimal-debug-surface recipe.
-    // Tests and diagnostics match this label rather than transient allocator IDs.
-    export inline constexpr std::string_view kMinimalDebugSurfaceRecipeLabel = "recipe.minimal-debug-surface";
-
-    // GRAPHICS-032A — stable pass labels for the minimal-debug-surface recipe.
-    // The two passes are the only recording passes in this recipe.
-    export inline constexpr std::string_view kMinimalDebugSurfacePassName = "Pass.Surface.MinimalDebug";
-    export inline constexpr std::string_view kMinimalDebugPresentPassName = "Pass.Present.MinimalDebug";
-
     export [[nodiscard]] FrameRecipeFeatures DeriveDefaultFrameRecipeFeatures(const RenderWorld& world);
 
     export [[nodiscard]] FrameRecipeIntrospection DescribeDefaultFrameRecipe(const FrameRecipeFeatures& features);
-
-    export [[nodiscard]] FrameRecipeIntrospection DescribeMinimalDebugSurfaceRecipe();
 
     export [[nodiscard]] RenderGraphValidationResult ValidateRecipeCompiledGraph(
         const FrameRecipeIntrospection& recipe,
@@ -302,8 +291,4 @@ namespace Extrinsic::Graphics
                                                                         const FrameRecipeImports& imports,
                                                                         const FrameRecipeSizing& sizing,
                                                                         const FrameRecipeShadowSizing& shadowSizing = {});
-
-    export [[nodiscard]] FrameRecipeBuildResult BuildMinimalDebugSurfaceRecipe(RenderGraph& graph,
-                                                                               const FrameRecipeImports& imports,
-                                                                               const FrameRecipeSizing& sizing);
 }

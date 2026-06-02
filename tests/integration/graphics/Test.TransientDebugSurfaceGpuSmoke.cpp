@@ -15,7 +15,6 @@
 
 import Extrinsic.Backends.Vulkan;
 import Extrinsic.Core.Config.Engine;
-import Extrinsic.Core.Config.Render;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
@@ -31,7 +30,6 @@ using Extrinsic::Backends::Vulkan::EvaluateVulkanDeviceOperationalStatus;
 using Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs;
 using Extrinsic::Backends::Vulkan::GetVulkanOperationalDiagnosticsSnapshot;
 using Extrinsic::Backends::Vulkan::ToString;
-using Extrinsic::Core::Config::FrameRecipeKind;
 using Extrinsic::Graphics::RenderCommandPassStatus;
 using Extrinsic::Runtime::Engine;
 using Extrinsic::Runtime::IApplication;
@@ -101,7 +99,6 @@ struct TransientDebugBootstrap
 	config.Window.Resizable = false;
 	config.Render.EnableValidation = false;
 	config.Render.EnableVSync = false;
-	config.Render.FrameRecipe = FrameRecipeKind::Default;
 
 	auto enginePtr = std::make_unique<Engine>(
 		config, std::make_unique<ExitAfterFramesApp>(targetFrames));
@@ -277,6 +274,5 @@ TEST(TransientDebugSurfaceGpuSmoke, MixedLanesRecordOnOperationalVulkanCommandSt
 
 	engine.Shutdown();
 }
-
 
 

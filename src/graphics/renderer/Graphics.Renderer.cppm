@@ -120,34 +120,12 @@ namespace Extrinsic::Graphics
         std::string DebugDump{};
         std::string Diagnostic{};
         std::string LifecycleDiagnostic{};
-        // GRAPHICS-032A — minimal-debug-surface recipe diagnostics. The two
-        // execution counters increment in GRAPHICS-032B/C once the pass bodies
-        // land; until then they remain zero even when the recipe is selected.
-        // `MinimalRecipeMissingPrerequisiteCount` reflects per-frame counts of
-        // material/pipeline/surface-bucket residency gaps detected at recipe
-        // build time. All three reset per-frame at `BeginFrame`/`ExecuteFrame`
-        // through the existing `m_LastRenderGraphStats = {}` cadence.
-        std::uint32_t MinimalSurfacePassExecutions = 0;
-        std::uint32_t MinimalPresentPassExecutions = 0;
-        std::uint32_t MinimalRecipeMissingPrerequisiteCount = 0;
-        // GRAPHICS-033D — count of frames in which the opt-in MinimalDebug
-        // backbuffer-to-host readback seam recorded the
-        // `Present → TransferSrc → CopyImageToBuffer → Present` triplet. Stays
-        // at zero unless `SetMinimalDebugBackbufferReadbackBuffer()` was
-        // configured with a valid HostVisible+TransferDst buffer and the
-        // recipe + device are operational during the frame. The smoke fixture
-        // asserts this is 1 after a single operational frame so the readback
-        // wiring cannot silently regress to a no-op.
-        std::uint32_t MinimalDebugBackbufferReadbackCopyCount = 0;
         // GRAPHICS-076E — count of frames in which the opt-in default-recipe
         // backbuffer-to-host readback seam recorded the
         // `Present → TransferSrc → CopyImageToBuffer → Present` triplet.
-        // This is intentionally separate from the MinimalDebug counter so the
-        // canonical default recipe can prove pixel parity without reusing the
-        // scaffold-only diagnostic. Stays at zero unless
-        // `SetDefaultRecipeBackbufferReadbackBuffer()` was configured with a
-        // valid HostVisible+TransferDst buffer and the default recipe + device
-        // are operational during the frame.
+        // Stays at zero unless `SetDefaultRecipeBackbufferReadbackBuffer()` was
+        // configured with a valid HostVisible+TransferDst buffer and the device
+        // is operational during the frame.
         std::uint32_t DefaultRecipeBackbufferReadbackCopyCount = 0;
         // GRAPHICS-074 Slice D.2 — count of frames in which the default
         // recipe's PickingPass executor branch recorded the picking-readback
@@ -638,37 +616,13 @@ namespace Extrinsic::Graphics
         virtual void SetLightingPath(FrameRecipeLightingPath path) noexcept = 0;
         [[nodiscard]] virtual FrameRecipeLightingPath GetLightingPath() const noexcept = 0;
 
-        // GRAPHICS-032A — opt-in selector for the minimal-debug-surface frame
-        // recipe. Default is `FrameRecipeKind::Default`, preserving the
-        // existing `BuildDefaultFrameRecipe` path. Runtime callers translate
-        // `Core::Config::RenderConfig::FrameRecipe` into this setter; scaffold
-        // retired by GRAPHICS-081.
-        virtual void SetFrameRecipe(Core::Config::FrameRecipeKind kind) noexcept = 0;
-
-        [[nodiscard]] virtual Core::Config::FrameRecipeKind GetFrameRecipe() const noexcept = 0;
-
-        // GRAPHICS-033D — opt-in backbuffer-to-host readback wiring for the
-        // MinimalDebug visible-triangle smoke (and the canonical
-        // GRAPHICS-076/081 default-recipe equivalent once those land). The
-        // caller owns the buffer's lifetime via `BufferManager::BufferLease`
-        // and passes the raw handle; the renderer issues
-        // `vkCmdCopyImageToBuffer` after the present pass and before the
-        // backbuffer transitions to PRESENT_SRC on hosts where the device is
-        // operational and the MinimalDebug recipe is selected. Calling with
-        // `RHI::BufferHandle{}` disables the readback path (the default
-        // post-Initialize state). Scaffold retired by GRAPHICS-081.
-        virtual void SetMinimalDebugBackbufferReadbackBuffer(RHI::BufferHandle handle) noexcept = 0;
-
-        [[nodiscard]] virtual RHI::BufferHandle GetMinimalDebugBackbufferReadbackBuffer() const noexcept = 0;
-
         // GRAPHICS-076E — opt-in backbuffer-to-host readback wiring for the
         // canonical default recipe's visible-triangle parity harness. The
         // caller owns the buffer lifetime and passes a raw HostVisible +
-        // TransferDst handle. The renderer records the same
-        // Present→TransferSrc→CopyTextureToBuffer→Present triplet as the
-        // MinimalDebug seam, but only when `FrameRecipeKind::Default` is
-        // selected and the device is operational. Calling with an invalid
-        // handle disables the path (default post-Initialize state).
+        // TransferDst handle. The renderer records the
+        // Present→TransferSrc→CopyTextureToBuffer→Present triplet when the
+        // device is operational. Calling with an invalid handle disables the
+        // path (default post-Initialize state).
         virtual void SetDefaultRecipeBackbufferReadbackBuffer(RHI::BufferHandle handle) noexcept = 0;
 
         [[nodiscard]] virtual RHI::BufferHandle GetDefaultRecipeBackbufferReadbackBuffer() const noexcept = 0;
