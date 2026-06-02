@@ -991,19 +991,16 @@ namespace Extrinsic::Runtime
 
         const auto& visualization = sidecar.Visualization;
         VisualizationAdapterStats perAdapter{};
-        adapter->Append(
-            m_VisualizationAdapterBatch,
-            VisualizationAdapterOptions{
-                .SourceName = visualization.ScalarFieldName,
-                .OutputName = visualization.ScalarFieldName,
-                .Domain = ToVisualizationAttributeDomain(visualization.ScalarDomain),
-                .BufferBDA = bindingIt->second.BufferBDA,
-                .AutoRange = visualization.Scalar.AutoRange,
-                .RangeMin = visualization.Scalar.RangeMin,
-                .RangeMax = visualization.Scalar.RangeMax,
-                .Colormap = visualization.Scalar.Map,
-            },
-            perAdapter);
+        VisualizationAdapterOptions options{};
+        options.SourceName = visualization.ScalarFieldName;
+        options.OutputName = visualization.ScalarFieldName;
+        options.Domain = ToVisualizationAttributeDomain(visualization.ScalarDomain);
+        options.BufferBDA = bindingIt->second.BufferBDA;
+        options.AutoRange = visualization.Scalar.AutoRange;
+        options.RangeMin = visualization.Scalar.RangeMin;
+        options.RangeMax = visualization.Scalar.RangeMax;
+        options.Colormap = visualization.Scalar.Map;
+        adapter->Append(m_VisualizationAdapterBatch, options, perAdapter);
 
         ++stats.VisualizationAdapterInvokedCount;
         stats.VisualizationAdapterPacketAppendCount += perAdapter.PacketAppendCount;

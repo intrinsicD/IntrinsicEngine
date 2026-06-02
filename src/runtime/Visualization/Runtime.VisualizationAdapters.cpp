@@ -9,6 +9,8 @@ module;
 #include <string_view>
 #include <utility>
 
+#include <glm/glm.hpp>
+
 module Extrinsic.Runtime.VisualizationAdapters;
 
 import Geometry.Properties;
@@ -21,6 +23,17 @@ namespace Extrinsic::Runtime
         [[nodiscard]] bool IsFinite(const float value) noexcept
         {
             return std::isfinite(value);
+        }
+
+        [[nodiscard]] bool IsFinite(const glm::vec3& value) noexcept
+        {
+            return IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z);
+        }
+
+        [[nodiscard]] bool IsFinite(const glm::vec4& value) noexcept
+        {
+            return IsFinite(value.x) && IsFinite(value.y) &&
+                   IsFinite(value.z) && IsFinite(value.w);
         }
 
         [[nodiscard]] bool ValidRange(const float minValue,
@@ -142,6 +155,91 @@ namespace Extrinsic::Runtime
             ++stats.PacketAppendCount;
             return true;
         }
+
+        template <typename T>
+        [[nodiscard]] bool ValidateSourceSpan(std::span<const T> values,
+                                              VisualizationAdapterStats& stats) noexcept
+        {
+            if (values.empty())
+            {
+                ++stats.EmptySourceCount;
+                return false;
+            }
+            if (values.size() > std::numeric_limits<std::uint32_t>::max())
+            {
+                ++stats.ElementCountOverflowCount;
+                return false;
+            }
+            for (const T& value : values)
+            {
+                if (!IsFinite(value))
+                {
+                    ++stats.NonFiniteValueCount;
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        bool AppendColorPacket(const Geometry::ConstProperty<glm::vec4>& property,
+                               VisualizationAdapterBatch& out,
+                               const VisualizationAdapterOptions& options,
+                               VisualizationAdapterStats& stats)
+        {
+            const std::span<const glm::vec4> values = property.Span();
+            if (!ValidateSourceSpan(values, stats))
+                return false;
+
+            if (options.ColorBufferBDA == 0u)
+            {
+                ++stats.InvalidBufferCount;
+                return false;
+            }
+
+            out.Colors.push_back(Graphics::ColorAttributePacket{
+                .Name = options.OutputName.empty() ? options.SourceName : options.OutputName,
+                .Domain = options.Domain,
+                .ElementCount = static_cast<std::uint32_t>(values.size()),
+                .ColorBufferBDA = options.ColorBufferBDA,
+            });
+            ++stats.PacketAppendCount;
+            return true;
+        }
+
+        bool AppendVectorFieldPacket(const Geometry::ConstProperty<glm::vec3>& property,
+                                     VisualizationAdapterBatch& out,
+                                     const VisualizationAdapterOptions& options,
+                                     VisualizationAdapterStats& stats)
+        {
+            const std::span<const glm::vec3> values = property.Span();
+            if (!ValidateSourceSpan(values, stats))
+                return false;
+
+            if (options.PositionBufferBDA == 0u || options.VectorBufferBDA == 0u)
+            {
+                ++stats.InvalidBufferCount;
+                return false;
+            }
+            if (!IsFinite(options.VectorScale) || options.VectorScale <= 0.0f ||
+                !IsFinite(options.VectorColor))
+            {
+                ++stats.InvalidRangeCount;
+                return false;
+            }
+
+            out.VectorFields.push_back(Graphics::VectorFieldOverlayPacket{
+                .Name = options.OutputName.empty() ? options.SourceName : options.OutputName,
+                .Domain = options.Domain,
+                .ElementCount = static_cast<std::uint32_t>(values.size()),
+                .PositionBufferBDA = options.PositionBufferBDA,
+                .VectorBufferBDA = options.VectorBufferBDA,
+                .Scale = options.VectorScale,
+                .Color = options.VectorColor,
+                .DepthTested = options.DepthTested,
+            });
+            ++stats.PacketAppendCount;
+            return true;
+        }
     }
 
     void VisualizationAdapterBatch::Clear() noexcept
@@ -206,6 +304,76 @@ namespace Extrinsic::Runtime
             doubleProperty.IsValid())
         {
             (void)AppendScalarPacket(doubleProperty, out, options, stats);
+            return;
+        }
+
+        if (m_Properties.Exists(options.SourceName))
+        {
+            ++stats.UnsupportedSourceTypeCount;
+        }
+        else
+        {
+            ++stats.MissingSourceCount;
+        }
+    }
+
+    KMeansLabelAdapter::KMeansLabelAdapter(
+        Geometry::ConstPropertySet properties) noexcept
+        : m_Properties(std::move(properties))
+    {
+    }
+
+    void KMeansLabelAdapter::Append(VisualizationAdapterBatch& out,
+                                    const VisualizationAdapterOptions& options,
+                                    VisualizationAdapterStats& stats) const
+    {
+        ++stats.AdapterInvocationCount;
+
+        if (options.SourceName.empty())
+        {
+            ++stats.MissingSourceCount;
+            return;
+        }
+
+        if (const auto colors = m_Properties.Get<glm::vec4>(options.SourceName);
+            colors.IsValid())
+        {
+            (void)AppendColorPacket(colors, out, options, stats);
+            return;
+        }
+
+        if (m_Properties.Exists(options.SourceName))
+        {
+            ++stats.UnsupportedSourceTypeCount;
+        }
+        else
+        {
+            ++stats.MissingSourceCount;
+        }
+    }
+
+    VectorFieldAdapter::VectorFieldAdapter(
+        Geometry::ConstPropertySet properties) noexcept
+        : m_Properties(std::move(properties))
+    {
+    }
+
+    void VectorFieldAdapter::Append(VisualizationAdapterBatch& out,
+                                    const VisualizationAdapterOptions& options,
+                                    VisualizationAdapterStats& stats) const
+    {
+        ++stats.AdapterInvocationCount;
+
+        if (options.SourceName.empty())
+        {
+            ++stats.MissingSourceCount;
+            return;
+        }
+
+        if (const auto vectors = m_Properties.Get<glm::vec3>(options.SourceName);
+            vectors.IsValid())
+        {
+            (void)AppendVectorFieldPacket(vectors, out, options, stats);
             return;
         }
 

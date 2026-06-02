@@ -34,6 +34,18 @@ namespace
         auto color = properties.Add<glm::vec3>("color", glm::vec3{1.0f});
         color[0] = glm::vec3{1.0f, 0.0f, 0.0f};
 
+        auto kmeansColor = properties.Add<glm::vec4>("v:kmeans_color", glm::vec4{1.0f});
+        kmeansColor[0] = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f};
+        kmeansColor[1] = glm::vec4{0.0f, 1.0f, 0.0f, 1.0f};
+        kmeansColor[2] = glm::vec4{0.0f, 0.0f, 1.0f, 1.0f};
+        kmeansColor[3] = glm::vec4{1.0f, 1.0f, 0.0f, 1.0f};
+
+        auto velocity = properties.Add<glm::vec3>("velocity", glm::vec3{0.0f});
+        velocity[0] = glm::vec3{1.0f, 0.0f, 0.0f};
+        velocity[1] = glm::vec3{0.0f, 1.0f, 0.0f};
+        velocity[2] = glm::vec3{0.0f, 0.0f, 1.0f};
+        velocity[3] = glm::vec3{-1.0f, 0.0f, 0.0f};
+
         return properties;
     }
 }
@@ -216,6 +228,194 @@ TEST(VisualizationAdapters, PropertyScalarAdapterRejectsEmptyAndNonFiniteSources
     EXPECT_EQ(stats.NonFiniteValueCount, 1u);
 }
 
+TEST(VisualizationAdapters, KMeansLabelAdapterAppendsColorPacket)
+{
+    Geometry::PropertySet properties = MakeScalarProperties();
+    const R::KMeansLabelAdapter adapter{
+        Geometry::ConstPropertySet{properties}};
+
+    R::VisualizationAdapterBatch batch{};
+    R::VisualizationAdapterStats stats{};
+    adapter.Append(batch,
+                   R::VisualizationAdapterOptions{
+                       .SourceName = "v:kmeans_color",
+                       .OutputName = "clusters",
+                       .Domain = G::VisualizationAttributeDomain::Vertex,
+                       .ColorBufferBDA = 0x6000u,
+                   },
+                   stats);
+
+    ASSERT_EQ(batch.Colors.size(), 1u);
+    const G::ColorAttributePacket& packet = batch.Colors.front();
+    EXPECT_EQ(packet.Name, "clusters");
+    EXPECT_EQ(packet.Domain, G::VisualizationAttributeDomain::Vertex);
+    EXPECT_EQ(packet.ElementCount, 4u);
+    EXPECT_EQ(packet.ColorBufferBDA, 0x6000u);
+    EXPECT_EQ(stats.AdapterInvocationCount, 1u);
+    EXPECT_EQ(stats.PacketAppendCount, 1u);
+
+    const G::VisualizationDiagnostics diagnostics =
+        G::ValidateVisualizationPackets(batch.AsPacketBatch(
+            true,
+            G::VisualizationAttributeDomain::Vertex));
+    EXPECT_EQ(diagnostics.InputPacketCount, 1u);
+    EXPECT_EQ(diagnostics.AcceptedPacketCount, 1u);
+    EXPECT_FALSE(diagnostics.HasErrors);
+}
+
+TEST(VisualizationAdapters, KMeansLabelAdapterRejectsInvalidSources)
+{
+    Geometry::PropertySet properties = MakeScalarProperties();
+    const R::KMeansLabelAdapter adapter{
+        Geometry::ConstPropertySet{properties}};
+
+    R::VisualizationAdapterBatch batch{};
+    R::VisualizationAdapterStats stats{};
+    adapter.Append(batch,
+                   R::VisualizationAdapterOptions{
+                       .SourceName = "missing",
+                       .ColorBufferBDA = 0x7000u,
+                   },
+                   stats);
+    adapter.Append(batch,
+                   R::VisualizationAdapterOptions{
+                       .SourceName = "color",
+                       .ColorBufferBDA = 0x7000u,
+                   },
+                   stats);
+    adapter.Append(batch,
+                   R::VisualizationAdapterOptions{
+                       .SourceName = "v:kmeans_color",
+                       .ColorBufferBDA = 0u,
+                   },
+                   stats);
+
+    Geometry::PropertySet badProperties;
+    badProperties.Resize(2u);
+    auto badColors = badProperties.Add<glm::vec4>("v:kmeans_color", glm::vec4{1.0f});
+    badColors[1] = glm::vec4{0.0f, std::numeric_limits<float>::infinity(), 0.0f, 1.0f};
+    const R::KMeansLabelAdapter badAdapter{
+        Geometry::ConstPropertySet{badProperties}};
+    badAdapter.Append(batch,
+                      R::VisualizationAdapterOptions{
+                          .SourceName = "v:kmeans_color",
+                          .ColorBufferBDA = 0x7000u,
+                      },
+                      stats);
+
+    EXPECT_TRUE(batch.Colors.empty());
+    EXPECT_EQ(stats.AdapterInvocationCount, 4u);
+    EXPECT_EQ(stats.MissingSourceCount, 1u);
+    EXPECT_EQ(stats.UnsupportedSourceTypeCount, 1u);
+    EXPECT_EQ(stats.InvalidBufferCount, 1u);
+    EXPECT_EQ(stats.NonFiniteValueCount, 1u);
+}
+
+TEST(VisualizationAdapters, VectorFieldAdapterAppendsVectorFieldPacket)
+{
+    Geometry::PropertySet properties = MakeScalarProperties();
+    const R::VectorFieldAdapter adapter{
+        Geometry::ConstPropertySet{properties}};
+
+    R::VisualizationAdapterBatch batch{};
+    R::VisualizationAdapterStats stats{};
+    adapter.Append(batch,
+                   R::VisualizationAdapterOptions{
+                       .SourceName = "velocity",
+                       .OutputName = "flow",
+                       .Domain = G::VisualizationAttributeDomain::Vertex,
+                       .PositionBufferBDA = 0x8000u,
+                       .VectorBufferBDA = 0x9000u,
+                       .VectorScale = 2.5f,
+                       .VectorColor = glm::vec4{0.25f, 0.5f, 1.0f, 1.0f},
+                       .DepthTested = false,
+                   },
+                   stats);
+
+    ASSERT_EQ(batch.VectorFields.size(), 1u);
+    const G::VectorFieldOverlayPacket& packet = batch.VectorFields.front();
+    EXPECT_EQ(packet.Name, "flow");
+    EXPECT_EQ(packet.Domain, G::VisualizationAttributeDomain::Vertex);
+    EXPECT_EQ(packet.ElementCount, 4u);
+    EXPECT_EQ(packet.PositionBufferBDA, 0x8000u);
+    EXPECT_EQ(packet.VectorBufferBDA, 0x9000u);
+    EXPECT_FLOAT_EQ(packet.Scale, 2.5f);
+    EXPECT_EQ(packet.Color, (glm::vec4{0.25f, 0.5f, 1.0f, 1.0f}));
+    EXPECT_FALSE(packet.DepthTested);
+    EXPECT_EQ(stats.AdapterInvocationCount, 1u);
+    EXPECT_EQ(stats.PacketAppendCount, 1u);
+
+    const G::VisualizationDiagnostics diagnostics =
+        G::ValidateVisualizationPackets(batch.AsPacketBatch(
+            true,
+            G::VisualizationAttributeDomain::Vertex));
+    EXPECT_EQ(diagnostics.InputPacketCount, 1u);
+    EXPECT_EQ(diagnostics.AcceptedPacketCount, 1u);
+    EXPECT_FALSE(diagnostics.HasErrors);
+}
+
+TEST(VisualizationAdapters, VectorFieldAdapterRejectsInvalidSources)
+{
+    Geometry::PropertySet properties = MakeScalarProperties();
+    const R::VectorFieldAdapter adapter{
+        Geometry::ConstPropertySet{properties}};
+
+    R::VisualizationAdapterBatch batch{};
+    R::VisualizationAdapterStats stats{};
+    adapter.Append(batch,
+                   R::VisualizationAdapterOptions{
+                       .SourceName = "missing",
+                       .PositionBufferBDA = 0xA000u,
+                       .VectorBufferBDA = 0xB000u,
+                   },
+                   stats);
+    adapter.Append(batch,
+                   R::VisualizationAdapterOptions{
+                       .SourceName = "curvature",
+                       .PositionBufferBDA = 0xA000u,
+                       .VectorBufferBDA = 0xB000u,
+                   },
+                   stats);
+    adapter.Append(batch,
+                   R::VisualizationAdapterOptions{
+                       .SourceName = "velocity",
+                       .PositionBufferBDA = 0u,
+                       .VectorBufferBDA = 0xB000u,
+                   },
+                   stats);
+    adapter.Append(batch,
+                   R::VisualizationAdapterOptions{
+                       .SourceName = "velocity",
+                       .PositionBufferBDA = 0xA000u,
+                       .VectorBufferBDA = 0xB000u,
+                       .VectorScale = 0.0f,
+                   },
+                   stats);
+
+    Geometry::PropertySet badProperties;
+    badProperties.Resize(2u);
+    auto badVectors = badProperties.Add<glm::vec3>("velocity", glm::vec3{0.0f});
+    badVectors[0] = glm::vec3{1.0f, 0.0f, 0.0f};
+    badVectors[1] = glm::vec3{0.0f, std::numeric_limits<float>::infinity(), 0.0f};
+    const R::VectorFieldAdapter badAdapter{
+        Geometry::ConstPropertySet{badProperties}};
+    badAdapter.Append(batch,
+                      R::VisualizationAdapterOptions{
+                          .SourceName = "velocity",
+                          .PositionBufferBDA = 0xA000u,
+                          .VectorBufferBDA = 0xB000u,
+                      },
+                      stats);
+
+    EXPECT_TRUE(batch.VectorFields.empty());
+    EXPECT_EQ(stats.AdapterInvocationCount, 5u);
+    EXPECT_EQ(stats.MissingSourceCount, 1u);
+    EXPECT_EQ(stats.UnsupportedSourceTypeCount, 1u);
+    EXPECT_EQ(stats.InvalidBufferCount, 1u);
+    EXPECT_EQ(stats.InvalidRangeCount, 1u);
+    EXPECT_EQ(stats.NonFiniteValueCount, 1u);
+}
+
 TEST(VisualizationAdapters, BatchClearAndPacketViewReflectAllPacketLanes)
 {
     R::VisualizationAdapterBatch batch{};
@@ -234,18 +434,26 @@ TEST(VisualizationAdapters, BatchClearAndPacketViewReflectAllPacketLanes)
         .ElementCount = 1u,
         .ColorBufferBDA = 0x3000u,
     });
+    batch.VectorFields.push_back(G::VectorFieldOverlayPacket{
+        .Name = "vectors",
+        .ElementCount = 1u,
+        .PositionBufferBDA = 0x4000u,
+        .VectorBufferBDA = 0x5000u,
+    });
 
     const G::VisualizationPacketBatch packetView =
         batch.AsPacketBatch(true, G::VisualizationAttributeDomain::Vertex);
     EXPECT_EQ(packetView.AttributeBuffers.size(), 1u);
     EXPECT_EQ(packetView.Scalars.size(), 1u);
     EXPECT_EQ(packetView.Colors.size(), 1u);
+    EXPECT_EQ(packetView.VectorFields.size(), 1u);
     EXPECT_TRUE(packetView.EnforceDomain);
 
     batch.Clear();
     EXPECT_TRUE(batch.AttributeBuffers.empty());
     EXPECT_TRUE(batch.Scalars.empty());
     EXPECT_TRUE(batch.Colors.empty());
+    EXPECT_TRUE(batch.VectorFields.empty());
 }
 
 TEST(VisualizationAdapters, RegistryReplacesAndUnregistersAdapters)

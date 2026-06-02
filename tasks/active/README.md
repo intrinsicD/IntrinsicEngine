@@ -26,15 +26,15 @@ structural checks plus the runtime contract/default CPU gates.
 
 [`RUNTIME-083`](RUNTIME-083-visualization-adapters.md) —
 `Extrinsic.Runtime.VisualizationAdapters` runtime producer umbrella. Status:
-in-progress on `main`; Slices A/B add the umbrella module,
-`PropertyScalarAdapter`, mutable visualization packet batch, adapter stats,
-registry contract, and extraction-cache scalar adapter pump into
+in-progress on `main`; Slices A-C.1 add the umbrella module, `PropertyScalarAdapter`,
+`KMeansLabelAdapter`, `VectorFieldAdapter`, mutable visualization packet batch,
+adapter stats, registry contract, and extraction-cache scalar adapter pump into
 `RuntimeRenderSnapshotBatch::Visualization*` spans. This partially unblocks
-UI-001's remaining visualization adapter packet acceptance; KMeans/vector/
-isoline/Htex adapter kinds remain open. Next verification: build
-`IntrinsicRuntimeGraphicsCpuTests`, run the focused visualization
-adapter/extraction tests, refresh the module inventory, and run runtime
-structural checks.
+UI-001's visualization adapter acceptance; standalone KMeans/color and
+vector-field adapter contracts are available, while isoline/Htex adapters and
+non-scalar extraction selection remain open. Next verification: build
+`IntrinsicRuntimeContractTests`, run focused isoline `VisualizationAdapters`
+contract tests, refresh the module inventory, and run runtime structural checks.
 
 The most recently retired tasks are summarised below.
 

@@ -8,6 +8,8 @@ module;
 #include <unordered_map>
 #include <vector>
 
+#include <glm/glm.hpp>
+
 export module Extrinsic.Runtime.VisualizationAdapters;
 
 import Geometry.Properties;
@@ -41,10 +43,16 @@ export namespace Extrinsic::Runtime
         Graphics::VisualizationAttributeDomain Domain{
             Graphics::VisualizationAttributeDomain::Vertex};
         std::uint64_t BufferBDA{0u};
+        std::uint64_t ColorBufferBDA{0u};
+        std::uint64_t PositionBufferBDA{0u};
+        std::uint64_t VectorBufferBDA{0u};
         bool AutoRange{true};
         float RangeMin{0.0f};
         float RangeMax{1.0f};
         Graphics::Colormap::Type Colormap{Graphics::Colormap::Type::Viridis};
+        float VectorScale{1.0f};
+        glm::vec4 VectorColor{1.0f};
+        bool DepthTested{true};
     };
 
     struct VisualizationAdapterStats
@@ -76,6 +84,32 @@ export namespace Extrinsic::Runtime
     {
     public:
         explicit PropertyScalarAdapter(Geometry::ConstPropertySet properties) noexcept;
+
+        void Append(VisualizationAdapterBatch& out,
+                    const VisualizationAdapterOptions& options,
+                    VisualizationAdapterStats& stats) const override;
+
+    private:
+        Geometry::ConstPropertySet m_Properties{};
+    };
+
+    class KMeansLabelAdapter final : public IVisualizationAdapter
+    {
+    public:
+        explicit KMeansLabelAdapter(Geometry::ConstPropertySet properties) noexcept;
+
+        void Append(VisualizationAdapterBatch& out,
+                    const VisualizationAdapterOptions& options,
+                    VisualizationAdapterStats& stats) const override;
+
+    private:
+        Geometry::ConstPropertySet m_Properties{};
+    };
+
+    class VectorFieldAdapter final : public IVisualizationAdapter
+    {
+    public:
+        explicit VectorFieldAdapter(Geometry::ConstPropertySet properties) noexcept;
 
         void Append(VisualizationAdapterBatch& out,
                     const VisualizationAdapterOptions& options,

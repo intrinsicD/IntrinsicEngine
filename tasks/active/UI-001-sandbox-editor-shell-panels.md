@@ -6,9 +6,9 @@
 - Branch: `main`.
 - Current slice: blocked after Slice C.2. Remaining file/import execution is
   gated on `ASSETIO-001`; remaining non-scalar visualization adapter packet
-  selection is gated on active `RUNTIME-083` Slices C/D.
+  selection is gated on active `RUNTIME-083` Slices C.2/D.
 - Next verification step: resume UI-001 after the remaining `RUNTIME-083`
-  non-scalar adapter seams and `ASSETIO-001` import command seams exist, then
+  non-scalar extraction seams and `ASSETIO-001` import command seams exist, then
   run task structural checks plus the runtime contract/default CPU gates.
 
 ## Slice plan
@@ -63,7 +63,7 @@
 - [x] Implement a selection/primitive details panel that displays current entity/face/edge/vertex/point selection results from `RUNTIME-089` / `RUNTIME-093`. Slice B models selected/hovered entity rows and refined primitive status/domain/kind/id/hit details; richer interaction remains for later command-surface slices.
 - [ ] Implement a file/import entry panel that calls asset/runtime import commands when `ASSETIO-001` is available and otherwise displays a deterministic disabled-state diagnostic. Slice A implements the deterministic disabled diagnostic; command execution remains gated on `ASSETIO-001`.
 - [x] Implement camera/render settings controls for active camera controller selection, debug overlay toggles, and primitive view toggles using runtime-owned APIs. Slice C.1 implements active camera-controller replacement and mesh edge/vertex primitive-view toggles; Slice C.2 implements selected-entity spatial-debug binding controls.
-- [ ] Implement geometry-domain visualization controls that choose scalar/color/vector/isolines as inputs to `RUNTIME-083` adapters without duplicating graphics validation. Slice C.2 implements selected-entity `VisualizationConfig` material/scalar/color command routing; scalar adapter packet production is available through `RUNTIME-083` Slice B, while non-scalar adapter production remains gated on `RUNTIME-083` Slices C/D.
+- [ ] Implement geometry-domain visualization controls that choose scalar/color/vector/isolines as inputs to `RUNTIME-083` adapters without duplicating graphics validation. Slice C.2 implements selected-entity `VisualizationConfig` material/scalar/color command routing; scalar adapter packet production is available through `RUNTIME-083` Slice B, standalone KMeans/color and vector-field adapter contracts are available through Slice C.1, and non-scalar extraction production remains gated on `RUNTIME-083` Slices C.2/D.
 - [x] Add UI diagnostics for missing dependencies (no ImGui adapter, no asset ingest, no selected entity, unsupported domain).
 
 ## Tests

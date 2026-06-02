@@ -4,11 +4,10 @@
 - Status: in-progress.
 - Owner/agent: Codex.
 - Branch: `main`.
-- Current slice: Slice B — extraction-cache scalar adapter pump and
-  `RuntimeRenderSnapshotBatch::Visualization*` handoff.
-- Next verification step: build `IntrinsicRuntimeGraphicsCpuTests`, run the
-  focused visualization adapter/extraction tests, regenerate module inventory,
-  and run runtime structural checks.
+- Current slice: Slice C.2 — isoline adapter behavior.
+- Next verification step: build `IntrinsicRuntimeContractTests`, run the
+  focused isoline `VisualizationAdapters` contract tests, regenerate module
+  inventory, and run runtime structural checks.
 
 ## Slice plan
 - **Slice A.** Add the promoted
@@ -25,8 +24,12 @@
   visualization adapters for renderables carrying visualization-source
   components, accumulate packets into `RuntimeRenderSnapshotBatch`, and surface
   runtime extraction stats.
-- **Slice C.** Add KMeans label, vector-field, and isoline adapters with
-  deterministic CPU contracts.
+- **Slice C.1.** Add KMeans/color and vector-field adapters with
+  deterministic CPU contracts. These adapters consume already-authored
+  property buffers plus externally supplied GPU buffer addresses; they do not
+  schedule KMeans or allocate vector-field residency.
+- **Slice C.2 (this slice).** Add isoline adapter behavior with deterministic
+  CPU contracts.
 - **Slice D.** Add Htex metadata / fragment-bake adapter behavior, including
   `RecreateHtex` streaming scheduling and final extraction stats.
 
@@ -39,8 +42,9 @@
 - No editor UI; the editor maps user choices into adapter pre-filter inputs.
 
 ## Context
-- Status: in-progress; Slices A/B landed scalar adapter contract and extraction
-  wiring, while non-scalar adapters remain open.
+- Status: in-progress; Slices A-C.1 landed scalar extraction, KMeans/color, and
+  vector-field adapter contracts, while isoline and Htex/fragment-bake adapters
+  remain open.
 - Owner/layer: `runtime`.
 - Planning anchor: `tasks/done/GRAPHICS-014Q-visualization-runtime-backend-clarifications.md` ("runtime extraction is the sole owner of translating PropertySet attributes, KMeans labels, isoline results, vector fields, and Htex metadata into the `RuntimeRenderSnapshotBatch` visualization packet spans; concrete producer adapters live under a planned `Extrinsic.Runtime.VisualizationAdapters` umbrella").
 - Bake-mapping selection (`UVBake`/`ExistingHtex`/`RecreateHtex`) is runtime/editor-owned. `RecreateHtex` requests are scheduled by runtime/geometry on a background task through `Extrinsic.Runtime.StreamingExecutor`; graphics increments `HtexRecreateRequestCount`.
@@ -66,6 +70,10 @@
   `UnregisterVisualizationAdapter`, `SetVisualizationAdapterBinding`,
   `ClearVisualizationAdapterBinding`) so the cache owns adapter lifetime and
   externally supplied buffer-device-address metadata.
+- [x] Slice C.1: add `KMeansLabelAdapter` / color-property packet production
+  and `VectorFieldAdapter` packet production with deterministic source
+  validation and externally supplied buffer-device-address metadata.
+- [ ] Slice C.2: add isoline adapter packet production.
 
 ## Tests
 - [ ] `contract;runtime` test: `PropertyScalarAdapter` produces a deterministic `ScalarAttributePacket` for a fixture `PropertySet`; out-of-range filters reject as expected.
@@ -76,7 +84,12 @@
   adapter packets reach `RenderWorld::Visualization`, missing bindings do not
   synthesize packets, and invalid external buffer addresses are counted without
   reaching renderer validation.
-- [ ] `contract;runtime` test: `KMeansLabelAdapter` and `VectorFieldAdapter` produce deterministic outputs for fixtures.
+- [x] Slice C.1 `contract;runtime` tests: `KMeansLabelAdapter` and
+  `VectorFieldAdapter` produce deterministic outputs for fixtures and reject
+  missing, unsupported, empty, non-finite, invalid-buffer, and invalid-range
+  inputs.
+- [ ] Slice C.2 `contract;runtime` test: `IsolineAdapter` produces deterministic
+  packet output for fixtures.
 - [ ] `contract;runtime` test: `HtexMetadataAdapter` enqueues a streaming task on `RecreateHtex` request and increments `RuntimeRenderExtractionStats::HtexRecreateScheduled` by 1.
 - [ ] `contract;runtime` test: `ValidateVisualizationPackets` continues to reject malformed adapter outputs (centralized validation per `GRAPHICS-014Q`).
 - [ ] No `gpu`/`vulkan` test in this slice.
@@ -90,6 +103,9 @@
 - [x] Slice B: update runtime docs, migration parity notes, active task index,
   and sandbox gate review to record scalar extraction-cache wiring while
   KMeans/vector/isoline/Htex adapter kinds remain open.
+- [x] Slice C.1: update runtime docs and active task state to record the
+  KMeans/color and vector-field adapter contracts while isolines and
+  Htex/fragment-bake metadata remain open.
 
 ## Acceptance criteria
 - [x] Slice A compiles the umbrella and proves `PropertyScalarAdapter` plus
@@ -97,6 +113,9 @@
 - [x] Slice B wires scalar-field adapter registration/bindings through
   `RenderExtractionCache::ExtractAndSubmit` into renderer-visible visualization
   packet spans with focused CPU integration coverage.
+- [x] Slice C.1 compiles KMeans/color and vector-field adapters and proves their
+  deterministic packet contracts without adding graphics-side geometry
+  ownership.
 - [ ] All five adapter kinds compile, register, and produce deterministic outputs.
 - [ ] `RecreateHtex` runs as a streaming task and triggers exactly once per request.
 - [ ] No new graphics imports beyond the existing `Graphics.VisualizationPackets` edge.
@@ -123,11 +142,14 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
 - Slice B extends `CPUContracted` to scalar adapter extraction-cache wiring. It
   does not claim KMeans labels, vector fields, isolines, Htex/fragment-bake
   metadata, or streaming scheduling.
-- Full `CPUContracted` for `RUNTIME-083` requires Slices C-D. `Operational`
+- Slice C.1 extends `CPUContracted` to KMeans/color and vector-field packet
+  producer adapters only. It does not claim isoline generation,
+  Htex/fragment-bake metadata, or streaming scheduling.
+- Full `CPUContracted` for `RUNTIME-083` requires Slices C.2-D. `Operational`
   owned by [`RUNTIME-095`](../backlog/runtime/RUNTIME-095-working-sandbox-acceptance.md)
   or a later visualization-specific backend smoke.
 
 ## Next verification step
-- Build `IntrinsicRuntimeGraphicsCpuTests`, run the focused visualization
-  adapter/extraction tests, regenerate the module inventory, and run runtime
-  structural checks.
+- Build `IntrinsicRuntimeContractTests`, run the focused isoline
+  `VisualizationAdapters` contract tests, regenerate the module inventory, and
+  run runtime structural checks.
