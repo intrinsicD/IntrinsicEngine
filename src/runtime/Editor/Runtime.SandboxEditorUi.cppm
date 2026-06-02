@@ -7,6 +7,7 @@ module;
 #include <vector>
 
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 export module Extrinsic.Runtime.SandboxEditorUi;
 
@@ -32,11 +33,27 @@ export namespace Extrinsic::Runtime
         VisualizationCommandsUnavailable,
     };
 
+    enum class SandboxEditorCommandStatus : std::uint8_t
+    {
+        Applied,
+        NoChange,
+        MissingScene,
+        MissingSelectionController,
+        StaleEntity,
+        MissingTransform,
+    };
+
     [[nodiscard]] const char* DebugNameForSandboxEditorDiagnosticCode(
         SandboxEditorDiagnosticCode code) noexcept;
 
+    [[nodiscard]] const char* DebugNameForSandboxEditorCommandStatus(
+        SandboxEditorCommandStatus status) noexcept;
+
     [[nodiscard]] const char* DebugNameForSandboxEditorGeometryDomain(
         ECS::Components::GeometrySources::Domain domain) noexcept;
+
+    [[nodiscard]] const char* DebugNameForSandboxEditorPrimitiveKind(
+        RefinedPrimitiveKind kind) noexcept;
 
     struct SandboxEditorDiagnostic
     {
@@ -60,6 +77,7 @@ export namespace Extrinsic::Runtime
     {
         bool      HasLocalTransform{false};
         glm::vec3 LocalPosition{0.0f};
+        glm::quat LocalRotation{1.0f, 0.0f, 0.0f, 0.0f};
         glm::vec3 LocalScale{1.0f};
         bool      HasWorldTransform{false};
         glm::vec3 WorldPosition{0.0f};
@@ -68,8 +86,19 @@ export namespace Extrinsic::Runtime
     struct SandboxEditorRenderHintModel
     {
         bool HasRenderSurface{false};
+        std::string SurfaceDomain{};
         bool HasRenderLines{false};
+        std::string LineDomain{};
+        bool        HasUniformLineWidth{false};
+        float       UniformLineWidth{0.0f};
+        bool        HasNamedLineWidth{false};
+        std::string LineWidthName{};
         bool HasRenderPoints{false};
+        std::string PointRenderType{};
+        bool        HasUniformPointSize{false};
+        float       UniformPointSize{0.0f};
+        bool        HasNamedPointSize{false};
+        std::string PointSizeName{};
     };
 
     struct SandboxEditorGeometryDomainModel
@@ -94,13 +123,25 @@ export namespace Extrinsic::Runtime
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
+    struct SandboxEditorPrimitiveDetailModel
+    {
+        bool HasPrimitive{false};
+        PrimitiveSelectionResult Primitive{};
+        bool HasFaceId{false};
+        bool HasEdgeId{false};
+        bool HasVertexId{false};
+        bool HasPointId{false};
+    };
+
     struct SandboxEditorSelectionModel
     {
         std::vector<std::uint32_t> SelectedStableIds{};
+        std::vector<SandboxEditorEntityRow> SelectedEntities{};
         bool                       HasHovered{false};
         std::uint32_t              HoveredStableId{0u};
-        bool                       HasPrimitive{false};
-        PrimitiveSelectionResult   Primitive{};
+        bool                       HasHoveredEntity{false};
+        SandboxEditorEntityRow     HoveredEntity{};
+        SandboxEditorPrimitiveDetailModel Primitive{};
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
@@ -147,11 +188,26 @@ export namespace Extrinsic::Runtime
         bool VisualizationCommandsAvailable{false};
     };
 
+    struct SandboxEditorTransformEditCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        bool SetPosition{false};
+        glm::vec3 Position{0.0f};
+        bool SetRotation{false};
+        glm::quat Rotation{1.0f, 0.0f, 0.0f, 0.0f};
+        bool SetScale{false};
+        glm::vec3 Scale{1.0f};
+    };
+
     [[nodiscard]] SandboxEditorPanelFrame BuildSandboxEditorPanelFrame(
         const SandboxEditorContext& context);
 
     bool SelectSandboxEditorEntity(const SandboxEditorContext& context,
                                    std::uint32_t stableEntityId);
+
+    SandboxEditorCommandStatus ApplySandboxEditorTransformEdit(
+        const SandboxEditorContext& context,
+        const SandboxEditorTransformEditCommand& command);
 
     void DrawSandboxEditorPanelFrame(const SandboxEditorPanelFrame& frame);
 

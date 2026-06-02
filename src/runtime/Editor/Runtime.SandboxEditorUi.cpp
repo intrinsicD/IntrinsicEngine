@@ -6,10 +6,12 @@ module;
 #include <optional>
 #include <string>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <imgui.h>
 
 module Extrinsic.Runtime.SandboxEditorUi;
@@ -94,6 +96,7 @@ namespace Extrinsic::Runtime
             {
                 model.HasLocalTransform = true;
                 model.LocalPosition = local->Position;
+                model.LocalRotation = local->Rotation;
                 model.LocalScale = local->Scale;
             }
 
@@ -110,11 +113,64 @@ namespace Extrinsic::Runtime
             const entt::registry& raw,
             const ECS::EntityHandle entity)
         {
-            return SandboxEditorRenderHintModel{
-                .HasRenderSurface = raw.all_of<G::RenderSurface>(entity),
-                .HasRenderLines = raw.all_of<G::RenderLines>(entity),
-                .HasRenderPoints = raw.all_of<G::RenderPoints>(entity),
-            };
+            SandboxEditorRenderHintModel model{};
+            if (const auto* surface = raw.try_get<G::RenderSurface>(entity))
+            {
+                model.HasRenderSurface = true;
+                model.SurfaceDomain =
+                    surface->Domain == G::RenderSurface::SourceDomain::Face
+                        ? "Face"
+                        : "Vertex";
+            }
+
+            if (const auto* lines = raw.try_get<G::RenderLines>(entity))
+            {
+                model.HasRenderLines = true;
+                model.LineDomain =
+                    lines->Domain == G::RenderLines::SourceDomain::Edge
+                        ? "Edge"
+                        : "Vertex";
+                if (const auto* width = std::get_if<float>(&lines->WidthSource))
+                {
+                    model.HasUniformLineWidth = true;
+                    model.UniformLineWidth = *width;
+                }
+                else if (const auto* name = std::get_if<std::string>(&lines->WidthSource))
+                {
+                    model.HasNamedLineWidth = true;
+                    model.LineWidthName = *name;
+                }
+            }
+
+            if (const auto* points = raw.try_get<G::RenderPoints>(entity))
+            {
+                model.HasRenderPoints = true;
+                switch (points->Type)
+                {
+                case G::RenderPoints::RenderType::Flat:
+                    model.PointRenderType = "Flat";
+                    break;
+                case G::RenderPoints::RenderType::Sphere:
+                    model.PointRenderType = "Sphere";
+                    break;
+                case G::RenderPoints::RenderType::Surfel:
+                    model.PointRenderType = "Surfel";
+                    break;
+                }
+
+                if (const auto* size = std::get_if<float>(&points->SizeSource))
+                {
+                    model.HasUniformPointSize = true;
+                    model.UniformPointSize = *size;
+                }
+                else if (const auto* name = std::get_if<std::string>(&points->SizeSource))
+                {
+                    model.HasNamedPointSize = true;
+                    model.PointSizeName = *name;
+                }
+            }
+
+            return model;
         }
 
         [[nodiscard]] SandboxEditorGeometryDomainModel BuildGeometryDomainModel(
@@ -148,6 +204,30 @@ namespace Extrinsic::Runtime
                     return entity;
             }
             return std::nullopt;
+        }
+
+        [[nodiscard]] std::optional<ECS::EntityHandle> ResolveStableEntity(
+            const entt::registry& raw,
+            const std::uint32_t stableId)
+        {
+            const ECS::EntityHandle entity =
+                SelectionController::ToEntityHandle(stableId);
+            if (entity != ECS::InvalidEntityHandle && raw.valid(entity))
+                return entity;
+            return std::nullopt;
+        }
+
+        [[nodiscard]] SandboxEditorPrimitiveDetailModel BuildPrimitiveDetailModel(
+            const PrimitiveSelectionResult& primitive)
+        {
+            return SandboxEditorPrimitiveDetailModel{
+                .HasPrimitive = true,
+                .Primitive = primitive,
+                .HasFaceId = primitive.FaceId != kInvalidPrimitiveIndex,
+                .HasEdgeId = primitive.EdgeId != kInvalidPrimitiveIndex,
+                .HasVertexId = primitive.VertexId != kInvalidPrimitiveIndex,
+                .HasPointId = primitive.PointId != kInvalidPrimitiveIndex,
+            };
         }
 
         [[nodiscard]] SandboxEditorInspectorModel BuildInspectorModel(
@@ -206,14 +286,44 @@ namespace Extrinsic::Runtime
             model.HasHovered = context.Selection->HasHovered();
             model.HoveredStableId = context.Selection->HoveredStableId();
 
+            if (context.Scene != nullptr)
+            {
+                const entt::registry& raw = context.Scene->Raw();
+                for (const std::uint32_t stableId : model.SelectedStableIds)
+                {
+                    if (const std::optional<ECS::EntityHandle> entity =
+                            ResolveStableEntity(raw, stableId);
+                        entity.has_value())
+                    {
+                        model.SelectedEntities.push_back(BuildEntityRow(raw, *entity));
+                    }
+                }
+
+                if (model.HasHovered)
+                {
+                    if (const std::optional<ECS::EntityHandle> hovered =
+                            ResolveStableEntity(raw, model.HoveredStableId);
+                        hovered.has_value())
+                    {
+                        model.HasHoveredEntity = true;
+                        model.HoveredEntity = BuildEntityRow(raw, *hovered);
+                    }
+                }
+            }
+            else
+            {
+                AddDiagnostic(model.Diagnostics,
+                              SandboxEditorDiagnosticCode::MissingScene,
+                              "Scene registry is unavailable for selection details.");
+            }
+
             if (context.LastRefinedPrimitive != nullptr &&
                 context.LastRefinedPrimitive->has_value())
             {
-                model.HasPrimitive = true;
-                model.Primitive = **context.LastRefinedPrimitive;
+                model.Primitive = BuildPrimitiveDetailModel(**context.LastRefinedPrimitive);
             }
 
-            if (model.SelectedStableIds.empty() && !model.HasPrimitive)
+            if (model.SelectedStableIds.empty() && !model.Primitive.HasPrimitive)
             {
                 AddDiagnostic(model.Diagnostics,
                               SandboxEditorDiagnosticCode::NoSelectedEntity,
@@ -300,6 +410,16 @@ namespace Extrinsic::Runtime
             ImGui::Text("%s: %.3f, %.3f, %.3f", label, value.x, value.y, value.z);
         }
 
+        void DrawQuat(const char* label, const glm::quat value)
+        {
+            ImGui::Text("%s: %.3f, %.3f, %.3f, %.3f",
+                        label,
+                        value.w,
+                        value.x,
+                        value.y,
+                        value.z);
+        }
+
         void DrawPanelFrame(const SandboxEditorPanelFrame& frame,
                             const SandboxEditorContext* context)
         {
@@ -351,8 +471,42 @@ namespace Extrinsic::Runtime
                                 inspector.Entity.HasDurableStableId ? "valid" : "none");
                     if (inspector.Transform.HasLocalTransform)
                     {
-                        DrawVec3("Local position", inspector.Transform.LocalPosition);
-                        DrawVec3("Local scale", inspector.Transform.LocalScale);
+                        if (context != nullptr)
+                        {
+                            glm::vec3 localPosition = inspector.Transform.LocalPosition;
+                            if (ImGui::DragFloat3("Local position",
+                                                  &localPosition.x,
+                                                  0.01f))
+                            {
+                                (void)ApplySandboxEditorTransformEdit(
+                                    *context,
+                                    SandboxEditorTransformEditCommand{
+                                        .StableEntityId = inspector.Entity.StableEntityId,
+                                        .SetPosition = true,
+                                        .Position = localPosition,
+                                    });
+                            }
+
+                            glm::vec3 localScale = inspector.Transform.LocalScale;
+                            if (ImGui::DragFloat3("Local scale",
+                                                  &localScale.x,
+                                                  0.01f))
+                            {
+                                (void)ApplySandboxEditorTransformEdit(
+                                    *context,
+                                    SandboxEditorTransformEditCommand{
+                                        .StableEntityId = inspector.Entity.StableEntityId,
+                                        .SetScale = true,
+                                        .Scale = localScale,
+                                    });
+                            }
+                        }
+                        else
+                        {
+                            DrawVec3("Local position", inspector.Transform.LocalPosition);
+                            DrawVec3("Local scale", inspector.Transform.LocalScale);
+                        }
+                        DrawQuat("Local rotation (wxyz)", inspector.Transform.LocalRotation);
                     }
                     if (inspector.Transform.HasWorldTransform)
                         DrawVec3("World position", inspector.Transform.WorldPosition);
@@ -360,6 +514,31 @@ namespace Extrinsic::Runtime
                                 inspector.RenderHints.HasRenderSurface ? "yes" : "no",
                                 inspector.RenderHints.HasRenderLines ? "yes" : "no",
                                 inspector.RenderHints.HasRenderPoints ? "yes" : "no");
+                    if (inspector.RenderHints.HasRenderSurface)
+                        ImGui::Text("Surface domain: %s",
+                                    inspector.RenderHints.SurfaceDomain.c_str());
+                    if (inspector.RenderHints.HasRenderLines)
+                    {
+                        ImGui::Text("Line domain: %s",
+                                    inspector.RenderHints.LineDomain.c_str());
+                        if (inspector.RenderHints.HasUniformLineWidth)
+                            ImGui::Text("Line width: %.3f",
+                                        inspector.RenderHints.UniformLineWidth);
+                        if (inspector.RenderHints.HasNamedLineWidth)
+                            ImGui::Text("Line width source: %s",
+                                        inspector.RenderHints.LineWidthName.c_str());
+                    }
+                    if (inspector.RenderHints.HasRenderPoints)
+                    {
+                        ImGui::Text("Point type: %s",
+                                    inspector.RenderHints.PointRenderType.c_str());
+                        if (inspector.RenderHints.HasUniformPointSize)
+                            ImGui::Text("Point size: %.3f",
+                                        inspector.RenderHints.UniformPointSize);
+                        if (inspector.RenderHints.HasNamedPointSize)
+                            ImGui::Text("Point size source: %s",
+                                        inspector.RenderHints.PointSizeName.c_str());
+                    }
                     ImGui::Text("Geometry domain: %s",
                                 DebugNameForSandboxEditorGeometryDomain(
                                     inspector.Geometry.Domain));
@@ -377,12 +556,38 @@ namespace Extrinsic::Runtime
             if (ImGui::Begin("Selection Details"))
             {
                 ImGui::Text("Selected entities: %zu", frame.Selection.SelectedStableIds.size());
+                for (const SandboxEditorEntityRow& row : frame.Selection.SelectedEntities)
+                    ImGui::BulletText("%s (%u)", row.Name.c_str(), row.StableEntityId);
                 if (frame.Selection.HasHovered)
+                {
                     ImGui::Text("Hovered render id: %u", frame.Selection.HoveredStableId);
-                if (frame.Selection.HasPrimitive)
+                    if (frame.Selection.HasHoveredEntity)
+                        ImGui::Text("Hovered entity: %s",
+                                    frame.Selection.HoveredEntity.Name.c_str());
+                }
+                if (frame.Selection.Primitive.HasPrimitive)
+                {
+                    const PrimitiveSelectionResult& primitive =
+                        frame.Selection.Primitive.Primitive;
                     ImGui::Text("Primitive status: %s",
-                                DebugNameForPrimitiveRefineStatus(
-                                    frame.Selection.Primitive.Status));
+                                DebugNameForPrimitiveRefineStatus(primitive.Status));
+                    ImGui::Text("Primitive domain/kind: %s / %s",
+                                DebugNameForSandboxEditorGeometryDomain(primitive.Domain),
+                                DebugNameForSandboxEditorPrimitiveKind(primitive.Kind));
+                    if (frame.Selection.Primitive.HasFaceId)
+                        ImGui::Text("Face id: %u", primitive.FaceId);
+                    if (frame.Selection.Primitive.HasEdgeId)
+                        ImGui::Text("Edge id: %u", primitive.EdgeId);
+                    if (frame.Selection.Primitive.HasVertexId)
+                        ImGui::Text("Vertex id: %u", primitive.VertexId);
+                    if (frame.Selection.Primitive.HasPointId)
+                        ImGui::Text("Point id: %u", primitive.PointId);
+                    if (primitive.HasHitPosition)
+                    {
+                        DrawVec3("Local hit", primitive.LocalHit);
+                        DrawVec3("World hit", primitive.WorldHit);
+                    }
+                }
                 DrawDiagnostics(frame.Selection.Diagnostics);
             }
             ImGui::End();
@@ -438,6 +643,27 @@ namespace Extrinsic::Runtime
         return "Unknown";
     }
 
+    const char* DebugNameForSandboxEditorCommandStatus(
+        const SandboxEditorCommandStatus status) noexcept
+    {
+        switch (status)
+        {
+        case SandboxEditorCommandStatus::Applied:
+            return "Applied";
+        case SandboxEditorCommandStatus::NoChange:
+            return "NoChange";
+        case SandboxEditorCommandStatus::MissingScene:
+            return "MissingScene";
+        case SandboxEditorCommandStatus::MissingSelectionController:
+            return "MissingSelectionController";
+        case SandboxEditorCommandStatus::StaleEntity:
+            return "StaleEntity";
+        case SandboxEditorCommandStatus::MissingTransform:
+            return "MissingTransform";
+        }
+        return "Unknown";
+    }
+
     const char* DebugNameForSandboxEditorGeometryDomain(
         const GS::Domain domain) noexcept
     {
@@ -453,6 +679,27 @@ namespace Extrinsic::Runtime
             return "PointCloud";
         case GS::Domain::Unknown:
             return "Unknown";
+        }
+        return "Unknown";
+    }
+
+    const char* DebugNameForSandboxEditorPrimitiveKind(
+        const RefinedPrimitiveKind kind) noexcept
+    {
+        switch (kind)
+        {
+        case RefinedPrimitiveKind::None:
+            return "None";
+        case RefinedPrimitiveKind::Entity:
+            return "Entity";
+        case RefinedPrimitiveKind::Face:
+            return "Face";
+        case RefinedPrimitiveKind::Edge:
+            return "Edge";
+        case RefinedPrimitiveKind::Vertex:
+            return "Vertex";
+        case RefinedPrimitiveKind::Point:
+            return "Point";
         }
         return "Unknown";
     }
@@ -514,6 +761,37 @@ namespace Extrinsic::Runtime
             return false;
         return context.Selection->SetSelectedByStableEntityId(*context.Scene,
                                                               stableEntityId);
+    }
+
+    SandboxEditorCommandStatus ApplySandboxEditorTransformEdit(
+        const SandboxEditorContext& context,
+        const SandboxEditorTransformEditCommand& command)
+    {
+        if (!command.SetPosition && !command.SetRotation && !command.SetScale)
+            return SandboxEditorCommandStatus::NoChange;
+        if (context.Scene == nullptr)
+            return SandboxEditorCommandStatus::MissingScene;
+        if (context.Selection == nullptr)
+            return SandboxEditorCommandStatus::MissingSelectionController;
+
+        entt::registry& raw = context.Scene->Raw();
+        const ECS::EntityHandle entity =
+            SelectionController::ToEntityHandle(command.StableEntityId);
+        if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
+            return SandboxEditorCommandStatus::StaleEntity;
+
+        auto* transform = raw.try_get<ECSC::Transform::Component>(entity);
+        if (transform == nullptr)
+            return SandboxEditorCommandStatus::MissingTransform;
+
+        if (command.SetPosition)
+            transform->Position = command.Position;
+        if (command.SetRotation)
+            transform->Rotation = command.Rotation;
+        if (command.SetScale)
+            transform->Scale = command.Scale;
+        raw.emplace_or_replace<ECSC::Transform::IsDirtyTag>(entity);
+        return SandboxEditorCommandStatus::Applied;
     }
 
     void DrawSandboxEditorPanelFrame(const SandboxEditorPanelFrame& frame)

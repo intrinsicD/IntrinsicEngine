@@ -11,9 +11,10 @@ not import lower layers directly.
 `Sandbox::App` attaches the promoted runtime-owned `SandboxEditorUi` shell
 through application lifecycle hooks. The app remains a runtime-only consumer:
 the editor shell registers with `Engine::SetImGuiEditorCallback`, reads scene
-and selection state through runtime APIs, and leaves asset import,
-camera/render-setting mutation, and visualization command routing to runtime
-owners for later UI-001 slices.
+and selection state through runtime APIs, emits selection and local-transform
+edit commands through runtime-owned seams, and leaves asset import,
+camera/render-setting mutation beyond transform edits, and visualization command
+routing to runtime owners for later UI-001 slices.
 
 ## Build presets
 

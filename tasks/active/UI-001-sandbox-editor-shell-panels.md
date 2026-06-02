@@ -4,23 +4,26 @@
 - Status: in-progress.
 - Owner/agent: Codex.
 - Branch: `main`.
-- Current slice: Slice A — promoted runtime editor shell, deterministic panel
-  models, disabled import state, selection command emission, and ImGui callback
-  registration.
+- Current slice: Slice B — enriched inspector/selection details, refined
+  primitive display, and runtime-owned local-transform edit command coverage.
 - Next verification step: run task structural checks plus the runtime
   contract/default CPU gates.
 
 ## Slice plan
-- **Slice A (this slice).** Add the promoted runtime sandbox editor UI module,
+- **Slice A.** Add the promoted runtime sandbox editor UI module,
   panel model builders, deterministic disabled file/import diagnostics, scene
   hierarchy selection command emission, and sandbox attachment through
   `Engine::SetImGuiEditorCallback`. Add CPU `contract;runtime` coverage for the
   model builders and callback registration. Defers fully interactive
   camera/render setting mutation, visualization adapter command routing, asset
   import execution, and final visual proof to later slices.
-- **Slice B.** Extend the inspector and selection details panels to cover the
-  full runtime/editor-facing data surface, including transform editing commands
-  and refined primitive display coverage once the Slice A shell is stable.
+- **Slice B (this slice).** Extend the inspector and selection details panels to
+  cover the runtime/editor-facing data surface available after Slice A:
+  transform rotation/scale/position, render hint parameters, selected/hovered
+  entity rows, refined primitive kind/id/hit data, and a runtime-owned local
+  transform edit command that stamps `Transform::IsDirtyTag`. Defers asset
+  import execution, camera/render settings beyond local transform edits, and
+  visualization adapter routing.
 - **Slice C.** Add runtime-owned command seams for camera/render settings,
   primitive-view toggles, and visualization adapter selection without making UI
   state authoritative.
@@ -46,7 +49,7 @@
 - [x] Add a promoted sandbox/editor UI module that registers a draw callback with the runtime ImGui adapter without adding app-layer graphics/runtime shortcuts.
 - [x] Implement a scene hierarchy panel that lists live scene entities by `MetaData::EntityName` and selection state, and emits selection commands through `RUNTIME-089` APIs.
 - [x] Implement an inspector panel that shows transform, stable ID/metadata, render hints (`RenderSurface`/`RenderLines`/`RenderPoints`), and available `GeometrySources` domains read through runtime/editor-facing views.
-- [ ] Implement a selection/primitive details panel that displays current entity/face/edge/vertex/point selection results from `RUNTIME-089` / `RUNTIME-093`. Slice A models selected entity ids, hover state, and refined primitive status; full primitive id/detail display remains for a later slice.
+- [x] Implement a selection/primitive details panel that displays current entity/face/edge/vertex/point selection results from `RUNTIME-089` / `RUNTIME-093`. Slice B models selected/hovered entity rows and refined primitive status/domain/kind/id/hit details; richer interaction remains for later command-surface slices.
 - [ ] Implement a file/import entry panel that calls asset/runtime import commands when `ASSETIO-001` is available and otherwise displays a deterministic disabled-state diagnostic. Slice A implements the deterministic disabled diagnostic; command execution remains gated on `ASSETIO-001`.
 - [ ] Implement camera/render settings controls for active camera controller selection, debug overlay toggles, and primitive view toggles using runtime-owned APIs.
 - [ ] Implement geometry-domain visualization controls that choose scalar/color/vector/isolines as inputs to `RUNTIME-083` adapters without duplicating graphics validation.
@@ -56,6 +59,7 @@
 - [x] Add `contract;runtime` or `unit;ui` coverage for panel model builders independent of Dear ImGui draw calls where possible.
 - [x] Add a `contract;runtime` test with a Null platform/window that registers the UI draw callback and produces a deterministic empty/disabled panel frame through `RUNTIME-090`.
 - [x] Add tests for scene hierarchy selection command emission, inspector domain enumeration, and disabled file/import state before `ASSETIO-001` lands.
+- [x] Add tests for selected/hovered entity detail models, refined primitive id/hit detail models, render-hint parameters, and local transform edit command dirty tagging.
 - [x] Add test labels per `tests/README.md`; add a new `ui` label to `tests/README.md` and `tests/CMakeLists.txt` only if it does not already exist.
 - [x] No `gpu`/`vulkan` test in this slice; visual overlay proof is owned by final sandbox acceptance.
 
@@ -63,12 +67,13 @@
 - [x] Update `tasks/backlog/ui/README.md` with UI-001 and its dependency gates.
 - [x] Update runtime/editor docs (`src/runtime/README.md` or a UI README if added) with the UI ownership model and command/event boundaries.
 - [x] Update `docs/migration/nonlegacy-parity-matrix.md` rows for the promoted sandbox/editor UI panels.
+- [x] Update `src/app/Sandbox/README.md` and the working-sandbox gate review with Slice B's runtime-owned transform edit seam and remaining deferred command surfaces.
 - [x] Refresh `docs/api/generated/module_inventory.md` if new modules are added.
 
 ## Acceptance criteria
 - [x] The sandbox has a promoted ImGui-based editor shell once `RUNTIME-090` and `GRAPHICS-079` are present.
 - [ ] Core panels expose scene hierarchy, inspector, selection details, file/import entry points, camera/render settings, and visualization controls with deterministic disabled states for missing backends.
-- [ ] UI emits commands/events to runtime/editor owners and does not own engine state directly. Slice A emits selection commands through `SelectionController` and owns no simulation/render/asset state; remaining import, camera/render, and visualization commands are deferred.
+- [ ] UI emits commands/events to runtime/editor owners and does not own engine state directly. Slice A emits selection commands through `SelectionController`; Slice B applies local transform edit commands through a runtime-owned seam and stamps `Transform::IsDirtyTag`; remaining import, camera/render, and visualization commands are deferred.
 
 ## Verification
 ```bash
@@ -92,7 +97,9 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
 ## Maturity
 - Slice A closes `CPUContracted` for the promoted shell, panel model/callback
   coverage, selection command emission, and deterministic disabled states.
-  Later slices close the remaining camera/render and visualization command
-  surfaces before retiring the full task.
+  Slice B closes `CPUContracted` for enriched inspector/selection detail models,
+  refined primitive id/hit display, and local transform edit command dirty
+  tagging. Later slices close the remaining camera/render and visualization
+  command surfaces before retiring the full task.
 - `Operational` owned by [`RUNTIME-095`](../backlog/runtime/RUNTIME-095-working-sandbox-acceptance.md)
   final sandbox acceptance after ImGui rendering is wired.
