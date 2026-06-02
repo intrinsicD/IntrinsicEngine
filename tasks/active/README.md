@@ -16,9 +16,10 @@ panels on top of the runtime ImGui adapter/pass stack. Status: in-progress on
 `main`; current slice extends the promoted runtime editor shell with enriched
 inspector/render-hint fields, selected/hovered entity rows, refined primitive
 id/hit display, a runtime-owned local-transform edit command, camera-controller
-replacement, and mesh edge/vertex primitive-view toggle commands with CPU
-`contract;runtime` coverage. Next verification: run the task structural checks
-plus the runtime contract/default CPU gates.
+replacement, mesh edge/vertex primitive-view toggle commands, and selected-entity
+spatial-debug / visualization-config command routing with CPU `contract;runtime`
+coverage. Next verification: run the task structural checks plus the runtime
+contract/default CPU gates.
 
 The most recently retired tasks are summarised below.
 

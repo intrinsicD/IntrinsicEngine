@@ -14,9 +14,11 @@ the editor shell registers with `Engine::SetImGuiEditorCallback`, reads scene
 and selection state through runtime APIs, emits selection and local-transform
 edit commands through runtime-owned seams, replaces runtime camera-controller
 slots through the engine-owned registry, toggles mesh edge/vertex primitive
-views through runtime extraction-cache settings, and leaves asset import, debug
-overlay settings, and full visualization command routing to runtime owners for
-later UI-001 slices.
+views through runtime extraction-cache settings, routes selected-entity
+spatial-debug options through `SpatialDebugBinding`, routes material/scalar/color
+visualization choices through `VisualizationConfig`, and leaves asset import
+execution plus the full `RUNTIME-083` visualization-adapter umbrella to runtime
+owners for later tasks.
 
 ## Build presets
 

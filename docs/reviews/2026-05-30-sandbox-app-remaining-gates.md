@@ -96,7 +96,7 @@ upstream these runtime gates consume.
 | Texture asset bridge | [`RUNTIME-080`](../../tasks/backlog/runtime/RUNTIME-080-asset-bridges-texture.md) | **OPEN** | No runtime asset-bridge module. |
 | Runtime ImGui platform/renderer adapter | [`RUNTIME-090`](../../tasks/done/RUNTIME-090-imgui-platform-renderer-adapter.md) | **OPEN** | No runtime ImGui adapter. Graphics-side `Extrinsic.Graphics.ImGuiOverlaySystem` + `Pass.ImGui` exist, but nothing produces `ImGuiOverlayFrame` records from runtime. |
 | Asset model/texture ingest ownership | [`ASSETIO-001`](../../tasks/backlog/assets/ASSETIO-001-asset-model-texture-ingest-ownership.md) | **OPEN** | Backlog; no ingest ownership wired. |
-| Sandbox editor shell + core panels | [`UI-001`](../../tasks/active/UI-001-sandbox-editor-shell-panels.md) | **ACTIVE** | Slice C.1 extends `Extrinsic.Runtime.SandboxEditorUi` with runtime-owned camera-controller replacement and mesh edge/vertex primitive-view toggle commands, alongside the Slice B inspector/selection/transform coverage. Asset import, debug overlay settings, and full visualization adapter routing remain open in later UI-001 slices. |
+| Sandbox editor shell + core panels | [`UI-001`](../../tasks/active/UI-001-sandbox-editor-shell-panels.md) | **ACTIVE** | Slice C.2 extends `Extrinsic.Runtime.SandboxEditorUi` with selected-entity `SpatialDebugBinding` and `VisualizationConfig` command routing, alongside the Slice B inspector/selection/transform coverage and Slice C.1 camera/primitive-view commands. Asset import execution and the full `RUNTIME-083` visualization-adapter umbrella remain open outside this slice. |
 
 ### E. Optional / non-blocking
 

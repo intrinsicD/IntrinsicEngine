@@ -20,11 +20,13 @@ module Extrinsic.Runtime.SandboxEditorUi;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Component.MetaData;
+import Extrinsic.ECS.Component.SpatialDebugBinding;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.Selection;
+import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Runtime.CameraControllers;
@@ -42,6 +44,96 @@ namespace Extrinsic::Runtime
         namespace GS = Extrinsic::ECS::Components::GeometrySources;
         namespace Sel = Extrinsic::ECS::Components::Selection;
         namespace G = Extrinsic::Graphics::Components;
+
+        [[nodiscard]] SandboxEditorSpatialDebugBindingModel FromSpatialDebugBinding(
+            const ECSC::SpatialDebugBinding& binding) noexcept
+        {
+            return SandboxEditorSpatialDebugBindingModel{
+                .HasBinding = true,
+                .Kind = binding.Kind,
+                .RegistryKey = binding.RegistryKey,
+                .LeafOnly = binding.LeafOnly,
+                .OccupancyOnly = binding.OccupancyOnly,
+                .MaxDepth = binding.MaxDepth,
+            };
+        }
+
+        [[nodiscard]] ECSC::SpatialDebugBinding ToSpatialDebugBinding(
+            const SandboxEditorSpatialDebugBindingCommand& command) noexcept
+        {
+            return ECSC::SpatialDebugBinding{
+                .Kind = command.Kind,
+                .RegistryKey = command.RegistryKey,
+                .LeafOnly = command.LeafOnly,
+                .OccupancyOnly = command.OccupancyOnly,
+                .MaxDepth = command.MaxDepth,
+            };
+        }
+
+        [[nodiscard]] bool SameSpatialDebugBinding(
+            const ECSC::SpatialDebugBinding& lhs,
+            const ECSC::SpatialDebugBinding& rhs) noexcept
+        {
+            return lhs.Kind == rhs.Kind &&
+                   lhs.RegistryKey == rhs.RegistryKey &&
+                   lhs.LeafOnly == rhs.LeafOnly &&
+                   lhs.OccupancyOnly == rhs.OccupancyOnly &&
+                   lhs.MaxDepth == rhs.MaxDepth;
+        }
+
+        [[nodiscard]] SandboxEditorVisualizationConfigModel FromVisualizationConfig(
+            const G::VisualizationConfig& config)
+        {
+            return SandboxEditorVisualizationConfigModel{
+                .HasConfig = true,
+                .Source = config.Source,
+                .Color = config.Color,
+                .ScalarFieldName = config.ScalarFieldName,
+                .ScalarDomain = config.ScalarDomain,
+                .ColorBufferName = config.ColorBufferName,
+                .ScalarAutoRange = config.Scalar.AutoRange,
+                .ScalarRangeMin = config.Scalar.RangeMin,
+                .ScalarRangeMax = config.Scalar.RangeMax,
+                .ScalarBinCount = config.Scalar.BinCount,
+                .IsolineCount = config.Scalar.Isolines.Num,
+            };
+        }
+
+        [[nodiscard]] G::VisualizationConfig ToVisualizationConfig(
+            const SandboxEditorVisualizationConfigCommand& command)
+        {
+            G::VisualizationConfig config{};
+            config.Source = command.Source;
+            config.Color = command.Color;
+            config.ScalarFieldName = command.ScalarFieldName;
+            config.ScalarDomain = command.ScalarDomain;
+            config.ColorBufferName = command.ColorBufferName;
+            config.Scalar.AutoRange = command.ScalarAutoRange;
+            config.Scalar.RangeMin = command.ScalarRangeMin;
+            config.Scalar.RangeMax = command.ScalarRangeMax;
+            config.Scalar.BinCount = command.ScalarBinCount;
+            config.Scalar.Isolines.Num = command.IsolineCount;
+            return config;
+        }
+
+        [[nodiscard]] bool SameVisualizationConfig(
+            const G::VisualizationConfig& lhs,
+            const G::VisualizationConfig& rhs) noexcept
+        {
+            return lhs.Source == rhs.Source &&
+                   lhs.Color.x == rhs.Color.x &&
+                   lhs.Color.y == rhs.Color.y &&
+                   lhs.Color.z == rhs.Color.z &&
+                   lhs.Color.w == rhs.Color.w &&
+                   lhs.ScalarFieldName == rhs.ScalarFieldName &&
+                   lhs.ScalarDomain == rhs.ScalarDomain &&
+                   lhs.ColorBufferName == rhs.ColorBufferName &&
+                   lhs.Scalar.AutoRange == rhs.Scalar.AutoRange &&
+                   lhs.Scalar.RangeMin == rhs.Scalar.RangeMin &&
+                   lhs.Scalar.RangeMax == rhs.Scalar.RangeMax &&
+                   lhs.Scalar.BinCount == rhs.Scalar.BinCount &&
+                   lhs.Scalar.Isolines.Num == rhs.Scalar.Isolines.Num;
+        }
 
         [[nodiscard]] SandboxEditorPrimitiveViewSettings FromRuntimeSettings(
             const MeshPrimitiveViewSettings settings) noexcept
@@ -460,7 +552,47 @@ namespace Extrinsic::Runtime
             {
                 AddDiagnostic(model.Diagnostics,
                               SandboxEditorDiagnosticCode::VisualizationCommandsUnavailable,
-                              "Visualization adapter command routing is deferred past Slice A.");
+                              "Visualization command seams are unavailable.");
+                return model;
+            }
+            if (context.Scene == nullptr)
+            {
+                AddDiagnostic(model.Diagnostics,
+                              SandboxEditorDiagnosticCode::MissingScene,
+                              "Scene registry is unavailable for visualization controls.");
+                return model;
+            }
+
+            const std::optional<ECS::EntityHandle> selected =
+                ResolveFirstSelectedEntity(context);
+            if (!selected.has_value())
+            {
+                AddDiagnostic(model.Diagnostics,
+                              SandboxEditorDiagnosticCode::NoSelectedEntity,
+                              "No selected entity is available for visualization controls.");
+                return model;
+            }
+
+            const entt::registry& raw = context.Scene->Raw();
+            model.HasSelectedEntity = true;
+            model.SelectedStableId =
+                SelectionController::ToStableEntityId(*selected);
+            model.SelectedDomain =
+                GS::BuildConstView(raw, *selected).ActiveDomain;
+
+            if (const auto* binding =
+                    raw.try_get<ECSC::SpatialDebugBinding>(*selected);
+                binding != nullptr)
+            {
+                model.SpatialDebug = FromSpatialDebugBinding(*binding);
+            }
+
+            if (const auto* visualization =
+                    raw.try_get<G::VisualizationConfig>(*selected);
+                visualization != nullptr)
+            {
+                model.Visualization =
+                    FromVisualizationConfig(*visualization);
             }
             return model;
         }
@@ -499,7 +631,7 @@ namespace Extrinsic::Runtime
                 .ImGuiAdapterAvailable = engine.GetImGuiAdapter().IsInitialized(),
                 .AssetImportCommandsAvailable = false,
                 .CameraRenderCommandsAvailable = true,
-                .VisualizationCommandsAvailable = false,
+                .VisualizationCommandsAvailable = true,
             };
         }
 
@@ -803,6 +935,101 @@ namespace Extrinsic::Runtime
 
             if (ImGui::Begin("Geometry Visualization"))
             {
+                if (frame.Visualization.HasSelectedEntity)
+                {
+                    ImGui::Text("Selected render id: %u",
+                                frame.Visualization.SelectedStableId);
+                    ImGui::Text("Geometry domain: %s",
+                                DebugNameForSandboxEditorGeometryDomain(
+                                    frame.Visualization.SelectedDomain));
+
+                    if (frame.Visualization.SpatialDebug.HasBinding)
+                    {
+                        ImGui::Text("Spatial debug: %s key=%llu",
+                                    DebugNameForSandboxEditorSpatialDebugKind(
+                                        frame.Visualization.SpatialDebug.Kind),
+                                    static_cast<unsigned long long>(
+                                        frame.Visualization.SpatialDebug.RegistryKey));
+                    }
+                    else
+                    {
+                        ImGui::TextDisabled("Spatial debug: disabled");
+                    }
+
+                    if (context != nullptr &&
+                        frame.Visualization.GeometryDomainControlsAvailable)
+                    {
+                        if (ImGui::Button("Enable BVH debug"))
+                        {
+                            (void)ApplySandboxEditorSpatialDebugBindingCommand(
+                                *context,
+                                SandboxEditorSpatialDebugBindingCommand{
+                                    .StableEntityId =
+                                        frame.Visualization.SelectedStableId,
+                                    .EnableBinding = true,
+                                });
+                        }
+                        ImGui::SameLine();
+                        if (ImGui::Button("Clear debug"))
+                        {
+                            (void)ApplySandboxEditorSpatialDebugBindingCommand(
+                                *context,
+                                SandboxEditorSpatialDebugBindingCommand{
+                                    .StableEntityId =
+                                        frame.Visualization.SelectedStableId,
+                                    .EnableBinding = false,
+                                });
+                        }
+
+                        if (frame.Visualization.Visualization.HasConfig)
+                        {
+                            ImGui::Text("Visualization: %s",
+                                        DebugNameForSandboxEditorVisualizationColorSource(
+                                            frame.Visualization.Visualization.Source));
+                        }
+                        else
+                        {
+                            ImGui::TextDisabled("Visualization: material/default");
+                        }
+
+                        if (ImGui::Button("Uniform color"))
+                        {
+                            (void)ApplySandboxEditorVisualizationConfigCommand(
+                                *context,
+                                SandboxEditorVisualizationConfigCommand{
+                                    .StableEntityId =
+                                        frame.Visualization.SelectedStableId,
+                                    .EnableConfig = true,
+                                    .Source = G::VisualizationConfig::ColorSource::UniformColor,
+                                });
+                        }
+                        ImGui::SameLine();
+                        if (ImGui::Button("Scalar: scalars"))
+                        {
+                            (void)ApplySandboxEditorVisualizationConfigCommand(
+                                *context,
+                                SandboxEditorVisualizationConfigCommand{
+                                    .StableEntityId =
+                                        frame.Visualization.SelectedStableId,
+                                    .EnableConfig = true,
+                                    .Source = G::VisualizationConfig::ColorSource::ScalarField,
+                                    .ScalarFieldName = "scalars",
+                                    .ScalarDomain = G::VisualizationConfig::Domain::Vertex,
+                                });
+                        }
+                        ImGui::SameLine();
+                        if (ImGui::Button("Clear vis"))
+                        {
+                            (void)ApplySandboxEditorVisualizationConfigCommand(
+                                *context,
+                                SandboxEditorVisualizationConfigCommand{
+                                    .StableEntityId =
+                                        frame.Visualization.SelectedStableId,
+                                    .EnableConfig = false,
+                                });
+                        }
+                    }
+                }
                 DrawDiagnostics(frame.Visualization.Diagnostics);
             }
             ImGui::End();
@@ -851,6 +1078,8 @@ namespace Extrinsic::Runtime
             return "MissingCameraControllerRegistry";
         case SandboxEditorCommandStatus::MissingPrimitiveViewCommands:
             return "MissingPrimitiveViewCommands";
+        case SandboxEditorCommandStatus::MissingVisualizationCommands:
+            return "MissingVisualizationCommands";
         case SandboxEditorCommandStatus::StaleEntity:
             return "StaleEntity";
         case SandboxEditorCommandStatus::MissingTransform:
@@ -914,6 +1143,59 @@ namespace Extrinsic::Runtime
             return "FreeLook";
         case Core::Config::CameraControllerKind::TopDown:
             return "TopDown";
+        }
+        return "Unknown";
+    }
+
+    const char* DebugNameForSandboxEditorSpatialDebugKind(
+        const ECSC::SpatialDebugGeometryKind kind) noexcept
+    {
+        switch (kind)
+        {
+        case ECSC::SpatialDebugGeometryKind::Bvh:
+            return "Bvh";
+        case ECSC::SpatialDebugGeometryKind::KdTree:
+            return "KdTree";
+        case ECSC::SpatialDebugGeometryKind::Octree:
+            return "Octree";
+        case ECSC::SpatialDebugGeometryKind::ConvexHull:
+            return "ConvexHull";
+        }
+        return "Unknown";
+    }
+
+    const char* DebugNameForSandboxEditorVisualizationColorSource(
+        const G::VisualizationConfig::ColorSource source) noexcept
+    {
+        switch (source)
+        {
+        case G::VisualizationConfig::ColorSource::Material:
+            return "Material";
+        case G::VisualizationConfig::ColorSource::UniformColor:
+            return "UniformColor";
+        case G::VisualizationConfig::ColorSource::ScalarField:
+            return "ScalarField";
+        case G::VisualizationConfig::ColorSource::PerVertexBuffer:
+            return "PerVertexBuffer";
+        case G::VisualizationConfig::ColorSource::PerEdgeBuffer:
+            return "PerEdgeBuffer";
+        case G::VisualizationConfig::ColorSource::PerFaceBuffer:
+            return "PerFaceBuffer";
+        }
+        return "Unknown";
+    }
+
+    const char* DebugNameForSandboxEditorVisualizationDomain(
+        const G::VisualizationConfig::Domain domain) noexcept
+    {
+        switch (domain)
+        {
+        case G::VisualizationConfig::Domain::Vertex:
+            return "Vertex";
+        case G::VisualizationConfig::Domain::Edge:
+            return "Edge";
+        case G::VisualizationConfig::Domain::Face:
+            return "Face";
         }
         return "Unknown";
     }
@@ -1071,6 +1353,70 @@ namespace Extrinsic::Runtime
             context.PrimitiveViewCommands.SetSettings(command.StableEntityId, settings);
         else
             context.PrimitiveViewCommands.ClearSettings(command.StableEntityId);
+        return SandboxEditorCommandStatus::Applied;
+    }
+
+    SandboxEditorCommandStatus ApplySandboxEditorSpatialDebugBindingCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorSpatialDebugBindingCommand& command)
+    {
+        if (!context.VisualizationCommandsAvailable)
+            return SandboxEditorCommandStatus::MissingVisualizationCommands;
+        if (context.Scene == nullptr)
+            return SandboxEditorCommandStatus::MissingScene;
+
+        entt::registry& raw = context.Scene->Raw();
+        const ECS::EntityHandle entity =
+            SelectionController::ToEntityHandle(command.StableEntityId);
+        if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
+            return SandboxEditorCommandStatus::StaleEntity;
+
+        if (!command.EnableBinding)
+        {
+            if (!raw.all_of<ECSC::SpatialDebugBinding>(entity))
+                return SandboxEditorCommandStatus::NoChange;
+            raw.remove<ECSC::SpatialDebugBinding>(entity);
+            return SandboxEditorCommandStatus::Applied;
+        }
+
+        const ECSC::SpatialDebugBinding next = ToSpatialDebugBinding(command);
+        const auto* current = raw.try_get<ECSC::SpatialDebugBinding>(entity);
+        if (current != nullptr && SameSpatialDebugBinding(*current, next))
+            return SandboxEditorCommandStatus::NoChange;
+
+        raw.emplace_or_replace<ECSC::SpatialDebugBinding>(entity, next);
+        return SandboxEditorCommandStatus::Applied;
+    }
+
+    SandboxEditorCommandStatus ApplySandboxEditorVisualizationConfigCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorVisualizationConfigCommand& command)
+    {
+        if (!context.VisualizationCommandsAvailable)
+            return SandboxEditorCommandStatus::MissingVisualizationCommands;
+        if (context.Scene == nullptr)
+            return SandboxEditorCommandStatus::MissingScene;
+
+        entt::registry& raw = context.Scene->Raw();
+        const ECS::EntityHandle entity =
+            SelectionController::ToEntityHandle(command.StableEntityId);
+        if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
+            return SandboxEditorCommandStatus::StaleEntity;
+
+        if (!command.EnableConfig)
+        {
+            if (!raw.all_of<G::VisualizationConfig>(entity))
+                return SandboxEditorCommandStatus::NoChange;
+            raw.remove<G::VisualizationConfig>(entity);
+            return SandboxEditorCommandStatus::Applied;
+        }
+
+        const G::VisualizationConfig next = ToVisualizationConfig(command);
+        const auto* current = raw.try_get<G::VisualizationConfig>(entity);
+        if (current != nullptr && SameVisualizationConfig(*current, next))
+            return SandboxEditorCommandStatus::NoChange;
+
+        raw.emplace_or_replace<G::VisualizationConfig>(entity, next);
         return SandboxEditorCommandStatus::Applied;
     }
 

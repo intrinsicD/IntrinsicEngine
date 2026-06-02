@@ -14,10 +14,12 @@ export module Extrinsic.Runtime.SandboxEditorUi;
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Geometry2D;
+import Extrinsic.ECS.Component.SpatialDebugBinding;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
@@ -45,6 +47,7 @@ export namespace Extrinsic::Runtime
         MissingSelectionController,
         MissingCameraControllerRegistry,
         MissingPrimitiveViewCommands,
+        MissingVisualizationCommands,
         StaleEntity,
         MissingTransform,
         UnsupportedGeometryDomain,
@@ -64,6 +67,15 @@ export namespace Extrinsic::Runtime
 
     [[nodiscard]] const char* DebugNameForSandboxEditorCameraControllerKind(
         Core::Config::CameraControllerKind kind) noexcept;
+
+    [[nodiscard]] const char* DebugNameForSandboxEditorSpatialDebugKind(
+        ECS::Components::SpatialDebugGeometryKind kind) noexcept;
+
+    [[nodiscard]] const char* DebugNameForSandboxEditorVisualizationColorSource(
+        Graphics::Components::VisualizationConfig::ColorSource source) noexcept;
+
+    [[nodiscard]] const char* DebugNameForSandboxEditorVisualizationDomain(
+        Graphics::Components::VisualizationConfig::Domain domain) noexcept;
 
     struct SandboxEditorDiagnostic
     {
@@ -201,9 +213,43 @@ export namespace Extrinsic::Runtime
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
+    struct SandboxEditorSpatialDebugBindingModel
+    {
+        bool HasBinding{false};
+        ECS::Components::SpatialDebugGeometryKind Kind{
+            ECS::Components::SpatialDebugGeometryKind::Bvh};
+        std::uint64_t RegistryKey{0u};
+        bool LeafOnly{false};
+        bool OccupancyOnly{false};
+        std::uint32_t MaxDepth{32u};
+    };
+
+    struct SandboxEditorVisualizationConfigModel
+    {
+        bool HasConfig{false};
+        Graphics::Components::VisualizationConfig::ColorSource Source{
+            Graphics::Components::VisualizationConfig::ColorSource::Material};
+        glm::vec4 Color{1.0f, 0.6f, 0.0f, 1.0f};
+        std::string ScalarFieldName{};
+        Graphics::Components::VisualizationConfig::Domain ScalarDomain{
+            Graphics::Components::VisualizationConfig::Domain::Vertex};
+        std::string ColorBufferName{};
+        bool ScalarAutoRange{true};
+        float ScalarRangeMin{0.0f};
+        float ScalarRangeMax{1.0f};
+        std::uint32_t ScalarBinCount{0u};
+        std::uint32_t IsolineCount{0u};
+    };
+
     struct SandboxEditorVisualizationModel
     {
         bool GeometryDomainControlsAvailable{false};
+        bool HasSelectedEntity{false};
+        std::uint32_t SelectedStableId{0u};
+        ECS::Components::GeometrySources::Domain SelectedDomain{
+            ECS::Components::GeometrySources::Domain::None};
+        SandboxEditorSpatialDebugBindingModel SpatialDebug{};
+        SandboxEditorVisualizationConfigModel Visualization{};
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
@@ -261,6 +307,36 @@ export namespace Extrinsic::Runtime
         bool EnableVertexView{false};
     };
 
+    struct SandboxEditorSpatialDebugBindingCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        bool EnableBinding{true};
+        ECS::Components::SpatialDebugGeometryKind Kind{
+            ECS::Components::SpatialDebugGeometryKind::Bvh};
+        std::uint64_t RegistryKey{0u};
+        bool LeafOnly{false};
+        bool OccupancyOnly{false};
+        std::uint32_t MaxDepth{32u};
+    };
+
+    struct SandboxEditorVisualizationConfigCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        bool EnableConfig{true};
+        Graphics::Components::VisualizationConfig::ColorSource Source{
+            Graphics::Components::VisualizationConfig::ColorSource::UniformColor};
+        glm::vec4 Color{1.0f, 0.6f, 0.0f, 1.0f};
+        std::string ScalarFieldName{};
+        Graphics::Components::VisualizationConfig::Domain ScalarDomain{
+            Graphics::Components::VisualizationConfig::Domain::Vertex};
+        std::string ColorBufferName{};
+        bool ScalarAutoRange{true};
+        float ScalarRangeMin{0.0f};
+        float ScalarRangeMax{1.0f};
+        std::uint32_t ScalarBinCount{0u};
+        std::uint32_t IsolineCount{0u};
+    };
+
     [[nodiscard]] SandboxEditorPanelFrame BuildSandboxEditorPanelFrame(
         const SandboxEditorContext& context);
 
@@ -278,6 +354,14 @@ export namespace Extrinsic::Runtime
     SandboxEditorCommandStatus ApplySandboxEditorPrimitiveViewCommand(
         const SandboxEditorContext& context,
         const SandboxEditorPrimitiveViewCommand& command);
+
+    SandboxEditorCommandStatus ApplySandboxEditorSpatialDebugBindingCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorSpatialDebugBindingCommand& command);
+
+    SandboxEditorCommandStatus ApplySandboxEditorVisualizationConfigCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorVisualizationConfigCommand& command);
 
     void DrawSandboxEditorPanelFrame(const SandboxEditorPanelFrame& frame);
 

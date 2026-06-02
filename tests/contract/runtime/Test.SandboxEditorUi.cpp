@@ -13,6 +13,7 @@
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Component.MetaData;
+import Extrinsic.ECS.Component.SpatialDebugBinding;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
@@ -20,6 +21,7 @@ import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.ImGuiOverlaySystem;
 import Extrinsic.Platform.Window;
@@ -612,6 +614,154 @@ TEST(SandboxEditorUi, PrimitiveViewCommandRoutesThroughRuntimeSettings)
                       .EnableEdgeView = true,
                   }),
               Runtime::SandboxEditorCommandStatus::UnsupportedGeometryDomain);
+}
+
+TEST(SandboxEditorUi, SpatialDebugBindingCommandRoutesThroughSelectedEntity)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "DebugMesh");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.VisualizationCommandsAvailable = true;
+
+    Runtime::SandboxEditorPanelFrame frame =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+    ASSERT_TRUE(frame.Visualization.GeometryDomainControlsAvailable);
+    ASSERT_TRUE(frame.Visualization.HasSelectedEntity);
+    EXPECT_FALSE(frame.Visualization.SpatialDebug.HasBinding);
+
+    const Runtime::SandboxEditorSpatialDebugBindingCommand enable{
+        .StableEntityId = stableId,
+        .EnableBinding = true,
+        .Kind = ECSC::SpatialDebugGeometryKind::Octree,
+        .RegistryKey = 42u,
+        .LeafOnly = true,
+        .OccupancyOnly = true,
+        .MaxDepth = 7u,
+    };
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorSpatialDebugBindingCommand(
+                  context,
+                  enable),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    ASSERT_TRUE(registry.Raw().all_of<ECSC::SpatialDebugBinding>(mesh));
+    const auto& binding =
+        registry.Raw().get<ECSC::SpatialDebugBinding>(mesh);
+    EXPECT_EQ(binding.Kind, ECSC::SpatialDebugGeometryKind::Octree);
+    EXPECT_EQ(binding.RegistryKey, 42u);
+    EXPECT_TRUE(binding.LeafOnly);
+    EXPECT_TRUE(binding.OccupancyOnly);
+    EXPECT_EQ(binding.MaxDepth, 7u);
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorSpatialDebugKind(
+                     binding.Kind),
+                 "Octree");
+
+    frame = Runtime::BuildSandboxEditorPanelFrame(context);
+    ASSERT_TRUE(frame.Visualization.SpatialDebug.HasBinding);
+    EXPECT_EQ(frame.Visualization.SpatialDebug.RegistryKey, 42u);
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorSpatialDebugBindingCommand(
+                  context,
+                  enable),
+              Runtime::SandboxEditorCommandStatus::NoChange);
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorSpatialDebugBindingCommand(
+                  context,
+                  Runtime::SandboxEditorSpatialDebugBindingCommand{
+                      .StableEntityId = stableId,
+                      .EnableBinding = false,
+                  }),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    EXPECT_FALSE(registry.Raw().all_of<ECSC::SpatialDebugBinding>(mesh));
+
+    Runtime::SandboxEditorContext unavailable = context;
+    unavailable.VisualizationCommandsAvailable = false;
+    EXPECT_EQ(Runtime::ApplySandboxEditorSpatialDebugBindingCommand(
+                  unavailable,
+                  enable),
+              Runtime::SandboxEditorCommandStatus::MissingVisualizationCommands);
+}
+
+TEST(SandboxEditorUi, VisualizationConfigCommandRoutesThroughSelectedEntity)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "VisualMesh");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.VisualizationCommandsAvailable = true;
+
+    const Runtime::SandboxEditorVisualizationConfigCommand scalar{
+        .StableEntityId = stableId,
+        .EnableConfig = true,
+        .Source = G::VisualizationConfig::ColorSource::ScalarField,
+        .ScalarFieldName = "curvature",
+        .ScalarDomain = G::VisualizationConfig::Domain::Face,
+        .ScalarAutoRange = false,
+        .ScalarRangeMin = -1.0f,
+        .ScalarRangeMax = 2.0f,
+        .ScalarBinCount = 4u,
+        .IsolineCount = 8u,
+    };
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationConfigCommand(
+                  context,
+                  scalar),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    ASSERT_TRUE(registry.Raw().all_of<G::VisualizationConfig>(mesh));
+    const auto& config = registry.Raw().get<G::VisualizationConfig>(mesh);
+    EXPECT_EQ(config.Source, G::VisualizationConfig::ColorSource::ScalarField);
+    EXPECT_EQ(config.ScalarFieldName, "curvature");
+    EXPECT_EQ(config.ScalarDomain, G::VisualizationConfig::Domain::Face);
+    EXPECT_FALSE(config.Scalar.AutoRange);
+    EXPECT_FLOAT_EQ(config.Scalar.RangeMin, -1.0f);
+    EXPECT_FLOAT_EQ(config.Scalar.RangeMax, 2.0f);
+    EXPECT_EQ(config.Scalar.BinCount, 4u);
+    EXPECT_EQ(config.Scalar.Isolines.Num, 8u);
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorVisualizationColorSource(
+                     config.Source),
+                 "ScalarField");
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorVisualizationDomain(
+                     config.ScalarDomain),
+                 "Face");
+
+    Runtime::SandboxEditorPanelFrame frame =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+    ASSERT_TRUE(frame.Visualization.Visualization.HasConfig);
+    EXPECT_EQ(frame.Visualization.Visualization.Source,
+              G::VisualizationConfig::ColorSource::ScalarField);
+    EXPECT_EQ(frame.Visualization.Visualization.ScalarFieldName, "curvature");
+    EXPECT_EQ(frame.Visualization.Visualization.IsolineCount, 8u);
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationConfigCommand(
+                  context,
+                  scalar),
+              Runtime::SandboxEditorCommandStatus::NoChange);
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationConfigCommand(
+                  context,
+                  Runtime::SandboxEditorVisualizationConfigCommand{
+                      .StableEntityId = stableId,
+                      .EnableConfig = false,
+                  }),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    EXPECT_FALSE(registry.Raw().all_of<G::VisualizationConfig>(mesh));
+
+    Runtime::SandboxEditorContext unavailable = context;
+    unavailable.VisualizationCommandsAvailable = false;
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationConfigCommand(
+                  unavailable,
+                  scalar),
+              Runtime::SandboxEditorCommandStatus::MissingVisualizationCommands);
 }
 
 TEST(SandboxEditorUi, AdapterCallbackDrawsDeterministicDisabledPanelFrame)
