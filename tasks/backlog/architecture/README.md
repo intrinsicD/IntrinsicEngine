@@ -35,6 +35,21 @@ map.
   already makes the null branch unreachable. Filed from
   [`docs/reports/2026-05-26-agent-output-audit.md`](../../../docs/reports/2026-05-26-agent-output-audit.md)
   Row 5.
+- [HARDEN-074 — Make markdown link checking see inline-code labels](HARDEN-074-doc-link-checker-inline-code-labels.md):
+  fixes the doc-link checker blind spot where links such as
+  ``[`TASK-ID`](...)`` can be skipped before validation, then cleans up the
+  stale links exposed by the stricter parser.
+- [HARDEN-075 — Validate task-state links and stale status claims](HARDEN-075-task-state-link-consistency-checker.md):
+  adds deterministic task lifecycle cross-reference checking so docs cannot
+  keep claiming a task is active/backlog/done when the file lives elsewhere or
+  no longer exists.
+- [HARDEN-076 — Enforce open task owners for layering allowlist rows](HARDEN-076-enforce-open-task-layering-allowlist-owners.md):
+  follows [`HARDEN-069`](HARDEN-069-rebind-legacy-layering-allowlist-to-active-retirement-tasks.md)
+  by making `check_layering_allowlist_quality.py` fail strict mode when a
+  temporary allowlist exception points at a missing or retired task owner.
+- [HARDEN-077 — Enforce operational follow-ups for ambiguous maturity closures](HARDEN-077-enforce-operational-followups-for-ambiguous-maturity.md):
+  turns the review-only "CPUContracted is not Operational" rule into a focused
+  task-policy check for backend-facing graphics/Vulkan/runtime slices.
 - [DOCS-001 — Reduce `docs/architecture/graphics.md` to contract + status](../../done/DOCS-001-reduce-graphics-architecture-prose.md)
   (done 2026-05-17): shrank the 793-line `graphics.md` to 118 lines by
   extracting 15 embedded decision records into ADRs `0004..0018` and adding a
@@ -63,6 +78,10 @@ map.
   GRAPHICS-033E/F + HARDEN-066 + RUNTIME-091 window
   (`docs/reports/2026-05-17-agent-output-audit.md`, ≈ 15 minutes, eight rows
   pass, one self-corrected historical finding, no new follow-up filed).
+- [REVIEW-002 — Recurring repo-state drift and inconsistency audit](REVIEW-002-recurring-drift-and-inconsistency-audit.md):
+  installs a whole-tree drift audit that composes existing validators and
+  semantic spot-checks for inventory drift, stale task links, allowlist owner
+  drift, planned-marker drift, dead seams, and naming inconsistency.
 
 ## Convergence
 
