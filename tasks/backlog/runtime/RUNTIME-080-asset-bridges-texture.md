@@ -29,7 +29,7 @@ recorded in the dependency anchors of
    `RHI::TextureDesc.{Format, Width, Height, MipLevels}`, `RHI::SamplerDesc`,
    and the source bytes for `GpuTextureRequest`. No such type exists in
    `src/assets/` today. `ASSETIO-001`
-   ([`tasks/backlog/assets/ASSETIO-001-asset-model-texture-ingest-ownership.md`](../assets/ASSETIO-001-asset-model-texture-ingest-ownership.md))
+   ([`tasks/active/ASSETIO-001-asset-model-texture-ingest-ownership.md`](../../active/ASSETIO-001-asset-model-texture-ingest-ownership.md))
    explicitly owns "Define and implement CPU texture decode payload
    ownership and metadata (`dimensions`, format/color space, component
    count, source path/generation) without creating GPU resources in

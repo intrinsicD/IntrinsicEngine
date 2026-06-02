@@ -9,6 +9,7 @@ store, load pipeline, event bus, and path index behind a single façade.
 - `Extrinsic.Asset.Service`
 - `Extrinsic.Asset.Registry`
 - `Extrinsic.Asset.PayloadStore`
+- `Extrinsic.Asset.ImportRouter`
 - `Extrinsic.Asset.LoadPipeline`
 - `Extrinsic.Asset.EventBus`
 - `Extrinsic.Asset.PathIndex`
@@ -20,6 +21,11 @@ store, load pipeline, event bus, and path index behind a single façade.
 - `AssetRegistry` owns the generational `AssetId` handles and per-asset metadata.
 - `AssetPayloadStore` stores typed payloads behind stable tickets and returns
   borrowed `std::span<const T>` views for reads.
+- `Asset.ImportRouter` resolves file extensions plus optional payload/domain
+  hints to CPU-only import/export routes for mesh, point-cloud, graph, model
+  scene, and texture payloads. It does not import geometry, runtime, graphics,
+  or decoder code; later ingest slices register or invoke decoders through this
+  routing contract.
 - `AssetLoadPipeline` tracks load stages, in-flight requests, GPU fence waits,
   and failure / completion transitions.
 - `AssetEventBus` batches `Ready`, `Failed`, `Reloaded`, and `Destroyed`
@@ -34,6 +40,7 @@ store, load pipeline, event bus, and path index behind a single façade.
 
 ```text
 Asset.EventBus.cppm
+Asset.ImportRouter.cppm
 Asset.LoadPipeline.cppm
 Asset.PathIndex.cppm
 Asset.PayloadStore.cppm
@@ -46,6 +53,7 @@ Asset.TypePool.cppm
 
 ```text
 Asset.EventBus.cpp
+Asset.ImportRouter.cpp
 Asset.LoadPipeline.cpp
 Asset.PathIndex.cpp
 Asset.PayloadStore.cpp

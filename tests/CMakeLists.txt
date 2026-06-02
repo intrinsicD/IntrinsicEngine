@@ -402,6 +402,7 @@ intrinsic_test_object_lib(GeometryTestObjs
 # --- Relocated HARDEN-041 wrapper sources: assets/core/ecs/graphics/runtime taxonomy ---
 set(_asset_unit_test_files
     Test.Asset.EventBus.cpp
+    Test.Asset.ImportRouter.cpp
     Test.Asset.PathIndex.cpp
     Test.Asset.PayloadStore.cpp
     Test.Asset.Registry.cpp

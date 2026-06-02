@@ -58,7 +58,7 @@ Planning parents (retired):
 - [`GRAPHICS-033D` (done)](../done/GRAPHICS-033D-gpu-vulkan-visible-triangle-smoke.md)
 - [`rendering/GRAPHICS-034-asset-backed-mesh-residency-bridge.md`](rendering/GRAPHICS-034-asset-backed-mesh-residency-bridge.md)
 - [`runtime/RORG-031-runtime-composition.md`](runtime/RORG-031-runtime-composition.md)
-- [`assets/ASSETIO-001-asset-model-texture-ingest-ownership.md`](assets/ASSETIO-001-asset-model-texture-ingest-ownership.md)
+- [`ASSETIO-001`](../active/ASSETIO-001-asset-model-texture-ingest-ownership.md)
 - [`GEOIO-002` (done)](../done/GEOIO-002-geometry-io-parity-hardening.md)
 - [`ecs/HARDEN-060` (done)](../done/HARDEN-060-ecs-scene-bootstrap-contract.md)
 - [`ecs/HARDEN-061` (done)](../done/HARDEN-061-ecs-hierarchy-transform-system-parity.md)
@@ -182,6 +182,7 @@ promoting backlog tasks to active so per-category DAGs do not diverge.
 
 - **GRAPHICS-034 ⇐ ASSETIO-001 ⇐ GEOIO-002.** Asset-backed mesh residency
   depends on promoted asset routing, which depends on geometry decoder parity.
+  `GEOIO-002` is retired and `ASSETIO-001` is active.
 - **RUNTIME-085..088 ⇐ HARDEN-065, GRAPHICS-030B, GRAPHICS-070/071.** Runtime
   mesh/graph/point-cloud residency depends on promoted `GeometrySources`, the
   proven runtime-to-`GpuWorld` upload/bind pattern, and retained surface/line/

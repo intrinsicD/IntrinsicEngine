@@ -33,7 +33,7 @@ map.
 
 - GEOIO-002 is retired in [`tasks/done`](../../done/GEOIO-002-geometry-io-parity-hardening.md)
   and contributes to **Theme E — Geometry IO completion** as the upstream gate
-  for [`assets/ASSETIO-001`](../assets/ASSETIO-001-asset-model-texture-ingest-ownership.md)
+  for [`ASSETIO-001`](../../active/ASSETIO-001-asset-model-texture-ingest-ownership.md)
   and asset-backed mesh residency in **Theme A — Shortest path to sandbox
   visible geometry** (`rendering/GRAPHICS-034`).
 - [GEOM-005](../../done/GEOM-005-api-style-and-numeric-policy.md) is retired in

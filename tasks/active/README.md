@@ -12,16 +12,28 @@ Each active task should include:
 ## Currently active
 
 [`UI-001`](UI-001-sandbox-editor-shell-panels.md) — sandbox editor shell and core
-panels on top of the runtime ImGui adapter/pass stack. Status: in-progress on
-`main` after Slice C.3; the promoted editor shell now covers enriched
+panels on top of the runtime ImGui adapter/pass stack. Status: blocked on
+[`ASSETIO-001`](ASSETIO-001-asset-model-texture-ingest-ownership.md) after Slice
+C.3; the promoted editor shell now covers enriched
 inspector/render-hint fields, selected/hovered entity rows, refined primitive
 id/hit display, a runtime-owned local-transform edit command, camera-controller
 replacement, mesh edge/vertex primitive-view toggle commands, and selected-entity
 spatial-debug, visualization-config, and visualization adapter-binding command
 routing with CPU `contract;runtime` coverage. Remaining file/import execution is
-gated on `ASSETIO-001`.
-Next verification: resume the ASSETIO-gated import panel slice, then run the
-task structural checks plus the runtime contract/default CPU gates.
+gated on active `ASSETIO-001`.
+Next verification: resume the file/import panel execution slice after ASSETIO
+lands a runtime-callable import route, then run the task structural checks plus
+the runtime contract/default CPU gates.
+
+[`ASSETIO-001`](ASSETIO-001-asset-model-texture-ingest-ownership.md) — asset
+model, texture, and import/export ingest ownership. Status: in-progress on
+`main`, promoted to address the UI-001 file/import blocker. Slice A verified
+the CPU-only `Extrinsic.Asset.ImportRouter` contract for extension lookup,
+import/export routing, payload/domain hints, and deterministic route diagnostics
+without importing geometry, runtime, graphics, or RHI into `src/assets`.
+Next verification: continue Slice B by wiring promoted geometry decoder/encoder
+callbacks through the route contract, then rerun focused asset/geometry route
+tests, task/docs/layering checks, and the default CPU-supported gate.
 
 The most recently retired tasks are summarised below.
 
