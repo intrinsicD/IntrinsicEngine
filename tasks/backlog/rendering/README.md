@@ -712,7 +712,7 @@ Cross-layer Theme B′ leaves outside `rendering/`:
 - [`runtime/RUNTIME-080` — Texture asset bridge](../runtime/RUNTIME-080-asset-bridges-texture.md).
 - [`RUNTIME-081` — Camera controllers](../../done/RUNTIME-081-camera-controllers.md).
 - [`runtime/RUNTIME-082` — Spatial debug adapters](../../done/RUNTIME-082-spatial-debug-adapters.md) (done 2026-05-27).
-- [`runtime/RUNTIME-083` — Visualization adapters](../runtime/RUNTIME-083-visualization-adapters.md).
+- [`runtime/RUNTIME-083` — Visualization adapters](../../active/RUNTIME-083-visualization-adapters.md).
 - [`runtime/RUNTIME-084` — Gizmo interaction](../runtime/RUNTIME-084-gizmo-interaction.md).
 - [`runtime/RUNTIME-090` — Dear ImGui platform/renderer adapter](../../done/RUNTIME-090-imgui-platform-renderer-adapter.md) (retired 2026-06-02 at `CPUContracted`; Slice A standalone adapter module plus Slice B `Engine` frame-loop wiring landed).
 

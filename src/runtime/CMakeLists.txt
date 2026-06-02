@@ -26,6 +26,7 @@ target_sources(${target_name}
         Runtime.StableEntityLookup.cppm
         Runtime.StreamingExecutor.cppm
         SpatialDebug/Runtime.SpatialDebugAdapters.cppm
+        Visualization/Runtime.VisualizationAdapters.cppm
         PRIVATE
         Runtime.EcsSystemBundle.cpp
         Runtime.Engine.cpp
@@ -44,6 +45,7 @@ target_sources(${target_name}
         Runtime.StableEntityLookup.cpp
         Runtime.StreamingExecutor.cpp
         SpatialDebug/Runtime.SpatialDebugAdapters.cpp
+        Visualization/Runtime.VisualizationAdapters.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)

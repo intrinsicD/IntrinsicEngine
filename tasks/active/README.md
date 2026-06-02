@@ -12,14 +12,25 @@ Each active task should include:
 ## Currently active
 
 [`UI-001`](UI-001-sandbox-editor-shell-panels.md) — sandbox editor shell and core
-panels on top of the runtime ImGui adapter/pass stack. Status: in-progress on
-`main`; current slice extends the promoted runtime editor shell with enriched
+panels on top of the runtime ImGui adapter/pass stack. Status: blocked on
+`main` after Slice C.2; the promoted editor shell now covers enriched
 inspector/render-hint fields, selected/hovered entity rows, refined primitive
 id/hit display, a runtime-owned local-transform edit command, camera-controller
 replacement, mesh edge/vertex primitive-view toggle commands, and selected-entity
 spatial-debug / visualization-config command routing with CPU `contract;runtime`
-coverage. Next verification: run the task structural checks plus the runtime
-contract/default CPU gates.
+coverage. Remaining file/import execution is gated on `ASSETIO-001`; remaining
+full visualization adapter packet selection is gated on active `RUNTIME-083`.
+Next verification: resume UI-001 after those seams exist, then run the task
+structural checks plus the runtime contract/default CPU gates.
+
+[`RUNTIME-083`](RUNTIME-083-visualization-adapters.md) —
+`Extrinsic.Runtime.VisualizationAdapters` runtime producer umbrella. Status:
+in-progress on `main`; current Slice A adds the umbrella module,
+`PropertyScalarAdapter`, mutable visualization packet batch, adapter stats, and
+registry contract. This is the direct blocker for UI-001's remaining
+visualization adapter packet acceptance. Next verification: build
+`IntrinsicRuntimeContractTests`, run the focused `VisualizationAdapters`
+contract tests, refresh the module inventory, and run runtime structural checks.
 
 The most recently retired tasks are summarised below.
 

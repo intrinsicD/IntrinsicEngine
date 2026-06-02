@@ -1,13 +1,15 @@
 # UI-001 — Sandbox editor shell and core panels
 
 ## Status
-- Status: in-progress.
+- Status: blocked.
 - Owner/agent: Codex.
 - Branch: `main`.
-- Current slice: Slice C.2 — runtime-owned selected-entity spatial-debug and
-  visualization-config command coverage.
-- Next verification step: run task structural checks plus the runtime
-  contract/default CPU gates.
+- Current slice: blocked after Slice C.2. Remaining file/import execution is
+  gated on `ASSETIO-001`; remaining full visualization adapter packet
+  selection is gated on active `RUNTIME-083`.
+- Next verification step: resume UI-001 after `RUNTIME-083` extraction wiring
+  and `ASSETIO-001` import command seams exist, then run task structural checks
+  plus the runtime contract/default CPU gates.
 
 ## Slice plan
 - **Slice A.** Add the promoted runtime sandbox editor UI module,

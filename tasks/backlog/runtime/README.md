@@ -46,7 +46,8 @@ done-task `Q` follow-ups. Each unblocks one or more rendering pass families.
   ConvexHull adapter + registry → `ExtractAndSubmit` wiring +
   `ECS::Components::SpatialDebugBinding` + cache-owned adapters); retired
   to `tasks/done/`.
-- [RUNTIME-083 — `Extrinsic.Runtime.VisualizationAdapters`](RUNTIME-083-visualization-adapters.md):
+- [RUNTIME-083 — `Extrinsic.Runtime.VisualizationAdapters`](../../active/RUNTIME-083-visualization-adapters.md)
+  (active):
   PropertySet / KMeans / Isoline / VectorField / HtexMetadata adapters producing
   visualization packet spans (clarified by GRAPHICS-014Q).
 - [RUNTIME-084 — `Extrinsic.Runtime.GizmoInteraction`](RUNTIME-084-gizmo-interaction.md):
