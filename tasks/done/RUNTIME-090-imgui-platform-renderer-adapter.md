@@ -13,9 +13,8 @@
 - PR/commit: Slice A — PR #962 (commits `3bd20f2`, `4676a1d`); Slice B — PR #963
   (commit `fdc3165`).
 - Next verification step: none for this task. The renderer-side `Pass.ImGui`
-  consumption + GPU font-atlas upload (the `Operational` proof of the produced
-  `ImGuiOverlayFrame` records) remain owned by `GRAPHICS-079`; final
-  working-sandbox acceptance is `RUNTIME-095`.
+  consumption + GPU font-atlas upload edge is satisfied by `GRAPHICS-079`;
+  final working-sandbox acceptance is `RUNTIME-095`.
 
 ## Goal
 - Open the runtime-side Dear ImGui adapter declared by `GRAPHICS-013CQ`: a new module `Extrinsic.Runtime.ImGuiAdapter` (planned home: `src/runtime/ImGui/Runtime.ImGuiAdapter.cppm`) that owns the ImGui context lifecycle, drives the platform input pump (window events / mouse / keyboard), walks `ImDrawData` after `ImGui::Render()`, and constructs `ImGuiOverlayFrame` records submitted via `ImGuiOverlaySystem::SubmitFrame(...)` once per frame after `ImGui::Render()` and before `IRenderer::PrepareFrame()`.
@@ -47,7 +46,7 @@
   (producer and consumer share one instance), rather than the renderer
   constructing its own.
 - Planning anchor: `tasks/done/GRAPHICS-013CQ-imgui-present-backend-clarifications.md` ("the runtime-side Dear ImGui platform/renderer adapter, **not** graphics, walks the `ImDrawData` produced by `ImGui::Render()` and constructs `ImGuiOverlayFrame` records, then calls `ImGuiOverlaySystem::SubmitFrame(...)`").
-- Today: `imgui_lib` is already linked into `ExtrinsicPlatform` for the GLFW backend; `ImGuiOverlaySystem` accepts overlay records but no producer exists; `Pass.ImGui` is unwired (`GRAPHICS-079`).
+- At task start: `imgui_lib` was already linked into `ExtrinsicPlatform` for the GLFW backend; `ImGuiOverlaySystem` accepted overlay records but no producer existed; `Pass.ImGui` was unwired (`GRAPHICS-079` later satisfied this edge).
 - DPI/font rebuilds re-run `ImGuiOverlaySystem::Shutdown()`/`Initialize()` cycle.
 - ImGui version in tree is `1.92.5` (`external/cache/imgui-src`, see
   `cmake/Dependencies.cmake`). 1.92 ships the dynamic texture system

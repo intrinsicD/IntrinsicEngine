@@ -19,16 +19,15 @@ not task-file placement.
 
 ## Executive summary
 
-The default recipe now routes effectively every pass it declares, the device
+The default recipe now routes every canonical pass it declares, the device
 factory can return an operational Vulkan device, and runtime mesh residency is
-wired. The remaining gates are concentrated in four areas:
+wired. The remaining gates are concentrated in three areas:
 
-1. **Default-recipe UI pass** — `ImGuiPass` is declared but not routed.
-2. **Runtime geometry residency** for graph (extraction wiring) and point cloud
+1. **Runtime geometry residency** for graph (extraction wiring) and point cloud
    (no packer yet), plus optional mesh primitive views.
-3. **Runtime selection** — no runtime-side controller, stable-entity lookup, or
+2. **Runtime selection** — no runtime-side controller, stable-entity lookup, or
    primitive refinement exists; only the graphics-side picking/outline path.
-4. **Asset + editor UI plumbing** — no runtime ImGui adapter, texture asset
+3. **Asset + editor UI plumbing** — texture asset
    bridge, asset ingest ownership, or editor shell/panel modules.
 
 The `MinimalDebug` scaffold is still present and must be retired before the
@@ -56,6 +55,11 @@ sandbox can claim acceptance on the default recipe.
 - **Camera controllers** — `RUNTIME-081` (done).
 - **Spatial-debug + visualization upload helpers** — `RUNTIME-082`,
   `GRAPHICS-077`, `GRAPHICS-078` (done).
+- **Default-recipe ImGui pass routing** — `GRAPHICS-079` (done). The renderer
+  owns the ImGui consumer route, retained font atlas, transient upload helper,
+  `FrameRecipe.PresentSource` write topology, and per-command bindless
+  user-texture sampling. The opt-in `ImGuiSurfaceGpuSmoke` is registered and
+  skips on hosts without an operational GLFW/Vulkan lane.
 
 ## Remaining gates
 
@@ -63,7 +67,6 @@ sandbox can claim acceptance on the default recipe.
 
 | Gate | Task | State | Evidence |
 |---|---|---|---|
-| Default-recipe ImGui pass routing | [`GRAPHICS-079`](../../tasks/active/GRAPHICS-079-default-recipe-imgui-pass-wiring.md) | **ACTIVE** | `ImGuiPass` is declared in `FrameRecipe.cpp` (~line 356). Slice A wires the renderer consumer route + overlay handoff seam at `CPUContracted`; Slice B wires `Engine` to hand its engine-owned overlay to the renderer and detach it during shutdown; Slice C adds retained font-atlas resources, renderer-owned transient vertex/index upload, and direct per-list draw recording contracts; Slice D.1 promotes the pass to a load/store `FrameRecipe.PresentSource` color attachment and proves the CPU/null recorded path. Slice D.2 adds per-command user-texture bindless metadata and shader sampling; the opt-in `gpu;vulkan` smoke remains the host-dependent proof before retirement. Blocks the UI-panels acceptance criterion. |
 | Retire `MinimalDebug` scaffold | [`GRAPHICS-081`](../../tasks/backlog/rendering/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md) | **OPEN** | `kMinimalDebugSurfaceRecipeLabel`, `Pass.Surface.MinimalDebug`, `Pass.Present.MinimalDebug`, `BuildMinimalDebugSurfaceRecipe(...)` and executor routing still present (`FrameRecipe.cppm`/`.cpp`, `Graphics.Renderer.cpp`). RUNTIME-095 forbids treating MinimalDebug as final acceptance. |
 
 ### B. Runtime geometry residency (mesh / graph / point cloud)
@@ -117,15 +120,15 @@ upstream these runtime gates consume.
 4. **RUNTIME-080 + ASSETIO-001** (texture asset bridge, asset model/texture
    ingest ownership) — the asset-plumbing seams RUNTIME-095 names as required
    upstreams. These can land in parallel with the selection chain.
-5. **RUNTIME-090 + GRAPHICS-079 → UI-001** (ImGui adapter, default-recipe ImGui
-   pass routing, then editor panels) — the UI acceptance chain.
+5. **UI-001** (editor panels on the completed ImGui adapter/pass path) — the UI
+   acceptance chain.
 6. **GRAPHICS-081** (retire MinimalDebug) — closure gate once the default recipe
    carries the sandbox.
 7. **RUNTIME-095** — author the CPU/null + opt-in Vulkan acceptance once A–E land.
 
-All four asset/UI-plumbing gates (`RUNTIME-080`, `ASSETIO-001`, `RUNTIME-090`,
-`UI-001`) are **required upstreams** per RUNTIME-095's Context section, so they
-stay on the acceptance path: do not retire RUNTIME-095 until each is complete.
+The remaining asset/UI-plumbing gates (`RUNTIME-080`, `ASSETIO-001`, `UI-001`)
+are **required upstreams** per RUNTIME-095's Context section, so they stay on
+the acceptance path: do not retire RUNTIME-095 until each is complete.
 A procedurally authored acceptance scene can reduce how much *content* breadth
 each seam must cover (RUNTIME-095 explicitly does not require every asset format
 or visualization mode), but it does not remove the requirement that the texture

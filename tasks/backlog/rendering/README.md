@@ -679,10 +679,12 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
 - [GRAPHICS-078E — Visualization-overlay pixel-readback parity harness](GRAPHICS-078E-visualization-overlay-pixel-readback.md):
   follow-up to GRAPHICS-078 Slice D. Adds opt-in Vulkan readback/sample-color
   parity without reusing MinimalDebug-only diagnostics.
-- [GRAPHICS-079 — Default-recipe `Pass.ImGui` wiring](../../active/GRAPHICS-079-default-recipe-imgui-pass-wiring.md)
-  (active): depends on GRAPHICS-076 (PresentSource finalization) and
-  `runtime/RUNTIME-090` (ImGui adapter producer). Slice A wires the renderer
-  `ImGuiPass` executor route + consumer handoff seam at `CPUContracted`.
+- [GRAPHICS-079 — Default-recipe `Pass.ImGui` wiring](../../done/GRAPHICS-079-default-recipe-imgui-pass-wiring.md)
+  (done): depends on GRAPHICS-076 (PresentSource finalization) and
+  `runtime/RUNTIME-090` (ImGui adapter producer). It wires the renderer
+  `ImGuiPass` executor route + consumer handoff seam, retained font atlas,
+  transient upload helper, `FrameRecipe.PresentSource` write topology, and
+  per-command bindless user-texture sampling.
 - [GRAPHICS-081 — Retire `FrameRecipe::MinimalDebugSurface` scaffold once default recipe is operational](GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md):
   depends on GRAPHICS-031A/B and GRAPHICS-070..076; consumes the now-green
   GRAPHICS-076E default-recipe pixel-readback parity evidence before deletion.

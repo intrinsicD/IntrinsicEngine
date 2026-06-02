@@ -1,5 +1,14 @@
 # GRAPHICS-079 — Default-recipe `Pass.ImGui` wiring (font atlas + per-cmd bindless + transient upload)
 
+## Status
+- State: done.
+- Owner/agent: codex.
+- Branch: `main`.
+- Maturity reached: `Operational` on Vulkan-capable hosts; `CPUContracted` on this host because the opt-in `gpu;vulkan` smoke is registered but skipped without an operational GLFW/Vulkan lane.
+- Completion date: 2026-06-02.
+- PR/commit: Slices A/B — commits `8f1374c6`, `61192d50`, and `84d16985`; Slice C — commit `97d34aba`; Slice D.1 — commit `9e283c72`; Slice D.2 — commit `69f9b16c`.
+- Next verification step: none for this task. Downstream UI/editor acceptance is owned by `UI-001` and final sandbox acceptance by `RUNTIME-095`.
+
 ## Goal
 - Wire the existing `Pass.ImGui` and `ImGuiOverlaySystem` into the renderer executor under the default recipe per `GRAPHICS-013C`/`013CQ`: graphics-owned retained font atlas allocated at `ImGuiOverlaySystem::Initialize()`, per-frame transient host-visible vertex/index buffer upload helper (mirroring `GRAPHICS-077`), one backend-local pipeline created at startup, executor route consumes `ImGuiOverlayFrame` records submitted by the runtime adapter (`RUNTIME-090`).
 
@@ -10,11 +19,11 @@
 - No mutation of `Pass.Present`'s contract.
 
 ## Context
-- Status: in-progress (Slice D.2 verification complete; retire after commit). Owner/branch: `codex/main`.
+- Status: done (see `## Status`). Owner/branch: `codex/main`.
 - Owner/layer: `graphics/renderer` for executor route, retained `ImGuiOverlaySystem` font-atlas resources, and the renderer-owned transient upload helper; Vulkan consumes the same RHI command/buffer surface when Slice D gives the pass a render target. Runtime composition (`Engine` producer↔consumer handoff) is owned by `runtime`.
 - Planning anchors: `tasks/done/GRAPHICS-013C-imgui-overlay-and-present.md`, `tasks/done/GRAPHICS-013CQ-imgui-present-backend-clarifications.md`.
 - Current state: `Pass.ImGui.cpp` consumes uploaded draw-list/command metadata, `ImGuiOverlaySystem` owns retained font-atlas resources when initialized through the renderer, and the executor has an explicit `"ImGuiPass"` route. Slice D.1 promotes `"ImGuiPass"` from SideEffect-only to a load/store `FrameRecipe.PresentSource` color attachment so the route records under the CPU/null render-pass scope when an uploadable overlay payload is attached. Slice D.2 adds per-command user-texture bindless metadata and shader sampling; the opt-in `ImGuiSurfaceGpuSmoke` is registered and reports `SKIPPED` on hosts without an operational GLFW/Vulkan lane.
-- Verification note (2026-06-02): Slice C focused ImGui coverage passed under the CPU/null gate. The exact task contract gate still reports one out-of-scope failure, `RHICommandContext.SubmitBarriersFallbackRoutesTextureAndBufferBarriers`, in untouched RHI barrier code; the full default CTest gate also reports the missing `IntrinsicBenchmarkSmoke.HalfedgeSmoke` executable pair. These are not addressed in this GRAPHICS-079 slice.
+- Verification note (2026-06-02): Slice D.2 focused ImGui coverage passed under the CPU/null gate, the shader targets compiled, `IntrinsicTests` built, and the opt-in `ImGuiSurfaceGpuSmoke` was registered and skipped on this host. The full default CTest gate still reports three out-of-scope failures: the missing `IntrinsicBenchmarkSmoke.HalfedgeSmoke` executable pair and `RHICommandContext.SubmitBarriersFallbackRoutesTextureAndBufferBarriers` in untouched RHI barrier code. These are not addressed in this GRAPHICS-079 task.
 - Reconciliation with current code (verified 2026-06-02): the canonical recipe pass name is `"ImGuiPass"` (not `"Pass.ImGui"`); `features.EnableImGui` defaults `true`, so the pass is declared every default-recipe frame. Slice A wired the renderer-side `ImGuiPass` executor route, `IRenderer::SetImGuiOverlaySystem`, `IRenderer::HasImGuiOverlaySystem`, and `m_ImGuiPipelineLease`; Slice B wires `Engine::Initialize()` to hand its `Graphics::ImGuiOverlaySystem` value to the renderer and `Engine::Shutdown()` to detach it before overlay teardown; Slice C adds retained font-atlas resources, renderer-owned transient vertex/index upload, and direct per-list draw recording contracts. The existing `Test.ImGuiPresentContract.cpp` already covers the recipe-declaration shape and the "render-graph rejects a non-present `Backbuffer` write" negative case (Tests bullet 4).
 - Per `GRAPHICS-013CQ`: the font atlas is graphics-owned retained (`R8_UNORM` default or `R8G8B8A8_UNORM` for colored atlases); user textures via existing `RHI::Bindless`; one backend pipeline (premultiplied-alpha blend, no depth test, scissor enabled, viewport from `DisplayWidth`/`DisplayHeight`, vertex stride `sizeof(ImDrawVert)`); pass writes `FrameRecipe.PresentSource` (NOT the imported backbuffer).
 
@@ -146,4 +155,4 @@ python3 tools/docs/check_doc_links.py --root .
 - Mixing mechanical file moves with semantic refactors.
 
 ## Next verification step
-- Retire this task to `tasks/done/` after the Slice D.2 commit; the opt-in `ImGuiSurfaceGpuSmoke` is present and skipped on this host.
+- None for this task. Downstream UI/editor acceptance is owned by `UI-001` and final sandbox acceptance by `RUNTIME-095`.

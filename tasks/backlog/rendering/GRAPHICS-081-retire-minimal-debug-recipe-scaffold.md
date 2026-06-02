@@ -42,7 +42,7 @@ This task is the largest scaffold retirement on the triangle-path; the smaller i
 - [ ] `GRAPHICS-029B`'s **direct `m_ReferenceCamera → RenderFrameInput::Camera` substitution** has been deleted by `RUNTIME-081` (CameraControllers); the reference-scene `CameraViewInput` survives only as the controller's seed. Grep `m_ReferenceCamera` returns zero matches in `Engine::BuildRenderFrameInput` and equivalent helpers.
 - [ ] `GRAPHICS-029B`'s **`#if __has_include(...)` (or CMake-flag) test guard** for `ProceduralGeometryRef` absence has been removed by `GRAPHICS-030A`'s retirement; the corresponding contract assertion is now unconditional.
 - [ ] `GRAPHICS-080`'s **acceptance pointer to the minimal recipe** has been replaced by the canonical default-recipe pointer per its staged-acceptance section.
-- [ ] `GRAPHICS-079`'s **closing-cleanup assertion** is in place: a default-recipe frame in the operational state reports zero `SkippedNonOperational`/`SkippedUnavailable` statuses for canonical pass names.
+- [x] `GRAPHICS-079`'s **closing-cleanup assertion** is in place: a default-recipe frame in the operational state reports zero `SkippedNonOperational`/`SkippedUnavailable` statuses for canonical pass names.
 
 If any of these audit boxes cannot be checked, the corresponding owner task must retire first; `GRAPHICS-081` does not paper over an unfinished retirement arc.
 

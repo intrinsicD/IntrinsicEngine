@@ -11,30 +11,28 @@ Each active task should include:
 
 ## Currently active
 
-[`GRAPHICS-079`](GRAPHICS-079-default-recipe-imgui-pass-wiring.md) — default-recipe
-`Pass.ImGui` wiring (Theme A working-sandbox path, the consumer half of the
-ImGui/UI leaves that gate `UI-001`). Status: **in-progress**, owner
-`codex/main` for Slice D.2 retirement. Earliest unblocked Theme A (P0)
-leaf: dependencies `GRAPHICS-076` (PresentSource finalization) and `RUNTIME-090`
-(ImGui adapter producer) are both retired to `tasks/done/`. The task is sliced
-A–D (see its `## Slice plan`); Slice A wires the renderer-side
-`ImGuiPass` executor route, the `IRenderer::SetImGuiOverlaySystem` overlay
-handoff seam, and the `m_ImGuiPipelineLease`, closing `Scaffolded → CPUContracted`
-for the graphics consumer. Slice B wires `Engine::Initialize()` /
-`Engine::Shutdown()` to attach/detach the engine-owned overlay system to/from
-the renderer consumer and adds runtime contract coverage for the shared handoff.
-Slice C adds the retained font atlas, renderer-owned transient vertex/index
-upload helper, runtime adapter payload copy, direct per-list
-`BindIndexBuffer + DrawIndexed` contract coverage, and byte-identical atlas
-retention across `RebuildOperationalResources()`. Slice D.1 has already
-promoted `Pass.ImGui` to write `FrameRecipe.PresentSource` and proved the
-CPU/null recorded path plus closing-cleanup assertion. Slice D.2 adds
-per-command user-texture bindless metadata/shader sampling, registers the
-`ImGuiSurfaceGpuSmoke` opt-in `gpu;vulkan` fixture, and skips that fixture on
-this host when GLFW/Vulkan is unavailable. Next verification step: retire the
-task to `tasks/done/` after the Slice D.2 commit.
+No currently active tasks.
 
 The most recently retired tasks are summarised below.
+
+Previously-active
+[`GRAPHICS-079`](../done/GRAPHICS-079-default-recipe-imgui-pass-wiring.md) —
+default-recipe `Pass.ImGui` wiring (Theme A working-sandbox path, the consumer
+half of the ImGui/UI leaves that gate `UI-001`) retired to `tasks/done/` on
+2026-06-02. Slices A/B wired the renderer-side `ImGuiPass` executor route,
+overlay handoff seam, pipeline lease, and runtime-owned overlay attachment.
+Slice C added the retained font atlas, renderer-owned transient vertex/index
+upload helper, runtime adapter payload copy, direct draw recording contracts,
+and byte-identical atlas retention across rebuild. Slice D.1 promoted
+`Pass.ImGui` to write `FrameRecipe.PresentSource` and proved the CPU/null
+recorded path plus the default-recipe closing-cleanup assertion. Slice D.2 added
+per-command user-texture bindless metadata/shader sampling and registered the
+opt-in `ImGuiSurfaceGpuSmoke` `gpu;vulkan` fixture, which skips on hosts without
+an operational GLFW/Vulkan lane. Maturity: `Operational` on Vulkan-capable
+hosts, `CPUContracted` on this host. Final implementation commit `69f9b16c`;
+full slice chain `8f1374c6`, `61192d50`, `84d16985`, `97d34aba`, `9e283c72`,
+`69f9b16c`. Downstream editor panels remain owned by `UI-001`; final sandbox
+acceptance remains owned by `RUNTIME-095`.
 
 Previously-active
 [`RUNTIME-090`](../done/RUNTIME-090-imgui-platform-renderer-adapter.md) —
@@ -61,10 +59,11 @@ tick and before the render contract's `PrepareFrame()`, so exactly one
 New `Test.ImGuiAdapterEngineWiring.cpp` `contract;runtime` coverage drives a
 bounded `Engine::Run()` (static wiring cases run displayless; the live per-frame
 loop + editor-hook cases are window-gated and verified under `xvfb-run`).
-GRAPHICS-079 Slice C now consumes the adapter-produced payload through the
-renderer-side retained font atlas and transient upload helper; the remaining
-`Operational` proof is Slice D's render-target write topology plus Vulkan smoke.
-Final working-sandbox acceptance is `RUNTIME-095`.
+GRAPHICS-079 now consumes the adapter-produced payload through the renderer-side
+retained font atlas, transient upload helper, `FrameRecipe.PresentSource`
+topology, per-command bindless user-texture sampling, and the registered
+`ImGuiSurfaceGpuSmoke` opt-in fixture. Final working-sandbox acceptance is
+`RUNTIME-095`.
 
 Previously-active
 [`RUNTIME-093`](../done/RUNTIME-093-primitive-selection-refinement.md) — runtime
