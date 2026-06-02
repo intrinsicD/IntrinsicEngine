@@ -270,18 +270,19 @@ namespace Extrinsic::Runtime
         m_Renderer->SetFrameRecipe(m_Config.Render.FrameRecipe);
         m_RendererOperational = m_Device->IsOperational();
 
-        // ── 2c. Runtime-side Dear ImGui adapter (RUNTIME-090 Slice B) ─────
+        // ── 2c. Runtime-side Dear ImGui adapter (RUNTIME-090 / GRAPHICS-079) ─
         // Constructed after the Window and Renderer exist. The adapter owns the
         // ImGui context lifecycle and produces exactly one ImGuiOverlayFrame per
         // engine frame into the runtime-owned overlay system; RunFrame brackets
         // the variable tick with BeginFrame/EndFrame (the producer half per
-        // GRAPHICS-013CQ). It is CPU-only and backend-agnostic, so it runs on
-        // the Null window/device as well as GLFW/Vulkan. The graphics-owned font
-        // atlas upload and Pass.ImGui execution are GRAPHICS-079, not wired here.
+        // GRAPHICS-013CQ). GRAPHICS-079 Slice B hands that same overlay instance
+        // to the renderer consumer, so the producer and `ImGuiPass` route share
+        // one system without graphics seeing live runtime/editor state.
         m_ImGuiAdapter = std::make_unique<ImGuiAdapter>(*m_Window, m_ImGuiOverlay);
         m_ImGuiAdapter->Initialize();
         if (m_ImGuiEditorCallback)
             m_ImGuiAdapter->SetEditorCallback(m_ImGuiEditorCallback);
+        m_Renderer->SetImGuiOverlaySystem(&m_ImGuiOverlay);
 
         // ── 3. CPU task graph (ECS system scheduling) ─────────────────────
         m_FrameGraph = std::make_unique<Core::FrameGraph>();
@@ -382,10 +383,15 @@ namespace Extrinsic::Runtime
 
     void Engine::Shutdown()
     {
-        // RUNTIME-090 Slice B — tear the Dear ImGui adapter down first, while
-        // the Window and overlay system it references are still alive. The
-        // adapter destructor shuts the overlay system + ImGui context down; the
-        // overlay system value member is reusable on a later re-Initialize().
+        // GRAPHICS-079 Slice B — detach the renderer consumer before the adapter
+        // shuts the shared overlay system down, so the renderer never observes a
+        // borrowed but inactive overlay during the rest of teardown.
+        if (m_Renderer)
+            m_Renderer->SetImGuiOverlaySystem(nullptr);
+        // RUNTIME-090 Slice B — tear the Dear ImGui adapter down while the
+        // Window and overlay system it references are still alive. The adapter
+        // destructor shuts the overlay system + ImGui context down; the overlay
+        // system value member is reusable on a later re-Initialize().
         m_ImGuiAdapter.reset();
 
         struct ShutdownHooks final : Core::IShutdownHooks
@@ -697,7 +703,9 @@ namespace Extrinsic::Runtime
         // contract's IRenderer::PrepareFrame(): it invokes the editor hook,
         // calls ImGui::Render(), walks ImDrawData, and submits one
         // ImGuiOverlayFrame to the overlay system (per GRAPHICS-013CQ). The
-        // graphics-side Pass.ImGui consumption is GRAPHICS-079.
+        // renderer consumer is attached in Initialize(); graphics-side
+        // draw upload + recorded Pass.ImGui execution remain later GRAPHICS-079
+        // slices.
         if (m_ImGuiAdapter)
             m_ImGuiAdapter->EndFrame();
 

@@ -915,7 +915,9 @@ Concretely:
   so producer and consumer share one instance. The renderer holds an
   `ImGuiOverlaySystem* m_ImGuiOverlaySystem` borrow plus a non-movable
   `std::optional<ImGuiPass> m_ImGuiPass` (emplaced when the overlay is handed
-  in, before or after `Initialize()`) and `m_ImGuiPipelineLease`. The ImGui
+  in, before or after `Initialize()`), exposes
+  `IRenderer::HasImGuiOverlaySystem()` as the boolean diagnostics observer used
+  by runtime composition tests, and owns `m_ImGuiPipelineLease`. The ImGui
   pipeline lives in `BuildImGuiPipelineDesc(m_BackbufferFormat)` — premultiplied-
   alpha blend (`src=One`, `dst=OneMinusSrcAlpha` for color and alpha), depth
   test + write disabled, color target pinned to the `FrameRecipe.PresentSource`
@@ -954,8 +956,10 @@ Concretely:
   helper with per-draw-list `BindIndexBuffer`/`Draw` blocks + the
   `ImGuiOverlayDiagnostics::DrawCalls` counter, the `Pass.ImGui` →
   `FrameRecipe.PresentSource` write topology + bindless user textures, and the
-  `gpu;vulkan` smoke + closing-cleanup assertion (the runtime `Engine`
-  producer↔consumer handoff is Slice B).
+  `gpu;vulkan` smoke + closing-cleanup assertion. GRAPHICS-079 Slice B wires the
+  runtime `Engine` producer↔consumer handoff so `Engine::Initialize()` passes the
+  engine-owned overlay to the renderer and `Engine::Shutdown()` detaches it
+  before the adapter shuts the overlay down.
 - `TransformSyncSystem`, `LightSystem`, and `VisualizationSyncSystem` consume
   graphics-owned snapshot records (`TransformSyncRecord`, `LightSnapshot`, and
   `VisualizationSyncRecord`) instead of querying live ECS registries. Runtime is

@@ -267,8 +267,9 @@ namespace Extrinsic::Runtime
         // RUNTIME-090 Slice B — runtime-side Dear ImGui adapter + the graphics
         // overlay system it produces into. The overlay system instance is
         // runtime-owned composition (the allowed runtime -> graphics edge) so
-        // the producer (this adapter) and the future Pass.ImGui consumer
-        // (GRAPHICS-079) share one instance. The adapter is constructed in
+        // the producer (this adapter) and the Pass.ImGui consumer
+        // (GRAPHICS-079) share one instance through
+        // IRenderer::SetImGuiOverlaySystem. The adapter is constructed in
         // Initialize() after the Window and Renderer exist and torn down first
         // in Shutdown() (it references the Window and the overlay system).
         // Declared after m_Renderer / before m_RenderExtraction so the unique_ptr

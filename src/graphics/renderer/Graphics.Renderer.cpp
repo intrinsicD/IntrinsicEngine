@@ -863,6 +863,11 @@ namespace Extrinsic::Graphics
             }
         }
 
+        bool HasImGuiOverlaySystem() const noexcept override
+        {
+            return m_ImGuiOverlaySystem != nullptr && m_ImGuiPass.has_value();
+        }
+
         void SubmitRuntimeSnapshots(const RuntimeRenderSnapshotBatch& snapshots) override
         {
             m_TransformSyncRecords.assign(snapshots.Transforms.begin(), snapshots.Transforms.end());

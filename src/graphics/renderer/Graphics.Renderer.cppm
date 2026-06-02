@@ -309,6 +309,11 @@ namespace Extrinsic::Graphics
         // `runtime -> graphics` handoff edge. Passing `nullptr` detaches the
         // overlay so the `ImGuiPass` route reports `SkippedUnavailable`.
         virtual void SetImGuiOverlaySystem(ImGuiOverlaySystem* overlay) noexcept = 0;
+        // GRAPHICS-079 Slice B — diagnostic observer for runtime composition
+        // tests. It reports whether the renderer currently has an ImGui
+        // consumer bound to a runtime-owned overlay; it does not expose the
+        // borrowed overlay or allow graphics to call back into runtime.
+        [[nodiscard]] virtual bool HasImGuiOverlaySystem() const noexcept = 0;
 
         [[nodiscard]] virtual RenderWorld ExtractRenderWorld(
             const RenderFrameInput& input) = 0;

@@ -14,15 +14,19 @@ Each active task should include:
 [`GRAPHICS-079`](GRAPHICS-079-default-recipe-imgui-pass-wiring.md) — default-recipe
 `Pass.ImGui` wiring (Theme A working-sandbox path, the consumer half of the
 ImGui/UI leaves that gate `UI-001`). Status: **in-progress**, owner
-`claude/intrinsicengine-agent-onboarding-HApUy`. Earliest unblocked Theme A (P0)
+`codex/main` for Slice B. Earliest unblocked Theme A (P0)
 leaf: dependencies `GRAPHICS-076` (PresentSource finalization) and `RUNTIME-090`
 (ImGui adapter producer) are both retired to `tasks/done/`. The task is sliced
-A–D (see its `## Slice plan`); Slice A (this branch) wires the renderer-side
+A–D (see its `## Slice plan`); Slice A wires the renderer-side
 `ImGuiPass` executor route, the `IRenderer::SetImGuiOverlaySystem` overlay
 handoff seam, and the `m_ImGuiPipelineLease`, closing `Scaffolded → CPUContracted`
-for the graphics consumer. Next verification step: `contract;graphics` gate over
-`Test.ImGuiPass.cpp` plus the default CPU gate, layering/test-layout/doc-links/
-task-policy checks, and module-inventory regeneration.
+for the graphics consumer. Slice B wires `Engine::Initialize()` /
+`Engine::Shutdown()` to attach/detach the engine-owned overlay system to/from
+the renderer consumer and adds runtime contract coverage for the shared handoff.
+Next verification step: Slice C font-atlas allocation + transient upload helper,
+then the `contract;graphics` / `contract;runtime` gates, default CPU gate,
+layering/test-layout/doc-links/task-policy checks, and module-inventory
+regeneration.
 
 The most recently retired tasks are summarised below.
 

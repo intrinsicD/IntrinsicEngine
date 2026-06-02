@@ -1,8 +1,10 @@
-// RUNTIME-090 Slice B — contract coverage that the runtime-side Dear ImGui
-// adapter is wired into `Engine`: the engine constructs and initializes the
-// adapter (after the Window and Renderer exist), owns the overlay system it
-// produces into, exposes the editor hook, and brackets each variable tick with
-// the adapter so exactly one `ImGuiOverlayFrame` is produced per engine frame.
+// RUNTIME-090 Slice B / GRAPHICS-079 Slice B — contract coverage that the
+// runtime-side Dear ImGui adapter is wired into `Engine` and the produced
+// overlay is handed to the renderer consumer: the engine constructs and
+// initializes the adapter (after the Window and Renderer exist), owns the
+// overlay system it produces into, exposes the editor hook, brackets each
+// variable tick with the adapter so exactly one `ImGuiOverlayFrame` is produced
+// per engine frame, and attaches the shared overlay to the renderer.
 //
 // The default CPU gate runs the GLFW platform backend with no display, where
 // `Engine::Run()` executes zero frames (the window reports `ShouldClose()`).
@@ -17,11 +19,13 @@
 
 #include <cstdint>
 #include <memory>
+#include <string>
 
 #include <gtest/gtest.h>
 #include <imgui.h>
 
 import Extrinsic.Core.Config.Engine;
+import Extrinsic.Graphics.Renderer;
 import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.ImGuiAdapter;
@@ -69,6 +73,18 @@ namespace
         config.Camera.Enabled         = false;
         return config;
     }
+
+    [[nodiscard]] const Extrinsic::Graphics::RenderGraphCommandPassStats* FindCommandPass(
+        const Extrinsic::Graphics::RenderGraphFrameStats& stats,
+        const std::string& name)
+    {
+        for (const auto& pass : stats.CommandRecords.Passes)
+        {
+            if (pass.Name == name)
+                return &pass;
+        }
+        return nullptr;
+    }
 }
 
 // Static wiring (runs in every environment, including displayless CI): the
@@ -84,6 +100,7 @@ TEST(ImGuiAdapterEngineWiring, AdapterInitializedAfterEngineInitialize)
     EXPECT_TRUE(engine.GetImGuiAdapter().IsInitialized());
     EXPECT_TRUE(diag.Initialized);
     EXPECT_EQ(diag.FramesProduced, 0u);
+    EXPECT_TRUE(engine.GetRenderer().HasImGuiOverlaySystem());
 
     engine.Shutdown();
 }
@@ -152,6 +169,17 @@ TEST(ImGuiAdapterEngineWiring, EditorHookInvokedOncePerFrameAndProducesDrawLists
     EXPECT_GT(diag.LastVertexCount, 0u);
     EXPECT_GT(diag.LastIndexCount, 0u);
     EXPECT_FALSE(diag.LastFrameUsedUserTexture); // a text panel only uses the font atlas
+
+    // GRAPHICS-079 Slice B: Engine hands the same overlay system to the
+    // renderer consumer. On the Null device the explicit ImGui route is present
+    // and fail-closed as SkippedNonOperational; the direct attachment observer
+    // above catches a missing producer↔consumer handoff before later slices
+    // make the route operational.
+    const auto& stats = engine.GetRenderer().GetLastRenderGraphStats();
+    const auto* imguiPass = FindCommandPass(stats, "ImGuiPass");
+    ASSERT_NE(imguiPass, nullptr);
+    EXPECT_EQ(imguiPass->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::SkippedNonOperational);
 
     engine.Shutdown();
 }

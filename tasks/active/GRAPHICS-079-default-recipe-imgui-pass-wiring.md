@@ -10,11 +10,11 @@
 - No mutation of `Pass.Present`'s contract.
 
 ## Context
-- Status: in-progress (Slice A). Owner/branch: `claude/intrinsicengine-agent-onboarding-HApUy`.
+- Status: in-progress (Slice B landed; Slice C next). Owner/branch: `codex/main`.
 - Owner/layer: `graphics/renderer` for executor route + `ImGuiOverlaySystem::Initialize` allocation; `graphics/vulkan` for the per-frame transient upload helper + pipeline. Runtime composition (`Engine` producer↔consumer handoff) is owned by `runtime`.
 - Planning anchors: `tasks/done/GRAPHICS-013C-imgui-overlay-and-present.md`, `tasks/done/GRAPHICS-013CQ-imgui-present-backend-clarifications.md`.
 - Today: `Pass.ImGui.cpp` exists as a shell; `ImGuiOverlaySystem` accepts overlay records but no GPU resources are allocated; the executor lambda has no branch.
-- Reconciliation with current code (verified 2026-06-02): the canonical recipe pass name is `"ImGuiPass"` (not `"Pass.ImGui"`); `features.EnableImGui` defaults `true`, so the pass is declared every default-recipe frame and currently falls through to the executor soft-skip default (`SkippedUnavailable` on an operational device, `SkippedNonOperational` otherwise). `ImGuiPass` + `ImGuiOverlaySystem` modules exist and are built into `ExtrinsicGraphics`, but the renderer holds no reference to either. The `Engine` already owns the `Graphics::ImGuiOverlaySystem` value (`RUNTIME-090`) and the `ImGuiAdapter` submits frames to it; GRAPHICS-079 hands that same instance to the renderer so producer and consumer share one overlay system. The existing `Test.ImGuiPresentContract.cpp` already covers the recipe-declaration shape and the "render-graph rejects a non-present `Backbuffer` write" negative case (Tests bullet 4).
+- Reconciliation with current code (verified 2026-06-02): the canonical recipe pass name is `"ImGuiPass"` (not `"Pass.ImGui"`); `features.EnableImGui` defaults `true`, so the pass is declared every default-recipe frame. Slice A wired the renderer-side `ImGuiPass` executor route, `IRenderer::SetImGuiOverlaySystem`, `IRenderer::HasImGuiOverlaySystem`, and `m_ImGuiPipelineLease`; Slice B wires `Engine::Initialize()` to hand its `Graphics::ImGuiOverlaySystem` value to the renderer and `Engine::Shutdown()` to detach it before overlay teardown. The existing `Test.ImGuiPresentContract.cpp` already covers the recipe-declaration shape and the "render-graph rejects a non-present `Backbuffer` write" negative case (Tests bullet 4).
 - Per `GRAPHICS-013CQ`: the font atlas is graphics-owned retained (`R8_UNORM` default or `R8G8B8A8_UNORM` for colored atlases); user textures via existing `RHI::Bindless`; one backend pipeline (premultiplied-alpha blend, no depth test, scissor enabled, viewport from `DisplayWidth`/`DisplayHeight`, vertex stride `sizeof(ImDrawVert)`); pass writes `FrameRecipe.PresentSource` (NOT the imported backbuffer).
 
 ## Required changes
@@ -22,6 +22,10 @@
 - [ ] Add an `ImGuiTransientUploadHelper` (backend-local under `src/graphics/vulkan`) that allocates per-frame transient vertex/index buffers from submitted `ImGuiOverlayFrame::DrawLists[i]` entries.
 - [x] Add `m_ImGuiPipelineLease` to `NullRenderer`. Create the pipeline at renderer init (premultiplied-alpha blend, no depth test, dynamic viewport). _(Slice A; `BuildImGuiPipelineDesc`. The `ImDrawVert` vertex stride + dynamic scissor are bound when the transient vertex/index buffers land in Slice C.)_
 - [x] Add the canonical-named `"ImGuiPass"` branch (recipe name; the task prose's `"Pass.ImGui"` refers to the module) in the executor lambda routing through `RecordImGuiPass(...)`. _(Slice A; plus the `IRenderer::SetImGuiOverlaySystem` consumer handoff seam. The `Recorded` path is gated on the live `activeRenderPass.HasAttachments` signal: the SideEffect-only recipe declaration begins no render pass for ImGui, and a `BindPipeline + DrawIndexed` outside a render pass is invalid on Vulkan, so an attached overlay with work reports `SkippedUnavailable` until the recipe write topology lands. Non-operational → `SkippedNonOperational`.)_
+- [x] Wire the runtime producer↔renderer consumer handoff: `Engine::Initialize()`
+  hands the engine-owned `m_ImGuiOverlay` to the renderer via
+  `SetImGuiOverlaySystem`, and `Engine::Shutdown()` detaches it before adapter
+  teardown. _(Slice B.)_
 - [ ] Ensure `Pass.ImGui` writes `FrameRecipe.PresentSource` (not `Backbuffer`); `Pass.Present` finalizes the imported backbuffer per `GRAPHICS-076`. _(Deferred to Slice D — operational graph write topology.)_
 - [ ] User textures referenced by `ImTextureID` in editor panels resolve through the existing `RHI::Bindless` heap as bindless indices in a backend-local per-cmd parameter buffer; no new graphics-visible descriptor surface.
 
@@ -30,9 +34,15 @@
 - [x] `contract;graphics` test: with no submitted frame (or no attached overlay system), the pass returns `SkippedUnavailable`. _(Slice A — `Test.ImGuiPass.cpp`; also pins the render-target safety invariant: an attached overlay **with** work on an operational device still reports `SkippedUnavailable` because the SideEffect-only recipe gives ImGui no render pass — both attach orders + post-`RebuildOperationalResources`, with `Present` still recording — plus `SkippedNonOperational` on a non-operational device and detach-to-`nullptr`. The `Recorded` proof is owned by Slice D, where the render-pass scope exists.)_
 - [ ] `contract;graphics` test: font atlas survives `RebuildGpuResources()` byte-identical. _(Deferred to Slice C — font-atlas allocation.)_
 - [x] `contract;graphics` test: a `Pass.ImGui` write to `Backbuffer` (negative case) produces a render-graph validation finding (rejected per `GRAPHICS-013CQ`). _(Already covered by `Test.ImGuiPresentContract.cpp::RenderGraphRejectsNonPresentBackbufferWrites`.)_
+- [x] `contract;runtime` test: `Engine::Initialize()` attaches the shared
+  overlay to the renderer, and a bounded live-window frame reaches the explicit
+  `"ImGuiPass"` route on the Null device. _(Slice B —
+  `Test.ImGuiAdapterEngineWiring.cpp`.)_
 
 ## Docs
 - [x] Update `src/graphics/renderer/README.md` to record the `Pass.ImGui` executor route + the `SetImGuiOverlaySystem` handoff seam. _(Slice A; the graphics-owned font-atlas ownership policy is recorded when it lands in Slice C.)_
+- [x] Update `src/runtime/README.md` for the Slice B engine-owned overlay
+  handoff to the renderer.
 - [ ] Update `src/graphics/vulkan/README.md` to add the helper + pipeline rows. _(Deferred to Slice C — backend-local transient upload helper.)_
 
 ## Acceptance criteria
@@ -79,12 +89,13 @@
   `ImGuiOverlaySystem::Initialize(device, textureManager)` (Slice C); the recipe
   `Pass.ImGui` → `FrameRecipe.PresentSource` write topology, bindless user
   textures, the `gpu;vulkan` smoke, and the closing-cleanup assertion (Slice D).
-- **Slice B.** Runtime composition: `Engine` hands its engine-owned
+- **Slice B (landed).** Runtime composition: `Engine` hands its engine-owned
   `m_ImGuiOverlay` to the renderer via `SetImGuiOverlaySystem` after the
-  `Renderer` initializes, so the produced `ImGuiOverlayFrame` reaches the
-  renderer route. `contract;runtime` coverage drives a bounded engine frame and
-  asserts the route records on the null device. Closes the producer↔consumer
-  seam.
+  adapter initializes the overlay, and detaches it during shutdown before the
+  overlay is torn down. `contract;runtime` coverage asserts the renderer has the
+  overlay attached after `Engine::Initialize()` and, on live-window lanes, that a
+  bounded frame reaches the explicit `"ImGuiPass"` route on the Null device.
+  Closes the producer↔consumer seam.
 - **Slice C.** Operational upload + font atlas. `ImGuiTransientUploadHelper`
   (backend-local under `src/graphics/vulkan`), per-draw-list vertex/index
   upload, `ImGuiPass::Execute` records two `BindIndexBuffer`/`Draw` blocks,
