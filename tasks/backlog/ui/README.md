@@ -11,7 +11,7 @@ map.
 ## Tasks
 
 - [RORG-031F — UI integration backlog seed](RORG-031-ui-integration.md).
-- [UI-001 — Sandbox editor shell and core panels](UI-001-sandbox-editor-shell-panels.md).
+- [UI-001 — Sandbox editor shell and core panels](../../active/UI-001-sandbox-editor-shell-panels.md) (active).
 
 ## Convergence
 

@@ -8,6 +8,13 @@ frame phases, and subsystem behavior belong in `Runtime` or lower engine layers.
 The executable obtains its default configuration through `Runtime` and should
 not import lower layers directly.
 
+`Sandbox::App` attaches the promoted runtime-owned `SandboxEditorUi` shell
+through application lifecycle hooks. The app remains a runtime-only consumer:
+the editor shell registers with `Engine::SetImGuiEditorCallback`, reads scene
+and selection state through runtime APIs, and leaves asset import,
+camera/render-setting mutation, and visualization command routing to runtime
+owners for later UI-001 slices.
+
 ## Build presets
 
 - `cmake --preset ci` configures the headless CPU/null gate (Sandbox disabled,

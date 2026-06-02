@@ -1,6 +1,7 @@
 export module Extrinsic.Sandbox;
 
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.SandboxEditorUi;
 
 namespace Extrinsic::Sandbox
 {
@@ -9,7 +10,7 @@ namespace Extrinsic::Sandbox
     public:
         void OnInitialize(Runtime::Engine& engine) override
         {
-            (void)engine;
+            m_EditorUi.Attach(engine);
         }
 
         void OnSimTick(Runtime::Engine& engine, double fixedDt) override
@@ -29,6 +30,10 @@ namespace Extrinsic::Sandbox
         void OnShutdown(Runtime::Engine& engine) override
         {
             (void)engine;
+            m_EditorUi.Detach();
         }
+
+    private:
+        Runtime::SandboxEditorUi m_EditorUi{};
     };
 }

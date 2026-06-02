@@ -91,7 +91,7 @@ Runtime/UI implementation leaves for the full sandbox app path:
 - [`runtime/RUNTIME-089` (done)](../done/RUNTIME-089-selection-controller.md) — runtime selection controller, pick-request policy, and `RenderWorld.Selection` handoff (retired 2026-05-31 at `CPUContracted`; Slice A standalone `SelectionController` module, Slice B `Engine::RunFrame` + `ExtractAndSubmit` wiring).
 - [`runtime/RUNTIME-092`](../done/RUNTIME-092-stable-entity-lookup.md) (done) — runtime stable entity lookup sidecar identified by `HARDEN-068`. Slice A landed the standalone `Extrinsic.Runtime.StableEntityLookup` sidecar at `Scaffolded`; Slice B (frame/extraction wiring + `SelectionController` seam swap) closed `CPUContracted`.
 - [`runtime/RUNTIME-093`](../done/RUNTIME-093-primitive-selection-refinement.md) (done, 2026-06-01, `CPUContracted`) — mesh/graph/point-cloud primitive refinement from graphics ID hints and authoritative CPU geometry. Slice A landed the standalone `Extrinsic.Runtime.PrimitiveSelectionRefinement` module at `Scaffolded`; Slice B1 added the CPU ray fallback; Slice B2 wired `RefinePickReadbackResult` into `Engine::RunFrame` to close `CPUContracted`.
-- [`ui/UI-001`](ui/UI-001-sandbox-editor-shell-panels.md) — sandbox editor shell and core panels on top of the ImGui adapter/pass.
+- [`UI-001`](../active/UI-001-sandbox-editor-shell-panels.md) — sandbox editor shell and core panels on top of the ImGui adapter/pass (active).
 - [`runtime/RUNTIME-095`](runtime/RUNTIME-095-working-sandbox-acceptance.md) — final CPU/null + opt-in Vulkan acceptance for mesh, graph, point cloud, cameras, selection, outline, and UI.
 
 ### Theme B — Rendering modernization (P1, gated by Theme A)

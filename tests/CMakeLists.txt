@@ -291,6 +291,7 @@ if(TARGET ExtrinsicRuntime)
         Test.RuntimeEcsSystemBundle.cpp
         Test.RuntimeReferenceScene.cpp
         Test.RuntimeVulkanBreadcrumb.cpp
+        Test.SandboxEditorUi.cpp
         Test.SelectionController.cpp
         Test.SelectionReadbackCorrelation.cpp
         Test.SelectionSnapshotExtraction.cpp

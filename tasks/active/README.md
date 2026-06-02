@@ -11,7 +11,12 @@ Each active task should include:
 
 ## Currently active
 
-No currently active tasks.
+[`UI-001`](UI-001-sandbox-editor-shell-panels.md) — sandbox editor shell and core
+panels on top of the runtime ImGui adapter/pass stack. Status: in-progress on
+`main`; current slice adds the promoted runtime editor shell, deterministic panel
+models, disabled import diagnostics, scene hierarchy selection command emission,
+and CPU `contract;runtime` callback-registration coverage. Next verification:
+run the task structural checks plus the runtime contract/default CPU gates.
 
 The most recently retired tasks are summarised below.
 
