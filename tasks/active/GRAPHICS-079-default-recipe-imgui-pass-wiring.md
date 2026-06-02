@@ -21,13 +21,13 @@
 - [ ] In `ImGuiOverlaySystem::Initialize(device, textureManager)`: allocate the font atlas texture (`R8_UNORM` 4K×4K default; size negotiated via existing `ImGuiOverlayFrame::FontAtlas` metadata at first submission); free at `Shutdown()`. DPI/font rebuilds re-run `Shutdown()`/`Initialize()`.
 - [ ] Add an `ImGuiTransientUploadHelper` (backend-local under `src/graphics/vulkan`) that allocates per-frame transient vertex/index buffers from submitted `ImGuiOverlayFrame::DrawLists[i]` entries.
 - [x] Add `m_ImGuiPipelineLease` to `NullRenderer`. Create the pipeline at renderer init (premultiplied-alpha blend, no depth test, dynamic viewport). _(Slice A; `BuildImGuiPipelineDesc`. The `ImDrawVert` vertex stride + dynamic scissor are bound when the transient vertex/index buffers land in Slice C.)_
-- [x] Add the canonical-named `"ImGuiPass"` branch (recipe name; the task prose's `"Pass.ImGui"` refers to the module) in the executor lambda routing through `RecordImGuiPass(...)`, returning `SkippedUnavailable` when no overlay frame/work was submitted. _(Slice A; plus the `IRenderer::SetImGuiOverlaySystem` consumer handoff seam.)_
+- [x] Add the canonical-named `"ImGuiPass"` branch (recipe name; the task prose's `"Pass.ImGui"` refers to the module) in the executor lambda routing through `RecordImGuiPass(...)`. _(Slice A; plus the `IRenderer::SetImGuiOverlaySystem` consumer handoff seam. The `Recorded` path is gated on the live `activeRenderPass.HasAttachments` signal: the SideEffect-only recipe declaration begins no render pass for ImGui, and a `BindPipeline + DrawIndexed` outside a render pass is invalid on Vulkan, so an attached overlay with work reports `SkippedUnavailable` until the recipe write topology lands. Non-operational → `SkippedNonOperational`.)_
 - [ ] Ensure `Pass.ImGui` writes `FrameRecipe.PresentSource` (not `Backbuffer`); `Pass.Present` finalizes the imported backbuffer per `GRAPHICS-076`. _(Deferred to Slice D — operational graph write topology.)_
 - [ ] User textures referenced by `ImTextureID` in editor panels resolve through the existing `RHI::Bindless` heap as bindless indices in a backend-local per-cmd parameter buffer; no new graphics-visible descriptor surface.
 
 ## Tests
 - [ ] `contract;graphics` test: with one submitted `ImGuiOverlayFrame` containing two draw lists, the helper allocates per-frame buffers and the pass records two `BindIndexBuffer`/`Draw` blocks; `ImGuiOverlaySystemDiagnostics::DrawCalls` increments by 2.
-- [x] `contract;graphics` test: with no submitted frame (or no attached overlay system), the pass returns `SkippedUnavailable`. _(Slice A — `Test.ImGuiPass.cpp`; also covers `Recorded` for both attach orders, `SkippedNonOperational` on a non-operational device, detach-to-`nullptr`, and record-after-`RebuildOperationalResources`.)_
+- [x] `contract;graphics` test: with no submitted frame (or no attached overlay system), the pass returns `SkippedUnavailable`. _(Slice A — `Test.ImGuiPass.cpp`; also pins the render-target safety invariant: an attached overlay **with** work on an operational device still reports `SkippedUnavailable` because the SideEffect-only recipe gives ImGui no render pass — both attach orders + post-`RebuildOperationalResources`, with `Present` still recording — plus `SkippedNonOperational` on a non-operational device and detach-to-`nullptr`. The `Recorded` proof is owned by Slice D, where the render-pass scope exists.)_
 - [ ] `contract;graphics` test: font atlas survives `RebuildGpuResources()` byte-identical. _(Deferred to Slice C — font-atlas allocation.)_
 - [x] `contract;graphics` test: a `Pass.ImGui` write to `Backbuffer` (negative case) produces a render-graph validation finding (rejected per `GRAPHICS-013CQ`). _(Already covered by `Test.ImGuiPresentContract.cpp::RenderGraphRejectsNonPresentBackbufferWrites`.)_
 
@@ -60,11 +60,19 @@
   in `InitializeOperationalPassResources()` (next `FailPipelineCreateCall`
   index, fail-closed), `ImGuiPass::GetPipeline()`, the `RecordImGuiPass(cmd)`
   helper mirroring `RecordPresentPass`/`RecordDebugViewPass` taxonomy
-  (non-operational → `SkippedNonOperational`; no overlay system / no valid
-  pipeline / no overlay work → `SkippedUnavailable`; else `Execute` +
-  `Recorded`), and the `"ImGuiPass"` executor branch. New `Test.ImGuiPass.cpp`
-  `contract;graphics` cases drive the renderer with an injected overlay system.
-  Preserves the CPU gate. **Defers:** the runtime `Engine` producer↔consumer
+  (non-operational → `SkippedNonOperational`; no render-pass attachment / no
+  overlay system / no valid pipeline / no overlay work → `SkippedUnavailable`;
+  else `Execute` + `Recorded`), and the `"ImGuiPass"` executor branch. New
+  `Test.ImGuiPass.cpp` `contract;graphics` cases drive the renderer with an
+  injected overlay system. **Render-target safety:** the SideEffect-only recipe
+  declaration begins no render pass for ImGui, so `RecordImGuiPass` gates the
+  `Recorded` path on the live `activeRenderPass.HasAttachments` signal — an
+  attached overlay with work is deliberately kept at `SkippedUnavailable` in
+  Slice A, because recording a `BindPipeline + DrawIndexed` outside a render
+  pass would be invalid on Vulkan. The `Recorded` proof moves to Slice D, where
+  the write topology gives the pass a real render target; no `RecordImGuiPass`
+  change is needed then (the gate flips automatically). Preserves the CPU gate.
+  **Defers:** the runtime `Engine` producer↔consumer
   handoff (Slice B); the transient host-visible vertex/index upload helper,
   per-draw-list `BindIndexBuffer`/`Draw` blocks, `ImGuiOverlayDiagnostics::DrawCalls`,
   and graphics-owned retained font-atlas allocation at
@@ -84,8 +92,12 @@
   `RebuildGpuResources()` byte-identical, bindless user textures. Adds Tests
   bullets 1–3.
 - **Slice D.** Operational backend wiring + recipe write topology
-  (`Pass.ImGui` writes `FrameRecipe.PresentSource`) + the closing-cleanup
-  assertion + `gpu;vulkan` smoke. Cites the opt-in Vulkan run.
+  (`Pass.ImGui` writes `FrameRecipe.PresentSource`, giving the pass a real
+  color attachment + render-pass scope). This is what flips
+  `RecordImGuiPass`'s `hasActiveRenderPass` gate to true, so the route finally
+  records on the CPU/null path and the `Recorded`-path contract assertions
+  land here (plus the closing-cleanup assertion + `gpu;vulkan` smoke). Cites
+  the opt-in Vulkan run.
 
 ## Verification
 ```bash

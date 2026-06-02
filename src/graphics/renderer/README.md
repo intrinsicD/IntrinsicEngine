@@ -928,15 +928,27 @@ Concretely:
   composites into `PresentSource` before `Pass.Present` finalizes the
   backbuffer) routes through `RecordImGuiPass(...)` with the same `Recorded` /
   `SkippedNonOperational` / `SkippedUnavailable` taxonomy the other default-
-  recipe helpers use: non-operational device → `SkippedNonOperational`; no
-  attached overlay system / missing pipeline lease / no submitted overlay work
-  → `SkippedUnavailable` (so a frame that would record zero commands is not a
-  false `Recorded`); otherwise `ImGuiPass::Execute` records the overlay draw
-  and the helper returns `Recorded`. The Slice A contract pin is
-  `tests/contract/graphics/Test.ImGuiPass.cpp` (both attach orders record,
-  no-overlay / no-work / detached `SkippedUnavailable`, non-operational
-  `SkippedNonOperational`, and a record-after-`RebuildOperationalResources`
-  stability case). Deferred to later slices of GRAPHICS-079: the graphics-owned
+  recipe helpers use: non-operational device → `SkippedNonOperational`;
+  otherwise `SkippedUnavailable` unless every gate passes. Crucially, the
+  overlay draw is a `BindPipeline + DrawIndexed` that is only valid inside a
+  render pass, but the default recipe declares `"ImGuiPass"` as a
+  `Read(FrameRecipe.PresentSource) + SideEffect()` node with NO color
+  attachment, so `BuildActiveRenderPassDesc(...).HasAttachments` is false and
+  the executor begins no render pass for it. `RecordImGuiPass` therefore takes
+  the live `hasActiveRenderPass` signal and keeps the `Recorded` path gated on
+  it (alongside attached overlay system + valid pipeline lease + submitted
+  overlay work): an attached overlay with work still reports
+  `SkippedUnavailable` rather than recording a draw into no render target,
+  which would be invalid command-buffer usage on Vulkan. Because the gate is
+  the live attachment signal (not a hardcoded flag), the `Recorded` path turns
+  on automatically once Slice D promotes ImGui to write
+  `FrameRecipe.PresentSource`. The Slice A contract pin is
+  `tests/contract/graphics/Test.ImGuiPass.cpp` (both attach orders + the
+  post-`RebuildOperationalResources` case skip `SkippedUnavailable` for the
+  missing render target while `Present` keeps recording; no-overlay / no-work /
+  detached `SkippedUnavailable`; non-operational `SkippedNonOperational`). The
+  `Recorded` proof is owned by Slice D. Deferred to later slices of
+  GRAPHICS-079: the graphics-owned
   retained font atlas allocated at `ImGuiOverlaySystem::Initialize(device,
   textureManager)`, the per-frame transient host-visible vertex/index upload
   helper with per-draw-list `BindIndexBuffer`/`Draw` blocks + the

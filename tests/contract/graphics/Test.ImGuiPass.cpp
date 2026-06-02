@@ -8,17 +8,19 @@
 // `ImGuiOverlaySystem` handed in via `SetImGuiOverlaySystem`, creates the
 // `m_ImGuiPipelineLease`, and routes the branch through `RecordImGuiPass`.
 //
-// These tests pin the executor taxonomy `RecordImGuiPass` introduces:
-//
-//   - `Recorded` when an overlay system with submitted work is attached and
-//     the device is operational (both attach orders — before and after
-//     `Initialize()` — bind the pipeline);
-//   - `SkippedUnavailable` when no overlay system is attached, when the
-//     attached overlay has no submitted work, and when the overlay is
-//     detached with `nullptr`;
-//   - `SkippedNonOperational` when the device is not operational;
-//   - the route keeps recording after `RebuildOperationalResources()` so the
-//     pipeline lease stays stable across an operational rebuild.
+// Critical safety invariant pinned here: the overlay draw is a
+// `BindPipeline + DrawIndexed` sequence that is only valid inside a render
+// pass, but the default recipe currently declares `"ImGuiPass"` as a
+// `Read(FrameRecipe.PresentSource) + SideEffect()` node with NO color
+// attachment, so the executor begins no render pass for it. Recording the
+// draw there would be invalid command-buffer usage on Vulkan, so until
+// Slice D promotes ImGui to write `FrameRecipe.PresentSource` the route must
+// stay skipped even when an operational device has an attached overlay with
+// submitted work. These tests therefore pin `SkippedUnavailable` for the
+// attached-overlay cases; the `Recorded` proof is owned by Slice D (and the
+// `gpu;vulkan` smoke), where the render-pass scope exists. `RecordImGuiPass`
+// gates the `Recorded` path on the live `activeRenderPass.HasAttachments`
+// signal, so it turns on automatically once the write-topology lands.
 //
 // The recipe-declaration shape (ImGui reads `FrameRecipe.PresentSource`, does
 // not write `Backbuffer`) and the render-graph rejection of a non-present
@@ -95,8 +97,14 @@ namespace
     }
 }
 
-TEST(ImGuiPassContract, RendererRoutesAndRecordsImGuiPassWhenOverlayAttachedAfterInitialize)
+TEST(ImGuiPassContract, AttachedOverlayWithWorkSkipsUnavailableWithoutRenderTargetAfterInitialize)
 {
+    // The core safety case: an operational device with an attached overlay
+    // that has submitted work must NOT record the overlay draw, because the
+    // default recipe declares `"ImGuiPass"` SideEffect-only (no color
+    // attachment → no render pass). Recording here would be invalid on
+    // Vulkan; the explicit route reports `SkippedUnavailable` (not a false
+    // `Recorded`, and not the soft-skip default).
     Tests::MockDevice device;
     device.BackbufferHandle = RHI::TextureHandle{501u, 1u};
 
@@ -106,7 +114,8 @@ TEST(ImGuiPassContract, RendererRoutesAndRecordsImGuiPassWhenOverlayAttachedAfte
 
     // Engine-owned overlay system handed in AFTER Initialize(): the pipeline
     // lease already exists, so `SetImGuiOverlaySystem` binds it to the freshly
-    // constructed pass.
+    // constructed pass. Only the missing render-pass attachment blocks
+    // recording.
     Graphics::ImGuiOverlaySystem overlay;
     overlay.Initialize();
     overlay.SubmitFrame(MakeOverlayFrameWithWork());
@@ -124,10 +133,10 @@ TEST(ImGuiPassContract, RendererRoutesAndRecordsImGuiPassWhenOverlayAttachedAfte
 
     const auto* imguiPass = FindCommandPass(stats, "ImGuiPass");
     ASSERT_NE(imguiPass, nullptr);
-    EXPECT_EQ(imguiPass->Status, Graphics::RenderCommandPassStatus::Recorded);
+    EXPECT_EQ(imguiPass->Status, Graphics::RenderCommandPassStatus::SkippedUnavailable);
 
-    // The canonical present pass still finalizes the backbuffer alongside the
-    // overlay route.
+    // The canonical present pass still finalizes the backbuffer; ImGui's skip
+    // is specific to its missing render target, not a recipe-wide regression.
     const auto* presentPass = FindCommandPass(stats, "Present");
     ASSERT_NE(presentPass, nullptr);
     EXPECT_EQ(presentPass->Status, Graphics::RenderCommandPassStatus::Recorded);
@@ -135,11 +144,12 @@ TEST(ImGuiPassContract, RendererRoutesAndRecordsImGuiPassWhenOverlayAttachedAfte
     renderer->Shutdown();
 }
 
-TEST(ImGuiPassContract, RendererRecordsImGuiPassWhenOverlayAttachedBeforeInitialize)
+TEST(ImGuiPassContract, AttachedOverlayWithWorkSkipsUnavailableWhenAttachedBeforeInitialize)
 {
     // Reverse attach order: the runtime may hand the overlay in before the
     // renderer initializes. The pass is emplaced without a pipeline, and
-    // `InitializeOperationalPassResources` binds the lease to it once created.
+    // `InitializeOperationalPassResources` binds the lease to it once created;
+    // the route still skips because the recipe gives ImGui no render target.
     Tests::MockDevice device;
     device.BackbufferHandle = RHI::TextureHandle{502u, 1u};
 
@@ -160,7 +170,7 @@ TEST(ImGuiPassContract, RendererRecordsImGuiPassWhenOverlayAttachedBeforeInitial
 
     const auto* imguiPass = FindCommandPass(stats, "ImGuiPass");
     ASSERT_NE(imguiPass, nullptr);
-    EXPECT_EQ(imguiPass->Status, Graphics::RenderCommandPassStatus::Recorded);
+    EXPECT_EQ(imguiPass->Status, Graphics::RenderCommandPassStatus::SkippedUnavailable);
 
     renderer->Shutdown();
 }
@@ -206,8 +216,7 @@ TEST(ImGuiPassContract, AttachedOverlayWithoutSubmittedWorkSkipsUnavailable)
     renderer->Initialize(device);
 
     // Initialized overlay but no submitted frame, so `HasOverlayWork()` is
-    // false and `ImGuiPass::Execute` would record zero commands; the helper
-    // must surface that as `SkippedUnavailable`, not a false `Recorded`.
+    // false; the helper must surface `SkippedUnavailable`.
     Graphics::ImGuiOverlaySystem overlay;
     overlay.Initialize();
     ASSERT_FALSE(overlay.HasOverlayWork());
@@ -285,7 +294,7 @@ TEST(ImGuiPassContract, NonOperationalDeviceSkipsNonOperational)
     renderer->Shutdown();
 }
 
-TEST(ImGuiPassContract, RouteKeepsRecordingAfterOperationalRebuild)
+TEST(ImGuiPassContract, RouteStaysWiredWithoutRecordingAfterOperationalRebuild)
 {
     Tests::MockDevice device;
     device.BackbufferHandle = RHI::TextureHandle{507u, 1u};
@@ -299,7 +308,9 @@ TEST(ImGuiPassContract, RouteKeepsRecordingAfterOperationalRebuild)
     renderer->SetImGuiOverlaySystem(&overlay);
 
     // Rebuilding operational resources recreates the ImGui pipeline lease and
-    // re-binds the consumer pass; the route must keep recording afterwards.
+    // re-binds the consumer pass. The route stays wired (and Present keeps
+    // recording), but ImGui still skips because the recipe gives it no render
+    // target yet.
     ASSERT_TRUE(renderer->RebuildOperationalResources(device));
 
     RHI::FrameHandle frame{};
@@ -311,7 +322,11 @@ TEST(ImGuiPassContract, RouteKeepsRecordingAfterOperationalRebuild)
 
     const auto* imguiPass = FindCommandPass(stats, "ImGuiPass");
     ASSERT_NE(imguiPass, nullptr);
-    EXPECT_EQ(imguiPass->Status, Graphics::RenderCommandPassStatus::Recorded);
+    EXPECT_EQ(imguiPass->Status, Graphics::RenderCommandPassStatus::SkippedUnavailable);
+
+    const auto* presentPass = FindCommandPass(stats, "Present");
+    ASSERT_NE(presentPass, nullptr);
+    EXPECT_EQ(presentPass->Status, Graphics::RenderCommandPassStatus::Recorded);
 
     renderer->Shutdown();
 }
