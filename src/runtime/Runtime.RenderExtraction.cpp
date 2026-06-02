@@ -37,6 +37,7 @@ import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.TransformSyncSystem;
 import Extrinsic.Graphics.LightSystem;
 import Extrinsic.Graphics.VisualizationSyncSystem;
+import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.Graphics.Component.GpuSceneSlot;
 import Extrinsic.Graphics.Component.Material;
 import Extrinsic.Graphics.Component.RenderGeometry;
@@ -48,6 +49,7 @@ import Extrinsic.Runtime.PointCloudGeometryPacker;
 import Extrinsic.Runtime.ProceduralGeometry;
 import Extrinsic.Runtime.ProceduralGeometryPacker;
 import Extrinsic.Runtime.SpatialDebugAdapters;
+import Extrinsic.Runtime.VisualizationAdapters;
 
 namespace Extrinsic::Runtime
 {
@@ -143,6 +145,61 @@ namespace Extrinsic::Runtime
     {
         return m_SpatialDebugRegistry;
     }
+
+    void RenderExtractionCache::RegisterVisualizationAdapter(
+        const std::uint64_t key,
+        std::unique_ptr<IVisualizationAdapter> adapter)
+    {
+        if (adapter == nullptr)
+        {
+            (void)UnregisterVisualizationAdapter(key);
+            return;
+        }
+        m_VisualizationAdapterRegistry.Register(key, *adapter);
+        m_VisualizationAdapters.insert_or_assign(key, std::move(adapter));
+    }
+
+    bool RenderExtractionCache::UnregisterVisualizationAdapter(
+        const std::uint64_t key) noexcept
+    {
+        m_VisualizationAdapterRegistry.Unregister(key);
+        return m_VisualizationAdapters.erase(key) != 0u;
+    }
+
+    std::size_t RenderExtractionCache::GetVisualizationAdapterCount() const noexcept
+    {
+        return m_VisualizationAdapters.size();
+    }
+
+    const VisualizationAdapterRegistry& RenderExtractionCache::GetVisualizationAdapterRegistryForTest() const noexcept
+    {
+        return m_VisualizationAdapterRegistry;
+    }
+
+    void RenderExtractionCache::SetVisualizationAdapterBinding(
+        const std::uint32_t stableEntityId,
+        VisualizationAdapterBinding binding)
+    {
+        m_VisualizationAdapterBindings.insert_or_assign(stableEntityId, binding);
+    }
+
+    void RenderExtractionCache::ClearVisualizationAdapterBinding(
+        const std::uint32_t stableEntityId) noexcept
+    {
+        m_VisualizationAdapterBindings.erase(stableEntityId);
+    }
+
+    std::optional<RenderExtractionCache::VisualizationAdapterBinding>
+    RenderExtractionCache::GetVisualizationAdapterBinding(
+        const std::uint32_t stableEntityId) const noexcept
+    {
+        const auto it = m_VisualizationAdapterBindings.find(stableEntityId);
+        if (it == m_VisualizationAdapterBindings.end())
+        {
+            return std::nullopt;
+        }
+        return it->second;
+    }
 }
 
 namespace Extrinsic::Runtime
@@ -158,6 +215,22 @@ namespace Extrinsic::Runtime
         {
             namespace G = Graphics::Components;
             return registry.any_of<G::RenderSurface, G::RenderLines, G::RenderPoints>(entity);
+        }
+
+        [[nodiscard]] Graphics::VisualizationAttributeDomain ToVisualizationAttributeDomain(
+            const Graphics::Components::VisualizationConfig::Domain domain) noexcept
+        {
+            using Domain = Graphics::Components::VisualizationConfig::Domain;
+            switch (domain)
+            {
+            case Domain::Vertex:
+                return Graphics::VisualizationAttributeDomain::Vertex;
+            case Domain::Edge:
+                return Graphics::VisualizationAttributeDomain::Edge;
+            case Domain::Face:
+                return Graphics::VisualizationAttributeDomain::Face;
+            }
+            return Graphics::VisualizationAttributeDomain::Vertex;
         }
 
         [[nodiscard]] std::uint32_t BuildRenderFlags(const entt::registry& registry, entt::entity entity)
@@ -886,6 +959,65 @@ namespace Extrinsic::Runtime
         }
     }
 
+    void RenderExtractionCache::AppendVisualizationAdapters(
+        const std::uint32_t stableId,
+        const RenderableSidecar& sidecar,
+        RuntimeRenderExtractionStats& stats)
+    {
+        using ColorSource = Graphics::Components::VisualizationConfig::ColorSource;
+
+        if (!sidecar.HasVisualization
+            || sidecar.Visualization.Source != ColorSource::ScalarField)
+        {
+            return;
+        }
+
+        ++stats.VisualizationAdapterScalarConfigsObserved;
+
+        const auto bindingIt = m_VisualizationAdapterBindings.find(stableId);
+        if (bindingIt == m_VisualizationAdapterBindings.end())
+        {
+            ++stats.VisualizationAdapterBindingsMissing;
+            return;
+        }
+
+        const IVisualizationAdapter* adapter =
+            m_VisualizationAdapterRegistry.Find(bindingIt->second.AdapterKey);
+        if (adapter == nullptr)
+        {
+            ++stats.VisualizationAdapterMissingAdapterCount;
+            return;
+        }
+
+        const auto& visualization = sidecar.Visualization;
+        VisualizationAdapterStats perAdapter{};
+        adapter->Append(
+            m_VisualizationAdapterBatch,
+            VisualizationAdapterOptions{
+                .SourceName = visualization.ScalarFieldName,
+                .OutputName = visualization.ScalarFieldName,
+                .Domain = ToVisualizationAttributeDomain(visualization.ScalarDomain),
+                .BufferBDA = bindingIt->second.BufferBDA,
+                .AutoRange = visualization.Scalar.AutoRange,
+                .RangeMin = visualization.Scalar.RangeMin,
+                .RangeMax = visualization.Scalar.RangeMax,
+                .Colormap = visualization.Scalar.Map,
+            },
+            perAdapter);
+
+        ++stats.VisualizationAdapterInvokedCount;
+        stats.VisualizationAdapterPacketAppendCount += perAdapter.PacketAppendCount;
+        stats.VisualizationAdapterMissingSourceCount += perAdapter.MissingSourceCount;
+        stats.VisualizationAdapterUnsupportedSourceTypeCount += perAdapter.UnsupportedSourceTypeCount;
+        stats.VisualizationAdapterEmptySourceCount += perAdapter.EmptySourceCount;
+        stats.VisualizationAdapterInvalidBufferCount += perAdapter.InvalidBufferCount;
+        stats.VisualizationAdapterInvalidRangeCount += perAdapter.InvalidRangeCount;
+        stats.VisualizationAdapterNonFiniteValueCount += perAdapter.NonFiniteValueCount;
+        stats.VisualizationAdapterElementCountOverflowCount += perAdapter.ElementCountOverflowCount;
+        stats.VisualizationAdapterManualRangeCount += perAdapter.ManualRangeCount;
+        stats.VisualizationAdapterFlatAutoRangeExpandedCount += perAdapter.FlatAutoRangeExpandedCount;
+    }
+
     void RenderExtractionCache::ReconcileMeshPrimitiveView(
         MeshPrimitiveViewKind kind,
         const ECS::Components::GeometrySources::ConstSourceView& view,
@@ -1135,6 +1267,7 @@ namespace Extrinsic::Runtime
         m_Transforms.clear();
         m_Visualizations.clear();
         m_Lights.clear();
+        m_VisualizationAdapterBatch.Clear();
 
         auto transformView = registry.view<ECS::Components::Transform::WorldMatrix>();
         for (const entt::entity entity : transformView)
@@ -1434,6 +1567,7 @@ namespace Extrinsic::Runtime
                 .GpuSlot = &sidecar->GpuSlot,
                 .Visualization = sidecar->HasVisualization ? &sidecar->Visualization : nullptr,
             });
+            AppendVisualizationAdapters(stableId, *sidecar, stats);
 
             m_Transforms.push_back(Graphics::TransformSyncRecord{
                 .StableId = stableId,
@@ -1503,6 +1637,21 @@ namespace Extrinsic::Runtime
         stats.SpatialDebugPointMarkerCount =
             static_cast<std::uint32_t>(m_SpatialDebugBatch.PointMarkers.size());
 
+        stats.VisualizationAttributeBufferPacketCount =
+            static_cast<std::uint32_t>(m_VisualizationAdapterBatch.AttributeBuffers.size());
+        stats.VisualizationScalarPacketCount =
+            static_cast<std::uint32_t>(m_VisualizationAdapterBatch.Scalars.size());
+        stats.VisualizationColorPacketCount =
+            static_cast<std::uint32_t>(m_VisualizationAdapterBatch.Colors.size());
+        stats.VisualizationVectorFieldPacketCount =
+            static_cast<std::uint32_t>(m_VisualizationAdapterBatch.VectorFields.size());
+        stats.VisualizationIsolinePacketCount =
+            static_cast<std::uint32_t>(m_VisualizationAdapterBatch.Isolines.size());
+        stats.VisualizationHtexAtlasPacketCount =
+            static_cast<std::uint32_t>(m_VisualizationAdapterBatch.HtexAtlases.size());
+        stats.VisualizationFragmentBakeAtlasPacketCount =
+            static_cast<std::uint32_t>(m_VisualizationAdapterBatch.FragmentBakeAtlases.size());
+
         stats.SubmittedTransformCount = static_cast<std::uint32_t>(m_Transforms.size());
         stats.SubmittedVisualizationCount = static_cast<std::uint32_t>(m_Visualizations.size());
         stats.SubmittedLightCount = static_cast<std::uint32_t>(m_Lights.size());
@@ -1561,6 +1710,13 @@ namespace Extrinsic::Runtime
             .Transforms                     = m_Transforms,
             .Lights                         = m_Lights,
             .Visualizations                 = m_Visualizations,
+            .VisualizationAttributeBuffers  = m_VisualizationAdapterBatch.AttributeBuffers,
+            .VisualizationScalars           = m_VisualizationAdapterBatch.Scalars,
+            .VisualizationColors            = m_VisualizationAdapterBatch.Colors,
+            .VisualizationVectorFields      = m_VisualizationAdapterBatch.VectorFields,
+            .VisualizationIsolines          = m_VisualizationAdapterBatch.Isolines,
+            .VisualizationHtexAtlases       = m_VisualizationAdapterBatch.HtexAtlases,
+            .VisualizationFragmentBakeAtlases = m_VisualizationAdapterBatch.FragmentBakeAtlases,
             .SpatialDebugBounds             = m_SpatialDebugBatch.Bounds,
             .SpatialDebugHierarchyNodes     = m_SpatialDebugBatch.HierarchyNodes,
             .SpatialDebugSplitPlanes        = m_SpatialDebugBatch.SplitPlanes,
@@ -1848,6 +2004,10 @@ namespace Extrinsic::Runtime
         m_SpatialDebugRegistry.Clear();
         m_SpatialDebugAdapters.clear();
         m_SpatialDebugBatch.Clear();
+        m_VisualizationAdapterRegistry.Clear();
+        m_VisualizationAdapters.clear();
+        m_VisualizationAdapterBindings.clear();
+        m_VisualizationAdapterBatch.Clear();
 
         renderer.SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{});
         m_LastStats = stats;

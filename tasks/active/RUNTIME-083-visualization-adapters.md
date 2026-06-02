@@ -4,14 +4,14 @@
 - Status: in-progress.
 - Owner/agent: Codex.
 - Branch: `main`.
-- Current slice: Slice A — visualization adapter umbrella, property-scalar
-  adapter, and adapter registry contract.
-- Next verification step: build `IntrinsicRuntimeContractTests`, run the
-  `VisualizationAdapters` focused contract tests, regenerate module inventory,
+- Current slice: Slice B — extraction-cache scalar adapter pump and
+  `RuntimeRenderSnapshotBatch::Visualization*` handoff.
+- Next verification step: build `IntrinsicRuntimeGraphicsCpuTests`, run the
+  focused visualization adapter/extraction tests, regenerate module inventory,
   and run runtime structural checks.
 
 ## Slice plan
-- **Slice A (this slice).** Add the promoted
+- **Slice A.** Add the promoted
   `Extrinsic.Runtime.VisualizationAdapters` module under
   `src/runtime/Visualization/` with a data-only batch container, adapter
   options/stats, `IVisualizationAdapter`, `PropertyScalarAdapter`, and
@@ -21,7 +21,7 @@
   values, and requires the caller to provide the externally owned GPU buffer
   address. No extraction-cache wiring and no GPU upload ownership in this
   slice.
-- **Slice B.** Wire `RenderExtractionCache::ExtractAndSubmit` to resolve active
+- **Slice B (this slice).** Wire `RenderExtractionCache::ExtractAndSubmit` to resolve active
   visualization adapters for renderables carrying visualization-source
   components, accumulate packets into `RuntimeRenderSnapshotBatch`, and surface
   runtime extraction stats.
@@ -39,7 +39,8 @@
 - No editor UI; the editor maps user choices into adapter pre-filter inputs.
 
 ## Context
-- Status: not started.
+- Status: in-progress; Slices A/B landed scalar adapter contract and extraction
+  wiring, while non-scalar adapters remain open.
 - Owner/layer: `runtime`.
 - Planning anchor: `tasks/done/GRAPHICS-014Q-visualization-runtime-backend-clarifications.md` ("runtime extraction is the sole owner of translating PropertySet attributes, KMeans labels, isoline results, vector fields, and Htex metadata into the `RuntimeRenderSnapshotBatch` visualization packet spans; concrete producer adapters live under a planned `Extrinsic.Runtime.VisualizationAdapters` umbrella").
 - Bake-mapping selection (`UVBake`/`ExistingHtex`/`RecreateHtex`) is runtime/editor-owned. `RecreateHtex` requests are scheduled by runtime/geometry on a background task through `Extrinsic.Runtime.StreamingExecutor`; graphics increments `HtexRecreateRequestCount`.
@@ -55,14 +56,26 @@
 - [x] Slice A: add the umbrella module, mutable visualization packet batch,
   options/stats, `IVisualizationAdapter`, `PropertyScalarAdapter`, and
   `VisualizationAdapterRegistry`.
-- [ ] Wire `RenderExtractionCache::ExtractAndSubmit` to invoke active adapters for entities that carry a visualization-source component, accumulate packets into `RuntimeRenderSnapshotBatch::Visualization*`, and surface adapter-side stats in `RuntimeRenderExtractionStats` (rejected counts, baked-vs-deferred counts, `RecreateHtex` enqueued count).
-- [ ] Add `VisualizationAdapterRegistry` for selecting the active adapter set per renderable / per editor toggle.
+- [x] Slice B: wire `RenderExtractionCache::ExtractAndSubmit` to invoke
+  active scalar-field adapters for renderables carrying
+  `Graphics::Components::VisualizationConfig::ScalarField`, accumulate packets
+  into `RuntimeRenderSnapshotBatch::Visualization*`, and surface adapter-side
+  scalar counters in `RuntimeRenderExtractionStats`.
+- [x] Slice B: add runtime-owned visualization adapter registration and
+  per-renderable binding APIs (`RegisterVisualizationAdapter`,
+  `UnregisterVisualizationAdapter`, `SetVisualizationAdapterBinding`,
+  `ClearVisualizationAdapterBinding`) so the cache owns adapter lifetime and
+  externally supplied buffer-device-address metadata.
 
 ## Tests
 - [ ] `contract;runtime` test: `PropertyScalarAdapter` produces a deterministic `ScalarAttributePacket` for a fixture `PropertySet`; out-of-range filters reject as expected.
 - [x] Slice A: add `contract;runtime` coverage for scalar float/double property
   adaptation, missing/empty/non-finite source rejection, range override, batch
   clearing, and registry replace/unregister semantics.
+- [x] Slice B: add `integration;runtime;graphics` coverage proving scalar
+  adapter packets reach `RenderWorld::Visualization`, missing bindings do not
+  synthesize packets, and invalid external buffer addresses are counted without
+  reaching renderer validation.
 - [ ] `contract;runtime` test: `KMeansLabelAdapter` and `VectorFieldAdapter` produce deterministic outputs for fixtures.
 - [ ] `contract;runtime` test: `HtexMetadataAdapter` enqueues a streaming task on `RecreateHtex` request and increments `RuntimeRenderExtractionStats::HtexRecreateScheduled` by 1.
 - [ ] `contract;runtime` test: `ValidateVisualizationPackets` continues to reject malformed adapter outputs (centralized validation per `GRAPHICS-014Q`).
@@ -74,10 +87,16 @@
 - [x] Update UI-001 and the working-sandbox gate review to show that
   visualization packet production is now partially unblocked by Slice A while
   extraction wiring and remaining adapter kinds are still open.
+- [x] Slice B: update runtime docs, migration parity notes, active task index,
+  and sandbox gate review to record scalar extraction-cache wiring while
+  KMeans/vector/isoline/Htex adapter kinds remain open.
 
 ## Acceptance criteria
 - [x] Slice A compiles the umbrella and proves `PropertyScalarAdapter` plus
   registry behavior with CPU `contract;runtime` tests.
+- [x] Slice B wires scalar-field adapter registration/bindings through
+  `RenderExtractionCache::ExtractAndSubmit` into renderer-visible visualization
+  packet spans with focused CPU integration coverage.
 - [ ] All five adapter kinds compile, register, and produce deterministic outputs.
 - [ ] `RecreateHtex` runs as a streaming task and triggers exactly once per request.
 - [ ] No new graphics imports beyond the existing `Graphics.VisualizationPackets` edge.
@@ -101,11 +120,14 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
 - Slice A closes `Scaffolded → CPUContracted` for the visualization-adapter
   umbrella, `PropertyScalarAdapter`, and registry only. It does not claim
   extraction wiring or all five adapter kinds.
-- Full `CPUContracted` for `RUNTIME-083` requires Slices B-D. `Operational`
+- Slice B extends `CPUContracted` to scalar adapter extraction-cache wiring. It
+  does not claim KMeans labels, vector fields, isolines, Htex/fragment-bake
+  metadata, or streaming scheduling.
+- Full `CPUContracted` for `RUNTIME-083` requires Slices C-D. `Operational`
   owned by [`RUNTIME-095`](../backlog/runtime/RUNTIME-095-working-sandbox-acceptance.md)
   or a later visualization-specific backend smoke.
 
 ## Next verification step
-- Build `IntrinsicRuntimeContractTests`, run the focused
-  `VisualizationAdapters` contract tests, regenerate the module inventory, and
-  run runtime structural checks.
+- Build `IntrinsicRuntimeGraphicsCpuTests`, run the focused visualization
+  adapter/extraction tests, regenerate the module inventory, and run runtime
+  structural checks.

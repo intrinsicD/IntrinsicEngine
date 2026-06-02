@@ -5,11 +5,11 @@
 - Owner/agent: Codex.
 - Branch: `main`.
 - Current slice: blocked after Slice C.2. Remaining file/import execution is
-  gated on `ASSETIO-001`; remaining full visualization adapter packet
-  selection is gated on active `RUNTIME-083`.
-- Next verification step: resume UI-001 after `RUNTIME-083` extraction wiring
-  and `ASSETIO-001` import command seams exist, then run task structural checks
-  plus the runtime contract/default CPU gates.
+  gated on `ASSETIO-001`; remaining non-scalar visualization adapter packet
+  selection is gated on active `RUNTIME-083` Slices C/D.
+- Next verification step: resume UI-001 after the remaining `RUNTIME-083`
+  non-scalar adapter seams and `ASSETIO-001` import command seams exist, then
+  run task structural checks plus the runtime contract/default CPU gates.
 
 ## Slice plan
 - **Slice A.** Add the promoted runtime sandbox editor UI module,
@@ -26,12 +26,12 @@
   transform edit command that stamps `Transform::IsDirtyTag`. Defers asset
   import execution, camera/render settings beyond local transform edits, and
   visualization adapter routing.
-- **Slice C.1 (this slice).** Add runtime-owned command seams for active
+- **Slice C.1.** Add runtime-owned command seams for active
   camera-controller replacement and mesh edge/vertex primitive-view toggles.
   These commands route through `Engine::GetCameraControllerRegistry()` and
   `Engine::{Set,Get,Clear}MeshPrimitiveViewSettings(...)`, so UI state remains
   presentation-only.
-- **Slice C.2 (this slice).** Add the runtime-owned command seams for
+- **Slice C.2.** Add the runtime-owned command seams for
   selected-entity spatial-debug settings and visualization-config selection
   without making UI state authoritative. The slice routes through
   `ECS::Components::SpatialDebugBinding` and
@@ -63,7 +63,7 @@
 - [x] Implement a selection/primitive details panel that displays current entity/face/edge/vertex/point selection results from `RUNTIME-089` / `RUNTIME-093`. Slice B models selected/hovered entity rows and refined primitive status/domain/kind/id/hit details; richer interaction remains for later command-surface slices.
 - [ ] Implement a file/import entry panel that calls asset/runtime import commands when `ASSETIO-001` is available and otherwise displays a deterministic disabled-state diagnostic. Slice A implements the deterministic disabled diagnostic; command execution remains gated on `ASSETIO-001`.
 - [x] Implement camera/render settings controls for active camera controller selection, debug overlay toggles, and primitive view toggles using runtime-owned APIs. Slice C.1 implements active camera-controller replacement and mesh edge/vertex primitive-view toggles; Slice C.2 implements selected-entity spatial-debug binding controls.
-- [ ] Implement geometry-domain visualization controls that choose scalar/color/vector/isolines as inputs to `RUNTIME-083` adapters without duplicating graphics validation. Slice C.2 implements selected-entity `VisualizationConfig` material/scalar/color command routing; full adapter packet production remains gated on `RUNTIME-083`.
+- [ ] Implement geometry-domain visualization controls that choose scalar/color/vector/isolines as inputs to `RUNTIME-083` adapters without duplicating graphics validation. Slice C.2 implements selected-entity `VisualizationConfig` material/scalar/color command routing; scalar adapter packet production is available through `RUNTIME-083` Slice B, while non-scalar adapter production remains gated on `RUNTIME-083` Slices C/D.
 - [x] Add UI diagnostics for missing dependencies (no ImGui adapter, no asset ingest, no selected entity, unsupported domain).
 
 ## Tests
@@ -115,8 +115,8 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
   tagging. Slice C.1 closes `CPUContracted` for camera-controller replacement
   and mesh primitive-view toggle command routing. Slice C.2 closes
   `CPUContracted` for selected-entity spatial-debug binding and
-  visualization-config command routing. Later slices close remaining
-  `RUNTIME-083` adapter packet selection once that umbrella exists before
+  visualization-config command routing. Later slices close remaining non-scalar
+  `RUNTIME-083` adapter packet selection once those adapters exist before
   retiring the full task.
 - `Operational` owned by [`RUNTIME-095`](../backlog/runtime/RUNTIME-095-working-sandbox-acceptance.md)
   final sandbox acceptance after ImGui rendering is wired.

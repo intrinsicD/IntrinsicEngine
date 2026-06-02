@@ -19,18 +19,22 @@ id/hit display, a runtime-owned local-transform edit command, camera-controller
 replacement, mesh edge/vertex primitive-view toggle commands, and selected-entity
 spatial-debug / visualization-config command routing with CPU `contract;runtime`
 coverage. Remaining file/import execution is gated on `ASSETIO-001`; remaining
-full visualization adapter packet selection is gated on active `RUNTIME-083`.
+non-scalar visualization adapter packet selection is gated on active
+`RUNTIME-083` Slices C/D.
 Next verification: resume UI-001 after those seams exist, then run the task
 structural checks plus the runtime contract/default CPU gates.
 
 [`RUNTIME-083`](RUNTIME-083-visualization-adapters.md) —
 `Extrinsic.Runtime.VisualizationAdapters` runtime producer umbrella. Status:
-in-progress on `main`; current Slice A adds the umbrella module,
-`PropertyScalarAdapter`, mutable visualization packet batch, adapter stats, and
-registry contract. This is the direct blocker for UI-001's remaining
-visualization adapter packet acceptance. Next verification: build
-`IntrinsicRuntimeContractTests`, run the focused `VisualizationAdapters`
-contract tests, refresh the module inventory, and run runtime structural checks.
+in-progress on `main`; Slices A/B add the umbrella module,
+`PropertyScalarAdapter`, mutable visualization packet batch, adapter stats,
+registry contract, and extraction-cache scalar adapter pump into
+`RuntimeRenderSnapshotBatch::Visualization*` spans. This partially unblocks
+UI-001's remaining visualization adapter packet acceptance; KMeans/vector/
+isoline/Htex adapter kinds remain open. Next verification: build
+`IntrinsicRuntimeGraphicsCpuTests`, run the focused visualization
+adapter/extraction tests, refresh the module inventory, and run runtime
+structural checks.
 
 The most recently retired tasks are summarised below.
 

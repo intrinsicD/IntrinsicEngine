@@ -4,6 +4,7 @@
 #include <memory>
 #include <span>
 
+#include <entt/entity/entity.hpp>
 #include <gtest/gtest.h>
 #include <glm/glm.hpp>
 
@@ -18,18 +19,22 @@ import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.GpuSceneSlot;
 import Extrinsic.Graphics.Component.VisualizationConfig;
+import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
+import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.TransferQueue;
 import Extrinsic.RHI.Types;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SpatialDebugAdapters;
+import Extrinsic.Runtime.VisualizationAdapters;
 import Geometry.AABB;
 import Geometry.BVH;
 import Geometry.ConvexHull;
 import Geometry.Plane;
+import Geometry.Properties;
 
 #include "MockRHI.hpp"
 
@@ -118,6 +123,38 @@ namespace
     }
 
     std::array<std::byte, 64> ZeroBytes64{};
+
+    [[nodiscard]] std::uint32_t StableId(entt::entity entity) noexcept
+    {
+        return static_cast<std::uint32_t>(entity);
+    }
+
+    [[nodiscard]] Geometry::PropertySet MakeScalarProperties()
+    {
+        Geometry::PropertySet properties;
+        properties.Resize(3u);
+
+        auto curvature = properties.Add<float>("curvature", 0.0f);
+        curvature[0] = -0.5f;
+        curvature[1] = 0.25f;
+        curvature[2] = 1.5f;
+
+        return properties;
+    }
+
+    void ConfigureScalarVisualization(ECS::Scene::Registry& scene,
+                                      entt::entity entity)
+    {
+        auto& registry = scene.Raw();
+        registry.emplace<ECS::Components::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
+        registry.emplace<Graphics::Components::RenderPoints>(entity);
+
+        auto& visualization = registry.emplace<Graphics::Components::VisualizationConfig>(entity);
+        visualization.Source = Graphics::Components::VisualizationConfig::ColorSource::ScalarField;
+        visualization.ScalarFieldName = "curvature";
+        visualization.ScalarDomain = Graphics::Components::VisualizationConfig::Domain::Vertex;
+        visualization.Scalar.Map = Graphics::Colormap::Type::Plasma;
+    }
 }
 
 TEST(RuntimeRenderExtraction, CreatesUpdatesAndClearsDirtyTransformSidecar)
@@ -208,6 +245,106 @@ TEST(RuntimeRenderExtraction, ExtractsVisualizationAndLightsWithoutRenderableOwn
     EXPECT_EQ(stats.SkippedInvalidEntityCount, 0u);
     EXPECT_EQ(fixture.Extraction.GetTrackedRenderableCount(), 1u);
     EXPECT_EQ(fixture.Renderer->GetGpuWorld().GetLiveInstanceCount(), 1u);
+}
+
+TEST(RuntimeRenderExtraction, VisualizationScalarAdapterBindingReachesRenderWorld)
+{
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+
+    Geometry::PropertySet properties = MakeScalarProperties();
+    const auto entity = scene.Create();
+    ConfigureScalarVisualization(scene, entity);
+
+    constexpr std::uint64_t kAdapterKey = 0x51A1u;
+    fixture.Extraction.RegisterVisualizationAdapter(
+        kAdapterKey,
+        std::make_unique<Runtime::PropertyScalarAdapter>(
+            Geometry::ConstPropertySet{properties}));
+    fixture.Extraction.SetVisualizationAdapterBinding(
+        StableId(entity),
+        Runtime::RenderExtractionCache::VisualizationAdapterBinding{
+            .AdapterKey = kAdapterKey,
+            .BufferBDA = 0xCAFE1000u,
+        });
+
+    const auto stats = fixture.Extract(scene);
+    const Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
+
+    EXPECT_EQ(stats.VisualizationAdapterScalarConfigsObserved, 1u);
+    EXPECT_EQ(stats.VisualizationAdapterBindingsMissing, 0u);
+    EXPECT_EQ(stats.VisualizationAdapterMissingAdapterCount, 0u);
+    EXPECT_EQ(stats.VisualizationAdapterInvokedCount, 1u);
+    EXPECT_EQ(stats.VisualizationAdapterPacketAppendCount, 1u);
+    EXPECT_EQ(stats.VisualizationScalarPacketCount, 1u);
+    EXPECT_EQ(stats.VisualizationAdapterInvalidBufferCount, 0u);
+
+    ASSERT_EQ(world.Visualization.Scalars.size(), 1u);
+    const Graphics::ScalarAttributePacket& packet = world.Visualization.Scalars.front();
+    EXPECT_EQ(packet.Name, "curvature");
+    EXPECT_EQ(packet.Domain, Graphics::VisualizationAttributeDomain::Vertex);
+    EXPECT_EQ(packet.ElementCount, 3u);
+    EXPECT_EQ(packet.ScalarBufferBDA, 0xCAFE1000u);
+    EXPECT_FLOAT_EQ(packet.RangeMin, -0.5f);
+    EXPECT_FLOAT_EQ(packet.RangeMax, 1.5f);
+    EXPECT_EQ(packet.Colormap, Graphics::Colormap::Type::Plasma);
+    EXPECT_EQ(world.Visualization.Diagnostics.InputPacketCount, 1u);
+    EXPECT_EQ(world.Visualization.Diagnostics.AcceptedPacketCount, 1u);
+    EXPECT_FALSE(world.Visualization.Diagnostics.HasErrors);
+    EXPECT_TRUE(world.Visualization.HasVisualizationPackets);
+}
+
+TEST(RuntimeRenderExtraction, VisualizationScalarAdapterMissingBindingDoesNotSubmitPackets)
+{
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+
+    const auto entity = scene.Create();
+    ConfigureScalarVisualization(scene, entity);
+
+    const auto stats = fixture.Extract(scene);
+    const Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
+
+    EXPECT_EQ(stats.VisualizationAdapterScalarConfigsObserved, 1u);
+    EXPECT_EQ(stats.VisualizationAdapterBindingsMissing, 1u);
+    EXPECT_EQ(stats.VisualizationAdapterInvokedCount, 0u);
+    EXPECT_EQ(stats.VisualizationScalarPacketCount, 0u);
+    EXPECT_TRUE(world.Visualization.Scalars.empty());
+    EXPECT_EQ(world.Visualization.Diagnostics.InputPacketCount, 0u);
+    EXPECT_FALSE(world.Visualization.HasVisualizationPackets);
+}
+
+TEST(RuntimeRenderExtraction, VisualizationScalarAdapterInvalidBdaIsCounted)
+{
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+
+    Geometry::PropertySet properties = MakeScalarProperties();
+    const auto entity = scene.Create();
+    ConfigureScalarVisualization(scene, entity);
+
+    constexpr std::uint64_t kAdapterKey = 0xBADBDAu;
+    fixture.Extraction.RegisterVisualizationAdapter(
+        kAdapterKey,
+        std::make_unique<Runtime::PropertyScalarAdapter>(
+            Geometry::ConstPropertySet{properties}));
+    fixture.Extraction.SetVisualizationAdapterBinding(
+        StableId(entity),
+        Runtime::RenderExtractionCache::VisualizationAdapterBinding{
+            .AdapterKey = kAdapterKey,
+            .BufferBDA = 0u,
+        });
+
+    const auto stats = fixture.Extract(scene);
+    const Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
+
+    EXPECT_EQ(stats.VisualizationAdapterScalarConfigsObserved, 1u);
+    EXPECT_EQ(stats.VisualizationAdapterInvokedCount, 1u);
+    EXPECT_EQ(stats.VisualizationAdapterInvalidBufferCount, 1u);
+    EXPECT_EQ(stats.VisualizationAdapterPacketAppendCount, 0u);
+    EXPECT_EQ(stats.VisualizationScalarPacketCount, 0u);
+    EXPECT_TRUE(world.Visualization.Scalars.empty());
+    EXPECT_EQ(world.Visualization.Diagnostics.InputPacketCount, 0u);
 }
 
 TEST(RuntimeRenderExtraction, ObservesAssetSourceAsUnavailableWithoutGpuAssetCache)
@@ -721,4 +858,3 @@ TEST(RuntimeRenderExtraction, SpatialDebugBindingHonorsLeafOnlyAndDepthCap)
     EXPECT_EQ(depthCapStats.SpatialDebugHierarchyNodeCount, 1u);
     EXPECT_EQ(depthCapStats.SpatialDebugDepthCapTruncationAccumulator, 1u);
 }
-

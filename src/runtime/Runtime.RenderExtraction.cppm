@@ -49,6 +49,7 @@ import Extrinsic.Runtime.ProceduralGeometry;
 import Extrinsic.Runtime.ProceduralGeometryPacker;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SpatialDebugAdapters;
+import Extrinsic.Runtime.VisualizationAdapters;
 
 export namespace Extrinsic::Runtime
 {
@@ -259,6 +260,35 @@ export namespace Extrinsic::Runtime
         std::uint32_t SpatialDebugInnerNodeAccumulator{0};
         std::uint32_t SpatialDebugEmptyNodeSkippedAccumulator{0};
         std::uint32_t SpatialDebugDepthCapTruncationAccumulator{0};
+
+        // RUNTIME-083 Slice B — runtime visualization adapter pump counters.
+        // `VisualizationAdapterScalarConfigsObserved` counts renderables whose
+        // `VisualizationConfig` requests `ScalarField` packet production.
+        // Registered adapters and per-renderable bindings are runtime-owned
+        // cache state, while `VisualizationConfig` supplies the source name,
+        // domain, range, and colormap. The packet lane counts mirror the spans
+        // attached to `RuntimeRenderSnapshotBatch::Visualization*`.
+        std::uint32_t VisualizationAdapterScalarConfigsObserved{0};
+        std::uint32_t VisualizationAdapterBindingsMissing{0};
+        std::uint32_t VisualizationAdapterMissingAdapterCount{0};
+        std::uint32_t VisualizationAdapterInvokedCount{0};
+        std::uint32_t VisualizationAdapterPacketAppendCount{0};
+        std::uint32_t VisualizationAdapterMissingSourceCount{0};
+        std::uint32_t VisualizationAdapterUnsupportedSourceTypeCount{0};
+        std::uint32_t VisualizationAdapterEmptySourceCount{0};
+        std::uint32_t VisualizationAdapterInvalidBufferCount{0};
+        std::uint32_t VisualizationAdapterInvalidRangeCount{0};
+        std::uint32_t VisualizationAdapterNonFiniteValueCount{0};
+        std::uint32_t VisualizationAdapterElementCountOverflowCount{0};
+        std::uint32_t VisualizationAdapterManualRangeCount{0};
+        std::uint32_t VisualizationAdapterFlatAutoRangeExpandedCount{0};
+        std::uint32_t VisualizationAttributeBufferPacketCount{0};
+        std::uint32_t VisualizationScalarPacketCount{0};
+        std::uint32_t VisualizationColorPacketCount{0};
+        std::uint32_t VisualizationVectorFieldPacketCount{0};
+        std::uint32_t VisualizationIsolinePacketCount{0};
+        std::uint32_t VisualizationHtexAtlasPacketCount{0};
+        std::uint32_t VisualizationFragmentBakeAtlasPacketCount{0};
     };
 
     [[nodiscard]] RuntimeRenderableAssetGenerationObservation ObserveRenderableAssetGeneration(
@@ -427,6 +457,29 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] std::size_t GetSpatialDebugAdapterCount() const noexcept;
         [[nodiscard]] const SpatialDebugAdapterRegistry& GetSpatialDebugRegistryForTest() const noexcept;
 
+        struct VisualizationAdapterBinding
+        {
+            std::uint64_t AdapterKey{0u};
+            std::uint64_t BufferBDA{0u};
+        };
+
+        // RUNTIME-083 Slice B — runtime-owned visualization adapter binding
+        // surface. `VisualizationConfig` on the entity declares the requested
+        // scalar source and presentation metadata; this cache-owned binding
+        // supplies the active adapter key plus the externally owned GPU buffer
+        // address the adapter must reference. Bindings are keyed by the same
+        // stable renderable id that extraction sidecars and selection use.
+        void RegisterVisualizationAdapter(std::uint64_t key,
+                                          std::unique_ptr<IVisualizationAdapter> adapter);
+        bool UnregisterVisualizationAdapter(std::uint64_t key) noexcept;
+        [[nodiscard]] std::size_t GetVisualizationAdapterCount() const noexcept;
+        [[nodiscard]] const VisualizationAdapterRegistry& GetVisualizationAdapterRegistryForTest() const noexcept;
+        void SetVisualizationAdapterBinding(std::uint32_t stableEntityId,
+                                            VisualizationAdapterBinding binding);
+        void ClearVisualizationAdapterBinding(std::uint32_t stableEntityId) noexcept;
+        [[nodiscard]] std::optional<VisualizationAdapterBinding> GetVisualizationAdapterBinding(
+            std::uint32_t stableEntityId) const noexcept;
+
     private:
         struct RenderableSidecar
         {
@@ -544,6 +597,9 @@ export namespace Extrinsic::Runtime
                                       RenderableSidecar& sidecar,
                                       Graphics::IRenderer& renderer,
                                       RuntimeRenderExtractionStats& stats);
+        void AppendVisualizationAdapters(std::uint32_t stableId,
+                                         const RenderableSidecar& sidecar,
+                                         RuntimeRenderExtractionStats& stats);
 
         // RUNTIME-085 Slice C — runtime-owned deferred-retire queue for mesh
         // upload handles. Mirrors the shape of
@@ -627,6 +683,14 @@ export namespace Extrinsic::Runtime
         std::unordered_map<std::uint64_t, std::unique_ptr<ISpatialDebugAdapter>> m_SpatialDebugAdapters{};
         SpatialDebugAdapterRegistry m_SpatialDebugRegistry{};
         SpatialDebugSnapshotBatch m_SpatialDebugBatch{};
+
+        // RUNTIME-083 Slice B — owned visualization adapter instances,
+        // non-owning registry mirror, per-renderable binding table, and a
+        // frame-local packet batch attached to `RuntimeRenderSnapshotBatch`.
+        std::unordered_map<std::uint64_t, std::unique_ptr<IVisualizationAdapter>> m_VisualizationAdapters{};
+        VisualizationAdapterRegistry m_VisualizationAdapterRegistry{};
+        std::unordered_map<std::uint32_t, VisualizationAdapterBinding> m_VisualizationAdapterBindings{};
+        VisualizationAdapterBatch m_VisualizationAdapterBatch{};
 
         RuntimeRenderExtractionStats m_LastStats{};
     };
