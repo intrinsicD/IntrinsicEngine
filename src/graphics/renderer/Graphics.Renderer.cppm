@@ -31,6 +31,7 @@ import Extrinsic.Graphics.DeferredSystem;
 import Extrinsic.Graphics.PostProcessSystem;
 import Extrinsic.Graphics.ShadowSystem;
 import Extrinsic.Graphics.TransformSyncSystem;
+import Extrinsic.Graphics.ImGuiOverlaySystem;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.FrameRecipe;
@@ -300,6 +301,14 @@ namespace Extrinsic::Graphics
         [[nodiscard]] virtual bool BeginFrame(RHI::FrameHandle& outFrame) = 0;
 
         virtual void SubmitRuntimeSnapshots(const RuntimeRenderSnapshotBatch& snapshots) = 0;
+
+        // GRAPHICS-079 Slice A — runtime composition hands the engine-owned
+        // `ImGuiOverlaySystem` (the producer the `RUNTIME-090` adapter submits
+        // to) to the renderer so the consumer-side `Pass.ImGui` reads the same
+        // overlay state. Runtime owns composition; this is the allowed
+        // `runtime -> graphics` handoff edge. Passing `nullptr` detaches the
+        // overlay so the `ImGuiPass` route reports `SkippedUnavailable`.
+        virtual void SetImGuiOverlaySystem(ImGuiOverlaySystem* overlay) noexcept = 0;
 
         [[nodiscard]] virtual RenderWorld ExtractRenderWorld(
             const RenderFrameInput& input) = 0;

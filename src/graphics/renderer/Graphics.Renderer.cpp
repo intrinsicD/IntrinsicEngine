@@ -68,6 +68,13 @@ import Extrinsic.Graphics.Pass.Present;
 // holds a reference and does not re-export the system module).
 import Extrinsic.Graphics.Pass.DebugView;
 import Extrinsic.Graphics.DebugViewSystem;
+// GRAPHICS-079 Slice A — canonical default-recipe `Pass.ImGui`. The
+// renderer owns a `std::optional<ImGuiPass>` bound to the engine-owned
+// `ImGuiOverlaySystem` handed in via `SetImGuiOverlaySystem`; the overlay
+// system module is already imported transitively through the renderer's
+// public surface, but the pass module is imported explicitly here so the
+// executor can construct and drive the consumer route.
+import Extrinsic.Graphics.Pass.ImGui;
 // GRAPHICS-077 Slice A — `TransientDebugSurfacePass` shell. Slice B
 // promotes the triangle lane from `SkippedUnavailable` to `Recorded`
 // by creating two pipeline variants (depth-tested + always-on-top)
@@ -616,6 +623,13 @@ namespace Extrinsic::Graphics
             // for their system-bound `Execute(...)` references.
             m_DebugViewPass.reset();
             m_DebugViewSystem.reset();
+            // GRAPHICS-079 Slice A — reset the canonical `ImGuiPass` consumer
+            // before teardown so its optional destructor does not observe a
+            // dangling `ImGuiOverlaySystem&`. The overlay system itself is
+            // engine-owned (runtime composition) and outlives the renderer's
+            // borrow; clear the borrow pointer too.
+            m_ImGuiPass.reset();
+            m_ImGuiOverlaySystem = nullptr;
             m_SelectionSystem.reset();
             m_LightSystem    .reset();
             m_ForwardSystem  .reset();
@@ -641,6 +655,11 @@ namespace Extrinsic::Graphics
             // lease above; same teardown ordering contract (lease reset
             // before `m_PipelineManager` is destroyed below).
             m_DebugViewPipelineLease.reset();
+            // GRAPHICS-079 Slice A — drop the canonical default-recipe
+            // `Pass.ImGui` pipeline lease alongside the debug-view lease
+            // above; same teardown ordering contract (lease reset before
+            // `m_PipelineManager` is destroyed below).
+            m_ImGuiPipelineLease.reset();
             // GRAPHICS-077 Slices B + C — drop the canonical default-
             // recipe transient-debug pipeline leases (triangle + line +
             // point lanes, depth-tested + always-on-top per lane)
@@ -817,6 +836,31 @@ namespace Extrinsic::Graphics
             // pre-rebuild bytes.
             DrainCompletedHistogramSlots();
             return m_Device->BeginFrame(outFrame);
+        }
+
+        // GRAPHICS-079 Slice A — receive the engine-owned `ImGuiOverlaySystem`
+        // (runtime owns composition). The renderer-owned `ImGuiPass` borrows the
+        // handed-in overlay so `RecordImGuiPass` reads the same submitted frame
+        // the `RUNTIME-090` adapter produced. May be called before or after
+        // `Initialize()`: if the pipeline lease already exists we bind it to the
+        // freshly-constructed pass here; otherwise `InitializeOperationalPassResources`
+        // binds it when the lease is created. `nullptr` detaches the consumer so
+        // the route reports `SkippedUnavailable`.
+        void SetImGuiOverlaySystem(ImGuiOverlaySystem* overlay) noexcept override
+        {
+            m_ImGuiOverlaySystem = overlay;
+            if (overlay == nullptr)
+            {
+                m_ImGuiPass.reset();
+                return;
+            }
+            m_ImGuiPass.emplace(*overlay);
+            if (m_PipelineManager.has_value() && m_ImGuiPipelineLease.has_value() &&
+                m_ImGuiPipelineLease->IsValid())
+            {
+                m_ImGuiPass->SetPipeline(
+                    m_PipelineManager->GetDeviceHandle(m_ImGuiPipelineLease->GetHandle()));
+            }
         }
 
         void SubmitRuntimeSnapshots(const RuntimeRenderSnapshotBatch& snapshots) override
@@ -2192,6 +2236,32 @@ namespace Extrinsic::Graphics
                         // lane failed its pipeline gate.
                         const RenderCommandPassStatus status =
                             RecordVisualizationOverlayPass(graphicsContext, renderWorld);
+                        AccumulateCommandRecordStatus(passName, status);
+                    }
+                    else if (passName == std::string_view{"ImGuiPass"})
+                    {
+                        // GRAPHICS-079 Slice A — default-recipe canonical
+                        // ImGui overlay route. The recipe declares
+                        // `"ImGuiPass"` every default-recipe frame
+                        // (`features.EnableImGui` defaults true; it reads
+                        // `FrameRecipe.PresentSource` and side-effects), so
+                        // this branch is reached every frame. Before this
+                        // slice the pass name fell through to the executor's
+                        // soft-skip default branch; it now routes through
+                        // `RecordImGuiPass` which mirrors the present/debug-view
+                        // taxonomy: non-operational device →
+                        // `SkippedNonOperational`; no attached overlay system /
+                        // missing pipeline lease / no submitted overlay work →
+                        // `SkippedUnavailable`; otherwise the consumer-side
+                        // `ImGuiPass::Execute` records the overlay draw and we
+                        // return `Recorded`. The runtime hands the engine-owned
+                        // overlay system in via `SetImGuiOverlaySystem`
+                        // (`RUNTIME-090` producer ↔ this consumer); the
+                        // per-draw-list `BindIndexBuffer`/`Draw` blocks +
+                        // transient host-visible upload + font atlas are owned
+                        // by later slices of this task.
+                        const RenderCommandPassStatus status =
+                            RecordImGuiPass(graphicsContext);
                         AccumulateCommandRecordStatus(passName, status);
                     }
                     else if (passName == std::string_view{"Present"})
@@ -3738,6 +3808,51 @@ namespace Extrinsic::Graphics
             return desc;
         }
 
+        // GRAPHICS-079 Slice A — canonical default-recipe `Pass.ImGui`
+        // pipeline. Per `GRAPHICS-013CQ`: premultiplied-alpha blend, no depth
+        // test/write, scissor enabled (dynamic), color target pinned to the
+        // `FrameRecipe.PresentSource` format (the swapchain backbuffer format,
+        // since PresentSource aliases the present color resource), and a
+        // dynamic viewport. The push-constant block is the
+        // `ImGuiOverlayPushConstants` (16 bytes) the `ImGuiOverlaySystem`
+        // builds; the real `ImDrawVert` vertex-buffer binding + per-draw-list
+        // scissored draws + bindless user textures are owned by Slice C. Paired
+        // with `assets/shaders/imgui.{vert,frag}`. Held byte-identical between
+        // the initial `Initialize()` and any subsequent
+        // `RebuildOperationalResources()` so the pipeline registry's dedupe
+        // yields a stable device handle.
+        [[nodiscard]] static RHI::PipelineDesc BuildImGuiPipelineDesc(
+            const RHI::Format colorFormat = RHI::Format::RGBA8_UNORM) noexcept
+        {
+            RHI::PipelineDesc desc{};
+            desc.VertexShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/imgui.vert.spv");
+            desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/imgui.frag.spv");
+            desc.PrimitiveTopology = RHI::Topology::TriangleList;
+            desc.Rasterizer.Culling = RHI::CullMode::None;
+            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
+            desc.Rasterizer.Fill = RHI::FillMode::Solid;
+            desc.DepthStencil.DepthTestEnable = false;
+            desc.DepthStencil.DepthWriteEnable = false;
+            desc.DepthStencil.StencilEnable = false;
+            // Premultiplied-alpha blend per GRAPHICS-013CQ: src = One,
+            // dst = OneMinusSrcAlpha for both color and alpha.
+            desc.ColorBlend[0].Enable = true;
+            desc.ColorBlend[0].SrcColorFactor = RHI::BlendFactor::One;
+            desc.ColorBlend[0].DstColorFactor = RHI::BlendFactor::OneMinusSrcAlpha;
+            desc.ColorBlend[0].ColorOp = RHI::BlendOp::Add;
+            desc.ColorBlend[0].SrcAlphaFactor = RHI::BlendFactor::One;
+            desc.ColorBlend[0].DstAlphaFactor = RHI::BlendFactor::OneMinusSrcAlpha;
+            desc.ColorBlend[0].AlphaOp = RHI::BlendOp::Add;
+            desc.ColorTargetCount = 1u;
+            desc.ColorTargetFormats[0] = colorFormat;
+            desc.DepthTargetFormat = RHI::Format::Undefined;
+            desc.PushConstantSize = static_cast<std::uint32_t>(sizeof(ImGuiOverlayPushConstants));
+            desc.DebugName = "Renderer.ImGui";
+            return desc;
+        }
+
         // GRAPHICS-077 Slice B — transient-debug triangle pipelines. Two
         // variants per lane (depth-tested + always-on-top) so packets
         // with `DepthTested = true` rasterize against the prepass depth
@@ -5016,6 +5131,38 @@ namespace Extrinsic::Graphics
                     static_cast<int>(isolineAlwaysOnTopPipeline.error()));
             }
 
+            // GRAPHICS-079 Slice A — canonical default-recipe `Pass.ImGui`
+            // pipeline. Created LAST (after the visualization-overlay isoline
+            // pipelines) so the existing `FailPipelineCreateCall` indices used
+            // by other lifecycle tests remain stable. Same reset/republish +
+            // fail-closed pattern as the present/debug-view leases so a failed
+            // `Create()` leaves `m_ImGuiPass` (when attached) in the fail-closed
+            // state that `RecordImGuiPass` interprets as `SkippedUnavailable`.
+            // The pass is only attached once the runtime hands in the overlay
+            // system via `SetImGuiOverlaySystem`, so the lease may exist before
+            // the pass does.
+            m_ImGuiPipelineLease.reset();
+            if (m_ImGuiPass)
+            {
+                m_ImGuiPass->SetPipeline(RHI::PipelineHandle{});
+            }
+            const RHI::PipelineDesc imguiDesc = BuildImGuiPipelineDesc(m_BackbufferFormat);
+            auto imguiPipeline = m_PipelineManager->Create(imguiDesc);
+            if (imguiPipeline.has_value())
+            {
+                m_ImGuiPipelineLease.emplace(std::move(*imguiPipeline));
+                if (m_ImGuiPass)
+                {
+                    m_ImGuiPass->SetPipeline(
+                        m_PipelineManager->GetDeviceHandle(m_ImGuiPipelineLease->GetHandle()));
+                }
+            }
+            else
+            {
+                Core::Log::Warn("[Graphics] ImGui pipeline unavailable; default-recipe ImGui recording will be skipped: error={}",
+                                static_cast<int>(imguiPipeline.error()));
+            }
+
             return m_CullingOutputAvailable && m_DepthPrepassPipelineLease.has_value() &&
                 m_DepthPrepassPipelineLease->IsValid();
         }
@@ -6226,6 +6373,41 @@ namespace Extrinsic::Graphics
             return RenderCommandPassStatus::Recorded;
         }
 
+        // GRAPHICS-079 Slice A — canonical default-recipe `Pass.ImGui`
+        // executor helper. Mirrors `RecordPresentPass` for the operational
+        // gate and `RecordDebugViewPass` for the missing-resource taxonomy.
+        // The `ImGuiPass` consumer only exists once the runtime hands in the
+        // engine-owned `ImGuiOverlaySystem` (`SetImGuiOverlaySystem`), and the
+        // pass body short-circuits internally on `!HasOverlayWork()`, so the
+        // helper gates on overlay attachment + submitted work to keep the
+        // executor taxonomy truthful: a frame with no overlay system attached,
+        // no created pipeline, or no submitted overlay work records zero
+        // commands and reports `SkippedUnavailable` rather than a false
+        // `Recorded`. The recipe declares `"ImGuiPass"` every default-recipe
+        // frame (`features.EnableImGui` defaults true), so this branch is the
+        // explicit route that replaces the soft-skip default for the pass.
+        // Slice C adds the per-draw-list `BindIndexBuffer`/`Draw` blocks +
+        // `DrawCalls` diagnostic behind the same gate.
+        [[nodiscard]] RenderCommandPassStatus RecordImGuiPass(RHI::ICommandContext& cmd)
+        {
+            if (m_Device == nullptr || !m_Device->IsOperational())
+            {
+                return RenderCommandPassStatus::SkippedNonOperational;
+            }
+            if (!m_ImGuiPass.has_value() ||
+                m_ImGuiOverlaySystem == nullptr ||
+                !m_ImGuiPipelineLease.has_value() ||
+                !m_ImGuiPipelineLease->IsValid() ||
+                !m_ImGuiPass->GetPipeline().IsValid() ||
+                !m_ImGuiOverlaySystem->HasOverlayWork())
+            {
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            m_ImGuiPass->Execute(cmd);
+            return RenderCommandPassStatus::Recorded;
+        }
+
         // GRAPHICS-076 Slice B — canonical default-recipe debug-view
         // executor helper. Mirrors `RecordPresentPass` for the
         // operational/lease checks, and additionally gates on
@@ -6636,6 +6818,18 @@ namespace Extrinsic::Graphics
         // recipe-side enablement.
         std::optional<DebugViewSystem>       m_DebugViewSystem;
         std::optional<DebugViewPass>         m_DebugViewPass;
+        // GRAPHICS-079 Slice A — canonical default-recipe `Pass.ImGui`
+        // consumer. The overlay system is engine-owned (runtime composition)
+        // and borrowed through the `m_ImGuiOverlaySystem` pointer set by
+        // `SetImGuiOverlaySystem`; `m_ImGuiPass` is `std::optional` because
+        // `ImGuiPass` requires an explicit `ImGuiOverlaySystem&` constructor
+        // argument and is non-movable, so it is emplaced only once the runtime
+        // hands the overlay in (which may be before or after `Initialize()`).
+        // The pass is reset in `Shutdown()` before `m_PipelineManager` /
+        // `m_ImGuiPipelineLease` are torn down. Until the runtime attaches an
+        // overlay system the route reports `SkippedUnavailable`.
+        ImGuiOverlaySystem*                  m_ImGuiOverlaySystem{nullptr};
+        std::optional<ImGuiPass>             m_ImGuiPass;
         // GRAPHICS-077 Slice A — scaffold-only `TransientDebugSurfacePass`.
         // Default-constructible (no system dependency), held as a plain
         // member so it lives for the renderer's full lifetime. Slice A
@@ -6756,6 +6950,16 @@ namespace Extrinsic::Graphics
         // `FailPipelineCreateCall` indices (1-24) used by other lifecycle
         // tests remain stable.
         std::optional<RHI::PipelineManager::PipelineLease> m_DebugViewPipelineLease;
+        // GRAPHICS-079 Slice A — canonical default-recipe `Pass.ImGui`
+        // pipeline lease. Created LAST inside
+        // `InitializeOperationalPassResources()` (after the visualization-
+        // overlay isoline pipelines) so the existing `FailPipelineCreateCall`
+        // indices used by other lifecycle tests remain stable. Same
+        // reset/republish + fail-closed pattern as the present/debug-view
+        // leases so a failed `Create()` leaves `m_ImGuiPass` (when attached) in
+        // the fail-closed state that `RecordImGuiPass` interprets as
+        // `SkippedUnavailable`.
+        std::optional<RHI::PipelineManager::PipelineLease> m_ImGuiPipelineLease;
         // GRAPHICS-077 Slice B — transient-debug triangle pipelines.
         // Two variants per lane (depth-tested + always-on-top); same
         // reset/republish pattern as the debug-view lease above so a

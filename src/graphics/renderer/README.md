@@ -903,6 +903,47 @@ Concretely:
   per-packet `Records*` / `Selects*AlwaysOnTop` shape, per-frame
   buffer-recycling invariant per lane, mixed-lane both-record
   acceptance test, and the per-lane partial-skip independence pin).
+- GRAPHICS-079 Slice A wires the canonical default-recipe `Pass.ImGui`
+  (`Extrinsic.Graphics.Pass.ImGui`) executor route on the CPU/null path
+  (`CPUContracted`). The recipe declares `"ImGuiPass"` every default-recipe
+  frame (`features.EnableImGui` defaults true; it reads
+  `FrameRecipe.PresentSource` and side-effects), and before this slice the
+  pass name fell through to the executor soft-skip default. The renderer now
+  owns the consumer side: `IRenderer::SetImGuiOverlaySystem(ImGuiOverlaySystem*)`
+  is the runtime-owned composition handoff edge — the runtime hands in the
+  same engine-owned overlay system the `RUNTIME-090` `ImGuiAdapter` submits to,
+  so producer and consumer share one instance. The renderer holds an
+  `ImGuiOverlaySystem* m_ImGuiOverlaySystem` borrow plus a non-movable
+  `std::optional<ImGuiPass> m_ImGuiPass` (emplaced when the overlay is handed
+  in, before or after `Initialize()`) and `m_ImGuiPipelineLease`. The ImGui
+  pipeline lives in `BuildImGuiPipelineDesc(m_BackbufferFormat)` — premultiplied-
+  alpha blend (`src=One`, `dst=OneMinusSrcAlpha` for color and alpha), depth
+  test + write disabled, color target pinned to the `FrameRecipe.PresentSource`
+  (backbuffer) format, `PushConstantSize = sizeof(ImGuiOverlayPushConstants)`
+  (16 bytes), pointed at the new `assets/shaders/imgui.{vert,frag}` pair — and
+  is created LAST inside the operational publisher (after the visualization-
+  overlay isoline pipelines) so the existing `FailPipelineCreateCall` indices
+  used by other lifecycle tests remain stable. On the executor side, the new
+  `"ImGuiPass"` branch (textually adjacent to `"Present"`, since the overlay
+  composites into `PresentSource` before `Pass.Present` finalizes the
+  backbuffer) routes through `RecordImGuiPass(...)` with the same `Recorded` /
+  `SkippedNonOperational` / `SkippedUnavailable` taxonomy the other default-
+  recipe helpers use: non-operational device → `SkippedNonOperational`; no
+  attached overlay system / missing pipeline lease / no submitted overlay work
+  → `SkippedUnavailable` (so a frame that would record zero commands is not a
+  false `Recorded`); otherwise `ImGuiPass::Execute` records the overlay draw
+  and the helper returns `Recorded`. The Slice A contract pin is
+  `tests/contract/graphics/Test.ImGuiPass.cpp` (both attach orders record,
+  no-overlay / no-work / detached `SkippedUnavailable`, non-operational
+  `SkippedNonOperational`, and a record-after-`RebuildOperationalResources`
+  stability case). Deferred to later slices of GRAPHICS-079: the graphics-owned
+  retained font atlas allocated at `ImGuiOverlaySystem::Initialize(device,
+  textureManager)`, the per-frame transient host-visible vertex/index upload
+  helper with per-draw-list `BindIndexBuffer`/`Draw` blocks + the
+  `ImGuiOverlayDiagnostics::DrawCalls` counter, the `Pass.ImGui` →
+  `FrameRecipe.PresentSource` write topology + bindless user textures, and the
+  `gpu;vulkan` smoke + closing-cleanup assertion (the runtime `Engine`
+  producer↔consumer handoff is Slice B).
 - `TransformSyncSystem`, `LightSystem`, and `VisualizationSyncSystem` consume
   graphics-owned snapshot records (`TransformSyncRecord`, `LightSnapshot`, and
   `VisualizationSyncRecord`) instead of querying live ECS registries. Runtime is
