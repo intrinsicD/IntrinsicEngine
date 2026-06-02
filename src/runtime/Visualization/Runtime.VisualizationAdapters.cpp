@@ -15,6 +15,7 @@ module Extrinsic.Runtime.VisualizationAdapters;
 
 import Geometry.Properties;
 import Extrinsic.Graphics.VisualizationPackets;
+import Extrinsic.Runtime.StreamingExecutor;
 
 namespace Extrinsic::Runtime
 {
@@ -315,6 +316,61 @@ namespace Extrinsic::Runtime
             ++stats.PacketAppendCount;
             return true;
         }
+
+        [[nodiscard]] std::string PacketName(
+            const VisualizationAdapterOptions& options)
+        {
+            return options.OutputName.empty() ? options.SourceName : options.OutputName;
+        }
+
+        [[nodiscard]] std::string FragmentSourceAttributeName(
+            const VisualizationAdapterOptions& options)
+        {
+            return options.SourceAttributeName.empty()
+                ? options.SourceName
+                : options.SourceAttributeName;
+        }
+
+        [[nodiscard]] bool ValidAtlasDimensions(
+            const VisualizationAdapterOptions& options) noexcept
+        {
+            return options.AtlasWidth > 0u && options.AtlasHeight > 0u;
+        }
+
+        [[nodiscard]] bool ScheduleHtexRecreate(
+            StreamingExecutor* executor,
+            const std::string& packetName,
+            const VisualizationAdapterOptions& options,
+            VisualizationAdapterStats& stats)
+        {
+            if (executor == nullptr)
+            {
+                ++stats.InvalidResourceCount;
+                return false;
+            }
+
+            const StreamingTaskHandle handle = executor->Submit(StreamingTaskDesc{
+                .Name = packetName.empty()
+                    ? std::string{"Visualization.HtexRecreate"}
+                    : std::string{"Visualization.HtexRecreate."} + packetName,
+                .EstimatedCost = 1u,
+                .Execute = [payloadToken = options.HtexRecreatePayloadToken]()
+                {
+                    return StreamingResult{
+                        StreamingCpuPayloadReady{.PayloadToken = payloadToken}};
+                },
+            });
+
+            if (!handle.IsValid())
+            {
+                ++stats.InvalidResourceCount;
+                return false;
+            }
+
+            ++stats.HtexRecreateScheduledCount;
+            stats.LastHtexRecreateTask = handle;
+            return true;
+        }
     }
 
     void VisualizationAdapterBatch::Clear() noexcept
@@ -501,6 +557,103 @@ namespace Extrinsic::Runtime
         else
         {
             ++stats.MissingSourceCount;
+        }
+    }
+
+    HtexMetadataAdapter::HtexMetadataAdapter(StreamingExecutor* executor) noexcept
+        : m_Executor(executor)
+    {
+    }
+
+    void HtexMetadataAdapter::Append(VisualizationAdapterBatch& out,
+                                     const VisualizationAdapterOptions& options,
+                                     VisualizationAdapterStats& stats) const
+    {
+        ++stats.AdapterInvocationCount;
+
+        if (!options.EmitHtexPreview && !options.EmitFragmentBake)
+        {
+            ++stats.MissingSourceCount;
+            return;
+        }
+
+        const std::string name = PacketName(options);
+        Graphics::HtexPatchPreviewAtlasPacket htexPacket{};
+        bool hasHtexPacket = false;
+        if (options.EmitHtexPreview)
+        {
+            if (name.empty() || options.PatchCount == 0u ||
+                !ValidAtlasDimensions(options))
+            {
+                ++stats.InvalidResourceCount;
+                return;
+            }
+
+            htexPacket = Graphics::HtexPatchPreviewAtlasPacket{
+                .Name = name,
+                .PatchCount = options.PatchCount,
+                .AtlasWidth = options.AtlasWidth,
+                .AtlasHeight = options.AtlasHeight,
+            };
+            hasHtexPacket = true;
+        }
+
+        Graphics::FragmentBakeAtlasPacket bakePacket{};
+        bool hasBakePacket = false;
+        if (options.EmitFragmentBake)
+        {
+            const std::string sourceAttribute =
+                FragmentSourceAttributeName(options);
+            if (name.empty() || sourceAttribute.empty() ||
+                options.FaceCount == 0u || !ValidAtlasDimensions(options))
+            {
+                ++stats.InvalidResourceCount;
+                return;
+            }
+
+            switch (options.FragmentBakeMapping)
+            {
+            case Graphics::VisualizationFragmentBakeMapping::ExistingTexcoords:
+                if (!options.MeshHasTexcoords ||
+                    options.TexcoordBufferBDA == 0u)
+                {
+                    ++stats.MissingTexcoordCount;
+                    return;
+                }
+                break;
+            case Graphics::VisualizationFragmentBakeMapping::ExistingHtex:
+                break;
+            case Graphics::VisualizationFragmentBakeMapping::RecreateHtex:
+                if (!ScheduleHtexRecreate(m_Executor, name, options, stats))
+                    return;
+                break;
+            default:
+                ++stats.InvalidResourceCount;
+                return;
+            }
+
+            bakePacket = Graphics::FragmentBakeAtlasPacket{
+                .Name = name,
+                .SourceAttributeName = sourceAttribute,
+                .Mapping = options.FragmentBakeMapping,
+                .MeshHasTexcoords = options.MeshHasTexcoords,
+                .FaceCount = options.FaceCount,
+                .AtlasWidth = options.AtlasWidth,
+                .AtlasHeight = options.AtlasHeight,
+                .TexcoordBufferBDA = options.TexcoordBufferBDA,
+            };
+            hasBakePacket = true;
+        }
+
+        if (hasHtexPacket)
+        {
+            out.HtexAtlases.push_back(std::move(htexPacket));
+            ++stats.PacketAppendCount;
+        }
+        if (hasBakePacket)
+        {
+            out.FragmentBakeAtlases.push_back(std::move(bakePacket));
+            ++stats.PacketAppendCount;
         }
     }
 

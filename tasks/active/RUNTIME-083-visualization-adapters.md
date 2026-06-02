@@ -4,9 +4,9 @@
 - Status: in-progress.
 - Owner/agent: Codex.
 - Branch: `main`.
-- Current slice: Slice D — Htex metadata / fragment-bake adapter behavior.
+- Current slice: Slice E — non-scalar extraction selection.
 - Next verification step: build `IntrinsicRuntimeContractTests`, run the
-  focused Htex/fragment-bake `VisualizationAdapters` contract tests,
+  focused non-scalar visualization extraction selection tests,
   regenerate module inventory, and run runtime structural checks.
 
 ## Slice plan
@@ -29,8 +29,11 @@
   property buffers plus externally supplied GPU buffer addresses; they do not
   schedule KMeans or allocate vector-field residency.
 - **Slice C.2.** Add isoline adapter behavior with deterministic CPU contracts.
-- **Slice D (this slice).** Add Htex metadata / fragment-bake adapter behavior, including
-  `RecreateHtex` streaming scheduling and final extraction stats.
+- **Slice D.** Add Htex metadata / fragment-bake adapter behavior, including
+  `RecreateHtex` streaming scheduling.
+- **Slice E (this slice).** Wire runtime-owned non-scalar extraction selection
+  so configured color/vector/isoline/Htex adapter packets can reach
+  `RuntimeRenderSnapshotBatch` without duplicating graphics validation.
 
 ## Goal
 - Open the runtime-side adapter umbrella declared by `GRAPHICS-014Q`: a new module `Extrinsic.Runtime.VisualizationAdapters` (planned home: `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm`) hosting concrete producer adapters that translate `PropertySet` attributes, KMeans labels, isoline results, vector fields, and Htex metadata into `RuntimeRenderSnapshotBatch` visualization packet spans (`VisualizationAttributeBuffers`, `VisualizationScalars`, `VisualizationColors`, `VisualizationVectorFields`, `VisualizationIsolines`, `VisualizationHtexAtlases`, `VisualizationFragmentBakeAtlases`).
@@ -41,15 +44,15 @@
 - No editor UI; the editor maps user choices into adapter pre-filter inputs.
 
 ## Context
-- Status: in-progress; Slices A-C.2 landed scalar extraction, KMeans/color,
-  vector-field, and isoline adapter contracts, while Htex/fragment-bake
-  adapters remain open.
+- Status: in-progress; Slices A-D landed scalar extraction, KMeans/color,
+  vector-field, isoline, Htex preview, and fragment-bake adapter contracts,
+  while non-scalar extraction selection remains open.
 - Owner/layer: `runtime`.
 - Planning anchor: `tasks/done/GRAPHICS-014Q-visualization-runtime-backend-clarifications.md` ("runtime extraction is the sole owner of translating PropertySet attributes, KMeans labels, isoline results, vector fields, and Htex metadata into the `RuntimeRenderSnapshotBatch` visualization packet spans; concrete producer adapters live under a planned `Extrinsic.Runtime.VisualizationAdapters` umbrella").
 - Bake-mapping selection (`UVBake`/`ExistingHtex`/`RecreateHtex`) is runtime/editor-owned. `RecreateHtex` requests are scheduled by runtime/geometry on a background task through `Extrinsic.Runtime.StreamingExecutor`; graphics increments `HtexRecreateRequestCount`.
 
 ## Required changes
-- [ ] Add `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` exporting `Extrinsic.Runtime.VisualizationAdapters` with:
+- [x] Add `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` exporting `Extrinsic.Runtime.VisualizationAdapters` with:
   - `class IVisualizationAdapter { virtual void Append(VisualizationPacketBatch& out, const VisualizationAdapterOptions& filters) = 0; }`,
   - concrete `PropertyScalarAdapter` (`PropertySet` → `ScalarAttributePacket`),
   - concrete `KMeansLabelAdapter` (`KMeansLabels` → `ColorAttributePacket`),
@@ -74,6 +77,12 @@
   validation and externally supplied buffer-device-address metadata.
 - [x] Slice C.2: add isoline adapter packet production with deterministic
   source/range/metadata validation.
+- [x] Slice D: add Htex preview and fragment-bake packet production with
+  deterministic metadata validation, `RecreateHtex` streaming-task scheduling,
+  and adapter-side counters recorded in `VisualizationAdapterStats`.
+- [ ] Slice E: wire runtime-owned non-scalar extraction selection for configured
+  color/vector/isoline/Htex adapter packets into `RuntimeRenderSnapshotBatch`
+  without moving validation out of `Graphics.VisualizationPackets`.
 
 ## Tests
 - [ ] `contract;runtime` test: `PropertyScalarAdapter` produces a deterministic `ScalarAttributePacket` for a fixture `PropertySet`; out-of-range filters reject as expected.
@@ -91,9 +100,20 @@
 - [x] Slice C.2 `contract;runtime` tests: `IsolineAdapter` produces
   deterministic packet output for fixtures and rejects missing, unsupported,
   empty, non-finite, invalid-count, invalid-range, and invalid-line metadata.
-- [ ] `contract;runtime` test: `HtexMetadataAdapter` enqueues a streaming task on `RecreateHtex` request and increments `RuntimeRenderExtractionStats::HtexRecreateScheduled` by 1.
-- [ ] `contract;runtime` test: `ValidateVisualizationPackets` continues to reject malformed adapter outputs (centralized validation per `GRAPHICS-014Q`).
-- [ ] No `gpu`/`vulkan` test in this slice.
+- [x] Slice D `contract;runtime` tests: `HtexMetadataAdapter` emits Htex
+  preview / fragment-bake packets, enqueues a streaming task on `RecreateHtex`,
+  records `HtexRecreateScheduledCount` plus the submitted task handle, and
+  rejects missing atlas dimensions, missing texcoords, and missing executor
+  ownership deterministically.
+- [x] Slice D `contract;runtime` test: `ValidateVisualizationPackets` continues
+  to accept well-formed Htex/fragment-bake adapter outputs and report texture
+  residency deferral / Htex recreate diagnostics centrally.
+- [ ] Slice E `integration;runtime;graphics` tests: configured non-scalar
+  adapter bindings reach the corresponding `RuntimeRenderSnapshotBatch`
+  visualization spans and missing bindings/adapters fail closed with extraction
+  stats.
+- [x] Slice D: no `gpu`/`vulkan` test in this slice.
+- [ ] Slice E: no `gpu`/`vulkan` test in this slice.
 
 ## Docs
 - [x] Update `src/runtime/README.md` to flip the planned `VisualizationAdapters` umbrella row to current state.
@@ -109,6 +129,11 @@
   Htex/fragment-bake metadata remain open.
 - [x] Slice C.2: update runtime docs and active task state to record the
   isoline adapter contract while Htex/fragment-bake metadata remains open.
+- [x] Slice D: update runtime docs and active task state to record the
+  Htex/fragment-bake adapter contract while non-scalar extraction selection
+  remains open.
+- [ ] Slice E: update runtime docs, migration parity notes, active task index,
+  and sandbox gate review to record non-scalar extraction selection.
 
 ## Acceptance criteria
 - [x] Slice A compiles the umbrella and proves `PropertyScalarAdapter` plus
@@ -121,9 +146,13 @@
   ownership.
 - [x] Slice C.2 compiles the isoline adapter and proves its deterministic packet
   contract without importing legacy graphics isoline extraction.
-- [ ] All five adapter kinds compile, register, and produce deterministic outputs.
-- [ ] `RecreateHtex` runs as a streaming task and triggers exactly once per request.
-- [ ] No new graphics imports beyond the existing `Graphics.VisualizationPackets` edge.
+- [x] Slice D compiles the Htex metadata adapter and proves deterministic
+  Htex preview / fragment-bake descriptor output plus `RecreateHtex` scheduling.
+- [x] All five adapter kinds compile, register, and produce deterministic outputs.
+- [x] `RecreateHtex` runs as a streaming task and triggers exactly once per request.
+- [ ] Configured non-scalar visualization adapter bindings reach renderer-visible
+  packet spans with deterministic missing-binding / missing-adapter stats.
+- [x] No new graphics imports beyond the existing `Graphics.VisualizationPackets` edge.
 
 ## Verification
 ```bash
@@ -155,11 +184,16 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
   `IsolineOverlayPacket` records, but it does not import legacy graphics
   isoline extraction, allocate overlay residency, wire non-scalar extraction
   selection, or schedule Htex/fragment-bake work.
-- Full `CPUContracted` for `RUNTIME-083` requires Slice D. `Operational`
+- Slice D extends `CPUContracted` to Htex preview and fragment-bake packet
+  producer adapters only. It validates caller-authored atlas metadata, emits
+  `HtexPatchPreviewAtlasPacket` and `FragmentBakeAtlasPacket` records, and
+  schedules a deterministic `RecreateHtex` streaming task when requested. It
+  does not allocate atlas residency or wire non-scalar extraction selection.
+- Full `CPUContracted` for `RUNTIME-083` requires Slice E, including extraction-side non-scalar packet stats. `Operational`
   owned by [`RUNTIME-095`](../backlog/runtime/RUNTIME-095-working-sandbox-acceptance.md)
   or a later visualization-specific backend smoke.
 
 ## Next verification step
-- Build `IntrinsicRuntimeContractTests`, run the focused Htex/fragment-bake
-  `VisualizationAdapters` contract tests, regenerate the module inventory, and
-  run runtime structural checks.
+- Build `IntrinsicRuntimeContractTests`, run focused non-scalar visualization
+  extraction selection tests, regenerate the module inventory, and run runtime
+  structural checks.

@@ -20,23 +20,22 @@ replacement, mesh edge/vertex primitive-view toggle commands, and selected-entit
 spatial-debug / visualization-config command routing with CPU `contract;runtime`
 coverage. Remaining file/import execution is gated on `ASSETIO-001`; remaining
 non-scalar visualization adapter packet selection is gated on active
-`RUNTIME-083` Slices C/D.
+`RUNTIME-083` Slice E.
 Next verification: resume UI-001 after those seams exist, then run the task
 structural checks plus the runtime contract/default CPU gates.
 
 [`RUNTIME-083`](RUNTIME-083-visualization-adapters.md) —
 `Extrinsic.Runtime.VisualizationAdapters` runtime producer umbrella. Status:
-in-progress on `main`; Slices A-C.2 add the umbrella module,
+in-progress on `main`; Slices A-D add the umbrella module,
 `PropertyScalarAdapter`, `KMeansLabelAdapter`, `VectorFieldAdapter`,
-`IsolineAdapter`, mutable visualization packet batch, adapter stats, registry
-contract, and extraction-cache scalar adapter pump into
+`IsolineAdapter`, `HtexMetadataAdapter`, mutable visualization packet batch,
+adapter stats, registry contract, and extraction-cache scalar adapter pump into
 `RuntimeRenderSnapshotBatch::Visualization*` spans. This partially unblocks
 UI-001's visualization adapter acceptance; standalone KMeans/color, vector-field,
-and isoline adapter contracts are available, while Htex/fragment-bake adapters
-and non-scalar extraction selection remain open. Next verification: build
-`IntrinsicRuntimeContractTests`, run focused Htex/fragment-bake
-`VisualizationAdapters` contract tests, refresh the module inventory, and run
-runtime structural checks.
+isoline, Htex preview, and fragment-bake adapter contracts are available, while
+non-scalar extraction selection remains open. Next verification: build
+`IntrinsicRuntimeContractTests`, run focused non-scalar visualization extraction
+selection tests, refresh the module inventory, and run runtime structural checks.
 
 The most recently retired tasks are summarised below.
 

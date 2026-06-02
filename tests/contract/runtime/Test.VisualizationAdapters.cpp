@@ -8,6 +8,7 @@ import Geometry.Properties;
 import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.Runtime.VisualizationAdapters;
+import Extrinsic.Runtime.StreamingExecutor;
 
 namespace G = Extrinsic::Graphics;
 namespace R = Extrinsic::Runtime;
@@ -524,6 +525,154 @@ TEST(VisualizationAdapters, IsolineAdapterRejectsInvalidSources)
     EXPECT_EQ(stats.PacketAppendCount, 0u);
 }
 
+TEST(VisualizationAdapters, HtexMetadataAdapterAppendsPreviewAndUvBakePackets)
+{
+    const R::HtexMetadataAdapter adapter{};
+
+    R::VisualizationAdapterBatch batch{};
+    R::VisualizationAdapterStats stats{};
+    adapter.Append(batch,
+                   R::VisualizationAdapterOptions{
+                       .SourceName = "curvature",
+                       .OutputName = "curvature_uv_bake",
+                       .EmitHtexPreview = true,
+                       .EmitFragmentBake = true,
+                       .SourceAttributeName = "curvature",
+                       .FragmentBakeMapping =
+                           G::VisualizationFragmentBakeMapping::ExistingTexcoords,
+                       .MeshHasTexcoords = true,
+                       .PatchCount = 8u,
+                       .FaceCount = 24u,
+                       .AtlasWidth = 512u,
+                       .AtlasHeight = 256u,
+                       .TexcoordBufferBDA = 0xCAFEu,
+                   },
+                   stats);
+
+    ASSERT_EQ(batch.HtexAtlases.size(), 1u);
+    ASSERT_EQ(batch.FragmentBakeAtlases.size(), 1u);
+    const G::HtexPatchPreviewAtlasPacket& htex = batch.HtexAtlases.front();
+    EXPECT_EQ(htex.Name, "curvature_uv_bake");
+    EXPECT_EQ(htex.PatchCount, 8u);
+    EXPECT_EQ(htex.AtlasWidth, 512u);
+    EXPECT_EQ(htex.AtlasHeight, 256u);
+
+    const G::FragmentBakeAtlasPacket& bake = batch.FragmentBakeAtlases.front();
+    EXPECT_EQ(bake.Name, "curvature_uv_bake");
+    EXPECT_EQ(bake.SourceAttributeName, "curvature");
+    EXPECT_EQ(bake.Mapping,
+              G::VisualizationFragmentBakeMapping::ExistingTexcoords);
+    EXPECT_TRUE(bake.MeshHasTexcoords);
+    EXPECT_EQ(bake.FaceCount, 24u);
+    EXPECT_EQ(bake.AtlasWidth, 512u);
+    EXPECT_EQ(bake.AtlasHeight, 256u);
+    EXPECT_EQ(bake.TexcoordBufferBDA, 0xCAFEu);
+    EXPECT_EQ(stats.AdapterInvocationCount, 1u);
+    EXPECT_EQ(stats.PacketAppendCount, 2u);
+
+    const G::VisualizationDiagnostics diagnostics =
+        G::ValidateVisualizationPackets(batch.AsPacketBatch());
+    EXPECT_EQ(diagnostics.InputPacketCount, 2u);
+    EXPECT_EQ(diagnostics.AcceptedPacketCount, 2u);
+    EXPECT_EQ(diagnostics.TextureResidencyDeferredCount, 2u);
+    EXPECT_FALSE(diagnostics.HasErrors);
+}
+
+TEST(VisualizationAdapters, HtexMetadataAdapterSchedulesRecreateHtexTask)
+{
+    R::StreamingExecutor executor{};
+    const R::HtexMetadataAdapter adapter{&executor};
+
+    R::VisualizationAdapterBatch batch{};
+    R::VisualizationAdapterStats stats{};
+    adapter.Append(batch,
+                   R::VisualizationAdapterOptions{
+                       .SourceName = "curvature",
+                       .OutputName = "curvature_htex_bake",
+                       .EmitFragmentBake = true,
+                       .SourceAttributeName = "curvature",
+                       .FragmentBakeMapping =
+                           G::VisualizationFragmentBakeMapping::RecreateHtex,
+                       .MeshHasTexcoords = true,
+                       .FaceCount = 24u,
+                       .AtlasWidth = 512u,
+                       .AtlasHeight = 512u,
+                       .HtexRecreatePayloadToken = 42u,
+                   },
+                   stats);
+
+    ASSERT_EQ(batch.FragmentBakeAtlases.size(), 1u);
+    EXPECT_EQ(batch.FragmentBakeAtlases.front().Mapping,
+              G::VisualizationFragmentBakeMapping::RecreateHtex);
+    EXPECT_EQ(stats.PacketAppendCount, 1u);
+    EXPECT_EQ(stats.HtexRecreateScheduledCount, 1u);
+    const R::StreamingTaskHandle task = stats.LastHtexRecreateTask;
+    EXPECT_TRUE(task.IsValid());
+    EXPECT_EQ(executor.GetState(task), R::StreamingTaskState::Pending);
+
+    executor.PumpBackground(1u);
+    executor.DrainCompletions();
+    EXPECT_EQ(executor.GetState(task), R::StreamingTaskState::Complete);
+
+    const G::VisualizationDiagnostics diagnostics =
+        G::ValidateVisualizationPackets(batch.AsPacketBatch());
+    EXPECT_EQ(diagnostics.InputPacketCount, 1u);
+    EXPECT_EQ(diagnostics.AcceptedPacketCount, 1u);
+    EXPECT_EQ(diagnostics.HtexRecreateRequestCount, 1u);
+    EXPECT_EQ(diagnostics.TextureResidencyDeferredCount, 1u);
+    EXPECT_FALSE(diagnostics.HasErrors);
+}
+
+TEST(VisualizationAdapters, HtexMetadataAdapterRejectsInvalidDescriptors)
+{
+    const R::HtexMetadataAdapter adapter{};
+
+    R::VisualizationAdapterBatch batch{};
+    R::VisualizationAdapterStats stats{};
+    adapter.Append(batch, R::VisualizationAdapterOptions{}, stats);
+    adapter.Append(batch,
+                   R::VisualizationAdapterOptions{
+                       .SourceName = "htex",
+                       .EmitHtexPreview = true,
+                       .PatchCount = 4u,
+                   },
+                   stats);
+    adapter.Append(batch,
+                   R::VisualizationAdapterOptions{
+                       .SourceName = "uv_bake",
+                       .EmitFragmentBake = true,
+                       .SourceAttributeName = "curvature",
+                       .FragmentBakeMapping =
+                           G::VisualizationFragmentBakeMapping::ExistingTexcoords,
+                       .MeshHasTexcoords = false,
+                       .FaceCount = 24u,
+                       .AtlasWidth = 512u,
+                       .AtlasHeight = 512u,
+                   },
+                   stats);
+    adapter.Append(batch,
+                   R::VisualizationAdapterOptions{
+                       .SourceName = "htex_bake",
+                       .EmitFragmentBake = true,
+                       .SourceAttributeName = "curvature",
+                       .FragmentBakeMapping =
+                           G::VisualizationFragmentBakeMapping::RecreateHtex,
+                       .FaceCount = 24u,
+                       .AtlasWidth = 512u,
+                       .AtlasHeight = 512u,
+                   },
+                   stats);
+
+    EXPECT_TRUE(batch.HtexAtlases.empty());
+    EXPECT_TRUE(batch.FragmentBakeAtlases.empty());
+    EXPECT_EQ(stats.AdapterInvocationCount, 4u);
+    EXPECT_EQ(stats.MissingSourceCount, 1u);
+    EXPECT_EQ(stats.InvalidResourceCount, 2u);
+    EXPECT_EQ(stats.MissingTexcoordCount, 1u);
+    EXPECT_EQ(stats.HtexRecreateScheduledCount, 0u);
+    EXPECT_EQ(stats.PacketAppendCount, 0u);
+}
+
 TEST(VisualizationAdapters, BatchClearAndPacketViewReflectAllPacketLanes)
 {
     R::VisualizationAdapterBatch batch{};
@@ -552,6 +701,20 @@ TEST(VisualizationAdapters, BatchClearAndPacketViewReflectAllPacketLanes)
         .SourceScalarName = "iso",
         .IsoValueCount = 2u,
     });
+    batch.HtexAtlases.push_back(G::HtexPatchPreviewAtlasPacket{
+        .Name = "htex",
+        .PatchCount = 2u,
+        .AtlasWidth = 8u,
+        .AtlasHeight = 8u,
+    });
+    batch.FragmentBakeAtlases.push_back(G::FragmentBakeAtlasPacket{
+        .Name = "bake",
+        .SourceAttributeName = "scalar",
+        .Mapping = G::VisualizationFragmentBakeMapping::ExistingHtex,
+        .FaceCount = 2u,
+        .AtlasWidth = 8u,
+        .AtlasHeight = 8u,
+    });
 
     const G::VisualizationPacketBatch packetView =
         batch.AsPacketBatch(true, G::VisualizationAttributeDomain::Vertex);
@@ -560,6 +723,8 @@ TEST(VisualizationAdapters, BatchClearAndPacketViewReflectAllPacketLanes)
     EXPECT_EQ(packetView.Colors.size(), 1u);
     EXPECT_EQ(packetView.VectorFields.size(), 1u);
     EXPECT_EQ(packetView.Isolines.size(), 1u);
+    EXPECT_EQ(packetView.HtexAtlases.size(), 1u);
+    EXPECT_EQ(packetView.FragmentBakeAtlases.size(), 1u);
     EXPECT_TRUE(packetView.EnforceDomain);
 
     batch.Clear();
@@ -568,6 +733,8 @@ TEST(VisualizationAdapters, BatchClearAndPacketViewReflectAllPacketLanes)
     EXPECT_TRUE(batch.Colors.empty());
     EXPECT_TRUE(batch.VectorFields.empty());
     EXPECT_TRUE(batch.Isolines.empty());
+    EXPECT_TRUE(batch.HtexAtlases.empty());
+    EXPECT_TRUE(batch.FragmentBakeAtlases.empty());
 }
 
 TEST(VisualizationAdapters, RegistryReplacesAndUnregistersAdapters)

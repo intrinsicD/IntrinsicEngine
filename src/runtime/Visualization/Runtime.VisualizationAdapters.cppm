@@ -15,6 +15,7 @@ export module Extrinsic.Runtime.VisualizationAdapters;
 import Geometry.Properties;
 import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.VisualizationPackets;
+import Extrinsic.Runtime.StreamingExecutor;
 
 export namespace Extrinsic::Runtime
 {
@@ -56,6 +57,18 @@ export namespace Extrinsic::Runtime
         float VectorScale{1.0f};
         glm::vec4 VectorColor{1.0f};
         bool DepthTested{true};
+        bool EmitHtexPreview{false};
+        bool EmitFragmentBake{false};
+        std::string SourceAttributeName{};
+        Graphics::VisualizationFragmentBakeMapping FragmentBakeMapping{
+            Graphics::VisualizationFragmentBakeMapping::ExistingTexcoords};
+        bool MeshHasTexcoords{false};
+        std::uint32_t PatchCount{0u};
+        std::uint32_t FaceCount{0u};
+        std::uint32_t AtlasWidth{0u};
+        std::uint32_t AtlasHeight{0u};
+        std::uint64_t TexcoordBufferBDA{0u};
+        std::uint64_t HtexRecreatePayloadToken{0u};
     };
 
     struct VisualizationAdapterStats
@@ -66,11 +79,15 @@ export namespace Extrinsic::Runtime
         std::uint32_t UnsupportedSourceTypeCount{0u};
         std::uint32_t EmptySourceCount{0u};
         std::uint32_t InvalidBufferCount{0u};
+        std::uint32_t InvalidResourceCount{0u};
+        std::uint32_t MissingTexcoordCount{0u};
         std::uint32_t InvalidRangeCount{0u};
         std::uint32_t NonFiniteValueCount{0u};
         std::uint32_t ElementCountOverflowCount{0u};
         std::uint32_t ManualRangeCount{0u};
         std::uint32_t FlatAutoRangeExpandedCount{0u};
+        std::uint32_t HtexRecreateScheduledCount{0u};
+        StreamingTaskHandle LastHtexRecreateTask{};
     };
 
     class IVisualizationAdapter
@@ -133,6 +150,19 @@ export namespace Extrinsic::Runtime
 
     private:
         Geometry::ConstPropertySet m_Properties{};
+    };
+
+    class HtexMetadataAdapter final : public IVisualizationAdapter
+    {
+    public:
+        explicit HtexMetadataAdapter(StreamingExecutor* executor = nullptr) noexcept;
+
+        void Append(VisualizationAdapterBatch& out,
+                    const VisualizationAdapterOptions& options,
+                    VisualizationAdapterStats& stats) const override;
+
+    private:
+        StreamingExecutor* m_Executor{nullptr};
     };
 
     class VisualizationAdapterRegistry
