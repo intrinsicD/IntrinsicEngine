@@ -15,7 +15,7 @@ Repository structure and policy scripts.
   live under ``tests/contract/repo/layering_fixtures/`` and are exercised
   by ``tests/regression/tooling/Test.CheckLayering.py``.
 - `check_ui_contract_guard.sh`: UI boundary guard script (canonical path).
-- `check_layering_allowlist_quality.py`: validates layering allowlist entry hygiene (required metadata, duplicate keys, and broad legacy wildcard bans).
+- `check_layering_allowlist_quality.py`: validates layering allowlist entry hygiene (required metadata, duplicate keys, broad legacy wildcard bans, and open task-owner references).
 - `check_test_layout.py`: enforces taxonomy-owned test source layout and forbids legacy wrapper test directories.
 - `generate_module_inventory.py`: module inventory generator for `src/`; defaults to `docs/api/generated/module_inventory.md`.
 

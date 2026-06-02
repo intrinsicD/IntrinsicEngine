@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+import re
 from pathlib import Path
 
 import yaml
@@ -12,6 +13,9 @@ import yaml
 ALLOWLIST_REL = Path("tools/repo/layering_allowlist.yaml")
 REQUIRED_FIELDS = ("from", "to", "file_glob", "task", "expires", "reason")
 FORBIDDEN_GLOBS = {"src/legacy/**", "./src/legacy/**"}
+LIFECYCLE_DIRS = ("active", "backlog", "done")
+OPEN_TASK_STATES = {"active", "backlog"}
+TASK_ID_FROM_FILENAME_RE = re.compile(r"^([A-Z]+-\d+[A-Z0-9]*)(?:-|\.md$)")
 
 
 def _load_entries(path: Path) -> list[dict[str, object]]:
@@ -32,8 +36,40 @@ def _load_entries(path: Path) -> list[dict[str, object]]:
     return normalized
 
 
-def validate(entries: list[dict[str, object]]) -> list[str]:
+def task_id_from_path(path: Path) -> str | None:
+    match = TASK_ID_FROM_FILENAME_RE.match(path.name)
+    return match.group(1) if match else None
+
+
+def collect_task_states(root: Path) -> dict[str, set[str]]:
+    states_by_task: dict[str, set[str]] = {}
+    tasks_root = root / "tasks"
+    for state in LIFECYCLE_DIRS:
+        state_root = tasks_root / state
+        if not state_root.is_dir():
+            continue
+        for path in sorted(state_root.rglob("*.md")):
+            if path.name == "README.md":
+                continue
+            task_id = task_id_from_path(path)
+            if task_id is None:
+                continue
+            states_by_task.setdefault(task_id, set()).add(state)
+    return states_by_task
+
+
+def describe_entry(idx: int, entry: dict[str, object]) -> str:
+    return (
+        f"Entry #{idx} "
+        f"(from='{str(entry.get('from', '')).strip()}', "
+        f"to='{str(entry.get('to', '')).strip()}', "
+        f"file_glob='{str(entry.get('file_glob', '')).strip()}')"
+    )
+
+
+def validate(entries: list[dict[str, object]], task_states: dict[str, set[str]] | None = None) -> list[str]:
     findings: list[str] = []
+    task_states = task_states or {}
 
     for idx, entry in enumerate(entries, start=1):
         for field in REQUIRED_FIELDS:
@@ -44,6 +80,28 @@ def validate(entries: list[dict[str, object]]) -> list[str]:
         file_glob = str(entry.get("file_glob", "")).strip()
         if file_glob in FORBIDDEN_GLOBS:
             findings.append(f"Entry #{idx}: forbidden broad glob '{file_glob}'.")
+
+        task = entry.get("task")
+        if not isinstance(task, str) or not task.strip():
+            continue
+
+        task_id = task.strip()
+        states = task_states.get(task_id, set())
+        context = describe_entry(idx, entry)
+        if not states:
+            findings.append(f"{context}: unknown task owner '{task_id}'.")
+            continue
+        if len(states) > 1:
+            findings.append(
+                f"{context}: task owner '{task_id}' appears in multiple lifecycle directories "
+                f"({', '.join(sorted(states))})."
+            )
+            continue
+        if states.isdisjoint(OPEN_TASK_STATES):
+            findings.append(
+                f"{context}: task owner '{task_id}' is retired/not open "
+                f"({', '.join(sorted(states))})."
+            )
 
     key_counter: Counter[tuple[str, str, str]] = Counter()
     for entry in entries:
@@ -83,7 +141,8 @@ def main() -> int:
         print(f"[check_layering_allowlist_quality] ERROR: {exc}")
         return 2
 
-    findings = validate(entries)
+    task_states = collect_task_states(args.root.resolve())
+    findings = validate(entries, task_states)
     print(f"[check_layering_allowlist_quality] Entries: {len(entries)}")
 
     if findings:

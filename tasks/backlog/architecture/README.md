@@ -43,7 +43,8 @@ map.
   (done 2026-06-02): added deterministic task lifecycle cross-reference checking so docs cannot
   keep claiming a task is active/backlog/done when the file lives elsewhere or
   no longer exists.
-- [HARDEN-076 — Enforce open task owners for layering allowlist rows](HARDEN-076-enforce-open-task-layering-allowlist-owners.md):
+- [HARDEN-076 — Enforce open task owners for layering allowlist rows](../../done/HARDEN-076-enforce-open-task-layering-allowlist-owners.md)
+  (done 2026-06-02):
   follows [`HARDEN-069`](../../done/HARDEN-069-rebind-legacy-layering-allowlist-to-active-retirement-tasks.md)
   by making `check_layering_allowlist_quality.py` fail strict mode when a
   temporary allowlist exception points at a missing or retired task owner.

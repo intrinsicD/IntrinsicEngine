@@ -27,6 +27,7 @@ This document defines enforceable layer dependencies for IntrinsicEngine.
 - Policy source of truth: `AGENTS.md`.
 - Scripted enforcement path: `tools/repo/check_layering.py`.
 - Temporary exceptions are tracked in `tools/repo/layering_allowlist.yaml` and must include task IDs and expiry notes.
+- Allowlist hygiene is validated by `tools/repo/check_layering_allowlist_quality.py`; each row's task owner must resolve to an open task under `tasks/backlog/` or `tasks/active/`.
 - The checker runs in warning mode by default and supports `--strict` for CI hard-fail.
 
 ### Local verification
@@ -38,4 +39,4 @@ python3 tools/repo/check_layering.py --root src --strict
 
 ### Migration note
 
-`src/legacy` may temporarily violate final boundaries only when the dependency is allowlisted and tracked in a current task under `tasks/active/` with a removal task.
+`src/legacy` may temporarily violate final boundaries only when the dependency is allowlisted and tracked in an open task under `tasks/backlog/` or `tasks/active/` with a removal task.
