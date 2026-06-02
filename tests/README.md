@@ -66,7 +66,13 @@ reusable `tests/support/MinimalTriangleReadback.hpp` and
 `tests/support/OperationalCounterStability.hpp` helpers so the canonical
 `GRAPHICS-076`/`GRAPHICS-081` default-recipe smoke can reuse the
 sample-point table, expected-color quantization, and fallback-counter
-stability contract byte-identical. The four-sample pixel assertion runs as a live
+stability contract byte-identical. The same smoke executable also contains
+the default-recipe, transient-debug, visualization-overlay, and
+`ImGuiSurfaceGpuSmoke.UserTextureImageRecordsOnOperationalVulkanCommandStream`
+fixtures; the ImGui fixture drives a runtime-produced `ImGui::Image()`
+payload through `ImGuiPass` and verifies that the default-recipe Vulkan
+command stream records the pass when the promoted backend is operational. The
+four-sample pixel assertion runs as a live
 `EXPECT_TRUE(Readback::ChannelsWithinTolerance(...))` site on a Vulkan-capable
 host: the renderer's opt-in `SetMinimalDebugBackbufferReadbackBuffer(handle)`
 hook + the RHI `CopyTextureToBuffer`/`ReadBuffer` seam drain the backbuffer

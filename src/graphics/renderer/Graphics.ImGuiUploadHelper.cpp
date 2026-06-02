@@ -29,6 +29,49 @@ namespace Extrinsic::Graphics
             bool Overflow{false};
         };
 
+        [[nodiscard]] bool DrawCommandRangeValid(const ImGuiOverlayDrawList& drawList,
+                                                 const ImGuiOverlayDrawCommand& command) noexcept
+        {
+            return command.IndexCount > 0u &&
+                   command.IndexOffset <= drawList.IndexCount &&
+                   command.IndexCount <= drawList.IndexCount - command.IndexOffset &&
+                   command.VertexOffset < drawList.VertexCount;
+        }
+
+        [[nodiscard]] std::vector<ImGuiDrawCommandUploadResult> BuildCommandUploads(
+            const ImGuiOverlayDrawList& drawList)
+        {
+            std::vector<ImGuiDrawCommandUploadResult> commands;
+            if (drawList.Commands.empty())
+            {
+                commands.push_back(ImGuiDrawCommandUploadResult{
+                    .IndexOffset = 0u,
+                    .VertexOffset = 0u,
+                    .IndexCount = drawList.IndexCount,
+                    .TextureBindlessIndex = RHI::kInvalidBindlessIndex,
+                    .UsesUserTexture = drawList.UsesUserTexture,
+                });
+                return commands;
+            }
+
+            commands.reserve(drawList.Commands.size());
+            for (const ImGuiOverlayDrawCommand& command : drawList.Commands)
+            {
+                if (!DrawCommandRangeValid(drawList, command))
+                {
+                    return {};
+                }
+                commands.push_back(ImGuiDrawCommandUploadResult{
+                    .IndexOffset = command.IndexOffset,
+                    .VertexOffset = command.VertexOffset,
+                    .IndexCount = command.IndexCount,
+                    .TextureBindlessIndex = command.TextureBindlessIndex,
+                    .UsesUserTexture = command.UsesUserTexture,
+                });
+            }
+            return commands;
+        }
+
         [[nodiscard]] LaneUploadOutput UploadBytes(
             RHI::IDevice& device,
             RHI::BufferManager& bufferManager,
@@ -124,7 +167,8 @@ namespace Extrinsic::Graphics
         for (const ImGuiOverlayDrawList& drawList : frame.DrawLists)
         {
             if (drawList.Vertices.size() != drawList.VertexCount ||
-                drawList.Indices.size() != drawList.IndexCount)
+                drawList.Indices.size() != drawList.IndexCount ||
+                BuildCommandUploads(drawList).empty())
             {
                 return result;
             }
@@ -157,6 +201,11 @@ namespace Extrinsic::Graphics
             listResult.IndexOffsetBytes = indexOffsetBytes;
             listResult.VertexCount = drawList.VertexCount;
             listResult.IndexCount = drawList.IndexCount;
+            listResult.Commands = BuildCommandUploads(drawList);
+            if (listResult.Commands.empty())
+            {
+                return ImGuiUploadResult{};
+            }
 
             vertices.insert(vertices.end(), drawList.Vertices.begin(), drawList.Vertices.end());
             indices.insert(indices.end(), drawList.Indices.begin(), drawList.Indices.end());

@@ -161,6 +161,48 @@ TEST(ImGuiAdapter, EditorPanelDrawProducesNonEmptyDrawList)
     EXPECT_FALSE(diag.LastFrameUsedUserTexture); // a text panel only uses the font atlas
 }
 
+TEST(ImGuiAdapter, ImageDrawPreservesUserTextureBindlessCommand)
+{
+    FakeWindow         window(1280, 720);
+    ImGuiOverlaySystem overlay;
+    ImGuiAdapter       adapter(window, overlay);
+
+    ASSERT_TRUE(adapter.Initialize());
+    adapter.SetEditorCallback(
+        []
+        {
+            ImGui::SetNextWindowPos(ImVec2(10.0f, 10.0f));
+            ImGui::SetNextWindowSize(ImVec2(220.0f, 120.0f));
+            ImGui::Begin("GRAPHICS-079 User Texture Panel");
+            ImGui::Image(static_cast<ImTextureID>(77u), ImVec2(16.0f, 16.0f));
+            ImGui::End();
+        });
+
+    adapter.BeginFrame(kFrameDelta);
+    adapter.EndFrame();
+    adapter.BeginFrame(kFrameDelta);
+    adapter.EndFrame();
+
+    const auto& diag = adapter.GetDiagnostics();
+    EXPECT_EQ(diag.FramesProduced, 2u);
+    EXPECT_TRUE(diag.LastFrameUsedUserTexture);
+
+    const auto* frame = overlay.GetCurrentFrame();
+    ASSERT_NE(frame, nullptr);
+    bool foundUserTextureCommand = false;
+    for (const Extrinsic::Graphics::ImGuiOverlayDrawList& drawList : frame->DrawLists)
+    {
+        for (const Extrinsic::Graphics::ImGuiOverlayDrawCommand& command : drawList.Commands)
+        {
+            if (command.UsesUserTexture && command.TextureBindlessIndex == 77u)
+            {
+                foundUserTextureCommand = true;
+            }
+        }
+    }
+    EXPECT_TRUE(foundUserTextureCommand);
+}
+
 // --- editor hook cadence ------------------------------------------------------
 
 TEST(ImGuiAdapter, EditorCallbackInvokedOncePerFramePair)

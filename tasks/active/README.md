@@ -14,7 +14,7 @@ Each active task should include:
 [`GRAPHICS-079`](GRAPHICS-079-default-recipe-imgui-pass-wiring.md) — default-recipe
 `Pass.ImGui` wiring (Theme A working-sandbox path, the consumer half of the
 ImGui/UI leaves that gate `UI-001`). Status: **in-progress**, owner
-`codex/main` for Slice D.2. Earliest unblocked Theme A (P0)
+`codex/main` for Slice D.2 retirement. Earliest unblocked Theme A (P0)
 leaf: dependencies `GRAPHICS-076` (PresentSource finalization) and `RUNTIME-090`
 (ImGui adapter producer) are both retired to `tasks/done/`. The task is sliced
 A–D (see its `## Slice plan`); Slice A wires the renderer-side
@@ -26,11 +26,13 @@ the renderer consumer and adds runtime contract coverage for the shared handoff.
 Slice C adds the retained font atlas, renderer-owned transient vertex/index
 upload helper, runtime adapter payload copy, direct per-list
 `BindIndexBuffer + DrawIndexed` contract coverage, and byte-identical atlas
-retention across `RebuildOperationalResources()`. Next verification step:
-Slice D.2 per-command user-texture bindless metadata/sampling and the
-`gpu;vulkan` smoke; Slice D.1 has already promoted `Pass.ImGui` to write
-`FrameRecipe.PresentSource` and proved the CPU/null recorded path plus
-closing-cleanup assertion.
+retention across `RebuildOperationalResources()`. Slice D.1 has already
+promoted `Pass.ImGui` to write `FrameRecipe.PresentSource` and proved the
+CPU/null recorded path plus closing-cleanup assertion. Slice D.2 adds
+per-command user-texture bindless metadata/shader sampling, registers the
+`ImGuiSurfaceGpuSmoke` opt-in `gpu;vulkan` fixture, and skips that fixture on
+this host when GLFW/Vulkan is unavailable. Next verification step: retire the
+task to `tasks/done/` after the Slice D.2 commit.
 
 The most recently retired tasks are summarised below.
 

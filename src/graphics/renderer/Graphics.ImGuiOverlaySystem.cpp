@@ -95,6 +95,43 @@ namespace Extrinsic::Graphics
                    lhs.SampleCount == rhs.SampleCount;
         }
 
+        [[nodiscard]] bool DrawCommandsValid(const ImGuiOverlayDrawList& drawList) noexcept
+        {
+            if (drawList.Commands.empty())
+            {
+                return drawList.CommandCount > 0u;
+            }
+
+            for (const ImGuiOverlayDrawCommand& command : drawList.Commands)
+            {
+                if (command.IndexCount == 0u ||
+                    command.IndexOffset > drawList.IndexCount ||
+                    command.IndexCount > drawList.IndexCount - command.IndexOffset ||
+                    command.VertexOffset >= drawList.VertexCount)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        [[nodiscard]] bool DrawListUsesUserTexture(const ImGuiOverlayDrawList& drawList) noexcept
+        {
+            if (drawList.UsesUserTexture)
+            {
+                return true;
+            }
+
+            for (const ImGuiOverlayDrawCommand& command : drawList.Commands)
+            {
+                if (command.UsesUserTexture)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         template <typename TImpl>
         void RefreshFontAtlasDiagnostics(TImpl& impl) noexcept
         {
@@ -269,18 +306,27 @@ namespace Extrinsic::Graphics
 
         for (const ImGuiOverlayDrawList& drawList : frame.DrawLists)
         {
-            if (drawList.CommandCount == 0u || drawList.VertexCount == 0u || drawList.IndexCount == 0u)
+            if (drawList.VertexCount == 0u || drawList.IndexCount == 0u ||
+                !DrawCommandsValid(drawList))
             {
                 ++m_Impl->Diagnostics.RejectedDrawListCount;
                 continue;
             }
 
+            ImGuiOverlayDrawList acceptedList = drawList;
+            if (!acceptedList.Commands.empty())
+            {
+                acceptedList.CommandCount = static_cast<std::uint32_t>(acceptedList.Commands.size());
+                acceptedList.UsesUserTexture = DrawListUsesUserTexture(acceptedList);
+            }
+
             ++m_Impl->Diagnostics.AcceptedDrawListCount;
-            m_Impl->Diagnostics.DrawCommandCount += drawList.CommandCount;
-            m_Impl->Diagnostics.VertexCount += drawList.VertexCount;
-            m_Impl->Diagnostics.IndexCount += drawList.IndexCount;
-            m_Impl->Diagnostics.HasUserTextures = m_Impl->Diagnostics.HasUserTextures || drawList.UsesUserTexture;
-            acceptedFrame.DrawLists.push_back(drawList);
+            m_Impl->Diagnostics.DrawCommandCount += acceptedList.CommandCount;
+            m_Impl->Diagnostics.VertexCount += acceptedList.VertexCount;
+            m_Impl->Diagnostics.IndexCount += acceptedList.IndexCount;
+            m_Impl->Diagnostics.HasUserTextures =
+                m_Impl->Diagnostics.HasUserTextures || acceptedList.UsesUserTexture;
+            acceptedFrame.DrawLists.push_back(std::move(acceptedList));
         }
 
         m_Impl->HasWork = m_Impl->Diagnostics.DrawCommandCount > 0u && m_Impl->Diagnostics.IndexCount > 0u;
@@ -335,14 +381,23 @@ namespace Extrinsic::Graphics
     ImGuiOverlayPushConstants ImGuiOverlaySystem::BuildPushConstants(
         const std::uint64_t vertexBufferBDA,
         const std::uint32_t firstVertex,
-        const std::uint32_t indexCount) const noexcept
+        const std::uint32_t indexCount,
+        const RHI::BindlessIndex textureBindlessIndex,
+        const std::uint32_t flags) const noexcept
     {
+        const RHI::BindlessIndex selectedTexture =
+            textureBindlessIndex != RHI::kInvalidBindlessIndex
+                ? textureBindlessIndex
+                : m_Impl->Diagnostics.FontAtlasBindlessIndex;
+        const std::uint32_t atlasFlags =
+            m_Impl->Frame.FontAtlas.UseColors ? kImGuiOverlayPushFlagFontAtlasColor : 0u;
         return ImGuiOverlayPushConstants{
             .VertexBufferBDA = vertexBufferBDA,
             .FirstVertex = firstVertex,
             .IndexCount = indexCount == 0u ? m_Impl->Diagnostics.IndexCount : indexCount,
             .FontAtlasBindlessIndex = m_Impl->Diagnostics.FontAtlasBindlessIndex,
-            .Flags = m_Impl->Diagnostics.HasUserTextures ? 1u : 0u,
+            .TextureBindlessIndex = selectedTexture,
+            .Flags = flags | atlasFlags,
             .Scale = {
                 m_Impl->Frame.DisplayWidth > 0u ? 2.0f / static_cast<float>(m_Impl->Frame.DisplayWidth) : 1.0f,
                 m_Impl->Frame.DisplayHeight > 0u ? 2.0f / static_cast<float>(m_Impl->Frame.DisplayHeight) : 1.0f,

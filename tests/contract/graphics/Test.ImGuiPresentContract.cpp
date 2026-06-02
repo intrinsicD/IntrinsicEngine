@@ -15,6 +15,7 @@ import Extrinsic.Graphics.Pass.ImGui;
 import Extrinsic.Graphics.Pass.Present;
 import Extrinsic.Graphics.RenderGraph;
 import Extrinsic.RHI.CommandContext;
+import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Types;
@@ -256,6 +257,8 @@ TEST(GraphicsImGuiPresentContract, ImGuiPassRecordsOverlayDrawDataOnlyWhenReady)
     EXPECT_EQ(pc.VertexBufferBDA, 0x12340000u);
     EXPECT_EQ(pc.FirstVertex, 7u);
     EXPECT_EQ(pc.IndexCount, 18u);
+    EXPECT_EQ(pc.TextureBindlessIndex, RHI::kInvalidBindlessIndex);
+    EXPECT_EQ(pc.Flags & Graphics::kImGuiOverlayPushFlagUserTexture, 0u);
 
     overlay.ClearFrame();
     RecordingCommandContext emptyCmd;

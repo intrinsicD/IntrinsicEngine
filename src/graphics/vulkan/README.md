@@ -321,13 +321,13 @@ available through the Vulkan 1.2/1.3 feature chain.
   precedent and keeps the concrete helper renderer-owned
   (`Extrinsic.Graphics.ImGuiUploadHelper`) over RHI buffers. Vulkan consumes the
   result through the existing public command surface (`BindIndexBuffer`, BDA in
-  `ImGuiOverlayPushConstants`, and `DrawIndexed`) under the Slice D.1
-  `FrameRecipe.PresentSource` render-pass scope. The
-  `assets/shaders/imgui.vert` path uses buffer-device-address vertex fetch and
-  the existing global push-constant layout prerequisites;
-  `assets/shaders/imgui.frag` currently forwards vertex color only. Font-atlas
-  sampling, per-command user-texture bindless indices, and the opt-in
-  `gpu;vulkan` smoke remain Slice D.2 work.
+  `ImGuiOverlayPushConstants`, per-command texture bindless indices, and
+  `DrawIndexed`) under the Slice D.1 `FrameRecipe.PresentSource` render-pass
+  scope. The `assets/shaders/imgui.vert` path uses buffer-device-address vertex
+  fetch and the existing global push-constant layout prerequisites;
+  `assets/shaders/imgui.frag` samples the retained font atlas or direct
+  user-texture bindless slot selected per command. The opt-in `gpu;vulkan`
+  smoke remains the host-dependent proof for the operational path.
   The opt-in `VulkanBootstrapSmoke` test is labeled `gpu;vulkan` and verifies
   bootstrap state plus the guarded acquire/command-record/submit/present path
   on hosts where the operational gate is not satisfied. The GRAPHICS-033D

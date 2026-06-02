@@ -4,6 +4,7 @@ module;
 #include <cstdint>
 #include <cstring>
 #include <functional>
+#include <limits>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -16,6 +17,7 @@ module Extrinsic.Runtime.ImGuiAdapter;
 
 import Extrinsic.Platform.Window;
 import Extrinsic.Graphics.ImGuiOverlaySystem;
+import Extrinsic.RHI.Bindless;
 
 namespace Extrinsic::Runtime
 {
@@ -43,6 +45,31 @@ namespace Extrinsic::Runtime
         [[nodiscard]] std::uint32_t ToPixelDimension(const float value)
         {
             return value > 0.0f ? static_cast<std::uint32_t>(value + 0.5f) : 0u;
+        }
+
+        [[nodiscard]] Graphics::ImGuiOverlayDrawCommand BuildOverlayDrawCommand(
+            const ImDrawCmd& command,
+            const ImTextureData* atlasTexData) noexcept
+        {
+            Graphics::ImGuiOverlayDrawCommand out{};
+            out.IndexOffset = command.IdxOffset;
+            out.VertexOffset = command.VtxOffset;
+            out.IndexCount = command.ElemCount;
+            out.UsesUserTexture = command.TexRef._TexData != atlasTexData;
+
+            if (out.UsesUserTexture)
+            {
+                const ImTextureID texId =
+                    command.TexRef._TexData != nullptr
+                        ? command.TexRef._TexData->TexID
+                        : command.TexRef._TexID;
+                if (texId <= static_cast<ImTextureID>(std::numeric_limits<RHI::BindlessIndex>::max()))
+                {
+                    out.TextureBindlessIndex = static_cast<RHI::BindlessIndex>(texId);
+                }
+            }
+
+            return out;
         }
     }
 
@@ -248,16 +275,29 @@ namespace Extrinsic::Runtime
                     overlayList.Indices.push_back(
                         static_cast<std::uint32_t>(cmdList->IdxBuffer[idx]));
                 }
+                overlayList.Commands.reserve(static_cast<std::size_t>(cmdList->CmdBuffer.Size));
                 for (int c = 0; c < cmdList->CmdBuffer.Size; ++c)
                 {
+                    const ImDrawCmd& drawCommand = cmdList->CmdBuffer[c];
+                    if (drawCommand.UserCallback != nullptr || drawCommand.ElemCount == 0u)
+                    {
+                        continue;
+                    }
+
                     // A command referencing a texture other than the font atlas
-                    // is a user texture (e.g. ImGui::Image).
-                    if (cmdList->CmdBuffer[c].TexRef._TexData != atlasTexData)
+                    // is a user texture (e.g. ImGui::Image). Preserve the
+                    // command's bindless slot so graphics can push it directly
+                    // without importing ImGui types or adding descriptor APIs.
+                    const Graphics::ImGuiOverlayDrawCommand overlayCommand =
+                        BuildOverlayDrawCommand(drawCommand, atlasTexData);
+                    overlayList.Commands.push_back(overlayCommand);
+                    if (overlayCommand.UsesUserTexture)
                     {
                         overlayList.UsesUserTexture = true;
                         usesUserTexture = true;
                     }
                 }
+                overlayList.CommandCount = static_cast<std::uint32_t>(overlayList.Commands.size());
 
                 drawListCount += 1u;
                 vertexCount += overlayList.VertexCount;

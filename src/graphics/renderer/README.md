@@ -918,16 +918,20 @@ Concretely:
   `RGBA8_UNORM` for colored atlas payloads) through `RHI::TextureManager` and
   retains its bindless index; `ImGuiUploadHelper` packs submitted POD
   vertices/indices into one growing host-visible vertex buffer and one growing
-  index buffer; `ImGuiPass::Execute(...)` records one
-  `BindIndexBuffer + PushConstants + DrawIndexed` block per uploaded draw list
-  and increments `ImGuiOverlayDiagnostics::DrawCalls`. Slice D.1 promotes the
-  frame recipe's `"ImGuiPass"` node from side-effect-only to a load/store
-  render-pass-scope pass that reads and writes the current
-  `FrameRecipe.PresentSource` color attachment, so an operational device with
-  an attached uploadable overlay frame records under the CPU/null gate. The
-  imported `Backbuffer` remains owned solely by `Pass.Present`; render-graph
-  validation still rejects non-present backbuffer writes. Remaining D.2 work:
-  per-command user-texture bindless sampling and the opt-in `gpu;vulkan` smoke.
+  index buffer; `ImGuiPass::Execute(...)` records deterministic
+  `BindIndexBuffer + PushConstants + DrawIndexed` blocks and increments
+  `ImGuiOverlayDiagnostics::DrawCalls`. Slice D.1 promotes the frame recipe's
+  `"ImGuiPass"` node from side-effect-only to a load/store render-pass-scope
+  pass that reads and writes the current `FrameRecipe.PresentSource` color
+  attachment, so an operational device with an attached uploadable overlay
+  frame records under the CPU/null gate. Slice D.2 adds
+  `ImGuiOverlayDrawCommand` command metadata, carries direct `ImTextureID`
+  values as `RHI::BindlessIndex` slots, pushes the selected texture index per
+  command, and samples the retained font atlas or user texture in
+  `assets/shaders/imgui.frag` without adding a graphics-visible descriptor
+  surface. The imported `Backbuffer` remains owned solely by `Pass.Present`;
+  render-graph validation still rejects non-present backbuffer writes. The
+  opt-in `gpu;vulkan` smoke remains the GPU-host proof for the same path.
 - `TransformSyncSystem`, `LightSystem`, and `VisualizationSyncSystem` consume
   graphics-owned snapshot records (`TransformSyncRecord`, `LightSnapshot`, and
   `VisualizationSyncRecord`) instead of querying live ECS registries. Runtime is
@@ -1618,20 +1622,22 @@ Concretely:
   upload mirrors the renderer-owned transient debug / visualization overlay
   helpers: `ImGuiUploadHelper` owns one growing host-visible vertex buffer and
   one growing index buffer, uploads the accepted `ImGuiOverlayFrame` POD
-  payloads through `RHI::IDevice::WriteBuffer`, and returns per-list offsets to
-  `Pass.ImGui`. The buffers are transient renderer resources, never retained on
-  `GpuWorld` and never exposed to runtime. Font atlas texture is graphics-owned
+  payloads through `RHI::IDevice::WriteBuffer`, and returns per-list offsets
+  plus per-command draw metadata to `Pass.ImGui`. The buffers are transient
+  renderer resources, never retained on `GpuWorld` and never exposed to
+  runtime. Font atlas texture is graphics-owned
   retained, mirroring SMAA `AreaTex`/`SearchTex` from `GRAPHICS-013AQ`
   (`R8_UNORM` fallback or `R8G8B8A8_UNORM` for colored atlases, allocated
   through `RHI::TextureManager`/`RHI::SamplerManager` and released by
   `ShutdownGpuResources()` before renderer manager teardown); DPI/font rebuilds
   re-run the overlay shutdown/initialize cycle. User textures referenced by
-  `ImTextureID` in editor panels still require the Slice D per-command metadata
-  path: they will resolve through the existing `RHI::Bindless` heap as bindless
-  texture indices carried in command parameters, with no new graphics-visible
-  descriptor surface. Until that lands,
+  `ImTextureID` in editor panels resolve through the existing `RHI::Bindless`
+  heap by treating the direct `ImTextureID` value as a `BindlessIndex` carried
+  on `ImGuiOverlayDrawCommand::TextureBindlessIndex`; `Pass.ImGui` pushes the
+  selected index per command, and the ImGui fragment shader samples that slot
+  (or the retained font atlas) with no new graphics-visible descriptor surface.
   `ImGuiOverlayFrame::DrawLists[i].UsesUserTexture` remains a diagnostics flag
-  only.
+  summarizing the command metadata.
   `ImGuiPass` owns exactly one pipeline created by the backend at startup
   and bound through the existing `SetPipeline`/`RHI::PipelineHandle` seam;
   backend Vulkan pipeline state (dynamic rendering against the

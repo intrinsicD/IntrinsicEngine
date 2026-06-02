@@ -9,6 +9,7 @@ module;
 export module Extrinsic.Graphics.ImGuiUploadHelper;
 
 import Extrinsic.Graphics.ImGuiOverlaySystem;
+import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
@@ -23,6 +24,15 @@ import Extrinsic.RHI.Handles;
 
 export namespace Extrinsic::Graphics
 {
+    struct ImGuiDrawCommandUploadResult
+    {
+        std::uint32_t IndexOffset{0u};
+        std::uint32_t VertexOffset{0u};
+        std::uint32_t IndexCount{0u};
+        RHI::BindlessIndex TextureBindlessIndex{RHI::kInvalidBindlessIndex};
+        bool UsesUserTexture{false};
+    };
+
     struct ImGuiDrawListUploadResult
     {
         RHI::BufferHandle VertexBuffer{};
@@ -32,6 +42,7 @@ export namespace Extrinsic::Graphics
         std::uint32_t FirstVertex{0u};
         std::uint32_t VertexCount{0u};
         std::uint32_t IndexCount{0u};
+        std::vector<ImGuiDrawCommandUploadResult> Commands{};
         bool Uploaded{false};
         bool Overflow{false};
     };

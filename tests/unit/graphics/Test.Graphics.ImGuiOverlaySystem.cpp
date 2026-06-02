@@ -3,6 +3,7 @@
 #include <string>
 
 import Extrinsic.Graphics.ImGuiOverlaySystem;
+import Extrinsic.RHI.Bindless;
 
 using namespace Extrinsic;
 
@@ -17,7 +18,21 @@ TEST(GraphicsImGuiOverlaySystem, SubmitFrameAggregatesValidDrawData)
         .DisplayHeight = 720u,
         .DrawLists = {
             Graphics::ImGuiOverlayDrawList{.CommandCount = 2u, .VertexCount = 20u, .IndexCount = 30u},
-            Graphics::ImGuiOverlayDrawList{.CommandCount = 1u, .VertexCount = 8u, .IndexCount = 12u, .UsesUserTexture = true},
+            Graphics::ImGuiOverlayDrawList{
+                .CommandCount = 1u,
+                .VertexCount = 8u,
+                .IndexCount = 12u,
+                .UsesUserTexture = true,
+                .Commands = {
+                    Graphics::ImGuiOverlayDrawCommand{
+                        .IndexOffset = 0u,
+                        .VertexOffset = 0u,
+                        .IndexCount = 12u,
+                        .TextureBindlessIndex = 42u,
+                        .UsesUserTexture = true,
+                    },
+                },
+            },
             Graphics::ImGuiOverlayDrawList{.CommandCount = 0u, .VertexCount = 8u, .IndexCount = 12u},
         },
     });
@@ -34,7 +49,14 @@ TEST(GraphicsImGuiOverlaySystem, SubmitFrameAggregatesValidDrawData)
 
     const Graphics::ImGuiOverlayPushConstants pc = overlay.BuildPushConstants();
     EXPECT_EQ(pc.IndexCount, 42u);
-    EXPECT_EQ(pc.Flags, 1u);
+    EXPECT_EQ(pc.TextureBindlessIndex, Extrinsic::RHI::kInvalidBindlessIndex);
+    EXPECT_EQ(pc.Flags, 0u);
+    const Graphics::ImGuiOverlayPushConstants userPc =
+        overlay.BuildPushConstants(0u, 0u, 12u, 42u, Graphics::kImGuiOverlayPushFlagUserTexture);
+    EXPECT_EQ(userPc.IndexCount, 12u);
+    EXPECT_EQ(userPc.TextureBindlessIndex, 42u);
+    EXPECT_EQ(userPc.Flags & Graphics::kImGuiOverlayPushFlagUserTexture,
+              Graphics::kImGuiOverlayPushFlagUserTexture);
     EXPECT_FLOAT_EQ(pc.Scale[0], 2.0f / 1280.0f);
     EXPECT_FLOAT_EQ(pc.Scale[1], 2.0f / 720.0f);
     EXPECT_FLOAT_EQ(pc.Translate[0], -1.0f);

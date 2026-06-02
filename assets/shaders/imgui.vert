@@ -11,6 +11,8 @@
 // a renderer-owned host-visible vertex buffer. The index buffer is bound
 // through RHI; this shader resolves the indexed `gl_VertexIndex` against the
 // pushed vertex-buffer device address and first-vertex offset.
+// Slice D.2 extends the push-constant block with the selected per-command
+// texture bindless index consumed by the fragment shader.
 
 #extension GL_EXT_scalar_block_layout : require
 #extension GL_EXT_buffer_reference : require
@@ -34,7 +36,9 @@ layout(push_constant) uniform ImGuiOverlayPushConstants
     uint FirstVertex;
     uint IndexCount;
     uint FontAtlasBindlessIndex;
+    uint TextureBindlessIndex;
     uint Flags;
+    uint Reserved0;
     vec2 Scale;
     vec2 Translate;
 } pc;

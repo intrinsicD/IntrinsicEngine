@@ -31,17 +31,44 @@ namespace Extrinsic::Graphics
                 continue;
             }
 
-            const ImGuiOverlayPushConstants pc =
-                m_OverlaySystem.BuildPushConstants(
-                    drawList.VertexBufferBDA,
-                    drawList.FirstVertex,
-                    drawList.IndexCount);
             cmd.BindIndexBuffer(drawList.IndexBuffer,
                                 drawList.IndexOffsetBytes,
                                 RHI::IndexType::Uint32);
-            cmd.PushConstants(&pc, sizeof(pc));
-            cmd.DrawIndexed(drawList.IndexCount, 1u, 0u, 0, 0u);
-            ++recordedDrawCalls;
+            if (drawList.Commands.empty())
+            {
+                const ImGuiOverlayPushConstants pc =
+                    m_OverlaySystem.BuildPushConstants(
+                        drawList.VertexBufferBDA,
+                        drawList.FirstVertex,
+                        drawList.IndexCount);
+                cmd.PushConstants(&pc, sizeof(pc));
+                cmd.DrawIndexed(drawList.IndexCount, 1u, 0u, 0, 0u);
+                ++recordedDrawCalls;
+                continue;
+            }
+
+            for (const ImGuiDrawCommandUploadResult& command : drawList.Commands)
+            {
+                if (command.IndexCount == 0u ||
+                    command.IndexOffset > drawList.IndexCount ||
+                    command.IndexCount > drawList.IndexCount - command.IndexOffset)
+                {
+                    continue;
+                }
+
+                const std::uint32_t flags =
+                    command.UsesUserTexture ? kImGuiOverlayPushFlagUserTexture : 0u;
+                const ImGuiOverlayPushConstants pc =
+                    m_OverlaySystem.BuildPushConstants(
+                        drawList.VertexBufferBDA,
+                        drawList.FirstVertex + command.VertexOffset,
+                        command.IndexCount,
+                        command.TextureBindlessIndex,
+                        flags);
+                cmd.PushConstants(&pc, sizeof(pc));
+                cmd.DrawIndexed(command.IndexCount, 1u, command.IndexOffset, 0, 0u);
+                ++recordedDrawCalls;
+            }
         }
         m_OverlaySystem.RecordDrawCalls(recordedDrawCalls);
     }

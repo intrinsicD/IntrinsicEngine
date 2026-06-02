@@ -475,6 +475,7 @@ endif()
 if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQUAL "Glfw")
     set(_graphics_vulkan_smoke_test_files
         Test.DefaultRecipeSurfaceGpuSmoke.cpp
+        Test.ImGuiSurfaceGpuSmoke.cpp
         Test.MinimalDebugSurfaceGpuSmoke.cpp
         Test.TransientDebugSurfaceGpuSmoke.cpp
         Test.VisualizationOverlaySurfaceGpuSmoke.cpp
@@ -487,7 +488,7 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
     intrinsic_test_object_lib(GraphicsVulkanSmokeTestObjs
         SOURCES
             ${_graphics_vulkan_smoke_test_sources}
-        DEPS ExtrinsicRuntime ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore
+        DEPS ExtrinsicRuntime ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicCore imgui_core_lib
     )
 endif()
 

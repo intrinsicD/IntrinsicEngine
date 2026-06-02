@@ -24,6 +24,15 @@ export namespace Extrinsic::Graphics
         std::uint32_t Color{0xffffffffu};
     };
 
+    struct ImGuiOverlayDrawCommand
+    {
+        std::uint32_t IndexOffset{0u};
+        std::uint32_t VertexOffset{0u};
+        std::uint32_t IndexCount{0u};
+        RHI::BindlessIndex TextureBindlessIndex{RHI::kInvalidBindlessIndex};
+        bool UsesUserTexture{false};
+    };
+
     struct ImGuiOverlayFontAtlas
     {
         bool Valid{false};
@@ -42,6 +51,7 @@ export namespace Extrinsic::Graphics
         bool UsesUserTexture{false};
         std::vector<ImGuiOverlayVertex> Vertices{};
         std::vector<std::uint32_t> Indices{};
+        std::vector<ImGuiOverlayDrawCommand> Commands{};
     };
 
     struct ImGuiOverlayFrame
@@ -86,10 +96,16 @@ export namespace Extrinsic::Graphics
         std::uint32_t FirstVertex{0u};
         std::uint32_t IndexCount{0u};
         std::uint32_t FontAtlasBindlessIndex{RHI::kInvalidBindlessIndex};
+        std::uint32_t TextureBindlessIndex{RHI::kInvalidBindlessIndex};
         std::uint32_t Flags{0u};
+        std::uint32_t Reserved0{0u};
         float Scale[2]{1.0f, 1.0f};
         float Translate[2]{0.0f, 0.0f};
     };
+
+    inline constexpr std::uint32_t kImGuiOverlayPushFlagUserTexture = 1u << 0u;
+    inline constexpr std::uint32_t kImGuiOverlayPushFlagFontAtlasColor = 1u << 1u;
+    static_assert(sizeof(ImGuiOverlayPushConstants) == 48u);
 
     struct PresentFinalizationInputs
     {
@@ -133,7 +149,9 @@ export namespace Extrinsic::Graphics
         [[nodiscard]] ImGuiOverlayPushConstants BuildPushConstants(
             std::uint64_t vertexBufferBDA = 0u,
             std::uint32_t firstVertex = 0u,
-            std::uint32_t indexCount = 0u) const noexcept;
+            std::uint32_t indexCount = 0u,
+            RHI::BindlessIndex textureBindlessIndex = RHI::kInvalidBindlessIndex,
+            std::uint32_t flags = 0u) const noexcept;
         [[nodiscard]] std::string FormatDiagnostics() const;
         [[nodiscard]] PresentFinalizationDiagnostics ValidatePresentFinalization(
             const PresentFinalizationInputs& inputs) const noexcept;

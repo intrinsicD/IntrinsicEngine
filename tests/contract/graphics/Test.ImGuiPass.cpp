@@ -41,6 +41,7 @@ import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.RHI.BufferManager;
+import Extrinsic.RHI.Bindless;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
@@ -126,6 +127,35 @@ namespace
         frame.DisplayHeight = 144u;
         frame.DrawLists.push_back(MakeOverlayDrawList(1u, 3u, {0u, 1u, 2u}));
         frame.DrawLists.push_back(MakeOverlayDrawList(2u, 4u, {0u, 1u, 2u, 2u, 3u, 0u}));
+        return frame;
+    }
+
+    [[nodiscard]] Graphics::ImGuiOverlayFrame MakeUserTextureCommandFrame()
+    {
+        Graphics::ImGuiOverlayFrame frame{};
+        frame.Enabled = true;
+        frame.DisplayWidth = 320u;
+        frame.DisplayHeight = 180u;
+        Graphics::ImGuiOverlayDrawList drawList =
+            MakeOverlayDrawList(2u, 4u, {0u, 1u, 2u, 1u, 2u, 3u});
+        drawList.UsesUserTexture = true;
+        drawList.Commands = {
+            Graphics::ImGuiOverlayDrawCommand{
+                .IndexOffset = 0u,
+                .VertexOffset = 0u,
+                .IndexCount = 3u,
+                .TextureBindlessIndex = 77u,
+                .UsesUserTexture = true,
+            },
+            Graphics::ImGuiOverlayDrawCommand{
+                .IndexOffset = 3u,
+                .VertexOffset = 1u,
+                .IndexCount = 3u,
+                .TextureBindlessIndex = RHI::kInvalidBindlessIndex,
+                .UsesUserTexture = false,
+            },
+        };
+        frame.DrawLists.push_back(std::move(drawList));
         return frame;
     }
 
@@ -234,6 +264,68 @@ TEST(ImGuiPassContract, UploadHelperPacksTwoDrawListsAndPassRecordsPerList)
                 sizeof(secondPush));
     EXPECT_EQ(secondPush.FirstVertex, 3u);
     EXPECT_EQ(secondPush.IndexCount, 6u);
+    EXPECT_EQ(secondPush.TextureBindlessIndex, RHI::kInvalidBindlessIndex);
+    EXPECT_EQ(secondPush.Flags & Graphics::kImGuiOverlayPushFlagUserTexture, 0u);
+}
+
+TEST(ImGuiPassContract, UploadHelperPreservesPerCommandTextureBindlessIndices)
+{
+    Tests::MockDevice device;
+    RHI::BufferManager bufferManager{device};
+
+    Graphics::ImGuiOverlaySystem overlay;
+    overlay.Initialize();
+    overlay.SubmitFrame(MakeUserTextureCommandFrame());
+    ASSERT_TRUE(overlay.HasOverlayWork());
+    EXPECT_TRUE(overlay.GetDiagnostics().HasUserTextures);
+    EXPECT_EQ(overlay.GetDiagnostics().DrawCommandCount, 2u);
+
+    const Graphics::ImGuiOverlayFrame* frame = overlay.GetCurrentFrame();
+    ASSERT_NE(frame, nullptr);
+
+    Graphics::ImGuiUploadHelper helper{device, bufferManager};
+    const Graphics::ImGuiUploadResult upload = helper.UploadFrame(*frame);
+    ASSERT_TRUE(upload.Uploaded);
+    ASSERT_EQ(upload.DrawLists.size(), 1u);
+    ASSERT_EQ(upload.DrawLists[0].Commands.size(), 2u);
+    EXPECT_EQ(upload.DrawLists[0].Commands[0].IndexOffset, 0u);
+    EXPECT_EQ(upload.DrawLists[0].Commands[0].IndexCount, 3u);
+    EXPECT_EQ(upload.DrawLists[0].Commands[0].TextureBindlessIndex, 77u);
+    EXPECT_TRUE(upload.DrawLists[0].Commands[0].UsesUserTexture);
+    EXPECT_EQ(upload.DrawLists[0].Commands[1].IndexOffset, 3u);
+    EXPECT_EQ(upload.DrawLists[0].Commands[1].VertexOffset, 1u);
+    EXPECT_EQ(upload.DrawLists[0].Commands[1].TextureBindlessIndex, RHI::kInvalidBindlessIndex);
+    EXPECT_FALSE(upload.DrawLists[0].Commands[1].UsesUserTexture);
+
+    Graphics::ImGuiPass pass{overlay};
+    pass.SetPipeline(RHI::PipelineHandle{601u, 1u});
+    pass.Execute(device.CommandContext, upload);
+
+    EXPECT_EQ(device.CommandContext.BindPipelineCalls, 1);
+    EXPECT_EQ(device.CommandContext.BindIndexBufferCalls, 1);
+    EXPECT_EQ(device.CommandContext.PushConstantsCalls, 2);
+    EXPECT_EQ(device.CommandContext.DrawIndexedCalls, 2);
+    EXPECT_EQ(overlay.GetDiagnostics().DrawCalls, 2u);
+
+    ASSERT_EQ(device.CommandContext.PushConstantPayloads.size(), 2u);
+    Graphics::ImGuiOverlayPushConstants firstPush{};
+    std::memcpy(&firstPush,
+                device.CommandContext.PushConstantPayloads[0].data(),
+                sizeof(firstPush));
+    EXPECT_EQ(firstPush.FirstVertex, 0u);
+    EXPECT_EQ(firstPush.IndexCount, 3u);
+    EXPECT_EQ(firstPush.TextureBindlessIndex, 77u);
+    EXPECT_EQ(firstPush.Flags & Graphics::kImGuiOverlayPushFlagUserTexture,
+              Graphics::kImGuiOverlayPushFlagUserTexture);
+
+    Graphics::ImGuiOverlayPushConstants secondPush{};
+    std::memcpy(&secondPush,
+                device.CommandContext.PushConstantPayloads[1].data(),
+                sizeof(secondPush));
+    EXPECT_EQ(secondPush.FirstVertex, 1u);
+    EXPECT_EQ(secondPush.IndexCount, 3u);
+    EXPECT_EQ(secondPush.TextureBindlessIndex, RHI::kInvalidBindlessIndex);
+    EXPECT_EQ(secondPush.Flags & Graphics::kImGuiOverlayPushFlagUserTexture, 0u);
 }
 
 TEST(ImGuiPassContract, FontAtlasUploadSurvivesOperationalRebuildByteIdentical)
