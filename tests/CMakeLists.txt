@@ -602,6 +602,7 @@ set(_graphics_contract_cpu_test_files
     Test.FrameRecipeContract.cpp
     Test.GpuWorldCompactionContract.cpp
     Test.GpuWorldLifetimeContract.cpp
+    Test.ImGuiPass.cpp
     Test.ImGuiPresentContract.cpp
     Test.LightingShadowContracts.cpp
     Test.LinePointPassContracts.cpp

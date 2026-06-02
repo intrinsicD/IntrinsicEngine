@@ -11,9 +11,20 @@ Each active task should include:
 
 ## Currently active
 
-None. No task is in-progress on a branch right now — pick the next unblocked
-leaf from [`tasks/backlog/README.md`](../backlog/README.md) per the priority
-rules. The most recently retired tasks are summarised below.
+[`GRAPHICS-079`](GRAPHICS-079-default-recipe-imgui-pass-wiring.md) — default-recipe
+`Pass.ImGui` wiring (Theme A working-sandbox path, the consumer half of the
+ImGui/UI leaves that gate `UI-001`). Status: **in-progress**, owner
+`claude/intrinsicengine-agent-onboarding-HApUy`. Earliest unblocked Theme A (P0)
+leaf: dependencies `GRAPHICS-076` (PresentSource finalization) and `RUNTIME-090`
+(ImGui adapter producer) are both retired to `tasks/done/`. The task is sliced
+A–D (see its `## Slice plan`); Slice A (this branch) wires the renderer-side
+`ImGuiPass` executor route, the `IRenderer::SetImGuiOverlaySystem` overlay
+handoff seam, and the `m_ImGuiPipelineLease`, closing `Scaffolded → CPUContracted`
+for the graphics consumer. Next verification step: `contract;graphics` gate over
+`Test.ImGuiPass.cpp` plus the default CPU gate, layering/test-layout/doc-links/
+task-policy checks, and module-inventory regeneration.
+
+The most recently retired tasks are summarised below.
 
 Previously-active
 [`RUNTIME-090`](../done/RUNTIME-090-imgui-platform-renderer-adapter.md) —

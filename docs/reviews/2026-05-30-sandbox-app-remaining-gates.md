@@ -63,7 +63,7 @@ sandbox can claim acceptance on the default recipe.
 
 | Gate | Task | State | Evidence |
 |---|---|---|---|
-| Default-recipe ImGui pass routing | [`GRAPHICS-079`](../../tasks/backlog/rendering/GRAPHICS-079-default-recipe-imgui-pass-wiring.md) | **OPEN** | `ImGuiPass` is declared in `FrameRecipe.cpp` (~line 356) but has no `else if (passName == "ImGuiPass")` branch in the executor; it falls through to `SkippedUnavailable`. Blocks the UI-panels acceptance criterion. |
+| Default-recipe ImGui pass routing | [`GRAPHICS-079`](../../tasks/active/GRAPHICS-079-default-recipe-imgui-pass-wiring.md) | **ACTIVE** | `ImGuiPass` is declared in `FrameRecipe.cpp` (~line 356) but had no `else if (passName == "ImGuiPass")` branch in the executor; it fell through to `SkippedUnavailable`. Slice A wires the renderer consumer route + overlay handoff seam at `CPUContracted`; operational upload/font-atlas/closing-cleanup deferred to later slices. Blocks the UI-panels acceptance criterion. |
 | Retire `MinimalDebug` scaffold | [`GRAPHICS-081`](../../tasks/backlog/rendering/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md) | **OPEN** | `kMinimalDebugSurfaceRecipeLabel`, `Pass.Surface.MinimalDebug`, `Pass.Present.MinimalDebug`, `BuildMinimalDebugSurfaceRecipe(...)` and executor routing still present (`FrameRecipe.cppm`/`.cpp`, `Graphics.Renderer.cpp`). RUNTIME-095 forbids treating MinimalDebug as final acceptance. |
 
 ### B. Runtime geometry residency (mesh / graph / point cloud)
