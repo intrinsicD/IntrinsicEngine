@@ -25,57 +25,57 @@
   prove that cross-links and lifecycle-state claims agree with the actual
   `tasks/backlog/`, `tasks/active/`, and `tasks/done/` tree.
 - This task complements
-  [`HARDEN-074`](../../done/HARDEN-074-doc-link-checker-inline-code-labels.md): link-target
+  [`HARDEN-074`](HARDEN-074-doc-link-checker-inline-code-labels.md): link-target
   existence and task lifecycle consistency are separate signals.
 - Related audit record:
-  [`docs/reviews/2026-06-02-repository-quality-assessment.md`](../../../docs/reviews/2026-06-02-repository-quality-assessment.md).
+  [`docs/reviews/2026-06-02-repository-quality-assessment.md`](../../docs/reviews/2026-06-02-repository-quality-assessment.md).
 
 ## Required changes
-- [ ] Add `tools/agents/check_task_state_links.py` or extend
+- [x] Add `tools/agents/check_task_state_links.py` or extend
   `tools/agents/check_task_policy.py` with an explicit task-state
   cross-reference pass. Prefer a separate script if that keeps diagnostics and
   tests simpler.
-- [ ] Build an index of task IDs to lifecycle location from `tasks/backlog/`,
+- [x] Build an index of task IDs to lifecycle location from `tasks/backlog/`,
   `tasks/active/`, and `tasks/done/`.
-- [ ] Detect relative markdown links under `tasks/` that target a task file in a
+- [x] Detect relative markdown links under `tasks/` that target a task file in a
   lifecycle directory inconsistent with the linked task ID's actual location.
-- [ ] Detect deterministic status phrases in task/backlog docs, such as
+- [x] Detect deterministic status phrases in task/backlog docs, such as
   `active task`, `moved to active`, `done task`, or `backlog task`, when they
   occur near a task ID whose actual file location disagrees.
-- [ ] Report diagnostics with source path, line number, task ID, claimed state,
+- [x] Report diagnostics with source path, line number, task ID, claimed state,
   actual state, and suggested target path.
-- [ ] Fix current stale task-state links and prose claims uncovered by the new
+- [x] Fix current stale task-state links and prose claims uncovered by the new
   checker.
-- [ ] Document the checker in `tools/agents/README.md`.
-- [ ] Wire the checker into `tools/ci/touched_scope.py` for changes under
+- [x] Document the checker in `tools/agents/README.md`.
+- [x] Wire the checker into `tools/ci/touched_scope.py` for changes under
   `tasks/` and relevant `docs/agent/` workflow files.
 
 ## Tests
-- [ ] Add Python regression tests under `tests/regression/tooling/` covering a
+- [x] Add Python regression tests under `tests/regression/tooling/` covering a
   task ID whose actual file is in `tasks/backlog/` but whose markdown link
   points at `tasks/active/`.
-- [ ] Add a regression test for stale lifecycle prose near a task ID.
-- [ ] Add a regression test proving historical links to `tasks/done/` remain
+- [x] Add a regression test for stale lifecycle prose near a task ID.
+- [x] Add a regression test proving historical links to `tasks/done/` remain
   valid when they explicitly describe completed work.
-- [ ] `python3 tools/agents/check_task_state_links.py --root . --strict` passes,
+- [x] `python3 tools/agents/check_task_state_links.py --root . --strict` passes,
   or the equivalent `check_task_policy.py` strict mode passes if the check is
   implemented there.
 
 ## Docs
-- [ ] Update `tools/agents/README.md` with the new checker purpose and command.
-- [ ] Update `docs/agent/task-format.md` if task authors need a specific
+- [x] Update `tools/agents/README.md` with the new checker purpose and command.
+- [x] Update `docs/agent/task-format.md` if task authors need a specific
   lifecycle-linking convention.
-- [ ] Update `docs/agent/prompt/prompt.md` if the default structural-check list
+- [x] Update `docs/agent/prompt/prompt.md` if the default structural-check list
   should include the new command.
 
 ## Acceptance criteria
-- [ ] A stale link from backlog prose to a nonexistent `tasks/active/<ID>.md`
+- [x] A stale link from backlog prose to a nonexistent `tasks/active/<ID>.md`
   file fails strict mode even when generic markdown link checking would pass or
   miss it.
-- [ ] A task ID linked to the wrong lifecycle directory reports the task's
+- [x] A task ID linked to the wrong lifecycle directory reports the task's
   actual lifecycle location.
-- [ ] Current repository task-state links pass after targeted corrections.
-- [ ] `tools/ci/touched_scope.py` includes the check for task/workflow-doc
+- [x] Current repository task-state links pass after targeted corrections.
+- [x] `tools/ci/touched_scope.py` includes the check for task/workflow-doc
   changes.
 
 ## Verification
@@ -94,3 +94,9 @@ python3 tools/docs/check_docs_sync.py --root . --strict
 - Expanding the checker into subjective roadmap interpretation.
 - Failing historical `tasks/done/` links that clearly describe completed work.
 - Combining this workflow hardening with unrelated task promotion or retirement.
+
+
+## Completion
+- Completed: 2026-06-02.
+- Status: done.
+- Commit reference: this commit (`HARDEN-075: check task lifecycle links`).

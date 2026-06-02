@@ -80,6 +80,7 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 Docs/task-only changes:
 ```
 python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/agents/check_task_state_links.py --root . --strict
 python3 tools/docs/check_doc_links.py --root .
 ```
 

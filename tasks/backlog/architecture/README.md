@@ -39,8 +39,8 @@ map.
   (done 2026-06-02): fixed the doc-link checker blind spot where links such as
   ``[`TASK-ID`](...)`` can be skipped before validation, then cleans up the
   stale links exposed by the stricter parser.
-- [HARDEN-075 — Validate task-state links and stale status claims](HARDEN-075-task-state-link-consistency-checker.md):
-  adds deterministic task lifecycle cross-reference checking so docs cannot
+- [HARDEN-075 — Validate task-state links and stale status claims](../../done/HARDEN-075-task-state-link-consistency-checker.md)
+  (done 2026-06-02): added deterministic task lifecycle cross-reference checking so docs cannot
   keep claiming a task is active/backlog/done when the file lives elsewhere or
   no longer exists.
 - [HARDEN-076 — Enforce open task owners for layering allowlist rows](HARDEN-076-enforce-open-task-layering-allowlist-owners.md):

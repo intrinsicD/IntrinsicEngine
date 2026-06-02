@@ -138,16 +138,19 @@ def analyze_changed_files(changed_files: list[str]) -> Plan:
         if path.startswith("docs/") or path.endswith(".md"):
             plan.structural_checks.add("docs")
             plan.reasons.append(f"{path}: documentation changed; selected doc link check")
+            if path.startswith("docs/agent/"):
+                plan.structural_checks.add("task_state")
+                plan.reasons.append(f"{path}: agent workflow docs changed; selected task-state link check")
             matched = True
 
         if path.startswith("tasks/"):
-            plan.structural_checks.add("task_policy")
-            plan.reasons.append(f"{path}: task record changed; selected task policy check")
+            plan.structural_checks.update({"task_policy", "task_state"})
+            plan.reasons.append(f"{path}: task record changed; selected task policy and task-state checks")
             matched = True
 
         if path.startswith("tools/agents/"):
-            plan.structural_checks.add("task_policy")
-            plan.reasons.append(f"{path}: task tooling changed; selected task policy check")
+            plan.structural_checks.update({"task_policy", "task_state"})
+            plan.reasons.append(f"{path}: task tooling changed; selected task policy and task-state checks")
             matched = True
         elif path.startswith("tools/docs/"):
             plan.structural_checks.add("docs")
@@ -242,6 +245,8 @@ def structural_commands(root_arg: str, checks: set[str]) -> list[Command]:
         commands.append(Command(("python3", "tools/docs/check_doc_links.py", "--root", root_arg), "documentation links"))
     if "task_policy" in checks:
         commands.append(Command(("python3", "tools/agents/check_task_policy.py", "--root", root_arg, "--strict"), "task policy"))
+    if "task_state" in checks:
+        commands.append(Command(("python3", "tools/agents/check_task_state_links.py", "--root", root_arg, "--strict"), "task-state links"))
     if "shader_outputs" in checks:
         commands.append(Command(("python3", "tools/repo/check_shader_outputs.py", "--root", root_arg), "shader output policy"))
     return commands

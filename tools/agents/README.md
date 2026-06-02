@@ -5,6 +5,7 @@ Agent workflow and task policy tooling.
 ## Current state
 
 - `check_task_policy.py` validates required task directories, rejects legacy root planning files, and delegates strict structured-task checks.
+- `check_task_state_links.py` validates that task links and nearby lifecycle status claims agree with the actual `tasks/backlog/`, `tasks/active/`, and `tasks/done/` location of the referenced task ID.
 - `validate_tasks.py` validates task IDs, required sections, completion metadata for `tasks/done/`, and checkbox todos in actionable sections.
 
 ## Planned moves

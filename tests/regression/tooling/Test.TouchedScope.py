@@ -54,6 +54,7 @@ class TouchedScopeTests(unittest.TestCase):
         self.assertNotIn("cmake --build", command_text)
         self.assertIn("check_doc_links.py", command_text)
         self.assertIn("check_task_policy.py", command_text)
+        self.assertIn("check_task_state_links.py", command_text)
 
     def test_cmake_changes_select_broad_cpu_gate(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
