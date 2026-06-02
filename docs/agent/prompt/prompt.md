@@ -133,3 +133,26 @@ Apply `docs/agent/review-checklist.md` (or the `intrinsicengine-review` skill if
 - Reporting completion without running the task's verification commands in the current session.
 - Embedding task-specific policy, theme priorities, or dependency anchors into this prompt instead of into `tasks/backlog/README.md` or the task file.
 - Loading both the `docs/agent/*` file and its mirror `intrinsicengine-*` skill for the same touched scope — they are equivalent content; pick one and continue.
+
+# Multi-task loop mode
+
+Continue implementing tasks sequentially until one stop condition is met.
+
+For each iteration:
+1. Inspect repo state: `git status --short --branch`, `ls tasks/active/`.
+2. Continue active work first; otherwise pick the earliest unblocked backlog task.
+3. Read the selected task file completely.
+4. Plan the smallest robust slice.
+5. Implement the smallest robust slice.
+6. Update tests/docs/task records as required.
+7. Run the strongest relevant verification.
+8. If complete, retire/promote the task according to repository policy and commit the changes with a clear commit message.
+9. Self-review, then start the next iteration.
+
+Stop immediately if:
+- verification fails and cannot be resolved locally,
+- an unexpected dirty worktree change appears,
+- dependencies/blockers are ambiguous,
+- the next task would violate `AGENTS.md`,
+- more than N tasks have completed,
+- runtime exceeds the configured budget.
