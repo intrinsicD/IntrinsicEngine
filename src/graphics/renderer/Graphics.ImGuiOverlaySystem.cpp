@@ -1,10 +1,16 @@
 module;
 
 #include <memory>
+#include <optional>
 #include <sstream>
 #include <string>
+#include <utility>
+#include <vector>
 
 module Extrinsic.Graphics.ImGuiOverlaySystem;
+
+import Extrinsic.RHI.Transfer;
+import Extrinsic.RHI.TransferQueue;
 
 namespace Extrinsic::Graphics
 {
@@ -12,8 +18,152 @@ namespace Extrinsic::Graphics
     {
         bool Initialized{false};
         bool HasWork{false};
+        bool FontAtlasDirty{false};
+        RHI::IDevice* Device{nullptr};
+        RHI::TextureManager* TextureManager{nullptr};
+        RHI::SamplerManager* SamplerManager{nullptr};
+        std::optional<RHI::TextureManager::TextureLease> FontAtlasTexture{};
+        std::optional<RHI::SamplerManager::SamplerLease> FontAtlasSampler{};
+        RHI::TextureDesc FontAtlasDesc{};
+        std::uint32_t FontAtlasAllocationCount{0u};
+        std::uint32_t FontAtlasUploadCount{0u};
         ImGuiOverlayDiagnostics Diagnostics{};
+        ImGuiOverlayFrame Frame{};
     };
+
+    namespace
+    {
+        [[nodiscard]] bool FontAtlasPayloadValid(const ImGuiOverlayFontAtlas& atlas) noexcept
+        {
+            if (!atlas.Valid || atlas.Width == 0u || atlas.Height == 0u ||
+                (atlas.BytesPerPixel != 1u && atlas.BytesPerPixel != 4u))
+            {
+                return false;
+            }
+
+            const std::uint64_t expectedBytes =
+                static_cast<std::uint64_t>(atlas.Width) *
+                static_cast<std::uint64_t>(atlas.Height) *
+                static_cast<std::uint64_t>(atlas.BytesPerPixel);
+            return expectedBytes > 0u &&
+                   expectedBytes == static_cast<std::uint64_t>(atlas.Pixels.size());
+        }
+
+        [[nodiscard]] RHI::SamplerDesc BuildFontAtlasSamplerDesc() noexcept
+        {
+            return RHI::SamplerDesc{
+                .MagFilter = RHI::FilterMode::Linear,
+                .MinFilter = RHI::FilterMode::Linear,
+                .MipFilter = RHI::MipmapMode::Nearest,
+                .AddressU = RHI::AddressMode::ClampToEdge,
+                .AddressV = RHI::AddressMode::ClampToEdge,
+                .AddressW = RHI::AddressMode::ClampToEdge,
+                .DebugName = "ImGui.FontAtlasSampler",
+            };
+        }
+
+        [[nodiscard]] RHI::TextureDesc BuildFontAtlasTextureDesc(
+            const ImGuiOverlayFontAtlas& atlas) noexcept
+        {
+            const bool validPayload = FontAtlasPayloadValid(atlas);
+            return RHI::TextureDesc{
+                .Width = validPayload ? atlas.Width : 4096u,
+                .Height = validPayload ? atlas.Height : 4096u,
+                .DepthOrArrayLayers = 1u,
+                .MipLevels = 1u,
+                .Fmt = (validPayload && atlas.BytesPerPixel == 4u)
+                    ? RHI::Format::RGBA8_UNORM
+                    : RHI::Format::R8_UNORM,
+                .Dimension = RHI::TextureDimension::Tex2D,
+                .Usage = RHI::TextureUsage::Sampled | RHI::TextureUsage::TransferDst,
+                .InitialLayout = RHI::TextureLayout::Undefined,
+                .SampleCount = 1u,
+                .DebugName = "ImGui.FontAtlas",
+            };
+        }
+
+        [[nodiscard]] bool FontAtlasDescCompatible(const RHI::TextureDesc& lhs,
+                                                   const RHI::TextureDesc& rhs) noexcept
+        {
+            return lhs.Width == rhs.Width &&
+                   lhs.Height == rhs.Height &&
+                   lhs.DepthOrArrayLayers == rhs.DepthOrArrayLayers &&
+                   lhs.MipLevels == rhs.MipLevels &&
+                   lhs.Fmt == rhs.Fmt &&
+                   lhs.Dimension == rhs.Dimension &&
+                   lhs.Usage == rhs.Usage &&
+                   lhs.SampleCount == rhs.SampleCount;
+        }
+
+        template <typename TImpl>
+        void RefreshFontAtlasDiagnostics(TImpl& impl) noexcept
+        {
+            const ImGuiOverlayFontAtlas& atlas = impl.Frame.FontAtlas;
+            impl.Diagnostics.FontAtlasAvailable = FontAtlasPayloadValid(atlas);
+            impl.Diagnostics.FontAtlasWidth = atlas.Width;
+            impl.Diagnostics.FontAtlasHeight = atlas.Height;
+            impl.Diagnostics.FontAtlasBytesPerPixel = atlas.BytesPerPixel;
+            impl.Diagnostics.FontAtlasByteCount = static_cast<std::uint64_t>(atlas.Pixels.size());
+            impl.Diagnostics.FontAtlasAllocationCount = impl.FontAtlasAllocationCount;
+            impl.Diagnostics.FontAtlasUploadCount = impl.FontAtlasUploadCount;
+            impl.Diagnostics.FontAtlasGpuAllocated = impl.FontAtlasTexture.has_value() &&
+                                                     impl.FontAtlasTexture->GetHandle().IsValid();
+            impl.Diagnostics.FontAtlasTexture = impl.Diagnostics.FontAtlasGpuAllocated
+                ? impl.FontAtlasTexture->GetHandle()
+                : RHI::TextureHandle{};
+            impl.Diagnostics.FontAtlasBindlessIndex =
+                (impl.TextureManager != nullptr && impl.Diagnostics.FontAtlasGpuAllocated)
+                    ? impl.TextureManager->GetBindlessIndex(impl.FontAtlasTexture->GetHandle())
+                    : RHI::kInvalidBindlessIndex;
+        }
+
+        template <typename TImpl>
+        [[nodiscard]] bool EnsureFontAtlasTexture(TImpl& impl)
+        {
+            if (impl.Device == nullptr || impl.TextureManager == nullptr ||
+                impl.SamplerManager == nullptr || !impl.Device->IsOperational())
+            {
+                return false;
+            }
+
+            if (!impl.FontAtlasSampler.has_value() ||
+                !impl.FontAtlasSampler->GetHandle().IsValid())
+            {
+                auto sampler = impl.SamplerManager->GetOrCreate(BuildFontAtlasSamplerDesc());
+                if (!sampler.has_value())
+                {
+                    impl.Diagnostics.FontAtlasAllocationFailed = true;
+                    return false;
+                }
+                impl.FontAtlasSampler.emplace(std::move(*sampler));
+            }
+
+            const RHI::TextureDesc desc = BuildFontAtlasTextureDesc(impl.Frame.FontAtlas);
+            if (impl.FontAtlasTexture.has_value() &&
+                impl.FontAtlasTexture->GetHandle().IsValid() &&
+                FontAtlasDescCompatible(impl.FontAtlasDesc, desc))
+            {
+                return true;
+            }
+
+            impl.FontAtlasTexture.reset();
+            impl.FontAtlasDesc = {};
+
+            auto texture = impl.TextureManager->Create(desc, impl.FontAtlasSampler->GetHandle());
+            if (!texture.has_value())
+            {
+                impl.Diagnostics.FontAtlasAllocationFailed = true;
+                RefreshFontAtlasDiagnostics(impl);
+                return false;
+            }
+
+            impl.FontAtlasTexture.emplace(std::move(*texture));
+            impl.FontAtlasDesc = desc;
+            ++impl.FontAtlasAllocationCount;
+            RefreshFontAtlasDiagnostics(impl);
+            return true;
+        }
+    }
 
     ImGuiOverlaySystem::ImGuiOverlaySystem()
         : m_Impl(std::make_unique<Impl>())
@@ -26,27 +176,94 @@ namespace Extrinsic::Graphics
         m_Impl->Initialized = true;
     }
 
+    void ImGuiOverlaySystem::InitializeGpuResources(RHI::IDevice& device,
+                                                    RHI::TextureManager& textureManager,
+                                                    RHI::SamplerManager& samplerManager)
+    {
+        m_Impl->Device = &device;
+        m_Impl->TextureManager = &textureManager;
+        m_Impl->SamplerManager = &samplerManager;
+        (void)EnsureFontAtlasTexture(*m_Impl);
+        RefreshFontAtlasDiagnostics(*m_Impl);
+    }
+
     void ImGuiOverlaySystem::Shutdown()
     {
         m_Impl->Initialized = false;
         ClearFrame();
     }
 
+    void ImGuiOverlaySystem::ShutdownGpuResources()
+    {
+        m_Impl->FontAtlasTexture.reset();
+        m_Impl->FontAtlasSampler.reset();
+        m_Impl->FontAtlasDesc = {};
+        m_Impl->Device = nullptr;
+        m_Impl->TextureManager = nullptr;
+        m_Impl->SamplerManager = nullptr;
+        m_Impl->FontAtlasDirty = false;
+        RefreshFontAtlasDiagnostics(*m_Impl);
+    }
+
+    void ImGuiOverlaySystem::UploadPendingFontAtlas()
+    {
+        if (!m_Impl->FontAtlasDirty || !FontAtlasPayloadValid(m_Impl->Frame.FontAtlas))
+        {
+            return;
+        }
+
+        if (!EnsureFontAtlasTexture(*m_Impl) || !m_Impl->FontAtlasTexture.has_value() ||
+            m_Impl->Device == nullptr)
+        {
+            m_Impl->Diagnostics.FontAtlasUploadFailed = true;
+            return;
+        }
+
+        const ImGuiOverlayFontAtlas& atlas = m_Impl->Frame.FontAtlas;
+        const RHI::TransferToken token =
+            m_Impl->Device->GetTransferQueue().UploadTexture(
+                m_Impl->FontAtlasTexture->GetHandle(),
+                atlas.Pixels.data(),
+                static_cast<std::uint64_t>(atlas.Pixels.size()),
+                0u,
+                0u);
+        if (!token.IsValid())
+        {
+            m_Impl->Diagnostics.FontAtlasUploadFailed = true;
+            return;
+        }
+
+        m_Impl->FontAtlasDirty = false;
+        ++m_Impl->FontAtlasUploadCount;
+        RefreshFontAtlasDiagnostics(*m_Impl);
+        m_Impl->Diagnostics.FontAtlasUploadQueued = true;
+    }
+
     void ImGuiOverlaySystem::SubmitFrame(const ImGuiOverlayFrame& frame)
     {
         m_Impl->Diagnostics = {};
         m_Impl->HasWork = false;
+        ImGuiOverlayFrame acceptedFrame{};
+        acceptedFrame.Enabled = frame.Enabled;
+        acceptedFrame.DisplayWidth = frame.DisplayWidth;
+        acceptedFrame.DisplayHeight = frame.DisplayHeight;
+        acceptedFrame.FontAtlas = frame.FontAtlas;
         m_Impl->Diagnostics.Enabled = frame.Enabled;
         m_Impl->Diagnostics.SubmittedDrawListCount = static_cast<std::uint32_t>(frame.DrawLists.size());
+        RefreshFontAtlasDiagnostics(*m_Impl);
 
         if (!frame.Enabled)
         {
+            m_Impl->Frame = std::move(acceptedFrame);
+            RefreshFontAtlasDiagnostics(*m_Impl);
             return;
         }
 
         if (frame.DisplayWidth == 0u || frame.DisplayHeight == 0u)
         {
             m_Impl->Diagnostics.InvalidDisplaySize = true;
+            m_Impl->Frame = std::move(acceptedFrame);
+            RefreshFontAtlasDiagnostics(*m_Impl);
             return;
         }
 
@@ -63,15 +280,36 @@ namespace Extrinsic::Graphics
             m_Impl->Diagnostics.VertexCount += drawList.VertexCount;
             m_Impl->Diagnostics.IndexCount += drawList.IndexCount;
             m_Impl->Diagnostics.HasUserTextures = m_Impl->Diagnostics.HasUserTextures || drawList.UsesUserTexture;
+            acceptedFrame.DrawLists.push_back(drawList);
         }
 
         m_Impl->HasWork = m_Impl->Diagnostics.DrawCommandCount > 0u && m_Impl->Diagnostics.IndexCount > 0u;
+        const bool fontAtlasChanged =
+            FontAtlasPayloadValid(frame.FontAtlas) &&
+            (!FontAtlasPayloadValid(m_Impl->Frame.FontAtlas) ||
+             m_Impl->Frame.FontAtlas.Width != frame.FontAtlas.Width ||
+             m_Impl->Frame.FontAtlas.Height != frame.FontAtlas.Height ||
+             m_Impl->Frame.FontAtlas.BytesPerPixel != frame.FontAtlas.BytesPerPixel ||
+             m_Impl->Frame.FontAtlas.Pixels != frame.FontAtlas.Pixels);
+        m_Impl->Frame = std::move(acceptedFrame);
+        if (fontAtlasChanged)
+        {
+            m_Impl->FontAtlasDirty = true;
+        }
+        RefreshFontAtlasDiagnostics(*m_Impl);
     }
 
     void ImGuiOverlaySystem::ClearFrame()
     {
         m_Impl->HasWork = false;
         m_Impl->Diagnostics = {};
+        m_Impl->Frame = {};
+        RefreshFontAtlasDiagnostics(*m_Impl);
+    }
+
+    void ImGuiOverlaySystem::RecordDrawCalls(const std::uint32_t drawCalls) noexcept
+    {
+        m_Impl->Diagnostics.DrawCalls += drawCalls;
     }
 
     bool ImGuiOverlaySystem::IsInitialized() const noexcept
@@ -89,13 +327,27 @@ namespace Extrinsic::Graphics
         return m_Impl->Diagnostics;
     }
 
-    ImGuiOverlayPushConstants ImGuiOverlaySystem::BuildPushConstants() const noexcept
+    const ImGuiOverlayFrame* ImGuiOverlaySystem::GetCurrentFrame() const noexcept
+    {
+        return &m_Impl->Frame;
+    }
+
+    ImGuiOverlayPushConstants ImGuiOverlaySystem::BuildPushConstants(
+        const std::uint64_t vertexBufferBDA,
+        const std::uint32_t firstVertex,
+        const std::uint32_t indexCount) const noexcept
     {
         return ImGuiOverlayPushConstants{
-            .DrawCommandCount = m_Impl->Diagnostics.DrawCommandCount,
-            .VertexCount = m_Impl->Diagnostics.VertexCount,
-            .IndexCount = m_Impl->Diagnostics.IndexCount,
+            .VertexBufferBDA = vertexBufferBDA,
+            .FirstVertex = firstVertex,
+            .IndexCount = indexCount == 0u ? m_Impl->Diagnostics.IndexCount : indexCount,
+            .FontAtlasBindlessIndex = m_Impl->Diagnostics.FontAtlasBindlessIndex,
             .Flags = m_Impl->Diagnostics.HasUserTextures ? 1u : 0u,
+            .Scale = {
+                m_Impl->Frame.DisplayWidth > 0u ? 2.0f / static_cast<float>(m_Impl->Frame.DisplayWidth) : 1.0f,
+                m_Impl->Frame.DisplayHeight > 0u ? 2.0f / static_cast<float>(m_Impl->Frame.DisplayHeight) : 1.0f,
+            },
+            .Translate = {-1.0f, -1.0f},
         };
     }
 
@@ -108,8 +360,12 @@ namespace Extrinsic::Graphics
             << " commands=" << m_Impl->Diagnostics.DrawCommandCount
             << " vertices=" << m_Impl->Diagnostics.VertexCount
             << " indices=" << m_Impl->Diagnostics.IndexCount
+            << " draws=" << m_Impl->Diagnostics.DrawCalls
             << " invalid_display=" << (m_Impl->Diagnostics.InvalidDisplaySize ? "true" : "false")
-            << " user_textures=" << (m_Impl->Diagnostics.HasUserTextures ? "true" : "false");
+            << " user_textures=" << (m_Impl->Diagnostics.HasUserTextures ? "true" : "false")
+            << " font_atlas=" << (m_Impl->Diagnostics.FontAtlasAvailable ? "true" : "false")
+            << " font_atlas_gpu=" << (m_Impl->Diagnostics.FontAtlasGpuAllocated ? "true" : "false")
+            << " font_atlas_uploads=" << m_Impl->Diagnostics.FontAtlasUploadCount;
         return out.str();
     }
 
@@ -126,4 +382,3 @@ namespace Extrinsic::Graphics
         return diagnostics;
     }
 }
-

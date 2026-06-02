@@ -57,6 +57,9 @@ export import Extrinsic.Graphics.TransientDebugUploadHelper;
 // tests that name the pass type (e.g. for push-constant size checks)
 // keep their import shape unchanged.
 export import Extrinsic.Graphics.VisualizationOverlayUploadHelper;
+// GRAPHICS-079 Slice C — re-export the ImGui upload helper result packets for
+// pass-level contract tests. The renderer still owns the concrete helper.
+export import Extrinsic.Graphics.ImGuiUploadHelper;
 export import Extrinsic.Graphics.Pass.VisualizationOverlay;
 // RUNTIME-082 Slice D — `RuntimeRenderSnapshotBatch` carries spans of
 // `SpatialDebugAabb` / `SpatialDebugHierarchyNode` / `SpatialDebugSplitPlane`

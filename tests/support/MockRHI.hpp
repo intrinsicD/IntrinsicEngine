@@ -163,6 +163,7 @@ namespace Extrinsic::Tests
             Dispatch,
             BindIndexBuffer,
             Draw,
+            DrawIndexed,
             DrawIndexedIndirectCount,
             DrawIndirectCount,
             TextureBarrier,
@@ -173,6 +174,15 @@ namespace Extrinsic::Tests
             std::uint32_t VertexCount = 0;
             std::uint32_t InstanceCount = 0;
             std::uint32_t FirstVertex = 0;
+            std::uint32_t FirstInstance = 0;
+        };
+
+        struct DrawIndexedRecord
+        {
+            std::uint32_t IndexCount = 0;
+            std::uint32_t InstanceCount = 0;
+            std::uint32_t FirstIndex = 0;
+            std::int32_t VertexOffset = 0;
             std::uint32_t FirstInstance = 0;
         };
 
@@ -250,7 +260,22 @@ namespace Extrinsic::Tests
             };
             Events.push_back(EventKind::Draw);
         }
-        void DrawIndexed(std::uint32_t, std::uint32_t, std::uint32_t, std::int32_t, std::uint32_t) override {}
+        void DrawIndexed(std::uint32_t indexCount,
+                         std::uint32_t instanceCount,
+                         std::uint32_t firstIndex,
+                         std::int32_t vertexOffset,
+                         std::uint32_t firstInstance) override
+        {
+            ++DrawIndexedCalls;
+            LastDrawIndexed = DrawIndexedRecord{
+                .IndexCount = indexCount,
+                .InstanceCount = instanceCount,
+                .FirstIndex = firstIndex,
+                .VertexOffset = vertexOffset,
+                .FirstInstance = firstInstance,
+            };
+            Events.push_back(EventKind::DrawIndexed);
+        }
         void DrawIndirect(RHI::BufferHandle, std::uint64_t, std::uint32_t) override {}
         void DrawIndexedIndirect(RHI::BufferHandle, std::uint64_t, std::uint32_t) override {}
         void DrawIndexedIndirectCount(RHI::BufferHandle, std::uint64_t, RHI::BufferHandle,
@@ -310,9 +335,11 @@ namespace Extrinsic::Tests
         int PushConstantsCalls = 0;
         int DispatchCalls = 0;
         int DrawCalls = 0;
+        int DrawIndexedCalls = 0;
         int DrawIndexedIndirectCountCalls = 0;
         int DrawIndirectCountCalls = 0;
         DrawRecord LastDraw{};
+        DrawIndexedRecord LastDrawIndexed{};
         std::uint32_t LastPushConstantSize = 0;
         std::uint32_t LastPushConstantOffset = 0;
         DispatchRecord LastDispatch{};

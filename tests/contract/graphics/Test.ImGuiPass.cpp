@@ -26,7 +26,9 @@
 // not write `Backbuffer`) and the render-graph rejection of a non-present
 // `Backbuffer` write are covered by `Test.ImGuiPresentContract.cpp`.
 
+#include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <string>
 #include <vector>
@@ -36,9 +38,12 @@
 import Extrinsic.Core.Config.Render;
 import Extrinsic.Graphics.FrameRecipe;
 import Extrinsic.Graphics.ImGuiOverlaySystem;
+import Extrinsic.Graphics.ImGuiUploadHelper;
+import Extrinsic.Graphics.Pass.ImGui;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
+import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
@@ -84,6 +89,71 @@ namespace
         return frame;
     }
 
+    [[nodiscard]] Graphics::ImGuiOverlayDrawList MakeOverlayDrawList(
+        const std::uint32_t commandCount,
+        const std::uint32_t vertexCount,
+        const std::vector<std::uint32_t>& indices)
+    {
+        Graphics::ImGuiOverlayDrawList drawList{};
+        drawList.CommandCount = commandCount;
+        drawList.VertexCount = vertexCount;
+        drawList.IndexCount = static_cast<std::uint32_t>(indices.size());
+        drawList.Vertices.reserve(vertexCount);
+        for (std::uint32_t index = 0u; index < vertexCount; ++index)
+        {
+            drawList.Vertices.push_back(Graphics::ImGuiOverlayVertex{
+                .Position = {
+                    static_cast<float>(index),
+                    static_cast<float>(index + 1u),
+                },
+                .UV = {0.0f, 1.0f},
+                .Color = 0xff00ffffu,
+            });
+        }
+        drawList.Indices = indices;
+        return drawList;
+    }
+
+    [[nodiscard]] Graphics::ImGuiOverlayFrame MakePayloadOverlayFrame()
+    {
+        Graphics::ImGuiOverlayFrame frame{};
+        frame.Enabled = true;
+        frame.DisplayWidth = 256u;
+        frame.DisplayHeight = 144u;
+        frame.DrawLists.push_back(MakeOverlayDrawList(1u, 3u, {0u, 1u, 2u}));
+        frame.DrawLists.push_back(MakeOverlayDrawList(2u, 4u, {0u, 1u, 2u, 2u, 3u, 0u}));
+        return frame;
+    }
+
+    [[nodiscard]] std::size_t CountTextureUploadsFor(const Tests::MockDevice& device,
+                                                     const RHI::TextureHandle texture)
+    {
+        std::size_t count = 0u;
+        for (const auto& upload : device.TransferQueue.TextureUploads)
+        {
+            if (upload.Texture == texture)
+            {
+                ++count;
+            }
+        }
+        return count;
+    }
+
+    [[nodiscard]] std::vector<std::byte> LastTextureUploadBytesFor(
+        const Tests::MockDevice& device,
+        const RHI::TextureHandle texture)
+    {
+        std::vector<std::byte> bytes{};
+        for (const auto& upload : device.TransferQueue.TextureUploads)
+        {
+            if (upload.Texture == texture)
+            {
+                bytes = upload.Data;
+            }
+        }
+        return bytes;
+    }
+
     [[nodiscard]] Graphics::RenderWorld DriveDefaultFrame(Graphics::IRenderer& renderer,
                                                           const RHI::FrameHandle& frame)
     {
@@ -95,6 +165,125 @@ namespace
         renderer.ExecuteFrame(frame, world);
         return world;
     }
+}
+
+TEST(ImGuiPassContract, UploadHelperPacksTwoDrawListsAndPassRecordsPerList)
+{
+    Tests::MockDevice device;
+    RHI::BufferManager bufferManager{device};
+
+    Graphics::ImGuiOverlaySystem overlay;
+    overlay.Initialize();
+    overlay.SubmitFrame(MakePayloadOverlayFrame());
+    ASSERT_TRUE(overlay.HasOverlayWork());
+
+    const Graphics::ImGuiOverlayFrame* frame = overlay.GetCurrentFrame();
+    ASSERT_NE(frame, nullptr);
+
+    Graphics::ImGuiUploadResult upload{};
+    const RHI::PipelineHandle pipeline{600u, 1u};
+    {
+        Graphics::ImGuiUploadHelper helper{device, bufferManager};
+        upload = helper.UploadFrame(*frame);
+
+        ASSERT_TRUE(upload.Uploaded);
+        ASSERT_FALSE(upload.Overflow);
+        ASSERT_EQ(upload.DrawListCount, 2u);
+        ASSERT_EQ(upload.DrawLists.size(), 2u);
+        EXPECT_EQ(upload.DrawLists[0].FirstVertex, 0u);
+        EXPECT_EQ(upload.DrawLists[0].IndexOffsetBytes, 0u);
+        EXPECT_EQ(upload.DrawLists[0].IndexCount, 3u);
+        EXPECT_EQ(upload.DrawLists[1].FirstVertex, 3u);
+        EXPECT_EQ(upload.DrawLists[1].IndexOffsetBytes, 3u * sizeof(std::uint32_t));
+        EXPECT_EQ(upload.DrawLists[1].IndexCount, 6u);
+        EXPECT_EQ(helper.GetBufferAllocationCount(), 2u);
+
+        ASSERT_EQ(device.BufferWrites.size(), 2u);
+        EXPECT_EQ(device.BufferWrites[0].Data.size(), 7u * sizeof(Graphics::ImGuiOverlayVertex));
+        EXPECT_EQ(device.BufferWrites[1].Data.size(), 9u * sizeof(std::uint32_t));
+
+        Graphics::ImGuiPass pass{overlay};
+        pass.SetPipeline(pipeline);
+        pass.Execute(device.CommandContext, upload);
+    }
+
+    EXPECT_EQ(device.CommandContext.BindPipelineCalls, 1);
+    EXPECT_EQ(device.CommandContext.BindIndexBufferCalls, 2);
+    EXPECT_EQ(device.CommandContext.PushConstantsCalls, 2);
+    EXPECT_EQ(device.CommandContext.DrawIndexedCalls, 2);
+    EXPECT_EQ(device.CommandContext.LastBoundPipeline, pipeline);
+    EXPECT_EQ(device.CommandContext.LastIndexType, RHI::IndexType::Uint32);
+    EXPECT_EQ(device.CommandContext.LastDrawIndexed.IndexCount, 6u);
+    EXPECT_EQ(overlay.GetDiagnostics().DrawCalls, 2u);
+
+    ASSERT_EQ(device.CommandContext.PushConstantPayloads.size(), 2u);
+    Graphics::ImGuiOverlayPushConstants firstPush{};
+    std::memcpy(&firstPush,
+                device.CommandContext.PushConstantPayloads[0].data(),
+                sizeof(firstPush));
+    EXPECT_EQ(firstPush.FirstVertex, 0u);
+    EXPECT_EQ(firstPush.IndexCount, 3u);
+
+    Graphics::ImGuiOverlayPushConstants secondPush{};
+    std::memcpy(&secondPush,
+                device.CommandContext.PushConstantPayloads[1].data(),
+                sizeof(secondPush));
+    EXPECT_EQ(secondPush.FirstVertex, 3u);
+    EXPECT_EQ(secondPush.IndexCount, 6u);
+}
+
+TEST(ImGuiPassContract, FontAtlasUploadSurvivesOperationalRebuildByteIdentical)
+{
+    Tests::MockDevice device;
+    device.BackbufferHandle = RHI::TextureHandle{508u, 1u};
+
+    Graphics::ImGuiOverlaySystem overlay;
+    overlay.Initialize();
+    Graphics::ImGuiOverlayFrame frame = MakePayloadOverlayFrame();
+    frame.FontAtlas = Graphics::ImGuiOverlayFontAtlas{
+        .Valid = true,
+        .Width = 2u,
+        .Height = 2u,
+        .BytesPerPixel = 1u,
+        .UseColors = false,
+        .Pixels = {
+            std::byte{0x10},
+            std::byte{0x20},
+            std::byte{0x30},
+            std::byte{0x40},
+        },
+    };
+    overlay.SubmitFrame(frame);
+
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->SetImGuiOverlaySystem(&overlay);
+    renderer->Initialize(device);
+
+    overlay.UploadPendingFontAtlas();
+    const Graphics::ImGuiOverlayDiagnostics before = overlay.GetDiagnostics();
+    EXPECT_TRUE(before.FontAtlasAvailable);
+    EXPECT_TRUE(before.FontAtlasGpuAllocated);
+    EXPECT_TRUE(before.FontAtlasTexture.IsValid());
+    EXPECT_NE(before.FontAtlasBindlessIndex, RHI::kInvalidBindlessIndex);
+    EXPECT_EQ(before.FontAtlasUploadCount, 1u);
+    EXPECT_EQ(before.FontAtlasAllocationCount, 1u);
+    EXPECT_EQ(CountTextureUploadsFor(device, before.FontAtlasTexture), 1u);
+    const std::vector<std::byte> firstUpload =
+        LastTextureUploadBytesFor(device, before.FontAtlasTexture);
+    EXPECT_EQ(firstUpload, frame.FontAtlas.Pixels);
+
+    ASSERT_TRUE(renderer->RebuildOperationalResources(device));
+    overlay.UploadPendingFontAtlas();
+
+    const Graphics::ImGuiOverlayDiagnostics after = overlay.GetDiagnostics();
+    EXPECT_EQ(after.FontAtlasTexture, before.FontAtlasTexture);
+    EXPECT_EQ(after.FontAtlasBindlessIndex, before.FontAtlasBindlessIndex);
+    EXPECT_EQ(after.FontAtlasUploadCount, 1u);
+    EXPECT_EQ(after.FontAtlasAllocationCount, 1u);
+    EXPECT_EQ(CountTextureUploadsFor(device, before.FontAtlasTexture), 1u);
+    EXPECT_EQ(LastTextureUploadBytesFor(device, before.FontAtlasTexture), firstUpload);
+
+    renderer->Shutdown();
 }
 
 TEST(ImGuiPassContract, AttachedOverlayWithWorkSkipsUnavailableWithoutRenderTargetAfterInitialize)
@@ -124,7 +313,7 @@ TEST(ImGuiPassContract, AttachedOverlayWithWorkSkipsUnavailableWithoutRenderTarg
 
     RHI::FrameHandle frame{};
     ASSERT_TRUE(renderer->BeginFrame(frame));
-    DriveDefaultFrame(*renderer, frame);
+    (void)DriveDefaultFrame(*renderer, frame);
 
     const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
     EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
@@ -163,7 +352,7 @@ TEST(ImGuiPassContract, AttachedOverlayWithWorkSkipsUnavailableWhenAttachedBefor
 
     RHI::FrameHandle frame{};
     ASSERT_TRUE(renderer->BeginFrame(frame));
-    DriveDefaultFrame(*renderer, frame);
+    (void)DriveDefaultFrame(*renderer, frame);
 
     const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
     EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
@@ -185,7 +374,7 @@ TEST(ImGuiPassContract, NoOverlaySystemAttachedSkipsUnavailable)
 
     RHI::FrameHandle frame{};
     ASSERT_TRUE(renderer->BeginFrame(frame));
-    DriveDefaultFrame(*renderer, frame);
+    (void)DriveDefaultFrame(*renderer, frame);
 
     const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
     EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
@@ -224,7 +413,7 @@ TEST(ImGuiPassContract, AttachedOverlayWithoutSubmittedWorkSkipsUnavailable)
 
     RHI::FrameHandle frame{};
     ASSERT_TRUE(renderer->BeginFrame(frame));
-    DriveDefaultFrame(*renderer, frame);
+    (void)DriveDefaultFrame(*renderer, frame);
 
     const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
     EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
@@ -252,7 +441,7 @@ TEST(ImGuiPassContract, DetachingOverlaySystemSkipsUnavailable)
 
     RHI::FrameHandle frame{};
     ASSERT_TRUE(renderer->BeginFrame(frame));
-    DriveDefaultFrame(*renderer, frame);
+    (void)DriveDefaultFrame(*renderer, frame);
 
     const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
     EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
@@ -281,7 +470,7 @@ TEST(ImGuiPassContract, NonOperationalDeviceSkipsNonOperational)
 
     RHI::FrameHandle frame{};
     ASSERT_TRUE(renderer->BeginFrame(frame));
-    DriveDefaultFrame(*renderer, frame);
+    (void)DriveDefaultFrame(*renderer, frame);
 
     const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
     EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
@@ -315,7 +504,7 @@ TEST(ImGuiPassContract, RouteStaysWiredWithoutRecordingAfterOperationalRebuild)
 
     RHI::FrameHandle frame{};
     ASSERT_TRUE(renderer->BeginFrame(frame));
-    DriveDefaultFrame(*renderer, frame);
+    (void)DriveDefaultFrame(*renderer, frame);
 
     const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
     EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;

@@ -45,28 +45,30 @@ Graphics never imports `imgui.h`, never calls Dear ImGui platform / renderer bac
 
 ### 2. Overlay upload, font / user textures, and backend pipeline
 
-**Vertex / index payload upload.** Mirrors the transient debug expansion pattern from `GRAPHICS-007Q` / `GRAPHICS-008Q`:
+**Vertex / index payload upload.** Mirrors the renderer-owned transient debug and visualization-overlay helper pattern:
 
-- Per-frame **host-visible (transient)** GPU buffers owned by a backend-local upload helper under `src/graphics/vulkan/`.
-- Recycled each frame.
+- Per-frame **host-visible (transient)** GPU buffers owned by `Extrinsic.Graphics.ImGuiUploadHelper` under `src/graphics/renderer/`.
+- Reused/grown across frames through RHI `BufferManager` leases.
+- Uploaded through `RHI::IDevice::WriteBuffer`.
+- Consumed through `RHI::ICommandContext::BindIndexBuffer`, BDA push constants, and `DrawIndexed`.
 - Never retained on `GpuWorld`.
-- Never exposed through RHI or renderer module surfaces.
+- Never exposed to runtime or as Vulkan-native types.
 
-The `ImGuiOverlayFrame` published to graphics remains a CPU-only diagnostics summary; the actual `ImDrawVert` / `ImDrawIdx` byte spans are handed to the backend through the same pre-record composition seam (alongside `SubmitFrame`) and the backend stages them into the transient ring.
+The `ImGuiOverlayFrame` published to graphics carries copied POD vertex/index payloads, not Dear ImGui types. The runtime adapter is still the only code that reads `ImDrawVert` / `ImDrawIdx`; graphics receives `ImGuiOverlayVertex` and `std::uint32_t` indices and stages them through the renderer-owned helper.
 
 **Font atlas texture.** Graphics-owned **retained**, mirroring the SMAA `AreaTex` / `SearchTex` ownership pattern from [ADR-0010](0010-postprocess-chain-backend-policy.md) §4:
 
-- `ImGuiOverlaySystem::Initialize()` accepts the runtime-supplied font-atlas pixel buffer.
+- `ImGuiOverlaySystem::InitializeGpuResources(...)` accepts RHI managers and uses the latest submitted font-atlas pixel buffer.
 - Default build: `R8_UNORM`.
 - Colored atlases: `R8G8B8A8_UNORM`.
-- A single retained `RHI::TextureHandle` is allocated through `RHI::TextureManager`, released at `Shutdown()`.
-- DPI / font rebuilds go through the same `Shutdown()` / `Initialize()` cycle rather than introducing a new mutator.
+- A single retained `RHI::TextureHandle` is allocated through `RHI::TextureManager`, released at `ShutdownGpuResources()` before renderer manager teardown.
+- DPI / font rebuilds go through the same overlay shutdown / initialize cycle rather than introducing a new mutator.
 
-**User textures.** Image previews referenced by `ImTextureID` in editor panels flow through the existing `RHI::Bindless` heap as bindless texture indices:
+**User textures.** Image previews referenced by `ImTextureID` in editor panels will flow through the existing `RHI::Bindless` heap as bindless texture indices once per-command metadata is added:
 
 - Per-cmd texture index is carried in a backend-local per-cmd parameter buffer produced from the runtime-supplied draw-cmd list at upload time.
 - No new graphics-visible descriptor surface is added.
-- `ImGuiOverlayFrame::DrawLists[i].UsesUserTexture` remains the **only** graphics-visible diagnostics flag for user-texture presence.
+- Until that path lands, `ImGuiOverlayFrame::DrawLists[i].UsesUserTexture` remains the **only** graphics-visible diagnostics flag for user-texture presence.
 
 **Pipeline state.** `ImGuiPass` owns exactly **one** pipeline created by the backend at startup and bound through the existing `SetPipeline` / `RHI::PipelineHandle` seam. Backend Vulkan pipeline state stays backend-local under `src/graphics/vulkan` and never leaks through RHI or renderer module surfaces:
 
@@ -75,7 +77,7 @@ The `ImGuiOverlayFrame` published to graphics remains a CPU-only diagnostics sum
 - No depth test.
 - Scissor enabled.
 - Viewport derived from `DisplayWidth` / `DisplayHeight`.
-- Vertex stride `sizeof(ImDrawVert)`.
+- BDA vertex fetch from `ImGuiOverlayVertex` records.
 
 The CPU/null backend exercises the same `SetPipeline` / `HasOverlayWork` / `BuildPushConstants` seam without Vulkan-specific code so the default CPU correctness gate stays authoritative.
 

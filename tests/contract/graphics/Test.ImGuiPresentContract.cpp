@@ -10,6 +10,7 @@
 
 import Extrinsic.Graphics.FrameRecipe;
 import Extrinsic.Graphics.ImGuiOverlaySystem;
+import Extrinsic.Graphics.ImGuiUploadHelper;
 import Extrinsic.Graphics.Pass.ImGui;
 import Extrinsic.Graphics.Pass.Present;
 import Extrinsic.Graphics.RenderGraph;
@@ -25,6 +26,7 @@ namespace
     enum class EventKind
     {
         BindPipeline,
+        BindIndexBuffer,
         PushConstants,
         Draw,
         DrawIndexed,
@@ -40,6 +42,9 @@ namespace
     public:
         std::vector<Event> Events{};
         RHI::PipelineHandle LastPipeline{};
+        RHI::BufferHandle LastIndexBuffer{};
+        std::uint64_t LastIndexBufferOffset{0u};
+        RHI::IndexType LastIndexType{RHI::IndexType::Uint32};
         std::uint32_t LastDrawVertexCount{0u};
         std::uint32_t LastDrawIndexedIndexCount{0u};
         std::vector<std::byte> LastPushConstants{};
@@ -55,7 +60,13 @@ namespace
             Events.push_back({.Kind = EventKind::BindPipeline});
             LastPipeline = pipeline;
         }
-        void BindIndexBuffer(RHI::BufferHandle, std::uint64_t, RHI::IndexType) override {}
+        void BindIndexBuffer(RHI::BufferHandle buffer, std::uint64_t offset, RHI::IndexType type) override
+        {
+            Events.push_back({.Kind = EventKind::BindIndexBuffer});
+            LastIndexBuffer = buffer;
+            LastIndexBufferOffset = offset;
+            LastIndexType = type;
+        }
         void PushConstants(const void* data, std::uint32_t size, std::uint32_t) override
         {
             Events.push_back({.Kind = EventKind::PushConstants});
@@ -206,24 +217,48 @@ TEST(GraphicsImGuiPresentContract, ImGuiPassRecordsOverlayDrawDataOnlyWhenReady)
     pass.SetPipeline(pipeline);
 
     RecordingCommandContext cmd;
-    pass.Execute(cmd);
+    const RHI::BufferHandle vertexBuffer{101u, 1u};
+    const RHI::BufferHandle indexBuffer{102u, 1u};
+    const Graphics::ImGuiUploadResult upload{
+        .DrawLists = {
+            Graphics::ImGuiDrawListUploadResult{
+                .VertexBuffer = vertexBuffer,
+                .IndexBuffer = indexBuffer,
+                .VertexBufferBDA = 0x12340000u,
+                .IndexOffsetBytes = 64u,
+                .FirstVertex = 7u,
+                .VertexCount = 10u,
+                .IndexCount = 18u,
+                .Uploaded = true,
+            },
+        },
+        .DrawListCount = 1u,
+        .Uploaded = true,
+    };
+    pass.Execute(cmd, upload);
 
-    ASSERT_EQ(cmd.Events.size(), 3u);
+    ASSERT_EQ(cmd.Events.size(), 4u);
     EXPECT_EQ(cmd.Events[0].Kind, EventKind::BindPipeline);
-    EXPECT_EQ(cmd.Events[1].Kind, EventKind::PushConstants);
-    EXPECT_EQ(cmd.Events[2].Kind, EventKind::DrawIndexed);
+    EXPECT_EQ(cmd.Events[1].Kind, EventKind::BindIndexBuffer);
+    EXPECT_EQ(cmd.Events[2].Kind, EventKind::PushConstants);
+    EXPECT_EQ(cmd.Events[3].Kind, EventKind::DrawIndexed);
     EXPECT_EQ(cmd.LastPipeline, pipeline);
+    EXPECT_EQ(cmd.LastIndexBuffer, indexBuffer);
+    EXPECT_EQ(cmd.LastIndexBufferOffset, 64u);
+    EXPECT_EQ(cmd.LastIndexType, RHI::IndexType::Uint32);
     EXPECT_EQ(cmd.LastDrawIndexedIndexCount, 18u);
+    EXPECT_EQ(overlay.GetDiagnostics().DrawCalls, 1u);
 
     ASSERT_EQ(cmd.LastPushConstants.size(), sizeof(Graphics::ImGuiOverlayPushConstants));
     Graphics::ImGuiOverlayPushConstants pc{};
     std::memcpy(&pc, cmd.LastPushConstants.data(), sizeof(pc));
-    EXPECT_EQ(pc.DrawCommandCount, 2u);
+    EXPECT_EQ(pc.VertexBufferBDA, 0x12340000u);
+    EXPECT_EQ(pc.FirstVertex, 7u);
     EXPECT_EQ(pc.IndexCount, 18u);
 
     overlay.ClearFrame();
     RecordingCommandContext emptyCmd;
-    pass.Execute(emptyCmd);
+    pass.Execute(emptyCmd, Graphics::ImGuiUploadResult{});
     EXPECT_TRUE(emptyCmd.Events.empty());
 }
 
@@ -244,5 +279,3 @@ TEST(GraphicsImGuiPresentContract, PresentPassRecordsFullscreenFinalizationOnlyW
     EXPECT_EQ(cmd.LastPipeline, pipeline);
     EXPECT_EQ(cmd.LastDrawVertexCount, 3u);
 }
-
-

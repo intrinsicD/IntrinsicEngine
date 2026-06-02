@@ -7,6 +7,7 @@ module;
 export module Extrinsic.Graphics.Pass.ImGui;
 
 import Extrinsic.Graphics.ImGuiOverlaySystem;
+import Extrinsic.Graphics.ImGuiUploadHelper;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Handles;
 
@@ -22,7 +23,7 @@ namespace Extrinsic::Graphics
 
         void SetPipeline(RHI::PipelineHandle pipeline) noexcept;
         [[nodiscard]] RHI::PipelineHandle GetPipeline() const noexcept { return m_Pipeline; }
-        void Execute(RHI::ICommandContext& cmd);
+        void Execute(RHI::ICommandContext& cmd, const ImGuiUploadResult& upload);
 
     private:
         ImGuiOverlaySystem& m_OverlaySystem;

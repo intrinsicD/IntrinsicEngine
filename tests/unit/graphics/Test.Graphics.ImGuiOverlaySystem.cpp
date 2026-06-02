@@ -33,10 +33,12 @@ TEST(GraphicsImGuiOverlaySystem, SubmitFrameAggregatesValidDrawData)
     EXPECT_TRUE(diagnostics.HasUserTextures);
 
     const Graphics::ImGuiOverlayPushConstants pc = overlay.BuildPushConstants();
-    EXPECT_EQ(pc.DrawCommandCount, 3u);
-    EXPECT_EQ(pc.VertexCount, 28u);
     EXPECT_EQ(pc.IndexCount, 42u);
     EXPECT_EQ(pc.Flags, 1u);
+    EXPECT_FLOAT_EQ(pc.Scale[0], 2.0f / 1280.0f);
+    EXPECT_FLOAT_EQ(pc.Scale[1], 2.0f / 720.0f);
+    EXPECT_FLOAT_EQ(pc.Translate[0], -1.0f);
+    EXPECT_FLOAT_EQ(pc.Translate[1], -1.0f);
 }
 
 TEST(GraphicsImGuiOverlaySystem, DisabledOrInvalidFramesHaveNoOverlayWork)
@@ -79,7 +81,7 @@ TEST(GraphicsImGuiOverlaySystem, DiagnosticsFormattingIsDeterministic)
     });
 
     EXPECT_EQ(overlay.FormatDiagnostics(),
-              "imgui-overlay: enabled=true accepted_lists=1 rejected_lists=0 commands=1 vertices=4 indices=6 invalid_display=false user_textures=false");
+              "imgui-overlay: enabled=true accepted_lists=1 rejected_lists=0 commands=1 vertices=4 indices=6 draws=0 invalid_display=false user_textures=false font_atlas=false font_atlas_gpu=false font_atlas_uploads=0");
 }
 
 TEST(GraphicsImGuiOverlaySystem, PresentFinalizationDiagnosticsRequireSourceBackbufferAndPass)
@@ -104,4 +106,3 @@ TEST(GraphicsImGuiOverlaySystem, PresentFinalizationDiagnosticsRequireSourceBack
     EXPECT_TRUE(missing.MissingBackbuffer);
     EXPECT_TRUE(missing.PresentPassDisabled);
 }
-

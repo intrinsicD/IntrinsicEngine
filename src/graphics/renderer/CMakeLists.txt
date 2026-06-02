@@ -20,6 +20,7 @@ target_sources(${target_name}
         Graphics.CullingSystem.cppm
         Graphics.DebugViewSystem.cppm
         Graphics.ImGuiOverlaySystem.cppm
+        Graphics.ImGuiUploadHelper.cppm
         Graphics.LightSystem.cppm
         Graphics.SelectionSystem.cppm
         Graphics.ForwardSystem.cppm
@@ -45,6 +46,7 @@ target_sources(${target_name}
         Graphics.CullingSystem.cpp
         Graphics.DebugViewSystem.cpp
         Graphics.ImGuiOverlaySystem.cpp
+        Graphics.ImGuiUploadHelper.cpp
         Graphics.LightSystem.cpp
         Graphics.SelectionSystem.cpp
         Graphics.ForwardSystem.cpp

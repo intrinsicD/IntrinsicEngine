@@ -15,7 +15,7 @@ Root scanned: `src`
 | `geometry` | 85 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
-| `graphics/renderer` | 56 |
+| `graphics/renderer` | 57 |
 | `graphics/rhi` | 17 |
 | `graphics/vulkan` | 13 |
 | `legacy` | 182 |
@@ -209,6 +209,7 @@ Root scanned: `src`
 | `Extrinsic.Graphics.GpuScene` | `src/graphics/renderer/Graphics.GpuScene.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.GpuWorld` | `src/graphics/renderer/Graphics.GpuWorld.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.ImGuiOverlaySystem` | `src/graphics/renderer/Graphics.ImGuiOverlaySystem.cppm` | `graphics/renderer` |
+| `Extrinsic.Graphics.ImGuiUploadHelper` | `src/graphics/renderer/Graphics.ImGuiUploadHelper.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.LightSystem` | `src/graphics/renderer/Graphics.LightSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Material` | `src/graphics/renderer/Graphics.Material.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.MaterialSystem` | `src/graphics/renderer/Graphics.MaterialSystem.cppm` | `graphics/renderer` |
@@ -484,4 +485,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 | `Extrinsic.Runtime.SpatialDebugAdapters` | `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` | `runtime` |
 
-Total modules: **457**
+Total modules: **458**

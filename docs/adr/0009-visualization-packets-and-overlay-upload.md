@@ -74,7 +74,6 @@ Vector-field glyphs and isoline polylines are **NOT** routed through the retaine
 They are auxiliary draw resources owned by a backend-local upload helper under `src/graphics/vulkan`, mirroring:
 
 - The transient debug expansion pattern from `GRAPHICS-007Q` / `GRAPHICS-010Q`.
-- The ImGui overlay upload pattern from `GRAPHICS-013CQ`.
 
 Per-frame host-visible (transient) GPU buffers are recycled each frame, never retained on `GpuWorld`, and never exposed through RHI or renderer module surfaces.
 

@@ -75,6 +75,7 @@ import Extrinsic.Graphics.DebugViewSystem;
 // public surface, but the pass module is imported explicitly here so the
 // executor can construct and drive the consumer route.
 import Extrinsic.Graphics.Pass.ImGui;
+import Extrinsic.Graphics.ImGuiUploadHelper;
 // GRAPHICS-077 Slice A — `TransientDebugSurfacePass` shell. Slice B
 // promotes the triangle lane from `SkippedUnavailable` to `Recorded`
 // by creating two pipeline variants (depth-tested + always-on-top)
@@ -309,6 +310,13 @@ namespace Extrinsic::Graphics
             // with GRAPHICS-078 Slice D.
             m_VisualizationOverlayUploadHelper =
                 std::make_unique<VisualizationOverlayUploadHelper>(device, *m_BufferManager);
+            // GRAPHICS-079 Slice C — backend-neutral ImGui upload helper.
+            // Mirrors the transient-debug / visualization-overlay helpers:
+            // one growing host-visible vertex buffer and one growing index
+            // buffer owned by the renderer, reset in Shutdown before the
+            // BufferManager is destroyed.
+            m_ImGuiUploadHelper =
+                std::make_unique<ImGuiUploadHelper>(device, *m_BufferManager);
             m_BackbufferFormat = device.GetBackbufferFormat();
             m_GpuWorld.emplace();
             m_GpuWorld->Initialize(device, *m_BufferManager);
@@ -494,6 +502,13 @@ namespace Extrinsic::Graphics
             {
                 [[maybe_unused]] const bool passResourcesReady = InitializeOperationalPassResources(device);
             }
+            if (m_ImGuiOverlaySystem != nullptr && m_TextureManager && m_SamplerManager)
+            {
+                m_ImGuiOverlaySystem->InitializeGpuResources(
+                    device,
+                    *m_TextureManager,
+                    *m_SamplerManager);
+            }
             // CullingSystem::Initialize requires a shader path — concrete
             // renderers supply it.  NullRenderer skips the cull dispatch.
         }
@@ -625,11 +640,10 @@ namespace Extrinsic::Graphics
             m_DebugViewSystem.reset();
             // GRAPHICS-079 Slice A — reset the canonical `ImGuiPass` consumer
             // before teardown so its optional destructor does not observe a
-            // dangling `ImGuiOverlaySystem&`. The overlay system itself is
-            // engine-owned (runtime composition) and outlives the renderer's
-            // borrow; clear the borrow pointer too.
+            // dangling `ImGuiOverlaySystem&`. Keep the borrowed overlay pointer
+            // long enough to release Slice C's manager-backed font-atlas leases
+            // before the managers are reset below.
             m_ImGuiPass.reset();
-            m_ImGuiOverlaySystem = nullptr;
             m_SelectionSystem.reset();
             m_LightSystem    .reset();
             m_ForwardSystem  .reset();
@@ -770,6 +784,11 @@ namespace Extrinsic::Graphics
             m_VisualizationOverlayPass.SetVectorFieldAlwaysOnTopPipeline(RHI::PipelineHandle{});
             m_VisualizationOverlayPass.SetIsolineDepthTestedPipeline(RHI::PipelineHandle{});
             m_VisualizationOverlayPass.SetIsolineAlwaysOnTopPipeline(RHI::PipelineHandle{});
+            if (m_ImGuiOverlaySystem != nullptr)
+            {
+                m_ImGuiOverlaySystem->ShutdownGpuResources();
+            }
+            m_ImGuiOverlaySystem = nullptr;
             m_PipelineManager.reset();
             m_TextureManager .reset();
             m_SamplerManager .reset();
@@ -784,6 +803,10 @@ namespace Extrinsic::Graphics
             // `BufferManager::BufferLease` destructor observes a live
             // manager.
             m_VisualizationOverlayUploadHelper.reset();
+            // GRAPHICS-079 Slice C — release the ImGui helper before the
+            // BufferManager for the same lease-lifetime reason as the other
+            // renderer-owned upload helpers.
+            m_ImGuiUploadHelper.reset();
             m_BufferManager  .reset();
             m_CullingOutputAvailable = false;
             // GRAPHICS-033D — drop the smoke's readback handle so a later
@@ -848,11 +871,19 @@ namespace Extrinsic::Graphics
         // the route reports `SkippedUnavailable`.
         void SetImGuiOverlaySystem(ImGuiOverlaySystem* overlay) noexcept override
         {
+            if (m_ImGuiOverlaySystem != nullptr && m_ImGuiOverlaySystem != overlay)
+            {
+                m_ImGuiOverlaySystem->ShutdownGpuResources();
+            }
             m_ImGuiOverlaySystem = overlay;
             if (overlay == nullptr)
             {
                 m_ImGuiPass.reset();
                 return;
+            }
+            if (m_Device != nullptr && m_TextureManager.has_value() && m_SamplerManager.has_value())
+            {
+                overlay->InitializeGpuResources(*m_Device, *m_TextureManager, *m_SamplerManager);
             }
             m_ImGuiPass.emplace(*overlay);
             if (m_PipelineManager.has_value() && m_ImGuiPipelineLease.has_value() &&
@@ -6422,13 +6453,29 @@ namespace Extrinsic::Graphics
                 !m_ImGuiPipelineLease.has_value() ||
                 !m_ImGuiPipelineLease->IsValid() ||
                 !m_ImGuiPass->GetPipeline().IsValid() ||
-                !m_ImGuiOverlaySystem->HasOverlayWork())
+                !m_ImGuiOverlaySystem->HasOverlayWork() ||
+                !m_ImGuiUploadHelper)
             {
                 return RenderCommandPassStatus::SkippedUnavailable;
             }
 
-            m_ImGuiPass->Execute(cmd);
-            return RenderCommandPassStatus::Recorded;
+            m_ImGuiOverlaySystem->UploadPendingFontAtlas();
+            const ImGuiOverlayFrame* frame = m_ImGuiOverlaySystem->GetCurrentFrame();
+            if (frame == nullptr)
+            {
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            const ImGuiUploadResult upload = m_ImGuiUploadHelper->UploadFrame(*frame);
+            if (!upload.Uploaded)
+            {
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            m_ImGuiPass->Execute(cmd, upload);
+            return m_ImGuiOverlaySystem->GetDiagnostics().DrawCalls > 0u
+                ? RenderCommandPassStatus::Recorded
+                : RenderCommandPassStatus::SkippedUnavailable;
         }
 
         // GRAPHICS-076 Slice B — canonical default-recipe debug-view
@@ -7060,6 +7107,10 @@ namespace Extrinsic::Graphics
         // helper's internal lease destructor observes a live
         // manager.
         std::unique_ptr<IVisualizationOverlayUploadHelper> m_VisualizationOverlayUploadHelper;
+        // GRAPHICS-079 Slice C — renderer-owned ImGui transient upload helper.
+        // Held as an interface pointer for parity with the transient-debug and
+        // visualization-overlay helpers and reset before BufferManager teardown.
+        std::unique_ptr<IImGuiUploadHelper> m_ImGuiUploadHelper;
         std::optional<RHI::PipelineManager::PipelineLease> m_ForwardSurfacePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_ForwardLinePipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_ForwardPointPipelineLease;

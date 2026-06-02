@@ -2,6 +2,7 @@ module;
 
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <functional>
 #include <string>
 #include <type_traits>
@@ -175,6 +176,15 @@ namespace Extrinsic::Runtime
 
         ImGui::Render();
         const ImDrawData* drawData = ImGui::GetDrawData();
+        unsigned char* fontPixels = nullptr;
+        int fontWidth = 0;
+        int fontHeight = 0;
+        int fontBytesPerPixel = 0;
+        ImGui::GetIO().Fonts->GetTexDataAsAlpha8(
+            &fontPixels,
+            &fontWidth,
+            &fontHeight,
+            &fontBytesPerPixel);
         // The font atlas texture reference. User-texture detection compares each
         // draw command's TexRef against this without calling GetTexID(): under
         // ImGuiBackendFlags_RendererHasTextures the atlas is not yet uploaded to
@@ -183,6 +193,21 @@ namespace Extrinsic::Runtime
 
         Graphics::ImGuiOverlayFrame frame;
         frame.Enabled = true;
+        if (fontPixels != nullptr && fontWidth > 0 && fontHeight > 0 &&
+            (fontBytesPerPixel == 1 || fontBytesPerPixel == 4))
+        {
+            const std::uint64_t byteCount =
+                static_cast<std::uint64_t>(fontWidth) *
+                static_cast<std::uint64_t>(fontHeight) *
+                static_cast<std::uint64_t>(fontBytesPerPixel);
+            frame.FontAtlas.Valid = true;
+            frame.FontAtlas.Width = static_cast<std::uint32_t>(fontWidth);
+            frame.FontAtlas.Height = static_cast<std::uint32_t>(fontHeight);
+            frame.FontAtlas.BytesPerPixel = static_cast<std::uint32_t>(fontBytesPerPixel);
+            frame.FontAtlas.UseColors = fontBytesPerPixel == 4;
+            frame.FontAtlas.Pixels.resize(static_cast<std::size_t>(byteCount));
+            std::memcpy(frame.FontAtlas.Pixels.data(), fontPixels, static_cast<std::size_t>(byteCount));
+        }
 
         std::uint32_t drawListCount = 0u;
         std::uint32_t vertexCount = 0u;
@@ -207,6 +232,22 @@ namespace Extrinsic::Runtime
                 overlayList.CommandCount = static_cast<std::uint32_t>(cmdList->CmdBuffer.Size);
                 overlayList.VertexCount = static_cast<std::uint32_t>(cmdList->VtxBuffer.Size);
                 overlayList.IndexCount = static_cast<std::uint32_t>(cmdList->IdxBuffer.Size);
+                overlayList.Vertices.reserve(static_cast<std::size_t>(cmdList->VtxBuffer.Size));
+                for (int v = 0; v < cmdList->VtxBuffer.Size; ++v)
+                {
+                    const ImDrawVert& src = cmdList->VtxBuffer[v];
+                    overlayList.Vertices.push_back(Graphics::ImGuiOverlayVertex{
+                        .Position = {src.pos.x, src.pos.y},
+                        .UV = {src.uv.x, src.uv.y},
+                        .Color = src.col,
+                    });
+                }
+                overlayList.Indices.reserve(static_cast<std::size_t>(cmdList->IdxBuffer.Size));
+                for (int idx = 0; idx < cmdList->IdxBuffer.Size; ++idx)
+                {
+                    overlayList.Indices.push_back(
+                        static_cast<std::uint32_t>(cmdList->IdxBuffer[idx]));
+                }
                 for (int c = 0; c < cmdList->CmdBuffer.Size; ++c)
                 {
                     // A command referencing a texture other than the font atlas

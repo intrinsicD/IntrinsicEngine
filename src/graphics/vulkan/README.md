@@ -316,6 +316,17 @@ available through the Vulkan 1.2/1.3 feature chain.
   mutable descriptor element inside the same submitted command buffer, which is
   what the `DefaultRecipeSurfaceGpuSmoke.ReferenceTriangleDebugViewReadbackMatchesMinimalHarnessSamples`
   fixture covers.
+  GRAPHICS-079 Slice C does not add a Vulkan-specific ImGui upload helper:
+  the promoted path follows the existing transient-debug / visualization-overlay
+  precedent and keeps the concrete helper renderer-owned
+  (`Extrinsic.Graphics.ImGuiUploadHelper`) over RHI buffers. Vulkan consumes the
+  result through the existing public command surface (`BindIndexBuffer`, BDA in
+  `ImGuiOverlayPushConstants`, and `DrawIndexed`) once Slice D gives
+  `"ImGuiPass"` a render-pass attachment. The `assets/shaders/imgui.vert` path
+  uses buffer-device-address vertex fetch and the existing global push-constant
+  layout prerequisites; `assets/shaders/imgui.frag` currently forwards vertex
+  color only. Font-atlas sampling and per-command user-texture bindless indices
+  remain Slice D work, alongside the opt-in `gpu;vulkan` smoke.
   The opt-in `VulkanBootstrapSmoke` test is labeled `gpu;vulkan` and verifies
   bootstrap state plus the guarded acquire/command-record/submit/present path
   on hosts where the operational gate is not satisfied. The GRAPHICS-033D
@@ -611,4 +622,3 @@ Extrinsic.Backends.Vulkan
   → VulkanMemoryAllocator (private)
   → glfw             (private)
 ```
-

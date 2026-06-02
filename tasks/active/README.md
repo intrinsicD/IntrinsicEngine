@@ -14,7 +14,7 @@ Each active task should include:
 [`GRAPHICS-079`](GRAPHICS-079-default-recipe-imgui-pass-wiring.md) — default-recipe
 `Pass.ImGui` wiring (Theme A working-sandbox path, the consumer half of the
 ImGui/UI leaves that gate `UI-001`). Status: **in-progress**, owner
-`codex/main` for Slice B. Earliest unblocked Theme A (P0)
+`codex/main` for Slice C. Earliest unblocked Theme A (P0)
 leaf: dependencies `GRAPHICS-076` (PresentSource finalization) and `RUNTIME-090`
 (ImGui adapter producer) are both retired to `tasks/done/`. The task is sliced
 A–D (see its `## Slice plan`); Slice A wires the renderer-side
@@ -23,10 +23,13 @@ handoff seam, and the `m_ImGuiPipelineLease`, closing `Scaffolded → CPUContrac
 for the graphics consumer. Slice B wires `Engine::Initialize()` /
 `Engine::Shutdown()` to attach/detach the engine-owned overlay system to/from
 the renderer consumer and adds runtime contract coverage for the shared handoff.
-Next verification step: Slice C font-atlas allocation + transient upload helper,
-then the `contract;graphics` / `contract;runtime` gates, default CPU gate,
-layering/test-layout/doc-links/task-policy checks, and module-inventory
-regeneration.
+Slice C adds the retained font atlas, renderer-owned transient vertex/index
+upload helper, runtime adapter payload copy, direct per-list
+`BindIndexBuffer + DrawIndexed` contract coverage, and byte-identical atlas
+retention across `RebuildOperationalResources()`. Next verification step:
+Slice D `Pass.ImGui` write topology to `FrameRecipe.PresentSource`, per-command
+user-texture bindless metadata/sampling, closing-cleanup assertion, and
+`gpu;vulkan` smoke.
 
 The most recently retired tasks are summarised below.
 
@@ -54,11 +57,11 @@ tick and before the render contract's `PrepareFrame()`, so exactly one
 `Engine::SetImGuiEditorCallback` with a read-only `GetImGuiAdapter()` observer.
 New `Test.ImGuiAdapterEngineWiring.cpp` `contract;runtime` coverage drives a
 bounded `Engine::Run()` (static wiring cases run displayless; the live per-frame
-loop + editor-hook cases are window-gated and verified under `xvfb-run`). The
-renderer-side `Pass.ImGui` consumption + GPU font-atlas upload (the
-`Operational` proof) remain `GRAPHICS-079`; the engine-owned overlay instance is
-handed to the renderer when that lands. Final working-sandbox acceptance is
-`RUNTIME-095`.
+loop + editor-hook cases are window-gated and verified under `xvfb-run`).
+GRAPHICS-079 Slice C now consumes the adapter-produced payload through the
+renderer-side retained font atlas and transient upload helper; the remaining
+`Operational` proof is Slice D's render-target write topology plus Vulkan smoke.
+Final working-sandbox acceptance is `RUNTIME-095`.
 
 Previously-active
 [`RUNTIME-093`](../done/RUNTIME-093-primitive-selection-refinement.md) — runtime
