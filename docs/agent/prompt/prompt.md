@@ -156,3 +156,5 @@ Stop immediately if:
 - the next task would violate `AGENTS.md`,
 - more than N tasks have completed,
 - runtime exceeds the configured budget.
+- user input is required to resolve a blocker.
+- the task backlog is empty.
