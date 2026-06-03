@@ -5,6 +5,7 @@ target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Asset.EventBus.cppm
+        Asset.GeometryIOBridge.cppm
         Asset.ImportRouter.cppm
         Asset.LoadPipeline.cppm
         Asset.PathIndex.cppm
@@ -14,6 +15,7 @@ target_sources(${target_name}
         Asset.TypePool.cppm
         PRIVATE
         Asset.EventBus.cpp
+        Asset.GeometryIOBridge.cpp
         Asset.ImportRouter.cpp
         Asset.LoadPipeline.cpp
         Asset.PathIndex.cpp

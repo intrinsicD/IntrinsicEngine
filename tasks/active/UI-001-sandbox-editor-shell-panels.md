@@ -5,11 +5,14 @@
 - Owner/agent: Codex.
 - Branch: `main`.
 - Current slice: blocked after Slice C.3. Remaining file/import execution is
-  gated on active `ASSETIO-001`; visualization adapter binding controls now
-  route through runtime-owned render-extraction state.
+  gated on active `ASSETIO-001`; ASSETIO Slice B now provides geometry callback
+  dispatch with default CPU gate verification, but UI-ready import execution
+  still needs the later model/texture and runtime handoff slices. Visualization
+  adapter binding controls now route through runtime-owned render-extraction
+  state.
 - Next verification step: resume the file/import panel execution slice after
-  ASSETIO lands a runtime-callable import route, then run task structural checks
-  plus the runtime contract/default CPU gates.
+  ASSETIO lands a runtime-callable import command/handoff route, then run task
+  structural checks plus the runtime contract/default CPU gates.
 
 ## Slice plan
 - **Slice A.** Add the promoted runtime sandbox editor UI module,

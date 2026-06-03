@@ -273,6 +273,7 @@ intrinsic_test_object_lib(EcsContractTestObjs
 if(TARGET ExtrinsicRuntime)
     set(_runtime_contract_test_files
         Test.GpuAssetCacheFallbackBootstrap.cpp
+        Test.AssetGeometryIO.cpp
         Test.ImGuiAdapter.cpp
         Test.ImGuiAdapterEngineWiring.cpp
         Test.MeshGeometryExtraction.cpp
@@ -402,6 +403,7 @@ intrinsic_test_object_lib(GeometryTestObjs
 # --- Relocated HARDEN-041 wrapper sources: assets/core/ecs/graphics/runtime taxonomy ---
 set(_asset_unit_test_files
     Test.Asset.EventBus.cpp
+    Test.Asset.GeometryIOBridge.cpp
     Test.Asset.ImportRouter.cpp
     Test.Asset.PathIndex.cpp
     Test.Asset.PayloadStore.cpp

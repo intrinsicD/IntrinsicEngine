@@ -8,6 +8,7 @@ option(INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN
 target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
+        Runtime.AssetGeometryIO.cppm
         Runtime.EcsSystemBundle.cppm
         Runtime.Engine.cppm
         Cameras/Runtime.CameraControllers.cppm
@@ -28,6 +29,7 @@ target_sources(${target_name}
         SpatialDebug/Runtime.SpatialDebugAdapters.cppm
         Visualization/Runtime.VisualizationAdapters.cppm
         PRIVATE
+        Runtime.AssetGeometryIO.cpp
         Runtime.EcsSystemBundle.cpp
         Runtime.Engine.cpp
         Editor/Runtime.SandboxEditorUi.cpp

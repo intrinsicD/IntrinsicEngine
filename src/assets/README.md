@@ -10,6 +10,7 @@ store, load pipeline, event bus, and path index behind a single façade.
 - `Extrinsic.Asset.Registry`
 - `Extrinsic.Asset.PayloadStore`
 - `Extrinsic.Asset.ImportRouter`
+- `Extrinsic.Asset.GeometryIOBridge`
 - `Extrinsic.Asset.LoadPipeline`
 - `Extrinsic.Asset.EventBus`
 - `Extrinsic.Asset.PathIndex`
@@ -24,8 +25,11 @@ store, load pipeline, event bus, and path index behind a single façade.
 - `Asset.ImportRouter` resolves file extensions plus optional payload/domain
   hints to CPU-only import/export routes for mesh, point-cloud, graph, model
   scene, and texture payloads. It does not import geometry, runtime, graphics,
-  or decoder code; later ingest slices register or invoke decoders through this
-  routing contract.
+  or decoder code.
+- `Asset.GeometryIOBridge` stores asset-owned geometry import/export callback
+  registrations keyed by resolved route format and payload kind. Runtime
+  registers the promoted geometry codecs; `src/assets` dispatches callbacks and
+  verifies typed payloads without importing geometry, runtime, graphics, or RHI.
 - `AssetLoadPipeline` tracks load stages, in-flight requests, GPU fence waits,
   and failure / completion transitions.
 - `AssetEventBus` batches `Ready`, `Failed`, `Reloaded`, and `Destroyed`
@@ -40,6 +44,7 @@ store, load pipeline, event bus, and path index behind a single façade.
 
 ```text
 Asset.EventBus.cppm
+Asset.GeometryIOBridge.cppm
 Asset.ImportRouter.cppm
 Asset.LoadPipeline.cppm
 Asset.PathIndex.cppm
@@ -53,6 +58,7 @@ Asset.TypePool.cppm
 
 ```text
 Asset.EventBus.cpp
+Asset.GeometryIOBridge.cpp
 Asset.ImportRouter.cpp
 Asset.LoadPipeline.cpp
 Asset.PathIndex.cpp

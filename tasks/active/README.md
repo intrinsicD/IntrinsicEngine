@@ -20,20 +20,24 @@ id/hit display, a runtime-owned local-transform edit command, camera-controller
 replacement, mesh edge/vertex primitive-view toggle commands, and selected-entity
 spatial-debug, visualization-config, and visualization adapter-binding command
 routing with CPU `contract;runtime` coverage. Remaining file/import execution is
-gated on active `ASSETIO-001`.
+gated on active `ASSETIO-001`; Slice B now provides geometry callback dispatch,
+but UI-ready import execution still needs the later model/texture and runtime
+handoff slices.
 Next verification: resume the file/import panel execution slice after ASSETIO
-lands a runtime-callable import route, then run the task structural checks plus
-the runtime contract/default CPU gates.
+lands a runtime-callable import command/handoff route, then run the task
+structural checks plus the runtime contract/default CPU gates.
 
 [`ASSETIO-001`](ASSETIO-001-asset-model-texture-ingest-ownership.md) — asset
 model, texture, and import/export ingest ownership. Status: in-progress on
 `main`, promoted to address the UI-001 file/import blocker. Slice A verified
 the CPU-only `Extrinsic.Asset.ImportRouter` contract for extension lookup,
 import/export routing, payload/domain hints, and deterministic route diagnostics
-without importing geometry, runtime, graphics, or RHI into `src/assets`.
-Next verification: continue Slice B by wiring promoted geometry decoder/encoder
-callbacks through the route contract, then rerun focused asset/geometry route
-tests, task/docs/layering checks, and the default CPU-supported gate.
+without importing geometry, runtime, graphics, or RHI into `src/assets`. Slice B
+adds `Extrinsic.Asset.GeometryIOBridge` plus runtime-owned promoted geometry
+decoder/encoder callback registration without importing geometry into
+`src/assets`; default CPU gate verification passed for the slice.
+Next verification: continue Slice C for model/scene and texture CPU payload
+ownership.
 
 The most recently retired tasks are summarised below.
 
