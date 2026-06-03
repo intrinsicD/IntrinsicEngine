@@ -36,9 +36,12 @@ Completed support tasks:
 These open the runtime-side producer/owner umbrellas already clarified by the
 done-task `Q` follow-ups. Each unblocks one or more rendering pass families.
 
-- [RUNTIME-080 — `Extrinsic.Runtime.AssetBridges.Texture`](RUNTIME-080-asset-bridges-texture.md):
-  texture-typed asset event subscriber producing `GpuAssetCache::RequestUpload`
-  calls (clarified by GRAPHICS-015Q).
+- [RUNTIME-080 — `Extrinsic.Runtime.AssetBridges.Texture`](../../done/RUNTIME-080-asset-bridges-texture.md)
+  _(superseded, retired 2026-06-03)_: texture-typed asset event subscriber
+  producing `GpuAssetCache::RequestUpload` calls (clarified by GRAPHICS-015Q).
+  The capability shipped under `ASSETIO-001` as
+  `Extrinsic.Runtime.AssetModelTextureHandoff`; this umbrella was retired
+  without re-implementation.
 - [RUNTIME-082 — `Extrinsic.Runtime.SpatialDebugAdapters`](../../done/RUNTIME-082-spatial-debug-adapters.md)
   (done 2026-05-27): BVH / KD-tree / Octree / ConvexHull adapters producing
   spatial-debug snapshot records (clarified by GRAPHICS-011Q). All four

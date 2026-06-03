@@ -80,7 +80,7 @@ Beyond-triangle full-graphics implementation tasks (Theme B′ in the rendering 
 - Default-recipe pass operational wiring: [`GRAPHICS-070..076`](rendering/) — forward surface, line/point, deferred GBuffer + lighting, shadows, selection/outline + picking readback, postprocess chain, debug view + canonical present.
 - Backend transient/visualization upload helpers: [`GRAPHICS-077`](../done/GRAPHICS-077-transient-debug-primitive-upload-helper.md) (done), [`GRAPHICS-078`](../done/GRAPHICS-078-visualization-overlay-upload-helper.md) (done).
 - Default-recipe ImGui pass: [`GRAPHICS-079`](../done/GRAPHICS-079-default-recipe-imgui-pass-wiring.md) (done).
-- Runtime adapter umbrellas (clarified by `Q` follow-ups): [`runtime/RUNTIME-080..084`, `RUNTIME-090`](runtime/) — texture asset bridge, camera controllers, spatial-debug adapters, visualization adapters, gizmo interaction, ImGui adapter.
+- Runtime adapter umbrellas (clarified by `Q` follow-ups): [`runtime/RUNTIME-081..084`, `RUNTIME-090`](runtime/) — camera controllers, spatial-debug adapters, visualization adapters, gizmo interaction, ImGui adapter. The texture asset bridge `RUNTIME-080` was superseded by `ASSETIO-001` (`Extrinsic.Runtime.AssetModelTextureHandoff`) and retired 2026-06-03.
 - Bootstrap scaffold retirement: [`done/GRAPHICS-081`](../done/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md) (done 2026-06-02) — the bootstrap visible-recipe classes, selector, diagnostics counters, shaders, tests, and module-inventory entries introduced by `GRAPHICS-032`/`033` are deleted. The canonical visible-triangle path is the default recipe.
 
 Runtime/UI implementation leaves for the full sandbox app path:
@@ -197,8 +197,9 @@ promoting backlog tasks to active so per-category DAGs do not diverge.
   remain command/event producers, not owners of engine state. `UI-001` is
   retired at `CPUContracted`; final operational proof remains under
   `RUNTIME-095`.
-- **RUNTIME-095 ⇐ GRAPHICS-072..079, GRAPHICS-081, ASSETIO-001/RUNTIME-080 as
-  needed for file-backed content, RUNTIME-085..089, RUNTIME-092..093, UI-001.**
+- **RUNTIME-095 ⇐ GRAPHICS-072..079, GRAPHICS-081, ASSETIO-001 (texture/model
+  ingest; `RUNTIME-080` retired into it) as needed for file-backed content,
+  RUNTIME-085..089, RUNTIME-092..093, UI-001.**
   The final working-sandbox acceptance composes the renderer, runtime
   residency, selection/refinement, asset handoff, and UI paths.
 - **GRAPHICS-029..034 ⇐ HARDEN-060..062.** Sandbox renderable extraction needs

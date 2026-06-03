@@ -13,7 +13,7 @@
 ## Context
 - Owner/layer: `runtime` composition and acceptance harness, with dependencies across rendering, assets, runtime adapters, and UI.
 - This task is the discoverable path from the current default-recipe visible-triangle baseline to the working sandbox described in Theme A of `tasks/backlog/README.md`.
-- Required upstreams include default-recipe rendering (`GRAPHICS-072..079`, `GRAPHICS-081`), runtime geometry residency (`RUNTIME-085..088`), selection (`GRAPHICS-074`, `RUNTIME-089`, `RUNTIME-092`, `RUNTIME-093`), asset/UI plumbing (`ASSETIO-001`, `RUNTIME-080`, `RUNTIME-090`, `UI-001`), and optional visualization/spatial-debug adapters (`RUNTIME-082`, `RUNTIME-083`, `GRAPHICS-077`, `GRAPHICS-078`).
+- Required upstreams include default-recipe rendering (`GRAPHICS-072..079`, `GRAPHICS-081`), runtime geometry residency (`RUNTIME-085..088`), selection (`GRAPHICS-074`, `RUNTIME-089`, `RUNTIME-092`, `RUNTIME-093`), asset/UI plumbing (`ASSETIO-001` — which subsumed the retired `RUNTIME-080` texture bridge —, `RUNTIME-090`, `UI-001`), and optional visualization/spatial-debug adapters (`RUNTIME-082`, `RUNTIME-083`, `GRAPHICS-077`, `GRAPHICS-078`).
 - The sandbox app itself must remain policy-light: composition and test scene setup live in runtime/reference-scene/editor seams, not direct graphics imports from `src/app`.
 
 ## Required changes
