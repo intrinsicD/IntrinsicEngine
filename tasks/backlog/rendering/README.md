@@ -688,9 +688,13 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   command-stream smoke passed locally on 2026-05-28 with
   `TransientDebugSurfaceGpuSmoke` recording triangle/line/point lanes on an
   operational Vulkan frame.
-- [GRAPHICS-077E — Transient-debug pixel-readback parity harness](GRAPHICS-077E-transient-debug-pixel-readback.md):
-  follow-up to GRAPHICS-077 Slice D. Adds opt-in Vulkan readback/sample-color
-  parity without reusing the canonical surface-readback diagnostics.
+- [GRAPHICS-077E — Transient-debug pixel-readback parity harness (done)](../../done/GRAPHICS-077E-transient-debug-pixel-readback.md):
+  retired follow-up to GRAPHICS-077 Slice D. Added
+  `SetTransientDebugBackbufferReadbackBuffer(...)` and
+  `TransientDebugBackbufferReadbackCopyCount`, CPU/null fail-closed contract
+  coverage, and an opt-in Vulkan readback/sample-color smoke for triangle,
+  line, point, and clear pixels without reusing the canonical surface-readback
+  diagnostics.
 - [GRAPHICS-078 — Backend visualization-overlay upload helper](../../done/GRAPHICS-078-visualization-overlay-upload-helper.md):
   depends on GRAPHICS-077 (mirrors helper pattern) and GRAPHICS-072.
   Promoted to `tasks/active/` on 2026-05-24 with a four-slice plan

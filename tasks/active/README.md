@@ -298,8 +298,8 @@ visual proof is deferred to `RUNTIME-095` (final working-sandbox acceptance).
 transient-debug upload helper retired to `tasks/done/` on 2026-05-28 after
 Slice D added `TransientDebugSurfaceGpuSmoke`; maturity is `CPUContracted` on
 CPU-only hosts and command-stream `Operational` on Vulkan-capable hosts. Pixel
-readback parity is tracked by
-[`GRAPHICS-077E`](../backlog/rendering/GRAPHICS-077E-transient-debug-pixel-readback.md).
+readback parity is retired by
+[`GRAPHICS-077E`](../done/GRAPHICS-077E-transient-debug-pixel-readback.md).
 
 [`GRAPHICS-078`](../done/GRAPHICS-078-visualization-overlay-upload-helper.md) —
 visualization-overlay upload helper retired to `tasks/done/` on 2026-05-28 after

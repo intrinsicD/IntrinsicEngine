@@ -460,9 +460,16 @@ test packets through a manually driven renderer frame so runtime extraction does
 not overwrite the snapshot spans. They assert the corresponding pass records on
 the operational Vulkan command stream, per-lane/per-kind submitted and recorded
 counters are non-zero, upload-overflow and missing-pipeline counters stay zero,
-and Vulkan fallback counters remain stable. Pixel-readback parity is tracked by
-`GRAPHICS-077E` and `GRAPHICS-078E`; those follow-ups add pass-scoped/default-
-recipe readback assertions for overlay pixels without reusing unrelated counters.
+and Vulkan fallback counters remain stable. GRAPHICS-077E adds the transient-
+debug pixel-readback sibling: `IRenderer::SetTransientDebugBackbufferReadbackBuffer`
+arms a caller-owned HostVisible+TransferDst buffer, the renderer copies the
+backbuffer through the same `CopyTextureToBuffer` / `ReadBuffer` Vulkan seam
+only when `TransientDebugSurfacePass` recorded, and
+`RenderGraphFrameStats::TransientDebugBackbufferReadbackCopyCount` distinguishes
+that copy from `DefaultRecipeBackbufferReadbackCopyCount`. The new
+`TransientDebugSurfaceGpuSmoke.MixedLanesReadBackExpectedSampleColors` fixture
+samples deterministic red triangle, green line, blue point, and clear pixels.
+`GRAPHICS-078E` remains the visualization-overlay sibling follow-up.
 
 Ordered gate checklist:
 

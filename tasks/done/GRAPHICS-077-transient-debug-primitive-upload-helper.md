@@ -6,10 +6,10 @@
   smoke passes on the Vulkan-capable host as of 2026-05-28. The shared
   GRAPHICS-076/BUG-012 default-recipe Vulkan command-stream blocker is cleared,
   and the dedicated transient-debug `gpu;vulkan` smoke now records all three
-  lanes on the operational Vulkan command stream. Pixel-readback parity is
-  explicitly deferred to
-  [`GRAPHICS-077E`](../backlog/rendering/GRAPHICS-077E-transient-debug-pixel-readback.md)
-  rather than expanding this Slice D into a renderer readback API change).
+  lanes on the operational Vulkan command stream. Pixel-readback parity was
+  intentionally split into
+  [`GRAPHICS-077E`](GRAPHICS-077E-transient-debug-pixel-readback.md),
+  which later retired the transient-specific readback hook/counter).
   Slice A scaffolded the recipe + executor shape on
   `claude/intrinsicengine-agent-onboarding-p1J2P` on 2026-05-23
   (224/224 graphics contract tests pass). Slice B promoted the
@@ -34,9 +34,8 @@
 - Started: 2026-05-23.
 - Completed: 2026-05-28.
 - Commit/PR: local commit `032b8ab7` (`GRAPHICS-077/078: add overlay Vulkan smokes`).
-- Next verification step: none for this task; pixel-readback parity is tracked
-  by
-  [`GRAPHICS-077E`](../backlog/rendering/GRAPHICS-077E-transient-debug-pixel-readback.md).
+- Next verification step: none for this task; pixel-readback parity is retired
+  by [`GRAPHICS-077E`](GRAPHICS-077E-transient-debug-pixel-readback.md).
   2026-05-28
   focused Slice D verification under `build/ci-vulkan`:
   `TransientDebugSurfaceGpuSmoke.MixedLanesRecordOnOperationalVulkanCommandStream`
@@ -141,10 +140,9 @@ slice exercises an opt-in `gpu;vulkan` smoke.
   frame so runtime extraction does not overwrite the test snapshots. It asserts
   `TransientDebugSurfacePass` is `Recorded`, all three submitted/recorded lane
   counters are `1`, `UploadOverflowCount` / `MissingPipelineSkipCount` stay
-  zero, and Vulkan fallback counters stay stable. Pixel-readback parity is
-  deferred to
-  [`GRAPHICS-077E`](../backlog/rendering/GRAPHICS-077E-transient-debug-pixel-readback.md)
-  because the current public readback seam is MinimalDebug-only.
+  zero, and Vulkan fallback counters stay stable. Pixel-readback parity was
+  split out and later retired by
+  [`GRAPHICS-077E`](GRAPHICS-077E-transient-debug-pixel-readback.md).
 
 ## Maturity
 
@@ -351,8 +349,8 @@ Slice D (optional `gpu;vulkan` smoke, deferred):
       on a manually driven renderer frame records `TransientDebugSurfacePass`
       on a real Vulkan command stream and that `TransientDebugUploadDiagnostics`
       counters match the submitted counts. Requires Vulkan-capable host.
-- [x] Defer pixel-readback color assertions to
-      [`GRAPHICS-077E`](../backlog/rendering/GRAPHICS-077E-transient-debug-pixel-readback.md)
+- [x] Split pixel-readback color assertions into
+      [`GRAPHICS-077E`](GRAPHICS-077E-transient-debug-pixel-readback.md)
       instead of reusing the MinimalDebug-only readback seam.
 
 ## Tests
@@ -474,8 +472,8 @@ Slice D (optional `gpu;vulkan` smoke, deferred):
 - [x] `gpu;vulkan;graphics` — command-stream/counter assertion that the
       transient triangle/line/point lanes record on an operational Vulkan
       frame with submitted/recorded counters equal to one per lane.
-- [x] Pixel-readback assertion is deferred to
-      [`GRAPHICS-077E`](../backlog/rendering/GRAPHICS-077E-transient-debug-pixel-readback.md).
+- [x] Pixel-readback assertion is covered by
+      [`GRAPHICS-077E`](GRAPHICS-077E-transient-debug-pixel-readback.md).
 
 ## Docs
 
@@ -529,7 +527,7 @@ Slice D (command-stream smoke, landed locally 2026-05-28):
       labels.
 - [x] Record the command-stream smoke graduation in this task file and move
       transient-debug pixel-readback parity into
-      [`GRAPHICS-077E`](../backlog/rendering/GRAPHICS-077E-transient-debug-pixel-readback.md).
+      [`GRAPHICS-077E`](GRAPHICS-077E-transient-debug-pixel-readback.md).
 
 ## Acceptance criteria
 
@@ -567,9 +565,9 @@ Full task (after Slice C, landed 2026-05-24):
 Slice D (optional, Vulkan-capable hosts only):
 - [x] `gpu;vulkan` smoke green with non-zero per-lane recorded
       counters on an operational Vulkan command stream.
-- [x] Pixel-readback confirmation is deferred to
-      [`GRAPHICS-077E`](../backlog/rendering/GRAPHICS-077E-transient-debug-pixel-readback.md)
-      because the existing readback hook/counter is MinimalDebug-only.
+- [x] Pixel-readback confirmation is covered by
+      [`GRAPHICS-077E`](GRAPHICS-077E-transient-debug-pixel-readback.md)
+      through the transient-specific hook/counter.
 
 ## Verification
 

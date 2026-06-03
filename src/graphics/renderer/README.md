@@ -721,11 +721,21 @@ Concretely:
   when at least one lane recorded, and `SkippedUnavailable` when
   every submitted lane failed its pipeline gate. Width / radius
   expansion (thick lines, disc points) is deferred — the
-  CPUContracted form pins the bind/push/draw shape only; Slice D
-  (opt-in `gpu;vulkan` pixel-readback smoke) remains deferred behind
-  the same Vulkan-capable-host gate as GRAPHICS-076 Slice D. The
+  CPUContracted form pins the bind/push/draw shape only. GRAPHICS-077E
+  adds the pass-scoped opt-in readback seam:
+  `IRenderer::SetTransientDebugBackbufferReadbackBuffer(...)` arms a
+  caller-owned HostVisible+TransferDst buffer, and
+  `RenderGraphFrameStats::TransientDebugBackbufferReadbackCopyCount`
+  increments only when `"TransientDebugSurfacePass"` records on an
+  operational frame. The hook records the same
+  `Present -> TransferSrc -> CopyTextureToBuffer -> Present` backbuffer
+  triplet as the canonical default-recipe readback seam, but it is gated
+  by the transient pass status and does not reuse
+  `DefaultRecipeBackbufferReadbackCopyCount`. The
   contract pin is `tests/contract/graphics/Test.TransientDebugSurfacePass.cpp`
-  (recipe declaration with/without transient primitives, executor
+  (recipe declaration with/without transient primitives, readback
+  default-disabled / pass-omitted / non-operational fail-closed behavior,
+  transient-specific counter separation, executor
   `SkippedNonOperational` short-circuit, executor
   `SkippedUnavailable` with `MissingPipelineSkipCount` increment on
   pipeline-create failure per lane, the operational `Recorded`

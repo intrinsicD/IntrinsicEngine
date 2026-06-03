@@ -2336,29 +2336,55 @@ namespace Extrinsic::Graphics
                 {
                     SubmitBarrierPacket(graphicsContext, *compiled, packet);
                 });
-            // GRAPHICS-076E — default-recipe pixel-readback parity hook:
+            const auto transientDebugRecordedThisFrame =
+                std::any_of(m_LastRenderGraphStats.CommandRecords.Passes.begin(),
+                            m_LastRenderGraphStats.CommandRecords.Passes.end(),
+                            [](const RenderGraphCommandPassStats& pass)
+                            {
+                                return pass.Name == "TransientDebugSurfacePass" &&
+                                       pass.Status == RenderCommandPassStatus::Recorded;
+                            });
+
+            // GRAPHICS-076E / GRAPHICS-077E — opt-in pixel-readback hooks:
             // copy after the executor's final Present transition and restore
-            // Present layout before the command buffer closes.
+            // Present layout before the command buffer closes. The transient
+            // hook is additionally gated on the transient-debug pass recording
+            // this frame so its counter cannot be confused with the canonical
+            // surface-readback path.
             if (executeResult.has_value() &&
-                m_DefaultRecipeReadbackBuffer.IsValid() &&
+                (m_DefaultRecipeReadbackBuffer.IsValid() ||
+                 (m_TransientDebugReadbackBuffer.IsValid() && transientDebugRecordedThisFrame)) &&
                 m_Device != nullptr && m_Device->IsOperational())
             {
                 const RHI::TextureHandle backbuffer = m_Device->GetBackbufferHandle(frame);
                 if (backbuffer.IsValid())
                 {
-                    graphicsContext.TextureBarrier(backbuffer,
-                                                    RHI::TextureLayout::Present,
-                                                    RHI::TextureLayout::TransferSrc);
-                    graphicsContext.CopyTextureToBuffer(backbuffer,
+                    const auto copyBackbuffer = [&](const RHI::BufferHandle readbackBuffer)
+                    {
+                        graphicsContext.TextureBarrier(backbuffer,
+                                                        RHI::TextureLayout::Present,
+                                                        RHI::TextureLayout::TransferSrc);
+                        graphicsContext.CopyTextureToBuffer(backbuffer,
+                                                            RHI::TextureLayout::TransferSrc,
+                                                            0u, 0u,
+                                                            readbackBuffer,
+                                                            0u,
+                                                            0u, 0u, 0u, 0u);
+                        graphicsContext.TextureBarrier(backbuffer,
                                                         RHI::TextureLayout::TransferSrc,
-                                                        0u, 0u,
-                                                        m_DefaultRecipeReadbackBuffer,
-                                                        0u,
-                                                        0u, 0u, 0u, 0u);
-                    graphicsContext.TextureBarrier(backbuffer,
-                                                    RHI::TextureLayout::TransferSrc,
-                                                    RHI::TextureLayout::Present);
-                    ++m_LastRenderGraphStats.DefaultRecipeBackbufferReadbackCopyCount;
+                                                        RHI::TextureLayout::Present);
+                    };
+
+                    if (m_DefaultRecipeReadbackBuffer.IsValid())
+                    {
+                        copyBackbuffer(m_DefaultRecipeReadbackBuffer);
+                        ++m_LastRenderGraphStats.DefaultRecipeBackbufferReadbackCopyCount;
+                    }
+                    if (m_TransientDebugReadbackBuffer.IsValid() && transientDebugRecordedThisFrame)
+                    {
+                        copyBackbuffer(m_TransientDebugReadbackBuffer);
+                        ++m_LastRenderGraphStats.TransientDebugBackbufferReadbackCopyCount;
+                    }
                 }
             }
             graphicsContext.End();
@@ -2756,6 +2782,16 @@ namespace Extrinsic::Graphics
         [[nodiscard]] RHI::BufferHandle GetDefaultRecipeBackbufferReadbackBuffer() const noexcept override
         {
             return m_DefaultRecipeReadbackBuffer;
+        }
+
+        void SetTransientDebugBackbufferReadbackBuffer(RHI::BufferHandle handle) noexcept override
+        {
+            m_TransientDebugReadbackBuffer = handle;
+        }
+
+        [[nodiscard]] RHI::BufferHandle GetTransientDebugBackbufferReadbackBuffer() const noexcept override
+        {
+            return m_TransientDebugReadbackBuffer;
         }
 
         // GRAPHICS-076 Slice B — public seam for the renderer-owned
@@ -6993,6 +7029,10 @@ namespace Extrinsic::Graphics
         // GRAPHICS-076E — opt-in default-recipe readback target. Invalid
         // handle = disabled (default).
         RHI::BufferHandle                    m_DefaultRecipeReadbackBuffer{};
+        // GRAPHICS-077E — opt-in transient-debug readback target. Invalid
+        // handle = disabled (default); additionally gated on
+        // `TransientDebugSurfacePass` recording this frame.
+        RHI::BufferHandle                    m_TransientDebugReadbackBuffer{};
         RenderGraphFrameStats                m_LastRenderGraphStats;
     };
 

@@ -61,6 +61,22 @@ namespace
         return nullptr;
     }
 
+    [[nodiscard]] bool HasBackbufferBarrier(const MockDevice& device,
+                                            const RHI::TextureLayout before,
+                                            const RHI::TextureLayout after) noexcept
+    {
+        for (const auto& barrier : device.CommandContext.TextureBarrierCalls)
+        {
+            if (barrier.Texture == device.BackbufferHandle &&
+                barrier.Before == before &&
+                barrier.After == after)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     void SubmitOneTriangle(Graphics::IRenderer& renderer, const bool depthTested = true)
     {
         // A single sanitized triangle packet is enough to flip
@@ -1006,6 +1022,152 @@ TEST(TransientDebugSurfacePassContract, RecordsAllThreeLanesWhenAllSubmitted)
     EXPECT_EQ(stats.TransientDebugUpload.PointRecordsRecorded, 1u);
     EXPECT_EQ(stats.TransientDebugUpload.UploadOverflowCount, 0u);
     EXPECT_EQ(stats.TransientDebugUpload.MissingPipelineSkipCount, 0u);
+
+    renderer->Shutdown();
+}
+
+TEST(TransientDebugSurfacePassContract, TransientReadbackDefaultDisabledEvenWhenPassRecords)
+{
+    MockDevice device;
+    device.BackbufferHandle = RHI::TextureHandle{726u, 1u};
+
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    EXPECT_FALSE(renderer->GetTransientDebugBackbufferReadbackBuffer().IsValid())
+        << "Transient-debug readback must default to disabled after Initialize().";
+
+    RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    SubmitOneTriangle(*renderer);
+
+    const Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 128},
+    };
+    Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+
+    const auto* pass = FindCommandPass(stats, "TransientDebugSurfacePass");
+    ASSERT_NE(pass, nullptr);
+    EXPECT_EQ(pass->Status, Graphics::RenderCommandPassStatus::Recorded);
+    EXPECT_EQ(stats.TransientDebugBackbufferReadbackCopyCount, 0u)
+        << "Recorded transient debug draws must not arm readback implicitly.";
+    EXPECT_FALSE(HasBackbufferBarrier(device, RHI::TextureLayout::Present, RHI::TextureLayout::TransferSrc));
+
+    renderer->Shutdown();
+}
+
+TEST(TransientDebugSurfacePassContract, TransientReadbackRecordsOnlyWhenPassRecords)
+{
+    MockDevice device;
+    device.BackbufferHandle = RHI::TextureHandle{727u, 1u};
+
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const RHI::BufferHandle readback{7727u, 1u};
+    renderer->SetTransientDebugBackbufferReadbackBuffer(readback);
+    EXPECT_EQ(renderer->GetTransientDebugBackbufferReadbackBuffer(), readback);
+
+    RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    SubmitOneTriangle(*renderer);
+    SubmitOneLine(*renderer);
+    SubmitOnePoint(*renderer);
+
+    const Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 128},
+    };
+    Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.DeviceOperational);
+
+    const auto* pass = FindCommandPass(stats, "TransientDebugSurfacePass");
+    ASSERT_NE(pass, nullptr);
+    EXPECT_EQ(pass->Status, Graphics::RenderCommandPassStatus::Recorded);
+    EXPECT_EQ(stats.TransientDebugBackbufferReadbackCopyCount, 1u)
+        << "Transient-debug readback must record once for an armed operational frame "
+           "whose transient pass recorded.";
+    EXPECT_EQ(stats.DefaultRecipeBackbufferReadbackCopyCount, 0u)
+        << "Transient-debug readback must not reuse the canonical surface counter.";
+    EXPECT_TRUE(HasBackbufferBarrier(device, RHI::TextureLayout::Present, RHI::TextureLayout::TransferSrc));
+    EXPECT_TRUE(HasBackbufferBarrier(device, RHI::TextureLayout::TransferSrc, RHI::TextureLayout::Present));
+
+    renderer->Shutdown();
+}
+
+TEST(TransientDebugSurfacePassContract, TransientReadbackSkipsWhenPassOmitted)
+{
+    MockDevice device;
+    device.BackbufferHandle = RHI::TextureHandle{728u, 1u};
+
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(device);
+    renderer->SetTransientDebugBackbufferReadbackBuffer(RHI::BufferHandle{7728u, 1u});
+
+    RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 128},
+    };
+    Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_EQ(FindCommandPass(stats, "TransientDebugSurfacePass"), nullptr);
+    EXPECT_EQ(stats.TransientDebugBackbufferReadbackCopyCount, 0u)
+        << "An armed transient readback buffer must not copy clean default frames.";
+    EXPECT_FALSE(HasBackbufferBarrier(device, RHI::TextureLayout::Present, RHI::TextureLayout::TransferSrc));
+
+    renderer->Shutdown();
+}
+
+TEST(TransientDebugSurfacePassContract, TransientReadbackSkipsWhenDeviceNonOperational)
+{
+    MockDevice device;
+    device.BackbufferHandle = RHI::TextureHandle{729u, 1u};
+
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(device);
+    renderer->SetTransientDebugBackbufferReadbackBuffer(RHI::BufferHandle{7729u, 1u});
+
+    device.Operational = false;
+
+    RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    SubmitOneTriangle(*renderer);
+
+    const Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 128},
+    };
+    Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_FALSE(stats.Execute.DeviceOperational);
+
+    const auto* pass = FindCommandPass(stats, "TransientDebugSurfacePass");
+    ASSERT_NE(pass, nullptr);
+    EXPECT_EQ(pass->Status, Graphics::RenderCommandPassStatus::SkippedNonOperational);
+    EXPECT_EQ(stats.TransientDebugBackbufferReadbackCopyCount, 0u);
+    EXPECT_FALSE(HasBackbufferBarrier(device, RHI::TextureLayout::Present, RHI::TextureLayout::TransferSrc));
 
     renderer->Shutdown();
 }

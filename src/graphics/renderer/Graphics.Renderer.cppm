@@ -127,6 +127,15 @@ namespace Extrinsic::Graphics
         // configured with a valid HostVisible+TransferDst buffer and the device
         // is operational during the frame.
         std::uint32_t DefaultRecipeBackbufferReadbackCopyCount = 0;
+        // GRAPHICS-077E — count of frames in which the opt-in transient-debug
+        // backbuffer-to-host readback seam recorded the same
+        // `Present -> TransferSrc -> CopyImageToBuffer -> Present` triplet
+        // after the default-recipe graph completed. Unlike the canonical
+        // default-recipe counter above, this increments only when
+        // `"TransientDebugSurfacePass"` recorded in the same frame, a valid
+        // transient-debug readback buffer is armed, and the device is
+        // operational.
+        std::uint32_t TransientDebugBackbufferReadbackCopyCount = 0;
         // GRAPHICS-074 Slice D.2 — count of frames in which the default
         // recipe's PickingPass executor branch recorded the picking-readback
         // copy pair (EntityId + PrimitiveId → renderer-owned
@@ -626,6 +635,15 @@ namespace Extrinsic::Graphics
         virtual void SetDefaultRecipeBackbufferReadbackBuffer(RHI::BufferHandle handle) noexcept = 0;
 
         [[nodiscard]] virtual RHI::BufferHandle GetDefaultRecipeBackbufferReadbackBuffer() const noexcept = 0;
+
+        // GRAPHICS-077E — opt-in backbuffer-to-host readback wiring for
+        // transient-debug pixel parity. The caller owns the HostVisible +
+        // TransferDst buffer lifetime. The renderer records the copy triplet
+        // only on operational frames where `TransientDebugSurfacePass`
+        // recorded; invalid handle disables the path.
+        virtual void SetTransientDebugBackbufferReadbackBuffer(RHI::BufferHandle handle) noexcept = 0;
+
+        [[nodiscard]] virtual RHI::BufferHandle GetTransientDebugBackbufferReadbackBuffer() const noexcept = 0;
 
         // GRAPHICS-076 Slice B — public seam for the renderer-owned
         // `DebugViewSystem`'s `RequestedResourceName` setting. Runtime /
