@@ -842,7 +842,7 @@ testable; each phase derisks the next.
   reservation. Explicitly long-horizon: no implementation children opened
   until backend support and at least one consumer exist. Depends on
   GRAPHICS-053.
-- [GRAPHICS-055 — Streaming Virtual Textures (planning)](GRAPHICS-055-streaming-virtual-textures.md):
+- [GRAPHICS-055 — Streaming Virtual Textures (done)](../../done/GRAPHICS-055-streaming-virtual-textures.md):
   locks 128² virtual page table, feedback pass, runtime page resolver,
   KTX2/Basis Universal UASTC shipping format. Depends on GRAPHICS-018T,
   GRAPHICS-026, GRAPHICS-041.
