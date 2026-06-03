@@ -782,7 +782,7 @@ testable; each phase derisks the next.
   locks offline Slang compilation under `tools/`, module/generic system,
   hot-reload retire-deadline wiring, autodiff annotation policy. Depends on
   GRAPHICS-006, GRAPHICS-023.
-- [GRAPHICS-042 — PBR feature completeness and IBL (planning)](GRAPHICS-042-pbr-feature-completeness-and-ibl.md):
+- [GRAPHICS-042 — PBR feature completeness and IBL (done)](../../done/GRAPHICS-042-pbr-feature-completeness-and-ibl.md):
   locks GGX multi-scatter compensation, sheen, anisotropy, clear-coat, and
   split-sum IBL with prefiltered envmap + DFG LUT. Depends on GRAPHICS-006,
   GRAPHICS-009.
