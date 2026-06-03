@@ -36,6 +36,18 @@ Graphics-owned bridge between `Assets::AssetId` and GPU resources.
   missing/pending/failed assets when available. Runtime owns producer sidecars;
   graphics only consumes IDs and cache views.
 
+## Asset-backed geometry residency boundary
+
+`GRAPHICS-034` records the asset-backed mesh residency plan as a runtime-owned
+bridge, not as new ownership inside `Graphics.GpuAssetCache`. Runtime owns the
+future `Runtime::AssetGeometryCache`, the `AssetInstance::Source` to
+`Assets::AssetId` normalization helper, CPU-payload requests through
+`Asset.Service`, source-priority decisions, failure fallback selection, and
+generation-rebind acknowledgment. This directory continues to expose only
+graphics-owned cache/view surfaces keyed by `Assets::AssetId`; it must not
+import live ECS, runtime sidecars, or `Asset.Service` to discover asset-backed
+renderables.
+
 ### Per `GRAPHICS-015Q`
 
 - **Capacity / eviction.** The cache stays explicitly non-evicting in this

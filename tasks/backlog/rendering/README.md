@@ -486,16 +486,15 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   [GRAPHICS-081](../../done/GRAPHICS-081-retire-minimal-debug-recipe-scaffold.md)
   after the default-recipe smoke/readback path replaced it. Depends on
   GRAPHICS-033A, GRAPHICS-033B, GRAPHICS-033C.
-- [GRAPHICS-034 — Asset-backed mesh residency from AssetInstance::Source to GpuWorld (planning)](GRAPHICS-034-asset-backed-mesh-residency-bridge.md):
-  planning-only design for the asset-source residency path; locks down
-  AssetId-normalization placement, separate runtime cache, key + refcount,
+- [GRAPHICS-034 — Asset-backed mesh residency from AssetInstance::Source to GpuWorld (done)](../../done/GRAPHICS-034-asset-backed-mesh-residency-bridge.md):
+  retired planning-only slice. Recorded the runtime-owned asset-source
+  residency contract: `AssetInstance::Source` normalization, separate
+  `Runtime::AssetGeometryCache`, `Assets::AssetId` key/refcount semantics,
   per-renderable state machine, ordering against `GpuAssetCache::Tick`,
-  GRAPHICS-023A/B/C/D integration, sharing fairness, stuck-pending policy,
-  failure-mode fallback (cube placeholder via GRAPHICS-031 + GRAPHICS-030
-  procedural source), diagnostics, performance, extensibility to non-mesh
-  domains, and layering. Implementation child slices
-  (`GRAPHICS-034-Impl-A/B/C/D/E`) are identified but not opened. Depends on
-  GRAPHICS-028, GRAPHICS-030, and ASSETIO-001 ingest ownership.
+  GRAPHICS-023A/B/C/D generation acknowledgment, sharing fairness,
+  stuck-pending policy, visible failure fallback, diagnostics, performance,
+  extensibility to non-mesh domains, and layering. Implementation child slices
+  (`GRAPHICS-034-Impl-A/B/C/D/E`) are identified but not opened.
 
 ### Theme A — Triangle path implementation children (GRAPHICS-029A..033F, GRAPHICS-080)
 

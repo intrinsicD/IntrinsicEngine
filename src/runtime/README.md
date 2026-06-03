@@ -238,6 +238,21 @@ with a supplied `Graphics::GpuAssetCache` view and `GpuSceneSlot` metadata to
 report pending/up-to-date/rebind-required states without performing the later
 GPU geometry or material rebind.
 
+`GRAPHICS-034` records the future asset-backed mesh residency bridge that
+extends that observation-only seam. Runtime will normalize
+`ECS::Components::AssetInstance::Source` through a named
+`Runtime::NormalizeAssetInstanceId(...)` helper, store residency in a separate
+`Runtime::AssetGeometryCache` keyed by `Assets::AssetId`, and prefer an attached
+asset source over procedural / `GeometrySources` residency for the same
+renderable. The cache state machine is `NotRequested -> CpuPending ->
+GpuUploading -> Ready/Failed`; `Ready` entries bind shared `GpuGeometryHandle`
+values through `GpuWorld::SetInstanceGeometry`, generation rebinds acknowledge
+GRAPHICS-023D only after a successful replacement bind, and refcount-zero
+entries retire through a future asset-geometry maintenance tick adjacent to the
+existing `GpuAssetCache::Tick` / geometry-cache ticks. Failed assets use a
+visible missing-mesh placeholder plus the GRAPHICS-031 default debug material
+once the implementation child lands; until then the bridge is not implemented.
+
 `RenderExtractionCache` also owns the procedural-source residency bridge
 (GRAPHICS-030B) and the runtime-authored mesh `GeometrySources` residency bridge
 (RUNTIME-085). When a renderable candidate carries

@@ -56,7 +56,7 @@ Planning parents (retired):
 - [`GRAPHICS-033B` (done)](../done/GRAPHICS-033B-vulkan-operational-diagnostics-and-breadcrumb.md)
 - [`GRAPHICS-033C` (done)](../done/GRAPHICS-033C-vulkan-minimal-recipe-recording.md)
 - [`GRAPHICS-033D` (done)](../done/GRAPHICS-033D-gpu-vulkan-visible-triangle-smoke.md)
-- [`rendering/GRAPHICS-034-asset-backed-mesh-residency-bridge.md`](rendering/GRAPHICS-034-asset-backed-mesh-residency-bridge.md)
+- [`rendering/GRAPHICS-034` (done)](../done/GRAPHICS-034-asset-backed-mesh-residency-bridge.md)
 - [`runtime/RORG-031-runtime-composition.md`](runtime/RORG-031-runtime-composition.md)
 - [`ASSETIO-001` (done)](../done/ASSETIO-001-asset-model-texture-ingest-ownership.md)
 - [`GEOIO-002` (done)](../done/GEOIO-002-geometry-io-parity-hardening.md)
@@ -181,8 +181,9 @@ These edges constrain task selection across categories. Respect them when
 promoting backlog tasks to active so per-category DAGs do not diverge.
 
 - **GRAPHICS-034 ⇐ ASSETIO-001 ⇐ GEOIO-002.** Asset-backed mesh residency
-  depends on promoted asset routing, which depends on geometry decoder parity.
-  `GEOIO-002` and `ASSETIO-001` are retired.
+  planning depends on promoted asset routing, which depends on geometry decoder
+  parity. `GEOIO-002`, `ASSETIO-001`, and `GRAPHICS-034` are retired; the
+  implementation children remain unopened.
 - **RUNTIME-085..088 ⇐ HARDEN-065, GRAPHICS-030B, GRAPHICS-070/071.** Runtime
   mesh/graph/point-cloud residency depends on promoted `GeometrySources`, the
   proven runtime-to-`GpuWorld` upload/bind pattern, and retained surface/line/

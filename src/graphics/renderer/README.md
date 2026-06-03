@@ -1633,6 +1633,18 @@ Concretely:
   changes; `Extrinsic.Graphics.GpuWorld` continues to expose only its
   existing `UploadGeometry`/`FreeGeometry`/`SetInstanceGeometry` API.
 - Per
+  [`GRAPHICS-034`](../../../tasks/done/GRAPHICS-034-asset-backed-mesh-residency-bridge.md),
+  asset-backed mesh residency is also runtime-owned. Runtime normalizes
+  `AssetInstance::Source` to `Assets::AssetId`, owns the future
+  `AssetGeometryCache`, requests CPU payloads through asset services, and
+  drives the `NotRequested` / `CpuPending` / `GpuUploading` / `Ready` /
+  `Failed` state machine. Graphics exposes only the existing
+  `GpuWorld::UploadGeometry`, `SetInstanceGeometry`, and `FreeGeometry`
+  value-type seams; it does not import live ECS, `Asset.Service`, or runtime
+  sidecar state. Failed asset-backed meshes use a visible placeholder policy
+  recorded by GRAPHICS-034 once the implementation child lands, with runtime
+  diagnostics owning all failure and stuck-pending counters.
+- Per
   [`GRAPHICS-031`](../../../tasks/done/GRAPHICS-031-default-debug-surface-material.md),
   the canonical missing-material fallback is the default debug surface
   material at slot 0 (`Extrinsic::Graphics::kDefaultMaterialSlotIndex`),
