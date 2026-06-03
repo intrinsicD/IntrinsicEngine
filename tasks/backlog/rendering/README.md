@@ -816,7 +816,7 @@ testable; each phase derisks the next.
   locks extended point record (anisotropic covariance + opacity + SH coeffs),
   tile-based sort + composite, `.gsplat` shipping format. Depends on
   GRAPHICS-014, GRAPHICS-030.
-- [GRAPHICS-049 — Neural radiance cache slot in the GI path (planning)](GRAPHICS-049-neural-radiance-cache-slot.md):
+- [GRAPHICS-049 — Neural radiance cache slot in the GI path (done)](../../done/GRAPHICS-049-neural-radiance-cache-slot.md):
   locks small-MLP shape, online training pass, cache invalidation, GI
   consumer seam. Depends on GRAPHICS-041, GRAPHICS-046.
 - [GRAPHICS-050 — Neural texture compression with random-access decode (planning)](GRAPHICS-050-neural-texture-compression.md):
