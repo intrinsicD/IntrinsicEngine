@@ -645,6 +645,7 @@ set(_runtime_graphics_cpu_test_files
     Test.RuntimeRenderExtraction.cpp
     Test.RuntimeDeviceSelection.cpp
     Test.RuntimeFrameLoopContract.cpp
+    Test.RuntimeSandboxAcceptance.cpp
 )
 intrinsic_resolve_test_sources(_runtime_graphics_cpu_test_sources
     SEARCH_DIRS integration/runtime contract/runtime

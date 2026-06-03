@@ -109,7 +109,14 @@ upstream these runtime gates consume.
 ### F. Final acceptance
 
 - [`RUNTIME-095`](../../tasks/backlog/runtime/RUNTIME-095-working-sandbox-acceptance.md)
-  itself — **OPEN**, blocked by A–D above.
+  itself — **IN PROGRESS**. Slice 1 landed 2026-06-03 (`Test.RuntimeSandboxAcceptance.cpp`,
+  `integration;runtime;graphics`): CPU/null end-to-end acceptance proving one
+  mesh + one graph + one point cloud all reside through a single extraction with
+  distinct `GpuWorld` handles, a finite/invertible camera-controller frame
+  camera, whole-entity selection per family, and the sandbox editor panel frame
+  enumerating the scene. Slice 2 (primitive-selection/outline CPU coverage) and
+  Slice 3 (opt-in `gpu;vulkan` default-recipe present smoke, `Operational`)
+  remain.
 
 ## Suggested dependency order to unblock RUNTIME-095
 
