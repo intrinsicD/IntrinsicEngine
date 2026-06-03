@@ -75,13 +75,13 @@ Graphics never reads or mutates ECS state and never imports editor selection pol
 
 ### 4. Transparent / special-material picking eligibility
 
-Until [`GRAPHICS-025`](../../tasks/backlog/rendering/GRAPHICS-025-hybrid-transparent-special-material-path.md) (hybrid transparent / special-material path) lands, picking eligibility is restricted to the eight-bucket cull contract documented in `rendering-three-pass.md`:
+Until the implementation children identified by [`GRAPHICS-025`](../../tasks/done/GRAPHICS-025-hybrid-transparent-special-material-path.md) add transparent / special-material lanes, picking eligibility is restricted to the eight-bucket cull contract documented in `rendering-three-pass.md`:
 
 - `SelectionSurface`, `SelectionLines`, and `SelectionPoints` mirror the opaque `SurfaceOpaque` / `Lines` / `Points` lanes for `Selectable` renderables only.
 - Transparent and special-forward renderables are **not** eligible for ID-pass writes.
 - Runtime extraction must surface them through CPU pick fallback (matching the existing CPU compatibility fallback policy for missing primitive hints) if editor policy requires picking transparent surfaces.
 
-When `GRAPHICS-025` introduces transparent / special-material lanes, eligibility extends through new selectable sub-buckets **without** changing:
+When those implementation children introduce transparent / special-material lanes, eligibility extends through new selectable sub-buckets **without** changing:
 
 - The `EncodedSelectionId` domain / payload packing.
 - The four-bucket selection vocabulary.

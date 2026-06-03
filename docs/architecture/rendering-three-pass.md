@@ -76,7 +76,7 @@ flow through `BuildDefaultFrameRecipe(...)` and its canonical pass names.
 - For explicit surface-triangle domains, the surface primitive hint is authoritative for the face anchor. CPU refinement may compute the nearest vertex/edge on that face and hit-space diagnostics, but it must not fall back to a different whole-mesh raycast face while a valid surface hint exists.
 - For mesh helper lines on pure-surface entities, CPU face-anchored refinement remains the compatibility fallback because rendered helper line IDs are not necessarily topology edge IDs.
 - If no valid primitive hint is available, CPU picking is the compatibility fallback and must return IDs from the authoritative mesh/graph/point-cloud data structures.
-- Transparent and special-material renderables are not eligible for ID-pass writes until `GRAPHICS-025` introduces selectable transparent / special-forward sub-buckets; until then the eight-bucket cull contract (`SelectionSurface`/`SelectionLines`/`SelectionPoints` mirroring opaque `SurfaceOpaque`/`Lines`/`Points` for `Selectable` renderables) is the picking-eligibility surface, and runtime extraction must route transparent picks through the CPU compatibility fallback if editor policy requires them.
+- Transparent and special-material renderables are not eligible for ID-pass writes until a future implementation child of `GRAPHICS-025` introduces selectable transparent / special-forward sub-buckets; until then the eight-bucket cull contract (`SelectionSurface`/`SelectionLines`/`SelectionPoints` mirroring opaque `SurfaceOpaque`/`Lines`/`Points` for `Selectable` renderables) is the picking-eligibility surface, and runtime extraction must route transparent picks through the CPU compatibility fallback if editor policy requires them.
 
 ## Pass Contract
 
@@ -180,7 +180,7 @@ The current `GpuCullBucketTable` contains eight bucket outputs:
 
 Selection participation is explicit via `GpuRender_Selectable`; the culling shader mirrors otherwise visible surface/line/point renderables into the matching selection bucket. Invalid geometry slots, out-of-range geometry slots, zero-sized geometry ranges, non-positive world-sphere radii, invisible instances, and frustum-culled instances produce no bucket writes. CPU-side generation checks in `GpuWorld` keep stale freed geometry from remaining in instance records before this shader path runs.
 
-Selection buckets are split by primitive domain only (`SelectionSurface`, `SelectionLines`, `SelectionPoints`); alpha-mask and depth-only behavior on selection ID writes is handled by the bound pipeline/shader at each selection ID pass and does not split selection into additional buckets. Transparent or special-material selection lanes are deferred to [GRAPHICS-025](../../tasks/backlog/rendering/GRAPHICS-025-hybrid-transparent-special-material-path.md); until then the eight `RHI::GpuCullBucketTable` outputs are the fixed contract.
+Selection buckets are split by primitive domain only (`SelectionSurface`, `SelectionLines`, `SelectionPoints`); alpha-mask and depth-only behavior on selection ID writes is handled by the bound pipeline/shader at each selection ID pass and does not split selection into additional buckets. Transparent or special-material selection lanes are deferred to the implementation children identified by [GRAPHICS-025](../../tasks/done/GRAPHICS-025-hybrid-transparent-special-material-path.md); until then the eight `RHI::GpuCullBucketTable` outputs are the fixed contract.
 
 `GpuInstanceStatic::VisibilityMask` is a 32-bit per-view inclusion bitmask: a renderable participates in a view when `(instance.VisibilityMask & view.VisibilityMask) != 0`. The default instance value `0xFFFF'FFFFu` participates in every view, which preserves current shader behavior until per-view extraction lands. `GpuInstanceStatic::Layer` is an opaque 32-bit grouping tag for higher-level runtime/editor use (world vs UI vs gizmo vs debug overlay) and is **not** a culling visibility filter; the cull shader does not branch on it. Runtime camera/view extraction owns the translation from ECS view-layer policy into per-view masks supplied to culling and pass consumers; graphics never reads ECS layer state directly.
 
@@ -192,9 +192,70 @@ Contradictory render-flag combinations (for example `Transparent | Selectable` b
 
 `DepthPrepass`, forward `SurfacePass`, and deferred `GBufferPass` consume the `SurfaceOpaque` bucket produced by `CullingPass`. Each pass binds its configured graphics pipeline, binds the managed index buffer from `GpuWorld`, pushes `GpuScenePushConstants`, and records `DrawIndexedIndirectCount` with the bucket's indexed-args buffer, count buffer, and capacity. `GpuScenePushConstants::SceneTableBDA` is the canonical binding seam for the scene table and the SSBOs reachable through it; these passes must not grow pass-specific push constants to carry renderable-instance, transform, material, geometry, or bounds/culling data.
 
-Forward lighting writes `SceneColorHDR` and owns `SceneDepth` when the depth prepass is disabled. Deferred and hybrid lighting paths write `SceneNormal`, `Albedo`, and `Material0` from `SurfacePass`, then resolve through `CompositionPass`; hybrid remains deferred-backed until `GRAPHICS-025` adds its transparent/special-material forward overlay. The CPU/null contract requires these command sequences to be testable without Vulkan and to skip recording when the owning system, pipeline, or surface bucket handles are not valid.
+Forward lighting writes `SceneColorHDR` and owns `SceneDepth` when the depth prepass is disabled. Deferred and hybrid lighting paths write `SceneNormal`, `Albedo`, and `Material0` from `SurfacePass`, then resolve through `CompositionPass`; hybrid remains deferred-backed in the current implementation, while [GRAPHICS-025](../../tasks/done/GRAPHICS-025-hybrid-transparent-special-material-path.md) records the transparent/special-material forward-overlay contract for future child tasks. The CPU/null contract requires these command sequences to be testable without Vulkan and to skip recording when the owning system, pipeline, or surface bucket handles are not valid.
 
-The `SurfaceAlphaMask` cull bucket is reserved infrastructure: `CullingSystem` allocates and emits it for forward compatibility, but `Pass.DepthPrepass`, `Pass.Forward.Surface`, and `Pass.Deferred.GBuffers` consume only `SurfaceOpaque` until material alpha evaluation lands. When alpha-mask material evaluation arrives, the alpha-mask depth and G-buffer paths reuse the existing pass command shapes with an alpha-mask-configured pipeline (alpha-test/`discard` shader, depth-write per the attachment policy below) rather than introducing new pass modules. Runtime extraction must not flag a renderable with `GpuRender_AlphaMask` unless `GpuRender_Surface` is also set; contradictory combinations are rejected through `RenderWorld::InvalidSnapshotRecordCount`. Transparent and special-material surface lanes remain owned by [GRAPHICS-025](../../tasks/backlog/rendering/GRAPHICS-025-hybrid-transparent-special-material-path.md).
+The `SurfaceAlphaMask` cull bucket is reserved infrastructure: `CullingSystem` allocates and emits it for forward compatibility, but `Pass.DepthPrepass`, `Pass.Forward.Surface`, and `Pass.Deferred.GBuffers` consume only `SurfaceOpaque` until material alpha evaluation lands. When alpha-mask material evaluation arrives, the alpha-mask depth and G-buffer paths reuse the existing pass command shapes with an alpha-mask-configured pipeline (alpha-test/`discard` shader, depth-write per the attachment policy below) rather than introducing new pass modules. Runtime extraction must not flag a renderable with `GpuRender_AlphaMask` unless `GpuRender_Surface` is also set; contradictory combinations are rejected through `RenderWorld::InvalidSnapshotRecordCount`. Transparent and special-material surface lanes remain owned by [GRAPHICS-025](../../tasks/done/GRAPHICS-025-hybrid-transparent-special-material-path.md) follow-up implementation children.
+
+### Hybrid transparent and special-material follow-up contract
+
+`GRAPHICS-025` closes the planning ambiguity only; it does not add a renderer
+pass, shader, material flag, or frame-recipe resource. The future real hybrid
+path has these fixed semantics:
+
+- **Deferred opaque base:** opaque surface materials, and alpha-mask materials
+  once material alpha evaluation is implemented, populate `SceneDepth` plus the
+  deferred G-buffer resources (`SceneNormal`, `Albedo`, `Material0`) and resolve
+  through `CompositionPass` into `SceneColorHDR`.
+- **Forward hybrid overlays:** transparent and special forward-only surface
+  materials draw after `CompositionPass` by loading `SceneColorHDR` and
+  `SceneDepth`. They are not allowed to write the G-buffer resources and must not
+  reuse `LinePass`, `PointPass`, transient debug, or visualization overlay packet
+  paths.
+- **Independent primitive overlays:** retained line/point renderables,
+  transient debug primitives, visualization overlays, selection outline, ImGui,
+  debug-view preview, postprocess, and present keep their existing owners and
+  resource contracts; `GRAPHICS-025` does not merge them into the future hybrid
+  surface overlay.
+
+Material classification for later implementation subtasks is:
+
+- `Opaque`: default surface classification; participates in the deferred opaque
+  base (or the existing forward surface path when the frame recipe selects
+  forward mode).
+- `AlphaMask`: binary coverage surface material; still treated as opaque for
+  depth ordering, shadowing, and G-buffer ownership, using the reserved
+  `SurfaceAlphaMask` bucket and alpha-test pipeline variants when implemented.
+- `Transparent`: alpha-blended surface material; reads `SceneDepth`, loads and
+  blends into `SceneColorHDR`, does not write depth by default, and requires a
+  future ordering/OIT subtask before GPU selection lanes can include it.
+- `Unlit`: shading-model classification, not a pass by itself. Opaque unlit
+  materials can use the opaque base or forward path; transparent unlit materials
+  follow the transparent surface rules.
+- `SpecialForwardOnly`: material that cannot be encoded in the canonical
+  G-buffer tuple (for example future hair, decal-like, refractive, or other
+  pass-specific shading). It uses the future hybrid surface overlay and must
+  declare its depth-write, sorting, and selection eligibility policy in the
+  child task that implements it.
+
+The fixed resource requirements are `SceneColorHDR` and `SceneDepth`. Velocity,
+history, per-material sorting buffers, and OIT attachments are not current
+frame-recipe resources. A future TAA/motion-vector task may add velocity/history
+resources, and a future transparency task may choose either sorted alpha
+blending or explicit OIT resources; that task must define the extra framegraph
+resources, memory ownership, CPU/null contract tests, and optional
+`gpu;vulkan` smoke coverage.
+
+Implementation split points are:
+
+- material classification value/API plus runtime-extraction validation,
+  cross-linked to `GRAPHICS-006` and `GRAPHICS-007`;
+- frame-recipe resource/pass declaration for the hybrid surface overlay,
+  cross-linked to `GRAPHICS-008` and `GRAPHICS-009`;
+- transparent sorting or OIT policy, including any optional velocity/history or
+  OIT resources, cross-linked to `GRAPHICS-013A` because the overlay writes the
+  HDR input consumed by postprocess;
+- transparent/special-forward selection eligibility, adding cull/selection
+  lanes only after the material classification and pass ordering are tested.
 
 Renderpass attachment ownership for the depth, surface, and G-buffer paths is fixed: `Pass.DepthPrepass` clears and writes `SceneDepth` (`LoadOp = Clear(1.0)`, `StoreOp = Store`, depth-write on, `CompareOp = Less`); without depth prepass, `Pass.Forward.Surface` clears and writes `SceneDepth` (`Clear(1.0)/Store`, depth-write on, `CompareOp = Less`) alongside `SceneColorHDR` (`Clear/Store`); with depth prepass, `Pass.Forward.Surface` loads `SceneDepth` (`Load/Store`, depth-write off, `CompareOp = Equal` for zero-overdraw early-Z) and clears `SceneColorHDR` (`Clear/Store`); `Pass.Deferred.GBuffers` clears each MRT (`SceneNormal`, `Albedo`, `Material0` all `Clear/Store`) and follows the same depth-prepass policy as forward (`Load + Equal` with depth-write off when prepass is active, `Clear(1.0) + Less` with depth-write on otherwise). The G-buffer MRT set is owned by `Pass.Deferred.GBuffers` and read as inputs by `CompositionPass`. Backend implementations may map these to native renderpass or dynamic-rendering load/store ops; the CPU/null contract verifies command sequencing and resource declarations only.
 
@@ -226,7 +287,7 @@ Transient debug primitive packets are frame-local submissions owned by runtime e
 
 Concrete backend implementations expand the renderer-owned, sanitized `DebugLinePacket`/`DebugPointPacket`/`DebugTrianglePacket` spans on `RenderWorld::DebugPrimitives` through dedicated **per-frame host-visible (transient) GPU buffers** owned by a future backend upload helper, not by folding them into `GpuWorld` or the canonical `CullingPass` buckets. This matches the per-frame transient-path policy in `## Performance Intent` and preserves the canonical instance-slot invariant: retained-pool generation checks (`GpuWorld::Diagnostics`) are not polluted by ephemeral primitives, and `GpuRender_Surface`/`GpuRender_Line`/`GpuRender_Point` flags remain reserved for retained renderable extraction. The existing `Cull.Lines.IndexedArgs`/`Cull.Lines.Count`/`Cull.Points.NonIndexedArgs`/`Cull.Points.Count` cull-bucket resources stay reserved for retained `GpuRender_Line`/`GpuRender_Point` renderables and are not reused for transient debug expansion.
 
-`DebugTrianglePacket` expansion is routed through a dedicated **debug-surface overlay** that draws into `SceneColorHDR`/`SceneDepth` after the lit composition (alongside the existing `LinePass`/`PointPass` overlays); it does not reuse `Pass.Forward.Surface` or `Pass.Deferred.GBuffers`, which consume only the canonical `SurfaceOpaque`/`SurfaceAlphaMask` cull buckets per the depth/surface/G-buffer contract above. Transient debug triangles are not retained renderables and must not be flagged `GpuRender_Surface`. The debug-surface overlay's source module lands next to `Extrinsic.Graphics.Pass.Forward.Line` / `Extrinsic.Graphics.Pass.Forward.Point` in `src/graphics/renderer/Passes/`; the logical pass slots into the pipeline order between `LinePass`/`PointPass` and `PostProcessPass`. The numbered pipeline-order step is intentionally not added until the implementation lands under `GRAPHICS-018`, so this section remains factual rather than aspirational. Future hybrid or forward-overlay merging with `Pass.Forward.Surface` is owned by [GRAPHICS-025](../../tasks/backlog/rendering/GRAPHICS-025-hybrid-transparent-special-material-path.md).
+`DebugTrianglePacket` expansion is routed through a dedicated **debug-surface overlay** that draws into `SceneColorHDR`/`SceneDepth` after the lit composition (alongside the existing `LinePass`/`PointPass` overlays); it does not reuse `Pass.Forward.Surface` or `Pass.Deferred.GBuffers`, which consume only the canonical `SurfaceOpaque`/`SurfaceAlphaMask` cull buckets per the depth/surface/G-buffer contract above. Transient debug triangles are not retained renderables and must not be flagged `GpuRender_Surface`. The debug-surface overlay's source module lands next to `Extrinsic.Graphics.Pass.Forward.Line` / `Extrinsic.Graphics.Pass.Forward.Point` in `src/graphics/renderer/Passes/`; the logical pass slots into the pipeline order between `LinePass`/`PointPass` and `PostProcessPass`. The numbered pipeline-order step is intentionally not added until the implementation lands under `GRAPHICS-018`, so this section remains factual rather than aspirational. Future hybrid or forward-overlay merging with `Pass.Forward.Surface` is owned by [GRAPHICS-025](../../tasks/done/GRAPHICS-025-hybrid-transparent-special-material-path.md) implementation children.
 
 The per-packet `DepthTested` boolean (`DebugLinePacket::DepthTested`, `DebugPointPacket::DepthTested`, `DebugTrianglePacket::DepthTested`) is expressed as **two pipeline variants per primitive lane**, not as separate cull buckets or separate frame-graph resources. The depth-tested variant attaches via `LOAD` with `CompareOp = Less`; the overlay variant attaches via `LOAD` with depth-test disabled and depth-write disabled. The future backend upload helper sorts per-frame packets into the two variants on the CPU side before recording draws, and `LinePass`/`PointPass` (plus the new debug-surface overlay) bind the appropriate variant. This mirrors the depth/surface/G-buffer policy that pipeline state, not buckets, owns alpha-mask vs opaque and depth-equal vs depth-less behavior. No new `FrameRecipe` resource is introduced; both variants attach via `LOAD` to `SceneColorHDR`/`SceneDepth` exactly as the existing line/point command contract specifies.
 
@@ -378,13 +439,13 @@ Notes:
 - Runtime is the sole owner of the `StableEntityId` -> live ECS resolution and of any selection / hover ECS mutation. Runtime consumes `SelectionSystem::GetLastPickResult()` / `GetLastPointIdResult()` (or the equivalent extraction-side seam), resolves the stable ID through its sidecar maps, applies editor selection policy (single-select vs additive, hover vs commit, point picking vs entity picking), and surfaces the resulting selected / hovered stable IDs back as part of `SelectionSnapshot`. `SelectionOutlinePass` consumes that snapshot's stable IDs as the outline-mask producer; graphics never reads or mutates ECS state and never imports editor selection policy. This preserves the `graphics/* -> no live ECS knowledge` rule from `AGENTS.md` and keeps `Graphics.SelectionSystem` as a reporting-only seam.
 - The frame recipe declares `PickingPass` dependencies on surface, line, and point cull buckets (`Cull.SurfaceOpaque.*`, `Cull.Lines.*`, and `Cull.Points.*`) so each split selection ID pass can reuse the canonical GPU-driven bucket contracts.
 - `Pass.Selection.Outline` is the source module for `SelectionOutlinePass`. Although it shares the `Selection.*` source prefix with the picking ID modules, it is a separate logical pass (scheduled after post-process) and must not be merged with `PickingPass` in the pipeline order.
-- Picking eligibility is restricted to the eight-bucket cull contract until [GRAPHICS-025](../../tasks/backlog/rendering/GRAPHICS-025-hybrid-transparent-special-material-path.md) introduces selectable transparent / special-forward sub-buckets: only `Selectable` opaque renderables flow through `SelectionSurface` / `SelectionLines` / `SelectionPoints`, and transparent / special-material renderables are not eligible for ID-pass writes. Runtime extraction routes transparent picks through CPU pick fallback if editor policy requires them; future selectable transparent lanes extend the bucket set without changing `EncodedSelectionId` packing or the four-domain selection vocabulary.
+- Picking eligibility is restricted to the eight-bucket cull contract until the implementation children identified by [GRAPHICS-025](../../tasks/done/GRAPHICS-025-hybrid-transparent-special-material-path.md) introduce selectable transparent / special-forward sub-buckets: only `Selectable` opaque renderables flow through `SelectionSurface` / `SelectionLines` / `SelectionPoints`, and transparent / special-material renderables are not eligible for ID-pass writes. Runtime extraction routes transparent picks through CPU pick fallback if editor policy requires them; future selectable transparent lanes extend the bucket set without changing `EncodedSelectionId` packing or the four-domain selection vocabulary.
 
 Lighting-path coexistence is now explicit:
 
 - **Forward mode:** `SurfacePass` writes directly to `SceneColorHDR`; `CompositionPass` is a no-op; `LinePass` and `PointPass` accumulate onto the same HDR target.
 - **Deferred mode:** `SurfacePass` writes only the G-buffer MRT set (`SceneNormal`, `Albedo`, `Material0`) plus depth; `CompositionPass` resolves those buffers into `SceneColorHDR`; `LinePass` and `PointPass` then execute as forward overlays on top of the lit HDR scene.
-- **Hybrid contract (staging):** recipe/pipeline contracts treat `Hybrid` as a deferred-backed path for resource declaration and composition scheduling. Until a dedicated hybrid composer lands, it reuses the same G-buffer + `CompositionPass` contract as deferred while preserving a distinct typed lighting-path value. The real hybrid/transparent/special-material follow-up is tracked by [GRAPHICS-025](../../tasks/backlog/rendering/GRAPHICS-025-hybrid-transparent-special-material-path.md).
+- **Hybrid contract (staging):** recipe/pipeline contracts treat `Hybrid` as a deferred-backed path for resource declaration and composition scheduling. Until a dedicated hybrid composer lands, it reuses the same G-buffer + `CompositionPass` contract as deferred while preserving a distinct typed lighting-path value. The real hybrid/transparent/special-material follow-up contract is recorded by [GRAPHICS-025](../../tasks/done/GRAPHICS-025-hybrid-transparent-special-material-path.md).
 
 This establishes the current composition rule: deferred-capable opaque surfaces live in `SurfacePass`, while line/point/debug content remains in the forward lane. The same ordering is the extension point for future transparent or special-material forward overlays.
 

@@ -5,7 +5,10 @@
 - Branch / PR: current branch / TBD
 - Completion date: 2026-05-02
 - Commit / PR: local split branch `split/current-working-tree-2026-05-02`; remote PR reference TBD.
-- Follow-ups: planning/implementation remains in `tasks/backlog/rendering/GRAPHICS-025-hybrid-transparent-special-material-path.md`.
+- Follow-ups: the planning task has since been retired as
+  `tasks/done/GRAPHICS-025-hybrid-transparent-special-material-path.md`;
+  implementation remains split into future material-classification, hybrid
+  recipe/pass, transparency/OIT, and selection-eligibility tasks.
 - Next verification step: `python3 tools/agents/check_task_policy.py --root . --strict` and `python3 tools/docs/check_doc_links.py --root . --strict`.
 
 ---
@@ -16,7 +19,7 @@ Create a future-facing task for the real hybrid rendering path and transparent/s
 
 Create:
 
-`tasks/backlog/rendering/GRAPHICS-025-hybrid-transparent-special-material-path.md`
+`tasks/done/GRAPHICS-025-hybrid-transparent-special-material-path.md`
 
 ## Goal
 

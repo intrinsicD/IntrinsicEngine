@@ -337,9 +337,12 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   GRAPHICS-010/011/014/017 done tasks plus this backlog index. Retirement
   gating in GRAPHICS-020 resolves overlay/presentation modules through
   the matrix in `../../../docs/migration/nonlegacy-parity-matrix.md`.
-- [GRAPHICS-025 — Hybrid, transparent, and special-material forward path](GRAPHICS-025-hybrid-transparent-special-material-path.md):
-  future-facing follow-up after GRAPHICS-006/007/008/009 and GRAPHICS-013A
-  establish material, bucket, opaque, lighting, and postprocess contracts.
+- [GRAPHICS-025 — Hybrid, transparent, and special-material forward path](../../done/GRAPHICS-025-hybrid-transparent-special-material-path.md):
+  retired planning slice; records deferred opaque base + future forward hybrid
+  surface overlay semantics, material classifications (`Opaque`, `AlphaMask`,
+  `Transparent`, `Unlit`, `SpecialForwardOnly`), `SceneColorHDR`/`SceneDepth`
+  resource ownership, optional velocity/history/OIT follow-up boundaries, and
+  split points without expanding GRAPHICS-006/007/008/009/013A.
 - [GRAPHICS-028 — ECS renderable-entity to GpuWorld residency bridge](../../done/GRAPHICS-028-ecs-renderable-residency-bridge.md):
   completed planning task that records the runtime-owned residency bridge
   between live ECS queries and `GpuWorld`. Residency state lives in a
