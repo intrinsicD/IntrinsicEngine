@@ -801,7 +801,7 @@ testable; each phase derisks the next.
   locks the optional `IRayTracingDevice` capability surface (BLAS/TLAS,
   inline RT in compute, ray pipelines + SBT) and the `GRAPHICS-033`
   operational-gate extension policy. Depends on GRAPHICS-033.
-- [GRAPHICS-046 — Hybrid GI: ReSTIR DI/GI hardware path and software fallback (planning)](GRAPHICS-046-hybrid-gi-restir-and-fallback.md):
+- [GRAPHICS-046 — Hybrid GI: ReSTIR DI/GI hardware path and software fallback (done)](../../done/GRAPHICS-046-hybrid-gi-restir-and-fallback.md):
   locks `GiPathKind` recipe selection, ReSTIR DI/GI passes + reservoir
   buffers (HW), DDGI probe volume + screen-space probes (SW). Depends on
   GRAPHICS-039, GRAPHICS-045.
