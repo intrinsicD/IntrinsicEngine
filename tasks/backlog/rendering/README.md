@@ -853,7 +853,7 @@ testable; each phase derisks the next.
 - [GRAPHICS-057 — DirectStorage-analog GPU decompression hookpoint on the transfer queue (done)](../../done/GRAPHICS-057-directstorage-gpu-decompression.md):
   locks `IGpuDecompressionTransferQueue` capability surface, GDeflate/Zstd
   payload formats, CPU-fallback rule. Depends on GRAPHICS-018T, GRAPHICS-026.
-- [GRAPHICS-058 — Frame generation pass (planning)](GRAPHICS-058-frame-generation-pass.md):
+- [GRAPHICS-058 — Frame generation pass (done)](../../done/GRAPHICS-058-frame-generation-pass.md):
   locks `IFrameGenerator` interface (interpolation/extrapolation), reference
   motion-blend interpolator, presentation pacing in `runtime/`. Depends on
   GRAPHICS-013C, GRAPHICS-040.
