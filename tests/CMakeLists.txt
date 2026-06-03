@@ -274,6 +274,7 @@ if(TARGET ExtrinsicRuntime)
     set(_runtime_contract_test_files
         Test.GpuAssetCacheFallbackBootstrap.cpp
         Test.AssetGeometryIO.cpp
+        Test.AssetModelTextureIO.cpp
         Test.ImGuiAdapter.cpp
         Test.ImGuiAdapterEngineWiring.cpp
         Test.MeshGeometryExtraction.cpp
@@ -405,6 +406,8 @@ set(_asset_unit_test_files
     Test.Asset.EventBus.cpp
     Test.Asset.GeometryIOBridge.cpp
     Test.Asset.ImportRouter.cpp
+    Test.Asset.ModelTextureIOBridge.cpp
+    Test.Asset.ModelTexturePayload.cpp
     Test.Asset.PathIndex.cpp
     Test.Asset.PayloadStore.cpp
     Test.Asset.Registry.cpp

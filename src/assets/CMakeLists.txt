@@ -8,6 +8,8 @@ target_sources(${target_name}
         Asset.GeometryIOBridge.cppm
         Asset.ImportRouter.cppm
         Asset.LoadPipeline.cppm
+        Asset.ModelTextureIOBridge.cppm
+        Asset.ModelTexturePayload.cppm
         Asset.PathIndex.cppm
         Asset.PayloadStore.cppm
         Asset.Registry.cppm
@@ -18,6 +20,8 @@ target_sources(${target_name}
         Asset.GeometryIOBridge.cpp
         Asset.ImportRouter.cpp
         Asset.LoadPipeline.cpp
+        Asset.ModelTextureIOBridge.cpp
+        Asset.ModelTexturePayload.cpp
         Asset.PathIndex.cpp
         Asset.PayloadStore.cpp
         Asset.Registry.cpp

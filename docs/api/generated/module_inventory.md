@@ -9,7 +9,7 @@ Root scanned: `src`
 | Layer | Module Count |
 |---|---:|
 | `app` | 1 |
-| `assets` | 9 |
+| `assets` | 11 |
 | `core` | 39 |
 | `ecs` | 27 |
 | `geometry` | 85 |
@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `legacy` | 182 |
 | `platform` | 5 |
-| `runtime` | 20 |
+| `runtime` | 21 |
 
 ## Modules
 
@@ -31,6 +31,8 @@ Root scanned: `src`
 | `Extrinsic.Asset.GeometryIOBridge` | `src/assets/Asset.GeometryIOBridge.cppm` | `assets` |
 | `Extrinsic.Asset.ImportRouter` | `src/assets/Asset.ImportRouter.cppm` | `assets` |
 | `Extrinsic.Asset.LoadPipeline` | `src/assets/Asset.LoadPipeline.cppm` | `assets` |
+| `Extrinsic.Asset.ModelTextureIOBridge` | `src/assets/Asset.ModelTextureIOBridge.cppm` | `assets` |
+| `Extrinsic.Asset.ModelTexturePayload` | `src/assets/Asset.ModelTexturePayload.cppm` | `assets` |
 | `Extrinsic.Asset.PathIndex` | `src/assets/Asset.PathIndex.cppm` | `assets` |
 | `Extrinsic.Asset.PayloadStore` | `src/assets/Asset.PayloadStore.cppm` | `assets` |
 | `Extrinsic.Asset.Registry` | `src/assets/Asset.Registry.cppm` | `assets` |
@@ -471,6 +473,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SandboxEditorUi` | `src/runtime/Editor/Runtime.SandboxEditorUi.cppm` | `runtime` |
 | `Extrinsic.Runtime.ImGuiAdapter` | `src/runtime/ImGui/Runtime.ImGuiAdapter.cppm` | `runtime` |
 | `Extrinsic.Runtime.AssetGeometryIO` | `src/runtime/Runtime.AssetGeometryIO.cppm` | `runtime` |
+| `Extrinsic.Runtime.AssetModelTextureIO` | `src/runtime/Runtime.AssetModelTextureIO.cppm` | `runtime` |
 | `Extrinsic.Runtime.EcsSystemBundle` | `src/runtime/Runtime.EcsSystemBundle.cppm` | `runtime` |
 | `Extrinsic.Runtime.Engine` | `src/runtime/Runtime.Engine.cppm` | `runtime` |
 | `Extrinsic.Runtime.GraphGeometryPacker` | `src/runtime/Runtime.GraphGeometryPacker.cppm` | `runtime` |
@@ -488,4 +491,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugAdapters` | `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **461**
+Total modules: **464**

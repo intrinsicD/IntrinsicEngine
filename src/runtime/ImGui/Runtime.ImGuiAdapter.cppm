@@ -4,16 +4,16 @@ module;
 #include <functional>
 #include <string>
 
+// Opaque forward declaration of the Dear ImGui context. Keep this in the
+// global module fragment so it denotes the same global-module entity declared
+// by `imgui.h` in the matching implementation unit, without including `imgui.h`
+// in this module interface (RUNTIME-090).
+struct ImGuiContext;
+
 export module Extrinsic.Runtime.ImGuiAdapter;
 
 import Extrinsic.Platform.Window;
 import Extrinsic.Graphics.ImGuiOverlaySystem;
-
-// Opaque forward declaration of the Dear ImGui context. The full type
-// (`imgui.h`) and its transitive glfw/volk link dependencies are confined to
-// the matching `.cpp` implementation unit so they never leak through this
-// module interface (RUNTIME-090). Importers only ever see a pointer.
-struct ImGuiContext;
 
 export namespace Extrinsic::Runtime
 {

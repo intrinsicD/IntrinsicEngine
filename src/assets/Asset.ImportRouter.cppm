@@ -23,6 +23,7 @@ export namespace Extrinsic::Assets
 
     enum class AssetFileFormat : std::uint8_t
     {
+        Unknown,
         OBJ,
         OFF,
         STL,

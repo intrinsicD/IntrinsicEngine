@@ -9,6 +9,7 @@ target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Runtime.AssetGeometryIO.cppm
+        Runtime.AssetModelTextureIO.cppm
         Runtime.EcsSystemBundle.cppm
         Runtime.Engine.cppm
         Cameras/Runtime.CameraControllers.cppm
@@ -30,6 +31,7 @@ target_sources(${target_name}
         Visualization/Runtime.VisualizationAdapters.cppm
         PRIVATE
         Runtime.AssetGeometryIO.cpp
+        Runtime.AssetModelTextureIO.cpp
         Runtime.EcsSystemBundle.cpp
         Runtime.Engine.cpp
         Editor/Runtime.SandboxEditorUi.cpp
@@ -70,6 +72,11 @@ target_link_libraries(${target_name}
 # runtime's public module surface. `imgui_core_lib` is always available, so the
 # adapter builds in headless-no-glfw configs too.
 target_link_libraries(${target_name} PRIVATE imgui_core_lib)
+
+# ASSETIO-001 Slice C.2b keeps concrete model/texture decoder dependencies
+# runtime-private. The exported registration seam only mentions promoted asset
+# bridge types, so tinygltf/stb headers and symbols do not leak into assets.
+target_link_libraries(${target_name} PRIVATE tinygltf stb)
 
 if(INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN)
         if(TARGET ExtrinsicBackendsVulkan)

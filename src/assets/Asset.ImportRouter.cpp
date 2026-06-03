@@ -377,6 +377,8 @@ namespace Extrinsic::Assets
     {
         switch (format)
         {
+        case AssetFileFormat::Unknown:
+            return "Unknown";
         case AssetFileFormat::OBJ:
             return "OBJ";
         case AssetFileFormat::OFF:

@@ -35,9 +35,22 @@ import/export routing, payload/domain hints, and deterministic route diagnostics
 without importing geometry, runtime, graphics, or RHI into `src/assets`. Slice B
 adds `Extrinsic.Asset.GeometryIOBridge` plus runtime-owned promoted geometry
 decoder/encoder callback registration without importing geometry into
-`src/assets`; default CPU gate verification passed for the slice.
-Next verification: continue Slice C for model/scene and texture CPU payload
-ownership.
+`src/assets`; default CPU gate verification passed for the slice. Slice C.1 adds
+the promoted CPU-only model/texture payload contract. Slice C.2a adds
+`Extrinsic.Asset.ModelTextureIOBridge` for asset-owned primary file reads,
+relative external-resource reads, promoted model/texture callback dispatch,
+decode-error propagation, and payload validation without importing geometry,
+runtime, graphics, or RHI into `src/assets`; focused asset checks, the broad
+`IntrinsicTests` build, structural checks, and the default CPU CTest gate pass
+after the runtime ImGui module forward declaration fix and benchmark smoke
+target build. Slice C.2b adds `Extrinsic.Runtime.AssetModelTextureIO` for
+runtime-owned concrete GLTF/GLB and STB-backed PNG/JPEG/TGA/BMP/HDR decoder
+registration plus decoded mesh primitive, embedded image, material texture ref,
+and external-resource diagnostic mapping into promoted CPU payloads; focused
+asset/runtime checks, structural checks, benchmark smoke target build, and the
+default CPU CTest gate pass for the slice. Runtime handoff remains in Slice D.
+Next verification: continue Slice D runtime handoff, then run the focused
+asset/runtime checks and default CPU gate for that slice.
 
 The most recently retired tasks are summarised below.
 

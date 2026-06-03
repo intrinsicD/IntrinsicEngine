@@ -11,6 +11,8 @@ store, load pipeline, event bus, and path index behind a single façade.
 - `Extrinsic.Asset.PayloadStore`
 - `Extrinsic.Asset.ImportRouter`
 - `Extrinsic.Asset.GeometryIOBridge`
+- `Extrinsic.Asset.ModelTextureIOBridge`
+- `Extrinsic.Asset.ModelTexturePayload`
 - `Extrinsic.Asset.LoadPipeline`
 - `Extrinsic.Asset.EventBus`
 - `Extrinsic.Asset.PathIndex`
@@ -30,6 +32,19 @@ store, load pipeline, event bus, and path index behind a single façade.
   registrations keyed by resolved route format and payload kind. Runtime
   registers the promoted geometry codecs; `src/assets` dispatches callbacks and
   verifies typed payloads without importing geometry, runtime, graphics, or RHI.
+- `Asset.ModelTextureIOBridge` stores asset-owned model-scene and texture
+  decoder callback registrations keyed by resolved route format. Assets own
+  primary file byte transport through `Extrinsic.Core.IOBackend`, relative
+  external-resource reads, callback dispatch, decode-error propagation, and
+  payload validation without importing decoder, geometry, runtime, graphics, or
+  RHI code.
+- `Asset.ModelTexturePayload` defines CPU-only model-scene and texture payload
+  records, validation helpers, material texture references, and external
+  resource diagnostics for GLTF/GLB and image ingest. Model primitives point at
+  typed `AssetGeometryPayload` records so decoded geometry can remain CPU-owned
+  without importing geometry into `src/assets`. It stores bytes and metadata
+  only; runtime registers the concrete tinygltf/stb decoder callbacks, while
+  ECS construction and GPU upload remain runtime/graphics handoff work.
 - `AssetLoadPipeline` tracks load stages, in-flight requests, GPU fence waits,
   and failure / completion transitions.
 - `AssetEventBus` batches `Ready`, `Failed`, `Reloaded`, and `Destroyed`
@@ -47,6 +62,8 @@ Asset.EventBus.cppm
 Asset.GeometryIOBridge.cppm
 Asset.ImportRouter.cppm
 Asset.LoadPipeline.cppm
+Asset.ModelTextureIOBridge.cppm
+Asset.ModelTexturePayload.cppm
 Asset.PathIndex.cppm
 Asset.PayloadStore.cppm
 Asset.Registry.cppm
@@ -61,6 +78,8 @@ Asset.EventBus.cpp
 Asset.GeometryIOBridge.cpp
 Asset.ImportRouter.cpp
 Asset.LoadPipeline.cpp
+Asset.ModelTextureIOBridge.cpp
+Asset.ModelTexturePayload.cpp
 Asset.PathIndex.cpp
 Asset.PayloadStore.cpp
 Asset.Registry.cpp
