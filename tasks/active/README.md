@@ -48,9 +48,17 @@ runtime-owned concrete GLTF/GLB and STB-backed PNG/JPEG/TGA/BMP/HDR decoder
 registration plus decoded mesh primitive, embedded image, material texture ref,
 and external-resource diagnostic mapping into promoted CPU payloads; focused
 asset/runtime checks, structural checks, benchmark smoke target build, and the
-default CPU CTest gate pass for the slice. Runtime handoff remains in Slice D.
-Next verification: continue Slice D runtime handoff, then run the focused
-asset/runtime checks and default CPU gate for that slice.
+default CPU CTest gate pass for the slice. Slice D.1 adds
+`Extrinsic.Runtime.AssetModelTextureHandoff` for runtime-owned texture
+GPU-residency handoff from `AssetService::Ready` texture payload events to
+`Graphics::GpuAssetCache::RequestUpload`, with unsupported-format failure
+diagnostics and teardown before asset/cache destruction; focused asset/runtime
+checks, structural/docs checks, benchmark smoke target build, and the default
+CPU CTest gate pass for the slice. Model-scene ECS construction remains deferred
+to Slice D.2 because the current GLTF primitive payload needs a separate
+promoted topology/entity materialization decision.
+Next verification: implement Slice D.2, then run the focused asset/runtime
+checks and default CPU gate for that slice.
 
 The most recently retired tasks are summarised below.
 

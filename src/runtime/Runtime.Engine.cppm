@@ -19,6 +19,7 @@ import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.ImGuiOverlaySystem;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.ImGuiAdapter;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
@@ -325,6 +326,7 @@ namespace Extrinsic::Runtime
         std::unique_ptr<Graphics::GpuAssetCache> m_GpuAssetCache;
         Assets::AssetEventBus::ListenerToken     m_GpuAssetCacheListener{
             Assets::AssetEventBus::InvalidToken};
+        std::unique_ptr<AssetModelTextureHandoff> m_AssetModelTextureHandoff;
         // ECS scene registry
         std::unique_ptr<ECS::Scene::Registry>  m_Scene;
 

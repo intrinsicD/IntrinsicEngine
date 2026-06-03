@@ -38,6 +38,7 @@ import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.SelectionSystem;
+import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.ImGuiAdapter;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
@@ -337,6 +338,9 @@ namespace Extrinsic::Runtime
                                                        drive RequestUpload */    break;
                 }
             });
+        m_AssetModelTextureHandoff = std::make_unique<AssetModelTextureHandoff>(
+            *m_AssetService,
+            *m_GpuAssetCache);
 
         // ── 6. ECS scene ──────────────────────────────────────────────────
         m_Scene = std::make_unique<ECS::Scene::Registry>();
@@ -407,6 +411,7 @@ namespace Extrinsic::Runtime
             std::unique_ptr<StreamingExecutor>& StreamingExecutorPtr;
             std::unique_ptr<Assets::AssetService>& AssetService;
             std::unique_ptr<Graphics::GpuAssetCache>& GpuAssetCache;
+            std::unique_ptr<AssetModelTextureHandoff>& AssetModelTextureHandoffPtr;
             Assets::AssetEventBus::ListenerToken& GpuAssetCacheListener;
             std::unique_ptr<ECS::Scene::Registry>& Scene;
             ReferenceSceneRegistry& ReferenceRegistry;
@@ -429,6 +434,7 @@ namespace Extrinsic::Runtime
                           std::unique_ptr<StreamingExecutor>& streamingExecutor,
                           std::unique_ptr<Assets::AssetService>& assetService,
                           std::unique_ptr<Graphics::GpuAssetCache>& gpuAssetCache,
+                          std::unique_ptr<AssetModelTextureHandoff>& assetModelTextureHandoff,
                           Assets::AssetEventBus::ListenerToken& gpuAssetCacheListener,
                           std::unique_ptr<ECS::Scene::Registry>& scene,
                           ReferenceSceneRegistry& referenceRegistry,
@@ -450,6 +456,7 @@ namespace Extrinsic::Runtime
                 , StreamingExecutorPtr(streamingExecutor)
                 , AssetService(assetService)
                 , GpuAssetCache(gpuAssetCache)
+                , AssetModelTextureHandoffPtr(assetModelTextureHandoff)
                 , GpuAssetCacheListener(gpuAssetCacheListener)
                 , Scene(scene)
                 , ReferenceRegistry(referenceRegistry)
@@ -505,6 +512,7 @@ namespace Extrinsic::Runtime
                 // flush cannot reach a freed cache.  The cache is destroyed
                 // before the renderer (which owns Buffer/Texture managers)
                 // so leases unwind through live managers.
+                AssetModelTextureHandoffPtr.reset();
                 if (AssetService &&
                     GpuAssetCacheListener != Assets::AssetEventBus::InvalidToken)
                 {
@@ -559,6 +567,7 @@ namespace Extrinsic::Runtime
                             m_StreamingExecutor,
                             m_AssetService,
                             m_GpuAssetCache,
+                            m_AssetModelTextureHandoff,
                             m_GpuAssetCacheListener,
                             m_Scene,
                             m_ReferenceSceneRegistry,

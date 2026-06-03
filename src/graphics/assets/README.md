@@ -124,22 +124,19 @@ Graphics-owned bridge between `Assets::AssetId` and GPU resources.
   passes the renderer's `SamplerManager` into the cache constructor so
   the fallback's nearest/clamp-to-edge sampler descriptor resolves
   through the deduplicated manager path; the cache never reads files.
-  Texture-typed asset bridges (planned
-  umbrella module `Extrinsic.Runtime.AssetBridges.Texture`, mirroring
-  the `Extrinsic.Runtime.SpatialDebugAdapters` pattern from
-  `GRAPHICS-011Q` and the `Extrinsic.Runtime.VisualizationAdapters`
-  pattern from `GRAPHICS-014Q`) subscribe to texture-typed
-  `AssetEvent::Ready` events on `AssetService::SubscribeAll`, read the
-  decoded CPU payload, construct a `GpuTextureRequest` (`AssetId`,
-  `Bytes` span, `TextureDesc`, sampler descriptor or pre-allocated
-  `SamplerHandle`), and call `cache.RequestUpload(req)` synchronously
-  from the asset-event handler thread. Heavy CPU decoding may be
-  queued through `Extrinsic.Runtime.StreamingExecutor` (the same async
-  surface used for visualization baking under `GRAPHICS-014Q`), but the
-  final `RequestUpload` call is always synchronous from runtime;
-  graphics never schedules CPU work and never imports `AssetService` or
-  `AssetEventBus`. `AssetEvent::Destroyed` flows to
-  `cache.NotifyDestroyed(id)` which queues live leases for retirement.
+  `Extrinsic.Runtime.AssetModelTextureHandoff` subscribes to
+  `AssetEvent::Ready` events on `AssetService::SubscribeAll`, reads promoted
+  `AssetTexture2DPayload` records, maps supported CPU formats to
+  `TextureDesc`, constructs `GpuTextureRequest` (`AssetId`, `Bytes` span,
+  `TextureDesc`, sampler descriptor), and calls `cache.RequestUpload(req)`
+  synchronously from the asset-event handler thread. RGB8 and unknown texture
+  payload formats fail closed before a graphics upload is requested. Heavy CPU
+  decoding may be queued through `Extrinsic.Runtime.StreamingExecutor` (the
+  same async surface used for visualization baking under `GRAPHICS-014Q`), but
+  the final `RequestUpload` call is always synchronous from runtime; graphics
+  never schedules CPU work and never imports `AssetService` or `AssetEventBus`.
+  `AssetEvent::Destroyed` flows to `cache.NotifyDestroyed(id)` which queues
+  live leases for retirement.
   Editor / app code may expose per-asset upload priority hints through
   future runtime APIs, but the cache currently has no priority queue
   and graphics never receives priority data.
@@ -171,9 +168,10 @@ It must **not** depend on:
 (RUNTIME-070), and subscribes to `AssetEventBus` via
 `AssetService::SubscribeAll`, mapping events to `NotifyFailed` /
 `NotifyReloaded` / `NotifyDestroyed`. `AssetEvent::Ready` is
-intentionally not handled by the cache itself — type-specific bridges
-(mesh / texture) are responsible for calling `RequestUpload` once their
-CPU payload is final.
+intentionally not handled by the cache itself. Runtime-owned type-specific
+bridges are responsible for calling `RequestUpload` once their CPU payload is
+final; `Extrinsic.Runtime.AssetModelTextureHandoff` covers decoded texture
+payloads, while model-scene ECS/material handoff remains deferred.
 
 `AssetHooks::TickAssets()` calls `cache.Tick(device.GetGlobalFrameNumber(),
 device.GetFramesInFlight())` once per frame, after `AssetService::Tick()`.

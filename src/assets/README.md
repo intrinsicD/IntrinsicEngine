@@ -43,8 +43,9 @@ store, load pipeline, event bus, and path index behind a single façade.
   resource diagnostics for GLTF/GLB and image ingest. Model primitives point at
   typed `AssetGeometryPayload` records so decoded geometry can remain CPU-owned
   without importing geometry into `src/assets`. It stores bytes and metadata
-  only; runtime registers the concrete tinygltf/stb decoder callbacks, while
-  ECS construction and GPU upload remain runtime/graphics handoff work.
+  only; runtime registers the concrete tinygltf/stb decoder callbacks and
+  separately owns texture Ready-event upload requests into `GpuAssetCache`.
+  Model-scene ECS construction remains runtime handoff work.
 - `AssetLoadPipeline` tracks load stages, in-flight requests, GPU fence waits,
   and failure / completion transitions.
 - `AssetEventBus` batches `Ready`, `Failed`, `Reloaded`, and `Destroyed`
@@ -106,9 +107,11 @@ handle.
 
 GPU-side state lives in a Graphics-owned side table (`GpuAssetCache`), keyed
 by `AssetId`. The bridge is event-driven: `AssetEventBus` publishes `Ready`,
-`Reloaded`, `Failed`, and `Destroyed`; `Graphics` subscribes. `Runtime` wires
-the subscription — it is the only layer that names both sides.
+`Reloaded`, `Failed`, and `Destroyed`; `Runtime` wires the graphics cache
+listener and type-specific handoff objects. `AssetModelTextureHandoff` handles
+texture `Ready` events by reading CPU texture payloads and requesting
+`GpuAssetCache` uploads. Runtime is the only layer that names both sides.
 
-See `CLAUDE.md` → "Assets ↔ Graphics boundary" for the full contract
+See `AGENTS.md` → "Assets ↔ Graphics boundary" for the full contract
 (per-asset state machine, `TransferManager` reuse, `AssetId`-in-components
 rule, hot-reload atomicity).

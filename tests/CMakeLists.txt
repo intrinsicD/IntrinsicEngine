@@ -274,6 +274,7 @@ if(TARGET ExtrinsicRuntime)
     set(_runtime_contract_test_files
         Test.GpuAssetCacheFallbackBootstrap.cpp
         Test.AssetGeometryIO.cpp
+        Test.AssetModelTextureHandoff.cpp
         Test.AssetModelTextureIO.cpp
         Test.ImGuiAdapter.cpp
         Test.ImGuiAdapterEngineWiring.cpp

@@ -4,7 +4,7 @@
 - Status: in-progress.
 - Owner/agent: Codex.
 - Branch: `main`.
-- Current slice: Slice C.2b implemented. The CPU-only import/export route
+- Current slice: Slice D.1 implemented and verified. The CPU-only import/export route
   contract, asset-owned geometry callback bridge, promoted model/texture
   payload records, and promoted model/texture decoder-callback bridge are
   present. Runtime now registers concrete GLTF/GLB and STB-backed
@@ -13,10 +13,15 @@
   external-resource diagnostics into promoted CPU payload records. Assets own
   primary file reads, relative external-resource reads, model/texture callback
   dispatch, decode-error propagation, and payload validation without importing
-  geometry, runtime, graphics, or RHI. Slice C.2b focused checks, structural
+  geometry, runtime, graphics, or RHI. Slice D.1 adds
+  `Extrinsic.Runtime.AssetModelTextureHandoff` for runtime-owned texture
+  `AssetService::Ready` event upload requests into
+  `Graphics::GpuAssetCache`, with unsupported-format failure diagnostics and
+  teardown before asset/cache destruction. Focused checks, structural/docs
   checks, benchmark smoke target build, and the default CPU CTest gate pass.
-- Next verification step: continue Slice D runtime handoff, then rerun the
-  focused asset/runtime checks and default CPU gate for that slice.
+- Next verification step: implement Slice D.2 runtime model-scene ECS entity
+  construction and embedded texture/material handoff, then run focused
+  asset/runtime checks and the default CPU gate.
 
 ## Slice plan
 - **Slice A.** Add `Extrinsic.Asset.ImportRouter` as a CPU-only routing
@@ -52,6 +57,15 @@
 - **Slice D.** Add runtime handoff from decoded asset payloads/events to ECS
   construction and graphics/assets residency requests, preserving runtime as the
   only layer that names both CPU assets and GPU residency.
+- **Slice D.1.** Add runtime-owned texture payload handoff: subscribe to
+  `AssetService` Ready events, read promoted `AssetTexture2DPayload` records,
+  build `GpuTextureRequest` descriptors, and submit upload requests to
+  `Graphics::GpuAssetCache`. Model-scene ECS construction remains deferred to
+  Slice D.2 because the current GLTF primitive payload is a mesh-IO property-set
+  result and needs a separate promoted topology/entity materialization decision.
+- **Slice D.2.** Add runtime-owned model-scene entity construction and embedded
+  texture/material handoff once the mesh-primitive payload to ECS
+  `GeometrySources` conversion is pinned by tests.
 
 ## Goal
 - Define and implement the promoted CPU asset ingest/export orchestration that replaces legacy `Graphics.IORegistry`, `Graphics.Importers.GLTF`, `Graphics.TextureLoader`, `Graphics.ModelLoader`, and `Graphics.Model` ownership without moving file IO or decode policy into final graphics layers.
@@ -70,14 +84,14 @@
 - [x] Define how asset ingest invokes geometry-owned decoders/encoders for OBJ/OFF/STL/PLY/PCD/XYZ/TGF without importing graphics or RHI. Slice B adds `Extrinsic.Asset.GeometryIOBridge` plus runtime-owned `RegisterPromotedGeometryIOCallbacks(...)`; `src/assets` dispatches callbacks by resolved route, while `src/runtime` imports geometry and translates decoder errors into promoted core errors.
 - [x] Define and implement GLTF/GLB CPU ingest ownership for model/scene payloads, external buffer/image resolution through `Core.IOBackend` or promoted asset path services, embedded image payloads, material texture references, and mesh primitive extraction through geometry-owned helpers. Slice C.1 adds the CPU-only model-scene payload records, material texture references, embedded-image records, and external-resource diagnostic contract. Slice C.2a adds the promoted bridge for primary/external resource reads, callback dispatch, error propagation, and payload validation. Slice C.2b adds runtime-owned GLTF/GLB decoder registration, embedded image/material mapping, external-resource diagnostics, and mesh geometry payload extraction into `AssetGeometryPayload` records.
 - [x] Define and implement CPU texture decode payload ownership and metadata (`dimensions`, format/color space, component count, source path/generation) without creating GPU resources in `assets`. Slice C.1 adds the texture payload metadata/pixel records and validation helpers. Slice C.2a adds promoted texture callback invocation and decoded-payload validation. Slice C.2b registers runtime-owned STB-backed PNG/JPEG/TGA/BMP/HDR texture decoders; KTX remains loader-missing until a dedicated decoder exists.
-- [ ] Define runtime handoff from decoded asset payloads/events to ECS entity construction and `graphics/assets::GpuAssetCache` upload requests.
+- [ ] Define runtime handoff from decoded asset payloads/events to ECS entity construction and `graphics/assets::GpuAssetCache` upload requests. Slice D.1 now owns decoded texture payload Ready-event upload requests into `GpuAssetCache`; Slice D.2 owns model-scene ECS entity construction and embedded texture/material handoff.
 - [ ] Add diagnostics for unsupported formats, ambiguous domain selection, external-resource failures, decode failures, and payload registration failures. Slice A covers route-level missing/unsupported/ambiguous/payload-mismatch diagnostics; Slice B maps geometry decode/write failures through promoted core error codes. Slice C.2a covers primary/external read failures, model/texture callback decode errors, and invalid decoded payload diagnostics. Slice C.2b maps tinygltf/stb decode failures to promoted core errors and records GLTF external-resource diagnostics; payload registration failures remain for the handoff/load-service slices.
 ## Tests
 - [ ] Add `unit;assets` tests for extension routing, import hints, typed payload registration, failure mapping, texture metadata decode, and deterministic error diagnostics. Slice A adds `AssetImportRouter` routing/failure diagnostics coverage; Slice B adds `AssetGeometryIOBridge` typed callback registration/dispatch and failure-path coverage. Slice C.1 adds `AssetModelTexturePayload` validation, route-fit, diagnostic consistency, and typed `AssetService` storage coverage. Slice C.2a adds `AssetModelTextureIOBridge` coverage for primary file reads, external resource reads, missing callbacks, invalid registrations, read/decode failures, and invalid decoded payloads. Slice C.2b adds `contract;runtime` coverage for concrete model/texture decoder registration, PNG decode, GLTF external-buffer decode, embedded image/material mapping, geometry payload extraction, and promoted decode failure mapping.
-- [ ] Add `integration;runtime;assets` tests for decoded geometry/model payloads flowing to runtime-owned ECS setup or residency requests without graphics owning file IO. Slice B adds `contract;runtime` coverage for promoted geometry decoder/encoder callback registration and real mesh/point-cloud import/export dispatch; Slice C.2b adds concrete model/texture decoder dispatch coverage. ECS setup and residency requests remain for Slice D.
+- [ ] Add `integration;runtime;assets` tests for decoded geometry/model payloads flowing to runtime-owned ECS setup or residency requests without graphics owning file IO. Slice B adds `contract;runtime` coverage for promoted geometry decoder/encoder callback registration and real mesh/point-cloud import/export dispatch; Slice C.2b adds concrete model/texture decoder dispatch coverage. Slice D.1 adds texture GPU-residency handoff coverage in `Test.AssetModelTextureHandoff.cpp`. ECS setup remains for Slice D.2.
 - [ ] Add `contract;graphics;assets` tests or existing `GpuAssetCache` coverage only for GPU-side cache behavior; do not make `src/assets` depend on graphics.
 ## Docs
-- [ ] Update `docs/migration/nonlegacy-parity-matrix.md` when ownership is implemented or staged. Slices A/B record the promoted route-contract and geometry callback surfaces; Slice C.1 records the model/texture payload contract; Slice C.2a records the promoted model/texture bridge; Slice C.2b records runtime-owned concrete GLTF/GLB and STB-backed texture decoder registration. Handoff slices still need updates.
+- [ ] Update `docs/migration/nonlegacy-parity-matrix.md` when ownership is implemented or staged. Slices A/B record the promoted route-contract and geometry callback surfaces; Slice C.1 records the model/texture payload contract; Slice C.2a records the promoted model/texture bridge; Slice C.2b records runtime-owned concrete GLTF/GLB and STB-backed texture decoder registration. Slice D.1 records runtime-owned texture GPU-residency handoff; Slice D.2 still needs model-scene ECS/material handoff updates.
 - [ ] Cross-link `GRAPHICS-019`, `GRAPHICS-020`, `GRAPHICS-028`, and `GEOIO-002` from implementation notes. Slices A/B update `src/assets/README.md`, `src/runtime/README.md`, and parity/gate docs for the route and geometry callback contracts.
 ## Acceptance criteria
 - [ ] Legacy graphics IO/model/texture responsibilities have promoted CPU asset/routing owners with explicit runtime and graphics-residency handoff seams.
@@ -96,6 +110,9 @@ python3 tools/repo/check_test_layout.py --root . --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/agents/check_task_state_links.py --root . --strict
 python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main
+git diff --check
+python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md --check
 ```
 ## Forbidden changes
 - Moving importer/exporter ownership into `src/graphics/*`.
@@ -123,8 +140,11 @@ python3 tools/docs/check_doc_links.py --root .
 - Slice C.2b extends `CPUContracted` by registering concrete model/texture
   decoders in runtime, proving texture/model metadata produced from real
   bytes, and mapping GLTF geometry/images/materials into promoted CPU payloads.
-- Later slices extend `CPUContracted` by proving runtime handoff, load-service
-  registration, and ECS/GPU residency requests.
+- Slice D.1 extends `CPUContracted` by proving runtime-owned texture
+  GPU-residency handoff from `AssetService` Ready events to `GpuAssetCache`
+  upload requests without importing graphics/RHI into `src/assets`.
+- Slice D.2 extends `CPUContracted` by proving runtime-owned model-scene ECS
+  construction and material/embedded-texture handoff.
 - `Operational` file-backed sandbox proof remains owned by
   [`RUNTIME-095`](../backlog/runtime/RUNTIME-095-working-sandbox-acceptance.md)
   after UI and runtime handoff slices compose the route contract.
