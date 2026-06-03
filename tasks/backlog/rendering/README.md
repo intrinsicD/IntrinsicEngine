@@ -858,6 +858,47 @@ testable; each phase derisks the next.
   motion-blend interpolator, presentation pacing in `runtime/`. Depends on
   GRAPHICS-013C, GRAPHICS-040.
 
+### Modernization Phase-1 implementation children (opened)
+
+The Phase-1 planning slices (GRAPHICS-036..040) are retired; their implementation
+children are now opened in dependency order as part of the rendering-modernization
+multi-task loop (depth-first, to a CPU-contracted state per child). Pick the earliest
+unblocked child. Phase 2–5 children (GRAPHICS-041..058) remain **deferred** — each of
+those planning slices explicitly keeps its children unopened until its gates are met
+(Theme A maturity, async/RT/Slang/meshlet prerequisites, vendor/backend availability,
+or "opened only when actually integrated"). Open them only when their recorded gates hold.
+
+Pipelined frames (GRAPHICS-036):
+- [GRAPHICS-036A (done)](../../done/GRAPHICS-036A-render-world-pool.md) — `Runtime.RenderWorldPool` slot-lifecycle value type (`CPUContracted`).
+- [GRAPHICS-036B (done)](../../done/GRAPHICS-036B-render-world-pool-diagnostics.md) — pool diagnostics mirror on `RuntimeRenderExtractionStats` (`CPUContracted`).
+- [GRAPHICS-036C](GRAPHICS-036C-render-world-pool-engine-wiring.md) — wire the pool into `Engine::RunFrame` behind default-on `SynchronousExtraction` (`Operational`). Depends on 036A/036B.
+- [GRAPHICS-036D](GRAPHICS-036D-render-world-pool-pipelined-proof.md) — pipelined render-N-1 integration proof. Depends on 036C.
+
+Async compute / multi-queue (GRAPHICS-037):
+- [GRAPHICS-037A](GRAPHICS-037A-queue-affinity-rhi-surface.md) — RHI `QueueAffinity` + demotion + null-queue mocks; reconciles the existing framegraph `RenderQueue`. Depends on GRAPHICS-037 (planning, done).
+- [GRAPHICS-037B](GRAPHICS-037B-cross-queue-edge-synthesis.md) — timeline-semaphore cross-queue edge synthesis + `CrossQueueCycle` fail-closed. Depends on 037A.
+- [GRAPHICS-037C](GRAPHICS-037C-ownership-transfer-barriers.md) — queue-family ownership-transfer barriers via the Sync2 compiler. Depends on 037B.
+- [GRAPHICS-037D](GRAPHICS-037D-multi-queue-vulkan-recording.md) — Vulkan multi-queue recording + opt-in `gpu;vulkan` smoke. Depends on 037C, GRAPHICS-033 (done).
+
+HZB two-phase occlusion culling (GRAPHICS-038):
+- [GRAPHICS-038A](GRAPHICS-038A-hzb-resource-and-lifetime.md) — HZB resource + ping-pong lifetime. Depends on GRAPHICS-038 (planning, done), GRAPHICS-007 (done).
+- [GRAPHICS-038B](GRAPHICS-038B-hzb-build-compute.md) — HZB build compute shader + dispatch wiring. Depends on 038A.
+- [GRAPHICS-038C](GRAPHICS-038C-two-phase-cull-shader.md) — phase-1/phase-2 cull shader + per-bucket buffer doubling + counters. Depends on 038B, GRAPHICS-007.
+- [GRAPHICS-038D](GRAPHICS-038D-camera-transition-and-selection-exemption.md) — camera-transition skip heuristic + selection-bucket exemption. Depends on 038C.
+- [GRAPHICS-038E](GRAPHICS-038E-hzb-conservatism-gpu-smoke.md) — opt-in `gpu;vulkan` conservatism smoke. Depends on 038D, GRAPHICS-033 (done).
+
+Clustered light binning (GRAPHICS-039):
+- [GRAPHICS-039A](GRAPHICS-039A-cluster-grid-build.md) — cluster grid resource + build pass. Depends on GRAPHICS-039 (planning, done), GRAPHICS-009 (done).
+- [GRAPHICS-039B](GRAPHICS-039B-light-cluster-assignment.md) — light-to-cluster assignment + overflow diagnostics. Depends on 039A.
+- [GRAPHICS-039C](GRAPHICS-039C-cluster-surface-shader-integration.md) — surface-shader integration + recipe wiring. Depends on 039B, GRAPHICS-008 (done).
+- [GRAPHICS-039D](GRAPHICS-039D-cluster-async-compute-affinity.md) — async-compute affinity tagging. Depends on 039C; gated by GRAPHICS-037 (037A) for real async execution.
+
+TAA + reconstructor seam (GRAPHICS-040):
+- [GRAPHICS-040A](GRAPHICS-040A-jitter-and-motion-vectors.md) — camera jitter + motion-vector buffer. Depends on GRAPHICS-040 (planning, done), GRAPHICS-013A (done).
+- [GRAPHICS-040B](GRAPHICS-040B-reconstructor-interface-and-reference-taa.md) — `IReconstructor` interface + reference TAA. Depends on 040A.
+- [GRAPHICS-040C](GRAPHICS-040C-aa-recipe-selection-and-integration.md) — AA recipe selection + post-chain integration. Depends on 040B, GRAPHICS-013A/075 (done).
+- GRAPHICS-040D (vendor reconstructor backends) — **not opened**: per GRAPHICS-040 decision 5/10 there is one child per vendor, opened only when that vendor SDK is actually integrated.
+
 ## Agent selection rules
 
 When picking the next rendering task to promote to active:
