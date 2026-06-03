@@ -47,6 +47,7 @@ import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.PointCloudGeometryPacker;
 import Extrinsic.Runtime.ProceduralGeometry;
 import Extrinsic.Runtime.ProceduralGeometryPacker;
+import Extrinsic.Runtime.RenderWorldPool;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SpatialDebugAdapters;
 export import Extrinsic.Runtime.VisualizationAdapters;
@@ -288,7 +289,28 @@ export namespace Extrinsic::Runtime
         std::uint32_t VisualizationIsolinePacketCount{0};
         std::uint32_t VisualizationHtexAtlasPacketCount{0};
         std::uint32_t VisualizationFragmentBakeAtlasPacketCount{0};
+
+        // GRAPHICS-036B — read-only mirror of the runtime `RenderWorldPool`
+        // diagnostics (GRAPHICS-036 decision 7). The pool (`GRAPHICS-036A`) owns
+        // the authoritative atomic counters; these fields surface them on the
+        // runtime extraction diagnostics so editor overlays / frame-stat readers
+        // see pipeline back-pressure without reaching into the pool. They stay
+        // zero until `GRAPHICS-036C` wires the pool into the frame loop and calls
+        // `MirrorRenderWorldPoolDiagnostics`. `RenderWorldFrameAgeFrames` is the
+        // age, in frames, of the most recently consumed snapshot (0 in
+        // synchronous mode); a bucketed-histogram form is deferred to a follow-up
+        // and is not owed by this slice.
+        std::uint64_t RenderWorldPipelineStallCount{0};
+        std::uint64_t RenderWorldExtractionSkipCount{0};
+        std::uint64_t RenderWorldFrameAgeFrames{0};
     };
+
+    // GRAPHICS-036B — copy the authoritative `RenderWorldPool` diagnostics
+    // (`GRAPHICS-036A`) into the runtime extraction stats mirror. Pure and
+    // side-effect-free apart from writing the three `RenderWorld*` fields, so the
+    // caller controls cadence. `GRAPHICS-036C` calls this once the pool is wired.
+    void MirrorRenderWorldPoolDiagnostics(const RenderWorldPool& pool,
+                                          RuntimeRenderExtractionStats& stats) noexcept;
 
     [[nodiscard]] RuntimeRenderableAssetGenerationObservation ObserveRenderableAssetGeneration(
         Graphics::Components::GpuSceneSlot& slot,

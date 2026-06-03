@@ -48,6 +48,7 @@ import Extrinsic.Runtime.MeshGeometryPacker;
 import Extrinsic.Runtime.PointCloudGeometryPacker;
 import Extrinsic.Runtime.ProceduralGeometry;
 import Extrinsic.Runtime.ProceduralGeometryPacker;
+import Extrinsic.Runtime.RenderWorldPool;
 import Extrinsic.Runtime.SpatialDebugAdapters;
 import Extrinsic.Runtime.VisualizationAdapters;
 
@@ -539,6 +540,15 @@ namespace Extrinsic::Runtime
         }
         slot.UpdateLastSeenAssetGeneration(observation.ObservedGeneration);
         return RuntimeRenderableAssetAcknowledgmentResult::Acknowledged;
+    }
+
+    void MirrorRenderWorldPoolDiagnostics(const RenderWorldPool& pool,
+                                          RuntimeRenderExtractionStats& stats) noexcept
+    {
+        const RenderWorldPoolDiagnostics& diag = pool.GetDiagnostics();
+        stats.RenderWorldPipelineStallCount  = diag.PipelineStallCount;
+        stats.RenderWorldExtractionSkipCount = diag.ExtractionSkipCount;
+        stats.RenderWorldFrameAgeFrames      = diag.LastConsumedFrameAge;
     }
 
     RenderExtractionCache::RenderableSidecar* RenderExtractionCache::EnsureRenderable(
