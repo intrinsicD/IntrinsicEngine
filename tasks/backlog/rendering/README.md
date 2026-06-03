@@ -837,7 +837,7 @@ testable; each phase derisks the next.
   locks the optional `IMeshShaderDevice` capability surface (task→mesh
   pipeline, indirect dispatch, payload limits) and recipe-selection
   fallback to `MeshletViaCompute`. Depends on GRAPHICS-033, GRAPHICS-044.
-- [GRAPHICS-054 — Work graphs RHI extension (IWorkGraphDevice) (planning, long-horizon)](GRAPHICS-054-work-graphs-rhi-extension.md):
+- [GRAPHICS-054 — Work graphs RHI extension (IWorkGraphDevice) (done, long-horizon)](../../done/GRAPHICS-054-work-graphs-rhi-extension.md):
   locks the optional `IWorkGraphDevice` capability surface and recipe-slot
   reservation. Explicitly long-horizon: no implementation children opened
   until backend support and at least one consumer exist. Depends on
