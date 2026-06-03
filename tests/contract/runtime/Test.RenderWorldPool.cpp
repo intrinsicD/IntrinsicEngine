@@ -3,8 +3,11 @@
 #include <gtest/gtest.h>
 
 import Extrinsic.Runtime.RenderWorldPool;
+import Extrinsic.Runtime.RenderExtraction;
 
 using Extrinsic::Runtime::RenderWorldPool;
+using Extrinsic::Runtime::RuntimeRenderExtractionStats;
+using Extrinsic::Runtime::MirrorRenderWorldPoolDiagnostics;
 
 namespace
 {
@@ -204,4 +207,41 @@ TEST(RenderWorldPool, FrameAgeReflectsPublishToConsumeDelta)
     // Consumer renders a later frame than the one the snapshot was produced for.
     (void)pool.AcquireFront(/*frameIndex=*/7u);
     EXPECT_EQ(pool.GetDiagnostics().LastConsumedFrameAge, 2u);
+}
+
+// --- GRAPHICS-036B: diagnostics mirror onto extraction stats -------------
+
+TEST(RenderWorldPoolDiagnostics, MirrorIsZeroForUntouchedPool)
+{
+    RenderWorldPool pool;
+    RuntimeRenderExtractionStats stats{};
+    MirrorRenderWorldPoolDiagnostics(pool, stats);
+    EXPECT_EQ(stats.RenderWorldPipelineStallCount, 0u);
+    EXPECT_EQ(stats.RenderWorldExtractionSkipCount, 0u);
+    EXPECT_EQ(stats.RenderWorldFrameAgeFrames, 0u);
+}
+
+TEST(RenderWorldPoolDiagnostics, MirrorCopiesStallSkipAndFrameAge)
+{
+    RenderWorldPool pool(2u);
+
+    // Produce one stall (consumer reuses front with no new publish).
+    const std::uint32_t a = pool.AcquireBack(0u);
+    pool.PublishFront(a);
+    (void)pool.AcquireFront(0u);
+    (void)pool.AcquireFront(1u); // no new publish -> stall, frame age 1
+
+    // Produce one skip (hold front, overwrite the unpublished back).
+    const std::uint32_t b = pool.AcquireBack(2u);
+    EXPECT_NE(b, a);
+    const std::uint32_t b2 = pool.AcquireBack(3u); // front A held -> replace back
+    EXPECT_EQ(b2, b);
+
+    RuntimeRenderExtractionStats stats{};
+    MirrorRenderWorldPoolDiagnostics(pool, stats);
+    EXPECT_EQ(stats.RenderWorldPipelineStallCount, pool.GetDiagnostics().PipelineStallCount);
+    EXPECT_EQ(stats.RenderWorldExtractionSkipCount, pool.GetDiagnostics().ExtractionSkipCount);
+    EXPECT_EQ(stats.RenderWorldFrameAgeFrames, pool.GetDiagnostics().LastConsumedFrameAge);
+    EXPECT_GE(stats.RenderWorldPipelineStallCount, 1u);
+    EXPECT_GE(stats.RenderWorldExtractionSkipCount, 1u);
 }
