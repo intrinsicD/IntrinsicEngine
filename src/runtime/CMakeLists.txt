@@ -26,6 +26,7 @@ target_sources(${target_name}
         Runtime.ProceduralGeometryPacker.cppm
         Runtime.ReferenceScene.cppm
         Runtime.RenderExtraction.cppm
+        Runtime.RenderWorldPool.cppm
         Runtime.SelectionController.cppm
         Runtime.StableEntityLookup.cppm
         Runtime.StreamingExecutor.cppm
@@ -49,6 +50,7 @@ target_sources(${target_name}
         Runtime.ProceduralGeometryPacker.cpp
         Runtime.ReferenceScene.cpp
         Runtime.RenderExtraction.cpp
+        Runtime.RenderWorldPool.cpp
         Runtime.SelectionController.cpp
         Runtime.StableEntityLookup.cpp
         Runtime.StreamingExecutor.cpp
