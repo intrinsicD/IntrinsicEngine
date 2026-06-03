@@ -826,7 +826,7 @@ testable; each phase derisks the next.
   locks forward+backward render-graph compile, adjoint buffer lifetime,
   `Pass.Loss` + gradient sink, build-time gating to keep production unchanged.
   Depends on GRAPHICS-041.
-- [GRAPHICS-052 — Deltaful GPU-resident scene (planning)](GRAPHICS-052-deltaful-gpu-resident-scene.md):
+- [GRAPHICS-052 — Deltaful GPU-resident scene (done)](../../done/GRAPHICS-052-deltaful-gpu-resident-scene.md):
   locks per-change delta records, persistent GPU scene buffer, apply-deltas
   pass, full-extract fallback. Promoted from `GRAPHICS-004Q`. Depends on
   GRAPHICS-002, GRAPHICS-004, GRAPHICS-016, GRAPHICS-036.
