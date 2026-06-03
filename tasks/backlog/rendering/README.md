@@ -797,47 +797,47 @@ testable; each phase derisks the next.
 
 #### Phase 3 — Ray tracing and global illumination
 
-- [GRAPHICS-045 — Ray tracing RHI extension (IRayTracingDevice) (planning)](GRAPHICS-045-ray-tracing-rhi-extension.md):
+- [GRAPHICS-045 — Ray tracing RHI extension (IRayTracingDevice) (done)](../../done/GRAPHICS-045-ray-tracing-rhi-extension.md):
   locks the optional `IRayTracingDevice` capability surface (BLAS/TLAS,
   inline RT in compute, ray pipelines + SBT) and the `GRAPHICS-033`
   operational-gate extension policy. Depends on GRAPHICS-033.
-- [GRAPHICS-046 — Hybrid GI: ReSTIR DI/GI hardware path and software fallback (planning)](GRAPHICS-046-hybrid-gi-restir-and-fallback.md):
+- [GRAPHICS-046 — Hybrid GI: ReSTIR DI/GI hardware path and software fallback (done)](../../done/GRAPHICS-046-hybrid-gi-restir-and-fallback.md):
   locks `GiPathKind` recipe selection, ReSTIR DI/GI passes + reservoir
   buffers (HW), DDGI probe volume + screen-space probes (SW). Depends on
   GRAPHICS-039, GRAPHICS-045.
-- [GRAPHICS-047 — Virtual Shadow Maps to replace cascade atlas (planning)](GRAPHICS-047-virtual-shadow-maps.md):
+- [GRAPHICS-047 — Virtual Shadow Maps to replace cascade atlas (done)](../../done/GRAPHICS-047-virtual-shadow-maps.md):
   locks 16K virtual address space, 128² page allocation, page-table
   encoding, and meshlet-cluster caster culling. Depends on GRAPHICS-009,
   GRAPHICS-038, GRAPHICS-044.
 
 #### Phase 4 — Research differentiators
 
-- [GRAPHICS-048 — 3D Gaussian Splatting rasterizer pass over the PointCloud primitive (planning)](GRAPHICS-048-gaussian-splatting-rasterizer.md):
+- [GRAPHICS-048 — 3D Gaussian Splatting rasterizer pass over the PointCloud primitive (done)](../../done/GRAPHICS-048-gaussian-splatting-rasterizer.md):
   locks extended point record (anisotropic covariance + opacity + SH coeffs),
   tile-based sort + composite, `.gsplat` shipping format. Depends on
   GRAPHICS-014, GRAPHICS-030.
-- [GRAPHICS-049 — Neural radiance cache slot in the GI path (planning)](GRAPHICS-049-neural-radiance-cache-slot.md):
+- [GRAPHICS-049 — Neural radiance cache slot in the GI path (done)](../../done/GRAPHICS-049-neural-radiance-cache-slot.md):
   locks small-MLP shape, online training pass, cache invalidation, GI
   consumer seam. Depends on GRAPHICS-041, GRAPHICS-046.
-- [GRAPHICS-050 — Neural texture compression with random-access decode (planning)](GRAPHICS-050-neural-texture-compression.md):
+- [GRAPHICS-050 — Neural texture compression with random-access decode (done)](../../done/GRAPHICS-050-neural-texture-compression.md):
   locks `.ntc` shipping format + per-material decoder Slang module + BCn
   fallback. Depends on GRAPHICS-041, GRAPHICS-042.
-- [GRAPHICS-051 — Differentiable rendering mode (planning)](GRAPHICS-051-differentiable-rendering-mode.md):
+- [GRAPHICS-051 — Differentiable rendering mode (done)](../../done/GRAPHICS-051-differentiable-rendering-mode.md):
   locks forward+backward render-graph compile, adjoint buffer lifetime,
   `Pass.Loss` + gradient sink, build-time gating to keep production unchanged.
   Depends on GRAPHICS-041.
-- [GRAPHICS-052 — Deltaful GPU-resident scene (planning)](GRAPHICS-052-deltaful-gpu-resident-scene.md):
+- [GRAPHICS-052 — Deltaful GPU-resident scene (done)](../../done/GRAPHICS-052-deltaful-gpu-resident-scene.md):
   locks per-change delta records, persistent GPU scene buffer, apply-deltas
   pass, full-extract fallback. Promoted from `GRAPHICS-004Q`. Depends on
   GRAPHICS-002, GRAPHICS-004, GRAPHICS-016, GRAPHICS-036.
 
 #### Phase 5 — Frontier
 
-- [GRAPHICS-053 — Mesh shaders RHI extension (IMeshShaderDevice) (planning)](GRAPHICS-053-mesh-shaders-rhi-extension.md):
+- [GRAPHICS-053 — Mesh shaders RHI extension (IMeshShaderDevice) (done)](../../done/GRAPHICS-053-mesh-shaders-rhi-extension.md):
   locks the optional `IMeshShaderDevice` capability surface (task→mesh
   pipeline, indirect dispatch, payload limits) and recipe-selection
   fallback to `MeshletViaCompute`. Depends on GRAPHICS-033, GRAPHICS-044.
-- [GRAPHICS-054 — Work graphs RHI extension (IWorkGraphDevice) (planning, long-horizon)](GRAPHICS-054-work-graphs-rhi-extension.md):
+- [GRAPHICS-054 — Work graphs RHI extension (IWorkGraphDevice) (done, long-horizon)](../../done/GRAPHICS-054-work-graphs-rhi-extension.md):
   locks the optional `IWorkGraphDevice` capability surface and recipe-slot
   reservation. Explicitly long-horizon: no implementation children opened
   until backend support and at least one consumer exist. Depends on
