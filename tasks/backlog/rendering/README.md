@@ -768,7 +768,7 @@ testable; each phase derisks the next.
 - [GRAPHICS-038 — HZB and two-phase occlusion culling extension to CullingPass (done)](../../done/GRAPHICS-038-hzb-two-phase-occlusion-culling.md):
   locks HZB resource shape + build pass + phase-1/phase-2 cull shader
   extension preserving the 8-bucket lane contract. Depends on GRAPHICS-007.
-- [GRAPHICS-039 — Clustered light binning (planning)](GRAPHICS-039-clustered-light-binning.md):
+- [GRAPHICS-039 — Clustered light binning (done)](../../done/GRAPHICS-039-clustered-light-binning.md):
   locks froxel-grid cluster build, light-to-cluster assignment, surface-shader
   binding. Depends on GRAPHICS-009.
 - [GRAPHICS-040 — TAA pass and reconstructor/upscaler interface seam (planning)](GRAPHICS-040-taa-and-reconstructor-interface.md):
