@@ -786,7 +786,7 @@ testable; each phase derisks the next.
   locks GGX multi-scatter compensation, sheen, anisotropy, clear-coat, and
   split-sum IBL with prefiltered envmap + DFG LUT. Depends on GRAPHICS-006,
   GRAPHICS-009.
-- [GRAPHICS-043 — Visibility buffer recipe and deferred materialization (planning)](GRAPHICS-043-visibility-buffer-deferred-materialization.md):
+- [GRAPHICS-043 — Visibility buffer recipe and deferred materialization (done)](../../done/GRAPHICS-043-visibility-buffer-deferred-materialization.md):
   locks vis-buffer encoding, tile classification, per-material compute
   materialization kernels with bindless sampling. Depends on GRAPHICS-008,
   GRAPHICS-041, GRAPHICS-044.
