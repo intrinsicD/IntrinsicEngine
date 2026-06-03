@@ -790,7 +790,7 @@ testable; each phase derisks the next.
   locks vis-buffer encoding, tile classification, per-material compute
   materialization kernels with bindless sampling. Depends on GRAPHICS-008,
   GRAPHICS-041, GRAPHICS-044.
-- [GRAPHICS-044 — Meshlet geometry representation in GpuGeometryRecord (planning)](GRAPHICS-044-meshlet-geometry-representation.md):
+- [GRAPHICS-044 — Meshlet geometry representation in GpuGeometryRecord (done)](../../done/GRAPHICS-044-meshlet-geometry-representation.md):
   locks meshlet table extension on `GpuGeometryRecord` (≤ 64 vertices, ≤ 124
   primitives, bounding sphere + normal cone), authoring-time meshletization
   in `assets/`. Depends on GRAPHICS-004.
