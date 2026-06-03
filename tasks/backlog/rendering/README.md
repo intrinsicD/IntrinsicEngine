@@ -771,26 +771,26 @@ testable; each phase derisks the next.
 - [GRAPHICS-039 — Clustered light binning (done)](../../done/GRAPHICS-039-clustered-light-binning.md):
   locks froxel-grid cluster build, light-to-cluster assignment, surface-shader
   binding. Depends on GRAPHICS-009.
-- [GRAPHICS-040 — TAA pass and reconstructor/upscaler interface seam (planning)](GRAPHICS-040-taa-and-reconstructor-interface.md):
+- [GRAPHICS-040 — TAA pass and reconstructor/upscaler interface seam (done)](../../done/GRAPHICS-040-taa-and-reconstructor-interface.md):
   locks sub-pixel jitter, motion-vector buffer, history color buffer, and the
   vendor-agnostic `IReconstructor` seam (DLSS/FSR/XeSS/MetalFX/NRD plug-in
   point). Depends on GRAPHICS-013A, GRAPHICS-036.
 
 #### Phase 2 — Shader & material modernization
 
-- [GRAPHICS-041 — Slang as canonical shading language with module compilation and hot reload (planning)](GRAPHICS-041-slang-shader-pipeline-and-hot-reload.md):
+- [GRAPHICS-041 — Slang as canonical shading language with module compilation and hot reload (done)](../../done/GRAPHICS-041-slang-shader-pipeline-and-hot-reload.md):
   locks offline Slang compilation under `tools/`, module/generic system,
   hot-reload retire-deadline wiring, autodiff annotation policy. Depends on
   GRAPHICS-006, GRAPHICS-023.
-- [GRAPHICS-042 — PBR feature completeness and IBL (planning)](GRAPHICS-042-pbr-feature-completeness-and-ibl.md):
+- [GRAPHICS-042 — PBR feature completeness and IBL (done)](../../done/GRAPHICS-042-pbr-feature-completeness-and-ibl.md):
   locks GGX multi-scatter compensation, sheen, anisotropy, clear-coat, and
   split-sum IBL with prefiltered envmap + DFG LUT. Depends on GRAPHICS-006,
   GRAPHICS-009.
-- [GRAPHICS-043 — Visibility buffer recipe and deferred materialization (planning)](GRAPHICS-043-visibility-buffer-deferred-materialization.md):
+- [GRAPHICS-043 — Visibility buffer recipe and deferred materialization (done)](../../done/GRAPHICS-043-visibility-buffer-deferred-materialization.md):
   locks vis-buffer encoding, tile classification, per-material compute
   materialization kernels with bindless sampling. Depends on GRAPHICS-008,
   GRAPHICS-041, GRAPHICS-044.
-- [GRAPHICS-044 — Meshlet geometry representation in GpuGeometryRecord (planning)](GRAPHICS-044-meshlet-geometry-representation.md):
+- [GRAPHICS-044 — Meshlet geometry representation in GpuGeometryRecord (done)](../../done/GRAPHICS-044-meshlet-geometry-representation.md):
   locks meshlet table extension on `GpuGeometryRecord` (≤ 64 vertices, ≤ 124
   primitives, bounding sphere + normal cone), authoring-time meshletization
   in `assets/`. Depends on GRAPHICS-004.
