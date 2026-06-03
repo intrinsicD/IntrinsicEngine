@@ -812,7 +812,7 @@ testable; each phase derisks the next.
 
 #### Phase 4 — Research differentiators
 
-- [GRAPHICS-048 — 3D Gaussian Splatting rasterizer pass over the PointCloud primitive (planning)](GRAPHICS-048-gaussian-splatting-rasterizer.md):
+- [GRAPHICS-048 — 3D Gaussian Splatting rasterizer pass over the PointCloud primitive (done)](../../done/GRAPHICS-048-gaussian-splatting-rasterizer.md):
   locks extended point record (anisotropic covariance + opacity + SH coeffs),
   tile-based sort + composite, `.gsplat` shipping format. Depends on
   GRAPHICS-014, GRAPHICS-030.
