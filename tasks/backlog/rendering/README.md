@@ -850,7 +850,7 @@ testable; each phase derisks the next.
   locks DAG record shape + LOD selector pass + HZB integration. Bounded
   scope: explicitly NOT Nanite parity (no SW raster, no cluster-page
   streaming). Depends on GRAPHICS-038, GRAPHICS-044, GRAPHICS-053.
-- [GRAPHICS-057 — DirectStorage-analog GPU decompression hookpoint on the transfer queue (planning)](GRAPHICS-057-directstorage-gpu-decompression.md):
+- [GRAPHICS-057 — DirectStorage-analog GPU decompression hookpoint on the transfer queue (done)](../../done/GRAPHICS-057-directstorage-gpu-decompression.md):
   locks `IGpuDecompressionTransferQueue` capability surface, GDeflate/Zstd
   payload formats, CPU-fallback rule. Depends on GRAPHICS-018T, GRAPHICS-026.
 - [GRAPHICS-058 — Frame generation pass (planning)](GRAPHICS-058-frame-generation-pass.md):
