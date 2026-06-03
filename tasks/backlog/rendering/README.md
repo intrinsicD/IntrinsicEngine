@@ -846,7 +846,7 @@ testable; each phase derisks the next.
   locks 128² virtual page table, feedback pass, runtime page resolver,
   KTX2/Basis Universal UASTC shipping format. Depends on GRAPHICS-018T,
   GRAPHICS-026, GRAPHICS-041.
-- [GRAPHICS-056 — Virtualized meshes with cluster DAG and continuous LOD (planning, bounded scope)](GRAPHICS-056-virtualized-meshes-cluster-lod.md):
+- [GRAPHICS-056 — Virtualized meshes with cluster DAG and continuous LOD (done, bounded scope)](../../done/GRAPHICS-056-virtualized-meshes-cluster-lod.md):
   locks DAG record shape + LOD selector pass + HZB integration. Bounded
   scope: explicitly NOT Nanite parity (no SW raster, no cluster-page
   streaming). Depends on GRAPHICS-038, GRAPHICS-044, GRAPHICS-053.
