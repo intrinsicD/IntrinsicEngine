@@ -765,7 +765,7 @@ testable; each phase derisks the next.
   locks `QueueAffinity` enum, partitioning, cross-queue timeline-semaphore
   edges, ownership transfer, and CPU-testable null-RHI mocks. Depends on
   GRAPHICS-022, GRAPHICS-018T.
-- [GRAPHICS-038 — HZB and two-phase occlusion culling extension to CullingPass (planning)](GRAPHICS-038-hzb-two-phase-occlusion-culling.md):
+- [GRAPHICS-038 — HZB and two-phase occlusion culling extension to CullingPass (done)](../../done/GRAPHICS-038-hzb-two-phase-occlusion-culling.md):
   locks HZB resource shape + build pass + phase-1/phase-2 cull shader
   extension preserving the 8-bucket lane contract. Depends on GRAPHICS-007.
 - [GRAPHICS-039 — Clustered light binning (planning)](GRAPHICS-039-clustered-light-binning.md):
