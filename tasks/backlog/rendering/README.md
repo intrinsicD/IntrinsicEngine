@@ -778,7 +778,7 @@ testable; each phase derisks the next.
 
 #### Phase 2 — Shader & material modernization
 
-- [GRAPHICS-041 — Slang as canonical shading language with module compilation and hot reload (planning)](GRAPHICS-041-slang-shader-pipeline-and-hot-reload.md):
+- [GRAPHICS-041 — Slang as canonical shading language with module compilation and hot reload (done)](../../done/GRAPHICS-041-slang-shader-pipeline-and-hot-reload.md):
   locks offline Slang compilation under `tools/`, module/generic system,
   hot-reload retire-deadline wiring, autodiff annotation policy. Depends on
   GRAPHICS-006, GRAPHICS-023.
