@@ -805,7 +805,7 @@ testable; each phase derisks the next.
   locks `GiPathKind` recipe selection, ReSTIR DI/GI passes + reservoir
   buffers (HW), DDGI probe volume + screen-space probes (SW). Depends on
   GRAPHICS-039, GRAPHICS-045.
-- [GRAPHICS-047 — Virtual Shadow Maps to replace cascade atlas (planning)](GRAPHICS-047-virtual-shadow-maps.md):
+- [GRAPHICS-047 — Virtual Shadow Maps to replace cascade atlas (done)](../../done/GRAPHICS-047-virtual-shadow-maps.md):
   locks 16K virtual address space, 128² page allocation, page-table
   encoding, and meshlet-cluster caster culling. Depends on GRAPHICS-009,
   GRAPHICS-038, GRAPHICS-044.
