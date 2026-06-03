@@ -23,6 +23,23 @@ This directory contains the `RHI` module/files.
   the layer-major / mip-minor `TextureUploadLayout` used by future batched
   transfer submissions.
 
+## Pipeline reload contracts
+
+- `RHI.PipelineRegistry` owns CPU-testable pipeline identity and cache
+  invalidation. `PipelineKey` combines shader paths, shader generations, and
+  render-state fields from `PipelineDesc`; `InvalidateShaderPath(path)` drops
+  affected cached leases and increments reload invalidation diagnostics.
+- `RHI.PipelineManager` owns the promoted backend recompilation seam.
+  `Recompile(handle, desc)` creates a replacement backend pipeline and stages it
+  without changing the caller-held pool handle; `CommitPending()` promotes the
+  staged replacement on the render thread and destroys the previous backend
+  object.
+- Failed recompiles keep the previously active backend pipeline alive.
+  `PipelineManagerDiagnostics` reports create/recompile successes, failed
+  recompiles, superseded pending reloads, committed reloads, live pipeline
+  count, and pending reload count so last-known-good fallback is covered by
+  CPU/null tests.
+
 ## Module ABI hygiene (clang-20 / C++23 modules)
 
 `RHI::ICommandContext` (`RHI.CommandContext.cppm`) is an **exported polymorphic
@@ -58,4 +75,3 @@ clang-20 vtable-mangling bug. BUG-013
 backbuffer-readback contract SEGV traced to stale BMIs after `BindFrameSampledTexture`
 was added; it did **not** reproduce on a clean build — the contract suite is
 green (225/225 in `IntrinsicGraphicsContractCpuTests`) once BMIs are consistent.
-

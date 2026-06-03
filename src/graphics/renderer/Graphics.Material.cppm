@@ -64,6 +64,41 @@ export namespace Extrinsic::Graphics
         return {};
     }
 
+    enum class MaterialLayoutReloadDecision : std::uint32_t
+    {
+        Compatible = 0,
+        VersionMismatch,
+        DefaultSlotMismatch,
+        SlotSizeMismatch,
+        CustomSlotCountMismatch,
+        TextureBindingCountMismatch,
+    };
+
+    [[nodiscard]] constexpr MaterialLayoutReloadDecision EvaluateMaterialLayoutReloadCompatibility(
+        const MaterialLayoutContract& current,
+        const MaterialLayoutContract& reloaded) noexcept
+    {
+        if (current.Version != reloaded.Version)
+            return MaterialLayoutReloadDecision::VersionMismatch;
+        if (current.DefaultSlot != reloaded.DefaultSlot)
+            return MaterialLayoutReloadDecision::DefaultSlotMismatch;
+        if (current.SlotSizeBytes != reloaded.SlotSizeBytes)
+            return MaterialLayoutReloadDecision::SlotSizeMismatch;
+        if (current.CustomVec4SlotCount != reloaded.CustomVec4SlotCount)
+            return MaterialLayoutReloadDecision::CustomSlotCountMismatch;
+        if (current.TextureBindingCount != reloaded.TextureBindingCount)
+            return MaterialLayoutReloadDecision::TextureBindingCountMismatch;
+        return MaterialLayoutReloadDecision::Compatible;
+    }
+
+    [[nodiscard]] constexpr bool IsMaterialLayoutReloadCompatible(
+        const MaterialLayoutContract& current,
+        const MaterialLayoutContract& reloaded) noexcept
+    {
+        return EvaluateMaterialLayoutReloadCompatibility(current, reloaded) ==
+               MaterialLayoutReloadDecision::Compatible;
+    }
+
     static_assert(kMaterialSlotSizeBytes == 128u, "GpuMaterialSlot layout version 1 is 128 bytes");
 
     // -----------------------------------------------------------------

@@ -503,7 +503,6 @@ endif()
 
 set(_graphics_unit_test_files
     Test.RHI.BufferManager.cpp
-    Test.RHI.PipelineManager.cpp
     Test.RHI.SamplerManager.cpp
     Test.RHI.TextureManager.cpp
 )
@@ -518,6 +517,7 @@ intrinsic_test_object_lib(GraphicsUnitTestObjs
 )
 
 set(_graphics_rhi_cpu_unit_test_files
+    Test.RHI.PipelineManager.cpp
     Test.RHI.PipelineRegistry.cpp
 )
 intrinsic_resolve_test_sources(_graphics_rhi_cpu_unit_test_sources

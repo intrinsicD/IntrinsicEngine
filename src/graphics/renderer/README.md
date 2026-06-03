@@ -1720,6 +1720,15 @@ Concretely:
   via `MaterialSystem::ResetPerFrameSubstitutionCounters()`), and
   the optional Impl-C (one additional debug variant) is identified
   but not opened.
+- GRAPHICS-023 closes the promoted material-layout reload contract as a
+  CPU-testable value seam: `GetCanonicalMaterialLayoutContract()` describes the
+  shader-visible SSBO layout, while
+  `EvaluateMaterialLayoutReloadCompatibility()` / `IsMaterialLayoutReloadCompatible()`
+  classify reload compatibility before any material state is swapped.
+  Version/default-slot/slot-size/custom-slot-count/texture-binding-count
+  mismatches are typed reasons; incompatible reloads must keep the previous
+  material state and report diagnostics rather than mutating shader-visible
+  layout.
 - `Graphics` may depend on `Core`, asset IDs, `RHI`, and geometry GPU views; it
   must not import live ECS ownership and must not store graphics GPU handles in
   canonical ECS components.

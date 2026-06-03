@@ -77,6 +77,39 @@ TEST(GraphicsMaterialSystem, CanonicalLayoutContractMatchesRhiSlot)
     EXPECT_EQ(static_cast<std::uint32_t>(Graphics::MaterialTextureSemantic::Emissive), 3u);
 }
 
+TEST(GraphicsMaterialSystem, MaterialLayoutReloadCompatibilityIsDeterministic)
+{
+    const auto current = Graphics::GetCanonicalMaterialLayoutContract();
+    EXPECT_TRUE(Graphics::IsMaterialLayoutReloadCompatible(current, current));
+    EXPECT_EQ(Graphics::EvaluateMaterialLayoutReloadCompatibility(current, current),
+              Graphics::MaterialLayoutReloadDecision::Compatible);
+
+    auto reloaded = current;
+    reloaded.Version += 1u;
+    EXPECT_EQ(Graphics::EvaluateMaterialLayoutReloadCompatibility(current, reloaded),
+              Graphics::MaterialLayoutReloadDecision::VersionMismatch);
+
+    reloaded = current;
+    reloaded.DefaultSlot += 1u;
+    EXPECT_EQ(Graphics::EvaluateMaterialLayoutReloadCompatibility(current, reloaded),
+              Graphics::MaterialLayoutReloadDecision::DefaultSlotMismatch);
+
+    reloaded = current;
+    reloaded.SlotSizeBytes += 16u;
+    EXPECT_EQ(Graphics::EvaluateMaterialLayoutReloadCompatibility(current, reloaded),
+              Graphics::MaterialLayoutReloadDecision::SlotSizeMismatch);
+
+    reloaded = current;
+    reloaded.CustomVec4SlotCount += 1u;
+    EXPECT_EQ(Graphics::EvaluateMaterialLayoutReloadCompatibility(current, reloaded),
+              Graphics::MaterialLayoutReloadDecision::CustomSlotCountMismatch);
+
+    reloaded = current;
+    reloaded.TextureBindingCount += 1u;
+    EXPECT_EQ(Graphics::EvaluateMaterialLayoutReloadCompatibility(current, reloaded),
+              Graphics::MaterialLayoutReloadDecision::TextureBindingCountMismatch);
+}
+
 TEST(GraphicsMaterialSystem, DefaultAndStaleMaterialSlotsResolveToFallbackWithDiagnostics)
 {
     MockDevice device;
@@ -332,4 +365,3 @@ TEST(GraphicsMaterialSystem, DefaultSlotCarriesDefaultDebugSurfaceParams)
 
     materials.Shutdown();
 }
-

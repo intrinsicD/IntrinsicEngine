@@ -143,6 +143,43 @@ TEST(RHIPipelineManager, CommitPendingPromotesNewPipelineAndDestroysOld)
     EXPECT_NE(mgr.GetDeviceHandle(handle), deviceBefore);
     EXPECT_EQ(callbackHits.load(), 1)
         << "CommitPending must fire the OnCompiled callback for each promoted pipeline.";
+
+    const auto diagnostics = mgr.GetDiagnostics();
+    EXPECT_EQ(diagnostics.SuccessfulCreateCount, 1u);
+    EXPECT_EQ(diagnostics.RecompileRequestCount, 1u);
+    EXPECT_EQ(diagnostics.SuccessfulRecompileCount, 1u);
+    EXPECT_EQ(diagnostics.CommittedRecompileCount, 1u);
+    EXPECT_EQ(diagnostics.PendingRecompileCount, 0u);
+    EXPECT_EQ(diagnostics.LivePipelineCount, 1u);
+}
+
+TEST(RHIPipelineManager, FailedRecompileKeepsLastKnownGoodPipelineAndReportsDiagnostic)
+{
+    MockDevice dev;
+    RHI::PipelineManager mgr{dev};
+    auto lease = *mgr.Create(AnyGraphicsPipeline());
+    const auto handle = lease.GetHandle();
+    const auto deviceBefore = mgr.GetDeviceHandle(handle);
+
+    RHI::PipelineDesc newDesc = AnyGraphicsPipeline();
+    newDesc.FragmentShaderPath = "shaders/broken.frag.spv";
+    dev.FailNextPipelineCreate = true;
+    mgr.Recompile(handle, newDesc);
+
+    EXPECT_TRUE(mgr.IsReady(handle));
+    EXPECT_EQ(mgr.GetDeviceHandle(handle), deviceBefore)
+        << "Failed hot reload must keep the previous device pipeline active.";
+    EXPECT_EQ(dev.DestroyPipelineCount, 0)
+        << "The last-known-good pipeline must not be destroyed on failed reload.";
+
+    const auto diagnostics = mgr.GetDiagnostics();
+    EXPECT_EQ(diagnostics.SuccessfulCreateCount, 1u);
+    EXPECT_EQ(diagnostics.RecompileRequestCount, 1u);
+    EXPECT_EQ(diagnostics.SuccessfulRecompileCount, 0u);
+    EXPECT_EQ(diagnostics.FailedRecompileCount, 1u);
+    EXPECT_EQ(diagnostics.PendingRecompileCount, 0u);
+    EXPECT_EQ(diagnostics.CommittedRecompileCount, 0u);
+    EXPECT_EQ(diagnostics.LivePipelineCount, 1u);
 }
 
 // -----------------------------------------------------------------------------

@@ -110,6 +110,7 @@ namespace Extrinsic::RHI
 
         std::mutex                   PendingMutex;  // guards PendingCommits
         std::vector<PendingCommit>   PendingCommits;
+        PipelineManagerDiagnostics   Diagnostics{};
 
         // Outstanding PipelineLease instances. See BufferManager.cpp for the
         // F2 rationale.
@@ -170,12 +171,18 @@ namespace Extrinsic::RHI
     {
         // F14: short-circuit on stub backends.
         if (!m_Impl->Device.IsOperational())
+        {
+            ++m_Impl->Diagnostics.FailedCreateCount;
             return Core::Err<PipelineLease>(Core::ErrorCode::DeviceNotOperational);
+        }
 
         // Compile synchronously on the calling (render) thread.
         PipelineHandle deviceHandle = m_Impl->Device.CreatePipeline(desc);
         if (!deviceHandle.IsValid())
+        {
+            ++m_Impl->Diagnostics.FailedCreateCount;
             return Core::Err<PipelineLease>(Core::ErrorCode::PipelineCreationFailed);
+        }
 
         std::uint32_t index;
         std::uint32_t generation;
@@ -212,6 +219,7 @@ namespace Extrinsic::RHI
         if (m_Impl->Slots[index].OnCompiled)
             m_Impl->Slots[index].OnCompiled(poolHandle);
 
+        ++m_Impl->Diagnostics.SuccessfulCreateCount;
         m_Impl->LiveLeaseCount.fetch_add(1, std::memory_order_relaxed);
         return PipelineLease::Adopt(*this, poolHandle);
     }
@@ -282,11 +290,16 @@ namespace Extrinsic::RHI
             oldActive      = slot->LoadActive();
             slot->Desc     = newDesc; // visible via GetDesc() immediately
         }
+        ++m_Impl->Diagnostics.RecompileRequestCount;
 
         // --- Compile off the hot path (no locks held) ---
         PipelineHandle newDevice = m_Impl->Device.CreatePipeline(newDesc);
         if (!newDevice.IsValid())
+        {
+            ++m_Impl->Diagnostics.FailedRecompileCount;
             return; // compilation failed; keep the old pipeline active
+        }
+        ++m_Impl->Diagnostics.SuccessfulRecompileCount;
 
         // --- Stage the result ---
         std::lock_guard lock{m_Impl->PendingMutex};
@@ -300,6 +313,7 @@ namespace Extrinsic::RHI
                 m_Impl->Device.DestroyPipeline(pc.NewDeviceHandle);
                 pc.NewDeviceHandle = newDevice;
                 pc.NewDesc         = newDesc;
+                ++m_Impl->Diagnostics.SupersededRecompileCount;
                 return;
             }
         }
@@ -347,6 +361,7 @@ namespace Extrinsic::RHI
             // Notify the pass that registered for callbacks.
             if (slot->OnCompiled)
                 slot->OnCompiled(poolHandle);
+            ++m_Impl->Diagnostics.CommittedRecompileCount;
         }
     }
 
@@ -379,5 +394,15 @@ namespace Extrinsic::RHI
         return static_cast<std::uint32_t>(m_Impl->Slots.size() - m_Impl->FreeList.size());
     }
 
-} // namespace Extrinsic::RHI
+    PipelineManagerDiagnostics PipelineManager::GetDiagnostics() const noexcept
+    {
+        PipelineManagerDiagnostics diagnostics = m_Impl->Diagnostics;
+        diagnostics.LivePipelineCount = GetLiveCount();
+        {
+            std::lock_guard lock{m_Impl->PendingMutex};
+            diagnostics.PendingRecompileCount = static_cast<std::uint32_t>(m_Impl->PendingCommits.size());
+        }
+        return diagnostics;
+    }
 
+} // namespace Extrinsic::RHI

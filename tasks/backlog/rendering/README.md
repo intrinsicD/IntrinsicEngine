@@ -303,9 +303,13 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   `CompiledRenderGraph::Diagnostic` field once downstream callers had
   migrated to structured `RenderGraphValidationResult` findings.
   CPU-only, no Vulkan requirement.
-- [GRAPHICS-023 — Shader, material, and texture hot reload](GRAPHICS-023-shader-material-texture-hot-reload.md):
-  depends on GRAPHICS-006 for registry/material/pipeline contracts and
-  GRAPHICS-015 for GPU asset/texture residency.
+- [GRAPHICS-023 — Shader, material, and texture hot reload](../../done/GRAPHICS-023-shader-material-texture-hot-reload.md):
+  retired at `CPUContracted`; promoted shader-path/generation invalidation,
+  pipeline recompile diagnostics, material-layout compatibility decisions,
+  texture fallback/reload retention, and runtime asset-generation observation
+  are CPU-testable without legacy graphics dependencies. Depends on
+  GRAPHICS-006 for registry/material/pipeline contracts and GRAPHICS-015 for GPU
+  asset/texture residency.
 - [GRAPHICS-023A — GpuSceneSlot asset generation tracking](../../done/GRAPHICS-023A-gpu-scene-slot-asset-generation-tracking.md):
   completed focused child task that lands the `GpuSceneSlot::SourceAsset` and
   `GpuSceneSlot::LastSeenAssetGeneration` metadata required by completed

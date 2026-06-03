@@ -75,6 +75,19 @@ export namespace Extrinsic::RHI
 {
     using PipelineCompiledCallback = std::function<void(PipelineHandle poolHandle)>;
 
+    struct PipelineManagerDiagnostics
+    {
+        std::uint32_t LivePipelineCount = 0;
+        std::uint32_t PendingRecompileCount = 0;
+        std::uint32_t SuccessfulCreateCount = 0;
+        std::uint32_t FailedCreateCount = 0;
+        std::uint32_t RecompileRequestCount = 0;
+        std::uint32_t SuccessfulRecompileCount = 0;
+        std::uint32_t FailedRecompileCount = 0;
+        std::uint32_t SupersededRecompileCount = 0;
+        std::uint32_t CommittedRecompileCount = 0;
+    };
+
     class PipelineManager
     {
     public:
@@ -150,9 +163,13 @@ export namespace Extrinsic::RHI
         /// Number of live pipeline slots (for diagnostics / editor UI).
         [[nodiscard]] std::uint32_t GetLiveCount() const noexcept;
 
+        /// CPU-visible reload diagnostics. Failed recompiles keep the
+        /// previously active device pipeline alive; these counters let tests
+        /// and tools distinguish that last-known-good fallback from success.
+        [[nodiscard]] PipelineManagerDiagnostics GetDiagnostics() const noexcept;
+
     private:
         struct Impl;
         std::unique_ptr<Impl> m_Impl;
     };
 }
-
