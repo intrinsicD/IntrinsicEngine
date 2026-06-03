@@ -819,7 +819,7 @@ testable; each phase derisks the next.
 - [GRAPHICS-049 — Neural radiance cache slot in the GI path (done)](../../done/GRAPHICS-049-neural-radiance-cache-slot.md):
   locks small-MLP shape, online training pass, cache invalidation, GI
   consumer seam. Depends on GRAPHICS-041, GRAPHICS-046.
-- [GRAPHICS-050 — Neural texture compression with random-access decode (planning)](GRAPHICS-050-neural-texture-compression.md):
+- [GRAPHICS-050 — Neural texture compression with random-access decode (done)](../../done/GRAPHICS-050-neural-texture-compression.md):
   locks `.ntc` shipping format + per-material decoder Slang module + BCn
   fallback. Depends on GRAPHICS-041, GRAPHICS-042.
 - [GRAPHICS-051 — Differentiable rendering mode (planning)](GRAPHICS-051-differentiable-rendering-mode.md):
