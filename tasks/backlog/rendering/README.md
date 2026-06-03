@@ -749,7 +749,7 @@ leaf task is a planning-only slice following the GRAPHICS-029..034 pattern
 (implementation children identified but not opened). Phases are independently
 testable; each phase derisks the next.
 
-- [GRAPHICS-035 — Rendering modernization roadmap (umbrella planning index)](GRAPHICS-035-modernization-roadmap.md):
+- [GRAPHICS-035 — Rendering modernization roadmap (umbrella planning index, done)](../../done/GRAPHICS-035-modernization-roadmap.md):
   records the agreed phased roadmap (Phase 1 frame structure, Phase 2 shader
   & material modernization, Phase 3 RT & GI, Phase 4 research differentiators,
   Phase 5 frontier). Parent of GRAPHICS-036..058. No implementation, no
@@ -757,18 +757,18 @@ testable; each phase derisks the next.
 
 #### Phase 1 — Modern frame structure
 
-- [GRAPHICS-036 — Pipelined frames and double-buffered render world (planning)](GRAPHICS-036-pipelined-frames-extraction-doublebuffer.md):
+- [GRAPHICS-036 — Pipelined frames and double-buffered render world (done)](../../done/GRAPHICS-036-pipelined-frames-extraction-doublebuffer.md):
   locks the contract for sim-N / render-N-1 pipelining against an immutable
   double-buffered render world. Owner layers: `runtime` (pool + swap),
   `graphics/renderer` (consumer). Depends on GRAPHICS-002, GRAPHICS-016.
-- [GRAPHICS-037 — Async compute and multi-queue scheduling in the frame graph (planning)](GRAPHICS-037-async-compute-multi-queue-rendergraph.md):
+- [GRAPHICS-037 — Async compute and multi-queue scheduling in the frame graph (done)](../../done/GRAPHICS-037-async-compute-multi-queue-rendergraph.md):
   locks `QueueAffinity` enum, partitioning, cross-queue timeline-semaphore
   edges, ownership transfer, and CPU-testable null-RHI mocks. Depends on
   GRAPHICS-022, GRAPHICS-018T.
-- [GRAPHICS-038 — HZB and two-phase occlusion culling extension to CullingPass (planning)](GRAPHICS-038-hzb-two-phase-occlusion-culling.md):
+- [GRAPHICS-038 — HZB and two-phase occlusion culling extension to CullingPass (done)](../../done/GRAPHICS-038-hzb-two-phase-occlusion-culling.md):
   locks HZB resource shape + build pass + phase-1/phase-2 cull shader
   extension preserving the 8-bucket lane contract. Depends on GRAPHICS-007.
-- [GRAPHICS-039 — Clustered light binning (planning)](GRAPHICS-039-clustered-light-binning.md):
+- [GRAPHICS-039 — Clustered light binning (done)](../../done/GRAPHICS-039-clustered-light-binning.md):
   locks froxel-grid cluster build, light-to-cluster assignment, surface-shader
   binding. Depends on GRAPHICS-009.
 - [GRAPHICS-040 — TAA pass and reconstructor/upscaler interface seam (planning)](GRAPHICS-040-taa-and-reconstructor-interface.md):

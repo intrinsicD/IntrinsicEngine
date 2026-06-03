@@ -120,6 +120,10 @@ The decision-record content this document previously inlined has been extracted 
 
 The handoff inventory that the GRAPHICS-017Q clarification paragraph previously embedded (legacy `Graphics.TransformGizmo` / `Graphics.Interaction` features awaiting promoted-implementation tasks) lives in [`docs/migration/nonlegacy-parity-matrix.md`](../migration/nonlegacy-parity-matrix.md); ADR-0006 cross-links it rather than duplicating it (no new migration doc was authored).
 
+## Modernization roadmap
+
+The phased path from the current 2025-era foundation (explicit RHI, render graph, snapshot extraction, GPU-driven culling, bindless materials) to a 2026+ feature set (modern frame structure, Slang shading, visibility-buffer/meshlet path, hardware ray tracing + hybrid GI, virtual shadow maps, reconstruction/upscaling seam, research differentiators) is indexed by [GRAPHICS-035 — Rendering modernization roadmap](../../tasks/done/GRAPHICS-035-modernization-roadmap.md). Each leaf (`GRAPHICS-036..058`) is a planning-only slice; implementation children stay unopened until Theme A's visible-geometry foundation is complete.
+
 ## Related references
 
 - Frame graph details: [frame-graph.md](frame-graph.md).

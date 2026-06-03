@@ -1,5 +1,10 @@
 # GRAPHICS-035 — Rendering modernization roadmap (umbrella planning index)
 
+- Status: completed (2026-06-03; planning-only; `Scaffolded`).
+- Owner / agent: rendering modernization roadmap planning (multi-task loop).
+- Commit reference: this task-retirement commit.
+- Next verification step: none; task is retired. Leaf planning slices proceed independently; implementation children stay unopened until Theme A is complete.
+
 ## Goal
 Record the agreed phased roadmap that takes the promoted rendering stack from its current 2025-era foundation (explicit RHI, render graph, snapshot extraction, GPU-driven culling, bindless materials) to a 2026+ feature set (modern frame structure, Slang-based shading, visibility-buffer/meshlet path, hardware ray tracing + hybrid GI, virtual shadow maps, reconstruction/upscaling seam, research-grade differentiators). This task is the index that orders and cross-links the leaf planning slices `GRAPHICS-036` through `GRAPHICS-058`; it does **not** open any implementation child slices.
 
@@ -63,30 +68,30 @@ Foundational architectural shifts that are expensive to retrofit later. Must pre
 - `GRAPHICS-058` — Frame generation pass.
 
 ## Required changes
-- [ ] Land this roadmap file as the single ordered index of the modernization phases.
-- [ ] Open each leaf planning slice (`GRAPHICS-036..058`) as a separate planning-only task following the `GRAPHICS-029..034` template.
-- [ ] Update `tasks/backlog/rendering/README.md` DAG to list the new tasks in dependency order, with each entry citing its upstream gates.
-- [ ] Cross-link this roadmap from `docs/architecture/graphics.md` and `docs/architecture/rendering-three-pass.md`. Do **not** edit semantic content of those docs in this slice.
+- [x] Land this roadmap file as the single ordered index of the modernization phases.
+- [x] Open each leaf planning slice (`GRAPHICS-036..058`) as a separate planning-only task following the `GRAPHICS-029..034` template.
+- [x] Update `tasks/backlog/rendering/README.md` DAG to list the new tasks in dependency order, with each entry citing its upstream gates.
+- [x] Cross-link this roadmap from `docs/architecture/graphics.md` and `docs/architecture/rendering-three-pass.md`. Do **not** edit semantic content of those docs in this slice.
 
 ## Tests
-- [ ] Planning slice: validators only.
-- [ ] Each leaf task records its own implementation-child test split. The default verification gate stays:
+- [x] Planning slice: validators only.
+- [x] Each leaf task records its own implementation-child test split. The default verification gate stays:
   ```bash
   ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
   ```
 
 ## Docs
-- [ ] `docs/architecture/graphics.md` — add a "Modernization roadmap" pointer to this task.
-- [ ] `docs/architecture/rendering-three-pass.md` — add a "Future work" pointer to this task without editing pass semantics.
-- [ ] `tasks/backlog/rendering/README.md` — DAG entry insertion (dependency order under existing `GRAPHICS-034`).
+- [x] `docs/architecture/graphics.md` — add a "Modernization roadmap" pointer to this task.
+- [x] `docs/architecture/rendering-three-pass.md` — add a "Future work" pointer to this task without editing pass semantics.
+- [x] `tasks/backlog/rendering/README.md` — DAG entry insertion (dependency order under existing `GRAPHICS-034`).
 
 ## Acceptance criteria
-- [ ] All twenty-three leaf planning slices exist as task files.
-- [ ] The DAG in `tasks/backlog/rendering/README.md` lists them with explicit upstream gates.
-- [ ] This roadmap is reachable from `docs/architecture/graphics.md` and `docs/architecture/rendering-three-pass.md`.
-- [ ] No implementation child slices are opened.
-- [ ] No semantic code or shader changes land.
-- [ ] Layering invariants in `AGENTS.md` §2 and §4 hold; this roadmap introduces no new dependency edges.
+- [x] All twenty-three leaf planning slices exist as task files.
+- [x] The DAG in `tasks/backlog/rendering/README.md` lists them with explicit upstream gates.
+- [x] This roadmap is reachable from `docs/architecture/graphics.md` and `docs/architecture/rendering-three-pass.md`.
+- [x] No implementation child slices are opened.
+- [x] No semantic code or shader changes land.
+- [x] Layering invariants in `AGENTS.md` §2 and §4 hold; this roadmap introduces no new dependency edges.
 
 ## Verification
 ```bash
@@ -94,6 +99,9 @@ python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/docs/check_doc_links.py --root . --strict
 python3 tools/repo/check_layering.py --root src --strict
 ```
+
+## Completion
+Completed 2026-06-03 as a planning-only `Scaffolded` umbrella index. All twenty-three leaf planning slices (`GRAPHICS-036..058`) exist as task files, the `tasks/backlog/rendering/README.md` DAG lists them in dependency order with explicit upstream gates, and this roadmap is now reachable from `docs/architecture/graphics.md` (`## Modernization roadmap`) and `docs/architecture/rendering-three-pass.md` (`## Where Active Work Lives`). No implementation child slices are opened and no semantic code or shader changes land; the leaves remain planning-only until Theme A's visible-geometry foundation is complete per `tasks/backlog/README.md`.
 
 ## Forbidden changes
 - No implementation, no shaders, no pipelines, no CMake option growth.
