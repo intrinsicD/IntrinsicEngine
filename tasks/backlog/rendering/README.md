@@ -833,7 +833,7 @@ testable; each phase derisks the next.
 
 #### Phase 5 — Frontier
 
-- [GRAPHICS-053 — Mesh shaders RHI extension (IMeshShaderDevice) (planning)](GRAPHICS-053-mesh-shaders-rhi-extension.md):
+- [GRAPHICS-053 — Mesh shaders RHI extension (IMeshShaderDevice) (done)](../../done/GRAPHICS-053-mesh-shaders-rhi-extension.md):
   locks the optional `IMeshShaderDevice` capability surface (task→mesh
   pipeline, indirect dispatch, payload limits) and recipe-selection
   fallback to `MeshletViaCompute`. Depends on GRAPHICS-033, GRAPHICS-044.
