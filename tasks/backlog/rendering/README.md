@@ -822,7 +822,7 @@ testable; each phase derisks the next.
 - [GRAPHICS-050 — Neural texture compression with random-access decode (done)](../../done/GRAPHICS-050-neural-texture-compression.md):
   locks `.ntc` shipping format + per-material decoder Slang module + BCn
   fallback. Depends on GRAPHICS-041, GRAPHICS-042.
-- [GRAPHICS-051 — Differentiable rendering mode (planning)](GRAPHICS-051-differentiable-rendering-mode.md):
+- [GRAPHICS-051 — Differentiable rendering mode (done)](../../done/GRAPHICS-051-differentiable-rendering-mode.md):
   locks forward+backward render-graph compile, adjoint buffer lifetime,
   `Pass.Loss` + gradient sink, build-time gating to keep production unchanged.
   Depends on GRAPHICS-041.
