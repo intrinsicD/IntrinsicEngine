@@ -7,9 +7,9 @@
   shared GRAPHICS-076/BUG-012 default-recipe Vulkan command-stream blocker is
   cleared, and the dedicated visualization-overlay `gpu;vulkan` smoke now
   records both lanes on the operational Vulkan command stream. Pixel-readback
-  parity is explicitly deferred to
-  [`GRAPHICS-078E`](../backlog/rendering/GRAPHICS-078E-visualization-overlay-pixel-readback.md)
-  rather than expanding this Slice D into a renderer readback API change).
+  parity is retired by
+  [`GRAPHICS-078E`](GRAPHICS-078E-visualization-overlay-pixel-readback.md)
+  without expanding this Slice D into a renderer readback API change).
   Slice A scaffolded the recipe + executor shape on
   `claude/intrinsicengine-agent-onboarding-3dLeQ` 2026-05-24
   (209/209 graphics contract tests pass). Slice B promoted the
@@ -43,9 +43,9 @@
   pattern: per-frame host-visible buffers, two pipeline variants per
   kind (depth-tested + always-on-top), one consolidated overlay pass
   drawing into `SceneColorHDR`/`SceneDepth` after lit composition.
-- Next verification step: none for this task; pixel-readback parity is tracked
+- Next verification step: none for this task; pixel-readback parity is retired
   by
-  [`GRAPHICS-078E`](../backlog/rendering/GRAPHICS-078E-visualization-overlay-pixel-readback.md).
+  [`GRAPHICS-078E`](GRAPHICS-078E-visualization-overlay-pixel-readback.md).
   2026-05-28
   focused Slice D verification under `build/ci-vulkan`:
   `VisualizationOverlaySurfaceGpuSmoke.MixedLanesRecordOnOperationalVulkanCommandStream`
@@ -103,9 +103,9 @@ final slice exercises an opt-in `gpu;vulkan` smoke.
   `Extrinsic.Graphics.VisualizationOverlayUploadHelper` so contract
   tests can substitute; the default concrete impl lives in the
   renderer module and uses `BufferManager` +
-  `IDevice::WriteBuffer(...)` — the Vulkan-tuned variant is deferred
-  to Slice D per the backend-locality non-goal that GRAPHICS-077
-  Slice D inherits). The `DepthTested` placement question recorded
+  `IDevice::WriteBuffer(...)`; future source-BDA expansion remains a
+  separate follow-up per the backend-locality non-goal). The
+  `DepthTested` placement question recorded
   under "Slice A clarifications captured during implementation" was
   resolved option (a): `VectorFieldOverlayPacket` grew a
   `bool DepthTested{true}` field mirroring
@@ -123,10 +123,11 @@ final slice exercises an opt-in `gpu;vulkan` smoke.
   place from Slice A; no further recipe-side LOAD-store template
   changes were required. CPU/null contract note: the helper does not
   have CPU access to `PositionBufferBDA` / `VectorBufferBDA` (those
-  are GPU pointers), so the CPU/null path writes zero positions and
-  the packet's packed color into each packed vertex; per-pixel
-  correctness on a real Vulkan device is owned by the optional
-  Slice D `gpu;vulkan` smoke and the Vulkan-tuned helper variant.
+  are GPU pointers), so the current path writes deterministic
+  placeholder glyph segments and the packet's packed color into each
+  packed vertex. GRAPHICS-078E validates those placeholders with
+  opt-in Vulkan pixel-readback; actual source-BDA endpoint expansion
+  remains future work.
 - **Slice C (landed 2026-05-25 on `claude/intrinsicengine-agent-onboarding-2P6pn`).**
   Isoline lane operational wiring. Mirrors Slice B for isoline
   polylines: two more pipelines (`Isoline.DepthTested`,
@@ -161,11 +162,11 @@ final slice exercises an opt-in `gpu;vulkan` smoke.
   Mirrors GRAPHICS-077 Slice C's per-lane independence semantics
   exactly. CPU/null contract note: the helper does not have CPU
   access to the source scalar field (its values + topology are
-  GPU-side), so the CPU/null path writes zero positions + the
-  packet color into each packed vertex; per-pixel correctness on a
-  real Vulkan device is owned by the optional Slice D `gpu;vulkan`
-  smoke and the Vulkan-tuned helper variant that expands scalar-
-  field-derived contour vertices.
+  GPU-side), so the current path writes deterministic placeholder
+  iso-line segments and the packet color into each packed vertex.
+  GRAPHICS-078E validates those placeholders with opt-in Vulkan
+  pixel-readback; actual scalar-field contour expansion remains
+  future work.
 - **Slice D (landed locally 2026-05-28).** Opt-in `gpu;vulkan;graphics`
   command-stream smoke asserting the visualization overlay pass records through
   a real Vulkan device on a Vulkan-capable host. The smoke warms the canonical
@@ -175,9 +176,9 @@ final slice exercises an opt-in `gpu;vulkan` smoke.
   `VisualizationOverlayPass` is `Recorded`, both submitted/recorded lane
   counters are `1`, `UploadOverflowCount` / `MissingPipelineSkipCount` stay
   zero, and Vulkan fallback counters stay stable. Pixel-readback parity is
-  deferred to
-  [`GRAPHICS-078E`](../backlog/rendering/GRAPHICS-078E-visualization-overlay-pixel-readback.md)
-  because the current public readback seam is MinimalDebug-only.
+  retired by
+  [`GRAPHICS-078E`](GRAPHICS-078E-visualization-overlay-pixel-readback.md)
+  through the visualization-overlay readback hook/counter.
 
 ## Maturity
 
@@ -447,8 +448,9 @@ Slice D (optional `gpu;vulkan` smoke, deferred):
       command stream and that `VisualizationOverlayUploadDiagnostics` counters
       match the submitted counts.
 - [x] Defer pixel-readback color assertions to
-      [`GRAPHICS-078E`](../backlog/rendering/GRAPHICS-078E-visualization-overlay-pixel-readback.md)
-      instead of reusing the MinimalDebug-only readback seam.
+      [`GRAPHICS-078E`](GRAPHICS-078E-visualization-overlay-pixel-readback.md)
+      as a sibling renderer readback API change instead of reusing the
+      MinimalDebug-only readback seam.
 
 ## Tests
 
@@ -579,14 +581,14 @@ Slice B (landed 2026-05-24):
       lane bind/draw shape, per-lane pipeline call indices #32 + #33,
       the helper module placement
       (`Extrinsic.Graphics.VisualizationOverlayUploadHelper`), and
-      the CPU/null-path data-substitution note (zero positions +
-      packet color, Vulkan-tuned expansion deferred to Slice D).
+      the CPU/null-path data-substitution note (deterministic
+      placeholder glyph positions + packet color after GRAPHICS-078E;
+      actual source-BDA expansion remains future work).
 - [-] `src/graphics/vulkan/README.md` row for the
-      `VisualizationOverlayUploadHelper` is deferred to Slice D —
+      `VisualizationOverlayUploadHelper` was deferred out of Slice B —
       the Slice B helper lives in the renderer module (CPU-functional
-      via `BufferManager`); the Vulkan-tuned concrete impl that
-      lands with Slice D is what justifies a vulkan-README entry,
-      mirroring the GRAPHICS-077 Slice B/C convention.
+      via `BufferManager`). The Vulkan README entry is now covered by
+      the GRAPHICS-078E readback sibling.
 - [x] Regenerated `docs/api/generated/module_inventory.md` (444
       modules; the new
       `Extrinsic.Graphics.VisualizationOverlayUploadHelper` module
@@ -600,12 +602,12 @@ Slice C (landed 2026-05-25):
       the `BuildVisualizationIsolinePipelineDesc` helper, the new
       shader pair placement, the per-lane gating semantics in
       `RecordVisualizationOverlayPass`, and the CPU/null-path data-
-      substitution note (zero positions + packet color, Vulkan-
-      tuned scalar-field-derived expansion deferred to Slice D).
-- [-] `src/graphics/vulkan/README.md` row remains deferred to Slice
-      D for the same reason recorded under Slice B (helper lives in
-      the renderer module; vulkan-README entry justified only when
-      the Vulkan-tuned concrete impl lands).
+      substitution note (deterministic placeholder iso-line positions
+      + packet color after GRAPHICS-078E; actual scalar-field contour
+      expansion remains future work).
+- [-] `src/graphics/vulkan/README.md` row remained deferred out of
+      Slice C for the same reason recorded under Slice B. The Vulkan
+      README entry is now covered by the GRAPHICS-078E readback sibling.
 - [x] Regenerate `docs/api/generated/module_inventory.md` (no new
       module surfaces in Slice C; the existing
       `Extrinsic.Graphics.VisualizationOverlayUploadHelper` module
@@ -621,7 +623,7 @@ Slice D (command-stream smoke, landed locally 2026-05-28):
       existing `gpu;vulkan;graphics` labels.
 - [x] Record the command-stream smoke graduation in this task file and move
       visualization-overlay pixel-readback parity into
-      [`GRAPHICS-078E`](../backlog/rendering/GRAPHICS-078E-visualization-overlay-pixel-readback.md).
+      [`GRAPHICS-078E`](GRAPHICS-078E-visualization-overlay-pixel-readback.md).
 
 ## Acceptance criteria
 
@@ -697,9 +699,10 @@ Slice D (optional, Vulkan-capable hosts only):
 
 - [x] `gpu;vulkan` smoke green with non-zero per-kind recorded
       counters on an operational Vulkan command stream.
-- [x] Pixel-readback confirmation is deferred to
-      [`GRAPHICS-078E`](../backlog/rendering/GRAPHICS-078E-visualization-overlay-pixel-readback.md)
-      because the existing readback hook/counter is MinimalDebug-only.
+- [x] Pixel-readback confirmation is retired by
+      [`GRAPHICS-078E`](GRAPHICS-078E-visualization-overlay-pixel-readback.md)
+      as a sibling renderer readback hook/counter instead of reusing
+      MinimalDebug-only diagnostics.
 
 ## Verification
 
@@ -736,11 +739,11 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -LE 'slow|flaky-qu
   scaffold-only and must keep the executor at the
   `SkippedUnavailable` baseline so reviewers can see the
   recipe/executor shape land independently of pipeline/helper work.
-- Adding the Vulkan-tuned isoline helper variant (scalar-field-
-  derived contour vertex expansion via GPU compute) inside Slice
-  C — explicitly deferred to Slice D so the CPU/null contract lands
-  independently and the Vulkan-tuned implementation can rely on a
-  Vulkan-capable host for end-to-end pixel-readback validation.
+- Adding source-BDA isoline contour expansion via GPU compute inside
+  Slice C — explicitly deferred out of this task so the CPU/null
+  contract lands independently; GRAPHICS-078E validates deterministic
+  placeholder pixels but still does not claim scalar-field contour
+  parity.
 
 ## Next verification step
 

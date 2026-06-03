@@ -39,7 +39,7 @@
 
 ## Docs
 - [x] Update `src/graphics/renderer/README.md` and `src/graphics/vulkan/README.md` with the new transient-debug readback hook/counter.
-- [x] Update `tasks/backlog/rendering/README.md` because this task is retired and `GRAPHICS-078E` remains the next sibling readback follow-up.
+- [x] Update `tasks/backlog/rendering/README.md`; `GRAPHICS-078E` has since retired the visualization-overlay sibling readback follow-up.
 
 ## Acceptance criteria
 - [x] Vulkan readback confirms expected transient-debug triangle/line/point sample colors on Vulkan-capable hosts through the opt-in smoke.

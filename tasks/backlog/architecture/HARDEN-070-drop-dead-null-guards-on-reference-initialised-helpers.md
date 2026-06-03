@@ -16,10 +16,10 @@
 - Do not remove the other early-return guards in the same methods (empty-span,
   `IsOperational()`, zero-endpoint, cap-overflow). Those check real call-site
   inputs, not internal invariants.
-- Do not delete or re-export the `I*` virtual interfaces — Slice D in
-  GRAPHICS-077 / GRAPHICS-078 still plans to add the Vulkan-tuned second
-  implementation against each interface, and `ISpatialDebugAdapter` now has
-  four concretes (`BvhAdapter`, `KdTreeAdapter`, `OctreeAdapter`,
+- Do not delete or re-export the `I*` virtual interfaces — GRAPHICS-077E /
+  GRAPHICS-078E keep them as renderer test/backend seams and future
+  source-BDA/backend-specific expansion points, and `ISpatialDebugAdapter` now
+  has four concretes (`BvhAdapter`, `KdTreeAdapter`, `OctreeAdapter`,
   `ConvexHullAdapter`).
 - Do not migrate other helpers/adapters with similar patterns in `src/`. The
   scope is strictly the three modules introduced in the 2026-05-18 → 2026-05-26

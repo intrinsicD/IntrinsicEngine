@@ -51,6 +51,44 @@ namespace Extrinsic::Graphics
             const std::uint32_t a = static_cast<std::uint32_t>(clamped.a * 255.0f + 0.5f);
             return r | (g << 8) | (b << 16) | (a << 24);
         }
+
+        struct OverlayFixtureSegment
+        {
+            glm::vec3 Start{0.0f};
+            glm::vec3 End{0.0f};
+        };
+
+        [[nodiscard]] constexpr float FixturePixelCenterToNdcX(const std::uint32_t pixelX) noexcept
+        {
+            return ((static_cast<float>(pixelX) + 0.5f) / 256.0f) * 2.0f - 1.0f;
+        }
+
+        [[nodiscard]] constexpr float FixturePixelCenterToNdcY(const std::uint32_t pixelY) noexcept
+        {
+            return 1.0f - ((static_cast<float>(pixelY) + 0.5f) / 256.0f) * 2.0f;
+        }
+
+        [[nodiscard]] OverlayFixtureSegment MakeVectorFieldFixtureSegment(
+            const std::uint64_t glyphIndex) noexcept
+        {
+            const std::uint32_t lane = static_cast<std::uint32_t>(glyphIndex % 4u);
+            const float y = FixturePixelCenterToNdcY(64u + lane * 12u);
+            return OverlayFixtureSegment{
+                .Start = glm::vec3{FixturePixelCenterToNdcX(48u), y, 0.0f},
+                .End   = glm::vec3{FixturePixelCenterToNdcX(96u), y, 0.0f},
+            };
+        }
+
+        [[nodiscard]] OverlayFixtureSegment MakeIsolineFixtureSegment(
+            const std::uint64_t isoIndex) noexcept
+        {
+            const std::uint32_t lane = static_cast<std::uint32_t>(isoIndex % 4u);
+            const float y = FixturePixelCenterToNdcY(176u + lane * 12u);
+            return OverlayFixtureSegment{
+                .Start = glm::vec3{FixturePixelCenterToNdcX(160u), y, 0.0f},
+                .End   = glm::vec3{FixturePixelCenterToNdcX(208u), y, 0.0f},
+            };
+        }
     }
 
     VisualizationOverlayUploadHelper::VisualizationOverlayUploadHelper(RHI::IDevice& device,
@@ -225,15 +263,19 @@ namespace Extrinsic::Graphics
             {
                 // CPU/null path: the helper does not have CPU access
                 // to `packet.PositionBufferBDA` / `VectorBufferBDA`
-                // (those are GPU pointers), so the packed-vertex
-                // position stays zero. The Vulkan-tuned variant
-                // (Slice D) substitutes a backend-locally-resolved
-                // anchor + scaled tip per glyph. Per-packet color
-                // packing is identical across both paths.
+                // (those are GPU pointers), so GRAPHICS-078E emits a
+                // deterministic placeholder glyph segment instead of
+                // claiming source-buffer parity. A future source-BDA
+                // expansion can replace only this fixture-position
+                // calculation while preserving per-packet color
+                // packing and draw shape.
+                const OverlayFixtureSegment segment =
+                    MakeVectorFieldFixtureSegment(endpoint / 2u);
+                const glm::vec3 position = (endpoint % 2u == 0u) ? segment.Start : segment.End;
                 PackedOverlayVertex& vertex = staging[writeIndex++];
-                vertex.Position[0] = 0.0f;
-                vertex.Position[1] = 0.0f;
-                vertex.Position[2] = 0.0f;
+                vertex.Position[0] = position.x;
+                vertex.Position[1] = position.y;
+                vertex.Position[2] = position.z;
                 vertex.PackedColor = packedColor;
             }
         }
@@ -277,12 +319,11 @@ namespace Extrinsic::Graphics
             return result;
         }
 
-        // CPU/null contract: each iso value contributes one placeholder
-        // `LineList` segment (two packed vertices) per packet so the
-        // pass can issue `Draw(2 * IsoValueCount, 1, 0, 0)` per packet.
-        // The Vulkan-tuned variant in Slice D substitutes an actual
-        // scalar-field-derived polyline expansion that emits per-iso
-        // contour vertices.
+        // CPU/null contract: each iso value contributes one deterministic
+        // placeholder `LineList` segment (two packed vertices) per packet so
+        // the pass can issue `Draw(2 * IsoValueCount, 1, 0, 0)` per packet.
+        // Actual scalar-field-derived polyline expansion remains future
+        // source-BDA work.
         std::uint64_t totalEndpointCount = 0u;
         for (const IsolineOverlayPacket& packet : isolines)
         {
@@ -318,15 +359,19 @@ namespace Extrinsic::Graphics
             {
                 // CPU/null path: the helper does not have CPU access
                 // to the source scalar field (its values + topology
-                // are GPU-side), so the packed-vertex position stays
-                // zero. The Vulkan-tuned variant (Slice D) substitutes
-                // backend-locally-resolved iso-contour vertices per
-                // packet. Per-packet color packing is identical
-                // across both paths.
+                // are GPU-side), so GRAPHICS-078E emits deterministic
+                // placeholder iso-line segments instead of claiming
+                // source-buffer parity. A future source-BDA expansion
+                // can replace only this fixture-position calculation
+                // while preserving per-packet color packing and draw
+                // shape.
+                const OverlayFixtureSegment segment =
+                    MakeIsolineFixtureSegment(endpoint / 2u);
+                const glm::vec3 position = (endpoint % 2u == 0u) ? segment.Start : segment.End;
                 PackedOverlayVertex& vertex = staging[writeIndex++];
-                vertex.Position[0] = 0.0f;
-                vertex.Position[1] = 0.0f;
-                vertex.Position[2] = 0.0f;
+                vertex.Position[0] = position.x;
+                vertex.Position[1] = position.y;
+                vertex.Position[2] = position.z;
                 vertex.PackedColor = packedColor;
             }
         }

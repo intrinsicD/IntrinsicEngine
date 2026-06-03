@@ -305,8 +305,8 @@ readback parity is retired by
 visualization-overlay upload helper retired to `tasks/done/` on 2026-05-28 after
 Slice D added `VisualizationOverlaySurfaceGpuSmoke`; maturity is
 `CPUContracted` on CPU-only hosts and command-stream `Operational` on
-Vulkan-capable hosts. Pixel readback parity is tracked by
-[`GRAPHICS-078E`](../backlog/rendering/GRAPHICS-078E-visualization-overlay-pixel-readback.md).
+Vulkan-capable hosts. Pixel readback parity is retired by
+[`GRAPHICS-078E`](../done/GRAPHICS-078E-visualization-overlay-pixel-readback.md).
 
 [`GEOM-015`](../done/GEOM-015-gjk-termination-diagnostics.md) — GJK
 termination diagnostics and scale-aware tolerance policy retired to

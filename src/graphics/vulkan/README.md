@@ -469,7 +469,15 @@ only when `TransientDebugSurfacePass` recorded, and
 that copy from `DefaultRecipeBackbufferReadbackCopyCount`. The new
 `TransientDebugSurfaceGpuSmoke.MixedLanesReadBackExpectedSampleColors` fixture
 samples deterministic red triangle, green line, blue point, and clear pixels.
-`GRAPHICS-078E` remains the visualization-overlay sibling follow-up.
+GRAPHICS-078E adds the visualization-overlay sibling:
+`IRenderer::SetVisualizationOverlayBackbufferReadbackBuffer` arms the same
+caller-owned HostVisible+TransferDst path, the renderer copies only when
+`VisualizationOverlayPass` recorded, and
+`RenderGraphFrameStats::VisualizationOverlayBackbufferReadbackCopyCount`
+separates that evidence from the canonical and transient-debug counters. The
+`VisualizationOverlaySurfaceGpuSmoke.MixedLanesReadBackExpectedSampleColors`
+fixture enables debug-view presentation of `SceneColorHDR`, then samples the
+deterministic vector-field red segment, isoline green segment, and clear pixels.
 
 Ordered gate checklist:
 

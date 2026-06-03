@@ -801,11 +801,10 @@ Concretely:
   `Recorded` when at least one packet's draw lands.
   CPU/null contract note: the helper does not have CPU access to
   `PositionBufferBDA` / `VectorBufferBDA` (those are GPU pointers),
-  so the CPU/null path writes zero positions and the packet color
-  into each packed vertex; per-pixel correctness on a real Vulkan
-  device is owned by the optional Slice D `gpu;vulkan` smoke and the
-  Vulkan-tuned helper variant that expands actual per-glyph
-  endpoints from the source BDAs.
+  so the helper writes deterministic placeholder glyph segments and
+  the packet color into each packed vertex. GRAPHICS-078E validates
+  those placeholders with opt-in Vulkan pixel-readback; actual
+  source-BDA endpoint expansion remains future work.
 - GRAPHICS-078 Slice C promotes the isoline lane from
   `SkippedUnavailable` to `Recorded` on the CPU/null path.
   `IsolineOverlayPacket` grows a `bool DepthTested{true}` field
@@ -834,20 +833,34 @@ Concretely:
   at least one lane recorded; `SkippedUnavailable` when every
   submitted lane failed its gate. CPU/null contract note: the helper
   does not have CPU access to the source scalar field (its values +
-  topology are GPU-side), so the CPU/null path writes zero positions
-  + the packet color into each packed vertex; per-pixel correctness
-  on a real Vulkan device is owned by the optional Slice D
-  `gpu;vulkan` smoke and the Vulkan-tuned helper variant that
-  expands scalar-field-derived contour vertices.
-- Slice D adds the opt-in `gpu;vulkan` pixel-readback smoke. The
-  contract pin is
+  topology are GPU-side), so the helper writes deterministic
+  placeholder iso-line segments and the packet color into each packed
+  vertex. GRAPHICS-078E validates those placeholders with opt-in
+  Vulkan pixel-readback; actual scalar-field contour expansion
+  remains future work.
+- Slice D adds the opt-in `gpu;vulkan` command-stream smoke and
+  GRAPHICS-078E adds the sibling pixel-readback harness. The
+  readback API is
+  `IRenderer::SetVisualizationOverlayBackbufferReadbackBuffer(...)`;
+  when an operational frame records `"VisualizationOverlayPass"` the
+  renderer copies the backbuffer through the existing
+  `Present -> TransferSrc -> CopyTextureToBuffer -> Present` seam and
+  increments
+  `RenderGraphFrameStats::VisualizationOverlayBackbufferReadbackCopyCount`.
+  The hook defaults disabled, skips clean/non-operational frames, and
+  does not reuse `DefaultRecipeBackbufferReadbackCopyCount` or
+  `TransientDebugBackbufferReadbackCopyCount`. The contract pin is
   `tests/contract/graphics/Test.VisualizationOverlayPass.cpp`
-  (14 tests on CPU/null hosts after Slice C: recipe declaration
+  (18 tests on CPU/null hosts after GRAPHICS-078E: recipe declaration
   with/without overlay packets, executor `SkippedNonOperational`
   short-circuit, per-lane `Missing*PipelineLeaseSkipsUnavailable`,
   per-packet `Records*` / `Selects*AlwaysOnTop` shape, per-frame
   buffer-recycling invariant per lane, mixed-lane both-record
-  acceptance test, and the per-lane partial-skip independence pin).
+  acceptance test, the per-lane partial-skip independence pin, and
+  fail-closed readback coverage). The opt-in Vulkan parity pin is
+  `VisualizationOverlaySurfaceGpuSmoke.MixedLanesReadBackExpectedSampleColors`,
+  which samples deterministic vector-field red, isoline green, and
+  clear pixels.
 - GRAPHICS-079 wires the canonical default-recipe `Pass.ImGui`
   (`Extrinsic.Graphics.Pass.ImGui`) executor route on the CPU/null path.
   Slice A added the explicit `"ImGuiPass"` executor branch, the renderer-owned

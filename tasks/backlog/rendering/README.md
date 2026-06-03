@@ -703,9 +703,13 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   landed/CPUContracted and Slice D command-stream smoke passed locally on
   2026-05-28 with `VisualizationOverlaySurfaceGpuSmoke` recording vector-field
   and isoline lanes on an operational Vulkan frame.
-- [GRAPHICS-078E — Visualization-overlay pixel-readback parity harness](GRAPHICS-078E-visualization-overlay-pixel-readback.md):
-  follow-up to GRAPHICS-078 Slice D. Adds opt-in Vulkan readback/sample-color
-  parity without reusing the canonical surface-readback diagnostics.
+- [GRAPHICS-078E — Visualization-overlay pixel-readback parity harness (done)](../../done/GRAPHICS-078E-visualization-overlay-pixel-readback.md):
+  retired follow-up to GRAPHICS-078 Slice D. Added
+  `SetVisualizationOverlayBackbufferReadbackBuffer(...)` and
+  `VisualizationOverlayBackbufferReadbackCopyCount`, CPU/null fail-closed
+  contract coverage, deterministic placeholder lane geometry, and an opt-in
+  Vulkan readback/sample-color smoke for vector-field, isoline, and clear
+  pixels without reusing canonical or transient-debug readback diagnostics.
 - [GRAPHICS-079 — Default-recipe `Pass.ImGui` wiring](../../done/GRAPHICS-079-default-recipe-imgui-pass-wiring.md)
   (done): depends on GRAPHICS-076 (PresentSource finalization) and
   `runtime/RUNTIME-090` (ImGui adapter producer). It wires the renderer

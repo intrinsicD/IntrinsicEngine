@@ -10,15 +10,12 @@
 // issue `Draw(2 * ElementCount, 1, 0, 0)` per packet with packet-
 // stable `gl_VertexIndex` semantics.
 //
-// CPU/null path note: the renderer-side helper does not have CPU
-// access to `VectorFieldOverlayPacket::PositionBufferBDA` /
-// `VectorBufferBDA` (those are GPU pointers), so the CPU/null path
-// writes zero positions and the packet color into each packed vertex.
-// The CPU/null contract only validates the `BindPipeline +
-// PushConstants + Draw(N, 1, 0, 0)` shape; per-pixel correctness on a
-// real Vulkan device is owned by the optional `gpu;vulkan` smoke
-// (GRAPHICS-078 Slice D) and the Vulkan-tuned helper variant that
-// expands actual per-glyph endpoints from the source BDAs.
+// CPU/null path note: the renderer-side helper does not have CPU access to
+// `VectorFieldOverlayPacket::PositionBufferBDA` / `VectorBufferBDA` (those are
+// GPU pointers), so it writes deterministic placeholder glyph segments and the
+// packet color into each packed vertex. GRAPHICS-078E validates those
+// placeholders with opt-in Vulkan pixel-readback; actual source-BDA endpoint
+// expansion remains future work.
 
 #version 460
 #extension GL_EXT_scalar_block_layout : require

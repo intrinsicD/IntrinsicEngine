@@ -9,15 +9,11 @@
 // executor can issue `Draw(2 * IsoValueCount, 1, 0, 0)` per packet with
 // packet-stable `gl_VertexIndex` semantics (`LineList` topology).
 //
-// CPU/null path note: the renderer-side helper does not have CPU
-// access to the source scalar field (its values + topology are GPU-
-// side), so the CPU/null path writes zero positions and the packet
-// color into each packed vertex. The CPU/null contract only validates
-// the `BindPipeline + PushConstants + Draw(N, 1, 0, 0)` shape; per-
-// pixel correctness on a real Vulkan device is owned by the optional
-// `gpu;vulkan` smoke (GRAPHICS-078 Slice D) and the Vulkan-tuned
-// helper variant that expands actual iso-contour vertices from the
-// scalar field's GPU buffer.
+// CPU/null path note: the renderer-side helper does not have CPU access to the
+// source scalar field (its values + topology are GPU-side), so it writes
+// deterministic placeholder iso-line segments and the packet color into each
+// packed vertex. GRAPHICS-078E validates those placeholders with opt-in Vulkan
+// pixel-readback; actual scalar-field contour expansion remains future work.
 
 #version 460
 #extension GL_EXT_scalar_block_layout : require

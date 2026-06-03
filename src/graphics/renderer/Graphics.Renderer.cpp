@@ -2344,16 +2344,25 @@ namespace Extrinsic::Graphics
                                 return pass.Name == "TransientDebugSurfacePass" &&
                                        pass.Status == RenderCommandPassStatus::Recorded;
                             });
+            const auto visualizationOverlayRecordedThisFrame =
+                std::any_of(m_LastRenderGraphStats.CommandRecords.Passes.begin(),
+                            m_LastRenderGraphStats.CommandRecords.Passes.end(),
+                            [](const RenderGraphCommandPassStats& pass)
+                            {
+                                return pass.Name == "VisualizationOverlayPass" &&
+                                       pass.Status == RenderCommandPassStatus::Recorded;
+                            });
 
-            // GRAPHICS-076E / GRAPHICS-077E — opt-in pixel-readback hooks:
-            // copy after the executor's final Present transition and restore
-            // Present layout before the command buffer closes. The transient
-            // hook is additionally gated on the transient-debug pass recording
-            // this frame so its counter cannot be confused with the canonical
-            // surface-readback path.
+            // GRAPHICS-076E / GRAPHICS-077E / GRAPHICS-078E — opt-in pixel-
+            // readback hooks: copy after the executor's final Present
+            // transition and restore Present layout before the command buffer
+            // closes. Pass-scoped hooks are additionally gated on their pass
+            // recording this frame so their counters cannot be confused with
+            // the canonical surface-readback path.
             if (executeResult.has_value() &&
                 (m_DefaultRecipeReadbackBuffer.IsValid() ||
-                 (m_TransientDebugReadbackBuffer.IsValid() && transientDebugRecordedThisFrame)) &&
+                 (m_TransientDebugReadbackBuffer.IsValid() && transientDebugRecordedThisFrame) ||
+                 (m_VisualizationOverlayReadbackBuffer.IsValid() && visualizationOverlayRecordedThisFrame)) &&
                 m_Device != nullptr && m_Device->IsOperational())
             {
                 const RHI::TextureHandle backbuffer = m_Device->GetBackbufferHandle(frame);
@@ -2384,6 +2393,11 @@ namespace Extrinsic::Graphics
                     {
                         copyBackbuffer(m_TransientDebugReadbackBuffer);
                         ++m_LastRenderGraphStats.TransientDebugBackbufferReadbackCopyCount;
+                    }
+                    if (m_VisualizationOverlayReadbackBuffer.IsValid() && visualizationOverlayRecordedThisFrame)
+                    {
+                        copyBackbuffer(m_VisualizationOverlayReadbackBuffer);
+                        ++m_LastRenderGraphStats.VisualizationOverlayBackbufferReadbackCopyCount;
                     }
                 }
             }
@@ -2792,6 +2806,16 @@ namespace Extrinsic::Graphics
         [[nodiscard]] RHI::BufferHandle GetTransientDebugBackbufferReadbackBuffer() const noexcept override
         {
             return m_TransientDebugReadbackBuffer;
+        }
+
+        void SetVisualizationOverlayBackbufferReadbackBuffer(RHI::BufferHandle handle) noexcept override
+        {
+            m_VisualizationOverlayReadbackBuffer = handle;
+        }
+
+        [[nodiscard]] RHI::BufferHandle GetVisualizationOverlayBackbufferReadbackBuffer() const noexcept override
+        {
+            return m_VisualizationOverlayReadbackBuffer;
         }
 
         // GRAPHICS-076 Slice B — public seam for the renderer-owned
@@ -3956,10 +3980,10 @@ namespace Extrinsic::Graphics
         // Mirrors the vector-field desc exactly except for the shader
         // pair (`visualization_isoline.{vert,frag}`) and the debug
         // name. `LineList` topology because each iso value is expanded
-        // by the helper into a placeholder line segment on the CPU/null
-        // path (two vertices per iso); the Vulkan-tuned variant in
-        // Slice D substitutes scalar-field-derived contour polylines
-        // while preserving the topology + push-constant contract.
+        // by the helper into a deterministic placeholder line segment
+        // (two vertices per iso). Actual scalar-field-derived contour
+        // polylines remain future source-BDA work while preserving the
+        // topology + push-constant contract.
         // Push-constant block is the dedicated
         // `VisualizationIsolinePushConstants` shape (BDA +
         // `FirstVertex`) so per-kind evolution (e.g. per-iso line width
@@ -6864,11 +6888,10 @@ namespace Extrinsic::Graphics
         // GRAPHICS-078 Slice B — backend-local visualization-overlay
         // upload helper. Same lifetime contract as the transient-
         // debug helper above: held as
-        // `unique_ptr<IVisualizationOverlayUploadHelper>` so Slice D
-        // can swap in a Vulkan-tuned concrete implementation (that
-        // expands actual per-glyph endpoints from the source BDAs)
-        // without disturbing the renderer-side wiring. Constructed
-        // in `Initialize(device)` against the live `BufferManager`;
+        // `unique_ptr<IVisualizationOverlayUploadHelper>` so future
+        // source-BDA expansion can replace placeholder endpoint
+        // generation without disturbing the renderer-side wiring.
+        // Constructed in `Initialize(device)` against the live `BufferManager`;
         // reset in `Shutdown()` before the `BufferManager` so the
         // helper's internal lease destructor observes a live
         // manager.
@@ -7033,6 +7056,10 @@ namespace Extrinsic::Graphics
         // handle = disabled (default); additionally gated on
         // `TransientDebugSurfacePass` recording this frame.
         RHI::BufferHandle                    m_TransientDebugReadbackBuffer{};
+        // GRAPHICS-078E — opt-in visualization-overlay readback target.
+        // Invalid handle = disabled (default); additionally gated on
+        // `VisualizationOverlayPass` recording this frame.
+        RHI::BufferHandle                    m_VisualizationOverlayReadbackBuffer{};
         RenderGraphFrameStats                m_LastRenderGraphStats;
     };
 

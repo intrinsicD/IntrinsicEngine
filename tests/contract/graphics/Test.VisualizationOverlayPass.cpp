@@ -64,6 +64,22 @@ namespace
         return nullptr;
     }
 
+    [[nodiscard]] bool HasBackbufferBarrier(const MockDevice& device,
+                                            const RHI::TextureLayout before,
+                                            const RHI::TextureLayout after) noexcept
+    {
+        for (const auto& barrier : device.CommandContext.TextureBarrierCalls)
+        {
+            if (barrier.Texture == device.BackbufferHandle &&
+                barrier.Before == before &&
+                barrier.After == after)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     void SubmitOneVectorField(Graphics::IRenderer& renderer, const bool depthTested = true)
     {
         // A single non-empty vector-field-overlay packet span is enough
@@ -907,6 +923,153 @@ TEST(VisualizationOverlayPassContract, MixedLaneVectorFieldAndIsolineBothRecord)
     EXPECT_EQ(stats.VisualizationOverlayUpload.IsolineRecordsRecorded, 1u);
     EXPECT_EQ(stats.VisualizationOverlayUpload.UploadOverflowCount, 0u);
     EXPECT_EQ(stats.VisualizationOverlayUpload.MissingPipelineSkipCount, 0u);
+
+    renderer->Shutdown();
+}
+
+TEST(VisualizationOverlayPassContract, VisualizationReadbackDefaultDisabledEvenWhenPassRecords)
+{
+    MockDevice device;
+    device.BackbufferHandle = RHI::TextureHandle{796u, 1u};
+
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    EXPECT_FALSE(renderer->GetVisualizationOverlayBackbufferReadbackBuffer().IsValid())
+        << "Visualization-overlay readback must default to disabled after Initialize().";
+
+    RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    SubmitOneVectorField(*renderer);
+
+    const Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 128},
+    };
+    Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+
+    const auto* pass = FindCommandPass(stats, "VisualizationOverlayPass");
+    ASSERT_NE(pass, nullptr);
+    EXPECT_EQ(pass->Status, Graphics::RenderCommandPassStatus::Recorded);
+    EXPECT_EQ(stats.VisualizationOverlayBackbufferReadbackCopyCount, 0u)
+        << "Recorded visualization-overlay draws must not arm readback implicitly.";
+    EXPECT_FALSE(HasBackbufferBarrier(device, RHI::TextureLayout::Present, RHI::TextureLayout::TransferSrc));
+
+    renderer->Shutdown();
+}
+
+TEST(VisualizationOverlayPassContract, VisualizationReadbackRecordsOnlyWhenPassRecords)
+{
+    MockDevice device;
+    device.BackbufferHandle = RHI::TextureHandle{797u, 1u};
+
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const RHI::BufferHandle readback{8797u, 1u};
+    renderer->SetVisualizationOverlayBackbufferReadbackBuffer(readback);
+    EXPECT_EQ(renderer->GetVisualizationOverlayBackbufferReadbackBuffer(), readback);
+
+    RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    SubmitOneVectorField(*renderer, /*depthTested=*/false);
+    SubmitOneIsoline(*renderer, /*depthTested=*/false);
+
+    const Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 128},
+    };
+    Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.DeviceOperational);
+
+    const auto* pass = FindCommandPass(stats, "VisualizationOverlayPass");
+    ASSERT_NE(pass, nullptr);
+    EXPECT_EQ(pass->Status, Graphics::RenderCommandPassStatus::Recorded);
+    EXPECT_EQ(stats.VisualizationOverlayBackbufferReadbackCopyCount, 1u)
+        << "Visualization-overlay readback must record once for an armed operational frame "
+           "whose overlay pass recorded.";
+    EXPECT_EQ(stats.DefaultRecipeBackbufferReadbackCopyCount, 0u)
+        << "Visualization-overlay readback must not reuse the canonical surface counter.";
+    EXPECT_EQ(stats.TransientDebugBackbufferReadbackCopyCount, 0u)
+        << "Visualization-overlay readback must not reuse the transient-debug counter.";
+    EXPECT_TRUE(HasBackbufferBarrier(device, RHI::TextureLayout::Present, RHI::TextureLayout::TransferSrc));
+    EXPECT_TRUE(HasBackbufferBarrier(device, RHI::TextureLayout::TransferSrc, RHI::TextureLayout::Present));
+
+    renderer->Shutdown();
+}
+
+TEST(VisualizationOverlayPassContract, VisualizationReadbackSkipsWhenPassOmitted)
+{
+    MockDevice device;
+    device.BackbufferHandle = RHI::TextureHandle{798u, 1u};
+
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(device);
+    renderer->SetVisualizationOverlayBackbufferReadbackBuffer(RHI::BufferHandle{8798u, 1u});
+
+    RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 128},
+    };
+    Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_EQ(FindCommandPass(stats, "VisualizationOverlayPass"), nullptr);
+    EXPECT_EQ(stats.VisualizationOverlayBackbufferReadbackCopyCount, 0u)
+        << "An armed visualization-overlay readback buffer must not copy clean default frames.";
+    EXPECT_FALSE(HasBackbufferBarrier(device, RHI::TextureLayout::Present, RHI::TextureLayout::TransferSrc));
+
+    renderer->Shutdown();
+}
+
+TEST(VisualizationOverlayPassContract, VisualizationReadbackSkipsWhenDeviceNonOperational)
+{
+    MockDevice device;
+    device.BackbufferHandle = RHI::TextureHandle{799u, 1u};
+
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(device);
+    renderer->SetVisualizationOverlayBackbufferReadbackBuffer(RHI::BufferHandle{8799u, 1u});
+
+    device.Operational = false;
+
+    RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    SubmitOneVectorField(*renderer);
+
+    const Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 128},
+    };
+    Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_FALSE(stats.Execute.DeviceOperational);
+
+    const auto* pass = FindCommandPass(stats, "VisualizationOverlayPass");
+    ASSERT_NE(pass, nullptr);
+    EXPECT_EQ(pass->Status, Graphics::RenderCommandPassStatus::SkippedNonOperational);
+    EXPECT_EQ(stats.VisualizationOverlayBackbufferReadbackCopyCount, 0u);
+    EXPECT_FALSE(HasBackbufferBarrier(device, RHI::TextureLayout::Present, RHI::TextureLayout::TransferSrc));
 
     renderer->Shutdown();
 }

@@ -26,9 +26,8 @@ import Extrinsic.RHI.Handles;
 //   - Slice B wires the vector-field lane (one glyph = one line
 //     segment = two packed vertices).
 //   - Slice C wires the isoline lane (each iso value contributes a
-//     `LineList` placeholder segment of two packed vertices on the
-//     CPU/null path; the Vulkan-tuned variant in Slice D expands
-//     actual isoline contour polylines from a GPU scalar field).
+//     `LineList` deterministic placeholder segment of two packed vertices
+//     until a source-buffer expansion path lands).
 // All lanes share the `position(vec3) + packed RGBA8 color(uint32)`
 // 16-byte packed-vertex layout consumed by the matching
 // `assets/shaders/visualization_*.{vert,frag}` shader pairs.
@@ -41,10 +40,10 @@ import Extrinsic.RHI.Handles;
 // buckets. The interface is declared in the renderer module so the
 // abstract type is reachable from CPU contract tests; the default
 // concrete implementation here is CPU-functional through
-// `BufferManager` + `IDevice::WriteBuffer(...)`. The Vulkan-tuned
-// concrete implementation (which expands the source position/vector
-// BDAs into actual per-glyph world-space endpoints) lands with the
-// optional Slice D `gpu;vulkan` smoke.
+// `BufferManager` + `IDevice::WriteBuffer(...)`. GRAPHICS-078E adds
+// deterministic fixture positions for pixel-readback parity; source-BDA
+// expansion into actual per-glyph / per-isoline world-space endpoints remains
+// future method-specific work.
 
 export namespace Extrinsic::Graphics
 {
@@ -93,8 +92,9 @@ export namespace Extrinsic::Graphics
     // each iso value contributes a single placeholder line segment
     // (two packed vertices) so the pass can issue
     // `Draw(2 * IsoValueCount, 1, 0, 0)` per packet via `LineList`
-    // topology. The Vulkan-tuned variant in Slice D substitutes an
-    // actual scalar-field-derived polyline expansion.
+    // topology. GRAPHICS-078E makes those placeholder segments deterministic
+    // so opt-in Vulkan pixel-readback can sample the isoline lane; actual
+    // scalar-field-derived polyline expansion remains future work.
     struct VisualizationIsolineUploadResult
     {
         RHI::BufferHandle VertexBuffer{};
@@ -147,13 +147,10 @@ export namespace Extrinsic::Graphics
     //
     // CPU/null contract note: the helper does not have CPU access to
     // the source `PositionBufferBDA` / `VectorBufferBDA` payloads
-    // (those are GPU pointers), so the CPU/null path writes zeroed
+    // (those are GPU pointers), so it writes deterministic placeholder
     // positions and the packet's packed color into each packed vertex.
-    // The bind/push/draw shape is the only behavior validated by the
-    // contract tests; per-pixel correctness on a real Vulkan device is
-    // owned by the optional Slice D `gpu;vulkan` smoke and the future
-    // Vulkan-tuned helper variant that expands actual per-glyph
-    // endpoints from the source BDAs.
+    // GRAPHICS-078E validates those placeholders with opt-in Vulkan
+    // pixel-readback; actual source-BDA expansion remains future work.
     //
     // Buffer recycling: a single growing buffer is reused across
     // frames per lane. `GetBufferAllocationCount()` returns the

@@ -136,6 +136,14 @@ namespace Extrinsic::Graphics
         // transient-debug readback buffer is armed, and the device is
         // operational.
         std::uint32_t TransientDebugBackbufferReadbackCopyCount = 0;
+        // GRAPHICS-078E — count of frames in which the opt-in visualization-
+        // overlay backbuffer-to-host readback seam recorded the same
+        // `Present -> TransferSrc -> CopyImageToBuffer -> Present` triplet
+        // after the default-recipe graph completed. This increments only when
+        // `"VisualizationOverlayPass"` recorded in the same frame, a valid
+        // visualization-overlay readback buffer is armed, and the device is
+        // operational.
+        std::uint32_t VisualizationOverlayBackbufferReadbackCopyCount = 0;
         // GRAPHICS-074 Slice D.2 — count of frames in which the default
         // recipe's PickingPass executor branch recorded the picking-readback
         // copy pair (EntityId + PrimitiveId → renderer-owned
@@ -644,6 +652,16 @@ namespace Extrinsic::Graphics
         virtual void SetTransientDebugBackbufferReadbackBuffer(RHI::BufferHandle handle) noexcept = 0;
 
         [[nodiscard]] virtual RHI::BufferHandle GetTransientDebugBackbufferReadbackBuffer() const noexcept = 0;
+
+        // GRAPHICS-078E — opt-in backbuffer-to-host readback wiring for
+        // visualization-overlay pixel parity. The caller owns the
+        // HostVisible + TransferDst buffer lifetime. The renderer records the
+        // copy triplet only on operational frames where
+        // `VisualizationOverlayPass` recorded; invalid handle disables the
+        // path.
+        virtual void SetVisualizationOverlayBackbufferReadbackBuffer(RHI::BufferHandle handle) noexcept = 0;
+
+        [[nodiscard]] virtual RHI::BufferHandle GetVisualizationOverlayBackbufferReadbackBuffer() const noexcept = 0;
 
         // GRAPHICS-076 Slice B — public seam for the renderer-owned
         // `DebugViewSystem`'s `RequestedResourceName` setting. Runtime /
