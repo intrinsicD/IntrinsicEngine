@@ -20,7 +20,7 @@ Root scanned: `src`
 | `graphics/vulkan` | 13 |
 | `legacy` | 182 |
 | `platform` | 5 |
-| `runtime` | 24 |
+| `runtime` | 25 |
 
 ## Modules
 
@@ -471,6 +471,7 @@ Root scanned: `src`
 | `Extrinsic.Platform.Backend.Null` | `src/platform/backends/null/Platform.Backend.Null.cppm` | `platform` |
 | `Extrinsic.Runtime.CameraControllers` | `src/runtime/Cameras/Runtime.CameraControllers.cppm` | `runtime` |
 | `Extrinsic.Runtime.SandboxEditorUi` | `src/runtime/Editor/Runtime.SandboxEditorUi.cppm` | `runtime` |
+| `Extrinsic.Runtime.GizmoInteraction` | `src/runtime/Gizmos/Runtime.GizmoInteraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.ImGuiAdapter` | `src/runtime/ImGui/Runtime.ImGuiAdapter.cppm` | `runtime` |
 | `Extrinsic.Runtime.AssetGeometryIO` | `src/runtime/Runtime.AssetGeometryIO.cppm` | `runtime` |
 | `Extrinsic.Runtime.AssetModelSceneHandoff` | `src/runtime/Runtime.AssetModelSceneHandoff.cppm` | `runtime` |
@@ -494,4 +495,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugAdapters` | `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **467**
+Total modules: **468**
