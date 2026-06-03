@@ -757,7 +757,7 @@ testable; each phase derisks the next.
 
 #### Phase 1 — Modern frame structure
 
-- [GRAPHICS-036 — Pipelined frames and double-buffered render world (planning)](GRAPHICS-036-pipelined-frames-extraction-doublebuffer.md):
+- [GRAPHICS-036 — Pipelined frames and double-buffered render world (done)](../../done/GRAPHICS-036-pipelined-frames-extraction-doublebuffer.md):
   locks the contract for sim-N / render-N-1 pipelining against an immutable
   double-buffered render world. Owner layers: `runtime` (pool + swap),
   `graphics/renderer` (consumer). Depends on GRAPHICS-002, GRAPHICS-016.
