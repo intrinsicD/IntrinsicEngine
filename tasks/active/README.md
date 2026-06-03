@@ -11,23 +11,23 @@ Each active task should include:
 
 ## Currently active
 
-[`UI-001`](UI-001-sandbox-editor-shell-panels.md) — sandbox editor shell and core
-panels on top of the runtime ImGui adapter/pass stack. Status: in-progress on
-`main`, ready for Slice D after retired
-[`ASSETIO-001`](../done/ASSETIO-001-asset-model-texture-ingest-ownership.md)
-closed the promoted asset route/model/texture ingest and runtime handoff seams
-at `CPUContracted`. The promoted editor shell already covers enriched
-inspector/render-hint fields, selected/hovered entity rows, refined primitive
-id/hit display, a runtime-owned local-transform edit command, camera-controller
-replacement, mesh edge/vertex primitive-view toggle commands, and selected-entity
-spatial-debug, visualization-config, and visualization adapter-binding command
-routing with CPU `contract;runtime` coverage. Remaining file/import execution
-should compose the promoted asset/runtime ingest seams without adding UI-owned
-asset authority.
-Next verification: resume the Slice D file/import panel execution seam, then run the task
-structural checks plus the runtime contract/default CPU gates.
+No tasks are currently active.
 
 The most recently retired tasks are summarised below.
+
+Previously-active
+[`UI-001`](../done/UI-001-sandbox-editor-shell-panels.md) — sandbox editor shell
+and core panels on top of the runtime ImGui adapter/pass stack retired to
+`tasks/done/` on 2026-06-03 at maturity `CPUContracted`. Slices A-D landed the
+promoted editor shell, scene hierarchy, inspector/render-hint fields,
+selected/hovered entity rows, refined primitive id/hit display, runtime-owned
+local-transform edits, camera-controller replacement, mesh edge/vertex
+primitive-view toggles, selected-entity spatial-debug and visualization-config
+commands, visualization adapter-binding routing through engine-owned
+render-extraction state, and file/import command execution through
+`Engine::ImportAssetFromPath(...)` on top of the retired `ASSETIO-001`
+asset/runtime ingest seams. Final file-backed visual/interactive proof remains
+owned by `RUNTIME-095`.
 
 Previously-active
 [`RUNTIME-083`](../done/RUNTIME-083-visualization-adapters.md) —

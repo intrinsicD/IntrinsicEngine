@@ -4,12 +4,14 @@ module;
 #include <functional>
 #include <memory>
 #include <optional>
+#include <string>
 
 export module Extrinsic.Runtime.Engine;
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Render;
 import Extrinsic.Core.Dag.TaskGraph;
+import Extrinsic.Core.Error;
 import Extrinsic.Core.FrameClock;
 import Extrinsic.Core.FrameGraph;
 import Extrinsic.RHI.Device;
@@ -30,6 +32,8 @@ import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Asset.EventBus;
+import Extrinsic.Asset.ImportRouter;
+import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.Service;
 import Extrinsic.ECS.Scene.Registry;
 
@@ -41,6 +45,23 @@ namespace Extrinsic::Runtime
     {
         bool UsePromotedVulkanDevice{false};
         bool FallsBackToNullDevice{true};
+    };
+
+    export struct RuntimeAssetImportRequest
+    {
+        std::string Path{};
+        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
+    };
+
+    export struct RuntimeAssetImportResult
+    {
+        Assets::AssetId Asset{};
+        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
+        std::uint64_t PrimitiveEntitiesCreated{0};
+        std::uint64_t EmbeddedTextureAssetsCreated{0};
+        std::uint64_t TextureUploadRequests{0};
+        bool MaterializedModelScene{false};
+        bool RequestedTextureUpload{false};
     };
 
     export [[nodiscard]] inline RuntimeDeviceSelection SelectRuntimeDeviceBackend(
@@ -211,6 +232,11 @@ namespace Extrinsic::Runtime
         [[nodiscard]] Assets::AssetService&   GetAssetService()  noexcept;
         [[nodiscard]] Graphics::GpuAssetCache& GetGpuAssetCache() noexcept;
         [[nodiscard]] ECS::Scene::Registry&   GetScene()         noexcept;
+        // UI-001 Slice D — runtime-owned file/import command seam. Editor UI
+        // submits a path + payload hint here; Engine composes the promoted
+        // ASSETIO model/texture decoders, AssetService, and runtime handoffs.
+        [[nodiscard]] Core::Expected<RuntimeAssetImportResult> ImportAssetFromPath(
+            RuntimeAssetImportRequest request);
         // RUNTIME-089 Slice B — runtime/editor-owned selection authority.
         // Input ports / editor tools submit hover/click picks here; RunFrame
         // drains the coalesced pick into the renderer's SelectionSystem before

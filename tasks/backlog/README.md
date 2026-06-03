@@ -91,7 +91,7 @@ Runtime/UI implementation leaves for the full sandbox app path:
 - [`runtime/RUNTIME-089` (done)](../done/RUNTIME-089-selection-controller.md) — runtime selection controller, pick-request policy, and `RenderWorld.Selection` handoff (retired 2026-05-31 at `CPUContracted`; Slice A standalone `SelectionController` module, Slice B `Engine::RunFrame` + `ExtractAndSubmit` wiring).
 - [`runtime/RUNTIME-092`](../done/RUNTIME-092-stable-entity-lookup.md) (done) — runtime stable entity lookup sidecar identified by `HARDEN-068`. Slice A landed the standalone `Extrinsic.Runtime.StableEntityLookup` sidecar at `Scaffolded`; Slice B (frame/extraction wiring + `SelectionController` seam swap) closed `CPUContracted`.
 - [`runtime/RUNTIME-093`](../done/RUNTIME-093-primitive-selection-refinement.md) (done, 2026-06-01, `CPUContracted`) — mesh/graph/point-cloud primitive refinement from graphics ID hints and authoritative CPU geometry. Slice A landed the standalone `Extrinsic.Runtime.PrimitiveSelectionRefinement` module at `Scaffolded`; Slice B1 added the CPU ray fallback; Slice B2 wired `RefinePickReadbackResult` into `Engine::RunFrame` to close `CPUContracted`.
-- [`UI-001`](../active/UI-001-sandbox-editor-shell-panels.md) — sandbox editor shell and core panels on top of the ImGui adapter/pass (active).
+- [`UI-001`](../done/UI-001-sandbox-editor-shell-panels.md) — sandbox editor shell and core panels on top of the ImGui adapter/pass (done, 2026-06-03, `CPUContracted`).
 - [`runtime/RUNTIME-095`](runtime/RUNTIME-095-working-sandbox-acceptance.md) — final CPU/null + opt-in Vulkan acceptance for mesh, graph, point cloud, cameras, selection, outline, and UI.
 
 ### Theme B — Rendering modernization (P1, gated by Theme A)
@@ -182,7 +182,7 @@ promoting backlog tasks to active so per-category DAGs do not diverge.
 
 - **GRAPHICS-034 ⇐ ASSETIO-001 ⇐ GEOIO-002.** Asset-backed mesh residency
   depends on promoted asset routing, which depends on geometry decoder parity.
-  `GEOIO-002` is retired and `ASSETIO-001` is active.
+  `GEOIO-002` and `ASSETIO-001` are retired.
 - **RUNTIME-085..088 ⇐ HARDEN-065, GRAPHICS-030B, GRAPHICS-070/071.** Runtime
   mesh/graph/point-cloud residency depends on promoted `GeometrySources`, the
   proven runtime-to-`GpuWorld` upload/bind pattern, and retained surface/line/
@@ -193,7 +193,9 @@ promoting backlog tasks to active so per-category DAGs do not diverge.
   residency/source data.
 - **UI-001 ⇐ RUNTIME-090, GRAPHICS-079, RUNTIME-089.** UI panels require ImGui
   frame production/presentation and runtime-owned selection state; panels must
-  remain command/event producers, not owners of engine state.
+  remain command/event producers, not owners of engine state. `UI-001` is
+  retired at `CPUContracted`; final operational proof remains under
+  `RUNTIME-095`.
 - **RUNTIME-095 ⇐ GRAPHICS-072..079, GRAPHICS-081, ASSETIO-001/RUNTIME-080 as
   needed for file-backed content, RUNTIME-085..089, RUNTIME-092..093, UI-001.**
   The final working-sandbox acceptance composes the renderer, runtime

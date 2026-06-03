@@ -724,7 +724,7 @@ Cross-layer Theme A leaves newly opened for the full working sandbox path:
 - [`runtime/RUNTIME-089` — Runtime selection controller and snapshot handoff](../../done/RUNTIME-089-selection-controller.md) (retired 2026-05-31 at `CPUContracted`; Slice A standalone `SelectionController` module, Slice B `Engine::RunFrame` + `RenderExtractionCache::ExtractAndSubmit` wiring).
 - [`runtime/RUNTIME-092` — Runtime stable entity lookup sidecar](../../done/RUNTIME-092-stable-entity-lookup.md) (retired 2026-05-31 at `CPUContracted`; Slice A standalone `StableEntityLookup` module, Slice B `Engine::RunFrame` per-frame rebuild + `SelectionController` render-id seam routing).
 - [`runtime/RUNTIME-093` — Primitive selection refinement](../../done/RUNTIME-093-primitive-selection-refinement.md) (done, 2026-06-01, `CPUContracted`).
-- [`UI-001` — Sandbox editor shell and core panels](../../active/UI-001-sandbox-editor-shell-panels.md).
+- [`UI-001` — Sandbox editor shell and core panels](../../done/UI-001-sandbox-editor-shell-panels.md) (retired 2026-06-03 at `CPUContracted`).
 - [`runtime/RUNTIME-095` — Working sandbox app acceptance path](../runtime/RUNTIME-095-working-sandbox-acceptance.md).
 
 ### Modernization roadmap (GRAPHICS-035..058)

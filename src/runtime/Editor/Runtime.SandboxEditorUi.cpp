@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -17,7 +18,10 @@ module;
 
 module Extrinsic.Runtime.SandboxEditorUi;
 
+import Extrinsic.Asset.ImportRouter;
+import Extrinsic.Asset.Registry;
 import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Error;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Component.MetaData;
 import Extrinsic.ECS.Component.SpatialDebugBinding;
@@ -45,6 +49,37 @@ namespace Extrinsic::Runtime
         namespace GS = Extrinsic::ECS::Components::GeometrySources;
         namespace Sel = Extrinsic::ECS::Components::Selection;
         namespace G = Extrinsic::Graphics::Components;
+        namespace A = Extrinsic::Assets;
+
+        [[nodiscard]] std::string ErrorName(const Core::ErrorCode error)
+        {
+            return std::string(Core::Error::ToString(error));
+        }
+
+        [[nodiscard]] std::string BuildImportSuccessMessage(
+            const SandboxEditorFileImportCommand& command,
+            const SandboxEditorFileImportResult& result)
+        {
+            std::string message = "Imported ";
+            message += A::DebugNameForAssetPayloadKind(result.PayloadKind);
+            message += " asset";
+            if (!command.Path.empty())
+            {
+                message += " from ";
+                message += command.Path;
+            }
+            message += ".";
+            return message;
+        }
+
+        [[nodiscard]] std::string BuildImportFailureMessage(
+            const Core::ErrorCode error)
+        {
+            std::string message = "Asset import failed: ";
+            message += ErrorName(error);
+            message += ".";
+            return message;
+        }
 
         [[nodiscard]] SandboxEditorSpatialDebugBindingModel FromSpatialDebugBinding(
             const ECSC::SpatialDebugBinding& binding) noexcept
@@ -552,17 +587,36 @@ namespace Extrinsic::Runtime
             const SandboxEditorContext& context)
         {
             SandboxEditorFileImportModel model{};
-            model.Enabled = context.AssetImportCommandsAvailable;
+            model.Enabled =
+                context.AssetImportCommandsAvailable ||
+                context.AssetImportCommands.Available();
+            model.PendingPath = context.PendingAssetImportPath;
+            model.PayloadKind = context.PendingAssetImportPayloadKind;
             if (model.Enabled)
             {
                 model.StatusText = "Import commands available.";
             }
             else
             {
-                model.StatusText = "Asset import is disabled: ASSETIO-001 is not available.";
+                model.StatusText =
+                    "Asset import is disabled: runtime import commands are unavailable.";
                 AddDiagnostic(model.Diagnostics,
                               SandboxEditorDiagnosticCode::AssetImportUnavailable,
                               model.StatusText);
+            }
+            if (context.LastAssetImportResult != nullptr)
+            {
+                model.LastResult = *context.LastAssetImportResult;
+                if (!context.LastAssetImportResult->Message.empty())
+                {
+                    model.StatusText = context.LastAssetImportResult->Message;
+                }
+                if (!context.LastAssetImportResult->Succeeded())
+                {
+                    AddDiagnostic(model.Diagnostics,
+                                  SandboxEditorDiagnosticCode::AssetImportFailed,
+                                  model.StatusText);
+                }
             }
             return model;
         }
@@ -701,6 +755,45 @@ namespace Extrinsic::Runtime
                 .CameraViewport = Core::Extent2D{
                     engine.GetWindow().GetFramebufferExtent().Width,
                     engine.GetWindow().GetFramebufferExtent().Height},
+                .AssetImportCommands = SandboxEditorAssetImportCommandSurface{
+                    .Import =
+                        [&engine](const SandboxEditorFileImportCommand& command)
+                        {
+                            auto imported = engine.ImportAssetFromPath(
+                                RuntimeAssetImportRequest{
+                                    .Path = command.Path,
+                                    .PayloadKind = command.PayloadKind,
+                                });
+                            if (!imported.has_value())
+                            {
+                                return SandboxEditorFileImportResult{
+                                    .Status = SandboxEditorCommandStatus::AssetImportFailed,
+                                    .PayloadKind = command.PayloadKind,
+                                    .Error = imported.error(),
+                                    .Message = BuildImportFailureMessage(imported.error()),
+                                };
+                            }
+
+                            SandboxEditorFileImportResult result{
+                                .Status = SandboxEditorCommandStatus::Applied,
+                                .Asset = imported->Asset,
+                                .PayloadKind = imported->PayloadKind,
+                                .PrimitiveEntitiesCreated =
+                                    imported->PrimitiveEntitiesCreated,
+                                .EmbeddedTextureAssetsCreated =
+                                    imported->EmbeddedTextureAssetsCreated,
+                                .TextureUploadRequests =
+                                    imported->TextureUploadRequests,
+                                .MaterializedModelScene =
+                                    imported->MaterializedModelScene,
+                                .RequestedTextureUpload =
+                                    imported->RequestedTextureUpload,
+                            };
+                            result.Message =
+                                BuildImportSuccessMessage(command, result);
+                            return result;
+                        },
+                },
                 .PrimitiveViewCommands = SandboxEditorPrimitiveViewCommandSurface{
                     .GetSettings =
                         [&engine](const std::uint32_t stableEntityId)
@@ -744,7 +837,7 @@ namespace Extrinsic::Runtime
                         },
                 },
                 .ImGuiAdapterAvailable = engine.GetImGuiAdapter().IsInitialized(),
-                .AssetImportCommandsAvailable = false,
+                .AssetImportCommandsAvailable = true,
                 .CameraRenderCommandsAvailable = true,
                 .VisualizationCommandsAvailable = true,
             };
@@ -775,8 +868,11 @@ namespace Extrinsic::Runtime
                         value.z);
         }
 
-        void DrawPanelFrame(const SandboxEditorPanelFrame& frame,
-                            const SandboxEditorContext* context)
+        void DrawPanelFrame(
+            const SandboxEditorPanelFrame& frame,
+            const SandboxEditorContext* context,
+            std::array<char, 1024>* importPathBuffer,
+            std::optional<SandboxEditorFileImportResult>* lastImportResult)
         {
             ImGui::SetNextWindowSize(ImVec2(360.0f, 520.0f), ImGuiCond_FirstUseEver);
             if (ImGui::Begin("Sandbox Editor"))
@@ -949,12 +1045,74 @@ namespace Extrinsic::Runtime
 
             if (ImGui::Begin("File / Import"))
             {
-                if (!frame.FileImport.Enabled)
+                const bool importControlsAvailable =
+                    frame.FileImport.Enabled &&
+                    context != nullptr &&
+                    importPathBuffer != nullptr &&
+                    lastImportResult != nullptr;
+                if (!importControlsAvailable)
                     ImGui::BeginDisabled();
-                ImGui::Button("Import asset");
-                if (!frame.FileImport.Enabled)
+                if (importPathBuffer != nullptr)
+                {
+                    ImGui::InputText("Path",
+                                     importPathBuffer->data(),
+                                     importPathBuffer->size());
+                }
+                else
+                {
+                    ImGui::TextDisabled("Path input is not bound.");
+                }
+                if (ImGui::Button("Import asset") && importControlsAvailable)
+                {
+                    *lastImportResult = ApplySandboxEditorFileImportCommand(
+                        *context,
+                        SandboxEditorFileImportCommand{
+                            .Path = std::string(importPathBuffer->data()),
+                            .PayloadKind = A::AssetPayloadKind::Unknown,
+                        });
+                }
+                if (!importControlsAvailable)
                     ImGui::EndDisabled();
                 ImGui::TextWrapped("%s", frame.FileImport.StatusText.c_str());
+                const SandboxEditorFileImportResult* result =
+                    lastImportResult != nullptr && lastImportResult->has_value()
+                        ? &**lastImportResult
+                        : frame.FileImport.LastResult.has_value()
+                            ? &*frame.FileImport.LastResult
+                            : nullptr;
+                if (result != nullptr)
+                {
+                    ImGui::Text("Last import: %s",
+                                DebugNameForSandboxEditorCommandStatus(
+                                    result->Status));
+                    ImGui::Text("Payload: %s",
+                                A::DebugNameForAssetPayloadKind(
+                                    result->PayloadKind));
+                    if (result->Asset.IsValid())
+                    {
+                        ImGui::Text("Asset: %u:%u",
+                                    result->Asset.Index,
+                                    result->Asset.Generation);
+                    }
+                    if (result->PrimitiveEntitiesCreated > 0u)
+                    {
+                        ImGui::Text("Primitive entities: %llu",
+                                    static_cast<unsigned long long>(
+                                        result->PrimitiveEntitiesCreated));
+                    }
+                    if (result->EmbeddedTextureAssetsCreated > 0u)
+                    {
+                        ImGui::Text("Embedded textures: %llu",
+                                    static_cast<unsigned long long>(
+                                        result->EmbeddedTextureAssetsCreated));
+                    }
+                    if (result->TextureUploadRequests > 0u)
+                    {
+                        ImGui::Text("Texture upload requests: %llu",
+                                    static_cast<unsigned long long>(
+                                        result->TextureUploadRequests));
+                    }
+                }
                 DrawDiagnostics(frame.FileImport.Diagnostics);
             }
             ImGui::End();
@@ -1182,6 +1340,8 @@ namespace Extrinsic::Runtime
             return "MissingImGuiAdapter";
         case SandboxEditorDiagnosticCode::AssetImportUnavailable:
             return "AssetImportUnavailable";
+        case SandboxEditorDiagnosticCode::AssetImportFailed:
+            return "AssetImportFailed";
         case SandboxEditorDiagnosticCode::NoSelectedEntity:
             return "NoSelectedEntity";
         case SandboxEditorDiagnosticCode::UnsupportedGeometryDomain:
@@ -1209,10 +1369,14 @@ namespace Extrinsic::Runtime
             return "MissingSelectionController";
         case SandboxEditorCommandStatus::MissingCameraControllerRegistry:
             return "MissingCameraControllerRegistry";
+        case SandboxEditorCommandStatus::MissingAssetImportCommands:
+            return "MissingAssetImportCommands";
         case SandboxEditorCommandStatus::MissingPrimitiveViewCommands:
             return "MissingPrimitiveViewCommands";
         case SandboxEditorCommandStatus::MissingVisualizationCommands:
             return "MissingVisualizationCommands";
+        case SandboxEditorCommandStatus::AssetImportFailed:
+            return "AssetImportFailed";
         case SandboxEditorCommandStatus::StaleEntity:
             return "StaleEntity";
         case SandboxEditorCommandStatus::MissingTransform:
@@ -1410,6 +1574,44 @@ namespace Extrinsic::Runtime
             return false;
         return context.Selection->SetSelectedByStableEntityId(*context.Scene,
                                                               stableEntityId);
+    }
+
+    SandboxEditorFileImportResult ApplySandboxEditorFileImportCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorFileImportCommand& command)
+    {
+        if (!context.AssetImportCommands.Available())
+        {
+            return SandboxEditorFileImportResult{
+                .Status = SandboxEditorCommandStatus::MissingAssetImportCommands,
+                .PayloadKind = command.PayloadKind,
+                .Error = Core::ErrorCode::InvalidState,
+                .Message = "Asset import command surface is unavailable.",
+            };
+        }
+        if (command.Path.empty())
+        {
+            return SandboxEditorFileImportResult{
+                .Status = SandboxEditorCommandStatus::AssetImportFailed,
+                .PayloadKind = command.PayloadKind,
+                .Error = Core::ErrorCode::InvalidPath,
+                .Message = BuildImportFailureMessage(Core::ErrorCode::InvalidPath),
+            };
+        }
+
+        SandboxEditorFileImportResult result =
+            context.AssetImportCommands.Import(command);
+        if (result.Status == SandboxEditorCommandStatus::Applied)
+        {
+            if (result.Message.empty())
+                result.Message = BuildImportSuccessMessage(command, result);
+            result.Error = Core::ErrorCode::Success;
+        }
+        else if (result.Message.empty())
+        {
+            result.Message = BuildImportFailureMessage(result.Error);
+        }
+        return result;
     }
 
     SandboxEditorCommandStatus ApplySandboxEditorTransformEdit(
@@ -1617,7 +1819,7 @@ namespace Extrinsic::Runtime
 
     void DrawSandboxEditorPanelFrame(const SandboxEditorPanelFrame& frame)
     {
-        DrawPanelFrame(frame, nullptr);
+        DrawPanelFrame(frame, nullptr, nullptr, nullptr);
     }
 
     SandboxEditorUi::~SandboxEditorUi()
@@ -1634,9 +1836,19 @@ namespace Extrinsic::Runtime
             {
                 if (m_Engine == nullptr)
                     return;
-                const SandboxEditorContext context = BuildContextFromEngine(*m_Engine);
+                SandboxEditorContext context = BuildContextFromEngine(*m_Engine);
+                context.PendingAssetImportPath =
+                    std::string(m_ImportPathBuffer.data());
+                context.PendingAssetImportPayloadKind =
+                    Extrinsic::Assets::AssetPayloadKind::Unknown;
+                if (m_LastImportResult.has_value())
+                    context.LastAssetImportResult = &*m_LastImportResult;
                 m_LastFrame = BuildSandboxEditorPanelFrame(context);
-                DrawPanelFrame(m_LastFrame, &context);
+                DrawPanelFrame(
+                    m_LastFrame,
+                    &context,
+                    &m_ImportPathBuffer,
+                    &m_LastImportResult);
             });
     }
 

@@ -2,6 +2,7 @@ module;
 
 #include <cstddef>
 #include <cstdint>
+#include <array>
 #include <functional>
 #include <optional>
 #include <string>
@@ -12,7 +13,10 @@ module;
 
 export module Extrinsic.Runtime.SandboxEditorUi;
 
+import Extrinsic.Asset.ImportRouter;
+import Extrinsic.Asset.Registry;
 import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Error;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Component.SpatialDebugBinding;
 import Extrinsic.ECS.Scene.Handle;
@@ -34,6 +38,7 @@ export namespace Extrinsic::Runtime
         MissingSelectionController,
         MissingImGuiAdapter,
         AssetImportUnavailable,
+        AssetImportFailed,
         NoSelectedEntity,
         UnsupportedGeometryDomain,
         CameraRenderCommandsUnavailable,
@@ -47,8 +52,10 @@ export namespace Extrinsic::Runtime
         MissingScene,
         MissingSelectionController,
         MissingCameraControllerRegistry,
+        MissingAssetImportCommands,
         MissingPrimitiveViewCommands,
         MissingVisualizationCommands,
+        AssetImportFailed,
         StaleEntity,
         MissingTransform,
         UnsupportedGeometryDomain,
@@ -171,9 +178,48 @@ export namespace Extrinsic::Runtime
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
+    struct SandboxEditorFileImportCommand
+    {
+        std::string Path{};
+        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
+    };
+
+    struct SandboxEditorFileImportResult
+    {
+        SandboxEditorCommandStatus Status{SandboxEditorCommandStatus::NoChange};
+        Assets::AssetId Asset{};
+        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
+        Core::ErrorCode Error{Core::ErrorCode::Success};
+        std::uint64_t PrimitiveEntitiesCreated{0};
+        std::uint64_t EmbeddedTextureAssetsCreated{0};
+        std::uint64_t TextureUploadRequests{0};
+        bool MaterializedModelScene{false};
+        bool RequestedTextureUpload{false};
+        std::string Message{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == SandboxEditorCommandStatus::Applied;
+        }
+    };
+
+    struct SandboxEditorAssetImportCommandSurface
+    {
+        std::function<SandboxEditorFileImportResult(
+            const SandboxEditorFileImportCommand&)> Import{};
+
+        [[nodiscard]] bool Available() const noexcept
+        {
+            return static_cast<bool>(Import);
+        }
+    };
+
     struct SandboxEditorFileImportModel
     {
         bool        Enabled{false};
+        std::string PendingPath{};
+        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
+        std::optional<SandboxEditorFileImportResult> LastResult{};
         std::string StatusText{};
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
@@ -303,8 +349,13 @@ export namespace Extrinsic::Runtime
         const std::optional<PrimitiveSelectionResult>* LastRefinedPrimitive{nullptr};
         CameraControllerRegistry* CameraControllers{nullptr};
         Core::Extent2D CameraViewport{};
+        SandboxEditorAssetImportCommandSurface AssetImportCommands{};
         SandboxEditorPrimitiveViewCommandSurface PrimitiveViewCommands{};
         SandboxEditorVisualizationAdapterBindingCommandSurface VisualizationAdapterBindings{};
+        std::string PendingAssetImportPath{};
+        Assets::AssetPayloadKind PendingAssetImportPayloadKind{
+            Assets::AssetPayloadKind::Unknown};
+        const SandboxEditorFileImportResult* LastAssetImportResult{nullptr};
         bool ImGuiAdapterAvailable{false};
         bool AssetImportCommandsAvailable{false};
         bool CameraRenderCommandsAvailable{false};
@@ -387,6 +438,10 @@ export namespace Extrinsic::Runtime
     bool SelectSandboxEditorEntity(const SandboxEditorContext& context,
                                    std::uint32_t stableEntityId);
 
+    SandboxEditorFileImportResult ApplySandboxEditorFileImportCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorFileImportCommand& command);
+
     SandboxEditorCommandStatus ApplySandboxEditorTransformEdit(
         const SandboxEditorContext& context,
         const SandboxEditorTransformEditCommand& command);
@@ -436,5 +491,7 @@ export namespace Extrinsic::Runtime
     private:
         Engine*                 m_Engine{nullptr};
         SandboxEditorPanelFrame m_LastFrame{};
+        std::array<char, 1024>  m_ImportPathBuffer{};
+        std::optional<SandboxEditorFileImportResult> m_LastImportResult{};
     };
 }

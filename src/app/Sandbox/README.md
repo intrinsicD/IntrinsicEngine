@@ -17,8 +17,11 @@ slots through the engine-owned registry, toggles mesh edge/vertex primitive
 views through runtime extraction-cache settings, routes selected-entity
 spatial-debug options through `SpatialDebugBinding`, routes material/scalar/color
 visualization choices through `VisualizationConfig`, routes visualization
-adapter bindings through runtime extraction-cache state, and leaves asset import
-execution to `ASSETIO-001`.
+adapter bindings through runtime extraction-cache state, and submits file/import
+path commands through `Engine::ImportAssetFromPath(...)`. Asset routing,
+decoding, `AssetService` mutation, model-scene materialization, and texture-upload
+requests remain runtime/asset owned; `Sandbox::App` does not special-case asset
+authority.
 
 ## Build presets
 

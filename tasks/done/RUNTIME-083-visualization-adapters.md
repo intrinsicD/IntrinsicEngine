@@ -197,7 +197,7 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
   or a later visualization-specific backend smoke.
 
 ## Next verification step
-- Downstream editor control composition resumes under
-  [`UI-001`](../active/UI-001-sandbox-editor-shell-panels.md); final
+- Downstream editor control composition is retired under
+  [`UI-001`](UI-001-sandbox-editor-shell-panels.md); final
   working-sandbox acceptance remains owned by
   [`RUNTIME-095`](../backlog/runtime/RUNTIME-095-working-sandbox-acceptance.md).

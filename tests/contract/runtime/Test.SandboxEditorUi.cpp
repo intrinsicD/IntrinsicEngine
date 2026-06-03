@@ -11,7 +11,10 @@
 #include <gtest/gtest.h>
 #include <glm/gtc/quaternion.hpp>
 
+import Extrinsic.Asset.ImportRouter;
+import Extrinsic.Asset.Registry;
 import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Error;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Component.MetaData;
 import Extrinsic.ECS.Component.SpatialDebugBinding;
@@ -36,6 +39,8 @@ import Extrinsic.Runtime.SelectionController;
 import Geometry.Properties;
 
 namespace Runtime = Extrinsic::Runtime;
+namespace Assets = Extrinsic::Assets;
+namespace Core = Extrinsic::Core;
 namespace ECS = Extrinsic::ECS;
 namespace ECSC = Extrinsic::ECS::Components;
 namespace GS = Extrinsic::ECS::Components::GeometrySources;
@@ -249,6 +254,105 @@ TEST(SandboxEditorUi, EmptyContextProducesDeterministicDisabledDiagnostics)
                               Runtime::SandboxEditorDiagnosticCode::AssetImportUnavailable));
     EXPECT_TRUE(HasDiagnostic(frame.Inspector.Diagnostics,
                               Runtime::SandboxEditorDiagnosticCode::MissingScene));
+}
+
+TEST(SandboxEditorUi, FileImportCommandRoutesThroughRuntimeOwnedSurface)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+
+    bool commandObserved = false;
+    Runtime::SandboxEditorFileImportCommand observedCommand{};
+    context.AssetImportCommands =
+        Runtime::SandboxEditorAssetImportCommandSurface{
+            .Import =
+                [&](const Runtime::SandboxEditorFileImportCommand& command)
+                {
+                    commandObserved = true;
+                    observedCommand = command;
+                    return Runtime::SandboxEditorFileImportResult{
+                        .Status = Runtime::SandboxEditorCommandStatus::Applied,
+                        .Asset = Assets::AssetId{7u, 2u},
+                        .PayloadKind = Assets::AssetPayloadKind::ModelScene,
+                        .PrimitiveEntitiesCreated = 1u,
+                        .EmbeddedTextureAssetsCreated = 2u,
+                        .TextureUploadRequests = 3u,
+                        .MaterializedModelScene = true,
+                        .Message = "Imported fake model.",
+                    };
+                },
+        };
+    context.PendingAssetImportPath = "assets/models/Duck.gltf";
+
+    Runtime::SandboxEditorPanelFrame frame =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+    EXPECT_TRUE(frame.FileImport.Enabled);
+    EXPECT_EQ(frame.FileImport.PendingPath, "assets/models/Duck.gltf");
+    EXPECT_FALSE(HasDiagnostic(
+        frame.FileImport.Diagnostics,
+        Runtime::SandboxEditorDiagnosticCode::AssetImportUnavailable));
+
+    const Runtime::SandboxEditorFileImportResult result =
+        Runtime::ApplySandboxEditorFileImportCommand(
+            context,
+            Runtime::SandboxEditorFileImportCommand{
+                .Path = "assets/models/Duck.gltf",
+                .PayloadKind = Assets::AssetPayloadKind::Unknown,
+            });
+
+    EXPECT_TRUE(commandObserved);
+    EXPECT_EQ(observedCommand.Path, "assets/models/Duck.gltf");
+    EXPECT_EQ(observedCommand.PayloadKind, Assets::AssetPayloadKind::Unknown);
+    EXPECT_TRUE(result.Succeeded());
+    EXPECT_EQ(result.Asset, (Assets::AssetId{7u, 2u}));
+    EXPECT_EQ(result.PayloadKind, Assets::AssetPayloadKind::ModelScene);
+    EXPECT_EQ(result.PrimitiveEntitiesCreated, 1u);
+    EXPECT_EQ(result.EmbeddedTextureAssetsCreated, 2u);
+    EXPECT_EQ(result.TextureUploadRequests, 3u);
+    EXPECT_TRUE(result.MaterializedModelScene);
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorCommandStatus(result.Status),
+                 "Applied");
+
+    context.LastAssetImportResult = &result;
+    frame = Runtime::BuildSandboxEditorPanelFrame(context);
+    ASSERT_TRUE(frame.FileImport.LastResult.has_value());
+    EXPECT_EQ(frame.FileImport.StatusText, "Imported fake model.");
+    EXPECT_FALSE(HasDiagnostic(
+        frame.FileImport.Diagnostics,
+        Runtime::SandboxEditorDiagnosticCode::AssetImportFailed));
+
+    Runtime::SandboxEditorContext missingSurface =
+        MakeContext(registry, selection);
+    const Runtime::SandboxEditorFileImportResult missing =
+        Runtime::ApplySandboxEditorFileImportCommand(
+            missingSurface,
+            Runtime::SandboxEditorFileImportCommand{
+                .Path = "assets/models/Duck.gltf",
+            });
+    EXPECT_EQ(missing.Status,
+              Runtime::SandboxEditorCommandStatus::MissingAssetImportCommands);
+    EXPECT_EQ(missing.Error, Core::ErrorCode::InvalidState);
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorCommandStatus(
+                     missing.Status),
+                 "MissingAssetImportCommands");
+
+    const Runtime::SandboxEditorFileImportResult empty =
+        Runtime::ApplySandboxEditorFileImportCommand(
+            context,
+            Runtime::SandboxEditorFileImportCommand{});
+    EXPECT_EQ(empty.Status,
+              Runtime::SandboxEditorCommandStatus::AssetImportFailed);
+    EXPECT_EQ(empty.Error, Core::ErrorCode::InvalidPath);
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorDiagnosticCode(
+                     Runtime::SandboxEditorDiagnosticCode::AssetImportFailed),
+                 "AssetImportFailed");
+
+    context.LastAssetImportResult = &empty;
+    frame = Runtime::BuildSandboxEditorPanelFrame(context);
+    EXPECT_TRUE(HasDiagnostic(
+        frame.FileImport.Diagnostics,
+        Runtime::SandboxEditorDiagnosticCode::AssetImportFailed));
 }
 
 TEST(SandboxEditorUi, HierarchyInspectorModelReportsSelectionRenderHintsAndDomain)
@@ -944,6 +1048,21 @@ TEST(SandboxEditorUi, AdapterCallbackDrawsDeterministicDisabledPanelFrame)
                               Runtime::SandboxEditorDiagnosticCode::AssetImportUnavailable));
 }
 
+TEST(SandboxEditorUi, EngineImportFacadeReportsMissingFile)
+{
+    Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    engine.Initialize();
+
+    auto imported = engine.ImportAssetFromPath(
+        Runtime::RuntimeAssetImportRequest{
+            .Path = "/tmp/intrinsicengine-ui-001-missing.gltf",
+        });
+    EXPECT_FALSE(imported.has_value());
+    EXPECT_EQ(imported.error(), Core::ErrorCode::FileNotFound);
+
+    engine.Shutdown();
+}
+
 TEST(SandboxEditorUi, EngineAttachmentRegistersEditorCallback)
 {
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
@@ -963,9 +1082,9 @@ TEST(SandboxEditorUi, EngineAttachmentRegistersEditorCallback)
     engine.Run();
 
     EXPECT_GE(engine.GetImGuiAdapter().GetDiagnostics().EditorCallbackInvocations, 1u);
-    EXPECT_FALSE(ui.GetLastFrame().FileImport.Enabled);
-    EXPECT_TRUE(HasDiagnostic(ui.GetLastFrame().FileImport.Diagnostics,
-                              Runtime::SandboxEditorDiagnosticCode::AssetImportUnavailable));
+    EXPECT_TRUE(ui.GetLastFrame().FileImport.Enabled);
+    EXPECT_FALSE(HasDiagnostic(ui.GetLastFrame().FileImport.Diagnostics,
+                               Runtime::SandboxEditorDiagnosticCode::AssetImportUnavailable));
 
     ui.Detach();
     engine.Shutdown();

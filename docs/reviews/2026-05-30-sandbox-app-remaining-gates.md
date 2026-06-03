@@ -27,8 +27,9 @@ wired. The remaining gates are concentrated in three areas:
    (no packer yet), plus optional mesh primitive views.
 2. **Runtime selection** — no runtime-side controller, stable-entity lookup, or
    primitive refinement exists; only the graphics-side picking/outline path.
-3. **Asset + editor UI plumbing** — texture asset
-   bridge, asset ingest ownership, or editor shell/panel modules.
+3. **Asset + editor UI plumbing** — texture asset bridge plus final
+   file-backed sandbox acceptance proof. The editor shell/panel command seams
+   are now CPU-contracted.
 
 2026-06-02 update: `GRAPHICS-081` retired the bootstrap recipe scaffold. Sandbox
 acceptance now depends on the canonical default recipe, UI/editor panels, and the
@@ -95,8 +96,8 @@ upstream these runtime gates consume.
 |---|---|---|---|
 | Texture asset bridge | [`RUNTIME-080`](../../tasks/backlog/runtime/RUNTIME-080-asset-bridges-texture.md) | **OPEN** | No runtime asset-bridge module. |
 | Runtime ImGui platform/renderer adapter | [`RUNTIME-090`](../../tasks/done/RUNTIME-090-imgui-platform-renderer-adapter.md) | **DONE** | `Extrinsic.Runtime.ImGuiAdapter` produces `ImGuiOverlayFrame` records from runtime-owned ImGui frames; `GRAPHICS-079` consumes them through the renderer-owned `Pass.ImGui` path. |
-| Asset model/texture ingest ownership | [`ASSETIO-001`](../../tasks/done/ASSETIO-001-asset-model-texture-ingest-ownership.md) | **DONE** | Retired at `CPUContracted`: promoted asset routing, geometry/model/texture decoder dispatch, texture GPU-residency handoff, model-scene ECS `GeometrySources` materialization, deterministic embedded child texture assets, and material `AssetId` binding records are covered. Operational file/import execution remains in `RUNTIME-095` / UI follow-up work. |
-| Sandbox editor shell + core panels | [`UI-001`](../../tasks/active/UI-001-sandbox-editor-shell-panels.md) | **ACTIVE** | Slice C.3 extends `Extrinsic.Runtime.SandboxEditorUi` with runtime-owned visualization adapter binding command/model routing through `RenderExtractionCache`, alongside Slice C.2 selected-entity `SpatialDebugBinding` / `VisualizationConfig`, Slice C.1 camera/primitive-view commands, and Slice B inspector/selection/transform coverage. Asset import execution is the next UI slice on top of retired `ASSETIO-001` runtime/asset seams. |
+| Asset model/texture ingest ownership | [`ASSETIO-001`](../../tasks/done/ASSETIO-001-asset-model-texture-ingest-ownership.md) | **DONE** | Retired at `CPUContracted`: promoted asset routing, geometry/model/texture decoder dispatch, texture GPU-residency handoff, model-scene ECS `GeometrySources` materialization, deterministic embedded child texture assets, and material `AssetId` binding records are covered. Operational file-backed sandbox consumption remains in `RUNTIME-095`. |
+| Sandbox editor shell + core panels | [`UI-001`](../../tasks/done/UI-001-sandbox-editor-shell-panels.md) | **DONE** | Retired at `CPUContracted`: `Extrinsic.Runtime.SandboxEditorUi` covers scene hierarchy, inspector, selection/refined primitive details, file/import entry command execution through `Engine::ImportAssetFromPath(...)`, camera/controller and mesh primitive-view commands, selected-entity `SpatialDebugBinding` / `VisualizationConfig`, and visualization adapter-binding routing through `RenderExtractionCache`. Operational visual/file-backed proof remains `RUNTIME-095`. |
 | Visualization adapter umbrella | [`RUNTIME-083`](../../tasks/done/RUNTIME-083-visualization-adapters.md) | **DONE** | Slices A-E add the runtime `VisualizationAdapters` umbrella, `PropertyScalarAdapter`, `KMeansLabelAdapter`, `VectorFieldAdapter`, `IsolineAdapter`, `HtexMetadataAdapter`, registry contract, runtime-owned extraction-cache adapter bindings, scalar/non-scalar packet handoff into `RuntimeRenderSnapshotBatch::Visualization*`, deterministic Htex/fragment-bake packet contracts with `RecreateHtex` streaming scheduling, and extraction-side packet/error stats. |
 
 ### E. Optional / non-blocking
@@ -122,15 +123,16 @@ upstream these runtime gates consume.
 4. **RUNTIME-080 + ASSETIO-001** (texture asset bridge, asset model/texture
    ingest ownership) — the asset-plumbing seams RUNTIME-095 names as required
    upstreams. These can land in parallel with the selection chain.
-5. **UI-001** (editor panels on the completed ImGui adapter/pass path) — the UI
-   acceptance chain.
+5. **UI-001** — completed at `CPUContracted`; editor panels and command seams are
+   no longer a prerequisite gate except for final `RUNTIME-095` proof.
 6. **GRAPHICS-081** — completed on 2026-06-02; no bootstrap recipe acceptance
    path remains.
 7. **RUNTIME-095** — author the CPU/null + opt-in Vulkan acceptance once A–E land.
 
-The remaining asset/UI-plumbing gates (`RUNTIME-080`, `ASSETIO-001`, `UI-001`)
-are **required upstreams** per RUNTIME-095's Context section, so they stay on
-the acceptance path: do not retire RUNTIME-095 until each is complete.
+The remaining asset/UI-plumbing gate (`RUNTIME-080`) and the retired
+`ASSETIO-001` / `UI-001` seams are **required upstreams** per RUNTIME-095's
+Context section, so they stay on the acceptance path: do not retire
+`RUNTIME-095` until the final file-backed runtime proof consumes them.
 A procedurally authored acceptance scene can reduce how much *content* breadth
 each seam must cover (RUNTIME-095 explicitly does not require every asset format
 or visualization mode), but it does not remove the requirement that the texture
