@@ -1,0 +1,131 @@
+module;
+
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <vector>
+
+export module Extrinsic.Runtime.AssetModelSceneHandoff;
+
+import Extrinsic.Asset.ModelTexturePayload;
+import Extrinsic.Asset.Registry;
+import Extrinsic.Asset.Service;
+import Extrinsic.Core.Error;
+import Extrinsic.ECS.Scene.Handle;
+import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Graphics.GpuAssetCache;
+import Extrinsic.Graphics.Material;
+import Extrinsic.Graphics.MaterialSystem;
+import Extrinsic.Graphics.Renderer;
+import Extrinsic.Runtime.AssetModelTextureHandoff;
+
+export namespace Extrinsic::Runtime
+{
+    struct AssetModelSceneHandoffOptions
+    {
+        AssetModelTextureHandoffOptions TextureOptions{};
+        bool RequestEmbeddedTextureUploads{true};
+        bool ResolveMaterialTextureBindings{true};
+    };
+
+    struct AssetModelSceneHandoffDiagnostics
+    {
+        std::uint64_t ReadyEventsObserved{0};
+        std::uint64_t ModelSceneReadyEvents{0};
+        std::uint64_t ModelSceneMaterializeRequests{0};
+        std::uint64_t ModelSceneMaterializeSuccesses{0};
+        std::uint64_t ModelSceneMaterializeFailures{0};
+        std::uint64_t PrimitiveEntitiesCreated{0};
+        std::uint64_t EmbeddedTextureAssetsCreated{0};
+        std::uint64_t EmbeddedTextureUploadRequests{0};
+        std::uint64_t EmbeddedTextureUploadFailures{0};
+        std::uint64_t MaterialInstancesCreated{0};
+        std::uint64_t MaterialTextureBindingsResolved{0};
+        std::uint64_t MaterialTextureBindingFailures{0};
+        std::uint64_t NonModelSceneReadyEvents{0};
+        Assets::AssetId LastFailedAsset{};
+        Core::ErrorCode LastError{Core::ErrorCode::Success};
+    };
+
+    struct AssetModelSceneMaterialRecord
+    {
+        std::uint32_t MaterialIndex{Assets::kInvalidAssetModelIndex};
+        Graphics::MaterialTextureAssetBindings TextureBindings{};
+        std::uint32_t MaterialSlot{Graphics::kDefaultMaterialSlotIndex};
+        bool HasMaterialSlot{false};
+        bool TextureBindingsResolved{false};
+    };
+
+    struct AssetModelScenePrimitiveRecord
+    {
+        ECS::EntityHandle Entity{};
+        std::uint32_t PrimitiveIndex{Assets::kInvalidAssetModelIndex};
+        std::uint32_t GeometryPayloadIndex{Assets::kInvalidAssetModelIndex};
+        std::uint32_t MaterialIndex{Assets::kInvalidAssetModelIndex};
+        std::uint32_t MaterialSlot{Graphics::kDefaultMaterialSlotIndex};
+        bool HasMaterialSlot{false};
+    };
+
+    struct AssetModelSceneHandoffRecord
+    {
+        Assets::AssetId ModelAsset{};
+        std::vector<Assets::AssetId> EmbeddedTextureAssets{};
+        std::vector<AssetModelSceneMaterialRecord> Materials{};
+        std::vector<AssetModelScenePrimitiveRecord> Primitives{};
+    };
+
+    struct AssetModelSceneHandoffState
+    {
+        AssetModelSceneHandoffRecord Record{};
+        std::vector<Graphics::MaterialSystem::MaterialLease> MaterialLeases{};
+    };
+
+    [[nodiscard]] std::string BuildEmbeddedTextureAssetPath(
+        std::string_view modelPath,
+        std::uint32_t imageIndex,
+        const Assets::AssetTexture2DPayload& image);
+
+    [[nodiscard]] Core::Expected<Assets::AssetId> LoadEmbeddedTextureAsset(
+        Assets::AssetService& service,
+        std::string_view modelPath,
+        std::uint32_t imageIndex,
+        const Assets::AssetTexture2DPayload& image);
+
+    [[nodiscard]] Core::Expected<AssetModelSceneHandoffState> MaterializeModelSceneAsset(
+        Assets::AssetService& service,
+        Graphics::GpuAssetCache& cache,
+        ECS::Scene::Registry& scene,
+        Graphics::MaterialSystem& materials,
+        Assets::AssetId modelAsset,
+        const AssetModelSceneHandoffOptions& options = {},
+        AssetModelSceneHandoffDiagnostics* diagnostics = nullptr);
+
+    class AssetModelSceneHandoff
+    {
+    public:
+        AssetModelSceneHandoff(
+            Assets::AssetService& service,
+            Graphics::GpuAssetCache& cache,
+            ECS::Scene::Registry& scene,
+            Graphics::IRenderer& renderer,
+            AssetModelSceneHandoffOptions options = {});
+        ~AssetModelSceneHandoff();
+
+        AssetModelSceneHandoff(const AssetModelSceneHandoff&) = delete;
+        AssetModelSceneHandoff& operator=(const AssetModelSceneHandoff&) = delete;
+        AssetModelSceneHandoff(AssetModelSceneHandoff&&) = delete;
+        AssetModelSceneHandoff& operator=(AssetModelSceneHandoff&&) = delete;
+
+        [[nodiscard]] bool IsSubscribed() const noexcept;
+        [[nodiscard]] AssetModelSceneHandoffDiagnostics GetDiagnostics() const noexcept;
+        [[nodiscard]] const AssetModelSceneHandoffRecord* FindRecord(
+            Assets::AssetId modelAsset) const noexcept;
+
+        [[nodiscard]] Core::Result MaterializeReadyModelScene(Assets::AssetId modelAsset);
+
+    private:
+        struct Impl;
+        std::unique_ptr<Impl> m_Impl;
+    };
+}

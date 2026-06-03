@@ -103,6 +103,13 @@ namespace Extrinsic::Runtime
         const Assets::AssetId id,
         const AssetModelTextureHandoffOptions& options)
     {
+        const Graphics::GpuAssetState currentState = cache.GetState(id);
+        if (currentState == Graphics::GpuAssetState::GpuUploading
+            || currentState == Graphics::GpuAssetState::Ready)
+        {
+            return Core::Ok();
+        }
+
         auto fail = [&cache, id, &options](const Core::ErrorCode error) -> Core::Result
         {
             if (options.NotifyCacheFailedOnUploadError && !IsTypeMismatch(error))

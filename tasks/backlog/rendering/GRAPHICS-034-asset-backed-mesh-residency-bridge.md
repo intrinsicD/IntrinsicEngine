@@ -19,7 +19,7 @@ Lock down the design for the asset-source residency path that bridges `ECS::Comp
 - `src/graphics/assets/Graphics.GpuAssetCache.cppm` implements `Assets::AssetId → GpuAssetView` with `NotRequested → CpuPending → GpuUploading → Ready/Failed`, generation counter, retire queue. GRAPHICS-023A/B/C/D already wire generation tracking and acknowledgment.
 - `Extrinsic::Graphics::Components::GpuSceneSlot` already carries `SourceAsset`, `LastSeenAssetGeneration`, and slot/generation fields needed by this bridge (landed in GRAPHICS-023A).
 - The 2026-05-08 review (sections "Asset loading is not yet a renderable geometry residency bridge" and "minimal milestone plan / 5") records this as the asset-backed follow-up to GRAPHICS-030.
-- `tasks/active/ASSETIO-001-asset-model-texture-ingest-ownership.md` covers asset-side ingest ownership; this task consumes whatever shape that boundary lands on.
+- `tasks/done/ASSETIO-001-asset-model-texture-ingest-ownership.md` covers asset-side ingest ownership and runtime model/texture handoff at `CPUContracted`; this task consumes that promoted boundary for asset-backed mesh residency.
 
 ## Design decisions to record
 1. **AssetId normalization placement.** Decide the function signature and module that converts `AssetInstance::Source::AssetId (std::uint32_t)` to `Assets::AssetId` and where it lives. Recommend a runtime-side helper `Runtime::NormalizeAssetInstanceId(...)` so neither ECS nor graphics imports the asset registry; record the rule that runtime never embeds the normalization in extraction tick code (it goes through one named function for testability).

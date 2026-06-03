@@ -12,59 +12,20 @@ Each active task should include:
 ## Currently active
 
 [`UI-001`](UI-001-sandbox-editor-shell-panels.md) — sandbox editor shell and core
-panels on top of the runtime ImGui adapter/pass stack. Status: blocked on
-[`ASSETIO-001`](ASSETIO-001-asset-model-texture-ingest-ownership.md) after Slice
-C.3; the promoted editor shell now covers enriched
+panels on top of the runtime ImGui adapter/pass stack. Status: in-progress on
+`main`, ready for Slice D after retired
+[`ASSETIO-001`](../done/ASSETIO-001-asset-model-texture-ingest-ownership.md)
+closed the promoted asset route/model/texture ingest and runtime handoff seams
+at `CPUContracted`. The promoted editor shell already covers enriched
 inspector/render-hint fields, selected/hovered entity rows, refined primitive
 id/hit display, a runtime-owned local-transform edit command, camera-controller
 replacement, mesh edge/vertex primitive-view toggle commands, and selected-entity
 spatial-debug, visualization-config, and visualization adapter-binding command
-routing with CPU `contract;runtime` coverage. Remaining file/import execution is
-gated on active `ASSETIO-001`; Slice B now provides geometry callback dispatch,
-but UI-ready import execution still needs the later model/texture and runtime
-handoff slices.
-Next verification: resume the file/import panel execution slice after ASSETIO
-lands a runtime-callable import command/handoff route, then run the task
+routing with CPU `contract;runtime` coverage. Remaining file/import execution
+should compose the promoted asset/runtime ingest seams without adding UI-owned
+asset authority.
+Next verification: resume the Slice D file/import panel execution seam, then run the task
 structural checks plus the runtime contract/default CPU gates.
-
-[`ASSETIO-001`](ASSETIO-001-asset-model-texture-ingest-ownership.md) — asset
-model, texture, and import/export ingest ownership. Status: blocked on
-`main`, promoted to address the UI-001 file/import blocker. Slice A verified
-the CPU-only `Extrinsic.Asset.ImportRouter` contract for extension lookup,
-import/export routing, payload/domain hints, and deterministic route diagnostics
-without importing geometry, runtime, graphics, or RHI into `src/assets`. Slice B
-adds `Extrinsic.Asset.GeometryIOBridge` plus runtime-owned promoted geometry
-decoder/encoder callback registration without importing geometry into
-`src/assets`; default CPU gate verification passed for the slice. Slice C.1 adds
-the promoted CPU-only model/texture payload contract. Slice C.2a adds
-`Extrinsic.Asset.ModelTextureIOBridge` for asset-owned primary file reads,
-relative external-resource reads, promoted model/texture callback dispatch,
-decode-error propagation, and payload validation without importing geometry,
-runtime, graphics, or RHI into `src/assets`; focused asset checks, the broad
-`IntrinsicTests` build, structural checks, and the default CPU CTest gate pass
-after the runtime ImGui module forward declaration fix and benchmark smoke
-target build. Slice C.2b adds `Extrinsic.Runtime.AssetModelTextureIO` for
-runtime-owned concrete GLTF/GLB and STB-backed PNG/JPEG/TGA/BMP/HDR decoder
-registration plus decoded mesh primitive, embedded image, material texture ref,
-and external-resource diagnostic mapping into promoted CPU payloads; focused
-asset/runtime checks, structural checks, benchmark smoke target build, and the
-default CPU CTest gate pass for the slice. Slice D.1 adds
-`Extrinsic.Runtime.AssetModelTextureHandoff` for runtime-owned texture
-GPU-residency handoff from `AssetService::Ready` texture payload events to
-`Graphics::GpuAssetCache::RequestUpload`, with unsupported-format failure
-diagnostics and teardown before asset/cache destruction; focused asset/runtime
-checks, structural/docs checks, benchmark smoke target build, and the default
-CPU CTest gate pass for the slice. Model-scene ECS construction remains deferred
-to Slice D.2 because the current GLTF primitive payload needs a separate
-promoted topology/entity materialization decision. D.2 is blocked on a pinned
-embedded-texture/material identity contract: the model payload stores embedded
-images by model-local index, while `GpuAssetCache` residency is keyed by
-`Assets::AssetId`, so the task must choose child texture assets with stable
-synthetic paths, material-local embedded texture storage, or an explicit
-model-to-texture asset mapping before implementation.
-Next verification: resolve the D.2 identity contract, then implement the
-runtime model-scene ECS/material handoff and run the focused asset/runtime
-checks plus the default CPU gate.
 
 The most recently retired tasks are summarised below.
 

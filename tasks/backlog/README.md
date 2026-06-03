@@ -58,7 +58,7 @@ Planning parents (retired):
 - [`GRAPHICS-033D` (done)](../done/GRAPHICS-033D-gpu-vulkan-visible-triangle-smoke.md)
 - [`rendering/GRAPHICS-034-asset-backed-mesh-residency-bridge.md`](rendering/GRAPHICS-034-asset-backed-mesh-residency-bridge.md)
 - [`runtime/RORG-031-runtime-composition.md`](runtime/RORG-031-runtime-composition.md)
-- [`ASSETIO-001`](../active/ASSETIO-001-asset-model-texture-ingest-ownership.md)
+- [`ASSETIO-001` (done)](../done/ASSETIO-001-asset-model-texture-ingest-ownership.md)
 - [`GEOIO-002` (done)](../done/GEOIO-002-geometry-io-parity-hardening.md)
 - [`ecs/HARDEN-060` (done)](../done/HARDEN-060-ecs-scene-bootstrap-contract.md)
 - [`ecs/HARDEN-061` (done)](../done/HARDEN-061-ecs-hierarchy-transform-system-parity.md)

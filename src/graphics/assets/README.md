@@ -129,12 +129,25 @@ Graphics-owned bridge between `Assets::AssetId` and GPU resources.
   `AssetTexture2DPayload` records, maps supported CPU formats to
   `TextureDesc`, constructs `GpuTextureRequest` (`AssetId`, `Bytes` span,
   `TextureDesc`, sampler descriptor), and calls `cache.RequestUpload(req)`
-  synchronously from the asset-event handler thread. RGB8 and unknown texture
-  payload formats fail closed before a graphics upload is requested. Heavy CPU
-  decoding may be queued through `Extrinsic.Runtime.StreamingExecutor` (the
-  same async surface used for visualization baking under `GRAPHICS-014Q`), but
-  the final `RequestUpload` call is always synchronous from runtime; graphics
-  never schedules CPU work and never imports `AssetService` or `AssetEventBus`.
+  synchronously from the asset-event handler thread. Duplicate requests for an
+  asset already `GpuUploading` or `Ready` are idempotent. RGB8 and unknown
+  texture payload formats fail closed before a graphics upload is requested.
+  Heavy CPU decoding may be queued through
+  `Extrinsic.Runtime.StreamingExecutor` (the same async surface used for
+  visualization baking under `GRAPHICS-014Q`), but the final `RequestUpload`
+  call is always synchronous from runtime; graphics never schedules CPU work
+  and never imports `AssetService` or `AssetEventBus`.
+  `Extrinsic.Runtime.AssetModelSceneHandoff` subscribes to model-scene
+  `AssetEvent::Ready` events, mints deterministic child texture assets for
+  embedded images (`<model-path>.embedded-texture-<image-index>.<ext>`),
+  requests those child uploads through the texture handoff, and records
+  `MaterialTextureAssetBindings` keyed by the child `AssetId`s. The material
+  system consumes those IDs through `ResolveTextureAssetBindings()`: ready
+  children resolve to bindless indices, while pending/missing/failed children
+  use the fallback path when available. Post-upload material re-resolution after
+  an embedded child transitions from pending to ready is not a graphics-cache
+  subscription; final runtime/app consumption remains owned by the later
+  operational sandbox slice.
   `AssetEvent::Destroyed` flows to `cache.NotifyDestroyed(id)` which queues
   live leases for retirement.
   Editor / app code may expose per-asset upload priority hints through
@@ -171,7 +184,8 @@ It must **not** depend on:
 intentionally not handled by the cache itself. Runtime-owned type-specific
 bridges are responsible for calling `RequestUpload` once their CPU payload is
 final; `Extrinsic.Runtime.AssetModelTextureHandoff` covers decoded texture
-payloads, while model-scene ECS/material handoff remains deferred.
+payloads and `Extrinsic.Runtime.AssetModelSceneHandoff` covers model-scene
+entity/material records plus embedded texture child asset uploads.
 
 `AssetHooks::TickAssets()` calls `cache.Tick(device.GetGlobalFrameNumber(),
 device.GetFramesInFlight())` once per frame, after `AssetService::Tick()`.

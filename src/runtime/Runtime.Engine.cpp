@@ -38,6 +38,7 @@ import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.SelectionSystem;
+import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.ImGuiAdapter;
@@ -338,12 +339,17 @@ namespace Extrinsic::Runtime
                                                        drive RequestUpload */    break;
                 }
             });
+        // ── 6. ECS scene ──────────────────────────────────────────────────
+        m_Scene = std::make_unique<ECS::Scene::Registry>();
+
         m_AssetModelTextureHandoff = std::make_unique<AssetModelTextureHandoff>(
             *m_AssetService,
             *m_GpuAssetCache);
-
-        // ── 6. ECS scene ──────────────────────────────────────────────────
-        m_Scene = std::make_unique<ECS::Scene::Registry>();
+        m_AssetModelSceneHandoff = std::make_unique<AssetModelSceneHandoff>(
+            *m_AssetService,
+            *m_GpuAssetCache,
+            *m_Scene,
+            *m_Renderer);
 
         // RUNTIME-092 Slice B — attach the runtime-owned stable-entity lookup
         // to the selection authority so render-id resolution flows through the
@@ -412,6 +418,7 @@ namespace Extrinsic::Runtime
             std::unique_ptr<Assets::AssetService>& AssetService;
             std::unique_ptr<Graphics::GpuAssetCache>& GpuAssetCache;
             std::unique_ptr<AssetModelTextureHandoff>& AssetModelTextureHandoffPtr;
+            std::unique_ptr<AssetModelSceneHandoff>& AssetModelSceneHandoffPtr;
             Assets::AssetEventBus::ListenerToken& GpuAssetCacheListener;
             std::unique_ptr<ECS::Scene::Registry>& Scene;
             ReferenceSceneRegistry& ReferenceRegistry;
@@ -435,6 +442,7 @@ namespace Extrinsic::Runtime
                           std::unique_ptr<Assets::AssetService>& assetService,
                           std::unique_ptr<Graphics::GpuAssetCache>& gpuAssetCache,
                           std::unique_ptr<AssetModelTextureHandoff>& assetModelTextureHandoff,
+                          std::unique_ptr<AssetModelSceneHandoff>& assetModelSceneHandoff,
                           Assets::AssetEventBus::ListenerToken& gpuAssetCacheListener,
                           std::unique_ptr<ECS::Scene::Registry>& scene,
                           ReferenceSceneRegistry& referenceRegistry,
@@ -457,6 +465,7 @@ namespace Extrinsic::Runtime
                 , AssetService(assetService)
                 , GpuAssetCache(gpuAssetCache)
                 , AssetModelTextureHandoffPtr(assetModelTextureHandoff)
+                , AssetModelSceneHandoffPtr(assetModelSceneHandoff)
                 , GpuAssetCacheListener(gpuAssetCacheListener)
                 , Scene(scene)
                 , ReferenceRegistry(referenceRegistry)
@@ -487,6 +496,10 @@ namespace Extrinsic::Runtime
             }
             void DestroyScene() override
             {
+                // The model-scene handoff borrows the scene and renderer, so
+                // detach it before provider teardown or wholesale scene reset.
+                AssetModelSceneHandoffPtr.reset();
+
                 // Reference scene teardown (GRAPHICS-029A/B): route entity
                 // destruction through the same provider that authored them
                 // before the scene registry is wholesale destroyed, and
@@ -568,6 +581,7 @@ namespace Extrinsic::Runtime
                             m_AssetService,
                             m_GpuAssetCache,
                             m_AssetModelTextureHandoff,
+                            m_AssetModelSceneHandoff,
                             m_GpuAssetCacheListener,
                             m_Scene,
                             m_ReferenceSceneRegistry,

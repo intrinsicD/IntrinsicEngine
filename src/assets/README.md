@@ -44,8 +44,10 @@ store, load pipeline, event bus, and path index behind a single façade.
   typed `AssetGeometryPayload` records so decoded geometry can remain CPU-owned
   without importing geometry into `src/assets`. It stores bytes and metadata
   only; runtime registers the concrete tinygltf/stb decoder callbacks and
-  separately owns texture Ready-event upload requests into `GpuAssetCache`.
-  Model-scene ECS construction remains runtime handoff work.
+  separately owns texture Ready-event upload requests into `GpuAssetCache` and
+  model-scene ECS/material handoff. Embedded images remain CPU payload records
+  in the model scene until runtime mints deterministic child texture assets for
+  GPU residency.
 - `AssetLoadPipeline` tracks load stages, in-flight requests, GPU fence waits,
   and failure / completion transitions.
 - `AssetEventBus` batches `Ready`, `Failed`, `Reloaded`, and `Destroyed`
@@ -110,7 +112,11 @@ by `AssetId`. The bridge is event-driven: `AssetEventBus` publishes `Ready`,
 `Reloaded`, `Failed`, and `Destroyed`; `Runtime` wires the graphics cache
 listener and type-specific handoff objects. `AssetModelTextureHandoff` handles
 texture `Ready` events by reading CPU texture payloads and requesting
-`GpuAssetCache` uploads. Runtime is the only layer that names both sides.
+`GpuAssetCache` uploads. `AssetModelSceneHandoff` handles model-scene `Ready`
+events by reading CPU model-scene payloads, minting child `AssetTexture2DPayload`
+assets at stable synthetic paths (`<model-path>.embedded-texture-<image-index>.<ext>`),
+and creating ECS/material records that reference those child texture assets by
+`AssetId`. Runtime is the only layer that names both sides.
 
 See `AGENTS.md` → "Assets ↔ Graphics boundary" for the full contract
 (per-asset state machine, `TransferManager` reuse, `AssetId`-in-components

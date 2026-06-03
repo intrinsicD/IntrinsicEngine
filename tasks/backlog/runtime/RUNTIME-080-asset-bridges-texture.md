@@ -11,57 +11,29 @@
 - No new RHI surface.
 
 ## Context
-- Status: not started.
+- Status: superseded by [`ASSETIO-001`](../../done/ASSETIO-001-asset-model-texture-ingest-ownership.md);
+  do not promote this task as written.
 - Owner/layer: `runtime`.
 - Planning anchors: `tasks/done/GRAPHICS-015Q-texture-residency-backend-clarifications.md` ("texture-typed asset bridges under the planned umbrella `Extrinsic.Runtime.AssetBridges.Texture` subscribe to texture-typed `AssetEvent::Ready`, build `GpuTextureRequest`, and call `cache.RequestUpload(req)` synchronously"); `src/graphics/renderer/README.md:385–395`.
-- Today: the runtime-owned fallback bootstrap (`RUNTIME-070`) is the only path that touches `GpuAssetCache` directly; texture-typed `AssetEvent::Ready` events fire but no one consumes them. Material `BindlessIndex` resolutions miss because `RequestUpload` is never called.
-- Streaming: heavy CPU texture decoding (PNG/EXR/KTX) happens off the main thread via `Extrinsic.Runtime.StreamingExecutor`; the bridge schedules and observes completion before issuing `RequestUpload`.
+- Current state: ASSETIO-001 Slice D.1 implemented
+  `Extrinsic.Runtime.AssetModelTextureHandoff`, which subscribes to
+  `AssetService::Ready`, reads canonical `AssetTexture2DPayload` records,
+  builds `GpuTextureRequest` descriptors, and requests uploads through
+  `Graphics::GpuAssetCache`. Slice D.2 made the helper idempotent for
+  already-uploading or ready child texture assets. Future work should not open
+  this task unless it is explicitly narrowed to a mechanical namespace
+  consolidation or a new capability not already covered by ASSETIO-001.
+- Streaming: heavy CPU texture decoding for promoted PNG/JPEG/TGA/BMP/HDR now
+  happens through the asset/model-texture IO bridge and runtime decoder
+  callbacks landed in ASSETIO-001. KTX remains a separate decoder gap, not a
+  reason to reopen this umbrella as written.
 
-## Open clarification (recorded 2026-05-25 by `claude/intrinsicengine-agent-onboarding-k31Vm` during pick-up triage; nonblocking — picker chose RUNTIME-082 as next earliest unblocked Theme A leaf and left this question for the eventual implementer)
+## Superseded clarification
 
-This task has two implicit upstream dependencies that are not currently
-recorded in the dependency anchors of
-[`tasks/backlog/README.md`](../README.md):
-
-1. **CPU texture payload type ownership.** The task assumes a typed payload
-   exists on `AssetPayloadStore` for a "texture-typed asset" — the bridge
-   reads it via `PayloadStore::ReadSpan<T>(id)` to derive
-   `RHI::TextureDesc.{Format, Width, Height, MipLevels}`, `RHI::SamplerDesc`,
-   and the source bytes for `GpuTextureRequest`. No such type exists in
-   `src/assets/` today. `ASSETIO-001`
-   ([`tasks/active/ASSETIO-001-asset-model-texture-ingest-ownership.md`](../../active/ASSETIO-001-asset-model-texture-ingest-ownership.md))
-   explicitly owns "Define and implement CPU texture decode payload
-   ownership and metadata (`dimensions`, format/color space, component
-   count, source path/generation) without creating GPU resources in
-   `assets`". Implementing RUNTIME-080 before ASSETIO-001 would either (a)
-   require the bridge to define a runtime-local placeholder payload type
-   (which is a speculative abstraction outside the selected task and
-   violates the prompt anti-pattern of cross-domain scope creep), or (b)
-   block on ASSETIO-001 landing the canonical type first.
-
-2. **Asset-type discriminator on `AssetEventBus`.** The task says
-   "subscribes to texture-typed `AssetEvent::Ready` … (filtered via the
-   existing asset-type discriminator)". `AssetEventBus` today carries only
-   `(AssetId, AssetEvent)` payloads (see
-   `src/assets/Asset.EventBus.cppm`) — there is no type discriminator on
-   the event surface. Filtering by payload type must be done after fact
-   via `PayloadStore::ReadSpan<T>(id)` returning a typed expected, which
-   depends on the payload type from clarification (1).
-
-**Recommended resolution before promotion.** Either:
-
-- Land ASSETIO-001's texture payload type first (or a focused Slice A of
-  ASSETIO-001 limited to defining the payload type), then promote
-  RUNTIME-080 with a slice plan whose Slice A consumes that type; or
-- Add a non-goal here explicitly recording that the bridge defines a
-  runtime-local placeholder payload type (e.g.
-  `Runtime::TextureSourcePayload`) and that ASSETIO-001 will reroute it to
-  the canonical asset-owned type during ingest landing. The placeholder
-  must not appear on any public `src/assets/` surface.
-
-Either path is reasonable; the choice belongs to whoever next promotes
-this task. Picker for the next session left this for the implementer rather
-than guessing.
+The earlier ambiguity about CPU texture payload ownership and asset-event type
+discrimination is resolved by ASSETIO-001. `src/assets` owns
+`AssetTexture2DPayload`; runtime filters event types by attempting typed reads
+from `AssetService`; graphics never imports `AssetService` or `AssetEventBus`.
 
 ## Required changes
 - [ ] Add `src/runtime/AssetBridges/Runtime.AssetBridges.Texture.cppm` exporting `Extrinsic.Runtime.AssetBridges.Texture` with:
