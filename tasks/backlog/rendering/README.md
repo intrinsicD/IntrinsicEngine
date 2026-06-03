@@ -842,18 +842,18 @@ testable; each phase derisks the next.
   reservation. Explicitly long-horizon: no implementation children opened
   until backend support and at least one consumer exist. Depends on
   GRAPHICS-053.
-- [GRAPHICS-055 — Streaming Virtual Textures (planning)](GRAPHICS-055-streaming-virtual-textures.md):
+- [GRAPHICS-055 — Streaming Virtual Textures (done)](../../done/GRAPHICS-055-streaming-virtual-textures.md):
   locks 128² virtual page table, feedback pass, runtime page resolver,
   KTX2/Basis Universal UASTC shipping format. Depends on GRAPHICS-018T,
   GRAPHICS-026, GRAPHICS-041.
-- [GRAPHICS-056 — Virtualized meshes with cluster DAG and continuous LOD (planning, bounded scope)](GRAPHICS-056-virtualized-meshes-cluster-lod.md):
+- [GRAPHICS-056 — Virtualized meshes with cluster DAG and continuous LOD (done, bounded scope)](../../done/GRAPHICS-056-virtualized-meshes-cluster-lod.md):
   locks DAG record shape + LOD selector pass + HZB integration. Bounded
   scope: explicitly NOT Nanite parity (no SW raster, no cluster-page
   streaming). Depends on GRAPHICS-038, GRAPHICS-044, GRAPHICS-053.
-- [GRAPHICS-057 — DirectStorage-analog GPU decompression hookpoint on the transfer queue (planning)](GRAPHICS-057-directstorage-gpu-decompression.md):
+- [GRAPHICS-057 — DirectStorage-analog GPU decompression hookpoint on the transfer queue (done)](../../done/GRAPHICS-057-directstorage-gpu-decompression.md):
   locks `IGpuDecompressionTransferQueue` capability surface, GDeflate/Zstd
   payload formats, CPU-fallback rule. Depends on GRAPHICS-018T, GRAPHICS-026.
-- [GRAPHICS-058 — Frame generation pass (planning)](GRAPHICS-058-frame-generation-pass.md):
+- [GRAPHICS-058 — Frame generation pass (done)](../../done/GRAPHICS-058-frame-generation-pass.md):
   locks `IFrameGenerator` interface (interpolation/extrapolation), reference
   motion-blend interpolator, presentation pacing in `runtime/`. Depends on
   GRAPHICS-013C, GRAPHICS-040.
