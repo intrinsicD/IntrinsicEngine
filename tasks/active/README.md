@@ -28,7 +28,7 @@ lands a runtime-callable import command/handoff route, then run the task
 structural checks plus the runtime contract/default CPU gates.
 
 [`ASSETIO-001`](ASSETIO-001-asset-model-texture-ingest-ownership.md) — asset
-model, texture, and import/export ingest ownership. Status: in-progress on
+model, texture, and import/export ingest ownership. Status: blocked on
 `main`, promoted to address the UI-001 file/import blocker. Slice A verified
 the CPU-only `Extrinsic.Asset.ImportRouter` contract for extension lookup,
 import/export routing, payload/domain hints, and deterministic route diagnostics
@@ -56,9 +56,15 @@ diagnostics and teardown before asset/cache destruction; focused asset/runtime
 checks, structural/docs checks, benchmark smoke target build, and the default
 CPU CTest gate pass for the slice. Model-scene ECS construction remains deferred
 to Slice D.2 because the current GLTF primitive payload needs a separate
-promoted topology/entity materialization decision.
-Next verification: implement Slice D.2, then run the focused asset/runtime
-checks and default CPU gate for that slice.
+promoted topology/entity materialization decision. D.2 is blocked on a pinned
+embedded-texture/material identity contract: the model payload stores embedded
+images by model-local index, while `GpuAssetCache` residency is keyed by
+`Assets::AssetId`, so the task must choose child texture assets with stable
+synthetic paths, material-local embedded texture storage, or an explicit
+model-to-texture asset mapping before implementation.
+Next verification: resolve the D.2 identity contract, then implement the
+runtime model-scene ECS/material handoff and run the focused asset/runtime
+checks plus the default CPU gate.
 
 The most recently retired tasks are summarised below.
 

@@ -1,7 +1,7 @@
 # ASSETIO-001 — Asset model, texture, and import/export ingest ownership
 
 ## Status
-- Status: in-progress.
+- Status: blocked.
 - Owner/agent: Codex.
 - Branch: `main`.
 - Current slice: Slice D.1 implemented and verified. The CPU-only import/export route
@@ -19,9 +19,17 @@
   `Graphics::GpuAssetCache`, with unsupported-format failure diagnostics and
   teardown before asset/cache destruction. Focused checks, structural/docs
   checks, benchmark smoke target build, and the default CPU CTest gate pass.
-- Next verification step: implement Slice D.2 runtime model-scene ECS entity
-  construction and embedded texture/material handoff, then run focused
-  asset/runtime checks and the default CPU gate.
+- Current blocker: Slice D.2 needs a pinned embedded-texture/material identity
+  contract before implementation. `AssetModelScenePayload` stores embedded
+  images by model-local index, while `Graphics::GpuAssetCache` residency is
+  keyed by `Assets::AssetId`; the task must decide whether runtime mints child
+  texture assets with stable synthetic paths, keeps embedded textures
+  material-local outside the cache, or introduces an explicit model-to-texture
+  asset mapping before ECS construction can be robustly tested.
+- Next verification step: resolve the Slice D.2 embedded texture/material
+  identity contract, then implement runtime model-scene ECS entity construction
+  and embedded texture/material handoff with focused asset/runtime checks and
+  the default CPU gate.
 
 ## Slice plan
 - **Slice A.** Add `Extrinsic.Asset.ImportRouter` as a CPU-only routing
