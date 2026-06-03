@@ -114,9 +114,11 @@ upstream these runtime gates consume.
   mesh + one graph + one point cloud all reside through a single extraction with
   distinct `GpuWorld` handles, a finite/invertible camera-controller frame
   camera, whole-entity selection per family, and the sandbox editor panel frame
-  enumerating the scene. Slice 2 (primitive-selection/outline CPU coverage) and
-  Slice 3 (opt-in `gpu;vulkan` default-recipe present smoke, `Operational`)
-  remain.
+  enumerating the scene. Slice 2 landed the same day: a mocked pick readback
+  resolves a mesh Face / graph Edge / point-cloud Point through
+  `RefinePickReadbackResult`, and the `RenderWorld.Selection` outline snapshot is
+  populated for the selected entity. Only Slice 3 (opt-in `gpu;vulkan`
+  default-recipe present smoke, `Operational`) remains.
 
 ## Suggested dependency order to unblock RUNTIME-095
 

@@ -11,10 +11,10 @@
 - No mandatory GPU run in the default CPU CI gate; Vulkan acceptance remains opt-in and label-gated.
 
 ## Context
-- Status: Slice 1 landed (CPU/null residency + camera + entity-selection + UI
-  panel acceptance, `CPUContracted`); Slices 2 (primitive selection/outline) and
-  3 (opt-in `gpu;vulkan` present smoke, `Operational`) remain. The task stays in
-  backlog until Slice 3 retires it.
+- Status: Slices 1 and 2 landed (CPU/null residency + camera + entity & primitive
+  selection + outline snapshot + UI panel acceptance, `CPUContracted`). Only
+  Slice 3 (opt-in `gpu;vulkan` default-recipe present smoke, `Operational`)
+  remains; the task stays in backlog until Slice 3 retires it on a Vulkan host.
 - Owner/layer: `runtime` composition and acceptance harness, with dependencies across rendering, assets, runtime adapters, and UI.
 - This task is the discoverable path from the current default-recipe visible-triangle baseline to the working sandbox described in Theme A of `tasks/backlog/README.md`.
 - Required upstreams include default-recipe rendering (`GRAPHICS-072..079`, `GRAPHICS-081`), runtime geometry residency (`RUNTIME-085..088`), selection (`GRAPHICS-074`, `RUNTIME-089`, `RUNTIME-092`, `RUNTIME-093`), asset/UI plumbing (`ASSETIO-001` — which subsumed the retired `RUNTIME-080` texture bridge —, `RUNTIME-090`, `UI-001`), and optional visualization/spatial-debug adapters (`RUNTIME-082`, `RUNTIME-083`, `GRAPHICS-077`, `GRAPHICS-078`).
@@ -32,12 +32,13 @@
   reporting selection. Test: `Test.RuntimeSandboxAcceptance.cpp`
   (`integration;runtime;graphics`). Defers primitive-domain selection/outline and
   the GPU smoke to Slices 2/3.
-- **Slice 2 (deferred, `CPUContracted`).** Primitive-selection acceptance: drive
-  `RefinePickReadbackResult` / `RefinePrimitiveSelection` with mocked pick
-  readbacks to resolve at least one primitive domain per family (mesh
-  face/edge/vertex, graph edge/node, point-cloud point), and assert the
-  `RenderWorld.Selection` outline snapshot is populated for selected/hovered
-  entities.
+- **Slice 2 (landed 2026-06-03, `CPUContracted`).** Primitive-selection
+  acceptance: drives `RefinePickReadbackResult` with mocked pick readbacks to
+  resolve one primitive domain per family (mesh Face, graph Edge, point-cloud
+  Point) and asserts the `RenderWorld.Selection` outline snapshot is populated
+  for the selected entity via `ExtractAndSubmit(..., &selection)` →
+  `ExtractRenderWorld`. Tests:
+  `RuntimeSandboxAcceptance.{PrimitiveRefinementResolvesOneDomainPerFamily,SelectionOutlineSnapshotPopulatedForSelectedEntity}`.
 - **Slice 3 (deferred, `Operational`).** Opt-in `gpu;vulkan;integration` smoke
   that drives `ExtrinsicSandbox`/the engine for bounded frames on a Vulkan-capable
   host and asserts the default recipe reaches present with no canonical pass
@@ -50,14 +51,14 @@
 - [ ] **(Slice 3)** Add an opt-in `gpu;vulkan;integration` smoke that launches or drives `ExtrinsicSandbox`/runtime for bounded frames and asserts default-recipe command recording reaches present with no canonical pass falling through the unavailable branch.
 - [x] Add CPU/null integration coverage that verifies extraction/submission state for the same scene without requiring Vulkan. _(Slice 1.)_
 - [x] Assert camera controller updates produce finite/invertible frame cameras for the acceptance scene. _(Slice 1.)_
-- [ ] **(Slice 1 partial / Slice 2)** Assert selection flow can select an entity and at least one primitive domain per geometry family where supported: mesh face/edge/vertex, graph edge/node, point-cloud point. _(Slice 1 covers whole-entity selection per family; primitive-domain selection is Slice 2.)_
-- [ ] **(Slice 2)** Assert outline snapshot state is populated for selected/hovered entities and the graphics command path records selection/outline passes when operational.
+- [x] Assert selection flow can select an entity and at least one primitive domain per geometry family where supported: mesh face/edge/vertex, graph edge/node, point-cloud point. _(Slice 1 whole-entity selection per family; Slice 2 resolves mesh Face / graph Edge / point-cloud Point via `RefinePickReadbackResult`.)_
+- [x] Assert outline snapshot state is populated for selected/hovered entities. _(Slice 2: `RenderWorld.Selection.SelectedStableIds` populated; the graphics command path recording selection/outline passes when **operational** is the Slice 3 `gpu;vulkan` proof.)_
 - [x] Assert core UI panels register and produce deterministic enabled/disabled states for the acceptance scene. _(Slice 1: `BuildSandboxEditorPanelFrame` enumerates the 3-entity scene and reports selection.)_
 - [ ] **(Retirement)** Record unsupported but non-blocking features explicitly (for example advanced PBR, transparent selection, Gaussian splats, full scene serialization) so the acceptance stop-state is reviewable.
 
 ## Tests
 - [x] Add `integration;runtime` CPU/null acceptance test for mesh/graph/point-cloud extraction and residency sidecars. _(Slice 1, `RuntimeSandboxAcceptance.MeshGraphPointCloudAllResideThroughOneExtraction`.)_
-- [ ] **(Slice 2)** Add `integration;runtime` selection acceptance test using mocked pick results and runtime selection/refinement APIs. _(Slice 1 covers whole-entity selection; mocked-pick primitive refinement is Slice 2.)_
+- [x] Add `integration;runtime` selection acceptance test using mocked pick results and runtime selection/refinement APIs. _(Slice 2, `PrimitiveRefinementResolvesOneDomainPerFamily` + `SelectionOutlineSnapshotPopulatedForSelectedEntity`.)_
 - [x] Add `integration;ui` or `contract;runtime` UI callback acceptance for core panels over the acceptance scene. _(Slice 1, `RuntimeSandboxAcceptance.EditorPanelFrameEnumeratesAcceptanceScene`.)_
 - [ ] **(Slice 3)** Add opt-in `gpu;vulkan;integration` smoke for default-recipe visible rendering on Vulkan-capable hosts.
 - [x] Keep slow/GPU tests out of the default CPU gate with labels documented in `tests/README.md` and `tests/CMakeLists.txt`. _(Slice 1 test is `integration;runtime;graphics`, CPU-only; no GPU label added yet.)_

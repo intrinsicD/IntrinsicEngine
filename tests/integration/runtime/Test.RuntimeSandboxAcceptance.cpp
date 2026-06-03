@@ -34,9 +34,13 @@ import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Renderer;
+import Extrinsic.Graphics.RenderFrameInput;
+import Extrinsic.Graphics.RenderWorld;
+import Extrinsic.Graphics.SelectionSystem;
 import Extrinsic.Platform.Input;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxEditorUi;
 import Extrinsic.Runtime.SelectionController;
@@ -115,6 +119,7 @@ namespace
         auto& faces = raw.emplace<gs::Faces>(entity);
         faces.Properties.Resize(1);
         faces.Properties.GetOrAdd<std::uint32_t>(std::string{pn::kFaceHalfedge}, kInvalidIndex).Vector() = {0u};
+        raw.emplace<gs::HasMeshTopology>(entity);
         return entity;
     }
 
@@ -291,5 +296,88 @@ TEST(RuntimeSandboxAcceptance, EditorPanelFrameEnumeratesAcceptanceScene)
     EXPECT_EQ(frame.Selection.SelectedStableIds[0],
               Runtime::SelectionController::ToStableEntityId(mesh));
 
+    engine.Shutdown();
+}
+
+// --- Slice 2: primitive selection per family + outline snapshot -------------
+
+namespace
+{
+    [[nodiscard]] Graphics::PickReadbackResult MockPick(EntityHandle entity,
+                                                        Graphics::SelectionPrimitiveDomain domain,
+                                                        std::uint32_t payload)
+    {
+        return Graphics::PickReadbackResult{
+            .EncodedId = Graphics::EncodeSelectionId(domain, payload),
+            .StableEntityId = static_cast<std::uint32_t>(entity),
+            .Hit = true,
+            .Sequence = 1u,
+        };
+    }
+}
+
+// A mocked pick readback resolves at least one primitive domain per geometry
+// family against the authoritative GeometrySources.
+TEST(RuntimeSandboxAcceptance, PrimitiveRefinementResolvesOneDomainPerFamily)
+{
+    Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.Initialize();
+    auto& scene = engine.GetScene();
+
+    const EntityHandle mesh = MakeMesh(scene);
+    const EntityHandle graph = MakeGraph(scene);
+    const EntityHandle cloud = MakePointCloud(scene);
+
+    const auto meshHit =
+        Runtime::RefinePickReadbackResult(scene, MockPick(mesh, Graphics::SelectionPrimitiveDomain::Face, 0u));
+    ASSERT_TRUE(meshHit.has_value());
+    EXPECT_TRUE(meshHit->Resolved());
+    EXPECT_EQ(meshHit->Kind, Runtime::RefinedPrimitiveKind::Face);
+    EXPECT_EQ(meshHit->EntityId, static_cast<std::uint32_t>(mesh));
+
+    const auto graphHit =
+        Runtime::RefinePickReadbackResult(scene, MockPick(graph, Graphics::SelectionPrimitiveDomain::Edge, 0u));
+    ASSERT_TRUE(graphHit.has_value());
+    EXPECT_TRUE(graphHit->Resolved());
+    EXPECT_EQ(graphHit->Kind, Runtime::RefinedPrimitiveKind::Edge);
+
+    const auto cloudHit =
+        Runtime::RefinePickReadbackResult(scene, MockPick(cloud, Graphics::SelectionPrimitiveDomain::Point, 0u));
+    ASSERT_TRUE(cloudHit.has_value());
+    EXPECT_TRUE(cloudHit->Resolved());
+    EXPECT_EQ(cloudHit->Kind, Runtime::RefinedPrimitiveKind::Point);
+
+    engine.Shutdown();
+}
+
+// A selected entity mirrors into the RenderWorld selection/outline snapshot the
+// graphics path consumes, with the recipe's default outline styling preserved.
+TEST(RuntimeSandboxAcceptance, SelectionOutlineSnapshotPopulatedForSelectedEntity)
+{
+    Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.Initialize();
+    auto& scene = engine.GetScene();
+
+    const EntityHandle mesh = MakeMesh(scene);
+    (void)MakeGraph(scene);
+    (void)MakePointCloud(scene);
+
+    Runtime::SelectionController& selection = engine.GetSelectionController();
+    ASSERT_TRUE(selection.SetSelectedEntity(scene, mesh));
+
+    Runtime::RenderExtractionCache extraction;
+    (void)extraction.ExtractAndSubmit(scene,
+                                      engine.GetRenderer(),
+                                      &engine.GetGpuAssetCache(),
+                                      &selection);
+    const Graphics::RenderWorld world =
+        engine.GetRenderer().ExtractRenderWorld(Graphics::RenderFrameInput{});
+
+    ASSERT_EQ(world.Selection.SelectedStableIds.size(), 1u);
+    EXPECT_EQ(world.Selection.SelectedStableIds[0],
+              Runtime::SelectionController::ToStableEntityId(mesh));
+    EXPECT_FALSE(world.Selection.HasHovered);
+
+    extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();
 }
