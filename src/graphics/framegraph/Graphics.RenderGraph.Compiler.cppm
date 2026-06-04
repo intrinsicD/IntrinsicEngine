@@ -44,6 +44,7 @@ namespace Extrinsic::Graphics
         InvalidExplicitDependency,
         InvalidTextureAccess,
         InvalidBufferAccess,
+        CrossQueueCycle,
     };
 
     export struct RenderGraphValidationFinding
@@ -120,6 +121,31 @@ namespace Extrinsic::Graphics
         std::uint32_t LastUsePass = 0;
     };
 
+    export struct CrossQueueTimelineSignal
+    {
+        std::uint32_t PassIndex = 0;
+        RenderQueue Queue = RenderQueue::Graphics;
+        std::uint64_t Value = 0;
+    };
+
+    export struct CrossQueueTimelineWait
+    {
+        std::uint32_t PassIndex = 0;
+        RenderQueue Queue = RenderQueue::Graphics;
+        std::uint32_t SignalPassIndex = 0;
+        RenderQueue SignalQueue = RenderQueue::Graphics;
+        std::uint64_t Value = 0;
+    };
+
+    export struct CrossQueueTimelineEdge
+    {
+        std::uint32_t SignalPassIndex = 0;
+        std::uint32_t WaitPassIndex = 0;
+        RenderQueue SignalQueue = RenderQueue::Graphics;
+        RenderQueue WaitQueue = RenderQueue::Graphics;
+        std::uint64_t Value = 0;
+    };
+
     export struct CompiledRenderGraph
     {
         std::uint32_t PassCount = 0;
@@ -129,6 +155,7 @@ namespace Extrinsic::Graphics
         std::uint32_t TransientBufferCount = 0;
         std::uint32_t EdgeCount = 0;
         std::uint32_t QueueHandoffEdgeCount = 0;
+        std::uint32_t CrossQueueTimelineEdgeCount = 0;
         std::uint64_t TransientMemoryEstimateBytes = 0;
         std::vector<std::uint32_t> TopologicalOrder{};
         std::vector<std::uint32_t> TopologicalLayerByPass{};
@@ -150,6 +177,9 @@ namespace Extrinsic::Graphics
         std::vector<bool> TextureIsBackbuffer{};
         std::vector<bool> BufferImported{};
         std::vector<CompiledRenderPassAttachment> RenderPassAttachments{};
+        std::vector<CrossQueueTimelineSignal> CrossQueueTimelineSignals{};
+        std::vector<CrossQueueTimelineWait> CrossQueueTimelineWaits{};
+        std::vector<CrossQueueTimelineEdge> CrossQueueTimelineEdges{};
         std::vector<BarrierPacket> BarrierPackets{};
         std::vector<RenderGraphValidationFinding> ValidationFindings{};
     };

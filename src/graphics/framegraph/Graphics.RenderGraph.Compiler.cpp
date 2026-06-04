@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <expected>
 #include <limits>
@@ -104,6 +105,14 @@ namespace Extrinsic::Graphics
             RenderQueue LastAccessorQueue = RenderQueue::Graphics;
         };
 
+        struct QueueHandoffDependency
+        {
+            std::uint32_t From = 0;
+            std::uint32_t To = 0;
+            RenderQueue FromQueue = RenderQueue::Graphics;
+            RenderQueue ToQueue = RenderQueue::Graphics;
+        };
+
         [[nodiscard]] bool ContainsSorted(const std::vector<std::uint32_t>& values, const std::uint32_t needle)
         {
             return std::binary_search(values.begin(), values.end(), needle);
@@ -120,13 +129,25 @@ namespace Extrinsic::Graphics
                                                     const ResourceState& state,
                                                     std::vector<std::vector<std::uint32_t>>& adjacency,
                                                     std::vector<std::uint32_t>& indegree,
-                                                    std::unordered_set<std::uint64_t>& dedup)
+                                                    std::unordered_set<std::uint64_t>& dedup,
+                                                    std::vector<QueueHandoffDependency>& queueHandoffs)
         {
             if (state.LastAccessor < 0 || state.LastAccessorQueue == queue)
             {
                 return false;
             }
-            return AddEdge(static_cast<std::uint32_t>(state.LastAccessor), passIndex, adjacency, indegree, dedup);
+            const std::uint32_t from = static_cast<std::uint32_t>(state.LastAccessor);
+            const bool added = AddEdge(from, passIndex, adjacency, indegree, dedup);
+            if (added)
+            {
+                queueHandoffs.push_back(QueueHandoffDependency{
+                    .From = from,
+                    .To = passIndex,
+                    .FromQueue = state.LastAccessorQueue,
+                    .ToQueue = queue,
+                });
+            }
+            return added;
         }
 
         constexpr std::uint64_t EncodeEdge(const std::uint32_t from, const std::uint32_t to)
@@ -160,9 +181,10 @@ namespace Extrinsic::Graphics
                          ResourceState& state,
                          std::vector<std::vector<std::uint32_t>>& adjacency,
                          std::vector<std::uint32_t>& indegree,
-                         std::unordered_set<std::uint64_t>& dedup)
+                         std::unordered_set<std::uint64_t>& dedup,
+                         std::vector<QueueHandoffDependency>& queueHandoffs)
         {
-            if (MaybeAddQueueHandoffEdge(passIndex, queue, state, adjacency, indegree, dedup))
+            if (MaybeAddQueueHandoffEdge(passIndex, queue, state, adjacency, indegree, dedup, queueHandoffs))
             {
                 ++queueHandoffEdgeCount;
             }
@@ -181,9 +203,10 @@ namespace Extrinsic::Graphics
                           ResourceState& state,
                           std::vector<std::vector<std::uint32_t>>& adjacency,
                           std::vector<std::uint32_t>& indegree,
-                          std::unordered_set<std::uint64_t>& dedup)
+                          std::unordered_set<std::uint64_t>& dedup,
+                          std::vector<QueueHandoffDependency>& queueHandoffs)
         {
-            if (MaybeAddQueueHandoffEdge(passIndex, queue, state, adjacency, indegree, dedup))
+            if (MaybeAddQueueHandoffEdge(passIndex, queue, state, adjacency, indegree, dedup, queueHandoffs))
             {
                 ++queueHandoffEdgeCount;
             }
@@ -460,6 +483,139 @@ namespace Extrinsic::Graphics
             }
             return "Unknown";
         }
+
+        [[nodiscard]] constexpr std::size_t QueueIndex(const RenderQueue queue) noexcept
+        {
+            switch (queue)
+            {
+            case RenderQueue::Graphics:
+                return 0u;
+            case RenderQueue::AsyncCompute:
+                return 1u;
+            case RenderQueue::Transfer:
+                return 2u;
+            }
+            return 0u;
+        }
+
+        [[nodiscard]] std::uint32_t RankForPass(const std::vector<std::uint32_t>& ranks,
+                                                const std::uint32_t passIndex) noexcept
+        {
+            return passIndex < ranks.size() ? ranks[passIndex] : std::numeric_limits<std::uint32_t>::max();
+        }
+
+        [[nodiscard]] bool HasCrossQueueCycleEdge(const std::vector<QueueHandoffDependency>& queueHandoffs,
+                                                  const std::vector<bool>& live,
+                                                  const std::vector<std::uint32_t>& liveIndegree)
+        {
+            return std::ranges::any_of(queueHandoffs, [&live, &liveIndegree](const QueueHandoffDependency& edge) {
+                return edge.From < live.size() && edge.To < live.size() &&
+                       edge.From < liveIndegree.size() && edge.To < liveIndegree.size() &&
+                       live[edge.From] && live[edge.To] &&
+                       liveIndegree[edge.From] > 0u && liveIndegree[edge.To] > 0u;
+            });
+        }
+
+        struct TimelineSignalAssignment
+        {
+            std::uint32_t PassIndex = 0;
+            RenderQueue Queue = RenderQueue::Graphics;
+            std::uint64_t Value = 0;
+        };
+
+        [[nodiscard]] std::uint64_t FindTimelineSignalValue(const std::vector<TimelineSignalAssignment>& assignments,
+                                                            const std::uint32_t passIndex,
+                                                            const RenderQueue queue)
+        {
+            const auto it = std::ranges::find_if(assignments, [passIndex, queue](const TimelineSignalAssignment& assignment) {
+                return assignment.PassIndex == passIndex && assignment.Queue == queue;
+            });
+            return it == assignments.end() ? 0u : it->Value;
+        }
+
+        void SynthesizeCrossQueueTimeline(const std::vector<QueueHandoffDependency>& queueHandoffs,
+                                          const std::vector<bool>& live,
+                                          const std::vector<std::uint32_t>& topologicalRankByPass,
+                                          std::vector<CrossQueueTimelineSignal>& signals,
+                                          std::vector<CrossQueueTimelineWait>& waits,
+                                          std::vector<CrossQueueTimelineEdge>& edges)
+        {
+            std::vector<QueueHandoffDependency> activeHandoffs{};
+            activeHandoffs.reserve(queueHandoffs.size());
+            for (const QueueHandoffDependency& handoff : queueHandoffs)
+            {
+                if (handoff.From < live.size() && handoff.To < live.size() && live[handoff.From] && live[handoff.To])
+                {
+                    activeHandoffs.push_back(handoff);
+                }
+            }
+
+            std::ranges::stable_sort(activeHandoffs, [&topologicalRankByPass](const QueueHandoffDependency& lhs,
+                                                                              const QueueHandoffDependency& rhs) {
+                return std::tuple{RankForPass(topologicalRankByPass, lhs.From), lhs.From, lhs.To} <
+                       std::tuple{RankForPass(topologicalRankByPass, rhs.From), rhs.From, rhs.To};
+            });
+            activeHandoffs.erase(std::unique(activeHandoffs.begin(),
+                                             activeHandoffs.end(),
+                                             [](const QueueHandoffDependency& lhs, const QueueHandoffDependency& rhs) {
+                                                 return lhs.From == rhs.From && lhs.To == rhs.To;
+                                             }),
+                                 activeHandoffs.end());
+
+            std::vector<TimelineSignalAssignment> assignments{};
+            assignments.reserve(activeHandoffs.size());
+            std::array<std::uint64_t, 3u> nextValueByQueue{};
+
+            for (const QueueHandoffDependency& handoff : activeHandoffs)
+            {
+                const bool exists = std::ranges::any_of(assignments, [&handoff](const TimelineSignalAssignment& assignment) {
+                    return assignment.PassIndex == handoff.From && assignment.Queue == handoff.FromQueue;
+                });
+                if (exists)
+                {
+                    continue;
+                }
+
+                const std::uint64_t value = ++nextValueByQueue[QueueIndex(handoff.FromQueue)];
+                assignments.push_back(TimelineSignalAssignment{
+                    .PassIndex = handoff.From,
+                    .Queue = handoff.FromQueue,
+                    .Value = value,
+                });
+                signals.push_back(CrossQueueTimelineSignal{
+                    .PassIndex = handoff.From,
+                    .Queue = handoff.FromQueue,
+                    .Value = value,
+                });
+            }
+
+            std::ranges::stable_sort(activeHandoffs, [&topologicalRankByPass](const QueueHandoffDependency& lhs,
+                                                                              const QueueHandoffDependency& rhs) {
+                return std::tuple{RankForPass(topologicalRankByPass, lhs.To), lhs.To, lhs.From} <
+                       std::tuple{RankForPass(topologicalRankByPass, rhs.To), rhs.To, rhs.From};
+            });
+
+            waits.reserve(activeHandoffs.size());
+            edges.reserve(activeHandoffs.size());
+            for (const QueueHandoffDependency& handoff : activeHandoffs)
+            {
+                const std::uint64_t value = FindTimelineSignalValue(assignments, handoff.From, handoff.FromQueue);
+                waits.push_back(CrossQueueTimelineWait{
+                    .PassIndex = handoff.To,
+                    .Queue = handoff.ToQueue,
+                    .SignalPassIndex = handoff.From,
+                    .SignalQueue = handoff.FromQueue,
+                    .Value = value,
+                });
+                edges.push_back(CrossQueueTimelineEdge{
+                    .SignalPassIndex = handoff.From,
+                    .WaitPassIndex = handoff.To,
+                    .SignalQueue = handoff.FromQueue,
+                    .WaitQueue = handoff.ToQueue,
+                    .Value = value,
+                });
+            }
+        }
     }
 
     bool RenderGraphValidationResult::HasErrors() const
@@ -685,6 +841,7 @@ namespace Extrinsic::Graphics
         std::vector<CompiledPassDeclarations> passDeclarations(passCount);
         std::unordered_set<std::uint64_t> dedup{};
         dedup.reserve(static_cast<std::size_t>(passCount) * 4u);
+        std::vector<QueueHandoffDependency> queueHandoffs{};
         std::uint32_t queueHandoffEdgeCount = 0;
 
         for (std::uint32_t textureIndex = 0; textureIndex < textures.size(); ++textureIndex)
@@ -747,12 +904,12 @@ namespace Extrinsic::Graphics
                 }
                 if (access.Write)
                 {
-                    ProcessWrite(passIndex, pass.Queue, queueHandoffEdgeCount, textureStates[access.Ref.Index], adjacency, indegree, dedup);
+                    ProcessWrite(passIndex, pass.Queue, queueHandoffEdgeCount, textureStates[access.Ref.Index], adjacency, indegree, dedup, queueHandoffs);
                     passDeclarations[passIndex].WriteTextures.push_back(access.Ref.Index);
                 }
                 else
                 {
-                    ProcessRead(passIndex, pass.Queue, queueHandoffEdgeCount, textureStates[access.Ref.Index], adjacency, indegree, dedup);
+                    ProcessRead(passIndex, pass.Queue, queueHandoffEdgeCount, textureStates[access.Ref.Index], adjacency, indegree, dedup, queueHandoffs);
                     passDeclarations[passIndex].ReadTextures.push_back(access.Ref.Index);
                 }
                 UpdateLifetime(textureLifetimes[access.Ref.Index], passIndex);
@@ -773,12 +930,12 @@ namespace Extrinsic::Graphics
                 }
                 if (access.Write)
                 {
-                    ProcessWrite(passIndex, pass.Queue, queueHandoffEdgeCount, bufferStates[access.Ref.Index], adjacency, indegree, dedup);
+                    ProcessWrite(passIndex, pass.Queue, queueHandoffEdgeCount, bufferStates[access.Ref.Index], adjacency, indegree, dedup, queueHandoffs);
                     passDeclarations[passIndex].WriteBuffers.push_back(access.Ref.Index);
                 }
                 else
                 {
-                    ProcessRead(passIndex, pass.Queue, queueHandoffEdgeCount, bufferStates[access.Ref.Index], adjacency, indegree, dedup);
+                    ProcessRead(passIndex, pass.Queue, queueHandoffEdgeCount, bufferStates[access.Ref.Index], adjacency, indegree, dedup, queueHandoffs);
                     passDeclarations[passIndex].ReadBuffers.push_back(access.Ref.Index);
                 }
                 UpdateLifetime(bufferLifetimes[access.Ref.Index], passIndex);
@@ -993,8 +1150,12 @@ namespace Extrinsic::Graphics
 
         if (order.size() != livePassCount)
         {
+            const bool crossQueueCycle = HasCrossQueueCycleEdge(queueHandoffs, live, liveIndegree);
+            const RenderGraphValidationCode cycleCode = crossQueueCycle ? RenderGraphValidationCode::CrossQueueCycle
+                                                                        : RenderGraphValidationCode::CycleDetected;
             std::ostringstream cycle;
-            cycle << "RenderGraph cycle detected among live passes: ";
+            cycle << (crossQueueCycle ? "RenderGraph cross-queue cycle detected among live passes: "
+                                      : "RenderGraph cycle detected among live passes: ");
             bool first = true;
             for (std::uint32_t i = 0; i < passCount; ++i)
             {
@@ -1023,7 +1184,7 @@ namespace Extrinsic::Graphics
                 }
                 AddFinding(g_LastCompileValidationResult,
                            RenderGraphValidationSeverity::Error,
-                           RenderGraphValidationCode::CycleDetected,
+                           cycleCode,
                            cycleMessage,
                            i,
                            passes[i].Name);
@@ -1032,7 +1193,7 @@ namespace Extrinsic::Graphics
             {
                 AddFinding(g_LastCompileValidationResult,
                            RenderGraphValidationSeverity::Error,
-                           RenderGraphValidationCode::CycleDetected,
+                           cycleCode,
                            cycleMessage,
                            InvalidValidationIndex(),
                            std::string{});
@@ -1079,6 +1240,25 @@ namespace Extrinsic::Graphics
                 }
             }
         }
+
+        std::uint32_t activeQueueHandoffEdgeCount = 0;
+        for (const QueueHandoffDependency& handoff : queueHandoffs)
+        {
+            if (handoff.From < live.size() && handoff.To < live.size() && live[handoff.From] && live[handoff.To])
+            {
+                ++activeQueueHandoffEdgeCount;
+            }
+        }
+
+        std::vector<CrossQueueTimelineSignal> crossQueueTimelineSignals{};
+        std::vector<CrossQueueTimelineWait> crossQueueTimelineWaits{};
+        std::vector<CrossQueueTimelineEdge> crossQueueTimelineEdges{};
+        SynthesizeCrossQueueTimeline(queueHandoffs,
+                                     live,
+                                     layerByPass,
+                                     crossQueueTimelineSignals,
+                                     crossQueueTimelineWaits,
+                                     crossQueueTimelineEdges);
 
         std::vector<BarrierPacket> barrierPackets{};
         barrierPackets.reserve(order.size());
@@ -1198,7 +1378,8 @@ namespace Extrinsic::Graphics
             .CulledPassCount = passCount - livePassCount,
             .ResourceCount = resourceCount,
             .EdgeCount = activeEdgeCount,
-            .QueueHandoffEdgeCount = queueHandoffEdgeCount,
+            .QueueHandoffEdgeCount = activeQueueHandoffEdgeCount,
+            .CrossQueueTimelineEdgeCount = static_cast<std::uint32_t>(crossQueueTimelineEdges.size()),
             .TopologicalOrder = std::move(order),
             .TopologicalLayerByPass = std::move(layerByPass),
             .PassNames = std::move(passNames),
@@ -1219,6 +1400,9 @@ namespace Extrinsic::Graphics
             .TextureIsBackbuffer = std::move(textureIsBackbuffer),
             .BufferImported = std::move(bufferImported),
             .RenderPassAttachments = std::move(renderPassAttachments),
+            .CrossQueueTimelineSignals = std::move(crossQueueTimelineSignals),
+            .CrossQueueTimelineWaits = std::move(crossQueueTimelineWaits),
+            .CrossQueueTimelineEdges = std::move(crossQueueTimelineEdges),
             .BarrierPackets = std::move(barrierPackets),
         };
         RenderGraphValidationResult validation = ValidateCompiledGraph(compiled);
@@ -1316,6 +1500,7 @@ namespace Extrinsic::Graphics
             << " resource_count=" << compiled.ResourceCount
             << " edge_count=" << compiled.EdgeCount
             << " queue_handoff_edges=" << compiled.QueueHandoffEdgeCount
+            << " cross_queue_timeline_edges=" << compiled.CrossQueueTimelineEdgeCount
             << " barrier_packet_count=" << compiled.BarrierPackets.size() << '\n';
 
         out << "  passes:\n";

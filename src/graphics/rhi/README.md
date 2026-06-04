@@ -9,6 +9,7 @@ This directory contains the `RHI` module/files.
 - `RHI.Device.cppm`
 - `RHI.FrameHandle.cppm`
 - `RHI.QueueAffinity.cppm`
+- `RHI.TimelineSemaphore.cppm`
 
 ## Queue affinity
 
@@ -22,6 +23,18 @@ This directory contains the `RHI` module/files.
 - The RHI surface contains no backend submission policy. Framegraph partitioning
   and later Vulkan queue recording consume this value contract without exposing
   API-native queue-family types through RHI.
+
+## Timeline semaphores
+
+- `RHI.TimelineSemaphore.cppm` declares `ITimelineSemaphore`, the backend-neutral
+  signal/wait interface used by compiled cross-queue handoff records.
+- The interface is intentionally minimal: `Signal(QueueAffinity, value)` records
+  work completion on the producing queue, and `Wait(QueueAffinity, value)` gates
+  the consuming queue. It does not expose Vulkan handles, queue-family indices,
+  or backend submission ownership through RHI.
+- The framegraph compiler owns deterministic value assignment and emits CPU-visible
+  signal/wait/edge records. Concrete backend submission remains owned by later
+  Vulkan multi-queue work.
 
 ## Transfer uploads
 

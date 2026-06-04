@@ -1701,6 +1701,12 @@ namespace Extrinsic::Graphics
             m_LastRenderGraphStats.Compile.CulledPassCount = compiled->CulledPassCount;
             m_LastRenderGraphStats.Compile.ResourceCount = compiled->ResourceCount;
             m_LastRenderGraphStats.Compile.BarrierCount = static_cast<std::uint32_t>(compiled->BarrierPackets.size());
+            m_LastRenderGraphStats.Compile.QueueHandoffEdgeCount = compiled->QueueHandoffEdgeCount;
+            m_LastRenderGraphStats.Compile.CrossQueueTimelineEdgeCount = compiled->CrossQueueTimelineEdgeCount;
+            m_LastRenderGraphStats.Compile.CrossQueueTimelineSignalCount =
+                static_cast<std::uint32_t>(compiled->CrossQueueTimelineSignals.size());
+            m_LastRenderGraphStats.Compile.CrossQueueTimelineWaitCount =
+                static_cast<std::uint32_t>(compiled->CrossQueueTimelineWaits.size());
             m_LastRenderGraphStats.Compile.TransientMemoryEstimateBytes = compiled->TransientMemoryEstimateBytes;
             m_LastRenderGraphStats.DebugDump = BuildRenderGraphDebugDump(*compiled);
             m_LastRenderGraphStats.Execute.DeviceOperational = m_Device->IsOperational();

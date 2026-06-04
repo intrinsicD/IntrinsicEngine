@@ -16,7 +16,7 @@ Root scanned: `src`
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 56 |
-| `graphics/rhi` | 18 |
+| `graphics/rhi` | 19 |
 | `graphics/vulkan` | 13 |
 | `legacy` | 182 |
 | `platform` | 5 |
@@ -268,6 +268,7 @@ Root scanned: `src`
 | `Extrinsic.RHI.SamplerManager` | `src/graphics/rhi/RHI.SamplerManager.cppm` | `graphics/rhi` |
 | `Extrinsic.RHI.TextureManager` | `src/graphics/rhi/RHI.TextureManager.cppm` | `graphics/rhi` |
 | `Extrinsic.RHI.TextureUpload` | `src/graphics/rhi/RHI.TextureUpload.cppm` | `graphics/rhi` |
+| `Extrinsic.RHI.TimelineSemaphore` | `src/graphics/rhi/RHI.TimelineSemaphore.cppm` | `graphics/rhi` |
 | `Extrinsic.RHI.Transfer` | `src/graphics/rhi/RHI.Transfer.cppm` | `graphics/rhi` |
 | `Extrinsic.RHI.TransferQueue` | `src/graphics/rhi/RHI.TransferQueue.cppm` | `graphics/rhi` |
 | `Extrinsic.RHI.Types` | `src/graphics/rhi/RHI.Types.cppm` | `graphics/rhi` |
@@ -497,4 +498,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugAdapters` | `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **470**
+Total modules: **471**

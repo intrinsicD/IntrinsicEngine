@@ -52,9 +52,20 @@ demotes to `Graphics`, while `Graphics` never migrates away from graphics.
 by resolved affinity in deterministic `(topological rank, declared pass index)`
 order and reports `QueueAffinityDemotedCount`.
 
-This is not backend execution yet. Cross-queue timeline edges, ownership-transfer
-barriers, and Vulkan multi-queue recording are owned by `GRAPHICS-037B`,
-`GRAPHICS-037C`, and `GRAPHICS-037D`.
+The compiler also emits backend-neutral cross-queue timeline records for live
+producer->consumer handoffs after culling. For each live pass on queue A that
+consumes a resource last accessed by queue B (B != A), the compiled graph
+contains one `CrossQueueTimelineSignal` on B, one `CrossQueueTimelineWait` on A,
+and one `CrossQueueTimelineEdge` tying the pair together. Values are assigned
+per producing queue in deterministic `(topological rank, declared pass index)`
+order, so repeated compiles of the same graph produce byte-identical records.
+Culled producer/consumer branches do not emit timeline records. A cyclic live
+cross-queue dependency fails compilation with `RenderGraphValidationCode::CrossQueueCycle`
+instead of producing a partial submit schedule.
+
+This remains a CPU/null contract, not backend execution. Queue-family
+ownership-transfer barriers and Vulkan multi-queue recording are owned by
+`GRAPHICS-037C` and `GRAPHICS-037D`.
 
 ## Default-Recipe `gpu;vulkan` Smoke
 

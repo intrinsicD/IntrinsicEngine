@@ -608,6 +608,7 @@ if(TARGET ExtrinsicBackendsVulkan)
 endif()
 
 set(_graphics_contract_cpu_test_files
+    Test.CrossQueueTimeline.cpp
     Test.CullingPassContracts.cpp
     Test.DefaultRecipeBackbufferReadback.cpp
     Test.DebugViewContract.cpp

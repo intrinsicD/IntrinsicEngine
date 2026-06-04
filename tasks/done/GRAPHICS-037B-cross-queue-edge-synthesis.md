@@ -25,29 +25,42 @@
   with a structured `RenderGraphValidationResult` finding (`Severity::Error`, kind
   `CrossQueueCycle`) and the renderer falls back to the single-queue path for that frame.
 
+## Status
+- Commit reference: this task-landing commit.
+- Landed 2026-06-04 at maturity `CPUContracted`. `RHI.TimelineSemaphore` now
+  owns the backend-neutral `ITimelineSemaphore::Signal/Wait` interface.
+  The framegraph compiler records live cross-queue handoffs after culling,
+  emits deterministic signal/wait/edge records with monotonically increasing
+  per-producing-queue values, and reports `CrossQueueCycle` for cyclic live
+  cross-queue dependencies. Renderer compile diagnostics now mirror
+  queue-handoff and cross-queue timeline signal/wait/edge counts. The default
+  compile/execute path remains CPU/null and single-queue operational;
+  `GRAPHICS-037C` and `GRAPHICS-037D` own ownership-transfer barriers and
+  Vulkan multi-queue submission.
+
 ## Required changes
-- [ ] Add the `RHI::ITimelineSemaphore` signal/wait surface (or confirm the existing one).
-- [ ] Extend the compiler to emit per-queue signal/wait edges at cross-queue boundaries
+- [x] Add the `RHI::ITimelineSemaphore` signal/wait surface (or confirm the existing one).
+- [x] Extend the compiler to emit per-queue signal/wait edges at cross-queue boundaries
       with deterministic per-queue value assignment.
-- [ ] Add the `CrossQueueCycle` validation finding kind + fail-closed single-queue fallback.
-- [ ] Surface the cross-queue-edge count on the `GRAPHICS-022` diagnostics result.
-- [ ] `contract;graphics` tests for edge placement, value monotonicity, determinism,
+- [x] Add the `CrossQueueCycle` validation finding kind + fail-closed single-queue fallback.
+- [x] Surface the cross-queue-edge count on the `GRAPHICS-022` diagnostics result.
+- [x] `contract;graphics` tests for edge placement, value monotonicity, determinism,
       culling interaction, and the cycle failure mode.
 
 ## Tests
-- [ ] `contract;graphics` — signal/wait placement at A↔B boundaries; per-queue value
+- [x] `contract;graphics` — signal/wait placement at A↔B boundaries; per-queue value
       monotonicity; byte-identical schedules across two compiles; culled-producer edge
       removal; `CrossQueueCycle` fail-closed.
-- [ ] CPU gate green.
+- [x] CPU gate green.
 
 ## Docs
-- [ ] Document the cross-queue edge model in `src/graphics/framegraph/README.md`.
-- [ ] Regenerate the module inventory if surfaces change.
+- [x] Document the cross-queue edge model in `src/graphics/framegraph/README.md`.
+- [x] Regenerate the module inventory if surfaces change.
 
 ## Acceptance criteria
-- [ ] Cross-queue edges are synthesized deterministically and validated under null RHI.
-- [ ] The cycle failure mode is deterministic and diagnosable (no hang/partial submit).
-- [ ] No new layering violations.
+- [x] Cross-queue edges are synthesized deterministically and validated under null RHI.
+- [x] The cycle failure mode is deterministic and diagnosable (no hang/partial submit).
+- [x] No new layering violations.
 
 ## Verification
 ```bash
