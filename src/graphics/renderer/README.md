@@ -305,10 +305,10 @@ Concretely:
   pure `ComputeHZBBuildDispatchPlan(...)` selector also covers the future
   single-pass/SPD-style path when a backend capability enables it. The shader
   asset `assets/shaders/hzb_build.comp` contains the subgroup + shared-memory
-  max-reduction code and compiles to `shaders/hzb_build.comp.spv`; publication
-  to a storage-image descriptor and opt-in `gpu;vulkan` conservatism proof remain
-  `GRAPHICS-038E` scope. This HZB build slice closes at `CPUContracted`; the
-  cull-shader extension and camera-transition heuristic are `GRAPHICS-038C/D`.
+  max-reduction code and compiles to `shaders/hzb_build.comp.spv`; production
+  storage-image descriptor publication remains future backend descriptor
+  integration. This HZB build slice closes at `CPUContracted`; the cull-shader
+  extension and camera-transition heuristic are `GRAPHICS-038C/D`.
 - GRAPHICS-038C extends the culling contract without renumbering the eight
   `RHI::GpuDrawBucketKind` lanes. Each bucket now exposes phase-1 and phase-2
   arg/count buffers through `GpuDrawBucket::Phase1` / `Phase2`; the legacy
@@ -323,8 +323,8 @@ Concretely:
   `ComputeTwoPhaseCullPartition(...)`: a candidate is rejected only when its
   nearest depth is strictly greater than the sampled conservative HZB max-depth,
   preserving the no-false-rejection invariant under standard-Z `Less`.
-  This slice closes at `CPUContracted`; concrete Vulkan reject-list publication /
-  phase-2 HZB recull proof remains `GRAPHICS-038E`.
+  This slice closes at `CPUContracted`; the opt-in Vulkan conservatism smoke is
+  `GRAPHICS-038E`.
 - GRAPHICS-038D adds the CPU/null camera-transition and selection-exemption
   rules for HZB culling. `CameraViewInput::ExplicitCameraTransition` is copied
   into `CameraViewSnapshot` and then into `RHI::CameraUBO::CullingFlags`;
@@ -336,8 +336,18 @@ Concretely:
   The three selection buckets (`SelectionSurface`, `SelectionLines`,
   `SelectionPoints`) are a hard occlusion exemption: the shader routes their
   emits through phase 1 even if a future phase-2 dispatch is active, preserving
-  picking determinism. This slice closes at `CPUContracted`; Vulkan proof for
-  the HZB reject-list and phase-2 path remains `GRAPHICS-038E`.
+  picking determinism. This slice closes at `CPUContracted`.
+- GRAPHICS-038E adds
+  `HzbOcclusionConservatismGpuSmoke.TwoPhasePredicateMatchesCpuContractOnOperationalVulkan`
+  under `IntrinsicGraphicsVulkanSmokeTests` (`gpu;vulkan;graphics`). The smoke
+  warms up the promoted Vulkan backend, dispatches the test-only
+  `assets/shaders/tests/hzb_conservatism_smoke.comp` compute kernel over
+  explicit previous/current HZB depth samples, reads back per-candidate
+  decisions, and compares them with `ComputeTwoPhaseCullPartition(...)`. It
+  proves the no-over-rejection probe, disocclusion rescue, persistent rejection,
+  missing-sample conservatism, frustum-first rejection, and selection-bucket
+  exemption on an operational Vulkan command stream while preserving the
+  default CPU/null contracts.
 - GRAPHICS-072 Slice A wires the default-recipe deferred-mode `"SurfacePass"`
   to the existing `DeferredGBufferPass` body. `NullRenderer` owns
   `m_DeferredGBufferPass` (constructed against `m_DeferredSystem`) and the

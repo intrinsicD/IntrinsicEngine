@@ -47,9 +47,12 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 
 Opt-in promoted Vulkan smoke coverage is selected with the label intersection
 form below. `IntrinsicGraphicsVulkanSmokeTests` includes the default-recipe,
-transient-debug, visualization-overlay, and
+HZB conservatism, transient-debug, visualization-overlay, and
 `ImGuiSurfaceGpuSmoke.UserTextureImageRecordsOnOperationalVulkanCommandStream`
-fixtures; the ImGui fixture drives a runtime-produced `ImGui::Image()`
+fixtures; the HZB fixture drives a test-only compute kernel on a real Vulkan
+command stream and compares visible/rescued/rejected decisions against
+`ComputeTwoPhaseCullPartition(...)`, while the ImGui fixture drives a
+runtime-produced `ImGui::Image()`
 payload through `ImGuiPass` and verifies that the default-recipe Vulkan
 command stream records the pass when the promoted backend is operational. The
 default-recipe smoke reports `SKIPPED` when GLFW or a Vulkan-capable

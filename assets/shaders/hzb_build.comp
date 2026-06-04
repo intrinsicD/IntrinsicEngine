@@ -9,8 +9,9 @@
 //   - single-pass/SPD selector: one base-mip dispatch, future backend support
 //
 // This CPUContracted slice pins the shader asset and reduction code. Publishing
-// the reduced value to a storage image is deferred to GRAPHICS-038E when the
-// promoted Vulkan descriptor layout grows the required backend-neutral binding.
+// the reduced value to a production storage-image binding remains future
+// backend descriptor integration; GRAPHICS-038E covers the opt-in Vulkan
+// conservatism predicate smoke without changing this production binding shape.
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 

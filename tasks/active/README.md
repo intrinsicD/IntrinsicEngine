@@ -11,11 +11,21 @@ Each active task should include:
 
 ## Currently active
 
-No task is currently active in this checkout. The next eligible rendering task
-in the opened DAG is `GRAPHICS-038E`, after the `GRAPHICS-038D` retirement
-commit lands.
+No task currently active.
 
 The most recently retired tasks are summarised below.
+
+Previously-active
+[`GRAPHICS-038E`](../done/GRAPHICS-038E-hzb-conservatism-gpu-smoke.md) —
+opt-in `gpu;vulkan` HZB conservatism smoke retired to `tasks/done/` on
+2026-06-04 at maturity `Operational` on Vulkan-capable hosts. The slice added a
+test-only HZB conservatism compute shader, a Vulkan smoke that dispatches the
+two-phase predicate on real GPU storage buffers, CPU parity checks against
+`ComputeTwoPhaseCullPartition(...)`, known-visible no-over-rejection,
+disocclusion rescue, persistent rejection, invalid-previous-sample
+conservatism, frustum-first rejection, and selection-bucket exemption coverage.
+The default CPU/null contracts remain unchanged; production HZB storage-image
+descriptor publication remains future backend descriptor integration.
 
 Previously-active
 [`GRAPHICS-038D`](../done/GRAPHICS-038D-camera-transition-and-selection-exemption.md) —

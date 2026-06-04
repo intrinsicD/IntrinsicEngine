@@ -1,0 +1,139 @@
+#version 460
+#extension GL_EXT_scalar_block_layout : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+
+// Test-only GRAPHICS-038E compute smoke. It runs the exact two-phase HZB
+// conservatism predicate on a real Vulkan command stream using explicit depth
+// samples, avoiding speculative production descriptor/projection policy.
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+const uint Decision_FrustumRejected = 0u;
+const uint Decision_Phase1Visible = 1u;
+const uint Decision_Phase2Rescued = 3u;
+const uint Decision_Phase2Rejected = 4u;
+
+const uint Bucket_SelectionSurface = 5u;
+const uint Bucket_SelectionLines = 6u;
+const uint Bucket_SelectionPoints = 7u;
+
+const uint Option_HZBStaleSkip = 1u << 0;
+const uint Option_ExemptSelectionBuckets = 1u << 1;
+
+struct HZBSmokeCandidate {
+    float PreviousNearestDepth;
+    float PreviousConservativeMaxDepth;
+    float CurrentNearestDepth;
+    float CurrentConservativeMaxDepth;
+    uint PreviousValid;
+    uint CurrentValid;
+    uint FrustumVisible;
+    uint Bucket;
+};
+
+struct HZBSmokeResult {
+    uint Decision;
+    uint Bucket;
+    uint Phase1VisibleCount;
+    uint Phase1RejectedCount;
+    uint Phase2RescuedCount;
+    uint FrustumRejectedCount;
+    uint SelectionOcclusionExemptCount;
+    uint _pad0;
+};
+
+layout(buffer_reference, scalar) readonly buffer HZBSmokeCandidateRef {
+    HZBSmokeCandidate Data[];
+};
+
+layout(buffer_reference, scalar) buffer HZBSmokeResultRef {
+    HZBSmokeResult Data[];
+};
+
+layout(push_constant, scalar) uniform HZBSmokePush {
+    uint64_t CandidateBDA;
+    uint64_t ResultBDA;
+    uint CandidateCount;
+    uint Options;
+    uint _pad0;
+    uint _pad1;
+} pc;
+
+bool hzbRejects(float nearestDepth, float conservativeMaxDepth, uint valid)
+{
+    return valid != 0u && nearestDepth > conservativeMaxDepth;
+}
+
+bool isSelectionBucket(uint bucket)
+{
+    return bucket == Bucket_SelectionSurface ||
+           bucket == Bucket_SelectionLines ||
+           bucket == Bucket_SelectionPoints;
+}
+
+void main()
+{
+    const uint index = gl_GlobalInvocationID.x;
+    if (index >= pc.CandidateCount) {
+        return;
+    }
+
+    HZBSmokeCandidateRef candidates = HZBSmokeCandidateRef(pc.CandidateBDA);
+    HZBSmokeResultRef results = HZBSmokeResultRef(pc.ResultBDA);
+    const HZBSmokeCandidate candidate = candidates.Data[index];
+
+    HZBSmokeResult result;
+    result.Decision = Decision_FrustumRejected;
+    result.Bucket = candidate.Bucket;
+    result.Phase1VisibleCount = 0u;
+    result.Phase1RejectedCount = 0u;
+    result.Phase2RescuedCount = 0u;
+    result.FrustumRejectedCount = 0u;
+    result.SelectionOcclusionExemptCount = 0u;
+    result._pad0 = 0u;
+
+    if (candidate.FrustumVisible == 0u) {
+        result.Decision = Decision_FrustumRejected;
+        result.FrustumRejectedCount = 1u;
+        results.Data[index] = result;
+        return;
+    }
+
+    if ((pc.Options & Option_HZBStaleSkip) != 0u) {
+        result.Decision = Decision_Phase1Visible;
+        result.Phase1VisibleCount = 1u;
+        results.Data[index] = result;
+        return;
+    }
+
+    if (((pc.Options & Option_ExemptSelectionBuckets) != 0u) &&
+        isSelectionBucket(candidate.Bucket)) {
+        result.Decision = Decision_Phase1Visible;
+        result.Phase1VisibleCount = 1u;
+        result.SelectionOcclusionExemptCount = 1u;
+        results.Data[index] = result;
+        return;
+    }
+
+    if (!hzbRejects(candidate.PreviousNearestDepth,
+                    candidate.PreviousConservativeMaxDepth,
+                    candidate.PreviousValid)) {
+        result.Decision = Decision_Phase1Visible;
+        result.Phase1VisibleCount = 1u;
+        results.Data[index] = result;
+        return;
+    }
+
+    result.Phase1RejectedCount = 1u;
+    if (!hzbRejects(candidate.CurrentNearestDepth,
+                    candidate.CurrentConservativeMaxDepth,
+                    candidate.CurrentValid)) {
+        result.Decision = Decision_Phase2Rescued;
+        result.Phase2RescuedCount = 1u;
+    } else {
+        result.Decision = Decision_Phase2Rejected;
+    }
+
+    results.Data[index] = result;
+}

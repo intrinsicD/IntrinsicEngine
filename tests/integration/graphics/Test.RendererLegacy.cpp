@@ -3,6 +3,7 @@
 #include <string>
 
 import Extrinsic.Graphics.Renderer;
+import Extrinsic.Graphics.FrameRecipe;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.RHI.FrameHandle;
@@ -50,7 +51,7 @@ TEST(GraphicsRenderer, NullRendererExecutesRenderGraphPath)
     renderer->Shutdown();
 }
 
-TEST(GraphicsRenderer, NullRendererDebugDumpContainsCanonicalPassesAndDataflowOrder)
+TEST(GraphicsRenderer, NullRendererForwardDebugDumpContainsCanonicalPassesAndDataflowOrder)
 {
     MockDevice device;
     auto renderer = Graphics::CreateRenderer();
@@ -78,7 +79,7 @@ TEST(GraphicsRenderer, NullRendererDebugDumpContainsCanonicalPassesAndDataflowOr
     EXPECT_NE(dump.find("name=\"CullingPass\""), std::string::npos);
     EXPECT_NE(dump.find("name=\"DepthPrepass\""), std::string::npos);
     EXPECT_NE(dump.find("name=\"SurfacePass\""), std::string::npos);
-    EXPECT_NE(dump.find("name=\"CompositionPass\""), std::string::npos);
+    EXPECT_EQ(dump.find("name=\"CompositionPass\""), std::string::npos);
     EXPECT_NE(dump.find("name=\"LinePass\""), std::string::npos);
     EXPECT_NE(dump.find("name=\"PointPass\""), std::string::npos);
     EXPECT_NE(dump.find("name=\"PostProcessPass\""), std::string::npos);
@@ -88,26 +89,62 @@ TEST(GraphicsRenderer, NullRendererDebugDumpContainsCanonicalPassesAndDataflowOr
     EXPECT_EQ(dump.find("name=\"PickingPass\""), std::string::npos);
 
     const std::size_t surfacePos = dump.find("name=\"SurfacePass\"");
-    const std::size_t compositionPos = dump.find("name=\"CompositionPass\"");
     const std::size_t linePos = dump.find("name=\"LinePass\"");
     const std::size_t pointPos = dump.find("name=\"PointPass\"");
     const std::size_t postPos = dump.find("name=\"PostProcessPass\"");
     const std::size_t imguiPos = dump.find("name=\"ImGuiPass\"");
     const std::size_t presentPos = dump.find("name=\"Present\"");
     ASSERT_NE(surfacePos, std::string::npos);
-    ASSERT_NE(compositionPos, std::string::npos);
     ASSERT_NE(linePos, std::string::npos);
     ASSERT_NE(pointPos, std::string::npos);
     ASSERT_NE(postPos, std::string::npos);
     ASSERT_NE(imguiPos, std::string::npos);
     ASSERT_NE(presentPos, std::string::npos);
 
-    EXPECT_LT(surfacePos, compositionPos);
-    EXPECT_LT(compositionPos, linePos);
+    EXPECT_LT(surfacePos, linePos);
     EXPECT_LT(linePos, pointPos);
     EXPECT_LT(pointPos, postPos);
     EXPECT_LT(postPos, imguiPos);
     EXPECT_LT(imguiPos, presentPos);
+
+    EXPECT_EQ(renderer->EndFrame(frame), 1u);
+    renderer->Shutdown();
+}
+
+TEST(GraphicsRenderer, NullRendererDeferredDebugDumpPlacesCompositionBetweenSurfaceAndLine)
+{
+    MockDevice device;
+    auto renderer = Graphics::CreateRenderer();
+    ASSERT_NE(renderer, nullptr);
+
+    renderer->Initialize(device);
+    renderer->SetLightingPath(Graphics::FrameRecipeLightingPath::Deferred);
+
+    RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Graphics::RenderFrameInput input{
+        .Alpha = 0.5,
+        .Viewport = {.Width = 1920u, .Height = 1080u},
+    };
+    auto world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const auto& stats = renderer->GetLastRenderGraphStats();
+    ASSERT_TRUE(stats.Compile.Succeeded);
+    ASSERT_FALSE(stats.DebugDump.empty());
+
+    const auto& dump = stats.DebugDump;
+    const std::size_t surfacePos = dump.find("name=\"SurfacePass\"");
+    const std::size_t compositionPos = dump.find("name=\"CompositionPass\"");
+    const std::size_t linePos = dump.find("name=\"LinePass\"");
+    ASSERT_NE(surfacePos, std::string::npos);
+    ASSERT_NE(compositionPos, std::string::npos);
+    ASSERT_NE(linePos, std::string::npos);
+
+    EXPECT_LT(surfacePos, compositionPos);
+    EXPECT_LT(compositionPos, linePos);
 
     EXPECT_EQ(renderer->EndFrame(frame), 1u);
     renderer->Shutdown();
