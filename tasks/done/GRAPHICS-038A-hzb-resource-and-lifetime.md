@@ -22,26 +22,41 @@
   reads the previous-frame HZB and phase 2 writes the current-frame HZB; resize/format
   changes reallocate through the retire-deadline window.
 
+## Status
+- Commit reference: this task-landing commit.
+- Landed 2026-06-04 at maturity `CPUContracted`. New renderer-owned module
+  `Extrinsic.Graphics.HZB` (`src/graphics/renderer/Graphics.HZB.{cppm,cpp}`,
+  mirroring the `ShadowSystem` retained-resource ownership): `HZBDesc` +
+  pure `NextPow2`/`ComputeHZBDesc` sizing (pow2 each dim, full mip chain to 1x1,
+  `RHI::Format::R32_FLOAT`), and `HZBSystem` owning the two-texture ping-pong
+  pair with per-frame role swap (`AdvanceFrame`), reallocation on extent/format
+  change, and a `framesInFlight` retire-deadline window (`Tick`). Verified:
+  `IntrinsicGraphicsContractCpuTests` 226/226 (4 new
+  `GraphicsHZBResourceLifetime` cases); layering/test-layout clean; module
+  inventory regenerated (+1 module). `GRAPHICS-038B/C/D/E` own the build
+  shader / cull extension / heuristic / `gpu;vulkan` smoke. The Vulkan
+  `R32_SFLOAT` is the engine's `RHI::Format::R32_FLOAT`.
+
 ## Required changes
-- [ ] Declare the HZB resource descriptor (`R32_SFLOAT`, pow2 extent, full mip chain).
-- [ ] Add the retained ping-pong pair owned by the renderer with `framesInFlight` retire
+- [x] Declare the HZB resource descriptor (`R32_SFLOAT`, pow2 extent, full mip chain).
+- [x] Add the retained ping-pong pair owned by the renderer with `framesInFlight` retire
       deadlines (mirroring `GRAPHICS-015Q`); reallocate on extent/format change.
-- [ ] `contract;graphics` tests for resource shape, mip-count formula, and ping-pong/
+- [x] `contract;graphics` tests for resource shape, mip-count formula, and ping-pong/
       retire-deadline lifetime under the null RHI.
 
 ## Tests
-- [ ] `contract;graphics` — pow2 sizing + mip-count formula; ping-pong identity across
+- [x] `contract;graphics` — pow2 sizing + mip-count formula; ping-pong identity across
       frames; reallocation on resize through the retire window; no leak.
-- [ ] CPU gate green.
+- [x] CPU gate green.
 
 ## Docs
-- [ ] Document the HZB resource + lifetime in `src/graphics/renderer/README.md`.
-- [ ] Regenerate the module inventory if surfaces change.
+- [x] Document the HZB resource + lifetime in `src/graphics/renderer/README.md`.
+- [x] Regenerate the module inventory if surfaces change.
 
 ## Acceptance criteria
-- [ ] The HZB resource shape and retained ping-pong lifetime exist and are CPU-tested.
-- [ ] No new layering violations.
-- [ ] `GRAPHICS-038B/C/D/E` remain the build/cull/heuristic/smoke follow-ups.
+- [x] The HZB resource shape and retained ping-pong lifetime exist and are CPU-tested.
+- [x] No new layering violations.
+- [x] `GRAPHICS-038B/C/D/E` remain the build/cull/heuristic/smoke follow-ups.
 
 ## Verification
 ```bash
