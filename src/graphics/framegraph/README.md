@@ -52,6 +52,16 @@ demotes to `Graphics`, while `Graphics` never migrates away from graphics.
 by resolved affinity in deterministic `(topological rank, declared pass index)`
 order and reports `QueueAffinityDemotedCount`.
 
+`BuildQueueSubmitPlan(...)` is the backend-neutral submit-plan seam. It walks the
+compiled topological order, resolves each pass through a
+`RHI::QueueCapabilityProfile`, groups contiguous passes into
+`QueueSubmitBatch` records, and attaches per-batch cross-queue timeline
+wait/signal records. When optional queues demote to `Graphics`, timeline edges
+whose signal and wait queues resolve to the same queue are omitted and counted
+through `OmittedSameQueueTimelineEdgeCount`. The plan is still a command-record
+contract; concrete `VkQueue` submits and timeline semaphore waits/signals remain
+backend-owned work.
+
 The compiler also emits backend-neutral cross-queue timeline records for live
 producer->consumer handoffs after culling. For each live pass on queue A that
 consumes a resource last accessed by queue B (B != A), the compiled graph

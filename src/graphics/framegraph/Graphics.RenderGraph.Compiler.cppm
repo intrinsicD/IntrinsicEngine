@@ -204,6 +204,40 @@ namespace Extrinsic::Graphics
         std::uint32_t QueueAffinityDemotedCount = 0;
     };
 
+    export struct QueueSubmitTimelineSignal
+    {
+        std::uint32_t PassIndex = 0;
+        RenderQueue RequestedQueue = RenderQueue::Graphics;
+        RenderQueue Queue = RenderQueue::Graphics;
+        std::uint64_t Value = 0;
+    };
+
+    export struct QueueSubmitTimelineWait
+    {
+        std::uint32_t PassIndex = 0;
+        RenderQueue RequestedQueue = RenderQueue::Graphics;
+        RenderQueue Queue = RenderQueue::Graphics;
+        std::uint32_t SignalPassIndex = 0;
+        RenderQueue RequestedSignalQueue = RenderQueue::Graphics;
+        RenderQueue SignalQueue = RenderQueue::Graphics;
+        std::uint64_t Value = 0;
+    };
+
+    export struct QueueSubmitBatch
+    {
+        RenderQueue Queue = RenderQueue::Graphics;
+        std::vector<std::uint32_t> PassIndices{};
+        std::vector<QueueSubmitTimelineWait> Waits{};
+        std::vector<QueueSubmitTimelineSignal> Signals{};
+    };
+
+    export struct QueueSubmitPlan
+    {
+        std::vector<QueueSubmitBatch> Batches{};
+        std::uint32_t QueueAffinityDemotedCount = 0;
+        std::uint32_t OmittedSameQueueTimelineEdgeCount = 0;
+    };
+
     export class RenderGraphCompiler final
     {
     public:
@@ -221,6 +255,9 @@ namespace Extrinsic::Graphics
         std::span<const std::uint32_t> topologicalRankByPass,
         RHI::QueueCapabilityProfile profile);
     export [[nodiscard]] QueuePartition PartitionPassesByQueue(
+        const CompiledRenderGraph& compiled,
+        RHI::QueueCapabilityProfile profile);
+    export [[nodiscard]] QueueSubmitPlan BuildQueueSubmitPlan(
         const CompiledRenderGraph& compiled,
         RHI::QueueCapabilityProfile profile);
     export [[nodiscard]] RenderGraphValidationResult ValidateCompiledGraph(

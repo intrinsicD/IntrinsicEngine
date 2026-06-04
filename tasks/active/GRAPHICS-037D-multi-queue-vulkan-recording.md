@@ -5,9 +5,10 @@
 - Owner/agent: Codex
 - Branch: `main`
 - Started: 2026-06-04
-- Current slice: Slice A (`Vulkan queue-family selection + ownership-transfer token recording`) complete
-  and structurally verified.
-- Next verification step: continue with Slice B (`backend-neutral queue-command/submit-plan seam`).
+- Current slice: Slice B (`backend-neutral queue-command/submit-plan seam`) complete and
+  structurally verified.
+- Next verification step: continue with Slice C (`per-affinity Vulkan command buffers +
+  timeline submit waits/signals`).
 
 ## Goal
 - Implement the Vulkan recording bodies for multi-queue submission (queue-family
@@ -50,6 +51,8 @@
 - [x] Select async-compute/transfer queue families during device bring-up (capability-gated).
 - [x] Record Vulkan Sync2 queue-family ownership-transfer barriers by translating
       framegraph queue-affinity tokens to concrete backend queue-family indices.
+- [x] Add backend-neutral queue-command/submit-plan seam and CPU/null submit-plan
+      contract coverage.
 - [ ] Record per-affinity command buffers and submit on the corresponding `VkQueue`.
 - [ ] Record timeline-semaphore signal/wait and queue-family ownership-transfer barriers
       from the compiled schedule.
@@ -60,11 +63,17 @@
 - [ ] `gpu;vulkan` smoke — multi-queue submission overlap on a Vulkan-capable host;
       skips on hosts without an operational Vulkan/GLFW lane.
 - [x] CPU-only Vulkan contract coverage proves queue-token resolution and fail-closed async diagnostics.
+- [x] CPU-only submit-plan contract coverage proves queue batching, timeline wait/signal
+      placement, and demotion fallback.
 - [x] Default CPU gate stays green (no regression to the single-queue path).
 
 ## Docs
 - [x] Document multi-queue Vulkan recording + queue-family selection in
       `src/graphics/vulkan/README.md`.
+- [x] Document backend-neutral RHI queue profile/context seam in
+      `src/graphics/rhi/README.md`.
+- [x] Document framegraph submit-plan semantics in
+      `src/graphics/framegraph/README.md`.
 
 ## Acceptance criteria
 - [ ] Multi-queue submission records and runs on a Vulkan-capable host via the opt-in smoke.
@@ -91,6 +100,29 @@ ctest --test-dir build/ci-vulkan --output-on-failure -R 'VulkanBootstrapSmoke' -
 python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+git diff --check
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/agents/check_task_state_links.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main
+```
+
+Slice B verification run on 2026-06-04:
+
+```bash
+cmake --build --preset ci-vulkan --target IntrinsicGraphicsVulkanContractTests
+ctest --test-dir build/ci-vulkan --output-on-failure -R 'Vulkan(FailClosedContract|OperationalStatusEvaluator|OperationalDiagnosticsSnapshot)' --timeout 60
+cmake --build --preset ci-vulkan --target IntrinsicGraphicsVulkanSmokeTests
+ctest --test-dir build/ci-vulkan --output-on-failure -R 'VulkanBootstrapSmoke' --timeout 120
+python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+# First CPU CTest attempt failed only because IntrinsicBenchmarkSmoke was not built by IntrinsicTests.
+cmake --build --preset ci --target IntrinsicBenchmarkSmoke
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 git diff --check
 python3 tools/agents/check_task_policy.py --root . --strict

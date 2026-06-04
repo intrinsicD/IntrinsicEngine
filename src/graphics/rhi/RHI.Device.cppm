@@ -11,6 +11,7 @@ import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Handles;
+import Extrinsic.RHI.QueueAffinity;
 import Extrinsic.RHI.Transfer;
 import Extrinsic.RHI.TransferQueue;
 import Extrinsic.RHI.Profiler;
@@ -101,6 +102,16 @@ namespace Extrinsic::RHI
 
         // ---- Command context -----------------------------------------
         virtual ICommandContext& GetGraphicsContext(std::uint32_t frameIndex) = 0;
+
+        // Backend-neutral queue seam used by the renderer's multi-queue
+        // submit planner. The default preserves the historical single graphics
+        // command context until a backend overrides specific queues.
+        [[nodiscard]] virtual QueueCapabilityProfile GetQueueCapabilityProfile() const noexcept { return {}; }
+        virtual ICommandContext& GetQueueContext(QueueAffinity affinity, std::uint32_t frameIndex)
+        {
+            (void)affinity;
+            return GetGraphicsContext(frameIndex);
+        }
 
         // ---- Buffer resources ----------------------------------------
         [[nodiscard]] virtual BufferHandle  CreateBuffer(const BufferDesc& desc)  = 0;

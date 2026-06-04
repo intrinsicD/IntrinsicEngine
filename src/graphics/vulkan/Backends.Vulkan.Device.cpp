@@ -2816,6 +2816,25 @@ RHI::ICommandContext& VulkanDevice::GetGraphicsContext(uint32_t frameIndex)
     return m_CmdContexts[frameIndex % kMaxFramesInFlight];
 }
 
+RHI::QueueCapabilityProfile VulkanDevice::GetQueueCapabilityProfile() const noexcept
+{
+    return RHI::QueueCapabilityProfile{
+        .SupportsAsyncCompute = m_AsyncComputeQueue != VK_NULL_HANDLE,
+        .SupportsTransfer = m_TransferVkQueue != VK_NULL_HANDLE &&
+                            m_TransferFamily != m_GraphicsFamily,
+    };
+}
+
+RHI::ICommandContext& VulkanDevice::GetQueueContext(const RHI::QueueAffinity affinity,
+                                                    const uint32_t frameIndex)
+{
+    // GRAPHICS-037D Slice B exposes the backend-neutral seam while preserving
+    // the current single graphics command buffer. Slice C will bind real
+    // per-affinity command buffers here before queue-specific submission.
+    (void)affinity;
+    return GetGraphicsContext(frameIndex);
+}
+
 // =============================================================================
 // §11a  VulkanDevice — buffer subsystem
 //

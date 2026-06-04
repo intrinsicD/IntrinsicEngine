@@ -444,6 +444,7 @@ namespace Extrinsic::Tests
         MockBindlessHeap   Bindless;
         MockCommandContext CommandContext;
         MockCommandContext AsyncComputeContext;
+        MockCommandContext TransferContext;
         MockTransferQueue  TransferQueue;
 
         // ---- IDevice -------------------------------------------------------
@@ -484,12 +485,18 @@ namespace Extrinsic::Tests
         RHI::ICommandContext& GetGraphicsContext(std::uint32_t) override { return CommandContext; }
         RHI::ITransferQueue& GetTransferQueue() override { return TransferQueue; }
 
-        [[nodiscard]] RHI::QueueCapabilityProfile GetQueueCapabilityProfile() const noexcept
+        [[nodiscard]] RHI::QueueCapabilityProfile GetQueueCapabilityProfile() const noexcept override
         {
             return RHI::QueueCapabilityProfile{
                 .SupportsAsyncCompute = AsyncComputeQueueAvailable,
                 .SupportsTransfer = TransferQueueAvailable,
             };
+        }
+
+        [[nodiscard]] RHI::ICommandContext& GetQueueContext(const RHI::QueueAffinity affinity,
+                                                            std::uint32_t) override
+        {
+            return GetMockQueueContext(affinity);
         }
 
         void SetQueueCapabilityProfile(const RHI::QueueCapabilityProfile profile) noexcept
@@ -517,6 +524,10 @@ namespace Extrinsic::Tests
             if (affinity == RHI::QueueAffinity::AsyncCompute && AsyncComputeQueueAvailable)
             {
                 return AsyncComputeContext;
+            }
+            if (affinity == RHI::QueueAffinity::Transfer && TransferQueueAvailable)
+            {
+                return TransferContext;
             }
             return CommandContext;
         }

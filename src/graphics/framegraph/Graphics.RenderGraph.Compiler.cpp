@@ -843,6 +843,153 @@ namespace Extrinsic::Graphics
                                       profile);
     }
 
+    QueueSubmitPlan BuildQueueSubmitPlan(const CompiledRenderGraph& compiled,
+                                         const RHI::QueueCapabilityProfile profile)
+    {
+        struct SignalKey
+        {
+            std::uint32_t PassIndex = 0;
+            RenderQueue RequestedQueue = RenderQueue::Graphics;
+            RenderQueue Queue = RenderQueue::Graphics;
+            std::uint64_t Value = 0;
+        };
+
+        const auto resolveQueue = [profile](const RenderQueue queue) {
+            return RHI::ResolveQueueAffinity(queue, profile);
+        };
+
+        QueueSubmitPlan plan{};
+        std::vector<std::uint32_t> passBatchIndex(
+            compiled.PassQueues.size(),
+            std::numeric_limits<std::uint32_t>::max());
+
+        for (const std::uint32_t passIndex : compiled.TopologicalOrder)
+        {
+            if (passIndex >= compiled.PassQueues.size())
+            {
+                continue;
+            }
+
+            RHI::QueueAffinityResolution resolution = resolveQueue(compiled.PassQueues[passIndex]);
+            if (resolution.Demoted)
+            {
+                ++plan.QueueAffinityDemotedCount;
+            }
+
+            if (plan.Batches.empty() || plan.Batches.back().Queue != resolution.Resolved)
+            {
+                plan.Batches.push_back(QueueSubmitBatch{
+                    .Queue = resolution.Resolved,
+                });
+            }
+
+            QueueSubmitBatch& batch = plan.Batches.back();
+            batch.PassIndices.push_back(passIndex);
+            passBatchIndex[passIndex] = static_cast<std::uint32_t>(plan.Batches.size() - 1u);
+        }
+
+        std::vector<SignalKey> activeSignals{};
+        activeSignals.reserve(compiled.CrossQueueTimelineEdges.size());
+        const auto appendSignalOnce = [&activeSignals](const SignalKey key)
+        {
+            const auto exists = std::ranges::any_of(activeSignals, [key](const SignalKey& existing) {
+                return existing.PassIndex == key.PassIndex &&
+                       existing.RequestedQueue == key.RequestedQueue &&
+                       existing.Queue == key.Queue &&
+                       existing.Value == key.Value;
+            });
+            if (!exists)
+            {
+                activeSignals.push_back(key);
+            }
+        };
+
+        for (const CrossQueueTimelineEdge& edge : compiled.CrossQueueTimelineEdges)
+        {
+            if (edge.SignalPassIndex >= passBatchIndex.size() ||
+                edge.WaitPassIndex >= passBatchIndex.size())
+            {
+                continue;
+            }
+
+            const std::uint32_t signalBatchIndex = passBatchIndex[edge.SignalPassIndex];
+            const std::uint32_t waitBatchIndex = passBatchIndex[edge.WaitPassIndex];
+            if (signalBatchIndex == std::numeric_limits<std::uint32_t>::max() ||
+                waitBatchIndex == std::numeric_limits<std::uint32_t>::max() ||
+                signalBatchIndex >= plan.Batches.size() ||
+                waitBatchIndex >= plan.Batches.size())
+            {
+                continue;
+            }
+
+            const RHI::QueueAffinityResolution signalResolution = resolveQueue(edge.SignalQueue);
+            const RHI::QueueAffinityResolution waitResolution = resolveQueue(edge.WaitQueue);
+            if (signalResolution.Resolved == waitResolution.Resolved)
+            {
+                ++plan.OmittedSameQueueTimelineEdgeCount;
+                continue;
+            }
+
+            appendSignalOnce(SignalKey{
+                .PassIndex = edge.SignalPassIndex,
+                .RequestedQueue = signalResolution.Requested,
+                .Queue = signalResolution.Resolved,
+                .Value = edge.Value,
+            });
+
+            plan.Batches[waitBatchIndex].Waits.push_back(QueueSubmitTimelineWait{
+                .PassIndex = edge.WaitPassIndex,
+                .RequestedQueue = waitResolution.Requested,
+                .Queue = waitResolution.Resolved,
+                .SignalPassIndex = edge.SignalPassIndex,
+                .RequestedSignalQueue = signalResolution.Requested,
+                .SignalQueue = signalResolution.Resolved,
+                .Value = edge.Value,
+            });
+        }
+
+        for (const CrossQueueTimelineSignal& signal : compiled.CrossQueueTimelineSignals)
+        {
+            if (signal.PassIndex >= passBatchIndex.size())
+            {
+                continue;
+            }
+
+            const RHI::QueueAffinityResolution resolution = resolveQueue(signal.Queue);
+            const SignalKey key{
+                .PassIndex = signal.PassIndex,
+                .RequestedQueue = resolution.Requested,
+                .Queue = resolution.Resolved,
+                .Value = signal.Value,
+            };
+            const bool isActive = std::ranges::any_of(activeSignals, [key](const SignalKey& active) {
+                return active.PassIndex == key.PassIndex &&
+                       active.RequestedQueue == key.RequestedQueue &&
+                       active.Queue == key.Queue &&
+                       active.Value == key.Value;
+            });
+            if (!isActive)
+            {
+                continue;
+            }
+
+            const std::uint32_t batchIndex = passBatchIndex[signal.PassIndex];
+            if (batchIndex >= plan.Batches.size())
+            {
+                continue;
+            }
+
+            plan.Batches[batchIndex].Signals.push_back(QueueSubmitTimelineSignal{
+                .PassIndex = signal.PassIndex,
+                .RequestedQueue = resolution.Requested,
+                .Queue = resolution.Resolved,
+                .Value = signal.Value,
+            });
+        }
+
+        return plan;
+    }
+
     bool CompiledPassDeclarations::DeclaresTextureRead(const TextureRef ref) const
     {
         if (!ref.IsValid())

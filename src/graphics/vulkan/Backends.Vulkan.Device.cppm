@@ -23,6 +23,7 @@ export import Extrinsic.RHI.Device;
 export import Extrinsic.RHI.FrameHandle;
 export import Extrinsic.RHI.Handles;
 export import Extrinsic.RHI.Profiler;
+export import Extrinsic.RHI.QueueAffinity;
 export import Extrinsic.RHI.Transfer;
 export import Extrinsic.RHI.TransferQueue;
 export import Extrinsic.RHI.Types;
@@ -84,6 +85,9 @@ namespace Extrinsic::Backends::Vulkan
         [[nodiscard]] RHI::TextureHandle GetBackbufferHandle(const RHI::FrameHandle& frame) const override;
 
         [[nodiscard]] RHI::ICommandContext& GetGraphicsContext(uint32_t frameIndex) override;
+        [[nodiscard]] RHI::QueueCapabilityProfile GetQueueCapabilityProfile() const noexcept override;
+        [[nodiscard]] RHI::ICommandContext& GetQueueContext(RHI::QueueAffinity affinity,
+                                                            uint32_t frameIndex) override;
 
         [[nodiscard]] RHI::BufferHandle CreateBuffer(const RHI::BufferDesc& desc) override;
         void DestroyBuffer(RHI::BufferHandle handle) override;

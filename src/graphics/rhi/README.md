@@ -23,6 +23,12 @@ This directory contains the `RHI` module/files.
 - The RHI surface contains no backend submission policy. Framegraph partitioning
   and later Vulkan queue recording consume this value contract without exposing
   API-native queue-family types through RHI.
+- `RHI::IDevice::GetQueueCapabilityProfile()` reports optional queue support to
+  backend-neutral schedulers. `IDevice::GetQueueContext(QueueAffinity, frameIndex)`
+  is the command-recording seam for future per-affinity command buffers; the
+  default implementation falls back to `GetGraphicsContext(frameIndex)` so Null,
+  CPU tests, and single-queue backends preserve existing behavior until they
+  explicitly override a queue.
 
 ## Timeline semaphores
 
