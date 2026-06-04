@@ -1,0 +1,94 @@
+#version 460
+
+// GRAPHICS-039A — builds one right-handed view-space AABB per froxel cell.
+// Light assignment and surface shader consumption are follow-up slices.
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+struct ClusterAABB
+{
+    vec4 Min;
+    vec4 Max;
+};
+
+layout(set = 0, binding = 0, std430) buffer ClusterGridAABBBuffer
+{
+    ClusterAABB Cells[];
+} uClusterGrid;
+
+layout(push_constant) uniform ClusterGridBuildPush
+{
+    uint RenderWidth;
+    uint RenderHeight;
+    uint TilesX;
+    uint TilesY;
+    uint SlicesZ;
+    uint CellCount;
+    float NearZ;
+    float FarZ;
+    float ProjectionScaleX;
+    float ProjectionScaleY;
+    uint ClusterTilePx;
+    uint Reserved0;
+} pc;
+
+float SliceDepth(uint slice)
+{
+    const float logRange = log(pc.FarZ / pc.NearZ);
+    return pc.NearZ * exp(logRange * (float(slice) / float(pc.SlicesZ)));
+}
+
+void IncludeCorner(inout vec3 minV,
+                   inout vec3 maxV,
+                   float ndcX,
+                   float ndcY,
+                   float positiveViewZ)
+{
+    const vec3 p = vec3(ndcX * positiveViewZ / pc.ProjectionScaleX,
+                       ndcY * positiveViewZ / pc.ProjectionScaleY,
+                       -positiveViewZ);
+    minV = min(minV, p);
+    maxV = max(maxV, p);
+}
+
+void main()
+{
+    const uint cell = gl_GlobalInvocationID.x;
+    if (cell >= pc.CellCount || pc.TilesX == 0u || pc.TilesY == 0u || pc.SlicesZ == 0u)
+    {
+        return;
+    }
+
+    const uint cellsPerSlice = pc.TilesX * pc.TilesY;
+    const uint sliceZ = cell / cellsPerSlice;
+    const uint inSlice = cell - sliceZ * cellsPerSlice;
+    const uint tileY = inSlice / pc.TilesX;
+    const uint tileX = inSlice - tileY * pc.TilesX;
+
+    const float nearZ = SliceDepth(sliceZ);
+    const float farZ = (sliceZ + 1u == pc.SlicesZ) ? pc.FarZ : SliceDepth(sliceZ + 1u);
+
+    const uint pixelMinX = tileX * pc.ClusterTilePx;
+    const uint pixelMinY = tileY * pc.ClusterTilePx;
+    const uint pixelMaxX = min((tileX + 1u) * pc.ClusterTilePx, pc.RenderWidth);
+    const uint pixelMaxY = min((tileY + 1u) * pc.ClusterTilePx, pc.RenderHeight);
+
+    const float ndcMinX = (2.0 * float(pixelMinX) / float(pc.RenderWidth)) - 1.0;
+    const float ndcMaxX = (2.0 * float(pixelMaxX) / float(pc.RenderWidth)) - 1.0;
+    const float ndcMinY = 1.0 - (2.0 * float(pixelMaxY) / float(pc.RenderHeight));
+    const float ndcMaxY = 1.0 - (2.0 * float(pixelMinY) / float(pc.RenderHeight));
+
+    vec3 minV = vec3(3.402823466e+38);
+    vec3 maxV = vec3(-3.402823466e+38);
+    IncludeCorner(minV, maxV, ndcMinX, ndcMinY, nearZ);
+    IncludeCorner(minV, maxV, ndcMaxX, ndcMinY, nearZ);
+    IncludeCorner(minV, maxV, ndcMinX, ndcMaxY, nearZ);
+    IncludeCorner(minV, maxV, ndcMaxX, ndcMaxY, nearZ);
+    IncludeCorner(minV, maxV, ndcMinX, ndcMinY, farZ);
+    IncludeCorner(minV, maxV, ndcMaxX, ndcMinY, farZ);
+    IncludeCorner(minV, maxV, ndcMinX, ndcMaxY, farZ);
+    IncludeCorner(minV, maxV, ndcMaxX, ndcMaxY, farZ);
+
+    uClusterGrid.Cells[cell].Min = vec4(minV, 0.0);
+    uClusterGrid.Cells[cell].Max = vec4(maxV, 0.0);
+}

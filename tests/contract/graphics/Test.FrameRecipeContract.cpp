@@ -47,6 +47,10 @@ namespace
             // Tests opt into `EnableHZBBuild`; default recipe tests leave the
             // feature off so this import is ignored.
             .HZBCurrent = Extrinsic::RHI::TextureHandle{18u, 1u},
+            // GRAPHICS-039A — renderer-owned cluster AABB storage buffer.
+            // Tests opt into `EnableClusterGridBuild`; default recipe tests
+            // leave the feature off so this import is ignored.
+            .ClusterGridAABBs = Extrinsic::RHI::BufferHandle{19u, 1u},
         };
     }
 
@@ -286,6 +290,7 @@ TEST(FrameRecipeContract, OptionalResourcesAreGatedByFeatures)
     EXPECT_FALSE(HasEnabledResource(defaults, FrameRecipeResourceKind::SelectionOutline));
     EXPECT_FALSE(HasEnabledResource(defaults, FrameRecipeResourceKind::DebugViewRGBA));
     EXPECT_FALSE(HasEnabledResource(defaults, FrameRecipeResourceKind::HZBCurrent));
+    EXPECT_FALSE(HasEnabledResource(defaults, FrameRecipeResourceKind::ClusterGridAABBs));
     EXPECT_TRUE(HasEnabledResource(defaults, FrameRecipeResourceKind::SceneColorLDR));
 
     FrameRecipeFeatures allFeatures{};
@@ -294,6 +299,7 @@ TEST(FrameRecipeContract, OptionalResourcesAreGatedByFeatures)
     allFeatures.EnableSelectionOutline = true;
     allFeatures.EnableDebugView = true;
     allFeatures.EnableHZBBuild = true;
+    allFeatures.EnableClusterGridBuild = true;
 
     const FrameRecipeIntrospection full = DescribeDefaultFrameRecipe(allFeatures);
     EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::EntityId));
@@ -302,6 +308,7 @@ TEST(FrameRecipeContract, OptionalResourcesAreGatedByFeatures)
     EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::SelectionOutline));
     EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::DebugViewRGBA));
     EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::HZBCurrent));
+    EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::ClusterGridAABBs));
 }
 
 TEST(FrameRecipeContract, LightingPathControlsGBufferResourcesAndComposition)
@@ -453,6 +460,89 @@ TEST(FrameRecipeContract, HZBBuildRequiresDepthPrepassAndImportedTarget)
     ASSERT_TRUE(depthDisabledCompiled.has_value());
     const std::vector<std::string> depthDisabledPassNames = OrderedPassNames(*depthDisabledCompiled);
     EXPECT_EQ(std::ranges::find(depthDisabledPassNames, "HZBBuildPass"), depthDisabledPassNames.end());
+}
+
+TEST(FrameRecipeContract, ClusterGridBuildRequiresDepthPrepassAndImportedTarget)
+{
+    FrameRecipeFeatures features{};
+    features.EnableClusterGridBuild = true;
+
+    const FrameRecipeIntrospection description = DescribeDefaultFrameRecipe(features);
+    const auto* clusterPass = FindPass(description, FrameRecipePassKind::ClusterGridBuild);
+    ASSERT_NE(clusterPass, nullptr);
+    EXPECT_TRUE(clusterPass->Enabled);
+    EXPECT_TRUE(clusterPass->Reads.empty());
+    EXPECT_TRUE(Contains(clusterPass->Writes, "ClusterGrid.AABBs"));
+
+    const auto* clusterResource = FindResource(description, FrameRecipeResourceKind::ClusterGridAABBs);
+    ASSERT_NE(clusterResource, nullptr);
+    EXPECT_TRUE(clusterResource->Enabled);
+    EXPECT_TRUE(clusterResource->Imported);
+    EXPECT_TRUE(clusterResource->Optional);
+    EXPECT_TRUE(clusterResource->ImportedWriteAllowed);
+
+    RenderGraph graph;
+    const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
+        graph,
+        features,
+        MakeImports(),
+        FrameRecipeSizing{.Width = 640u, .Height = 480u});
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    {
+        const auto& compileResult = graph.GetLastCompileValidationResult();
+        ASSERT_TRUE(compiled.has_value())
+            << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
+    }
+
+    const std::vector<std::string> passNames = OrderedPassNames(*compiled);
+    const auto depthIt = std::ranges::find(passNames, "DepthPrepass");
+    const auto clusterIt = std::ranges::find(passNames, "ClusterGridBuildPass");
+    const auto surfaceIt = std::ranges::find(passNames, "SurfacePass");
+    ASSERT_NE(depthIt, passNames.end());
+    ASSERT_NE(clusterIt, passNames.end());
+    ASSERT_NE(surfaceIt, passNames.end());
+    EXPECT_LT(depthIt, clusterIt);
+    EXPECT_LT(clusterIt, surfaceIt);
+    EXPECT_NE(std::ranges::find(compiled->BufferNames, "ClusterGrid.AABBs"), compiled->BufferNames.end());
+
+    const RenderGraphValidationResult validation = ValidateRecipeCompiledGraph(description, *compiled);
+    EXPECT_FALSE(validation.HasErrors())
+        << (validation.Findings.empty() ? "<no findings>" : validation.Findings.front().Message);
+
+    FrameRecipeImports missingImport = MakeImports();
+    missingImport.ClusterGridAABBs = {};
+    RenderGraph missingImportGraph;
+    const FrameRecipeBuildResult missingImportBuild = BuildDefaultFrameRecipe(
+        missingImportGraph,
+        features,
+        missingImport,
+        FrameRecipeSizing{.Width = 640u, .Height = 480u});
+    ASSERT_TRUE(missingImportBuild.Succeeded) << missingImportBuild.Diagnostic;
+    const auto missingImportCompiled = missingImportGraph.Compile();
+    ASSERT_TRUE(missingImportCompiled.has_value());
+    const std::vector<std::string> missingImportPassNames = OrderedPassNames(*missingImportCompiled);
+    EXPECT_EQ(std::ranges::find(missingImportPassNames, "ClusterGridBuildPass"), missingImportPassNames.end());
+
+    features.EnableDepthPrepass = false;
+    const FrameRecipeIntrospection depthDisabled = DescribeDefaultFrameRecipe(features);
+    const auto* depthDisabledCluster = FindPass(depthDisabled, FrameRecipePassKind::ClusterGridBuild);
+    ASSERT_NE(depthDisabledCluster, nullptr);
+    EXPECT_FALSE(depthDisabledCluster->Enabled);
+    EXPECT_FALSE(HasEnabledResource(depthDisabled, FrameRecipeResourceKind::ClusterGridAABBs));
+
+    RenderGraph depthDisabledGraph;
+    const FrameRecipeBuildResult depthDisabledBuild = BuildDefaultFrameRecipe(
+        depthDisabledGraph,
+        features,
+        MakeImports(),
+        FrameRecipeSizing{.Width = 640u, .Height = 480u});
+    ASSERT_TRUE(depthDisabledBuild.Succeeded) << depthDisabledBuild.Diagnostic;
+    const auto depthDisabledCompiled = depthDisabledGraph.Compile();
+    ASSERT_TRUE(depthDisabledCompiled.has_value());
+    const std::vector<std::string> depthDisabledPassNames = OrderedPassNames(*depthDisabledCompiled);
+    EXPECT_EQ(std::ranges::find(depthDisabledPassNames, "ClusterGridBuildPass"), depthDisabledPassNames.end());
 }
 
 TEST(FrameRecipeContract, BackbufferIsFinalizedOnlyByPresentDeclaration)
@@ -914,4 +1004,3 @@ TEST(FrameRecipeContract, ShadowAtlasTransientPathAcceptsTypedShadowSizing)
     }
     EXPECT_TRUE(foundShadow);
 }
-

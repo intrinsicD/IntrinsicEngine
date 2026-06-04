@@ -621,6 +621,7 @@ set(_graphics_contract_cpu_test_files
     Test.ImGuiPass.cpp
     Test.ImGuiPresentContract.cpp
     Test.LightingShadowContracts.cpp
+    Test.LightClusterGrid.cpp
     Test.LinePointPassContracts.cpp
     Test.MaterialSubstitutionContract.cpp
     Test.MinimalTriangleReadbackHarness.cpp

@@ -11,9 +11,23 @@ Each active task should include:
 
 ## Currently active
 
-No task currently active.
+No currently active task. The next unblocked clustered-light candidate is
+[`GRAPHICS-039B`](../backlog/rendering/GRAPHICS-039B-light-cluster-assignment.md).
 
 The most recently retired tasks are summarised below.
+
+Previously-active
+[`GRAPHICS-039A`](../done/GRAPHICS-039A-cluster-grid-build.md) — cluster grid
+resource + build pass retired to `tasks/done/` on 2026-06-04 at maturity
+`CPUContracted`. The slice added the `Extrinsic.Graphics.LightClusters` module,
+the default 80 px tile / 24 logarithmic Z-slice froxel-grid contract, per-cell
+view-space AABB construction with clamped partial-edge tile bounds,
+`ClusterGrid.AABBs` resource/import semantics, default-recipe
+`ClusterGridBuildPass` ordering after depth/HZB, the
+`cluster_grid_build.comp` shader asset, and contract coverage for dimensions,
+log-Z slicing, empty beyond-far mapping, partial edge tiles, AABB bounds,
+resource usage, dispatch shape, and frame-recipe gating. Light assignment,
+shader consumption, and async-compute affinity remain `GRAPHICS-039B/C/D`.
 
 Previously-active
 [`GRAPHICS-038E`](../done/GRAPHICS-038E-hzb-conservatism-gpu-smoke.md) —

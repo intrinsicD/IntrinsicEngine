@@ -73,6 +73,7 @@ implementation.
 - `Extrinsic.Graphics.PostProcessSystem`
 - `Extrinsic.Graphics.ShadowSystem`
 - `Extrinsic.Graphics.HZB`
+- `Extrinsic.Graphics.LightClusters`
 - `Extrinsic.Graphics.TransformSyncSystem`
 
 ### RHI modules (`Graphics/RHI`)
@@ -348,6 +349,23 @@ Concretely:
   missing-sample conservatism, frustum-first rejection, and selection-bucket
   exemption on an operational Vulkan command stream while preserving the
   default CPU/null contracts.
+- GRAPHICS-039A lands `Extrinsic.Graphics.LightClusters` — the clustered-light
+  froxel grid contract and backend-neutral cluster-grid build command shape.
+  `ComputeClusterGridDesc(w, h)` uses the recorded `GRAPHICS-039` formula:
+  `TilesX = ceil(w / 80)`, `TilesY = ceil(h / 80)`, `SlicesZ = 24`
+  (`16x9x24` at `1280x720`). `MapViewZToClusterSlice(...)` applies the
+  Olsson-style logarithmic split in positive view-Z, clamps sub-near samples to
+  slice 0, and reports samples beyond the far plane as out-of-range so later
+  light assignment leaves those cells empty. `ComputeClusterCellAABB(...)`
+  produces one shader-visible 32-byte `ClusterGridAABB` per cell in
+  right-handed view space (`MinZ = -far`, `MaxZ = -near`), using clamped pixel
+  bounds for partial edge tiles. The default recipe declares an opt-in
+  `"ClusterGridBuildPass"` that writes the imported
+  `ClusterGrid.AABBs` storage buffer when `EnableClusterGridBuild`,
+  `DepthPrepass`, and a valid buffer import are all present. The shader asset
+  `assets/shaders/cluster_grid_build.comp` mirrors the same math; backend
+  descriptor publication, light assignment, surface-shader consumption, and
+  async-compute affinity remain the `GRAPHICS-039B/C/D` follow-ups.
 - GRAPHICS-072 Slice A wires the default-recipe deferred-mode `"SurfacePass"`
   to the existing `DeferredGBufferPass` body. `NullRenderer` owns
   `m_DeferredGBufferPass` (constructed against `m_DeferredSystem`) and the

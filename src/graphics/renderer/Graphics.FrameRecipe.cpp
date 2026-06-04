@@ -235,6 +235,7 @@ namespace Extrinsic::Graphics
         // target / the `Picking.Readback` buffer when picking is dropped.
         const bool pickingActive = features.EnablePicking && features.EnableDepthPrepass;
         const bool hzbBuildActive = features.EnableHZBBuild && features.EnableDepthPrepass;
+        const bool clusterGridBuildActive = features.EnableClusterGridBuild && features.EnableDepthPrepass;
         FrameRecipeIntrospection out{};
 
         AddPass(out, FrameRecipePassKind::Culling, "CullingPass", true, false,
@@ -244,6 +245,8 @@ namespace Extrinsic::Graphics
                 {"Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count"}, {"SceneDepth"});
         AddPass(out, FrameRecipePassKind::HZBBuild, "HZBBuildPass", hzbBuildActive, false,
                 {"SceneDepth"}, {"HZB.Current"});
+        AddPass(out, FrameRecipePassKind::ClusterGridBuild, "ClusterGridBuildPass",
+                clusterGridBuildActive, false, {}, {"ClusterGrid.AABBs"});
         // GRAPHICS-074 recipe-side follow-up — picking now runs *after*
         // `DepthPrepass` and reads `SceneDepth` so the picking pipeline can
         // depth-equal-test against the nearest-surface depth instead of
@@ -363,6 +366,8 @@ namespace Extrinsic::Graphics
         AddResource(out, FrameRecipeResourceKind::Backbuffer, "Backbuffer", true, true, true);
         AddResource(out, FrameRecipeResourceKind::SceneDepth, "SceneDepth", true);
         AddResource(out, FrameRecipeResourceKind::HZBCurrent, "HZB.Current", hzbBuildActive, true, false, true, true);
+        AddResource(out, FrameRecipeResourceKind::ClusterGridAABBs, "ClusterGrid.AABBs",
+                    clusterGridBuildActive, true, false, true, true);
         // GRAPHICS-074 recipe-side follow-up — `EntityId` is consumed by
         // PickingPass (active iff `pickingActive`) and SelectionOutlinePass
         // (active iff `EnableSelectionOutline`); `PrimitiveId` and
@@ -529,6 +534,8 @@ namespace Extrinsic::Graphics
         // when `PickingPass` is dropped.
         const bool pickingActive = features.EnablePicking && features.EnableDepthPrepass;
         const bool hzbBuildActive = features.EnableHZBBuild && features.EnableDepthPrepass && imports.HZBCurrent.IsValid();
+        const bool clusterGridBuildActive = features.EnableClusterGridBuild && features.EnableDepthPrepass &&
+                                            imports.ClusterGridAABBs.IsValid();
         const auto width = ClampExtent(sizing.Width);
         const auto height = ClampExtent(sizing.Height);
         const FrameRecipeIntrospection declaration = DescribeDefaultFrameRecipe(features);
@@ -567,6 +574,7 @@ namespace Extrinsic::Graphics
         BufferRef postProcessHistogram{};
         BufferRef pickingReadback{};
         BufferRef histogramReadback{};
+        BufferRef clusterGridAABBs{};
         TextureRef hzbCurrent{};
 
         if (hzbBuildActive)
@@ -575,6 +583,13 @@ namespace Extrinsic::Graphics
                                              imports.HZBCurrent,
                                              TextureState::ShaderWrite,
                                              TextureState::ShaderRead);
+        }
+        if (clusterGridBuildActive)
+        {
+            clusterGridAABBs = graph.ImportBuffer("ClusterGrid.AABBs",
+                                                  imports.ClusterGridAABBs,
+                                                  BufferState::ShaderWrite,
+                                                  BufferState::ShaderRead);
         }
 
         if (pickingActive || features.EnableSelectionOutline)
@@ -790,6 +805,13 @@ namespace Extrinsic::Graphics
             addOrderedPass("HZBBuildPass", [=](RenderGraphBuilder& builder) {
                 builder.Read(depth, TextureUsage::ShaderRead);
                 builder.Write(hzbCurrent, TextureUsage::ShaderWrite);
+            });
+        }
+
+        if (clusterGridBuildActive)
+        {
+            addOrderedPass("ClusterGridBuildPass", [=](RenderGraphBuilder& builder) {
+                builder.Write(clusterGridAABBs, BufferUsage::ShaderWrite);
             });
         }
 

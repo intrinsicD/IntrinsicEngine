@@ -30,6 +30,7 @@ target_sources(${target_name}
         Graphics.PostProcessSystem.cppm
         Graphics.ShadowSystem.cppm
         Graphics.HZB.cppm
+        Graphics.LightClusters.cppm
         Graphics.TransformSyncSystem.cppm
         Graphics.TransientDebugUploadHelper.cppm
         Graphics.VisualizationOverlayUploadHelper.cppm
@@ -56,6 +57,7 @@ target_sources(${target_name}
         Graphics.PostProcessSystem.cpp
         Graphics.ShadowSystem.cpp
         Graphics.HZB.cpp
+        Graphics.LightClusters.cpp
         Graphics.TransformSyncSystem.cpp
 )
 

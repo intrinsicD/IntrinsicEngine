@@ -85,6 +85,12 @@ namespace Extrinsic::Graphics
         // the renderer-owned retained `HZB.Current` import. Append-only to
         // keep prior numeric values stable.
         HZBBuild,
+        // GRAPHICS-039A — compute cluster-grid build pass. Declared after
+        // the depth/HZB build band when enabled, writes the renderer-owned
+        // `ClusterGrid.AABBs` storage-buffer import, and records the froxel
+        // AABB build command shape. Append-only to keep prior numeric values
+        // stable.
+        ClusterGridBuild,
     };
 
     export enum class FrameRecipeResourceKind : std::uint8_t
@@ -139,6 +145,10 @@ namespace Extrinsic::Graphics
         // GRAPHICS-038B — renderer-owned retained HZB write target imported
         // from `HZBSystem::CurrentHZB()`.
         HZBCurrent,
+        // GRAPHICS-039A — renderer-owned cluster AABB storage buffer imported
+        // from the clustered-light grid owner. The build pass writes one
+        // right-handed view-space AABB per froxel cell.
+        ClusterGridAABBs,
     };
 
     export struct FrameRecipeFeatures
@@ -150,6 +160,10 @@ namespace Extrinsic::Graphics
         // recipe descriptions remain behavior-preserving unless the renderer
         // or a focused contract test explicitly enables the HZB slice.
         bool EnableHZBBuild{false};
+        // GRAPHICS-039A — opt into the cluster-grid AABB build pass when the
+        // renderer has a valid `ClusterGrid.AABBs` import. Defaults off until
+        // the clustered-light consumers land.
+        bool EnableClusterGridBuild{false};
         bool EnablePicking{false};
         bool EnableShadows{false};
         bool EnableSelectionOutline{false};
@@ -243,6 +257,9 @@ namespace Extrinsic::Graphics
         RHI::BufferHandle HistogramReadback{};
         // GRAPHICS-038B — retained HZB write target owned by HZBSystem.
         RHI::TextureHandle HZBCurrent{};
+        // GRAPHICS-039A — retained cluster AABB storage buffer written by the
+        // cluster-grid build pass and read by the future light-assignment pass.
+        RHI::BufferHandle ClusterGridAABBs{};
     };
 
     // GRAPHICS-073 Slice B — typed sizing seam for the shadow atlas. When

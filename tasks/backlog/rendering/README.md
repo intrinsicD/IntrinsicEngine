@@ -888,7 +888,7 @@ HZB two-phase occlusion culling (GRAPHICS-038):
 - [GRAPHICS-038E (done)](../../done/GRAPHICS-038E-hzb-conservatism-gpu-smoke.md) — opt-in `gpu;vulkan` conservatism smoke (`Operational`, 2026-06-04). Depended on 038D (done), GRAPHICS-033 (done).
 
 Clustered light binning (GRAPHICS-039):
-- [GRAPHICS-039A](GRAPHICS-039A-cluster-grid-build.md) — cluster grid resource + build pass. Depends on GRAPHICS-039 (planning, done), GRAPHICS-009 (done).
+- [GRAPHICS-039A (done)](../../done/GRAPHICS-039A-cluster-grid-build.md) — cluster grid resource + build pass (`CPUContracted`, 2026-06-04). Depended on GRAPHICS-039 (planning, done), GRAPHICS-009 (done).
 - [GRAPHICS-039B](GRAPHICS-039B-light-cluster-assignment.md) — light-to-cluster assignment + overflow diagnostics. Depends on 039A.
 - [GRAPHICS-039C](GRAPHICS-039C-cluster-surface-shader-integration.md) — surface-shader integration + recipe wiring. Depends on 039B, GRAPHICS-008 (done).
 - [GRAPHICS-039D](GRAPHICS-039D-cluster-async-compute-affinity.md) — async-compute affinity tagging. Depends on 039C; gated by GRAPHICS-037 (037A) for real async execution.

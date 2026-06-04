@@ -44,6 +44,7 @@ namespace Extrinsic::Graphics
             case FrameRecipeResourceKind::PickingReadback:
             case FrameRecipeResourceKind::PostProcessHistogram:
             case FrameRecipeResourceKind::HistogramReadback:
+            case FrameRecipeResourceKind::ClusterGridAABBs:
                 return DebugViewResourceClass::Buffer;
             case FrameRecipeResourceKind::EntityId:
             case FrameRecipeResourceKind::PrimitiveId:
