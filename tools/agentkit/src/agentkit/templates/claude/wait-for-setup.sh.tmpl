@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Block until the session-start hook (.claude/setup.sh) finishes provisioning.
+# Returns 0 on success, non-zero if provisioning failed or the timeout elapses.
+#
+# Usage:
+#   .claude/wait-for-setup.sh                 # 30 min default timeout
+#   .claude/wait-for-setup.sh --timeout 600   # 10 min override
+set -euo pipefail
+
+TIMEOUT_SECS=1800
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --timeout) TIMEOUT_SECS="$2"; shift 2 ;;
+        --timeout=*) TIMEOUT_SECS="${1#*=}"; shift ;;
+        -h|--help) sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        *) echo "Unknown argument: $1" >&2; exit 2 ;;
+    esac
+done
+
+DONE_MARKER="/tmp/{{MARKER_PREFIX}}-session-setup.done"
+FAIL_MARKER="/tmp/{{MARKER_PREFIX}}-session-setup.failed"
+LOG="/tmp/{{MARKER_PREFIX}}-session-setup.log"
+
+start=$(date +%s)
+while :; do
+    [ -f "$DONE_MARKER" ] && exit 0
+    if [ -f "$FAIL_MARKER" ]; then
+        echo "Session provisioning failed. Tail of $LOG:" >&2
+        tail -n 40 "$LOG" >&2 || true
+        exit 1
+    fi
+    now=$(date +%s)
+    if [ $((now - start)) -ge "$TIMEOUT_SECS" ]; then
+        echo "Timed out after ${TIMEOUT_SECS}s waiting for $DONE_MARKER." >&2
+        exit 124
+    fi
+    sleep 2
+done

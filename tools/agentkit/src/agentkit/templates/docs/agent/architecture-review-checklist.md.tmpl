@@ -1,0 +1,33 @@
+# Architecture Review Checklist
+
+Apply this **in addition** to the
+[review checklist](/{{DOCS_AGENT_DIR}}/review-checklist.md) whenever a change
+touches module boundaries, ownership, public interfaces, concurrency, or the
+error-handling strategy.
+
+## Boundaries and dependency direction
+
+- [ ] The change respects the dependency direction declared in `{{CONTRACT_FILE}}`
+      (lower-level modules do not import higher-level ones).
+- [ ] No new cross-boundary dependency was added without justification.
+- [ ] Composition/wiring stays at the intended seam; lower modules remain reusable.
+
+## Ownership and lifetime
+
+- [ ] Every new resource has a clear owner and a defined lifetime.
+- [ ] No hidden global/shared mutable state was introduced.
+
+## Concurrency
+
+- [ ] Shared state crossing threads/tasks is synchronized or clearly immutable.
+- [ ] Ordering and reentrancy assumptions are documented where they matter.
+
+## Error handling
+
+- [ ] Failure is explicit (typed errors / results), not silent.
+- [ ] Invariants are checked at boundaries, not deep in call stacks.
+
+## Reversibility
+
+- [ ] The change can be reverted or evolved later (no premature, hard-to-undo
+      abstraction; no one-way door taken without a note in the task/ADR).

@@ -1,0 +1,25 @@
+---
+name: {{SKILL_DOCS_SYNC}}
+description: Documentation synchronization policy for {{PROJECT_NAME}} — which docs must update in the same change as code, structure, or policy. Defines the same-PR rule, the factual-current-state gate, and link integrity. Use when moving or renaming files, changing public API or module surfaces, updating {{CONTRACT_FILE}}, or asking whether a documentation update is required.
+---
+
+# Docs sync
+
+Docs ship in the **same** change as what they describe. See
+`references/docs-sync-policy.md` for the per-change-type targets.
+
+## The rule of thumb
+
+If a change alters behavior, structure, or policy, update the relevant docs and
+task records in the same PR. Keep docs factual (current state). Fix every link
+when files move (prefer repo-root-relative `/path` links).
+
+## Enforce
+
+- Link integrity: `python3 {{CHECKS_DIR}}/check_doc_links.py --root . --strict`
+- "Change X ⇒ update doc Y" rules live in `{{RULES_FILE}}`, checked by
+  `python3 {{CHECKS_DIR}}/check_docs_sync.py --root .`
+
+## References
+
+- `references/docs-sync-policy.md`

@@ -1,0 +1,21 @@
+# Agent Roles
+
+A single agent often plays several of these roles in one session. Naming them
+makes handoffs and reviews clearer.
+
+- **Architect** — owns boundaries, ownership, and dependency direction. Decides
+  *where* a change belongs and whether a new dependency edge is justified.
+- **Implementation** — writes the smallest useful patch for one task, matching
+  the conventions of the surrounding code.
+- **Test** — ensures behavior changes are covered; keeps the verification gate
+  (`{{TEST_CMD}}`) meaningful and green.
+- **Review** — runs the [review checklist](/{{DOCS_AGENT_DIR}}/review-checklist.md)
+  before commit/PR, and periodically the
+  [output audit](/{{DOCS_AGENT_DIR}}/agent-output-review-checklist.md).
+
+## Handoff expectations
+
+When you stop mid-task, leave the repository in a reviewable state: update the
+task file's checkboxes, note what's in flight and what didn't work, and reference
+the relevant branch/PR. The `{{PROJECT_SLUG}}-handoff` skill produces a
+self-contained handoff document for the next session.

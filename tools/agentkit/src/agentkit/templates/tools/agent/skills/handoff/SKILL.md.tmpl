@@ -1,0 +1,25 @@
+---
+name: {{SKILL_HANDOFF}}
+description: Compact the current conversation into a handoff document so another agent (or this agent in a fresh session) can continue the work without re-reading the whole thread. Output goes to the OS temporary directory, never into the repository. Use when the user says "handoff", "compact this", or "summarize for next session", or when context is about to be summarized and the next agent needs a clean starting point.
+argument-hint: "What should the next session focus on?"
+---
+
+# Handoff
+
+Produce a single self-contained handoff document. Write it to the OS temp
+directory (e.g. `$TMPDIR/{{PROJECT_SLUG}}-handoff-<date>.md`), **never** into the
+repository.
+
+Capture, in this order:
+
+1. **Objective** — what the next session should accomplish.
+2. **Repo state** — branch, whether the tree is clean, the active task id(s).
+3. **Done** — what changed and why, with file references.
+4. **In flight** — what is half-done and the exact next step.
+5. **What didn't work** — dead ends, so they aren't retried.
+6. **Verification** — the command(s) that prove progress (`{{TEST_CMD}}`) and
+   their current pass/fail state.
+7. **References** — relevant tasks, docs, PRs.
+
+Redact secrets. Keep it skimmable: a new agent should be productive in minutes
+without re-reading the original conversation.

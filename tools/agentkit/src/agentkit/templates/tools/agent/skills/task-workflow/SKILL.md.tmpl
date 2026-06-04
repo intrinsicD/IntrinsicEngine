@@ -1,0 +1,32 @@
+---
+name: {{SKILL_TASK_WORKFLOW}}
+description: How to author, slice, promote, and retire task files in the {{PROJECT_NAME}} tasks/ tree (backlog, active, done). Defines the required task structure and the optional maturity closure rule. Use when creating a new task, promoting a backlog task to active, retiring a task to done, splitting work into slices, writing acceptance criteria, or whenever the user mentions a task id or uses "scaffold", "stub", or "minimal" closing wording.
+---
+
+# Task workflow
+
+Tasks live in `tasks/backlog/`, `tasks/active/`, `tasks/done/`. Every task file
+uses the nine-section structure in `references/task-format.md` and is based on
+`references/task-template.md`.
+
+## Lifecycle
+
+- **Backlog → Active**: move the file, start work, keep checkboxes current.
+- **Active → Done**: when acceptance criteria are met, move to `tasks/done/`,
+  add a completion date (`YYYY-MM-DD`) and a PR/commit reference, tick all boxes.
+
+## Slicing
+
+Keep each task small enough to ship and review on its own. If a slice stops
+partial-but-correct, add a `## Maturity` section and follow the closure rule in
+`references/task-maturity.md` (name a follow-up id or state none is owed).
+
+## Validate
+
+    python3 {{CHECKS_DIR}}/check_tasks.py --root . --strict
+
+## References
+
+- `references/task-format.md`
+- `references/task-maturity.md`
+- `references/task-template.md`

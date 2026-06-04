@@ -1,0 +1,36 @@
+# Review Checklist
+
+Run this before committing or opening a PR for any non-trivial change in
+{{PROJECT_NAME}}. It is the per-change gate; the deeper
+[architecture review](/{{DOCS_AGENT_DIR}}/architecture-review-checklist.md)
+applies when you change boundaries or ownership.
+
+## Scope and ownership
+
+- [ ] The change matches exactly one task (or an explicitly approved batch).
+- [ ] Mechanical moves/renames and semantic edits are **not** mixed in one commit.
+- [ ] No unrelated drive-by changes snuck in; the diff is reviewable.
+
+## Correctness and tests
+
+- [ ] Tests were added or updated for every behavior change.
+- [ ] The strongest relevant verification was run: `{{TEST_CMD}}`.
+- [ ] Pass rate is preserved or improved (or a temporary shim is documented).
+- [ ] Failure paths and edge cases are handled, not just the happy path.
+
+## Documentation and tasks
+
+- [ ] Docs and task records are updated in the same change (see
+      [docs-sync-policy](/{{DOCS_AGENT_DIR}}/docs-sync-policy.md)).
+- [ ] Moved files have their references/links updated.
+- [ ] The task file's checkboxes reflect reality; a finished task is moved to
+      `tasks/done/` with completion metadata.
+
+## CI and temporary shims
+
+- [ ] Structural checks pass for touched scope
+      (`python3 tools/agentkit/agentkit.py check --strict`, or the shipped
+      `{{CHECKS_DIR}}/` scripts directly).
+- [ ] Any temporary shim is tracked by a current task under `tasks/active/`
+      with a specific removal task id.
+- [ ] Commit message explains *why*, not just *what*.

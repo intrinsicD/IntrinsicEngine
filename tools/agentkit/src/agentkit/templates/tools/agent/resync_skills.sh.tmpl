@@ -1,0 +1,39 @@
+#!/bin/bash
+# Resync skill references from the authoritative docs for {{PROJECT_NAME}}.
+# References are verbatim copies; this keeps the skill surface in lockstep with
+# docs/agent/* and the contract. Run from anywhere in the repo.
+set -euo pipefail
+
+if REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"; then
+    :
+else
+    REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+fi
+SKILLS="${1:-${REPO_ROOT}/{{SKILLS_DIR}}}"
+SLUG="{{PROJECT_SLUG}}"
+
+declare -A MAP=(
+    ["{{CONTRACT_FILE}}"]="${SLUG}-core/references/contract.md"
+    ["{{DOCS_AGENT_DIR}}/roles.md"]="${SLUG}-core/references/roles.md"
+    ["{{DOCS_AGENT_DIR}}/prompt/prompt.md"]="${SLUG}-core/references/session-onboarding.md"
+    ["{{DOCS_AGENT_DIR}}/task-format.md"]="${SLUG}-task-workflow/references/task-format.md"
+    ["{{DOCS_AGENT_DIR}}/task-maturity.md"]="${SLUG}-task-workflow/references/task-maturity.md"
+    ["tasks/templates/task.md"]="${SLUG}-task-workflow/references/task-template.md"
+    ["{{DOCS_AGENT_DIR}}/review-checklist.md"]="${SLUG}-review/references/review-checklist.md"
+    ["{{DOCS_AGENT_DIR}}/architecture-review-checklist.md"]="${SLUG}-review/references/architecture-review-checklist.md"
+    ["{{DOCS_AGENT_DIR}}/agent-output-review-checklist.md"]="${SLUG}-review/references/agent-output-review-checklist.md"
+    ["{{DOCS_AGENT_DIR}}/docs-sync-policy.md"]="${SLUG}-docs-sync/references/docs-sync-policy.md"
+)
+
+for src in "${!MAP[@]}"; do
+    dst="${SKILLS}/${MAP[$src]}"
+    if [[ ! -f "${REPO_ROOT}/${src}" ]]; then
+        echo "MISSING SOURCE: ${src}" >&2
+        continue
+    fi
+    mkdir -p "$(dirname "$dst")"
+    cp "${REPO_ROOT}/${src}" "$dst"
+    echo "  ${src} -> ${MAP[$src]}"
+done
+
+echo "Resynced ${#MAP[@]} reference files."

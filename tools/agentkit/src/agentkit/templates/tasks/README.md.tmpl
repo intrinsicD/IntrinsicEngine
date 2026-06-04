@@ -1,0 +1,37 @@
+# Tasks
+
+The canonical work-tracking system for {{PROJECT_NAME}}.
+
+## Lifecycle
+
+Directories: {{TASK_DIRS_LIST}}
+
+1. `tasks/backlog/` — planned, not yet started.
+2. `tasks/active/` — in progress or blocked.
+3. `tasks/done/` — completed, with completion metadata (a `YYYY-MM-DD` date and a
+   PR/commit reference).
+
+Base new task files on `tasks/templates/`. Do not keep long-lived planning
+checklists at the repository root once the work belongs in this structure.
+
+## Task id prefixes
+
+Ids look like `{{TASK_ID_EXAMPLE}}` and use a registered prefix:
+
+{{TASK_PREFIXES_BLOCK}}
+
+Adjust this list in `agentkit.toml` (`[tasks].id_prefixes`).
+
+## Required shape
+
+All task files follow [task-format](/{{DOCS_AGENT_DIR}}/task-format.md): Goal,
+Non-goals, Context, Required changes, Tests, Docs, Acceptance criteria,
+Verification, Forbidden changes.
+
+## Conventions
+
+- Keep each task small and scoped.
+- Use checkbox todos (`- [ ]`) in Required changes / Tests / Docs / Acceptance criteria.
+- Create a task quickly with:
+  `python3 tools/agentkit/agentkit.py new-task {{TASK_ID_EXAMPLE}} "Title"`
+- Validate with: `python3 {{CHECKS_DIR}}/check_tasks.py --root . --strict`
