@@ -1,0 +1,59 @@
+# Task Format
+
+Every task file in `tasks/` follows one structure so agents and reviewers can
+scan them quickly and tooling can validate them
+(`{{CHECKS_DIR}}/check_tasks.py`).
+
+## Required structure
+
+````markdown
+# {{TASK_ID_EXAMPLE}} — Short imperative title
+
+## Goal
+- What outcome this task delivers.
+
+## Non-goals
+- What this task explicitly does not do.
+
+## Context
+- Why now; links to related code, tasks, or docs.
+
+## Required changes
+- [ ] Concrete, reviewable change.
+
+## Tests
+- [ ] Test or verification requirement.
+
+## Docs
+- [ ] Documentation update (or "none — reason").
+
+## Acceptance criteria
+- [ ] Observable condition that means "done".
+
+## Verification
+```bash
+{{TEST_CMD}}
+```
+
+## Forbidden changes
+- Mixing mechanical moves with semantic refactors.
+- Introducing unrelated feature work.
+````
+
+## Field guidance
+
+- The H1 is `# <ID> — <title>`. The id matches the pattern in `agentkit.toml`
+  (`[tasks].id_regex`) and uses a registered prefix (see [tasks/README](/tasks/README.md)).
+- **Goal / Non-goals / Context / Forbidden changes** are plain bullets.
+- **Required changes / Tests / Docs / Acceptance criteria** use checkbox todos
+  (`- [ ]` open, `- [x]` done) so progress is mechanically visible.
+- Keep tasks small. If a task needs more than a handful of required changes,
+  split it into slices that each ship independently.
+- A file in `tasks/done/` carries a completion date (`YYYY-MM-DD`) and a
+  reference to the PR or commit that closed it, and has no open `- [ ]` todos.
+
+## Optional `## Maturity`
+
+Add a `## Maturity` section when the stop-state is ambiguous (a slice that lands
+partial-but-correct rather than fully complete). See
+[task-maturity](/{{DOCS_AGENT_DIR}}/task-maturity.md) for the closure rule.

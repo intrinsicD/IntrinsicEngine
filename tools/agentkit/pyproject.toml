@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentkit-bootstrap"
+version = "0.1.0"
+description = "Bootstrap a portable, contract-driven agentic workflow into any repository."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+keywords = ["agents", "ai", "workflow", "bootstrap", "claude", "codex", "copilot"]
+dependencies = []
+
+[project.scripts]
+agentkit = "agentkit.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+agentkit = ["templates/**", "templates/**/.gitkeep"]

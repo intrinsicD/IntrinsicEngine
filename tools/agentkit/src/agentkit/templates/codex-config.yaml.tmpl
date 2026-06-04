@@ -1,0 +1,17 @@
+project:
+  name: {{PROJECT_NAME}}
+  language: {{LANGUAGE}}
+
+workflow:
+  # The canonical local verification gate. Keep in sync with agentkit.toml [commands].
+  verification_command: "{{TEST_CMD}}"
+  instruction_file: "{{CONTRACT_FILE}}"
+
+ignore:
+  - "build/**"
+  - ".git/**"
+  - "node_modules/**"
+
+agent:
+  reasoning_effort: high
+  enable_compaction: true

@@ -1,0 +1,40 @@
+name: ci-docs
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  structural:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validate tasks (strict)
+        run: python3 {{CHECKS_DIR}}/check_tasks.py --root . --strict
+
+      - name: Validate doc links (strict)
+        run: python3 {{CHECKS_DIR}}/check_doc_links.py --root . --strict
+
+      - name: Validate root hygiene (strict)
+        run: python3 {{CHECKS_DIR}}/check_root_hygiene.py --root . --strict
+
+      - name: Validate workflow naming (strict)
+        run: python3 {{CHECKS_DIR}}/check_workflow_names.py --root . --strict
+
+      - name: Validate agent surfaces (strict)
+        run: python3 {{CHECKS_DIR}}/check_agent_config.py --root . --strict
+
+      - name: Validate PR template
+        run: python3 {{CHECKS_DIR}}/check_pr_contract.py --root . --mode ci
+
+      - name: Validate docs-sync rules
+        run: python3 {{CHECKS_DIR}}/check_docs_sync.py --root . --base-ref "origin/${{ github.base_ref }}"

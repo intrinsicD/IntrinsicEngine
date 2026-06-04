@@ -1,0 +1,30 @@
+# Documentation Sync Policy
+
+Documentation ships in the **same** change as the code/structure it describes.
+Stale docs are worse than missing docs.
+
+## Principles
+
+- **Same-PR rule.** If a change alters behavior, structure, or policy, update
+  the relevant docs and task records in the same PR.
+- **Factual, current state.** Docs describe what *is*, not what is hoped for.
+  Label any forward-looking content explicitly.
+- **Link integrity.** When files move or are renamed, fix every reference. The
+  link checker (`{{CHECKS_DIR}}/check_doc_links.py`) enforces resolvable links;
+  prefer repo-root-relative links (`/path/from/root.md`) so they survive being
+  mirrored into skill `references/`.
+
+## Per-change-type targets
+
+| When you change… | Also update… |
+|------------------|--------------|
+| Public API / module surface | the doc(s) describing that surface |
+| Repository structure / file moves | `{{CONTRACT_FILE}}` map + any inventory |
+| Task / process policy | `tasks/` records and the relevant `{{DOCS_AGENT_DIR}}/*` doc |
+| CI / workflow behavior | the workflow files and any CI notes in `{{CONTRACT_FILE}}` |
+
+## Enforced rules
+
+Machine-checkable "change X ⇒ update a doc in Y" rules live in `{{RULES_FILE}}`
+and run via `{{CHECKS_DIR}}/check_docs_sync.py`. Add a rule there when a code
+area must always travel with a documentation update.
