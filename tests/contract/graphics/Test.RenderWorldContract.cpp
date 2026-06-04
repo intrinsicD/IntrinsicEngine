@@ -232,7 +232,7 @@ TEST(RenderWorldContract, ExposesRendererOwnedImmutableRuntimeSnapshots)
     renderer->Shutdown();
 }
 
-TEST(RenderWorldContract, BeginFrameClearsPreviousRuntimeSnapshots)
+TEST(RenderWorldContract, BeginFrameRetainsRuntimeSnapshotSlotsUntilOverwrite)
 {
     Tests::MockDevice device;
     std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
@@ -240,20 +240,49 @@ TEST(RenderWorldContract, BeginFrameClearsPreviousRuntimeSnapshots)
 
     RHI::FrameHandle frame{};
     ASSERT_TRUE(renderer->BeginFrame(frame));
-    const auto instance = renderer->GetGpuWorld().AllocateInstance(7u);
-    ASSERT_TRUE(instance.IsValid());
+    const auto firstInstance = renderer->GetGpuWorld().AllocateInstance(7u);
+    const auto secondInstance = renderer->GetGpuWorld().AllocateInstance(8u);
+    ASSERT_TRUE(firstInstance.IsValid());
+    ASSERT_TRUE(secondInstance.IsValid());
 
-    const std::array<Graphics::TransformSyncRecord, 1> transforms{{
+    const std::array<Graphics::TransformSyncRecord, 1> firstTransforms{{
         Graphics::TransformSyncRecord{
             .StableId = 7u,
-            .Instance = instance,
+            .Instance = firstInstance,
         },
     }};
-    renderer->SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{.Transforms = transforms});
-    EXPECT_EQ(renderer->ExtractRenderWorld({}).Renderables.size(), 1u);
+    const std::array<Graphics::TransformSyncRecord, 1> secondTransforms{{
+        Graphics::TransformSyncRecord{
+            .StableId = 8u,
+            .Instance = secondInstance,
+        },
+    }};
+    renderer->SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{.Transforms = firstTransforms}, 0u);
+    renderer->SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{.Transforms = secondTransforms}, 1u);
+
+    const Graphics::RenderWorld firstWorld = renderer->ExtractRenderWorld({}, 0u);
+    ASSERT_EQ(firstWorld.Renderables.size(), 1u);
+    EXPECT_EQ(firstWorld.Renderables[0].StableId, 7u);
+    const Graphics::RenderWorld secondWorld = renderer->ExtractRenderWorld({}, 1u);
+    ASSERT_EQ(secondWorld.Renderables.size(), 1u);
+    EXPECT_EQ(secondWorld.Renderables[0].StableId, 8u);
 
     ASSERT_TRUE(renderer->BeginFrame(frame));
-    const Graphics::RenderWorld emptyWorld = renderer->ExtractRenderWorld({});
+    const Graphics::RenderWorld retainedFirstWorld = renderer->ExtractRenderWorld({}, 0u);
+    ASSERT_EQ(retainedFirstWorld.Renderables.size(), 1u);
+    EXPECT_EQ(retainedFirstWorld.Renderables[0].StableId, 7u);
+    EXPECT_FALSE(retainedFirstWorld.PickRequest.Pending);
+    EXPECT_FALSE(retainedFirstWorld.PickRequest.HasRay);
+    EXPECT_FALSE(retainedFirstWorld.Camera.Valid);
+    EXPECT_FALSE(retainedFirstWorld.Selection.HasHovered);
+    EXPECT_FALSE(retainedFirstWorld.Shadows.Enabled);
+
+    const Graphics::RenderWorld retainedSecondWorld = renderer->ExtractRenderWorld({}, 1u);
+    ASSERT_EQ(retainedSecondWorld.Renderables.size(), 1u);
+    EXPECT_EQ(retainedSecondWorld.Renderables[0].StableId, 8u);
+
+    renderer->SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{}, 0u);
+    const Graphics::RenderWorld emptyWorld = renderer->ExtractRenderWorld({}, 0u);
     EXPECT_TRUE(emptyWorld.Renderables.empty());
     EXPECT_TRUE(emptyWorld.Lights.empty());
     EXPECT_FALSE(emptyWorld.PickRequest.Pending);
@@ -277,8 +306,11 @@ TEST(RenderWorldContract, BeginFrameClearsPreviousRuntimeSnapshots)
     EXPECT_FALSE(emptyWorld.PostProcess.Enabled);
     EXPECT_EQ(emptyWorld.InvalidSnapshotRecordCount, 0u);
 
+    const Graphics::RenderWorld stillRetainedSecondWorld = renderer->ExtractRenderWorld({}, 1u);
+    ASSERT_EQ(stillRetainedSecondWorld.Renderables.size(), 1u);
+    EXPECT_EQ(stillRetainedSecondWorld.Renderables[0].StableId, 8u);
+
     renderer->Shutdown();
 }
-
 
 

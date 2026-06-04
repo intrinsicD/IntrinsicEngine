@@ -321,9 +321,9 @@ namespace Extrinsic::Runtime
         // Size the runtime-owned slot pool from the render config: one logical
         // buffer in the default synchronous mode (serial extraction/render,
         // behavior-preserving), or the triple-buffered default when pipelined
-        // extraction is requested. Flipping SynchronousExtraction off by default
-        // and proving the render-N-1 path is GRAPHICS-036D; this slice only wires
-        // the lifecycle so the synchronous baseline is exercised end-to-end.
+        // extraction is requested. The production default remains synchronous;
+        // GRAPHICS-036D proves the opt-in render-N-1 path by consuming the
+        // previous front while extraction writes the newly acquired back slot.
         m_RenderWorldPool = std::make_unique<RenderWorldPool>(
             m_Config.Render.SynchronousExtraction
                 ? 1u
@@ -851,6 +851,7 @@ namespace Extrinsic::Runtime
             Graphics::GpuAssetCache* GpuAssetCache;
             const SelectionController& Selection;
             RenderWorldPool& Pool;
+            bool SynchronousExtraction;
             RuntimeRenderExtractionStats& Stats;
             std::uint64_t FrameIndex;
             std::uint32_t& OutFrontSlot;
@@ -864,6 +865,7 @@ namespace Extrinsic::Runtime
                              Graphics::GpuAssetCache* gpuAssetCache,
                              const SelectionController& selection,
                              RenderWorldPool& pool,
+                             const bool synchronousExtraction,
                              RuntimeRenderExtractionStats& stats,
                              std::uint64_t frameIndex,
                              std::uint32_t& outFrontSlot,
@@ -876,6 +878,7 @@ namespace Extrinsic::Runtime
                 , GpuAssetCache(gpuAssetCache)
                 , Selection(selection)
                 , Pool(pool)
+                , SynchronousExtraction(synchronousExtraction)
                 , Stats(stats)
                 , FrameIndex(frameIndex)
                 , OutFrontSlot(outFrontSlot)
@@ -896,17 +899,36 @@ namespace Extrinsic::Runtime
                 const std::uint32_t backSlot = Pool.AcquireBack(FrameIndex);
 
                 // RUNTIME-089 Slice B — mirror the runtime selection snapshot
-                // into RenderWorld::Selection via the extraction batch.
-                Stats = Extraction.ExtractAndSubmit(Scene, Renderer, GpuAssetCache, &Selection);
-
+                // into RenderWorld::Selection via the extraction batch. In
+                // pipelined mode the renderer writes into the acquired back
+                // slot while the consumer below reads the previous front slot.
+                const std::uint32_t submitSlot =
+                    backSlot != RenderWorldPool::kInvalidSlot ? backSlot : 0u;
                 if (backSlot != RenderWorldPool::kInvalidSlot)
+                {
+                    Stats = Extraction.ExtractAndSubmit(Scene,
+                                                         Renderer,
+                                                         GpuAssetCache,
+                                                         &Selection,
+                                                         submitSlot);
                     Pool.PublishFront(backSlot);
+                }
+                else
+                {
+                    Stats = Extraction.GetLastStats();
+                }
 
-                // Consumer half: acquire the published front under a refcount for
-                // the renderer's in-flight window; released after frame retire.
-                OutFrontSlot = Pool.AcquireFront(FrameIndex);
+                // Consumer half: synchronous mode preserves the existing
+                // same-frame consume. Pipelined mode intentionally consumes the
+                // previously published front (render-N-1) after extraction has
+                // published N.
+                OutFrontSlot = SynchronousExtraction
+                    ? Pool.AcquireFront(FrameIndex)
+                    : Pool.AcquirePreviousFront(FrameIndex);
 
-                World = Renderer.ExtractRenderWorld(Input);
+                const std::uint32_t extractSlot =
+                    OutFrontSlot != RenderWorldPool::kInvalidSlot ? OutFrontSlot : submitSlot;
+                World = Renderer.ExtractRenderWorld(Input, extractSlot);
 
                 // GRAPHICS-036B — surface the pool's three counters on the
                 // extraction stats for editor overlays / tests.
@@ -923,6 +945,7 @@ namespace Extrinsic::Runtime
                                      m_GpuAssetCache.get(),
                                      m_SelectionController,
                                      *m_RenderWorldPool,
+                                     m_Config.Render.SynchronousExtraction,
                                      extractionStats,
                                      frameIndex,
                                      pooledFrontSlot,
@@ -1098,11 +1121,10 @@ namespace Extrinsic::Runtime
         (void)completedGpuValue;
 
         // ── GRAPHICS-036C: release the pooled front at frame retire ────────
-        // The renderer consumed the front snapshot this frame (commands are
-        // recorded by ExecuteFrame above). In the synchronous default the front
-        // is released here so the single slot is reclaimable next frame; the
-        // pipelined render-N-1 path that holds the reference across the in-flight
-        // GPU window is the GRAPHICS-036D follow-up.
+        // The renderer consumed the acquired snapshot this frame (commands are
+        // recorded by ExecuteFrame above). Synchronous mode releases the current
+        // front; pipelined mode releases the previous front consumed by render-N
+        // after extraction-N has already published the new front.
         if (pooledFrontSlot != RenderWorldPool::kInvalidSlot)
             m_RenderWorldPool->ReleaseFront(pooledFrontSlot);
 

@@ -1388,7 +1388,8 @@ namespace Extrinsic::Runtime
         ECS::Scene::Registry& scene,
         Graphics::IRenderer& renderer,
         Graphics::GpuAssetCache* gpuAssets,
-        const SelectionController* selection)
+        const SelectionController* selection,
+        const std::uint32_t runtimeSnapshotStorageSlot)
     {
         RuntimeRenderExtractionStats stats{};
         auto& registry = scene.Raw();
@@ -1860,7 +1861,7 @@ namespace Extrinsic::Runtime
             batch.SelectionHoveredStableId   = selection->HoveredStableId();
             batch.SelectionHasHovered        = selection->HasHovered();
         }
-        renderer.SubmitRuntimeSnapshots(batch);
+        renderer.SubmitRuntimeSnapshots(batch, runtimeSnapshotStorageSlot);
 
         m_LastStats = stats;
         return m_LastStats;

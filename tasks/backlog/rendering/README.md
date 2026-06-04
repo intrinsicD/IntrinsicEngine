@@ -872,7 +872,7 @@ Pipelined frames (GRAPHICS-036):
 - [GRAPHICS-036A (done)](../../done/GRAPHICS-036A-render-world-pool.md) — `Runtime.RenderWorldPool` slot-lifecycle value type (`CPUContracted`).
 - [GRAPHICS-036B (done)](../../done/GRAPHICS-036B-render-world-pool-diagnostics.md) — pool diagnostics mirror on `RuntimeRenderExtractionStats` (`CPUContracted`).
 - [GRAPHICS-036C (done)](../../done/GRAPHICS-036C-render-world-pool-engine-wiring.md) — wired the pool into `Engine::RunFrame` behind default-on `SynchronousExtraction` (`Operational`, 2026-06-04). Depended on 036A/036B.
-- [GRAPHICS-036D](GRAPHICS-036D-render-world-pool-pipelined-proof.md) — pipelined render-N-1 integration proof. Depends on 036C.
+- [GRAPHICS-036D (done)](../../done/GRAPHICS-036D-render-world-pool-pipelined-proof.md) — pipelined render-N-1 integration proof (`Operational`, 2026-06-04). Depended on 036C.
 
 Async compute / multi-queue (GRAPHICS-037):
 - [GRAPHICS-037A](GRAPHICS-037A-queue-affinity-rhi-surface.md) — RHI `QueueAffinity` + demotion + null-queue mocks; reconciles the existing framegraph `RenderQueue`. Depends on GRAPHICS-037 (planning, done).

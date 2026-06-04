@@ -276,6 +276,93 @@ namespace Extrinsic::Graphics
 
     class NullRenderer final : public IRenderer
     {
+    private:
+        static constexpr std::uint32_t kRuntimeSnapshotStorageSlots = 4u;
+
+        struct RuntimeSnapshotStorage
+        {
+            std::vector<VisualizationSyncRecord>           VisualizationSyncRecords;
+            std::vector<VisualizationAttributeBufferPacket> VisualizationAttributeBuffers;
+            std::vector<ScalarAttributePacket>              VisualizationScalars;
+            std::vector<ColorAttributePacket>               VisualizationColors;
+            std::vector<VectorFieldOverlayPacket>           VisualizationVectorFields;
+            std::vector<IsolineOverlayPacket>               VisualizationIsolines;
+            std::vector<HtexPatchPreviewAtlasPacket>        VisualizationHtexAtlases;
+            std::vector<FragmentBakeAtlasPacket>            VisualizationFragmentBakeAtlases;
+            VisualizationDiagnostics                        VisualizationDiagnostics{};
+            VisualizationOverlaySummary                     VisualizationOverlaySummary{};
+            std::vector<TransformSyncRecord>                TransformSyncRecords;
+            std::vector<LightSnapshot>                      LightSnapshots;
+            std::vector<DebugLinePacket>                    DebugLinePackets;
+            std::vector<DebugPointPacket>                   DebugPointPackets;
+            std::vector<DebugTrianglePacket>                DebugTrianglePackets;
+            std::vector<TransformGizmoRenderPacket>         TransformGizmoPackets;
+            std::vector<RenderableSnapshot>                 RenderableSnapshots;
+            std::vector<std::uint32_t>                      SelectionSelectedStableIds;
+            std::uint32_t                                   SelectionHoveredStableId{0u};
+            bool                                            SelectionHasHovered{false};
+            std::uint32_t                                   InvalidSnapshotRecordCount{0u};
+
+            void Clear()
+            {
+                VisualizationSyncRecords.clear();
+                VisualizationAttributeBuffers.clear();
+                VisualizationScalars.clear();
+                VisualizationColors.clear();
+                VisualizationVectorFields.clear();
+                VisualizationIsolines.clear();
+                VisualizationHtexAtlases.clear();
+                VisualizationFragmentBakeAtlases.clear();
+                VisualizationDiagnostics = {};
+                VisualizationOverlaySummary = {};
+                TransformSyncRecords.clear();
+                LightSnapshots.clear();
+                DebugLinePackets.clear();
+                DebugPointPackets.clear();
+                DebugTrianglePackets.clear();
+                TransformGizmoPackets.clear();
+                RenderableSnapshots.clear();
+                SelectionSelectedStableIds.clear();
+                SelectionHoveredStableId = 0u;
+                SelectionHasHovered = false;
+                InvalidSnapshotRecordCount = 0u;
+            }
+        };
+
+        [[nodiscard]] static std::uint32_t NormalizeRuntimeSnapshotSlot(
+            const std::uint32_t storageSlot) noexcept
+        {
+            return storageSlot < kRuntimeSnapshotStorageSlots ? storageSlot : 0u;
+        }
+
+        [[nodiscard]] RuntimeSnapshotStorage& RuntimeSnapshotSlot(
+            const std::uint32_t storageSlot) noexcept
+        {
+            return m_RuntimeSnapshotSlots[NormalizeRuntimeSnapshotSlot(storageSlot)];
+        }
+
+        [[nodiscard]] const RuntimeSnapshotStorage& RuntimeSnapshotSlot(
+            const std::uint32_t storageSlot) const noexcept
+        {
+            return m_RuntimeSnapshotSlots[NormalizeRuntimeSnapshotSlot(storageSlot)];
+        }
+
+        [[nodiscard]] RuntimeSnapshotStorage& ActiveRuntimeSnapshotStorage() noexcept
+        {
+            return RuntimeSnapshotSlot(m_ActiveRuntimeSnapshotReadSlot);
+        }
+
+        [[nodiscard]] const RuntimeSnapshotStorage& ActiveRuntimeSnapshotStorage() const noexcept
+        {
+            return RuntimeSnapshotSlot(m_ActiveRuntimeSnapshotReadSlot);
+        }
+
+        void ClearRuntimeSnapshotSlots()
+        {
+            for (RuntimeSnapshotStorage& storage : m_RuntimeSnapshotSlots)
+                storage.Clear();
+        }
+
     public:
         void Initialize(RHI::IDevice& device) override
         {
@@ -571,6 +658,7 @@ namespace Extrinsic::Graphics
         void Shutdown() override
         {
             m_Device = nullptr;
+            ClearRuntimeSnapshotSlots();
             if (m_SelectionSystem) m_SelectionSystem->Shutdown();
             if (m_LightSystem)     m_LightSystem->Shutdown();
             // GRAPHICS-076 Slice B — drop the renderer-owned
@@ -888,8 +976,32 @@ namespace Extrinsic::Graphics
             return m_ImGuiOverlaySystem != nullptr && m_ImGuiPass.has_value();
         }
 
-        void SubmitRuntimeSnapshots(const RuntimeRenderSnapshotBatch& snapshots) override
+        void SubmitRuntimeSnapshots(const RuntimeRenderSnapshotBatch& snapshots,
+                                    const std::uint32_t storageSlot) override
         {
+            RuntimeSnapshotStorage& storage = RuntimeSnapshotSlot(storageSlot);
+            auto& m_TransformSyncRecords = storage.TransformSyncRecords;
+            auto& m_LightSnapshots = storage.LightSnapshots;
+            auto& m_VisualizationSyncRecords = storage.VisualizationSyncRecords;
+            auto& m_VisualizationAttributeBuffers = storage.VisualizationAttributeBuffers;
+            auto& m_VisualizationScalars = storage.VisualizationScalars;
+            auto& m_VisualizationColors = storage.VisualizationColors;
+            auto& m_VisualizationVectorFields = storage.VisualizationVectorFields;
+            auto& m_VisualizationIsolines = storage.VisualizationIsolines;
+            auto& m_VisualizationHtexAtlases = storage.VisualizationHtexAtlases;
+            auto& m_VisualizationFragmentBakeAtlases = storage.VisualizationFragmentBakeAtlases;
+            auto& m_VisualizationDiagnostics = storage.VisualizationDiagnostics;
+            auto& m_VisualizationOverlaySummary = storage.VisualizationOverlaySummary;
+            auto& m_DebugLinePackets = storage.DebugLinePackets;
+            auto& m_DebugPointPackets = storage.DebugPointPackets;
+            auto& m_DebugTrianglePackets = storage.DebugTrianglePackets;
+            auto& m_TransformGizmoPackets = storage.TransformGizmoPackets;
+            auto& m_RenderableSnapshots = storage.RenderableSnapshots;
+            auto& m_SelectionSelectedStableIds = storage.SelectionSelectedStableIds;
+            auto& m_SelectionHoveredStableId = storage.SelectionHoveredStableId;
+            auto& m_SelectionHasHovered = storage.SelectionHasHovered;
+            auto& m_InvalidSnapshotRecordCount = storage.InvalidSnapshotRecordCount;
+
             m_TransformSyncRecords.assign(snapshots.Transforms.begin(), snapshots.Transforms.end());
             m_LightSnapshots.assign(snapshots.Lights.begin(), snapshots.Lights.end());
             m_VisualizationSyncRecords.assign(snapshots.Visualizations.begin(), snapshots.Visualizations.end());
@@ -1124,8 +1236,31 @@ namespace Extrinsic::Graphics
             }
         }
 
-        RenderWorld ExtractRenderWorld(const RenderFrameInput& input) override
+        RenderWorld ExtractRenderWorld(const RenderFrameInput& input,
+                                       const std::uint32_t storageSlot) override
         {
+            m_ActiveRuntimeSnapshotReadSlot = NormalizeRuntimeSnapshotSlot(storageSlot);
+            const RuntimeSnapshotStorage& storage = ActiveRuntimeSnapshotStorage();
+            const auto& m_LightSnapshots = storage.LightSnapshots;
+            const auto& m_VisualizationAttributeBuffers = storage.VisualizationAttributeBuffers;
+            const auto& m_VisualizationScalars = storage.VisualizationScalars;
+            const auto& m_VisualizationColors = storage.VisualizationColors;
+            const auto& m_VisualizationVectorFields = storage.VisualizationVectorFields;
+            const auto& m_VisualizationIsolines = storage.VisualizationIsolines;
+            const auto& m_VisualizationHtexAtlases = storage.VisualizationHtexAtlases;
+            const auto& m_VisualizationFragmentBakeAtlases = storage.VisualizationFragmentBakeAtlases;
+            const auto& m_VisualizationDiagnostics = storage.VisualizationDiagnostics;
+            const auto& m_VisualizationOverlaySummary = storage.VisualizationOverlaySummary;
+            const auto& m_DebugLinePackets = storage.DebugLinePackets;
+            const auto& m_DebugPointPackets = storage.DebugPointPackets;
+            const auto& m_DebugTrianglePackets = storage.DebugTrianglePackets;
+            const auto& m_TransformGizmoPackets = storage.TransformGizmoPackets;
+            const auto& m_RenderableSnapshots = storage.RenderableSnapshots;
+            const auto& m_SelectionSelectedStableIds = storage.SelectionSelectedStableIds;
+            const auto& m_SelectionHoveredStableId = storage.SelectionHoveredStableId;
+            const auto& m_SelectionHasHovered = storage.SelectionHasHovered;
+            const auto& m_InvalidSnapshotRecordCount = storage.InvalidSnapshotRecordCount;
+
             m_HasExtractedRenderWorld = true;
             m_HasPreparedFrame = false;
             const PickPixelRequest pick = input.Pick.Pending
@@ -1203,6 +1338,7 @@ namespace Extrinsic::Graphics
                 m_HasPreparedFrame = false;
                 return;
             }
+            RuntimeSnapshotStorage* const activeSnapshot = &ActiveRuntimeSnapshotStorage();
 
             // Phase 14.1 sync order contract:
             //  1) commit pipelines
@@ -1244,10 +1380,10 @@ namespace Extrinsic::Graphics
                         b.Read<PrepMaterialBaseSyncTag>();
                         b.Write<PrepVisualizationSyncTag>();
                     },
-                    [this]
+                    [this, activeSnapshot]
                     {
                         m_VisualizationSyncSystem->Sync(
-                            m_VisualizationSyncRecords,
+                            activeSnapshot->VisualizationSyncRecords,
                             *m_MaterialSystem,
                             *m_ColormapSystem,
                             *m_GpuWorld);
@@ -1270,9 +1406,9 @@ namespace Extrinsic::Graphics
                         b.Read<PrepMaterialOverrideSyncTag>();
                         b.Write<PrepTransformSyncTag>();
                     },
-                    [this]
+                    [this, activeSnapshot]
                     {
-                        m_TransformSyncSystem->SyncGpuBuffer(m_TransformSyncRecords, *m_GpuWorld);
+                        m_TransformSyncSystem->SyncGpuBuffer(activeSnapshot->TransformSyncRecords, *m_GpuWorld);
                     });
                 m_RenderPrepGraph.AddPass(
                     "RenderPrep.LightSync",
@@ -1281,9 +1417,9 @@ namespace Extrinsic::Graphics
                         b.Read<PrepTransformSyncTag>();
                         b.Write<PrepLightSyncTag>();
                     },
-                    [this]
+                    [this, activeSnapshot]
                     {
-                        m_LightSystem->SyncGpuBuffer(m_LightSnapshots, *m_GpuWorld);
+                        m_LightSystem->SyncGpuBuffer(activeSnapshot->LightSnapshots, *m_GpuWorld);
                     });
                 m_RenderPrepGraph.AddPass(
                     "RenderPrep.GpuWorldSync",
@@ -1331,13 +1467,13 @@ namespace Extrinsic::Graphics
                 m_PipelineManager->CommitPending();
                 m_MaterialSystem->SyncGpuBuffer();
                 m_VisualizationSyncSystem->Sync(
-                    m_VisualizationSyncRecords,
+                    activeSnapshot->VisualizationSyncRecords,
                     *m_MaterialSystem,
                     *m_ColormapSystem,
                     *m_GpuWorld);
                 m_MaterialSystem->SyncGpuBuffer();
-                m_TransformSyncSystem->SyncGpuBuffer(m_TransformSyncRecords, *m_GpuWorld);
-                m_LightSystem->SyncGpuBuffer(m_LightSnapshots, *m_GpuWorld);
+                m_TransformSyncSystem->SyncGpuBuffer(activeSnapshot->TransformSyncRecords, *m_GpuWorld);
+                m_LightSystem->SyncGpuBuffer(activeSnapshot->LightSnapshots, *m_GpuWorld);
                 m_GpuWorld->SetMaterialBuffer(
                     m_MaterialSystem->GetBuffer(),
                     m_MaterialSystem->GetCapacity());
@@ -5472,24 +5608,7 @@ namespace Extrinsic::Graphics
 
         void ResetFrameState()
         {
-            m_VisualizationSyncRecords.clear();
-            m_VisualizationAttributeBuffers.clear();
-            m_VisualizationScalars.clear();
-            m_VisualizationColors.clear();
-            m_VisualizationVectorFields.clear();
-            m_VisualizationIsolines.clear();
-            m_VisualizationHtexAtlases.clear();
-            m_VisualizationFragmentBakeAtlases.clear();
-            m_VisualizationDiagnostics = {};
-            m_VisualizationOverlaySummary = {};
-            m_TransformSyncRecords.clear();
-            m_LightSnapshots.clear();
-            m_DebugLinePackets.clear();
-            m_DebugPointPackets.clear();
-            m_DebugTrianglePackets.clear();
-            m_TransformGizmoPackets.clear();
-            m_RenderableSnapshots.clear();
-            m_InvalidSnapshotRecordCount = 0;
+            m_ActiveRuntimeSnapshotReadSlot = 0u;
             if (m_MaterialSystem)
             {
                 m_MaterialSystem->ResetPerFrameSubstitutionCounters();
@@ -7015,30 +7134,8 @@ namespace Extrinsic::Graphics
         std::vector<bool>                              m_HistogramSlotPending;
         std::vector<std::uint64_t>                     m_HistogramSlotIssuedFrame;
         std::vector<bool>                              m_HistogramSlotInvalidated;
-        std::vector<VisualizationSyncRecord> m_VisualizationSyncRecords;
-        std::vector<VisualizationAttributeBufferPacket> m_VisualizationAttributeBuffers;
-        std::vector<ScalarAttributePacket>              m_VisualizationScalars;
-        std::vector<ColorAttributePacket>               m_VisualizationColors;
-        std::vector<VectorFieldOverlayPacket>           m_VisualizationVectorFields;
-        std::vector<IsolineOverlayPacket>               m_VisualizationIsolines;
-        std::vector<HtexPatchPreviewAtlasPacket>        m_VisualizationHtexAtlases;
-        std::vector<FragmentBakeAtlasPacket>            m_VisualizationFragmentBakeAtlases;
-        VisualizationDiagnostics             m_VisualizationDiagnostics{};
-        VisualizationOverlaySummary          m_VisualizationOverlaySummary{};
-        std::vector<TransformSyncRecord>     m_TransformSyncRecords;
-        std::vector<LightSnapshot>           m_LightSnapshots;
-        std::vector<DebugLinePacket>         m_DebugLinePackets;
-        std::vector<DebugPointPacket>        m_DebugPointPackets;
-        std::vector<DebugTrianglePacket>     m_DebugTrianglePackets;
-        std::vector<TransformGizmoRenderPacket> m_TransformGizmoPackets;
-        std::vector<RenderableSnapshot>      m_RenderableSnapshots;
-        // RUNTIME-089 Slice B — stable storage for the runtime selection
-        // snapshot copied out of the submitted batch so the spans surfaced on
-        // RenderWorld::Selection outlive ExtractRenderWorld.
-        std::vector<std::uint32_t>           m_SelectionSelectedStableIds;
-        std::uint32_t                        m_SelectionHoveredStableId{0u};
-        bool                                 m_SelectionHasHovered{false};
-        std::uint32_t                        m_InvalidSnapshotRecordCount{0};
+        std::array<RuntimeSnapshotStorage, kRuntimeSnapshotStorageSlots> m_RuntimeSnapshotSlots{};
+        std::uint32_t                        m_ActiveRuntimeSnapshotReadSlot{0u};
         bool                                 m_EnableRenderPrepTaskGraph{true};
         bool                                 m_CullingOutputAvailable{false};
         bool                                 m_HasExtractedRenderWorld{false};

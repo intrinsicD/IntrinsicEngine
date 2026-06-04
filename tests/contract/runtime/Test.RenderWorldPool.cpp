@@ -259,6 +259,30 @@ TEST(RenderWorldPool, FrameAgeReflectsPublishToConsumeDelta)
     EXPECT_EQ(pool.GetDiagnostics().LastConsumedFrameAge, 2u);
 }
 
+TEST(RenderWorldPool, PreviousFrontAcquireConsumesRenderNMinusOneWithoutStall)
+{
+    RenderWorldPool pool(3u);
+
+    const std::uint32_t frame0 = pool.AcquireBack(0u);
+    ASSERT_NE(frame0, kInvalid);
+    pool.PublishFront(frame0);
+
+    const std::uint32_t frame1 = pool.AcquireBack(1u);
+    ASSERT_NE(frame1, kInvalid);
+    ASSERT_NE(frame1, frame0);
+    pool.PublishFront(frame1);
+
+    const std::uint32_t consumed = pool.AcquirePreviousFront(1u);
+    EXPECT_EQ(consumed, frame0);
+    EXPECT_EQ(pool.RefCount(frame0), 1u);
+    EXPECT_EQ(pool.GetDiagnostics().LastConsumedFrameAge, 1u);
+    EXPECT_EQ(pool.GetDiagnostics().PipelineStallCount, 0u);
+    EXPECT_EQ(pool.GetDiagnostics().ExtractionSkipCount, 0u);
+
+    pool.ReleaseFront(consumed);
+    EXPECT_EQ(pool.RefCount(frame0), 0u);
+}
+
 // --- GRAPHICS-036B: diagnostics mirror onto extraction stats -------------
 
 TEST(RenderWorldPoolDiagnostics, MirrorIsZeroForUntouchedPool)

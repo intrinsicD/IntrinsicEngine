@@ -105,6 +105,14 @@ export namespace Extrinsic::Runtime
         // incremented. Returns `kInvalidSlot` only before any `PublishFront`.
         [[nodiscard]] std::uint32_t AcquireFront(std::uint64_t frameIndex) noexcept;
 
+        // Acquire the front that was current immediately before the most recent
+        // publish. This is the deterministic render-N-1 path: extraction
+        // publishes snapshot N, then rendering consumes the retained snapshot
+        // from N-1 without treating that intentional one-frame delay as a
+        // consumer stall. Before the second publish, this falls back to the
+        // current front so the pipeline can bootstrap frame 0.
+        [[nodiscard]] std::uint32_t AcquirePreviousFront(std::uint64_t frameIndex) noexcept;
+
         // Release a previously acquired front slot (decrement refcount). When the
         // refcount reaches zero and the slot is no longer the published front it
         // becomes reclaimable at the next `AcquireBack`.
@@ -137,6 +145,7 @@ export namespace Extrinsic::Runtime
         std::vector<Slot> m_Slots;
 
         std::atomic<std::uint32_t> m_Front{kInvalidSlot};   // published front index
+        std::atomic<std::uint32_t> m_PreviousFront{kInvalidSlot}; // front before latest publish
         std::atomic<std::uint64_t> m_PublishSeq{0u};        // monotonic publish count
         std::uint32_t              m_Back{kInvalidSlot};    // acquired-not-published back
         std::uint64_t              m_LastConsumedSeq{0u};   // publish seq seen at last consume

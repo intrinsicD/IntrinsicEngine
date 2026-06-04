@@ -912,10 +912,13 @@ Concretely:
   graphics-owned snapshot records (`TransformSyncRecord`, `LightSnapshot`, and
   `VisualizationSyncRecord`) instead of querying live ECS registries. Runtime is
   responsible for building those records from ECS/assets/geometry state.
-- `IRenderer::SubmitRuntimeSnapshots()` is the promoted handoff from runtime to
-  graphics. The renderer copies snapshot records into frame-local storage before
-  `ExtractRenderWorld()`/`PrepareFrame()` consume them; it does not retain ECS
-  registry references.
+- `IRenderer::SubmitRuntimeSnapshots(..., storageSlot)` is the promoted handoff
+  from runtime to graphics. The renderer copies snapshot records into retained
+  storage keyed by the runtime `RenderWorldPool` slot before
+  `ExtractRenderWorld(..., storageSlot)` / `PrepareFrame()` consume them; it
+  does not retain ECS registry references. Slot 0 remains the default legacy
+  path, while the pipelined render-N-1 path writes extraction-N to the acquired
+  back slot and extracts from the acquired previous-front slot.
 - Renderable asset-generation observation is runtime-owned. Per `GRAPHICS-023C`,
   `Extrinsic.Runtime.RenderExtraction` may compare `AssetInstance::Source` with a
   supplied `Graphics.GpuAssetCache` view and `GpuSceneSlot` metadata, but
@@ -1768,9 +1771,11 @@ Concretely:
   `InvalidMaterialSlotCount`, `DefaultDebugSurfaceUses`) live on
   `MaterialSystemDiagnostics` next to the unchanged
   `FallbackSlotResolveCount`, and are zeroed at the start of every
-  `SubmitRuntimeSnapshots()` and inside `ResetFrameState()` —
-  mirroring the existing `InvalidSnapshotRecordCount` reset cadence —
-  via `MaterialSystem::ResetPerFrameSubstitutionCounters()`), and
+  `SubmitRuntimeSnapshots()` and by the per-frame reset path via
+  `MaterialSystem::ResetPerFrameSubstitutionCounters()`. Retained runtime
+  snapshot slots themselves are not cleared by `ResetFrameState()`; they are
+  cleared only when their slot is rewritten so pipelined render-N-1 spans remain
+  stable), and
   the optional Impl-C (one additional debug variant) is identified
   but not opened.
 - GRAPHICS-023 closes the promoted material-layout reload contract as a

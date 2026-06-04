@@ -260,11 +260,13 @@ namespace Extrinsic::Runtime
         // ── GRAPHICS-036C — pipelined-frames render-world pool ────────────
         // Runtime-owned slot-lifecycle pool (`GRAPHICS-036A`) driven by RunFrame:
         // extraction acquires/publishes a back slot, the renderer consumes/releases
-        // the front slot, and the pool's three diagnostics counters mirror onto the
-        // last extraction stats each frame. Sized from
+        // the current front in synchronous mode or previous front in pipelined
+        // mode, and the pool's three diagnostics counters mirror onto the last
+        // extraction stats each frame. Sized from
         // `RenderConfig::SynchronousExtraction` in Initialize() (1 buffer when
-        // synchronous, triple-buffered otherwise). Valid after Initialize(); the
-        // pipelined render-N-1 storage proof is `GRAPHICS-036D`.
+        // synchronous, triple-buffered otherwise). Valid after Initialize();
+        // pipelined mode consumes the previous front after publishing the new
+        // front so render-N observes the retained N-1 snapshot.
         [[nodiscard]] const RenderWorldPool&  GetRenderWorldPool() const noexcept;
         // The `RuntimeRenderExtractionStats` produced by the most recent frame's
         // `ExtractAndSubmit`, including the mirrored `RenderWorldPool*` counters.
@@ -345,8 +347,8 @@ namespace Extrinsic::Runtime
         // Initialize() sized from RenderConfig::SynchronousExtraction (held by
         // unique_ptr because RenderWorldPool owns atomics and is neither copyable
         // nor movable, so it cannot be resized by assignment). RunFrame drives the
-        // acquire/publish/acquire/release sequence and mirrors its diagnostics into
-        // m_LastExtractionStats once per frame.
+        // acquire/publish/acquire-current-or-previous/release sequence and mirrors
+        // its diagnostics into m_LastExtractionStats once per frame.
         std::unique_ptr<RenderWorldPool>      m_RenderWorldPool{};
         RuntimeRenderExtractionStats          m_LastExtractionStats{};
         // Monotonic frame counter stamped onto pool slots for the consumer's

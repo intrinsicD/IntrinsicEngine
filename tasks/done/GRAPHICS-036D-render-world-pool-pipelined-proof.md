@@ -25,30 +25,45 @@
   render-N-1 reads a distinct buffer from the one extraction-N writes; that storage
   multi-buffering is the substantive work of this slice.
 
+## Status
+- Commit reference: this task-landing commit.
+- Landed 2026-06-04 at maturity `Operational` on the CPU/null gate. The renderer
+  now keeps retained runtime snapshot storage per pool slot, `Engine::RunFrame`
+  writes extraction-N into the acquired back slot, and opt-in pipelined mode
+  consumes `AcquirePreviousFront(frameIndex)` so render-N sees N-1 without
+  aliasing extraction-N. The production default remains
+  `RenderConfig::SynchronousExtraction = true`; no default flip landed.
+- Proof coverage: `RenderWorldPoolPipelined.ConsumesRenderNMinusOneWhileExtractionWritesN`
+  drives five frames with `SynchronousExtraction = false`, asserts the model
+  snapshot fields observed by render-N come from N-1, and asserts no
+  stall/skip counters with frame age 1 after bootstrap. The synchronous
+  frame-age-0 regression remains covered by the existing `contract;runtime`
+  pool tests.
+
 ## Required changes
-- [ ] Multi-buffer the renderer-side snapshot stable storage so a pooled front slot
+- [x] Multi-buffer the renderer-side snapshot stable storage so a pooled front slot
       maps to a distinct retained snapshot copy.
-- [ ] Add an opt-in deterministic `integration` test that runs N frames with
+- [x] Add an opt-in deterministic `integration` test that runs N frames with
       `SynchronousExtraction = false` and asserts render-of-frame-N observes the
       snapshot fields produced at frame N-1.
-- [ ] Assert the three pool counters (stall/skip/frame-age) report the expected
+- [x] Assert the three pool counters (stall/skip/frame-age) report the expected
       pipelined values (frame age ≥ 1).
 
 ## Tests
-- [ ] `integration` — deterministic pipelined N-frame run; render-N-1 field assertion;
+- [x] `integration` — deterministic pipelined N-frame run; render-N-1 field assertion;
       frame-age ≥ 1; no torn snapshot.
-- [ ] `contract;runtime` — regression that synchronous mode still reports frame age 0.
-- [ ] CPU gate stays green.
+- [x] `contract;runtime` — regression that synchronous mode still reports frame age 0.
+- [x] CPU gate stays green.
 
 ## Docs
-- [ ] Update `src/runtime/README.md` and `docs/architecture/graphics.md` with the
+- [x] Update `src/runtime/README.md` and `docs/architecture/graphics.md` with the
       pipelined-path proof and the production default decision.
-- [ ] Update `docs/architecture/rendering-three-pass.md` snapshot-lifetime callout.
+- [x] Update `docs/architecture/rendering-three-pass.md` snapshot-lifetime callout.
 
 ## Acceptance criteria
-- [ ] The pipelined path is proven by a deterministic opt-in integration test.
-- [ ] Synchronous mode remains correct and is regression-tested.
-- [ ] Any production-default flip is explicitly recorded.
+- [x] The pipelined path is proven by a deterministic opt-in integration test.
+- [x] Synchronous mode remains correct and is regression-tested.
+- [x] Any production-default flip is explicitly recorded.
 
 ## Verification
 ```bash

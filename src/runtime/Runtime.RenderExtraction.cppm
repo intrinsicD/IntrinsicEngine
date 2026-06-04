@@ -339,7 +339,8 @@ export namespace Extrinsic::Runtime
             ECS::Scene::Registry& scene,
             Graphics::IRenderer& renderer,
             Graphics::GpuAssetCache* gpuAssets = nullptr,
-            const SelectionController* selection = nullptr);
+            const SelectionController* selection = nullptr,
+            std::uint32_t runtimeSnapshotStorageSlot = 0u);
         void Shutdown(Graphics::IRenderer& renderer);
 
         // Maintenance-phase hook called by Engine::RunFrame after

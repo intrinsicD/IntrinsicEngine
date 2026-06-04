@@ -104,10 +104,14 @@ flow through `BuildDefaultFrameRecipe(...)` and its canonical pass names.
 
 All renderable buffers are derived from PropertySet spans (`std::span`) and uploaded through lifecycle/sync systems.
 
-`RenderWorld` is the frame-local immutable snapshot consumed by renderer passes.
-Runtime submits extraction packets through `IRenderer::SubmitRuntimeSnapshots()`;
-the renderer copies them into renderer-owned frame storage and exposes read-only
-spans from `RenderWorld`:
+`RenderWorld` is the immutable snapshot consumed by renderer passes for the
+selected runtime snapshot slot. Runtime submits extraction packets through
+`IRenderer::SubmitRuntimeSnapshots(..., storageSlot)`; the renderer copies them
+into renderer-owned retained storage for that slot and exposes read-only spans
+from `RenderWorld` through `IRenderer::ExtractRenderWorld(..., storageSlot)`.
+With `RenderConfig::SynchronousExtraction = false`, runtime writes extraction-N
+into the pool back slot, publishes it, then renders from the previous front slot
+so render-N observes N-1 data while extraction-N writes a separate retained copy.
 
 - `RenderableSnapshot`: stable renderable ID, canonical `GpuInstanceHandle`,
   current model matrix, bounds/culling data, render flags, and resolved material
@@ -121,15 +125,16 @@ spans from `RenderWorld`:
 - `DebugPrimitiveSnapshot`: sanitized transient debug line, point, and triangle
   packet spans. Runtime submits packet spans through
   `IRenderer::SubmitRuntimeSnapshots()`; graphics copies and sanitizes them into
-  renderer-owned frame storage. Non-finite coordinates/colors are rejected,
-  line widths are clamped to `[0.5, 32]`, point radii are clamped to
+  the selected retained storage slot. Non-finite coordinates/colors are
+  rejected, line widths are clamped to `[0.5, 32]`, point radii are clamped to
   `[0.0001, 1]`, and rejected records increment `InvalidSnapshotRecordCount`.
 - `VisualizationSnapshot`: renderer-owned spans of data-only visualization
   packets submitted through `RuntimeRenderSnapshotBatch` (`AttributeBuffers`,
   `Scalars`, `Colors`, `VectorFields`, `Isolines`, `HtexAtlases`, and
-  `FragmentBakeAtlases`). The renderer copies these spans into frame-local
-  storage, attaches `VisualizationDiagnostics` and `VisualizationOverlaySummary`,
-  and clears them on the next `BeginFrame()`.
+  `FragmentBakeAtlases`). The renderer copies these spans into the selected
+  retained storage slot, attaches `VisualizationDiagnostics` and
+  `VisualizationOverlaySummary`, and clears them only when that same slot is
+  rewritten by a later `SubmitRuntimeSnapshots` call.
 - `InvalidSnapshotRecordCount`: deterministic diagnostics for malformed runtime
   records dropped while building the immutable snapshot.
 

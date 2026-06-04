@@ -298,7 +298,14 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] virtual bool BeginFrame(RHI::FrameHandle& outFrame) = 0;
 
-        virtual void SubmitRuntimeSnapshots(const RuntimeRenderSnapshotBatch& snapshots) = 0;
+        // Runtime snapshot payloads are copied into renderer-owned stable
+        // storage. `storageSlot` is a small caller-owned ring index (slot 0 is
+        // the legacy/default path); pipelined extraction passes the
+        // RenderWorldPool back slot here and later extracts from the acquired
+        // front/previous-front slot. The RuntimeRenderSnapshotBatch shape stays
+        // unchanged: only the renderer-side retained lifetime is multi-buffered.
+        virtual void SubmitRuntimeSnapshots(const RuntimeRenderSnapshotBatch& snapshots,
+                                            std::uint32_t storageSlot = 0u) = 0;
 
         // GRAPHICS-079 Slice A — runtime composition hands the engine-owned
         // `ImGuiOverlaySystem` (the producer the `RUNTIME-090` adapter submits
@@ -314,7 +321,8 @@ namespace Extrinsic::Graphics
         [[nodiscard]] virtual bool HasImGuiOverlaySystem() const noexcept = 0;
 
         [[nodiscard]] virtual RenderWorld ExtractRenderWorld(
-            const RenderFrameInput& input) = 0;
+            const RenderFrameInput& input,
+            std::uint32_t storageSlot = 0u) = 0;
 
         virtual void PrepareFrame(RenderWorld& world) = 0;
 

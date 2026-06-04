@@ -127,6 +127,8 @@ namespace Extrinsic::Runtime
     {
         if (slot >= m_Slots.size())
             return;
+        const std::uint32_t previous = m_Front.load(std::memory_order_acquire);
+        m_PreviousFront.store(previous, std::memory_order_release);
         // Slot contents are fully written by the producer before this release
         // store, so a consumer that acquires the index never sees a torn slot.
         m_Front.store(slot, std::memory_order_release);
@@ -151,6 +153,27 @@ namespace Extrinsic::Runtime
             ++m_Diagnostics.PipelineStallCount;
         m_LastConsumedSeq = publishSeq;
 
+        m_Slots[front].RefCount.fetch_add(1u, std::memory_order_acq_rel);
+
+        const std::uint64_t published = m_Slots[front].PublishedFrame;
+        m_Diagnostics.LastConsumedFrameAge =
+            (frameIndex >= published) ? (frameIndex - published) : 0u;
+        return front;
+    }
+
+    std::uint32_t RenderWorldPool::AcquirePreviousFront(std::uint64_t frameIndex) noexcept
+    {
+        std::uint32_t front = m_PreviousFront.load(std::memory_order_acquire);
+        if (front == kInvalidSlot)
+            front = m_Front.load(std::memory_order_acquire);
+        if (front == kInvalidSlot || front >= m_Slots.size())
+            return kInvalidSlot;
+
+        // This is the intentional render-N-1 consume path, not a
+        // consumer-faster-than-producer stall. Mark the current publish
+        // sequence consumed so a later normal AcquireFront() call observes the
+        // same baseline.
+        m_LastConsumedSeq = m_PublishSeq.load(std::memory_order_acquire);
         m_Slots[front].RefCount.fetch_add(1u, std::memory_order_acq_rel);
 
         const std::uint64_t published = m_Slots[front].PublishedFrame;
