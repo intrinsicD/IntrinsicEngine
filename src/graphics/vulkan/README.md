@@ -210,11 +210,16 @@ available through the Vulkan 1.2/1.3 feature chain.
   and translate `GRAPHICS-037C` queue-affinity ownership-transfer tokens into
   concrete Vulkan queue-family indices. Same-family transfers collapse back to
   `VK_QUEUE_FAMILY_IGNORED`, which preserves the single-family fallback path on
-  adapters that expose compute work through the graphics family. This is the
-  Vulkan-owned recording prerequisite for `GRAPHICS-037D`; real per-affinity
-  command buffers and timeline-semaphore submit waits/signals remain owned by
-  the active follow-up slices because the renderer/RHI seam still exposes only
-  the graphics command context. Barriers also update each touched
+  adapters that expose compute work through the graphics family. The promoted
+  device accepts renderer `FrameQueueSubmitPlanDesc` batches, allocates
+  per-affinity primary command buffers from graphics/async-compute/transfer
+  command pools, and submits them with `vkQueueSubmit2` on the matching
+  `VkQueue`. Per-frame queue timeline semaphores carry compiled cross-queue
+  waits/signals, the first graphics batch waits image acquire, and the final
+  graphics batch signals render-done for present. Optional async/transfer fences
+  are used only for queue lanes whose final batch is not already guarded by the
+  present fence, while capability-absent plans fall back to the single graphics
+  submit path. Barriers also update each touched
   `VulkanImage::CurrentLayout` so subsequent
   uploads/barriers in the same frame observe the most recent recorded layout.
 - `VulkanDevice::CreateBuffer` and `VulkanDevice::CreateTexture` declare
@@ -458,6 +463,17 @@ capability checks pass, a non-operational post-`engine.Run()` status is a test
 failure rather than a skip. Default-recipe pixel-readback parity is tracked by
 `GRAPHICS-076E` so the command-stream smoke remains separate from the renderer
 API work needed for a default-recipe readback hook/counter.
+
+GRAPHICS-037D extends this default-recipe proof to real multi-queue submission.
+`PostProcessHistogramPass` requests `RenderQueue::AsyncCompute`; the renderer
+builds an RHI submit plan, Vulkan records the histogram command buffer from the
+async-compute command pool, and `EndFrame()` submits the graphics/async/graphics
+batches with timeline semaphore waits/signals. The
+`DefaultRecipeSurfaceGpuSmoke.AsyncComputeHistogramQueueReadbackMatchesMinimalHarnessSamples`
+fixture is labeled `gpu;vulkan;graphics`, skips when the host lacks GLFW,
+operational Vulkan, or async-compute support, and otherwise asserts
+`RenderGraphFrameStats::AsyncComputeUtilizedFrames >= 1` plus the existing
+four-sample readback parity.
 
 GRAPHICS-077 and GRAPHICS-078 extend the same operational proof to the default
 recipe's post-lit overlay band. The opt-in `gpu;vulkan;graphics` fixtures

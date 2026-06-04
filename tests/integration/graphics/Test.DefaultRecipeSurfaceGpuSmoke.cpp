@@ -24,8 +24,10 @@ import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Platform.Backend.Glfw;
 import Extrinsic.RHI.Descriptors;
+import Extrinsic.RHI.Device;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.Handles;
+import Extrinsic.RHI.QueueAffinity;
 import Extrinsic.RHI.TextureUpload;
 import Extrinsic.Runtime.Engine;
 
@@ -324,6 +326,65 @@ struct DefaultRecipeRunCapture
     }
     return summary;
 }
+
+template <typename DeviceT>
+void ExpectMinimalHarnessReadbackSamples(
+    DeviceT& device,
+    const Extrinsic::RHI::BufferHandle readbackBuffer,
+    const std::uint64_t readbackSize,
+    const std::uint32_t bytesPerPixel,
+    const Extrinsic::RHI::Format backbufferFormat,
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats)
+{
+    static_assert(Readback::kSamplePoints.size() == 4u,
+                  "gpu;vulkan pixel readback requires exactly four deterministic sample points");
+
+    std::vector<std::uint8_t> readbackBytes(static_cast<std::size_t>(readbackSize), 0u);
+    device.ReadBuffer(readbackBuffer, readbackBytes.data(), readbackSize, 0u);
+
+    const std::uint64_t rowStride =
+        static_cast<std::uint64_t>(bytesPerPixel) *
+        static_cast<std::uint64_t>(Readback::kFramebufferWidth);
+
+    for (const Readback::SamplePoint& sample : Readback::kSamplePoints)
+    {
+        const std::uint64_t pixelOffset =
+            static_cast<std::uint64_t>(sample.PixelY) * rowStride +
+            static_cast<std::uint64_t>(sample.PixelX) * static_cast<std::uint64_t>(bytesPerPixel);
+        ASSERT_LE(pixelOffset + 4u, readbackSize)
+            << "Sample point " << sample.Label << " is outside the readback buffer.";
+
+        const std::uint8_t b0 = readbackBytes[static_cast<std::size_t>(pixelOffset + 0u)];
+        const std::uint8_t b1 = readbackBytes[static_cast<std::size_t>(pixelOffset + 1u)];
+        const std::uint8_t b2 = readbackBytes[static_cast<std::size_t>(pixelOffset + 2u)];
+        const std::uint8_t b3 = readbackBytes[static_cast<std::size_t>(pixelOffset + 3u)];
+
+        const Readback::ExpectedPixel actualSrgb = ReorderToRgba(backbufferFormat, b0, b1, b2, b3);
+        const Readback::ExpectedPixel actualLinear = SrgbToLinearPixel(backbufferFormat, actualSrgb);
+        const Readback::ExpectedPixel expected = Readback::ExpectedAt(sample);
+        EXPECT_TRUE(Readback::ChannelsWithinTolerance(expected, actualLinear))
+            << "Sample " << sample.Label
+            << " (pixel " << sample.PixelX << "," << sample.PixelY
+            << ", inside=" << (sample.InsideTriangle ? "true" : "false") << ")"
+            << " expected linear RGBA=("
+            << static_cast<int>(expected.R) << ","
+            << static_cast<int>(expected.G) << ","
+            << static_cast<int>(expected.B) << ","
+            << static_cast<int>(expected.A) << ")"
+            << " actual linear RGBA=("
+            << static_cast<int>(actualLinear.R) << ","
+            << static_cast<int>(actualLinear.G) << ","
+            << static_cast<int>(actualLinear.B) << ","
+            << static_cast<int>(actualLinear.A) << ")"
+            << " raw bytes=("
+            << static_cast<int>(b0) << ","
+            << static_cast<int>(b1) << ","
+            << static_cast<int>(b2) << ","
+            << static_cast<int>(b3) << ")"
+            << " backbuffer format=" << static_cast<int>(backbufferFormat)
+            << " pass statuses=[" << BuildPassStatusSummary(stats) << "]";
+    }
+}
 } // namespace
 
 // GRAPHICS-076 Slice D — canonical default-recipe smoke. It drives one
@@ -474,54 +535,112 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ReferenceTriangleDebugViewReadbackMatchesMini
         << ", validationError " << run.Before.ValidationError << " -> " << run.After.ValidationError
         << ", gateFailure " << run.Before.OperationalGateFailure << " -> " << run.After.OperationalGateFailure;
 
-    static_assert(Readback::kSamplePoints.size() == 4u,
-                  "GRAPHICS-076E pixel readback requires exactly four deterministic sample points");
+    ExpectMinimalHarnessReadbackSamples(device,
+                                        readbackBuffer,
+                                        readbackSize,
+                                        bytesPerPixel,
+                                        backbufferFormat,
+                                        stats);
 
-    std::vector<std::uint8_t> readbackBytes(static_cast<std::size_t>(readbackSize), 0u);
-    device.ReadBuffer(readbackBuffer, readbackBytes.data(), readbackSize, 0u);
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+    device.DestroyBuffer(readbackBuffer);
 
-    const std::uint64_t rowStride =
-        static_cast<std::uint64_t>(bytesPerPixel) *
-        static_cast<std::uint64_t>(Readback::kFramebufferWidth);
+    engine.Shutdown();
+}
 
-    for (const Readback::SamplePoint& sample : Readback::kSamplePoints)
+TEST(DefaultRecipeSurfaceGpuSmoke, AsyncComputeHistogramQueueReadbackMatchesMinimalHarnessSamples)
+{
+    auto bootstrap = BootstrapEngineForDefaultRecipe(
+        4u, "Intrinsic Default-recipe gpu;vulkan async-compute smoke");
+    if (bootstrap.Skipped)
     {
-        const std::uint64_t pixelOffset =
-            static_cast<std::uint64_t>(sample.PixelY) * rowStride +
-            static_cast<std::uint64_t>(sample.PixelX) * static_cast<std::uint64_t>(bytesPerPixel);
-        ASSERT_LE(pixelOffset + 4u, readbackSize)
-            << "Sample point " << sample.Label << " is outside the readback buffer.";
-
-        const std::uint8_t b0 = readbackBytes[static_cast<std::size_t>(pixelOffset + 0u)];
-        const std::uint8_t b1 = readbackBytes[static_cast<std::size_t>(pixelOffset + 1u)];
-        const std::uint8_t b2 = readbackBytes[static_cast<std::size_t>(pixelOffset + 2u)];
-        const std::uint8_t b3 = readbackBytes[static_cast<std::size_t>(pixelOffset + 3u)];
-
-        const Readback::ExpectedPixel actualSrgb = ReorderToRgba(backbufferFormat, b0, b1, b2, b3);
-        const Readback::ExpectedPixel actualLinear = SrgbToLinearPixel(backbufferFormat, actualSrgb);
-        const Readback::ExpectedPixel expected = Readback::ExpectedAt(sample);
-        EXPECT_TRUE(Readback::ChannelsWithinTolerance(expected, actualLinear))
-            << "Sample " << sample.Label
-            << " (pixel " << sample.PixelX << "," << sample.PixelY
-            << ", inside=" << (sample.InsideTriangle ? "true" : "false") << ")"
-            << " expected linear RGBA=("
-            << static_cast<int>(expected.R) << ","
-            << static_cast<int>(expected.G) << ","
-            << static_cast<int>(expected.B) << ","
-            << static_cast<int>(expected.A) << ")"
-            << " actual linear RGBA=("
-            << static_cast<int>(actualLinear.R) << ","
-            << static_cast<int>(actualLinear.G) << ","
-            << static_cast<int>(actualLinear.B) << ","
-            << static_cast<int>(actualLinear.A) << ")"
-            << " raw bytes=("
-            << static_cast<int>(b0) << ","
-            << static_cast<int>(b1) << ","
-            << static_cast<int>(b2) << ","
-            << static_cast<int>(b3) << ")"
-            << " backbuffer format=" << static_cast<int>(backbufferFormat)
-            << " pass statuses=[" << BuildPassStatusSummary(stats) << "]";
+        GTEST_SKIP() << bootstrap.SkipReason;
     }
+    Engine& engine = *bootstrap.EnginePtr;
+
+    auto& renderer = engine.GetRenderer();
+    auto& device   = engine.GetDevice();
+    if (!device.GetQueueCapabilityProfile().SupportsAsyncCompute)
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Promoted Vulkan device has no async-compute queue; GRAPHICS-037D smoke is opt-in.";
+    }
+
+    const auto warmup = DriveDefaultRecipeAndCapture(engine);
+    if (!warmup.DeviceOperational)
+    {
+        engine.Shutdown();
+        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during async-compute smoke warmup: status="
+                      << ToString(warmup.Status.Code) << " reason=" << ToString(warmup.Status.Reason)
+                      << ". Host capability checks passed, so this is a GRAPHICS-037D regression, not a skip condition.";
+        return;
+    }
+
+    const Extrinsic::RHI::Format backbufferFormat = device.GetBackbufferFormat();
+    const std::uint32_t bytesPerPixel = Extrinsic::RHI::BytesPerBlock(backbufferFormat);
+    if (bytesPerPixel == 0u)
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Backbuffer format has no host-uploadable layout on this host; async-compute smoke skipped.";
+    }
+
+    const std::uint64_t readbackSize =
+        static_cast<std::uint64_t>(bytesPerPixel) *
+        static_cast<std::uint64_t>(Readback::kFramebufferWidth) *
+        static_cast<std::uint64_t>(Readback::kFramebufferHeight);
+    Extrinsic::RHI::BufferHandle readbackBuffer = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
+        .SizeBytes = readbackSize,
+        .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
+        .HostVisible = true,
+        .DebugName = "DefaultRecipe.AsyncComputeReadback",
+    });
+    if (!readbackBuffer.IsValid())
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Readback buffer allocation failed; gpu;vulkan smoke is opt-in.";
+    }
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(readbackBuffer);
+
+    const auto run = DriveDefaultRecipeDebugViewFrameAndCapture(engine, true);
+
+    if (!run.DeviceOperational)
+    {
+        renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+        device.DestroyBuffer(readbackBuffer);
+        engine.Shutdown();
+        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip after running the async-compute smoke: status="
+                      << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
+                      << ". Host capability checks passed, so this is a GRAPHICS-037D regression, not a skip condition.";
+        return;
+    }
+
+    EXPECT_EQ(run.Status.Code, Extrinsic::Backends::Vulkan::VulkanOperationalStatusCode::Operational);
+    EXPECT_EQ(run.Status.Reason, Extrinsic::Backends::Vulkan::VulkanOperationalReason::None);
+
+    const auto& stats = run.Stats;
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.DeviceOperational);
+    EXPECT_EQ(FindPassStatus(stats, "PostProcessHistogramPass"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(stats);
+    EXPECT_GE(stats.AsyncComputeUtilizedFrames, 1u)
+        << "Default recipe did not accept a multi-queue submit plan with an async-compute batch.";
+    EXPECT_GE(stats.DefaultRecipeBackbufferReadbackCopyCount, 1u)
+        << "Default-recipe readback triplet did not record on the async-compute smoke frame.";
+
+    EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
+        << "Vulkan fallback counters incremented across an operational async-compute frame: "
+        << "fallbackToNull " << run.Before.FallbackToNull << " -> " << run.After.FallbackToNull
+        << ", initFailure " << run.Before.InitFailure << " -> " << run.After.InitFailure
+        << ", validationError " << run.Before.ValidationError << " -> " << run.After.ValidationError
+        << ", gateFailure " << run.Before.OperationalGateFailure << " -> " << run.After.OperationalGateFailure;
+
+    ExpectMinimalHarnessReadbackSamples(device,
+                                        readbackBuffer,
+                                        readbackSize,
+                                        bytesPerPixel,
+                                        backbufferFormat,
+                                        stats);
 
     renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
     device.DestroyBuffer(readbackBuffer);

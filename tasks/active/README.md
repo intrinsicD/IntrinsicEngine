@@ -11,14 +11,20 @@ Each active task should include:
 
 ## Currently active
 
-[`GRAPHICS-037D`](GRAPHICS-037D-multi-queue-vulkan-recording.md) — Vulkan
-multi-queue recording is in progress. Current slice adds async-compute
-queue-family discovery/acquisition diagnostics and Sync2 queue-family token
-translation in `graphics/vulkan`; follow-up slices still own the
-backend-neutral submit-plan seam, real per-affinity command-buffer submission,
-timeline waits/signals, and the opt-in `gpu;vulkan` operational smoke.
+No active tasks are currently listed.
 
 The most recently retired tasks are summarised below.
+
+Previously-active
+[`GRAPHICS-037D`](../done/GRAPHICS-037D-multi-queue-vulkan-recording.md) —
+Vulkan multi-queue recording retired to `tasks/done/` on 2026-06-04 at
+maturity `Operational` on Vulkan-capable hosts. Slices A-D landed
+async-compute/transfer queue-family discovery, Sync2 queue-family token
+translation, the backend-neutral RHI submit-plan/context seam, per-affinity
+Vulkan command-buffer submission with timeline waits/signals and ownership
+transfer barriers, default-recipe async histogram routing, and opt-in
+`gpu;vulkan` readback smoke coverage. Capability-absent hosts keep the
+single-queue path through queue-affinity demotion and the default CPU gate.
 
 Previously-active
 [`UI-001`](../done/UI-001-sandbox-editor-shell-panels.md) — sandbox editor shell

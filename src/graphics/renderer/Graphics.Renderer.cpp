@@ -17,6 +17,7 @@ module;
 
 module Extrinsic.Graphics.Renderer;
 
+import Extrinsic.Core.Error;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Types;
 import Extrinsic.RHI.BufferManager;
@@ -1718,7 +1719,6 @@ namespace Extrinsic::Graphics
             m_LastRenderGraphStats.Execute.DeviceOperational = m_Device->IsOperational();
 
             const auto executeBegin = std::chrono::steady_clock::now();
-            auto& graphicsContext = m_Device->GetGraphicsContext(frame.FrameIndex);
             std::vector<std::string_view> passNameByIndex(compiled->PassDeclarations.size());
             for (std::size_t passIndex = 0; passIndex < passNameByIndex.size() && passIndex < compiled->PassNames.size(); ++passIndex)
             {
@@ -1735,12 +1735,57 @@ namespace Extrinsic::Graphics
             // deferred resources.
             const bool defaultRecipeUsesDeferred =
                 (defaultRecipeFeatures.LightingPath != FrameRecipeLightingPath::Forward);
-            graphicsContext.Begin();
-            const auto executeResult = m_RenderGraphExecutor.Execute(
-                *compiled,
-                {},
-                [this, &graphicsContext, &passNameByIndex, &camera, &frame, &compiled,
-                 defaultRecipeUsesDeferred, &renderWorld](const std::uint32_t passIndex)
+            const QueueSubmitPlan queueSubmitPlan =
+                BuildQueueSubmitPlan(*compiled, m_Device->GetQueueCapabilityProfile());
+            std::vector<std::vector<RHI::QueueTimelineWaitDesc>> rhiQueueWaits(queueSubmitPlan.Batches.size());
+            std::vector<std::vector<RHI::QueueTimelineSignalDesc>> rhiQueueSignals(queueSubmitPlan.Batches.size());
+            std::vector<RHI::QueueSubmitBatchDesc> rhiSubmitBatches{};
+            rhiSubmitBatches.reserve(queueSubmitPlan.Batches.size());
+            for (std::size_t batchIndex = 0; batchIndex < queueSubmitPlan.Batches.size(); ++batchIndex)
+            {
+                const QueueSubmitBatch& batch = queueSubmitPlan.Batches[batchIndex];
+                rhiQueueWaits[batchIndex].reserve(batch.Waits.size());
+                for (const QueueSubmitTimelineWait& wait : batch.Waits)
+                {
+                    rhiQueueWaits[batchIndex].push_back(RHI::QueueTimelineWaitDesc{
+                        .Queue = wait.Queue,
+                        .SignalQueue = wait.SignalQueue,
+                        .Value = wait.Value,
+                    });
+                }
+                rhiQueueSignals[batchIndex].reserve(batch.Signals.size());
+                for (const QueueSubmitTimelineSignal& signal : batch.Signals)
+                {
+                    rhiQueueSignals[batchIndex].push_back(RHI::QueueTimelineSignalDesc{
+                        .Queue = signal.Queue,
+                        .Value = signal.Value,
+                    });
+                }
+                rhiSubmitBatches.push_back(RHI::QueueSubmitBatchDesc{
+                    .Queue = batch.Queue,
+                    .Waits = rhiQueueWaits[batchIndex],
+                    .Signals = rhiQueueSignals[batchIndex],
+                });
+            }
+            bool useQueueSubmitPlan = false;
+            if (queueSubmitPlan.Batches.size() > 1u)
+            {
+                useQueueSubmitPlan = m_Device->BeginFrameQueueSubmitPlan(frame, RHI::FrameQueueSubmitPlanDesc{
+                    .Batches = rhiSubmitBatches,
+                });
+            }
+            const bool asyncComputeSubmitPlanAccepted =
+                useQueueSubmitPlan &&
+                std::any_of(queueSubmitPlan.Batches.begin(),
+                            queueSubmitPlan.Batches.end(),
+                            [](const QueueSubmitBatch& batch) {
+                                return batch.Queue == RenderQueue::AsyncCompute;
+                            });
+
+            const auto recordPass =
+                [this, &passNameByIndex, &camera, &frame, &compiled,
+                 defaultRecipeUsesDeferred, &renderWorld](RHI::ICommandContext& graphicsContext,
+                                                           const std::uint32_t passIndex)
                 {
                     if (passIndex >= passNameByIndex.size())
                     {
@@ -2479,77 +2524,201 @@ namespace Extrinsic::Graphics
                         AccumulateCommandRecordStatus(passName, status);
                     }
                     endActiveRenderPass();
-                },
-                [&graphicsContext, &compiled](const BarrierPacket& packet)
+                };
+
+            const auto submitBarriersForContext =
+                [&compiled](RHI::ICommandContext& graphicsContext, const BarrierPacket& packet)
                 {
                     SubmitBarrierPacket(graphicsContext, *compiled, packet);
-                });
-            const auto transientDebugRecordedThisFrame =
-                std::any_of(m_LastRenderGraphStats.CommandRecords.Passes.begin(),
-                            m_LastRenderGraphStats.CommandRecords.Passes.end(),
-                            [](const RenderGraphCommandPassStats& pass)
-                            {
-                                return pass.Name == "TransientDebugSurfacePass" &&
-                                       pass.Status == RenderCommandPassStatus::Recorded;
-                            });
-            const auto visualizationOverlayRecordedThisFrame =
-                std::any_of(m_LastRenderGraphStats.CommandRecords.Passes.begin(),
-                            m_LastRenderGraphStats.CommandRecords.Passes.end(),
-                            [](const RenderGraphCommandPassStats& pass)
-                            {
-                                return pass.Name == "VisualizationOverlayPass" &&
-                                       pass.Status == RenderCommandPassStatus::Recorded;
-                            });
+                };
 
-            // GRAPHICS-076E / GRAPHICS-077E / GRAPHICS-078E — opt-in pixel-
-            // readback hooks: copy after the executor's final Present
-            // transition and restore Present layout before the command buffer
-            // closes. Pass-scoped hooks are additionally gated on their pass
-            // recording this frame so their counters cannot be confused with
-            // the canonical surface-readback path.
-            if (executeResult.has_value() &&
-                (m_DefaultRecipeReadbackBuffer.IsValid() ||
-                 (m_TransientDebugReadbackBuffer.IsValid() && transientDebugRecordedThisFrame) ||
-                 (m_VisualizationOverlayReadbackBuffer.IsValid() && visualizationOverlayRecordedThisFrame)) &&
-                m_Device != nullptr && m_Device->IsOperational())
-            {
-                const RHI::TextureHandle backbuffer = m_Device->GetBackbufferHandle(frame);
-                if (backbuffer.IsValid())
+            const auto recordPostGraphReadbacks =
+                [&](RHI::ICommandContext& graphicsContext, const bool graphExecuted)
                 {
-                    const auto copyBackbuffer = [&](const RHI::BufferHandle readbackBuffer)
-                    {
-                        graphicsContext.TextureBarrier(backbuffer,
-                                                        RHI::TextureLayout::Present,
-                                                        RHI::TextureLayout::TransferSrc);
-                        graphicsContext.CopyTextureToBuffer(backbuffer,
-                                                            RHI::TextureLayout::TransferSrc,
-                                                            0u, 0u,
-                                                            readbackBuffer,
-                                                            0u,
-                                                            0u, 0u, 0u, 0u);
-                        graphicsContext.TextureBarrier(backbuffer,
-                                                        RHI::TextureLayout::TransferSrc,
-                                                        RHI::TextureLayout::Present);
-                    };
+                    const auto transientDebugRecordedThisFrame =
+                        std::any_of(m_LastRenderGraphStats.CommandRecords.Passes.begin(),
+                                    m_LastRenderGraphStats.CommandRecords.Passes.end(),
+                                    [](const RenderGraphCommandPassStats& pass)
+                                    {
+                                        return pass.Name == "TransientDebugSurfacePass" &&
+                                               pass.Status == RenderCommandPassStatus::Recorded;
+                                    });
+                    const auto visualizationOverlayRecordedThisFrame =
+                        std::any_of(m_LastRenderGraphStats.CommandRecords.Passes.begin(),
+                                    m_LastRenderGraphStats.CommandRecords.Passes.end(),
+                                    [](const RenderGraphCommandPassStats& pass)
+                                    {
+                                        return pass.Name == "VisualizationOverlayPass" &&
+                                               pass.Status == RenderCommandPassStatus::Recorded;
+                                    });
 
-                    if (m_DefaultRecipeReadbackBuffer.IsValid())
+                    // GRAPHICS-076E / GRAPHICS-077E / GRAPHICS-078E —
+                    // opt-in pixel-readback hooks: copy after the executor's
+                    // final Present transition and restore Present layout
+                    // before the command buffer closes. Pass-scoped hooks are
+                    // additionally gated on their pass recording this frame so
+                    // their counters cannot be confused with the canonical
+                    // surface-readback path.
+                    if (graphExecuted &&
+                        (m_DefaultRecipeReadbackBuffer.IsValid() ||
+                         (m_TransientDebugReadbackBuffer.IsValid() && transientDebugRecordedThisFrame) ||
+                         (m_VisualizationOverlayReadbackBuffer.IsValid() && visualizationOverlayRecordedThisFrame)) &&
+                        m_Device != nullptr && m_Device->IsOperational())
                     {
-                        copyBackbuffer(m_DefaultRecipeReadbackBuffer);
-                        ++m_LastRenderGraphStats.DefaultRecipeBackbufferReadbackCopyCount;
+                        const RHI::TextureHandle backbuffer = m_Device->GetBackbufferHandle(frame);
+                        if (backbuffer.IsValid())
+                        {
+                            const auto copyBackbuffer = [&](const RHI::BufferHandle readbackBuffer)
+                            {
+                                graphicsContext.TextureBarrier(backbuffer,
+                                                                RHI::TextureLayout::Present,
+                                                                RHI::TextureLayout::TransferSrc);
+                                graphicsContext.CopyTextureToBuffer(backbuffer,
+                                                                    RHI::TextureLayout::TransferSrc,
+                                                                    0u, 0u,
+                                                                    readbackBuffer,
+                                                                    0u,
+                                                                    0u, 0u, 0u, 0u);
+                                graphicsContext.TextureBarrier(backbuffer,
+                                                                RHI::TextureLayout::TransferSrc,
+                                                                RHI::TextureLayout::Present);
+                            };
+
+                            if (m_DefaultRecipeReadbackBuffer.IsValid())
+                            {
+                                copyBackbuffer(m_DefaultRecipeReadbackBuffer);
+                                ++m_LastRenderGraphStats.DefaultRecipeBackbufferReadbackCopyCount;
+                            }
+                            if (m_TransientDebugReadbackBuffer.IsValid() && transientDebugRecordedThisFrame)
+                            {
+                                copyBackbuffer(m_TransientDebugReadbackBuffer);
+                                ++m_LastRenderGraphStats.TransientDebugBackbufferReadbackCopyCount;
+                            }
+                            if (m_VisualizationOverlayReadbackBuffer.IsValid() && visualizationOverlayRecordedThisFrame)
+                            {
+                                copyBackbuffer(m_VisualizationOverlayReadbackBuffer);
+                                ++m_LastRenderGraphStats.VisualizationOverlayBackbufferReadbackCopyCount;
+                            }
+                        }
                     }
-                    if (m_TransientDebugReadbackBuffer.IsValid() && transientDebugRecordedThisFrame)
+                };
+
+            const auto executeSingleQueue = [&]() -> Core::Result
+            {
+                RHI::ICommandContext& graphicsContext = m_Device->GetGraphicsContext(frame.FrameIndex);
+                graphicsContext.Begin();
+                Core::Result result = m_RenderGraphExecutor.Execute(
+                    *compiled,
+                    {},
+                    [&recordPass, &graphicsContext](const std::uint32_t passIndex)
                     {
-                        copyBackbuffer(m_TransientDebugReadbackBuffer);
-                        ++m_LastRenderGraphStats.TransientDebugBackbufferReadbackCopyCount;
-                    }
-                    if (m_VisualizationOverlayReadbackBuffer.IsValid() && visualizationOverlayRecordedThisFrame)
+                        recordPass(graphicsContext, passIndex);
+                    },
+                    [&submitBarriersForContext, &graphicsContext](const BarrierPacket& packet)
                     {
-                        copyBackbuffer(m_VisualizationOverlayReadbackBuffer);
-                        ++m_LastRenderGraphStats.VisualizationOverlayBackbufferReadbackCopyCount;
+                        submitBarriersForContext(graphicsContext, packet);
+                    });
+                recordPostGraphReadbacks(graphicsContext, result.has_value());
+                graphicsContext.End();
+                return result;
+            };
+
+            const auto emitBarriersForPass =
+                [&](RHI::ICommandContext& context,
+                    const std::uint32_t passIndex,
+                    const BarrierPacketStage stage) -> Core::Result
+                {
+                    const std::uint32_t finalPassIndex =
+                        static_cast<std::uint32_t>(compiled->PassDeclarations.size());
+                    for (const BarrierPacket& packet : compiled->BarrierPackets)
+                    {
+                        if (packet.PassIndex != passIndex || packet.Stage != stage)
+                        {
+                            continue;
+                        }
+                        if (packet.PassIndex > finalPassIndex)
+                        {
+                            return Core::Err(Core::ErrorCode::OutOfRange);
+                        }
+                        for (const TextureBarrierPacket& textureBarrier : packet.TextureBarriers)
+                        {
+                            if (textureBarrier.TextureIndex >= compiled->TextureHandles.size())
+                            {
+                                return Core::Err(Core::ErrorCode::OutOfRange);
+                            }
+                        }
+                        for (const BufferBarrierPacket& bufferBarrier : packet.BufferBarriers)
+                        {
+                            if (bufferBarrier.BufferIndex >= compiled->BufferHandles.size())
+                            {
+                                return Core::Err(Core::ErrorCode::OutOfRange);
+                            }
+                        }
+                        submitBarriersForContext(context, packet);
                     }
+                    return Core::Ok();
+                };
+
+            const auto executeSubmitPlan = [&]() -> Core::Result
+            {
+                for (std::size_t batchIndex = 0; batchIndex < queueSubmitPlan.Batches.size(); ++batchIndex)
+                {
+                    const QueueSubmitBatch& batch = queueSubmitPlan.Batches[batchIndex];
+                    RHI::ICommandContext& context =
+                        m_Device->GetQueueSubmitContext(batch.Queue,
+                                                        frame.FrameIndex,
+                                                        static_cast<std::uint32_t>(batchIndex));
+                    context.Begin();
+                    for (const std::uint32_t passIndex : batch.PassIndices)
+                    {
+                        if (passIndex >= compiled->PassDeclarations.size())
+                        {
+                            context.End();
+                            return Core::Err(Core::ErrorCode::OutOfRange);
+                        }
+                        const CompiledPassDeclarations& declarations =
+                            compiled->PassDeclarations[passIndex];
+                        if (declarations.PassIndex != passIndex)
+                        {
+                            context.End();
+                            return Core::Err(Core::ErrorCode::InvalidState);
+                        }
+                        Core::Result before =
+                            emitBarriersForPass(context, passIndex, BarrierPacketStage::BeforePass);
+                        if (!before.has_value())
+                        {
+                            context.End();
+                            return before;
+                        }
+                        recordPass(context, passIndex);
+                        Core::Result after =
+                            emitBarriersForPass(context, passIndex, BarrierPacketStage::AfterPass);
+                        if (!after.has_value())
+                        {
+                            context.End();
+                            return after;
+                        }
+                    }
+                    if (batchIndex + 1u == queueSubmitPlan.Batches.size())
+                    {
+                        Core::Result finalBarriers = emitBarriersForPass(
+                            context,
+                            static_cast<std::uint32_t>(compiled->PassDeclarations.size()),
+                            BarrierPacketStage::BeforePass);
+                        if (!finalBarriers.has_value())
+                        {
+                            context.End();
+                            return finalBarriers;
+                        }
+                        recordPostGraphReadbacks(context, true);
+                    }
+                    context.End();
                 }
-            }
-            graphicsContext.End();
+                return Core::Ok();
+            };
+
+            const Core::Result executeResult =
+                useQueueSubmitPlan ? executeSubmitPlan() : executeSingleQueue();
             const auto executeEnd = std::chrono::steady_clock::now();
             m_LastRenderGraphStats.Execute.TimeMicros = static_cast<std::uint64_t>(
                 std::chrono::duration_cast<std::chrono::microseconds>(executeEnd - executeBegin).count());
@@ -2559,6 +2728,10 @@ namespace Extrinsic::Graphics
                 Core::Log::Error("[Graphics] RenderGraph Execute() failed: error={}",
                                  static_cast<int>(executeResult.error()));
                 return;
+            }
+            if (asyncComputeSubmitPlanAccepted)
+            {
+                ++m_LastRenderGraphStats.AsyncComputeUtilizedFrames;
             }
             m_LastRenderGraphStats.Execute.Succeeded = true;
 

@@ -125,6 +125,12 @@ namespace Extrinsic::Graphics
         std::string DebugDump{};
         std::string Diagnostic{};
         std::string LifecycleDiagnostic{};
+        // GRAPHICS-037D Slice D — count of frames in which the default
+        // recipe produced an accepted multi-queue submit plan containing an
+        // `AsyncCompute` batch. Stays at zero when the backend has no async
+        // queue, when the framegraph demotes optional queues to graphics, or
+        // when the backend rejects the submit-plan seam.
+        std::uint32_t AsyncComputeUtilizedFrames = 0;
         // GRAPHICS-076E — count of frames in which the opt-in default-recipe
         // backbuffer-to-host readback seam recorded the
         // `Present → TransferSrc → CopyImageToBuffer → Present` triplet.

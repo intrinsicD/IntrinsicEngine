@@ -1479,7 +1479,13 @@ Concretely:
   transfer queue. A new `HistogramReadbackCopyCount` stat counter
   on `RenderGraphFrameStats` mirrors the existing
   `PickingReadbackCopyCount` so contract tests can assert the
-  copy ran exactly once per operational frame. Each AA stage is free to define its own pass-local push
+  copy ran exactly once per operational frame. GRAPHICS-037D routes the
+  same compute-only `"PostProcessHistogramPass"` through
+  `RenderQueue::AsyncCompute` as the default recipe's opt-in multi-queue
+  smoke pass; when the backend accepts a submit plan containing an async
+  batch, `RenderGraphFrameStats::AsyncComputeUtilizedFrames` increments
+  for that frame, while capability-absent hosts demote the pass back to
+  graphics. Each AA stage is free to define its own pass-local push
   block where the shader interface demands more than the canonical 20
   bytes. Frame recipe resources `PostProcess.BloomScratch`,
   `PostProcess.Histogram`, and

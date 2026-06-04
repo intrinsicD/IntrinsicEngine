@@ -1051,6 +1051,11 @@ namespace Extrinsic::Graphics
             // and the dispatch barrier lands before the bloom +
             // tonemap render-pass scope opens.
             addOrderedPass("PostProcessHistogramPass", [=](RenderGraphBuilder& builder) {
+                // GRAPHICS-037D Slice D — the histogram dispatch is the
+                // default recipe's existing compute-only pass. Prefer the
+                // optional async-compute queue here; the framegraph/RHI
+                // resolver demotes to graphics on capability-absent hosts.
+                builder.SetQueue(RenderQueue::AsyncCompute);
                 builder.Read(hdr, TextureUsage::ShaderRead);
                 builder.Write(postProcessHistogram, BufferUsage::ShaderWrite);
                 // GRAPHICS-075 Slice E.2 — when the renderer owns a valid

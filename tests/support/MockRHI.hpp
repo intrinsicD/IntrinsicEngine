@@ -398,6 +398,20 @@ namespace Extrinsic::Tests
             std::uint32_t ArrayLayer = 0;
         };
 
+        struct QueueSubmitContextRequest
+        {
+            RHI::QueueAffinity Affinity = RHI::QueueAffinity::Graphics;
+            std::uint32_t FrameIndex = 0;
+            std::uint32_t BatchIndex = 0;
+        };
+
+        struct RecordedQueueSubmitBatch
+        {
+            RHI::QueueAffinity Queue = RHI::QueueAffinity::Graphics;
+            std::vector<RHI::QueueTimelineWaitDesc> Waits{};
+            std::vector<RHI::QueueTimelineSignalDesc> Signals{};
+        };
+
         // ---- Knobs ---------------------------------------------------------
         bool Operational            = true;
         bool FailNextBufferCreate   = false;
@@ -408,6 +422,7 @@ namespace Extrinsic::Tests
         bool BeginFrameResult       = true;
         bool AsyncComputeQueueAvailable = false;
         bool TransferQueueAvailable = false;
+        bool AcceptQueueSubmitPlans = false;
         RHI::FrameHandle NextFrame{.FrameIndex = 0u, .SwapchainImageIndex = 0u};
         RHI::TextureHandle BackbufferHandle{100u, 1u};
         std::uint64_t GlobalFrameNumber = 0;
@@ -435,6 +450,8 @@ namespace Extrinsic::Tests
         mutable RHI::FrameHandle LastBackbufferFrame{};
         std::vector<BufferWriteRecord> BufferWrites;
         std::vector<TextureWriteRecord> TextureWrites;
+        std::vector<QueueSubmitContextRequest> QueueSubmitContextRequests;
+        std::vector<RecordedQueueSubmitBatch> RecordedQueueSubmitPlan;
 
         // GRAPHICS-033E: records every `NoteRecipeGraphValidation(bool)` call
         // so contract tests can verify the renderer publishes the recipe-aware
@@ -496,6 +513,40 @@ namespace Extrinsic::Tests
         [[nodiscard]] RHI::ICommandContext& GetQueueContext(const RHI::QueueAffinity affinity,
                                                             std::uint32_t) override
         {
+            return GetMockQueueContext(affinity);
+        }
+
+        [[nodiscard]] bool BeginFrameQueueSubmitPlan(const RHI::FrameHandle&,
+                                                     const RHI::FrameQueueSubmitPlanDesc& plan) override
+        {
+            RecordedQueueSubmitPlan.clear();
+            if (!AcceptQueueSubmitPlans)
+            {
+                return false;
+            }
+
+            RecordedQueueSubmitPlan.reserve(plan.Batches.size());
+            for (const RHI::QueueSubmitBatchDesc& batch : plan.Batches)
+            {
+                RecordedQueueSubmitBatch recorded{
+                    .Queue = batch.Queue,
+                };
+                recorded.Waits.assign(batch.Waits.begin(), batch.Waits.end());
+                recorded.Signals.assign(batch.Signals.begin(), batch.Signals.end());
+                RecordedQueueSubmitPlan.push_back(std::move(recorded));
+            }
+            return true;
+        }
+
+        [[nodiscard]] RHI::ICommandContext& GetQueueSubmitContext(const RHI::QueueAffinity affinity,
+                                                                  std::uint32_t frameIndex,
+                                                                  std::uint32_t batchIndex) override
+        {
+            QueueSubmitContextRequests.push_back(QueueSubmitContextRequest{
+                .Affinity = affinity,
+                .FrameIndex = frameIndex,
+                .BatchIndex = batchIndex,
+            });
             return GetMockQueueContext(affinity);
         }
 

@@ -58,9 +58,11 @@ compiled topological order, resolves each pass through a
 `QueueSubmitBatch` records, and attaches per-batch cross-queue timeline
 wait/signal records. When optional queues demote to `Graphics`, timeline edges
 whose signal and wait queues resolve to the same queue are omitted and counted
-through `OmittedSameQueueTimelineEdgeCount`. The plan is still a command-record
-contract; concrete `VkQueue` submits and timeline semaphore waits/signals remain
-backend-owned work.
+through `OmittedSameQueueTimelineEdgeCount`. The renderer converts this plan to
+`RHI::FrameQueueSubmitPlanDesc` and records each batch through
+`IDevice::GetQueueSubmitContext(...)` when the backend accepts the plan. Concrete
+`VkQueue` selection, command-buffer allocation, timeline semaphores, and queue
+fences remain backend-owned work.
 
 The compiler also emits backend-neutral cross-queue timeline records for live
 producer->consumer handoffs after culling. For each live pass on queue A that
@@ -84,8 +86,9 @@ and the acquire packet is tagged `BeforePass` on the consumer. The packet fields
 carry CPU-visible queue-family tokens derived from `RenderQueue`; concrete
 Vulkan queue-family translation remains backend work.
 
-This remains a CPU/null contract, not backend execution. Vulkan multi-queue
-recording and opt-in `gpu;vulkan` smoke coverage are owned by `GRAPHICS-037D`.
+This remains a CPU/null scheduling contract. Vulkan multi-queue recording
+consumes the contract through the RHI submit-plan seam, and opt-in `gpu;vulkan`
+smoke coverage is owned by `GRAPHICS-037D`.
 
 ## Default-Recipe `gpu;vulkan` Smoke
 
@@ -97,3 +100,11 @@ backbuffer-readback parity harness under `gpu;vulkan;graphics`. The fixture is
 selected only via `ctest -L 'gpu' -L 'vulkan' ...`; the default CPU gate excludes
 it and the tests report `SKIPPED` when GLFW or a Vulkan-capable swapchain/device
 is unavailable.
+
+`PostProcessHistogramPass` is the default recipe's compute-only async queue
+probe. The recipe requests `RenderQueue::AsyncCompute` for that pass; the
+framegraph/RHI resolver demotes it back to graphics on hosts without async
+queue support. On promoted Vulkan hosts with async compute, the
+`DefaultRecipeSurfaceGpuSmoke.AsyncComputeHistogramQueueReadbackMatchesMinimalHarnessSamples`
+fixture asserts that `RenderGraphFrameStats::AsyncComputeUtilizedFrames >= 1`
+and that the same four-sample backbuffer-readback parity harness still matches.

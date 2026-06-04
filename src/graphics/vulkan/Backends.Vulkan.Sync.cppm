@@ -23,12 +23,18 @@ namespace Extrinsic::Backends::Vulkan
         VkCommandPool   CmdPool       = VK_NULL_HANDLE;
         VkCommandBuffer CmdBuffer     = VK_NULL_HANDLE;
         VkFence         Fence         = VK_NULL_HANDLE;
+        VkFence         AsyncComputeFence = VK_NULL_HANDLE;
+        VkFence         TransferFence = VK_NULL_HANDLE;
         VkSemaphore     ImageAcquired = VK_NULL_HANDLE;
         VkSemaphore     RenderDone    = VK_NULL_HANDLE;
+        VkSemaphore     QueueTimelines[3] = {VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE};
+        std::uint64_t   QueueTimelineBase[3] = {0, 0, 0};
+        VkCommandPool   AsyncComputeCmdPool = VK_NULL_HANDLE;
+        VkCommandPool   TransferCmdPool = VK_NULL_HANDLE;
         std::uint32_t   AcquiredImageIndex = 0;
         bool            ImageAcquiredForFrame = false;
         bool            SubmittedForPresent = false;
+        std::vector<VkCommandBuffer> QueueSubmitCmdBuffers;
         std::vector<VulkanDeferredDelete> DeletionQueue;
     };
 }
-

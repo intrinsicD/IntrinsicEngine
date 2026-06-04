@@ -88,6 +88,11 @@ namespace Extrinsic::Backends::Vulkan
         [[nodiscard]] RHI::QueueCapabilityProfile GetQueueCapabilityProfile() const noexcept override;
         [[nodiscard]] RHI::ICommandContext& GetQueueContext(RHI::QueueAffinity affinity,
                                                             uint32_t frameIndex) override;
+        [[nodiscard]] bool BeginFrameQueueSubmitPlan(const RHI::FrameHandle& frame,
+                                                     const RHI::FrameQueueSubmitPlanDesc& plan) override;
+        [[nodiscard]] RHI::ICommandContext& GetQueueSubmitContext(RHI::QueueAffinity affinity,
+                                                                  uint32_t frameIndex,
+                                                                  uint32_t batchIndex) override;
 
         [[nodiscard]] RHI::BufferHandle CreateBuffer(const RHI::BufferDesc& desc) override;
         void DestroyBuffer(RHI::BufferHandle handle) override;
@@ -194,6 +199,14 @@ namespace Extrinsic::Backends::Vulkan
             void CollectCompleted() override {}
         };
 
+        struct PendingQueueSubmitBatch
+        {
+            RHI::QueueAffinity Queue = RHI::QueueAffinity::Graphics;
+            std::vector<RHI::QueueTimelineWaitDesc> Waits{};
+            std::vector<RHI::QueueTimelineSignalDesc> Signals{};
+            VkCommandBuffer CommandBuffer = VK_NULL_HANDLE;
+        };
+
         // BeginOneShot/EndOneShot submit to the graphics queue and wait for it
         // to become idle. These helpers are init/load-time only; runtime
         // uploads must use IDevice::GetTransferQueue() / ITransferQueue.
@@ -248,6 +261,8 @@ namespace Extrinsic::Backends::Vulkan
         uint64_t m_GlobalFrameNumber = 0;
 
         std::array<VulkanCommandContext, kMaxFramesInFlight> m_CmdContexts;
+        std::array<std::vector<VulkanCommandContext>, kMaxFramesInFlight> m_QueueSubmitContexts;
+        std::array<std::vector<PendingQueueSubmitBatch>, kMaxFramesInFlight> m_QueueSubmitBatches;
         VkCommandPool   m_OneShotCmdPool   = VK_NULL_HANDLE;
         VkCommandBuffer m_OneShotCmdBuffer = VK_NULL_HANDLE;
         bool            m_OneShotRecording = false;

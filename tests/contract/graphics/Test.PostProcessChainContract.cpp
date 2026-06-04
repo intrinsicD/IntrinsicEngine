@@ -343,6 +343,14 @@ TEST(GraphicsPostProcessChainContract, FrameRecipeDeclaresPostProcessHistogramAs
     ASSERT_NE(postIt, order.end());
     EXPECT_LT(pointIt, histogramIt);
     EXPECT_LT(histogramIt, postIt);
+
+    const std::size_t histogramOrderIndex =
+        static_cast<std::size_t>(std::distance(order.begin(), histogramIt));
+    ASSERT_LT(histogramOrderIndex, compiled->TopologicalOrder.size());
+    const std::uint32_t histogramPassIndex = compiled->TopologicalOrder[histogramOrderIndex];
+    ASSERT_LT(histogramPassIndex, compiled->PassQueues.size());
+    EXPECT_EQ(compiled->PassQueues[histogramPassIndex], Graphics::RenderQueue::AsyncCompute)
+        << "PostProcessHistogramPass is the default recipe's async-compute queue smoke pass.";
 }
 
 // GRAPHICS-075 Slice D.2a — the AA umbrella splits into three ordered
@@ -1407,6 +1415,5 @@ TEST(GraphicsPostProcessChainContract, PassesSkipMissingPipelineOrDisabledChain)
     missingPipeline.Execute(missingPipelineCmd, camera);
     EXPECT_TRUE(missingPipelineCmd.Events.empty());
 }
-
 
 

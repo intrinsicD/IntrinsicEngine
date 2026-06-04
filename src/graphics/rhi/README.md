@@ -21,14 +21,21 @@ This directory contains the `RHI` module/files.
   `Graphics` and callers can count the demotion through their scheduling
   diagnostics.
 - The RHI surface contains no backend submission policy. Framegraph partitioning
-  and later Vulkan queue recording consume this value contract without exposing
+  and Vulkan queue recording consume this value contract without exposing
   API-native queue-family types through RHI.
 - `RHI::IDevice::GetQueueCapabilityProfile()` reports optional queue support to
-  backend-neutral schedulers. `IDevice::GetQueueContext(QueueAffinity, frameIndex)`
-  is the command-recording seam for future per-affinity command buffers; the
-  default implementation falls back to `GetGraphicsContext(frameIndex)` so Null,
-  CPU tests, and single-queue backends preserve existing behavior until they
-  explicitly override a queue.
+  backend-neutral schedulers. `IDevice::GetQueueContext(QueueAffinity,
+  frameIndex)` is the command-recording seam for per-affinity command buffers;
+  the default implementation falls back to `GetGraphicsContext(frameIndex)` so
+  Null, CPU tests, and single-queue backends preserve existing behavior until
+  they explicitly override a queue.
+- `RHI::FrameQueueSubmitPlanDesc` is the backend-neutral bridge from a compiled
+  framegraph submit plan to a concrete device. `BeginFrameQueueSubmitPlan(...)`
+  lets a backend allocate per-batch command buffers for a frame, and
+  `GetQueueSubmitContext(queue, frameIndex, batchIndex)` returns the matching
+  command context for renderer recording. Default implementations decline the
+  plan and route back to the single graphics context, so capability-absent hosts
+  remain fail-closed.
 
 ## Timeline semaphores
 
@@ -38,9 +45,11 @@ This directory contains the `RHI` module/files.
   work completion on the producing queue, and `Wait(QueueAffinity, value)` gates
   the consuming queue. It does not expose Vulkan handles, queue-family indices,
   or backend submission ownership through RHI.
-- The framegraph compiler owns deterministic value assignment and emits CPU-visible
-  signal/wait/edge records. Concrete backend submission remains owned by later
-  Vulkan multi-queue work.
+- The framegraph compiler owns deterministic value assignment and emits
+  CPU-visible signal/wait/edge records. Concrete backend submission maps these
+  records through `FrameQueueSubmitPlanDesc`; Vulkan lowers them to
+  `vkQueueSubmit2` timeline waits/signals without exposing native handles
+  through RHI.
 
 ## Transfer uploads
 

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <utility>
 #include <vector>
@@ -179,6 +180,77 @@ TEST(GraphicsQueueAffinity, MockDeviceExposesToggleableOptionalQueues)
     EXPECT_EQ(transferInterfaceContext, static_cast<RHI::ICommandContext*>(&device.TransferContext));
     RHI::ITransferQueue* transferQueue = &device.GetMockTransferQueueForAffinity();
     EXPECT_EQ(transferQueue, static_cast<RHI::ITransferQueue*>(&device.TransferQueue));
+}
+
+TEST(GraphicsQueueAffinity, MockDeviceRecordsFrameQueueSubmitPlanAndBatchContexts)
+{
+    const CompiledRenderGraph compiled = CompileSubmitPlanGraph();
+    const QueueSubmitPlan plan = BuildQueueSubmitPlan(
+        compiled,
+        RHI::QueueCapabilityProfile{
+            .SupportsAsyncCompute = true,
+            .SupportsTransfer = true,
+        });
+    ASSERT_EQ(plan.Batches.size(), 3u);
+
+    std::vector<std::vector<RHI::QueueTimelineWaitDesc>> waits(plan.Batches.size());
+    std::vector<std::vector<RHI::QueueTimelineSignalDesc>> signals(plan.Batches.size());
+    std::vector<RHI::QueueSubmitBatchDesc> batches{};
+    batches.reserve(plan.Batches.size());
+    for (std::size_t batchIndex = 0; batchIndex < plan.Batches.size(); ++batchIndex)
+    {
+        const QueueSubmitBatch& batch = plan.Batches[batchIndex];
+        for (const QueueSubmitTimelineWait& wait : batch.Waits)
+        {
+            waits[batchIndex].push_back(RHI::QueueTimelineWaitDesc{
+                .Queue = wait.Queue,
+                .SignalQueue = wait.SignalQueue,
+                .Value = wait.Value,
+            });
+        }
+        for (const QueueSubmitTimelineSignal& signal : batch.Signals)
+        {
+            signals[batchIndex].push_back(RHI::QueueTimelineSignalDesc{
+                .Queue = signal.Queue,
+                .Value = signal.Value,
+            });
+        }
+        batches.push_back(RHI::QueueSubmitBatchDesc{
+            .Queue = batch.Queue,
+            .Waits = waits[batchIndex],
+            .Signals = signals[batchIndex],
+        });
+    }
+
+    Extrinsic::Tests::MockDevice device;
+    device.AcceptQueueSubmitPlans = true;
+    device.SetQueueCapabilityProfile(RHI::QueueCapabilityProfile{
+        .SupportsAsyncCompute = true,
+        .SupportsTransfer = true,
+    });
+
+    EXPECT_TRUE(device.BeginFrameQueueSubmitPlan(RHI::FrameHandle{.FrameIndex = 2u},
+                                                 RHI::FrameQueueSubmitPlanDesc{.Batches = batches}));
+    ASSERT_EQ(device.RecordedQueueSubmitPlan.size(), 3u);
+    EXPECT_EQ(device.RecordedQueueSubmitPlan[0].Queue, RHI::QueueAffinity::Graphics);
+    EXPECT_EQ(device.RecordedQueueSubmitPlan[1].Queue, RHI::QueueAffinity::AsyncCompute);
+    EXPECT_EQ(device.RecordedQueueSubmitPlan[2].Queue, RHI::QueueAffinity::Graphics);
+    ASSERT_EQ(device.RecordedQueueSubmitPlan[1].Waits.size(), 1u);
+    EXPECT_EQ(device.RecordedQueueSubmitPlan[1].Waits[0].SignalQueue, RHI::QueueAffinity::Graphics);
+    ASSERT_EQ(device.RecordedQueueSubmitPlan[1].Signals.size(), 1u);
+    EXPECT_EQ(device.RecordedQueueSubmitPlan[1].Signals[0].Queue, RHI::QueueAffinity::AsyncCompute);
+
+    RHI::ICommandContext* graphics0 =
+        &device.GetQueueSubmitContext(RHI::QueueAffinity::Graphics, 2u, 0u);
+    RHI::ICommandContext* async =
+        &device.GetQueueSubmitContext(RHI::QueueAffinity::AsyncCompute, 2u, 1u);
+    RHI::ICommandContext* graphics1 =
+        &device.GetQueueSubmitContext(RHI::QueueAffinity::Graphics, 2u, 2u);
+    EXPECT_EQ(graphics0, static_cast<RHI::ICommandContext*>(&device.CommandContext));
+    EXPECT_EQ(async, static_cast<RHI::ICommandContext*>(&device.AsyncComputeContext));
+    EXPECT_EQ(graphics1, static_cast<RHI::ICommandContext*>(&device.CommandContext));
+    ASSERT_EQ(device.QueueSubmitContextRequests.size(), 3u);
+    EXPECT_EQ(device.QueueSubmitContextRequests[1].BatchIndex, 1u);
 }
 
 TEST(GraphicsQueueAffinity, BuildQueueSubmitPlanCreatesBatchesAndTimelineBoundaries)

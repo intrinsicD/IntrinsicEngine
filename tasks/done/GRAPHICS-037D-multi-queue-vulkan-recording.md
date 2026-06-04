@@ -1,14 +1,15 @@
 # GRAPHICS-037D — Multi-queue Vulkan recording + opt-in gpu;vulkan smoke
 
 ## Status
-- Status: `in-progress`
-- Owner/agent: Codex
-- Branch: `main`
-- Started: 2026-06-04
-- Current slice: Slice B (`backend-neutral queue-command/submit-plan seam`) complete and
-  structurally verified.
-- Next verification step: continue with Slice C (`per-affinity Vulkan command buffers +
-  timeline submit waits/signals`).
+- Commit reference: this task-landing commit.
+- Landed 2026-06-04 at maturity `Operational` on Vulkan-capable hosts. The
+  renderer/RHI submit-plan seam now records per-affinity command contexts;
+  Vulkan submits per-affinity command buffers with timeline waits/signals and
+  queue-family ownership-transfer barriers; the default recipe routes
+  `PostProcessHistogramPass` to async compute and the opt-in `gpu;vulkan`
+  smoke validates `AsyncComputeUtilizedFrames >= 1` with readback parity.
+- Capability-absent hosts demote optional async/transfer work to the graphics
+  queue and keep the default single-queue path covered by the CPU gate.
 
 ## Goal
 - Implement the Vulkan recording bodies for multi-queue submission (queue-family
@@ -28,9 +29,9 @@
 - Decision 11: opt-in `gpu;vulkan` smoke for real multi-queue submission once Vulkan is
   operational. The smoke runs only on Vulkan + GLFW hosts and is excluded from the
   default CPU gate.
-- Current renderer/RHI constraint: `RHI::IDevice` exposes only the graphics command
-  context, so inter-queue timeline waits cannot yet be placed at real Vulkan submission
-  boundaries without a follow-up backend-neutral submit-plan seam.
+- Renderer/RHI submit-plan seam now exposes per-affinity command contexts and
+  timeline wait/signal descriptors, allowing Vulkan to place inter-queue waits
+  at real submit boundaries without importing Vulkan into renderer/framegraph.
 
 ## Slice plan
 - **Slice A (this slice).** Add Vulkan async-compute queue-family discovery/acquisition
@@ -53,14 +54,14 @@
       framegraph queue-affinity tokens to concrete backend queue-family indices.
 - [x] Add backend-neutral queue-command/submit-plan seam and CPU/null submit-plan
       contract coverage.
-- [ ] Record per-affinity command buffers and submit on the corresponding `VkQueue`.
-- [ ] Record timeline-semaphore signal/wait and queue-family ownership-transfer barriers
+- [x] Record per-affinity command buffers and submit on the corresponding `VkQueue`.
+- [x] Record timeline-semaphore signal/wait and queue-family ownership-transfer barriers
       from the compiled schedule.
-- [ ] Add an opt-in `gpu;vulkan` smoke asserting an async-compute pass actually runs on
+- [x] Add an opt-in `gpu;vulkan` smoke asserting an async-compute pass actually runs on
       the async queue (`AsyncComputeUtilizedFrames` ≥ 1) with correct output.
 
 ## Tests
-- [ ] `gpu;vulkan` smoke — multi-queue submission overlap on a Vulkan-capable host;
+- [x] `gpu;vulkan` smoke — multi-queue submission overlap on a Vulkan-capable host;
       skips on hosts without an operational Vulkan/GLFW lane.
 - [x] CPU-only Vulkan contract coverage proves queue-token resolution and fail-closed async diagnostics.
 - [x] CPU-only submit-plan contract coverage proves queue batching, timeline wait/signal
@@ -76,9 +77,9 @@
       `src/graphics/framegraph/README.md`.
 
 ## Acceptance criteria
-- [ ] Multi-queue submission records and runs on a Vulkan-capable host via the opt-in smoke.
-- [ ] Capability-absent hosts fall back to the single-queue path; CPU gate unchanged.
-- [ ] No new layering violations.
+- [x] Multi-queue submission records and runs on a Vulkan-capable host via the opt-in smoke.
+- [x] Capability-absent hosts fall back to the single-queue path; CPU gate unchanged.
+- [x] No new layering violations.
 
 ## Verification
 ```bash
@@ -124,6 +125,67 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 # First CPU CTest attempt failed only because IntrinsicBenchmarkSmoke was not built by IntrinsicTests.
 cmake --build --preset ci --target IntrinsicBenchmarkSmoke
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+git diff --check
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/agents/check_task_state_links.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main
+```
+
+Slice C focused verification run on 2026-06-04:
+
+```bash
+cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests
+ctest --test-dir build/ci --output-on-failure -R 'Graphics(QueueAffinity|CrossQueueTimeline|OwnershipTransfer)' --timeout 60
+build/ci/bin/IntrinsicGraphicsContractCpuTests --gtest_filter='GraphicsQueueAffinity.MockDeviceRecordsFrameQueueSubmitPlanAndBatchContexts'
+cmake --preset ci-vulkan
+cmake --build --preset ci-vulkan --target IntrinsicGraphicsVulkanContractTests
+ctest --test-dir build/ci-vulkan --output-on-failure -R 'Vulkan(FailClosedContract|OperationalStatusEvaluator|OperationalDiagnosticsSnapshot)' --timeout 60
+```
+
+Slice C clean verification run on 2026-06-04:
+
+```bash
+rm -rf build/ci build/ci-vulkan
+cmake --preset ci
+cmake --preset ci-vulkan
+cmake --build --preset ci --target IntrinsicTests
+cmake --build --preset ci-vulkan --target IntrinsicGraphicsVulkanContractTests
+ctest --test-dir build/ci --output-on-failure -R 'Graphics(QueueAffinity|CrossQueueTimeline|OwnershipTransfer)' --timeout 60
+# First default CPU CTest attempt failed only because IntrinsicBenchmarkSmoke was not built by IntrinsicTests.
+cmake --build --preset ci --target IntrinsicBenchmarkSmoke
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+ctest --test-dir build/ci-vulkan --output-on-failure -R 'Vulkan(FailClosedContract|OperationalStatusEvaluator|OperationalDiagnosticsSnapshot)' --timeout 60
+python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
+git diff --check
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/agents/check_task_state_links.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main
+```
+
+Slice D focused verification run on 2026-06-04:
+
+```bash
+cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests
+ctest --test-dir build/ci --output-on-failure -R '(Graphics(QueueAffinity|CrossQueueTimeline|OwnershipTransfer)|GraphicsPostProcessChainContract\.FrameRecipeDeclaresPostProcessHistogramAsOrderedPass|RendererFrameLifecycle\.AsyncComputeQueuePlanIncrementsUtilizationStat)' --timeout 60
+cmake --build --preset ci-vulkan --target IntrinsicGraphicsVulkanSmokeTests
+ctest --test-dir build/ci-vulkan --output-on-failure -R 'DefaultRecipeSurfaceGpuSmoke\.AsyncComputeHistogramQueueReadbackMatchesMinimalHarnessSamples' --timeout 120
+```
+
+Final verification run on 2026-06-04:
+
+```bash
+cmake --build --preset ci --target IntrinsicTests
+cmake --build --preset ci --target IntrinsicBenchmarkSmoke
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+ctest --test-dir build/ci-vulkan --output-on-failure -R 'Vulkan(FailClosedContract|OperationalStatusEvaluator|OperationalDiagnosticsSnapshot)' --timeout 60
+ctest --test-dir build/ci-vulkan --output-on-failure -R 'DefaultRecipeSurfaceGpuSmoke\.(RecipeSelectorReachesOperationalVulkanCommandStream|ReferenceTriangleDebugViewReadbackMatchesMinimalHarnessSamples|AsyncComputeHistogramQueueReadbackMatchesMinimalHarnessSamples)' --timeout 120
+python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
 git diff --check
 python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/agents/check_task_state_links.py --root . --strict

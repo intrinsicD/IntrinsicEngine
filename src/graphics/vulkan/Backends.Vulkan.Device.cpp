@@ -108,6 +108,20 @@ namespace
         }
     };
 
+    [[nodiscard]] constexpr std::uint32_t QueueSlot(const RHI::QueueAffinity queue) noexcept
+    {
+        switch (queue)
+        {
+        case RHI::QueueAffinity::Graphics:
+            return 0u;
+        case RHI::QueueAffinity::AsyncCompute:
+            return 1u;
+        case RHI::QueueAffinity::Transfer:
+            return 2u;
+        }
+        return 0u;
+    }
+
     void PublishBootstrapDiagnostics(const VulkanBootstrapDiagnosticsSnapshot& snapshot) noexcept
     {
         std::scoped_lock lock{g_BootstrapDiagnosticsMutex};
@@ -1615,6 +1629,42 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
             }
             ++diagnostics.FrameCommandPoolCount;
 
+            const auto createOptionalQueueCommandPool =
+                [&](const std::uint32_t family, VkCommandPool& outPool, const char* queueName) -> bool
+                {
+                    outPool = VK_NULL_HANDLE;
+                    if (family == m_GraphicsFamily)
+                    {
+                        return true;
+                    }
+                    VkCommandPoolCreateInfo optionalPoolInfo{};
+                    optionalPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+                    optionalPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+                    optionalPoolInfo.queueFamilyIndex = family;
+                    const VkResult optionalResult =
+                        vkCreateCommandPool(m_Device, &optionalPoolInfo, nullptr, &outPool);
+                    diagnostics.LastVkResult = static_cast<std::int32_t>(optionalResult);
+                    if (optionalResult != VK_SUCCESS || outPool == VK_NULL_HANDLE)
+                    {
+                        Core::Log::Error("[VulkanDevice::Initialize] vkCreateCommandPool failed for {} queue per-frame Vulkan resources; promoted Vulkan device remains non-operational.",
+                                         queueName);
+                        fail(VulkanBootstrapStatus::FailedPerFrameResourceCreation, optionalResult);
+                        return false;
+                    }
+                    return true;
+                };
+
+            if (m_AsyncComputeQueue != VK_NULL_HANDLE &&
+                !createOptionalQueueCommandPool(m_AsyncComputeFamily, frame.AsyncComputeCmdPool, "async-compute"))
+            {
+                return;
+            }
+            if (m_TransferVkQueue != VK_NULL_HANDLE &&
+                !createOptionalQueueCommandPool(m_TransferFamily, frame.TransferCmdPool, "transfer"))
+            {
+                return;
+            }
+
             VkCommandBufferAllocateInfo commandBufferInfo{};
             commandBufferInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
             commandBufferInfo.commandPool = frame.CmdPool;
@@ -1645,6 +1695,29 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
             }
             ++diagnostics.FrameFenceCount;
 
+            if (m_AsyncComputeQueue != VK_NULL_HANDLE)
+            {
+                result = vkCreateFence(m_Device, &fenceInfo, nullptr, &frame.AsyncComputeFence);
+                diagnostics.LastVkResult = static_cast<std::int32_t>(result);
+                if (result != VK_SUCCESS || frame.AsyncComputeFence == VK_NULL_HANDLE)
+                {
+                    Core::Log::Error("[VulkanDevice::Initialize] vkCreateFence failed for async-compute per-frame Vulkan resources; promoted Vulkan device remains non-operational.");
+                    fail(VulkanBootstrapStatus::FailedPerFrameResourceCreation, result);
+                    return;
+                }
+            }
+            if (m_TransferVkQueue != VK_NULL_HANDLE)
+            {
+                result = vkCreateFence(m_Device, &fenceInfo, nullptr, &frame.TransferFence);
+                diagnostics.LastVkResult = static_cast<std::int32_t>(result);
+                if (result != VK_SUCCESS || frame.TransferFence == VK_NULL_HANDLE)
+                {
+                    Core::Log::Error("[VulkanDevice::Initialize] vkCreateFence failed for transfer per-frame Vulkan resources; promoted Vulkan device remains non-operational.");
+                    fail(VulkanBootstrapStatus::FailedPerFrameResourceCreation, result);
+                    return;
+                }
+            }
+
             VkSemaphoreCreateInfo semaphoreInfo{};
             semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
@@ -1667,6 +1740,45 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
                 return;
             }
             ++diagnostics.FrameRenderDoneSemaphoreCount;
+
+            VkSemaphoreTypeCreateInfo timelineTypeInfo{};
+            timelineTypeInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
+            timelineTypeInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+            timelineTypeInfo.initialValue = 0u;
+
+            VkSemaphoreCreateInfo timelineInfo{};
+            timelineInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+            timelineInfo.pNext = &timelineTypeInfo;
+
+            const auto createTimeline = [&](const RHI::QueueAffinity queue, const char* queueName) -> bool
+            {
+                const std::uint32_t slot = QueueSlot(queue);
+                result = vkCreateSemaphore(m_Device, &timelineInfo, nullptr, &frame.QueueTimelines[slot]);
+                diagnostics.LastVkResult = static_cast<std::int32_t>(result);
+                if (result != VK_SUCCESS || frame.QueueTimelines[slot] == VK_NULL_HANDLE)
+                {
+                    Core::Log::Error("[VulkanDevice::Initialize] vkCreateSemaphore failed for {} timeline per-frame Vulkan resources; promoted Vulkan device remains non-operational.",
+                                     queueName);
+                    fail(VulkanBootstrapStatus::FailedPerFrameResourceCreation, result);
+                    return false;
+                }
+                frame.QueueTimelineBase[slot] = 0u;
+                return true;
+            };
+            if (!createTimeline(RHI::QueueAffinity::Graphics, "graphics"))
+            {
+                return;
+            }
+            if (m_AsyncComputeQueue != VK_NULL_HANDLE &&
+                !createTimeline(RHI::QueueAffinity::AsyncCompute, "async-compute"))
+            {
+                return;
+            }
+            if (m_TransferVkQueue != VK_NULL_HANDLE &&
+                !createTimeline(RHI::QueueAffinity::Transfer, "transfer"))
+            {
+                return;
+            }
 
             m_CmdContexts[frameSlot].Bind(m_Device,
                                           frame.CmdBuffer,
@@ -2189,24 +2301,47 @@ void VulkanDevice::Shutdown()
         PerFrame& frame = m_Frames[frameSlot];
         if (device != VK_NULL_HANDLE)
         {
+            for (VkSemaphore& timeline : frame.QueueTimelines)
+            {
+                if (timeline != VK_NULL_HANDLE)
+                    vkDestroySemaphore(device, timeline, nullptr);
+            }
+            if (frame.TransferFence != VK_NULL_HANDLE)
+                vkDestroyFence(device, frame.TransferFence, nullptr);
+            if (frame.AsyncComputeFence != VK_NULL_HANDLE)
+                vkDestroyFence(device, frame.AsyncComputeFence, nullptr);
             if (frame.RenderDone != VK_NULL_HANDLE)
                 vkDestroySemaphore(device, frame.RenderDone, nullptr);
             if (frame.ImageAcquired != VK_NULL_HANDLE)
                 vkDestroySemaphore(device, frame.ImageAcquired, nullptr);
             if (frame.Fence != VK_NULL_HANDLE)
                 vkDestroyFence(device, frame.Fence, nullptr);
+            if (frame.TransferCmdPool != VK_NULL_HANDLE)
+                vkDestroyCommandPool(device, frame.TransferCmdPool, nullptr);
+            if (frame.AsyncComputeCmdPool != VK_NULL_HANDLE)
+                vkDestroyCommandPool(device, frame.AsyncComputeCmdPool, nullptr);
             if (frame.CmdPool != VK_NULL_HANDLE)
                 vkDestroyCommandPool(device, frame.CmdPool, nullptr);
         }
 
         frame.CmdBuffer = VK_NULL_HANDLE;
         frame.CmdPool = VK_NULL_HANDLE;
+        frame.AsyncComputeCmdPool = VK_NULL_HANDLE;
+        frame.TransferCmdPool = VK_NULL_HANDLE;
         frame.Fence = VK_NULL_HANDLE;
+        frame.AsyncComputeFence = VK_NULL_HANDLE;
+        frame.TransferFence = VK_NULL_HANDLE;
         frame.ImageAcquired = VK_NULL_HANDLE;
         frame.RenderDone = VK_NULL_HANDLE;
+        for (std::uint32_t queueSlot = 0; queueSlot < 3u; ++queueSlot)
+        {
+            frame.QueueTimelines[queueSlot] = VK_NULL_HANDLE;
+            frame.QueueTimelineBase[queueSlot] = 0u;
+        }
         frame.AcquiredImageIndex = 0;
         frame.ImageAcquiredForFrame = false;
         frame.SubmittedForPresent = false;
+        frame.QueueSubmitCmdBuffers.clear();
         frame.DeletionQueue.clear();
 
         m_CmdContexts[frameSlot].Bind(VK_NULL_HANDLE,
@@ -2218,6 +2353,8 @@ void VulkanDevice::Shutdown()
                                       nullptr,
                                       nullptr,
                                       RHI::SamplerHandle{});
+        m_QueueSubmitContexts[frameSlot].clear();
+        m_QueueSubmitBatches[frameSlot].clear();
     }
 
     if (m_Vma != VK_NULL_HANDLE)
@@ -2313,7 +2450,20 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
         return false;
     }
 
-    VkResult result = vkWaitForFences(m_Device, 1u, &frame.Fence, VK_TRUE, UINT64_MAX);
+    std::vector<VkFence> frameFences{frame.Fence};
+    if (frame.AsyncComputeFence != VK_NULL_HANDLE)
+    {
+        frameFences.push_back(frame.AsyncComputeFence);
+    }
+    if (frame.TransferFence != VK_NULL_HANDLE)
+    {
+        frameFences.push_back(frame.TransferFence);
+    }
+    VkResult result = vkWaitForFences(m_Device,
+                                      static_cast<std::uint32_t>(frameFences.size()),
+                                      frameFences.data(),
+                                      VK_TRUE,
+                                      UINT64_MAX);
     if (result != VK_SUCCESS)
     {
         NoteDeviceLostIfNeeded(result);
@@ -2330,6 +2480,35 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
         Core::Log::Error("[VulkanDevice::BeginFrame] vkWaitForFences failed; guarded Vulkan frame acquire skipped");
         return false;
     }
+
+    const auto commandPoolForQueue = [&frame](const RHI::QueueAffinity queue) noexcept
+    {
+        switch (queue)
+        {
+        case RHI::QueueAffinity::AsyncCompute:
+            return frame.AsyncComputeCmdPool != VK_NULL_HANDLE ? frame.AsyncComputeCmdPool : frame.CmdPool;
+        case RHI::QueueAffinity::Transfer:
+            return frame.TransferCmdPool != VK_NULL_HANDLE ? frame.TransferCmdPool : frame.CmdPool;
+        case RHI::QueueAffinity::Graphics:
+            return frame.CmdPool;
+        }
+        return frame.CmdPool;
+    };
+    for (const PendingQueueSubmitBatch& batch : m_QueueSubmitBatches[m_FrameSlot])
+    {
+        if (batch.CommandBuffer != VK_NULL_HANDLE)
+        {
+            VkCommandPool pool = commandPoolForQueue(batch.Queue);
+            if (pool != VK_NULL_HANDLE)
+            {
+                VkCommandBuffer commandBuffer = batch.CommandBuffer;
+                vkFreeCommandBuffers(m_Device, pool, 1u, &commandBuffer);
+            }
+        }
+    }
+    m_QueueSubmitBatches[m_FrameSlot].clear();
+    m_QueueSubmitContexts[m_FrameSlot].clear();
+    frame.QueueSubmitCmdBuffers.clear();
 
     FlushDeletionQueue(m_FrameSlot);
 
@@ -2349,6 +2528,46 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
         });
         Core::Log::Error("[VulkanDevice::BeginFrame] vkResetCommandPool failed before acquire; guarded frame skipped");
         return false;
+    }
+    if (frame.AsyncComputeCmdPool != VK_NULL_HANDLE)
+    {
+        result = vkResetCommandPool(m_Device, frame.AsyncComputeCmdPool, 0u);
+        if (result != VK_SUCCESS)
+        {
+            NoteDeviceLostIfNeeded(result);
+            MutateFrameLifecycleDiagnostics([this, result](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+            {
+                snapshot.BeginStatus = VulkanFrameBeginStatus::FailedAcquire;
+                snapshot.LastVkResult = static_cast<std::int32_t>(result);
+                snapshot.LastFrameIndex = m_FrameSlot;
+                snapshot.LastSwapchainImageIndex = 0;
+                snapshot.DeviceOperational = m_Operational;
+                snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
+                snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+            });
+            Core::Log::Error("[VulkanDevice::BeginFrame] vkResetCommandPool failed for async-compute queue before acquire; guarded frame skipped");
+            return false;
+        }
+    }
+    if (frame.TransferCmdPool != VK_NULL_HANDLE)
+    {
+        result = vkResetCommandPool(m_Device, frame.TransferCmdPool, 0u);
+        if (result != VK_SUCCESS)
+        {
+            NoteDeviceLostIfNeeded(result);
+            MutateFrameLifecycleDiagnostics([this, result](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+            {
+                snapshot.BeginStatus = VulkanFrameBeginStatus::FailedAcquire;
+                snapshot.LastVkResult = static_cast<std::int32_t>(result);
+                snapshot.LastFrameIndex = m_FrameSlot;
+                snapshot.LastSwapchainImageIndex = 0;
+                snapshot.DeviceOperational = m_Operational;
+                snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
+                snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+            });
+            Core::Log::Error("[VulkanDevice::BeginFrame] vkResetCommandPool failed for transfer queue before acquire; guarded frame skipped");
+            return false;
+        }
     }
 
     std::uint32_t imageIndex = 0;
@@ -2505,6 +2724,246 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
             snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
         });
         Core::Log::Error("[VulkanDevice::EndFrame] vkResetFences failed; guarded submit skipped");
+        return;
+    }
+
+    std::vector<PendingQueueSubmitBatch>& pendingBatches = m_QueueSubmitBatches[frame.FrameIndex];
+    if (!pendingBatches.empty())
+    {
+        const auto queueForAffinity = [this](const RHI::QueueAffinity queue) noexcept
+        {
+            switch (queue)
+            {
+            case RHI::QueueAffinity::AsyncCompute:
+                return m_AsyncComputeQueue != VK_NULL_HANDLE ? m_AsyncComputeQueue : m_GraphicsQueue;
+            case RHI::QueueAffinity::Transfer:
+                return m_TransferVkQueue != VK_NULL_HANDLE ? m_TransferVkQueue : m_GraphicsQueue;
+            case RHI::QueueAffinity::Graphics:
+                return m_GraphicsQueue;
+            }
+            return m_GraphicsQueue;
+        };
+
+        std::array<std::uint32_t, 3u> lastBatchForQueue{};
+        lastBatchForQueue.fill(std::numeric_limits<std::uint32_t>::max());
+        std::uint32_t firstGraphicsBatch = std::numeric_limits<std::uint32_t>::max();
+        std::uint32_t renderDoneBatch = static_cast<std::uint32_t>(pendingBatches.size() - 1u);
+        std::array<std::uint64_t, 3u> maxSignalValueByQueue{};
+        for (std::uint32_t batchIndex = 0; batchIndex < pendingBatches.size(); ++batchIndex)
+        {
+            PendingQueueSubmitBatch& batch = pendingBatches[batchIndex];
+            const std::uint32_t slot = QueueSlot(batch.Queue);
+            lastBatchForQueue[slot] = batchIndex;
+            if (batch.Queue == RHI::QueueAffinity::Graphics &&
+                firstGraphicsBatch == std::numeric_limits<std::uint32_t>::max())
+            {
+                firstGraphicsBatch = batchIndex;
+            }
+            for (const RHI::QueueTimelineSignalDesc& signal : batch.Signals)
+            {
+                const std::uint32_t signalSlot = QueueSlot(signal.Queue);
+                maxSignalValueByQueue[signalSlot] =
+                    std::max(maxSignalValueByQueue[signalSlot], signal.Value);
+            }
+        }
+        if (firstGraphicsBatch != std::numeric_limits<std::uint32_t>::max())
+        {
+            renderDoneBatch = lastBatchForQueue[QueueSlot(RHI::QueueAffinity::Graphics)];
+        }
+
+        std::vector<VkFence> optionalFencesToReset{};
+        if (lastBatchForQueue[QueueSlot(RHI::QueueAffinity::AsyncCompute)] !=
+                std::numeric_limits<std::uint32_t>::max() &&
+            lastBatchForQueue[QueueSlot(RHI::QueueAffinity::AsyncCompute)] != renderDoneBatch &&
+            perFrame.AsyncComputeFence != VK_NULL_HANDLE)
+        {
+            optionalFencesToReset.push_back(perFrame.AsyncComputeFence);
+        }
+        if (lastBatchForQueue[QueueSlot(RHI::QueueAffinity::Transfer)] !=
+                std::numeric_limits<std::uint32_t>::max() &&
+            lastBatchForQueue[QueueSlot(RHI::QueueAffinity::Transfer)] != renderDoneBatch &&
+            perFrame.TransferFence != VK_NULL_HANDLE)
+        {
+            optionalFencesToReset.push_back(perFrame.TransferFence);
+        }
+        if (!optionalFencesToReset.empty())
+        {
+            result = vkResetFences(m_Device,
+                                   static_cast<std::uint32_t>(optionalFencesToReset.size()),
+                                   optionalFencesToReset.data());
+            if (result != VK_SUCCESS)
+            {
+                NoteDeviceLostIfNeeded(result);
+                MutateFrameLifecycleDiagnostics([this, &frame, result](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+                {
+                    snapshot.EndStatus = VulkanFrameEndStatus::FailedSubmit;
+                    snapshot.LastVkResult = static_cast<std::int32_t>(result);
+                    snapshot.LastFrameIndex = frame.FrameIndex;
+                    snapshot.LastSwapchainImageIndex = frame.SwapchainImageIndex;
+                    snapshot.DeviceOperational = m_Operational;
+                    snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
+                    snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+                });
+                Core::Log::Error("[VulkanDevice::EndFrame] vkResetFences failed for optional queue submit fences; guarded submit skipped");
+                return;
+            }
+        }
+
+        for (std::uint32_t batchIndex = 0; batchIndex < pendingBatches.size(); ++batchIndex)
+        {
+            PendingQueueSubmitBatch& batch = pendingBatches[batchIndex];
+            if (batch.CommandBuffer == VK_NULL_HANDLE)
+            {
+                result = VK_ERROR_INITIALIZATION_FAILED;
+                break;
+            }
+
+            std::vector<VkSemaphoreSubmitInfo> waitInfos{};
+            std::vector<VkSemaphoreSubmitInfo> signalInfos{};
+
+            const bool waitsForImageAcquire =
+                batchIndex == (firstGraphicsBatch != std::numeric_limits<std::uint32_t>::max()
+                                   ? firstGraphicsBatch
+                                   : 0u);
+            if (waitsForImageAcquire)
+            {
+                VkSemaphoreSubmitInfo waitAcquire{};
+                waitAcquire.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+                waitAcquire.semaphore = perFrame.ImageAcquired;
+                waitAcquire.value = 0u;
+                waitAcquire.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+                waitAcquire.deviceIndex = 0u;
+                waitInfos.push_back(waitAcquire);
+            }
+
+            for (const RHI::QueueTimelineWaitDesc& wait : batch.Waits)
+            {
+                const std::uint32_t signalSlot = QueueSlot(wait.SignalQueue);
+                VkSemaphore timeline = perFrame.QueueTimelines[signalSlot];
+                if (timeline == VK_NULL_HANDLE)
+                {
+                    continue;
+                }
+                VkSemaphoreSubmitInfo waitInfo{};
+                waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+                waitInfo.semaphore = timeline;
+                waitInfo.value = perFrame.QueueTimelineBase[signalSlot] + wait.Value;
+                waitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+                waitInfo.deviceIndex = 0u;
+                waitInfos.push_back(waitInfo);
+            }
+
+            for (const RHI::QueueTimelineSignalDesc& signal : batch.Signals)
+            {
+                const std::uint32_t signalSlot = QueueSlot(signal.Queue);
+                VkSemaphore timeline = perFrame.QueueTimelines[signalSlot];
+                if (timeline == VK_NULL_HANDLE)
+                {
+                    continue;
+                }
+                VkSemaphoreSubmitInfo signalInfo{};
+                signalInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+                signalInfo.semaphore = timeline;
+                signalInfo.value = perFrame.QueueTimelineBase[signalSlot] + signal.Value;
+                signalInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+                signalInfo.deviceIndex = 0u;
+                signalInfos.push_back(signalInfo);
+            }
+
+            if (batchIndex == renderDoneBatch)
+            {
+                VkSemaphoreSubmitInfo renderDone{};
+                renderDone.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+                renderDone.semaphore = perFrame.RenderDone;
+                renderDone.value = 0u;
+                renderDone.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+                renderDone.deviceIndex = 0u;
+                signalInfos.push_back(renderDone);
+            }
+
+            VkCommandBufferSubmitInfo commandBufferInfo{};
+            commandBufferInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+            commandBufferInfo.commandBuffer = batch.CommandBuffer;
+            commandBufferInfo.deviceMask = 0u;
+
+            VkSubmitInfo2 submitInfo{};
+            submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+            submitInfo.waitSemaphoreInfoCount = static_cast<std::uint32_t>(waitInfos.size());
+            submitInfo.pWaitSemaphoreInfos = waitInfos.data();
+            submitInfo.commandBufferInfoCount = 1u;
+            submitInfo.pCommandBufferInfos = &commandBufferInfo;
+            submitInfo.signalSemaphoreInfoCount = static_cast<std::uint32_t>(signalInfos.size());
+            submitInfo.pSignalSemaphoreInfos = signalInfos.data();
+
+            VkFence submitFence = VK_NULL_HANDLE;
+            if (batchIndex == renderDoneBatch)
+            {
+                submitFence = perFrame.Fence;
+            }
+            else if (batch.Queue == RHI::QueueAffinity::AsyncCompute &&
+                     batchIndex == lastBatchForQueue[QueueSlot(RHI::QueueAffinity::AsyncCompute)])
+            {
+                submitFence = perFrame.AsyncComputeFence;
+            }
+            else if (batch.Queue == RHI::QueueAffinity::Transfer &&
+                     batchIndex == lastBatchForQueue[QueueSlot(RHI::QueueAffinity::Transfer)])
+            {
+                submitFence = perFrame.TransferFence;
+            }
+
+            VkQueue queue = queueForAffinity(batch.Queue);
+            if (queue == VK_NULL_HANDLE)
+            {
+                result = VK_ERROR_INITIALIZATION_FAILED;
+                break;
+            }
+
+            {
+                std::scoped_lock lock{m_QueueMutex};
+                result = vkQueueSubmit2(queue, 1u, &submitInfo, submitFence);
+            }
+            if (result != VK_SUCCESS)
+            {
+                break;
+            }
+        }
+
+        if (result != VK_SUCCESS)
+        {
+            NoteDeviceLostIfNeeded(result);
+            perFrame.SubmittedForPresent = false;
+            MutateFrameLifecycleDiagnostics([this, &frame, result](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+            {
+                snapshot.EndStatus = VulkanFrameEndStatus::FailedSubmit;
+                snapshot.LastVkResult = static_cast<std::int32_t>(result);
+                snapshot.LastFrameIndex = frame.FrameIndex;
+                snapshot.LastSwapchainImageIndex = frame.SwapchainImageIndex;
+                snapshot.DeviceOperational = m_Operational;
+                snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
+                snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+            });
+            Core::Log::Error("[VulkanDevice::EndFrame] vkQueueSubmit2 failed for guarded multi-queue Vulkan frame");
+            return;
+        }
+
+        for (std::uint32_t slot = 0; slot < maxSignalValueByQueue.size(); ++slot)
+        {
+            perFrame.QueueTimelineBase[slot] += maxSignalValueByQueue[slot];
+        }
+
+        perFrame.SubmittedForPresent = true;
+        m_FrameSlot = (frame.FrameIndex + 1u) % kMaxFramesInFlight;
+        ++m_GlobalFrameNumber;
+        MutateFrameLifecycleDiagnostics([this, &frame](VulkanFrameLifecycleDiagnosticsSnapshot& snapshot) noexcept
+        {
+            snapshot.EndStatus = VulkanFrameEndStatus::Submitted;
+            snapshot.LastVkResult = 0;
+            snapshot.LastFrameIndex = frame.FrameIndex;
+            snapshot.LastSwapchainImageIndex = frame.SwapchainImageIndex;
+            snapshot.DeviceOperational = m_Operational;
+            snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
+            snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
+        });
         return;
     }
 
@@ -2828,11 +3287,137 @@ RHI::QueueCapabilityProfile VulkanDevice::GetQueueCapabilityProfile() const noex
 RHI::ICommandContext& VulkanDevice::GetQueueContext(const RHI::QueueAffinity affinity,
                                                     const uint32_t frameIndex)
 {
-    // GRAPHICS-037D Slice B exposes the backend-neutral seam while preserving
-    // the current single graphics command buffer. Slice C will bind real
-    // per-affinity command buffers here before queue-specific submission.
     (void)affinity;
     return GetGraphicsContext(frameIndex);
+}
+
+bool VulkanDevice::BeginFrameQueueSubmitPlan(const RHI::FrameHandle& frame,
+                                             const RHI::FrameQueueSubmitPlanDesc& plan)
+{
+    if (frame.FrameIndex >= kMaxFramesInFlight || m_Device == VK_NULL_HANDLE)
+    {
+        return false;
+    }
+
+    PerFrame& perFrame = m_Frames[frame.FrameIndex];
+    std::vector<PendingQueueSubmitBatch>& pending = m_QueueSubmitBatches[frame.FrameIndex];
+    std::vector<VulkanCommandContext>& contexts = m_QueueSubmitContexts[frame.FrameIndex];
+    pending.clear();
+    contexts.clear();
+    perFrame.QueueSubmitCmdBuffers.clear();
+
+    if (plan.Batches.empty())
+    {
+        return false;
+    }
+
+    const auto commandPoolForQueue = [&perFrame](const RHI::QueueAffinity queue) noexcept
+    {
+        switch (queue)
+        {
+        case RHI::QueueAffinity::AsyncCompute:
+            return perFrame.AsyncComputeCmdPool != VK_NULL_HANDLE ? perFrame.AsyncComputeCmdPool : perFrame.CmdPool;
+        case RHI::QueueAffinity::Transfer:
+            return perFrame.TransferCmdPool != VK_NULL_HANDLE ? perFrame.TransferCmdPool : perFrame.CmdPool;
+        case RHI::QueueAffinity::Graphics:
+            return perFrame.CmdPool;
+        }
+        return perFrame.CmdPool;
+    };
+
+    pending.reserve(plan.Batches.size());
+    contexts.resize(plan.Batches.size());
+    perFrame.QueueSubmitCmdBuffers.resize(plan.Batches.size(), VK_NULL_HANDLE);
+
+    const auto releasePendingCommandBuffers = [&]() noexcept
+    {
+        for (const PendingQueueSubmitBatch& pendingBatch : pending)
+        {
+            if (pendingBatch.CommandBuffer == VK_NULL_HANDLE)
+            {
+                continue;
+            }
+            VkCommandPool pool = commandPoolForQueue(pendingBatch.Queue);
+            if (pool != VK_NULL_HANDLE)
+            {
+                VkCommandBuffer commandBuffer = pendingBatch.CommandBuffer;
+                vkFreeCommandBuffers(m_Device, pool, 1u, &commandBuffer);
+            }
+        }
+        pending.clear();
+        contexts.clear();
+        perFrame.QueueSubmitCmdBuffers.clear();
+    };
+
+    for (std::size_t batchIndex = 0; batchIndex < plan.Batches.size(); ++batchIndex)
+    {
+        const RHI::QueueSubmitBatchDesc& batch = plan.Batches[batchIndex];
+        VkCommandPool pool = commandPoolForQueue(batch.Queue);
+        if (pool == VK_NULL_HANDLE)
+        {
+            releasePendingCommandBuffers();
+            return false;
+        }
+
+        VkCommandBufferAllocateInfo allocateInfo{};
+        allocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocateInfo.commandPool = pool;
+        allocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocateInfo.commandBufferCount = 1u;
+
+        VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
+        const VkResult result = vkAllocateCommandBuffers(m_Device, &allocateInfo, &commandBuffer);
+        if (result != VK_SUCCESS || commandBuffer == VK_NULL_HANDLE)
+        {
+            NoteDeviceLostIfNeeded(result);
+            if (commandBuffer != VK_NULL_HANDLE)
+            {
+                vkFreeCommandBuffers(m_Device, pool, 1u, &commandBuffer);
+            }
+            releasePendingCommandBuffers();
+            Core::Log::Error("[VulkanDevice::BeginFrameQueueSubmitPlan] vkAllocateCommandBuffers failed; falling back to graphics submit for this frame");
+            return false;
+        }
+
+        PendingQueueSubmitBatch pendingBatch{
+            .Queue = batch.Queue,
+            .CommandBuffer = commandBuffer,
+        };
+        pendingBatch.Waits.assign(batch.Waits.begin(), batch.Waits.end());
+        pendingBatch.Signals.assign(batch.Signals.begin(), batch.Signals.end());
+        pending.push_back(std::move(pendingBatch));
+        perFrame.QueueSubmitCmdBuffers[batchIndex] = commandBuffer;
+        contexts[batchIndex].Bind(m_Device,
+                                  commandBuffer,
+                                  m_GlobalPipelineLayout,
+                                  m_BindlessHeap ? m_BindlessHeap->GetSet() : VK_NULL_HANDLE,
+                                  &m_Buffers,
+                                  &m_Images,
+                                  &m_Samplers,
+                                  &m_Pipelines,
+                                  m_DefaultSamplerHandle,
+                                  m_GraphicsFamily,
+                                  m_AsyncComputeQueue != VK_NULL_HANDLE
+                                      ? m_AsyncComputeFamily
+                                      : VK_QUEUE_FAMILY_IGNORED,
+                                  m_PresentFamily,
+                                  m_TransferFamily);
+    }
+
+    return pending.size() == plan.Batches.size();
+}
+
+RHI::ICommandContext& VulkanDevice::GetQueueSubmitContext(const RHI::QueueAffinity affinity,
+                                                          const uint32_t frameIndex,
+                                                          const uint32_t batchIndex)
+{
+    if (frameIndex < kMaxFramesInFlight &&
+        batchIndex < m_QueueSubmitContexts[frameIndex].size())
+    {
+        return m_QueueSubmitContexts[frameIndex][batchIndex];
+    }
+
+    return GetQueueContext(affinity, frameIndex);
 }
 
 // =============================================================================
