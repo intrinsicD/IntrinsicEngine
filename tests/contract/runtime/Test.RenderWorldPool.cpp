@@ -173,6 +173,56 @@ TEST(RenderWorldPool, ProducerReplacesUnpublishedBackAndCountsSkip)
     EXPECT_EQ(pool.GetDiagnostics().ExtractionSkipCount, 1u);
 }
 
+// --- exhausted pool must not hand out a referenced slot ------------------
+
+// Regression for PR #970 review: with all three buffers published as fronts and
+// still held in flight (no retires), AcquireBack has no free slot and no
+// unpublished back slot. It must fail closed (kInvalidSlot) rather than reuse a
+// slot an in-flight frame still references.
+TEST(RenderWorldPool, ExhaustedPoolDoesNotReuseReferencedSlot)
+{
+    RenderWorldPool pool(3u);
+
+    // Publish + acquire (hold) a distinct front for frames 0, 1, 2 without ever
+    // releasing, so all three slots end up referenced.
+    std::uint32_t held[3] = {kInvalid, kInvalid, kInvalid};
+    for (std::uint32_t frame = 0u; frame < 3u; ++frame)
+    {
+        const std::uint32_t back = pool.AcquireBack(frame);
+        ASSERT_NE(back, kInvalid) << "frame " << frame;
+        pool.PublishFront(back);
+        const std::uint32_t front = pool.AcquireFront(frame);
+        ASSERT_EQ(front, back);
+        held[frame] = front;
+    }
+
+    // All three slots are distinct and each holds exactly one reference.
+    EXPECT_NE(held[0], held[1]);
+    EXPECT_NE(held[0], held[2]);
+    EXPECT_NE(held[1], held[2]);
+    EXPECT_EQ(pool.RefCount(held[0]), 1u);
+    EXPECT_EQ(pool.RefCount(held[1]), 1u);
+    EXPECT_EQ(pool.RefCount(held[2]), 1u);
+
+    // The pool is exhausted: AcquireBack must not hand out any of the in-flight
+    // slots. It fails closed and counts the skip.
+    const std::uint32_t exhausted = pool.AcquireBack(3u);
+    EXPECT_EQ(exhausted, kInvalid);
+    EXPECT_EQ(pool.GetDiagnostics().ExtractionSkipCount, 1u);
+
+    // No referenced slot was reused or overwritten: every held front still
+    // carries exactly its one reference.
+    EXPECT_EQ(pool.RefCount(held[0]), 1u);
+    EXPECT_EQ(pool.RefCount(held[1]), 1u);
+    EXPECT_EQ(pool.RefCount(held[2]), 1u);
+
+    // Releasing one in-flight front lets the next AcquireBack reclaim it (the
+    // pool recovers once back-pressure clears).
+    pool.ReleaseFront(held[0]);
+    const std::uint32_t recovered = pool.AcquireBack(4u);
+    EXPECT_EQ(recovered, held[0]);
+}
+
 // --- synchronous (single-buffer) collapse --------------------------------
 
 TEST(RenderWorldPool, SynchronousModeReusesSingleSlotWithoutCounters)

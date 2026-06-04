@@ -19,8 +19,10 @@ export namespace Extrinsic::Runtime
         // published since the last `AcquireFront` (consumer faster than
         // producer).
         std::uint64_t PipelineStallCount = 0u;
-        // Producer overwrote a still-unpublished back slot because no free slot
-        // was available at `AcquireBack` (producer faster than consumer).
+        // Producer could not get a free slot at `AcquireBack` (producer faster
+        // than consumer): it either overwrote a still-unpublished back slot, or
+        // — when every slot is a published front still held in flight — skipped
+        // the extraction entirely by returning `kInvalidSlot`.
         std::uint64_t ExtractionSkipCount = 0u;
         // Age, in frames, of the snapshot returned by the most recent
         // `AcquireFront` (published-frame delta). `0` in synchronous mode or when
@@ -55,7 +57,11 @@ export namespace Extrinsic::Runtime
     //
     // Back-pressure (decision 5): producer-faster-than-consumer replaces the
     // still-unpublished back slot (`ExtractionSkipCount`); consumer-faster-than-
-    // producer reuses the previously consumed front (`PipelineStallCount`).
+    // producer reuses the previously consumed front (`PipelineStallCount`). If
+    // the producer outruns the consumer so far that every slot is a published
+    // front still held in flight, `AcquireBack` fails closed (returns
+    // `kInvalidSlot`, still counting `ExtractionSkipCount`) rather than reuse a
+    // referenced slot.
     //
     // Layering: imports nothing from graphics/ECS/platform; manages only
     // indices and atomics. Single-threaded-safe and (for the index/refcount
@@ -80,9 +86,13 @@ export namespace Extrinsic::Runtime
         // Acquire a free slot to write the next snapshot into. Drains pending
         // reclamations first. If no slot is free and an unpublished back slot
         // exists, that back slot is returned for overwrite and
-        // `ExtractionSkipCount` is incremented. `frameIndex` stamps the slot for
-        // the consumer's frame-age computation. Always returns a valid slot for
-        // the supported one-producer/one-consumer configurations.
+        // `ExtractionSkipCount` is incremented. If no slot is free and every
+        // slot is a published front the consumer/GPU still holds in flight
+        // (refcount > 0), the pool is exhausted: `ExtractionSkipCount` is
+        // incremented and `kInvalidSlot` is returned so the producer skips this
+        // extraction and keeps the previous front current — the pool never
+        // hands out a referenced slot. `frameIndex` stamps the slot for the
+        // consumer's frame-age computation.
         [[nodiscard]] std::uint32_t AcquireBack(std::uint64_t frameIndex) noexcept;
 
         // Publish a previously acquired back slot as the new front (release).
