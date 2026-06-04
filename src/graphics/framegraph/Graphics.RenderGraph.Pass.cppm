@@ -10,15 +10,11 @@ export module Extrinsic.Graphics.RenderGraph:Pass;
 
 import :Resources;
 import Extrinsic.RHI.CommandContext;
+import Extrinsic.RHI.QueueAffinity;
 
 namespace Extrinsic::Graphics
 {
-    export enum class RenderQueue : std::uint8_t
-    {
-        Graphics = 0,
-        AsyncCompute,
-        AsyncTransfer,
-    };
+    export using RenderQueue = RHI::QueueAffinity;
 
     export enum class TextureUsage : std::uint8_t
     {

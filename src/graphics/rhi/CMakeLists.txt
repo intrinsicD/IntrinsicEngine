@@ -7,6 +7,7 @@ target_sources(${target_name}
         RHI.BufferView.cppm
         RHI.Descriptors.cppm
         RHI.Handles.cppm
+        RHI.QueueAffinity.cppm
         RHI.Transfer.cppm
         RHI.TransferQueue.cppm
         RHI.TextureUpload.cppm

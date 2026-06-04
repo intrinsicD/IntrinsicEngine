@@ -366,7 +366,7 @@ namespace Extrinsic::Graphics
             {
             case RenderQueue::Graphics: return "graphics";
             case RenderQueue::AsyncCompute: return "async_compute";
-            case RenderQueue::AsyncTransfer: return "async_transfer";
+            case RenderQueue::Transfer: return "transfer";
             }
             return "unknown";
         }
