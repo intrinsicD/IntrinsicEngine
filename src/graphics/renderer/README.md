@@ -296,9 +296,19 @@ Concretely:
   `GRAPHICS-015Q` pattern, drained by `HZBSystem::Tick(currentFrame,
   framesInFlight)`) so an in-flight frame never samples a freed texture; the
   textures declare `Sampled | Storage` usage for the read/compute-write split.
-  This slice owns the resource + lifetime contract only (`CPUContracted`); the
-  build compute shader, cull-shader extension, camera-transition heuristic, and
-  opt-in `gpu;vulkan` conservatism smoke are `GRAPHICS-038B/C/D/E`.
+  GRAPHICS-038B adds the default-recipe `"HZBBuildPass"` immediately after
+  `"DepthPrepass"` when an operational renderer has allocated and imported
+  `HZB.Current`. The renderer records the backend-neutral per-mip fallback
+  command shape by default (`BindPipeline` + one 32-byte
+  `HZBBuildPushConstants` push + `Dispatch` per mip, with `General/ShaderWrite`
+  to `General/ShaderRead|ShaderWrite` stitch barriers between mips), while the
+  pure `ComputeHZBBuildDispatchPlan(...)` selector also covers the future
+  single-pass/SPD-style path when a backend capability enables it. The shader
+  asset `assets/shaders/hzb_build.comp` contains the subgroup + shared-memory
+  max-reduction code and compiles to `shaders/hzb_build.comp.spv`; publication
+  to a storage-image descriptor and opt-in `gpu;vulkan` conservatism proof remain
+  `GRAPHICS-038E` scope. This HZB build slice closes at `CPUContracted`; the
+  cull-shader extension and camera-transition heuristic are `GRAPHICS-038C/D`.
 - GRAPHICS-072 Slice A wires the default-recipe deferred-mode `"SurfacePass"`
   to the existing `DeferredGBufferPass` body. `NullRenderer` owns
   `m_DeferredGBufferPass` (constructed against `m_DeferredSystem`) and the
@@ -1540,7 +1550,7 @@ Concretely:
   derived deterministically from `FrameRecipeResourceKind` plus
   `DebugViewResourceClass`: direct LDR color blit for `SceneColorLDR`,
   Reinhard tonemap for `SceneColorHDR`, depth-linearize-to-grayscale for
-  `SceneDepth`/`ShadowAtlas`, world-space normal for `SceneNormal`,
+  `SceneDepth`/`ShadowAtlas`/`HZB.Current`, world-space normal for `SceneNormal`,
   integer-hash to color for `EntityId`/`PrimitiveId` (`PrimitiveId` decoded
   via `EncodedSelectionId`), direct color for `Albedo`, and scalar
   channel false-color (roughness -> R, metallic -> G, blue zeroed) for

@@ -33,7 +33,7 @@ The mapping is:
 |-----------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------|
 | `SceneColorLDR` (`RGBA8_UNORM`)         | Direct LDR color blit                                                                                                                       |
 | `SceneColorHDR` (`RGBA16_FLOAT`)        | Backend-local Reinhard tone-mapped color preview (no commitment to the postprocess chain)                                                  |
-| `SceneDepth` and other depth-class      | Linearize via existing `CameraUBO` near/far → grayscale ramp                                                                               |
+| `SceneDepth` and other depth-class, including `HZB.Current` | Linearize via existing `CameraUBO` near/far → grayscale ramp                                                                               |
 | `SceneNormal` (`RGBA16_FLOAT`)          | World-space normal visualization (`* 0.5 + 0.5`)                                                                                            |
 | `EntityId` (`R32_UINT`)                 | Deterministic 32-bit integer hash → color                                                                                                  |
 | `PrimitiveId` (`R32_UINT`)              | Decode through `EncodedSelectionId` ([ADR-0007](0007-picking-selection-and-outline.md) §1); high 4 bits (`SelectionPrimitiveDomain`) modulate hue, low 28 bits drive the hash |

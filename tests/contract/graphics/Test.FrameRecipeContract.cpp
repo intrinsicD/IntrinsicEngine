@@ -43,6 +43,10 @@ namespace
             // picking above. Tests that disable postprocess ignore this
             // import (the recipe drops the histogram pass altogether).
             .HistogramReadback = Extrinsic::RHI::BufferHandle{17u, 1u},
+            // GRAPHICS-038B — renderer-owned retained HZB.Current texture.
+            // Tests opt into `EnableHZBBuild`; default recipe tests leave the
+            // feature off so this import is ignored.
+            .HZBCurrent = Extrinsic::RHI::TextureHandle{18u, 1u},
         };
     }
 
@@ -281,6 +285,7 @@ TEST(FrameRecipeContract, OptionalResourcesAreGatedByFeatures)
     EXPECT_FALSE(HasEnabledResource(defaults, FrameRecipeResourceKind::ShadowAtlas));
     EXPECT_FALSE(HasEnabledResource(defaults, FrameRecipeResourceKind::SelectionOutline));
     EXPECT_FALSE(HasEnabledResource(defaults, FrameRecipeResourceKind::DebugViewRGBA));
+    EXPECT_FALSE(HasEnabledResource(defaults, FrameRecipeResourceKind::HZBCurrent));
     EXPECT_TRUE(HasEnabledResource(defaults, FrameRecipeResourceKind::SceneColorLDR));
 
     FrameRecipeFeatures allFeatures{};
@@ -288,6 +293,7 @@ TEST(FrameRecipeContract, OptionalResourcesAreGatedByFeatures)
     allFeatures.EnableShadows = true;
     allFeatures.EnableSelectionOutline = true;
     allFeatures.EnableDebugView = true;
+    allFeatures.EnableHZBBuild = true;
 
     const FrameRecipeIntrospection full = DescribeDefaultFrameRecipe(allFeatures);
     EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::EntityId));
@@ -295,6 +301,7 @@ TEST(FrameRecipeContract, OptionalResourcesAreGatedByFeatures)
     EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::ShadowAtlas));
     EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::SelectionOutline));
     EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::DebugViewRGBA));
+    EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::HZBCurrent));
 }
 
 TEST(FrameRecipeContract, LightingPathControlsGBufferResourcesAndComposition)
@@ -363,6 +370,89 @@ TEST(FrameRecipeContract, DepthPrepassFeatureGatesPassAndSurfaceDepthOwnership)
     const std::vector<std::string> passNames = OrderedPassNames(*compiled);
     EXPECT_EQ(std::ranges::find(passNames, "DepthPrepass"), passNames.end());
     EXPECT_NE(std::ranges::find(passNames, "SurfacePass"), passNames.end());
+}
+
+TEST(FrameRecipeContract, HZBBuildRequiresDepthPrepassAndImportedTarget)
+{
+    FrameRecipeFeatures features{};
+    features.EnableHZBBuild = true;
+
+    const FrameRecipeIntrospection description = DescribeDefaultFrameRecipe(features);
+    const auto* hzbPass = FindPass(description, FrameRecipePassKind::HZBBuild);
+    ASSERT_NE(hzbPass, nullptr);
+    EXPECT_TRUE(hzbPass->Enabled);
+    EXPECT_TRUE(Contains(hzbPass->Reads, "SceneDepth"));
+    EXPECT_TRUE(Contains(hzbPass->Writes, "HZB.Current"));
+
+    const auto* hzbResource = FindResource(description, FrameRecipeResourceKind::HZBCurrent);
+    ASSERT_NE(hzbResource, nullptr);
+    EXPECT_TRUE(hzbResource->Enabled);
+    EXPECT_TRUE(hzbResource->Imported);
+    EXPECT_TRUE(hzbResource->Optional);
+    EXPECT_TRUE(hzbResource->ImportedWriteAllowed);
+
+    RenderGraph graph;
+    const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
+        graph,
+        features,
+        MakeImports(),
+        FrameRecipeSizing{.Width = 640u, .Height = 480u});
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    {
+        const auto& compileResult = graph.GetLastCompileValidationResult();
+        ASSERT_TRUE(compiled.has_value())
+            << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
+    }
+
+    const std::vector<std::string> passNames = OrderedPassNames(*compiled);
+    const auto depthIt = std::ranges::find(passNames, "DepthPrepass");
+    const auto hzbIt = std::ranges::find(passNames, "HZBBuildPass");
+    const auto surfaceIt = std::ranges::find(passNames, "SurfacePass");
+    ASSERT_NE(depthIt, passNames.end());
+    ASSERT_NE(hzbIt, passNames.end());
+    ASSERT_NE(surfaceIt, passNames.end());
+    EXPECT_LT(depthIt, hzbIt);
+    EXPECT_LT(hzbIt, surfaceIt);
+    EXPECT_NE(std::ranges::find(compiled->TextureNames, "HZB.Current"), compiled->TextureNames.end());
+
+    const RenderGraphValidationResult validation = ValidateRecipeCompiledGraph(description, *compiled);
+    EXPECT_FALSE(validation.HasErrors())
+        << (validation.Findings.empty() ? "<no findings>" : validation.Findings.front().Message);
+
+    FrameRecipeImports missingImport = MakeImports();
+    missingImport.HZBCurrent = {};
+    RenderGraph missingImportGraph;
+    const FrameRecipeBuildResult missingImportBuild = BuildDefaultFrameRecipe(
+        missingImportGraph,
+        features,
+        missingImport,
+        FrameRecipeSizing{.Width = 640u, .Height = 480u});
+    ASSERT_TRUE(missingImportBuild.Succeeded) << missingImportBuild.Diagnostic;
+    const auto missingImportCompiled = missingImportGraph.Compile();
+    ASSERT_TRUE(missingImportCompiled.has_value());
+    const std::vector<std::string> missingImportPassNames = OrderedPassNames(*missingImportCompiled);
+    EXPECT_EQ(std::ranges::find(missingImportPassNames, "HZBBuildPass"), missingImportPassNames.end());
+
+    features.EnableDepthPrepass = false;
+    const FrameRecipeIntrospection depthDisabled = DescribeDefaultFrameRecipe(features);
+    const auto* depthDisabledHZB = FindPass(depthDisabled, FrameRecipePassKind::HZBBuild);
+    ASSERT_NE(depthDisabledHZB, nullptr);
+    EXPECT_FALSE(depthDisabledHZB->Enabled);
+    EXPECT_FALSE(HasEnabledResource(depthDisabled, FrameRecipeResourceKind::HZBCurrent));
+
+    RenderGraph depthDisabledGraph;
+    const FrameRecipeBuildResult depthDisabledBuild = BuildDefaultFrameRecipe(
+        depthDisabledGraph,
+        features,
+        MakeImports(),
+        FrameRecipeSizing{.Width = 640u, .Height = 480u});
+    ASSERT_TRUE(depthDisabledBuild.Succeeded) << depthDisabledBuild.Diagnostic;
+    const auto depthDisabledCompiled = depthDisabledGraph.Compile();
+    ASSERT_TRUE(depthDisabledCompiled.has_value());
+    const std::vector<std::string> depthDisabledPassNames = OrderedPassNames(*depthDisabledCompiled);
+    EXPECT_EQ(std::ranges::find(depthDisabledPassNames, "HZBBuildPass"), depthDisabledPassNames.end());
 }
 
 TEST(FrameRecipeContract, BackbufferIsFinalizedOnlyByPresentDeclaration)
@@ -824,6 +914,4 @@ TEST(FrameRecipeContract, ShadowAtlasTransientPathAcceptsTypedShadowSizing)
     }
     EXPECT_TRUE(foundShadow);
 }
-
-
 

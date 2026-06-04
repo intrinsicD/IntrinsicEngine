@@ -2,9 +2,11 @@ module;
 
 #include <cstdint>
 #include <memory>
+#include <vector>
 
 export module Extrinsic.Graphics.HZB;
 
+import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
@@ -47,6 +49,70 @@ export namespace Extrinsic::Graphics
     // desc.
     [[nodiscard]] HZBDesc ComputeHZBDesc(std::uint32_t renderWidth,
                                          std::uint32_t renderHeight) noexcept;
+
+    enum class HZBBuildMode : std::uint8_t
+    {
+        PerMipDispatch = 0,
+        SinglePassMipChain,
+    };
+
+    struct HZBBuildCapabilities
+    {
+        bool SupportsSinglePassMipChain{false};
+    };
+
+    struct HZBBuildDispatchDesc
+    {
+        std::uint32_t TargetMip{0u};
+        std::uint32_t SourceMip{0u};
+        bool ReadsDepthSource{true};
+        std::uint32_t TargetWidth{0u};
+        std::uint32_t TargetHeight{0u};
+        std::uint32_t GroupCountX{0u};
+        std::uint32_t GroupCountY{0u};
+        std::uint32_t GroupCountZ{1u};
+    };
+
+    struct HZBBuildDispatchPlan
+    {
+        HZBBuildMode Mode{HZBBuildMode::PerMipDispatch};
+        HZBDesc Desc{};
+        std::vector<HZBBuildDispatchDesc> Dispatches{};
+
+        [[nodiscard]] bool IsValid() const noexcept
+        {
+            return Desc.IsValid() && !Dispatches.empty();
+        }
+    };
+
+    // GRAPHICS-038B — CPU-testable dispatch planning for the HZB build pass.
+    // `SupportsSinglePassMipChain` selects the SPD-style one-dispatch path;
+    // otherwise each mip is dispatched in ascending target-mip order with
+    // inter-dispatch barriers recorded by `RecordHZBBuild(...)`.
+    [[nodiscard]] HZBBuildDispatchPlan ComputeHZBBuildDispatchPlan(
+        const HZBDesc& desc,
+        HZBBuildCapabilities capabilities,
+        std::uint32_t tileSize = 16u);
+
+    // Matches `assets/shaders/hzb_build.comp` std430 push layout.
+    struct HZBBuildPushConstants
+    {
+        std::uint32_t RenderWidth{0u};
+        std::uint32_t RenderHeight{0u};
+        std::uint32_t TargetMip{0u};
+        std::uint32_t SourceMip{0u};
+        std::uint32_t MipCount{0u};
+        std::uint32_t BuildMode{0u};
+        std::uint32_t TargetWidth{0u};
+        std::uint32_t TargetHeight{0u};
+    };
+
+    // Records the backend-neutral HZB build command shape. Returns false when
+    // required inputs are invalid; otherwise records every planned dispatch.
+    bool RecordHZBBuild(RHI::ICommandContext& cmd,
+                        RHI::PipelineHandle pipeline,
+                        RHI::TextureHandle hzbTexture,
+                        const HZBBuildDispatchPlan& plan);
 
     struct HZBDiagnostics
     {

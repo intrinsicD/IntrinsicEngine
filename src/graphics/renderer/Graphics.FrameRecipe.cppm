@@ -80,6 +80,11 @@ namespace Extrinsic::Graphics
         // the opt-in `gpu;vulkan` smoke. Append-only at the end of the
         // enum to keep prior numeric values stable.
         VisualizationOverlay,
+        // GRAPHICS-038B — compute HZB build pass. Declared after
+        // `DepthPrepass`, reads `SceneDepth` as a shader input, and writes
+        // the renderer-owned retained `HZB.Current` import. Append-only to
+        // keep prior numeric values stable.
+        HZBBuild,
     };
 
     export enum class FrameRecipeResourceKind : std::uint8_t
@@ -131,12 +136,20 @@ namespace Extrinsic::Graphics
         // `BeginFrame()` and forwards the 256-bin payload to
         // `PostProcessSystem::PublishHistogramReadback(...)`.
         HistogramReadback,
+        // GRAPHICS-038B — renderer-owned retained HZB write target imported
+        // from `HZBSystem::CurrentHZB()`.
+        HZBCurrent,
     };
 
     export struct FrameRecipeFeatures
     {
         FrameRecipeLightingPath LightingPath{FrameRecipeLightingPath::Deferred};
         bool EnableDepthPrepass{true};
+        // GRAPHICS-038B — opt into the HZB build pass when the renderer has a
+        // valid retained `HZB.Current` import. Defaults off so standalone
+        // recipe descriptions remain behavior-preserving unless the renderer
+        // or a focused contract test explicitly enables the HZB slice.
+        bool EnableHZBBuild{false};
         bool EnablePicking{false};
         bool EnableShadows{false};
         bool EnableSelectionOutline{false};
@@ -228,6 +241,8 @@ namespace Extrinsic::Graphics
         // `CopyBuffer(PostProcess.Histogram → Histogram.Readback)` recorded
         // by the `"PostProcessHistogramPass"` executor branch.
         RHI::BufferHandle HistogramReadback{};
+        // GRAPHICS-038B — retained HZB write target owned by HZBSystem.
+        RHI::TextureHandle HZBCurrent{};
     };
 
     // GRAPHICS-073 Slice B — typed sizing seam for the shadow atlas. When

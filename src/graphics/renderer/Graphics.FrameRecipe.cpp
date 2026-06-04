@@ -234,6 +234,7 @@ namespace Extrinsic::Graphics
         // and avoids allocating the full-resolution R32_UINT `PrimitiveId`
         // target / the `Picking.Readback` buffer when picking is dropped.
         const bool pickingActive = features.EnablePicking && features.EnableDepthPrepass;
+        const bool hzbBuildActive = features.EnableHZBBuild && features.EnableDepthPrepass;
         FrameRecipeIntrospection out{};
 
         AddPass(out, FrameRecipePassKind::Culling, "CullingPass", true, false,
@@ -241,6 +242,8 @@ namespace Extrinsic::Graphics
                 {"Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count", "Cull.Lines.IndexedArgs", "Cull.Lines.Count", "Cull.Points.NonIndexedArgs", "Cull.Points.Count"});
         AddPass(out, FrameRecipePassKind::DepthPrepass, "DepthPrepass", features.EnableDepthPrepass, false,
                 {"Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count"}, {"SceneDepth"});
+        AddPass(out, FrameRecipePassKind::HZBBuild, "HZBBuildPass", hzbBuildActive, false,
+                {"SceneDepth"}, {"HZB.Current"});
         // GRAPHICS-074 recipe-side follow-up — picking now runs *after*
         // `DepthPrepass` and reads `SceneDepth` so the picking pipeline can
         // depth-equal-test against the nearest-surface depth instead of
@@ -359,6 +362,7 @@ namespace Extrinsic::Graphics
 
         AddResource(out, FrameRecipeResourceKind::Backbuffer, "Backbuffer", true, true, true);
         AddResource(out, FrameRecipeResourceKind::SceneDepth, "SceneDepth", true);
+        AddResource(out, FrameRecipeResourceKind::HZBCurrent, "HZB.Current", hzbBuildActive, true, false, true, true);
         // GRAPHICS-074 recipe-side follow-up — `EntityId` is consumed by
         // PickingPass (active iff `pickingActive`) and SelectionOutlinePass
         // (active iff `EnableSelectionOutline`); `PrimitiveId` and
@@ -524,6 +528,7 @@ namespace Extrinsic::Graphics
         // `PrimitiveId` / `Picking.Readback` resources are not allocated
         // when `PickingPass` is dropped.
         const bool pickingActive = features.EnablePicking && features.EnableDepthPrepass;
+        const bool hzbBuildActive = features.EnableHZBBuild && features.EnableDepthPrepass && imports.HZBCurrent.IsValid();
         const auto width = ClampExtent(sizing.Width);
         const auto height = ClampExtent(sizing.Height);
         const FrameRecipeIntrospection declaration = DescribeDefaultFrameRecipe(features);
@@ -562,6 +567,15 @@ namespace Extrinsic::Graphics
         BufferRef postProcessHistogram{};
         BufferRef pickingReadback{};
         BufferRef histogramReadback{};
+        TextureRef hzbCurrent{};
+
+        if (hzbBuildActive)
+        {
+            hzbCurrent = graph.ImportTexture("HZB.Current",
+                                             imports.HZBCurrent,
+                                             TextureState::ShaderWrite,
+                                             TextureState::ShaderRead);
+        }
 
         if (pickingActive || features.EnableSelectionOutline)
         {
@@ -768,6 +782,14 @@ namespace Extrinsic::Graphics
                         .Store = RHI::StoreOp::Store,
                     },
                 });
+            });
+        }
+
+        if (hzbBuildActive)
+        {
+            addOrderedPass("HZBBuildPass", [=](RenderGraphBuilder& builder) {
+                builder.Read(depth, TextureUsage::ShaderRead);
+                builder.Write(hzbCurrent, TextureUsage::ShaderWrite);
             });
         }
 

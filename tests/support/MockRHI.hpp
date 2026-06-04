@@ -192,6 +192,8 @@ namespace Extrinsic::Tests
             RHI::TextureHandle Texture{};
             RHI::TextureLayout Before = RHI::TextureLayout::Undefined;
             RHI::TextureLayout After = RHI::TextureLayout::Undefined;
+            RHI::MemoryAccess BeforeAccess = RHI::MemoryAccess::None;
+            RHI::MemoryAccess AfterAccess = RHI::MemoryAccess::None;
         };
 
         struct BufferBarrierRecord
@@ -297,6 +299,7 @@ namespace Extrinsic::Tests
         {
             ++DispatchCalls;
             LastDispatch = DispatchRecord{.X = x, .Y = y, .Z = z};
+            DispatchRecords.push_back(LastDispatch);
             Events.push_back(EventKind::Dispatch);
         }
         void DispatchIndirect(RHI::BufferHandle, std::uint64_t) override {}
@@ -315,7 +318,14 @@ namespace Extrinsic::Tests
         {
             for (const RHI::TextureBarrierDesc& barrier : batch.TextureBarriers)
             {
-                TextureBarrier(barrier.Texture, barrier.BeforeLayout, barrier.AfterLayout);
+                TextureBarrierCalls.push_back(TextureBarrierRecord{
+                    .Texture = barrier.Texture,
+                    .Before = barrier.BeforeLayout,
+                    .After = barrier.AfterLayout,
+                    .BeforeAccess = barrier.BeforeAccess,
+                    .AfterAccess = barrier.AfterAccess,
+                });
+                Events.push_back(EventKind::TextureBarrier);
             }
             for (const RHI::BufferBarrierDesc& barrier : batch.BufferBarriers)
             {
@@ -335,6 +345,7 @@ namespace Extrinsic::Tests
 
         std::vector<TextureBarrierRecord> TextureBarrierCalls{};
         std::vector<BufferBarrierRecord>  BufferBarrierCalls{};
+        std::vector<DispatchRecord> DispatchRecords{};
         std::vector<EventKind> Events{};
         std::vector<std::uint32_t> PushConstantSizes{};
         // GRAPHICS-072 Slice C — full payload capture parallel to

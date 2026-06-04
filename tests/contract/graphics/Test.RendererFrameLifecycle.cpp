@@ -14,6 +14,7 @@
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.FrameRecipe;
+import Extrinsic.Graphics.HZB;
 import Extrinsic.Graphics.Pass.PostProcess.Bloom;
 import Extrinsic.Graphics.Pass.PostProcess.FXAA;
 import Extrinsic.Graphics.Pass.PostProcess.Histogram;
@@ -77,6 +78,23 @@ namespace
         }
         return nullptr;
     }
+
+    [[nodiscard]] std::uint32_t ExpectedCullDispatchGroups() noexcept
+    {
+        return (Extrinsic::RHI::kMaxIndirectDrawCount + Extrinsic::RHI::kGpuCullDispatchGroupSize - 1u) /
+               Extrinsic::RHI::kGpuCullDispatchGroupSize;
+    }
+
+    [[nodiscard]] Extrinsic::Graphics::HZBBuildDispatchPlan ExpectedFallbackHZBPlan(
+        const std::uint32_t width,
+        const std::uint32_t height)
+    {
+        return Extrinsic::Graphics::ComputeHZBBuildDispatchPlan(
+            Extrinsic::Graphics::ComputeHZBDesc(width, height),
+            Extrinsic::Graphics::HZBBuildCapabilities{
+                .SupportsSinglePassMipChain = false,
+            });
+    }
 }
 
 TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext)
@@ -97,6 +115,9 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     const Extrinsic::Graphics::RenderFrameInput input{
         .Viewport = {.Width = 320, .Height = 240},
     };
+    const Extrinsic::Graphics::HZBBuildDispatchPlan hzbPlan =
+        ExpectedFallbackHZBPlan(320u, 240u);
+    ASSERT_TRUE(hzbPlan.IsValid());
     Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
     renderer->PrepareFrame(world);
     renderer->ExecuteFrame(frame, world);
@@ -135,12 +156,12 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     // taxonomy. GRAPHICS-076 Slice A — the canonical `Pass.Present`
     // now records under the default recipe (BindPipeline + Draw(3,1,0,0)
     // fullscreen finalizer), bumping Recorded by one. Total Recorded
-    // entries: 5 routed (Culling/Depth/Surface/Line/Point) + 1 under
+    // entries: 6 routed (Culling/Depth/HZB/Surface/Line/Point) + 1 under
     // `"PostProcessHistogramPass"` + 2 under `"PostProcessPass"`
     // (bloom + tonemap) + 3 under the per-stage AA passes
-    // (edge / blend / resolve helpers) + 1 under `"Present"` = 12.
+    // (edge / blend / resolve helpers) + 1 under `"Present"` = 13.
     // Remaining unwired passes still soft-skip with SkippedUnavailable.
-    EXPECT_EQ(stats.CommandRecords.Recorded, 12u);
+    EXPECT_EQ(stats.CommandRecords.Recorded, 13u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     EXPECT_GE(stats.CommandRecords.SkippedUnavailable, 1u);
@@ -149,6 +170,9 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     ASSERT_NE(FindCommandPass(stats, "DepthPrepass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "DepthPrepass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "HZBBuildPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "HZBBuildPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     ASSERT_NE(FindCommandPass(stats, "SurfacePass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "SurfacePass")->Status,
@@ -200,26 +224,55 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     // false / `None`, so the bloom + FXAA `Execute` bodies emit no
     // bind/push/draw under the default settings (their helpers still
     // report `Recorded` under the umbrella's accumulator).
+    // GRAPHICS-038B — the HZB build pass adds one compute pipeline bind and
+    // one 32-byte push/dispatch per fallback mip. The first dispatch remains
+    // culling; HZB dispatches follow after `DepthPrepass`.
     // GRAPHICS-076 Slice A — the canonical `Pass.Present` finalizer adds
     // one fullscreen `BindPipeline` (the present pipeline) but no
     // additional push constant since `BuildPresentPipelineDesc()` pins
-    // `PushConstantSize = 0u`. The bind count therefore becomes 7 while
-    // the push count stays at 6.
-    EXPECT_EQ(device.CommandContext.BindPipelineCalls, 7);
-    EXPECT_EQ(device.CommandContext.PushConstantsCalls, 6);
-    ASSERT_EQ(device.CommandContext.PushConstantSizes.size(), 6u);
+    // `PushConstantSize = 0u`.
+    EXPECT_EQ(device.CommandContext.BindPipelineCalls, 8);
+    EXPECT_EQ(device.CommandContext.PushConstantsCalls,
+              static_cast<int>(6u + hzbPlan.Dispatches.size()));
+    ASSERT_EQ(device.CommandContext.PushConstantSizes.size(),
+              6u + hzbPlan.Dispatches.size());
     EXPECT_EQ(device.CommandContext.PushConstantSizes[0], sizeof(Extrinsic::RHI::GpuCullPushConstants));
     EXPECT_EQ(device.CommandContext.PushConstantSizes[1], sizeof(Extrinsic::RHI::GpuScenePushConstants));
-    EXPECT_EQ(device.CommandContext.PushConstantSizes[2], sizeof(Extrinsic::RHI::GpuScenePushConstants));
-    EXPECT_EQ(device.CommandContext.PushConstantSizes[3], sizeof(Extrinsic::RHI::GpuScenePushConstants));
-    EXPECT_EQ(device.CommandContext.PushConstantSizes[4], sizeof(Extrinsic::RHI::GpuScenePushConstants));
-    EXPECT_EQ(device.CommandContext.PushConstantSizes[5], sizeof(Extrinsic::Graphics::PostProcessToneMapPushConstants));
-    EXPECT_EQ(device.CommandContext.DispatchCalls, 1);
-    EXPECT_EQ(device.CommandContext.LastDispatch.X,
-              (Extrinsic::RHI::kMaxIndirectDrawCount + Extrinsic::RHI::kGpuCullDispatchGroupSize - 1u) /
-                  Extrinsic::RHI::kGpuCullDispatchGroupSize);
-    EXPECT_EQ(device.CommandContext.LastDispatch.Y, 1u);
-    EXPECT_EQ(device.CommandContext.LastDispatch.Z, 1u);
+    for (std::size_t i = 0u; i < hzbPlan.Dispatches.size(); ++i)
+    {
+        EXPECT_EQ(device.CommandContext.PushConstantSizes[2u + i],
+                  sizeof(Extrinsic::Graphics::HZBBuildPushConstants));
+    }
+    const std::size_t postHZBPushBase = 2u + hzbPlan.Dispatches.size();
+    EXPECT_EQ(device.CommandContext.PushConstantSizes[postHZBPushBase + 0u],
+              sizeof(Extrinsic::RHI::GpuScenePushConstants));
+    EXPECT_EQ(device.CommandContext.PushConstantSizes[postHZBPushBase + 1u],
+              sizeof(Extrinsic::RHI::GpuScenePushConstants));
+    EXPECT_EQ(device.CommandContext.PushConstantSizes[postHZBPushBase + 2u],
+              sizeof(Extrinsic::RHI::GpuScenePushConstants));
+    EXPECT_EQ(device.CommandContext.PushConstantSizes[postHZBPushBase + 3u],
+              sizeof(Extrinsic::Graphics::PostProcessToneMapPushConstants));
+    EXPECT_EQ(device.CommandContext.DispatchCalls,
+              static_cast<int>(1u + hzbPlan.Dispatches.size()));
+    ASSERT_EQ(device.CommandContext.DispatchRecords.size(),
+              1u + hzbPlan.Dispatches.size());
+    EXPECT_EQ(device.CommandContext.DispatchRecords[0].X, ExpectedCullDispatchGroups());
+    EXPECT_EQ(device.CommandContext.DispatchRecords[0].Y, 1u);
+    EXPECT_EQ(device.CommandContext.DispatchRecords[0].Z, 1u);
+    for (std::size_t i = 0u; i < hzbPlan.Dispatches.size(); ++i)
+    {
+        const auto& expected = hzbPlan.Dispatches[i];
+        const auto& recorded = device.CommandContext.DispatchRecords[1u + i];
+        EXPECT_EQ(recorded.X, expected.GroupCountX);
+        EXPECT_EQ(recorded.Y, expected.GroupCountY);
+        EXPECT_EQ(recorded.Z, expected.GroupCountZ);
+    }
+    EXPECT_EQ(stats.HZBBuildRecordedFrames, 1u);
+    EXPECT_EQ(stats.HZBBuildDispatchCount,
+              static_cast<std::uint32_t>(hzbPlan.Dispatches.size()));
+    EXPECT_EQ(stats.HZBBuildMipCount, hzbPlan.Desc.MipLevels);
+    EXPECT_EQ(stats.HZBBuildFallbackFrames, 1u);
+    EXPECT_EQ(stats.HZBBuildSinglePassFrames, 0u);
     EXPECT_EQ(device.CommandContext.BindIndexBufferCalls, 3);
     EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 3);
     EXPECT_EQ(device.CommandContext.DrawIndirectCountCalls, 1);
@@ -447,6 +500,9 @@ TEST(RendererFrameLifecycle, OperationalRebuildAfterNonOperationalStartupRecords
     const Extrinsic::Graphics::RenderFrameInput input{
         .Viewport = {.Width = 160, .Height = 90},
     };
+    const Extrinsic::Graphics::HZBBuildDispatchPlan hzbPlan =
+        ExpectedFallbackHZBPlan(160u, 90u);
+    ASSERT_TRUE(hzbPlan.IsValid());
     Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
     renderer->PrepareFrame(world);
     renderer->ExecuteFrame(frame, world);
@@ -491,12 +547,13 @@ TEST(RendererFrameLifecycle, OperationalRebuildAfterNonOperationalStartupRecords
     // since `EnableHistogram` defaults to false). GRAPHICS-076 Slice A —
     // the rebuild also publishes the canonical present pipeline lease,
     // so the `"Present"` graph pass routes through `RecordPresentPass`
-    // and reports `Recorded` after the operational rebuild. Total
-    // `Recorded`: 5 routed + 1 under `PostProcessHistogramPass` + 2
+    // and reports `Recorded` after the operational rebuild. GRAPHICS-038B
+    // adds the routed `"HZBBuildPass"` after `DepthPrepass`. Total
+    // `Recorded`: 6 routed + 1 under `PostProcessHistogramPass` + 2
     // under `PostProcessPass` (bloom + tonemap) + 3 under the AA
-    // passes + 1 under `Present` = 12. Remaining unwired passes still
+    // passes + 1 under `Present` = 13. Remaining unwired passes still
     // soft-skip with SkippedUnavailable.
-    EXPECT_EQ(stats.CommandRecords.Recorded, 12u);
+    EXPECT_EQ(stats.CommandRecords.Recorded, 13u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     ASSERT_NE(FindCommandPass(stats, "CullingPass"), nullptr);
@@ -504,6 +561,9 @@ TEST(RendererFrameLifecycle, OperationalRebuildAfterNonOperationalStartupRecords
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     ASSERT_NE(FindCommandPass(stats, "DepthPrepass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "DepthPrepass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "HZBBuildPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "HZBBuildPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     ASSERT_NE(FindCommandPass(stats, "SurfacePass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "SurfacePass")->Status,
@@ -529,7 +589,11 @@ TEST(RendererFrameLifecycle, OperationalRebuildAfterNonOperationalStartupRecords
     ASSERT_NE(FindCommandPass(stats, "PostProcessAAResolvePass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "PostProcessAAResolvePass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
-    EXPECT_EQ(device.CommandContext.DispatchCalls, 1);
+    EXPECT_EQ(device.CommandContext.DispatchCalls,
+              static_cast<int>(1u + hzbPlan.Dispatches.size()));
+    EXPECT_EQ(stats.HZBBuildDispatchCount,
+              static_cast<std::uint32_t>(hzbPlan.Dispatches.size()));
+    EXPECT_EQ(stats.HZBBuildFallbackFrames, 1u);
     EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 3);
     EXPECT_EQ(device.CommandContext.DrawIndirectCountCalls, 1);
 
@@ -584,7 +648,9 @@ TEST(RendererFrameLifecycle, DepthPrepassPipelineFailureSkipsUnavailableCommandP
     // the canonical present pipeline is created after postprocess (call #23), well
     // after the depth-prepass failure point at call #2, so the
     // `"Present"` graph pass records via `RecordPresentPass` → total
-    // climbs to 11.
+    // climbs to 11. GRAPHICS-038B also declares `"HZBBuildPass"` when its
+    // retained target is allocated, but the executor fails closed as
+    // `SkippedUnavailable` because the depth producer's pipeline is missing.
     EXPECT_EQ(stats.CommandRecords.Recorded, 11u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
@@ -594,6 +660,9 @@ TEST(RendererFrameLifecycle, DepthPrepassPipelineFailureSkipsUnavailableCommandP
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     ASSERT_NE(FindCommandPass(stats, "DepthPrepass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "DepthPrepass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable);
+    ASSERT_NE(FindCommandPass(stats, "HZBBuildPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "HZBBuildPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable);
     ASSERT_NE(FindCommandPass(stats, "SurfacePass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "SurfacePass")->Status,
@@ -671,7 +740,9 @@ TEST(RendererFrameLifecycle, CullingPipelineFailureSkipsRoutedCommandPassesUnava
     // similarly culling-independent (the present helper only checks
     // device-operational + present pipeline lease, never
     // `m_CullingOutputAvailable`); the `"Present"` graph pass records
-    // → total climbs to 7.
+    // → total climbs to 7. GRAPHICS-038B declares `"HZBBuildPass"` when the
+    // retained target is allocated, but the executor keeps it
+    // `SkippedUnavailable` because culling/depth prerequisites are missing.
     EXPECT_EQ(stats.CommandRecords.Recorded, 7u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
@@ -681,6 +752,9 @@ TEST(RendererFrameLifecycle, CullingPipelineFailureSkipsRoutedCommandPassesUnava
               Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable);
     ASSERT_NE(FindCommandPass(stats, "DepthPrepass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "DepthPrepass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable);
+    ASSERT_NE(FindCommandPass(stats, "HZBBuildPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "HZBBuildPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable);
     ASSERT_NE(FindCommandPass(stats, "PostProcessHistogramPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "PostProcessHistogramPass")->Status,
@@ -770,7 +844,12 @@ TEST(RendererFrameLifecycle, FrameRecipePassesAllProduceStructuredCommandRecordS
     // Every entry below must carry a structured status so future routing
     // changes can't silently regress to a no-op.
     static constexpr const char* kRoutedPasses[] = {
-        "CullingPass", "DepthPrepass", "SurfacePass", "LinePass", "PointPass",
+        "CullingPass", "DepthPrepass",
+        // GRAPHICS-038B — the retained HZB build pass runs as a compute pass
+        // immediately after `DepthPrepass` when the renderer owns a valid
+        // `HZB.Current` target.
+        "HZBBuildPass",
+        "SurfacePass", "LinePass", "PointPass",
         // GRAPHICS-075 Slice E.1 — the histogram compute dispatch lives
         // in its own ordered graph pass before `"PostProcessPass"`
         // because Vulkan rejects `vkCmdDispatch` inside an active
@@ -2468,6 +2547,119 @@ TEST(RendererFrameLifecycle, PostProcessHistogramPipelineSurvivesOperationalRebu
     EXPECT_TRUE(rebuiltPipeline.IsValid());
     const Extrinsic::RHI::PipelineDesc rebuiltDesc = renderer->GetPostProcessHistogramPipelineDesc();
     EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
+
+    renderer->Shutdown();
+}
+
+// ---------------------------------------------------------------------------
+// GRAPHICS-038B — default-recipe HZB build compute pipeline + command shape.
+// ---------------------------------------------------------------------------
+
+TEST(RendererFrameLifecycle, HZBBuildPipelineSurvivesOperationalRebuild)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{431u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const Extrinsic::RHI::PipelineHandle initialPipeline = renderer->GetHZBBuildPipeline();
+    EXPECT_TRUE(initialPipeline.IsValid());
+
+    const Extrinsic::RHI::PipelineDesc initialDesc = renderer->GetHZBBuildPipelineDesc();
+    EXPECT_TRUE(initialDesc.ComputeShaderPath.ends_with(
+        "shaders/hzb_build.comp.spv"))
+        << initialDesc.ComputeShaderPath;
+    EXPECT_TRUE(initialDesc.VertexShaderPath.empty())
+        << "HZB build is a compute pipeline; VertexShaderPath must stay empty.";
+    EXPECT_TRUE(initialDesc.FragmentShaderPath.empty())
+        << "HZB build is a compute pipeline; FragmentShaderPath must stay empty.";
+    EXPECT_EQ(initialDesc.ColorTargetCount, 0u);
+    EXPECT_EQ(initialDesc.DepthTargetFormat, Extrinsic::RHI::Format::Undefined);
+    static_assert(sizeof(Extrinsic::Graphics::HZBBuildPushConstants) == 32u);
+    EXPECT_EQ(initialDesc.PushConstantSize,
+              sizeof(Extrinsic::Graphics::HZBBuildPushConstants));
+
+    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
+    const Extrinsic::RHI::PipelineHandle rebuiltPipeline = renderer->GetHZBBuildPipeline();
+    EXPECT_TRUE(rebuiltPipeline.IsValid());
+    const Extrinsic::RHI::PipelineDesc rebuiltDesc = renderer->GetHZBBuildPipelineDesc();
+    EXPECT_TRUE(PipelineDescBytesEqual(initialDesc, rebuiltDesc));
+
+    renderer->Shutdown();
+}
+
+TEST(RendererFrameLifecycle, HZBBuildPassRecordsFallbackDispatches)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{432u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 64, .Height = 32},
+    };
+    const Extrinsic::Graphics::HZBBuildDispatchPlan hzbPlan =
+        ExpectedFallbackHZBPlan(64u, 32u);
+    ASSERT_TRUE(hzbPlan.IsValid());
+
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    ASSERT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    ASSERT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    ASSERT_NE(FindCommandPass(stats, "HZBBuildPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "HZBBuildPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+
+    EXPECT_TRUE(renderer->GetHZBSystem().IsAllocated());
+    EXPECT_EQ(renderer->GetHZBSystem().GetAllocatedDesc(), hzbPlan.Desc);
+    EXPECT_EQ(stats.HZBBuildRecordedFrames, 1u);
+    EXPECT_EQ(stats.HZBBuildDispatchCount,
+              static_cast<std::uint32_t>(hzbPlan.Dispatches.size()));
+    EXPECT_EQ(stats.HZBBuildMipCount, hzbPlan.Desc.MipLevels);
+    EXPECT_EQ(stats.HZBBuildFallbackFrames, 1u);
+    EXPECT_EQ(stats.HZBBuildSinglePassFrames, 0u);
+
+    ASSERT_EQ(device.CommandContext.DispatchRecords.size(),
+              1u + hzbPlan.Dispatches.size());
+    EXPECT_EQ(device.CommandContext.DispatchRecords[0].X, ExpectedCullDispatchGroups());
+    EXPECT_EQ(device.CommandContext.DispatchRecords[0].Y, 1u);
+    EXPECT_EQ(device.CommandContext.DispatchRecords[0].Z, 1u);
+    for (std::size_t i = 0u; i < hzbPlan.Dispatches.size(); ++i)
+    {
+        const auto& expected = hzbPlan.Dispatches[i];
+        const auto& recorded = device.CommandContext.DispatchRecords[1u + i];
+        EXPECT_EQ(recorded.X, expected.GroupCountX);
+        EXPECT_EQ(recorded.Y, expected.GroupCountY);
+        EXPECT_EQ(recorded.Z, expected.GroupCountZ);
+    }
+
+    const Extrinsic::RHI::TextureHandle builtHZB = renderer->GetHZBSystem().PreviousHZB();
+    ASSERT_TRUE(builtHZB.IsValid());
+    std::uint32_t stitchBarrierCount = 0u;
+    for (const Extrinsic::Tests::MockCommandContext::TextureBarrierRecord& barrier :
+         device.CommandContext.TextureBarrierCalls)
+    {
+        if (barrier.Texture == builtHZB &&
+            barrier.Before == Extrinsic::RHI::TextureLayout::General &&
+            barrier.After == Extrinsic::RHI::TextureLayout::General &&
+            barrier.BeforeAccess == Extrinsic::RHI::MemoryAccess::ShaderWrite &&
+            barrier.AfterAccess == (Extrinsic::RHI::MemoryAccess::ShaderRead |
+                                    Extrinsic::RHI::MemoryAccess::ShaderWrite))
+        {
+            ++stitchBarrierCount;
+        }
+    }
+    EXPECT_EQ(stitchBarrierCount, hzbPlan.Dispatches.size() - 1u);
 
     renderer->Shutdown();
 }

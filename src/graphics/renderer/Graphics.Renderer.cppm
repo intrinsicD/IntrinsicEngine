@@ -30,6 +30,7 @@ import Extrinsic.Graphics.ForwardSystem;
 import Extrinsic.Graphics.DeferredSystem;
 import Extrinsic.Graphics.PostProcessSystem;
 import Extrinsic.Graphics.ShadowSystem;
+import Extrinsic.Graphics.HZB;
 import Extrinsic.Graphics.TransformSyncSystem;
 import Extrinsic.Graphics.ImGuiOverlaySystem;
 import Extrinsic.Graphics.RenderFrameInput;
@@ -131,6 +132,14 @@ namespace Extrinsic::Graphics
         // queue, when the framegraph demotes optional queues to graphics, or
         // when the backend rejects the submit-plan seam.
         std::uint32_t AsyncComputeUtilizedFrames = 0;
+        // GRAPHICS-038B — HZB build pass command-shape counters. The default
+        // renderer records the deterministic per-mip fallback path until a
+        // concrete backend capability plumbs the SPD-style single-pass path.
+        std::uint32_t HZBBuildRecordedFrames = 0;
+        std::uint32_t HZBBuildDispatchCount = 0;
+        std::uint32_t HZBBuildMipCount = 0;
+        std::uint32_t HZBBuildFallbackFrames = 0;
+        std::uint32_t HZBBuildSinglePassFrames = 0;
         // GRAPHICS-076E — count of frames in which the opt-in default-recipe
         // backbuffer-to-host readback seam recorded the
         // `Present → TransferSrc → CopyImageToBuffer → Present` triplet.
@@ -364,6 +373,7 @@ namespace Extrinsic::Graphics
         [[nodiscard]] virtual DeferredSystem&        GetDeferredSystem()  = 0;
         [[nodiscard]] virtual PostProcessSystem&     GetPostProcessSystem() = 0;
         [[nodiscard]] virtual ShadowSystem&          GetShadowSystem()    = 0;
+        [[nodiscard]] virtual HZBSystem&             GetHZBSystem()       = 0;
         [[nodiscard]] virtual const RenderGraphFrameStats& GetLastRenderGraphStats() const = 0;
 
         // GRAPHICS-031A — accessor for the canonical missing-material fallback
@@ -607,6 +617,14 @@ namespace Extrinsic::Graphics
         // wiring that consumes the exposure-adaptation history buffer.
         [[nodiscard]] virtual RHI::PipelineHandle GetPostProcessHistogramPipeline() const noexcept = 0;
         [[nodiscard]] virtual RHI::PipelineDesc GetPostProcessHistogramPipelineDesc() const noexcept = 0;
+
+        // GRAPHICS-038B — accessor for the HZB build compute pipeline
+        // (`hzb_build.comp`, no graphics stages, push constants matching
+        // `HZBBuildPushConstants`). Handle is invalid until an operational
+        // device path publishes the lease; descriptor remains deterministic
+        // for contract tests and rebuild verification.
+        [[nodiscard]] virtual RHI::PipelineHandle GetHZBBuildPipeline() const noexcept = 0;
+        [[nodiscard]] virtual RHI::PipelineDesc GetHZBBuildPipelineDesc() const noexcept = 0;
 
         // GRAPHICS-074 (Slice D.1) — accessor for the renderer-owned host-
         // visible `Picking.Readback` buffer. The buffer is sized for

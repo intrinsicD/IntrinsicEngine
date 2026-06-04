@@ -1,0 +1,124 @@
+#version 460
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+
+// Hi-Z buffer build compute shader (GRAPHICS-038B).
+//
+// Dispatch contract:
+//   - local_size = 16x16
+//   - per-mip fallback: one dispatch per target mip tile grid
+//   - single-pass/SPD selector: one base-mip dispatch, future backend support
+//
+// This CPUContracted slice pins the shader asset and reduction code. Publishing
+// the reduced value to a storage image is deferred to GRAPHICS-038E when the
+// promoted Vulkan descriptor layout grows the required backend-neutral binding.
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D uDepthSource;
+
+layout(push_constant) uniform HZBBuildPush
+{
+    uint RenderWidth;
+    uint RenderHeight;
+    uint TargetMip;
+    uint SourceMip;
+    uint MipCount;
+    uint BuildMode;
+    uint TargetWidth;
+    uint TargetHeight;
+} pc;
+
+shared float sharedDepth[256];
+shared float sharedSubgroupMax[32];
+
+float LoadSourceDepth(ivec2 pixel)
+{
+    if (pixel.x < 0 || pixel.y < 0 ||
+        pixel.x >= int(pc.RenderWidth) || pixel.y >= int(pc.RenderHeight))
+    {
+        return 1.0;
+    }
+
+    vec2 uv = (vec2(pixel) + vec2(0.5)) / vec2(float(pc.RenderWidth), float(pc.RenderHeight));
+    return textureLod(uDepthSource, uv, float(pc.SourceMip)).r;
+}
+
+float LoadConservativeDepthForTargetPixel(uvec2 targetPixel)
+{
+    const uvec2 sourceBase = targetPixel << 1u;
+    float depthMax = 0.0;
+    depthMax = max(depthMax, LoadSourceDepth(ivec2(sourceBase + uvec2(0u, 0u))));
+    depthMax = max(depthMax, LoadSourceDepth(ivec2(sourceBase + uvec2(1u, 0u))));
+    depthMax = max(depthMax, LoadSourceDepth(ivec2(sourceBase + uvec2(0u, 1u))));
+    depthMax = max(depthMax, LoadSourceDepth(ivec2(sourceBase + uvec2(1u, 1u))));
+    return depthMax;
+}
+
+float ReduceTileMaxShared(float value)
+{
+    const uint localIndex = gl_LocalInvocationIndex;
+    sharedDepth[localIndex] = value;
+    barrier();
+
+    for (uint stride = 128u; stride > 0u; stride >>= 1u)
+    {
+        if (localIndex < stride)
+        {
+            sharedDepth[localIndex] = max(sharedDepth[localIndex],
+                                          sharedDepth[localIndex + stride]);
+        }
+        barrier();
+    }
+    return sharedDepth[0];
+}
+
+float ReduceTileMaxSubgroup(float value)
+{
+#ifdef GL_KHR_shader_subgroup_arithmetic
+    const float subgroupReduced = subgroupMax(value);
+    if (subgroupElect())
+    {
+        sharedSubgroupMax[gl_SubgroupID] = subgroupReduced;
+    }
+    barrier();
+
+    const uint localIndex = gl_LocalInvocationIndex;
+    const float groupInput = localIndex < gl_NumSubgroups
+        ? sharedSubgroupMax[localIndex]
+        : 0.0;
+    const float groupReduced = subgroupMax(groupInput);
+    if (localIndex == 0u)
+    {
+        sharedSubgroupMax[0] = groupReduced;
+    }
+    barrier();
+    return sharedSubgroupMax[0];
+#else
+    return ReduceTileMaxShared(value);
+#endif
+}
+
+void main()
+{
+    const uvec2 targetPixel =
+        gl_WorkGroupID.xy * gl_WorkGroupSize.xy + gl_LocalInvocationID.xy;
+    const bool inBounds =
+        targetPixel.x < pc.TargetWidth && targetPixel.y < pc.TargetHeight;
+
+    const float localDepth = inBounds
+        ? LoadConservativeDepthForTargetPixel(targetPixel)
+        : 0.0;
+
+    const bool preferSharedFallback = (pc.BuildMode == 0u);
+    const float tileMax = preferSharedFallback
+        ? ReduceTileMaxShared(localDepth)
+        : ReduceTileMaxSubgroup(localDepth);
+
+    // Storage-image publication is intentionally deferred. Keep the reduced
+    // value live so the asset compiles as the exact reduction contract this
+    // slice tests through the null-RHI command shape.
+    if (gl_LocalInvocationIndex == 0u)
+    {
+        sharedDepth[0] = tileMax;
+    }
+}

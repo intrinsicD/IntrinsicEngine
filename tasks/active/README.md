@@ -16,6 +16,17 @@ No active tasks are currently listed.
 The most recently retired tasks are summarised below.
 
 Previously-active
+[`GRAPHICS-038B`](../done/GRAPHICS-038B-hzb-build-compute.md) — HZB build
+compute shader + dispatch wiring retired to `tasks/done/` on 2026-06-04 at
+maturity `CPUContracted`. The slice added `assets/shaders/hzb_build.comp`, the
+pure HZB build-plan selector, backend-neutral per-mip fallback recording,
+default-recipe `HZBBuildPass` wiring after `DepthPrepass`, renderer-owned
+`HZB.Current` import/pipeline lease plumbing, null-RHI dispatch/barrier
+contracts, shader-output verification, and rendering/debug-view docs sync.
+Single-pass/SPD-style storage-image publication and opt-in `gpu;vulkan`
+conservatism proof remain owned by `GRAPHICS-038E`.
+
+Previously-active
 [`GRAPHICS-037D`](../done/GRAPHICS-037D-multi-queue-vulkan-recording.md) —
 Vulkan multi-queue recording retired to `tasks/done/` on 2026-06-04 at
 maturity `Operational` on Vulkan-capable hosts. Slices A-D landed

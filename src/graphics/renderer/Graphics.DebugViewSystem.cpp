@@ -22,6 +22,7 @@ namespace Extrinsic::Graphics
             switch (resource.Kind)
             {
             case FrameRecipeResourceKind::SceneDepth:
+            case FrameRecipeResourceKind::HZBCurrent:
             case FrameRecipeResourceKind::ShadowAtlas:
                 return DebugViewResourceClass::DepthTexture;
             case FrameRecipeResourceKind::Backbuffer:
@@ -306,4 +307,3 @@ namespace Extrinsic::Graphics
         };
     }
 }
-

@@ -5,12 +5,15 @@
 // follow-ups; this slice pins the pure sizing math and the
 // allocate/reallocate/retire/no-leak lifetime under the null RHI.
 
+#include <cstddef>
 #include <cstdint>
+#include <cstring>
 
 #include <gtest/gtest.h>
 
 import Extrinsic.Graphics.HZB;
 import Extrinsic.RHI.Descriptors;
+import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.TextureManager;
 
 #include "MockRHI.hpp"
@@ -155,4 +158,130 @@ TEST(GraphicsHZBResourceLifetime, FailedTextureCreateLeavesSystemUnallocated)
     EXPECT_EQ(hzb.GetDiagnostics().AllocationCount, 0u);
 
     hzb.Shutdown();
+}
+
+TEST(GraphicsHZBBuildPlan, PerMipFallbackCoversEveryMipInOrder)
+{
+    const Graphics::HZBDesc desc = Graphics::ComputeHZBDesc(64u, 32u);
+    ASSERT_TRUE(desc.IsValid());
+    ASSERT_EQ(desc.MipLevels, 7u);
+
+    const Graphics::HZBBuildDispatchPlan plan =
+        Graphics::ComputeHZBBuildDispatchPlan(
+            desc,
+            Graphics::HZBBuildCapabilities{.SupportsSinglePassMipChain = false});
+
+    EXPECT_EQ(plan.Mode, Graphics::HZBBuildMode::PerMipDispatch);
+    ASSERT_TRUE(plan.IsValid());
+    ASSERT_EQ(plan.Dispatches.size(), desc.MipLevels);
+
+    constexpr std::uint32_t kExpectedWidths[] = {64u, 32u, 16u, 8u, 4u, 2u, 1u};
+    constexpr std::uint32_t kExpectedHeights[] = {32u, 16u, 8u, 4u, 2u, 1u, 1u};
+    constexpr std::uint32_t kExpectedGroupsX[] = {4u, 2u, 1u, 1u, 1u, 1u, 1u};
+    constexpr std::uint32_t kExpectedGroupsY[] = {2u, 1u, 1u, 1u, 1u, 1u, 1u};
+
+    for (std::uint32_t mip = 0u; mip < desc.MipLevels; ++mip)
+    {
+        const Graphics::HZBBuildDispatchDesc& dispatch = plan.Dispatches[mip];
+        EXPECT_EQ(dispatch.TargetMip, mip);
+        EXPECT_EQ(dispatch.SourceMip, mip == 0u ? 0u : mip - 1u);
+        EXPECT_EQ(dispatch.ReadsDepthSource, mip == 0u);
+        EXPECT_EQ(dispatch.TargetWidth, kExpectedWidths[mip]);
+        EXPECT_EQ(dispatch.TargetHeight, kExpectedHeights[mip]);
+        EXPECT_EQ(dispatch.GroupCountX, kExpectedGroupsX[mip]);
+        EXPECT_EQ(dispatch.GroupCountY, kExpectedGroupsY[mip]);
+        EXPECT_EQ(dispatch.GroupCountZ, 1u);
+    }
+}
+
+TEST(GraphicsHZBBuildPlan, SinglePassMipChainUsesOneBaseDispatch)
+{
+    const Graphics::HZBDesc desc = Graphics::ComputeHZBDesc(64u, 32u);
+    ASSERT_TRUE(desc.IsValid());
+
+    const Graphics::HZBBuildDispatchPlan plan =
+        Graphics::ComputeHZBBuildDispatchPlan(
+            desc,
+            Graphics::HZBBuildCapabilities{.SupportsSinglePassMipChain = true},
+            /*tileSize=*/8u);
+
+    EXPECT_EQ(plan.Mode, Graphics::HZBBuildMode::SinglePassMipChain);
+    ASSERT_TRUE(plan.IsValid());
+    ASSERT_EQ(plan.Dispatches.size(), 1u);
+
+    const Graphics::HZBBuildDispatchDesc& dispatch = plan.Dispatches.front();
+    EXPECT_EQ(dispatch.TargetMip, 0u);
+    EXPECT_EQ(dispatch.SourceMip, 0u);
+    EXPECT_TRUE(dispatch.ReadsDepthSource);
+    EXPECT_EQ(dispatch.TargetWidth, desc.Width);
+    EXPECT_EQ(dispatch.TargetHeight, desc.Height);
+    EXPECT_EQ(dispatch.GroupCountX, 8u);
+    EXPECT_EQ(dispatch.GroupCountY, 4u);
+    EXPECT_EQ(dispatch.GroupCountZ, 1u);
+}
+
+TEST(GraphicsHZBBuildPlan, RecordFallbackDispatchesAndMipStitchBarriers)
+{
+    const Graphics::HZBDesc desc = Graphics::ComputeHZBDesc(64u, 32u);
+    const Graphics::HZBBuildDispatchPlan plan =
+        Graphics::ComputeHZBBuildDispatchPlan(
+            desc,
+            Graphics::HZBBuildCapabilities{.SupportsSinglePassMipChain = false});
+
+    Tests::MockCommandContext cmd;
+    const RHI::PipelineHandle pipeline{41u, 1u};
+    const RHI::TextureHandle hzb{42u, 1u};
+
+    ASSERT_TRUE(Graphics::RecordHZBBuild(cmd, pipeline, hzb, plan));
+
+    EXPECT_EQ(cmd.BindPipelineCalls, 1);
+    ASSERT_EQ(cmd.DispatchRecords.size(), plan.Dispatches.size());
+    ASSERT_EQ(cmd.PushConstantPayloads.size(), plan.Dispatches.size());
+    ASSERT_EQ(cmd.TextureBarrierCalls.size(), plan.Dispatches.size() - 1u);
+
+    for (std::size_t i = 0u; i < plan.Dispatches.size(); ++i)
+    {
+        const Graphics::HZBBuildDispatchDesc& dispatch = plan.Dispatches[i];
+        const Tests::MockCommandContext::DispatchRecord& recorded = cmd.DispatchRecords[i];
+        EXPECT_EQ(recorded.X, dispatch.GroupCountX);
+        EXPECT_EQ(recorded.Y, dispatch.GroupCountY);
+        EXPECT_EQ(recorded.Z, dispatch.GroupCountZ);
+
+        ASSERT_EQ(cmd.PushConstantPayloads[i].size(), sizeof(Graphics::HZBBuildPushConstants));
+        Graphics::HZBBuildPushConstants pc{};
+        std::memcpy(&pc, cmd.PushConstantPayloads[i].data(), sizeof(pc));
+        EXPECT_EQ(pc.RenderWidth, desc.Width);
+        EXPECT_EQ(pc.RenderHeight, desc.Height);
+        EXPECT_EQ(pc.TargetMip, dispatch.TargetMip);
+        EXPECT_EQ(pc.SourceMip, dispatch.SourceMip);
+        EXPECT_EQ(pc.MipCount, desc.MipLevels);
+        EXPECT_EQ(pc.BuildMode, static_cast<std::uint32_t>(Graphics::HZBBuildMode::PerMipDispatch));
+        EXPECT_EQ(pc.TargetWidth, dispatch.TargetWidth);
+        EXPECT_EQ(pc.TargetHeight, dispatch.TargetHeight);
+    }
+
+    for (const Tests::MockCommandContext::TextureBarrierRecord& barrier : cmd.TextureBarrierCalls)
+    {
+        EXPECT_EQ(barrier.Texture, hzb);
+        EXPECT_EQ(barrier.Before, RHI::TextureLayout::General);
+        EXPECT_EQ(barrier.After, RHI::TextureLayout::General);
+        EXPECT_EQ(barrier.BeforeAccess, RHI::MemoryAccess::ShaderWrite);
+        EXPECT_EQ(barrier.AfterAccess,
+                  RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite);
+    }
+}
+
+TEST(GraphicsHZBBuildPlan, RecordRejectsInvalidInputs)
+{
+    Tests::MockCommandContext cmd;
+    const Graphics::HZBBuildDispatchPlan plan =
+        Graphics::ComputeHZBBuildDispatchPlan(
+            Graphics::ComputeHZBDesc(64u, 32u),
+            Graphics::HZBBuildCapabilities{});
+
+    EXPECT_FALSE(Graphics::RecordHZBBuild(cmd, RHI::PipelineHandle{}, RHI::TextureHandle{42u, 1u}, plan));
+    EXPECT_FALSE(Graphics::RecordHZBBuild(cmd, RHI::PipelineHandle{41u, 1u}, RHI::TextureHandle{}, plan));
+    EXPECT_FALSE(Graphics::RecordHZBBuild(cmd, RHI::PipelineHandle{41u, 1u}, RHI::TextureHandle{42u, 1u}, {}));
+    EXPECT_EQ(cmd.BindPipelineCalls, 0);
+    EXPECT_EQ(cmd.DispatchCalls, 0);
 }

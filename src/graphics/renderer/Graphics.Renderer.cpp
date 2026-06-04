@@ -40,6 +40,7 @@ import Extrinsic.Graphics.ForwardSystem;
 import Extrinsic.Graphics.DeferredSystem;
 import Extrinsic.Graphics.PostProcessSystem;
 import Extrinsic.Graphics.ShadowSystem;
+import Extrinsic.Graphics.HZB;
 import Extrinsic.Graphics.TransformSyncSystem;
 import Extrinsic.Graphics.Pass.DepthPrepass;
 import Extrinsic.Graphics.Pass.Deferred.GBuffers;
@@ -490,6 +491,12 @@ namespace Extrinsic::Graphics
             m_ShadowSystem.emplace();
             m_ShadowSystem->Initialize(device, *m_TextureManager, *m_SamplerManager);
             m_ShadowPass.emplace(*m_ShadowSystem);
+            // GRAPHICS-038A/B — retained HZB ping-pong resource + build pass
+            // target. The system owns two renderer-retained textures through
+            // TextureManager; ExecuteFrame allocates/resizes them for the
+            // current viewport before importing `HZB.Current` into the recipe.
+            m_HZBSystem.emplace();
+            m_HZBSystem->Initialize(device, *m_TextureManager);
             // GRAPHICS-072 Slice A — DeferredSystem and its `DeferredGBufferPass`
             // must be live before the operational publisher runs so the
             // initial `Initialize()` path can call `SetPipeline(...)` on the
@@ -677,6 +684,7 @@ namespace Extrinsic::Graphics
             if (m_DeferredSystem)  m_DeferredSystem->Shutdown();
             if (m_PostProcessSystem) m_PostProcessSystem->Shutdown();
             if (m_ShadowSystem)    m_ShadowSystem->Shutdown();
+            if (m_HZBSystem)       m_HZBSystem->Shutdown();
             if (m_CullingSystem)   m_CullingSystem->Shutdown();
             if (m_TransformSyncSystem) m_TransformSyncSystem->Shutdown();
             if (m_VisualizationSyncSystem) m_VisualizationSyncSystem->Shutdown();
@@ -741,6 +749,7 @@ namespace Extrinsic::Graphics
             m_DeferredSystem .reset();
             m_PostProcessSystem.reset();
             m_ShadowSystem   .reset();
+            m_HZBSystem      .reset();
             m_CullingSystem  .reset();
             m_TransformSyncSystem.reset();
             m_VisualizationSyncSystem.reset();
@@ -820,6 +829,7 @@ namespace Extrinsic::Graphics
             // is torn down below since the lease destructor calls back
             // through the manager.
             m_PostProcessHistogramPipelineLease.reset();
+            m_HZBBuildPipelineLease.reset();
             ReleaseAllFrameTransientResources();
             // GRAPHICS-074 Slice D.1 — drop the renderer-owned
             // `Picking.Readback` lease before the BufferManager is torn
@@ -1508,6 +1518,25 @@ namespace Extrinsic::Graphics
             const auto& surfaceOpaque = m_CullingSystem->GetBucket(RHI::GpuDrawBucketKind::SurfaceOpaque);
             const auto& lines = m_CullingSystem->GetBucket(RHI::GpuDrawBucketKind::Lines);
             const auto& points = m_CullingSystem->GetBucket(RHI::GpuDrawBucketKind::Points);
+            const FrameRecipeSizing sizing{
+                .Width = renderWorld.Viewport.Width > 0 ? static_cast<std::uint32_t>(renderWorld.Viewport.Width) : 1u,
+                .Height = renderWorld.Viewport.Height > 0 ? static_cast<std::uint32_t>(renderWorld.Viewport.Height) : 1u,
+                .BackbufferFormat = m_BackbufferFormat,
+                .DepthFormat = RHI::Format::D32_FLOAT,
+            };
+
+            RHI::TextureHandle hzbCurrent{};
+            if (m_HZBSystem.has_value() && m_Device->IsOperational())
+            {
+                const std::uint64_t frameNumber = m_Device->GetGlobalFrameNumber();
+                const bool hzbAllocated =
+                    m_HZBSystem->EnsureAllocated(sizing.Width, sizing.Height, frameNumber);
+                m_HZBSystem->Tick(frameNumber, std::max(1u, m_Device->GetFramesInFlight()));
+                if (hzbAllocated && m_HZBSystem->IsAllocated())
+                {
+                    hzbCurrent = m_HZBSystem->CurrentHZB();
+                }
+            }
             const FrameRecipeImports imports{
                 .Backbuffer = m_Device->GetBackbufferHandle(frame),
                 .SceneTable = m_GpuWorld->GetSceneTableBuffer(),
@@ -1552,12 +1581,10 @@ namespace Extrinsic::Graphics
                 .HistogramReadback = (m_HistogramReadbackBuffer.has_value() && m_HistogramReadbackBuffer->IsValid())
                                          ? m_HistogramReadbackBuffer->GetHandle()
                                          : RHI::BufferHandle{},
-            };
-            const FrameRecipeSizing sizing{
-                .Width = renderWorld.Viewport.Width > 0 ? static_cast<std::uint32_t>(renderWorld.Viewport.Width) : 1u,
-                .Height = renderWorld.Viewport.Height > 0 ? static_cast<std::uint32_t>(renderWorld.Viewport.Height) : 1u,
-                .BackbufferFormat = m_BackbufferFormat,
-                .DepthFormat = RHI::Format::D32_FLOAT,
+                // GRAPHICS-038B — current-frame HZB build target. Invalid on
+                // non-operational devices or allocation failure, which keeps
+                // the recipe from declaring `HZBBuildPass`.
+                .HZBCurrent = hzbCurrent,
             };
             // GRAPHICS-073 Slice B — derive the typed shadow sizing from the
             // current `ShadowSystem` params so transient fallbacks (no atlas
@@ -1608,6 +1635,8 @@ namespace Extrinsic::Graphics
             defaultRecipeFeatures.EnableAntiAliasing =
                 m_PostProcessSystem.has_value() &&
                 SelectedAntiAliasingPipelinesAvailable();
+            defaultRecipeFeatures.EnableHZBBuild =
+                defaultRecipeFeatures.EnableDepthPrepass && hzbCurrent.IsValid();
             const FrameRecipeBuildResult recipe = BuildDefaultFrameRecipe(m_RenderGraph,
                                                                           defaultRecipeFeatures,
                                                                           imports,
@@ -1877,6 +1906,17 @@ namespace Extrinsic::Graphics
                     else if (passName == std::string_view{"DepthPrepass"})
                     {
                         const RenderCommandPassStatus status = RecordDepthPrepass(graphicsContext, camera, frame.FrameIndex);
+                        AccumulateCommandRecordStatus(passName, status);
+                    }
+                    else if (passName == std::string_view{"HZBBuildPass"})
+                    {
+                        // GRAPHICS-038B — build the retained HZB pyramid
+                        // immediately after the depth prepass. The recipe only
+                        // declares this pass when `HZB.Current` was imported, so
+                        // this branch observes a renderer-owned retained target
+                        // and records the backend-neutral per-mip fallback
+                        // dispatch plan.
+                        const RenderCommandPassStatus status = RecordHZBBuildPass(graphicsContext);
                         AccumulateCommandRecordStatus(passName, status);
                     }
                     else if (passName == std::string_view{"SurfacePass"} && !defaultRecipeUsesDeferred)
@@ -2734,6 +2774,10 @@ namespace Extrinsic::Graphics
                 ++m_LastRenderGraphStats.AsyncComputeUtilizedFrames;
             }
             m_LastRenderGraphStats.Execute.Succeeded = true;
+            if (m_HZBSystem.has_value() && m_LastRenderGraphStats.HZBBuildRecordedFrames > 0u)
+            {
+                m_HZBSystem->AdvanceFrame();
+            }
 
             // Phase 14.2 GPU order is intentionally fixed for concrete
             // backends:
@@ -3066,6 +3110,21 @@ namespace Extrinsic::Graphics
             return BuildPostProcessHistogramPipelineDesc();
         }
 
+        [[nodiscard]] RHI::PipelineHandle GetHZBBuildPipeline() const noexcept override
+        {
+            if (!m_PipelineManager.has_value() || !m_HZBBuildPipelineLease.has_value() ||
+                !m_HZBBuildPipelineLease->IsValid())
+            {
+                return RHI::PipelineHandle{};
+            }
+            return m_PipelineManager->GetDeviceHandle(m_HZBBuildPipelineLease->GetHandle());
+        }
+
+        [[nodiscard]] RHI::PipelineDesc GetHZBBuildPipelineDesc() const noexcept override
+        {
+            return BuildHZBBuildPipelineDesc();
+        }
+
         [[nodiscard]] RHI::BufferHandle GetPickingReadbackBuffer() const noexcept override
         {
             if (!m_PickingReadbackBuffer.has_value() || !m_PickingReadbackBuffer->IsValid())
@@ -3184,6 +3243,7 @@ namespace Extrinsic::Graphics
         DeferredSystem&        GetDeferredSystem()  override { return *m_DeferredSystem;  }
         PostProcessSystem&     GetPostProcessSystem() override { return *m_PostProcessSystem; }
         ShadowSystem&          GetShadowSystem()    override { return *m_ShadowSystem;    }
+        HZBSystem&             GetHZBSystem()       override { return *m_HZBSystem;       }
         const RenderGraphFrameStats& GetLastRenderGraphStats() const override { return m_LastRenderGraphStats; }
 
     private:
@@ -4007,6 +4067,25 @@ namespace Extrinsic::Graphics
             desc.DepthTargetFormat = RHI::Format::Undefined;
             desc.PushConstantSize = static_cast<std::uint32_t>(sizeof(PostProcessHistogramPushConstants));
             desc.DebugName = "Renderer.PostProcess.Histogram";
+            return desc;
+        }
+
+        // GRAPHICS-038B — default-recipe HZB build compute pipeline. It records
+        // outside a render-pass scope under `"HZBBuildPass"` and consumes the
+        // 32-byte `HZBBuildPushConstants` block that selects the target mip and
+        // fallback/single-pass mode. The shader asset contains the subgroup +
+        // shared-memory reduction code; this slice pins the CPU/null command
+        // shape while the storage-image binding and gpu;vulkan conservatism
+        // proof remain `GRAPHICS-038E` scope.
+        [[nodiscard]] static RHI::PipelineDesc BuildHZBBuildPipelineDesc() noexcept
+        {
+            RHI::PipelineDesc desc{};
+            desc.ComputeShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/hzb_build.comp.spv");
+            desc.ColorTargetCount = 0u;
+            desc.DepthTargetFormat = RHI::Format::Undefined;
+            desc.PushConstantSize = static_cast<std::uint32_t>(sizeof(HZBBuildPushConstants));
+            desc.DebugName = "Renderer.HZB.Build";
             return desc;
         }
 
@@ -5386,13 +5465,34 @@ namespace Extrinsic::Graphics
                     static_cast<int>(isolineAlwaysOnTopPipeline.error()));
             }
 
+            // GRAPHICS-038B — HZB build compute pipeline. Appended after the
+            // GRAPHICS-077/078 visualization pipeline lanes so all existing
+            // `FailPipelineCreateCall` indices through #34 remain stable. Same
+            // reset/republish + fail-closed pattern as the other default-recipe
+            // compute pipelines: a failed create leaves `"HZBBuildPass"` in
+            // `SkippedUnavailable` rather than retaining a stale device handle.
+            m_HZBBuildPipelineLease.reset();
+            const RHI::PipelineDesc hzbBuildDesc = BuildHZBBuildPipelineDesc();
+            auto hzbBuildPipeline = m_PipelineManager->Create(hzbBuildDesc);
+            if (hzbBuildPipeline.has_value())
+            {
+                m_HZBBuildPipelineLease.emplace(std::move(*hzbBuildPipeline));
+            }
+            else
+            {
+                Core::Log::Warn(
+                    "[Graphics] HZB.Build pipeline unavailable; default-recipe HZB build recording will be skipped: error={}",
+                    static_cast<int>(hzbBuildPipeline.error()));
+            }
+
             // GRAPHICS-079 Slice A — canonical default-recipe `Pass.ImGui`
-            // pipeline. Created LAST (after the visualization-overlay isoline
-            // pipelines) so the existing `FailPipelineCreateCall` indices used
-            // by other lifecycle tests remain stable. Same reset/republish +
-            // fail-closed pattern as the present/debug-view leases so a failed
-            // `Create()` leaves `m_ImGuiPass` (when attached) in the fail-closed
-            // state that `RecordImGuiPass` interprets as `SkippedUnavailable`.
+            // pipeline. Created LAST (after HZB.Build, which follows the
+            // visualization-overlay isoline pipelines) so the existing
+            // `FailPipelineCreateCall` indices used by other lifecycle tests
+            // remain stable. Same reset/republish + fail-closed pattern as the
+            // present/debug-view leases so a failed `Create()` leaves
+            // `m_ImGuiPass` (when attached) in the fail-closed state that
+            // `RecordImGuiPass` interprets as `SkippedUnavailable`.
             // The pass is only attached once the runtime hands in the overlay
             // system via `SetImGuiOverlaySystem`, so the lease may exist before
             // the pass does.
@@ -6498,6 +6598,52 @@ namespace Extrinsic::Graphics
             return RenderCommandPassStatus::Recorded;
         }
 
+        // GRAPHICS-038B — default-recipe `"HZBBuildPass"` executor route.
+        // The recipe declares this compute pass only after a valid retained
+        // `HZB.Current` import is available. This slice records the deterministic
+        // per-mip fallback command shape; the optional single-pass/SPD backend
+        // path is covered by the pure planner and reserved for a later
+        // capability-gated backend implementation.
+        [[nodiscard]] RenderCommandPassStatus RecordHZBBuildPass(RHI::ICommandContext& cmd)
+        {
+            if (m_Device == nullptr || !m_Device->IsOperational())
+            {
+                return RenderCommandPassStatus::SkippedNonOperational;
+            }
+            if (!m_HZBSystem.has_value() ||
+                !m_HZBSystem->IsAllocated() ||
+                !m_CullingOutputAvailable ||
+                !m_DepthPrepassPipelineLease.has_value() ||
+                !m_DepthPrepassPipelineLease->IsValid() ||
+                !m_HZBBuildPipelineLease.has_value() ||
+                !m_HZBBuildPipelineLease->IsValid())
+            {
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            const HZBBuildDispatchPlan plan = ComputeHZBBuildDispatchPlan(
+                m_HZBSystem->GetAllocatedDesc(),
+                HZBBuildCapabilities{.SupportsSinglePassMipChain = false});
+            if (!RecordHZBBuild(cmd, GetHZBBuildPipeline(), m_HZBSystem->CurrentHZB(), plan))
+            {
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            ++m_LastRenderGraphStats.HZBBuildRecordedFrames;
+            m_LastRenderGraphStats.HZBBuildDispatchCount +=
+                static_cast<std::uint32_t>(plan.Dispatches.size());
+            m_LastRenderGraphStats.HZBBuildMipCount += plan.Desc.MipLevels;
+            if (plan.Mode == HZBBuildMode::SinglePassMipChain)
+            {
+                ++m_LastRenderGraphStats.HZBBuildSinglePassFrames;
+            }
+            else
+            {
+                ++m_LastRenderGraphStats.HZBBuildFallbackFrames;
+            }
+            return RenderCommandPassStatus::Recorded;
+        }
+
         // GRAPHICS-076 Slice A — canonical default-recipe present executor
         // helper. The `PresentPass::Execute()` body records the
         // `BindPipeline + Draw(3, 1, 0, 0)` shape unconditionally when its
@@ -6943,6 +7089,7 @@ namespace Extrinsic::Graphics
         std::optional<DeferredSystem>        m_DeferredSystem;
         std::optional<PostProcessSystem>     m_PostProcessSystem;
         std::optional<ShadowSystem>          m_ShadowSystem;
+        std::optional<HZBSystem>             m_HZBSystem;
         RHI::IDevice*                        m_Device{nullptr};
         RenderGraph                          m_RenderGraph;
         RenderGraphExecutor                  m_RenderGraphExecutor;
@@ -7116,13 +7263,13 @@ namespace Extrinsic::Graphics
         std::optional<RHI::PipelineManager::PipelineLease> m_DebugViewPipelineLease;
         // GRAPHICS-079 Slice A — canonical default-recipe `Pass.ImGui`
         // pipeline lease. Created LAST inside
-        // `InitializeOperationalPassResources()` (after the visualization-
-        // overlay isoline pipelines) so the existing `FailPipelineCreateCall`
-        // indices used by other lifecycle tests remain stable. Same
-        // reset/republish + fail-closed pattern as the present/debug-view
-        // leases so a failed `Create()` leaves `m_ImGuiPass` (when attached) in
-        // the fail-closed state that `RecordImGuiPass` interprets as
-        // `SkippedUnavailable`.
+        // `InitializeOperationalPassResources()` (after the HZB build compute
+        // pipeline, which itself appends after the visualization-overlay
+        // isoline pipelines) so existing `FailPipelineCreateCall` indices used
+        // by other lifecycle tests remain stable. Same reset/republish +
+        // fail-closed pattern as the present/debug-view leases so a failed
+        // `Create()` leaves `m_ImGuiPass` (when attached) in the fail-closed
+        // state that `RecordImGuiPass` interprets as `SkippedUnavailable`.
         std::optional<RHI::PipelineManager::PipelineLease> m_ImGuiPipelineLease;
         // GRAPHICS-077 Slice B — transient-debug triangle pipelines.
         // Two variants per lane (depth-tested + always-on-top); same
@@ -7181,6 +7328,11 @@ namespace Extrinsic::Graphics
         // missing-pipeline taxonomy.
         std::optional<RHI::PipelineManager::PipelineLease> m_VisualizationOverlayIsolinePipelineLeaseDepthTested;
         std::optional<RHI::PipelineManager::PipelineLease> m_VisualizationOverlayIsolinePipelineLeaseAlwaysOnTop;
+        // GRAPHICS-038B — HZB build compute pipeline lease. Created after
+        // visualization-overlay call #34 and before ImGui so all previously
+        // documented pipeline-create indices stay stable; a failed create makes
+        // `"HZBBuildPass"` report `SkippedUnavailable`.
+        std::optional<RHI::PipelineManager::PipelineLease> m_HZBBuildPipelineLease;
         // GRAPHICS-077 Slice B — backend-local transient-debug upload
         // helper. Held as `unique_ptr<ITransientDebugUploadHelper>` so
         // Slice D can swap in a Vulkan-tuned concrete implementation

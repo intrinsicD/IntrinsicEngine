@@ -1,7 +1,9 @@
 module;
 
 #include <cstdint>
+#include <cstddef>
 #include <memory>
+#include <span>
 #include <utility>
 #include <vector>
 
@@ -47,6 +49,111 @@ namespace Extrinsic::Graphics
         }
         desc.MipLevels = mips;
         return desc;
+    }
+
+    namespace
+    {
+        [[nodiscard]] constexpr std::uint32_t CeilDiv(const std::uint32_t value,
+                                                       const std::uint32_t divisor) noexcept
+        {
+            return divisor == 0u ? 0u : (value + divisor - 1u) / divisor;
+        }
+
+        [[nodiscard]] constexpr std::uint32_t MipExtent(const std::uint32_t base,
+                                                        const std::uint32_t mip) noexcept
+        {
+            const std::uint32_t shifted = mip >= 31u ? 0u : (base >> mip);
+            return shifted > 0u ? shifted : 1u;
+        }
+    }
+
+    HZBBuildDispatchPlan ComputeHZBBuildDispatchPlan(const HZBDesc& desc,
+                                                     HZBBuildCapabilities capabilities,
+                                                     std::uint32_t tileSize)
+    {
+        HZBBuildDispatchPlan plan{};
+        plan.Mode = capabilities.SupportsSinglePassMipChain
+            ? HZBBuildMode::SinglePassMipChain
+            : HZBBuildMode::PerMipDispatch;
+        plan.Desc = desc;
+
+        if (!desc.IsValid() || tileSize == 0u)
+            return plan;
+
+        if (plan.Mode == HZBBuildMode::SinglePassMipChain)
+        {
+            plan.Dispatches.push_back(HZBBuildDispatchDesc{
+                .TargetMip = 0u,
+                .SourceMip = 0u,
+                .ReadsDepthSource = true,
+                .TargetWidth = desc.Width,
+                .TargetHeight = desc.Height,
+                .GroupCountX = CeilDiv(desc.Width, tileSize),
+                .GroupCountY = CeilDiv(desc.Height, tileSize),
+                .GroupCountZ = 1u,
+            });
+            return plan;
+        }
+
+        plan.Dispatches.reserve(desc.MipLevels);
+        for (std::uint32_t mip = 0u; mip < desc.MipLevels; ++mip)
+        {
+            const std::uint32_t width = MipExtent(desc.Width, mip);
+            const std::uint32_t height = MipExtent(desc.Height, mip);
+            plan.Dispatches.push_back(HZBBuildDispatchDesc{
+                .TargetMip = mip,
+                .SourceMip = mip == 0u ? 0u : mip - 1u,
+                .ReadsDepthSource = mip == 0u,
+                .TargetWidth = width,
+                .TargetHeight = height,
+                .GroupCountX = CeilDiv(width, tileSize),
+                .GroupCountY = CeilDiv(height, tileSize),
+                .GroupCountZ = 1u,
+            });
+        }
+        return plan;
+    }
+
+    bool RecordHZBBuild(RHI::ICommandContext& cmd,
+                        RHI::PipelineHandle pipeline,
+                        RHI::TextureHandle hzbTexture,
+                        const HZBBuildDispatchPlan& plan)
+    {
+        if (!pipeline.IsValid() || !hzbTexture.IsValid() || !plan.IsValid())
+            return false;
+
+        cmd.BindPipeline(pipeline);
+        for (std::size_t dispatchIndex = 0u; dispatchIndex < plan.Dispatches.size(); ++dispatchIndex)
+        {
+            const HZBBuildDispatchDesc& dispatch = plan.Dispatches[dispatchIndex];
+            const HZBBuildPushConstants pc{
+                .RenderWidth = plan.Desc.Width,
+                .RenderHeight = plan.Desc.Height,
+                .TargetMip = dispatch.TargetMip,
+                .SourceMip = dispatch.SourceMip,
+                .MipCount = plan.Desc.MipLevels,
+                .BuildMode = static_cast<std::uint32_t>(plan.Mode),
+                .TargetWidth = dispatch.TargetWidth,
+                .TargetHeight = dispatch.TargetHeight,
+            };
+            cmd.PushConstants(&pc, static_cast<std::uint32_t>(sizeof(pc)), 0u);
+            cmd.Dispatch(dispatch.GroupCountX, dispatch.GroupCountY, dispatch.GroupCountZ);
+
+            if (plan.Mode == HZBBuildMode::PerMipDispatch && dispatchIndex + 1u < plan.Dispatches.size())
+            {
+                const RHI::TextureBarrierDesc barrier{
+                    .Texture = hzbTexture,
+                    .BeforeLayout = RHI::TextureLayout::General,
+                    .AfterLayout = RHI::TextureLayout::General,
+                    .BeforeAccess = RHI::MemoryAccess::ShaderWrite,
+                    .AfterAccess = RHI::MemoryAccess::ShaderRead | RHI::MemoryAccess::ShaderWrite,
+                };
+                cmd.SubmitBarriers(RHI::BarrierBatchDesc{
+                    .TextureBarriers = std::span<const RHI::TextureBarrierDesc>{&barrier, 1u},
+                });
+            }
+        }
+        return true;
     }
 
     struct HZBSystem::Impl
