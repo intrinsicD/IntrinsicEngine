@@ -11,7 +11,12 @@ Each active task should include:
 
 ## Currently active
 
-No tasks are currently active.
+[`GRAPHICS-037D`](GRAPHICS-037D-multi-queue-vulkan-recording.md) — Vulkan
+multi-queue recording is in progress. Current slice adds async-compute
+queue-family discovery/acquisition diagnostics and Sync2 queue-family token
+translation in `graphics/vulkan`; follow-up slices still own the
+backend-neutral submit-plan seam, real per-affinity command-buffer submission,
+timeline waits/signals, and the opt-in `gpu;vulkan` operational smoke.
 
 The most recently retired tasks are summarised below.
 

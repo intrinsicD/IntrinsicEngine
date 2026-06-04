@@ -15,9 +15,58 @@ import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.Handles;
+import Extrinsic.RHI.QueueAffinity;
 import Extrinsic.RHI.Transfer;
 import Extrinsic.RHI.TransferQueue;
 import Extrinsic.RHI.Types;
+
+TEST(VulkanFailClosedContract, QueueFamilyTokenResolverMapsAffinityTokens)
+{
+    const Extrinsic::Backends::Vulkan::VulkanQueueFamilyMap fullMap{
+        .Graphics = 3u,
+        .AsyncCompute = 7u,
+        .Transfer = 11u,
+        .Present = 13u,
+        .SupportsAsyncCompute = true,
+        .SupportsTransfer = true,
+    };
+
+    EXPECT_EQ(Extrinsic::Backends::Vulkan::ResolveVulkanQueueFamilyToken(
+                  fullMap,
+                  static_cast<std::uint32_t>(Extrinsic::RHI::QueueAffinity::Graphics)),
+              3u);
+    EXPECT_EQ(Extrinsic::Backends::Vulkan::ResolveVulkanQueueFamilyToken(
+                  fullMap,
+                  static_cast<std::uint32_t>(Extrinsic::RHI::QueueAffinity::AsyncCompute)),
+              7u);
+    EXPECT_EQ(Extrinsic::Backends::Vulkan::ResolveVulkanQueueFamilyToken(
+                  fullMap,
+                  static_cast<std::uint32_t>(Extrinsic::RHI::QueueAffinity::Transfer)),
+              11u);
+    EXPECT_EQ(Extrinsic::Backends::Vulkan::ResolveVulkanQueueFamilyToken(
+                  fullMap,
+                  Extrinsic::Backends::Vulkan::kIgnoredVulkanQueueFamily),
+              Extrinsic::Backends::Vulkan::kIgnoredVulkanQueueFamily);
+    EXPECT_EQ(Extrinsic::Backends::Vulkan::ResolveVulkanQueueFamilyToken(fullMap, 99u),
+              99u);
+
+    const Extrinsic::Backends::Vulkan::VulkanQueueFamilyMap singleQueueMap{
+        .Graphics = 5u,
+        .AsyncCompute = Extrinsic::Backends::Vulkan::kIgnoredVulkanQueueFamily,
+        .Transfer = Extrinsic::Backends::Vulkan::kIgnoredVulkanQueueFamily,
+        .Present = 5u,
+        .SupportsAsyncCompute = false,
+        .SupportsTransfer = false,
+    };
+    EXPECT_EQ(Extrinsic::Backends::Vulkan::ResolveVulkanQueueFamilyToken(
+                  singleQueueMap,
+                  static_cast<std::uint32_t>(Extrinsic::RHI::QueueAffinity::AsyncCompute)),
+              5u);
+    EXPECT_EQ(Extrinsic::Backends::Vulkan::ResolveVulkanQueueFamilyToken(
+                  singleQueueMap,
+                  static_cast<std::uint32_t>(Extrinsic::RHI::QueueAffinity::Transfer)),
+              5u);
+}
 
 TEST(VulkanFailClosedContract, DeviceConstructorIsFailClosedWithoutGpuBringup)
 {
@@ -78,6 +127,9 @@ TEST(VulkanFailClosedContract, InitializeWithNullWindowSkipsBootstrapWithoutVulk
     EXPECT_FALSE(diagnostics.PhysicalDeviceSelected);
     EXPECT_FALSE(diagnostics.LogicalDeviceCreated);
     EXPECT_FALSE(diagnostics.GraphicsQueueAcquired);
+    EXPECT_FALSE(diagnostics.AsyncComputeQueueFound);
+    EXPECT_FALSE(diagnostics.AsyncComputeQueueDedicated);
+    EXPECT_FALSE(diagnostics.AsyncComputeQueueAcquired);
     EXPECT_FALSE(diagnostics.PresentQueueAcquired);
     EXPECT_FALSE(diagnostics.TransferQueueAcquired);
     EXPECT_FALSE(diagnostics.MemoryAllocatorCreated);

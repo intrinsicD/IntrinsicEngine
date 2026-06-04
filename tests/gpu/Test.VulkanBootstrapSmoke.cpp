@@ -80,6 +80,37 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
         << "with a GLFW native window, bootstrap should reach the Vulkan loader before any clean failure";
 
     const std::uint32_t expectedFramesInFlight = device->GetFramesInFlight();
+    const auto expectRequiredQueuesFound = [&diagnostics]()
+    {
+        EXPECT_TRUE(diagnostics.GraphicsQueueFound);
+        EXPECT_TRUE(diagnostics.PresentQueueFound);
+        EXPECT_TRUE(diagnostics.TransferQueueFound);
+        if (!diagnostics.AsyncComputeQueueFound)
+        {
+            EXPECT_FALSE(diagnostics.AsyncComputeQueueDedicated);
+        }
+    };
+    const auto expectRequiredQueuesAcquired = [&diagnostics]()
+    {
+        EXPECT_TRUE(diagnostics.GraphicsQueueAcquired);
+        EXPECT_TRUE(diagnostics.PresentQueueAcquired);
+        EXPECT_TRUE(diagnostics.TransferQueueAcquired);
+        if (diagnostics.AsyncComputeQueueFound)
+        {
+            EXPECT_TRUE(diagnostics.AsyncComputeQueueAcquired);
+        }
+        else
+        {
+            EXPECT_FALSE(diagnostics.AsyncComputeQueueAcquired);
+        }
+    };
+    const auto expectNoQueuesAcquired = [&diagnostics]()
+    {
+        EXPECT_FALSE(diagnostics.GraphicsQueueAcquired);
+        EXPECT_FALSE(diagnostics.AsyncComputeQueueAcquired);
+        EXPECT_FALSE(diagnostics.PresentQueueAcquired);
+        EXPECT_FALSE(diagnostics.TransferQueueAcquired);
+    };
 
     if (diagnostics.PhysicalDeviceSelected)
     {
@@ -112,12 +143,8 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
         EXPECT_TRUE(diagnostics.SurfaceCreated);
         EXPECT_TRUE(diagnostics.PhysicalDeviceSelected);
         EXPECT_TRUE(diagnostics.LogicalDeviceCreated);
-        EXPECT_TRUE(diagnostics.GraphicsQueueFound);
-        EXPECT_TRUE(diagnostics.PresentQueueFound);
-        EXPECT_TRUE(diagnostics.TransferQueueFound);
-        EXPECT_TRUE(diagnostics.GraphicsQueueAcquired);
-        EXPECT_TRUE(diagnostics.PresentQueueAcquired);
-        EXPECT_TRUE(diagnostics.TransferQueueAcquired);
+        expectRequiredQueuesFound();
+        expectRequiredQueuesAcquired();
         EXPECT_TRUE(diagnostics.MemoryAllocatorCreated);
         EXPECT_TRUE(diagnostics.PerFrameResourcesCreated);
         EXPECT_EQ(diagnostics.FrameCommandPoolCount, expectedFramesInFlight);
@@ -143,12 +170,8 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
         EXPECT_TRUE(diagnostics.SurfaceCreated);
         EXPECT_TRUE(diagnostics.PhysicalDeviceSelected);
         EXPECT_TRUE(diagnostics.LogicalDeviceCreated);
-        EXPECT_TRUE(diagnostics.GraphicsQueueFound);
-        EXPECT_TRUE(diagnostics.PresentQueueFound);
-        EXPECT_TRUE(diagnostics.TransferQueueFound);
-        EXPECT_TRUE(diagnostics.GraphicsQueueAcquired);
-        EXPECT_TRUE(diagnostics.PresentQueueAcquired);
-        EXPECT_TRUE(diagnostics.TransferQueueAcquired);
+        expectRequiredQueuesFound();
+        expectRequiredQueuesAcquired();
         EXPECT_TRUE(diagnostics.MemoryAllocatorCreated);
         EXPECT_TRUE(diagnostics.PerFrameResourcesCreated);
         EXPECT_EQ(diagnostics.FrameCommandPoolCount, expectedFramesInFlight);
@@ -166,12 +189,8 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
         EXPECT_TRUE(diagnostics.SurfaceCreated);
         EXPECT_TRUE(diagnostics.PhysicalDeviceSelected);
         EXPECT_TRUE(diagnostics.LogicalDeviceCreated);
-        EXPECT_TRUE(diagnostics.GraphicsQueueFound);
-        EXPECT_TRUE(diagnostics.PresentQueueFound);
-        EXPECT_TRUE(diagnostics.TransferQueueFound);
-        EXPECT_TRUE(diagnostics.GraphicsQueueAcquired);
-        EXPECT_TRUE(diagnostics.PresentQueueAcquired);
-        EXPECT_TRUE(diagnostics.TransferQueueAcquired);
+        expectRequiredQueuesFound();
+        expectRequiredQueuesAcquired();
         EXPECT_TRUE(diagnostics.MemoryAllocatorCreated);
         EXPECT_FALSE(diagnostics.PerFrameResourcesCreated);
         EXPECT_TRUE(diagnostics.SwapchainExtensionSupported);
@@ -183,12 +202,8 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
         EXPECT_TRUE(diagnostics.SurfaceCreated);
         EXPECT_TRUE(diagnostics.PhysicalDeviceSelected);
         EXPECT_TRUE(diagnostics.LogicalDeviceCreated);
-        EXPECT_TRUE(diagnostics.GraphicsQueueFound);
-        EXPECT_TRUE(diagnostics.PresentQueueFound);
-        EXPECT_TRUE(diagnostics.TransferQueueFound);
-        EXPECT_TRUE(diagnostics.GraphicsQueueAcquired);
-        EXPECT_TRUE(diagnostics.PresentQueueAcquired);
-        EXPECT_TRUE(diagnostics.TransferQueueAcquired);
+        expectRequiredQueuesFound();
+        expectRequiredQueuesAcquired();
         EXPECT_FALSE(diagnostics.MemoryAllocatorCreated);
         EXPECT_FALSE(diagnostics.PerFrameResourcesCreated);
         EXPECT_TRUE(diagnostics.SwapchainExtensionSupported);
@@ -200,12 +215,8 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
         EXPECT_TRUE(diagnostics.SurfaceCreated);
         EXPECT_TRUE(diagnostics.PhysicalDeviceSelected);
         EXPECT_FALSE(diagnostics.LogicalDeviceCreated);
-        EXPECT_TRUE(diagnostics.GraphicsQueueFound);
-        EXPECT_TRUE(diagnostics.PresentQueueFound);
-        EXPECT_TRUE(diagnostics.TransferQueueFound);
-        EXPECT_FALSE(diagnostics.GraphicsQueueAcquired);
-        EXPECT_FALSE(diagnostics.PresentQueueAcquired);
-        EXPECT_FALSE(diagnostics.TransferQueueAcquired);
+        expectRequiredQueuesFound();
+        expectNoQueuesAcquired();
         EXPECT_TRUE(diagnostics.SwapchainExtensionSupported);
         EXPECT_TRUE(diagnostics.SwapchainSurfaceSupported);
         EXPECT_GT(diagnostics.PhysicalDeviceCount, 0u);
@@ -214,14 +225,14 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
         EXPECT_TRUE(diagnostics.InstanceCreated);
         EXPECT_TRUE(diagnostics.SurfaceCreated);
         EXPECT_TRUE(diagnostics.PhysicalDeviceSelected);
-        EXPECT_TRUE(diagnostics.GraphicsQueueFound);
-        EXPECT_TRUE(diagnostics.PresentQueueFound);
-        EXPECT_TRUE(diagnostics.TransferQueueFound);
+        expectRequiredQueuesFound();
         EXPECT_TRUE(diagnostics.SwapchainExtensionSupported);
         EXPECT_TRUE(diagnostics.SwapchainSurfaceSupported);
         if (diagnostics.LogicalDeviceCreated)
         {
             EXPECT_FALSE(diagnostics.GraphicsQueueAcquired &&
+                         (!diagnostics.AsyncComputeQueueFound ||
+                          diagnostics.AsyncComputeQueueAcquired) &&
                          diagnostics.PresentQueueAcquired &&
                          diagnostics.TransferQueueAcquired);
         }
@@ -233,12 +244,8 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
         EXPECT_TRUE(diagnostics.SurfaceCreated);
         EXPECT_TRUE(diagnostics.PhysicalDeviceSelected);
         EXPECT_TRUE(diagnostics.LogicalDeviceCreated);
-        EXPECT_TRUE(diagnostics.GraphicsQueueFound);
-        EXPECT_TRUE(diagnostics.PresentQueueFound);
-        EXPECT_TRUE(diagnostics.TransferQueueFound);
-        EXPECT_TRUE(diagnostics.GraphicsQueueAcquired);
-        EXPECT_TRUE(diagnostics.PresentQueueAcquired);
-        EXPECT_TRUE(diagnostics.TransferQueueAcquired);
+        expectRequiredQueuesFound();
+        expectRequiredQueuesAcquired();
         EXPECT_FALSE(diagnostics.MemoryAllocatorCreated);
         EXPECT_FALSE(diagnostics.PerFrameResourcesCreated);
         EXPECT_EQ(diagnostics.FrameCommandPoolCount, 0u);
@@ -254,12 +261,8 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
         EXPECT_TRUE(diagnostics.SurfaceCreated);
         EXPECT_TRUE(diagnostics.PhysicalDeviceSelected);
         EXPECT_TRUE(diagnostics.LogicalDeviceCreated);
-        EXPECT_TRUE(diagnostics.GraphicsQueueFound);
-        EXPECT_TRUE(diagnostics.PresentQueueFound);
-        EXPECT_TRUE(diagnostics.TransferQueueFound);
-        EXPECT_TRUE(diagnostics.GraphicsQueueAcquired);
-        EXPECT_TRUE(diagnostics.PresentQueueAcquired);
-        EXPECT_TRUE(diagnostics.TransferQueueAcquired);
+        expectRequiredQueuesFound();
+        expectRequiredQueuesAcquired();
         EXPECT_TRUE(diagnostics.MemoryAllocatorCreated);
         EXPECT_FALSE(diagnostics.PerFrameResourcesCreated);
         EXPECT_LE(diagnostics.FrameCommandPoolCount, expectedFramesInFlight);
@@ -278,12 +281,8 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
         EXPECT_TRUE(diagnostics.SurfaceCreated);
         EXPECT_TRUE(diagnostics.PhysicalDeviceSelected);
         EXPECT_TRUE(diagnostics.LogicalDeviceCreated);
-        EXPECT_TRUE(diagnostics.GraphicsQueueFound);
-        EXPECT_TRUE(diagnostics.PresentQueueFound);
-        EXPECT_TRUE(diagnostics.TransferQueueFound);
-        EXPECT_TRUE(diagnostics.GraphicsQueueAcquired);
-        EXPECT_TRUE(diagnostics.PresentQueueAcquired);
-        EXPECT_TRUE(diagnostics.TransferQueueAcquired);
+        expectRequiredQueuesFound();
+        expectRequiredQueuesAcquired();
         EXPECT_TRUE(diagnostics.MemoryAllocatorCreated);
         EXPECT_TRUE(diagnostics.PerFrameResourcesCreated);
         EXPECT_TRUE(diagnostics.SwapchainExtensionSupported);
@@ -782,4 +781,3 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
     device->Shutdown();
     EXPECT_FALSE(device->IsOperational());
 }
-

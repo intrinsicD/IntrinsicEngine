@@ -43,6 +43,7 @@ void VulkanCommandContext::Bind(VkDevice device, VkCommandBuffer cmd,
                                  Core::ResourcePool<VulkanPipeline, RHI::PipelineHandle, kMaxFramesInFlight>* pipelines,
                                  RHI::SamplerHandle defaultSampler,
                                  uint32_t graphicsQueueFamily,
+                                 uint32_t asyncComputeQueueFamily,
                                  uint32_t presentQueueFamily,
                                  uint32_t transferQueueFamily)
 {
@@ -56,6 +57,7 @@ void VulkanCommandContext::Bind(VkDevice device, VkCommandBuffer cmd,
     m_Pipelines     = pipelines;
     m_DefaultSampler = defaultSampler;
     m_GraphicsQueueFamily = graphicsQueueFamily;
+    m_AsyncComputeQueueFamily = asyncComputeQueueFamily;
     m_PresentQueueFamily  = presentQueueFamily;
     m_TransferQueueFamily = transferQueueFamily;
     m_BindPoint     = VK_PIPELINE_BIND_POINT_GRAPHICS;
@@ -551,17 +553,38 @@ void VulkanCommandContext::SubmitBarriers(const RHI::BarrierBatchDesc& batch)
     bufferBarriers.reserve(batch.BufferBarriers.size());
     memoryBarriers.reserve(batch.MemoryBarriers.size());
 
-    const auto resolveQueueFamily = [this](uint32_t requested) -> uint32_t
+    const VulkanQueueFamilyMap queueFamilyMap{
+        .Graphics = m_GraphicsQueueFamily,
+        .AsyncCompute = m_AsyncComputeQueueFamily,
+        .Transfer = m_TransferQueueFamily,
+        .Present = m_PresentQueueFamily,
+        .SupportsAsyncCompute = m_AsyncComputeQueueFamily != VK_QUEUE_FAMILY_IGNORED,
+        .SupportsTransfer = m_TransferQueueFamily != VK_QUEUE_FAMILY_IGNORED,
+    };
+
+    struct ResolvedOwnershipFamilies
     {
-        // Backend-neutral RHI traffic encodes "no ownership transfer" as
-        // VK_QUEUE_FAMILY_IGNORED; honor it as a passthrough. When the renderer
-        // asks for graphics/transfer/present ownership it does so via the same
-        // sentinel today, so the command context conservatively keeps the
-        // request as supplied. Concrete queue-family translation is reserved
-        // for future renderer/transfer integrations once IsOperational() can
-        // be true.
-        (void)this;
-        return requested;
+        std::uint32_t Source = VK_QUEUE_FAMILY_IGNORED;
+        std::uint32_t Destination = VK_QUEUE_FAMILY_IGNORED;
+    };
+
+    const auto resolveOwnershipFamilies =
+        [queueFamilyMap](const std::uint32_t source,
+                         const std::uint32_t destination) -> ResolvedOwnershipFamilies
+    {
+        const std::uint32_t resolvedSource = ResolveVulkanQueueFamilyToken(queueFamilyMap, source);
+        const std::uint32_t resolvedDestination = ResolveVulkanQueueFamilyToken(queueFamilyMap, destination);
+        if (resolvedSource == VK_QUEUE_FAMILY_IGNORED ||
+            resolvedDestination == VK_QUEUE_FAMILY_IGNORED ||
+            resolvedSource == resolvedDestination)
+        {
+            return {};
+        }
+
+        return ResolvedOwnershipFamilies{
+            .Source = resolvedSource,
+            .Destination = resolvedDestination,
+        };
     };
 
     for (const RHI::TextureBarrierDesc& desc : batch.TextureBarriers)
@@ -583,8 +606,10 @@ void VulkanCommandContext::SubmitBarriers(const RHI::BarrierBatchDesc& batch)
         barrier.dstAccessMask = ToVkAccess(desc.AfterAccess);
         barrier.oldLayout = ToVkImageLayout(desc.BeforeLayout);
         barrier.newLayout = ToVkImageLayout(desc.AfterLayout);
-        barrier.srcQueueFamilyIndex = resolveQueueFamily(desc.SrcQueueFamily);
-        barrier.dstQueueFamilyIndex = resolveQueueFamily(desc.DstQueueFamily);
+        const ResolvedOwnershipFamilies ownership =
+            resolveOwnershipFamilies(desc.SrcQueueFamily, desc.DstQueueFamily);
+        barrier.srcQueueFamilyIndex = ownership.Source;
+        barrier.dstQueueFamilyIndex = ownership.Destination;
         barrier.image = image->Image;
         barrier.subresourceRange = {AspectFromFormat(image->Format), 0, image->MipLevels, 0, image->ArrayLayers};
         imageBarriers.push_back(barrier);
@@ -609,8 +634,10 @@ void VulkanCommandContext::SubmitBarriers(const RHI::BarrierBatchDesc& batch)
         barrier.srcAccessMask = ToVkAccess(desc.BeforeAccess);
         barrier.dstStageMask = ToVkStage(desc.AfterAccess);
         barrier.dstAccessMask = ToVkAccess(desc.AfterAccess);
-        barrier.srcQueueFamilyIndex = resolveQueueFamily(desc.SrcQueueFamily);
-        barrier.dstQueueFamilyIndex = resolveQueueFamily(desc.DstQueueFamily);
+        const ResolvedOwnershipFamilies ownership =
+            resolveOwnershipFamilies(desc.SrcQueueFamily, desc.DstQueueFamily);
+        barrier.srcQueueFamilyIndex = ownership.Source;
+        barrier.dstQueueFamilyIndex = ownership.Destination;
         barrier.buffer = buffer->Buffer;
         barrier.offset = desc.Offset;
         barrier.size = desc.Size;

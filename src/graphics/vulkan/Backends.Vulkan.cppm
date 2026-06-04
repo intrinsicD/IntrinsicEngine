@@ -2,12 +2,14 @@ module;
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <string_view>
 
 export module Extrinsic.Backends.Vulkan;
 
 import Extrinsic.RHI.Device;
+import Extrinsic.RHI.QueueAffinity;
 
 // GRAPHICS-033C cleanup: the operational-status types are owned by the
 // `:OperationalStatus` partition so the `:Device` partition can name
@@ -18,6 +20,41 @@ export import :OperationalStatus;
 
 namespace Extrinsic::Backends::Vulkan
 {
+    export constexpr std::uint32_t kIgnoredVulkanQueueFamily =
+        std::numeric_limits<std::uint32_t>::max();
+
+    export struct VulkanQueueFamilyMap
+    {
+        std::uint32_t Graphics = kIgnoredVulkanQueueFamily;
+        std::uint32_t AsyncCompute = kIgnoredVulkanQueueFamily;
+        std::uint32_t Transfer = kIgnoredVulkanQueueFamily;
+        std::uint32_t Present = kIgnoredVulkanQueueFamily;
+        bool SupportsAsyncCompute = false;
+        bool SupportsTransfer = false;
+    };
+
+    export [[nodiscard]] constexpr std::uint32_t ResolveVulkanQueueFamilyToken(
+        const VulkanQueueFamilyMap map,
+        const std::uint32_t requested) noexcept
+    {
+        if (requested == kIgnoredVulkanQueueFamily)
+        {
+            return kIgnoredVulkanQueueFamily;
+        }
+
+        switch (static_cast<RHI::QueueAffinity>(requested))
+        {
+        case RHI::QueueAffinity::Graphics:
+            return map.Graphics;
+        case RHI::QueueAffinity::AsyncCompute:
+            return map.SupportsAsyncCompute ? map.AsyncCompute : map.Graphics;
+        case RHI::QueueAffinity::Transfer:
+            return map.SupportsTransfer ? map.Transfer : map.Graphics;
+        }
+
+        return requested;
+    }
+
     // Factory — creates the Vulkan backend IDevice.
     // Call once during engine initialization; the returned device owns all
     // Vulkan state.  Destroy it before the window is destroyed.
@@ -59,6 +96,7 @@ namespace Extrinsic::Backends::Vulkan
         std::uint32_t RequiredInstanceExtensionCount = 0;
         std::uint32_t PhysicalDeviceCount = 0;
         std::uint32_t GraphicsQueueFamily = 0;
+        std::uint32_t AsyncComputeQueueFamily = 0;
         std::uint32_t PresentQueueFamily = 0;
         std::uint32_t TransferQueueFamily = 0;
         std::uint32_t FrameCommandPoolCount = 0;
@@ -81,9 +119,12 @@ namespace Extrinsic::Backends::Vulkan
         bool PhysicalDeviceSelected = false;
         bool LogicalDeviceCreated = false;
         bool GraphicsQueueFound = false;
+        bool AsyncComputeQueueFound = false;
+        bool AsyncComputeQueueDedicated = false;
         bool PresentQueueFound = false;
         bool TransferQueueFound = false;
         bool GraphicsQueueAcquired = false;
+        bool AsyncComputeQueueAcquired = false;
         bool PresentQueueAcquired = false;
         bool TransferQueueAcquired = false;
         bool MemoryAllocatorCreated = false;
@@ -352,4 +393,3 @@ namespace Extrinsic::Backends::Vulkan
     // `import Extrinsic.Backends.Vulkan` see every operational symbol
     // verbatim.
 }
-

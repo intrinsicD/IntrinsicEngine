@@ -10,7 +10,7 @@ supports required Vulkan 1.2/1.3 features (`timelineSemaphore`, descriptor
 indexing update-after-bind/partially-bound, `bufferDeviceAddress`,
 `shaderInt64`, `scalarBlockLayout`, dynamic rendering, and
 `synchronization2`), creating a logical device with those features and `VK_KHR_swapchain`,
-loading device-level volk entry points, acquiring graphics/present/transfer `VkQueue` handles,
+loading device-level volk entry points, acquiring graphics/optional async-compute/present/transfer `VkQueue` handles,
 creating a VMA allocator, allocating per-frame command pools, primary command
 buffers, fences, and acquire/render semaphores, then creating a guarded swapchain
   with image views and backend-local `RHI::TextureHandle` registrations for the
@@ -47,8 +47,9 @@ available through the Vulkan 1.2/1.3 feature chain.
 - `GetVulkanBootstrapDiagnosticsSnapshot()` reports the most recent bootstrap
   attempt as backend-specific CPU diagnostics: status, last Vulkan result code,
   whether a native window/volk/validation/instance/surface/device probe was
-  reached, queue-family indices, swapchain extension/surface support, logical
-  device creation, graphics/present/transfer queue acquisition, VMA allocator
+  reached, queue-family indices, optional async-compute queue-family support,
+  swapchain extension/surface support, logical
+  device creation, graphics/async-compute/present/transfer queue acquisition, VMA allocator
   creation, per-frame command-pool/command-buffer/fence/semaphore counts, and
   swapchain creation/image enumeration/image-view/handle-registration counts and extent.
   It also reports whether required device features for later operational paths
@@ -200,13 +201,21 @@ available through the Vulkan 1.2/1.3 feature chain.
   diagnostic counter for those skips. It is not part of renderer branching;
   renderer/runtime code must still gate command recording on `IDevice::IsOperational()`.
   After service-ready bootstrap, `Bind()` additionally records the resolved
-  graphics/present/transfer queue family indices and rebinds the live frame
+  graphics/async-compute/present/transfer queue family indices and rebinds the live frame
   command buffer plus buffer/image/pipeline pools so per-frame `BeginFrame`
   routes the canonical render-graph executor through the live command buffer
   while the renderer brackets the entire executor invocation with one
   `Begin()`/`End()` pair. `TextureBarrier`/`SubmitBarriers` translate
   `RHI::TextureLayout`/`RHI::MemoryAccess` into `vkCmdPipelineBarrier2` records
-  and update each touched `VulkanImage::CurrentLayout` so subsequent
+  and translate `GRAPHICS-037C` queue-affinity ownership-transfer tokens into
+  concrete Vulkan queue-family indices. Same-family transfers collapse back to
+  `VK_QUEUE_FAMILY_IGNORED`, which preserves the single-family fallback path on
+  adapters that expose compute work through the graphics family. This is the
+  Vulkan-owned recording prerequisite for `GRAPHICS-037D`; real per-affinity
+  command buffers and timeline-semaphore submit waits/signals remain owned by
+  the active follow-up slices because the renderer/RHI seam still exposes only
+  the graphics command context. Barriers also update each touched
+  `VulkanImage::CurrentLayout` so subsequent
   uploads/barriers in the same frame observe the most recent recorded layout.
 - `VulkanDevice::CreateBuffer` and `VulkanDevice::CreateTexture` declare
   `VK_SHARING_MODE_CONCURRENT` with the unique graphics/transfer queue-family

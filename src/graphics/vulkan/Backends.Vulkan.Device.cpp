@@ -67,11 +67,21 @@ namespace
     struct QueueFamilyProbe
     {
         std::uint32_t Graphics = 0;
+        std::uint32_t AsyncCompute = 0;
+        std::uint32_t AsyncComputeQueueIndex = 0;
         std::uint32_t Present = 0;
         std::uint32_t Transfer = 0;
         bool GraphicsFound = false;
+        bool AsyncComputeFound = false;
+        bool AsyncComputeDedicated = false;
         bool PresentFound = false;
         bool TransferFound = false;
+    };
+
+    struct QueueFamilyCreateRequest
+    {
+        std::uint32_t Family = 0;
+        std::uint32_t QueueCount = 1;
     };
 
     struct RequiredDeviceFeatureProbe
@@ -222,12 +232,33 @@ namespace
                 probe.Transfer = index;
                 probe.TransferFound = true;
             }
+
+            if (!probe.AsyncComputeFound &&
+                (family.queueFlags & VK_QUEUE_COMPUTE_BIT) != 0 &&
+                (family.queueFlags & VK_QUEUE_GRAPHICS_BIT) == 0)
+            {
+                probe.AsyncCompute = index;
+                probe.AsyncComputeQueueIndex = 0;
+                probe.AsyncComputeFound = true;
+                probe.AsyncComputeDedicated = true;
+            }
         }
 
         if (!probe.TransferFound && probe.GraphicsFound)
         {
             probe.Transfer = probe.Graphics;
             probe.TransferFound = true;
+        }
+
+        if (!probe.AsyncComputeFound && probe.GraphicsFound &&
+            probe.Graphics < families.size() &&
+            (families[probe.Graphics].queueFlags & VK_QUEUE_COMPUTE_BIT) != 0 &&
+            families[probe.Graphics].queueCount > 1u)
+        {
+            probe.AsyncCompute = probe.Graphics;
+            probe.AsyncComputeQueueIndex = 1u;
+            probe.AsyncComputeFound = true;
+            probe.AsyncComputeDedicated = false;
         }
 
         return probe;
@@ -346,26 +377,37 @@ namespace
         };
     }
 
-    [[nodiscard]] std::vector<std::uint32_t> UniqueQueueFamilies(const QueueFamilyProbe& queueProbe)
+    [[nodiscard]] std::vector<QueueFamilyCreateRequest> UniqueQueueFamilyCreateRequests(
+        const QueueFamilyProbe& queueProbe)
     {
-        std::vector<std::uint32_t> families;
-        const auto addUnique = [&families](const std::uint32_t family)
+        std::vector<QueueFamilyCreateRequest> requests;
+        const auto addRequest = [&requests](const std::uint32_t family,
+                                            const std::uint32_t queueCount)
         {
-            for (const std::uint32_t existing : families)
+            const std::uint32_t requiredQueueCount = std::max(1u, queueCount);
+            for (QueueFamilyCreateRequest& existing : requests)
             {
-                if (existing == family)
+                if (existing.Family == family)
+                {
+                    existing.QueueCount = std::max(existing.QueueCount, requiredQueueCount);
                     return;
+                }
             }
-            families.push_back(family);
+            requests.push_back(QueueFamilyCreateRequest{
+                .Family = family,
+                .QueueCount = requiredQueueCount,
+            });
         };
 
         if (queueProbe.GraphicsFound)
-            addUnique(queueProbe.Graphics);
+            addRequest(queueProbe.Graphics, 1u);
+        if (queueProbe.AsyncComputeFound)
+            addRequest(queueProbe.AsyncCompute, queueProbe.AsyncComputeQueueIndex + 1u);
         if (queueProbe.PresentFound)
-            addUnique(queueProbe.Present);
+            addRequest(queueProbe.Present, 1u);
         if (queueProbe.TransferFound)
-            addUnique(queueProbe.Transfer);
-        return families;
+            addRequest(queueProbe.Transfer, 1u);
+        return requests;
     }
 
     [[nodiscard]] VkResult CreateBootstrapLogicalDevice(VkPhysicalDevice physicalDevice,
@@ -381,20 +423,27 @@ namespace
         if (outSamplerAnisotropySupported != nullptr)
             *outSamplerAnisotropySupported = false;
 
-        const std::vector<std::uint32_t> uniqueFamilies = UniqueQueueFamilies(queueProbe);
-        if (uniqueFamilies.empty())
+        const std::vector<QueueFamilyCreateRequest> queueRequests =
+            UniqueQueueFamilyCreateRequests(queueProbe);
+        if (queueRequests.empty())
             return VK_ERROR_INITIALIZATION_FAILED;
 
         constexpr float kQueuePriority = 1.0f;
         std::vector<VkDeviceQueueCreateInfo> queueInfos;
-        queueInfos.reserve(uniqueFamilies.size());
-        for (const std::uint32_t family : uniqueFamilies)
+        std::vector<std::array<float, 4u>> queuePriorities;
+        queueInfos.reserve(queueRequests.size());
+        queuePriorities.resize(queueRequests.size());
+        for (std::size_t requestIndex = 0; requestIndex < queueRequests.size(); ++requestIndex)
         {
+            const QueueFamilyCreateRequest& request = queueRequests[requestIndex];
+            queuePriorities[requestIndex].fill(kQueuePriority);
             VkDeviceQueueCreateInfo queueInfo{};
             queueInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-            queueInfo.queueFamilyIndex = family;
-            queueInfo.queueCount = 1;
-            queueInfo.pQueuePriorities = &kQueuePriority;
+            queueInfo.queueFamilyIndex = request.Family;
+            queueInfo.queueCount = std::min<std::uint32_t>(
+                request.QueueCount,
+                static_cast<std::uint32_t>(queuePriorities[requestIndex].size()));
+            queueInfo.pQueuePriorities = queuePriorities[requestIndex].data();
             queueInfos.push_back(queueInfo);
         }
 
@@ -1454,15 +1503,20 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
 
         m_PhysDevice = physicalDevice;
         m_GraphicsFamily = queueProbe.Graphics;
+        m_AsyncComputeFamily = queueProbe.AsyncCompute;
+        m_AsyncComputeQueueIndex = queueProbe.AsyncComputeQueueIndex;
         m_PresentFamily = queueProbe.Present;
         m_TransferFamily = queueProbe.Transfer;
 
         diagnostics.Status = VulkanBootstrapStatus::ProbedPhysicalDevice;
         diagnostics.PhysicalDeviceSelected = true;
         diagnostics.GraphicsQueueFound = queueProbe.GraphicsFound;
+        diagnostics.AsyncComputeQueueFound = queueProbe.AsyncComputeFound;
+        diagnostics.AsyncComputeQueueDedicated = queueProbe.AsyncComputeDedicated;
         diagnostics.PresentQueueFound = queueProbe.PresentFound;
         diagnostics.TransferQueueFound = queueProbe.TransferFound;
         diagnostics.GraphicsQueueFamily = queueProbe.Graphics;
+        diagnostics.AsyncComputeQueueFamily = queueProbe.AsyncCompute;
         diagnostics.PresentQueueFamily = queueProbe.Present;
         diagnostics.TransferQueueFamily = queueProbe.Transfer;
         diagnostics.SwapchainExtensionSupported = swapchainExtensionSupported;
@@ -1496,14 +1550,24 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
         diagnostics.BufferDeviceAddressEnabled = true;
 
         vkGetDeviceQueue(m_Device, m_GraphicsFamily, 0, &m_GraphicsQueue);
+        if (queueProbe.AsyncComputeFound)
+        {
+            vkGetDeviceQueue(m_Device,
+                             m_AsyncComputeFamily,
+                             m_AsyncComputeQueueIndex,
+                             &m_AsyncComputeQueue);
+        }
         vkGetDeviceQueue(m_Device, m_PresentFamily, 0, &m_PresentQueue);
         vkGetDeviceQueue(m_Device, m_TransferFamily, 0, &m_TransferVkQueue);
 
         diagnostics.GraphicsQueueAcquired = m_GraphicsQueue != VK_NULL_HANDLE;
+        diagnostics.AsyncComputeQueueAcquired =
+            queueProbe.AsyncComputeFound && m_AsyncComputeQueue != VK_NULL_HANDLE;
         diagnostics.PresentQueueAcquired = m_PresentQueue != VK_NULL_HANDLE;
         diagnostics.TransferQueueAcquired = m_TransferVkQueue != VK_NULL_HANDLE;
         if (!diagnostics.GraphicsQueueAcquired || !diagnostics.PresentQueueAcquired ||
-            !diagnostics.TransferQueueAcquired)
+            !diagnostics.TransferQueueAcquired ||
+            (queueProbe.AsyncComputeFound && !diagnostics.AsyncComputeQueueAcquired))
         {
             Core::Log::Error("[VulkanDevice::Initialize] vkGetDeviceQueue did not return all required queues; promoted Vulkan device remains non-operational.");
             fail(VulkanBootstrapStatus::FailedLogicalDeviceCreation, VK_ERROR_INITIALIZATION_FAILED);
@@ -1614,6 +1678,9 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
                                           &m_Pipelines,
                                           m_DefaultSamplerHandle,
                                           m_GraphicsFamily,
+                                          m_AsyncComputeQueue != VK_NULL_HANDLE
+                                              ? m_AsyncComputeFamily
+                                              : VK_QUEUE_FAMILY_IGNORED,
                                           m_PresentFamily,
                                           m_TransferFamily);
         }
@@ -1982,6 +2049,9 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
                                           &m_Pipelines,
                                           m_DefaultSamplerHandle,
                                           m_GraphicsFamily,
+                                          m_AsyncComputeQueue != VK_NULL_HANDLE
+                                              ? m_AsyncComputeFamily
+                                              : VK_QUEUE_FAMILY_IGNORED,
                                           m_PresentFamily,
                                           m_TransferFamily);
             ++serviceDiagnostics.CommandContextRebindCount;
@@ -2158,9 +2228,12 @@ void VulkanDevice::Shutdown()
         vkDestroyDevice(m_Device, nullptr);
     m_Device = VK_NULL_HANDLE;
     m_GraphicsQueue = VK_NULL_HANDLE;
+    m_AsyncComputeQueue = VK_NULL_HANDLE;
     m_PresentQueue = VK_NULL_HANDLE;
     m_TransferVkQueue = VK_NULL_HANDLE;
     m_GraphicsFamily = 0;
+    m_AsyncComputeFamily = 0;
+    m_AsyncComputeQueueIndex = 0;
     m_PresentFamily = 0;
     m_TransferFamily = 0;
 
@@ -2350,6 +2423,9 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
                                     &m_Pipelines,
                                     m_DefaultSamplerHandle,
                                     m_GraphicsFamily,
+                                    m_AsyncComputeQueue != VK_NULL_HANDLE
+                                        ? m_AsyncComputeFamily
+                                        : VK_QUEUE_FAMILY_IGNORED,
                                     m_PresentFamily,
                                     m_TransferFamily);
 

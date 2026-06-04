@@ -220,10 +220,13 @@ namespace Extrinsic::Backends::Vulkan
         VkDevice                 m_Device         = VK_NULL_HANDLE;
         VmaAllocator             m_Vma            = VK_NULL_HANDLE;
 
-        VkQueue  m_GraphicsQueue    = VK_NULL_HANDLE;
-        VkQueue  m_PresentQueue     = VK_NULL_HANDLE;
-        VkQueue  m_TransferVkQueue  = VK_NULL_HANDLE;
+        VkQueue  m_GraphicsQueue     = VK_NULL_HANDLE;
+        VkQueue  m_AsyncComputeQueue = VK_NULL_HANDLE;
+        VkQueue  m_PresentQueue      = VK_NULL_HANDLE;
+        VkQueue  m_TransferVkQueue   = VK_NULL_HANDLE;
         uint32_t m_GraphicsFamily = 0;
+        uint32_t m_AsyncComputeFamily = 0;
+        uint32_t m_AsyncComputeQueueIndex = 0;
         uint32_t m_PresentFamily  = 0;
         uint32_t m_TransferFamily = 0;
         std::mutex m_QueueMutex;
@@ -276,4 +279,3 @@ namespace Extrinsic::Backends::Vulkan
         bool             m_SamplerAnisotropySupported = false;
     };
 }
-

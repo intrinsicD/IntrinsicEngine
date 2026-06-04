@@ -33,6 +33,7 @@ namespace Extrinsic::Backends::Vulkan
                   Core::ResourcePool<VulkanPipeline, RHI::PipelineHandle, kMaxFramesInFlight>* pipelines,
                   RHI::SamplerHandle defaultSampler,
                   uint32_t graphicsQueueFamily = VK_QUEUE_FAMILY_IGNORED,
+                  uint32_t asyncComputeQueueFamily = VK_QUEUE_FAMILY_IGNORED,
                   uint32_t presentQueueFamily  = VK_QUEUE_FAMILY_IGNORED,
                   uint32_t transferQueueFamily = VK_QUEUE_FAMILY_IGNORED);
 
@@ -124,8 +125,8 @@ namespace Extrinsic::Backends::Vulkan
         Core::ResourcePool<VulkanPipeline, RHI::PipelineHandle, kMaxFramesInFlight>* m_Pipelines = nullptr;
         RHI::SamplerHandle m_DefaultSampler{};
         uint32_t         m_GraphicsQueueFamily = VK_QUEUE_FAMILY_IGNORED;
+        uint32_t         m_AsyncComputeQueueFamily = VK_QUEUE_FAMILY_IGNORED;
         uint32_t         m_PresentQueueFamily  = VK_QUEUE_FAMILY_IGNORED;
         uint32_t         m_TransferQueueFamily = VK_QUEUE_FAMILY_IGNORED;
     };
 }
-
