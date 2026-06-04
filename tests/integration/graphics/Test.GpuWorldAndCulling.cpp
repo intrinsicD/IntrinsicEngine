@@ -51,7 +51,9 @@ static_assert(sizeof(RHI::GpuDrawIndexedCommand) == 20);
 static_assert(sizeof(RHI::GpuDrawCommand) == 16);
 static_assert(sizeof(RHI::GpuCullBucketOutput) == 24);
 static_assert(alignof(RHI::GpuCullBucketOutput) == 8);
-static_assert(sizeof(RHI::GpuCullBucketTable) == 192);
+static_assert(sizeof(RHI::GpuCullBucketDiagnosticsCounters) == 16);
+static_assert(sizeof(RHI::GpuCullBucketPhases) == 64);
+static_assert(sizeof(RHI::GpuCullBucketTable) == 512);
 static_assert(alignof(RHI::GpuCullBucketTable) == 8);
 
 TEST(GraphicsGpuWorld, Smoke_AllocateUploadSyncShutdown)

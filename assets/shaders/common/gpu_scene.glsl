@@ -18,6 +18,8 @@ const uint GpuRender_FlatShading = 1u << 8;
 const uint GpuRender_Selectable  = 1u << 9;
 const uint GpuRender_Visible     = 1u << 31;
 const uint GpuInvalidGeometrySlot = 0xFFFFFFFFu;
+const uint GpuCullPhase_Phase1 = 0u;
+const uint GpuCullPhase_Phase2 = 1u;
 
 struct GpuSceneTable {
     uint64_t InstanceStaticBDA;
@@ -153,15 +155,34 @@ struct GpuCullBucketOutput {
     uint _pad0;
 };
 
+struct GpuCullBucketDiagnosticsCounters {
+    uint Phase1VisibleCount;
+    uint Phase1RejectedCount;
+    uint Phase2RescuedCount;
+    uint _pad0;
+};
+
+struct GpuCullBucketDiagnosticsOutput {
+    uint64_t CountersBDA;
+    uint _pad0;
+    uint _pad1;
+};
+
+struct GpuCullBucketPhases {
+    GpuCullBucketOutput Phase1;
+    GpuCullBucketOutput Phase2;
+    GpuCullBucketDiagnosticsOutput Diagnostics;
+};
+
 struct GpuCullBucketTable {
-    GpuCullBucketOutput SurfaceOpaque;
-    GpuCullBucketOutput SurfaceAlphaMask;
-    GpuCullBucketOutput Lines;
-    GpuCullBucketOutput Points;
-    GpuCullBucketOutput ShadowOpaque;
-    GpuCullBucketOutput SelectionSurface;
-    GpuCullBucketOutput SelectionLines;
-    GpuCullBucketOutput SelectionPoints;
+    GpuCullBucketPhases SurfaceOpaque;
+    GpuCullBucketPhases SurfaceAlphaMask;
+    GpuCullBucketPhases Lines;
+    GpuCullBucketPhases Points;
+    GpuCullBucketPhases ShadowOpaque;
+    GpuCullBucketPhases SelectionSurface;
+    GpuCullBucketPhases SelectionLines;
+    GpuCullBucketPhases SelectionPoints;
 };
 
 layout(buffer_reference, scalar) readonly buffer GpuSceneTableRef {

@@ -11,9 +11,21 @@ Each active task should include:
 
 ## Currently active
 
-No active tasks are currently listed.
+No active task is currently promoted.
 
 The most recently retired tasks are summarised below.
+
+Previously-active
+[`GRAPHICS-038C`](../done/GRAPHICS-038C-two-phase-cull-shader.md) —
+phase-1/phase-2 cull shader extension and per-bucket buffer doubling retired
+to `tasks/done/` on 2026-06-04 at maturity `CPUContracted`. The slice added the
+`GpuCullBucketPhases` ABI, phase-1/phase-2 indirect output surfaces per bucket,
+diagnostics counters, shader phase-output selection, renderer reset/table/barrier
+wiring for both phases, `GetBucketPhase(kind, phase)`, deterministic CPU
+visible/rejected/rescued partition coverage, and rendering docs sync. The
+camera-transition/selection exemption remains `GRAPHICS-038D`; concrete Vulkan
+HZB reject-list publication, phase-2 recull, and opt-in `gpu;vulkan`
+conservatism proof remain `GRAPHICS-038E`.
 
 Previously-active
 [`GRAPHICS-038B`](../done/GRAPHICS-038B-hzb-build-compute.md) — HZB build

@@ -309,6 +309,23 @@ Concretely:
   to a storage-image descriptor and opt-in `gpu;vulkan` conservatism proof remain
   `GRAPHICS-038E` scope. This HZB build slice closes at `CPUContracted`; the
   cull-shader extension and camera-transition heuristic are `GRAPHICS-038C/D`.
+- GRAPHICS-038C extends the culling contract without renumbering the eight
+  `RHI::GpuDrawBucketKind` lanes. Each bucket now exposes phase-1 and phase-2
+  arg/count buffers through `GpuDrawBucket::Phase1` / `Phase2`; the legacy
+  `GetBucket(kind)` fields continue to alias phase 1 so existing draw passes
+  remain behavior-preserving. `RHI::GpuCullBucketTable` mirrors this as
+  `GpuCullBucketPhases { Phase1, Phase2, Diagnostics }` per bucket, and each
+  bucket owns one `GpuCullBucketDiagnosticsCounters` storage buffer with
+  `Phase1VisibleCount`, `Phase1RejectedCount`, and `Phase2RescuedCount`.
+  `CullingPass` resets both phase count buffers and the diagnostics buffer,
+  publishes the expanded table, dispatches the phase-1 cull shader, then
+  barriers both phases plus diagnostics. The CPU/null contract also pins
+  `ComputeTwoPhaseCullPartition(...)`: a candidate is rejected only when its
+  nearest depth is strictly greater than the sampled conservative HZB max-depth,
+  preserving the no-false-rejection invariant under standard-Z `Less`.
+  This slice closes at `CPUContracted`; camera-transition skipping and
+  selection-bucket exemption are `GRAPHICS-038D`, and concrete Vulkan
+  reject-list publication / phase-2 HZB recull proof remains `GRAPHICS-038E`.
 - GRAPHICS-072 Slice A wires the default-recipe deferred-mode `"SurfacePass"`
   to the existing `DeferredGBufferPass` body. `NullRenderer` owns
   `m_DeferredGBufferPass` (constructed against `m_DeferredSystem`) and the

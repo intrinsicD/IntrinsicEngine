@@ -4,6 +4,7 @@ module;
 #include <cassert>
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -26,11 +27,59 @@ namespace Extrinsic::Graphics
 {
     static constexpr std::uint32_t kInitialCapacity = 1024;
 
+    bool HZBRejectsNearestDepth(const CullingHZBDepthSample sample) noexcept
+    {
+        return sample.Valid && sample.NearestDepth > sample.ConservativeMaxDepth;
+    }
+
+    CullingTwoPhasePartition ComputeTwoPhaseCullPartition(
+        std::span<const CullingTwoPhaseCandidate> candidates)
+    {
+        CullingTwoPhasePartition partition{};
+        partition.Decisions.reserve(candidates.size());
+        for (const CullingTwoPhaseCandidate& candidate : candidates)
+        {
+            if (!candidate.FrustumVisible ||
+                candidate.Bucket == RHI::GpuDrawBucketKind::Count)
+            {
+                partition.Decisions.push_back(CullingTwoPhaseDecision::FrustumRejected);
+                ++partition.FrustumRejectedCount;
+                continue;
+            }
+
+            CullingTwoPhaseBucketCounters& counters =
+                partition.Buckets[static_cast<std::size_t>(candidate.Bucket)];
+            if (!HZBRejectsNearestDepth(candidate.PreviousFrameHZB))
+            {
+                ++counters.Phase1VisibleCount;
+                partition.Decisions.push_back(CullingTwoPhaseDecision::Phase1Visible);
+                continue;
+            }
+
+            ++counters.Phase1RejectedCount;
+            if (!HZBRejectsNearestDepth(candidate.CurrentFrameHZB))
+            {
+                ++counters.Phase2RescuedCount;
+                partition.Decisions.push_back(CullingTwoPhaseDecision::Phase2Rescued);
+            }
+            else
+            {
+                partition.Decisions.push_back(CullingTwoPhaseDecision::Phase2Rejected);
+            }
+        }
+        return partition;
+    }
+
     namespace
     {
         constexpr std::size_t ToIndex(const RHI::GpuDrawBucketKind kind) noexcept
         {
             return static_cast<std::size_t>(kind);
+        }
+
+        constexpr std::size_t ToIndex(const CullingPhase phase) noexcept
+        {
+            return static_cast<std::size_t>(phase);
         }
 
         void ExtractFrustumPlanes(const glm::mat4& vp, glm::vec4 planes[6]) noexcept
@@ -48,6 +97,31 @@ namespace Extrinsic::Graphics
             planes[4] = r2;
             planes[5] = r3 - r2;
         }
+
+        [[nodiscard]] constexpr GpuDrawBucketPhase MakePublicPhase(const RHI::BufferHandle args,
+                                                                    const RHI::BufferHandle count,
+                                                                    const bool indexed,
+                                                                    const std::uint32_t capacity) noexcept
+        {
+            return GpuDrawBucketPhase{
+                .IndexedArgsBuffer = indexed ? args : RHI::BufferHandle{},
+                .NonIndexedArgsBuffer = indexed ? RHI::BufferHandle{} : args,
+                .CountBuffer = count,
+                .Capacity = capacity,
+                .Indexed = indexed,
+            };
+        }
+
+        [[nodiscard]] constexpr RHI::GpuCullBucketOutput MakeShaderPhase(const std::uint64_t argsBda,
+                                                                         const std::uint64_t countBda,
+                                                                         const std::uint32_t capacity) noexcept
+        {
+            return RHI::GpuCullBucketOutput{
+                .ArgsBDA = argsBda,
+                .CountBDA = countBda,
+                .Capacity = capacity,
+            };
+        }
     }
 
     struct CullSlot
@@ -60,13 +134,20 @@ namespace Extrinsic::Graphics
 
     struct BucketStorage
     {
+        struct PhaseStorage
+        {
+            RHI::BufferManager::BufferLease ArgsLease{};
+            RHI::BufferManager::BufferLease CountLease{};
+            std::uint64_t ArgsBDA = 0;
+            std::uint64_t CountBDA = 0;
+        };
+
         GpuDrawBucket Bucket{};
-        RHI::BufferManager::BufferLease IndexedArgsLease{};
-        RHI::BufferManager::BufferLease NonIndexedArgsLease{};
-        RHI::BufferManager::BufferLease CountLease{};
-        std::uint64_t IndexedArgsBDA = 0;
-        std::uint64_t NonIndexedArgsBDA = 0;
-        std::uint64_t CountBDA = 0;
+        std::array<PhaseStorage, static_cast<std::size_t>(RHI::GpuCullPhase::Count)> Phases{};
+        RHI::BufferManager::BufferLease DiagnosticsLease{};
+        std::uint64_t DiagnosticsBDA = 0;
+        bool Indexed = true;
+        std::uint32_t Capacity = 0;
     };
 
     struct CullingSystem::Impl
@@ -92,39 +173,61 @@ namespace Extrinsic::Graphics
             const std::uint64_t indexedArgsBytes = capacity * sizeof(RHI::GpuDrawIndexedCommand);
             const std::uint64_t pointArgsBytes   = capacity * sizeof(RHI::GpuDrawCommand);
             const std::uint64_t countBytes       = sizeof(std::uint32_t);
-
-            auto argsOr = BufferMgr->Create({
-                .SizeBytes   = indexed ? indexedArgsBytes : pointArgsBytes,
-                .Usage       = RHI::BufferUsage::Storage | RHI::BufferUsage::Indirect | RHI::BufferUsage::TransferDst,
-                .HostVisible = false,
-                .DebugName   = indexed ? "CullBucketIndexedArgs" : "CullBucketPointArgs",
-            });
-            if (!argsOr.has_value()) return false;
-
-            auto countOr = BufferMgr->Create({
-                .SizeBytes   = countBytes,
-                .Usage       = RHI::BufferUsage::Storage | RHI::BufferUsage::Indirect | RHI::BufferUsage::TransferDst,
-                .HostVisible = false,
-                .DebugName   = "CullBucketCount",
-            });
-            if (!countOr.has_value()) return false;
-
-            if (indexed)
+            const auto allocatePhase = [&](const CullingPhase phase) -> bool
             {
-                bucket.IndexedArgsLease = std::move(*argsOr);
-                bucket.Bucket.IndexedArgsBuffer = bucket.IndexedArgsLease.GetHandle();
-                bucket.IndexedArgsBDA = Device->GetBufferDeviceAddress(bucket.Bucket.IndexedArgsBuffer);
-            }
-            else
+                auto argsOr = BufferMgr->Create({
+                    .SizeBytes   = indexed ? indexedArgsBytes : pointArgsBytes,
+                    .Usage       = RHI::BufferUsage::Storage | RHI::BufferUsage::Indirect | RHI::BufferUsage::TransferDst,
+                    .HostVisible = false,
+                    .DebugName   = indexed ? "CullBucketIndexedArgs.Phase" : "CullBucketPointArgs.Phase",
+                });
+                if (!argsOr.has_value()) return false;
+
+                auto countOr = BufferMgr->Create({
+                    .SizeBytes   = countBytes,
+                    .Usage       = RHI::BufferUsage::Storage | RHI::BufferUsage::Indirect | RHI::BufferUsage::TransferDst,
+                    .HostVisible = false,
+                    .DebugName   = "CullBucketCount.Phase",
+                });
+                if (!countOr.has_value()) return false;
+
+                auto& phaseStorage = bucket.Phases[ToIndex(phase)];
+                phaseStorage.ArgsLease = std::move(*argsOr);
+                phaseStorage.CountLease = std::move(*countOr);
+                phaseStorage.ArgsBDA = Device->GetBufferDeviceAddress(phaseStorage.ArgsLease.GetHandle());
+                phaseStorage.CountBDA = Device->GetBufferDeviceAddress(phaseStorage.CountLease.GetHandle());
+                return true;
+            };
+
+            if (!allocatePhase(CullingPhase::Phase1) || !allocatePhase(CullingPhase::Phase2))
             {
-                bucket.NonIndexedArgsLease = std::move(*argsOr);
-                bucket.Bucket.NonIndexedArgsBuffer = bucket.NonIndexedArgsLease.GetHandle();
-                bucket.NonIndexedArgsBDA = Device->GetBufferDeviceAddress(bucket.Bucket.NonIndexedArgsBuffer);
+                return false;
             }
 
-            bucket.CountLease = std::move(*countOr);
-            bucket.Bucket.CountBuffer = bucket.CountLease.GetHandle();
-            bucket.CountBDA = Device->GetBufferDeviceAddress(bucket.Bucket.CountBuffer);
+            auto diagnosticsOr = BufferMgr->Create({
+                .SizeBytes = sizeof(RHI::GpuCullBucketDiagnosticsCounters),
+                .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst,
+                .HostVisible = false,
+                .DebugName = "CullBucketDiagnostics",
+            });
+            if (!diagnosticsOr.has_value()) return false;
+
+            bucket.DiagnosticsLease = std::move(*diagnosticsOr);
+            bucket.DiagnosticsBDA = Device->GetBufferDeviceAddress(bucket.DiagnosticsLease.GetHandle());
+            bucket.Indexed = indexed;
+            bucket.Capacity = capacity;
+            bucket.Bucket.Phase1 = MakePublicPhase(bucket.Phases[ToIndex(CullingPhase::Phase1)].ArgsLease.GetHandle(),
+                                                   bucket.Phases[ToIndex(CullingPhase::Phase1)].CountLease.GetHandle(),
+                                                   indexed,
+                                                   capacity);
+            bucket.Bucket.Phase2 = MakePublicPhase(bucket.Phases[ToIndex(CullingPhase::Phase2)].ArgsLease.GetHandle(),
+                                                   bucket.Phases[ToIndex(CullingPhase::Phase2)].CountLease.GetHandle(),
+                                                   indexed,
+                                                   capacity);
+            bucket.Bucket.IndexedArgsBuffer = bucket.Bucket.Phase1.IndexedArgsBuffer;
+            bucket.Bucket.NonIndexedArgsBuffer = bucket.Bucket.Phase1.NonIndexedArgsBuffer;
+            bucket.Bucket.CountBuffer = bucket.Bucket.Phase1.CountBuffer;
+            bucket.Bucket.DiagnosticsBuffer = bucket.DiagnosticsLease.GetHandle();
             bucket.Bucket.Capacity = capacity;
             bucket.Bucket.Indexed = indexed;
             return true;
@@ -215,12 +318,17 @@ namespace Extrinsic::Graphics
         for (auto& bucket : m_Impl->Buckets)
         {
             bucket.Bucket = {};
-            bucket.IndexedArgsLease = {};
-            bucket.NonIndexedArgsLease = {};
-            bucket.CountLease = {};
-            bucket.IndexedArgsBDA = 0;
-            bucket.NonIndexedArgsBDA = 0;
-            bucket.CountBDA = 0;
+            for (auto& phase : bucket.Phases)
+            {
+                phase.ArgsLease = {};
+                phase.CountLease = {};
+                phase.ArgsBDA = 0;
+                phase.CountBDA = 0;
+            }
+            bucket.DiagnosticsLease = {};
+            bucket.DiagnosticsBDA = 0;
+            bucket.Indexed = true;
+            bucket.Capacity = 0;
         }
         m_Impl->CullBucketTableLease = {};
         m_Impl->CullBucketTableBDA = 0;
@@ -296,8 +404,17 @@ namespace Extrinsic::Graphics
     {
         for (auto& bucket : m_Impl->Buckets)
         {
-            cmd.FillBuffer(bucket.Bucket.CountBuffer, 0, sizeof(std::uint32_t), 0);
-            cmd.BufferBarrier(bucket.Bucket.CountBuffer,
+            for (const auto& phase : bucket.Phases)
+            {
+                const RHI::BufferHandle count = phase.CountLease.GetHandle();
+                cmd.FillBuffer(count, 0, sizeof(std::uint32_t), 0);
+                cmd.BufferBarrier(count,
+                                  RHI::MemoryAccess::TransferWrite,
+                                  RHI::MemoryAccess::ShaderWrite);
+            }
+            const RHI::BufferHandle diagnostics = bucket.DiagnosticsLease.GetHandle();
+            cmd.FillBuffer(diagnostics, 0, sizeof(RHI::GpuCullBucketDiagnosticsCounters), 0);
+            cmd.BufferBarrier(diagnostics,
                               RHI::MemoryAccess::TransferWrite,
                               RHI::MemoryAccess::ShaderWrite);
         }
@@ -334,6 +451,17 @@ namespace Extrinsic::Graphics
         pc.SceneTableBDA = gpuWorld.GetSceneTableBDA();
         pc.CullBucketTableBDA = m_Impl->CullBucketTableBDA;
 
+        const auto makeBucketPhases = [](const BucketStorage& bucket) -> RHI::GpuCullBucketPhases
+        {
+            const auto& phase1 = bucket.Phases[ToIndex(CullingPhase::Phase1)];
+            const auto& phase2 = bucket.Phases[ToIndex(CullingPhase::Phase2)];
+            return RHI::GpuCullBucketPhases{
+                .Phase1 = MakeShaderPhase(phase1.ArgsBDA, phase1.CountBDA, bucket.Capacity),
+                .Phase2 = MakeShaderPhase(phase2.ArgsBDA, phase2.CountBDA, bucket.Capacity),
+                .Diagnostics = RHI::GpuCullBucketDiagnosticsOutput{.CountersBDA = bucket.DiagnosticsBDA},
+            };
+        };
+
         const auto& surface = m_Impl->Buckets[ToIndex(RHI::GpuDrawBucketKind::SurfaceOpaque)];
         const auto& alpha   = m_Impl->Buckets[ToIndex(RHI::GpuDrawBucketKind::SurfaceAlphaMask)];
         const auto& lines   = m_Impl->Buckets[ToIndex(RHI::GpuDrawBucketKind::Lines)];
@@ -344,32 +472,17 @@ namespace Extrinsic::Graphics
         const auto& selectionPoints  = m_Impl->Buckets[ToIndex(RHI::GpuDrawBucketKind::SelectionPoints)];
 
         pc.InstanceCapacity = gpuWorld.GetInstanceCapacity();
+        pc.CullPhase = static_cast<std::uint32_t>(RHI::GpuCullPhase::Phase1);
 
         RHI::GpuCullBucketTable bucketTable{};
-        bucketTable.SurfaceOpaque.ArgsBDA = surface.IndexedArgsBDA;
-        bucketTable.SurfaceOpaque.CountBDA = surface.CountBDA;
-        bucketTable.SurfaceOpaque.Capacity = surface.Bucket.Capacity;
-        bucketTable.SurfaceAlphaMask.ArgsBDA = alpha.IndexedArgsBDA;
-        bucketTable.SurfaceAlphaMask.CountBDA = alpha.CountBDA;
-        bucketTable.SurfaceAlphaMask.Capacity = alpha.Bucket.Capacity;
-        bucketTable.Lines.ArgsBDA = lines.IndexedArgsBDA;
-        bucketTable.Lines.CountBDA = lines.CountBDA;
-        bucketTable.Lines.Capacity = lines.Bucket.Capacity;
-        bucketTable.Points.ArgsBDA = points.NonIndexedArgsBDA;
-        bucketTable.Points.CountBDA = points.CountBDA;
-        bucketTable.Points.Capacity = points.Bucket.Capacity;
-        bucketTable.ShadowOpaque.ArgsBDA = shadow.IndexedArgsBDA;
-        bucketTable.ShadowOpaque.CountBDA = shadow.CountBDA;
-        bucketTable.ShadowOpaque.Capacity = shadow.Bucket.Capacity;
-        bucketTable.SelectionSurface.ArgsBDA = selectionSurface.IndexedArgsBDA;
-        bucketTable.SelectionSurface.CountBDA = selectionSurface.CountBDA;
-        bucketTable.SelectionSurface.Capacity = selectionSurface.Bucket.Capacity;
-        bucketTable.SelectionLines.ArgsBDA = selectionLines.IndexedArgsBDA;
-        bucketTable.SelectionLines.CountBDA = selectionLines.CountBDA;
-        bucketTable.SelectionLines.Capacity = selectionLines.Bucket.Capacity;
-        bucketTable.SelectionPoints.ArgsBDA = selectionPoints.NonIndexedArgsBDA;
-        bucketTable.SelectionPoints.CountBDA = selectionPoints.CountBDA;
-        bucketTable.SelectionPoints.Capacity = selectionPoints.Bucket.Capacity;
+        bucketTable.SurfaceOpaque = makeBucketPhases(surface);
+        bucketTable.SurfaceAlphaMask = makeBucketPhases(alpha);
+        bucketTable.Lines = makeBucketPhases(lines);
+        bucketTable.Points = makeBucketPhases(points);
+        bucketTable.ShadowOpaque = makeBucketPhases(shadow);
+        bucketTable.SelectionSurface = makeBucketPhases(selectionSurface);
+        bucketTable.SelectionLines = makeBucketPhases(selectionLines);
+        bucketTable.SelectionPoints = makeBucketPhases(selectionPoints);
         m_Impl->Device->WriteBuffer(m_Impl->CullBucketTableLease.GetHandle(), &bucketTable, sizeof(bucketTable), 0);
         cmd.BufferBarrier(m_Impl->CullBucketTableLease.GetHandle(),
                           RHI::MemoryAccess::TransferWrite,
@@ -387,19 +500,31 @@ namespace Extrinsic::Graphics
 
         for (auto& bucket : m_Impl->Buckets)
         {
-            const auto args = bucket.Bucket.Indexed ? bucket.Bucket.IndexedArgsBuffer : bucket.Bucket.NonIndexedArgsBuffer;
-            cmd.BufferBarrier(args,
+            for (const auto& phase : bucket.Phases)
+            {
+                cmd.BufferBarrier(phase.ArgsLease.GetHandle(),
+                                  RHI::MemoryAccess::ShaderWrite,
+                                  RHI::MemoryAccess::IndirectRead);
+                cmd.BufferBarrier(phase.CountLease.GetHandle(),
+                                  RHI::MemoryAccess::ShaderWrite,
+                                  RHI::MemoryAccess::IndirectRead);
+            }
+            cmd.BufferBarrier(bucket.DiagnosticsLease.GetHandle(),
                               RHI::MemoryAccess::ShaderWrite,
-                              RHI::MemoryAccess::IndirectRead);
-            cmd.BufferBarrier(bucket.Bucket.CountBuffer,
-                              RHI::MemoryAccess::ShaderWrite,
-                              RHI::MemoryAccess::IndirectRead);
+                              RHI::MemoryAccess::ShaderRead);
         }
     }
 
     const GpuDrawBucket& CullingSystem::GetBucket(const RHI::GpuDrawBucketKind kind) const
     {
         return m_Impl->Buckets[ToIndex(kind)].Bucket;
+    }
+
+    GpuDrawBucketPhase CullingSystem::GetBucketPhase(const RHI::GpuDrawBucketKind kind,
+                                                     const CullingPhase phase) const
+    {
+        const GpuDrawBucket& bucket = GetBucket(kind);
+        return phase == CullingPhase::Phase2 ? bucket.Phase2 : bucket.Phase1;
     }
 
     RHI::BufferHandle CullingSystem::GetDrawCommandBuffer() const noexcept

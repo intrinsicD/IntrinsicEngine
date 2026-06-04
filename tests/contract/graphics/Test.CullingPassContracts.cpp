@@ -112,7 +112,11 @@ namespace
 }
 
 static_assert(static_cast<std::uint32_t>(RHI::GpuDrawBucketKind::Count) == 8u);
-static_assert(sizeof(RHI::GpuCullBucketTable) == 192u);
+static_assert(static_cast<std::uint32_t>(RHI::GpuCullPhase::Count) == 2u);
+static_assert(sizeof(RHI::GpuCullBucketOutput) == 24u);
+static_assert(sizeof(RHI::GpuCullBucketDiagnosticsCounters) == 16u);
+static_assert(sizeof(RHI::GpuCullBucketPhases) == 64u);
+static_assert(sizeof(RHI::GpuCullBucketTable) == 512u);
 static_assert(RHI::IsIndexedDrawBucket(RHI::GpuDrawBucketKind::SelectionSurface));
 static_assert(RHI::IsIndexedDrawBucket(RHI::GpuDrawBucketKind::SelectionLines));
 static_assert(!RHI::IsIndexedDrawBucket(RHI::GpuDrawBucketKind::SelectionPoints));
@@ -133,7 +137,22 @@ TEST(GraphicsCullingContracts, BucketsCoverSurfaceLinePointShadowAndSelectionDom
         EXPECT_TRUE(bucket.IndexedArgsBuffer.IsValid()) << RHI::GpuDrawBucketName(kind);
         EXPECT_FALSE(bucket.NonIndexedArgsBuffer.IsValid()) << RHI::GpuDrawBucketName(kind);
         EXPECT_TRUE(bucket.CountBuffer.IsValid()) << RHI::GpuDrawBucketName(kind);
+        EXPECT_TRUE(bucket.DiagnosticsBuffer.IsValid()) << RHI::GpuDrawBucketName(kind);
         EXPECT_GT(bucket.Capacity, 0u) << RHI::GpuDrawBucketName(kind);
+        EXPECT_TRUE(bucket.Phase1.Indexed) << RHI::GpuDrawBucketName(kind);
+        EXPECT_TRUE(bucket.Phase1.IndexedArgsBuffer.IsValid()) << RHI::GpuDrawBucketName(kind);
+        EXPECT_TRUE(bucket.Phase1.CountBuffer.IsValid()) << RHI::GpuDrawBucketName(kind);
+        EXPECT_TRUE(bucket.Phase2.Indexed) << RHI::GpuDrawBucketName(kind);
+        EXPECT_TRUE(bucket.Phase2.IndexedArgsBuffer.IsValid()) << RHI::GpuDrawBucketName(kind);
+        EXPECT_TRUE(bucket.Phase2.CountBuffer.IsValid()) << RHI::GpuDrawBucketName(kind);
+        EXPECT_NE(bucket.Phase1.IndexedArgsBuffer, bucket.Phase2.IndexedArgsBuffer)
+            << RHI::GpuDrawBucketName(kind);
+        EXPECT_NE(bucket.Phase1.CountBuffer, bucket.Phase2.CountBuffer)
+            << RHI::GpuDrawBucketName(kind);
+        EXPECT_EQ(culling.GetBucketPhase(kind, Graphics::CullingPhase::Phase1).IndexedArgsBuffer,
+                  bucket.IndexedArgsBuffer);
+        EXPECT_EQ(culling.GetBucketPhase(kind, Graphics::CullingPhase::Phase2).IndexedArgsBuffer,
+                  bucket.Phase2.IndexedArgsBuffer);
     }
 
     for (const auto kind : kNonIndexedBuckets)
@@ -143,7 +162,22 @@ TEST(GraphicsCullingContracts, BucketsCoverSurfaceLinePointShadowAndSelectionDom
         EXPECT_FALSE(bucket.IndexedArgsBuffer.IsValid()) << RHI::GpuDrawBucketName(kind);
         EXPECT_TRUE(bucket.NonIndexedArgsBuffer.IsValid()) << RHI::GpuDrawBucketName(kind);
         EXPECT_TRUE(bucket.CountBuffer.IsValid()) << RHI::GpuDrawBucketName(kind);
+        EXPECT_TRUE(bucket.DiagnosticsBuffer.IsValid()) << RHI::GpuDrawBucketName(kind);
         EXPECT_GT(bucket.Capacity, 0u) << RHI::GpuDrawBucketName(kind);
+        EXPECT_FALSE(bucket.Phase1.Indexed) << RHI::GpuDrawBucketName(kind);
+        EXPECT_TRUE(bucket.Phase1.NonIndexedArgsBuffer.IsValid()) << RHI::GpuDrawBucketName(kind);
+        EXPECT_TRUE(bucket.Phase1.CountBuffer.IsValid()) << RHI::GpuDrawBucketName(kind);
+        EXPECT_FALSE(bucket.Phase2.Indexed) << RHI::GpuDrawBucketName(kind);
+        EXPECT_TRUE(bucket.Phase2.NonIndexedArgsBuffer.IsValid()) << RHI::GpuDrawBucketName(kind);
+        EXPECT_TRUE(bucket.Phase2.CountBuffer.IsValid()) << RHI::GpuDrawBucketName(kind);
+        EXPECT_NE(bucket.Phase1.NonIndexedArgsBuffer, bucket.Phase2.NonIndexedArgsBuffer)
+            << RHI::GpuDrawBucketName(kind);
+        EXPECT_NE(bucket.Phase1.CountBuffer, bucket.Phase2.CountBuffer)
+            << RHI::GpuDrawBucketName(kind);
+        EXPECT_EQ(culling.GetBucketPhase(kind, Graphics::CullingPhase::Phase1).NonIndexedArgsBuffer,
+                  bucket.NonIndexedArgsBuffer);
+        EXPECT_EQ(culling.GetBucketPhase(kind, Graphics::CullingPhase::Phase2).NonIndexedArgsBuffer,
+                  bucket.Phase2.NonIndexedArgsBuffer);
     }
 
     culling.Shutdown();
@@ -170,12 +204,24 @@ TEST(GraphicsCullingContracts, CullingPassResetsDispatchesAndPublishesAllBucketM
     pass.Execute(cmd, camera, world);
 
     constexpr std::size_t bucketCount = static_cast<std::size_t>(RHI::GpuDrawBucketKind::Count);
-    const std::size_t expectedEvents = (bucketCount * 2u) + 1u + 3u + (bucketCount * 2u);
+    const std::size_t expectedEvents = (bucketCount * 6u) + 1u + 3u + (bucketCount * 5u);
     ASSERT_EQ(cmd.Events.size(), expectedEvents);
 
     std::size_t event = 0;
     for (std::size_t i = 0; i < bucketCount; ++i)
     {
+        for (std::size_t phase = 0; phase < 2u; ++phase)
+        {
+            EXPECT_EQ(cmd.Events[event].Kind, EventKind::FillBuffer);
+            EXPECT_TRUE(cmd.Events[event].Buffer.IsValid());
+            ++event;
+
+            EXPECT_EQ(cmd.Events[event].Kind, EventKind::BufferBarrier);
+            EXPECT_EQ(cmd.Events[event].Before, RHI::MemoryAccess::TransferWrite);
+            EXPECT_EQ(cmd.Events[event].After, RHI::MemoryAccess::ShaderWrite);
+            ++event;
+        }
+
         EXPECT_EQ(cmd.Events[event].Kind, EventKind::FillBuffer);
         EXPECT_TRUE(cmd.Events[event].Buffer.IsValid());
         ++event;
@@ -197,14 +243,22 @@ TEST(GraphicsCullingContracts, CullingPassResetsDispatchesAndPublishesAllBucketM
 
     for (std::size_t i = 0; i < bucketCount; ++i)
     {
-        EXPECT_EQ(cmd.Events[event].Kind, EventKind::BufferBarrier);
-        EXPECT_EQ(cmd.Events[event].Before, RHI::MemoryAccess::ShaderWrite);
-        EXPECT_EQ(cmd.Events[event].After, RHI::MemoryAccess::IndirectRead);
-        ++event;
+        for (std::size_t phase = 0; phase < 2u; ++phase)
+        {
+            EXPECT_EQ(cmd.Events[event].Kind, EventKind::BufferBarrier);
+            EXPECT_EQ(cmd.Events[event].Before, RHI::MemoryAccess::ShaderWrite);
+            EXPECT_EQ(cmd.Events[event].After, RHI::MemoryAccess::IndirectRead);
+            ++event;
+
+            EXPECT_EQ(cmd.Events[event].Kind, EventKind::BufferBarrier);
+            EXPECT_EQ(cmd.Events[event].Before, RHI::MemoryAccess::ShaderWrite);
+            EXPECT_EQ(cmd.Events[event].After, RHI::MemoryAccess::IndirectRead);
+            ++event;
+        }
 
         EXPECT_EQ(cmd.Events[event].Kind, EventKind::BufferBarrier);
         EXPECT_EQ(cmd.Events[event].Before, RHI::MemoryAccess::ShaderWrite);
-        EXPECT_EQ(cmd.Events[event].After, RHI::MemoryAccess::IndirectRead);
+        EXPECT_EQ(cmd.Events[event].After, RHI::MemoryAccess::ShaderRead);
         ++event;
     }
     EXPECT_EQ(event, cmd.Events.size());
@@ -219,18 +273,97 @@ TEST(GraphicsCullingContracts, CullingPassResetsDispatchesAndPublishesAllBucketM
 
         RHI::GpuCullBucketTable table{};
         std::memcpy(&table, write.Data.data(), sizeof(table));
-        EXPECT_GT(table.SurfaceOpaque.Capacity, 0u);
-        EXPECT_GT(table.SurfaceAlphaMask.Capacity, 0u);
-        EXPECT_GT(table.Lines.Capacity, 0u);
-        EXPECT_GT(table.Points.Capacity, 0u);
-        EXPECT_GT(table.ShadowOpaque.Capacity, 0u);
-        EXPECT_GT(table.SelectionSurface.Capacity, 0u);
-        EXPECT_GT(table.SelectionLines.Capacity, 0u);
-        EXPECT_GT(table.SelectionPoints.Capacity, 0u);
+        if (table.SurfaceOpaque.Phase1.Capacity == 0u)
+        {
+            continue;
+        }
+        EXPECT_GT(table.SurfaceOpaque.Phase1.Capacity, 0u);
+        EXPECT_GT(table.SurfaceOpaque.Phase2.Capacity, 0u);
+        EXPECT_GT(table.SurfaceAlphaMask.Phase1.Capacity, 0u);
+        EXPECT_GT(table.Lines.Phase1.Capacity, 0u);
+        EXPECT_GT(table.Points.Phase1.Capacity, 0u);
+        EXPECT_GT(table.ShadowOpaque.Phase1.Capacity, 0u);
+        EXPECT_GT(table.SelectionSurface.Phase1.Capacity, 0u);
+        EXPECT_GT(table.SelectionLines.Phase1.Capacity, 0u);
+        EXPECT_GT(table.SelectionPoints.Phase1.Capacity, 0u);
         sawBucketTableWrite = true;
     }
     EXPECT_TRUE(sawBucketTableWrite);
 
     culling.Shutdown();
     world.Shutdown();
+}
+
+TEST(GraphicsCullingContracts, TwoPhasePartitionIsDeterministicAndConservative)
+{
+    const Graphics::CullingHZBDepthSample visibleAtEqualDepth{
+        .NearestDepth = 0.5f,
+        .ConservativeMaxDepth = 0.5f,
+        .Valid = true,
+    };
+    const Graphics::CullingHZBDepthSample rejectedBehindDepth{
+        .NearestDepth = 0.6f,
+        .ConservativeMaxDepth = 0.5f,
+        .Valid = true,
+    };
+    const Graphics::CullingHZBDepthSample noSample{
+        .NearestDepth = 0.9f,
+        .ConservativeMaxDepth = 0.0f,
+        .Valid = false,
+    };
+
+    EXPECT_FALSE(Graphics::HZBRejectsNearestDepth(visibleAtEqualDepth));
+    EXPECT_TRUE(Graphics::HZBRejectsNearestDepth(rejectedBehindDepth));
+    EXPECT_FALSE(Graphics::HZBRejectsNearestDepth(noSample));
+
+    const std::vector<Graphics::CullingTwoPhaseCandidate> candidates{
+        {
+            .Bucket = RHI::GpuDrawBucketKind::SurfaceOpaque,
+            .FrustumVisible = true,
+            .PreviousFrameHZB = visibleAtEqualDepth,
+            .CurrentFrameHZB = rejectedBehindDepth,
+        },
+        {
+            .Bucket = RHI::GpuDrawBucketKind::SurfaceOpaque,
+            .FrustumVisible = true,
+            .PreviousFrameHZB = rejectedBehindDepth,
+            .CurrentFrameHZB = visibleAtEqualDepth,
+        },
+        {
+            .Bucket = RHI::GpuDrawBucketKind::Lines,
+            .FrustumVisible = true,
+            .PreviousFrameHZB = rejectedBehindDepth,
+            .CurrentFrameHZB = rejectedBehindDepth,
+        },
+        {
+            .Bucket = RHI::GpuDrawBucketKind::Points,
+            .FrustumVisible = false,
+            .PreviousFrameHZB = visibleAtEqualDepth,
+            .CurrentFrameHZB = visibleAtEqualDepth,
+        },
+    };
+
+    const Graphics::CullingTwoPhasePartition first =
+        Graphics::ComputeTwoPhaseCullPartition(candidates);
+    const Graphics::CullingTwoPhasePartition second =
+        Graphics::ComputeTwoPhaseCullPartition(candidates);
+
+    ASSERT_EQ(first.Decisions.size(), candidates.size());
+    EXPECT_EQ(first.Decisions, second.Decisions);
+    EXPECT_EQ(first.Decisions[0], Graphics::CullingTwoPhaseDecision::Phase1Visible);
+    EXPECT_EQ(first.Decisions[1], Graphics::CullingTwoPhaseDecision::Phase2Rescued);
+    EXPECT_EQ(first.Decisions[2], Graphics::CullingTwoPhaseDecision::Phase2Rejected);
+    EXPECT_EQ(first.Decisions[3], Graphics::CullingTwoPhaseDecision::FrustumRejected);
+
+    const auto& surface = first.Buckets[static_cast<std::size_t>(RHI::GpuDrawBucketKind::SurfaceOpaque)];
+    EXPECT_EQ(surface.Phase1VisibleCount, 1u);
+    EXPECT_EQ(surface.Phase1RejectedCount, 1u);
+    EXPECT_EQ(surface.Phase2RescuedCount, 1u);
+
+    const auto& lines = first.Buckets[static_cast<std::size_t>(RHI::GpuDrawBucketKind::Lines)];
+    EXPECT_EQ(lines.Phase1VisibleCount, 0u);
+    EXPECT_EQ(lines.Phase1RejectedCount, 1u);
+    EXPECT_EQ(lines.Phase2RescuedCount, 0u);
+
+    EXPECT_EQ(first.FrustumRejectedCount, 1u);
 }

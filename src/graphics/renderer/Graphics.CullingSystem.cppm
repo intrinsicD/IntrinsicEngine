@@ -1,9 +1,12 @@
 module;
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <string_view>
+#include <vector>
 
 export module Extrinsic.Graphics.CullingSystem;
 
@@ -21,7 +24,13 @@ export namespace Extrinsic::Graphics
     struct CullingTag;
     using CullingHandle = Core::StrongHandle<CullingTag>;
 
-    struct GpuDrawBucket
+    enum class CullingPhase : std::uint32_t
+    {
+        Phase1 = static_cast<std::uint32_t>(RHI::GpuCullPhase::Phase1),
+        Phase2 = static_cast<std::uint32_t>(RHI::GpuCullPhase::Phase2),
+    };
+
+    struct GpuDrawBucketPhase
     {
         RHI::BufferHandle IndexedArgsBuffer{};
         RHI::BufferHandle NonIndexedArgsBuffer{};
@@ -29,6 +38,61 @@ export namespace Extrinsic::Graphics
         std::uint32_t Capacity = 0;
         bool Indexed = true;
     };
+
+    struct GpuDrawBucket
+    {
+        RHI::BufferHandle IndexedArgsBuffer{};
+        RHI::BufferHandle NonIndexedArgsBuffer{};
+        RHI::BufferHandle CountBuffer{};
+        RHI::BufferHandle DiagnosticsBuffer{};
+        std::uint32_t Capacity = 0;
+        bool Indexed = true;
+        GpuDrawBucketPhase Phase1{};
+        GpuDrawBucketPhase Phase2{};
+    };
+
+    struct CullingHZBDepthSample
+    {
+        float NearestDepth = 0.0f;
+        float ConservativeMaxDepth = 1.0f;
+        bool Valid = false;
+    };
+
+    enum class CullingTwoPhaseDecision : std::uint8_t
+    {
+        FrustumRejected,
+        Phase1Visible,
+        Phase1Rejected,
+        Phase2Rescued,
+        Phase2Rejected,
+    };
+
+    struct CullingTwoPhaseCandidate
+    {
+        RHI::GpuDrawBucketKind Bucket = RHI::GpuDrawBucketKind::SurfaceOpaque;
+        bool FrustumVisible = true;
+        CullingHZBDepthSample PreviousFrameHZB{};
+        CullingHZBDepthSample CurrentFrameHZB{};
+    };
+
+    struct CullingTwoPhaseBucketCounters
+    {
+        std::uint32_t Phase1VisibleCount = 0;
+        std::uint32_t Phase1RejectedCount = 0;
+        std::uint32_t Phase2RescuedCount = 0;
+    };
+
+    struct CullingTwoPhasePartition
+    {
+        std::array<CullingTwoPhaseBucketCounters,
+                   static_cast<std::size_t>(RHI::GpuDrawBucketKind::Count)> Buckets{};
+        std::vector<CullingTwoPhaseDecision> Decisions{};
+        std::uint32_t FrustumRejectedCount = 0;
+    };
+
+    [[nodiscard]] bool HZBRejectsNearestDepth(CullingHZBDepthSample sample) noexcept;
+    [[nodiscard]] CullingTwoPhasePartition ComputeTwoPhaseCullPartition(
+        std::span<const CullingTwoPhaseCandidate> candidates);
 
     class CullingSystem
     {
@@ -63,6 +127,8 @@ export namespace Extrinsic::Graphics
                           const GpuWorld&       gpuWorld);
 
         [[nodiscard]] const GpuDrawBucket& GetBucket(RHI::GpuDrawBucketKind kind) const;
+        [[nodiscard]] GpuDrawBucketPhase GetBucketPhase(RHI::GpuDrawBucketKind kind,
+                                                        CullingPhase phase) const;
 
         [[nodiscard]] RHI::BufferHandle GetDrawCommandBuffer()     const noexcept;
         [[nodiscard]] RHI::BufferHandle GetVisibilityCountBuffer() const noexcept;

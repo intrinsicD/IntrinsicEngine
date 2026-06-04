@@ -57,6 +57,13 @@ export namespace Extrinsic::RHI
         Count
     };
 
+    enum class GpuCullPhase : std::uint32_t
+    {
+        Phase1 = 0,
+        Phase2 = 1,
+        Count
+    };
+
     [[nodiscard]] constexpr bool IsIndexedDrawBucket(const GpuDrawBucketKind kind) noexcept
     {
         switch (kind)
@@ -207,7 +214,7 @@ export namespace Extrinsic::RHI
         std::uint64_t SceneTableBDA = 0;
         std::uint64_t CullBucketTableBDA = 0;
         std::uint32_t InstanceCapacity = 0;
-        std::uint32_t _pad0 = 0;
+        std::uint32_t CullPhase = static_cast<std::uint32_t>(GpuCullPhase::Phase1);
     };
     static_assert(sizeof(GpuCullPushConstants) <= 128);
 
@@ -222,18 +229,46 @@ export namespace Extrinsic::RHI
 
     static_assert(alignof(GpuCullBucketOutput) == 8);
 
+    struct alignas(4) GpuCullBucketDiagnosticsCounters
+    {
+        std::uint32_t Phase1VisibleCount = 0;
+        std::uint32_t Phase1RejectedCount = 0;
+        std::uint32_t Phase2RescuedCount = 0;
+        std::uint32_t _pad0 = 0;
+    };
+    static_assert(sizeof(GpuCullBucketDiagnosticsCounters) == 16);
+    static_assert(alignof(GpuCullBucketDiagnosticsCounters) == 4);
+
+    struct alignas(8) GpuCullBucketDiagnosticsOutput
+    {
+        std::uint64_t CountersBDA = 0;
+        std::uint32_t _pad0 = 0;
+        std::uint32_t _pad1 = 0;
+    };
+    static_assert(sizeof(GpuCullBucketDiagnosticsOutput) == 16);
+    static_assert(alignof(GpuCullBucketDiagnosticsOutput) == 8);
+
+    struct alignas(8) GpuCullBucketPhases
+    {
+        GpuCullBucketOutput Phase1{};
+        GpuCullBucketOutput Phase2{};
+        GpuCullBucketDiagnosticsOutput Diagnostics{};
+    };
+    static_assert(sizeof(GpuCullBucketPhases) == 64);
+    static_assert(alignof(GpuCullBucketPhases) == 8);
+
     struct alignas(8) GpuCullBucketTable
     {
-        GpuCullBucketOutput SurfaceOpaque{};
-        GpuCullBucketOutput SurfaceAlphaMask{};
-        GpuCullBucketOutput Lines{};
-        GpuCullBucketOutput Points{};
-        GpuCullBucketOutput ShadowOpaque{};
-        GpuCullBucketOutput SelectionSurface{};
-        GpuCullBucketOutput SelectionLines{};
-        GpuCullBucketOutput SelectionPoints{};
+        GpuCullBucketPhases SurfaceOpaque{};
+        GpuCullBucketPhases SurfaceAlphaMask{};
+        GpuCullBucketPhases Lines{};
+        GpuCullBucketPhases Points{};
+        GpuCullBucketPhases ShadowOpaque{};
+        GpuCullBucketPhases SelectionSurface{};
+        GpuCullBucketPhases SelectionLines{};
+        GpuCullBucketPhases SelectionPoints{};
     };
-    static_assert(sizeof(GpuCullBucketTable) == 192);
+    static_assert(sizeof(GpuCullBucketTable) == 512);
     static_assert(alignof(GpuCullBucketTable) == 8);
     // -------------------------------------------------------
     // Per-frame camera + lighting UBO  (set 0, binding 0)

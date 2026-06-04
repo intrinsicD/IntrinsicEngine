@@ -14,7 +14,7 @@ layout(push_constant, scalar) uniform CullPC {
     uint64_t CullBucketTableBDA;
 
     uint InstanceCapacity;
-    uint _pad0;
+    uint CullPhase;
 } pc;
 
 bool sphereVisible(vec4 worldSphere, vec4 planes[6]) {
@@ -27,11 +27,23 @@ bool sphereVisible(vec4 worldSphere, vec4 planes[6]) {
     return true;
 }
 
-void emitIndexed(GpuCullBucketOutput bucket,
-                 uint indexCount,
-                 uint firstIndex,
-                 int vertexOffset,
-                 uint firstInstance) {
+GpuCullBucketOutput selectPhaseOutput(GpuCullBucketPhases bucket) {
+    return pc.CullPhase == GpuCullPhase_Phase2 ? bucket.Phase2 : bucket.Phase1;
+}
+
+void incrementDiagnostic(GpuCullBucketPhases bucket, uint counterIndex) {
+    if (bucket.Diagnostics.CountersBDA == uint64_t(0)) {
+        return;
+    }
+    GpuCounterRef counters = GpuCounterRef(bucket.Diagnostics.CountersBDA);
+    atomicAdd(counters.Value[counterIndex], 1u);
+}
+
+void emitIndexedPhase(GpuCullBucketOutput bucket,
+                      uint indexCount,
+                      uint firstIndex,
+                      int vertexOffset,
+                      uint firstInstance) {
     if (indexCount == 0u) {
         return;
     }
@@ -50,10 +62,10 @@ void emitIndexed(GpuCullBucketOutput bucket,
     args.Data[outIndex].firstInstance = firstInstance;
 }
 
-void emitNonIndexed(GpuCullBucketOutput bucket,
-                    uint vertexCount,
-                    uint firstVertex,
-                    uint firstInstance) {
+void emitNonIndexedPhase(GpuCullBucketOutput bucket,
+                         uint vertexCount,
+                         uint firstVertex,
+                         uint firstInstance) {
     if (vertexCount == 0u) {
         return;
     }
@@ -69,6 +81,31 @@ void emitNonIndexed(GpuCullBucketOutput bucket,
     args.Data[outIndex].instanceCount = 1u;
     args.Data[outIndex].firstVertex = firstVertex;
     args.Data[outIndex].firstInstance = firstInstance;
+}
+
+void emitIndexed(GpuCullBucketPhases bucket,
+                 uint indexCount,
+                 uint firstIndex,
+                 int vertexOffset,
+                 uint firstInstance) {
+    if (pc.CullPhase == GpuCullPhase_Phase2) {
+        incrementDiagnostic(bucket, 2u);
+    } else {
+        incrementDiagnostic(bucket, 0u);
+    }
+    emitIndexedPhase(selectPhaseOutput(bucket), indexCount, firstIndex, vertexOffset, firstInstance);
+}
+
+void emitNonIndexed(GpuCullBucketPhases bucket,
+                    uint vertexCount,
+                    uint firstVertex,
+                    uint firstInstance) {
+    if (pc.CullPhase == GpuCullPhase_Phase2) {
+        incrementDiagnostic(bucket, 2u);
+    } else {
+        incrementDiagnostic(bucket, 0u);
+    }
+    emitNonIndexedPhase(selectPhaseOutput(bucket), vertexCount, firstVertex, firstInstance);
 }
 
 void main() {
