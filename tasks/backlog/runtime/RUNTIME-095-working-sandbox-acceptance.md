@@ -51,8 +51,10 @@
   for `kTargetFrames` bounded frames with the acceptance families (one mesh, one
   graph, one point cloud) composed onto the reference camera, and asserts the
   default recipe reaches the canonical `"Present"` pass with no canonical pass
-  falling through the `SkippedUnavailable` branch, the families reside on the
-  operational `GpuWorld`, and the Vulkan fallback counters stay stable. It
+  falling through the `SkippedUnavailable` branch, each acceptance family
+  resides on its own runtime residency lane (mesh/graph/point-cloud, asserted
+  per lane so the reference triangle's separate `Procedural` lane cannot mask a
+  broken family), and the Vulkan fallback counters stay stable. It
   self-skips when GLFW cannot initialize or the promoted Vulkan device does not
   reach operational readiness. The test source + CMake wiring (a dedicated
   `IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests` executable labeled
@@ -64,7 +66,7 @@
 ## Required changes
 - [x] Define a deterministic sandbox acceptance scene provider or fixture that creates/loads one mesh, one graph, and one point cloud using promoted runtime/ECS/asset seams. _(Slice 1: `Test.RuntimeSandboxAcceptance.cpp` authors them via promoted ECS `GeometrySources`.)_
 - [x] Ensure each fixture entity has camera-visible transforms, bounds, render hints, selectable state, and valid `GpuWorld` residency via the appropriate runtime bridge. _(Slice 1: transform/world-matrix, render hints, `SelectableTag`, `StableId`, and per-lane residency asserted.)_
-- [x] **(Slice 3 — artifact landed; operational run pending a Vulkan host)** Add an opt-in `gpu;vulkan;integration` smoke that launches or drives `ExtrinsicSandbox`/runtime for bounded frames and asserts default-recipe command recording reaches present with no canonical pass falling through the unavailable branch. _(Slice 3: `tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp` drives `Engine::Run()` for `kTargetFrames` over the acceptance families on the reference camera and asserts `"Present"` is `Recorded`, no pass is `SkippedUnavailable`, the families reside on `GpuWorld`, and the Vulkan fallback counters stay stable. Authored + compile-verified under `ci` and observed to self-skip on a non-Vulkan host; the assertion has **not** yet executed green on a Vulkan device — that operational run is the remaining retirement gate, tracked in `Acceptance criteria` and `Verification`.)_
+- [x] **(Slice 3 — artifact landed; operational run pending a Vulkan host)** Add an opt-in `gpu;vulkan;integration` smoke that launches or drives `ExtrinsicSandbox`/runtime for bounded frames and asserts default-recipe command recording reaches present with no canonical pass falling through the unavailable branch. _(Slice 3: `tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp` drives `Engine::Run()` for `kTargetFrames` over the acceptance families on the reference camera and asserts `"Present"` is `Recorded`, no pass is `SkippedUnavailable`, each acceptance family resides on its own mesh/graph/point-cloud residency lane (asserted per lane so the reference triangle's `Procedural` lane cannot mask a broken family), and the Vulkan fallback counters stay stable. Authored + compile-verified under `ci` and observed to self-skip on a non-Vulkan host; the assertion has **not** yet executed green on a Vulkan device — that operational run is the remaining retirement gate, tracked in `Acceptance criteria` and `Verification`.)_
 - [x] Add CPU/null integration coverage that verifies extraction/submission state for the same scene without requiring Vulkan. _(Slice 1.)_
 - [x] Assert camera controller updates produce finite/invertible frame cameras for the acceptance scene. _(Slice 1.)_
 - [x] Assert selection flow can select an entity and at least one primitive domain per geometry family where supported: mesh face/edge/vertex, graph edge/node, point-cloud point. _(Slice 1 whole-entity selection per family; Slice 2 resolves mesh Face / graph Edge / point-cloud Point via `RefinePickReadbackResult`.)_

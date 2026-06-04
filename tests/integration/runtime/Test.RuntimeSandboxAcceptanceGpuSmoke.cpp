@@ -41,11 +41,11 @@ import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.RenderGeometry;
-import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Platform.Backend.Glfw;
 import Extrinsic.RHI.Device;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.RenderExtraction;
 import Geometry.Properties;
 
 namespace
@@ -365,13 +365,26 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, AcceptanceSceneReachesOperationalDefaultR
             << "operational device. pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
     }
 
-    // The acceptance families resided on the operational path (Slice 1 covers the
-    // exact per-family residency counts on the Null backend).
-    auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
-    EXPECT_GE(gpuWorld.GetLiveInstanceCount(), 3u)
-        << "Mesh/graph/point-cloud acceptance families did not all reside through the operational frames.";
-    EXPECT_GE(gpuWorld.GetLiveGeometryCount(), 3u)
-        << "Mesh/graph/point-cloud acceptance families did not bind three distinct geometries.";
+    // Each acceptance family resided on the operational path, asserted per
+    // family rather than by a total live count. The reference triangle from
+    // CreateReferenceEngineConfig() rides the separate `Procedural` residency
+    // lane, so these mesh/graph/point-cloud lane counters exclude it: if any one
+    // acceptance family stopped extracting or uploading, its (upload + reuse)
+    // total stays 0 and this gate fails -- a total-count check would instead be
+    // satisfied by the reference triangle plus the two surviving families. Every
+    // resident, non-dirty family increments its own lane's reuse hit on each
+    // steady-state extraction (Runtime.RenderExtraction.cpp), so the last frame's
+    // stats carry one reuse (or, on the first frame, one upload) per family.
+    const auto& ex = engine.GetLastRenderExtractionStats();
+    EXPECT_GE(ex.MeshGeometryUploads + ex.MeshGeometryReuseHits, 1u)
+        << "Acceptance mesh family did not reside on the operational mesh lane.";
+    EXPECT_GE(ex.GraphGeometryUploads + ex.GraphGeometryReuseHits, 1u)
+        << "Acceptance graph family did not reside on the operational graph lane.";
+    EXPECT_GE(ex.PointCloudGeometryUploads + ex.PointCloudGeometryReuseHits, 1u)
+        << "Acceptance point-cloud family did not reside on the operational point-cloud lane.";
+    EXPECT_EQ(ex.MeshGeometryFailedPack, 0u) << "Acceptance mesh lane reported a failed pack.";
+    EXPECT_EQ(ex.GraphGeometryFailedPack, 0u) << "Acceptance graph lane reported a failed pack.";
+    EXPECT_EQ(ex.PointCloudGeometryFailedPack, 0u) << "Acceptance point-cloud lane reported a failed pack.";
 
     EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
         << "Vulkan fallback counters incremented across operational sandbox acceptance frames: "
