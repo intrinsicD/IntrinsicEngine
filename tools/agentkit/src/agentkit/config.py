@@ -61,9 +61,9 @@ CHECK_FILES = [
 
 # Source doc (relative to target root) -> (skill template dir, reference filename).
 # Mirrors the repo's resync model: skill references are verbatim copies of the
-# authoritative docs. Kept in sync with tools/agent/resync_skills.sh.
-RESYNC_MAP: list[tuple[str, str, str]] = [
-    ("AGENTS.md", "core", "contract.md"),
+# authoritative docs. The contract entry is added by build_resync_map() so it
+# honors the configured contract filename. Kept in sync with resync_skills.sh.
+RESYNC_DOC_MAP: list[tuple[str, str, str]] = [
     ("docs/agent/roles.md", "core", "roles.md"),
     ("docs/agent/prompt/prompt.md", "core", "session-onboarding.md"),
     ("docs/agent/task-format.md", "task-workflow", "task-format.md"),
@@ -74,6 +74,11 @@ RESYNC_MAP: list[tuple[str, str, str]] = [
     ("docs/agent/agent-output-review-checklist.md", "review", "agent-output-review-checklist.md"),
     ("docs/agent/docs-sync-policy.md", "docs-sync", "docs-sync-policy.md"),
 ]
+
+
+def build_resync_map(contract_file: str) -> list[tuple[str, str, str]]:
+    """Full doc->reference map, with the contract mirrored from *contract_file*."""
+    return [(contract_file, "core", "contract.md"), *RESYNC_DOC_MAP]
 
 DEFAULT_TASK_PREFIXES = ["FEAT", "FIX", "DOCS", "CHORE", "REFAC", "TEST", "CI", "ARCH"]
 DEFAULT_TASK_SECTIONS = [
@@ -117,6 +122,16 @@ def slugify(name: str) -> str:
     return slug or "project"
 
 
+def _allowed_root_markdown(contract_file: str) -> list[str]:
+    # Always allow the configured contract file at the root (it may not be AGENTS.md).
+    ordered = ["README.md", contract_file, "CLAUDE.md", "CHANGELOG.md"]
+    seen: list[str] = []
+    for name in ordered:
+        if name not in seen:
+            seen.append(name)
+    return seen
+
+
 def default_config(
     *,
     name: str,
@@ -156,7 +171,7 @@ def default_config(
             "required": list(DEFAULT_ALLOWED_WORKFLOWS),
         },
         "hygiene": {
-            "allowed_root_markdown": list(DEFAULT_ALLOWED_ROOT_MARKDOWN),
+            "allowed_root_markdown": _allowed_root_markdown(contract_file),
             "ignore_globs": list(DEFAULT_IGNORE_GLOBS),
             "expected_top_level": [],
         },

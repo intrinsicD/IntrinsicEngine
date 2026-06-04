@@ -16,6 +16,7 @@ from . import config as cfgmod
 _AGGREGATE: list[tuple[str, list[str], bool]] = [
     ("check_tasks.py", ["--root", "."], True),
     ("check_doc_links.py", ["--root", "."], True),
+    ("check_docs_sync.py", ["--root", "."], True),
     ("check_root_hygiene.py", ["--root", "."], True),
     ("check_workflow_names.py", ["--root", "."], True),
     ("check_agent_config.py", ["--root", "."], True),

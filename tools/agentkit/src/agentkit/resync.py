@@ -11,10 +11,10 @@ from pathlib import Path
 from . import config as cfgmod
 
 
-def resync(target: Path, slug: str) -> list[tuple[str, str]]:
+def resync(target: Path, slug: str, contract_file: str = "AGENTS.md") -> list[tuple[str, str]]:
     target = Path(target)
     results: list[tuple[str, str]] = []
-    for src_rel, skill_dir, ref_name in cfgmod.RESYNC_MAP:
+    for src_rel, skill_dir, ref_name in cfgmod.build_resync_map(contract_file):
         src = target / src_rel
         dst_rel = f"{cfgmod.SKILLS_DIR}/{slug}-{skill_dir}/references/{ref_name}"
         dst = target / dst_rel

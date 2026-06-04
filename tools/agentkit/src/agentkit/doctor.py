@@ -14,6 +14,7 @@ def _expected_paths(cfg: dict[str, Any]) -> list[str]:
         cfgmod.CONFIG_FILENAME,
         cfgmod.get(cfg, "project.contract_file", "AGENTS.md"),
         f"{cfgmod.TOOLS_DIR}/README.md",
+        f"{cfgmod.TOOLS_DIR}/check.py",
         f"{cfgmod.TOOLS_DIR}/resync_skills.sh",
         cfgmod.get(cfg, "docs_sync.rules_file", f"{cfgmod.TOOLS_DIR}/docs_sync_rules.toml"),
         ".github/workflows/pr-fast.yml",
@@ -47,7 +48,8 @@ def diagnose(target: Path, cfg: dict[str, Any]) -> tuple[list[str], list[str], l
 
     drift: list[str] = []
     slug = cfgmod.get(cfg, "project.slug", "project")
-    for src_rel, skill_dir, ref_name in cfgmod.RESYNC_MAP:
+    contract_file = cfgmod.get(cfg, "project.contract_file", "AGENTS.md")
+    for src_rel, skill_dir, ref_name in cfgmod.build_resync_map(contract_file):
         src = target / src_rel
         ref = target / f"{cfgmod.SKILLS_DIR}/{slug}-{skill_dir}/references/{ref_name}"
         if src.is_file() and ref.is_file():

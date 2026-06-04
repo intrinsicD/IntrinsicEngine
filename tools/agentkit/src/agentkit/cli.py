@@ -80,8 +80,8 @@ def _cmd_init(args: argparse.Namespace) -> int:
         print(
             "\nNext steps:\n"
             f"  1. Edit {cfgmod.CONFIG_FILENAME}: fill in [commands] (build/test) and task prefixes.\n"
-            f"  2. Fill the TODO placeholders in AGENTS.md and .claude/setup.sh.\n"
-            "  3. Run: python3 tools/agentkit/agentkit.py check --strict\n"
+            f"  2. Fill the TODO placeholders in {cfg['project']['contract_file']} and .claude/setup.sh.\n"
+            f"  3. Run: python3 {cfgmod.TOOLS_DIR}/check.py --strict\n"
         )
     return 0
 
@@ -117,7 +117,8 @@ def _cmd_resync(args: argparse.Namespace) -> int:
         print(f"[agentkit] {exc}")
         return 2
     slug = cfgmod.get(cfg, "project.slug", "project")
-    for action, rel in resync.resync(target, slug):
+    contract_file = cfgmod.get(cfg, "project.contract_file", "AGENTS.md")
+    for action, rel in resync.resync(target, slug, contract_file):
         print(f"  {action:<22} {rel}")
     return 0
 

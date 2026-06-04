@@ -32,6 +32,7 @@ Verification, Forbidden changes.
 
 - Keep each task small and scoped.
 - Use checkbox todos (`- [ ]`) in Required changes / Tests / Docs / Acceptance criteria.
-- Create a task quickly with:
-  `python3 tools/agentkit/agentkit.py new-task {{TASK_ID_EXAMPLE}} "Title"`
+- Create a task by copying a template, then editing its `# <ID> — <title>` heading:
+  `cp tasks/templates/task.md tasks/backlog/{{TASK_ID_EXAMPLE}}-short-title.md`
+  (or, if agentkit is installed: `agentkit new-task {{TASK_ID_EXAMPLE}} "Title"`)
 - Validate with: `python3 {{CHECKS_DIR}}/check_tasks.py --root . --strict`

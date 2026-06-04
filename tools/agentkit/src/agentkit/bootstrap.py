@@ -120,12 +120,12 @@ class Generator:
         header = (
             f"agentkit configuration for {self.ctx['PROJECT_NAME']}.\n"
             "Single source of truth for the generator and the shipped checks.\n"
-            "Edit, then run: python3 tools/agentkit/agentkit.py check --strict"
+            f"Edit, then run: python3 {cfgmod.TOOLS_DIR}/check.py --strict"
         )
         self._write(cfgmod.CONFIG_FILENAME, dump_toml(self.cfg, header=header))
 
         # 2. Contract + thin redirects.
-        self._emit("AGENTS.md.tmpl", "AGENTS.md")
+        self._emit("AGENTS.md.tmpl", str(self.ctx["CONTRACT_FILE"]))
         if harness.get("claude", True):
             self._emit("CLAUDE.md.tmpl", "CLAUDE.md")
         if harness.get("copilot", True):
@@ -160,6 +160,8 @@ class Generator:
             self._emit(
                 f"tools/agent/checks/{check}", f"{cfgmod.CHECKS_DIR}/{check}", mode="copy"
             )
+        # Vendored "run all checks" entry point — no agentkit install required.
+        self._emit("tools/agent/check.py", f"{cfgmod.TOOLS_DIR}/check.py", mode="copy")
 
         # 7. Skills (core router + specialists).
         self._emit("tools/agent/skills/README.md.tmpl", f"{cfgmod.SKILLS_DIR}/README.md")
@@ -186,7 +188,8 @@ class Generator:
         return self.results
 
     def _mirror_references(self, slug: str) -> None:
-        for src_rel, skill_dir, ref_name in cfgmod.RESYNC_MAP:
+        contract_file = str(self.ctx["CONTRACT_FILE"])
+        for src_rel, skill_dir, ref_name in cfgmod.build_resync_map(contract_file):
             src = self.target / src_rel
             out_rel = f"{cfgmod.SKILLS_DIR}/{slug}-{skill_dir}/references/{ref_name}"
             if self.dry_run:

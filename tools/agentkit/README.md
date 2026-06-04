@@ -15,12 +15,20 @@ step.
 # From the target repository root:
 python3 /path/to/tools/agentkit/agentkit.py init --name "My Project" --language "Python"
 
-# Then fill in the placeholders it created and run the checks:
-python3 tools/agentkit/agentkit.py check --strict
+# Then fill in the placeholders it created and run the checks. The generated
+# repo ships a vendored, dependency-free runner — no agentkit install needed:
+python3 tools/agent/check.py --strict
 ```
 
 `init` is idempotent: it skips files that already exist unless you pass
 `--force`. Use `--dry-run` to preview.
+
+> **Generated repo vs. agentkit CLI.** `init` does not vendor `agentkit` itself
+> into the target. A bootstrapped repo is self-sufficient via the files under
+> `tools/agent/`: run the checks with `python3 tools/agent/check.py`, re-mirror
+> skills with `bash tools/agent/resync_skills.sh`, and create tasks by copying
+> `tasks/templates/`. The `agentkit <command>` forms below additionally require
+> the launcher on disk or `pip install ./tools/agentkit`.
 
 ## What it generates
 

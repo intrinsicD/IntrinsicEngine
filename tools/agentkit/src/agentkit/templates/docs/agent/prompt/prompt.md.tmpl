@@ -21,7 +21,7 @@ The default operating loop for an agent working in {{PROJECT_NAME}}. Read
 ## Verify before claiming done
 
 7. Run the strongest relevant verification: `{{TEST_CMD}}`.
-8. Run the structural checks: `python3 tools/agentkit/agentkit.py check --strict`.
+8. Run the structural checks: `python3 {{TOOLS_DIR}}/check.py --strict`.
 9. Self-review against the
    [review checklist](/{{DOCS_AGENT_DIR}}/review-checklist.md). Commit with a
    message that explains *why*.
