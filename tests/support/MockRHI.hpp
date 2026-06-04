@@ -34,6 +34,7 @@ import Extrinsic.RHI.Device;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Profiler;
+import Extrinsic.RHI.QueueAffinity;
 import Extrinsic.RHI.Types;
 import Extrinsic.RHI.Transfer;
 import Extrinsic.RHI.TransferQueue;
@@ -405,6 +406,8 @@ namespace Extrinsic::Tests
         bool FailNextPipelineCreate = false;
         int  FailPipelineCreateCall = 0;
         bool BeginFrameResult       = true;
+        bool AsyncComputeQueueAvailable = false;
+        bool TransferQueueAvailable = false;
         RHI::FrameHandle NextFrame{.FrameIndex = 0u, .SwapchainImageIndex = 0u};
         RHI::TextureHandle BackbufferHandle{100u, 1u};
         std::uint64_t GlobalFrameNumber = 0;
@@ -440,6 +443,7 @@ namespace Extrinsic::Tests
 
         MockBindlessHeap   Bindless;
         MockCommandContext CommandContext;
+        MockCommandContext AsyncComputeContext;
         MockTransferQueue  TransferQueue;
 
         // ---- IDevice -------------------------------------------------------
@@ -479,6 +483,48 @@ namespace Extrinsic::Tests
 
         RHI::ICommandContext& GetGraphicsContext(std::uint32_t) override { return CommandContext; }
         RHI::ITransferQueue& GetTransferQueue() override { return TransferQueue; }
+
+        [[nodiscard]] RHI::QueueCapabilityProfile GetQueueCapabilityProfile() const noexcept
+        {
+            return RHI::QueueCapabilityProfile{
+                .SupportsAsyncCompute = AsyncComputeQueueAvailable,
+                .SupportsTransfer = TransferQueueAvailable,
+            };
+        }
+
+        void SetQueueCapabilityProfile(const RHI::QueueCapabilityProfile profile) noexcept
+        {
+            AsyncComputeQueueAvailable = profile.SupportsAsyncCompute;
+            TransferQueueAvailable = profile.SupportsTransfer;
+        }
+
+        [[nodiscard]] bool SupportsMockQueue(const RHI::QueueAffinity affinity) const noexcept
+        {
+            switch (affinity)
+            {
+            case RHI::QueueAffinity::Graphics:
+                return true;
+            case RHI::QueueAffinity::AsyncCompute:
+                return AsyncComputeQueueAvailable;
+            case RHI::QueueAffinity::Transfer:
+                return TransferQueueAvailable;
+            }
+            return false;
+        }
+
+        [[nodiscard]] RHI::ICommandContext& GetMockQueueContext(const RHI::QueueAffinity affinity)
+        {
+            if (affinity == RHI::QueueAffinity::AsyncCompute && AsyncComputeQueueAvailable)
+            {
+                return AsyncComputeContext;
+            }
+            return CommandContext;
+        }
+
+        [[nodiscard]] RHI::ITransferQueue& GetMockTransferQueueForAffinity()
+        {
+            return TransferQueue;
+        }
 
         RHI::BufferHandle CreateBuffer(const RHI::BufferDesc&) override
         {

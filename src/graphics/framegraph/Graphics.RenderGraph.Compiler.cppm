@@ -13,6 +13,7 @@ import Extrinsic.Core.Error;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Handles;
+import Extrinsic.RHI.QueueAffinity;
 import :Pass;
 import :Resources;
 import :Barriers;
@@ -153,6 +154,23 @@ namespace Extrinsic::Graphics
         std::vector<RenderGraphValidationFinding> ValidationFindings{};
     };
 
+    export struct QueuePartitionedPass
+    {
+        std::uint32_t PassIndex = 0;
+        std::uint32_t TopologicalRank = 0;
+        RenderQueue Requested = RenderQueue::Graphics;
+        RenderQueue Resolved = RenderQueue::Graphics;
+        bool Demoted = false;
+    };
+
+    export struct QueuePartition
+    {
+        std::vector<QueuePartitionedPass> Graphics{};
+        std::vector<QueuePartitionedPass> AsyncCompute{};
+        std::vector<QueuePartitionedPass> Transfer{};
+        std::uint32_t QueueAffinityDemotedCount = 0;
+    };
+
     export class RenderGraphCompiler final
     {
     public:
@@ -164,6 +182,14 @@ namespace Extrinsic::Graphics
     };
 
     export [[nodiscard]] std::string BuildRenderGraphDebugDump(const CompiledRenderGraph& compiled);
+    export [[nodiscard]] QueuePartition PartitionPassesByQueue(
+        std::span<const RenderQueue> passQueues,
+        std::span<const std::uint32_t> livePasses,
+        std::span<const std::uint32_t> topologicalRankByPass,
+        RHI::QueueCapabilityProfile profile);
+    export [[nodiscard]] QueuePartition PartitionPassesByQueue(
+        const CompiledRenderGraph& compiled,
+        RHI::QueueCapabilityProfile profile);
     export [[nodiscard]] RenderGraphValidationResult ValidateCompiledGraph(
         const CompiledRenderGraph& compiled,
         std::span<const ImportedResourceAuthorization> authorizations = {});

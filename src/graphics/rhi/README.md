@@ -8,6 +8,20 @@ This directory contains the `RHI` module/files.
 - `RHI.CommandContext.cppm`
 - `RHI.Device.cppm`
 - `RHI.FrameHandle.cppm`
+- `RHI.QueueAffinity.cppm`
+
+## Queue affinity
+
+- `RHI.QueueAffinity.cppm` declares the backend-neutral queue vocabulary
+  `RHI::QueueAffinity { Graphics, AsyncCompute, Transfer }`,
+  `QueueCapabilityProfile`, and `ResolveQueueAffinity(...)`.
+- `Graphics` is the mandatory single-queue fallback. `AsyncCompute` and
+  `Transfer` are optional capabilities; when absent, requested work demotes to
+  `Graphics` and callers can count the demotion through their scheduling
+  diagnostics.
+- The RHI surface contains no backend submission policy. Framegraph partitioning
+  and later Vulkan queue recording consume this value contract without exposing
+  API-native queue-family types through RHI.
 
 ## Transfer uploads
 

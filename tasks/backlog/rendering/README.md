@@ -875,7 +875,7 @@ Pipelined frames (GRAPHICS-036):
 - [GRAPHICS-036D (done)](../../done/GRAPHICS-036D-render-world-pool-pipelined-proof.md) — pipelined render-N-1 integration proof (`Operational`, 2026-06-04). Depended on 036C.
 
 Async compute / multi-queue (GRAPHICS-037):
-- [GRAPHICS-037A](GRAPHICS-037A-queue-affinity-rhi-surface.md) — RHI `QueueAffinity` + demotion + null-queue mocks; reconciles the existing framegraph `RenderQueue`. Depends on GRAPHICS-037 (planning, done).
+- [GRAPHICS-037A (done)](../../done/GRAPHICS-037A-queue-affinity-rhi-surface.md) — RHI `QueueAffinity` + demotion + null-queue mocks; reconciles the existing framegraph `RenderQueue` (`CPUContracted`, 2026-06-04). Depends on GRAPHICS-037 (planning, done).
 - [GRAPHICS-037B](GRAPHICS-037B-cross-queue-edge-synthesis.md) — timeline-semaphore cross-queue edge synthesis + `CrossQueueCycle` fail-closed. Depends on 037A.
 - [GRAPHICS-037C](GRAPHICS-037C-ownership-transfer-barriers.md) — queue-family ownership-transfer barriers via the Sync2 compiler. Depends on 037B.
 - [GRAPHICS-037D](GRAPHICS-037D-multi-queue-vulkan-recording.md) — Vulkan multi-queue recording + opt-in `gpu;vulkan` smoke. Depends on 037C, GRAPHICS-033 (done).

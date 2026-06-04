@@ -38,6 +38,24 @@ barrier annotation or special backbuffer-write exception.
 Tests should assert compiled graph/resource properties by pass label and resource
 name, not transient allocation IDs or backend-native handles.
 
+## Queue Affinity Contract
+
+`RenderPassRecord::Queue` uses `RHI::QueueAffinity` as the canonical queue
+vocabulary through the framegraph `RenderQueue` alias. The supported affinity
+names are `Graphics`, `AsyncCompute`, and `Transfer`; the single-queue default
+remains `Graphics`.
+
+`RHI::ResolveQueueAffinity(requested, profile)` is the CPU-testable demotion
+rule for optional queues: missing `AsyncCompute` or `Transfer` capability
+demotes to `Graphics`, while `Graphics` never migrates away from graphics.
+`PartitionPassesByQueue(...)` is a pure helper that buckets compiled live passes
+by resolved affinity in deterministic `(topological rank, declared pass index)`
+order and reports `QueueAffinityDemotedCount`.
+
+This is not backend execution yet. Cross-queue timeline edges, ownership-transfer
+barriers, and Vulkan multi-queue recording are owned by `GRAPHICS-037B`,
+`GRAPHICS-037C`, and `GRAPHICS-037D`.
+
 ## Default-Recipe `gpu;vulkan` Smoke
 
 The opt-in default-recipe smoke coverage lives in

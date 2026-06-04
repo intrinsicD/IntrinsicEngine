@@ -21,6 +21,7 @@ import :Compiler;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
+import Extrinsic.RHI.QueueAffinity;
 import Extrinsic.Core.Error;
 
 namespace Extrinsic::Graphics
@@ -476,6 +477,75 @@ namespace Extrinsic::Graphics
         return static_cast<std::size_t>(std::ranges::count_if(Findings, [severity](const RenderGraphValidationFinding& finding) {
             return finding.Severity == severity;
         }));
+    }
+
+    QueuePartition PartitionPassesByQueue(const std::span<const RenderQueue> passQueues,
+                                          const std::span<const std::uint32_t> livePasses,
+                                          const std::span<const std::uint32_t> topologicalRankByPass,
+                                          const RHI::QueueCapabilityProfile profile)
+    {
+        std::vector<std::uint32_t> orderedPasses{};
+        orderedPasses.reserve(livePasses.size());
+        for (const std::uint32_t passIndex : livePasses)
+        {
+            if (passIndex < passQueues.size())
+            {
+                orderedPasses.push_back(passIndex);
+            }
+        }
+
+        const auto rankFor = [topologicalRankByPass](const std::uint32_t passIndex) {
+            return passIndex < topologicalRankByPass.size()
+                       ? topologicalRankByPass[passIndex]
+                       : std::numeric_limits<std::uint32_t>::max();
+        };
+
+        std::ranges::stable_sort(orderedPasses, [rankFor](const std::uint32_t lhs, const std::uint32_t rhs) {
+            return std::pair{rankFor(lhs), lhs} < std::pair{rankFor(rhs), rhs};
+        });
+
+        QueuePartition partition{};
+        for (const std::uint32_t passIndex : orderedPasses)
+        {
+            const RenderQueue requested = passQueues[passIndex];
+            const RHI::QueueAffinityResolution resolution = RHI::ResolveQueueAffinity(requested, profile);
+            QueuePartitionedPass entry{
+                .PassIndex = passIndex,
+                .TopologicalRank = rankFor(passIndex),
+                .Requested = resolution.Requested,
+                .Resolved = resolution.Resolved,
+                .Demoted = resolution.Demoted,
+            };
+
+            if (entry.Demoted)
+            {
+                ++partition.QueueAffinityDemotedCount;
+            }
+
+            switch (entry.Resolved)
+            {
+            case RenderQueue::Graphics:
+                partition.Graphics.push_back(std::move(entry));
+                break;
+            case RenderQueue::AsyncCompute:
+                partition.AsyncCompute.push_back(std::move(entry));
+                break;
+            case RenderQueue::Transfer:
+                partition.Transfer.push_back(std::move(entry));
+                break;
+            }
+        }
+
+        return partition;
+    }
+
+    QueuePartition PartitionPassesByQueue(const CompiledRenderGraph& compiled,
+                                          const RHI::QueueCapabilityProfile profile)
+    {
+        return PartitionPassesByQueue(compiled.PassQueues,
+                                      compiled.TopologicalOrder,
+                                      compiled.TopologicalLayerByPass,
+                                      profile);
     }
 
     bool CompiledPassDeclarations::DeclaresTextureRead(const TextureRef ref) const

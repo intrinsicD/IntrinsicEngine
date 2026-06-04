@@ -33,32 +33,46 @@
 - Decision 6 determinism: passes ordered by `(topological rank, declared pass index)`,
   assigned to queues by affinity; no wall-clock / hash-iteration / pointer identity.
 
+## Status
+- Commit references: `59c5a382` for the mechanical `RenderQueue` -> RHI
+  reconciliation; this task-landing commit for demotion, partitioning, tests,
+  docs, and retirement.
+- Landed 2026-06-04 at maturity `CPUContracted`. `RHI.QueueAffinity` now owns
+  the canonical `QueueAffinity` enum, `QueueCapabilityProfile`, and
+  `ResolveQueueAffinity(...)` fallback policy. The framegraph `RenderQueue`
+  name is an alias to the RHI enum, and `PartitionPassesByQueue(...)` buckets
+  live compiled passes by resolved affinity in deterministic
+  `(topological rank, declared pass index)` order while reporting
+  `QueueAffinityDemotedCount`. The single-queue compile/execute path remains
+  unchanged as the default; `GRAPHICS-037B/C/D` own cross-queue timeline edges,
+  ownership-transfer barriers, and Vulkan recording.
+
 ## Required changes
-- [ ] Add `RHI::QueueAffinity { Graphics, AsyncCompute, Transfer }` to `graphics/rhi`.
-- [ ] Reconcile the framegraph `RenderQueue` with `RHI::QueueAffinity` (mechanical, own commit).
-- [ ] Add a `QueueCapabilityProfile` (which optional queues exist) and a pure
+- [x] Add `RHI::QueueAffinity { Graphics, AsyncCompute, Transfer }` to `graphics/rhi`.
+- [x] Reconcile the framegraph `RenderQueue` with `RHI::QueueAffinity` (mechanical, own commit).
+- [x] Add a `QueueCapabilityProfile` (which optional queues exist) and a pure
       `ResolveQueueAffinity(requested, profile)` demotion helper with the decision-2 fallback.
-- [ ] Add a deterministic `PartitionPassesByQueue(...)` helper bucketing passes by
+- [x] Add a deterministic `PartitionPassesByQueue(...)` helper bucketing passes by
       resolved affinity per the decision-6 tiebreaker.
-- [ ] Add null-RHI mock queues (graphics + optional async-compute + transfer, toggleable).
-- [ ] `contract;graphics` tests for demotion fallback, partition determinism, and
+- [x] Add null-RHI mock queues (graphics + optional async-compute + transfer, toggleable).
+- [x] `contract;graphics` tests for demotion fallback, partition determinism, and
       the `QueueAffinityDemotedCount` accounting.
 
 ## Tests
-- [ ] `contract;graphics` — demotion per missing capability; deterministic partition
+- [x] `contract;graphics` — demotion per missing capability; deterministic partition
       under a fixed schedule; demotion counter accounting; `Graphics`-tagged passes
       never migrate (decision 1 hard rule).
-- [ ] CPU gate: `ctest --test-dir build/ci -L graphics -LE 'gpu|vulkan|slow|flaky-quarantine'` green.
+- [x] CPU gate: `ctest --test-dir build/ci -L graphics -LE 'gpu|vulkan|slow|flaky-quarantine'` green.
 
 ## Docs
-- [ ] Add `QueueAffinity` semantics to `src/graphics/framegraph/README.md` and a
+- [x] Add `QueueAffinity` semantics to `src/graphics/framegraph/README.md` and a
       multi-queue scheduling note to `docs/architecture/graphics.md`.
-- [ ] Regenerate `docs/api/generated/module_inventory.md` for the new RHI surface.
+- [x] Regenerate `docs/api/generated/module_inventory.md` for the new RHI surface.
 
 ## Acceptance criteria
-- [ ] `RHI::QueueAffinity` exists and the framegraph references it (no upward edge).
-- [ ] Demotion + partition helpers are pure, deterministic, and CPU-tested.
-- [ ] No new layering violations; single-queue path unchanged as the default.
+- [x] `RHI::QueueAffinity` exists and the framegraph references it (no upward edge).
+- [x] Demotion + partition helpers are pure, deterministic, and CPU-tested.
+- [x] No new layering violations; single-queue path unchanged as the default.
 
 ## Verification
 ```bash

@@ -624,6 +624,7 @@ set(_graphics_contract_cpu_test_files
     Test.MinimalTriangleReadbackHarness.cpp
     Test.PostProcessChainContract.cpp
     Test.PresentPass.cpp
+    Test.QueueAffinity.cpp
     Test.RendererFrameLifecycle.cpp
     Test.RenderWorldContract.cpp
     Test.RenderGraphValidation.cpp
