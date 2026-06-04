@@ -23,28 +23,38 @@
   the decision-3 timeline wait sequences acquire after release; `CONCURRENT` needs only
   the semaphore edge + normal layout/access barriers.
 
+## Status
+- Commit reference: this task-landing commit.
+- Landed 2026-06-04 at maturity `CPUContracted`. The framegraph Sync2 barrier
+  packet surface now carries `QueueSharingMode`, queue-family ownership-transfer
+  fields, and before/after-pass packet timing. Live cross-queue transient resources
+  compile as `Concurrent` with timeline edges plus normal barriers only; live
+  cross-queue imported resources stay `Exclusive` and emit release-after-producer /
+  acquire-before-consumer transfer pairs with `CrossQueueOwnershipTransferCount`
+  diagnostics. Real Vulkan multi-queue recording remains owned by `GRAPHICS-037D`.
+
 ## Required changes
-- [ ] Add a queue-family field to the Sync2 barrier descriptors (no second path).
-- [ ] Classify cross-queue resources transient→`CONCURRENT` / retained→`EXCLUSIVE`.
-- [ ] Emit release/acquire ownership-transfer barrier pairs for `EXCLUSIVE` cross-queue
+- [x] Add a queue-family field to the Sync2 barrier descriptors (no second path).
+- [x] Classify cross-queue resources transient→`CONCURRENT` / retained→`EXCLUSIVE`.
+- [x] Emit release/acquire ownership-transfer barrier pairs for `EXCLUSIVE` cross-queue
       resources, sequenced after the `GRAPHICS-037B` timeline wait.
-- [ ] Surface `CrossQueueOwnershipTransferCount` on the diagnostics result (decision 8).
-- [ ] `contract;graphics` tests asserting barrier composition vs the existing compiler.
+- [x] Surface `CrossQueueOwnershipTransferCount` on the diagnostics result (decision 8).
+- [x] `contract;graphics` tests asserting barrier composition vs the existing compiler.
 
 ## Tests
-- [ ] `contract;graphics` — release/acquire pairing for `EXCLUSIVE` resources;
+- [x] `contract;graphics` — release/acquire pairing for `EXCLUSIVE` resources;
       `CONCURRENT` resources get only the semaphore edge; ownership-transfer counter
       accounting; interaction with the existing single-queue barrier output unchanged.
-- [ ] CPU gate green.
+- [x] CPU gate green.
 
 ## Docs
-- [ ] Document the resource ownership policy in `src/graphics/framegraph/README.md`
+- [x] Document the resource ownership policy in `src/graphics/framegraph/README.md`
       and `docs/architecture/graphics.md`.
 
 ## Acceptance criteria
-- [ ] Ownership-transfer barriers compose with the Sync2 compiler with no second path.
-- [ ] The transient/retained sharing-mode split is enforced and CPU-tested.
-- [ ] No new layering violations.
+- [x] Ownership-transfer barriers compose with the Sync2 compiler with no second path.
+- [x] The transient/retained sharing-mode split is enforced and CPU-tested.
+- [x] No new layering violations.
 
 ## Verification
 ```bash

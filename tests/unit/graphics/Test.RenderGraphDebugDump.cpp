@@ -73,7 +73,7 @@ TEST(RenderGraphDebugDump, GoldenSmallRenderPassGraphIncludesAttachmentsAndResou
 
     const std::string expected =
         "RenderGraph\n"
-        "  pass_count=3 culled_pass_count=0 resource_count=3 edge_count=2 queue_handoff_edges=0 cross_queue_timeline_edges=0 barrier_packet_count=4\n"
+        "  pass_count=3 culled_pass_count=0 resource_count=3 edge_count=2 queue_handoff_edges=0 cross_queue_timeline_edges=0 cross_queue_ownership_transfers=0 barrier_packet_count=4\n"
         "  passes:\n"
         "    [0] pass=0 name=\"DepthPrepass\" layer=0 queue=graphics side_effect=false\n"
         "      color_targets: none\n"
@@ -87,9 +87,9 @@ TEST(RenderGraphDebugDump, GoldenSmallRenderPassGraphIncludesAttachmentsAndResou
         "        [0] texture=2 name=\"Backbuffer\" load=dont_care store=store format=RGBA8_UNORM\n"
         "      depth_target: none\n"
         "  textures:\n"
-        "    texture[0] name=\"SceneDepth\" used=true imported=false final_state=Undefined first_write_pass=0 last_read_pass=1 producer_count=1 consumer_count=1 first_use_pass=0 last_use_pass=1\n"
-        "    texture[1] name=\"SceneColorHDR\" used=true imported=false final_state=Undefined first_write_pass=1 last_read_pass=2 producer_count=1 consumer_count=1 first_use_pass=1 last_use_pass=2\n"
-        "    texture[2] name=\"Backbuffer\" used=true imported=true final_state=Present first_write_pass=2 last_read_pass=none producer_count=1 consumer_count=0 first_use_pass=2 last_use_pass=2\n"
+        "    texture[0] name=\"SceneDepth\" used=true imported=false sharing=exclusive final_state=Undefined first_write_pass=0 last_read_pass=1 producer_count=1 consumer_count=1 first_use_pass=0 last_use_pass=1\n"
+        "    texture[1] name=\"SceneColorHDR\" used=true imported=false sharing=exclusive final_state=Undefined first_write_pass=1 last_read_pass=2 producer_count=1 consumer_count=1 first_use_pass=1 last_use_pass=2\n"
+        "    texture[2] name=\"Backbuffer\" used=true imported=true sharing=exclusive final_state=Present first_write_pass=2 last_read_pass=none producer_count=1 consumer_count=0 first_use_pass=2 last_use_pass=2\n"
         "  buffers:\n";
 
     EXPECT_EQ(BuildRenderGraphDebugDump(*compiled), expected);
@@ -113,9 +113,9 @@ TEST(RenderGraphDebugDump, ResourceOnlyGraphRetainsImportedStateMetadata)
 
     const std::string dump = BuildRenderGraphDebugDump(*compiled);
     EXPECT_NE(dump.find("pass_count=0"), std::string::npos);
-    EXPECT_NE(dump.find("texture[0] name=\"HistoryColor\" used=false imported=true final_state=Present"), std::string::npos);
+    EXPECT_NE(dump.find("texture[0] name=\"HistoryColor\" used=false imported=true sharing=exclusive final_state=Present"),
+              std::string::npos);
 }
-
 
 
 

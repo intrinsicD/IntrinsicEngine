@@ -185,6 +185,8 @@ namespace Extrinsic::Graphics
                     .AfterLayout = ToTextureLayout(barrier.After),
                     .BeforeAccess = ToMemoryAccess(barrier.Before),
                     .AfterAccess = ToMemoryAccess(barrier.After),
+                    .SrcQueueFamily = barrier.OwnershipTransfer.SourceQueueFamily,
+                    .DstQueueFamily = barrier.OwnershipTransfer.DestinationQueueFamily,
                 });
             }
 
@@ -196,6 +198,8 @@ namespace Extrinsic::Graphics
                     .Buffer = graph.BufferHandles[barrier.BufferIndex],
                     .BeforeAccess = ToMemoryAccess(barrier.Before),
                     .AfterAccess = ToMemoryAccess(barrier.After),
+                    .SrcQueueFamily = barrier.OwnershipTransfer.SourceQueueFamily,
+                    .DstQueueFamily = barrier.OwnershipTransfer.DestinationQueueFamily,
                 });
             }
 
@@ -1707,6 +1711,8 @@ namespace Extrinsic::Graphics
                 static_cast<std::uint32_t>(compiled->CrossQueueTimelineSignals.size());
             m_LastRenderGraphStats.Compile.CrossQueueTimelineWaitCount =
                 static_cast<std::uint32_t>(compiled->CrossQueueTimelineWaits.size());
+            m_LastRenderGraphStats.Compile.CrossQueueOwnershipTransferCount =
+                compiled->CrossQueueOwnershipTransferCount;
             m_LastRenderGraphStats.Compile.TransientMemoryEstimateBytes = compiled->TransientMemoryEstimateBytes;
             m_LastRenderGraphStats.DebugDump = BuildRenderGraphDebugDump(*compiled);
             m_LastRenderGraphStats.Execute.DeviceOperational = m_Device->IsOperational();

@@ -623,6 +623,7 @@ set(_graphics_contract_cpu_test_files
     Test.LinePointPassContracts.cpp
     Test.MaterialSubstitutionContract.cpp
     Test.MinimalTriangleReadbackHarness.cpp
+    Test.OwnershipTransferBarriers.cpp
     Test.PostProcessChainContract.cpp
     Test.PresentPass.cpp
     Test.QueueAffinity.cpp

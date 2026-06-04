@@ -156,6 +156,7 @@ namespace Extrinsic::Graphics
         std::uint32_t EdgeCount = 0;
         std::uint32_t QueueHandoffEdgeCount = 0;
         std::uint32_t CrossQueueTimelineEdgeCount = 0;
+        std::uint32_t CrossQueueOwnershipTransferCount = 0;
         std::uint64_t TransientMemoryEstimateBytes = 0;
         std::vector<std::uint32_t> TopologicalOrder{};
         std::vector<std::uint32_t> TopologicalLayerByPass{};
@@ -176,6 +177,8 @@ namespace Extrinsic::Graphics
         std::vector<bool> TextureImported{};
         std::vector<bool> TextureIsBackbuffer{};
         std::vector<bool> BufferImported{};
+        std::vector<QueueSharingMode> TextureQueueSharingModes{};
+        std::vector<QueueSharingMode> BufferQueueSharingModes{};
         std::vector<CompiledRenderPassAttachment> RenderPassAttachments{};
         std::vector<CrossQueueTimelineSignal> CrossQueueTimelineSignals{};
         std::vector<CrossQueueTimelineWait> CrossQueueTimelineWaits{};

@@ -113,6 +113,16 @@ namespace Extrinsic::Graphics
             RenderQueue ToQueue = RenderQueue::Graphics;
         };
 
+        struct ResourceQueueHandoff
+        {
+            std::uint32_t From = 0;
+            std::uint32_t To = 0;
+            RenderQueue FromQueue = RenderQueue::Graphics;
+            RenderQueue ToQueue = RenderQueue::Graphics;
+            bool IsTextureResource = true;
+            std::uint32_t ResourceIndex = 0;
+        };
+
         [[nodiscard]] bool ContainsSorted(const std::vector<std::uint32_t>& values, const std::uint32_t needle)
         {
             return std::binary_search(values.begin(), values.end(), needle);
@@ -126,27 +136,35 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] bool MaybeAddQueueHandoffEdge(const std::uint32_t passIndex,
                                                     const RenderQueue queue,
+                                                    const bool isTextureResource,
+                                                    const std::uint32_t resourceIndex,
                                                     const ResourceState& state,
                                                     std::vector<std::vector<std::uint32_t>>& adjacency,
                                                     std::vector<std::uint32_t>& indegree,
                                                     std::unordered_set<std::uint64_t>& dedup,
-                                                    std::vector<QueueHandoffDependency>& queueHandoffs)
+                                                    std::vector<QueueHandoffDependency>& queueHandoffs,
+                                                    std::vector<ResourceQueueHandoff>& resourceHandoffs)
         {
             if (state.LastAccessor < 0 || state.LastAccessorQueue == queue)
             {
                 return false;
             }
             const std::uint32_t from = static_cast<std::uint32_t>(state.LastAccessor);
+            resourceHandoffs.push_back(ResourceQueueHandoff{
+                .From = from,
+                .To = passIndex,
+                .FromQueue = state.LastAccessorQueue,
+                .ToQueue = queue,
+                .IsTextureResource = isTextureResource,
+                .ResourceIndex = resourceIndex,
+            });
+            queueHandoffs.push_back(QueueHandoffDependency{
+                .From = from,
+                .To = passIndex,
+                .FromQueue = state.LastAccessorQueue,
+                .ToQueue = queue,
+            });
             const bool added = AddEdge(from, passIndex, adjacency, indegree, dedup);
-            if (added)
-            {
-                queueHandoffs.push_back(QueueHandoffDependency{
-                    .From = from,
-                    .To = passIndex,
-                    .FromQueue = state.LastAccessorQueue,
-                    .ToQueue = queue,
-                });
-            }
             return added;
         }
 
@@ -177,14 +195,26 @@ namespace Extrinsic::Graphics
 
         void ProcessRead(const std::uint32_t passIndex,
                          const RenderQueue queue,
+                         const bool isTextureResource,
+                         const std::uint32_t resourceIndex,
                          std::uint32_t& queueHandoffEdgeCount,
                          ResourceState& state,
                          std::vector<std::vector<std::uint32_t>>& adjacency,
                          std::vector<std::uint32_t>& indegree,
                          std::unordered_set<std::uint64_t>& dedup,
-                         std::vector<QueueHandoffDependency>& queueHandoffs)
+                         std::vector<QueueHandoffDependency>& queueHandoffs,
+                         std::vector<ResourceQueueHandoff>& resourceHandoffs)
         {
-            if (MaybeAddQueueHandoffEdge(passIndex, queue, state, adjacency, indegree, dedup, queueHandoffs))
+            if (MaybeAddQueueHandoffEdge(passIndex,
+                                         queue,
+                                         isTextureResource,
+                                         resourceIndex,
+                                         state,
+                                         adjacency,
+                                         indegree,
+                                         dedup,
+                                         queueHandoffs,
+                                         resourceHandoffs))
             {
                 ++queueHandoffEdgeCount;
             }
@@ -199,14 +229,26 @@ namespace Extrinsic::Graphics
 
         void ProcessWrite(const std::uint32_t passIndex,
                           const RenderQueue queue,
+                          const bool isTextureResource,
+                          const std::uint32_t resourceIndex,
                           std::uint32_t& queueHandoffEdgeCount,
                           ResourceState& state,
                           std::vector<std::vector<std::uint32_t>>& adjacency,
                           std::vector<std::uint32_t>& indegree,
                           std::unordered_set<std::uint64_t>& dedup,
-                          std::vector<QueueHandoffDependency>& queueHandoffs)
+                          std::vector<QueueHandoffDependency>& queueHandoffs,
+                          std::vector<ResourceQueueHandoff>& resourceHandoffs)
         {
-            if (MaybeAddQueueHandoffEdge(passIndex, queue, state, adjacency, indegree, dedup, queueHandoffs))
+            if (MaybeAddQueueHandoffEdge(passIndex,
+                                         queue,
+                                         isTextureResource,
+                                         resourceIndex,
+                                         state,
+                                         adjacency,
+                                         indegree,
+                                         dedup,
+                                         queueHandoffs,
+                                         resourceHandoffs))
             {
                 ++queueHandoffEdgeCount;
             }
@@ -428,6 +470,16 @@ namespace Extrinsic::Graphics
             return "Unknown";
         }
 
+        [[nodiscard]] constexpr const char* ToString(const QueueSharingMode mode)
+        {
+            switch (mode)
+            {
+            case QueueSharingMode::Exclusive: return "exclusive";
+            case QueueSharingMode::Concurrent: return "concurrent";
+            }
+            return "unknown";
+        }
+
         [[nodiscard]] constexpr const char* ToString(const RHI::LoadOp op)
         {
             switch (op)
@@ -616,6 +668,93 @@ namespace Extrinsic::Graphics
                 });
             }
         }
+
+        void ClassifyQueueSharingModes(const std::vector<ResourceQueueHandoff>& resourceHandoffs,
+                                       const std::vector<bool>& live,
+                                       const std::vector<bool>& textureImported,
+                                       const std::vector<bool>& bufferImported,
+                                       std::vector<QueueSharingMode>& textureModes,
+                                       std::vector<QueueSharingMode>& bufferModes)
+        {
+            for (const ResourceQueueHandoff& handoff : resourceHandoffs)
+            {
+                if (handoff.From >= live.size() || handoff.To >= live.size() || !live[handoff.From] || !live[handoff.To])
+                {
+                    continue;
+                }
+
+                if (handoff.IsTextureResource)
+                {
+                    if (handoff.ResourceIndex >= textureModes.size())
+                    {
+                        continue;
+                    }
+                    textureModes[handoff.ResourceIndex] = BoolAt(textureImported, handoff.ResourceIndex)
+                                                              ? QueueSharingMode::Exclusive
+                                                              : QueueSharingMode::Concurrent;
+                    continue;
+                }
+
+                if (handoff.ResourceIndex < bufferModes.size())
+                {
+                    bufferModes[handoff.ResourceIndex] = BoolAt(bufferImported, handoff.ResourceIndex)
+                                                            ? QueueSharingMode::Exclusive
+                                                            : QueueSharingMode::Concurrent;
+                }
+            }
+        }
+
+        [[nodiscard]] QueueOwnershipTransfer MakeOwnershipTransfer(const QueueOwnershipTransferKind kind,
+                                                                   const RenderQueue source,
+                                                                   const RenderQueue destination)
+        {
+            return QueueOwnershipTransfer{
+                .Kind = kind,
+                .SourceQueue = source,
+                .DestinationQueue = destination,
+                .SourceQueueFamily = QueueFamilyToken(source),
+                .DestinationQueueFamily = QueueFamilyToken(destination),
+            };
+        }
+
+        [[nodiscard]] BarrierPacket& FindOrCreateBarrierPacket(std::vector<BarrierPacket>& packets,
+                                                               const std::uint32_t passIndex,
+                                                               const BarrierPacketStage stage)
+        {
+            const auto it = std::ranges::find_if(packets, [passIndex, stage](const BarrierPacket& packet) {
+                return packet.PassIndex == passIndex && packet.Stage == stage;
+            });
+            if (it != packets.end())
+            {
+                return *it;
+            }
+
+            packets.push_back(BarrierPacket{
+                .PassIndex = passIndex,
+                .Stage = stage,
+            });
+            return packets.back();
+        }
+
+        [[nodiscard]] constexpr std::uint8_t StageSortKey(const BarrierPacketStage stage) noexcept
+        {
+            switch (stage)
+            {
+            case BarrierPacketStage::BeforePass:
+                return 0u;
+            case BarrierPacketStage::AfterPass:
+                return 1u;
+            }
+            return 0u;
+        }
+
+        void SortBarrierPackets(std::vector<BarrierPacket>& packets)
+        {
+            std::ranges::stable_sort(packets, [](const BarrierPacket& lhs, const BarrierPacket& rhs) {
+                return std::tuple{lhs.PassIndex, StageSortKey(lhs.Stage)} <
+                       std::tuple{rhs.PassIndex, StageSortKey(rhs.Stage)};
+            });
+        }
     }
 
     bool RenderGraphValidationResult::HasErrors() const
@@ -786,6 +925,8 @@ namespace Extrinsic::Graphics
             compiled.TextureImported.resize(textures.size(), false);
             compiled.TextureIsBackbuffer.resize(textures.size(), false);
             compiled.BufferImported.resize(buffers.size(), false);
+            compiled.TextureQueueSharingModes.resize(textures.size(), QueueSharingMode::Exclusive);
+            compiled.BufferQueueSharingModes.resize(buffers.size(), QueueSharingMode::Exclusive);
 
             for (std::uint32_t textureIndex = 0; textureIndex < textures.size(); ++textureIndex)
             {
@@ -842,6 +983,7 @@ namespace Extrinsic::Graphics
         std::unordered_set<std::uint64_t> dedup{};
         dedup.reserve(static_cast<std::size_t>(passCount) * 4u);
         std::vector<QueueHandoffDependency> queueHandoffs{};
+        std::vector<ResourceQueueHandoff> resourceHandoffs{};
         std::uint32_t queueHandoffEdgeCount = 0;
 
         for (std::uint32_t textureIndex = 0; textureIndex < textures.size(); ++textureIndex)
@@ -904,12 +1046,32 @@ namespace Extrinsic::Graphics
                 }
                 if (access.Write)
                 {
-                    ProcessWrite(passIndex, pass.Queue, queueHandoffEdgeCount, textureStates[access.Ref.Index], adjacency, indegree, dedup, queueHandoffs);
+                    ProcessWrite(passIndex,
+                                 pass.Queue,
+                                 true,
+                                 access.Ref.Index,
+                                 queueHandoffEdgeCount,
+                                 textureStates[access.Ref.Index],
+                                 adjacency,
+                                 indegree,
+                                 dedup,
+                                 queueHandoffs,
+                                 resourceHandoffs);
                     passDeclarations[passIndex].WriteTextures.push_back(access.Ref.Index);
                 }
                 else
                 {
-                    ProcessRead(passIndex, pass.Queue, queueHandoffEdgeCount, textureStates[access.Ref.Index], adjacency, indegree, dedup, queueHandoffs);
+                    ProcessRead(passIndex,
+                                pass.Queue,
+                                true,
+                                access.Ref.Index,
+                                queueHandoffEdgeCount,
+                                textureStates[access.Ref.Index],
+                                adjacency,
+                                indegree,
+                                dedup,
+                                queueHandoffs,
+                                resourceHandoffs);
                     passDeclarations[passIndex].ReadTextures.push_back(access.Ref.Index);
                 }
                 UpdateLifetime(textureLifetimes[access.Ref.Index], passIndex);
@@ -930,12 +1092,32 @@ namespace Extrinsic::Graphics
                 }
                 if (access.Write)
                 {
-                    ProcessWrite(passIndex, pass.Queue, queueHandoffEdgeCount, bufferStates[access.Ref.Index], adjacency, indegree, dedup, queueHandoffs);
+                    ProcessWrite(passIndex,
+                                 pass.Queue,
+                                 false,
+                                 access.Ref.Index,
+                                 queueHandoffEdgeCount,
+                                 bufferStates[access.Ref.Index],
+                                 adjacency,
+                                 indegree,
+                                 dedup,
+                                 queueHandoffs,
+                                 resourceHandoffs);
                     passDeclarations[passIndex].WriteBuffers.push_back(access.Ref.Index);
                 }
                 else
                 {
-                    ProcessRead(passIndex, pass.Queue, queueHandoffEdgeCount, bufferStates[access.Ref.Index], adjacency, indegree, dedup, queueHandoffs);
+                    ProcessRead(passIndex,
+                                pass.Queue,
+                                false,
+                                access.Ref.Index,
+                                queueHandoffEdgeCount,
+                                bufferStates[access.Ref.Index],
+                                adjacency,
+                                indegree,
+                                dedup,
+                                queueHandoffs,
+                                resourceHandoffs);
                     passDeclarations[passIndex].ReadBuffers.push_back(access.Ref.Index);
                 }
                 UpdateLifetime(bufferLifetimes[access.Ref.Index], passIndex);
@@ -1242,11 +1424,16 @@ namespace Extrinsic::Graphics
         }
 
         std::uint32_t activeQueueHandoffEdgeCount = 0;
+        std::unordered_set<std::uint64_t> activeQueueHandoffDedup{};
+        activeQueueHandoffDedup.reserve(queueHandoffs.size());
         for (const QueueHandoffDependency& handoff : queueHandoffs)
         {
             if (handoff.From < live.size() && handoff.To < live.size() && live[handoff.From] && live[handoff.To])
             {
-                ++activeQueueHandoffEdgeCount;
+                if (activeQueueHandoffDedup.insert(EncodeEdge(handoff.From, handoff.To)).second)
+                {
+                    ++activeQueueHandoffEdgeCount;
+                }
             }
         }
 
@@ -1260,10 +1447,24 @@ namespace Extrinsic::Graphics
                                      crossQueueTimelineWaits,
                                      crossQueueTimelineEdges);
 
+        std::vector<QueueSharingMode> textureQueueSharingModes(textures.size(), QueueSharingMode::Exclusive);
+        std::vector<QueueSharingMode> bufferQueueSharingModes(buffers.size(), QueueSharingMode::Exclusive);
+        ClassifyQueueSharingModes(resourceHandoffs,
+                                  live,
+                                  textureImported,
+                                  bufferImported,
+                                  textureQueueSharingModes,
+                                  bufferQueueSharingModes);
+
         std::vector<BarrierPacket> barrierPackets{};
-        barrierPackets.reserve(order.size());
+        barrierPackets.reserve(order.size() + resourceHandoffs.size());
         std::vector<TextureBarrierState> textureStateByRef(textures.size(), TextureBarrierState::Undefined);
         std::vector<BufferBarrierState> bufferStateByRef(buffers.size(), BufferBarrierState::Undefined);
+        std::vector<std::int32_t> textureLastAccessorByRef(textures.size(), -1);
+        std::vector<std::int32_t> bufferLastAccessorByRef(buffers.size(), -1);
+        std::vector<RenderQueue> textureQueueByRef(textures.size(), RenderQueue::Graphics);
+        std::vector<RenderQueue> bufferQueueByRef(buffers.size(), RenderQueue::Graphics);
+        std::uint32_t crossQueueOwnershipTransferCount = 0;
 
         for (std::uint32_t i = 0; i < textures.size(); ++i)
         {
@@ -1283,42 +1484,117 @@ namespace Extrinsic::Graphics
         for (const std::uint32_t passIndex : order)
         {
             const auto& pass = passes[passIndex];
-            BarrierPacket packet{};
-            packet.PassIndex = passIndex;
 
             for (const auto& access : pass.TextureAccesses)
             {
+                const std::uint32_t textureIndex = access.Ref.Index;
                 const auto next = ToTextureBarrierState(access.Usage);
-                const auto prev = textureStateByRef[access.Ref.Index];
-                if (prev != next)
+                const auto prev = textureStateByRef[textureIndex];
+                const QueueSharingMode sharingMode = textureQueueSharingModes[textureIndex];
+                const bool needsOwnershipTransfer =
+                    textureLastAccessorByRef[textureIndex] >= 0 &&
+                    textureQueueByRef[textureIndex] != pass.Queue &&
+                    sharingMode == QueueSharingMode::Exclusive;
+
+                if (needsOwnershipTransfer)
                 {
-                    packet.TextureBarriers.push_back(TextureBarrierPacket{
-                        .TextureIndex = access.Ref.Index,
+                    const RenderQueue sourceQueue = textureQueueByRef[textureIndex];
+                    BarrierPacket& release = FindOrCreateBarrierPacket(
+                        barrierPackets,
+                        static_cast<std::uint32_t>(textureLastAccessorByRef[textureIndex]),
+                        BarrierPacketStage::AfterPass);
+                    release.TextureBarriers.push_back(TextureBarrierPacket{
+                        .TextureIndex = textureIndex,
                         .Before = prev,
                         .After = next,
+                        .SharingMode = sharingMode,
+                        .OwnershipTransfer = MakeOwnershipTransfer(QueueOwnershipTransferKind::Release,
+                                                                   sourceQueue,
+                                                                   pass.Queue),
                     });
-                    textureStateByRef[access.Ref.Index] = next;
+
+                    BarrierPacket& acquire = FindOrCreateBarrierPacket(barrierPackets, passIndex, BarrierPacketStage::BeforePass);
+                    acquire.TextureBarriers.push_back(TextureBarrierPacket{
+                        .TextureIndex = textureIndex,
+                        .Before = prev,
+                        .After = next,
+                        .SharingMode = sharingMode,
+                        .OwnershipTransfer = MakeOwnershipTransfer(QueueOwnershipTransferKind::Acquire,
+                                                                   sourceQueue,
+                                                                   pass.Queue),
+                    });
+                    ++crossQueueOwnershipTransferCount;
+                    textureStateByRef[textureIndex] = next;
                 }
+                else if (prev != next)
+                {
+                    BarrierPacket& packet = FindOrCreateBarrierPacket(barrierPackets, passIndex, BarrierPacketStage::BeforePass);
+                    packet.TextureBarriers.push_back(TextureBarrierPacket{
+                        .TextureIndex = textureIndex,
+                        .Before = prev,
+                        .After = next,
+                        .SharingMode = sharingMode,
+                    });
+                    textureStateByRef[textureIndex] = next;
+                }
+                textureLastAccessorByRef[textureIndex] = static_cast<std::int32_t>(passIndex);
+                textureQueueByRef[textureIndex] = pass.Queue;
             }
 
             for (const auto& access : pass.BufferAccesses)
             {
+                const std::uint32_t bufferIndex = access.Ref.Index;
                 const auto next = ToBufferBarrierState(access.Usage);
-                const auto prev = bufferStateByRef[access.Ref.Index];
-                if (prev != next)
+                const auto prev = bufferStateByRef[bufferIndex];
+                const QueueSharingMode sharingMode = bufferQueueSharingModes[bufferIndex];
+                const bool needsOwnershipTransfer =
+                    bufferLastAccessorByRef[bufferIndex] >= 0 &&
+                    bufferQueueByRef[bufferIndex] != pass.Queue &&
+                    sharingMode == QueueSharingMode::Exclusive;
+
+                if (needsOwnershipTransfer)
                 {
-                    packet.BufferBarriers.push_back(BufferBarrierPacket{
-                        .BufferIndex = access.Ref.Index,
+                    const RenderQueue sourceQueue = bufferQueueByRef[bufferIndex];
+                    BarrierPacket& release = FindOrCreateBarrierPacket(
+                        barrierPackets,
+                        static_cast<std::uint32_t>(bufferLastAccessorByRef[bufferIndex]),
+                        BarrierPacketStage::AfterPass);
+                    release.BufferBarriers.push_back(BufferBarrierPacket{
+                        .BufferIndex = bufferIndex,
                         .Before = prev,
                         .After = next,
+                        .SharingMode = sharingMode,
+                        .OwnershipTransfer = MakeOwnershipTransfer(QueueOwnershipTransferKind::Release,
+                                                                   sourceQueue,
+                                                                   pass.Queue),
                     });
-                    bufferStateByRef[access.Ref.Index] = next;
-                }
-            }
 
-            if (!packet.TextureBarriers.empty() || !packet.BufferBarriers.empty())
-            {
-                barrierPackets.push_back(std::move(packet));
+                    BarrierPacket& acquire = FindOrCreateBarrierPacket(barrierPackets, passIndex, BarrierPacketStage::BeforePass);
+                    acquire.BufferBarriers.push_back(BufferBarrierPacket{
+                        .BufferIndex = bufferIndex,
+                        .Before = prev,
+                        .After = next,
+                        .SharingMode = sharingMode,
+                        .OwnershipTransfer = MakeOwnershipTransfer(QueueOwnershipTransferKind::Acquire,
+                                                                   sourceQueue,
+                                                                   pass.Queue),
+                    });
+                    ++crossQueueOwnershipTransferCount;
+                    bufferStateByRef[bufferIndex] = next;
+                }
+                else if (prev != next)
+                {
+                    BarrierPacket& packet = FindOrCreateBarrierPacket(barrierPackets, passIndex, BarrierPacketStage::BeforePass);
+                    packet.BufferBarriers.push_back(BufferBarrierPacket{
+                        .BufferIndex = bufferIndex,
+                        .Before = prev,
+                        .After = next,
+                        .SharingMode = sharingMode,
+                    });
+                    bufferStateByRef[bufferIndex] = next;
+                }
+                bufferLastAccessorByRef[bufferIndex] = static_cast<std::int32_t>(passIndex);
+                bufferQueueByRef[bufferIndex] = pass.Queue;
             }
         }
 
@@ -1342,6 +1618,7 @@ namespace Extrinsic::Graphics
                 .TextureIndex = textureIndex,
                 .Before = currentState,
                 .After = targetState,
+                .SharingMode = textureQueueSharingModes[textureIndex],
             });
             textureStateByRef[textureIndex] = targetState;
         }
@@ -1364,6 +1641,7 @@ namespace Extrinsic::Graphics
                 .BufferIndex = bufferIndex,
                 .Before = currentState,
                 .After = targetState,
+                .SharingMode = bufferQueueSharingModes[bufferIndex],
             });
             bufferStateByRef[bufferIndex] = targetState;
         }
@@ -1373,6 +1651,8 @@ namespace Extrinsic::Graphics
             barrierPackets.push_back(std::move(importedFinalPacket));
         }
 
+        SortBarrierPackets(barrierPackets);
+
         CompiledRenderGraph compiled{
             .PassCount = livePassCount,
             .CulledPassCount = passCount - livePassCount,
@@ -1380,6 +1660,7 @@ namespace Extrinsic::Graphics
             .EdgeCount = activeEdgeCount,
             .QueueHandoffEdgeCount = activeQueueHandoffEdgeCount,
             .CrossQueueTimelineEdgeCount = static_cast<std::uint32_t>(crossQueueTimelineEdges.size()),
+            .CrossQueueOwnershipTransferCount = crossQueueOwnershipTransferCount,
             .TopologicalOrder = std::move(order),
             .TopologicalLayerByPass = std::move(layerByPass),
             .PassNames = std::move(passNames),
@@ -1399,6 +1680,8 @@ namespace Extrinsic::Graphics
             .TextureImported = std::move(textureImported),
             .TextureIsBackbuffer = std::move(textureIsBackbuffer),
             .BufferImported = std::move(bufferImported),
+            .TextureQueueSharingModes = std::move(textureQueueSharingModes),
+            .BufferQueueSharingModes = std::move(bufferQueueSharingModes),
             .RenderPassAttachments = std::move(renderPassAttachments),
             .CrossQueueTimelineSignals = std::move(crossQueueTimelineSignals),
             .CrossQueueTimelineWaits = std::move(crossQueueTimelineWaits),
@@ -1501,6 +1784,7 @@ namespace Extrinsic::Graphics
             << " edge_count=" << compiled.EdgeCount
             << " queue_handoff_edges=" << compiled.QueueHandoffEdgeCount
             << " cross_queue_timeline_edges=" << compiled.CrossQueueTimelineEdgeCount
+            << " cross_queue_ownership_transfers=" << compiled.CrossQueueOwnershipTransferCount
             << " barrier_packet_count=" << compiled.BarrierPackets.size() << '\n';
 
         out << "  passes:\n";
@@ -1585,6 +1869,9 @@ namespace Extrinsic::Graphics
             }
             out << " used=" << (lifetime.HasUse ? "true" : "false")
                 << " imported=" << (BoolAt(compiled.TextureImported, static_cast<std::uint32_t>(index)) ? "true" : "false")
+                << " sharing=" << (index < compiled.TextureQueueSharingModes.size()
+                                      ? ToString(compiled.TextureQueueSharingModes[index])
+                                      : "unknown")
                 << " final_state=" << (index < compiled.TextureFinalStates.size() ? ToString(compiled.TextureFinalStates[index]) : "Unknown")
                 << " first_write_pass=";
             writeOptionalPass(out, textureUses[index].FirstWritePass);
@@ -1610,6 +1897,9 @@ namespace Extrinsic::Graphics
             }
             out << " used=" << (lifetime.HasUse ? "true" : "false")
                 << " imported=" << (BoolAt(compiled.BufferImported, static_cast<std::uint32_t>(index)) ? "true" : "false")
+                << " sharing=" << (index < compiled.BufferQueueSharingModes.size()
+                                      ? ToString(compiled.BufferQueueSharingModes[index])
+                                      : "unknown")
                 << " final_state=" << (index < compiled.BufferFinalStates.size() ? ToString(compiled.BufferFinalStates[index]) : "Unknown")
                 << " first_write_pass=";
             writeOptionalPass(out, bufferUses[index].FirstWritePass);

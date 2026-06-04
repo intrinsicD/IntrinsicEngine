@@ -63,9 +63,19 @@ Culled producer/consumer branches do not emit timeline records. A cyclic live
 cross-queue dependency fails compilation with `RenderGraphValidationCode::CrossQueueCycle`
 instead of producing a partial submit schedule.
 
-This remains a CPU/null contract, not backend execution. Queue-family
-ownership-transfer barriers and Vulkan multi-queue recording are owned by
-`GRAPHICS-037C` and `GRAPHICS-037D`.
+Cross-queue resource ownership policy is compiled into the same barrier packets
+as layout/access transitions. Live cross-queue transient resources are classified
+as `QueueSharingMode::Concurrent`, so they keep the timeline edge plus normal
+barriers and do not emit queue-family ownership transfers. Live cross-queue
+imported resources are classified as retained `QueueSharingMode::Exclusive` and
+emit paired `QueueOwnershipTransferKind::Release` / `Acquire` barriers through
+the Sync2 packet path: the release packet is tagged `AfterPass` on the producer,
+and the acquire packet is tagged `BeforePass` on the consumer. The packet fields
+carry CPU-visible queue-family tokens derived from `RenderQueue`; concrete
+Vulkan queue-family translation remains backend work.
+
+This remains a CPU/null contract, not backend execution. Vulkan multi-queue
+recording and opt-in `gpu;vulkan` smoke coverage are owned by `GRAPHICS-037D`.
 
 ## Default-Recipe `gpu;vulkan` Smoke
 

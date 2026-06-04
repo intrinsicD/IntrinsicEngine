@@ -36,10 +36,11 @@ namespace Extrinsic::Graphics
             }
         }
 
-        const auto emitBarriersForPass = [&](const std::uint32_t passIndex) -> Core::Result {
+        const auto emitBarriersForPass = [&](const std::uint32_t passIndex,
+                                             const BarrierPacketStage stage) -> Core::Result {
             for (const BarrierPacket& packet : graph.BarrierPackets)
             {
-                if (packet.PassIndex != passIndex)
+                if (packet.PassIndex != passIndex || packet.Stage != stage)
                 {
                     continue;
                 }
@@ -91,7 +92,7 @@ namespace Extrinsic::Graphics
                 }
             }
 
-            Core::Result barrierResult = emitBarriersForPass(passIndex);
+            Core::Result barrierResult = emitBarriersForPass(passIndex, BarrierPacketStage::BeforePass);
             if (!barrierResult.has_value())
             {
                 return barrierResult;
@@ -101,9 +102,15 @@ namespace Extrinsic::Graphics
             {
                 onPass(passIndex);
             }
+
+            Core::Result postBarrierResult = emitBarriersForPass(passIndex, BarrierPacketStage::AfterPass);
+            if (!postBarrierResult.has_value())
+            {
+                return postBarrierResult;
+            }
         }
 
-        Core::Result finalBarrierResult = emitBarriersForPass(finalPassIndex);
+        Core::Result finalBarrierResult = emitBarriersForPass(finalPassIndex, BarrierPacketStage::BeforePass);
         if (!finalBarrierResult.has_value())
         {
             return finalBarrierResult;
