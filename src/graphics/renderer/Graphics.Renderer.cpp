@@ -5917,6 +5917,9 @@ namespace Extrinsic::Graphics
             camera.NearPlane = world.Camera.NearPlane;
             camera.FarPlane = world.Camera.FarPlane;
             camera.FrameIndex = frameIndex;
+            camera.CullingFlags = world.Camera.ExplicitCameraTransition
+                ? RHI::CameraCulling_ExplicitTransition
+                : RHI::CameraCulling_None;
 
             if (world.Camera.Valid)
             {

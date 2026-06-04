@@ -884,8 +884,8 @@ HZB two-phase occlusion culling (GRAPHICS-038):
 - [GRAPHICS-038A (done)](../../done/GRAPHICS-038A-hzb-resource-and-lifetime.md) — HZB resource + ping-pong lifetime (`CPUContracted`, 2026-06-04). Depended on GRAPHICS-038 (planning, done), GRAPHICS-007 (done).
 - [GRAPHICS-038B (done)](../../done/GRAPHICS-038B-hzb-build-compute.md) — HZB build compute shader + dispatch wiring (`CPUContracted`, 2026-06-04). Depended on 038A.
 - [GRAPHICS-038C (done)](../../done/GRAPHICS-038C-two-phase-cull-shader.md) — phase-1/phase-2 cull shader + per-bucket buffer doubling + counters (`CPUContracted`, 2026-06-04). Depended on 038B, GRAPHICS-007.
-- [GRAPHICS-038D](GRAPHICS-038D-camera-transition-and-selection-exemption.md) — camera-transition skip heuristic + selection-bucket exemption. Depends on 038C.
-- [GRAPHICS-038E](GRAPHICS-038E-hzb-conservatism-gpu-smoke.md) — opt-in `gpu;vulkan` conservatism smoke. Depends on 038D, GRAPHICS-033 (done).
+- [GRAPHICS-038D (done)](../../done/GRAPHICS-038D-camera-transition-and-selection-exemption.md) — camera-transition skip heuristic + selection-bucket exemption (`CPUContracted`, 2026-06-04). Depended on 038C.
+- [GRAPHICS-038E](GRAPHICS-038E-hzb-conservatism-gpu-smoke.md) — opt-in `gpu;vulkan` conservatism smoke. Depends on 038D (done), GRAPHICS-033 (done).
 
 Clustered light binning (GRAPHICS-039):
 - [GRAPHICS-039A](GRAPHICS-039A-cluster-grid-build.md) — cluster grid resource + build pass. Depends on GRAPHICS-039 (planning, done), GRAPHICS-009 (done).

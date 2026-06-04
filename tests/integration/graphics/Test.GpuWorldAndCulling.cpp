@@ -6,7 +6,9 @@
 
 #include <gtest/gtest.h>
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
+import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.CullingSystem;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.RHI.BufferManager;
@@ -155,6 +157,72 @@ TEST(GraphicsCullingSystem, Smoke_InitializeBucketsAndDispatchPath)
 
     culling.Shutdown();
     world.Shutdown();
+}
+
+TEST(GraphicsCullingSystem, TeleportSnapshotTreatsCandidatesAsPhase1Visible)
+{
+    Graphics::CameraViewInput input{};
+    input.Position = {0.0f, 0.0f, 4.0f};
+    input.Forward = {0.0f, 0.0f, -1.0f};
+    input.Up = {0.0f, 1.0f, 0.0f};
+    input.NearPlane = 0.1f;
+    input.FarPlane = 100.0f;
+    input.View = glm::lookAt(input.Position, input.Position + input.Forward, input.Up);
+    input.Projection = glm::perspective(glm::radians(45.0f), 16.0f / 9.0f, input.NearPlane, input.FarPlane);
+    input.Projection[1][1] *= -1.0f;
+    input.ExplicitCameraTransition = true;
+    input.Valid = true;
+
+    const Graphics::CameraViewSnapshot snapshot =
+        Graphics::BuildCameraViewSnapshot(input, Core::Extent2D{1280, 720});
+    ASSERT_TRUE(snapshot.Valid);
+    EXPECT_TRUE(snapshot.ExplicitCameraTransition);
+
+    const Graphics::CullingHZBDepthSample rejected{
+        .NearestDepth = 0.9f,
+        .ConservativeMaxDepth = 0.2f,
+        .Valid = true,
+    };
+    const std::vector<Graphics::CullingTwoPhaseCandidate> candidates{
+        {
+            .Bucket = RHI::GpuDrawBucketKind::SurfaceOpaque,
+            .FrustumVisible = true,
+            .PreviousFrameHZB = rejected,
+            .CurrentFrameHZB = rejected,
+        },
+        {
+            .Bucket = RHI::GpuDrawBucketKind::Lines,
+            .FrustumVisible = true,
+            .PreviousFrameHZB = rejected,
+            .CurrentFrameHZB = rejected,
+        },
+        {
+            .Bucket = RHI::GpuDrawBucketKind::SelectionPoints,
+            .FrustumVisible = true,
+            .PreviousFrameHZB = rejected,
+            .CurrentFrameHZB = rejected,
+        },
+    };
+
+    const Graphics::CullingTwoPhasePartition partition =
+        Graphics::ComputeTwoPhaseCullPartition(candidates, Graphics::CullingTwoPhaseOptions{
+            .HZBStaleSkip = snapshot.ExplicitCameraTransition,
+        });
+
+    ASSERT_EQ(partition.Decisions.size(), candidates.size());
+    EXPECT_EQ(partition.Decisions[0], Graphics::CullingTwoPhaseDecision::Phase1Visible);
+    EXPECT_EQ(partition.Decisions[1], Graphics::CullingTwoPhaseDecision::Phase1Visible);
+    EXPECT_EQ(partition.Decisions[2], Graphics::CullingTwoPhaseDecision::Phase1Visible);
+    EXPECT_EQ(partition.HZBStaleVisibleCount, 3u);
+
+    const auto& surface =
+        partition.Buckets[static_cast<std::size_t>(RHI::GpuDrawBucketKind::SurfaceOpaque)];
+    const auto& selection =
+        partition.Buckets[static_cast<std::size_t>(RHI::GpuDrawBucketKind::SelectionPoints)];
+    EXPECT_EQ(surface.Phase1VisibleCount, 1u);
+    EXPECT_EQ(surface.Phase1RejectedCount, 0u);
+    EXPECT_EQ(selection.Phase1VisibleCount, 1u);
+    EXPECT_EQ(selection.Phase1RejectedCount, 0u);
 }
 
 TEST(GraphicsGpuWorld, GeometryUpload_UsesVertexUnitsForOffsets)

@@ -20,6 +20,8 @@ const uint GpuRender_Visible     = 1u << 31;
 const uint GpuInvalidGeometrySlot = 0xFFFFFFFFu;
 const uint GpuCullPhase_Phase1 = 0u;
 const uint GpuCullPhase_Phase2 = 1u;
+const uint GpuCullFlag_HZBStaleSkip = 1u << 0;
+const uint GpuCullFlag_SelectionBucketOcclusionExempt = 1u << 1;
 
 struct GpuSceneTable {
     uint64_t InstanceStaticBDA;

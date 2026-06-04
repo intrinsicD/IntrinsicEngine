@@ -121,6 +121,26 @@ TEST(RuntimeCameraControllers, RegistryReplacementCanSeedNextControllerFromTermi
     ExpectValidCameraView(replacement);
 }
 
+TEST(RuntimeCameraControllers, RegistryCameraTransitionFlagIsOneShotPerSlot)
+{
+    Runtime::CameraControllerRegistry registry;
+    registry.Register(Runtime::CameraControllerSlot::Main,
+                      Runtime::CreateCameraController(Core::Config::CameraControllerKind::Orbit, MakeSeed()));
+
+    EXPECT_TRUE(registry.ConsumeCameraTransition(Runtime::CameraControllerSlot::Main));
+    EXPECT_FALSE(registry.ConsumeCameraTransition(Runtime::CameraControllerSlot::Main));
+
+    registry.MarkCameraTransition(Runtime::CameraControllerSlot::Main);
+    EXPECT_TRUE(registry.ConsumeCameraTransition(Runtime::CameraControllerSlot::Main));
+    EXPECT_FALSE(registry.ConsumeCameraTransition(Runtime::CameraControllerSlot::Main));
+
+    registry.Replace(Runtime::CameraControllerSlot::Main,
+                     Runtime::CreateCameraController(Core::Config::CameraControllerKind::Fly, MakeSeed()));
+    EXPECT_TRUE(registry.ConsumeCameraTransition(Runtime::CameraControllerSlot::Main));
+    EXPECT_FALSE(registry.ConsumeCameraTransition(Runtime::CameraControllerSlot::Main));
+    EXPECT_FALSE(registry.ConsumeCameraTransition(Runtime::CameraControllerSlot::Preview));
+}
+
 TEST(RuntimeCameraControllers, FactoryCreatesEveryControllerKindWithValidView)
 {
     constexpr Core::Config::CameraControllerKind kinds[] = {
@@ -196,6 +216,5 @@ TEST(RuntimeCameraControllers, RegistrySupportsMultipleCameraSlots)
     EXPECT_EQ(registry.Resolve(Runtime::CameraControllerSlot::TopDown).Kind(), Core::Config::CameraControllerKind::TopDown);
     EXPECT_EQ(registry.Resolve(Runtime::CameraControllerSlot::EditorSecondary).Kind(), Core::Config::CameraControllerKind::FreeLook);
 }
-
 
 

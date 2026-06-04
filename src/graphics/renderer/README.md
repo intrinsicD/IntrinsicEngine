@@ -323,9 +323,21 @@ Concretely:
   `ComputeTwoPhaseCullPartition(...)`: a candidate is rejected only when its
   nearest depth is strictly greater than the sampled conservative HZB max-depth,
   preserving the no-false-rejection invariant under standard-Z `Less`.
-  This slice closes at `CPUContracted`; camera-transition skipping and
-  selection-bucket exemption are `GRAPHICS-038D`, and concrete Vulkan
-  reject-list publication / phase-2 HZB recull proof remains `GRAPHICS-038E`.
+  This slice closes at `CPUContracted`; concrete Vulkan reject-list publication /
+  phase-2 HZB recull proof remains `GRAPHICS-038E`.
+- GRAPHICS-038D adds the CPU/null camera-transition and selection-exemption
+  rules for HZB culling. `CameraViewInput::ExplicitCameraTransition` is copied
+  into `CameraViewSnapshot` and then into `RHI::CameraUBO::CullingFlags`;
+  `CullingSystem` also compares consecutive camera positions and forward
+  vectors (`10` world units or a `10` degree direction delta by default). Either
+  source marks the frame as stale-HZB, increments
+  `CullingDiagnostics::HzbStaleSkipCount`, and pushes
+  `GpuCullFlag_HZBStaleSkip` so the cull shader emits phase-1 outputs only.
+  The three selection buckets (`SelectionSurface`, `SelectionLines`,
+  `SelectionPoints`) are a hard occlusion exemption: the shader routes their
+  emits through phase 1 even if a future phase-2 dispatch is active, preserving
+  picking determinism. This slice closes at `CPUContracted`; Vulkan proof for
+  the HZB reject-list and phase-2 path remains `GRAPHICS-038E`.
 - GRAPHICS-072 Slice A wires the default-recipe deferred-mode `"SurfacePass"`
   to the existing `DeferredGBufferPass` body. `NullRenderer` owns
   `m_DeferredGBufferPass` (constructed against `m_DeferredSystem`) and the

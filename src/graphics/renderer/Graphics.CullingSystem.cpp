@@ -2,8 +2,10 @@ module;
 
 #include <array>
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -32,8 +34,51 @@ namespace Extrinsic::Graphics
         return sample.Valid && sample.NearestDepth > sample.ConservativeMaxDepth;
     }
 
+    CullingCameraTransitionDecision EvaluateCameraTransition(
+        const std::optional<CullingCameraTransitionState> previous,
+        const CullingCameraTransitionState current,
+        const CullingCameraTransitionThresholds thresholds) noexcept
+    {
+        CullingCameraTransitionDecision decision{};
+        decision.ExplicitTrigger = current.ExplicitCameraTransition;
+
+        if (previous.has_value() && previous->Valid && current.Valid)
+        {
+            const glm::vec3 delta = current.Position - previous->Position;
+            decision.PositionDelta = glm::length(delta);
+            if (std::isfinite(decision.PositionDelta) &&
+                thresholds.PositionDeltaThreshold > 0.0f &&
+                decision.PositionDelta >= thresholds.PositionDeltaThreshold)
+            {
+                decision.PositionDeltaTrigger = true;
+            }
+
+            const float previousLen = glm::length(previous->Forward);
+            const float currentLen = glm::length(current.Forward);
+            if (std::isfinite(previousLen) && std::isfinite(currentLen) &&
+                previousLen > 0.000001f && currentLen > 0.000001f)
+            {
+                const glm::vec3 previousForward = previous->Forward / previousLen;
+                const glm::vec3 currentForward = current.Forward / currentLen;
+                decision.DirectionDot = glm::clamp(glm::dot(previousForward, currentForward), -1.0f, 1.0f);
+                if (std::isfinite(decision.DirectionDot) &&
+                    thresholds.DirectionDotThreshold < 1.0f &&
+                    decision.DirectionDot <= thresholds.DirectionDotThreshold)
+                {
+                    decision.DirectionDeltaTrigger = true;
+                }
+            }
+        }
+
+        decision.SkipHZBPhase1 = decision.ExplicitTrigger ||
+                                 decision.PositionDeltaTrigger ||
+                                 decision.DirectionDeltaTrigger;
+        return decision;
+    }
+
     CullingTwoPhasePartition ComputeTwoPhaseCullPartition(
-        std::span<const CullingTwoPhaseCandidate> candidates)
+        std::span<const CullingTwoPhaseCandidate> candidates,
+        const CullingTwoPhaseOptions options)
     {
         CullingTwoPhasePartition partition{};
         partition.Decisions.reserve(candidates.size());
@@ -49,6 +94,22 @@ namespace Extrinsic::Graphics
 
             CullingTwoPhaseBucketCounters& counters =
                 partition.Buckets[static_cast<std::size_t>(candidate.Bucket)];
+            if (options.HZBStaleSkip)
+            {
+                ++counters.Phase1VisibleCount;
+                ++partition.HZBStaleVisibleCount;
+                partition.Decisions.push_back(CullingTwoPhaseDecision::Phase1Visible);
+                continue;
+            }
+
+            if (options.ExemptSelectionBuckets && RHI::IsSelectionDrawBucket(candidate.Bucket))
+            {
+                ++counters.Phase1VisibleCount;
+                ++partition.SelectionOcclusionExemptCount;
+                partition.Decisions.push_back(CullingTwoPhaseDecision::Phase1Visible);
+                continue;
+            }
+
             if (!HZBRejectsNearestDepth(candidate.PreviousFrameHZB))
             {
                 ++counters.Phase1VisibleCount;
@@ -158,6 +219,9 @@ namespace Extrinsic::Graphics
         RHI::PipelineManager::PipelineLease CullPipeline;
         RHI::BufferManager::BufferLease CullBucketTableLease{};
         std::uint64_t CullBucketTableBDA = 0;
+        std::optional<CullingCameraTransitionState> PreviousCamera{};
+        CullingCameraTransitionThresholds TransitionThresholds{};
+        CullingDiagnostics Diagnostics{};
 
         std::array<BucketStorage, static_cast<std::size_t>(RHI::GpuDrawBucketKind::Count)> Buckets{};
 
@@ -332,6 +396,8 @@ namespace Extrinsic::Graphics
         }
         m_Impl->CullBucketTableLease = {};
         m_Impl->CullBucketTableBDA = 0;
+        m_Impl->PreviousCamera.reset();
+        m_Impl->Diagnostics = {};
         m_Impl->Slots.clear();
         m_Impl->FreeList.clear();
         m_Impl->Capacity = 0;
@@ -451,6 +517,27 @@ namespace Extrinsic::Graphics
         pc.SceneTableBDA = gpuWorld.GetSceneTableBDA();
         pc.CullBucketTableBDA = m_Impl->CullBucketTableBDA;
 
+        const CullingCameraTransitionState currentCamera{
+            .Position = glm::vec3{camera.CameraPosition},
+            .Forward = glm::vec3{camera.CameraDirection},
+            .Valid = true,
+            .ExplicitCameraTransition =
+                (camera.CullingFlags & RHI::CameraCulling_ExplicitTransition) != 0u,
+        };
+        const CullingCameraTransitionDecision transition =
+            EvaluateCameraTransition(m_Impl->PreviousCamera,
+                                     currentCamera,
+                                     m_Impl->TransitionThresholds);
+        m_Impl->PreviousCamera = currentCamera;
+        m_Impl->Diagnostics.LastHzbStaleSkip = transition.SkipHZBPhase1;
+        m_Impl->Diagnostics.LastExplicitCameraTransition = transition.ExplicitTrigger;
+        m_Impl->Diagnostics.LastCameraPositionDeltaTransition = transition.PositionDeltaTrigger;
+        m_Impl->Diagnostics.LastCameraDirectionDeltaTransition = transition.DirectionDeltaTrigger;
+        if (transition.SkipHZBPhase1)
+        {
+            ++m_Impl->Diagnostics.HzbStaleSkipCount;
+        }
+
         const auto makeBucketPhases = [](const BucketStorage& bucket) -> RHI::GpuCullBucketPhases
         {
             const auto& phase1 = bucket.Phases[ToIndex(CullingPhase::Phase1)];
@@ -473,6 +560,11 @@ namespace Extrinsic::Graphics
 
         pc.InstanceCapacity = gpuWorld.GetInstanceCapacity();
         pc.CullPhase = static_cast<std::uint32_t>(RHI::GpuCullPhase::Phase1);
+        pc.CullingFlags = RHI::GpuCullFlag_SelectionBucketOcclusionExempt;
+        if (transition.SkipHZBPhase1)
+        {
+            pc.CullingFlags |= RHI::GpuCullFlag_HZBStaleSkip;
+        }
 
         RHI::GpuCullBucketTable bucketTable{};
         bucketTable.SurfaceOpaque = makeBucketPhases(surface);
@@ -525,6 +617,11 @@ namespace Extrinsic::Graphics
     {
         const GpuDrawBucket& bucket = GetBucket(kind);
         return phase == CullingPhase::Phase2 ? bucket.Phase2 : bucket.Phase1;
+    }
+
+    CullingDiagnostics CullingSystem::GetDiagnostics() const noexcept
+    {
+        return m_Impl->Diagnostics;
     }
 
     RHI::BufferHandle CullingSystem::GetDrawCommandBuffer() const noexcept

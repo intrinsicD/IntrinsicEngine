@@ -11,9 +11,22 @@ Each active task should include:
 
 ## Currently active
 
-No active task is currently promoted.
+No task is currently active in this checkout. The next eligible rendering task
+in the opened DAG is `GRAPHICS-038E`, after the `GRAPHICS-038D` retirement
+commit lands.
 
 The most recently retired tasks are summarised below.
+
+Previously-active
+[`GRAPHICS-038D`](../done/GRAPHICS-038D-camera-transition-and-selection-exemption.md) —
+camera-transition skip heuristic and selection-bucket occlusion exemption
+retired to `tasks/done/` on 2026-06-04 at maturity `CPUContracted`. The slice
+added snapshot-carried explicit camera-transition flags, delta-threshold
+stale-HZB detection, `HzbStaleSkipCount` diagnostics, shader push-constant
+flags, hard frustum-only phase-1 routing for selection buckets, runtime
+camera-controller one-shot transition signaling, contract/integration coverage,
+and renderer/runtime docs sync. `Operational` opt-in GPU/Vulkan conservatism
+proof remains owned by `GRAPHICS-038E`.
 
 Previously-active
 [`GRAPHICS-038C`](../done/GRAPHICS-038C-two-phase-cull-shader.md) —

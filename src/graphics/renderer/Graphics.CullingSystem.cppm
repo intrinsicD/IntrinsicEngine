@@ -4,9 +4,12 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string_view>
 #include <vector>
+
+#include <glm/glm.hpp>
 
 export module Extrinsic.Graphics.CullingSystem;
 
@@ -75,6 +78,12 @@ export namespace Extrinsic::Graphics
         CullingHZBDepthSample CurrentFrameHZB{};
     };
 
+    struct CullingTwoPhaseOptions
+    {
+        bool HZBStaleSkip = false;
+        bool ExemptSelectionBuckets = true;
+    };
+
     struct CullingTwoPhaseBucketCounters
     {
         std::uint32_t Phase1VisibleCount = 0;
@@ -88,11 +97,51 @@ export namespace Extrinsic::Graphics
                    static_cast<std::size_t>(RHI::GpuDrawBucketKind::Count)> Buckets{};
         std::vector<CullingTwoPhaseDecision> Decisions{};
         std::uint32_t FrustumRejectedCount = 0;
+        std::uint32_t HZBStaleVisibleCount = 0;
+        std::uint32_t SelectionOcclusionExemptCount = 0;
+    };
+
+    struct CullingCameraTransitionThresholds
+    {
+        float PositionDeltaThreshold = 10.0f;
+        float DirectionDotThreshold = 0.98480773f; // cos(10 degrees)
+    };
+
+    struct CullingCameraTransitionState
+    {
+        glm::vec3 Position{0.0f};
+        glm::vec3 Forward{0.0f, 0.0f, -1.0f};
+        bool Valid = false;
+        bool ExplicitCameraTransition = false;
+    };
+
+    struct CullingCameraTransitionDecision
+    {
+        bool SkipHZBPhase1 = false;
+        bool ExplicitTrigger = false;
+        bool PositionDeltaTrigger = false;
+        bool DirectionDeltaTrigger = false;
+        float PositionDelta = 0.0f;
+        float DirectionDot = 1.0f;
+    };
+
+    struct CullingDiagnostics
+    {
+        std::uint32_t HzbStaleSkipCount = 0;
+        bool LastHzbStaleSkip = false;
+        bool LastExplicitCameraTransition = false;
+        bool LastCameraPositionDeltaTransition = false;
+        bool LastCameraDirectionDeltaTransition = false;
     };
 
     [[nodiscard]] bool HZBRejectsNearestDepth(CullingHZBDepthSample sample) noexcept;
+    [[nodiscard]] CullingCameraTransitionDecision EvaluateCameraTransition(
+        std::optional<CullingCameraTransitionState> previous,
+        CullingCameraTransitionState current,
+        CullingCameraTransitionThresholds thresholds) noexcept;
     [[nodiscard]] CullingTwoPhasePartition ComputeTwoPhaseCullPartition(
-        std::span<const CullingTwoPhaseCandidate> candidates);
+        std::span<const CullingTwoPhaseCandidate> candidates,
+        CullingTwoPhaseOptions options = {});
 
     class CullingSystem
     {
@@ -129,6 +178,7 @@ export namespace Extrinsic::Graphics
         [[nodiscard]] const GpuDrawBucket& GetBucket(RHI::GpuDrawBucketKind kind) const;
         [[nodiscard]] GpuDrawBucketPhase GetBucketPhase(RHI::GpuDrawBucketKind kind,
                                                         CullingPhase phase) const;
+        [[nodiscard]] CullingDiagnostics GetDiagnostics() const noexcept;
 
         [[nodiscard]] RHI::BufferHandle GetDrawCommandBuffer()     const noexcept;
         [[nodiscard]] RHI::BufferHandle GetVisibilityCountBuffer() const noexcept;

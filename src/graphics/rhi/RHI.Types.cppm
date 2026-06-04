@@ -64,6 +64,19 @@ export namespace Extrinsic::RHI
         Count
     };
 
+    enum CameraCullingFlags : std::uint32_t
+    {
+        CameraCulling_None = 0,
+        CameraCulling_ExplicitTransition = 1u << 0,
+    };
+
+    enum GpuCullFlags : std::uint32_t
+    {
+        GpuCullFlag_None = 0,
+        GpuCullFlag_HZBStaleSkip = 1u << 0,
+        GpuCullFlag_SelectionBucketOcclusionExempt = 1u << 1,
+    };
+
     [[nodiscard]] constexpr bool IsIndexedDrawBucket(const GpuDrawBucketKind kind) noexcept
     {
         switch (kind)
@@ -77,6 +90,25 @@ export namespace Extrinsic::RHI
             return true;
         case GpuDrawBucketKind::Points:
         case GpuDrawBucketKind::SelectionPoints:
+        case GpuDrawBucketKind::Count:
+            return false;
+        }
+        return false;
+    }
+
+    [[nodiscard]] constexpr bool IsSelectionDrawBucket(const GpuDrawBucketKind kind) noexcept
+    {
+        switch (kind)
+        {
+        case GpuDrawBucketKind::SelectionSurface:
+        case GpuDrawBucketKind::SelectionLines:
+        case GpuDrawBucketKind::SelectionPoints:
+            return true;
+        case GpuDrawBucketKind::SurfaceOpaque:
+        case GpuDrawBucketKind::SurfaceAlphaMask:
+        case GpuDrawBucketKind::Lines:
+        case GpuDrawBucketKind::Points:
+        case GpuDrawBucketKind::ShadowOpaque:
         case GpuDrawBucketKind::Count:
             return false;
         }
@@ -215,6 +247,8 @@ export namespace Extrinsic::RHI
         std::uint64_t CullBucketTableBDA = 0;
         std::uint32_t InstanceCapacity = 0;
         std::uint32_t CullPhase = static_cast<std::uint32_t>(GpuCullPhase::Phase1);
+        std::uint32_t CullingFlags = GpuCullFlag_SelectionBucketOcclusionExempt;
+        std::uint32_t _pad0 = 0;
     };
     static_assert(sizeof(GpuCullPushConstants) <= 128);
 
@@ -307,7 +341,8 @@ export namespace Extrinsic::RHI
 
         // Frame counters (useful for temporal effects / jitter)
         std::uint32_t FrameIndex  = 0;
-        std::uint32_t _pad0 = 0, _pad1 = 0, _pad2 = 0;
+        std::uint32_t CullingFlags = CameraCulling_None;
+        std::uint32_t _pad1 = 0, _pad2 = 0;
     };
 
     // -------------------------------------------------------

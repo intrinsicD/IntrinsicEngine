@@ -801,6 +801,8 @@ namespace Extrinsic::Runtime
                 const Platform::IWindow& window = *m_Window;
                 controller->Update(window.GetInput(), frameDt);
                 renderInput.Camera = controller->GetView(viewport);
+                renderInput.Camera.ExplicitCameraTransition =
+                    m_CameraControllers.ConsumeCameraTransition(CameraControllerSlot::Main);
             }
         }
 

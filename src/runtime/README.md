@@ -578,6 +578,14 @@ extraction. If the reference scene is disabled or returns no camera, the
 controller falls back to a deterministic default perspective camera at
 `(0, 0, 4)` looking down `-Z`.
 
+Camera-controller registration and replacement are one-shot camera-transition
+events. `CameraControllerRegistry` marks the slot as pending, and
+`Engine::RunFrame()` consumes that bit into
+`CameraViewInput::ExplicitCameraTransition` on the first extracted frame after
+the change. Graphics uses the immutable flag, plus its own consecutive-camera
+delta thresholds, to skip stale previous-frame HZB occlusion without reading
+live runtime or ECS state.
+
 The reference-scene seed is still finalized with `BuildReferenceCameraViewInput`
 before seeding so its projection keeps the Vulkan clip-space Y inversion used by
 the legacy `Graphics::CameraComponent` update at

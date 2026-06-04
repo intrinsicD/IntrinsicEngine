@@ -15,6 +15,8 @@ layout(push_constant, scalar) uniform CullPC {
 
     uint InstanceCapacity;
     uint CullPhase;
+    uint CullingFlags;
+    uint _pad0;
 } pc;
 
 bool sphereVisible(vec4 worldSphere, vec4 planes[6]) {
@@ -28,6 +30,9 @@ bool sphereVisible(vec4 worldSphere, vec4 planes[6]) {
 }
 
 GpuCullBucketOutput selectPhaseOutput(GpuCullBucketPhases bucket) {
+    if ((pc.CullingFlags & GpuCullFlag_HZBStaleSkip) != 0u) {
+        return bucket.Phase1;
+    }
     return pc.CullPhase == GpuCullPhase_Phase2 ? bucket.Phase2 : bucket.Phase1;
 }
 
@@ -88,7 +93,8 @@ void emitIndexed(GpuCullBucketPhases bucket,
                  uint firstIndex,
                  int vertexOffset,
                  uint firstInstance) {
-    if (pc.CullPhase == GpuCullPhase_Phase2) {
+    if (pc.CullPhase == GpuCullPhase_Phase2 &&
+        (pc.CullingFlags & GpuCullFlag_HZBStaleSkip) == 0u) {
         incrementDiagnostic(bucket, 2u);
     } else {
         incrementDiagnostic(bucket, 0u);
@@ -100,12 +106,38 @@ void emitNonIndexed(GpuCullBucketPhases bucket,
                     uint vertexCount,
                     uint firstVertex,
                     uint firstInstance) {
-    if (pc.CullPhase == GpuCullPhase_Phase2) {
+    if (pc.CullPhase == GpuCullPhase_Phase2 &&
+        (pc.CullingFlags & GpuCullFlag_HZBStaleSkip) == 0u) {
         incrementDiagnostic(bucket, 2u);
     } else {
         incrementDiagnostic(bucket, 0u);
     }
     emitNonIndexedPhase(selectPhaseOutput(bucket), vertexCount, firstVertex, firstInstance);
+}
+
+void emitIndexedSelection(GpuCullBucketPhases bucket,
+                          uint indexCount,
+                          uint firstIndex,
+                          int vertexOffset,
+                          uint firstInstance) {
+    if ((pc.CullingFlags & GpuCullFlag_SelectionBucketOcclusionExempt) != 0u) {
+        incrementDiagnostic(bucket, 0u);
+        emitIndexedPhase(bucket.Phase1, indexCount, firstIndex, vertexOffset, firstInstance);
+        return;
+    }
+    emitIndexed(bucket, indexCount, firstIndex, vertexOffset, firstInstance);
+}
+
+void emitNonIndexedSelection(GpuCullBucketPhases bucket,
+                             uint vertexCount,
+                             uint firstVertex,
+                             uint firstInstance) {
+    if ((pc.CullingFlags & GpuCullFlag_SelectionBucketOcclusionExempt) != 0u) {
+        incrementDiagnostic(bucket, 0u);
+        emitNonIndexedPhase(bucket.Phase1, vertexCount, firstVertex, firstInstance);
+        return;
+    }
+    emitNonIndexed(bucket, vertexCount, firstVertex, firstInstance);
 }
 
 void main() {
@@ -159,11 +191,11 @@ void main() {
         }
 
         if (selectable) {
-            emitIndexed(buckets.SelectionSurface,
-                        geo.SurfaceIndexCount,
-                        geo.SurfaceFirstIndex,
-                        int(geo.VertexOffset),
-                        slot);
+            emitIndexedSelection(buckets.SelectionSurface,
+                                 geo.SurfaceIndexCount,
+                                 geo.SurfaceFirstIndex,
+                                 int(geo.VertexOffset),
+                                 slot);
         }
     }
 
@@ -175,11 +207,11 @@ void main() {
                     slot);
 
         if (selectable) {
-            emitIndexed(buckets.SelectionLines,
-                        geo.LineIndexCount,
-                        geo.LineFirstIndex,
-                        int(geo.VertexOffset),
-                        slot);
+            emitIndexedSelection(buckets.SelectionLines,
+                                 geo.LineIndexCount,
+                                 geo.LineFirstIndex,
+                                 int(geo.VertexOffset),
+                                 slot);
         }
     }
 
@@ -190,10 +222,10 @@ void main() {
                        slot);
 
         if (selectable) {
-            emitNonIndexed(buckets.SelectionPoints,
-                           geo.PointVertexCount,
-                           geo.PointFirstVertex,
-                           slot);
+            emitNonIndexedSelection(buckets.SelectionPoints,
+                                    geo.PointVertexCount,
+                                    geo.PointFirstVertex,
+                                    slot);
         }
     }
 }

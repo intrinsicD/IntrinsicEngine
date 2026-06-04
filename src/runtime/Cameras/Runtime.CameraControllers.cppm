@@ -578,7 +578,9 @@ namespace Extrinsic::Runtime
                 std::terminate();
             if (ResolveOrNull(slot) != nullptr)
                 std::terminate();
-            m_Slots.push_back(Slot{slot, std::move(controller)});
+            m_Slots.push_back(Slot{.SlotId = slot,
+                                   .Controller = std::move(controller),
+                                   .PendingCameraTransition = true});
         }
 
         void Replace(CameraControllerSlot slot, std::unique_ptr<ICameraController> controller)
@@ -590,10 +592,39 @@ namespace Extrinsic::Runtime
                 if (entry.SlotId == slot)
                 {
                     entry.Controller = std::move(controller);
+                    entry.PendingCameraTransition = true;
                     return;
                 }
             }
-            m_Slots.push_back(Slot{slot, std::move(controller)});
+            m_Slots.push_back(Slot{.SlotId = slot,
+                                   .Controller = std::move(controller),
+                                   .PendingCameraTransition = true});
+        }
+
+        void MarkCameraTransition(CameraControllerSlot slot) noexcept
+        {
+            for (Slot& entry : m_Slots)
+            {
+                if (entry.SlotId == slot)
+                {
+                    entry.PendingCameraTransition = true;
+                    return;
+                }
+            }
+        }
+
+        [[nodiscard]] bool ConsumeCameraTransition(CameraControllerSlot slot) noexcept
+        {
+            for (Slot& entry : m_Slots)
+            {
+                if (entry.SlotId == slot)
+                {
+                    const bool pending = entry.PendingCameraTransition;
+                    entry.PendingCameraTransition = false;
+                    return pending;
+                }
+            }
+            return false;
         }
 
         [[nodiscard]] ICameraController& Resolve(CameraControllerSlot slot)
@@ -618,11 +649,11 @@ namespace Extrinsic::Runtime
         {
             CameraControllerSlot SlotId{};
             std::unique_ptr<ICameraController> Controller;
+            bool PendingCameraTransition{false};
         };
 
         std::vector<Slot> m_Slots;
     };
 }
-
 
 
