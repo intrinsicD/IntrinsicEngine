@@ -72,6 +72,7 @@ implementation.
 - `Extrinsic.Graphics.DeferredSystem`
 - `Extrinsic.Graphics.PostProcessSystem`
 - `Extrinsic.Graphics.ShadowSystem`
+- `Extrinsic.Graphics.HZB`
 - `Extrinsic.Graphics.TransformSyncSystem`
 
 ### RHI modules (`Graphics/RHI`)
@@ -279,6 +280,23 @@ Concretely:
   `set 0, binding 1`) is owned by GRAPHICS-072 (absorbed from the original
   GRAPHICS-073 Slice C scope) and lands alongside the deferred GBuffer +
   lighting passes.
+- GRAPHICS-038A lands `Extrinsic.Graphics.HZB` — the Hi-Z buffer resource shape
+  and its retained graphics-owned ping-pong lifetime. `ComputeHZBDesc(w, h)` is
+  the pure sizing helper (each render dimension rounded up to the next power of
+  two, full mip chain `floor(log2(max(W,H)))+1` to 1x1, `RHI::Format::R32_FLOAT`
+  — the engine's single-channel float, never a normalized format that could
+  quantize the conservative max-depth bound). `HZBSystem` owns two retained
+  textures and swaps their previous/current roles per frame (`AdvanceFrame()`),
+  so the phase-1 occlusion cull (`GRAPHICS-038C`) reads the previous-frame
+  pyramid while the phase-2 build (`GRAPHICS-038B`) writes the current one. A
+  render-extent/format change reallocates both textures and retires the
+  superseded leases through a `framesInFlight` retire-deadline window (the
+  `GRAPHICS-015Q` pattern, drained by `HZBSystem::Tick(currentFrame,
+  framesInFlight)`) so an in-flight frame never samples a freed texture; the
+  textures declare `Sampled | Storage` usage for the read/compute-write split.
+  This slice owns the resource + lifetime contract only (`CPUContracted`); the
+  build compute shader, cull-shader extension, camera-transition heuristic, and
+  opt-in `gpu;vulkan` conservatism smoke are `GRAPHICS-038B/C/D/E`.
 - GRAPHICS-072 Slice A wires the default-recipe deferred-mode `"SurfacePass"`
   to the existing `DeferredGBufferPass` body. `NullRenderer` owns
   `m_DeferredGBufferPass` (constructed against `m_DeferredSystem`) and the

@@ -53,6 +53,7 @@ import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.ReferenceScene;
 import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.RenderWorldPool;
 import Extrinsic.Asset.EventBus;
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.ModelTextureIOBridge;
@@ -315,6 +316,18 @@ namespace Extrinsic::Runtime
         if (m_ImGuiEditorCallback)
             m_ImGuiAdapter->SetEditorCallback(m_ImGuiEditorCallback);
         m_Renderer->SetImGuiOverlaySystem(&m_ImGuiOverlay);
+
+        // ── 2d. Render-world pool (GRAPHICS-036C) ─────────────────────────
+        // Size the runtime-owned slot pool from the render config: one logical
+        // buffer in the default synchronous mode (serial extraction/render,
+        // behavior-preserving), or the triple-buffered default when pipelined
+        // extraction is requested. Flipping SynchronousExtraction off by default
+        // and proving the render-N-1 path is GRAPHICS-036D; this slice only wires
+        // the lifecycle so the synchronous baseline is exercised end-to-end.
+        m_RenderWorldPool = std::make_unique<RenderWorldPool>(
+            m_Config.Render.SynchronousExtraction
+                ? 1u
+                : RenderWorldPool::kDefaultBuffers);
 
         // ── 3. CPU task graph (ECS system scheduling) ─────────────────────
         m_FrameGraph = std::make_unique<Core::FrameGraph>();
@@ -821,6 +834,15 @@ namespace Extrinsic::Runtime
         RHI::FrameHandle frame{};
         Graphics::RenderWorld renderWorld{};
 
+        // GRAPHICS-036C — the render-world pool slot lifecycle is driven around
+        // extraction inside the hook (producer: AcquireBack/PublishFront;
+        // consumer: AcquireFront) and the front reference is released after the
+        // frame retires below. `frameIndex` stamps the acquired slot so the
+        // consumer's frame-age diagnostic reads 0 in the synchronous baseline.
+        const std::uint64_t frameIndex = m_FrameIndex++;
+        RuntimeRenderExtractionStats extractionStats{};
+        std::uint32_t pooledFrontSlot = RenderWorldPool::kInvalidSlot;
+
         struct RenderFrameHooks final : Core::IRenderFrameHooks
         {
             Graphics::IRenderer& Renderer;
@@ -828,6 +850,10 @@ namespace Extrinsic::Runtime
             RenderExtractionCache& Extraction;
             Graphics::GpuAssetCache* GpuAssetCache;
             const SelectionController& Selection;
+            RenderWorldPool& Pool;
+            RuntimeRenderExtractionStats& Stats;
+            std::uint64_t FrameIndex;
+            std::uint32_t& OutFrontSlot;
             RHI::FrameHandle& Frame;
             const Graphics::RenderFrameInput& Input;
             Graphics::RenderWorld& World;
@@ -837,6 +863,10 @@ namespace Extrinsic::Runtime
                              RenderExtractionCache& extraction,
                              Graphics::GpuAssetCache* gpuAssetCache,
                              const SelectionController& selection,
+                             RenderWorldPool& pool,
+                             RuntimeRenderExtractionStats& stats,
+                             std::uint64_t frameIndex,
+                             std::uint32_t& outFrontSlot,
                              RHI::FrameHandle& frame,
                              const Graphics::RenderFrameInput& input,
                              Graphics::RenderWorld& world)
@@ -845,6 +875,10 @@ namespace Extrinsic::Runtime
                 , Extraction(extraction)
                 , GpuAssetCache(gpuAssetCache)
                 , Selection(selection)
+                , Pool(pool)
+                , Stats(stats)
+                , FrameIndex(frameIndex)
+                , OutFrontSlot(outFrontSlot)
                 , Frame(frame)
                 , Input(input)
                 , World(world)
@@ -854,11 +888,29 @@ namespace Extrinsic::Runtime
             bool BeginFrame() override { return Renderer.BeginFrame(Frame); }
             void ExtractRenderWorld() override
             {
+                // GRAPHICS-036C — producer half: acquire a back slot, write the
+                // snapshot into it via ExtractAndSubmit, then publish it as the
+                // front. AcquireBack only fails closed (kInvalidSlot) when the
+                // pool is exhausted; in that case the previous front stays current
+                // and we skip the publish so no in-flight slot is overwritten.
+                const std::uint32_t backSlot = Pool.AcquireBack(FrameIndex);
+
                 // RUNTIME-089 Slice B — mirror the runtime selection snapshot
                 // into RenderWorld::Selection via the extraction batch.
-                [[maybe_unused]] const RuntimeRenderExtractionStats stats =
-                    Extraction.ExtractAndSubmit(Scene, Renderer, GpuAssetCache, &Selection);
+                Stats = Extraction.ExtractAndSubmit(Scene, Renderer, GpuAssetCache, &Selection);
+
+                if (backSlot != RenderWorldPool::kInvalidSlot)
+                    Pool.PublishFront(backSlot);
+
+                // Consumer half: acquire the published front under a refcount for
+                // the renderer's in-flight window; released after frame retire.
+                OutFrontSlot = Pool.AcquireFront(FrameIndex);
+
                 World = Renderer.ExtractRenderWorld(Input);
+
+                // GRAPHICS-036B — surface the pool's three counters on the
+                // extraction stats for editor overlays / tests.
+                MirrorRenderWorldPoolDiagnostics(Pool, Stats);
             }
             void PrepareFrame() override { Renderer.PrepareFrame(World); }
             void ExecuteFrame() override { Renderer.ExecuteFrame(Frame, World); }
@@ -870,13 +922,20 @@ namespace Extrinsic::Runtime
                                      m_RenderExtraction,
                                      m_GpuAssetCache.get(),
                                      m_SelectionController,
+                                     *m_RenderWorldPool,
+                                     extractionStats,
+                                     frameIndex,
+                                     pooledFrontSlot,
                                      frame,
                                      renderInput,
                                      renderWorld);
 
         const Core::RenderFrameResult renderResult = Core::ExecuteRenderFrameContract(renderHooks);
+        m_LastExtractionStats = extractionStats;
         if (!renderResult.BeganFrame)
         {
+            // BeginFrame failed before extraction ran, so no slot was acquired
+            // (pooledFrontSlot stays kInvalidSlot) — nothing to release.
             m_FrameClock.EndFrame();
             return;
         }
@@ -1038,6 +1097,15 @@ namespace Extrinsic::Runtime
         // retirement directly on completedGpuValue for tighter recycling.
         (void)completedGpuValue;
 
+        // ── GRAPHICS-036C: release the pooled front at frame retire ────────
+        // The renderer consumed the front snapshot this frame (commands are
+        // recorded by ExecuteFrame above). In the synchronous default the front
+        // is released here so the single slot is reclaimable next frame; the
+        // pipelined render-N-1 path that holds the reference across the in-flight
+        // GPU window is the GRAPHICS-036D follow-up.
+        if (pooledFrontSlot != RenderWorldPool::kInvalidSlot)
+            m_RenderWorldPool->ReleaseFront(pooledFrontSlot);
+
         // ── Phase 11: Clock EndFrame ──────────────────────────────────────
         m_FrameClock.EndFrame();
     }
@@ -1053,6 +1121,12 @@ namespace Extrinsic::Runtime
     Assets::AssetService& Engine::GetAssetService()  noexcept { return *m_AssetService;  }
     Graphics::GpuAssetCache& Engine::GetGpuAssetCache() noexcept { return *m_GpuAssetCache; }
     ECS::Scene::Registry& Engine::GetScene()         noexcept { return *m_Scene;         }
+
+    const RenderWorldPool& Engine::GetRenderWorldPool() const noexcept { return *m_RenderWorldPool; }
+    const RuntimeRenderExtractionStats& Engine::GetLastRenderExtractionStats() const noexcept
+    {
+        return m_LastExtractionStats;
+    }
 
     Core::Expected<RuntimeAssetImportResult> Engine::ImportAssetFromPath(
         RuntimeAssetImportRequest request)

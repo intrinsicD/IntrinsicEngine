@@ -29,33 +29,51 @@
   renderer holds a front reference across the in-flight GPU window and releases it at
   frame retire.
 
+## Status
+- Commit reference: this task-landing commit.
+- Landed 2026-06-04 at maturity `Operational` on the CPU/null gate.
+  `RenderConfig::SynchronousExtraction` (default `true`) lives on the core render
+  config; `Engine` owns a `std::unique_ptr<RenderWorldPool>` sized from it in
+  `Initialize()` (1 buffer synchronous, triple-buffered otherwise); `RunFrame`
+  drives `AcquireBack`/`PublishFront`/`AcquireFront`/`ReleaseFront` around
+  extraction and mirrors the pool diagnostics onto `m_LastExtractionStats`
+  (exposed via `Engine::GetLastRenderExtractionStats()` /
+  `Engine::GetRenderWorldPool()`). Verified: `IntrinsicRuntimeContractTests`
+  357/357 (2 new `RenderWorldPoolEngineWiring` static-wiring cases pass; the
+  per-frame `BoundedRunDrivesPoolSynchronousBaseline` case skips on the
+  displayless gate per the RUNTIME-090 Slice B precedent, with the slot
+  sequencing itself pinned by the GRAPHICS-036A `Test.RenderWorldPool.cpp`
+  unit contract); layering/test-layout/doc-links/task-policy clean; module
+  inventory regenerated (no diff). `GRAPHICS-036D` owns the pipelined render-N-1
+  proof.
+
 ## Required changes
-- [ ] Add `RenderConfig::SynchronousExtraction` (default `true`) to the core render config.
-- [ ] Have `Engine` own a `RenderWorldPool` sized from the config in `Initialize()`.
-- [ ] In `Engine::RunFrame`, `AcquireBack(frameIndex)` before render extraction,
+- [x] Add `RenderConfig::SynchronousExtraction` (default `true`) to the core render config.
+- [x] Have `Engine` own a `RenderWorldPool` sized from the config in `Initialize()`.
+- [x] In `Engine::RunFrame`, `AcquireBack(frameIndex)` before render extraction,
       `PublishFront(slot)` after extraction submit, `AcquireFront(frameIndex)` before
       the renderer consumes, and `ReleaseFront(slot)` at frame retire; call
       `MirrorRenderWorldPoolDiagnostics` into the extraction stats once per frame.
-- [ ] Add `contract;runtime` coverage driving a bounded `Engine::Run()` that asserts
+- [x] Add `contract;runtime` coverage driving a bounded `Engine::Run()` that asserts
       the pool is driven correctly in synchronous mode (behavior-preserving; counters
       report the synchronous baseline).
 
 ## Tests
-- [ ] `contract;runtime` — bounded `Engine::Run()` in synchronous mode preserves the
+- [x] `contract;runtime` — bounded `Engine::Run()` in synchronous mode preserves the
       existing single-snapshot behavior; pool lifecycle is exercised; diagnostics
       mirror reports the synchronous baseline.
-- [ ] CPU gate: `ctest --test-dir build/ci -L runtime -LE 'gpu|vulkan|slow|flaky-quarantine'` green.
+- [x] CPU gate: `ctest --test-dir build/ci -L runtime -LE 'gpu|vulkan|slow|flaky-quarantine'` green.
 
 ## Docs
-- [ ] Document the pool frame-loop wiring + `SynchronousExtraction` default in
+- [x] Document the pool frame-loop wiring + `SynchronousExtraction` default in
       `src/runtime/README.md` (canonical frame-loop phases) and `docs/architecture/graphics.md`.
-- [ ] Regenerate `docs/api/generated/module_inventory.md` if module surfaces change.
+- [x] Regenerate `docs/api/generated/module_inventory.md` if module surfaces change.
 
 ## Acceptance criteria
-- [ ] `Engine::RunFrame` drives the pool acquire/publish/acquire/release sequence and
+- [x] `Engine::RunFrame` drives the pool acquire/publish/acquire/release sequence and
       mirrors diagnostics, with the synchronous default preserving current behavior.
-- [ ] No new layering violations; default CPU gate stays green.
-- [ ] `GRAPHICS-036D` remains the pipelined-path proof follow-up.
+- [x] No new layering violations; default CPU gate stays green.
+- [x] `GRAPHICS-036D` remains the pipelined-path proof follow-up.
 
 ## Verification
 ```bash

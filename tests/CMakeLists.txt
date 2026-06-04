@@ -304,6 +304,7 @@ if(TARGET ExtrinsicRuntime)
         Test.SpatialDebugAdapters.cpp
         Test.StableEntityLookup.cpp
         Test.RenderWorldPool.cpp
+        Test.RenderWorldPoolEngineWiring.cpp
         Test.VisualizationAdapters.cpp
     )
     intrinsic_resolve_test_sources(_runtime_contract_test_sources
@@ -614,6 +615,7 @@ set(_graphics_contract_cpu_test_files
     Test.FrameRecipeContract.cpp
     Test.GpuWorldCompactionContract.cpp
     Test.GpuWorldLifetimeContract.cpp
+    Test.HZBResourceLifetime.cpp
     Test.ImGuiPass.cpp
     Test.ImGuiPresentContract.cpp
     Test.LightingShadowContracts.cpp
