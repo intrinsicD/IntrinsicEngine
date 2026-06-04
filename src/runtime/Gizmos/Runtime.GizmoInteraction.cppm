@@ -19,8 +19,9 @@ export namespace Extrinsic::Runtime
 {
     // Which transform operation the gizmo currently authors. RUNTIME-084 Slice A
     // implements translate hit-test + drag math; rotate/scale modes are
-    // hit-testable and render-packetable but their drag application is owned by a
-    // follow-up slice (the drag-tick deltas only mutate translation today).
+    // hit-testable and render-packetable but their drag *application* is owned by
+    // a follow-up slice. `BeginDrag`/`DragTick` reject non-Translate modes (no-op)
+    // so switching modes never moves entities through the translate path.
     enum class GizmoMode : std::uint8_t
     {
         Translate = 0,
@@ -194,8 +195,10 @@ export namespace Extrinsic::Runtime
         // --- drag lifecycle ---
         // Begin an axis drag from a resolved hit. Records the per-entity before
         // transforms and the drag anchor parameter along the world axis. Returns
-        // false when the hit is a no-hit, the selection is empty, or the ray is
-        // degenerate.
+        // false when the hit is a no-hit, the selection is empty, the ray is
+        // degenerate, or the mode is not `Translate` — Slice A only applies
+        // translation, so Rotate/Scale drags are rejected here (their drag
+        // application is the Slice B follow-up) rather than silently translating.
         bool BeginDrag(const Registry& registry,
                        const GizmoHitResult& hit,
                        const PickRay& ray,
@@ -203,9 +206,10 @@ export namespace Extrinsic::Runtime
 
         // Apply an in-progress drag for the current ray. Mutates ECS authoring
         // transforms (translation along the locked axis) and stamps the transform
-        // dirty marker. No-op (returns false) when not dragging or the ray is
-        // degenerate. The applied scalar is rounded to the snap step when the
-        // `Snap` modifier is set.
+        // dirty marker. No-op (returns false) when not dragging, the ray is
+        // degenerate, or the mode is not `Translate` (a mid-drag switch to
+        // Rotate/Scale does nothing rather than translate). The applied scalar is
+        // rounded to the snap step when the `Snap` modifier is set.
         bool DragTick(Registry& registry, const PickRay& ray);
 
         // Commit the drag: emit one `GizmoTransformEdit` per moved entity to

@@ -231,6 +231,13 @@ namespace Extrinsic::Runtime
         if (!hit.Hit || hit.Axis == GizmoAxis::None || selected.empty())
             return false;
 
+        // Slice A only applies translation. Reject drags in Rotate/Scale mode so
+        // a caller that has switched modes does not move selected entities
+        // through the translate path; rotate/scale drag application is owned by
+        // the Slice B follow-up.
+        if (m_Mode != GizmoMode::Translate)
+            return false;
+
         const float dirLen = glm::length(ray.Direction);
         if (!(std::isfinite(dirLen) && dirLen > kEpsilon) || !IsFinite(ray.Origin))
             return false;
@@ -268,6 +275,12 @@ namespace Extrinsic::Runtime
     bool GizmoInteraction::DragTick(Registry& registry, const PickRay& ray)
     {
         if (!m_Dragging)
+            return false;
+
+        // Translation is the only drag application in Slice A. If the mode was
+        // switched to Rotate/Scale mid-drag, do nothing rather than translate
+        // through the unfinished path.
+        if (m_Mode != GizmoMode::Translate)
             return false;
 
         const float dirLen = glm::length(ray.Direction);

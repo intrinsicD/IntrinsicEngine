@@ -172,6 +172,41 @@ TEST(GizmoInteraction, DragCancelRestoresBeforeTransform)
     EXPECT_NEAR(registry.Raw().get<Tf::Component>(entity).Position.x, 1.f, 1.0e-4f);
 }
 
+// Rotate/Scale modes do not translate: Slice A only applies translation, so
+// BeginDrag is rejected (and a mid-drag mode switch stops DragTick) rather than
+// moving the selected entity through the translate path.
+TEST(GizmoInteraction, NonTranslateModesRejectDragApplication)
+{
+    Registry registry{};
+    const EntityHandle entity = MakeEntity(registry, glm::vec3{0.f});
+    const EntityHandle selected[] = {entity};
+
+    GizmoHitResult hit{};
+    hit.Hit = true;
+    hit.Axis = GizmoAxis::X;
+    hit.Entity = entity;
+    const PickRay startRay{.Origin = {2.f, 0.f, 5.f}, .Direction = {0.f, 0.f, -1.f}};
+    const PickRay currentRay{.Origin = {5.f, 0.f, 5.f}, .Direction = {0.f, 0.f, -1.f}};
+
+    for (const GizmoMode mode : {GizmoMode::Rotate, GizmoMode::Scale})
+    {
+        GizmoInteraction gizmo{};
+        gizmo.SetMode(mode);
+        EXPECT_FALSE(gizmo.BeginDrag(registry, hit, startRay, selected));
+        EXPECT_FALSE(gizmo.IsDragging());
+        EXPECT_FALSE(gizmo.DragTick(registry, currentRay));
+        EXPECT_NEAR(registry.Raw().get<Tf::Component>(entity).Position.x, 0.f, 1.0e-4f);
+    }
+
+    // A drag started in Translate mode that is switched to Rotate mid-drag stops
+    // applying translation instead of continuing to move the entity.
+    GizmoInteraction gizmo{};
+    ASSERT_TRUE(gizmo.BeginDrag(registry, hit, startRay, selected));
+    gizmo.SetMode(GizmoMode::Rotate);
+    EXPECT_FALSE(gizmo.DragTick(registry, currentRay));
+    EXPECT_NEAR(registry.Raw().get<Tf::Component>(entity).Position.x, 0.f, 1.0e-4f);
+}
+
 // --- Snap rounding ---------------------------------------------------------
 
 TEST(GizmoInteraction, SnapModifierRoundsTranslationToStep)

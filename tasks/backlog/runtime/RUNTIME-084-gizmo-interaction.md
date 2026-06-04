@@ -20,8 +20,10 @@
   axis-handle hit testing, axis-constrained translate drag against ECS authoring
   transforms, snap rounding, undo emission, and the frozen render-packet field
   mapping, all behind pure `contract;runtime` tests. Preserves the default CPU
-  gate. Defers `Engine` wiring + real pointer-input binding to Slice B. Maturity
-  `CPUContracted`.
+  gate. Defers `Engine` wiring + real pointer-input binding to Slice B. Rotate/
+  Scale drag *application* is also Slice B, so Slice A's `BeginDrag`/`DragTick`
+  reject non-`Translate` modes (no-op) rather than move entities through the
+  translate path. Maturity `CPUContracted`.
 - **Slice B (deferred).** Wire `Engine::OnVariableTick` to build the gizmo pivot
   camera snapshot from the active camera controller, read the window cursor +
   button state, drive `HitTest`/`BeginDrag`/`DragTick`/`DragCommit`, and refresh
