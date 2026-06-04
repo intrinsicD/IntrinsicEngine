@@ -723,7 +723,7 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   readback path canonical.
 
 Cross-layer Theme B′ leaves outside `rendering/`:
-- [`runtime/RUNTIME-080` — Texture asset bridge](../runtime/RUNTIME-080-asset-bridges-texture.md).
+- [`runtime/RUNTIME-080` — Texture asset bridge](../../done/RUNTIME-080-asset-bridges-texture.md) (superseded by `ASSETIO-001`, retired 2026-06-03).
 - [`RUNTIME-081` — Camera controllers](../../done/RUNTIME-081-camera-controllers.md).
 - [`runtime/RUNTIME-082` — Spatial debug adapters](../../done/RUNTIME-082-spatial-debug-adapters.md) (done 2026-05-27).
 - [`runtime/RUNTIME-083` — Visualization adapters](../../done/RUNTIME-083-visualization-adapters.md).

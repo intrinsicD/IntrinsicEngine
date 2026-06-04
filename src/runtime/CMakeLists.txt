@@ -16,6 +16,7 @@ target_sources(${target_name}
         Runtime.Engine.cppm
         Cameras/Runtime.CameraControllers.cppm
         Editor/Runtime.SandboxEditorUi.cppm
+        Gizmos/Runtime.GizmoInteraction.cppm
         ImGui/Runtime.ImGuiAdapter.cppm
         Runtime.GraphGeometryPacker.cppm
         Runtime.MeshGeometryPacker.cppm
@@ -40,6 +41,7 @@ target_sources(${target_name}
         Runtime.EcsSystemBundle.cpp
         Runtime.Engine.cpp
         Editor/Runtime.SandboxEditorUi.cpp
+        Gizmos/Runtime.GizmoInteraction.cpp
         ImGui/Runtime.ImGuiAdapter.cpp
         Runtime.GraphGeometryPacker.cpp
         Runtime.MeshGeometryPacker.cpp

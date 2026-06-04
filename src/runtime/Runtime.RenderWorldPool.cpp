@@ -94,19 +94,26 @@ namespace Extrinsic::Runtime
         std::uint32_t slot = FindFreeSlot();
         if (slot == kInvalidSlot)
         {
-            // Producer faster than consumer (decision 5): overwrite the still-
-            // unpublished back slot if one exists; otherwise (a misconfigured
-            // pool where every slot is held in flight) fall back to the lowest
-            // non-front slot. Both paths count an extraction skip.
+            // Producer faster than consumer (decision 5): no slot is free.
             ++m_Diagnostics.ExtractionSkipCount;
-            if (m_Back != kInvalidSlot)
+            // Overwrite the still-unpublished back slot when one exists: it was
+            // never published, so the consumer never took a reference on it
+            // (its refcount is 0). Otherwise every remaining slot is a published
+            // front the consumer/GPU still holds in flight (refcount > 0), so
+            // the pool is exhausted: reusing any of them would let this
+            // extraction overwrite storage an in-flight frame still references,
+            // violating the refcount lifecycle the pool guarantees. In that
+            // case fail closed — return kInvalidSlot so the producer skips this
+            // extraction and keeps the previous front current — instead of
+            // handing out a referenced slot.
+            if (m_Back != kInvalidSlot &&
+                m_Slots[m_Back].RefCount.load(std::memory_order_acquire) == 0u)
             {
                 slot = m_Back;
             }
             else
             {
-                const std::uint32_t front = m_Front.load(std::memory_order_acquire);
-                slot = (front == 0u && m_Slots.size() > 1u) ? 1u : 0u;
+                return kInvalidSlot;
             }
         }
 

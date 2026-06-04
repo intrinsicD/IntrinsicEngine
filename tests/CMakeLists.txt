@@ -283,6 +283,7 @@ if(TARGET ExtrinsicRuntime)
         Test.MeshGeometryPacker.cpp
         Test.MeshPrimitiveViewPacker.cpp
         Test.MeshPrimitiveViewExtraction.cpp
+        Test.GizmoInteraction.cpp
         Test.GraphGeometryExtraction.cpp
         Test.GraphGeometryPacker.cpp
         Test.PointCloudGeometryExtraction.cpp
@@ -644,6 +645,7 @@ set(_runtime_graphics_cpu_test_files
     Test.RuntimeRenderExtraction.cpp
     Test.RuntimeDeviceSelection.cpp
     Test.RuntimeFrameLoopContract.cpp
+    Test.RuntimeSandboxAcceptance.cpp
 )
 intrinsic_resolve_test_sources(_runtime_graphics_cpu_test_sources
     SEARCH_DIRS integration/runtime contract/runtime

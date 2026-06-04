@@ -94,7 +94,7 @@ upstream these runtime gates consume.
 
 | Gate | Task | State | Evidence |
 |---|---|---|---|
-| Texture asset bridge | [`RUNTIME-080`](../../tasks/backlog/runtime/RUNTIME-080-asset-bridges-texture.md) | **OPEN** | No runtime asset-bridge module. |
+| Texture asset bridge | [`RUNTIME-080`](../../tasks/done/RUNTIME-080-asset-bridges-texture.md) | **SUPERSEDED / DONE** | Capability shipped under `ASSETIO-001` as `Extrinsic.Runtime.AssetModelTextureHandoff`; the umbrella was retired without re-implementation on 2026-06-03. |
 | Runtime ImGui platform/renderer adapter | [`RUNTIME-090`](../../tasks/done/RUNTIME-090-imgui-platform-renderer-adapter.md) | **DONE** | `Extrinsic.Runtime.ImGuiAdapter` produces `ImGuiOverlayFrame` records from runtime-owned ImGui frames; `GRAPHICS-079` consumes them through the renderer-owned `Pass.ImGui` path. |
 | Asset model/texture ingest ownership | [`ASSETIO-001`](../../tasks/done/ASSETIO-001-asset-model-texture-ingest-ownership.md) | **DONE** | Retired at `CPUContracted`: promoted asset routing, geometry/model/texture decoder dispatch, texture GPU-residency handoff, model-scene ECS `GeometrySources` materialization, deterministic embedded child texture assets, and material `AssetId` binding records are covered. Operational file-backed sandbox consumption remains in `RUNTIME-095`. |
 | Sandbox editor shell + core panels | [`UI-001`](../../tasks/done/UI-001-sandbox-editor-shell-panels.md) | **DONE** | Retired at `CPUContracted`: `Extrinsic.Runtime.SandboxEditorUi` covers scene hierarchy, inspector, selection/refined primitive details, file/import entry command execution through `Engine::ImportAssetFromPath(...)`, camera/controller and mesh primitive-view commands, selected-entity `SpatialDebugBinding` / `VisualizationConfig`, and visualization adapter-binding routing through `RenderExtractionCache`. Operational visual/file-backed proof remains `RUNTIME-095`. |
@@ -109,7 +109,16 @@ upstream these runtime gates consume.
 ### F. Final acceptance
 
 - [`RUNTIME-095`](../../tasks/backlog/runtime/RUNTIME-095-working-sandbox-acceptance.md)
-  itself — **OPEN**, blocked by A–D above.
+  itself — **IN PROGRESS**. Slice 1 landed 2026-06-03 (`Test.RuntimeSandboxAcceptance.cpp`,
+  `integration;runtime;graphics`): CPU/null end-to-end acceptance proving one
+  mesh + one graph + one point cloud all reside through a single extraction with
+  distinct `GpuWorld` handles, a finite/invertible camera-controller frame
+  camera, whole-entity selection per family, and the sandbox editor panel frame
+  enumerating the scene. Slice 2 landed the same day: a mocked pick readback
+  resolves a mesh Face / graph Edge / point-cloud Point through
+  `RefinePickReadbackResult`, and the `RenderWorld.Selection` outline snapshot is
+  populated for the selected entity. Only Slice 3 (opt-in `gpu;vulkan`
+  default-recipe present smoke, `Operational`) remains.
 
 ## Suggested dependency order to unblock RUNTIME-095
 
@@ -120,19 +129,20 @@ upstream these runtime gates consume.
 3. **RUNTIME-089 → RUNTIME-092 → RUNTIME-093** (selection controller, stable
    lookup, primitive refinement) — the selection acceptance chain; `RUNTIME-088`
    feeds primitive selection.
-4. **RUNTIME-080 + ASSETIO-001** (texture asset bridge, asset model/texture
-   ingest ownership) — the asset-plumbing seams RUNTIME-095 names as required
-   upstreams. These can land in parallel with the selection chain.
+4. **ASSETIO-001** (asset model/texture ingest ownership, which subsumed the
+   retired `RUNTIME-080` texture bridge as `AssetModelTextureHandoff`) — the
+   asset-plumbing seam RUNTIME-095 names as a required upstream. It can land in
+   parallel with the selection chain.
 5. **UI-001** — completed at `CPUContracted`; editor panels and command seams are
    no longer a prerequisite gate except for final `RUNTIME-095` proof.
 6. **GRAPHICS-081** — completed on 2026-06-02; no bootstrap recipe acceptance
    path remains.
 7. **RUNTIME-095** — author the CPU/null + opt-in Vulkan acceptance once A–E land.
 
-The remaining asset/UI-plumbing gate (`RUNTIME-080`) and the retired
-`ASSETIO-001` / `UI-001` seams are **required upstreams** per RUNTIME-095's
-Context section, so they stay on the acceptance path: do not retire
-`RUNTIME-095` until the final file-backed runtime proof consumes them.
+The retired `ASSETIO-001` (which subsumed `RUNTIME-080`) and `UI-001` seams are
+**required upstreams** per RUNTIME-095's Context section, so they stay on the
+acceptance path: do not retire `RUNTIME-095` until the final file-backed runtime
+proof consumes them.
 A procedurally authored acceptance scene can reduce how much *content* breadth
 each seam must cover (RUNTIME-095 explicitly does not require every asset format
 or visualization mode), but it does not remove the requirement that the texture
