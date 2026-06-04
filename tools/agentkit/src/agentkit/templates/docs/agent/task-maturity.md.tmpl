@@ -1,0 +1,32 @@
+# Task Maturity
+
+Some slices land **partial-but-correct** rather than fully complete — a scaffold,
+a CPU-only path, a behind-a-flag feature. That is fine, as long as the stop-state
+is explicit. This doc defines the closure rule for ambiguous endpoints.
+
+## When to add a `## Maturity` section
+
+Add it whenever "done" is debatable: a feature that works in one mode but not
+another, a reference implementation without the optimized path, an interface
+that is wired but not yet exercised end-to-end.
+
+## A generic maturity ladder
+
+Adapt these to your project; the names matter less than being explicit:
+
+1. **Scaffolded** — structure/interfaces exist; behavior is stubbed or fails closed.
+2. **Functional** — the primary path works and is tested.
+3. **Hardened** — edge cases, error paths, and performance addressed.
+4. **Retired** — superseded or removed.
+
+## The closure rule
+
+A task that intentionally stops below full maturity **must** do one of:
+
+- name the follow-up task id that owns the remaining maturity, e.g.
+  *"Hardening owned by {{TASK_ID_EXAMPLE}}."*, or
+- explicitly state that no follow-up is owed, e.g.
+  *"Functional is the intended endpoint; no hardening follow-up is owed."*
+
+A `## Maturity` section that does neither is an open-ended slice and should not
+be closed. This keeps "partial" from quietly becoming "abandoned".

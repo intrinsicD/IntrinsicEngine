@@ -1,0 +1,40 @@
+# Session Onboarding Prompt
+
+The default operating loop for an agent working in {{PROJECT_NAME}}. Read
+`{{CONTRACT_FILE}}` first; this is how to *apply* it.
+
+## Orient
+
+1. Read `{{CONTRACT_FILE}}` and the master skill
+   (`{{SKILLS_DIR}}/{{SKILL_CORE}}/SKILL.md`).
+2. Find or pick the work: an active task, then backlog priority. If the work
+   isn't captured as a task yet, write one first (see
+   [task-format](/{{DOCS_AGENT_DIR}}/task-format.md)).
+
+## Execute (smallest useful slice)
+
+3. Scope the change to one task. Inspect the surrounding code before editing.
+4. Implement the smallest patch that satisfies the task.
+5. Add or update tests for the behavior you changed.
+6. Update docs/task records in the same change.
+
+## Verify before claiming done
+
+7. Run the strongest relevant verification: `{{TEST_CMD}}`.
+8. Run the structural checks: `python3 {{TOOLS_DIR}}/check.py --strict`.
+9. Self-review against the
+   [review checklist](/{{DOCS_AGENT_DIR}}/review-checklist.md). Commit with a
+   message that explains *why*.
+
+## Anti-patterns to avoid
+
+- Mixing mechanical moves with semantic refactors.
+- Expanding scope beyond the task.
+- Claiming completion without running the verification gate.
+- Adding abstraction with a single caller.
+- Writing docs that describe a hoped-for future as the present.
+
+## Multi-task loop
+
+When a task closes (moved to `tasks/done/` with completion metadata), return to
+step 2 and pick the next one, rather than enlarging the current change.

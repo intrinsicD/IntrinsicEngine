@@ -1,0 +1,29 @@
+# Agent Output Review Checklist
+
+A periodic (e.g. weekly) human-led audit of recent agent-authored commits in
+{{PROJECT_NAME}}. It catches drift that a single-PR review misses. The cadence
+is additive to per-PR review and is intentionally **not** enforced by CI.
+
+Review the recent slices and flag any of these failure modes:
+
+1. **Silent scope creep** — changes beyond the task's stated scope, accumulated
+   quietly across several PRs.
+2. **Decorative comments** — comments that restate the code instead of
+   explaining intent, invariants, or *why*.
+3. **Premature abstraction** — interfaces/indirection with a single caller and
+   no second use in sight.
+4. **Documented-but-not-tested** — docs or task records claim behavior that no
+   test actually exercises.
+5. **Defensive validation theater** — redundant guards that can never fire, or
+   that mask real errors instead of surfacing them.
+6. **Untracked temporary shims** — "temporary" workarounds with no removal task
+   and no expiry.
+7. **Ceremony without shipped value** — process artifacts (tasks, docs, configs)
+   produced without a corresponding working change.
+8. **Half-finished slices** — work left in `tasks/active/` that is effectively
+   abandoned, or `done/` entries that aren't actually done.
+9. **Aspirational docs** — documentation describing a desired future state as if
+   it were the current state.
+
+For each finding: record it, decide pass/fail, and open a follow-up task
+(`tasks/backlog/`) rather than fixing it inline during the audit.

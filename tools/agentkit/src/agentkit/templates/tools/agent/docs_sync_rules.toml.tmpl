@@ -1,0 +1,18 @@
+# Docs-sync rules for {{PROJECT_NAME}}.
+# Checked by {{CHECKS_DIR}}/check_docs_sync.py.
+#
+# Each rule: if a changed file matches any `when` glob, then at least one changed
+# file must also match a `require_one_of` glob. Globs are fnmatch-style, where
+# `*` spans path separators. With no active rules this check is a no-op.
+#
+# Uncomment and adapt to your layout:
+#
+# [[rule]]
+# name = "source changes need docs or a changelog"
+# when = ["src/**", "lib/**"]
+# require_one_of = ["docs/**", "CHANGELOG.md"]
+#
+# [[rule]]
+# name = "public API changes need API docs"
+# when = ["include/**", "src/**/api/**"]
+# require_one_of = ["docs/api/**"]

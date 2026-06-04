@@ -1,0 +1,31 @@
+name: pr-fast
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  pr-fast:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # TODO: install your toolchain/dependencies, then build and test.
+      # Mirror agentkit.toml [commands]; see also .claude/setup.sh.
+      #
+      # - name: Build
+      #   run: {{BUILD_CMD}}
+      # - name: Test
+      #   run: {{TEST_CMD}}
+
+      - name: Validate tasks (strict)
+        run: python3 {{CHECKS_DIR}}/check_tasks.py --root . --strict
+
+      - name: Validate doc links (strict)
+        run: python3 {{CHECKS_DIR}}/check_doc_links.py --root . --strict

@@ -1,0 +1,23 @@
+---
+name: {{SKILL_DIAGNOSE}}
+description: Disciplined diagnosis loop for hard bugs and regressions in {{PROJECT_NAME}}. Build a deterministic feedback loop, reproduce, rank falsifiable hypotheses, instrument with tagged probes, fix, add a regression test, then clean up. Use when the user says "diagnose this" or "debug this", reports a crash, a flaky test, or a regression versus a known-good baseline.
+---
+
+# Diagnose
+
+A loop, not a guess. Resist the urge to patch before you can reproduce.
+
+1. **Feedback loop** — find or build the fastest command that reliably shows the
+   failure. If it is slow or flaky, fix that first.
+2. **Reproduce** — make the failure deterministic. Pin inputs, seeds, versions.
+3. **Hypotheses** — write 3–5 *falsifiable* causes, ranked by likelihood. For
+   each, note the single observation that would confirm or kill it.
+4. **Instrument** — add tagged probes (e.g. `[DBG-1234]`) at the decision points
+   your hypotheses disagree about. Let the data, not intuition, pick.
+5. **Fix + regression test** — write a test that fails on the bug *before*
+   applying the fix, so the fix is proven and the bug can't silently return.
+6. **Clean up** — remove probes, keep the regression test, and record in the
+   task (or a post-mortem note) what would have caught this earlier.
+
+If a known-good baseline exists, bisect or diff against it — a differential is
+usually faster than reasoning from first principles.

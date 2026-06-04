@@ -1,0 +1,41 @@
+---
+name: {{SKILL_CORE}}
+description: Master entry point and router for the {{PROJECT_NAME}} agentic workflow. Read at the start of every session. Summarizes the authoritative contract ({{CONTRACT_FILE}}) and routes to specialist skills for task workflow, review, docs sync, diagnosis, and handoff. Use whenever working in this repository, or when asked about repository policy, the agent contract, the task workflow, build/verification commands, or which skill applies.
+---
+
+# {{PROJECT_NAME}} — Core
+
+This is the master skill. The authoritative contract is `{{CONTRACT_FILE}}`; this
+skill summarizes it and routes to specialists. Authority order:
+`{{CONTRACT_FILE}}` > `{{DOCS_AGENT_DIR}}/*` > skills. If a skill and a source
+doc disagree, the source doc wins.
+
+## Session start
+
+1. Read `{{CONTRACT_FILE}}`.
+2. Skim `references/session-onboarding.md` (the operating loop).
+3. Pick an active task or write one before coding (task-workflow skill).
+
+## Routing — load specialists on demand
+
+| When you are… | Use skill |
+|---------------|-----------|
+| creating, slicing, promoting, or closing tasks | `{{SKILL_TASK_WORKFLOW}}` |
+| about to commit, open a PR, or finish a slice | `{{SKILL_REVIEW}}` |
+| moving files, changing public surfaces, deciding if docs must update | `{{SKILL_DOCS_SYNC}}` |
+| chasing a hard bug, crash, flake, or regression | `{{SKILL_DIAGNOSE}}` |
+| compacting a session for the next agent | `{{SKILL_HANDOFF}}` |
+
+## Operating principles (summary)
+
+- Smallest useful patch, one task at a time.
+- Never mix mechanical moves with semantic refactors.
+- Tests and docs travel with behavior changes.
+- Before claiming done, run `{{TEST_CMD}}` and
+  `python3 {{TOOLS_DIR}}/check.py --strict`.
+
+## References
+
+- `references/contract.md` — mirror of `{{CONTRACT_FILE}}`.
+- `references/roles.md`
+- `references/session-onboarding.md`
