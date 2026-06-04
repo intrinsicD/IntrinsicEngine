@@ -505,6 +505,26 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
     )
 endif()
 
+# RUNTIME-095 Slice 3 — opt-in `gpu;vulkan;integration` working-sandbox present
+# smoke. Runtime-owned (drives the `Engine` over an ECS-authored acceptance
+# scene) so it lives next to the Slice 1/2 CPU acceptance test and links the
+# runtime/graphics/Vulkan stack; gated on the promoted Vulkan backend + GLFW
+# platform exactly like the graphics smokes above.
+if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQUAL "Glfw")
+    set(_runtime_sandbox_acceptance_gpu_smoke_test_files
+        Test.RuntimeSandboxAcceptanceGpuSmoke.cpp
+    )
+    intrinsic_resolve_test_sources(_runtime_sandbox_acceptance_gpu_smoke_test_sources
+        SEARCH_DIRS integration/runtime
+        FILES ${_runtime_sandbox_acceptance_gpu_smoke_test_files}
+    )
+    intrinsic_test_object_lib(RuntimeSandboxAcceptanceGpuSmokeTestObjs
+        SOURCES
+            ${_runtime_sandbox_acceptance_gpu_smoke_test_sources}
+        DEPS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicECS ExtrinsicCore glm::glm
+    )
+endif()
+
 set(_graphics_unit_test_files
     Test.RHI.BufferManager.cpp
     Test.RHI.SamplerManager.cpp
@@ -975,6 +995,20 @@ if(TARGET GraphicsVulkanSmokeTestObjs)
         LABELS gpu vulkan graphics
     )
     intrinsic_add_glsl_shaders(IntrinsicGraphicsVulkanSmokeTests)
+endif()
+
+# RUNTIME-095 Slice 3 — opt-in `gpu;vulkan;integration` working-sandbox present smoke.
+# LINK_LIBS unions the proven default-recipe GPU smoke set (Runtime + Vulkan
+# backend + Platform/RHI/Core) with the ECS/Graphics symbols the acceptance-scene
+# authoring needs (matching the `IntrinsicRuntimeGraphicsCpuTests` link set used
+# by the Slice 1/2 CPU acceptance test).
+if(TARGET RuntimeSandboxAcceptanceGpuSmokeTestObjs)
+    intrinsic_test_executable(IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests
+        OBJECTS RuntimeSandboxAcceptanceGpuSmokeTestObjs
+        LINK_LIBS ExtrinsicRuntime ExtrinsicGraphics ExtrinsicBackendsVulkan ExtrinsicPlatform ExtrinsicRHI ExtrinsicECS ExtrinsicCore
+        LABELS gpu vulkan integration runtime graphics
+    )
+    intrinsic_add_glsl_shaders(IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests)
 endif()
 
 intrinsic_test_executable(IntrinsicGraphicsUnitTests
