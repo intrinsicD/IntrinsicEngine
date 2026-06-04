@@ -31,6 +31,7 @@ import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.RenderWorldPool;
 import Extrinsic.Asset.EventBus;
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.Registry;
@@ -256,6 +257,21 @@ namespace Extrinsic::Runtime
         [[deprecated("Use Runtime.StreamingExecutor integration; TaskGraph bridge is temporary.")]]
         [[nodiscard]] Core::Dag::TaskGraph&   GetStreamingGraph() noexcept;
 
+        // ── GRAPHICS-036C — pipelined-frames render-world pool ────────────
+        // Runtime-owned slot-lifecycle pool (`GRAPHICS-036A`) driven by RunFrame:
+        // extraction acquires/publishes a back slot, the renderer consumes/releases
+        // the front slot, and the pool's three diagnostics counters mirror onto the
+        // last extraction stats each frame. Sized from
+        // `RenderConfig::SynchronousExtraction` in Initialize() (1 buffer when
+        // synchronous, triple-buffered otherwise). Valid after Initialize(); the
+        // pipelined render-N-1 storage proof is `GRAPHICS-036D`.
+        [[nodiscard]] const RenderWorldPool&  GetRenderWorldPool() const noexcept;
+        // The `RuntimeRenderExtractionStats` produced by the most recent frame's
+        // `ExtractAndSubmit`, including the mirrored `RenderWorldPool*` counters.
+        // Zero-initialized until the first frame extracts.
+        [[nodiscard]] const RuntimeRenderExtractionStats&
+            GetLastRenderExtractionStats() const noexcept;
+
         // ── Reference scene seam (GRAPHICS-029A/B) ────────────────────────
         // Accessible before Initialize() so tests and downstream impl
         // children register providers prior to subsystem wiring. After
@@ -325,6 +341,17 @@ namespace Extrinsic::Runtime
         std::function<void()>                m_ImGuiEditorCallback{};
         std::unique_ptr<ImGuiAdapter>        m_ImGuiAdapter{};
         RenderExtractionCache                 m_RenderExtraction;
+        // GRAPHICS-036C — runtime-owned render-world slot pool. Constructed in
+        // Initialize() sized from RenderConfig::SynchronousExtraction (held by
+        // unique_ptr because RenderWorldPool owns atomics and is neither copyable
+        // nor movable, so it cannot be resized by assignment). RunFrame drives the
+        // acquire/publish/acquire/release sequence and mirrors its diagnostics into
+        // m_LastExtractionStats once per frame.
+        std::unique_ptr<RenderWorldPool>      m_RenderWorldPool{};
+        RuntimeRenderExtractionStats          m_LastExtractionStats{};
+        // Monotonic frame counter stamped onto pool slots for the consumer's
+        // frame-age computation; incremented once per RunFrame.
+        std::uint64_t                         m_FrameIndex{0u};
         // RUNTIME-089 Slice B — selection authority; persists across frames so
         // in-flight picks correlate with their later readbacks.
         SelectionController                   m_SelectionController{};

@@ -134,17 +134,38 @@ freshly-constructed subsystems):
    `RenderWorld.PickRequest` and the GPU picking slot) so graphics issues the
    pick this frame.
 5. Renderer begin frame.
-6. Runtime render extraction: ECS queries, runtime sidecars, dirty-domain interpretation, deletion cleanup, the runtime selection snapshot mirror into `RenderWorld.Selection` (RUNTIME-089 Slice B, via the `SelectionController*` argument to `RenderExtractionCache::ExtractAndSubmit`), and `IRenderer::SubmitRuntimeSnapshots()` handoff.
+6. Runtime render extraction: the `RenderWorldPool` producer acquires a back slot (`AcquireBack(frameIndex)`, GRAPHICS-036C), then ECS queries, runtime sidecars, dirty-domain interpretation, deletion cleanup, the runtime selection snapshot mirror into `RenderWorld.Selection` (RUNTIME-089 Slice B, via the `SelectionController*` argument to `RenderExtractionCache::ExtractAndSubmit`), and `IRenderer::SubmitRuntimeSnapshots()` handoff. The producer then publishes the slot (`PublishFront`), the consumer acquires the front under a refcount (`AcquireFront(frameIndex)`), and `MirrorRenderWorldPoolDiagnostics` copies the pool's three counters onto `Engine::GetLastRenderExtractionStats()`.
 7. Renderer render-world extraction.
 8. Render prepare.
 9. Render execute.
 10. End frame + present.
 11. Maintenance: transfer retirement, streaming drain/apply/pump, asset service tick, `GpuAssetCache::Tick`, `RenderExtractionCache::TickProceduralGeometry` (procedural geometry deferred-retire window), `RenderExtractionCache::TickMeshGeometry` (runtime-owned mesh-residency deferred-retire window), and `RenderExtractionCache::TickGraphGeometry` (runtime-owned graph-residency deferred-retire window), `RenderExtractionCache::TickPointCloudGeometry` (runtime-owned point-cloud-residency deferred-retire window), and `RenderExtractionCache::TickMeshPrimitiveViewGeometry` (runtime-owned mesh edge/vertex primitive-view deferred-retire window). After the maintenance contract the runtime rebuilds the `StableEntityLookup` from the live scene (`RUNTIME-092` Slice B), then drains **all** completed pick readbacks (`SelectionSystem::PopPickResult()` FIFO) into the `SelectionController`, resolving each by its correlation `Sequence` so multiple-in-flight / out-of-order readbacks each apply to the correct request; the controller resolves the render id through the attached lookup (decode + live-registry validation), rejects stale/non-selectable hits, and mutates ECS `Selected`/`Hovered` tags (RUNTIME-089 + RUNTIME-092 Slice B). Each drained readback is also refined into its authoritative sub-primitive via `RefinePickReadbackResult` and cached in the Engine-owned `m_LastRefinedPrimitive` (`Engine::GetLastRefinedPrimitiveSelection()`, `RUNTIME-093` Slice B2): the newest readback wins, a background readback clears it, and an empty-drain frame retains the prior value — graphics never reads this cache (it only produced the hint).
+    After the readback drain the `RenderWorldPool` front reference acquired in
+    phase 6 is released at frame retire (`ReleaseFront`, GRAPHICS-036C); in the
+    default synchronous mode the single logical slot is reclaimable next frame.
 12. Frame clock finalize.
 
 `Engine::RunFrame()` consumes `Extrinsic.Core.FrameClock` for wall-clock frame
 delta sampling and post-sleep resampling; runtime owns the phase orchestration,
 not the reusable clock value type.
+
+### Pipelined render-world pool (`GRAPHICS-036C`)
+
+`Engine` owns a runtime-side `Extrinsic.Runtime.RenderWorldPool` constructed in
+`Initialize()` and sized from `Core::Config::RenderConfig::SynchronousExtraction`
+(default `true`): one logical buffer in the synchronous baseline, or the
+triple-buffered default when pipelined extraction is requested. `RunFrame` drives
+the slot lifecycle — `AcquireBack`/`PublishFront` around `ExtractAndSubmit`,
+`AcquireFront` before the renderer consumes, and `ReleaseFront` at frame retire —
+and mirrors the pool's `PipelineStallCount`/`ExtractionSkipCount`/
+`LastConsumedFrameAge` counters onto the last extraction stats each frame. The
+synchronous default re-publishes the one slot every frame and is behavior-
+preserving (no stalls/skips, frame age 0); flipping `SynchronousExtraction` off
+by default and proving the multi-buffered render-N-1 path is owned by
+`GRAPHICS-036D`. The pool never imports graphics/ECS/platform — it manages only
+slot indices and atomics; the consumer (`graphics/renderer`) still sees only the
+`const` snapshot through the existing `SubmitRuntimeSnapshots`/`ExtractRenderWorld`
+seam, so no new dependency edge is introduced.
 
 ## Streaming integration
 

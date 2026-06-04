@@ -871,7 +871,7 @@ or "opened only when actually integrated"). Open them only when their recorded g
 Pipelined frames (GRAPHICS-036):
 - [GRAPHICS-036A (done)](../../done/GRAPHICS-036A-render-world-pool.md) — `Runtime.RenderWorldPool` slot-lifecycle value type (`CPUContracted`).
 - [GRAPHICS-036B (done)](../../done/GRAPHICS-036B-render-world-pool-diagnostics.md) — pool diagnostics mirror on `RuntimeRenderExtractionStats` (`CPUContracted`).
-- [GRAPHICS-036C](GRAPHICS-036C-render-world-pool-engine-wiring.md) — wire the pool into `Engine::RunFrame` behind default-on `SynchronousExtraction` (`Operational`). Depends on 036A/036B.
+- [GRAPHICS-036C (done)](../../done/GRAPHICS-036C-render-world-pool-engine-wiring.md) — wired the pool into `Engine::RunFrame` behind default-on `SynchronousExtraction` (`Operational`, 2026-06-04). Depended on 036A/036B.
 - [GRAPHICS-036D](GRAPHICS-036D-render-world-pool-pipelined-proof.md) — pipelined render-N-1 integration proof. Depends on 036C.
 
 Async compute / multi-queue (GRAPHICS-037):
