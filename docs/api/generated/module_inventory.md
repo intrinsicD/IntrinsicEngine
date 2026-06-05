@@ -19,8 +19,9 @@ Root scanned: `src`
 | `graphics/rhi` | 19 |
 | `graphics/vulkan` | 13 |
 | `legacy` | 182 |
+| `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 25 |
+| `runtime` | 26 |
 
 ## Modules
 
@@ -470,6 +471,7 @@ Root scanned: `src`
 | `Runtime.Selection` | `src/legacy/Runtime/Runtime.Selection.cppm` | `legacy` |
 | `Runtime.SelectionModule` | `src/legacy/Runtime/Runtime.SelectionModule.cppm` | `legacy` |
 | `Runtime.SystemBundles` | `src/legacy/Runtime/Runtime.SystemBundles.cppm` | `legacy` |
+| `Extrinsic.Physics.World` | `src/physics/Physics.World.cppm` | `physics` |
 | `Extrinsic.Platform.Window` | `src/platform/Platform.IWindow.cppm` | `platform` |
 | `Extrinsic.Platform.Input` | `src/platform/Platform.Input.cppm` | `platform` |
 | `Extrinsic.Platform.Backend.Glfw` | `src/platform/backends/glfw/Platform.Backend.Glfw.cppm` | `platform` |
@@ -488,6 +490,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.GraphGeometryPacker` | `src/runtime/Runtime.GraphGeometryPacker.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshGeometryPacker` | `src/runtime/Runtime.MeshGeometryPacker.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshPrimitiveViewPacker` | `src/runtime/Runtime.MeshPrimitiveViewPacker.cppm` | `runtime` |
+| `Extrinsic.Runtime.PhysicsBridge` | `src/runtime/Runtime.PhysicsBridge.cppm` | `runtime` |
 | `Extrinsic.Runtime.PointCloudGeometryPacker` | `src/runtime/Runtime.PointCloudGeometryPacker.cppm` | `runtime` |
 | `Extrinsic.Runtime.PrimitiveSelectionRefinement` | `src/runtime/Runtime.PrimitiveSelectionRefinement.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProceduralGeometry` | `src/runtime/Runtime.ProceduralGeometry.cppm` | `runtime` |
@@ -501,4 +504,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugAdapters` | `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **474**
+Total modules: **476**

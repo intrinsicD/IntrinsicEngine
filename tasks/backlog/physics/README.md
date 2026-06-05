@@ -1,10 +1,10 @@
 # Physics Backlog
 
-Physics layer ownership, first runtime-independent physics-world implementation,
-and phenomena roadmap. `src/physics` is approved by
+Physics layer ownership, runtime-independent physics-world implementation, and
+phenomena roadmap. `src/physics` is approved by
 [ADR-0019](../../../docs/adr/0019-physics-layer-ownership-and-ecs-integration.md)
-as a promoted layer with `physics -> core, geometry` dependencies, but no
-physics source code exists yet.
+as a promoted layer with `physics -> core, geometry` dependencies. `PHYSICS-001`
+has added the first CPU-only world/state source and runtime bridge.
 
 See [`tasks/backlog/README.md`](../README.md) for the cross-domain convergence
 map.
@@ -13,7 +13,7 @@ map.
 
 - [ARCH-001 - Define physics layer ownership and ECS integration](../../done/ARCH-001-physics-layer-ownership-and-ecs-integration.md) (done 2026-06-05).
 - [ARCH-002 - Physics phenomena roadmap and method selection](ARCH-002-physics-phenomena-roadmap.md).
-- [PHYSICS-001 - Physics world state and runtime fixed-step sync](PHYSICS-001-physics-world-state-and-runtime-sync.md).
+- [PHYSICS-001 - Physics world state and runtime fixed-step sync](../../done/PHYSICS-001-physics-world-state-and-runtime-sync.md) (done 2026-06-05).
 - [PHYSICS-002 - Collision broadphase/narrowphase contract](PHYSICS-002-collision-broadphase-narrowphase-contract.md).
 - [PHYSICS-003 - Constraints, islands, sleep, and solver diagnostics](PHYSICS-003-constraints-islands-and-solver-diagnostics.md).
 
@@ -25,12 +25,12 @@ map.
   is retired, and the rigid-body reference method
   [`METHOD-001`](../../done/METHOD-001-rigid-body-dynamics-reference-backend.md)
   is retired at `CPUContracted`.
-- `PHYSICS-001` is unblocked by `HARDEN-064` and `METHOD-001`. It owns the
-  first `src/physics` world/state source addition and runtime bridge.
-- `PHYSICS-002` depends on `PHYSICS-001` and owns collision broadphase/
-  narrowphase contracts.
-- `PHYSICS-003` depends on `PHYSICS-001` and `PHYSICS-002` and owns constraint,
-  island, sleep, and solver diagnostics.
+- `PHYSICS-001` is retired at `CPUContracted`; it owns the first
+  `src/physics` world/state source addition and `Extrinsic.Runtime.PhysicsBridge`.
+- `PHYSICS-002` is now unblocked by `PHYSICS-001` and owns collision
+  broadphase/narrowphase contracts.
+- `PHYSICS-003` depends on retired `PHYSICS-001` and open `PHYSICS-002`; it
+  owns constraint, island, sleep, and solver diagnostics.
 - ARCH-002 must not bless GPU/optimized backend tasks for any phenomenon before
   its CPU reference path exists.
 

@@ -5,7 +5,7 @@
 - Completed: 2026-06-05.
 - Maturity: `CPUContracted`.
 - Commit/PR: this task retirement commit.
-- `Operational` owned by `PHYSICS-001`.
+- CPU-only runtime/world integration is retired in [`PHYSICS-001`](PHYSICS-001-physics-world-state-and-runtime-sync.md).
 
 
 ## Goal

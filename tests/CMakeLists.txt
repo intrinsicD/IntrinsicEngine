@@ -355,6 +355,36 @@ target_include_directories(PhysicsMethodTestObjs PRIVATE
     ${CMAKE_SOURCE_DIR}/methods/physics/rigid_body_reference/include
 )
 
+# --- Physics world tests (CPU-only promoted src/physics contract) ---
+set(_physics_world_test_files
+    Test.Physics.World.cpp
+)
+intrinsic_resolve_test_sources(_physics_world_test_sources
+    SEARCH_DIRS unit/physics
+    FILES ${_physics_world_test_files}
+)
+intrinsic_test_object_lib(PhysicsWorldTestObjs
+    SOURCES
+        ${_physics_world_test_sources}
+    DEPS ExtrinsicPhysics ExtrinsicCore IntrinsicGeometry
+)
+
+# --- Runtime physics bridge tests (runtime-owned ECS <-> physics composition) ---
+if(TARGET ExtrinsicRuntime)
+    set(_runtime_physics_bridge_test_files
+        Test.RuntimePhysicsBridge.cpp
+    )
+    intrinsic_resolve_test_sources(_runtime_physics_bridge_test_sources
+        SEARCH_DIRS integration/runtime
+        FILES ${_runtime_physics_bridge_test_files}
+    )
+    intrinsic_test_object_lib(RuntimePhysicsBridgeTestObjs
+        SOURCES
+            ${_runtime_physics_bridge_test_sources}
+        DEPS ExtrinsicRuntime ExtrinsicPhysics ExtrinsicECS ExtrinsicCore glm::glm
+    )
+endif()
+
 # --- Geometry tests (DEC, mesh algorithms, graphs — no GPU, no ECS) ---
 set(_geometry_test_files
     Test_RuntimeGeometry.cpp
@@ -982,6 +1012,21 @@ intrinsic_test_executable(IntrinsicPhysicsMethodTests
     LINK_LIBS IntrinsicCore
     LABELS unit physics
 )
+
+# --- Physics world tests (CPU-only) ---
+intrinsic_test_executable(IntrinsicPhysicsWorldTests
+    OBJECTS PhysicsWorldTestObjs
+    LINK_LIBS ExtrinsicPhysics
+    LABELS unit physics
+)
+
+if(TARGET RuntimePhysicsBridgeTestObjs)
+    intrinsic_test_executable(IntrinsicRuntimePhysicsBridgeTests
+        OBJECTS RuntimePhysicsBridgeTestObjs
+        LINK_LIBS ExtrinsicRuntime ExtrinsicPhysics ExtrinsicECS ExtrinsicCore
+        LABELS integration runtime ecs physics
+    )
+endif()
 
 # --- Core + Geometry (DEC, mesh algorithms — no GPU, no ECS) ---
 intrinsic_test_executable(IntrinsicGeometryTests

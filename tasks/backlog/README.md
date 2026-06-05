@@ -129,7 +129,9 @@ Members:
   (done 2026-06-05) — deterministic `cpu_reference` rigid-body method package.
 - [`HARDEN-064`](../done/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md)
   (done 2026-06-05; also Theme D).
-- [`physics/PHYSICS-001-physics-world-state-and-runtime-sync.md`](physics/PHYSICS-001-physics-world-state-and-runtime-sync.md).
+- [`PHYSICS-001`](../done/PHYSICS-001-physics-world-state-and-runtime-sync.md)
+  (done 2026-06-05) — first CPU-only physics world/state source and runtime
+  bridge.
 - [`physics/PHYSICS-002-collision-broadphase-narrowphase-contract.md`](physics/PHYSICS-002-collision-broadphase-narrowphase-contract.md).
 - [`physics/PHYSICS-003-constraints-islands-and-solver-diagnostics.md`](physics/PHYSICS-003-constraints-islands-and-solver-diagnostics.md).
 
@@ -230,12 +232,12 @@ promoting backlog tasks to active so per-category DAGs do not diverge.
   physics/runtime follow-ups.
 - **HARDEN-064 ⇐ ARCH-001.** Satisfied 2026-06-05: ECS collider/rigid-body
   authoring shipped under ADR-0019 without storing solver handles in ECS.
-- **PHYSICS-001 ⇐ HARDEN-064, METHOD-001.** Satisfied 2026-06-05: ECS
-  authoring descriptors and the rigid-body CPU reference coverage are both
-  retired, so `PHYSICS-001` may promote as the first physics world/runtime
-  sync source task.
-- **PHYSICS-002 ⇐ PHYSICS-001.** Collision broadphase/narrowphase contracts
-  depend on the physics world/body descriptor surface.
+- **PHYSICS-001 ⇐ HARDEN-064, METHOD-001.** Satisfied 2026-06-05:
+  `PHYSICS-001` is retired at `CPUContracted` with the first
+  `src/physics` world/body descriptor surface and runtime fixed-step bridge.
+- **PHYSICS-002 ⇐ PHYSICS-001.** Satisfied 2026-06-05 for promotion:
+  collision broadphase/narrowphase contracts now depend on the retired
+  physics world/body descriptor surface.
 - **PHYSICS-003 ⇐ PHYSICS-001, PHYSICS-002.** Constraint/island/sleep solver
   diagnostics depend on world lifecycle and collision contacts.
 - **GRAPHICS-035..058 ⇐ Theme A.** Theme A's visible-geometry foundation is

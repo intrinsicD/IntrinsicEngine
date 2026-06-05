@@ -25,5 +25,6 @@ This index is the canonical entry point for method/paper implementation document
   is the deterministic CPU reference backend for fixed-step rigid-body
   integration and first-phase analytic contact contracts. It retires
   [`METHOD-001`](../../tasks/done/METHOD-001-rigid-body-dynamics-reference-backend.md)
-  at `CPUContracted`; runtime/world integration remains owned by
-  [`PHYSICS-001`](../../tasks/backlog/physics/PHYSICS-001-physics-world-state-and-runtime-sync.md).
+  at `CPUContracted`; CPU-only runtime/world integration is now
+  `CPUContracted` by
+  [`PHYSICS-001`](../../tasks/done/PHYSICS-001-physics-world-state-and-runtime-sync.md).

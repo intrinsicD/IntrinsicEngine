@@ -1,8 +1,8 @@
 # Physics Architecture
 
 `physics` is the canonical owner for runtime-independent physical simulation
-world/state once `src/physics` implementation begins. The architecture decision
-is recorded in [ADR-0019](../adr/0019-physics-layer-ownership-and-ecs-integration.md).
+world/state. The architecture decision is recorded in
+[ADR-0019](../adr/0019-physics-layer-ownership-and-ecs-integration.md).
 
 ## Responsibilities
 
@@ -37,6 +37,31 @@ Disallowed:
 `runtime` is the only layer that may compose live ECS registries with physics
 world handles.
 
+## Implemented World/State Surface
+
+`PHYSICS-001` adds the first promoted physics source root and module:
+
+- `src/physics/Physics.World.cppm` exports `Extrinsic.Physics.World`.
+- `BodyHandle` is a generation-checked `Extrinsic.Core.StrongHandle` value.
+- `BodyDescriptor` records motion type, pose, linear/angular velocity, mass,
+  damping, gravity scale, enabled/contact participation flags, and child shape
+  descriptors.
+- `ShapeDescriptor` currently supports first-phase primitive descriptors for
+  sphere, capsule, and box/OBB-local-pose authoring.
+- `World` owns create/destroy/update/get/contains/clear lifecycle APIs and
+  rejects invalid descriptors or stale handles with diagnostics.
+- `Step(StepInput)` runs a deterministic CPU-only unconstrained integration:
+  static bodies are skipped, kinematic bodies integrate authored velocities,
+  and dynamic bodies integrate gravity, damping, linear velocity, and angular
+  velocity. It does not generate contacts, solve constraints, build islands, or
+  sleep bodies.
+
+World diagnostics currently report body counts, create/destroy/update counts,
+invalid descriptor rejects, stale handle rejects, executed step count, and the
+last step's static/kinematic/dynamic/disabled body counters. Collision contact
+diagnostics are still owned by `PHYSICS-002`; constraint/island/sleep diagnostics
+are still owned by `PHYSICS-003`.
+
 ## ECS and Runtime Split
 
 ECS stores authoring intent only:
@@ -50,18 +75,23 @@ The ECS descriptor surface is present in
 [`HARDEN-064`](../../tasks/done/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md)
 as `Extrinsic.ECS.Component.Collider` and
 `Extrinsic.ECS.Component.RigidBody`. It is a CPU authoring contract only; live
-physics-world state and runtime synchronization remain follow-up work.
+physics-world state is stored in `Extrinsic.Physics.World`, and runtime
+synchronization is stored in runtime-owned bridge sidecars.
 
 ECS must not store physics-world handles, broadphase proxies, contacts, islands,
 solver indices, runtime sidecars, graphics handles, or RHI handles.
 
 Runtime owns the bridge:
 
-- maps stable ECS identity to physics handles in runtime sidecars;
-- syncs ECS authoring descriptors into physics state on fixed-step boundaries;
-- steps physics with deterministic fixed `dt`;
-- writes simulated transforms back to ECS;
-- routes contacts/collision events to runtime/editor/app command surfaces.
+- maps stable ECS identity to physics handles in runtime sidecars through
+  `Extrinsic.Runtime.PhysicsBridge`;
+- syncs ECS authoring descriptors into physics state before fixed-step stepping;
+- steps physics with deterministic fixed `dt` through an accumulator;
+- writes simulated dynamic-body transforms back to ECS and stamps transform
+  dirty markers;
+- skips static and kinematic writeback with diagnostics;
+- routes future contacts/collision events to runtime/editor/app command
+  surfaces once `PHYSICS-002` exposes contact data.
 
 ## First-Phase Collider Policy
 
@@ -105,7 +135,7 @@ and contact/event counts where applicable.
 
 - [`HARDEN-064`](../../tasks/done/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md) defines ECS collider and rigid-body authoring descriptors.
 - [`METHOD-001`](../../tasks/done/METHOD-001-rigid-body-dynamics-reference-backend.md) defines the CPU reference rigid-body method backend.
-- [`PHYSICS-001`](../../tasks/backlog/physics/PHYSICS-001-physics-world-state-and-runtime-sync.md) owns the first physics world/state module and runtime bridge.
+- [`PHYSICS-001`](../../tasks/done/PHYSICS-001-physics-world-state-and-runtime-sync.md) defines the first physics world/state module and runtime bridge at `CPUContracted` maturity.
 - [`PHYSICS-002`](../../tasks/backlog/physics/PHYSICS-002-collision-broadphase-narrowphase-contract.md) owns collision broadphase/narrowphase contracts.
 - [`PHYSICS-003`](../../tasks/backlog/physics/PHYSICS-003-constraints-islands-and-solver-diagnostics.md) owns constraints, islands, sleep, and solver diagnostics.
 - [`ARCH-002`](../../tasks/backlog/physics/ARCH-002-physics-phenomena-roadmap.md) owns non-rigid and multi-phenomena roadmap decisions.

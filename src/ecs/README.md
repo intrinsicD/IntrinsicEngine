@@ -308,9 +308,9 @@ collider is either an explicitly non-contacting body or a diagnostic for
 missing collider authoring.
 
 [ADR-0019](../../docs/adr/0019-physics-layer-ownership-and-ecs-integration.md)
-accepts `src/physics` as the future simulation-world layer and keeps ECS as
-authoring intent only. Runtime owns ECS-to-physics synchronization, live handle
-sidecars, fixed-step scheduling, transform writeback, and contact/event routing.
+accepts `src/physics` as the simulation-world layer and keeps ECS as authoring
+intent only. Runtime owns ECS-to-physics synchronization, live handle sidecars,
+fixed-step scheduling, transform writeback, and contact/event routing.
 ECS is forbidden from storing rigid-body solver-owned state on collider or
 rigid-body components; the contract test enforces this by rejecting
 `RigidBodyHandle`, `PhysicsBody*`, `Broadphase*`, `ContactCache*`, `IslandId`,

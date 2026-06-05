@@ -14,6 +14,7 @@ target_sources(${target_name}
         Runtime.AssetModelTextureIO.cppm
         Runtime.EcsSystemBundle.cppm
         Runtime.Engine.cppm
+        Runtime.PhysicsBridge.cppm
         Cameras/Runtime.CameraControllers.cppm
         Editor/Runtime.SandboxEditorUi.cppm
         Gizmos/Runtime.GizmoInteraction.cppm
@@ -40,6 +41,7 @@ target_sources(${target_name}
         Runtime.AssetModelTextureIO.cpp
         Runtime.EcsSystemBundle.cpp
         Runtime.Engine.cpp
+        Runtime.PhysicsBridge.cpp
         Editor/Runtime.SandboxEditorUi.cpp
         Gizmos/Runtime.GizmoInteraction.cpp
         ImGui/Runtime.ImGuiAdapter.cpp
@@ -69,6 +71,7 @@ target_link_libraries(${target_name}
         ExtrinsicECS
         ExtrinsicGraphics
         ExtrinsicGraphicsAssets
+        ExtrinsicPhysics
         ExtrinsicPlatform
         IntrinsicGeometry
         EnTT::EnTT

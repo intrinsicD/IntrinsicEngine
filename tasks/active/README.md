@@ -19,13 +19,15 @@ Previously-active
 [`ARCH-001`](../done/ARCH-001-physics-layer-ownership-and-ecs-integration.md)
 — physics layer ownership and ECS/runtime integration contract retired to
 `tasks/done/` on 2026-06-05 at maturity `Retired`. The slice accepted
-`src/physics` as the future simulation-world layer through ADR-0019 with
+`src/physics` as the simulation-world layer through ADR-0019 with
 `physics -> core, geometry` dependencies, updated `AGENTS.md`, architecture
 docs, agent skill mirrors, label policy, and layering tooling, and opened
 `PHYSICS-001..003` follow-up tasks for world/runtime sync,
 broadphase/narrowphase, and solver diagnostics. `HARDEN-064` has since retired
 the ECS collider/rigid-body authoring contract under the
-no-solver-handles-in-ECS boundary.
+no-solver-handles-in-ECS boundary, and `PHYSICS-001` has retired the first
+CPU-only physics world/runtime bridge. `PHYSICS-002` is the next open physics
+runtime-readiness leaf.
 
 Previously-active
 [`GRAPHICS-040C`](../done/GRAPHICS-040C-aa-recipe-selection-and-integration.md)

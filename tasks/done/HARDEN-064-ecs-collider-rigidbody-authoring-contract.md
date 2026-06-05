@@ -9,8 +9,8 @@
   child local poses, material/filtering/trigger/contact-offset metadata, and
   added a separate `RigidBody` authoring component for static/kinematic/dynamic
   body intent without solver/runtime handles.
-- `Operational` follow-up is owned by
-  [`PHYSICS-001`](../backlog/physics/PHYSICS-001-physics-world-state-and-runtime-sync.md)
+- CPU-only runtime/world follow-up is retired in
+  [`PHYSICS-001`](PHYSICS-001-physics-world-state-and-runtime-sync.md)
   after retired [`METHOD-001`](METHOD-001-rigid-body-dynamics-reference-backend.md)
   supplied enough CPU reference dynamics coverage.
 
@@ -51,7 +51,7 @@
 - [x] Define transform/scale policy: entity/world transform provides body pose, collider local pose offsets the shape, uniform scale may be supported for simple primitives, non-uniform scale must be baked/cooked or rejected for dynamic bodies with diagnostics.
 - [x] Ensure canonical ECS stores only CPU-only descriptors or stable asset/geometry identifiers; no `PhysicsBodyHandle`, broadphase proxy, contact cache, island ID, solver body index, graphics handle, or RHI handle may be stored in ECS components.
 - [x] Cross-link runtime ECS-to-physics synchronization and physics-world
-      cooking to [`PHYSICS-001`](../backlog/physics/PHYSICS-001-physics-world-state-and-runtime-sync.md).
+      cooking to [`PHYSICS-001`](PHYSICS-001-physics-world-state-and-runtime-sync.md).
 
 ## Tests
 - [x] Add or update `tests/unit/ecs/Test.ECS.ColliderAuthoring.cpp` for descriptor defaults, primitive shape construction, compound child local poses, trigger/filter/material defaults, invalid shape diagnostics, and body/collider combination rules that are enforceable in ECS.

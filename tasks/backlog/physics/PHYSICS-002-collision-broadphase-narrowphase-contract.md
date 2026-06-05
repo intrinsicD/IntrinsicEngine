@@ -11,7 +11,7 @@
 
 ## Context
 - Owner/layer: `physics`; allowed dependencies are `core` and `geometry` per [ADR-0019](../../../docs/adr/0019-physics-layer-ownership-and-ecs-integration.md).
-- Depends on [`PHYSICS-001`](PHYSICS-001-physics-world-state-and-runtime-sync.md) for world/body descriptor surfaces and handle lifecycle.
+- Depends on retired [`PHYSICS-001`](../../done/PHYSICS-001-physics-world-state-and-runtime-sync.md) for world/body descriptor surfaces and handle lifecycle.
 - Uses geometry collision/math kernels as primitives, not as a physics world owner.
 - First-phase dynamic-capable shapes are sphere, capsule, and box/OBB. Convex hull, static/kinematic triangle mesh, height field, SDF, and convex decomposition remain later tasks unless this task explicitly splits a child.
 

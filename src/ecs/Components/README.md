@@ -85,7 +85,7 @@ They intentionally stop at CPU descriptors:
 
 No physics-world handle, broadphase proxy, contact cache, island ID, solver
 index, runtime sidecar, graphics handle, or RHI handle may be stored here.
-`src/physics` owns future world/solver state, and `src/runtime` owns the
+`src/physics` owns world/solver state, and `src/runtime` owns the
 ECS-to-physics synchronization bridge.
 
 ## Render residency boundary
