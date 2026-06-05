@@ -11,10 +11,24 @@ Each active task should include:
 
 ## Currently active
 
-No currently active task. The next unblocked clustered-light candidate is
-[`GRAPHICS-039D`](../backlog/rendering/GRAPHICS-039D-cluster-async-compute-affinity.md).
+No currently active task.
+
+Next eligible backlog candidate:
+[`GRAPHICS-040A`](../backlog/rendering/GRAPHICS-040A-jitter-and-motion-vectors.md) —
+camera jitter + motion-vector buffer. Depends on `GRAPHICS-040` (planning,
+done) and `GRAPHICS-013A` (done).
 
 The most recently retired tasks are summarised below.
+
+Previously-active
+[`GRAPHICS-039D`](../done/GRAPHICS-039D-cluster-async-compute-affinity.md) —
+cluster build/assignment async-compute affinity retired to `tasks/done/` on
+2026-06-05 at maturity `CPUContracted`. The slice tagged
+`ClusterGridBuildPass` and `LightClusterAssignmentPass` with
+`RenderQueue::AsyncCompute`, proved capability-absent demotion to graphics
+through the framegraph/RHI queue-affinity helpers and submit-plan builder,
+preserved single-queue correctness, updated the renderer docs, and added
+frame-recipe contract coverage for async-capable and async-absent profiles.
 
 Previously-active
 [`GRAPHICS-039C`](../done/GRAPHICS-039C-cluster-surface-shader-integration.md) —
@@ -26,7 +40,7 @@ pipeline leases, default-recipe reads for forward `SurfacePass` and deferred
 `CompositionPass`, shared GLSL clustered-light iteration with a full-loop
 fallback, CPU parity coverage for known-cell clustered accumulation, renderer
 lifecycle assertions for scene-table publication/rebuild survival, and touched
-shader compilation. Async-compute affinity remains `GRAPHICS-039D`.
+shader compilation. Async-compute affinity is retired in `GRAPHICS-039D`.
 
 Previously-active
 [`GRAPHICS-039B`](../done/GRAPHICS-039B-light-cluster-assignment.md) —

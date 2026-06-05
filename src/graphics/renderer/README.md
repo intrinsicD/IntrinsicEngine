@@ -353,10 +353,10 @@ Concretely:
   missing-sample conservatism, frustum-first rejection, and selection-bucket
   exemption on an operational Vulkan command stream while preserving the
   default CPU/null contracts.
-- GRAPHICS-039A/B/C land `Extrinsic.Graphics.LightClusters` — the
+- GRAPHICS-039A/B/C/D land `Extrinsic.Graphics.LightClusters` — the
   clustered-light froxel grid contract, backend-neutral cluster-grid build
   command shape, CPU/null light-assignment contract, and default-recipe shader
-  consumption seam.
+  consumption/async-affinity seams.
   `ComputeClusterGridDesc(w, h)` uses the recorded `GRAPHICS-039` formula:
   `TilesX = ceil(w / 80)`, `TilesY = ceil(h / 80)`, `SlicesZ = 24`
   (`16x9x24` at `1280x720`). `MapViewZToClusterSlice(...)` applies the
@@ -393,7 +393,10 @@ Concretely:
   full scene loop, iterates only the packed per-cell point/spot indices, and
   falls back to the full loop when cluster buffers are unavailable. Concrete
   Vulkan descriptor publication remains backend-owned through the existing
-  scene-table BDA path; async-compute affinity remains `GRAPHICS-039D`.
+  scene-table BDA path. `GRAPHICS-039D` tags both cluster compute passes with
+  `RenderQueue::AsyncCompute`; the framegraph/RHI queue resolver demotes those
+  requests to the graphics queue on capability-absent devices, so clustered
+  lighting correctness does not depend on async-compute availability.
 - GRAPHICS-072 Slice A wires the default-recipe deferred-mode `"SurfacePass"`
   to the existing `DeferredGBufferPass` body. `NullRenderer` owns
   `m_DeferredGBufferPass` (constructed against `m_DeferredSystem`) and the

@@ -891,7 +891,9 @@ Clustered light binning (GRAPHICS-039):
 - [GRAPHICS-039A (done)](../../done/GRAPHICS-039A-cluster-grid-build.md) — cluster grid resource + build pass (`CPUContracted`, 2026-06-04). Depended on GRAPHICS-039 (planning, done), GRAPHICS-009 (done).
 - [GRAPHICS-039B (done)](../../done/GRAPHICS-039B-light-cluster-assignment.md) — light-to-cluster assignment + overflow diagnostics (`CPUContracted`, 2026-06-05). Depended on 039A.
 - [GRAPHICS-039C (done)](../../done/GRAPHICS-039C-cluster-surface-shader-integration.md) — surface-shader integration + recipe wiring (`CPUContracted`, 2026-06-05). Depended on 039B, GRAPHICS-008 (done).
-- [GRAPHICS-039D](GRAPHICS-039D-cluster-async-compute-affinity.md) — async-compute affinity tagging. Depends on 039C (done); gated by GRAPHICS-037 (037A done) for real async execution.
+- [GRAPHICS-039D (done)](../../done/GRAPHICS-039D-cluster-async-compute-affinity.md) — async-compute affinity tagging (`CPUContracted`, 2026-06-05). Depended on 039C (done); consumes GRAPHICS-037D (done) for real multi-queue execution.
+
+Clustered light binning children are complete; the next unblocked rendering child is GRAPHICS-040A.
 
 TAA + reconstructor seam (GRAPHICS-040):
 - [GRAPHICS-040A](GRAPHICS-040A-jitter-and-motion-vectors.md) — camera jitter + motion-vector buffer. Depends on GRAPHICS-040 (planning, done), GRAPHICS-013A (done).

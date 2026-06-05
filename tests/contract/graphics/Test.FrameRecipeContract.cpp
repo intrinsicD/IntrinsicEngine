@@ -9,10 +9,12 @@
 import Extrinsic.Graphics.FrameRecipe;
 import Extrinsic.Graphics.RenderGraph;
 import Extrinsic.RHI.Handles;
+import Extrinsic.RHI.QueueAffinity;
 
 namespace
 {
     using namespace Extrinsic::Graphics;
+    namespace RHI = Extrinsic::RHI;
 
     [[nodiscard]] FrameRecipeImports MakeImports()
     {
@@ -69,6 +71,19 @@ namespace
             names.push_back(compiled.PassNames[passIndex]);
         }
         return names;
+    }
+
+    [[nodiscard]] std::uint32_t PassIndexByName(const CompiledRenderGraph& compiled,
+                                                const std::string_view passName)
+    {
+        for (std::uint32_t i = 0u; i < compiled.PassNames.size(); ++i)
+        {
+            if (compiled.PassNames[i] == passName)
+            {
+                return i;
+            }
+        }
+        return compiled.PassCount;
     }
 
     [[nodiscard]] bool HasEnabledResource(const FrameRecipeIntrospection& description,
@@ -676,6 +691,72 @@ TEST(FrameRecipeContract, LightClusterAssignmentRequiresGridBuildAndImportedOutp
     EXPECT_FALSE(HasEnabledResource(missingGrid, FrameRecipeResourceKind::ClusterLightHeaders));
     EXPECT_FALSE(HasEnabledResource(missingGrid, FrameRecipeResourceKind::ClusterLightIndices));
     EXPECT_FALSE(HasEnabledResource(missingGrid, FrameRecipeResourceKind::ClusterLightCounter));
+}
+
+TEST(FrameRecipeContract, ClusterPassesRequestAsyncComputeAndDemoteToGraphics)
+{
+    FrameRecipeFeatures features{};
+    features.EnableClusterGridBuild = true;
+    features.EnableClusterLightAssignment = true;
+    // Isolate this contract from the existing postprocess histogram async pass.
+    features.EnablePostProcess = false;
+
+    RenderGraph graph;
+    const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
+        graph,
+        features,
+        MakeImports(),
+        FrameRecipeSizing{.Width = 640u, .Height = 480u});
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    {
+        const auto& compileResult = graph.GetLastCompileValidationResult();
+        ASSERT_TRUE(compiled.has_value())
+            << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
+    }
+
+    const std::uint32_t clusterGridPass =
+        PassIndexByName(*compiled, "ClusterGridBuildPass");
+    const std::uint32_t assignmentPass =
+        PassIndexByName(*compiled, "LightClusterAssignmentPass");
+    ASSERT_LT(clusterGridPass, compiled->PassQueues.size());
+    ASSERT_LT(assignmentPass, compiled->PassQueues.size());
+    EXPECT_EQ(compiled->PassQueues[clusterGridPass], RenderQueue::AsyncCompute);
+    EXPECT_EQ(compiled->PassQueues[assignmentPass], RenderQueue::AsyncCompute);
+
+    const QueuePartition singleQueuePartition =
+        PartitionPassesByQueue(*compiled, RHI::QueueCapabilityProfile{});
+    EXPECT_TRUE(singleQueuePartition.AsyncCompute.empty());
+    EXPECT_EQ(singleQueuePartition.QueueAffinityDemotedCount, 2u);
+    const auto isDemotedClusterPass = [clusterGridPass, assignmentPass](const QueuePartitionedPass& pass) {
+        return (pass.PassIndex == clusterGridPass || pass.PassIndex == assignmentPass) &&
+               pass.Requested == RenderQueue::AsyncCompute &&
+               pass.Resolved == RenderQueue::Graphics &&
+               pass.Demoted;
+    };
+    EXPECT_EQ(std::ranges::count_if(singleQueuePartition.Graphics, isDemotedClusterPass), 2);
+
+    const QueueSubmitPlan singleQueuePlan =
+        BuildQueueSubmitPlan(*compiled, RHI::QueueCapabilityProfile{});
+    ASSERT_EQ(singleQueuePlan.Batches.size(), 1u);
+    EXPECT_EQ(singleQueuePlan.Batches[0].Queue, RenderQueue::Graphics);
+    EXPECT_EQ(singleQueuePlan.QueueAffinityDemotedCount, 2u);
+    EXPECT_NE(std::ranges::find(singleQueuePlan.Batches[0].PassIndices, clusterGridPass),
+              singleQueuePlan.Batches[0].PassIndices.end());
+    EXPECT_NE(std::ranges::find(singleQueuePlan.Batches[0].PassIndices, assignmentPass),
+              singleQueuePlan.Batches[0].PassIndices.end());
+
+    const QueueSubmitPlan asyncPlan = BuildQueueSubmitPlan(
+        *compiled,
+        RHI::QueueCapabilityProfile{.SupportsAsyncCompute = true});
+    EXPECT_EQ(asyncPlan.QueueAffinityDemotedCount, 0u);
+    const auto asyncBatchHasClusterBand = [clusterGridPass, assignmentPass](const QueueSubmitBatch& batch) {
+        return batch.Queue == RenderQueue::AsyncCompute &&
+               std::ranges::find(batch.PassIndices, clusterGridPass) != batch.PassIndices.end() &&
+               std::ranges::find(batch.PassIndices, assignmentPass) != batch.PassIndices.end();
+    };
+    EXPECT_TRUE(std::ranges::any_of(asyncPlan.Batches, asyncBatchHasClusterBand));
 }
 
 TEST(FrameRecipeContract, BackbufferIsFinalizedOnlyByPresentDeclaration)

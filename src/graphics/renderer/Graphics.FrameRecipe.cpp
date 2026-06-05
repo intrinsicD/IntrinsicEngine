@@ -905,6 +905,10 @@ namespace Extrinsic::Graphics
         if (clusterGridBuildActive)
         {
             addOrderedPass("ClusterGridBuildPass", [=](RenderGraphBuilder& builder) {
+                // GRAPHICS-039D — prefer async compute for clustered-light
+                // compute work; the framegraph/RHI resolver demotes to
+                // graphics on single-queue devices.
+                builder.SetQueue(RenderQueue::AsyncCompute);
                 builder.Write(clusterGridAABBs, BufferUsage::ShaderWrite);
             });
         }
@@ -912,6 +916,10 @@ namespace Extrinsic::Graphics
         if (clusterLightAssignmentActive)
         {
             addOrderedPass("LightClusterAssignmentPass", [=](RenderGraphBuilder& builder) {
+                // GRAPHICS-039D — same affinity as the cluster-grid build so
+                // the build/assignment band remains together when async
+                // compute is available and demotes together when absent.
+                builder.SetQueue(RenderQueue::AsyncCompute);
                 builder.Read(clusterGridAABBs, BufferUsage::ShaderRead);
                 builder.Read(lights, BufferUsage::ShaderRead);
                 builder.Write(clusterLightHeaders, BufferUsage::ShaderWrite);
