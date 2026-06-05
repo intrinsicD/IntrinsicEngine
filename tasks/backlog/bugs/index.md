@@ -5,7 +5,13 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-_None currently open._
+- [`BUG-015` — ExtrinsicSandbox clustered Vulkan validation cascade](BUG-015-extrinsic-sandbox-clustered-vulkan-validation-cascade.md).
+  Running the local debug `ExtrinsicSandbox` with promoted Vulkan reports
+  compute pipeline-layout mismatches for clustered-lighting storage buffers,
+  followed by queue-ownership, command-buffer-lifetime, and transient image
+  usage/layout validation errors. The first validation class to fix is the
+  cluster-grid/light-assignment compute descriptor layout mismatch; later
+  validation errors must be rechecked as possible cascades.
 
 ---
 

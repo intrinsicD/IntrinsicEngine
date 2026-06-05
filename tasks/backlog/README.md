@@ -180,12 +180,12 @@ Reproducible correctness/regression fixes only. Origin:
 [`bugs/index.md`](bugs/index.md).
 
 Members:
-- _None currently open._ [`BUG-013`](../done/BUG-013-backbuffer-readback-contract-vtable-segv.md)
-  (backbuffer readback contract SEGV) was closed 2026-05-29 as not
-  reproducible on a clean `ci` preset build — a stale incremental module-BMI
-  artifact, not a source defect. See [`bugs/index.md`](bugs/index.md) and
-  `src/graphics/rhi/README.md` for the clean-rebuild prevention. `GRAPHICS-076E`
-  is now green after the GRAPHICS-076F descriptor-slot fix.
+- [`BUG-015`](bugs/BUG-015-extrinsic-sandbox-clustered-vulkan-validation-cascade.md)
+  — app-default promoted Vulkan validation cascade after clustered-lighting
+  bring-up. Primary first failure: clustered compute pipeline layouts do not
+  match storage-buffer shader declarations; later queue-ownership and transient
+  image layout/usage validation errors must be verified after that first class
+  is fixed.
 
 ## Cross-domain dependency anchors
 
