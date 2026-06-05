@@ -3,7 +3,7 @@ intrinsic_add_module_library(${target_name})
 
 option(INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN
         "Allow runtime to instantiate the promoted fail-closed Vulkan IDevice when RenderConfig opts in"
-        OFF)
+        ON)
 
 target_sources(${target_name}
         PUBLIC

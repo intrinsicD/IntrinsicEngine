@@ -1,10 +1,21 @@
 # Working Sandbox App — Remaining Gates (2026-05-30)
 
+> **Closed (2026-06-04).** The scoped working-sandbox acceptance path is now
+> retired by [`RUNTIME-095`](../../tasks/done/RUNTIME-095-working-sandbox-acceptance.md)
+> at `Operational` on Vulkan-capable hosts. The closing smoke drives the
+> runtime `Engine` for bounded frames with one mesh, one graph, one point cloud,
+> the reference camera, selection/outline state, and the runtime-owned
+> `SandboxEditorUi` attached, then asserts the default recipe records canonical
+> `Present` with no canonical `SkippedUnavailable` pass. Broad file-format
+> breadth, KTX decode, post-upload material re-resolution, full scene
+> serialization, advanced PBR, transparency, Gaussian splats, and legacy
+> deletion remain outside this review's acceptance scope.
+
 ## Scope
 
-This note inventories the **remaining gates** between the current branch state
-and the `ExtrinsicSandbox` acceptance contract defined by
-[`RUNTIME-095`](../../tasks/backlog/runtime/RUNTIME-095-working-sandbox-acceptance.md):
+This note originally inventoried the **remaining gates** between the 2026-05-30
+branch state and the `ExtrinsicSandbox` acceptance contract defined by
+[`RUNTIME-095`](../../tasks/done/RUNTIME-095-working-sandbox-acceptance.md):
 render at least one mesh, one graph, and one point cloud through the default
 runtime/graphics path with working camera controls, entity/primitive selection,
 selection outline, and core UI panels.
@@ -13,27 +24,31 @@ It supersedes the visible-triangle framing of
 [2026-05-11 sandbox & graphics gap analysis](2026-05-11-sandbox-graphics-gap-analysis.md):
 that review recorded a renderer that "cannot render a single visible pixel."
 Since then the visible-triangle scaffold landed and the default recipe gained
-operational pass routing, so the gate set has moved from "first pixel" to
-"sandbox acceptance." Status below is from code inspection (file:line evidence),
-not task-file placement.
+operational pass routing, so the gate set moved from "first pixel" to
+"sandbox acceptance." Rows below preserve the historical 2026-05-30 inspection
+state; the closure note above is the current status.
 
 ## Executive summary
 
-The default recipe now routes every canonical pass it declares, the device
-factory can return an operational Vulkan device, and runtime mesh residency is
-wired. The remaining gates are concentrated in three areas:
+As of 2026-05-30, the default recipe routed every canonical pass it declared,
+the device factory could return an operational Vulkan device, and runtime mesh
+residency was wired. The remaining gates were concentrated in three areas:
 
 1. **Runtime geometry residency** for graph (extraction wiring) and point cloud
    (no packer yet), plus optional mesh primitive views.
 2. **Runtime selection** — no runtime-side controller, stable-entity lookup, or
    primitive refinement exists; only the graphics-side picking/outline path.
-3. **Asset + editor UI plumbing** — texture asset bridge plus final
-   file-backed sandbox acceptance proof. The editor shell/panel command seams
-   are now CPU-contracted.
+3. **Asset + editor UI plumbing** — texture/model asset handoff and editor UI
+   command seams are CPU-contracted; the scoped operational sandbox proof is now
+   closed by RUNTIME-095.
 
 2026-06-02 update: `GRAPHICS-081` retired the bootstrap recipe scaffold. Sandbox
-acceptance now depends on the canonical default recipe, UI/editor panels, and the
+acceptance depended on the canonical default recipe, UI/editor panels, and the
 remaining asset/runtime acceptance gates rather than any bootstrap path.
+
+2026-06-04 update: `RUNTIME-095` retired the scoped sandbox acceptance path at
+`Operational` on Vulkan-capable hosts; remaining rows below are historical
+evidence for the path that led to that retirement.
 
 ## What has landed (no longer a gate)
 
@@ -96,8 +111,8 @@ upstream these runtime gates consume.
 |---|---|---|---|
 | Texture asset bridge | [`RUNTIME-080`](../../tasks/done/RUNTIME-080-asset-bridges-texture.md) | **SUPERSEDED / DONE** | Capability shipped under `ASSETIO-001` as `Extrinsic.Runtime.AssetModelTextureHandoff`; the umbrella was retired without re-implementation on 2026-06-03. |
 | Runtime ImGui platform/renderer adapter | [`RUNTIME-090`](../../tasks/done/RUNTIME-090-imgui-platform-renderer-adapter.md) | **DONE** | `Extrinsic.Runtime.ImGuiAdapter` produces `ImGuiOverlayFrame` records from runtime-owned ImGui frames; `GRAPHICS-079` consumes them through the renderer-owned `Pass.ImGui` path. |
-| Asset model/texture ingest ownership | [`ASSETIO-001`](../../tasks/done/ASSETIO-001-asset-model-texture-ingest-ownership.md) | **DONE** | Retired at `CPUContracted`: promoted asset routing, geometry/model/texture decoder dispatch, texture GPU-residency handoff, model-scene ECS `GeometrySources` materialization, deterministic embedded child texture assets, and material `AssetId` binding records are covered. Operational file-backed sandbox consumption remains in `RUNTIME-095`. |
-| Sandbox editor shell + core panels | [`UI-001`](../../tasks/done/UI-001-sandbox-editor-shell-panels.md) | **DONE** | Retired at `CPUContracted`: `Extrinsic.Runtime.SandboxEditorUi` covers scene hierarchy, inspector, selection/refined primitive details, file/import entry command execution through `Engine::ImportAssetFromPath(...)`, camera/controller and mesh primitive-view commands, selected-entity `SpatialDebugBinding` / `VisualizationConfig`, and visualization adapter-binding routing through `RenderExtractionCache`. Operational visual/file-backed proof remains `RUNTIME-095`. |
+| Asset model/texture ingest ownership | [`ASSETIO-001`](../../tasks/done/ASSETIO-001-asset-model-texture-ingest-ownership.md) | **DONE** | Retired at `CPUContracted`: promoted asset routing, geometry/model/texture decoder dispatch, texture GPU-residency handoff, model-scene ECS `GeometrySources` materialization, deterministic embedded child texture assets, and material `AssetId` binding records are covered. RUNTIME-095 closes the scoped operational sandbox proof; broader file-format visual coverage remains future work. |
+| Sandbox editor shell + core panels | [`UI-001`](../../tasks/done/UI-001-sandbox-editor-shell-panels.md) | **DONE** | Retired at `CPUContracted`: `Extrinsic.Runtime.SandboxEditorUi` covers scene hierarchy, inspector, selection/refined primitive details, file/import entry command execution through `Engine::ImportAssetFromPath(...)`, camera/controller and mesh primitive-view commands, selected-entity `SpatialDebugBinding` / `VisualizationConfig`, and visualization adapter-binding routing through `RenderExtractionCache`. RUNTIME-095 closes the scoped operational visual/interactive proof with the editor shell attached. |
 | Visualization adapter umbrella | [`RUNTIME-083`](../../tasks/done/RUNTIME-083-visualization-adapters.md) | **DONE** | Slices A-E add the runtime `VisualizationAdapters` umbrella, `PropertyScalarAdapter`, `KMeansLabelAdapter`, `VectorFieldAdapter`, `IsolineAdapter`, `HtexMetadataAdapter`, registry contract, runtime-owned extraction-cache adapter bindings, scalar/non-scalar packet handoff into `RuntimeRenderSnapshotBatch::Visualization*`, deterministic Htex/fragment-bake packet contracts with `RecreateHtex` streaming scheduling, and extraction-side packet/error stats. |
 
 ### E. Optional / non-blocking
@@ -108,8 +123,9 @@ upstream these runtime gates consume.
 
 ### F. Final acceptance
 
-- [`RUNTIME-095`](../../tasks/backlog/runtime/RUNTIME-095-working-sandbox-acceptance.md)
-  itself — **IN PROGRESS**. Slice 1 landed 2026-06-03 (`Test.RuntimeSandboxAcceptance.cpp`,
+- [`RUNTIME-095`](../../tasks/done/RUNTIME-095-working-sandbox-acceptance.md)
+  itself — **DONE** (2026-06-04, `Operational` on Vulkan-capable hosts). Slice 1
+  landed 2026-06-03 (`Test.RuntimeSandboxAcceptance.cpp`,
   `integration;runtime;graphics`): CPU/null end-to-end acceptance proving one
   mesh + one graph + one point cloud all reside through a single extraction with
   distinct `GpuWorld` handles, a finite/invertible camera-controller frame
@@ -117,33 +133,31 @@ upstream these runtime gates consume.
   enumerating the scene. Slice 2 landed the same day: a mocked pick readback
   resolves a mesh Face / graph Edge / point-cloud Point through
   `RefinePickReadbackResult`, and the `RenderWorld.Selection` outline snapshot is
-  populated for the selected entity. Only Slice 3 (opt-in `gpu;vulkan`
-  default-recipe present smoke, `Operational`) remains.
+  populated for the selected entity. Slice 3 now drives the bounded runtime
+  `Engine` on the promoted Vulkan path with `SandboxEditorUi` attached and passes
+  the `RuntimeSandboxAcceptanceGpuSmoke.AcceptanceSceneReachesOperationalDefaultRecipePresent`
+  smoke.
 
-## Suggested dependency order to unblock RUNTIME-095
+## Completed dependency order for RUNTIME-095
 
-1. **RUNTIME-086 Slice B/C** (graph residency wiring) — already in progress; the
-   shortest residency win after mesh.
-2. **RUNTIME-087** (point-cloud residency) — completes the mesh/graph/point-cloud
-   triad RUNTIME-095 must render.
-3. **RUNTIME-089 → RUNTIME-092 → RUNTIME-093** (selection controller, stable
-   lookup, primitive refinement) — the selection acceptance chain; `RUNTIME-088`
-   feeds primitive selection.
+1. **RUNTIME-086 Slice B/C** (graph residency wiring) — completed the graph
+   residency lane after mesh.
+2. **RUNTIME-087** (point-cloud residency) — completed the mesh/graph/point-cloud
+   triad RUNTIME-095 renders.
+3. **RUNTIME-089 -> RUNTIME-092 -> RUNTIME-093** (selection controller, stable
+   lookup, primitive refinement) — completed the selection acceptance chain;
+   `RUNTIME-088` feeds primitive selection.
 4. **ASSETIO-001** (asset model/texture ingest ownership, which subsumed the
    retired `RUNTIME-080` texture bridge as `AssetModelTextureHandoff`) — the
-   asset-plumbing seam RUNTIME-095 names as a required upstream. It can land in
-   parallel with the selection chain.
+   asset-plumbing seam RUNTIME-095 names as a required upstream.
 5. **UI-001** — completed at `CPUContracted`; editor panels and command seams are
-   no longer a prerequisite gate except for final `RUNTIME-095` proof.
+   consumed by the RUNTIME-095 smoke through `SandboxEditorUi`.
 6. **GRAPHICS-081** — completed on 2026-06-02; no bootstrap recipe acceptance
    path remains.
-7. **RUNTIME-095** — author the CPU/null + opt-in Vulkan acceptance once A–E land.
+7. **RUNTIME-095** — completed the CPU/null + opt-in Vulkan acceptance once A–E landed.
 
-The retired `ASSETIO-001` (which subsumed `RUNTIME-080`) and `UI-001` seams are
-**required upstreams** per RUNTIME-095's Context section, so they stay on the
-acceptance path: do not retire `RUNTIME-095` until the final file-backed runtime
-proof consumes them.
-A procedurally authored acceptance scene can reduce how much *content* breadth
-each seam must cover (RUNTIME-095 explicitly does not require every asset format
-or visualization mode), but it does not remove the requirement that the texture
-asset bridge and asset/texture ingest ownership seams exist and are wired.
+The retired `ASSETIO-001` (which subsumed `RUNTIME-080`) and `UI-001` seams were
+required upstreams per RUNTIME-095's Context section. The closing acceptance uses
+a procedurally authored scene to keep content breadth reviewable, attaches the
+runtime-owned editor UI shell, and keeps file/import breadth outside the
+RUNTIME-095 stop-state.

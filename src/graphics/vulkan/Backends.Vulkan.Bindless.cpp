@@ -166,7 +166,7 @@ void VulkanBindlessHeap::UpdateTextureSlot(RHI::BindlessIndex slot,
                                             RHI::SamplerHandle sampler)
 {
     std::scoped_lock lock{m_Mutex};
-    if (slot == RHI::kInvalidBindlessIndex || slot >= m_NextSlot)
+    if (slot < kFirstTextureBindlessSlot || slot >= m_NextSlot)
         return;
 
     VkImageView view = VK_NULL_HANDLE;
@@ -180,7 +180,7 @@ void VulkanBindlessHeap::UpdateTextureSlot(RHI::BindlessIndex slot,
 void VulkanBindlessHeap::FreeSlot(RHI::BindlessIndex slot)
 {
     std::scoped_lock lock{m_Mutex};
-    if (slot == RHI::kInvalidBindlessIndex || slot >= m_NextSlot) return;
+    if (slot < kFirstTextureBindlessSlot || slot >= m_NextSlot) return;
     if (m_DefaultView != VK_NULL_HANDLE && m_DefaultSampler != VK_NULL_HANDLE)
     {
         m_Pending.push_back({OpType::UpdateRaw,
@@ -249,4 +249,3 @@ uint32_t VulkanBindlessHeap::GetAllocatedSlotCount() const
 }
 
 } // namespace Extrinsic::Backends::Vulkan
-

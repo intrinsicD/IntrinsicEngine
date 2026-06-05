@@ -74,12 +74,11 @@ available through the Vulkan 1.2/1.3 feature chain.
   failure/skipped statuses, and the backend-owned operational predicate inputs.
   Constructors for these internal service objects leave invalid state and log
   diagnostics instead of aborting when Vulkan allocation fails, so the promoted
-  backend can remain fail-closed. Public `GetBindlessHeap()` still routes
-  through `IDevice::IsOperational()` so descriptor allocation remains blocked
-  until canonical renderer resource/descriptor/pass execution is reconciled.
-  Public `GetTransferQueue()` now exposes the live async upload service once
-  guarded live prerequisites are ready (`PublicTransferQueueExposed = true`),
-  while the device itself and bindless heap remain non-operational/fail-closed.
+  backend can remain fail-closed before service bootstrap. Public
+  `GetBindlessHeap()` and `GetTransferQueue()` expose the live services once
+  guarded live/safety prerequisites are ready (`PublicBindlessHeapExposed =
+  true`, `PublicTransferQueueExposed = true`), while texture creation, command
+  execution, and frame lifecycle still gate on `IDevice::IsOperational()`.
 - The internal `VulkanTransferQueue` path is hardened for future public handoff:
   command-buffer allocation/begin/end/submit and semaphore-query failures now log
   diagnostics and return invalid `RHI::TransferToken` values instead of aborting
@@ -108,10 +107,11 @@ available through the Vulkan 1.2/1.3 feature chain.
   service references for `GetBindlessHeap()` and `GetTransferQueue()`. These
   fallbacks do not allocate GPU slots or upload data; they return invalid
   indices/tokens and make maintenance calls no-ops so callers never dereference
-  null backend state. Once guarded live prerequisites are ready,
-  `GetTransferQueue()` returns the live Vulkan transfer queue even while
-  `IsOperational()` remains false; `GetBindlessHeap()` continues to return the
-  fallback heap until operational promotion.
+  null backend state. Once guarded live/safety prerequisites are ready,
+  `GetTransferQueue()` returns the live Vulkan transfer queue and
+  `GetBindlessHeap()` returns the live Vulkan bindless heap even while
+  `IsOperational()` remains false; RHI managers still refuse GPU resource
+  creation until the operational predicate is satisfied.
   Fallback bindless allocation attempts increment
   `GetFallbackBindlessAllocationAttemptCount()`, fallback transfer-queue upload
   attempts (buffer or texture) increment
@@ -201,25 +201,21 @@ available through the Vulkan 1.2/1.3 feature chain.
   diagnostic counter for those skips. It is not part of renderer branching;
   renderer/runtime code must still gate command recording on `IDevice::IsOperational()`.
   After service-ready bootstrap, `Bind()` additionally records the resolved
-  graphics/async-compute/present/transfer queue family indices and rebinds the live frame
-  command buffer plus buffer/image/pipeline pools so per-frame `BeginFrame`
-  routes the canonical render-graph executor through the live command buffer
-  while the renderer brackets the entire executor invocation with one
-  `Begin()`/`End()` pair. `TextureBarrier`/`SubmitBarriers` translate
+  graphics/async-compute/present/transfer queue family indices and rebinds the
+  live frame command buffer plus buffer/image/pipeline pools so per-frame
+  `BeginFrame` routes the canonical render-graph executor through the live
+  command buffer while the renderer brackets the entire executor invocation with
+  one `Begin()`/`End()` pair. `TextureBarrier`/`SubmitBarriers` translate
   `RHI::TextureLayout`/`RHI::MemoryAccess` into `vkCmdPipelineBarrier2` records
   and translate `GRAPHICS-037C` queue-affinity ownership-transfer tokens into
   concrete Vulkan queue-family indices. Same-family transfers collapse back to
   `VK_QUEUE_FAMILY_IGNORED`, which preserves the single-family fallback path on
   adapters that expose compute work through the graphics family. The promoted
-  device accepts renderer `FrameQueueSubmitPlanDesc` batches, allocates
-  per-affinity primary command buffers from graphics/async-compute/transfer
-  command pools, and submits them with `vkQueueSubmit2` on the matching
-  `VkQueue`. Per-frame queue timeline semaphores carry compiled cross-queue
-  waits/signals, the first graphics batch waits image acquire, and the final
-  graphics batch signals render-done for present. Optional async/transfer fences
-  are used only for queue lanes whose final batch is not already guarded by the
-  present fence, while capability-absent plans fall back to the single graphics
-  submit path. Barriers also update each touched
+  device currently reports a graphics-only framegraph `QueueCapabilityProfile`
+  so optional async-compute/transfer passes demote into the graphics submit path
+  until cross-queue barrier lowering is validation-clean. The dedicated
+  `VulkanTransferQueue` remains available through `GetTransferQueue()` for
+  upload traffic. Barriers also update each touched
   `VulkanImage::CurrentLayout` so subsequent
   uploads/barriers in the same frame observe the most recent recorded layout.
 - `VulkanDevice::CreateBuffer` and `VulkanDevice::CreateTexture` declare
@@ -325,9 +321,12 @@ available through the Vulkan 1.2/1.3 feature chain.
   inputs to bindless descriptor slot 0, default `Pass.DebugView`'s selected
   texture to slot 1, and canonical `Pass.Present`'s `FrameRecipe.PresentSource`
   to slot 2 via `VulkanCommandContext::BindFrameSampledTextureAt(...)`. The
-  split slots keep debug-view and present fullscreen draws from racing on one
-  mutable descriptor element inside the same submitted command buffer, which is
-  what the `DefaultRecipeSurfaceGpuSmoke.ReferenceTriangleDebugViewReadbackMatchesMinimalHarnessSamples`
+  Vulkan bindless allocator starts real texture leases at slot 3 so retained
+  textures such as the ImGui font atlas cannot be overwritten by those
+  framegraph bridge updates. The split slots keep debug-view and present
+  fullscreen draws from racing on one mutable descriptor element inside the same
+  submitted command buffer, which is what the
+  `DefaultRecipeSurfaceGpuSmoke.ReferenceTriangleDebugViewReadbackMatchesMinimalHarnessSamples`
   fixture covers.
   GRAPHICS-079 Slice C does not add a Vulkan-specific ImGui upload helper:
   the promoted path follows the existing transient-debug / visualization-overlay
@@ -414,12 +413,11 @@ The predicate fails closed unless every one of the following holds:
   all non-null).
 
 The service-diagnostics block sources `serviceDiagnostics.PublicBindlessHeapExposed`
-from `HasOperationalSafetyPrerequisites() && IsOperational()`, which is a
-correctness clarification rather than a behavior change: the operational
-predicate already consumes the safety prereqs through gate 8, and the
-diagnostics block previously assumed `IsOperational()` implied safety
-prereqs. Splitting the inputs removes the implicit assumption without
-relaxing any fail-closed observable.
+from `HasOperationalSafetyPrerequisites()` and a valid bindless heap. Texture
+creation and command execution remain `IDevice::IsOperational()`-gated, but
+renderer managers capture the live bindless heap during initialization so
+post-transition resources such as ImGui's font atlas do not stay pinned to the
+fallback heap after the first clean recipe validation publish.
 
 GRAPHICS-076E adds the opt-in `gpu;vulkan` default-recipe readback fixture in
 `tests/integration/graphics/Test.DefaultRecipeSurfaceGpuSmoke.cpp`. It uses

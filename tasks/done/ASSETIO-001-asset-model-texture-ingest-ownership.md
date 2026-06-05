@@ -6,8 +6,9 @@
 - Owner/agent: Codex.
 - Branch: `main`.
 - Final implementation commit: this retirement commit.
-- Maturity: `CPUContracted`; `Operational` file/import sandbox proof is owned by
-  [`RUNTIME-095`](../backlog/runtime/RUNTIME-095-working-sandbox-acceptance.md).
+- Maturity: `CPUContracted`; [`RUNTIME-095`](RUNTIME-095-working-sandbox-acceptance.md)
+  closes the scoped operational sandbox proof, while broad file/import visual
+  coverage remains future work.
 - Summary: The CPU-only import/export route contract, asset-owned geometry
   callback bridge, promoted model/texture payload records, promoted
   model/texture decoder-callback bridge, concrete runtime GLTF/GLB and
@@ -69,8 +70,8 @@
   assets, requests their texture uploads, converts mesh primitive payloads into
   ECS `GeometrySources`, creates `RenderSurface` entities, and records
   `MaterialTextureAssetBindings` by child `AssetId`. Post-upload material
-  bindless re-resolution and file/import UI command execution are downstream
-  `Operational` work owned by `RUNTIME-095`.
+  bindless re-resolution and broad file/import visual coverage remain downstream;
+  RUNTIME-095 closes the scoped operational sandbox proof.
 
 ## Goal
 - Define and implement the promoted CPU asset ingest/export orchestration that replaces legacy `Graphics.IORegistry`, `Graphics.Importers.GLTF`, `Graphics.TextureLoader`, `Graphics.ModelLoader`, and `Graphics.Model` ownership without moving file IO or decode policy into final graphics layers.
@@ -135,7 +136,7 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
 - Slice B closes `CPUContracted` for promoted geometry callback invocation:
   `src/assets` resolves and dispatches geometry import/export callbacks without
   importing geometry, while `src/runtime` registers the concrete promoted
-  geometry codecs. `Operational` owned by `RUNTIME-095`.
+  geometry codecs. RUNTIME-095 closes the scoped operational sandbox proof.
 - Slice C.1 extends `CPUContracted` for model/texture payload ownership:
   `src/assets` exposes CPU-only texture/model-scene records, validation helpers,
   external-resource diagnostics, and typed payload storage coverage without
@@ -153,6 +154,6 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
   upload requests without importing graphics/RHI into `src/assets`.
 - Slice D.2 extends `CPUContracted` by proving runtime-owned model-scene ECS
   construction and material/embedded-texture handoff.
-- `Operational` file-backed sandbox proof remains owned by
-  [`RUNTIME-095`](../backlog/runtime/RUNTIME-095-working-sandbox-acceptance.md)
-  after UI and runtime handoff slices compose the route contract.
+- [`RUNTIME-095`](RUNTIME-095-working-sandbox-acceptance.md) closes the scoped
+  operational sandbox proof after UI and runtime handoff slices compose the
+  route contract; broad file/import visual coverage remains future work.

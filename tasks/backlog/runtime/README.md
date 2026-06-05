@@ -76,7 +76,7 @@ compose with the rendering tasks listed in `tasks/backlog/rendering/README.md`.
   `GeometrySources` → `GpuWorld::GeometryUploadDesc` triangle-list shape
   with fail-closed `MeshPackStatus` taxonomy), Slice B the extraction wiring,
   and Slice C the dirty-domain reupload + deferred-retire ordering.
-  `Operational` visual proof is deferred to `RUNTIME-095`.
+  `Operational` visual proof is closed by RUNTIME-095.
 - [RUNTIME-086 — `GeometrySources` graph residency bridge](../../done/RUNTIME-086-geometrysources-graph-residency.md):
   graph nodes/edges to retained point and line geometry. _(retired to
   `tasks/done/` on 2026-05-30 at maturity `CPUContracted`; Slice A — graph
@@ -90,8 +90,8 @@ compose with the rendering tasks listed in `tasks/backlog/rendering/README.md`.
 - [RUNTIME-088 — Mesh primitive view lifecycle](../../done/RUNTIME-088-mesh-primitive-view-lifecycle.md)
   _(done 2026-05-31 at maturity `CPUContracted`: optional mesh edge/vertex render
   views as runtime sidecars over the authoritative mesh `GeometrySources`,
-  wired into `RenderExtractionCache`; `Operational` visual proof owned by
-  `RUNTIME-095`.)_
+  wired into `RenderExtractionCache`; `Operational` visual proof closed by
+  RUNTIME-095.)_
 - [RUNTIME-089 — Runtime selection controller and snapshot handoff](../../done/RUNTIME-089-selection-controller.md)
   _(done; retired 2026-05-31 at `CPUContracted`)_: input/pick-result policy,
   selected/hovered state, and `RenderWorld.Selection` submission. Slice A
@@ -111,9 +111,10 @@ compose with the rendering tasks listed in `tasks/backlog/rendering/README.md`.
   (done, 2026-06-01, `CPUContracted`): mesh face/edge/vertex, graph edge/node, and
   point-cloud point refinement from graphics primitive hints plus authoritative
   `GeometrySources`, wired into `Engine::RunFrame` via `RefinePickReadbackResult`.
-- [RUNTIME-095 — Working sandbox app acceptance path](RUNTIME-095-working-sandbox-acceptance.md):
-  final CPU/null + opt-in Vulkan acceptance for mesh, graph, point cloud,
-  camera, selection, outline, and UI.
+- [RUNTIME-095 — Working sandbox app acceptance path](../../done/RUNTIME-095-working-sandbox-acceptance.md):
+  done 2026-06-04 at `Operational` on Vulkan-capable hosts; final CPU/null +
+  opt-in Vulkan acceptance for mesh, graph, point cloud, camera, selection,
+  outline, and UI.
 
 ## Cross-linked rendering tasks (runtime-owned)
 

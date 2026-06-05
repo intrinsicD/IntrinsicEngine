@@ -9,5 +9,6 @@ GPU-agnostic; GPU residency lives under `src/graphics/assets` and is wired by
   retired at `CPUContracted` with the owner split around legacy graphics IO
   registry, GLTF/GLB model ingest, CPU texture decode payloads, extension
   routing, runtime-to-graphics texture residency handoff, and runtime-owned
-  model-scene ECS/material handoff implemented. `Operational` file/import
-  sandbox proof remains owned by `RUNTIME-095` and UI follow-up work.
+  model-scene ECS/material handoff implemented. The scoped working-sandbox
+  operational proof is closed by RUNTIME-095; broad file-format visual coverage
+  remains future asset/UI follow-up work.

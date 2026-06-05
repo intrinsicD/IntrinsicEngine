@@ -16,9 +16,10 @@ consolidation or a genuinely new capability.
 - Final implementation commit: this retirement commit (no code change — the
   capability already shipped under ASSETIO-001).
 - Maturity: `CPUContracted` (inherited from the shipped
-  `AssetModelTextureHandoff` contract coverage). `Operational` file-backed
-  texture upload proof remains owned by
-  [`RUNTIME-095`](../backlog/runtime/RUNTIME-095-working-sandbox-acceptance.md).
+  `AssetModelTextureHandoff` contract coverage).
+  [`RUNTIME-095`](RUNTIME-095-working-sandbox-acceptance.md) closes the scoped
+  operational sandbox proof; broad file-backed texture visual coverage remains
+  future work.
 - Superseded by: `tasks/done/ASSETIO-001-asset-model-texture-ingest-ownership.md`
   (Slice D.1 / D.2).
 

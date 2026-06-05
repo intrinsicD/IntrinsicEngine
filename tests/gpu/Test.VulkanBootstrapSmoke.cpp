@@ -351,9 +351,9 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
         EXPECT_GT(serviceDiagnostics.BindlessCapacity, 0u);
         EXPECT_TRUE(serviceDiagnostics.LiveOperationalPrerequisitesReady);
         EXPECT_TRUE(serviceDiagnostics.OperationalSafetyPrerequisitesReady);
-        EXPECT_FALSE(serviceDiagnostics.PublicServicesExposed);
+        EXPECT_TRUE(serviceDiagnostics.PublicServicesExposed);
         EXPECT_FALSE(serviceDiagnostics.PublicServicesRemainFailClosed);
-        EXPECT_FALSE(serviceDiagnostics.PublicBindlessHeapExposed);
+        EXPECT_TRUE(serviceDiagnostics.PublicBindlessHeapExposed);
         EXPECT_TRUE(serviceDiagnostics.PublicTransferQueueExposed);
 
         const Extrinsic::RHI::BufferHandle sceneTableBuffer = device->CreateBuffer({
@@ -655,11 +655,10 @@ TEST(VulkanBootstrapSmoke, InitializeCreatesPerFrameResourcesOrFailsCleanly)
 
         const std::uint64_t beforeFallbackBindless =
             Extrinsic::Backends::Vulkan::GetFallbackBindlessAllocationAttemptCount();
-        EXPECT_EQ(device->GetBindlessHeap().AllocateTextureSlot({}, {}),
-                  Extrinsic::RHI::kInvalidBindlessIndex);
+        EXPECT_GT(device->GetBindlessHeap().GetCapacity(), 0u);
         EXPECT_EQ(Extrinsic::Backends::Vulkan::GetFallbackBindlessAllocationAttemptCount(),
-                  beforeFallbackBindless + 1u)
-            << "live bindless service exists internally, but public access must remain fail-closed until operational";
+                  beforeFallbackBindless)
+            << "public bindless is live after guarded service bootstrap; texture creation still gates on IsOperational()";
 
         if (!CommandSucceeded("glslc --version >/dev/null 2>&1"))
         {

@@ -730,7 +730,7 @@ Cross-layer Theme B′ leaves outside `rendering/`:
 - [`runtime/RUNTIME-084` — Gizmo interaction](../runtime/RUNTIME-084-gizmo-interaction.md).
 - [`runtime/RUNTIME-090` — Dear ImGui platform/renderer adapter](../../done/RUNTIME-090-imgui-platform-renderer-adapter.md) (retired 2026-06-02 at `CPUContracted`; Slice A standalone adapter module plus Slice B `Engine` frame-loop wiring landed).
 
-Cross-layer Theme A leaves newly opened for the full working sandbox path:
+Cross-layer Theme A leaves retired for the full working sandbox path:
 - [`RUNTIME-085` — `GeometrySources` mesh residency bridge](../../done/RUNTIME-085-geometrysources-mesh-residency.md) (retired 2026-05-28 at `CPUContracted`; Slices A–C landed the mesh packer, extraction wiring, and dirty-domain reupload/retire ordering).
 - [`runtime/RUNTIME-086` — `GeometrySources` graph residency bridge](../../done/RUNTIME-086-geometrysources-graph-residency.md) (retired 2026-05-30 at `CPUContracted`; Slice A graph packer plus Slices B + C extraction residency wiring landed).
 - [`runtime/RUNTIME-087` — `GeometrySources` point-cloud residency bridge](../../done/RUNTIME-087-geometrysources-pointcloud-residency.md) (retired 2026-05-30 at `CPUContracted`).
@@ -739,7 +739,7 @@ Cross-layer Theme A leaves newly opened for the full working sandbox path:
 - [`runtime/RUNTIME-092` — Runtime stable entity lookup sidecar](../../done/RUNTIME-092-stable-entity-lookup.md) (retired 2026-05-31 at `CPUContracted`; Slice A standalone `StableEntityLookup` module, Slice B `Engine::RunFrame` per-frame rebuild + `SelectionController` render-id seam routing).
 - [`runtime/RUNTIME-093` — Primitive selection refinement](../../done/RUNTIME-093-primitive-selection-refinement.md) (done, 2026-06-01, `CPUContracted`).
 - [`UI-001` — Sandbox editor shell and core panels](../../done/UI-001-sandbox-editor-shell-panels.md) (retired 2026-06-03 at `CPUContracted`).
-- [`runtime/RUNTIME-095` — Working sandbox app acceptance path](../runtime/RUNTIME-095-working-sandbox-acceptance.md).
+- [`runtime/RUNTIME-095` — Working sandbox app acceptance path](../../done/RUNTIME-095-working-sandbox-acceptance.md) (retired 2026-06-04 at `Operational` on Vulkan-capable hosts).
 
 ### Modernization roadmap (GRAPHICS-035..058)
 

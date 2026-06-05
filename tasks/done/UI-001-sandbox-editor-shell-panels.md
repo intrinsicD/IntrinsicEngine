@@ -13,9 +13,9 @@
   visualization-config, and visualization adapter-binding controls. Commands
   route through runtime-owned seams, including Slice D's
   `Engine::ImportAssetFromPath(...)` file/import command over the retired
-  `ASSETIO-001` asset route/model/texture ingest and handoff surfaces. Final
-  file-backed visual/interactive proof remains `Operational` work owned by
-  `RUNTIME-095`.
+  `ASSETIO-001` asset route/model/texture ingest and handoff surfaces.
+  RUNTIME-095 closes the scoped visual/interactive proof; broad file-backed UI
+  workflows remain future work.
 
 ## Slice plan
 - **Slice A.** Add the promoted runtime sandbox editor UI module,
@@ -52,7 +52,7 @@
 - **Slice D.** Add the runtime-owned file/import command seam and close
   `CPUContracted` for all required panels. The panel forwards path/payload hints
   to `Engine::ImportAssetFromPath(...)`, folds success/failure diagnostics back
-  into the model, and leaves final `Operational` proof to `RUNTIME-095`.
+  into the model, and leaves final scoped `Operational` proof to `RUNTIME-095`.
 
 ## Goal
 - Implement the first promoted sandbox/editor UI shell on top of the runtime ImGui adapter, with core panels for scene hierarchy, file/import entry points, inspector, selection details, camera/render settings, and geometry-domain visualization controls.
@@ -95,7 +95,7 @@
 - [x] Update `tasks/backlog/ui/README.md` with UI-001 and its dependency gates.
 - [x] Update runtime/editor docs (`src/runtime/README.md` or a UI README if added) with the UI ownership model and command/event boundaries.
 - [x] Update `docs/migration/nonlegacy-parity-matrix.md` rows for the promoted sandbox/editor UI panels.
-- [x] Update `src/app/Sandbox/README.md` and the working-sandbox gate review with Slice B's runtime-owned transform edit seam, Slice C.1's camera/primitive-view command seams, Slice C.2's spatial-debug/visualization-config seams, Slice C.3's visualization adapter-binding seam, Slice D's file/import command seam, and the remaining `RUNTIME-095` operational proof.
+- [x] Update `src/app/Sandbox/README.md` and the working-sandbox gate review with Slice B's runtime-owned transform edit seam, Slice C.1's camera/primitive-view command seams, Slice C.2's spatial-debug/visualization-config seams, Slice C.3's visualization adapter-binding seam, Slice D's file/import command seam, and the downstream `RUNTIME-095` operational proof.
 - [x] Refresh `docs/api/generated/module_inventory.md` if new modules are added.
 
 ## Acceptance criteria
@@ -134,5 +134,6 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
   selected-entity visualization adapter-binding command/model routing. Slice D
   closes `CPUContracted` for file/import execution on top of the retired
   ASSETIO runtime/asset seams and retires the full task.
-- `Operational` owned by [`RUNTIME-095`](../backlog/runtime/RUNTIME-095-working-sandbox-acceptance.md)
-  final sandbox acceptance after ImGui rendering is wired.
+- Scoped `Operational` proof closed by
+  [`RUNTIME-095`](RUNTIME-095-working-sandbox-acceptance.md) after ImGui rendering
+  is wired.

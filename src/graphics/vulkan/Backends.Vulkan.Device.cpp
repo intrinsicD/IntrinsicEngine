@@ -1332,7 +1332,7 @@ RHI::ITransferQueue& VulkanDevice::GetTransferQueue()
 
 RHI::IBindlessHeap& VulkanDevice::GetBindlessHeap()
 {
-    if (IsOperational() && m_BindlessHeap && m_BindlessHeap->IsValid())
+    if (HasOperationalSafetyPrerequisites() && m_BindlessHeap && m_BindlessHeap->IsValid())
         return *m_BindlessHeap;
     return m_FallbackBindlessHeap;
 }
@@ -2172,14 +2172,14 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
             serviceDiagnostics.CommandContextRebindCount == kMaxFramesInFlight;
         RefreshOperationalState();
         serviceDiagnostics.LiveOperationalPrerequisitesReady = HasLiveOperationalPrerequisites();
-        // GRAPHICS-033F: source `PublicBindlessHeapExposed` from
-        // `HasOperationalSafetyPrerequisites() && IsOperational()` rather
-        // than from `IsOperational()` alone. This is a correctness clarification
-        // (the operational predicate already consumes the safety prereqs
-        // through gate 8), not a behavior change for fail-closed paths.
+        // GRAPHICS-033F/RUNTIME-095: expose public services after raw Vulkan
+        // safety prerequisites are reconciled. Texture creation and command
+        // execution still gate on `IDevice::IsOperational()`, but managers must
+        // capture the live bindless heap during renderer initialization so
+        // post-transition resource creation does not stay pinned to fallback.
         const bool safetyPrereqsReady = HasOperationalSafetyPrerequisites();
         serviceDiagnostics.OperationalSafetyPrerequisitesReady = safetyPrereqsReady;
-        serviceDiagnostics.PublicBindlessHeapExposed = safetyPrereqsReady && IsOperational() &&
+        serviceDiagnostics.PublicBindlessHeapExposed = safetyPrereqsReady &&
                                                        m_BindlessHeap && m_BindlessHeap->IsValid();
         serviceDiagnostics.PublicTransferQueueExposed = serviceDiagnostics.LiveOperationalPrerequisitesReady &&
                                                          m_TransferQueue && m_TransferQueue->IsValid();
@@ -2193,7 +2193,7 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
         diagnostics.Status = VulkanBootstrapStatus::RegisteredSwapchainImages;
         PublishBootstrapDiagnostics(diagnostics);
 
-        Core::Log::Warn("[VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; canonical frame execution, resize/device-loss handling, and operational public-service exposure remain predicate blockers, so device remains non-operational.");
+        Core::Log::Warn("[VulkanDevice::Initialize] Vulkan bootstrap created logical-device, queue, VMA, per-frame command/sync, swapchain image/view/handle, bindless heap, transfer queue, and global pipeline-layout state; canonical frame execution waits for the first clean recipe validation publish, so device remains non-operational during cold start.");
         return;
     }
 
@@ -3277,10 +3277,14 @@ RHI::ICommandContext& VulkanDevice::GetGraphicsContext(uint32_t frameIndex)
 
 RHI::QueueCapabilityProfile VulkanDevice::GetQueueCapabilityProfile() const noexcept
 {
+    // GRAPHICS-037D follow-up: keep render-graph frame execution on the
+    // graphics queue until cross-queue barrier lowering is validation-clean.
+    // The dedicated VulkanTransferQueue remains available through
+    // GetTransferQueue() for upload traffic; this profile only controls
+    // framegraph pass batching.
     return RHI::QueueCapabilityProfile{
-        .SupportsAsyncCompute = m_AsyncComputeQueue != VK_NULL_HANDLE,
-        .SupportsTransfer = m_TransferVkQueue != VK_NULL_HANDLE &&
-                            m_TransferFamily != m_GraphicsFamily,
+        .SupportsAsyncCompute = false,
+        .SupportsTransfer = false,
     };
 }
 

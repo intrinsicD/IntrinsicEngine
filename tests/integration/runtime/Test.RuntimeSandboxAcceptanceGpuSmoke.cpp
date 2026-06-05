@@ -6,9 +6,11 @@
 // (`Test.RuntimeSandboxAcceptance.cpp`); this slice drives the runtime `Engine`
 // for a small bounded number of frames on a Vulkan-capable host with the
 // acceptance families (one mesh, one graph, one point cloud) composed into the
-// scene, and asserts that the default recipe reaches the canonical `"Present"`
-// pass with no canonical pass falling through the `SkippedUnavailable` branch
-// and with the Vulkan fallback counters stable across the operational frames.
+// scene and the same runtime-owned `SandboxEditorUi` shell attached as the
+// `ExtrinsicSandbox` app. It asserts that the default recipe reaches the
+// canonical `"Present"` pass with no canonical pass falling through the
+// `SkippedUnavailable` branch and with the Vulkan fallback counters stable
+// across the operational frames.
 //
 // The fixture self-skips on non-Vulkan hosts (no GLFW, no operational promoted
 // Vulkan device), so it is excluded from the default CPU gate by its
@@ -32,6 +34,7 @@
 
 import Extrinsic.Backends.Vulkan;
 import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Component.MetaData;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Component.Transform;
@@ -43,9 +46,13 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Platform.Backend.Glfw;
+import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
+import Extrinsic.RHI.Handles;
+import Extrinsic.RHI.TextureUpload;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.SandboxEditorUi;
 import Geometry.Properties;
 
 namespace
@@ -81,7 +88,11 @@ public:
     {
     }
 
-    void OnInitialize(Engine&) override {}
+    void OnInitialize(Engine& engine) override
+    {
+        m_EditorUi.Attach(engine);
+    }
+
     void OnSimTick(Engine&, double) override {}
 
     void OnVariableTick(Engine& engine, double, double) override
@@ -93,9 +104,13 @@ public:
         }
     }
 
-    void OnShutdown(Engine&) override {}
+    void OnShutdown(Engine&) override
+    {
+        m_EditorUi.Detach();
+    }
 
 private:
+    Extrinsic::Runtime::SandboxEditorUi m_EditorUi{};
     std::uint32_t m_TargetFrames{1u};
     std::uint32_t m_Frames{0u};
 };
@@ -254,9 +269,9 @@ struct AcceptanceBootstrap
     std::string SkipReason;
 };
 
-// Bootstrap an operational promoted-Vulkan engine the same way the GRAPHICS-076
-// default-recipe smoke does, then compose the acceptance families into the
-// already-initialized reference scene.
+// Bootstrap an operational promoted-Vulkan engine with the sandbox editor shell
+// attached, then compose the acceptance families into the already-initialized
+// reference scene.
 [[nodiscard]] AcceptanceBootstrap BootstrapAcceptanceEngine()
 {
     if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
@@ -292,6 +307,38 @@ struct AcceptanceBootstrap
     return AcceptanceBootstrap{.EnginePtr = std::move(enginePtr), .Skipped = false, .SkipReason = {}};
 }
 
+// Reproduce the actual `src/app/Sandbox/main.cpp` config path: keep
+// `CreateReferenceEngineConfig()` defaults, including validation and VSync.
+[[nodiscard]] AcceptanceBootstrap BootstrapDefaultSandboxAppEngine()
+{
+    if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
+    {
+        return AcceptanceBootstrap{
+            .EnginePtr = nullptr,
+            .Skipped = true,
+            .SkipReason = "GLFW could not initialize in this environment; gpu;vulkan sandbox app smoke is opt-in.",
+        };
+    }
+
+    auto config = Extrinsic::Runtime::CreateReferenceEngineConfig();
+    auto enginePtr = std::make_unique<Engine>(
+        config, std::make_unique<ExitAfterFramesApp>(kTargetFrames));
+    enginePtr->Initialize();
+
+    const auto initInputs = GetVulkanDeviceOperationalInputs(&enginePtr->GetDevice());
+    if (!initInputs.LogicalDeviceReady || !initInputs.SwapchainReady || !initInputs.CommandSyncReady)
+    {
+        enginePtr->Shutdown();
+        return AcceptanceBootstrap{
+            .EnginePtr = nullptr,
+            .Skipped = true,
+            .SkipReason = "Promoted Vulkan did not reach logical-device/swapchain/command-sync readiness on this host.",
+        };
+    }
+
+    return AcceptanceBootstrap{.EnginePtr = std::move(enginePtr), .Skipped = false, .SkipReason = {}};
+}
+
 struct AcceptanceRunCapture
 {
     Counters::Snapshot Before{};
@@ -311,6 +358,28 @@ struct AcceptanceRunCapture
     capture.Stats = engine.GetRenderer().GetLastRenderGraphStats();
     capture.After = ToCounterSnapshot(GetVulkanOperationalDiagnosticsSnapshot());
     return capture;
+}
+
+[[nodiscard]] std::uint64_t CountNonBlackRgbPixels(
+    Extrinsic::RHI::IDevice& device,
+    const Extrinsic::RHI::BufferHandle readbackBuffer,
+    const std::uint64_t readbackSize,
+    const std::uint32_t bytesPerPixel)
+{
+    std::vector<std::uint8_t> readbackBytes(static_cast<std::size_t>(readbackSize), 0u);
+    device.ReadBuffer(readbackBuffer, readbackBytes.data(), readbackSize, 0u);
+
+    std::uint64_t nonBlack = 0u;
+    for (std::uint64_t offset = 0u; offset + 2u < readbackSize; offset += bytesPerPixel)
+    {
+        if (readbackBytes[static_cast<std::size_t>(offset + 0u)] != 0u ||
+            readbackBytes[static_cast<std::size_t>(offset + 1u)] != 0u ||
+            readbackBytes[static_cast<std::size_t>(offset + 2u)] != 0u)
+        {
+            ++nonBlack;
+        }
+    }
+    return nonBlack;
 }
 } // namespace
 
@@ -393,5 +462,88 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, AcceptanceSceneReachesOperationalDefaultR
         << ", validationError " << run.Before.ValidationError << " -> " << run.After.ValidationError
         << ", gateFailure " << run.Before.OperationalGateFailure << " -> " << run.After.OperationalGateFailure;
 
+    engine.Shutdown();
+}
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke, ExtrinsicSandboxDefaultConfigProducesVisibleFrameWithValidation)
+{
+    auto bootstrap = BootstrapDefaultSandboxAppEngine();
+    if (bootstrap.Skipped)
+    {
+        GTEST_SKIP() << bootstrap.SkipReason;
+    }
+    Engine& engine = *bootstrap.EnginePtr;
+
+    auto& renderer = engine.GetRenderer();
+    auto& device = engine.GetDevice();
+    const Extrinsic::RHI::Format backbufferFormat = device.GetBackbufferFormat();
+    const std::uint32_t bytesPerPixel = Extrinsic::RHI::BytesPerBlock(backbufferFormat);
+    const Extrinsic::Core::Extent2D extent = device.GetBackbufferExtent();
+    if (bytesPerPixel < 4u || extent.Width == 0u || extent.Height == 0u)
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style smoke readback.";
+    }
+
+    const std::uint64_t readbackSize =
+        static_cast<std::uint64_t>(bytesPerPixel) *
+        static_cast<std::uint64_t>(extent.Width) *
+        static_cast<std::uint64_t>(extent.Height);
+    const Extrinsic::RHI::BufferHandle readbackBuffer = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
+        .SizeBytes = readbackSize,
+        .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
+        .HostVisible = true,
+        .DebugName = "Sandbox.DefaultConfig.Readback",
+    });
+    if (!readbackBuffer.IsValid())
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Readback buffer allocation failed; gpu;vulkan smoke is opt-in.";
+    }
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(readbackBuffer);
+
+    const auto run = DriveAcceptanceAndCapture(engine);
+    const auto adapterDiagnostics = engine.GetImGuiAdapter().GetDiagnostics();
+
+    if (!run.DeviceOperational)
+    {
+        renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+        device.DestroyBuffer(readbackBuffer);
+        engine.Shutdown();
+        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach operational Vulkan after bounded frames: status="
+                      << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
+                      << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+        return;
+    }
+
+    EXPECT_EQ(run.Status.Code, Extrinsic::Backends::Vulkan::VulkanOperationalStatusCode::Operational);
+    EXPECT_EQ(run.Status.Reason, Extrinsic::Backends::Vulkan::VulkanOperationalReason::None);
+    EXPECT_TRUE(run.Stats.Compile.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_TRUE(run.Stats.Execute.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_EQ(FindPassStatus(run.Stats, "Present"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_EQ(FindPassStatus(run.Stats, "ImGuiPass"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_GE(run.Stats.DefaultRecipeBackbufferReadbackCopyCount, 1u)
+        << "Sandbox default-config readback triplet did not record on any operational frame.";
+    EXPECT_GT(adapterDiagnostics.FramesProduced, 0u);
+    EXPECT_GT(adapterDiagnostics.LastVertexCount, 0u);
+    EXPECT_GT(adapterDiagnostics.LastIndexCount, 0u);
+    EXPECT_GT(adapterDiagnostics.LastCommandCount, 0u);
+
+    const std::uint64_t nonBlackPixels =
+        CountNonBlackRgbPixels(device, readbackBuffer, readbackSize, bytesPerPixel);
+    EXPECT_GT(nonBlackPixels, 0u)
+        << "Sandbox default-config frame read back as entirely black despite recorded Present/ImGui passes. "
+        << "adapter frames=" << adapterDiagnostics.FramesProduced
+        << " drawLists=" << adapterDiagnostics.LastDrawListCount
+        << " vertices=" << adapterDiagnostics.LastVertexCount
+        << " indices=" << adapterDiagnostics.LastIndexCount
+        << " commands=" << adapterDiagnostics.LastCommandCount
+        << " display=" << adapterDiagnostics.DisplayWidth << "x" << adapterDiagnostics.DisplayHeight
+        << " pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+    device.DestroyBuffer(readbackBuffer);
     engine.Shutdown();
 }

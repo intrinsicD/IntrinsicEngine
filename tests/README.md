@@ -71,9 +71,10 @@ triplet against MockDevice, non-operational skip path) run inside the default ga
 The opt-in `IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests` executable (labels
 `gpu;vulkan;integration;runtime;graphics`, RUNTIME-095 Slice 3) drives
 `Engine::Run()` over the working-sandbox acceptance scene (one mesh, one graph,
-one point cloud composed onto the reference camera) for a bounded number of
-frames and asserts the default recipe reaches the canonical `"Present"` pass
-with no canonical pass falling through `SkippedUnavailable`, that each
+one point cloud composed onto the reference camera) with the runtime-owned
+`SandboxEditorUi` attached for a bounded number of frames and asserts the
+default recipe reaches the canonical `"Present"` pass with no canonical pass
+falling through `SkippedUnavailable`, that each
 acceptance family resides on its own mesh/graph/point-cloud residency lane
 (asserted per lane so the reference triangle's separate `Procedural` lane
 cannot mask a broken family), and that the Vulkan fallback counters stay

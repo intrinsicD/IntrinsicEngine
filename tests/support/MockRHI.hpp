@@ -220,6 +220,7 @@ namespace Extrinsic::Tests
         {
             ++BindPipelineCalls;
             LastBoundPipeline = handle;
+            BoundPipelines.push_back(handle);
             Events.push_back(EventKind::BindPipeline);
         }
         void BindIndexBuffer(RHI::BufferHandle buffer, std::uint64_t offset, RHI::IndexType type) override
@@ -348,6 +349,7 @@ namespace Extrinsic::Tests
         std::vector<DispatchRecord> DispatchRecords{};
         std::vector<EventKind> Events{};
         std::vector<std::uint32_t> PushConstantSizes{};
+        std::vector<RHI::PipelineHandle> BoundPipelines{};
         // GRAPHICS-072 Slice C — full payload capture parallel to
         // `PushConstantSizes`. `PushConstantPayloads[i]` holds the bytes of
         // the i-th `PushConstants(...)` call in submission order.
@@ -436,6 +438,7 @@ namespace Extrinsic::Tests
         bool AcceptQueueSubmitPlans = false;
         RHI::FrameHandle NextFrame{.FrameIndex = 0u, .SwapchainImageIndex = 0u};
         RHI::TextureHandle BackbufferHandle{100u, 1u};
+        RHI::Format BackbufferFormat = RHI::Format::RGBA8_UNORM;
         std::uint64_t GlobalFrameNumber = 0;
         // Default mirrors a typical double-buffered swapchain (matches the
         // RHI's historical fixed value); tests that need to exercise
@@ -461,6 +464,8 @@ namespace Extrinsic::Tests
         mutable RHI::FrameHandle LastBackbufferFrame{};
         std::vector<BufferWriteRecord> BufferWrites;
         std::vector<TextureWriteRecord> TextureWrites;
+        std::vector<RHI::PipelineDesc> CreatedPipelineDescs;
+        std::vector<RHI::PipelineHandle> CreatedPipelineHandles;
         std::vector<QueueSubmitContextRequest> QueueSubmitContextRequests;
         std::vector<RecordedQueueSubmitBatch> RecordedQueueSubmitPlan;
 
@@ -509,6 +514,7 @@ namespace Extrinsic::Tests
             return BackbufferHandle;
         }
         Core::Extent2D GetBackbufferExtent() const override { return {}; }
+        [[nodiscard]] RHI::Format GetBackbufferFormat() const override { return BackbufferFormat; }
 
         RHI::ICommandContext& GetGraphicsContext(std::uint32_t) override { return CommandContext; }
         RHI::ITransferQueue& GetTransferQueue() override { return TransferQueue; }
@@ -679,15 +685,24 @@ namespace Extrinsic::Tests
         }
         void DestroySampler(RHI::SamplerHandle) override { ++DestroySamplerCount; }
 
-        RHI::PipelineHandle CreatePipeline(const RHI::PipelineDesc&) override
+        RHI::PipelineHandle CreatePipeline(const RHI::PipelineDesc& desc) override
         {
             ++CreatePipelineCount;
+            CreatedPipelineDescs.push_back(desc);
             if (FailPipelineCreateCall > 0 && CreatePipelineCount == FailPipelineCreateCall)
             {
+                CreatedPipelineHandles.push_back(RHI::PipelineHandle{});
                 return {};
             }
-            if (FailNextPipelineCreate) { FailNextPipelineCreate = false; return {}; }
-            return RHI::PipelineHandle{m_NextPipeline++, 1u};
+            if (FailNextPipelineCreate)
+            {
+                FailNextPipelineCreate = false;
+                CreatedPipelineHandles.push_back(RHI::PipelineHandle{});
+                return {};
+            }
+            const RHI::PipelineHandle handle{m_NextPipeline++, 1u};
+            CreatedPipelineHandles.push_back(handle);
+            return handle;
         }
         void DestroyPipeline(RHI::PipelineHandle) override { ++DestroyPipelineCount; }
 

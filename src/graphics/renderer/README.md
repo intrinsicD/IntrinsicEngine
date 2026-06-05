@@ -299,10 +299,14 @@ Concretely:
   textures declare `Sampled | Storage` usage for the read/compute-write split.
   GRAPHICS-038B adds the default-recipe `"HZBBuildPass"` immediately after
   `"DepthPrepass"` when an operational renderer has allocated and imported
-  `HZB.Current`. The renderer records the backend-neutral per-mip fallback
-  command shape by default (`BindPipeline` + one 32-byte
-  `HZBBuildPushConstants` push + `Dispatch` per mip, with `General/ShaderWrite`
-  to `General/ShaderRead|ShaderWrite` stitch barriers between mips), while the
+  `HZB.Current`. The recipe imports the retained current HZB image from
+  `TextureState::Undefined` and leaves it in `TextureState::ShaderWrite`, so a
+  newly recreated Vulkan image receives its first storage-image layout
+  transition before the compute descriptor is used. The renderer records the
+  backend-neutral per-mip fallback command shape by default (`BindPipeline` +
+  one 32-byte `HZBBuildPushConstants` push + `Dispatch` per mip, with
+  `General/ShaderWrite` to `General/ShaderRead|ShaderWrite` stitch barriers
+  between mips), while the
   pure `ComputeHZBBuildDispatchPlan(...)` selector also covers the future
   single-pass/SPD-style path when a backend capability enables it. The shader
   asset `assets/shaders/hzb_build.comp` contains the subgroup + shared-memory
@@ -953,7 +957,8 @@ Concretely:
   Slice A added the explicit `"ImGuiPass"` executor branch, the renderer-owned
   `std::optional<ImGuiPass>` consumer, the borrowed
   `ImGuiOverlaySystem* m_ImGuiOverlaySystem`, `IRenderer::SetImGuiOverlaySystem`
-  / `HasImGuiOverlaySystem`, and the `m_ImGuiPipelineLease`. Slice B wires the
+  / `HasImGuiOverlaySystem`, and ImGui pipeline leases for the active
+  present-source formats. Slice B wires the
   runtime `Engine` producer↔consumer handoff so `Engine::Initialize()` passes
   the engine-owned overlay to the renderer and `Engine::Shutdown()` detaches it
   before the adapter shuts the overlay down. Slice C adds the graphics-owned
@@ -961,7 +966,10 @@ Concretely:
   `ImGuiOverlaySystem::InitializeGpuResources(device, textureManager,
   samplerManager)` allocates the retained atlas texture (`R8_UNORM` fallback,
   `RGBA8_UNORM` for colored atlas payloads) through `RHI::TextureManager` and
-  retains its bindless index; `ImGuiUploadHelper` packs submitted POD
+  retains its bindless index; `IRenderer::RebuildOperationalResources()` invokes
+  the same initializer so an overlay attached during Vulkan cold start allocates
+  the atlas after the first operational transition. `ImGuiUploadHelper` packs
+  submitted POD
   vertices/indices into one growing host-visible vertex buffer and one growing
   index buffer; `ImGuiPass::Execute(...)` records deterministic
   `BindIndexBuffer + PushConstants + DrawIndexed` blocks and increments
@@ -974,9 +982,15 @@ Concretely:
   values as `RHI::BindlessIndex` slots, pushes the selected texture index per
   command, and samples the retained font atlas or user texture in
   `assets/shaders/imgui.frag` without adding a graphics-visible descriptor
-  surface. The imported `Backbuffer` remains owned solely by `Pass.Present`;
-  render-graph validation still rejects non-present backbuffer writes. The
-  opt-in `gpu;vulkan` smoke remains the GPU-host proof for the same path.
+  surface. `RecordImGuiPass()` flushes queued bindless descriptor updates after
+  `UploadPendingFontAtlas()` and before `ImGuiPass::Execute(...)`, so a
+  freshly allocated atlas slot is visible to the shader in the same frame. The
+  promoted Vulkan backend reserves framegraph sampled-texture descriptor slots
+  0..2 and allocates real bindless textures from slot 3 upward, so the font
+  atlas slot cannot be overwritten by DebugView/Present descriptor updates.
+  The imported `Backbuffer` remains owned solely by `Pass.Present`; render-graph validation
+  still rejects non-present backbuffer writes. The opt-in `gpu;vulkan` smoke
+  remains the GPU-host proof for the same path.
 - `TransformSyncSystem`, `LightSystem`, and `VisualizationSyncSystem` consume
   graphics-owned snapshot records (`TransformSyncRecord`, `LightSnapshot`, and
   `VisualizationSyncRecord`) instead of querying live ECS registries. Runtime is
@@ -1692,12 +1706,17 @@ Concretely:
   (or the retained font atlas) with no new graphics-visible descriptor surface.
   `ImGuiOverlayFrame::DrawLists[i].UsesUserTexture` remains a diagnostics flag
   summarizing the command metadata.
-  `ImGuiPass` owns exactly one pipeline created by the backend at startup
-  and bound through the existing `SetPipeline`/`RHI::PipelineHandle` seam;
-  backend Vulkan pipeline state (dynamic rendering against the
-  present-source attachment, premultiplied-alpha blend, no depth test,
-  scissor enabled, viewport from `DisplayWidth`/`DisplayHeight`, vertex
-  stride `sizeof(ImDrawVert)`) remains backend-local under
+  `ImGuiPass` owns backend-created pipeline variants for the possible
+  present-source color formats and binds the variant matching the active
+  render-pass attachment through the existing `SetPipeline` /
+  `RHI::PipelineHandle` seam. The swapchain-format variant covers
+  `SceneColorLDR`/AA-resolved presentation, and the `RGBA8_UNORM` variant
+  covers the `DebugViewRGBA` present source. Backend Vulkan pipeline state
+  (dynamic rendering against the present-source attachment, Dear ImGui
+  straight-alpha color blend
+  (`SrcAlpha`, `OneMinusSrcAlpha`), no depth test, scissor enabled,
+  viewport from `DisplayWidth`/`DisplayHeight`, vertex stride
+  `sizeof(ImDrawVert)`) remains backend-local under
   `src/graphics/vulkan`. `Pass.Present` keeps the CPU-testable
   fullscreen-triangle finalization form (`Draw(3, 1, 0, 0)` after binding
   the present pipeline); backend-native swapchain `vkCmdCopyImage` /

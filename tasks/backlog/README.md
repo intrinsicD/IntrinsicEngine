@@ -38,13 +38,13 @@ Implementation-children gap follow-up: `GRAPHICS-029A..033F`,
 `GRAPHICS-032D`, `GRAPHICS-080`, `runtime/RUNTIME-070`, and `BUILD-001`
 are retired in `tasks/done/`.
 
-Current working-sandbox path: the visible-triangle scaffold is complete; the
-remaining path is (1) default-recipe renderer completion, (2) runtime
-`GeometrySources` residency for mesh/graph/point-cloud content, (3) runtime
-selection/refinement handoff, (4) ImGui/editor UI panels, and (5) the final
-`ExtrinsicSandbox` acceptance task. Keep this path in backlog tasks rather than
-`Sandbox::App`, which remains policy-light and imports runtime only. The current
-verified remaining-gate inventory for this path is in
+Current working-sandbox path: complete for the scoped Theme A acceptance scene.
+The visible-triangle scaffold is retired; the default-recipe renderer,
+runtime `GeometrySources` residency for mesh/graph/point-cloud content,
+selection/refinement handoff, ImGui/editor UI panels, and final
+`ExtrinsicSandbox` acceptance task are all retired to `tasks/done/`.
+`Sandbox::App` remains policy-light and imports runtime only. The completed
+gate inventory for this path is in
 [2026-05-30 working sandbox app — remaining gates](../../docs/reviews/2026-05-30-sandbox-app-remaining-gates.md).
 
 Planning parents (retired):
@@ -92,13 +92,14 @@ Runtime/UI implementation leaves for the full sandbox app path:
 - [`runtime/RUNTIME-092`](../done/RUNTIME-092-stable-entity-lookup.md) (done) — runtime stable entity lookup sidecar identified by `HARDEN-068`. Slice A landed the standalone `Extrinsic.Runtime.StableEntityLookup` sidecar at `Scaffolded`; Slice B (frame/extraction wiring + `SelectionController` seam swap) closed `CPUContracted`.
 - [`runtime/RUNTIME-093`](../done/RUNTIME-093-primitive-selection-refinement.md) (done, 2026-06-01, `CPUContracted`) — mesh/graph/point-cloud primitive refinement from graphics ID hints and authoritative CPU geometry. Slice A landed the standalone `Extrinsic.Runtime.PrimitiveSelectionRefinement` module at `Scaffolded`; Slice B1 added the CPU ray fallback; Slice B2 wired `RefinePickReadbackResult` into `Engine::RunFrame` to close `CPUContracted`.
 - [`UI-001`](../done/UI-001-sandbox-editor-shell-panels.md) — sandbox editor shell and core panels on top of the ImGui adapter/pass (done, 2026-06-03, `CPUContracted`).
-- [`runtime/RUNTIME-095`](runtime/RUNTIME-095-working-sandbox-acceptance.md) — final CPU/null + opt-in Vulkan acceptance for mesh, graph, point cloud, cameras, selection, outline, and UI.
+- [`runtime/RUNTIME-095`](../done/RUNTIME-095-working-sandbox-acceptance.md) (done, 2026-06-04, `Operational` on Vulkan-capable hosts) — final CPU/null + opt-in Vulkan acceptance for mesh, graph, point cloud, cameras, selection, outline, and UI.
 
-### Theme B — Rendering modernization (P1, gated by Theme A)
+### Theme B — Rendering modernization (P1, Theme A unblocked)
 
 Promote the post-reorganization renderer toward 2026-era features without
-breaking the foundation. All leaves stay planning-only until Theme A is
-unblocked.
+breaking the foundation. Theme A's scoped working-sandbox acceptance is retired,
+so Theme B leaves may now be selected according to their own rendering DAG and
+task-level dependencies.
 
 Members:
 - [`GRAPHICS-035-modernization-roadmap.md` (done)](../done/GRAPHICS-035-modernization-roadmap.md) (umbrella).
@@ -198,10 +199,11 @@ promoting backlog tasks to active so per-category DAGs do not diverge.
   retired at `CPUContracted`; final operational proof remains under
   `RUNTIME-095`.
 - **RUNTIME-095 ⇐ GRAPHICS-072..079, GRAPHICS-081, ASSETIO-001 (texture/model
-  ingest; `RUNTIME-080` retired into it) as needed for file-backed content,
-  RUNTIME-085..089, RUNTIME-092..093, UI-001.**
-  The final working-sandbox acceptance composes the renderer, runtime
-  residency, selection/refinement, asset handoff, and UI paths.
+  ingest; `RUNTIME-080` retired into it), RUNTIME-085..089,
+  RUNTIME-092..093, UI-001.**
+  Satisfied 2026-06-04: the final working-sandbox acceptance composes the
+  renderer, runtime residency, selection/refinement, asset/UI command surfaces,
+  and UI paths for the scoped mesh/graph/point-cloud scene.
 - **GRAPHICS-029..034 ⇐ HARDEN-060..062.** Sandbox renderable extraction needs
   promoted ECS scene/hierarchy/transform parity. `HARDEN-060`, `HARDEN-061`,
   and `HARDEN-062` are all retired to `tasks/done/`, so this gate is
@@ -216,8 +218,9 @@ promoting backlog tasks to active so per-category DAGs do not diverge.
   layer ownership decision before runtime/ECS integration.
 - **HARDEN-064 ⇐ ARCH-001.** ECS collider/rigid-body authoring contract must
   wait for the physics layer ownership decision.
-- **GRAPHICS-035..058 ⇐ Theme A.** Rendering modernization leaves stay
-  planning-only until the visible-geometry foundation is complete.
+- **GRAPHICS-035..058 ⇐ Theme A.** Theme A's visible-geometry foundation is
+  complete; rendering modernization leaves are now gated by their individual
+  task dependencies and the rendering DAG.
 - **GRAPHICS-033B ⇐ GRAPHICS-033A (done).** Diagnostics counters and the
   `VulkanRequestedButNotOperational` startup breadcrumb depend on the
   status / reason enums and the reconciliation matrix wiring.

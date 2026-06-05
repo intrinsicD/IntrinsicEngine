@@ -658,6 +658,13 @@ namespace Extrinsic::Graphics
             {
                 m_PostProcessSystem->Initialize(device, *m_TextureManager, *m_BufferManager);
             }
+            if (m_ImGuiOverlaySystem != nullptr && m_TextureManager && m_SamplerManager)
+            {
+                m_ImGuiOverlaySystem->InitializeGpuResources(
+                    device,
+                    *m_TextureManager,
+                    *m_SamplerManager);
+            }
 
             const bool passResourcesReady = InitializeOperationalPassResources(device);
             m_RenderGraph.Reset();
@@ -772,6 +779,7 @@ namespace Extrinsic::Graphics
             // above; same teardown ordering contract (lease reset before
             // `m_PipelineManager` is destroyed below).
             m_ImGuiPipelineLease.reset();
+            m_ImGuiRgba8PipelineLease.reset();
             // GRAPHICS-077 Slices B + C — drop the canonical default-
             // recipe transient-debug pipeline leases (triangle + line +
             // point lanes, depth-tested + always-on-top per lane)
@@ -2494,7 +2502,7 @@ namespace Extrinsic::Graphics
                         // overlay system in via `SetImGuiOverlaySystem`
                         // (`RUNTIME-090` producer ↔ this consumer).
                         const RenderCommandPassStatus status =
-                            RecordImGuiPass(graphicsContext, activeRenderPass.HasAttachments);
+                            RecordImGuiPass(graphicsContext, activeRenderPass.FirstColorFormat);
                         AccumulateCommandRecordStatus(passName, status);
                     }
                     else if (passName == std::string_view{"Present"})
@@ -4168,8 +4176,9 @@ namespace Extrinsic::Graphics
         }
 
         // GRAPHICS-079 Slice A — canonical default-recipe `Pass.ImGui`
-        // pipeline. Per `GRAPHICS-013CQ`: premultiplied-alpha blend, no depth
-        // test/write, scissor enabled (dynamic), color target pinned to the
+        // pipeline. Match Dear ImGui's Vulkan backend straight-alpha color
+        // blend (`SrcAlpha`, `OneMinusSrcAlpha`), no depth test/write,
+        // scissor enabled (dynamic), color target pinned to the
         // `FrameRecipe.PresentSource` format (the swapchain backbuffer format,
         // since PresentSource aliases the present color resource), and a
         // dynamic viewport. The push-constant block is the
@@ -4195,10 +4204,11 @@ namespace Extrinsic::Graphics
             desc.DepthStencil.DepthTestEnable = false;
             desc.DepthStencil.DepthWriteEnable = false;
             desc.DepthStencil.StencilEnable = false;
-            // Premultiplied-alpha blend per GRAPHICS-013CQ: src = One,
-            // dst = OneMinusSrcAlpha for both color and alpha.
+            // Dear ImGui emits straight-alpha vertex/texture colors; match
+            // `imgui_impl_vulkan` so transparent font-atlas pixels do not
+            // fill the whole glyph quad.
             desc.ColorBlend[0].Enable = true;
-            desc.ColorBlend[0].SrcColorFactor = RHI::BlendFactor::One;
+            desc.ColorBlend[0].SrcColorFactor = RHI::BlendFactor::SrcAlpha;
             desc.ColorBlend[0].DstColorFactor = RHI::BlendFactor::OneMinusSrcAlpha;
             desc.ColorBlend[0].ColorOp = RHI::BlendOp::Add;
             desc.ColorBlend[0].SrcAlphaFactor = RHI::BlendFactor::One;
@@ -5497,6 +5507,7 @@ namespace Extrinsic::Graphics
             // system via `SetImGuiOverlaySystem`, so the lease may exist before
             // the pass does.
             m_ImGuiPipelineLease.reset();
+            m_ImGuiRgba8PipelineLease.reset();
             if (m_ImGuiPass)
             {
                 m_ImGuiPass->SetPipeline(RHI::PipelineHandle{});
@@ -5517,6 +5528,22 @@ namespace Extrinsic::Graphics
                 Core::Log::Warn("[Graphics] ImGui pipeline unavailable; default-recipe ImGui recording will be skipped: error={}",
                                 static_cast<int>(imguiPipeline.error()));
             }
+            if (m_BackbufferFormat != RHI::Format::RGBA8_UNORM)
+            {
+                const RHI::PipelineDesc imguiRgba8Desc =
+                    BuildImGuiPipelineDesc(RHI::Format::RGBA8_UNORM);
+                auto imguiRgba8Pipeline = m_PipelineManager->Create(imguiRgba8Desc);
+                if (imguiRgba8Pipeline.has_value())
+                {
+                    m_ImGuiRgba8PipelineLease.emplace(std::move(*imguiRgba8Pipeline));
+                }
+                else
+                {
+                    Core::Log::Warn(
+                        "[Graphics] RGBA8 ImGui pipeline unavailable; ImGui over DebugViewRGBA will be skipped: error={}",
+                        static_cast<int>(imguiRgba8Pipeline.error()));
+                }
+            }
 
             return m_CullingOutputAvailable && m_DepthPrepassPipelineLease.has_value() &&
                 m_DepthPrepassPipelineLease->IsValid();
@@ -5526,6 +5553,7 @@ namespace Extrinsic::Graphics
         {
             std::vector<RHI::ColorAttachment> ColorAttachments{};
             RHI::DepthAttachment DepthAttachment{};
+            RHI::Format FirstColorFormat = RHI::Format::Undefined;
             bool HasAttachments = false;
         };
 
@@ -5572,6 +5600,10 @@ namespace Extrinsic::Graphics
                     .ClearB = 0.0f,
                     .ClearA = 1.0f,
                 };
+                if (out.FirstColorFormat == RHI::Format::Undefined)
+                {
+                    out.FirstColorFormat = attachment.Format;
+                }
                 out.HasAttachments = true;
             }
             return out;
@@ -6688,26 +6720,55 @@ namespace Extrinsic::Graphics
         // rather than recording invalid Vulkan command-buffer usage. With an
         // attached overlay payload and valid upload/pipeline resources, the
         // route records and publishes `ImGuiOverlayDiagnostics::DrawCalls`.
+        [[nodiscard]] RHI::PipelineHandle ResolveImGuiPipelineForFormat(
+            const RHI::Format colorFormat) const noexcept
+        {
+            if (!m_PipelineManager.has_value())
+            {
+                return {};
+            }
+
+            const auto deviceHandleFor =
+                [this](const std::optional<RHI::PipelineManager::PipelineLease>& lease)
+                    -> RHI::PipelineHandle
+                {
+                    if (!lease.has_value() || !lease->IsValid())
+                    {
+                        return {};
+                    }
+                    return m_PipelineManager->GetDeviceHandle(lease->GetHandle());
+                };
+
+            if (colorFormat == RHI::Format::RGBA8_UNORM &&
+                m_BackbufferFormat != RHI::Format::RGBA8_UNORM)
+            {
+                return deviceHandleFor(m_ImGuiRgba8PipelineLease);
+            }
+            return deviceHandleFor(m_ImGuiPipelineLease);
+        }
+
         [[nodiscard]] RenderCommandPassStatus RecordImGuiPass(RHI::ICommandContext& cmd,
-                                                              const bool hasActiveRenderPass)
+                                                              const RHI::Format activeColorFormat)
         {
             if (m_Device == nullptr || !m_Device->IsOperational())
             {
                 return RenderCommandPassStatus::SkippedNonOperational;
             }
-            if (!hasActiveRenderPass ||
+            const RHI::PipelineHandle imguiPipeline =
+                ResolveImGuiPipelineForFormat(activeColorFormat);
+            if (activeColorFormat == RHI::Format::Undefined ||
                 !m_ImGuiPass.has_value() ||
                 m_ImGuiOverlaySystem == nullptr ||
-                !m_ImGuiPipelineLease.has_value() ||
-                !m_ImGuiPipelineLease->IsValid() ||
-                !m_ImGuiPass->GetPipeline().IsValid() ||
+                !imguiPipeline.IsValid() ||
                 !m_ImGuiOverlaySystem->HasOverlayWork() ||
                 !m_ImGuiUploadHelper)
             {
                 return RenderCommandPassStatus::SkippedUnavailable;
             }
+            m_ImGuiPass->SetPipeline(imguiPipeline);
 
             m_ImGuiOverlaySystem->UploadPendingFontAtlas();
+            m_Device->GetBindlessHeap().FlushPending();
             const ImGuiOverlayFrame* frame = m_ImGuiOverlaySystem->GetCurrentFrame();
             if (frame == nullptr)
             {
@@ -7273,7 +7334,12 @@ namespace Extrinsic::Graphics
         // fail-closed pattern as the present/debug-view leases so a failed
         // `Create()` leaves `m_ImGuiPass` (when attached) in the fail-closed
         // state that `RecordImGuiPass` interprets as `SkippedUnavailable`.
+        // The default-recipe present source can be either swapchain-format
+        // (`SceneColorLDR` / AA resolved) or `RGBA8_UNORM` (`DebugViewRGBA`),
+        // so the executor selects the matching variant from the active
+        // render-pass attachment format before recording.
         std::optional<RHI::PipelineManager::PipelineLease> m_ImGuiPipelineLease;
+        std::optional<RHI::PipelineManager::PipelineLease> m_ImGuiRgba8PipelineLease;
         // GRAPHICS-077 Slice B — transient-debug triangle pipelines.
         // Two variants per lane (depth-tested + always-on-top); same
         // reset/republish pattern as the debug-view lease above so a

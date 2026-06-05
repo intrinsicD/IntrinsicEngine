@@ -129,7 +129,7 @@ namespace Extrinsic::Runtime
             if (selection.UsePromotedVulkanDevice)
             {
 #if defined(EXTRINSIC_RUNTIME_HAS_PROMOTED_VULKAN)
-                Core::Log::Warn("[Runtime] Promoted Vulkan device selected; backend remains fail-closed until GRAPHICS-018 completes operational bring-up.");
+                Core::Log::Warn("[Runtime] Promoted Vulkan device selected; backend remains fail-closed until the first clean default-recipe validation promotes it.");
                 return Backends::Vulkan::CreateVulkanDevice();
 #endif
             }

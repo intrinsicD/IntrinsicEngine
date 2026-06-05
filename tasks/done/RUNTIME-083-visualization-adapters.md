@@ -6,9 +6,10 @@
 - Owner/agent: Codex.
 - Branch: `main`.
 - Final implementation commit: this retirement commit.
-- Maturity: `CPUContracted`; `Operational` owned by
-  [`RUNTIME-095`](../backlog/runtime/RUNTIME-095-working-sandbox-acceptance.md)
-  or a later visualization-specific backend smoke.
+- Maturity: `CPUContracted`; the general scoped sandbox proof is closed by
+  [`RUNTIME-095`](RUNTIME-095-working-sandbox-acceptance.md), while
+  visualization-specific backend proof remains owned by a later
+  visualization-specific smoke if needed.
 
 ## Slice plan
 - **Slice A.** Add the promoted
@@ -192,12 +193,12 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
   does not allocate atlas residency or wire non-scalar extraction selection.
 - Slice E closes full `CPUContracted` for `RUNTIME-083`, including
   runtime-owned non-scalar extraction selection and extraction-side non-scalar
-  packet stats. `Operational`
-  owned by [`RUNTIME-095`](../backlog/runtime/RUNTIME-095-working-sandbox-acceptance.md)
-  or a later visualization-specific backend smoke.
+  packet stats. The general scoped sandbox proof is closed by
+  [`RUNTIME-095`](RUNTIME-095-working-sandbox-acceptance.md); visualization-specific
+  backend proof remains owned by a later visualization-specific smoke if needed.
 
 ## Next verification step
 - Downstream editor control composition is retired under
-  [`UI-001`](UI-001-sandbox-editor-shell-panels.md); final
-  working-sandbox acceptance remains owned by
-  [`RUNTIME-095`](../backlog/runtime/RUNTIME-095-working-sandbox-acceptance.md).
+  [`UI-001`](UI-001-sandbox-editor-shell-panels.md); final scoped
+  working-sandbox acceptance is closed by
+  [`RUNTIME-095`](RUNTIME-095-working-sandbox-acceptance.md).

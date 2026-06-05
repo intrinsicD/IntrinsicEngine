@@ -579,10 +579,14 @@ namespace Extrinsic::Graphics
 
         if (hzbBuildActive)
         {
+            // Retained HZB images are recreated by the renderer and arrive in
+            // VK_IMAGE_LAYOUT_UNDEFINED; import them that way so the graph emits
+            // the first ShaderWrite transition before the build pass binds the
+            // storage image descriptor.
             hzbCurrent = graph.ImportTexture("HZB.Current",
                                              imports.HZBCurrent,
-                                             TextureState::ShaderWrite,
-                                             TextureState::ShaderRead);
+                                             TextureState::Undefined,
+                                             TextureState::ShaderWrite);
         }
         if (clusterGridBuildActive)
         {

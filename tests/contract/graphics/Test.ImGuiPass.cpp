@@ -22,6 +22,7 @@
 // not write `Backbuffer`) and the render-graph rejection of a non-present
 // `Backbuffer` write are covered by `Test.ImGuiPresentContract.cpp`.
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -382,6 +383,57 @@ TEST(ImGuiPassContract, FontAtlasUploadSurvivesOperationalRebuildByteIdentical)
     renderer->Shutdown();
 }
 
+TEST(ImGuiPassContract, FontAtlasAllocatesAfterColdStartOperationalRebuild)
+{
+    Tests::MockDevice device;
+    device.BackbufferHandle = RHI::TextureHandle{509u, 1u};
+    device.Operational = false;
+
+    Graphics::ImGuiOverlaySystem overlay;
+    overlay.Initialize();
+    Graphics::ImGuiOverlayFrame frame = MakePayloadOverlayFrame();
+    frame.FontAtlas = Graphics::ImGuiOverlayFontAtlas{
+        .Valid = true,
+        .Width = 2u,
+        .Height = 2u,
+        .BytesPerPixel = 1u,
+        .UseColors = false,
+        .Pixels = {
+            std::byte{0x11},
+            std::byte{0x22},
+            std::byte{0x33},
+            std::byte{0x44},
+        },
+    };
+    overlay.SubmitFrame(frame);
+
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->SetImGuiOverlaySystem(&overlay);
+    renderer->Initialize(device);
+
+    const Graphics::ImGuiOverlayDiagnostics coldStart = overlay.GetDiagnostics();
+    EXPECT_TRUE(coldStart.FontAtlasAvailable);
+    EXPECT_FALSE(coldStart.FontAtlasGpuAllocated);
+    EXPECT_EQ(coldStart.FontAtlasAllocationCount, 0u);
+    EXPECT_EQ(coldStart.FontAtlasUploadCount, 0u);
+
+    device.Operational = true;
+    ASSERT_TRUE(renderer->RebuildOperationalResources(device));
+    overlay.UploadPendingFontAtlas();
+
+    const Graphics::ImGuiOverlayDiagnostics promoted = overlay.GetDiagnostics();
+    EXPECT_TRUE(promoted.FontAtlasGpuAllocated);
+    EXPECT_TRUE(promoted.FontAtlasTexture.IsValid());
+    EXPECT_NE(promoted.FontAtlasBindlessIndex, RHI::kInvalidBindlessIndex);
+    EXPECT_EQ(promoted.FontAtlasAllocationCount, 1u);
+    EXPECT_EQ(promoted.FontAtlasUploadCount, 1u);
+    EXPECT_EQ(CountTextureUploadsFor(device, promoted.FontAtlasTexture), 1u);
+    EXPECT_EQ(LastTextureUploadBytesFor(device, promoted.FontAtlasTexture),
+              frame.FontAtlas.Pixels);
+
+    renderer->Shutdown();
+}
+
 TEST(ImGuiPassContract, AttachedOverlayWithWorkRecordsAfterInitialize)
 {
     // Slice D.1 gives `"ImGuiPass"` a load/store `FrameRecipe.PresentSource`
@@ -432,6 +484,177 @@ TEST(ImGuiPassContract, AttachedOverlayWithWorkRecordsAfterInitialize)
         EXPECT_NE(pass.Status, Graphics::RenderCommandPassStatus::SkippedNonOperational)
             << pass.Name;
     }
+
+    renderer->Shutdown();
+}
+
+TEST(ImGuiPassContract, PipelineMatchesLegacyDearImGuiStraightAlphaBlend)
+{
+    Tests::MockDevice device;
+    device.BackbufferHandle = RHI::TextureHandle{510u, 1u};
+
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const RHI::PipelineDesc* imguiPipeline = nullptr;
+    for (const RHI::PipelineDesc& desc : device.CreatedPipelineDescs)
+    {
+        if (std::string_view(desc.DebugName) == "Renderer.ImGui")
+        {
+            imguiPipeline = &desc;
+            break;
+        }
+    }
+    ASSERT_NE(imguiPipeline, nullptr);
+
+    const RHI::ColorBlendDesc& blend = imguiPipeline->ColorBlend[0];
+    EXPECT_TRUE(blend.Enable);
+    EXPECT_EQ(blend.SrcColorFactor, RHI::BlendFactor::SrcAlpha);
+    EXPECT_EQ(blend.DstColorFactor, RHI::BlendFactor::OneMinusSrcAlpha);
+    EXPECT_EQ(blend.ColorOp, RHI::BlendOp::Add);
+    EXPECT_EQ(blend.SrcAlphaFactor, RHI::BlendFactor::One);
+    EXPECT_EQ(blend.DstAlphaFactor, RHI::BlendFactor::OneMinusSrcAlpha);
+    EXPECT_EQ(blend.AlphaOp, RHI::BlendOp::Add);
+
+    renderer->Shutdown();
+}
+
+TEST(ImGuiPassContract, DebugViewRgba8PresentSourceBindsRgba8PipelineVariant)
+{
+    Tests::MockDevice device;
+    device.BackbufferFormat = RHI::Format::BGRA8_UNORM;
+    device.BackbufferHandle = RHI::TextureHandle{512u, 1u};
+
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    RHI::PipelineHandle backbufferImGuiPipeline{};
+    RHI::PipelineHandle rgba8ImGuiPipeline{};
+    ASSERT_EQ(device.CreatedPipelineDescs.size(), device.CreatedPipelineHandles.size());
+    for (std::size_t i = 0; i < device.CreatedPipelineDescs.size(); ++i)
+    {
+        const RHI::PipelineDesc& desc = device.CreatedPipelineDescs[i];
+        if (std::string_view(desc.DebugName) != "Renderer.ImGui")
+        {
+            continue;
+        }
+        if (desc.ColorTargetFormats[0] == RHI::Format::BGRA8_UNORM)
+        {
+            backbufferImGuiPipeline = device.CreatedPipelineHandles[i];
+        }
+        else if (desc.ColorTargetFormats[0] == RHI::Format::RGBA8_UNORM)
+        {
+            rgba8ImGuiPipeline = device.CreatedPipelineHandles[i];
+        }
+    }
+    ASSERT_TRUE(backbufferImGuiPipeline.IsValid());
+    ASSERT_TRUE(rgba8ImGuiPipeline.IsValid());
+    ASSERT_NE(backbufferImGuiPipeline, rgba8ImGuiPipeline);
+
+    Graphics::ImGuiOverlaySystem overlay;
+    overlay.Initialize();
+    overlay.SubmitFrame(MakeOverlayFrameWithWork());
+    renderer->SetImGuiOverlaySystem(&overlay);
+
+    RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 256, .Height = 144},
+        .DebugOverlayEnabled = true,
+    };
+    Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+
+    const auto* debugViewPass = FindCommandPass(stats, "DebugViewPass");
+    ASSERT_NE(debugViewPass, nullptr);
+    EXPECT_EQ(debugViewPass->Status, Graphics::RenderCommandPassStatus::Recorded);
+
+    const auto* imguiPass = FindCommandPass(stats, "ImGuiPass");
+    ASSERT_NE(imguiPass, nullptr);
+    EXPECT_EQ(imguiPass->Status, Graphics::RenderCommandPassStatus::Recorded);
+
+    const auto& bound = device.CommandContext.BoundPipelines;
+    EXPECT_NE(std::find(bound.begin(), bound.end(), rgba8ImGuiPipeline), bound.end());
+    EXPECT_EQ(std::find(bound.begin(), bound.end(), backbufferImGuiPipeline), bound.end())
+        << "ImGui over DebugViewRGBA must not bind the swapchain-format pipeline.";
+
+    renderer->Shutdown();
+}
+
+TEST(ImGuiPassContract, FontAtlasUploadFlushesBindlessHeapBeforeDraw)
+{
+    Tests::MockDevice device;
+    device.BackbufferHandle = RHI::TextureHandle{513u, 1u};
+
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    Graphics::ImGuiOverlaySystem overlay;
+    overlay.Initialize();
+    Graphics::ImGuiOverlayFrame frameWithAtlas = MakeOverlayFrameWithWork();
+    frameWithAtlas.FontAtlas = Graphics::ImGuiOverlayFontAtlas{
+        .Valid = true,
+        .Width = 2u,
+        .Height = 2u,
+        .BytesPerPixel = 1u,
+        .UseColors = false,
+        .Pixels = {
+            std::byte{0x00},
+            std::byte{0x80},
+            std::byte{0xc0},
+            std::byte{0xff},
+        },
+    };
+    overlay.SubmitFrame(frameWithAtlas);
+    renderer->SetImGuiOverlaySystem(&overlay);
+
+    const int flushCallsBeforeFrame = device.Bindless.FlushCalls;
+
+    RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    (void)DriveDefaultFrame(*renderer, frame);
+
+    const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+
+    const auto* imguiPass = FindCommandPass(stats, "ImGuiPass");
+    ASSERT_NE(imguiPass, nullptr);
+    EXPECT_EQ(imguiPass->Status, Graphics::RenderCommandPassStatus::Recorded);
+    EXPECT_GT(device.Bindless.FlushCalls, flushCallsBeforeFrame);
+
+    const Graphics::ImGuiOverlayDiagnostics diag = overlay.GetDiagnostics();
+    EXPECT_TRUE(diag.FontAtlasGpuAllocated);
+    EXPECT_EQ(diag.FontAtlasUploadCount, 1u);
+    EXPECT_NE(diag.FontAtlasBindlessIndex, RHI::kInvalidBindlessIndex);
+
+    bool foundImGuiPushConstants = false;
+    for (const std::vector<std::byte>& payload : device.CommandContext.PushConstantPayloads)
+    {
+        if (payload.size() != sizeof(Graphics::ImGuiOverlayPushConstants))
+        {
+            continue;
+        }
+
+        Graphics::ImGuiOverlayPushConstants pc{};
+        std::memcpy(&pc, payload.data(), sizeof(pc));
+        if (pc.FontAtlasBindlessIndex == diag.FontAtlasBindlessIndex &&
+            pc.TextureBindlessIndex == diag.FontAtlasBindlessIndex &&
+            pc.FirstVertex == 0u &&
+            pc.IndexCount == frameWithAtlas.DrawLists.front().IndexCount)
+        {
+            foundImGuiPushConstants = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(foundImGuiPushConstants)
+        << "ImGuiPass must draw with the uploaded font atlas bindless slot after "
+           "flushing the queued descriptor write.";
 
     renderer->Shutdown();
 }

@@ -61,11 +61,14 @@
   no new graphics-visible descriptor surface is added.
   `ImGuiOverlayFrame::DrawLists[i].UsesUserTexture` remains the only
   graphics-visible diagnostics flag for user-texture presence. Pipeline
-  state: `ImGuiPass` owns exactly one pipeline created by the backend
-  at startup and bound through the existing `SetPipeline` /
-  `RHI::PipelineHandle` seam. Backend Vulkan pipeline state (dynamic
-  rendering against the present-source attachment, premultiplied-alpha
-  blend, no depth test, scissor enabled, viewport derived from
+  state: `ImGuiPass` owns backend-created pipeline variants for the possible
+  present-source color formats and binds the variant matching the active
+  render-pass attachment through the existing `SetPipeline` /
+  `RHI::PipelineHandle` seam. The swapchain-format variant covers
+  `SceneColorLDR`/AA-resolved presentation, and the `RGBA8_UNORM` variant
+  covers the `DebugViewRGBA` present source. Backend Vulkan pipeline state
+  (dynamic rendering against the present-source attachment, Dear ImGui straight-alpha
+  color blend (`SrcAlpha`, `OneMinusSrcAlpha`), no depth test, scissor enabled, viewport derived from
   `DisplayWidth`/`DisplayHeight`, vertex stride `sizeof(ImDrawVert)`)
   remains backend-local under `src/graphics/vulkan` and never leaks
   through RHI or renderer module surfaces. The CPU/null backend
@@ -176,4 +179,3 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Mixing docs-only clarification with semantic C++ behavior edits.
 - Introducing platform/window ownership into graphics.
 - Making GPU/Vulkan tests part of the default CPU-supported gate.
-

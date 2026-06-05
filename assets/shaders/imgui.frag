@@ -2,7 +2,7 @@
 
 // GRAPHICS-079 Slice A — canonical default-recipe ImGui overlay fragment
 // shader (CPUContracted placeholder). Pairs with `imgui.vert`. The
-// premultiplied-alpha blend state lives on the pipeline
+// Dear ImGui straight-alpha blend state lives on the pipeline
 // (`BuildImGuiPipelineDesc`). Slice C forwards the copied ImGui vertex color;
 // Slice D.2 samples the retained font atlas or a per-command user texture from
 // the global bindless heap selected by `ImGuiOverlayPushConstants`.

@@ -37,8 +37,8 @@ namespace Extrinsic::Graphics
         glm::vec3 Up{0.f, 1.f, 0.f};
         float NearPlane{0.1f};
         float FarPlane{1000.f};
-        bool ExplicitCameraTransition{false};
         bool Valid{false};
+        bool ExplicitCameraTransition{false};
     };
 
     export struct PickPixelRequest
@@ -70,9 +70,9 @@ namespace Extrinsic::Graphics
         FrustumPlaneSnapshot FrustumPlanes[6]{};
         glm::vec3 PickRayOrigin{0.f};
         glm::vec3 PickRayDirection{0.f, 0.f, -1.f};
-        bool ExplicitCameraTransition{false};
         bool Valid{false};
         bool HasPickRay{false};
+        bool ExplicitCameraTransition{false};
     };
 
     namespace Detail
@@ -193,4 +193,3 @@ namespace Extrinsic::Graphics
         return snapshot;
     }
 }
-

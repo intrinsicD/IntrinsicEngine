@@ -100,10 +100,11 @@ All of this is possible **while `IsOperational()` remains false**. Renderer / ru
 
 ### 8. Backend service exposure under `IsOperational() == false`
 
-The two backend services that have opt-in pre-operational consumers expose distinct policies:
+The two backend services that have opt-in pre-operational consumers expose matching service-ready policies:
 
-- **`GetBindlessHeap()`** is routed through `IDevice::IsOperational()` and returns the fallback heap while non-operational.
-- **`GetTransferQueue()`** returns the live `VulkanTransferQueue` once guarded live prerequisites are ready, even while `IsOperational()` remains false, so opt-in upload smoke and streaming seams can exercise async transfer without special-casing Vulkan. Pre-bootstrap / non-service-ready states still return the fail-closed fallback queue.
+- **`GetBindlessHeap()`** returns the live `VulkanBindlessHeap` once guarded safety prerequisites are ready, even while `IsOperational()` remains false. RHI managers still gate texture creation on `IDevice::IsOperational()`, so exposing the heap early only prevents managers constructed during cold start from being permanently pinned to the fallback heap.
+- **`GetTransferQueue()`** returns the live `VulkanTransferQueue` once guarded live prerequisites are ready, even while `IsOperational()` remains false, so opt-in upload smoke and streaming seams can exercise async transfer without special-casing Vulkan.
+- Pre-bootstrap / non-service-ready states still return fail-closed fallback services.
 
 The live internal `VulkanBindlessHeap` resolves backend-owned RHI texture / sampler handles into descriptor writes through a Vulkan-local resolver, preserving texture / material descriptor readiness without exposing `Vk*` handles or live ECS knowledge outside `src/graphics/vulkan`.
 
@@ -153,12 +154,12 @@ Positive:
 - Renderer / runtime code stays Vulkan-agnostic — every gate is `IDevice::IsOperational()`, never a Vulkan diagnostic.
 - Runtime never aborts because Vulkan was requested but unavailable — the fail-closed path always returns Null.
 - Bring-up failures (volk init, instance, device, swapchain, features, services) are observable through CPU diagnostics without booting a Vulkan device.
-- Async transfer is usable by `gpu;vulkan` smoke and streaming seams before `IsOperational()` is true, without `Extrinsic::Backends::Vulkan::*` leaks into runtime / renderer code.
+- Bindless and async transfer services are usable by service-ready `gpu;vulkan` smoke, renderer managers, and streaming seams before `IsOperational()` is true, without `Extrinsic::Backends::Vulkan::*` leaks into runtime / renderer code.
 - The `GRAPHICS-018Q` clarifications close out the open Vulkan integration questions with explicit, reviewable policies that do not require widening the RHI surface.
 
 Trade-offs and risks:
 
-- `GetTransferQueue()` returning the live queue while `IsOperational() == false` is an explicit asymmetry against `GetBindlessHeap()`; documented here so future readers do not "normalize" it without understanding the smoke-coverage motivation.
+- Public service exposure before `IsOperational()` means resource managers can hold live service references during cold start. The managers and frame lifecycle must keep their existing `IDevice::IsOperational()` gates so descriptor/bootstrap readiness does not become permission to execute canonical renderer work early.
 - The fail-closed → fail-closed → first-fire-breadcrumb pattern relies on per-counter rate limiting. Adding a new fail-closed path without wiring its breadcrumb through the rate limiter would regress the 60 Hz log-spam guarantee. ADR-0005 (operational readiness gate) records the gate; this ADR records the breadcrumb policy.
 - The 1:1 counter ↔ reason-enum rule blocks any future "global fallback reason" demultiplex. That is intentional: process-monotonic counters must stay reorder-safe.
 

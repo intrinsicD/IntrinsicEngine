@@ -122,6 +122,48 @@ TEST(ImGuiAdapter, InitializeRejectsDoubleInitialize)
     EXPECT_TRUE(adapter.IsInitialized());
 }
 
+TEST(ImGuiAdapter, InitializeLoadsBundledRobotoAndBuildsLegacyFontAtlas)
+{
+    FakeWindow         window(1280, 720);
+    ImGuiOverlaySystem overlay;
+    ImGuiAdapter       adapter(window, overlay);
+
+    ASSERT_TRUE(adapter.Initialize());
+
+    ImGuiIO& io = ImGui::GetIO();
+    EXPECT_EQ(io.BackendFlags & ImGuiBackendFlags_RendererHasTextures, 0);
+    ASSERT_GT(io.Fonts->Fonts.Size, 0);
+    const ImFont* font = io.Fonts->Fonts[0];
+    ASSERT_NE(font, nullptr);
+    EXPECT_NE(std::string_view(font->GetDebugName()).find("Roboto-Medium.ttf"),
+              std::string_view::npos);
+
+    unsigned char* fontPixels = nullptr;
+    int fontWidth = 0;
+    int fontHeight = 0;
+    int fontBytesPerPixel = 0;
+    io.Fonts->GetTexDataAsAlpha8(
+        &fontPixels,
+        &fontWidth,
+        &fontHeight,
+        &fontBytesPerPixel);
+    ASSERT_NE(fontPixels, nullptr);
+    EXPECT_GT(fontWidth, 0);
+    EXPECT_GT(fontHeight, 0);
+    EXPECT_EQ(fontBytesPerPixel, 1);
+
+    adapter.BeginFrame(kFrameDelta);
+    adapter.EndFrame();
+
+    const auto* frame = overlay.GetCurrentFrame();
+    ASSERT_NE(frame, nullptr);
+    EXPECT_TRUE(frame->FontAtlas.Valid);
+    EXPECT_EQ(frame->FontAtlas.Width, static_cast<std::uint32_t>(fontWidth));
+    EXPECT_EQ(frame->FontAtlas.Height, static_cast<std::uint32_t>(fontHeight));
+    EXPECT_EQ(frame->FontAtlas.BytesPerPixel, 1u);
+    EXPECT_FALSE(frame->FontAtlas.Pixels.empty());
+}
+
 // --- ImDrawData -> ImGuiOverlayFrame walk ------------------------------------
 
 TEST(ImGuiAdapter, EditorPanelDrawProducesNonEmptyDrawList)

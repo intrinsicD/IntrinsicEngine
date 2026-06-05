@@ -3,9 +3,12 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <algorithm>
+#include <filesystem>
 #include <functional>
 #include <limits>
 #include <string>
+#include <system_error>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -15,6 +18,7 @@ module;
 
 module Extrinsic.Runtime.ImGuiAdapter;
 
+import Extrinsic.Core.Filesystem.PathResolver;
 import Extrinsic.Platform.Window;
 import Extrinsic.Graphics.ImGuiOverlaySystem;
 import Extrinsic.RHI.Bindless;
@@ -23,6 +27,9 @@ namespace Extrinsic::Runtime
 {
     namespace
     {
+        constexpr const char* kBundledFontAsset = "fonts/Roboto-Medium.ttf";
+        constexpr float kBaseFontSizePixels = 16.0f;
+
         // Apply the window's logical size and HiDPI scale onto ImGui IO. ImGui
         // expects `DisplaySize` in window coordinates and `DisplayFramebufferScale`
         // as framebuffer-pixels-per-window-unit, so the overlay frame can report
@@ -42,6 +49,60 @@ namespace Extrinsic::Runtime
             io.DisplayFramebufferScale = ImVec2(scaleX, scaleY);
         }
 
+        [[nodiscard]] std::string ResolveBundledFontPath()
+        {
+            const std::string path = Extrinsic::Core::Filesystem::GetAssetPath(kBundledFontAsset);
+            std::error_code ec;
+            return std::filesystem::exists(path, ec) ? path : std::string{};
+        }
+
+        [[nodiscard]] bool TextureRefMatchesAtlas(
+            const ImTextureRef texture,
+            const ImTextureRef atlas) noexcept
+        {
+            if (atlas._TexData != nullptr)
+            {
+                return texture._TexData == atlas._TexData;
+            }
+
+            if (texture._TexData != nullptr)
+            {
+                return false;
+            }
+
+            return texture._TexID == atlas._TexID;
+        }
+
+        void ConfigureFonts(ImGuiIO& io)
+        {
+            const float dpiScale = std::max(io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
+            const float fontSize = kBaseFontSizePixels * (dpiScale > 0.0f ? dpiScale : 1.0f);
+            const std::string fontPath = ResolveBundledFontPath();
+            ImFontConfig fontConfig{};
+            fontConfig.Flags |= ImFontFlags_NoLoadError;
+            if (!fontPath.empty() &&
+                io.Fonts->AddFontFromFileTTF(fontPath.c_str(), fontSize, &fontConfig) != nullptr)
+            {
+                return;
+            }
+
+            fontConfig.SizePixels = fontSize;
+            io.Fonts->AddFontDefault(&fontConfig);
+        }
+
+        void BuildLegacyFontAtlas(ImGuiIO& io)
+        {
+            unsigned char* pixels = nullptr;
+            int width = 0;
+            int height = 0;
+            int bytesPerPixel = 0;
+            io.Fonts->GetTexDataAsAlpha8(&pixels, &width, &height, &bytesPerPixel);
+            (void)pixels;
+            (void)width;
+            (void)height;
+            (void)bytesPerPixel;
+        }
+
         [[nodiscard]] std::uint32_t ToPixelDimension(const float value)
         {
             return value > 0.0f ? static_cast<std::uint32_t>(value + 0.5f) : 0u;
@@ -55,7 +116,13 @@ namespace Extrinsic::Runtime
             out.IndexOffset = command.IdxOffset;
             out.VertexOffset = command.VtxOffset;
             out.IndexCount = command.ElemCount;
-            out.UsesUserTexture = command.TexRef._TexData != atlasTexData;
+            ImTextureRef atlasTexRef = ImGui::GetIO().Fonts->TexRef;
+            if (atlasTexData != nullptr)
+            {
+                atlasTexRef._TexData = const_cast<ImTextureData*>(atlasTexData);
+                atlasTexRef._TexID = ImTextureID_Invalid;
+            }
+            out.UsesUserTexture = !TextureRefMatchesAtlas(command.TexRef, atlasTexRef);
 
             if (out.UsesUserTexture)
             {
@@ -63,7 +130,8 @@ namespace Extrinsic::Runtime
                     command.TexRef._TexData != nullptr
                         ? command.TexRef._TexData->TexID
                         : command.TexRef._TexID;
-                if (texId <= static_cast<ImTextureID>(std::numeric_limits<RHI::BindlessIndex>::max()))
+                if (texId != ImTextureID_Invalid &&
+                    texId <= static_cast<ImTextureID>(std::numeric_limits<RHI::BindlessIndex>::max()))
                 {
                     out.TextureBindlessIndex = static_cast<RHI::BindlessIndex>(texId);
                 }
@@ -108,10 +176,10 @@ namespace Extrinsic::Runtime
         io.LogFilename = nullptr;
         io.BackendPlatformName = "Extrinsic.Runtime.ImGuiAdapter";
         io.BackendRendererName = "Extrinsic.Graphics.ImGuiOverlaySystem";
-        // 1.92 dynamic texture system: ImGui owns the font atlas lifecycle, so
-        // NewFrame()/Render() run headless without a pre-built atlas or
-        // SetTexID(). The graphics-owned retained atlas upload is GRAPHICS-079.
-        io.BackendFlags |= ImGuiBackendFlags_RendererHasTextures;
+        // The promoted renderer consumes a copied CPU font-atlas payload and
+        // uploads it through `ImGuiOverlaySystem`, so do not advertise ImGui
+        // 1.92 dynamic texture handling until graphics processes
+        // ImDrawData::Textures[] and acknowledges ImTextureData requests.
         io.BackendFlags |= ImGuiBackendFlags_HasMouseCursors;
         io.BackendFlags |= ImGuiBackendFlags_HasSetMousePos;
 
@@ -121,6 +189,8 @@ namespace Extrinsic::Runtime
         platformIo.Platform_SetClipboardTextFn = &ImGuiAdapter::ClipboardSet;
 
         ApplyDisplayMetrics(io, m_Window.GetWindowExtent(), m_Window.GetFramebufferExtent());
+        ConfigureFonts(io);
+        BuildLegacyFontAtlas(io);
     }
 
     void ImGuiAdapter::BeginFrame(double deltaSeconds)
@@ -213,9 +283,9 @@ namespace Extrinsic::Runtime
             &fontHeight,
             &fontBytesPerPixel);
         // The font atlas texture reference. User-texture detection compares each
-        // draw command's TexRef against this without calling GetTexID(): under
-        // ImGuiBackendFlags_RendererHasTextures the atlas is not yet uploaded to
-        // a GPU id (that upload is GRAPHICS-079), so GetTexID() would assert.
+        // draw command's TexRef against this without calling GetTexID(): the
+        // promoted renderer consumes a copied CPU atlas through GRAPHICS-079,
+        // so the atlas has no ImGui-owned GPU id here.
         const ImTextureData* atlasTexData = ImGui::GetIO().Fonts->TexRef._TexData;
 
         Graphics::ImGuiOverlayFrame frame;

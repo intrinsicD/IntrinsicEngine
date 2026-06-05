@@ -51,6 +51,30 @@ tooling package). If `glslc` is unavailable, configure emits a warning and the
 non-shader targets continue to build, but Sandbox pipelines that require SPIR-V
 artifacts will fail to load and renderer fallback diagnostics may increment.
 
+## Working Sandbox Acceptance
+
+`RUNTIME-095` retires the scoped working-sandbox acceptance path: on the
+default CPU/null gate, `RuntimeSandboxAcceptance.*` proves mesh, graph, and point
+cloud residency, finite camera-controller output, entity and primitive
+selection, selection-outline snapshot handoff, and deterministic editor-panel
+models. On Vulkan-capable hosts, the opt-in
+`RuntimeSandboxAcceptanceGpuSmoke.AcceptanceSceneReachesOperationalDefaultRecipePresent`
+smoke drives bounded `Engine::Run()` frames with the same mesh/graph/point-cloud
+scene and the `SandboxEditorUi` attached, then asserts canonical default-recipe
+`Present` plus no canonical `SkippedUnavailable` pass.
+
+Run the scoped operational smoke with:
+
+```bash
+cmake --preset ci-vulkan
+cmake --build --preset ci-vulkan --target IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests ExtrinsicSandbox
+ctest --test-dir build/ci-vulkan --output-on-failure -R RuntimeSandboxAcceptanceGpuSmoke --timeout 120
+```
+
+This acceptance does not claim every asset format, KTX decode, post-upload
+material re-resolution, advanced PBR, transparent selection, Gaussian splats, or
+scene serialization parity.
+
 ## Contents
 
 - `CMakeLists.txt`

@@ -15,6 +15,11 @@ export import Extrinsic.RHI.Handles;
 namespace Extrinsic::Backends::Vulkan
 {
     export constexpr uint32_t kBindlessCapacity = 65536;
+    // Descriptor elements 0..2 are temporarily reserved for framegraph-sampled
+    // textures updated directly by VulkanCommandContext:
+    //   0 = default sampled input, 1 = DebugView, 2 = Present.
+    // Real bindless texture leases must start after those bridge slots.
+    constexpr RHI::BindlessIndex kFirstTextureBindlessSlot = 3;
 
     export class VulkanDevice;
 
@@ -63,7 +68,7 @@ namespace Extrinsic::Backends::Vulkan
         VkImageView           m_DefaultView = VK_NULL_HANDLE;
         VkSampler             m_DefaultSampler = VK_NULL_HANDLE;
         uint32_t              m_Capacity = 0;
-        uint32_t              m_NextSlot = 1;
+        uint32_t              m_NextSlot = kFirstTextureBindlessSlot;
         uint32_t              m_AllocCount = 0;
         std::vector<RHI::BindlessIndex> m_FreeSlots;
         std::vector<PendingOp>          m_Pending;
@@ -71,4 +76,3 @@ namespace Extrinsic::Backends::Vulkan
         mutable std::mutex              m_Mutex;
     };
 }
-
