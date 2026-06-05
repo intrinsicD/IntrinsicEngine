@@ -192,7 +192,7 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     // (bloom + tonemap) + 3 under the per-stage AA passes
     // (edge / blend / resolve helpers) + 1 under `"Present"` = 15.
     // Remaining unwired passes still soft-skip with SkippedUnavailable.
-    EXPECT_EQ(stats.CommandRecords.Recorded, 15u);
+    EXPECT_EQ(stats.CommandRecords.Recorded, 12u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     EXPECT_GE(stats.CommandRecords.SkippedUnavailable, 1u);
@@ -226,19 +226,9 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     ASSERT_NE(FindCommandPass(stats, "PostProcessPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "PostProcessPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
-    // GRAPHICS-075 Slice D.2a — the AA umbrella splits into three ordered
-    // graph passes so the framegraph emits real `ColorAttachment →
-    // ShaderRead` barriers between SMAA edge / blend / resolve stages
-    // (and between `SceneColorLDR` and the AA reads in edge / resolve).
-    ASSERT_NE(FindCommandPass(stats, "PostProcessAAEdgePass"), nullptr);
-    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAEdgePass")->Status,
-              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
-    ASSERT_NE(FindCommandPass(stats, "PostProcessAABlendPass"), nullptr);
-    EXPECT_EQ(FindCommandPass(stats, "PostProcessAABlendPass")->Status,
-              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
-    ASSERT_NE(FindCommandPass(stats, "PostProcessAAResolvePass"), nullptr);
-    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAResolvePass")->Status,
-              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAEdgePass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAABlendPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAResolvePass"), nullptr);
     // GRAPHICS-076 Slice A — `Pass.Present` records the canonical
     // fullscreen `BindPipeline + Draw(3, 1, 0, 0)` shape on the
     // operational CPU/null path, replacing the previous
@@ -615,7 +605,7 @@ TEST(RendererFrameLifecycle, OperationalRebuildAfterNonOperationalStartupRecords
     // under `PostProcessPass` (bloom + tonemap) + 3 under the AA
     // passes + 1 under `Present` = 15. Remaining unwired passes still
     // soft-skip with SkippedUnavailable.
-    EXPECT_EQ(stats.CommandRecords.Recorded, 15u);
+    EXPECT_EQ(stats.CommandRecords.Recorded, 12u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     ASSERT_NE(FindCommandPass(stats, "CullingPass"), nullptr);
@@ -648,15 +638,9 @@ TEST(RendererFrameLifecycle, OperationalRebuildAfterNonOperationalStartupRecords
     ASSERT_NE(FindCommandPass(stats, "PostProcessPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "PostProcessPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
-    ASSERT_NE(FindCommandPass(stats, "PostProcessAAEdgePass"), nullptr);
-    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAEdgePass")->Status,
-              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
-    ASSERT_NE(FindCommandPass(stats, "PostProcessAABlendPass"), nullptr);
-    EXPECT_EQ(FindCommandPass(stats, "PostProcessAABlendPass")->Status,
-              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
-    ASSERT_NE(FindCommandPass(stats, "PostProcessAAResolvePass"), nullptr);
-    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAResolvePass")->Status,
-              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAEdgePass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAABlendPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAResolvePass"), nullptr);
     EXPECT_EQ(device.CommandContext.DispatchCalls,
               static_cast<int>(3u + hzbPlan.Dispatches.size()));
     EXPECT_EQ(stats.HZBBuildDispatchCount,
@@ -723,7 +707,7 @@ TEST(RendererFrameLifecycle, DepthPrepassPipelineFailureSkipsUnavailableCommandP
     // `SkippedUnavailable` because the depth producer's pipeline is missing.
     // GRAPHICS-039C cluster grid/assignment do not consume the depth output
     // directly, so they still record their compute command shape: total 13.
-    EXPECT_EQ(stats.CommandRecords.Recorded, 13u);
+    EXPECT_EQ(stats.CommandRecords.Recorded, 10u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     EXPECT_GE(stats.CommandRecords.SkippedUnavailable, 1u);
@@ -757,15 +741,9 @@ TEST(RendererFrameLifecycle, DepthPrepassPipelineFailureSkipsUnavailableCommandP
     ASSERT_NE(FindCommandPass(stats, "PostProcessPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "PostProcessPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
-    ASSERT_NE(FindCommandPass(stats, "PostProcessAAEdgePass"), nullptr);
-    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAEdgePass")->Status,
-              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
-    ASSERT_NE(FindCommandPass(stats, "PostProcessAABlendPass"), nullptr);
-    EXPECT_EQ(FindCommandPass(stats, "PostProcessAABlendPass")->Status,
-              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
-    ASSERT_NE(FindCommandPass(stats, "PostProcessAAResolvePass"), nullptr);
-    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAResolvePass")->Status,
-              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAEdgePass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAABlendPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAResolvePass"), nullptr);
     EXPECT_EQ(device.CommandContext.DispatchCalls, 3);
     EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 2);
     EXPECT_EQ(device.CommandContext.DrawIndirectCountCalls, 1);
@@ -822,7 +800,7 @@ TEST(RendererFrameLifecycle, CullingPipelineFailureSkipsRoutedCommandPassesUnava
     // `SkippedUnavailable` because culling/depth prerequisites are missing.
     // GRAPHICS-039C cluster grid/assignment remain culling-independent and
     // record their compute command shape: total climbs to 9.
-    EXPECT_EQ(stats.CommandRecords.Recorded, 9u);
+    EXPECT_EQ(stats.CommandRecords.Recorded, 6u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     EXPECT_GE(stats.CommandRecords.SkippedUnavailable, 2u);
@@ -847,15 +825,9 @@ TEST(RendererFrameLifecycle, CullingPipelineFailureSkipsRoutedCommandPassesUnava
     ASSERT_NE(FindCommandPass(stats, "PostProcessPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "PostProcessPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
-    ASSERT_NE(FindCommandPass(stats, "PostProcessAAEdgePass"), nullptr);
-    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAEdgePass")->Status,
-              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
-    ASSERT_NE(FindCommandPass(stats, "PostProcessAABlendPass"), nullptr);
-    EXPECT_EQ(FindCommandPass(stats, "PostProcessAABlendPass")->Status,
-              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
-    ASSERT_NE(FindCommandPass(stats, "PostProcessAAResolvePass"), nullptr);
-    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAResolvePass")->Status,
-              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAEdgePass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAABlendPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAResolvePass"), nullptr);
     EXPECT_EQ(device.CommandContext.DispatchCalls, 2);
     EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 0);
 
@@ -947,13 +919,6 @@ TEST(RendererFrameLifecycle, FrameRecipePassesAllProduceStructuredCommandRecordS
         // umbrella executor branch (Bloom + ToneMap legs) and reports
         // `Recorded` on the operational CPU/null gate.
         "PostProcessPass",
-        // GRAPHICS-075 Slice D.2a — the AA umbrella splits into three
-        // ordered graph passes so edge / blend / resolve pipelines can
-        // target format-incompatible color attachments. FXAA records
-        // under the resolve pass only; SMAA records under all three.
-        "PostProcessAAEdgePass",
-        "PostProcessAABlendPass",
-        "PostProcessAAResolvePass",
         // GRAPHICS-076 Slice A — the canonical default-recipe present pass
         // records the fullscreen `BindPipeline + Draw(3, 1, 0, 0)` shape
         // when its pipeline lease is valid; the executor's `"Present"`
@@ -3020,6 +2985,48 @@ namespace
 {
     constexpr int kPostProcessFXAACreateCallIndex = 18;
     constexpr int kPostProcessSMAAResolveCreateCallIndex = 21;
+}
+
+TEST(RendererFrameLifecycle, TAARecordsReconstructionPassAndDiagnostics)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{323u, 1u};
+    device.NextFrame = Extrinsic::RHI::FrameHandle{.FrameIndex = 1u, .SwapchainImageIndex = 0u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+    renderer->GetPostProcessSystem().SetSettings(Extrinsic::Graphics::PostProcessSettings{
+        .Enabled = true,
+        .AntiAliasing = Extrinsic::Graphics::PostProcessAntiAliasing::TAA,
+    });
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 72},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+
+    const Extrinsic::Graphics::RenderGraphCommandPassStats* reconstruction =
+        FindCommandPass(stats, "ReconstructionPass");
+    ASSERT_NE(reconstruction, nullptr);
+    EXPECT_EQ(reconstruction->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAEdgePass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAABlendPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "PostProcessAAResolvePass"), nullptr);
+    EXPECT_EQ(stats.ReconstructorAppliedFrames, 1u);
+    EXPECT_FLOAT_EQ(stats.HistoryDisocclusionPercent, 0.0f);
+    EXPECT_TRUE(stats.JitterOffsetX != 0.0f || stats.JitterOffsetY != 0.0f);
+
+    renderer->Shutdown();
 }
 
 TEST(RendererFrameLifecycle, FXAASelectedWithoutPipelineKeepsResolveSkippedAndPresentOnSceneColorLDR)

@@ -893,13 +893,12 @@ Clustered light binning (GRAPHICS-039):
 - [GRAPHICS-039C (done)](../../done/GRAPHICS-039C-cluster-surface-shader-integration.md) — surface-shader integration + recipe wiring (`CPUContracted`, 2026-06-05). Depended on 039B, GRAPHICS-008 (done).
 - [GRAPHICS-039D (done)](../../done/GRAPHICS-039D-cluster-async-compute-affinity.md) — async-compute affinity tagging (`CPUContracted`, 2026-06-05). Depended on 039C (done); consumes GRAPHICS-037D (done) for real multi-queue execution.
 
-Clustered light binning children are complete; `GRAPHICS-040B` is retired and
-the next unblocked rendering child is `GRAPHICS-040C`.
+Clustered light binning children and the CPU/null TAA recipe path are complete.
 
 TAA + reconstructor seam (GRAPHICS-040):
 - [GRAPHICS-040A (done)](../../done/GRAPHICS-040A-jitter-and-motion-vectors.md) — camera jitter + motion-vector buffer (`CPUContracted`, 2026-06-05). Depends on GRAPHICS-040 (planning, done), GRAPHICS-013A (done).
 - [GRAPHICS-040B (done)](../../done/GRAPHICS-040B-reconstructor-interface-and-reference-taa.md) — `IReconstructor` interface + reference TAA (`CPUContracted`, 2026-06-05). Depends on 040A.
-- [GRAPHICS-040C](GRAPHICS-040C-aa-recipe-selection-and-integration.md) — AA recipe selection + post-chain integration. Depends on 040B (done), GRAPHICS-013A/075 (done).
+- [GRAPHICS-040C (done)](../../done/GRAPHICS-040C-aa-recipe-selection-and-integration.md) — AA recipe selection + post-chain integration (`Operational`, 2026-06-05). Depends on 040B (done), GRAPHICS-013A/075 (done).
 - GRAPHICS-040D (vendor reconstructor backends) — **not opened**: per GRAPHICS-040 decision 5/10 there is one child per vendor, opened only when that vendor SDK is actually integrated.
 
 ## Agent selection rules

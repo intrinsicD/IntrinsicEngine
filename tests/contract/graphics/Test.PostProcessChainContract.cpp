@@ -244,6 +244,38 @@ namespace
         }
         return names;
     }
+
+    [[nodiscard]] bool PassReadsTexture(const Graphics::CompiledRenderGraph& compiled,
+                                        const std::string_view passName,
+                                        const std::string_view textureName)
+    {
+        for (const Graphics::CompiledPassDeclarations& declaration : compiled.PassDeclarations)
+        {
+            if (declaration.PassIndex >= compiled.PassNames.size() ||
+                compiled.PassNames[declaration.PassIndex] != passName)
+            {
+                continue;
+            }
+
+            for (const std::uint32_t textureIndex : declaration.ReadTextures)
+            {
+                if (textureIndex < compiled.TextureNames.size() &&
+                    compiled.TextureNames[textureIndex] == textureName)
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    [[nodiscard]] bool ChainHasStage(const Graphics::PostProcessChainDesc& chain,
+                                     const Graphics::PostProcessStageKind stage)
+    {
+        return std::ranges::any_of(chain.Stages, [stage](const Graphics::PostProcessStageDesc& candidate) {
+            return candidate.Kind == stage;
+        });
+    }
 }
 
 TEST(GraphicsPostProcessChainContract, FrameRecipeDeclaresHdrToLdrResources)
@@ -283,9 +315,9 @@ TEST(GraphicsPostProcessChainContract, FrameRecipeDeclaresHdrToLdrResources)
     EXPECT_TRUE(HasResource(description, Graphics::FrameRecipeResourceKind::SceneColorLDR, true));
     EXPECT_TRUE(HasResourceName(description, "PostProcess.BloomScratch", true));
     EXPECT_TRUE(HasResourceName(description, "PostProcess.Histogram", true));
-    EXPECT_TRUE(HasResourceName(description, "PostProcess.AATemp.Edges", true));
-    EXPECT_TRUE(HasResourceName(description, "PostProcess.AATemp.Weights", true));
-    EXPECT_TRUE(HasResourceName(description, "PostProcess.AATemp.Resolved", true));
+    EXPECT_TRUE(HasResourceName(description, "PostProcess.AATemp.Edges", false));
+    EXPECT_TRUE(HasResourceName(description, "PostProcess.AATemp.Weights", false));
+    EXPECT_TRUE(HasResourceName(description, "PostProcess.AATemp.Resolved", false));
 }
 
 // GRAPHICS-075 Slice E.1 — the histogram compute dispatch lives in its
@@ -365,7 +397,9 @@ TEST(GraphicsPostProcessChainContract, FrameRecipeDeclaresPostProcessHistogramAs
 // output reaches present.
 TEST(GraphicsPostProcessChainContract, FrameRecipeSplitsAAUmbrellaPerStage)
 {
-    const Graphics::FrameRecipeIntrospection description = Graphics::DescribeDefaultFrameRecipe(Graphics::FrameRecipeFeatures{});
+    const Graphics::FrameRecipeAAOptions aaOptions{.Mode = Graphics::FrameRecipeAAMode::SMAA};
+    const Graphics::FrameRecipeIntrospection description =
+        Graphics::DescribeDefaultFrameRecipe(Graphics::FrameRecipeFeatures{}, aaOptions);
 
     const auto* edge = FindPass(description, Graphics::FrameRecipePassKind::PostProcessAAEdge);
     const auto* blend = FindPass(description, Graphics::FrameRecipePassKind::PostProcessAABlend);
@@ -399,7 +433,8 @@ TEST(GraphicsPostProcessChainContract, FrameRecipeSplitsAAUmbrellaPerStage)
         graph,
         Graphics::FrameRecipeFeatures{},
         MakeImports(),
-        Graphics::FrameRecipeSizing{.Width = 320u, .Height = 180u});
+        Graphics::FrameRecipeSizing{.Width = 320u, .Height = 180u},
+        aaOptions);
     ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
 
     const auto compiled = graph.Compile();
@@ -429,15 +464,22 @@ TEST(GraphicsPostProcessChainContract, FrameRecipeSplitsAAUmbrellaPerStage)
 // observable.
 TEST(GraphicsPostProcessChainContract, AntiAliasingFlipsPresentSourceToResolved)
 {
-    auto presentReadsResolvedFor = [](const bool enableAntiAliasing) {
+    auto presentReadsResolvedFor = [](const Graphics::FrameRecipeAAMode mode,
+                                      const bool enableAntiAliasing) {
         Graphics::FrameRecipeFeatures features{};
         features.EnableAntiAliasing = enableAntiAliasing;
+        const Graphics::FrameRecipeAAOptions aaOptions{
+            .Mode = mode,
+            .ReconstructionHistoryPrevious = RHI::TextureHandle{30u, 1u},
+            .ReconstructionHistoryCurrent = RHI::TextureHandle{31u, 1u},
+        };
         Graphics::RenderGraph graph;
         const Graphics::FrameRecipeBuildResult build = Graphics::BuildDefaultFrameRecipe(
             graph,
             features,
             MakeImports(),
-            Graphics::FrameRecipeSizing{.Width = 320u, .Height = 180u});
+            Graphics::FrameRecipeSizing{.Width = 320u, .Height = 180u},
+            aaOptions);
         EXPECT_TRUE(build.Succeeded) << build.Diagnostic;
 
         const auto compiled = graph.Compile();
@@ -473,13 +515,45 @@ TEST(GraphicsPostProcessChainContract, AntiAliasingFlipsPresentSourceToResolved)
         return false;
     };
 
-    EXPECT_FALSE(presentReadsResolvedFor(false))
+    EXPECT_FALSE(presentReadsResolvedFor(Graphics::FrameRecipeAAMode::NoAA, false))
         << "With AA disabled, present must consume SceneColorLDR so the "
            "(cleared / undefined) AA-resolved attachment does not reach "
            "the backbuffer.";
-    EXPECT_TRUE(presentReadsResolvedFor(true))
-        << "With AA enabled, present must consume PostProcess.AATemp.Resolved "
-           "so the AA-resolved color reaches the backbuffer.";
+    EXPECT_FALSE(presentReadsResolvedFor(Graphics::FrameRecipeAAMode::FXAA, false))
+        << "Selecting a spatial AA mode is not sufficient to flip the "
+           "present source; the renderer only enables the route after the "
+           "matching pipeline set is available.";
+    EXPECT_TRUE(presentReadsResolvedFor(Graphics::FrameRecipeAAMode::FXAA, true))
+        << "FXAA with an available route must present PostProcess.AATemp.Resolved.";
+    EXPECT_TRUE(presentReadsResolvedFor(Graphics::FrameRecipeAAMode::SMAA, true))
+        << "SMAA with an available route must present PostProcess.AATemp.Resolved.";
+    EXPECT_FALSE(presentReadsResolvedFor(Graphics::FrameRecipeAAMode::TAA, true))
+        << "Temporal AA resolves HDR before postprocess; present must remain "
+           "on SceneColorLDR rather than the spatial AA temp.";
+}
+
+TEST(GraphicsPostProcessChainContract, TemporalAAFeedsPostProcessFromReconstruction)
+{
+    const Graphics::FrameRecipeAAOptions aaOptions{
+        .Mode = Graphics::FrameRecipeAAMode::TAA,
+        .ReconstructionHistoryPrevious = RHI::TextureHandle{30u, 1u},
+        .ReconstructionHistoryCurrent = RHI::TextureHandle{31u, 1u},
+    };
+
+    Graphics::RenderGraph graph;
+    const Graphics::FrameRecipeBuildResult build = Graphics::BuildDefaultFrameRecipe(
+        graph,
+        Graphics::FrameRecipeFeatures{},
+        MakeImports(),
+        Graphics::FrameRecipeSizing{.Width = 320u, .Height = 180u},
+        aaOptions);
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    EXPECT_TRUE(PassReadsTexture(*compiled, "PostProcessHistogramPass", "Reconstruction.ResolvedHDR"));
+    EXPECT_TRUE(PassReadsTexture(*compiled, "PostProcessPass", "Reconstruction.ResolvedHDR"));
+    EXPECT_FALSE(PassReadsTexture(*compiled, "Present", "PostProcess.AATemp.Resolved"));
 }
 
 TEST(GraphicsPostProcessChainContract, PostprocessGateControlsPresentSource)
@@ -1196,6 +1270,29 @@ TEST(GraphicsPostProcessChainContract, FXAASkipsWhenAntiAliasingNotFXAA)
     EXPECT_EQ(activeCmd.Events[2].Kind, EventKind::Draw);
 }
 
+TEST(GraphicsPostProcessChainContract, TemporalAAModesDoNotEnableSpatialAAStages)
+{
+    Graphics::PostProcessSystem post;
+    post.Initialize();
+
+    for (const Graphics::PostProcessAntiAliasing mode : {
+             Graphics::PostProcessAntiAliasing::TAA,
+             Graphics::PostProcessAntiAliasing::ExternalReconstructor,
+         })
+    {
+        post.SetSettings(Graphics::PostProcessSettings{
+            .Enabled = true,
+            .AntiAliasing = mode,
+        });
+
+        const Graphics::PostProcessChainDesc chain = post.DescribeChain();
+        ASSERT_TRUE(chain.Enabled);
+        EXPECT_TRUE(ChainHasStage(chain, Graphics::PostProcessStageKind::ToneMap));
+        EXPECT_FALSE(ChainHasStage(chain, Graphics::PostProcessStageKind::FXAA));
+        EXPECT_FALSE(ChainHasStage(chain, Graphics::PostProcessStageKind::SMAA));
+    }
+}
+
 // GRAPHICS-075 Slice D.1 — when `AntiAliasing == SMAA` the SMAA pass
 // body must record three Bind/Push/Draw triples (edge → blend →
 // resolve), each carrying a 16-byte std430 push block whose
@@ -1415,5 +1512,3 @@ TEST(GraphicsPostProcessChainContract, PassesSkipMissingPipelineOrDisabledChain)
     missingPipeline.Execute(missingPipelineCmd, camera);
     EXPECT_TRUE(missingPipelineCmd.Events.empty());
 }
-
-

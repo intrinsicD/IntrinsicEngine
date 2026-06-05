@@ -304,6 +304,8 @@ namespace Extrinsic::Graphics
             case PostProcessAntiAliasing::None:
             case PostProcessAntiAliasing::FXAA:
             case PostProcessAntiAliasing::SMAA:
+            case PostProcessAntiAliasing::TAA:
+            case PostProcessAntiAliasing::ExternalReconstructor:
                 return true;
             }
             return false;
@@ -602,6 +604,8 @@ namespace Extrinsic::Graphics
         case PostProcessAntiAliasing::SMAA:
             addStage(PostProcessStageKind::SMAA, false, true, true);
             break;
+        case PostProcessAntiAliasing::TAA:
+        case PostProcessAntiAliasing::ExternalReconstructor:
         case PostProcessAntiAliasing::None:
             break;
         }

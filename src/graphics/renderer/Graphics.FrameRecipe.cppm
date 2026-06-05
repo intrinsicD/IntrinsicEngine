@@ -23,6 +23,15 @@ namespace Extrinsic::Graphics
         Hybrid,
     };
 
+    export enum class FrameRecipeAAMode : std::uint8_t
+    {
+        NoAA = 0,
+        FXAA,
+        SMAA,
+        TAA,
+        ExternalReconstructor,
+    };
+
     export enum class FrameRecipePassKind : std::uint8_t
     {
         Culling = 0,
@@ -97,6 +106,11 @@ namespace Extrinsic::Graphics
         // `ClusterLights.Headers` / `ClusterLights.Indices` imports plus the
         // shader-visible `ClusterLights.Counter` atomic allocator.
         LightClusterAssignment,
+        // GRAPHICS-040C — compute-style temporal reconstruction pass. Declared
+        // after lit HDR composition/debug overlays and before postprocess so
+        // TAA/external reconstruction can read jittered HDR/depth/motion plus
+        // retained history and publish a reconstructed HDR input for tonemap.
+        Reconstruction,
     };
 
     export enum class FrameRecipeResourceKind : std::uint8_t
@@ -166,6 +180,11 @@ namespace Extrinsic::Graphics
         // color target. The engine RHI name for `R16G16_SFLOAT` is
         // `RG16_FLOAT`.
         MotionVectors,
+        // GRAPHICS-040C — retained reconstruction history imports plus the
+        // frame-transient reconstructed HDR target consumed by postprocess.
+        ReconstructionHistoryPrevious,
+        ReconstructionHistoryCurrent,
+        ReconstructionResolvedHDR,
     };
 
     export struct FrameRecipeFeatures
@@ -191,14 +210,10 @@ namespace Extrinsic::Graphics
         bool EnableSelectionOutline{false};
         bool EnableDebugView{false};
         bool EnablePostProcess{true};
-        // GRAPHICS-075 Slice D.2a — when set, `BuildDefaultFrameRecipe`
-        // flips `presentSource` from `SceneColorLDR` to
-        // `PostProcess.AATemp.Resolved` so the AA-resolved color reaches
-        // present. Recipe-build keeps allocating the three AA transients
-        // unconditionally (their allocation is gated on `EnablePostProcess`),
-        // but the present routing only consumes the resolved target when
-        // `PostProcessSettings::AntiAliasing != None`. The renderer derives
-        // this flag from `PostProcessSystem::GetSettings().AntiAliasing`.
+        // GRAPHICS-075 Slice D.2a — spatial-AA present routing gate. The
+        // renderer sets this only when the selected spatial mode's pipelines
+        // are available, so present consumes `PostProcess.AATemp.Resolved` for
+        // usable FXAA/SMAA output and falls back to `SceneColorLDR` otherwise.
         bool EnableAntiAliasing{false};
         bool EnableImGui{true};
         // GRAPHICS-077 Slice A — recipe-side gate for the new
@@ -230,9 +245,27 @@ namespace Extrinsic::Graphics
         // consumes the matching camera flag; the recipe suppresses temporal
         // motion/history surfaces while this is set.
         bool NoJitterNoHistory{false};
-        // GRAPHICS-040A — opt-in until GRAPHICS-040C adds the AA/reconstructor
-        // selector that can turn TAA/external reconstruction on by default.
+        // GRAPHICS-040A/040C — explicit opt-in for non-selector motion-vector
+        // consumers; temporal AA/reconstructor modes also force this target.
         bool EnableMotionVectors{false};
+    };
+
+    export struct FrameRecipeAAOptions
+    {
+        // GRAPHICS-040C — explicit recipe selector. `NoAA` is the default,
+        // `FXAA` compiles only the resolve pass, `SMAA` compiles edge/blend/
+        // resolve, and temporal modes compile `ReconstructionPass` plus
+        // motion/history resources before postprocess.
+        FrameRecipeAAMode Mode{FrameRecipeAAMode::NoAA};
+        // Optional pre-reconstruction render resolution. Zero means "match
+        // output", preserving existing call sites while allowing temporal
+        // reconstruction to declare input/output extent splits.
+        std::uint32_t InputWidth{0u};
+        std::uint32_t InputHeight{0u};
+        // Retained reconstruction history ping-pong images supplied by the
+        // renderer when `Mode` is temporal.
+        RHI::TextureHandle ReconstructionHistoryPrevious{};
+        RHI::TextureHandle ReconstructionHistoryCurrent{};
     };
 
     export struct FrameRecipeSizing
@@ -352,6 +385,9 @@ namespace Extrinsic::Graphics
     export [[nodiscard]] FrameRecipeIntrospection DescribeDefaultFrameRecipe(const FrameRecipeFeatures& features);
     export [[nodiscard]] FrameRecipeIntrospection DescribeDefaultFrameRecipe(const FrameRecipeFeatures& features,
                                                                              FrameRecipeTemporalOptions temporalOptions);
+    export [[nodiscard]] FrameRecipeIntrospection DescribeDefaultFrameRecipe(const FrameRecipeFeatures& features,
+                                                                             const FrameRecipeAAOptions& aaOptions,
+                                                                             FrameRecipeTemporalOptions temporalOptions = {});
 
     export [[nodiscard]] RenderGraphValidationResult ValidateRecipeCompiledGraph(
         const FrameRecipeIntrospection& recipe,
@@ -368,4 +404,11 @@ namespace Extrinsic::Graphics
                                                                         const FrameRecipeSizing& sizing,
                                                                         const FrameRecipeShadowSizing& shadowSizing,
                                                                         FrameRecipeTemporalOptions temporalOptions);
+    export [[nodiscard]] FrameRecipeBuildResult BuildDefaultFrameRecipe(RenderGraph& graph,
+                                                                        const FrameRecipeFeatures& features,
+                                                                        const FrameRecipeImports& imports,
+                                                                        const FrameRecipeSizing& sizing,
+                                                                        const FrameRecipeAAOptions& aaOptions,
+                                                                        const FrameRecipeShadowSizing& shadowSizing = {},
+                                                                        FrameRecipeTemporalOptions temporalOptions = {});
 }

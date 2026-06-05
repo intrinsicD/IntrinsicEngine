@@ -234,6 +234,13 @@ namespace Extrinsic::Graphics
         // existing `m_LastRenderGraphStats = {}` cadence in
         // `ExecuteFrame()`.
         VisualizationOverlayUploadDiagnostics VisualizationOverlayUpload{};
+        // GRAPHICS-040C — temporal reconstruction diagnostics surfaced on
+        // the renderer stats path. These remain CPU/null observable and do
+        // not expose backend/vendor details.
+        std::uint32_t ReconstructorAppliedFrames = 0;
+        float HistoryDisocclusionPercent = 0.0f;
+        float JitterOffsetX = 0.0f;
+        float JitterOffsetY = 0.0f;
     };
 
     export struct RuntimeRenderSnapshotBatch

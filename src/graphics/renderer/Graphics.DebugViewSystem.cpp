@@ -62,6 +62,10 @@ namespace Extrinsic::Graphics
             case FrameRecipeResourceKind::PostProcessAATempEdges:
             case FrameRecipeResourceKind::PostProcessAATempWeights:
             case FrameRecipeResourceKind::PostProcessAATempResolved:
+            case FrameRecipeResourceKind::MotionVectors:
+            case FrameRecipeResourceKind::ReconstructionHistoryPrevious:
+            case FrameRecipeResourceKind::ReconstructionHistoryCurrent:
+            case FrameRecipeResourceKind::ReconstructionResolvedHDR:
                 return DebugViewResourceClass::Texture;
             }
             return DebugViewResourceClass::Unknown;

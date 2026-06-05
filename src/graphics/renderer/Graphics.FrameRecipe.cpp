@@ -27,6 +27,17 @@ namespace Extrinsic::Graphics
                    features.LightingPath == FrameRecipeLightingPath::Hybrid;
         }
 
+        [[nodiscard]] constexpr bool IsSpatialAAMode(const FrameRecipeAAMode mode) noexcept
+        {
+            return mode == FrameRecipeAAMode::FXAA || mode == FrameRecipeAAMode::SMAA;
+        }
+
+        [[nodiscard]] constexpr bool IsReconstructionAAMode(const FrameRecipeAAMode mode) noexcept
+        {
+            return mode == FrameRecipeAAMode::TAA ||
+                   mode == FrameRecipeAAMode::ExternalReconstructor;
+        }
+
         [[nodiscard]] constexpr std::uint32_t ClampExtent(const std::uint32_t value)
         {
             return value == 0u ? 1u : value;
@@ -112,6 +123,20 @@ namespace Extrinsic::Graphics
                 .Height = height,
                 .Fmt = format,
                 .Usage = RHI::TextureUsage::DepthTarget | RHI::TextureUsage::Sampled,
+                .DebugName = name,
+            };
+        }
+
+        [[nodiscard]] RHI::TextureDesc StorageTextureDesc(const std::uint32_t width,
+                                                          const std::uint32_t height,
+                                                          const RHI::Format format,
+                                                          const char* name)
+        {
+            return RHI::TextureDesc{
+                .Width = width,
+                .Height = height,
+                .Fmt = format,
+                .Usage = RHI::TextureUsage::Storage | RHI::TextureUsage::Sampled,
                 .DebugName = name,
             };
         }
@@ -250,10 +275,17 @@ namespace Extrinsic::Graphics
 
     [[nodiscard]] FrameRecipeIntrospection DescribeDefaultFrameRecipe(const FrameRecipeFeatures& features)
     {
-        return DescribeDefaultFrameRecipe(features, FrameRecipeTemporalOptions{});
+        return DescribeDefaultFrameRecipe(features, FrameRecipeAAOptions{}, FrameRecipeTemporalOptions{});
     }
 
     [[nodiscard]] FrameRecipeIntrospection DescribeDefaultFrameRecipe(const FrameRecipeFeatures& features,
+                                                                      const FrameRecipeTemporalOptions temporalOptions)
+    {
+        return DescribeDefaultFrameRecipe(features, FrameRecipeAAOptions{}, temporalOptions);
+    }
+
+    [[nodiscard]] FrameRecipeIntrospection DescribeDefaultFrameRecipe(const FrameRecipeFeatures& features,
+                                                                      const FrameRecipeAAOptions& aaOptions,
                                                                       const FrameRecipeTemporalOptions temporalOptions)
     {
         const bool usesDeferred = UsesDeferredResources(features);
@@ -270,8 +302,16 @@ namespace Extrinsic::Graphics
         const bool clusterGridBuildActive = features.EnableClusterGridBuild && features.EnableDepthPrepass;
         const bool clusterLightAssignmentActive =
             features.EnableClusterLightAssignment && clusterGridBuildActive;
+        const bool reconstructionActive =
+            IsReconstructionAAMode(aaOptions.Mode) && !temporalOptions.NoJitterNoHistory;
+        const bool smaaActive = aaOptions.Mode == FrameRecipeAAMode::SMAA;
+        const bool spatialAAActive = IsSpatialAAMode(aaOptions.Mode);
         const bool motionVectorsActive =
-            temporalOptions.EnableMotionVectors && !temporalOptions.NoJitterNoHistory;
+            (temporalOptions.EnableMotionVectors || reconstructionActive) &&
+            !temporalOptions.NoJitterNoHistory;
+        const std::string_view postProcessInput =
+            reconstructionActive ? std::string_view{"Reconstruction.ResolvedHDR"}
+                                 : std::string_view{"SceneColorHDR"};
         FrameRecipeIntrospection out{};
 
         AddPass(out, FrameRecipePassKind::Culling, "CullingPass", true, false,
@@ -407,47 +447,34 @@ namespace Extrinsic::Graphics
         AddPass(out, FrameRecipePassKind::VisualizationOverlay, "VisualizationOverlayPass",
                 features.EnableVisualizationOverlay, false,
                 {"SceneColorHDR", "SceneDepth"}, {"SceneColorHDR"});
-        // GRAPHICS-075 Slice C — postprocess chain is split across two
-        // graph passes so the FXAA/SMAA legs can sample the
-        // freshly-written `SceneColorLDR` through a proper framegraph
-        // read-after-write barrier. `PostProcessPass` owns
-        // Bloom + ToneMap (Histogram lands with Slice E) and writes
-        // `SceneColorLDR`. Slice D.2a then splits the single AA umbrella
-        // into three ordered passes so edge / blend / resolve pipelines
-        // can target format-incompatible color attachments (`RG8_UNORM`
-        // / `RGBA8_UNORM` / backbuffer format); each pass declares a
-        // single matched-format `Write`. FXAA records under the resolve
-        // pass only (its sampled-image read is the freshly-written
-        // `SceneColorLDR`); SMAA records under all three. With
-        // `AntiAliasing == None` all three AA pass bodies emit no
-        // bind/push/draw (the helpers still route `Recorded`); the
-        // present source flips to `PostProcess.AATemp.Resolved` only
-        // when `features.EnableAntiAliasing` is set.
-        // GRAPHICS-075 Slice E.1 — the histogram compute dispatch lives
-        // in its own ordered graph pass before `"PostProcessPass"` because
-        // Vulkan forbids `vkCmdDispatch` inside an active render-pass
-        // scope, and `"PostProcessPass"` is a render-pass-scope pass
-        // (bloom + tonemap fragment work into color attachments). The
-        // `"PostProcessHistogramPass"` declaration reads `SceneColorHDR`
-        // and writes the `PostProcess.Histogram` storage buffer; the
-        // umbrella below no longer carries the histogram write.
-        // GRAPHICS-075 Slice E.2 — the histogram pass also writes the
-        // renderer-owned host-visible `Histogram.Readback` buffer via a
-        // `CopyBuffer(PostProcess.Histogram → Histogram.Readback @ slot * 1024)`
-        // recorded by the executor after the compute dispatch. Declaring the
-        // buffer in the pass's `Writes` list authorises the imported-write
-        // through the recipe-aware validator (mirroring the `Picking.Readback`
-        // import on `PickingPass`).
+        AddPass(out, FrameRecipePassKind::Reconstruction, "ReconstructionPass",
+                reconstructionActive, false,
+                {"SceneColorHDR", "SceneDepth", "MotionVectors", "Reconstruction.HistoryPrevious"},
+                {"Reconstruction.HistoryCurrent", "Reconstruction.ResolvedHDR"});
+        // GRAPHICS-040C — postprocess consumes reconstructed HDR when the AA
+        // selector chooses a temporal mode, otherwise it consumes the lit HDR
+        // target directly. Spatial AA remains post-tonemap and declares only
+        // the passes needed by the selected mode: FXAA resolve-only; SMAA
+        // edge/blend/resolve.
         AddPass(out, FrameRecipePassKind::PostProcessHistogram, "PostProcessHistogramPass", features.EnablePostProcess, false,
-                {"SceneColorHDR"}, {"PostProcess.Histogram", "Histogram.Readback"});
+                {postProcessInput}, {"PostProcess.Histogram", "Histogram.Readback"});
         AddPass(out, FrameRecipePassKind::PostProcess, "PostProcessPass", features.EnablePostProcess, false,
-                {"SceneColorHDR"}, {"PostProcess.BloomScratch", "SceneColorLDR"});
-        AddPass(out, FrameRecipePassKind::PostProcessAAEdge, "PostProcessAAEdgePass", features.EnablePostProcess, false,
+                {postProcessInput}, {"PostProcess.BloomScratch", "SceneColorLDR"});
+        AddPass(out, FrameRecipePassKind::PostProcessAAEdge, "PostProcessAAEdgePass",
+                features.EnablePostProcess && smaaActive, false,
                 {"SceneColorLDR"}, {"PostProcess.AATemp.Edges"});
-        AddPass(out, FrameRecipePassKind::PostProcessAABlend, "PostProcessAABlendPass", features.EnablePostProcess, false,
+        AddPass(out, FrameRecipePassKind::PostProcessAABlend, "PostProcessAABlendPass",
+                features.EnablePostProcess && smaaActive, false,
                 {"PostProcess.AATemp.Edges"}, {"PostProcess.AATemp.Weights"});
-        AddPass(out, FrameRecipePassKind::PostProcessAAResolve, "PostProcessAAResolvePass", features.EnablePostProcess, false,
-                {"SceneColorLDR", "PostProcess.AATemp.Weights"}, {"PostProcess.AATemp.Resolved"});
+        const std::vector<std::string_view> aaResolveReads =
+            smaaActive ? std::vector<std::string_view>{"SceneColorLDR", "PostProcess.AATemp.Weights"}
+                       : std::vector<std::string_view>{"SceneColorLDR"};
+        AddPassWithVectors(out, FrameRecipePassKind::PostProcessAAResolve,
+                           "PostProcessAAResolvePass",
+                           features.EnablePostProcess && spatialAAActive,
+                           false,
+                           aaResolveReads,
+                           {"PostProcess.AATemp.Resolved"});
         AddPass(out, FrameRecipePassKind::SelectionOutline, "SelectionOutlinePass", features.EnableSelectionOutline, false,
                 {"FrameRecipe.PresentSource", "EntityId", "SceneDepth"}, {"SelectionOutline"});
         AddPass(out, FrameRecipePassKind::DebugView, "DebugViewPass", features.EnableDebugView, false,
@@ -481,6 +508,12 @@ namespace Extrinsic::Graphics
         AddResource(out, FrameRecipeResourceKind::Material0, "Material0", usesDeferred, false, false, true);
         AddResource(out, FrameRecipeResourceKind::MotionVectors, "MotionVectors", motionVectorsActive, false, false, true);
         AddResource(out, FrameRecipeResourceKind::SceneColorHDR, "SceneColorHDR", true);
+        AddResource(out, FrameRecipeResourceKind::ReconstructionHistoryPrevious,
+                    "Reconstruction.HistoryPrevious", reconstructionActive, true, false, true);
+        AddResource(out, FrameRecipeResourceKind::ReconstructionHistoryCurrent,
+                    "Reconstruction.HistoryCurrent", reconstructionActive, true, false, true, true);
+        AddResource(out, FrameRecipeResourceKind::ReconstructionResolvedHDR,
+                    "Reconstruction.ResolvedHDR", reconstructionActive, false, false, true);
         // GRAPHICS-073 Slice B — declare ShadowAtlas as imported-write-allowed.
         // `BuildDefaultFrameRecipe` chooses between an imported handle (when
         // `imports.ShadowAtlas.IsValid()`) and a transient depth target at
@@ -491,14 +524,12 @@ namespace Extrinsic::Graphics
         AddResource(out, FrameRecipeResourceKind::SceneColorLDR, "SceneColorLDR", features.EnablePostProcess, false, false, true);
         AddResource(out, FrameRecipeResourceKind::PostProcessBloomScratch, "PostProcess.BloomScratch", features.EnablePostProcess, false, false, true);
         AddResource(out, FrameRecipeResourceKind::PostProcessHistogram, "PostProcess.Histogram", features.EnablePostProcess, false, false, true);
-        // GRAPHICS-075 Slice D.2a — three matched-format AA attachments
-        // replace the single `PostProcess.AATemp` transient. Edge is
-        // `RG8_UNORM`, blend is `RGBA8_UNORM`, resolve is the
-        // backbuffer format. `presentSource` flips to the resolved
-        // attachment when `features.EnableAntiAliasing` is set.
-        AddResource(out, FrameRecipeResourceKind::PostProcessAATempEdges, "PostProcess.AATemp.Edges", features.EnablePostProcess, false, false, true);
-        AddResource(out, FrameRecipeResourceKind::PostProcessAATempWeights, "PostProcess.AATemp.Weights", features.EnablePostProcess, false, false, true);
-        AddResource(out, FrameRecipeResourceKind::PostProcessAATempResolved, "PostProcess.AATemp.Resolved", features.EnablePostProcess, false, false, true);
+        AddResource(out, FrameRecipeResourceKind::PostProcessAATempEdges, "PostProcess.AATemp.Edges",
+                    features.EnablePostProcess && smaaActive, false, false, true);
+        AddResource(out, FrameRecipeResourceKind::PostProcessAATempWeights, "PostProcess.AATemp.Weights",
+                    features.EnablePostProcess && smaaActive, false, false, true);
+        AddResource(out, FrameRecipeResourceKind::PostProcessAATempResolved, "PostProcess.AATemp.Resolved",
+                    features.EnablePostProcess && spatialAAActive, false, false, true);
         AddResource(out, FrameRecipeResourceKind::SelectionOutline, "SelectionOutline", features.EnableSelectionOutline, false, false, true);
         AddResource(out, FrameRecipeResourceKind::DebugViewRGBA, "DebugViewRGBA", features.EnableDebugView, false, false, true);
         AddResource(out, FrameRecipeResourceKind::SceneTable, "GpuWorld.SceneTable", true, true);
@@ -622,6 +653,7 @@ namespace Extrinsic::Graphics
                                        features,
                                        imports,
                                        sizing,
+                                       FrameRecipeAAOptions{},
                                        shadowSizing,
                                        FrameRecipeTemporalOptions{});
     }
@@ -630,6 +662,23 @@ namespace Extrinsic::Graphics
                                                                         const FrameRecipeFeatures& features,
                                                                         const FrameRecipeImports& imports,
                                                                         const FrameRecipeSizing& sizing,
+                                                                        const FrameRecipeShadowSizing& shadowSizing,
+                                                                        const FrameRecipeTemporalOptions temporalOptions)
+    {
+        return BuildDefaultFrameRecipe(graph,
+                                       features,
+                                       imports,
+                                       sizing,
+                                       FrameRecipeAAOptions{},
+                                       shadowSizing,
+                                       temporalOptions);
+    }
+
+    [[nodiscard]] FrameRecipeBuildResult BuildDefaultFrameRecipe(RenderGraph& graph,
+                                                                        const FrameRecipeFeatures& features,
+                                                                        const FrameRecipeImports& imports,
+                                                                        const FrameRecipeSizing& sizing,
+                                                                        const FrameRecipeAAOptions& aaOptions,
                                                                         const FrameRecipeShadowSizing& shadowSizing,
                                                                         const FrameRecipeTemporalOptions temporalOptions)
     {
@@ -655,11 +704,28 @@ namespace Extrinsic::Graphics
             features.EnableClusterLightAssignment && clusterGridBuildActive &&
             imports.ClusterLightHeaders.IsValid() && imports.ClusterLightIndices.IsValid() &&
             imports.ClusterLightCounter.IsValid();
+        const bool reconstructionActive =
+            IsReconstructionAAMode(aaOptions.Mode) && !temporalOptions.NoJitterNoHistory;
+        const bool smaaActive = aaOptions.Mode == FrameRecipeAAMode::SMAA;
+        const bool spatialAAActive = IsSpatialAAMode(aaOptions.Mode);
         const bool motionVectorsActive =
-            temporalOptions.EnableMotionVectors && !temporalOptions.NoJitterNoHistory;
+            (temporalOptions.EnableMotionVectors || reconstructionActive) &&
+            !temporalOptions.NoJitterNoHistory;
+        if (reconstructionActive &&
+            (!aaOptions.ReconstructionHistoryPrevious.IsValid() ||
+             !aaOptions.ReconstructionHistoryCurrent.IsValid()))
+        {
+            return FrameRecipeBuildResult{
+                .Succeeded = false,
+                .MissingPrerequisiteCount = 2u,
+                .Diagnostic = "FrameRecipe temporal AA requires valid Reconstruction history imports.",
+            };
+        }
         const auto width = ClampExtent(sizing.Width);
         const auto height = ClampExtent(sizing.Height);
-        const FrameRecipeIntrospection declaration = DescribeDefaultFrameRecipe(features, temporalOptions);
+        const auto inputWidth = ClampExtent(aaOptions.InputWidth == 0u ? sizing.Width : aaOptions.InputWidth);
+        const auto inputHeight = ClampExtent(aaOptions.InputHeight == 0u ? sizing.Height : aaOptions.InputHeight);
+        const FrameRecipeIntrospection declaration = DescribeDefaultFrameRecipe(features, aaOptions, temporalOptions);
 
         const auto backbuffer = graph.ImportBackbuffer("Backbuffer", imports.Backbuffer);
         const auto sceneTable = graph.ImportBuffer("GpuWorld.SceneTable", imports.SceneTable, BufferState::ShaderRead, BufferState::ShaderRead);
@@ -677,8 +743,8 @@ namespace Extrinsic::Graphics
         const auto pointDrawIndirect = graph.ImportBuffer("Cull.Points.NonIndexedArgs", imports.PointsNonIndexedArgs, BufferState::ShaderWrite, BufferState::IndirectRead);
         const auto pointDrawCount = graph.ImportBuffer("Cull.Points.Count", imports.PointsCount, BufferState::ShaderWrite, BufferState::IndirectRead);
 
-        const auto depth = graph.CreateTexture("SceneDepth", DepthTargetDesc(width, height, sizing.DepthFormat, "SceneDepth"));
-        const auto hdr = graph.CreateTexture("SceneColorHDR", ColorTargetDesc(width, height, RHI::Format::RGBA16_FLOAT, "SceneColorHDR"));
+        const auto depth = graph.CreateTexture("SceneDepth", DepthTargetDesc(inputWidth, inputHeight, sizing.DepthFormat, "SceneDepth"));
+        const auto hdr = graph.CreateTexture("SceneColorHDR", ColorTargetDesc(inputWidth, inputHeight, RHI::Format::RGBA16_FLOAT, "SceneColorHDR"));
         TextureRef entityId{};
         TextureRef primitiveId{};
         TextureRef sceneNormal{};
@@ -691,6 +757,9 @@ namespace Extrinsic::Graphics
         TextureRef postProcessAATempEdges{};
         TextureRef postProcessAATempWeights{};
         TextureRef postProcessAATempResolved{};
+        TextureRef reconstructionHistoryPrevious{};
+        TextureRef reconstructionHistoryCurrent{};
+        TextureRef reconstructionResolvedHDR{};
         TextureRef selectionOutline{};
         TextureRef debugView{};
         BufferRef postProcessHistogram{};
@@ -768,7 +837,21 @@ namespace Extrinsic::Graphics
         if (motionVectorsActive)
         {
             motionVectors = graph.CreateTexture("MotionVectors",
-                                                ColorTargetDesc(width, height, RHI::Format::RG16_FLOAT, "MotionVectors"));
+                                                ColorTargetDesc(inputWidth, inputHeight, RHI::Format::RG16_FLOAT, "MotionVectors"));
+        }
+        if (reconstructionActive)
+        {
+            reconstructionHistoryPrevious = graph.ImportTexture("Reconstruction.HistoryPrevious",
+                                                                aaOptions.ReconstructionHistoryPrevious,
+                                                                TextureState::ShaderRead,
+                                                                TextureState::ShaderRead);
+            reconstructionHistoryCurrent = graph.ImportTexture("Reconstruction.HistoryCurrent",
+                                                               aaOptions.ReconstructionHistoryCurrent,
+                                                               TextureState::ShaderWrite,
+                                                               TextureState::ShaderRead);
+            reconstructionResolvedHDR = graph.CreateTexture(
+                "Reconstruction.ResolvedHDR",
+                StorageTextureDesc(width, height, RHI::Format::RGBA16_FLOAT, "Reconstruction.ResolvedHDR"));
         }
         if (features.EnableShadows)
         {
@@ -853,15 +936,21 @@ namespace Extrinsic::Graphics
             // correct layout transitions between them and the AA umbrella
             // never aliases two pipelines with incompatible color formats
             // inside a single render-pass scope on Vulkan.
-            postProcessAATempEdges = graph.CreateTexture(
-                "PostProcess.AATemp.Edges",
-                ColorTargetDesc(width, height, RHI::Format::RG8_UNORM, "PostProcess.AATemp.Edges"));
-            postProcessAATempWeights = graph.CreateTexture(
-                "PostProcess.AATemp.Weights",
-                ColorTargetDesc(width, height, RHI::Format::RGBA8_UNORM, "PostProcess.AATemp.Weights"));
-            postProcessAATempResolved = graph.CreateTexture(
-                "PostProcess.AATemp.Resolved",
-                ColorTargetDesc(width, height, sizing.BackbufferFormat, "PostProcess.AATemp.Resolved"));
+            if (smaaActive)
+            {
+                postProcessAATempEdges = graph.CreateTexture(
+                    "PostProcess.AATemp.Edges",
+                    ColorTargetDesc(width, height, RHI::Format::RG8_UNORM, "PostProcess.AATemp.Edges"));
+                postProcessAATempWeights = graph.CreateTexture(
+                    "PostProcess.AATemp.Weights",
+                    ColorTargetDesc(width, height, RHI::Format::RGBA8_UNORM, "PostProcess.AATemp.Weights"));
+            }
+            if (spatialAAActive)
+            {
+                postProcessAATempResolved = graph.CreateTexture(
+                    "PostProcess.AATemp.Resolved",
+                    ColorTargetDesc(width, height, sizing.BackbufferFormat, "PostProcess.AATemp.Resolved"));
+            }
             // GRAPHICS-075 Slice E.1 — `TransferDst` is required so the
             // histogram pass body can `vkCmdFillBuffer` the 256 uint32
             // bins to zero before each frame's dispatch (the shader
@@ -1243,6 +1332,21 @@ namespace Extrinsic::Graphics
             });
         }
 
+        TextureRef postProcessInput = hdr;
+        if (reconstructionActive)
+        {
+            addOrderedPass("ReconstructionPass", [=](RenderGraphBuilder& builder) {
+                builder.SetQueue(RenderQueue::AsyncCompute);
+                builder.Read(hdr, TextureUsage::ShaderRead);
+                builder.Read(depth, TextureUsage::ShaderRead);
+                builder.Read(motionVectors, TextureUsage::ShaderRead);
+                builder.Read(reconstructionHistoryPrevious, TextureUsage::ShaderRead);
+                builder.Write(reconstructionHistoryCurrent, TextureUsage::ShaderWrite);
+                builder.Write(reconstructionResolvedHDR, TextureUsage::ShaderWrite);
+            });
+            postProcessInput = reconstructionResolvedHDR;
+        }
+
         TextureRef presentSource = hdr;
         if (features.EnablePostProcess)
         {
@@ -1290,7 +1394,7 @@ namespace Extrinsic::Graphics
                 // optional async-compute queue here; the framegraph/RHI
                 // resolver demotes to graphics on capability-absent hosts.
                 builder.SetQueue(RenderQueue::AsyncCompute);
-                builder.Read(hdr, TextureUsage::ShaderRead);
+                builder.Read(postProcessInput, TextureUsage::ShaderRead);
                 builder.Write(postProcessHistogram, BufferUsage::ShaderWrite);
                 // GRAPHICS-075 Slice E.2 — when the renderer owns a valid
                 // host-visible `Histogram.Readback` buffer, declare it as a
@@ -1302,36 +1406,46 @@ namespace Extrinsic::Graphics
                 }
             });
             addOrderedPass("PostProcessPass", [=](RenderGraphBuilder& builder) {
-                builder.Read(hdr, TextureUsage::ShaderRead);
+                builder.Read(postProcessInput, TextureUsage::ShaderRead);
                 builder.Write(ldr, TextureUsage::ColorAttachmentWrite);
                 builder.Write(postProcessBloomScratch, TextureUsage::ColorAttachmentWrite);
                 builder.SetRenderPass(RHI::RenderPassDesc{
                     .ColorTargets = kDefaultClearColorAttachments,
                 });
             });
-            addOrderedPass("PostProcessAAEdgePass", [=](RenderGraphBuilder& builder) {
-                builder.Read(ldr, TextureUsage::ShaderRead);
-                builder.Write(postProcessAATempEdges, TextureUsage::ColorAttachmentWrite);
-                builder.SetRenderPass(RHI::RenderPassDesc{
-                    .ColorTargets = kDefaultClearColorAttachments,
+            if (smaaActive)
+            {
+                addOrderedPass("PostProcessAAEdgePass", [=](RenderGraphBuilder& builder) {
+                    builder.Read(ldr, TextureUsage::ShaderRead);
+                    builder.Write(postProcessAATempEdges, TextureUsage::ColorAttachmentWrite);
+                    builder.SetRenderPass(RHI::RenderPassDesc{
+                        .ColorTargets = kDefaultClearColorAttachments,
+                    });
                 });
-            });
-            addOrderedPass("PostProcessAABlendPass", [=](RenderGraphBuilder& builder) {
-                builder.Read(postProcessAATempEdges, TextureUsage::ShaderRead);
-                builder.Write(postProcessAATempWeights, TextureUsage::ColorAttachmentWrite);
-                builder.SetRenderPass(RHI::RenderPassDesc{
-                    .ColorTargets = kDefaultClearColorAttachments,
+                addOrderedPass("PostProcessAABlendPass", [=](RenderGraphBuilder& builder) {
+                    builder.Read(postProcessAATempEdges, TextureUsage::ShaderRead);
+                    builder.Write(postProcessAATempWeights, TextureUsage::ColorAttachmentWrite);
+                    builder.SetRenderPass(RHI::RenderPassDesc{
+                        .ColorTargets = kDefaultClearColorAttachments,
+                    });
                 });
-            });
-            addOrderedPass("PostProcessAAResolvePass", [=](RenderGraphBuilder& builder) {
-                builder.Read(ldr, TextureUsage::ShaderRead);
-                builder.Read(postProcessAATempWeights, TextureUsage::ShaderRead);
-                builder.Write(postProcessAATempResolved, TextureUsage::ColorAttachmentWrite);
-                builder.SetRenderPass(RHI::RenderPassDesc{
-                    .ColorTargets = kDefaultClearColorAttachments,
+            }
+            if (spatialAAActive)
+            {
+                addOrderedPass("PostProcessAAResolvePass", [=](RenderGraphBuilder& builder) {
+                    builder.Read(ldr, TextureUsage::ShaderRead);
+                    if (smaaActive)
+                    {
+                        builder.Read(postProcessAATempWeights, TextureUsage::ShaderRead);
+                    }
+                    builder.Write(postProcessAATempResolved, TextureUsage::ColorAttachmentWrite);
+                    builder.SetRenderPass(RHI::RenderPassDesc{
+                        .ColorTargets = kDefaultClearColorAttachments,
+                    });
                 });
-            });
-            presentSource = features.EnableAntiAliasing ? postProcessAATempResolved : ldr;
+            }
+            presentSource =
+                (features.EnableAntiAliasing && spatialAAActive) ? postProcessAATempResolved : ldr;
         }
 
         if (features.EnableSelectionOutline)

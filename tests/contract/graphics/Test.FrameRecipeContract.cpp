@@ -87,6 +87,12 @@ namespace
         return compiled.PassCount;
     }
 
+    [[nodiscard]] bool HasPassName(const CompiledRenderGraph& compiled,
+                                   const std::string_view passName)
+    {
+        return PassIndexByName(compiled, passName) < compiled.PassNames.size();
+    }
+
     [[nodiscard]] bool HasEnabledResource(const FrameRecipeIntrospection& description,
                                           const FrameRecipeResourceKind kind)
     {
@@ -154,6 +160,66 @@ namespace
         }
         return false;
     }
+
+    [[nodiscard]] bool PassReadsTexture(const CompiledRenderGraph& compiled,
+                                        const std::string_view passName,
+                                        const std::string_view textureName)
+    {
+        for (const CompiledPassDeclarations& declaration : compiled.PassDeclarations)
+        {
+            if (declaration.PassIndex >= compiled.PassNames.size() ||
+                compiled.PassNames[declaration.PassIndex] != passName)
+            {
+                continue;
+            }
+
+            for (const std::uint32_t textureIndex : declaration.ReadTextures)
+            {
+                if (textureIndex < compiled.TextureNames.size() &&
+                    compiled.TextureNames[textureIndex] == textureName)
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    [[nodiscard]] bool PassWritesTexture(const CompiledRenderGraph& compiled,
+                                         const std::string_view passName,
+                                         const std::string_view textureName)
+    {
+        for (const CompiledPassDeclarations& declaration : compiled.PassDeclarations)
+        {
+            if (declaration.PassIndex >= compiled.PassNames.size() ||
+                compiled.PassNames[declaration.PassIndex] != passName)
+            {
+                continue;
+            }
+
+            for (const std::uint32_t textureIndex : declaration.WriteTextures)
+            {
+                if (textureIndex < compiled.TextureNames.size() &&
+                    compiled.TextureNames[textureIndex] == textureName)
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    [[nodiscard]] const TextureResourceDesc* TextureDescByName(RenderGraph& graph,
+                                                              const CompiledRenderGraph& compiled,
+                                                              const std::string_view textureName)
+    {
+        const std::uint32_t textureIndex = TextureIndexByName(compiled, textureName);
+        if (textureIndex >= compiled.TextureNames.size())
+        {
+            return nullptr;
+        }
+        return graph.GetTextureDescByIndex(textureIndex);
+    }
 }
 
 TEST(FrameRecipeContract, DefaultRecipeBuildsCanonicalPassOrder)
@@ -189,15 +255,9 @@ TEST(FrameRecipeContract, DefaultRecipeBuildsCanonicalPassOrder)
         // the dispatch-inside-render-pass hazard.
         "PostProcessHistogramPass",
         "PostProcessPass",
-        // GRAPHICS-075 Slice D.2a — the AA umbrella splits into three
-        // ordered graph passes so edge / blend / resolve pipelines can
-        // target format-incompatible color attachments (`RG8_UNORM` /
-        // `RGBA8_UNORM` / backbuffer). FXAA records under the resolve
-        // pass only (its sampled-image read is the freshly-written
-        // `SceneColorLDR`); SMAA records under all three.
-        "PostProcessAAEdgePass",
-        "PostProcessAABlendPass",
-        "PostProcessAAResolvePass",
+        // GRAPHICS-040C — AA passes are no longer default structural
+        // no-ops. The recipe selector instantiates only the passes required
+        // by the selected AA mode; NoAA keeps the default chain lean.
         "ImGuiPass",
         "Present",
     };
@@ -306,9 +366,6 @@ TEST(FrameRecipeContract, DefaultRecipeDrawPassesDeclareRenderPassAttachments)
         "TransientDebugSurfacePass",
         "VisualizationOverlayPass",
         "PostProcessPass",
-        "PostProcessAAEdgePass",
-        "PostProcessAABlendPass",
-        "PostProcessAAResolvePass",
         "SelectionOutlinePass",
         "DebugViewPass",
         "Present",
@@ -319,6 +376,36 @@ TEST(FrameRecipeContract, DefaultRecipeDrawPassesDeclareRenderPassAttachments)
         EXPECT_TRUE(HasCompiledRenderPassAttachment(*compiled, passName))
             << "Default-recipe graphics pass \"" << passName
             << "\" compiled without a render-pass attachment; Vulkan draw commands would record outside dynamic rendering.";
+    }
+}
+
+TEST(FrameRecipeContract, SpatialAARecipeDrawPassesDeclareRenderPassAttachments)
+{
+    RenderGraph graph;
+    FrameRecipeFeatures features{};
+    features.EnableAntiAliasing = true;
+    const FrameRecipeAAOptions aaOptions{.Mode = FrameRecipeAAMode::SMAA};
+
+    const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
+        graph,
+        features,
+        MakeImports(),
+        FrameRecipeSizing{.Width = 1280u, .Height = 720u},
+        aaOptions);
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+
+    for (const std::string_view passName : {
+             std::string_view{"PostProcessAAEdgePass"},
+             std::string_view{"PostProcessAABlendPass"},
+             std::string_view{"PostProcessAAResolvePass"},
+         })
+    {
+        EXPECT_TRUE(HasCompiledRenderPassAttachment(*compiled, passName))
+            << "Spatial-AA graph pass \"" << passName
+            << "\" compiled without a render-pass attachment.";
     }
 }
 
@@ -336,6 +423,12 @@ TEST(FrameRecipeContract, OptionalResourcesAreGatedByFeatures)
     EXPECT_FALSE(HasEnabledResource(defaults, FrameRecipeResourceKind::ClusterLightIndices));
     EXPECT_FALSE(HasEnabledResource(defaults, FrameRecipeResourceKind::ClusterLightCounter));
     EXPECT_FALSE(HasEnabledResource(defaults, FrameRecipeResourceKind::MotionVectors));
+    EXPECT_FALSE(HasEnabledResource(defaults, FrameRecipeResourceKind::ReconstructionHistoryPrevious));
+    EXPECT_FALSE(HasEnabledResource(defaults, FrameRecipeResourceKind::ReconstructionHistoryCurrent));
+    EXPECT_FALSE(HasEnabledResource(defaults, FrameRecipeResourceKind::ReconstructionResolvedHDR));
+    EXPECT_FALSE(HasEnabledResource(defaults, FrameRecipeResourceKind::PostProcessAATempEdges));
+    EXPECT_FALSE(HasEnabledResource(defaults, FrameRecipeResourceKind::PostProcessAATempWeights));
+    EXPECT_FALSE(HasEnabledResource(defaults, FrameRecipeResourceKind::PostProcessAATempResolved));
     EXPECT_TRUE(HasEnabledResource(defaults, FrameRecipeResourceKind::SceneColorLDR));
 
     FrameRecipeFeatures allFeatures{};
@@ -361,6 +454,215 @@ TEST(FrameRecipeContract, OptionalResourcesAreGatedByFeatures)
     EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::ClusterLightIndices));
     EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::ClusterLightCounter));
     EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::MotionVectors));
+
+    const FrameRecipeIntrospection smaa = DescribeDefaultFrameRecipe(
+        FrameRecipeFeatures{},
+        FrameRecipeAAOptions{.Mode = FrameRecipeAAMode::SMAA});
+    EXPECT_TRUE(HasEnabledResource(smaa, FrameRecipeResourceKind::PostProcessAATempEdges));
+    EXPECT_TRUE(HasEnabledResource(smaa, FrameRecipeResourceKind::PostProcessAATempWeights));
+    EXPECT_TRUE(HasEnabledResource(smaa, FrameRecipeResourceKind::PostProcessAATempResolved));
+
+    const FrameRecipeAAOptions temporalAA{
+        .Mode = FrameRecipeAAMode::TAA,
+        .ReconstructionHistoryPrevious = RHI::TextureHandle{30u, 1u},
+        .ReconstructionHistoryCurrent = RHI::TextureHandle{31u, 1u},
+    };
+    const FrameRecipeIntrospection temporal = DescribeDefaultFrameRecipe(FrameRecipeFeatures{}, temporalAA);
+    EXPECT_TRUE(HasEnabledResource(temporal, FrameRecipeResourceKind::MotionVectors));
+    EXPECT_TRUE(HasEnabledResource(temporal, FrameRecipeResourceKind::ReconstructionHistoryPrevious));
+    EXPECT_TRUE(HasEnabledResource(temporal, FrameRecipeResourceKind::ReconstructionHistoryCurrent));
+    EXPECT_TRUE(HasEnabledResource(temporal, FrameRecipeResourceKind::ReconstructionResolvedHDR));
+    EXPECT_FALSE(HasEnabledResource(temporal, FrameRecipeResourceKind::PostProcessAATempEdges));
+    EXPECT_FALSE(HasEnabledResource(temporal, FrameRecipeResourceKind::PostProcessAATempWeights));
+    EXPECT_FALSE(HasEnabledResource(temporal, FrameRecipeResourceKind::PostProcessAATempResolved));
+}
+
+TEST(FrameRecipeContract, AAModeSelectorCompilesExpectedPassSets)
+{
+    auto buildFor = [](RenderGraph& graph, const FrameRecipeAAMode mode) {
+        FrameRecipeAAOptions aaOptions{
+            .Mode = mode,
+            .ReconstructionHistoryPrevious = RHI::TextureHandle{30u, 1u},
+            .ReconstructionHistoryCurrent = RHI::TextureHandle{31u, 1u},
+        };
+        return BuildDefaultFrameRecipe(
+            graph,
+            FrameRecipeFeatures{},
+            MakeImports(),
+            FrameRecipeSizing{.Width = 320u, .Height = 180u},
+            aaOptions);
+    };
+
+    {
+        RenderGraph graph;
+        const FrameRecipeBuildResult build = buildFor(graph, FrameRecipeAAMode::NoAA);
+        ASSERT_TRUE(build.Succeeded);
+        const auto compiled = graph.Compile();
+        ASSERT_TRUE(compiled.has_value());
+        EXPECT_FALSE(HasPassName(*compiled, "PostProcessAAEdgePass"));
+        EXPECT_FALSE(HasPassName(*compiled, "PostProcessAABlendPass"));
+        EXPECT_FALSE(HasPassName(*compiled, "PostProcessAAResolvePass"));
+        EXPECT_FALSE(HasPassName(*compiled, "ReconstructionPass"));
+    }
+
+    {
+        RenderGraph graph;
+        const FrameRecipeBuildResult build = buildFor(graph, FrameRecipeAAMode::FXAA);
+        ASSERT_TRUE(build.Succeeded);
+        const auto compiled = graph.Compile();
+        ASSERT_TRUE(compiled.has_value());
+        EXPECT_FALSE(HasPassName(*compiled, "PostProcessAAEdgePass"));
+        EXPECT_FALSE(HasPassName(*compiled, "PostProcessAABlendPass"));
+        EXPECT_TRUE(HasPassName(*compiled, "PostProcessAAResolvePass"));
+        EXPECT_FALSE(HasPassName(*compiled, "ReconstructionPass"));
+        EXPECT_TRUE(PassReadsTexture(*compiled, "PostProcessAAResolvePass", "SceneColorLDR"));
+        EXPECT_FALSE(PassReadsTexture(*compiled, "PostProcessAAResolvePass", "PostProcess.AATemp.Weights"));
+    }
+
+    {
+        RenderGraph graph;
+        const FrameRecipeBuildResult build = buildFor(graph, FrameRecipeAAMode::SMAA);
+        ASSERT_TRUE(build.Succeeded);
+        const auto compiled = graph.Compile();
+        ASSERT_TRUE(compiled.has_value());
+        EXPECT_TRUE(HasPassName(*compiled, "PostProcessAAEdgePass"));
+        EXPECT_TRUE(HasPassName(*compiled, "PostProcessAABlendPass"));
+        EXPECT_TRUE(HasPassName(*compiled, "PostProcessAAResolvePass"));
+        EXPECT_FALSE(HasPassName(*compiled, "ReconstructionPass"));
+        EXPECT_TRUE(PassReadsTexture(*compiled, "PostProcessAAResolvePass", "PostProcess.AATemp.Weights"));
+    }
+
+    for (const FrameRecipeAAMode mode : {
+             FrameRecipeAAMode::TAA,
+             FrameRecipeAAMode::ExternalReconstructor,
+         })
+    {
+        RenderGraph graph;
+        const FrameRecipeBuildResult build = buildFor(graph, mode);
+        ASSERT_TRUE(build.Succeeded);
+        const auto compiled = graph.Compile();
+        ASSERT_TRUE(compiled.has_value());
+        EXPECT_FALSE(HasPassName(*compiled, "PostProcessAAEdgePass"));
+        EXPECT_FALSE(HasPassName(*compiled, "PostProcessAABlendPass"));
+        EXPECT_FALSE(HasPassName(*compiled, "PostProcessAAResolvePass"));
+        EXPECT_TRUE(HasPassName(*compiled, "ReconstructionPass"));
+        EXPECT_TRUE(PassReadsTexture(*compiled, "ReconstructionPass", "MotionVectors"));
+        EXPECT_TRUE(PassWritesTexture(*compiled, "ReconstructionPass", "Reconstruction.ResolvedHDR"));
+        EXPECT_TRUE(PassReadsTexture(*compiled, "PostProcessPass", "Reconstruction.ResolvedHDR"));
+    }
+}
+
+TEST(FrameRecipeContract, TemporalReconstructionUsesInputAndOutputExtents)
+{
+    RenderGraph graph;
+    const FrameRecipeAAOptions aaOptions{
+        .Mode = FrameRecipeAAMode::TAA,
+        .InputWidth = 1280u,
+        .InputHeight = 720u,
+        .ReconstructionHistoryPrevious = RHI::TextureHandle{30u, 1u},
+        .ReconstructionHistoryCurrent = RHI::TextureHandle{31u, 1u},
+    };
+    const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
+        graph,
+        FrameRecipeFeatures{},
+        MakeImports(),
+        FrameRecipeSizing{.Width = 1920u, .Height = 1080u},
+        aaOptions);
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+
+    const TextureResourceDesc* hdr = TextureDescByName(graph, *compiled, "SceneColorHDR");
+    const TextureResourceDesc* depth = TextureDescByName(graph, *compiled, "SceneDepth");
+    const TextureResourceDesc* motion = TextureDescByName(graph, *compiled, "MotionVectors");
+    const TextureResourceDesc* reconstruction = TextureDescByName(graph, *compiled, "Reconstruction.ResolvedHDR");
+    const TextureResourceDesc* ldr = TextureDescByName(graph, *compiled, "SceneColorLDR");
+    ASSERT_NE(hdr, nullptr);
+    ASSERT_NE(depth, nullptr);
+    ASSERT_NE(motion, nullptr);
+    ASSERT_NE(reconstruction, nullptr);
+    ASSERT_NE(ldr, nullptr);
+
+    EXPECT_EQ(hdr->Desc.Width, 1280u);
+    EXPECT_EQ(hdr->Desc.Height, 720u);
+    EXPECT_EQ(depth->Desc.Width, 1280u);
+    EXPECT_EQ(depth->Desc.Height, 720u);
+    EXPECT_EQ(motion->Desc.Width, 1280u);
+    EXPECT_EQ(motion->Desc.Height, 720u);
+    EXPECT_EQ(reconstruction->Desc.Width, 1920u);
+    EXPECT_EQ(reconstruction->Desc.Height, 1080u);
+    EXPECT_EQ(reconstruction->Desc.Fmt, RHI::Format::RGBA16_FLOAT);
+    EXPECT_TRUE(HasTextureUsage(reconstruction->Desc.Usage, RHI::TextureUsage::Storage));
+    EXPECT_TRUE(HasTextureUsage(reconstruction->Desc.Usage, RHI::TextureUsage::Sampled));
+    EXPECT_EQ(ldr->Desc.Width, 1920u);
+    EXPECT_EQ(ldr->Desc.Height, 1080u);
+
+    const std::vector<std::string> order = OrderedPassNames(*compiled);
+    const auto pointIt = std::ranges::find(order, "PointPass");
+    const auto reconstructionIt = std::ranges::find(order, "ReconstructionPass");
+    const auto histogramIt = std::ranges::find(order, "PostProcessHistogramPass");
+    const auto postIt = std::ranges::find(order, "PostProcessPass");
+    ASSERT_NE(pointIt, order.end());
+    ASSERT_NE(reconstructionIt, order.end());
+    ASSERT_NE(histogramIt, order.end());
+    ASSERT_NE(postIt, order.end());
+    EXPECT_LT(pointIt, reconstructionIt);
+    EXPECT_LT(reconstructionIt, histogramIt);
+    EXPECT_LT(histogramIt, postIt);
+}
+
+TEST(FrameRecipeContract, NoJitterNoHistorySuppressesTemporalReconstruction)
+{
+    RenderGraph graph;
+    const FrameRecipeAAOptions aaOptions{
+        .Mode = FrameRecipeAAMode::TAA,
+        .ReconstructionHistoryPrevious = RHI::TextureHandle{30u, 1u},
+        .ReconstructionHistoryCurrent = RHI::TextureHandle{31u, 1u},
+    };
+    constexpr FrameRecipeTemporalOptions temporalOptions{.NoJitterNoHistory = true};
+
+    const FrameRecipeIntrospection description =
+        DescribeDefaultFrameRecipe(FrameRecipeFeatures{}, aaOptions, temporalOptions);
+    EXPECT_FALSE(HasEnabledResource(description, FrameRecipeResourceKind::MotionVectors));
+    EXPECT_FALSE(HasEnabledResource(description, FrameRecipeResourceKind::ReconstructionHistoryPrevious));
+    EXPECT_FALSE(HasEnabledResource(description, FrameRecipeResourceKind::ReconstructionHistoryCurrent));
+    EXPECT_FALSE(HasEnabledResource(description, FrameRecipeResourceKind::ReconstructionResolvedHDR));
+    const auto* reconstruction = FindPass(description, FrameRecipePassKind::Reconstruction);
+    ASSERT_NE(reconstruction, nullptr);
+    EXPECT_FALSE(reconstruction->Enabled);
+
+    const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
+        graph,
+        FrameRecipeFeatures{},
+        MakeImports(),
+        FrameRecipeSizing{.Width = 640u, .Height = 360u},
+        aaOptions,
+        FrameRecipeShadowSizing{},
+        temporalOptions);
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    EXPECT_FALSE(HasPassName(*compiled, "ReconstructionPass"));
+    EXPECT_EQ(std::ranges::find(compiled->TextureNames, "MotionVectors"),
+              compiled->TextureNames.end());
+    EXPECT_EQ(std::ranges::find(compiled->TextureNames, "Reconstruction.ResolvedHDR"),
+              compiled->TextureNames.end());
+}
+
+TEST(FrameRecipeContract, TemporalReconstructionRequiresHistoryImports)
+{
+    RenderGraph graph;
+    const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
+        graph,
+        FrameRecipeFeatures{},
+        MakeImports(),
+        FrameRecipeSizing{.Width = 640u, .Height = 360u},
+        FrameRecipeAAOptions{.Mode = FrameRecipeAAMode::TAA});
+
+    EXPECT_FALSE(build.Succeeded);
+    EXPECT_NE(build.Diagnostic.find("Reconstruction history"), std::string::npos);
 }
 
 TEST(FrameRecipeContract, LightingPathControlsGBufferResourcesAndComposition)

@@ -380,7 +380,7 @@ namespace Extrinsic::Graphics
             .Height = desc.Height,
             .MipLevels = 1u,
             .Fmt = desc.Fmt,
-            .Usage = RHI::TextureUsage::Sampled | RHI::TextureUsage::ColorTarget,
+            .Usage = RHI::TextureUsage::Sampled | RHI::TextureUsage::Storage,
             .DebugName = "Reconstruction.History",
         };
 

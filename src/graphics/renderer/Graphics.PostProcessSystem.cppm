@@ -32,6 +32,8 @@ export namespace Extrinsic::Graphics
         None = 0,
         FXAA,
         SMAA,
+        TAA,
+        ExternalReconstructor,
     };
 
     enum class PostProcessStageKind : std::uint8_t

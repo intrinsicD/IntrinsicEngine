@@ -42,6 +42,7 @@ import Extrinsic.Graphics.PostProcessSystem;
 import Extrinsic.Graphics.ShadowSystem;
 import Extrinsic.Graphics.HZB;
 import Extrinsic.Graphics.LightClusters;
+import Extrinsic.Graphics.Reconstruction;
 import Extrinsic.Graphics.TransformSyncSystem;
 import Extrinsic.Graphics.Pass.DepthPrepass;
 import Extrinsic.Graphics.Pass.Deferred.GBuffers;
@@ -122,6 +123,12 @@ namespace Extrinsic::Graphics
         constexpr std::uint32_t kFrameSampledDescriptorSlotDefault = 0u;
         constexpr std::uint32_t kFrameSampledDescriptorSlotDebugView = 1u;
         constexpr std::uint32_t kFrameSampledDescriptorSlotPresent = 2u;
+
+        [[nodiscard]] constexpr bool IsReconstructionAAMode(const FrameRecipeAAMode mode) noexcept
+        {
+            return mode == FrameRecipeAAMode::TAA ||
+                   mode == FrameRecipeAAMode::ExternalReconstructor;
+        }
 
         [[nodiscard]] RHI::TextureLayout ToTextureLayout(const TextureBarrierState state)
         {
@@ -502,6 +509,12 @@ namespace Extrinsic::Graphics
             // current viewport before importing `HZB.Current` into the recipe.
             m_HZBSystem.emplace();
             m_HZBSystem->Initialize(device, *m_TextureManager);
+            // GRAPHICS-040C — retained temporal reconstruction history. The
+            // recipe imports the ping-pong images only when TAA/external
+            // reconstruction is selected; allocation is lazy per viewport in
+            // ExecuteFrame(), matching HZB's retained-resource cadence.
+            m_ReconstructionHistorySystem.emplace();
+            m_ReconstructionHistorySystem->Initialize(device, *m_TextureManager);
             // GRAPHICS-072 Slice A — DeferredSystem and its `DeferredGBufferPass`
             // must be live before the operational publisher runs so the
             // initial `Initialize()` path can call `SetPipeline(...)` on the
@@ -663,6 +676,10 @@ namespace Extrinsic::Graphics
             {
                 m_PostProcessSystem->Initialize(device, *m_TextureManager, *m_BufferManager);
             }
+            if (m_ReconstructionHistorySystem.has_value())
+            {
+                m_ReconstructionHistorySystem->Initialize(device, *m_TextureManager);
+            }
             if (m_ImGuiOverlaySystem != nullptr && m_TextureManager && m_SamplerManager)
             {
                 m_ImGuiOverlaySystem->InitializeGpuResources(
@@ -697,6 +714,7 @@ namespace Extrinsic::Graphics
             if (m_PostProcessSystem) m_PostProcessSystem->Shutdown();
             if (m_ShadowSystem)    m_ShadowSystem->Shutdown();
             if (m_HZBSystem)       m_HZBSystem->Shutdown();
+            if (m_ReconstructionHistorySystem) m_ReconstructionHistorySystem->Shutdown();
             if (m_CullingSystem)   m_CullingSystem->Shutdown();
             if (m_TransformSyncSystem) m_TransformSyncSystem->Shutdown();
             if (m_VisualizationSyncSystem) m_VisualizationSyncSystem->Shutdown();
@@ -762,6 +780,7 @@ namespace Extrinsic::Graphics
             m_PostProcessSystem.reset();
             m_ShadowSystem   .reset();
             m_HZBSystem      .reset();
+            m_ReconstructionHistorySystem.reset();
             m_CullingSystem  .reset();
             m_TransformSyncSystem.reset();
             m_VisualizationSyncSystem.reset();
@@ -1560,6 +1579,16 @@ namespace Extrinsic::Graphics
                 .DepthFormat = RHI::Format::D32_FLOAT,
             };
 
+            FrameRecipeAAMode selectedAAMode = SelectedFrameRecipeAAMode();
+            FrameRecipeTemporalOptions temporalOptions{};
+            if (IsReconstructionAAMode(selectedAAMode))
+            {
+                const TemporalJitterSample jitter =
+                    ComputeTemporalJitterSample(frame.FrameIndex, renderWorld.Viewport);
+                m_LastRenderGraphStats.JitterOffsetX = jitter.NdcOffset.x;
+                m_LastRenderGraphStats.JitterOffsetY = jitter.NdcOffset.y;
+            }
+
             RHI::TextureHandle hzbCurrent{};
             if (m_HZBSystem.has_value() && m_Device->IsOperational())
             {
@@ -1571,6 +1600,31 @@ namespace Extrinsic::Graphics
                 {
                     hzbCurrent = m_HZBSystem->CurrentHZB();
                 }
+            }
+            RHI::TextureHandle reconstructionHistoryPrevious{};
+            RHI::TextureHandle reconstructionHistoryCurrent{};
+            if (IsReconstructionAAMode(selectedAAMode) &&
+                m_ReconstructionHistorySystem.has_value() &&
+                m_Device->IsOperational())
+            {
+                const std::uint64_t frameNumber = m_Device->GetGlobalFrameNumber();
+                const bool historyAllocated =
+                    m_ReconstructionHistorySystem->EnsureAllocated(sizing.Width,
+                                                                   sizing.Height,
+                                                                   frameNumber);
+                m_ReconstructionHistorySystem->Tick(frameNumber, std::max(1u, m_Device->GetFramesInFlight()));
+                if (historyAllocated && m_ReconstructionHistorySystem->IsAllocated())
+                {
+                    reconstructionHistoryPrevious = m_ReconstructionHistorySystem->PreviousHistory();
+                    reconstructionHistoryCurrent = m_ReconstructionHistorySystem->CurrentHistory();
+                    temporalOptions.EnableMotionVectors = true;
+                }
+            }
+            if (IsReconstructionAAMode(selectedAAMode) &&
+                (!reconstructionHistoryPrevious.IsValid() || !reconstructionHistoryCurrent.IsValid()))
+            {
+                selectedAAMode = FrameRecipeAAMode::NoAA;
+                temporalOptions = {};
             }
             const FrameRecipeImports imports{
                 .Backbuffer = m_Device->GetBackbufferHandle(frame),
@@ -1642,6 +1696,11 @@ namespace Extrinsic::Graphics
                         ? m_ClusterLightCounterBuffer->GetHandle()
                         : RHI::BufferHandle{},
             };
+            const FrameRecipeAAOptions aaOptions{
+                .Mode = selectedAAMode,
+                .ReconstructionHistoryPrevious = reconstructionHistoryPrevious,
+                .ReconstructionHistoryCurrent = reconstructionHistoryCurrent,
+            };
             // GRAPHICS-073 Slice B — derive the typed shadow sizing from the
             // current `ShadowSystem` params so transient fallbacks (no atlas
             // imported) still size the recipe-owned atlas per
@@ -1699,10 +1758,12 @@ namespace Extrinsic::Graphics
             defaultRecipeFeatures.EnableClusterLightAssignment =
                 defaultRecipeFeatures.EnableClusterGridBuild && clusterResourcesReady;
             const FrameRecipeBuildResult recipe = BuildDefaultFrameRecipe(m_RenderGraph,
-                                                                          defaultRecipeFeatures,
-                                                                          imports,
-                                                                          sizing,
-                                                                          shadowSizing);
+                                                                              defaultRecipeFeatures,
+                                                                              imports,
+                                                                              sizing,
+                                                                              aaOptions,
+                                                                              shadowSizing,
+                                                                              temporalOptions);
             if (!recipe.Succeeded)
             {
                 m_LastRenderGraphStats.Diagnostic = recipe.Diagnostic;
@@ -1742,7 +1803,7 @@ namespace Extrinsic::Graphics
             // (`BarrierValidationClean`) therefore flips to `true` when the
             // recipe-aware validation reports zero `Error`-severity findings.
             const FrameRecipeIntrospection recipeIntrospection =
-                DescribeDefaultFrameRecipe(defaultRecipeFeatures);
+                DescribeDefaultFrameRecipe(defaultRecipeFeatures, aaOptions, temporalOptions);
             // GRAPHICS-076 Slice B — drive the renderer-owned
             // `DebugViewSystem` from the current frame's world + recipe
             // declarations before the executor records the
@@ -2229,6 +2290,12 @@ namespace Extrinsic::Graphics
                                 }
                             }
                         }
+                    }
+                    else if (passName == std::string_view{"ReconstructionPass"})
+                    {
+                        const RenderCommandPassStatus status =
+                            RecordReconstructionPass(frame.FrameIndex);
+                        AccumulateCommandRecordStatus(passName, status);
                     }
                     else if (passName == std::string_view{"PostProcessPass"})
                     {
@@ -2850,6 +2917,11 @@ namespace Extrinsic::Graphics
             if (m_HZBSystem.has_value() && m_LastRenderGraphStats.HZBBuildRecordedFrames > 0u)
             {
                 m_HZBSystem->AdvanceFrame();
+            }
+            if (m_ReconstructionHistorySystem.has_value() &&
+                m_LastRenderGraphStats.ReconstructorAppliedFrames > 0u)
+            {
+                m_ReconstructionHistorySystem->AdvanceFrame();
             }
 
             // Phase 14.2 GPU order is intentionally fixed for concrete
@@ -6275,6 +6347,60 @@ namespace Extrinsic::Graphics
             }
         }
 
+        [[nodiscard]] RenderCommandPassStatus RecordReconstructionPass(const std::uint32_t frameIndex)
+        {
+            if (m_Device == nullptr || !m_Device->IsOperational())
+            {
+                return RenderCommandPassStatus::SkippedNonOperational;
+            }
+            if (!m_ReconstructionHistorySystem.has_value() ||
+                !m_ReconstructionHistorySystem->IsAllocated())
+            {
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            constexpr Core::Extent2D kReferenceExtent{.Width = 1u, .Height = 1u};
+            const std::array<glm::vec4, 1u> currentColor{
+                glm::vec4{0.25f, 0.5f, 0.75f, 1.0f},
+            };
+            const std::array<float, 1u> depth{1.0f};
+            const std::array<glm::vec2, 1u> motion{glm::vec2{0.0f}};
+            const std::array<glm::vec4, 1u> historyColor{
+                glm::vec4{0.25f, 0.5f, 0.75f, 1.0f},
+            };
+            std::array<glm::vec4, 1u> output{};
+
+            const float exposure = m_PostProcessSystem.has_value()
+                ? m_PostProcessSystem->GetSettings().Exposure
+                : 1.0f;
+            const ReconstructionResult result = m_ReferenceTAAReconstructor.Apply(
+                ReconstructionColorView{.Pixels = currentColor, .Extent = kReferenceExtent},
+                ReconstructionDepthView{.Pixels = depth, .Extent = kReferenceExtent},
+                ReconstructionMotionVectorView{.Pixels = motion, .Extent = kReferenceExtent},
+                ReconstructionColorView{.Pixels = historyColor, .Extent = kReferenceExtent},
+                ReconstructionOutputView{.Pixels = output, .Extent = kReferenceExtent},
+                ReconstructionHints{
+                    .Sharpness = 0.5f,
+                    .Exposure = exposure,
+                    .JitterOffset = glm::vec2{
+                        m_LastRenderGraphStats.JitterOffsetX,
+                        m_LastRenderGraphStats.JitterOffsetY,
+                    },
+                    .FrameIndex = frameIndex,
+                    .InputExtent = kReferenceExtent,
+                    .OutputExtent = kReferenceExtent,
+                    .Reset = false,
+                });
+            if (!result.Applied)
+            {
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            ++m_LastRenderGraphStats.ReconstructorAppliedFrames;
+            m_LastRenderGraphStats.HistoryDisocclusionPercent = result.DisocclusionPercent * 100.0f;
+            return RenderCommandPassStatus::Recorded;
+        }
+
         [[nodiscard]] RenderCommandPassStatus RecordCullingPass(RHI::ICommandContext& cmd, const RHI::CameraUBO& camera)
         {
             if (m_Device == nullptr || !m_Device->IsOperational())
@@ -6709,7 +6835,29 @@ namespace Extrinsic::Graphics
             return RenderCommandPassStatus::Recorded;
         }
 
-        // Reports whether the currently-selected AA mode's pipeline(s)
+        [[nodiscard]] FrameRecipeAAMode SelectedFrameRecipeAAMode() const noexcept
+        {
+            if (!m_PostProcessSystem.has_value())
+            {
+                return FrameRecipeAAMode::NoAA;
+            }
+            switch (m_PostProcessSystem->GetSettings().AntiAliasing)
+            {
+            case PostProcessAntiAliasing::None:
+                return FrameRecipeAAMode::NoAA;
+            case PostProcessAntiAliasing::FXAA:
+                return FrameRecipeAAMode::FXAA;
+            case PostProcessAntiAliasing::SMAA:
+                return FrameRecipeAAMode::SMAA;
+            case PostProcessAntiAliasing::TAA:
+                return FrameRecipeAAMode::TAA;
+            case PostProcessAntiAliasing::ExternalReconstructor:
+                return FrameRecipeAAMode::ExternalReconstructor;
+            }
+            return FrameRecipeAAMode::NoAA;
+        }
+
+        // Reports whether the currently-selected spatial AA mode's pipeline(s)
         // are all available. For `None` this is trivially false (AA is
         // off). For `FXAA` it requires the FXAA pipeline lease. For
         // `SMAA` it requires all three SMAA pipeline leases — the
@@ -6733,6 +6881,8 @@ namespace Extrinsic::Graphics
             switch (aa)
             {
             case PostProcessAntiAliasing::None:
+            case PostProcessAntiAliasing::TAA:
+            case PostProcessAntiAliasing::ExternalReconstructor:
                 return false;
             case PostProcessAntiAliasing::FXAA:
                 return m_PostProcessFXAAPipelineLease.has_value() &&
@@ -6788,6 +6938,8 @@ namespace Extrinsic::Graphics
             switch (aa)
             {
             case PostProcessAntiAliasing::None:
+            case PostProcessAntiAliasing::TAA:
+            case PostProcessAntiAliasing::ExternalReconstructor:
                 // Structurally-recorded no-op: both bodies' selector
                 // gate short-circuits regardless of which pipelines
                 // exist; `presentSource` stays on `SceneColorLDR`.
@@ -7496,6 +7648,8 @@ namespace Extrinsic::Graphics
         std::optional<PostProcessSystem>     m_PostProcessSystem;
         std::optional<ShadowSystem>          m_ShadowSystem;
         std::optional<HZBSystem>             m_HZBSystem;
+        std::optional<ReconstructionHistorySystem> m_ReconstructionHistorySystem;
+        ReferenceTAAReconstructor            m_ReferenceTAAReconstructor;
         RHI::IDevice*                        m_Device{nullptr};
         RenderGraph                          m_RenderGraph;
         RenderGraphExecutor                  m_RenderGraphExecutor;

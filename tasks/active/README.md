@@ -11,10 +11,19 @@ Each active task should include:
 
 ## Currently active
 
-No active task is currently selected. The next unblocked rendering child is
-`GRAPHICS-040C`.
+No currently active task.
 
 The most recently retired tasks are summarised below.
+
+Previously-active
+[`GRAPHICS-040C`](../done/GRAPHICS-040C-aa-recipe-selection-and-integration.md)
+— AA recipe selection + post-chain integration retired to `tasks/done/` on
+2026-06-05 at maturity `Operational`. The slice added the explicit
+`FrameRecipeAAOptions` selector, mode-specific FXAA/SMAA pass compilation,
+temporal `ReconstructionPass` routing with retained history imports,
+input/output extent splitting, renderer-side reference-TAA execution, and
+`ReconstructorAppliedFrames` / `HistoryDisocclusionPercent` / jitter
+diagnostics. Vendor reconstructor backend children remain unopened.
 
 Previously-active
 [`GRAPHICS-040B`](../done/GRAPHICS-040B-reconstructor-interface-and-reference-taa.md)
@@ -26,7 +35,8 @@ Previously-active
 exposure-aware history weighting, reset invalidation, and disocclusion
 fallback reporting, plus a retained `RGBA16_FLOAT` ping-pong
 `ReconstructionHistorySystem` with retire-window coverage. Recipe selection and
-post-chain integration remain `GRAPHICS-040C`; vendor children remain unopened.
+post-chain integration are retired in `GRAPHICS-040C`; vendor children remain
+unopened.
 
 Previously-active
 [`GRAPHICS-040A`](../done/GRAPHICS-040A-jitter-and-motion-vectors.md) —
@@ -36,8 +46,8 @@ temporal jitter helper, projection-matrix jitter override, authoritative
 `TemporalCameraViewSnapshot::JitterOffset`, opt-in `MotionVectors`
 frame-recipe resource/attachment shape, `NoJitterNoHistory` suppression, and
 graphics contract coverage for jitter replay, projection math, and motion-vector
-target gating. Reference TAA reconstruction remains `GRAPHICS-040B`; recipe
-selection and post-chain integration remain `GRAPHICS-040C`.
+target gating. Reference TAA reconstruction retired in `GRAPHICS-040B`; recipe
+selection and post-chain integration retired in `GRAPHICS-040C`.
 
 Previously-active
 [`GRAPHICS-039D`](../done/GRAPHICS-039D-cluster-async-compute-affinity.md) —

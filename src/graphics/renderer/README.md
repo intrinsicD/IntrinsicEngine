@@ -398,7 +398,7 @@ Concretely:
   `RenderQueue::AsyncCompute`; the framegraph/RHI queue resolver demotes those
   requests to the graphics queue on capability-absent devices, so clustered
   lighting correctness does not depend on async-compute availability.
-- GRAPHICS-040A adds the CPU-contracted temporal input seam for future TAA /
+- GRAPHICS-040A adds the CPU-contracted temporal input seam used by TAA /
   external reconstruction without growing the base camera snapshot ABI.
   `ComputeTemporalJitterSample(...)` selects a Halton(2,3)x16 sample from the
   rendered-frame index, scales it to NDC by `2 / viewport`, and
@@ -425,8 +425,22 @@ Concretely:
   history invalidation, and current-color fallback for disoccluded pixels. The
   retained `ReconstructionHistorySystem` owns the `RGBA16_FLOAT`
   (`R16G16B16A16_SFLOAT`) ping-pong history pair through `RHI::TextureManager`
-  with a `framesInFlight` retire deadline. Recipe selection, shader dispatch,
-  and the operational resolve smoke remain `GRAPHICS-040C`.
+  with a `framesInFlight` retire deadline.
+- GRAPHICS-040C adds the explicit recipe AA selector. `FrameRecipeAAOptions::Mode`
+  selects exactly one of `NoAA`, `FXAA`, `SMAA`, `TAA`, or
+  `ExternalReconstructor`: `NoAA` declares no AA passes, `FXAA` declares only
+  `PostProcessAAResolvePass`, `SMAA` declares edge/blend/resolve, and temporal
+  modes declare `ReconstructionPass` plus imported previous/current history and
+  `Reconstruction.ResolvedHDR`. Temporal modes force motion-vector production
+  unless `FrameRecipeTemporalOptions::NoJitterNoHistory` is set. The optional
+  `InputWidth`/`InputHeight` fields size `SceneColorHDR`, `SceneDepth`, and
+  `MotionVectors`, while the normal recipe sizing controls
+  `Reconstruction.ResolvedHDR`, postprocess, overlays, and present; equal input
+  and output extents run as pure TAA. The renderer maps
+  `PostProcessSettings::AntiAliasing` into the recipe selector, allocates/ticks
+  `ReconstructionHistorySystem`, runs the vendor-free `ReferenceTAAReconstructor`
+  on the CPU/null route, and reports `ReconstructorAppliedFrames`,
+  `HistoryDisocclusionPercent`, and `JitterOffsetX/Y`.
 - GRAPHICS-072 Slice A wires the default-recipe deferred-mode `"SurfacePass"`
   to the existing `DeferredGBufferPass` body. `NullRenderer` owns
   `m_DeferredGBufferPass` (constructed against `m_DeferredSystem`) and the
@@ -1449,27 +1463,26 @@ Concretely:
   RelativeThreshold + float SubpixelBlending` std430 push block). The
   `NullRenderer` owns `m_PostProcessFXAAPass` +
   `m_PostProcessFXAAPipelineLease`, both republished byte-identical
-  across `RebuildOperationalResources()`. **GRAPHICS-075 Slice D.2a
-  splits the AA umbrella into three ordered graph passes**
-  (`"PostProcessAAEdgePass"`, `"PostProcessAABlendPass"`,
-  `"PostProcessAAResolvePass"`) so edge / blend / resolve pipelines
-  can target format-incompatible color attachments. The recipe
-  declares `PostProcess.AATemp.{Edges,Weights,Resolved}` as three
-  matched-format transients (`RG8_UNORM` / `RGBA8_UNORM` /
-  backbuffer format) and each pass declares a single matched-format
-  `Write`. FXAA records under the resolve pass only — its sampled-
-  image read of `SceneColorLDR` crosses a real framegraph read-
-  after-write barrier rather than aliasing the umbrella's color
-  attachment mid-render-pass (Vulkan's classic read-after-write
-  feedback hazard). The framegraph compiler emits the
-  `SceneColorLDR ColorAttachment → ShaderRead` transition between
-  `PostProcessPass` (bloom + tonemap) and `PostProcessAAEdgePass`,
-  then the `AATemp.Edges ColorAttachment → ShaderRead` transition
-  between edge and blend, and the `AATemp.Weights ColorAttachment →
-  ShaderRead` transition before resolve. `presentSource` flips to
-  `PostProcess.AATemp.Resolved` only when
-  `PostProcessSettings::AntiAliasing != None` **and** the matching
-  AA mode's pipeline(s) are actually present
+  across `RebuildOperationalResources()`. **GRAPHICS-040C keeps the
+  GRAPHICS-075 split but makes it mode-selected rather than a default
+  structural no-op.** `FrameRecipeAAOptions::Mode == FXAA` declares
+  only `"PostProcessAAResolvePass"` and
+  `PostProcess.AATemp.Resolved`; `Mode == SMAA` declares
+  `"PostProcessAAEdgePass"`, `"PostProcessAABlendPass"`, and
+  `"PostProcessAAResolvePass"` plus
+  `PostProcess.AATemp.{Edges,Weights,Resolved}`. `NoAA`, `TAA`, and
+  `ExternalReconstructor` declare no spatial-AA passes. FXAA records
+  under the resolve pass only — its sampled-image read of
+  `SceneColorLDR` crosses a real framegraph read-after-write barrier
+  rather than aliasing the umbrella's color attachment mid-render-pass
+  (Vulkan's classic read-after-write feedback hazard). SMAA still fans
+  out across edge/blend/resolve so the framegraph emits the
+  `SceneColorLDR ColorAttachment → ShaderRead`,
+  `AATemp.Edges ColorAttachment → ShaderRead`, and
+  `AATemp.Weights ColorAttachment → ShaderRead` transitions between
+  stages. `presentSource` flips to `PostProcess.AATemp.Resolved` only
+  when the selected recipe mode is spatial **and** the matching AA
+  mode's pipeline(s) are actually present
   (`FrameRecipeFeatures::EnableAntiAliasing = true` only if the
   renderer's `SelectedAntiAliasingPipelinesAvailable()` is true:
   FXAA requires the FXAA pipeline; SMAA requires all three SMAA
@@ -1494,11 +1507,9 @@ Concretely:
   `ContrastThreshold`, etc., and produce visually-meaningless FXAA
   output. The FXAA body is gated by
   `PostProcessSettings::AntiAliasing == FXAA` inside the pass body
-  (which `IsStageEnabled` enforces); `None` or `SMAA` short-circuits
-  `Execute(...)` to a no-op while the helper still returns
-  `Recorded` under the `"PostProcessAAResolvePass"` accumulator,
-  mirroring the bloom helper's "structurally-recorded no-op"
-  taxonomy when `EnableBloom = false`. `GRAPHICS-075` Slice D.2a
+  (which `IsStageEnabled` enforces); `None`, `SMAA`, `TAA`, or
+  `ExternalReconstructor` short-circuits `Execute(...)` to a no-op.
+  `GRAPHICS-075` Slice D.2a
   fixes the three SMAA pipelines (vertex
   `post_fullscreen.vert.spv` paired with `post_smaa_edge.frag.spv` /
   `post_smaa_blend.frag.spv` / `post_smaa_resolve.frag.spv`) at the
@@ -1623,13 +1634,14 @@ Concretely:
   smoke pass; when the backend accepts a submit plan containing an async
   batch, `RenderGraphFrameStats::AsyncComputeUtilizedFrames` increments
   for that frame, while capability-absent hosts demote the pass back to
-  graphics. Each AA stage is free to define its own pass-local push
+  graphics. Each spatial-AA stage is free to define its own pass-local push
   block where the shader interface demands more than the canonical 20
   bytes. Frame recipe resources `PostProcess.BloomScratch`,
-  `PostProcess.Histogram`, and
-  `PostProcess.AATemp.{Edges,Weights,Resolved}` are transient
-  postprocess-owned intermediates; concrete Vulkan descriptors and
-  shaders remain backend follow-ups. Per `GRAPHICS-013AQ`,
+  `PostProcess.Histogram`, mode-selected
+  `PostProcess.AATemp.{Edges,Weights,Resolved}`, and
+  `Reconstruction.ResolvedHDR` are transient postprocess/reconstruction
+  intermediates; concrete Vulkan descriptors and shaders remain backend
+  follow-ups. Per `GRAPHICS-013AQ`,
   `PostProcessSystem` is the sole owner of the retained postprocess resources
   (SMAA `AreaTex` `R8G8_UNORM` 160x560 and `SearchTex` `R8_UNORM` 66x33
   lookup textures — the historic `256x33` notation tracked the wrong
@@ -1653,9 +1665,12 @@ Concretely:
   `PostProcess.AATemp.Weights` `R8G8B8A8_UNORM`,
   `PostProcess.AATemp.Resolved` backbuffer format), one per ordered AA graph
   pass; FXAA and SMAA remain mutually exclusive per
-  `PostProcessSettings::AntiAliasing`, and
-  quality presets are encoded into `PostProcessPushConstants::StageKind`
-  packing rather than expanding the push-constant struct. Concrete
+  `PostProcessSettings::AntiAliasing`. TAA and external reconstruction import
+  the retained `ReconstructionHistorySystem` ping-pong pair and feed
+  `Reconstruction.ResolvedHDR` into histogram/tone map instead of declaring
+  spatial-AA passes. Quality presets are encoded into
+  `PostProcessPushConstants::StageKind` packing rather than expanding the
+  push-constant struct. Concrete
   `VkDescriptorSetLayout` bindings remain backend-local under
   `src/graphics/vulkan` and never leak through RHI or renderer code.
 - `DebugViewSystem` owns backend-agnostic render-target inspection metadata and
