@@ -649,6 +649,7 @@ set(_graphics_contract_cpu_test_files
     Test.PostProcessChainContract.cpp
     Test.PresentPass.cpp
     Test.QueueAffinity.cpp
+    Test.ReconstructionContract.cpp
     Test.RendererFrameLifecycle.cpp
     Test.RenderWorldContract.cpp
     Test.RenderGraphValidation.cpp

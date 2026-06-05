@@ -71,6 +71,7 @@ implementation.
 - `Extrinsic.Graphics.GpuScene`
 - `Extrinsic.Graphics.DeferredSystem`
 - `Extrinsic.Graphics.PostProcessSystem`
+- `Extrinsic.Graphics.Reconstruction`
 - `Extrinsic.Graphics.ShadowSystem`
 - `Extrinsic.Graphics.HZB`
 - `Extrinsic.Graphics.LightClusters`
@@ -413,6 +414,19 @@ Concretely:
   `GpuInstanceDynamic::PrevModel` ABI, which `TransformSyncSystem` already
   maintains. Shader-side MV encoding and reconstructor consumption remain
   `GRAPHICS-040B/C`.
+- GRAPHICS-040B adds the vendor-free reconstruction seam for TAA/external
+  upscalers without importing Vulkan or SDK types into promoted graphics.
+  `IReconstructor::Apply(...)` consumes CPU-public color, depth, motion-vector,
+  history-color, output, and `ReconstructionHints` views and returns
+  `ReconstructionResult` with `Applied`, `DisocclusionPercent`, and a
+  fail-closed reason. `ReferenceTAAReconstructor` is the roadmap's only
+  concrete in-engine reconstructor: it uses the 5x5 current-frame neighborhood
+  for YCoCg variance clipping, exposure-aware history weighting, reset-driven
+  history invalidation, and current-color fallback for disoccluded pixels. The
+  retained `ReconstructionHistorySystem` owns the `RGBA16_FLOAT`
+  (`R16G16B16A16_SFLOAT`) ping-pong history pair through `RHI::TextureManager`
+  with a `framesInFlight` retire deadline. Recipe selection, shader dispatch,
+  and the operational resolve smoke remain `GRAPHICS-040C`.
 - GRAPHICS-072 Slice A wires the default-recipe deferred-mode `"SurfacePass"`
   to the existing `DeferredGBufferPass` body. `NullRenderer` owns
   `m_DeferredGBufferPass` (constructed against `m_DeferredSystem`) and the

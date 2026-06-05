@@ -28,6 +28,7 @@ target_sources(${target_name}
         Graphics.GpuScene.cppm
         Graphics.DeferredSystem.cppm
         Graphics.PostProcessSystem.cppm
+        Graphics.Reconstruction.cppm
         Graphics.ShadowSystem.cppm
         Graphics.HZB.cppm
         Graphics.LightClusters.cppm
@@ -55,6 +56,7 @@ target_sources(${target_name}
         Graphics.SpatialDebugVisualizers.cpp
         Graphics.DeferredSystem.cpp
         Graphics.PostProcessSystem.cpp
+        Graphics.Reconstruction.cpp
         Graphics.ShadowSystem.cpp
         Graphics.HZB.cpp
         Graphics.LightClusters.cpp

@@ -11,10 +11,22 @@ Each active task should include:
 
 ## Currently active
 
-No task is currently active on `main`. The next unblocked rendering child is
-`GRAPHICS-040B` after the retired `GRAPHICS-040A` slice.
+No active task is currently selected. The next unblocked rendering child is
+`GRAPHICS-040C`.
 
 The most recently retired tasks are summarised below.
+
+Previously-active
+[`GRAPHICS-040B`](../done/GRAPHICS-040B-reconstructor-interface-and-reference-taa.md)
+— `IReconstructor` interface + reference TAA retired to `tasks/done/` on
+2026-06-05 at maturity `CPUContracted`. The slice added the vendor-free
+`Extrinsic.Graphics.Reconstruction` module with `IReconstructor`,
+`ReconstructionHints`, and `ReconstructionResult`, a CPU-contracted
+`ReferenceTAAReconstructor` using 5x5 YCoCg variance clipping,
+exposure-aware history weighting, reset invalidation, and disocclusion
+fallback reporting, plus a retained `RGBA16_FLOAT` ping-pong
+`ReconstructionHistorySystem` with retire-window coverage. Recipe selection and
+post-chain integration remain `GRAPHICS-040C`; vendor children remain unopened.
 
 Previously-active
 [`GRAPHICS-040A`](../done/GRAPHICS-040A-jitter-and-motion-vectors.md) —
