@@ -573,6 +573,17 @@ TEST(FrameRecipeContract, LightClusterAssignmentRequiresGridBuildAndImportedOutp
     EXPECT_TRUE(Contains(assignmentPass->Writes, "ClusterLights.Headers"));
     EXPECT_TRUE(Contains(assignmentPass->Writes, "ClusterLights.Indices"));
     EXPECT_TRUE(Contains(assignmentPass->Writes, "ClusterLights.Counter"));
+    const auto* compositionPass = FindPass(description, FrameRecipePassKind::Composition);
+    ASSERT_NE(compositionPass, nullptr);
+    EXPECT_TRUE(Contains(compositionPass->Reads, "ClusterLights.Headers"));
+    EXPECT_TRUE(Contains(compositionPass->Reads, "ClusterLights.Indices"));
+    FrameRecipeFeatures forwardFeatures = features;
+    forwardFeatures.LightingPath = FrameRecipeLightingPath::Forward;
+    const FrameRecipeIntrospection forwardDescription = DescribeDefaultFrameRecipe(forwardFeatures);
+    const auto* forwardSurface = FindPass(forwardDescription, FrameRecipePassKind::Surface);
+    ASSERT_NE(forwardSurface, nullptr);
+    EXPECT_TRUE(Contains(forwardSurface->Reads, "ClusterLights.Headers"));
+    EXPECT_TRUE(Contains(forwardSurface->Reads, "ClusterLights.Indices"));
 
     const auto* headerResource = FindResource(description, FrameRecipeResourceKind::ClusterLightHeaders);
     ASSERT_NE(headerResource, nullptr);

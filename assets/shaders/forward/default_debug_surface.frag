@@ -35,5 +35,11 @@ layout(location = 0) out vec4 outColor;
 void main() {
     const GpuSceneTable scene = GpuSceneTableRef(pc.SceneTableBDA).Value;
     const GpuMaterialSlot mat = GpuMaterialSlotRef(scene.MaterialBDA).Data[fragMaterialSlot];
-    outColor = mat.BaseColorFactor;
+    const float positiveViewZ = GpuPositiveViewZFromDeviceDepth(gl_FragCoord.z, scene);
+    const vec3 lightDebug = GpuAccumulateClusteredSceneLightsDebug(
+        scene,
+        gl_FragCoord.xy,
+        positiveViewZ);
+    const float debugLift = min(length(lightDebug) * 0.05, 0.25);
+    outColor = vec4(mat.BaseColorFactor.rgb * (1.0 + debugLift), mat.BaseColorFactor.a);
 }

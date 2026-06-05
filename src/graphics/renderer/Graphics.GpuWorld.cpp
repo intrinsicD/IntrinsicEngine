@@ -242,6 +242,7 @@ namespace Extrinsic::Graphics
         std::vector<RHI::GpuLight>           LightsCpu;
         std::vector<ManagedGeometryAllocation> GeometryAllocations;
         RHI::GpuSceneTable                   SceneTableCpu{};
+        ClusterLightTableDesc                ClusterLights{};
 
         std::vector<bool> DirtyInstanceStatic;
         std::vector<bool> DirtyInstanceDynamic;
@@ -390,10 +391,24 @@ namespace Extrinsic::Graphics
             SceneTableCpu.BoundsBDA          = Device->GetBufferDeviceAddress(BoundsLease.GetHandle());
             SceneTableCpu.MaterialBDA        = Device->GetBufferDeviceAddress(MaterialBuffer);
             SceneTableCpu.LightBDA           = Device->GetBufferDeviceAddress(LightLease.GetHandle());
+            SceneTableCpu.ClusterLightHeaderBDA =
+                Device->GetBufferDeviceAddress(ClusterLights.HeaderBuffer);
+            SceneTableCpu.ClusterLightIndexBDA =
+                Device->GetBufferDeviceAddress(ClusterLights.IndexBuffer);
             SceneTableCpu.InstanceCapacity   = Desc.MaxInstances;
             SceneTableCpu.GeometryCapacity   = Desc.MaxGeometryRecords;
             SceneTableCpu.MaterialCapacity   = MaterialCapacity;
             SceneTableCpu.LightCount         = static_cast<std::uint32_t>(LightsCpu.size());
+            SceneTableCpu.ClusterTilePx      = ClusterLights.TilePx;
+            SceneTableCpu.ClusterTilesX      = ClusterLights.TilesX;
+            SceneTableCpu.ClusterTilesY      = ClusterLights.TilesY;
+            SceneTableCpu.ClusterSlicesZ     = ClusterLights.SlicesZ;
+            SceneTableCpu.ClusterCellCount   = ClusterLights.CellCount;
+            SceneTableCpu.ClusterMaxLightsPerCell = ClusterLights.MaxLightsPerCell;
+            SceneTableCpu.ClusterNearZ       = ClusterLights.NearZ;
+            SceneTableCpu.ClusterFarZ        = ClusterLights.FarZ;
+            SceneTableCpu.ClusterProjectionScaleX = ClusterLights.ProjectionScaleX;
+            SceneTableCpu.ClusterProjectionScaleY = ClusterLights.ProjectionScaleY;
             DirtySceneTable = true;
         }
 
@@ -913,6 +928,18 @@ namespace Extrinsic::Graphics
         }
         m_Impl->LightsCpu.assign(lights.begin(), lights.begin() + capped);
         m_Impl->DirtyLights = true;
+        m_Impl->RefreshSceneTable();
+    }
+
+    void GpuWorld::SetClusterLightTable(const ClusterLightTableDesc& desc)
+    {
+        m_Impl->ClusterLights = desc;
+        m_Impl->RefreshSceneTable();
+    }
+
+    void GpuWorld::ClearClusterLightTable()
+    {
+        m_Impl->ClusterLights = {};
         m_Impl->RefreshSceneTable();
     }
 

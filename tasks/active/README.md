@@ -12,9 +12,21 @@ Each active task should include:
 ## Currently active
 
 No currently active task. The next unblocked clustered-light candidate is
-[`GRAPHICS-039C`](../backlog/rendering/GRAPHICS-039C-cluster-surface-shader-integration.md).
+[`GRAPHICS-039D`](../backlog/rendering/GRAPHICS-039D-cluster-async-compute-affinity.md).
 
 The most recently retired tasks are summarised below.
+
+Previously-active
+[`GRAPHICS-039C`](../done/GRAPHICS-039C-cluster-surface-shader-integration.md) —
+clustered surface-shader integration + recipe wiring retired to `tasks/done/`
+on 2026-06-05 at maturity `CPUContracted`. The slice added scene-table BDA
+publication for `ClusterLights.Headers` / `ClusterLights.Indices`, cluster-grid
+metadata in `GpuSceneTable`, renderer-owned retained cluster buffers and
+pipeline leases, default-recipe reads for forward `SurfacePass` and deferred
+`CompositionPass`, shared GLSL clustered-light iteration with a full-loop
+fallback, CPU parity coverage for known-cell clustered accumulation, renderer
+lifecycle assertions for scene-table publication/rebuild survival, and touched
+shader compilation. Async-compute affinity remains `GRAPHICS-039D`.
 
 Previously-active
 [`GRAPHICS-039B`](../done/GRAPHICS-039B-light-cluster-assignment.md) —

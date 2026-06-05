@@ -222,13 +222,24 @@ export namespace Extrinsic::RHI
         std::uint64_t BoundsBDA          = 0;
         std::uint64_t MaterialBDA        = 0;
         std::uint64_t LightBDA           = 0;
-        std::uint64_t _padBDA            = 0;
+        std::uint64_t ClusterLightHeaderBDA = 0;
+        std::uint64_t ClusterLightIndexBDA  = 0;
         std::uint32_t InstanceCapacity   = 0;
         std::uint32_t GeometryCapacity   = 0;
         std::uint32_t MaterialCapacity   = 0;
         std::uint32_t LightCount         = 0;
+        std::uint32_t ClusterTilePx      = 0;
+        std::uint32_t ClusterTilesX      = 0;
+        std::uint32_t ClusterTilesY      = 0;
+        std::uint32_t ClusterSlicesZ     = 0;
+        std::uint32_t ClusterCellCount   = 0;
+        std::uint32_t ClusterMaxLightsPerCell = 0;
+        float ClusterNearZ               = 0.f;
+        float ClusterFarZ                = 0.f;
+        float ClusterProjectionScaleX    = 0.f;
+        float ClusterProjectionScaleY    = 0.f;
     };
-    static_assert(sizeof(GpuSceneTable) == 80);
+    static_assert(sizeof(GpuSceneTable) == 128);
 
     struct alignas(16) GpuScenePushConstants
     {

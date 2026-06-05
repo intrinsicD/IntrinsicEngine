@@ -15,6 +15,7 @@ import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.FrameRecipe;
 import Extrinsic.Graphics.HZB;
+import Extrinsic.Graphics.LightClusters;
 import Extrinsic.Graphics.Pass.PostProcess.Bloom;
 import Extrinsic.Graphics.Pass.PostProcess.FXAA;
 import Extrinsic.Graphics.Pass.PostProcess.Histogram;
@@ -95,6 +96,30 @@ namespace
                 .SupportsSinglePassMipChain = false,
             });
     }
+
+    [[nodiscard]] Extrinsic::Graphics::ClusterGridBuildDispatchPlan ExpectedClusterGridPlan(
+        const std::uint32_t width,
+        const std::uint32_t height)
+    {
+        return Extrinsic::Graphics::ComputeClusterGridBuildDispatchPlan(
+            Extrinsic::Graphics::ComputeClusterGridDesc(width, height));
+    }
+
+    [[nodiscard]] const Extrinsic::RHI::GpuSceneTable* FindLastSceneTableWrite(
+        const Extrinsic::Tests::MockDevice& device,
+        const Extrinsic::RHI::BufferHandle sceneTableBuffer)
+    {
+        for (auto it = device.BufferWrites.rbegin(); it != device.BufferWrites.rend(); ++it)
+        {
+            if (it->Handle == sceneTableBuffer &&
+                it->Offset == 0u &&
+                it->Data.size() == sizeof(Extrinsic::RHI::GpuSceneTable))
+            {
+                return reinterpret_cast<const Extrinsic::RHI::GpuSceneTable*>(it->Data.data());
+            }
+        }
+        return nullptr;
+    }
 }
 
 TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext)
@@ -118,6 +143,9 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     const Extrinsic::Graphics::HZBBuildDispatchPlan hzbPlan =
         ExpectedFallbackHZBPlan(320u, 240u);
     ASSERT_TRUE(hzbPlan.IsValid());
+    const Extrinsic::Graphics::ClusterGridBuildDispatchPlan clusterPlan =
+        ExpectedClusterGridPlan(320u, 240u);
+    ASSERT_TRUE(clusterPlan.IsValid());
     Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
     renderer->PrepareFrame(world);
     renderer->ExecuteFrame(frame, world);
@@ -156,12 +184,15 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     // taxonomy. GRAPHICS-076 Slice A — the canonical `Pass.Present`
     // now records under the default recipe (BindPipeline + Draw(3,1,0,0)
     // fullscreen finalizer), bumping Recorded by one. Total Recorded
-    // entries: 6 routed (Culling/Depth/HZB/Surface/Line/Point) + 1 under
+    // GRAPHICS-039C — the clustered-light grid build and assignment passes
+    // now record between HZB and lighting when their retained buffers are
+    // published through `GpuSceneTable`.
+    // entries: 8 routed (Culling/Depth/HZB/ClusterGrid/LightAssign/Surface/Line/Point) + 1 under
     // `"PostProcessHistogramPass"` + 2 under `"PostProcessPass"`
     // (bloom + tonemap) + 3 under the per-stage AA passes
-    // (edge / blend / resolve helpers) + 1 under `"Present"` = 13.
+    // (edge / blend / resolve helpers) + 1 under `"Present"` = 15.
     // Remaining unwired passes still soft-skip with SkippedUnavailable.
-    EXPECT_EQ(stats.CommandRecords.Recorded, 13u);
+    EXPECT_EQ(stats.CommandRecords.Recorded, 15u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     EXPECT_GE(stats.CommandRecords.SkippedUnavailable, 1u);
@@ -173,6 +204,12 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     ASSERT_NE(FindCommandPass(stats, "HZBBuildPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "HZBBuildPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "ClusterGridBuildPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "ClusterGridBuildPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "LightClusterAssignmentPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "LightClusterAssignmentPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     ASSERT_NE(FindCommandPass(stats, "SurfacePass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "SurfacePass")->Status,
@@ -215,7 +252,7 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     EXPECT_EQ(device.CommandContext.BeginCalls, 1);
     EXPECT_EQ(device.CommandContext.EndCalls, 1);
     EXPECT_TRUE(ContainsTextureBarrier(device.CommandContext, device.BackbufferHandle));
-    EXPECT_GE(device.CommandContext.FillBufferCalls, 8);
+    EXPECT_GE(device.CommandContext.FillBufferCalls, 9);
     // GRAPHICS-071 — culling pipeline plus depth/surface/line/point draw
     // pipelines each bind once. The draw passes all carry scene push
     // constants. GRAPHICS-075 Slice A adds the tonemap fullscreen bind +
@@ -227,15 +264,17 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     // GRAPHICS-038B — the HZB build pass adds one compute pipeline bind and
     // one 32-byte push/dispatch per fallback mip. The first dispatch remains
     // culling; HZB dispatches follow after `DepthPrepass`.
+    // GRAPHICS-039C — cluster grid build and light assignment add two compute
+    // pipeline binds, two pushes, and two dispatches after the HZB band.
     // GRAPHICS-076 Slice A — the canonical `Pass.Present` finalizer adds
     // one fullscreen `BindPipeline` (the present pipeline) but no
     // additional push constant since `BuildPresentPipelineDesc()` pins
     // `PushConstantSize = 0u`.
-    EXPECT_EQ(device.CommandContext.BindPipelineCalls, 8);
+    EXPECT_EQ(device.CommandContext.BindPipelineCalls, 10);
     EXPECT_EQ(device.CommandContext.PushConstantsCalls,
-              static_cast<int>(6u + hzbPlan.Dispatches.size()));
+              static_cast<int>(8u + hzbPlan.Dispatches.size()));
     ASSERT_EQ(device.CommandContext.PushConstantSizes.size(),
-              6u + hzbPlan.Dispatches.size());
+              8u + hzbPlan.Dispatches.size());
     EXPECT_EQ(device.CommandContext.PushConstantSizes[0], sizeof(Extrinsic::RHI::GpuCullPushConstants));
     EXPECT_EQ(device.CommandContext.PushConstantSizes[1], sizeof(Extrinsic::RHI::GpuScenePushConstants));
     for (std::size_t i = 0u; i < hzbPlan.Dispatches.size(); ++i)
@@ -245,17 +284,22 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     }
     const std::size_t postHZBPushBase = 2u + hzbPlan.Dispatches.size();
     EXPECT_EQ(device.CommandContext.PushConstantSizes[postHZBPushBase + 0u],
-              sizeof(Extrinsic::RHI::GpuScenePushConstants));
+              sizeof(Extrinsic::Graphics::ClusterGridBuildPushConstants));
     EXPECT_EQ(device.CommandContext.PushConstantSizes[postHZBPushBase + 1u],
+              sizeof(Extrinsic::Graphics::ClusterLightAssignmentPushConstants));
+    const std::size_t postClusterPushBase = postHZBPushBase + 2u;
+    EXPECT_EQ(device.CommandContext.PushConstantSizes[postClusterPushBase + 0u],
               sizeof(Extrinsic::RHI::GpuScenePushConstants));
-    EXPECT_EQ(device.CommandContext.PushConstantSizes[postHZBPushBase + 2u],
+    EXPECT_EQ(device.CommandContext.PushConstantSizes[postClusterPushBase + 1u],
               sizeof(Extrinsic::RHI::GpuScenePushConstants));
-    EXPECT_EQ(device.CommandContext.PushConstantSizes[postHZBPushBase + 3u],
+    EXPECT_EQ(device.CommandContext.PushConstantSizes[postClusterPushBase + 2u],
+              sizeof(Extrinsic::RHI::GpuScenePushConstants));
+    EXPECT_EQ(device.CommandContext.PushConstantSizes[postClusterPushBase + 3u],
               sizeof(Extrinsic::Graphics::PostProcessToneMapPushConstants));
     EXPECT_EQ(device.CommandContext.DispatchCalls,
-              static_cast<int>(1u + hzbPlan.Dispatches.size()));
+              static_cast<int>(3u + hzbPlan.Dispatches.size()));
     ASSERT_EQ(device.CommandContext.DispatchRecords.size(),
-              1u + hzbPlan.Dispatches.size());
+              3u + hzbPlan.Dispatches.size());
     EXPECT_EQ(device.CommandContext.DispatchRecords[0].X, ExpectedCullDispatchGroups());
     EXPECT_EQ(device.CommandContext.DispatchRecords[0].Y, 1u);
     EXPECT_EQ(device.CommandContext.DispatchRecords[0].Z, 1u);
@@ -267,12 +311,29 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
         EXPECT_EQ(recorded.Y, expected.GroupCountY);
         EXPECT_EQ(recorded.Z, expected.GroupCountZ);
     }
+    const std::size_t clusterDispatchBase = 1u + hzbPlan.Dispatches.size();
+    EXPECT_EQ(device.CommandContext.DispatchRecords[clusterDispatchBase + 0u].X,
+              clusterPlan.GroupCountX);
+    EXPECT_EQ(device.CommandContext.DispatchRecords[clusterDispatchBase + 0u].Y,
+              clusterPlan.GroupCountY);
+    EXPECT_EQ(device.CommandContext.DispatchRecords[clusterDispatchBase + 0u].Z,
+              clusterPlan.GroupCountZ);
+    EXPECT_EQ(device.CommandContext.DispatchRecords[clusterDispatchBase + 1u].X,
+              clusterPlan.GroupCountX);
+    EXPECT_EQ(device.CommandContext.DispatchRecords[clusterDispatchBase + 1u].Y,
+              clusterPlan.GroupCountY);
+    EXPECT_EQ(device.CommandContext.DispatchRecords[clusterDispatchBase + 1u].Z,
+              clusterPlan.GroupCountZ);
     EXPECT_EQ(stats.HZBBuildRecordedFrames, 1u);
     EXPECT_EQ(stats.HZBBuildDispatchCount,
               static_cast<std::uint32_t>(hzbPlan.Dispatches.size()));
     EXPECT_EQ(stats.HZBBuildMipCount, hzbPlan.Desc.MipLevels);
     EXPECT_EQ(stats.HZBBuildFallbackFrames, 1u);
     EXPECT_EQ(stats.HZBBuildSinglePassFrames, 0u);
+    EXPECT_EQ(stats.ClusterGridBuildRecordedFrames, 1u);
+    EXPECT_EQ(stats.ClusterGridBuildDispatchCount, 1u);
+    EXPECT_EQ(stats.ClusterLightAssignmentRecordedFrames, 1u);
+    EXPECT_EQ(stats.ClusterLightAssignmentDispatchCount, 1u);
     EXPECT_EQ(device.CommandContext.BindIndexBufferCalls, 3);
     EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 3);
     EXPECT_EQ(device.CommandContext.DrawIndirectCountCalls, 1);
@@ -548,12 +609,13 @@ TEST(RendererFrameLifecycle, OperationalRebuildAfterNonOperationalStartupRecords
     // the rebuild also publishes the canonical present pipeline lease,
     // so the `"Present"` graph pass routes through `RecordPresentPass`
     // and reports `Recorded` after the operational rebuild. GRAPHICS-038B
-    // adds the routed `"HZBBuildPass"` after `DepthPrepass`. Total
-    // `Recorded`: 6 routed + 1 under `PostProcessHistogramPass` + 2
+    // adds the routed `"HZBBuildPass"` after `DepthPrepass`. GRAPHICS-039C
+    // adds the cluster grid build and light-assignment routes before
+    // lighting. Total `Recorded`: 8 routed + 1 under `PostProcessHistogramPass` + 2
     // under `PostProcessPass` (bloom + tonemap) + 3 under the AA
-    // passes + 1 under `Present` = 13. Remaining unwired passes still
+    // passes + 1 under `Present` = 15. Remaining unwired passes still
     // soft-skip with SkippedUnavailable.
-    EXPECT_EQ(stats.CommandRecords.Recorded, 13u);
+    EXPECT_EQ(stats.CommandRecords.Recorded, 15u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     ASSERT_NE(FindCommandPass(stats, "CullingPass"), nullptr);
@@ -564,6 +626,12 @@ TEST(RendererFrameLifecycle, OperationalRebuildAfterNonOperationalStartupRecords
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     ASSERT_NE(FindCommandPass(stats, "HZBBuildPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "HZBBuildPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "ClusterGridBuildPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "ClusterGridBuildPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "LightClusterAssignmentPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "LightClusterAssignmentPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     ASSERT_NE(FindCommandPass(stats, "SurfacePass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "SurfacePass")->Status,
@@ -590,10 +658,12 @@ TEST(RendererFrameLifecycle, OperationalRebuildAfterNonOperationalStartupRecords
     EXPECT_EQ(FindCommandPass(stats, "PostProcessAAResolvePass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     EXPECT_EQ(device.CommandContext.DispatchCalls,
-              static_cast<int>(1u + hzbPlan.Dispatches.size()));
+              static_cast<int>(3u + hzbPlan.Dispatches.size()));
     EXPECT_EQ(stats.HZBBuildDispatchCount,
               static_cast<std::uint32_t>(hzbPlan.Dispatches.size()));
     EXPECT_EQ(stats.HZBBuildFallbackFrames, 1u);
+    EXPECT_EQ(stats.ClusterGridBuildRecordedFrames, 1u);
+    EXPECT_EQ(stats.ClusterLightAssignmentRecordedFrames, 1u);
     EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 3);
     EXPECT_EQ(device.CommandContext.DrawIndirectCountCalls, 1);
 
@@ -651,7 +721,9 @@ TEST(RendererFrameLifecycle, DepthPrepassPipelineFailureSkipsUnavailableCommandP
     // climbs to 11. GRAPHICS-038B also declares `"HZBBuildPass"` when its
     // retained target is allocated, but the executor fails closed as
     // `SkippedUnavailable` because the depth producer's pipeline is missing.
-    EXPECT_EQ(stats.CommandRecords.Recorded, 11u);
+    // GRAPHICS-039C cluster grid/assignment do not consume the depth output
+    // directly, so they still record their compute command shape: total 13.
+    EXPECT_EQ(stats.CommandRecords.Recorded, 13u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     EXPECT_GE(stats.CommandRecords.SkippedUnavailable, 1u);
@@ -664,6 +736,12 @@ TEST(RendererFrameLifecycle, DepthPrepassPipelineFailureSkipsUnavailableCommandP
     ASSERT_NE(FindCommandPass(stats, "HZBBuildPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "HZBBuildPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable);
+    ASSERT_NE(FindCommandPass(stats, "ClusterGridBuildPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "ClusterGridBuildPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "LightClusterAssignmentPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "LightClusterAssignmentPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     ASSERT_NE(FindCommandPass(stats, "SurfacePass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "SurfacePass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
@@ -688,7 +766,7 @@ TEST(RendererFrameLifecycle, DepthPrepassPipelineFailureSkipsUnavailableCommandP
     ASSERT_NE(FindCommandPass(stats, "PostProcessAAResolvePass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "PostProcessAAResolvePass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
-    EXPECT_EQ(device.CommandContext.DispatchCalls, 1);
+    EXPECT_EQ(device.CommandContext.DispatchCalls, 3);
     EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 2);
     EXPECT_EQ(device.CommandContext.DrawIndirectCountCalls, 1);
 
@@ -729,7 +807,6 @@ TEST(RendererFrameLifecycle, CullingPipelineFailureSkipsRoutedCommandPassesUnava
     // ordered graph passes (`"PostProcessAA{Edge,Blend,Resolve}Pass"`);
     // each per-stage helper records `Recorded` → three more entries
     // (total 5: 0 routed + 2 under PostProcessPass + 3 under the AA
-    // passes). GRAPHICS-075 Slice E.1 — the histogram compute pipeline
     // is similarly culling-independent and lives in its own ordered
     // graph pass `"PostProcessHistogramPass"`; the helper records
     // `Recorded` per the structurally-recorded-no-op taxonomy
@@ -743,7 +820,9 @@ TEST(RendererFrameLifecycle, CullingPipelineFailureSkipsRoutedCommandPassesUnava
     // → total climbs to 7. GRAPHICS-038B declares `"HZBBuildPass"` when the
     // retained target is allocated, but the executor keeps it
     // `SkippedUnavailable` because culling/depth prerequisites are missing.
-    EXPECT_EQ(stats.CommandRecords.Recorded, 7u);
+    // GRAPHICS-039C cluster grid/assignment remain culling-independent and
+    // record their compute command shape: total climbs to 9.
+    EXPECT_EQ(stats.CommandRecords.Recorded, 9u);
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     EXPECT_GE(stats.CommandRecords.SkippedUnavailable, 2u);
@@ -756,6 +835,12 @@ TEST(RendererFrameLifecycle, CullingPipelineFailureSkipsRoutedCommandPassesUnava
     ASSERT_NE(FindCommandPass(stats, "HZBBuildPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "HZBBuildPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::SkippedUnavailable);
+    ASSERT_NE(FindCommandPass(stats, "ClusterGridBuildPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "ClusterGridBuildPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+    ASSERT_NE(FindCommandPass(stats, "LightClusterAssignmentPass"), nullptr);
+    EXPECT_EQ(FindCommandPass(stats, "LightClusterAssignmentPass")->Status,
+              Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     ASSERT_NE(FindCommandPass(stats, "PostProcessHistogramPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "PostProcessHistogramPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
@@ -771,7 +856,7 @@ TEST(RendererFrameLifecycle, CullingPipelineFailureSkipsRoutedCommandPassesUnava
     ASSERT_NE(FindCommandPass(stats, "PostProcessAAResolvePass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "PostProcessAAResolvePass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
-    EXPECT_EQ(device.CommandContext.DispatchCalls, 0);
+    EXPECT_EQ(device.CommandContext.DispatchCalls, 2);
     EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 0);
 
     renderer->Shutdown();
@@ -849,6 +934,8 @@ TEST(RendererFrameLifecycle, FrameRecipePassesAllProduceStructuredCommandRecordS
         // immediately after `DepthPrepass` when the renderer owns a valid
         // `HZB.Current` target.
         "HZBBuildPass",
+        "ClusterGridBuildPass",
+        "LightClusterAssignmentPass",
         "SurfacePass", "LinePass", "PointPass",
         // GRAPHICS-075 Slice E.1 — the histogram compute dispatch lives
         // in its own ordered graph pass before `"PostProcessPass"`
@@ -2590,6 +2677,83 @@ TEST(RendererFrameLifecycle, HZBBuildPipelineSurvivesOperationalRebuild)
     renderer->Shutdown();
 }
 
+TEST(RendererFrameLifecycle, ClusterLightingPipelinesAndSceneTablePublishSurviveRebuild)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{433u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    const Extrinsic::RHI::PipelineHandle initialGridPipeline =
+        renderer->GetClusterGridBuildPipeline();
+    const Extrinsic::RHI::PipelineHandle initialAssignmentPipeline =
+        renderer->GetClusterLightAssignmentPipeline();
+    EXPECT_TRUE(initialGridPipeline.IsValid());
+    EXPECT_TRUE(initialAssignmentPipeline.IsValid());
+
+    const Extrinsic::RHI::PipelineDesc initialGridDesc =
+        renderer->GetClusterGridBuildPipelineDesc();
+    EXPECT_TRUE(initialGridDesc.ComputeShaderPath.ends_with(
+        "shaders/cluster_grid_build.comp.spv"))
+        << initialGridDesc.ComputeShaderPath;
+    EXPECT_TRUE(initialGridDesc.VertexShaderPath.empty());
+    EXPECT_TRUE(initialGridDesc.FragmentShaderPath.empty());
+    EXPECT_EQ(initialGridDesc.ColorTargetCount, 0u);
+    EXPECT_EQ(initialGridDesc.DepthTargetFormat, Extrinsic::RHI::Format::Undefined);
+    EXPECT_EQ(initialGridDesc.PushConstantSize,
+              sizeof(Extrinsic::Graphics::ClusterGridBuildPushConstants));
+
+    const Extrinsic::RHI::PipelineDesc initialAssignmentDesc =
+        renderer->GetClusterLightAssignmentPipelineDesc();
+    EXPECT_TRUE(initialAssignmentDesc.ComputeShaderPath.ends_with(
+        "shaders/light_cluster_assign.comp.spv"))
+        << initialAssignmentDesc.ComputeShaderPath;
+    EXPECT_TRUE(initialAssignmentDesc.VertexShaderPath.empty());
+    EXPECT_TRUE(initialAssignmentDesc.FragmentShaderPath.empty());
+    EXPECT_EQ(initialAssignmentDesc.ColorTargetCount, 0u);
+    EXPECT_EQ(initialAssignmentDesc.DepthTargetFormat, Extrinsic::RHI::Format::Undefined);
+    EXPECT_EQ(initialAssignmentDesc.PushConstantSize,
+              sizeof(Extrinsic::Graphics::ClusterLightAssignmentPushConstants));
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 160, .Height = 96},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+
+    const Extrinsic::RHI::GpuSceneTable* sceneTable =
+        FindLastSceneTableWrite(device, renderer->GetGpuWorld().GetSceneTableBuffer());
+    ASSERT_NE(sceneTable, nullptr);
+    const Extrinsic::Graphics::ClusterGridDesc expectedDesc =
+        Extrinsic::Graphics::ComputeClusterGridDesc(160u, 96u);
+    ASSERT_TRUE(expectedDesc.IsValid());
+    EXPECT_NE(sceneTable->ClusterLightHeaderBDA, 0u);
+    EXPECT_NE(sceneTable->ClusterLightIndexBDA, 0u);
+    EXPECT_EQ(sceneTable->ClusterTilePx, expectedDesc.ClusterTilePx);
+    EXPECT_EQ(sceneTable->ClusterTilesX, expectedDesc.TilesX);
+    EXPECT_EQ(sceneTable->ClusterTilesY, expectedDesc.TilesY);
+    EXPECT_EQ(sceneTable->ClusterSlicesZ, expectedDesc.SlicesZ);
+    EXPECT_EQ(sceneTable->ClusterCellCount, expectedDesc.CellCount);
+    EXPECT_EQ(sceneTable->ClusterMaxLightsPerCell,
+              Extrinsic::Graphics::kMaxClusterLightsPerCell);
+    EXPECT_GT(sceneTable->ClusterNearZ, 0.0f);
+    EXPECT_GT(sceneTable->ClusterFarZ, sceneTable->ClusterNearZ);
+
+    EXPECT_TRUE(renderer->RebuildOperationalResources(device));
+    EXPECT_TRUE(renderer->GetClusterGridBuildPipeline().IsValid());
+    EXPECT_TRUE(renderer->GetClusterLightAssignmentPipeline().IsValid());
+    EXPECT_TRUE(PipelineDescBytesEqual(initialGridDesc,
+                                      renderer->GetClusterGridBuildPipelineDesc()));
+    EXPECT_TRUE(PipelineDescBytesEqual(initialAssignmentDesc,
+                                      renderer->GetClusterLightAssignmentPipelineDesc()));
+
+    renderer->Shutdown();
+}
+
 TEST(RendererFrameLifecycle, HZBBuildPassRecordsFallbackDispatches)
 {
     Extrinsic::Tests::MockDevice device;
@@ -2608,6 +2772,9 @@ TEST(RendererFrameLifecycle, HZBBuildPassRecordsFallbackDispatches)
     const Extrinsic::Graphics::HZBBuildDispatchPlan hzbPlan =
         ExpectedFallbackHZBPlan(64u, 32u);
     ASSERT_TRUE(hzbPlan.IsValid());
+    const Extrinsic::Graphics::ClusterGridBuildDispatchPlan clusterPlan =
+        ExpectedClusterGridPlan(64u, 32u);
+    ASSERT_TRUE(clusterPlan.IsValid());
 
     Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
     renderer->PrepareFrame(world);
@@ -2630,7 +2797,7 @@ TEST(RendererFrameLifecycle, HZBBuildPassRecordsFallbackDispatches)
     EXPECT_EQ(stats.HZBBuildSinglePassFrames, 0u);
 
     ASSERT_EQ(device.CommandContext.DispatchRecords.size(),
-              1u + hzbPlan.Dispatches.size());
+              3u + hzbPlan.Dispatches.size());
     EXPECT_EQ(device.CommandContext.DispatchRecords[0].X, ExpectedCullDispatchGroups());
     EXPECT_EQ(device.CommandContext.DispatchRecords[0].Y, 1u);
     EXPECT_EQ(device.CommandContext.DispatchRecords[0].Z, 1u);
@@ -2642,6 +2809,11 @@ TEST(RendererFrameLifecycle, HZBBuildPassRecordsFallbackDispatches)
         EXPECT_EQ(recorded.Y, expected.GroupCountY);
         EXPECT_EQ(recorded.Z, expected.GroupCountZ);
     }
+    const std::size_t clusterDispatchBase = 1u + hzbPlan.Dispatches.size();
+    EXPECT_EQ(device.CommandContext.DispatchRecords[clusterDispatchBase + 0u].X,
+              clusterPlan.GroupCountX);
+    EXPECT_EQ(device.CommandContext.DispatchRecords[clusterDispatchBase + 1u].X,
+              clusterPlan.GroupCountX);
 
     const Extrinsic::RHI::TextureHandle builtHZB = renderer->GetHZBSystem().PreviousHZB();
     ASSERT_TRUE(builtHZB.IsValid());

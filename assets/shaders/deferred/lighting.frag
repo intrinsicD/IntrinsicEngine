@@ -36,16 +36,11 @@ layout(set = 0, binding = 0) uniform sampler2D globalTextures[];
 void main()
 {
     const GpuSceneTable scene = GpuSceneTableRef(pc.SceneTableBDA).Value;
-    GpuLightRef lights = GpuLightRef(scene.LightBDA);
-
-    vec3 accum = vec3(0.0);
-    for (uint i = 0u; i < scene.LightCount; ++i)
-    {
-        const GpuLight light = lights.Data[i];
-        const vec3 lightColor = light.Color_Intensity.xyz;
-        const float intensity = light.Color_Intensity.w;
-        accum += lightColor * intensity;
-    }
+    const float positiveViewZ = GpuPositiveViewZFromDeviceDepth(gl_FragCoord.z, scene);
+    const vec3 accum = GpuAccumulateClusteredSceneLightsDebug(
+        scene,
+        gl_FragCoord.xy,
+        positiveViewZ);
 
     // GRAPHICS-072 Slice C — sample the bound shadow atlas when the binding
     // is valid (non-zero slot, since slot 0 is reserved as the engine

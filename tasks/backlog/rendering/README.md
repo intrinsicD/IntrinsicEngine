@@ -770,7 +770,7 @@ testable; each phase derisks the next.
   extension preserving the 8-bucket lane contract. Depends on GRAPHICS-007.
 - [GRAPHICS-039 — Clustered light binning (done)](../../done/GRAPHICS-039-clustered-light-binning.md):
   locks froxel-grid cluster build, light-to-cluster assignment, surface-shader
-  binding. Depends on GRAPHICS-009.
+  consumption, and recipe/resource binding contracts. Depends on GRAPHICS-009.
 - [GRAPHICS-040 — TAA pass and reconstructor/upscaler interface seam (done)](../../done/GRAPHICS-040-taa-and-reconstructor-interface.md):
   locks sub-pixel jitter, motion-vector buffer, history color buffer, and the
   vendor-agnostic `IReconstructor` seam (DLSS/FSR/XeSS/MetalFX/NRD plug-in
@@ -890,8 +890,8 @@ HZB two-phase occlusion culling (GRAPHICS-038):
 Clustered light binning (GRAPHICS-039):
 - [GRAPHICS-039A (done)](../../done/GRAPHICS-039A-cluster-grid-build.md) — cluster grid resource + build pass (`CPUContracted`, 2026-06-04). Depended on GRAPHICS-039 (planning, done), GRAPHICS-009 (done).
 - [GRAPHICS-039B (done)](../../done/GRAPHICS-039B-light-cluster-assignment.md) — light-to-cluster assignment + overflow diagnostics (`CPUContracted`, 2026-06-05). Depended on 039A.
-- [GRAPHICS-039C](GRAPHICS-039C-cluster-surface-shader-integration.md) — surface-shader integration + recipe wiring. Depends on 039B, GRAPHICS-008 (done).
-- [GRAPHICS-039D](GRAPHICS-039D-cluster-async-compute-affinity.md) — async-compute affinity tagging. Depends on 039C; gated by GRAPHICS-037 (037A) for real async execution.
+- [GRAPHICS-039C (done)](../../done/GRAPHICS-039C-cluster-surface-shader-integration.md) — surface-shader integration + recipe wiring (`CPUContracted`, 2026-06-05). Depended on 039B, GRAPHICS-008 (done).
+- [GRAPHICS-039D](GRAPHICS-039D-cluster-async-compute-affinity.md) — async-compute affinity tagging. Depends on 039C (done); gated by GRAPHICS-037 (037A done) for real async execution.
 
 TAA + reconstructor seam (GRAPHICS-040):
 - [GRAPHICS-040A](GRAPHICS-040A-jitter-and-motion-vectors.md) — camera jitter + motion-vector buffer. Depends on GRAPHICS-040 (planning, done), GRAPHICS-013A (done).

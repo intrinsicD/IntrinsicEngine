@@ -69,6 +69,24 @@ namespace Extrinsic::Graphics
             });
         }
 
+        void AddPassWithVectors(FrameRecipeIntrospection& out,
+                                const FrameRecipePassKind kind,
+                                const std::string_view name,
+                                const bool enabled,
+                                const bool finalizesBackbuffer,
+                                std::vector<std::string_view> reads,
+                                std::vector<std::string_view> writes)
+        {
+            out.Passes.push_back(FrameRecipePassDeclaration{
+                .Kind = kind,
+                .Name = name,
+                .Enabled = enabled,
+                .FinalizesBackbuffer = finalizesBackbuffer,
+                .Reads = std::move(reads),
+                .Writes = std::move(writes),
+            });
+        }
+
         [[nodiscard]] RHI::TextureDesc ColorTargetDesc(const std::uint32_t width,
                                                        const std::uint32_t height,
                                                        const RHI::Format format,
@@ -280,12 +298,50 @@ namespace Extrinsic::Graphics
         }
         else
         {
-            AddPass(out, FrameRecipePassKind::Surface, "SurfacePass", true, false,
-                    {"GpuWorld.SceneTable", "GpuWorld.InstanceStatic", "GpuWorld.InstanceDynamic", "GpuWorld.GeometryRecords", "Material.Buffer", "Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count", "SceneDepth", "ShadowAtlas"},
-                    {"SceneColorHDR", "SceneDepth"});
+            std::vector<std::string_view> surfaceReads{
+                "GpuWorld.SceneTable",
+                "GpuWorld.InstanceStatic",
+                "GpuWorld.InstanceDynamic",
+                "GpuWorld.GeometryRecords",
+                "Material.Buffer",
+                "Cull.SurfaceOpaque.IndexedArgs",
+                "Cull.SurfaceOpaque.Count",
+                "SceneDepth",
+                "ShadowAtlas",
+            };
+            if (clusterLightAssignmentActive)
+            {
+                surfaceReads.push_back("ClusterLights.Headers");
+                surfaceReads.push_back("ClusterLights.Indices");
+            }
+            AddPassWithVectors(out,
+                               FrameRecipePassKind::Surface,
+                               "SurfacePass",
+                               true,
+                               false,
+                               std::move(surfaceReads),
+                               {"SceneColorHDR", "SceneDepth"});
         }
-        AddPass(out, FrameRecipePassKind::Composition, "CompositionPass", usesDeferred, false,
-                {"SceneNormal", "Albedo", "Material0", "SceneDepth", "GpuWorld.Lights", "ShadowAtlas"}, {"SceneColorHDR"});
+        std::vector<std::string_view> compositionReads{
+            "SceneNormal",
+            "Albedo",
+            "Material0",
+            "SceneDepth",
+            "GpuWorld.Lights",
+            "ShadowAtlas",
+        };
+        if (clusterLightAssignmentActive && usesDeferred)
+        {
+            compositionReads.push_back("ClusterLights.Headers");
+            compositionReads.push_back("ClusterLights.Indices");
+        }
+        AddPassWithVectors(out,
+                           FrameRecipePassKind::Composition,
+                           "CompositionPass",
+                           usesDeferred,
+                           false,
+                           std::move(compositionReads),
+                           {"SceneColorHDR"});
         AddPass(out, FrameRecipePassKind::Line, "LinePass", true, false,
                 {"SceneDepth", "Cull.Lines.IndexedArgs", "Cull.Lines.Count"}, {"SceneColorHDR"});
         AddPass(out, FrameRecipePassKind::Point, "PointPass", true, false,
@@ -922,6 +978,11 @@ namespace Extrinsic::Graphics
             builder.Read(instanceDynamic, BufferUsage::ShaderRead);
             builder.Read(geometryRecords, BufferUsage::ShaderRead);
             builder.Read(materialBuffer, BufferUsage::ShaderRead);
+            if (clusterLightAssignmentActive && !usesDeferred)
+            {
+                builder.Read(clusterLightHeaders, BufferUsage::ShaderRead);
+                builder.Read(clusterLightIndices, BufferUsage::ShaderRead);
+            }
             builder.Read(drawIndirect, BufferUsage::IndirectRead);
             builder.Read(drawCount, BufferUsage::IndirectRead);
             if (features.EnableDepthPrepass)
@@ -982,6 +1043,11 @@ namespace Extrinsic::Graphics
                 builder.Read(material0, TextureUsage::ShaderRead);
                 builder.Read(depth, TextureUsage::DepthRead);
                 builder.Read(lights, BufferUsage::ShaderRead);
+                if (clusterLightAssignmentActive)
+                {
+                    builder.Read(clusterLightHeaders, BufferUsage::ShaderRead);
+                    builder.Read(clusterLightIndices, BufferUsage::ShaderRead);
+                }
                 if (features.EnableShadows)
                 {
                     // GRAPHICS-072 Slice C — the deferred lighting fragment

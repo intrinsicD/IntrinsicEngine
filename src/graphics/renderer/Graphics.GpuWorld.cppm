@@ -86,6 +86,22 @@ export namespace Extrinsic::Graphics
             std::uint64_t MinRecoverableBytes = 1;
         };
 
+        struct ClusterLightTableDesc
+        {
+            RHI::BufferHandle HeaderBuffer{};
+            RHI::BufferHandle IndexBuffer{};
+            std::uint32_t TilePx = 0;
+            std::uint32_t TilesX = 0;
+            std::uint32_t TilesY = 0;
+            std::uint32_t SlicesZ = 0;
+            std::uint32_t CellCount = 0;
+            std::uint32_t MaxLightsPerCell = 0;
+            float NearZ = 0.f;
+            float FarZ = 0.f;
+            float ProjectionScaleX = 0.f;
+            float ProjectionScaleY = 0.f;
+        };
+
         struct GeometryRelocation
         {
             GpuGeometryHandle Geometry{};
@@ -164,6 +180,8 @@ export namespace Extrinsic::Graphics
 
         void SetMaterialBuffer(RHI::BufferHandle materialBuffer, std::uint32_t materialCapacity);
         void SetLights(std::span<const RHI::GpuLight> lights);
+        void SetClusterLightTable(const ClusterLightTableDesc& desc);
+        void ClearClusterLightTable();
 
         void SyncFrame();
 

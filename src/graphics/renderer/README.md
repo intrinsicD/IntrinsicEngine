@@ -353,9 +353,10 @@ Concretely:
   missing-sample conservatism, frustum-first rejection, and selection-bucket
   exemption on an operational Vulkan command stream while preserving the
   default CPU/null contracts.
-- GRAPHICS-039A/B land `Extrinsic.Graphics.LightClusters` — the
+- GRAPHICS-039A/B/C land `Extrinsic.Graphics.LightClusters` — the
   clustered-light froxel grid contract, backend-neutral cluster-grid build
-  command shape, and CPU/null light-assignment contract.
+  command shape, CPU/null light-assignment contract, and default-recipe shader
+  consumption seam.
   `ComputeClusterGridDesc(w, h)` uses the recorded `GRAPHICS-039` formula:
   `TilesX = ceil(w / 80)`, `TilesY = ceil(h / 80)`, `SlicesZ = 24`
   (`16x9x24` at `1280x720`). `MapViewZToClusterSlice(...)` applies the
@@ -365,7 +366,7 @@ Concretely:
   produces one shader-visible 32-byte `ClusterGridAABB` per cell in
   right-handed view space (`MinZ = -far`, `MaxZ = -near`), using clamped pixel
   bounds for partial edge tiles. The default recipe declares an opt-in
-  `"ClusterGridBuildPass"` that writes the imported
+  `"ClusterGridBuildPass"` that writes the renderer-owned imported
   `ClusterGrid.AABBs` storage buffer when `EnableClusterGridBuild`,
   `DepthPrepass`, and a valid buffer import are all present. `GRAPHICS-039B`
   adds `ClusterLightCellHeader` (`{ offset, count }`), the
@@ -381,8 +382,18 @@ Concretely:
   `assets/shaders/cluster_grid_build.comp` mirrors the grid-build math, and
   `assets/shaders/light_cluster_assign.comp` mirrors the non-directional light
   assignment policy with a shader-visible atomic allocation counter.
-  Surface-shader consumption and async-compute affinity remain the `GRAPHICS-039C/D`
-  follow-ups.
+  `GRAPHICS-039C` makes the default renderer allocate the retained cluster-grid,
+  header, index, and counter buffers before GPU-scene sync, publishes
+  `ClusterLightHeaderBDA`, `ClusterLightIndexBDA`, grid dimensions, tile size,
+  near/far planes, and projection scales through `GpuSceneTable`, and declares
+  `ClusterLights.Headers` / `ClusterLights.Indices` reads on the forward
+  `SurfacePass` and deferred `CompositionPass` when assignment is active. The
+  shared `common/gpu_scene.glsl` helper derives the cell from `gl_FragCoord.xy`
+  plus reconstructed positive view-Z, handles directional lights through the
+  full scene loop, iterates only the packed per-cell point/spot indices, and
+  falls back to the full loop when cluster buffers are unavailable. Concrete
+  Vulkan descriptor publication remains backend-owned through the existing
+  scene-table BDA path; async-compute affinity remains `GRAPHICS-039D`.
 - GRAPHICS-072 Slice A wires the default-recipe deferred-mode `"SurfacePass"`
   to the existing `DeferredGBufferPass` body. `NullRenderer` owns
   `m_DeferredGBufferPass` (constructed against `m_DeferredSystem`) and the

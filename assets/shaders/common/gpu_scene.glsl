@@ -32,12 +32,26 @@ struct GpuSceneTable {
     uint64_t BoundsBDA;
     uint64_t MaterialBDA;
     uint64_t LightBDA;
-    uint64_t _padBDA;
+    uint64_t ClusterLightHeaderBDA;
+    uint64_t ClusterLightIndexBDA;
 
     uint InstanceCapacity;
     uint GeometryCapacity;
     uint MaterialCapacity;
     uint LightCount;
+
+    uint ClusterTilePx;
+    uint ClusterTilesX;
+    uint ClusterTilesY;
+    uint ClusterSlicesZ;
+
+    uint ClusterCellCount;
+    uint ClusterMaxLightsPerCell;
+    float ClusterNearZ;
+    float ClusterFarZ;
+
+    float ClusterProjectionScaleX;
+    float ClusterProjectionScaleY;
 };
 
 struct GpuInstanceStatic {
@@ -126,6 +140,11 @@ struct GpuLight {
     vec4 Direction_Type;
     vec4 Color_Intensity;
     vec4 Params;
+};
+
+struct GpuClusterLightCellHeader {
+    uint Offset;
+    uint Count;
 };
 
 struct GpuBounds {
@@ -220,6 +239,14 @@ layout(buffer_reference, scalar) readonly buffer GpuLightRef {
     GpuLight Data[];
 };
 
+layout(buffer_reference, scalar) readonly buffer GpuClusterLightHeaderRef {
+    GpuClusterLightCellHeader Data[];
+};
+
+layout(buffer_reference, scalar) readonly buffer GpuClusterLightIndexRef {
+    uint Data[];
+};
+
 layout(buffer_reference, scalar) buffer GpuDrawIndexedCommandRef {
     GpuDrawIndexedCommand Data[];
 };
@@ -235,5 +262,129 @@ layout(buffer_reference, scalar) buffer GpuCounterRef {
 layout(buffer_reference, scalar) readonly buffer GpuCullBucketTableRef {
     GpuCullBucketTable Value;
 };
+
+bool GpuClusterLightingAvailable(GpuSceneTable scene)
+{
+    return scene.ClusterLightHeaderBDA != uint64_t(0) &&
+           scene.ClusterLightIndexBDA != uint64_t(0) &&
+           scene.ClusterTilePx > 0u &&
+           scene.ClusterTilesX > 0u &&
+           scene.ClusterTilesY > 0u &&
+           scene.ClusterSlicesZ > 0u &&
+           scene.ClusterCellCount > 0u &&
+           scene.ClusterMaxLightsPerCell > 0u &&
+           scene.ClusterNearZ > 0.0 &&
+           scene.ClusterFarZ > scene.ClusterNearZ;
+}
+
+uint GpuClusterSliceFromPositiveViewZ(float positiveViewZ, GpuSceneTable scene)
+{
+    if (!GpuClusterLightingAvailable(scene))
+    {
+        return 0u;
+    }
+
+    const float logRange = log(scene.ClusterFarZ / scene.ClusterNearZ);
+    if (isnan(logRange) || isinf(logRange) || logRange <= 0.0)
+    {
+        return 0u;
+    }
+
+    const float clampedZ = clamp(max(positiveViewZ, scene.ClusterNearZ),
+                                 scene.ClusterNearZ,
+                                 scene.ClusterFarZ);
+    const float normalized = log(clampedZ / scene.ClusterNearZ) / logRange;
+    return min(uint(floor(normalized * float(scene.ClusterSlicesZ))),
+               scene.ClusterSlicesZ - 1u);
+}
+
+float GpuPositiveViewZFromDeviceDepth(float deviceDepth, GpuSceneTable scene)
+{
+    if (scene.ClusterNearZ <= 0.0 || scene.ClusterFarZ <= scene.ClusterNearZ)
+    {
+        return 1.0;
+    }
+
+    // Reconstruct a conservative positive view-Z from a 0..1 depth value.
+    // This keeps clustered-light indexing live even before the deferred
+    // composer samples a depth texture for exact per-fragment reconstruction.
+    const float z = clamp(deviceDepth, 0.0, 1.0);
+    const float denom = max(scene.ClusterFarZ - z * (scene.ClusterFarZ - scene.ClusterNearZ),
+                            0.000001);
+    return (scene.ClusterNearZ * scene.ClusterFarZ) / denom;
+}
+
+uint GpuClusterCellIndex(vec2 fragCoord, float positiveViewZ, GpuSceneTable scene)
+{
+    if (!GpuClusterLightingAvailable(scene))
+    {
+        return 0u;
+    }
+
+    const uint tilePx = max(scene.ClusterTilePx, 1u);
+    const uint tileX = min(uint(max(fragCoord.x, 0.0)) / tilePx, scene.ClusterTilesX - 1u);
+    const uint tileY = min(uint(max(fragCoord.y, 0.0)) / tilePx, scene.ClusterTilesY - 1u);
+    const uint sliceZ = GpuClusterSliceFromPositiveViewZ(positiveViewZ, scene);
+    const uint cell = (sliceZ * scene.ClusterTilesY + tileY) * scene.ClusterTilesX + tileX;
+    return min(cell, scene.ClusterCellCount - 1u);
+}
+
+vec3 GpuLightDebugContribution(GpuLight light)
+{
+    return light.Color_Intensity.xyz * light.Color_Intensity.w;
+}
+
+vec3 GpuAccumulateFullSceneLightsDebug(GpuSceneTable scene)
+{
+    vec3 accum = vec3(0.0);
+    if (scene.LightBDA == uint64_t(0))
+    {
+        return accum;
+    }
+
+    GpuLightRef lights = GpuLightRef(scene.LightBDA);
+    for (uint i = 0u; i < scene.LightCount; ++i)
+    {
+        accum += GpuLightDebugContribution(lights.Data[i]);
+    }
+    return accum;
+}
+
+vec3 GpuAccumulateClusteredSceneLightsDebug(GpuSceneTable scene,
+                                            vec2 fragCoord,
+                                            float positiveViewZ)
+{
+    if (!GpuClusterLightingAvailable(scene) || scene.LightBDA == uint64_t(0))
+    {
+        return GpuAccumulateFullSceneLightsDebug(scene);
+    }
+
+    GpuLightRef lights = GpuLightRef(scene.LightBDA);
+    GpuClusterLightHeaderRef headers = GpuClusterLightHeaderRef(scene.ClusterLightHeaderBDA);
+    GpuClusterLightIndexRef indices = GpuClusterLightIndexRef(scene.ClusterLightIndexBDA);
+
+    vec3 accum = vec3(0.0);
+    for (uint lightIndex = 0u; lightIndex < scene.LightCount; ++lightIndex)
+    {
+        const GpuLight light = lights.Data[lightIndex];
+        if (uint(round(light.Direction_Type.w)) == 0u)
+        {
+            accum += GpuLightDebugContribution(light);
+        }
+    }
+
+    const uint cell = GpuClusterCellIndex(fragCoord, positiveViewZ, scene);
+    const GpuClusterLightCellHeader header = headers.Data[cell];
+    const uint count = min(header.Count, scene.ClusterMaxLightsPerCell);
+    for (uint i = 0u; i < count; ++i)
+    {
+        const uint lightIndex = indices.Data[header.Offset + i];
+        if (lightIndex < scene.LightCount)
+        {
+            accum += GpuLightDebugContribution(lights.Data[lightIndex]);
+        }
+    }
+    return accum;
+}
 
 #endif // INTRINSIC_GPU_SCENE_GLSL

@@ -41,6 +41,7 @@ import Extrinsic.Graphics.DeferredSystem;
 import Extrinsic.Graphics.PostProcessSystem;
 import Extrinsic.Graphics.ShadowSystem;
 import Extrinsic.Graphics.HZB;
+import Extrinsic.Graphics.LightClusters;
 import Extrinsic.Graphics.TransformSyncSystem;
 import Extrinsic.Graphics.Pass.DepthPrepass;
 import Extrinsic.Graphics.Pass.Deferred.GBuffers;
@@ -222,9 +223,13 @@ namespace Extrinsic::Graphics
         struct PrepMaterialOverrideSyncTag {};
         struct PrepTransformSyncTag {};
         struct PrepLightSyncTag {};
+        struct PrepClusterLightTableTag {};
         struct PrepGpuWorldSyncTag {};
 
         constexpr float kCameraInverseDeterminantEpsilon = 0.000001f;
+        constexpr float kClusterDefaultVerticalFovRadians = 1.5707963267948966f;
+        constexpr float kClusterDefaultNearZ = 0.1f;
+        constexpr float kClusterDefaultFarZ = 1000.0f;
         constexpr float kMinLineWidth = 0.5f;
         constexpr float kMaxLineWidth = 32.0f;
         constexpr float kMinPointRadius = 0.0001f;
@@ -838,7 +843,15 @@ namespace Extrinsic::Graphics
             // through the manager.
             m_PostProcessHistogramPipelineLease.reset();
             m_HZBBuildPipelineLease.reset();
+            m_ClusterGridBuildPipelineLease.reset();
+            m_ClusterLightAssignmentPipelineLease.reset();
             ReleaseAllFrameTransientResources();
+            m_ClusterGridAABBBuffer.reset();
+            m_ClusterLightHeaderBuffer.reset();
+            m_ClusterLightIndexBuffer.reset();
+            m_ClusterLightCounterBuffer.reset();
+            m_ClusterGridDesc = {};
+            m_ClusterGridProjection = {};
             // GRAPHICS-074 Slice D.1 — drop the renderer-owned
             // `Picking.Readback` lease before the BufferManager is torn
             // down so the lease's destructor still observes a live manager
@@ -1353,7 +1366,7 @@ namespace Extrinsic::Graphics
             };
         }
 
-        void PrepareFrame(RenderWorld&) override
+        void PrepareFrame(RenderWorld& renderWorld) override
         {
             if (!m_HasExtractedRenderWorld)
             {
@@ -1445,10 +1458,22 @@ namespace Extrinsic::Graphics
                         m_LightSystem->SyncGpuBuffer(activeSnapshot->LightSnapshots, *m_GpuWorld);
                     });
                 m_RenderPrepGraph.AddPass(
-                    "RenderPrep.GpuWorldSync",
+                    "RenderPrep.ClusterLightTableSync",
                     [] (Core::Dag::TaskGraphBuilder& b)
                     {
                         b.Read<PrepLightSyncTag>();
+                        b.Write<PrepClusterLightTableTag>();
+                    },
+                    [this, &renderWorld]
+                    {
+                        [[maybe_unused]] const bool clusterResourcesReady =
+                            EnsureClusterLightResources(renderWorld);
+                    });
+                m_RenderPrepGraph.AddPass(
+                    "RenderPrep.GpuWorldSync",
+                    [] (Core::Dag::TaskGraphBuilder& b)
+                    {
+                        b.Read<PrepClusterLightTableTag>();
                         b.Write<PrepGpuWorldSyncTag>();
                     },
                     [this]
@@ -1500,6 +1525,8 @@ namespace Extrinsic::Graphics
                 m_GpuWorld->SetMaterialBuffer(
                     m_MaterialSystem->GetBuffer(),
                     m_MaterialSystem->GetCapacity());
+                [[maybe_unused]] const bool clusterResourcesReady =
+                    EnsureClusterLightResources(renderWorld);
                 m_GpuWorld->SyncFrame();
                 m_CullingSystem->SyncGpuBuffer();
             }
@@ -1593,6 +1620,27 @@ namespace Extrinsic::Graphics
                 // non-operational devices or allocation failure, which keeps
                 // the recipe from declaring `HZBBuildPass`.
                 .HZBCurrent = hzbCurrent,
+                // GRAPHICS-039C — renderer-owned clustered-light buffers.
+                // Published to shaders through `GpuSceneTable` BDAs during
+                // `PrepareFrame()` and imported here so the recipe can order
+                // build/assignment before forward/deferred lighting consumes
+                // the header/index pair.
+                .ClusterGridAABBs =
+                    (m_ClusterGridAABBBuffer.has_value() && m_ClusterGridAABBBuffer->IsValid())
+                        ? m_ClusterGridAABBBuffer->GetHandle()
+                        : RHI::BufferHandle{},
+                .ClusterLightHeaders =
+                    (m_ClusterLightHeaderBuffer.has_value() && m_ClusterLightHeaderBuffer->IsValid())
+                        ? m_ClusterLightHeaderBuffer->GetHandle()
+                        : RHI::BufferHandle{},
+                .ClusterLightIndices =
+                    (m_ClusterLightIndexBuffer.has_value() && m_ClusterLightIndexBuffer->IsValid())
+                        ? m_ClusterLightIndexBuffer->GetHandle()
+                        : RHI::BufferHandle{},
+                .ClusterLightCounter =
+                    (m_ClusterLightCounterBuffer.has_value() && m_ClusterLightCounterBuffer->IsValid())
+                        ? m_ClusterLightCounterBuffer->GetHandle()
+                        : RHI::BufferHandle{},
             };
             // GRAPHICS-073 Slice B — derive the typed shadow sizing from the
             // current `ShadowSystem` params so transient fallbacks (no atlas
@@ -1645,6 +1693,11 @@ namespace Extrinsic::Graphics
                 SelectedAntiAliasingPipelinesAvailable();
             defaultRecipeFeatures.EnableHZBBuild =
                 defaultRecipeFeatures.EnableDepthPrepass && hzbCurrent.IsValid();
+            const bool clusterResourcesReady = ClusterLightResourcesReady();
+            defaultRecipeFeatures.EnableClusterGridBuild =
+                defaultRecipeFeatures.EnableDepthPrepass && clusterResourcesReady;
+            defaultRecipeFeatures.EnableClusterLightAssignment =
+                defaultRecipeFeatures.EnableClusterGridBuild && clusterResourcesReady;
             const FrameRecipeBuildResult recipe = BuildDefaultFrameRecipe(m_RenderGraph,
                                                                           defaultRecipeFeatures,
                                                                           imports,
@@ -1925,6 +1978,18 @@ namespace Extrinsic::Graphics
                         // and records the backend-neutral per-mip fallback
                         // dispatch plan.
                         const RenderCommandPassStatus status = RecordHZBBuildPass(graphicsContext);
+                        AccumulateCommandRecordStatus(passName, status);
+                    }
+                    else if (passName == std::string_view{"ClusterGridBuildPass"})
+                    {
+                        const RenderCommandPassStatus status =
+                            RecordClusterGridBuildPass(graphicsContext);
+                        AccumulateCommandRecordStatus(passName, status);
+                    }
+                    else if (passName == std::string_view{"LightClusterAssignmentPass"})
+                    {
+                        const RenderCommandPassStatus status =
+                            RecordClusterLightAssignmentPass(graphicsContext);
                         AccumulateCommandRecordStatus(passName, status);
                     }
                     else if (passName == std::string_view{"SurfacePass"} && !defaultRecipeUsesDeferred)
@@ -3133,6 +3198,36 @@ namespace Extrinsic::Graphics
             return BuildHZBBuildPipelineDesc();
         }
 
+        [[nodiscard]] RHI::PipelineHandle GetClusterGridBuildPipeline() const noexcept override
+        {
+            if (!m_PipelineManager.has_value() || !m_ClusterGridBuildPipelineLease.has_value() ||
+                !m_ClusterGridBuildPipelineLease->IsValid())
+            {
+                return {};
+            }
+            return m_PipelineManager->GetDeviceHandle(m_ClusterGridBuildPipelineLease->GetHandle());
+        }
+
+        [[nodiscard]] RHI::PipelineDesc GetClusterGridBuildPipelineDesc() const noexcept override
+        {
+            return BuildClusterGridBuildPipelineDesc();
+        }
+
+        [[nodiscard]] RHI::PipelineHandle GetClusterLightAssignmentPipeline() const noexcept override
+        {
+            if (!m_PipelineManager.has_value() || !m_ClusterLightAssignmentPipelineLease.has_value() ||
+                !m_ClusterLightAssignmentPipelineLease->IsValid())
+            {
+                return {};
+            }
+            return m_PipelineManager->GetDeviceHandle(m_ClusterLightAssignmentPipelineLease->GetHandle());
+        }
+
+        [[nodiscard]] RHI::PipelineDesc GetClusterLightAssignmentPipelineDesc() const noexcept override
+        {
+            return BuildClusterLightAssignmentPipelineDesc();
+        }
+
         [[nodiscard]] RHI::BufferHandle GetPickingReadbackBuffer() const noexcept override
         {
             if (!m_PickingReadbackBuffer.has_value() || !m_PickingReadbackBuffer->IsValid())
@@ -4097,6 +4192,31 @@ namespace Extrinsic::Graphics
             return desc;
         }
 
+        [[nodiscard]] static RHI::PipelineDesc BuildClusterGridBuildPipelineDesc() noexcept
+        {
+            RHI::PipelineDesc desc{};
+            desc.ComputeShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/cluster_grid_build.comp.spv");
+            desc.ColorTargetCount = 0u;
+            desc.DepthTargetFormat = RHI::Format::Undefined;
+            desc.PushConstantSize = static_cast<std::uint32_t>(sizeof(ClusterGridBuildPushConstants));
+            desc.DebugName = "Renderer.ClusterGrid.Build";
+            return desc;
+        }
+
+        [[nodiscard]] static RHI::PipelineDesc BuildClusterLightAssignmentPipelineDesc() noexcept
+        {
+            RHI::PipelineDesc desc{};
+            desc.ComputeShaderPath = Core::Filesystem::GetShaderPath(
+                "shaders/light_cluster_assign.comp.spv");
+            desc.ColorTargetCount = 0u;
+            desc.DepthTargetFormat = RHI::Format::Undefined;
+            desc.PushConstantSize =
+                static_cast<std::uint32_t>(sizeof(ClusterLightAssignmentPushConstants));
+            desc.DebugName = "Renderer.ClusterLights.Assign";
+            return desc;
+        }
+
         // GRAPHICS-076 Slice A — canonical default-recipe present pipeline.
         // Pairs with the new `assets/shaders/present.{vert,frag}` shaders:
         // the vertex stage emits the fullscreen triangle (positions
@@ -4423,6 +4543,127 @@ namespace Extrinsic::Graphics
                 ? "Renderer.VisualizationOverlay.Isoline.DepthTested"
                 : "Renderer.VisualizationOverlay.Isoline.AlwaysOnTop";
             return desc;
+        }
+
+        void ResetClusterLightResources()
+        {
+            m_ClusterGridAABBBuffer.reset();
+            m_ClusterLightHeaderBuffer.reset();
+            m_ClusterLightIndexBuffer.reset();
+            m_ClusterLightCounterBuffer.reset();
+            m_ClusterGridDesc = {};
+            m_ClusterGridProjection = {};
+            if (m_GpuWorld)
+            {
+                m_GpuWorld->ClearClusterLightTable();
+            }
+        }
+
+        [[nodiscard]] bool EnsureClusterLightResources(const RenderWorld& renderWorld)
+        {
+            if (m_Device == nullptr || !m_Device->IsOperational() || !m_BufferManager || !m_GpuWorld)
+            {
+                if (m_GpuWorld)
+                {
+                    m_GpuWorld->ClearClusterLightTable();
+                }
+                return false;
+            }
+
+            const std::uint32_t width = renderWorld.Viewport.Width > 0
+                ? static_cast<std::uint32_t>(renderWorld.Viewport.Width)
+                : 1u;
+            const std::uint32_t height = renderWorld.Viewport.Height > 0
+                ? static_cast<std::uint32_t>(renderWorld.Viewport.Height)
+                : 1u;
+            const ClusterGridDesc desc = ComputeClusterGridDesc(width, height);
+            const float aspect = static_cast<float>(width) / static_cast<float>(height);
+            const ClusterGridProjection projection =
+                BuildClusterGridProjectionFromVerticalFov(
+                    kClusterDefaultVerticalFovRadians,
+                    aspect,
+                    kClusterDefaultNearZ,
+                    kClusterDefaultFarZ);
+            if (!desc.IsValid() || !projection.IsValid())
+            {
+                ResetClusterLightResources();
+                return false;
+            }
+
+            const bool needsAllocation =
+                m_ClusterGridDesc != desc ||
+                !m_ClusterGridAABBBuffer.has_value() ||
+                !m_ClusterGridAABBBuffer->IsValid() ||
+                !m_ClusterLightHeaderBuffer.has_value() ||
+                !m_ClusterLightHeaderBuffer->IsValid() ||
+                !m_ClusterLightIndexBuffer.has_value() ||
+                !m_ClusterLightIndexBuffer->IsValid() ||
+                !m_ClusterLightCounterBuffer.has_value() ||
+                !m_ClusterLightCounterBuffer->IsValid();
+            if (needsAllocation)
+            {
+                m_ClusterGridAABBBuffer.reset();
+                m_ClusterLightHeaderBuffer.reset();
+                m_ClusterLightIndexBuffer.reset();
+                m_ClusterLightCounterBuffer.reset();
+                m_ClusterGridDesc = {};
+                m_ClusterGridProjection = {};
+
+                auto gridOr = m_BufferManager->Create(BuildClusterGridAABBBufferDesc(desc));
+                auto headersOr = m_BufferManager->Create(BuildClusterLightHeaderBufferDesc(desc));
+                auto indicesOr = m_BufferManager->Create(
+                    BuildClusterLightIndexBufferDesc(desc, kMaxClusterLightsPerCell));
+                auto counterOr = m_BufferManager->Create(BuildClusterLightCounterBufferDesc());
+                if (!gridOr.has_value() || !headersOr.has_value() ||
+                    !indicesOr.has_value() || !counterOr.has_value())
+                {
+                    ResetClusterLightResources();
+                    Core::Log::Warn(
+                        "[Graphics] Clustered-light buffers unavailable; cluster passes will be omitted from the default recipe.");
+                    return false;
+                }
+
+                m_ClusterGridAABBBuffer.emplace(std::move(*gridOr));
+                m_ClusterLightHeaderBuffer.emplace(std::move(*headersOr));
+                m_ClusterLightIndexBuffer.emplace(std::move(*indicesOr));
+                m_ClusterLightCounterBuffer.emplace(std::move(*counterOr));
+                m_ClusterGridDesc = desc;
+                m_ClusterGridProjection = projection;
+            }
+            else
+            {
+                m_ClusterGridProjection = projection;
+            }
+
+            m_GpuWorld->SetClusterLightTable(GpuWorld::ClusterLightTableDesc{
+                .HeaderBuffer = m_ClusterLightHeaderBuffer->GetHandle(),
+                .IndexBuffer = m_ClusterLightIndexBuffer->GetHandle(),
+                .TilePx = desc.ClusterTilePx,
+                .TilesX = desc.TilesX,
+                .TilesY = desc.TilesY,
+                .SlicesZ = desc.SlicesZ,
+                .CellCount = desc.CellCount,
+                .MaxLightsPerCell = kMaxClusterLightsPerCell,
+                .NearZ = projection.NearZ,
+                .FarZ = projection.FarZ,
+                .ProjectionScaleX = projection.ProjectionScaleX,
+                .ProjectionScaleY = projection.ProjectionScaleY,
+            });
+            return true;
+        }
+
+        [[nodiscard]] bool ClusterLightResourcesReady() const noexcept
+        {
+            return m_ClusterGridDesc.IsValid() &&
+                   m_ClusterGridProjection.IsValid() &&
+                   m_ClusterGridAABBBuffer.has_value() &&
+                   m_ClusterGridAABBBuffer->IsValid() &&
+                   m_ClusterLightHeaderBuffer.has_value() &&
+                   m_ClusterLightHeaderBuffer->IsValid() &&
+                   m_ClusterLightIndexBuffer.has_value() &&
+                   m_ClusterLightIndexBuffer->IsValid() &&
+                   m_ClusterLightCounterBuffer.has_value() &&
+                   m_ClusterLightCounterBuffer->IsValid();
         }
 
         [[nodiscard]] bool InitializeOperationalPassResources(RHI::IDevice& device)
@@ -5495,11 +5736,45 @@ namespace Extrinsic::Graphics
                     static_cast<int>(hzbBuildPipeline.error()));
             }
 
+            // GRAPHICS-039C — clustered-light compute pipelines. Appended
+            // after HZB.Build so existing `FailPipelineCreateCall` indices
+            // through the HZB slot remain stable. Missing leases leave the
+            // corresponding cluster graph passes in `SkippedUnavailable`.
+            m_ClusterGridBuildPipelineLease.reset();
+            const RHI::PipelineDesc clusterGridBuildDesc =
+                BuildClusterGridBuildPipelineDesc();
+            auto clusterGridBuildPipeline = m_PipelineManager->Create(clusterGridBuildDesc);
+            if (clusterGridBuildPipeline.has_value())
+            {
+                m_ClusterGridBuildPipelineLease.emplace(std::move(*clusterGridBuildPipeline));
+            }
+            else
+            {
+                Core::Log::Warn(
+                    "[Graphics] ClusterGrid.Build pipeline unavailable; default-recipe cluster-grid recording will be skipped: error={}",
+                    static_cast<int>(clusterGridBuildPipeline.error()));
+            }
+
+            m_ClusterLightAssignmentPipelineLease.reset();
+            const RHI::PipelineDesc clusterLightAssignmentDesc =
+                BuildClusterLightAssignmentPipelineDesc();
+            auto clusterLightAssignmentPipeline =
+                m_PipelineManager->Create(clusterLightAssignmentDesc);
+            if (clusterLightAssignmentPipeline.has_value())
+            {
+                m_ClusterLightAssignmentPipelineLease.emplace(
+                    std::move(*clusterLightAssignmentPipeline));
+            }
+            else
+            {
+                Core::Log::Warn(
+                    "[Graphics] ClusterLights.Assign pipeline unavailable; default-recipe light-assignment recording will be skipped: error={}",
+                    static_cast<int>(clusterLightAssignmentPipeline.error()));
+            }
+
             // GRAPHICS-079 Slice A — canonical default-recipe `Pass.ImGui`
-            // pipeline. Created LAST (after HZB.Build, which follows the
-            // visualization-overlay isoline pipelines) so the existing
-            // `FailPipelineCreateCall` indices used by other lifecycle tests
-            // remain stable. Same reset/republish + fail-closed pattern as the
+            // pipeline. Created after HZB and the clustered-light compute
+            // pipelines. Same reset/republish + fail-closed pattern as the
             // present/debug-view leases so a failed `Create()` leaves
             // `m_ImGuiPass` (when attached) in the fail-closed state that
             // `RecordImGuiPass` interprets as `SkippedUnavailable`.
@@ -6679,6 +6954,73 @@ namespace Extrinsic::Graphics
             return RenderCommandPassStatus::Recorded;
         }
 
+        [[nodiscard]] RenderCommandPassStatus RecordClusterGridBuildPass(RHI::ICommandContext& cmd)
+        {
+            if (m_Device == nullptr || !m_Device->IsOperational())
+            {
+                return RenderCommandPassStatus::SkippedNonOperational;
+            }
+            if (!ClusterLightResourcesReady() ||
+                !m_ClusterGridBuildPipelineLease.has_value() ||
+                !m_ClusterGridBuildPipelineLease->IsValid())
+            {
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            const ClusterGridBuildDispatchPlan plan =
+                ComputeClusterGridBuildDispatchPlan(m_ClusterGridDesc);
+            if (!RecordClusterGridBuild(cmd,
+                                        GetClusterGridBuildPipeline(),
+                                        m_ClusterGridAABBBuffer->GetHandle(),
+                                        plan,
+                                        m_ClusterGridProjection))
+            {
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            ++m_LastRenderGraphStats.ClusterGridBuildRecordedFrames;
+            ++m_LastRenderGraphStats.ClusterGridBuildDispatchCount;
+            return RenderCommandPassStatus::Recorded;
+        }
+
+        [[nodiscard]] RenderCommandPassStatus RecordClusterLightAssignmentPass(RHI::ICommandContext& cmd)
+        {
+            if (m_Device == nullptr || !m_Device->IsOperational())
+            {
+                return RenderCommandPassStatus::SkippedNonOperational;
+            }
+            if (!m_GpuWorld ||
+                !ClusterLightResourcesReady() ||
+                !m_ClusterGridBuildPipelineLease.has_value() ||
+                !m_ClusterGridBuildPipelineLease->IsValid() ||
+                !m_ClusterLightAssignmentPipelineLease.has_value() ||
+                !m_ClusterLightAssignmentPipelineLease->IsValid())
+            {
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            const ClusterLightAssignmentDispatchPlan plan =
+                ComputeClusterLightAssignmentDispatchPlan(
+                    m_ClusterGridDesc,
+                    m_GpuWorld ? m_GpuWorld->GetLightCount() : 0u,
+                    kMaxClusterLightsPerCell);
+            if (!RecordClusterLightAssignment(cmd,
+                                              GetClusterLightAssignmentPipeline(),
+                                              m_ClusterGridAABBBuffer->GetHandle(),
+                                              m_GpuWorld->GetLightBuffer(),
+                                              m_ClusterLightHeaderBuffer->GetHandle(),
+                                              m_ClusterLightIndexBuffer->GetHandle(),
+                                              m_ClusterLightCounterBuffer->GetHandle(),
+                                              plan))
+            {
+                return RenderCommandPassStatus::SkippedUnavailable;
+            }
+
+            ++m_LastRenderGraphStats.ClusterLightAssignmentRecordedFrames;
+            ++m_LastRenderGraphStats.ClusterLightAssignmentDispatchCount;
+            return RenderCommandPassStatus::Recorded;
+        }
+
         // GRAPHICS-076 Slice A — canonical default-recipe present executor
         // helper. The `PresentPass::Execute()` body records the
         // `BindPipeline + Draw(3, 1, 0, 0)` shape unconditionally when its
@@ -7402,6 +7744,13 @@ namespace Extrinsic::Graphics
         // documented pipeline-create indices stay stable; a failed create makes
         // `"HZBBuildPass"` report `SkippedUnavailable`.
         std::optional<RHI::PipelineManager::PipelineLease> m_HZBBuildPipelineLease;
+        // GRAPHICS-039C — clustered-light compute pipeline leases. Created
+        // after HZB so the existing pipeline-create indices through HZB stay
+        // stable; missing leases make the cluster recipe passes report
+        // `SkippedUnavailable` while the scene-table publication remains
+        // fail-closed.
+        std::optional<RHI::PipelineManager::PipelineLease> m_ClusterGridBuildPipelineLease;
+        std::optional<RHI::PipelineManager::PipelineLease> m_ClusterLightAssignmentPipelineLease;
         // GRAPHICS-077 Slice B — backend-local transient-debug upload
         // helper. Held as `unique_ptr<ITransientDebugUploadHelper>` so
         // Slice D can swap in a Vulkan-tuned concrete implementation
@@ -7540,6 +7889,15 @@ namespace Extrinsic::Graphics
         std::vector<bool>                              m_HistogramSlotPending;
         std::vector<std::uint64_t>                     m_HistogramSlotIssuedFrame;
         std::vector<bool>                              m_HistogramSlotInvalidated;
+        // GRAPHICS-039C — retained clustered-light buffers sized to the
+        // current viewport. `PrepareFrame()` publishes the header/index BDAs
+        // and grid metadata through `GpuSceneTable` before `GpuWorld::SyncFrame()`.
+        std::optional<RHI::BufferManager::BufferLease> m_ClusterGridAABBBuffer;
+        std::optional<RHI::BufferManager::BufferLease> m_ClusterLightHeaderBuffer;
+        std::optional<RHI::BufferManager::BufferLease> m_ClusterLightIndexBuffer;
+        std::optional<RHI::BufferManager::BufferLease> m_ClusterLightCounterBuffer;
+        ClusterGridDesc                                m_ClusterGridDesc{};
+        ClusterGridProjection                          m_ClusterGridProjection{};
         std::array<RuntimeSnapshotStorage, kRuntimeSnapshotStorageSlots> m_RuntimeSnapshotSlots{};
         std::uint32_t                        m_ActiveRuntimeSnapshotReadSlot{0u};
         bool                                 m_EnableRenderPrepTaskGraph{true};

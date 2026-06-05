@@ -140,6 +140,14 @@ namespace Extrinsic::Graphics
         std::uint32_t HZBBuildMipCount = 0;
         std::uint32_t HZBBuildFallbackFrames = 0;
         std::uint32_t HZBBuildSinglePassFrames = 0;
+        // GRAPHICS-039C — clustered-light build/assignment command-shape
+        // counters. These increment only when the retained buffers and
+        // compute-pipeline leases are available and the executor records the
+        // cluster passes.
+        std::uint32_t ClusterGridBuildRecordedFrames = 0;
+        std::uint32_t ClusterGridBuildDispatchCount = 0;
+        std::uint32_t ClusterLightAssignmentRecordedFrames = 0;
+        std::uint32_t ClusterLightAssignmentDispatchCount = 0;
         // GRAPHICS-076E — count of frames in which the opt-in default-recipe
         // backbuffer-to-host readback seam recorded the
         // `Present → TransferSrc → CopyImageToBuffer → Present` triplet.
@@ -625,6 +633,15 @@ namespace Extrinsic::Graphics
         // for contract tests and rebuild verification.
         [[nodiscard]] virtual RHI::PipelineHandle GetHZBBuildPipeline() const noexcept = 0;
         [[nodiscard]] virtual RHI::PipelineDesc GetHZBBuildPipelineDesc() const noexcept = 0;
+
+        // GRAPHICS-039C — accessors for the clustered-light compute pipelines.
+        // `ClusterGridBuild` writes froxel AABBs, and
+        // `ClusterLightAssignment` writes the per-cell header/index buffers
+        // consumed through `GpuSceneTable` BDAs by lighting shaders.
+        [[nodiscard]] virtual RHI::PipelineHandle GetClusterGridBuildPipeline() const noexcept = 0;
+        [[nodiscard]] virtual RHI::PipelineDesc GetClusterGridBuildPipelineDesc() const noexcept = 0;
+        [[nodiscard]] virtual RHI::PipelineHandle GetClusterLightAssignmentPipeline() const noexcept = 0;
+        [[nodiscard]] virtual RHI::PipelineDesc GetClusterLightAssignmentPipelineDesc() const noexcept = 0;
 
         // GRAPHICS-074 (Slice D.1) — accessor for the renderer-owned host-
         // visible `Picking.Readback` buffer. The buffer is sized for

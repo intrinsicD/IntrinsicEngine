@@ -659,7 +659,14 @@ namespace Extrinsic::Tests
                         contents.data() + static_cast<std::size_t>(offset),
                         static_cast<std::size_t>(toCopy));
         }
-        [[nodiscard]] std::uint64_t GetBufferDeviceAddress(RHI::BufferHandle) const override { return 0; }
+        [[nodiscard]] std::uint64_t GetBufferDeviceAddress(RHI::BufferHandle handle) const override
+        {
+            if (!handle.IsValid())
+            {
+                return 0u;
+            }
+            return 0x1'0000'0000ull + (static_cast<std::uint64_t>(handle.Index) * 0x1000ull);
+        }
 
         RHI::TextureHandle CreateTexture(const RHI::TextureDesc&) override
         {

@@ -9,6 +9,7 @@
 #include <vector>
 
 #include <gtest/gtest.h>
+#include <glm/glm.hpp>
 
 import Extrinsic.Graphics.LightClusters;
 import Extrinsic.Graphics.LightSystem;
@@ -162,6 +163,77 @@ TEST(GraphicsLightClusterGrid, AssignLightsUsesConservativeShapesAndSkipsDirecti
     EXPECT_EQ(result.Diagnostics.LightClusterOverflowCount, 0u);
     EXPECT_EQ(result.Diagnostics.LightsCulledCount, 1u);
     EXPECT_EQ(result.Diagnostics.EmptyClusterCount, 0u);
+}
+
+TEST(GraphicsLightClusterGrid, ClusteredDebugAccumulationMatchesFullLoopForAssignedCell)
+{
+    const Graphics::ClusterGridDesc desc = SingleCellDesc();
+    const std::vector<Graphics::ClusterGridAABB> cells{UnitViewCell()};
+    const std::vector<Graphics::LightSnapshot> lights{
+        Graphics::LightSnapshot{
+            .LightType = Graphics::LightSnapshot::Type::Directional,
+            .Intensity = 0.5f,
+            .Color = {0.25f, 0.5f, 1.0f},
+        },
+        Graphics::LightSnapshot{
+            .LightType = Graphics::LightSnapshot::Type::Point,
+            .Position = {0.f, 0.f, -2.f},
+            .Range = 0.5f,
+            .Intensity = 2.0f,
+            .Color = {1.0f, 0.0f, 0.0f},
+        },
+        Graphics::LightSnapshot{
+            .LightType = Graphics::LightSnapshot::Type::Spot,
+            .Position = {0.f, 0.f, -1.5f},
+            .Range = 6.f,
+            .Direction = {0.f, 0.f, -1.f},
+            .Intensity = 3.0f,
+            .Color = {0.0f, 1.0f, 0.0f},
+            .OuterConeCos = 0.75f,
+        },
+        Graphics::LightSnapshot{
+            .LightType = Graphics::LightSnapshot::Type::Point,
+            .Position = {20.f, 0.f, -2.f},
+            .Range = 0.5f,
+            .Intensity = 7.0f,
+            .Color = {0.0f, 0.0f, 1.0f},
+        },
+    };
+
+    const Graphics::ClusterLightAssignmentResult result =
+        Graphics::AssignLightsToClusters(desc, cells, lights);
+    ASSERT_TRUE(result.Valid);
+    ASSERT_EQ(result.Headers.size(), 1u);
+
+    glm::vec3 fullLoop{0.f};
+    glm::vec3 clustered{0.f};
+    for (std::uint32_t lightIndex = 0u; lightIndex < lights.size(); ++lightIndex)
+    {
+        const Graphics::LightSnapshot& light = lights[lightIndex];
+        const glm::vec3 contribution = light.Color * light.Intensity;
+        if (light.LightType == Graphics::LightSnapshot::Type::Directional ||
+            Graphics::DoesClusterAABBIntersectLight(cells[0], light))
+        {
+            fullLoop += contribution;
+        }
+        if (light.LightType == Graphics::LightSnapshot::Type::Directional)
+        {
+            clustered += contribution;
+        }
+    }
+
+    const Graphics::ClusterLightCellHeader header = result.Headers[0];
+    for (std::uint32_t i = 0u; i < header.Count; ++i)
+    {
+        ASSERT_LT(header.Offset + i, result.LightIndices.size());
+        const std::uint32_t lightIndex = result.LightIndices[header.Offset + i];
+        ASSERT_LT(lightIndex, lights.size());
+        clustered += lights[lightIndex].Color * lights[lightIndex].Intensity;
+    }
+
+    EXPECT_NEAR(clustered.x, fullLoop.x, 0.0001f);
+    EXPECT_NEAR(clustered.y, fullLoop.y, 0.0001f);
+    EXPECT_NEAR(clustered.z, fullLoop.z, 0.0001f);
 }
 
 TEST(GraphicsLightClusterGrid, AssignmentCountsEmptyCellsAndRejectsInvalidInputs)
