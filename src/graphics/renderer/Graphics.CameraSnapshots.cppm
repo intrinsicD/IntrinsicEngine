@@ -75,8 +75,40 @@ namespace Extrinsic::Graphics
         bool ExplicitCameraTransition{false};
     };
 
+    export inline constexpr std::uint32_t kTemporalJitterSequenceLength = 16u;
+
+    export struct TemporalJitterSample
+    {
+        glm::vec2 PixelOffset{0.f};
+        glm::vec2 NdcOffset{0.f};
+        std::uint32_t SequenceIndex{0u};
+        bool Enabled{false};
+    };
+
+    export struct TemporalCameraViewSnapshot
+    {
+        CameraViewSnapshot Camera{};
+        glm::vec2 JitterOffset{0.f};
+        std::uint32_t JitterSequenceIndex{0u};
+        bool HasTemporalJitter{false};
+    };
+
     namespace Detail
     {
+        [[nodiscard]] constexpr float Halton(std::uint32_t index,
+                                             const std::uint32_t base) noexcept
+        {
+            float result = 0.f;
+            float invBase = 1.f / static_cast<float>(base);
+            while (index > 0u)
+            {
+                result += static_cast<float>(index % base) * invBase;
+                index /= base;
+                invBase /= static_cast<float>(base);
+            }
+            return result;
+        }
+
         [[nodiscard]] constexpr glm::vec4 Row(const glm::mat4& m, const int row) noexcept
         {
             return {m[0][row], m[1][row], m[2][row], m[3][row]};
@@ -113,15 +145,52 @@ namespace Extrinsic::Graphics
         }
     }
 
-    export [[nodiscard]] inline CameraViewSnapshot BuildCameraViewSnapshot(
+    export [[nodiscard]] inline TemporalJitterSample ComputeTemporalJitterSample(
+        const std::uint64_t renderedFrameIndex,
+        const Core::Extent2D viewport,
+        const bool noJitterNoHistory = false) noexcept
+    {
+        const std::uint32_t sequenceIndex =
+            static_cast<std::uint32_t>(renderedFrameIndex % kTemporalJitterSequenceLength);
+        TemporalJitterSample sample{.SequenceIndex = sequenceIndex};
+        if (noJitterNoHistory || viewport.Width == 0u || viewport.Height == 0u)
+        {
+            return sample;
+        }
+
+        const std::uint32_t haltonIndex = sequenceIndex + 1u;
+        sample.PixelOffset = glm::vec2{
+            Detail::Halton(haltonIndex, 2u) - 0.5f,
+            Detail::Halton(haltonIndex, 3u) - 0.5f,
+        };
+        sample.NdcOffset = glm::vec2{
+            sample.PixelOffset.x * (2.f / static_cast<float>(viewport.Width)),
+            sample.PixelOffset.y * (2.f / static_cast<float>(viewport.Height)),
+        };
+        sample.Enabled = true;
+        return sample;
+    }
+
+    export [[nodiscard]] inline glm::mat4 ApplyTemporalJitterProjectionOverride(
+        glm::mat4 projection,
+        const glm::vec2 ndcOffset) noexcept
+    {
+        projection[2][0] += ndcOffset.x;
+        projection[2][1] += ndcOffset.y;
+        return projection;
+    }
+
+    [[nodiscard]] inline CameraViewSnapshot BuildCameraViewSnapshotWithProjection(
         const CameraViewInput& input,
         const Core::Extent2D viewport,
-        const PickPixelRequest pick = {}) noexcept
+        const PickPixelRequest pick,
+        const glm::mat4& projection) noexcept
     {
         CameraViewSnapshot snapshot{};
+
         snapshot.View = input.View;
-        snapshot.Projection = input.Projection;
-        snapshot.ViewProjection = input.Projection * input.View;
+        snapshot.Projection = projection;
+        snapshot.ViewProjection = projection * input.View;
         snapshot.Position = input.Position;
         snapshot.Forward = input.Forward;
         snapshot.Up = input.Up;
@@ -131,7 +200,7 @@ namespace Extrinsic::Graphics
 
         const bool validInput = input.Valid &&
             input.NearPlane > 0.f && input.FarPlane > input.NearPlane &&
-            Detail::IsFinite(input.View) && Detail::IsFinite(input.Projection) &&
+            Detail::IsFinite(input.View) && Detail::IsFinite(projection) &&
             Detail::IsFinite(input.Position) && Detail::IsFinite(input.Forward) &&
             Detail::IsFinite(input.Up) &&
             glm::length(input.Forward) > 0.000001f &&
@@ -191,5 +260,39 @@ namespace Extrinsic::Graphics
         }
 
         return snapshot;
+    }
+
+    export [[nodiscard]] inline CameraViewSnapshot BuildCameraViewSnapshot(
+        const CameraViewInput& input,
+        const Core::Extent2D viewport,
+        const PickPixelRequest pick = {}) noexcept
+    {
+        return BuildCameraViewSnapshotWithProjection(input, viewport, pick, input.Projection);
+    }
+
+    export [[nodiscard]] inline TemporalCameraViewSnapshot BuildTemporalCameraViewSnapshot(
+        const CameraViewInput& input,
+        const Core::Extent2D viewport,
+        const PickPixelRequest pick,
+        const std::uint64_t renderedFrameIndex,
+        const bool enableTemporalJitter,
+        const bool noJitterNoHistory = false) noexcept
+    {
+        const TemporalJitterSample jitter = enableTemporalJitter
+            ? ComputeTemporalJitterSample(renderedFrameIndex, viewport, noJitterNoHistory)
+            : TemporalJitterSample{
+                .SequenceIndex = static_cast<std::uint32_t>(
+                    renderedFrameIndex % kTemporalJitterSequenceLength),
+            };
+        const glm::mat4 projection = jitter.Enabled
+            ? ApplyTemporalJitterProjectionOverride(input.Projection, jitter.NdcOffset)
+            : input.Projection;
+
+        return TemporalCameraViewSnapshot{
+            .Camera = BuildCameraViewSnapshotWithProjection(input, viewport, pick, projection),
+            .JitterOffset = jitter.NdcOffset,
+            .JitterSequenceIndex = jitter.SequenceIndex,
+            .HasTemporalJitter = jitter.Enabled,
+        };
     }
 }

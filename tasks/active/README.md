@@ -11,14 +11,21 @@ Each active task should include:
 
 ## Currently active
 
-No currently active task.
-
-Next eligible backlog candidate:
-[`GRAPHICS-040A`](../backlog/rendering/GRAPHICS-040A-jitter-and-motion-vectors.md) —
-camera jitter + motion-vector buffer. Depends on `GRAPHICS-040` (planning,
-done) and `GRAPHICS-013A` (done).
+No task is currently active on `main`. The next unblocked rendering child is
+`GRAPHICS-040B` after the retired `GRAPHICS-040A` slice.
 
 The most recently retired tasks are summarised below.
+
+Previously-active
+[`GRAPHICS-040A`](../done/GRAPHICS-040A-jitter-and-motion-vectors.md) —
+camera jitter + motion-vector buffer retired to `tasks/done/` on 2026-06-05 at
+maturity `CPUContracted`. The slice added a deterministic Halton(2,3)×16
+temporal jitter helper, projection-matrix jitter override, authoritative
+`TemporalCameraViewSnapshot::JitterOffset`, opt-in `MotionVectors`
+frame-recipe resource/attachment shape, `NoJitterNoHistory` suppression, and
+graphics contract coverage for jitter replay, projection math, and motion-vector
+target gating. Reference TAA reconstruction remains `GRAPHICS-040B`; recipe
+selection and post-chain integration remain `GRAPHICS-040C`.
 
 Previously-active
 [`GRAPHICS-039D`](../done/GRAPHICS-039D-cluster-async-compute-affinity.md) —

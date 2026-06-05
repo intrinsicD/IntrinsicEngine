@@ -162,6 +162,10 @@ namespace Extrinsic::Graphics
         ClusterLightHeaders,
         ClusterLightIndices,
         ClusterLightCounter,
+        // GRAPHICS-040A — framegraph-managed screen-space motion-vector
+        // color target. The engine RHI name for `R16G16_SFLOAT` is
+        // `RG16_FLOAT`.
+        MotionVectors,
     };
 
     export struct FrameRecipeFeatures
@@ -218,6 +222,17 @@ namespace Extrinsic::Graphics
         // has no pipelines and no helper; Slices B/C wire the per-kind
         // pipelines + upload + recording paths.
         bool EnableVisualizationOverlay{false};
+    };
+
+    export struct FrameRecipeTemporalOptions
+    {
+        // GRAPHICS-040A — golden-image determinism mode. The jitter helper
+        // consumes the matching camera flag; the recipe suppresses temporal
+        // motion/history surfaces while this is set.
+        bool NoJitterNoHistory{false};
+        // GRAPHICS-040A — opt-in until GRAPHICS-040C adds the AA/reconstructor
+        // selector that can turn TAA/external reconstruction on by default.
+        bool EnableMotionVectors{false};
     };
 
     export struct FrameRecipeSizing
@@ -335,6 +350,8 @@ namespace Extrinsic::Graphics
     export [[nodiscard]] FrameRecipeFeatures DeriveDefaultFrameRecipeFeatures(const RenderWorld& world);
 
     export [[nodiscard]] FrameRecipeIntrospection DescribeDefaultFrameRecipe(const FrameRecipeFeatures& features);
+    export [[nodiscard]] FrameRecipeIntrospection DescribeDefaultFrameRecipe(const FrameRecipeFeatures& features,
+                                                                             FrameRecipeTemporalOptions temporalOptions);
 
     export [[nodiscard]] RenderGraphValidationResult ValidateRecipeCompiledGraph(
         const FrameRecipeIntrospection& recipe,
@@ -345,4 +362,10 @@ namespace Extrinsic::Graphics
                                                                         const FrameRecipeImports& imports,
                                                                         const FrameRecipeSizing& sizing,
                                                                         const FrameRecipeShadowSizing& shadowSizing = {});
+    export [[nodiscard]] FrameRecipeBuildResult BuildDefaultFrameRecipe(RenderGraph& graph,
+                                                                        const FrameRecipeFeatures& features,
+                                                                        const FrameRecipeImports& imports,
+                                                                        const FrameRecipeSizing& sizing,
+                                                                        const FrameRecipeShadowSizing& shadowSizing,
+                                                                        FrameRecipeTemporalOptions temporalOptions);
 }

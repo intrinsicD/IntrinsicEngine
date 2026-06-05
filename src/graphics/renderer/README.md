@@ -397,6 +397,22 @@ Concretely:
   `RenderQueue::AsyncCompute`; the framegraph/RHI queue resolver demotes those
   requests to the graphics queue on capability-absent devices, so clustered
   lighting correctness does not depend on async-compute availability.
+- GRAPHICS-040A adds the CPU-contracted temporal input seam for future TAA /
+  external reconstruction without growing the base camera snapshot ABI.
+  `ComputeTemporalJitterSample(...)` selects a Halton(2,3)x16 sample from the
+  rendered-frame index, scales it to NDC by `2 / viewport`, and
+  `BuildTemporalCameraViewSnapshot(...)` applies it to projection `[2][0]` /
+  `[2][1]` while returning the authoritative NDC offset in
+  `TemporalCameraViewSnapshot::JitterOffset`. Jitter remains opt-in until
+  `GRAPHICS-040C` adds recipe selection, so the default renderer does not
+  jitter frames without a temporal resolve. The same slice adds an opt-in
+  `MotionVectors` frame-recipe target (`RG16_FLOAT`, the engine RHI equivalent
+  of `R16G16_SFLOAT`) declared and attached by `SurfacePass` when
+  `FrameRecipeTemporalOptions::EnableMotionVectors` is true and suppressed by
+  `FrameRecipeTemporalOptions::NoJitterNoHistory`; dynamic vectors can use the existing
+  `GpuInstanceDynamic::PrevModel` ABI, which `TransformSyncSystem` already
+  maintains. Shader-side MV encoding and reconstructor consumption remain
+  `GRAPHICS-040B/C`.
 - GRAPHICS-072 Slice A wires the default-recipe deferred-mode `"SurfacePass"`
   to the existing `DeferredGBufferPass` body. `NullRenderer` owns
   `m_DeferredGBufferPass` (constructed against `m_DeferredSystem`) and the

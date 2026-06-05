@@ -890,7 +890,10 @@ namespace Extrinsic::Runtime
             {
             }
 
-            bool BeginFrame() override { return Renderer.BeginFrame(Frame); }
+            bool BeginFrame() override
+            {
+                return Renderer.BeginFrame(Frame);
+            }
             void ExtractRenderWorld() override
             {
                 // GRAPHICS-036C — producer half: acquire a back slot, write the

@@ -22,6 +22,118 @@ import Extrinsic.RHI.Types;
 
 using namespace Extrinsic;
 
+namespace
+{
+    constexpr float kJitterEpsilon = 0.000001f;
+
+    void ExpectVec2Near(const glm::vec2 actual,
+                        const glm::vec2 expected,
+                        const float epsilon = kJitterEpsilon)
+    {
+        EXPECT_NEAR(actual.x, expected.x, epsilon);
+        EXPECT_NEAR(actual.y, expected.y, epsilon);
+    }
+}
+
+TEST(RenderWorldContract, TemporalJitterHaltonSequenceIsDeterministicAndWraps)
+{
+    static_assert(Graphics::kTemporalJitterSequenceLength == 16u);
+    constexpr Core::Extent2D viewport{1280u, 720u};
+    constexpr std::array<glm::vec2, 4> expectedPixelOffsets{{
+        {0.0f, -1.0f / 6.0f},
+        {-0.25f, 1.0f / 6.0f},
+        {0.25f, -7.0f / 18.0f},
+        {-0.375f, -1.0f / 18.0f},
+    }};
+
+    for (std::uint64_t frameIndex = 0u; frameIndex < expectedPixelOffsets.size(); ++frameIndex)
+    {
+        const Graphics::TemporalJitterSample sample =
+            Graphics::ComputeTemporalJitterSample(frameIndex, viewport);
+        EXPECT_TRUE(sample.Enabled);
+        EXPECT_EQ(sample.SequenceIndex, frameIndex);
+        ExpectVec2Near(sample.PixelOffset, expectedPixelOffsets[frameIndex]);
+        ExpectVec2Near(sample.NdcOffset,
+                       glm::vec2{
+                           expectedPixelOffsets[frameIndex].x * (2.f / static_cast<float>(viewport.Width)),
+                           expectedPixelOffsets[frameIndex].y * (2.f / static_cast<float>(viewport.Height)),
+                       });
+    }
+
+    const Graphics::TemporalJitterSample wrapped =
+        Graphics::ComputeTemporalJitterSample(Graphics::kTemporalJitterSequenceLength, viewport);
+    EXPECT_EQ(wrapped.SequenceIndex, 0u);
+    ExpectVec2Near(wrapped.PixelOffset, expectedPixelOffsets[0]);
+}
+
+TEST(RenderWorldContract, TemporalJitterAppliesProjectionOverrideAndSnapshotOffset)
+{
+    constexpr Core::Extent2D viewport{800u, 600u};
+    glm::mat4 projection{1.f};
+    projection[2][0] = 0.125f;
+    projection[2][1] = -0.25f;
+
+    const std::uint64_t frameIndex = 5u;
+    const Graphics::TemporalJitterSample sample =
+        Graphics::ComputeTemporalJitterSample(frameIndex, viewport);
+    ASSERT_TRUE(sample.Enabled);
+
+    const Graphics::TemporalCameraViewSnapshot temporalSnapshot = Graphics::BuildTemporalCameraViewSnapshot(
+        Graphics::CameraViewInput{
+            .View = glm::mat4{1.f},
+            .Projection = projection,
+            .Position = {0.f, 0.f, 0.f},
+            .Forward = {0.f, 0.f, -1.f},
+            .Up = {0.f, 1.f, 0.f},
+            .NearPlane = 0.1f,
+            .FarPlane = 100.f,
+            .Valid = true,
+        },
+        viewport,
+        {},
+        frameIndex,
+        true);
+
+    EXPECT_TRUE(temporalSnapshot.Camera.Valid);
+    EXPECT_TRUE(temporalSnapshot.HasTemporalJitter);
+    EXPECT_EQ(temporalSnapshot.JitterSequenceIndex, frameIndex % Graphics::kTemporalJitterSequenceLength);
+    ExpectVec2Near(temporalSnapshot.JitterOffset, sample.NdcOffset);
+    EXPECT_NEAR(temporalSnapshot.Camera.Projection[2][0], projection[2][0] + sample.NdcOffset.x, kJitterEpsilon);
+    EXPECT_NEAR(temporalSnapshot.Camera.Projection[2][1], projection[2][1] + sample.NdcOffset.y, kJitterEpsilon);
+    EXPECT_NEAR(temporalSnapshot.Camera.ViewProjection[2][0], temporalSnapshot.Camera.Projection[2][0], kJitterEpsilon);
+    EXPECT_NEAR(temporalSnapshot.Camera.ViewProjection[2][1], temporalSnapshot.Camera.Projection[2][1], kJitterEpsilon);
+}
+
+TEST(RenderWorldContract, NoJitterNoHistoryForcesZeroCameraJitter)
+{
+    constexpr Core::Extent2D viewport{800u, 600u};
+    const glm::mat4 projection{1.f};
+    const std::uint64_t frameIndex = 11u;
+
+    const Graphics::TemporalCameraViewSnapshot temporalSnapshot = Graphics::BuildTemporalCameraViewSnapshot(
+        Graphics::CameraViewInput{
+            .View = glm::mat4{1.f},
+            .Projection = projection,
+            .Position = {0.f, 0.f, 0.f},
+            .Forward = {0.f, 0.f, -1.f},
+            .Up = {0.f, 1.f, 0.f},
+            .NearPlane = 0.1f,
+            .FarPlane = 100.f,
+            .Valid = true,
+        },
+        viewport,
+        {},
+        frameIndex,
+        true,
+        true);
+
+    EXPECT_TRUE(temporalSnapshot.Camera.Valid);
+    EXPECT_FALSE(temporalSnapshot.HasTemporalJitter);
+    EXPECT_EQ(temporalSnapshot.JitterSequenceIndex, frameIndex % Graphics::kTemporalJitterSequenceLength);
+    ExpectVec2Near(temporalSnapshot.JitterOffset, glm::vec2{0.f});
+    EXPECT_EQ(temporalSnapshot.Camera.Projection, projection);
+}
+
 TEST(RenderWorldContract, ExposesRendererOwnedImmutableRuntimeSnapshots)
 {
     Tests::MockDevice device;
@@ -312,5 +424,3 @@ TEST(RenderWorldContract, BeginFrameRetainsRuntimeSnapshotSlotsUntilOverwrite)
 
     renderer->Shutdown();
 }
-
-

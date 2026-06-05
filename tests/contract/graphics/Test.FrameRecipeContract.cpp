@@ -8,6 +8,7 @@
 
 import Extrinsic.Graphics.FrameRecipe;
 import Extrinsic.Graphics.RenderGraph;
+import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.QueueAffinity;
 
@@ -115,6 +116,25 @@ namespace
     [[nodiscard]] bool Contains(const std::vector<std::string_view>& values, const std::string_view value)
     {
         return std::ranges::find(values, value) != values.end();
+    }
+
+    [[nodiscard]] bool HasTextureUsage(const RHI::TextureUsage flags,
+                                       const RHI::TextureUsage bit) noexcept
+    {
+        return (static_cast<std::uint32_t>(flags) & static_cast<std::uint32_t>(bit)) != 0u;
+    }
+
+    [[nodiscard]] std::uint32_t TextureIndexByName(const CompiledRenderGraph& compiled,
+                                                   const std::string_view textureName)
+    {
+        for (std::uint32_t i = 0u; i < compiled.TextureNames.size(); ++i)
+        {
+            if (compiled.TextureNames[i] == textureName)
+            {
+                return i;
+            }
+        }
+        return static_cast<std::uint32_t>(compiled.TextureNames.size());
     }
 
     [[nodiscard]] bool IsDepthBarrierState(const TextureBarrierState state) noexcept
@@ -315,6 +335,7 @@ TEST(FrameRecipeContract, OptionalResourcesAreGatedByFeatures)
     EXPECT_FALSE(HasEnabledResource(defaults, FrameRecipeResourceKind::ClusterLightHeaders));
     EXPECT_FALSE(HasEnabledResource(defaults, FrameRecipeResourceKind::ClusterLightIndices));
     EXPECT_FALSE(HasEnabledResource(defaults, FrameRecipeResourceKind::ClusterLightCounter));
+    EXPECT_FALSE(HasEnabledResource(defaults, FrameRecipeResourceKind::MotionVectors));
     EXPECT_TRUE(HasEnabledResource(defaults, FrameRecipeResourceKind::SceneColorLDR));
 
     FrameRecipeFeatures allFeatures{};
@@ -326,7 +347,9 @@ TEST(FrameRecipeContract, OptionalResourcesAreGatedByFeatures)
     allFeatures.EnableClusterGridBuild = true;
     allFeatures.EnableClusterLightAssignment = true;
 
-    const FrameRecipeIntrospection full = DescribeDefaultFrameRecipe(allFeatures);
+    const FrameRecipeIntrospection full = DescribeDefaultFrameRecipe(
+        allFeatures,
+        FrameRecipeTemporalOptions{.EnableMotionVectors = true});
     EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::EntityId));
     EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::PrimitiveId));
     EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::ShadowAtlas));
@@ -337,6 +360,7 @@ TEST(FrameRecipeContract, OptionalResourcesAreGatedByFeatures)
     EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::ClusterLightHeaders));
     EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::ClusterLightIndices));
     EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::ClusterLightCounter));
+    EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::MotionVectors));
 }
 
 TEST(FrameRecipeContract, LightingPathControlsGBufferResourcesAndComposition)
@@ -372,6 +396,99 @@ TEST(FrameRecipeContract, LightingPathControlsGBufferResourcesAndComposition)
         EXPECT_TRUE(Contains(surface->Writes, "Albedo"));
         EXPECT_TRUE(Contains(surface->Writes, "Material0"));
     }
+}
+
+TEST(FrameRecipeContract, MotionVectorTargetIsOptInRg16SurfaceOutput)
+{
+    FrameRecipeFeatures features{};
+    features.LightingPath = FrameRecipeLightingPath::Forward;
+    constexpr FrameRecipeTemporalOptions temporalOptions{.EnableMotionVectors = true};
+
+    const FrameRecipeIntrospection description = DescribeDefaultFrameRecipe(features, temporalOptions);
+    const auto* motion = FindResource(description, FrameRecipeResourceKind::MotionVectors);
+    ASSERT_NE(motion, nullptr);
+    EXPECT_TRUE(motion->Enabled);
+    EXPECT_TRUE(motion->Optional);
+    EXPECT_FALSE(motion->Imported);
+    EXPECT_EQ(motion->Name, std::string_view{"MotionVectors"});
+
+    const auto* surface = FindPass(description, FrameRecipePassKind::Surface);
+    ASSERT_NE(surface, nullptr);
+    EXPECT_TRUE(Contains(surface->Writes, "SceneColorHDR"));
+    EXPECT_TRUE(Contains(surface->Writes, "MotionVectors"));
+
+    RenderGraph graph;
+    const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
+        graph,
+        features,
+        MakeImports(),
+        FrameRecipeSizing{.Width = 640u, .Height = 360u},
+        FrameRecipeShadowSizing{},
+        temporalOptions);
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    {
+        const auto& compileResult = graph.GetLastCompileValidationResult();
+        ASSERT_TRUE(compiled.has_value())
+            << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
+    }
+
+    const std::uint32_t textureIndex = TextureIndexByName(*compiled, "MotionVectors");
+    ASSERT_LT(textureIndex, compiled->TextureNames.size());
+    const TextureResourceDesc* textureDesc = graph.GetTextureDescByIndex(textureIndex);
+    ASSERT_NE(textureDesc, nullptr);
+    EXPECT_EQ(textureDesc->Desc.Width, 640u);
+    EXPECT_EQ(textureDesc->Desc.Height, 360u);
+    EXPECT_EQ(textureDesc->Desc.Fmt, RHI::Format::RG16_FLOAT);
+    EXPECT_TRUE(HasTextureUsage(textureDesc->Desc.Usage, RHI::TextureUsage::ColorTarget));
+    EXPECT_TRUE(HasTextureUsage(textureDesc->Desc.Usage, RHI::TextureUsage::Sampled));
+
+    const std::uint32_t surfaceIndex = PassIndexByName(*compiled, "SurfacePass");
+    ASSERT_LT(surfaceIndex, compiled->PassNames.size());
+    bool foundMotionAttachment = false;
+    for (const CompiledRenderPassAttachment& attachment : compiled->RenderPassAttachments)
+    {
+        if (attachment.PassIndex == surfaceIndex &&
+            !attachment.IsDepthAttachment &&
+            attachment.ResourceIndex == textureIndex)
+        {
+            foundMotionAttachment = true;
+            EXPECT_EQ(attachment.Format, RHI::Format::RG16_FLOAT);
+        }
+    }
+    EXPECT_TRUE(foundMotionAttachment);
+}
+
+TEST(FrameRecipeContract, NoJitterNoHistorySuppressesMotionVectorTarget)
+{
+    FrameRecipeFeatures features{};
+    constexpr FrameRecipeTemporalOptions temporalOptions{
+        .NoJitterNoHistory = true,
+        .EnableMotionVectors = true,
+    };
+
+    const FrameRecipeIntrospection description = DescribeDefaultFrameRecipe(features, temporalOptions);
+    EXPECT_FALSE(HasEnabledResource(description, FrameRecipeResourceKind::MotionVectors));
+
+    RenderGraph graph;
+    const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
+        graph,
+        features,
+        MakeImports(),
+        FrameRecipeSizing{.Width = 640u, .Height = 360u},
+        FrameRecipeShadowSizing{},
+        temporalOptions);
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    {
+        const auto& compileResult = graph.GetLastCompileValidationResult();
+        ASSERT_TRUE(compiled.has_value())
+            << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
+    }
+    EXPECT_EQ(std::ranges::find(compiled->TextureNames, "MotionVectors"),
+              compiled->TextureNames.end());
 }
 
 TEST(FrameRecipeContract, DepthPrepassFeatureGatesPassAndSurfaceDepthOwnership)

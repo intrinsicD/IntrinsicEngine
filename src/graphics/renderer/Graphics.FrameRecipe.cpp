@@ -2,6 +2,7 @@ module;
 
 #include <cstdint>
 #include <initializer_list>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -159,6 +160,13 @@ namespace Extrinsic::Graphics
             RHI::ColorAttachment{.Target = RenderPassAttachmentToken(), .Load = RHI::LoadOp::Clear, .Store = RHI::StoreOp::Store},
         };
 
+        constexpr RHI::ColorAttachment kDefaultClearFourColorAttachments[] = {
+            RHI::ColorAttachment{.Target = RenderPassAttachmentToken(), .Load = RHI::LoadOp::Clear, .Store = RHI::StoreOp::Store},
+            RHI::ColorAttachment{.Target = RenderPassAttachmentToken(), .Load = RHI::LoadOp::Clear, .Store = RHI::StoreOp::Store},
+            RHI::ColorAttachment{.Target = RenderPassAttachmentToken(), .Load = RHI::LoadOp::Clear, .Store = RHI::StoreOp::Store},
+            RHI::ColorAttachment{.Target = RenderPassAttachmentToken(), .Load = RHI::LoadOp::Clear, .Store = RHI::StoreOp::Store},
+        };
+
         // GRAPHICS-077 Slice A — LOAD-store color attachment template for
         // the `TransientDebugSurfacePass` render-pass desc. The lit
         // composition must survive into the postprocess chain, so the
@@ -242,6 +250,12 @@ namespace Extrinsic::Graphics
 
     [[nodiscard]] FrameRecipeIntrospection DescribeDefaultFrameRecipe(const FrameRecipeFeatures& features)
     {
+        return DescribeDefaultFrameRecipe(features, FrameRecipeTemporalOptions{});
+    }
+
+    [[nodiscard]] FrameRecipeIntrospection DescribeDefaultFrameRecipe(const FrameRecipeFeatures& features,
+                                                                      const FrameRecipeTemporalOptions temporalOptions)
+    {
         const bool usesDeferred = UsesDeferredResources(features);
         // GRAPHICS-074 recipe-side follow-up — picking-active is the
         // recipe-wide condition that gates `PickingPass`, its `PrimitiveId`
@@ -256,6 +270,8 @@ namespace Extrinsic::Graphics
         const bool clusterGridBuildActive = features.EnableClusterGridBuild && features.EnableDepthPrepass;
         const bool clusterLightAssignmentActive =
             features.EnableClusterLightAssignment && clusterGridBuildActive;
+        const bool motionVectorsActive =
+            temporalOptions.EnableMotionVectors && !temporalOptions.NoJitterNoHistory;
         FrameRecipeIntrospection out{};
 
         AddPass(out, FrameRecipePassKind::Culling, "CullingPass", true, false,
@@ -290,11 +306,21 @@ namespace Extrinsic::Graphics
             // GRAPHICS-072 Slice C — the deferred SurfacePass is the GBuffer
             // pass; it no longer samples `ShadowAtlas`. Shadow sampling moved
             // to the deferred CompositionPass with `TextureUsage::ShaderRead`.
-            AddPass(out, FrameRecipePassKind::Surface, "SurfacePass", true, false,
-                    {"GpuWorld.SceneTable", "GpuWorld.InstanceStatic", "GpuWorld.InstanceDynamic", "GpuWorld.GeometryRecords", "Material.Buffer", "Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count", "SceneDepth"},
-                    features.EnableDepthPrepass
-                        ? std::initializer_list<std::string_view>{"SceneNormal", "Albedo", "Material0"}
-                        : std::initializer_list<std::string_view>{"SceneNormal", "Albedo", "Material0", "SceneDepth"});
+            std::vector<std::string_view> surfaceWrites =
+                features.EnableDepthPrepass
+                    ? std::vector<std::string_view>{"SceneNormal", "Albedo", "Material0"}
+                    : std::vector<std::string_view>{"SceneNormal", "Albedo", "Material0", "SceneDepth"};
+            if (motionVectorsActive)
+            {
+                surfaceWrites.push_back("MotionVectors");
+            }
+            AddPassWithVectors(out,
+                               FrameRecipePassKind::Surface,
+                               "SurfacePass",
+                               true,
+                               false,
+                               {"GpuWorld.SceneTable", "GpuWorld.InstanceStatic", "GpuWorld.InstanceDynamic", "GpuWorld.GeometryRecords", "Material.Buffer", "Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count", "SceneDepth"},
+                               std::move(surfaceWrites));
         }
         else
         {
@@ -314,13 +340,18 @@ namespace Extrinsic::Graphics
                 surfaceReads.push_back("ClusterLights.Headers");
                 surfaceReads.push_back("ClusterLights.Indices");
             }
+            std::vector<std::string_view> surfaceWrites{"SceneColorHDR", "SceneDepth"};
+            if (motionVectorsActive)
+            {
+                surfaceWrites.push_back("MotionVectors");
+            }
             AddPassWithVectors(out,
                                FrameRecipePassKind::Surface,
                                "SurfacePass",
                                true,
                                false,
                                std::move(surfaceReads),
-                               {"SceneColorHDR", "SceneDepth"});
+                               std::move(surfaceWrites));
         }
         std::vector<std::string_view> compositionReads{
             "SceneNormal",
@@ -448,6 +479,7 @@ namespace Extrinsic::Graphics
         AddResource(out, FrameRecipeResourceKind::SceneNormal, "SceneNormal", usesDeferred, false, false, true);
         AddResource(out, FrameRecipeResourceKind::Albedo, "Albedo", usesDeferred, false, false, true);
         AddResource(out, FrameRecipeResourceKind::Material0, "Material0", usesDeferred, false, false, true);
+        AddResource(out, FrameRecipeResourceKind::MotionVectors, "MotionVectors", motionVectorsActive, false, false, true);
         AddResource(out, FrameRecipeResourceKind::SceneColorHDR, "SceneColorHDR", true);
         // GRAPHICS-073 Slice B — declare ShadowAtlas as imported-write-allowed.
         // `BuildDefaultFrameRecipe` chooses between an imported handle (when
@@ -586,6 +618,21 @@ namespace Extrinsic::Graphics
                                                                         const FrameRecipeSizing& sizing,
                                                                         const FrameRecipeShadowSizing& shadowSizing)
     {
+        return BuildDefaultFrameRecipe(graph,
+                                       features,
+                                       imports,
+                                       sizing,
+                                       shadowSizing,
+                                       FrameRecipeTemporalOptions{});
+    }
+
+    [[nodiscard]] FrameRecipeBuildResult BuildDefaultFrameRecipe(RenderGraph& graph,
+                                                                        const FrameRecipeFeatures& features,
+                                                                        const FrameRecipeImports& imports,
+                                                                        const FrameRecipeSizing& sizing,
+                                                                        const FrameRecipeShadowSizing& shadowSizing,
+                                                                        const FrameRecipeTemporalOptions temporalOptions)
+    {
         if (!imports.Backbuffer.IsValid())
         {
             return FrameRecipeBuildResult{
@@ -608,9 +655,11 @@ namespace Extrinsic::Graphics
             features.EnableClusterLightAssignment && clusterGridBuildActive &&
             imports.ClusterLightHeaders.IsValid() && imports.ClusterLightIndices.IsValid() &&
             imports.ClusterLightCounter.IsValid();
+        const bool motionVectorsActive =
+            temporalOptions.EnableMotionVectors && !temporalOptions.NoJitterNoHistory;
         const auto width = ClampExtent(sizing.Width);
         const auto height = ClampExtent(sizing.Height);
-        const FrameRecipeIntrospection declaration = DescribeDefaultFrameRecipe(features);
+        const FrameRecipeIntrospection declaration = DescribeDefaultFrameRecipe(features, temporalOptions);
 
         const auto backbuffer = graph.ImportBackbuffer("Backbuffer", imports.Backbuffer);
         const auto sceneTable = graph.ImportBuffer("GpuWorld.SceneTable", imports.SceneTable, BufferState::ShaderRead, BufferState::ShaderRead);
@@ -635,6 +684,7 @@ namespace Extrinsic::Graphics
         TextureRef sceneNormal{};
         TextureRef albedo{};
         TextureRef material0{};
+        TextureRef motionVectors{};
         TextureRef shadowAtlas{};
         TextureRef ldr{};
         TextureRef postProcessBloomScratch{};
@@ -714,6 +764,11 @@ namespace Extrinsic::Graphics
             sceneNormal = graph.CreateTexture("SceneNormal", ColorTargetDesc(width, height, RHI::Format::RGBA16_FLOAT, "SceneNormal"));
             albedo = graph.CreateTexture("Albedo", ColorTargetDesc(width, height, RHI::Format::RGBA8_UNORM, "Albedo"));
             material0 = graph.CreateTexture("Material0", ColorTargetDesc(width, height, RHI::Format::RGBA16_FLOAT, "Material0"));
+        }
+        if (motionVectorsActive)
+        {
+            motionVectors = graph.CreateTexture("MotionVectors",
+                                                ColorTargetDesc(width, height, RHI::Format::RG16_FLOAT, "MotionVectors"));
         }
         if (features.EnableShadows)
         {
@@ -1017,10 +1072,18 @@ namespace Extrinsic::Graphics
                 builder.Write(sceneNormal, TextureUsage::ColorAttachmentWrite);
                 builder.Write(albedo, TextureUsage::ColorAttachmentWrite);
                 builder.Write(material0, TextureUsage::ColorAttachmentWrite);
+                if (motionVectorsActive)
+                {
+                    builder.Write(motionVectors, TextureUsage::ColorAttachmentWrite);
+                }
             }
             else
             {
                 builder.Write(hdr, TextureUsage::ColorAttachmentWrite);
+                if (motionVectorsActive)
+                {
+                    builder.Write(motionVectors, TextureUsage::ColorAttachmentWrite);
+                }
             }
             const RHI::DepthAttachment surfaceDepthAttachment{
                 .Target = RenderPassAttachmentToken(),
@@ -1030,14 +1093,18 @@ namespace Extrinsic::Graphics
             if (usesDeferred)
             {
                 builder.SetRenderPass(RHI::RenderPassDesc{
-                    .ColorTargets = kDefaultClearThreeColorAttachments,
+                    .ColorTargets = motionVectorsActive
+                        ? std::span<const RHI::ColorAttachment>{kDefaultClearFourColorAttachments}
+                        : std::span<const RHI::ColorAttachment>{kDefaultClearThreeColorAttachments},
                     .Depth = surfaceDepthAttachment,
                 });
             }
             else
             {
                 builder.SetRenderPass(RHI::RenderPassDesc{
-                    .ColorTargets = kDefaultClearColorAttachments,
+                    .ColorTargets = motionVectorsActive
+                        ? std::span<const RHI::ColorAttachment>{kDefaultClearTwoColorAttachments}
+                        : std::span<const RHI::ColorAttachment>{kDefaultClearColorAttachments},
                     .Depth = surfaceDepthAttachment,
                 });
             }

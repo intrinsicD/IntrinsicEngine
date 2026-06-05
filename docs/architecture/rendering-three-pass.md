@@ -40,6 +40,7 @@ The render graph blackboard exposes a fixed canonical resource vocabulary:
 | `SceneNormal` | `R16G16B16A16_SFLOAT` | Frame transient | Deferred-capable surface normal target; also sampleable for debug |
 | `Albedo` | `R8G8B8A8_UNORM` | Frame transient | Deferred-capable surface albedo target |
 | `Material0` | `R16G16B16A16_SFLOAT` | Frame transient | Deferred-capable surface material/shading parameters |
+| `MotionVectors` | `R16G16_SFLOAT` (`RHI::Format::RG16_FLOAT`) | Frame transient, opt-in | Screen-space current-to-previous NDC delta target declared by `SurfacePass` when `FrameRecipeTemporalOptions::EnableMotionVectors` is true and `NoJitterNoHistory` is false; shader encoding/reconstructor consumption remain GRAPHICS-040B/C |
 | `SceneColorHDR` | `R16G16B16A16_SFLOAT` | Frame transient | Geometry/lighting output |
 | `ShadowAtlas` | `D32_SFLOAT` | Frame transient | Cascade shadow depth atlas (horizontal strip, one cascade per column block). Produced by `ShadowPass`, sampled by `SurfacePass` (forward) and `CompositionPass` (deferred) |
 | `SceneColorLDR` | Swapchain format | Frame transient | Post-process + overlay composition target |
@@ -252,12 +253,13 @@ Material classification for later implementation subtasks is:
   declare its depth-write, sorting, and selection eligibility policy in the
   child task that implements it.
 
-The fixed resource requirements are `SceneColorHDR` and `SceneDepth`. Velocity,
-history, per-material sorting buffers, and OIT attachments are not current
-frame-recipe resources. A future TAA/motion-vector task may add velocity/history
-resources, and a future transparency task may choose either sorted alpha
-blending or explicit OIT resources; that task must define the extra framegraph
-resources, memory ownership, CPU/null contract tests, and optional
+The fixed resource requirements are `SceneColorHDR` and `SceneDepth`.
+`MotionVectors` is now a current opt-in frame-recipe resource for TAA/external
+reconstruction setup, but history color and reconstructor outputs remain future
+`GRAPHICS-040B/C` resources. Per-material sorting buffers and OIT attachments
+are not current frame-recipe resources; a future transparency task may choose
+either sorted alpha blending or explicit OIT resources and must define the extra
+framegraph resources, memory ownership, CPU/null contract tests, and optional
 `gpu;vulkan` smoke coverage.
 
 Implementation split points are:
