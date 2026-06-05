@@ -13,6 +13,21 @@
 - Allowed: `core` and geometry handles/types only when explicitly justified.
 - Disallowed: direct dependency on graphics/runtime/app internals.
 
+## Physics authoring boundary
+
+Physics layer ownership is accepted in
+[ADR-0019](../adr/0019-physics-layer-ownership-and-ecs-integration.md).
+ECS owns authoring intent only: collider/body descriptors, local collider
+poses, material/filtering/trigger intent, enabled state, and CPU-only geometry
+descriptors when explicitly justified. Physics-world handles, broadphase
+proxies, contact caches, islands, solver indices, runtime sidecars, graphics
+handles, and RHI handles are forbidden in canonical ECS components.
+
+Runtime owns ECS-to-physics synchronization, fixed-step scheduling, live handle
+sidecars, physics-to-ECS transform writeback, and contact/event routing.
+Compound colliders are explicit child-shape descriptors under a collider/body;
+the ECS scene hierarchy is not a compound-collider tree.
+
 ## Stable identity and scene metadata
 
 The volatile `entt::entity` value is unsuitable as a serialized

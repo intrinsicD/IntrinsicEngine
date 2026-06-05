@@ -20,9 +20,10 @@ Required dependency boundaries:
 - `geometry` -> `core`
 - `assets` -> `core`
 - `ecs` -> `core`; geometry handles/types only when explicitly required
+- `physics` -> `core`, `geometry`; no live ECS/runtime/graphics/platform/app ownership
 - `graphics/rhi` -> `core`
 - `graphics/*` -> `core`, asset IDs, `graphics/rhi`, geometry GPU views; no live ECS knowledge
-- `runtime` -> lower layers; owns composition/wiring
+- `runtime` -> lower layers; owns composition/wiring, including physics bridge ownership
 - `app` -> `runtime` only
 - `methods` -> public method API + declared backend integration only
 - `benchmarks` -> public method APIs only

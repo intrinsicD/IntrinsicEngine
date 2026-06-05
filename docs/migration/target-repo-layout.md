@@ -19,6 +19,7 @@ IntrinsicEngine/
     assets/
     ecs/
     geometry/
+    physics/
     graphics/
       rhi/
       vulkan/

@@ -80,6 +80,15 @@ class CheckLayeringFixtureTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("No layering violations found", result.stdout)
 
+    def test_positive_clean_physics_passes(self) -> None:
+        result = run_checker(
+            "--root",
+            str(FIXTURES / "positive_clean_physics"),
+            "--strict",
+        )
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("No layering violations found", result.stdout)
+
     def test_negative_rhi_imports_platform_window_fails(self) -> None:
         result = run_checker(
             "--root",
@@ -131,6 +140,20 @@ class CheckLayeringFixtureTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertIn("core cannot depend on geometry", result.stdout)
         self.assertIn("Extrinsic.Geometry.HalfedgeMesh", result.stdout)
+
+    def test_negative_physics_imports_higher_layers_fails(self) -> None:
+        result = run_checker(
+            "--root",
+            str(FIXTURES / "negative_physics_imports_higher_layers"),
+            "--strict",
+        )
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("physics cannot depend on ecs", result.stdout)
+        self.assertIn("physics cannot depend on runtime", result.stdout)
+        self.assertIn("physics cannot depend on graphics", result.stdout)
+        self.assertIn("physics cannot depend on platform", result.stdout)
+        self.assertIn("physics cannot depend on app", result.stdout)
+        self.assertIn("Extrinsic.Runtime.Engine", result.stdout)
 
     def test_bulk_fixture_scan_with_exclude_passes(self) -> None:
         result = run_checker(

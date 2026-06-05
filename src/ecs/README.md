@@ -287,26 +287,25 @@ scene-side use case, not by graphics or solver consumers.
 ## Collider vs rigid-body authoring
 
 `ECS.Component.Collider` stores **CPU geometric descriptors only** — currently
-a vector of `Geometry::Sphere`. The promoted ECS layer does not own the
-authoring contract for rigid-body solver state: that is governed by
-[`HARDEN-064`](../../tasks/backlog/ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md),
-which is itself gated on the physics layer ownership decision tracked by
-[`ARCH-001`](../../tasks/backlog/physics/ARCH-001-physics-layer-ownership-and-ecs-integration.md).
+a vector of `Geometry::Sphere`. [ADR-0019](../../docs/adr/0019-physics-layer-ownership-and-ecs-integration.md)
+accepts `src/physics` as the future simulation-world layer and keeps ECS as
+authoring intent only. The concrete collider/rigid-body descriptor expansion is
+governed by
+[`HARDEN-064`](../../tasks/backlog/ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md).
 
-Until the physics ownership decision lands, ECS is forbidden from storing
-rigid-body or solver-owned state on collider components; the contract
-test enforces this by rejecting `RigidBody*`, `PhysicsBody*`, `Broadphase*`,
-`ContactCache*`, `IslandId`, and `SolverIndex` mentions inside `src/ecs`.
+ECS is forbidden from storing rigid-body solver-owned state on collider
+components; the contract test enforces this by rejecting `RigidBody*`,
+`PhysicsBody*`, `Broadphase*`, `ContactCache*`, `IslandId`, and
+`SolverIndex` mentions inside `src/ecs`.
 
 ## Scene hierarchy vs collider hierarchy
 
 `ECS.Component.Hierarchy` describes the **scene-graph** parent/child
 relationship used by the promoted `TransformHierarchy` traversal: parent,
 first-child, sibling links, child count, and a stable `EntityHandle`. It
-does **not** implicitly define a compound-collider topology. A future
-physics layer that introduces compound colliders must declare its own
-parent/child relationship — likely as a separate component owned by the
-physics or runtime layer — rather than re-using the scene hierarchy as
-the collider tree. The contract test rejects `Collider`, `Compound`, and
+does **not** implicitly define a compound-collider topology. Compound colliders
+must be explicit collider child-shape descriptors with local poses under the
+physics authoring contract rather than re-using the scene hierarchy as the
+collider tree. The contract test rejects `Collider`, `Compound`, and
 `RigidBody`/`PhysicsBody` mentions inside the hierarchy component to
 preserve this separation.

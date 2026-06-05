@@ -19,7 +19,7 @@ The documented label set is:
 - categories: `unit`, `contract`, `integration`, `regression`, `benchmark`,
   `slo`.
 - subsystems/ownership: `assets`, `build`, `core`, `ecs`, `geometry`,
-  `graphics`, `headless`, `platform`, `runtime`.
+  `graphics`, `headless`, `physics`, `platform`, `runtime`.
 - capabilities/backends: `glfw`, `gpu`, `vulkan`.
 - opt-in filters: `slow`, `flaky-quarantine`.
 

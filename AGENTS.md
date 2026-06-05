@@ -44,6 +44,7 @@ The following dependency boundaries are mandatory:
 - `geometry` -> `core`.
 - `assets` -> `core`.
 - `ecs` -> `core`; may use geometry handles/types only when explicitly required.
+- `physics` -> `core`, `geometry`; owns simulation world/state, never live ECS/runtime/graphics/platform/app.
 - `graphics/rhi` -> `core`.
 - `graphics/assets` -> `core`, asset IDs (`Asset.Registry` types only), `graphics/rhi`; no live `AssetService` traffic.
 - `graphics/vulkan` -> `core`, `graphics/rhi`, backend-local Vulkan dependencies (`Vulkan::Vulkan`, `volk`,
@@ -51,7 +52,7 @@ The following dependency boundaries are mandatory:
   RHI/renderer APIs.
 - `graphics/*` -> `core`, asset IDs, `graphics/rhi`, geometry GPU views; **no live ECS knowledge**.
 - `platform` -> `core`.
-- `runtime` -> all lower layers; owns composition/wiring.
+- `runtime` -> all lower layers; owns composition/wiring, including ECS-to-physics synchronization and physics-to-ECS writeback.
 - `app` -> `runtime` only.
 - `methods` -> public method API + declared backend integration only.
 - `benchmarks` -> public method APIs only.
@@ -68,6 +69,7 @@ Target source layout:
 - `src/assets/`.
 - `src/ecs/`.
 - `src/geometry/`.
+- `src/physics/` (approved by ADR-0019; implementation lands only under scoped physics tasks).
 - `src/graphics/rhi/`, `src/graphics/assets/`, `src/graphics/vulkan/`, `src/graphics/framegraph/`,
   `src/graphics/renderer/`.
 - `src/runtime/`.
@@ -87,6 +89,10 @@ Agents must enforce ownership and dependency flow:
 - Lower layers never import higher layers.
 - Runtime wiring remains in `runtime`; lower subsystems remain reusable.
 - Graphics subsystems operate on snapshots/views, not live gameplay ownership.
+- `physics` owns simulation world/state and may use geometry collision/math kernels, but must not import live ECS,
+  runtime, graphics/RHI, platform, app, live asset services, or method packages.
+- ECS physics authoring components store CPU descriptors only. Runtime owns any live sidecar that maps ECS identity to
+  physics handles, fixed-step scheduling, and simulation writeback.
 - `assets` is CPU-only and GPU-agnostic; GPU-side asset state lives in `src/graphics/assets/` and is wired by `runtime`
   from asset events.
 - `platform` exposes window/input ports and explicit backends; it must not import `graphics`, `ecs`, or `runtime`.
@@ -155,7 +161,7 @@ For each change:
 - Preserve or improve pass rate unless a temporary shim is documented.
 - Label tests using the documented CTest allow-list in `tests/README.md` and `tests/CMakeLists.txt` (categories:
   `unit`, `contract`, `integration`, `regression`, `benchmark`, `slo`; ownership labels:
-  `assets`, `build`, `core`, `ecs`, `geometry`, `graphics`, `headless`, `platform`, `runtime`; capabilities:
+  `assets`, `build`, `core`, `ecs`, `geometry`, `graphics`, `headless`, `physics`, `platform`, `runtime`; capabilities:
   `glfw`, `gpu`, `vulkan`; opt-in labels: `slow`, `flaky-quarantine`). New labels must update both files in the same
   change.
 - New C++ test files use `Test.<Name>.cpp`; existing `Test_*.cpp` files are compatibility carryover and should only be

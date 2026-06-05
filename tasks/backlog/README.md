@@ -114,16 +114,22 @@ Members:
   frame generation. See [`rendering/README.md`](rendering/README.md) for the
   full list and DAG.
 
-### Theme C — Physics readiness (P1, gated by ARCH-001)
+### Theme C — Physics readiness (P1, ARCH-001 accepted)
 
 Define physics layer ownership before any solver code lands; then implement the
-rigid-body reference backend behind that contract.
+ECS authoring, CPU reference, and physics-world/runtime bridge behind that
+contract.
 
 Members:
-- [`physics/ARCH-001-physics-layer-ownership-and-ecs-integration.md`](physics/ARCH-001-physics-layer-ownership-and-ecs-integration.md) (gating decision).
+- [`ARCH-001`](../done/ARCH-001-physics-layer-ownership-and-ecs-integration.md)
+  (done 2026-06-05) — accepted `src/physics` as `physics -> core, geometry`
+  via [ADR-0019](../../docs/adr/0019-physics-layer-ownership-and-ecs-integration.md).
 - [`physics/ARCH-002-physics-phenomena-roadmap.md`](physics/ARCH-002-physics-phenomena-roadmap.md).
 - [`methods/METHOD-001-rigid-body-dynamics-reference-backend.md`](methods/METHOD-001-rigid-body-dynamics-reference-backend.md).
 - [`ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md`](ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md) (also Theme D).
+- [`physics/PHYSICS-001-physics-world-state-and-runtime-sync.md`](physics/PHYSICS-001-physics-world-state-and-runtime-sync.md).
+- [`physics/PHYSICS-002-collision-broadphase-narrowphase-contract.md`](physics/PHYSICS-002-collision-broadphase-narrowphase-contract.md).
+- [`physics/PHYSICS-003-constraints-islands-and-solver-diagnostics.md`](physics/PHYSICS-003-constraints-islands-and-solver-diagnostics.md).
 
 ### Theme D — ECS hardening parity (P0)
 
@@ -214,10 +220,18 @@ promoting backlog tasks to active so per-category DAGs do not diverge.
 - **HARDEN-067 ⇐ RUNTIME-091 or equivalent scheduling decision.** Bounds
   propagation can be implemented independently, but default-runtime usefulness
   depends on a known ECS system activation path.
-- **METHOD-001 ⇐ ARCH-001.** Rigid-body reference must wait for the physics
-  layer ownership decision before runtime/ECS integration.
-- **HARDEN-064 ⇐ ARCH-001.** ECS collider/rigid-body authoring contract must
-  wait for the physics layer ownership decision.
+- **METHOD-001 ⇐ ARCH-001.** Satisfied 2026-06-05: the physics layer
+  ownership decision is accepted. Runtime/ECS integration remains out of
+  scope for the method package and is owned by physics/runtime follow-ups.
+- **HARDEN-064 ⇐ ARCH-001.** Satisfied 2026-06-05: ECS collider/rigid-body
+  authoring may proceed under ADR-0019 without storing solver handles in ECS.
+- **PHYSICS-001 ⇐ HARDEN-064, METHOD-001.** The first physics world/runtime
+  sync source task waits for the ECS authoring descriptors and enough CPU
+  reference coverage to validate deterministic stepping.
+- **PHYSICS-002 ⇐ PHYSICS-001.** Collision broadphase/narrowphase contracts
+  depend on the physics world/body descriptor surface.
+- **PHYSICS-003 ⇐ PHYSICS-001, PHYSICS-002.** Constraint/island/sleep solver
+  diagnostics depend on world lifecycle and collision contacts.
 - **GRAPHICS-035..058 ⇐ Theme A.** Theme A's visible-geometry foundation is
   complete; rendering modernization leaves are now gated by their individual
   task dependencies and the rendering DAG.

@@ -21,7 +21,7 @@ This document defines the canonical test classification policy for IntrinsicEngi
 
 Target directory ownership:
 
-- `tests/unit/` for unit tests by subsystem (`core`, `assets`, `ecs`, `geometry`, `graphics`, `runtime`).
+- `tests/unit/` for unit tests by subsystem (`core`, `assets`, `ecs`, `geometry`, `physics`, `graphics`, `runtime`).
 - `tests/contract/` for architecture and lifecycle contract checks.
 - `tests/integration/` for multi-subsystem tests (headless runtime/app flows).
 - `tests/gpu/` for GPU-dependent backend tests.

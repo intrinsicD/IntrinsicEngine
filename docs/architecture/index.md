@@ -22,6 +22,7 @@ Status labels:
 - [Geometry API style and numeric policy](geometry-api-style.md) (`canonical`)
 - [Assets](assets.md) (`canonical`)
 - [ECS](ecs.md) (`canonical`)
+- [Physics](physics.md) (`canonical`)
 - [Task graphs](task-graphs.md) (`canonical`)
 - [Frame graph](frame-graph.md) (`canonical`)
 - [Module rules](module-rules.md) (`canonical`)
@@ -49,6 +50,7 @@ Status labels:
 - [`0016-texture-residency-and-asset-cache-policy.md`](../adr/0016-texture-residency-and-asset-cache-policy.md) (`canonical`)
 - [`0017-default-debug-surface-material.md`](../adr/0017-default-debug-surface-material.md) (`canonical`)
 - [`0018-missing-material-fallback-substitution.md`](../adr/0018-missing-material-fallback-substitution.md) (`canonical`)
+- [`0019-physics-layer-ownership-and-ecs-integration.md`](../adr/0019-physics-layer-ownership-and-ecs-integration.md) (`canonical`)
 
 ## Existing architecture references by status
 

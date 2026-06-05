@@ -52,7 +52,7 @@ authoritative for these.
 | Skill | Purpose | Triggers on |
 | --- | --- | --- |
 | `intrinsicengine-diagnose` | Disciplined diagnosis loop: feedback-loop → reproduce → rank hypotheses → instrument with tagged probes → fix → regression-test → cleanup. Adapted with C++/Vulkan tooling (ctest labels, validation layers, RenderDoc, backend differentials, benchmark baselines). | "diagnose this", crashes, validation-layer errors, CPU/null gate failures, reference-vs-optimized parity mismatches, benchmark regressions |
-| `intrinsicengine-zoom-out` | One-shot layer-cake map of an unfamiliar file using the engine's domain vocabulary (`core`/`geometry`/`assets`/`ecs`/`graphics/*`/`runtime`/`app`/`methods`) and `.cppm` module surfaces. | "zoom out", "where does this fit", "give me the layer map" |
+| `intrinsicengine-zoom-out` | One-shot layer-cake map of an unfamiliar file using the engine's domain vocabulary (`core`/`geometry`/`assets`/`ecs`/`physics`/`graphics/*`/`runtime`/`app`/`methods`) and `.cppm` module surfaces. | "zoom out", "where does this fit", "give me the layer map" |
 | `intrinsicengine-handoff` | Compact the current conversation into a handoff document for the next agent. Saves to `$TMPDIR`, never into the repo (no in-tree planning docs). | "handoff", "compact this", end-of-session summarization |
 
 ## Authority chain (important)

@@ -1,6 +1,6 @@
 ---
 name: intrinsicengine-core
-description: Authoritative repository contract for IntrinsicEngine — a modular C++23 Vulkan-based research engine for graphics and geometry processing. Defines layering invariants (core/geometry/assets/ecs/graphics/runtime/app), C++23 module rules with clang-20 + clang-scan-deps-20, the CMake preset workflow, the task-driven slice discipline, and the default CPU correctness gate. Use this skill whenever working in any clone of `IntrinsicEngine`, touching any file under `src/`, `tasks/`, `methods/`, `benchmarks/`, `docs/`, or `tools/`, or when asked about layer ownership, module conventions, build commands, the CI preset, the agentic workflow, or anything that mentions IntrinsicEngine, `AGENTS.md`, or repository policy — even if the user does not explicitly ask for the contract.
+description: Authoritative repository contract for IntrinsicEngine — a modular C++23 Vulkan-based research engine for graphics and geometry processing. Defines layering invariants (core/geometry/assets/ecs/physics/graphics/runtime/app), C++23 module rules with clang-20 + clang-scan-deps-20, the CMake preset workflow, the task-driven slice discipline, and the default CPU correctness gate. Use this skill whenever working in any clone of `IntrinsicEngine`, touching any file under `src/`, `tasks/`, `methods/`, `benchmarks/`, `docs/`, or `tools/`, or when asked about layer ownership, module conventions, build commands, the CI preset, the agentic workflow, or anything that mentions IntrinsicEngine, `AGENTS.md`, or repository policy — even if the user does not explicitly ask for the contract.
 ---
 
 # IntrinsicEngine Core Contract
@@ -44,12 +44,13 @@ Dependency boundaries — lower layers never import higher layers:
 - `geometry` → `core`
 - `assets` → `core`
 - `ecs` → `core`; geometry handles/types only when explicitly required
+- `physics` → `core`, `geometry`; no live ECS/runtime/graphics/platform/app ownership
 - `graphics/rhi` → `core`
 - `graphics/assets` → `core`, asset IDs (`Asset.Registry` types only), `graphics/rhi`; no live `AssetService` traffic
 - `graphics/vulkan` → `core`, `graphics/rhi`, backend-local Vulkan deps (`Vulkan::Vulkan`, `volk`, `VulkanMemoryAllocator`, `glfw`); **no ECS, runtime, or live asset-service knowledge**, and no `Vk*` types through RHI/renderer APIs
 - `graphics/*` → `core`, asset IDs, `graphics/rhi`, geometry GPU views; **no live ECS knowledge**
 - `platform` → `core`
-- `runtime` → all lower layers; owns composition/wiring
+- `runtime` → all lower layers; owns composition/wiring, including physics bridge ownership
 - `app` → `runtime` only
 - `methods` → public method API + declared backend integration only
 - `benchmarks` → public method APIs only

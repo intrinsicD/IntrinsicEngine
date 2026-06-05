@@ -27,9 +27,12 @@ map.
 - HARDEN-060..062 are required prerequisites for **Theme A — Shortest path to
   sandbox visible geometry** (renderable extraction needs promoted scene
   bootstrap and hierarchy/transform behavior).
-- HARDEN-064 is in **Theme C — Physics readiness** and is gated by
-  [`physics/ARCH-001`](../physics/ARCH-001-physics-layer-ownership-and-ecs-integration.md);
-  it must not start before that decision lands.
+- HARDEN-064 is in **Theme C — Physics readiness**. The upstream
+  [`ARCH-001`](../../done/ARCH-001-physics-layer-ownership-and-ecs-integration.md)
+  gate is accepted via
+  [ADR-0019](../../../docs/adr/0019-physics-layer-ownership-and-ecs-integration.md),
+  so the ECS authoring contract may proceed without storing physics-world
+  handles in canonical ECS components.
 - HARDEN-065 is a near-term follow-up from the
   [`src/ecs` gap analysis](../../../docs/reviews/2026-05-13-src-ecs-gap-analysis.md)
   and must not move GPU residency or runtime extraction ownership into ECS.

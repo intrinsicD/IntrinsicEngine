@@ -26,3 +26,8 @@ Drop a new positive or negative directory beside the existing ones using the
 same `<positive|negative>_<short_label>/src/<layer>/` shape, add a single
 file demonstrating the edge, and extend `Test.CheckLayering.py` if the case
 exercises a new violation type.
+
+`positive_clean_physics` and `negative_physics_imports_higher_layers` pin the
+`ARCH-001` physics-layer contract: future `src/physics` modules may import
+`core` and `geometry`, but not `ecs`, `runtime`, `graphics`, `platform`, or
+`app`.

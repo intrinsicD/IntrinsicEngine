@@ -1,6 +1,6 @@
 ---
 name: intrinsicengine-zoom-out
-description: Ask the agent to zoom out and give a layer-cake map of the code under discussion, using IntrinsicEngine's domain vocabulary (`core`, `geometry`, `assets`, `ecs`, `graphics/rhi`, `graphics/vulkan`, `graphics/*`, `platform`, `runtime`, `app`, `methods`, `benchmarks`, `tests`) and `.cppm` module surfaces. Use when you're unfamiliar with a section of code, need higher-level context before editing, or want a map of how a touched file fits the larger system. Trigger phrases include "zoom out", "give me the layer map", "where does this fit", "I don't know this area".
+description: Ask the agent to zoom out and give a layer-cake map of the code under discussion, using IntrinsicEngine's domain vocabulary (`core`, `geometry`, `assets`, `ecs`, `physics`, `graphics/rhi`, `graphics/vulkan`, `graphics/*`, `platform`, `runtime`, `app`, `methods`, `benchmarks`, `tests`) and `.cppm` module surfaces. Use when you're unfamiliar with a section of code, need higher-level context before editing, or want a map of how a touched file fits the larger system. Trigger phrases include "zoom out", "give me the layer map", "where does this fit", "I don't know this area".
 disable-model-invocation: true
 ---
 
@@ -11,8 +11,8 @@ I don't know this area of the engine well. Go up a layer of abstraction.
 Give me:
 
 1. **Which layer this file lives in** (`core` / `geometry` / `assets` / `ecs` /
-   `graphics/rhi` / `graphics/vulkan` / `graphics/<other>` / `platform` /
-   `runtime` / `app` / `methods` / `benchmarks` / `tests`).
+   `physics` / `graphics/rhi` / `graphics/vulkan` / `graphics/<other>` /
+   `platform` / `runtime` / `app` / `methods` / `benchmarks` / `tests`).
 2. **The `.cppm` module surface(s) it exports or imports** — what names are
    visible across the layer boundary, and what is implementation-private.
 3. **The layers above and below** that depend on or are depended on by this

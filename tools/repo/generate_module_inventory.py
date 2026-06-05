@@ -14,6 +14,7 @@ SRC_LAYER_BY_TOP = {
     "geometry": "geometry",
     "assets": "assets",
     "ecs": "ecs",
+    "physics": "physics",
     "runtime": "runtime",
     "platform": "platform",
     "app": "app",

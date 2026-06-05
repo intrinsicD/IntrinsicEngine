@@ -62,6 +62,7 @@ LAYER_NAMES = {
     "geometry",
     "assets",
     "ecs",
+    "physics",
     "graphics_rhi",
     "graphics",
     "runtime",
@@ -75,9 +76,10 @@ ALLOWED_DEPS = {
     "geometry": {"core"},
     "assets": {"core"},
     "ecs": {"core", "geometry"},
+    "physics": {"core", "geometry"},
     "graphics_rhi": {"core"},
     "graphics": {"core", "assets", "graphics_rhi", "geometry"},
-    "runtime": {"core", "geometry", "assets", "ecs", "graphics_rhi", "graphics", "platform", "legacy"},
+    "runtime": {"core", "geometry", "assets", "ecs", "physics", "graphics_rhi", "graphics", "platform", "legacy"},
     "platform": {"core"},
     "app": {"runtime"},
     "legacy": {"legacy"},
@@ -94,6 +96,7 @@ MODULE_PREFIX_LAYERS: tuple[tuple[str, str], ...] = (
     ("Extrinsic.Asset.", "assets"),
     ("Extrinsic.Assets.", "assets"),
     ("Extrinsic.ECS.", "ecs"),
+    ("Extrinsic.Physics.", "physics"),
     ("Extrinsic.Geometry.", "geometry"),
     ("Extrinsic.Core.", "core"),
     ("Extrinsic.Platform.", "platform"),
@@ -123,6 +126,8 @@ CMAKE_TARGET_LAYERS: tuple[tuple[str, str], ...] = (
     ("ExtrinsicAssets", "assets"),
     ("ExtrinsicECS", "ecs"),
     ("IntrinsicECS", "ecs"),
+    ("ExtrinsicPhysics", "physics"),
+    ("IntrinsicPhysics", "physics"),
     ("ExtrinsicGeometry", "geometry"),
     ("IntrinsicGeometry", "geometry"),
     ("ExtrinsicPlatform", "platform"),
@@ -183,6 +188,8 @@ def detect_owner_layer(path: Path) -> str | None:
             return "assets"
         if "ECS" in parts or "ecs" in parts:
             return "ecs"
+        if "Physics" in parts or "physics" in parts:
+            return "physics"
         if "RHI" in parts or "rhi" in parts:
             return "graphics_rhi"
         if "Graphics" in parts or "graphics" in parts:
@@ -223,6 +230,8 @@ def detect_target_layer(reference: str) -> str | None:
 
     if "ecs/" in lower or lower.startswith("ecs"):
         return "ecs"
+    if "physics/" in lower or lower.startswith("physics"):
+        return "physics"
     if "asset/" in lower or "assets/" in lower or lower.startswith("asset") or lower.startswith("assets"):
         return "assets"
     if "geometry/" in lower or lower.startswith("geometry"):

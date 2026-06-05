@@ -8,6 +8,7 @@ IntrinsicEngine uses a layered architecture optimized for modularity, testabilit
 - `geometry`: geometry-processing and mesh/domain algorithms built on `core`.
 - `assets`: asset identity, metadata, and loading contracts built on `core`.
 - `ecs`: entity/component systems built on `core` (and geometry handles only when explicitly justified).
+- `physics`: simulation world/state built on `core` and `geometry`; runtime owns ECS synchronization and writeback.
 - `graphics`: rendering stack split into `rhi`, backend(s), frame graph, and renderer.
 - `runtime`: composition root that wires lower layers.
 - `app`: top-level application/sandbox entrypoints that depend on `runtime`.
@@ -16,6 +17,7 @@ IntrinsicEngine uses a layered architecture optimized for modularity, testabilit
 ## Contract references
 
 - Dependency and ownership rules: [layering.md](layering.md).
+- Physics layer ownership: [physics.md](physics.md).
 - Module/import constraints: [module-rules.md](module-rules.md).
 - Execution graph ownership: [task-graphs.md](task-graphs.md) and [frame-graph.md](frame-graph.md).
 

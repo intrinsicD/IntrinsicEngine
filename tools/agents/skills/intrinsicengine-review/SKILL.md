@@ -112,7 +112,7 @@ the full version.
 ### Layering and ownership
 
 - Owning layer/subsystem is explicit (`core`, `geometry`, `assets`, `ecs`,
-  `graphics/*`, `runtime`, `app`, `legacy`).
+  `physics`, `graphics/*`, `runtime`, `app`, `legacy`).
 - New dependency edges are justified and align with `AGENTS.md` invariants.
 - No lower layer imports higher layers.
 - `runtime` remains the composition root; lower layers remain reusable.

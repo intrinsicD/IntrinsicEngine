@@ -22,6 +22,7 @@ This index tracks long-lived architecture decisions for IntrinsicEngine.
 16. [0016 — Texture residency, fallback, and asset cache policy](0016-texture-residency-and-asset-cache-policy.md)
 17. [0017 — Default debug surface material (slot 0)](0017-default-debug-surface-material.md)
 18. [0018 — Missing-material fallback substitution and diagnostics](0018-missing-material-fallback-substitution.md)
+19. [0019 — Physics layer ownership and ECS integration](0019-physics-layer-ownership-and-ecs-integration.md)
 
 ## Conventions
 

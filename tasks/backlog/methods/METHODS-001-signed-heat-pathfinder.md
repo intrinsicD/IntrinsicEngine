@@ -7,7 +7,7 @@
 ## Non-goals
 - [ ] No re-authoring of METHOD-002 itself; its required-changes list, variants, and acceptance criteria stand.
 - [ ] No re-scoping of `GEOM-008` (sparse-solver infrastructure; retired at `CPUContracted` shipping CSR builder + CG only), `GEOM-005` (geometry API style + numeric policy), or `GEOM-020` (the LDLT/LLT follow-up).
-- [ ] No selection of an alternative pathfinder method (`METHOD-001` is gated by physics layer ownership and is not the right starter; `METHOD-005`/`METHOD-007` are hard-gated by `GEOM-007` robust predicates; `METHOD-003`/`METHOD-004` are reasonable peers but do not share as much code surface with the existing `Geometry.HalfedgeMesh.Geodesic` / `VectorHeatMethod` modules).
+- [ ] No selection of an alternative pathfinder method (`METHOD-001` now has an accepted physics ownership gate, but still depends on the ECS authoring and physics/runtime bridge sequence for engine integration and is not the right starter; `METHOD-005`/`METHOD-007` are hard-gated by `GEOM-007` robust predicates; `METHOD-003`/`METHOD-004` are reasonable peers but do not share as much code surface with the existing `Geometry.HalfedgeMesh.Geodesic` / `VectorHeatMethod` modules).
 - [ ] No introduction of new method packages or method-program scope.
 
 ## Context

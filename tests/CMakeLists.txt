@@ -35,6 +35,7 @@ set(_intrinsic_allowed_test_labels
     graphics
     headless
     integration
+    physics
     platform
     regression
     runtime

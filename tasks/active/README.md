@@ -16,6 +16,18 @@ No currently active task.
 The most recently retired tasks are summarised below.
 
 Previously-active
+[`ARCH-001`](../done/ARCH-001-physics-layer-ownership-and-ecs-integration.md)
+— physics layer ownership and ECS/runtime integration contract retired to
+`tasks/done/` on 2026-06-05 at maturity `Retired`. The slice accepted
+`src/physics` as the future simulation-world layer through ADR-0019 with
+`physics -> core, geometry` dependencies, updated `AGENTS.md`, architecture
+docs, agent skill mirrors, label policy, and layering tooling, and opened
+`PHYSICS-001..003` follow-up tasks for world/runtime sync,
+broadphase/narrowphase, and solver diagnostics. `HARDEN-064` is now unblocked
+for ECS collider/rigid-body authoring under the no-solver-handles-in-ECS
+contract.
+
+Previously-active
 [`GRAPHICS-040C`](../done/GRAPHICS-040C-aa-recipe-selection-and-integration.md)
 — AA recipe selection + post-chain integration retired to `tasks/done/` on
 2026-06-05 at maturity `Operational`. The slice added the explicit

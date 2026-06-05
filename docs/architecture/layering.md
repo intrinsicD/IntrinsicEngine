@@ -8,18 +8,20 @@ This document defines enforceable layer dependencies for IntrinsicEngine.
 - `geometry` -> `core`
 - `assets` -> `core`
 - `ecs` -> `core` (+ geometry handles/types only when explicitly required)
+- `physics` -> `core`, `geometry`
 - `graphics/rhi` -> `core`
 - `graphics/assets` -> `core`, asset IDs (`Asset.Registry` types only — no live `AssetService` traffic), `graphics/rhi`
 - `graphics/*` -> `core`, asset IDs, `graphics/rhi`, geometry GPU views
-- `runtime` -> all lower layers; owns composition/wiring
+- `runtime` -> all lower layers; owns composition/wiring, including ECS-to-physics synchronization and physics-to-ECS writeback
 - `app` -> `runtime`
 
 ## Prohibited dependencies
 
 - Any lower layer importing a higher layer.
 - Graphics importing live ECS/gameplay ownership types.
+- Physics importing live ECS/runtime/graphics/RHI/platform/app ownership types.
 - App symbols imported by lower layers.
-- Runtime imports in lower layers (`core`, `geometry`, `assets`, `ecs`, `graphics/*`, `platform`).
+- Runtime imports in lower layers (`core`, `geometry`, `assets`, `ecs`, `physics`, `graphics/*`, `platform`).
 - Undocumented legacy compatibility shortcuts.
 
 ## Enforcement

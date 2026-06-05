@@ -4,7 +4,7 @@ Use this checklist for architecture-impacting changes (code, build, docs, CI, an
 
 ## Layering and ownership
 
-- [ ] Owning layer/subsystem is explicit (`core`, `geometry`, `assets`, `ecs`, `graphics/*`, `runtime`, `app`, `legacy`).
+- [ ] Owning layer/subsystem is explicit (`core`, `geometry`, `assets`, `ecs`, `physics`, `graphics/*`, `runtime`, `app`, `legacy`).
 - [ ] New dependency edges are justified and align with `AGENTS.md` invariants.
 - [ ] No lower layer imports higher layers.
 - [ ] `runtime` remains composition root; lower layers remain reusable.

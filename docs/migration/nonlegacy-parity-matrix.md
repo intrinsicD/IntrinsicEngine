@@ -13,6 +13,10 @@ claim that legacy retirement is complete.
 - Promoted source roots inspected: `src/core`, `src/assets`, `src/ecs`,
   `src/geometry`, `src/graphics/{framegraph,renderer,rhi,vulkan}`,
   `src/platform`, `src/runtime`, and `src/app`.
+- `src/physics` is approved by
+  [ADR-0019](../adr/0019-physics-layer-ownership-and-ecs-integration.md), but
+  no physics modules exist yet; it enters this matrix when a scoped physics
+  implementation task adds the source root.
 - Legacy references below use module names from the generated inventory only;
   this document does not modify or require edits in `src/legacy/`.
 - “Missing behavior” means missing or not yet proven by non-legacy contracts,

@@ -15,7 +15,8 @@ map.
 ## Tasks
 
 - [METHOD-001 — Rigid-body dynamics reference backend](METHOD-001-rigid-body-dynamics-reference-backend.md)
-  (gated by [`physics/ARCH-001`](../physics/ARCH-001-physics-layer-ownership-and-ecs-integration.md);
+  (ownership gate accepted by [`ARCH-001`](../../done/ARCH-001-physics-layer-ownership-and-ecs-integration.md)
+  / [ADR-0019](../../../docs/adr/0019-physics-layer-ownership-and-ecs-integration.md);
   ECS authoring side handled by [`ecs/HARDEN-064`](../ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md)).
 - [METHOD-002 — Signed Heat Method reference backend](METHOD-002-signed-heat-method-reference-backend.md)
   **(pathfinder method per [METHODS-001](METHODS-001-signed-heat-pathfinder.md))**.
@@ -32,9 +33,9 @@ map.
 ## Convergence
 
 - METHOD-001 contributes to **Theme C — Physics readiness**. The CPU reference
-  package may be drafted independently, but runtime/ECS integration and any
-  performance backend must wait for the physics layer ownership decision in
-  ARCH-001.
+  package may proceed under accepted ADR-0019, but runtime/ECS integration and
+  any performance backend remain out of scope for the method package and must
+  wait for the ECS authoring and physics/runtime bridge tasks.
 - METHOD-002 through METHOD-007 are seeded by the geometry paper survey
   [`docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md`](../../../docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md)
   and target gaps from
