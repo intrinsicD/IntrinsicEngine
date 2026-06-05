@@ -11,14 +11,14 @@
   body intent without solver/runtime handles.
 - `Operational` follow-up is owned by
   [`PHYSICS-001`](../backlog/physics/PHYSICS-001-physics-world-state-and-runtime-sync.md)
-  after [`METHOD-001`](../backlog/methods/METHOD-001-rigid-body-dynamics-reference-backend.md)
-  supplies enough CPU reference dynamics coverage.
+  after retired [`METHOD-001`](METHOD-001-rigid-body-dynamics-reference-backend.md)
+  supplied enough CPU reference dynamics coverage.
 
 ## Goal
 - Define promoted ECS authoring components for colliders and rigid bodies that can support future physics integration without storing physics-world internals.
 
 ## Non-goals
-- No rigid-body solver, broadphase, narrowphase, constraint solver, or runtime sync implementation; CPU reference dynamics are owned by [`METHOD-001`](../backlog/methods/METHOD-001-rigid-body-dynamics-reference-backend.md).
+- No rigid-body solver, broadphase, narrowphase, constraint solver, or runtime sync implementation; CPU reference dynamics are owned by retired [`METHOD-001`](METHOD-001-rigid-body-dynamics-reference-backend.md).
 - No `src/physics` source additions, physics-world implementation, or runtime
   bridge in this ECS authoring task. [`ARCH-001`](ARCH-001-physics-layer-ownership-and-ecs-integration.md)
   accepted the layer contract; this task stays in `src/ecs`.
@@ -32,7 +32,7 @@
 - The prior promoted `src/ecs/Components/ECS.Component.Collider.cppm` stored only `std::vector<Geometry::Sphere>`.
 - Ideal model: `Collider` describes collision shape/material/filtering/trigger intent; `RigidBody` describes motion/mass/velocity/damping/sleep/CCD intent; physics world/runtime sidecars own solver handles, broadphase proxies, islands, contacts, warm-start caches, and writeback scheduling.
 - ECS hierarchy is scene/authoring hierarchy and must not be the implicit physics compound-collider representation.
-- Convergence: part of **Theme C — Physics readiness** and **Theme D — ECS hardening parity** in [`tasks/backlog/README.md`](../backlog/README.md). The CPU reference dynamics this contract enables live in [`METHOD-001`](../backlog/methods/METHOD-001-rigid-body-dynamics-reference-backend.md).
+- Convergence: part of **Theme C — Physics readiness** and **Theme D — ECS hardening parity** in [`tasks/backlog/README.md`](../backlog/README.md). The CPU reference dynamics this contract enables live in retired [`METHOD-001`](METHOD-001-rigid-body-dynamics-reference-backend.md).
 
 ## Required changes
 - [x] Define separate ECS authoring components for collision and body motion intent:

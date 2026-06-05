@@ -18,3 +18,12 @@ This index is the canonical entry point for method/paper implementation document
 
 - [Agent method workflow](../agent/method-workflow.md)
 - [Methods directory overview](../../methods/README.md)
+
+## Physics Methods
+
+- [`physics.rigid_body_reference`](../../methods/physics/rigid_body_reference/)
+  is the deterministic CPU reference backend for fixed-step rigid-body
+  integration and first-phase analytic contact contracts. It retires
+  [`METHOD-001`](../../tasks/done/METHOD-001-rigid-body-dynamics-reference-backend.md)
+  at `CPUContracted`; runtime/world integration remains owned by
+  [`PHYSICS-001`](../../tasks/backlog/physics/PHYSICS-001-physics-world-state-and-runtime-sync.md).

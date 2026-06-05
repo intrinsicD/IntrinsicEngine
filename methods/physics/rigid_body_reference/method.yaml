@@ -1,0 +1,32 @@
+id: physics.rigid_body_reference
+name: Rigid Body Dynamics Reference Backend
+domain: physics
+status: reference
+paper:
+  title: "Rigid Body Simulation"
+  authors: "David Baraff"
+  year: 1997
+  doi: ""
+  url: "https://www.cs.cmu.edu/~baraff/sigcourse/"
+inputs:
+  - "Fixed-step body states with pose, linear/angular velocity, mass, diagonal inertia, damping, sleep flags, and child collider shapes."
+  - "Analytic collider descriptors for sphere, capsule, and oriented box children with local poses."
+  - "Step parameters: delta time, gravity, restitution, solver iterations, penetration slop, and position-correction percentage."
+outputs:
+  - "Reference body states after deterministic semi-implicit Euler integration and normal-only contact resolution."
+  - "Contact records with body/shape indices, normal, point, penetration, and support status."
+  - "Diagnostics for validation status, contact counts, unsupported pairs, penetration residual, kinetic-energy drift, and convergence."
+backends:
+  - cpu_reference
+metrics:
+  - "quality_error_l2"
+  - "runtime_ms"
+correctness_tests:
+  - "../../../tests/unit/physics/Test.RigidBodyReference.cpp"
+benchmarks:
+  - "../../../benchmarks/physics/manifests/rigid_body_reference_smoke.yaml"
+known_limitations:
+  - "The reference solver is correctness-first and deterministic; it does not claim runtime performance."
+  - "Contacts are normal-only with no friction, no angular contact impulses, no island solver, and no optimized broadphase."
+  - "Dynamic support is limited to sphere-sphere, sphere-capsule, and sphere-box contact pairs; unsupported pairs are reported in diagnostics."
+  - "Triangle mesh colliders are intentionally absent from the dynamic reference input surface; future mesh support must stay static/kinematic or use a separate convex-decomposition method."

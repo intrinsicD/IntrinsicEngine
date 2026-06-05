@@ -64,8 +64,8 @@ The promoted ECS layer should not own:
   promoted population helpers for mesh/graph/point-cloud data (`HARDEN-065`).
 - `Collider` / `RigidBody` authoring is CPU-contracted by `HARDEN-064`;
   runtime ECS-to-physics synchronization and live physics-world state remain
-  outside ECS and are owned by `PHYSICS-001` after `METHOD-001` supplies enough
-  reference coverage.
+  outside ECS and are owned by `PHYSICS-001`, now that `METHOD-001` supplies
+  enough reference coverage.
 - Several current ECS tests still exercise the legacy `ECS` module rather than only `Extrinsic.ECS.*`, so they are not retirement evidence for promoted ECS.
 
 ## Gap matrix
@@ -82,7 +82,7 @@ The promoted ECS layer should not own:
 | Entity lifecycle cleanup | `Registry::Destroy` destroys one entity if valid. Hierarchy detach exists. | Recursive destroy or explicit destruction policy for child closure, component cleanup hooks, and orphan handling diagnostics. | Runtime/editor deletion must duplicate hierarchy cleanup policy; stale child links or sidecars become likely. | P1 — `ecs` command/lifecycle seam, runtime sidecars remain runtime-owned. |
 | Stable identity and serialization metadata | `MetaData` stores only `EntityName`; `AssetInstance::Source::AssetId` is raw `std::uint32_t`. | Stable entity UUID/local scene ID, optional prefab/source provenance, serialization schema/version tags, and typed asset-ID decision. | Scene save/load, diffing, undo/redo, hot reload, and external references lack promoted ECS identity contracts. | P1 — `ecs` + `assets` architecture decision; AssetId typing was deferred by [`HARDEN-062`](../../tasks/done/HARDEN-062-ecs-layering-and-component-boundary-hardening.md). |
 | Selection and picking commands | Selection tags and cached selected primitive indices exist. Legacy runtime selection modules still own behavior. | Pure selection mutation commands, multi-select mode contract, hover/pick result application seam, and selection-changed events or runtime ownership decision. | Editor/runtime selection workflows remain legacy/runtime-specific and are not ECS-retirement-ready. | P1 — `ecs` for data/commands if kept pure; `runtime/editor` for input and GPU readback. |
-| Physics authoring | `HARDEN-064` adds `Collider::ShapeDescriptor` for sphere/capsule/box/OBB child shapes plus `RigidBody` static/kinematic/dynamic body intent. ECS docs and contract tests still forbid solver handles. | Runtime ECS-to-physics synchronization, live physics-world handles, and CPU reference dynamics remain outside ECS. | ECS can represent first-phase rigid-body authoring without owning a solver; physics/runtime integration still needs the method reference and `PHYSICS-001`. | Done for ECS — [`HARDEN-064`](../../tasks/done/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md); follow-up [`METHOD-001`](../../tasks/backlog/methods/METHOD-001-rigid-body-dynamics-reference-backend.md) and [`PHYSICS-001`](../../tasks/backlog/physics/PHYSICS-001-physics-world-state-and-runtime-sync.md). |
+| Physics authoring | `HARDEN-064` adds `Collider::ShapeDescriptor` for sphere/capsule/box/OBB child shapes plus `RigidBody` static/kinematic/dynamic body intent. ECS docs and contract tests still forbid solver handles. | Runtime ECS-to-physics synchronization and live physics-world handles remain outside ECS. | ECS can represent first-phase rigid-body authoring without owning a solver; physics/runtime integration now has the method reference and still needs `PHYSICS-001`. | Done for ECS — [`HARDEN-064`](../../tasks/done/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md); reference method done — [`METHOD-001`](../../tasks/done/METHOD-001-rigid-body-dynamics-reference-backend.md); follow-up [`PHYSICS-001`](../../tasks/backlog/physics/PHYSICS-001-physics-world-state-and-runtime-sync.md). |
 | Light authoring | Directional/point/spot/ambient light structs exist with minimal color/intensity fields. | Range/attenuation, cone angles, shadow/cascade policy, enabled state, temperature/units policy, and CPU validation helpers. | Lighting can be extracted but lacks an authoring-grade component contract. | P1/P2 — `ecs` for CPU descriptors, graphics for render interpretation. |
 | Component enabled/visibility state | Shadow caster and selection tags exist; no general enabled/disabled layer. | Entity active/enabled tag, render visibility, simulation participation, and propagation policy through hierarchy. | Systems must infer participation from component presence; editor hide/disable workflows need ad hoc tags. | P2 — `ecs` data, runtime/editor policy. |
 | DEC / method caches | Legacy `ECS:Components.DEC` wraps computed DEC operators. Promoted ECS has no DEC cache component. | Ownership decision for method/cache components: promote CPU-only method cache components, move to `methods`, or keep in runtime/editor sidecars. | Geometry/method workflows that cache per-entity computations remain legacy or ad hoc. | P2 — `methods` + `ecs` ownership decision. |
@@ -134,9 +134,9 @@ The promoted ECS layer should not own:
 
 5. **Physics authoring components** (done for ECS)
    - `HARDEN-064` expands `Collider` and adds `RigidBody` authoring descriptors.
-   - The remaining work is `METHOD-001` reference dynamics and `PHYSICS-001`
-     world/runtime synchronization; preserve the no-solver-handles-in-ECS
-     invariant.
+   - The remaining work is `PHYSICS-001` world/runtime synchronization after
+     retired `METHOD-001` reference dynamics; preserve the
+     no-solver-handles-in-ECS invariant.
 
 ### P2 — useful but not retirement-critical
 

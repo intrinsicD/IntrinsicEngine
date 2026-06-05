@@ -14,6 +14,7 @@
 // with the previous scaffold's CMake/CI wiring.
 
 #include "../geometry/Bench.GeometrySmoke.hpp"
+#include "../physics/Bench.RigidBodyReferenceSmoke.hpp"
 
 #include <cstdlib>
 #include <filesystem>
@@ -96,6 +97,41 @@ namespace
         return EmittedBenchmark{kHalfedgeSmokeBenchmarkId, out.str(), metrics.Succeeded};
     }
 
+    auto EmitRigidBodyReferenceSmoke(const std::string& commit) -> EmittedBenchmark
+    {
+        using namespace Intrinsic::Bench::Physics;
+
+        const auto metrics = RunRigidBodyReferenceSmoke();
+
+        std::ostringstream out;
+        out.setf(std::ios::fixed);
+        out.precision(6);
+        out << "{\n"
+            << "  \"benchmark_id\": \"" << EscapeJson(kRigidBodyReferenceSmokeBenchmarkId) << "\",\n"
+            << "  \"method\": \""       << EscapeJson(kRigidBodyReferenceSmokeMethod)      << "\",\n"
+            << "  \"backend\": \"cpu_reference\",\n"
+            << "  \"dataset\": \""      << EscapeJson(kRigidBodyReferenceSmokeDataset)     << "\",\n"
+            << "  \"commit\": \""       << EscapeJson(commit)                              << "\",\n"
+            << "  \"metrics\": {\n"
+            << "    \"runtime_ms\": "      << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
+            << "  },\n"
+            << "  \"diagnostics\": {\n"
+            << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"smoke\",\n"
+            << "    \"warmup_iterations\": 1,\n"
+            << "    \"measured_iterations\": 8,\n"
+            << "    \"contact_count\": "          << metrics.ContactCount << ",\n"
+            << "    \"unsupported_pair_count\": " << metrics.UnsupportedPairCount << ",\n"
+            << "    \"final_velocity_a\": "       << metrics.FinalVelocityA << ",\n"
+            << "    \"final_velocity_b\": "       << metrics.FinalVelocityB << "\n"
+            << "  },\n"
+            << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed") << "\"\n"
+            << "}\n";
+
+        return EmittedBenchmark{kRigidBodyReferenceSmokeBenchmarkId, out.str(), metrics.Succeeded};
+    }
+
     auto WriteFile(const std::filesystem::path& path, std::string_view payload) -> bool
     {
         std::error_code ec;
@@ -124,6 +160,7 @@ auto main(int argc, char** argv) -> int
 
     std::vector<EmittedBenchmark> emitted;
     emitted.push_back(EmitHalfedgeSmoke(commit));
+    emitted.push_back(EmitRigidBodyReferenceSmoke(commit));
 
     // Output target: an existing directory or a path with no extension (or no
     // filename component) is treated as a directory and gets one JSON per

@@ -125,7 +125,8 @@ Members:
   (done 2026-06-05) — accepted `src/physics` as `physics -> core, geometry`
   via [ADR-0019](../../docs/adr/0019-physics-layer-ownership-and-ecs-integration.md).
 - [`physics/ARCH-002-physics-phenomena-roadmap.md`](physics/ARCH-002-physics-phenomena-roadmap.md).
-- [`methods/METHOD-001-rigid-body-dynamics-reference-backend.md`](methods/METHOD-001-rigid-body-dynamics-reference-backend.md).
+- [`METHOD-001`](../done/METHOD-001-rigid-body-dynamics-reference-backend.md)
+  (done 2026-06-05) — deterministic `cpu_reference` rigid-body method package.
 - [`HARDEN-064`](../done/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md)
   (done 2026-06-05; also Theme D).
 - [`physics/PHYSICS-001-physics-world-state-and-runtime-sync.md`](physics/PHYSICS-001-physics-world-state-and-runtime-sync.md).
@@ -223,14 +224,16 @@ promoting backlog tasks to active so per-category DAGs do not diverge.
   propagation can be implemented independently, but default-runtime usefulness
   depends on a known ECS system activation path.
 - **METHOD-001 ⇐ ARCH-001.** Satisfied 2026-06-05: the physics layer
-  ownership decision is accepted. Runtime/ECS integration remains out of
-  scope for the method package and is owned by physics/runtime follow-ups.
+  ownership decision is accepted and the deterministic `cpu_reference`
+  rigid-body method package is retired at `CPUContracted`. Runtime/ECS
+  integration remains out of scope for the method package and is owned by
+  physics/runtime follow-ups.
 - **HARDEN-064 ⇐ ARCH-001.** Satisfied 2026-06-05: ECS collider/rigid-body
   authoring shipped under ADR-0019 without storing solver handles in ECS.
-- **PHYSICS-001 ⇐ HARDEN-064, METHOD-001.** The first physics world/runtime
-  sync source task has the ECS authoring descriptors from `HARDEN-064`; it
-  still waits for enough `METHOD-001` CPU reference coverage to validate
-  deterministic stepping.
+- **PHYSICS-001 ⇐ HARDEN-064, METHOD-001.** Satisfied 2026-06-05: ECS
+  authoring descriptors and the rigid-body CPU reference coverage are both
+  retired, so `PHYSICS-001` may promote as the first physics world/runtime
+  sync source task.
 - **PHYSICS-002 ⇐ PHYSICS-001.** Collision broadphase/narrowphase contracts
   depend on the physics world/body descriptor surface.
 - **PHYSICS-003 ⇐ PHYSICS-001, PHYSICS-002.** Constraint/island/sleep solver

@@ -8,6 +8,8 @@ set(INTRINSIC_BENCHMARK_ROOT "${CMAKE_CURRENT_SOURCE_DIR}" CACHE INTERNAL "Intri
 add_executable(IntrinsicBenchmarkSmoke
     runners/BenchmarkSmokeRunner.cpp
     geometry/Bench_ExampleSmoke.cpp
+    physics/Bench_RigidBodyReferenceSmoke.cpp
+    ${CMAKE_SOURCE_DIR}/methods/physics/rigid_body_reference/src/RigidBodyReference.cpp
 )
 
 set_target_properties(IntrinsicBenchmarkSmoke PROPERTIES CXX_SCAN_FOR_MODULES ON)
@@ -15,6 +17,9 @@ set_target_properties(IntrinsicBenchmarkSmoke PROPERTIES CXX_SCAN_FOR_MODULES ON
 target_compile_features(IntrinsicBenchmarkSmoke PRIVATE cxx_std_23)
 target_compile_options(IntrinsicBenchmarkSmoke PRIVATE ${INTRINSIC_COMPILE_FLAGS})
 target_link_options(IntrinsicBenchmarkSmoke PRIVATE ${INTRINSIC_LINK_FLAGS})
+target_include_directories(IntrinsicBenchmarkSmoke PRIVATE
+    ${CMAKE_SOURCE_DIR}/methods/physics/rigid_body_reference/include
+)
 
 target_link_libraries(IntrinsicBenchmarkSmoke
     PRIVATE
@@ -34,36 +39,36 @@ add_custom_target(IntrinsicBenchmarks
     COMMENT "Running benchmark smoke scaffold"
 )
 
-# GEOM-009 — register the smoke runner as a CTest case so the default CPU
-# gate exercises the benchmark workload + emitted result schema, not just the
-# placeholder. The validator script is invoked as a follow-up fixture so the
-# JSON is structurally checked on every run.
+# Register the smoke runner as a CTest case so the default CPU gate exercises
+# the benchmark workloads + emitted result schema, not just placeholders. The
+# validator script is invoked as a follow-up fixture so the JSON is
+# structurally checked on every run.
 if(BUILD_TESTING)
     set(_intrinsic_bench_smoke_test_dir "${CMAKE_BINARY_DIR}/benchmark/IntrinsicBenchmarkSmokeTest")
 
     add_test(
-        NAME IntrinsicBenchmarkSmoke.HalfedgeSmoke.Run
+        NAME IntrinsicBenchmarkSmoke.Run
         COMMAND $<TARGET_FILE:IntrinsicBenchmarkSmoke> "${_intrinsic_bench_smoke_test_dir}"
     )
-    set_tests_properties(IntrinsicBenchmarkSmoke.HalfedgeSmoke.Run PROPERTIES
-        LABELS "benchmark;geometry"
+    set_tests_properties(IntrinsicBenchmarkSmoke.Run PROPERTIES
+        LABELS "benchmark;geometry;physics"
         TIMEOUT 30
-        FIXTURES_SETUP IntrinsicBenchmarkSmoke.HalfedgeSmoke
+        FIXTURES_SETUP IntrinsicBenchmarkSmoke
     )
 
     find_package(Python3 COMPONENTS Interpreter QUIET)
     if(Python3_Interpreter_FOUND)
         add_test(
-            NAME IntrinsicBenchmarkSmoke.HalfedgeSmoke.Validate
+            NAME IntrinsicBenchmarkSmoke.Validate
             COMMAND ${Python3_EXECUTABLE}
                 "${CMAKE_SOURCE_DIR}/tools/benchmark/validate_benchmark_results.py"
                 --root "${_intrinsic_bench_smoke_test_dir}"
                 --strict
         )
-        set_tests_properties(IntrinsicBenchmarkSmoke.HalfedgeSmoke.Validate PROPERTIES
-            LABELS "benchmark;geometry"
+        set_tests_properties(IntrinsicBenchmarkSmoke.Validate PROPERTIES
+            LABELS "benchmark;geometry;physics"
             TIMEOUT 30
-            FIXTURES_REQUIRED IntrinsicBenchmarkSmoke.HalfedgeSmoke
+            FIXTURES_REQUIRED IntrinsicBenchmarkSmoke
         )
     endif()
 endif()

@@ -1,0 +1,17 @@
+benchmark_id: physics.rigid_body_reference.smoke
+method: physics.rigid_body_reference
+dataset: builtin.rigid_body.two_sphere
+params:
+  intent: smoke
+  steps: 1
+  delta_time: 0.01
+  restitution: 1.0
+  solver_iterations: 8
+  warmup_iterations: 1
+  measured_iterations: 8
+metrics:
+  - runtime_ms
+  - quality_error_l2
+thresholds:
+  smoke_runtime_ms_max: 50
+  quality_error_l2_max: 1.0e-12

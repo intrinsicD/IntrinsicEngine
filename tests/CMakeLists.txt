@@ -337,6 +337,24 @@ intrinsic_test_object_lib(BenchmarkTestObjs
     DEPS IntrinsicCore EnTT::EnTT
 )
 
+# --- Physics method reference tests (CPU-only; methods/ package, no runtime/ECS) ---
+set(_physics_method_test_files
+    Test.RigidBodyReference.cpp
+)
+intrinsic_resolve_test_sources(_physics_method_test_sources
+    SEARCH_DIRS unit/physics
+    FILES ${_physics_method_test_files}
+)
+intrinsic_test_object_lib(PhysicsMethodTestObjs
+    SOURCES
+        ${_physics_method_test_sources}
+        ${CMAKE_SOURCE_DIR}/methods/physics/rigid_body_reference/src/RigidBodyReference.cpp
+    DEPS IntrinsicCore
+)
+target_include_directories(PhysicsMethodTestObjs PRIVATE
+    ${CMAKE_SOURCE_DIR}/methods/physics/rigid_body_reference/include
+)
+
 # --- Geometry tests (DEC, mesh algorithms, graphs — no GPU, no ECS) ---
 set(_geometry_test_files
     Test_RuntimeGeometry.cpp
@@ -956,6 +974,13 @@ intrinsic_test_executable(IntrinsicBenchmarkTests
     OBJECTS  BenchmarkTestObjs
     LINK_LIBS IntrinsicCore
     LABELS benchmark slo slow
+)
+
+# --- Physics method reference tests (CPU-only) ---
+intrinsic_test_executable(IntrinsicPhysicsMethodTests
+    OBJECTS PhysicsMethodTestObjs
+    LINK_LIBS IntrinsicCore
+    LABELS unit physics
 )
 
 # --- Core + Geometry (DEC, mesh algorithms — no GPU, no ECS) ---
