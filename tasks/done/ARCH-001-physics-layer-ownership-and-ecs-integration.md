@@ -17,7 +17,7 @@
 
 ## Context
 - Owner/layer: architecture planning across `core`, `geometry`, `ecs`, `physics`, `runtime`, and `methods`.
-- Convergence: anchor of Theme C - Physics readiness in [`tasks/backlog/README.md`](../backlog/README.md). This decision gates [`ecs/HARDEN-064`](../backlog/ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md) and [`methods/METHOD-001`](../backlog/methods/METHOD-001-rigid-body-dynamics-reference-backend.md).
+- Convergence: anchor of Theme C - Physics readiness in [`tasks/backlog/README.md`](../backlog/README.md). This decision gated retired [`HARDEN-064`](HARDEN-064-ecs-collider-rigidbody-authoring-contract.md) and gates [`methods/METHOD-001`](../backlog/methods/METHOD-001-rigid-body-dynamics-reference-backend.md).
 - `AGENTS.md` now includes `src/physics/` in the target source layout and records the `physics -> core, geometry` dependency edge.
 - Geometry already provides collision/math building blocks such as `Geometry.GJK`, `Geometry.EPA`, `Geometry.ContactManifold`, `Geometry.Overlap`, `Geometry.SDF`, and `Geometry.SDFContact`.
 - `docs/architecture/patterns.md` already sketches a `PhysicsWorld` owner and `PhysicsTickJob` worker split, but it is only an architectural pattern example.
@@ -32,7 +32,7 @@
   - [x] Physics world/state: solver islands, broadphase, contacts, constraints, integration caches.
   - [x] Runtime bridge: fixed-step scheduling, ECS-to-physics synchronization, physics-to-ECS transform writeback.
   - [x] Methods packages: reference algorithms, parity baselines, diagnostics, and papers.
-- [x] Decide the canonical collider/body ownership contract before implementation, using [`tasks/backlog/ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md`](../backlog/ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md) as the ECS authoring follow-up and [`tasks/backlog/methods/METHOD-001-rigid-body-dynamics-reference-backend.md`](../backlog/methods/METHOD-001-rigid-body-dynamics-reference-backend.md) as the CPU reference dynamics follow-up.
+- [x] Decide the canonical collider/body ownership contract before implementation, using retired [`tasks/done/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md`](HARDEN-064-ecs-collider-rigidbody-authoring-contract.md) as the ECS authoring follow-up and [`tasks/backlog/methods/METHOD-001-rigid-body-dynamics-reference-backend.md`](../backlog/methods/METHOD-001-rigid-body-dynamics-reference-backend.md) as the CPU reference dynamics follow-up.
 - [x] Define first-phase collider shape policy: sphere, capsule, and box/OBB as dynamic-capable primitives; convex hull and static/kinematic triangle mesh as later or separately gated work; dynamic concave triangle mesh only via future convex decomposition or specialized method work.
 - [x] Define transform/scale policy for physics: body pose from ECS transform, collider local pose per shape, uniform scale policy for simple primitives, and diagnostics/rejection for unsupported non-uniform dynamic scaling.
 - [x] Decide whether physics can depend on `geometry` directly and whether ECS may store geometry collider primitives or only handles/descriptors.

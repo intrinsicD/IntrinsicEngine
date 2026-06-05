@@ -23,6 +23,15 @@ descriptors when explicitly justified. Physics-world handles, broadphase
 proxies, contact caches, islands, solver indices, runtime sidecars, graphics
 handles, and RHI handles are forbidden in canonical ECS components.
 
+`HARDEN-064` shipped this ECS-side authoring surface as
+`Extrinsic.ECS.Component.Collider` and `Extrinsic.ECS.Component.RigidBody`.
+Collider authoring supports sphere, capsule, and box/OBB shape descriptors with
+explicit child local poses, material/filtering/trigger/contact-offset metadata,
+and per-shape enabled state. Rigid-body authoring stores static/kinematic/
+dynamic intent, mass policy, velocities, damping, gravity scale, sleep flags,
+CCD intent, and contact participation. ECS classifies valid authoring
+combinations but does not create live physics-world state.
+
 Runtime owns ECS-to-physics synchronization, fixed-step scheduling, live handle
 sidecars, physics-to-ECS transform writeback, and contact/event routing.
 Compound colliders are explicit child-shape descriptors under a collider/body;

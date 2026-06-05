@@ -11,7 +11,7 @@ Root scanned: `src`
 | `app` | 1 |
 | `assets` | 11 |
 | `core` | 39 |
-| `ecs` | 27 |
+| `ecs` | 28 |
 | `geometry` | 85 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
@@ -89,6 +89,7 @@ Root scanned: `src`
 | `Extrinsic.ECS.Component.Light` | `src/ecs/Components/ECS.Component.Light.cppm` | `ecs` |
 | `Extrinsic.ECS.Component.MetaData` | `src/ecs/Components/ECS.Component.MetaData.cppm` | `ecs` |
 | `Extrinsic.ECS.Component.ProceduralGeometryRef` | `src/ecs/Components/ECS.Component.ProceduralGeometryRef.cppm` | `ecs` |
+| `Extrinsic.ECS.Component.RigidBody` | `src/ecs/Components/ECS.Component.RigidBody.cppm` | `ecs` |
 | `Extrinsic.ECS.Components.Selection` | `src/ecs/Components/ECS.Component.Selection.cppm` | `ecs` |
 | `Extrinsic.ECS.Component.ShadowCaster` | `src/ecs/Components/ECS.Component.ShadowCaster.cppm` | `ecs` |
 | `Extrinsic.ECS.Component.SpatialDebugBinding` | `src/ecs/Components/ECS.Component.SpatialDebugBinding.cppm` | `ecs` |
@@ -500,4 +501,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugAdapters` | `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **473**
+Total modules: **474**

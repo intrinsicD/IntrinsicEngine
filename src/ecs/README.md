@@ -40,6 +40,7 @@ plain data; systems are stateless functions that operate on components.
 - `Extrinsic.ECS.Component.Culling.Proxy`
 - `Extrinsic.ECS.Component.AssetInstance`
 - `Extrinsic.ECS.Component.Collider`
+- `Extrinsic.ECS.Component.RigidBody`
 - `Extrinsic.ECS.Component.Light`
 - `Extrinsic.ECS.Component.ProceduralGeometryRef`
 - `Extrinsic.ECS.Component.Selection`
@@ -120,6 +121,7 @@ Components/
   ECS.Component.Culling.Proxy.cppm
   ECS.Component.AssetInstance.cppm
   ECS.Component.Collider.cppm
+  ECS.Component.RigidBody.cppm
   ECS.Component.Light.cppm
   ECS.Component.ProceduralGeometryRef.cppm
   ECS.Component.Selection.cppm
@@ -160,9 +162,12 @@ imports before they reach the layering allowlist.
 - `src/ecs/CMakeLists.txt` links `EnTT::EnTT` (header-only) for the
   `entt::registry` storage used by the typed `Registry` wrapper.
 - `src/ecs/Components/CMakeLists.txt` links `IntrinsicGeometry` and
-  `glm::glm` only — components import `Geometry.*` types (Sphere, AABB,
-  OBB, Octree, ConvexHull, Properties) and use `glm` for transform math.
-  ECS components do **not** link `ExtrinsicAssets` and **not**
+  `glm::glm` only — components import data-only `Geometry.*` types
+  (AABB, OBB, Octree, ConvexHull, Properties, and geometry containers for
+  `GeometrySources` population) and use `glm` for transform/pose math.
+  `Collider` and `RigidBody` are ECS-owned authoring descriptors; they do
+  not import a physics world, runtime bridge, graphics state, or live asset
+  service. ECS components do **not** link `ExtrinsicAssets` and **not**
   `ExtrinsicCore`; ExtrinsicCore enters `ExtrinsicECS` transitively via
   `Systems/CMakeLists.txt` for the `Extrinsic.Core.FrameGraph` import in
   `ECS.System.TransformHierarchy`.
@@ -286,17 +291,30 @@ scene-side use case, not by graphics or solver consumers.
 
 ## Collider vs rigid-body authoring
 
-`ECS.Component.Collider` stores **CPU geometric descriptors only** — currently
-a vector of `Geometry::Sphere`. [ADR-0019](../../docs/adr/0019-physics-layer-ownership-and-ecs-integration.md)
-accepts `src/physics` as the future simulation-world layer and keeps ECS as
-authoring intent only. The concrete collider/rigid-body descriptor expansion is
-governed by
-[`HARDEN-064`](../../tasks/backlog/ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md).
+`ECS.Component.Collider` stores **CPU collision authoring descriptors only**.
+`HARDEN-064` replaced the earlier sphere-only payload with an explicit
+`ShapeDescriptor` list covering first-phase primitive shapes (`SphereShape`,
+`CapsuleShape`, and `BoxShape` / OBB via child local orientation), per-shape
+`LocalPose`, `Material`, `CollisionFilter`, `ContactOffsets`, trigger state,
+and enabled state. Compound colliders are represented by multiple child shape
+descriptors under one collider component.
 
-ECS is forbidden from storing rigid-body solver-owned state on collider
-components; the contract test enforces this by rejecting `RigidBody*`,
-`PhysicsBody*`, `Broadphase*`, `ContactCache*`, `IslandId`, and
-`SolverIndex` mentions inside `src/ecs`.
+`ECS.Component.RigidBody` stores body-motion authoring intent separately from
+the collider: `Static` / `Kinematic` / `Dynamic` motion type, mass policy,
+linear and angular velocities, damping, gravity scale, sleep flags, CCD intent,
+contact participation, and enabled state. The `Collider`-only combination is
+classified as static collision/trigger authoring; `RigidBody` without a
+collider is either an explicitly non-contacting body or a diagnostic for
+missing collider authoring.
+
+[ADR-0019](../../docs/adr/0019-physics-layer-ownership-and-ecs-integration.md)
+accepts `src/physics` as the future simulation-world layer and keeps ECS as
+authoring intent only. Runtime owns ECS-to-physics synchronization, live handle
+sidecars, fixed-step scheduling, transform writeback, and contact/event routing.
+ECS is forbidden from storing rigid-body solver-owned state on collider or
+rigid-body components; the contract test enforces this by rejecting
+`RigidBodyHandle`, `PhysicsBody*`, `Broadphase*`, `ContactCache*`, `IslandId`,
+and `SolverIndex` mentions inside `src/ecs`.
 
 ## Scene hierarchy vs collider hierarchy
 

@@ -17,7 +17,8 @@ map.
 - [METHOD-001 — Rigid-body dynamics reference backend](METHOD-001-rigid-body-dynamics-reference-backend.md)
   (ownership gate accepted by [`ARCH-001`](../../done/ARCH-001-physics-layer-ownership-and-ecs-integration.md)
   / [ADR-0019](../../../docs/adr/0019-physics-layer-ownership-and-ecs-integration.md);
-  ECS authoring side handled by [`ecs/HARDEN-064`](../ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md)).
+  ECS authoring side handled by retired
+  [`HARDEN-064`](../../done/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md)).
 - [METHOD-002 — Signed Heat Method reference backend](METHOD-002-signed-heat-method-reference-backend.md)
   **(pathfinder method per [METHODS-001](METHODS-001-signed-heat-pathfinder.md))**.
 - [METHOD-003 — Closest Point Method PDE solver reference backend](METHOD-003-closest-point-method-pde-reference-backend.md).

@@ -20,13 +20,14 @@ map.
 ## Convergence
 
 - These tasks anchor **Theme C - Physics readiness**.
-- ARCH-001 is accepted and unblocks the ECS authoring contract
-  [`ecs/HARDEN-064`](../ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md)
-  plus the rigid-body reference method
+- ARCH-001 is accepted, the ECS authoring contract
+  [`HARDEN-064`](../../done/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md)
+  is retired, and the rigid-body reference method remains
   [`methods/METHOD-001`](../methods/METHOD-001-rigid-body-dynamics-reference-backend.md).
-- `PHYSICS-001` should wait for `HARDEN-064` and enough `METHOD-001` reference
-  coverage to validate deterministic stepping. It owns the first `src/physics`
-  world/state source addition and runtime bridge.
+- `PHYSICS-001` now has the ECS authoring descriptors from `HARDEN-064`; it
+  should still wait for enough `METHOD-001` reference coverage to validate
+  deterministic stepping. It owns the first `src/physics` world/state source
+  addition and runtime bridge.
 - `PHYSICS-002` depends on `PHYSICS-001` and owns collision broadphase/
   narrowphase contracts.
 - `PHYSICS-003` depends on `PHYSICS-001` and `PHYSICS-002` and owns constraint,

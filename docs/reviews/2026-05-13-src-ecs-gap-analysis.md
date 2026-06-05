@@ -36,13 +36,16 @@ The promoted ECS layer should not own:
 - **Transform propagation:** `Extrinsic.ECS.System.TransformHierarchy` recomputes world matrices for dirty subtrees, clears `Transform::IsDirtyTag`, and emits `Transform::WorldUpdatedTag`.
 - **Boundary hardening:** `tests/contract/ecs/Test.ECS.LayeringBoundaries.cpp` rejects higher-layer imports and prohibited runtime/graphics/physics-world symbols in `src/ecs`.
 - **Render-adjacent data contracts:** `AssetInstance`, `ProceduralGeometryRef`, `DirtyTags`, culling bounds/proxy components, light components, selection tags, and `ShadowCaster` exist as CPU-only scene data.
-- **Physics seed only:** `Collider` exists, but currently stores only `std::vector<Geometry::Sphere>` and explicitly excludes rigid-body or solver state.
+- **Physics authoring descriptors:** `Collider` now stores explicit sphere,
+  capsule, and box/OBB child-shape descriptors with local poses, material,
+  filtering, trigger/contact-offset metadata, and `RigidBody` stores static /
+  kinematic / dynamic body intent without solver state.
 
 ### Current promoted module surface
 
 - Scene: `Extrinsic.ECS.Scene.Handle`, `Extrinsic.ECS.Scene.Registry`, `Extrinsic.ECS.Scene.Bootstrap`.
 - Hierarchy: `Extrinsic.ECS.Hierarchy.Structure`, `Extrinsic.ECS.Hierarchy.Mutation`.
-- Components: transform, world matrix, hierarchy, metadata, geometry sources, culling local/world/proxy, asset instance, collider, light, procedural geometry reference, selection, shadow caster, dirty tags.
+- Components: transform, world matrix, hierarchy, metadata, geometry sources, culling local/world/proxy, asset instance, collider, rigid body, light, procedural geometry reference, selection, shadow caster, dirty tags.
 - Systems: `Extrinsic.ECS.System.TransformHierarchy`, `Extrinsic.ECS.System.RenderSync`.
 
 ### Important current limitations
@@ -59,7 +62,10 @@ The promoted ECS layer should not own:
   consumer needs it.
 - `GeometrySources` now owns per-domain `Geometry::PropertySet` components and
   promoted population helpers for mesh/graph/point-cloud data (`HARDEN-065`).
-- `Collider` is sphere-only and no `RigidBody` authoring component exists. This is intentionally gated by `ARCH-001` and `HARDEN-064`.
+- `Collider` / `RigidBody` authoring is CPU-contracted by `HARDEN-064`;
+  runtime ECS-to-physics synchronization and live physics-world state remain
+  outside ECS and are owned by `PHYSICS-001` after `METHOD-001` supplies enough
+  reference coverage.
 - Several current ECS tests still exercise the legacy `ECS` module rather than only `Extrinsic.ECS.*`, so they are not retirement evidence for promoted ECS.
 
 ## Gap matrix
@@ -76,7 +82,7 @@ The promoted ECS layer should not own:
 | Entity lifecycle cleanup | `Registry::Destroy` destroys one entity if valid. Hierarchy detach exists. | Recursive destroy or explicit destruction policy for child closure, component cleanup hooks, and orphan handling diagnostics. | Runtime/editor deletion must duplicate hierarchy cleanup policy; stale child links or sidecars become likely. | P1 — `ecs` command/lifecycle seam, runtime sidecars remain runtime-owned. |
 | Stable identity and serialization metadata | `MetaData` stores only `EntityName`; `AssetInstance::Source::AssetId` is raw `std::uint32_t`. | Stable entity UUID/local scene ID, optional prefab/source provenance, serialization schema/version tags, and typed asset-ID decision. | Scene save/load, diffing, undo/redo, hot reload, and external references lack promoted ECS identity contracts. | P1 — `ecs` + `assets` architecture decision; AssetId typing was deferred by [`HARDEN-062`](../../tasks/done/HARDEN-062-ecs-layering-and-component-boundary-hardening.md). |
 | Selection and picking commands | Selection tags and cached selected primitive indices exist. Legacy runtime selection modules still own behavior. | Pure selection mutation commands, multi-select mode contract, hover/pick result application seam, and selection-changed events or runtime ownership decision. | Editor/runtime selection workflows remain legacy/runtime-specific and are not ECS-retirement-ready. | P1 — `ecs` for data/commands if kept pure; `runtime/editor` for input and GPU readback. |
-| Physics authoring | `Collider` is sphere-only; no `RigidBody`. ECS docs forbid solver handles. | Collider descriptor model for sphere/capsule/box/OBB, compound child shapes with local poses, filters/materials/triggers, and `RigidBody` motion intent. | The architecture gate is now accepted; current ECS components still cannot represent first-phase rigid-body scenes until `HARDEN-064` lands. | P1 — [`ARCH-001`](../../tasks/done/ARCH-001-physics-layer-ownership-and-ecs-integration.md) done, then [`HARDEN-064`](../../tasks/backlog/ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md). |
+| Physics authoring | `HARDEN-064` adds `Collider::ShapeDescriptor` for sphere/capsule/box/OBB child shapes plus `RigidBody` static/kinematic/dynamic body intent. ECS docs and contract tests still forbid solver handles. | Runtime ECS-to-physics synchronization, live physics-world handles, and CPU reference dynamics remain outside ECS. | ECS can represent first-phase rigid-body authoring without owning a solver; physics/runtime integration still needs the method reference and `PHYSICS-001`. | Done for ECS — [`HARDEN-064`](../../tasks/done/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md); follow-up [`METHOD-001`](../../tasks/backlog/methods/METHOD-001-rigid-body-dynamics-reference-backend.md) and [`PHYSICS-001`](../../tasks/backlog/physics/PHYSICS-001-physics-world-state-and-runtime-sync.md). |
 | Light authoring | Directional/point/spot/ambient light structs exist with minimal color/intensity fields. | Range/attenuation, cone angles, shadow/cascade policy, enabled state, temperature/units policy, and CPU validation helpers. | Lighting can be extracted but lacks an authoring-grade component contract. | P1/P2 — `ecs` for CPU descriptors, graphics for render interpretation. |
 | Component enabled/visibility state | Shadow caster and selection tags exist; no general enabled/disabled layer. | Entity active/enabled tag, render visibility, simulation participation, and propagation policy through hierarchy. | Systems must infer participation from component presence; editor hide/disable workflows need ad hoc tags. | P2 — `ecs` data, runtime/editor policy. |
 | DEC / method caches | Legacy `ECS:Components.DEC` wraps computed DEC operators. Promoted ECS has no DEC cache component. | Ownership decision for method/cache components: promote CPU-only method cache components, move to `methods`, or keep in runtime/editor sidecars. | Geometry/method workflows that cache per-entity computations remain legacy or ad hoc. | P2 — `methods` + `ecs` ownership decision. |
@@ -126,9 +132,11 @@ The promoted ECS layer should not own:
    - Treat selection tags as data, but define deterministic operations for replace/add/toggle/clear and primitive-selection caches.
    - Keep GPU pick readback and input interpretation outside ECS.
 
-5. **Physics authoring components**
-   - After accepted `ARCH-001`, expand `Collider` and add `RigidBody` authoring descriptors per `HARDEN-064`.
-   - Preserve the no-solver-handles invariant.
+5. **Physics authoring components** (done for ECS)
+   - `HARDEN-064` expands `Collider` and adds `RigidBody` authoring descriptors.
+   - The remaining work is `METHOD-001` reference dynamics and `PHYSICS-001`
+     world/runtime synchronization; preserve the no-solver-handles-in-ECS
+     invariant.
 
 ### P2 — useful but not retirement-critical
 
@@ -152,7 +160,9 @@ The promoted ECS layer should not own:
 - `EntityState` or `EnabledTag` / `DisabledTag` with clear hierarchy propagation semantics.
 - `RenderableIntent` only if it remains CPU-only and asset/geometry-ID based; otherwise keep render-specific components in `graphics` and runtime extraction.
 - `GeometrySourceOwner` or an owning alternative to the current borrowed `GeometrySources` model, if ECS should be authoritative for loaded/editable geometry.
-- `RigidBody` plus expanded `Collider` descriptors after accepted `ARCH-001`.
+- Additional physics authoring components only if `PHYSICS-*` or method work
+  identifies data that remains ECS authoring intent rather than live solver
+  state; `RigidBody` plus expanded `Collider` descriptors are present.
 - `Light` fields for range, attenuation, spot cone, shadow intent, and validation if ECS is the light authoring source.
 
 ### Components that should probably not be promoted into canonical ECS
@@ -165,7 +175,10 @@ The promoted ECS layer should not own:
 ## Test and verification gaps
 
 - Promoted ECS unit coverage exists for scene registry, bootstrap, hierarchy, and transform hierarchy, but several `tests/unit/ecs` files still import legacy `ECS` and `Core` umbrella modules. These tests are useful compatibility coverage, but they are not promoted-retirement evidence.
-- No promoted tests cover event payloads, command buffer semantics, selection mutation commands, geometry-source population, render-sync tag forwarding, bounds propagation, or collider/rigid-body authoring.
+- Promoted collider/rigid-body authoring coverage exists in
+  `tests/unit/ecs/Test.ECS.ColliderAuthoring.cpp`. Remaining promoted gaps are
+  command buffer semantics and any future selection mutation commands not owned
+  by runtime/editor.
 - The ECS contract test catches upward imports and prohibited symbols, but it does not prove behavioral readiness of render extraction, runtime scheduling, serialization, or physics integration.
 
 Recommended focused test additions as gaps are closed:
@@ -175,7 +188,8 @@ Recommended focused test additions as gaps are closed:
 - `tests/unit/ecs/Test.ECS.GeometrySourcesPopulate.cpp` — mesh/graph/point-cloud population and dirty-domain stamping.
 - `tests/unit/ecs/Test.ECS.BoundsPropagation.cpp` — local-to-world bounds recompute and stale/missing bounds diagnostics.
 - `tests/unit/ecs/Test.ECS.SelectionCommands.cpp` — replace/add/toggle/clear selection semantics if owned by ECS.
-- `tests/unit/ecs/Test.ECS.ColliderAuthoring.cpp` — expanded collider/rigid-body descriptors after accepted `ARCH-001`.
+- `tests/unit/ecs/Test.ECS.ColliderAuthoring.cpp` — added by `HARDEN-064` for
+  expanded collider/rigid-body descriptors.
 - `tests/integration/runtime/Test.RuntimeEcsSystemBundle.cpp` — runtime fixed-step activation of promoted ECS systems.
 
 ## Recommended next task order
@@ -185,9 +199,9 @@ Recommended focused test additions as gaps are closed:
 3. **Implement [`HARDEN-065`](../../tasks/done/HARDEN-065-ecs-geometry-source-population-and-dirty-domains.md)** (done) — decide owning vs borrowed `GeometrySources` and port/rewrite population helpers with dirty-domain tests.
 4. **Implement [`HARDEN-066`](../../tasks/done/HARDEN-066-ecs-render-sync-export-policy.md)** (done) — either implement a CPU-only tag/export pass or retire the placeholder and document runtime extraction as the sole owner.
 5. **Implement [`HARDEN-067`](../../tasks/done/HARDEN-067-ecs-bounds-propagation-system.md)** (done) — keep world culling bounds synchronized after promoted transform updates.
-6. **After accepted [`ARCH-001`](../../tasks/done/ARCH-001-physics-layer-ownership-and-ecs-integration.md), implement [`HARDEN-064`](../../tasks/backlog/ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md)** — expand collider and add rigid-body authoring components without solver handles.
+6. **Implement [`HARDEN-064`](../../tasks/done/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md)** (done) — expand collider and add rigid-body authoring components without solver handles.
 7. **Implement [`HARDEN-068`](../../tasks/done/HARDEN-068-ecs-stable-identity-and-scene-metadata.md)** (done) — define ECS-owned stable identity/metadata before runtime scene serialization depends on entity references. `HARDEN-068-Impl-A` landed the `StableId` payload module; `HARDEN-068-Impl-B/C` remain identified-only follow-ups that open only when a concrete consumer demands them.
 
 ## Bottom line
 
-`src/ecs` has a solid promoted foundation for registry ownership, default entity bootstrap, hierarchy mutation, transform propagation, and layer-boundary enforcement. The largest missing pieces are not more component structs; they are deterministic seams: command application, event ownership, runtime scheduling activation, geometry-source population/dirty stamping, render-sync/export policy, and physics authoring after the architecture gate. Closing those gaps will make ECS a reliable scene-authority layer while preserving the repository contract that runtime wires systems and graphics/physics own their sidecars.
+`src/ecs` has a solid promoted foundation for registry ownership, default entity bootstrap, hierarchy mutation, transform propagation, and layer-boundary enforcement. The largest remaining pieces are not more component structs; they are deterministic seams and higher-layer integrations: command application where runtime/editor need it, event dispatch ownership, runtime scheduling activation, render extraction policy, and physics world/runtime sync after the ECS authoring contract. Closing those gaps will make ECS a reliable scene-authority layer while preserving the repository contract that runtime wires systems and graphics/physics own their sidecars.

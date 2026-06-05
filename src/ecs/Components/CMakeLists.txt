@@ -13,6 +13,7 @@ target_sources(${target_name}
         ECS.Component.Light.cppm
         ECS.Component.MetaData.cppm
         ECS.Component.ProceduralGeometryRef.cppm
+        ECS.Component.RigidBody.cppm
         ECS.Component.Selection.cppm
         ECS.Component.ShadowCaster.cppm
         ECS.Component.SpatialDebugBinding.cppm
@@ -20,6 +21,8 @@ target_sources(${target_name}
         ECS.Component.Transform.Local.cppm
         ECS.Component.Transform.World.cppm
         PRIVATE
+        ECS.Component.Collider.cpp
+        ECS.Component.RigidBody.cpp
         ECS.Component.Transform.Local.cpp
         ECS.Component.GeometrySourcesPopulate.cpp
 )

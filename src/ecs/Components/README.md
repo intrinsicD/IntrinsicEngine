@@ -17,6 +17,7 @@ This directory contains the `Components` module/files.
 - `ECS.Component.Light.cppm`
 - `ECS.Component.MetaData.cppm`
 - `ECS.Component.ProceduralGeometryRef.cppm`
+- `ECS.Component.RigidBody.cppm`
 - `ECS.Component.Selection.cppm`
 - `ECS.Component.ShadowCaster.cppm`
 - `ECS.Component.SpatialDebugBinding.cppm`
@@ -63,6 +64,29 @@ existing `HARDEN-062` decision (cross-linked from
 `ecs -> assets` dependency contract is not widened under HARDEN-068
 (Decision 5); widening would require a separate `ARCH-*` task that
 owns the layering allowlist change.
+
+## Collider and rigid-body authoring
+
+`ECS.Component.Collider` and `ECS.Component.RigidBody` define the ECS-owned
+physics authoring contract from
+[`HARDEN-064`](../../../tasks/done/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md).
+They intentionally stop at CPU descriptors:
+
+- `Collider::Component` is a list of `ShapeDescriptor` child shapes. The
+  first-phase shape set is sphere, capsule, and box/OBB; each child carries its
+  own local pose, material, collision filter, contact/rest offsets, trigger
+  state, and enabled bit.
+- `RigidBody::Component` carries motion intent (`Static`, `Kinematic`, or
+  `Dynamic`), mass policy, velocities, damping, gravity scale, sleep flags,
+  CCD intent, contact participation, and enabled state.
+- Component combinations are classified in ECS only as authoring diagnostics:
+  collider-only static/trigger authoring, explicit static, kinematic, dynamic,
+  non-contacting body state, or missing-collider-for-contacting-body.
+
+No physics-world handle, broadphase proxy, contact cache, island ID, solver
+index, runtime sidecar, graphics handle, or RHI handle may be stored here.
+`src/physics` owns future world/solver state, and `src/runtime` owns the
+ECS-to-physics synchronization bridge.
 
 ## Render residency boundary
 

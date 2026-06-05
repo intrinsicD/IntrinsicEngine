@@ -23,9 +23,9 @@ Previously-active
 `physics -> core, geometry` dependencies, updated `AGENTS.md`, architecture
 docs, agent skill mirrors, label policy, and layering tooling, and opened
 `PHYSICS-001..003` follow-up tasks for world/runtime sync,
-broadphase/narrowphase, and solver diagnostics. `HARDEN-064` is now unblocked
-for ECS collider/rigid-body authoring under the no-solver-handles-in-ECS
-contract.
+broadphase/narrowphase, and solver diagnostics. `HARDEN-064` has since retired
+the ECS collider/rigid-body authoring contract under the
+no-solver-handles-in-ECS boundary.
 
 Previously-active
 [`GRAPHICS-040C`](../done/GRAPHICS-040C-aa-recipe-selection-and-integration.md)

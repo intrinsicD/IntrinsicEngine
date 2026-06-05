@@ -7,7 +7,7 @@
 - No broadphase/narrowphase implementation beyond placeholders required to validate lifecycle.
 - No constraint solver, contact resolution, sleep/island solver, or optimized backend.
 - No graphics, platform, app, or method-package imports from `src/physics`.
-- No ECS component expansion beyond what [`HARDEN-064`](../ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md) already owns.
+- No ECS component expansion beyond what retired [`HARDEN-064`](../../done/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md) already owns.
 
 ## Context
 - Owner/layer: `physics` plus `runtime` bridge. `physics -> core, geometry`; `runtime` composes ECS and physics.

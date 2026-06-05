@@ -219,6 +219,7 @@ set(_ecs_test_files
     Test.ECS.Hierarchy.cpp
     Test.ECS.TransformHierarchy.cpp
     Test.ECS.BoundsPropagation.cpp
+    Test.ECS.ColliderAuthoring.cpp
     Test.ECS.RenderSync.cpp
     Test.ECS.Events.cpp
     Test.ECS.GeometryDirtyDomains.cpp

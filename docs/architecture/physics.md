@@ -46,6 +46,12 @@ ECS stores authoring intent only:
 - rigid-body static/kinematic/dynamic intent, mass policy, velocities, damping,
   gravity scale, sleep, and CCD intent.
 
+The ECS descriptor surface is present in
+[`HARDEN-064`](../../tasks/done/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md)
+as `Extrinsic.ECS.Component.Collider` and
+`Extrinsic.ECS.Component.RigidBody`. It is a CPU authoring contract only; live
+physics-world state and runtime synchronization remain follow-up work.
+
 ECS must not store physics-world handles, broadphase proxies, contacts, islands,
 solver indices, runtime sidecars, graphics handles, or RHI handles.
 
@@ -97,7 +103,7 @@ and contact/event counts where applicable.
 
 ## Follow-Ups
 
-- [`HARDEN-064`](../../tasks/backlog/ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md) defines ECS collider and rigid-body authoring descriptors.
+- [`HARDEN-064`](../../tasks/done/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md) defines ECS collider and rigid-body authoring descriptors.
 - [`METHOD-001`](../../tasks/backlog/methods/METHOD-001-rigid-body-dynamics-reference-backend.md) defines the CPU reference rigid-body method backend.
 - [`PHYSICS-001`](../../tasks/backlog/physics/PHYSICS-001-physics-world-state-and-runtime-sync.md) owns the first physics world/state module and runtime bridge.
 - [`PHYSICS-002`](../../tasks/backlog/physics/PHYSICS-002-collision-broadphase-narrowphase-contract.md) owns collision broadphase/narrowphase contracts.

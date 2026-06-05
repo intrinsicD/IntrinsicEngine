@@ -126,7 +126,8 @@ Members:
   via [ADR-0019](../../docs/adr/0019-physics-layer-ownership-and-ecs-integration.md).
 - [`physics/ARCH-002-physics-phenomena-roadmap.md`](physics/ARCH-002-physics-phenomena-roadmap.md).
 - [`methods/METHOD-001-rigid-body-dynamics-reference-backend.md`](methods/METHOD-001-rigid-body-dynamics-reference-backend.md).
-- [`ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md`](ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md) (also Theme D).
+- [`HARDEN-064`](../done/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md)
+  (done 2026-06-05; also Theme D).
 - [`physics/PHYSICS-001-physics-world-state-and-runtime-sync.md`](physics/PHYSICS-001-physics-world-state-and-runtime-sync.md).
 - [`physics/PHYSICS-002-collision-broadphase-narrowphase-contract.md`](physics/PHYSICS-002-collision-broadphase-narrowphase-contract.md).
 - [`physics/PHYSICS-003-constraints-islands-and-solver-diagnostics.md`](physics/PHYSICS-003-constraints-islands-and-solver-diagnostics.md).
@@ -141,7 +142,8 @@ Members:
 - [`ecs/HARDEN-061` (done)](../done/HARDEN-061-ecs-hierarchy-transform-system-parity.md).
 - [`ecs/HARDEN-062` (done)](../done/HARDEN-062-ecs-layering-and-component-boundary-hardening.md).
 - [`done/HARDEN-063`](../done/HARDEN-063-ecs-events-and-command-seams.md) (done).
-- [`ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md`](ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md) (also Theme C).
+- [`done/HARDEN-064`](../done/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md)
+  (done; also Theme C).
 - [`done/HARDEN-065`](../done/HARDEN-065-ecs-geometry-source-population-and-dirty-domains.md) (done).
 - [`done/HARDEN-066`](../done/HARDEN-066-ecs-render-sync-export-policy.md) (done).
 - [`done/HARDEN-067-ecs-bounds-propagation-system.md`](../done/HARDEN-067-ecs-bounds-propagation-system.md) (done).
@@ -224,10 +226,11 @@ promoting backlog tasks to active so per-category DAGs do not diverge.
   ownership decision is accepted. Runtime/ECS integration remains out of
   scope for the method package and is owned by physics/runtime follow-ups.
 - **HARDEN-064 ⇐ ARCH-001.** Satisfied 2026-06-05: ECS collider/rigid-body
-  authoring may proceed under ADR-0019 without storing solver handles in ECS.
+  authoring shipped under ADR-0019 without storing solver handles in ECS.
 - **PHYSICS-001 ⇐ HARDEN-064, METHOD-001.** The first physics world/runtime
-  sync source task waits for the ECS authoring descriptors and enough CPU
-  reference coverage to validate deterministic stepping.
+  sync source task has the ECS authoring descriptors from `HARDEN-064`; it
+  still waits for enough `METHOD-001` CPU reference coverage to validate
+  deterministic stepping.
 - **PHYSICS-002 ⇐ PHYSICS-001.** Collision broadphase/narrowphase contracts
   depend on the physics world/body descriptor surface.
 - **PHYSICS-003 ⇐ PHYSICS-001, PHYSICS-002.** Constraint/island/sleep solver

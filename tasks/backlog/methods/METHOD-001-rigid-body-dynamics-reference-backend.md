@@ -9,16 +9,16 @@
 - No runtime/ECS integration in this method task; [`ARCH-001`](../../done/ARCH-001-physics-layer-ownership-and-ecs-integration.md)
   / [ADR-0019](../../../docs/adr/0019-physics-layer-ownership-and-ecs-integration.md)
   assigns runtime integration to physics/runtime follow-ups.
-- No ECS authoring component changes; that is owned by [`HARDEN-064`](../ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md).
+- No ECS authoring component changes; that is owned by retired [`HARDEN-064`](../../done/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md).
 - No performance claims without benchmark baselines.
 
 ## Context
 - Paper/method: foundational rigid-body dynamics and impulse/constraint solving; exact references must be selected during intake.
 - Method package: `methods/physics/rigid_body_reference/`
 - Geometry already has contact and overlap primitives, but rigid-body dynamics needs state integration, mass/inertia, contacts, constraints, solver iterations, diagnostics, and determinism guarantees.
-- The reference method should model collision shapes separately from rigid-body state so future ECS authoring components and physics-world integration can compare against the same collider/body split.
+- The reference method should model collision shapes separately from rigid-body state so ECS authoring components from `HARDEN-064` and future physics-world integration can compare against the same collider/body split.
 - This task follows `docs/agent/method-workflow.md`: paper/method intake, CPU reference first, correctness tests, benchmark harness/manifests, then documentation.
-- Convergence: part of **Theme C — Physics readiness** in [`tasks/backlog/README.md`](../README.md). The accepted physics layer ownership decision in [`ARCH-001`](../../done/ARCH-001-physics-layer-ownership-and-ecs-integration.md) / [ADR-0019](../../../docs/adr/0019-physics-layer-ownership-and-ecs-integration.md) and the ECS authoring contract in [`HARDEN-064`](../ecs/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md) bound where state and runtime sync ultimately live.
+- Convergence: part of **Theme C — Physics readiness** in [`tasks/backlog/README.md`](../README.md). The accepted physics layer ownership decision in [`ARCH-001`](../../done/ARCH-001-physics-layer-ownership-and-ecs-integration.md) / [ADR-0019](../../../docs/adr/0019-physics-layer-ownership-and-ecs-integration.md) and the ECS authoring contract in retired [`HARDEN-064`](../../done/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md) bound where state and runtime sync ultimately live.
 
 ## Required changes
 - [ ] Intake paper(s) or textbook method references and define the method contract.

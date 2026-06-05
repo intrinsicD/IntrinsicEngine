@@ -94,9 +94,8 @@ TEST(EcsLayeringBoundaries, EcsSourcesDoNotImportHigherLayerModules)
 
 // Canonical ECS components store CPU-only descriptors and stable IDs. They
 // must not embed graphics/RHI handles, runtime sidecars, or solver-owned
-// physics state. HARDEN-064 governs the future collider/rigid-body authoring
-// contract; until then ECS components are forbidden from carrying runtime or
-// solver state.
+// physics state. HARDEN-064 defines collider/rigid-body authoring descriptors
+// in ECS, but live runtime or solver state remains forbidden.
 TEST(EcsLayeringBoundaries, EcsComponentsRejectProhibitedRuntimeAndSolverState)
 {
     const auto files = CollectEcsSourceFiles();
@@ -158,22 +157,46 @@ TEST(EcsLayeringBoundaries, AssetInstanceComponentRemainsCpuStableIdOnly)
     EXPECT_EQ(content.find("import Extrinsic.Asset"), std::string::npos);
 }
 
-// Collider components describe CPU geometric primitives only. They must not
-// embed solver-owned state (rigid-body handles, contact caches, broadphase
-// proxies, island IDs, runtime sync sidecars). HARDEN-064 will define the
-// authoring contract once the physics layer ownership decision (ARCH-001) lands.
-TEST(EcsLayeringBoundaries, ColliderComponentRejectsRigidBodyAndSolverState)
+// Collider components describe CPU authoring descriptors only. They must not
+// embed solver-owned state (body handles, contact caches, broadphase proxies,
+// island IDs, runtime sync sidecars).
+TEST(EcsLayeringBoundaries, ColliderComponentRejectsSolverStateAndExposesDescriptors)
 {
     const auto path = RepoRoot() / "src/ecs/Components/ECS.Component.Collider.cppm";
     const auto content = ReadFile(path);
     ASSERT_FALSE(content.empty()) << "Cannot read " << path.string();
 
-    // CPU geometry primitives are explicitly allowed; the existing collider
-    // representation uses Geometry.Sphere as a CPU descriptor.
     EXPECT_NE(content.find("export module Extrinsic.ECS.Component.Collider"), std::string::npos);
-    EXPECT_NE(content.find("import Geometry."), std::string::npos);
+    EXPECT_NE(content.find("struct SphereShape"), std::string::npos);
+    EXPECT_NE(content.find("struct CapsuleShape"), std::string::npos);
+    EXPECT_NE(content.find("struct BoxShape"), std::string::npos);
+    EXPECT_NE(content.find("struct ShapeDescriptor"), std::string::npos);
+    EXPECT_NE(content.find("struct LocalPose"), std::string::npos);
 
-    EXPECT_EQ(content.find("RigidBody"), std::string::npos);
+    EXPECT_EQ(content.find("PhysicsBody"), std::string::npos);
+    EXPECT_EQ(content.find("Broadphase"), std::string::npos);
+    EXPECT_EQ(content.find("ContactCache"), std::string::npos);
+    EXPECT_EQ(content.find("IslandId"), std::string::npos);
+    EXPECT_EQ(content.find("SolverIndex"), std::string::npos);
+    EXPECT_EQ(content.find("import Extrinsic.Runtime"), std::string::npos);
+    EXPECT_EQ(content.find("import Extrinsic.Graphics"), std::string::npos);
+    EXPECT_EQ(content.find("import Extrinsic.RHI"), std::string::npos);
+}
+
+// RigidBody is ECS-owned authoring intent only: motion, mass, velocity, damping,
+// gravity, sleep, and CCD flags. Live solver handles and runtime sidecars must
+// remain outside canonical ECS components.
+TEST(EcsLayeringBoundaries, RigidBodyComponentRejectsSolverAndRuntimeState)
+{
+    const auto path = RepoRoot() / "src/ecs/Components/ECS.Component.RigidBody.cppm";
+    const auto content = ReadFile(path);
+    ASSERT_FALSE(content.empty()) << "Cannot read " << path.string();
+
+    EXPECT_NE(content.find("export module Extrinsic.ECS.Component.RigidBody"), std::string::npos);
+    EXPECT_NE(content.find("enum class MotionType"), std::string::npos);
+    EXPECT_NE(content.find("enum class MassPolicy"), std::string::npos);
+    EXPECT_NE(content.find("struct Component"), std::string::npos);
+
     EXPECT_EQ(content.find("PhysicsBody"), std::string::npos);
     EXPECT_EQ(content.find("Broadphase"), std::string::npos);
     EXPECT_EQ(content.find("ContactCache"), std::string::npos);
