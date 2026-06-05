@@ -12,9 +12,23 @@ Each active task should include:
 ## Currently active
 
 No currently active task. The next unblocked clustered-light candidate is
-[`GRAPHICS-039B`](../backlog/rendering/GRAPHICS-039B-light-cluster-assignment.md).
+[`GRAPHICS-039C`](../backlog/rendering/GRAPHICS-039C-cluster-surface-shader-integration.md).
 
 The most recently retired tasks are summarised below.
+
+Previously-active
+[`GRAPHICS-039B`](../done/GRAPHICS-039B-light-cluster-assignment.md) —
+light-to-cluster assignment + overflow diagnostics retired to `tasks/done/` on
+2026-06-05 at maturity `CPUContracted`. The slice added
+`ClusterLightCellHeader`, retained `ClusterLights.Headers` /
+`ClusterLights.Indices` / `ClusterLights.Counter` imports, the
+`light_cluster_assign.comp` shader asset, a deterministic CPU assignment helper
+over existing `LightSnapshot` values, conservative point/spot inclusion,
+directional-light skip, 256-contributor clamp diagnostics, frame-recipe
+`LightClusterAssignmentPass` ordering after `ClusterGridBuildPass`, and
+contract coverage for shape inclusion, empty cells, overflow, counter clearing,
+command shape, and diagnostic publication. Surface-shader consumption and
+async-compute affinity remain `GRAPHICS-039C/D`.
 
 Previously-active
 [`GRAPHICS-039A`](../done/GRAPHICS-039A-cluster-grid-build.md) — cluster grid

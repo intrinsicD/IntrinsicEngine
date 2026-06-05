@@ -56,6 +56,9 @@ export namespace Extrinsic::Graphics
 	{
 		std::uint32_t UploadedLightCount{0u};
 		std::uint32_t UnsupportedLightCount{0u};
+		std::uint32_t LightClusterOverflowCount{0u};
+		std::uint32_t LightsCulledCount{0u};
+		std::uint32_t EmptyClusterCount{0u};
 		bool UsedFallbackDirectional{false};
 	};
 
@@ -83,6 +86,9 @@ export namespace Extrinsic::Graphics
 		void ApplyTo(RHI::CameraUBO& camera) const noexcept;
 		[[nodiscard]] LightEnvironmentPacket BuildEnvironmentPacket(std::span<const LightSnapshot> lights) const;
 		void SyncGpuBuffer(std::span<const LightSnapshot> lights, GpuWorld& gpuWorld);
+		void PublishClusterAssignmentDiagnostics(std::uint32_t overflowCount,
+												 std::uint32_t lightsCulledCount,
+												 std::uint32_t emptyClusterCount) noexcept;
 		[[nodiscard]] LightSyncDiagnostics GetDiagnostics() const noexcept;
 
 		[[nodiscard]] bool IsInitialized() const noexcept;

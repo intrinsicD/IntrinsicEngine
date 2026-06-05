@@ -353,23 +353,36 @@ Concretely:
   missing-sample conservatism, frustum-first rejection, and selection-bucket
   exemption on an operational Vulkan command stream while preserving the
   default CPU/null contracts.
-- GRAPHICS-039A lands `Extrinsic.Graphics.LightClusters` — the clustered-light
-  froxel grid contract and backend-neutral cluster-grid build command shape.
+- GRAPHICS-039A/B land `Extrinsic.Graphics.LightClusters` — the
+  clustered-light froxel grid contract, backend-neutral cluster-grid build
+  command shape, and CPU/null light-assignment contract.
   `ComputeClusterGridDesc(w, h)` uses the recorded `GRAPHICS-039` formula:
   `TilesX = ceil(w / 80)`, `TilesY = ceil(h / 80)`, `SlicesZ = 24`
   (`16x9x24` at `1280x720`). `MapViewZToClusterSlice(...)` applies the
   Olsson-style logarithmic split in positive view-Z, clamps sub-near samples to
-  slice 0, and reports samples beyond the far plane as out-of-range so later
-  light assignment leaves those cells empty. `ComputeClusterCellAABB(...)`
+  slice 0, and reports samples beyond the far plane as out-of-range so light
+  assignment leaves those cells empty. `ComputeClusterCellAABB(...)`
   produces one shader-visible 32-byte `ClusterGridAABB` per cell in
   right-handed view space (`MinZ = -far`, `MaxZ = -near`), using clamped pixel
   bounds for partial edge tiles. The default recipe declares an opt-in
   `"ClusterGridBuildPass"` that writes the imported
   `ClusterGrid.AABBs` storage buffer when `EnableClusterGridBuild`,
-  `DepthPrepass`, and a valid buffer import are all present. The shader asset
-  `assets/shaders/cluster_grid_build.comp` mirrors the same math; backend
-  descriptor publication, light assignment, surface-shader consumption, and
-  async-compute affinity remain the `GRAPHICS-039B/C/D` follow-ups.
+  `DepthPrepass`, and a valid buffer import are all present. `GRAPHICS-039B`
+  adds `ClusterLightCellHeader` (`{ offset, count }`), the
+  `ClusterLights.Headers`, `ClusterLights.Indices`, and `ClusterLights.Counter`
+  imported storage buffers, `AssignLightsToClusters(...)`, and
+  `RecordClusterLightAssignment(...)`. The
+  assignment consumes existing `LightSnapshot` records only: directional lights
+  are skipped, point lights use sphere-vs-AABB closest-point tests, spot lights
+  use a conservative sphere-prefilter plus cone/AABB bounding-sphere SAT
+  approximation, and each cell clamps to the first 256 contributing lights while
+  incrementing `LightClusterOverflowCount`. `LightSystem` diagnostics now also
+  expose `LightsCulledCount` and `EmptyClusterCount`. The shader asset
+  `assets/shaders/cluster_grid_build.comp` mirrors the grid-build math, and
+  `assets/shaders/light_cluster_assign.comp` mirrors the non-directional light
+  assignment policy with a shader-visible atomic allocation counter.
+  Surface-shader consumption and async-compute affinity remain the `GRAPHICS-039C/D`
+  follow-ups.
 - GRAPHICS-072 Slice A wires the default-recipe deferred-mode `"SurfacePass"`
   to the existing `DeferredGBufferPass` body. `NullRenderer` owns
   `m_DeferredGBufferPass` (constructed against `m_DeferredSystem`) and the

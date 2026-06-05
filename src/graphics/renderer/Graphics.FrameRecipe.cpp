@@ -236,6 +236,8 @@ namespace Extrinsic::Graphics
         const bool pickingActive = features.EnablePicking && features.EnableDepthPrepass;
         const bool hzbBuildActive = features.EnableHZBBuild && features.EnableDepthPrepass;
         const bool clusterGridBuildActive = features.EnableClusterGridBuild && features.EnableDepthPrepass;
+        const bool clusterLightAssignmentActive =
+            features.EnableClusterLightAssignment && clusterGridBuildActive;
         FrameRecipeIntrospection out{};
 
         AddPass(out, FrameRecipePassKind::Culling, "CullingPass", true, false,
@@ -247,6 +249,10 @@ namespace Extrinsic::Graphics
                 {"SceneDepth"}, {"HZB.Current"});
         AddPass(out, FrameRecipePassKind::ClusterGridBuild, "ClusterGridBuildPass",
                 clusterGridBuildActive, false, {}, {"ClusterGrid.AABBs"});
+        AddPass(out, FrameRecipePassKind::LightClusterAssignment, "LightClusterAssignmentPass",
+                clusterLightAssignmentActive, false,
+                {"ClusterGrid.AABBs", "GpuWorld.Lights"},
+                {"ClusterLights.Headers", "ClusterLights.Indices", "ClusterLights.Counter"});
         // GRAPHICS-074 recipe-side follow-up — picking now runs *after*
         // `DepthPrepass` and reads `SceneDepth` so the picking pipeline can
         // depth-equal-test against the nearest-surface depth instead of
@@ -368,6 +374,12 @@ namespace Extrinsic::Graphics
         AddResource(out, FrameRecipeResourceKind::HZBCurrent, "HZB.Current", hzbBuildActive, true, false, true, true);
         AddResource(out, FrameRecipeResourceKind::ClusterGridAABBs, "ClusterGrid.AABBs",
                     clusterGridBuildActive, true, false, true, true);
+        AddResource(out, FrameRecipeResourceKind::ClusterLightHeaders, "ClusterLights.Headers",
+                    clusterLightAssignmentActive, true, false, true, true);
+        AddResource(out, FrameRecipeResourceKind::ClusterLightIndices, "ClusterLights.Indices",
+                    clusterLightAssignmentActive, true, false, true, true);
+        AddResource(out, FrameRecipeResourceKind::ClusterLightCounter, "ClusterLights.Counter",
+                    clusterLightAssignmentActive, true, false, true, true);
         // GRAPHICS-074 recipe-side follow-up — `EntityId` is consumed by
         // PickingPass (active iff `pickingActive`) and SelectionOutlinePass
         // (active iff `EnableSelectionOutline`); `PrimitiveId` and
@@ -536,6 +548,10 @@ namespace Extrinsic::Graphics
         const bool hzbBuildActive = features.EnableHZBBuild && features.EnableDepthPrepass && imports.HZBCurrent.IsValid();
         const bool clusterGridBuildActive = features.EnableClusterGridBuild && features.EnableDepthPrepass &&
                                             imports.ClusterGridAABBs.IsValid();
+        const bool clusterLightAssignmentActive =
+            features.EnableClusterLightAssignment && clusterGridBuildActive &&
+            imports.ClusterLightHeaders.IsValid() && imports.ClusterLightIndices.IsValid() &&
+            imports.ClusterLightCounter.IsValid();
         const auto width = ClampExtent(sizing.Width);
         const auto height = ClampExtent(sizing.Height);
         const FrameRecipeIntrospection declaration = DescribeDefaultFrameRecipe(features);
@@ -575,6 +591,9 @@ namespace Extrinsic::Graphics
         BufferRef pickingReadback{};
         BufferRef histogramReadback{};
         BufferRef clusterGridAABBs{};
+        BufferRef clusterLightHeaders{};
+        BufferRef clusterLightIndices{};
+        BufferRef clusterLightCounter{};
         TextureRef hzbCurrent{};
 
         if (hzbBuildActive)
@@ -594,6 +613,21 @@ namespace Extrinsic::Graphics
                                                   imports.ClusterGridAABBs,
                                                   BufferState::ShaderWrite,
                                                   BufferState::ShaderRead);
+        }
+        if (clusterLightAssignmentActive)
+        {
+            clusterLightHeaders = graph.ImportBuffer("ClusterLights.Headers",
+                                                     imports.ClusterLightHeaders,
+                                                     BufferState::ShaderWrite,
+                                                     BufferState::ShaderRead);
+            clusterLightIndices = graph.ImportBuffer("ClusterLights.Indices",
+                                                     imports.ClusterLightIndices,
+                                                     BufferState::ShaderWrite,
+                                                     BufferState::ShaderRead);
+            clusterLightCounter = graph.ImportBuffer("ClusterLights.Counter",
+                                                     imports.ClusterLightCounter,
+                                                     BufferState::ShaderWrite,
+                                                     BufferState::ShaderRead);
         }
 
         if (pickingActive || features.EnableSelectionOutline)
@@ -816,6 +850,17 @@ namespace Extrinsic::Graphics
         {
             addOrderedPass("ClusterGridBuildPass", [=](RenderGraphBuilder& builder) {
                 builder.Write(clusterGridAABBs, BufferUsage::ShaderWrite);
+            });
+        }
+
+        if (clusterLightAssignmentActive)
+        {
+            addOrderedPass("LightClusterAssignmentPass", [=](RenderGraphBuilder& builder) {
+                builder.Read(clusterGridAABBs, BufferUsage::ShaderRead);
+                builder.Read(lights, BufferUsage::ShaderRead);
+                builder.Write(clusterLightHeaders, BufferUsage::ShaderWrite);
+                builder.Write(clusterLightIndices, BufferUsage::ShaderWrite);
+                builder.Write(clusterLightCounter, BufferUsage::ShaderWrite);
             });
         }
 

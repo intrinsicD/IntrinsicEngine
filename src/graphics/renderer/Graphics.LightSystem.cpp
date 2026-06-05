@@ -168,12 +168,19 @@ namespace Extrinsic::Graphics
         }
 
         gpuWorld.SetLights(lights);
-		m_Impl->Diagnostics = LightSyncDiagnostics{
-			.UploadedLightCount = static_cast<std::uint32_t>(lights.size()),
-			.UnsupportedLightCount = packet.UnsupportedLightCount,
-			.UsedFallbackDirectional = !directionalFromSnapshots,
-		};
+		m_Impl->Diagnostics.UploadedLightCount = static_cast<std::uint32_t>(lights.size());
+		m_Impl->Diagnostics.UnsupportedLightCount = packet.UnsupportedLightCount;
+		m_Impl->Diagnostics.UsedFallbackDirectional = !directionalFromSnapshots;
     }
+
+	void LightSystem::PublishClusterAssignmentDiagnostics(const std::uint32_t overflowCount,
+														 const std::uint32_t lightsCulledCount,
+														 const std::uint32_t emptyClusterCount) noexcept
+	{
+		m_Impl->Diagnostics.LightClusterOverflowCount = overflowCount;
+		m_Impl->Diagnostics.LightsCulledCount = lightsCulledCount;
+		m_Impl->Diagnostics.EmptyClusterCount = emptyClusterCount;
+	}
 
   LightSyncDiagnostics LightSystem::GetDiagnostics() const noexcept
   {

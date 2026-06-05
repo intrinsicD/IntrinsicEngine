@@ -91,6 +91,12 @@ namespace Extrinsic::Graphics
         // AABB build command shape. Append-only to keep prior numeric values
         // stable.
         ClusterGridBuild,
+        // GRAPHICS-039B — compute light-to-cluster assignment pass. Declared
+        // after `ClusterGridBuildPass`, reads `ClusterGrid.AABBs` plus the
+        // snapshot-authored `GpuWorld.Lights` buffer, and writes the packed
+        // `ClusterLights.Headers` / `ClusterLights.Indices` imports plus the
+        // shader-visible `ClusterLights.Counter` atomic allocator.
+        LightClusterAssignment,
     };
 
     export enum class FrameRecipeResourceKind : std::uint8_t
@@ -149,6 +155,13 @@ namespace Extrinsic::Graphics
         // from the clustered-light grid owner. The build pass writes one
         // right-handed view-space AABB per froxel cell.
         ClusterGridAABBs,
+        // GRAPHICS-039B — renderer-owned clustered-light assignment outputs.
+        // `ClusterLights.Headers` stores `{ offset, count }` per froxel cell;
+        // `ClusterLights.Indices` stores the packed uint light-index lists;
+        // `ClusterLights.Counter` stores the shader atomic allocator cursor.
+        ClusterLightHeaders,
+        ClusterLightIndices,
+        ClusterLightCounter,
     };
 
     export struct FrameRecipeFeatures
@@ -164,6 +177,11 @@ namespace Extrinsic::Graphics
         // renderer has a valid `ClusterGrid.AABBs` import. Defaults off until
         // the clustered-light consumers land.
         bool EnableClusterGridBuild{false};
+        // GRAPHICS-039B — opt into the light-to-cluster assignment pass once
+        // the renderer has valid header/index imports. Requires
+        // `EnableClusterGridBuild` because the assignment consumes the same
+        // frame's cluster AABBs.
+        bool EnableClusterLightAssignment{false};
         bool EnablePicking{false};
         bool EnableShadows{false};
         bool EnableSelectionOutline{false};
@@ -260,6 +278,10 @@ namespace Extrinsic::Graphics
         // GRAPHICS-039A — retained cluster AABB storage buffer written by the
         // cluster-grid build pass and read by the future light-assignment pass.
         RHI::BufferHandle ClusterGridAABBs{};
+        // GRAPHICS-039B — retained clustered-light assignment outputs.
+        RHI::BufferHandle ClusterLightHeaders{};
+        RHI::BufferHandle ClusterLightIndices{};
+        RHI::BufferHandle ClusterLightCounter{};
     };
 
     // GRAPHICS-073 Slice B — typed sizing seam for the shadow atlas. When

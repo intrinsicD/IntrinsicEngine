@@ -31,7 +31,10 @@ The render graph blackboard exposes a fixed canonical resource vocabulary:
 |----------|--------|----------|----------------|
 | `SceneDepth` | Swapchain/device depth format | Imported | Depth-tested scene + picking |
 | `HZB.Current` | `R32_FLOAT` | Imported retained graphics texture | Current-frame Hi-Z pyramid written by `HZBBuildPass` after `DepthPrepass`; sampled by later HZB consumers once their slices land |
-| `ClusterGrid.AABBs` | storage buffer | Imported retained graphics buffer | One 32-byte right-handed view-space AABB per froxel cell (`ceil(W/80) x ceil(H/80) x 24`, with partial edge tiles clamped to viewport pixel bounds) written by `ClusterGridBuildPass`; read by future clustered-light assignment |
+| `ClusterGrid.AABBs` | storage buffer | Imported retained graphics buffer | One 32-byte right-handed view-space AABB per froxel cell (`ceil(W/80) x ceil(H/80) x 24`, with partial edge tiles clamped to viewport pixel bounds) written by `ClusterGridBuildPass`; read by `LightClusterAssignmentPass` |
+| `ClusterLights.Headers` | storage buffer | Imported retained graphics buffer | One `{ offset, count }` header per froxel cell, written by `LightClusterAssignmentPass`; each count is clamped to 256 contributors |
+| `ClusterLights.Indices` | storage buffer | Imported retained graphics buffer | Packed `uint` light-index lists written by `LightClusterAssignmentPass`; surface/deferred shader consumption remains `GRAPHICS-039C` |
+| `ClusterLights.Counter` | storage buffer | Imported retained graphics buffer | One `uint` atomic allocation cursor cleared before `LightClusterAssignmentPass`; readback/diagnostic consumers remain follow-up scope |
 | `EntityId` | `R32_UINT` | Frame transient | `PickingPass`, selection/debug sampling |
 | `PrimitiveId` | `R32_UINT` | Frame transient | `PickingPass` primitive-domain hint (`4` high bits = `SelectionPrimitiveDomain`, `28` low bits = authoritative face/edge/point ID when available, otherwise primitive index) for sub-element selection/debug. Pack/unpack uses the `EncodedSelectionId` helper so graphics, runtime, and shaders share one seam |
 | `SceneNormal` | `R16G16B16A16_SFLOAT` | Frame transient | Deferred-capable surface normal target; also sampleable for debug |
@@ -56,7 +59,7 @@ Default feature gates:
 
 - Always active: `CullingPass`, `SurfacePass`, `LinePass`, `PointPass`, `Present`, `SceneDepth`, `SceneColorHDR`, GPU scene buffers, material buffer, and draw-bucket buffers for surface opaque, surface alpha-mask, lines, points, shadow opaque, and selection surface/line/point lanes.
 - Default active but explicitly gateable: `DepthPrepass`, deferred/hybrid `CompositionPass`, `PostProcessPass`, and `ImGuiPass`.
-- Optional: `HZBBuildPass` (`HZB.Current`, gated on a valid renderer-owned import plus `DepthPrepass`), `ClusterGridBuildPass` (`ClusterGrid.AABBs`, gated on a valid renderer-owned import plus `DepthPrepass`), `PickingPass` (`EntityId`, `PrimitiveId`, `Picking.Readback`), `ShadowPass` (`ShadowAtlas`), `SelectionOutlinePass` (`SelectionOutline`), and `DebugViewPass` (`DebugViewRGBA`).
+- Optional: `HZBBuildPass` (`HZB.Current`, gated on a valid renderer-owned import plus `DepthPrepass`), `ClusterGridBuildPass` (`ClusterGrid.AABBs`, gated on a valid renderer-owned import plus `DepthPrepass`), `LightClusterAssignmentPass` (`ClusterLights.Headers` / `ClusterLights.Indices` / `ClusterLights.Counter`, gated on the cluster-grid build plus valid renderer-owned imports), `PickingPass` (`EntityId`, `PrimitiveId`, `Picking.Readback`), `ShadowPass` (`ShadowAtlas`), `SelectionOutlinePass` (`SelectionOutline`), and `DebugViewPass` (`DebugViewRGBA`).
 
 The imported `Backbuffer` is declared once and finalized only by the `Present` declaration; intermediate passes write transient recipe resources instead of taking backbuffer ownership. At frame execution time the renderer resolves this import through `RHI::IDevice::GetBackbufferHandle(frame)` and never fabricates a placeholder swapchain handle. The renderer owns command-context `Begin()`/`End()` bracketing around render-graph barrier/command recording, while runtime remains responsible for calling `IDevice::Present(frame)` after `IRenderer::EndFrame(frame)`.
 
@@ -88,7 +91,8 @@ flow through `BuildDefaultFrameRecipe(...)` and its canonical pass names.
 | `PickingPass` | `SceneDepth` | `EntityId` | Clears both; no swapchain ownership. Logical picking/selection ID stage: composed of split source modules (`Pass.Selection.EntityId`, `Pass.Selection.FaceId`, `Pass.Selection.EdgeId`, `Pass.Selection.PointId`) plus the readback/result seam owned by `SelectionSystem`. Each module fills part of the `EntityId` / `PrimitiveId` outputs; the logical name is `PickingPass` |
 | `DepthPrepass` | GPUScene buffers | `SceneDepth` | Depth-only early-Z fill (triangle-list geometry only). Clears depth to 1.0. Recipe-driven: active only when `FrameRecipe::DepthPrepass` is true. Internal to `SurfacePass` (shares draw stream and GPU culling infrastructure) |
 | `HZBBuildPass` | `SceneDepth` | `HZB.Current` | Compute Hi-Z build pass that runs immediately after `DepthPrepass` when the renderer has a valid retained HZB import. The CPU/null contract records a backend-neutral per-mip fallback dispatch shape; production storage-image descriptor publication remains future backend descriptor integration, and the opt-in Vulkan conservatism smoke is `GRAPHICS-038E` |
-| `ClusterGridBuildPass` | projection/grid push constants | `ClusterGrid.AABBs` | Compute cluster-grid build pass that records one linear dispatch over all froxel cells and writes one right-handed view-space AABB per cell. The CPU/null contract pins the `ceil(W/80) x ceil(H/80) x 24` grid, logarithmic positive-view-Z slice mapping, partial-edge tile clamping, and AABB shape; light assignment, surface-shader consumption, and async-compute affinity are `GRAPHICS-039B/C/D` |
+| `ClusterGridBuildPass` | projection/grid push constants | `ClusterGrid.AABBs` | Compute cluster-grid build pass that records one linear dispatch over all froxel cells and writes one right-handed view-space AABB per cell. The CPU/null contract pins the `ceil(W/80) x ceil(H/80) x 24` grid, logarithmic positive-view-Z slice mapping, partial-edge tile clamping, and AABB shape |
+| `LightClusterAssignmentPass` | `ClusterGrid.AABBs`, `GpuWorld.Lights` | `ClusterLights.Headers`, `ClusterLights.Indices`, `ClusterLights.Counter` | Compute clustered-light assignment pass that writes packed per-cell light lists through an atomic counter. Directional lights are skipped; point lights use sphere-vs-AABB tests; spot lights use conservative sphere-prefilter plus cone/AABB bounding-sphere approximation; overflows clamp to the first 256 lights and increment diagnostics. Surface-shader consumption and async-compute affinity are `GRAPHICS-039C/D` |
 | `ShadowPass` | GPUScene buffers, `ShadowCascadeData` / shadow params in the global camera-light packet | `ShadowAtlas` | Renders depth-only from each cascade's light-space VP into a horizontal-strip atlas (`CascadeCount × Resolution` wide). Uses the `ShadowOpaque` culling bucket and skips command recording when `ShadowParams::Enabled` is false, the cascade count/resolution disables the atlas, the pipeline is missing, or the bucket is invalid. Uses a dedicated depth pipeline with `VK_CULL_MODE_FRONT_BIT` to reduce self-shadowing. Recipe-gated by `ShadowParams::Enabled`. Texel-snapped cascade frusta computed by runtime/later shadow extraction are packed into `ShadowCascadeData` |
 | `SurfacePass` | forward: `SceneDepth`, `ShadowAtlas` (sampled), GPUScene buffers; deferred: `SceneDepth`, GPUScene buffers (no shadow atlas read) | forward: `SceneColorHDR`; deferred: `SceneNormal` + `Albedo` + `Material0`, `SceneDepth` | Opaque surface lane. Forward path samples `ShadowAtlas` via global set (binding 1, `sampler2DShadow` with `VK_COMPARE_OP_LESS_OR_EQUAL`). The deferred-mode surface pass is the GBuffer pass; it no longer samples the shadow atlas (shadow sampling moved entirely to `CompositionPass` per GRAPHICS-072 Slice C). When depth prepass is active, loads existing depth and uses `VK_COMPARE_OP_EQUAL` (zero overdraw). Otherwise clears depth with `VK_COMPARE_OP_LESS` |
 | `CompositionPass` | deferred: `SceneNormal`, `Albedo`, `Material0`, `SceneDepth`, `ShadowAtlas` (sampled through the bindless heap at `set = 0, binding = 0`, indexed by `DeferredLightingPushConstants::ShadowAtlasBindlessIndex` sourced from `ShadowSystem::GetAtlasBindlessIndex()`) | deferred: `SceneColorHDR` | Fullscreen deferred lighting with PCF shadow sampling from cascade atlas. The legacy `set 1, binding 1` `sampler2DShadow` model cannot be honored on the bindless-only promoted Vulkan pipeline layout (`setLayoutCount = 1`), so the engine pushes the atlas bindless slot through push constants instead (GRAPHICS-072 Slice C). The framegraph compiler emits a `DepthAttachment → ShaderReadOnly` barrier on the atlas between `ShadowPass` and this pass. No-op in forward mode |
@@ -406,20 +410,21 @@ Per-frame lighting is carried by `LightEnvironmentPacket` and includes direction
 3. `DepthPrepass` (internal to `SurfacePass`, recipe-gated)
 4. `HZBBuildPass` (compute Hi-Z build after `DepthPrepass`, gated on a valid `HZB.Current` import)
 5. `ClusterGridBuildPass` (compute froxel AABB build after the depth/HZB band, gated on a valid `ClusterGrid.AABBs` import)
-6. `ShadowPass` (recipe-gated by `ShadowParams::Enabled`)
-7. `SurfacePass`
-8. `CompositionPass`
-9. `LinePass`
-10. `PointPass`
-11. `PostProcessHistogramPass` (compute dispatch; lives in its own ordered graph pass because Vulkan rejects `vkCmdDispatch` inside an active render-pass scope; body short-circuits when `EnableHistogram == false`)
-12. `PostProcessPass`
-13. `PostProcessAAEdgePass` (SMAA edge; no-op when `AntiAliasing != SMAA`)
-14. `PostProcessAABlendPass` (SMAA blending weights; no-op when `AntiAliasing != SMAA`)
-15. `PostProcessAAResolvePass` (FXAA or SMAA resolve, mutually exclusive per `PostProcessSettings::AntiAliasing`)
-16. `SelectionOutlinePass`
-17. `DebugViewPass`
-18. `ImGuiPass`
-19. `Present`
+6. `LightClusterAssignmentPass` (compute per-cell light-list assignment after cluster-grid build, gated on valid `ClusterLights.Headers` / `ClusterLights.Indices` / `ClusterLights.Counter` imports)
+7. `ShadowPass` (recipe-gated by `ShadowParams::Enabled`)
+8. `SurfacePass`
+9. `CompositionPass`
+10. `LinePass`
+11. `PointPass`
+12. `PostProcessHistogramPass` (compute dispatch; lives in its own ordered graph pass because Vulkan rejects `vkCmdDispatch` inside an active render-pass scope; body short-circuits when `EnableHistogram == false`)
+13. `PostProcessPass`
+14. `PostProcessAAEdgePass` (SMAA edge; no-op when `AntiAliasing != SMAA`)
+15. `PostProcessAABlendPass` (SMAA blending weights; no-op when `AntiAliasing != SMAA`)
+16. `PostProcessAAResolvePass` (FXAA or SMAA resolve, mutually exclusive per `PostProcessSettings::AntiAliasing`)
+17. `SelectionOutlinePass`
+18. `DebugViewPass`
+19. `ImGuiPass`
+20. `Present`
 
 `Extrinsic.Graphics.FrameRecipe::DescribeDefaultFrameRecipe()` reports this pass order with disabled optional stages retained as declarations for tooling/review, while `BuildDefaultFrameRecipe()` emits only enabled passes/resources into `Graphics.RenderGraph`.
 
@@ -434,6 +439,7 @@ The promoted graphics layer keeps a 1:1 mapping between logical passes documente
 | `DepthPrepass` | `Extrinsic.Graphics.Pass.DepthPrepass` (internal to `SurfacePass`) | `DepthPrepassPass` |
 | `HZBBuildPass` | `Extrinsic.Graphics.HZB` | `RecordHZBBuild` |
 | `ClusterGridBuildPass` | `Extrinsic.Graphics.LightClusters` | `RecordClusterGridBuild` |
+| `LightClusterAssignmentPass` | `Extrinsic.Graphics.LightClusters` | `RecordClusterLightAssignment` |
 | `ShadowPass` | `Extrinsic.Graphics.Pass.Shadows` | `ShadowPass` |
 | `SurfacePass` | `Extrinsic.Graphics.Pass.Forward.Surface`, `Extrinsic.Graphics.Pass.Deferred.GBuffers` | `SurfacePass`, `GBufferPass` |
 | `CompositionPass` | `Extrinsic.Graphics.Pass.Deferred.Lighting` | `DeferredLightingPass` |

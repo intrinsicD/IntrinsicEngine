@@ -1,18 +1,23 @@
 module;
 
 #include <cstdint>
+#include <span>
+#include <vector>
 
 export module Extrinsic.Graphics.LightClusters;
 
 import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Handles;
+import Extrinsic.Graphics.LightSystem;
 
 export namespace Extrinsic::Graphics
 {
     inline constexpr std::uint32_t kDefaultClusterTilePx = 80u;
     inline constexpr std::uint32_t kDefaultClusterZSlices = 24u;
     inline constexpr std::uint32_t kClusterGridBuildGroupSize = 64u;
+    inline constexpr std::uint32_t kClusterLightAssignmentGroupSize = 64u;
+    inline constexpr std::uint32_t kMaxClusterLightsPerCell = 256u;
     inline constexpr std::uint32_t kInvalidClusterCellIndex = 0xFFFF'FFFFu;
 
     // GRAPHICS-039A — froxel grid dimensions from the clustered-light planning
@@ -50,6 +55,16 @@ export namespace Extrinsic::Graphics
     };
     static_assert(sizeof(ClusterGridAABB) == 32u);
     static_assert(alignof(ClusterGridAABB) == 16u);
+
+    // Shader-visible std430 header for one froxel cell. Offset is measured in
+    // uint light-index elements inside `ClusterLights.Indices`.
+    struct alignas(8) ClusterLightCellHeader
+    {
+        std::uint32_t Offset{0u};
+        std::uint32_t Count{0u};
+    };
+    static_assert(sizeof(ClusterLightCellHeader) == 8u);
+    static_assert(alignof(ClusterLightCellHeader) == 8u);
 
     struct ClusterGridProjection
     {
@@ -91,6 +106,38 @@ export namespace Extrinsic::Graphics
         }
     };
 
+    struct ClusterLightAssignmentDispatchPlan
+    {
+        ClusterGridDesc Desc{};
+        std::uint32_t LightCount{0u};
+        std::uint32_t MaxLightsPerCell{kMaxClusterLightsPerCell};
+        std::uint32_t GroupSize{kClusterLightAssignmentGroupSize};
+        std::uint32_t GroupCountX{0u};
+        std::uint32_t GroupCountY{1u};
+        std::uint32_t GroupCountZ{1u};
+
+        [[nodiscard]] bool IsValid() const noexcept
+        {
+            return Desc.IsValid() && MaxLightsPerCell > 0u && GroupSize > 0u &&
+                   GroupCountX > 0u && GroupCountY > 0u && GroupCountZ > 0u;
+        }
+    };
+
+    struct ClusterLightAssignmentDiagnostics
+    {
+        std::uint32_t LightClusterOverflowCount{0u};
+        std::uint32_t LightsCulledCount{0u};
+        std::uint32_t EmptyClusterCount{0u};
+    };
+
+    struct ClusterLightAssignmentResult
+    {
+        std::vector<ClusterLightCellHeader> Headers{};
+        std::vector<std::uint32_t> LightIndices{};
+        ClusterLightAssignmentDiagnostics Diagnostics{};
+        bool Valid{false};
+    };
+
     // Matches `assets/shaders/cluster_grid_build.comp` std430 push layout.
     struct ClusterGridBuildPushConstants
     {
@@ -109,6 +156,16 @@ export namespace Extrinsic::Graphics
     };
     static_assert(sizeof(ClusterGridBuildPushConstants) == 48u);
 
+    // Matches `assets/shaders/light_cluster_assign.comp` push layout.
+    struct ClusterLightAssignmentPushConstants
+    {
+        std::uint32_t CellCount{0u};
+        std::uint32_t LightCount{0u};
+        std::uint32_t MaxLightsPerCell{0u};
+        std::uint32_t Reserved0{0u};
+    };
+    static_assert(sizeof(ClusterLightAssignmentPushConstants) == 16u);
+
     [[nodiscard]] ClusterGridDesc ComputeClusterGridDesc(
         std::uint32_t renderWidth,
         std::uint32_t renderHeight,
@@ -120,6 +177,24 @@ export namespace Extrinsic::Graphics
 
     [[nodiscard]] RHI::BufferDesc BuildClusterGridAABBBufferDesc(
         const ClusterGridDesc& desc) noexcept;
+
+    [[nodiscard]] std::uint64_t ComputeClusterLightHeaderBufferSizeBytes(
+        const ClusterGridDesc& desc) noexcept;
+
+    [[nodiscard]] std::uint64_t ComputeClusterLightIndexBufferSizeBytes(
+        const ClusterGridDesc& desc,
+        std::uint32_t maxLightsPerCell = kMaxClusterLightsPerCell) noexcept;
+
+    [[nodiscard]] std::uint64_t ComputeClusterLightCounterBufferSizeBytes() noexcept;
+
+    [[nodiscard]] RHI::BufferDesc BuildClusterLightHeaderBufferDesc(
+        const ClusterGridDesc& desc) noexcept;
+
+    [[nodiscard]] RHI::BufferDesc BuildClusterLightIndexBufferDesc(
+        const ClusterGridDesc& desc,
+        std::uint32_t maxLightsPerCell = kMaxClusterLightsPerCell) noexcept;
+
+    [[nodiscard]] RHI::BufferDesc BuildClusterLightCounterBufferDesc() noexcept;
 
     [[nodiscard]] ClusterGridProjection BuildClusterGridProjectionFromVerticalFov(
         float verticalFovRadians,
@@ -154,6 +229,22 @@ export namespace Extrinsic::Graphics
         const ClusterGridDesc& desc,
         std::uint32_t groupSize = kClusterGridBuildGroupSize) noexcept;
 
+    [[nodiscard]] ClusterLightAssignmentDispatchPlan ComputeClusterLightAssignmentDispatchPlan(
+        const ClusterGridDesc& desc,
+        std::uint32_t lightCount,
+        std::uint32_t maxLightsPerCell = kMaxClusterLightsPerCell,
+        std::uint32_t groupSize = kClusterLightAssignmentGroupSize) noexcept;
+
+    [[nodiscard]] bool DoesClusterAABBIntersectLight(
+        const ClusterGridAABB& cell,
+        const LightSnapshot& light) noexcept;
+
+    [[nodiscard]] ClusterLightAssignmentResult AssignLightsToClusters(
+        const ClusterGridDesc& desc,
+        std::span<const ClusterGridAABB> cells,
+        std::span<const LightSnapshot> lights,
+        std::uint32_t maxLightsPerCell = kMaxClusterLightsPerCell);
+
     // Records the backend-neutral compute command shape for rebuilding the
     // cluster AABB buffer. The concrete backend owns descriptor publication.
     bool RecordClusterGridBuild(RHI::ICommandContext& cmd,
@@ -161,4 +252,16 @@ export namespace Extrinsic::Graphics
                                 RHI::BufferHandle aabbBuffer,
                                 const ClusterGridBuildDispatchPlan& plan,
                                 const ClusterGridProjection& projection);
+
+    // Records the backend-neutral assignment dispatch. Descriptor publication
+    // is backend-owned; this helper clears the shader-visible atomic counter
+    // and pins the dispatch plus shader-read publication barriers.
+    bool RecordClusterLightAssignment(RHI::ICommandContext& cmd,
+                                      RHI::PipelineHandle pipeline,
+                                      RHI::BufferHandle aabbBuffer,
+                                      RHI::BufferHandle lightsBuffer,
+                                      RHI::BufferHandle headerBuffer,
+                                      RHI::BufferHandle indexBuffer,
+                                      RHI::BufferHandle counterBuffer,
+                                      const ClusterLightAssignmentDispatchPlan& plan);
 }

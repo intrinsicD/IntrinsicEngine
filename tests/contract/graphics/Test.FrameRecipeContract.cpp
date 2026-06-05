@@ -51,6 +51,12 @@ namespace
             // Tests opt into `EnableClusterGridBuild`; default recipe tests
             // leave the feature off so this import is ignored.
             .ClusterGridAABBs = Extrinsic::RHI::BufferHandle{19u, 1u},
+            // GRAPHICS-039B — renderer-owned clustered-light assignment
+            // outputs. Tests opt into `EnableClusterLightAssignment`; default
+            // recipe tests leave the feature off so these imports are ignored.
+            .ClusterLightHeaders = Extrinsic::RHI::BufferHandle{20u, 1u},
+            .ClusterLightIndices = Extrinsic::RHI::BufferHandle{21u, 1u},
+            .ClusterLightCounter = Extrinsic::RHI::BufferHandle{22u, 1u},
         };
     }
 
@@ -291,6 +297,9 @@ TEST(FrameRecipeContract, OptionalResourcesAreGatedByFeatures)
     EXPECT_FALSE(HasEnabledResource(defaults, FrameRecipeResourceKind::DebugViewRGBA));
     EXPECT_FALSE(HasEnabledResource(defaults, FrameRecipeResourceKind::HZBCurrent));
     EXPECT_FALSE(HasEnabledResource(defaults, FrameRecipeResourceKind::ClusterGridAABBs));
+    EXPECT_FALSE(HasEnabledResource(defaults, FrameRecipeResourceKind::ClusterLightHeaders));
+    EXPECT_FALSE(HasEnabledResource(defaults, FrameRecipeResourceKind::ClusterLightIndices));
+    EXPECT_FALSE(HasEnabledResource(defaults, FrameRecipeResourceKind::ClusterLightCounter));
     EXPECT_TRUE(HasEnabledResource(defaults, FrameRecipeResourceKind::SceneColorLDR));
 
     FrameRecipeFeatures allFeatures{};
@@ -300,6 +309,7 @@ TEST(FrameRecipeContract, OptionalResourcesAreGatedByFeatures)
     allFeatures.EnableDebugView = true;
     allFeatures.EnableHZBBuild = true;
     allFeatures.EnableClusterGridBuild = true;
+    allFeatures.EnableClusterLightAssignment = true;
 
     const FrameRecipeIntrospection full = DescribeDefaultFrameRecipe(allFeatures);
     EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::EntityId));
@@ -309,6 +319,9 @@ TEST(FrameRecipeContract, OptionalResourcesAreGatedByFeatures)
     EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::DebugViewRGBA));
     EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::HZBCurrent));
     EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::ClusterGridAABBs));
+    EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::ClusterLightHeaders));
+    EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::ClusterLightIndices));
+    EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::ClusterLightCounter));
 }
 
 TEST(FrameRecipeContract, LightingPathControlsGBufferResourcesAndComposition)
@@ -543,6 +556,115 @@ TEST(FrameRecipeContract, ClusterGridBuildRequiresDepthPrepassAndImportedTarget)
     ASSERT_TRUE(depthDisabledCompiled.has_value());
     const std::vector<std::string> depthDisabledPassNames = OrderedPassNames(*depthDisabledCompiled);
     EXPECT_EQ(std::ranges::find(depthDisabledPassNames, "ClusterGridBuildPass"), depthDisabledPassNames.end());
+}
+
+TEST(FrameRecipeContract, LightClusterAssignmentRequiresGridBuildAndImportedOutputs)
+{
+    FrameRecipeFeatures features{};
+    features.EnableClusterGridBuild = true;
+    features.EnableClusterLightAssignment = true;
+
+    const FrameRecipeIntrospection description = DescribeDefaultFrameRecipe(features);
+    const auto* assignmentPass = FindPass(description, FrameRecipePassKind::LightClusterAssignment);
+    ASSERT_NE(assignmentPass, nullptr);
+    EXPECT_TRUE(assignmentPass->Enabled);
+    EXPECT_TRUE(Contains(assignmentPass->Reads, "ClusterGrid.AABBs"));
+    EXPECT_TRUE(Contains(assignmentPass->Reads, "GpuWorld.Lights"));
+    EXPECT_TRUE(Contains(assignmentPass->Writes, "ClusterLights.Headers"));
+    EXPECT_TRUE(Contains(assignmentPass->Writes, "ClusterLights.Indices"));
+    EXPECT_TRUE(Contains(assignmentPass->Writes, "ClusterLights.Counter"));
+
+    const auto* headerResource = FindResource(description, FrameRecipeResourceKind::ClusterLightHeaders);
+    ASSERT_NE(headerResource, nullptr);
+    EXPECT_TRUE(headerResource->Enabled);
+    EXPECT_TRUE(headerResource->Imported);
+    EXPECT_TRUE(headerResource->Optional);
+    EXPECT_TRUE(headerResource->ImportedWriteAllowed);
+    const auto* indexResource = FindResource(description, FrameRecipeResourceKind::ClusterLightIndices);
+    ASSERT_NE(indexResource, nullptr);
+    EXPECT_TRUE(indexResource->Enabled);
+    EXPECT_TRUE(indexResource->Imported);
+    EXPECT_TRUE(indexResource->Optional);
+    EXPECT_TRUE(indexResource->ImportedWriteAllowed);
+    const auto* counterResource = FindResource(description, FrameRecipeResourceKind::ClusterLightCounter);
+    ASSERT_NE(counterResource, nullptr);
+    EXPECT_TRUE(counterResource->Enabled);
+    EXPECT_TRUE(counterResource->Imported);
+    EXPECT_TRUE(counterResource->Optional);
+    EXPECT_TRUE(counterResource->ImportedWriteAllowed);
+
+    RenderGraph graph;
+    const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
+        graph,
+        features,
+        MakeImports(),
+        FrameRecipeSizing{.Width = 640u, .Height = 480u});
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    {
+        const auto& compileResult = graph.GetLastCompileValidationResult();
+        ASSERT_TRUE(compiled.has_value())
+            << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
+    }
+
+    const std::vector<std::string> passNames = OrderedPassNames(*compiled);
+    const auto depthIt = std::ranges::find(passNames, "DepthPrepass");
+    const auto clusterIt = std::ranges::find(passNames, "ClusterGridBuildPass");
+    const auto assignmentIt = std::ranges::find(passNames, "LightClusterAssignmentPass");
+    const auto surfaceIt = std::ranges::find(passNames, "SurfacePass");
+    ASSERT_NE(depthIt, passNames.end());
+    ASSERT_NE(clusterIt, passNames.end());
+    ASSERT_NE(assignmentIt, passNames.end());
+    ASSERT_NE(surfaceIt, passNames.end());
+    EXPECT_LT(depthIt, clusterIt);
+    EXPECT_LT(clusterIt, assignmentIt);
+    EXPECT_LT(assignmentIt, surfaceIt);
+    EXPECT_NE(std::ranges::find(compiled->BufferNames, "ClusterLights.Headers"), compiled->BufferNames.end());
+    EXPECT_NE(std::ranges::find(compiled->BufferNames, "ClusterLights.Indices"), compiled->BufferNames.end());
+    EXPECT_NE(std::ranges::find(compiled->BufferNames, "ClusterLights.Counter"), compiled->BufferNames.end());
+
+    const RenderGraphValidationResult validation = ValidateRecipeCompiledGraph(description, *compiled);
+    EXPECT_FALSE(validation.HasErrors())
+        << (validation.Findings.empty() ? "<no findings>" : validation.Findings.front().Message);
+
+    FrameRecipeImports missingHeaders = MakeImports();
+    missingHeaders.ClusterLightHeaders = {};
+    RenderGraph missingHeadersGraph;
+    const FrameRecipeBuildResult missingHeadersBuild = BuildDefaultFrameRecipe(
+        missingHeadersGraph,
+        features,
+        missingHeaders,
+        FrameRecipeSizing{.Width = 640u, .Height = 480u});
+    ASSERT_TRUE(missingHeadersBuild.Succeeded) << missingHeadersBuild.Diagnostic;
+    const auto missingHeadersCompiled = missingHeadersGraph.Compile();
+    ASSERT_TRUE(missingHeadersCompiled.has_value());
+    const std::vector<std::string> missingHeaderPassNames = OrderedPassNames(*missingHeadersCompiled);
+    EXPECT_EQ(std::ranges::find(missingHeaderPassNames, "LightClusterAssignmentPass"), missingHeaderPassNames.end());
+
+    FrameRecipeImports missingCounter = MakeImports();
+    missingCounter.ClusterLightCounter = {};
+    RenderGraph missingCounterGraph;
+    const FrameRecipeBuildResult missingCounterBuild = BuildDefaultFrameRecipe(
+        missingCounterGraph,
+        features,
+        missingCounter,
+        FrameRecipeSizing{.Width = 640u, .Height = 480u});
+    ASSERT_TRUE(missingCounterBuild.Succeeded) << missingCounterBuild.Diagnostic;
+    const auto missingCounterCompiled = missingCounterGraph.Compile();
+    ASSERT_TRUE(missingCounterCompiled.has_value());
+    const std::vector<std::string> missingCounterPassNames = OrderedPassNames(*missingCounterCompiled);
+    EXPECT_EQ(std::ranges::find(missingCounterPassNames, "LightClusterAssignmentPass"), missingCounterPassNames.end());
+
+    FrameRecipeFeatures missingGridFeature{};
+    missingGridFeature.EnableClusterLightAssignment = true;
+    const FrameRecipeIntrospection missingGrid = DescribeDefaultFrameRecipe(missingGridFeature);
+    const auto* missingGridAssignment = FindPass(missingGrid, FrameRecipePassKind::LightClusterAssignment);
+    ASSERT_NE(missingGridAssignment, nullptr);
+    EXPECT_FALSE(missingGridAssignment->Enabled);
+    EXPECT_FALSE(HasEnabledResource(missingGrid, FrameRecipeResourceKind::ClusterLightHeaders));
+    EXPECT_FALSE(HasEnabledResource(missingGrid, FrameRecipeResourceKind::ClusterLightIndices));
+    EXPECT_FALSE(HasEnabledResource(missingGrid, FrameRecipeResourceKind::ClusterLightCounter));
 }
 
 TEST(FrameRecipeContract, BackbufferIsFinalizedOnlyByPresentDeclaration)

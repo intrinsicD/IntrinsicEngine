@@ -1,0 +1,214 @@
+#version 460
+
+// GRAPHICS-039B — assigns non-directional lights to clustered-light froxel
+// cells. Each invocation owns one cell, collects up to MaxLightsPerCell
+// conservative contributors locally, then reserves a packed output span with
+// an atomic bump allocator in ClusterLights.Counter.
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+const uint LightType_Directional = 0u;
+const uint LightType_Point = 1u;
+const uint LightType_Spot = 2u;
+
+struct ClusterAABB
+{
+    vec4 Min;
+    vec4 Max;
+};
+
+struct ClusterLightCellHeader
+{
+    uint Offset;
+    uint Count;
+};
+
+struct GpuLight
+{
+    vec4 Position_Range;
+    vec4 Direction_Type;
+    vec4 Color_Intensity;
+    vec4 Params;
+};
+
+layout(set = 0, binding = 0, std430) readonly buffer ClusterGridAABBBuffer
+{
+    ClusterAABB Cells[];
+} uClusterGrid;
+
+layout(set = 0, binding = 1, std430) readonly buffer LightBuffer
+{
+    GpuLight Lights[];
+} uLights;
+
+layout(set = 0, binding = 2, std430) buffer ClusterLightHeaderBuffer
+{
+    ClusterLightCellHeader Headers[];
+} uHeaders;
+
+layout(set = 0, binding = 3, std430) buffer ClusterLightIndexBuffer
+{
+    uint Indices[];
+} uIndices;
+
+layout(set = 0, binding = 4, std430) buffer ClusterLightCounterBuffer
+{
+    uint Value;
+} uCounter;
+
+layout(push_constant) uniform ClusterLightAssignmentPush
+{
+    uint CellCount;
+    uint LightCount;
+    uint MaxLightsPerCell;
+    uint Reserved0;
+} pc;
+
+bool IsFiniteVec3(vec3 v)
+{
+    return all(not(isnan(v))) && all(not(isinf(v)));
+}
+
+vec3 NormalizeOrZero(vec3 v)
+{
+    const float len2 = dot(v, v);
+    if (isnan(len2) || isinf(len2) || len2 <= 1.0e-12)
+    {
+        return vec3(0.0);
+    }
+    return v * inversesqrt(len2);
+}
+
+float DistanceSquaredPointAABB(vec3 point, vec3 minV, vec3 maxV)
+{
+    const vec3 closest = clamp(point, minV, maxV);
+    const vec3 delta = point - closest;
+    return dot(delta, delta);
+}
+
+bool IsValidAABB(ClusterAABB cell)
+{
+    const vec3 minV = cell.Min.xyz;
+    const vec3 maxV = cell.Max.xyz;
+    return IsFiniteVec3(minV) && IsFiniteVec3(maxV) &&
+           minV.x <= maxV.x && minV.y <= maxV.y && minV.z <= maxV.z;
+}
+
+bool SphereIntersectsAABB(vec3 center, float radius, ClusterAABB cell)
+{
+    if (!IsFiniteVec3(center) || isnan(radius) || isinf(radius) || radius <= 0.0 || !IsValidAABB(cell))
+    {
+        return false;
+    }
+
+    const float d2 = DistanceSquaredPointAABB(center, cell.Min.xyz, cell.Max.xyz);
+    return d2 <= radius * radius;
+}
+
+bool ConservativeSpotIntersectsAABB(GpuLight light, ClusterAABB cell)
+{
+    if (!SphereIntersectsAABB(light.Position_Range.xyz, light.Position_Range.w, cell))
+    {
+        return false;
+    }
+
+    const vec3 dir = NormalizeOrZero(light.Direction_Type.xyz);
+    if (dot(dir, dir) <= 0.0)
+    {
+        return true;
+    }
+
+    const vec3 minV = cell.Min.xyz;
+    const vec3 maxV = cell.Max.xyz;
+    const vec3 center = (minV + maxV) * 0.5;
+    const vec3 halfExtent = (maxV - minV) * 0.5;
+    const float cellRadius = length(halfExtent);
+    const vec3 toCenter = center - light.Position_Range.xyz;
+    const float centerDistance2 = dot(toCenter, toCenter);
+    if (isnan(centerDistance2) || isinf(centerDistance2))
+    {
+        return false;
+    }
+    if (centerDistance2 <= cellRadius * cellRadius)
+    {
+        return true;
+    }
+
+    const float axial = dot(toCenter, dir);
+    if (axial + cellRadius < 0.0 || axial - cellRadius > light.Position_Range.w)
+    {
+        return false;
+    }
+
+    const float outerCos = clamp(light.Params.y, 0.0, 1.0);
+    if (outerCos <= 0.0)
+    {
+        return true;
+    }
+
+    const float sinOuter = sqrt(max(0.0, 1.0 - outerCos * outerCos));
+    const float radial2 = max(0.0, centerDistance2 - axial * axial);
+    const float radial = sqrt(radial2);
+    const float coneRadiusAtCenter = max(0.0, axial) * (sinOuter / outerCos);
+
+    return radial <= coneRadiusAtCenter + cellRadius;
+}
+
+bool LightIntersectsCell(GpuLight light, ClusterAABB cell)
+{
+    const uint lightType = uint(round(light.Direction_Type.w));
+    if (lightType == LightType_Directional)
+    {
+        return false;
+    }
+    if (lightType == LightType_Point)
+    {
+        return SphereIntersectsAABB(light.Position_Range.xyz, light.Position_Range.w, cell);
+    }
+    if (lightType == LightType_Spot)
+    {
+        return ConservativeSpotIntersectsAABB(light, cell);
+    }
+    return false;
+}
+
+void main()
+{
+    const uint cellIndex = gl_GlobalInvocationID.x;
+    if (cellIndex >= pc.CellCount || pc.MaxLightsPerCell == 0u)
+    {
+        return;
+    }
+
+    const ClusterAABB cell = uClusterGrid.Cells[cellIndex];
+    uint accepted[256];
+    uint acceptedCount = 0u;
+    const uint localLimit = min(pc.MaxLightsPerCell, 256u);
+
+    for (uint lightIndex = 0u; lightIndex < pc.LightCount; ++lightIndex)
+    {
+        const GpuLight light = uLights.Lights[lightIndex];
+        if (!LightIntersectsCell(light, cell))
+        {
+            continue;
+        }
+        if (acceptedCount < localLimit)
+        {
+            accepted[acceptedCount] = lightIndex;
+            ++acceptedCount;
+        }
+    }
+
+    uint offset = 0u;
+    if (acceptedCount > 0u)
+    {
+        offset = atomicAdd(uCounter.Value, acceptedCount);
+        for (uint i = 0u; i < acceptedCount; ++i)
+        {
+            uIndices.Indices[offset + i] = accepted[i];
+        }
+    }
+
+    uHeaders.Headers[cellIndex].Offset = offset;
+    uHeaders.Headers[cellIndex].Count = acceptedCount;
+}
