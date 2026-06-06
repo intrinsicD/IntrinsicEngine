@@ -500,7 +500,18 @@ void VulkanCommandContext::TextureBarrier(RHI::TextureHandle tex,
     vkCmdPipelineBarrier2(m_Cmd, &dep);
 
     img->CurrentLayout = newLayout;
-    UpdateFrameSampledDescriptor(tex, newLayout, 0u);
+    // BUG-016: do NOT auto-bind the transitioned texture into frame-sampled
+    // bridge slot 0 here. Slot 0 is the shared "default" postprocess bridge
+    // element; the renderer now drives it (and the dedicated DebugView/Present
+    // slots 1/2) with explicit per-pass `BindFrameSampledTextureAt` calls. The
+    // whole frame is recorded into one command buffer against one bindless
+    // descriptor set and submitted once, so a host-side descriptor write here
+    // would be observed by *every* recorded draw at submit, not just the next
+    // pass. The late present-source `ColorAttachment->ShaderRead` transition
+    // would therefore rebind slot 0 to `SceneColorLDR` for the whole frame and
+    // the earlier-executing tonemap (`PostProcessPass`) would sample its own
+    // black output instead of `SceneColorHDR`. The explicit per-pass binds are
+    // the authoritative bridge; this legacy auto-bind only destabilises slot 0.
 }
 
 void VulkanCommandContext::BufferBarrier(RHI::BufferHandle buf,
@@ -543,13 +554,11 @@ void VulkanCommandContext::SubmitBarriers(const RHI::BarrierBatchDesc& batch)
 
     std::vector<VkImageMemoryBarrier2> imageBarriers{};
     std::vector<VulkanImage*> imageBarrierTargets{};
-    std::vector<RHI::TextureHandle> imageBarrierHandles{};
     std::vector<VkBufferMemoryBarrier2> bufferBarriers{};
     std::vector<VkMemoryBarrier2> memoryBarriers{};
 
     imageBarriers.reserve(batch.TextureBarriers.size());
     imageBarrierTargets.reserve(batch.TextureBarriers.size());
-    imageBarrierHandles.reserve(batch.TextureBarriers.size());
     bufferBarriers.reserve(batch.BufferBarriers.size());
     memoryBarriers.reserve(batch.MemoryBarriers.size());
 
@@ -558,6 +567,13 @@ void VulkanCommandContext::SubmitBarriers(const RHI::BarrierBatchDesc& batch)
         .AsyncCompute = m_AsyncComputeQueueFamily,
         .Transfer = m_TransferQueueFamily,
         .Present = m_PresentQueueFamily,
+        // BUG-015: the device only binds async-compute/transfer families here when
+        // the framegraph queue-capability profile actually schedules passes onto
+        // them (see ResolveFrameGraphBarrierQueueFamilies). When the profile is
+        // graphics-only these arrive as VK_QUEUE_FAMILY_IGNORED, so async/transfer
+        // ownership tokens resolve back to the graphics family and no cross-queue
+        // QFOT barrier is recorded for single-queue submission. Do not re-derive
+        // these flags from physical family presence.
         .SupportsAsyncCompute = m_AsyncComputeQueueFamily != VK_QUEUE_FAMILY_IGNORED,
         .SupportsTransfer = m_TransferQueueFamily != VK_QUEUE_FAMILY_IGNORED,
     };
@@ -614,7 +630,6 @@ void VulkanCommandContext::SubmitBarriers(const RHI::BarrierBatchDesc& batch)
         barrier.subresourceRange = {AspectFromFormat(image->Format), 0, image->MipLevels, 0, image->ArrayLayers};
         imageBarriers.push_back(barrier);
         imageBarrierTargets.push_back(image);
-        imageBarrierHandles.push_back(desc.Texture);
     }
 
     for (const RHI::BufferBarrierDesc& desc : batch.BufferBarriers)
@@ -674,22 +689,19 @@ void VulkanCommandContext::SubmitBarriers(const RHI::BarrierBatchDesc& batch)
     // tracking the recorded layout here lets subsequent barriers/uploads pick a
     // correct oldLayout without the renderer/RHI seam having to know which
     // backend recorded the prior transition.
-    bool frameSampledDescriptorUpdated = false;
     for (std::size_t barrierIndex = 0; barrierIndex < imageBarriers.size(); ++barrierIndex)
     {
         if (imageBarrierTargets[barrierIndex] != nullptr)
         {
             imageBarrierTargets[barrierIndex]->CurrentLayout = imageBarriers[barrierIndex].newLayout;
-            if (!frameSampledDescriptorUpdated && barrierIndex < imageBarrierHandles.size() &&
-                imageBarriers[barrierIndex].newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-            {
-                UpdateFrameSampledDescriptor(imageBarrierHandles[barrierIndex],
-                                             imageBarriers[barrierIndex].newLayout,
-                                             0u);
-                frameSampledDescriptorUpdated = true;
-            }
         }
     }
+    // BUG-016: deliberately do NOT auto-bind any barrier target into
+    // frame-sampled bridge slot 0 here (see `TextureBarrier` for the full
+    // rationale). The shared bindless set is submitted once per frame, so a
+    // late `->ShaderRead` transition would clobber slot 0 for every recorded
+    // draw and collapse the tonemap's `SceneColorHDR` read. The renderer drives
+    // slot 0 (and the DebugView/Present slots) explicitly per pass.
 }
 
 void VulkanCommandContext::FillBuffer(RHI::BufferHandle handle,

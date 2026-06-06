@@ -93,6 +93,14 @@ namespace Extrinsic::Graphics
         RHI::LoadOp Load = RHI::LoadOp::Clear;
         RHI::StoreOp Store = RHI::StoreOp::Store;
         RHI::Format Format = RHI::Format::Undefined;
+        // BUG-016: carry the recipe-declared color clear value through
+        // compilation so the executor's render-pass scope clears to the
+        // recipe color (e.g. the default-recipe blue scene background) instead
+        // of a hardcoded black. Ignored for depth attachments.
+        float ClearR = 0.0f;
+        float ClearG = 0.0f;
+        float ClearB = 0.0f;
+        float ClearA = 1.0f;
     };
 
     export struct CompiledPassDeclarations

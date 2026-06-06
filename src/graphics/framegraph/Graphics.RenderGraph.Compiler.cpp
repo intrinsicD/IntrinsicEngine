@@ -1326,6 +1326,10 @@ namespace Extrinsic::Graphics
                         .Load = pass.RenderPass.ColorTargets[colorIndex].Load,
                         .Store = pass.RenderPass.ColorTargets[colorIndex].Store,
                         .Format = textureIndex < textures.size() ? textures[textureIndex].Desc.Fmt : RHI::Format::Undefined,
+                        .ClearR = pass.RenderPass.ColorTargets[colorIndex].ClearR,
+                        .ClearG = pass.RenderPass.ColorTargets[colorIndex].ClearG,
+                        .ClearB = pass.RenderPass.ColorTargets[colorIndex].ClearB,
+                        .ClearA = pass.RenderPass.ColorTargets[colorIndex].ClearA,
                     });
                 }
 

@@ -55,6 +55,46 @@ namespace Extrinsic::Backends::Vulkan
         return requested;
     }
 
+    // BUG-015: queue families a command context may use as the source/destination
+    // of framegraph queue-family ownership-transfer (QFOT) barriers. The optional
+    // async-compute/transfer families collapse to `kIgnoredVulkanQueueFamily`
+    // unless the *framegraph* `RHI::QueueCapabilityProfile` actually schedules
+    // passes onto them. The promoted device currently reports a graphics-only
+    // framegraph profile and demotes every render-graph pass to the graphics
+    // queue at submit time, so binding the physical async/transfer families here
+    // would make `SubmitBarriers` lower release/acquire ownership transfers to a
+    // second family that single-queue submission never matches — producing the
+    // `VkBufferMemoryBarrier-buffer-00004` acquire-without-release errors and the
+    // `-00001/-00003` duplicate-barrier warnings. Gating on the framegraph profile
+    // keeps barrier ownership resolution consistent with pass batching.
+    export struct VulkanFrameGraphBarrierQueueFamilies
+    {
+        std::uint32_t Graphics = kIgnoredVulkanQueueFamily;
+        std::uint32_t AsyncCompute = kIgnoredVulkanQueueFamily;
+        std::uint32_t Transfer = kIgnoredVulkanQueueFamily;
+        std::uint32_t Present = kIgnoredVulkanQueueFamily;
+    };
+
+    export [[nodiscard]] constexpr VulkanFrameGraphBarrierQueueFamilies
+    ResolveFrameGraphBarrierQueueFamilies(
+        const std::uint32_t graphicsFamily,
+        const std::uint32_t asyncComputeFamily,
+        const std::uint32_t transferFamily,
+        const std::uint32_t presentFamily,
+        const RHI::QueueCapabilityProfile frameGraphProfile) noexcept
+    {
+        return VulkanFrameGraphBarrierQueueFamilies{
+            .Graphics = graphicsFamily,
+            .AsyncCompute = frameGraphProfile.SupportsAsyncCompute
+                                ? asyncComputeFamily
+                                : kIgnoredVulkanQueueFamily,
+            .Transfer = frameGraphProfile.SupportsTransfer
+                            ? transferFamily
+                            : kIgnoredVulkanQueueFamily,
+            .Present = presentFamily,
+        };
+    }
+
     // Factory — creates the Vulkan backend IDevice.
     // Call once during engine initialization; the returned device owns all
     // Vulkan state.  Destroy it before the window is destroyed.

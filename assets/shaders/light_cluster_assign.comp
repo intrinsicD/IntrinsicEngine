@@ -4,6 +4,15 @@
 // cells. Each invocation owns one cell, collects up to MaxLightsPerCell
 // conservative contributors locally, then reserves a packed output span with
 // an atomic bump allocator in ClusterLights.Counter.
+//
+// BUG-015: all storage buffers reach this pass through Buffer Device Addresses
+// carried in push constants (the engine's global pipeline layout only exposes
+// the bindless sampler array + push constants), matching the BDA convention in
+// common/gpu_scene.glsl / instance_cull.comp.
+
+#extension GL_EXT_scalar_block_layout : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
@@ -31,33 +40,38 @@ struct GpuLight
     vec4 Params;
 };
 
-layout(set = 0, binding = 0, std430) readonly buffer ClusterGridAABBBuffer
+layout(buffer_reference, scalar) readonly buffer ClusterGridAABBRef
 {
     ClusterAABB Cells[];
-} uClusterGrid;
+};
 
-layout(set = 0, binding = 1, std430) readonly buffer LightBuffer
+layout(buffer_reference, scalar) readonly buffer ClusterLightSourceRef
 {
     GpuLight Lights[];
-} uLights;
+};
 
-layout(set = 0, binding = 2, std430) buffer ClusterLightHeaderBuffer
+layout(buffer_reference, scalar) buffer ClusterLightHeaderRef
 {
     ClusterLightCellHeader Headers[];
-} uHeaders;
+};
 
-layout(set = 0, binding = 3, std430) buffer ClusterLightIndexBuffer
+layout(buffer_reference, scalar) buffer ClusterLightIndexRef
 {
     uint Indices[];
-} uIndices;
+};
 
-layout(set = 0, binding = 4, std430) buffer ClusterLightCounterBuffer
+layout(buffer_reference, scalar) buffer ClusterLightCounterRef
 {
-    uint Value;
-} uCounter;
+    uint Value[];
+};
 
-layout(push_constant) uniform ClusterLightAssignmentPush
+layout(push_constant, scalar) uniform ClusterLightAssignmentPush
 {
+    uint64_t ClusterGridBDA;
+    uint64_t LightsBDA;
+    uint64_t HeadersBDA;
+    uint64_t IndicesBDA;
+    uint64_t CounterBDA;
     uint CellCount;
     uint LightCount;
     uint MaxLightsPerCell;
@@ -175,40 +189,52 @@ bool LightIntersectsCell(GpuLight light, ClusterAABB cell)
 void main()
 {
     const uint cellIndex = gl_GlobalInvocationID.x;
-    if (cellIndex >= pc.CellCount || pc.MaxLightsPerCell == 0u)
+    if (cellIndex >= pc.CellCount || pc.MaxLightsPerCell == 0u ||
+        pc.ClusterGridBDA == uint64_t(0) || pc.HeadersBDA == uint64_t(0) ||
+        pc.IndicesBDA == uint64_t(0) || pc.CounterBDA == uint64_t(0))
     {
         return;
     }
 
-    const ClusterAABB cell = uClusterGrid.Cells[cellIndex];
+    ClusterGridAABBRef gridRef = ClusterGridAABBRef(pc.ClusterGridBDA);
+    ClusterLightHeaderRef headerRef = ClusterLightHeaderRef(pc.HeadersBDA);
+    ClusterLightIndexRef indexRef = ClusterLightIndexRef(pc.IndicesBDA);
+    ClusterLightCounterRef counterRef = ClusterLightCounterRef(pc.CounterBDA);
+    const bool hasLights = pc.LightsBDA != uint64_t(0) && pc.LightCount > 0u;
+
+    const ClusterAABB cell = gridRef.Cells[cellIndex];
     uint accepted[256];
     uint acceptedCount = 0u;
     const uint localLimit = min(pc.MaxLightsPerCell, 256u);
 
-    for (uint lightIndex = 0u; lightIndex < pc.LightCount; ++lightIndex)
+    if (hasLights)
     {
-        const GpuLight light = uLights.Lights[lightIndex];
-        if (!LightIntersectsCell(light, cell))
+        ClusterLightSourceRef lightRef = ClusterLightSourceRef(pc.LightsBDA);
+        for (uint lightIndex = 0u; lightIndex < pc.LightCount; ++lightIndex)
         {
-            continue;
-        }
-        if (acceptedCount < localLimit)
-        {
-            accepted[acceptedCount] = lightIndex;
-            ++acceptedCount;
+            const GpuLight light = lightRef.Lights[lightIndex];
+            if (!LightIntersectsCell(light, cell))
+            {
+                continue;
+            }
+            if (acceptedCount < localLimit)
+            {
+                accepted[acceptedCount] = lightIndex;
+                ++acceptedCount;
+            }
         }
     }
 
     uint offset = 0u;
     if (acceptedCount > 0u)
     {
-        offset = atomicAdd(uCounter.Value, acceptedCount);
+        offset = atomicAdd(counterRef.Value[0], acceptedCount);
         for (uint i = 0u; i < acceptedCount; ++i)
         {
-            uIndices.Indices[offset + i] = accepted[i];
+            indexRef.Indices[offset + i] = accepted[i];
         }
     }
 
-    uHeaders.Headers[cellIndex].Offset = offset;
-    uHeaders.Headers[cellIndex].Count = acceptedCount;
+    headerRef.Headers[cellIndex].Offset = offset;
+    headerRef.Headers[cellIndex].Count = acceptedCount;
 }

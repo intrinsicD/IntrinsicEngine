@@ -70,7 +70,9 @@ struct VisualizationOverlaySamplePoint
 inline constexpr std::array<VisualizationOverlaySamplePoint, 3> kVisualizationReadbackSamples{{
 	VisualizationOverlaySamplePoint{"vector_field_red", 72u, 64u, ExpectedColor(1.0f, 0.0f, 0.0f)},
 	VisualizationOverlaySamplePoint{"isoline_green", 184u, 176u, ExpectedColor(0.0f, 1.0f, 0.0f)},
-	VisualizationOverlaySamplePoint{"clear_black", 16u, 16u, ExpectedColor(0.0f, 0.0f, 0.0f)},
+	// BUG-015/BUG-016: the default-recipe SceneColorHDR background clears to a
+	// visible blue (0.10, 0.20, 0.45), not black.
+	VisualizationOverlaySamplePoint{"scene_clear_blue", 16u, 16u, ExpectedColor(0.10f, 0.20f, 0.45f)},
 }};
 
 [[nodiscard]] Readback::ExpectedPixel ReorderToRgba(

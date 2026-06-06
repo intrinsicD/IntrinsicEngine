@@ -19,6 +19,7 @@ module Extrinsic.Graphics.Renderer;
 
 import Extrinsic.Core.Error;
 import Extrinsic.RHI.Device;
+import Extrinsic.RHI.QueueAffinity;
 import Extrinsic.RHI.Types;
 import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.TextureManager;
@@ -183,20 +184,42 @@ namespace Extrinsic::Graphics
 
         void SubmitBarrierPacket(RHI::ICommandContext& cmd,
                                  const CompiledRenderGraph& graph,
-                                 const BarrierPacket& packet)
+                                 const BarrierPacket& packet,
+                                 const RHI::QueueCapabilityProfile& frameGraphProfile)
         {
+            // BUG-015: a queue-family ownership transfer (QFOT) is only real when
+            // the device's framegraph queue profile actually schedules the
+            // producer and consumer onto *different* queues. The promoted device
+            // reports a graphics-only profile and demotes every pass onto the
+            // graphics queue, so any compiled release/acquire pair must collapse
+            // to a plain barrier here (IGNORED families). Otherwise single-queue
+            // submission records a QFOT acquire with no matching release
+            // (UNASSIGNED-VkBufferMemoryBarrier-buffer-00004) plus duplicate
+            // release/acquire warnings (-00001/-00003). Resolving against the
+            // profile (not bound Vulkan families) keeps this correct regardless of
+            // backend queue-family wiring.
+            constexpr std::uint32_t kNoQueueFamilyTransfer = static_cast<std::uint32_t>(-1);
+            const auto isLiveCrossQueueTransfer =
+                [&frameGraphProfile](const QueueOwnershipTransfer& transfer) noexcept
+            {
+                return IsLiveCrossQueueOwnershipTransfer(transfer, frameGraphProfile);
+            };
+
             std::vector<RHI::TextureBarrierDesc> textureBarriers;
             textureBarriers.reserve(packet.TextureBarriers.size());
             for (const TextureBarrierPacket& barrier : packet.TextureBarriers)
             {
+                const bool liveTransfer = isLiveCrossQueueTransfer(barrier.OwnershipTransfer);
                 textureBarriers.push_back(RHI::TextureBarrierDesc{
                     .Texture = graph.TextureHandles[barrier.TextureIndex],
                     .BeforeLayout = ToTextureLayout(barrier.Before),
                     .AfterLayout = ToTextureLayout(barrier.After),
                     .BeforeAccess = ToMemoryAccess(barrier.Before),
                     .AfterAccess = ToMemoryAccess(barrier.After),
-                    .SrcQueueFamily = barrier.OwnershipTransfer.SourceQueueFamily,
-                    .DstQueueFamily = barrier.OwnershipTransfer.DestinationQueueFamily,
+                    .SrcQueueFamily = liveTransfer ? barrier.OwnershipTransfer.SourceQueueFamily
+                                                   : kNoQueueFamilyTransfer,
+                    .DstQueueFamily = liveTransfer ? barrier.OwnershipTransfer.DestinationQueueFamily
+                                                   : kNoQueueFamilyTransfer,
                 });
             }
 
@@ -204,12 +227,15 @@ namespace Extrinsic::Graphics
             bufferBarriers.reserve(packet.BufferBarriers.size());
             for (const BufferBarrierPacket& barrier : packet.BufferBarriers)
             {
+                const bool liveTransfer = isLiveCrossQueueTransfer(barrier.OwnershipTransfer);
                 bufferBarriers.push_back(RHI::BufferBarrierDesc{
                     .Buffer = graph.BufferHandles[barrier.BufferIndex],
                     .BeforeAccess = ToMemoryAccess(barrier.Before),
                     .AfterAccess = ToMemoryAccess(barrier.After),
-                    .SrcQueueFamily = barrier.OwnershipTransfer.SourceQueueFamily,
-                    .DstQueueFamily = barrier.OwnershipTransfer.DestinationQueueFamily,
+                    .SrcQueueFamily = liveTransfer ? barrier.OwnershipTransfer.SourceQueueFamily
+                                                   : kNoQueueFamilyTransfer,
+                    .DstQueueFamily = liveTransfer ? barrier.OwnershipTransfer.DestinationQueueFamily
+                                                   : kNoQueueFamilyTransfer,
                 });
             }
 
@@ -1976,7 +2002,29 @@ namespace Extrinsic::Graphics
                             }
                         }
                         const CompiledPassDeclarations& declarations = compiled->PassDeclarations[passIndex];
-                        if (!sampledTextureBound && !declarations.ReadTextures.empty())
+                        // BUG-016: the ImGui overlay pass declares a framegraph
+                        // read of the present source only so the compiler keeps
+                        // the prior color content as a LOAD attachment; its
+                        // fragment shader samples its own retained font-atlas /
+                        // per-command user textures from dedicated bindless
+                        // leases (reserved slots >= 3 per BUG-014), never the
+                        // shared frame-sampled bridge slot 0. All passes share a
+                        // single bindless descriptor set, so the *last* host-side
+                        // descriptor write to a slot is what every recorded draw
+                        // observes at submit. Binding slot 0 here to the ImGui
+                        // pass's SceneColorLDR read would therefore overwrite the
+                        // postprocess bridge descriptor that the
+                        // earlier-recorded-but-later-executing tonemap
+                        // (`PostProcessPass`) samples, so the tonemap would read
+                        // its own output target instead of SceneColorHDR and
+                        // collapse SceneColorLDR (the present source) to black.
+                        // ImGui owns its descriptors, so skip the generic bridge
+                        // bind for it.
+                        const bool bindsFrameSampledBridge =
+                            !sampledTextureBound &&
+                            !declarations.ReadTextures.empty() &&
+                            passName != std::string_view{"ImGuiPass"};
+                        if (bindsFrameSampledBridge)
                         {
                             const std::uint32_t textureIndex = declarations.ReadTextures.front();
                             if (textureIndex < compiled->TextureHandles.size())
@@ -2706,10 +2754,13 @@ namespace Extrinsic::Graphics
                     endActiveRenderPass();
                 };
 
+            const RHI::QueueCapabilityProfile frameGraphQueueProfile =
+                m_Device != nullptr ? m_Device->GetQueueCapabilityProfile()
+                                    : RHI::QueueCapabilityProfile{};
             const auto submitBarriersForContext =
-                [&compiled](RHI::ICommandContext& graphicsContext, const BarrierPacket& packet)
+                [&compiled, frameGraphQueueProfile](RHI::ICommandContext& graphicsContext, const BarrierPacket& packet)
                 {
-                    SubmitBarrierPacket(graphicsContext, *compiled, packet);
+                    SubmitBarrierPacket(graphicsContext, *compiled, packet, frameGraphQueueProfile);
                 };
 
             const auto recordPostGraphReadbacks =
@@ -5942,10 +5993,13 @@ namespace Extrinsic::Graphics
                     .Target = texture,
                     .Load = attachment.Load,
                     .Store = attachment.Store,
-                    .ClearR = 0.0f,
-                    .ClearG = 0.0f,
-                    .ClearB = 0.0f,
-                    .ClearA = 1.0f,
+                    // BUG-016: honor the recipe-declared clear color carried
+                    // through compilation so the default-recipe scene clears to
+                    // its configured blue background instead of black.
+                    .ClearR = attachment.ClearR,
+                    .ClearG = attachment.ClearG,
+                    .ClearB = attachment.ClearB,
+                    .ClearA = attachment.ClearA,
                 };
                 if (out.FirstColorFormat == RHI::Format::Undefined)
                 {
@@ -7121,9 +7175,12 @@ namespace Extrinsic::Graphics
 
             const ClusterGridBuildDispatchPlan plan =
                 ComputeClusterGridBuildDispatchPlan(m_ClusterGridDesc);
+            const RHI::BufferHandle aabbHandle = m_ClusterGridAABBBuffer->GetHandle();
+            const std::uint64_t aabbAddress = m_Device->GetBufferDeviceAddress(aabbHandle);
             if (!RecordClusterGridBuild(cmd,
                                         GetClusterGridBuildPipeline(),
-                                        m_ClusterGridAABBBuffer->GetHandle(),
+                                        aabbHandle,
+                                        aabbAddress,
                                         plan,
                                         m_ClusterGridProjection))
             {
@@ -7156,13 +7213,23 @@ namespace Extrinsic::Graphics
                     m_ClusterGridDesc,
                     m_GpuWorld ? m_GpuWorld->GetLightCount() : 0u,
                     kMaxClusterLightsPerCell);
+            const RHI::BufferHandle aabbHandle = m_ClusterGridAABBBuffer->GetHandle();
+            const RHI::BufferHandle lightsHandle = m_GpuWorld->GetLightBuffer();
+            const RHI::BufferHandle headerHandle = m_ClusterLightHeaderBuffer->GetHandle();
+            const RHI::BufferHandle indexHandle = m_ClusterLightIndexBuffer->GetHandle();
+            const RHI::BufferHandle counterHandle = m_ClusterLightCounterBuffer->GetHandle();
             if (!RecordClusterLightAssignment(cmd,
                                               GetClusterLightAssignmentPipeline(),
-                                              m_ClusterGridAABBBuffer->GetHandle(),
-                                              m_GpuWorld->GetLightBuffer(),
-                                              m_ClusterLightHeaderBuffer->GetHandle(),
-                                              m_ClusterLightIndexBuffer->GetHandle(),
-                                              m_ClusterLightCounterBuffer->GetHandle(),
+                                              aabbHandle,
+                                              m_Device->GetBufferDeviceAddress(aabbHandle),
+                                              lightsHandle,
+                                              m_Device->GetBufferDeviceAddress(lightsHandle),
+                                              headerHandle,
+                                              m_Device->GetBufferDeviceAddress(headerHandle),
+                                              indexHandle,
+                                              m_Device->GetBufferDeviceAddress(indexHandle),
+                                              counterHandle,
+                                              m_Device->GetBufferDeviceAddress(counterHandle),
                                               plan))
             {
                 return RenderCommandPassStatus::SkippedUnavailable;

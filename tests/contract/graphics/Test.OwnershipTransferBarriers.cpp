@@ -321,3 +321,51 @@ TEST(GraphicsOwnershipTransferBarriers, SingleQueueResourceKeepsExclusiveBarrier
     }
     EXPECT_TRUE(sawShaderReadBarrier);
 }
+
+// BUG-015: the renderer lowers a compiled ownership transfer to a real Vulkan
+// QFOT only when the device's framegraph queue profile schedules the producer
+// and consumer onto different queues. This predicate is the single source of
+// truth shared by the renderer; it must collapse to a plain barrier under the
+// promoted graphics-only profile even when the compiled transfer names distinct
+// async-compute/transfer queues.
+TEST(OwnershipTransferBarriers, LiveCrossQueueTransferDependsOnDeviceProfile)
+{
+    const QueueOwnershipTransfer asyncComputeAcquire{
+        .Kind = QueueOwnershipTransferKind::Acquire,
+        .SourceQueue = RHI::QueueAffinity::AsyncCompute,
+        .DestinationQueue = RHI::QueueAffinity::Graphics,
+        .SourceQueueFamily = QueueFamilyToken(RHI::QueueAffinity::AsyncCompute),
+        .DestinationQueueFamily = QueueFamilyToken(RHI::QueueAffinity::Graphics),
+    };
+
+    // Graphics-only profile (the promoted-device default): both sides resolve to
+    // graphics, so the transfer collapses — no QFOT may be recorded.
+    const RHI::QueueCapabilityProfile graphicsOnly{
+        .SupportsAsyncCompute = false,
+        .SupportsTransfer = false,
+    };
+    EXPECT_FALSE(IsLiveCrossQueueOwnershipTransfer(asyncComputeAcquire, graphicsOnly));
+
+    // A profile that genuinely exposes async compute keeps the hand-off live.
+    const RHI::QueueCapabilityProfile asyncCapable{
+        .SupportsAsyncCompute = true,
+        .SupportsTransfer = false,
+    };
+    EXPECT_TRUE(IsLiveCrossQueueOwnershipTransfer(asyncComputeAcquire, asyncCapable));
+
+    // A transfer-queue hand-off stays collapsed unless transfer is supported.
+    const QueueOwnershipTransfer transferRelease{
+        .Kind = QueueOwnershipTransferKind::Release,
+        .SourceQueue = RHI::QueueAffinity::Graphics,
+        .DestinationQueue = RHI::QueueAffinity::Transfer,
+        .SourceQueueFamily = QueueFamilyToken(RHI::QueueAffinity::Graphics),
+        .DestinationQueueFamily = QueueFamilyToken(RHI::QueueAffinity::Transfer),
+    };
+    EXPECT_FALSE(IsLiveCrossQueueOwnershipTransfer(transferRelease, asyncCapable));
+    EXPECT_TRUE(IsLiveCrossQueueOwnershipTransfer(
+        transferRelease,
+        RHI::QueueCapabilityProfile{.SupportsAsyncCompute = false, .SupportsTransfer = true}));
+
+    // A None-kind barrier is never a queue ownership transfer.
+    EXPECT_FALSE(IsLiveCrossQueueOwnershipTransfer(QueueOwnershipTransfer{}, asyncCapable));
+}

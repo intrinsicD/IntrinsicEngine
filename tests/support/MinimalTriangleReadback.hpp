@@ -27,11 +27,14 @@ namespace Extrinsic::Tests::Support::MinimalTriangleReadback
     inline constexpr float kTriangleB = 0.85f;
     inline constexpr float kTriangleA = 1.0f;
 
-    // Clear color produced by kMinimalRenderPassColorAttachments
-    // (src/graphics/renderer/Graphics.FrameRecipe.cpp).
-    inline constexpr float kClearR = 0.0f;
-    inline constexpr float kClearG = 0.0f;
-    inline constexpr float kClearB = 0.0f;
+    // Background clear color of the previewed default-recipe scene color
+    // (`SceneColorHDR`). BUG-015 set the default-recipe scene clear to a visible
+    // blue and BUG-016 made it actually reach the framebuffer, so the previewed
+    // exterior background is this blue (mirrors `kDefaultClearColorAttachments`
+    // in src/graphics/renderer/Graphics.FrameRecipe.cpp), not black.
+    inline constexpr float kClearR = 0.10f;
+    inline constexpr float kClearG = 0.20f;
+    inline constexpr float kClearB = 0.45f;
     inline constexpr float kClearA = 1.0f;
 
     // Framebuffer dimensions used by the default-recipe smoke window.

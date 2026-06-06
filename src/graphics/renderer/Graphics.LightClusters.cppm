@@ -138,9 +138,13 @@ export namespace Extrinsic::Graphics
         bool Valid{false};
     };
 
-    // Matches `assets/shaders/cluster_grid_build.comp` std430 push layout.
+    // Matches `assets/shaders/cluster_grid_build.comp` scalar push layout.
+    // BUG-015: the AABB output buffer is reached through a Buffer Device
+    // Address carried in push constants (BDA convention), so the leading 8-byte
+    // `ClusterGridBDA` precedes the dimension/projection words.
     struct ClusterGridBuildPushConstants
     {
+        std::uint64_t ClusterGridBDA{0u};
         std::uint32_t RenderWidth{0u};
         std::uint32_t RenderHeight{0u};
         std::uint32_t TilesX{0u};
@@ -154,17 +158,25 @@ export namespace Extrinsic::Graphics
         std::uint32_t ClusterTilePx{0u};
         std::uint32_t Reserved0{0u};
     };
-    static_assert(sizeof(ClusterGridBuildPushConstants) == 48u);
+    static_assert(sizeof(ClusterGridBuildPushConstants) == 56u);
 
-    // Matches `assets/shaders/light_cluster_assign.comp` push layout.
+    // Matches `assets/shaders/light_cluster_assign.comp` scalar push layout.
+    // BUG-015: every storage buffer (grid AABBs, lights, headers, indices,
+    // counter) is reached through a Buffer Device Address carried in push
+    // constants. The five 8-byte addresses precede the trailing uint params.
     struct ClusterLightAssignmentPushConstants
     {
+        std::uint64_t ClusterGridBDA{0u};
+        std::uint64_t LightsBDA{0u};
+        std::uint64_t HeadersBDA{0u};
+        std::uint64_t IndicesBDA{0u};
+        std::uint64_t CounterBDA{0u};
         std::uint32_t CellCount{0u};
         std::uint32_t LightCount{0u};
         std::uint32_t MaxLightsPerCell{0u};
         std::uint32_t Reserved0{0u};
     };
-    static_assert(sizeof(ClusterLightAssignmentPushConstants) == 16u);
+    static_assert(sizeof(ClusterLightAssignmentPushConstants) == 56u);
 
     [[nodiscard]] ClusterGridDesc ComputeClusterGridDesc(
         std::uint32_t renderWidth,
@@ -246,22 +258,32 @@ export namespace Extrinsic::Graphics
         std::uint32_t maxLightsPerCell = kMaxClusterLightsPerCell);
 
     // Records the backend-neutral compute command shape for rebuilding the
-    // cluster AABB buffer. The concrete backend owns descriptor publication.
+    // cluster AABB buffer. BUG-015: `aabbBufferAddress` is the buffer device
+    // address published to the shader through push constants; the handle is
+    // retained for the shader-read publication barrier.
     bool RecordClusterGridBuild(RHI::ICommandContext& cmd,
                                 RHI::PipelineHandle pipeline,
                                 RHI::BufferHandle aabbBuffer,
+                                std::uint64_t aabbBufferAddress,
                                 const ClusterGridBuildDispatchPlan& plan,
                                 const ClusterGridProjection& projection);
 
-    // Records the backend-neutral assignment dispatch. Descriptor publication
-    // is backend-owned; this helper clears the shader-visible atomic counter
-    // and pins the dispatch plus shader-read publication barriers.
+    // Records the backend-neutral assignment dispatch. BUG-015: each
+    // `*Address` is the buffer device address published to the shader through
+    // push constants; the handles are retained for the counter clear and the
+    // shader-read publication barriers. This helper clears the shader-visible
+    // atomic counter and pins the dispatch plus publication barriers.
     bool RecordClusterLightAssignment(RHI::ICommandContext& cmd,
                                       RHI::PipelineHandle pipeline,
                                       RHI::BufferHandle aabbBuffer,
+                                      std::uint64_t aabbBufferAddress,
                                       RHI::BufferHandle lightsBuffer,
+                                      std::uint64_t lightsBufferAddress,
                                       RHI::BufferHandle headerBuffer,
+                                      std::uint64_t headerBufferAddress,
                                       RHI::BufferHandle indexBuffer,
+                                      std::uint64_t indexBufferAddress,
                                       RHI::BufferHandle counterBuffer,
+                                      std::uint64_t counterBufferAddress,
                                       const ClusterLightAssignmentDispatchPlan& plan);
 }

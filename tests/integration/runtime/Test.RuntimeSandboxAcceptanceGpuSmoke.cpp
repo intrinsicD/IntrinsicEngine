@@ -533,6 +533,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ExtrinsicSandboxDefaultConfigProducesVisi
 
     const std::uint64_t nonBlackPixels =
         CountNonBlackRgbPixels(device, readbackBuffer, readbackSize, bytesPerPixel);
+    const std::uint64_t totalPixels =
+        static_cast<std::uint64_t>(extent.Width) * static_cast<std::uint64_t>(extent.Height);
     EXPECT_GT(nonBlackPixels, 0u)
         << "Sandbox default-config frame read back as entirely black despite recorded Present/ImGui passes. "
         << "adapter frames=" << adapterDiagnostics.FramesProduced
@@ -542,6 +544,18 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ExtrinsicSandboxDefaultConfigProducesVisi
         << " commands=" << adapterDiagnostics.LastCommandCount
         << " display=" << adapterDiagnostics.DisplayWidth << "x" << adapterDiagnostics.DisplayHeight
         << " pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+
+    // BUG-016: the operational default recipe must present the lit scene-color
+    // background (the recipe's blue clear tonemapped and presented), not just a
+    // few ImGui overlay pixels. Before the fix the postprocess tonemap sampled
+    // its own (black) output via the destabilised bindless bridge slot 0, so the
+    // whole backbuffer read back black. Require a substantial majority of pixels
+    // to be non-black so a regression that only leaves ImGui (or nothing)
+    // visible is caught, not just a single stray non-black texel.
+    EXPECT_GT(nonBlackPixels, totalPixels / 2u)
+        << "Sandbox default-config frame did not present a full-screen lit background; only "
+        << nonBlackPixels << "/" << totalPixels << " pixels were non-black. This indicates the "
+        << "postprocess present source regressed to black again (BUG-016).";
 
     renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
     device.DestroyBuffer(readbackBuffer);

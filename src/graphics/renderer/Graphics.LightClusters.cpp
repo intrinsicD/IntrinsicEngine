@@ -532,15 +532,18 @@ namespace Extrinsic::Graphics
     bool RecordClusterGridBuild(RHI::ICommandContext& cmd,
                                 const RHI::PipelineHandle pipeline,
                                 const RHI::BufferHandle aabbBuffer,
+                                const std::uint64_t aabbBufferAddress,
                                 const ClusterGridBuildDispatchPlan& plan,
                                 const ClusterGridProjection& projection)
     {
-        if (!pipeline.IsValid() || !aabbBuffer.IsValid() || !plan.IsValid() || !projection.IsValid())
+        if (!pipeline.IsValid() || !aabbBuffer.IsValid() || aabbBufferAddress == 0u ||
+            !plan.IsValid() || !projection.IsValid())
         {
             return false;
         }
 
         const ClusterGridBuildPushConstants pc{
+            .ClusterGridBDA = aabbBufferAddress,
             .RenderWidth = plan.Desc.RenderWidth,
             .RenderHeight = plan.Desc.RenderHeight,
             .TilesX = plan.Desc.TilesX,
@@ -573,20 +576,31 @@ namespace Extrinsic::Graphics
     bool RecordClusterLightAssignment(RHI::ICommandContext& cmd,
                                       const RHI::PipelineHandle pipeline,
                                       const RHI::BufferHandle aabbBuffer,
+                                      const std::uint64_t aabbBufferAddress,
                                       const RHI::BufferHandle lightsBuffer,
+                                      const std::uint64_t lightsBufferAddress,
                                       const RHI::BufferHandle headerBuffer,
+                                      const std::uint64_t headerBufferAddress,
                                       const RHI::BufferHandle indexBuffer,
+                                      const std::uint64_t indexBufferAddress,
                                       const RHI::BufferHandle counterBuffer,
+                                      const std::uint64_t counterBufferAddress,
                                       const ClusterLightAssignmentDispatchPlan& plan)
     {
         if (!pipeline.IsValid() || !aabbBuffer.IsValid() || !lightsBuffer.IsValid() ||
             !headerBuffer.IsValid() || !indexBuffer.IsValid() || !counterBuffer.IsValid() ||
-            !plan.IsValid())
+            aabbBufferAddress == 0u || lightsBufferAddress == 0u || headerBufferAddress == 0u ||
+            indexBufferAddress == 0u || counterBufferAddress == 0u || !plan.IsValid())
         {
             return false;
         }
 
         const ClusterLightAssignmentPushConstants pc{
+            .ClusterGridBDA = aabbBufferAddress,
+            .LightsBDA = lightsBufferAddress,
+            .HeadersBDA = headerBufferAddress,
+            .IndicesBDA = indexBufferAddress,
+            .CounterBDA = counterBufferAddress,
             .CellCount = plan.Desc.CellCount,
             .LightCount = plan.LightCount,
             .MaxLightsPerCell = plan.MaxLightsPerCell,

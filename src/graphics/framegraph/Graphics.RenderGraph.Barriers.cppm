@@ -53,6 +53,26 @@ namespace Extrinsic::Graphics
         std::uint32_t DestinationQueueFamily = kIgnoredQueueFamily;
     };
 
+    // BUG-015: a compiled ownership transfer (release/acquire pair) only describes
+    // a *real* queue-family hand-off when the device's framegraph queue-capability
+    // profile actually schedules the producer and consumer onto different queues.
+    // When optional async-compute/transfer passes demote to graphics, both sides
+    // resolve to the graphics queue and the transfer must collapse to a plain
+    // barrier — otherwise single-queue submission records a QFOT acquire with no
+    // matching release. This predicate is the single source of truth used by the
+    // renderer's barrier lowering and is unit-tested independently of a live GPU.
+    export [[nodiscard]] constexpr bool IsLiveCrossQueueOwnershipTransfer(
+        const QueueOwnershipTransfer& transfer,
+        const RHI::QueueCapabilityProfile profile) noexcept
+    {
+        if (transfer.Kind == QueueOwnershipTransferKind::None)
+        {
+            return false;
+        }
+        return RHI::ResolveQueueAffinity(transfer.SourceQueue, profile).Resolved !=
+               RHI::ResolveQueueAffinity(transfer.DestinationQueue, profile).Resolved;
+    }
+
     export enum class TextureBarrierState : std::uint8_t
     {
         Undefined = 0,

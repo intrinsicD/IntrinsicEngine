@@ -2,6 +2,18 @@
 
 // GRAPHICS-039A — builds one right-handed view-space AABB per froxel cell.
 // Light assignment and surface shader consumption are follow-up slices.
+//
+// BUG-015: the engine's single global pipeline layout exposes only the
+// bindless combined-image-sampler array at set=0/binding=0 plus push
+// constants; every storage buffer reaches a shader through a Buffer Device
+// Address (BDA) carried in push constants (see common/gpu_scene.glsl and
+// instance_cull.comp). Declaring a descriptor-bound storage buffer here makes
+// vkCreateComputePipelines fail validation against that layout
+// (VUID-VkComputePipelineCreateInfo-layout-07990/07988), so this pass uses BDA.
+
+#extension GL_EXT_scalar_block_layout : require
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
@@ -11,13 +23,14 @@ struct ClusterAABB
     vec4 Max;
 };
 
-layout(set = 0, binding = 0, std430) buffer ClusterGridAABBBuffer
+layout(buffer_reference, scalar) buffer ClusterGridAABBRef
 {
     ClusterAABB Cells[];
-} uClusterGrid;
+};
 
-layout(push_constant) uniform ClusterGridBuildPush
+layout(push_constant, scalar) uniform ClusterGridBuildPush
 {
+    uint64_t ClusterGridBDA;
     uint RenderWidth;
     uint RenderHeight;
     uint TilesX;
@@ -54,7 +67,8 @@ void IncludeCorner(inout vec3 minV,
 void main()
 {
     const uint cell = gl_GlobalInvocationID.x;
-    if (cell >= pc.CellCount || pc.TilesX == 0u || pc.TilesY == 0u || pc.SlicesZ == 0u)
+    if (cell >= pc.CellCount || pc.TilesX == 0u || pc.TilesY == 0u || pc.SlicesZ == 0u ||
+        pc.ClusterGridBDA == uint64_t(0))
     {
         return;
     }
@@ -89,6 +103,7 @@ void main()
     IncludeCorner(minV, maxV, ndcMinX, ndcMaxY, farZ);
     IncludeCorner(minV, maxV, ndcMaxX, ndcMaxY, farZ);
 
-    uClusterGrid.Cells[cell].Min = vec4(minV, 0.0);
-    uClusterGrid.Cells[cell].Max = vec4(maxV, 0.0);
+    ClusterGridAABBRef grid = ClusterGridAABBRef(pc.ClusterGridBDA);
+    grid.Cells[cell].Min = vec4(minV, 0.0);
+    grid.Cells[cell].Max = vec4(maxV, 0.0);
 }

@@ -163,6 +163,13 @@ namespace Extrinsic::Graphics
                 .Target = RenderPassAttachmentToken(),
                 .Load = RHI::LoadOp::Clear,
                 .Store = RHI::StoreOp::Store,
+                // BUG-015: clear the default-recipe scene color to a visible
+                // blue so an operational promoted-Vulkan frame is plainly
+                // distinguishable from an undefined/black backbuffer.
+                .ClearR = 0.10f,
+                .ClearG = 0.20f,
+                .ClearB = 0.45f,
+                .ClearA = 1.0f,
             },
         };
 
@@ -175,7 +182,11 @@ namespace Extrinsic::Graphics
         };
 
         constexpr RHI::ColorAttachment kDefaultClearTwoColorAttachments[] = {
-            RHI::ColorAttachment{.Target = RenderPassAttachmentToken(), .Load = RHI::LoadOp::Clear, .Store = RHI::StoreOp::Store},
+            // BUG-015: first attachment is the forward scene color — clear it to
+            // the same visible blue as the no-motion path; the second attachment
+            // is motion vectors and stays cleared to zero.
+            RHI::ColorAttachment{.Target = RenderPassAttachmentToken(), .Load = RHI::LoadOp::Clear, .Store = RHI::StoreOp::Store,
+                                 .ClearR = 0.10f, .ClearG = 0.20f, .ClearB = 0.45f, .ClearA = 1.0f},
             RHI::ColorAttachment{.Target = RenderPassAttachmentToken(), .Load = RHI::LoadOp::Clear, .Store = RHI::StoreOp::Store},
         };
 

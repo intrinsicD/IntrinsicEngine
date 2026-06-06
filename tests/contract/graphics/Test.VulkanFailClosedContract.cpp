@@ -68,6 +68,55 @@ TEST(VulkanFailClosedContract, QueueFamilyTokenResolverMapsAffinityTokens)
               5u);
 }
 
+TEST(VulkanFailClosedContract, FrameGraphBarrierFamiliesCollapseUnderGraphicsOnlyProfile)
+{
+    namespace VK = Extrinsic::Backends::Vulkan;
+
+    // BUG-015: even when the physical device exposes distinct async-compute and
+    // transfer families, a graphics-only framegraph profile must collapse them to
+    // VK_QUEUE_FAMILY_IGNORED so single-queue submission never records a
+    // cross-queue ownership transfer that has no matching release.
+    const Extrinsic::RHI::QueueCapabilityProfile graphicsOnly{
+        .SupportsAsyncCompute = false,
+        .SupportsTransfer = false,
+    };
+    const VK::VulkanFrameGraphBarrierQueueFamilies collapsed =
+        VK::ResolveFrameGraphBarrierQueueFamilies(0u, 2u, 2u, 0u, graphicsOnly);
+    EXPECT_EQ(collapsed.Graphics, 0u);
+    EXPECT_EQ(collapsed.AsyncCompute, VK::kIgnoredVulkanQueueFamily);
+    EXPECT_EQ(collapsed.Transfer, VK::kIgnoredVulkanQueueFamily);
+
+    // Feeding the collapsed families through the same map the command context
+    // builds must resolve async/transfer ownership tokens back to graphics.
+    const VK::VulkanQueueFamilyMap collapsedMap{
+        .Graphics = collapsed.Graphics,
+        .AsyncCompute = collapsed.AsyncCompute,
+        .Transfer = collapsed.Transfer,
+        .Present = collapsed.Present,
+        .SupportsAsyncCompute = collapsed.AsyncCompute != VK::kIgnoredVulkanQueueFamily,
+        .SupportsTransfer = collapsed.Transfer != VK::kIgnoredVulkanQueueFamily,
+    };
+    EXPECT_EQ(VK::ResolveVulkanQueueFamilyToken(
+                  collapsedMap,
+                  static_cast<std::uint32_t>(Extrinsic::RHI::QueueAffinity::AsyncCompute)),
+              0u);
+    EXPECT_EQ(VK::ResolveVulkanQueueFamilyToken(
+                  collapsedMap,
+                  static_cast<std::uint32_t>(Extrinsic::RHI::QueueAffinity::Transfer)),
+              0u);
+
+    // A profile that genuinely supports the optional queues preserves the
+    // physical families so real multi-queue handoffs still emit QFOT barriers.
+    const Extrinsic::RHI::QueueCapabilityProfile fullProfile{
+        .SupportsAsyncCompute = true,
+        .SupportsTransfer = true,
+    };
+    const VK::VulkanFrameGraphBarrierQueueFamilies preserved =
+        VK::ResolveFrameGraphBarrierQueueFamilies(0u, 2u, 4u, 0u, fullProfile);
+    EXPECT_EQ(preserved.AsyncCompute, 2u);
+    EXPECT_EQ(preserved.Transfer, 4u);
+}
+
 TEST(VulkanFailClosedContract, DeviceConstructorIsFailClosedWithoutGpuBringup)
 {
     std::unique_ptr<Extrinsic::RHI::IDevice> device = Extrinsic::Backends::Vulkan::CreateVulkanDevice();

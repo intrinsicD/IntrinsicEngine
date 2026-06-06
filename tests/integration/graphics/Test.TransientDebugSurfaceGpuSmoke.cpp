@@ -95,10 +95,12 @@ inline constexpr TransientDebugSamplePoint kPointSample{
 	ExpectedColor(0.0f, 0.0f, 1.0f),
 };
 inline constexpr TransientDebugSamplePoint kClearSample{
-	"clear_black",
+	"scene_clear_blue",
 	16u,
 	16u,
-	ExpectedColor(0.0f, 0.0f, 0.0f),
+	// BUG-015/BUG-016: the default-recipe SceneColorHDR background clears to a
+	// visible blue (0.10, 0.20, 0.45), not black.
+	ExpectedColor(0.10f, 0.20f, 0.45f),
 };
 inline constexpr std::array<TransientDebugSamplePoint, 4> kTransientReadbackSamples{{
 	kTriangleSample,

@@ -1780,6 +1780,13 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
                 return;
             }
 
+            const VulkanFrameGraphBarrierQueueFamilies barrierFamilies =
+                ResolveFrameGraphBarrierQueueFamilies(
+                    m_GraphicsFamily,
+                    m_AsyncComputeQueue != VK_NULL_HANDLE ? m_AsyncComputeFamily : VK_QUEUE_FAMILY_IGNORED,
+                    m_TransferVkQueue != VK_NULL_HANDLE ? m_TransferFamily : VK_QUEUE_FAMILY_IGNORED,
+                    m_PresentFamily,
+                    GetQueueCapabilityProfile());
             m_CmdContexts[frameSlot].Bind(m_Device,
                                           frame.CmdBuffer,
                                           m_GlobalPipelineLayout,
@@ -1789,12 +1796,10 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
                                           &m_Samplers,
                                           &m_Pipelines,
                                           m_DefaultSamplerHandle,
-                                          m_GraphicsFamily,
-                                          m_AsyncComputeQueue != VK_NULL_HANDLE
-                                              ? m_AsyncComputeFamily
-                                              : VK_QUEUE_FAMILY_IGNORED,
-                                          m_PresentFamily,
-                                          m_TransferFamily);
+                                          barrierFamilies.Graphics,
+                                          barrierFamilies.AsyncCompute,
+                                          barrierFamilies.Present,
+                                          barrierFamilies.Transfer);
         }
 
         VkCommandPoolCreateInfo oneShotPoolInfo{};
@@ -2151,6 +2156,13 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
 
         for (std::uint32_t frameSlot = 0; frameSlot < kMaxFramesInFlight; ++frameSlot)
         {
+            const VulkanFrameGraphBarrierQueueFamilies barrierFamilies =
+                ResolveFrameGraphBarrierQueueFamilies(
+                    m_GraphicsFamily,
+                    m_AsyncComputeQueue != VK_NULL_HANDLE ? m_AsyncComputeFamily : VK_QUEUE_FAMILY_IGNORED,
+                    m_TransferVkQueue != VK_NULL_HANDLE ? m_TransferFamily : VK_QUEUE_FAMILY_IGNORED,
+                    m_PresentFamily,
+                    GetQueueCapabilityProfile());
             m_CmdContexts[frameSlot].Bind(m_Device,
                                           m_Frames[frameSlot].CmdBuffer,
                                           m_GlobalPipelineLayout,
@@ -2160,12 +2172,10 @@ void VulkanDevice::Initialize(const RHI::DeviceCreateDesc& desc)
                                           &m_Samplers,
                                           &m_Pipelines,
                                           m_DefaultSamplerHandle,
-                                          m_GraphicsFamily,
-                                          m_AsyncComputeQueue != VK_NULL_HANDLE
-                                              ? m_AsyncComputeFamily
-                                              : VK_QUEUE_FAMILY_IGNORED,
-                                          m_PresentFamily,
-                                          m_TransferFamily);
+                                          barrierFamilies.Graphics,
+                                          barrierFamilies.AsyncCompute,
+                                          barrierFamilies.Present,
+                                          barrierFamilies.Transfer);
             ++serviceDiagnostics.CommandContextRebindCount;
         }
         serviceDiagnostics.CommandContextsRebound =
@@ -3391,6 +3401,13 @@ bool VulkanDevice::BeginFrameQueueSubmitPlan(const RHI::FrameHandle& frame,
         pendingBatch.Signals.assign(batch.Signals.begin(), batch.Signals.end());
         pending.push_back(std::move(pendingBatch));
         perFrame.QueueSubmitCmdBuffers[batchIndex] = commandBuffer;
+        const VulkanFrameGraphBarrierQueueFamilies barrierFamilies =
+            ResolveFrameGraphBarrierQueueFamilies(
+                m_GraphicsFamily,
+                m_AsyncComputeQueue != VK_NULL_HANDLE ? m_AsyncComputeFamily : VK_QUEUE_FAMILY_IGNORED,
+                m_TransferVkQueue != VK_NULL_HANDLE ? m_TransferFamily : VK_QUEUE_FAMILY_IGNORED,
+                m_PresentFamily,
+                GetQueueCapabilityProfile());
         contexts[batchIndex].Bind(m_Device,
                                   commandBuffer,
                                   m_GlobalPipelineLayout,
@@ -3400,12 +3417,10 @@ bool VulkanDevice::BeginFrameQueueSubmitPlan(const RHI::FrameHandle& frame,
                                   &m_Samplers,
                                   &m_Pipelines,
                                   m_DefaultSamplerHandle,
-                                  m_GraphicsFamily,
-                                  m_AsyncComputeQueue != VK_NULL_HANDLE
-                                      ? m_AsyncComputeFamily
-                                      : VK_QUEUE_FAMILY_IGNORED,
-                                  m_PresentFamily,
-                                  m_TransferFamily);
+                                  barrierFamilies.Graphics,
+                                  barrierFamilies.AsyncCompute,
+                                  barrierFamilies.Present,
+                                  barrierFamilies.Transfer);
     }
 
     return pending.size() == plan.Batches.size();
@@ -3683,7 +3698,14 @@ RHI::BufferHandle VulkanDevice::CreateBuffer(const RHI::BufferDesc& desc)
         buf.HostCoherent = (memProps & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) != 0;
     }
 
-    if (desc.DebugName && m_ValidationEnabled)
+    // BUG-015: guard the debug-utils entry point. `m_ValidationEnabled`
+    // tracks the *request* (RenderConfig::EnableValidation), but the
+    // debug-utils function pointer is only non-null when the validation layer
+    // and VK_EXT_debug_utils were actually loaded. When validation is
+    // requested on a host without the layer, calling a null
+    // `vkSetDebugUtilsObjectNameEXT` SEGVs. CreateImage/CreateSampler/the
+    // SetDebugName helper already guard on the pointer; mirror them here.
+    if (desc.DebugName && m_ValidationEnabled && vkSetDebugUtilsObjectNameEXT)
     {
         VkDebugUtilsObjectNameInfoEXT nm{};
         nm.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
@@ -4128,6 +4150,13 @@ void VulkanDevice::WriteTexture(RHI::TextureHandle handle,
     }
 
     std::memcpy(stagingAllocationInfo.pMappedData, data, static_cast<std::size_t>(requiredBytes));
+    const VkResult flushResult =
+        vmaFlushAllocation(m_Vma, stagingAllocation, 0, requiredBytes);
+    if (flushResult != VK_SUCCESS)
+    {
+        Core::Log::Warn("[VulkanDevice::WriteTexture] vmaFlushAllocation reported VkResult={}; device may observe stale CPU writes on non-coherent staging memory.",
+                        static_cast<int>(flushResult));
+    }
 
     VkCommandBuffer cmd = BeginOneShot();
     if (cmd == VK_NULL_HANDLE)

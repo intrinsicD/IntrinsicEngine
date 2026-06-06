@@ -435,8 +435,9 @@ TEST(GraphicsLightClusterGrid, RecordBuildDispatchesOneLinearGridAndPublishBarri
     Tests::MockCommandContext cmd;
     const RHI::PipelineHandle pipeline{17u, 1u};
     const RHI::BufferHandle aabbs{18u, 1u};
+    constexpr std::uint64_t aabbAddress = 0x1000u;
 
-    ASSERT_TRUE(Graphics::RecordClusterGridBuild(cmd, pipeline, aabbs, plan, projection));
+    ASSERT_TRUE(Graphics::RecordClusterGridBuild(cmd, pipeline, aabbs, aabbAddress, plan, projection));
 
     EXPECT_EQ(cmd.BindPipelineCalls, 1);
     EXPECT_EQ(cmd.LastBoundPipeline, pipeline);
@@ -449,6 +450,7 @@ TEST(GraphicsLightClusterGrid, RecordBuildDispatchesOneLinearGridAndPublishBarri
     ASSERT_EQ(cmd.PushConstantPayloads[0].size(), sizeof(Graphics::ClusterGridBuildPushConstants));
     Graphics::ClusterGridBuildPushConstants pc{};
     std::memcpy(&pc, cmd.PushConstantPayloads[0].data(), sizeof(pc));
+    EXPECT_EQ(pc.ClusterGridBDA, aabbAddress);
     EXPECT_EQ(pc.RenderWidth, desc.RenderWidth);
     EXPECT_EQ(pc.RenderHeight, desc.RenderHeight);
     EXPECT_EQ(pc.TilesX, desc.TilesX);
@@ -488,8 +490,19 @@ TEST(GraphicsLightClusterGrid, RecordAssignmentDispatchesOneLinearGridAndPublish
     const RHI::BufferHandle headers{20u, 1u};
     const RHI::BufferHandle indices{21u, 1u};
     const RHI::BufferHandle counter{22u, 1u};
+    constexpr std::uint64_t aabbAddress = 0x1000u;
+    constexpr std::uint64_t lightsAddress = 0x2000u;
+    constexpr std::uint64_t headersAddress = 0x3000u;
+    constexpr std::uint64_t indicesAddress = 0x4000u;
+    constexpr std::uint64_t counterAddress = 0x5000u;
 
-    ASSERT_TRUE(Graphics::RecordClusterLightAssignment(cmd, pipeline, aabbs, lights, headers, indices, counter, plan));
+    ASSERT_TRUE(Graphics::RecordClusterLightAssignment(cmd, pipeline,
+                                                       aabbs, aabbAddress,
+                                                       lights, lightsAddress,
+                                                       headers, headersAddress,
+                                                       indices, indicesAddress,
+                                                       counter, counterAddress,
+                                                       plan));
 
     EXPECT_EQ(cmd.FillBufferCalls, 1);
     EXPECT_EQ(cmd.BindPipelineCalls, 1);
@@ -503,6 +516,11 @@ TEST(GraphicsLightClusterGrid, RecordAssignmentDispatchesOneLinearGridAndPublish
     ASSERT_EQ(cmd.PushConstantPayloads[0].size(), sizeof(Graphics::ClusterLightAssignmentPushConstants));
     Graphics::ClusterLightAssignmentPushConstants pc{};
     std::memcpy(&pc, cmd.PushConstantPayloads[0].data(), sizeof(pc));
+    EXPECT_EQ(pc.ClusterGridBDA, aabbAddress);
+    EXPECT_EQ(pc.LightsBDA, lightsAddress);
+    EXPECT_EQ(pc.HeadersBDA, headersAddress);
+    EXPECT_EQ(pc.IndicesBDA, indicesAddress);
+    EXPECT_EQ(pc.CounterBDA, counterAddress);
     EXPECT_EQ(pc.CellCount, desc.CellCount);
     EXPECT_EQ(pc.LightCount, 37u);
     EXPECT_EQ(pc.MaxLightsPerCell, Graphics::kMaxClusterLightsPerCell);
@@ -530,23 +548,38 @@ TEST(GraphicsLightClusterGrid, RecordRejectsInvalidInputs)
     const Graphics::ClusterGridProjection projection = DefaultProjection();
 
     Tests::MockCommandContext cmd;
-    EXPECT_FALSE(Graphics::RecordClusterGridBuild(cmd, RHI::PipelineHandle{}, RHI::BufferHandle{18u, 1u}, plan, projection));
-    EXPECT_FALSE(Graphics::RecordClusterGridBuild(cmd, RHI::PipelineHandle{17u, 1u}, RHI::BufferHandle{}, plan, projection));
-    EXPECT_FALSE(Graphics::RecordClusterGridBuild(cmd, RHI::PipelineHandle{17u, 1u}, RHI::BufferHandle{18u, 1u}, {}, projection));
-    EXPECT_FALSE(Graphics::RecordClusterGridBuild(cmd, RHI::PipelineHandle{17u, 1u}, RHI::BufferHandle{18u, 1u}, plan, {}));
+    constexpr std::uint64_t kAddr = 0x1000u;
+    EXPECT_FALSE(Graphics::RecordClusterGridBuild(cmd, RHI::PipelineHandle{}, RHI::BufferHandle{18u, 1u}, kAddr, plan, projection));
+    EXPECT_FALSE(Graphics::RecordClusterGridBuild(cmd, RHI::PipelineHandle{17u, 1u}, RHI::BufferHandle{}, kAddr, plan, projection));
+    EXPECT_FALSE(Graphics::RecordClusterGridBuild(cmd, RHI::PipelineHandle{17u, 1u}, RHI::BufferHandle{18u, 1u}, 0u, plan, projection));
+    EXPECT_FALSE(Graphics::RecordClusterGridBuild(cmd, RHI::PipelineHandle{17u, 1u}, RHI::BufferHandle{18u, 1u}, kAddr, {}, projection));
+    EXPECT_FALSE(Graphics::RecordClusterGridBuild(cmd, RHI::PipelineHandle{17u, 1u}, RHI::BufferHandle{18u, 1u}, kAddr, plan, {}));
     EXPECT_EQ(cmd.BindPipelineCalls, 0);
     EXPECT_EQ(cmd.DispatchCalls, 0);
     EXPECT_TRUE(cmd.BufferBarrierCalls.empty());
 
     const Graphics::ClusterLightAssignmentDispatchPlan assignmentPlan =
         Graphics::ComputeClusterLightAssignmentDispatchPlan(desc, 4u);
-    EXPECT_FALSE(Graphics::RecordClusterLightAssignment(cmd, RHI::PipelineHandle{}, RHI::BufferHandle{18u, 1u}, RHI::BufferHandle{19u, 1u}, RHI::BufferHandle{20u, 1u}, RHI::BufferHandle{21u, 1u}, RHI::BufferHandle{22u, 1u}, assignmentPlan));
-    EXPECT_FALSE(Graphics::RecordClusterLightAssignment(cmd, RHI::PipelineHandle{17u, 1u}, RHI::BufferHandle{}, RHI::BufferHandle{19u, 1u}, RHI::BufferHandle{20u, 1u}, RHI::BufferHandle{21u, 1u}, RHI::BufferHandle{22u, 1u}, assignmentPlan));
-    EXPECT_FALSE(Graphics::RecordClusterLightAssignment(cmd, RHI::PipelineHandle{17u, 1u}, RHI::BufferHandle{18u, 1u}, RHI::BufferHandle{}, RHI::BufferHandle{20u, 1u}, RHI::BufferHandle{21u, 1u}, RHI::BufferHandle{22u, 1u}, assignmentPlan));
-    EXPECT_FALSE(Graphics::RecordClusterLightAssignment(cmd, RHI::PipelineHandle{17u, 1u}, RHI::BufferHandle{18u, 1u}, RHI::BufferHandle{19u, 1u}, RHI::BufferHandle{}, RHI::BufferHandle{21u, 1u}, RHI::BufferHandle{22u, 1u}, assignmentPlan));
-    EXPECT_FALSE(Graphics::RecordClusterLightAssignment(cmd, RHI::PipelineHandle{17u, 1u}, RHI::BufferHandle{18u, 1u}, RHI::BufferHandle{19u, 1u}, RHI::BufferHandle{20u, 1u}, RHI::BufferHandle{}, RHI::BufferHandle{22u, 1u}, assignmentPlan));
-    EXPECT_FALSE(Graphics::RecordClusterLightAssignment(cmd, RHI::PipelineHandle{17u, 1u}, RHI::BufferHandle{18u, 1u}, RHI::BufferHandle{19u, 1u}, RHI::BufferHandle{20u, 1u}, RHI::BufferHandle{21u, 1u}, RHI::BufferHandle{}, assignmentPlan));
-    EXPECT_FALSE(Graphics::RecordClusterLightAssignment(cmd, RHI::PipelineHandle{17u, 1u}, RHI::BufferHandle{18u, 1u}, RHI::BufferHandle{19u, 1u}, RHI::BufferHandle{20u, 1u}, RHI::BufferHandle{21u, 1u}, RHI::BufferHandle{22u, 1u}, {}));
+    const RHI::PipelineHandle p{17u, 1u};
+    const RHI::BufferHandle a{18u, 1u};
+    const RHI::BufferHandle l{19u, 1u};
+    const RHI::BufferHandle h{20u, 1u};
+    const RHI::BufferHandle i{21u, 1u};
+    const RHI::BufferHandle c{22u, 1u};
+    // Invalid pipeline, then each invalid buffer handle, then each zero address,
+    // then an invalid plan are all rejected before any recording happens.
+    EXPECT_FALSE(Graphics::RecordClusterLightAssignment(cmd, RHI::PipelineHandle{}, a, kAddr, l, kAddr, h, kAddr, i, kAddr, c, kAddr, assignmentPlan));
+    EXPECT_FALSE(Graphics::RecordClusterLightAssignment(cmd, p, RHI::BufferHandle{}, kAddr, l, kAddr, h, kAddr, i, kAddr, c, kAddr, assignmentPlan));
+    EXPECT_FALSE(Graphics::RecordClusterLightAssignment(cmd, p, a, kAddr, RHI::BufferHandle{}, kAddr, h, kAddr, i, kAddr, c, kAddr, assignmentPlan));
+    EXPECT_FALSE(Graphics::RecordClusterLightAssignment(cmd, p, a, kAddr, l, kAddr, RHI::BufferHandle{}, kAddr, i, kAddr, c, kAddr, assignmentPlan));
+    EXPECT_FALSE(Graphics::RecordClusterLightAssignment(cmd, p, a, kAddr, l, kAddr, h, kAddr, RHI::BufferHandle{}, kAddr, c, kAddr, assignmentPlan));
+    EXPECT_FALSE(Graphics::RecordClusterLightAssignment(cmd, p, a, kAddr, l, kAddr, h, kAddr, i, kAddr, RHI::BufferHandle{}, kAddr, assignmentPlan));
+    EXPECT_FALSE(Graphics::RecordClusterLightAssignment(cmd, p, a, 0u, l, kAddr, h, kAddr, i, kAddr, c, kAddr, assignmentPlan));
+    EXPECT_FALSE(Graphics::RecordClusterLightAssignment(cmd, p, a, kAddr, l, 0u, h, kAddr, i, kAddr, c, kAddr, assignmentPlan));
+    EXPECT_FALSE(Graphics::RecordClusterLightAssignment(cmd, p, a, kAddr, l, kAddr, h, 0u, i, kAddr, c, kAddr, assignmentPlan));
+    EXPECT_FALSE(Graphics::RecordClusterLightAssignment(cmd, p, a, kAddr, l, kAddr, h, kAddr, i, 0u, c, kAddr, assignmentPlan));
+    EXPECT_FALSE(Graphics::RecordClusterLightAssignment(cmd, p, a, kAddr, l, kAddr, h, kAddr, i, kAddr, c, 0u, assignmentPlan));
+    EXPECT_FALSE(Graphics::RecordClusterLightAssignment(cmd, p, a, kAddr, l, kAddr, h, kAddr, i, kAddr, c, kAddr, {}));
     EXPECT_EQ(cmd.BindPipelineCalls, 0);
     EXPECT_EQ(cmd.DispatchCalls, 0);
     EXPECT_TRUE(cmd.BufferBarrierCalls.empty());
