@@ -21,10 +21,17 @@ map.
 - [RORG-031A — Architecture foundation backlog seed](RORG-031A-architecture-foundation.md):
   tracks architecture-doc normalization, layering-checker, docs-sync-checker,
   and module-inventory governance work.
-- [RORG-036 — Layer ownership audit for misplaced concepts](RORG-036-layer-ownership-audit.md):
-  inventories promoted modules whose value types, pure data contracts, or
-  dependency-free APIs appear to live in higher layers than their true owner and
-  creates one scoped follow-up task per accepted move/split.
+- [RORG-036 — Layer ownership audit for misplaced concepts](../../done/RORG-036-layer-ownership-audit.md)
+  (done 2026-06-06): whole-tree audit of promoted module placement against the
+  `/AGENTS.md` §2 table. Outcome was a **clean baseline** — `RORG-034`/`RORG-035`
+  already moved the previously-misplaced frame-loop and extent/rect value types
+  to `core`, and no remaining promoted module imports a higher/sibling layer for
+  a value-type-only reason. Examined the named candidates
+  (`Runtime.StreamingExecutor`, the geometry/procedural packers, the
+  dependency-free `Runtime.RenderWorldPool`) and decided each stays; zero moves
+  accepted, so no follow-up move/split tasks were filed. `RenderWorldPool` is
+  recorded in the task as a latent `core`-split candidate to revisit on a second
+  consumer.
 - [HARDEN-069 — Rebind legacy layering allowlist entries to active retirement tasks](../../done/HARDEN-069-rebind-legacy-layering-allowlist-to-active-retirement-tasks.md)
   (done 2026-06-02): metadata-only rebinding of legacy allowlist rows from the retired `HARDEN-010`
   ID to current legacy-retirement task IDs, preserving the allowlisted edge set.
