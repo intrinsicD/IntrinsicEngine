@@ -6,6 +6,7 @@ module;
 #include <vector>
 
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 export module Extrinsic.Runtime.GizmoInteraction;
 
@@ -17,11 +18,9 @@ import Extrinsic.Graphics.RenderWorld;
 
 export namespace Extrinsic::Runtime
 {
-    // Which transform operation the gizmo currently authors. RUNTIME-084 Slice A
-    // implements translate hit-test + drag math; rotate/scale modes are
-    // hit-testable and render-packetable but their drag *application* is owned by
-    // a follow-up slice. `BeginDrag`/`DragTick` reject non-Translate modes (no-op)
-    // so switching modes never moves entities through the translate path.
+    // Which transform operation the gizmo currently authors. The operation mode
+    // is latched on BeginDrag so toolbar changes during a drag do not reinterpret
+    // the same pointer delta as a different transform edit.
     enum class GizmoMode : std::uint8_t
     {
         Translate = 0,
@@ -86,6 +85,16 @@ export namespace Extrinsic::Runtime
         float AxisLength = 1.f;
         // Translation snap increment applied when the `Snap` modifier is held.
         float TranslateSnapStep = 0.25f;
+        // Rotation angle in radians per world-space axis parameter unit.
+        float RotateRadiansPerWorldUnit = 1.0f;
+        // Rotation snap increment in radians applied when `Snap` is held.
+        float RotateSnapStepRadians = 0.2617993878f; // 15 degrees.
+        // Axis-scale multiplier per world-space axis parameter unit.
+        float ScaleFactorPerWorldUnit = 1.0f;
+        // Scale snap increment applied when `Snap` is held.
+        float ScaleSnapStep = 0.1f;
+        // Lower bound for authored scale components.
+        float MinScale = 0.001f;
     };
 
     // The resolved gizmo handle for a pointer pick.
@@ -107,6 +116,10 @@ export namespace Extrinsic::Runtime
         Extrinsic::ECS::EntityHandle Entity{Extrinsic::ECS::InvalidEntityHandle};
         glm::vec3                    BeforePosition{0.f};
         glm::vec3                    AfterPosition{0.f};
+        glm::quat                    BeforeRotation{1.f, 0.f, 0.f, 0.f};
+        glm::quat                    AfterRotation{1.f, 0.f, 0.f, 0.f};
+        glm::vec3                    BeforeScale{1.f};
+        glm::vec3                    AfterScale{1.f};
     };
 
     // Minimal runtime-owned undo stack for gizmo edits. The editor may instead
@@ -138,7 +151,7 @@ export namespace Extrinsic::Runtime
         std::uint32_t EditsEmitted       = 0u;
     };
 
-    // Runtime / editor-owned transform-gizmo interaction (RUNTIME-084, Slice A).
+    // Runtime / editor-owned transform-gizmo interaction (RUNTIME-084).
     //
     // Owns per-frame interaction state (mode, axis lock, drag origin, snap step,
     // modifier mask, multi-select pivot, orientation frame), screen-space handle
@@ -195,21 +208,18 @@ export namespace Extrinsic::Runtime
         // --- drag lifecycle ---
         // Begin an axis drag from a resolved hit. Records the per-entity before
         // transforms and the drag anchor parameter along the world axis. Returns
-        // false when the hit is a no-hit, the selection is empty, the ray is
-        // degenerate, or the mode is not `Translate` — Slice A only applies
-        // translation, so Rotate/Scale drags are rejected here (their drag
-        // application is the Slice B follow-up) rather than silently translating.
+        // false when the hit is a no-hit, the selection is empty, or the ray is
+        // degenerate.
         bool BeginDrag(const Registry& registry,
                        const GizmoHitResult& hit,
                        const PickRay& ray,
                        std::span<const EntityHandle> selected);
 
         // Apply an in-progress drag for the current ray. Mutates ECS authoring
-        // transforms (translation along the locked axis) and stamps the transform
-        // dirty marker. No-op (returns false) when not dragging, the ray is
-        // degenerate, or the mode is not `Translate` (a mid-drag switch to
-        // Rotate/Scale does nothing rather than translate). The applied scalar is
-        // rounded to the snap step when the `Snap` modifier is set.
+        // transforms (translate / rotate / scale along the locked axis) and
+        // stamps the transform dirty marker. No-op (returns false) when not
+        // dragging or the ray is degenerate. The drag mode is latched at
+        // BeginDrag; snap rounds the active operation to its configured step.
         bool DragTick(Registry& registry, const PickRay& ray);
 
         // Commit the drag: emit one `GizmoTransformEdit` per moved entity to
@@ -228,6 +238,8 @@ export namespace Extrinsic::Runtime
         {
             EntityHandle Entity{Extrinsic::ECS::InvalidEntityHandle};
             glm::vec3    BeforePosition{0.f};
+            glm::quat    BeforeRotation{1.f, 0.f, 0.f, 0.f};
+            glm::vec3    BeforeScale{1.f};
         };
 
         // World-space unit direction for `axis` under the current orientation
@@ -245,6 +257,7 @@ export namespace Extrinsic::Runtime
         std::uint32_t    m_ModifierMask{0u};
 
         bool        m_Dragging{false};
+        GizmoMode   m_DragMode{GizmoMode::Translate};
         GizmoAxis   m_DragAxis{GizmoAxis::None};
         glm::vec3   m_DragOrigin{0.f};   // gizmo pivot at drag start
         glm::vec3   m_DragAxisDir{1.f, 0.f, 0.f};

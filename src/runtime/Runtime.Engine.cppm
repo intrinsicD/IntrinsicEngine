@@ -5,6 +5,7 @@ module;
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 export module Extrinsic.Runtime.Engine;
 
@@ -14,6 +15,7 @@ import Extrinsic.Core.Dag.TaskGraph;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.FrameClock;
 import Extrinsic.Core.FrameGraph;
+import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.RHI.Device;
 import Extrinsic.Platform.Window;
 import Extrinsic.Graphics.CameraSnapshots;
@@ -23,6 +25,7 @@ import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
+import Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.Runtime.ImGuiAdapter;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
@@ -244,6 +247,15 @@ namespace Extrinsic::Runtime
         // extraction, consumes the readback after present, and mirrors the
         // controller snapshot into RenderWorld::Selection.
         [[nodiscard]] SelectionController&    GetSelectionController() noexcept;
+        // RUNTIME-084 Slice B — runtime/editor-owned transform-gizmo authority.
+        // Engine reads platform input and the active camera snapshot each frame,
+        // drives hit-test / drag tick / commit against selected ECS authoring
+        // transforms, and submits only render-safe TransformGizmoRenderPacket
+        // spans to graphics through RenderExtractionCache.
+        [[nodiscard]] GizmoInteraction&       GetGizmoInteraction() noexcept;
+        [[nodiscard]] const GizmoInteraction& GetGizmoInteraction() const noexcept;
+        [[nodiscard]] GizmoUndoStack&         GetGizmoUndoStack() noexcept;
+        [[nodiscard]] const GizmoUndoStack&   GetGizmoUndoStack() const noexcept;
         // RUNTIME-093 Slice B2 — editor-facing refined-primitive selection cache.
         // RunFrame refines each pick readback's encoded primitive hint against the
         // hit entity's authoritative `GeometrySources` (newest pick wins; a
@@ -357,6 +369,13 @@ namespace Extrinsic::Runtime
         // RUNTIME-089 Slice B — selection authority; persists across frames so
         // in-flight picks correlate with their later readbacks.
         SelectionController                   m_SelectionController{};
+        // RUNTIME-084 Slice B — runtime/editor transform-gizmo interaction and
+        // transient packet production. These are runtime-owned state; graphics
+        // receives copied TransformGizmoRenderPacket values only.
+        GizmoInteraction                      m_GizmoInteraction{};
+        GizmoUndoStack                        m_GizmoUndoStack{};
+        TransformGizmoRenderPacketBuilder     m_GizmoPacketBuilder{};
+        std::vector<ECS::EntityHandle>        m_GizmoSelectedEntities{};
         // RUNTIME-092 Slice B — runtime-owned StableId/render-id lookup sidecar.
         // Rebuilt each frame before readback consumption and attached to the
         // controller in Initialize() so selection resolves durable ids through

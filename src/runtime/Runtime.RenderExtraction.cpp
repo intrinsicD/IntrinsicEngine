@@ -1389,7 +1389,8 @@ namespace Extrinsic::Runtime
         Graphics::IRenderer& renderer,
         Graphics::GpuAssetCache* gpuAssets,
         const SelectionController* selection,
-        const std::uint32_t runtimeSnapshotStorageSlot)
+        const std::uint32_t runtimeSnapshotStorageSlot,
+        std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos)
     {
         RuntimeRenderExtractionStats stats{};
         auto& registry = scene.Raw();
@@ -1848,6 +1849,7 @@ namespace Extrinsic::Runtime
             .VisualizationIsolines          = m_VisualizationState->Batch.Isolines,
             .VisualizationHtexAtlases       = m_VisualizationState->Batch.HtexAtlases,
             .VisualizationFragmentBakeAtlases = m_VisualizationState->Batch.FragmentBakeAtlases,
+            .TransformGizmos                = transformGizmos,
             .SpatialDebugBounds             = m_SpatialDebugBatch.Bounds,
             .SpatialDebugHierarchyNodes     = m_SpatialDebugBatch.HierarchyNodes,
             .SpatialDebugSplitPlanes        = m_SpatialDebugBatch.SplitPlanes,

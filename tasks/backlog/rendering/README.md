@@ -232,7 +232,7 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   defined earlier without blocking.
 - [GRAPHICS-017Q — Camera/gizmo runtime clarification follow-ups](../../done/GRAPHICS-017Q-camera-gizmo-runtime-clarifications.md):
   retired docs-only clarification for runtime camera controller
-  ownership (concrete controllers under planned umbrella module
+  ownership (concrete controllers under
   `Extrinsic.Runtime.CameraControllers`, mirroring the
   `Extrinsic.Runtime.SpatialDebugAdapters`/`VisualizationAdapters`/
   `AssetBridges.Texture` patterns from `GRAPHICS-011Q`/`014Q`/`015Q`;
@@ -241,8 +241,8 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   `(viewport, pixel, request_kind)` key, single-shot `PickPixelRequest`
   span on `RenderFrameInput`, drained on the next `BeginFrame()`
   mirroring the `Picking.Readback` drain from `GRAPHICS-012Q`),
-  transform-gizmo hit testing (runtime/editor-owned under planned
-  umbrella `Extrinsic.Runtime.GizmoInteraction`, reading
+  transform-gizmo hit testing (runtime/editor-owned under
+  `Extrinsic.Runtime.GizmoInteraction`, reading
   `CameraViewSnapshot::ViewProjection`/`PickRay` plus platform pointer
   pixels; `TransformGizmoRenderPacket` carries only render-relevant
   fields), interaction state storage (runtime/editor-owned per-frame
@@ -727,7 +727,7 @@ Cross-layer Theme B′ leaves outside `rendering/`:
 - [`RUNTIME-081` — Camera controllers](../../done/RUNTIME-081-camera-controllers.md).
 - [`runtime/RUNTIME-082` — Spatial debug adapters](../../done/RUNTIME-082-spatial-debug-adapters.md) (done 2026-05-27).
 - [`runtime/RUNTIME-083` — Visualization adapters](../../done/RUNTIME-083-visualization-adapters.md).
-- [`runtime/RUNTIME-084` — Gizmo interaction](../runtime/RUNTIME-084-gizmo-interaction.md).
+- [`runtime/RUNTIME-084` — Gizmo interaction](../../done/RUNTIME-084-gizmo-interaction.md) (retired 2026-06-06 at `CPUContracted`).
 - [`runtime/RUNTIME-090` — Dear ImGui platform/renderer adapter](../../done/RUNTIME-090-imgui-platform-renderer-adapter.md) (retired 2026-06-02 at `CPUContracted`; Slice A standalone adapter module plus Slice B `Engine` frame-loop wiring landed).
 
 Cross-layer Theme A leaves retired for the full working sandbox path:

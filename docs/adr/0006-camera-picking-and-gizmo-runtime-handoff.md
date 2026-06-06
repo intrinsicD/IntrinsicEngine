@@ -26,7 +26,7 @@ The handoff question matters because three different domains touch this seam:
 
 ### 1. Runtime camera-controller ownership
 
-Concrete camera controllers (orbit, fly, free-look, top-down) live as runtime modules under the planned umbrella module name `Extrinsic.Runtime.CameraControllers`. The naming mirrors the runtime-adapter pattern already used by:
+Concrete camera controllers (orbit, fly, free-look, top-down) live as runtime modules under `Extrinsic.Runtime.CameraControllers`. The naming mirrors the runtime-adapter pattern already used by:
 
 - `Extrinsic.Runtime.SpatialDebugAdapters` (`GRAPHICS-011Q`).
 - `Extrinsic.Runtime.VisualizationAdapters` (`GRAPHICS-014Q`).
@@ -64,7 +64,7 @@ There is **no** graphics-side persistent pending-pick queue across frames and **
 
 ### 3. Transform-gizmo hit testing ownership
 
-Hit testing is runtime/editor-owned under the planned umbrella module name `Extrinsic.Runtime.GizmoInteraction`, mirroring the same adapter pattern as the camera-controller umbrella.
+Hit testing lives in the concrete runtime/editor-owned `Extrinsic.Runtime.GizmoInteraction` module, mirroring the same adapter pattern as the camera-controller umbrella.
 
 The hit-test path reads:
 
@@ -150,7 +150,7 @@ Trade-offs and risks:
 
 - Editor policy has two valid options for gizmo handle picking (direct CPU ray-vs-gizmo, or routed through `PickPixelRequest`). The ADR records the preference but does not force the choice, so two editors could legitimately implement different behaviors. This is intentional but means reviewers must check the editor's choice against latency expectations.
 - The runtime-coalescing rule for pick requests means a programmatic editor that fires picks faster than the input tick will silently drop earlier picks. This matches `GRAPHICS-014Q`'s "runtime validates at extraction" stance and is documented in `GRAPHICS-017Q`, but is worth re-stating here so consumers know graphics is not the deduplication seam.
-- Several runtime umbrella module names (`Extrinsic.Runtime.CameraControllers`, `Extrinsic.Runtime.GizmoInteraction`) are *planned* — no concrete module currently exists. Future code must use these names; if a different name lands first, this ADR must be amended (not silently superseded by code).
+- The runtime umbrella module names recorded by this ADR have since landed as `Extrinsic.Runtime.CameraControllers` and `Extrinsic.Runtime.GizmoInteraction`; future editor/runtime follow-ups must extend those modules or explicitly amend this ADR.
 
 Follow-up tasks required: none from this ADR. The matrix-tracked legacy promotion tasks are gated by `GRAPHICS-020` and do not become urgent because of this extraction.
 

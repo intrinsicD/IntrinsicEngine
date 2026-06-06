@@ -33,6 +33,7 @@ import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.MaterialSystem;
+import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.TransformSyncSystem;
 import Extrinsic.Graphics.LightSystem;
 import Extrinsic.Graphics.VisualizationSyncSystem;
@@ -340,7 +341,8 @@ export namespace Extrinsic::Runtime
             Graphics::IRenderer& renderer,
             Graphics::GpuAssetCache* gpuAssets = nullptr,
             const SelectionController* selection = nullptr,
-            std::uint32_t runtimeSnapshotStorageSlot = 0u);
+            std::uint32_t runtimeSnapshotStorageSlot = 0u,
+            std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos = {});
         void Shutdown(Graphics::IRenderer& renderer);
 
         // Maintenance-phase hook called by Engine::RunFrame after

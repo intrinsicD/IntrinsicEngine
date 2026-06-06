@@ -1,8 +1,9 @@
-// RUNTIME-084 Slice A — contract coverage for the runtime transform-gizmo
-// interaction module: screen-space handle hit testing, axis-constrained drag
-// application against ECS authoring transforms, snap rounding, undo emission,
-// and the frozen render-packet field set.
+// RUNTIME-084 — contract coverage for the runtime transform-gizmo interaction
+// module: screen-space handle hit testing, axis-constrained translate/rotate/
+// scale application against ECS authoring transforms, snap rounding, undo
+// emission, and the frozen render-packet field set.
 
+#include <cmath>
 #include <cstdint>
 
 #include <gtest/gtest.h>
@@ -147,6 +148,8 @@ TEST(GizmoInteraction, DragTickTranslatesAlongAxisAndCommitEmitsUndoRecord)
     EXPECT_EQ(undo.Back().Entity, entity);
     EXPECT_NEAR(undo.Back().BeforePosition.x, 0.f, 1.0e-4f);
     EXPECT_NEAR(undo.Back().AfterPosition.x, 3.f, 1.0e-4f);
+    EXPECT_NEAR(undo.Back().BeforeScale.x, 1.f, 1.0e-4f);
+    EXPECT_NEAR(undo.Back().AfterScale.x, 1.f, 1.0e-4f);
 }
 
 TEST(GizmoInteraction, DragCancelRestoresBeforeTransform)
@@ -169,13 +172,13 @@ TEST(GizmoInteraction, DragCancelRestoresBeforeTransform)
 
     gizmo.DragCancel(registry);
     EXPECT_FALSE(gizmo.IsDragging());
-    EXPECT_NEAR(registry.Raw().get<Tf::Component>(entity).Position.x, 1.f, 1.0e-4f);
+    const auto& restored = registry.Raw().get<Tf::Component>(entity);
+    EXPECT_NEAR(restored.Position.x, 1.f, 1.0e-4f);
+    EXPECT_NEAR(restored.Scale.x, 1.f, 1.0e-4f);
+    EXPECT_NEAR(restored.Rotation.w, 1.f, 1.0e-4f);
 }
 
-// Rotate/Scale modes do not translate: Slice A only applies translation, so
-// BeginDrag is rejected (and a mid-drag mode switch stops DragTick) rather than
-// moving the selected entity through the translate path.
-TEST(GizmoInteraction, NonTranslateModesRejectDragApplication)
+TEST(GizmoInteraction, DragTickRotatesAroundAxisAndCommitEmitsUndoRecord)
 {
     Registry registry{};
     const EntityHandle entity = MakeEntity(registry, glm::vec3{0.f});
@@ -188,23 +191,74 @@ TEST(GizmoInteraction, NonTranslateModesRejectDragApplication)
     const PickRay startRay{.Origin = {2.f, 0.f, 5.f}, .Direction = {0.f, 0.f, -1.f}};
     const PickRay currentRay{.Origin = {5.f, 0.f, 5.f}, .Direction = {0.f, 0.f, -1.f}};
 
-    for (const GizmoMode mode : {GizmoMode::Rotate, GizmoMode::Scale})
-    {
-        GizmoInteraction gizmo{};
-        gizmo.SetMode(mode);
-        EXPECT_FALSE(gizmo.BeginDrag(registry, hit, startRay, selected));
-        EXPECT_FALSE(gizmo.IsDragging());
-        EXPECT_FALSE(gizmo.DragTick(registry, currentRay));
-        EXPECT_NEAR(registry.Raw().get<Tf::Component>(entity).Position.x, 0.f, 1.0e-4f);
-    }
+    GizmoInteraction gizmo{};
+    gizmo.SetMode(GizmoMode::Rotate);
+    ASSERT_TRUE(gizmo.BeginDrag(registry, hit, startRay, selected));
+    ASSERT_TRUE(gizmo.DragTick(registry, currentRay));
 
-    // A drag started in Translate mode that is switched to Rotate mid-drag stops
-    // applying translation instead of continuing to move the entity.
+    const auto& transform = registry.Raw().get<Tf::Component>(entity);
+    EXPECT_NEAR(transform.Position.x, 0.f, 1.0e-4f);
+    EXPECT_NEAR(transform.Rotation.w, std::cos(1.5f), 1.0e-4f);
+    EXPECT_NEAR(transform.Rotation.x, std::sin(1.5f), 1.0e-4f);
+
+    GizmoUndoStack undo{};
+    EXPECT_EQ(gizmo.DragCommit(registry, undo), 1u);
+    ASSERT_EQ(undo.Size(), 1u);
+    EXPECT_NEAR(undo.Back().BeforeRotation.w, 1.f, 1.0e-4f);
+    EXPECT_NEAR(undo.Back().AfterRotation.w, std::cos(1.5f), 1.0e-4f);
+}
+
+TEST(GizmoInteraction, DragTickScalesAlongAxisAndCommitEmitsUndoRecord)
+{
+    Registry registry{};
+    const EntityHandle entity = MakeEntity(registry, glm::vec3{0.f});
+    const EntityHandle selected[] = {entity};
+
+    GizmoHitResult hit{};
+    hit.Hit = true;
+    hit.Axis = GizmoAxis::X;
+    hit.Entity = entity;
+    const PickRay startRay{.Origin = {2.f, 0.f, 5.f}, .Direction = {0.f, 0.f, -1.f}};
+    const PickRay currentRay{.Origin = {3.f, 0.f, 5.f}, .Direction = {0.f, 0.f, -1.f}};
+
+    GizmoInteraction gizmo{};
+    gizmo.SetMode(GizmoMode::Scale);
+    ASSERT_TRUE(gizmo.BeginDrag(registry, hit, startRay, selected));
+    ASSERT_TRUE(gizmo.DragTick(registry, currentRay));
+
+    const auto& transform = registry.Raw().get<Tf::Component>(entity);
+    EXPECT_NEAR(transform.Scale.x, 2.f, 1.0e-4f);
+    EXPECT_NEAR(transform.Scale.y, 1.f, 1.0e-4f);
+    EXPECT_NEAR(transform.Scale.z, 1.f, 1.0e-4f);
+
+    GizmoUndoStack undo{};
+    EXPECT_EQ(gizmo.DragCommit(registry, undo), 1u);
+    ASSERT_EQ(undo.Size(), 1u);
+    EXPECT_NEAR(undo.Back().BeforeScale.x, 1.f, 1.0e-4f);
+    EXPECT_NEAR(undo.Back().AfterScale.x, 2.f, 1.0e-4f);
+}
+
+TEST(GizmoInteraction, DragModeIsLatchedWhenToolbarModeChangesMidDrag)
+{
+    Registry registry{};
+    const EntityHandle entity = MakeEntity(registry, glm::vec3{0.f});
+    const EntityHandle selected[] = {entity};
+
+    GizmoHitResult hit{};
+    hit.Hit = true;
+    hit.Axis = GizmoAxis::X;
+    hit.Entity = entity;
+    const PickRay startRay{.Origin = {2.f, 0.f, 5.f}, .Direction = {0.f, 0.f, -1.f}};
+    const PickRay currentRay{.Origin = {5.f, 0.f, 5.f}, .Direction = {0.f, 0.f, -1.f}};
+
     GizmoInteraction gizmo{};
     ASSERT_TRUE(gizmo.BeginDrag(registry, hit, startRay, selected));
     gizmo.SetMode(GizmoMode::Rotate);
-    EXPECT_FALSE(gizmo.DragTick(registry, currentRay));
-    EXPECT_NEAR(registry.Raw().get<Tf::Component>(entity).Position.x, 0.f, 1.0e-4f);
+    ASSERT_TRUE(gizmo.DragTick(registry, currentRay));
+
+    const auto& transform = registry.Raw().get<Tf::Component>(entity);
+    EXPECT_NEAR(transform.Position.x, 3.f, 1.0e-4f);
+    EXPECT_NEAR(transform.Rotation.w, 1.f, 1.0e-4f);
 }
 
 // --- Snap rounding ---------------------------------------------------------

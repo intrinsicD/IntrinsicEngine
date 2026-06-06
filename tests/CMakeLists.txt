@@ -286,6 +286,7 @@ if(TARGET ExtrinsicRuntime)
         Test.MeshPrimitiveViewPacker.cpp
         Test.MeshPrimitiveViewExtraction.cpp
         Test.GizmoInteraction.cpp
+        Test.GizmoInteractionEngineWiring.cpp
         Test.GraphGeometryExtraction.cpp
         Test.GraphGeometryPacker.cpp
         Test.PointCloudGeometryExtraction.cpp

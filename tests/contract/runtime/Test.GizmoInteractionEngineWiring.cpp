@@ -1,0 +1,146 @@
+// RUNTIME-084 Slice B — runtime composition coverage for transform-gizmo
+// packet submission. Engine owns selection/input/gizmo state and graphics only
+// receives copied TransformGizmoRenderPacket values through runtime snapshots.
+
+#include <cstdint>
+#include <memory>
+#include <vector>
+
+#include <gtest/gtest.h>
+#include <glm/glm.hpp>
+
+import Extrinsic.Core.Config.Engine;
+import Extrinsic.ECS.Component.Transform;
+import Extrinsic.ECS.Scene.Handle;
+import Extrinsic.Graphics.RenderFrameInput;
+import Extrinsic.Graphics.RenderWorld;
+import Extrinsic.Platform.Window;
+import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.GizmoInteraction;
+import Extrinsic.Runtime.RenderExtraction;
+
+namespace
+{
+    namespace Tf = Extrinsic::ECS::Components::Transform;
+
+    using Extrinsic::ECS::EntityHandle;
+    using Extrinsic::Runtime::Engine;
+
+    [[nodiscard]] Extrinsic::Core::Config::EngineConfig HeadlessConfig()
+    {
+        Extrinsic::Core::Config::EngineConfig config{};
+        config.ReferenceScene.Enabled = false;
+        config.Camera.Enabled = false;
+        return config;
+    }
+
+    EntityHandle MakeTransformEntity(Engine& engine, const glm::vec3 position)
+    {
+        EntityHandle entity = engine.GetScene().Create();
+        engine.GetScene().Raw().emplace<Tf::Component>(entity, Tf::Component{
+            .Position = position,
+            .Scale = glm::vec3{1.f},
+        });
+        return entity;
+    }
+
+    class SelectGizmoEntityApplication final : public Extrinsic::Runtime::IApplication
+    {
+    public:
+        void OnInitialize(Engine& engine) override
+        {
+            Entity = MakeTransformEntity(engine, glm::vec3{2.f, 3.f, 4.f});
+        }
+
+        void OnSimTick(Engine& /*engine*/, double /*fixedDt*/) override {}
+
+        void OnVariableTick(Engine& engine, double /*alpha*/, double /*dt*/) override
+        {
+            ++VariableTicks;
+            SelectionApplied =
+                engine.GetSelectionController().SetSelectedEntity(engine.GetScene(), Entity);
+            engine.GetGizmoInteraction().SetMode(Extrinsic::Runtime::GizmoMode::Translate);
+            engine.RequestExit();
+        }
+
+        void OnShutdown(Engine& /*engine*/) override {}
+
+        EntityHandle Entity{Extrinsic::ECS::InvalidEntityHandle};
+        bool         SelectionApplied{false};
+        std::uint32_t VariableTicks{0u};
+    };
+}
+
+TEST(GizmoInteractionEngineWiring, ExtractionSubmitsTransformGizmoPackets)
+{
+    Engine engine(HeadlessConfig(), std::make_unique<SelectGizmoEntityApplication>());
+    engine.Initialize();
+
+    const EntityHandle entity = MakeTransformEntity(engine, glm::vec3{2.f, 3.f, 4.f});
+    ASSERT_TRUE(engine.GetSelectionController().SetSelectedEntity(engine.GetScene(), entity));
+
+    std::vector<EntityHandle> selected{entity};
+    Extrinsic::Runtime::TransformGizmoRenderPacketBuilder builder{};
+    const auto packets = builder.Build(engine.GetScene(),
+                                       selected,
+                                       Extrinsic::Runtime::GizmoMode::Translate,
+                                       Extrinsic::Runtime::GizmoOrientation::Global,
+                                       1.25f);
+    ASSERT_EQ(packets.size(), 1u);
+
+    Extrinsic::Runtime::RenderExtractionCache extraction{};
+    (void)extraction.ExtractAndSubmit(engine.GetScene(),
+                                      engine.GetRenderer(),
+                                      &engine.GetGpuAssetCache(),
+                                      &engine.GetSelectionController(),
+                                      0u,
+                                      packets);
+
+    Extrinsic::Graphics::RenderFrameInput input{};
+    input.Viewport = engine.GetWindow().GetFramebufferExtent();
+    const Extrinsic::Graphics::RenderWorld world =
+        engine.GetRenderer().ExtractRenderWorld(input, 0u);
+
+    EXPECT_TRUE(world.Gizmos.HasGizmos);
+    ASSERT_EQ(world.Gizmos.TransformGizmoCount, 1u);
+    EXPECT_EQ(world.Gizmos.TransformGizmos[0].StableId,
+              static_cast<std::uint32_t>(entity));
+    EXPECT_NEAR(world.Gizmos.TransformGizmos[0].AxisLength, 1.25f, 1.0e-4f);
+    EXPECT_NEAR(world.Gizmos.TransformGizmos[0].Transform[3].x, 2.f, 1.0e-4f);
+    EXPECT_NEAR(world.Gizmos.TransformGizmos[0].Transform[3].y, 3.f, 1.0e-4f);
+    EXPECT_NEAR(world.Gizmos.TransformGizmos[0].Transform[3].z, 4.f, 1.0e-4f);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
+TEST(GizmoInteractionEngineWiring, RunFramePublishesSelectedEntityGizmoPacket)
+{
+    auto app = std::make_unique<SelectGizmoEntityApplication>();
+    SelectGizmoEntityApplication* appRaw = app.get();
+    Engine engine(HeadlessConfig(), std::move(app));
+    engine.Initialize();
+
+    if (engine.GetWindow().ShouldClose())
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "window backend unavailable; per-frame gizmo wiring requires a display";
+    }
+
+    engine.Run();
+    ASSERT_EQ(appRaw->VariableTicks, 1u);
+    ASSERT_NE(appRaw->Entity, Extrinsic::ECS::InvalidEntityHandle);
+    ASSERT_TRUE(appRaw->SelectionApplied);
+
+    Extrinsic::Graphics::RenderFrameInput input{};
+    input.Viewport = engine.GetWindow().GetFramebufferExtent();
+    const Extrinsic::Graphics::RenderWorld world =
+        engine.GetRenderer().ExtractRenderWorld(input, 0u);
+
+    EXPECT_TRUE(world.Gizmos.HasGizmos);
+    ASSERT_EQ(world.Gizmos.TransformGizmoCount, 1u);
+    EXPECT_EQ(world.Gizmos.TransformGizmos[0].StableId,
+              static_cast<std::uint32_t>(appRaw->Entity));
+
+    engine.Shutdown();
+}

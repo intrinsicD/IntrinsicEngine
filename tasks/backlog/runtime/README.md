@@ -53,9 +53,12 @@ done-task `Q` follow-ups. Each unblocks one or more rendering pass families.
   (done 2026-06-02, `CPUContracted`):
   PropertySet / KMeans / Isoline / VectorField / HtexMetadata adapters producing
   visualization packet spans (clarified by GRAPHICS-014Q).
-- [RUNTIME-084 — `Extrinsic.Runtime.GizmoInteraction`](RUNTIME-084-gizmo-interaction.md):
-  transform-gizmo hit testing, interaction state, drag application, undo
-  emission (clarified by GRAPHICS-017Q).
+- [RUNTIME-084 — `Extrinsic.Runtime.GizmoInteraction`](../../done/RUNTIME-084-gizmo-interaction.md)
+  (done 2026-06-06, `CPUContracted`): transform-gizmo hit testing,
+  translate/rotate/scale drag application, undo emission, Engine
+  input/camera/selection wiring, and
+  `RuntimeRenderSnapshotBatch::TransformGizmos` submission (clarified by
+  GRAPHICS-017Q).
 - [RUNTIME-090 — `Extrinsic.Runtime.ImGuiAdapter`](../../done/RUNTIME-090-imgui-platform-renderer-adapter.md)
   (done, 2026-06-02, `CPUContracted`): Dear ImGui platform/renderer adapter
   producing `ImGuiOverlayFrame` records for `ImGuiOverlaySystem::SubmitFrame`

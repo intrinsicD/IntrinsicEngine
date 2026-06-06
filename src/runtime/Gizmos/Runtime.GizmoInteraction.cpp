@@ -1,5 +1,6 @@
 module;
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <span>
@@ -94,6 +95,53 @@ namespace Extrinsic::Runtime
                 return false;
             outPosition = transform->Position;
             return true;
+        }
+
+        [[nodiscard]] bool ReadTransform(const Extrinsic::ECS::Scene::Registry& registry,
+                                         const Extrinsic::ECS::EntityHandle entity,
+                                         glm::vec3& outPosition,
+                                         glm::quat& outRotation,
+                                         glm::vec3& outScale) noexcept
+        {
+            if (!registry.IsValid(entity))
+                return false;
+            const auto* transform =
+                registry.Raw().try_get<Extrinsic::ECS::Components::Transform::Component>(entity);
+            if (transform == nullptr)
+                return false;
+            outPosition = transform->Position;
+            outRotation = transform->Rotation;
+            outScale = transform->Scale;
+            return true;
+        }
+
+        [[nodiscard]] glm::quat NormalizeOrIdentity(const glm::quat value) noexcept
+        {
+            const float lenSquared = glm::dot(value, value);
+            if (!(std::isfinite(lenSquared) && lenSquared > kEpsilon))
+                return glm::quat{1.f, 0.f, 0.f, 0.f};
+
+            const float invLen = 1.0f / std::sqrt(lenSquared);
+            return glm::quat{
+                value.w * invLen,
+                value.x * invLen,
+                value.y * invLen,
+                value.z * invLen,
+            };
+        }
+
+        [[nodiscard]] bool MeaningfullyDifferent(const glm::vec3 beforePosition,
+                                                 const glm::quat beforeRotation,
+                                                 const glm::vec3 beforeScale,
+                                                 const glm::vec3 afterPosition,
+                                                 const glm::quat afterRotation,
+                                                 const glm::vec3 afterScale) noexcept
+        {
+            const float rotationDelta = std::abs(glm::dot(NormalizeOrIdentity(beforeRotation),
+                                                          NormalizeOrIdentity(afterRotation)));
+            return glm::length(afterPosition - beforePosition) > kEpsilon ||
+                   glm::length(afterScale - beforeScale) > kEpsilon ||
+                   rotationDelta < 1.0f - kEpsilon;
         }
     }
 
@@ -231,13 +279,6 @@ namespace Extrinsic::Runtime
         if (!hit.Hit || hit.Axis == GizmoAxis::None || selected.empty())
             return false;
 
-        // Slice A only applies translation. Reject drags in Rotate/Scale mode so
-        // a caller that has switched modes does not move selected entities
-        // through the translate path; rotate/scale drag application is owned by
-        // the Slice B follow-up.
-        if (m_Mode != GizmoMode::Translate)
-            return false;
-
         const float dirLen = glm::length(ray.Direction);
         if (!(std::isfinite(dirLen) && dirLen > kEpsilon) || !IsFinite(ray.Origin))
             return false;
@@ -256,13 +297,23 @@ namespace Extrinsic::Runtime
         for (const EntityHandle entity : selected)
         {
             glm::vec3 position{0.f};
-            if (ReadPosition(registry, entity, position))
-                m_DragEntries.push_back(DragEntry{.Entity = entity, .BeforePosition = position});
+            glm::quat rotation{1.f, 0.f, 0.f, 0.f};
+            glm::vec3 scale{1.f};
+            if (ReadTransform(registry, entity, position, rotation, scale))
+            {
+                m_DragEntries.push_back(DragEntry{
+                    .Entity = entity,
+                    .BeforePosition = position,
+                    .BeforeRotation = rotation,
+                    .BeforeScale = scale,
+                });
+            }
         }
         if (m_DragEntries.empty())
             return false;
 
         m_Dragging = true;
+        m_DragMode = m_Mode;
         m_DragAxis = hit.Axis;
         m_DragOrigin = pivot;
         m_DragAxisDir = axisDir;
@@ -277,12 +328,6 @@ namespace Extrinsic::Runtime
         if (!m_Dragging)
             return false;
 
-        // Translation is the only drag application in Slice A. If the mode was
-        // switched to Rotate/Scale mid-drag, do nothing rather than translate
-        // through the unfinished path.
-        if (m_Mode != GizmoMode::Translate)
-            return false;
-
         const float dirLen = glm::length(ray.Direction);
         if (!(std::isfinite(dirLen) && dirLen > kEpsilon) || !IsFinite(ray.Origin))
             return false;
@@ -292,10 +337,30 @@ namespace Extrinsic::Runtime
         if (!ClosestAxisParam(ray.Origin, rayDir, m_DragOrigin, m_DragAxisDir, currentParam))
             return false;
 
-        float deltaScalar = currentParam - m_DragStartParam;
-        if (HasModifier(m_ModifierMask, GizmoModifier::Snap) && m_Config.TranslateSnapStep > kEpsilon)
+        const float rawDeltaScalar = currentParam - m_DragStartParam;
+        float deltaScalar = rawDeltaScalar;
+        const bool snap = HasModifier(m_ModifierMask, GizmoModifier::Snap);
+        if (snap && m_DragMode == GizmoMode::Translate && m_Config.TranslateSnapStep > kEpsilon)
         {
             deltaScalar = std::round(deltaScalar / m_Config.TranslateSnapStep) * m_Config.TranslateSnapStep;
+            ++m_Diagnostics.SnappedTicks;
+        }
+        else if (snap && m_DragMode == GizmoMode::Rotate && m_Config.RotateSnapStepRadians > kEpsilon)
+        {
+            float radians = rawDeltaScalar * m_Config.RotateRadiansPerWorldUnit;
+            radians = std::round(radians / m_Config.RotateSnapStepRadians) * m_Config.RotateSnapStepRadians;
+            deltaScalar = m_Config.RotateRadiansPerWorldUnit > kEpsilon
+                ? radians / m_Config.RotateRadiansPerWorldUnit
+                : rawDeltaScalar;
+            ++m_Diagnostics.SnappedTicks;
+        }
+        else if (snap && m_DragMode == GizmoMode::Scale && m_Config.ScaleSnapStep > kEpsilon)
+        {
+            float factor = 1.0f + rawDeltaScalar * m_Config.ScaleFactorPerWorldUnit;
+            factor = std::round(factor / m_Config.ScaleSnapStep) * m_Config.ScaleSnapStep;
+            deltaScalar = m_Config.ScaleFactorPerWorldUnit > kEpsilon
+                ? (factor - 1.0f) / m_Config.ScaleFactorPerWorldUnit
+                : rawDeltaScalar;
             ++m_Diagnostics.SnappedTicks;
         }
 
@@ -308,7 +373,35 @@ namespace Extrinsic::Runtime
                 registry.Raw().try_get<Extrinsic::ECS::Components::Transform::Component>(entry.Entity);
             if (transform == nullptr)
                 continue;
-            transform->Position = entry.BeforePosition + worldDelta;
+            switch (m_DragMode)
+            {
+            case GizmoMode::Translate:
+                transform->Position = entry.BeforePosition + worldDelta;
+                break;
+            case GizmoMode::Rotate:
+            {
+                const float radians = deltaScalar * m_Config.RotateRadiansPerWorldUnit;
+                transform->Rotation = glm::normalize(glm::angleAxis(radians, m_DragAxisDir) *
+                                                       entry.BeforeRotation);
+                break;
+            }
+            case GizmoMode::Scale:
+            {
+                const float minScale = m_Config.MinScale > kEpsilon ? m_Config.MinScale : kEpsilon;
+                const float factor = std::max(minScale,
+                                              1.0f + deltaScalar * m_Config.ScaleFactorPerWorldUnit);
+                glm::vec3 scale = entry.BeforeScale;
+                switch (m_DragAxis)
+                {
+                case GizmoAxis::X: scale.x = std::max(minScale, entry.BeforeScale.x * factor); break;
+                case GizmoAxis::Y: scale.y = std::max(minScale, entry.BeforeScale.y * factor); break;
+                case GizmoAxis::Z: scale.z = std::max(minScale, entry.BeforeScale.z * factor); break;
+                case GizmoAxis::None: break;
+                }
+                transform->Scale = scale;
+                break;
+            }
+            }
             registry.Raw().emplace_or_replace<Extrinsic::ECS::Components::Transform::IsDirtyTag>(entry.Entity);
         }
 
@@ -325,20 +418,31 @@ namespace Extrinsic::Runtime
         for (const DragEntry& entry : m_DragEntries)
         {
             glm::vec3 after{0.f};
-            if (!ReadPosition(registry, entry.Entity, after))
+            glm::quat afterRotation{1.f, 0.f, 0.f, 0.f};
+            glm::vec3 afterScale{1.f};
+            if (!ReadTransform(registry, entry.Entity, after, afterRotation, afterScale))
                 continue;
-            // Skip records that did not actually move (no-op drag).
-            if (glm::length(after - entry.BeforePosition) <= kEpsilon)
+            if (!MeaningfullyDifferent(entry.BeforePosition,
+                                       entry.BeforeRotation,
+                                       entry.BeforeScale,
+                                       after,
+                                       afterRotation,
+                                       afterScale))
                 continue;
             undo.Push(GizmoTransformEdit{
                 .Entity = entry.Entity,
                 .BeforePosition = entry.BeforePosition,
                 .AfterPosition = after,
+                .BeforeRotation = entry.BeforeRotation,
+                .AfterRotation = afterRotation,
+                .BeforeScale = entry.BeforeScale,
+                .AfterScale = afterScale,
             });
             ++emitted;
         }
 
         m_Dragging = false;
+        m_DragMode = GizmoMode::Translate;
         m_DragAxis = GizmoAxis::None;
         m_DragEntries.clear();
         ++m_Diagnostics.DragsCommitted;
@@ -359,9 +463,12 @@ namespace Extrinsic::Runtime
             if (transform == nullptr)
                 continue;
             transform->Position = entry.BeforePosition;
+            transform->Rotation = entry.BeforeRotation;
+            transform->Scale = entry.BeforeScale;
             registry.Raw().emplace_or_replace<Extrinsic::ECS::Components::Transform::IsDirtyTag>(entry.Entity);
         }
         m_Dragging = false;
+        m_DragMode = GizmoMode::Translate;
         m_DragAxis = GizmoAxis::None;
         m_DragEntries.clear();
         ++m_Diagnostics.DragsCancelled;

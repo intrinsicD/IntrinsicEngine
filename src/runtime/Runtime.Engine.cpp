@@ -1,6 +1,8 @@
 module;
 
 #include <array>
+#include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -12,6 +14,8 @@ module;
 #include <string_view>
 #include <utility>
 #include <vector>
+
+#include <glm/glm.hpp>
 
 module Extrinsic.Runtime.Engine;
 
@@ -25,6 +29,7 @@ import Extrinsic.Core.Dag.TaskGraph;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.FrameClock;
 import Extrinsic.Core.FrameGraph;
+import Extrinsic.Core.Geometry2D;
 import Extrinsic.Core.Logging;
 import Extrinsic.Core.IOBackend;
 import Extrinsic.Core.Tasks;
@@ -45,6 +50,7 @@ import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.AssetModelTextureIO;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.Runtime.ImGuiAdapter;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Core.FrameLoop;
@@ -61,12 +67,14 @@ import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.Service;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Platform.Input;
 
 namespace Extrinsic::Runtime
 {
     namespace
     {
         constexpr double kIdleSleepSeconds = 0.016; // ~60 Hz event wake
+        constexpr int kGizmoMouseButton = 0;
 
         // RUNTIME-070: runtime-baked fallback texture bytes for GpuAssetCache.
         // A 4×4 RGBA8_UNORM magenta-and-black checkerboard repeated from a 2×2
@@ -168,6 +176,101 @@ namespace Extrinsic::Runtime
             return error == Core::ErrorCode::Success
                 ? Core::ErrorCode::Unknown
                 : error;
+        }
+
+        [[nodiscard]] std::uint32_t ClampCursorPixel(const float value,
+                                                     const std::uint32_t extent) noexcept
+        {
+            if (extent == 0u || !std::isfinite(value))
+                return 0u;
+            const float clamped = std::clamp(value, 0.0f, static_cast<float>(extent - 1u));
+            return static_cast<std::uint32_t>(clamped);
+        }
+
+        [[nodiscard]] std::uint32_t BuildGizmoModifierMask(
+            const Platform::Input::Context& input) noexcept
+        {
+            std::uint32_t mask = 0u;
+            if (input.IsKeyPressed(Platform::Input::Key::LeftShift))
+                mask |= static_cast<std::uint32_t>(GizmoModifier::Snap);
+            return mask;
+        }
+
+        void RebuildSelectedGizmoEntities(
+            const SelectionController& selection,
+            ECS::Scene::Registry& scene,
+            std::vector<ECS::EntityHandle>& outSelected)
+        {
+            outSelected.clear();
+            for (const std::uint32_t stableId : selection.SelectedStableIds())
+            {
+                const ECS::EntityHandle entity =
+                    SelectionController::ToEntityHandle(stableId);
+                if (scene.IsValid(entity))
+                    outSelected.push_back(entity);
+            }
+        }
+
+        void DriveGizmoInteractionForFrame(
+            GizmoInteraction& gizmo,
+            GizmoUndoStack& undo,
+            ECS::Scene::Registry& scene,
+            const Platform::Input::Context& input,
+            const Graphics::CameraViewInput& cameraInput,
+            const Core::Extent2D viewport,
+            std::span<const ECS::EntityHandle> selected)
+        {
+            gizmo.SetModifierMask(BuildGizmoModifierMask(input));
+            if (Core::IsEmpty(viewport))
+            {
+                if (gizmo.IsDragging())
+                    gizmo.DragCancel(scene);
+                return;
+            }
+
+            const Platform::Input::Context::XY cursor = input.GetMousePosition();
+            const std::uint32_t pixelX = ClampCursorPixel(cursor.x, viewport.Width);
+            const std::uint32_t pixelY = ClampCursorPixel(cursor.y, viewport.Height);
+            const Graphics::CameraViewSnapshot camera =
+                Graphics::BuildCameraViewSnapshot(
+                    cameraInput,
+                    viewport,
+                    Graphics::PickPixelRequest{
+                        .X = pixelX,
+                        .Y = pixelY,
+                        .Pending = true,
+                    });
+            if (!camera.Valid || !camera.HasPickRay)
+            {
+                if (!input.IsMouseButtonPressed(kGizmoMouseButton) && gizmo.IsDragging())
+                    (void)gizmo.DragCommit(scene, undo);
+                return;
+            }
+
+            const PickRay ray{
+                .Origin = camera.PickRayOrigin,
+                .Direction = camera.PickRayDirection,
+            };
+
+            if (input.IsMouseButtonJustPressed(kGizmoMouseButton))
+            {
+                const GizmoHitResult hit = gizmo.HitTest(
+                    scene,
+                    camera,
+                    glm::vec2{cursor.x, cursor.y},
+                    viewport,
+                    selected);
+                if (hit.Hit)
+                    (void)gizmo.BeginDrag(scene, hit, ray, selected);
+            }
+            else if (input.IsMouseButtonPressed(kGizmoMouseButton) && gizmo.IsDragging())
+            {
+                (void)gizmo.DragTick(scene, ray);
+            }
+            else if (!input.IsMouseButtonPressed(kGizmoMouseButton) && gizmo.IsDragging())
+            {
+                (void)gizmo.DragCommit(scene, undo);
+            }
         }
 
         // Converts frame-recorded streaming passes into persistent executor tasks.
@@ -806,6 +909,22 @@ namespace Extrinsic::Runtime
             }
         }
 
+        RebuildSelectedGizmoEntities(m_SelectionController, *m_Scene, m_GizmoSelectedEntities);
+        const Platform::IWindow& inputWindow = *m_Window;
+        DriveGizmoInteractionForFrame(m_GizmoInteraction,
+                                      m_GizmoUndoStack,
+                                      *m_Scene,
+                                      inputWindow.GetInput(),
+                                      renderInput.Camera,
+                                      viewport,
+                                      m_GizmoSelectedEntities);
+        const std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos =
+            m_GizmoPacketBuilder.Build(*m_Scene,
+                                       m_GizmoSelectedEntities,
+                                       m_GizmoInteraction.Mode(),
+                                       m_GizmoInteraction.Orientation(),
+                                       m_GizmoInteraction.Config().AxisLength);
+
         // ── RUNTIME-089 Slice B: drain the coalesced selection pick ───────
         // Input ports / editor tools submit hover/click picks onto the
         // controller (GetSelectionController()); here we drain the single
@@ -859,6 +978,7 @@ namespace Extrinsic::Runtime
             std::uint32_t& OutFrontSlot;
             RHI::FrameHandle& Frame;
             const Graphics::RenderFrameInput& Input;
+            std::span<const Graphics::TransformGizmoRenderPacket> TransformGizmos;
             Graphics::RenderWorld& World;
 
             RenderFrameHooks(Graphics::IRenderer& renderer,
@@ -873,6 +993,7 @@ namespace Extrinsic::Runtime
                              std::uint32_t& outFrontSlot,
                              RHI::FrameHandle& frame,
                              const Graphics::RenderFrameInput& input,
+                             std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos,
                              Graphics::RenderWorld& world)
                 : Renderer(renderer)
                 , Scene(scene)
@@ -886,6 +1007,7 @@ namespace Extrinsic::Runtime
                 , OutFrontSlot(outFrontSlot)
                 , Frame(frame)
                 , Input(input)
+                , TransformGizmos(transformGizmos)
                 , World(world)
             {
             }
@@ -915,7 +1037,8 @@ namespace Extrinsic::Runtime
                                                          Renderer,
                                                          GpuAssetCache,
                                                          &Selection,
-                                                         submitSlot);
+                                                         submitSlot,
+                                                         TransformGizmos);
                     Pool.PublishFront(backSlot);
                 }
                 else
@@ -956,6 +1079,7 @@ namespace Extrinsic::Runtime
                                      pooledFrontSlot,
                                      frame,
                                      renderInput,
+                                     transformGizmos,
                                      renderWorld);
 
         const Core::RenderFrameResult renderResult = Core::ExecuteRenderFrameContract(renderHooks);
@@ -1148,6 +1272,10 @@ namespace Extrinsic::Runtime
     Assets::AssetService& Engine::GetAssetService()  noexcept { return *m_AssetService;  }
     Graphics::GpuAssetCache& Engine::GetGpuAssetCache() noexcept { return *m_GpuAssetCache; }
     ECS::Scene::Registry& Engine::GetScene()         noexcept { return *m_Scene;         }
+    GizmoInteraction& Engine::GetGizmoInteraction() noexcept { return m_GizmoInteraction; }
+    const GizmoInteraction& Engine::GetGizmoInteraction() const noexcept { return m_GizmoInteraction; }
+    GizmoUndoStack& Engine::GetGizmoUndoStack() noexcept { return m_GizmoUndoStack; }
+    const GizmoUndoStack& Engine::GetGizmoUndoStack() const noexcept { return m_GizmoUndoStack; }
 
     const RenderWorldPool& Engine::GetRenderWorldPool() const noexcept { return *m_RenderWorldPool; }
     const RuntimeRenderExtractionStats& Engine::GetLastRenderExtractionStats() const noexcept
