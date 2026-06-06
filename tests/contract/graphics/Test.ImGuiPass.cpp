@@ -160,13 +160,13 @@ namespace
         return frame;
     }
 
-    [[nodiscard]] std::size_t CountTextureUploadsFor(const Tests::MockDevice& device,
-                                                     const RHI::TextureHandle texture)
+    [[nodiscard]] std::size_t CountTextureWritesFor(const Tests::MockDevice& device,
+                                                    const RHI::TextureHandle texture)
     {
         std::size_t count = 0u;
-        for (const auto& upload : device.TransferQueue.TextureUploads)
+        for (const auto& write : device.TextureWrites)
         {
-            if (upload.Texture == texture)
+            if (write.Handle == texture)
             {
                 ++count;
             }
@@ -174,16 +174,16 @@ namespace
         return count;
     }
 
-    [[nodiscard]] std::vector<std::byte> LastTextureUploadBytesFor(
+    [[nodiscard]] std::vector<std::byte> LastTextureWriteBytesFor(
         const Tests::MockDevice& device,
         const RHI::TextureHandle texture)
     {
         std::vector<std::byte> bytes{};
-        for (const auto& upload : device.TransferQueue.TextureUploads)
+        for (const auto& write : device.TextureWrites)
         {
-            if (upload.Texture == texture)
+            if (write.Handle == texture)
             {
-                bytes = upload.Data;
+                bytes = write.Data;
             }
         }
         return bytes;
@@ -364,9 +364,17 @@ TEST(ImGuiPassContract, FontAtlasUploadSurvivesOperationalRebuildByteIdentical)
     EXPECT_NE(before.FontAtlasBindlessIndex, RHI::kInvalidBindlessIndex);
     EXPECT_EQ(before.FontAtlasUploadCount, 1u);
     EXPECT_EQ(before.FontAtlasAllocationCount, 1u);
-    EXPECT_EQ(CountTextureUploadsFor(device, before.FontAtlasTexture), 1u);
+    EXPECT_EQ(CountTextureWritesFor(device, before.FontAtlasTexture), 1u);
+    ASSERT_FALSE(device.Bindless.AllocatedSamplers.empty());
+    const RHI::SamplerHandle allocatedSampler = device.Bindless.AllocatedSamplers.back();
+    EXPECT_NE(std::find(device.CreatedSamplerHandles.begin(),
+                        device.CreatedSamplerHandles.end(),
+                        allocatedSampler),
+              device.CreatedSamplerHandles.end())
+        << "Font atlas bindless allocation must receive a device-created sampler handle, "
+           "not a SamplerManager-local pool handle.";
     const std::vector<std::byte> firstUpload =
-        LastTextureUploadBytesFor(device, before.FontAtlasTexture);
+        LastTextureWriteBytesFor(device, before.FontAtlasTexture);
     EXPECT_EQ(firstUpload, frame.FontAtlas.Pixels);
 
     ASSERT_TRUE(renderer->RebuildOperationalResources(device));
@@ -377,8 +385,8 @@ TEST(ImGuiPassContract, FontAtlasUploadSurvivesOperationalRebuildByteIdentical)
     EXPECT_EQ(after.FontAtlasBindlessIndex, before.FontAtlasBindlessIndex);
     EXPECT_EQ(after.FontAtlasUploadCount, 1u);
     EXPECT_EQ(after.FontAtlasAllocationCount, 1u);
-    EXPECT_EQ(CountTextureUploadsFor(device, before.FontAtlasTexture), 1u);
-    EXPECT_EQ(LastTextureUploadBytesFor(device, before.FontAtlasTexture), firstUpload);
+    EXPECT_EQ(CountTextureWritesFor(device, before.FontAtlasTexture), 1u);
+    EXPECT_EQ(LastTextureWriteBytesFor(device, before.FontAtlasTexture), firstUpload);
 
     renderer->Shutdown();
 }
@@ -427,8 +435,8 @@ TEST(ImGuiPassContract, FontAtlasAllocatesAfterColdStartOperationalRebuild)
     EXPECT_NE(promoted.FontAtlasBindlessIndex, RHI::kInvalidBindlessIndex);
     EXPECT_EQ(promoted.FontAtlasAllocationCount, 1u);
     EXPECT_EQ(promoted.FontAtlasUploadCount, 1u);
-    EXPECT_EQ(CountTextureUploadsFor(device, promoted.FontAtlasTexture), 1u);
-    EXPECT_EQ(LastTextureUploadBytesFor(device, promoted.FontAtlasTexture),
+    EXPECT_EQ(CountTextureWritesFor(device, promoted.FontAtlasTexture), 1u);
+    EXPECT_EQ(LastTextureWriteBytesFor(device, promoted.FontAtlasTexture),
               frame.FontAtlas.Pixels);
 
     renderer->Shutdown();

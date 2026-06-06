@@ -4,16 +4,15 @@ module;
 #include <cassert>
 #include <cstdint>
 #include <cstring>
-#include <deque>
 #include <memory>
 #include <mutex>
 #include <unordered_map>
-#include <vector>
 
 module Extrinsic.RHI.SamplerManager;
 
 import Extrinsic.Core.Error;
 import Extrinsic.Core.HandleLease;
+import Extrinsic.Core.StrongHandle;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
@@ -21,15 +20,18 @@ import Extrinsic.RHI.Device;
 // ============================================================
 // SamplerManager — implementation
 // ============================================================
-// The dedup table maps a 64-bit FNV-1a hash of SamplerDesc's
-// fields to a pool index.  On collision the matching desc is
-// verified byte-for-byte before reuse (the assert fires on a
-// true hash collision, which is an engine structural bug).
+// The dedup table maps a 64-bit FNV-1a hash of SamplerDesc's fields to the
+// IDevice-issued sampler handle. The lease published to callers is that same
+// device handle, so downstream APIs such as TextureManager::Create can pass it
+// through to backend bindless resolvers without a manager-local translation
+// step. On collision the matching desc is verified byte-for-byte before reuse
+// (the assert fires on a true hash collision, which is an engine structural
+// bug).
 //
 // Complexity:
 //   GetOrCreate — O(1) average (hash lookup + optional create)
-//   Retain       — O(1) lock-free
-//   Release      — O(1) lock-free; O(1) locked on zero
+//   Retain       — O(1) average (handle lookup + refcount increment)
+//   Release      — O(1) average (handle lookup + optional device destroy)
 //   GetDesc      — O(1) lock-free
 // ============================================================
 
@@ -98,12 +100,12 @@ namespace Extrinsic::RHI
         SamplerDesc               Desc{};
         SamplerHandle             DeviceHandle{};
         std::atomic<std::uint32_t> RefCount{0};
-        std::uint32_t              Generation = 0;
-        bool                       Live       = false;
 
         SamplerSlot() = default;
         SamplerSlot(const SamplerSlot&)            = delete;
         SamplerSlot& operator=(const SamplerSlot&) = delete;
+        SamplerSlot(SamplerSlot&&)                 = delete;
+        SamplerSlot& operator=(SamplerSlot&&)      = delete;
     };
 
     // -----------------------------------------------------------------
@@ -113,10 +115,10 @@ namespace Extrinsic::RHI
     {
         IDevice&                        Device;
         std::mutex                      Mutex;
-        std::deque<SamplerSlot>         Slots;
-        std::vector<std::uint32_t>      FreeList;
-        // desc hash → pool index (only live entries)
-        std::unordered_map<std::uint64_t, std::uint32_t> DedupTable;
+        std::unordered_map<SamplerHandle, SamplerSlot,
+                           Core::StrongHandleHash<SamplerTag>> Slots;
+        // desc hash -> device sampler handle (only live entries)
+        std::unordered_map<std::uint64_t, SamplerHandle> DedupTable;
 
         // Outstanding SamplerLease instances. See BufferManager.cpp for the
         // F2 rationale.
@@ -127,19 +129,15 @@ namespace Extrinsic::RHI
         [[nodiscard]] SamplerSlot* Resolve(SamplerHandle handle) noexcept
         {
             if (!handle.IsValid()) return nullptr;
-            if (handle.Index >= static_cast<std::uint32_t>(Slots.size())) return nullptr;
-            SamplerSlot& slot = Slots[handle.Index];
-            if (!slot.Live || slot.Generation != handle.Generation) return nullptr;
-            return &slot;
+            const auto it = Slots.find(handle);
+            return it == Slots.end() ? nullptr : &it->second;
         }
 
         [[nodiscard]] const SamplerSlot* Resolve(SamplerHandle handle) const noexcept
         {
             if (!handle.IsValid()) return nullptr;
-            if (handle.Index >= static_cast<std::uint32_t>(Slots.size())) return nullptr;
-            const SamplerSlot& slot = Slots[handle.Index];
-            if (!slot.Live || slot.Generation != handle.Generation) return nullptr;
-            return &slot;
+            const auto it = Slots.find(handle);
+            return it == Slots.end() ? nullptr : &it->second;
         }
     };
 
@@ -176,17 +174,21 @@ namespace Extrinsic::RHI
         // --- dedup lookup ---
         if (auto it = m_Impl->DedupTable.find(hash); it != m_Impl->DedupTable.end())
         {
-            const std::uint32_t idx  = it->second;
-            SamplerSlot&        slot = m_Impl->Slots[idx];
+            SamplerSlot* slot = m_Impl->Resolve(it->second);
+            assert(slot && "SamplerManager dedup table referenced a stale sampler handle");
+            if (!slot)
+            {
+                m_Impl->DedupTable.erase(it);
+                return Core::Err<SamplerLease>(Core::ErrorCode::InvalidState);
+            }
 
-            assert(SamplerDescsEqual(slot.Desc, desc) &&
+            assert(SamplerDescsEqual(slot->Desc, desc) &&
                    "SamplerDesc hash collision — two distinct descs mapped to the same hash");
 
-            slot.RefCount.fetch_add(1, std::memory_order_relaxed);
+            slot->RefCount.fetch_add(1, std::memory_order_relaxed);
             m_Impl->LiveLeaseCount.fetch_add(1, std::memory_order_relaxed);
-            SamplerHandle poolHandle{idx, slot.Generation};
             // Lease::Adopt — we already incremented refcount above.
-            return SamplerLease::Adopt(*this, poolHandle);
+            return SamplerLease::Adopt(*this, it->second);
         }
 
         // --- not found: allocate new GPU sampler ---
@@ -194,44 +196,32 @@ namespace Extrinsic::RHI
         if (!deviceHandle.IsValid())
             return Core::Err<SamplerLease>(Core::ErrorCode::OutOfDeviceMemory);
 
-        std::uint32_t index;
-        std::uint32_t generation;
-
-        if (!m_Impl->FreeList.empty())
-        {
-            index      = m_Impl->FreeList.back();
-            m_Impl->FreeList.pop_back();
-            generation = m_Impl->Slots[index].Generation;
-        }
-        else
-        {
-            index      = static_cast<std::uint32_t>(m_Impl->Slots.size());
-            generation = 0;
-            m_Impl->Slots.emplace_back();
-        }
-
-        SamplerSlot& slot  = m_Impl->Slots[index];
+        const auto [slotIt, inserted] = m_Impl->Slots.try_emplace(deviceHandle);
+        assert(inserted &&
+               "SamplerManager::GetOrCreate — IDevice issued a duplicate live "
+               "SamplerHandle. The device-side pool must increment the handle "
+               "generation on reuse; see Core::ResourcePool::Add.");
+        (void)inserted;
+        SamplerSlot& slot  = slotIt->second;
         slot.Desc          = desc;
         slot.DeviceHandle  = deviceHandle;
-        slot.Generation    = generation;
-        slot.Live          = true;
         slot.RefCount.store(1, std::memory_order_relaxed);
 
-        m_Impl->DedupTable[hash] = index;
+        m_Impl->DedupTable[hash] = deviceHandle;
 
-        SamplerHandle poolHandle{index, generation};
         m_Impl->LiveLeaseCount.fetch_add(1, std::memory_order_relaxed);
-        return SamplerLease::Adopt(*this, poolHandle);
+        return SamplerLease::Adopt(*this, deviceHandle);
     }
 
     // -----------------------------------------------------------------
     void SamplerManager::Retain(SamplerHandle handle)
     {
-        SamplerSlot* slot = m_Impl->Resolve(handle);
-        assert(slot && "Retain called on invalid or released handle");
-        if (slot)
+        std::lock_guard lock{m_Impl->Mutex};
+        const auto it = m_Impl->Slots.find(handle);
+        assert(it != m_Impl->Slots.end() && "Retain called on invalid or released handle");
+        if (it != m_Impl->Slots.end())
         {
-            slot->RefCount.fetch_add(1, std::memory_order_relaxed);
+            it->second.RefCount.fetch_add(1, std::memory_order_relaxed);
             m_Impl->LiveLeaseCount.fetch_add(1, std::memory_order_relaxed);
         }
     }
@@ -239,28 +229,36 @@ namespace Extrinsic::RHI
     // -----------------------------------------------------------------
     void SamplerManager::Release(SamplerHandle handle)
     {
-        SamplerSlot* slot = m_Impl->Resolve(handle);
-        assert(slot && "Release called on invalid or already-freed handle");
-        if (!slot) return;
-
-        const std::uint32_t prev =
-            slot->RefCount.fetch_sub(1, std::memory_order_acq_rel);
-
-        assert(prev > 0 && "Refcount underflow");
-
-        m_Impl->LiveLeaseCount.fetch_sub(1, std::memory_order_acq_rel);
-
-        if (prev == 1)
+        SamplerHandle deviceHandleToDestroy{};
+        bool shouldDestroy = false;
         {
-            m_Impl->Device.DestroySampler(slot->DeviceHandle);
-
-            const std::uint64_t hash = HashSamplerDesc(slot->Desc);
-
             std::lock_guard lock{m_Impl->Mutex};
-            m_Impl->DedupTable.erase(hash);
-            slot->Live = false;
-            slot->Generation++;
-            m_Impl->FreeList.push_back(handle.Index);
+            const auto it = m_Impl->Slots.find(handle);
+            assert(it != m_Impl->Slots.end() &&
+                   "Release called on invalid or already-freed handle");
+            if (it == m_Impl->Slots.end()) return;
+
+            SamplerSlot& slot = it->second;
+            const std::uint32_t prev =
+                slot.RefCount.fetch_sub(1, std::memory_order_acq_rel);
+
+            assert(prev > 0 && "Refcount underflow");
+
+            m_Impl->LiveLeaseCount.fetch_sub(1, std::memory_order_acq_rel);
+
+            if (prev == 1)
+            {
+                deviceHandleToDestroy = slot.DeviceHandle;
+                const std::uint64_t hash = HashSamplerDesc(slot.Desc);
+                m_Impl->DedupTable.erase(hash);
+                m_Impl->Slots.erase(it);
+                shouldDestroy = true;
+            }
+        }
+
+        if (shouldDestroy)
+        {
+            m_Impl->Device.DestroySampler(deviceHandleToDestroy);
         }
     }
 
@@ -285,4 +283,3 @@ namespace Extrinsic::RHI
     }
 
 } // namespace Extrinsic::RHI
-

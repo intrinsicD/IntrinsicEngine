@@ -9,9 +9,6 @@ module;
 
 module Extrinsic.Graphics.ImGuiOverlaySystem;
 
-import Extrinsic.RHI.Transfer;
-import Extrinsic.RHI.TransferQueue;
-
 namespace Extrinsic::Graphics
 {
     struct ImGuiOverlaySystem::Impl
@@ -257,19 +254,11 @@ namespace Extrinsic::Graphics
         }
 
         const ImGuiOverlayFontAtlas& atlas = m_Impl->Frame.FontAtlas;
-        const RHI::TransferToken token =
-            m_Impl->Device->GetTransferQueue().UploadTexture(
-                m_Impl->FontAtlasTexture->GetHandle(),
-                atlas.Pixels.data(),
-                static_cast<std::uint64_t>(atlas.Pixels.size()),
-                0u,
-                0u);
-        if (!token.IsValid())
-        {
-            m_Impl->Diagnostics.FontAtlasUploadFailed = true;
-            return;
-        }
-
+        m_Impl->Device->WriteTexture(m_Impl->FontAtlasTexture->GetHandle(),
+                                     atlas.Pixels.data(),
+                                     static_cast<std::uint64_t>(atlas.Pixels.size()),
+                                     0u,
+                                     0u);
         m_Impl->FontAtlasDirty = false;
         ++m_Impl->FontAtlasUploadCount;
         RefreshFontAtlasDiagnostics(*m_Impl);

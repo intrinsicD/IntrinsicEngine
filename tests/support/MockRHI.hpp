@@ -129,15 +129,26 @@ namespace Extrinsic::Tests
         int FreeCalls     = 0;
         int UpdateCalls   = 0;
         int FlushCalls    = 0;
+        std::vector<RHI::TextureHandle> AllocatedTextures;
+        std::vector<RHI::SamplerHandle> AllocatedSamplers;
+        std::vector<RHI::TextureHandle> UpdatedTextures;
+        std::vector<RHI::SamplerHandle> UpdatedSamplers;
 
-        [[nodiscard]] RHI::BindlessIndex AllocateTextureSlot(RHI::TextureHandle,
-                                                             RHI::SamplerHandle) override
+        [[nodiscard]] RHI::BindlessIndex AllocateTextureSlot(RHI::TextureHandle texture,
+                                                             RHI::SamplerHandle sampler) override
         {
             ++AllocateCalls;
+            AllocatedTextures.push_back(texture);
+            AllocatedSamplers.push_back(sampler);
             return ++m_NextSlot;
         }
-        void UpdateTextureSlot(RHI::BindlessIndex, RHI::TextureHandle,
-                               RHI::SamplerHandle) override { ++UpdateCalls; }
+        void UpdateTextureSlot(RHI::BindlessIndex, RHI::TextureHandle texture,
+                               RHI::SamplerHandle sampler) override
+        {
+            ++UpdateCalls;
+            UpdatedTextures.push_back(texture);
+            UpdatedSamplers.push_back(sampler);
+        }
         void FreeSlot(RHI::BindlessIndex) override { ++FreeCalls; }
         void FlushPending() override { ++FlushCalls; }
         [[nodiscard]] std::uint32_t GetCapacity()           const override { return 65536; }
@@ -409,6 +420,7 @@ namespace Extrinsic::Tests
             std::uint64_t SizeBytes = 0;
             std::uint32_t MipLevel = 0;
             std::uint32_t ArrayLayer = 0;
+            std::vector<std::byte> Data{};
         };
 
         struct QueueSubmitContextRequest
@@ -466,6 +478,7 @@ namespace Extrinsic::Tests
         std::vector<TextureWriteRecord> TextureWrites;
         std::vector<RHI::PipelineDesc> CreatedPipelineDescs;
         std::vector<RHI::PipelineHandle> CreatedPipelineHandles;
+        std::vector<RHI::SamplerHandle> CreatedSamplerHandles;
         std::vector<QueueSubmitContextRequest> QueueSubmitContextRequests;
         std::vector<RecordedQueueSubmitBatch> RecordedQueueSubmitPlan;
 
@@ -675,20 +688,28 @@ namespace Extrinsic::Tests
             return RHI::TextureHandle{m_NextTexture++, 1u};
         }
         void DestroyTexture(RHI::TextureHandle) override { ++DestroyTextureCount; }
-        void WriteTexture(RHI::TextureHandle handle, const void*, std::uint64_t size,
+        void WriteTexture(RHI::TextureHandle handle, const void* data, std::uint64_t size,
                           std::uint32_t mipLevel, std::uint32_t arrayLayer) override
         {
-            TextureWrites.push_back(TextureWriteRecord{.Handle = handle,
-                                                       .SizeBytes = size,
-                                                       .MipLevel = mipLevel,
-                                                       .ArrayLayer = arrayLayer});
+            TextureWriteRecord record{.Handle = handle,
+                                      .SizeBytes = size,
+                                      .MipLevel = mipLevel,
+                                      .ArrayLayer = arrayLayer};
+            record.Data.resize(static_cast<std::size_t>(size));
+            if (data != nullptr && size > 0u)
+            {
+                std::memcpy(record.Data.data(), data, static_cast<std::size_t>(size));
+            }
+            TextureWrites.push_back(std::move(record));
         }
 
         RHI::SamplerHandle CreateSampler(const RHI::SamplerDesc&) override
         {
             ++CreateSamplerCount;
             if (FailNextSamplerCreate) { FailNextSamplerCreate = false; return {}; }
-            return RHI::SamplerHandle{m_NextSampler++, 1u};
+            const RHI::SamplerHandle handle{m_NextSampler++, 1u};
+            CreatedSamplerHandles.push_back(handle);
+            return handle;
         }
         void DestroySampler(RHI::SamplerHandle) override { ++DestroySamplerCount; }
 

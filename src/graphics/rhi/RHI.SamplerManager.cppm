@@ -52,7 +52,8 @@ import Extrinsic.RHI.Device;
 //
 //   auto linear2 = mgr.GetOrCreate({...same desc...}); // returns same GPU object
 //
-//   // Pass the raw handle to TextureManager::Create() for bindless registration.
+//   // Lease handles are IDevice-issued handles; pass them directly to
+//   // TextureManager::Create() for bindless registration.
 //   auto tex = texMgr.Create(texDesc, linear.GetHandle());
 // ============================================================
 
@@ -110,4 +111,3 @@ export namespace Extrinsic::RHI
         std::unique_ptr<Impl> m_Impl;
     };
 }
-
