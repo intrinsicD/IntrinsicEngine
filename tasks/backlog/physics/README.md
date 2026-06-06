@@ -14,7 +14,7 @@ map.
 - [ARCH-001 - Define physics layer ownership and ECS integration](../../done/ARCH-001-physics-layer-ownership-and-ecs-integration.md) (done 2026-06-05).
 - [ARCH-002 - Physics phenomena roadmap and method selection](../../done/ARCH-002-physics-phenomena-roadmap.md) (done 2026-06-06).
 - [PHYSICS-001 - Physics world state and runtime fixed-step sync](../../done/PHYSICS-001-physics-world-state-and-runtime-sync.md) (done 2026-06-05).
-- [PHYSICS-002 - Collision broadphase/narrowphase contract](PHYSICS-002-collision-broadphase-narrowphase-contract.md).
+- [PHYSICS-002 - Collision broadphase/narrowphase contract](../../done/PHYSICS-002-collision-broadphase-narrowphase-contract.md) (done 2026-06-06).
 - [PHYSICS-003 - Constraints, islands, sleep, and solver diagnostics](PHYSICS-003-constraints-islands-and-solver-diagnostics.md).
 
 ## Convergence
@@ -27,9 +27,10 @@ map.
   is retired at `CPUContracted`.
 - `PHYSICS-001` is retired at `CPUContracted`; it owns the first
   `src/physics` world/state source addition and `Extrinsic.Runtime.PhysicsBridge`.
-- `PHYSICS-002` is now unblocked by `PHYSICS-001` and owns collision
-  broadphase/narrowphase contracts.
-- `PHYSICS-003` depends on retired `PHYSICS-001` and open `PHYSICS-002`; it
+- `PHYSICS-002` is retired at `CPUContracted`; it owns deterministic CPU
+  broadphase candidates, first-phase primitive contact records, and collision
+  diagnostics.
+- `PHYSICS-003` is now unblocked by retired `PHYSICS-001` and `PHYSICS-002`; it
   owns constraint, island, sleep, and solver diagnostics.
 - ARCH-002 must not bless GPU/optimized backend tasks for any phenomenon before
   its CPU reference path exists. It retired with first non-rigid physics method

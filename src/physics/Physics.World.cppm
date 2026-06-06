@@ -96,6 +96,66 @@ export namespace Extrinsic::Physics
         std::uint32_t DisabledBodiesSkipped{0u};
     };
 
+    enum class CollisionRejectReason : std::uint8_t
+    {
+        None,
+        InvalidBody,
+        InvalidShape,
+        DisabledBody,
+        DisabledShape,
+        FilteredBody,
+        NonUniformDynamicScale,
+        UnsupportedPair,
+    };
+
+    struct ShapeReference
+    {
+        BodyHandle Body{};
+        std::uint32_t ShapeIndex{0u};
+    };
+
+    struct CollisionCandidatePair
+    {
+        ShapeReference A{};
+        ShapeReference B{};
+    };
+
+    struct ContactRecord
+    {
+        ShapeReference A{};
+        ShapeReference B{};
+        glm::vec3 Normal{0.0f, 1.0f, 0.0f};
+        float PenetrationDepth{0.0f};
+        glm::vec3 ContactPointA{0.0f};
+        glm::vec3 ContactPointB{0.0f};
+        bool IsTrigger{false};
+    };
+
+    struct CollisionDiagnostics
+    {
+        ValidationStatus Status{ValidationStatus::Valid};
+        CollisionRejectReason LastRejectReason{CollisionRejectReason::None};
+        std::uint32_t BodiesVisited{0u};
+        std::uint32_t ShapesVisited{0u};
+        std::uint32_t DisabledBodiesSkipped{0u};
+        std::uint32_t FilteredBodiesSkipped{0u};
+        std::uint32_t DisabledShapesSkipped{0u};
+        std::uint32_t InvalidBodiesRejected{0u};
+        std::uint32_t InvalidShapesRejected{0u};
+        std::uint32_t DynamicNonUniformScaleRejects{0u};
+        std::uint32_t BroadphasePairs{0u};
+        std::uint32_t ContactsGenerated{0u};
+        std::uint32_t TriggerContacts{0u};
+        std::uint32_t UnsupportedPairs{0u};
+    };
+
+    struct CollisionResult
+    {
+        std::vector<CollisionCandidatePair> Candidates{};
+        std::vector<ContactRecord> Contacts{};
+        CollisionDiagnostics Diagnostics{};
+    };
+
     struct WorldDiagnostics
     {
         std::uint32_t BodyCount{0u};
@@ -136,6 +196,7 @@ export namespace Extrinsic::Physics
         [[nodiscard]] bool Contains(BodyHandle handle) const noexcept;
 
         [[nodiscard]] StepDiagnostics Step(const StepInput& input = {});
+        [[nodiscard]] CollisionResult ComputeCollisionContacts() const;
         void Clear() noexcept;
 
         [[nodiscard]] std::size_t BodyCount() const noexcept { return m_Diagnostics.BodyCount; }

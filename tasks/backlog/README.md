@@ -134,7 +134,9 @@ Members:
 - [`PHYSICS-001`](../done/PHYSICS-001-physics-world-state-and-runtime-sync.md)
   (done 2026-06-05) — first CPU-only physics world/state source and runtime
   bridge.
-- [`physics/PHYSICS-002-collision-broadphase-narrowphase-contract.md`](physics/PHYSICS-002-collision-broadphase-narrowphase-contract.md).
+- [`PHYSICS-002`](../done/PHYSICS-002-collision-broadphase-narrowphase-contract.md)
+  (done 2026-06-06) — deterministic CPU broadphase/contact records and
+  collision diagnostics for first-phase sphere/capsule/box shapes.
 - [`physics/PHYSICS-003-constraints-islands-and-solver-diagnostics.md`](physics/PHYSICS-003-constraints-islands-and-solver-diagnostics.md).
 
 ### Theme D — ECS hardening parity (P0)
@@ -242,9 +244,9 @@ promoting backlog tasks to active so per-category DAGs do not diverge.
 - **PHYSICS-001 ⇐ HARDEN-064, METHOD-001.** Satisfied 2026-06-05:
   `PHYSICS-001` is retired at `CPUContracted` with the first
   `src/physics` world/body descriptor surface and runtime fixed-step bridge.
-- **PHYSICS-002 ⇐ PHYSICS-001.** Satisfied 2026-06-05 for promotion:
-  collision broadphase/narrowphase contracts now depend on the retired
-  physics world/body descriptor surface.
+- **PHYSICS-002 ⇐ PHYSICS-001.** Satisfied 2026-06-06:
+  collision broadphase/narrowphase contracts are retired at `CPUContracted`
+  on top of the physics world/body descriptor surface.
 - **PHYSICS-003 ⇐ PHYSICS-001, PHYSICS-002.** Constraint/island/sleep solver
   diagnostics depend on world lifecycle and collision contacts.
 - **GRAPHICS-035..058 ⇐ Theme A.** Theme A's visible-geometry foundation is

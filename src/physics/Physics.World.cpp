@@ -4,6 +4,7 @@ module;
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -11,11 +12,28 @@ module;
 
 module Extrinsic.Physics.World;
 
+import Geometry.Capsule;
+import Geometry.ContactManifold;
+import Geometry.OBB;
+import Geometry.Sphere;
+
 namespace Extrinsic::Physics
 {
     namespace
     {
         constexpr float kRotationLengthEpsilon = 1.0e-6f;
+        constexpr float kScaleUniformEpsilon = 1.0e-4f;
+
+        struct BuiltCollisionShape
+        {
+            ShapeReference Reference{};
+            MotionType Motion{MotionType::Static};
+            ShapeKind Kind{ShapeKind::Sphere};
+            bool IsTrigger{false};
+            Geometry::Sphere Sphere{};
+            Geometry::Capsule Capsule{};
+            Geometry::OBB Box{};
+        };
 
         [[nodiscard]] float DampingFactor(float damping, float dt) noexcept
         {
@@ -36,6 +54,171 @@ namespace Extrinsic::Physics
         {
             ++generation;
             return generation == 0u ? 1u : generation;
+        }
+
+        [[nodiscard]] bool IsUniformScale(const glm::vec3& scale) noexcept
+        {
+            return std::abs(scale.x - scale.y) <= kScaleUniformEpsilon &&
+                   std::abs(scale.x - scale.z) <= kScaleUniformEpsilon;
+        }
+
+        [[nodiscard]] float MaxScaleComponent(const glm::vec3& scale) noexcept
+        {
+            const glm::vec3 absScale = glm::abs(scale);
+            return std::max(absScale.x, std::max(absScale.y, absScale.z));
+        }
+
+        [[nodiscard]] glm::quat ComposeRotation(const Transform& bodyPose, const Transform& local)
+        {
+            return glm::normalize(bodyPose.Rotation * local.Rotation);
+        }
+
+        [[nodiscard]] glm::vec3 ComposePosition(const Transform& bodyPose, const Transform& local)
+        {
+            return bodyPose.Position + bodyPose.Rotation * (bodyPose.Scale * local.Position);
+        }
+
+        [[nodiscard]] std::optional<BuiltCollisionShape> BuildCollisionShape(BodyHandle body,
+                                                                             MotionType motion,
+                                                                             const Transform& bodyPose,
+                                                                             const ShapeDescriptor& shape,
+                                                                             std::uint32_t shapeIndex,
+                                                                             CollisionDiagnostics& diagnostics)
+        {
+            ++diagnostics.ShapesVisited;
+            if (!shape.Enabled)
+            {
+                diagnostics.LastRejectReason = CollisionRejectReason::DisabledShape;
+                ++diagnostics.DisabledShapesSkipped;
+                return std::nullopt;
+            }
+
+            if (Validate(shape) != ValidationStatus::Valid)
+            {
+                diagnostics.Status = ValidationStatus::InvalidShape;
+                diagnostics.LastRejectReason = CollisionRejectReason::InvalidShape;
+                ++diagnostics.InvalidShapesRejected;
+                return std::nullopt;
+            }
+
+            const glm::vec3 scale = bodyPose.Scale * shape.Local.Scale;
+            if (motion == MotionType::Dynamic && !IsUniformScale(scale))
+            {
+                diagnostics.LastRejectReason = CollisionRejectReason::NonUniformDynamicScale;
+                ++diagnostics.DynamicNonUniformScaleRejects;
+                return std::nullopt;
+            }
+
+            BuiltCollisionShape built{};
+            built.Reference = ShapeReference{body, shapeIndex};
+            built.Motion = motion;
+            built.Kind = shape.Kind;
+            built.IsTrigger = shape.IsTrigger;
+
+            const glm::vec3 center = ComposePosition(bodyPose, shape.Local);
+            const glm::quat rotation = ComposeRotation(bodyPose, shape.Local);
+
+            switch (shape.Kind)
+            {
+            case ShapeKind::Sphere:
+                built.Sphere.Center = center;
+                built.Sphere.Radius = shape.Radius * MaxScaleComponent(scale);
+                break;
+            case ShapeKind::Capsule:
+                {
+                    const glm::vec3 axis = rotation * glm::vec3(0.0f, shape.CapsuleHalfHeight * std::abs(scale.y), 0.0f);
+                    built.Capsule.PointA = center - axis;
+                    built.Capsule.PointB = center + axis;
+                    built.Capsule.Radius = shape.Radius * std::max(std::abs(scale.x), std::abs(scale.z));
+                    break;
+                }
+            case ShapeKind::Box:
+                built.Box.Center = center;
+                built.Box.Extents = shape.HalfExtents * glm::abs(scale);
+                built.Box.Rotation = rotation;
+                break;
+            }
+
+            return built;
+        }
+
+        template <typename ShapeA, typename ShapeB>
+        void AppendContactIfPresent(const ShapeReference& refA,
+                                    const ShapeReference& refB,
+                                    bool isTrigger,
+                                    const ShapeA& a,
+                                    const ShapeB& b,
+                                    CollisionResult& result)
+        {
+            const std::optional<Geometry::ContactManifold> contact = Geometry::ComputeContact(a, b);
+            if (!contact)
+                return;
+
+            ContactRecord record{};
+            record.A = refA;
+            record.B = refB;
+            record.Normal = contact->Normal;
+            record.PenetrationDepth = contact->PenetrationDepth;
+            record.ContactPointA = contact->ContactPointA;
+            record.ContactPointB = contact->ContactPointB;
+            record.IsTrigger = isTrigger;
+            result.Contacts.push_back(record);
+            ++result.Diagnostics.ContactsGenerated;
+            if (isTrigger)
+                ++result.Diagnostics.TriggerContacts;
+        }
+
+        void DispatchContact(const BuiltCollisionShape& a, const BuiltCollisionShape& b, CollisionResult& result)
+        {
+            const bool trigger = a.IsTrigger || b.IsTrigger;
+            switch (a.Kind)
+            {
+            case ShapeKind::Sphere:
+                switch (b.Kind)
+                {
+                case ShapeKind::Sphere:
+                    AppendContactIfPresent(a.Reference, b.Reference, trigger, a.Sphere, b.Sphere, result);
+                    return;
+                case ShapeKind::Capsule:
+                    AppendContactIfPresent(a.Reference, b.Reference, trigger, a.Sphere, b.Capsule, result);
+                    return;
+                case ShapeKind::Box:
+                    AppendContactIfPresent(a.Reference, b.Reference, trigger, a.Sphere, b.Box, result);
+                    return;
+                }
+                break;
+            case ShapeKind::Capsule:
+                switch (b.Kind)
+                {
+                case ShapeKind::Sphere:
+                    AppendContactIfPresent(a.Reference, b.Reference, trigger, a.Capsule, b.Sphere, result);
+                    return;
+                case ShapeKind::Capsule:
+                    AppendContactIfPresent(a.Reference, b.Reference, trigger, a.Capsule, b.Capsule, result);
+                    return;
+                case ShapeKind::Box:
+                    AppendContactIfPresent(a.Reference, b.Reference, trigger, a.Capsule, b.Box, result);
+                    return;
+                }
+                break;
+            case ShapeKind::Box:
+                switch (b.Kind)
+                {
+                case ShapeKind::Sphere:
+                    AppendContactIfPresent(a.Reference, b.Reference, trigger, a.Box, b.Sphere, result);
+                    return;
+                case ShapeKind::Capsule:
+                    AppendContactIfPresent(a.Reference, b.Reference, trigger, a.Box, b.Capsule, result);
+                    return;
+                case ShapeKind::Box:
+                    AppendContactIfPresent(a.Reference, b.Reference, trigger, a.Box, b.Box, result);
+                    return;
+                }
+                break;
+            }
+
+            ++result.Diagnostics.UnsupportedPairs;
+            result.Diagnostics.LastRejectReason = CollisionRejectReason::UnsupportedPair;
         }
     }
 
@@ -350,6 +533,77 @@ namespace Extrinsic::Physics
         diagnostics.StepIndex = m_Diagnostics.StepsExecuted;
         m_Diagnostics.LastStep = diagnostics;
         return diagnostics;
+    }
+
+    [[nodiscard]] CollisionResult World::ComputeCollisionContacts() const
+    {
+        CollisionResult result{};
+        std::vector<BuiltCollisionShape> shapes{};
+        shapes.reserve(m_Diagnostics.BodyCount);
+
+        for (std::uint32_t bodyIndex = 0u; bodyIndex < m_Slots.size(); ++bodyIndex)
+        {
+            const Slot& slot = m_Slots[bodyIndex];
+            if (!slot.Occupied)
+                continue;
+
+            ++result.Diagnostics.BodiesVisited;
+            const BodyDescriptor& body = slot.Body;
+            if (!body.Enabled)
+            {
+                result.Diagnostics.LastRejectReason = CollisionRejectReason::DisabledBody;
+                ++result.Diagnostics.DisabledBodiesSkipped;
+                continue;
+            }
+
+            if (!body.ParticipatesInContacts)
+            {
+                result.Diagnostics.LastRejectReason = CollisionRejectReason::FilteredBody;
+                ++result.Diagnostics.FilteredBodiesSkipped;
+                continue;
+            }
+
+            const ValidationStatus bodyStatus = Validate(body);
+            if (bodyStatus != ValidationStatus::Valid)
+            {
+                result.Diagnostics.Status = bodyStatus;
+                result.Diagnostics.LastRejectReason = CollisionRejectReason::InvalidBody;
+                ++result.Diagnostics.InvalidBodiesRejected;
+                continue;
+            }
+
+            const BodyHandle handle{bodyIndex, slot.Generation};
+            for (std::uint32_t shapeIndex = 0u; shapeIndex < body.Shapes.size(); ++shapeIndex)
+            {
+                if (std::optional<BuiltCollisionShape> shape =
+                        BuildCollisionShape(handle,
+                                            body.Motion,
+                                            body.Pose,
+                                            body.Shapes[shapeIndex],
+                                            shapeIndex,
+                                            result.Diagnostics))
+                {
+                    shapes.push_back(*shape);
+                }
+            }
+        }
+
+        for (std::size_t i = 0u; i < shapes.size(); ++i)
+        {
+            for (std::size_t j = i + 1u; j < shapes.size(); ++j)
+            {
+                const BuiltCollisionShape& a = shapes[i];
+                const BuiltCollisionShape& b = shapes[j];
+                if (a.Reference.Body.Index == b.Reference.Body.Index)
+                    continue;
+
+                result.Candidates.push_back(CollisionCandidatePair{a.Reference, b.Reference});
+                ++result.Diagnostics.BroadphasePairs;
+                DispatchContact(a, b, result);
+            }
+        }
+
+        return result;
     }
 
     void World::Clear() noexcept

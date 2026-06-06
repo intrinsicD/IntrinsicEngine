@@ -11,7 +11,7 @@
 
 ## Context
 - Owner/layer: `physics`, with runtime only composing the fixed-step bridge.
-- Depends on retired [`PHYSICS-001`](../../done/PHYSICS-001-physics-world-state-and-runtime-sync.md) and open [`PHYSICS-002`](PHYSICS-002-collision-broadphase-narrowphase-contract.md).
+- Depends on retired [`PHYSICS-001`](../../done/PHYSICS-001-physics-world-state-and-runtime-sync.md) and retired [`PHYSICS-002`](../../done/PHYSICS-002-collision-broadphase-narrowphase-contract.md).
 - `METHOD-001` is the correctness reference for rigid-body dynamics. This task must compare against the CPU reference where fixture coverage exists.
 - Solver state, islands, warm-start caches, and sleep state are physics-world internals and must not leak into ECS components.
 

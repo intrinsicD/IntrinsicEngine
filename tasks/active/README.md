@@ -46,7 +46,8 @@ broadphase/narrowphase, and solver diagnostics. `HARDEN-064` has since retired
 the ECS collider/rigid-body authoring contract under the
 no-solver-handles-in-ECS boundary, and `PHYSICS-001` has retired the first
 CPU-only physics world/runtime bridge. `PHYSICS-002` is the next open physics
-runtime-readiness leaf.
+runtime-readiness leaf retired on 2026-06-06; `PHYSICS-003` is now the next
+open physics runtime-readiness leaf.
 
 Previously-active
 [`GRAPHICS-040C`](../done/GRAPHICS-040C-aa-recipe-selection-and-integration.md)

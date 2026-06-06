@@ -53,14 +53,41 @@ world handles.
 - `Step(StepInput)` runs a deterministic CPU-only unconstrained integration:
   static bodies are skipped, kinematic bodies integrate authored velocities,
   and dynamic bodies integrate gravity, damping, linear velocity, and angular
-  velocity. It does not generate contacts, solve constraints, build islands, or
-  sleep bodies.
+  velocity.
+- `ComputeCollisionContacts()` emits physics-owned broadphase candidate pairs,
+  contact records, and diagnostics for first-phase sphere, capsule, and box/OBB
+  shapes. It wraps geometry-owned primitive/contact kernels without exposing
+  geometry ownership as the physics public contract.
 
 World diagnostics currently report body counts, create/destroy/update counts,
 invalid descriptor rejects, stale handle rejects, executed step count, and the
-last step's static/kinematic/dynamic/disabled body counters. Collision contact
-diagnostics are still owned by `PHYSICS-002`; constraint/island/sleep diagnostics
-are still owned by `PHYSICS-003`.
+last step's static/kinematic/dynamic/disabled body counters. Collision result
+diagnostics report visited/skipped bodies and shapes, deterministic broadphase
+pair count, generated contact count, trigger contact count, invalid body/shape
+rejects, dynamic non-uniform scale rejects, and unsupported pair count.
+`LastRejectReason` records the most recent skip/reject category for focused
+diagnostics; counters remain the authoritative aggregate.
+Constraint/island/sleep diagnostics are still owned by `PHYSICS-003`.
+
+## Collision Contract Surface
+
+`PHYSICS-002` closes the first CPU collision contract at `CPUContracted`
+maturity:
+
+- Shape references are `(BodyHandle, ShapeIndex)` pairs, so contacts can be
+  mapped back to physics-owned body state without ECS/runtime imports.
+- Broadphase candidates are generated deterministically in body-slot order and
+  shape-index order. This first slice uses all-pairs enumeration; spatial
+  acceleration is a later optimization that must preserve deterministic output
+  semantics.
+- Narrowphase contacts include normal, penetration depth, contact point on A,
+  contact point on B, and trigger status.
+- Collision filtering currently covers body-level contact participation,
+  disabled bodies, disabled shapes, and trigger classification. ECS/runtime
+  filtering policy remains outside `src/physics`.
+- Dynamic non-uniform shape/body scale is rejected with diagnostics. Static and
+  kinematic cooked-shape policy may expand later, but dynamic concave mesh
+  support remains forbidden in the first phase.
 
 ## ECS and Runtime Split
 
@@ -136,7 +163,7 @@ and contact/event counts where applicable.
 - [`HARDEN-064`](../../tasks/done/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md) defines ECS collider and rigid-body authoring descriptors.
 - [`METHOD-001`](../../tasks/done/METHOD-001-rigid-body-dynamics-reference-backend.md) defines the CPU reference rigid-body method backend.
 - [`PHYSICS-001`](../../tasks/done/PHYSICS-001-physics-world-state-and-runtime-sync.md) defines the first physics world/state module and runtime bridge at `CPUContracted` maturity.
-- [`PHYSICS-002`](../../tasks/backlog/physics/PHYSICS-002-collision-broadphase-narrowphase-contract.md) owns collision broadphase/narrowphase contracts.
+- [`PHYSICS-002`](../../tasks/done/PHYSICS-002-collision-broadphase-narrowphase-contract.md) owns collision broadphase/narrowphase contracts.
 - [`PHYSICS-003`](../../tasks/backlog/physics/PHYSICS-003-constraints-islands-and-solver-diagnostics.md) owns constraints, islands, sleep, and solver diagnostics.
 - [`ARCH-002`](../../tasks/done/ARCH-002-physics-phenomena-roadmap.md) records the non-rigid and multi-phenomena roadmap decisions.
 - [`METHOD-009`](../../tasks/backlog/methods/METHOD-009-particle-spring-reference-backend.md), [`METHOD-010`](../../tasks/backlog/methods/METHOD-010-xpbd-cloth-shell-reference-backend.md), and [`METHOD-011`](../../tasks/backlog/methods/METHOD-011-sph-fluid-reference-backend.md) are the first non-rigid physics method-package follow-ups. They remain CPU-reference-first and open no GPU backend.

@@ -12,9 +12,9 @@
   collider/rigid-body authoring descriptors, steps the physics world on a
   fixed accumulator, and writes dynamic body transforms back to ECS with dirty
   markers.
-- `Operational` engine-frame composition, contact broadphase/narrowphase, and
-  solver/island/sleep behavior remain deferred. Collision contracts are owned
-  by [`PHYSICS-002`](../backlog/physics/PHYSICS-002-collision-broadphase-narrowphase-contract.md);
+- `Operational` engine-frame composition and solver/island/sleep behavior
+  remain deferred. Collision contracts are now `CPUContracted` by
+  [`PHYSICS-002`](PHYSICS-002-collision-broadphase-narrowphase-contract.md);
   constraints/islands/sleep diagnostics are owned by
   [`PHYSICS-003`](../backlog/physics/PHYSICS-003-constraints-islands-and-solver-diagnostics.md).
 
