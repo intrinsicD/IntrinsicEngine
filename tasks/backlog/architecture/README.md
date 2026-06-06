@@ -35,11 +35,13 @@ map.
 - [HARDEN-069 — Rebind legacy layering allowlist entries to active retirement tasks](../../done/HARDEN-069-rebind-legacy-layering-allowlist-to-active-retirement-tasks.md)
   (done 2026-06-02): metadata-only rebinding of legacy allowlist rows from the retired `HARDEN-010`
   ID to current legacy-retirement task IDs, preserving the allowlisted edge set.
-- [HARDEN-070 — Drop dead null guards on reference-initialised helpers](HARDEN-070-drop-dead-null-guards-on-reference-initialised-helpers.md):
-  hygiene cleanup of ~7 internal-boundary `m_X == nullptr` guards in
-  `SpatialDebugAdapters`, `TransientDebugUploadHelper`, and
-  `VisualizationOverlayUploadHelper` whose constructor-reference precondition
-  already makes the null branch unreachable. Filed from
+- [HARDEN-070 — Drop dead null guards on reference-initialised helpers](../../done/HARDEN-070-drop-dead-null-guards-on-reference-initialised-helpers.md)
+  (done 2026-06-06): hygiene cleanup of the nine internal-boundary
+  `m_X == nullptr` guards in `SpatialDebugAdapters` (4),
+  `TransientDebugUploadHelper` (3), and `VisualizationOverlayUploadHelper` (2)
+  whose constructor-reference precondition already makes the null branch
+  unreachable; replaced with one-line lifetime-contract notes in each `.cppm`.
+  Filed from
   [`docs/reports/2026-05-26-agent-output-audit.md`](../../../docs/reports/2026-05-26-agent-output-audit.md)
   Row 5.
 - [HARDEN-074 — Make markdown link checking see inline-code labels](../../done/HARDEN-074-doc-link-checker-inline-code-labels.md)

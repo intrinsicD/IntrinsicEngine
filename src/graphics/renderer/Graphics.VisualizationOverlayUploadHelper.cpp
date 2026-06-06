@@ -211,8 +211,7 @@ namespace Extrinsic::Graphics
         VisualizationVectorFieldUploadResult result{};
         result.PacketCount = static_cast<std::uint32_t>(vectorFields.size());
 
-        if (vectorFields.empty() || m_Device == nullptr || m_BufferManager == nullptr ||
-            !m_Device->IsOperational())
+        if (vectorFields.empty() || !m_Device->IsOperational())
         {
             return result;
         }
@@ -313,8 +312,7 @@ namespace Extrinsic::Graphics
         VisualizationIsolineUploadResult result{};
         result.PacketCount = static_cast<std::uint32_t>(isolines.size());
 
-        if (isolines.empty() || m_Device == nullptr || m_BufferManager == nullptr ||
-            !m_Device->IsOperational())
+        if (isolines.empty() || !m_Device->IsOperational())
         {
             return result;
         }

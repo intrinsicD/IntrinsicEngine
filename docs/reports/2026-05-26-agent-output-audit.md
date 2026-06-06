@@ -71,7 +71,7 @@ Notable substantive commits used as evidence anchors:
 ## Follow-ups
 
 - **Row 5 (defensive internal-boundary null checks).** Filed as
-  [`HARDEN-070`](../../tasks/backlog/architecture/HARDEN-070-drop-dead-null-guards-on-reference-initialised-helpers.md).
+  [`HARDEN-070`](../../tasks/done/HARDEN-070-drop-dead-null-guards-on-reference-initialised-helpers.md).
   The pattern repeats across three new modules
   (`SpatialDebugAdapters`, `TransientDebugUploadHelper`,
   `VisualizationOverlayUploadHelper`) and is a low-risk mechanical

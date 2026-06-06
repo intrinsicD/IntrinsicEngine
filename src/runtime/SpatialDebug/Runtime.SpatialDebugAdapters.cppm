@@ -55,6 +55,12 @@ export namespace Extrinsic::Runtime
                             SpatialDebugAdapterStats&         stats) const = 0;
     };
 
+    // Lifetime contract for the concrete adapters below (BvhAdapter,
+    // KdTreeAdapter, OctreeAdapter, ConvexHullAdapter): each is constructed from
+    // a const reference to its source tree and deletes the rvalue overload, so
+    // the non-owning source pointer is non-null for the adapter's lifetime.
+    // `Append` therefore does not null-check the source; it only guards the
+    // source's observable state (empty nodes/vertices).
     class BvhAdapter final : public ISpatialDebugAdapter
     {
     public:
