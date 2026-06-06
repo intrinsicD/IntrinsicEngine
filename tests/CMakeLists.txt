@@ -700,6 +700,7 @@ set(_graphics_contract_cpu_test_files
     Test.PresentPass.cpp
     Test.QueueAffinity.cpp
     Test.ReconstructionContract.cpp
+    Test.RenderCommandRouter.cpp
     Test.RendererFrameLifecycle.cpp
     Test.RenderWorldContract.cpp
     Test.RenderGraphValidation.cpp

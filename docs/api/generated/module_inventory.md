@@ -15,7 +15,7 @@ Root scanned: `src`
 | `geometry` | 85 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
-| `graphics/renderer` | 58 |
+| `graphics/renderer` | 59 |
 | `graphics/rhi` | 19 |
 | `graphics/vulkan` | 13 |
 | `legacy` | 182 |
@@ -223,6 +223,7 @@ Root scanned: `src`
 | `Extrinsic.Graphics.MaterialSystem` | `src/graphics/renderer/Graphics.MaterialSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.PostProcessSystem` | `src/graphics/renderer/Graphics.PostProcessSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Reconstruction` | `src/graphics/renderer/Graphics.Reconstruction.cppm` | `graphics/renderer` |
+| `Extrinsic.Graphics.RenderCommandRouter` | `src/graphics/renderer/Graphics.RenderCommandRouter.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.RenderFrameInput` | `src/graphics/renderer/Graphics.RenderFrameInput.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.RenderWorld` | `src/graphics/renderer/Graphics.RenderWorld.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Renderer` | `src/graphics/renderer/Graphics.Renderer.cppm` | `graphics/renderer` |
@@ -504,4 +505,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugAdapters` | `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **476**
+Total modules: **477**

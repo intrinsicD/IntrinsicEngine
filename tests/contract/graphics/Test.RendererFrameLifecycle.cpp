@@ -196,11 +196,17 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     EXPECT_EQ(stats.CommandRecords.SkippedNonOperational, 0u);
     EXPECT_EQ(stats.CommandRecords.Skipped, stats.CommandRecords.SkippedUnavailable);
     EXPECT_GE(stats.CommandRecords.SkippedUnavailable, 1u);
-    ASSERT_NE(FindCommandPass(stats, "CullingPass"), nullptr);
-    EXPECT_EQ(FindCommandPass(stats, "CullingPass")->Status,
+    const auto* cullingPass = FindCommandPass(stats, "CullingPass");
+    ASSERT_NE(cullingPass, nullptr);
+    EXPECT_EQ(cullingPass->Id,
+              Extrinsic::Graphics::ToFramePassId(Extrinsic::Graphics::FrameRecipePassKind::Culling));
+    EXPECT_EQ(cullingPass->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
-    ASSERT_NE(FindCommandPass(stats, "DepthPrepass"), nullptr);
-    EXPECT_EQ(FindCommandPass(stats, "DepthPrepass")->Status,
+    const auto* depthPrepass = FindCommandPass(stats, "DepthPrepass");
+    ASSERT_NE(depthPrepass, nullptr);
+    EXPECT_EQ(depthPrepass->Id,
+              Extrinsic::Graphics::ToFramePassId(Extrinsic::Graphics::FrameRecipePassKind::DepthPrepass));
+    EXPECT_EQ(depthPrepass->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     ASSERT_NE(FindCommandPass(stats, "HZBBuildPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "HZBBuildPass")->Status,
@@ -211,8 +217,11 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     ASSERT_NE(FindCommandPass(stats, "LightClusterAssignmentPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "LightClusterAssignmentPass")->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
-    ASSERT_NE(FindCommandPass(stats, "SurfacePass"), nullptr);
-    EXPECT_EQ(FindCommandPass(stats, "SurfacePass")->Status,
+    const auto* surfacePass = FindCommandPass(stats, "SurfacePass");
+    ASSERT_NE(surfacePass, nullptr);
+    EXPECT_EQ(surfacePass->Id,
+              Extrinsic::Graphics::ToFramePassId(Extrinsic::Graphics::FrameRecipePassKind::Surface));
+    EXPECT_EQ(surfacePass->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     ASSERT_NE(FindCommandPass(stats, "LinePass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "LinePass")->Status,
@@ -233,8 +242,11 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     // fullscreen `BindPipeline + Draw(3, 1, 0, 0)` shape on the
     // operational CPU/null path, replacing the previous
     // `SkippedUnavailable` taxonomy.
-    ASSERT_NE(FindCommandPass(stats, "Present"), nullptr);
-    EXPECT_EQ(FindCommandPass(stats, "Present")->Status,
+    const auto* presentPass = FindCommandPass(stats, "Present");
+    ASSERT_NE(presentPass, nullptr);
+    EXPECT_EQ(presentPass->Id,
+              Extrinsic::Graphics::ToFramePassId(Extrinsic::Graphics::FrameRecipePassKind::Present));
+    EXPECT_EQ(presentPass->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
     EXPECT_EQ(device.GetBackbufferHandleCount, 1);
     EXPECT_EQ(device.LastBackbufferFrame.FrameIndex, frame.FrameIndex);

@@ -101,6 +101,7 @@ import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.FrameRecipe;
 import Extrinsic.Graphics.RenderGraph;
+import Extrinsic.Graphics.RenderCommandRouter;
 import Extrinsic.Core.Config.Render;
 import Extrinsic.Core.Dag.TaskGraph;
 import Extrinsic.Core.Dag.Scheduler;
@@ -408,6 +409,11 @@ namespace Extrinsic::Graphics
         }
 
     public:
+        NullRenderer()
+        {
+            RegisterCommandRoutes();
+        }
+
         void Initialize(RHI::IDevice& device) override
         {
             m_Device = &device;
@@ -1978,11 +1984,15 @@ namespace Extrinsic::Graphics
                                         passIndex);
                         return;
                     }
+                    const FramePassId passId = passIndex < compiled->PassIds.size()
+                        ? compiled->PassIds[passIndex]
+                        : FramePassId{};
                     const ActiveRenderPassDesc activeRenderPass = BuildActiveRenderPassDesc(*compiled, passIndex);
                     if (passIndex < compiled->PassDeclarations.size())
                     {
                         bool sampledTextureBound = false;
-                        if (passName == std::string_view{"DebugViewPass"} && m_DebugViewSystem.has_value())
+                        if (passId == ToFramePassId(FrameRecipePassKind::DebugView) &&
+                            m_DebugViewSystem.has_value())
                         {
                             const DebugViewResolvedSelection selection = m_DebugViewSystem->GetResolvedSelection();
                             const auto selected = std::find(compiled->TextureNames.begin(),
@@ -2023,14 +2033,14 @@ namespace Extrinsic::Graphics
                         const bool bindsFrameSampledBridge =
                             !sampledTextureBound &&
                             !declarations.ReadTextures.empty() &&
-                            passName != std::string_view{"ImGuiPass"};
+                            passId != ToFramePassId(FrameRecipePassKind::ImGui);
                         if (bindsFrameSampledBridge)
                         {
                             const std::uint32_t textureIndex = declarations.ReadTextures.front();
                             if (textureIndex < compiled->TextureHandles.size())
                             {
                                 const std::uint32_t descriptorSlot =
-                                    passName == std::string_view{"Present"}
+                                    passId == ToFramePassId(FrameRecipePassKind::Present)
                                         ? kFrameSampledDescriptorSlotPresent
                                         : kFrameSampledDescriptorSlotDefault;
                                 graphicsContext.BindFrameSampledTextureAt(
@@ -2056,702 +2066,30 @@ namespace Extrinsic::Graphics
                     // GRAPHICS-074 Slice D.2 — the picking executor branch
                     // needs to end the render pass mid-branch so it can
                     // record the texture-to-buffer copies (which must run
-                    // outside any render pass). The outer `endActiveRenderPass()`
-                    // at the bottom of the lambda would then double-end, so
-                    // we track whether the inner branch already ended it.
+                    // outside any render pass). The route helper at the bottom
+                    // must not double-end it, so this latch tracks whether
+                    // the picking callback already closed the active pass.
                     bool renderPassEnded = false;
-                    const auto endActiveRenderPass = [&graphicsContext, &activeRenderPass, &renderPassEnded]
-                    {
-                        if (!renderPassEnded && activeRenderPass.HasAttachments)
-                        {
-                            graphicsContext.EndRenderPass();
-                            renderPassEnded = true;
-                        }
+                    RenderCommandRouteContext routeContext{
+                        .Camera = &camera,
+                        .Frame = &frame,
+                        .World = &renderWorld,
+                        .Compiled = &*compiled,
+                        .ActiveRenderPass = &activeRenderPass,
+                        .RenderPassEnded = &renderPassEnded,
+                        .DefaultRecipeUsesDeferred = defaultRecipeUsesDeferred,
                     };
-                    if (passName == std::string_view{"CullingPass"})
+                    const RenderCommandRoute route{
+                        .PassId = passId,
+                        .DebugName = passName,
+                    };
+                    if (!m_CommandRouter.Dispatch(route, graphicsContext, &routeContext))
                     {
-                        const RenderCommandPassStatus status = RecordCullingPass(graphicsContext, camera);
-                        AccumulateCommandRecordStatus(passName, status);
+                        const RenderCommandPassStatus status = MissingRenderCommandRouteStatus(
+                            m_Device != nullptr && m_Device->IsOperational());
+                        AccumulateCommandRecordStatus(passName, passId, status);
                     }
-                    else if (passName == std::string_view{"DepthPrepass"})
-                    {
-                        const RenderCommandPassStatus status = RecordDepthPrepass(graphicsContext, camera, frame.FrameIndex);
-                        AccumulateCommandRecordStatus(passName, status);
-                    }
-                    else if (passName == std::string_view{"HZBBuildPass"})
-                    {
-                        // GRAPHICS-038B — build the retained HZB pyramid
-                        // immediately after the depth prepass. The recipe only
-                        // declares this pass when `HZB.Current` was imported, so
-                        // this branch observes a renderer-owned retained target
-                        // and records the backend-neutral per-mip fallback
-                        // dispatch plan.
-                        const RenderCommandPassStatus status = RecordHZBBuildPass(graphicsContext);
-                        AccumulateCommandRecordStatus(passName, status);
-                    }
-                    else if (passName == std::string_view{"ClusterGridBuildPass"})
-                    {
-                        const RenderCommandPassStatus status =
-                            RecordClusterGridBuildPass(graphicsContext);
-                        AccumulateCommandRecordStatus(passName, status);
-                    }
-                    else if (passName == std::string_view{"LightClusterAssignmentPass"})
-                    {
-                        const RenderCommandPassStatus status =
-                            RecordClusterLightAssignmentPass(graphicsContext);
-                        AccumulateCommandRecordStatus(passName, status);
-                    }
-                    else if (passName == std::string_view{"SurfacePass"} && !defaultRecipeUsesDeferred)
-                    {
-                        // GRAPHICS-070 — default-recipe forward surface pass.
-                        // The deferred mode branch is owned by the next
-                        // `else if` below.
-                        const RenderCommandPassStatus status =
-                            RecordForwardSurfacePass(graphicsContext, camera, frame.FrameIndex);
-                        AccumulateCommandRecordStatus(passName, status);
-                    }
-                    else if (passName == std::string_view{"SurfacePass"} && defaultRecipeUsesDeferred)
-                    {
-                        // GRAPHICS-072 Slice A — default-recipe deferred
-                        // GBuffer pass.
-                        const RenderCommandPassStatus status =
-                            RecordDeferredGBufferPass(graphicsContext, camera, frame.FrameIndex);
-                        AccumulateCommandRecordStatus(passName, status);
-                    }
-                    else if (passName == std::string_view{"CompositionPass"})
-                    {
-                        // GRAPHICS-072 Slice B — default-recipe deferred
-                        // lighting composition. Only declared by
-                        // `BuildDefaultFrameRecipe` when `usesDeferred` is
-                        // true, so this branch is reached only under the
-                        // deferred lighting path. The shadow-atlas binding
-                        // (`set 1, binding 1`) is Slice C scope and the
-                        // current `DeferredLightingPass::Execute` body only
-                        // pushes the 16-byte `SceneTableBDA` block + draws
-                        // the fullscreen triangle.
-                        const RenderCommandPassStatus status =
-                            RecordDeferredLightingPass(graphicsContext, camera, frame.FrameIndex);
-                        AccumulateCommandRecordStatus(passName, status);
-                    }
-                    else if (passName == std::string_view{"LinePass"})
-                    {
-                        const RenderCommandPassStatus status =
-                            RecordForwardLinePass(graphicsContext, camera, frame.FrameIndex);
-                        AccumulateCommandRecordStatus(passName, status);
-                    }
-                    else if (passName == std::string_view{"PointPass"})
-                    {
-                        const RenderCommandPassStatus status =
-                            RecordForwardPointPass(graphicsContext, camera, frame.FrameIndex);
-                        AccumulateCommandRecordStatus(passName, status);
-                    }
-                    else if (passName == std::string_view{"ShadowPass"})
-                    {
-                        const RenderCommandPassStatus status =
-                            RecordShadowPass(graphicsContext, camera, frame.FrameIndex);
-                        AccumulateCommandRecordStatus(passName, status);
-                    }
-                    else if (passName == std::string_view{"SelectionOutlinePass"})
-                    {
-                        // GRAPHICS-074 Slice C/D.4 — default-recipe selection
-                        // outline route. The recipe declares
-                        // `SelectionOutlinePass` only when
-                        // `features.EnableSelectionOutline` is true (set from
-                        // `world.Selection.HasHovered ||
-                        // !world.Selection.SelectedStableIds.empty()` in
-                        // `DeriveDefaultFrameRecipeFeatures`), so this branch
-                        // is reached only when at least one selectable entity
-                        // is present this frame. `RecordSelectionOutlinePass`
-                        // mirrors the selection-ID helpers: non-operational
-                        // device → `SkippedNonOperational`; missing pass /
-                        // lease → `SkippedUnavailable`; otherwise the
-                        // fullscreen `Bind/PushConstants/Draw(3,1,0,0)` shape
-                        // records and we return `Recorded`. Slice D.4 sources
-                        // the `selection_outline.frag` push block from
-                        // `renderWorld.Selection` so the shader sees the
-                        // seeded hovered/selected ids + outline visual style
-                        // instead of the Slice C all-zero placeholder.
-                        const RenderCommandPassStatus status =
-                            RecordSelectionOutlinePass(graphicsContext, camera, frame.FrameIndex,
-                                                       renderWorld.Selection);
-                        AccumulateCommandRecordStatus(passName, status);
-                    }
-                    else if (passName == std::string_view{"PickingPass"})
-                    {
-                        // GRAPHICS-074 Slice A + B — default-recipe selection
-                        // ID sub-passes. The recipe declares `PickingPass`
-                        // only when `features.EnablePicking &&
-                        // features.EnableDepthPrepass` is true, so the branch
-                        // is reached only when picking is active and a
-                        // populated `SceneDepth` exists. The four sub-passes
-                        // share the recipe's `PickingPass` render pass and
-                        // dispatch back-to-back: EntityId first (so its
-                        // `(Entity, 0)` `PrimitiveId` is the fallback when no
-                        // sub-element pass covers a pixel), then
-                        // Face/Edge/Point — each writes the matching
-                        // `EncodeSelectionId(domain, gl_PrimitiveID)` into
-                        // `PrimitiveId` over its own cull bucket
-                        // (`SurfaceOpaque` / `Lines` / `Points`). With
-                        // depth-equal / depth-write-off, only the
-                        // nearest-surface fragment per pixel can write, so
-                        // the most refined domain code that survives the
-                        // prepass depth test wins per pixel. The status is
-                        // accumulated under the single `PickingPass` name to
-                        // keep the executor's per-pass status taxonomy the
-                        // same shape the rest of the recipe uses: any
-                        // sub-pass that records bumps the aggregate to
-                        // `Recorded`; a sub-pass with a not-yet-ready
-                        // pipeline downgrades to `SkippedUnavailable` per
-                        // `AccumulateCommandRecordStatus`'s usual rules; a
-                        // non-operational device produces
-                        // `SkippedNonOperational` uniformly. The
-                        // `Picking.Readback` drain +
-                        // `PublishPickResult`/`PublishNoHit` wiring remain
-                        // Slice D scope.
-                        const RenderCommandPassStatus entityStatus =
-                            RecordSelectionEntityIdPass(graphicsContext, camera, frame.FrameIndex);
-                        AccumulateCommandRecordStatus(passName, entityStatus);
-                        const RenderCommandPassStatus faceStatus =
-                            RecordSelectionFaceIdPass(graphicsContext, camera, frame.FrameIndex);
-                        AccumulateCommandRecordStatus(passName, faceStatus);
-                        const RenderCommandPassStatus edgeStatus =
-                            RecordSelectionEdgeIdPass(graphicsContext, camera, frame.FrameIndex);
-                        AccumulateCommandRecordStatus(passName, edgeStatus);
-                        const RenderCommandPassStatus pointStatus =
-                            RecordSelectionPointIdPass(graphicsContext, camera, frame.FrameIndex);
-                        AccumulateCommandRecordStatus(passName, pointStatus);
-
-                        // GRAPHICS-074 Slice D.2 — picking-readback copy
-                        // pair. After the four selection-ID sub-passes have
-                        // recorded against the shared `PickingPass` render
-                        // pass, copy one pixel each from `EntityId` and
-                        // `PrimitiveId` (at the requested pick coordinates)
-                        // into the renderer-owned host-visible
-                        // `Picking.Readback` buffer at the per-frame slot
-                        // (`slot * 8` for `EntityId`, `slot * 8 + 4` for the
-                        // `EncodedSelectionId`). The two copies are wrapped
-                        // by `ColorAttachment → TransferSrc → ColorAttachment`
-                        // transitions and executed *outside* the render pass
-                        // — so we end it first and let the outer
-                        // `endActiveRenderPass()` skip via the
-                        // `renderPassEnded` latch. The copy is gated on:
-                        //   (a) operational device,
-                        //   (b) renderer's `Picking.Readback` buffer wired,
-                        //   (c) `renderWorld.PickRequest.Pending` (the same
-                        //       signal that enabled `EnablePicking` upstream).
-                        // When any gate fails, no copy or barriers record so
-                        // the per-slot `PickingReadbackCopyCount` counter
-                        // accurately distinguishes pending-pick frames from
-                        // skipped frames. Slice D.3 drains the buffer on
-                        // `BeginFrame()` once the issuing frame completes.
-                        if (m_Device != nullptr && m_Device->IsOperational() &&
-                            m_PickingReadbackBuffer.has_value() &&
-                            m_PickingReadbackBuffer->IsValid() &&
-                            renderWorld.PickRequest.Pending)
-                        {
-                            const RHI::BufferHandle pickingBuffer =
-                                m_PickingReadbackBuffer->GetHandle();
-                            RHI::TextureHandle entityIdHandle{};
-                            RHI::TextureHandle primitiveIdHandle{};
-                            for (std::size_t i = 0; i < compiled->TextureNames.size(); ++i)
-                            {
-                                if (i >= compiled->TextureHandles.size())
-                                {
-                                    break;
-                                }
-                                if (compiled->TextureNames[i] == std::string_view{"EntityId"})
-                                {
-                                    entityIdHandle = compiled->TextureHandles[i];
-                                }
-                                else if (compiled->TextureNames[i] == std::string_view{"PrimitiveId"})
-                                {
-                                    primitiveIdHandle = compiled->TextureHandles[i];
-                                }
-                            }
-                            if (entityIdHandle.IsValid() && primitiveIdHandle.IsValid())
-                            {
-                                endActiveRenderPass();
-                                const std::uint32_t framesInFlight =
-                                    std::max(1u, m_Device->GetFramesInFlight());
-                                const std::uint32_t slot =
-                                    frame.FrameIndex % framesInFlight;
-                                const std::uint64_t slotOffset =
-                                    static_cast<std::uint64_t>(slot) * 8ull;
-                                const std::uint32_t pickX = renderWorld.PickRequest.X;
-                                const std::uint32_t pickY = renderWorld.PickRequest.Y;
-
-                                graphicsContext.TextureBarrier(entityIdHandle,
-                                                                RHI::TextureLayout::ColorAttachment,
-                                                                RHI::TextureLayout::TransferSrc);
-                                graphicsContext.TextureBarrier(primitiveIdHandle,
-                                                                RHI::TextureLayout::ColorAttachment,
-                                                                RHI::TextureLayout::TransferSrc);
-                                graphicsContext.CopyTextureToBuffer(entityIdHandle,
-                                                                     RHI::TextureLayout::TransferSrc,
-                                                                     0u, 0u,
-                                                                     pickingBuffer,
-                                                                     slotOffset,
-                                                                     pickX, pickY,
-                                                                     1u, 1u);
-                                graphicsContext.CopyTextureToBuffer(primitiveIdHandle,
-                                                                     RHI::TextureLayout::TransferSrc,
-                                                                     0u, 0u,
-                                                                     pickingBuffer,
-                                                                     slotOffset + 4ull,
-                                                                     pickX, pickY,
-                                                                     1u, 1u);
-                                graphicsContext.TextureBarrier(entityIdHandle,
-                                                                RHI::TextureLayout::TransferSrc,
-                                                                RHI::TextureLayout::ColorAttachment);
-                                graphicsContext.TextureBarrier(primitiveIdHandle,
-                                                                RHI::TextureLayout::TransferSrc,
-                                                                RHI::TextureLayout::ColorAttachment);
-                                ++m_LastRenderGraphStats.PickingReadbackCopyCount;
-
-                                // GRAPHICS-074 Slice D.3 — record the per-
-                                // slot metadata the next BeginFrame() drain
-                                // keys off. The slot arrays were sized to
-                                // `frames-in-flight` in
-                                // InitializeOperationalPassResources(), so
-                                // `slot` is always within range when we
-                                // reach this site (operational device =>
-                                // arrays sized). `Invalidated` is reset to
-                                // false on issue because the copy we just
-                                // recorded supersedes any prior slot
-                                // contents; a subsequent
-                                // RebuildOperationalResources() may flip it
-                                // back to true before the drain runs.
-                                if (slot < m_PickingSlotPending.size())
-                                {
-                                    m_PickingSlotPending[slot] = true;
-                                    m_PickingSlotIssuedFrame[slot] = frame.FrameIndex;
-                                    m_PickingSlotRequest[slot] = PickPixelRequest{
-                                        .X = pickX,
-                                        .Y = pickY,
-                                        .Pending = true,
-                                    };
-                                    m_PickingSlotInvalidated[slot] = false;
-                                    // RUNTIME-089 — record the runtime
-                                    // correlation token for this slot so the
-                                    // drain can replay it on the readback.
-                                    m_PickingSlotSequence[slot] = renderWorld.PickRequest.Sequence;
-                                }
-                            }
-                        }
-                    }
-                    else if (passName == std::string_view{"ReconstructionPass"})
-                    {
-                        const RenderCommandPassStatus status =
-                            RecordReconstructionPass(frame.FrameIndex);
-                        AccumulateCommandRecordStatus(passName, status);
-                    }
-                    else if (passName == std::string_view{"PostProcessPass"})
-                    {
-                        // GRAPHICS-075 Slice A — default-recipe postprocess
-                        // umbrella branch. The recipe declares
-                        // `"PostProcessPass"` whenever
-                        // `features.EnablePostProcess` is true (its current
-                        // unconditional default in
-                        // `DeriveDefaultFrameRecipeFeatures`). Slice B.1
-                        // fans out to Bloom (downsample + upsample) before
-                        // ToneMap so the bloom write naturally precedes the
-                        // tonemap read of `PostProcess.BloomScratch` in
-                        // recorded order. Slice C splits FXAA into its own
-                        // ordered graph pass, and Slice D.2a further
-                        // splits the AA umbrella into three ordered
-                        // passes (`"PostProcessAA{Edge,Blend,Resolve}Pass"`,
-                        // see the dedicated executor branches below) so
-                        // edge / blend / resolve pipelines can target
-                        // format-incompatible color attachments. Slice E
-                        // will add the Histogram sub-pass behind this
-                        // same `"PostProcessPass"` branch. The status is
-                        // accumulated under the single `"PostProcessPass"`
-                        // name to keep the executor's per-pass status
-                        // taxonomy the same shape the rest of the recipe
-                        // uses: any sub-pass that records bumps the
-                        // aggregate to `Recorded`; a sub-pass with a
-                        // not-yet-ready pipeline downgrades to
-                        // `SkippedUnavailable` per
-                        // `AccumulateCommandRecordStatus`'s usual rules;
-                        // a non-operational device produces
-                        // `SkippedNonOperational` uniformly.
-                        // GRAPHICS-075 Slice B.2 — resolve the per-frame
-                        // `PostProcess.BloomScratch` transient handle from
-                        // the compiled graph and republish it to the bloom
-                        // pass alongside the *effective* mip-chain depth
-                        // (clamped via `ComputeBloomMipChainLevels` against
-                        // the current viewport extent — Vulkan rejects
-                        // `mipLevels > floor(log2(max(W, H))) + 1`). The
-                        // recipe-side `BuildDefaultFrameRecipe` declares
-                        // `BloomScratch` with the same helper, so the pass-
-                        // side iteration count matches the allocated
-                        // texture's actual mip range. The lookup walks the
-                        // compiled `TextureNames`/`TextureHandles` parallel
-                        // arrays the same way the picking executor route
-                        // resolves `EntityId`/`PrimitiveId` upstream. When
-                        // the transient resource is absent (e.g. when
-                        // `EnablePostProcess = false`) we publish
-                        // `TextureHandle{}` + a degenerate single-mip count;
-                        // the pass body early-skips the iteration in that
-                        // case rather than recording over a missing
-                        // attachment.
-                        if (m_PostProcessBloomPass.has_value())
-                        {
-                            RHI::TextureHandle bloomScratchHandle{};
-                            for (std::size_t i = 0; i < compiled->TextureNames.size(); ++i)
-                            {
-                                if (i >= compiled->TextureHandles.size())
-                                {
-                                    break;
-                                }
-                                if (compiled->TextureNames[i] == std::string_view{"PostProcess.BloomScratch"})
-                                {
-                                    bloomScratchHandle = compiled->TextureHandles[i];
-                                    break;
-                                }
-                            }
-                            const Core::Extent2D bloomExtent = m_Device != nullptr
-                                ? m_Device->GetBackbufferExtent()
-                                : Core::Extent2D{.Width = 1, .Height = 1};
-                            const std::uint32_t bloomWidth = bloomExtent.Width > 0
-                                ? static_cast<std::uint32_t>(bloomExtent.Width)
-                                : 1u;
-                            const std::uint32_t bloomHeight = bloomExtent.Height > 0
-                                ? static_cast<std::uint32_t>(bloomExtent.Height)
-                                : 1u;
-                            const std::uint32_t bloomMipLevels =
-                                ComputeBloomMipChainLevels(bloomWidth, bloomHeight);
-                            m_PostProcessBloomPass->SetBloomScratch(bloomScratchHandle, bloomMipLevels);
-                        }
-                        const RenderCommandPassStatus bloomStatus =
-                            RecordPostProcessBloomPass(graphicsContext, camera);
-                        AccumulateCommandRecordStatus(passName, bloomStatus);
-                        const RenderCommandPassStatus toneMapStatus =
-                            RecordPostProcessToneMapPass(graphicsContext, camera);
-                        AccumulateCommandRecordStatus(passName, toneMapStatus);
-                    }
-                    else if (passName == std::string_view{"PostProcessHistogramPass"})
-                    {
-                        // GRAPHICS-075 Slice E.1 — the histogram compute
-                        // dispatch lives in its own ordered graph pass
-                        // before `"PostProcessPass"` because Vulkan
-                        // forbids `vkCmdDispatch` inside an active
-                        // render-pass scope. Publish the backbuffer
-                        // extent so the dispatch shape (`ceil(W/16) x
-                        // ceil(H/16) x 1`, matching the shader's
-                        // `local_size_x = local_size_y = 16` tile) tracks
-                        // the runtime viewport rather than the stale
-                        // `(1, 1, 1)` the Slice A stub recorded, and
-                        // publish the per-frame `PostProcess.Histogram`
-                        // transient buffer handle so the pass body can
-                        // zero-fill the 256 bins before dispatching
-                        // (the shader accumulates via `atomicAdd`, so
-                        // without a per-frame clear the transient
-                        // allocator's reused contents from prior frames
-                        // would contaminate the next frame's luminance
-                        // distribution and corrupt Slice E.2's
-                        // exposure-adaptation readback). With
-                        // `EnableHistogram == false` the pass body
-                        // short-circuits and the helper still reports
-                        // `Recorded` per the structurally-recorded-no-op
-                        // taxonomy bloom / FXAA / SMAA already follow.
-                        RHI::BufferHandle histogramHandle{};
-                        for (std::size_t i = 0; i < compiled->BufferNames.size(); ++i)
-                        {
-                            if (i >= compiled->BufferHandles.size())
-                            {
-                                break;
-                            }
-                            if (compiled->BufferNames[i] == std::string_view{"PostProcess.Histogram"})
-                            {
-                                histogramHandle = compiled->BufferHandles[i];
-                                break;
-                            }
-                        }
-                        if (m_PostProcessHistogramPass.has_value())
-                        {
-                            const Core::Extent2D histogramExtent = m_Device != nullptr
-                                ? m_Device->GetBackbufferExtent()
-                                : Core::Extent2D{.Width = 1, .Height = 1};
-                            const std::uint32_t histogramWidth = histogramExtent.Width > 0
-                                ? static_cast<std::uint32_t>(histogramExtent.Width)
-                                : 1u;
-                            const std::uint32_t histogramHeight = histogramExtent.Height > 0
-                                ? static_cast<std::uint32_t>(histogramExtent.Height)
-                                : 1u;
-                            m_PostProcessHistogramPass->SetViewport(histogramWidth, histogramHeight);
-                            m_PostProcessHistogramPass->SetHistogramBuffer(histogramHandle);
-                        }
-                        const RenderCommandPassStatus status =
-                            RecordPostProcessHistogramPass(graphicsContext, camera);
-                        AccumulateCommandRecordStatus(passName, status);
-
-                        // GRAPHICS-075 Slice E.2 — record the per-frame
-                        // `CopyBuffer(PostProcess.Histogram → Histogram.Readback
-                        // @ slot * 1024)` after the histogram compute dispatch
-                        // so the next frame's `BeginFrame()`-side drain can
-                        // decode the 256-bin payload and publish it to
-                        // `PostProcessSystem::PublishHistogramReadback(...)`.
-                        // The copy is gated on:
-                        //   (a) the histogram helper actually recording
-                        //       (`status == Recorded` — operational device +
-                        //       valid pipeline + populated `PostProcessSystem`),
-                        //   (b) the histogram *stage* being live
-                        //       (`IsStageEnabled(Histogram)` — the helper
-                        //       returns `Recorded` even when the stage is off,
-                        //       under the standing "structurally-recorded
-                        //       no-op" taxonomy bloom / FXAA / SMAA also
-                        //       follow; the pass body early-returns without
-                        //       dispatching, so the transient
-                        //       `PostProcess.Histogram` buffer is never
-                        //       zero-filled or atomically populated this
-                        //       frame, and a copy here would publish
-                        //       undefined transient-allocator bytes into the
-                        //       exposure-history mirror through the next
-                        //       drain — corrupting adaptation state even
-                        //       though the histogram is disabled),
-                        //   (c) the renderer's `Histogram.Readback` lease
-                        //       being valid,
-                        //   (d) the recipe having compiled a transient
-                        //       `PostProcess.Histogram` handle into the graph.
-                        // The bracketing `ShaderWrite → TransferRead →
-                        // ShaderWrite` buffer barrier pair makes the atomic
-                        // accumulations visible to the copy and restores the
-                        // shader-write state so downstream consumers of the
-                        // histogram buffer (none today; landed under the
-                        // exposure-history Slice E.2 plan but consumed by
-                        // future GPU-side tonemap iterations) observe valid
-                        // state.
-                        const bool histogramStageLive =
-                            m_PostProcessSystem.has_value() &&
-                            m_PostProcessSystem->IsStageEnabled(PostProcessStageKind::Histogram);
-                        if (status == RenderCommandPassStatus::Recorded &&
-                            histogramStageLive &&
-                            m_HistogramReadbackBuffer.has_value() &&
-                            m_HistogramReadbackBuffer->IsValid() &&
-                            histogramHandle.IsValid())
-                        {
-                            const RHI::BufferHandle readbackBuffer =
-                                m_HistogramReadbackBuffer->GetHandle();
-                            const std::uint32_t framesInFlight =
-                                std::max(1u, m_Device->GetFramesInFlight());
-                            const std::uint32_t slot =
-                                frame.FrameIndex % framesInFlight;
-                            const std::uint64_t slotOffset =
-                                static_cast<std::uint64_t>(slot) *
-                                kHistogramReadbackSlotBytes;
-
-                            graphicsContext.BufferBarrier(histogramHandle,
-                                                          RHI::MemoryAccess::ShaderWrite,
-                                                          RHI::MemoryAccess::TransferRead);
-                            graphicsContext.CopyBuffer(histogramHandle,
-                                                       readbackBuffer,
-                                                       /*srcOffset=*/0u,
-                                                       /*dstOffset=*/slotOffset,
-                                                       /*sizeBytes=*/kHistogramReadbackSlotBytes);
-                            graphicsContext.BufferBarrier(histogramHandle,
-                                                          RHI::MemoryAccess::TransferRead,
-                                                          RHI::MemoryAccess::ShaderWrite);
-                            ++m_LastRenderGraphStats.HistogramReadbackCopyCount;
-
-                            if (slot < m_HistogramSlotPending.size())
-                            {
-                                m_HistogramSlotPending[slot] = true;
-                                m_HistogramSlotIssuedFrame[slot] = frame.FrameIndex;
-                                m_HistogramSlotInvalidated[slot] = false;
-                            }
-                        }
-                    }
-                    else if (passName == std::string_view{"PostProcessAAEdgePass"})
-                    {
-                        // GRAPHICS-075 Slice D.2a — the AA umbrella splits
-                        // into three ordered graph passes so edge / blend
-                        // / resolve pipelines can target format-
-                        // incompatible color attachments (`RG8_UNORM` /
-                        // `RGBA8_UNORM` / backbuffer). SMAA edge records
-                        // here when `AntiAliasing == SMAA`; otherwise the
-                        // pass body short-circuits to a no-op and the
-                        // helper still returns `Recorded` under the same
-                        // "structurally-recorded no-op" taxonomy bloom
-                        // and FXAA already follow.
-                        const RenderCommandPassStatus status =
-                            RecordPostProcessAAEdgePass(graphicsContext, camera);
-                        AccumulateCommandRecordStatus(passName, status);
-                    }
-                    else if (passName == std::string_view{"PostProcessAABlendPass"})
-                    {
-                        // GRAPHICS-075 Slice D.2a — SMAA blend records
-                        // here when `AntiAliasing == SMAA`; mutually
-                        // exclusive with FXAA, which records under the
-                        // resolve pass only.
-                        const RenderCommandPassStatus status =
-                            RecordPostProcessAABlendPass(graphicsContext, camera);
-                        AccumulateCommandRecordStatus(passName, status);
-                    }
-                    else if (passName == std::string_view{"PostProcessAAResolvePass"})
-                    {
-                        // GRAPHICS-075 Slice D.2a — both FXAA and SMAA
-                        // resolve write `PostProcess.AATemp.Resolved` in
-                        // the resolve graph pass. FXAA samples
-                        // `SceneColorLDR` directly; SMAA resolve samples
-                        // `SceneColorLDR` + `AATemp.Weights`. Both bodies
-                        // are gated on `IsStageEnabled` per
-                        // `PostProcessSettings::AntiAliasing`, so only
-                        // the active mode emits bind/push/draw; the
-                        // helper still returns `Recorded` when both
-                        // bodies short-circuit (e.g. `AntiAliasing ==
-                        // None`).
-                        const RenderCommandPassStatus status =
-                            RecordPostProcessAAResolvePass(graphicsContext, camera);
-                        AccumulateCommandRecordStatus(passName, status);
-                    }
-                    else if (passName == std::string_view{"TransientDebugSurfacePass"})
-                    {
-                        // GRAPHICS-077 Slices B + C — operational branch
-                        // for the transient-debug surface overlay. The
-                        // recipe declares this pass only when at least
-                        // one transient debug primitive packet exists
-                        // (`features.EnableTransientDebugSurface`
-                        // derived from per-lane span emptiness in
-                        // `DeriveDefaultFrameRecipeFeatures`), so this
-                        // branch is reached only when the world has
-                        // submitted transient debug payload for the
-                        // frame. All three lanes (triangle, line,
-                        // point) are operational: the helper packs
-                        // each lane's packets into its own host-
-                        // visible vertex buffer through
-                        // `m_TransientDebugUploadHelper`, and
-                        // `Execute{Triangles,Lines,Points}(...)`
-                        // records the per-packet `BindPipeline +
-                        // PushConstants + Draw(N, 1, 0, 0)` shape
-                        // (N = 3 / 2 / 1). `Recorded` when at least
-                        // one lane recorded its draws,
-                        // `SkippedUnavailable` when every submitted
-                        // lane failed its pipeline gate.
-                        const RenderCommandPassStatus status =
-                            RecordTransientDebugSurfacePass(graphicsContext, renderWorld);
-                        AccumulateCommandRecordStatus(passName, status);
-                    }
-                    else if (passName == std::string_view{"VisualizationOverlayPass"})
-                    {
-                        // GRAPHICS-078 Slice B — operational branch for
-                        // the canonical default-recipe visualization-
-                        // overlay pass. The recipe declares this pass
-                        // only when at least one visualization-overlay
-                        // packet (vector field or isoline) exists
-                        // (`features.EnableVisualizationOverlay`
-                        // derived from per-kind span emptiness in
-                        // `DeriveDefaultFrameRecipeFeatures`), so this
-                        // branch is reached only when the world has
-                        // submitted overlay payload for the frame.
-                        // Vector-field lane is operational: the helper
-                        // packs each packet's `2 * ElementCount` glyph
-                        // endpoints into a host-visible vertex buffer
-                        // through `m_VisualizationOverlayUploadHelper`,
-                        // and `ExecuteVectorFields(...)` records the
-                        // per-packet `BindPipeline + PushConstants +
-                        // Draw(2 * ElementCount, 1, 0, 0)` shape.
-                        // Isoline lane still increments
-                        // `MissingPipelineSkipCount` until Slice C
-                        // wires its operational path. `Recorded` when
-                        // at least one lane recorded its draws,
-                        // `SkippedUnavailable` when every submitted
-                        // lane failed its pipeline gate.
-                        const RenderCommandPassStatus status =
-                            RecordVisualizationOverlayPass(graphicsContext, renderWorld);
-                        AccumulateCommandRecordStatus(passName, status);
-                    }
-                    else if (passName == std::string_view{"ImGuiPass"})
-                    {
-                        // GRAPHICS-079 Slice D.1 — default-recipe canonical
-                        // ImGui overlay route. The recipe declares
-                        // `"ImGuiPass"` every default-recipe frame
-                        // (`features.EnableImGui` defaults true) and gives it
-                        // a load/store `FrameRecipe.PresentSource` color
-                        // attachment, so submitted overlay payload records
-                        // inside a real render-pass scope. `RecordImGuiPass`
-                        // mirrors the present/debug-view taxonomy:
-                        // non-operational device → `SkippedNonOperational`;
-                        // no active render pass / no attached overlay system /
-                        // missing pipeline lease / no submitted overlay work /
-                        // failed transient upload → `SkippedUnavailable`;
-                        // otherwise the consumer-side `ImGuiPass::Execute`
-                        // records the per-draw-list `BindIndexBuffer +
-                        // PushConstants + DrawIndexed` blocks and returns
-                        // `Recorded`. The runtime hands the engine-owned
-                        // overlay system in via `SetImGuiOverlaySystem`
-                        // (`RUNTIME-090` producer ↔ this consumer).
-                        const RenderCommandPassStatus status =
-                            RecordImGuiPass(graphicsContext, activeRenderPass.FirstColorFormat);
-                        AccumulateCommandRecordStatus(passName, status);
-                    }
-                    else if (passName == std::string_view{"Present"})
-                    {
-                        // GRAPHICS-076 Slice A — default-recipe canonical
-                        // present route. The recipe always declares
-                        // `"Present"` as the end-of-graph finalization
-                        // pass (it reads `FrameRecipe.PresentSource` and
-                        // the imported `Backbuffer`), so this branch is
-                        // reached every frame in the default recipe.
-                        // `RecordPresentPass` mirrors the other default-
-                        // recipe helpers' taxonomy: non-operational device
-                        // → `SkippedNonOperational`; missing pipeline lease
-                        // → `SkippedUnavailable`; otherwise the canonical
-                        // fullscreen `BindPipeline + Draw(3, 1, 0, 0)`
-                        // shape records and we return `Recorded`.
-                        const RenderCommandPassStatus status =
-                            RecordPresentPass(graphicsContext);
-                        AccumulateCommandRecordStatus(passName, status);
-                    }
-                    else if (passName == std::string_view{"DebugViewPass"})
-                    {
-                        // GRAPHICS-076 Slice B — default-recipe canonical
-                        // debug-view route. The recipe declares
-                        // `"DebugViewPass"` only when
-                        // `features.EnableDebugView` is true (set from
-                        // `world.DebugOverlayEnabled ||
-                        // world.DebugPrimitives.HasTransientDebug` in
-                        // `DeriveDefaultFrameRecipeFeatures`), so this
-                        // branch is reached only when the world has
-                        // requested a debug overlay. The renderer-side
-                        // `m_DebugViewSystem` has already had
-                        // `SetSettings + ResolveSelection` driven for this
-                        // frame above (right after
-                        // `DescribeDefaultFrameRecipe` produced
-                        // `recipeIntrospection`), so the executor only
-                        // needs to fan into `RecordDebugViewPass(...)`.
-                        // `RecordDebugViewPass` returns
-                        // `SkippedNonOperational` for a non-operational
-                        // device, `SkippedUnavailable` when the pipeline
-                        // lease / pass / system / resolved selection is
-                        // missing or disabled, and `Recorded` when the
-                        // fullscreen `BindPipeline + PushConstants(16) +
-                        // Draw(3, 1, 0, 0)` shape lands on the command
-                        // context.
-                        const RenderCommandPassStatus status =
-                            RecordDebugViewPass(graphicsContext, camera);
-                        AccumulateCommandRecordStatus(passName, status);
-                    }
-                    else
-                    {
-                        // GRAPHICS-018 §4: surface/deferred/debug pass command bodies
-                        // are not yet wired to operational Vulkan resources. They
-                        // soft-skip with structured diagnostics so the executor
-                        // emits the same render-graph barriers and the renderer
-                        // reports complete per-pass status, while preserving
-                        // backend-neutral RHI traffic. The status splits cleanly
-                        // by device readiness: a non-operational device reports
-                        // SkippedNonOperational so CPU CI surfaces accidental
-                        // operational claims, and an operational device reports
-                        // SkippedUnavailable so future per-pass routing changes
-                        // don't silently regress to a no-op.
-                        const RenderCommandPassStatus status =
-                            (m_Device == nullptr || !m_Device->IsOperational())
-                                ? RenderCommandPassStatus::SkippedNonOperational
-                                : RenderCommandPassStatus::SkippedUnavailable;
-                        AccumulateCommandRecordStatus(passName, status);
-                    }
-                    endActiveRenderPass();
+                    EndActiveRenderPassForRoute(graphicsContext, routeContext);
                 };
 
             const RHI::QueueCapabilityProfile frameGraphQueueProfile =
@@ -2771,7 +2109,7 @@ namespace Extrinsic::Graphics
                                     m_LastRenderGraphStats.CommandRecords.Passes.end(),
                                     [](const RenderGraphCommandPassStats& pass)
                                     {
-                                        return pass.Name == "TransientDebugSurfacePass" &&
+                                        return pass.Id == ToFramePassId(FrameRecipePassKind::TransientDebugSurface) &&
                                                pass.Status == RenderCommandPassStatus::Recorded;
                                     });
                     const auto visualizationOverlayRecordedThisFrame =
@@ -2779,7 +2117,7 @@ namespace Extrinsic::Graphics
                                     m_LastRenderGraphStats.CommandRecords.Passes.end(),
                                     [](const RenderGraphCommandPassStats& pass)
                                     {
-                                        return pass.Name == "VisualizationOverlayPass" &&
+                                        return pass.Id == ToFramePassId(FrameRecipePassKind::VisualizationOverlay) &&
                                                pass.Status == RenderCommandPassStatus::Recorded;
                                     });
 
@@ -6010,6 +5348,31 @@ namespace Extrinsic::Graphics
             return out;
         }
 
+        struct RenderCommandRouteContext
+        {
+            const RHI::CameraUBO* Camera = nullptr;
+            const RHI::FrameHandle* Frame = nullptr;
+            const RenderWorld* World = nullptr;
+            const CompiledRenderGraph* Compiled = nullptr;
+            const ActiveRenderPassDesc* ActiveRenderPass = nullptr;
+            bool* RenderPassEnded = nullptr;
+            bool DefaultRecipeUsesDeferred = false;
+        };
+
+        [[nodiscard]] static RenderCommandRouteContext& RouteContextFrom(void* context) noexcept;
+        static void EndActiveRenderPassForRoute(RHI::ICommandContext& cmd,
+                                                RenderCommandRouteContext& context);
+        void RegisterCommandRoutes();
+        void RecordPickingCommandRoute(const RenderCommandRoute& route,
+                                       RHI::ICommandContext& cmd,
+                                       RenderCommandRouteContext& context);
+        void RecordPostProcessCommandRoute(const RenderCommandRoute& route,
+                                           RHI::ICommandContext& cmd,
+                                           RenderCommandRouteContext& context);
+        void RecordPostProcessHistogramCommandRoute(const RenderCommandRoute& route,
+                                                    RHI::ICommandContext& cmd,
+                                                    RenderCommandRouteContext& context);
+
         [[nodiscard]] static bool CompatibleTextureDesc(const RHI::TextureDesc& lhs,
                                                         const RHI::TextureDesc& rhs) noexcept
         {
@@ -6378,10 +5741,12 @@ namespace Extrinsic::Graphics
         }
 
         void AccumulateCommandRecordStatus(const std::string_view passName,
+                                           const FramePassId passId,
                                            const RenderCommandPassStatus status)
         {
             m_LastRenderGraphStats.CommandRecords.Passes.push_back(RenderGraphCommandPassStats{
                 .Name = std::string{passName},
+                .Id = passId,
                 .Status = status,
             });
 
@@ -7720,6 +7085,7 @@ namespace Extrinsic::Graphics
         RHI::IDevice*                        m_Device{nullptr};
         RenderGraph                          m_RenderGraph;
         RenderGraphExecutor                  m_RenderGraphExecutor;
+        RenderCommandRouter                  m_CommandRouter;
         std::vector<std::vector<RHI::TextureHandle>> m_FrameTransientTextures{};
         std::vector<std::vector<RHI::BufferHandle>>  m_FrameTransientBuffers{};
         std::vector<std::vector<RHI::TextureDesc>>   m_FrameTransientTextureDescs{};
@@ -8144,6 +7510,427 @@ namespace Extrinsic::Graphics
         RHI::BufferHandle                    m_VisualizationOverlayReadbackBuffer{};
         RenderGraphFrameStats                m_LastRenderGraphStats;
     };
+
+    NullRenderer::RenderCommandRouteContext& NullRenderer::RouteContextFrom(void* context) noexcept
+    {
+        return *static_cast<RenderCommandRouteContext*>(context);
+    }
+
+    void NullRenderer::EndActiveRenderPassForRoute(RHI::ICommandContext& cmd,
+                                                   RenderCommandRouteContext& context)
+    {
+        if (context.RenderPassEnded != nullptr &&
+            context.ActiveRenderPass != nullptr &&
+            !*context.RenderPassEnded &&
+            context.ActiveRenderPass->HasAttachments)
+        {
+            cmd.EndRenderPass();
+            *context.RenderPassEnded = true;
+        }
+    }
+
+    void NullRenderer::RecordPickingCommandRoute(const RenderCommandRoute& route,
+                                                 RHI::ICommandContext& cmd,
+                                                 RenderCommandRouteContext& context)
+    {
+        const RHI::CameraUBO& camera = *context.Camera;
+        const RHI::FrameHandle& frame = *context.Frame;
+        const RenderWorld& renderWorld = *context.World;
+        const CompiledRenderGraph& compiled = *context.Compiled;
+
+        const RenderCommandPassStatus entityStatus =
+            RecordSelectionEntityIdPass(cmd, camera, frame.FrameIndex);
+        AccumulateCommandRecordStatus(route.DebugName, route.PassId, entityStatus);
+        const RenderCommandPassStatus faceStatus =
+            RecordSelectionFaceIdPass(cmd, camera, frame.FrameIndex);
+        AccumulateCommandRecordStatus(route.DebugName, route.PassId, faceStatus);
+        const RenderCommandPassStatus edgeStatus =
+            RecordSelectionEdgeIdPass(cmd, camera, frame.FrameIndex);
+        AccumulateCommandRecordStatus(route.DebugName, route.PassId, edgeStatus);
+        const RenderCommandPassStatus pointStatus =
+            RecordSelectionPointIdPass(cmd, camera, frame.FrameIndex);
+        AccumulateCommandRecordStatus(route.DebugName, route.PassId, pointStatus);
+
+        if (m_Device != nullptr && m_Device->IsOperational() &&
+            m_PickingReadbackBuffer.has_value() &&
+            m_PickingReadbackBuffer->IsValid() &&
+            renderWorld.PickRequest.Pending)
+        {
+            const RHI::BufferHandle pickingBuffer =
+                m_PickingReadbackBuffer->GetHandle();
+            RHI::TextureHandle entityIdHandle{};
+            RHI::TextureHandle primitiveIdHandle{};
+            for (std::size_t i = 0; i < compiled.TextureNames.size(); ++i)
+            {
+                if (i >= compiled.TextureHandles.size())
+                {
+                    break;
+                }
+                if (compiled.TextureNames[i] == std::string_view{"EntityId"})
+                {
+                    entityIdHandle = compiled.TextureHandles[i];
+                }
+                else if (compiled.TextureNames[i] == std::string_view{"PrimitiveId"})
+                {
+                    primitiveIdHandle = compiled.TextureHandles[i];
+                }
+            }
+            if (entityIdHandle.IsValid() && primitiveIdHandle.IsValid())
+            {
+                EndActiveRenderPassForRoute(cmd, context);
+                const std::uint32_t framesInFlight =
+                    std::max(1u, m_Device->GetFramesInFlight());
+                const std::uint32_t slot =
+                    frame.FrameIndex % framesInFlight;
+                const std::uint64_t slotOffset =
+                    static_cast<std::uint64_t>(slot) * 8ull;
+                const std::uint32_t pickX = renderWorld.PickRequest.X;
+                const std::uint32_t pickY = renderWorld.PickRequest.Y;
+
+                cmd.TextureBarrier(entityIdHandle,
+                                   RHI::TextureLayout::ColorAttachment,
+                                   RHI::TextureLayout::TransferSrc);
+                cmd.TextureBarrier(primitiveIdHandle,
+                                   RHI::TextureLayout::ColorAttachment,
+                                   RHI::TextureLayout::TransferSrc);
+                cmd.CopyTextureToBuffer(entityIdHandle,
+                                        RHI::TextureLayout::TransferSrc,
+                                        0u, 0u,
+                                        pickingBuffer,
+                                        slotOffset,
+                                        pickX, pickY,
+                                        1u, 1u);
+                cmd.CopyTextureToBuffer(primitiveIdHandle,
+                                        RHI::TextureLayout::TransferSrc,
+                                        0u, 0u,
+                                        pickingBuffer,
+                                        slotOffset + 4ull,
+                                        pickX, pickY,
+                                        1u, 1u);
+                cmd.TextureBarrier(entityIdHandle,
+                                   RHI::TextureLayout::TransferSrc,
+                                   RHI::TextureLayout::ColorAttachment);
+                cmd.TextureBarrier(primitiveIdHandle,
+                                   RHI::TextureLayout::TransferSrc,
+                                   RHI::TextureLayout::ColorAttachment);
+                ++m_LastRenderGraphStats.PickingReadbackCopyCount;
+
+                if (slot < m_PickingSlotPending.size())
+                {
+                    m_PickingSlotPending[slot] = true;
+                    m_PickingSlotIssuedFrame[slot] = frame.FrameIndex;
+                    m_PickingSlotRequest[slot] = PickPixelRequest{
+                        .X = pickX,
+                        .Y = pickY,
+                        .Pending = true,
+                    };
+                    m_PickingSlotInvalidated[slot] = false;
+                    m_PickingSlotSequence[slot] = renderWorld.PickRequest.Sequence;
+                }
+            }
+        }
+    }
+
+    void NullRenderer::RecordPostProcessCommandRoute(const RenderCommandRoute& route,
+                                                     RHI::ICommandContext& cmd,
+                                                     RenderCommandRouteContext& context)
+    {
+        const RHI::CameraUBO& camera = *context.Camera;
+        const CompiledRenderGraph& compiled = *context.Compiled;
+
+        if (m_PostProcessBloomPass.has_value())
+        {
+            RHI::TextureHandle bloomScratchHandle{};
+            for (std::size_t i = 0; i < compiled.TextureNames.size(); ++i)
+            {
+                if (i >= compiled.TextureHandles.size())
+                {
+                    break;
+                }
+                if (compiled.TextureNames[i] == std::string_view{"PostProcess.BloomScratch"})
+                {
+                    bloomScratchHandle = compiled.TextureHandles[i];
+                    break;
+                }
+            }
+            const Core::Extent2D bloomExtent = m_Device != nullptr
+                ? m_Device->GetBackbufferExtent()
+                : Core::Extent2D{.Width = 1, .Height = 1};
+            const std::uint32_t bloomWidth = bloomExtent.Width > 0
+                ? static_cast<std::uint32_t>(bloomExtent.Width)
+                : 1u;
+            const std::uint32_t bloomHeight = bloomExtent.Height > 0
+                ? static_cast<std::uint32_t>(bloomExtent.Height)
+                : 1u;
+            const std::uint32_t bloomMipLevels =
+                ComputeBloomMipChainLevels(bloomWidth, bloomHeight);
+            m_PostProcessBloomPass->SetBloomScratch(bloomScratchHandle, bloomMipLevels);
+        }
+        const RenderCommandPassStatus bloomStatus =
+            RecordPostProcessBloomPass(cmd, camera);
+        AccumulateCommandRecordStatus(route.DebugName, route.PassId, bloomStatus);
+        const RenderCommandPassStatus toneMapStatus =
+            RecordPostProcessToneMapPass(cmd, camera);
+        AccumulateCommandRecordStatus(route.DebugName, route.PassId, toneMapStatus);
+    }
+
+    void NullRenderer::RecordPostProcessHistogramCommandRoute(const RenderCommandRoute& route,
+                                                              RHI::ICommandContext& cmd,
+                                                              RenderCommandRouteContext& context)
+    {
+        const RHI::CameraUBO& camera = *context.Camera;
+        const RHI::FrameHandle& frame = *context.Frame;
+        const CompiledRenderGraph& compiled = *context.Compiled;
+
+        RHI::BufferHandle histogramHandle{};
+        for (std::size_t i = 0; i < compiled.BufferNames.size(); ++i)
+        {
+            if (i >= compiled.BufferHandles.size())
+            {
+                break;
+            }
+            if (compiled.BufferNames[i] == std::string_view{"PostProcess.Histogram"})
+            {
+                histogramHandle = compiled.BufferHandles[i];
+                break;
+            }
+        }
+        if (m_PostProcessHistogramPass.has_value())
+        {
+            const Core::Extent2D histogramExtent = m_Device != nullptr
+                ? m_Device->GetBackbufferExtent()
+                : Core::Extent2D{.Width = 1, .Height = 1};
+            const std::uint32_t histogramWidth = histogramExtent.Width > 0
+                ? static_cast<std::uint32_t>(histogramExtent.Width)
+                : 1u;
+            const std::uint32_t histogramHeight = histogramExtent.Height > 0
+                ? static_cast<std::uint32_t>(histogramExtent.Height)
+                : 1u;
+            m_PostProcessHistogramPass->SetViewport(histogramWidth, histogramHeight);
+            m_PostProcessHistogramPass->SetHistogramBuffer(histogramHandle);
+        }
+        const RenderCommandPassStatus status =
+            RecordPostProcessHistogramPass(cmd, camera);
+        AccumulateCommandRecordStatus(route.DebugName, route.PassId, status);
+
+        const bool histogramStageLive =
+            m_PostProcessSystem.has_value() &&
+            m_PostProcessSystem->IsStageEnabled(PostProcessStageKind::Histogram);
+        if (status == RenderCommandPassStatus::Recorded &&
+            histogramStageLive &&
+            m_HistogramReadbackBuffer.has_value() &&
+            m_HistogramReadbackBuffer->IsValid() &&
+            histogramHandle.IsValid())
+        {
+            const RHI::BufferHandle readbackBuffer =
+                m_HistogramReadbackBuffer->GetHandle();
+            const std::uint32_t framesInFlight =
+                std::max(1u, m_Device->GetFramesInFlight());
+            const std::uint32_t slot =
+                frame.FrameIndex % framesInFlight;
+            const std::uint64_t slotOffset =
+                static_cast<std::uint64_t>(slot) *
+                kHistogramReadbackSlotBytes;
+
+            cmd.BufferBarrier(histogramHandle,
+                              RHI::MemoryAccess::ShaderWrite,
+                              RHI::MemoryAccess::TransferRead);
+            cmd.CopyBuffer(histogramHandle,
+                           readbackBuffer,
+                           /*srcOffset=*/0u,
+                           /*dstOffset=*/slotOffset,
+                           /*sizeBytes=*/kHistogramReadbackSlotBytes);
+            cmd.BufferBarrier(histogramHandle,
+                              RHI::MemoryAccess::TransferRead,
+                              RHI::MemoryAccess::ShaderWrite);
+            ++m_LastRenderGraphStats.HistogramReadbackCopyCount;
+
+            if (slot < m_HistogramSlotPending.size())
+            {
+                m_HistogramSlotPending[slot] = true;
+                m_HistogramSlotIssuedFrame[slot] = frame.FrameIndex;
+                m_HistogramSlotInvalidated[slot] = false;
+            }
+        }
+    }
+
+    void NullRenderer::RegisterCommandRoutes()
+    {
+        m_CommandRouter.Clear();
+        const auto id = [](const FrameRecipePassKind kind) noexcept {
+            return ToFramePassId(kind);
+        };
+
+        m_CommandRouter.Register(id(FrameRecipePassKind::Culling),
+            [this](const RenderCommandRoute& route, RHI::ICommandContext& cmd, void* contextPointer) {
+                RenderCommandRouteContext& context = RouteContextFrom(contextPointer);
+                const RenderCommandPassStatus status = RecordCullingPass(cmd, *context.Camera);
+                AccumulateCommandRecordStatus(route.DebugName, route.PassId, status);
+            });
+
+        m_CommandRouter.Register(id(FrameRecipePassKind::DepthPrepass),
+            [this](const RenderCommandRoute& route, RHI::ICommandContext& cmd, void* contextPointer) {
+                RenderCommandRouteContext& context = RouteContextFrom(contextPointer);
+                const RenderCommandPassStatus status =
+                    RecordDepthPrepass(cmd, *context.Camera, context.Frame->FrameIndex);
+                AccumulateCommandRecordStatus(route.DebugName, route.PassId, status);
+            });
+
+        m_CommandRouter.Register(id(FrameRecipePassKind::HZBBuild),
+            [this](const RenderCommandRoute& route, RHI::ICommandContext& cmd, void*) {
+                const RenderCommandPassStatus status = RecordHZBBuildPass(cmd);
+                AccumulateCommandRecordStatus(route.DebugName, route.PassId, status);
+            });
+
+        m_CommandRouter.Register(id(FrameRecipePassKind::ClusterGridBuild),
+            [this](const RenderCommandRoute& route, RHI::ICommandContext& cmd, void*) {
+                const RenderCommandPassStatus status = RecordClusterGridBuildPass(cmd);
+                AccumulateCommandRecordStatus(route.DebugName, route.PassId, status);
+            });
+
+        m_CommandRouter.Register(id(FrameRecipePassKind::LightClusterAssignment),
+            [this](const RenderCommandRoute& route, RHI::ICommandContext& cmd, void*) {
+                const RenderCommandPassStatus status = RecordClusterLightAssignmentPass(cmd);
+                AccumulateCommandRecordStatus(route.DebugName, route.PassId, status);
+            });
+
+        m_CommandRouter.Register(id(FrameRecipePassKind::Surface),
+            [this](const RenderCommandRoute& route, RHI::ICommandContext& cmd, void* contextPointer) {
+                RenderCommandRouteContext& context = RouteContextFrom(contextPointer);
+                const RenderCommandPassStatus status = context.DefaultRecipeUsesDeferred
+                    ? RecordDeferredGBufferPass(cmd, *context.Camera, context.Frame->FrameIndex)
+                    : RecordForwardSurfacePass(cmd, *context.Camera, context.Frame->FrameIndex);
+                AccumulateCommandRecordStatus(route.DebugName, route.PassId, status);
+            });
+
+        m_CommandRouter.Register(id(FrameRecipePassKind::Composition),
+            [this](const RenderCommandRoute& route, RHI::ICommandContext& cmd, void* contextPointer) {
+                RenderCommandRouteContext& context = RouteContextFrom(contextPointer);
+                const RenderCommandPassStatus status =
+                    RecordDeferredLightingPass(cmd, *context.Camera, context.Frame->FrameIndex);
+                AccumulateCommandRecordStatus(route.DebugName, route.PassId, status);
+            });
+
+        m_CommandRouter.Register(id(FrameRecipePassKind::Line),
+            [this](const RenderCommandRoute& route, RHI::ICommandContext& cmd, void* contextPointer) {
+                RenderCommandRouteContext& context = RouteContextFrom(contextPointer);
+                const RenderCommandPassStatus status =
+                    RecordForwardLinePass(cmd, *context.Camera, context.Frame->FrameIndex);
+                AccumulateCommandRecordStatus(route.DebugName, route.PassId, status);
+            });
+
+        m_CommandRouter.Register(id(FrameRecipePassKind::Point),
+            [this](const RenderCommandRoute& route, RHI::ICommandContext& cmd, void* contextPointer) {
+                RenderCommandRouteContext& context = RouteContextFrom(contextPointer);
+                const RenderCommandPassStatus status =
+                    RecordForwardPointPass(cmd, *context.Camera, context.Frame->FrameIndex);
+                AccumulateCommandRecordStatus(route.DebugName, route.PassId, status);
+            });
+
+        m_CommandRouter.Register(id(FrameRecipePassKind::Shadow),
+            [this](const RenderCommandRoute& route, RHI::ICommandContext& cmd, void* contextPointer) {
+                RenderCommandRouteContext& context = RouteContextFrom(contextPointer);
+                const RenderCommandPassStatus status =
+                    RecordShadowPass(cmd, *context.Camera, context.Frame->FrameIndex);
+                AccumulateCommandRecordStatus(route.DebugName, route.PassId, status);
+            });
+
+        m_CommandRouter.Register(id(FrameRecipePassKind::SelectionOutline),
+            [this](const RenderCommandRoute& route, RHI::ICommandContext& cmd, void* contextPointer) {
+                RenderCommandRouteContext& context = RouteContextFrom(contextPointer);
+                const RenderCommandPassStatus status =
+                    RecordSelectionOutlinePass(cmd,
+                                               *context.Camera,
+                                               context.Frame->FrameIndex,
+                                               context.World->Selection);
+                AccumulateCommandRecordStatus(route.DebugName, route.PassId, status);
+            });
+
+        m_CommandRouter.Register(id(FrameRecipePassKind::Picking),
+            [this](const RenderCommandRoute& route, RHI::ICommandContext& cmd, void* contextPointer) {
+                RecordPickingCommandRoute(route, cmd, RouteContextFrom(contextPointer));
+            });
+
+        m_CommandRouter.Register(id(FrameRecipePassKind::Reconstruction),
+            [this](const RenderCommandRoute& route, RHI::ICommandContext&, void* contextPointer) {
+                RenderCommandRouteContext& context = RouteContextFrom(contextPointer);
+                const RenderCommandPassStatus status =
+                    RecordReconstructionPass(context.Frame->FrameIndex);
+                AccumulateCommandRecordStatus(route.DebugName, route.PassId, status);
+            });
+
+        m_CommandRouter.Register(id(FrameRecipePassKind::PostProcess),
+            [this](const RenderCommandRoute& route, RHI::ICommandContext& cmd, void* contextPointer) {
+                RecordPostProcessCommandRoute(route, cmd, RouteContextFrom(contextPointer));
+            });
+
+        m_CommandRouter.Register(id(FrameRecipePassKind::PostProcessHistogram),
+            [this](const RenderCommandRoute& route, RHI::ICommandContext& cmd, void* contextPointer) {
+                RecordPostProcessHistogramCommandRoute(route, cmd, RouteContextFrom(contextPointer));
+            });
+
+        m_CommandRouter.Register(id(FrameRecipePassKind::PostProcessAAEdge),
+            [this](const RenderCommandRoute& route, RHI::ICommandContext& cmd, void* contextPointer) {
+                RenderCommandRouteContext& context = RouteContextFrom(contextPointer);
+                const RenderCommandPassStatus status =
+                    RecordPostProcessAAEdgePass(cmd, *context.Camera);
+                AccumulateCommandRecordStatus(route.DebugName, route.PassId, status);
+            });
+
+        m_CommandRouter.Register(id(FrameRecipePassKind::PostProcessAABlend),
+            [this](const RenderCommandRoute& route, RHI::ICommandContext& cmd, void* contextPointer) {
+                RenderCommandRouteContext& context = RouteContextFrom(contextPointer);
+                const RenderCommandPassStatus status =
+                    RecordPostProcessAABlendPass(cmd, *context.Camera);
+                AccumulateCommandRecordStatus(route.DebugName, route.PassId, status);
+            });
+
+        m_CommandRouter.Register(id(FrameRecipePassKind::PostProcessAAResolve),
+            [this](const RenderCommandRoute& route, RHI::ICommandContext& cmd, void* contextPointer) {
+                RenderCommandRouteContext& context = RouteContextFrom(contextPointer);
+                const RenderCommandPassStatus status =
+                    RecordPostProcessAAResolvePass(cmd, *context.Camera);
+                AccumulateCommandRecordStatus(route.DebugName, route.PassId, status);
+            });
+
+        m_CommandRouter.Register(id(FrameRecipePassKind::TransientDebugSurface),
+            [this](const RenderCommandRoute& route, RHI::ICommandContext& cmd, void* contextPointer) {
+                RenderCommandRouteContext& context = RouteContextFrom(contextPointer);
+                const RenderCommandPassStatus status =
+                    RecordTransientDebugSurfacePass(cmd, *context.World);
+                AccumulateCommandRecordStatus(route.DebugName, route.PassId, status);
+            });
+
+        m_CommandRouter.Register(id(FrameRecipePassKind::VisualizationOverlay),
+            [this](const RenderCommandRoute& route, RHI::ICommandContext& cmd, void* contextPointer) {
+                RenderCommandRouteContext& context = RouteContextFrom(contextPointer);
+                const RenderCommandPassStatus status =
+                    RecordVisualizationOverlayPass(cmd, *context.World);
+                AccumulateCommandRecordStatus(route.DebugName, route.PassId, status);
+            });
+
+        m_CommandRouter.Register(id(FrameRecipePassKind::ImGui),
+            [this](const RenderCommandRoute& route, RHI::ICommandContext& cmd, void* contextPointer) {
+                RenderCommandRouteContext& context = RouteContextFrom(contextPointer);
+                const RenderCommandPassStatus status =
+                    RecordImGuiPass(cmd, context.ActiveRenderPass->FirstColorFormat);
+                AccumulateCommandRecordStatus(route.DebugName, route.PassId, status);
+            });
+
+        m_CommandRouter.Register(id(FrameRecipePassKind::Present),
+            [this](const RenderCommandRoute& route, RHI::ICommandContext& cmd, void*) {
+                const RenderCommandPassStatus status = RecordPresentPass(cmd);
+                AccumulateCommandRecordStatus(route.DebugName, route.PassId, status);
+            });
+
+        m_CommandRouter.Register(id(FrameRecipePassKind::DebugView),
+            [this](const RenderCommandRoute& route, RHI::ICommandContext& cmd, void* contextPointer) {
+                RenderCommandRouteContext& context = RouteContextFrom(contextPointer);
+                const RenderCommandPassStatus status =
+                    RecordDebugViewPass(cmd, *context.Camera);
+                AccumulateCommandRecordStatus(route.DebugName, route.PassId, status);
+            });
+    }
 
     std::unique_ptr<IRenderer> CreateRenderer()
     {

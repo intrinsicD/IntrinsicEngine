@@ -37,6 +37,7 @@ import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.FrameRecipe;
 import Extrinsic.Graphics.RenderGraph;
+export import Extrinsic.Graphics.RenderCommandRouter;
 // GRAPHICS-077 — re-export the upload helper module so consumers of
 // `RenderGraphFrameStats::TransientDebugUpload` (e.g. contract tests,
 // editor diagnostics) reach the `TransientDebugUploadDiagnostics`
@@ -73,13 +74,6 @@ import Extrinsic.Core.Config.Render;
 
 namespace Extrinsic::Graphics
 {
-    export enum class RenderCommandPassStatus : std::uint8_t
-    {
-        Recorded,
-        SkippedNonOperational,
-        SkippedUnavailable,
-    };
-
     export struct RenderGraphCompileStats
     {
         bool Succeeded = false;
@@ -106,6 +100,7 @@ namespace Extrinsic::Graphics
     export struct RenderGraphCommandPassStats
     {
         std::string Name{};
+        FramePassId Id{};
         RenderCommandPassStatus Status = RenderCommandPassStatus::SkippedUnavailable;
     };
 

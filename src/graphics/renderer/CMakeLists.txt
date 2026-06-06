@@ -8,6 +8,7 @@ target_sources(${target_name}
         Graphics.CameraSnapshots.cppm
         Graphics.Colormap.cppm
         Graphics.FrameRecipe.cppm
+        Graphics.RenderCommandRouter.cppm
         Graphics.Renderer.cppm
         Graphics.RenderFrameInput.cppm
         Graphics.RenderWorld.cppm
@@ -36,6 +37,7 @@ target_sources(${target_name}
         Graphics.TransientDebugUploadHelper.cppm
         Graphics.VisualizationOverlayUploadHelper.cppm
         PRIVATE
+        Graphics.RenderCommandRouter.cpp
         Graphics.Renderer.cpp
         Graphics.FrameRecipe.cpp
         Graphics.TransientDebugUploadHelper.cpp

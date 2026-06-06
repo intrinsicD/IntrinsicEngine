@@ -10,6 +10,7 @@ and renderer/render-graph orchestration.
 
 - `Extrinsic.Graphics.Renderer`
 - `Extrinsic.Graphics.FrameRecipe`
+- `Extrinsic.Graphics.RenderCommandRouter`
 - `Extrinsic.Graphics.RenderGraph`
 
 `Extrinsic.Graphics.RenderGraph` re-exports:
@@ -136,6 +137,11 @@ implementation.
   gates, typed pass/resource IDs, canonical diagnostic names, resource
   declarations, pass-order introspection, and the backend-agnostic graph
   construction path used by the null renderer.
+- `Graphics.RenderCommandRouter` owns the renderer command-recording dispatch
+  seam. The renderer registers command recorders by `FramePassId`, command
+  status records carry both `FramePassId` and the debug label, and unknown typed
+  pass IDs report the structured skipped status instead of silently recording a
+  no-op. Debug names remain diagnostics only; they are not routing keys.
 
 ### Shader push-constant compatibility policy
 
@@ -213,8 +219,8 @@ Concretely:
   predates the GpuScene seam (it declares `mat4 Model` + `PtrPositions`
   push constants plus `set = 0/2/3` descriptor sets) and is deliberately
   *not* referenced by the new pipeline; a dedicated lit forward-surface
-  shader is a GRAPHICS-072 follow-up. The executor's `"SurfacePass"` branch
-  routes to `RecordForwardSurfacePass(...)` only when the active
+  shader is a GRAPHICS-072 follow-up. The typed `SurfacePass` command route
+  invokes `RecordForwardSurfacePass(...)` only when the active
   default-recipe features select the forward lighting path; deferred mode
   routes to `RecordDeferredGBufferPass(...)` per GRAPHICS-072 Slice A. While
   GRAPHICS-072 is still open, `DeriveDefaultFrameRecipeFeatures()` selects
@@ -467,16 +473,16 @@ Concretely:
   pipelines. `Initialize()` emplaces
   `m_DeferredSystem` + `m_DeferredGBufferPass` *before* calling
   `InitializeOperationalPassResources()` so the publisher's `SetPipeline(...)`
-  actually lands on the pass on the initial operational path. The executor's
-  `"SurfacePass"` branch routes to `RecordDeferredGBufferPass(...)` when the
-  active default-recipe features select the deferred lighting path; forward
+  actually lands on the pass on the initial operational path. The typed
+  `SurfacePass` command route invokes `RecordDeferredGBufferPass(...)` when
+  the active default-recipe features select the deferred lighting path; forward
   mode continues to route to `RecordForwardSurfacePass(...)` per GRAPHICS-070.
   `IRenderer::SetLightingPath(FrameRecipeLightingPath)` is the renderer-stored
   test seam that flips the runtime `LightingPath` after
   `DeriveDefaultFrameRecipeFeatures()` derives the default (`Forward`); the
   derivation continues to return `Forward` by default so existing contract
-  tests stay green, and contract tests opt into the deferred-mode executor
-  branch by calling `SetLightingPath(FrameRecipeLightingPath::Deferred)`. The
+  tests stay green, and contract tests opt into the deferred-mode command route
+  by calling `SetLightingPath(FrameRecipeLightingPath::Deferred)`. The
   deferred-lighting shadow-atlas binding (originally specified as
   `set 1, binding 1`) is owned by GRAPHICS-072 Slice C; on the promoted
   Vulkan pipeline layout (bindless-only, `setLayoutCount = 1` with the
@@ -505,10 +511,10 @@ Concretely:
   satisfies, and feeding `DeferredLightingPushConstants` bytes into that
   layout would silently misinterpret `SceneTableBDA` as part of
   `mat4 InvViewProj[0]` — the same footgun shape Slice A documents above
-  and the renderer push-constant compatibility policy prohibits. The
-  executor's `"CompositionPass"` branch routes to
-  `RecordDeferredLightingPass(...)` whenever the recipe declares the pass
-  (i.e. `usesDeferred`); the cross-pass `SceneNormal`/`Albedo`/`Material0`
+  and the renderer push-constant compatibility policy prohibits. The typed
+  `CompositionPass` command route invokes `RecordDeferredLightingPass(...)`
+  whenever the recipe declares the pass (i.e. `usesDeferred`); the cross-pass
+  `SceneNormal`/`Albedo`/`Material0`
   `ColorAttachment → ShaderReadOnly` barriers are emitted by the framegraph
   compiler from the recipe's `Read(..., ShaderRead)` declarations on the
   CompositionPass. The full G-buffer/CameraUBO sampler wiring remains a
@@ -565,9 +571,9 @@ Concretely:
   `assets/shaders/pick_id.{vert,frag}` declares the pre-GpuScene
   `mat4 Model + PtrPositions + ... + uint EntityID` push block and is
   deliberately *not* referenced — see the "Shader push-constant
-  compatibility policy" subsection above for the explicit rule. The
-  executor's `"PickingPass"` branch routes to
-  `RecordSelectionEntityIdPass(...)` with the standard
+  compatibility policy" subsection above for the explicit rule. The typed
+  `PickingPass` command route invokes `RecordSelectionEntityIdPass(...)` with
+  the standard
   `SkippedNonOperational` / `SkippedUnavailable` / `Recorded` taxonomy.
   `Initialize()` emplaces `m_SelectionSystem` + `m_SelectionEntityIdPass`
   *before* calling `InitializeOperationalPassResources()` so the
@@ -639,8 +645,7 @@ Concretely:
   `assets/shaders/pick_line.{vert,frag}` /
   `assets/shaders/pick_point.{vert,frag}` shaders declare the pre-GpuScene
   push block and are deliberately *not* referenced — see the "Shader
-  push-constant compatibility policy" subsection above. The executor's
-  `"PickingPass"` branch now routes through
+  push-constant compatibility policy" subsection above. The typed `PickingPass` command route now invokes
   `RecordSelectionEntityIdPass(...)` then
   `RecordSelectionFaceIdPass(...)` then
   `RecordSelectionEdgeIdPass(...)` then
@@ -653,7 +658,7 @@ Concretely:
   `Picking.Readback` buffer + drain +
   `PublishPickResult`/`PublishNoHit` wiring (Slice D) remain.
 - GRAPHICS-074 Slice C wires the default-recipe `"SelectionOutlinePass"`
-  executor branch. `NullRenderer` owns `m_SelectionOutlinePass`
+  typed command route. `NullRenderer` owns `m_SelectionOutlinePass`
   (constructed against `m_SelectionSystem`, emplaced *before*
   `InitializeOperationalPassResources()` runs so the publisher's
   `SetPipeline(...)` actually lands on the pass on the initial operational
@@ -674,8 +679,8 @@ Concretely:
   `Passes/Pass.Selection.Outline.cppm`, which mirrors the
   `selection_outline.frag` `layout(push_constant) uniform Push { ... }`
   block byte-for-byte under Vulkan std430 (vec4 OutlineColor + vec4
-  HoverColor + 12 floats/uints + uint[16] SelectedIds). The executor's
-  `"SelectionOutlinePass"` branch routes through
+  HoverColor + 12 floats/uints + uint[16] SelectedIds). The typed
+  `SelectionOutlinePass` command route invokes
   `RecordSelectionOutlinePass(...)` with the standard
   `SkippedNonOperational` / `SkippedUnavailable` / `Recorded` taxonomy,
   and is reached only when `features.EnableSelectionOutline` is true
@@ -711,8 +716,8 @@ Concretely:
   publisher (call #23 per
   `tests/contract/graphics/Test.RendererFrameLifecycle.cpp`), placed
   after the postprocess histogram pipeline so the existing test
-  fixtures' `FailPipelineCreateCall` indices (1-22) remain explicit. On
-  the executor side, the `"Present"` branch routes through
+  fixtures' `FailPipelineCreateCall` indices (1-22) remain explicit. On the
+  executor side, the typed `Present` command route invokes
   `RecordPresentPass(...)` with the same `Recorded` /
   `SkippedNonOperational` / `SkippedUnavailable` taxonomy the other
   default-recipe pass helpers already use; no new per-pass counter is
@@ -763,8 +768,7 @@ Concretely:
   attachment format), and is created after present inside the operational
   publisher (call #24, immediately after present at #23) so the
   existing `FailPipelineCreateCall` indices (1-23) used by other
-  lifecycle / present tests remain stable. On the executor side, the
-  new `"DebugViewPass"` branch routes through
+  lifecycle / present tests remain stable. On the executor side, the typed `DebugViewPass` command route invokes
   `RecordDebugViewPass(graphicsContext, camera)` with the
   `Recorded` / `SkippedNonOperational` / `SkippedUnavailable` taxonomy
   the other default-recipe helpers use. Two new diagnostics surface on
@@ -815,8 +819,7 @@ Concretely:
   `Pass.Present` wiring rationale — without `SetRenderPass` the future
   bind/draw would land outside a render-pass scope, invalid on Vulkan).
   Renderer-side, `NullRenderer` owns a plain `m_TransientDebugSurfacePass`
-  member (no system dependency) and a new `"TransientDebugSurfacePass"`
-  executor branch routes through `RecordTransientDebugSurfacePass(...)`
+  member (no system dependency) and a typed `TransientDebugSurfacePass` command route invokes `RecordTransientDebugSurfacePass(...)`
   with the `SkippedNonOperational` / `SkippedUnavailable` taxonomy used
   by the other default-recipe helpers. The new
   `TransientDebugUploadDiagnostics` struct lives on
@@ -824,7 +827,7 @@ Concretely:
   counters (`UploadOverflowCount`, `{Line,Point,Triangle}RecordsSubmitted`,
   `{Line,Point,Triangle}RecordsRecorded`, `MissingPipelineSkipCount`).
   Slice A pinned all counters at zero except `MissingPipelineSkipCount`,
-  which incremented by one each frame the executor reached the branch
+  which incremented by one each frame the typed route was reached
   with an operational device but no pipeline (the scaffold-only
   signal that distinguished "feature on" from "feature off").
   GRAPHICS-077 Slice B promotes the triangle lane from
@@ -931,8 +934,7 @@ Concretely:
   depth)` so the framegraph compiler emits a real
   `CompiledRenderPassAttachment` pair before any future Slice B/C
   bind/draw lands. Renderer-side, `NullRenderer` owns a plain
-  `m_VisualizationOverlayPass` member (no system dependency) and a
-  new `"VisualizationOverlayPass"` executor branch routes through
+  `m_VisualizationOverlayPass` member (no system dependency) and a typed `VisualizationOverlayPass` command route invokes
   `RecordVisualizationOverlayPass(...)` with the
   `SkippedNonOperational` / `SkippedUnavailable` taxonomy used by the
   other default-recipe helpers. The new
@@ -1035,7 +1037,7 @@ Concretely:
   clear pixels.
 - GRAPHICS-079 wires the canonical default-recipe `Pass.ImGui`
   (`Extrinsic.Graphics.Pass.ImGui`) executor route on the CPU/null path.
-  Slice A added the explicit `"ImGuiPass"` executor branch, the renderer-owned
+  Slice A added the typed `ImGuiPass` route registration, the renderer-owned
   `std::optional<ImGuiPass>` consumer, the borrowed
   `ImGuiOverlaySystem* m_ImGuiOverlaySystem`, `IRenderer::SetImGuiOverlaySystem`
   / `HasImGuiOverlaySystem`, and ImGui pipeline leases for the active
@@ -1400,8 +1402,7 @@ Concretely:
   backbuffer-format color target, no depth, `PushConstantSize =
   sizeof(PostProcessPushConstants)`) is created in
   `InitializeOperationalPassResources(device)` and republished byte-identical
-  across `RebuildOperationalResources()`, and the recipe's
-  `"PostProcessPass"` umbrella executor branch routes through
+  across `RebuildOperationalResources()`, and the recipe's typed `PostProcessPass` umbrella command route invokes
   `RecordPostProcessToneMapPass(...)` with the recorded
   `SkippedNonOperational` / `SkippedUnavailable` / `Recorded` taxonomy.
   The pass body pushes the pass-local `PostProcessToneMapPushConstants`
@@ -1624,8 +1625,8 @@ Concretely:
   (`1024 * frames-in-flight` bytes, `HostVisible | TransferDst`)
   imported by the recipe through `FrameRecipeImports::HistogramReadback`,
   the per-frame `CopyBuffer(PostProcess.Histogram → Histogram.Readback
-  @ slot * 1024)` recorded by the `"PostProcessHistogramPass"`
-  executor branch after the compute dispatch (bracketed by
+  @ slot * 1024)` recorded by the typed `PostProcessHistogramPass` route after
+  the compute dispatch (bracketed by
   `ShaderWrite → TransferRead → ShaderWrite` buffer barriers on
   the per-frame `PostProcess.Histogram` handle so the atomic
   accumulations are visible to the copy), the `BeginFrame()`-side

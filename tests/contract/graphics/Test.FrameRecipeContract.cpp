@@ -291,12 +291,16 @@ TEST(FrameRecipeContract, DefaultRecipePropagatesTypedPassAndResourceIds)
         FindCompiledPassIndexForRecipeId(recipe, *compiled, ToFramePassId(FrameRecipePassKind::Surface));
     ASSERT_TRUE(surfaceIndex.has_value());
     ASSERT_LT(*surfaceIndex, compiled->PassNames.size());
+    ASSERT_LT(*surfaceIndex, compiled->PassIds.size());
+    EXPECT_EQ(compiled->PassIds[*surfaceIndex], ToFramePassId(FrameRecipePassKind::Surface));
     EXPECT_EQ(compiled->PassNames[*surfaceIndex], "SurfacePass");
 
     const std::optional<std::uint32_t> presentIndex =
         FindCompiledPassIndexForRecipeId(recipe, *compiled, ToFramePassId(FrameRecipePassKind::Present));
     ASSERT_TRUE(presentIndex.has_value());
     ASSERT_LT(*presentIndex, compiled->PassNames.size());
+    ASSERT_LT(*presentIndex, compiled->PassIds.size());
+    EXPECT_EQ(compiled->PassIds[*presentIndex], ToFramePassId(FrameRecipePassKind::Present));
     EXPECT_EQ(compiled->PassNames[*presentIndex], "Present");
 
     const std::optional<std::uint32_t> hdrRecipeIndex =
@@ -316,6 +320,25 @@ TEST(FrameRecipeContract, DefaultRecipePropagatesTypedPassAndResourceIds)
     ASSERT_TRUE(sceneTableIndex.has_value());
     ASSERT_LT(*sceneTableIndex, compiled->BufferNames.size());
     EXPECT_EQ(compiled->BufferNames[*sceneTableIndex], "GpuWorld.SceneTable");
+}
+
+TEST(FrameRecipeContract, CompiledPassLookupUsesTypedIdWhenDebugNameChanges)
+{
+    const FrameRecipeIntrospection recipe = DescribeDefaultFrameRecipe(FrameRecipeFeatures{});
+    RenderGraph graph;
+    const PassRef renamedSurface = graph.AddPass("RenamedSurfacePass", true);
+    ASSERT_TRUE(graph.SetPassId(renamedSurface, ToFramePassId(FrameRecipePassKind::Surface)).has_value());
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+
+    const std::optional<std::uint32_t> surfaceIndex =
+        FindCompiledPassIndexForRecipeId(recipe, *compiled, ToFramePassId(FrameRecipePassKind::Surface));
+    ASSERT_TRUE(surfaceIndex.has_value());
+    ASSERT_LT(*surfaceIndex, compiled->PassIds.size());
+    ASSERT_LT(*surfaceIndex, compiled->PassNames.size());
+    EXPECT_EQ(compiled->PassIds[*surfaceIndex], ToFramePassId(FrameRecipePassKind::Surface));
+    EXPECT_EQ(compiled->PassNames[*surfaceIndex], "RenamedSurfacePass");
 }
 
 TEST(FrameRecipeContract, TypedIdentityDoesNotChangeDebugNames)

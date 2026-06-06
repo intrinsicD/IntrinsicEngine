@@ -740,12 +740,18 @@ namespace Extrinsic::Graphics
         const CompiledRenderGraph& compiled,
         const FramePassId id)
     {
-        const std::optional<std::uint32_t> recipeIndex = FindFrameRecipePassIndexById(recipe, id);
-        if (!recipeIndex.has_value())
+        if (!FindFrameRecipePassIndexById(recipe, id).has_value())
         {
             return std::nullopt;
         }
-        return FindCompiledNameIndex(compiled.PassNames, recipe.Passes[*recipeIndex].Name);
+        for (std::uint32_t index = 0u; index < compiled.PassIds.size(); ++index)
+        {
+            if (compiled.PassIds[index] == id)
+            {
+                return index;
+            }
+        }
+        return std::nullopt;
     }
 
     std::optional<std::uint32_t> FindCompiledTextureIndexForRecipeId(

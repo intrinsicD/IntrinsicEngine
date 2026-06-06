@@ -180,6 +180,7 @@ namespace Extrinsic::Graphics
         std::vector<std::uint32_t> TopologicalOrder{};
         std::vector<std::uint32_t> TopologicalLayerByPass{};
         std::vector<std::string> PassNames{};
+        std::vector<FramePassId> PassIds{};
         std::vector<RenderQueue> PassQueues{};
         std::vector<bool> PassSideEffects{};
         std::vector<CompiledPassDeclarations> PassDeclarations{};

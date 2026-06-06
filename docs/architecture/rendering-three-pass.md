@@ -448,6 +448,11 @@ paths fail closed.
 
 `Extrinsic.Graphics.FrameRecipe::DescribeDefaultFrameRecipe()` reports this pass order with disabled optional stages retained as declarations for tooling/review, while `BuildDefaultFrameRecipe()` emits only enabled passes/resources into `Graphics.RenderGraph`. The recipe-owned typed IDs are the stable contract for addressing passes/resources; exact string names are retained for diagnostics, debug dumps, and user-facing inspection tables.
 
+During execution, `Extrinsic.Graphics.RenderCommandRouter` consumes the compiled
+`FramePassId` stream and dispatches command bodies by typed pass identity.
+`RenderGraphCommandRecordStats` keeps both the typed ID and debug name for
+diagnostics, but debug names do not select pass command bodies.
+
 ### Pass module naming
 
 The promoted graphics layer keeps a 1:1 mapping between logical passes documented above and the C++20 module names under `src/graphics/renderer/Passes/`. Agents and reviewers should treat the table below as canonical when reconciling task text, doc text, and source.

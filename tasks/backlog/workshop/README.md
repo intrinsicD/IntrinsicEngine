@@ -18,8 +18,9 @@ and absence of a standing architecture-review gate.
    `ExtrinsicPlatform`, and the strict layering check runs unguarded in
    `pr-fast` / `ci-linux-clang`.
 3. [`WORKSHOP-003` (done)](../../done/WORKSHOP-003-typed-frame-pass-and-resource-identity.md) and
-   [`WORKSHOP-004`](WORKSHOP-004-typed-command-router.md) — make frame-pass
-   identity typed and remove stringly command routing.
+   [`WORKSHOP-004` (done)](../../done/WORKSHOP-004-typed-command-router.md) —
+   make frame-pass identity typed and remove stringly command routing. Retired
+   2026-06-06.
 4. [`WORKSHOP-005`](WORKSHOP-005-renderer-subsystem-registry.md) and
    [`WORKSHOP-006`](WORKSHOP-006-extract-render-prep-pipeline.md) — split
    renderer responsibilities before the renderer becomes the new god object.
@@ -43,8 +44,8 @@ and absence of a standing architecture-review gate.
   WORKSHOP-002 removed; the strict `check_layering.py --root src --strict`
   run is now clean and `pr-fast` / `ci-linux-clang` invoke it directly
   (expected-failure wrapper deleted with WORKSHOP-002's retirement).
-- **WORKSHOP-004 ⇐ WORKSHOP-003 (done).** Typed command routing consumes the
-  typed pass identity introduced by WORKSHOP-003.
+- **WORKSHOP-004 (done) ⇐ WORKSHOP-003 (done).** Typed command routing consumes
+  the typed pass identity introduced by WORKSHOP-003. Retired 2026-06-06.
 - **WORKSHOP-006 ⇐ WORKSHOP-005.** Render-prep extraction is easier once
   subsystem ownership has been moved into the registry.
 - **WORKSHOP-007 ⇐ WORKSHOP-003.** Dependency-driven recipes benefit from

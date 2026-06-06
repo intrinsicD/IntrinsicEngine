@@ -885,6 +885,7 @@ namespace Extrinsic::Graphics
         TopologicalOrder = other.TopologicalOrder;
         TopologicalLayerByPass = other.TopologicalLayerByPass;
         PassNames = other.PassNames;
+        PassIds = other.PassIds;
         PassQueues = other.PassQueues;
         PassSideEffects = other.PassSideEffects;
         PassDeclarations = other.PassDeclarations;
@@ -932,6 +933,7 @@ namespace Extrinsic::Graphics
         TopologicalOrder = std::move(other.TopologicalOrder);
         TopologicalLayerByPass = std::move(other.TopologicalLayerByPass);
         PassNames = std::move(other.PassNames);
+        PassIds = std::move(other.PassIds);
         PassQueues = std::move(other.PassQueues);
         PassSideEffects = std::move(other.PassSideEffects);
         PassDeclarations = std::move(other.PassDeclarations);
@@ -1326,6 +1328,7 @@ namespace Extrinsic::Graphics
         std::vector<BufferState> bufferInitialStates(buffers.size(), BufferState::Undefined);
         std::vector<BufferState> bufferFinalStates(buffers.size(), BufferState::Undefined);
         std::vector<std::string> passNames(passCount);
+        std::vector<FramePassId> passIds(passCount);
         std::vector<RenderQueue> passQueues(passCount, RenderQueue::Graphics);
         std::vector<bool> passSideEffects(passCount, false);
         std::vector<CompiledRenderPassAttachment> renderPassAttachments{};
@@ -1369,6 +1372,7 @@ namespace Extrinsic::Graphics
         {
             const RenderPassRecord& pass = passes[passIndex];
             passNames[passIndex] = pass.Name;
+            passIds[passIndex] = pass.Id;
             passQueues[passIndex] = pass.Queue;
             passSideEffects[passIndex] = pass.SideEffect;
             passDeclarations[passIndex].PassIndex = passIndex;
@@ -2001,6 +2005,7 @@ namespace Extrinsic::Graphics
         compiled.TopologicalOrder = std::move(order);
         compiled.TopologicalLayerByPass = std::move(layerByPass);
         compiled.PassNames = std::move(passNames);
+        compiled.PassIds = std::move(passIds);
         compiled.PassQueues = std::move(passQueues);
         compiled.PassSideEffects = std::move(passSideEffects);
         compiled.PassDeclarations = std::move(passDeclarations);
