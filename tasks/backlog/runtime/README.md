@@ -142,5 +142,6 @@ these as runtime work when scheduling and review:
 - [`AGENTS.md`](../../../AGENTS.md) — authoritative repository agent contract.
 - [`tasks/backlog/rendering/README.md`](../rendering/README.md) — rendering
   backlog DAG and selection rules.
-- [`tasks/backlog/rendering/GRAPHICS-001-rendering-parity-inventory.md`](../rendering/GRAPHICS-001-rendering-parity-inventory.md) —
-  canonical rendering backlog index.
+- [`GRAPHICS-001 — Rendering parity inventory and task index`](../../done/GRAPHICS-001-rendering-parity-inventory.md) —
+  retired rendering parity seed; current rendering selection lives in the
+  rendering backlog DAG above.

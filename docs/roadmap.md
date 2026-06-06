@@ -69,7 +69,7 @@ Runtime/frame-pipeline execution work is tracked through the structured task sys
 
 This architecture track is intentionally cross-cutting: it enables later rendering, streaming, and interaction work without reordering the feature roadmap below.
 
-**GPU-driven pipeline plan:** [docs/architecture/gpu-driven-modular-rendering-pipeline-plan.md](architecture/gpu-driven-modular-rendering-pipeline-plan.md) provides the concrete implementation plan for GPU-driven visibility, unified GPU scene topology, and modular rendering boundaries. It is consumed by the structured rendering backlog (see [GRAPHICS-001 — Rendering parity inventory and task index](../tasks/backlog/rendering/GRAPHICS-001-rendering-parity-inventory.md) and [tasks/backlog/rendering/README.md](../tasks/backlog/rendering/README.md)).
+**GPU-driven pipeline plan:** [docs/architecture/gpu-driven-modular-rendering-pipeline-plan.md](architecture/gpu-driven-modular-rendering-pipeline-plan.md) provides the concrete implementation plan for GPU-driven visibility, unified GPU scene topology, and modular rendering boundaries. It is consumed by the structured rendering backlog (see [tasks/backlog/rendering/README.md](../tasks/backlog/rendering/README.md)); the original parity seed is retired as [GRAPHICS-001 — Rendering parity inventory and task index](../tasks/done/GRAPHICS-001-rendering-parity-inventory.md).
 
 ### Architecture constraints (preserve during all refactor work)
 

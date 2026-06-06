@@ -1,16 +1,15 @@
 # Rendering Backlog Index
 
 This README is the agent-facing entry point into the `tasks/backlog/rendering/`
-queue. It complements the canonical inventory and points agents at the next
-valid task without requiring them to read every file.
+queue. It is the current rendering DAG and points agents at the next valid task
+without requiring them to read every file.
 
 ## Canonical sources
 
-- [GRAPHICS-001 — Rendering parity inventory and task index](GRAPHICS-001-rendering-parity-inventory.md)
-  is the canonical rendering backlog index. The prose ordering inside
-  GRAPHICS-001 remains authoritative whenever this README and GRAPHICS-001
-  disagree on intent; this README expresses the same ordering as a
-  machine-readable DAG.
+- [GRAPHICS-001 — Rendering parity inventory and task index](../../done/GRAPHICS-001-rendering-parity-inventory.md)
+  is the retired parity seed that originally opened and ordered
+  GRAPHICS-002..025. It must not be selected as active backlog work; current
+  rendering selection follows this README's DAG.
 - `RORG-031B`, if encountered in older notes, is **historical/superseded
   planning** that has been retired to
   [`tasks/done/RORG-031B-rendering-pipeline-backlog-seed.md`](../../done/RORG-031B-rendering-pipeline-backlog-seed.md).
@@ -294,9 +293,10 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   modules. It records promoted owners, blocker tasks, test evidence, and final
   deletion readiness checks; no legacy source deletion happens in this slice.
 - [GRAPHICS-022 — Rendergraph diagnostics and validation](../../done/GRAPHICS-022-rendergraph-diagnostics-validation.md):
-  completed follow-on infrastructure hardening task; canonical ordering matches
-  GRAPHICS-001 and it depends on GRAPHICS-003 for frame-recipe context while
-  remaining CPU/null testable (no Vulkan requirement).
+  completed follow-on infrastructure hardening task; ordering matches the
+  retired GRAPHICS-001 parity seed and it depends on GRAPHICS-003 for
+  frame-recipe context while remaining CPU/null testable (no Vulkan
+  requirement).
 - [GRAPHICS-027 — Remove rendergraph compile diagnostic string shim](../../done/GRAPHICS-027-remove-rendergraph-diagnostic-shim.md):
   completed follow-up to GRAPHICS-022 that removed the
   `GetLastCompileDiagnostic()` string compatibility shim and the dead

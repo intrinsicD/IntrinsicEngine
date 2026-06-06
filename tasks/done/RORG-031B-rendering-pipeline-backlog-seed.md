@@ -9,9 +9,9 @@ implementation plan.
 - Completed: 2026-05-01.
 - Commit: pending (lands with this task).
 - PR: see branch `claude/next-active-task-CaTBY`.
-- Superseded by: `tasks/backlog/rendering/GRAPHICS-001-rendering-parity-inventory.md`
-  (canonical rendering backlog index) and the `GRAPHICS-002` through `GRAPHICS-021`
-  task chain enumerated by `GRAPHICS-001`.
+- Superseded by: `tasks/done/GRAPHICS-001-rendering-parity-inventory.md`
+  (retired rendering parity seed) and the current rendering DAG in
+  `tasks/backlog/rendering/README.md`.
 - Follow-up: workflow/cleanup tracking continues under
   `tasks/done/GRAPHICS-021-rendering-backlog-workflow-cleanup.md`.
 

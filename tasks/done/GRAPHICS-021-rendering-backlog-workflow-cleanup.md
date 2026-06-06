@@ -3,6 +3,8 @@
 - Status: completed
 - Completion date: 2026-05-03
 - Commit / PR: local split commit; remote PR reference TBD.
+- Current note: `GRAPHICS-001` was retired on 2026-06-06; current rendering
+  task selection lives in `tasks/backlog/rendering/README.md`.
 
 The cleanup follow-ups are tracked in structured task records, the rendering
 backlog README/DAG exists, and the remaining implementation gate is

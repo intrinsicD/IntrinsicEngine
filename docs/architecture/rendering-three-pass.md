@@ -533,8 +533,8 @@ This establishes the current composition rule: deferred-capable opaque surfaces 
 
 ## Where Active Work Lives
 
-- Canonical rendering backlog index: [GRAPHICS-001 — Rendering parity inventory and task index](../../tasks/backlog/rendering/GRAPHICS-001-rendering-parity-inventory.md).
 - Rendering backlog dependency DAG and agent selection rules: [tasks/backlog/rendering/README.md](../../tasks/backlog/rendering/README.md).
+- Retired parity seed: [GRAPHICS-001 — Rendering parity inventory and task index](../../tasks/done/GRAPHICS-001-rendering-parity-inventory.md).
 - Medium/long-horizon planning: [docs/roadmap.md](../roadmap.md).
 - Future work — rendering modernization roadmap (2026+ feature set): [GRAPHICS-035 — Rendering modernization roadmap](../../tasks/done/GRAPHICS-035-modernization-roadmap.md).
 - Historical migration narrative: [docs/migration/archive/plan.md](../migration/archive/plan.md) (archival index).
