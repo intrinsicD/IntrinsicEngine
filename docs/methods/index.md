@@ -28,3 +28,12 @@ This index is the canonical entry point for method/paper implementation document
   at `CPUContracted`; CPU-only runtime/world integration is now
   `CPUContracted` by
   [`PHYSICS-001`](../../tasks/done/PHYSICS-001-physics-world-state-and-runtime-sync.md).
+- [`methods/physics/README.md`](../../methods/physics/) records the physics
+  method roadmap from
+  [`ARCH-002`](../../tasks/done/ARCH-002-physics-phenomena-roadmap.md). The
+  first non-rigid follow-ups are
+  [`METHOD-009`](../../tasks/backlog/methods/METHOD-009-particle-spring-reference-backend.md),
+  [`METHOD-010`](../../tasks/backlog/methods/METHOD-010-xpbd-cloth-shell-reference-backend.md),
+  and [`METHOD-011`](../../tasks/backlog/methods/METHOD-011-sph-fluid-reference-backend.md).
+  Each remains CPU-reference-first; GPU backends require later parity-proven
+  tasks.

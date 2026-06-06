@@ -12,7 +12,7 @@ map.
 ## Tasks
 
 - [ARCH-001 - Define physics layer ownership and ECS integration](../../done/ARCH-001-physics-layer-ownership-and-ecs-integration.md) (done 2026-06-05).
-- [ARCH-002 - Physics phenomena roadmap and method selection](ARCH-002-physics-phenomena-roadmap.md).
+- [ARCH-002 - Physics phenomena roadmap and method selection](../../done/ARCH-002-physics-phenomena-roadmap.md) (done 2026-06-06).
 - [PHYSICS-001 - Physics world state and runtime fixed-step sync](../../done/PHYSICS-001-physics-world-state-and-runtime-sync.md) (done 2026-06-05).
 - [PHYSICS-002 - Collision broadphase/narrowphase contract](PHYSICS-002-collision-broadphase-narrowphase-contract.md).
 - [PHYSICS-003 - Constraints, islands, sleep, and solver diagnostics](PHYSICS-003-constraints-islands-and-solver-diagnostics.md).
@@ -32,7 +32,11 @@ map.
 - `PHYSICS-003` depends on retired `PHYSICS-001` and open `PHYSICS-002`; it
   owns constraint, island, sleep, and solver diagnostics.
 - ARCH-002 must not bless GPU/optimized backend tasks for any phenomenon before
-  its CPU reference path exists.
+  its CPU reference path exists. It retired with first non-rigid physics method
+  follow-ups:
+  [`METHOD-009`](../methods/METHOD-009-particle-spring-reference-backend.md),
+  [`METHOD-010`](../methods/METHOD-010-xpbd-cloth-shell-reference-backend.md),
+  and [`METHOD-011`](../methods/METHOD-011-sph-fluid-reference-backend.md).
 
 Forbidden across all members: physics solver code in ECS, runtime-owned solver
 internals, graphics/RHI dependencies in physics, or treating rendering

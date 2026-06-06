@@ -34,6 +34,12 @@ map.
   `methods/geometry/_example_vector_heat/` to `methods/_examples/vector_heat/`
   and resolved its `TODO`/`year: 0` paper placeholders; no CPU reference backend
   (real Vector Heat Method intake remains a future METHOD-* task).
+- [METHOD-009 — Particle and mass-spring reference backend](METHOD-009-particle-spring-reference-backend.md)
+  (physics roadmap follow-up from [`ARCH-002`](../../done/ARCH-002-physics-phenomena-roadmap.md)).
+- [METHOD-010 — XPBD cloth and shell reference backend](METHOD-010-xpbd-cloth-shell-reference-backend.md)
+  (physics roadmap follow-up from [`ARCH-002`](../../done/ARCH-002-physics-phenomena-roadmap.md)).
+- [METHOD-011 — SPH fluid reference backend](METHOD-011-sph-fluid-reference-backend.md)
+  (physics roadmap follow-up from [`ARCH-002`](../../done/ARCH-002-physics-phenomena-roadmap.md)).
 
 ## Convergence
 
@@ -41,6 +47,11 @@ map.
   `CPUContracted`. Runtime/ECS integration and any performance backend remain
   out of scope for the method package and are owned by physics/runtime bridge
   follow-ups.
+- METHOD-009 through METHOD-011 are physics-roadmap follow-ups from
+  [`ARCH-002`](../../done/ARCH-002-physics-phenomena-roadmap.md). Promote them
+  CPU-reference-first in numeric order unless a task records a stronger local
+  dependency; do not open optimized CPU or GPU backends until the selected
+  reference backend is implemented, tested, benchmark-manifested, and documented.
 - METHOD-002 through METHOD-007 are seeded by the geometry paper survey
   [`docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md`](../../../docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md)
   and target gaps from

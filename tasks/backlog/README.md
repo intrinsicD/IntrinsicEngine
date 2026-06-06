@@ -124,7 +124,9 @@ Members:
 - [`ARCH-001`](../done/ARCH-001-physics-layer-ownership-and-ecs-integration.md)
   (done 2026-06-05) — accepted `src/physics` as `physics -> core, geometry`
   via [ADR-0019](../../docs/adr/0019-physics-layer-ownership-and-ecs-integration.md).
-- [`physics/ARCH-002-physics-phenomena-roadmap.md`](physics/ARCH-002-physics-phenomena-roadmap.md).
+- [`ARCH-002`](../done/ARCH-002-physics-phenomena-roadmap.md)
+  (done 2026-06-06) — physics phenomena roadmap; opened CPU-reference-first
+  non-rigid method follow-ups `METHOD-009`, `METHOD-010`, and `METHOD-011`.
 - [`METHOD-001`](../done/METHOD-001-rigid-body-dynamics-reference-backend.md)
   (done 2026-06-05) — deterministic `cpu_reference` rigid-body method package.
 - [`HARDEN-064`](../done/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md)
