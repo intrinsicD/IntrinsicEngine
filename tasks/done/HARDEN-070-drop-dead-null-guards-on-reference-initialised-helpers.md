@@ -22,7 +22,7 @@
   parameters and can therefore never be null in well-formed code, replacing
   the implicit "may be null" contract with an explicit lifetime-contract note
   in each helper's header. (Originally ~7; the
-  [2026-05-28 audit](../../../docs/reports/2026-05-28-agent-output-audit.md)
+  [2026-05-28 audit](../../docs/reports/2026-05-28-agent-output-audit.md)
   Row 5 added the fourth spatial-debug adapter, `ConvexHullAdapter`, which
   landed after this task was filed carrying the identical pattern.)
 
@@ -50,7 +50,7 @@
   `graphics/renderer` (`src/graphics/renderer/`). Cross-layer but each
   layer's edit is independent.
 - Source of the finding:
-  [`docs/reports/2026-05-26-agent-output-audit.md`](../../../docs/reports/2026-05-26-agent-output-audit.md)
+  [`docs/reports/2026-05-26-agent-output-audit.md`](../../docs/reports/2026-05-26-agent-output-audit.md)
   Row 5 (defensive validation at internal boundaries). The pattern repeats
   across the three new modules introduced this window, so the audit recorded
   it as a single hygiene-cleanup task rather than three per-module cleanups.
@@ -124,7 +124,7 @@
       and `src/graphics/renderer/README.md` already describe the renderer-
       owned lifetime; no edits required there.
 - [x] Cross-link this task from the
-      [2026-05-26 audit](../../../docs/reports/2026-05-26-agent-output-audit.md)
+      [2026-05-26 audit](../../docs/reports/2026-05-26-agent-output-audit.md)
       Row 5 follow-up note when this task lands (replace the `(planned)`
       task-seed mention with the actual task ID).
 
