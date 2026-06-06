@@ -133,8 +133,9 @@ implementation.
   resource/state transitions and pass-level scheduling through
   `Graphics.RenderGraph`.
 - `Graphics.FrameRecipe` owns the reusable default frame recipe: typed feature
-  gates, canonical resource declarations, pass-order introspection, and the
-  backend-agnostic graph construction path used by the null renderer.
+  gates, typed pass/resource IDs, canonical diagnostic names, resource
+  declarations, pass-order introspection, and the backend-agnostic graph
+  construction path used by the null renderer.
 
 ### Shader push-constant compatibility policy
 

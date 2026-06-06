@@ -57,7 +57,7 @@ The render graph blackboard exposes a fixed canonical resource vocabulary:
 | `DebugViewRGBA` | `R8G8B8A8_UNORM` | Frame transient | Debug-view preview output for sampled resource inspection |
 | `Backbuffer` | Swapchain format | Imported | Final presentation destination only |
 
-`FrameRecipe` determines which of these are allocated for a frame. Unused optional resources are not created. The promoted implementation lives in `Extrinsic.Graphics.FrameRecipe`; it declares typed feature gates, canonical resource names, pass-order introspection, and the backend-agnostic graph construction helper consumed by the null renderer.
+`FrameRecipe` determines which of these are allocated for a frame. Unused optional resources are not created. The promoted implementation lives in `Extrinsic.Graphics.FrameRecipe`; it declares typed feature gates, typed `FramePassId` / `FrameResourceId` values derived from `FrameRecipePassKind` / `FrameRecipeResourceKind`, canonical diagnostic names, pass-order introspection, and the backend-agnostic graph construction helper consumed by the null renderer. `FrameRecipeIntrospection` exposes typed ID-to-compiled-index lookup helpers, while pass/resource names remain stable debug text only.
 
 Default feature gates:
 
@@ -73,7 +73,8 @@ GRAPHICS-081 retired the bootstrap-only recipe scaffold once the canonical
 default recipe recorded the visible-geometry path operationally. The current
 renderer recipe set is the default recipe only: feature gates, pass declarations,
 resource declarations, command-status diagnostics, and backbuffer finalization all
-flow through `BuildDefaultFrameRecipe(...)` and its canonical pass names.
+flow through `BuildDefaultFrameRecipe(...)`, typed recipe IDs, and canonical
+diagnostic names.
 
 ## Picking and sub-element selection contract
 
@@ -445,7 +446,7 @@ paths fail closed.
 20. `ImGuiPass`
 21. `Present`
 
-`Extrinsic.Graphics.FrameRecipe::DescribeDefaultFrameRecipe()` reports this pass order with disabled optional stages retained as declarations for tooling/review, while `BuildDefaultFrameRecipe()` emits only enabled passes/resources into `Graphics.RenderGraph`.
+`Extrinsic.Graphics.FrameRecipe::DescribeDefaultFrameRecipe()` reports this pass order with disabled optional stages retained as declarations for tooling/review, while `BuildDefaultFrameRecipe()` emits only enabled passes/resources into `Graphics.RenderGraph`. The recipe-owned typed IDs are the stable contract for addressing passes/resources; exact string names are retained for diagnostics, debug dumps, and user-facing inspection tables.
 
 ### Pass module naming
 
@@ -493,6 +494,9 @@ This establishes the current composition rule: deferred-capable opaque surfaces 
 
 - Render-graph introspection reports per-pass attachment metadata (resource name, format, load/store ops, imported flag).
 - Render-graph introspection reports per-resource first/last read and write pass indices.
+- Default-recipe introspection maps typed pass/resource IDs to compiled
+  pass/resource indices, and duplicate non-zero IDs are hard compile errors
+  (`DuplicatePassId` / `DuplicateResourceId`).
 - Temporary audit logging may dump pass order, resource creation, transitions, and formats from `RenderDriver`.
 - Any pass using `LOAD` without a guaranteed earlier write in-frame emits a `LoadWithoutGuaranteedWriter` warning; imported resources with a defined initial state are reported as informational findings.
 - `ValidateCompiledGraph(const CompiledRenderGraph&, std::span<const ImportedResourceAuthorization>)` returns `RenderGraphValidationResult` findings tagged with `RenderGraphValidationSeverity` and `RenderGraphValidationCode`.

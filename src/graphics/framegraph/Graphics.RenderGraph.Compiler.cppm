@@ -45,6 +45,8 @@ namespace Extrinsic::Graphics
         InvalidTextureAccess,
         InvalidBufferAccess,
         CrossQueueCycle,
+        DuplicatePassId,
+        DuplicateResourceId,
     };
 
     export struct RenderGraphValidationFinding
@@ -156,6 +158,15 @@ namespace Extrinsic::Graphics
 
     export struct CompiledRenderGraph
     {
+        // Keep vector-heavy special members out-of-line so Clang module importers
+        // do not synthesize layout-sensitive copies independently.
+        CompiledRenderGraph();
+        CompiledRenderGraph(const CompiledRenderGraph& other);
+        CompiledRenderGraph(CompiledRenderGraph&& other) noexcept;
+        CompiledRenderGraph& operator=(const CompiledRenderGraph& other);
+        CompiledRenderGraph& operator=(CompiledRenderGraph&& other) noexcept;
+        ~CompiledRenderGraph();
+
         std::uint32_t PassCount = 0;
         std::uint32_t CulledPassCount = 0;
         std::uint32_t ResourceCount = 0;

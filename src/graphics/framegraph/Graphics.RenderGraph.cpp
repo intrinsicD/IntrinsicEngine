@@ -668,6 +668,40 @@ namespace Extrinsic::Graphics
         return &m_Impl->Buffers[index];
     }
 
+    Core::Result RenderGraph::SetPassId(const PassRef ref, const FramePassId id)
+    {
+        if (!m_Impl || !ref.IsValid() || ref.Index >= m_Impl->Passes.size())
+        {
+            return Core::Err(Core::ErrorCode::InvalidArgument);
+        }
+        if (ref.Generation != m_Impl->Generation)
+        {
+            return Core::Err(Core::ErrorCode::InvalidState);
+        }
+        m_Impl->Passes[ref.Index].Id = id;
+        return Core::Ok();
+    }
+
+    Core::Result RenderGraph::SetTextureResourceId(const TextureRef ref, const FrameResourceId id)
+    {
+        if (!ValidateTextureRef(ref).has_value())
+        {
+            return Core::Err(Core::ErrorCode::InvalidArgument);
+        }
+        m_Impl->Textures[ref.Index].Id = id;
+        return Core::Ok();
+    }
+
+    Core::Result RenderGraph::SetBufferResourceId(const BufferRef ref, const FrameResourceId id)
+    {
+        if (!ValidateBufferRef(ref).has_value())
+        {
+            return Core::Err(Core::ErrorCode::InvalidArgument);
+        }
+        m_Impl->Buffers[ref.Index].Id = id;
+        return Core::Ok();
+    }
+
     void RenderGraph::Reset()
     {
         if (!m_Impl)

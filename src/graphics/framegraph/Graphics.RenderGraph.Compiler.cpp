@@ -399,6 +399,102 @@ namespace Extrinsic::Graphics
             SortValidationFindings(g_LastCompileValidationResult);
         }
 
+        [[nodiscard]] bool ValidateUniquePassIds(const std::span<const RenderPassRecord> passes)
+        {
+            for (std::uint32_t passIndex = 0; passIndex < passes.size(); ++passIndex)
+            {
+                const FramePassId id = passes[passIndex].Id;
+                if (!id.IsValid())
+                {
+                    continue;
+                }
+
+                for (std::uint32_t priorIndex = 0; priorIndex < passIndex; ++priorIndex)
+                {
+                    if (passes[priorIndex].Id != id)
+                    {
+                        continue;
+                    }
+
+                    SetLastCompileFinding(
+                        RenderGraphValidationCode::DuplicatePassId,
+                        "RenderGraph duplicate typed pass id: id=" + std::to_string(id.Value) +
+                            " first_pass=\"" + passes[priorIndex].Name + "\" duplicate_pass=\"" +
+                            passes[passIndex].Name + "\".",
+                        passIndex,
+                        passes[passIndex].Name);
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        [[nodiscard]] bool ValidateUniqueResourceIds(const std::span<const TextureResourceDesc> textures,
+                                                     const std::span<const BufferResourceDesc> buffers)
+        {
+            struct SeenResource
+            {
+                FrameResourceId Id{};
+                std::uint32_t Index = 0;
+                bool IsTexture = true;
+                std::string Name{};
+            };
+
+            std::vector<SeenResource> seen{};
+            seen.reserve(textures.size() + buffers.size());
+
+            auto check = [&seen](const FrameResourceId id,
+                                 const std::uint32_t index,
+                                 const bool isTexture,
+                                 const std::string& name) -> bool {
+                if (!id.IsValid())
+                {
+                    return true;
+                }
+
+                const auto duplicate = std::ranges::find_if(seen, [id](const SeenResource& prior) {
+                    return prior.Id == id;
+                });
+                if (duplicate == seen.end())
+                {
+                    seen.push_back(SeenResource{
+                        .Id = id,
+                        .Index = index,
+                        .IsTexture = isTexture,
+                        .Name = name,
+                    });
+                    return true;
+                }
+
+                SetLastCompileFinding(
+                    RenderGraphValidationCode::DuplicateResourceId,
+                    "RenderGraph duplicate typed resource id: id=" + std::to_string(id.Value) +
+                        " first_resource=\"" + duplicate->Name + "\" duplicate_resource=\"" + name + "\".",
+                    InvalidValidationIndex(),
+                    std::string{},
+                    isTexture,
+                    index,
+                    name);
+                return false;
+            };
+
+            for (std::uint32_t textureIndex = 0; textureIndex < textures.size(); ++textureIndex)
+            {
+                if (!check(textures[textureIndex].Id, textureIndex, true, textures[textureIndex].Name))
+                {
+                    return false;
+                }
+            }
+            for (std::uint32_t bufferIndex = 0; bufferIndex < buffers.size(); ++bufferIndex)
+            {
+                if (!check(buffers[bufferIndex].Id, bufferIndex, false, buffers[bufferIndex].Name))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         [[nodiscard]] const ImportedResourceAuthorization* FindAuthorization(
             const std::span<const ImportedResourceAuthorization> authorizations,
             const bool isTexture,
@@ -757,6 +853,114 @@ namespace Extrinsic::Graphics
         }
     }
 
+    CompiledRenderGraph::CompiledRenderGraph() = default;
+
+    CompiledRenderGraph::CompiledRenderGraph(const CompiledRenderGraph& other)
+    {
+        *this = other;
+    }
+
+    CompiledRenderGraph::CompiledRenderGraph(CompiledRenderGraph&& other) noexcept
+    {
+        *this = std::move(other);
+    }
+
+    CompiledRenderGraph& CompiledRenderGraph::operator=(const CompiledRenderGraph& other)
+    {
+        if (this == &other)
+        {
+            return *this;
+        }
+
+        PassCount = other.PassCount;
+        CulledPassCount = other.CulledPassCount;
+        ResourceCount = other.ResourceCount;
+        TransientTextureCount = other.TransientTextureCount;
+        TransientBufferCount = other.TransientBufferCount;
+        EdgeCount = other.EdgeCount;
+        QueueHandoffEdgeCount = other.QueueHandoffEdgeCount;
+        CrossQueueTimelineEdgeCount = other.CrossQueueTimelineEdgeCount;
+        CrossQueueOwnershipTransferCount = other.CrossQueueOwnershipTransferCount;
+        TransientMemoryEstimateBytes = other.TransientMemoryEstimateBytes;
+        TopologicalOrder = other.TopologicalOrder;
+        TopologicalLayerByPass = other.TopologicalLayerByPass;
+        PassNames = other.PassNames;
+        PassQueues = other.PassQueues;
+        PassSideEffects = other.PassSideEffects;
+        PassDeclarations = other.PassDeclarations;
+        TextureNames = other.TextureNames;
+        BufferNames = other.BufferNames;
+        TextureLifetimes = other.TextureLifetimes;
+        BufferLifetimes = other.BufferLifetimes;
+        TextureInitialStates = other.TextureInitialStates;
+        TextureFinalStates = other.TextureFinalStates;
+        BufferInitialStates = other.BufferInitialStates;
+        BufferFinalStates = other.BufferFinalStates;
+        TextureHandles = other.TextureHandles;
+        BufferHandles = other.BufferHandles;
+        TextureImported = other.TextureImported;
+        TextureIsBackbuffer = other.TextureIsBackbuffer;
+        BufferImported = other.BufferImported;
+        TextureQueueSharingModes = other.TextureQueueSharingModes;
+        BufferQueueSharingModes = other.BufferQueueSharingModes;
+        RenderPassAttachments = other.RenderPassAttachments;
+        CrossQueueTimelineSignals = other.CrossQueueTimelineSignals;
+        CrossQueueTimelineWaits = other.CrossQueueTimelineWaits;
+        CrossQueueTimelineEdges = other.CrossQueueTimelineEdges;
+        BarrierPackets = other.BarrierPackets;
+        ValidationFindings = other.ValidationFindings;
+        return *this;
+    }
+
+    CompiledRenderGraph& CompiledRenderGraph::operator=(CompiledRenderGraph&& other) noexcept
+    {
+        if (this == &other)
+        {
+            return *this;
+        }
+
+        PassCount = other.PassCount;
+        CulledPassCount = other.CulledPassCount;
+        ResourceCount = other.ResourceCount;
+        TransientTextureCount = other.TransientTextureCount;
+        TransientBufferCount = other.TransientBufferCount;
+        EdgeCount = other.EdgeCount;
+        QueueHandoffEdgeCount = other.QueueHandoffEdgeCount;
+        CrossQueueTimelineEdgeCount = other.CrossQueueTimelineEdgeCount;
+        CrossQueueOwnershipTransferCount = other.CrossQueueOwnershipTransferCount;
+        TransientMemoryEstimateBytes = other.TransientMemoryEstimateBytes;
+        TopologicalOrder = std::move(other.TopologicalOrder);
+        TopologicalLayerByPass = std::move(other.TopologicalLayerByPass);
+        PassNames = std::move(other.PassNames);
+        PassQueues = std::move(other.PassQueues);
+        PassSideEffects = std::move(other.PassSideEffects);
+        PassDeclarations = std::move(other.PassDeclarations);
+        TextureNames = std::move(other.TextureNames);
+        BufferNames = std::move(other.BufferNames);
+        TextureLifetimes = std::move(other.TextureLifetimes);
+        BufferLifetimes = std::move(other.BufferLifetimes);
+        TextureInitialStates = std::move(other.TextureInitialStates);
+        TextureFinalStates = std::move(other.TextureFinalStates);
+        BufferInitialStates = std::move(other.BufferInitialStates);
+        BufferFinalStates = std::move(other.BufferFinalStates);
+        TextureHandles = std::move(other.TextureHandles);
+        BufferHandles = std::move(other.BufferHandles);
+        TextureImported = std::move(other.TextureImported);
+        TextureIsBackbuffer = std::move(other.TextureIsBackbuffer);
+        BufferImported = std::move(other.BufferImported);
+        TextureQueueSharingModes = std::move(other.TextureQueueSharingModes);
+        BufferQueueSharingModes = std::move(other.BufferQueueSharingModes);
+        RenderPassAttachments = std::move(other.RenderPassAttachments);
+        CrossQueueTimelineSignals = std::move(other.CrossQueueTimelineSignals);
+        CrossQueueTimelineWaits = std::move(other.CrossQueueTimelineWaits);
+        CrossQueueTimelineEdges = std::move(other.CrossQueueTimelineEdges);
+        BarrierPackets = std::move(other.BarrierPackets);
+        ValidationFindings = std::move(other.ValidationFindings);
+        return *this;
+    }
+
+    CompiledRenderGraph::~CompiledRenderGraph() = default;
+
     bool RenderGraphValidationResult::HasErrors() const
     {
         return CountBySeverity(RenderGraphValidationSeverity::Error) != 0u;
@@ -1054,6 +1258,10 @@ namespace Extrinsic::Graphics
         g_LastCompileValidationResult.Findings.clear();
         const std::uint32_t passCount = static_cast<std::uint32_t>(passes.size());
         const std::uint32_t resourceCount = static_cast<std::uint32_t>(textures.size() + buffers.size());
+        if (!ValidateUniquePassIds(passes) || !ValidateUniqueResourceIds(textures, buffers))
+        {
+            return std::unexpected(Core::ErrorCode::InvalidArgument);
+        }
         if (passCount == 0)
         {
             CompiledRenderGraph compiled{};
@@ -1533,28 +1741,6 @@ namespace Extrinsic::Graphics
             }
             SortValidationFindings(g_LastCompileValidationResult);
 
-            CompiledRenderGraph failed{
-                .PassCount = livePassCount,
-                .CulledPassCount = passCount - livePassCount,
-                .ResourceCount = resourceCount,
-                .EdgeCount = static_cast<std::uint32_t>(dedup.size()),
-                .QueueHandoffEdgeCount = queueHandoffEdgeCount,
-                .TopologicalOrder = order,
-                .TopologicalLayerByPass = layerByPass,
-                .PassNames = std::move(passNames),
-                .PassQueues = std::move(passQueues),
-                .PassSideEffects = std::move(passSideEffects),
-                .PassDeclarations = std::move(passDeclarations),
-                .TextureNames = std::move(textureNames),
-                .BufferNames = std::move(bufferNames),
-                .TextureLifetimes = std::move(textureLifetimes),
-                .BufferLifetimes = std::move(bufferLifetimes),
-                .TextureInitialStates = std::move(textureInitialStates),
-                .TextureFinalStates = std::move(textureFinalStates),
-                .BufferInitialStates = std::move(bufferInitialStates),
-                .BufferFinalStates = std::move(bufferFinalStates),
-                .ValidationFindings = g_LastCompileValidationResult.Findings,
-            };
             return std::unexpected(Core::ErrorCode::InvalidState);
         }
 
@@ -1804,41 +1990,40 @@ namespace Extrinsic::Graphics
 
         SortBarrierPackets(barrierPackets);
 
-        CompiledRenderGraph compiled{
-            .PassCount = livePassCount,
-            .CulledPassCount = passCount - livePassCount,
-            .ResourceCount = resourceCount,
-            .EdgeCount = activeEdgeCount,
-            .QueueHandoffEdgeCount = activeQueueHandoffEdgeCount,
-            .CrossQueueTimelineEdgeCount = static_cast<std::uint32_t>(crossQueueTimelineEdges.size()),
-            .CrossQueueOwnershipTransferCount = crossQueueOwnershipTransferCount,
-            .TopologicalOrder = std::move(order),
-            .TopologicalLayerByPass = std::move(layerByPass),
-            .PassNames = std::move(passNames),
-            .PassQueues = std::move(passQueues),
-            .PassSideEffects = std::move(passSideEffects),
-            .PassDeclarations = std::move(passDeclarations),
-            .TextureNames = std::move(textureNames),
-            .BufferNames = std::move(bufferNames),
-            .TextureLifetimes = std::move(textureLifetimes),
-            .BufferLifetimes = std::move(bufferLifetimes),
-            .TextureInitialStates = std::move(textureInitialStates),
-            .TextureFinalStates = std::move(textureFinalStates),
-            .BufferInitialStates = std::move(bufferInitialStates),
-            .BufferFinalStates = std::move(bufferFinalStates),
-            .TextureHandles = std::move(textureHandles),
-            .BufferHandles = std::move(bufferHandles),
-            .TextureImported = std::move(textureImported),
-            .TextureIsBackbuffer = std::move(textureIsBackbuffer),
-            .BufferImported = std::move(bufferImported),
-            .TextureQueueSharingModes = std::move(textureQueueSharingModes),
-            .BufferQueueSharingModes = std::move(bufferQueueSharingModes),
-            .RenderPassAttachments = std::move(renderPassAttachments),
-            .CrossQueueTimelineSignals = std::move(crossQueueTimelineSignals),
-            .CrossQueueTimelineWaits = std::move(crossQueueTimelineWaits),
-            .CrossQueueTimelineEdges = std::move(crossQueueTimelineEdges),
-            .BarrierPackets = std::move(barrierPackets),
-        };
+        CompiledRenderGraph compiled{};
+        compiled.PassCount = livePassCount;
+        compiled.CulledPassCount = passCount - livePassCount;
+        compiled.ResourceCount = resourceCount;
+        compiled.EdgeCount = activeEdgeCount;
+        compiled.QueueHandoffEdgeCount = activeQueueHandoffEdgeCount;
+        compiled.CrossQueueTimelineEdgeCount = static_cast<std::uint32_t>(crossQueueTimelineEdges.size());
+        compiled.CrossQueueOwnershipTransferCount = crossQueueOwnershipTransferCount;
+        compiled.TopologicalOrder = std::move(order);
+        compiled.TopologicalLayerByPass = std::move(layerByPass);
+        compiled.PassNames = std::move(passNames);
+        compiled.PassQueues = std::move(passQueues);
+        compiled.PassSideEffects = std::move(passSideEffects);
+        compiled.PassDeclarations = std::move(passDeclarations);
+        compiled.TextureNames = std::move(textureNames);
+        compiled.BufferNames = std::move(bufferNames);
+        compiled.TextureLifetimes = std::move(textureLifetimes);
+        compiled.BufferLifetimes = std::move(bufferLifetimes);
+        compiled.TextureInitialStates = std::move(textureInitialStates);
+        compiled.TextureFinalStates = std::move(textureFinalStates);
+        compiled.BufferInitialStates = std::move(bufferInitialStates);
+        compiled.BufferFinalStates = std::move(bufferFinalStates);
+        compiled.TextureHandles = std::move(textureHandles);
+        compiled.BufferHandles = std::move(bufferHandles);
+        compiled.TextureImported = std::move(textureImported);
+        compiled.TextureIsBackbuffer = std::move(textureIsBackbuffer);
+        compiled.BufferImported = std::move(bufferImported);
+        compiled.TextureQueueSharingModes = std::move(textureQueueSharingModes);
+        compiled.BufferQueueSharingModes = std::move(bufferQueueSharingModes);
+        compiled.RenderPassAttachments = std::move(renderPassAttachments);
+        compiled.CrossQueueTimelineSignals = std::move(crossQueueTimelineSignals);
+        compiled.CrossQueueTimelineWaits = std::move(crossQueueTimelineWaits);
+        compiled.CrossQueueTimelineEdges = std::move(crossQueueTimelineEdges);
+        compiled.BarrierPackets = std::move(barrierPackets);
         RenderGraphValidationResult validation = ValidateCompiledGraph(compiled);
         compiled.ValidationFindings = validation.Findings;
         g_LastCompileValidationResult = std::move(validation);

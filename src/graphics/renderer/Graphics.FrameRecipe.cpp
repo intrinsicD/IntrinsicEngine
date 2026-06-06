@@ -2,6 +2,7 @@ module;
 
 #include <cstdint>
 #include <initializer_list>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -53,6 +54,7 @@ namespace Extrinsic::Graphics
         {
             out.Passes.push_back(FrameRecipePassDeclaration{
                 .Kind = kind,
+                .Id = ToFramePassId(kind),
                 .Name = name,
                 .Enabled = enabled,
                 .FinalizesBackbuffer = finalizesBackbuffer,
@@ -72,6 +74,7 @@ namespace Extrinsic::Graphics
         {
             out.Resources.push_back(FrameRecipeResourceDeclaration{
                 .Kind = kind,
+                .Id = ToFrameResourceId(kind),
                 .Name = name,
                 .Enabled = enabled,
                 .Imported = imported,
@@ -91,6 +94,7 @@ namespace Extrinsic::Graphics
         {
             out.Passes.push_back(FrameRecipePassDeclaration{
                 .Kind = kind,
+                .Id = ToFramePassId(kind),
                 .Name = name,
                 .Enabled = enabled,
                 .FinalizesBackbuffer = finalizesBackbuffer,
@@ -235,6 +239,105 @@ namespace Extrinsic::Graphics
             },
         };
 
+    }
+
+    std::string_view FrameRecipePassKindName(const FrameRecipePassKind kind) noexcept
+    {
+        switch (kind)
+        {
+        case FrameRecipePassKind::Culling: return "CullingPass";
+        case FrameRecipePassKind::Picking: return "PickingPass";
+        case FrameRecipePassKind::DepthPrepass: return "DepthPrepass";
+        case FrameRecipePassKind::Shadow: return "ShadowPass";
+        case FrameRecipePassKind::Surface: return "SurfacePass";
+        case FrameRecipePassKind::Composition: return "CompositionPass";
+        case FrameRecipePassKind::Line: return "LinePass";
+        case FrameRecipePassKind::Point: return "PointPass";
+        case FrameRecipePassKind::PostProcess: return "PostProcessPass";
+        case FrameRecipePassKind::PostProcessHistogram: return "PostProcessHistogramPass";
+        case FrameRecipePassKind::PostProcessAAEdge: return "PostProcessAAEdgePass";
+        case FrameRecipePassKind::PostProcessAABlend: return "PostProcessAABlendPass";
+        case FrameRecipePassKind::PostProcessAAResolve: return "PostProcessAAResolvePass";
+        case FrameRecipePassKind::SelectionOutline: return "SelectionOutlinePass";
+        case FrameRecipePassKind::DebugView: return "DebugViewPass";
+        case FrameRecipePassKind::ImGui: return "ImGuiPass";
+        case FrameRecipePassKind::Present: return "Present";
+        case FrameRecipePassKind::TransientDebugSurface: return "TransientDebugSurfacePass";
+        case FrameRecipePassKind::VisualizationOverlay: return "VisualizationOverlayPass";
+        case FrameRecipePassKind::HZBBuild: return "HZBBuildPass";
+        case FrameRecipePassKind::ClusterGridBuild: return "ClusterGridBuildPass";
+        case FrameRecipePassKind::LightClusterAssignment: return "LightClusterAssignmentPass";
+        case FrameRecipePassKind::Reconstruction: return "ReconstructionPass";
+        }
+        return "UnknownPass";
+    }
+
+    std::string_view FrameRecipeResourceKindName(const FrameRecipeResourceKind kind) noexcept
+    {
+        switch (kind)
+        {
+        case FrameRecipeResourceKind::Backbuffer: return "Backbuffer";
+        case FrameRecipeResourceKind::SceneDepth: return "SceneDepth";
+        case FrameRecipeResourceKind::EntityId: return "EntityId";
+        case FrameRecipeResourceKind::PrimitiveId: return "PrimitiveId";
+        case FrameRecipeResourceKind::SceneNormal: return "SceneNormal";
+        case FrameRecipeResourceKind::Albedo: return "Albedo";
+        case FrameRecipeResourceKind::Material0: return "Material0";
+        case FrameRecipeResourceKind::SceneColorHDR: return "SceneColorHDR";
+        case FrameRecipeResourceKind::ShadowAtlas: return "ShadowAtlas";
+        case FrameRecipeResourceKind::SceneColorLDR: return "SceneColorLDR";
+        case FrameRecipeResourceKind::SelectionOutline: return "SelectionOutline";
+        case FrameRecipeResourceKind::DebugViewRGBA: return "DebugViewRGBA";
+        case FrameRecipeResourceKind::SceneTable: return "GpuWorld.SceneTable";
+        case FrameRecipeResourceKind::InstanceStatic: return "GpuWorld.InstanceStatic";
+        case FrameRecipeResourceKind::InstanceDynamic: return "GpuWorld.InstanceDynamic";
+        case FrameRecipeResourceKind::EntityConfig: return "GpuWorld.EntityConfig";
+        case FrameRecipeResourceKind::GeometryRecords: return "GpuWorld.GeometryRecords";
+        case FrameRecipeResourceKind::Bounds: return "GpuWorld.Bounds";
+        case FrameRecipeResourceKind::Lights: return "GpuWorld.Lights";
+        case FrameRecipeResourceKind::MaterialBuffer: return "Material.Buffer";
+        case FrameRecipeResourceKind::SurfaceOpaqueIndexedArgs: return "Cull.SurfaceOpaque.IndexedArgs";
+        case FrameRecipeResourceKind::SurfaceOpaqueCount: return "Cull.SurfaceOpaque.Count";
+        case FrameRecipeResourceKind::LinesIndexedArgs: return "Cull.Lines.IndexedArgs";
+        case FrameRecipeResourceKind::LinesCount: return "Cull.Lines.Count";
+        case FrameRecipeResourceKind::PointsNonIndexedArgs: return "Cull.Points.NonIndexedArgs";
+        case FrameRecipeResourceKind::PointsCount: return "Cull.Points.Count";
+        case FrameRecipeResourceKind::PickingReadback: return "Picking.Readback";
+        case FrameRecipeResourceKind::PostProcessBloomScratch: return "PostProcess.BloomScratch";
+        case FrameRecipeResourceKind::PostProcessHistogram: return "PostProcess.Histogram";
+        case FrameRecipeResourceKind::PostProcessAATempEdges: return "PostProcess.AATemp.Edges";
+        case FrameRecipeResourceKind::PostProcessAATempWeights: return "PostProcess.AATemp.Weights";
+        case FrameRecipeResourceKind::PostProcessAATempResolved: return "PostProcess.AATemp.Resolved";
+        case FrameRecipeResourceKind::HistogramReadback: return "Histogram.Readback";
+        case FrameRecipeResourceKind::HZBCurrent: return "HZB.Current";
+        case FrameRecipeResourceKind::ClusterGridAABBs: return "ClusterGrid.AABBs";
+        case FrameRecipeResourceKind::ClusterLightHeaders: return "ClusterLights.Headers";
+        case FrameRecipeResourceKind::ClusterLightIndices: return "ClusterLights.Indices";
+        case FrameRecipeResourceKind::ClusterLightCounter: return "ClusterLights.Counter";
+        case FrameRecipeResourceKind::MotionVectors: return "MotionVectors";
+        case FrameRecipeResourceKind::ReconstructionHistoryPrevious: return "Reconstruction.HistoryPrevious";
+        case FrameRecipeResourceKind::ReconstructionHistoryCurrent: return "Reconstruction.HistoryCurrent";
+        case FrameRecipeResourceKind::ReconstructionResolvedHDR: return "Reconstruction.ResolvedHDR";
+        }
+        return "UnknownResource";
+    }
+
+    std::string_view FrameRecipePassIdName(const FramePassId id) noexcept
+    {
+        if (!id.IsValid())
+        {
+            return "InvalidPass";
+        }
+        return FrameRecipePassKindName(static_cast<FrameRecipePassKind>(id.Value - 1u));
+    }
+
+    std::string_view FrameRecipeResourceIdName(const FrameResourceId id) noexcept
+    {
+        if (!id.IsValid())
+        {
+            return "InvalidResource";
+        }
+        return FrameRecipeResourceKindName(static_cast<FrameRecipeResourceKind>(id.Value - 1u));
     }
 
     [[nodiscard]] FrameRecipeFeatures DeriveDefaultFrameRecipeFeatures(const RenderWorld& world)
@@ -577,6 +680,100 @@ namespace Extrinsic::Graphics
         return out;
     }
 
+    std::optional<std::uint32_t> FindFrameRecipePassIndexById(
+        const FrameRecipeIntrospection& recipe,
+        const FramePassId id)
+    {
+        if (!id.IsValid())
+        {
+            return std::nullopt;
+        }
+
+        for (std::uint32_t passIndex = 0; passIndex < recipe.Passes.size(); ++passIndex)
+        {
+            if (recipe.Passes[passIndex].Id == id)
+            {
+                return passIndex;
+            }
+        }
+        return std::nullopt;
+    }
+
+    std::optional<std::uint32_t> FindFrameRecipeResourceIndexById(
+        const FrameRecipeIntrospection& recipe,
+        const FrameResourceId id)
+    {
+        if (!id.IsValid())
+        {
+            return std::nullopt;
+        }
+
+        for (std::uint32_t resourceIndex = 0; resourceIndex < recipe.Resources.size(); ++resourceIndex)
+        {
+            if (recipe.Resources[resourceIndex].Id == id)
+            {
+                return resourceIndex;
+            }
+        }
+        return std::nullopt;
+    }
+
+    namespace
+    {
+        [[nodiscard]] std::optional<std::uint32_t> FindCompiledNameIndex(
+            const std::vector<std::string>& names,
+            const std::string_view name)
+        {
+            for (std::uint32_t index = 0; index < names.size(); ++index)
+            {
+                if (names[index] == name)
+                {
+                    return index;
+                }
+            }
+            return std::nullopt;
+        }
+    }
+
+    std::optional<std::uint32_t> FindCompiledPassIndexForRecipeId(
+        const FrameRecipeIntrospection& recipe,
+        const CompiledRenderGraph& compiled,
+        const FramePassId id)
+    {
+        const std::optional<std::uint32_t> recipeIndex = FindFrameRecipePassIndexById(recipe, id);
+        if (!recipeIndex.has_value())
+        {
+            return std::nullopt;
+        }
+        return FindCompiledNameIndex(compiled.PassNames, recipe.Passes[*recipeIndex].Name);
+    }
+
+    std::optional<std::uint32_t> FindCompiledTextureIndexForRecipeId(
+        const FrameRecipeIntrospection& recipe,
+        const CompiledRenderGraph& compiled,
+        const FrameResourceId id)
+    {
+        const std::optional<std::uint32_t> recipeIndex = FindFrameRecipeResourceIndexById(recipe, id);
+        if (!recipeIndex.has_value())
+        {
+            return std::nullopt;
+        }
+        return FindCompiledNameIndex(compiled.TextureNames, recipe.Resources[*recipeIndex].Name);
+    }
+
+    std::optional<std::uint32_t> FindCompiledBufferIndexForRecipeId(
+        const FrameRecipeIntrospection& recipe,
+        const CompiledRenderGraph& compiled,
+        const FrameResourceId id)
+    {
+        const std::optional<std::uint32_t> recipeIndex = FindFrameRecipeResourceIndexById(recipe, id);
+        if (!recipeIndex.has_value())
+        {
+            return std::nullopt;
+        }
+        return FindCompiledNameIndex(compiled.BufferNames, recipe.Resources[*recipeIndex].Name);
+    }
+
     [[nodiscard]] RenderGraphValidationResult ValidateRecipeCompiledGraph(
         const FrameRecipeIntrospection& recipe,
         const CompiledRenderGraph& compiled)
@@ -738,24 +935,64 @@ namespace Extrinsic::Graphics
         const auto inputHeight = ClampExtent(aaOptions.InputHeight == 0u ? sizing.Height : aaOptions.InputHeight);
         const FrameRecipeIntrospection declaration = DescribeDefaultFrameRecipe(features, aaOptions, temporalOptions);
 
-        const auto backbuffer = graph.ImportBackbuffer("Backbuffer", imports.Backbuffer);
-        const auto sceneTable = graph.ImportBuffer("GpuWorld.SceneTable", imports.SceneTable, BufferState::ShaderRead, BufferState::ShaderRead);
-        const auto instanceStatic = graph.ImportBuffer("GpuWorld.InstanceStatic", imports.InstanceStatic, BufferState::ShaderRead, BufferState::ShaderRead);
-        const auto instanceDynamic = graph.ImportBuffer("GpuWorld.InstanceDynamic", imports.InstanceDynamic, BufferState::ShaderRead, BufferState::ShaderRead);
-        const auto entityConfig = graph.ImportBuffer("GpuWorld.EntityConfig", imports.EntityConfig, BufferState::ShaderRead, BufferState::ShaderRead);
-        const auto geometryRecords = graph.ImportBuffer("GpuWorld.GeometryRecords", imports.GeometryRecords, BufferState::ShaderRead, BufferState::ShaderRead);
-        const auto bounds = graph.ImportBuffer("GpuWorld.Bounds", imports.Bounds, BufferState::ShaderRead, BufferState::ShaderRead);
-        const auto lights = graph.ImportBuffer("GpuWorld.Lights", imports.Lights, BufferState::ShaderRead, BufferState::ShaderRead);
-        const auto materialBuffer = graph.ImportBuffer("Material.Buffer", imports.MaterialBuffer, BufferState::ShaderRead, BufferState::ShaderRead);
-        const auto drawIndirect = graph.ImportBuffer("Cull.SurfaceOpaque.IndexedArgs", imports.SurfaceOpaqueIndexedArgs, BufferState::ShaderWrite, BufferState::IndirectRead);
-        const auto drawCount = graph.ImportBuffer("Cull.SurfaceOpaque.Count", imports.SurfaceOpaqueCount, BufferState::ShaderWrite, BufferState::IndirectRead);
-        const auto lineDrawIndirect = graph.ImportBuffer("Cull.Lines.IndexedArgs", imports.LinesIndexedArgs, BufferState::ShaderWrite, BufferState::IndirectRead);
-        const auto lineDrawCount = graph.ImportBuffer("Cull.Lines.Count", imports.LinesCount, BufferState::ShaderWrite, BufferState::IndirectRead);
-        const auto pointDrawIndirect = graph.ImportBuffer("Cull.Points.NonIndexedArgs", imports.PointsNonIndexedArgs, BufferState::ShaderWrite, BufferState::IndirectRead);
-        const auto pointDrawCount = graph.ImportBuffer("Cull.Points.Count", imports.PointsCount, BufferState::ShaderWrite, BufferState::IndirectRead);
+        auto importBackbuffer = [&graph](std::string name,
+                                         const RHI::TextureHandle handle,
+                                         const FrameRecipeResourceKind kind) {
+            const TextureRef ref = graph.ImportBackbuffer(std::move(name), handle);
+            (void)graph.SetTextureResourceId(ref, ToFrameResourceId(kind));
+            return ref;
+        };
+        auto importTexture = [&graph](std::string name,
+                                      const RHI::TextureHandle handle,
+                                      const TextureState initial,
+                                      const TextureState finalState,
+                                      const FrameRecipeResourceKind kind) {
+            const TextureRef ref = graph.ImportTexture(std::move(name), handle, initial, finalState);
+            (void)graph.SetTextureResourceId(ref, ToFrameResourceId(kind));
+            return ref;
+        };
+        auto createTexture = [&graph](std::string name,
+                                      const RHI::TextureDesc& desc,
+                                      const FrameRecipeResourceKind kind) {
+            const TextureRef ref = graph.CreateTexture(std::move(name), desc);
+            (void)graph.SetTextureResourceId(ref, ToFrameResourceId(kind));
+            return ref;
+        };
+        auto importBuffer = [&graph](std::string name,
+                                     const RHI::BufferHandle handle,
+                                     const BufferState initial,
+                                     const BufferState finalState,
+                                     const FrameRecipeResourceKind kind) {
+            const BufferRef ref = graph.ImportBuffer(std::move(name), handle, initial, finalState);
+            (void)graph.SetBufferResourceId(ref, ToFrameResourceId(kind));
+            return ref;
+        };
+        auto createBuffer = [&graph](std::string name,
+                                     const RHI::BufferDesc& desc,
+                                     const FrameRecipeResourceKind kind) {
+            const BufferRef ref = graph.CreateBuffer(std::move(name), desc);
+            (void)graph.SetBufferResourceId(ref, ToFrameResourceId(kind));
+            return ref;
+        };
 
-        const auto depth = graph.CreateTexture("SceneDepth", DepthTargetDesc(inputWidth, inputHeight, sizing.DepthFormat, "SceneDepth"));
-        const auto hdr = graph.CreateTexture("SceneColorHDR", ColorTargetDesc(inputWidth, inputHeight, RHI::Format::RGBA16_FLOAT, "SceneColorHDR"));
+        const auto backbuffer = importBackbuffer("Backbuffer", imports.Backbuffer, FrameRecipeResourceKind::Backbuffer);
+        const auto sceneTable = importBuffer("GpuWorld.SceneTable", imports.SceneTable, BufferState::ShaderRead, BufferState::ShaderRead, FrameRecipeResourceKind::SceneTable);
+        const auto instanceStatic = importBuffer("GpuWorld.InstanceStatic", imports.InstanceStatic, BufferState::ShaderRead, BufferState::ShaderRead, FrameRecipeResourceKind::InstanceStatic);
+        const auto instanceDynamic = importBuffer("GpuWorld.InstanceDynamic", imports.InstanceDynamic, BufferState::ShaderRead, BufferState::ShaderRead, FrameRecipeResourceKind::InstanceDynamic);
+        const auto entityConfig = importBuffer("GpuWorld.EntityConfig", imports.EntityConfig, BufferState::ShaderRead, BufferState::ShaderRead, FrameRecipeResourceKind::EntityConfig);
+        const auto geometryRecords = importBuffer("GpuWorld.GeometryRecords", imports.GeometryRecords, BufferState::ShaderRead, BufferState::ShaderRead, FrameRecipeResourceKind::GeometryRecords);
+        const auto bounds = importBuffer("GpuWorld.Bounds", imports.Bounds, BufferState::ShaderRead, BufferState::ShaderRead, FrameRecipeResourceKind::Bounds);
+        const auto lights = importBuffer("GpuWorld.Lights", imports.Lights, BufferState::ShaderRead, BufferState::ShaderRead, FrameRecipeResourceKind::Lights);
+        const auto materialBuffer = importBuffer("Material.Buffer", imports.MaterialBuffer, BufferState::ShaderRead, BufferState::ShaderRead, FrameRecipeResourceKind::MaterialBuffer);
+        const auto drawIndirect = importBuffer("Cull.SurfaceOpaque.IndexedArgs", imports.SurfaceOpaqueIndexedArgs, BufferState::ShaderWrite, BufferState::IndirectRead, FrameRecipeResourceKind::SurfaceOpaqueIndexedArgs);
+        const auto drawCount = importBuffer("Cull.SurfaceOpaque.Count", imports.SurfaceOpaqueCount, BufferState::ShaderWrite, BufferState::IndirectRead, FrameRecipeResourceKind::SurfaceOpaqueCount);
+        const auto lineDrawIndirect = importBuffer("Cull.Lines.IndexedArgs", imports.LinesIndexedArgs, BufferState::ShaderWrite, BufferState::IndirectRead, FrameRecipeResourceKind::LinesIndexedArgs);
+        const auto lineDrawCount = importBuffer("Cull.Lines.Count", imports.LinesCount, BufferState::ShaderWrite, BufferState::IndirectRead, FrameRecipeResourceKind::LinesCount);
+        const auto pointDrawIndirect = importBuffer("Cull.Points.NonIndexedArgs", imports.PointsNonIndexedArgs, BufferState::ShaderWrite, BufferState::IndirectRead, FrameRecipeResourceKind::PointsNonIndexedArgs);
+        const auto pointDrawCount = importBuffer("Cull.Points.Count", imports.PointsCount, BufferState::ShaderWrite, BufferState::IndirectRead, FrameRecipeResourceKind::PointsCount);
+
+        const auto depth = createTexture("SceneDepth", DepthTargetDesc(inputWidth, inputHeight, sizing.DepthFormat, "SceneDepth"), FrameRecipeResourceKind::SceneDepth);
+        const auto hdr = createTexture("SceneColorHDR", ColorTargetDesc(inputWidth, inputHeight, RHI::Format::RGBA16_FLOAT, "SceneColorHDR"), FrameRecipeResourceKind::SceneColorHDR);
         TextureRef entityId{};
         TextureRef primitiveId{};
         TextureRef sceneNormal{};
@@ -788,41 +1025,50 @@ namespace Extrinsic::Graphics
             // VK_IMAGE_LAYOUT_UNDEFINED; import them that way so the graph emits
             // the first ShaderWrite transition before the build pass binds the
             // storage image descriptor.
-            hzbCurrent = graph.ImportTexture("HZB.Current",
-                                             imports.HZBCurrent,
-                                             TextureState::Undefined,
-                                             TextureState::ShaderWrite);
+            hzbCurrent = importTexture("HZB.Current",
+                                       imports.HZBCurrent,
+                                       TextureState::Undefined,
+                                       TextureState::ShaderWrite,
+                                       FrameRecipeResourceKind::HZBCurrent);
         }
         if (clusterGridBuildActive)
         {
-            clusterGridAABBs = graph.ImportBuffer("ClusterGrid.AABBs",
-                                                  imports.ClusterGridAABBs,
-                                                  BufferState::ShaderWrite,
-                                                  BufferState::ShaderRead);
+            clusterGridAABBs = importBuffer("ClusterGrid.AABBs",
+                                            imports.ClusterGridAABBs,
+                                            BufferState::ShaderWrite,
+                                            BufferState::ShaderRead,
+                                            FrameRecipeResourceKind::ClusterGridAABBs);
         }
         if (clusterLightAssignmentActive)
         {
-            clusterLightHeaders = graph.ImportBuffer("ClusterLights.Headers",
-                                                     imports.ClusterLightHeaders,
-                                                     BufferState::ShaderWrite,
-                                                     BufferState::ShaderRead);
-            clusterLightIndices = graph.ImportBuffer("ClusterLights.Indices",
-                                                     imports.ClusterLightIndices,
-                                                     BufferState::ShaderWrite,
-                                                     BufferState::ShaderRead);
-            clusterLightCounter = graph.ImportBuffer("ClusterLights.Counter",
-                                                     imports.ClusterLightCounter,
-                                                     BufferState::ShaderWrite,
-                                                     BufferState::ShaderRead);
+            clusterLightHeaders = importBuffer("ClusterLights.Headers",
+                                               imports.ClusterLightHeaders,
+                                               BufferState::ShaderWrite,
+                                               BufferState::ShaderRead,
+                                               FrameRecipeResourceKind::ClusterLightHeaders);
+            clusterLightIndices = importBuffer("ClusterLights.Indices",
+                                               imports.ClusterLightIndices,
+                                               BufferState::ShaderWrite,
+                                               BufferState::ShaderRead,
+                                               FrameRecipeResourceKind::ClusterLightIndices);
+            clusterLightCounter = importBuffer("ClusterLights.Counter",
+                                               imports.ClusterLightCounter,
+                                               BufferState::ShaderWrite,
+                                               BufferState::ShaderRead,
+                                               FrameRecipeResourceKind::ClusterLightCounter);
         }
 
         if (pickingActive || features.EnableSelectionOutline)
         {
-            entityId = graph.CreateTexture("EntityId", ColorTargetDesc(width, height, RHI::Format::R32_UINT, "EntityId"));
+            entityId = createTexture("EntityId",
+                                     ColorTargetDesc(width, height, RHI::Format::R32_UINT, "EntityId"),
+                                     FrameRecipeResourceKind::EntityId);
         }
         if (pickingActive)
         {
-            primitiveId = graph.CreateTexture("PrimitiveId", ColorTargetDesc(width, height, RHI::Format::R32_UINT, "PrimitiveId"));
+            primitiveId = createTexture("PrimitiveId",
+                                        ColorTargetDesc(width, height, RHI::Format::R32_UINT, "PrimitiveId"),
+                                        FrameRecipeResourceKind::PrimitiveId);
             // GRAPHICS-074 Slice D.2 — import the renderer-owned host-visible
             // `Picking.Readback` buffer rather than allocating a transient
             // one (Slice D.1 owns the lease; this slice wires it into the
@@ -834,35 +1080,40 @@ namespace Extrinsic::Graphics
             // `BeginFrame()` drain. Renderer wiring guarantees
             // `imports.PickingReadback` is valid when `pickingActive` is true
             // (publisher fail-closed otherwise), so we always import here.
-            pickingReadback = graph.ImportBuffer("Picking.Readback",
-                                                 imports.PickingReadback,
-                                                 BufferState::TransferDst,
-                                                 BufferState::HostReadback);
+            pickingReadback = importBuffer("Picking.Readback",
+                                           imports.PickingReadback,
+                                           BufferState::TransferDst,
+                                           BufferState::HostReadback,
+                                           FrameRecipeResourceKind::PickingReadback);
         }
         if (usesDeferred)
         {
-            sceneNormal = graph.CreateTexture("SceneNormal", ColorTargetDesc(width, height, RHI::Format::RGBA16_FLOAT, "SceneNormal"));
-            albedo = graph.CreateTexture("Albedo", ColorTargetDesc(width, height, RHI::Format::RGBA8_UNORM, "Albedo"));
-            material0 = graph.CreateTexture("Material0", ColorTargetDesc(width, height, RHI::Format::RGBA16_FLOAT, "Material0"));
+            sceneNormal = createTexture("SceneNormal", ColorTargetDesc(width, height, RHI::Format::RGBA16_FLOAT, "SceneNormal"), FrameRecipeResourceKind::SceneNormal);
+            albedo = createTexture("Albedo", ColorTargetDesc(width, height, RHI::Format::RGBA8_UNORM, "Albedo"), FrameRecipeResourceKind::Albedo);
+            material0 = createTexture("Material0", ColorTargetDesc(width, height, RHI::Format::RGBA16_FLOAT, "Material0"), FrameRecipeResourceKind::Material0);
         }
         if (motionVectorsActive)
         {
-            motionVectors = graph.CreateTexture("MotionVectors",
-                                                ColorTargetDesc(inputWidth, inputHeight, RHI::Format::RG16_FLOAT, "MotionVectors"));
+            motionVectors = createTexture("MotionVectors",
+                                          ColorTargetDesc(inputWidth, inputHeight, RHI::Format::RG16_FLOAT, "MotionVectors"),
+                                          FrameRecipeResourceKind::MotionVectors);
         }
         if (reconstructionActive)
         {
-            reconstructionHistoryPrevious = graph.ImportTexture("Reconstruction.HistoryPrevious",
-                                                                aaOptions.ReconstructionHistoryPrevious,
-                                                                TextureState::ShaderRead,
-                                                                TextureState::ShaderRead);
-            reconstructionHistoryCurrent = graph.ImportTexture("Reconstruction.HistoryCurrent",
-                                                               aaOptions.ReconstructionHistoryCurrent,
-                                                               TextureState::ShaderWrite,
-                                                               TextureState::ShaderRead);
-            reconstructionResolvedHDR = graph.CreateTexture(
+            reconstructionHistoryPrevious = importTexture("Reconstruction.HistoryPrevious",
+                                                          aaOptions.ReconstructionHistoryPrevious,
+                                                          TextureState::ShaderRead,
+                                                          TextureState::ShaderRead,
+                                                          FrameRecipeResourceKind::ReconstructionHistoryPrevious);
+            reconstructionHistoryCurrent = importTexture("Reconstruction.HistoryCurrent",
+                                                         aaOptions.ReconstructionHistoryCurrent,
+                                                         TextureState::ShaderWrite,
+                                                         TextureState::ShaderRead,
+                                                         FrameRecipeResourceKind::ReconstructionHistoryCurrent);
+            reconstructionResolvedHDR = createTexture(
                 "Reconstruction.ResolvedHDR",
-                StorageTextureDesc(width, height, RHI::Format::RGBA16_FLOAT, "Reconstruction.ResolvedHDR"));
+                StorageTextureDesc(width, height, RHI::Format::RGBA16_FLOAT, "Reconstruction.ResolvedHDR"),
+                FrameRecipeResourceKind::ReconstructionResolvedHDR);
         }
         if (features.EnableShadows)
         {
@@ -906,10 +1157,11 @@ namespace Extrinsic::Graphics
             // keeps the recipe build deterministic without a ShadowSystem.
             if (imports.ShadowAtlas.IsValid())
             {
-                shadowAtlas = graph.ImportTexture("ShadowAtlas",
-                                                  imports.ShadowAtlas,
-                                                  TextureState::Undefined,
-                                                  TextureState::DepthWrite);
+                shadowAtlas = importTexture("ShadowAtlas",
+                                            imports.ShadowAtlas,
+                                            TextureState::Undefined,
+                                            TextureState::DepthWrite,
+                                            FrameRecipeResourceKind::ShadowAtlas);
             }
             else
             {
@@ -919,13 +1171,16 @@ namespace Extrinsic::Graphics
                 const std::uint32_t atlasHeight = (shadowSizing.AtlasResolution > 0u)
                                                       ? shadowSizing.AtlasResolution
                                                       : height;
-                shadowAtlas = graph.CreateTexture("ShadowAtlas",
-                                                  DepthTargetDesc(atlasWidth, atlasHeight, RHI::Format::D32_FLOAT, "ShadowAtlas"));
+                shadowAtlas = createTexture("ShadowAtlas",
+                                            DepthTargetDesc(atlasWidth, atlasHeight, RHI::Format::D32_FLOAT, "ShadowAtlas"),
+                                            FrameRecipeResourceKind::ShadowAtlas);
             }
         }
         if (features.EnablePostProcess)
         {
-            ldr = graph.CreateTexture("SceneColorLDR", ColorTargetDesc(width, height, sizing.BackbufferFormat, "SceneColorLDR"));
+            ldr = createTexture("SceneColorLDR",
+                                ColorTargetDesc(width, height, sizing.BackbufferFormat, "SceneColorLDR"),
+                                FrameRecipeResourceKind::SceneColorLDR);
             // GRAPHICS-075 Slice B.2 — `BloomScratch` is a mip pyramid capped
             // at `kBloomMipChainLevels = 6` per
             // `docs/architecture/rendering-three-pass.md` ("capped at six
@@ -939,7 +1194,9 @@ namespace Extrinsic::Graphics
             // storage and the pass-side iteration stay in lock-step.
             RHI::TextureDesc bloomScratchDesc = ColorTargetDesc(width, height, RHI::Format::RGBA16_FLOAT, "PostProcess.BloomScratch");
             bloomScratchDesc.MipLevels = ComputeBloomMipChainLevels(width, height);
-            postProcessBloomScratch = graph.CreateTexture("PostProcess.BloomScratch", bloomScratchDesc);
+            postProcessBloomScratch = createTexture("PostProcess.BloomScratch",
+                                                    bloomScratchDesc,
+                                                    FrameRecipeResourceKind::PostProcessBloomScratch);
             // GRAPHICS-075 Slice D.2a — three matched-format AA attachments
             // replace the single `PostProcess.AATemp` transient. The
             // edge / blend / resolve graph passes each declare a single
@@ -949,18 +1206,21 @@ namespace Extrinsic::Graphics
             // inside a single render-pass scope on Vulkan.
             if (smaaActive)
             {
-                postProcessAATempEdges = graph.CreateTexture(
+                postProcessAATempEdges = createTexture(
                     "PostProcess.AATemp.Edges",
-                    ColorTargetDesc(width, height, RHI::Format::RG8_UNORM, "PostProcess.AATemp.Edges"));
-                postProcessAATempWeights = graph.CreateTexture(
+                    ColorTargetDesc(width, height, RHI::Format::RG8_UNORM, "PostProcess.AATemp.Edges"),
+                    FrameRecipeResourceKind::PostProcessAATempEdges);
+                postProcessAATempWeights = createTexture(
                     "PostProcess.AATemp.Weights",
-                    ColorTargetDesc(width, height, RHI::Format::RGBA8_UNORM, "PostProcess.AATemp.Weights"));
+                    ColorTargetDesc(width, height, RHI::Format::RGBA8_UNORM, "PostProcess.AATemp.Weights"),
+                    FrameRecipeResourceKind::PostProcessAATempWeights);
             }
             if (spatialAAActive)
             {
-                postProcessAATempResolved = graph.CreateTexture(
+                postProcessAATempResolved = createTexture(
                     "PostProcess.AATemp.Resolved",
-                    ColorTargetDesc(width, height, sizing.BackbufferFormat, "PostProcess.AATemp.Resolved"));
+                    ColorTargetDesc(width, height, sizing.BackbufferFormat, "PostProcess.AATemp.Resolved"),
+                    FrameRecipeResourceKind::PostProcessAATempResolved);
             }
             // GRAPHICS-075 Slice E.1 — `TransferDst` is required so the
             // histogram pass body can `vkCmdFillBuffer` the 256 uint32
@@ -970,11 +1230,11 @@ namespace Extrinsic::Graphics
             // distribution and the downstream exposure-adaptation
             // readback Slice E.2 wires). `TransferSrc` stays for the
             // Slice E.2 host-visible readback copy.
-            postProcessHistogram = graph.CreateBuffer("PostProcess.Histogram", RHI::BufferDesc{
+            postProcessHistogram = createBuffer("PostProcess.Histogram", RHI::BufferDesc{
                 .SizeBytes = 256u * sizeof(std::uint32_t),
                 .Usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferSrc | RHI::BufferUsage::TransferDst,
                 .DebugName = "PostProcess.Histogram",
-            });
+            }, FrameRecipeResourceKind::PostProcessHistogram);
             // GRAPHICS-075 Slice E.2 — import the renderer-owned host-visible
             // `Histogram.Readback` buffer rather than allocating a transient
             // one. The `TransferDst` initial state satisfies the framegraph's
@@ -987,23 +1247,31 @@ namespace Extrinsic::Graphics
             // skip the renderer-side allocation still build a valid recipe.
             if (imports.HistogramReadback.IsValid())
             {
-                histogramReadback = graph.ImportBuffer("Histogram.Readback",
-                                                       imports.HistogramReadback,
-                                                       BufferState::TransferDst,
-                                                       BufferState::HostReadback);
+                histogramReadback = importBuffer("Histogram.Readback",
+                                                 imports.HistogramReadback,
+                                                 BufferState::TransferDst,
+                                                 BufferState::HostReadback,
+                                                 FrameRecipeResourceKind::HistogramReadback);
             }
         }
         if (features.EnableSelectionOutline)
         {
-            selectionOutline = graph.CreateTexture("SelectionOutline", ColorTargetDesc(width, height, sizing.BackbufferFormat, "SelectionOutline"));
+            selectionOutline = createTexture("SelectionOutline",
+                                             ColorTargetDesc(width, height, sizing.BackbufferFormat, "SelectionOutline"),
+                                             FrameRecipeResourceKind::SelectionOutline);
         }
         if (features.EnableDebugView)
         {
-            debugView = graph.CreateTexture("DebugViewRGBA", ColorTargetDesc(width, height, RHI::Format::RGBA8_UNORM, "DebugViewRGBA"));
+            debugView = createTexture("DebugViewRGBA",
+                                      ColorTargetDesc(width, height, RHI::Format::RGBA8_UNORM, "DebugViewRGBA"),
+                                      FrameRecipeResourceKind::DebugViewRGBA);
         }
 
         PassRef previous{};
-        auto addOrderedPass = [&graph, &previous](std::string name, auto setup, const bool sideEffect = false) {
+        auto addOrderedPass = [&graph, &previous](const FrameRecipePassKind kind,
+                                                  std::string name,
+                                                  auto setup,
+                                                  const bool sideEffect = false) {
             const PassRef dependency = previous;
             PassRef pass = graph.AddPass(std::move(name), [dependency, setup](RenderGraphBuilder& builder) mutable {
                 if (dependency.IsValid())
@@ -1012,11 +1280,12 @@ namespace Extrinsic::Graphics
                 }
                 setup(builder);
             }, sideEffect);
+            (void)graph.SetPassId(pass, ToFramePassId(kind));
             previous = pass;
             return pass;
         };
 
-        addOrderedPass("CullingPass", [=](RenderGraphBuilder& builder) {
+        addOrderedPass(FrameRecipePassKind::Culling, "CullingPass", [=](RenderGraphBuilder& builder) {
             builder.Read(sceneTable, BufferUsage::ShaderRead);
             builder.Read(instanceStatic, BufferUsage::ShaderRead);
             builder.Read(instanceDynamic, BufferUsage::ShaderRead);
@@ -1035,7 +1304,7 @@ namespace Extrinsic::Graphics
 
         if (features.EnableDepthPrepass)
         {
-            addOrderedPass("DepthPrepass", [=](RenderGraphBuilder& builder) {
+            addOrderedPass(FrameRecipePassKind::DepthPrepass, "DepthPrepass", [=](RenderGraphBuilder& builder) {
                 builder.Read(drawIndirect, BufferUsage::IndirectRead);
                 builder.Read(drawCount, BufferUsage::IndirectRead);
                 builder.Write(depth, TextureUsage::DepthWrite);
@@ -1051,7 +1320,7 @@ namespace Extrinsic::Graphics
 
         if (hzbBuildActive)
         {
-            addOrderedPass("HZBBuildPass", [=](RenderGraphBuilder& builder) {
+            addOrderedPass(FrameRecipePassKind::HZBBuild, "HZBBuildPass", [=](RenderGraphBuilder& builder) {
                 builder.Read(depth, TextureUsage::ShaderRead);
                 builder.Write(hzbCurrent, TextureUsage::ShaderWrite);
             });
@@ -1059,7 +1328,7 @@ namespace Extrinsic::Graphics
 
         if (clusterGridBuildActive)
         {
-            addOrderedPass("ClusterGridBuildPass", [=](RenderGraphBuilder& builder) {
+            addOrderedPass(FrameRecipePassKind::ClusterGridBuild, "ClusterGridBuildPass", [=](RenderGraphBuilder& builder) {
                 // GRAPHICS-039D — prefer async compute for clustered-light
                 // compute work; the framegraph/RHI resolver demotes to
                 // graphics on single-queue devices.
@@ -1070,7 +1339,7 @@ namespace Extrinsic::Graphics
 
         if (clusterLightAssignmentActive)
         {
-            addOrderedPass("LightClusterAssignmentPass", [=](RenderGraphBuilder& builder) {
+            addOrderedPass(FrameRecipePassKind::LightClusterAssignment, "LightClusterAssignmentPass", [=](RenderGraphBuilder& builder) {
                 // GRAPHICS-039D — same affinity as the cluster-grid build so
                 // the build/assignment band remains together when async
                 // compute is available and demotes together when absent.
@@ -1096,7 +1365,7 @@ namespace Extrinsic::Graphics
         // sets aligned.
         if (pickingActive)
         {
-            addOrderedPass("PickingPass", [=](RenderGraphBuilder& builder) {
+            addOrderedPass(FrameRecipePassKind::Picking, "PickingPass", [=](RenderGraphBuilder& builder) {
                 builder.Read(depth, TextureUsage::DepthRead);
                 builder.Read(drawIndirect, BufferUsage::IndirectRead);
                 builder.Read(drawCount, BufferUsage::IndirectRead);
@@ -1121,7 +1390,7 @@ namespace Extrinsic::Graphics
 
         if (features.EnableShadows)
         {
-            addOrderedPass("ShadowPass", [=](RenderGraphBuilder& builder) {
+            addOrderedPass(FrameRecipePassKind::Shadow, "ShadowPass", [=](RenderGraphBuilder& builder) {
                 builder.Read(drawIndirect, BufferUsage::IndirectRead);
                 builder.Read(drawCount, BufferUsage::IndirectRead);
                 builder.Write(shadowAtlas, TextureUsage::DepthWrite);
@@ -1135,7 +1404,7 @@ namespace Extrinsic::Graphics
             });
         }
 
-        addOrderedPass("SurfacePass", [=](RenderGraphBuilder& builder) {
+        addOrderedPass(FrameRecipePassKind::Surface, "SurfacePass", [=](RenderGraphBuilder& builder) {
             builder.Read(sceneTable, BufferUsage::ShaderRead);
             builder.Read(instanceStatic, BufferUsage::ShaderRead);
             builder.Read(instanceDynamic, BufferUsage::ShaderRead);
@@ -1212,7 +1481,7 @@ namespace Extrinsic::Graphics
 
         if (usesDeferred)
         {
-            addOrderedPass("CompositionPass", [=](RenderGraphBuilder& builder) {
+            addOrderedPass(FrameRecipePassKind::Composition, "CompositionPass", [=](RenderGraphBuilder& builder) {
                 builder.Read(sceneNormal, TextureUsage::ShaderRead);
                 builder.Read(albedo, TextureUsage::ShaderRead);
                 builder.Read(material0, TextureUsage::ShaderRead);
@@ -1248,7 +1517,7 @@ namespace Extrinsic::Graphics
             });
         }
 
-        addOrderedPass("LinePass", [=](RenderGraphBuilder& builder) {
+        addOrderedPass(FrameRecipePassKind::Line, "LinePass", [=](RenderGraphBuilder& builder) {
             builder.Read(depth, TextureUsage::DepthRead);
             builder.Read(lineDrawIndirect, BufferUsage::IndirectRead);
             builder.Read(lineDrawCount, BufferUsage::IndirectRead);
@@ -1263,7 +1532,7 @@ namespace Extrinsic::Graphics
             });
         });
 
-        addOrderedPass("PointPass", [=](RenderGraphBuilder& builder) {
+        addOrderedPass(FrameRecipePassKind::Point, "PointPass", [=](RenderGraphBuilder& builder) {
             builder.Read(depth, TextureUsage::DepthRead);
             builder.Read(pointDrawIndirect, BufferUsage::IndirectRead);
             builder.Read(pointDrawCount, BufferUsage::IndirectRead);
@@ -1304,7 +1573,7 @@ namespace Extrinsic::Graphics
         // `SkippedUnavailable` because no pipelines exist yet.
         if (features.EnableTransientDebugSurface)
         {
-            addOrderedPass("TransientDebugSurfacePass", [=](RenderGraphBuilder& builder) {
+            addOrderedPass(FrameRecipePassKind::TransientDebugSurface, "TransientDebugSurfacePass", [=](RenderGraphBuilder& builder) {
                 builder.Read(depth, TextureUsage::DepthRead);
                 builder.Write(hdr, TextureUsage::ColorAttachmentWrite);
                 builder.SetRenderPass(RHI::RenderPassDesc{
@@ -1329,7 +1598,7 @@ namespace Extrinsic::Graphics
         // isoline lane.
         if (features.EnableVisualizationOverlay)
         {
-            addOrderedPass("VisualizationOverlayPass", [=](RenderGraphBuilder& builder) {
+            addOrderedPass(FrameRecipePassKind::VisualizationOverlay, "VisualizationOverlayPass", [=](RenderGraphBuilder& builder) {
                 builder.Read(depth, TextureUsage::DepthRead);
                 builder.Write(hdr, TextureUsage::ColorAttachmentWrite);
                 builder.SetRenderPass(RHI::RenderPassDesc{
@@ -1346,7 +1615,7 @@ namespace Extrinsic::Graphics
         TextureRef postProcessInput = hdr;
         if (reconstructionActive)
         {
-            addOrderedPass("ReconstructionPass", [=](RenderGraphBuilder& builder) {
+            addOrderedPass(FrameRecipePassKind::Reconstruction, "ReconstructionPass", [=](RenderGraphBuilder& builder) {
                 builder.SetQueue(RenderQueue::AsyncCompute);
                 builder.Read(hdr, TextureUsage::ShaderRead);
                 builder.Read(depth, TextureUsage::ShaderRead);
@@ -1399,7 +1668,7 @@ namespace Extrinsic::Graphics
             // `SceneColorHDR ColorAttachment → ShaderRead` transition
             // and the dispatch barrier lands before the bloom +
             // tonemap render-pass scope opens.
-            addOrderedPass("PostProcessHistogramPass", [=](RenderGraphBuilder& builder) {
+            addOrderedPass(FrameRecipePassKind::PostProcessHistogram, "PostProcessHistogramPass", [=](RenderGraphBuilder& builder) {
                 // GRAPHICS-037D Slice D — the histogram dispatch is the
                 // default recipe's existing compute-only pass. Prefer the
                 // optional async-compute queue here; the framegraph/RHI
@@ -1416,7 +1685,7 @@ namespace Extrinsic::Graphics
                     builder.Write(histogramReadback, BufferUsage::TransferDst);
                 }
             });
-            addOrderedPass("PostProcessPass", [=](RenderGraphBuilder& builder) {
+            addOrderedPass(FrameRecipePassKind::PostProcess, "PostProcessPass", [=](RenderGraphBuilder& builder) {
                 builder.Read(postProcessInput, TextureUsage::ShaderRead);
                 builder.Write(ldr, TextureUsage::ColorAttachmentWrite);
                 builder.Write(postProcessBloomScratch, TextureUsage::ColorAttachmentWrite);
@@ -1426,14 +1695,14 @@ namespace Extrinsic::Graphics
             });
             if (smaaActive)
             {
-                addOrderedPass("PostProcessAAEdgePass", [=](RenderGraphBuilder& builder) {
+                addOrderedPass(FrameRecipePassKind::PostProcessAAEdge, "PostProcessAAEdgePass", [=](RenderGraphBuilder& builder) {
                     builder.Read(ldr, TextureUsage::ShaderRead);
                     builder.Write(postProcessAATempEdges, TextureUsage::ColorAttachmentWrite);
                     builder.SetRenderPass(RHI::RenderPassDesc{
                         .ColorTargets = kDefaultClearColorAttachments,
                     });
                 });
-                addOrderedPass("PostProcessAABlendPass", [=](RenderGraphBuilder& builder) {
+                addOrderedPass(FrameRecipePassKind::PostProcessAABlend, "PostProcessAABlendPass", [=](RenderGraphBuilder& builder) {
                     builder.Read(postProcessAATempEdges, TextureUsage::ShaderRead);
                     builder.Write(postProcessAATempWeights, TextureUsage::ColorAttachmentWrite);
                     builder.SetRenderPass(RHI::RenderPassDesc{
@@ -1443,7 +1712,7 @@ namespace Extrinsic::Graphics
             }
             if (spatialAAActive)
             {
-                addOrderedPass("PostProcessAAResolvePass", [=](RenderGraphBuilder& builder) {
+                addOrderedPass(FrameRecipePassKind::PostProcessAAResolve, "PostProcessAAResolvePass", [=](RenderGraphBuilder& builder) {
                     builder.Read(ldr, TextureUsage::ShaderRead);
                     if (smaaActive)
                     {
@@ -1462,7 +1731,7 @@ namespace Extrinsic::Graphics
         if (features.EnableSelectionOutline)
         {
             const TextureRef input = presentSource;
-            addOrderedPass("SelectionOutlinePass", [=](RenderGraphBuilder& builder) {
+            addOrderedPass(FrameRecipePassKind::SelectionOutline, "SelectionOutlinePass", [=](RenderGraphBuilder& builder) {
                 builder.Read(input, TextureUsage::ShaderRead);
                 builder.Read(entityId, TextureUsage::ShaderRead);
                 builder.Read(depth, TextureUsage::DepthRead);
@@ -1482,7 +1751,7 @@ namespace Extrinsic::Graphics
         if (features.EnableDebugView)
         {
             const TextureRef input = presentSource;
-            addOrderedPass("DebugViewPass", [=](RenderGraphBuilder& builder) {
+            addOrderedPass(FrameRecipePassKind::DebugView, "DebugViewPass", [=](RenderGraphBuilder& builder) {
                 builder.Read(input, TextureUsage::ShaderRead);
                 builder.Write(debugView, TextureUsage::ColorAttachmentWrite);
                 builder.SetRenderPass(RHI::RenderPassDesc{
@@ -1495,7 +1764,7 @@ namespace Extrinsic::Graphics
         if (features.EnableImGui)
         {
             const TextureRef input = presentSource;
-            addOrderedPass("ImGuiPass", [=](RenderGraphBuilder& builder) {
+            addOrderedPass(FrameRecipePassKind::ImGui, "ImGuiPass", [=](RenderGraphBuilder& builder) {
                 builder.Read(input, TextureUsage::ShaderRead);
                 builder.Write(input, TextureUsage::ColorAttachmentWrite);
                 builder.SetRenderPass(RHI::RenderPassDesc{
@@ -1518,7 +1787,7 @@ namespace Extrinsic::Graphics
         // backbuffer's `FinalState = Present` contract (see
         // `RenderGraph::ImportBackbuffer`), so no `TextureUsage::Present`
         // read is needed on this pass.
-        addOrderedPass("Present", [=](RenderGraphBuilder& builder) {
+        addOrderedPass(FrameRecipePassKind::Present, "Present", [=](RenderGraphBuilder& builder) {
             builder.Read(presentSource, TextureUsage::ShaderRead);
             builder.Write(backbuffer, TextureUsage::ColorAttachmentWrite);
             builder.SetRenderPass(RHI::RenderPassDesc{

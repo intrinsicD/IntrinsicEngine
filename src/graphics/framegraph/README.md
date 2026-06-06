@@ -8,8 +8,9 @@ state, or asset-service traffic.
 
 ## Ownership boundaries
 
-- `graphics/renderer` owns `FrameRecipe` identities, recipe feature gates, pass
-  labels, renderer diagnostics, and pass-body command contracts.
+- `graphics/renderer` owns `FrameRecipe` typed pass/resource identities,
+  recipe feature gates, canonical debug labels, renderer diagnostics, and
+  pass-body command contracts.
 - `graphics/framegraph` consumes recipe-declared resources/passes, validates
   imported-resource write authorization, computes first/last resource uses, and
   emits barrier packets in pass order.
@@ -23,9 +24,16 @@ state, or asset-service traffic.
 The canonical renderer recipe is built by
 `BuildDefaultFrameRecipe(graph, features, imports, sizing, shadowSizing)` in
 `Extrinsic.Graphics.FrameRecipe` and declared by
-`DescribeDefaultFrameRecipe(features)`. The framegraph treats those declarations
-as the single source of truth for imported-resource write authorization,
-transient-resource lifetime, pass ordering, and final backbuffer presentation.
+`DescribeDefaultFrameRecipe(features)`. The recipe assigns typed
+`FramePassId`/`FrameResourceId` values to recipe-owned passes and resources; the
+framegraph stores those IDs on pass/resource declarations and rejects duplicate
+non-zero IDs at compile time. `FrameRecipeIntrospection` exposes helper lookups
+that map typed IDs to compiled pass/resource indices without resizing the
+returned `CompiledRenderGraph` value. Human-readable names remain stable
+diagnostics and debug dump labels, not the correctness contract. The framegraph
+treats recipe declarations as the single source of truth for imported-resource
+write authorization, transient-resource lifetime, pass ordering, and final
+backbuffer presentation.
 
 The framegraph compiler infers required transitions from declared uses: draw
 passes write `SceneColorHDR` and related intermediate attachments, optional
@@ -35,8 +43,10 @@ post-pass `ColorAttachmentWrite -> Present` transition is emitted from
 `RenderGraph::ImportBackbuffer`'s final-state contract; there is no recipe-local
 barrier annotation or special backbuffer-write exception.
 
-Tests should assert compiled graph/resource properties by pass label and resource
-name, not transient allocation IDs or backend-native handles.
+Tests should assert compiled graph/resource properties by typed recipe identity
+where available, and may assert pass/resource names only for diagnostics and
+debug dump stability. Tests must not depend on transient allocation IDs or
+backend-native handles.
 
 ## Queue Affinity Contract
 

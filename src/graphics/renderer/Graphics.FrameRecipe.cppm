@@ -2,6 +2,7 @@ module;
 
 #include <cstdint>
 #include <initializer_list>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -113,6 +114,11 @@ namespace Extrinsic::Graphics
         Reconstruction,
     };
 
+    export [[nodiscard]] constexpr FramePassId ToFramePassId(const FrameRecipePassKind kind) noexcept
+    {
+        return FramePassId{static_cast<std::uint32_t>(kind) + 1u};
+    }
+
     export enum class FrameRecipeResourceKind : std::uint8_t
     {
         Backbuffer = 0,
@@ -186,6 +192,16 @@ namespace Extrinsic::Graphics
         ReconstructionHistoryCurrent,
         ReconstructionResolvedHDR,
     };
+
+    export [[nodiscard]] constexpr FrameResourceId ToFrameResourceId(const FrameRecipeResourceKind kind) noexcept
+    {
+        return FrameResourceId{static_cast<std::uint32_t>(kind) + 1u};
+    }
+
+    export [[nodiscard]] std::string_view FrameRecipePassKindName(FrameRecipePassKind kind) noexcept;
+    export [[nodiscard]] std::string_view FrameRecipeResourceKindName(FrameRecipeResourceKind kind) noexcept;
+    export [[nodiscard]] std::string_view FrameRecipePassIdName(FramePassId id) noexcept;
+    export [[nodiscard]] std::string_view FrameRecipeResourceIdName(FrameResourceId id) noexcept;
 
     export struct FrameRecipeFeatures
     {
@@ -347,6 +363,7 @@ namespace Extrinsic::Graphics
     export struct FrameRecipePassDeclaration
     {
         FrameRecipePassKind Kind{FrameRecipePassKind::Culling};
+        FramePassId Id{ToFramePassId(FrameRecipePassKind::Culling)};
         std::string_view Name{};
         bool Enabled{false};
         bool FinalizesBackbuffer{false};
@@ -357,6 +374,7 @@ namespace Extrinsic::Graphics
     export struct FrameRecipeResourceDeclaration
     {
         FrameRecipeResourceKind Kind{FrameRecipeResourceKind::Backbuffer};
+        FrameResourceId Id{ToFrameResourceId(FrameRecipeResourceKind::Backbuffer)};
         std::string_view Name{};
         bool Enabled{false};
         bool Imported{false};
@@ -392,6 +410,24 @@ namespace Extrinsic::Graphics
     export [[nodiscard]] RenderGraphValidationResult ValidateRecipeCompiledGraph(
         const FrameRecipeIntrospection& recipe,
         const CompiledRenderGraph& compiled);
+    export [[nodiscard]] std::optional<std::uint32_t> FindFrameRecipePassIndexById(
+        const FrameRecipeIntrospection& recipe,
+        FramePassId id);
+    export [[nodiscard]] std::optional<std::uint32_t> FindFrameRecipeResourceIndexById(
+        const FrameRecipeIntrospection& recipe,
+        FrameResourceId id);
+    export [[nodiscard]] std::optional<std::uint32_t> FindCompiledPassIndexForRecipeId(
+        const FrameRecipeIntrospection& recipe,
+        const CompiledRenderGraph& compiled,
+        FramePassId id);
+    export [[nodiscard]] std::optional<std::uint32_t> FindCompiledTextureIndexForRecipeId(
+        const FrameRecipeIntrospection& recipe,
+        const CompiledRenderGraph& compiled,
+        FrameResourceId id);
+    export [[nodiscard]] std::optional<std::uint32_t> FindCompiledBufferIndexForRecipeId(
+        const FrameRecipeIntrospection& recipe,
+        const CompiledRenderGraph& compiled,
+        FrameResourceId id);
 
     export [[nodiscard]] FrameRecipeBuildResult BuildDefaultFrameRecipe(RenderGraph& graph,
                                                                         const FrameRecipeFeatures& features,

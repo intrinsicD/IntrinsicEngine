@@ -61,6 +61,9 @@ namespace Extrinsic::Graphics
         [[nodiscard]] const BufferResourceDesc* GetBufferDesc(BufferRef ref) const;
         [[nodiscard]] const TextureResourceDesc* GetTextureDescByIndex(std::uint32_t index) const;
         [[nodiscard]] const BufferResourceDesc* GetBufferDescByIndex(std::uint32_t index) const;
+        [[nodiscard]] Core::Result SetPassId(PassRef ref, FramePassId id);
+        [[nodiscard]] Core::Result SetTextureResourceId(TextureRef ref, FrameResourceId id);
+        [[nodiscard]] Core::Result SetBufferResourceId(BufferRef ref, FrameResourceId id);
         void Reset();
 
         [[nodiscard]] std::uint32_t GetPassCount() const;

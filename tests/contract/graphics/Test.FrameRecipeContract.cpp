@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -263,6 +264,123 @@ TEST(FrameRecipeContract, DefaultRecipeBuildsCanonicalPassOrder)
     };
     EXPECT_EQ(OrderedPassNames(*compiled), expected);
     EXPECT_EQ(build.DeclaredPassCount, expected.size());
+}
+
+TEST(FrameRecipeContract, DefaultRecipePropagatesTypedPassAndResourceIds)
+{
+    const FrameRecipeIntrospection recipe = DescribeDefaultFrameRecipe(FrameRecipeFeatures{});
+
+    RenderGraph graph;
+    const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
+        graph,
+        FrameRecipeFeatures{},
+        MakeImports(),
+        FrameRecipeSizing{.Width = 1280u, .Height = 720u});
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+
+    const std::optional<std::uint32_t> surfaceRecipeIndex =
+        FindFrameRecipePassIndexById(recipe, ToFramePassId(FrameRecipePassKind::Surface));
+    ASSERT_TRUE(surfaceRecipeIndex.has_value());
+    EXPECT_EQ(recipe.Passes[*surfaceRecipeIndex].Id, ToFramePassId(FrameRecipePassKind::Surface));
+    EXPECT_EQ(FrameRecipePassIdName(recipe.Passes[*surfaceRecipeIndex].Id), std::string_view{"SurfacePass"});
+
+    const std::optional<std::uint32_t> surfaceIndex =
+        FindCompiledPassIndexForRecipeId(recipe, *compiled, ToFramePassId(FrameRecipePassKind::Surface));
+    ASSERT_TRUE(surfaceIndex.has_value());
+    ASSERT_LT(*surfaceIndex, compiled->PassNames.size());
+    EXPECT_EQ(compiled->PassNames[*surfaceIndex], "SurfacePass");
+
+    const std::optional<std::uint32_t> presentIndex =
+        FindCompiledPassIndexForRecipeId(recipe, *compiled, ToFramePassId(FrameRecipePassKind::Present));
+    ASSERT_TRUE(presentIndex.has_value());
+    ASSERT_LT(*presentIndex, compiled->PassNames.size());
+    EXPECT_EQ(compiled->PassNames[*presentIndex], "Present");
+
+    const std::optional<std::uint32_t> hdrRecipeIndex =
+        FindFrameRecipeResourceIndexById(recipe, ToFrameResourceId(FrameRecipeResourceKind::SceneColorHDR));
+    ASSERT_TRUE(hdrRecipeIndex.has_value());
+    EXPECT_EQ(recipe.Resources[*hdrRecipeIndex].Id, ToFrameResourceId(FrameRecipeResourceKind::SceneColorHDR));
+    EXPECT_EQ(FrameRecipeResourceIdName(recipe.Resources[*hdrRecipeIndex].Id), std::string_view{"SceneColorHDR"});
+
+    const std::optional<std::uint32_t> hdrIndex =
+        FindCompiledTextureIndexForRecipeId(recipe, *compiled, ToFrameResourceId(FrameRecipeResourceKind::SceneColorHDR));
+    ASSERT_TRUE(hdrIndex.has_value());
+    ASSERT_LT(*hdrIndex, compiled->TextureNames.size());
+    EXPECT_EQ(compiled->TextureNames[*hdrIndex], "SceneColorHDR");
+
+    const std::optional<std::uint32_t> sceneTableIndex =
+        FindCompiledBufferIndexForRecipeId(recipe, *compiled, ToFrameResourceId(FrameRecipeResourceKind::SceneTable));
+    ASSERT_TRUE(sceneTableIndex.has_value());
+    ASSERT_LT(*sceneTableIndex, compiled->BufferNames.size());
+    EXPECT_EQ(compiled->BufferNames[*sceneTableIndex], "GpuWorld.SceneTable");
+}
+
+TEST(FrameRecipeContract, TypedIdentityDoesNotChangeDebugNames)
+{
+    RenderGraph graph;
+    const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
+        graph,
+        FrameRecipeFeatures{},
+        MakeImports(),
+        FrameRecipeSizing{.Width = 320u, .Height = 180u});
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+
+    const std::string dump = BuildRenderGraphDebugDump(*compiled);
+    EXPECT_NE(dump.find("name=\"CullingPass\""), std::string::npos);
+    EXPECT_NE(dump.find("name=\"SceneColorHDR\""), std::string::npos);
+    EXPECT_NE(dump.find("name=\"GpuWorld.SceneTable\""), std::string::npos);
+    EXPECT_EQ(FrameRecipePassKindName(FrameRecipePassKind::PostProcess), std::string_view{"PostProcessPass"});
+    EXPECT_EQ(FrameRecipeResourceKindName(FrameRecipeResourceKind::PostProcessHistogram),
+              std::string_view{"PostProcess.Histogram"});
+}
+
+TEST(FrameRecipeContract, DuplicateTypedPassIdsAreDiagnosed)
+{
+    RenderGraph graph;
+    const PassRef first = graph.AddPass("FirstTypedPass", true);
+    const PassRef duplicate = graph.AddPass("RenamedDebugPass", true);
+    ASSERT_TRUE(graph.SetPassId(first, FramePassId{77u}).has_value());
+    ASSERT_TRUE(graph.SetPassId(duplicate, FramePassId{77u}).has_value());
+
+    const auto compiled = graph.Compile();
+    EXPECT_FALSE(compiled.has_value());
+
+    const RenderGraphValidationResult& result = graph.GetLastCompileValidationResult();
+    ASSERT_EQ(result.Findings.size(), 1u);
+    EXPECT_EQ(result.Findings[0].Code, RenderGraphValidationCode::DuplicatePassId);
+    EXPECT_EQ(result.Findings[0].PassName, "RenamedDebugPass");
+    EXPECT_NE(result.Findings[0].Message.find("FirstTypedPass"), std::string::npos);
+}
+
+TEST(FrameRecipeContract, DuplicateTypedResourceIdsAreDiagnosed)
+{
+    RenderGraph graph;
+    const RHI::TextureDesc desc{
+        .Width = 1u,
+        .Height = 1u,
+        .Fmt = RHI::Format::RGBA8_UNORM,
+        .Usage = RHI::TextureUsage::ColorTarget,
+        .DebugName = "DuplicateResource",
+    };
+    const TextureRef first = graph.CreateTexture("FirstTypedResource", desc);
+    const TextureRef duplicate = graph.CreateTexture("RenamedDebugResource", desc);
+    ASSERT_TRUE(graph.SetTextureResourceId(first, FrameResourceId{91u}).has_value());
+    ASSERT_TRUE(graph.SetTextureResourceId(duplicate, FrameResourceId{91u}).has_value());
+
+    const auto compiled = graph.Compile();
+    EXPECT_FALSE(compiled.has_value());
+
+    const RenderGraphValidationResult& result = graph.GetLastCompileValidationResult();
+    ASSERT_EQ(result.Findings.size(), 1u);
+    EXPECT_EQ(result.Findings[0].Code, RenderGraphValidationCode::DuplicateResourceId);
+    EXPECT_EQ(result.Findings[0].ResourceName, "RenamedDebugResource");
+    EXPECT_NE(result.Findings[0].Message.find("FirstTypedResource"), std::string::npos);
 }
 
 TEST(FrameRecipeContract, DefaultRecipeDoesNotDepthTransitionColorResources)

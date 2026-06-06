@@ -16,6 +16,28 @@ namespace Extrinsic::Graphics
 {
     export using RenderQueue = RHI::QueueAffinity;
 
+    export struct FramePassId
+    {
+        std::uint32_t Value = 0;
+
+        [[nodiscard]] constexpr bool IsValid() const noexcept
+        {
+            return Value != 0u;
+        }
+    };
+
+    export [[nodiscard]] constexpr bool operator==(const FramePassId lhs,
+                                                   const FramePassId rhs) noexcept
+    {
+        return lhs.Value == rhs.Value;
+    }
+
+    export [[nodiscard]] constexpr bool operator!=(const FramePassId lhs,
+                                                   const FramePassId rhs) noexcept
+    {
+        return !(lhs == rhs);
+    }
+
     export enum class TextureUsage : std::uint8_t
     {
         ColorAttachmentRead = 0,
@@ -71,6 +93,7 @@ namespace Extrinsic::Graphics
     export struct RenderPassRecord
     {
         std::string Name{};
+        FramePassId Id{};
         bool SideEffect = false;
         RenderQueue Queue = RenderQueue::Graphics;
         std::vector<TextureAccess> TextureAccesses{};

@@ -10,6 +10,28 @@ import Extrinsic.RHI.Descriptors;
 
 namespace Extrinsic::Graphics
 {
+    export struct FrameResourceId
+    {
+        std::uint32_t Value = 0;
+
+        [[nodiscard]] constexpr bool IsValid() const noexcept
+        {
+            return Value != 0u;
+        }
+    };
+
+    export [[nodiscard]] constexpr bool operator==(const FrameResourceId lhs,
+                                                   const FrameResourceId rhs) noexcept
+    {
+        return lhs.Value == rhs.Value;
+    }
+
+    export [[nodiscard]] constexpr bool operator!=(const FrameResourceId lhs,
+                                                   const FrameResourceId rhs) noexcept
+    {
+        return !(lhs == rhs);
+    }
+
     export enum class TextureState : std::uint8_t
     {
         Undefined = 0,
@@ -60,6 +82,7 @@ namespace Extrinsic::Graphics
     export struct TextureResourceDesc
     {
         std::string Name{};
+        FrameResourceId Id{};
         bool Imported = false;
         bool IsBackbuffer = false;
         bool AliasEligible = true;
@@ -73,6 +96,7 @@ namespace Extrinsic::Graphics
     export struct BufferResourceDesc
     {
         std::string Name{};
+        FrameResourceId Id{};
         bool Imported = false;
         bool AliasEligible = true;
         BufferState InitialState = BufferState::Undefined;
