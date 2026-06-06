@@ -6,6 +6,7 @@ This directory contains the `RHI` module/files.
 
 - `CMakeLists.txt`
 - `RHI.CommandContext.cppm`
+- `RHI.CommandContext.cpp` (out-of-line vtable key function + defaulted-virtual bodies)
 - `RHI.Device.cppm`
 - `RHI.FrameHandle.cppm`
 - `RHI.QueueAffinity.cppm`
@@ -104,6 +105,15 @@ any other exported polymorphic RHI interface):
 - Prefer adding new non-pure virtuals **at the end** of the interface and keep
   bodies in the `.cpp` module implementation unit where the body is non-trivial
   (AGENTS.md §5), to minimise layout churn for existing slots.
+- The interface's bodies live in `RHI.CommandContext.cpp` (HARDEN-073). The
+  destructor is declared in the `.cppm` and defined there as the **out-of-line
+  key function**, so the `ICommandContext` vtable is emitted in exactly one TU
+  (a single authoritative module-owned emission). The defaulted-virtual bodies
+  (`BindFrameSampledTexture`, `CopyTextureToBuffer`, `BindFrameSampledTextureAt`)
+  are defined alongside it; `SubmitBarriers` is pure virtual and has no body to
+  host. Note: this anchoring does **not** prevent the stale-BMI slot-mismatch
+  failure mode above — that is a slot-offset problem, not a symbol-emission one;
+  the clean-rebuild rule remains the authoritative prevention.
 - `BindFrameSampledTextureAt(TextureHandle, std::uint32_t)` is the
   slot-explicit sibling of `BindFrameSampledTexture(TextureHandle)`. Backends
   that bridge framegraph sampled inputs through a global bindless array use it

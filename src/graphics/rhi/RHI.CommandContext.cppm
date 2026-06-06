@@ -134,7 +134,12 @@ namespace Extrinsic::RHI
     export class ICommandContext
     {
     public:
-        virtual ~ICommandContext() = default;
+        // Out-of-line key function: the destructor is defined in
+        // RHI.CommandContext.cpp so the vtable is emitted in exactly one TU
+        // (a single authoritative module-owned emission). The other
+        // non-pure virtual bodies below are likewise defined there per
+        // AGENTS.md §5 (keep .cppm interfaces to declarations).
+        virtual ~ICommandContext();
 
         // ---- Command buffer lifecycle --------------------------------
         virtual void Begin() = 0;
@@ -159,7 +164,7 @@ namespace Extrinsic::RHI
         // framegraph texture. Backends that use fixed/global sampled slots may
         // publish this texture before fullscreen postprocess/present draws;
         // backends with explicit descriptor binding can ignore it.
-        virtual void BindFrameSampledTexture(TextureHandle texture) { BindFrameSampledTextureAt(texture, 0u); }
+        virtual void BindFrameSampledTexture(TextureHandle texture);
 
         // ---- Push constants ------------------------------------------
         virtual void BindIndexBuffer(BufferHandle  buffer,
@@ -288,29 +293,13 @@ namespace Extrinsic::RHI
                                          std::uint32_t srcOffsetX,
                                          std::uint32_t srcOffsetY,
                                          std::uint32_t srcWidth,
-                                         std::uint32_t srcHeight)
-        {
-            (void)src;
-            (void)srcLayout;
-            (void)mipLevel;
-            (void)arrayLayer;
-            (void)dst;
-            (void)dstOffset;
-            (void)srcOffsetX;
-            (void)srcOffsetY;
-            (void)srcWidth;
-            (void)srcHeight;
-        }
+                                         std::uint32_t srcHeight);
 
         // Optional slot-explicit sibling for passes that must keep multiple
         // sampled framegraph inputs live in the same submitted command buffer.
         // Backends that do not use fixed/global sampled slots can ignore it.
         // Kept at the end of this exported polymorphic interface to minimise
         // vtable slot churn for downstream module BMIs.
-        virtual void BindFrameSampledTextureAt(TextureHandle texture, std::uint32_t descriptorIndex)
-        {
-            (void)texture;
-            (void)descriptorIndex;
-        }
+        virtual void BindFrameSampledTextureAt(TextureHandle texture, std::uint32_t descriptorIndex);
     };
 }
