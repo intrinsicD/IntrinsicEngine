@@ -76,13 +76,16 @@ TEST(RenderGraphDebugDump, GoldenSmallRenderPassGraphIncludesAttachmentsAndResou
         "  pass_count=3 culled_pass_count=0 resource_count=3 edge_count=2 queue_handoff_edges=0 cross_queue_timeline_edges=0 cross_queue_ownership_transfers=0 barrier_packet_count=4\n"
         "  passes:\n"
         "    [0] pass=0 name=\"DepthPrepass\" layer=0 queue=graphics side_effect=false\n"
+        "      explicit_dependencies: none\n"
         "      color_targets: none\n"
         "      depth_target: texture=0 name=\"SceneDepth\" load=clear store=store format=D32_FLOAT\n"
         "    [1] pass=1 name=\"SurfacePass\" layer=1 queue=graphics side_effect=false\n"
+        "      explicit_dependencies: none\n"
         "      color_targets:\n"
         "        [0] texture=1 name=\"SceneColorHDR\" load=clear store=store format=RGBA16_FLOAT\n"
         "      depth_target: texture=0 name=\"SceneDepth\" load=load store=store format=D32_FLOAT\n"
         "    [2] pass=2 name=\"Present\" layer=2 queue=graphics side_effect=true\n"
+        "      explicit_dependencies: none\n"
         "      color_targets:\n"
         "        [0] texture=2 name=\"Backbuffer\" load=dont_care store=store format=RGBA8_UNORM\n"
         "      depth_target: none\n"
@@ -116,6 +119,5 @@ TEST(RenderGraphDebugDump, ResourceOnlyGraphRetainsImportedStateMetadata)
     EXPECT_NE(dump.find("texture[0] name=\"HistoryColor\" used=false imported=true sharing=exclusive final_state=Present"),
               std::string::npos);
 }
-
 
 

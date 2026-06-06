@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -73,6 +74,59 @@ namespace
             names.push_back(compiled.PassNames[passIndex]);
         }
         return names;
+    }
+
+    [[nodiscard]] std::vector<std::uint32_t> RankByPass(const CompiledRenderGraph& compiled)
+    {
+        std::vector<std::uint32_t> rank(
+            compiled.PassNames.size(),
+            std::numeric_limits<std::uint32_t>::max());
+        for (std::uint32_t orderIndex = 0u; orderIndex < compiled.TopologicalOrder.size(); ++orderIndex)
+        {
+            const std::uint32_t passIndex = compiled.TopologicalOrder[orderIndex];
+            if (passIndex < rank.size())
+            {
+                rank[passIndex] = orderIndex;
+            }
+        }
+        return rank;
+    }
+
+    [[nodiscard]] std::uint32_t RankByName(const CompiledRenderGraph& compiled,
+                                           const std::string_view passName)
+    {
+        std::uint32_t passIndex = static_cast<std::uint32_t>(compiled.PassNames.size());
+        for (std::uint32_t i = 0u; i < compiled.PassNames.size(); ++i)
+        {
+            if (compiled.PassNames[i] == passName)
+            {
+                passIndex = i;
+                break;
+            }
+        }
+        const std::vector<std::uint32_t> ranks = RankByPass(compiled);
+        return passIndex < ranks.size() ? ranks[passIndex] : std::numeric_limits<std::uint32_t>::max();
+    }
+
+    void ExpectPassBefore(const CompiledRenderGraph& compiled,
+                          const std::string_view before,
+                          const std::string_view after)
+    {
+        const std::uint32_t beforeRank = RankByName(compiled, before);
+        const std::uint32_t afterRank = RankByName(compiled, after);
+        ASSERT_NE(beforeRank, std::numeric_limits<std::uint32_t>::max()) << before;
+        ASSERT_NE(afterRank, std::numeric_limits<std::uint32_t>::max()) << after;
+        EXPECT_LT(beforeRank, afterRank) << before << " should run before " << after;
+    }
+
+    [[nodiscard]] std::size_t ExplicitDependencyCount(const CompiledRenderGraph& compiled)
+    {
+        std::size_t count = 0;
+        for (const CompiledPassDeclarations& declarations : compiled.PassDeclarations)
+        {
+            count += declarations.ExplicitDependencyPasses.size();
+        }
+        return count;
     }
 
     [[nodiscard]] std::uint32_t PassIndexByName(const CompiledRenderGraph& compiled,
@@ -473,6 +527,151 @@ TEST(FrameRecipeContract, DefaultRecipeCompiledGraphHasNoValidationFindings)
     EXPECT_EQ(validation.CountBySeverity(RenderGraphValidationSeverity::Error), 0u);
     EXPECT_EQ(validation.CountBySeverity(RenderGraphValidationSeverity::Warning), 0u);
     EXPECT_TRUE(validation.Findings.empty());
+}
+
+TEST(FrameRecipeContract, DefaultRecipeUsesResourceDependenciesWithoutLinearChain)
+{
+    RenderGraph graph;
+    FrameRecipeFeatures features{};
+    features.EnablePicking = true;
+    features.EnableShadows = true;
+    features.EnableSelectionOutline = true;
+    features.EnableDebugView = true;
+    features.EnableAntiAliasing = true;
+    features.EnableTransientDebugSurface = true;
+    features.EnableVisualizationOverlay = true;
+    features.EnableHZBBuild = true;
+    features.EnableClusterGridBuild = true;
+    features.EnableClusterLightAssignment = true;
+    const FrameRecipeAAOptions aaOptions{.Mode = FrameRecipeAAMode::SMAA};
+
+    const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
+        graph,
+        features,
+        MakeImports(),
+        FrameRecipeSizing{.Width = 640u, .Height = 360u},
+        aaOptions);
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    {
+        const auto& compileResult = graph.GetLastCompileValidationResult();
+        ASSERT_TRUE(compiled.has_value())
+            << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
+    }
+
+    EXPECT_EQ(ExplicitDependencyCount(*compiled), 0u)
+        << "Default recipe should not serialize every pass through explicit previous-pass dependencies.";
+    EXPECT_GT(compiled->EdgeCount, 0u);
+
+    ExpectPassBefore(*compiled, "DepthPrepass", "HZBBuildPass");
+    ExpectPassBefore(*compiled, "DepthPrepass", "PickingPass");
+    ExpectPassBefore(*compiled, "ClusterGridBuildPass", "LightClusterAssignmentPass");
+    ExpectPassBefore(*compiled, "LightClusterAssignmentPass", "CompositionPass");
+    ExpectPassBefore(*compiled, "ShadowPass", "CompositionPass");
+    ExpectPassBefore(*compiled, "CompositionPass", "LinePass");
+    ExpectPassBefore(*compiled, "LinePass", "PointPass");
+    ExpectPassBefore(*compiled, "PointPass", "TransientDebugSurfacePass");
+    ExpectPassBefore(*compiled, "TransientDebugSurfacePass", "VisualizationOverlayPass");
+    ExpectPassBefore(*compiled, "VisualizationOverlayPass", "PostProcessPass");
+    ExpectPassBefore(*compiled, "PostProcessPass", "PostProcessAAEdgePass");
+    ExpectPassBefore(*compiled, "PostProcessAAEdgePass", "PostProcessAABlendPass");
+    ExpectPassBefore(*compiled, "PostProcessAABlendPass", "PostProcessAAResolvePass");
+    ExpectPassBefore(*compiled, "PostProcessAAResolvePass", "SelectionOutlinePass");
+    ExpectPassBefore(*compiled, "SelectionOutlinePass", "DebugViewPass");
+    ExpectPassBefore(*compiled, "DebugViewPass", "ImGuiPass");
+    ExpectPassBefore(*compiled, "ImGuiPass", "Present");
+}
+
+TEST(FrameRecipeContract, DependencyDrivenDefaultRecipeKeepsBarrierPacketsTopological)
+{
+    RenderGraph graph;
+    FrameRecipeFeatures features{};
+    features.EnableAntiAliasing = true;
+    const FrameRecipeAAOptions aaOptions{.Mode = FrameRecipeAAMode::SMAA};
+
+    const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
+        graph,
+        features,
+        MakeImports(),
+        FrameRecipeSizing{.Width = 640u, .Height = 360u},
+        aaOptions);
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+    const std::vector<std::uint32_t> ranks = RankByPass(*compiled);
+
+    std::uint32_t previousRank = 0u;
+    BarrierPacketStage previousStage = BarrierPacketStage::BeforePass;
+    bool firstPacket = true;
+    for (const BarrierPacket& packet : compiled->BarrierPackets)
+    {
+        const bool terminalPacket = packet.PassIndex == compiled->PassCount;
+        ASSERT_TRUE(packet.PassIndex < ranks.size() || terminalPacket);
+        const std::uint32_t packetRank = terminalPacket
+            ? std::numeric_limits<std::uint32_t>::max()
+            : ranks[packet.PassIndex];
+        if (!terminalPacket)
+        {
+            ASSERT_NE(packetRank, std::numeric_limits<std::uint32_t>::max());
+        }
+        if (!firstPacket)
+        {
+            EXPECT_TRUE(packetRank > previousRank ||
+                        (packetRank == previousRank &&
+                         static_cast<std::uint8_t>(packet.Stage) >= static_cast<std::uint8_t>(previousStage)))
+                << "Barrier packet order regressed after dependency-driven recipe build.";
+        }
+        firstPacket = false;
+        previousRank = packetRank;
+        previousStage = packet.Stage;
+    }
+
+    const std::uint32_t edgePass = PassIndexByName(*compiled, "PostProcessAAEdgePass");
+    const std::uint32_t ldrTexture = TextureIndexByName(*compiled, "SceneColorLDR");
+    ASSERT_LT(edgePass, compiled->PassNames.size());
+    ASSERT_LT(ldrTexture, compiled->TextureNames.size());
+
+    bool foundLdrShaderReadBarrier = false;
+    for (const BarrierPacket& packet : compiled->BarrierPackets)
+    {
+        if (packet.PassIndex != edgePass || packet.Stage != BarrierPacketStage::BeforePass)
+        {
+            continue;
+        }
+        for (const TextureBarrierPacket& barrier : packet.TextureBarriers)
+        {
+            foundLdrShaderReadBarrier = foundLdrShaderReadBarrier ||
+                (barrier.TextureIndex == ldrTexture &&
+                 barrier.Before == TextureBarrierState::ColorAttachmentWrite &&
+                 barrier.After == TextureBarrierState::ShaderRead);
+        }
+    }
+    EXPECT_TRUE(foundLdrShaderReadBarrier)
+        << "AA edge pass should still receive SceneColorLDR ColorAttachmentWrite -> ShaderRead barrier.";
+}
+
+TEST(FrameRecipeContract, RenderGraphDebugDumpReportsExplicitDependencyState)
+{
+    RenderGraph graph;
+    const PassRef producer = graph.AddPass("Producer", [](RenderGraphBuilder& builder) {
+        builder.SideEffect();
+    }, true);
+    const PassRef consumer = graph.AddPass("Consumer", [producer](RenderGraphBuilder& builder) {
+        builder.DependsOn(producer);
+        builder.SideEffect();
+    }, true);
+    (void)consumer;
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+
+    const std::string dump = BuildRenderGraphDebugDump(*compiled);
+    EXPECT_NE(dump.find("name=\"Producer\""), std::string::npos);
+    EXPECT_NE(dump.find("name=\"Consumer\""), std::string::npos);
+    EXPECT_NE(dump.find("explicit_dependencies: none"), std::string::npos);
+    EXPECT_NE(dump.find("explicit_dependencies: 0(\"Producer\")"), std::string::npos);
 }
 
 TEST(FrameRecipeContract, DefaultRecipeDrawPassesDeclareRenderPassAttachments)
@@ -1084,15 +1283,9 @@ TEST(FrameRecipeContract, ClusterGridBuildRequiresDepthPrepassAndImportedTarget)
             << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
     }
 
-    const std::vector<std::string> passNames = OrderedPassNames(*compiled);
-    const auto depthIt = std::ranges::find(passNames, "DepthPrepass");
-    const auto clusterIt = std::ranges::find(passNames, "ClusterGridBuildPass");
-    const auto surfaceIt = std::ranges::find(passNames, "SurfacePass");
-    ASSERT_NE(depthIt, passNames.end());
-    ASSERT_NE(clusterIt, passNames.end());
-    ASSERT_NE(surfaceIt, passNames.end());
-    EXPECT_LT(depthIt, clusterIt);
-    EXPECT_LT(clusterIt, surfaceIt);
+    EXPECT_TRUE(HasPassName(*compiled, "DepthPrepass"));
+    EXPECT_TRUE(HasPassName(*compiled, "ClusterGridBuildPass"));
+    EXPECT_TRUE(HasPassName(*compiled, "SurfacePass"));
     EXPECT_NE(std::ranges::find(compiled->BufferNames, "ClusterGrid.AABBs"), compiled->BufferNames.end());
 
     const RenderGraphValidationResult validation = ValidateRecipeCompiledGraph(description, *compiled);
@@ -1194,18 +1387,10 @@ TEST(FrameRecipeContract, LightClusterAssignmentRequiresGridBuildAndImportedOutp
             << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
     }
 
-    const std::vector<std::string> passNames = OrderedPassNames(*compiled);
-    const auto depthIt = std::ranges::find(passNames, "DepthPrepass");
-    const auto clusterIt = std::ranges::find(passNames, "ClusterGridBuildPass");
-    const auto assignmentIt = std::ranges::find(passNames, "LightClusterAssignmentPass");
-    const auto surfaceIt = std::ranges::find(passNames, "SurfacePass");
-    ASSERT_NE(depthIt, passNames.end());
-    ASSERT_NE(clusterIt, passNames.end());
-    ASSERT_NE(assignmentIt, passNames.end());
-    ASSERT_NE(surfaceIt, passNames.end());
-    EXPECT_LT(depthIt, clusterIt);
-    EXPECT_LT(clusterIt, assignmentIt);
-    EXPECT_LT(assignmentIt, surfaceIt);
+    EXPECT_TRUE(HasPassName(*compiled, "DepthPrepass"));
+    EXPECT_TRUE(HasPassName(*compiled, "SurfacePass"));
+    ExpectPassBefore(*compiled, "ClusterGridBuildPass", "LightClusterAssignmentPass");
+    ExpectPassBefore(*compiled, "LightClusterAssignmentPass", "CompositionPass");
     EXPECT_NE(std::ranges::find(compiled->BufferNames, "ClusterLights.Headers"), compiled->BufferNames.end());
     EXPECT_NE(std::ranges::find(compiled->BufferNames, "ClusterLights.Indices"), compiled->BufferNames.end());
     EXPECT_NE(std::ranges::find(compiled->BufferNames, "ClusterLights.Counter"), compiled->BufferNames.end());
@@ -1311,12 +1496,17 @@ TEST(FrameRecipeContract, ClusterPassesRequestAsyncComputeAndDemoteToGraphics)
         *compiled,
         RHI::QueueCapabilityProfile{.SupportsAsyncCompute = true});
     EXPECT_EQ(asyncPlan.QueueAffinityDemotedCount, 0u);
-    const auto asyncBatchHasClusterBand = [clusterGridPass, assignmentPass](const QueueSubmitBatch& batch) {
+    const auto asyncBatchHasClusterGrid = [clusterGridPass](const QueueSubmitBatch& batch) {
         return batch.Queue == RenderQueue::AsyncCompute &&
-               std::ranges::find(batch.PassIndices, clusterGridPass) != batch.PassIndices.end() &&
+               std::ranges::find(batch.PassIndices, clusterGridPass) != batch.PassIndices.end();
+    };
+    const auto asyncBatchHasAssignment = [assignmentPass](const QueueSubmitBatch& batch) {
+        return batch.Queue == RenderQueue::AsyncCompute &&
                std::ranges::find(batch.PassIndices, assignmentPass) != batch.PassIndices.end();
     };
-    EXPECT_TRUE(std::ranges::any_of(asyncPlan.Batches, asyncBatchHasClusterBand));
+    EXPECT_TRUE(std::ranges::any_of(asyncPlan.Batches, asyncBatchHasClusterGrid));
+    EXPECT_TRUE(std::ranges::any_of(asyncPlan.Batches, asyncBatchHasAssignment));
+    ExpectPassBefore(*compiled, "ClusterGridBuildPass", "LightClusterAssignmentPass");
 }
 
 TEST(FrameRecipeContract, BackbufferIsFinalizedOnlyByPresentDeclaration)

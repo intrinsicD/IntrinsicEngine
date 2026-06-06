@@ -16,6 +16,16 @@ No currently active task.
 The most recently retired tasks are summarised below.
 
 Previously-active
+[`WORKSHOP-007`](../done/WORKSHOP-007-dependency-driven-default-recipe.md) —
+dependency-driven default frame recipe retired to `tasks/done/` on
+2026-06-06. The slice removed blanket previous-pass chaining from
+`BuildDefaultFrameRecipe`, kept explicit pass dependencies as an intentional
+graph API rather than a default recipe behavior, exposed explicit dependency
+edges in compiled pass declarations/debug dumps, and added contract coverage for
+resource-derived ordering, side-effect order, barrier packet ordering, and
+picking/selection/debug/postprocess feature combinations.
+
+Previously-active
 [`WORKSHOP-006`](../done/WORKSHOP-006-extract-render-prep-pipeline.md) —
 render-prep pipeline extraction retired to `tasks/done/` on 2026-06-06. The
 slice added the `Extrinsic.Graphics.RenderPrepPipeline` module, moved

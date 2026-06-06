@@ -25,8 +25,8 @@ and absence of a standing architecture-review gate.
    [`WORKSHOP-006` (done)](../../done/WORKSHOP-006-extract-render-prep-pipeline.md) — split
    renderer responsibilities before the renderer becomes the new god object.
    Both tasks retired 2026-06-06.
-5. [`WORKSHOP-007`](WORKSHOP-007-dependency-driven-default-recipe.md) — move
-   the default recipe toward true graph semantics.
+5. [`WORKSHOP-007` (done)](../../done/WORKSHOP-007-dependency-driven-default-recipe.md) — move
+   the default recipe toward true graph semantics. Retired 2026-06-06.
 6. [`WORKSHOP-008` (done)](../../done/WORKSHOP-008-task-maturity-taxonomy.md) —
    prevent "scaffold done" from looking like "capability done." Retired
    2026-05-17; taxonomy lives at [`docs/agent/task-maturity.md`](../../../docs/agent/task-maturity.md).
@@ -50,8 +50,9 @@ and absence of a standing architecture-review gate.
 - **WORKSHOP-006 (done) ⇐ WORKSHOP-005 (done).** Render-prep extraction is easier
   once subsystem ownership has been moved into the registry. `WORKSHOP-005`
   and `WORKSHOP-006` retired 2026-06-06.
-- **WORKSHOP-007 ⇐ WORKSHOP-003.** Dependency-driven recipes benefit from
-  typed resource identity for ordering decisions.
+- **WORKSHOP-007 (done) ⇐ WORKSHOP-003 (done).** Dependency-driven recipes
+  benefit from typed resource identity for ordering decisions. `WORKSHOP-007`
+  retired 2026-06-06.
 - **WORKSHOP-009 ⇐ WORKSHOP-001 (done), WORKSHOP-008 (done).** The review
   gate references the strict layer checker (WORKSHOP-001 retired
   2026-05-17) and the maturity taxonomy at

@@ -138,7 +138,9 @@ implementation.
 - `Graphics.FrameRecipe` owns the reusable default frame recipe: typed feature
   gates, typed pass/resource IDs, canonical diagnostic names, resource
   declarations, pass-order introspection, and the backend-agnostic graph
-  construction path used by the null renderer.
+  construction path used by the null renderer. It emits passes without blanket
+  previous-pass chaining; declared reads/writes own ordering wherever possible,
+  and explicit pass dependencies are reserved for real side-effect constraints.
 - `Graphics.RenderCommandRouter` owns the renderer command-recording dispatch
   seam. The renderer registers command recorders by `FramePassId`, command
   status records carry both `FramePassId` and the debug label, and unknown typed
@@ -597,9 +599,9 @@ Concretely:
   route (Slice C), and the `Picking.Readback` buffer + drain +
   `PublishPickResult`/`PublishNoHit` wiring (Slice D) remain.
 - GRAPHICS-074 recipe-side follow-up (between Slice A and Slice B)
-  reorders the default recipe so `addOrderedPass("PickingPass", ...)`
-  runs *after* `addOrderedPass("DepthPrepass", ...)` and declares
-  `builder.Read(SceneDepth, DepthRead)` on the picking pass. The matching
+  declares `"PickingPass"` after `"DepthPrepass"` in the default recipe and
+  relies on `builder.Read(SceneDepth, DepthRead)` to express the real graph
+  dependency on the prepass-produced `SceneDepth`. The matching
   introspection gate in `DescribeDefaultFrameRecipe` enables picking on
   `features.EnablePicking && features.EnableDepthPrepass` and lists
   `SceneDepth` in the pass's reads; the recipe declares the pass only

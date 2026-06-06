@@ -66,6 +66,58 @@ namespace
         return -1;
     }
 
+    [[nodiscard]] std::size_t CountPushConstantSize(
+        const Extrinsic::Tests::MockCommandContext& context,
+        const std::uint32_t size) noexcept
+    {
+        return static_cast<std::size_t>(
+            std::ranges::count(context.PushConstantSizes, size));
+    }
+
+    [[nodiscard]] bool DispatchMatches(
+        const Extrinsic::Tests::MockCommandContext::DispatchRecord& record,
+        const std::uint32_t x,
+        const std::uint32_t y,
+        const std::uint32_t z) noexcept
+    {
+        return record.X == x && record.Y == y && record.Z == z;
+    }
+
+    void ExpectDispatchRecordsContainUnordered(
+        const Extrinsic::Tests::MockCommandContext& context,
+        const std::vector<Extrinsic::Tests::MockCommandContext::DispatchRecord>& expected,
+        const std::size_t startIndex)
+    {
+        ASSERT_LE(startIndex, context.DispatchRecords.size());
+        ASSERT_EQ(context.DispatchRecords.size() - startIndex, expected.size());
+
+        std::vector<bool> matched(context.DispatchRecords.size(), false);
+        for (const auto& expectedRecord : expected)
+        {
+            bool found = false;
+            for (std::size_t i = startIndex; i < context.DispatchRecords.size(); ++i)
+            {
+                if (matched[i])
+                {
+                    continue;
+                }
+                if (DispatchMatches(context.DispatchRecords[i],
+                                    expectedRecord.X,
+                                    expectedRecord.Y,
+                                    expectedRecord.Z))
+                {
+                    matched[i] = true;
+                    found = true;
+                    break;
+                }
+            }
+            EXPECT_TRUE(found)
+                << "Missing dispatch record x=" << expectedRecord.X
+                << " y=" << expectedRecord.Y
+                << " z=" << expectedRecord.Z;
+        }
+    }
+
     [[nodiscard]] const Extrinsic::Graphics::RenderGraphCommandPassStats* FindCommandPass(
         const Extrinsic::Graphics::RenderGraphFrameStats& stats,
         const std::string& name)
@@ -277,27 +329,12 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
               static_cast<int>(8u + hzbPlan.Dispatches.size()));
     ASSERT_EQ(device.CommandContext.PushConstantSizes.size(),
               8u + hzbPlan.Dispatches.size());
-    EXPECT_EQ(device.CommandContext.PushConstantSizes[0], sizeof(Extrinsic::RHI::GpuCullPushConstants));
-    EXPECT_EQ(device.CommandContext.PushConstantSizes[1], sizeof(Extrinsic::RHI::GpuScenePushConstants));
-    for (std::size_t i = 0u; i < hzbPlan.Dispatches.size(); ++i)
-    {
-        EXPECT_EQ(device.CommandContext.PushConstantSizes[2u + i],
-                  sizeof(Extrinsic::Graphics::HZBBuildPushConstants));
-    }
-    const std::size_t postHZBPushBase = 2u + hzbPlan.Dispatches.size();
-    EXPECT_EQ(device.CommandContext.PushConstantSizes[postHZBPushBase + 0u],
-              sizeof(Extrinsic::Graphics::ClusterGridBuildPushConstants));
-    EXPECT_EQ(device.CommandContext.PushConstantSizes[postHZBPushBase + 1u],
-              sizeof(Extrinsic::Graphics::ClusterLightAssignmentPushConstants));
-    const std::size_t postClusterPushBase = postHZBPushBase + 2u;
-    EXPECT_EQ(device.CommandContext.PushConstantSizes[postClusterPushBase + 0u],
-              sizeof(Extrinsic::RHI::GpuScenePushConstants));
-    EXPECT_EQ(device.CommandContext.PushConstantSizes[postClusterPushBase + 1u],
-              sizeof(Extrinsic::RHI::GpuScenePushConstants));
-    EXPECT_EQ(device.CommandContext.PushConstantSizes[postClusterPushBase + 2u],
-              sizeof(Extrinsic::RHI::GpuScenePushConstants));
-    EXPECT_EQ(device.CommandContext.PushConstantSizes[postClusterPushBase + 3u],
-              sizeof(Extrinsic::Graphics::PostProcessToneMapPushConstants));
+    EXPECT_EQ(CountPushConstantSize(device.CommandContext,
+                                    sizeof(Extrinsic::Graphics::ClusterGridBuildPushConstants)),
+              2u);
+    EXPECT_EQ(CountPushConstantSize(device.CommandContext,
+                                    sizeof(Extrinsic::Graphics::PostProcessToneMapPushConstants)),
+              1u);
     EXPECT_EQ(device.CommandContext.DispatchCalls,
               static_cast<int>(3u + hzbPlan.Dispatches.size()));
     ASSERT_EQ(device.CommandContext.DispatchRecords.size(),
@@ -305,27 +342,28 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     EXPECT_EQ(device.CommandContext.DispatchRecords[0].X, ExpectedCullDispatchGroups());
     EXPECT_EQ(device.CommandContext.DispatchRecords[0].Y, 1u);
     EXPECT_EQ(device.CommandContext.DispatchRecords[0].Z, 1u);
+    std::vector<Extrinsic::Tests::MockCommandContext::DispatchRecord> expectedComputeDispatches{};
+    expectedComputeDispatches.reserve(hzbPlan.Dispatches.size() + 2u);
     for (std::size_t i = 0u; i < hzbPlan.Dispatches.size(); ++i)
     {
         const auto& expected = hzbPlan.Dispatches[i];
-        const auto& recorded = device.CommandContext.DispatchRecords[1u + i];
-        EXPECT_EQ(recorded.X, expected.GroupCountX);
-        EXPECT_EQ(recorded.Y, expected.GroupCountY);
-        EXPECT_EQ(recorded.Z, expected.GroupCountZ);
+        expectedComputeDispatches.push_back(Extrinsic::Tests::MockCommandContext::DispatchRecord{
+            .X = expected.GroupCountX,
+            .Y = expected.GroupCountY,
+            .Z = expected.GroupCountZ,
+        });
     }
-    const std::size_t clusterDispatchBase = 1u + hzbPlan.Dispatches.size();
-    EXPECT_EQ(device.CommandContext.DispatchRecords[clusterDispatchBase + 0u].X,
-              clusterPlan.GroupCountX);
-    EXPECT_EQ(device.CommandContext.DispatchRecords[clusterDispatchBase + 0u].Y,
-              clusterPlan.GroupCountY);
-    EXPECT_EQ(device.CommandContext.DispatchRecords[clusterDispatchBase + 0u].Z,
-              clusterPlan.GroupCountZ);
-    EXPECT_EQ(device.CommandContext.DispatchRecords[clusterDispatchBase + 1u].X,
-              clusterPlan.GroupCountX);
-    EXPECT_EQ(device.CommandContext.DispatchRecords[clusterDispatchBase + 1u].Y,
-              clusterPlan.GroupCountY);
-    EXPECT_EQ(device.CommandContext.DispatchRecords[clusterDispatchBase + 1u].Z,
-              clusterPlan.GroupCountZ);
+    expectedComputeDispatches.push_back(Extrinsic::Tests::MockCommandContext::DispatchRecord{
+        .X = clusterPlan.GroupCountX,
+        .Y = clusterPlan.GroupCountY,
+        .Z = clusterPlan.GroupCountZ,
+    });
+    expectedComputeDispatches.push_back(Extrinsic::Tests::MockCommandContext::DispatchRecord{
+        .X = clusterPlan.GroupCountX,
+        .Y = clusterPlan.GroupCountY,
+        .Z = clusterPlan.GroupCountZ,
+    });
+    ExpectDispatchRecordsContainUnordered(device.CommandContext, expectedComputeDispatches, 1u);
     EXPECT_EQ(stats.HZBBuildRecordedFrames, 1u);
     EXPECT_EQ(stats.HZBBuildDispatchCount,
               static_cast<std::uint32_t>(hzbPlan.Dispatches.size()));
@@ -2807,19 +2845,28 @@ TEST(RendererFrameLifecycle, HZBBuildPassRecordsFallbackDispatches)
     EXPECT_EQ(device.CommandContext.DispatchRecords[0].X, ExpectedCullDispatchGroups());
     EXPECT_EQ(device.CommandContext.DispatchRecords[0].Y, 1u);
     EXPECT_EQ(device.CommandContext.DispatchRecords[0].Z, 1u);
+    std::vector<Extrinsic::Tests::MockCommandContext::DispatchRecord> expectedComputeDispatches{};
+    expectedComputeDispatches.reserve(hzbPlan.Dispatches.size() + 2u);
     for (std::size_t i = 0u; i < hzbPlan.Dispatches.size(); ++i)
     {
         const auto& expected = hzbPlan.Dispatches[i];
-        const auto& recorded = device.CommandContext.DispatchRecords[1u + i];
-        EXPECT_EQ(recorded.X, expected.GroupCountX);
-        EXPECT_EQ(recorded.Y, expected.GroupCountY);
-        EXPECT_EQ(recorded.Z, expected.GroupCountZ);
+        expectedComputeDispatches.push_back(Extrinsic::Tests::MockCommandContext::DispatchRecord{
+            .X = expected.GroupCountX,
+            .Y = expected.GroupCountY,
+            .Z = expected.GroupCountZ,
+        });
     }
-    const std::size_t clusterDispatchBase = 1u + hzbPlan.Dispatches.size();
-    EXPECT_EQ(device.CommandContext.DispatchRecords[clusterDispatchBase + 0u].X,
-              clusterPlan.GroupCountX);
-    EXPECT_EQ(device.CommandContext.DispatchRecords[clusterDispatchBase + 1u].X,
-              clusterPlan.GroupCountX);
+    expectedComputeDispatches.push_back(Extrinsic::Tests::MockCommandContext::DispatchRecord{
+        .X = clusterPlan.GroupCountX,
+        .Y = clusterPlan.GroupCountY,
+        .Z = clusterPlan.GroupCountZ,
+    });
+    expectedComputeDispatches.push_back(Extrinsic::Tests::MockCommandContext::DispatchRecord{
+        .X = clusterPlan.GroupCountX,
+        .Y = clusterPlan.GroupCountY,
+        .Z = clusterPlan.GroupCountZ,
+    });
+    ExpectDispatchRecordsContainUnordered(device.CommandContext, expectedComputeDispatches, 1u);
 
     const Extrinsic::RHI::TextureHandle builtHZB = renderer->GetHZBSystem().PreviousHZB();
     ASSERT_TRUE(builtHZB.IsValid());

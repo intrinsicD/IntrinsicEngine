@@ -450,7 +450,7 @@ paths fail closed.
 20. `ImGuiPass`
 21. `Present`
 
-`Extrinsic.Graphics.FrameRecipe::DescribeDefaultFrameRecipe()` reports this pass order with disabled optional stages retained as declarations for tooling/review, while `BuildDefaultFrameRecipe()` emits only enabled passes/resources into `Graphics.RenderGraph`. The recipe-owned typed IDs are the stable contract for addressing passes/resources; exact string names are retained for diagnostics, debug dumps, and user-facing inspection tables.
+`Extrinsic.Graphics.FrameRecipe::DescribeDefaultFrameRecipe()` reports this logical declaration/review order with disabled optional stages retained as declarations for tooling/review, while `BuildDefaultFrameRecipe()` emits only enabled passes/resources into `Graphics.RenderGraph`. The compiler is free to topologically schedule independent branches; required order is expressed through declared resource reads/writes, or through rare explicit pass dependencies when a real side effect is not otherwise represented by resources. Presentation, UI, and readback-adjacent stages remain side-effect-sensitive declarations. The recipe-owned typed IDs are the stable contract for addressing passes/resources; exact string names are retained for diagnostics, debug dumps, and user-facing inspection tables.
 
 During execution, `Extrinsic.Graphics.RenderCommandRouter` consumes the compiled
 `FramePassId` stream and dispatches command bodies by typed pass identity.

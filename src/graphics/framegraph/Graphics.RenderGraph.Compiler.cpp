@@ -1388,6 +1388,7 @@ namespace Extrinsic::Graphics
                     return std::unexpected(Core::ErrorCode::InvalidArgument);
                 }
                 AddEdge(dependency.Index, passIndex, adjacency, indegree, dedup);
+                passDeclarations[passIndex].ExplicitDependencyPasses.push_back(dependency.Index);
             }
 
             for (const TextureAccess& access : pass.TextureAccesses)
@@ -2146,6 +2147,27 @@ namespace Extrinsic::Graphics
                 out << " queue=" << ToString(compiled.PassQueues[passIndex]);
             }
             out << " side_effect=" << (BoolAt(compiled.PassSideEffects, passIndex) ? "true" : "false");
+            out << '\n';
+
+            out << "      explicit_dependencies:";
+            if (passIndex < compiled.PassDeclarations.size() &&
+                !compiled.PassDeclarations[passIndex].ExplicitDependencyPasses.empty())
+            {
+                for (const std::uint32_t dependencyIndex :
+                     compiled.PassDeclarations[passIndex].ExplicitDependencyPasses)
+                {
+                    out << ' ' << dependencyIndex;
+                    if (dependencyIndex < compiled.PassNames.size() &&
+                        !compiled.PassNames[dependencyIndex].empty())
+                    {
+                        out << "(\"" << compiled.PassNames[dependencyIndex] << "\")";
+                    }
+                }
+            }
+            else
+            {
+                out << " none";
+            }
             out << '\n';
 
             out << "      color_targets:";

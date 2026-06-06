@@ -33,8 +33,14 @@ that map typed IDs to compiled pass/resource indices, and
 `PassNames` for renderer command routing and diagnostics. Human-readable names
 remain stable diagnostics and debug dump labels, not the correctness contract.
 The framegraph treats recipe declarations as the single source of truth for
-imported-resource write authorization, transient-resource lifetime, pass
-ordering, and final backbuffer presentation.
+imported-resource write authorization, transient-resource lifetime,
+dependency-driven pass ordering, and final backbuffer presentation. Default
+recipe passes should rely on declared resource reads/writes for order wherever
+that dependency is representable in the graph; explicit pass dependencies are
+reserved for ordering constraints that resources do not model. The compiler
+preserves those explicit edges in `CompiledPassDeclarations::ExplicitDependencyPasses`,
+and debug dumps print them per pass so reviewers can distinguish intentional
+side-effect ordering from resource-derived scheduling.
 
 The framegraph compiler infers required transitions from declared uses: draw
 passes write `SceneColorHDR` and related intermediate attachments, optional

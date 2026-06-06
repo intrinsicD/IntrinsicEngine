@@ -1273,25 +1273,18 @@ namespace Extrinsic::Graphics
                                       FrameRecipeResourceKind::DebugViewRGBA);
         }
 
-        PassRef previous{};
-        auto addOrderedPass = [&graph, &previous](const FrameRecipePassKind kind,
-                                                  std::string name,
-                                                  auto setup,
-                                                  const bool sideEffect = false) {
-            const PassRef dependency = previous;
-            PassRef pass = graph.AddPass(std::move(name), [dependency, setup](RenderGraphBuilder& builder) mutable {
-                if (dependency.IsValid())
-                {
-                    builder.DependsOn(dependency);
-                }
+        auto addRecipePass = [&graph](const FrameRecipePassKind kind,
+                                      std::string name,
+                                      auto setup,
+                                      const bool sideEffect = false) {
+            PassRef pass = graph.AddPass(std::move(name), [setup](RenderGraphBuilder& builder) mutable {
                 setup(builder);
             }, sideEffect);
             (void)graph.SetPassId(pass, ToFramePassId(kind));
-            previous = pass;
             return pass;
         };
 
-        addOrderedPass(FrameRecipePassKind::Culling, "CullingPass", [=](RenderGraphBuilder& builder) {
+        addRecipePass(FrameRecipePassKind::Culling, "CullingPass", [=](RenderGraphBuilder& builder) {
             builder.Read(sceneTable, BufferUsage::ShaderRead);
             builder.Read(instanceStatic, BufferUsage::ShaderRead);
             builder.Read(instanceDynamic, BufferUsage::ShaderRead);
@@ -1310,7 +1303,7 @@ namespace Extrinsic::Graphics
 
         if (features.EnableDepthPrepass)
         {
-            addOrderedPass(FrameRecipePassKind::DepthPrepass, "DepthPrepass", [=](RenderGraphBuilder& builder) {
+            addRecipePass(FrameRecipePassKind::DepthPrepass, "DepthPrepass", [=](RenderGraphBuilder& builder) {
                 builder.Read(drawIndirect, BufferUsage::IndirectRead);
                 builder.Read(drawCount, BufferUsage::IndirectRead);
                 builder.Write(depth, TextureUsage::DepthWrite);
@@ -1326,7 +1319,7 @@ namespace Extrinsic::Graphics
 
         if (hzbBuildActive)
         {
-            addOrderedPass(FrameRecipePassKind::HZBBuild, "HZBBuildPass", [=](RenderGraphBuilder& builder) {
+            addRecipePass(FrameRecipePassKind::HZBBuild, "HZBBuildPass", [=](RenderGraphBuilder& builder) {
                 builder.Read(depth, TextureUsage::ShaderRead);
                 builder.Write(hzbCurrent, TextureUsage::ShaderWrite);
             });
@@ -1334,7 +1327,7 @@ namespace Extrinsic::Graphics
 
         if (clusterGridBuildActive)
         {
-            addOrderedPass(FrameRecipePassKind::ClusterGridBuild, "ClusterGridBuildPass", [=](RenderGraphBuilder& builder) {
+            addRecipePass(FrameRecipePassKind::ClusterGridBuild, "ClusterGridBuildPass", [=](RenderGraphBuilder& builder) {
                 // GRAPHICS-039D — prefer async compute for clustered-light
                 // compute work; the framegraph/RHI resolver demotes to
                 // graphics on single-queue devices.
@@ -1345,10 +1338,10 @@ namespace Extrinsic::Graphics
 
         if (clusterLightAssignmentActive)
         {
-            addOrderedPass(FrameRecipePassKind::LightClusterAssignment, "LightClusterAssignmentPass", [=](RenderGraphBuilder& builder) {
+            addRecipePass(FrameRecipePassKind::LightClusterAssignment, "LightClusterAssignmentPass", [=](RenderGraphBuilder& builder) {
                 // GRAPHICS-039D — same affinity as the cluster-grid build so
-                // the build/assignment band remains together when async
-                // compute is available and demotes together when absent.
+                // both passes request async compute and demote together on
+                // single-queue devices. Resource reads/writes own ordering.
                 builder.SetQueue(RenderQueue::AsyncCompute);
                 builder.Read(clusterGridAABBs, BufferUsage::ShaderRead);
                 builder.Read(lights, BufferUsage::ShaderRead);
@@ -1371,7 +1364,7 @@ namespace Extrinsic::Graphics
         // sets aligned.
         if (pickingActive)
         {
-            addOrderedPass(FrameRecipePassKind::Picking, "PickingPass", [=](RenderGraphBuilder& builder) {
+            addRecipePass(FrameRecipePassKind::Picking, "PickingPass", [=](RenderGraphBuilder& builder) {
                 builder.Read(depth, TextureUsage::DepthRead);
                 builder.Read(drawIndirect, BufferUsage::IndirectRead);
                 builder.Read(drawCount, BufferUsage::IndirectRead);
@@ -1396,7 +1389,7 @@ namespace Extrinsic::Graphics
 
         if (features.EnableShadows)
         {
-            addOrderedPass(FrameRecipePassKind::Shadow, "ShadowPass", [=](RenderGraphBuilder& builder) {
+            addRecipePass(FrameRecipePassKind::Shadow, "ShadowPass", [=](RenderGraphBuilder& builder) {
                 builder.Read(drawIndirect, BufferUsage::IndirectRead);
                 builder.Read(drawCount, BufferUsage::IndirectRead);
                 builder.Write(shadowAtlas, TextureUsage::DepthWrite);
@@ -1410,7 +1403,7 @@ namespace Extrinsic::Graphics
             });
         }
 
-        addOrderedPass(FrameRecipePassKind::Surface, "SurfacePass", [=](RenderGraphBuilder& builder) {
+        addRecipePass(FrameRecipePassKind::Surface, "SurfacePass", [=](RenderGraphBuilder& builder) {
             builder.Read(sceneTable, BufferUsage::ShaderRead);
             builder.Read(instanceStatic, BufferUsage::ShaderRead);
             builder.Read(instanceDynamic, BufferUsage::ShaderRead);
@@ -1487,7 +1480,7 @@ namespace Extrinsic::Graphics
 
         if (usesDeferred)
         {
-            addOrderedPass(FrameRecipePassKind::Composition, "CompositionPass", [=](RenderGraphBuilder& builder) {
+            addRecipePass(FrameRecipePassKind::Composition, "CompositionPass", [=](RenderGraphBuilder& builder) {
                 builder.Read(sceneNormal, TextureUsage::ShaderRead);
                 builder.Read(albedo, TextureUsage::ShaderRead);
                 builder.Read(material0, TextureUsage::ShaderRead);
@@ -1523,7 +1516,7 @@ namespace Extrinsic::Graphics
             });
         }
 
-        addOrderedPass(FrameRecipePassKind::Line, "LinePass", [=](RenderGraphBuilder& builder) {
+        addRecipePass(FrameRecipePassKind::Line, "LinePass", [=](RenderGraphBuilder& builder) {
             builder.Read(depth, TextureUsage::DepthRead);
             builder.Read(lineDrawIndirect, BufferUsage::IndirectRead);
             builder.Read(lineDrawCount, BufferUsage::IndirectRead);
@@ -1538,7 +1531,7 @@ namespace Extrinsic::Graphics
             });
         });
 
-        addOrderedPass(FrameRecipePassKind::Point, "PointPass", [=](RenderGraphBuilder& builder) {
+        addRecipePass(FrameRecipePassKind::Point, "PointPass", [=](RenderGraphBuilder& builder) {
             builder.Read(depth, TextureUsage::DepthRead);
             builder.Read(pointDrawIndirect, BufferUsage::IndirectRead);
             builder.Read(pointDrawCount, BufferUsage::IndirectRead);
@@ -1579,7 +1572,7 @@ namespace Extrinsic::Graphics
         // `SkippedUnavailable` because no pipelines exist yet.
         if (features.EnableTransientDebugSurface)
         {
-            addOrderedPass(FrameRecipePassKind::TransientDebugSurface, "TransientDebugSurfacePass", [=](RenderGraphBuilder& builder) {
+            addRecipePass(FrameRecipePassKind::TransientDebugSurface, "TransientDebugSurfacePass", [=](RenderGraphBuilder& builder) {
                 builder.Read(depth, TextureUsage::DepthRead);
                 builder.Write(hdr, TextureUsage::ColorAttachmentWrite);
                 builder.SetRenderPass(RHI::RenderPassDesc{
@@ -1604,7 +1597,7 @@ namespace Extrinsic::Graphics
         // isoline lane.
         if (features.EnableVisualizationOverlay)
         {
-            addOrderedPass(FrameRecipePassKind::VisualizationOverlay, "VisualizationOverlayPass", [=](RenderGraphBuilder& builder) {
+            addRecipePass(FrameRecipePassKind::VisualizationOverlay, "VisualizationOverlayPass", [=](RenderGraphBuilder& builder) {
                 builder.Read(depth, TextureUsage::DepthRead);
                 builder.Write(hdr, TextureUsage::ColorAttachmentWrite);
                 builder.SetRenderPass(RHI::RenderPassDesc{
@@ -1621,7 +1614,7 @@ namespace Extrinsic::Graphics
         TextureRef postProcessInput = hdr;
         if (reconstructionActive)
         {
-            addOrderedPass(FrameRecipePassKind::Reconstruction, "ReconstructionPass", [=](RenderGraphBuilder& builder) {
+            addRecipePass(FrameRecipePassKind::Reconstruction, "ReconstructionPass", [=](RenderGraphBuilder& builder) {
                 builder.SetQueue(RenderQueue::AsyncCompute);
                 builder.Read(hdr, TextureUsage::ShaderRead);
                 builder.Read(depth, TextureUsage::ShaderRead);
@@ -1674,7 +1667,7 @@ namespace Extrinsic::Graphics
             // `SceneColorHDR ColorAttachment → ShaderRead` transition
             // and the dispatch barrier lands before the bloom +
             // tonemap render-pass scope opens.
-            addOrderedPass(FrameRecipePassKind::PostProcessHistogram, "PostProcessHistogramPass", [=](RenderGraphBuilder& builder) {
+            addRecipePass(FrameRecipePassKind::PostProcessHistogram, "PostProcessHistogramPass", [=](RenderGraphBuilder& builder) {
                 // GRAPHICS-037D Slice D — the histogram dispatch is the
                 // default recipe's existing compute-only pass. Prefer the
                 // optional async-compute queue here; the framegraph/RHI
@@ -1691,7 +1684,7 @@ namespace Extrinsic::Graphics
                     builder.Write(histogramReadback, BufferUsage::TransferDst);
                 }
             });
-            addOrderedPass(FrameRecipePassKind::PostProcess, "PostProcessPass", [=](RenderGraphBuilder& builder) {
+            addRecipePass(FrameRecipePassKind::PostProcess, "PostProcessPass", [=](RenderGraphBuilder& builder) {
                 builder.Read(postProcessInput, TextureUsage::ShaderRead);
                 builder.Write(ldr, TextureUsage::ColorAttachmentWrite);
                 builder.Write(postProcessBloomScratch, TextureUsage::ColorAttachmentWrite);
@@ -1701,14 +1694,14 @@ namespace Extrinsic::Graphics
             });
             if (smaaActive)
             {
-                addOrderedPass(FrameRecipePassKind::PostProcessAAEdge, "PostProcessAAEdgePass", [=](RenderGraphBuilder& builder) {
+                addRecipePass(FrameRecipePassKind::PostProcessAAEdge, "PostProcessAAEdgePass", [=](RenderGraphBuilder& builder) {
                     builder.Read(ldr, TextureUsage::ShaderRead);
                     builder.Write(postProcessAATempEdges, TextureUsage::ColorAttachmentWrite);
                     builder.SetRenderPass(RHI::RenderPassDesc{
                         .ColorTargets = kDefaultClearColorAttachments,
                     });
                 });
-                addOrderedPass(FrameRecipePassKind::PostProcessAABlend, "PostProcessAABlendPass", [=](RenderGraphBuilder& builder) {
+                addRecipePass(FrameRecipePassKind::PostProcessAABlend, "PostProcessAABlendPass", [=](RenderGraphBuilder& builder) {
                     builder.Read(postProcessAATempEdges, TextureUsage::ShaderRead);
                     builder.Write(postProcessAATempWeights, TextureUsage::ColorAttachmentWrite);
                     builder.SetRenderPass(RHI::RenderPassDesc{
@@ -1718,7 +1711,7 @@ namespace Extrinsic::Graphics
             }
             if (spatialAAActive)
             {
-                addOrderedPass(FrameRecipePassKind::PostProcessAAResolve, "PostProcessAAResolvePass", [=](RenderGraphBuilder& builder) {
+                addRecipePass(FrameRecipePassKind::PostProcessAAResolve, "PostProcessAAResolvePass", [=](RenderGraphBuilder& builder) {
                     builder.Read(ldr, TextureUsage::ShaderRead);
                     if (smaaActive)
                     {
@@ -1737,7 +1730,7 @@ namespace Extrinsic::Graphics
         if (features.EnableSelectionOutline)
         {
             const TextureRef input = presentSource;
-            addOrderedPass(FrameRecipePassKind::SelectionOutline, "SelectionOutlinePass", [=](RenderGraphBuilder& builder) {
+            addRecipePass(FrameRecipePassKind::SelectionOutline, "SelectionOutlinePass", [=](RenderGraphBuilder& builder) {
                 builder.Read(input, TextureUsage::ShaderRead);
                 builder.Read(entityId, TextureUsage::ShaderRead);
                 builder.Read(depth, TextureUsage::DepthRead);
@@ -1757,7 +1750,7 @@ namespace Extrinsic::Graphics
         if (features.EnableDebugView)
         {
             const TextureRef input = presentSource;
-            addOrderedPass(FrameRecipePassKind::DebugView, "DebugViewPass", [=](RenderGraphBuilder& builder) {
+            addRecipePass(FrameRecipePassKind::DebugView, "DebugViewPass", [=](RenderGraphBuilder& builder) {
                 builder.Read(input, TextureUsage::ShaderRead);
                 builder.Write(debugView, TextureUsage::ColorAttachmentWrite);
                 builder.SetRenderPass(RHI::RenderPassDesc{
@@ -1770,7 +1763,7 @@ namespace Extrinsic::Graphics
         if (features.EnableImGui)
         {
             const TextureRef input = presentSource;
-            addOrderedPass(FrameRecipePassKind::ImGui, "ImGuiPass", [=](RenderGraphBuilder& builder) {
+            addRecipePass(FrameRecipePassKind::ImGui, "ImGuiPass", [=](RenderGraphBuilder& builder) {
                 builder.Read(input, TextureUsage::ShaderRead);
                 builder.Write(input, TextureUsage::ColorAttachmentWrite);
                 builder.SetRenderPass(RHI::RenderPassDesc{
@@ -1793,7 +1786,7 @@ namespace Extrinsic::Graphics
         // backbuffer's `FinalState = Present` contract (see
         // `RenderGraph::ImportBackbuffer`), so no `TextureUsage::Present`
         // read is needed on this pass.
-        addOrderedPass(FrameRecipePassKind::Present, "Present", [=](RenderGraphBuilder& builder) {
+        addRecipePass(FrameRecipePassKind::Present, "Present", [=](RenderGraphBuilder& builder) {
             builder.Read(presentSource, TextureUsage::ShaderRead);
             builder.Write(backbuffer, TextureUsage::ColorAttachmentWrite);
             builder.SetRenderPass(RHI::RenderPassDesc{

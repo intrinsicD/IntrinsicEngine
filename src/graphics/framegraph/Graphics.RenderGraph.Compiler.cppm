@@ -108,6 +108,7 @@ namespace Extrinsic::Graphics
     export struct CompiledPassDeclarations
     {
         std::uint32_t PassIndex = 0;
+        std::vector<std::uint32_t> ExplicitDependencyPasses{};
         std::vector<std::uint32_t> ReadTextures{};
         std::vector<std::uint32_t> WriteTextures{};
         std::vector<std::uint32_t> ReadBuffers{};
