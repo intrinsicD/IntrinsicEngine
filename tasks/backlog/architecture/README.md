@@ -89,10 +89,19 @@ map.
   GRAPHICS-033E/F + HARDEN-066 + RUNTIME-091 window
   (`docs/reports/2026-05-17-agent-output-audit.md`, ≈ 15 minutes, eight rows
   pass, one self-corrected historical finding, no new follow-up filed).
-- [REVIEW-002 — Recurring repo-state drift and inconsistency audit](REVIEW-002-recurring-drift-and-inconsistency-audit.md):
-  installs a whole-tree drift audit that composes existing validators and
-  semantic spot-checks for inventory drift, stale task links, allowlist owner
-  drift, planned-marker drift, dead seams, and naming inconsistency.
+- [REVIEW-002 — Recurring repo-state drift and inconsistency audit](../../done/REVIEW-002-recurring-drift-and-inconsistency-audit.md)
+  (done 2026-06-06): installed the whole-tree drift audit
+  ([`docs/agent/drift-audit-checklist.md`](../../../docs/agent/drift-audit-checklist.md))
+  composing existing validators and semantic spot-checks for inventory drift,
+  stale task links, allowlist owner drift, planned-marker drift, dead seams, and
+  naming inconsistency, and ran the first calibration
+  ([`docs/reports/2026-06-06-drift-audit.md`](../../../docs/reports/2026-06-06-drift-audit.md),
+  ≈ 20 min). Eight rows clean; Row 7 (untracked TODO/temporary markers) filed
+  the follow-up `HARDEN-078`.
+- [HARDEN-078 — Track or resolve untracked TODO / temporary markers in promoted src](HARDEN-078-track-untracked-todo-temporary-markers.md):
+  drift-audit Row 7 follow-up — gives the `Core.Filesystem` TODO and the
+  `Runtime.Engine::GetStreamingGraph()` temporary bridge a tracked owner per
+  `AGENTS.md` §13.
 
 ## Legacy retirement
 

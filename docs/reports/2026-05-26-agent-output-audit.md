@@ -30,7 +30,7 @@ window".
   (retired 2026-05-22 after Slice 3.3.c),
   [`GEOM-015`](../../tasks/done/GEOM-015-gjk-termination-diagnostics.md)
   (retired 2026-05-22 after Slice 4),
-  [`REVIEW-002`](../../tasks/backlog/architecture/REVIEW-002-recurring-drift-and-inconsistency-audit.md)
+  [`REVIEW-002`](../../tasks/done/REVIEW-002-recurring-drift-and-inconsistency-audit.md)
   (backlog seed for the recurring drift audit).
 - Sampling: rows 1–9 each spot-checked against 3–5 representative
   substantive commits per task family (geometry, graphics passes,

@@ -1,15 +1,30 @@
 # REVIEW-002 — Recurring repo-state drift and inconsistency audit
 
+## Status
+
+- Status: done (retired 2026-06-06). The nine-row drift-audit checklist is
+  installed, the cadence pointers are added, and the first calibration audit ran
+  on `HEAD` (`b7ab258`).
+- Completed: 2026-06-06.
+- Commit: this commit adds `docs/agent/drift-audit-checklist.md`, the calibration
+  report `docs/reports/2026-06-06-drift-audit.md`, the `contract.md`/`roles.md`
+  cadence pointers, the backlog "Recurring audits" pointer, the Row-7 follow-up
+  task `HARDEN-078`, and retires this task to `tasks/done/`.
+- Result: calibration outcome was 8 rows `pass`/`not-applicable` and one
+  `findings` row (Row 7 — untracked TODO/temporary markers), which filed
+  `HARDEN-078`. Elapsed ≈ 20 minutes (within the ≤ 45-minute target). Subsequent
+  drift audits write new dated reports without re-opening this task.
+
 ## Goal
 
-- [ ] Establish a recurring, agent-runnable **repo-state drift audit** that
+- [x] Establish a recurring, agent-runnable **repo-state drift audit** that
   inspects the whole tree (not a window of recent commits) for accumulated
   drift between code, docs, tasks, generated inventories, and tracked
   migration exceptions, and produces a dated report under
   `docs/reports/<YYYY-MM-DD>-drift-audit.md`.
-- [ ] Author `docs/agent/drift-audit-checklist.md` so any reviewer or agent
+- [x] Author `docs/agent/drift-audit-checklist.md` so any reviewer or agent
   can execute the same audit deterministically from the checklist.
-- [ ] Run the first calibration audit and record the elapsed time so future
+- [x] Run the first calibration audit and record the elapsed time so future
   cadences can calibrate against a ≤ 45-minute target.
 
 ## Non-goals
@@ -99,73 +114,73 @@
 
 ## Required changes
 
-- [ ] Author `docs/agent/drift-audit-checklist.md` containing the nine
+- [x] Author `docs/agent/drift-audit-checklist.md` containing the nine
   drift-category rows above. Each row records: a one-sentence
   definition; the concrete command(s) or `git grep` pattern that
   surfaces the signal; what counts as a `finding` vs `pass` vs
   `not-applicable`; and the fix pointer (which follow-up task type to
   open, or which existing tool to extend).
-- [ ] Add a short cadence note to `docs/agent/contract.md` linking to
+- [x] Add a short cadence note to `docs/agent/contract.md` linking to
   the new checklist alongside the existing pointer to
   `agent-output-review-checklist.md`, and stating that REVIEW-002 is
   *additive* to REVIEW-001 (state audit vs. window audit).
-- [ ] Cross-link the new checklist from `docs/agent/roles.md` under the
+- [x] Cross-link the new checklist from `docs/agent/roles.md` under the
   same rotating reviewer role that owns REVIEW-001.
-- [ ] Execute the first calibration audit on the current `HEAD` and
+- [x] Execute the first calibration audit on the current `HEAD` and
   record findings as `docs/reports/<YYYY-MM-DD>-drift-audit.md`. The
   report uses the same shape as
   `docs/reports/2026-05-17-agent-output-audit.md`: window block (here,
   the current commit SHA and date), one findings-table row per
   checklist row with `pass | findings | not-applicable`, follow-ups,
   and elapsed time.
-- [ ] For every `findings` row in the calibration report, file a
+- [x] For every `findings` row in the calibration report, file a
   follow-up backlog task under the appropriate `tasks/backlog/<area>/`
   directory and link it from the report. Do not remediate inside this
   task.
-- [ ] Retire this task to `tasks/done/` once the checklist, contract
+- [x] Retire this task to `tasks/done/` once the checklist, contract
   pointer, and calibration report have landed.
 
 ## Tests
 
-- [ ] No new C++ code is produced. The checklist commands must run
+- [x] No new C++ code is produced. The checklist commands must run
   cleanly on a fresh `cmake --preset ci` build tree (where build
   artifacts are needed; most rows are git/python-only).
-- [ ] `python3 tools/agents/validate_tasks.py --root tasks --strict`
+- [x] `python3 tools/agents/validate_tasks.py --root tasks --strict`
   passes after this task file lands and after the checklist + report
   land.
-- [ ] `python3 tools/agents/check_task_policy.py --root . --strict`
+- [x] `python3 tools/agents/check_task_policy.py --root . --strict`
   passes.
-- [ ] `python3 tools/docs/check_doc_links.py --root .` passes
+- [x] `python3 tools/docs/check_doc_links.py --root .` passes
   (calibration report and checklist are link-clean).
-- [ ] Calibration success criterion: every checklist row has an
+- [x] Calibration success criterion: every checklist row has an
   outcome; every `findings` outcome links to a tracked follow-up task;
   total elapsed time is recorded.
 
 ## Docs
 
-- [ ] `docs/agent/drift-audit-checklist.md` created.
-- [ ] `docs/agent/contract.md` updated with cadence pointer.
-- [ ] `docs/agent/roles.md` updated with reviewer ownership note (same
+- [x] `docs/agent/drift-audit-checklist.md` created.
+- [x] `docs/agent/contract.md` updated with cadence pointer.
+- [x] `docs/agent/roles.md` updated with reviewer ownership note (same
   rotating reviewer as REVIEW-001).
-- [ ] `docs/reports/<YYYY-MM-DD>-drift-audit.md` — calibration report.
-- [ ] Optional: one-line pointer added to `tasks/backlog/README.md`
+- [x] `docs/reports/<YYYY-MM-DD>-drift-audit.md` — calibration report.
+- [x] Optional: one-line pointer added to `tasks/backlog/README.md`
   under a "Recurring audits" subsection so future reviewers discover
   both REVIEW-001 and REVIEW-002 from the backlog index.
 
 ## Acceptance criteria
 
-- [ ] Checklist file exists and covers all nine drift categories with
+- [x] Checklist file exists and covers all nine drift categories with
   a concrete command/pattern per row and a `pass | findings |
   not-applicable` outcome slot.
-- [ ] Calibration report exists, runs in ≤ 45 minutes elapsed (recorded
+- [x] Calibration report exists, runs in ≤ 45 minutes elapsed (recorded
   in the report), and every row has an outcome.
-- [ ] At least one follow-up backlog task is filed if calibration finds
+- [x] At least one follow-up backlog task is filed if calibration finds
   any `findings` outcome; if calibration is clean, the report
   explicitly states that and the checklist records the clean baseline.
-- [ ] Cadence is documented as recurring on demand or every 2–4 weeks
+- [x] Cadence is documented as recurring on demand or every 2–4 weeks
   but is **not** enforced by CI; missing a cycle is recorded as "no
   audit this cycle, next reviewer extends the window."
-- [ ] Strict task-policy, task-validation, and docs-links validators
+- [x] Strict task-policy, task-validation, and docs-links validators
   pass on each commit landing this task.
 
 ## Verification
