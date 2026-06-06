@@ -2,14 +2,24 @@
 
 ## Status
 
-- Status: resolved for the default-recipe command-stream blocker as of
-  2026-05-28. The normal (non-bypassed)
+- Status: done (retired 2026-06-06). The command-stream fix landed under
+  GRAPHICS-076's Slice D graduation on 2026-05-28; this retirement is a
+  records-hygiene move of the already-resolved task from `tasks/backlog/bugs/`
+  into `tasks/done/` plus the bugs-index synchronization. No engine/test code
+  changed in the retirement commit.
+- Completed: 2026-06-06.
+- Commit: implementation landed under the GRAPHICS-076 Slice A–D series
+  (see [`GRAPHICS-076`](GRAPHICS-076-default-recipe-debug-view-and-present-wiring.md));
+  this retirement commit records only the task move from `tasks/backlog/bugs/`
+  to `tasks/done/` and the bugs-index synchronization.
+- Resolution (2026-05-28): resolved for the default-recipe command-stream
+  blocker. The normal (non-bypassed)
   `DefaultRecipeSurfaceGpuSmoke.RecipeSelectorReachesOperationalVulkanCommandStream`
   now passes under the `ci-vulkan` tree on this Vulkan-capable host, and the full
   opt-in GPU smoke selection passes 4/4. The default CPU gate passes 2297/2297
   after explicitly building `IntrinsicBenchmarkSmoke`. Default-recipe
   pixel-readback parity is not part of this bug fix; it is tracked separately by
-  [`GRAPHICS-076E`](../../done/GRAPHICS-076E-default-recipe-pixel-readback.md).
+  [`GRAPHICS-076E`](GRAPHICS-076E-default-recipe-pixel-readback.md).
 
 ## Goal
 - Identify and fix the malformed pipeline barrier (or unrooted image

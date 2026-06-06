@@ -172,7 +172,7 @@
       (`src/graphics/vulkan/Backends.Vulkan.CommandContext.cpp:574`).
 - At this point, the barrier defect was the next actionable upstream
   blocker for graduating this fixture from `Skipped` to `Passed`. It is captured as
-  [`BUG-012`](../backlog/bugs/BUG-012-default-recipe-vkcmdpipelinebarrier2-segv-nvidia.md)
+  [`BUG-012`](BUG-012-default-recipe-vkcmdpipelinebarrier2-segv-nvidia.md)
   with a full reproducer, stack trace, and acceptance criteria. The
   later 2026-05-27 BUG-012 partial update below supersedes the
   "only remaining" wording by recording the newly exposed

@@ -187,6 +187,10 @@ Members:
   [`BUG-016`](../done/BUG-016-extrinsic-sandbox-operational-frame-black-readback.md)
   closed the promoted Vulkan sandbox validation cascade and the downstream
   black-frame readback regression on 2026-06-06.
+  [`BUG-012`](../done/BUG-012-default-recipe-vkcmdpipelinebarrier2-segv-nvidia.md)
+  (default-recipe `vkCmdPipelineBarrier2` SEGV) was resolved under
+  GRAPHICS-076 on 2026-05-28; its resolved record was retired from
+  `tasks/backlog/bugs/` to `tasks/done/` on 2026-06-06.
 
 ## Cross-domain dependency anchors
 
