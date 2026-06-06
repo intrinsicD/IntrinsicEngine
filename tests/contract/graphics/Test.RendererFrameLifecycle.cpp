@@ -876,6 +876,35 @@ TEST(RendererFrameLifecycle, BeginFrameSkipDoesNotRecordCommands)
     renderer->Shutdown();
 }
 
+TEST(RendererFrameLifecycle, ExecuteFrameRejectsAfterRenderPrepFailure)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{77u, 3u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 64, .Height = 64},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+
+    renderer->Shutdown();
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_FALSE(stats.Compile.Succeeded);
+    EXPECT_FALSE(stats.Execute.Succeeded);
+    EXPECT_NE(stats.Diagnostic.find("ExecuteFrame requires successful PrepareFrame"), std::string::npos);
+    EXPECT_NE(stats.Diagnostic.find("Render prep missing required input"), std::string::npos);
+    EXPECT_EQ(device.CommandContext.BeginCalls, 0);
+    EXPECT_EQ(device.CommandContext.EndCalls, 0);
+}
+
 TEST(RendererFrameLifecycle, FrameRecipePassesAllProduceStructuredCommandRecordStatuses)
 {
     // GRAPHICS-018 §4 contract: every pass emitted by the default FrameRecipe

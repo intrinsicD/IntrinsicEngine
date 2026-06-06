@@ -38,6 +38,7 @@ import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.FrameRecipe;
 import Extrinsic.Graphics.RenderGraph;
 export import Extrinsic.Graphics.RenderCommandRouter;
+export import Extrinsic.Graphics.RenderPrepPipeline;
 export import Extrinsic.Graphics.RenderSubsystemRegistry;
 // GRAPHICS-077 — re-export the upload helper module so consumers of
 // `RenderGraphFrameStats::TransientDebugUpload` (e.g. contract tests,

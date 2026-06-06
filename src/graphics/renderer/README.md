@@ -11,6 +11,7 @@ and renderer/render-graph orchestration.
 - `Extrinsic.Graphics.Renderer`
 - `Extrinsic.Graphics.FrameRecipe`
 - `Extrinsic.Graphics.RenderCommandRouter`
+- `Extrinsic.Graphics.RenderPrepPipeline`
 - `Extrinsic.Graphics.RenderSubsystemRegistry`
 - `Extrinsic.Graphics.RenderGraph`
 
@@ -150,6 +151,11 @@ implementation.
   forwards existing `IRenderer` accessors through the registry, while retaining
   pass objects, pipeline leases, upload helpers, and frame-transient resources
   whose destruction must occur before registry storage resets.
+- `Graphics.RenderPrepPipeline` owns the CPU-side `PrepareFrame()` sequencing
+  seam. The renderer supplies required manager/system pointers, retained
+  transform/light/visualization snapshot spans, and the cluster-light resource
+  hook; the pipeline records structured missing-input and task-graph
+  compile/execute diagnostics before `ExecuteFrame()` can proceed.
 
 ### Shader push-constant compatibility policy
 

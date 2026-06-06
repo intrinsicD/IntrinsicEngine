@@ -22,9 +22,9 @@ and absence of a standing architecture-review gate.
    make frame-pass identity typed and remove stringly command routing. Retired
    2026-06-06.
 4. [`WORKSHOP-005` (done)](../../done/WORKSHOP-005-renderer-subsystem-registry.md) and
-   [`WORKSHOP-006`](WORKSHOP-006-extract-render-prep-pipeline.md) — split
+   [`WORKSHOP-006` (done)](../../done/WORKSHOP-006-extract-render-prep-pipeline.md) — split
    renderer responsibilities before the renderer becomes the new god object.
-   `WORKSHOP-005` retired 2026-06-06.
+   Both tasks retired 2026-06-06.
 5. [`WORKSHOP-007`](WORKSHOP-007-dependency-driven-default-recipe.md) — move
    the default recipe toward true graph semantics.
 6. [`WORKSHOP-008` (done)](../../done/WORKSHOP-008-task-maturity-taxonomy.md) —
@@ -47,9 +47,9 @@ and absence of a standing architecture-review gate.
   (expected-failure wrapper deleted with WORKSHOP-002's retirement).
 - **WORKSHOP-004 (done) ⇐ WORKSHOP-003 (done).** Typed command routing consumes
   the typed pass identity introduced by WORKSHOP-003. Retired 2026-06-06.
-- **WORKSHOP-006 ⇐ WORKSHOP-005 (done).** Render-prep extraction is easier
+- **WORKSHOP-006 (done) ⇐ WORKSHOP-005 (done).** Render-prep extraction is easier
   once subsystem ownership has been moved into the registry. `WORKSHOP-005`
-  retired 2026-06-06.
+  and `WORKSHOP-006` retired 2026-06-06.
 - **WORKSHOP-007 ⇐ WORKSHOP-003.** Dependency-driven recipes benefit from
   typed resource identity for ordering decisions.
 - **WORKSHOP-009 ⇐ WORKSHOP-001 (done), WORKSHOP-008 (done).** The review

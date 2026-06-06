@@ -69,6 +69,8 @@ The imported `Backbuffer` is declared once and finalized only by the `Present` d
 
 Renderer subsystem lifetime is centralized in `Extrinsic.Graphics.RenderSubsystemRegistry`: the registry owns the core RHI managers plus `GpuWorld`, material, colormap, visualization sync, culling, transform sync, light, selection, forward, deferred, postprocess, and shadow systems. Pass objects and pipeline leases remain renderer-owned because they borrow those systems and must be released before registry storage resets.
 
+CPU-side render preparation is centralized in `Extrinsic.Graphics.RenderPrepPipeline`. `IRenderer::PrepareFrame()` delegates the ordered prep chain to that seam using explicit manager/system inputs and retained snapshot spans, so prep ordering and failure diagnostics are tested independently from render-graph execution.
+
 ### Bootstrap Scaffold Retirement
 
 GRAPHICS-081 retired the bootstrap-only recipe scaffold once the canonical

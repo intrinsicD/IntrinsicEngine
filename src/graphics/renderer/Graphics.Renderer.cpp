@@ -103,8 +103,8 @@ import Extrinsic.Graphics.FrameRecipe;
 import Extrinsic.Graphics.RenderGraph;
 import Extrinsic.Graphics.RenderCommandRouter;
 import Extrinsic.Graphics.RenderSubsystemRegistry;
+import Extrinsic.Graphics.RenderPrepPipeline;
 import Extrinsic.Core.Config.Render;
-import Extrinsic.Core.Dag.TaskGraph;
 import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.Core.Filesystem.PathResolver;
@@ -251,15 +251,6 @@ namespace Extrinsic::Graphics
                 .BufferBarriers = bufferBarriers,
             });
         }
-
-        struct PrepPipelineCommitTag {};
-        struct PrepMaterialBaseSyncTag {};
-        struct PrepVisualizationSyncTag {};
-        struct PrepMaterialOverrideSyncTag {};
-        struct PrepTransformSyncTag {};
-        struct PrepLightSyncTag {};
-        struct PrepClusterLightTableTag {};
-        struct PrepGpuWorldSyncTag {};
 
         constexpr float kCameraInverseDeterminantEpsilon = 0.000001f;
         constexpr float kClusterDefaultVerticalFovRadians = 1.5707963267948966f;
@@ -1345,168 +1336,44 @@ namespace Extrinsic::Graphics
 
         void PrepareFrame(RenderWorld& renderWorld) override
         {
+            m_LastRenderPrepResult = {};
             if (!m_HasExtractedRenderWorld)
             {
                 Core::Log::Warn("[Graphics] PrepareFrame called before ExtractRenderWorld");
+                m_LastRenderPrepResult.Diagnostic = "PrepareFrame requires ExtractRenderWorld.";
+                m_LastRenderGraphStats.LifecycleDiagnostic = m_LastRenderPrepResult.Diagnostic;
                 m_HasPreparedFrame = false;
                 return;
             }
             RuntimeSnapshotStorage* const activeSnapshot = &ActiveRuntimeSnapshotStorage();
 
-            // Phase 14.1 sync order contract:
-            //  1) commit pipelines
-            //  2) flush base materials
-            //  3) resolve visualization overrides + write GpuEntityConfig
-            //  4) flush override material deltas
-            //  5) write instance transforms/material slots/flags/bounds
-            //  6) write lights
-            //  7) refresh scene table material binding
-            //  8) upload GpuWorld dirty ranges
-            if (m_EnableRenderPrepTaskGraph)
-            {
-                m_RenderPrepGraph.Reset();
-                m_RenderPrepGraph.AddPass(
-                    "RenderPrep.PipelineCommit",
-                    [] (Core::Dag::TaskGraphBuilder& b)
-                    {
-                        b.Write<PrepPipelineCommitTag>();
-                    },
-                    [this]
-                    {
-                        m_Subsystems.PipelineManager()->CommitPending();
-                    });
-                m_RenderPrepGraph.AddPass(
-                    "RenderPrep.MaterialBaseSync",
-                    [] (Core::Dag::TaskGraphBuilder& b)
-                    {
-                        b.Read<PrepPipelineCommitTag>();
-                        b.Write<PrepMaterialBaseSyncTag>();
-                    },
-                    [this]
-                    {
-                        m_Subsystems.MaterialSystemRegistry()->SyncGpuBuffer();
-                    });
-                m_RenderPrepGraph.AddPass(
-                    "RenderPrep.VisualizationSync",
-                    [] (Core::Dag::TaskGraphBuilder& b)
-                    {
-                        b.Read<PrepMaterialBaseSyncTag>();
-                        b.Write<PrepVisualizationSyncTag>();
-                    },
-                    [this, activeSnapshot]
-                    {
-                        m_Subsystems.VisualizationSyncSystemRegistry()->Sync(
-                            activeSnapshot->VisualizationSyncRecords,
-                            *m_Subsystems.MaterialSystemRegistry(),
-                            *m_Subsystems.ColormapSystemRegistry(),
-                            *m_Subsystems.GpuWorldSystem());
-                    });
-                m_RenderPrepGraph.AddPass(
-                    "RenderPrep.MaterialOverrideSync",
-                    [] (Core::Dag::TaskGraphBuilder& b)
-                    {
-                        b.Read<PrepVisualizationSyncTag>();
-                        b.Write<PrepMaterialOverrideSyncTag>();
-                    },
-                    [this]
-                    {
-                        m_Subsystems.MaterialSystemRegistry()->SyncGpuBuffer();
-                    });
-                m_RenderPrepGraph.AddPass(
-                    "RenderPrep.TransformSync",
-                    [] (Core::Dag::TaskGraphBuilder& b)
-                    {
-                        b.Read<PrepMaterialOverrideSyncTag>();
-                        b.Write<PrepTransformSyncTag>();
-                    },
-                    [this, activeSnapshot]
-                    {
-                        m_Subsystems.TransformSyncSystemRegistry()->SyncGpuBuffer(activeSnapshot->TransformSyncRecords, *m_Subsystems.GpuWorldSystem());
-                    });
-                m_RenderPrepGraph.AddPass(
-                    "RenderPrep.LightSync",
-                    [] (Core::Dag::TaskGraphBuilder& b)
-                    {
-                        b.Read<PrepTransformSyncTag>();
-                        b.Write<PrepLightSyncTag>();
-                    },
-                    [this, activeSnapshot]
-                    {
-                        m_Subsystems.LightSystemRegistry()->SyncGpuBuffer(activeSnapshot->LightSnapshots, *m_Subsystems.GpuWorldSystem());
-                    });
-                m_RenderPrepGraph.AddPass(
-                    "RenderPrep.ClusterLightTableSync",
-                    [] (Core::Dag::TaskGraphBuilder& b)
-                    {
-                        b.Read<PrepLightSyncTag>();
-                        b.Write<PrepClusterLightTableTag>();
-                    },
-                    [this, &renderWorld]
-                    {
-                        [[maybe_unused]] const bool clusterResourcesReady =
-                            EnsureClusterLightResources(renderWorld);
-                    });
-                m_RenderPrepGraph.AddPass(
-                    "RenderPrep.GpuWorldSync",
-                    [] (Core::Dag::TaskGraphBuilder& b)
-                    {
-                        b.Read<PrepClusterLightTableTag>();
-                        b.Write<PrepGpuWorldSyncTag>();
-                    },
-                    [this]
-                    {
-                        m_Subsystems.GpuWorldSystem()->SetMaterialBuffer(
-                            m_Subsystems.MaterialSystemRegistry()->GetBuffer(),
-                            m_Subsystems.MaterialSystemRegistry()->GetCapacity());
-                        m_Subsystems.GpuWorldSystem()->SyncFrame();
-                    });
-                m_RenderPrepGraph.AddPass(
-                    "RenderPrep.CullingSync",
-                    [] (Core::Dag::TaskGraphBuilder& b)
-                    {
-                        b.Read<PrepGpuWorldSyncTag>();
-                    },
-                    [this]
-                    {
-                        m_Subsystems.CullingSystemRegistry()->SyncGpuBuffer();
-                    });
-                const auto compile = m_RenderPrepGraph.Compile();
-                if (!compile.has_value())
+            RenderPrepPipelineInputs inputs{
+                .PipelineManager = m_Subsystems.PipelineManager() ? &*m_Subsystems.PipelineManager() : nullptr,
+                .Materials = m_Subsystems.MaterialSystemRegistry() ? &*m_Subsystems.MaterialSystemRegistry() : nullptr,
+                .Colormaps = m_Subsystems.ColormapSystemRegistry() ? &*m_Subsystems.ColormapSystemRegistry() : nullptr,
+                .VisualizationSync = m_Subsystems.VisualizationSyncSystemRegistry() ? &*m_Subsystems.VisualizationSyncSystemRegistry() : nullptr,
+                .TransformSync = m_Subsystems.TransformSyncSystemRegistry() ? &*m_Subsystems.TransformSyncSystemRegistry() : nullptr,
+                .Lights = m_Subsystems.LightSystemRegistry() ? &*m_Subsystems.LightSystemRegistry() : nullptr,
+                .World = m_Subsystems.GpuWorldSystem() ? &*m_Subsystems.GpuWorldSystem() : nullptr,
+                .Culling = m_Subsystems.CullingSystemRegistry() ? &*m_Subsystems.CullingSystemRegistry() : nullptr,
+                .VisualizationSyncRecords = std::span<VisualizationSyncRecord>{activeSnapshot->VisualizationSyncRecords},
+                .TransformSyncRecords = std::span<const TransformSyncRecord>{activeSnapshot->TransformSyncRecords},
+                .LightSnapshots = std::span<const LightSnapshot>{activeSnapshot->LightSnapshots},
+                .EnsureClusterLightResources = [this, &renderWorld]
                 {
-                    Core::Log::Error("[Graphics] Render prep TaskGraph compile failed: error={}",
-                                     static_cast<int>(compile.error()));
-                    m_HasPreparedFrame = false;
-                    return;
-                }
-                const auto execute = m_RenderPrepGraph.Execute();
-                if (!execute.has_value())
-                {
-                    Core::Log::Error("[Graphics] Render prep TaskGraph execute failed: error={}",
-                                     static_cast<int>(execute.error()));
-                    m_HasPreparedFrame = false;
-                    return;
-                }
-            }
-            else
+                    return EnsureClusterLightResources(renderWorld);
+                },
+            };
+
+            m_LastRenderPrepResult = m_RenderPrepPipeline.Run(inputs);
+            if (!m_LastRenderPrepResult.Succeeded)
             {
-                m_Subsystems.PipelineManager()->CommitPending();
-                m_Subsystems.MaterialSystemRegistry()->SyncGpuBuffer();
-                m_Subsystems.VisualizationSyncSystemRegistry()->Sync(
-                    activeSnapshot->VisualizationSyncRecords,
-                    *m_Subsystems.MaterialSystemRegistry(),
-                    *m_Subsystems.ColormapSystemRegistry(),
-                    *m_Subsystems.GpuWorldSystem());
-                m_Subsystems.MaterialSystemRegistry()->SyncGpuBuffer();
-                m_Subsystems.TransformSyncSystemRegistry()->SyncGpuBuffer(activeSnapshot->TransformSyncRecords, *m_Subsystems.GpuWorldSystem());
-                m_Subsystems.LightSystemRegistry()->SyncGpuBuffer(activeSnapshot->LightSnapshots, *m_Subsystems.GpuWorldSystem());
-                m_Subsystems.GpuWorldSystem()->SetMaterialBuffer(
-                    m_Subsystems.MaterialSystemRegistry()->GetBuffer(),
-                    m_Subsystems.MaterialSystemRegistry()->GetCapacity());
-                [[maybe_unused]] const bool clusterResourcesReady =
-                    EnsureClusterLightResources(renderWorld);
-                m_Subsystems.GpuWorldSystem()->SyncFrame();
-                m_Subsystems.CullingSystemRegistry()->SyncGpuBuffer();
+                Core::Log::Error("[Graphics] {}", m_LastRenderPrepResult.Diagnostic);
+                m_LastRenderGraphStats.LifecycleDiagnostic = m_LastRenderPrepResult.Diagnostic;
+                m_HasPreparedFrame = false;
+                return;
             }
+
             m_HasPreparedFrame = true;
         }
 
@@ -1516,7 +1383,9 @@ namespace Extrinsic::Graphics
             m_LastRenderGraphStats = {};
             if (!m_HasPreparedFrame)
             {
-                m_LastRenderGraphStats.Diagnostic = "ExecuteFrame requires successful PrepareFrame.";
+                m_LastRenderGraphStats.Diagnostic = m_LastRenderPrepResult.Diagnostic.empty()
+                    ? std::string{"ExecuteFrame requires successful PrepareFrame."}
+                    : std::string{"ExecuteFrame requires successful PrepareFrame: "} + m_LastRenderPrepResult.Diagnostic;
                 Core::Log::Warn("[Graphics] ExecuteFrame called before successful PrepareFrame");
                 return;
             }
@@ -5622,6 +5491,7 @@ namespace Extrinsic::Graphics
             }
             m_HasExtractedRenderWorld = false;
             m_HasPreparedFrame = false;
+            m_LastRenderPrepResult = {};
             m_LastRenderGraphStats = {};
         }
 
@@ -7001,7 +6871,8 @@ namespace Extrinsic::Graphics
         std::vector<std::vector<RHI::BufferHandle>>  m_FrameTransientBuffers{};
         std::vector<std::vector<RHI::TextureDesc>>   m_FrameTransientTextureDescs{};
         std::vector<std::vector<RHI::BufferDesc>>    m_FrameTransientBufferDescs{};
-        Core::Dag::TaskGraph                 m_RenderPrepGraph{Core::Dag::QueueDomain::Cpu};
+        RenderPrepPipeline                  m_RenderPrepPipeline;
+        RenderPrepPipelineResult            m_LastRenderPrepResult{};
         DepthPrepassPass                     m_DepthPrepassPass;
         // GRAPHICS-076 Slice A — canonical default-recipe present pass.
         // Default-constructed (no system dependency); the publisher in
@@ -7398,7 +7269,6 @@ namespace Extrinsic::Graphics
         ClusterGridProjection                          m_ClusterGridProjection{};
         std::array<RuntimeSnapshotStorage, kRuntimeSnapshotStorageSlots> m_RuntimeSnapshotSlots{};
         std::uint32_t                        m_ActiveRuntimeSnapshotReadSlot{0u};
-        bool                                 m_EnableRenderPrepTaskGraph{true};
         bool                                 m_CullingOutputAvailable{false};
         bool                                 m_HasExtractedRenderWorld{false};
         bool                                 m_HasPreparedFrame{false};

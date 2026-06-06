@@ -16,6 +16,15 @@ No currently active task.
 The most recently retired tasks are summarised below.
 
 Previously-active
+[`WORKSHOP-006`](../done/WORKSHOP-006-extract-render-prep-pipeline.md) —
+render-prep pipeline extraction retired to `tasks/done/` on 2026-06-06. The
+slice added the `Extrinsic.Graphics.RenderPrepPipeline` module, moved
+CPU-side `PrepareFrame` prep ordering out of the renderer, retained task-graph
+and sequential ordering coverage, added fail-closed missing-input/task-graph
+diagnostics, and made renderer lifecycle diagnostics reject `ExecuteFrame`
+after failed prep.
+
+Previously-active
 [`ARCH-001`](../done/ARCH-001-physics-layer-ownership-and-ecs-integration.md)
 — physics layer ownership and ECS/runtime integration contract retired to
 `tasks/done/` on 2026-06-05 at maturity `Retired`. The slice accepted
