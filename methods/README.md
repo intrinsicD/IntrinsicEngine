@@ -17,6 +17,7 @@ Each method package should follow this lifecycle:
 ## Directory layout
 
 - `_template/`: starter package that can be copied for a new method.
+- `_examples/`: non-real, instructional structure examples (not paper intakes); see [`_examples/README.md`](_examples/README.md).
 - `geometry/`: geometry processing methods.
 - `rendering/`: rendering and light transport methods.
 - `physics/`: simulation and dynamics methods.

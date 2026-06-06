@@ -12,7 +12,7 @@
 
 ## Context
 - Owning subsystem/layer: `methods/` program governance + `geometry`.
-- As of 2026-05-16, `methods/` contains 0 LOC of implementation: only `_template/` and the placeholder `geometry/_example_vector_heat/` scaffold. Seven backlog method cards exist (`METHOD-001..007`) but none has been started. This is the most obvious unstarted track relative to the stated mission ("method-driven research integration"; `AGENTS.md` §1).
+- As of 2026-05-16, `methods/` contains 0 LOC of implementation: only `_template/` and the structure example at `_examples/vector_heat/` (relocated from `geometry/_example_vector_heat/` by `METHOD-008`). Seven backlog method cards exist (`METHOD-001..007`) but none has been started. This is the most obvious unstarted track relative to the stated mission ("method-driven research integration"; `AGENTS.md` §1).
 - Signed Heat (Feng & Crane, SIGGRAPH 2024) is the strongest pathfinder pick because:
   - The promoted `src/geometry/` layer already ships `Geometry.HalfedgeMesh.DEC`, `Geometry.HalfedgeMesh.Geodesic`, and `Geometry.HalfedgeMesh.VectorHeatMethod`. METHOD-002 reuses cotan-Laplace + lumped mass already assembled by DEC.
   - The CPU reference algorithm is well-documented (three linear-algebra steps after Laplace assembly). It originally gated on a single missing seam: `GEOM-008` (Eigen3 introduction + sparse builders + diagnostics). `GEOM-008` retired on 2026-05-27 shipping the CSR builder and CG iterative solver only; the LDLT path that METHOD-002 Step 2 names is owned by the follow-up `GEOM-020`. The promotion gate is therefore `GEOM-020`, not retired `GEOM-008`.

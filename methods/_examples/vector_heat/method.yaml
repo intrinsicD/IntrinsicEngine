@@ -1,13 +1,13 @@
 id: geometry.example_vector_heat
-name: Example Vector Heat Package Skeleton
+name: Example Method Package Structure (not a real intake)
 domain: geometry
 status: proposed
 paper:
-  title: "Vector Heat Method (Example Placeholder)"
-  authors: "TODO"
-  year: 0
-  doi: "TODO"
-  url: "https://example.invalid/vector-heat"
+  title: "Structure example only — not a real paper intake"
+  authors: "IntrinsicEngine method-package structure example"
+  year: 2026
+  doi: "n/a — structure example, not a real paper intake"
+  url: "https://example.invalid/structure-example"
 inputs:
   - triangle_mesh
 outputs:
