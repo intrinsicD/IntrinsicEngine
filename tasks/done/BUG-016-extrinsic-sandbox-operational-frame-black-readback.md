@@ -2,12 +2,16 @@
 
 ## Status
 
-- Status: fixed (2026-06-05). Root cause localised and corrected; the app-default
+- Status: done (retired 2026-06-06). Root cause localised and corrected; the app-default
   `gpu;vulkan` readback regression and the surface/transient/visualization smokes
   are green on this Vulkan-capable host.
 - Reported: 2026-06-05 from a local `ExtrinsicSandbox` run after the promoted
   Vulkan device reached operational and the clustered validation cascade was
   cleared.
+- Completed: 2026-06-06. Implementation commits: `51e905fd`, `eef2622d`,
+  `bcbee8b5`; retirement recorded in this commit.
+- Commit: this retirement commit records the final task move and backlog index
+  synchronization.
 - Owner/layer: `graphics/renderer`, `graphics/vulkan`, `graphics/framegraph`.
   `app` and `runtime` composition remain out of scope except as evidence.
 
@@ -129,7 +133,9 @@ Diagnose in this order; each step narrows the failing stage without a GUI:
       the propagated blue scene clear; the ImGui-clobber + barrier-auto-bind
       regression is exercised end-to-end by the app-default present readback.)_
 - [x] Preserve the default CPU-supported gate. _(255 graphics/framegraph/renderer
-      CPU contract tests green; `MinimalTriangleReadbackHarness` green.)_
+      CPU contract tests green during the implementation slice;
+      `MinimalTriangleReadbackHarness` green; full default CPU gate passed
+      2787/2787 during retirement verification.)_
 
 ## Docs
 - [x] Update `docs/architecture/rendering-three-pass.md` and/or
@@ -147,18 +153,29 @@ Diagnose in this order; each step narrows the failing stage without a GUI:
 
 ## Verification
 ```bash
+# Focused Vulkan/source verification from the implementation commits:
 cmake --preset ci-vulkan
-cmake --build --preset ci-vulkan --target ExtrinsicSandbox IntrinsicTests
+cmake --build --preset ci-vulkan --target IntrinsicGraphicsContractCpuTests IntrinsicGraphicsVulkanSmokeTests ExtrinsicSandbox
 LSAN_OPTIONS=suppressions=$PWD/lsan.supp timeout 20s ./build/ci-vulkan/bin/ExtrinsicSandbox
 
-# Non-black backbuffer readback regression (gpu;vulkan label intersection):
-ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' --timeout 120
+ctest --test-dir build/ci-vulkan --output-on-failure -R 'ImGuiPassContract|ImGuiSurfaceGpuSmoke|VisualizationOverlaySurfaceGpuSmoke|RuntimeSandboxAcceptanceGpuSmoke' --timeout 120
 
-# Keep the default CPU gate green:
+# Retirement verification on 2026-06-06:
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
+CCACHE_DISABLE=1 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
 ```
+
+Results: focused Vulkan smokes passed 20/20 in the implementation slice; the
+default CPU gate passed 2787/2787 on 2026-06-06. The ccache-enabled
+`IntrinsicTests` build first failed with a clang-23 frontend bus error in module
+compilation, then the identical build with `CCACHE_DISABLE=1` passed.
 
 ## Forbidden changes
 - Shipping a fix without a regression test when one is feasible.

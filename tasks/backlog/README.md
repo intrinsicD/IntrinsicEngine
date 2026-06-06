@@ -180,13 +180,13 @@ Reproducible correctness/regression fixes only. Origin:
 [`bugs/index.md`](bugs/index.md).
 
 Members:
-- [`BUG-015`](../active/BUG-015-extrinsic-sandbox-clustered-vulkan-validation-cascade.md)
-  — app-default promoted Vulkan validation cascade after clustered-lighting
-  bring-up. **Promoted to `tasks/active/` on 2026-06-05.** The clustered compute
-  pipeline-layout mismatch (storage buffers moved to the BDA convention) and the
-  validation-unavailable `CreateBuffer` crash are fixed; the device now reaches
-  operational and records the full pipeline. A remaining black-frame rendering
-  regression (separate from the validation cascade) is tracked in the active task.
+- No currently active bug records.
+- Recently retired:
+  [`BUG-015`](../done/BUG-015-extrinsic-sandbox-clustered-vulkan-validation-cascade.md)
+  and
+  [`BUG-016`](../done/BUG-016-extrinsic-sandbox-operational-frame-black-readback.md)
+  closed the promoted Vulkan sandbox validation cascade and the downstream
+  black-frame readback regression on 2026-06-06.
 
 ## Cross-domain dependency anchors
 

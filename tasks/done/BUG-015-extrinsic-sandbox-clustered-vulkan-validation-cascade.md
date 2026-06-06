@@ -2,8 +2,12 @@
 
 ## Status
 
-- Status: active (promoted from `tasks/backlog/bugs/` on 2026-06-05).
+- Status: done (retired 2026-06-06).
 - Reported: 2026-06-05 from a local debug-build `ExtrinsicSandbox` run.
+- Completed: 2026-06-06. Implementation commits: `51e905fd`, `eef2622d`,
+  `bcbee8b5`; retirement recorded in this commit.
+- Commit: this retirement commit records the final task move and backlog index
+  synchronization.
 - Owner/layer: `graphics/vulkan`, `graphics/rhi`, `graphics/renderer`, and
   runtime-owned promoted Vulkan operational gating. `app` remains out of scope.
 
@@ -114,24 +118,20 @@ Root causes found, in dependency order:
       pipeline records (`ClusterGridBuildPass`, `LightClusterAssignmentPass`,
       `ImGuiPass`, `Present` all `Recorded`) with no crash and no cluster
       pipeline-layout validation errors.
-- [x] Root-cause + durably fix the recurring present-pass crash: it was a
-      ccache + C++23-modules stale-object hazard (`depend_mode=false` cannot track
-      module BMI changes), producing an `ICommandContext` vtable slot mismatch
-      between the renderer and the Vulkan backend (`cmd.Draw(...)` dispatching
-      into `PushConstants(...)`). `cmake/Dependencies.cmake` now runs ccache in
-      depend mode.
-  - [ ] **Reverified 2026-06-05 — depend-mode remedy is INCOMPLETE on this host
-        (NVIDIA 590.48.01 / clang-20).** The same `cmd.Draw(3,1,0,0)` →
-        `VulkanCommandContext::PushConstants(data=0x3, size=1)` SEGV
-        (`memcpy` from `0x3`, the `vertexCount=3` arg reinterpreted as the
-        `const void* data` pointer) still reproduces on a `ci-vulkan`
-        `--clean-first` rebuild *when ccache serves the cached objects*. A
-        `CCACHE_DISABLE=1 --clean-first` rebuild of the identical sources runs the
-        sandbox crash-free (15s, no SEGV), which confirms the root cause is ccache
-        serving a vtable-inconsistent object even under depend mode. Follow-up:
-        strengthen the ccache safety (e.g. include module BMI/compiler identity in
-        the hash or fall back to `ccache -C` on module-interface churn) under a
-        build-hygiene task; tracks with the BUG-013 clang-20 modules vtable hazard.
+- [x] Root-cause the recurring present-pass crash to a ccache + C++23-modules
+      stale-object hazard (`depend_mode=false` cannot track module BMI changes),
+      producing an `ICommandContext` vtable slot mismatch between the renderer and
+      the Vulkan backend (`cmd.Draw(...)` dispatching into `PushConstants(...)`).
+      `cmake/Dependencies.cmake` now runs ccache in depend mode as a first safety
+      mitigation.
+- [x] Record the remaining ccache/modules caveat outside this rendering bug.
+      Reverification on 2026-06-05 showed that ccache can still serve a
+      vtable-inconsistent object on this host even under depend mode, while an
+      identical `CCACHE_DISABLE=1` rebuild runs crash-free. Structural
+      command-context hardening remains tracked by
+      [`HARDEN-073`](../backlog/rendering/HARDEN-073-rhi-command-context-vtable-key-function.md);
+      this BUG-015 retirement verifies the rendering fix with ccache disabled
+      after the cache/toolchain failure is observed.
 - [x] Stop the QFOT validation cascade (Bug E): bind async-compute/transfer
       barrier families into command contexts only when the framegraph
       `QueueCapabilityProfile` schedules onto them
@@ -158,25 +158,19 @@ Root causes found, in dependency order:
       (default CPU gate).
 
 ## Remaining (follow-up)
-- [ ] **Black-frame rendering correctness — carved out to
-      [`BUG-016`](../backlog/bugs/BUG-016-extrinsic-sandbox-operational-frame-black-readback.md).**
-      With the device operational and the QFOT cascade cleared, the
-      sandbox-acceptance GPU smoke still reads the backbuffer back entirely black
-      (`nonBlackPixels == 0`) even though every pass — including `Present` and
-      `ImGuiPass` — records and ImGui produces draw data (7 lists / 1900 verts).
-      This is a downstream postprocess/present/ImGui (or transient-resource)
-      content defect, out of scope for the clustered-validation cascade fixed
-      here. It is localizable in this environment (per-attachment GPU readback
-      bisection + validation `debug_printf`); interactive RenderDoc is **not**
-      required. Regressed in the GRAPHICS-039/040 window after `RUNTIME-095`
-      verified a non-black frame on 2026-06-04.
-
-
+- [x] **Black-frame rendering correctness — resolved by
+      [`BUG-016`](BUG-016-extrinsic-sandbox-operational-frame-black-readback.md).**
+      The downstream black-readback defect was localised with per-stage GPU
+      readback bisection. Its root causes were frame-sampled bridge slot 0 being
+      clobbered by late barrier/ImGui descriptor writes and recipe clear colors
+      being dropped during framegraph compilation. BUG-016 retired on 2026-06-06
+      with the light-blue clear and visible ImGui covered by automated
+      `gpu;vulkan` smokes.
 
 ## Tests
-- [ ] CPU contract coverage that the cluster compute pipeline descs carry the
+- [x] CPU contract coverage that the cluster compute pipeline descs carry the
       BDA push-constant layout (no descriptor-bound storage-buffer requirement).
-- [ ] Update `Test.LightClusterGrid.cpp` record-helper coverage for the new
+- [x] Update `Test.LightClusterGrid.cpp` record-helper coverage for the new
       BDA push-constant payloads.
 - [x] Contract regression `VulkanFailClosedContract.FrameGraphBarrierFamiliesCollapseUnderGraphicsOnlyProfile`
       (`tests/contract/graphics/Test.VulkanFailClosedContract.cpp`): a graphics-only
@@ -188,39 +182,49 @@ Root causes found, in dependency order:
       gate): the renderer's `IsLiveCrossQueueOwnershipTransfer` predicate collapses
       a compiled async/transfer ownership transfer under the graphics-only profile
       and keeps it live only when the profile genuinely exposes that queue.
-- [ ] Preserve the default CPU-supported gate and existing ImGui/default-recipe
+- [x] Preserve the default CPU-supported gate and existing ImGui/default-recipe
       Vulkan smokes.
 
 ## Docs
-- [ ] Update `src/graphics/vulkan/README.md` and/or
+- [x] Update `src/graphics/vulkan/README.md` and/or
       `docs/architecture/rendering-three-pass.md` for the clustered compute BDA
       contract.
-- [ ] Update `tasks/backlog/bugs/index.md` when the root cause and verified fix
+- [x] Update `tasks/backlog/bugs/index.md` when the root cause and verified fix
       are known.
-- [ ] Refresh `docs/api/generated/module_inventory.md` if module surfaces change.
+- [x] Refresh `docs/api/generated/module_inventory.md` if module surfaces change.
 
 ## Acceptance criteria
-- [ ] `ExtrinsicSandbox` no longer crashes when validation is requested but the
+- [x] `ExtrinsicSandbox` no longer crashes when validation is requested but the
       layer is unavailable.
-- [ ] With validation available, the clustered compute pipelines create without
+- [x] With validation available, the clustered compute pipelines create without
       `VUID-VkComputePipelineCreateInfo-layout-07990/07988`.
-- [ ] `ExtrinsicSandbox` reaches an operational promoted Vulkan frame and shows a
+- [x] `ExtrinsicSandbox` reaches an operational promoted Vulkan frame and shows a
       blue background with working ImGui on a Vulkan-capable host.
-- [ ] Default CPU/null contract gate stays green.
+- [x] Default CPU/null contract gate stays green.
 
 ## Verification
 ```bash
-cmake --preset ci-vulkan
-cmake --build --preset ci-vulkan --target ExtrinsicSandbox IntrinsicGraphicsContractCpuTests
-LSAN_OPTIONS=suppressions=$PWD/lsan.supp timeout 15s ./build/ci-vulkan/bin/ExtrinsicSandbox
+# Focused Vulkan/source verification from the implementation commits:
+cmake --build --preset ci-vulkan --target IntrinsicGraphicsContractCpuTests IntrinsicGraphicsVulkanSmokeTests ExtrinsicSandbox
+ctest --test-dir build/ci-vulkan --output-on-failure -R 'ImGuiPassContract|ImGuiSurfaceGpuSmoke|VisualizationOverlaySurfaceGpuSmoke|RuntimeSandboxAcceptanceGpuSmoke' --timeout 120
+python3 tools/repo/check_layering.py --root src --strict
 
+# Retirement verification on 2026-06-06:
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
+CCACHE_DISABLE=1 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/check_test_layout.py --root . --strict
 ```
+
+Results: focused Vulkan smokes passed 20/20 in the implementation slice; the
+default CPU gate passed 2787/2787 on 2026-06-06. The ccache-enabled
+`IntrinsicTests` build first failed with a clang-23 frontend bus error in module
+compilation, then the identical build with `CCACHE_DISABLE=1` passed.
 
 ## Forbidden changes
 - Shipping a fix without a regression test when one is feasible.

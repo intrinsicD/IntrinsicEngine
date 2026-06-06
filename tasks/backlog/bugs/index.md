@@ -5,46 +5,15 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-015` — ExtrinsicSandbox clustered Vulkan validation cascade](../../active/BUG-015-extrinsic-sandbox-clustered-vulkan-validation-cascade.md).
-  **Promoted to `tasks/active/` on 2026-06-05.** Fixed: the clustered
-  `cluster_grid_build.comp` / `light_cluster_assign.comp` compute pipelines now
-  use the engine BDA convention (validation-clean against the global pipeline
-  layout); the validation-unavailable `CreateBuffer` null-`vkSetDebugUtilsObjectNameEXT`
-  crash is guarded; the promoted Vulkan device now reaches operational and records
-  the full pipeline (`ClusterGridBuildPass`/`LightClusterAssignmentPass`/`ImGuiPass`/
-  `Present`). Also fixed a ccache + C++23-modules stale-object hazard
-  (`depend_mode`) that caused a separate `ICommandContext` vtable-slot crash on
-  incremental rebuilds. **Also fixed (2026-06-05): the queue-family
-  ownership-transfer (QFOT) barrier cascade** (`VkBufferMemoryBarrier-buffer-00004`
-  acquire-without-release errors plus `-00001/-00003` duplicate-barrier warnings on
-  `GpuWorld.Lights` / `ClusterLights.Headers` / `ClusterLights.Indices`). Root
-  cause: the cluster passes request `RenderQueue::AsyncCompute` and the compiler
-  emits cross-queue release/acquire transfers from the *requested* queue, but the
-  promoted device reports a graphics-only framegraph profile and demotes every
-  pass to the graphics queue at submit time — so the Vulkan barrier path lowered
-  the transfers to a real second family that single-queue submission never
-  matched. The device now binds async/transfer barrier families into command
-  contexts only when the framegraph profile schedules onto them
-  (`ResolveFrameGraphBarrierQueueFamilies`), **and** the renderer now collapses
-  the ownership transfer at the lowering seam (`SubmitBarrierPacket` via the
-  shared `IsLiveCrossQueueOwnershipTransfer` predicate) so the fix holds even when
-  a stale Vulkan backend object (the confirmed ccache/modules hazard) keeps the
-  physical families bound. **Remaining:** the operational
-  sandbox frame still reads back entirely black — carved out to `BUG-016`.
-
-- [`BUG-016` — ExtrinsicSandbox operational frame reads back black](BUG-016-extrinsic-sandbox-operational-frame-black-readback.md).
-  Downstream rendering-correctness regression (separate from the `BUG-015`
-  validation cascade): with the promoted Vulkan device operational and every pass
-  recording, the backbuffer readback is entirely black (`nonBlackPixels == 0`)
-  despite the blue clear and ImGui draw data. Same *visible* symptom class as the
-  closed `BUG-014` bindless slot collision; re-audit the postprocess→present→ImGui
-  descriptor/sampling path. Localizable in-environment (per-attachment GPU
-  readback bisection + validation `debug_printf`); interactive RenderDoc is not
-  required.
+- No active bug records as of 2026-06-06.
 
 ---
 
 ## Verified / Closed
+
+- Closed 2026-06-06: [`BUG-016` — ExtrinsicSandbox operational frame reads back black](../../done/BUG-016-extrinsic-sandbox-operational-frame-black-readback.md). The black readback was caused by two output-stage defects: frame-sampled bridge slot 0 was overwritten by late barrier/ImGui descriptor writes before submission, making the tonemap sample the wrong image, and recipe clear colors were dropped during framegraph compilation. The renderer now owns explicit per-pass frame-sampled bindings, barriers no longer auto-bind slot 0, ImGui no longer clobbers the shared bridge slot, and compiled render-pass attachments preserve the light-blue clear. Focused `gpu;vulkan` smokes passed 20/20; the default CPU gate passed 2787/2787 during retirement verification.
+
+- Closed 2026-06-06: [`BUG-015` — ExtrinsicSandbox clustered Vulkan validation cascade](../../done/BUG-015-extrinsic-sandbox-clustered-vulkan-validation-cascade.md). Clustered compute shaders moved to the engine BDA convention, record helpers pass buffer device addresses via push constants, `CreateBuffer` guards the validation debug-name function pointer, default-recipe clears are light blue, and graphics-only framegraph profiles collapse async/transfer ownership transfers so the QFOT validation cascade is gone. The promoted Vulkan sandbox reaches an operational frame with visible ImGui after BUG-016's downstream output fix. The remaining ccache/modules vtable hardening is not part of this bug and stays tracked by `HARDEN-073`.
 
 - Closed 2026-06-05: [`BUG-014` — ExtrinsicSandbox ImGui black window regression](../../done/BUG-014-extrinsic-sandbox-imgui-black-window.md). The black frame was caused by a Vulkan descriptor collision: framegraph bridge slots for DebugView/Present overlapped real bindless texture leases, so `Pass.Present` could overwrite the retained ImGui font-atlas slot. The promoted Vulkan bindless allocator now reserves slots 0..2 and starts real texture leases at slot 3; the app-default `gpu;vulkan` regression asserts recorded `Present`/`ImGuiPass` plus non-black backbuffer readback with validation enabled.
 
