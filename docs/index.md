@@ -41,6 +41,8 @@ This page is the canonical entry point for repository documentation.
 - [Agent contract](agent/contract.md)
 - [Task format](agent/task-format.md)
 - [Review checklist](agent/review-checklist.md)
+- [Clean-workshop review gate](agent/clean-workshop-review.md)
+- [Drift-audit checklist](agent/drift-audit-checklist.md)
 - [Docs sync policy](agent/docs-sync-policy.md)
 - [Roles](agent/roles.md)
 
