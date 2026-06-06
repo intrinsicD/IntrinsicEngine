@@ -26,6 +26,12 @@ These roles describe responsibilities; one change may involve multiple roles.
   when picked up that week. The role rotates rather than belonging to a
   permanent reviewer; the per-PR `docs/agent/review-checklist.md` stays
   the per-commit gate and is not replaced by the weekly sweep.
+- Also owns the *state-scoped* repo-state drift audit in
+  [`docs/agent/drift-audit-checklist.md`](drift-audit-checklist.md)
+  (`REVIEW-002`), run on demand or every 2–4 weeks against the whole current
+  tree. It rotates through the same reviewer pool as the weekly sweep and is
+  additive to it (state audit vs. commit-window audit); neither gates PR
+  merges.
 
 ## Paper Agent
 

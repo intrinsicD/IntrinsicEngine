@@ -156,6 +156,11 @@ export namespace Extrinsic::Graphics
     // all lanes. The `PerFrameBufferRecycling` contract test pins this
     // to the post-frame-1 baseline across N frames with constant
     // payload (no per-frame leak).
+    // Lifetime contract: constructed from `RHI::IDevice& + RHI::BufferManager&`;
+    // the device and manager pointers are non-null for the helper's lifetime
+    // (the renderer owns both and resets the helper before the manager in
+    // `Shutdown()`). The `Upload*` methods therefore only guard the device's
+    // operational state and the empty-input case, not the member pointers.
     class TransientDebugUploadHelper final : public ITransientDebugUploadHelper
     {
     public:

@@ -62,9 +62,6 @@ namespace Extrinsic::Runtime
                             const SpatialDebugAdapterOptions& options,
                             SpatialDebugAdapterStats&         stats) const
     {
-        if (m_Bvh == nullptr)
-            return;
-
         const auto& nodes = m_Bvh->Nodes();
         if (nodes.empty())
             return;
@@ -164,9 +161,6 @@ namespace Extrinsic::Runtime
                                const SpatialDebugAdapterOptions& options,
                                SpatialDebugAdapterStats&         stats) const
     {
-        if (m_KdTree == nullptr)
-            return;
-
         const auto& nodes = m_KdTree->Nodes();
         if (nodes.empty())
             return;
@@ -260,9 +254,6 @@ namespace Extrinsic::Runtime
                                const SpatialDebugAdapterOptions& options,
                                SpatialDebugAdapterStats&         stats) const
     {
-        if (m_Octree == nullptr)
-            return;
-
         const auto& nodes = m_Octree->m_Nodes;
         if (nodes.empty())
             return;
@@ -388,9 +379,6 @@ namespace Extrinsic::Runtime
                                    const SpatialDebugAdapterOptions& /*options*/,
                                    SpatialDebugAdapterStats&         /*stats*/) const
     {
-        if (m_Hull == nullptr)
-            return;
-
         const auto& vertices = m_Hull->Vertices;
         const auto& planes   = m_Hull->Planes;
         if (vertices.empty())

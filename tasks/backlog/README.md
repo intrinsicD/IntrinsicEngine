@@ -187,6 +187,10 @@ Members:
   [`BUG-016`](../done/BUG-016-extrinsic-sandbox-operational-frame-black-readback.md)
   closed the promoted Vulkan sandbox validation cascade and the downstream
   black-frame readback regression on 2026-06-06.
+  [`BUG-012`](../done/BUG-012-default-recipe-vkcmdpipelinebarrier2-segv-nvidia.md)
+  (default-recipe `vkCmdPipelineBarrier2` SEGV) was resolved under
+  GRAPHICS-076 on 2026-05-28; its resolved record was retired from
+  `tasks/backlog/bugs/` to `tasks/done/` on 2026-06-06.
 
 ## Cross-domain dependency anchors
 
@@ -266,6 +270,20 @@ Before promoting a backlog task to active:
 3. Confirm required docs updates are listed.
 4. Confirm the cross-domain dependency anchors above are satisfied or are
    explicitly recorded as out-of-scope in the task file.
+
+## Recurring audits
+
+Two additive, non-CI-enforced review cadences keep accumulated drift visible.
+Neither gates PR merges; both rotate through the same reviewer pool and file
+follow-up backlog tasks for findings.
+
+- **Weekly agent-output audit** (`REVIEW-001`, done): window-scoped review of
+  ~one week of agent-authored commits against
+  [`docs/agent/agent-output-review-checklist.md`](../../docs/agent/agent-output-review-checklist.md).
+- **Repo-state drift audit** (`REVIEW-002`, done): whole-tree state audit
+  against [`docs/agent/drift-audit-checklist.md`](../../docs/agent/drift-audit-checklist.md),
+  run on demand or every 2–4 weeks; reports land at
+  `docs/reports/<YYYY-MM-DD>-drift-audit.md`.
 
 ## Related
 

@@ -28,8 +28,11 @@ and absence of a standing architecture-review gate.
 6. [`WORKSHOP-008` (done)](../../done/WORKSHOP-008-task-maturity-taxonomy.md) —
    prevent "scaffold done" from looking like "capability done." Retired
    2026-05-17; taxonomy lives at [`docs/agent/task-maturity.md`](../../../docs/agent/task-maturity.md).
-7. [`WORKSHOP-009`](WORKSHOP-009-clean-workshop-review-gate.md) — add a
-   standing architecture-review gate to keep the workshop clean.
+7. [`WORKSHOP-009` (done)](../../done/WORKSHOP-009-clean-workshop-review-gate.md) —
+   added the standing clean-workshop architecture-review gate
+   ([`docs/agent/clean-workshop-review.md`](../../../docs/agent/clean-workshop-review.md)
+   + `tools/ci/run_clean_workshop_review.sh`) to keep the workshop clean.
+   Retired 2026-06-06.
 
 ## Cross-domain dependency anchors
 

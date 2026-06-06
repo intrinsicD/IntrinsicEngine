@@ -170,8 +170,7 @@ namespace Extrinsic::Graphics
         TransientDebugTriangleUploadResult result{};
         result.PacketCount = static_cast<std::uint32_t>(triangles.size());
 
-        if (triangles.empty() || m_Device == nullptr || m_BufferManager == nullptr ||
-            !m_Device->IsOperational())
+        if (triangles.empty() || !m_Device->IsOperational())
         {
             return result;
         }
@@ -226,8 +225,7 @@ namespace Extrinsic::Graphics
         TransientDebugLineUploadResult result{};
         result.PacketCount = static_cast<std::uint32_t>(lines.size());
 
-        if (lines.empty() || m_Device == nullptr || m_BufferManager == nullptr ||
-            !m_Device->IsOperational())
+        if (lines.empty() || !m_Device->IsOperational())
         {
             return result;
         }
@@ -286,8 +284,7 @@ namespace Extrinsic::Graphics
         TransientDebugPointUploadResult result{};
         result.PacketCount = static_cast<std::uint32_t>(points.size());
 
-        if (points.empty() || m_Device == nullptr || m_BufferManager == nullptr ||
-            !m_Device->IsOperational())
+        if (points.empty() || !m_Device->IsOperational())
         {
             return result;
         }

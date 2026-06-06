@@ -1,12 +1,28 @@
 # HARDEN-070 — Drop dead null guards on reference-initialised helpers
 
+## Status
+
+- Status: done (retired 2026-06-06) at maturity `Retired` (pure hygiene
+  cleanup; the underlying helpers stay at `CPUContracted`).
+- Completed: 2026-06-06.
+- Commit: this commit removes the nine dead null guards, adds the lifetime
+  notes, and retires the task to `tasks/done/`.
+- Result: all nine `m_(Bvh|KdTree|Octree|Hull|Device|BufferManager) == nullptr`
+  guards removed from the three modules; lifetime-contract notes added to the
+  three `.cppm` interfaces. Focused suites green (53/53 CTest cases across
+  `SpatialDebugAdapters`/`TransientDebugSurfacePass`/`VisualizationOverlayPass`);
+  full default CPU gate 2736/2738 (the only 2 failures are the pre-existing
+  `IntrinsicBenchmarkSmoke.{Run,Validate}` Not-Run entries — the benchmark
+  binary was not built this run — unrelated to this change);
+  `check_layering.py --root src --strict` clean.
+
 ## Goal
 - Remove the ~8 defensive `m_X == nullptr` early-return guards in three helper
   modules whose non-owning pointers are initialised from constructor reference
   parameters and can therefore never be null in well-formed code, replacing
   the implicit "may be null" contract with an explicit lifetime-contract note
   in each helper's header. (Originally ~7; the
-  [2026-05-28 audit](../../../docs/reports/2026-05-28-agent-output-audit.md)
+  [2026-05-28 audit](../../docs/reports/2026-05-28-agent-output-audit.md)
   Row 5 added the fourth spatial-debug adapter, `ConvexHullAdapter`, which
   landed after this task was filed carrying the identical pattern.)
 
@@ -34,7 +50,7 @@
   `graphics/renderer` (`src/graphics/renderer/`). Cross-layer but each
   layer's edit is independent.
 - Source of the finding:
-  [`docs/reports/2026-05-26-agent-output-audit.md`](../../../docs/reports/2026-05-26-agent-output-audit.md)
+  [`docs/reports/2026-05-26-agent-output-audit.md`](../../docs/reports/2026-05-26-agent-output-audit.md)
   Row 5 (defensive validation at internal boundaries). The pattern repeats
   across the three new modules introduced this window, so the audit recorded
   it as a single hygiene-cleanup task rather than three per-module cleanups.
@@ -61,69 +77,69 @@
   prevents reaching it).
 
 ## Required changes
-- [ ] In `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cpp`, remove
+- [x] In `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cpp`, remove
       the `if (m_X == nullptr) return;` early-return in each of `BvhAdapter::Append`,
       `KdTreeAdapter::Append`, `OctreeAdapter::Append`, and
       `ConvexHullAdapter::Append` (the `m_Hull == nullptr` guard). Leave the
       `if (nodes.empty()) return;` / `if (vertices.empty()) return;` guards
       untouched — those check the source's observable state, not an internal
       invariant.
-- [ ] In `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm`, add a
+- [x] In `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm`, add a
       one-line lifetime-contract note to each adapter class (or a single
       shared note above the first adapter) saying: "Constructed from a const
       reference to the source tree; the rvalue overload is deleted so the
       non-owning pointer is non-null for the adapter's lifetime."
-- [ ] In `src/graphics/renderer/Graphics.TransientDebugUploadHelper.cpp`,
+- [x] In `src/graphics/renderer/Graphics.TransientDebugUploadHelper.cpp`,
       remove the `m_Device == nullptr || m_BufferManager == nullptr` clauses
       from the three `Upload*` early-return conditions in `UploadTriangles`,
       `UploadLines`, `UploadPoints`. Keep the `triangles.empty() / lines.empty()
       / points.empty() || !m_Device->IsOperational()` clauses untouched.
-- [ ] In `src/graphics/renderer/Graphics.TransientDebugUploadHelper.cppm`,
+- [x] In `src/graphics/renderer/Graphics.TransientDebugUploadHelper.cppm`,
       add a one-line lifetime-contract note to the
       `TransientDebugUploadHelper` class saying: "Constructed from
       `RHI::IDevice& + RHI::BufferManager&`; the device and manager
       pointers are non-null for the helper's lifetime (the renderer owns
       both and resets the helper before the manager in `Shutdown()`)."
-- [ ] In `src/graphics/renderer/Graphics.VisualizationOverlayUploadHelper.cpp`,
+- [x] In `src/graphics/renderer/Graphics.VisualizationOverlayUploadHelper.cpp`,
       remove the `m_Device == nullptr || m_BufferManager == nullptr` clauses
       from the two `Upload*` early-return conditions in `UploadVectorFields`
       and `UploadIsolines`.
-- [ ] In `src/graphics/renderer/Graphics.VisualizationOverlayUploadHelper.cppm`,
+- [x] In `src/graphics/renderer/Graphics.VisualizationOverlayUploadHelper.cppm`,
       add the same one-line lifetime-contract note to the
       `VisualizationOverlayUploadHelper` class.
-- [ ] No changes to the matching test files. The existing contract tests
+- [x] No changes to the matching test files. The existing contract tests
       cover the surviving guards (empty input, non-operational device,
       cap-overflow) and continue to pass without the dead branches.
 
 ## Tests
-- [ ] No new tests. Removing the dead branch does not create a new failure
+- [x] No new tests. Removing the dead branch does not create a new failure
       mode; the precondition (`m_X != nullptr` from a reference-binding
       constructor) is enforced by the type system.
-- [ ] `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine'`
+- [x] `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine'`
       passes; specifically the three suites above must remain green.
 
 ## Docs
-- [ ] No docs changes needed. The lifetime-contract notes added to the
+- [x] No docs changes needed. The lifetime-contract notes added to the
       `.cppm` headers are the documentation. `src/runtime/SpatialDebug/README.md`
       and `src/graphics/renderer/README.md` already describe the renderer-
       owned lifetime; no edits required there.
-- [ ] Cross-link this task from the
-      [2026-05-26 audit](../../../docs/reports/2026-05-26-agent-output-audit.md)
+- [x] Cross-link this task from the
+      [2026-05-26 audit](../../docs/reports/2026-05-26-agent-output-audit.md)
       Row 5 follow-up note when this task lands (replace the `(planned)`
       task-seed mention with the actual task ID).
 
 ## Acceptance criteria
-- [ ] No `m_(Bvh|KdTree|Octree|Hull|Device|BufferManager) == nullptr` check
+- [x] No `m_(Bvh|KdTree|Octree|Hull|Device|BufferManager) == nullptr` check
       remains in the three touched `.cpp` files.
-- [ ] Each touched `.cppm` carries a one-line lifetime-contract note on
+- [x] Each touched `.cppm` carries a one-line lifetime-contract note on
       the affected class (or a single shared note covering all classes
       in `SpatialDebugAdapters.cppm`).
-- [ ] All three suites (`Test.SpatialDebugAdapters.cpp`,
+- [x] All three suites (`Test.SpatialDebugAdapters.cpp`,
       `Test.TransientDebugSurfacePass.cpp`,
       `Test.VisualizationOverlayPass.cpp`) stay green at their current
       test count (10 / 16 / 14 cases).
-- [ ] `python3 tools/repo/check_layering.py --root src --strict` passes.
-- [ ] Diff for the task is restricted to the six files named above plus
+- [x] `python3 tools/repo/check_layering.py --root src --strict` passes.
+- [x] Diff for the task is restricted to the six files named above plus
       this task file's retire move to `tasks/done/`.
 
 ## Verification

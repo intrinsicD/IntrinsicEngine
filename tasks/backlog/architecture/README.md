@@ -21,18 +21,27 @@ map.
 - [RORG-031A — Architecture foundation backlog seed](RORG-031A-architecture-foundation.md):
   tracks architecture-doc normalization, layering-checker, docs-sync-checker,
   and module-inventory governance work.
-- [RORG-036 — Layer ownership audit for misplaced concepts](RORG-036-layer-ownership-audit.md):
-  inventories promoted modules whose value types, pure data contracts, or
-  dependency-free APIs appear to live in higher layers than their true owner and
-  creates one scoped follow-up task per accepted move/split.
+- [RORG-036 — Layer ownership audit for misplaced concepts](../../done/RORG-036-layer-ownership-audit.md)
+  (done 2026-06-06): whole-tree audit of promoted module placement against the
+  `/AGENTS.md` §2 table. Outcome was a **clean baseline** — `RORG-034`/`RORG-035`
+  already moved the previously-misplaced frame-loop and extent/rect value types
+  to `core`, and no remaining promoted module imports a higher/sibling layer for
+  a value-type-only reason. Examined the named candidates
+  (`Runtime.StreamingExecutor`, the geometry/procedural packers, the
+  dependency-free `Runtime.RenderWorldPool`) and decided each stays; zero moves
+  accepted, so no follow-up move/split tasks were filed. `RenderWorldPool` is
+  recorded in the task as a latent `core`-split candidate to revisit on a second
+  consumer.
 - [HARDEN-069 — Rebind legacy layering allowlist entries to active retirement tasks](../../done/HARDEN-069-rebind-legacy-layering-allowlist-to-active-retirement-tasks.md)
   (done 2026-06-02): metadata-only rebinding of legacy allowlist rows from the retired `HARDEN-010`
   ID to current legacy-retirement task IDs, preserving the allowlisted edge set.
-- [HARDEN-070 — Drop dead null guards on reference-initialised helpers](HARDEN-070-drop-dead-null-guards-on-reference-initialised-helpers.md):
-  hygiene cleanup of ~7 internal-boundary `m_X == nullptr` guards in
-  `SpatialDebugAdapters`, `TransientDebugUploadHelper`, and
-  `VisualizationOverlayUploadHelper` whose constructor-reference precondition
-  already makes the null branch unreachable. Filed from
+- [HARDEN-070 — Drop dead null guards on reference-initialised helpers](../../done/HARDEN-070-drop-dead-null-guards-on-reference-initialised-helpers.md)
+  (done 2026-06-06): hygiene cleanup of the nine internal-boundary
+  `m_X == nullptr` guards in `SpatialDebugAdapters` (4),
+  `TransientDebugUploadHelper` (3), and `VisualizationOverlayUploadHelper` (2)
+  whose constructor-reference precondition already makes the null branch
+  unreachable; replaced with one-line lifetime-contract notes in each `.cppm`.
+  Filed from
   [`docs/reports/2026-05-26-agent-output-audit.md`](../../../docs/reports/2026-05-26-agent-output-audit.md)
   Row 5.
 - [HARDEN-074 — Make markdown link checking see inline-code labels](../../done/HARDEN-074-doc-link-checker-inline-code-labels.md)
@@ -80,10 +89,49 @@ map.
   GRAPHICS-033E/F + HARDEN-066 + RUNTIME-091 window
   (`docs/reports/2026-05-17-agent-output-audit.md`, ≈ 15 minutes, eight rows
   pass, one self-corrected historical finding, no new follow-up filed).
-- [REVIEW-002 — Recurring repo-state drift and inconsistency audit](REVIEW-002-recurring-drift-and-inconsistency-audit.md):
-  installs a whole-tree drift audit that composes existing validators and
-  semantic spot-checks for inventory drift, stale task links, allowlist owner
-  drift, planned-marker drift, dead seams, and naming inconsistency.
+- [REVIEW-002 — Recurring repo-state drift and inconsistency audit](../../done/REVIEW-002-recurring-drift-and-inconsistency-audit.md)
+  (done 2026-06-06): installed the whole-tree drift audit
+  ([`docs/agent/drift-audit-checklist.md`](../../../docs/agent/drift-audit-checklist.md))
+  composing existing validators and semantic spot-checks for inventory drift,
+  stale task links, allowlist owner drift, planned-marker drift, dead seams, and
+  naming inconsistency, and ran the first calibration
+  ([`docs/reports/2026-06-06-drift-audit.md`](../../../docs/reports/2026-06-06-drift-audit.md),
+  ≈ 20 min). Eight rows clean; Row 7 (untracked TODO/temporary markers) filed
+  the follow-up `HARDEN-078`.
+- [HARDEN-078 — Track or resolve untracked TODO / temporary markers in promoted src](HARDEN-078-track-untracked-todo-temporary-markers.md):
+  drift-audit Row 7 follow-up — gives the `Core.Filesystem` TODO and the
+  `Runtime.Engine::GetStreamingGraph()` temporary bridge a tracked owner per
+  `AGENTS.md` §13.
+
+## Legacy retirement
+
+`LEGACY-002` seeds one structured deletion task per remaining
+`src/legacy/<Subsystem>/` subtree so the layering allowlist and migration docs
+can name a concrete owning task per subtree. Each task follows the
+[`LEGACY-001`](LEGACY-001-delete-src-legacy-interface.md) shape (scope,
+consumer-grep prerequisite gate, mechanical-deletion verification) and stays in
+backlog until its gate exits 0.
+
+- [LEGACY-003 — Delete `src/legacy/Apps/`](LEGACY-003-delete-src-legacy-apps.md) (2 files → `src/app/`, `src/platform/`).
+- [LEGACY-004 — Delete `src/legacy/Asset/`](LEGACY-004-delete-src-legacy-asset.md) (6 files → `src/assets/`).
+- [LEGACY-005 — Delete `src/legacy/Core/`](LEGACY-005-delete-src-legacy-core.md) (40 files → `src/core/`).
+- [LEGACY-006 — Delete `src/legacy/ECS/`](LEGACY-006-delete-src-legacy-ecs.md) (29 files → `src/ecs/`).
+- [LEGACY-007 — Delete `src/legacy/EditorUI/`](LEGACY-007-delete-src-legacy-editorui.md) (8 files → `src/app/`).
+- [LEGACY-008 — Delete `src/legacy/Graphics/`](LEGACY-008-delete-src-legacy-graphics.md) (168 files → `src/graphics/*`).
+- [LEGACY-009 — Delete `src/legacy/RHI/`](LEGACY-009-delete-src-legacy-rhi.md) (54 files → `src/graphics/rhi/`).
+- [LEGACY-010 — Delete `src/legacy/Runtime/`](LEGACY-010-delete-src-legacy-runtime.md) (29 files → `src/runtime/`).
+
+Ordering hint — deletion is **consumer-leaves first, foundation last**: a
+subtree can only be mechanically deleted once no other subtree (and no promoted
+module) still imports it. Suggested order after `LEGACY-001`: `Apps`
+(`LEGACY-003`, a pure leaf binary whose removal unblocks the rest once
+`ExtrinsicSandbox` is canonical) → `EditorUI` (`LEGACY-007`) → `Runtime`
+(`LEGACY-010`) → `Graphics` (`LEGACY-008`) → `Asset` (`LEGACY-004`) → `RHI`
+(`LEGACY-009`) → `ECS` (`LEGACY-006`) → `Core` (`LEGACY-005`, the foundation,
+still imported by promoted `geometry`/`runtime`, so it retires last). The
+`sequencing` table in
+[`docs/migration/legacy-retirement.md`](../../../docs/migration/legacy-retirement.md)
+tracks the per-subtree prerequisite checklists.
 
 ## Convergence
 

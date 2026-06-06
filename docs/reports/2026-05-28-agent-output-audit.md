@@ -69,7 +69,7 @@ Notable substantive commits used as evidence anchors:
 ## Follow-ups
 
 - **Row 5 (defensive internal-boundary null checks).** Folded into the existing
-  [`HARDEN-070`](../../tasks/backlog/architecture/HARDEN-070-drop-dead-null-guards-on-reference-initialised-helpers.md)
+  [`HARDEN-070`](../../tasks/done/HARDEN-070-drop-dead-null-guards-on-reference-initialised-helpers.md)
   cleanup. `ConvexHullAdapter::Append`'s `m_Hull == nullptr` guard
   (`Runtime.SpatialDebugAdapters.cpp:391`) is the same dead-guard pattern on a
   sibling adapter in the *same file* HARDEN-070 already edits, and HARDEN-070

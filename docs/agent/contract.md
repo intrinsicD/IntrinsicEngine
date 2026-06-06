@@ -112,3 +112,16 @@ cadence is *additive*: it does not gate PR merges, does not impose
 per-commit reviewer load, and either silently passes or files specific
 follow-up tasks. Reviewer ownership rotates; see
 [`docs/agent/roles.md`](roles.md).
+
+A second, *state-scoped* audit complements the window-scoped weekly sweep:
+the repo-state drift audit driven by
+[`REVIEW-002`](../../tasks/done/REVIEW-002-recurring-drift-and-inconsistency-audit.md)
+and run from [`docs/agent/drift-audit-checklist.md`](drift-audit-checklist.md).
+Where the weekly sweep reviews roughly one week of *commits*, the drift audit
+inspects the *whole current tree* for accumulated drift between code, docs,
+tasks, generated inventories, and tracked migration exceptions (inventory
+drift, retired allowlist owners, stale `(planned)` markers, dead seams,
+untracked TODO/shim markers, naming/cross-doc rot). It is also additive — on
+demand or every 2–4 weeks, not CI-enforced — and writes a dated report to
+`docs/reports/<YYYY-MM-DD>-drift-audit.md`. It rotates through the same
+reviewer pool as the weekly sweep.

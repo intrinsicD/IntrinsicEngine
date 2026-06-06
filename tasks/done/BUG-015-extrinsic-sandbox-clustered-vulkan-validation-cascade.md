@@ -129,7 +129,7 @@ Root causes found, in dependency order:
       vtable-inconsistent object on this host even under depend mode, while an
       identical `CCACHE_DISABLE=1` rebuild runs crash-free. Structural
       command-context hardening remains tracked by
-      [`HARDEN-073`](../backlog/rendering/HARDEN-073-rhi-command-context-vtable-key-function.md);
+      [`HARDEN-073`](HARDEN-073-rhi-command-context-vtable-key-function.md);
       this BUG-015 retirement verifies the rendering fix with ccache disabled
       after the cache/toolchain failure is observed.
 - [x] Stop the QFOT validation cascade (Bug E): bind async-compute/transfer
