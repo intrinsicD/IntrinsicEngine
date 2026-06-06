@@ -5,13 +5,42 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-015` — ExtrinsicSandbox clustered Vulkan validation cascade](BUG-015-extrinsic-sandbox-clustered-vulkan-validation-cascade.md).
-  Running the local debug `ExtrinsicSandbox` with promoted Vulkan reports
-  compute pipeline-layout mismatches for clustered-lighting storage buffers,
-  followed by queue-ownership, command-buffer-lifetime, and transient image
-  usage/layout validation errors. The first validation class to fix is the
-  cluster-grid/light-assignment compute descriptor layout mismatch; later
-  validation errors must be rechecked as possible cascades.
+- [`BUG-015` — ExtrinsicSandbox clustered Vulkan validation cascade](../../active/BUG-015-extrinsic-sandbox-clustered-vulkan-validation-cascade.md).
+  **Promoted to `tasks/active/` on 2026-06-05.** Fixed: the clustered
+  `cluster_grid_build.comp` / `light_cluster_assign.comp` compute pipelines now
+  use the engine BDA convention (validation-clean against the global pipeline
+  layout); the validation-unavailable `CreateBuffer` null-`vkSetDebugUtilsObjectNameEXT`
+  crash is guarded; the promoted Vulkan device now reaches operational and records
+  the full pipeline (`ClusterGridBuildPass`/`LightClusterAssignmentPass`/`ImGuiPass`/
+  `Present`). Also fixed a ccache + C++23-modules stale-object hazard
+  (`depend_mode`) that caused a separate `ICommandContext` vtable-slot crash on
+  incremental rebuilds. **Also fixed (2026-06-05): the queue-family
+  ownership-transfer (QFOT) barrier cascade** (`VkBufferMemoryBarrier-buffer-00004`
+  acquire-without-release errors plus `-00001/-00003` duplicate-barrier warnings on
+  `GpuWorld.Lights` / `ClusterLights.Headers` / `ClusterLights.Indices`). Root
+  cause: the cluster passes request `RenderQueue::AsyncCompute` and the compiler
+  emits cross-queue release/acquire transfers from the *requested* queue, but the
+  promoted device reports a graphics-only framegraph profile and demotes every
+  pass to the graphics queue at submit time — so the Vulkan barrier path lowered
+  the transfers to a real second family that single-queue submission never
+  matched. The device now binds async/transfer barrier families into command
+  contexts only when the framegraph profile schedules onto them
+  (`ResolveFrameGraphBarrierQueueFamilies`), **and** the renderer now collapses
+  the ownership transfer at the lowering seam (`SubmitBarrierPacket` via the
+  shared `IsLiveCrossQueueOwnershipTransfer` predicate) so the fix holds even when
+  a stale Vulkan backend object (the confirmed ccache/modules hazard) keeps the
+  physical families bound. **Remaining:** the operational
+  sandbox frame still reads back entirely black — carved out to `BUG-016`.
+
+- [`BUG-016` — ExtrinsicSandbox operational frame reads back black](BUG-016-extrinsic-sandbox-operational-frame-black-readback.md).
+  Downstream rendering-correctness regression (separate from the `BUG-015`
+  validation cascade): with the promoted Vulkan device operational and every pass
+  recording, the backbuffer readback is entirely black (`nonBlackPixels == 0`)
+  despite the blue clear and ImGui draw data. Same *visible* symptom class as the
+  closed `BUG-014` bindless slot collision; re-audit the postprocess→present→ImGui
+  descriptor/sampling path. Localizable in-environment (per-attachment GPU
+  readback bisection + validation `debug_printf`); interactive RenderDoc is not
+  required.
 
 ---
 

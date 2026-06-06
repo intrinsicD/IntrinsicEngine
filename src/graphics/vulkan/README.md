@@ -103,6 +103,23 @@ available through the Vulkan 1.2/1.3 feature chain.
   still gates on `IDevice::IsOperational()`, so this direct backend resource path
   is an opt-in bootstrap prerequisite and does not make canonical frame execution
   operational.
+- BUG-015: every pipeline (graphics and compute) is created against the single
+  `m_GlobalPipelineLayout`, whose only descriptor set is the bindless
+  `COMBINED_IMAGE_SAMPLER` array at `set = 0, binding = 0` plus an all-stage push
+  constant range. Shaders therefore must reach storage buffers through Buffer
+  Device Addresses carried in push constants, never through descriptor-bound
+  `layout(set, binding) buffer` declarations. A descriptor-bound storage buffer in
+  a compute shader makes `vkCreateComputePipelines` fail validation against the
+  global layout (`VUID-VkComputePipelineCreateInfo-layout-07990/07988`); the
+  clustered-light `cluster_grid_build.comp` / `light_cluster_assign.comp` passes
+  follow the BDA convention used by `instance_cull.comp` and `common/gpu_scene.glsl`.
+- BUG-015: `m_ValidationEnabled` tracks the *request*
+  (`RenderConfig::EnableValidation`), but the `VK_EXT_debug_utils` entry points are
+  only non-null when the validation layer actually loaded. Every debug-name site
+  (`CreateBuffer`, `CreateImage`, `CreateSampler`, and the `SetDebugName` helper)
+  must guard on `vkSetDebugUtilsObjectNameEXT != nullptr`; otherwise a host that
+  requests validation without the layer present SEGVs on the first buffer
+  allocation.
 - Pre-bootstrap and non-service-ready instances still return valid fail-closed
   service references for `GetBindlessHeap()` and `GetTransferQueue()`. These
   fallbacks do not allocate GPU slots or upload data; they return invalid
@@ -213,7 +230,16 @@ available through the Vulkan 1.2/1.3 feature chain.
   adapters that expose compute work through the graphics family. The promoted
   device currently reports a graphics-only framegraph `QueueCapabilityProfile`
   so optional async-compute/transfer passes demote into the graphics submit path
-  until cross-queue barrier lowering is validation-clean. The dedicated
+  until cross-queue barrier lowering is validation-clean. To keep barrier
+  ownership resolution consistent with that pass batching, the device binds the
+  physical async-compute/transfer queue families into each command context only
+  when the framegraph profile actually schedules onto them
+  (`ResolveFrameGraphBarrierQueueFamilies`); under the graphics-only profile they
+  arrive as `VK_QUEUE_FAMILY_IGNORED` so `SubmitBarriers` resolves async/transfer
+  ownership tokens back to the graphics family and records no cross-queue
+  ownership-transfer barrier (BUG-015 — avoids `VkBufferMemoryBarrier-buffer-00004`
+  acquire-without-release errors and `-00001/-00003` duplicate-barrier warnings on
+  single-queue submission). The dedicated
   `VulkanTransferQueue` remains available through `GetTransferQueue()` for
   upload traffic. Barriers also update each touched
   `VulkanImage::CurrentLayout` so subsequent
@@ -328,6 +354,17 @@ available through the Vulkan 1.2/1.3 feature chain.
   submitted command buffer, which is what the
   `DefaultRecipeSurfaceGpuSmoke.ReferenceTriangleDebugViewReadbackMatchesMinimalHarnessSamples`
   fixture covers.
+  BUG-016: the renderer's explicit per-pass `BindFrameSampledTextureAt(...)` is
+  the *single* authority over the bridge slots. `TextureBarrier`/`SubmitBarriers`
+  deliberately do **not** auto-bind a transitioned image into slot 0: the whole
+  frame is recorded into one command buffer against one bindless set and
+  submitted once, so the last host-side write to a slot is what every recorded
+  draw observes at submit. A late `SceneColorLDR ColorAttachment -> ShaderRead`
+  transition before `Present` would otherwise rebind slot 0 to `SceneColorLDR`
+  for the whole frame and the earlier-executing tonemap (`PostProcessPass`) would
+  sample its own black output instead of `SceneColorHDR`. For the same reason
+  the `ImGuiPass` — which samples only its own retained font-atlas/user-texture
+  leases (slots >= 3) — does not bind the shared bridge slot 0.
   GRAPHICS-079 Slice C does not add a Vulkan-specific ImGui upload helper:
   the promoted path follows the existing transient-debug / visualization-overlay
   precedent and keeps the concrete helper renderer-owned

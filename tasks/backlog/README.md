@@ -180,12 +180,13 @@ Reproducible correctness/regression fixes only. Origin:
 [`bugs/index.md`](bugs/index.md).
 
 Members:
-- [`BUG-015`](bugs/BUG-015-extrinsic-sandbox-clustered-vulkan-validation-cascade.md)
+- [`BUG-015`](../active/BUG-015-extrinsic-sandbox-clustered-vulkan-validation-cascade.md)
   — app-default promoted Vulkan validation cascade after clustered-lighting
-  bring-up. Primary first failure: clustered compute pipeline layouts do not
-  match storage-buffer shader declarations; later queue-ownership and transient
-  image layout/usage validation errors must be verified after that first class
-  is fixed.
+  bring-up. **Promoted to `tasks/active/` on 2026-06-05.** The clustered compute
+  pipeline-layout mismatch (storage buffers moved to the BDA convention) and the
+  validation-unavailable `CreateBuffer` crash are fixed; the device now reaches
+  operational and records the full pipeline. A remaining black-frame rendering
+  regression (separate from the validation cascade) is tracked in the active task.
 
 ## Cross-domain dependency anchors
 

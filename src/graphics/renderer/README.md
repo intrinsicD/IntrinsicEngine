@@ -726,7 +726,16 @@ Concretely:
   emitted by the compiler from the imported backbuffer's
   `FinalState = Present` contract (see `RenderGraph::ImportBackbuffer`),
   so the recipe does not need a separate `TextureUsage::Present` read
-  on this pass. The Slice A contract pin is
+  on this pass.
+  BUG-016: `CompiledRenderPassAttachment` now also carries the recipe-declared
+  color clear (`ClearR/G/B/A`), and `BuildActiveRenderPassDesc` honors it, so the
+  default-recipe blue `SceneColorHDR` scene clear
+  (`kDefaultClearColorAttachments`) reaches the framebuffer instead of a
+  hardcoded black. The executor also skips the shared frame-sampled bridge slot
+  bind for `ImGuiPass` (it samples its own bindless leases), so the late
+  present-source `ShaderRead` barrier cannot leave the tonemap reading a black
+  self-sampled slot 0 — see `src/graphics/vulkan/README.md` for the bridge-slot
+  ownership rule. The Slice A contract pin is
   `tests/contract/graphics/Test.PresentPass.cpp` (BindPipeline + Draw(3,
   1, 0, 0) shape, missing-pipeline-lease `SkippedUnavailable`,
   non-operational-device `SkippedNonOperational`); the lifecycle test
