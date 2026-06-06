@@ -102,6 +102,11 @@ map.
   drift-audit Row 7 follow-up — gives the `Core.Filesystem` TODO and the
   `Runtime.Engine::GetStreamingGraph()` temporary bridge a tracked owner per
   `AGENTS.md` §13.
+- [HARDEN-079 — Core module implementation splits](HARDEN-079-core-module-implementation-splits.md):
+  module-interface hygiene follow-up for promoted `src/core/*.cppm` targets
+  found by the 2026-06-06 implementation-body audit, including
+  `Core.FrameGraph.cppm` and other core interfaces with non-trivial bodies that
+  should live in matching `.cpp` implementation units.
 
 ## Legacy retirement
 

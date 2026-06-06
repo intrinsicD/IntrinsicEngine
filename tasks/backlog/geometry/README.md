@@ -27,6 +27,8 @@ map.
 - [GEOM-020 — Sparse direct factorization solver seam (LDLT/LLT)](GEOM-020-sparse-direct-factorization-seam.md)
   (follow-up to retired `GEOM-008`; gates `methods/METHOD-002` /
   `METHOD-003` LDLT paths).
+- [GEOM-021 — MeshSoup module implementation split](GEOM-021-meshsoup-module-implementation-split.md).
+- [GEOM-022 — Remaining geometry module implementation splits](GEOM-022-remaining-geometry-module-implementation-splits.md).
 - [RORG-031E — Geometry and method-readiness backlog seed](RORG-031-geometry-method-readiness.md).
 
 ## Convergence
@@ -62,6 +64,13 @@ map.
   that methods/METHOD-002 (step 2) and METHOD-003 (step 5) already
   reference as "the LDLT path from GEOM-008". Method tasks gated on the
   LDLT path must wait on GEOM-020, not on retired GEOM-008.
+- GEOM-021 is a module-hygiene follow-up for retired GEOM-006: it keeps the
+  `Geometry.MeshSoup` public module interface declarative by moving
+  non-trivial validation/container bodies into a matching implementation unit
+  and trimming interface-only includes/imports.
+- GEOM-022 is the same module-interface hygiene pass for the remaining
+  promoted geometry cleanup targets found by the 2026-06-06 implementation-body
+  audit, excluding `Geometry.MeshSoup` which is owned by GEOM-021.
 - GEOM-012 ensures mesh, graph, and point-cloud algorithms can share compatible
   property storage through explicit borrowed views instead of accidental copies.
 - GEOM-013 and GEOM-014 are seeded by the geometry paper survey

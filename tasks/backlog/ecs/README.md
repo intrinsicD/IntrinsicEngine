@@ -20,6 +20,7 @@ map.
 - [HARDEN-066 — Define ECS render-sync/export dirty-tag policy](../../done/HARDEN-066-ecs-render-sync-export-policy.md) (done).
 - [HARDEN-067 — Add ECS world-bounds propagation system](../../done/HARDEN-067-ecs-bounds-propagation-system.md) (done).
 - [HARDEN-068 — Define ECS stable identity and scene metadata contract](../../done/HARDEN-068-ecs-stable-identity-and-scene-metadata.md) (done).
+- [HARDEN-080 — ECS module implementation splits](HARDEN-080-ecs-module-implementation-splits.md).
 
 ## Convergence
 
@@ -45,6 +46,10 @@ map.
   and pairs naturally with runtime fixed-step activation.
 - HARDEN-068 should precede runtime scene-serialization implementation that
   needs stable ECS entity references.
+- HARDEN-080 is a module-interface hygiene follow-up for promoted ECS `.cppm`
+  targets found by the 2026-06-06 implementation-body audit. It must preserve
+  the existing ECS contracts from HARDEN-060..068 and move only non-trivial
+  non-template bodies plus implementation-only includes/imports.
 - Forbidden across all members: physics-world handles, runtime sidecars,
   graphics handles, RHI handles, or live `AssetService` traffic in canonical
   ECS components.

@@ -16,6 +16,10 @@ another backlog directory.
   every fixed-step substep before `Core::FrameGraph::Compile` so
   `TransformHierarchy` + `BoundsPropagation` run deterministically before
   render extraction.
+- [RUNTIME-096 — Runtime module implementation splits](RUNTIME-096-runtime-module-implementation-splits.md):
+  module-interface hygiene follow-up for promoted runtime `.cppm` targets found
+  by the 2026-06-06 implementation-body audit, including camera controllers,
+  gizmo helpers, engine helper functions, and geometry packers.
 
 ### Sandbox / triangle path support tasks (runtime-owned)
 

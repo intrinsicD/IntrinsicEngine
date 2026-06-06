@@ -17,6 +17,10 @@ backend layout, selection policy, and dependency note.
   planning-only umbrella for Wayland / Windows / macOS backends documented as
   future plug-in slots in `src/platform/README.md`. Stays planning-only until
   there is a concrete need.
+- [PLATFORM-005 — Platform module implementation splits](PLATFORM-005-platform-module-implementation-splits.md):
+  module-interface hygiene follow-up for `Platform.Input`, `Platform.Backend.Glfw`,
+  and `Platform.Backend.Null`; moves non-trivial bodies and backend-only
+  includes/imports out of `.cppm` interfaces without changing platform behavior.
 
 Retired:
 
