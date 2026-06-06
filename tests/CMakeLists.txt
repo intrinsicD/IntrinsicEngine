@@ -701,6 +701,7 @@ set(_graphics_contract_cpu_test_files
     Test.QueueAffinity.cpp
     Test.ReconstructionContract.cpp
     Test.RenderCommandRouter.cpp
+    Test.RenderSubsystemRegistry.cpp
     Test.RendererFrameLifecycle.cpp
     Test.RenderWorldContract.cpp
     Test.RenderGraphValidation.cpp

@@ -67,6 +67,8 @@ Default feature gates:
 
 The imported `Backbuffer` is declared once and finalized only by the `Present` declaration; intermediate passes write transient recipe resources instead of taking backbuffer ownership. At frame execution time the renderer resolves this import through `RHI::IDevice::GetBackbufferHandle(frame)` and never fabricates a placeholder swapchain handle. The renderer owns command-context `Begin()`/`End()` bracketing around render-graph barrier/command recording, while runtime remains responsible for calling `IDevice::Present(frame)` after `IRenderer::EndFrame(frame)`.
 
+Renderer subsystem lifetime is centralized in `Extrinsic.Graphics.RenderSubsystemRegistry`: the registry owns the core RHI managers plus `GpuWorld`, material, colormap, visualization sync, culling, transform sync, light, selection, forward, deferred, postprocess, and shadow systems. Pass objects and pipeline leases remain renderer-owned because they borrow those systems and must be released before registry storage resets.
+
 ### Bootstrap Scaffold Retirement
 
 GRAPHICS-081 retired the bootstrap-only recipe scaffold once the canonical

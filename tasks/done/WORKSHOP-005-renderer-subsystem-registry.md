@@ -1,5 +1,11 @@
 # WORKSHOP-005 — Extract renderer subsystem registry and lifecycle ownership
 
+Status: completed (2026-06-06)
+Owner: Codex (GPT-5)
+Branch / PR: current branch / TBD
+Completion date: 2026-06-06
+Follow-ups: WORKSHOP-006 owns render-prep pipeline extraction after subsystem ownership is centralized.
+
 ## Goal
 - Reduce `Graphics.Renderer.cpp` god-object pressure by moving renderer subsystem/resource-manager ownership and lifecycle order into a dedicated renderer subsystem registry.
 
@@ -15,8 +21,8 @@
 - This task creates a stable containment seam without changing behavior.
 
 ## Required changes
-- [ ] Introduce a dedicated renderer subsystem registry/lifecycle class, for example `Graphics.RenderSubsystemRegistry` or `Graphics.RenderResourceSystemRegistry`.
-- [ ] Move ownership of these objects into the registry where appropriate:
+- [x] Introduce a dedicated renderer subsystem registry/lifecycle class, for example `Graphics.RenderSubsystemRegistry` or `Graphics.RenderResourceSystemRegistry`.
+- [x] Move ownership of these objects into the registry where appropriate:
   - `RHI::BufferManager`
   - `RHI::TextureManager`
   - `RHI::SamplerManager`
@@ -33,30 +39,30 @@
   - `DeferredSystem`
   - `PostProcessSystem`
   - `ShadowSystem`
-- [ ] Make initialization and shutdown order explicit in one place.
-- [ ] Preserve `IRenderer` accessors initially by forwarding through the registry.
-- [ ] Move operational-resource rebuild helper ownership into the registry if it only touches subsystem resources.
-- [ ] Keep frame lifecycle methods behavior-equivalent.
-- [ ] Add diagnostics for partially initialized registry state.
-- [ ] Keep patches mechanical where possible; avoid mixing this extraction with semantic pass changes.
+- [x] Make initialization and shutdown order explicit in one place.
+- [x] Preserve `IRenderer` accessors initially by forwarding through the registry.
+- [x] Move operational-resource rebuild helper ownership into the registry if it only touches subsystem resources.
+- [x] Keep frame lifecycle methods behavior-equivalent.
+- [x] Add diagnostics for partially initialized registry state.
+- [x] Keep patches mechanical where possible; avoid mixing this extraction with semantic pass changes.
 
 ## Tests
-- [ ] Add a unit/contract test proving subsystem init/shutdown order is deterministic.
-- [ ] Add a test proving `Shutdown()` is safe after partial initialization failure.
-- [ ] Add a test proving `RebuildOperationalResources()` fails closed when required subsystems are missing.
-- [ ] Update existing renderer frame lifecycle tests to use the registry path.
-- [ ] Keep existing renderer/RHI manager tests passing.
+- [x] Add a unit/contract test proving subsystem init/shutdown order is deterministic.
+- [x] Add a test proving `Shutdown()` is safe after partial initialization failure.
+- [x] Add a test proving `RebuildOperationalResources()` fails closed when required subsystems are missing.
+- [x] Update existing renderer frame lifecycle tests to use the registry path.
+- [x] Keep existing renderer/RHI manager tests passing.
 
 ## Docs
-- [ ] Update rendering architecture docs to describe renderer subsystem registry ownership.
-- [ ] Update `docs/migration/nonlegacy-parity-matrix.md` graphics/renderer row.
-- [ ] Update generated module inventory if public module surfaces changed.
+- [x] Update rendering architecture docs to describe renderer subsystem registry ownership.
+- [x] Update `docs/migration/nonlegacy-parity-matrix.md` graphics/renderer row.
+- [x] Update generated module inventory if public module surfaces changed.
 
 ## Acceptance criteria
-- [ ] `Graphics.Renderer.cpp` no longer directly owns the full list of subsystem optionals/managers.
-- [ ] Subsystem lifecycle order is explicit and tested.
-- [ ] Existing `IRenderer` public API remains source-compatible unless a deliberate API change is documented.
-- [ ] No new layer dependencies are introduced.
+- [x] `Graphics.Renderer.cpp` no longer directly owns the full list of subsystem optionals/managers.
+- [x] Subsystem lifecycle order is explicit and tested.
+- [x] Existing `IRenderer` public API remains source-compatible unless a deliberate API change is documented.
+- [x] No new layer dependencies are introduced.
 
 ## Verification
 ```bash

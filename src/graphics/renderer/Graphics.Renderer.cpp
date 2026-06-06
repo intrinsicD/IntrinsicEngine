@@ -102,6 +102,7 @@ import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.FrameRecipe;
 import Extrinsic.Graphics.RenderGraph;
 import Extrinsic.Graphics.RenderCommandRouter;
+import Extrinsic.Graphics.RenderSubsystemRegistry;
 import Extrinsic.Core.Config.Render;
 import Extrinsic.Core.Dag.TaskGraph;
 import Extrinsic.Core.Dag.Scheduler;
@@ -417,10 +418,8 @@ namespace Extrinsic::Graphics
         void Initialize(RHI::IDevice& device) override
         {
             m_Device = &device;
-            m_BufferManager  .emplace(device);
-            m_SamplerManager .emplace(device);
-            m_TextureManager .emplace(device, device.GetBindlessHeap());
-            m_PipelineManager.emplace(device);
+            m_BackbufferFormat = device.GetBackbufferFormat();
+            m_Subsystems.Initialize(device);
             // GRAPHICS-077 Slice B — backend-local transient-debug upload
             // helper. Constructed alongside the BufferManager so per-frame
             // `UploadTriangles(...)` can lease a single growing host-
@@ -431,7 +430,7 @@ namespace Extrinsic::Graphics
             // the Vulkan-tuned concrete implementation lands with
             // GRAPHICS-077 Slice D.
             m_TransientDebugUploadHelper =
-                std::make_unique<TransientDebugUploadHelper>(device, *m_BufferManager);
+                std::make_unique<TransientDebugUploadHelper>(device, *m_Subsystems.BufferManager());
             // GRAPHICS-078 Slice B — backend-local visualization-overlay
             // upload helper. Same lifetime contract as the transient-
             // debug helper above: constructed alongside the
@@ -444,33 +443,14 @@ namespace Extrinsic::Graphics
             // gate; the Vulkan-tuned concrete implementation lands
             // with GRAPHICS-078 Slice D.
             m_VisualizationOverlayUploadHelper =
-                std::make_unique<VisualizationOverlayUploadHelper>(device, *m_BufferManager);
+                std::make_unique<VisualizationOverlayUploadHelper>(device, *m_Subsystems.BufferManager());
             // GRAPHICS-079 Slice C — backend-neutral ImGui upload helper.
             // Mirrors the transient-debug / visualization-overlay helpers:
             // one growing host-visible vertex buffer and one growing index
             // buffer owned by the renderer, reset in Shutdown before the
             // BufferManager is destroyed.
             m_ImGuiUploadHelper =
-                std::make_unique<ImGuiUploadHelper>(device, *m_BufferManager);
-            m_BackbufferFormat = device.GetBackbufferFormat();
-            m_GpuWorld.emplace();
-            m_GpuWorld->Initialize(device, *m_BufferManager);
-            m_MaterialSystem .emplace();
-            m_MaterialSystem->Initialize(device, *m_BufferManager);
-            m_ColormapSystem.emplace();
-            m_ColormapSystem->Initialize(device, *m_TextureManager, *m_SamplerManager);
-            m_VisualizationSyncSystem.emplace();
-            m_VisualizationSyncSystem->Initialize(*m_MaterialSystem, device);
-            m_TransformSyncSystem.emplace();
-            m_TransformSyncSystem->Initialize();
-            m_GpuWorld->SetMaterialBuffer(
-                m_MaterialSystem->GetBuffer(),
-                m_MaterialSystem->GetCapacity());
-            m_CullingSystem  .emplace();
-            m_LightSystem    .emplace();
-            m_LightSystem->Initialize();
-            m_SelectionSystem.emplace();
-            m_SelectionSystem->Initialize();
+                std::make_unique<ImGuiUploadHelper>(device, *m_Subsystems.BufferManager());
             // GRAPHICS-074 Slice A — `EntityIdPass` is selection-system-bound
             // and consumes the `SurfaceOpaque` cull bucket via
             // `EntityIdPass::Execute(...)`. The pass must be emplaced before
@@ -482,7 +462,7 @@ namespace Extrinsic::Graphics
             // itself, and `Execute()` would early-return on
             // `!m_Pipeline.IsValid()` while the executor still reported
             // `Recorded`.
-            m_SelectionEntityIdPass.emplace(*m_SelectionSystem);
+            m_SelectionEntityIdPass.emplace(*m_Subsystems.SelectionSystemRegistry());
             // GRAPHICS-074 Slice B — Face/Edge/Point ID selection passes
             // share the same publisher-before-first-frame invariant as the
             // EntityId pass above: each is emplaced here so the operational
@@ -491,9 +471,9 @@ namespace Extrinsic::Graphics
             // semantics: `has_value()` lease + default pipeline handle on
             // the pass would silently early-return inside `Execute()` while
             // the executor still reported `Recorded`.
-            m_SelectionFaceIdPass.emplace(*m_SelectionSystem);
-            m_SelectionEdgeIdPass.emplace(*m_SelectionSystem);
-            m_SelectionPointIdPass.emplace(*m_SelectionSystem);
+            m_SelectionFaceIdPass.emplace(*m_Subsystems.SelectionSystemRegistry());
+            m_SelectionEdgeIdPass.emplace(*m_Subsystems.SelectionSystemRegistry());
+            m_SelectionPointIdPass.emplace(*m_Subsystems.SelectionSystemRegistry());
             // GRAPHICS-074 Slice C — `SelectionOutlinePass` is selection-system-
             // bound and renders a fullscreen quad into `SelectionOutline`. Same
             // publisher-before-first-frame invariant as the other selection
@@ -503,9 +483,7 @@ namespace Extrinsic::Graphics
             // the pipeline handle or `SelectionSystem` is not initialised, so
             // a missing pipeline yields `SkippedUnavailable` on the executor
             // taxonomy rather than a silently-recorded no-op.
-            m_SelectionOutlinePass.emplace(*m_SelectionSystem);
-            m_ForwardSystem.emplace();
-            m_ForwardSystem->Initialize();
+            m_SelectionOutlinePass.emplace(*m_Subsystems.SelectionSystemRegistry());
             // GRAPHICS-070/071/073 — default-recipe forward surface/line/point/
             // shadow passes own their system-bound instances plus pipeline
             // leases created from `InitializeOperationalPassResources()`. The
@@ -519,9 +497,9 @@ namespace Extrinsic::Graphics
             // routed through the same code path on
             // `RebuildOperationalResources()` so the post-operational-
             // transition reset (GRAPHICS-018R) republishes them byte-identical.
-            m_ForwardSurfacePass.emplace(*m_ForwardSystem);
-            m_ForwardLinePass.emplace(*m_ForwardSystem);
-            m_ForwardPointPass.emplace(*m_ForwardSystem);
+            m_ForwardSurfacePass.emplace(*m_Subsystems.ForwardSystemRegistry());
+            m_ForwardLinePass.emplace(*m_Subsystems.ForwardSystemRegistry());
+            m_ForwardPointPass.emplace(*m_Subsystems.ForwardSystemRegistry());
             // GRAPHICS-073 Slice A — ShadowSystem must be live before the
             // operational publisher creates the depth-only shadow pipeline
             // and calls `SetPipeline(...)` on `m_ShadowPass`.
@@ -532,21 +510,19 @@ namespace Extrinsic::Graphics
             // `SetParams(...)` enables shadows. The atlas is *not* reallocated
             // by `RebuildOperationalResources()` so the imported handle stays
             // byte-identical across rebuilds.
-            m_ShadowSystem.emplace();
-            m_ShadowSystem->Initialize(device, *m_TextureManager, *m_SamplerManager);
-            m_ShadowPass.emplace(*m_ShadowSystem);
+            m_ShadowPass.emplace(*m_Subsystems.ShadowSystemRegistry());
             // GRAPHICS-038A/B — retained HZB ping-pong resource + build pass
             // target. The system owns two renderer-retained textures through
             // TextureManager; ExecuteFrame allocates/resizes them for the
             // current viewport before importing `HZB.Current` into the recipe.
             m_HZBSystem.emplace();
-            m_HZBSystem->Initialize(device, *m_TextureManager);
+            m_HZBSystem->Initialize(device, *m_Subsystems.TextureManager());
             // GRAPHICS-040C — retained temporal reconstruction history. The
             // recipe imports the ping-pong images only when TAA/external
             // reconstruction is selected; allocation is lazy per viewport in
             // ExecuteFrame(), matching HZB's retained-resource cadence.
             m_ReconstructionHistorySystem.emplace();
-            m_ReconstructionHistorySystem->Initialize(device, *m_TextureManager);
+            m_ReconstructionHistorySystem->Initialize(device, *m_Subsystems.TextureManager());
             // GRAPHICS-072 Slice A — DeferredSystem and its `DeferredGBufferPass`
             // must be live before the operational publisher runs so the
             // initial `Initialize()` path can call `SetPipeline(...)` on the
@@ -554,9 +530,7 @@ namespace Extrinsic::Graphics
             // follow above: `has_value()` lease but an unset pipeline handle
             // on the pass would silently early-return inside `Execute()` while
             // the executor still reported `Recorded`.
-            m_DeferredSystem.emplace();
-            m_DeferredSystem->Initialize();
-            m_DeferredGBufferPass.emplace(*m_DeferredSystem);
+            m_DeferredGBufferPass.emplace(*m_Subsystems.DeferredSystemRegistry());
             // GRAPHICS-072 Slice B — DeferredLightingPass must be live before
             // the operational publisher runs so the initial `Initialize()`
             // path can call `SetPipeline(...)` on the lighting pass. Same
@@ -567,9 +541,9 @@ namespace Extrinsic::Graphics
             // `Execute(...)` can publish the atlas bindless index through the
             // pushed `DeferredLightingPushConstants::ShadowAtlasBindlessIndex`
             // field. The system has already been emplaced + Initialize'd
-            // above (m_ShadowSystem), so the reference is live before the
+            // above (m_Subsystems.ShadowSystemRegistry()), so the reference is live before the
             // operational publisher runs.
-            m_DeferredLightingPass.emplace(*m_DeferredSystem, *m_ShadowSystem);
+            m_DeferredLightingPass.emplace(*m_Subsystems.DeferredSystemRegistry(), *m_Subsystems.ShadowSystemRegistry());
             // GRAPHICS-075 Slice A — `PostProcessSystem` must be live before
             // the operational publisher runs so the initial `Initialize()`
             // path can call `SetPipeline(...)` on `m_PostProcessToneMapPass`.
@@ -588,18 +562,16 @@ namespace Extrinsic::Graphics
             // path below re-invokes it so a device that becomes operational
             // later picks up the allocation without a Shutdown()+Initialize()
             // round-trip.
-            m_PostProcessSystem.emplace();
-            m_PostProcessSystem->Initialize(device, *m_TextureManager, *m_BufferManager);
-            m_PostProcessToneMapPass.emplace(*m_PostProcessSystem);
+            m_PostProcessToneMapPass.emplace(*m_Subsystems.PostProcessSystemRegistry());
             // GRAPHICS-075 Slice B.1 — same lifetime contract as the
-            // tonemap pass above: emplace after `m_PostProcessSystem` is
+            // tonemap pass above: emplace after `m_Subsystems.PostProcessSystemRegistry()` is
             // initialised and before the operational publisher runs, so
             // the initial `Initialize()` path can call
             // `SetDownsamplePipeline(...)` / `SetUpsamplePipeline(...)` on
             // `m_PostProcessBloomPass`.
-            m_PostProcessBloomPass.emplace(*m_PostProcessSystem);
+            m_PostProcessBloomPass.emplace(*m_Subsystems.PostProcessSystemRegistry());
             // GRAPHICS-075 Slice C — same lifetime contract as the bloom
-            // pass above: emplace after `m_PostProcessSystem` is
+            // pass above: emplace after `m_Subsystems.PostProcessSystemRegistry()` is
             // initialised and before the operational publisher runs, so
             // the initial `Initialize()` path can call `SetPipeline(...)`
             // on `m_PostProcessFXAAPass`. The FXAA leg is gated by
@@ -608,7 +580,7 @@ namespace Extrinsic::Graphics
             // still reports `Recorded` under the umbrella's accumulator
             // when the stage is disabled, mirroring the bloom helper's
             // "structurally-recorded no-op" taxonomy.
-            m_PostProcessFXAAPass.emplace(*m_PostProcessSystem);
+            m_PostProcessFXAAPass.emplace(*m_Subsystems.PostProcessSystemRegistry());
             // GRAPHICS-075 Slice D.2a — SMAA pass shares the same lifetime
             // contract as the bloom + FXAA passes above. Mutually
             // exclusive with FXAA per `PostProcessSettings::AntiAliasing`;
@@ -618,14 +590,14 @@ namespace Extrinsic::Graphics
             // their `"PostProcessAA{Edge,Blend,Resolve}Pass"`
             // accumulators. Per-stage pipeline leases (edge / blend /
             // resolve) are bound in `InitializeOperationalPassResources`.
-            m_PostProcessSMAAPass.emplace(*m_PostProcessSystem);
+            m_PostProcessSMAAPass.emplace(*m_Subsystems.PostProcessSystemRegistry());
             // GRAPHICS-075 Slice E.1 — same lifetime contract as the
             // tonemap + bloom + FXAA + SMAA passes above; emplaced after
-            // `m_PostProcessSystem` is initialised and before the
+            // `m_Subsystems.PostProcessSystemRegistry()` is initialised and before the
             // operational publisher runs so the initial `Initialize()`
             // path can call `SetPipeline(...)` on
             // `m_PostProcessHistogramPass`.
-            m_PostProcessHistogramPass.emplace(*m_PostProcessSystem);
+            m_PostProcessHistogramPass.emplace(*m_Subsystems.PostProcessSystemRegistry());
             // GRAPHICS-076 Slice B — `DebugViewSystem` is a renderer-owned
             // CPU-only system (resource inspection / deterministic
             // selection / fallback diagnostics) that the canonical
@@ -649,12 +621,12 @@ namespace Extrinsic::Graphics
             {
                 [[maybe_unused]] const bool passResourcesReady = InitializeOperationalPassResources(device);
             }
-            if (m_ImGuiOverlaySystem != nullptr && m_TextureManager && m_SamplerManager)
+            if (m_ImGuiOverlaySystem != nullptr && m_Subsystems.TextureManager() && m_Subsystems.SamplerManager())
             {
                 m_ImGuiOverlaySystem->InitializeGpuResources(
                     device,
-                    *m_TextureManager,
-                    *m_SamplerManager);
+                    *m_Subsystems.TextureManager(),
+                    *m_Subsystems.SamplerManager());
             }
             // CullingSystem::Initialize requires a shader path — concrete
             // renderers supply it.  NullRenderer skips the cull dispatch.
@@ -671,53 +643,33 @@ namespace Extrinsic::Graphics
                 return false;
             }
             m_BackbufferFormat = device.GetBackbufferFormat();
-            if (!m_BufferManager || !m_PipelineManager || !m_MaterialSystem ||
-                !m_GpuWorld || !m_CullingSystem)
+            if (!m_Subsystems.PipelineManager() || !m_Subsystems.TextureManager() ||
+                !m_Subsystems.CullingSystemRegistry())
             {
                 m_LastRenderGraphStats.LifecycleDiagnostic =
                     "Renderer operational-resource rebuild requires initialized renderer systems.";
                 return false;
             }
 
-            if (!m_MaterialSystem->RebuildGpuResources(device, *m_BufferManager))
+            if (!m_Subsystems.RebuildOperationalResources(device))
             {
+                const RenderSubsystemRegistryDiagnostics diagnostics = m_Subsystems.GetDiagnostics();
                 m_LastRenderGraphStats.LifecycleDiagnostic =
-                    "Renderer operational-resource rebuild failed while recreating material buffers.";
+                    diagnostics.LastRebuildFailedMissingRequiredSubsystem
+                        ? "Renderer operational-resource rebuild requires initialized renderer systems."
+                        : "Renderer operational-resource rebuild failed while recreating registry resources.";
                 return false;
-            }
-            if (!m_GpuWorld->RebuildGpuResources(device, *m_BufferManager))
-            {
-                m_LastRenderGraphStats.LifecycleDiagnostic =
-                    "Renderer operational-resource rebuild failed while recreating GpuWorld buffers.";
-                return false;
-            }
-            m_GpuWorld->SetMaterialBuffer(
-                m_MaterialSystem->GetBuffer(),
-                m_MaterialSystem->GetCapacity());
-            m_MaterialSystem->SyncGpuBuffer();
-            m_GpuWorld->SyncFrame();
-
-            // GRAPHICS-075 Slice D.2b — re-invoke the device-aware
-            // PostProcessSystem initializer to cover the case where the
-            // device was non-operational at first Initialize() and has
-            // since become operational. The overload is idempotent — the
-            // retained SMAA LUT + exposure-history leases survive
-            // RebuildOperationalResources() byte-identical when they were
-            // already allocated.
-            if (m_PostProcessSystem.has_value())
-            {
-                m_PostProcessSystem->Initialize(device, *m_TextureManager, *m_BufferManager);
             }
             if (m_ReconstructionHistorySystem.has_value())
             {
-                m_ReconstructionHistorySystem->Initialize(device, *m_TextureManager);
+                m_ReconstructionHistorySystem->Initialize(device, *m_Subsystems.TextureManager());
             }
-            if (m_ImGuiOverlaySystem != nullptr && m_TextureManager && m_SamplerManager)
+            if (m_ImGuiOverlaySystem != nullptr && m_Subsystems.TextureManager() && m_Subsystems.SamplerManager())
             {
                 m_ImGuiOverlaySystem->InitializeGpuResources(
                     device,
-                    *m_TextureManager,
-                    *m_SamplerManager);
+                    *m_Subsystems.TextureManager(),
+                    *m_Subsystems.SamplerManager());
             }
 
             const bool passResourcesReady = InitializeOperationalPassResources(device);
@@ -732,8 +684,7 @@ namespace Extrinsic::Graphics
         {
             m_Device = nullptr;
             ClearRuntimeSnapshotSlots();
-            if (m_SelectionSystem) m_SelectionSystem->Shutdown();
-            if (m_LightSystem)     m_LightSystem->Shutdown();
+            m_Subsystems.ShutdownSystems();
             // GRAPHICS-076 Slice B — drop the renderer-owned
             // `DebugViewSystem` alongside the other CPU-only systems
             // above. The pass + pipeline-lease resets below land before
@@ -741,18 +692,8 @@ namespace Extrinsic::Graphics
             // optional destructor never observes a dangling system
             // reference.
             if (m_DebugViewSystem) m_DebugViewSystem->Shutdown();
-            if (m_ForwardSystem)   m_ForwardSystem->Shutdown();
-            if (m_DeferredSystem)  m_DeferredSystem->Shutdown();
-            if (m_PostProcessSystem) m_PostProcessSystem->Shutdown();
-            if (m_ShadowSystem)    m_ShadowSystem->Shutdown();
             if (m_HZBSystem)       m_HZBSystem->Shutdown();
             if (m_ReconstructionHistorySystem) m_ReconstructionHistorySystem->Shutdown();
-            if (m_CullingSystem)   m_CullingSystem->Shutdown();
-            if (m_TransformSyncSystem) m_TransformSyncSystem->Shutdown();
-            if (m_VisualizationSyncSystem) m_VisualizationSyncSystem->Shutdown();
-            if (m_ColormapSystem)  m_ColormapSystem->Shutdown();
-            if (m_GpuWorld)        m_GpuWorld->Shutdown();
-            if (m_MaterialSystem)  m_MaterialSystem->Shutdown();
 
             // GRAPHICS-070/071/072/073/074 — drop forward, deferred GBuffer,
             // shadow, and EntityId selection passes before resetting their
@@ -782,12 +723,12 @@ namespace Extrinsic::Graphics
             m_PostProcessFXAAPass.reset();
             // GRAPHICS-075 Slice D.1 — SMAA pass shares the same lifetime
             // contract as the bloom + tonemap + FXAA passes above; drop
-            // before `m_PostProcessSystem` is reset below so the optional
+            // before `m_Subsystems.PostProcessSystemRegistry()` is reset below so the optional
             // destructor does not observe a dangling reference.
             m_PostProcessSMAAPass.reset();
             // GRAPHICS-075 Slice E.1 — histogram pass shares the same
             // lifetime contract as the SMAA / FXAA / bloom / tonemap
-            // passes above; drop before `m_PostProcessSystem` is reset
+            // passes above; drop before `m_Subsystems.PostProcessSystemRegistry()` is reset
             // below so the optional destructor does not observe a
             // dangling reference.
             m_PostProcessHistogramPass.reset();
@@ -805,35 +746,23 @@ namespace Extrinsic::Graphics
             // long enough to release Slice C's manager-backed font-atlas leases
             // before the managers are reset below.
             m_ImGuiPass.reset();
-            m_SelectionSystem.reset();
-            m_LightSystem    .reset();
-            m_ForwardSystem  .reset();
-            m_DeferredSystem .reset();
-            m_PostProcessSystem.reset();
-            m_ShadowSystem   .reset();
             m_HZBSystem      .reset();
             m_ReconstructionHistorySystem.reset();
-            m_CullingSystem  .reset();
-            m_TransformSyncSystem.reset();
-            m_VisualizationSyncSystem.reset();
-            m_ColormapSystem .reset();
-            m_GpuWorld       .reset();
-            m_MaterialSystem .reset();
             m_DepthPrepassPipelineLease.reset();
             m_DefaultDebugSurfacePipelineLease.reset();
             // GRAPHICS-076 Slice A — drop the canonical default-recipe
-            // present pipeline lease before `m_PipelineManager` is destroyed
+            // present pipeline lease before `m_Subsystems.PipelineManager()` is destroyed
             // below.
             m_PresentPipelineLease.reset();
             // GRAPHICS-076 Slice B — drop the canonical default-recipe
             // `Pass.DebugView` pipeline lease alongside the present
             // lease above; same teardown ordering contract (lease reset
-            // before `m_PipelineManager` is destroyed below).
+            // before `m_Subsystems.PipelineManager()` is destroyed below).
             m_DebugViewPipelineLease.reset();
             // GRAPHICS-079 Slice A — drop the canonical default-recipe
             // `Pass.ImGui` pipeline lease alongside the debug-view lease
             // above; same teardown ordering contract (lease reset before
-            // `m_PipelineManager` is destroyed below).
+            // `m_Subsystems.PipelineManager()` is destroyed below).
             m_ImGuiPipelineLease.reset();
             m_ImGuiRgba8PipelineLease.reset();
             // GRAPHICS-077 Slices B + C — drop the canonical default-
@@ -841,7 +770,7 @@ namespace Extrinsic::Graphics
             // point lanes, depth-tested + always-on-top per lane)
             // alongside the debug-view lease above; same teardown
             // ordering contract (leases reset before
-            // `m_PipelineManager` is destroyed below).
+            // `m_Subsystems.PipelineManager()` is destroyed below).
             m_TransientDebugTrianglePipelineLeaseDepthTested.reset();
             m_TransientDebugTrianglePipelineLeaseAlwaysOnTop.reset();
             m_TransientDebugLinePipelineLeaseDepthTested.reset();
@@ -852,7 +781,7 @@ namespace Extrinsic::Graphics
             // recipe visualization-overlay pipeline leases (vector-
             // field + isoline lanes, depth-tested + always-on-top each)
             // alongside the transient-debug leases above; same teardown
-            // ordering contract (leases reset before `m_PipelineManager`
+            // ordering contract (leases reset before `m_Subsystems.PipelineManager()`
             // is destroyed below).
             m_VisualizationOverlayVectorFieldPipelineLeaseDepthTested.reset();
             m_VisualizationOverlayVectorFieldPipelineLeaseAlwaysOnTop.reset();
@@ -882,14 +811,14 @@ namespace Extrinsic::Graphics
             // GRAPHICS-075 Slice D.1 — drop the three SMAA pipeline leases
             // alongside the FXAA lease above; same teardown ordering
             // contract. The leases must reset before
-            // `m_PipelineManager` is torn down below since the lease
+            // `m_Subsystems.PipelineManager()` is torn down below since the lease
             // destructor calls back through the manager.
             m_PostProcessSMAAEdgePipelineLease.reset();
             m_PostProcessSMAABlendPipelineLease.reset();
             m_PostProcessSMAAResolvePipelineLease.reset();
             // GRAPHICS-075 Slice E.1 — drop the histogram pipeline lease
             // alongside the SMAA leases above; same teardown ordering
-            // contract. The lease must reset before `m_PipelineManager`
+            // contract. The lease must reset before `m_Subsystems.PipelineManager()`
             // is torn down below since the lease destructor calls back
             // through the manager.
             m_PostProcessHistogramPipelineLease.reset();
@@ -957,9 +886,6 @@ namespace Extrinsic::Graphics
                 m_ImGuiOverlaySystem->ShutdownGpuResources();
             }
             m_ImGuiOverlaySystem = nullptr;
-            m_PipelineManager.reset();
-            m_TextureManager .reset();
-            m_SamplerManager .reset();
             // GRAPHICS-077 Slice B — drop the transient-debug upload
             // helper before the BufferManager is destroyed so the
             // helper's internal `BufferManager::BufferLease` destructor
@@ -975,7 +901,7 @@ namespace Extrinsic::Graphics
             // BufferManager for the same lease-lifetime reason as the other
             // renderer-owned upload helpers.
             m_ImGuiUploadHelper.reset();
-            m_BufferManager  .reset();
+            m_Subsystems.ResetStorage();
             m_CullingOutputAvailable = false;
         }
 
@@ -1045,16 +971,16 @@ namespace Extrinsic::Graphics
                 m_ImGuiPass.reset();
                 return;
             }
-            if (m_Device != nullptr && m_TextureManager.has_value() && m_SamplerManager.has_value())
+            if (m_Device != nullptr && m_Subsystems.TextureManager().has_value() && m_Subsystems.SamplerManager().has_value())
             {
-                overlay->InitializeGpuResources(*m_Device, *m_TextureManager, *m_SamplerManager);
+                overlay->InitializeGpuResources(*m_Device, *m_Subsystems.TextureManager(), *m_Subsystems.SamplerManager());
             }
             m_ImGuiPass.emplace(*overlay);
-            if (m_PipelineManager.has_value() && m_ImGuiPipelineLease.has_value() &&
+            if (m_Subsystems.PipelineManager().has_value() && m_ImGuiPipelineLease.has_value() &&
                 m_ImGuiPipelineLease->IsValid())
             {
                 m_ImGuiPass->SetPipeline(
-                    m_PipelineManager->GetDeviceHandle(m_ImGuiPipelineLease->GetHandle()));
+                    m_Subsystems.PipelineManager()->GetDeviceHandle(m_ImGuiPipelineLease->GetHandle()));
             }
         }
 
@@ -1118,9 +1044,9 @@ namespace Extrinsic::Graphics
             m_VisualizationDiagnostics = ValidateVisualizationPackets(visualizationBatch);
             m_VisualizationOverlaySummary = BuildVisualizationOverlaySummary(visualizationBatch);
             m_InvalidSnapshotRecordCount = 0;
-            if (m_MaterialSystem)
+            if (m_Subsystems.MaterialSystemRegistry())
             {
-                m_MaterialSystem->ResetPerFrameSubstitutionCounters();
+                m_Subsystems.MaterialSystemRegistry()->ResetPerFrameSubstitutionCounters();
             }
 
             m_DebugLinePackets.clear();
@@ -1279,7 +1205,7 @@ namespace Extrinsic::Graphics
             m_RenderableSnapshots.clear();
             m_RenderableSnapshots.reserve(m_TransformSyncRecords.size());
             const std::uint32_t materialCapacity =
-                m_MaterialSystem ? m_MaterialSystem->GetCapacity() : 0u;
+                m_Subsystems.MaterialSystemRegistry() ? m_Subsystems.MaterialSystemRegistry()->GetCapacity() : 0u;
             for (TransformSyncRecord& record : m_TransformSyncRecords)
             {
                 if (!record.Instance.IsValid())
@@ -1292,23 +1218,23 @@ namespace Extrinsic::Graphics
                 {
                     record.MaterialSlot = kDefaultMaterialSlotIndex;
                     record.HasMaterialSlot = true;
-                    if (m_MaterialSystem)
+                    if (m_Subsystems.MaterialSystemRegistry())
                     {
-                        m_MaterialSystem->RecordMissingMaterialFallback();
+                        m_Subsystems.MaterialSystemRegistry()->RecordMissingMaterialFallback();
                     }
                 }
                 else if (materialCapacity > 0u && record.MaterialSlot >= materialCapacity)
                 {
                     record.MaterialSlot = kDefaultMaterialSlotIndex;
-                    if (m_MaterialSystem)
+                    if (m_Subsystems.MaterialSystemRegistry())
                     {
-                        m_MaterialSystem->RecordInvalidMaterialSlot();
+                        m_Subsystems.MaterialSystemRegistry()->RecordInvalidMaterialSlot();
                     }
                 }
 
-                if (record.MaterialSlot == kDefaultMaterialSlotIndex && m_MaterialSystem)
+                if (record.MaterialSlot == kDefaultMaterialSlotIndex && m_Subsystems.MaterialSystemRegistry())
                 {
-                    m_MaterialSystem->RecordDefaultDebugSurfaceUse();
+                    m_Subsystems.MaterialSystemRegistry()->RecordDefaultDebugSurfaceUse();
                 }
 
                 m_RenderableSnapshots.push_back(RenderableSnapshot{
@@ -1447,7 +1373,7 @@ namespace Extrinsic::Graphics
                     },
                     [this]
                     {
-                        m_PipelineManager->CommitPending();
+                        m_Subsystems.PipelineManager()->CommitPending();
                     });
                 m_RenderPrepGraph.AddPass(
                     "RenderPrep.MaterialBaseSync",
@@ -1458,7 +1384,7 @@ namespace Extrinsic::Graphics
                     },
                     [this]
                     {
-                        m_MaterialSystem->SyncGpuBuffer();
+                        m_Subsystems.MaterialSystemRegistry()->SyncGpuBuffer();
                     });
                 m_RenderPrepGraph.AddPass(
                     "RenderPrep.VisualizationSync",
@@ -1469,11 +1395,11 @@ namespace Extrinsic::Graphics
                     },
                     [this, activeSnapshot]
                     {
-                        m_VisualizationSyncSystem->Sync(
+                        m_Subsystems.VisualizationSyncSystemRegistry()->Sync(
                             activeSnapshot->VisualizationSyncRecords,
-                            *m_MaterialSystem,
-                            *m_ColormapSystem,
-                            *m_GpuWorld);
+                            *m_Subsystems.MaterialSystemRegistry(),
+                            *m_Subsystems.ColormapSystemRegistry(),
+                            *m_Subsystems.GpuWorldSystem());
                     });
                 m_RenderPrepGraph.AddPass(
                     "RenderPrep.MaterialOverrideSync",
@@ -1484,7 +1410,7 @@ namespace Extrinsic::Graphics
                     },
                     [this]
                     {
-                        m_MaterialSystem->SyncGpuBuffer();
+                        m_Subsystems.MaterialSystemRegistry()->SyncGpuBuffer();
                     });
                 m_RenderPrepGraph.AddPass(
                     "RenderPrep.TransformSync",
@@ -1495,7 +1421,7 @@ namespace Extrinsic::Graphics
                     },
                     [this, activeSnapshot]
                     {
-                        m_TransformSyncSystem->SyncGpuBuffer(activeSnapshot->TransformSyncRecords, *m_GpuWorld);
+                        m_Subsystems.TransformSyncSystemRegistry()->SyncGpuBuffer(activeSnapshot->TransformSyncRecords, *m_Subsystems.GpuWorldSystem());
                     });
                 m_RenderPrepGraph.AddPass(
                     "RenderPrep.LightSync",
@@ -1506,7 +1432,7 @@ namespace Extrinsic::Graphics
                     },
                     [this, activeSnapshot]
                     {
-                        m_LightSystem->SyncGpuBuffer(activeSnapshot->LightSnapshots, *m_GpuWorld);
+                        m_Subsystems.LightSystemRegistry()->SyncGpuBuffer(activeSnapshot->LightSnapshots, *m_Subsystems.GpuWorldSystem());
                     });
                 m_RenderPrepGraph.AddPass(
                     "RenderPrep.ClusterLightTableSync",
@@ -1529,10 +1455,10 @@ namespace Extrinsic::Graphics
                     },
                     [this]
                     {
-                        m_GpuWorld->SetMaterialBuffer(
-                            m_MaterialSystem->GetBuffer(),
-                            m_MaterialSystem->GetCapacity());
-                        m_GpuWorld->SyncFrame();
+                        m_Subsystems.GpuWorldSystem()->SetMaterialBuffer(
+                            m_Subsystems.MaterialSystemRegistry()->GetBuffer(),
+                            m_Subsystems.MaterialSystemRegistry()->GetCapacity());
+                        m_Subsystems.GpuWorldSystem()->SyncFrame();
                     });
                 m_RenderPrepGraph.AddPass(
                     "RenderPrep.CullingSync",
@@ -1542,7 +1468,7 @@ namespace Extrinsic::Graphics
                     },
                     [this]
                     {
-                        m_CullingSystem->SyncGpuBuffer();
+                        m_Subsystems.CullingSystemRegistry()->SyncGpuBuffer();
                     });
                 const auto compile = m_RenderPrepGraph.Compile();
                 if (!compile.has_value())
@@ -1563,23 +1489,23 @@ namespace Extrinsic::Graphics
             }
             else
             {
-                m_PipelineManager->CommitPending();
-                m_MaterialSystem->SyncGpuBuffer();
-                m_VisualizationSyncSystem->Sync(
+                m_Subsystems.PipelineManager()->CommitPending();
+                m_Subsystems.MaterialSystemRegistry()->SyncGpuBuffer();
+                m_Subsystems.VisualizationSyncSystemRegistry()->Sync(
                     activeSnapshot->VisualizationSyncRecords,
-                    *m_MaterialSystem,
-                    *m_ColormapSystem,
-                    *m_GpuWorld);
-                m_MaterialSystem->SyncGpuBuffer();
-                m_TransformSyncSystem->SyncGpuBuffer(activeSnapshot->TransformSyncRecords, *m_GpuWorld);
-                m_LightSystem->SyncGpuBuffer(activeSnapshot->LightSnapshots, *m_GpuWorld);
-                m_GpuWorld->SetMaterialBuffer(
-                    m_MaterialSystem->GetBuffer(),
-                    m_MaterialSystem->GetCapacity());
+                    *m_Subsystems.MaterialSystemRegistry(),
+                    *m_Subsystems.ColormapSystemRegistry(),
+                    *m_Subsystems.GpuWorldSystem());
+                m_Subsystems.MaterialSystemRegistry()->SyncGpuBuffer();
+                m_Subsystems.TransformSyncSystemRegistry()->SyncGpuBuffer(activeSnapshot->TransformSyncRecords, *m_Subsystems.GpuWorldSystem());
+                m_Subsystems.LightSystemRegistry()->SyncGpuBuffer(activeSnapshot->LightSnapshots, *m_Subsystems.GpuWorldSystem());
+                m_Subsystems.GpuWorldSystem()->SetMaterialBuffer(
+                    m_Subsystems.MaterialSystemRegistry()->GetBuffer(),
+                    m_Subsystems.MaterialSystemRegistry()->GetCapacity());
                 [[maybe_unused]] const bool clusterResourcesReady =
                     EnsureClusterLightResources(renderWorld);
-                m_GpuWorld->SyncFrame();
-                m_CullingSystem->SyncGpuBuffer();
+                m_Subsystems.GpuWorldSystem()->SyncFrame();
+                m_Subsystems.CullingSystemRegistry()->SyncGpuBuffer();
             }
             m_HasPreparedFrame = true;
         }
@@ -1601,9 +1527,9 @@ namespace Extrinsic::Graphics
                 return;
             }
             m_RenderGraph.Reset();
-            const auto& surfaceOpaque = m_CullingSystem->GetBucket(RHI::GpuDrawBucketKind::SurfaceOpaque);
-            const auto& lines = m_CullingSystem->GetBucket(RHI::GpuDrawBucketKind::Lines);
-            const auto& points = m_CullingSystem->GetBucket(RHI::GpuDrawBucketKind::Points);
+            const auto& surfaceOpaque = m_Subsystems.CullingSystemRegistry()->GetBucket(RHI::GpuDrawBucketKind::SurfaceOpaque);
+            const auto& lines = m_Subsystems.CullingSystemRegistry()->GetBucket(RHI::GpuDrawBucketKind::Lines);
+            const auto& points = m_Subsystems.CullingSystemRegistry()->GetBucket(RHI::GpuDrawBucketKind::Points);
             const FrameRecipeSizing sizing{
                 .Width = renderWorld.Viewport.Width > 0 ? static_cast<std::uint32_t>(renderWorld.Viewport.Width) : 1u,
                 .Height = renderWorld.Viewport.Height > 0 ? static_cast<std::uint32_t>(renderWorld.Viewport.Height) : 1u,
@@ -1660,14 +1586,14 @@ namespace Extrinsic::Graphics
             }
             const FrameRecipeImports imports{
                 .Backbuffer = m_Device->GetBackbufferHandle(frame),
-                .SceneTable = m_GpuWorld->GetSceneTableBuffer(),
-                .InstanceStatic = m_GpuWorld->GetInstanceStaticBuffer(),
-                .InstanceDynamic = m_GpuWorld->GetInstanceDynamicBuffer(),
-                .EntityConfig = m_GpuWorld->GetEntityConfigBuffer(),
-                .GeometryRecords = m_GpuWorld->GetGeometryRecordBuffer(),
-                .Bounds = m_GpuWorld->GetBoundsBuffer(),
-                .Lights = m_GpuWorld->GetLightBuffer(),
-                .MaterialBuffer = m_MaterialSystem->GetBuffer(),
+                .SceneTable = m_Subsystems.GpuWorldSystem()->GetSceneTableBuffer(),
+                .InstanceStatic = m_Subsystems.GpuWorldSystem()->GetInstanceStaticBuffer(),
+                .InstanceDynamic = m_Subsystems.GpuWorldSystem()->GetInstanceDynamicBuffer(),
+                .EntityConfig = m_Subsystems.GpuWorldSystem()->GetEntityConfigBuffer(),
+                .GeometryRecords = m_Subsystems.GpuWorldSystem()->GetGeometryRecordBuffer(),
+                .Bounds = m_Subsystems.GpuWorldSystem()->GetBoundsBuffer(),
+                .Lights = m_Subsystems.GpuWorldSystem()->GetLightBuffer(),
+                .MaterialBuffer = m_Subsystems.MaterialSystemRegistry()->GetBuffer(),
                 .SurfaceOpaqueIndexedArgs = surfaceOpaque.IndexedArgsBuffer,
                 .SurfaceOpaqueCount = surfaceOpaque.CountBuffer,
                 .LinesIndexedArgs = lines.IndexedArgsBuffer,
@@ -1681,7 +1607,7 @@ namespace Extrinsic::Graphics
                 // path. Stays invalid until the runtime publishes shadows
                 // enabled, which keeps default-CPU/null fixtures on the
                 // transient fallback.
-                .ShadowAtlas = m_ShadowSystem ? m_ShadowSystem->GetAtlasTexture() : RHI::TextureHandle{},
+                .ShadowAtlas = m_Subsystems.ShadowSystemRegistry() ? m_Subsystems.ShadowSystemRegistry()->GetAtlasTexture() : RHI::TextureHandle{},
                 // GRAPHICS-074 Slice D.2 — hand the renderer-owned host-
                 // visible `Picking.Readback` lease to the recipe so it is
                 // imported (with `TransferDst → HostReadback`) rather than
@@ -1740,9 +1666,9 @@ namespace Extrinsic::Graphics
             // is imported, `BuildDefaultFrameRecipe` ignores this sizing and
             // honors the imported handle's dimensions.
             FrameRecipeShadowSizing shadowSizing{};
-            if (m_ShadowSystem)
+            if (m_Subsystems.ShadowSystemRegistry())
             {
-                const ShadowParams shadowParams = m_ShadowSystem->GetParams();
+                const ShadowParams shadowParams = m_Subsystems.ShadowSystemRegistry()->GetParams();
                 shadowSizing.AtlasResolution = shadowParams.AtlasResolution;
                 shadowSizing.CascadeCount = shadowParams.CascadeCount;
             }
@@ -1780,7 +1706,7 @@ namespace Extrinsic::Graphics
             // `PostProcessSettings` (it is renderer-internal state, not
             // a `RenderWorld` field), so plumb the flag here.
             defaultRecipeFeatures.EnableAntiAliasing =
-                m_PostProcessSystem.has_value() &&
+                m_Subsystems.PostProcessSystemRegistry().has_value() &&
                 SelectedAntiAliasingPipelinesAvailable();
             defaultRecipeFeatures.EnableHZBBuild =
                 defaultRecipeFeatures.EnableDepthPrepass && hzbCurrent.IsValid();
@@ -2346,12 +2272,12 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] RHI::PipelineHandle GetDefaultDebugSurfacePipeline() const noexcept override
         {
-            if (!m_PipelineManager.has_value() || !m_DefaultDebugSurfacePipelineLease.has_value() ||
+            if (!m_Subsystems.PipelineManager().has_value() || !m_DefaultDebugSurfacePipelineLease.has_value() ||
                 !m_DefaultDebugSurfacePipelineLease->IsValid())
             {
                 return RHI::PipelineHandle{};
             }
-            return m_PipelineManager->GetDeviceHandle(m_DefaultDebugSurfacePipelineLease->GetHandle());
+            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_DefaultDebugSurfacePipelineLease->GetHandle());
         }
 
         [[nodiscard]] RHI::PipelineDesc GetDefaultDebugSurfacePipelineDesc() const noexcept override
@@ -2361,12 +2287,12 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] RHI::PipelineHandle GetForwardSurfacePipeline() const noexcept override
         {
-            if (!m_PipelineManager.has_value() || !m_ForwardSurfacePipelineLease.has_value() ||
+            if (!m_Subsystems.PipelineManager().has_value() || !m_ForwardSurfacePipelineLease.has_value() ||
                 !m_ForwardSurfacePipelineLease->IsValid())
             {
                 return RHI::PipelineHandle{};
             }
-            return m_PipelineManager->GetDeviceHandle(m_ForwardSurfacePipelineLease->GetHandle());
+            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_ForwardSurfacePipelineLease->GetHandle());
         }
 
         [[nodiscard]] RHI::PipelineDesc GetForwardSurfacePipelineDesc() const noexcept override
@@ -2376,12 +2302,12 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] RHI::PipelineHandle GetForwardLinePipeline() const noexcept override
         {
-            if (!m_PipelineManager.has_value() || !m_ForwardLinePipelineLease.has_value() ||
+            if (!m_Subsystems.PipelineManager().has_value() || !m_ForwardLinePipelineLease.has_value() ||
                 !m_ForwardLinePipelineLease->IsValid())
             {
                 return RHI::PipelineHandle{};
             }
-            return m_PipelineManager->GetDeviceHandle(m_ForwardLinePipelineLease->GetHandle());
+            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_ForwardLinePipelineLease->GetHandle());
         }
 
         [[nodiscard]] RHI::PipelineDesc GetForwardLinePipelineDesc() const noexcept override
@@ -2391,12 +2317,12 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] RHI::PipelineHandle GetForwardPointPipeline() const noexcept override
         {
-            if (!m_PipelineManager.has_value() || !m_ForwardPointPipelineLease.has_value() ||
+            if (!m_Subsystems.PipelineManager().has_value() || !m_ForwardPointPipelineLease.has_value() ||
                 !m_ForwardPointPipelineLease->IsValid())
             {
                 return RHI::PipelineHandle{};
             }
-            return m_PipelineManager->GetDeviceHandle(m_ForwardPointPipelineLease->GetHandle());
+            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_ForwardPointPipelineLease->GetHandle());
         }
 
         [[nodiscard]] RHI::PipelineDesc GetForwardPointPipelineDesc() const noexcept override
@@ -2406,12 +2332,12 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] RHI::PipelineHandle GetShadowPipeline() const noexcept override
         {
-            if (!m_PipelineManager.has_value() || !m_ShadowPipelineLease.has_value() ||
+            if (!m_Subsystems.PipelineManager().has_value() || !m_ShadowPipelineLease.has_value() ||
                 !m_ShadowPipelineLease->IsValid())
             {
                 return RHI::PipelineHandle{};
             }
-            return m_PipelineManager->GetDeviceHandle(m_ShadowPipelineLease->GetHandle());
+            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_ShadowPipelineLease->GetHandle());
         }
 
         [[nodiscard]] RHI::PipelineDesc GetShadowPipelineDesc() const noexcept override
@@ -2421,12 +2347,12 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] RHI::PipelineHandle GetDeferredGBufferPipeline() const noexcept override
         {
-            if (!m_PipelineManager.has_value() || !m_DeferredGBufferPipelineLease.has_value() ||
+            if (!m_Subsystems.PipelineManager().has_value() || !m_DeferredGBufferPipelineLease.has_value() ||
                 !m_DeferredGBufferPipelineLease->IsValid())
             {
                 return RHI::PipelineHandle{};
             }
-            return m_PipelineManager->GetDeviceHandle(m_DeferredGBufferPipelineLease->GetHandle());
+            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_DeferredGBufferPipelineLease->GetHandle());
         }
 
         [[nodiscard]] RHI::PipelineDesc GetDeferredGBufferPipelineDesc() const noexcept override
@@ -2436,12 +2362,12 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] RHI::PipelineHandle GetDeferredLightingPipeline() const noexcept override
         {
-            if (!m_PipelineManager.has_value() || !m_DeferredLightingPipelineLease.has_value() ||
+            if (!m_Subsystems.PipelineManager().has_value() || !m_DeferredLightingPipelineLease.has_value() ||
                 !m_DeferredLightingPipelineLease->IsValid())
             {
                 return RHI::PipelineHandle{};
             }
-            return m_PipelineManager->GetDeviceHandle(m_DeferredLightingPipelineLease->GetHandle());
+            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_DeferredLightingPipelineLease->GetHandle());
         }
 
         [[nodiscard]] RHI::PipelineDesc GetDeferredLightingPipelineDesc() const noexcept override
@@ -2451,12 +2377,12 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] RHI::PipelineHandle GetSelectionEntityIdPipeline() const noexcept override
         {
-            if (!m_PipelineManager.has_value() || !m_SelectionEntityIdPipelineLease.has_value() ||
+            if (!m_Subsystems.PipelineManager().has_value() || !m_SelectionEntityIdPipelineLease.has_value() ||
                 !m_SelectionEntityIdPipelineLease->IsValid())
             {
                 return RHI::PipelineHandle{};
             }
-            return m_PipelineManager->GetDeviceHandle(m_SelectionEntityIdPipelineLease->GetHandle());
+            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_SelectionEntityIdPipelineLease->GetHandle());
         }
 
         [[nodiscard]] RHI::PipelineDesc GetSelectionEntityIdPipelineDesc() const noexcept override
@@ -2466,12 +2392,12 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] RHI::PipelineHandle GetSelectionFaceIdPipeline() const noexcept override
         {
-            if (!m_PipelineManager.has_value() || !m_SelectionFaceIdPipelineLease.has_value() ||
+            if (!m_Subsystems.PipelineManager().has_value() || !m_SelectionFaceIdPipelineLease.has_value() ||
                 !m_SelectionFaceIdPipelineLease->IsValid())
             {
                 return RHI::PipelineHandle{};
             }
-            return m_PipelineManager->GetDeviceHandle(m_SelectionFaceIdPipelineLease->GetHandle());
+            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_SelectionFaceIdPipelineLease->GetHandle());
         }
 
         [[nodiscard]] RHI::PipelineDesc GetSelectionFaceIdPipelineDesc() const noexcept override
@@ -2481,12 +2407,12 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] RHI::PipelineHandle GetSelectionEdgeIdPipeline() const noexcept override
         {
-            if (!m_PipelineManager.has_value() || !m_SelectionEdgeIdPipelineLease.has_value() ||
+            if (!m_Subsystems.PipelineManager().has_value() || !m_SelectionEdgeIdPipelineLease.has_value() ||
                 !m_SelectionEdgeIdPipelineLease->IsValid())
             {
                 return RHI::PipelineHandle{};
             }
-            return m_PipelineManager->GetDeviceHandle(m_SelectionEdgeIdPipelineLease->GetHandle());
+            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_SelectionEdgeIdPipelineLease->GetHandle());
         }
 
         [[nodiscard]] RHI::PipelineDesc GetSelectionEdgeIdPipelineDesc() const noexcept override
@@ -2496,12 +2422,12 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] RHI::PipelineHandle GetSelectionPointIdPipeline() const noexcept override
         {
-            if (!m_PipelineManager.has_value() || !m_SelectionPointIdPipelineLease.has_value() ||
+            if (!m_Subsystems.PipelineManager().has_value() || !m_SelectionPointIdPipelineLease.has_value() ||
                 !m_SelectionPointIdPipelineLease->IsValid())
             {
                 return RHI::PipelineHandle{};
             }
-            return m_PipelineManager->GetDeviceHandle(m_SelectionPointIdPipelineLease->GetHandle());
+            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_SelectionPointIdPipelineLease->GetHandle());
         }
 
         [[nodiscard]] RHI::PipelineDesc GetSelectionPointIdPipelineDesc() const noexcept override
@@ -2511,12 +2437,12 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] RHI::PipelineHandle GetSelectionOutlinePipeline() const noexcept override
         {
-            if (!m_PipelineManager.has_value() || !m_SelectionOutlinePipelineLease.has_value() ||
+            if (!m_Subsystems.PipelineManager().has_value() || !m_SelectionOutlinePipelineLease.has_value() ||
                 !m_SelectionOutlinePipelineLease->IsValid())
             {
                 return RHI::PipelineHandle{};
             }
-            return m_PipelineManager->GetDeviceHandle(m_SelectionOutlinePipelineLease->GetHandle());
+            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_SelectionOutlinePipelineLease->GetHandle());
         }
 
         [[nodiscard]] RHI::PipelineDesc GetSelectionOutlinePipelineDesc() const noexcept override
@@ -2526,12 +2452,12 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] RHI::PipelineHandle GetPostProcessToneMapPipeline() const noexcept override
         {
-            if (!m_PipelineManager.has_value() || !m_PostProcessToneMapPipelineLease.has_value() ||
+            if (!m_Subsystems.PipelineManager().has_value() || !m_PostProcessToneMapPipelineLease.has_value() ||
                 !m_PostProcessToneMapPipelineLease->IsValid())
             {
                 return RHI::PipelineHandle{};
             }
-            return m_PipelineManager->GetDeviceHandle(m_PostProcessToneMapPipelineLease->GetHandle());
+            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_PostProcessToneMapPipelineLease->GetHandle());
         }
 
         [[nodiscard]] RHI::PipelineDesc GetPostProcessToneMapPipelineDesc() const noexcept override
@@ -2541,12 +2467,12 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] RHI::PipelineHandle GetPostProcessBloomDownsamplePipeline() const noexcept override
         {
-            if (!m_PipelineManager.has_value() || !m_PostProcessBloomDownsamplePipelineLease.has_value() ||
+            if (!m_Subsystems.PipelineManager().has_value() || !m_PostProcessBloomDownsamplePipelineLease.has_value() ||
                 !m_PostProcessBloomDownsamplePipelineLease->IsValid())
             {
                 return RHI::PipelineHandle{};
             }
-            return m_PipelineManager->GetDeviceHandle(m_PostProcessBloomDownsamplePipelineLease->GetHandle());
+            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_PostProcessBloomDownsamplePipelineLease->GetHandle());
         }
 
         [[nodiscard]] RHI::PipelineDesc GetPostProcessBloomDownsamplePipelineDesc() const noexcept override
@@ -2556,12 +2482,12 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] RHI::PipelineHandle GetPostProcessBloomUpsamplePipeline() const noexcept override
         {
-            if (!m_PipelineManager.has_value() || !m_PostProcessBloomUpsamplePipelineLease.has_value() ||
+            if (!m_Subsystems.PipelineManager().has_value() || !m_PostProcessBloomUpsamplePipelineLease.has_value() ||
                 !m_PostProcessBloomUpsamplePipelineLease->IsValid())
             {
                 return RHI::PipelineHandle{};
             }
-            return m_PipelineManager->GetDeviceHandle(m_PostProcessBloomUpsamplePipelineLease->GetHandle());
+            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_PostProcessBloomUpsamplePipelineLease->GetHandle());
         }
 
         [[nodiscard]] RHI::PipelineDesc GetPostProcessBloomUpsamplePipelineDesc() const noexcept override
@@ -2571,12 +2497,12 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] RHI::PipelineHandle GetPostProcessFXAAPipeline() const noexcept override
         {
-            if (!m_PipelineManager.has_value() || !m_PostProcessFXAAPipelineLease.has_value() ||
+            if (!m_Subsystems.PipelineManager().has_value() || !m_PostProcessFXAAPipelineLease.has_value() ||
                 !m_PostProcessFXAAPipelineLease->IsValid())
             {
                 return RHI::PipelineHandle{};
             }
-            return m_PipelineManager->GetDeviceHandle(m_PostProcessFXAAPipelineLease->GetHandle());
+            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_PostProcessFXAAPipelineLease->GetHandle());
         }
 
         [[nodiscard]] RHI::PipelineDesc GetPostProcessFXAAPipelineDesc() const noexcept override
@@ -2586,12 +2512,12 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] RHI::PipelineHandle GetPostProcessSMAAEdgePipeline() const noexcept override
         {
-            if (!m_PipelineManager.has_value() || !m_PostProcessSMAAEdgePipelineLease.has_value() ||
+            if (!m_Subsystems.PipelineManager().has_value() || !m_PostProcessSMAAEdgePipelineLease.has_value() ||
                 !m_PostProcessSMAAEdgePipelineLease->IsValid())
             {
                 return RHI::PipelineHandle{};
             }
-            return m_PipelineManager->GetDeviceHandle(m_PostProcessSMAAEdgePipelineLease->GetHandle());
+            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_PostProcessSMAAEdgePipelineLease->GetHandle());
         }
 
         [[nodiscard]] RHI::PipelineDesc GetPostProcessSMAAEdgePipelineDesc() const noexcept override
@@ -2601,12 +2527,12 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] RHI::PipelineHandle GetPostProcessSMAABlendPipeline() const noexcept override
         {
-            if (!m_PipelineManager.has_value() || !m_PostProcessSMAABlendPipelineLease.has_value() ||
+            if (!m_Subsystems.PipelineManager().has_value() || !m_PostProcessSMAABlendPipelineLease.has_value() ||
                 !m_PostProcessSMAABlendPipelineLease->IsValid())
             {
                 return RHI::PipelineHandle{};
             }
-            return m_PipelineManager->GetDeviceHandle(m_PostProcessSMAABlendPipelineLease->GetHandle());
+            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_PostProcessSMAABlendPipelineLease->GetHandle());
         }
 
         [[nodiscard]] RHI::PipelineDesc GetPostProcessSMAABlendPipelineDesc() const noexcept override
@@ -2616,12 +2542,12 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] RHI::PipelineHandle GetPostProcessSMAAResolvePipeline() const noexcept override
         {
-            if (!m_PipelineManager.has_value() || !m_PostProcessSMAAResolvePipelineLease.has_value() ||
+            if (!m_Subsystems.PipelineManager().has_value() || !m_PostProcessSMAAResolvePipelineLease.has_value() ||
                 !m_PostProcessSMAAResolvePipelineLease->IsValid())
             {
                 return RHI::PipelineHandle{};
             }
-            return m_PipelineManager->GetDeviceHandle(m_PostProcessSMAAResolvePipelineLease->GetHandle());
+            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_PostProcessSMAAResolvePipelineLease->GetHandle());
         }
 
         [[nodiscard]] RHI::PipelineDesc GetPostProcessSMAAResolvePipelineDesc() const noexcept override
@@ -2631,12 +2557,12 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] RHI::PipelineHandle GetPostProcessHistogramPipeline() const noexcept override
         {
-            if (!m_PipelineManager.has_value() || !m_PostProcessHistogramPipelineLease.has_value() ||
+            if (!m_Subsystems.PipelineManager().has_value() || !m_PostProcessHistogramPipelineLease.has_value() ||
                 !m_PostProcessHistogramPipelineLease->IsValid())
             {
                 return RHI::PipelineHandle{};
             }
-            return m_PipelineManager->GetDeviceHandle(m_PostProcessHistogramPipelineLease->GetHandle());
+            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_PostProcessHistogramPipelineLease->GetHandle());
         }
 
         [[nodiscard]] RHI::PipelineDesc GetPostProcessHistogramPipelineDesc() const noexcept override
@@ -2646,12 +2572,12 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] RHI::PipelineHandle GetHZBBuildPipeline() const noexcept override
         {
-            if (!m_PipelineManager.has_value() || !m_HZBBuildPipelineLease.has_value() ||
+            if (!m_Subsystems.PipelineManager().has_value() || !m_HZBBuildPipelineLease.has_value() ||
                 !m_HZBBuildPipelineLease->IsValid())
             {
                 return RHI::PipelineHandle{};
             }
-            return m_PipelineManager->GetDeviceHandle(m_HZBBuildPipelineLease->GetHandle());
+            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_HZBBuildPipelineLease->GetHandle());
         }
 
         [[nodiscard]] RHI::PipelineDesc GetHZBBuildPipelineDesc() const noexcept override
@@ -2661,12 +2587,12 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] RHI::PipelineHandle GetClusterGridBuildPipeline() const noexcept override
         {
-            if (!m_PipelineManager.has_value() || !m_ClusterGridBuildPipelineLease.has_value() ||
+            if (!m_Subsystems.PipelineManager().has_value() || !m_ClusterGridBuildPipelineLease.has_value() ||
                 !m_ClusterGridBuildPipelineLease->IsValid())
             {
                 return {};
             }
-            return m_PipelineManager->GetDeviceHandle(m_ClusterGridBuildPipelineLease->GetHandle());
+            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_ClusterGridBuildPipelineLease->GetHandle());
         }
 
         [[nodiscard]] RHI::PipelineDesc GetClusterGridBuildPipelineDesc() const noexcept override
@@ -2676,12 +2602,12 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] RHI::PipelineHandle GetClusterLightAssignmentPipeline() const noexcept override
         {
-            if (!m_PipelineManager.has_value() || !m_ClusterLightAssignmentPipelineLease.has_value() ||
+            if (!m_Subsystems.PipelineManager().has_value() || !m_ClusterLightAssignmentPipelineLease.has_value() ||
                 !m_ClusterLightAssignmentPipelineLease->IsValid())
             {
                 return {};
             }
-            return m_PipelineManager->GetDeviceHandle(m_ClusterLightAssignmentPipelineLease->GetHandle());
+            return m_Subsystems.PipelineManager()->GetDeviceHandle(m_ClusterLightAssignmentPipelineLease->GetHandle());
         }
 
         [[nodiscard]] RHI::PipelineDesc GetClusterLightAssignmentPipelineDesc() const noexcept override
@@ -2791,22 +2717,22 @@ namespace Extrinsic::Graphics
             return m_DebugViewSystem->GetSettings().RequestedResourceName;
         }
 
-        RHI::BufferManager&   GetBufferManager()   override { return *m_BufferManager;   }
-        RHI::TextureManager&  GetTextureManager()  override { return *m_TextureManager;  }
-        RHI::SamplerManager&  GetSamplerManager()  override { return *m_SamplerManager;  }
-        RHI::PipelineManager& GetPipelineManager() override { return *m_PipelineManager; }
-        GpuWorld&             GetGpuWorld()        override { return *m_GpuWorld;        }
-        MaterialSystem&        GetMaterialSystem()  override { return *m_MaterialSystem;  }
-        ColormapSystem&        GetColormapSystem()  override { return *m_ColormapSystem;  }
-        VisualizationSyncSystem& GetVisualizationSyncSystem() override { return *m_VisualizationSyncSystem; }
-        CullingSystem&         GetCullingSystem()   override { return *m_CullingSystem;   }
-        TransformSyncSystem&   GetTransformSyncSystem() override { return *m_TransformSyncSystem; }
-        LightSystem&           GetLightSystem()     override { return *m_LightSystem;     }
-        SelectionSystem&       GetSelectionSystem() override { return *m_SelectionSystem; }
-        ForwardSystem&         GetForwardSystem()   override { return *m_ForwardSystem;   }
-        DeferredSystem&        GetDeferredSystem()  override { return *m_DeferredSystem;  }
-        PostProcessSystem&     GetPostProcessSystem() override { return *m_PostProcessSystem; }
-        ShadowSystem&          GetShadowSystem()    override { return *m_ShadowSystem;    }
+        RHI::BufferManager&   GetBufferManager()   override { return *m_Subsystems.BufferManager();   }
+        RHI::TextureManager&  GetTextureManager()  override { return *m_Subsystems.TextureManager();  }
+        RHI::SamplerManager&  GetSamplerManager()  override { return *m_Subsystems.SamplerManager();  }
+        RHI::PipelineManager& GetPipelineManager() override { return *m_Subsystems.PipelineManager(); }
+        GpuWorld&             GetGpuWorld()        override { return *m_Subsystems.GpuWorldSystem();        }
+        MaterialSystem&        GetMaterialSystem()  override { return *m_Subsystems.MaterialSystemRegistry();  }
+        ColormapSystem&        GetColormapSystem()  override { return *m_Subsystems.ColormapSystemRegistry();  }
+        VisualizationSyncSystem& GetVisualizationSyncSystem() override { return *m_Subsystems.VisualizationSyncSystemRegistry(); }
+        CullingSystem&         GetCullingSystem()   override { return *m_Subsystems.CullingSystemRegistry();   }
+        TransformSyncSystem&   GetTransformSyncSystem() override { return *m_Subsystems.TransformSyncSystemRegistry(); }
+        LightSystem&           GetLightSystem()     override { return *m_Subsystems.LightSystemRegistry();     }
+        SelectionSystem&       GetSelectionSystem() override { return *m_Subsystems.SelectionSystemRegistry(); }
+        ForwardSystem&         GetForwardSystem()   override { return *m_Subsystems.ForwardSystemRegistry();   }
+        DeferredSystem&        GetDeferredSystem()  override { return *m_Subsystems.DeferredSystemRegistry();  }
+        PostProcessSystem&     GetPostProcessSystem() override { return *m_Subsystems.PostProcessSystemRegistry(); }
+        ShadowSystem&          GetShadowSystem()    override { return *m_Subsystems.ShadowSystemRegistry();    }
         HZBSystem&             GetHZBSystem()       override { return *m_HZBSystem;       }
         const RenderGraphFrameStats& GetLastRenderGraphStats() const override { return m_LastRenderGraphStats; }
 
@@ -3320,7 +3246,7 @@ namespace Extrinsic::Graphics
         // block byte-for-byte under Vulkan std430 (4×4 bytes header + 4×4
         // bytes grading scalars + 3× `vec3 + float pad`). The pass body
         // builds the payload through `BuildPostProcessToneMapPushConstants(
-        // m_PostProcessSystem.GetSettings())`, which derives `Exposure` /
+        // m_Subsystems.PostProcessSystemRegistry().GetSettings())`, which derives `Exposure` /
         // `BloomIntensity` from settings and uses deterministic defaults
         // (`Operator = 0` ACES, `ColorGradingOn = 0`, neutral
         // `Saturation`/`Contrast`/`Lift`/`Gamma`/`Gain`) for the rest. The
@@ -4014,19 +3940,19 @@ namespace Extrinsic::Graphics
             m_ClusterLightCounterBuffer.reset();
             m_ClusterGridDesc = {};
             m_ClusterGridProjection = {};
-            if (m_GpuWorld)
+            if (m_Subsystems.GpuWorldSystem())
             {
-                m_GpuWorld->ClearClusterLightTable();
+                m_Subsystems.GpuWorldSystem()->ClearClusterLightTable();
             }
         }
 
         [[nodiscard]] bool EnsureClusterLightResources(const RenderWorld& renderWorld)
         {
-            if (m_Device == nullptr || !m_Device->IsOperational() || !m_BufferManager || !m_GpuWorld)
+            if (m_Device == nullptr || !m_Device->IsOperational() || !m_Subsystems.BufferManager() || !m_Subsystems.GpuWorldSystem())
             {
-                if (m_GpuWorld)
+                if (m_Subsystems.GpuWorldSystem())
                 {
-                    m_GpuWorld->ClearClusterLightTable();
+                    m_Subsystems.GpuWorldSystem()->ClearClusterLightTable();
                 }
                 return false;
             }
@@ -4070,11 +3996,11 @@ namespace Extrinsic::Graphics
                 m_ClusterGridDesc = {};
                 m_ClusterGridProjection = {};
 
-                auto gridOr = m_BufferManager->Create(BuildClusterGridAABBBufferDesc(desc));
-                auto headersOr = m_BufferManager->Create(BuildClusterLightHeaderBufferDesc(desc));
-                auto indicesOr = m_BufferManager->Create(
+                auto gridOr = m_Subsystems.BufferManager()->Create(BuildClusterGridAABBBufferDesc(desc));
+                auto headersOr = m_Subsystems.BufferManager()->Create(BuildClusterLightHeaderBufferDesc(desc));
+                auto indicesOr = m_Subsystems.BufferManager()->Create(
                     BuildClusterLightIndexBufferDesc(desc, kMaxClusterLightsPerCell));
-                auto counterOr = m_BufferManager->Create(BuildClusterLightCounterBufferDesc());
+                auto counterOr = m_Subsystems.BufferManager()->Create(BuildClusterLightCounterBufferDesc());
                 if (!gridOr.has_value() || !headersOr.has_value() ||
                     !indicesOr.has_value() || !counterOr.has_value())
                 {
@@ -4096,7 +4022,7 @@ namespace Extrinsic::Graphics
                 m_ClusterGridProjection = projection;
             }
 
-            m_GpuWorld->SetClusterLightTable(GpuWorld::ClusterLightTableDesc{
+            m_Subsystems.GpuWorldSystem()->SetClusterLightTable(GpuWorld::ClusterLightTableDesc{
                 .HeaderBuffer = m_ClusterLightHeaderBuffer->GetHandle(),
                 .IndexBuffer = m_ClusterLightIndexBuffer->GetHandle(),
                 .TilePx = desc.ClusterTilePx,
@@ -4129,17 +4055,17 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] bool InitializeOperationalPassResources(RHI::IDevice& device)
         {
-            if (!device.IsOperational() || !m_CullingSystem || !m_BufferManager || !m_PipelineManager)
+            if (!device.IsOperational() || !m_Subsystems.CullingSystemRegistry() || !m_Subsystems.BufferManager() || !m_Subsystems.PipelineManager())
             {
                 m_CullingOutputAvailable = false;
                 return false;
             }
 
-            m_CullingSystem->Shutdown();
-            m_CullingOutputAvailable = m_CullingSystem->Initialize(
+            m_Subsystems.CullingSystemRegistry()->Shutdown();
+            m_CullingOutputAvailable = m_Subsystems.CullingSystemRegistry()->Initialize(
                 device,
-                *m_BufferManager,
-                *m_PipelineManager,
+                *m_Subsystems.BufferManager(),
+                *m_Subsystems.PipelineManager(),
                 Core::Filesystem::GetShaderPath("shaders/instance_cull.comp.spv"));
 
             m_DepthPrepassPipelineLease.reset();
@@ -4150,12 +4076,12 @@ namespace Extrinsic::Graphics
             depthPrepassDesc.DepthTargetFormat = RHI::Format::D32_FLOAT;
             depthPrepassDesc.PushConstantSize = sizeof(RHI::GpuScenePushConstants);
             depthPrepassDesc.DebugName = "Renderer.DepthPrepass";
-            auto depthPipeline = m_PipelineManager->Create(depthPrepassDesc);
+            auto depthPipeline = m_Subsystems.PipelineManager()->Create(depthPrepassDesc);
             if (depthPipeline.has_value())
             {
                 m_DepthPrepassPipelineLease.emplace(std::move(*depthPipeline));
                 m_DepthPrepassPass.SetPipeline(
-                    m_PipelineManager->GetDeviceHandle(m_DepthPrepassPipelineLease->GetHandle()));
+                    m_Subsystems.PipelineManager()->GetDeviceHandle(m_DepthPrepassPipelineLease->GetHandle()));
             }
             else
             {
@@ -4168,7 +4094,7 @@ namespace Extrinsic::Graphics
             // so the descriptor matches across initial init and rebuilds.
             m_DefaultDebugSurfacePipelineLease.reset();
             const RHI::PipelineDesc defaultDebugSurfaceDesc = BuildDefaultDebugSurfacePipelineDesc(m_BackbufferFormat);
-            auto defaultDebugSurfacePipeline = m_PipelineManager->Create(defaultDebugSurfaceDesc);
+            auto defaultDebugSurfacePipeline = m_Subsystems.PipelineManager()->Create(defaultDebugSurfaceDesc);
             if (defaultDebugSurfacePipeline.has_value())
             {
                 m_DefaultDebugSurfacePipelineLease.emplace(std::move(*defaultDebugSurfacePipeline));
@@ -4190,14 +4116,14 @@ namespace Extrinsic::Graphics
                 m_ForwardSurfacePass->SetPipeline(RHI::PipelineHandle{});
             }
             const RHI::PipelineDesc forwardSurfaceDesc = BuildForwardSurfacePipelineDesc();
-            auto forwardSurfacePipeline = m_PipelineManager->Create(forwardSurfaceDesc);
+            auto forwardSurfacePipeline = m_Subsystems.PipelineManager()->Create(forwardSurfaceDesc);
             if (forwardSurfacePipeline.has_value())
             {
                 m_ForwardSurfacePipelineLease.emplace(std::move(*forwardSurfacePipeline));
                 if (m_ForwardSurfacePass)
                 {
                     m_ForwardSurfacePass->SetPipeline(
-                        m_PipelineManager->GetDeviceHandle(m_ForwardSurfacePipelineLease->GetHandle()));
+                        m_Subsystems.PipelineManager()->GetDeviceHandle(m_ForwardSurfacePipelineLease->GetHandle()));
                 }
             }
             else
@@ -4216,14 +4142,14 @@ namespace Extrinsic::Graphics
                 m_ForwardLinePass->SetPipeline(RHI::PipelineHandle{});
             }
             const RHI::PipelineDesc forwardLineDesc = BuildForwardLinePipelineDesc();
-            auto forwardLinePipeline = m_PipelineManager->Create(forwardLineDesc);
+            auto forwardLinePipeline = m_Subsystems.PipelineManager()->Create(forwardLineDesc);
             if (forwardLinePipeline.has_value())
             {
                 m_ForwardLinePipelineLease.emplace(std::move(*forwardLinePipeline));
                 if (m_ForwardLinePass)
                 {
                     m_ForwardLinePass->SetPipeline(
-                        m_PipelineManager->GetDeviceHandle(m_ForwardLinePipelineLease->GetHandle()));
+                        m_Subsystems.PipelineManager()->GetDeviceHandle(m_ForwardLinePipelineLease->GetHandle()));
                 }
             }
             else
@@ -4238,14 +4164,14 @@ namespace Extrinsic::Graphics
                 m_ForwardPointPass->SetPipeline(RHI::PipelineHandle{});
             }
             const RHI::PipelineDesc forwardPointDesc = BuildForwardPointPipelineDesc();
-            auto forwardPointPipeline = m_PipelineManager->Create(forwardPointDesc);
+            auto forwardPointPipeline = m_Subsystems.PipelineManager()->Create(forwardPointDesc);
             if (forwardPointPipeline.has_value())
             {
                 m_ForwardPointPipelineLease.emplace(std::move(*forwardPointPipeline));
                 if (m_ForwardPointPass)
                 {
                     m_ForwardPointPass->SetPipeline(
-                        m_PipelineManager->GetDeviceHandle(m_ForwardPointPipelineLease->GetHandle()));
+                        m_Subsystems.PipelineManager()->GetDeviceHandle(m_ForwardPointPipelineLease->GetHandle()));
                 }
             }
             else
@@ -4264,14 +4190,14 @@ namespace Extrinsic::Graphics
                 m_ShadowPass->SetPipeline(RHI::PipelineHandle{});
             }
             const RHI::PipelineDesc shadowDesc = BuildShadowPipelineDesc();
-            auto shadowPipeline = m_PipelineManager->Create(shadowDesc);
+            auto shadowPipeline = m_Subsystems.PipelineManager()->Create(shadowDesc);
             if (shadowPipeline.has_value())
             {
                 m_ShadowPipelineLease.emplace(std::move(*shadowPipeline));
                 if (m_ShadowPass)
                 {
                     m_ShadowPass->SetPipeline(
-                        m_PipelineManager->GetDeviceHandle(m_ShadowPipelineLease->GetHandle()));
+                        m_Subsystems.PipelineManager()->GetDeviceHandle(m_ShadowPipelineLease->GetHandle()));
                 }
             }
             else
@@ -4290,14 +4216,14 @@ namespace Extrinsic::Graphics
                 m_DeferredGBufferPass->SetPipeline(RHI::PipelineHandle{});
             }
             const RHI::PipelineDesc deferredGBufferDesc = BuildDeferredGBufferPipelineDesc();
-            auto deferredGBufferPipeline = m_PipelineManager->Create(deferredGBufferDesc);
+            auto deferredGBufferPipeline = m_Subsystems.PipelineManager()->Create(deferredGBufferDesc);
             if (deferredGBufferPipeline.has_value())
             {
                 m_DeferredGBufferPipelineLease.emplace(std::move(*deferredGBufferPipeline));
                 if (m_DeferredGBufferPass)
                 {
                     m_DeferredGBufferPass->SetPipeline(
-                        m_PipelineManager->GetDeviceHandle(m_DeferredGBufferPipelineLease->GetHandle()));
+                        m_Subsystems.PipelineManager()->GetDeviceHandle(m_DeferredGBufferPipelineLease->GetHandle()));
                 }
             }
             else
@@ -4317,14 +4243,14 @@ namespace Extrinsic::Graphics
                 m_DeferredLightingPass->SetPipeline(RHI::PipelineHandle{});
             }
             const RHI::PipelineDesc deferredLightingDesc = BuildDeferredLightingPipelineDesc();
-            auto deferredLightingPipeline = m_PipelineManager->Create(deferredLightingDesc);
+            auto deferredLightingPipeline = m_Subsystems.PipelineManager()->Create(deferredLightingDesc);
             if (deferredLightingPipeline.has_value())
             {
                 m_DeferredLightingPipelineLease.emplace(std::move(*deferredLightingPipeline));
                 if (m_DeferredLightingPass)
                 {
                     m_DeferredLightingPass->SetPipeline(
-                        m_PipelineManager->GetDeviceHandle(m_DeferredLightingPipelineLease->GetHandle()));
+                        m_Subsystems.PipelineManager()->GetDeviceHandle(m_DeferredLightingPipelineLease->GetHandle()));
                 }
             }
             else
@@ -4338,7 +4264,7 @@ namespace Extrinsic::Graphics
             // survives `RebuildOperationalResources()` byte-identical when
             // `device.GetFramesInFlight()` is unchanged (same pattern
             // `ShadowSystem` follows for its depth atlas); the
-            // `m_BufferManager` itself is torn down in `Shutdown()` along
+            // `m_Subsystems.BufferManager()` itself is torn down in `Shutdown()` along
             // with the lease, so a fresh `Initialize(device)` after
             // `Shutdown()` will allocate a new buffer against the new
             // manager. Sized for `8 * frames-in-flight` bytes per
@@ -4363,7 +4289,7 @@ namespace Extrinsic::Graphics
             {
                 m_PickingReadbackBuffer.reset();
                 m_PickingReadbackBufferSize = 0u;
-                auto pickingReadbackOr = m_BufferManager->Create({
+                auto pickingReadbackOr = m_Subsystems.BufferManager()->Create({
                     .SizeBytes   = pickingReadbackBytes,
                     .Usage       = RHI::BufferUsage::TransferDst,
                     .HostVisible = true,
@@ -4409,12 +4335,12 @@ namespace Extrinsic::Graphics
             {
                 for (std::size_t slot = newSlotCount; slot < m_PickingSlotPending.size(); ++slot)
                 {
-                    if (m_PickingSlotPending[slot] && m_SelectionSystem)
+                    if (m_PickingSlotPending[slot] && m_Subsystems.SelectionSystemRegistry())
                     {
                         // RUNTIME-089 — resolve the truncated pending pick as a
                         // NoHit carrying its correlation Sequence so the runtime
                         // releases the exact in-flight request, not the oldest.
-                        m_SelectionSystem->PublishPickResult(PickReadbackResult{
+                        m_Subsystems.SelectionSystemRegistry()->PublishPickResult(PickReadbackResult{
                             .Hit      = false,
                             .Sequence = m_PickingSlotSequence[slot],
                         });
@@ -4465,7 +4391,7 @@ namespace Extrinsic::Graphics
             {
                 m_HistogramReadbackBuffer.reset();
                 m_HistogramReadbackBufferSize = 0u;
-                auto histogramReadbackOr = m_BufferManager->Create({
+                auto histogramReadbackOr = m_Subsystems.BufferManager()->Create({
                     .SizeBytes   = histogramReadbackBytes,
                     .Usage       = RHI::BufferUsage::TransferDst,
                     .HostVisible = true,
@@ -4524,14 +4450,14 @@ namespace Extrinsic::Graphics
                 m_SelectionEntityIdPass->SetPipeline(RHI::PipelineHandle{});
             }
             const RHI::PipelineDesc selectionEntityIdDesc = BuildSelectionEntityIdPipelineDesc();
-            auto selectionEntityIdPipeline = m_PipelineManager->Create(selectionEntityIdDesc);
+            auto selectionEntityIdPipeline = m_Subsystems.PipelineManager()->Create(selectionEntityIdDesc);
             if (selectionEntityIdPipeline.has_value())
             {
                 m_SelectionEntityIdPipelineLease.emplace(std::move(*selectionEntityIdPipeline));
                 if (m_SelectionEntityIdPass)
                 {
                     m_SelectionEntityIdPass->SetPipeline(
-                        m_PipelineManager->GetDeviceHandle(m_SelectionEntityIdPipelineLease->GetHandle()));
+                        m_Subsystems.PipelineManager()->GetDeviceHandle(m_SelectionEntityIdPipelineLease->GetHandle()));
                 }
             }
             else
@@ -4551,14 +4477,14 @@ namespace Extrinsic::Graphics
                 m_SelectionFaceIdPass->SetPipeline(RHI::PipelineHandle{});
             }
             const RHI::PipelineDesc selectionFaceIdDesc = BuildSelectionFaceIdPipelineDesc();
-            auto selectionFaceIdPipeline = m_PipelineManager->Create(selectionFaceIdDesc);
+            auto selectionFaceIdPipeline = m_Subsystems.PipelineManager()->Create(selectionFaceIdDesc);
             if (selectionFaceIdPipeline.has_value())
             {
                 m_SelectionFaceIdPipelineLease.emplace(std::move(*selectionFaceIdPipeline));
                 if (m_SelectionFaceIdPass)
                 {
                     m_SelectionFaceIdPass->SetPipeline(
-                        m_PipelineManager->GetDeviceHandle(m_SelectionFaceIdPipelineLease->GetHandle()));
+                        m_Subsystems.PipelineManager()->GetDeviceHandle(m_SelectionFaceIdPipelineLease->GetHandle()));
                 }
             }
             else
@@ -4573,14 +4499,14 @@ namespace Extrinsic::Graphics
                 m_SelectionEdgeIdPass->SetPipeline(RHI::PipelineHandle{});
             }
             const RHI::PipelineDesc selectionEdgeIdDesc = BuildSelectionEdgeIdPipelineDesc();
-            auto selectionEdgeIdPipeline = m_PipelineManager->Create(selectionEdgeIdDesc);
+            auto selectionEdgeIdPipeline = m_Subsystems.PipelineManager()->Create(selectionEdgeIdDesc);
             if (selectionEdgeIdPipeline.has_value())
             {
                 m_SelectionEdgeIdPipelineLease.emplace(std::move(*selectionEdgeIdPipeline));
                 if (m_SelectionEdgeIdPass)
                 {
                     m_SelectionEdgeIdPass->SetPipeline(
-                        m_PipelineManager->GetDeviceHandle(m_SelectionEdgeIdPipelineLease->GetHandle()));
+                        m_Subsystems.PipelineManager()->GetDeviceHandle(m_SelectionEdgeIdPipelineLease->GetHandle()));
                 }
             }
             else
@@ -4595,14 +4521,14 @@ namespace Extrinsic::Graphics
                 m_SelectionPointIdPass->SetPipeline(RHI::PipelineHandle{});
             }
             const RHI::PipelineDesc selectionPointIdDesc = BuildSelectionPointIdPipelineDesc();
-            auto selectionPointIdPipeline = m_PipelineManager->Create(selectionPointIdDesc);
+            auto selectionPointIdPipeline = m_Subsystems.PipelineManager()->Create(selectionPointIdDesc);
             if (selectionPointIdPipeline.has_value())
             {
                 m_SelectionPointIdPipelineLease.emplace(std::move(*selectionPointIdPipeline));
                 if (m_SelectionPointIdPass)
                 {
                     m_SelectionPointIdPass->SetPipeline(
-                        m_PipelineManager->GetDeviceHandle(m_SelectionPointIdPipelineLease->GetHandle()));
+                        m_Subsystems.PipelineManager()->GetDeviceHandle(m_SelectionPointIdPipelineLease->GetHandle()));
                 }
             }
             else
@@ -4622,14 +4548,14 @@ namespace Extrinsic::Graphics
             }
             const RHI::PipelineDesc selectionOutlineDesc =
                 BuildSelectionOutlinePipelineDesc(m_BackbufferFormat);
-            auto selectionOutlinePipeline = m_PipelineManager->Create(selectionOutlineDesc);
+            auto selectionOutlinePipeline = m_Subsystems.PipelineManager()->Create(selectionOutlineDesc);
             if (selectionOutlinePipeline.has_value())
             {
                 m_SelectionOutlinePipelineLease.emplace(std::move(*selectionOutlinePipeline));
                 if (m_SelectionOutlinePass)
                 {
                     m_SelectionOutlinePass->SetPipeline(
-                        m_PipelineManager->GetDeviceHandle(m_SelectionOutlinePipelineLease->GetHandle()));
+                        m_Subsystems.PipelineManager()->GetDeviceHandle(m_SelectionOutlinePipelineLease->GetHandle()));
                 }
             }
             else
@@ -4652,14 +4578,14 @@ namespace Extrinsic::Graphics
             }
             const RHI::PipelineDesc postProcessToneMapDesc =
                 BuildPostProcessToneMapPipelineDesc(m_BackbufferFormat);
-            auto postProcessToneMapPipeline = m_PipelineManager->Create(postProcessToneMapDesc);
+            auto postProcessToneMapPipeline = m_Subsystems.PipelineManager()->Create(postProcessToneMapDesc);
             if (postProcessToneMapPipeline.has_value())
             {
                 m_PostProcessToneMapPipelineLease.emplace(std::move(*postProcessToneMapPipeline));
                 if (m_PostProcessToneMapPass)
                 {
                     m_PostProcessToneMapPass->SetPipeline(
-                        m_PipelineManager->GetDeviceHandle(m_PostProcessToneMapPipelineLease->GetHandle()));
+                        m_Subsystems.PipelineManager()->GetDeviceHandle(m_PostProcessToneMapPipelineLease->GetHandle()));
                 }
             }
             else
@@ -4684,14 +4610,14 @@ namespace Extrinsic::Graphics
             }
             const RHI::PipelineDesc postProcessBloomDownsampleDesc =
                 BuildPostProcessBloomDownsamplePipelineDesc();
-            auto postProcessBloomDownsamplePipeline = m_PipelineManager->Create(postProcessBloomDownsampleDesc);
+            auto postProcessBloomDownsamplePipeline = m_Subsystems.PipelineManager()->Create(postProcessBloomDownsampleDesc);
             if (postProcessBloomDownsamplePipeline.has_value())
             {
                 m_PostProcessBloomDownsamplePipelineLease.emplace(std::move(*postProcessBloomDownsamplePipeline));
                 if (m_PostProcessBloomPass)
                 {
                     m_PostProcessBloomPass->SetDownsamplePipeline(
-                        m_PipelineManager->GetDeviceHandle(m_PostProcessBloomDownsamplePipelineLease->GetHandle()));
+                        m_Subsystems.PipelineManager()->GetDeviceHandle(m_PostProcessBloomDownsamplePipelineLease->GetHandle()));
                 }
             }
             else
@@ -4702,14 +4628,14 @@ namespace Extrinsic::Graphics
 
             const RHI::PipelineDesc postProcessBloomUpsampleDesc =
                 BuildPostProcessBloomUpsamplePipelineDesc();
-            auto postProcessBloomUpsamplePipeline = m_PipelineManager->Create(postProcessBloomUpsampleDesc);
+            auto postProcessBloomUpsamplePipeline = m_Subsystems.PipelineManager()->Create(postProcessBloomUpsampleDesc);
             if (postProcessBloomUpsamplePipeline.has_value())
             {
                 m_PostProcessBloomUpsamplePipelineLease.emplace(std::move(*postProcessBloomUpsamplePipeline));
                 if (m_PostProcessBloomPass)
                 {
                     m_PostProcessBloomPass->SetUpsamplePipeline(
-                        m_PipelineManager->GetDeviceHandle(m_PostProcessBloomUpsamplePipelineLease->GetHandle()));
+                        m_Subsystems.PipelineManager()->GetDeviceHandle(m_PostProcessBloomUpsamplePipelineLease->GetHandle()));
                 }
             }
             else
@@ -4734,14 +4660,14 @@ namespace Extrinsic::Graphics
             }
             const RHI::PipelineDesc postProcessFXAADesc =
                 BuildPostProcessFXAAPipelineDesc(m_BackbufferFormat);
-            auto postProcessFXAAPipeline = m_PipelineManager->Create(postProcessFXAADesc);
+            auto postProcessFXAAPipeline = m_Subsystems.PipelineManager()->Create(postProcessFXAADesc);
             if (postProcessFXAAPipeline.has_value())
             {
                 m_PostProcessFXAAPipelineLease.emplace(std::move(*postProcessFXAAPipeline));
                 if (m_PostProcessFXAAPass)
                 {
                     m_PostProcessFXAAPass->SetPipeline(
-                        m_PipelineManager->GetDeviceHandle(m_PostProcessFXAAPipelineLease->GetHandle()));
+                        m_Subsystems.PipelineManager()->GetDeviceHandle(m_PostProcessFXAAPipelineLease->GetHandle()));
                 }
             }
             else
@@ -4776,14 +4702,14 @@ namespace Extrinsic::Graphics
             }
             const RHI::PipelineDesc postProcessSMAAEdgeDesc =
                 BuildPostProcessSMAAEdgePipelineDesc();
-            auto postProcessSMAAEdgePipeline = m_PipelineManager->Create(postProcessSMAAEdgeDesc);
+            auto postProcessSMAAEdgePipeline = m_Subsystems.PipelineManager()->Create(postProcessSMAAEdgeDesc);
             if (postProcessSMAAEdgePipeline.has_value())
             {
                 m_PostProcessSMAAEdgePipelineLease.emplace(std::move(*postProcessSMAAEdgePipeline));
                 if (m_PostProcessSMAAPass)
                 {
                     m_PostProcessSMAAPass->SetEdgePipeline(
-                        m_PipelineManager->GetDeviceHandle(m_PostProcessSMAAEdgePipelineLease->GetHandle()));
+                        m_Subsystems.PipelineManager()->GetDeviceHandle(m_PostProcessSMAAEdgePipelineLease->GetHandle()));
                 }
             }
             else
@@ -4793,14 +4719,14 @@ namespace Extrinsic::Graphics
             }
             const RHI::PipelineDesc postProcessSMAABlendDesc =
                 BuildPostProcessSMAABlendPipelineDesc();
-            auto postProcessSMAABlendPipeline = m_PipelineManager->Create(postProcessSMAABlendDesc);
+            auto postProcessSMAABlendPipeline = m_Subsystems.PipelineManager()->Create(postProcessSMAABlendDesc);
             if (postProcessSMAABlendPipeline.has_value())
             {
                 m_PostProcessSMAABlendPipelineLease.emplace(std::move(*postProcessSMAABlendPipeline));
                 if (m_PostProcessSMAAPass)
                 {
                     m_PostProcessSMAAPass->SetBlendPipeline(
-                        m_PipelineManager->GetDeviceHandle(m_PostProcessSMAABlendPipelineLease->GetHandle()));
+                        m_Subsystems.PipelineManager()->GetDeviceHandle(m_PostProcessSMAABlendPipelineLease->GetHandle()));
                 }
             }
             else
@@ -4810,14 +4736,14 @@ namespace Extrinsic::Graphics
             }
             const RHI::PipelineDesc postProcessSMAAResolveDesc =
                 BuildPostProcessSMAAResolvePipelineDesc(m_BackbufferFormat);
-            auto postProcessSMAAResolvePipeline = m_PipelineManager->Create(postProcessSMAAResolveDesc);
+            auto postProcessSMAAResolvePipeline = m_Subsystems.PipelineManager()->Create(postProcessSMAAResolveDesc);
             if (postProcessSMAAResolvePipeline.has_value())
             {
                 m_PostProcessSMAAResolvePipelineLease.emplace(std::move(*postProcessSMAAResolvePipeline));
                 if (m_PostProcessSMAAPass)
                 {
                     m_PostProcessSMAAPass->SetResolvePipeline(
-                        m_PipelineManager->GetDeviceHandle(m_PostProcessSMAAResolvePipelineLease->GetHandle()));
+                        m_Subsystems.PipelineManager()->GetDeviceHandle(m_PostProcessSMAAResolvePipelineLease->GetHandle()));
                 }
             }
             else
@@ -4839,14 +4765,14 @@ namespace Extrinsic::Graphics
             }
             const RHI::PipelineDesc postProcessHistogramDesc =
                 BuildPostProcessHistogramPipelineDesc();
-            auto postProcessHistogramPipeline = m_PipelineManager->Create(postProcessHistogramDesc);
+            auto postProcessHistogramPipeline = m_Subsystems.PipelineManager()->Create(postProcessHistogramDesc);
             if (postProcessHistogramPipeline.has_value())
             {
                 m_PostProcessHistogramPipelineLease.emplace(std::move(*postProcessHistogramPipeline));
                 if (m_PostProcessHistogramPass)
                 {
                     m_PostProcessHistogramPass->SetPipeline(
-                        m_PipelineManager->GetDeviceHandle(m_PostProcessHistogramPipelineLease->GetHandle()));
+                        m_Subsystems.PipelineManager()->GetDeviceHandle(m_PostProcessHistogramPipelineLease->GetHandle()));
                 }
             }
             else
@@ -4870,12 +4796,12 @@ namespace Extrinsic::Graphics
             m_PresentPass.SetPipeline(RHI::PipelineHandle{});
             const RHI::PipelineDesc presentDesc =
                 BuildPresentPipelineDesc(m_BackbufferFormat);
-            auto presentPipeline = m_PipelineManager->Create(presentDesc);
+            auto presentPipeline = m_Subsystems.PipelineManager()->Create(presentDesc);
             if (presentPipeline.has_value())
             {
                 m_PresentPipelineLease.emplace(std::move(*presentPipeline));
                 m_PresentPass.SetPipeline(
-                    m_PipelineManager->GetDeviceHandle(m_PresentPipelineLease->GetHandle()));
+                    m_Subsystems.PipelineManager()->GetDeviceHandle(m_PresentPipelineLease->GetHandle()));
             }
             else
             {
@@ -4900,14 +4826,14 @@ namespace Extrinsic::Graphics
                 m_DebugViewPass->SetPipeline(RHI::PipelineHandle{});
             }
             const RHI::PipelineDesc debugViewDesc = BuildDebugViewPipelineDesc();
-            auto debugViewPipeline = m_PipelineManager->Create(debugViewDesc);
+            auto debugViewPipeline = m_Subsystems.PipelineManager()->Create(debugViewDesc);
             if (debugViewPipeline.has_value())
             {
                 m_DebugViewPipelineLease.emplace(std::move(*debugViewPipeline));
                 if (m_DebugViewPass)
                 {
                     m_DebugViewPass->SetPipeline(
-                        m_PipelineManager->GetDeviceHandle(m_DebugViewPipelineLease->GetHandle()));
+                        m_Subsystems.PipelineManager()->GetDeviceHandle(m_DebugViewPipelineLease->GetHandle()));
                 }
             }
             else
@@ -4967,13 +4893,13 @@ namespace Extrinsic::Graphics
 
             const RHI::PipelineDesc triangleDepthTestedDesc =
                 BuildTransientDebugTrianglePipelineDesc(true);
-            auto triangleDepthTestedPipeline = m_PipelineManager->Create(triangleDepthTestedDesc);
+            auto triangleDepthTestedPipeline = m_Subsystems.PipelineManager()->Create(triangleDepthTestedDesc);
             if (triangleDepthTestedPipeline.has_value())
             {
                 m_TransientDebugTrianglePipelineLeaseDepthTested.emplace(
                     std::move(*triangleDepthTestedPipeline));
                 m_TransientDebugSurfacePass.SetTriangleDepthTestedPipeline(
-                    m_PipelineManager->GetDeviceHandle(
+                    m_Subsystems.PipelineManager()->GetDeviceHandle(
                         m_TransientDebugTrianglePipelineLeaseDepthTested->GetHandle()));
             }
             else
@@ -4986,13 +4912,13 @@ namespace Extrinsic::Graphics
 
             const RHI::PipelineDesc triangleAlwaysOnTopDesc =
                 BuildTransientDebugTrianglePipelineDesc(false);
-            auto triangleAlwaysOnTopPipeline = m_PipelineManager->Create(triangleAlwaysOnTopDesc);
+            auto triangleAlwaysOnTopPipeline = m_Subsystems.PipelineManager()->Create(triangleAlwaysOnTopDesc);
             if (triangleAlwaysOnTopPipeline.has_value())
             {
                 m_TransientDebugTrianglePipelineLeaseAlwaysOnTop.emplace(
                     std::move(*triangleAlwaysOnTopPipeline));
                 m_TransientDebugSurfacePass.SetTriangleAlwaysOnTopPipeline(
-                    m_PipelineManager->GetDeviceHandle(
+                    m_Subsystems.PipelineManager()->GetDeviceHandle(
                         m_TransientDebugTrianglePipelineLeaseAlwaysOnTop->GetHandle()));
             }
             else
@@ -5005,13 +4931,13 @@ namespace Extrinsic::Graphics
 
             const RHI::PipelineDesc lineDepthTestedDesc =
                 BuildTransientDebugLinePipelineDesc(true);
-            auto lineDepthTestedPipeline = m_PipelineManager->Create(lineDepthTestedDesc);
+            auto lineDepthTestedPipeline = m_Subsystems.PipelineManager()->Create(lineDepthTestedDesc);
             if (lineDepthTestedPipeline.has_value())
             {
                 m_TransientDebugLinePipelineLeaseDepthTested.emplace(
                     std::move(*lineDepthTestedPipeline));
                 m_TransientDebugSurfacePass.SetLineDepthTestedPipeline(
-                    m_PipelineManager->GetDeviceHandle(
+                    m_Subsystems.PipelineManager()->GetDeviceHandle(
                         m_TransientDebugLinePipelineLeaseDepthTested->GetHandle()));
             }
             else
@@ -5024,13 +4950,13 @@ namespace Extrinsic::Graphics
 
             const RHI::PipelineDesc lineAlwaysOnTopDesc =
                 BuildTransientDebugLinePipelineDesc(false);
-            auto lineAlwaysOnTopPipeline = m_PipelineManager->Create(lineAlwaysOnTopDesc);
+            auto lineAlwaysOnTopPipeline = m_Subsystems.PipelineManager()->Create(lineAlwaysOnTopDesc);
             if (lineAlwaysOnTopPipeline.has_value())
             {
                 m_TransientDebugLinePipelineLeaseAlwaysOnTop.emplace(
                     std::move(*lineAlwaysOnTopPipeline));
                 m_TransientDebugSurfacePass.SetLineAlwaysOnTopPipeline(
-                    m_PipelineManager->GetDeviceHandle(
+                    m_Subsystems.PipelineManager()->GetDeviceHandle(
                         m_TransientDebugLinePipelineLeaseAlwaysOnTop->GetHandle()));
             }
             else
@@ -5043,13 +4969,13 @@ namespace Extrinsic::Graphics
 
             const RHI::PipelineDesc pointDepthTestedDesc =
                 BuildTransientDebugPointPipelineDesc(true);
-            auto pointDepthTestedPipeline = m_PipelineManager->Create(pointDepthTestedDesc);
+            auto pointDepthTestedPipeline = m_Subsystems.PipelineManager()->Create(pointDepthTestedDesc);
             if (pointDepthTestedPipeline.has_value())
             {
                 m_TransientDebugPointPipelineLeaseDepthTested.emplace(
                     std::move(*pointDepthTestedPipeline));
                 m_TransientDebugSurfacePass.SetPointDepthTestedPipeline(
-                    m_PipelineManager->GetDeviceHandle(
+                    m_Subsystems.PipelineManager()->GetDeviceHandle(
                         m_TransientDebugPointPipelineLeaseDepthTested->GetHandle()));
             }
             else
@@ -5062,13 +4988,13 @@ namespace Extrinsic::Graphics
 
             const RHI::PipelineDesc pointAlwaysOnTopDesc =
                 BuildTransientDebugPointPipelineDesc(false);
-            auto pointAlwaysOnTopPipeline = m_PipelineManager->Create(pointAlwaysOnTopDesc);
+            auto pointAlwaysOnTopPipeline = m_Subsystems.PipelineManager()->Create(pointAlwaysOnTopDesc);
             if (pointAlwaysOnTopPipeline.has_value())
             {
                 m_TransientDebugPointPipelineLeaseAlwaysOnTop.emplace(
                     std::move(*pointAlwaysOnTopPipeline));
                 m_TransientDebugSurfacePass.SetPointAlwaysOnTopPipeline(
-                    m_PipelineManager->GetDeviceHandle(
+                    m_Subsystems.PipelineManager()->GetDeviceHandle(
                         m_TransientDebugPointPipelineLeaseAlwaysOnTop->GetHandle()));
             }
             else
@@ -5091,13 +5017,13 @@ namespace Extrinsic::Graphics
             const RHI::PipelineDesc vectorFieldDepthTestedDesc =
                 BuildVisualizationVectorFieldPipelineDesc(true);
             auto vectorFieldDepthTestedPipeline =
-                m_PipelineManager->Create(vectorFieldDepthTestedDesc);
+                m_Subsystems.PipelineManager()->Create(vectorFieldDepthTestedDesc);
             if (vectorFieldDepthTestedPipeline.has_value())
             {
                 m_VisualizationOverlayVectorFieldPipelineLeaseDepthTested.emplace(
                     std::move(*vectorFieldDepthTestedPipeline));
                 m_VisualizationOverlayPass.SetVectorFieldDepthTestedPipeline(
-                    m_PipelineManager->GetDeviceHandle(
+                    m_Subsystems.PipelineManager()->GetDeviceHandle(
                         m_VisualizationOverlayVectorFieldPipelineLeaseDepthTested->GetHandle()));
             }
             else
@@ -5111,13 +5037,13 @@ namespace Extrinsic::Graphics
             const RHI::PipelineDesc vectorFieldAlwaysOnTopDesc =
                 BuildVisualizationVectorFieldPipelineDesc(false);
             auto vectorFieldAlwaysOnTopPipeline =
-                m_PipelineManager->Create(vectorFieldAlwaysOnTopDesc);
+                m_Subsystems.PipelineManager()->Create(vectorFieldAlwaysOnTopDesc);
             if (vectorFieldAlwaysOnTopPipeline.has_value())
             {
                 m_VisualizationOverlayVectorFieldPipelineLeaseAlwaysOnTop.emplace(
                     std::move(*vectorFieldAlwaysOnTopPipeline));
                 m_VisualizationOverlayPass.SetVectorFieldAlwaysOnTopPipeline(
-                    m_PipelineManager->GetDeviceHandle(
+                    m_Subsystems.PipelineManager()->GetDeviceHandle(
                         m_VisualizationOverlayVectorFieldPipelineLeaseAlwaysOnTop->GetHandle()));
             }
             else
@@ -5140,13 +5066,13 @@ namespace Extrinsic::Graphics
             const RHI::PipelineDesc isolineDepthTestedDesc =
                 BuildVisualizationIsolinePipelineDesc(true);
             auto isolineDepthTestedPipeline =
-                m_PipelineManager->Create(isolineDepthTestedDesc);
+                m_Subsystems.PipelineManager()->Create(isolineDepthTestedDesc);
             if (isolineDepthTestedPipeline.has_value())
             {
                 m_VisualizationOverlayIsolinePipelineLeaseDepthTested.emplace(
                     std::move(*isolineDepthTestedPipeline));
                 m_VisualizationOverlayPass.SetIsolineDepthTestedPipeline(
-                    m_PipelineManager->GetDeviceHandle(
+                    m_Subsystems.PipelineManager()->GetDeviceHandle(
                         m_VisualizationOverlayIsolinePipelineLeaseDepthTested->GetHandle()));
             }
             else
@@ -5160,13 +5086,13 @@ namespace Extrinsic::Graphics
             const RHI::PipelineDesc isolineAlwaysOnTopDesc =
                 BuildVisualizationIsolinePipelineDesc(false);
             auto isolineAlwaysOnTopPipeline =
-                m_PipelineManager->Create(isolineAlwaysOnTopDesc);
+                m_Subsystems.PipelineManager()->Create(isolineAlwaysOnTopDesc);
             if (isolineAlwaysOnTopPipeline.has_value())
             {
                 m_VisualizationOverlayIsolinePipelineLeaseAlwaysOnTop.emplace(
                     std::move(*isolineAlwaysOnTopPipeline));
                 m_VisualizationOverlayPass.SetIsolineAlwaysOnTopPipeline(
-                    m_PipelineManager->GetDeviceHandle(
+                    m_Subsystems.PipelineManager()->GetDeviceHandle(
                         m_VisualizationOverlayIsolinePipelineLeaseAlwaysOnTop->GetHandle()));
             }
             else
@@ -5185,7 +5111,7 @@ namespace Extrinsic::Graphics
             // `SkippedUnavailable` rather than retaining a stale device handle.
             m_HZBBuildPipelineLease.reset();
             const RHI::PipelineDesc hzbBuildDesc = BuildHZBBuildPipelineDesc();
-            auto hzbBuildPipeline = m_PipelineManager->Create(hzbBuildDesc);
+            auto hzbBuildPipeline = m_Subsystems.PipelineManager()->Create(hzbBuildDesc);
             if (hzbBuildPipeline.has_value())
             {
                 m_HZBBuildPipelineLease.emplace(std::move(*hzbBuildPipeline));
@@ -5204,7 +5130,7 @@ namespace Extrinsic::Graphics
             m_ClusterGridBuildPipelineLease.reset();
             const RHI::PipelineDesc clusterGridBuildDesc =
                 BuildClusterGridBuildPipelineDesc();
-            auto clusterGridBuildPipeline = m_PipelineManager->Create(clusterGridBuildDesc);
+            auto clusterGridBuildPipeline = m_Subsystems.PipelineManager()->Create(clusterGridBuildDesc);
             if (clusterGridBuildPipeline.has_value())
             {
                 m_ClusterGridBuildPipelineLease.emplace(std::move(*clusterGridBuildPipeline));
@@ -5220,7 +5146,7 @@ namespace Extrinsic::Graphics
             const RHI::PipelineDesc clusterLightAssignmentDesc =
                 BuildClusterLightAssignmentPipelineDesc();
             auto clusterLightAssignmentPipeline =
-                m_PipelineManager->Create(clusterLightAssignmentDesc);
+                m_Subsystems.PipelineManager()->Create(clusterLightAssignmentDesc);
             if (clusterLightAssignmentPipeline.has_value())
             {
                 m_ClusterLightAssignmentPipelineLease.emplace(
@@ -5249,14 +5175,14 @@ namespace Extrinsic::Graphics
                 m_ImGuiPass->SetPipeline(RHI::PipelineHandle{});
             }
             const RHI::PipelineDesc imguiDesc = BuildImGuiPipelineDesc(m_BackbufferFormat);
-            auto imguiPipeline = m_PipelineManager->Create(imguiDesc);
+            auto imguiPipeline = m_Subsystems.PipelineManager()->Create(imguiDesc);
             if (imguiPipeline.has_value())
             {
                 m_ImGuiPipelineLease.emplace(std::move(*imguiPipeline));
                 if (m_ImGuiPass)
                 {
                     m_ImGuiPass->SetPipeline(
-                        m_PipelineManager->GetDeviceHandle(m_ImGuiPipelineLease->GetHandle()));
+                        m_Subsystems.PipelineManager()->GetDeviceHandle(m_ImGuiPipelineLease->GetHandle()));
                 }
             }
             else
@@ -5268,7 +5194,7 @@ namespace Extrinsic::Graphics
             {
                 const RHI::PipelineDesc imguiRgba8Desc =
                     BuildImGuiPipelineDesc(RHI::Format::RGBA8_UNORM);
-                auto imguiRgba8Pipeline = m_PipelineManager->Create(imguiRgba8Desc);
+                auto imguiRgba8Pipeline = m_Subsystems.PipelineManager()->Create(imguiRgba8Desc);
                 if (imguiRgba8Pipeline.has_value())
                 {
                     m_ImGuiRgba8PipelineLease.emplace(std::move(*imguiRgba8Pipeline));
@@ -5555,7 +5481,7 @@ namespace Extrinsic::Graphics
             {
                 return;
             }
-            if (m_PickingSlotPending.empty() || !m_SelectionSystem)
+            if (m_PickingSlotPending.empty() || !m_Subsystems.SelectionSystemRegistry())
             {
                 return;
             }
@@ -5592,14 +5518,14 @@ namespace Extrinsic::Graphics
                 const std::uint64_t slotSequence = m_PickingSlotSequence[slot];
                 if (m_PickingSlotInvalidated[slot] || entityId == 0u)
                 {
-                    m_SelectionSystem->PublishPickResult(PickReadbackResult{
+                    m_Subsystems.SelectionSystemRegistry()->PublishPickResult(PickReadbackResult{
                         .Hit      = false,
                         .Sequence = slotSequence,
                     });
                 }
                 else
                 {
-                    m_SelectionSystem->PublishPickResult(PickReadbackResult{
+                    m_Subsystems.SelectionSystemRegistry()->PublishPickResult(PickReadbackResult{
                         .EncodedId      = encoded,
                         .StableEntityId = entityId,
                         .Hit            = true,
@@ -5638,7 +5564,7 @@ namespace Extrinsic::Graphics
             {
                 return;
             }
-            if (m_HistogramSlotPending.empty() || !m_PostProcessSystem.has_value())
+            if (m_HistogramSlotPending.empty() || !m_Subsystems.PostProcessSystemRegistry().has_value())
             {
                 return;
             }
@@ -5676,7 +5602,7 @@ namespace Extrinsic::Graphics
                                          kHistogramReadbackSlotBytes,
                                          slotOffset);
                 }
-                m_PostProcessSystem->PublishHistogramReadback(
+                m_Subsystems.PostProcessSystemRegistry()->PublishHistogramReadback(
                     std::span<const std::uint32_t>{bins.data(), bins.size()},
                     m_HistogramSlotIssuedFrame[slot],
                     m_Device);
@@ -5690,9 +5616,9 @@ namespace Extrinsic::Graphics
         void ResetFrameState()
         {
             m_ActiveRuntimeSnapshotReadSlot = 0u;
-            if (m_MaterialSystem)
+            if (m_Subsystems.MaterialSystemRegistry())
             {
-                m_MaterialSystem->ResetPerFrameSubstitutionCounters();
+                m_Subsystems.MaterialSystemRegistry()->ResetPerFrameSubstitutionCounters();
             }
             m_HasExtractedRenderWorld = false;
             m_HasPreparedFrame = false;
@@ -5729,13 +5655,13 @@ namespace Extrinsic::Graphics
                 }
             }
 
-            if (m_LightSystem)
+            if (m_Subsystems.LightSystemRegistry())
             {
-                m_LightSystem->ApplyTo(camera);
+                m_Subsystems.LightSystemRegistry()->ApplyTo(camera);
             }
-            if (m_ShadowSystem)
+            if (m_Subsystems.ShadowSystemRegistry())
             {
-                m_ShadowSystem->ApplyTo(camera);
+                m_Subsystems.ShadowSystemRegistry()->ApplyTo(camera);
             }
             return camera;
         }
@@ -5789,8 +5715,8 @@ namespace Extrinsic::Graphics
             };
             std::array<glm::vec4, 1u> output{};
 
-            const float exposure = m_PostProcessSystem.has_value()
-                ? m_PostProcessSystem->GetSettings().Exposure
+            const float exposure = m_Subsystems.PostProcessSystemRegistry().has_value()
+                ? m_Subsystems.PostProcessSystemRegistry()->GetSettings().Exposure
                 : 1.0f;
             const ReconstructionResult result = m_ReferenceTAAReconstructor.Apply(
                 ReconstructionColorView{.Pixels = currentColor, .Extent = kReferenceExtent},
@@ -5831,8 +5757,8 @@ namespace Extrinsic::Graphics
                 return RenderCommandPassStatus::SkippedUnavailable;
             }
 
-            m_CullingSystem->ResetCounters(cmd);
-            m_CullingSystem->DispatchCull(cmd, camera, *m_GpuWorld);
+            m_Subsystems.CullingSystemRegistry()->ResetCounters(cmd);
+            m_Subsystems.CullingSystemRegistry()->DispatchCull(cmd, camera, *m_Subsystems.GpuWorldSystem());
             return RenderCommandPassStatus::Recorded;
         }
 
@@ -5857,12 +5783,12 @@ namespace Extrinsic::Graphics
             if (!m_CullingOutputAvailable || !m_ForwardSurfacePass.has_value() ||
                 !m_ForwardSurfacePipelineLease.has_value() ||
                 !m_ForwardSurfacePipelineLease->IsValid() ||
-                !m_GpuWorld.has_value() || !m_CullingSystem.has_value())
+                !m_Subsystems.GpuWorldSystem().has_value() || !m_Subsystems.CullingSystemRegistry().has_value())
             {
                 return RenderCommandPassStatus::SkippedUnavailable;
             }
 
-            m_ForwardSurfacePass->Execute(cmd, camera, *m_GpuWorld, *m_CullingSystem, frameIndex);
+            m_ForwardSurfacePass->Execute(cmd, camera, *m_Subsystems.GpuWorldSystem(), *m_Subsystems.CullingSystemRegistry(), frameIndex);
             return RenderCommandPassStatus::Recorded;
         }
 
@@ -5877,12 +5803,12 @@ namespace Extrinsic::Graphics
             if (!m_CullingOutputAvailable || !m_ForwardLinePass.has_value() ||
                 !m_ForwardLinePipelineLease.has_value() ||
                 !m_ForwardLinePipelineLease->IsValid() ||
-                !m_GpuWorld.has_value() || !m_CullingSystem.has_value())
+                !m_Subsystems.GpuWorldSystem().has_value() || !m_Subsystems.CullingSystemRegistry().has_value())
             {
                 return RenderCommandPassStatus::SkippedUnavailable;
             }
 
-            m_ForwardLinePass->Execute(cmd, camera, *m_GpuWorld, *m_CullingSystem, frameIndex);
+            m_ForwardLinePass->Execute(cmd, camera, *m_Subsystems.GpuWorldSystem(), *m_Subsystems.CullingSystemRegistry(), frameIndex);
             return RenderCommandPassStatus::Recorded;
         }
 
@@ -5897,12 +5823,12 @@ namespace Extrinsic::Graphics
             if (!m_CullingOutputAvailable || !m_ForwardPointPass.has_value() ||
                 !m_ForwardPointPipelineLease.has_value() ||
                 !m_ForwardPointPipelineLease->IsValid() ||
-                !m_GpuWorld.has_value() || !m_CullingSystem.has_value())
+                !m_Subsystems.GpuWorldSystem().has_value() || !m_Subsystems.CullingSystemRegistry().has_value())
             {
                 return RenderCommandPassStatus::SkippedUnavailable;
             }
 
-            m_ForwardPointPass->Execute(cmd, camera, *m_GpuWorld, *m_CullingSystem, frameIndex);
+            m_ForwardPointPass->Execute(cmd, camera, *m_Subsystems.GpuWorldSystem(), *m_Subsystems.CullingSystemRegistry(), frameIndex);
             return RenderCommandPassStatus::Recorded;
         }
 
@@ -5923,12 +5849,12 @@ namespace Extrinsic::Graphics
             if (!m_CullingOutputAvailable || !m_ShadowPass.has_value() ||
                 !m_ShadowPipelineLease.has_value() ||
                 !m_ShadowPipelineLease->IsValid() ||
-                !m_GpuWorld.has_value() || !m_CullingSystem.has_value())
+                !m_Subsystems.GpuWorldSystem().has_value() || !m_Subsystems.CullingSystemRegistry().has_value())
             {
                 return RenderCommandPassStatus::SkippedUnavailable;
             }
 
-            m_ShadowPass->Execute(cmd, camera, *m_GpuWorld, *m_CullingSystem, frameIndex);
+            m_ShadowPass->Execute(cmd, camera, *m_Subsystems.GpuWorldSystem(), *m_Subsystems.CullingSystemRegistry(), frameIndex);
             return RenderCommandPassStatus::Recorded;
         }
 
@@ -5957,12 +5883,12 @@ namespace Extrinsic::Graphics
             if (!m_CullingOutputAvailable || !m_SelectionEntityIdPass.has_value() ||
                 !m_SelectionEntityIdPipelineLease.has_value() ||
                 !m_SelectionEntityIdPipelineLease->IsValid() ||
-                !m_GpuWorld.has_value() || !m_CullingSystem.has_value())
+                !m_Subsystems.GpuWorldSystem().has_value() || !m_Subsystems.CullingSystemRegistry().has_value())
             {
                 return RenderCommandPassStatus::SkippedUnavailable;
             }
 
-            m_SelectionEntityIdPass->Execute(cmd, camera, *m_GpuWorld, *m_CullingSystem, frameIndex);
+            m_SelectionEntityIdPass->Execute(cmd, camera, *m_Subsystems.GpuWorldSystem(), *m_Subsystems.CullingSystemRegistry(), frameIndex);
             return RenderCommandPassStatus::Recorded;
         }
 
@@ -5997,12 +5923,12 @@ namespace Extrinsic::Graphics
             if (!m_CullingOutputAvailable || !m_SelectionFaceIdPass.has_value() ||
                 !m_SelectionFaceIdPipelineLease.has_value() ||
                 !m_SelectionFaceIdPipelineLease->IsValid() ||
-                !m_GpuWorld.has_value() || !m_CullingSystem.has_value())
+                !m_Subsystems.GpuWorldSystem().has_value() || !m_Subsystems.CullingSystemRegistry().has_value())
             {
                 return RenderCommandPassStatus::SkippedUnavailable;
             }
 
-            m_SelectionFaceIdPass->Execute(cmd, camera, *m_GpuWorld, *m_CullingSystem, frameIndex);
+            m_SelectionFaceIdPass->Execute(cmd, camera, *m_Subsystems.GpuWorldSystem(), *m_Subsystems.CullingSystemRegistry(), frameIndex);
             return RenderCommandPassStatus::Recorded;
         }
 
@@ -6017,12 +5943,12 @@ namespace Extrinsic::Graphics
             if (!m_CullingOutputAvailable || !m_SelectionEdgeIdPass.has_value() ||
                 !m_SelectionEdgeIdPipelineLease.has_value() ||
                 !m_SelectionEdgeIdPipelineLease->IsValid() ||
-                !m_GpuWorld.has_value() || !m_CullingSystem.has_value())
+                !m_Subsystems.GpuWorldSystem().has_value() || !m_Subsystems.CullingSystemRegistry().has_value())
             {
                 return RenderCommandPassStatus::SkippedUnavailable;
             }
 
-            m_SelectionEdgeIdPass->Execute(cmd, camera, *m_GpuWorld, *m_CullingSystem, frameIndex);
+            m_SelectionEdgeIdPass->Execute(cmd, camera, *m_Subsystems.GpuWorldSystem(), *m_Subsystems.CullingSystemRegistry(), frameIndex);
             return RenderCommandPassStatus::Recorded;
         }
 
@@ -6037,12 +5963,12 @@ namespace Extrinsic::Graphics
             if (!m_CullingOutputAvailable || !m_SelectionPointIdPass.has_value() ||
                 !m_SelectionPointIdPipelineLease.has_value() ||
                 !m_SelectionPointIdPipelineLease->IsValid() ||
-                !m_GpuWorld.has_value() || !m_CullingSystem.has_value())
+                !m_Subsystems.GpuWorldSystem().has_value() || !m_Subsystems.CullingSystemRegistry().has_value())
             {
                 return RenderCommandPassStatus::SkippedUnavailable;
             }
 
-            m_SelectionPointIdPass->Execute(cmd, camera, *m_GpuWorld, *m_CullingSystem, frameIndex);
+            m_SelectionPointIdPass->Execute(cmd, camera, *m_Subsystems.GpuWorldSystem(), *m_Subsystems.CullingSystemRegistry(), frameIndex);
             return RenderCommandPassStatus::Recorded;
         }
 
@@ -6105,7 +6031,7 @@ namespace Extrinsic::Graphics
             {
                 return RenderCommandPassStatus::SkippedNonOperational;
             }
-            if (!m_PostProcessSystem.has_value() ||
+            if (!m_Subsystems.PostProcessSystemRegistry().has_value() ||
                 !m_PostProcessToneMapPass.has_value() ||
                 !m_PostProcessToneMapPipelineLease.has_value() ||
                 !m_PostProcessToneMapPipelineLease->IsValid())
@@ -6151,7 +6077,7 @@ namespace Extrinsic::Graphics
             const bool hasUpsamplePipeline =
                 m_PostProcessBloomUpsamplePipelineLease.has_value() &&
                 m_PostProcessBloomUpsamplePipelineLease->IsValid();
-            if (!m_PostProcessSystem.has_value() ||
+            if (!m_Subsystems.PostProcessSystemRegistry().has_value() ||
                 !m_PostProcessBloomPass.has_value() ||
                 (!hasDownsamplePipeline && !hasUpsamplePipeline))
             {
@@ -6190,7 +6116,7 @@ namespace Extrinsic::Graphics
             {
                 return RenderCommandPassStatus::SkippedNonOperational;
             }
-            if (!m_PostProcessSystem.has_value() ||
+            if (!m_Subsystems.PostProcessSystemRegistry().has_value() ||
                 !m_PostProcessHistogramPass.has_value() ||
                 !m_PostProcessHistogramPipelineLease.has_value() ||
                 !m_PostProcessHistogramPipelineLease->IsValid())
@@ -6223,7 +6149,7 @@ namespace Extrinsic::Graphics
             {
                 return RenderCommandPassStatus::SkippedNonOperational;
             }
-            if (!m_PostProcessSystem.has_value() ||
+            if (!m_Subsystems.PostProcessSystemRegistry().has_value() ||
                 !m_PostProcessSMAAPass.has_value() ||
                 !m_PostProcessSMAAEdgePipelineLease.has_value() ||
                 !m_PostProcessSMAAEdgePipelineLease->IsValid())
@@ -6242,7 +6168,7 @@ namespace Extrinsic::Graphics
             {
                 return RenderCommandPassStatus::SkippedNonOperational;
             }
-            if (!m_PostProcessSystem.has_value() ||
+            if (!m_Subsystems.PostProcessSystemRegistry().has_value() ||
                 !m_PostProcessSMAAPass.has_value() ||
                 !m_PostProcessSMAABlendPipelineLease.has_value() ||
                 !m_PostProcessSMAABlendPipelineLease->IsValid())
@@ -6256,11 +6182,11 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] FrameRecipeAAMode SelectedFrameRecipeAAMode() const noexcept
         {
-            if (!m_PostProcessSystem.has_value())
+            if (!m_Subsystems.PostProcessSystemRegistry().has_value())
             {
                 return FrameRecipeAAMode::NoAA;
             }
-            switch (m_PostProcessSystem->GetSettings().AntiAliasing)
+            switch (m_Subsystems.PostProcessSystemRegistry()->GetSettings().AntiAliasing)
             {
             case PostProcessAntiAliasing::None:
                 return FrameRecipeAAMode::NoAA;
@@ -6292,11 +6218,11 @@ namespace Extrinsic::Graphics
         // against a no-op draw.
         [[nodiscard]] bool SelectedAntiAliasingPipelinesAvailable() const noexcept
         {
-            if (!m_PostProcessSystem.has_value())
+            if (!m_Subsystems.PostProcessSystemRegistry().has_value())
             {
                 return false;
             }
-            const PostProcessAntiAliasing aa = m_PostProcessSystem->GetSettings().AntiAliasing;
+            const PostProcessAntiAliasing aa = m_Subsystems.PostProcessSystemRegistry()->GetSettings().AntiAliasing;
             switch (aa)
             {
             case PostProcessAntiAliasing::None:
@@ -6339,14 +6265,14 @@ namespace Extrinsic::Graphics
             {
                 return RenderCommandPassStatus::SkippedNonOperational;
             }
-            if (!m_PostProcessSystem.has_value() ||
+            if (!m_Subsystems.PostProcessSystemRegistry().has_value() ||
                 !m_PostProcessFXAAPass.has_value() ||
                 !m_PostProcessSMAAPass.has_value())
             {
                 return RenderCommandPassStatus::SkippedUnavailable;
             }
 
-            const PostProcessAntiAliasing aa = m_PostProcessSystem->GetSettings().AntiAliasing;
+            const PostProcessAntiAliasing aa = m_Subsystems.PostProcessSystemRegistry()->GetSettings().AntiAliasing;
             const bool hasFxaaPipeline =
                 m_PostProcessFXAAPipelineLease.has_value() &&
                 m_PostProcessFXAAPipelineLease->IsValid();
@@ -6403,12 +6329,12 @@ namespace Extrinsic::Graphics
             if (!m_CullingOutputAvailable || !m_DeferredGBufferPass.has_value() ||
                 !m_DeferredGBufferPipelineLease.has_value() ||
                 !m_DeferredGBufferPipelineLease->IsValid() ||
-                !m_GpuWorld.has_value() || !m_CullingSystem.has_value())
+                !m_Subsystems.GpuWorldSystem().has_value() || !m_Subsystems.CullingSystemRegistry().has_value())
             {
                 return RenderCommandPassStatus::SkippedUnavailable;
             }
 
-            m_DeferredGBufferPass->Execute(cmd, camera, *m_GpuWorld, *m_CullingSystem, frameIndex);
+            m_DeferredGBufferPass->Execute(cmd, camera, *m_Subsystems.GpuWorldSystem(), *m_Subsystems.CullingSystemRegistry(), frameIndex);
             return RenderCommandPassStatus::Recorded;
         }
 
@@ -6442,19 +6368,19 @@ namespace Extrinsic::Graphics
             if (!m_CullingOutputAvailable || !m_DeferredGBufferPass.has_value() ||
                 !m_DeferredGBufferPipelineLease.has_value() ||
                 !m_DeferredGBufferPipelineLease->IsValid() ||
-                !m_CullingSystem.has_value())
+                !m_Subsystems.CullingSystemRegistry().has_value())
             {
                 return RenderCommandPassStatus::SkippedUnavailable;
             }
             if (!m_DeferredLightingPass.has_value() ||
                 !m_DeferredLightingPipelineLease.has_value() ||
                 !m_DeferredLightingPipelineLease->IsValid() ||
-                !m_GpuWorld.has_value())
+                !m_Subsystems.GpuWorldSystem().has_value())
             {
                 return RenderCommandPassStatus::SkippedUnavailable;
             }
 
-            m_DeferredLightingPass->Execute(cmd, camera, *m_GpuWorld);
+            m_DeferredLightingPass->Execute(cmd, camera, *m_Subsystems.GpuWorldSystem());
             return RenderCommandPassStatus::Recorded;
         }
 
@@ -6475,7 +6401,7 @@ namespace Extrinsic::Graphics
                 return RenderCommandPassStatus::SkippedUnavailable;
             }
 
-            m_DepthPrepassPass.Execute(cmd, camera, *m_GpuWorld, *m_CullingSystem, frameIndex);
+            m_DepthPrepassPass.Execute(cmd, camera, *m_Subsystems.GpuWorldSystem(), *m_Subsystems.CullingSystemRegistry(), frameIndex);
             return RenderCommandPassStatus::Recorded;
         }
 
@@ -6563,7 +6489,7 @@ namespace Extrinsic::Graphics
             {
                 return RenderCommandPassStatus::SkippedNonOperational;
             }
-            if (!m_GpuWorld ||
+            if (!m_Subsystems.GpuWorldSystem() ||
                 !ClusterLightResourcesReady() ||
                 !m_ClusterGridBuildPipelineLease.has_value() ||
                 !m_ClusterGridBuildPipelineLease->IsValid() ||
@@ -6576,10 +6502,10 @@ namespace Extrinsic::Graphics
             const ClusterLightAssignmentDispatchPlan plan =
                 ComputeClusterLightAssignmentDispatchPlan(
                     m_ClusterGridDesc,
-                    m_GpuWorld ? m_GpuWorld->GetLightCount() : 0u,
+                    m_Subsystems.GpuWorldSystem() ? m_Subsystems.GpuWorldSystem()->GetLightCount() : 0u,
                     kMaxClusterLightsPerCell);
             const RHI::BufferHandle aabbHandle = m_ClusterGridAABBBuffer->GetHandle();
-            const RHI::BufferHandle lightsHandle = m_GpuWorld->GetLightBuffer();
+            const RHI::BufferHandle lightsHandle = m_Subsystems.GpuWorldSystem()->GetLightBuffer();
             const RHI::BufferHandle headerHandle = m_ClusterLightHeaderBuffer->GetHandle();
             const RHI::BufferHandle indexHandle = m_ClusterLightIndexBuffer->GetHandle();
             const RHI::BufferHandle counterHandle = m_ClusterLightCounterBuffer->GetHandle();
@@ -6649,7 +6575,7 @@ namespace Extrinsic::Graphics
         [[nodiscard]] RHI::PipelineHandle ResolveImGuiPipelineForFormat(
             const RHI::Format colorFormat) const noexcept
         {
-            if (!m_PipelineManager.has_value())
+            if (!m_Subsystems.PipelineManager().has_value())
             {
                 return {};
             }
@@ -6662,7 +6588,7 @@ namespace Extrinsic::Graphics
                     {
                         return {};
                     }
-                    return m_PipelineManager->GetDeviceHandle(lease->GetHandle());
+                    return m_Subsystems.PipelineManager()->GetDeviceHandle(lease->GetHandle());
                 };
 
             if (colorFormat == RHI::Format::RGBA8_UNORM &&
@@ -6792,7 +6718,7 @@ namespace Extrinsic::Graphics
                 return RenderCommandPassStatus::SkippedNonOperational;
             }
 
-            // The helper is constructed alongside `m_BufferManager` in
+            // The helper is constructed alongside `m_Subsystems.BufferManager()` in
             // `Initialize(...)`; on a successful operational gate it
             // is always present. Defensive nullopt gate left in place
             // so a future refactor that defers helper construction
@@ -6954,7 +6880,7 @@ namespace Extrinsic::Graphics
                 return RenderCommandPassStatus::SkippedNonOperational;
             }
 
-            // The helper is constructed alongside `m_BufferManager` in
+            // The helper is constructed alongside `m_Subsystems.BufferManager()` in
             // `Initialize(...)`; on a successful operational gate it
             // is always present. Defensive nullopt gate left in place
             // so a future refactor that defers helper construction
@@ -7062,23 +6988,8 @@ namespace Extrinsic::Graphics
                 : RenderCommandPassStatus::SkippedUnavailable;
         }
 
-        std::optional<RHI::BufferManager>   m_BufferManager;
-        std::optional<RHI::SamplerManager>  m_SamplerManager;
-        std::optional<RHI::TextureManager>  m_TextureManager;
-        std::optional<RHI::PipelineManager> m_PipelineManager;
+        RenderSubsystemRegistry             m_Subsystems;
         RHI::Format                          m_BackbufferFormat{RHI::Format::RGBA8_UNORM};
-        std::optional<GpuWorld>              m_GpuWorld;
-        std::optional<MaterialSystem>        m_MaterialSystem;
-        std::optional<ColormapSystem>        m_ColormapSystem;
-        std::optional<VisualizationSyncSystem> m_VisualizationSyncSystem;
-        std::optional<CullingSystem>         m_CullingSystem;
-        std::optional<TransformSyncSystem>   m_TransformSyncSystem;
-        std::optional<LightSystem>           m_LightSystem;
-        std::optional<SelectionSystem>       m_SelectionSystem;
-        std::optional<ForwardSystem>         m_ForwardSystem;
-        std::optional<DeferredSystem>        m_DeferredSystem;
-        std::optional<PostProcessSystem>     m_PostProcessSystem;
-        std::optional<ShadowSystem>          m_ShadowSystem;
         std::optional<HZBSystem>             m_HZBSystem;
         std::optional<ReconstructionHistorySystem> m_ReconstructionHistorySystem;
         ReferenceTAAReconstructor            m_ReferenceTAAReconstructor;
@@ -7100,7 +7011,7 @@ namespace Extrinsic::Graphics
         // shape unconditionally when its cached pipeline handle is valid,
         // matching the contract enforced by the new `PresentPassContract`
         // tests. Lives for the renderer's full lifetime, with its pipeline
-        // handle zeroed in `Shutdown()` before `m_PipelineManager` is reset.
+        // handle zeroed in `Shutdown()` before `m_Subsystems.PipelineManager()` is reset.
         PresentPass                          m_PresentPass;
         // GRAPHICS-076 Slice B — canonical default-recipe `DebugViewSystem`
         // + `DebugViewPass`. The system owns resource inspection /
@@ -7114,7 +7025,7 @@ namespace Extrinsic::Graphics
         // emplaced + `Initialize()`d in `Initialize(device)`, the pass
         // is emplaced immediately after holding `*m_DebugViewSystem`,
         // and both are reset in `Shutdown()` before
-        // `m_PipelineManager` / `m_DebugViewPipelineLease` are torn
+        // `m_Subsystems.PipelineManager()` / `m_DebugViewPipelineLease` are torn
         // down. The system is driven from `ExecuteFrame()`:
         // `SetSettings({.Enabled = world.DebugOverlayEnabled ||
         // world.DebugPrimitives.HasTransientDebug, ...})` then
@@ -7131,7 +7042,7 @@ namespace Extrinsic::Graphics
         // `ImGuiPass` requires an explicit `ImGuiOverlaySystem&` constructor
         // argument and is non-movable, so it is emplaced only once the runtime
         // hands the overlay in (which may be before or after `Initialize()`).
-        // The pass is reset in `Shutdown()` before `m_PipelineManager` /
+        // The pass is reset in `Shutdown()` before `m_Subsystems.PipelineManager()` /
         // `m_ImGuiPipelineLease` are torn down. Until the runtime attaches an
         // overlay system the route reports `SkippedUnavailable`.
         ImGuiOverlaySystem*                  m_ImGuiOverlaySystem{nullptr};
@@ -7161,50 +7072,50 @@ namespace Extrinsic::Graphics
         // GRAPHICS-070 — default-recipe forward surface pass. Owned as an
         // `optional` so the explicit `ForwardSystem&` constructor invariant is
         // preserved: emplaced in `Initialize()` immediately after the
-        // `m_ForwardSystem` slot is constructed, and reset in `Shutdown()`
+        // `m_Subsystems.ForwardSystemRegistry()` slot is constructed, and reset in `Shutdown()`
         // before the `ForwardSystem` slot is torn down.
         std::optional<ForwardSurfacePass>    m_ForwardSurfacePass;
         std::optional<ForwardLinePass>       m_ForwardLinePass;
         std::optional<ForwardPointPass>      m_ForwardPointPass;
         // GRAPHICS-073 Slice A — default-recipe shadow pass. Same lifetime
         // contract as the forward pass optionals: emplaced after
-        // `m_ShadowSystem` in `Initialize()` and reset before the system in
+        // `m_Subsystems.ShadowSystemRegistry()` in `Initialize()` and reset before the system in
         // `Shutdown()`.
         std::optional<ShadowPass>            m_ShadowPass;
         // GRAPHICS-072 Slice A — default-recipe deferred GBuffer pass. Same
-        // lifetime contract: emplaced after `m_DeferredSystem` is initialised
+        // lifetime contract: emplaced after `m_Subsystems.DeferredSystemRegistry()` is initialised
         // and before the operational publisher runs; reset before
-        // `m_DeferredSystem` in `Shutdown()`.
+        // `m_Subsystems.DeferredSystemRegistry()` in `Shutdown()`.
         std::optional<DeferredGBufferPass>   m_DeferredGBufferPass;
         // GRAPHICS-072 Slice B — default-recipe deferred lighting pass. Same
         // lifetime contract as the GBuffer pass: emplaced alongside
-        // `m_DeferredGBufferPass` after `m_DeferredSystem` is initialised,
-        // reset before `m_DeferredSystem` in `Shutdown()`.
+        // `m_DeferredGBufferPass` after `m_Subsystems.DeferredSystemRegistry()` is initialised,
+        // reset before `m_Subsystems.DeferredSystemRegistry()` in `Shutdown()`.
         std::optional<DeferredLightingPass>  m_DeferredLightingPass;
         // GRAPHICS-074 Slice A — default-recipe EntityId selection pass.
         // Same lifetime contract as the forward / shadow / deferred passes:
-        // emplaced after `m_SelectionSystem` is initialised and before the
-        // operational publisher runs; reset before `m_SelectionSystem` in
+        // emplaced after `m_Subsystems.SelectionSystemRegistry()` is initialised and before the
+        // operational publisher runs; reset before `m_Subsystems.SelectionSystemRegistry()` in
         // `Shutdown()`.
         std::optional<EntityIdPass>          m_SelectionEntityIdPass;
         // GRAPHICS-074 Slice B — default-recipe Face / Edge / Point
         // selection ID passes. Same lifetime contract as the EntityId pass
-        // above: each is emplaced after `m_SelectionSystem` is initialised
+        // above: each is emplaced after `m_Subsystems.SelectionSystemRegistry()` is initialised
         // and before the operational publisher runs; reset before
-        // `m_SelectionSystem` in `Shutdown()`.
+        // `m_Subsystems.SelectionSystemRegistry()` in `Shutdown()`.
         std::optional<FaceIdPass>            m_SelectionFaceIdPass;
         std::optional<EdgeIdPass>            m_SelectionEdgeIdPass;
         std::optional<PointIdPass>           m_SelectionPointIdPass;
         // GRAPHICS-074 Slice C — default-recipe selection outline pass.
         // Same lifetime contract as the selection-ID passes above: emplaced
-        // after `m_SelectionSystem` is initialised and before the operational
-        // publisher runs; reset before `m_SelectionSystem` in `Shutdown()`.
+        // after `m_Subsystems.SelectionSystemRegistry()` is initialised and before the operational
+        // publisher runs; reset before `m_Subsystems.SelectionSystemRegistry()` in `Shutdown()`.
         std::optional<SelectionOutlinePass>  m_SelectionOutlinePass;
         // GRAPHICS-075 Slice A — default-recipe postprocess tonemap pass.
         // Same lifetime contract as the selection / forward / deferred /
-        // shadow passes above: emplaced after `m_PostProcessSystem` is
+        // shadow passes above: emplaced after `m_Subsystems.PostProcessSystemRegistry()` is
         // initialised and before the operational publisher runs; reset
-        // before `m_PostProcessSystem` in `Shutdown()`. Slices B–E add the
+        // before `m_Subsystems.PostProcessSystemRegistry()` in `Shutdown()`. Slices B–E add the
         // sibling Histogram / Bloom / FXAA / SMAA pass instances behind
         // the same `"PostProcessPass"` umbrella executor branch.
         std::optional<PostProcessToneMapPass> m_PostProcessToneMapPass;
@@ -7222,8 +7133,8 @@ namespace Extrinsic::Graphics
         // `PostProcessSettings::AntiAliasing` (each per-stage Execute
         // gates on `IsStageEnabled(SMAA)`). Same lifetime contract as
         // the tonemap + bloom + FXAA passes above: emplaced after
-        // `m_PostProcessSystem` is initialised and before the
-        // operational publisher runs; reset before `m_PostProcessSystem`
+        // `m_Subsystems.PostProcessSystemRegistry()` is initialised and before the
+        // operational publisher runs; reset before `m_Subsystems.PostProcessSystemRegistry()`
         // in `Shutdown()`.
         std::optional<PostProcessSMAAPass>    m_PostProcessSMAAPass;
         // GRAPHICS-075 Slice E.1 — default-recipe postprocess histogram
@@ -7233,9 +7144,9 @@ namespace Extrinsic::Graphics
         // scope); it therefore fans out under its own ordered graph pass
         // `"PostProcessHistogramPass"` declared by the recipe. Same
         // lifetime contract as the tonemap + bloom + FXAA + SMAA passes
-        // above: emplaced after `m_PostProcessSystem` is initialised and
+        // above: emplaced after `m_Subsystems.PostProcessSystemRegistry()` is initialised and
         // before the operational publisher runs; reset before
-        // `m_PostProcessSystem` in `Shutdown()`.
+        // `m_Subsystems.PostProcessSystemRegistry()` in `Shutdown()`.
         std::optional<PostProcessHistogramPass> m_PostProcessHistogramPass;
         std::optional<RHI::PipelineManager::PipelineLease> m_DepthPrepassPipelineLease;
         std::optional<RHI::PipelineManager::PipelineLease> m_DefaultDebugSurfacePipelineLease;
@@ -7419,7 +7330,7 @@ namespace Extrinsic::Graphics
         // frames-in-flight after a swapchain rebuild the lease is dropped
         // and re-created so Slice D.2's `slot * 8` per-frame copy
         // addressing never overruns the allocation. The lease is reset in
-        // `Shutdown()` before `m_BufferManager` so the destruction order
+        // `Shutdown()` before `m_Subsystems.BufferManager()` so the destruction order
         // matches the rest of the lease-owning members above. Slice D.1
         // only exposes the buffer through `GetPickingReadbackBuffer()` /
         // `GetPickingReadbackBufferSize()`; Slice D.2 imports it into the
@@ -7714,8 +7625,8 @@ namespace Extrinsic::Graphics
         AccumulateCommandRecordStatus(route.DebugName, route.PassId, status);
 
         const bool histogramStageLive =
-            m_PostProcessSystem.has_value() &&
-            m_PostProcessSystem->IsStageEnabled(PostProcessStageKind::Histogram);
+            m_Subsystems.PostProcessSystemRegistry().has_value() &&
+            m_Subsystems.PostProcessSystemRegistry()->IsStageEnabled(PostProcessStageKind::Histogram);
         if (status == RenderCommandPassStatus::Recorded &&
             histogramStageLive &&
             m_HistogramReadbackBuffer.has_value() &&

@@ -11,6 +11,7 @@ and renderer/render-graph orchestration.
 - `Extrinsic.Graphics.Renderer`
 - `Extrinsic.Graphics.FrameRecipe`
 - `Extrinsic.Graphics.RenderCommandRouter`
+- `Extrinsic.Graphics.RenderSubsystemRegistry`
 - `Extrinsic.Graphics.RenderGraph`
 
 `Extrinsic.Graphics.RenderGraph` re-exports:
@@ -142,6 +143,13 @@ implementation.
   status records carry both `FramePassId` and the debug label, and unknown typed
   pass IDs report the structured skipped status instead of silently recording a
   no-op. Debug names remain diagnostics only; they are not routing keys.
+- `Graphics.RenderSubsystemRegistry` owns the renderer core manager/subsystem
+  lifetime seam: RHI buffer/texture/sampler/pipeline managers, `GpuWorld`,
+  material, colormap, visualization sync, culling, transform sync, light,
+  selection, forward, deferred, postprocess, and shadow systems. `NullRenderer`
+  forwards existing `IRenderer` accessors through the registry, while retaining
+  pass objects, pipeline leases, upload helpers, and frame-transient resources
+  whose destruction must occur before registry storage resets.
 
 ### Shader push-constant compatibility policy
 
