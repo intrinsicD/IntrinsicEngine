@@ -20,7 +20,7 @@ map.
 - [HARDEN-066 — Define ECS render-sync/export dirty-tag policy](../../done/HARDEN-066-ecs-render-sync-export-policy.md) (done).
 - [HARDEN-067 — Add ECS world-bounds propagation system](../../done/HARDEN-067-ecs-bounds-propagation-system.md) (done).
 - [HARDEN-068 — Define ECS stable identity and scene metadata contract](../../done/HARDEN-068-ecs-stable-identity-and-scene-metadata.md) (done).
-- [HARDEN-080 — ECS module implementation splits](HARDEN-080-ecs-module-implementation-splits.md).
+- [HARDEN-080 — ECS module implementation splits](../../active/HARDEN-080-ecs-module-implementation-splits.md).
 
 ## Convergence
 

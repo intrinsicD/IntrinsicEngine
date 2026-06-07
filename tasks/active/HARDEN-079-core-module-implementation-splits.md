@@ -10,7 +10,10 @@
 - No attempt to move templates or constexpr bodies that must remain visible to importers.
 
 ## Context
-- Status: backlog.
+- Status: blocked (current implementation-split slice complete locally; retirement blocked by default CPU CTest failure on 2026-06-07).
+- Owner/agent: Codex.
+- Branch / PR: current branch / TBD.
+- Next verification step: resolve the `src/graphics/framegraph/Graphics.RenderGraph.Compiler.cpp:1565` ASan heap-buffer-overflow default-gate blocker, then rerun the default CPU gate and retire this task if clean.
 - Owning subsystem/layer: `core` (`core -> nothing`). Filed under architecture because there is no dedicated core backlog directory.
 - `AGENTS.md` requires `.cppm` interfaces to stay focused on declarations, small inline accessors, and templates. Non-trivial control-flow, container traversal/mutation, diagnostics assembly, and implementation-only imports belong in `.cpp` implementation units.
 - Static audit on 2026-06-06 identified these promoted core cleanup targets:
@@ -28,13 +31,13 @@
 - `Core.FrameGraph.cppm` already has `src/core/Core.FrameGraph.cpp`; its audited target is `HashTypeSig` at line 55. Prefer moving targets into existing implementation units before creating new ones.
 
 ## Required changes
-- [ ] For targets that already have matching implementation units, move audited non-trivial bodies into the existing `.cpp`: `Core.FrameGraph`, `Core.Memory.Polymorphic`, `Core.Tasks.LocalTask`, and `Core.Telemetry`.
-- [ ] For targets without matching implementation units, add `.cpp` files only where the moved bodies justify a separate implementation unit: `Core.BoundedHeap`, `Core.Dag.Scheduler.Hazards`, `Core.Error`, `Core.FrameLoop`, `Core.HandleLease`, `Core.Hash`, and `Core.ResourcePool`.
-- [ ] Register any newly added `.cpp` files as private sources in `src/core/CMakeLists.txt`.
-- [ ] Keep template-dependent storage/container helpers in `.cppm` where importer visibility is required; document any intentionally retained non-moved body in this task before retirement.
-- [ ] Remove `inline` from moved non-template exported declarations where no longer required.
-- [ ] Clean up global-module-fragment includes in touched `.cppm` files, moving implementation-only headers into matching `.cpp` files.
-- [ ] Audit imports in touched `.cppm` files and move implementation-only imports into `.cpp` when the public surface no longer requires them.
+- [x] For targets that already have matching implementation units, move audited non-trivial bodies into the existing `.cpp`: `Core.FrameGraph`, `Core.Memory.Polymorphic`, `Core.Tasks.LocalTask`, and `Core.Telemetry`.
+- [x] For targets without matching implementation units, add `.cpp` files only where the moved bodies justify a separate implementation unit: `Core.BoundedHeap`, `Core.Dag.Scheduler.Hazards`, `Core.Error`, `Core.FrameLoop`, `Core.HandleLease`, `Core.Hash`, and `Core.ResourcePool`.
+- [x] Register any newly added `.cpp` files as private sources in `src/core/CMakeLists.txt`.
+- [x] Keep template-dependent storage/container helpers in `.cppm` where importer visibility is required; document any intentionally retained non-moved body in this task before retirement.
+- [x] Remove `inline` from moved non-template exported declarations where no longer required.
+- [x] Clean up global-module-fragment includes in touched `.cppm` files, moving implementation-only headers into matching `.cpp` files.
+- [x] Audit imports in touched `.cppm` files and move implementation-only imports into `.cpp` when the public surface no longer requires them.
 
 ## Tests
 - [ ] Existing core unit and contract tests remain green.
@@ -42,9 +45,9 @@
 - [ ] If any task/frame-loop behavior is touched, run focused frame-graph/task tests in addition to the default CPU gate.
 
 ## Docs
-- [ ] Update architecture docs only if a public core contract or module surface wording changes.
-- [ ] Regenerate `docs/api/generated/module_inventory.md` if module imports/surfaces change.
-- [ ] Update this task with completion notes before retirement.
+- [x] Update architecture docs only if a public core contract or module surface wording changes.
+- [x] Regenerate `docs/api/generated/module_inventory.md` if module imports/surfaces change.
+- [x] Update this task with completion notes before retirement.
 
 ## Acceptance criteria
 - [ ] Touched core `.cppm` files expose declarations, templates, and small inline accessors only, or record a justified retained exception.
@@ -52,6 +55,11 @@
 - [ ] Touched `.cppm` files no longer include/import implementation-only dependencies.
 - [ ] Core tests pass without changed expectations.
 - [ ] The change preserves `core -> nothing` layering.
+
+## Progress notes
+- 2026-06-07: Current implementation-split slice completed locally: moved non-trivial non-template bodies into matching `.cpp` implementation units, registered new private sources in CMake, and retained importer-visible templates, constexpr helpers, ABI structs, and small accessors in module interfaces where required.
+- Focused target builds passed for the touched subsystem, and `docs/api/generated/module_inventory.md` was regenerated with `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`.
+- Retirement blocker: current-session verification on 2026-06-07 passed configure, `IntrinsicTests` build, generated-inventory, task-policy, layering, test-layout, doc-link, and diff-whitespace checks. The default CPU CTest gate failed with 159 failed tests out of 2816; the failures reproduce the existing `src/graphics/framegraph/Graphics.RenderGraph.Compiler.cpp:1565` ASan heap-buffer-overflow during render-graph compile, reached through `src/graphics/framegraph/Graphics.RenderGraph.cpp:405`, and cascade through graphics/runtime tests.
 
 ## Verification
 ```bash

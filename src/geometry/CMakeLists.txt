@@ -87,14 +87,24 @@ target_sources(${target_name}
         Geometry.Validation.cppm
         Geometry.cppm
         PRIVATE
+        Geometry.AABB.cpp
         Geometry.BVH.cpp
+        Geometry.Capsule.cpp
+        Geometry.ContactManifold.cpp
+        Geometry.Containment.cpp
+        Geometry.ConvexHull.cpp
         Geometry.ConvexHullBuilder.cpp
+        Geometry.Cylinder.cpp
         Geometry.DomainViews.cpp
+        Geometry.Ellipsoid.cpp
         Geometry.EPA.cpp
+        Geometry.Frustum.cpp
+        Geometry.GJK.cpp
         Geometry.Graph.IO.cpp
         Geometry.Graph.ShortestPath.cpp
         Geometry.Graph.Utils.cpp
         Geometry.Graph.cpp
+        Geometry.Grid.cpp
         Geometry.HalfedgeMesh.AdaptiveRemeshing.cpp
         Geometry.HalfedgeMesh.Analysis.cpp
         Geometry.HalfedgeMesh.Boolean.cpp
@@ -122,21 +132,32 @@ target_sources(${target_name}
         Geometry.Linalg.cpp
         Geometry.MarchingCubes.cpp
         Geometry.Mesh.Conversion.cpp
+        Geometry.MeshSoup.cpp
         Geometry.NormalEstimation.cpp
+        Geometry.OBB.cpp
         Geometry.Octree.cpp
+        Geometry.Overlap.cpp
         Geometry.PCA.cpp
+        Geometry.Plane.cpp
         Geometry.PointCloud.Conversion.cpp
         Geometry.PointCloud.IO.cpp
         Geometry.PointCloud.Utils.cpp
         Geometry.PointCloud.cpp
         Geometry.Properties.cpp
+        Geometry.Quadric.cpp
+        Geometry.Queries.cpp
         Geometry.Raycast.cpp
         Geometry.Registration.cpp
+        Geometry.RobustPredicates.cpp
         Geometry.SDF.cpp
+        Geometry.Segment.cpp
         Geometry.Sphere.Sampling.cpp
         Geometry.Sphere.cpp
+        Geometry.Support.cpp
         Geometry.Sparse.cpp
         Geometry.SurfaceReconstruction.cpp
+        Geometry.Triangle.cpp
+        Geometry.Validation.cpp
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Geometry.Graph.Fwd.cppm

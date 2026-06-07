@@ -33,12 +33,7 @@ export namespace Extrinsic::Runtime
         std::vector<std::uint32_t> SurfaceIndices;
         std::vector<std::uint32_t> LineIndices;
 
-        void Clear() noexcept
-        {
-            VertexBytes.clear();
-            SurfaceIndices.clear();
-            LineIndices.clear();
-        }
+        void Clear() noexcept;
     };
 
     [[nodiscard]] const char* DebugNameFor(ProceduralGeometryKind kind) noexcept;

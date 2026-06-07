@@ -56,6 +56,28 @@ namespace Geometry
         return BuildFromOwned(params);
     }
 
+    void BVH::QueryAABB(const AABB& queryShape, std::vector<ElementIndex>& out) const
+    {
+        Query(queryShape, out);
+    }
+
+    void BVH::QuerySphere(const Sphere& queryShape, std::vector<ElementIndex>& out) const
+    {
+        Query(queryShape, out);
+    }
+
+    void BVH::QueryRay(const Ray& queryShape, std::vector<ElementIndex>& out) const
+    {
+        Query(queryShape, out);
+    }
+
+    void BVH::Clear()
+    {
+        m_ElementAabbs.clear();
+        m_ElementIndices.clear();
+        m_Nodes.clear();
+    }
+
     std::optional<BVHBuildResult> BVH::BuildFromOwned(const BVHBuildParams& params)
     {
         m_Nodes.clear();
@@ -168,4 +190,3 @@ namespace Geometry
         };
     }
 }
-

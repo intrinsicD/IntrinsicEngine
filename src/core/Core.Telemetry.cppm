@@ -163,11 +163,7 @@ export namespace Extrinsic::Core::Telemetry
         static constexpr std::size_t kMaxCategories      = 256;
         static constexpr std::size_t kMaxPassTimings     = 32;
 
-        [[nodiscard]] static TelemetrySystem& Get() noexcept
-        {
-            static TelemetrySystem s_Instance;
-            return s_Instance;
-        }
+        [[nodiscard]] static TelemetrySystem& Get() noexcept;
 
         // --- Frame lifecycle (main thread) ---
         void BeginFrame();
@@ -266,19 +262,9 @@ export namespace Extrinsic::Core::Telemetry
     class ScopedTimer
     {
     public:
-        ScopedTimer(const char* name, uint32_t nameHash) noexcept
-            : m_Name(name)
-            , m_NameHash(nameHash)
-            , m_Start(std::chrono::high_resolution_clock::now())
-        {}
+        ScopedTimer(const char* name, uint32_t nameHash) noexcept;
 
-        ~ScopedTimer()
-        {
-            const auto end = std::chrono::high_resolution_clock::now();
-            const uint64_t ns = static_cast<uint64_t>(
-                std::chrono::duration_cast<std::chrono::nanoseconds>(end - m_Start).count());
-            TelemetrySystem::Get().RecordSample(m_NameHash, m_Name, ns);
-        }
+        ~ScopedTimer();
 
         ScopedTimer(const ScopedTimer&) = delete;
         ScopedTimer& operator=(const ScopedTimer&) = delete;
@@ -309,4 +295,3 @@ export namespace Extrinsic::Core::Telemetry
 #define INTRINSIC_PROFILE_FUNCTION EXTRINSIC_PROFILE_FUNCTION
 #define PROFILE_SCOPE            EXTRINSIC_PROFILE_SCOPE
 #define PROFILE_FUNCTION         EXTRINSIC_PROFILE_FUNCTION
-

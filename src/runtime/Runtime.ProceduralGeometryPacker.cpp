@@ -63,6 +63,13 @@ namespace Extrinsic::Runtime
         return "Procedural.Unknown";
     }
 
+    void ProceduralGeometryPackBuffer::Clear() noexcept
+    {
+        VertexBytes.clear();
+        SurfaceIndices.clear();
+        LineIndices.clear();
+    }
+
     std::optional<Extrinsic::Graphics::GpuWorld::GeometryUploadDesc> Pack(
         ProceduralGeometryKind kind,
         const ProceduralGeometryParams& params,

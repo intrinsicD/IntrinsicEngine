@@ -34,10 +34,7 @@ export namespace Extrinsic::Runtime
     {
         std::vector<std::byte> VertexBytes;
 
-        void Clear() noexcept
-        {
-            VertexBytes.clear();
-        }
+        void Clear() noexcept;
     };
 
     // Fail-closed status returned by `PackCloud`. Each value maps to a single

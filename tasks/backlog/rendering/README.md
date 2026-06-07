@@ -15,7 +15,7 @@ without requiring them to read every file.
   [`tasks/done/RORG-031B-rendering-pipeline-backlog-seed.md`](../../done/RORG-031B-rendering-pipeline-backlog-seed.md).
   It is not the active implementation path and must not be selected as
   next-active work.
-- [GRAPHICS-083 — Graphics/RHI module implementation splits](GRAPHICS-083-graphics-rhi-module-implementation-splits.md):
+- [GRAPHICS-083 — Graphics/RHI module implementation splits](../../active/GRAPHICS-083-graphics-rhi-module-implementation-splits.md):
   module-interface hygiene follow-up for promoted graphics, RHI, and Vulkan
   `.cppm` targets found by the 2026-06-06 implementation-body audit. This is a
   mechanical cleanup task only; it must not change rendering, RHI, or backend

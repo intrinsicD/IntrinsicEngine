@@ -10,7 +10,10 @@
 - No attempt to move templates or bodies that must remain visible to importers.
 
 ## Context
-- Status: backlog.
+- Status: blocked (current implementation-split slice complete locally; retirement blocked by default CPU CTest failure on 2026-06-07).
+- Owner/agent: Codex.
+- Branch / PR: current branch / TBD.
+- Next verification step: resolve the `src/graphics/framegraph/Graphics.RenderGraph.Compiler.cpp:1565` ASan heap-buffer-overflow default-gate blocker, then rerun the default CPU gate and retire this task if clean.
 - Owning subsystem/layer: `ecs` (`ecs -> core`; geometry handles/types only when explicitly required).
 - `AGENTS.md` requires non-trivial `.cppm` bodies to live in implementation units when they do not need importer visibility.
 - Static audit on 2026-06-06 identified these promoted ECS cleanup targets:
@@ -20,12 +23,12 @@
 - `ECS.Component.GeometrySources` includes domain/view builders with live registry reads; keep the public records visible, but move non-trivial query/build bodies when possible.
 
 ## Required changes
-- [ ] Add matching `.cpp` implementation units for audited ECS modules when none exist, or reuse existing implementation files if present.
-- [ ] Move non-template bodies for `GeometrySources` domain/view detection/building, `StableId` validity/hash helpers, and scene-registry create/clear helpers where they no longer need inline visibility.
-- [ ] Register any newly added `.cpp` files as private sources in `src/ecs/CMakeLists.txt`.
-- [ ] Keep component POD/value declarations in `.cppm`; move only implementation/control-flow bodies.
-- [ ] Clean up global-module-fragment includes in touched `.cppm` files, moving implementation-only headers to `.cpp`.
-- [ ] Audit imports in touched `.cppm` files and keep only public-surface imports in the interface.
+- [x] Add matching `.cpp` implementation units for audited ECS modules when none exist, or reuse existing implementation files if present.
+- [x] Move non-template bodies for `GeometrySources` domain/view detection/building, `StableId` validity/hash helpers, and scene-registry create/clear helpers where they no longer need inline visibility.
+- [x] Register any newly added `.cpp` files as private sources in `src/ecs/CMakeLists.txt`.
+- [x] Keep component POD/value declarations in `.cppm`; move only implementation/control-flow bodies.
+- [x] Clean up global-module-fragment includes in touched `.cppm` files, moving implementation-only headers to `.cpp`.
+- [x] Audit imports in touched `.cppm` files and keep only public-surface imports in the interface.
 
 ## Tests
 - [ ] Existing ECS unit/contract tests remain green.
@@ -33,9 +36,9 @@
 - [ ] Add no new behavior tests unless the split exposes an untested contract seam or a bug.
 
 ## Docs
-- [ ] Update ECS architecture docs only if public behavior or ownership wording changes.
-- [ ] Regenerate `docs/api/generated/module_inventory.md` if module imports/surfaces change.
-- [ ] Update this task with completion notes before retirement.
+- [x] Update ECS architecture docs only if public behavior or ownership wording changes.
+- [x] Regenerate `docs/api/generated/module_inventory.md` if module imports/surfaces change.
+- [x] Update this task with completion notes before retirement.
 
 ## Acceptance criteria
 - [ ] Touched ECS `.cppm` files expose declarations/value types/templates only, or record a justified retained exception.
@@ -43,6 +46,11 @@
 - [ ] Touched `.cppm` files no longer include/import implementation-only dependencies.
 - [ ] ECS and affected extraction tests pass without changed expectations.
 - [ ] The change preserves ECS layering and introduces no live higher-layer ownership.
+
+## Progress notes
+- 2026-06-07: Current implementation-split slice completed locally: moved non-trivial non-template bodies into matching `.cpp` implementation units, registered new private sources in CMake, and retained importer-visible templates, constexpr helpers, ABI structs, and small accessors in module interfaces where required.
+- Focused target builds passed for the touched subsystem, and `docs/api/generated/module_inventory.md` was regenerated with `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`.
+- Retirement blocker: current-session verification on 2026-06-07 passed configure, `IntrinsicTests` build, generated-inventory, task-policy, layering, test-layout, doc-link, and diff-whitespace checks. The default CPU CTest gate failed with 159 failed tests out of 2816; the failures reproduce the existing `src/graphics/framegraph/Graphics.RenderGraph.Compiler.cpp:1565` ASan heap-buffer-overflow during render-graph compile, reached through `src/graphics/framegraph/Graphics.RenderGraph.cpp:405`, and cascade through graphics/runtime tests.
 
 ## Verification
 ```bash

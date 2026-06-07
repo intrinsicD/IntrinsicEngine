@@ -39,6 +39,7 @@ target_sources(${target_name}
         Graphics.TransientDebugUploadHelper.cppm
         Graphics.VisualizationOverlayUploadHelper.cppm
         PRIVATE
+        Graphics.CameraSnapshots.cpp
         Graphics.RenderCommandRouter.cpp
         Graphics.RenderPrepPipeline.cpp
         Graphics.RenderSubsystemRegistry.cpp

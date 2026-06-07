@@ -1,6 +1,7 @@
 module;
 
 #include <ostream>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -21,6 +22,66 @@ namespace Geometry
             out.emplace_back(std::string(s->Name()));
         }
         return out;
+    }
+
+    void PropertyRegistry::Clear()
+    {
+        m_Size = 0;
+        m_Storages.clear();
+        m_NameIndex.clear();
+    }
+
+    void PropertyRegistry::Reserve(size_t n)
+    {
+        m_Storages.reserve(n);
+    }
+
+    void PropertyRegistry::Resize(size_t n)
+    {
+        m_Size = n;
+        for (auto& storage : m_Storages)
+            if (storage) storage->Resize(n);
+    }
+
+    void PropertyRegistry::ShrinkToFit()
+    {
+        for (auto& storage : m_Storages)
+            if (storage) storage->ShrinkToFit();
+    }
+
+    void PropertyRegistry::PushBack()
+    {
+        m_Size += 1;
+        for (auto& storage : m_Storages)
+            if (storage) storage->PushBack();
+    }
+
+    void PropertyRegistry::Swap(size_t i0, size_t i1)
+    {
+        for (auto& storage : m_Storages)
+            if (storage) storage->Swap(i0, i1);
+    }
+
+    bool PropertyRegistry::Contains(std::string_view name) const
+    {
+        return Find(name).has_value();
+    }
+
+    std::optional<PropertyId> PropertyRegistry::Find(std::string_view name) const
+    {
+        auto it = m_NameIndex.find(name);
+        if (it != m_NameIndex.end()) return it->second;
+        return std::nullopt;
+    }
+
+    Internal::PropertyStorageBase* PropertyRegistry::Storage(PropertyId id) noexcept
+    {
+        return m_Storages[id].get();
+    }
+
+    const Internal::PropertyStorageBase* PropertyRegistry::Storage(PropertyId id) const noexcept
+    {
+        return m_Storages[id].get();
     }
 
     PropertyRegistry::PropertyRegistry(const PropertyRegistry& other) : m_Storages(), m_NameIndex(), m_Size(other.m_Size)

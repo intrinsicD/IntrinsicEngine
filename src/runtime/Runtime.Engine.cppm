@@ -68,24 +68,9 @@ namespace Extrinsic::Runtime
         bool RequestedTextureUpload{false};
     };
 
-    export [[nodiscard]] inline RuntimeDeviceSelection SelectRuntimeDeviceBackend(
+    export [[nodiscard]] RuntimeDeviceSelection SelectRuntimeDeviceBackend(
         const Core::Config::RenderConfig& config,
-        const bool promotedVulkanAvailable) noexcept
-    {
-        switch (config.Backend)
-        {
-        case Core::Config::GraphicsBackend::Vulkan:
-            if (config.EnablePromotedVulkanDevice && promotedVulkanAvailable)
-            {
-                return RuntimeDeviceSelection{
-                    .UsePromotedVulkanDevice = true,
-                    .FallsBackToNullDevice = false,
-                };
-            }
-            return RuntimeDeviceSelection{};
-        }
-        return RuntimeDeviceSelection{};
-    }
+        bool promotedVulkanAvailable) noexcept;
 
     // GRAPHICS-033B: pure decision for the runtime startup breadcrumb. Returns
     // true when the runtime requested the promoted Vulkan device but the
@@ -93,32 +78,11 @@ namespace Extrinsic::Runtime
     // `src/graphics/vulkan/README.md`. The breadcrumb is emitted exactly once
     // per `Engine::Initialize()` because the call site evaluates this once;
     // no internal guard is needed here.
-    export [[nodiscard]] inline bool ShouldEmitVulkanRequestedButNotOperationalBreadcrumb(
+    export [[nodiscard]] bool ShouldEmitVulkanRequestedButNotOperationalBreadcrumb(
         const Core::Config::RenderConfig& config,
-        const bool isDeviceOperational) noexcept
-    {
-        if (config.Backend != Core::Config::GraphicsBackend::Vulkan)
-            return false;
-        if (!config.EnablePromotedVulkanDevice)
-            return false;
-        return !isDeviceOperational;
-    }
+        bool isDeviceOperational) noexcept;
 
-    export [[nodiscard]] inline Core::Config::EngineConfig CreateReferenceEngineConfig()
-    {
-        Core::Config::EngineConfig config{};
-        config.Window.Title = "Modular Vulkan Engine";
-        config.Window.Width = 1600;
-        config.Window.Height = 900;
-        config.Render.Backend = Core::Config::GraphicsBackend::Vulkan;
-        config.Render.EnablePromotedVulkanDevice = true;
-        config.Render.EnableValidation = true;
-        config.Render.EnableVSync = true;
-        config.Render.FramesInFlight = 2;
-        config.ReferenceScene.Enabled = true;
-        config.ReferenceScene.Selector = Core::Config::ReferenceSceneSelector::Triangle;
-        return config;
-    }
+    export [[nodiscard]] Core::Config::EngineConfig CreateReferenceEngineConfig();
 
     // ============================================================
     // IApplication — the user-facing hook interface.

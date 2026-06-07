@@ -11,7 +11,10 @@
 - No attempt to move templates or constexpr bodies that must remain visible to importers.
 
 ## Context
-- Status: backlog.
+- Status: blocked (current implementation-split slice complete locally; retirement blocked by default CPU CTest failure on 2026-06-07).
+- Owner/agent: Codex.
+- Branch / PR: current branch / TBD.
+- Next verification step: resolve the `src/graphics/framegraph/Graphics.RenderGraph.Compiler.cpp:1565` ASan heap-buffer-overflow default-gate blocker, then rerun the default CPU gate and retire this task if clean.
 - Owning subsystem/layer: `graphics/*`, `graphics/rhi`, and `graphics/vulkan` per `AGENTS.md` dependency boundaries.
 - Static audit on 2026-06-06 identified these promoted graphics/RHI/Vulkan cleanup targets:
   `src/graphics/renderer/Components/Graphics.Component.GpuSceneSlot.cppm`,
@@ -27,14 +30,14 @@
 - Prefer existing implementation units where available, especially pass helpers and RHI pipeline registry files, before adding new `.cpp` files.
 
 ## Required changes
-- [ ] Slice A: move audited bodies for targets that already have matching `.cpp` implementation units.
-- [ ] Slice B: add missing implementation units for renderer/RHI public-helper modules where moved bodies justify `.cpp` files.
-- [ ] Slice C: move backend-local Vulkan helpers out of `Backends.Vulkan.cppm` without changing public Vulkan factory/diagnostic behavior.
-- [ ] Register any newly added `.cpp` files as private sources in the relevant `src/graphics/**/CMakeLists.txt` file.
-- [ ] Keep templates, ABI structs, simple constexpr enum classifiers, and importer-required inline helpers in `.cppm` when required; record retained exceptions before retirement.
-- [ ] Remove `inline` from moved non-template exported declarations where no longer required.
-- [ ] Clean up global-module-fragment includes in touched `.cppm` files, moving implementation-only headers into matching `.cpp` files.
-- [ ] Audit imports in touched `.cppm` files and keep only public-surface imports in interfaces.
+- [x] Slice A: move audited bodies for targets that already have matching `.cpp` implementation units.
+- [x] Slice B: add missing implementation units for renderer/RHI public-helper modules where moved bodies justify `.cpp` files.
+- [x] Slice C: move backend-local Vulkan helpers out of `Backends.Vulkan.cppm` without changing public Vulkan factory/diagnostic behavior.
+- [x] Register any newly added `.cpp` files as private sources in the relevant `src/graphics/**/CMakeLists.txt` file.
+- [x] Keep templates, ABI structs, simple constexpr enum classifiers, and importer-required inline helpers in `.cppm` when required; record retained exceptions before retirement.
+- [x] Remove `inline` from moved non-template exported declarations where no longer required.
+- [x] Clean up global-module-fragment includes in touched `.cppm` files, moving implementation-only headers into matching `.cpp` files.
+- [x] Audit imports in touched `.cppm` files and keep only public-surface imports in interfaces.
 
 ## Tests
 - [ ] Existing graphics contract tests remain green.
@@ -43,9 +46,9 @@
 - [ ] Add no new behavior tests unless the split exposes an untested contract seam or a bug.
 
 ## Docs
-- [ ] Update graphics/RHI architecture docs only if public behavior or ownership wording changes.
-- [ ] Regenerate `docs/api/generated/module_inventory.md` if module imports/surfaces change.
-- [ ] Update this task with per-slice completion notes before retirement.
+- [x] Update graphics/RHI architecture docs only if public behavior or ownership wording changes.
+- [x] Regenerate `docs/api/generated/module_inventory.md` if module imports/surfaces change.
+- [x] Update this task with per-slice completion notes before retirement.
 
 ## Acceptance criteria
 - [ ] Touched graphics/RHI/Vulkan `.cppm` files expose declarations, ABI/value types, templates, and small inline/constexpr importer-required helpers only, or record justified retained exceptions.
@@ -53,6 +56,11 @@
 - [ ] Touched `.cppm` files no longer include/import implementation-only dependencies.
 - [ ] CPU graphics/RHI tests and the default CPU gate pass without changed expectations.
 - [ ] The change preserves graphics/RHI/Vulkan layering and introduces no live ECS/runtime/platform ownership into promoted graphics APIs.
+
+## Progress notes
+- 2026-06-07: Current implementation-split slice completed locally: moved non-trivial non-template bodies into matching `.cpp` implementation units, registered new private sources in CMake, and retained importer-visible templates, constexpr helpers, ABI structs, and small accessors in module interfaces where required.
+- Focused target builds passed for the touched subsystem, and `docs/api/generated/module_inventory.md` was regenerated with `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`.
+- Retirement blocker: current-session verification on 2026-06-07 passed configure, `IntrinsicTests` build, generated-inventory, task-policy, layering, test-layout, doc-link, and diff-whitespace checks. The default CPU CTest gate failed with 159 failed tests out of 2816; the failures reproduce the existing `src/graphics/framegraph/Graphics.RenderGraph.Compiler.cpp:1565` ASan heap-buffer-overflow during render-graph compile, reached through `src/graphics/framegraph/Graphics.RenderGraph.cpp:405`, and cascade through graphics/runtime tests.
 
 ## Verification
 ```bash

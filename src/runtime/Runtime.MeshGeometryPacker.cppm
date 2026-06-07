@@ -36,11 +36,7 @@ export namespace Extrinsic::Runtime
         std::vector<std::byte> VertexBytes;
         std::vector<std::uint32_t> SurfaceIndices;
 
-        void Clear() noexcept
-        {
-            VertexBytes.clear();
-            SurfaceIndices.clear();
-        }
+        void Clear() noexcept;
     };
 
     // Fail-closed status returned by `PackMesh`. Each value maps to a single

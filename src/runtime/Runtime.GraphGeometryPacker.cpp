@@ -50,6 +50,12 @@ namespace Extrinsic::Runtime
         return "Graph.Unknown";
     }
 
+    void GraphPackBuffer::Clear() noexcept
+    {
+        VertexBytes.clear();
+        LineIndices.clear();
+    }
+
     GraphPackResult PackGraph(
         const ECS::Components::GeometrySources::ConstSourceView& view,
         const bool wantLines,
@@ -156,5 +162,4 @@ namespace Extrinsic::Runtime
         return GraphPackResult{GraphPackStatus::Success, desc};
     }
 }
-
 

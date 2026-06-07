@@ -31,6 +31,8 @@ target_sources(${target_name}
         RHI.SamplerManager.cpp
         RHI.PipelineManager.cpp
         RHI.PipelineRegistry.cpp
+        RHI.Profiler.cpp
+        RHI.TextureUpload.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)

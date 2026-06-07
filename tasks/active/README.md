@@ -11,7 +11,29 @@ Each active task should include:
 
 ## Currently active
 
-No currently active task.
+- [`HARDEN-079`](HARDEN-079-core-module-implementation-splits.md) — core
+  module implementation splits; current implementation-split slice is complete locally, but
+  retirement is blocked by the default CPU CTest rendergraph ASan failure at `src/graphics/framegraph/Graphics.RenderGraph.Compiler.cpp:1565` (159 failed tests on 2026-06-07).
+- [`GEOM-021`](GEOM-021-meshsoup-module-implementation-split.md) — MeshSoup
+  module implementation split; current implementation-split slice is complete locally, but
+  retirement is blocked by the default CPU CTest rendergraph ASan failure at `src/graphics/framegraph/Graphics.RenderGraph.Compiler.cpp:1565` (159 failed tests on 2026-06-07).
+- [`GEOM-022`](GEOM-022-remaining-geometry-module-implementation-splits.md) —
+  remaining geometry module implementation splits; current implementation-split slice is complete
+  locally, but retirement is blocked by the default CPU CTest rendergraph ASan
+  failure.
+- [`HARDEN-080`](HARDEN-080-ecs-module-implementation-splits.md) — ECS module
+  implementation splits; current implementation-split slice is complete locally, but retirement is
+  blocked by the default CPU CTest rendergraph ASan failure at `src/graphics/framegraph/Graphics.RenderGraph.Compiler.cpp:1565` (159 failed tests on 2026-06-07).
+- [`PLATFORM-005`](PLATFORM-005-platform-module-implementation-splits.md) —
+  platform module implementation splits; current implementation-split slice is complete locally,
+  but retirement is blocked by the default CPU CTest rendergraph ASan failure at `src/graphics/framegraph/Graphics.RenderGraph.Compiler.cpp:1565` (159 failed tests on 2026-06-07).
+- [`GRAPHICS-083`](GRAPHICS-083-graphics-rhi-module-implementation-splits.md) —
+  graphics/RHI module implementation splits; current implementation-split slice is complete
+  locally, but retirement is blocked by the default CPU CTest rendergraph ASan
+  failure.
+- [`RUNTIME-096`](RUNTIME-096-runtime-module-implementation-splits.md) —
+  runtime module implementation splits; current implementation-split slice is complete locally, but
+  retirement is blocked by the default CPU CTest rendergraph ASan failure at `src/graphics/framegraph/Graphics.RenderGraph.Compiler.cpp:1565` (159 failed tests on 2026-06-07).
 
 The most recently retired tasks are summarised below.
 

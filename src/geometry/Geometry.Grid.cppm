@@ -132,19 +132,10 @@ export namespace Geometry::Grid
 
         // Construct with given dimensions. Allocates the PropertySet to
         // VertexCount() elements.
-        explicit DenseGrid(const GridDimensions& dims)
-            : m_Dims(dims)
-        {
-            m_Cells.Resize(dims.VertexCount());
-        }
+        explicit DenseGrid(const GridDimensions& dims);
 
         // Reinitialize with new dimensions. Clears all existing properties.
-        void Reset(const GridDimensions& dims)
-        {
-            m_Dims = dims;
-            m_Cells.Clear();
-            m_Cells.Resize(dims.VertexCount());
-        }
+        void Reset(const GridDimensions& dims);
 
         // --- Dimensions ---
 
@@ -188,24 +179,15 @@ export namespace Geometry::Grid
             return m_Cells.GetOrAdd<T>(std::move(name), std::move(defaultValue));
         }
 
-        [[nodiscard]] bool HasProperty(std::string_view name) const
-        {
-            return m_Cells.Exists(name);
-        }
+        [[nodiscard]] bool HasProperty(std::string_view name) const;
 
         // --- Convenience: scalar field access (common case) ---
 
         // Get scalar value at vertex (x, y, z) from a named float property.
-        [[nodiscard]] float At(const Property<float>& prop, std::size_t x, std::size_t y, std::size_t z) const
-        {
-            return prop[m_Dims.LinearIndex(x, y, z)];
-        }
+        [[nodiscard]] float At(const Property<float>& prop, std::size_t x, std::size_t y, std::size_t z) const;
 
         // Set scalar value at vertex (x, y, z) on a named float property.
-        void Set(Property<float>& prop, std::size_t x, std::size_t y, std::size_t z, float value)
-        {
-            prop[m_Dims.LinearIndex(x, y, z)] = value;
-        }
+        void Set(Property<float>& prop, std::size_t x, std::size_t y, std::size_t z, float value);
 
         // --- World-space queries (forwarded from GridDimensions) ---
 
@@ -254,20 +236,10 @@ export namespace Geometry::Grid
 
         SparseGrid() = default;
 
-        explicit SparseGrid(const GridDimensions& dims)
-            : m_Dims(dims)
-        {
-        }
+        explicit SparseGrid(const GridDimensions& dims);
 
         // Reinitialize with new dimensions. Clears all allocated blocks.
-        void Reset(const GridDimensions& dims)
-        {
-            m_Dims = dims;
-            m_Cells.Clear();
-            m_BlockTable.clear();
-            m_FreeBlocks.clear();
-            m_AllocatedBlockCount = 0;
-        }
+        void Reset(const GridDimensions& dims);
 
         // --- Dimensions ---
 
@@ -283,61 +255,20 @@ export namespace Geometry::Grid
 
         // Returns the PropertySet index for vertex (x, y, z), allocating the
         // containing block if it doesn't exist yet.
-        [[nodiscard]] std::size_t TouchVertex(std::size_t x, std::size_t y, std::size_t z)
-        {
-            const auto bx = x >> BlockBits;
-            const auto by = y >> BlockBits;
-            const auto bz = z >> BlockBits;
-            const uint64_t key = PackBlockKey(bx, by, bz);
-
-            auto it = m_BlockTable.find(key);
-            if (it == m_BlockTable.end())
-            {
-                auto base = AllocateBlock();
-                it = m_BlockTable.emplace(key, base).first;
-            }
-
-            return it->second + LocalIndex(x & BlockMask, y & BlockMask, z & BlockMask);
-        }
+        [[nodiscard]] std::size_t TouchVertex(std::size_t x, std::size_t y, std::size_t z);
 
         // Returns the PropertySet index for vertex (x, y, z), or nullopt if
         // the containing block is not allocated.
-        [[nodiscard]] std::optional<std::size_t> VertexIndex(std::size_t x, std::size_t y, std::size_t z) const
-        {
-            const auto bx = x >> BlockBits;
-            const auto by = y >> BlockBits;
-            const auto bz = z >> BlockBits;
-            const uint64_t key = PackBlockKey(bx, by, bz);
-
-            auto it = m_BlockTable.find(key);
-            if (it == m_BlockTable.end())
-                return std::nullopt;
-
-            return it->second + LocalIndex(x & BlockMask, y & BlockMask, z & BlockMask);
-        }
+        [[nodiscard]] std::optional<std::size_t> VertexIndex(std::size_t x, std::size_t y, std::size_t z) const;
 
         // Check if the block containing (x, y, z) is allocated.
-        [[nodiscard]] bool IsAllocated(std::size_t x, std::size_t y, std::size_t z) const
-        {
-            const uint64_t key = PackBlockKey(x >> BlockBits, y >> BlockBits, z >> BlockBits);
-            return m_BlockTable.contains(key);
-        }
+        [[nodiscard]] bool IsAllocated(std::size_t x, std::size_t y, std::size_t z) const;
 
         // --- Block-level operations ---
 
         // Allocate the block containing (x, y, z) if not already present.
         // Returns the base PropertySet index of the block.
-        std::size_t TouchBlock(std::size_t bx, std::size_t by, std::size_t bz)
-        {
-            const uint64_t key = PackBlockKey(bx, by, bz);
-            auto it = m_BlockTable.find(key);
-            if (it != m_BlockTable.end())
-                return it->second;
-
-            auto base = AllocateBlock();
-            m_BlockTable.emplace(key, base);
-            return base;
-        }
+        std::size_t TouchBlock(std::size_t bx, std::size_t by, std::size_t bz);
 
         // --- Iteration ---
 
@@ -458,23 +389,7 @@ export namespace Geometry::Grid
         }
 
         // Allocate a new block, reusing freed slots if available.
-        [[nodiscard]] std::size_t AllocateBlock()
-        {
-            if (!m_FreeBlocks.empty())
-            {
-                auto base = m_FreeBlocks.back();
-                m_FreeBlocks.pop_back();
-                ++m_AllocatedBlockCount;
-                return base;
-            }
-
-            // Grow the PropertySet by one block.
-            const std::size_t base = m_Cells.Size();
-            for (std::size_t i = 0; i < BlockVolume; ++i)
-                m_Cells.PushBack();
-            ++m_AllocatedBlockCount;
-            return base;
-        }
+        [[nodiscard]] std::size_t AllocateBlock();
 
         GridDimensions m_Dims;
         PropertySet m_Cells;

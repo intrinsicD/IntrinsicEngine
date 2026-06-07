@@ -48,6 +48,11 @@ namespace Extrinsic::Runtime
         return "PointCloud.Unknown";
     }
 
+    void PointCloudPackBuffer::Clear() noexcept
+    {
+        VertexBytes.clear();
+    }
+
     PointCloudPackResult PackCloud(
         const ECS::Components::GeometrySources::ConstSourceView& view,
         PointCloudPackBuffer& outBuffer)

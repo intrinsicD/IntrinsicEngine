@@ -74,6 +74,12 @@ namespace Extrinsic::Core::Telemetry
     // -----------------------------------------------------------------------
     // TelemetrySystem
     // -----------------------------------------------------------------------
+    TelemetrySystem& TelemetrySystem::Get() noexcept
+    {
+        static TelemetrySystem s_Instance;
+        return s_Instance;
+    }
+
     void TelemetrySystem::BeginFrame()
     {
         m_FrameStart = std::chrono::high_resolution_clock::now();
@@ -298,5 +304,18 @@ namespace Extrinsic::Core::Telemetry
         }
         return kMaxCategories; // dropped
     }
-}
 
+    ScopedTimer::ScopedTimer(const char* name, uint32_t nameHash) noexcept
+        : m_Name(name)
+        , m_NameHash(nameHash)
+        , m_Start(std::chrono::high_resolution_clock::now())
+    {}
+
+    ScopedTimer::~ScopedTimer()
+    {
+        const auto end = std::chrono::high_resolution_clock::now();
+        const uint64_t ns = static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(end - m_Start).count());
+        TelemetrySystem::Get().RecordSample(m_NameHash, m_Name, ns);
+    }
+}

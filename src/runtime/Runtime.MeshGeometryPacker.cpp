@@ -143,6 +143,12 @@ namespace Extrinsic::Runtime
         return "Mesh.Unknown";
     }
 
+    void MeshPackBuffer::Clear() noexcept
+    {
+        VertexBytes.clear();
+        SurfaceIndices.clear();
+    }
+
     MeshPackResult PackMesh(
         const ECS::Components::GeometrySources::ConstSourceView& view,
         MeshPackBuffer& outBuffer)

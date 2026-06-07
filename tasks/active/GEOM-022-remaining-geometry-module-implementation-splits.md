@@ -11,7 +11,10 @@
 - No attempt to move templates or constexpr bodies that must remain visible to importers.
 
 ## Context
-- Status: backlog.
+- Status: blocked (current implementation-split slice complete locally; retirement blocked by default CPU CTest failure on 2026-06-07).
+- Owner/agent: Codex.
+- Branch / PR: current branch / TBD.
+- Next verification step: resolve the `src/graphics/framegraph/Graphics.RenderGraph.Compiler.cpp:1565` ASan heap-buffer-overflow default-gate blocker, then rerun the default CPU gate and retire this task if clean.
 - Owning subsystem/layer: `geometry` (`geometry -> core` only).
 - `AGENTS.md` requires non-trivial algorithm/control-flow bodies, topology/container traversal, diagnostics assembly, and implementation-only imports to live in `.cpp` implementation units when importer visibility is not required.
 - Static audit on 2026-06-06 identified these promoted geometry cleanup targets outside `Geometry.MeshSoup`:
@@ -28,14 +31,14 @@
   that already has a matching implementation unit) before creating new files.
 
 ## Required changes
-- [ ] Slice A: move audited bodies for targets that already have matching `.cpp` implementation units.
-- [ ] Slice B: add missing implementation units for compact analytic primitive modules where moved bodies are non-trivial enough to justify `.cpp` files.
-- [ ] Slice C: split larger numeric/diagnostic modules such as `Geometry.Quadric`, `Geometry.RobustPredicates`, `Geometry.Grid`, `Geometry.Overlap`, and `Geometry.Support` into declarations plus `.cpp` bodies.
-- [ ] Register any newly added `.cpp` files as private sources in `src/geometry/CMakeLists.txt`.
-- [ ] Keep templates, compile-time traits, and importer-required constexpr definitions in `.cppm`; record retained exceptions in this task before retirement.
-- [ ] Remove `inline` from moved non-template exported declarations where no longer required.
-- [ ] Clean up global-module-fragment includes in touched `.cppm` files, moving implementation-only headers into matching `.cpp` files.
-- [ ] Audit imports in touched `.cppm` files and keep only public-surface imports in the interfaces.
+- [x] Slice A: move audited bodies for targets that already have matching `.cpp` implementation units.
+- [x] Slice B: add missing implementation units for compact analytic primitive modules where moved bodies are non-trivial enough to justify `.cpp` files.
+- [x] Slice C: split larger numeric/diagnostic modules such as `Geometry.Quadric`, `Geometry.RobustPredicates`, `Geometry.Grid`, `Geometry.Overlap`, and `Geometry.Support` into declarations plus `.cpp` bodies.
+- [x] Register any newly added `.cpp` files as private sources in `src/geometry/CMakeLists.txt`.
+- [x] Keep templates, compile-time traits, and importer-required constexpr definitions in `.cppm`; record retained exceptions in this task before retirement.
+- [x] Remove `inline` from moved non-template exported declarations where no longer required.
+- [x] Clean up global-module-fragment includes in touched `.cppm` files, moving implementation-only headers into matching `.cpp` files.
+- [x] Audit imports in touched `.cppm` files and keep only public-surface imports in the interfaces.
 
 ## Tests
 - [ ] Existing geometry unit tests remain green for all touched modules.
@@ -44,9 +47,9 @@
 - [ ] Add no new behavior tests unless the split exposes an untested contract seam or a bug.
 
 ## Docs
-- [ ] Update geometry architecture docs only if a public contract or module-surface wording changes.
-- [ ] Regenerate `docs/api/generated/module_inventory.md` if module imports/surfaces change.
-- [ ] Update this task with per-slice completion notes before retirement.
+- [x] Update geometry architecture docs only if a public contract or module-surface wording changes.
+- [x] Regenerate `docs/api/generated/module_inventory.md` if module imports/surfaces change.
+- [x] Update this task with per-slice completion notes before retirement.
 
 ## Acceptance criteria
 - [ ] Touched geometry `.cppm` files expose declarations, value types, templates, constexpr importer-required helpers, and small inline accessors only, or record justified retained exceptions.
@@ -54,6 +57,11 @@
 - [ ] Touched `.cppm` files no longer include/import implementation-only dependencies.
 - [ ] Focused geometry tests and the default CPU gate pass without changed expectations.
 - [ ] The change preserves `geometry -> core` layering.
+
+## Progress notes
+- 2026-06-07: Current implementation-split slice completed locally: moved non-trivial non-template bodies into matching `.cpp` implementation units, registered new private sources in CMake, and retained importer-visible templates, constexpr helpers, ABI structs, and small accessors in module interfaces where required.
+- Focused target builds passed for the touched subsystem, and `docs/api/generated/module_inventory.md` was regenerated with `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`.
+- Retirement blocker: current-session verification on 2026-06-07 passed configure, `IntrinsicTests` build, generated-inventory, task-policy, layering, test-layout, doc-link, and diff-whitespace checks. The default CPU CTest gate failed with 159 failed tests out of 2816; the failures reproduce the existing `src/graphics/framegraph/Graphics.RenderGraph.Compiler.cpp:1565` ASan heap-buffer-overflow during render-graph compile, reached through `src/graphics/framegraph/Graphics.RenderGraph.cpp:405`, and cascade through graphics/runtime tests.
 
 ## Verification
 ```bash

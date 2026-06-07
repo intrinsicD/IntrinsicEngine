@@ -42,6 +42,7 @@ target_sources(${target_name}
         Runtime.EcsSystemBundle.cpp
         Runtime.Engine.cpp
         Runtime.PhysicsBridge.cpp
+        Cameras/Runtime.CameraControllers.cpp
         Editor/Runtime.SandboxEditorUi.cpp
         Gizmos/Runtime.GizmoInteraction.cpp
         ImGui/Runtime.ImGuiAdapter.cpp

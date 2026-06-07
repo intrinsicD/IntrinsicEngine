@@ -51,9 +51,11 @@ target_sources(${target_name}
         Core.Memory.ScopeStack.cpp
         Core.Memory.Polymorphic.cpp
         PRIVATE
+        Core.Dag.Scheduler.Hazards.cpp
         Core.Dag.Scheduler.cpp
         Core.Dag.TaskGraph.cpp
         Core.FrameGraph.cpp
+        Core.FrameLoop.cpp
         Core.Filesystem.cpp
         Core.Filesystem.PathResolver.cpp
         Core.IOBackend.cpp
@@ -75,4 +77,3 @@ target_compile_definitions(${target_name}
         PUBLIC
         ENGINE_ROOT_DIR="${CMAKE_SOURCE_DIR}"
 )
-

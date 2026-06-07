@@ -60,23 +60,6 @@ export namespace Extrinsic::ECS::Components
     // their unordered containers with `StableIdHash` explicitly.
     struct StableIdHash
     {
-        std::size_t operator()(StableId const& id) const noexcept
-        {
-            // splitmix64-style finalizer over each half, then xor-combine.
-            // Distinct from a plain xor so two ids with the same value in
-            // both halves do not collapse to zero.
-            auto mix = [](std::uint64_t v) noexcept -> std::uint64_t
-            {
-                v ^= v >> 33;
-                v *= 0xff51afd7ed558ccdULL;
-                v ^= v >> 33;
-                v *= 0xc4ceb9fe1a85ec53ULL;
-                v ^= v >> 33;
-                return v;
-            };
-            const std::uint64_t h = mix(id.High);
-            const std::uint64_t l = mix(id.Low);
-            return static_cast<std::size_t>(h ^ (l + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2)));
-        }
+        std::size_t operator()(StableId const& id) const noexcept;
     };
 }

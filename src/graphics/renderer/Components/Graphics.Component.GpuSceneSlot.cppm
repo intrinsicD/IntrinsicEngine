@@ -98,35 +98,16 @@ export namespace Extrinsic::Graphics::Components
         }
 
         // Returns the handle for the named buffer, or a null handle if not found.
-        [[nodiscard]] RHI::BufferHandle Find(std::string_view name) const noexcept
-        {
-            if (auto it = NamedBuffers.find(std::string{name}); it != NamedBuffers.end())
-                return it->second;
-            return {};
-        }
+        [[nodiscard]] RHI::BufferHandle Find(std::string_view name) const noexcept;
 
         // Returns the full NamedBuffer entry, or nullptr if not found.
-        [[nodiscard]] const BufferEntry* FindEntry(std::string_view name) const noexcept
-        {
-            if (auto it = NamedBufferEntries.find(std::string{name}); it != NamedBufferEntries.end())
-                return &it->second;
-            return nullptr;
-        }
+        [[nodiscard]] const BufferEntry* FindEntry(std::string_view name) const noexcept;
 
         // Inserts or updates a buffer entry. Called by lifecycle systems only.
         void Upsert(std::string name, RHI::BufferHandle handle,
-                    uint32_t elementCount, uint32_t stride)
-        {
-            NamedBuffers.insert_or_assign(name, handle);
-            NamedBufferEntries.insert_or_assign(name,
-                BufferEntry{name, handle, elementCount, stride});
-        }
+                    uint32_t elementCount, uint32_t stride);
 
-        void Remove(std::string_view name)
-        {
-            NamedBuffers.erase(std::string{name});
-            NamedBufferEntries.erase(std::string{name});
-        }
+        void Remove(std::string_view name);
 
         [[nodiscard]] GpuInstanceHandle ToInstanceHandle() const noexcept
         {
@@ -150,47 +131,17 @@ export namespace Extrinsic::Graphics::Components
             GeometryGeneration = h.Generation;
         }
 
-        void SetSourceAsset(Assets::AssetId asset, std::uint64_t generation = 0) noexcept
-        {
-            SourceAsset = asset;
-            LastSeenAssetGeneration = generation;
-        }
+        void SetSourceAsset(Assets::AssetId asset, std::uint64_t generation = 0) noexcept;
 
-        void UpdateLastSeenAssetGeneration(std::uint64_t generation) noexcept
-        {
-            LastSeenAssetGeneration = generation;
-        }
+        void UpdateLastSeenAssetGeneration(std::uint64_t generation) noexcept;
 
         [[nodiscard]] GpuSceneSlotAssetRebindDecision EvaluateSourceAssetRebind(
             Assets::AssetId observedAsset,
-            std::uint64_t observedGeneration) const noexcept
-        {
-            if (!HasSourceAsset())
-                return GpuSceneSlotAssetRebindDecision::NoSourceAsset;
-
-            if (observedAsset != SourceAsset)
-                return GpuSceneSlotAssetRebindDecision::AssetMismatch;
-
-            if (observedGeneration == 0)
-                return GpuSceneSlotAssetRebindDecision::GenerationUnavailable;
-
-            if (observedGeneration <= LastSeenAssetGeneration)
-                return GpuSceneSlotAssetRebindDecision::UpToDate;
-
-            return GpuSceneSlotAssetRebindDecision::RebindRequired;
-        }
+            std::uint64_t observedGeneration) const noexcept;
 
         [[nodiscard]] bool NeedsSourceAssetRebind(Assets::AssetId observedAsset,
-                                                  std::uint64_t observedGeneration) const noexcept
-        {
-            return EvaluateSourceAssetRebind(observedAsset, observedGeneration)
-                == GpuSceneSlotAssetRebindDecision::RebindRequired;
-        }
+                                                  std::uint64_t observedGeneration) const noexcept;
 
-        void ClearSourceAsset() noexcept
-        {
-            SourceAsset = {};
-            LastSeenAssetGeneration = 0;
-        }
+        void ClearSourceAsset() noexcept;
     };
 }

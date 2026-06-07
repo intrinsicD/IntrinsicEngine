@@ -26,16 +26,13 @@ namespace Extrinsic::ECS::Scene
         Registry(const Registry&) = delete;
         Registry& operator=(const Registry&) = delete;
 
-        [[nodiscard]] EntityHandle Create() { return m_Registry.create(); }
+        [[nodiscard]] EntityHandle Create();
 
-        void Destroy(const EntityHandle entity) { if (IsValid(entity)) m_Registry.destroy(entity); }
+        void Destroy(EntityHandle entity);
 
-        [[nodiscard]] bool IsValid(const EntityHandle entity) const noexcept
-        {
-            return m_Registry.valid(entity);
-        }
+        [[nodiscard]] bool IsValid(EntityHandle entity) const noexcept;
 
-        void Clear() { m_Registry.clear(); }
+        void Clear();
 
         [[nodiscard]] entt::registry& Raw() noexcept { return m_Registry; }
 

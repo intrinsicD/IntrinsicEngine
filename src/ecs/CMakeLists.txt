@@ -11,6 +11,7 @@ target_sources(${target_name}
         Hierarchy/ECS.Hierarchy.Mutation.cppm
         PRIVATE
         ECS.Scene.Bootstrap.cpp
+        ECS.Scene.Registry.cpp
         Hierarchy/ECS.Hierarchy.Structure.cpp
         Hierarchy/ECS.Hierarchy.Mutation.cpp
 )

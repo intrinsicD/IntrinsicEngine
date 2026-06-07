@@ -56,11 +56,7 @@ export namespace Extrinsic::Runtime
         std::vector<std::byte> VertexBytes;
         std::vector<std::uint32_t> LineIndices;
 
-        void Clear() noexcept
-        {
-            VertexBytes.clear();
-            LineIndices.clear();
-        }
+        void Clear() noexcept;
     };
 
     // Fail-closed status returned by the pack functions. Each value maps to a

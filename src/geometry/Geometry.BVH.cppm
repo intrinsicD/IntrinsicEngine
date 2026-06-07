@@ -87,31 +87,15 @@ export namespace Geometry
             }
         }
 
-        void QueryAABB(const AABB& queryShape, std::vector<ElementIndex>& out) const
-        {
-            Query(queryShape, out);
-        }
-
-        void QuerySphere(const Sphere& queryShape, std::vector<ElementIndex>& out) const
-        {
-            Query(queryShape, out);
-        }
-
-        void QueryRay(const Ray& queryShape, std::vector<ElementIndex>& out) const
-        {
-            Query(queryShape, out);
-        }
+        void QueryAABB(const AABB& queryShape, std::vector<ElementIndex>& out) const;
+        void QuerySphere(const Sphere& queryShape, std::vector<ElementIndex>& out) const;
+        void QueryRay(const Ray& queryShape, std::vector<ElementIndex>& out) const;
 
         [[nodiscard]] const std::vector<AABB>& ElementAabbs() const noexcept { return m_ElementAabbs; }
         [[nodiscard]] const std::vector<ElementIndex>& ElementIndices() const noexcept { return m_ElementIndices; }
         [[nodiscard]] const std::vector<Node>& Nodes() const noexcept { return m_Nodes; }
 
-        void Clear()
-        {
-            m_ElementAabbs.clear();
-            m_ElementIndices.clear();
-            m_Nodes.clear();
-        }
+        void Clear();
 
     private:
         [[nodiscard]] std::optional<BVHBuildResult> BuildFromOwned(const BVHBuildParams& params);
@@ -121,4 +105,3 @@ export namespace Geometry
         std::vector<Node> m_Nodes{};
     };
 }
-

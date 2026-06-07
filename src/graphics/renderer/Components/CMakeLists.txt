@@ -5,7 +5,8 @@ target_sources(${target_name}
         Graphics.Component.Material.cppm
         Graphics.Component.RenderGeometry.cppm
         Graphics.Component.VisualizationConfig.cppm
+        PRIVATE
+        Graphics.Component.GpuSceneSlot.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)
-

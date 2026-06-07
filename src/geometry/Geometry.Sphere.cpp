@@ -1,9 +1,16 @@
 module;
 
-#include <glm/glm.hpp>
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstdint>
+#include <limits>
+#include <numbers>
 #include <optional>
-#include <vector>
 #include <span>
+#include <vector>
+
+#include <glm/glm.hpp>
 
 module Geometry.Sphere;
 
@@ -11,6 +18,59 @@ import Geometry.LinearSolver;
 
 namespace Geometry
 {
+
+    float Sphere::GetDiameter() const
+    {
+        return Radius * 2.0f;
+    }
+
+    float Sphere::GetSurfaceArea() const
+    {
+        return 4.0f * std::numbers::pi_v<float> * Radius * Radius;
+    }
+
+    float Sphere::GetVolume() const
+    {
+        return (4.0f / 3.0f) * std::numbers::pi_v<float> * Radius * Radius * Radius;
+    }
+
+    glm::vec3 ClosestPoint(const Sphere& sphere, const glm::vec3& point)
+    {
+        const glm::vec3 delta = point - sphere.Center;
+        const float distSq = glm::dot(delta, delta);
+        const float radiusSq = sphere.Radius * sphere.Radius;
+        if (distSq <= radiusSq)
+        {
+            return point;
+        }
+        if (distSq <= 1e-12f)
+        {
+            return sphere.Center;
+        }
+        return sphere.Center + delta * (sphere.Radius * glm::inversesqrt(distSq));
+    }
+
+    double SignedDistance(const Sphere& sphere, const glm::vec3& point)
+    {
+        return static_cast<double>(glm::distance(point, sphere.Center) - sphere.Radius);
+    }
+
+    double Distance(const Sphere& sphere, const glm::vec3& point)
+    {
+        return std::max(SignedDistance(sphere, point), 0.0);
+    }
+
+    double SquaredDistance(const Sphere& sphere, const glm::vec3& point)
+    {
+        const double dist = Distance(sphere, point);
+        return dist * dist;
+    }
+
+    double Volume(const Sphere& sphere)
+    {
+        return static_cast<double>(sphere.GetVolume());
+    }
+
 namespace SphereFitDetail
     {
         [[nodiscard]] bool IsFinite(const glm::vec3& v)

@@ -38,6 +38,8 @@ target_sources(${target_name}
         backends/null/Platform.Backend.Null.cppm
         PRIVATE
         Platform.CreateWindow.cpp
+        Platform.Input.cpp
+        backends/null/Platform.Backend.Null.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)
@@ -50,6 +52,7 @@ if(_intrinsic_platform_backend STREQUAL "Glfw")
                 backends/glfw/Platform.Backend.Glfw.cppm
                 backends/glfw/Platform.Backend.GlfwVulkanSurface.cppm
                 PRIVATE
+                backends/glfw/Platform.Backend.Glfw.cpp
                 backends/glfw/Platform.Backend.GlfwVulkanSurface.cpp
         )
         target_compile_definitions(${target_name} PRIVATE INTRINSIC_PLATFORM_BACKEND_GLFW=1)

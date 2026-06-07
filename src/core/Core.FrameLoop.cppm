@@ -34,23 +34,8 @@ namespace Extrinsic::Core
         [[nodiscard]] virtual std::uint64_t EndFrame() = 0;
     };
 
-    export [[nodiscard]] inline RenderFrameResult ExecuteRenderFrameContract(
-        IRenderFrameHooks& hooks)
-    {
-        RenderFrameResult result{};
-        result.BeganFrame = hooks.BeginFrame();
-
-        if (!result.BeganFrame)
-            return result;
-
-        hooks.ExtractRenderWorld();
-        hooks.PrepareFrame();
-        hooks.ExecuteFrame();
-        result.CompletedGpuValue = hooks.EndFrame();
-        result.CompletedFrame = true;
-
-        return result;
-    }
+    export [[nodiscard]] RenderFrameResult ExecuteRenderFrameContract(
+        IRenderFrameHooks& hooks);
 
     export class IPlatformFrameHooks
     {
@@ -70,27 +55,9 @@ namespace Extrinsic::Core
         bool Minimized{false};
     };
 
-    export [[nodiscard]] inline PlatformFrameResult ExecutePlatformBeginFrameContract(
+    export [[nodiscard]] PlatformFrameResult ExecutePlatformBeginFrameContract(
         IPlatformFrameHooks& hooks,
-        double minimizedWaitSeconds)
-    {
-        hooks.PollEvents();
-
-        PlatformFrameResult result{};
-        result.ShouldClose = hooks.ShouldClose();
-        if (result.ShouldClose)
-            return result;
-
-        result.Minimized = hooks.IsMinimized();
-        if (result.Minimized)
-        {
-            hooks.WaitForEventsTimeout(minimizedWaitSeconds);
-            return result;
-        }
-
-        result.ContinueFrame = true;
-        return result;
-    }
+        double minimizedWaitSeconds);
 
     export class ITransferFrameHooks
     {
@@ -119,19 +86,11 @@ namespace Extrinsic::Core
         virtual void PumpBackground(std::uint32_t maxLaunches) = 0;
     };
 
-    export inline void ExecuteMaintenanceContract(
+    export void ExecuteMaintenanceContract(
         ITransferFrameHooks& transfer,
         IStreamingFrameHooks& streaming,
         IAssetFrameHooks& assets,
-        std::uint32_t maxStreamingLaunches)
-    {
-        transfer.CollectCompletedTransfers();
-        streaming.DrainCompletions();
-        streaming.ApplyMainThreadResults();
-        assets.TickAssets();
-        streaming.SubmitFrameWork();
-        streaming.PumpBackground(maxStreamingLaunches);
-    }
+        std::uint32_t maxStreamingLaunches);
 
     export class IOperationalTransitionHooks
     {
@@ -145,23 +104,8 @@ namespace Extrinsic::Core
         virtual void MarkRendererOperational() = 0;
     };
 
-    export [[nodiscard]] inline bool ExecuteOperationalTransitionContract(
-        IOperationalTransitionHooks& hooks)
-    {
-        if (!hooks.IsDeviceOperational() || hooks.IsRendererOperational())
-        {
-            return false;
-        }
-
-        hooks.WaitDeviceIdle();
-        if (!hooks.RebuildRendererOperationalResources())
-        {
-            return false;
-        }
-
-        hooks.MarkRendererOperational();
-        return true;
-    }
+    export [[nodiscard]] bool ExecuteOperationalTransitionContract(
+        IOperationalTransitionHooks& hooks);
 
     export class IShutdownHooks
     {
@@ -183,20 +127,5 @@ namespace Extrinsic::Core
         virtual void MarkUninitialized() = 0;
     };
 
-    export inline void ExecuteShutdownContract(IShutdownHooks& hooks)
-    {
-        hooks.StopRunning();
-        hooks.WaitDeviceIdle();
-        hooks.ShutdownApplication();
-        hooks.ShutdownStreaming();
-        hooks.DestroyScene();
-        hooks.DestroyAssets();
-        hooks.DestroyStreamingState();
-        hooks.DestroyFrameGraph();
-        hooks.ShutdownRenderer();
-        hooks.ShutdownDevice();
-        hooks.DestroyWindow();
-        hooks.ShutdownScheduler();
-        hooks.MarkUninitialized();
-    }
+    export void ExecuteShutdownContract(IShutdownHooks& hooks);
 }

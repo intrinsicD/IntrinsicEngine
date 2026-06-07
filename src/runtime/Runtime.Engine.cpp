@@ -337,6 +337,52 @@ namespace Extrinsic::Runtime
         }
     }
 
+    RuntimeDeviceSelection SelectRuntimeDeviceBackend(
+        const Core::Config::RenderConfig& config,
+        const bool promotedVulkanAvailable) noexcept
+    {
+        switch (config.Backend)
+        {
+        case Core::Config::GraphicsBackend::Vulkan:
+            if (config.EnablePromotedVulkanDevice && promotedVulkanAvailable)
+            {
+                return RuntimeDeviceSelection{
+                    .UsePromotedVulkanDevice = true,
+                    .FallsBackToNullDevice = false,
+                };
+            }
+            return RuntimeDeviceSelection{};
+        }
+        return RuntimeDeviceSelection{};
+    }
+
+    bool ShouldEmitVulkanRequestedButNotOperationalBreadcrumb(
+        const Core::Config::RenderConfig& config,
+        const bool isDeviceOperational) noexcept
+    {
+        if (config.Backend != Core::Config::GraphicsBackend::Vulkan)
+            return false;
+        if (!config.EnablePromotedVulkanDevice)
+            return false;
+        return !isDeviceOperational;
+    }
+
+    Core::Config::EngineConfig CreateReferenceEngineConfig()
+    {
+        Core::Config::EngineConfig config{};
+        config.Window.Title = "Modular Vulkan Engine";
+        config.Window.Width = 1600;
+        config.Window.Height = 900;
+        config.Render.Backend = Core::Config::GraphicsBackend::Vulkan;
+        config.Render.EnablePromotedVulkanDevice = true;
+        config.Render.EnableValidation = true;
+        config.Render.EnableVSync = true;
+        config.Render.FramesInFlight = 2;
+        config.ReferenceScene.Enabled = true;
+        config.ReferenceScene.Selector = Core::Config::ReferenceSceneSelector::Triangle;
+        return config;
+    }
+
     // ── Construction / destruction ────────────────────────────────────────
 
     Engine::Engine(Core::Config::EngineConfig config,

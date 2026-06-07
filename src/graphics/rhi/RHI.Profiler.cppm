@@ -58,12 +58,7 @@ export namespace Extrinsic::RHI
         std::uint64_t CpuSubmitTimeNs = 0;  // CPU time at vkQueueSubmit (monotonic ns)
         std::vector<GpuTimestampScope> Scopes{};
 
-        [[nodiscard]] std::uint64_t FindScopeDurationNs(std::string_view name) const
-        {
-            for (const auto& s : Scopes)
-                if (s.Name == name) return s.DurationNs;
-            return 0;
-        }
+        [[nodiscard]] std::uint64_t FindScopeDurationNs(std::string_view name) const;
     };
 
     // ----------------------------------------------------------
@@ -103,4 +98,3 @@ export namespace Extrinsic::RHI
         [[nodiscard]] virtual std::uint32_t GetFramesInFlight() const = 0;
     };
 }
-

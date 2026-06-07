@@ -36,11 +36,7 @@ export namespace Extrinsic::Runtime
         std::vector<std::byte> VertexBytes;
         std::vector<std::uint32_t> LineIndices;
 
-        void Clear() noexcept
-        {
-            VertexBytes.clear();
-            LineIndices.clear();
-        }
+        void Clear() noexcept;
     };
 
     // Fail-closed status returned by `PackGraph`. Each value maps to a single
@@ -93,4 +89,3 @@ export namespace Extrinsic::Runtime
         bool wantPoints,
         GraphPackBuffer& outBuffer);
 }
-

@@ -128,6 +128,12 @@ namespace Extrinsic::Runtime
         return "MeshPrimitiveView.Unknown";
     }
 
+    void MeshPrimitiveViewBuffer::Clear() noexcept
+    {
+        VertexBytes.clear();
+        LineIndices.clear();
+    }
+
     MeshPrimitiveViewResult PackMeshEdgeView(
         const ECS::Components::GeometrySources::ConstSourceView& view,
         MeshPrimitiveViewBuffer& outBuffer)

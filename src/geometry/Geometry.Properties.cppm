@@ -156,44 +156,27 @@ export namespace Geometry
         [[nodiscard]] std::vector<std::string> PropertyNames() const;
 
         /// Clears all properties and their data.
-        inline void Clear() { m_Size = 0; m_Storages.clear(); m_NameIndex.clear(); }
+        void Clear();
         /// Reserves storage slots for property arrays.
-        inline void Reserve(size_t n) { m_Storages.reserve(n); }
+        void Reserve(size_t n);
 
         /// Resizes all properties to n elements, filling with defaults.
-        void Resize(size_t n)
-        {
-            m_Size = n;
-            for (auto& storage : m_Storages)
-                if (storage) storage->Resize(n);
-        }
+        void Resize(size_t n);
 
         /// Shrinks all property storages to fit.
-        void ShrinkToFit() { for (auto& storage : m_Storages) if (storage) storage->ShrinkToFit(); }
+        void ShrinkToFit();
         /// Appends one element to each property storage.
-        void PushBack() { m_Size += 1; for (auto& storage : m_Storages) if (storage) storage->PushBack(); }
+        void PushBack();
 
         /// Swaps element i0 and i1 across all property arrays.
-        void Swap(size_t i0, size_t i1)
-        {
-            for (auto& storage : m_Storages)
-                if (storage) storage->Swap(i0, i1);
-        }
+        void Swap(size_t i0, size_t i1);
 
         /// Returns true if a property with this name exists.
-        [[nodiscard]] bool Contains(std::string_view name) const
-        {
-            return Find(name).has_value();
-        }
+        [[nodiscard]] bool Contains(std::string_view name) const;
 
         /// Finds a property by name; returns nullopt if not found.
         /// O(1) average via internal hash map.
-        [[nodiscard]] std::optional<PropertyId> Find(std::string_view name) const
-        {
-            auto it = m_NameIndex.find(name);
-            if (it != m_NameIndex.end()) return it->second;
-            return std::nullopt;
-        }
+        [[nodiscard]] std::optional<PropertyId> Find(std::string_view name) const;
 
         /// Adds a new property; returns nullopt if the name already exists.
         template <class T>
@@ -227,15 +210,9 @@ export namespace Geometry
         bool Remove(PropertyId id);
 
     private:
-        [[nodiscard]] Internal::PropertyStorageBase* Storage(PropertyId id) noexcept
-        {
-            return m_Storages[id].get();
-        }
+        [[nodiscard]] Internal::PropertyStorageBase* Storage(PropertyId id) noexcept;
 
-        [[nodiscard]] const Internal::PropertyStorageBase* Storage(PropertyId id) const noexcept
-        {
-            return m_Storages[id].get();
-        }
+        [[nodiscard]] const Internal::PropertyStorageBase* Storage(PropertyId id) const noexcept;
 
         template <class T>
         [[nodiscard]] Internal::PropertyStorage<T>* Storage(PropertyId id) noexcept;
