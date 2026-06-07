@@ -1525,6 +1525,37 @@ namespace Extrinsic::Runtime
         };
     }
 
+    Core::Expected<SceneSerializationResult> Engine::SaveSceneToPath(
+        std::string path) const
+    {
+        if (!m_Initialized || !m_Scene)
+            return Core::Err<SceneSerializationResult>(Core::ErrorCode::InvalidState);
+        if (path.empty())
+            return Core::Err<SceneSerializationResult>(Core::ErrorCode::InvalidPath);
+
+        Core::IO::FileIOBackend backend;
+        return SaveSceneDocument(*m_Scene, path, backend);
+    }
+
+    Core::Expected<SceneDeserializationResult> Engine::LoadSceneFromPath(
+        std::string path)
+    {
+        if (!m_Initialized || !m_Scene)
+            return Core::Err<SceneDeserializationResult>(Core::ErrorCode::InvalidState);
+        if (path.empty())
+            return Core::Err<SceneDeserializationResult>(Core::ErrorCode::InvalidPath);
+
+        Core::IO::FileIOBackend backend;
+        auto loaded = LoadSceneDocument(*m_Scene, path, backend);
+        if (!loaded.has_value())
+            return Core::Err<SceneDeserializationResult>(loaded.error());
+
+        m_SelectionController.ClearSelection(*m_Scene);
+        m_LastRefinedPrimitive.reset();
+        m_StableEntityLookup.Rebuild(*m_Scene);
+        return loaded;
+    }
+
     SelectionController&  Engine::GetSelectionController() noexcept { return m_SelectionController; }
     const std::optional<PrimitiveSelectionResult>&
     Engine::GetLastRefinedPrimitiveSelection() const noexcept { return m_LastRefinedPrimitive; }

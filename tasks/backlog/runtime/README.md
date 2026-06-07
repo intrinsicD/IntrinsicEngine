@@ -25,6 +25,11 @@ another backlog directory.
   triangle's `ProceduralGeometryRef` bootstrap with ordinary mesh-domain
   `GeometrySources`, selectable/editor-visible components, and a white
   appearance contract while keeping the sandbox app implementation runtime-only.
+- [RUNTIME-098 — Promoted scene serialization and editor command seam](../../done/RUNTIME-098-promoted-scene-serialization.md)
+  (done, 2026-06-07, `CPUContracted`): adds backend-neutral JSON scene
+  save/load over current sandbox-authored ECS data, runtime `Engine` scene-file
+  facades, and Sandbox editor `File / Scene` commands without reviving legacy
+  serializer/editor modules.
 
 ### Sandbox / triangle path support tasks (runtime-owned)
 
@@ -131,6 +136,10 @@ compose with the rendering tasks listed in `tasks/backlog/rendering/README.md`.
   _(done 2026-06-07 at maturity `CPUContracted`)_: the default visible triangle
   is an ordinary ECS mesh entity using the same runtime extraction and editor
   inspection paths as loaded mesh objects.
+- [RUNTIME-098 — Promoted scene serialization and editor command seam](../../done/RUNTIME-098-promoted-scene-serialization.md)
+  _(done 2026-06-07 at maturity `CPUContracted`)_: scene save/load persists
+  current sandbox-authored mesh/graph/point-cloud ECS data and is exposed
+  through the runtime-owned Sandbox editor scene-file command surface.
 
 ## Cross-linked rendering tasks (runtime-owned)
 

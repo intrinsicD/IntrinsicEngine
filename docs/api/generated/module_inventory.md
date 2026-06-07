@@ -21,7 +21,7 @@ Root scanned: `src`
 | `legacy` | 182 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 26 |
+| `runtime` | 27 |
 
 ## Modules
 
@@ -501,10 +501,11 @@ Root scanned: `src`
 | `Extrinsic.Runtime.ReferenceScene` | `src/runtime/Runtime.ReferenceScene.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderExtraction` | `src/runtime/Runtime.RenderExtraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderWorldPool` | `src/runtime/Runtime.RenderWorldPool.cppm` | `runtime` |
+| `Extrinsic.Runtime.SceneSerialization` | `src/runtime/Runtime.SceneSerialization.cppm` | `runtime` |
 | `Extrinsic.Runtime.SelectionController` | `src/runtime/Runtime.SelectionController.cppm` | `runtime` |
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 | `Extrinsic.Runtime.SpatialDebugAdapters` | `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **479**
+Total modules: **480**

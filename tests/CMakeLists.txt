@@ -298,6 +298,7 @@ if(TARGET ExtrinsicRuntime)
         Test.RuntimeCameraControllers.cpp
         Test.RuntimeEcsSystemBundle.cpp
         Test.RuntimeReferenceScene.cpp
+        Test.RuntimeSceneSerialization.cpp
         Test.RuntimeVulkanBreadcrumb.cpp
         Test.SandboxEditorUi.cpp
         Test.SelectionController.cpp
@@ -319,7 +320,7 @@ if(TARGET ExtrinsicRuntime)
     intrinsic_test_object_lib(RuntimeContractTestObjs
         SOURCES
             ${_runtime_contract_test_sources}
-        DEPS ExtrinsicRuntime imgui_core_lib
+        DEPS ExtrinsicRuntime imgui_core_lib nlohmann_json::nlohmann_json
     )
 endif()
 

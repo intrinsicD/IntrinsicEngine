@@ -15,6 +15,7 @@ target_sources(${target_name}
         Runtime.EcsSystemBundle.cppm
         Runtime.Engine.cppm
         Runtime.PhysicsBridge.cppm
+        Runtime.SceneSerialization.cppm
         Cameras/Runtime.CameraControllers.cppm
         Editor/Runtime.SandboxEditorUi.cppm
         Gizmos/Runtime.GizmoInteraction.cppm
@@ -42,6 +43,7 @@ target_sources(${target_name}
         Runtime.EcsSystemBundle.cpp
         Runtime.Engine.cpp
         Runtime.PhysicsBridge.cpp
+        Runtime.SceneSerialization.cpp
         Cameras/Runtime.CameraControllers.cpp
         Editor/Runtime.SandboxEditorUi.cpp
         Gizmos/Runtime.GizmoInteraction.cpp
@@ -88,7 +90,7 @@ target_link_libraries(${target_name} PRIVATE imgui_core_lib)
 # ASSETIO-001 Slice C.2b keeps concrete model/texture decoder dependencies
 # runtime-private. The exported registration seam only mentions promoted asset
 # bridge types, so tinygltf/stb headers and symbols do not leak into assets.
-target_link_libraries(${target_name} PRIVATE tinygltf stb)
+target_link_libraries(${target_name} PRIVATE tinygltf stb nlohmann_json::nlohmann_json)
 
 if(INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN)
         if(TARGET ExtrinsicBackendsVulkan)

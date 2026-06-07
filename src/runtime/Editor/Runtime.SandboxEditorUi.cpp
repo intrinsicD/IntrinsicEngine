@@ -39,6 +39,7 @@ import Extrinsic.Runtime.ImGuiAdapter;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
 
 namespace Extrinsic::Runtime
@@ -150,6 +151,46 @@ namespace Extrinsic::Runtime
             message += ".";
             return message;
         }
+
+        [[nodiscard]] std::string BuildSceneFileSuccessMessage(
+            const SandboxEditorSceneFileCommand& command,
+            const SandboxEditorSceneFileResult& result)
+        {
+            std::string message = result.Operation == SandboxEditorSceneFileOperation::Save
+                ? "Saved scene"
+                : "Loaded scene";
+            if (!command.Path.empty())
+            {
+                if (result.Operation == SandboxEditorSceneFileOperation::Save)
+                    message += " to ";
+                else
+                    message += " from ";
+                message += command.Path;
+            }
+            message += " (entities=";
+            message += std::to_string(result.Stats.Entities);
+            message += ", mesh=";
+            message += std::to_string(result.Stats.MeshEntities);
+            message += ", graph=";
+            message += std::to_string(result.Stats.GraphEntities);
+            message += ", pointCloud=";
+            message += std::to_string(result.Stats.PointCloudEntities);
+            message += ").";
+            return message;
+        }
+
+        [[nodiscard]] std::string BuildSceneFileFailureMessage(
+            const SandboxEditorSceneFileOperation operation,
+            const Core::ErrorCode error)
+        {
+            std::string message = operation == SandboxEditorSceneFileOperation::Save
+                ? "Scene save failed: "
+                : "Scene load failed: ";
+            message += ErrorName(error);
+            message += ".";
+            return message;
+        }
+
 
         [[nodiscard]] SandboxEditorSpatialDebugBindingModel FromSpatialDebugBinding(
             const ECSC::SpatialDebugBinding& binding) noexcept
@@ -659,6 +700,41 @@ namespace Extrinsic::Runtime
             return model;
         }
 
+        [[nodiscard]] SandboxEditorSceneFileModel BuildSceneFileModel(
+            const SandboxEditorContext& context)
+        {
+            SandboxEditorSceneFileModel model{};
+            model.Enabled =
+                context.SceneFileCommandsAvailable ||
+                context.SceneFileCommands.Available();
+            model.PendingPath = context.PendingSceneFilePath;
+            if (model.Enabled)
+            {
+                model.StatusText = "Scene save/load commands available.";
+            }
+            else
+            {
+                model.StatusText =
+                    "Scene save/load is disabled: runtime scene file commands are unavailable.";
+                AddDiagnostic(model.Diagnostics,
+                              SandboxEditorDiagnosticCode::SceneFileUnavailable,
+                              model.StatusText);
+            }
+            if (context.LastSceneFileResult != nullptr)
+            {
+                model.LastResult = *context.LastSceneFileResult;
+                if (!context.LastSceneFileResult->Message.empty())
+                    model.StatusText = context.LastSceneFileResult->Message;
+                if (!context.LastSceneFileResult->Succeeded())
+                {
+                    AddDiagnostic(model.Diagnostics,
+                                  SandboxEditorDiagnosticCode::SceneFileFailed,
+                                  model.StatusText);
+                }
+            }
+            return model;
+        }
+
         [[nodiscard]] SandboxEditorFileImportModel BuildFileImportModel(
             const SandboxEditorContext& context)
         {
@@ -870,6 +946,54 @@ namespace Extrinsic::Runtime
                             return result;
                         },
                 },
+                .SceneFileCommands = SandboxEditorSceneFileCommandSurface{
+                    .Save =
+                        [&engine](const SandboxEditorSceneFileCommand& command)
+                        {
+                            auto saved = engine.SaveSceneToPath(command.Path);
+                            if (!saved.has_value())
+                            {
+                                return SandboxEditorSceneFileResult{
+                                    .Status = SandboxEditorCommandStatus::SceneSaveFailed,
+                                    .Operation = SandboxEditorSceneFileOperation::Save,
+                                    .Error = saved.error(),
+                                    .Message = BuildSceneFileFailureMessage(
+                                        SandboxEditorSceneFileOperation::Save,
+                                        saved.error()),
+                                };
+                            }
+                            SandboxEditorSceneFileResult result{
+                                .Status = SandboxEditorCommandStatus::Applied,
+                                .Operation = SandboxEditorSceneFileOperation::Save,
+                                .Stats = saved->Stats,
+                            };
+                            result.Message = BuildSceneFileSuccessMessage(command, result);
+                            return result;
+                        },
+                    .Load =
+                        [&engine](const SandboxEditorSceneFileCommand& command)
+                        {
+                            auto loaded = engine.LoadSceneFromPath(command.Path);
+                            if (!loaded.has_value())
+                            {
+                                return SandboxEditorSceneFileResult{
+                                    .Status = SandboxEditorCommandStatus::SceneLoadFailed,
+                                    .Operation = SandboxEditorSceneFileOperation::Load,
+                                    .Error = loaded.error(),
+                                    .Message = BuildSceneFileFailureMessage(
+                                        SandboxEditorSceneFileOperation::Load,
+                                        loaded.error()),
+                                };
+                            }
+                            SandboxEditorSceneFileResult result{
+                                .Status = SandboxEditorCommandStatus::Applied,
+                                .Operation = SandboxEditorSceneFileOperation::Load,
+                                .Stats = loaded->Stats,
+                            };
+                            result.Message = BuildSceneFileSuccessMessage(command, result);
+                            return result;
+                        },
+                },
                 .PrimitiveViewCommands = SandboxEditorPrimitiveViewCommandSurface{
                     .GetSettings =
                         [&engine](const std::uint32_t stableEntityId)
@@ -914,6 +1038,7 @@ namespace Extrinsic::Runtime
                 },
                 .ImGuiAdapterAvailable = engine.GetImGuiAdapter().IsInitialized(),
                 .AssetImportCommandsAvailable = true,
+                .SceneFileCommandsAvailable = true,
                 .CameraRenderCommandsAvailable = true,
                 .VisualizationCommandsAvailable = true,
             };
@@ -1289,7 +1414,9 @@ namespace Extrinsic::Runtime
             const SandboxEditorPanelFrame& frame,
             const SandboxEditorContext* context,
             std::array<char, 1024>* importPathBuffer,
+            std::array<char, 1024>* scenePathBuffer,
             std::optional<SandboxEditorFileImportResult>* lastImportResult,
+            std::optional<SandboxEditorSceneFileResult>* lastSceneFileResult,
             std::array<bool, 9>* domainWindowOpen)
         {
             DrawDomainMenus(domainWindowOpen);
@@ -1461,6 +1588,66 @@ namespace Extrinsic::Runtime
                     }
                 }
                 DrawDiagnostics(frame.Selection.Diagnostics);
+            }
+            ImGui::End();
+
+            if (ImGui::Begin("File / Scene"))
+            {
+                const bool sceneControlsAvailable =
+                    frame.SceneFile.Enabled &&
+                    context != nullptr &&
+                    scenePathBuffer != nullptr &&
+                    lastSceneFileResult != nullptr;
+                if (!sceneControlsAvailable)
+                    ImGui::BeginDisabled();
+                if (scenePathBuffer != nullptr)
+                {
+                    ImGui::InputText("Scene path",
+                                     scenePathBuffer->data(),
+                                     scenePathBuffer->size());
+                }
+                else
+                {
+                    ImGui::TextDisabled("Scene path input is not bound.");
+                }
+                if (ImGui::Button("Save scene") && sceneControlsAvailable)
+                {
+                    *lastSceneFileResult = ApplySandboxEditorSceneSaveCommand(
+                        *context,
+                        SandboxEditorSceneFileCommand{
+                            .Path = std::string(scenePathBuffer->data()),
+                        });
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Load scene") && sceneControlsAvailable)
+                {
+                    *lastSceneFileResult = ApplySandboxEditorSceneLoadCommand(
+                        *context,
+                        SandboxEditorSceneFileCommand{
+                            .Path = std::string(scenePathBuffer->data()),
+                        });
+                }
+                if (!sceneControlsAvailable)
+                    ImGui::EndDisabled();
+                ImGui::TextWrapped("%s", frame.SceneFile.StatusText.c_str());
+                const SandboxEditorSceneFileResult* result =
+                    lastSceneFileResult != nullptr && lastSceneFileResult->has_value()
+                        ? &**lastSceneFileResult
+                        : frame.SceneFile.LastResult.has_value()
+                            ? &*frame.SceneFile.LastResult
+                            : nullptr;
+                if (result != nullptr)
+                {
+                    ImGui::Text("Last scene command: %s",
+                                DebugNameForSandboxEditorCommandStatus(
+                                    result->Status));
+                    ImGui::Text("Stats: entities=%u mesh=%u graph=%u pointCloud=%u",
+                                result->Stats.Entities,
+                                result->Stats.MeshEntities,
+                                result->Stats.GraphEntities,
+                                result->Stats.PointCloudEntities);
+                }
+                DrawDiagnostics(frame.SceneFile.Diagnostics);
             }
             ImGui::End();
 
@@ -1763,6 +1950,10 @@ namespace Extrinsic::Runtime
             return "AssetImportUnavailable";
         case SandboxEditorDiagnosticCode::AssetImportFailed:
             return "AssetImportFailed";
+        case SandboxEditorDiagnosticCode::SceneFileUnavailable:
+            return "SceneFileUnavailable";
+        case SandboxEditorDiagnosticCode::SceneFileFailed:
+            return "SceneFileFailed";
         case SandboxEditorDiagnosticCode::NoSelectedEntity:
             return "NoSelectedEntity";
         case SandboxEditorDiagnosticCode::UnsupportedGeometryDomain:
@@ -1792,12 +1983,18 @@ namespace Extrinsic::Runtime
             return "MissingCameraControllerRegistry";
         case SandboxEditorCommandStatus::MissingAssetImportCommands:
             return "MissingAssetImportCommands";
+        case SandboxEditorCommandStatus::MissingSceneFileCommands:
+            return "MissingSceneFileCommands";
         case SandboxEditorCommandStatus::MissingPrimitiveViewCommands:
             return "MissingPrimitiveViewCommands";
         case SandboxEditorCommandStatus::MissingVisualizationCommands:
             return "MissingVisualizationCommands";
         case SandboxEditorCommandStatus::AssetImportFailed:
             return "AssetImportFailed";
+        case SandboxEditorCommandStatus::SceneSaveFailed:
+            return "SceneSaveFailed";
+        case SandboxEditorCommandStatus::SceneLoadFailed:
+            return "SceneLoadFailed";
         case SandboxEditorCommandStatus::StaleEntity:
             return "StaleEntity";
         case SandboxEditorCommandStatus::MissingTransform:
@@ -1997,6 +2194,7 @@ namespace Extrinsic::Runtime
 
         frame.Inspector = BuildInspectorModel(context);
         frame.Selection = BuildSelectionModel(context);
+        frame.SceneFile = BuildSceneFileModel(context);
         frame.FileImport = BuildFileImportModel(context);
         frame.CameraRender = BuildCameraRenderModel(context);
         frame.Visualization = BuildVisualizationModel(context);
@@ -2155,6 +2353,86 @@ namespace Extrinsic::Runtime
         else if (result.Message.empty())
         {
             result.Message = BuildImportFailureMessage(result.Error);
+        }
+        return result;
+    }
+
+    SandboxEditorSceneFileResult ApplySandboxEditorSceneSaveCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorSceneFileCommand& command)
+    {
+        if (!context.SceneFileCommands.Available())
+        {
+            return SandboxEditorSceneFileResult{
+                .Status = SandboxEditorCommandStatus::MissingSceneFileCommands,
+                .Operation = SandboxEditorSceneFileOperation::Save,
+                .Error = Core::ErrorCode::InvalidState,
+                .Message = "Scene file command surface is unavailable.",
+            };
+        }
+        if (command.Path.empty())
+        {
+            return SandboxEditorSceneFileResult{
+                .Status = SandboxEditorCommandStatus::SceneSaveFailed,
+                .Operation = SandboxEditorSceneFileOperation::Save,
+                .Error = Core::ErrorCode::InvalidPath,
+                .Message = BuildSceneFileFailureMessage(
+                    SandboxEditorSceneFileOperation::Save,
+                    Core::ErrorCode::InvalidPath),
+            };
+        }
+
+        SandboxEditorSceneFileResult result = context.SceneFileCommands.Save(command);
+        result.Operation = SandboxEditorSceneFileOperation::Save;
+        if (result.Status == SandboxEditorCommandStatus::Applied)
+        {
+            if (result.Message.empty())
+                result.Message = BuildSceneFileSuccessMessage(command, result);
+            result.Error = Core::ErrorCode::Success;
+        }
+        else if (result.Message.empty())
+        {
+            result.Message = BuildSceneFileFailureMessage(result.Operation, result.Error);
+        }
+        return result;
+    }
+
+    SandboxEditorSceneFileResult ApplySandboxEditorSceneLoadCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorSceneFileCommand& command)
+    {
+        if (!context.SceneFileCommands.Available())
+        {
+            return SandboxEditorSceneFileResult{
+                .Status = SandboxEditorCommandStatus::MissingSceneFileCommands,
+                .Operation = SandboxEditorSceneFileOperation::Load,
+                .Error = Core::ErrorCode::InvalidState,
+                .Message = "Scene file command surface is unavailable.",
+            };
+        }
+        if (command.Path.empty())
+        {
+            return SandboxEditorSceneFileResult{
+                .Status = SandboxEditorCommandStatus::SceneLoadFailed,
+                .Operation = SandboxEditorSceneFileOperation::Load,
+                .Error = Core::ErrorCode::InvalidPath,
+                .Message = BuildSceneFileFailureMessage(
+                    SandboxEditorSceneFileOperation::Load,
+                    Core::ErrorCode::InvalidPath),
+            };
+        }
+
+        SandboxEditorSceneFileResult result = context.SceneFileCommands.Load(command);
+        result.Operation = SandboxEditorSceneFileOperation::Load;
+        if (result.Status == SandboxEditorCommandStatus::Applied)
+        {
+            if (result.Message.empty())
+                result.Message = BuildSceneFileSuccessMessage(command, result);
+            result.Error = Core::ErrorCode::Success;
+        }
+        else if (result.Message.empty())
+        {
+            result.Message = BuildSceneFileFailureMessage(result.Operation, result.Error);
         }
         return result;
     }
@@ -2364,7 +2642,7 @@ namespace Extrinsic::Runtime
 
     void DrawSandboxEditorPanelFrame(const SandboxEditorPanelFrame& frame)
     {
-        DrawPanelFrame(frame, nullptr, nullptr, nullptr, nullptr);
+        DrawPanelFrame(frame, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
     }
 
     SandboxEditorUi::~SandboxEditorUi()
@@ -2386,6 +2664,10 @@ namespace Extrinsic::Runtime
                     std::string(m_ImportPathBuffer.data());
                 context.PendingAssetImportPayloadKind =
                     Extrinsic::Assets::AssetPayloadKind::Unknown;
+                context.PendingSceneFilePath =
+                    std::string(m_ScenePathBuffer.data());
+                if (m_LastSceneFileResult.has_value())
+                    context.LastSceneFileResult = &*m_LastSceneFileResult;
                 if (m_LastImportResult.has_value())
                     context.LastAssetImportResult = &*m_LastImportResult;
                 m_LastFrame = BuildSandboxEditorPanelFrame(context);
@@ -2393,7 +2675,9 @@ namespace Extrinsic::Runtime
                     m_LastFrame,
                     &context,
                     &m_ImportPathBuffer,
+                    &m_ScenePathBuffer,
                     &m_LastImportResult,
+                    &m_LastSceneFileResult,
                     &m_DomainWindowOpen);
             });
     }

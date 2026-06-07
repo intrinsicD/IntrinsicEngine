@@ -35,6 +35,7 @@ import Extrinsic.Runtime.ImGuiAdapter;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxEditorUi;
+import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
 import Geometry.Properties;
 
@@ -277,6 +278,9 @@ TEST(SandboxEditorUi, EmptyContextProducesDeterministicDisabledDiagnostics)
                               Runtime::SandboxEditorDiagnosticCode::MissingSelectionController));
     EXPECT_TRUE(HasDiagnostic(frame.Diagnostics,
                               Runtime::SandboxEditorDiagnosticCode::MissingImGuiAdapter));
+    EXPECT_FALSE(frame.SceneFile.Enabled);
+    EXPECT_TRUE(HasDiagnostic(frame.SceneFile.Diagnostics,
+                              Runtime::SandboxEditorDiagnosticCode::SceneFileUnavailable));
     EXPECT_FALSE(frame.FileImport.Enabled);
     EXPECT_TRUE(HasDiagnostic(frame.FileImport.Diagnostics,
                               Runtime::SandboxEditorDiagnosticCode::AssetImportUnavailable));
@@ -381,6 +385,122 @@ TEST(SandboxEditorUi, FileImportCommandRoutesThroughRuntimeOwnedSurface)
     EXPECT_TRUE(HasDiagnostic(
         frame.FileImport.Diagnostics,
         Runtime::SandboxEditorDiagnosticCode::AssetImportFailed));
+}
+
+TEST(SandboxEditorUi, SceneFileCommandRoutesThroughRuntimeOwnedSurface)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+
+    bool saveObserved = false;
+    bool loadObserved = false;
+    Runtime::SandboxEditorSceneFileCommand observedSave{};
+    Runtime::SandboxEditorSceneFileCommand observedLoad{};
+    context.SceneFileCommands = Runtime::SandboxEditorSceneFileCommandSurface{
+        .Save =
+            [&](const Runtime::SandboxEditorSceneFileCommand& command)
+            {
+                saveObserved = true;
+                observedSave = command;
+                return Runtime::SandboxEditorSceneFileResult{
+                    .Status = Runtime::SandboxEditorCommandStatus::Applied,
+                    .Operation = Runtime::SandboxEditorSceneFileOperation::Save,
+                    .Stats = Runtime::SceneSerializationStats{
+                        .Entities = 3u,
+                        .MeshEntities = 1u,
+                        .GraphEntities = 1u,
+                        .PointCloudEntities = 1u,
+                    },
+                    .Message = "Saved fake scene.",
+                };
+            },
+        .Load =
+            [&](const Runtime::SandboxEditorSceneFileCommand& command)
+            {
+                loadObserved = true;
+                observedLoad = command;
+                return Runtime::SandboxEditorSceneFileResult{
+                    .Status = Runtime::SandboxEditorCommandStatus::Applied,
+                    .Operation = Runtime::SandboxEditorSceneFileOperation::Load,
+                    .Stats = Runtime::SceneSerializationStats{.Entities = 2u},
+                    .Message = "Loaded fake scene.",
+                };
+            },
+    };
+    context.PendingSceneFilePath = "scene.extrinsic.json";
+
+    Runtime::SandboxEditorPanelFrame frame =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+    EXPECT_TRUE(frame.SceneFile.Enabled);
+    EXPECT_EQ(frame.SceneFile.PendingPath, "scene.extrinsic.json");
+    EXPECT_FALSE(HasDiagnostic(
+        frame.SceneFile.Diagnostics,
+        Runtime::SandboxEditorDiagnosticCode::SceneFileUnavailable));
+
+    const Runtime::SandboxEditorSceneFileResult save =
+        Runtime::ApplySandboxEditorSceneSaveCommand(
+            context,
+            Runtime::SandboxEditorSceneFileCommand{
+                .Path = "scene.extrinsic.json",
+            });
+    EXPECT_TRUE(saveObserved);
+    EXPECT_EQ(observedSave.Path, "scene.extrinsic.json");
+    EXPECT_TRUE(save.Succeeded());
+    EXPECT_EQ(save.Stats.Entities, 3u);
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorCommandStatus(save.Status),
+                 "Applied");
+
+    const Runtime::SandboxEditorSceneFileResult load =
+        Runtime::ApplySandboxEditorSceneLoadCommand(
+            context,
+            Runtime::SandboxEditorSceneFileCommand{
+                .Path = "scene.extrinsic.json",
+            });
+    EXPECT_TRUE(loadObserved);
+    EXPECT_EQ(observedLoad.Path, "scene.extrinsic.json");
+    EXPECT_TRUE(load.Succeeded());
+    EXPECT_EQ(load.Stats.Entities, 2u);
+
+    context.LastSceneFileResult = &load;
+    frame = Runtime::BuildSandboxEditorPanelFrame(context);
+    ASSERT_TRUE(frame.SceneFile.LastResult.has_value());
+    EXPECT_EQ(frame.SceneFile.StatusText, "Loaded fake scene.");
+    EXPECT_FALSE(HasDiagnostic(
+        frame.SceneFile.Diagnostics,
+        Runtime::SandboxEditorDiagnosticCode::SceneFileFailed));
+
+    Runtime::SandboxEditorContext missingSurface =
+        MakeContext(registry, selection);
+    const Runtime::SandboxEditorSceneFileResult missing =
+        Runtime::ApplySandboxEditorSceneSaveCommand(
+            missingSurface,
+            Runtime::SandboxEditorSceneFileCommand{
+                .Path = "scene.extrinsic.json",
+            });
+    EXPECT_EQ(missing.Status,
+              Runtime::SandboxEditorCommandStatus::MissingSceneFileCommands);
+    EXPECT_EQ(missing.Error, Core::ErrorCode::InvalidState);
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorCommandStatus(
+                     missing.Status),
+                 "MissingSceneFileCommands");
+
+    const Runtime::SandboxEditorSceneFileResult emptySave =
+        Runtime::ApplySandboxEditorSceneSaveCommand(
+            context,
+            Runtime::SandboxEditorSceneFileCommand{});
+    EXPECT_EQ(emptySave.Status,
+              Runtime::SandboxEditorCommandStatus::SceneSaveFailed);
+    EXPECT_EQ(emptySave.Error, Core::ErrorCode::InvalidPath);
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorDiagnosticCode(
+                     Runtime::SandboxEditorDiagnosticCode::SceneFileFailed),
+                 "SceneFileFailed");
+
+    context.LastSceneFileResult = &emptySave;
+    frame = Runtime::BuildSandboxEditorPanelFrame(context);
+    EXPECT_TRUE(HasDiagnostic(
+        frame.SceneFile.Diagnostics,
+        Runtime::SandboxEditorDiagnosticCode::SceneFileFailed));
 }
 
 TEST(SandboxEditorUi, HierarchyInspectorModelReportsSelectionRenderHintsAndDomain)

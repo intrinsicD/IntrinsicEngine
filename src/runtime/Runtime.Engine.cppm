@@ -31,6 +31,7 @@ import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.ReferenceScene;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.RenderExtraction;
@@ -205,6 +206,13 @@ namespace Extrinsic::Runtime
         // ASSETIO model/texture decoders, AssetService, and runtime handoffs.
         [[nodiscard]] Core::Expected<RuntimeAssetImportResult> ImportAssetFromPath(
             RuntimeAssetImportRequest request);
+        // RUNTIME-098 — promoted scene persistence facade. Editor/UI code
+        // submits file paths here; Engine owns file IO, scene replacement, and
+        // runtime sidecar cleanup while the serializer stays backend-neutral.
+        [[nodiscard]] Core::Expected<SceneSerializationResult> SaveSceneToPath(
+            std::string path) const;
+        [[nodiscard]] Core::Expected<SceneDeserializationResult> LoadSceneFromPath(
+            std::string path);
         // RUNTIME-089 Slice B — runtime/editor-owned selection authority.
         // Input ports / editor tools submit hover/click picks here; RunFrame
         // drains the coalesced pick into the renderer's SelectionSystem before

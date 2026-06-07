@@ -28,6 +28,7 @@ import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
 
 export namespace Extrinsic::Runtime
@@ -39,6 +40,8 @@ export namespace Extrinsic::Runtime
         MissingImGuiAdapter,
         AssetImportUnavailable,
         AssetImportFailed,
+        SceneFileUnavailable,
+        SceneFileFailed,
         NoSelectedEntity,
         UnsupportedGeometryDomain,
         CameraRenderCommandsUnavailable,
@@ -53,9 +56,12 @@ export namespace Extrinsic::Runtime
         MissingSelectionController,
         MissingCameraControllerRegistry,
         MissingAssetImportCommands,
+        MissingSceneFileCommands,
         MissingPrimitiveViewCommands,
         MissingVisualizationCommands,
         AssetImportFailed,
+        SceneSaveFailed,
+        SceneLoadFailed,
         StaleEntity,
         MissingTransform,
         UnsupportedGeometryDomain,
@@ -185,6 +191,53 @@ export namespace Extrinsic::Runtime
         bool                       HasHoveredEntity{false};
         SandboxEditorEntityRow     HoveredEntity{};
         SandboxEditorPrimitiveDetailModel Primitive{};
+        std::vector<SandboxEditorDiagnostic> Diagnostics{};
+    };
+
+    enum class SandboxEditorSceneFileOperation : std::uint8_t
+    {
+        Save,
+        Load,
+    };
+
+    struct SandboxEditorSceneFileCommand
+    {
+        std::string Path{};
+    };
+
+    struct SandboxEditorSceneFileResult
+    {
+        SandboxEditorCommandStatus Status{SandboxEditorCommandStatus::NoChange};
+        SandboxEditorSceneFileOperation Operation{SandboxEditorSceneFileOperation::Save};
+        SceneSerializationStats Stats{};
+        Core::ErrorCode Error{Core::ErrorCode::Success};
+        std::string Message{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == SandboxEditorCommandStatus::Applied;
+        }
+    };
+
+    struct SandboxEditorSceneFileCommandSurface
+    {
+        std::function<SandboxEditorSceneFileResult(
+            const SandboxEditorSceneFileCommand&)> Save{};
+        std::function<SandboxEditorSceneFileResult(
+            const SandboxEditorSceneFileCommand&)> Load{};
+
+        [[nodiscard]] bool Available() const noexcept
+        {
+            return static_cast<bool>(Save) && static_cast<bool>(Load);
+        }
+    };
+
+    struct SandboxEditorSceneFileModel
+    {
+        bool        Enabled{false};
+        std::string PendingPath{};
+        std::optional<SandboxEditorSceneFileResult> LastResult{};
+        std::string StatusText{};
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
@@ -367,6 +420,7 @@ export namespace Extrinsic::Runtime
         std::vector<SandboxEditorEntityRow> Hierarchy{};
         SandboxEditorInspectorModel         Inspector{};
         SandboxEditorSelectionModel         Selection{};
+        SandboxEditorSceneFileModel        SceneFile{};
         SandboxEditorFileImportModel        FileImport{};
         SandboxEditorCameraRenderModel      CameraRender{};
         SandboxEditorVisualizationModel     Visualization{};
@@ -381,14 +435,18 @@ export namespace Extrinsic::Runtime
         CameraControllerRegistry* CameraControllers{nullptr};
         Core::Extent2D CameraViewport{};
         SandboxEditorAssetImportCommandSurface AssetImportCommands{};
+        SandboxEditorSceneFileCommandSurface SceneFileCommands{};
         SandboxEditorPrimitiveViewCommandSurface PrimitiveViewCommands{};
         SandboxEditorVisualizationAdapterBindingCommandSurface VisualizationAdapterBindings{};
         std::string PendingAssetImportPath{};
+        std::string PendingSceneFilePath{};
         Assets::AssetPayloadKind PendingAssetImportPayloadKind{
             Assets::AssetPayloadKind::Unknown};
         const SandboxEditorFileImportResult* LastAssetImportResult{nullptr};
+        const SandboxEditorSceneFileResult* LastSceneFileResult{nullptr};
         bool ImGuiAdapterAvailable{false};
         bool AssetImportCommandsAvailable{false};
+        bool SceneFileCommandsAvailable{false};
         bool CameraRenderCommandsAvailable{false};
         bool VisualizationCommandsAvailable{false};
     };
@@ -477,6 +535,14 @@ export namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const SandboxEditorFileImportCommand& command);
 
+    SandboxEditorSceneFileResult ApplySandboxEditorSceneSaveCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorSceneFileCommand& command);
+
+    SandboxEditorSceneFileResult ApplySandboxEditorSceneLoadCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorSceneFileCommand& command);
+
     SandboxEditorCommandStatus ApplySandboxEditorTransformEdit(
         const SandboxEditorContext& context,
         const SandboxEditorTransformEditCommand& command);
@@ -527,7 +593,9 @@ export namespace Extrinsic::Runtime
         Engine*                 m_Engine{nullptr};
         SandboxEditorPanelFrame m_LastFrame{};
         std::array<char, 1024>  m_ImportPathBuffer{};
+        std::array<char, 1024>  m_ScenePathBuffer{};
         std::array<bool, 9>     m_DomainWindowOpen{};
         std::optional<SandboxEditorFileImportResult> m_LastImportResult{};
+        std::optional<SandboxEditorSceneFileResult> m_LastSceneFileResult{};
     };
 }
