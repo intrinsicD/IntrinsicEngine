@@ -46,6 +46,7 @@ export namespace Extrinsic::Runtime
         UnsupportedGeometryDomain,
         CameraRenderCommandsUnavailable,
         VisualizationCommandsUnavailable,
+        GeometryProcessingFailed,
     };
 
     enum class SandboxEditorCommandStatus : std::uint8_t
@@ -65,6 +66,8 @@ export namespace Extrinsic::Runtime
         StaleEntity,
         MissingTransform,
         UnsupportedGeometryDomain,
+        InvalidProcessingParameters,
+        GeometryProcessingFailed,
     };
 
     [[nodiscard]] const char* DebugNameForSandboxEditorDiagnosticCode(
@@ -222,6 +225,37 @@ export namespace Extrinsic::Runtime
 
     [[nodiscard]] const char* DebugNameForSandboxEditorGeometryProcessingAlgorithm(
         SandboxEditorGeometryProcessingAlgorithm algorithm) noexcept;
+
+    struct SandboxEditorKMeansCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        SandboxEditorGeometryProcessingDomain Domain{
+            SandboxEditorGeometryProcessingDomain::PointCloudPoints};
+        std::uint32_t ClusterCount{8u};
+        std::uint32_t MaxIterations{32u};
+        std::uint32_t Seed{42u};
+        bool UseHierarchicalInitialization{true};
+    };
+
+    struct SandboxEditorKMeansResult
+    {
+        SandboxEditorCommandStatus Status{SandboxEditorCommandStatus::NoChange};
+        SandboxEditorGeometryProcessingDomain Domain{
+            SandboxEditorGeometryProcessingDomain::None};
+        std::uint32_t LabelCount{0u};
+        std::uint32_t ClusterCount{0u};
+        std::uint32_t Iterations{0u};
+        bool Converged{false};
+        float Inertia{0.0f};
+        std::uint32_t MaxDistanceIndex{0u};
+        Core::ErrorCode Error{Core::ErrorCode::Success};
+        std::string Message{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == SandboxEditorCommandStatus::Applied;
+        }
+    };
 
     struct SandboxEditorDiagnostic
     {
@@ -520,6 +554,7 @@ export namespace Extrinsic::Runtime
         SandboxEditorGeometryProcessingCapabilities Capabilities{};
         std::vector<SandboxEditorGeometryProcessingEntry> Entries{};
         std::vector<SandboxEditorGeometryProcessingDomain> KMeansDomains{};
+        std::optional<SandboxEditorKMeansResult> LastKMeansResult{};
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
@@ -574,6 +609,7 @@ export namespace Extrinsic::Runtime
             Assets::AssetPayloadKind::Unknown};
         const SandboxEditorFileImportResult* LastAssetImportResult{nullptr};
         const SandboxEditorSceneFileResult* LastSceneFileResult{nullptr};
+        const SandboxEditorKMeansResult* LastKMeansResult{nullptr};
         bool ImGuiAdapterAvailable{false};
         bool AssetImportCommandsAvailable{false};
         bool SceneFileCommandsAvailable{false};
@@ -697,6 +733,10 @@ export namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const SandboxEditorVisualizationAdapterBindingCommand& command);
 
+    SandboxEditorKMeansResult ApplySandboxEditorKMeansCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorKMeansCommand& command);
+
     void DrawSandboxEditorPanelFrame(const SandboxEditorPanelFrame& frame);
 
     class SandboxEditorUi
@@ -727,5 +767,12 @@ export namespace Extrinsic::Runtime
         std::array<bool, 12>    m_DomainWindowOpen{};
         std::optional<SandboxEditorFileImportResult> m_LastImportResult{};
         std::optional<SandboxEditorSceneFileResult> m_LastSceneFileResult{};
+        std::optional<SandboxEditorKMeansResult> m_LastKMeansResult{};
+        SandboxEditorGeometryProcessingDomain m_KMeansDomain{
+            SandboxEditorGeometryProcessingDomain::None};
+        std::int32_t m_KMeansClusterCount{8};
+        std::int32_t m_KMeansMaxIterations{32};
+        std::int32_t m_KMeansSeed{42};
+        bool m_KMeansUseHierarchicalInitialization{true};
     };
 }

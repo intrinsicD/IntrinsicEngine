@@ -21,6 +21,7 @@ import Extrinsic.ECS.Component.SpatialDebugBinding;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
+import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Scene.Handle;
@@ -44,6 +45,7 @@ namespace Assets = Extrinsic::Assets;
 namespace Core = Extrinsic::Core;
 namespace ECS = Extrinsic::ECS;
 namespace ECSC = Extrinsic::ECS::Components;
+namespace Dirty = Extrinsic::ECS::Components::DirtyTags;
 namespace GS = Extrinsic::ECS::Components::GeometrySources;
 namespace Sel = Extrinsic::ECS::Components::Selection;
 namespace G = Extrinsic::Graphics::Components;
@@ -107,6 +109,44 @@ namespace
             std::string{PN::kPosition},
             glm::vec3{0.0f});
         pos.Vector() = positions;
+    }
+
+    void ExpectKMeansVertexProperties(Geometry::PropertySet& properties,
+                                      const std::size_t expectedCount,
+                                      const bool pointCloudNames)
+    {
+        const std::string labelName =
+            pointCloudNames ? "p:kmeans_label" : "v:kmeans_label";
+        const std::string colorName =
+            pointCloudNames ? "p:kmeans_color" : "v:kmeans_color";
+
+        auto labels = properties.Get<std::uint32_t>(labelName);
+        auto colors = properties.Get<glm::vec4>(colorName);
+        ASSERT_TRUE(labels);
+        ASSERT_TRUE(colors);
+        ASSERT_EQ(labels.Vector().size(), expectedCount);
+        ASSERT_EQ(colors.Vector().size(), expectedCount);
+        for (std::size_t i = 0u; i < expectedCount; ++i)
+        {
+            EXPECT_LT(labels.Vector()[i], expectedCount);
+            EXPECT_FLOAT_EQ(colors.Vector()[i].w, 1.0f);
+        }
+
+        if (pointCloudNames)
+        {
+            EXPECT_FALSE(properties.Get<float>("v:kmeans_label_f"));
+        }
+        else
+        {
+            auto labelFloats = properties.Get<float>("v:kmeans_label_f");
+            ASSERT_TRUE(labelFloats);
+            ASSERT_EQ(labelFloats.Vector().size(), expectedCount);
+            for (std::size_t i = 0u; i < expectedCount; ++i)
+            {
+                EXPECT_FLOAT_EQ(labelFloats.Vector()[i],
+                                static_cast<float>(labels.Vector()[i]));
+            }
+        }
     }
 
     void SetEdges(GS::Edges& edges,
@@ -749,6 +789,212 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
                     registry,
                     empty)
                     .empty());
+}
+
+TEST(SandboxEditorUi, KMeansCommandPublishesMeshGraphAndPointCloudProperties)
+{
+    using Domain = Runtime::SandboxEditorGeometryProcessingDomain;
+
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
+    AddTriangleMeshSource(registry, mesh);
+    const Runtime::SandboxEditorKMeansResult meshResult =
+        Runtime::ApplySandboxEditorKMeansCommand(
+            context,
+            Runtime::SandboxEditorKMeansCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(mesh),
+                .Domain = Domain::MeshVertices,
+                .ClusterCount = 2u,
+                .MaxIterations = 8u,
+                .Seed = 7u,
+            });
+    ASSERT_TRUE(meshResult.Succeeded());
+    EXPECT_EQ(meshResult.Domain, Domain::MeshVertices);
+    EXPECT_EQ(meshResult.LabelCount, 3u);
+    EXPECT_EQ(meshResult.ClusterCount, 2u);
+    EXPECT_EQ(meshResult.Error, Core::ErrorCode::Success);
+    ExpectKMeansVertexProperties(
+        registry.Raw().get<GS::Vertices>(mesh).Properties,
+        3u,
+        false);
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+
+    const ECS::EntityHandle graph = MakeSelectable(registry, "Graph");
+    AddGraphSource(registry, graph);
+    const Runtime::SandboxEditorKMeansResult graphResult =
+        Runtime::ApplySandboxEditorKMeansCommand(
+            context,
+            Runtime::SandboxEditorKMeansCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(graph),
+                .Domain = Domain::GraphVertices,
+                .ClusterCount = 2u,
+                .MaxIterations = 8u,
+                .Seed = 11u,
+                .UseHierarchicalInitialization = false,
+            });
+    ASSERT_TRUE(graphResult.Succeeded());
+    EXPECT_EQ(graphResult.Domain, Domain::GraphVertices);
+    EXPECT_EQ(graphResult.LabelCount, 3u);
+    ExpectKMeansVertexProperties(
+        registry.Raw().get<GS::Nodes>(graph).Properties,
+        3u,
+        false);
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(graph));
+
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "Cloud");
+    AddPointCloudSource(registry, cloud, 4u);
+    SetPositions(registry.Raw().get<GS::Vertices>(cloud),
+                 {
+                     {0.0f, 0.0f, 0.0f},
+                     {0.1f, 0.0f, 0.0f},
+                     {2.0f, 0.0f, 0.0f},
+                     {2.1f, 0.0f, 0.0f},
+                 });
+    const Runtime::SandboxEditorKMeansResult cloudResult =
+        Runtime::ApplySandboxEditorKMeansCommand(
+            context,
+            Runtime::SandboxEditorKMeansCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(cloud),
+                .Domain = Domain::PointCloudPoints,
+                .ClusterCount = 2u,
+                .MaxIterations = 8u,
+                .Seed = 13u,
+            });
+    ASSERT_TRUE(cloudResult.Succeeded());
+    EXPECT_EQ(cloudResult.Domain, Domain::PointCloudPoints);
+    EXPECT_EQ(cloudResult.LabelCount, 4u);
+    ExpectKMeansVertexProperties(
+        registry.Raw().get<GS::Vertices>(cloud).Properties,
+        4u,
+        true);
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(cloud));
+
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
+    context.LastKMeansResult = &cloudResult;
+    const Runtime::SandboxEditorDomainWindowModel model =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::PointCloud);
+    ASSERT_TRUE(model.Processing.LastKMeansResult.has_value());
+    EXPECT_TRUE(model.Processing.LastKMeansResult->Succeeded());
+    EXPECT_EQ(model.Processing.LastKMeansResult->LabelCount, 4u);
+}
+
+TEST(SandboxEditorUi, KMeansCommandFailsClosedForInvalidTargetsAndInputs)
+{
+    using Domain = Runtime::SandboxEditorGeometryProcessingDomain;
+
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+
+    const Runtime::SandboxEditorKMeansCommand validShape{
+        .StableEntityId = 1u,
+        .Domain = Domain::PointCloudPoints,
+        .ClusterCount = 2u,
+        .MaxIterations = 8u,
+    };
+
+    const Runtime::SandboxEditorKMeansResult missingScene =
+        Runtime::ApplySandboxEditorKMeansCommand(
+            Runtime::SandboxEditorContext{},
+            validShape);
+    EXPECT_EQ(missingScene.Status,
+              Runtime::SandboxEditorCommandStatus::MissingScene);
+    EXPECT_EQ(missingScene.Error, Core::ErrorCode::InvalidState);
+
+    const Runtime::SandboxEditorKMeansResult invalidParameters =
+        Runtime::ApplySandboxEditorKMeansCommand(
+            context,
+            Runtime::SandboxEditorKMeansCommand{
+                .StableEntityId = 1u,
+                .Domain = Domain::MeshEdges,
+                .ClusterCount = 0u,
+                .MaxIterations = 0u,
+            });
+    EXPECT_EQ(invalidParameters.Status,
+              Runtime::SandboxEditorCommandStatus::InvalidProcessingParameters);
+    EXPECT_EQ(invalidParameters.Error, Core::ErrorCode::InvalidArgument);
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorCommandStatus(
+                     invalidParameters.Status),
+                 "InvalidProcessingParameters");
+
+    const Runtime::SandboxEditorKMeansResult stale =
+        Runtime::ApplySandboxEditorKMeansCommand(
+            context,
+            Runtime::SandboxEditorKMeansCommand{
+                .StableEntityId = std::numeric_limits<std::uint32_t>::max(),
+                .Domain = Domain::PointCloudPoints,
+                .ClusterCount = 2u,
+                .MaxIterations = 8u,
+            });
+    EXPECT_EQ(stale.Status, Runtime::SandboxEditorCommandStatus::StaleEntity);
+    EXPECT_EQ(stale.Error, Core::ErrorCode::ResourceNotFound);
+
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "Cloud");
+    AddPointCloudSource(registry, cloud, 3u);
+    const std::uint32_t cloudStableId =
+        Runtime::SelectionController::ToStableEntityId(cloud);
+    const Runtime::SandboxEditorKMeansResult wrongDomain =
+        Runtime::ApplySandboxEditorKMeansCommand(
+            context,
+            Runtime::SandboxEditorKMeansCommand{
+                .StableEntityId = cloudStableId,
+                .Domain = Domain::MeshVertices,
+                .ClusterCount = 2u,
+                .MaxIterations = 8u,
+            });
+    EXPECT_EQ(wrongDomain.Status,
+              Runtime::SandboxEditorCommandStatus::UnsupportedGeometryDomain);
+
+    const Runtime::SandboxEditorKMeansResult missingPositions =
+        Runtime::ApplySandboxEditorKMeansCommand(
+            context,
+            Runtime::SandboxEditorKMeansCommand{
+                .StableEntityId = cloudStableId,
+                .Domain = Domain::PointCloudPoints,
+                .ClusterCount = 2u,
+                .MaxIterations = 8u,
+            });
+    EXPECT_EQ(missingPositions.Status,
+              Runtime::SandboxEditorCommandStatus::InvalidProcessingParameters);
+
+    SetPositions(registry.Raw().get<GS::Vertices>(cloud),
+                 {
+                     {0.0f, 0.0f, 0.0f},
+                     {std::numeric_limits<float>::infinity(), 0.0f, 0.0f},
+                     {1.0f, 0.0f, 0.0f},
+                 });
+    const Runtime::SandboxEditorKMeansResult nonFinite =
+        Runtime::ApplySandboxEditorKMeansCommand(
+            context,
+            Runtime::SandboxEditorKMeansCommand{
+                .StableEntityId = cloudStableId,
+                .Domain = Domain::PointCloudPoints,
+                .ClusterCount = 2u,
+                .MaxIterations = 8u,
+            });
+    EXPECT_EQ(nonFinite.Status,
+              Runtime::SandboxEditorCommandStatus::InvalidProcessingParameters);
+
+    context.LastKMeansResult = &nonFinite;
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
+    const Runtime::SandboxEditorDomainWindowModel model =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::PointCloud);
+    EXPECT_TRUE(HasDiagnostic(
+        model.Processing.Diagnostics,
+        Runtime::SandboxEditorDiagnosticCode::GeometryProcessingFailed));
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorDiagnosticCode(
+                     Runtime::SandboxEditorDiagnosticCode::GeometryProcessingFailed),
+                 "GeometryProcessingFailed");
 }
 
 TEST(SandboxEditorUi, DomainWindowModelsReportSelectedMeshGraphAndPointCloudState)

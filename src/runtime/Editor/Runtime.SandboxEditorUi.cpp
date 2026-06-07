@@ -2,10 +2,12 @@ module;
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <utility>
 #include <variant>
@@ -28,6 +30,7 @@ import Extrinsic.ECS.Component.SpatialDebugBinding;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
+import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.Graphics.Component.VisualizationConfig;
@@ -41,16 +44,30 @@ import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
+import Geometry.KMeans;
+import Geometry.Properties;
 
 namespace Extrinsic::Runtime
 {
     namespace
     {
         namespace ECSC = Extrinsic::ECS::Components;
+        namespace Dirty = Extrinsic::ECS::Components::DirtyTags;
         namespace GS = Extrinsic::ECS::Components::GeometrySources;
         namespace Sel = Extrinsic::ECS::Components::Selection;
         namespace G = Extrinsic::Graphics::Components;
         namespace A = Extrinsic::Assets;
+        namespace GK = Geometry::KMeans;
+
+        struct KMeansUiState
+        {
+            std::optional<SandboxEditorKMeansResult>* LastResult{nullptr};
+            SandboxEditorGeometryProcessingDomain* Domain{nullptr};
+            std::int32_t* ClusterCount{nullptr};
+            std::int32_t* MaxIterations{nullptr};
+            std::int32_t* Seed{nullptr};
+            bool* UseHierarchicalInitialization{nullptr};
+        };
 
         enum class DomainWindowSection : std::uint8_t
         {
@@ -648,6 +665,207 @@ namespace Extrinsic::Runtime
             return std::nullopt;
         }
 
+        [[nodiscard]] SandboxEditorKMeansResult MakeKMeansResult(
+            const SandboxEditorCommandStatus status,
+            const SandboxEditorGeometryProcessingDomain domain,
+            const Core::ErrorCode error,
+            std::string message)
+        {
+            return SandboxEditorKMeansResult{
+                .Status = status,
+                .Domain = domain,
+                .Error = error,
+                .Message = std::move(message),
+            };
+        }
+
+        [[nodiscard]] bool IsKMeansExecutionDomain(
+            const SandboxEditorGeometryProcessingDomain domain) noexcept
+        {
+            using Domain = SandboxEditorGeometryProcessingDomain;
+            return domain == Domain::MeshVertices ||
+                   domain == Domain::GraphVertices ||
+                   domain == Domain::PointCloudPoints;
+        }
+
+        [[nodiscard]] bool SourceViewSupportsKMeansDomain(
+            const GS::MutableSourceView& view,
+            const SandboxEditorGeometryProcessingDomain domain) noexcept
+        {
+            using Domain = SandboxEditorGeometryProcessingDomain;
+            switch (domain)
+            {
+            case Domain::MeshVertices:
+                return view.ActiveDomain == GS::Domain::Mesh &&
+                       view.VertexSource != nullptr;
+            case Domain::GraphVertices:
+                return view.ActiveDomain == GS::Domain::Graph &&
+                       view.NodeSource != nullptr;
+            case Domain::PointCloudPoints:
+                return view.ActiveDomain == GS::Domain::PointCloud &&
+                       view.VertexSource != nullptr;
+            case Domain::None:
+            case Domain::MeshEdges:
+            case Domain::MeshHalfedges:
+            case Domain::MeshFaces:
+            case Domain::GraphEdges:
+            case Domain::GraphHalfedges:
+                return false;
+            }
+            return false;
+        }
+
+        [[nodiscard]] Geometry::PropertySet* KMeansTargetProperties(
+            GS::MutableSourceView& view,
+            const SandboxEditorGeometryProcessingDomain domain) noexcept
+        {
+            using Domain = SandboxEditorGeometryProcessingDomain;
+            switch (domain)
+            {
+            case Domain::MeshVertices:
+            case Domain::PointCloudPoints:
+                return view.VertexSource != nullptr
+                    ? &view.VertexSource->Properties
+                    : nullptr;
+            case Domain::GraphVertices:
+                return view.NodeSource != nullptr
+                    ? &view.NodeSource->Properties
+                    : nullptr;
+            case Domain::None:
+            case Domain::MeshEdges:
+            case Domain::MeshHalfedges:
+            case Domain::MeshFaces:
+            case Domain::GraphEdges:
+            case Domain::GraphHalfedges:
+                return nullptr;
+            }
+            return nullptr;
+        }
+
+        [[nodiscard]] bool IsFinitePosition(const glm::vec3& position) noexcept
+        {
+            return std::isfinite(position.x) &&
+                   std::isfinite(position.y) &&
+                   std::isfinite(position.z);
+        }
+
+        [[nodiscard]] std::optional<std::vector<glm::vec3>> CollectKMeansPositions(
+            const Geometry::PropertySet& properties)
+        {
+            const auto positions =
+                properties.Get<glm::vec3>(GS::PropertyNames::kPosition);
+            if (!positions || positions.Vector().empty())
+                return std::nullopt;
+            if (positions.Vector().size() != properties.Size())
+                return std::nullopt;
+
+            std::vector<glm::vec3> points{};
+            points.reserve(positions.Vector().size());
+            for (const glm::vec3& position : positions.Vector())
+            {
+                if (!IsFinitePosition(position))
+                    return std::nullopt;
+                points.push_back(position);
+            }
+            return points;
+        }
+
+        [[nodiscard]] glm::vec4 KMeansLabelColor(const std::uint32_t label)
+        {
+            const float h =
+                std::fmod(0.61803398875f * static_cast<float>(label), 1.0f);
+            constexpr float s = 0.65f;
+            constexpr float v = 0.95f;
+
+            const float hh = h * 6.0f;
+            const float c = v * s;
+            const float x =
+                c * (1.0f - std::fabs(std::fmod(hh, 2.0f) - 1.0f));
+            const float m = v - c;
+
+            glm::vec3 rgb{0.0f};
+            if (hh < 1.0f)
+                rgb = {c, x, 0.0f};
+            else if (hh < 2.0f)
+                rgb = {x, c, 0.0f};
+            else if (hh < 3.0f)
+                rgb = {0.0f, c, x};
+            else if (hh < 4.0f)
+                rgb = {0.0f, x, c};
+            else if (hh < 5.0f)
+                rgb = {x, 0.0f, c};
+            else
+                rgb = {c, 0.0f, x};
+            return glm::vec4(rgb + glm::vec3(m), 1.0f);
+        }
+
+        [[nodiscard]] bool PublishKMeansProperties(
+            Geometry::PropertySet& properties,
+            const SandboxEditorGeometryProcessingDomain domain,
+            const GK::KMeansResult& result)
+        {
+            if (result.Labels.empty() ||
+                result.Labels.size() != properties.Size())
+            {
+                return false;
+            }
+
+            const bool pointCloud =
+                domain == SandboxEditorGeometryProcessingDomain::PointCloudPoints;
+            const std::string labelName =
+                pointCloud ? "p:kmeans_label" : "v:kmeans_label";
+            const std::string colorName =
+                pointCloud ? "p:kmeans_color" : "v:kmeans_color";
+
+            auto labels = properties.GetOrAdd<std::uint32_t>(labelName, 0u);
+            auto colors =
+                properties.GetOrAdd<glm::vec4>(colorName, glm::vec4{1.0f});
+            if (!labels || !colors)
+                return false;
+            if (labels.Vector().size() != result.Labels.size() ||
+                colors.Vector().size() != result.Labels.size())
+            {
+                return false;
+            }
+
+            for (std::size_t i = 0u; i < result.Labels.size(); ++i)
+            {
+                labels.Vector()[i] = result.Labels[i];
+                colors.Vector()[i] = KMeansLabelColor(result.Labels[i]);
+            }
+
+            if (!pointCloud)
+            {
+                auto labelFloats =
+                    properties.GetOrAdd<float>("v:kmeans_label_f", 0.0f);
+                if (!labelFloats ||
+                    labelFloats.Vector().size() != result.Labels.size())
+                {
+                    return false;
+                }
+                for (std::size_t i = 0u; i < result.Labels.size(); ++i)
+                    labelFloats.Vector()[i] =
+                        static_cast<float>(result.Labels[i]);
+            }
+            return true;
+        }
+
+        [[nodiscard]] std::string BuildKMeansSuccessMessage(
+            const SandboxEditorGeometryProcessingDomain domain,
+            const SandboxEditorKMeansResult& result)
+        {
+            std::string message = "K-Means completed for ";
+            message += DebugNameForSandboxEditorGeometryProcessingDomain(domain);
+            message += " (labels=";
+            message += std::to_string(result.LabelCount);
+            message += ", clusters=";
+            message += std::to_string(result.ClusterCount);
+            message += ", iterations=";
+            message += std::to_string(result.Iterations);
+            message += ").";
+            return message;
+        }
+
         [[nodiscard]] SandboxEditorGeometryProcessingModel BuildGeometryProcessingModel(
             const SandboxEditorContext& context)
         {
@@ -686,6 +904,19 @@ namespace Extrinsic::Runtime
                 ResolveSandboxEditorGeometryProcessingEntries(model.Capabilities);
             model.KMeansDomains =
                 GetAvailableSandboxEditorKMeansDomains(*context.Scene, *selected);
+            if (context.LastKMeansResult != nullptr)
+            {
+                model.LastKMeansResult = *context.LastKMeansResult;
+                if (!context.LastKMeansResult->Succeeded())
+                {
+                    AddDiagnostic(
+                        model.Diagnostics,
+                        SandboxEditorDiagnosticCode::GeometryProcessingFailed,
+                        context.LastKMeansResult->Message.empty()
+                            ? "Last K-Means command failed."
+                            : context.LastKMeansResult->Message);
+                }
+            }
             if (!model.Capabilities.HasAny())
             {
                 AddDiagnostic(model.Diagnostics,
@@ -1501,8 +1732,133 @@ namespace Extrinsic::Runtime
                 ImGui::TextDisabled("No supported processing domains.");
         }
 
+        [[nodiscard]] bool ContainsKMeansDomain(
+            const std::vector<SandboxEditorGeometryProcessingDomain>& domains,
+            const SandboxEditorGeometryProcessingDomain domain)
+        {
+            return std::find(domains.begin(), domains.end(), domain) != domains.end();
+        }
+
+        void DrawKMeansResultStatus(
+            const std::optional<SandboxEditorKMeansResult>& lastResult)
+        {
+            if (!lastResult.has_value())
+            {
+                ImGui::TextDisabled("Last K-Means run: none");
+                return;
+            }
+
+            const SandboxEditorKMeansResult& result = *lastResult;
+            ImGui::Text("Last K-Means run: %s",
+                        DebugNameForSandboxEditorCommandStatus(result.Status));
+            ImGui::Text("Domain: %s",
+                        DebugNameForSandboxEditorGeometryProcessingDomain(
+                            result.Domain));
+            if (result.Succeeded())
+            {
+                ImGui::Text("Labels: %u  clusters: %u  iterations: %u",
+                            result.LabelCount,
+                            result.ClusterCount,
+                            result.Iterations);
+                ImGui::Text("Converged: %s  inertia: %.6f",
+                            result.Converged ? "yes" : "no",
+                            result.Inertia);
+            }
+            if (!result.Message.empty())
+                ImGui::TextWrapped("%s", result.Message.c_str());
+        }
+
+        void DrawKMeansExecutionControls(
+            const SandboxEditorDomainWindowModel& model,
+            const SandboxEditorContext& context,
+            const SandboxEditorGeometryProcessingModel& processing,
+            KMeansUiState* kmeansState)
+        {
+            ImGui::SeparatorText("K-Means execution");
+            if (processing.KMeansDomains.empty())
+            {
+                ImGui::TextDisabled("K-Means is unavailable for this selection.");
+                return;
+            }
+            if (kmeansState == nullptr ||
+                kmeansState->LastResult == nullptr ||
+                kmeansState->Domain == nullptr ||
+                kmeansState->ClusterCount == nullptr ||
+                kmeansState->MaxIterations == nullptr ||
+                kmeansState->Seed == nullptr ||
+                kmeansState->UseHierarchicalInitialization == nullptr)
+            {
+                ImGui::TextDisabled("K-Means execution controls are not bound.");
+                return;
+            }
+
+            if (!ContainsKMeansDomain(processing.KMeansDomains,
+                                      *kmeansState->Domain))
+            {
+                *kmeansState->Domain = processing.KMeansDomains.front();
+            }
+
+            const char* currentDomain =
+                DebugNameForSandboxEditorGeometryProcessingDomain(
+                    *kmeansState->Domain);
+            if (ImGui::BeginCombo("Domain", currentDomain))
+            {
+                for (const SandboxEditorGeometryProcessingDomain domain :
+                     processing.KMeansDomains)
+                {
+                    const bool selected = *kmeansState->Domain == domain;
+                    if (ImGui::Selectable(
+                            DebugNameForSandboxEditorGeometryProcessingDomain(domain),
+                            selected))
+                    {
+                        *kmeansState->Domain = domain;
+                    }
+                    if (selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+
+            ImGui::DragInt("Clusters", kmeansState->ClusterCount, 1.0f, 1, 1024);
+            ImGui::DragInt("Max iterations", kmeansState->MaxIterations, 1.0f, 1, 4096);
+            ImGui::DragInt("Seed", kmeansState->Seed, 1.0f, 0, 1'000'000);
+            *kmeansState->ClusterCount =
+                std::clamp(*kmeansState->ClusterCount, 1, 1024);
+            *kmeansState->MaxIterations =
+                std::clamp(*kmeansState->MaxIterations, 1, 4096);
+            *kmeansState->Seed =
+                std::clamp(*kmeansState->Seed, 0, 1'000'000);
+            ImGui::Checkbox("Hierarchical initialization",
+                            kmeansState->UseHierarchicalInitialization);
+
+            if (ImGui::Button("Run K-Means"))
+            {
+                *kmeansState->LastResult = ApplySandboxEditorKMeansCommand(
+                    context,
+                    SandboxEditorKMeansCommand{
+                        .StableEntityId = model.SelectedStableId,
+                        .Domain = *kmeansState->Domain,
+                        .ClusterCount = static_cast<std::uint32_t>(
+                            *kmeansState->ClusterCount),
+                        .MaxIterations = static_cast<std::uint32_t>(
+                            *kmeansState->MaxIterations),
+                        .Seed = static_cast<std::uint32_t>(*kmeansState->Seed),
+                        .UseHierarchicalInitialization =
+                            *kmeansState->UseHierarchicalInitialization,
+                    });
+            }
+
+            const std::optional<SandboxEditorKMeansResult>& result =
+                kmeansState->LastResult->has_value()
+                    ? *kmeansState->LastResult
+                    : processing.LastKMeansResult;
+            DrawKMeansResultStatus(result);
+        }
+
         void DrawDomainProcessingWindow(
-            const SandboxEditorDomainWindowModel& model)
+            const SandboxEditorDomainWindowModel& model,
+            const SandboxEditorContext& context,
+            KMeansUiState* kmeansState)
         {
             DrawDomainWindowHeader(model);
             ImGui::SeparatorText("Processing capabilities");
@@ -1553,14 +1909,15 @@ namespace Extrinsic::Runtime
                             entry.Algorithm));
                 }
             }
-            ImGui::TextDisabled("Execution command surfaces are pending; this window is discovery-only.");
+            DrawKMeansExecutionControls(model, context, processing, kmeansState);
         }
 
         void DrawOneDomainWindow(
             const SandboxEditorContext& context,
             const SandboxEditorDomainWindowKind kind,
             const DomainWindowSection section,
-            std::array<bool, 12>& domainWindowOpen)
+            std::array<bool, 12>& domainWindowOpen,
+            KMeansUiState* kmeansState)
         {
             const std::size_t slot = DomainWindowSlotIndex(kind, section);
             if (!domainWindowOpen[slot])
@@ -1583,7 +1940,7 @@ namespace Extrinsic::Runtime
                     DrawDomainSelectionWindow(model);
                     break;
                 case DomainWindowSection::Processing:
-                    DrawDomainProcessingWindow(model);
+                    DrawDomainProcessingWindow(model, context, kmeansState);
                     break;
                 case DomainWindowSection::Count:
                     break;
@@ -1594,7 +1951,8 @@ namespace Extrinsic::Runtime
 
         void DrawDomainWindows(
             const SandboxEditorContext* context,
-            std::array<bool, 12>* domainWindowOpen)
+            std::array<bool, 12>* domainWindowOpen,
+            KMeansUiState* kmeansState)
         {
             if (context == nullptr || domainWindowOpen == nullptr)
                 return;
@@ -1614,7 +1972,12 @@ namespace Extrinsic::Runtime
             {
                 for (const DomainWindowSection section : kSections)
                 {
-                    DrawOneDomainWindow(*context, kind, section, *domainWindowOpen);
+                    DrawOneDomainWindow(
+                        *context,
+                        kind,
+                        section,
+                        *domainWindowOpen,
+                        kmeansState);
                 }
             }
         }
@@ -1626,10 +1989,11 @@ namespace Extrinsic::Runtime
             std::array<char, 1024>* scenePathBuffer,
             std::optional<SandboxEditorFileImportResult>* lastImportResult,
             std::optional<SandboxEditorSceneFileResult>* lastSceneFileResult,
-            std::array<bool, 12>* domainWindowOpen)
+            std::array<bool, 12>* domainWindowOpen,
+            KMeansUiState* kmeansState)
         {
             DrawDomainMenus(domainWindowOpen);
-            DrawDomainWindows(context, domainWindowOpen);
+            DrawDomainWindows(context, domainWindowOpen, kmeansState);
 
             ImGui::SetNextWindowSize(ImVec2(360.0f, 520.0f), ImGuiCond_FirstUseEver);
             if (ImGui::Begin("Sandbox Editor"))
@@ -2171,6 +2535,8 @@ namespace Extrinsic::Runtime
             return "CameraRenderCommandsUnavailable";
         case SandboxEditorDiagnosticCode::VisualizationCommandsUnavailable:
             return "VisualizationCommandsUnavailable";
+        case SandboxEditorDiagnosticCode::GeometryProcessingFailed:
+            return "GeometryProcessingFailed";
         }
         return "Unknown";
     }
@@ -2210,6 +2576,10 @@ namespace Extrinsic::Runtime
             return "MissingTransform";
         case SandboxEditorCommandStatus::UnsupportedGeometryDomain:
             return "UnsupportedGeometryDomain";
+        case SandboxEditorCommandStatus::InvalidProcessingParameters:
+            return "InvalidProcessingParameters";
+        case SandboxEditorCommandStatus::GeometryProcessingFailed:
+            return "GeometryProcessingFailed";
         }
         return "Unknown";
     }
@@ -3085,9 +3455,129 @@ namespace Extrinsic::Runtime
         return SandboxEditorCommandStatus::Applied;
     }
 
+    SandboxEditorKMeansResult ApplySandboxEditorKMeansCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorKMeansCommand& command)
+    {
+        if (context.Scene == nullptr)
+        {
+            return MakeKMeansResult(
+                SandboxEditorCommandStatus::MissingScene,
+                command.Domain,
+                Core::ErrorCode::InvalidState,
+                "Scene registry is unavailable for K-Means.");
+        }
+        if (!IsKMeansExecutionDomain(command.Domain) ||
+            command.ClusterCount == 0u ||
+            command.MaxIterations == 0u)
+        {
+            return MakeKMeansResult(
+                SandboxEditorCommandStatus::InvalidProcessingParameters,
+                command.Domain,
+                Core::ErrorCode::InvalidArgument,
+                "K-Means requires mesh vertices, graph nodes, or point-cloud points with positive cluster and iteration counts.");
+        }
+
+        entt::registry& raw = context.Scene->Raw();
+        const std::optional<ECS::EntityHandle> entity =
+            ResolveStableEntity(raw, command.StableEntityId);
+        if (!entity.has_value())
+        {
+            return MakeKMeansResult(
+                SandboxEditorCommandStatus::StaleEntity,
+                command.Domain,
+                Core::ErrorCode::ResourceNotFound,
+                "K-Means target entity is stale or no longer live.");
+        }
+
+        GS::MutableSourceView view = GS::BuildMutableView(raw, *entity);
+        if (!view.Valid() || !SourceViewSupportsKMeansDomain(view, command.Domain))
+        {
+            return MakeKMeansResult(
+                SandboxEditorCommandStatus::UnsupportedGeometryDomain,
+                command.Domain,
+                Core::ErrorCode::InvalidArgument,
+                "Selected entity does not expose the requested K-Means GeometrySources domain.");
+        }
+
+        Geometry::PropertySet* properties =
+            KMeansTargetProperties(view, command.Domain);
+        if (properties == nullptr)
+        {
+            return MakeKMeansResult(
+                SandboxEditorCommandStatus::UnsupportedGeometryDomain,
+                command.Domain,
+                Core::ErrorCode::InvalidArgument,
+                "Requested K-Means GeometrySources domain has no writable property set.");
+        }
+
+        std::optional<std::vector<glm::vec3>> points =
+            CollectKMeansPositions(*properties);
+        if (!points.has_value())
+        {
+            return MakeKMeansResult(
+                SandboxEditorCommandStatus::InvalidProcessingParameters,
+                command.Domain,
+                Core::ErrorCode::InvalidArgument,
+                "K-Means requires a non-empty finite v:position property on the requested domain.");
+        }
+
+        GK::KMeansParams params{};
+        params.ClusterCount = command.ClusterCount;
+        params.MaxIterations = command.MaxIterations;
+        params.Seed = command.Seed;
+        params.Init = command.UseHierarchicalInitialization
+            ? GK::Initialization::Hierarchical
+            : GK::Initialization::Random;
+        params.Compute = GK::Backend::CPU;
+
+        const std::optional<GK::KMeansResult> clustered =
+            GK::Cluster(std::span<const glm::vec3>{points->data(), points->size()},
+                        params);
+        if (!clustered.has_value())
+        {
+            return MakeKMeansResult(
+                SandboxEditorCommandStatus::GeometryProcessingFailed,
+                command.Domain,
+                Core::ErrorCode::Unknown,
+                "Geometry.KMeans returned no result for the requested points.");
+        }
+
+        if (!PublishKMeansProperties(*properties, command.Domain, *clustered))
+        {
+            return MakeKMeansResult(
+                SandboxEditorCommandStatus::GeometryProcessingFailed,
+                command.Domain,
+                Core::ErrorCode::TypeMismatch,
+                "K-Means result publication failed because output properties have incompatible types or sizes.");
+        }
+
+        Dirty::MarkVertexAttributesDirty(raw, *entity);
+        SandboxEditorKMeansResult result{
+            .Status = SandboxEditorCommandStatus::Applied,
+            .Domain = command.Domain,
+            .LabelCount = static_cast<std::uint32_t>(clustered->Labels.size()),
+            .ClusterCount = static_cast<std::uint32_t>(clustered->Centroids.size()),
+            .Iterations = clustered->Iterations,
+            .Converged = clustered->Converged,
+            .Inertia = clustered->Inertia,
+            .MaxDistanceIndex = clustered->MaxDistanceIndex,
+            .Error = Core::ErrorCode::Success,
+        };
+        result.Message = BuildKMeansSuccessMessage(command.Domain, result);
+        return result;
+    }
+
     void DrawSandboxEditorPanelFrame(const SandboxEditorPanelFrame& frame)
     {
-        DrawPanelFrame(frame, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+        DrawPanelFrame(frame,
+                       nullptr,
+                       nullptr,
+                       nullptr,
+                       nullptr,
+                       nullptr,
+                       nullptr,
+                       nullptr);
     }
 
     SandboxEditorUi::~SandboxEditorUi()
@@ -3115,7 +3605,18 @@ namespace Extrinsic::Runtime
                     context.LastSceneFileResult = &*m_LastSceneFileResult;
                 if (m_LastImportResult.has_value())
                     context.LastAssetImportResult = &*m_LastImportResult;
+                if (m_LastKMeansResult.has_value())
+                    context.LastKMeansResult = &*m_LastKMeansResult;
                 m_LastFrame = BuildSandboxEditorPanelFrame(context);
+                KMeansUiState kmeansState{
+                    .LastResult = &m_LastKMeansResult,
+                    .Domain = &m_KMeansDomain,
+                    .ClusterCount = &m_KMeansClusterCount,
+                    .MaxIterations = &m_KMeansMaxIterations,
+                    .Seed = &m_KMeansSeed,
+                    .UseHierarchicalInitialization =
+                        &m_KMeansUseHierarchicalInitialization,
+                };
                 DrawPanelFrame(
                     m_LastFrame,
                     &context,
@@ -3123,7 +3624,8 @@ namespace Extrinsic::Runtime
                     &m_ScenePathBuffer,
                     &m_LastImportResult,
                     &m_LastSceneFileResult,
-                    &m_DomainWindowOpen);
+                    &m_DomainWindowOpen,
+                    &kmeansState);
             });
     }
 
