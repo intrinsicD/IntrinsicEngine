@@ -33,9 +33,10 @@
   unconditional).
 - Layering allowlist (`tools/repo/layering_allowlist.yaml`) carries
   grandfathered rows keyed under `src/legacy/ECS/`; drop only those.
-- Prerequisite (today, 2026-06-06): the consumer-grep gate FAILS — legacy `ECS`
-  is still imported by other legacy subtrees (`Graphics`, `Runtime`) and the
-  legacy Sandbox. Promotion is blocked until those migrate to `Extrinsic.ECS`.
+- Prerequisite (today, 2026-06-07): the consumer-grep gate FAILS — legacy `ECS`
+  is still imported by other legacy subtrees (`Graphics`, `Runtime`). The
+  legacy Sandbox consumer retired under `LEGACY-003`; remaining consumers must
+  migrate to `Extrinsic.ECS` before promotion.
 
 ## Required changes
 - [ ] (Prerequisite, verified before promotion to `tasks/active/`) Run the

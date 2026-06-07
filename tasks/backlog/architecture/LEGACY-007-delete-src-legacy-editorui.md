@@ -36,12 +36,10 @@
   `if(NOT INTRINSIC_HEADLESS_NO_GLFW)` (~L276).
 - Layering allowlist (`tools/repo/layering_allowlist.yaml`) carries
   grandfathered rows keyed under `src/legacy/EditorUI/`; drop only those.
-- Prerequisite (today, 2026-06-07): the consumer-grep gate FAILS — the known
-  external source consumer of `Runtime.EditorUI` is
-  `src/legacy/Apps/Sandbox/main.cpp`. Promotion is blocked until the legacy
-  Sandbox retires (`LEGACY-003`). The previous
-  `tests/integration/app/Test_EditorUI.cpp` consumer migrated to promoted
-  `SandboxEditorUi` contract coverage under `UI-003`.
+- Prerequisite (today, 2026-06-07): `LEGACY-003` retired the legacy Sandbox
+  consumer and the previous `tests/integration/app/Test_EditorUI.cpp` consumer
+  migrated to promoted `SandboxEditorUi` contract coverage under `UI-003`.
+  The consumer-grep gate should now exit 0; rerun it before promotion.
 
 ## Required changes
 - [ ] (Prerequisite, verified before promotion to `tasks/active/`) Run the

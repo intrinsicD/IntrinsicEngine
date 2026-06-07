@@ -36,9 +36,10 @@
   `if(NOT INTRINSIC_HEADLESS_NO_GLFW)` (~L274; `# needs Asset`).
 - Layering allowlist (`tools/repo/layering_allowlist.yaml`) carries
   grandfathered rows keyed under `src/legacy/Graphics/`; drop only those.
-- Prerequisite (today, 2026-06-06): the consumer-grep gate FAILS — legacy
-  `Graphics`/`Graphics.*` modules are still imported by `src/legacy/Runtime/`,
-  `src/legacy/EditorUI/`, and the legacy Sandbox. Per
+- Prerequisite (today, 2026-06-07): the consumer-grep gate FAILS — legacy
+  `Graphics`/`Graphics.*` modules are still imported by `src/legacy/Runtime/`
+  and `src/legacy/EditorUI`. The legacy Sandbox consumer retired under
+  `LEGACY-003`. Per
   [`docs/migration/legacy-retirement.md`](../../../docs/migration/legacy-retirement.md),
   this subtree's retirement is gated on the
   `GRAPHICS-033 + GRAPHICS-070..076 + GRAPHICS-081` chain (already retired) plus

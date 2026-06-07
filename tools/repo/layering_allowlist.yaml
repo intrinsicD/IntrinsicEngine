@@ -4,12 +4,6 @@
 exceptions:
   - from: legacy
     to: core
-    file_glob: "src/legacy/Apps/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Apps/ retirement task"
-    reason: "Temporary legacy layering exception for Apps while hardening preserves strict boundaries for promoted layers."
-  - from: legacy
-    to: core
     file_glob: "src/legacy/Asset/**"
     task: "LEGACY-002"
     expires: "until LEGACY-002 seeds the src/legacy/Asset/ retirement task"
@@ -56,12 +50,6 @@ exceptions:
     task: "LEGACY-002"
     expires: "until LEGACY-002 seeds the src/legacy/Runtime/ retirement task"
     reason: "Temporary legacy layering exception for Runtime while hardening preserves strict boundaries for promoted layers."
-  - from: legacy
-    to: geometry
-    file_glob: "src/legacy/Apps/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Apps/ retirement task"
-    reason: "Temporary legacy layering exception for Apps while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: geometry
     file_glob: "src/legacy/Asset/**"
@@ -112,12 +100,6 @@ exceptions:
     reason: "Temporary legacy layering exception for Runtime while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: assets
-    file_glob: "src/legacy/Apps/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Apps/ retirement task"
-    reason: "Temporary legacy layering exception for Apps while hardening preserves strict boundaries for promoted layers."
-  - from: legacy
-    to: assets
     file_glob: "src/legacy/Asset/**"
     task: "LEGACY-002"
     expires: "until LEGACY-002 seeds the src/legacy/Asset/ retirement task"
@@ -164,12 +146,6 @@ exceptions:
     task: "LEGACY-002"
     expires: "until LEGACY-002 seeds the src/legacy/Runtime/ retirement task"
     reason: "Temporary legacy layering exception for Runtime while hardening preserves strict boundaries for promoted layers."
-  - from: legacy
-    to: ecs
-    file_glob: "src/legacy/Apps/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Apps/ retirement task"
-    reason: "Temporary legacy layering exception for Apps while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: ecs
     file_glob: "src/legacy/Asset/**"
@@ -220,12 +196,6 @@ exceptions:
     reason: "Temporary legacy layering exception for Runtime while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: graphics_rhi
-    file_glob: "src/legacy/Apps/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Apps/ retirement task"
-    reason: "Temporary legacy layering exception for Apps while hardening preserves strict boundaries for promoted layers."
-  - from: legacy
-    to: graphics_rhi
     file_glob: "src/legacy/Asset/**"
     task: "LEGACY-002"
     expires: "until LEGACY-002 seeds the src/legacy/Asset/ retirement task"
@@ -272,12 +242,6 @@ exceptions:
     task: "LEGACY-002"
     expires: "until LEGACY-002 seeds the src/legacy/Runtime/ retirement task"
     reason: "Temporary legacy layering exception for Runtime while hardening preserves strict boundaries for promoted layers."
-  - from: legacy
-    to: graphics
-    file_glob: "src/legacy/Apps/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Apps/ retirement task"
-    reason: "Temporary legacy layering exception for Apps while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: graphics
     file_glob: "src/legacy/Asset/**"
@@ -328,12 +292,6 @@ exceptions:
     reason: "Temporary legacy layering exception for Runtime while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: runtime
-    file_glob: "src/legacy/Apps/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Apps/ retirement task"
-    reason: "Temporary legacy layering exception for Apps while hardening preserves strict boundaries for promoted layers."
-  - from: legacy
-    to: runtime
     file_glob: "src/legacy/Asset/**"
     task: "LEGACY-002"
     expires: "until LEGACY-002 seeds the src/legacy/Asset/ retirement task"
@@ -382,12 +340,6 @@ exceptions:
     reason: "Temporary legacy layering exception for Runtime while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: platform
-    file_glob: "src/legacy/Apps/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Apps/ retirement task"
-    reason: "Temporary legacy layering exception for Apps while hardening preserves strict boundaries for promoted layers."
-  - from: legacy
-    to: platform
     file_glob: "src/legacy/Asset/**"
     task: "LEGACY-002"
     expires: "until LEGACY-002 seeds the src/legacy/Asset/ retirement task"
@@ -434,12 +386,6 @@ exceptions:
     task: "LEGACY-002"
     expires: "until LEGACY-002 seeds the src/legacy/Runtime/ retirement task"
     reason: "Temporary legacy layering exception for Runtime while hardening preserves strict boundaries for promoted layers."
-  - from: legacy
-    to: app
-    file_glob: "src/legacy/Apps/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Apps/ retirement task"
-    reason: "Temporary legacy layering exception for Apps while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: app
     file_glob: "src/legacy/Asset/**"

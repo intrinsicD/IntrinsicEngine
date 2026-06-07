@@ -117,7 +117,9 @@ can name a concrete owning task per subtree. Each task follows the
 consumer-grep prerequisite gate, mechanical-deletion verification) and stays in
 backlog until its gate exits 0.
 
-- [LEGACY-003 — Delete `src/legacy/Apps/`](LEGACY-003-delete-src-legacy-apps.md) (2 files → `src/app/`, `src/platform/`).
+- [LEGACY-003 — Delete `src/legacy/Apps/`](../../done/LEGACY-003-delete-src-legacy-apps.md)
+  (done 2026-06-07): removed the legacy Sandbox leaf binary and its CMake
+  wiring after `ExtrinsicSandbox` became canonical.
 - [LEGACY-004 — Delete `src/legacy/Asset/`](LEGACY-004-delete-src-legacy-asset.md) (6 files → `src/assets/`).
 - [LEGACY-005 — Delete `src/legacy/Core/`](LEGACY-005-delete-src-legacy-core.md) (40 files → `src/core/`).
 - [LEGACY-006 — Delete `src/legacy/ECS/`](LEGACY-006-delete-src-legacy-ecs.md) (29 files → `src/ecs/`).
@@ -128,9 +130,8 @@ backlog until its gate exits 0.
 
 Ordering hint — deletion is **consumer-leaves first, foundation last**: a
 subtree can only be mechanically deleted once no other subtree (and no promoted
-module) still imports it. Suggested order after `LEGACY-001`: `Apps`
-(`LEGACY-003`, a pure leaf binary whose removal unblocks the rest once
-`ExtrinsicSandbox` is canonical) → `EditorUI` (`LEGACY-007`) → `Runtime`
+module) still imports it. `Apps` (`LEGACY-003`) is retired; suggested remaining
+order after `LEGACY-001`: `EditorUI` (`LEGACY-007`) → `Runtime`
 (`LEGACY-010`) → `Graphics` (`LEGACY-008`) → `Asset` (`LEGACY-004`) → `RHI`
 (`LEGACY-009`) → `ECS` (`LEGACY-006`) → `Core` (`LEGACY-005`, the foundation,
 still imported by promoted `geometry`/`runtime`, so it retires last). The

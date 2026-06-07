@@ -34,10 +34,11 @@
   `if(NOT INTRINSIC_HEADLESS_NO_GLFW)` (~L273; `# needs Core + RHI`).
 - Layering allowlist (`tools/repo/layering_allowlist.yaml`) carries
   grandfathered rows keyed under `src/legacy/Asset/`; drop only those.
-- Prerequisite (today, 2026-06-06): the consumer-grep gate FAILS — legacy
-  `Asset.*` modules are still imported by `src/legacy/Graphics/`,
-  `src/legacy/Runtime/` (`Runtime.AssetIngestService`), and the legacy Sandbox.
-  Promotion is blocked until those migrate to `src/assets/`.
+- Prerequisite (today, 2026-06-07): the consumer-grep gate FAILS — legacy
+  `Asset.*` modules are still imported by `src/legacy/Graphics/` and
+  `src/legacy/Runtime/` (`Runtime.AssetIngestService`). The legacy Sandbox
+  consumer retired under `LEGACY-003`; remaining consumers must migrate to
+  `src/assets/` before promotion.
 
 ## Required changes
 - [ ] (Prerequisite, verified before promotion to `tasks/active/`) Run the
