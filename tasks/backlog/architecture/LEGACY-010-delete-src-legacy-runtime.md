@@ -8,10 +8,9 @@
       this subtree, and regenerate the module inventory.
 
 ## Non-goals
-- Do not delete any other `src/legacy/` subtree under cover of this task. In
-  particular, the `Runtime.EditorUI` module lives under `src/legacy/EditorUI/`
-  and is owned by [`LEGACY-007`](LEGACY-007-delete-src-legacy-editorui.md), not
-  here.
+- Do not delete any other `src/legacy/` subtree under cover of this task. The
+  `Runtime.EditorUI` module was retired separately by
+  [`LEGACY-007`](../../done/LEGACY-007-delete-src-legacy-editorui.md).
 - Do not introduce new promoted code paths in this commit; the promoted
   `src/runtime/` (`Extrinsic.Runtime.*`) surface must already carry the
   consumers.
@@ -33,8 +32,8 @@
   `Runtime.RenderOrchestrator`, `Runtime.ResourceMaintenance`,
   `Runtime.AssetIngestService`, `Runtime.SceneManager`,
   `Runtime.SceneSerializer`, `Runtime.Selection`, `Runtime.SelectionModule`,
-  `Runtime.SystemBundles`. (The `Runtime.EditorUI` module is the EditorUI
-  subtree, owned by `LEGACY-007`.)
+  `Runtime.SystemBundles`. The former `Runtime.EditorUI` module was owned by
+  the separate EditorUI subtree and is retired under `LEGACY-007`.
 - Promoted equivalent: `src/runtime/` (`Extrinsic.Runtime.*`), the
   `RUNTIME-070..095` composition/extraction/selection promotion chain.
 - CMake references: `INTRINSIC_LEGACY_RUNTIME_SOURCE_ROOT` (`CMakeLists.txt`
@@ -42,10 +41,11 @@
   `if(NOT INTRINSIC_HEADLESS_NO_GLFW)` (~L277; `# needs Asset`).
 - Layering allowlist (`tools/repo/layering_allowlist.yaml`) carries
   grandfathered rows keyed under `src/legacy/Runtime/`; drop only those.
-- Prerequisite (today, 2026-06-06): the consumer-grep gate FAILS — legacy
-  `Runtime.*` modules are still imported by `src/legacy/EditorUI/`, the legacy
-  Sandbox, and integration tests. Promotion is blocked until those migrate to
-  `Extrinsic.Runtime.*`.
+- Prerequisite (today, 2026-06-07): the consumer-grep gate FAILS — legacy
+  `Runtime.*` modules are still imported by integration tests and remaining
+  legacy subtrees. The legacy Sandbox consumer retired under `LEGACY-003`, and
+  the legacy EditorUI consumer retired under `LEGACY-007`; remaining consumers
+  must migrate to `Extrinsic.Runtime.*`.
 
 ## Required changes
 - [ ] (Prerequisite, verified before promotion to `tasks/active/`) Run the

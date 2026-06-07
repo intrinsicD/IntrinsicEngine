@@ -123,16 +123,18 @@ backlog until its gate exits 0.
 - [LEGACY-004 — Delete `src/legacy/Asset/`](LEGACY-004-delete-src-legacy-asset.md) (6 files → `src/assets/`).
 - [LEGACY-005 — Delete `src/legacy/Core/`](LEGACY-005-delete-src-legacy-core.md) (40 files → `src/core/`).
 - [LEGACY-006 — Delete `src/legacy/ECS/`](LEGACY-006-delete-src-legacy-ecs.md) (29 files → `src/ecs/`).
-- [LEGACY-007 — Delete `src/legacy/EditorUI/`](LEGACY-007-delete-src-legacy-editorui.md) (8 files → `src/app/`).
+- [LEGACY-007 — Delete `src/legacy/EditorUI/`](../../done/LEGACY-007-delete-src-legacy-editorui.md)
+  (done 2026-06-07): removed the legacy editor UI subtree after promoted
+  `SandboxEditorUi` coverage replaced its remaining consumers.
 - [LEGACY-008 — Delete `src/legacy/Graphics/`](LEGACY-008-delete-src-legacy-graphics.md) (168 files → `src/graphics/*`).
 - [LEGACY-009 — Delete `src/legacy/RHI/`](LEGACY-009-delete-src-legacy-rhi.md) (54 files → `src/graphics/rhi/`).
 - [LEGACY-010 — Delete `src/legacy/Runtime/`](LEGACY-010-delete-src-legacy-runtime.md) (29 files → `src/runtime/`).
 
 Ordering hint — deletion is **consumer-leaves first, foundation last**: a
 subtree can only be mechanically deleted once no other subtree (and no promoted
-module) still imports it. `Apps` (`LEGACY-003`) is retired; suggested remaining
-order after `LEGACY-001`: `EditorUI` (`LEGACY-007`) → `Runtime`
-(`LEGACY-010`) → `Graphics` (`LEGACY-008`) → `Asset` (`LEGACY-004`) → `RHI`
+module) still imports it. `Apps` (`LEGACY-003`) and `EditorUI`
+(`LEGACY-007`) are retired; suggested remaining order after `LEGACY-001`:
+`Runtime` (`LEGACY-010`) → `Graphics` (`LEGACY-008`) → `Asset` (`LEGACY-004`) → `RHI`
 (`LEGACY-009`) → `ECS` (`LEGACY-006`) → `Core` (`LEGACY-005`, the foundation,
 still imported by promoted `geometry`/`runtime`, so it retires last). The
 `sequencing` table in

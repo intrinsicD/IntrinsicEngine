@@ -6,7 +6,7 @@ This document tracks medium- and long-horizon feature planning for IntrinsicEngi
 
 ## Status legend (read this first)
 
-Many feature sections below use a `MVP complete` marker. Unless explicitly annotated otherwise, that marker describes the implementation under `src/legacy/Graphics/` and `src/legacy/EditorUI/` — the rendering and editor stack the Sandbox currently runs on. It does **not** mean the promoted `src/graphics/*` rendering stack ships the same feature today.
+Many feature sections below use a `MVP complete` marker. Unless explicitly annotated otherwise, that marker describes the legacy-stack implementation: remaining legacy rendering under `src/legacy/Graphics/` plus the now-retired legacy editor subtree formerly under `src/legacy/EditorUI/`. It does **not** mean the promoted `src/graphics/*` rendering stack ships the same feature today.
 
 As of 2026-06-02 the promoted Vulkan visible-triangle path is through the canonical default recipe. `GRAPHICS-033E/F`, `GRAPHICS-076E/F`, `GRAPHICS-080`, and `GRAPHICS-081` retired the operational-gate, default-recipe readback, promoted-preset, and bootstrap-scaffold work. Per the `SelectRuntimeDeviceBackend()` contract in `src/runtime/Runtime.Engine.cppm`, runtime selection still looks at config + build flags, **not** at `IsOperational()`: when the build defines `EXTRINSIC_RUNTIME_HAS_PROMOTED_VULKAN` and `RenderConfig::EnablePromotedVulkanDevice == true`, `Runtime::CreateDevice()` returns `Backends::Vulkan::CreateVulkanDevice()` and consumers gate real work on `IDevice::IsOperational()`. Hosts that do not satisfy the Vulkan gate continue to fall back or fail closed through the `VulkanRequestedButNotOperational` breadcrumb path; Vulkan-capable hosts use the default recipe rather than the retired bootstrap scaffold.
 
@@ -156,7 +156,7 @@ Undo/redo integration now lives in `Core::CommandHistory`; editor panels should 
 
 ### UI Improvements
 
-> All "complete" claims in this section describe the **legacy editor** under `src/legacy/EditorUI/`. Promoted-editor wiring lives under `src/app/` and is currently scaffold-only; the promoted-stack equivalent is gated on the same rendering parity matrix that gates retirement of `src/legacy/Graphics/`.
+> All "complete" claims in this section describe the now-retired **legacy editor** formerly under `src/legacy/EditorUI/`. Promoted editor wiring lives in `Extrinsic.Runtime.SandboxEditorUi` and is attached by `src/app/Sandbox/`; promoted feature coverage is tracked by the migration parity matrix and the sandbox UI tasks, not by reviving the legacy editor.
 
 The editor UI foundation is in place: programmatic default dock layout (Hierarchy left, Viewport center, Inspector right, Assets/Stats bottom), three theme presets (Dark/Light/High Contrast) via View → Theme, keyboard shortcut hints on menu items and toolbar buttons, contextual tooltips on View Settings and toolbar controls, enriched status bar (selection mode, entity/sub-element counts, lighting path, active tool, GPU VRAM usage), and a properly nested hierarchy panel with entity type icons and per-entity context menus.
 

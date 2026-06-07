@@ -18,7 +18,7 @@ Root scanned: `src`
 | `graphics/renderer` | 61 |
 | `graphics/rhi` | 19 |
 | `graphics/vulkan` | 13 |
-| `legacy` | 182 |
+| `legacy` | 181 |
 | `physics` | 1 |
 | `platform` | 5 |
 | `runtime` | 27 |
@@ -340,7 +340,6 @@ Root scanned: `src`
 | `ECS:Systems.AxisRotator` | `src/legacy/ECS/Systems/ECS.Systems.AxisRotator.cppm` | `legacy` |
 | `ECS:Systems.Transform` | `src/legacy/ECS/Systems/ECS.Systems.Transform.cppm` | `legacy` |
 | `ECS:TransformGraphContracts` | `src/legacy/ECS/Systems/ECS.TransformGraphContracts.cppm` | `legacy` |
-| `Runtime.EditorUI` | `src/legacy/EditorUI/Runtime.EditorUI.cppm` | `legacy` |
 | `Graphics.Components.Core` | `src/legacy/Graphics/Components/Graphics.Components.Core.cppm` | `legacy` |
 | `Graphics.Components.DataAuthority` | `src/legacy/Graphics/Components/Graphics.Components.DataAuthority.cppm` | `legacy` |
 | `Graphics.Components.DirtyTag` | `src/legacy/Graphics/Components/Graphics.Components.DirtyTag.cppm` | `legacy` |
@@ -508,4 +507,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugAdapters` | `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **480**
+Total modules: **479**

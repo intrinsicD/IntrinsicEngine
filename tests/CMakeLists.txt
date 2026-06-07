@@ -833,7 +833,7 @@ if(TARGET ExtrinsicRuntime AND NOT INTRINSIC_HEADLESS_NO_GLFW)
     intrinsic_test_object_lib(RuntimeTestObjs
         SOURCES
             ${_runtime_test_sources}
-        DEPS ExtrinsicRuntime nlohmann_json::nlohmann_json EnTT::EnTT glm::glm IntrinsicRHI IntrinsicGraphics IntrinsicRuntime IntrinsicEditorUI
+        DEPS ExtrinsicRuntime nlohmann_json::nlohmann_json EnTT::EnTT glm::glm IntrinsicRHI IntrinsicGraphics IntrinsicRuntime
     )
 
     set(_runtime_selection_contract_test_files
@@ -889,7 +889,7 @@ if(TARGET RuntimeTestObjs)
     # --- Full suite link target (build-only; category targets own CTest registration) ---
     intrinsic_test_executable(IntrinsicTests
         OBJECTS  CoreTestObjs ECSTestObjs ContractBuildTestObjs BenchmarkTestObjs GeometryTestObjs RuntimeTestObjs RuntimeSelectionContractTestObjs
-        LINK_LIBS IntrinsicRuntime IntrinsicEditorUI
+        LINK_LIBS IntrinsicRuntime
         NO_DISCOVER
     )
 
@@ -905,7 +905,7 @@ if(TARGET RuntimeTestObjs)
     # until HARDEN-041 splits test sources into finer taxonomy targets.
     intrinsic_test_executable(IntrinsicRuntimeTests
         OBJECTS RuntimeTestObjs
-        LINK_LIBS IntrinsicRuntime IntrinsicEditorUI
+        LINK_LIBS IntrinsicRuntime
         LABELS integration runtime headless graphics gpu vulkan slow
     )
 

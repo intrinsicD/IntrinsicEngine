@@ -93,13 +93,13 @@ Legacy code is still approximately 42% of `src` C++ LOC.
 | [tests/unit/geometry/Test.GeometryIO.cpp](../../tests/unit/geometry/Test.GeometryIO.cpp) | 5,295 |
 | [src/graphics/vulkan/Backends.Vulkan.Device.cpp](../../src/graphics/vulkan/Backends.Vulkan.Device.cpp) | 3,973 |
 | [tests/contract/graphics/Test.RendererFrameLifecycle.cpp](../../tests/contract/graphics/Test.RendererFrameLifecycle.cpp) | 3,868 |
-| [src/legacy/EditorUI/Runtime.EditorUI.Widgets.cpp](../../src/legacy/EditorUI/Runtime.EditorUI.Widgets.cpp) | 3,770 |
+| `src/legacy/EditorUI/Runtime.EditorUI.Widgets.cpp` (retired 2026-06-07 by `LEGACY-007`) | 3,770 |
 
 ### Largest `.cppm` Module Interfaces
 
 | File | LOC |
 | --- | ---: |
-| [src/legacy/EditorUI/Runtime.EditorUI.cppm](../../src/legacy/EditorUI/Runtime.EditorUI.cppm) | 860 |
+| `src/legacy/EditorUI/Runtime.EditorUI.cppm` (retired 2026-06-07 by `LEGACY-007`) | 860 |
 | [src/geometry/Geometry.Properties.cppm](../../src/geometry/Geometry.Properties.cppm) | 842 |
 | [src/legacy/Graphics/Graphics.RenderPipeline.cppm](../../src/legacy/Graphics/Graphics.RenderPipeline.cppm) | 836 |
 | [src/legacy/Asset/Asset.Manager.cppm](../../src/legacy/Asset/Asset.Manager.cppm) | 727 |

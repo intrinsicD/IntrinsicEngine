@@ -157,16 +157,23 @@ Treat this as a facade; call into a lower-level `Geometry:*` or `Core:*` kernel 
 
 ## 11) UI integration seam (where and how to hook feature UI)
 
-Define UI in the `Runtime::EditorUI` layer, not inside the domain algorithm module.
+Define UI-facing command/state seams in runtime editor modules, not inside the
+domain algorithm module and not in `src/app/` glue code.
 
 ### Placement rules
 
-- **Algorithm UI state + widgets:** `src/Runtime/EditorUI/Runtime.EditorUI.<Feature>Controller.cpp`
-- **Panel/menu registration:** `Interface::GUI::RegisterPanel(...)` and `RegisterMainMenuBar(...)`
-- **Execution trigger:** UI emits a typed request to the runtime feature facade (`Runtime.<Feature>Module`)
+- **Algorithm UI state + widgets:** `src/runtime/Editor/Runtime.SandboxEditorUi.*`
+  or a future `src/runtime/Editor/Runtime.<Feature>Editor.*` promoted module.
+- **Panel/menu registration:** the promoted `SandboxEditorUi` frame model and
+  ImGui adapter attachment.
+- **Execution trigger:** UI emits a typed request to the runtime feature facade
+  (`Extrinsic.Runtime.<Feature>` or equivalent runtime-owned command surface).
 - **Background progress/result polling:** runtime/streaming lane, then UI only renders readonly status
 
-Current engine precedent already follows this pattern (see `Runtime.EditorUI.GeometryWorkflowController.cpp`).
+Current promoted precedent follows this pattern in
+`Extrinsic.Runtime.SandboxEditorUi`: editor panels expose deterministic frame
+models and typed command surfaces, while execution and ownership stay in
+runtime.
 
 ### Data flow contract
 
@@ -183,33 +190,24 @@ Keep UI callbacks non-blocking: no heavy compute inside ImGui draw functions.
 ### Minimal UI/controller skeleton
 
 ```cpp
-// Runtime.EditorUI.MyFeatureController.cpp
-module Runtime.EditorUI;
+// Runtime.MyFeatureEditor.cpp
+module Extrinsic.Runtime.MyFeatureEditor;
 
-import Interface;
-import Runtime:MyFeatureModule;
+import Extrinsic.Runtime.MyFeature;
 
-namespace Runtime::EditorUI {
+namespace Extrinsic::Runtime {
 
 void MyFeatureController::RegisterPanelsAndMenu() {
-    Interface::GUI::RegisterPanel("Geometry - My Feature", [this]() { DrawPanel(); }, true, 0, false);
-    Interface::GUI::RegisterMainMenuBar("Geometry", [this]() {
-        if (ImGui::BeginMenu("Geometry")) {
-            if (ImGui::MenuItem("My Feature")) {
-                Interface::GUI::OpenPanel("Geometry - My Feature");
-            }
-            ImGui::EndMenu();
-        }
-    });
+    // Register a panel descriptor with SandboxEditorUi's frame model.
 }
 
 void MyFeatureController::DrawPanel() {
     // 1) Draw controls
-    // 2) On Apply: enqueue Runtime::ExecuteMyFeatureAsync(request)
+    // 2) On Apply: enqueue ExecuteMyFeatureAsync(request)
     // 3) Draw progress + diagnostics from readonly result snapshot
 }
 
-} // namespace Runtime::EditorUI
+} // namespace Extrinsic::Runtime
 ```
 
 ### UI performance guardrails
@@ -225,8 +223,9 @@ void MyFeatureController::DrawPanel() {
 
 For each new feature, register all three artifacts:
 
-1. **Runtime facade module** (`Runtime.<Feature>Module`)
-2. **Editor UI controller/panel** (`Runtime.EditorUI.<Feature>Controller`)
+1. **Runtime facade module** (`Extrinsic.Runtime.<Feature>`)
+2. **Editor UI controller/panel** (`Extrinsic.Runtime.<Feature>Editor` or a
+   `SandboxEditorUi` command/window extension)
 3. **Architecture note** in `docs/architecture/` with command/result contract
 
 If one is missing, feature discoverability degrades quickly.

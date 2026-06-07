@@ -22,7 +22,7 @@
 - Layering allowlist (`tools/repo/layering_allowlist.yaml`) carries grandfathered entries for legacy modules. Drop only rows whose key path begins with `src/legacy/Interface/`.
 
 ## Required changes
-- [ ] (Prerequisite, verified before this task is moved to `tasks/active/`) Run the consumer-grep gate in the Verification section and confirm it exits 0 with `OK: no external consumers ...`. The gate must fail loudly when any match outside `src/legacy/Interface/**` is found; `git grep` exits 0 on match, so the verification block inverts that. Today (2026-05-16) the gate fails by design — ~248 matches across files including `src/legacy/Apps/Sandbox/main.cpp`, `src/legacy/Graphics/Graphics.RenderDriver.cpp`, `src/legacy/EditorUI/*`, `src/legacy/Runtime/*`, and `tests/contract/ui/Test_PanelRegistration.cpp`. Promotion is blocked until those consumers migrate to the promoted platform/app entry points. Record the empty grep output in the commit message as evidence the prerequisite passed.
+- [ ] (Prerequisite, verified before this task is moved to `tasks/active/`) Run the consumer-grep gate in the Verification section and confirm it exits 0 with `OK: no external consumers ...`. The gate must fail loudly when any match outside `src/legacy/Interface/**` is found; `git grep` exits 0 on match, so the verification block inverts that. Today (2026-06-07) the gate still fails across remaining legacy graphics/runtime consumers and `tests/contract/ui/Test_PanelRegistration.cpp`. The legacy Sandbox and legacy EditorUI consumers retired under `LEGACY-003` and `LEGACY-007`; remaining consumers must migrate to the promoted platform/app entry points. Record the empty grep output in the commit message as evidence the prerequisite passed.
 - [ ] Delete the four files under `src/legacy/Interface/`.
 - [ ] Remove the corresponding `add_subdirectory(${INTRINSIC_LEGACY_INTERFACE_SOURCE_ROOT})` line and the `INTRINSIC_LEGACY_INTERFACE_SOURCE_ROOT` variable assignment from `CMakeLists.txt`.
 - [ ] Drop the allowlist rows in `tools/repo/layering_allowlist.yaml` whose key begins with `src/legacy/Interface/`.
@@ -59,7 +59,7 @@
 #
 # Today (2026-05-16) this gate fails: ~248 matches across files including
 # src/legacy/Apps/Sandbox/main.cpp, src/legacy/Graphics/Graphics.RenderDriver.cpp,
-# src/legacy/EditorUI/*, src/legacy/Runtime/*, and
+# src/legacy/Runtime/*, and
 # tests/contract/ui/Test_PanelRegistration.cpp. The gate stays failing
 # until consumers migrate to the promoted platform/app entry points.
 if git grep -nE 'import\s+Interface\b|Interface::GUI|#include\s*"Interface' \

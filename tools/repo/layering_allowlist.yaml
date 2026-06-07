@@ -22,12 +22,6 @@ exceptions:
     reason: "Temporary legacy layering exception for ECS while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: core
-    file_glob: "src/legacy/EditorUI/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/EditorUI/ retirement task"
-    reason: "Temporary legacy layering exception for EditorUI while hardening preserves strict boundaries for promoted layers."
-  - from: legacy
-    to: core
     file_glob: "src/legacy/Graphics/**"
     task: "LEGACY-002"
     expires: "until LEGACY-002 seeds the src/legacy/Graphics/ retirement task"
@@ -70,12 +64,6 @@ exceptions:
     reason: "Temporary legacy layering exception for ECS while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: geometry
-    file_glob: "src/legacy/EditorUI/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/EditorUI/ retirement task"
-    reason: "Temporary legacy layering exception for EditorUI while hardening preserves strict boundaries for promoted layers."
-  - from: legacy
-    to: geometry
     file_glob: "src/legacy/Graphics/**"
     task: "LEGACY-002"
     expires: "until LEGACY-002 seeds the src/legacy/Graphics/ retirement task"
@@ -118,12 +106,6 @@ exceptions:
     reason: "Temporary legacy layering exception for ECS while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: assets
-    file_glob: "src/legacy/EditorUI/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/EditorUI/ retirement task"
-    reason: "Temporary legacy layering exception for EditorUI while hardening preserves strict boundaries for promoted layers."
-  - from: legacy
-    to: assets
     file_glob: "src/legacy/Graphics/**"
     task: "LEGACY-002"
     expires: "until LEGACY-002 seeds the src/legacy/Graphics/ retirement task"
@@ -166,12 +148,6 @@ exceptions:
     reason: "Temporary legacy layering exception for ECS while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: ecs
-    file_glob: "src/legacy/EditorUI/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/EditorUI/ retirement task"
-    reason: "Temporary legacy layering exception for EditorUI while hardening preserves strict boundaries for promoted layers."
-  - from: legacy
-    to: ecs
     file_glob: "src/legacy/Graphics/**"
     task: "LEGACY-002"
     expires: "until LEGACY-002 seeds the src/legacy/Graphics/ retirement task"
@@ -214,12 +190,6 @@ exceptions:
     reason: "Temporary legacy layering exception for ECS while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: graphics_rhi
-    file_glob: "src/legacy/EditorUI/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/EditorUI/ retirement task"
-    reason: "Temporary legacy layering exception for EditorUI while hardening preserves strict boundaries for promoted layers."
-  - from: legacy
-    to: graphics_rhi
     file_glob: "src/legacy/Graphics/**"
     task: "LEGACY-002"
     expires: "until LEGACY-002 seeds the src/legacy/Graphics/ retirement task"
@@ -260,12 +230,6 @@ exceptions:
     task: "LEGACY-002"
     expires: "until LEGACY-002 seeds the src/legacy/ECS/ retirement task"
     reason: "Temporary legacy layering exception for ECS while hardening preserves strict boundaries for promoted layers."
-  - from: legacy
-    to: graphics
-    file_glob: "src/legacy/EditorUI/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/EditorUI/ retirement task"
-    reason: "Temporary legacy layering exception for EditorUI while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: graphics
     file_glob: "src/legacy/Graphics/**"
@@ -310,12 +274,6 @@ exceptions:
     reason: "Temporary legacy layering exception for ECS while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: runtime
-    file_glob: "src/legacy/EditorUI/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/EditorUI/ retirement task"
-    reason: "Temporary legacy layering exception for EditorUI while hardening preserves strict boundaries for promoted layers."
-  - from: legacy
-    to: runtime
     file_glob: "src/legacy/Graphics/**"
     task: "LEGACY-002"
     expires: "until LEGACY-002 seeds the src/legacy/Graphics/ retirement task"
@@ -358,12 +316,6 @@ exceptions:
     reason: "Temporary legacy layering exception for ECS while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: platform
-    file_glob: "src/legacy/EditorUI/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/EditorUI/ retirement task"
-    reason: "Temporary legacy layering exception for EditorUI while hardening preserves strict boundaries for promoted layers."
-  - from: legacy
-    to: platform
     file_glob: "src/legacy/Graphics/**"
     task: "LEGACY-002"
     expires: "until LEGACY-002 seeds the src/legacy/Graphics/ retirement task"
@@ -404,12 +356,6 @@ exceptions:
     task: "LEGACY-002"
     expires: "until LEGACY-002 seeds the src/legacy/ECS/ retirement task"
     reason: "Temporary legacy layering exception for ECS while hardening preserves strict boundaries for promoted layers."
-  - from: legacy
-    to: app
-    file_glob: "src/legacy/EditorUI/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/EditorUI/ retirement task"
-    reason: "Temporary legacy layering exception for EditorUI while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: app
     file_glob: "src/legacy/Graphics/**"
