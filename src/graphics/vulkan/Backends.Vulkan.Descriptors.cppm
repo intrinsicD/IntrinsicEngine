@@ -15,11 +15,12 @@ export import Extrinsic.RHI.Handles;
 namespace Extrinsic::Backends::Vulkan
 {
     export constexpr uint32_t kBindlessCapacity = 65536;
-    // Descriptor elements 0..2 are temporarily reserved for framegraph-sampled
+    // Descriptor elements 0..3 are temporarily reserved for framegraph-sampled
     // textures updated directly by VulkanCommandContext:
-    //   0 = default sampled input, 1 = DebugView, 2 = Present.
+    //   0 = default sampled input, 1 = DebugView, 2 = Present,
+    //   3 = SelectionOutline EntityId.
     // Real bindless texture leases must start after those bridge slots.
-    constexpr RHI::BindlessIndex kFirstTextureBindlessSlot = 3;
+    constexpr RHI::BindlessIndex kFirstTextureBindlessSlot = 4;
 
     export class VulkanDevice;
 

@@ -2663,6 +2663,7 @@ namespace Extrinsic::Runtime
                 if (context != nullptr &&
                     frame.CameraRender.CameraControlsAvailable)
                 {
+                    ImGui::TextDisabled("Viewport controls: RMB/MMB drag rotates; WASD pans/moves; Shift accelerates; scroll zooms.");
                     if (ImGui::Button("Orbit"))
                     {
                         (void)ApplySandboxEditorCameraControllerCommand(

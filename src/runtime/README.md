@@ -584,6 +584,13 @@ extraction. If the reference scene is disabled or returns no camera, the
 controller falls back to a deterministic default perspective camera at
 `(0, 0, 4)` looking down `-Z`.
 
+The default editor controls are deliberately simple and backend-neutral:
+right- or middle-mouse drag rotates orbit/fly/free-look cameras, `WASD` moves or
+pans according to the active controller, `Shift` accelerates movement, and mouse
+wheel zooms orbit/top-down cameras. The sandbox `Camera / Render` window mirrors
+these bindings so controller replacement buttons are not the only visible UI.
+Viewport left-click selection is routed from the runtime input context into `SelectionController::RequestClickPick(...)`; it is suppressed while ImGui or an active gizmo owns the mouse. The production input context is updated by the active `Platform::IWindow` backend before runtime selection routing runs.
+
 Camera-controller registration and replacement are one-shot camera-transition
 events. `CameraControllerRegistry` marks the slot as pending, and
 `Engine::RunFrame()` consumes that bit into

@@ -25,6 +25,13 @@ namespace Extrinsic::Runtime
         constexpr float kMaxPitchRadians = 89.0f * std::numbers::pi_v<float> / 180.0f;
         constexpr float kTau = std::numbers::pi_v<float> * 2.0f;
         constexpr int kMouseButtonRight = 1;
+        constexpr int kMouseButtonMiddle = 2;
+
+        [[nodiscard]] bool IsCameraRotateDragActive(const Platform::Input::Context& input) noexcept
+        {
+            return input.IsMouseButtonPressed(kMouseButtonRight) ||
+                   input.IsMouseButtonPressed(kMouseButtonMiddle);
+        }
 
         [[nodiscard]] float WrapRadians(float value) noexcept
         {
@@ -164,7 +171,7 @@ namespace Extrinsic::Runtime
     {
         const float dt = static_cast<float>(std::max(0.0, deltaSeconds));
 
-        if (input.IsMouseButtonPressed(Detail::kMouseButtonRight))
+        if (Detail::IsCameraRotateDragActive(input))
         {
             const auto pos = input.GetMousePosition();
             if (m_FirstMouse)
@@ -252,7 +259,7 @@ namespace Extrinsic::Runtime
     void FlyCameraController::Update(const Platform::Input::Context& input,
                                      const double deltaSeconds) noexcept
     {
-        if (input.IsMouseButtonPressed(Detail::kMouseButtonRight))
+        if (Detail::IsCameraRotateDragActive(input))
         {
             const auto pos = input.GetMousePosition();
             if (m_FirstMouse)
@@ -330,7 +337,7 @@ namespace Extrinsic::Runtime
     void FreeLookCameraController::Update(const Platform::Input::Context& input,
                                           const double deltaSeconds) noexcept
     {
-        if (input.IsMouseButtonPressed(Detail::kMouseButtonRight))
+        if (Detail::IsCameraRotateDragActive(input))
         {
             const auto pos = input.GetMousePosition();
             if (m_FirstMouse)

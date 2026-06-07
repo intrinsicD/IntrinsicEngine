@@ -126,6 +126,7 @@ namespace Extrinsic::Graphics
         constexpr std::uint32_t kFrameSampledDescriptorSlotDefault = 0u;
         constexpr std::uint32_t kFrameSampledDescriptorSlotDebugView = 1u;
         constexpr std::uint32_t kFrameSampledDescriptorSlotPresent = 2u;
+        constexpr std::uint32_t kFrameSampledDescriptorSlotSelectionOutline = 3u;
 
         [[nodiscard]] constexpr bool IsReconstructionAAMode(const FrameRecipeAAMode mode) noexcept
         {
@@ -1799,7 +1800,7 @@ namespace Extrinsic::Graphics
                                 {
                                     graphicsContext.BindFrameSampledTextureAt(
                                         compiled->TextureHandles[textureIndex],
-                                        kFrameSampledDescriptorSlotDefault);
+                                        kFrameSampledDescriptorSlotSelectionOutline);
                                     sampledTextureBound = true;
                                 }
                             }
@@ -1830,7 +1831,7 @@ namespace Extrinsic::Graphics
                         // the prior color content as a LOAD attachment; its
                         // fragment shader samples its own retained font-atlas /
                         // per-command user textures from dedicated bindless
-                        // leases (reserved slots >= 3 per BUG-014), never the
+                        // leases (reserved slots >= 4 per BUG-019), never the
                         // shared frame-sampled bridge slot 0. All passes share a
                         // single bindless descriptor set, so the *last* host-side
                         // descriptor write to a slot is what every recorded draw

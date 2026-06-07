@@ -77,6 +77,21 @@ TEST(RuntimeCameraControllers, OrbitYawWrapsDuringMouseDrag)
     ExpectValidCameraView(controller.GetView(Core::Extent2D{1280, 720}));
 }
 
+TEST(RuntimeCameraControllers, OrbitAlsoRotatesWithMiddleMouseDrag)
+{
+    Runtime::OrbitCameraController controller{MakeSeed()};
+    Platform::Input::Context input{};
+    input.SetMouseButtonState(2, true);
+    input.SetMousePosition(0.0f, 0.0f);
+    controller.Update(input, 1.0 / 60.0);
+
+    input.SetMousePosition(64.0f, 0.0f);
+    controller.Update(input, 1.0 / 60.0);
+
+    EXPECT_NE(controller.YawRadians(), 0.0f);
+    ExpectValidCameraView(controller.GetView(Core::Extent2D{1280, 720}));
+}
+
 TEST(RuntimeCameraControllers, FlyMovementScalesWithDeltaTime)
 {
     Runtime::FlyCameraController singleStep{MakeSeed()};
@@ -216,5 +231,4 @@ TEST(RuntimeCameraControllers, RegistrySupportsMultipleCameraSlots)
     EXPECT_EQ(registry.Resolve(Runtime::CameraControllerSlot::TopDown).Kind(), Core::Config::CameraControllerKind::TopDown);
     EXPECT_EQ(registry.Resolve(Runtime::CameraControllerSlot::EditorSecondary).Kind(), Core::Config::CameraControllerKind::FreeLook);
 }
-
 

@@ -3309,7 +3309,7 @@ TEST(RendererFrameLifecycle, SelectionOutlinePassRecordsWhenSelectableEntityPres
     renderer->Shutdown();
 }
 
-TEST(RendererFrameLifecycle, SelectionOutlineBindsEntityIdToDefaultSampledSlot)
+TEST(RendererFrameLifecycle, SelectionOutlineBindsEntityIdToDedicatedSampledSlot)
 {
     Extrinsic::Tests::MockDevice device;
     device.Operational = true;
@@ -3345,18 +3345,26 @@ TEST(RendererFrameLifecycle, SelectionOutlineBindsEntityIdToDefaultSampledSlot)
         << "Selection outline must have a concrete EntityId texture to sample.";
 
     Extrinsic::RHI::TextureHandle lastDefaultSlotBinding{};
+    Extrinsic::RHI::TextureHandle lastSelectionOutlineSlotBinding{};
     for (const auto& binding : device.CommandContext.SampledTextureBindings)
     {
         if (binding.DescriptorIndex == 0u)
         {
             lastDefaultSlotBinding = binding.Texture;
         }
+        if (binding.DescriptorIndex == 3u)
+        {
+            lastSelectionOutlineSlotBinding = binding.Texture;
+        }
     }
 
-    EXPECT_EQ(lastDefaultSlotBinding, entityId)
-        << "SelectionOutlinePass shader samples uTextures[0] as EntityId; "
-        << "the generic sorted-read fallback previously rebound slot 0 to "
-        << "SceneDepth and made the fullscreen overlay black out the frame.";
+    EXPECT_NE(lastDefaultSlotBinding, entityId)
+        << "SelectionOutlinePass must not overwrite descriptor slot 0; "
+        << "that slot is still sampled by earlier-recorded postprocess draws "
+        << "when the single bindless descriptor set is submitted.";
+    EXPECT_EQ(lastSelectionOutlineSlotBinding, entityId)
+        << "selection_outline.frag samples EntityId from dedicated frame-sampled "
+        << "descriptor slot 3 so hierarchy selection cannot clobber tonemap slot 0.";
 
     renderer->Shutdown();
 }

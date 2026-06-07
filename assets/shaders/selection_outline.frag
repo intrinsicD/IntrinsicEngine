@@ -5,6 +5,8 @@ layout(location = 0) out vec4 outColor;
 
 layout(set = 0, binding = 0) uniform usampler2D uTextures[];
 
+const uint kSelectionOutlineFrameSampledDescriptorSlot = 3u;
+
 layout(push_constant) uniform Push
 {
     vec4 OutlineColor;     // RGBA color for selected entities
@@ -36,11 +38,11 @@ bool IsSelected(uint id)
 
 void main()
 {
-    ivec2 texSize = textureSize(uTextures[0], 0);
+    ivec2 texSize = textureSize(uTextures[kSelectionOutlineFrameSampledDescriptorSlot], 0);
     ivec2 coord = ivec2(vUV * vec2(texSize));
     coord = clamp(coord, ivec2(0), texSize - ivec2(1));
 
-    uint centerId = texelFetch(uTextures[0], coord, 0).x;
+    uint centerId = texelFetch(uTextures[kSelectionOutlineFrameSampledDescriptorSlot], coord, 0).x;
     bool centerSelected = IsSelected(centerId);
     bool centerHovered = (centerId != 0u && centerId == pc.HoveredId);
 
@@ -71,7 +73,7 @@ void main()
         {
             ivec2 nc = coord + offsets[i] * r;
             nc = clamp(nc, ivec2(0), texSize - ivec2(1));
-            uint neighborId = texelFetch(uTextures[0], nc, 0).x;
+            uint neighborId = texelFetch(uTextures[kSelectionOutlineFrameSampledDescriptorSlot], nc, 0).x;
 
             bool neighborSelected = IsSelected(neighborId);
             if (centerSelected != neighborSelected)

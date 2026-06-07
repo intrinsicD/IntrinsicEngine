@@ -503,7 +503,8 @@ void VulkanCommandContext::TextureBarrier(RHI::TextureHandle tex,
     // BUG-016: do NOT auto-bind the transitioned texture into frame-sampled
     // bridge slot 0 here. Slot 0 is the shared "default" postprocess bridge
     // element; the renderer now drives it (and the dedicated DebugView/Present
-    // slots 1/2) with explicit per-pass `BindFrameSampledTextureAt` calls. The
+    // slots 1/2 plus SelectionOutline slot 3) with explicit per-pass
+    // `BindFrameSampledTextureAt` calls. The
     // whole frame is recorded into one command buffer against one bindless
     // descriptor set and submitted once, so a host-side descriptor write here
     // would be observed by *every* recorded draw at submit, not just the next

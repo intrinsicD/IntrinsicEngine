@@ -692,11 +692,11 @@ Concretely:
   present source and keeps it as the present source after the pass, so the
   shader's transparent pixels preserve the scene instead of becoming a
   black standalone overlay. The executor explicitly binds the compiled
-  `EntityId` texture into frame-sampled descriptor slot 0 before this pass;
+  `EntityId` texture into frame-sampled descriptor slot 3 before this pass;
   it must not use the generic sorted-read fallback, because the pass also
   reads `SceneDepth` and the loaded present source for graph ordering /
   attachment preservation while `selection_outline.frag` samples only
-  `uTextures[0]` as an unsigned entity-ID texture. `PushConstantSize = 144`
+  `uTextures[3]` as an unsigned entity-ID texture. `PushConstantSize = 144`
   matches `SelectionOutlinePushConstants` exported from
   `Passes/Pass.Selection.Outline.cppm`, which mirrors the
   `selection_outline.frag` `layout(push_constant) uniform Push { ... }`
@@ -808,8 +808,9 @@ Concretely:
   the selected debug-view texture through the slot-explicit
   `ICommandContext::BindFrameSampledTextureAt(..., 1)` hook, while the
   canonical `Present` pass publishes `FrameRecipe.PresentSource` at
-  descriptor slot 2. The shader pair samples those reserved slots so the
-  two fullscreen passes do not overwrite the same global sampled descriptor
+  descriptor slot 2 and `SelectionOutlinePass` publishes `EntityId` at
+  descriptor slot 3. The shader pair samples those reserved slots so the
+  fullscreen passes do not overwrite the same global sampled descriptor
   element before a single command-buffer submit; older postprocess bridges
   continue to use slot 0. The Slice B contract pin is
   `tests/contract/graphics/Test.DebugViewPass.cpp` (BindPipeline +
@@ -1091,8 +1092,9 @@ Concretely:
   `UploadPendingFontAtlas()` and before `ImGuiPass::Execute(...)`, so a
   freshly allocated atlas slot is visible to the shader in the same frame. The
   promoted Vulkan backend reserves framegraph sampled-texture descriptor slots
-  0..2 and allocates real bindless textures from slot 3 upward, so the font
-  atlas slot cannot be overwritten by DebugView/Present descriptor updates.
+  0..3 and allocates real bindless textures from slot 4 upward, so the font
+  atlas slot cannot be overwritten by DebugView/Present/SelectionOutline
+  descriptor updates.
   The imported `Backbuffer` remains owned solely by `Pass.Present`; render-graph validation
   still rejects non-present backbuffer writes. The opt-in `gpu;vulkan` smoke
   remains the GPU-host proof for the same path.
