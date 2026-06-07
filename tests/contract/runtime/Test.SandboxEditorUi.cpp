@@ -578,6 +578,10 @@ TEST(SandboxEditorUi, HierarchyInspectorModelReportsSelectionRenderHintsAndDomai
     EXPECT_EQ(frame.Inspector.Geometry.Domain, GS::Domain::PointCloud);
     EXPECT_TRUE(frame.Inspector.Geometry.Valid);
     EXPECT_EQ(frame.Inspector.Geometry.VertexCount, 3u);
+    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        frame.Inspector.Processing.Domains,
+        Runtime::SandboxEditorGeometryProcessingDomain::PointCloudPoints));
+    EXPECT_FALSE(frame.Inspector.Processing.HasEditableSurfaceMesh);
 
     ASSERT_EQ(frame.Selection.SelectedStableIds.size(), 1u);
     EXPECT_EQ(frame.Selection.SelectedStableIds[0],
@@ -585,6 +589,166 @@ TEST(SandboxEditorUi, HierarchyInspectorModelReportsSelectionRenderHintsAndDomai
     ASSERT_EQ(frame.Selection.SelectedEntities.size(), 1u);
     EXPECT_EQ(frame.Selection.SelectedEntities[0].Name, "Cloud A");
     EXPECT_FALSE(frame.FileImport.Enabled);
+}
+
+TEST(SandboxEditorUi, GeometryProcessingSupportedDomainsMatchPromotedEditorContract)
+{
+    using Algorithm = Runtime::SandboxEditorGeometryProcessingAlgorithm;
+    using Domain = Runtime::SandboxEditorGeometryProcessingDomain;
+
+    const Domain kmeans =
+        Runtime::GetSandboxEditorSupportedGeometryProcessingDomains(
+            Algorithm::KMeans);
+    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        kmeans,
+        Domain::MeshVertices));
+    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        kmeans,
+        Domain::GraphVertices));
+    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        kmeans,
+        Domain::PointCloudPoints));
+    EXPECT_FALSE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        kmeans,
+        Domain::MeshEdges));
+
+    const Domain smoothing =
+        Runtime::GetSandboxEditorSupportedGeometryProcessingDomains(
+            Algorithm::Smoothing);
+    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        smoothing,
+        Domain::MeshVertices));
+    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        smoothing,
+        Domain::MeshEdges));
+    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        smoothing,
+        Domain::MeshHalfedges));
+    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        smoothing,
+        Domain::MeshFaces));
+    EXPECT_FALSE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        smoothing,
+        Domain::GraphVertices));
+
+    EXPECT_TRUE(Runtime::SupportsSandboxEditorGeometryProcessingDomain(
+        Algorithm::ShortestPath,
+        Domain::GraphVertices));
+    EXPECT_FALSE(Runtime::SupportsSandboxEditorGeometryProcessingDomain(
+        Algorithm::ShortestPath,
+        Domain::PointCloudPoints));
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorGeometryProcessingDomain(
+                     Domain::GraphVertices),
+                 "Graph Nodes");
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorGeometryProcessingAlgorithm(
+                     Algorithm::VectorHeat),
+                 "Vector Heat Method");
+}
+
+TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntries)
+{
+    using Algorithm = Runtime::SandboxEditorGeometryProcessingAlgorithm;
+    using Domain = Runtime::SandboxEditorGeometryProcessingDomain;
+
+    ECS::Scene::Registry registry;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
+    AddTriangleMeshSource(registry, mesh);
+
+    const Runtime::SandboxEditorGeometryProcessingCapabilities meshCaps =
+        Runtime::GetSandboxEditorGeometryProcessingCapabilities(registry, mesh);
+    EXPECT_TRUE(meshCaps.HasEditableSurfaceMesh);
+    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        meshCaps.Domains,
+        Domain::MeshVertices));
+    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        meshCaps.Domains,
+        Domain::MeshEdges));
+    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        meshCaps.Domains,
+        Domain::MeshHalfedges));
+    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        meshCaps.Domains,
+        Domain::MeshFaces));
+    EXPECT_FALSE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        meshCaps.Domains,
+        Domain::GraphVertices));
+
+    const std::vector<Runtime::SandboxEditorGeometryProcessingEntry> meshEntries =
+        Runtime::ResolveSandboxEditorGeometryProcessingEntries(meshCaps);
+    ASSERT_EQ(meshEntries.size(), 11u);
+    EXPECT_EQ(meshEntries[0].Algorithm, Algorithm::KMeans);
+    EXPECT_EQ(meshEntries[1].Algorithm, Algorithm::ShortestPath);
+    EXPECT_EQ(meshEntries[2].Algorithm, Algorithm::VectorHeat);
+    EXPECT_EQ(meshEntries[3].Algorithm, Algorithm::Parameterization);
+    EXPECT_EQ(meshEntries[4].Algorithm, Algorithm::ConvexHull);
+    EXPECT_EQ(meshEntries[5].Algorithm, Algorithm::BooleanCSG);
+    EXPECT_EQ(meshEntries[6].Algorithm, Algorithm::Remeshing);
+    EXPECT_EQ(meshEntries[10].Algorithm, Algorithm::Repair);
+
+    const std::vector<Domain> meshKMeans =
+        Runtime::GetAvailableSandboxEditorKMeansDomains(registry, mesh);
+    ASSERT_EQ(meshKMeans.size(), 1u);
+    EXPECT_EQ(meshKMeans[0], Domain::MeshVertices);
+
+    const ECS::EntityHandle graph = MakeSelectable(registry, "Graph");
+    AddGraphSource(registry, graph);
+    const Runtime::SandboxEditorGeometryProcessingCapabilities graphCaps =
+        Runtime::GetSandboxEditorGeometryProcessingCapabilities(registry, graph);
+    EXPECT_FALSE(graphCaps.HasEditableSurfaceMesh);
+    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        graphCaps.Domains,
+        Domain::GraphVertices));
+    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        graphCaps.Domains,
+        Domain::GraphEdges));
+    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        graphCaps.Domains,
+        Domain::GraphHalfedges));
+    EXPECT_FALSE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        graphCaps.Domains,
+        Domain::MeshVertices));
+    const std::vector<Runtime::SandboxEditorGeometryProcessingEntry> graphEntries =
+        Runtime::ResolveSandboxEditorGeometryProcessingEntries(registry, graph);
+    ASSERT_EQ(graphEntries.size(), 2u);
+    EXPECT_EQ(graphEntries[0].Algorithm, Algorithm::KMeans);
+    EXPECT_EQ(graphEntries[1].Algorithm, Algorithm::ShortestPath);
+    const std::vector<Domain> graphKMeans =
+        Runtime::GetAvailableSandboxEditorKMeansDomains(registry, graph);
+    ASSERT_EQ(graphKMeans.size(), 1u);
+    EXPECT_EQ(graphKMeans[0], Domain::GraphVertices);
+
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "Cloud");
+    AddPointCloudSource(registry, cloud, 5u);
+    const Runtime::SandboxEditorGeometryProcessingCapabilities cloudCaps =
+        Runtime::GetSandboxEditorGeometryProcessingCapabilities(registry, cloud);
+    EXPECT_FALSE(cloudCaps.HasEditableSurfaceMesh);
+    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        cloudCaps.Domains,
+        Domain::PointCloudPoints));
+    EXPECT_FALSE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        cloudCaps.Domains,
+        Domain::MeshVertices));
+    const std::vector<Runtime::SandboxEditorGeometryProcessingEntry> cloudEntries =
+        Runtime::ResolveSandboxEditorGeometryProcessingEntries(registry, cloud);
+    ASSERT_EQ(cloudEntries.size(), 8u);
+    EXPECT_EQ(cloudEntries[0].Algorithm, Algorithm::KMeans);
+    EXPECT_EQ(cloudEntries[1].Algorithm, Algorithm::NormalEstimation);
+    EXPECT_EQ(cloudEntries[2].Algorithm, Algorithm::Registration);
+    EXPECT_EQ(cloudEntries[7].Algorithm, Algorithm::SurfaceReconstruction);
+    const std::vector<Domain> cloudKMeans =
+        Runtime::GetAvailableSandboxEditorKMeansDomains(registry, cloud);
+    ASSERT_EQ(cloudKMeans.size(), 1u);
+    EXPECT_EQ(cloudKMeans[0], Domain::PointCloudPoints);
+
+    const ECS::EntityHandle empty = MakeSelectable(registry, "Empty");
+    const Runtime::SandboxEditorGeometryProcessingCapabilities emptyCaps =
+        Runtime::GetSandboxEditorGeometryProcessingCapabilities(registry, empty);
+    EXPECT_FALSE(emptyCaps.HasAny());
+    EXPECT_TRUE(Runtime::ResolveSandboxEditorGeometryProcessingEntries(
+                    registry,
+                    empty)
+                    .empty());
 }
 
 TEST(SandboxEditorUi, DomainWindowModelsReportSelectedMeshGraphAndPointCloudState)
@@ -679,12 +843,21 @@ TEST(SandboxEditorUi, DomainWindowModelsReportSelectedMeshGraphAndPointCloudStat
     ASSERT_TRUE(meshModel.Primitive.HasPrimitive);
     EXPECT_TRUE(meshModel.Primitive.HasFaceId);
     EXPECT_TRUE(meshModel.Primitive.HasVertexId);
+    ASSERT_TRUE(meshModel.Processing.HasSelectedEntity);
+    ASSERT_EQ(meshModel.Processing.KMeansDomains.size(), 1u);
+    EXPECT_EQ(meshModel.Processing.KMeansDomains[0],
+              Runtime::SandboxEditorGeometryProcessingDomain::MeshVertices);
+    ASSERT_FALSE(meshModel.Processing.Entries.empty());
+    EXPECT_EQ(meshModel.Processing.Entries[0].Algorithm,
+              Runtime::SandboxEditorGeometryProcessingAlgorithm::KMeans);
 
     const Runtime::SandboxEditorDomainWindowModel graphWhileMeshSelected =
         Runtime::BuildSandboxEditorDomainWindowModel(
             context,
             Runtime::SandboxEditorDomainWindowKind::Graph);
     EXPECT_FALSE(graphWhileMeshSelected.DomainMatches);
+    EXPECT_FALSE(graphWhileMeshSelected.Processing.HasSelectedEntity);
+    EXPECT_TRUE(graphWhileMeshSelected.Processing.Entries.empty());
     EXPECT_TRUE(HasDiagnostic(
         graphWhileMeshSelected.Diagnostics,
         Runtime::SandboxEditorDiagnosticCode::UnsupportedGeometryDomain));
@@ -718,6 +891,10 @@ TEST(SandboxEditorUi, DomainWindowModelsReportSelectedMeshGraphAndPointCloudStat
     ASSERT_TRUE(graphModel.Primitive.HasPrimitive);
     EXPECT_TRUE(graphModel.Primitive.HasEdgeId);
     EXPECT_TRUE(graphModel.Primitive.HasVertexId);
+    ASSERT_TRUE(graphModel.Processing.HasSelectedEntity);
+    ASSERT_EQ(graphModel.Processing.KMeansDomains.size(), 1u);
+    EXPECT_EQ(graphModel.Processing.KMeansDomains[0],
+              Runtime::SandboxEditorGeometryProcessingDomain::GraphVertices);
 
     const std::uint32_t cloudStableId =
         Runtime::SelectionController::ToStableEntityId(cloud);
@@ -745,6 +922,10 @@ TEST(SandboxEditorUi, DomainWindowModelsReportSelectedMeshGraphAndPointCloudStat
     EXPECT_TRUE(cloudModel.RenderHints.HasRenderPoints);
     ASSERT_TRUE(cloudModel.Primitive.HasPrimitive);
     EXPECT_TRUE(cloudModel.Primitive.HasPointId);
+    ASSERT_TRUE(cloudModel.Processing.HasSelectedEntity);
+    ASSERT_EQ(cloudModel.Processing.KMeansDomains.size(), 1u);
+    EXPECT_EQ(cloudModel.Processing.KMeansDomains[0],
+              Runtime::SandboxEditorGeometryProcessingDomain::PointCloudPoints);
 }
 
 TEST(SandboxEditorUi, DomainWindowModelsReportNoSelectionStaleAndWrongDomain)

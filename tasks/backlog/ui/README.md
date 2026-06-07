@@ -13,6 +13,7 @@ map.
 - [RORG-031F — UI integration backlog seed](RORG-031-ui-integration.md).
 - [UI-001 — Sandbox editor shell and core panels](../../done/UI-001-sandbox-editor-shell-panels.md) (done, 2026-06-03, `CPUContracted`).
 - [UI-002 — Sandbox EditorUI domain menu windows](../../done/UI-002-editor-domain-menu-windows.md) (done, 2026-06-07, `CPUContracted`).
+- [UI-003 — Sandbox EditorUI geometry processing capabilities](../../done/UI-003-sandbox-editor-geometry-processing-capabilities.md) (done, 2026-06-07, `CPUContracted`).
 
 ## Convergence
 
@@ -26,6 +27,11 @@ map.
   `SandboxEditorUi` shell: it adds first-class `Mesh`, `Graph`, and
   `PointCloud` ImGui menu slots whose windows control selected-entity
   components through runtime-owned command surfaces.
+- UI-003 is a retired promoted EditorUI follow-up that reimplements the legacy
+  geometry-processing capability discovery seam against promoted
+  `GeometrySources`. The domain menus now expose read-only `Processing` windows
+  with source-domain, stable algorithm-entry, and K-Means source-domain
+  affordances; execution command surfaces remain future runtime/editor work.
 - UI work that depends on renderer overlays/handoff coordinates with the
   retired [`GRAPHICS-024`](../../done/GRAPHICS-024-overlays-presentation-editor-handoff.md)
   parity matrix and the rendering DAG in

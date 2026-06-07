@@ -59,7 +59,8 @@ private:
     std::unordered_map<std::string, std::vector<std::byte>> m_Files;
 };
 
-// SceneDirtyTracker tests live in Test_EditorUI.cpp (9 comprehensive tests).
+// SceneDirtyTracker remains legacy EditorUI-owned; promoted scene-file command
+// coverage lives in tests/contract/runtime/Test.SandboxEditorUi.cpp.
 
 // ---------------------------------------------------------------------------
 // Scene schema tests — verify JSON structure produced by SaveScene

@@ -774,7 +774,6 @@ if(TARGET ExtrinsicRuntime AND NOT INTRINSIC_HEADLESS_NO_GLFW)
         Test_Exporters.cpp
         Test_DebugDraw.cpp
         Test_DebugDrawVisualizations.cpp
-        Test_EditorUI.cpp
         Test_PointCloudRenderPass.cpp
         Test_GraphRenderPass.cpp
         Test_RuntimeGeometry_Reuse.cpp

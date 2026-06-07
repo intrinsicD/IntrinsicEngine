@@ -27,18 +27,21 @@
   [`docs/migration/legacy-retirement.md`](../../../docs/migration/legacy-retirement.md).
 - Subtree size: 8 files. Legacy module name (bare, non-`Extrinsic.`):
   `Runtime.EditorUI`.
-- Promoted equivalent: `src/app/` editor shell + ImGui panels delivered by
-  `UI-001` on the `RUNTIME-090`/`GRAPHICS-079` ImGui adapter/pass stack.
+- Promoted equivalent: `Extrinsic.Runtime.SandboxEditorUi` attached by
+  `src/app/Sandbox/`, delivered by `UI-001` on the
+  `RUNTIME-090`/`GRAPHICS-079` ImGui adapter/pass stack and extended by
+  `UI-002`, `UI-003`, and `RUNTIME-098`.
 - CMake references: `INTRINSIC_LEGACY_EDITOR_UI_SOURCE_ROOT` (`CMakeLists.txt`
   ~L235) and `add_subdirectory(${INTRINSIC_LEGACY_EDITOR_UI_SOURCE_ROOT})` under
   `if(NOT INTRINSIC_HEADLESS_NO_GLFW)` (~L276).
 - Layering allowlist (`tools/repo/layering_allowlist.yaml`) carries
   grandfathered rows keyed under `src/legacy/EditorUI/`; drop only those.
-- Prerequisite (today, 2026-06-06): the consumer-grep gate FAILS — known
-  consumers of `Runtime.EditorUI` are `src/legacy/Apps/Sandbox/main.cpp` and
-  `tests/integration/app/Test_EditorUI.cpp`. Promotion is blocked until the
-  legacy Sandbox retires (`LEGACY-003`) and the integration test migrates to the
-  promoted editor shell.
+- Prerequisite (today, 2026-06-07): the consumer-grep gate FAILS — the known
+  external source consumer of `Runtime.EditorUI` is
+  `src/legacy/Apps/Sandbox/main.cpp`. Promotion is blocked until the legacy
+  Sandbox retires (`LEGACY-003`). The previous
+  `tests/integration/app/Test_EditorUI.cpp` consumer migrated to promoted
+  `SandboxEditorUi` contract coverage under `UI-003`.
 
 ## Required changes
 - [ ] (Prerequisite, verified before promotion to `tasks/active/`) Run the
@@ -62,10 +65,10 @@
       Sequencing.
 
 ## Tests
-- [ ] No new tests; this is a removal. Migrate or retire
-      `tests/integration/app/Test_EditorUI.cpp` (currently imports
-      `Runtime.EditorUI`) before this deletion; that migration is a prerequisite,
-      not part of this mechanical commit.
+- [ ] No new tests; this is a removal. The previous
+      `tests/integration/app/Test_EditorUI.cpp` legacy consumer migrated under
+      `UI-003`; keep this commit mechanical and do not add replacement promoted
+      behavior here.
 - [ ] Default CPU gate stays green:
       `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`.
 - [ ] `python3 tools/repo/check_layering.py --root src --strict` passes and the

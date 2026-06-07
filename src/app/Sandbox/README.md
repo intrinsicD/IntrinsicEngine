@@ -26,11 +26,11 @@ implementation does not special-case asset authority.
 
 The promoted EditorUI also exposes stable top-level ImGui menu slots for
 `PointCloud`, `Graph`, and `Mesh`. Their submenu items open selected-entity
-domain windows for render-hint status, visualization/spatial-debug controls, and
-primitive-selection details. These windows are an EditorUI workflow only: they
-reuse `SandboxEditorUi` models and runtime-owned command surfaces, and
-the sandbox app still does not own selection, ECS mutation, rendering, or asset
-state.
+domain windows for render-hint status, visualization/spatial-debug controls,
+primitive-selection details, and processing-discovery affordances. These
+windows are an EditorUI workflow only: they reuse `SandboxEditorUi` models and
+runtime-owned command surfaces, and the sandbox app still does not own
+selection, ECS mutation, rendering, or asset state.
 
 With the standard reference configuration, runtime creates `ReferenceTriangle`
 through `Extrinsic.Runtime.ReferenceScene::TriangleProvider` as an ordinary

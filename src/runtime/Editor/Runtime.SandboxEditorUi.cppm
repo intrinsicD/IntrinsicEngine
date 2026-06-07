@@ -104,6 +104,125 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] const char* DebugNameForSandboxEditorVisualizationAdapterBindingKind(
         RenderExtractionCache::VisualizationAdapterBindingKind kind) noexcept;
 
+    enum class SandboxEditorGeometryProcessingDomain : std::uint32_t
+    {
+        None = 0u,
+        MeshVertices = 1u << 0u,
+        MeshEdges = 1u << 1u,
+        MeshHalfedges = 1u << 2u,
+        MeshFaces = 1u << 3u,
+        GraphVertices = 1u << 4u,
+        GraphEdges = 1u << 5u,
+        GraphHalfedges = 1u << 6u,
+        PointCloudPoints = 1u << 7u,
+    };
+
+    [[nodiscard]] constexpr SandboxEditorGeometryProcessingDomain operator|(
+        const SandboxEditorGeometryProcessingDomain lhs,
+        const SandboxEditorGeometryProcessingDomain rhs) noexcept
+    {
+        return static_cast<SandboxEditorGeometryProcessingDomain>(
+            static_cast<std::uint32_t>(lhs) | static_cast<std::uint32_t>(rhs));
+    }
+
+    [[nodiscard]] constexpr SandboxEditorGeometryProcessingDomain operator&(
+        const SandboxEditorGeometryProcessingDomain lhs,
+        const SandboxEditorGeometryProcessingDomain rhs) noexcept
+    {
+        return static_cast<SandboxEditorGeometryProcessingDomain>(
+            static_cast<std::uint32_t>(lhs) & static_cast<std::uint32_t>(rhs));
+    }
+
+    constexpr SandboxEditorGeometryProcessingDomain& operator|=(
+        SandboxEditorGeometryProcessingDomain& lhs,
+        const SandboxEditorGeometryProcessingDomain rhs) noexcept
+    {
+        lhs = lhs | rhs;
+        return lhs;
+    }
+
+    [[nodiscard]] constexpr bool HasAnySandboxEditorGeometryProcessingDomain(
+        const SandboxEditorGeometryProcessingDomain domains,
+        const SandboxEditorGeometryProcessingDomain query) noexcept
+    {
+        return static_cast<std::uint32_t>(domains & query) != 0u;
+    }
+
+    enum class SandboxEditorGeometryProcessingAlgorithm : std::uint8_t
+    {
+        KMeans,
+        Remeshing,
+        Simplification,
+        Smoothing,
+        Subdivision,
+        Repair,
+        NormalEstimation,
+        ShortestPath,
+        ConvexHull,
+        SurfaceReconstruction,
+        VectorHeat,
+        Parameterization,
+        BooleanCSG,
+        Registration,
+        BilateralFilter,
+        OutlierEstimation,
+        KernelDensity,
+    };
+
+    struct SandboxEditorGeometryProcessingCapabilities
+    {
+        SandboxEditorGeometryProcessingDomain Domains{
+            SandboxEditorGeometryProcessingDomain::None};
+        bool HasEditableSurfaceMesh{false};
+
+        [[nodiscard]] bool HasAny() const noexcept
+        {
+            return HasEditableSurfaceMesh ||
+                   Domains != SandboxEditorGeometryProcessingDomain::None;
+        }
+    };
+
+    struct SandboxEditorGeometryProcessingEntry
+    {
+        SandboxEditorGeometryProcessingAlgorithm Algorithm{
+            SandboxEditorGeometryProcessingAlgorithm::KMeans};
+        SandboxEditorGeometryProcessingDomain Domains{
+            SandboxEditorGeometryProcessingDomain::None};
+    };
+
+    [[nodiscard]] SandboxEditorGeometryProcessingDomain
+    GetSandboxEditorSupportedGeometryProcessingDomains(
+        SandboxEditorGeometryProcessingAlgorithm algorithm) noexcept;
+
+    [[nodiscard]] bool SupportsSandboxEditorGeometryProcessingDomain(
+        SandboxEditorGeometryProcessingAlgorithm algorithm,
+        SandboxEditorGeometryProcessingDomain domain) noexcept;
+
+    [[nodiscard]] SandboxEditorGeometryProcessingCapabilities
+    GetSandboxEditorGeometryProcessingCapabilities(
+        const ECS::Scene::Registry& registry,
+        ECS::EntityHandle entity);
+
+    [[nodiscard]] std::vector<SandboxEditorGeometryProcessingEntry>
+    ResolveSandboxEditorGeometryProcessingEntries(
+        SandboxEditorGeometryProcessingCapabilities capabilities);
+
+    [[nodiscard]] std::vector<SandboxEditorGeometryProcessingEntry>
+    ResolveSandboxEditorGeometryProcessingEntries(
+        const ECS::Scene::Registry& registry,
+        ECS::EntityHandle entity);
+
+    [[nodiscard]] std::vector<SandboxEditorGeometryProcessingDomain>
+    GetAvailableSandboxEditorKMeansDomains(
+        const ECS::Scene::Registry& registry,
+        ECS::EntityHandle entity);
+
+    [[nodiscard]] const char* DebugNameForSandboxEditorGeometryProcessingDomain(
+        SandboxEditorGeometryProcessingDomain domain) noexcept;
+
+    [[nodiscard]] const char* DebugNameForSandboxEditorGeometryProcessingAlgorithm(
+        SandboxEditorGeometryProcessingAlgorithm algorithm) noexcept;
+
     struct SandboxEditorDiagnostic
     {
         SandboxEditorDiagnosticCode Code{SandboxEditorDiagnosticCode::MissingScene};
@@ -169,6 +288,7 @@ export namespace Extrinsic::Runtime
         SandboxEditorTransformModel     Transform{};
         SandboxEditorRenderHintModel    RenderHints{};
         SandboxEditorGeometryDomainModel Geometry{};
+        SandboxEditorGeometryProcessingCapabilities Processing{};
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
@@ -394,6 +514,15 @@ export namespace Extrinsic::Runtime
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
+    struct SandboxEditorGeometryProcessingModel
+    {
+        bool HasSelectedEntity{false};
+        SandboxEditorGeometryProcessingCapabilities Capabilities{};
+        std::vector<SandboxEditorGeometryProcessingEntry> Entries{};
+        std::vector<SandboxEditorGeometryProcessingDomain> KMeansDomains{};
+        std::vector<SandboxEditorDiagnostic> Diagnostics{};
+    };
+
     struct SandboxEditorDomainWindowModel
     {
         SandboxEditorDomainWindowKind Kind{SandboxEditorDomainWindowKind::Mesh};
@@ -411,6 +540,7 @@ export namespace Extrinsic::Runtime
         SandboxEditorPrimitiveViewSettings PrimitiveView{};
         bool VisualizationControlsAvailable{false};
         SandboxEditorVisualizationModel Visualization{};
+        SandboxEditorGeometryProcessingModel Processing{};
         SandboxEditorPrimitiveDetailModel Primitive{};
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
@@ -594,7 +724,7 @@ export namespace Extrinsic::Runtime
         SandboxEditorPanelFrame m_LastFrame{};
         std::array<char, 1024>  m_ImportPathBuffer{};
         std::array<char, 1024>  m_ScenePathBuffer{};
-        std::array<bool, 9>     m_DomainWindowOpen{};
+        std::array<bool, 12>    m_DomainWindowOpen{};
         std::optional<SandboxEditorFileImportResult> m_LastImportResult{};
         std::optional<SandboxEditorSceneFileResult> m_LastSceneFileResult{};
     };

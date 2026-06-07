@@ -97,6 +97,7 @@ Runtime/UI implementation leaves for the full sandbox app path:
 Post-acceptance sandbox follow-ups:
 - [`runtime/RUNTIME-097` (done)](../done/RUNTIME-097-default-sandbox-ecs-triangle.md) — default white triangle is now an ordinary ECS mesh-domain `GeometrySources` entity with selectable/editor-visible components instead of the procedural bootstrap path.
 - [`ui/UI-002` (done)](../done/UI-002-editor-domain-menu-windows.md) — promoted EditorUI now has `PointCloud`, `Graph`, and `Mesh` menu slots whose submenu-opened windows inspect and control selected-entity components through runtime-owned seams.
+- [`ui/UI-003` (done)](../done/UI-003-sandbox-editor-geometry-processing-capabilities.md) — promoted EditorUI now reimplements legacy geometry-processing capability discovery against promoted `GeometrySources`, with read-only processing windows for mesh, graph, and point-cloud selections.
 - [`BUG-017` (done)](../done/BUG-017-sandbox-selection-click-and-outline-black-frame.md) — default sandbox viewport clicks now submit selection picks, and hierarchy selection composites the outline over the existing present source instead of presenting an outline-only black frame.
 
 ### Theme B — Rendering modernization (P1, Theme A unblocked)

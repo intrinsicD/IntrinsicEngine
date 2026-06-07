@@ -57,7 +57,8 @@ namespace Extrinsic::Runtime
             Render = 0,
             Visualization = 1,
             Selection = 2,
-            Count = 3,
+            Processing = 3,
+            Count = 4,
         };
 
         [[nodiscard]] GS::Domain ExpectedDomainForWindowKind(
@@ -87,6 +88,7 @@ namespace Extrinsic::Runtime
                 case DomainWindowSection::Render: return "Mesh / Render";
                 case DomainWindowSection::Visualization: return "Mesh / Visualization";
                 case DomainWindowSection::Selection: return "Mesh / Selection";
+                case DomainWindowSection::Processing: return "Mesh / Processing";
                 case DomainWindowSection::Count: break;
                 }
                 break;
@@ -96,6 +98,7 @@ namespace Extrinsic::Runtime
                 case DomainWindowSection::Render: return "Graph / Render";
                 case DomainWindowSection::Visualization: return "Graph / Visualization";
                 case DomainWindowSection::Selection: return "Graph / Selection";
+                case DomainWindowSection::Processing: return "Graph / Processing";
                 case DomainWindowSection::Count: break;
                 }
                 break;
@@ -105,6 +108,7 @@ namespace Extrinsic::Runtime
                 case DomainWindowSection::Render: return "PointCloud / Render";
                 case DomainWindowSection::Visualization: return "PointCloud / Visualization";
                 case DomainWindowSection::Selection: return "PointCloud / Selection";
+                case DomainWindowSection::Processing: return "PointCloud / Processing";
                 case DomainWindowSection::Count: break;
                 }
                 break;
@@ -398,6 +402,66 @@ namespace Extrinsic::Runtime
             return Core::Extent2D{1, 1};
         }
 
+        constexpr SandboxEditorGeometryProcessingDomain kMeshTopologyDomains =
+            SandboxEditorGeometryProcessingDomain::MeshVertices |
+            SandboxEditorGeometryProcessingDomain::MeshEdges |
+            SandboxEditorGeometryProcessingDomain::MeshHalfedges |
+            SandboxEditorGeometryProcessingDomain::MeshFaces;
+
+        constexpr SandboxEditorGeometryProcessingDomain kGraphTopologyDomains =
+            SandboxEditorGeometryProcessingDomain::GraphVertices |
+            SandboxEditorGeometryProcessingDomain::GraphEdges |
+            SandboxEditorGeometryProcessingDomain::GraphHalfedges;
+
+        constexpr SandboxEditorGeometryProcessingDomain kPointCloudDomains =
+            SandboxEditorGeometryProcessingDomain::PointCloudPoints;
+
+        [[nodiscard]] constexpr bool IsSurfaceTopologyAlgorithm(
+            const SandboxEditorGeometryProcessingAlgorithm algorithm) noexcept
+        {
+            switch (algorithm)
+            {
+            case SandboxEditorGeometryProcessingAlgorithm::Remeshing:
+            case SandboxEditorGeometryProcessingAlgorithm::Simplification:
+            case SandboxEditorGeometryProcessingAlgorithm::Smoothing:
+            case SandboxEditorGeometryProcessingAlgorithm::Subdivision:
+            case SandboxEditorGeometryProcessingAlgorithm::Repair:
+                return true;
+            case SandboxEditorGeometryProcessingAlgorithm::KMeans:
+            case SandboxEditorGeometryProcessingAlgorithm::NormalEstimation:
+            case SandboxEditorGeometryProcessingAlgorithm::ShortestPath:
+            case SandboxEditorGeometryProcessingAlgorithm::ConvexHull:
+            case SandboxEditorGeometryProcessingAlgorithm::SurfaceReconstruction:
+            case SandboxEditorGeometryProcessingAlgorithm::VectorHeat:
+            case SandboxEditorGeometryProcessingAlgorithm::Parameterization:
+            case SandboxEditorGeometryProcessingAlgorithm::BooleanCSG:
+            case SandboxEditorGeometryProcessingAlgorithm::Registration:
+            case SandboxEditorGeometryProcessingAlgorithm::BilateralFilter:
+            case SandboxEditorGeometryProcessingAlgorithm::OutlierEstimation:
+            case SandboxEditorGeometryProcessingAlgorithm::KernelDensity:
+                return false;
+            }
+            return false;
+        }
+
+        [[nodiscard]] SandboxEditorGeometryProcessingDomain
+        DomainsForSourceView(const GS::ConstSourceView& view) noexcept
+        {
+            switch (view.ActiveDomain)
+            {
+            case GS::Domain::Mesh:
+                return kMeshTopologyDomains;
+            case GS::Domain::Graph:
+                return kGraphTopologyDomains;
+            case GS::Domain::PointCloud:
+                return kPointCloudDomains;
+            case GS::Domain::None:
+            case GS::Domain::Unknown:
+                return SandboxEditorGeometryProcessingDomain::None;
+            }
+            return SandboxEditorGeometryProcessingDomain::None;
+        }
+
         [[nodiscard]] SandboxEditorDiagnostic MakeDiagnostic(
             const SandboxEditorDiagnosticCode code,
             std::string message)
@@ -584,6 +648,53 @@ namespace Extrinsic::Runtime
             return std::nullopt;
         }
 
+        [[nodiscard]] SandboxEditorGeometryProcessingModel BuildGeometryProcessingModel(
+            const SandboxEditorContext& context)
+        {
+            SandboxEditorGeometryProcessingModel model{};
+            if (context.Scene == nullptr)
+            {
+                AddDiagnostic(model.Diagnostics,
+                              SandboxEditorDiagnosticCode::MissingScene,
+                              "Scene registry is unavailable for processing controls.");
+                return model;
+            }
+            if (context.Selection == nullptr)
+            {
+                AddDiagnostic(model.Diagnostics,
+                              SandboxEditorDiagnosticCode::MissingSelectionController,
+                              "Selection controller is unavailable for processing controls.");
+                return model;
+            }
+
+            const std::optional<ECS::EntityHandle> selected =
+                ResolveFirstSelectedEntity(context);
+            if (!selected.has_value())
+            {
+                AddDiagnostic(model.Diagnostics,
+                              SandboxEditorDiagnosticCode::NoSelectedEntity,
+                              "No selected entity is available for processing controls.");
+                return model;
+            }
+
+            model.HasSelectedEntity = true;
+            model.Capabilities =
+                GetSandboxEditorGeometryProcessingCapabilities(
+                    *context.Scene,
+                    *selected);
+            model.Entries =
+                ResolveSandboxEditorGeometryProcessingEntries(model.Capabilities);
+            model.KMeansDomains =
+                GetAvailableSandboxEditorKMeansDomains(*context.Scene, *selected);
+            if (!model.Capabilities.HasAny())
+            {
+                AddDiagnostic(model.Diagnostics,
+                              SandboxEditorDiagnosticCode::UnsupportedGeometryDomain,
+                              "Selected entity has no supported GeometrySources processing domain.");
+            }
+            return model;
+        }
+
         [[nodiscard]] SandboxEditorPrimitiveDetailModel BuildPrimitiveDetailModel(
             const PrimitiveSelectionResult& primitive)
         {
@@ -625,6 +736,10 @@ namespace Extrinsic::Runtime
             model.Transform = BuildTransformModel(raw, *selected);
             model.RenderHints = BuildRenderHintModel(raw, *selected);
             model.Geometry = BuildGeometryDomainModel(raw, *selected);
+            model.Processing =
+                GetSandboxEditorGeometryProcessingCapabilities(
+                    *context.Scene,
+                    *selected);
 
             if (model.Geometry.Domain == GS::Domain::Unknown)
             {
@@ -1071,7 +1186,7 @@ namespace Extrinsic::Runtime
 
         void DrawDomainMenu(
             const SandboxEditorDomainWindowKind kind,
-            std::array<bool, 9>* domainWindowOpen)
+            std::array<bool, 12>* domainWindowOpen)
         {
             if (!ImGui::BeginMenu(DebugNameForSandboxEditorDomainWindowKind(kind)))
                 return;
@@ -1094,12 +1209,17 @@ namespace Extrinsic::Runtime
                     "Selection details",
                     nullptr,
                     &(*domainWindowOpen)[DomainWindowSlotIndex(kind, DomainWindowSection::Selection)]);
+                ImGui::MenuItem(
+                    "Processing",
+                    nullptr,
+                    &(*domainWindowOpen)[DomainWindowSlotIndex(kind, DomainWindowSection::Processing)]);
             }
             else
             {
                 (void)ImGui::MenuItem("Render hints", nullptr, false, false);
                 (void)ImGui::MenuItem("Visualization", nullptr, false, false);
                 (void)ImGui::MenuItem("Selection details", nullptr, false, false);
+                (void)ImGui::MenuItem("Processing", nullptr, false, false);
             }
 
             if (!menuEnabled)
@@ -1107,7 +1227,7 @@ namespace Extrinsic::Runtime
             ImGui::EndMenu();
         }
 
-        void DrawDomainMenus(std::array<bool, 9>* domainWindowOpen)
+        void DrawDomainMenus(std::array<bool, 12>* domainWindowOpen)
         {
             if (!ImGui::BeginMainMenuBar())
                 return;
@@ -1351,11 +1471,96 @@ namespace Extrinsic::Runtime
             DrawPrimitiveDetails(model.Primitive);
         }
 
+        void DrawProcessingDomains(
+            const SandboxEditorGeometryProcessingDomain domains)
+        {
+            constexpr std::array<SandboxEditorGeometryProcessingDomain, 8>
+                kDisplayDomains{
+                    SandboxEditorGeometryProcessingDomain::MeshVertices,
+                    SandboxEditorGeometryProcessingDomain::MeshEdges,
+                    SandboxEditorGeometryProcessingDomain::MeshHalfedges,
+                    SandboxEditorGeometryProcessingDomain::MeshFaces,
+                    SandboxEditorGeometryProcessingDomain::GraphVertices,
+                    SandboxEditorGeometryProcessingDomain::GraphEdges,
+                    SandboxEditorGeometryProcessingDomain::GraphHalfedges,
+                    SandboxEditorGeometryProcessingDomain::PointCloudPoints,
+                };
+
+            bool any = false;
+            for (const SandboxEditorGeometryProcessingDomain domain :
+                 kDisplayDomains)
+            {
+                if (!HasAnySandboxEditorGeometryProcessingDomain(domains, domain))
+                    continue;
+                any = true;
+                ImGui::BulletText("%s",
+                                  DebugNameForSandboxEditorGeometryProcessingDomain(
+                                      domain));
+            }
+            if (!any)
+                ImGui::TextDisabled("No supported processing domains.");
+        }
+
+        void DrawDomainProcessingWindow(
+            const SandboxEditorDomainWindowModel& model)
+        {
+            DrawDomainWindowHeader(model);
+            ImGui::SeparatorText("Processing capabilities");
+
+            const SandboxEditorGeometryProcessingModel& processing =
+                model.Processing;
+            DrawDiagnostics(processing.Diagnostics);
+            if (!DomainWindowReady(model) || !processing.HasSelectedEntity)
+            {
+                ImGui::TextDisabled("Select a matching domain entity to inspect processing affordances.");
+                return;
+            }
+
+            ImGui::Text("Editable surface mesh: %s",
+                        processing.Capabilities.HasEditableSurfaceMesh ? "yes" : "no");
+            ImGui::SeparatorText("Source domains");
+            DrawProcessingDomains(processing.Capabilities.Domains);
+
+            ImGui::SeparatorText("K-Means sources");
+            if (processing.KMeansDomains.empty())
+            {
+                ImGui::TextDisabled("K-Means is unavailable for this selection.");
+            }
+            else
+            {
+                for (const SandboxEditorGeometryProcessingDomain domain :
+                     processing.KMeansDomains)
+                {
+                    ImGui::BulletText(
+                        "%s",
+                        DebugNameForSandboxEditorGeometryProcessingDomain(domain));
+                }
+            }
+
+            ImGui::SeparatorText("Available operations");
+            if (processing.Entries.empty())
+            {
+                ImGui::TextDisabled("No processing operations match this selection.");
+            }
+            else
+            {
+                for (const SandboxEditorGeometryProcessingEntry& entry :
+                     processing.Entries)
+                {
+                    ImGui::BulletText(
+                        "%s",
+                        DebugNameForSandboxEditorGeometryProcessingAlgorithm(
+                            entry.Algorithm));
+                }
+            }
+            ImGui::TextDisabled("Execution command surfaces are pending; this window is discovery-only.");
+        }
+
         void DrawOneDomainWindow(
             const SandboxEditorContext& context,
             const SandboxEditorDomainWindowKind kind,
             const DomainWindowSection section,
-            std::array<bool, 9>& domainWindowOpen)
+            std::array<bool, 12>& domainWindowOpen)
         {
             const std::size_t slot = DomainWindowSlotIndex(kind, section);
             if (!domainWindowOpen[slot])
@@ -1377,6 +1582,9 @@ namespace Extrinsic::Runtime
                 case DomainWindowSection::Selection:
                     DrawDomainSelectionWindow(model);
                     break;
+                case DomainWindowSection::Processing:
+                    DrawDomainProcessingWindow(model);
+                    break;
                 case DomainWindowSection::Count:
                     break;
                 }
@@ -1386,7 +1594,7 @@ namespace Extrinsic::Runtime
 
         void DrawDomainWindows(
             const SandboxEditorContext* context,
-            std::array<bool, 9>* domainWindowOpen)
+            std::array<bool, 12>* domainWindowOpen)
         {
             if (context == nullptr || domainWindowOpen == nullptr)
                 return;
@@ -1396,10 +1604,11 @@ namespace Extrinsic::Runtime
                 SandboxEditorDomainWindowKind::Graph,
                 SandboxEditorDomainWindowKind::Mesh,
             };
-            constexpr std::array<DomainWindowSection, 3> kSections{
+            constexpr std::array<DomainWindowSection, 4> kSections{
                 DomainWindowSection::Render,
                 DomainWindowSection::Visualization,
                 DomainWindowSection::Selection,
+                DomainWindowSection::Processing,
             };
             for (const SandboxEditorDomainWindowKind kind : kKinds)
             {
@@ -1417,7 +1626,7 @@ namespace Extrinsic::Runtime
             std::array<char, 1024>* scenePathBuffer,
             std::optional<SandboxEditorFileImportResult>* lastImportResult,
             std::optional<SandboxEditorSceneFileResult>* lastSceneFileResult,
-            std::array<bool, 9>* domainWindowOpen)
+            std::array<bool, 12>* domainWindowOpen)
         {
             DrawDomainMenus(domainWindowOpen);
             DrawDomainWindows(context, domainWindowOpen);
@@ -2150,6 +2359,237 @@ namespace Extrinsic::Runtime
         return "Unknown";
     }
 
+    SandboxEditorGeometryProcessingDomain
+    GetSandboxEditorSupportedGeometryProcessingDomains(
+        const SandboxEditorGeometryProcessingAlgorithm algorithm) noexcept
+    {
+        using Domain = SandboxEditorGeometryProcessingDomain;
+        switch (algorithm)
+        {
+        case SandboxEditorGeometryProcessingAlgorithm::KMeans:
+            return Domain::MeshVertices |
+                   Domain::GraphVertices |
+                   Domain::PointCloudPoints;
+        case SandboxEditorGeometryProcessingAlgorithm::Remeshing:
+        case SandboxEditorGeometryProcessingAlgorithm::Simplification:
+        case SandboxEditorGeometryProcessingAlgorithm::Smoothing:
+        case SandboxEditorGeometryProcessingAlgorithm::Subdivision:
+        case SandboxEditorGeometryProcessingAlgorithm::Repair:
+            return kMeshTopologyDomains;
+        case SandboxEditorGeometryProcessingAlgorithm::NormalEstimation:
+            return Domain::PointCloudPoints;
+        case SandboxEditorGeometryProcessingAlgorithm::ShortestPath:
+            return Domain::MeshVertices | Domain::GraphVertices;
+        case SandboxEditorGeometryProcessingAlgorithm::ConvexHull:
+            return Domain::MeshVertices | Domain::PointCloudPoints;
+        case SandboxEditorGeometryProcessingAlgorithm::SurfaceReconstruction:
+            return Domain::PointCloudPoints;
+        case SandboxEditorGeometryProcessingAlgorithm::VectorHeat:
+            return Domain::MeshVertices;
+        case SandboxEditorGeometryProcessingAlgorithm::Parameterization:
+            return Domain::MeshVertices | Domain::MeshFaces;
+        case SandboxEditorGeometryProcessingAlgorithm::BooleanCSG:
+            return Domain::MeshVertices | Domain::MeshFaces;
+        case SandboxEditorGeometryProcessingAlgorithm::Registration:
+        case SandboxEditorGeometryProcessingAlgorithm::BilateralFilter:
+        case SandboxEditorGeometryProcessingAlgorithm::OutlierEstimation:
+        case SandboxEditorGeometryProcessingAlgorithm::KernelDensity:
+            return Domain::PointCloudPoints;
+        }
+        return Domain::None;
+    }
+
+    bool SupportsSandboxEditorGeometryProcessingDomain(
+        const SandboxEditorGeometryProcessingAlgorithm algorithm,
+        const SandboxEditorGeometryProcessingDomain domain) noexcept
+    {
+        return HasAnySandboxEditorGeometryProcessingDomain(
+            GetSandboxEditorSupportedGeometryProcessingDomains(algorithm),
+            domain);
+    }
+
+    SandboxEditorGeometryProcessingCapabilities
+    GetSandboxEditorGeometryProcessingCapabilities(
+        const ECS::Scene::Registry& registry,
+        const ECS::EntityHandle entity)
+    {
+        SandboxEditorGeometryProcessingCapabilities capabilities{};
+        const entt::registry& raw = registry.Raw();
+        if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
+            return capabilities;
+
+        const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
+        capabilities.Domains = DomainsForSourceView(view);
+        capabilities.HasEditableSurfaceMesh =
+            view.ActiveDomain == GS::Domain::Mesh && view.Valid();
+        return capabilities;
+    }
+
+    std::vector<SandboxEditorGeometryProcessingEntry>
+    ResolveSandboxEditorGeometryProcessingEntries(
+        const SandboxEditorGeometryProcessingCapabilities capabilities)
+    {
+        static constexpr std::array<SandboxEditorGeometryProcessingAlgorithm, 17>
+            kAlgorithmOrder{
+                SandboxEditorGeometryProcessingAlgorithm::KMeans,
+                SandboxEditorGeometryProcessingAlgorithm::NormalEstimation,
+                SandboxEditorGeometryProcessingAlgorithm::Registration,
+                SandboxEditorGeometryProcessingAlgorithm::BilateralFilter,
+                SandboxEditorGeometryProcessingAlgorithm::OutlierEstimation,
+                SandboxEditorGeometryProcessingAlgorithm::KernelDensity,
+                SandboxEditorGeometryProcessingAlgorithm::ShortestPath,
+                SandboxEditorGeometryProcessingAlgorithm::VectorHeat,
+                SandboxEditorGeometryProcessingAlgorithm::Parameterization,
+                SandboxEditorGeometryProcessingAlgorithm::ConvexHull,
+                SandboxEditorGeometryProcessingAlgorithm::SurfaceReconstruction,
+                SandboxEditorGeometryProcessingAlgorithm::BooleanCSG,
+                SandboxEditorGeometryProcessingAlgorithm::Remeshing,
+                SandboxEditorGeometryProcessingAlgorithm::Simplification,
+                SandboxEditorGeometryProcessingAlgorithm::Smoothing,
+                SandboxEditorGeometryProcessingAlgorithm::Subdivision,
+                SandboxEditorGeometryProcessingAlgorithm::Repair,
+            };
+
+        std::vector<SandboxEditorGeometryProcessingEntry> entries{};
+        entries.reserve(kAlgorithmOrder.size());
+        for (const SandboxEditorGeometryProcessingAlgorithm algorithm :
+             kAlgorithmOrder)
+        {
+            if (IsSurfaceTopologyAlgorithm(algorithm) &&
+                !capabilities.HasEditableSurfaceMesh)
+            {
+                continue;
+            }
+
+            const SandboxEditorGeometryProcessingDomain domains =
+                capabilities.Domains &
+                GetSandboxEditorSupportedGeometryProcessingDomains(algorithm);
+            if (domains == SandboxEditorGeometryProcessingDomain::None)
+                continue;
+
+            entries.push_back(SandboxEditorGeometryProcessingEntry{
+                .Algorithm = algorithm,
+                .Domains = domains,
+            });
+        }
+        return entries;
+    }
+
+    std::vector<SandboxEditorGeometryProcessingEntry>
+    ResolveSandboxEditorGeometryProcessingEntries(
+        const ECS::Scene::Registry& registry,
+        const ECS::EntityHandle entity)
+    {
+        return ResolveSandboxEditorGeometryProcessingEntries(
+            GetSandboxEditorGeometryProcessingCapabilities(registry, entity));
+    }
+
+    std::vector<SandboxEditorGeometryProcessingDomain>
+    GetAvailableSandboxEditorKMeansDomains(
+        const ECS::Scene::Registry& registry,
+        const ECS::EntityHandle entity)
+    {
+        using Domain = SandboxEditorGeometryProcessingDomain;
+        const Domain domains =
+            GetSandboxEditorGeometryProcessingCapabilities(registry, entity)
+                .Domains &
+            GetSandboxEditorSupportedGeometryProcessingDomains(
+                SandboxEditorGeometryProcessingAlgorithm::KMeans);
+
+        std::vector<Domain> result{};
+        result.reserve(3u);
+        if (HasAnySandboxEditorGeometryProcessingDomain(
+                domains,
+                Domain::MeshVertices))
+        {
+            result.push_back(Domain::MeshVertices);
+        }
+        if (HasAnySandboxEditorGeometryProcessingDomain(
+                domains,
+                Domain::GraphVertices))
+        {
+            result.push_back(Domain::GraphVertices);
+        }
+        if (HasAnySandboxEditorGeometryProcessingDomain(
+                domains,
+                Domain::PointCloudPoints))
+        {
+            result.push_back(Domain::PointCloudPoints);
+        }
+        return result;
+    }
+
+    const char* DebugNameForSandboxEditorGeometryProcessingDomain(
+        const SandboxEditorGeometryProcessingDomain domain) noexcept
+    {
+        using Domain = SandboxEditorGeometryProcessingDomain;
+        switch (domain)
+        {
+        case Domain::None:
+            return "None";
+        case Domain::MeshVertices:
+            return "Mesh Vertices";
+        case Domain::MeshEdges:
+            return "Mesh Edges";
+        case Domain::MeshHalfedges:
+            return "Mesh Halfedges";
+        case Domain::MeshFaces:
+            return "Mesh Faces";
+        case Domain::GraphVertices:
+            return "Graph Nodes";
+        case Domain::GraphEdges:
+            return "Graph Edges";
+        case Domain::GraphHalfedges:
+            return "Graph Halfedges";
+        case Domain::PointCloudPoints:
+            return "Point Cloud Points";
+        }
+        return "Mixed";
+    }
+
+    const char* DebugNameForSandboxEditorGeometryProcessingAlgorithm(
+        const SandboxEditorGeometryProcessingAlgorithm algorithm) noexcept
+    {
+        switch (algorithm)
+        {
+        case SandboxEditorGeometryProcessingAlgorithm::KMeans:
+            return "K-Means";
+        case SandboxEditorGeometryProcessingAlgorithm::Remeshing:
+            return "Remeshing";
+        case SandboxEditorGeometryProcessingAlgorithm::Simplification:
+            return "Simplification";
+        case SandboxEditorGeometryProcessingAlgorithm::Smoothing:
+            return "Smoothing";
+        case SandboxEditorGeometryProcessingAlgorithm::Subdivision:
+            return "Subdivision";
+        case SandboxEditorGeometryProcessingAlgorithm::Repair:
+            return "Repair";
+        case SandboxEditorGeometryProcessingAlgorithm::NormalEstimation:
+            return "Normal Estimation";
+        case SandboxEditorGeometryProcessingAlgorithm::ShortestPath:
+            return "Shortest Path";
+        case SandboxEditorGeometryProcessingAlgorithm::ConvexHull:
+            return "Convex Hull";
+        case SandboxEditorGeometryProcessingAlgorithm::SurfaceReconstruction:
+            return "Surface Reconstruction";
+        case SandboxEditorGeometryProcessingAlgorithm::VectorHeat:
+            return "Vector Heat Method";
+        case SandboxEditorGeometryProcessingAlgorithm::Parameterization:
+            return "Parameterization";
+        case SandboxEditorGeometryProcessingAlgorithm::BooleanCSG:
+            return "Boolean CSG";
+        case SandboxEditorGeometryProcessingAlgorithm::Registration:
+            return "ICP Registration";
+        case SandboxEditorGeometryProcessingAlgorithm::BilateralFilter:
+            return "Bilateral Filter";
+        case SandboxEditorGeometryProcessingAlgorithm::OutlierEstimation:
+            return "Outlier Estimation";
+        case SandboxEditorGeometryProcessingAlgorithm::KernelDensity:
+            return "Kernel Density";
+        }
+        return "Unknown";
+    }
+
     SandboxEditorPanelFrame BuildSandboxEditorPanelFrame(
         const SandboxEditorContext& context)
     {
@@ -2250,6 +2690,11 @@ namespace Extrinsic::Runtime
         model.RenderHints = BuildRenderHintModel(raw, *selected);
         model.SelectedDomain = GS::BuildConstView(raw, *selected).ActiveDomain;
         model.DomainMatches = model.SelectedDomain == model.ExpectedDomain;
+        if (model.DomainMatches)
+        {
+            model.Processing = BuildGeometryProcessingModel(context);
+            AppendDiagnostics(model.Diagnostics, model.Processing.Diagnostics);
+        }
 
         if (!model.DomainMatches)
         {
