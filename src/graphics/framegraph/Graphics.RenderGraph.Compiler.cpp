@@ -853,6 +853,52 @@ namespace Extrinsic::Graphics
         }
     }
 
+    CompiledPassDeclarations::CompiledPassDeclarations() = default;
+
+    CompiledPassDeclarations::CompiledPassDeclarations(const CompiledPassDeclarations& other)
+    {
+        *this = other;
+    }
+
+    CompiledPassDeclarations::CompiledPassDeclarations(CompiledPassDeclarations&& other) noexcept
+    {
+        *this = std::move(other);
+    }
+
+    CompiledPassDeclarations& CompiledPassDeclarations::operator=(const CompiledPassDeclarations& other)
+    {
+        if (this == &other)
+        {
+            return *this;
+        }
+
+        PassIndex = other.PassIndex;
+        ExplicitDependencyPasses = other.ExplicitDependencyPasses;
+        ReadTextures = other.ReadTextures;
+        WriteTextures = other.WriteTextures;
+        ReadBuffers = other.ReadBuffers;
+        WriteBuffers = other.WriteBuffers;
+        return *this;
+    }
+
+    CompiledPassDeclarations& CompiledPassDeclarations::operator=(CompiledPassDeclarations&& other) noexcept
+    {
+        if (this == &other)
+        {
+            return *this;
+        }
+
+        PassIndex = other.PassIndex;
+        ExplicitDependencyPasses = std::move(other.ExplicitDependencyPasses);
+        ReadTextures = std::move(other.ReadTextures);
+        WriteTextures = std::move(other.WriteTextures);
+        ReadBuffers = std::move(other.ReadBuffers);
+        WriteBuffers = std::move(other.WriteBuffers);
+        return *this;
+    }
+
+    CompiledPassDeclarations::~CompiledPassDeclarations() = default;
+
     CompiledRenderGraph::CompiledRenderGraph() = default;
 
     CompiledRenderGraph::CompiledRenderGraph(const CompiledRenderGraph& other)
@@ -1337,7 +1383,8 @@ namespace Extrinsic::Graphics
         std::vector<std::vector<std::uint32_t>> adjacency(passCount);
         std::vector<std::vector<std::uint32_t>> reverseAdjacency(passCount);
         std::vector<std::uint32_t> indegree(passCount, 0u);
-        std::vector<CompiledPassDeclarations> passDeclarations(passCount);
+        std::vector<CompiledPassDeclarations> passDeclarations{};
+        passDeclarations.resize(static_cast<std::size_t>(passCount));
         std::unordered_set<std::uint64_t> dedup{};
         dedup.reserve(static_cast<std::size_t>(passCount) * 4u);
         std::vector<QueueHandoffDependency> queueHandoffs{};

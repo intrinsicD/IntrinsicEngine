@@ -1,3 +1,7 @@
+module;
+
+#include <memory>
+
 export module Extrinsic.Sandbox;
 
 import Extrinsic.Runtime.Engine;
@@ -5,7 +9,7 @@ import Extrinsic.Runtime.SandboxEditorUi;
 
 namespace Extrinsic::Sandbox
 {
-    export class App final : public Runtime::IApplication
+    class App final : public Runtime::IApplication
     {
     public:
         void OnInitialize(Runtime::Engine& engine) override
@@ -36,4 +40,9 @@ namespace Extrinsic::Sandbox
     private:
         Runtime::SandboxEditorUi m_EditorUi{};
     };
+}
+
+export namespace Extrinsic::Sandbox
+{
+    [[nodiscard]] std::unique_ptr<Runtime::IApplication> CreateSandboxApp();
 }

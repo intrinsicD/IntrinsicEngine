@@ -24,7 +24,7 @@ another backlog directory.
   (done, 2026-06-07, `CPUContracted`): replaced the default sandbox/reference
   triangle's `ProceduralGeometryRef` bootstrap with ordinary mesh-domain
   `GeometrySources`, selectable/editor-visible components, and a white
-  appearance contract while keeping `Sandbox::App` runtime-only.
+  appearance contract while keeping the sandbox app implementation runtime-only.
 
 ### Sandbox / triangle path support tasks (runtime-owned)
 

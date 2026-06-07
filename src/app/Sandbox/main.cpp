@@ -8,7 +8,7 @@ int main()
 {
     auto config = Extrinsic::Runtime::CreateReferenceEngineConfig();
 
-    auto app = std::make_unique<Extrinsic::Sandbox::App>();
+    auto app = Extrinsic::Sandbox::CreateSandboxApp();
 
     Extrinsic::Runtime::Engine engine{config, std::move(app)};
     engine.Initialize();

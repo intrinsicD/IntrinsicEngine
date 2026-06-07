@@ -9,6 +9,7 @@ target_sources(ExtrinsicSandbox
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Sandbox.cppm
         PRIVATE
+        Sandbox.cpp
         main.cpp
 )
 

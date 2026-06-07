@@ -107,7 +107,7 @@
       disabled diagnostics for unsupported selection state.
 - [x] `SelectionController` remains the authority for selected/hovered state,
       and UI does not introduce a second selection model.
-- [x] `Sandbox::App` remains a runtime-only consumer.
+- [x] The sandbox app implementation remains a runtime-only consumer.
 
 ## Verification
 ```bash
@@ -150,7 +150,7 @@ python3 tools/docs/check_doc_links.py --root .
 
 ## Forbidden changes
 - Importing graphics/RHI ownership into UI or app code.
-- Mutating ECS/render components directly from `Sandbox::App`.
+- Mutating ECS/render components directly from the sandbox app implementation.
 - Replacing `SelectionController` with UI-local selection state.
 - Hiding missing runtime command surfaces instead of reporting deterministic
   disabled diagnostics.

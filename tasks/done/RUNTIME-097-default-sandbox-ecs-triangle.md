@@ -28,7 +28,7 @@
 - No new graph or point-cloud demo entities in this task.
 
 ## Context
-- Owner/layer: `runtime` reference-scene/bootstrap composition. `Sandbox::App`
+- Owner/layer: `runtime` reference-scene/bootstrap composition. The sandbox app implementation
   must remain a runtime-only consumer that attaches `SandboxEditorUi`; it must
   not import ECS, graphics, RHI, assets, or platform implementation details.
 - The current default reference triangle is authored by
@@ -83,7 +83,7 @@
 - [x] Update `src/runtime/README.md` to describe the default triangle as
       ECS-authored mesh `GeometrySources`, not `ProceduralGeometryRef`.
 - [x] Update `src/app/Sandbox/README.md` with the default sandbox scene behavior
-      and the fact that `Sandbox::App` still only attaches runtime-owned
+      and the fact that the sandbox app implementation still only attaches runtime-owned
       `SandboxEditorUi`.
 - [x] Update `tasks/backlog/runtime/README.md` and
       `tasks/backlog/README.md` status links when the task is promoted or
@@ -98,7 +98,7 @@
       `SandboxEditorUi` hierarchy/inspector models as ordinary mesh geometry.
 - [x] Runtime extraction uses the mesh `GeometrySources` residency path for the
       default triangle and does not use `ProceduralGeometryRef` for that entity.
-- [x] `Sandbox::App` remains policy-light and imports runtime only.
+- [x] The sandbox app implementation remains policy-light and imports runtime only.
 
 ## Verification
 ```bash

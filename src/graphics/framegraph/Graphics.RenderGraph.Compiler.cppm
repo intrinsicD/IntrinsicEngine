@@ -107,6 +107,15 @@ namespace Extrinsic::Graphics
 
     export struct CompiledPassDeclarations
     {
+        // Keep vector-heavy special members out-of-line so Clang module importers
+        // do not synthesize layout-sensitive copies independently.
+        CompiledPassDeclarations();
+        CompiledPassDeclarations(const CompiledPassDeclarations& other);
+        CompiledPassDeclarations(CompiledPassDeclarations&& other) noexcept;
+        CompiledPassDeclarations& operator=(const CompiledPassDeclarations& other);
+        CompiledPassDeclarations& operator=(CompiledPassDeclarations&& other) noexcept;
+        ~CompiledPassDeclarations();
+
         std::uint32_t PassIndex = 0;
         std::vector<std::uint32_t> ExplicitDependencyPasses{};
         std::vector<std::uint32_t> ReadTextures{};

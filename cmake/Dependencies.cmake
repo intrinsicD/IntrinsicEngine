@@ -26,20 +26,15 @@ find_program(CCACHE_PROGRAM ccache)
 if(CCACHE_PROGRAM)
     message(STATUS "Using CCache: ${CCACHE_PROGRAM}")
     # BUG-015: this repository builds C++23 named modules with clang. In ccache's
-    # default preprocessor mode (`depend_mode=false`) the hash of a
-    # module-consuming TU does not see the imported module's BMI, so when a
-    # module interface changes its vtable layout (e.g. `ICommandContext`), ccache
-    # can serve a stale object compiled against the OLD layout. That produces a
-    # silent virtual-call slot mismatch between separately built targets (the
-    # renderer and the Vulkan backend) and crashes at runtime
-    # (`cmd.Draw(...)` dispatching into `PushConstants(...)`). Enabling ccache
-    # depend mode makes ccache hash the compiler-generated dependency list, which
-    # includes module BMIs, so a BMI change correctly invalidates the cached
-    # object. Wrap the launcher with `cmake -E env CCACHE_DEPEND=1` so the setting
-    # travels with every preset build without mutating the developer's global
-    # ccache config.
+    # default direct/preprocessor modes the hash of a module-consuming TU can miss
+    # imported BMI contents, so a module interface layout change can reuse an
+    # object compiled against the old layout. That produces silent ABI drift
+    # between separately built targets (for example, vector-heavy exported
+    # structs or virtual-call slots). Use depend mode and disable direct mode for
+    # preset builds so ccache keys module importers through compiler-generated
+    # dependency data instead of a direct source hash.
     set(_intrinsic_ccache_launcher
-        "${CMAKE_COMMAND}" -E env CCACHE_DEPEND=1 "${CCACHE_PROGRAM}")
+        "${CMAKE_COMMAND}" -E env CCACHE_DEPEND=1 CCACHE_NODIRECT=1 "${CCACHE_PROGRAM}")
     set(CMAKE_CXX_COMPILER_LAUNCHER ${_intrinsic_ccache_launcher})
     set(CMAKE_C_COMPILER_LAUNCHER ${_intrinsic_ccache_launcher})
 endif()

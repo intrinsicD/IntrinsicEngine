@@ -2,14 +2,15 @@
 
 This directory contains the `Sandbox` module/files.
 
-`Sandbox` is the generic reference integration target. `Sandbox::App` should
-remain policy-light: it may observe lifecycle hooks, but engine feature wiring,
-frame phases, and subsystem behavior belong in `Runtime` or lower engine layers.
-The executable obtains its default configuration through `Runtime` and should
-not import lower layers directly.
+`Sandbox` is the generic reference integration target. The executable obtains
+its concrete runtime application through `Sandbox::CreateSandboxApp()` so the
+module-private app implementation remains policy-light: it may observe
+lifecycle hooks, but engine feature wiring, frame phases, and subsystem behavior
+belong in `Runtime` or lower engine layers. The executable obtains its default
+configuration through `Runtime` and should not import lower layers directly.
 
-`Sandbox::App` attaches the promoted runtime-owned `SandboxEditorUi` shell
-through application lifecycle hooks. The app remains a runtime-only consumer:
+The sandbox app attaches the promoted runtime-owned `SandboxEditorUi` shell
+through application lifecycle hooks. It remains a runtime-only consumer:
 the editor shell registers with `Engine::SetImGuiEditorCallback`, reads scene
 and selection state through runtime APIs, emits selection and local-transform
 edit commands through runtime-owned seams, replaces runtime camera-controller
@@ -19,23 +20,23 @@ spatial-debug options through `SpatialDebugBinding`, routes material/scalar/colo
 visualization choices through `VisualizationConfig`, routes visualization
 adapter bindings through runtime extraction-cache state, and submits file/import
 path commands through `Engine::ImportAssetFromPath(...)`. Asset routing,
-decoding, `AssetService` mutation, model-scene materialization, and texture-upload
-requests remain runtime/asset owned; `Sandbox::App` does not special-case asset
-authority.
+decoding, `AssetService` mutation, model-scene materialization, and
+texture-upload requests remain runtime/asset owned; the sandbox app
+implementation does not special-case asset authority.
 
 The promoted EditorUI also exposes stable top-level ImGui menu slots for
 `PointCloud`, `Graph`, and `Mesh`. Their submenu items open selected-entity
 domain windows for render-hint status, visualization/spatial-debug controls, and
 primitive-selection details. These windows are an EditorUI workflow only: they
 reuse `SandboxEditorUi` models and runtime-owned command surfaces, and
-`Sandbox::App` still does not own selection, ECS mutation, rendering, or asset
+the sandbox app still does not own selection, ECS mutation, rendering, or asset
 state.
 
 With the standard reference configuration, runtime creates `ReferenceTriangle`
 through `Extrinsic.Runtime.ReferenceScene::TriangleProvider` as an ordinary
 ECS mesh-domain `GeometrySources` entity with `RenderSurface`, durable
 `StableId`, `Selection::SelectableTag`, and white `VisualizationConfig`.
-`Sandbox::App` does not create, render, select, or special-case the triangle.
+The sandbox app does not create, render, select, or special-case the triangle.
 
 ## Build presets
 
