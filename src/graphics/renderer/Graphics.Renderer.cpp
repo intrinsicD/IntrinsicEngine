@@ -466,14 +466,14 @@ namespace Extrinsic::Graphics
             m_SelectionEdgeIdPass.emplace(*m_Subsystems.SelectionSystemRegistry());
             m_SelectionPointIdPass.emplace(*m_Subsystems.SelectionSystemRegistry());
             // GRAPHICS-074 Slice C — `SelectionOutlinePass` is selection-system-
-            // bound and renders a fullscreen quad into `SelectionOutline`. Same
-            // publisher-before-first-frame invariant as the other selection
-            // passes above: emplaced here so the operational publisher can
-            // `SetPipeline(...)` on the pass instance before any executor
-            // branch reaches `Execute(...)`. `Execute()` early-returns when
-            // the pipeline handle or `SelectionSystem` is not initialised, so
-            // a missing pipeline yields `SkippedUnavailable` on the executor
-            // taxonomy rather than a silently-recorded no-op.
+            // bound and renders a fullscreen overlay into the current present
+            // source. Same publisher-before-first-frame invariant as the
+            // other selection passes above: emplaced here so the operational
+            // publisher can `SetPipeline(...)` on the pass instance before
+            // any executor branch reaches `Execute(...)`. `Execute()` early-
+            // returns when the pipeline handle or `SelectionSystem` is not
+            // initialised, so a missing pipeline yields `SkippedUnavailable`
+            // on the executor taxonomy rather than a silently-recorded no-op.
             m_SelectionOutlinePass.emplace(*m_Subsystems.SelectionSystemRegistry());
             // GRAPHICS-070/071/073 — default-recipe forward surface/line/point/
             // shadow passes own their system-bound instances plus pipeline
@@ -1786,6 +1786,24 @@ namespace Extrinsic::Graphics
                     if (passIndex < compiled->PassDeclarations.size())
                     {
                         bool sampledTextureBound = false;
+                        if (passId == ToFramePassId(FrameRecipePassKind::SelectionOutline))
+                        {
+                            const auto entityId = std::find(compiled->TextureNames.begin(),
+                                                            compiled->TextureNames.end(),
+                                                            std::string_view{"EntityId"});
+                            if (entityId != compiled->TextureNames.end())
+                            {
+                                const std::size_t textureIndex = static_cast<std::size_t>(
+                                    std::distance(compiled->TextureNames.begin(), entityId));
+                                if (textureIndex < compiled->TextureHandles.size())
+                                {
+                                    graphicsContext.BindFrameSampledTextureAt(
+                                        compiled->TextureHandles[textureIndex],
+                                        kFrameSampledDescriptorSlotDefault);
+                                    sampledTextureBound = true;
+                                }
+                            }
+                        }
                         if (passId == ToFramePassId(FrameRecipePassKind::DebugView) &&
                             m_DebugViewSystem.has_value())
                         {
@@ -3037,13 +3055,12 @@ namespace Extrinsic::Graphics
         // no push constants — just emits a fullscreen triangle and a UV
         // varying) with `selection_outline.frag.spv` (samples the `EntityId`
         // R32_UINT target through `usampler2D uPickID` and writes the outline
-        // RGBA into the `SelectionOutline` color target). The recipe's
-        // `"SelectionOutlinePass"` declares
-        // `Read(presentSource, ShaderRead) + Read(EntityId, ShaderRead) +
-        // Read(SceneDepth, DepthRead) + Write(SelectionOutline,
-        // ColorAttachmentWrite)`, so the render pass attaches `SelectionOutline`
-        // (backbuffer format, per `FrameRecipeSizing::BackbufferFormat`) and
-        // `SceneDepth` (D32_FLOAT, read-only). Depth state stays off — the
+        // RGBA overlay contribution). The recipe's `"SelectionOutlinePass"`
+        // declares `Read(EntityId, ShaderRead) + Read(SceneDepth, DepthRead) +
+        // Read(presentSource, ColorAttachmentRead) +
+        // Write(presentSource, ColorAttachmentWrite)`, so the render pass loads
+        // the current present source as the color target and alpha-blends the
+        // shader's overlay into it. Depth state stays off — the
         // shader does not test or write depth — but the pipeline declares the
         // matching `DepthTargetFormat` so it remains render-pass-compatible
         // with the declared depth attachment.
@@ -3088,7 +3105,13 @@ namespace Extrinsic::Graphics
             desc.DepthStencil.DepthTestEnable = false;
             desc.DepthStencil.DepthWriteEnable = false;
             desc.DepthStencil.StencilEnable = false;
-            desc.ColorBlend[0].Enable = false;
+            desc.ColorBlend[0].Enable = true;
+            desc.ColorBlend[0].SrcColorFactor = RHI::BlendFactor::SrcAlpha;
+            desc.ColorBlend[0].DstColorFactor = RHI::BlendFactor::OneMinusSrcAlpha;
+            desc.ColorBlend[0].ColorOp = RHI::BlendOp::Add;
+            desc.ColorBlend[0].SrcAlphaFactor = RHI::BlendFactor::One;
+            desc.ColorBlend[0].DstAlphaFactor = RHI::BlendFactor::OneMinusSrcAlpha;
+            desc.ColorBlend[0].AlphaOp = RHI::BlendOp::Add;
             desc.ColorTargetCount = 1u;
             desc.ColorTargetFormats[0] = colorFormat;
             desc.DepthTargetFormat = RHI::Format::D32_FLOAT;

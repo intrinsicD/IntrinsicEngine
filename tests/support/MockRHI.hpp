@@ -207,6 +207,12 @@ namespace Extrinsic::Tests
             RHI::MemoryAccess AfterAccess = RHI::MemoryAccess::None;
         };
 
+        struct SampledTextureBindingRecord
+        {
+            RHI::TextureHandle Texture{};
+            std::uint32_t DescriptorIndex = 0u;
+        };
+
         struct BufferBarrierRecord
         {
             RHI::BufferHandle Buffer{};
@@ -321,6 +327,14 @@ namespace Extrinsic::Tests
             Events.push_back(EventKind::TextureBarrier);
         }
 
+        void BindFrameSampledTextureAt(RHI::TextureHandle texture, std::uint32_t descriptorIndex) override
+        {
+            SampledTextureBindings.push_back(SampledTextureBindingRecord{
+                .Texture = texture,
+                .DescriptorIndex = descriptorIndex,
+            });
+        }
+
         void BufferBarrier(RHI::BufferHandle buffer, RHI::MemoryAccess before, RHI::MemoryAccess after) override
         {
             BufferBarrierCalls.push_back({buffer, before, after});
@@ -356,6 +370,7 @@ namespace Extrinsic::Tests
                                  RHI::TextureHandle, std::uint32_t, std::uint32_t) override {}
 
         std::vector<TextureBarrierRecord> TextureBarrierCalls{};
+        std::vector<SampledTextureBindingRecord> SampledTextureBindings{};
         std::vector<BufferBarrierRecord>  BufferBarrierCalls{};
         std::vector<DispatchRecord> DispatchRecords{};
         std::vector<EventKind> Events{};
@@ -476,6 +491,8 @@ namespace Extrinsic::Tests
         mutable RHI::FrameHandle LastBackbufferFrame{};
         std::vector<BufferWriteRecord> BufferWrites;
         std::vector<TextureWriteRecord> TextureWrites;
+        std::vector<RHI::TextureDesc> CreatedTextureDescs;
+        std::vector<RHI::TextureHandle> CreatedTextureHandles;
         std::vector<RHI::PipelineDesc> CreatedPipelineDescs;
         std::vector<RHI::PipelineHandle> CreatedPipelineHandles;
         std::vector<RHI::SamplerHandle> CreatedSamplerHandles;
@@ -681,11 +698,14 @@ namespace Extrinsic::Tests
             return 0x1'0000'0000ull + (static_cast<std::uint64_t>(handle.Index) * 0x1000ull);
         }
 
-        RHI::TextureHandle CreateTexture(const RHI::TextureDesc&) override
+        RHI::TextureHandle CreateTexture(const RHI::TextureDesc& desc) override
         {
             ++CreateTextureCount;
             if (FailNextTextureCreate) { FailNextTextureCreate = false; return {}; }
-            return RHI::TextureHandle{m_NextTexture++, 1u};
+            const RHI::TextureHandle handle{m_NextTexture++, 1u};
+            CreatedTextureDescs.push_back(desc);
+            CreatedTextureHandles.push_back(handle);
+            return handle;
         }
         void DestroyTexture(RHI::TextureHandle) override { ++DestroyTextureCount; }
         void WriteTexture(RHI::TextureHandle handle, const void* data, std::uint64_t size,

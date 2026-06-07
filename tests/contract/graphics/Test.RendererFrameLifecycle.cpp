@@ -74,6 +74,23 @@ namespace
             std::ranges::count(context.PushConstantSizes, size));
     }
 
+    [[nodiscard]] Extrinsic::RHI::TextureHandle FindCreatedTextureByDebugName(
+        const Extrinsic::Tests::MockDevice& device,
+        const std::string_view debugName) noexcept
+    {
+        const std::size_t count =
+            std::min(device.CreatedTextureDescs.size(), device.CreatedTextureHandles.size());
+        for (std::size_t i = 0; i < count; ++i)
+        {
+            const char* name = device.CreatedTextureDescs[i].DebugName;
+            if (name != nullptr && std::string_view{name} == debugName)
+            {
+                return device.CreatedTextureHandles[i];
+            }
+        }
+        return {};
+    }
+
     [[nodiscard]] bool DispatchMatches(
         const Extrinsic::Tests::MockCommandContext::DispatchRecord& record,
         const std::uint32_t x,
@@ -2280,12 +2297,18 @@ TEST(RendererFrameLifecycle, SelectionOutlinePipelineSurvivesOperationalRebuild)
     EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::None);
     EXPECT_FALSE(initialDesc.DepthStencil.DepthTestEnable);
     EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
-    EXPECT_FALSE(initialDesc.ColorBlend[0].Enable);
+    EXPECT_TRUE(initialDesc.ColorBlend[0].Enable);
+    EXPECT_EQ(initialDesc.ColorBlend[0].SrcColorFactor, Extrinsic::RHI::BlendFactor::SrcAlpha);
+    EXPECT_EQ(initialDesc.ColorBlend[0].DstColorFactor, Extrinsic::RHI::BlendFactor::OneMinusSrcAlpha);
+    EXPECT_EQ(initialDesc.ColorBlend[0].ColorOp, Extrinsic::RHI::BlendOp::Add);
+    EXPECT_EQ(initialDesc.ColorBlend[0].SrcAlphaFactor, Extrinsic::RHI::BlendFactor::One);
+    EXPECT_EQ(initialDesc.ColorBlend[0].DstAlphaFactor, Extrinsic::RHI::BlendFactor::OneMinusSrcAlpha);
+    EXPECT_EQ(initialDesc.ColorBlend[0].AlphaOp, Extrinsic::RHI::BlendOp::Add);
     EXPECT_EQ(initialDesc.ColorTargetCount, 1u);
-    // Color target matches the recipe's `SelectionOutline` texture, which is
-    // allocated with `FrameRecipeSizing::BackbufferFormat`; the MockDevice
-    // does not override `GetBackbufferFormat()` so the renderer's stored
-    // format is `RHI::Format::RGBA8_UNORM`.
+    // Color target matches the recipe's current present source, whose format
+    // is `FrameRecipeSizing::BackbufferFormat`; the MockDevice does not
+    // override `GetBackbufferFormat()` so the renderer's stored format is
+    // `RHI::Format::RGBA8_UNORM`.
     EXPECT_EQ(initialDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::RGBA8_UNORM);
     // Render-pass-compatible with the recipe-declared depth attachment
     // (`builder.Read(SceneDepth, DepthRead)`) even though the pipeline does
@@ -3282,6 +3305,58 @@ TEST(RendererFrameLifecycle, SelectionOutlinePassRecordsWhenSelectableEntityPres
     EXPECT_TRUE(foundOutlinePush)
         << "SelectionOutlinePass must push a 144-byte SelectionOutlinePushConstants "
         << "block byte-matching BuildSelectionOutlinePushConstants(renderWorld.Selection).";
+
+    renderer->Shutdown();
+}
+
+TEST(RendererFrameLifecycle, SelectionOutlineBindsEntityIdToDefaultSampledSlot)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{293u, 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer = Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 320, .Height = 240},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    const std::uint32_t selectedIds[] = {42u};
+    world.Selection.SelectedStableIds = std::span<const std::uint32_t>(selectedIds);
+
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    const Extrinsic::Graphics::RenderGraphCommandPassStats* outlinePass =
+        FindCommandPass(stats, "SelectionOutlinePass");
+    ASSERT_NE(outlinePass, nullptr);
+    EXPECT_EQ(outlinePass->Status, Extrinsic::Graphics::RenderCommandPassStatus::Recorded);
+
+    const Extrinsic::RHI::TextureHandle entityId =
+        FindCreatedTextureByDebugName(device, "EntityId");
+    ASSERT_TRUE(entityId.IsValid())
+        << "Selection outline must have a concrete EntityId texture to sample.";
+
+    Extrinsic::RHI::TextureHandle lastDefaultSlotBinding{};
+    for (const auto& binding : device.CommandContext.SampledTextureBindings)
+    {
+        if (binding.DescriptorIndex == 0u)
+        {
+            lastDefaultSlotBinding = binding.Texture;
+        }
+    }
+
+    EXPECT_EQ(lastDefaultSlotBinding, entityId)
+        << "SelectionOutlinePass shader samples uTextures[0] as EntityId; "
+        << "the generic sorted-read fallback previously rebound slot 0 to "
+        << "SceneDepth and made the fullscreen overlay black out the frame.";
 
     renderer->Shutdown();
 }

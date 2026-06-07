@@ -38,6 +38,7 @@ import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.SelectionSystem;
 import Extrinsic.Platform.Input;
+import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
@@ -68,6 +69,23 @@ namespace
         void OnInitialize(Runtime::Engine&) override {}
         void OnSimTick(Runtime::Engine&, double) override {}
         void OnVariableTick(Runtime::Engine&, double, double) override {}
+        void OnShutdown(Runtime::Engine&) override {}
+    };
+
+    class InjectClickAndExitApplication final : public Runtime::IApplication
+    {
+    public:
+        void OnInitialize(Runtime::Engine&) override {}
+        void OnSimTick(Runtime::Engine&, double) override {}
+        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        {
+            const Extrinsic::Platform::IWindow& window = engine.GetWindow();
+            auto& input = const_cast<Extrinsic::Platform::Input::Context&>(
+                window.GetInput());
+            input.SetMousePosition(32.0f, 48.0f);
+            input.SetMouseButtonState(0, true);
+            engine.RequestExit();
+        }
         void OnShutdown(Runtime::Engine&) override {}
     };
 
@@ -379,5 +397,21 @@ TEST(RuntimeSandboxAcceptance, SelectionOutlineSnapshotPopulatedForSelectedEntit
     EXPECT_FALSE(world.Selection.HasHovered);
 
     extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
+TEST(RuntimeSandboxAcceptance, ViewportLeftClickSubmitsSelectionPick)
+{
+    Runtime::Engine engine(HeadlessConfig(), std::make_unique<InjectClickAndExitApplication>());
+    engine.Initialize();
+
+    engine.Run();
+
+    const Runtime::SelectionControllerDiagnostics diagnostics =
+        engine.GetSelectionController().GetDiagnostics();
+    EXPECT_EQ(diagnostics.ClickRequestsSubmitted, 1u);
+    EXPECT_EQ(diagnostics.PicksDrained, 1u);
+    EXPECT_EQ(engine.GetSelectionController().InFlightPickCount(), 1u);
+
     engine.Shutdown();
 }

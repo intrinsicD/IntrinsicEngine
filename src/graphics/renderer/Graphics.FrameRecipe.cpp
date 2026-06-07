@@ -117,6 +117,15 @@ namespace Extrinsic::Graphics
             };
         }
 
+        [[nodiscard]] RHI::TextureDesc SelectionReadbackTargetDesc(const std::uint32_t width,
+                                                                   const std::uint32_t height,
+                                                                   const char* name)
+        {
+            RHI::TextureDesc desc = ColorTargetDesc(width, height, RHI::Format::R32_UINT, name);
+            desc.Usage = desc.Usage | RHI::TextureUsage::TransferSrc;
+            return desc;
+        }
+
         [[nodiscard]] RHI::TextureDesc DepthTargetDesc(const std::uint32_t width,
                                                        const std::uint32_t height,
                                                        const RHI::Format format,
@@ -403,15 +412,14 @@ namespace Extrinsic::Graphics
                                                                       const FrameRecipeTemporalOptions temporalOptions)
     {
         const bool usesDeferred = UsesDeferredResources(features);
-        // GRAPHICS-074 recipe-side follow-up — picking-active is the
-        // recipe-wide condition that gates `PickingPass`, its `PrimitiveId`
-        // and `Picking.Readback` outputs, and the `EntityId` half of its
-        // output (jointly with `EnableSelectionOutline`, which is the only
-        // other consumer of `EntityId`). Centralising the conjunction keeps
-        // the pass declaration and the resource declarations from drifting
-        // and avoids allocating the full-resolution R32_UINT `PrimitiveId`
-        // target / the `Picking.Readback` buffer when picking is dropped.
+        // The selection-ID pass feeds two independent consumers: host picking
+        // readback and screen-space selection outline. Keep the ID target
+        // producer active for either consumer, while keeping the host readback
+        // buffer/copies gated on actual picking.
         const bool pickingActive = features.EnablePicking && features.EnableDepthPrepass;
+        const bool selectionIdActive = features.EnableDepthPrepass &&
+            (pickingActive || features.EnableSelectionOutline);
+        const bool selectionOutlineActive = features.EnableSelectionOutline && selectionIdActive;
         const bool hzbBuildActive = features.EnableHZBBuild && features.EnableDepthPrepass;
         const bool clusterGridBuildActive = features.EnableClusterGridBuild && features.EnableDepthPrepass;
         const bool clusterLightAssignmentActive =
@@ -441,18 +449,19 @@ namespace Extrinsic::Graphics
                 clusterLightAssignmentActive, false,
                 {"ClusterGrid.AABBs", "GpuWorld.Lights"},
                 {"ClusterLights.Headers", "ClusterLights.Indices", "ClusterLights.Counter"});
-        // GRAPHICS-074 recipe-side follow-up — picking now runs *after*
-        // `DepthPrepass` and reads `SceneDepth` so the picking pipeline can
-        // depth-equal-test against the nearest-surface depth instead of
-        // last-fragment-winning into the `EntityId`/`PrimitiveId` targets.
-        // The pass is therefore gated on `pickingActive` (`EnablePicking &&
-        // EnableDepthPrepass`); with `EnableDepthPrepass=false` the recipe
-        // would not produce a valid `SceneDepth` and the depth-equal pipeline
-        // would be render-pass-incompatible.
-        AddPass(out, FrameRecipePassKind::Picking, "PickingPass",
-                pickingActive, false,
-                {"SceneDepth", "Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count", "Cull.Lines.IndexedArgs", "Cull.Lines.Count", "Cull.Points.NonIndexedArgs", "Cull.Points.Count"},
-                {"EntityId", "PrimitiveId", "Picking.Readback"});
+        // GRAPHICS-074/BUG-018 — the same selection-ID render pass is used
+        // for click readback and for hierarchy/hover outline. Readback remains
+        // picking-only; EntityId/PrimitiveId must still be produced when only
+        // SelectionOutlinePass consumes EntityId.
+        std::vector<std::string_view> pickingWrites{"EntityId", "PrimitiveId"};
+        if (pickingActive)
+        {
+            pickingWrites.push_back("Picking.Readback");
+        }
+        AddPassWithVectors(out, FrameRecipePassKind::Picking, "PickingPass",
+                           selectionIdActive, false,
+                           {"SceneDepth", "Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count", "Cull.Lines.IndexedArgs", "Cull.Lines.Count", "Cull.Points.NonIndexedArgs", "Cull.Points.Count"},
+                           std::move(pickingWrites));
         AddPass(out, FrameRecipePassKind::Shadow, "ShadowPass", features.EnableShadows, false,
                 {"Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count"}, {"ShadowAtlas"});
         if (usesDeferred)
@@ -589,8 +598,8 @@ namespace Extrinsic::Graphics
                            false,
                            aaResolveReads,
                            {"PostProcess.AATemp.Resolved"});
-        AddPass(out, FrameRecipePassKind::SelectionOutline, "SelectionOutlinePass", features.EnableSelectionOutline, false,
-                {"FrameRecipe.PresentSource", "EntityId", "SceneDepth"}, {"SelectionOutline"});
+        AddPass(out, FrameRecipePassKind::SelectionOutline, "SelectionOutlinePass", selectionOutlineActive, false,
+                {"EntityId", "SceneDepth", "FrameRecipe.PresentSource"}, {"FrameRecipe.PresentSource"});
         AddPass(out, FrameRecipePassKind::DebugView, "DebugViewPass", features.EnableDebugView, false,
                 {"FrameRecipe.PresentSource"}, {"DebugViewRGBA"});
         AddPass(out, FrameRecipePassKind::ImGui, "ImGuiPass", features.EnableImGui, false,
@@ -608,15 +617,12 @@ namespace Extrinsic::Graphics
                     clusterLightAssignmentActive, true, false, true, true);
         AddResource(out, FrameRecipeResourceKind::ClusterLightCounter, "ClusterLights.Counter",
                     clusterLightAssignmentActive, true, false, true, true);
-        // GRAPHICS-074 recipe-side follow-up — `EntityId` is consumed by
-        // PickingPass (active iff `pickingActive`) and SelectionOutlinePass
-        // (active iff `EnableSelectionOutline`); `PrimitiveId` and
-        // `Picking.Readback` are consumed only by PickingPass. Gating these
-        // on the same conjunction the pass uses avoids allocating dead
-        // full-resolution R32_UINT targets / the host-visible readback
-        // buffer when picking is dropped because the depth prepass is off.
-        AddResource(out, FrameRecipeResourceKind::EntityId, "EntityId", pickingActive || features.EnableSelectionOutline, false, false, true);
-        AddResource(out, FrameRecipeResourceKind::PrimitiveId, "PrimitiveId", pickingActive, false, false, true);
+        // BUG-018 — EntityId is read by SelectionOutlinePass even when no
+        // click pick is pending. PrimitiveId is a sibling color attachment in
+        // the selection-ID pipelines, so it follows the ID-pass gate; only
+        // Picking.Readback is picking-only.
+        AddResource(out, FrameRecipeResourceKind::EntityId, "EntityId", selectionIdActive, false, false, true);
+        AddResource(out, FrameRecipeResourceKind::PrimitiveId, "PrimitiveId", selectionIdActive, false, false, true);
         AddResource(out, FrameRecipeResourceKind::SceneNormal, "SceneNormal", usesDeferred, false, false, true);
         AddResource(out, FrameRecipeResourceKind::Albedo, "Albedo", usesDeferred, false, false, true);
         AddResource(out, FrameRecipeResourceKind::Material0, "Material0", usesDeferred, false, false, true);
@@ -644,7 +650,7 @@ namespace Extrinsic::Graphics
                     features.EnablePostProcess && smaaActive, false, false, true);
         AddResource(out, FrameRecipeResourceKind::PostProcessAATempResolved, "PostProcess.AATemp.Resolved",
                     features.EnablePostProcess && spatialAAActive, false, false, true);
-        AddResource(out, FrameRecipeResourceKind::SelectionOutline, "SelectionOutline", features.EnableSelectionOutline, false, false, true);
+        AddResource(out, FrameRecipeResourceKind::SelectionOutline, "SelectionOutline", false, false, false, true);
         AddResource(out, FrameRecipeResourceKind::DebugViewRGBA, "DebugViewRGBA", features.EnableDebugView, false, false, true);
         AddResource(out, FrameRecipeResourceKind::SceneTable, "GpuWorld.SceneTable", true, true);
         AddResource(out, FrameRecipeResourceKind::InstanceStatic, "GpuWorld.InstanceStatic", true, true);
@@ -905,12 +911,13 @@ namespace Extrinsic::Graphics
         }
 
         const bool usesDeferred = UsesDeferredResources(features);
-        // GRAPHICS-074 recipe-side follow-up — same `pickingActive`
-        // conjunction `DescribeDefaultFrameRecipe` uses; keep the
-        // declaration and the build wired identically so the `EntityId` /
-        // `PrimitiveId` / `Picking.Readback` resources are not allocated
-        // when `PickingPass` is dropped.
+        // BUG-018 — split host picking readback from the selection-ID pass.
+        // Hierarchy/hover outline still needs EntityId produced when no click
+        // pick is pending; only the readback import/copies are picking-only.
         const bool pickingActive = features.EnablePicking && features.EnableDepthPrepass;
+        const bool selectionIdActive = features.EnableDepthPrepass &&
+            (pickingActive || features.EnableSelectionOutline);
+        const bool selectionOutlineActive = features.EnableSelectionOutline && selectionIdActive;
         const bool hzbBuildActive = features.EnableHZBBuild && features.EnableDepthPrepass && imports.HZBCurrent.IsValid();
         const bool clusterGridBuildActive = features.EnableClusterGridBuild && features.EnableDepthPrepass &&
                                             imports.ClusterGridAABBs.IsValid();
@@ -1014,7 +1021,6 @@ namespace Extrinsic::Graphics
         TextureRef reconstructionHistoryPrevious{};
         TextureRef reconstructionHistoryCurrent{};
         TextureRef reconstructionResolvedHDR{};
-        TextureRef selectionOutline{};
         TextureRef debugView{};
         BufferRef postProcessHistogram{};
         BufferRef pickingReadback{};
@@ -1064,17 +1070,23 @@ namespace Extrinsic::Graphics
                                                FrameRecipeResourceKind::ClusterLightCounter);
         }
 
-        if (pickingActive || features.EnableSelectionOutline)
+        if (selectionIdActive)
         {
+            const RHI::TextureDesc entityIdDesc = pickingActive
+                ? SelectionReadbackTargetDesc(width, height, "EntityId")
+                : ColorTargetDesc(width, height, RHI::Format::R32_UINT, "EntityId");
             entityId = createTexture("EntityId",
-                                     ColorTargetDesc(width, height, RHI::Format::R32_UINT, "EntityId"),
+                                     entityIdDesc,
                                      FrameRecipeResourceKind::EntityId);
+            const RHI::TextureDesc primitiveIdDesc = pickingActive
+                ? SelectionReadbackTargetDesc(width, height, "PrimitiveId")
+                : ColorTargetDesc(width, height, RHI::Format::R32_UINT, "PrimitiveId");
+            primitiveId = createTexture("PrimitiveId",
+                                        primitiveIdDesc,
+                                        FrameRecipeResourceKind::PrimitiveId);
         }
         if (pickingActive)
         {
-            primitiveId = createTexture("PrimitiveId",
-                                        ColorTargetDesc(width, height, RHI::Format::R32_UINT, "PrimitiveId"),
-                                        FrameRecipeResourceKind::PrimitiveId);
             // GRAPHICS-074 Slice D.2 — import the renderer-owned host-visible
             // `Picking.Readback` buffer rather than allocating a transient
             // one (Slice D.1 owns the lease; this slice wires it into the
@@ -1260,12 +1272,6 @@ namespace Extrinsic::Graphics
                                                  FrameRecipeResourceKind::HistogramReadback);
             }
         }
-        if (features.EnableSelectionOutline)
-        {
-            selectionOutline = createTexture("SelectionOutline",
-                                             ColorTargetDesc(width, height, sizing.BackbufferFormat, "SelectionOutline"),
-                                             FrameRecipeResourceKind::SelectionOutline);
-        }
         if (features.EnableDebugView)
         {
             debugView = createTexture("DebugViewRGBA",
@@ -1351,18 +1357,10 @@ namespace Extrinsic::Graphics
             });
         }
 
-        // GRAPHICS-074 recipe-side follow-up — picking is ordered after
-        // `DepthPrepass` and reads `SceneDepth` as `DepthRead` so the
-        // selection-ID pipelines can depth-equal-test against the
-        // nearest-surface depth populated by the prepass. The pass and its
-        // `PrimitiveId` / `Picking.Readback` resources are gated on
-        // `pickingActive` (`EnablePicking && EnableDepthPrepass`): without
-        // `DepthPrepass` the picking render pass would lack a depth
-        // attachment and the depth-equal pipeline would be render-pass-
-        // incompatible. The matching introspection gate in
-        // `DescribeDefaultFrameRecipe` keeps the declared and built pass
-        // sets aligned.
-        if (pickingActive)
+        // BUG-018 — this pass writes the per-pixel selection IDs needed by
+        // both click picking and selection outline. The readback buffer write
+        // is included only when a pick request is actually pending.
+        if (selectionIdActive)
         {
             addRecipePass(FrameRecipePassKind::Picking, "PickingPass", [=](RenderGraphBuilder& builder) {
                 builder.Read(depth, TextureUsage::DepthRead);
@@ -1374,7 +1372,10 @@ namespace Extrinsic::Graphics
                 builder.Read(pointDrawCount, BufferUsage::IndirectRead);
                 builder.Write(entityId, TextureUsage::ColorAttachmentWrite);
                 builder.Write(primitiveId, TextureUsage::ColorAttachmentWrite);
-                builder.Write(pickingReadback, BufferUsage::TransferDst);
+                if (pickingActive)
+                {
+                    builder.Write(pickingReadback, BufferUsage::TransferDst);
+                }
                 builder.SetRenderPass(RHI::RenderPassDesc{
                     .ColorTargets = kDefaultClearTwoColorAttachments,
                     .Depth = RHI::DepthAttachment{
@@ -1727,16 +1728,15 @@ namespace Extrinsic::Graphics
                 (features.EnableAntiAliasing && spatialAAActive) ? postProcessAATempResolved : ldr;
         }
 
-        if (features.EnableSelectionOutline)
+        if (selectionOutlineActive)
         {
-            const TextureRef input = presentSource;
             addRecipePass(FrameRecipePassKind::SelectionOutline, "SelectionOutlinePass", [=](RenderGraphBuilder& builder) {
-                builder.Read(input, TextureUsage::ShaderRead);
                 builder.Read(entityId, TextureUsage::ShaderRead);
                 builder.Read(depth, TextureUsage::DepthRead);
-                builder.Write(selectionOutline, TextureUsage::ColorAttachmentWrite);
+                builder.Read(presentSource, TextureUsage::ColorAttachmentRead);
+                builder.Write(presentSource, TextureUsage::ColorAttachmentWrite);
                 builder.SetRenderPass(RHI::RenderPassDesc{
-                    .ColorTargets = kDefaultClearColorAttachments,
+                    .ColorTargets = kDefaultLoadColorAttachments,
                     .Depth = RHI::DepthAttachment{
                         .Target = RenderPassAttachmentToken(),
                         .Load = RHI::LoadOp::Load,
@@ -1744,7 +1744,6 @@ namespace Extrinsic::Graphics
                     },
                 });
             });
-            presentSource = selectionOutline;
         }
 
         if (features.EnableDebugView)

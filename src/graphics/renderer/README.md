@@ -602,19 +602,17 @@ Concretely:
   declares `"PickingPass"` after `"DepthPrepass"` in the default recipe and
   relies on `builder.Read(SceneDepth, DepthRead)` to express the real graph
   dependency on the prepass-produced `SceneDepth`. The matching
-  introspection gate in `DescribeDefaultFrameRecipe` enables picking on
-  `features.EnablePicking && features.EnableDepthPrepass` and lists
-  `SceneDepth` in the pass's reads; the recipe declares the pass only
+  introspection gate in `DescribeDefaultFrameRecipe` separates
+  `pickingActive` from `selectionIdActive`: picking readback is enabled only
   when a pick request is pending (`world.HasPendingPick ||
-  world.PickRequest.Pending`) *and* a depth prepass is configured. Both
-  `DescribeDefaultFrameRecipe` and `BuildDefaultFrameRecipe` derive the
-  same `pickingActive = EnablePicking && EnableDepthPrepass` conjunction
-  and gate the picking-only `PrimitiveId` color target and
-  `Picking.Readback` host-visible buffer on it (and the `EntityId` color
-  target on `pickingActive || EnableSelectionOutline`, since
-  SelectionOutlinePass is the only other `EntityId` consumer), so the
-  recipe never allocates dead full-resolution R32_UINT targets / the
-  readback buffer when picking is dropped. `BuildSelectionEntityIdPipelineDesc()`
+  world.PickRequest.Pending`) *and* a depth prepass is configured, while the
+  selection-ID render pass also stays enabled for hierarchy/hover outline
+  frames that need a written `EntityId` texture. `EntityId` and `PrimitiveId`
+  follow `selectionIdActive` because the selection-ID pipelines write both
+  R32_UINT color attachments; `Picking.Readback` and `TransferSrc` texture
+  usage remain picking-only. This avoids both dead readback resources when no
+  pick is pending and missing-producer graphs when `SelectionOutlinePass`
+  samples `EntityId`. `BuildSelectionEntityIdPipelineDesc()`
   now mirrors the depth-equal / depth-write-off / `D32_FLOAT` shape the
   forward and deferred GBuffer pipelines use against the same depth
   buffer, so the recipe-emitted render pass with a read-only `D32_FLOAT`
@@ -684,13 +682,21 @@ Concretely:
   byte-identical through `RebuildOperationalResources()` using the same
   reset-then-publish pattern as the four selection-ID pipelines. The
   pipeline pairs the fullscreen `shaders/post_fullscreen.vert.spv` with
-  `shaders/selection_outline.frag.spv` and writes a single color target
-  whose format matches the recipe's `SelectionOutline` texture
+  `shaders/selection_outline.frag.spv` and writes a single alpha-blended
+  color target whose format matches the current present source
   (`FrameRecipeSizing::BackbufferFormat`); depth state stays off (the
   shader does not test or write depth) but the descriptor declares the
   matching `D32_FLOAT` depth target so the pipeline remains
   render-pass-compatible with the recipe's `Read(SceneDepth, DepthRead)`
-  declaration on `"SelectionOutlinePass"`. `PushConstantSize = 144`
+  declaration on `"SelectionOutlinePass"`. The recipe loads the current
+  present source and keeps it as the present source after the pass, so the
+  shader's transparent pixels preserve the scene instead of becoming a
+  black standalone overlay. The executor explicitly binds the compiled
+  `EntityId` texture into frame-sampled descriptor slot 0 before this pass;
+  it must not use the generic sorted-read fallback, because the pass also
+  reads `SceneDepth` and the loaded present source for graph ordering /
+  attachment preservation while `selection_outline.frag` samples only
+  `uTextures[0]` as an unsigned entity-ID texture. `PushConstantSize = 144`
   matches `SelectionOutlinePushConstants` exported from
   `Passes/Pass.Selection.Outline.cppm`, which mirrors the
   `selection_outline.frag` `layout(push_constant) uniform Push { ... }`

@@ -491,11 +491,10 @@ namespace Extrinsic::Graphics
         // GRAPHICS-074 (Slice C) — accessor for the default-recipe selection
         // outline pipeline (vertex `post_fullscreen.vert.spv` + fragment
         // `selection_outline.frag.spv`, single color target matching the
-        // backbuffer format the recipe uses for the `SelectionOutline`
-        // texture, depth-test/write off). The pipeline is a fullscreen
-        // triangle (no vertex inputs) that the recipe's
-        // `"SelectionOutlinePass"` branch binds and draws into the
-        // `SelectionOutline` color target. Handle is invalid until an
+        // current present source format, alpha blending on, depth-test/write
+        // off). The pipeline is a fullscreen triangle (no vertex inputs) that
+        // the recipe's `"SelectionOutlinePass"` branch binds and draws into
+        // the current present-source color target. Handle is invalid until an
         // operational device path publishes the lease; the descriptor
         // remains deterministic so contract tests can assert byte-identical
         // rebuild behavior. Slice D adds the `Picking.Readback` buffer +

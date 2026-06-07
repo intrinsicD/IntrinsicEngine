@@ -32,8 +32,8 @@ how the *current* backlog maps onto that contract.
 
 ### Theme A — Shortest path to sandbox visible geometry (P0)
 
-Render real geometry from `Sandbox::App` through the promoted runtime/graphics
-path. Origin: [sandbox geometry rendering gap analysis (2026-05-08)](../../docs/reviews/2026-05-08-sandbox-geometry-rendering-gap-analysis.md).
+Render real geometry from the sandbox app implementation through the promoted
+runtime/graphics path. Origin: [sandbox geometry rendering gap analysis (2026-05-08)](../../docs/reviews/2026-05-08-sandbox-geometry-rendering-gap-analysis.md).
 Implementation-children gap follow-up: `GRAPHICS-029A..033F`,
 `GRAPHICS-032D`, `GRAPHICS-080`, `runtime/RUNTIME-070`, and `BUILD-001`
 are retired in `tasks/done/`.
@@ -43,7 +43,7 @@ The visible-triangle scaffold is retired; the default-recipe renderer,
 runtime `GeometrySources` residency for mesh/graph/point-cloud content,
 selection/refinement handoff, ImGui/editor UI panels, and final
 `ExtrinsicSandbox` acceptance task are all retired to `tasks/done/`.
-`Sandbox::App` remains policy-light and imports runtime only. The completed
+The sandbox app implementation remains policy-light and imports runtime only. The completed
 gate inventory for this path is in
 [2026-05-30 working sandbox app — remaining gates](../../docs/reviews/2026-05-30-sandbox-app-remaining-gates.md).
 
@@ -97,6 +97,7 @@ Runtime/UI implementation leaves for the full sandbox app path:
 Post-acceptance sandbox follow-ups:
 - [`runtime/RUNTIME-097` (done)](../done/RUNTIME-097-default-sandbox-ecs-triangle.md) — default white triangle is now an ordinary ECS mesh-domain `GeometrySources` entity with selectable/editor-visible components instead of the procedural bootstrap path.
 - [`ui/UI-002` (done)](../done/UI-002-editor-domain-menu-windows.md) — promoted EditorUI now has `PointCloud`, `Graph`, and `Mesh` menu slots whose submenu-opened windows inspect and control selected-entity components through runtime-owned seams.
+- [`BUG-017` (done)](../done/BUG-017-sandbox-selection-click-and-outline-black-frame.md) — default sandbox viewport clicks now submit selection picks, and hierarchy selection composites the outline over the existing present source instead of presenting an outline-only black frame.
 
 ### Theme B — Rendering modernization (P1, Theme A unblocked)
 

@@ -75,6 +75,7 @@ namespace Extrinsic::Runtime
     {
         constexpr double kIdleSleepSeconds = 0.016; // ~60 Hz event wake
         constexpr int kGizmoMouseButton = 0;
+        constexpr int kSelectionMouseButton = 0;
 
         // RUNTIME-070: runtime-baked fallback texture bytes for GpuAssetCache.
         // A 4×4 RGBA8_UNORM magenta-and-black checkerboard repeated from a 2×2
@@ -185,6 +186,39 @@ namespace Extrinsic::Runtime
                 return 0u;
             const float clamped = std::clamp(value, 0.0f, static_cast<float>(extent - 1u));
             return static_cast<std::uint32_t>(clamped);
+        }
+
+        [[nodiscard]] bool CursorInsideViewport(const Platform::Input::Context::XY cursor,
+                                                const Core::Extent2D viewport) noexcept
+        {
+            return viewport.Width > 0 &&
+                   viewport.Height > 0 &&
+                   std::isfinite(cursor.x) &&
+                   std::isfinite(cursor.y) &&
+                   cursor.x >= 0.0f &&
+                   cursor.y >= 0.0f &&
+                   cursor.x < static_cast<float>(viewport.Width) &&
+                   cursor.y < static_cast<float>(viewport.Height);
+        }
+
+        void SubmitViewportSelectionClickForFrame(SelectionController& selection,
+                                                  const Platform::Input::Context& input,
+                                                  const Core::Extent2D viewport,
+                                                  const bool imguiCapturesMouse,
+                                                  const bool gizmoCapturesMouse) noexcept
+        {
+            if (imguiCapturesMouse || gizmoCapturesMouse || Core::IsEmpty(viewport) ||
+                !input.IsMouseButtonJustPressed(kSelectionMouseButton))
+            {
+                return;
+            }
+
+            const Platform::Input::Context::XY cursor = input.GetMousePosition();
+            if (!CursorInsideViewport(cursor, viewport))
+                return;
+
+            selection.RequestClickPick(ClampCursorPixel(cursor.x, viewport.Width),
+                                       ClampCursorPixel(cursor.y, viewport.Height));
         }
 
         [[nodiscard]] std::uint32_t BuildGizmoModifierMask(
@@ -964,6 +998,11 @@ namespace Extrinsic::Runtime
                                       renderInput.Camera,
                                       viewport,
                                       m_GizmoSelectedEntities);
+        SubmitViewportSelectionClickForFrame(m_SelectionController,
+                                             inputWindow.GetInput(),
+                                             viewport,
+                                             m_ImGuiAdapter != nullptr && m_ImGuiAdapter->WantsMouseCapture(),
+                                             m_GizmoInteraction.IsDragging());
         const std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos =
             m_GizmoPacketBuilder.Build(*m_Scene,
                                        m_GizmoSelectedEntities,

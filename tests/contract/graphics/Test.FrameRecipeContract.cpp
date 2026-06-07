@@ -786,7 +786,7 @@ TEST(FrameRecipeContract, OptionalResourcesAreGatedByFeatures)
     EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::EntityId));
     EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::PrimitiveId));
     EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::ShadowAtlas));
-    EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::SelectionOutline));
+    EXPECT_FALSE(HasEnabledResource(full, FrameRecipeResourceKind::SelectionOutline));
     EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::DebugViewRGBA));
     EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::HZBCurrent));
     EXPECT_TRUE(HasEnabledResource(full, FrameRecipeResourceKind::ClusterGridAABBs));
@@ -1588,6 +1588,7 @@ TEST(FrameRecipeContract, IntrospectionReportsPassResourceReadsAndWrites)
     EXPECT_TRUE(picking->Enabled);
     EXPECT_TRUE(Contains(picking->Writes, "EntityId"));
     EXPECT_TRUE(Contains(picking->Writes, "PrimitiveId"));
+    EXPECT_TRUE(Contains(picking->Writes, "Picking.Readback"));
     // GRAPHICS-074 recipe-side follow-up — picking samples the
     // depth-prepass-populated SceneDepth so the depth-equal pipeline picks
     // the nearest-surface fragment per pixel instead of last-fragment-winning.
@@ -1595,6 +1596,15 @@ TEST(FrameRecipeContract, IntrospectionReportsPassResourceReadsAndWrites)
     EXPECT_TRUE(Contains(picking->Reads, "Cull.SurfaceOpaque.IndexedArgs"));
     EXPECT_TRUE(Contains(picking->Reads, "Cull.Lines.IndexedArgs"));
     EXPECT_TRUE(Contains(picking->Reads, "Cull.Points.NonIndexedArgs"));
+
+    const auto* outline = FindPass(description, FrameRecipePassKind::SelectionOutline);
+    ASSERT_NE(outline, nullptr);
+    EXPECT_TRUE(outline->Enabled);
+    EXPECT_TRUE(Contains(outline->Reads, "EntityId"));
+    EXPECT_TRUE(Contains(outline->Reads, "SceneDepth"));
+    EXPECT_TRUE(Contains(outline->Reads, "FrameRecipe.PresentSource"));
+    EXPECT_TRUE(Contains(outline->Writes, "FrameRecipe.PresentSource"));
+    EXPECT_FALSE(Contains(outline->Writes, "SelectionOutline"));
 
     const auto* present = FindPass(description, FrameRecipePassKind::Present);
     ASSERT_NE(present, nullptr);
@@ -1662,12 +1672,10 @@ TEST(FrameRecipeContract, PickingRequiresDepthPrepass)
     EXPECT_EQ(std::ranges::find(compiled->TextureNames, "EntityId"), compiled->TextureNames.end());
 }
 
-// GRAPHICS-074 recipe-side follow-up — `EntityId` is shared between
-// PickingPass and SelectionOutlinePass. When picking is gated off but
-// SelectionOutline is enabled, the recipe must still allocate `EntityId`
-// (the outline pass reads it) but must continue to drop the picking-only
-// `PrimitiveId` and `Picking.Readback` resources.
-TEST(FrameRecipeContract, EntityIdSurvivesForSelectionOutlineWithoutPicking)
+// BUG-018 — without a depth prepass, the depth-equal selection-ID pipelines
+// cannot produce valid IDs for either readback or outline. Keep that case
+// fail-closed: no PickingPass, no SelectionOutlinePass, and no ID targets.
+TEST(FrameRecipeContract, SelectionOutlineRequiresSelectionIdDepthPrepass)
 {
     FrameRecipeFeatures features{};
     features.EnablePicking = true;
@@ -1675,7 +1683,13 @@ TEST(FrameRecipeContract, EntityIdSurvivesForSelectionOutlineWithoutPicking)
     features.EnableSelectionOutline = true;
 
     const FrameRecipeIntrospection description = DescribeDefaultFrameRecipe(features);
-    EXPECT_TRUE(HasEnabledResource(description, FrameRecipeResourceKind::EntityId));
+    const auto* picking = FindPass(description, FrameRecipePassKind::Picking);
+    ASSERT_NE(picking, nullptr);
+    EXPECT_FALSE(picking->Enabled);
+    const auto* outline = FindPass(description, FrameRecipePassKind::SelectionOutline);
+    ASSERT_NE(outline, nullptr);
+    EXPECT_FALSE(outline->Enabled);
+    EXPECT_FALSE(HasEnabledResource(description, FrameRecipeResourceKind::EntityId));
     EXPECT_FALSE(HasEnabledResource(description, FrameRecipeResourceKind::PrimitiveId));
     EXPECT_FALSE(HasEnabledResource(description, FrameRecipeResourceKind::PickingReadback));
 
@@ -1693,9 +1707,75 @@ TEST(FrameRecipeContract, EntityIdSurvivesForSelectionOutlineWithoutPicking)
         ASSERT_TRUE(compiled.has_value())
             << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
     }
-    EXPECT_NE(std::ranges::find(compiled->TextureNames, "EntityId"), compiled->TextureNames.end());
+    EXPECT_EQ(std::ranges::find(compiled->TextureNames, "EntityId"), compiled->TextureNames.end());
+    EXPECT_EQ(std::ranges::find(compiled->TextureNames, "SelectionOutline"), compiled->TextureNames.end());
     EXPECT_EQ(std::ranges::find(compiled->TextureNames, "PrimitiveId"), compiled->TextureNames.end());
     EXPECT_EQ(std::ranges::find(compiled->BufferNames, "Picking.Readback"), compiled->BufferNames.end());
+}
+
+// BUG-018 — hierarchy selection enables SelectionOutline without a pending
+// mouse pick. The recipe must still run the selection-ID producer so
+// SelectionOutlinePass has a written EntityId texture, while continuing to
+// drop the host readback buffer and TransferSrc-only texture usage.
+TEST(FrameRecipeContract, SelectionOutlineWithoutPendingPickProducesIdsWithoutReadback)
+{
+    FrameRecipeFeatures features{};
+    features.EnablePicking = false;
+    features.EnableSelectionOutline = true;
+    // EnableDepthPrepass defaults to true.
+
+    const FrameRecipeIntrospection description = DescribeDefaultFrameRecipe(features);
+    const auto* picking = FindPass(description, FrameRecipePassKind::Picking);
+    ASSERT_NE(picking, nullptr);
+    EXPECT_TRUE(picking->Enabled);
+    EXPECT_TRUE(Contains(picking->Writes, "EntityId"));
+    EXPECT_TRUE(Contains(picking->Writes, "PrimitiveId"));
+    EXPECT_FALSE(Contains(picking->Writes, "Picking.Readback"));
+
+    const auto* outline = FindPass(description, FrameRecipePassKind::SelectionOutline);
+    ASSERT_NE(outline, nullptr);
+    EXPECT_TRUE(outline->Enabled);
+    EXPECT_TRUE(Contains(outline->Reads, "EntityId"));
+    EXPECT_TRUE(Contains(outline->Writes, "FrameRecipe.PresentSource"));
+
+    EXPECT_TRUE(HasEnabledResource(description, FrameRecipeResourceKind::EntityId));
+    EXPECT_TRUE(HasEnabledResource(description, FrameRecipeResourceKind::PrimitiveId));
+    EXPECT_FALSE(HasEnabledResource(description, FrameRecipeResourceKind::PickingReadback));
+
+    RenderGraph graph;
+    const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
+        graph,
+        features,
+        MakeImports(),
+        FrameRecipeSizing{.Width = 640u, .Height = 480u});
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    {
+        const auto& compileResult = graph.GetLastCompileValidationResult();
+        ASSERT_TRUE(compiled.has_value())
+            << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
+    }
+    EXPECT_NE(std::ranges::find(compiled->TextureNames, "EntityId"), compiled->TextureNames.end());
+    EXPECT_NE(std::ranges::find(compiled->TextureNames, "PrimitiveId"), compiled->TextureNames.end());
+    EXPECT_EQ(std::ranges::find(compiled->TextureNames, "SelectionOutline"), compiled->TextureNames.end());
+    EXPECT_EQ(std::ranges::find(compiled->BufferNames, "Picking.Readback"), compiled->BufferNames.end());
+    ExpectPassBefore(*compiled, "PickingPass", "SelectionOutlinePass");
+
+    const TextureResourceDesc* entityId = TextureDescByName(graph, *compiled, "EntityId");
+    const TextureResourceDesc* primitiveId = TextureDescByName(graph, *compiled, "PrimitiveId");
+    ASSERT_NE(entityId, nullptr);
+    ASSERT_NE(primitiveId, nullptr);
+    EXPECT_TRUE(HasTextureUsage(entityId->Desc.Usage, RHI::TextureUsage::ColorTarget));
+    EXPECT_TRUE(HasTextureUsage(entityId->Desc.Usage, RHI::TextureUsage::Sampled));
+    EXPECT_FALSE(HasTextureUsage(entityId->Desc.Usage, RHI::TextureUsage::TransferSrc));
+    EXPECT_TRUE(HasTextureUsage(primitiveId->Desc.Usage, RHI::TextureUsage::ColorTarget));
+    EXPECT_TRUE(HasTextureUsage(primitiveId->Desc.Usage, RHI::TextureUsage::Sampled));
+    EXPECT_FALSE(HasTextureUsage(primitiveId->Desc.Usage, RHI::TextureUsage::TransferSrc));
+
+    const RenderGraphValidationResult validation = ValidateRecipeCompiledGraph(description, *compiled);
+    EXPECT_FALSE(validation.HasErrors())
+        << (validation.Findings.empty() ? "<no findings>" : validation.Findings.front().Message);
 }
 
 // GRAPHICS-074 recipe-side follow-up — when picking *and* the depth prepass
@@ -1796,6 +1876,45 @@ TEST(FrameRecipeContract, PickingReadbackImportedFromRenderer)
     const RenderGraphValidationResult validation = ValidateRecipeCompiledGraph(recipe, *compiled);
     EXPECT_FALSE(validation.HasErrors())
         << (validation.Findings.empty() ? "<no findings>" : validation.Findings.front().Message);
+}
+
+TEST(FrameRecipeContract, PickingIdTargetsDeclareTransferSrcUsageForReadbackCopies)
+{
+    FrameRecipeFeatures features{};
+    features.EnablePicking = true;
+    // EnableDepthPrepass defaults to true.
+
+    RenderGraph graph;
+    const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
+        graph,
+        features,
+        MakeImports(),
+        FrameRecipeSizing{.Width = 640u, .Height = 480u});
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    {
+        const auto& compileResult = graph.GetLastCompileValidationResult();
+        ASSERT_TRUE(compiled.has_value())
+            << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
+    }
+
+    const TextureResourceDesc* entityId = TextureDescByName(graph, *compiled, "EntityId");
+    const TextureResourceDesc* primitiveId = TextureDescByName(graph, *compiled, "PrimitiveId");
+    ASSERT_NE(entityId, nullptr);
+    ASSERT_NE(primitiveId, nullptr);
+
+    EXPECT_TRUE(HasTextureUsage(entityId->Desc.Usage, RHI::TextureUsage::ColorTarget));
+    EXPECT_TRUE(HasTextureUsage(entityId->Desc.Usage, RHI::TextureUsage::Sampled));
+    EXPECT_TRUE(HasTextureUsage(entityId->Desc.Usage, RHI::TextureUsage::TransferSrc))
+        << "Picking readback records CopyTextureToBuffer(EntityId), so Vulkan "
+           "requires VK_IMAGE_USAGE_TRANSFER_SRC_BIT.";
+
+    EXPECT_TRUE(HasTextureUsage(primitiveId->Desc.Usage, RHI::TextureUsage::ColorTarget));
+    EXPECT_TRUE(HasTextureUsage(primitiveId->Desc.Usage, RHI::TextureUsage::Sampled));
+    EXPECT_TRUE(HasTextureUsage(primitiveId->Desc.Usage, RHI::TextureUsage::TransferSrc))
+        << "Picking readback records CopyTextureToBuffer(PrimitiveId), so Vulkan "
+           "requires VK_IMAGE_USAGE_TRANSFER_SRC_BIT.";
 }
 
 TEST(FrameRecipeContract, MissingBackbufferReportsDiagnostic)

@@ -53,6 +53,7 @@ import Extrinsic.RHI.TextureUpload;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxEditorUi;
+import Extrinsic.Runtime.SelectionController;
 import Geometry.Properties;
 
 namespace
@@ -381,6 +382,22 @@ struct AcceptanceRunCapture
     }
     return nonBlack;
 }
+
+[[nodiscard]] EntityHandle FindEntityByName(
+    Registry& scene,
+    const std::string_view name)
+{
+    auto view = scene.Raw().view<ECSC::MetaData>();
+    EntityHandle found = Extrinsic::ECS::InvalidEntityHandle;
+    view.each([&found, name](const EntityHandle entity, const ECSC::MetaData& meta)
+    {
+        if (meta.EntityName == name)
+        {
+            found = entity;
+        }
+    });
+    return found;
+}
 } // namespace
 
 // The working-sandbox acceptance scene (one mesh, one graph, one point cloud)
@@ -556,6 +573,89 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ExtrinsicSandboxDefaultConfigProducesVisi
         << "Sandbox default-config frame did not present a full-screen lit background; only "
         << nonBlackPixels << "/" << totalPixels << " pixels were non-black. This indicates the "
         << "postprocess present source regressed to black again (BUG-016).";
+
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+    device.DestroyBuffer(readbackBuffer);
+    engine.Shutdown();
+}
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke, HierarchySelectionKeepsDefaultSandboxVisibleWithOutline)
+{
+    auto bootstrap = BootstrapDefaultSandboxAppEngine();
+    if (bootstrap.Skipped)
+    {
+        GTEST_SKIP() << bootstrap.SkipReason;
+    }
+    Engine& engine = *bootstrap.EnginePtr;
+
+    EntityHandle triangle = FindEntityByName(engine.GetScene(), "ReferenceTriangle");
+    ASSERT_NE(triangle, Extrinsic::ECS::InvalidEntityHandle);
+    ASSERT_TRUE(engine.GetSelectionController().SetSelectedEntity(engine.GetScene(), triangle));
+    ASSERT_EQ(engine.GetSelectionController().SelectedCount(), 1u);
+    ASSERT_EQ(engine.GetSelectionController().SelectedStableIds().size(), 1u);
+    EXPECT_EQ(engine.GetSelectionController().SelectedStableIds()[0],
+              Extrinsic::Runtime::SelectionController::ToStableEntityId(triangle));
+
+    auto& renderer = engine.GetRenderer();
+    auto& device = engine.GetDevice();
+    const Extrinsic::RHI::Format backbufferFormat = device.GetBackbufferFormat();
+    const std::uint32_t bytesPerPixel = Extrinsic::RHI::BytesPerBlock(backbufferFormat);
+    const Extrinsic::Core::Extent2D extent = device.GetBackbufferExtent();
+    if (bytesPerPixel < 4u || extent.Width == 0u || extent.Height == 0u)
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style smoke readback.";
+    }
+
+    const std::uint64_t readbackSize =
+        static_cast<std::uint64_t>(bytesPerPixel) *
+        static_cast<std::uint64_t>(extent.Width) *
+        static_cast<std::uint64_t>(extent.Height);
+    const Extrinsic::RHI::BufferHandle readbackBuffer = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
+        .SizeBytes = readbackSize,
+        .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
+        .HostVisible = true,
+        .DebugName = "Sandbox.HierarchySelection.Readback",
+    });
+    if (!readbackBuffer.IsValid())
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Readback buffer allocation failed; gpu;vulkan smoke is opt-in.";
+    }
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(readbackBuffer);
+
+    const auto run = DriveAcceptanceAndCapture(engine);
+
+    if (!run.DeviceOperational)
+    {
+        renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+        device.DestroyBuffer(readbackBuffer);
+        engine.Shutdown();
+        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach operational Vulkan with hierarchy selection: status="
+                      << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
+                      << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+        return;
+    }
+
+    EXPECT_EQ(run.Status.Code, Extrinsic::Backends::Vulkan::VulkanOperationalStatusCode::Operational);
+    EXPECT_EQ(run.Status.Reason, Extrinsic::Backends::Vulkan::VulkanOperationalReason::None);
+    EXPECT_TRUE(run.Stats.Compile.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_TRUE(run.Stats.Execute.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_EQ(FindPassStatus(run.Stats, "Present"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_EQ(FindPassStatus(run.Stats, "SelectionOutlinePass"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_GE(run.Stats.DefaultRecipeBackbufferReadbackCopyCount, 1u)
+        << "Sandbox hierarchy-selection readback triplet did not record on any operational frame.";
+
+    const std::uint64_t nonBlackPixels =
+        CountNonBlackRgbPixels(device, readbackBuffer, readbackSize, bytesPerPixel);
+    const std::uint64_t totalPixels =
+        static_cast<std::uint64_t>(extent.Width) * static_cast<std::uint64_t>(extent.Height);
+    EXPECT_GT(nonBlackPixels, totalPixels / 2u)
+        << "Sandbox hierarchy selection turned the frame black; only "
+        << nonBlackPixels << "/" << totalPixels << " pixels were non-black. "
+        << "pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
 
     renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
     device.DestroyBuffer(readbackBuffer);

@@ -436,6 +436,15 @@ namespace Extrinsic::Runtime
         m_EditorCallback = std::move(callback);
     }
 
+    bool ImGuiAdapter::WantsMouseCapture() const noexcept
+    {
+        if (m_Context == nullptr)
+            return false;
+
+        ImGui::SetCurrentContext(m_Context);
+        return ImGui::GetIO().WantCaptureMouse;
+    }
+
     const char* ImGuiAdapter::ClipboardGet(ImGuiContext* /*ctx*/)
     {
         auto* self = static_cast<ImGuiAdapter*>(ImGui::GetPlatformIO().Platform_ClipboardUserData);
