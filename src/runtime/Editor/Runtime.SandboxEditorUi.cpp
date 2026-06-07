@@ -303,6 +303,264 @@ namespace Extrinsic::Runtime
                    lhs.Scalar.Isolines.Num == rhs.Scalar.Isolines.Num;
         }
 
+        [[nodiscard]] bool IsInternalVisualizationProperty(
+            const std::string& name) noexcept
+        {
+            return name == GS::PropertyNames::kPosition ||
+                   name == GS::PropertyNames::kNormal ||
+                   name == GS::PropertyNames::kEdgeV0 ||
+                   name == GS::PropertyNames::kEdgeV1 ||
+                   name == GS::PropertyNames::kHalfedgeToVertex ||
+                   name == GS::PropertyNames::kHalfedgeNext ||
+                   name == GS::PropertyNames::kHalfedgeFace ||
+                   name == GS::PropertyNames::kFaceHalfedge ||
+                   name == "v:point" ||
+                   name == "v:tex" ||
+                   name == "v:texcoord" ||
+                   name == "p:position" ||
+                   name == "p:normal";
+        }
+
+        [[nodiscard]] bool IsConnectivityVisualizationProperty(
+            const std::string& name) noexcept
+        {
+            return name == GS::PropertyNames::kPosition ||
+                   name == GS::PropertyNames::kEdgeV0 ||
+                   name == GS::PropertyNames::kEdgeV1 ||
+                   name == GS::PropertyNames::kHalfedgeToVertex ||
+                   name == GS::PropertyNames::kHalfedgeNext ||
+                   name == GS::PropertyNames::kHalfedgeFace ||
+                   name == GS::PropertyNames::kFaceHalfedge ||
+                   name == "v:point" ||
+                   name == "v:tex" ||
+                   name == "v:texcoord" ||
+                   name == "p:position";
+        }
+
+        [[nodiscard]] std::optional<SandboxEditorVisualizationPropertyValueKind>
+        DetectVisualizationPropertyKind(
+            const Geometry::PropertySet& properties,
+            const std::string& name)
+        {
+            if (properties.Get<float>(name))
+                return SandboxEditorVisualizationPropertyValueKind::ScalarFloat;
+            if (properties.Get<double>(name))
+                return SandboxEditorVisualizationPropertyValueKind::ScalarDouble;
+            if (properties.Get<glm::vec3>(name))
+                return SandboxEditorVisualizationPropertyValueKind::Vec3;
+            if (properties.Get<glm::vec4>(name))
+                return SandboxEditorVisualizationPropertyValueKind::Vec4;
+            if (properties.Get<std::uint32_t>(name))
+                return SandboxEditorVisualizationPropertyValueKind::UInt32;
+            return std::nullopt;
+        }
+
+        [[nodiscard]] bool IsScalarVisualizationKind(
+            const SandboxEditorVisualizationPropertyValueKind kind) noexcept
+        {
+            return kind ==
+                       SandboxEditorVisualizationPropertyValueKind::ScalarFloat ||
+                   kind ==
+                       SandboxEditorVisualizationPropertyValueKind::ScalarDouble;
+        }
+
+        [[nodiscard]] bool DomainSupportsVisualizationConfig(
+            const SandboxEditorVisualizationPropertyDomain domain) noexcept
+        {
+            using Domain = SandboxEditorVisualizationPropertyDomain;
+            switch (domain)
+            {
+            case Domain::MeshVertices:
+            case Domain::MeshEdges:
+            case Domain::MeshFaces:
+            case Domain::GraphVertices:
+            case Domain::GraphEdges:
+            case Domain::PointCloudPoints:
+                return true;
+            }
+            return false;
+        }
+
+        [[nodiscard]] G::VisualizationConfig::Domain ToVisualizationConfigDomain(
+            const SandboxEditorVisualizationPropertyDomain domain) noexcept
+        {
+            using Domain = SandboxEditorVisualizationPropertyDomain;
+            switch (domain)
+            {
+            case Domain::MeshEdges:
+            case Domain::GraphEdges:
+                return G::VisualizationConfig::Domain::Edge;
+            case Domain::MeshFaces:
+                return G::VisualizationConfig::Domain::Face;
+            case Domain::MeshVertices:
+            case Domain::GraphVertices:
+            case Domain::PointCloudPoints:
+                return G::VisualizationConfig::Domain::Vertex;
+            }
+            return G::VisualizationConfig::Domain::Vertex;
+        }
+
+        [[nodiscard]] G::VisualizationConfig::ColorSource ToColorBufferSource(
+            const SandboxEditorVisualizationPropertyDomain domain) noexcept
+        {
+            using Domain = SandboxEditorVisualizationPropertyDomain;
+            switch (domain)
+            {
+            case Domain::MeshEdges:
+            case Domain::GraphEdges:
+                return G::VisualizationConfig::ColorSource::PerEdgeBuffer;
+            case Domain::MeshFaces:
+                return G::VisualizationConfig::ColorSource::PerFaceBuffer;
+            case Domain::MeshVertices:
+            case Domain::GraphVertices:
+            case Domain::PointCloudPoints:
+                return G::VisualizationConfig::ColorSource::PerVertexBuffer;
+            }
+            return G::VisualizationConfig::ColorSource::PerVertexBuffer;
+        }
+
+        [[nodiscard]] const Geometry::PropertySet* PropertySetForVisualizationDomain(
+            const GS::ConstSourceView& view,
+            const SandboxEditorVisualizationPropertyDomain domain) noexcept
+        {
+            using Domain = SandboxEditorVisualizationPropertyDomain;
+            switch (domain)
+            {
+            case Domain::MeshVertices:
+                return view.ActiveDomain == GS::Domain::Mesh &&
+                               view.VertexSource != nullptr
+                           ? &view.VertexSource->Properties
+                           : nullptr;
+            case Domain::MeshEdges:
+                return view.ActiveDomain == GS::Domain::Mesh &&
+                               view.EdgeSource != nullptr
+                           ? &view.EdgeSource->Properties
+                           : nullptr;
+            case Domain::MeshFaces:
+                return view.ActiveDomain == GS::Domain::Mesh &&
+                               view.FaceSource != nullptr
+                           ? &view.FaceSource->Properties
+                           : nullptr;
+            case Domain::GraphVertices:
+                return view.ActiveDomain == GS::Domain::Graph &&
+                               view.NodeSource != nullptr
+                           ? &view.NodeSource->Properties
+                           : nullptr;
+            case Domain::GraphEdges:
+                return view.ActiveDomain == GS::Domain::Graph &&
+                               view.EdgeSource != nullptr
+                           ? &view.EdgeSource->Properties
+                           : nullptr;
+            case Domain::PointCloudPoints:
+                return view.ActiveDomain == GS::Domain::PointCloud &&
+                               view.VertexSource != nullptr
+                           ? &view.VertexSource->Properties
+                           : nullptr;
+            }
+            return nullptr;
+        }
+
+        void AppendVisualizationPropertiesForDomain(
+            std::vector<SandboxEditorVisualizationPropertyInfo>& out,
+            const Geometry::PropertySet& properties,
+            const SandboxEditorVisualizationPropertyDomain domain)
+        {
+            if (!DomainSupportsVisualizationConfig(domain))
+                return;
+
+            for (const std::string& name : properties.Properties())
+            {
+                const std::optional<SandboxEditorVisualizationPropertyValueKind>
+                    kind = DetectVisualizationPropertyKind(properties, name);
+                if (!kind.has_value())
+                    continue;
+
+                const bool internal = IsInternalVisualizationProperty(name);
+                const bool connectivity =
+                    IsConnectivityVisualizationProperty(name);
+                const bool scalar =
+                    !internal && IsScalarVisualizationKind(*kind);
+                const bool color =
+                    !internal &&
+                    *kind == SandboxEditorVisualizationPropertyValueKind::Vec4;
+                const bool vector =
+                    !connectivity &&
+                    *kind == SandboxEditorVisualizationPropertyValueKind::Vec3;
+                const bool integer =
+                    !internal && !connectivity &&
+                    *kind == SandboxEditorVisualizationPropertyValueKind::UInt32;
+                if (!scalar && !color && !vector && !integer)
+                {
+                    continue;
+                }
+
+                out.push_back(SandboxEditorVisualizationPropertyInfo{
+                    .Name = name,
+                    .Domain = domain,
+                    .ValueKind = *kind,
+                    .ElementCount = properties.Size(),
+                    .ScalarPresetAvailable = scalar,
+                    .IsolinePresetAvailable = scalar,
+                    .ColorBufferPresetAvailable = color,
+                    .VectorFieldCandidate = vector,
+                });
+            }
+        }
+
+        [[nodiscard]] std::vector<SandboxEditorVisualizationPropertyInfo>
+        BuildVisualizationProperties(const GS::ConstSourceView& view)
+        {
+            std::vector<SandboxEditorVisualizationPropertyInfo> out{};
+            const auto append =
+                [&](const SandboxEditorVisualizationPropertyDomain domain)
+                {
+                    if (const Geometry::PropertySet* properties =
+                            PropertySetForVisualizationDomain(view, domain))
+                    {
+                        AppendVisualizationPropertiesForDomain(
+                            out,
+                            *properties,
+                            domain);
+                    }
+                };
+
+            switch (view.ActiveDomain)
+            {
+            case GS::Domain::Mesh:
+                append(SandboxEditorVisualizationPropertyDomain::MeshVertices);
+                append(SandboxEditorVisualizationPropertyDomain::MeshEdges);
+                append(SandboxEditorVisualizationPropertyDomain::MeshFaces);
+                break;
+            case GS::Domain::Graph:
+                append(SandboxEditorVisualizationPropertyDomain::GraphVertices);
+                append(SandboxEditorVisualizationPropertyDomain::GraphEdges);
+                break;
+            case GS::Domain::PointCloud:
+                append(SandboxEditorVisualizationPropertyDomain::PointCloudPoints);
+                break;
+            case GS::Domain::None:
+            case GS::Domain::Unknown:
+                break;
+            }
+            return out;
+        }
+
+        [[nodiscard]] bool PropertySupportsPreset(
+            const SandboxEditorVisualizationPropertyInfo& property,
+            const SandboxEditorVisualizationPropertyPreset preset) noexcept
+        {
+            switch (preset)
+            {
+            case SandboxEditorVisualizationPropertyPreset::Scalar:
+                return property.ScalarPresetAvailable;
+            case SandboxEditorVisualizationPropertyPreset::Isoline:
+                return property.IsolinePresetAvailable;
+            case SandboxEditorVisualizationPropertyPreset::ColorBuffer:
+                return property.ColorBufferPresetAvailable;
+            }
+            return false;
+        }
+
         [[nodiscard]] SandboxEditorVisualizationAdapterBindingModel
         FromVisualizationAdapterBinding(
             const RenderExtractionCache::VisualizationAdapterBinding& binding)
@@ -1212,8 +1470,10 @@ namespace Extrinsic::Runtime
             model.HasSelectedEntity = true;
             model.SelectedStableId =
                 SelectionController::ToStableEntityId(*selected);
-            model.SelectedDomain =
-                GS::BuildConstView(raw, *selected).ActiveDomain;
+            const GS::ConstSourceView sourceView =
+                GS::BuildConstView(raw, *selected);
+            model.SelectedDomain = sourceView.ActiveDomain;
+            model.Properties = BuildVisualizationProperties(sourceView);
 
             if (const auto* binding =
                     raw.try_get<ECSC::SpatialDebugBinding>(*selected);
@@ -1524,6 +1784,102 @@ namespace Extrinsic::Runtime
             }
         }
 
+        void DrawVisualizationPropertyPresets(
+            const std::vector<SandboxEditorVisualizationPropertyInfo>& properties,
+            const SandboxEditorContext& context,
+            const std::uint32_t selectedStableId,
+            const bool canEditVisualization)
+        {
+            ImGui::SeparatorText("Properties");
+            if (properties.empty())
+            {
+                ImGui::TextDisabled("No visualization-eligible properties.");
+                return;
+            }
+
+            if (!canEditVisualization)
+                ImGui::BeginDisabled();
+
+            for (std::size_t i = 0u; i < properties.size(); ++i)
+            {
+                const SandboxEditorVisualizationPropertyInfo& property =
+                    properties[i];
+                ImGui::PushID(static_cast<int>(i));
+                ImGui::Text("%s  [%s, %s, %llu]",
+                            property.Name.c_str(),
+                            DebugNameForSandboxEditorVisualizationPropertyDomain(
+                                property.Domain),
+                            DebugNameForSandboxEditorVisualizationPropertyValueKind(
+                                property.ValueKind),
+                            static_cast<unsigned long long>(
+                                property.ElementCount));
+
+                bool wroteButton = false;
+                if (property.ScalarPresetAvailable)
+                {
+                    if (ImGui::SmallButton("Scalar") && canEditVisualization)
+                    {
+                        (void)ApplySandboxEditorVisualizationPropertyCommand(
+                            context,
+                            SandboxEditorVisualizationPropertyCommand{
+                                .StableEntityId = selectedStableId,
+                                .Domain = property.Domain,
+                                .Preset =
+                                    SandboxEditorVisualizationPropertyPreset::Scalar,
+                                .PropertyName = property.Name,
+                            });
+                    }
+                    wroteButton = true;
+                }
+                if (property.IsolinePresetAvailable)
+                {
+                    if (wroteButton)
+                        ImGui::SameLine();
+                    if (ImGui::SmallButton("Isolines") && canEditVisualization)
+                    {
+                        (void)ApplySandboxEditorVisualizationPropertyCommand(
+                            context,
+                            SandboxEditorVisualizationPropertyCommand{
+                                .StableEntityId = selectedStableId,
+                                .Domain = property.Domain,
+                                .Preset =
+                                    SandboxEditorVisualizationPropertyPreset::Isoline,
+                                .PropertyName = property.Name,
+                                .IsolineCount = 12u,
+                            });
+                    }
+                    wroteButton = true;
+                }
+                if (property.ColorBufferPresetAvailable)
+                {
+                    if (wroteButton)
+                        ImGui::SameLine();
+                    if (ImGui::SmallButton("Color buffer") &&
+                        canEditVisualization)
+                    {
+                        (void)ApplySandboxEditorVisualizationPropertyCommand(
+                            context,
+                            SandboxEditorVisualizationPropertyCommand{
+                                .StableEntityId = selectedStableId,
+                                .Domain = property.Domain,
+                                .Preset =
+                                    SandboxEditorVisualizationPropertyPreset::ColorBuffer,
+                                .PropertyName = property.Name,
+                            });
+                    }
+                    wroteButton = true;
+                }
+                if (property.VectorFieldCandidate && !wroteButton)
+                {
+                    ImGui::TextDisabled("Vector-field candidate; adapter residency is not owned by this UI slice.");
+                }
+                ImGui::PopID();
+            }
+
+            if (!canEditVisualization)
+                ImGui::EndDisabled();
+        }
+
         void DrawDomainRenderWindow(const SandboxEditorDomainWindowModel& model,
                                     const SandboxEditorContext& context)
         {
@@ -1638,19 +1994,6 @@ namespace Extrinsic::Runtime
                     });
             }
             ImGui::SameLine();
-            if (ImGui::Button("Scalar: scalars") && canEditVisualization)
-            {
-                (void)ApplySandboxEditorVisualizationConfigCommand(
-                    context,
-                    SandboxEditorVisualizationConfigCommand{
-                        .StableEntityId = model.SelectedStableId,
-                        .EnableConfig = true,
-                        .Source = G::VisualizationConfig::ColorSource::ScalarField,
-                        .ScalarFieldName = "scalars",
-                        .ScalarDomain = G::VisualizationConfig::Domain::Vertex,
-                    });
-            }
-            ImGui::SameLine();
             if (ImGui::Button("Clear vis") && canEditVisualization)
             {
                 (void)ApplySandboxEditorVisualizationConfigCommand(
@@ -1663,6 +2006,12 @@ namespace Extrinsic::Runtime
 
             if (!canEditVisualization)
                 ImGui::EndDisabled();
+
+            DrawVisualizationPropertyPresets(
+                visualization.Properties,
+                context,
+                model.SelectedStableId,
+                canEditVisualization);
         }
 
         void DrawPrimitiveDetails(const SandboxEditorPrimitiveDetailModel& primitive)
@@ -2472,22 +2821,8 @@ namespace Extrinsic::Runtime
                                     .StableEntityId =
                                         frame.Visualization.SelectedStableId,
                                     .EnableConfig = true,
-                                    .Source = G::VisualizationConfig::ColorSource::UniformColor,
-                                });
-                        }
-                        ImGui::SameLine();
-                        if (ImGui::Button("Scalar: scalars"))
-                        {
-                            (void)ApplySandboxEditorVisualizationConfigCommand(
-                                *context,
-                                SandboxEditorVisualizationConfigCommand{
-                                    .StableEntityId =
-                                        frame.Visualization.SelectedStableId,
-                                    .EnableConfig = true,
-                                    .Source = G::VisualizationConfig::ColorSource::ScalarField,
-                                    .ScalarFieldName = "scalars",
-                                    .ScalarDomain = G::VisualizationConfig::Domain::Vertex,
-                                });
+                                        .Source = G::VisualizationConfig::ColorSource::UniformColor,
+                                    });
                         }
                         ImGui::SameLine();
                         if (ImGui::Button("Clear vis"))
@@ -2500,6 +2835,11 @@ namespace Extrinsic::Runtime
                                     .EnableConfig = false,
                                 });
                         }
+                        DrawVisualizationPropertyPresets(
+                            frame.Visualization.Properties,
+                            *context,
+                            frame.Visualization.SelectedStableId,
+                            true);
                     }
                 }
                 DrawDiagnostics(frame.Visualization.Diagnostics);
@@ -2535,6 +2875,8 @@ namespace Extrinsic::Runtime
             return "CameraRenderCommandsUnavailable";
         case SandboxEditorDiagnosticCode::VisualizationCommandsUnavailable:
             return "VisualizationCommandsUnavailable";
+        case SandboxEditorDiagnosticCode::InvalidVisualizationProperty:
+            return "InvalidVisualizationProperty";
         case SandboxEditorDiagnosticCode::GeometryProcessingFailed:
             return "GeometryProcessingFailed";
         }
@@ -2576,6 +2918,8 @@ namespace Extrinsic::Runtime
             return "MissingTransform";
         case SandboxEditorCommandStatus::UnsupportedGeometryDomain:
             return "UnsupportedGeometryDomain";
+        case SandboxEditorCommandStatus::InvalidVisualizationProperty:
+            return "InvalidVisualizationProperty";
         case SandboxEditorCommandStatus::InvalidProcessingParameters:
             return "InvalidProcessingParameters";
         case SandboxEditorCommandStatus::GeometryProcessingFailed:
@@ -2725,6 +3069,64 @@ namespace Extrinsic::Runtime
             return "Isoline";
         case Kind::HtexMetadata:
             return "HtexMetadata";
+        }
+        return "Unknown";
+    }
+
+    const char* DebugNameForSandboxEditorVisualizationPropertyDomain(
+        const SandboxEditorVisualizationPropertyDomain domain) noexcept
+    {
+        using Domain = SandboxEditorVisualizationPropertyDomain;
+        switch (domain)
+        {
+        case Domain::MeshVertices:
+            return "MeshVertices";
+        case Domain::MeshEdges:
+            return "MeshEdges";
+        case Domain::MeshFaces:
+            return "MeshFaces";
+        case Domain::GraphVertices:
+            return "GraphVertices";
+        case Domain::GraphEdges:
+            return "GraphEdges";
+        case Domain::PointCloudPoints:
+            return "PointCloudPoints";
+        }
+        return "Unknown";
+    }
+
+    const char* DebugNameForSandboxEditorVisualizationPropertyValueKind(
+        const SandboxEditorVisualizationPropertyValueKind kind) noexcept
+    {
+        using Kind = SandboxEditorVisualizationPropertyValueKind;
+        switch (kind)
+        {
+        case Kind::ScalarFloat:
+            return "ScalarFloat";
+        case Kind::ScalarDouble:
+            return "ScalarDouble";
+        case Kind::Vec3:
+            return "Vec3";
+        case Kind::Vec4:
+            return "Vec4";
+        case Kind::UInt32:
+            return "UInt32";
+        }
+        return "Unknown";
+    }
+
+    const char* DebugNameForSandboxEditorVisualizationPropertyPreset(
+        const SandboxEditorVisualizationPropertyPreset preset) noexcept
+    {
+        using Preset = SandboxEditorVisualizationPropertyPreset;
+        switch (preset)
+        {
+        case Preset::Scalar:
+            return "Scalar";
+        case Preset::Isoline:
+            return "Isoline";
+        case Preset::ColorBuffer:
+            return "ColorBuffer";
         }
         return "Unknown";
     }
@@ -3411,6 +3813,96 @@ namespace Extrinsic::Runtime
 
         raw.emplace_or_replace<G::VisualizationConfig>(entity, next);
         return SandboxEditorCommandStatus::Applied;
+    }
+
+    SandboxEditorCommandStatus ApplySandboxEditorVisualizationPropertyCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorVisualizationPropertyCommand& command)
+    {
+        if (!context.VisualizationCommandsAvailable)
+            return SandboxEditorCommandStatus::MissingVisualizationCommands;
+        if (context.Scene == nullptr)
+            return SandboxEditorCommandStatus::MissingScene;
+
+        entt::registry& raw = context.Scene->Raw();
+        const ECS::EntityHandle entity =
+            SelectionController::ToEntityHandle(command.StableEntityId);
+        if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
+            return SandboxEditorCommandStatus::StaleEntity;
+        if (command.PropertyName.empty())
+            return SandboxEditorCommandStatus::InvalidVisualizationProperty;
+
+        const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
+        const Geometry::PropertySet* properties =
+            PropertySetForVisualizationDomain(view, command.Domain);
+        if (properties == nullptr)
+            return SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+
+        std::optional<SandboxEditorVisualizationPropertyInfo> matched{};
+        std::vector<SandboxEditorVisualizationPropertyInfo> allProperties{};
+        AppendVisualizationPropertiesForDomain(
+            allProperties,
+            *properties,
+            command.Domain);
+        for (const SandboxEditorVisualizationPropertyInfo& property :
+             allProperties)
+        {
+            if (property.Name == command.PropertyName)
+            {
+                matched = property;
+                break;
+            }
+        }
+        if (!matched.has_value() ||
+            !PropertySupportsPreset(*matched, command.Preset))
+        {
+            return SandboxEditorCommandStatus::InvalidVisualizationProperty;
+        }
+
+        SandboxEditorVisualizationConfigCommand configCommand{
+            .StableEntityId = command.StableEntityId,
+            .EnableConfig = true,
+            .ScalarFieldName = command.PropertyName,
+            .ScalarDomain = ToVisualizationConfigDomain(command.Domain),
+            .ColorBufferName = command.PropertyName,
+            .ScalarAutoRange = command.ScalarAutoRange,
+            .ScalarRangeMin = command.ScalarRangeMin,
+            .ScalarRangeMax = command.ScalarRangeMax,
+            .ScalarBinCount = command.ScalarBinCount,
+        };
+
+        switch (command.Preset)
+        {
+        case SandboxEditorVisualizationPropertyPreset::Scalar:
+            if (!command.ScalarAutoRange &&
+                !(command.ScalarRangeMin < command.ScalarRangeMax))
+            {
+                return SandboxEditorCommandStatus::InvalidVisualizationProperty;
+            }
+            configCommand.Source =
+                G::VisualizationConfig::ColorSource::ScalarField;
+            configCommand.IsolineCount = 0u;
+            break;
+        case SandboxEditorVisualizationPropertyPreset::Isoline:
+            if (command.IsolineCount == 0u ||
+                (!command.ScalarAutoRange &&
+                 !(command.ScalarRangeMin < command.ScalarRangeMax)))
+            {
+                return SandboxEditorCommandStatus::InvalidVisualizationProperty;
+            }
+            configCommand.Source =
+                G::VisualizationConfig::ColorSource::ScalarField;
+            configCommand.IsolineCount = command.IsolineCount;
+            break;
+        case SandboxEditorVisualizationPropertyPreset::ColorBuffer:
+            configCommand.Source = ToColorBufferSource(command.Domain);
+            configCommand.IsolineCount = 0u;
+            break;
+        }
+
+        return ApplySandboxEditorVisualizationConfigCommand(
+            context,
+            configCommand);
     }
 
     SandboxEditorCommandStatus ApplySandboxEditorVisualizationAdapterBindingCommand(

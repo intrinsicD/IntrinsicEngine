@@ -46,6 +46,7 @@ export namespace Extrinsic::Runtime
         UnsupportedGeometryDomain,
         CameraRenderCommandsUnavailable,
         VisualizationCommandsUnavailable,
+        InvalidVisualizationProperty,
         GeometryProcessingFailed,
     };
 
@@ -66,6 +67,7 @@ export namespace Extrinsic::Runtime
         StaleEntity,
         MissingTransform,
         UnsupportedGeometryDomain,
+        InvalidVisualizationProperty,
         InvalidProcessingParameters,
         GeometryProcessingFailed,
     };
@@ -106,6 +108,41 @@ export namespace Extrinsic::Runtime
 
     [[nodiscard]] const char* DebugNameForSandboxEditorVisualizationAdapterBindingKind(
         RenderExtractionCache::VisualizationAdapterBindingKind kind) noexcept;
+
+    enum class SandboxEditorVisualizationPropertyDomain : std::uint8_t
+    {
+        MeshVertices,
+        MeshEdges,
+        MeshFaces,
+        GraphVertices,
+        GraphEdges,
+        PointCloudPoints,
+    };
+
+    enum class SandboxEditorVisualizationPropertyValueKind : std::uint8_t
+    {
+        ScalarFloat,
+        ScalarDouble,
+        Vec3,
+        Vec4,
+        UInt32,
+    };
+
+    enum class SandboxEditorVisualizationPropertyPreset : std::uint8_t
+    {
+        Scalar,
+        Isoline,
+        ColorBuffer,
+    };
+
+    [[nodiscard]] const char* DebugNameForSandboxEditorVisualizationPropertyDomain(
+        SandboxEditorVisualizationPropertyDomain domain) noexcept;
+
+    [[nodiscard]] const char* DebugNameForSandboxEditorVisualizationPropertyValueKind(
+        SandboxEditorVisualizationPropertyValueKind kind) noexcept;
+
+    [[nodiscard]] const char* DebugNameForSandboxEditorVisualizationPropertyPreset(
+        SandboxEditorVisualizationPropertyPreset preset) noexcept;
 
     enum class SandboxEditorGeometryProcessingDomain : std::uint32_t
     {
@@ -524,6 +561,20 @@ export namespace Extrinsic::Runtime
         std::uint32_t IsolineCount{0u};
     };
 
+    struct SandboxEditorVisualizationPropertyInfo
+    {
+        std::string Name{};
+        SandboxEditorVisualizationPropertyDomain Domain{
+            SandboxEditorVisualizationPropertyDomain::MeshVertices};
+        SandboxEditorVisualizationPropertyValueKind ValueKind{
+            SandboxEditorVisualizationPropertyValueKind::ScalarFloat};
+        std::size_t ElementCount{0u};
+        bool ScalarPresetAvailable{false};
+        bool IsolinePresetAvailable{false};
+        bool ColorBufferPresetAvailable{false};
+        bool VectorFieldCandidate{false};
+    };
+
     struct SandboxEditorVisualizationAdapterBindingModel
     {
         bool HasBinding{false};
@@ -544,6 +595,7 @@ export namespace Extrinsic::Runtime
             ECS::Components::GeometrySources::Domain::None};
         SandboxEditorSpatialDebugBindingModel SpatialDebug{};
         SandboxEditorVisualizationConfigModel Visualization{};
+        std::vector<SandboxEditorVisualizationPropertyInfo> Properties{};
         SandboxEditorVisualizationAdapterBindingModel AdapterBinding{};
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
@@ -676,6 +728,21 @@ export namespace Extrinsic::Runtime
         std::uint32_t IsolineCount{0u};
     };
 
+    struct SandboxEditorVisualizationPropertyCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        SandboxEditorVisualizationPropertyDomain Domain{
+            SandboxEditorVisualizationPropertyDomain::MeshVertices};
+        SandboxEditorVisualizationPropertyPreset Preset{
+            SandboxEditorVisualizationPropertyPreset::Scalar};
+        std::string PropertyName{};
+        bool ScalarAutoRange{true};
+        float ScalarRangeMin{0.0f};
+        float ScalarRangeMax{1.0f};
+        std::uint32_t ScalarBinCount{0u};
+        std::uint32_t IsolineCount{12u};
+    };
+
     struct SandboxEditorVisualizationAdapterBindingCommand
     {
         std::uint32_t StableEntityId{0u};
@@ -728,6 +795,10 @@ export namespace Extrinsic::Runtime
     SandboxEditorCommandStatus ApplySandboxEditorVisualizationConfigCommand(
         const SandboxEditorContext& context,
         const SandboxEditorVisualizationConfigCommand& command);
+
+    SandboxEditorCommandStatus ApplySandboxEditorVisualizationPropertyCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorVisualizationPropertyCommand& command);
 
     SandboxEditorCommandStatus ApplySandboxEditorVisualizationAdapterBindingCommand(
         const SandboxEditorContext& context,

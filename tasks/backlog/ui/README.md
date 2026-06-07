@@ -15,6 +15,7 @@ map.
 - [UI-002 — Sandbox EditorUI domain menu windows](../../done/UI-002-editor-domain-menu-windows.md) (done, 2026-06-07, `CPUContracted`).
 - [UI-003 — Sandbox EditorUI geometry processing capabilities](../../done/UI-003-sandbox-editor-geometry-processing-capabilities.md) (done, 2026-06-07, `CPUContracted`).
 - [UI-004 — Sandbox EditorUI K-Means execution command seam](../../done/UI-004-sandbox-editor-kmeans-execution.md) (done, 2026-06-07, `CPUContracted`).
+- [UI-005 — Sandbox EditorUI visualization property presets](../../done/UI-005-sandbox-editor-visualization-property-presets.md) (done, 2026-06-07, `CPUContracted`).
 
 ## Convergence
 
@@ -38,6 +39,13 @@ map.
   label/color properties and marks vertex attributes dirty; CUDA/asynchronous
   scheduling, centroid entities, topology mutation, and broader algorithm
   execution remain future runtime/editor work.
+- UI-005 is a retired promoted EditorUI follow-up that reimplements the legacy
+  property-enumeration-to-visualization seam for current `GeometrySources`.
+  Selected mesh, graph, and point-cloud visualization windows now list eligible
+  scalar, isoline, color-buffer, and vector-candidate properties and route
+  supported presets through runtime-owned `VisualizationConfig` commands.
+  Generic GPU residency/upload for arbitrary property arrays remains future
+  runtime/renderer work.
 - UI work that depends on renderer overlays/handoff coordinates with the
   retired [`GRAPHICS-024`](../../done/GRAPHICS-024-overlays-presentation-editor-handoff.md)
   parity matrix and the rendering DAG in

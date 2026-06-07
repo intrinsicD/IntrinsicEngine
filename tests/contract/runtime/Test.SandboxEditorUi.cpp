@@ -149,6 +149,21 @@ namespace
         }
     }
 
+    [[nodiscard]] const Runtime::SandboxEditorVisualizationPropertyInfo*
+    FindVisualizationProperty(
+        const std::vector<Runtime::SandboxEditorVisualizationPropertyInfo>& properties,
+        const Runtime::SandboxEditorVisualizationPropertyDomain domain,
+        const std::string& name)
+    {
+        for (const Runtime::SandboxEditorVisualizationPropertyInfo& property :
+             properties)
+        {
+            if (property.Domain == domain && property.Name == name)
+                return &property;
+        }
+        return nullptr;
+    }
+
     void SetEdges(GS::Edges& edges,
                   const std::vector<std::uint32_t>& v0,
                   const std::vector<std::uint32_t>& v1)
@@ -995,6 +1010,351 @@ TEST(SandboxEditorUi, KMeansCommandFailsClosedForInvalidTargetsAndInputs)
     EXPECT_STREQ(Runtime::DebugNameForSandboxEditorDiagnosticCode(
                      Runtime::SandboxEditorDiagnosticCode::GeometryProcessingFailed),
                  "GeometryProcessingFailed");
+}
+
+TEST(SandboxEditorUi, VisualizationModelEnumeratesPromotedGeometryProperties)
+{
+    using Domain = Runtime::SandboxEditorVisualizationPropertyDomain;
+    using Kind = Runtime::SandboxEditorVisualizationPropertyValueKind;
+
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "PropertyMesh");
+    AddTriangleMeshSource(registry, mesh);
+    auto& meshVertices = registry.Raw().get<GS::Vertices>(mesh);
+    meshVertices.Properties.GetOrAdd<float>("v:temperature", 0.0f)
+        .Vector() = {0.0f, 0.5f, 1.0f};
+    meshVertices.Properties.GetOrAdd<glm::vec4>("v:kmeans_color", glm::vec4{1.0f})
+        .Vector() = {glm::vec4{1.0f}, glm::vec4{0.0f, 1.0f, 0.0f, 1.0f}, glm::vec4{0.0f, 0.0f, 1.0f, 1.0f}};
+    meshVertices.Properties.GetOrAdd<std::uint32_t>("v:kmeans_label", 0u)
+        .Vector() = {0u, 1u, 1u};
+    meshVertices.Properties.GetOrAdd<float>("v:kmeans_label_f", 0.0f)
+        .Vector() = {0.0f, 1.0f, 1.0f};
+    meshVertices.Properties.GetOrAdd<glm::vec3>("v:normal", glm::vec3{0.0f, 0.0f, 1.0f})
+        .Vector() = {glm::vec3{0.0f, 0.0f, 1.0f}, glm::vec3{0.0f, 0.0f, 1.0f}, glm::vec3{0.0f, 0.0f, 1.0f}};
+
+    auto& meshEdges = registry.Raw().get<GS::Edges>(mesh);
+    meshEdges.Properties.GetOrAdd<double>("e:weight", 0.0)
+        .Vector() = {1.0, 2.0, 3.0};
+    meshEdges.Properties.GetOrAdd<glm::vec4>("e:debug_color", glm::vec4{1.0f})
+        .Vector() = {glm::vec4{1.0f}, glm::vec4{1.0f}, glm::vec4{1.0f}};
+
+    auto& meshFaces = registry.Raw().get<GS::Faces>(mesh);
+    meshFaces.Properties.GetOrAdd<float>("f:curvature", 0.0f)
+        .Vector() = {0.25f};
+
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.VisualizationCommandsAvailable = true;
+
+    const Runtime::SandboxEditorDomainWindowModel meshModel =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::Mesh);
+    const auto& properties = meshModel.Visualization.Properties;
+
+    EXPECT_EQ(FindVisualizationProperty(properties, Domain::MeshVertices, "v:position"),
+              nullptr);
+    ASSERT_NE(FindVisualizationProperty(properties, Domain::MeshVertices, "v:temperature"),
+              nullptr);
+    const auto* scalar =
+        FindVisualizationProperty(properties, Domain::MeshVertices, "v:temperature");
+    EXPECT_EQ(scalar->ValueKind, Kind::ScalarFloat);
+    EXPECT_TRUE(scalar->ScalarPresetAvailable);
+    EXPECT_TRUE(scalar->IsolinePresetAvailable);
+    EXPECT_FALSE(scalar->ColorBufferPresetAvailable);
+
+    const auto* color =
+        FindVisualizationProperty(properties, Domain::MeshVertices, "v:kmeans_color");
+    ASSERT_NE(color, nullptr);
+    EXPECT_EQ(color->ValueKind, Kind::Vec4);
+    EXPECT_TRUE(color->ColorBufferPresetAvailable);
+    EXPECT_FALSE(color->ScalarPresetAvailable);
+
+    const auto* label =
+        FindVisualizationProperty(properties, Domain::MeshVertices, "v:kmeans_label");
+    ASSERT_NE(label, nullptr);
+    EXPECT_EQ(label->ValueKind, Kind::UInt32);
+    EXPECT_FALSE(label->ScalarPresetAvailable);
+    EXPECT_FALSE(label->ColorBufferPresetAvailable);
+
+    const auto* normal =
+        FindVisualizationProperty(properties, Domain::MeshVertices, "v:normal");
+    ASSERT_NE(normal, nullptr);
+    EXPECT_TRUE(normal->VectorFieldCandidate);
+    EXPECT_FALSE(normal->ColorBufferPresetAvailable);
+
+    const auto* edgeWeight =
+        FindVisualizationProperty(properties, Domain::MeshEdges, "e:weight");
+    ASSERT_NE(edgeWeight, nullptr);
+    EXPECT_EQ(edgeWeight->ValueKind, Kind::ScalarDouble);
+    EXPECT_TRUE(edgeWeight->ScalarPresetAvailable);
+    EXPECT_EQ(FindVisualizationProperty(properties,
+                                        Domain::MeshEdges,
+                                        std::string{GS::PropertyNames::kEdgeV0}),
+              nullptr);
+    EXPECT_EQ(FindVisualizationProperty(properties,
+                                        Domain::MeshEdges,
+                                        std::string{GS::PropertyNames::kEdgeV1}),
+              nullptr);
+
+    const auto* faceScalar =
+        FindVisualizationProperty(properties, Domain::MeshFaces, "f:curvature");
+    ASSERT_NE(faceScalar, nullptr);
+    EXPECT_EQ(faceScalar->ElementCount, 1u);
+
+    const ECS::EntityHandle graph = MakeSelectable(registry, "PropertyGraph");
+    AddGraphSource(registry, graph);
+    auto& graphNodes = registry.Raw().get<GS::Nodes>(graph);
+    graphNodes.Properties.GetOrAdd<float>("v:centrality", 0.0f)
+        .Vector() = {0.0f, 1.0f, 2.0f};
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, graph));
+    const Runtime::SandboxEditorDomainWindowModel graphModel =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::Graph);
+    EXPECT_NE(FindVisualizationProperty(graphModel.Visualization.Properties,
+                                        Domain::GraphVertices,
+                                        "v:centrality"),
+              nullptr);
+    EXPECT_EQ(FindVisualizationProperty(graphModel.Visualization.Properties,
+                                        Domain::GraphEdges,
+                                        std::string{GS::PropertyNames::kEdgeV0}),
+              nullptr);
+
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "PropertyCloud");
+    AddPointCloudSource(registry, cloud, 2u);
+    auto& cloudVertices = registry.Raw().get<GS::Vertices>(cloud);
+    cloudVertices.Properties.GetOrAdd<glm::vec4>("p:kmeans_color", glm::vec4{1.0f})
+        .Vector() = {glm::vec4{1.0f}, glm::vec4{0.0f, 1.0f, 0.0f, 1.0f}};
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
+    const Runtime::SandboxEditorDomainWindowModel cloudModel =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::PointCloud);
+    EXPECT_NE(FindVisualizationProperty(cloudModel.Visualization.Properties,
+                                        Domain::PointCloudPoints,
+                                        "p:kmeans_color"),
+              nullptr);
+
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorVisualizationPropertyDomain(
+                     Domain::PointCloudPoints),
+                 "PointCloudPoints");
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorVisualizationPropertyValueKind(
+                     Kind::Vec4),
+                 "Vec4");
+}
+
+TEST(SandboxEditorUi, VisualizationPropertyPresetCommandRoutesThroughConfig)
+{
+    using Domain = Runtime::SandboxEditorVisualizationPropertyDomain;
+    using Preset = Runtime::SandboxEditorVisualizationPropertyPreset;
+
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "PresetMesh");
+    AddTriangleMeshSource(registry, mesh);
+    auto& vertices = registry.Raw().get<GS::Vertices>(mesh);
+    vertices.Properties.GetOrAdd<float>("v:temperature", 0.0f)
+        .Vector() = {0.0f, 0.5f, 1.0f};
+    vertices.Properties.GetOrAdd<glm::vec4>("v:kmeans_color", glm::vec4{1.0f})
+        .Vector() = {glm::vec4{1.0f}, glm::vec4{0.0f, 1.0f, 0.0f, 1.0f}, glm::vec4{0.0f, 0.0f, 1.0f, 1.0f}};
+    vertices.Properties.GetOrAdd<std::uint32_t>("v:kmeans_label", 0u)
+        .Vector() = {0u, 1u, 1u};
+    auto& edges = registry.Raw().get<GS::Edges>(mesh);
+    edges.Properties.GetOrAdd<glm::vec4>("e:debug_color", glm::vec4{1.0f})
+        .Vector() = {glm::vec4{1.0f}, glm::vec4{1.0f}, glm::vec4{1.0f}};
+
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.VisualizationCommandsAvailable = true;
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationPropertyCommand(
+                  context,
+                  Runtime::SandboxEditorVisualizationPropertyCommand{
+                      .StableEntityId = stableId,
+                      .Domain = Domain::MeshVertices,
+                      .Preset = Preset::Scalar,
+                      .PropertyName = "v:temperature",
+                      .ScalarAutoRange = false,
+                      .ScalarRangeMin = -1.0f,
+                      .ScalarRangeMax = 2.0f,
+                      .ScalarBinCount = 8u,
+                  }),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    ASSERT_TRUE(registry.Raw().all_of<G::VisualizationConfig>(mesh));
+    const auto& scalar = registry.Raw().get<G::VisualizationConfig>(mesh);
+    EXPECT_EQ(scalar.Source, G::VisualizationConfig::ColorSource::ScalarField);
+    EXPECT_EQ(scalar.ScalarFieldName, "v:temperature");
+    EXPECT_EQ(scalar.ScalarDomain, G::VisualizationConfig::Domain::Vertex);
+    EXPECT_FALSE(scalar.Scalar.AutoRange);
+    EXPECT_FLOAT_EQ(scalar.Scalar.RangeMin, -1.0f);
+    EXPECT_FLOAT_EQ(scalar.Scalar.RangeMax, 2.0f);
+    EXPECT_EQ(scalar.Scalar.BinCount, 8u);
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationPropertyCommand(
+                  context,
+                  Runtime::SandboxEditorVisualizationPropertyCommand{
+                      .StableEntityId = stableId,
+                      .Domain = Domain::MeshVertices,
+                      .Preset = Preset::Scalar,
+                      .PropertyName = "v:temperature",
+                      .ScalarAutoRange = false,
+                      .ScalarRangeMin = -1.0f,
+                      .ScalarRangeMax = 2.0f,
+                      .ScalarBinCount = 8u,
+                  }),
+              Runtime::SandboxEditorCommandStatus::NoChange);
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationPropertyCommand(
+                  context,
+                  Runtime::SandboxEditorVisualizationPropertyCommand{
+                      .StableEntityId = stableId,
+                      .Domain = Domain::MeshVertices,
+                      .Preset = Preset::Isoline,
+                      .PropertyName = "v:temperature",
+                      .IsolineCount = 6u,
+                  }),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    const auto& isoline = registry.Raw().get<G::VisualizationConfig>(mesh);
+    EXPECT_EQ(isoline.Source, G::VisualizationConfig::ColorSource::ScalarField);
+    EXPECT_EQ(isoline.ScalarFieldName, "v:temperature");
+    EXPECT_EQ(isoline.Scalar.Isolines.Num, 6u);
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationPropertyCommand(
+                  context,
+                  Runtime::SandboxEditorVisualizationPropertyCommand{
+                      .StableEntityId = stableId,
+                      .Domain = Domain::MeshVertices,
+                      .Preset = Preset::ColorBuffer,
+                      .PropertyName = "v:kmeans_color",
+                  }),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    const auto& vertexColor = registry.Raw().get<G::VisualizationConfig>(mesh);
+    EXPECT_EQ(vertexColor.Source,
+              G::VisualizationConfig::ColorSource::PerVertexBuffer);
+    EXPECT_EQ(vertexColor.ColorBufferName, "v:kmeans_color");
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationPropertyCommand(
+                  context,
+                  Runtime::SandboxEditorVisualizationPropertyCommand{
+                      .StableEntityId = stableId,
+                      .Domain = Domain::MeshEdges,
+                      .Preset = Preset::ColorBuffer,
+                      .PropertyName = "e:debug_color",
+                  }),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    const auto& edgeColor = registry.Raw().get<G::VisualizationConfig>(mesh);
+    EXPECT_EQ(edgeColor.Source,
+              G::VisualizationConfig::ColorSource::PerEdgeBuffer);
+    EXPECT_EQ(edgeColor.ColorBufferName, "e:debug_color");
+
+    const G::VisualizationConfig invalidBaseline = edgeColor;
+    const auto expectVisualizationConfigUnchanged =
+        [&registry, mesh, &invalidBaseline]()
+        {
+            const auto& current =
+                registry.Raw().get<G::VisualizationConfig>(mesh);
+            EXPECT_EQ(current.Source, invalidBaseline.Source);
+            EXPECT_EQ(current.ColorBufferName, invalidBaseline.ColorBufferName);
+            EXPECT_EQ(current.ScalarFieldName, invalidBaseline.ScalarFieldName);
+            EXPECT_EQ(current.ScalarDomain, invalidBaseline.ScalarDomain);
+            EXPECT_EQ(current.Scalar.AutoRange, invalidBaseline.Scalar.AutoRange);
+            EXPECT_FLOAT_EQ(current.Scalar.RangeMin,
+                            invalidBaseline.Scalar.RangeMin);
+            EXPECT_FLOAT_EQ(current.Scalar.RangeMax,
+                            invalidBaseline.Scalar.RangeMax);
+            EXPECT_EQ(current.Scalar.BinCount,
+                      invalidBaseline.Scalar.BinCount);
+            EXPECT_EQ(current.Scalar.Isolines.Num,
+                      invalidBaseline.Scalar.Isolines.Num);
+        };
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationPropertyCommand(
+                  context,
+                  Runtime::SandboxEditorVisualizationPropertyCommand{
+                      .StableEntityId = stableId,
+                      .Domain = Domain::GraphVertices,
+                      .Preset = Preset::Scalar,
+                      .PropertyName = "v:temperature",
+                  }),
+              Runtime::SandboxEditorCommandStatus::UnsupportedGeometryDomain);
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationPropertyCommand(
+                  context,
+                  Runtime::SandboxEditorVisualizationPropertyCommand{
+                      .StableEntityId = stableId,
+                      .Domain = Domain::MeshVertices,
+                      .Preset = Preset::Scalar,
+                      .PropertyName = "v:position",
+                  }),
+              Runtime::SandboxEditorCommandStatus::InvalidVisualizationProperty);
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationPropertyCommand(
+                  context,
+                  Runtime::SandboxEditorVisualizationPropertyCommand{
+                      .StableEntityId = stableId,
+                      .Domain = Domain::MeshVertices,
+                      .Preset = Preset::Scalar,
+                      .PropertyName = "v:kmeans_label",
+                  }),
+              Runtime::SandboxEditorCommandStatus::InvalidVisualizationProperty);
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationPropertyCommand(
+                  context,
+                  Runtime::SandboxEditorVisualizationPropertyCommand{
+                      .StableEntityId = stableId,
+                      .Domain = Domain::MeshVertices,
+                      .Preset = Preset::Scalar,
+                      .PropertyName = "missing",
+                  }),
+              Runtime::SandboxEditorCommandStatus::InvalidVisualizationProperty);
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationPropertyCommand(
+                  context,
+                  Runtime::SandboxEditorVisualizationPropertyCommand{
+                      .StableEntityId = stableId,
+                      .Domain = Domain::MeshVertices,
+                      .Preset = Preset::Scalar,
+                      .PropertyName = "v:temperature",
+                      .ScalarAutoRange = false,
+                      .ScalarRangeMin = 2.0f,
+                      .ScalarRangeMax = -1.0f,
+                  }),
+              Runtime::SandboxEditorCommandStatus::InvalidVisualizationProperty);
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationPropertyCommand(
+                  context,
+                  Runtime::SandboxEditorVisualizationPropertyCommand{
+                      .StableEntityId =
+                          std::numeric_limits<std::uint32_t>::max(),
+                      .Domain = Domain::MeshVertices,
+                      .Preset = Preset::Scalar,
+                      .PropertyName = "v:temperature",
+                  }),
+              Runtime::SandboxEditorCommandStatus::StaleEntity);
+
+    Runtime::SandboxEditorContext unavailable = context;
+    unavailable.VisualizationCommandsAvailable = false;
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationPropertyCommand(
+                  unavailable,
+                  Runtime::SandboxEditorVisualizationPropertyCommand{
+                      .StableEntityId = stableId,
+                      .Domain = Domain::MeshVertices,
+                      .Preset = Preset::Scalar,
+                      .PropertyName = "v:temperature",
+                  }),
+              Runtime::SandboxEditorCommandStatus::MissingVisualizationCommands);
+    expectVisualizationConfigUnchanged();
+
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorVisualizationPropertyPreset(
+                     Preset::ColorBuffer),
+                 "ColorBuffer");
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorCommandStatus(
+                     Runtime::SandboxEditorCommandStatus::InvalidVisualizationProperty),
+                 "InvalidVisualizationProperty");
 }
 
 TEST(SandboxEditorUi, DomainWindowModelsReportSelectedMeshGraphAndPointCloudState)
