@@ -10,10 +10,10 @@
 - No attempt to move templates or constexpr bodies that must remain visible to importers.
 
 ## Context
-- Status: blocked (current implementation-split slice complete locally; retirement blocked by default CPU CTest failure on 2026-06-07).
+- Status: done (retired 2026-06-07; implementation split landed in `bfcd2751`).
 - Owner/agent: Codex.
 - Branch / PR: current branch / TBD.
-- Next verification step: resolve the `src/graphics/framegraph/Graphics.RenderGraph.Compiler.cpp:1565` ASan heap-buffer-overflow default-gate blocker, then rerun the default CPU gate and retire this task if clean.
+- Next verification step: none; retired after a clean no-cache rebuild, explicit benchmark-smoke target build, and default CPU gate on 2026-06-07.
 - Owning subsystem/layer: `core` (`core -> nothing`). Filed under architecture because there is no dedicated core backlog directory.
 - `AGENTS.md` requires `.cppm` interfaces to stay focused on declarations, small inline accessors, and templates. Non-trivial control-flow, container traversal/mutation, diagnostics assembly, and implementation-only imports belong in `.cpp` implementation units.
 - Static audit on 2026-06-06 identified these promoted core cleanup targets:
@@ -40,9 +40,9 @@
 - [x] Audit imports in touched `.cppm` files and move implementation-only imports into `.cpp` when the public surface no longer requires them.
 
 ## Tests
-- [ ] Existing core unit and contract tests remain green.
-- [ ] Add no new behavior tests unless the split exposes an untested core contract seam or a bug.
-- [ ] If any task/frame-loop behavior is touched, run focused frame-graph/task tests in addition to the default CPU gate.
+- [x] Existing core unit and contract tests remain green.
+- [x] Add no new behavior tests unless the split exposes an untested core contract seam or a bug.
+- [x] If any task/frame-loop behavior is touched, run focused frame-graph/task tests in addition to the default CPU gate.
 
 ## Docs
 - [x] Update architecture docs only if a public core contract or module surface wording changes.
@@ -50,16 +50,16 @@
 - [x] Update this task with completion notes before retirement.
 
 ## Acceptance criteria
-- [ ] Touched core `.cppm` files expose declarations, templates, and small inline accessors only, or record a justified retained exception.
-- [ ] Any new `.cpp` implementation units are registered in CMake and compile under the `ci` preset.
-- [ ] Touched `.cppm` files no longer include/import implementation-only dependencies.
-- [ ] Core tests pass without changed expectations.
-- [ ] The change preserves `core -> nothing` layering.
+- [x] Touched core `.cppm` files expose declarations, templates, and small inline accessors only, or record a justified retained exception.
+- [x] Any new `.cpp` implementation units are registered in CMake and compile under the `ci` preset.
+- [x] Touched `.cppm` files no longer include/import implementation-only dependencies.
+- [x] Core tests pass without changed expectations.
+- [x] The change preserves `core -> nothing` layering.
 
 ## Progress notes
 - 2026-06-07: Current implementation-split slice completed locally: moved non-trivial non-template bodies into matching `.cpp` implementation units, registered new private sources in CMake, and retained importer-visible templates, constexpr helpers, ABI structs, and small accessors in module interfaces where required.
 - Focused target builds passed for the touched subsystem, and `docs/api/generated/module_inventory.md` was regenerated with `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`.
-- Retirement blocker: current-session verification on 2026-06-07 passed configure, `IntrinsicTests` build, generated-inventory, task-policy, layering, test-layout, doc-link, and diff-whitespace checks. The default CPU CTest gate failed with 159 failed tests out of 2816; the failures reproduce the existing `src/graphics/framegraph/Graphics.RenderGraph.Compiler.cpp:1565` ASan heap-buffer-overflow during render-graph compile, reached through `src/graphics/framegraph/Graphics.RenderGraph.cpp:405`, and cascade through graphics/runtime tests.
+- 2026-06-07 retirement verification: the previous rendergraph ASan blocker was reproduced as stale C++23 module layout state from ccache/incremental module artifacts, not a source defect in the implementation split. A `CCACHE_DISABLE=1` `IntrinsicTests` rebuild plus an explicit `IntrinsicBenchmarkSmoke` build restored a clean default CPU gate; final `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60` passed 2816/2816.
 
 ## Verification
 ```bash

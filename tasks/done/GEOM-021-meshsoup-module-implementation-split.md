@@ -16,10 +16,10 @@
 - No attempt to move templates or template-dependent bodies into `.cpp`.
 
 ## Context
-- Status: blocked (current implementation-split slice complete locally; retirement blocked by default CPU CTest failure on 2026-06-07).
+- Status: done (retired 2026-06-07; implementation split landed in `bfcd2751`).
 - Owner/agent: Codex.
 - Branch / PR: current branch / TBD.
-- Next verification step: resolve the `src/graphics/framegraph/Graphics.RenderGraph.Compiler.cpp:1565` ASan heap-buffer-overflow default-gate blocker, then rerun the default CPU gate and retire this task if clean.
+- Next verification step: none; retired after a clean no-cache rebuild, explicit benchmark-smoke target build, and default CPU gate on 2026-06-07.
 - Owning subsystem/layer: `geometry` (`geometry -> core` only).
 - `AGENTS.md` requires `.cppm` module interfaces to stay focused on exported
   types, declarations, small inline accessors, and templates that must be
@@ -81,11 +81,11 @@
       to `Geometry.MeshSoup.cpp` if any appear.
 
 ## Tests
-- [ ] Existing `tests/unit/geometry/Test.MeshSoup.cpp` remains green.
-- [ ] Existing conversion coverage using MeshSoup remains green:
+- [x] Existing `tests/unit/geometry/Test.MeshSoup.cpp` remains green.
+- [x] Existing conversion coverage using MeshSoup remains green:
       `tests/unit/geometry/Test.MeshConversion.cpp` and
       `tests/unit/geometry/Test.PointCloudConversion.cpp`.
-- [ ] Add no new behavior tests unless the split exposes an untested contract
+- [x] Add no new behavior tests unless the split exposes an untested contract
       seam or a bug.
 
 ## Docs
@@ -98,22 +98,22 @@
       `tasks/done/`.
 
 ## Acceptance criteria
-- [ ] `Geometry.MeshSoup.cppm` exposes declarations, data types, templates, and
+- [x] `Geometry.MeshSoup.cppm` exposes declarations, data types, templates, and
       small inline accessors only; non-trivial validation/container logic lives
       in `Geometry.MeshSoup.cpp`.
-- [ ] `Geometry.MeshSoup.cpp` compiles as part of `IntrinsicGeometry` through
+- [x] `Geometry.MeshSoup.cpp` compiles as part of `IntrinsicGeometry` through
       the configured CMake preset.
-- [ ] `Geometry.MeshSoup.cppm` no longer includes headers needed only by moved
+- [x] `Geometry.MeshSoup.cppm` no longer includes headers needed only by moved
       implementations.
-- [ ] Existing MeshSoup, mesh-conversion, and point-cloud-conversion tests pass
+- [x] Existing MeshSoup, mesh-conversion, and point-cloud-conversion tests pass
       without changed expectations.
-- [ ] The change preserves `geometry -> core` layering and introduces no
+- [x] The change preserves `geometry -> core` layering and introduces no
       renderer/runtime/ECS/assets/platform/app dependencies.
 
 ## Progress notes
 - 2026-06-07: Current implementation-split slice completed locally: moved non-trivial non-template bodies into matching `.cpp` implementation units, registered new private sources in CMake, and retained importer-visible templates, constexpr helpers, ABI structs, and small accessors in module interfaces where required.
 - Focused target builds passed for the touched subsystem, and `docs/api/generated/module_inventory.md` was regenerated with `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`.
-- Retirement blocker: current-session verification on 2026-06-07 passed configure, `IntrinsicTests` build, generated-inventory, task-policy, layering, test-layout, doc-link, and diff-whitespace checks. The default CPU CTest gate failed with 159 failed tests out of 2816; the failures reproduce the existing `src/graphics/framegraph/Graphics.RenderGraph.Compiler.cpp:1565` ASan heap-buffer-overflow during render-graph compile, reached through `src/graphics/framegraph/Graphics.RenderGraph.cpp:405`, and cascade through graphics/runtime tests.
+- 2026-06-07 retirement verification: the previous rendergraph ASan blocker was reproduced as stale C++23 module layout state from ccache/incremental module artifacts, not a source defect in the implementation split. A `CCACHE_DISABLE=1` `IntrinsicTests` rebuild plus an explicit `IntrinsicBenchmarkSmoke` build restored a clean default CPU gate; final `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60` passed 2816/2816.
 
 ## Verification
 ```bash

@@ -27,8 +27,8 @@ map.
 - [GEOM-020 — Sparse direct factorization solver seam (LDLT/LLT)](GEOM-020-sparse-direct-factorization-seam.md)
   (follow-up to retired `GEOM-008`; gates `methods/METHOD-002` /
   `METHOD-003` LDLT paths).
-- [GEOM-021 — MeshSoup module implementation split](../../active/GEOM-021-meshsoup-module-implementation-split.md).
-- [GEOM-022 — Remaining geometry module implementation splits](../../active/GEOM-022-remaining-geometry-module-implementation-splits.md).
+- [GEOM-021 — MeshSoup module implementation split](../../done/GEOM-021-meshsoup-module-implementation-split.md).
+- [GEOM-022 — Remaining geometry module implementation splits](../../done/GEOM-022-remaining-geometry-module-implementation-splits.md).
 - [RORG-031E — Geometry and method-readiness backlog seed](RORG-031-geometry-method-readiness.md).
 
 ## Convergence

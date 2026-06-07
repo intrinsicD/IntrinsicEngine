@@ -11,10 +11,10 @@
 - No attempt to move templates or constexpr bodies that must remain visible to importers.
 
 ## Context
-- Status: blocked (current implementation-split slice complete locally; retirement blocked by default CPU CTest failure on 2026-06-07).
+- Status: done (retired 2026-06-07; implementation split landed in `bfcd2751`).
 - Owner/agent: Codex.
 - Branch / PR: current branch / TBD.
-- Next verification step: resolve the `src/graphics/framegraph/Graphics.RenderGraph.Compiler.cpp:1565` ASan heap-buffer-overflow default-gate blocker, then rerun the default CPU gate and retire this task if clean.
+- Next verification step: none; retired after a clean no-cache rebuild, explicit benchmark-smoke target build, and default CPU gate on 2026-06-07.
 - Owning subsystem/layer: `geometry` (`geometry -> core` only).
 - `AGENTS.md` requires non-trivial algorithm/control-flow bodies, topology/container traversal, diagnostics assembly, and implementation-only imports to live in `.cpp` implementation units when importer visibility is not required.
 - Static audit on 2026-06-06 identified these promoted geometry cleanup targets outside `Geometry.MeshSoup`:
@@ -41,10 +41,10 @@
 - [x] Audit imports in touched `.cppm` files and keep only public-surface imports in the interfaces.
 
 ## Tests
-- [ ] Existing geometry unit tests remain green for all touched modules.
-- [ ] Existing contact/overlap/support/robust-predicate tests remain green if the analytic modules are touched.
-- [ ] Existing MeshSoup/conversion tests remain green if module-inventory or umbrella imports change.
-- [ ] Add no new behavior tests unless the split exposes an untested contract seam or a bug.
+- [x] Existing geometry unit tests remain green for all touched modules.
+- [x] Existing contact/overlap/support/robust-predicate tests remain green if the analytic modules are touched.
+- [x] Existing MeshSoup/conversion tests remain green if module-inventory or umbrella imports change.
+- [x] Add no new behavior tests unless the split exposes an untested contract seam or a bug.
 
 ## Docs
 - [x] Update geometry architecture docs only if a public contract or module-surface wording changes.
@@ -52,16 +52,16 @@
 - [x] Update this task with per-slice completion notes before retirement.
 
 ## Acceptance criteria
-- [ ] Touched geometry `.cppm` files expose declarations, value types, templates, constexpr importer-required helpers, and small inline accessors only, or record justified retained exceptions.
-- [ ] Any new `.cpp` implementation units are registered in CMake and compile under the `ci` preset.
-- [ ] Touched `.cppm` files no longer include/import implementation-only dependencies.
-- [ ] Focused geometry tests and the default CPU gate pass without changed expectations.
-- [ ] The change preserves `geometry -> core` layering.
+- [x] Touched geometry `.cppm` files expose declarations, value types, templates, constexpr importer-required helpers, and small inline accessors only, or record justified retained exceptions.
+- [x] Any new `.cpp` implementation units are registered in CMake and compile under the `ci` preset.
+- [x] Touched `.cppm` files no longer include/import implementation-only dependencies.
+- [x] Focused geometry tests and the default CPU gate pass without changed expectations.
+- [x] The change preserves `geometry -> core` layering.
 
 ## Progress notes
 - 2026-06-07: Current implementation-split slice completed locally: moved non-trivial non-template bodies into matching `.cpp` implementation units, registered new private sources in CMake, and retained importer-visible templates, constexpr helpers, ABI structs, and small accessors in module interfaces where required.
 - Focused target builds passed for the touched subsystem, and `docs/api/generated/module_inventory.md` was regenerated with `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`.
-- Retirement blocker: current-session verification on 2026-06-07 passed configure, `IntrinsicTests` build, generated-inventory, task-policy, layering, test-layout, doc-link, and diff-whitespace checks. The default CPU CTest gate failed with 159 failed tests out of 2816; the failures reproduce the existing `src/graphics/framegraph/Graphics.RenderGraph.Compiler.cpp:1565` ASan heap-buffer-overflow during render-graph compile, reached through `src/graphics/framegraph/Graphics.RenderGraph.cpp:405`, and cascade through graphics/runtime tests.
+- 2026-06-07 retirement verification: the previous rendergraph ASan blocker was reproduced as stale C++23 module layout state from ccache/incremental module artifacts, not a source defect in the implementation split. A `CCACHE_DISABLE=1` `IntrinsicTests` rebuild plus an explicit `IntrinsicBenchmarkSmoke` build restored a clean default CPU gate; final `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60` passed 2816/2816.
 
 ## Verification
 ```bash
