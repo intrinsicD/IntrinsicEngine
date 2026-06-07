@@ -51,6 +51,76 @@ namespace Extrinsic::Runtime
         namespace G = Extrinsic::Graphics::Components;
         namespace A = Extrinsic::Assets;
 
+        enum class DomainWindowSection : std::uint8_t
+        {
+            Render = 0,
+            Visualization = 1,
+            Selection = 2,
+            Count = 3,
+        };
+
+        [[nodiscard]] GS::Domain ExpectedDomainForWindowKind(
+            const SandboxEditorDomainWindowKind kind) noexcept
+        {
+            switch (kind)
+            {
+            case SandboxEditorDomainWindowKind::Mesh:
+                return GS::Domain::Mesh;
+            case SandboxEditorDomainWindowKind::Graph:
+                return GS::Domain::Graph;
+            case SandboxEditorDomainWindowKind::PointCloud:
+                return GS::Domain::PointCloud;
+            }
+            return GS::Domain::None;
+        }
+
+        [[nodiscard]] const char* DomainWindowTitle(
+            const SandboxEditorDomainWindowKind kind,
+            const DomainWindowSection section) noexcept
+        {
+            switch (kind)
+            {
+            case SandboxEditorDomainWindowKind::Mesh:
+                switch (section)
+                {
+                case DomainWindowSection::Render: return "Mesh / Render";
+                case DomainWindowSection::Visualization: return "Mesh / Visualization";
+                case DomainWindowSection::Selection: return "Mesh / Selection";
+                case DomainWindowSection::Count: break;
+                }
+                break;
+            case SandboxEditorDomainWindowKind::Graph:
+                switch (section)
+                {
+                case DomainWindowSection::Render: return "Graph / Render";
+                case DomainWindowSection::Visualization: return "Graph / Visualization";
+                case DomainWindowSection::Selection: return "Graph / Selection";
+                case DomainWindowSection::Count: break;
+                }
+                break;
+            case SandboxEditorDomainWindowKind::PointCloud:
+                switch (section)
+                {
+                case DomainWindowSection::Render: return "PointCloud / Render";
+                case DomainWindowSection::Visualization: return "PointCloud / Visualization";
+                case DomainWindowSection::Selection: return "PointCloud / Selection";
+                case DomainWindowSection::Count: break;
+                }
+                break;
+            }
+            return "Domain / Unknown";
+        }
+
+        [[nodiscard]] std::size_t DomainWindowSlotIndex(
+            const SandboxEditorDomainWindowKind kind,
+            const DomainWindowSection section) noexcept
+        {
+            const auto kindIndex = static_cast<std::size_t>(kind);
+            const auto sectionIndex = static_cast<std::size_t>(section);
+            return kindIndex * static_cast<std::size_t>(DomainWindowSection::Count) +
+                   sectionIndex;
+        }
+
         [[nodiscard]] std::string ErrorName(const Core::ErrorCode error)
         {
             return std::string(Core::Error::ToString(error));
@@ -302,6 +372,12 @@ namespace Extrinsic::Runtime
                            std::string message)
         {
             diagnostics.push_back(MakeDiagnostic(code, std::move(message)));
+        }
+
+        void AppendDiagnostics(std::vector<SandboxEditorDiagnostic>& destination,
+                               const std::vector<SandboxEditorDiagnostic>& source)
+        {
+            destination.insert(destination.end(), source.begin(), source.end());
         }
 
         [[nodiscard]] std::string FallbackEntityName(const ECS::EntityHandle entity)
@@ -868,12 +944,357 @@ namespace Extrinsic::Runtime
                         value.z);
         }
 
+        void DrawDomainMenu(
+            const SandboxEditorDomainWindowKind kind,
+            std::array<bool, 9>* domainWindowOpen)
+        {
+            if (!ImGui::BeginMenu(DebugNameForSandboxEditorDomainWindowKind(kind)))
+                return;
+
+            const bool menuEnabled = domainWindowOpen != nullptr;
+            if (!menuEnabled)
+                ImGui::BeginDisabled();
+
+            if (domainWindowOpen != nullptr)
+            {
+                ImGui::MenuItem(
+                    "Render hints",
+                    nullptr,
+                    &(*domainWindowOpen)[DomainWindowSlotIndex(kind, DomainWindowSection::Render)]);
+                ImGui::MenuItem(
+                    "Visualization",
+                    nullptr,
+                    &(*domainWindowOpen)[DomainWindowSlotIndex(kind, DomainWindowSection::Visualization)]);
+                ImGui::MenuItem(
+                    "Selection details",
+                    nullptr,
+                    &(*domainWindowOpen)[DomainWindowSlotIndex(kind, DomainWindowSection::Selection)]);
+            }
+            else
+            {
+                (void)ImGui::MenuItem("Render hints", nullptr, false, false);
+                (void)ImGui::MenuItem("Visualization", nullptr, false, false);
+                (void)ImGui::MenuItem("Selection details", nullptr, false, false);
+            }
+
+            if (!menuEnabled)
+                ImGui::EndDisabled();
+            ImGui::EndMenu();
+        }
+
+        void DrawDomainMenus(std::array<bool, 9>* domainWindowOpen)
+        {
+            if (!ImGui::BeginMainMenuBar())
+                return;
+            DrawDomainMenu(SandboxEditorDomainWindowKind::PointCloud, domainWindowOpen);
+            DrawDomainMenu(SandboxEditorDomainWindowKind::Graph, domainWindowOpen);
+            DrawDomainMenu(SandboxEditorDomainWindowKind::Mesh, domainWindowOpen);
+            ImGui::EndMainMenuBar();
+        }
+
+        [[nodiscard]] bool DomainWindowReady(
+            const SandboxEditorDomainWindowModel& model) noexcept
+        {
+            return model.HasSelectedEntity && model.DomainMatches;
+        }
+
+        void DrawDomainWindowHeader(const SandboxEditorDomainWindowModel& model)
+        {
+            ImGui::Text("Expected domain: %s",
+                        DebugNameForSandboxEditorGeometryDomain(model.ExpectedDomain));
+            if (model.HasSelectedEntity)
+            {
+                ImGui::Text("Selected: %s (%u)",
+                            model.SelectedEntity.Name.c_str(),
+                            model.SelectedStableId);
+                ImGui::Text("Selected domain: %s",
+                            DebugNameForSandboxEditorGeometryDomain(model.SelectedDomain));
+            }
+            else
+            {
+                ImGui::TextDisabled("Selected: none");
+            }
+            DrawDiagnostics(model.Diagnostics);
+        }
+
+        void DrawRenderHintStatus(const SandboxEditorRenderHintModel& hints)
+        {
+            ImGui::Text("Surface: %s",
+                        hints.HasRenderSurface ? hints.SurfaceDomain.c_str() : "none");
+            if (hints.HasRenderLines)
+            {
+                ImGui::Text("Lines: %s", hints.LineDomain.c_str());
+                if (hints.HasUniformLineWidth)
+                    ImGui::Text("Line width: %.3f", hints.UniformLineWidth);
+                if (hints.HasNamedLineWidth)
+                    ImGui::Text("Line width source: %s", hints.LineWidthName.c_str());
+            }
+            else
+            {
+                ImGui::TextDisabled("Lines: none");
+            }
+
+            if (hints.HasRenderPoints)
+            {
+                ImGui::Text("Points: %s", hints.PointRenderType.c_str());
+                if (hints.HasUniformPointSize)
+                    ImGui::Text("Point size: %.3f", hints.UniformPointSize);
+                if (hints.HasNamedPointSize)
+                    ImGui::Text("Point size source: %s", hints.PointSizeName.c_str());
+            }
+            else
+            {
+                ImGui::TextDisabled("Points: none");
+            }
+        }
+
+        void DrawDomainRenderWindow(const SandboxEditorDomainWindowModel& model,
+                                    const SandboxEditorContext& context)
+        {
+            DrawDomainWindowHeader(model);
+            ImGui::SeparatorText("Render hint status");
+            DrawRenderHintStatus(model.RenderHints);
+
+            if (model.Kind != SandboxEditorDomainWindowKind::Mesh)
+                return;
+
+            ImGui::SeparatorText("Mesh primitive views");
+            const bool canEditPrimitiveView =
+                DomainWindowReady(model) &&
+                model.PrimitiveViewControlsAvailable &&
+                model.HasPrimitiveViewSettings;
+            if (!canEditPrimitiveView)
+                ImGui::BeginDisabled();
+
+            bool edgeView = model.PrimitiveView.EnableEdgeView;
+            if (ImGui::Checkbox("Edge view", &edgeView) && canEditPrimitiveView)
+            {
+                (void)ApplySandboxEditorPrimitiveViewCommand(
+                    context,
+                    SandboxEditorPrimitiveViewCommand{
+                        .StableEntityId = model.SelectedStableId,
+                        .SetEdgeView = true,
+                        .EnableEdgeView = edgeView,
+                    });
+            }
+
+            bool vertexView = model.PrimitiveView.EnableVertexView;
+            if (ImGui::Checkbox("Vertex view", &vertexView) && canEditPrimitiveView)
+            {
+                (void)ApplySandboxEditorPrimitiveViewCommand(
+                    context,
+                    SandboxEditorPrimitiveViewCommand{
+                        .StableEntityId = model.SelectedStableId,
+                        .SetVertexView = true,
+                        .EnableVertexView = vertexView,
+                    });
+            }
+
+            if (!canEditPrimitiveView)
+                ImGui::EndDisabled();
+        }
+
+        void DrawDomainVisualizationWindow(
+            const SandboxEditorDomainWindowModel& model,
+            const SandboxEditorContext& context)
+        {
+            DrawDomainWindowHeader(model);
+            const SandboxEditorVisualizationModel& visualization = model.Visualization;
+
+            if (visualization.SpatialDebug.HasBinding)
+            {
+                ImGui::Text("Spatial debug: %s key=%llu",
+                            DebugNameForSandboxEditorSpatialDebugKind(
+                                visualization.SpatialDebug.Kind),
+                            static_cast<unsigned long long>(
+                                visualization.SpatialDebug.RegistryKey));
+            }
+            else
+            {
+                ImGui::TextDisabled("Spatial debug: disabled");
+            }
+
+            if (visualization.Visualization.HasConfig)
+            {
+                ImGui::Text("Visualization: %s",
+                            DebugNameForSandboxEditorVisualizationColorSource(
+                                visualization.Visualization.Source));
+            }
+            else
+            {
+                ImGui::TextDisabled("Visualization: material/default");
+            }
+
+            const bool canEditVisualization =
+                DomainWindowReady(model) &&
+                model.VisualizationControlsAvailable;
+            if (!canEditVisualization)
+                ImGui::BeginDisabled();
+
+            if (ImGui::Button("Enable BVH debug") && canEditVisualization)
+            {
+                (void)ApplySandboxEditorSpatialDebugBindingCommand(
+                    context,
+                    SandboxEditorSpatialDebugBindingCommand{
+                        .StableEntityId = model.SelectedStableId,
+                        .EnableBinding = true,
+                    });
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Clear debug") && canEditVisualization)
+            {
+                (void)ApplySandboxEditorSpatialDebugBindingCommand(
+                    context,
+                    SandboxEditorSpatialDebugBindingCommand{
+                        .StableEntityId = model.SelectedStableId,
+                        .EnableBinding = false,
+                    });
+            }
+
+            if (ImGui::Button("Uniform color") && canEditVisualization)
+            {
+                (void)ApplySandboxEditorVisualizationConfigCommand(
+                    context,
+                    SandboxEditorVisualizationConfigCommand{
+                        .StableEntityId = model.SelectedStableId,
+                        .EnableConfig = true,
+                        .Source = G::VisualizationConfig::ColorSource::UniformColor,
+                    });
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Scalar: scalars") && canEditVisualization)
+            {
+                (void)ApplySandboxEditorVisualizationConfigCommand(
+                    context,
+                    SandboxEditorVisualizationConfigCommand{
+                        .StableEntityId = model.SelectedStableId,
+                        .EnableConfig = true,
+                        .Source = G::VisualizationConfig::ColorSource::ScalarField,
+                        .ScalarFieldName = "scalars",
+                        .ScalarDomain = G::VisualizationConfig::Domain::Vertex,
+                    });
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Clear vis") && canEditVisualization)
+            {
+                (void)ApplySandboxEditorVisualizationConfigCommand(
+                    context,
+                    SandboxEditorVisualizationConfigCommand{
+                        .StableEntityId = model.SelectedStableId,
+                        .EnableConfig = false,
+                    });
+            }
+
+            if (!canEditVisualization)
+                ImGui::EndDisabled();
+        }
+
+        void DrawPrimitiveDetails(const SandboxEditorPrimitiveDetailModel& primitive)
+        {
+            if (!primitive.HasPrimitive)
+            {
+                ImGui::TextDisabled("No refined primitive selection for this domain.");
+                return;
+            }
+
+            const PrimitiveSelectionResult& result = primitive.Primitive;
+            ImGui::Text("Primitive status: %s",
+                        DebugNameForPrimitiveRefineStatus(result.Status));
+            ImGui::Text("Primitive domain/kind: %s / %s",
+                        DebugNameForSandboxEditorGeometryDomain(result.Domain),
+                        DebugNameForSandboxEditorPrimitiveKind(result.Kind));
+            if (primitive.HasFaceId)
+                ImGui::Text("Face id: %u", result.FaceId);
+            if (primitive.HasEdgeId)
+                ImGui::Text("Edge id: %u", result.EdgeId);
+            if (primitive.HasVertexId)
+                ImGui::Text("Vertex id: %u", result.VertexId);
+            if (primitive.HasPointId)
+                ImGui::Text("Point id: %u", result.PointId);
+            if (result.HasHitPosition)
+            {
+                DrawVec3("Local hit", result.LocalHit);
+                DrawVec3("World hit", result.WorldHit);
+            }
+        }
+
+        void DrawDomainSelectionWindow(
+            const SandboxEditorDomainWindowModel& model)
+        {
+            DrawDomainWindowHeader(model);
+            ImGui::SeparatorText("Primitive selection");
+            DrawPrimitiveDetails(model.Primitive);
+        }
+
+        void DrawOneDomainWindow(
+            const SandboxEditorContext& context,
+            const SandboxEditorDomainWindowKind kind,
+            const DomainWindowSection section,
+            std::array<bool, 9>& domainWindowOpen)
+        {
+            const std::size_t slot = DomainWindowSlotIndex(kind, section);
+            if (!domainWindowOpen[slot])
+                return;
+
+            const SandboxEditorDomainWindowModel model =
+                BuildSandboxEditorDomainWindowModel(context, kind);
+            ImGui::SetNextWindowSize(ImVec2(340.0f, 300.0f), ImGuiCond_FirstUseEver);
+            if (ImGui::Begin(DomainWindowTitle(kind, section), &domainWindowOpen[slot]))
+            {
+                switch (section)
+                {
+                case DomainWindowSection::Render:
+                    DrawDomainRenderWindow(model, context);
+                    break;
+                case DomainWindowSection::Visualization:
+                    DrawDomainVisualizationWindow(model, context);
+                    break;
+                case DomainWindowSection::Selection:
+                    DrawDomainSelectionWindow(model);
+                    break;
+                case DomainWindowSection::Count:
+                    break;
+                }
+            }
+            ImGui::End();
+        }
+
+        void DrawDomainWindows(
+            const SandboxEditorContext* context,
+            std::array<bool, 9>* domainWindowOpen)
+        {
+            if (context == nullptr || domainWindowOpen == nullptr)
+                return;
+
+            constexpr std::array<SandboxEditorDomainWindowKind, 3> kKinds{
+                SandboxEditorDomainWindowKind::PointCloud,
+                SandboxEditorDomainWindowKind::Graph,
+                SandboxEditorDomainWindowKind::Mesh,
+            };
+            constexpr std::array<DomainWindowSection, 3> kSections{
+                DomainWindowSection::Render,
+                DomainWindowSection::Visualization,
+                DomainWindowSection::Selection,
+            };
+            for (const SandboxEditorDomainWindowKind kind : kKinds)
+            {
+                for (const DomainWindowSection section : kSections)
+                {
+                    DrawOneDomainWindow(*context, kind, section, *domainWindowOpen);
+                }
+            }
+        }
+
         void DrawPanelFrame(
             const SandboxEditorPanelFrame& frame,
             const SandboxEditorContext* context,
             std::array<char, 1024>* importPathBuffer,
-            std::optional<SandboxEditorFileImportResult>* lastImportResult)
+            std::optional<SandboxEditorFileImportResult>* lastImportResult,
+            std::array<bool, 9>* domainWindowOpen)
         {
+            DrawDomainMenus(domainWindowOpen);
+            DrawDomainWindows(context, domainWindowOpen);
+
             ImGui::SetNextWindowSize(ImVec2(360.0f, 520.0f), ImGuiCond_FirstUseEver);
             if (ImGui::Begin("Sandbox Editor"))
             {
@@ -1406,6 +1827,21 @@ namespace Extrinsic::Runtime
         return "Unknown";
     }
 
+    const char* DebugNameForSandboxEditorDomainWindowKind(
+        const SandboxEditorDomainWindowKind kind) noexcept
+    {
+        switch (kind)
+        {
+        case SandboxEditorDomainWindowKind::Mesh:
+            return "Mesh";
+        case SandboxEditorDomainWindowKind::Graph:
+            return "Graph";
+        case SandboxEditorDomainWindowKind::PointCloud:
+            return "PointCloud";
+        }
+        return "Unknown";
+    }
+
     const char* DebugNameForSandboxEditorPrimitiveKind(
         const RefinedPrimitiveKind kind) noexcept
     {
@@ -1565,6 +2001,115 @@ namespace Extrinsic::Runtime
         frame.CameraRender = BuildCameraRenderModel(context);
         frame.Visualization = BuildVisualizationModel(context);
         return frame;
+    }
+
+    SandboxEditorDomainWindowModel BuildSandboxEditorDomainWindowModel(
+        const SandboxEditorContext& context,
+        const SandboxEditorDomainWindowKind kind)
+    {
+        SandboxEditorDomainWindowModel model{};
+        model.Kind = kind;
+        model.ExpectedDomain = ExpectedDomainForWindowKind(kind);
+        model.PrimitiveViewControlsAvailable =
+            kind == SandboxEditorDomainWindowKind::Mesh &&
+            context.PrimitiveViewCommands.Available();
+        model.VisualizationControlsAvailable =
+            context.VisualizationCommandsAvailable;
+
+        if (context.Scene == nullptr)
+        {
+            AddDiagnostic(model.Diagnostics,
+                          SandboxEditorDiagnosticCode::MissingScene,
+                          "Scene registry is unavailable for domain window.");
+            return model;
+        }
+        if (context.Selection == nullptr)
+        {
+            AddDiagnostic(model.Diagnostics,
+                          SandboxEditorDiagnosticCode::MissingSelectionController,
+                          "Selection controller is unavailable for domain window.");
+            return model;
+        }
+
+        const std::optional<ECS::EntityHandle> selected =
+            ResolveFirstSelectedEntity(context);
+        if (!selected.has_value())
+        {
+            const bool hadStaleSelection =
+                !context.Selection->SelectedStableIds().empty();
+            AddDiagnostic(model.Diagnostics,
+                          SandboxEditorDiagnosticCode::NoSelectedEntity,
+                          hadStaleSelection
+                              ? "Selected entity is stale or no longer live."
+                              : "No selected entity is available for domain window.");
+            return model;
+        }
+
+        const entt::registry& raw = context.Scene->Raw();
+        model.HasSelectedEntity = true;
+        model.SelectedEntity = BuildEntityRow(raw, *selected);
+        model.SelectedStableId = SelectionController::ToStableEntityId(*selected);
+        model.RenderHints = BuildRenderHintModel(raw, *selected);
+        model.SelectedDomain = GS::BuildConstView(raw, *selected).ActiveDomain;
+        model.DomainMatches = model.SelectedDomain == model.ExpectedDomain;
+
+        if (!model.DomainMatches)
+        {
+            std::string message =
+                std::string(DebugNameForSandboxEditorDomainWindowKind(kind));
+            message += " window requires ";
+            message += DebugNameForSandboxEditorGeometryDomain(model.ExpectedDomain);
+            message += "-domain selection; selected domain is ";
+            message += DebugNameForSandboxEditorGeometryDomain(model.SelectedDomain);
+            message += ".";
+            AddDiagnostic(model.Diagnostics,
+                          SandboxEditorDiagnosticCode::UnsupportedGeometryDomain,
+                          std::move(message));
+        }
+
+        if (kind == SandboxEditorDomainWindowKind::Mesh)
+        {
+            if (context.PrimitiveViewCommands.Available())
+            {
+                model.HasPrimitiveViewSettings = model.DomainMatches;
+                if (model.HasPrimitiveViewSettings)
+                    model.PrimitiveView =
+                        context.PrimitiveViewCommands.GetSettings(
+                            model.SelectedStableId);
+            }
+            else
+            {
+                AddDiagnostic(model.Diagnostics,
+                              SandboxEditorDiagnosticCode::CameraRenderCommandsUnavailable,
+                              "Mesh primitive view command seam is unavailable.");
+            }
+        }
+
+        if (!context.VisualizationCommandsAvailable)
+        {
+            AddDiagnostic(model.Diagnostics,
+                          SandboxEditorDiagnosticCode::VisualizationCommandsUnavailable,
+                          "Visualization command seams are unavailable.");
+        }
+        else
+        {
+            model.Visualization = BuildVisualizationModel(context);
+            AppendDiagnostics(model.Diagnostics, model.Visualization.Diagnostics);
+        }
+
+        if (context.LastRefinedPrimitive != nullptr &&
+            context.LastRefinedPrimitive->has_value())
+        {
+            const PrimitiveSelectionResult& primitive =
+                **context.LastRefinedPrimitive;
+            const bool sameEntity =
+                primitive.EntityId == model.SelectedStableId ||
+                primitive.StableId == model.SelectedStableId;
+            if (sameEntity && primitive.Domain == model.SelectedDomain)
+                model.Primitive = BuildPrimitiveDetailModel(primitive);
+        }
+
+        return model;
     }
 
     bool SelectSandboxEditorEntity(const SandboxEditorContext& context,
@@ -1819,7 +2364,7 @@ namespace Extrinsic::Runtime
 
     void DrawSandboxEditorPanelFrame(const SandboxEditorPanelFrame& frame)
     {
-        DrawPanelFrame(frame, nullptr, nullptr, nullptr);
+        DrawPanelFrame(frame, nullptr, nullptr, nullptr, nullptr);
     }
 
     SandboxEditorUi::~SandboxEditorUi()
@@ -1848,7 +2393,8 @@ namespace Extrinsic::Runtime
                     m_LastFrame,
                     &context,
                     &m_ImportPathBuffer,
-                    &m_LastImportResult);
+                    &m_LastImportResult,
+                    &m_DomainWindowOpen);
             });
     }
 

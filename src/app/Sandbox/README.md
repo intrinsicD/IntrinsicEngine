@@ -23,6 +23,20 @@ decoding, `AssetService` mutation, model-scene materialization, and texture-uplo
 requests remain runtime/asset owned; `Sandbox::App` does not special-case asset
 authority.
 
+The promoted EditorUI also exposes stable top-level ImGui menu slots for
+`PointCloud`, `Graph`, and `Mesh`. Their submenu items open selected-entity
+domain windows for render-hint status, visualization/spatial-debug controls, and
+primitive-selection details. These windows are an EditorUI workflow only: they
+reuse `SandboxEditorUi` models and runtime-owned command surfaces, and
+`Sandbox::App` still does not own selection, ECS mutation, rendering, or asset
+state.
+
+With the standard reference configuration, runtime creates `ReferenceTriangle`
+through `Extrinsic.Runtime.ReferenceScene::TriangleProvider` as an ordinary
+ECS mesh-domain `GeometrySources` entity with `RenderSurface`, durable
+`StableId`, `Selection::SelectableTag`, and white `VisualizationConfig`.
+`Sandbox::App` does not create, render, select, or special-case the triangle.
+
 ## Build presets
 
 - `cmake --preset ci` configures the headless CPU/null gate (Sandbox disabled,

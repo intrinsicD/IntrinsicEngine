@@ -70,6 +70,16 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] const char* DebugNameForSandboxEditorGeometryDomain(
         ECS::Components::GeometrySources::Domain domain) noexcept;
 
+    enum class SandboxEditorDomainWindowKind : std::uint8_t
+    {
+        Mesh,
+        Graph,
+        PointCloud,
+    };
+
+    [[nodiscard]] const char* DebugNameForSandboxEditorDomainWindowKind(
+        SandboxEditorDomainWindowKind kind) noexcept;
+
     [[nodiscard]] const char* DebugNameForSandboxEditorPrimitiveKind(
         RefinedPrimitiveKind kind) noexcept;
 
@@ -331,6 +341,27 @@ export namespace Extrinsic::Runtime
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
+    struct SandboxEditorDomainWindowModel
+    {
+        SandboxEditorDomainWindowKind Kind{SandboxEditorDomainWindowKind::Mesh};
+        ECS::Components::GeometrySources::Domain ExpectedDomain{
+            ECS::Components::GeometrySources::Domain::Mesh};
+        bool HasSelectedEntity{false};
+        SandboxEditorEntityRow SelectedEntity{};
+        std::uint32_t SelectedStableId{0u};
+        ECS::Components::GeometrySources::Domain SelectedDomain{
+            ECS::Components::GeometrySources::Domain::None};
+        bool DomainMatches{false};
+        SandboxEditorRenderHintModel RenderHints{};
+        bool PrimitiveViewControlsAvailable{false};
+        bool HasPrimitiveViewSettings{false};
+        SandboxEditorPrimitiveViewSettings PrimitiveView{};
+        bool VisualizationControlsAvailable{false};
+        SandboxEditorVisualizationModel Visualization{};
+        SandboxEditorPrimitiveDetailModel Primitive{};
+        std::vector<SandboxEditorDiagnostic> Diagnostics{};
+    };
+
     struct SandboxEditorPanelFrame
     {
         std::vector<SandboxEditorEntityRow> Hierarchy{};
@@ -435,6 +466,10 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] SandboxEditorPanelFrame BuildSandboxEditorPanelFrame(
         const SandboxEditorContext& context);
 
+    [[nodiscard]] SandboxEditorDomainWindowModel BuildSandboxEditorDomainWindowModel(
+        const SandboxEditorContext& context,
+        SandboxEditorDomainWindowKind kind);
+
     bool SelectSandboxEditorEntity(const SandboxEditorContext& context,
                                    std::uint32_t stableEntityId);
 
@@ -492,6 +527,7 @@ export namespace Extrinsic::Runtime
         Engine*                 m_Engine{nullptr};
         SandboxEditorPanelFrame m_LastFrame{};
         std::array<char, 1024>  m_ImportPathBuffer{};
+        std::array<bool, 9>     m_DomainWindowOpen{};
         std::optional<SandboxEditorFileImportResult> m_LastImportResult{};
     };
 }

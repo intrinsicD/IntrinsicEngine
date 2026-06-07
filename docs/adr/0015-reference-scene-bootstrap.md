@@ -6,14 +6,15 @@
 - **Related tasks:** [`tasks/done/GRAPHICS-029`](../../tasks/done/GRAPHICS-029-runtime-reference-scene-bootstrap.md), [`GRAPHICS-029A`](../../tasks/done/GRAPHICS-029A-reference-scene-skeleton.md), [`GRAPHICS-029B`](../../tasks/done/GRAPHICS-029B-triangle-provider-and-camera.md), [`tasks/done/GRAPHICS-080`](../../tasks/done/GRAPHICS-080-enable-promoted-vulkan-by-default.md)
 - **Related docs:** [`docs/architecture/graphics.md`](../architecture/graphics.md), [`src/runtime/README.md`](../../src/runtime/README.md), [`src/app/Sandbox/README.md`](../../src/app/Sandbox/README.md)
 - **Supersedes:** none. Extracted from the `## Reference scene bootstrap` section in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/done/DOCS-001-reduce-graphics-architecture-prose.md).
-- **Related ADRs:** [ADR-0013](0013-ecs-renderable-residency-bridge.md) records the ECS-renderable residency bridge that the reference scene's entities feed into. [ADR-0014](0014-procedural-source-residency-bridge.md) records the procedural-source residency bridge that the `TriangleProvider` exercises. [ADR-0005](0005-vulkan-operational-readiness-gate.md) records the Vulkan operational truth table that governs which backend actually runs when the reference sandbox launches with `Render.EnablePromotedVulkanDevice = true`.
+- **Related ADRs:** [ADR-0013](0013-ecs-renderable-residency-bridge.md) records the ECS-renderable residency bridge that the reference scene's entities feed into. [ADR-0014](0014-procedural-source-residency-bridge.md) records the procedural-source residency bridge that early `TriangleProvider` slices exercised. [ADR-0005](0005-vulkan-operational-readiness-gate.md) records the Vulkan operational truth table that governs which backend actually runs when the reference sandbox launches with `Render.EnablePromotedVulkanDevice = true`.
+- **Status update:** RUNTIME-097 (2026-06-07) supersedes the default triangle's procedural-source detail: `TriangleProvider` now authors the default `ReferenceTriangle` as selectable mesh-domain `GeometrySources` with a durable `StableId` and white `VisualizationConfig`. The runtime-owned provider, registry, camera seed, no-GPU-typed-ECS-state rule, and app/runtime boundary in this ADR remain in force.
 
 ## Context
 
 The promoted graphics pipeline needs at least one renderable candidate to validate that:
 
 - `Runtime.RenderExtraction` observes a live renderable entity.
-- The procedural-source residency bridge ([ADR-0014](0014-procedural-source-residency-bridge.md)) lands the geometry.
+- The runtime-owned residency bridge lands the geometry through the selected source lane.
 - The default debug-surface material ([GRAPHICS-031](../../tasks/done/GRAPHICS-031-default-debug-surface-material.md)) composes a frame without crashing on missing geometry.
 
 Without a bootstrap, every sandbox / test that wants a "visible triangle" must either author one ad-hoc or wait for the full ECS scene editor to land. That fragments coverage and makes the GRAPHICS-033D opt-in `gpu;vulkan` visible-triangle smoke depend on whichever app happened to author the test entity.
@@ -21,7 +22,7 @@ Without a bootstrap, every sandbox / test that wants a "visible triangle" must e
 `GRAPHICS-029` records the planning contract for a **runtime-owned, opt-in** reference scene that produces at least one renderable candidate observable by `Runtime.RenderExtraction`. `GRAPHICS-029A` lands the skeleton + config plumbing; `GRAPHICS-029B` lands the `TriangleProvider` + camera seed + contract test. The reference scene must:
 
 1. Stay on the runtime side (apps stay policy-light per the app / runtime boundary).
-2. Use the procedural-source residency bridge rather than authoring asset state.
+2. Use a runtime-owned residency bridge rather than authoring asset state.
 3. Not attach any GPU-typed value to the ECS entity (preserving the [ADR-0013](0013-ecs-renderable-residency-bridge.md) `ecs → core` invariant).
 4. Compose forward-compatibly with the future `Extrinsic.Runtime.CameraControllers` umbrella ([ADR-0006](0006-camera-picking-and-gizmo-runtime-handoff.md) §1).
 5. Layer cleanly: no `Extrinsic.Graphics.GpuWorld` / `Renderer` / `GpuAssetCache` / RHI / asset / platform imports.
@@ -57,8 +58,11 @@ The entity carries:
 - `Transform::Component{}` (identity).
 - `Transform::WorldMatrix{}` (identity).
 - `Hierarchy::Component{}` (no parent / children).
+- `ECS::Components::StableId` with a durable runtime-authored identity.
+- `ECS::Components::Selection::SelectableTag`.
 - Exactly one `Graphics::Components::RenderSurface{ Domain = SourceDomain::Vertex }` render hint.
-- Once GRAPHICS-030-Impl-A lands (now retired as [GRAPHICS-030A](../../tasks/done/GRAPHICS-030A-procedural-geometry-descriptor-cache.md)): the CPU-only `ECS::Components::ProceduralGeometryRef{ Kind = ProceduralGeometryKind::Triangle }` linking it to the procedural-source residency bridge from [ADR-0014](0014-procedural-source-residency-bridge.md).
+- `Graphics::Components::VisualizationConfig{ Source = UniformColor, Color = white }`.
+- Mesh-domain `ECS::Components::GeometrySources` populated from one finite halfedge triangle.
 
 **No GPU-typed value** is attached to the entity:
 

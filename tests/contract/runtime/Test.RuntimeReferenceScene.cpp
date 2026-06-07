@@ -10,16 +10,23 @@ import Extrinsic.Core.Config.Engine;
 import Extrinsic.ECS.Component.Hierarchy;
 import Extrinsic.ECS.Component.MetaData;
 import Extrinsic.ECS.Component.ProceduralGeometryRef;
+import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
+import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.Component.RenderGeometry;
+import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.ReferenceScene;
 import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.SandboxEditorUi;
+import Extrinsic.Runtime.SelectionController;
+import Geometry.Properties;
 
 using Extrinsic::Core::Config::ReferenceSceneSelector;
 using Extrinsic::ECS::EntityHandle;
@@ -38,6 +45,10 @@ using Extrinsic::Runtime::TriangleProvider;
 
 namespace
 {
+    namespace E = Extrinsic::ECS::Components;
+    namespace G = Extrinsic::Graphics::Components;
+    namespace GS = Extrinsic::ECS::Components::GeometrySources;
+
     class TrackingProvider final : public IReferenceSceneProvider
     {
     public:
@@ -69,6 +80,44 @@ namespace
         int TeardownCalls{0};
         EntityHandle CreatedEntity{Extrinsic::ECS::InvalidEntityHandle};
     };
+
+    void ExpectReferenceTriangleEntityContract(Registry& scene,
+                                               const EntityHandle entity)
+    {
+        ASSERT_TRUE(scene.IsValid(entity));
+        auto& raw = scene.Raw();
+
+        ASSERT_TRUE(raw.all_of<E::MetaData>(entity));
+        EXPECT_EQ(raw.get<E::MetaData>(entity).EntityName, "ReferenceTriangle");
+
+        EXPECT_TRUE((raw.all_of<E::Transform::Component,
+                                E::Transform::WorldMatrix,
+                                E::Hierarchy::Component>(entity)));
+
+        ASSERT_TRUE(raw.all_of<E::StableId>(entity));
+        EXPECT_TRUE(E::IsValid(raw.get<E::StableId>(entity)));
+        EXPECT_TRUE(raw.all_of<E::Selection::SelectableTag>(entity));
+
+        ASSERT_TRUE(raw.all_of<G::RenderSurface>(entity));
+        EXPECT_EQ(raw.get<G::RenderSurface>(entity).Domain,
+                  G::RenderSurface::SourceDomain::Vertex);
+
+        ASSERT_TRUE(raw.all_of<G::VisualizationConfig>(entity));
+        const auto& visualization = raw.get<G::VisualizationConfig>(entity);
+        EXPECT_EQ(visualization.Source,
+                  G::VisualizationConfig::ColorSource::UniformColor);
+        EXPECT_EQ(visualization.Color, glm::vec4(1.0f));
+
+        EXPECT_FALSE(raw.all_of<E::ProceduralGeometryRef>(entity));
+
+        const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
+        ASSERT_TRUE(view.Valid());
+        EXPECT_EQ(view.ActiveDomain, GS::Domain::Mesh);
+        EXPECT_EQ(view.VerticesAlive(), 3u);
+        EXPECT_EQ(view.EdgesAlive(), 3u);
+        EXPECT_EQ(view.HalfedgesTotal(), 6u);
+        EXPECT_EQ(view.FacesAlive(), 1u);
+    }
 }
 
 TEST(ReferenceSceneRegistry, ResolveOnUnregisteredSelectorFiresTerminateGuard)
@@ -88,9 +137,6 @@ TEST(ReferenceSceneRegistry, ResolveOnUnregisteredSelectorFiresTerminateGuard)
 
 TEST(ReferenceSceneRegistry, MakeDefaultReferenceSceneRegistryRegistersTriangleProvider)
 {
-    namespace G = Extrinsic::Graphics::Components;
-    namespace E = Extrinsic::ECS::Components;
-
     ReferenceSceneRegistry registry = MakeDefaultReferenceSceneRegistry();
 
     IReferenceSceneProvider* provider =
@@ -105,10 +151,7 @@ TEST(ReferenceSceneRegistry, MakeDefaultReferenceSceneRegistryRegistersTriangleP
     ASSERT_EQ(population.Entities.size(), 1u);
     const EntityHandle entity = population.Entities.front().Entity;
     ASSERT_TRUE(scene.IsValid(entity));
-    auto& raw = scene.Raw();
-    ASSERT_TRUE(raw.all_of<E::MetaData>(entity));
-    EXPECT_EQ(raw.get<E::MetaData>(entity).EntityName, "ReferenceTriangle");
-    EXPECT_TRUE((raw.all_of<G::RenderSurface, E::ProceduralGeometryRef>(entity)));
+    ExpectReferenceTriangleEntityContract(scene, entity);
 }
 
 TEST(ReferenceSceneRegistry, RegisterFollowedByResolveReturnsTheRegisteredProvider)
@@ -162,9 +205,6 @@ TEST(ReferenceSceneRegistry, RegisterDefaultsIfAbsentPreservesPreRegisteredProvi
 
 TEST(TriangleProviderContract, PopulateCreatesNamedTriangleEntityWithExpectedComponents)
 {
-    namespace G = Extrinsic::Graphics::Components;
-    namespace E = Extrinsic::ECS::Components;
-
     Registry scene;
     TriangleProvider provider;
     const ReferenceScenePopulation population = provider.Populate(scene);
@@ -173,21 +213,7 @@ TEST(TriangleProviderContract, PopulateCreatesNamedTriangleEntityWithExpectedCom
     const EntityHandle entity = population.Entities.front().Entity;
     ASSERT_TRUE(scene.IsValid(entity));
 
-    auto& raw = scene.Raw();
-    ASSERT_TRUE(raw.all_of<E::MetaData>(entity));
-    EXPECT_EQ(raw.get<E::MetaData>(entity).EntityName, "ReferenceTriangle");
-
-    EXPECT_TRUE((raw.all_of<E::Transform::Component,
-                            E::Transform::WorldMatrix,
-                            E::Hierarchy::Component>(entity)));
-
-    ASSERT_TRUE(raw.all_of<G::RenderSurface>(entity));
-    EXPECT_EQ(raw.get<G::RenderSurface>(entity).Domain,
-              G::RenderSurface::SourceDomain::Vertex);
-
-    ASSERT_TRUE(raw.all_of<E::ProceduralGeometryRef>(entity));
-    EXPECT_EQ(raw.get<E::ProceduralGeometryRef>(entity).Kind,
-              E::ProceduralGeometryKind::Triangle);
+    ExpectReferenceTriangleEntityContract(scene, entity);
 
     ASSERT_TRUE(population.Camera.has_value());
     const CameraViewInput& seed = *population.Camera;
@@ -329,9 +355,6 @@ TEST(EngineReferenceScene, ReferenceEngineConfigInvokesPreRegisteredProviderOnce
 
 TEST(EngineReferenceScene, ReferenceEnabledInstallsDefaultTriangleProviderWhenAbsent)
 {
-    namespace G = Extrinsic::Graphics::Components;
-    namespace E = Extrinsic::ECS::Components;
-
     Extrinsic::Core::Config::EngineConfig config{};
     config.ReferenceScene.Enabled = true;
     config.ReferenceScene.Selector = ReferenceSceneSelector::Triangle;
@@ -343,15 +366,11 @@ TEST(EngineReferenceScene, ReferenceEnabledInstallsDefaultTriangleProviderWhenAb
     ASSERT_EQ(engine.GetScene().Raw().storage<EntityHandle>().size(), 1u);
 
     auto& raw = engine.GetScene().Raw();
-    auto view = raw.view<E::MetaData, G::RenderSurface, E::ProceduralGeometryRef>();
+    auto view = raw.view<E::MetaData, G::RenderSurface, GS::Vertices, GS::Edges, GS::Halfedges, GS::Faces>();
     ASSERT_EQ(view.size_hint(), 1u);
     for (const auto entity : view)
     {
-        EXPECT_EQ(view.get<E::MetaData>(entity).EntityName, "ReferenceTriangle");
-        EXPECT_EQ(view.get<G::RenderSurface>(entity).Domain,
-                  G::RenderSurface::SourceDomain::Vertex);
-        EXPECT_EQ(view.get<E::ProceduralGeometryRef>(entity).Kind,
-                  E::ProceduralGeometryKind::Triangle);
+        ExpectReferenceTriangleEntityContract(engine.GetScene(), entity);
     }
 
     ASSERT_TRUE(engine.GetReferenceCameraSeed().has_value());
@@ -377,7 +396,62 @@ TEST(EngineReferenceScene, RenderExtractionReportsOneCandidateAndOneAllocatedIns
                                                     &engine.GetGpuAssetCache());
     EXPECT_EQ(stats.CandidateRenderableCount, 1u);
     EXPECT_EQ(stats.AllocatedInstanceCount, 1u);
+    EXPECT_EQ(stats.MeshGeometryUploads, 1u);
+    EXPECT_EQ(stats.MeshGeometryFailedPack, 0u);
+    EXPECT_EQ(stats.ProceduralRenderablesEnumerated, 0u);
+    EXPECT_EQ(stats.ProceduralGeometryUploads, 0u);
+    EXPECT_EQ(stats.ProceduralGeometryReuseHits, 0u);
 
     extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
+TEST(EngineReferenceScene, DefaultTriangleIsSelectableAndVisibleToSandboxEditorModels)
+{
+    Extrinsic::Core::Config::EngineConfig config{};
+    config.ReferenceScene.Enabled = true;
+    config.ReferenceScene.Selector = ReferenceSceneSelector::Triangle;
+
+    Extrinsic::Runtime::Engine engine(config, std::make_unique<StubApplication>());
+    engine.Initialize();
+    ASSERT_TRUE(engine.IsReferenceSceneInstalled());
+
+    auto& raw = engine.GetScene().Raw();
+    auto view = raw.view<E::MetaData, G::RenderSurface, GS::Vertices, GS::Edges, GS::Halfedges, GS::Faces>();
+    ASSERT_EQ(view.size_hint(), 1u);
+    const EntityHandle entity = *view.begin();
+
+    Extrinsic::Runtime::SelectionController& selection =
+        engine.GetSelectionController();
+    ASSERT_TRUE(selection.SetSelectedEntity(engine.GetScene(), entity));
+
+    const Extrinsic::Runtime::SandboxEditorContext context{
+        .Scene = &engine.GetScene(),
+        .Selection = &selection,
+        .ImGuiAdapterAvailable = true,
+        .AssetImportCommandsAvailable = false,
+        .CameraRenderCommandsAvailable = true,
+        .VisualizationCommandsAvailable = true,
+    };
+    const Extrinsic::Runtime::SandboxEditorPanelFrame frame =
+        Extrinsic::Runtime::BuildSandboxEditorPanelFrame(context);
+
+    ASSERT_EQ(frame.Hierarchy.size(), 1u);
+    EXPECT_EQ(frame.Hierarchy[0].Name, "ReferenceTriangle");
+    EXPECT_TRUE(frame.Hierarchy[0].Selectable);
+    EXPECT_TRUE(frame.Hierarchy[0].Selected);
+    EXPECT_TRUE(frame.Hierarchy[0].HasDurableStableId);
+
+    ASSERT_TRUE(frame.Inspector.HasEntity);
+    EXPECT_EQ(frame.Inspector.Entity.Name, "ReferenceTriangle");
+    EXPECT_EQ(frame.Inspector.Geometry.Domain, GS::Domain::Mesh);
+    EXPECT_TRUE(frame.Inspector.RenderHints.HasRenderSurface);
+    EXPECT_EQ(frame.Inspector.Geometry.VertexCount, 3u);
+    EXPECT_EQ(frame.Inspector.Geometry.EdgeCount, 3u);
+    EXPECT_EQ(frame.Inspector.Geometry.HalfedgeCount, 6u);
+    EXPECT_EQ(frame.Inspector.Geometry.FaceCount, 1u);
+    ASSERT_EQ(frame.Selection.SelectedEntities.size(), 1u);
+    EXPECT_EQ(frame.Selection.SelectedEntities[0].Name, "ReferenceTriangle");
+
     engine.Shutdown();
 }

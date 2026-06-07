@@ -94,6 +94,10 @@ Runtime/UI implementation leaves for the full sandbox app path:
 - [`UI-001`](../done/UI-001-sandbox-editor-shell-panels.md) — sandbox editor shell and core panels on top of the ImGui adapter/pass (done, 2026-06-03, `CPUContracted`).
 - [`runtime/RUNTIME-095`](../done/RUNTIME-095-working-sandbox-acceptance.md) (done, 2026-06-04, `Operational` on Vulkan-capable hosts) — final CPU/null + opt-in Vulkan acceptance for mesh, graph, point cloud, cameras, selection, outline, and UI.
 
+Post-acceptance sandbox follow-ups:
+- [`runtime/RUNTIME-097` (done)](../done/RUNTIME-097-default-sandbox-ecs-triangle.md) — default white triangle is now an ordinary ECS mesh-domain `GeometrySources` entity with selectable/editor-visible components instead of the procedural bootstrap path.
+- [`ui/UI-002` (done)](../done/UI-002-editor-domain-menu-windows.md) — promoted EditorUI now has `PointCloud`, `Graph`, and `Mesh` menu slots whose submenu-opened windows inspect and control selected-entity components through runtime-owned seams.
+
 ### Theme B — Rendering modernization (P1, Theme A unblocked)
 
 Promote the post-reorganization renderer toward 2026-era features without

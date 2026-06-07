@@ -20,6 +20,11 @@ another backlog directory.
   module-interface hygiene follow-up for promoted runtime `.cppm` targets found
   by the 2026-06-06 implementation-body audit, including camera controllers,
   gizmo helpers, engine helper functions, and geometry packers.
+- [RUNTIME-097 — Default sandbox ECS-authored white triangle](../../done/RUNTIME-097-default-sandbox-ecs-triangle.md)
+  (done, 2026-06-07, `CPUContracted`): replaced the default sandbox/reference
+  triangle's `ProceduralGeometryRef` bootstrap with ordinary mesh-domain
+  `GeometrySources`, selectable/editor-visible components, and a white
+  appearance contract while keeping `Sandbox::App` runtime-only.
 
 ### Sandbox / triangle path support tasks (runtime-owned)
 
@@ -122,6 +127,10 @@ compose with the rendering tasks listed in `tasks/backlog/rendering/README.md`.
   done 2026-06-04 at `Operational` on Vulkan-capable hosts; final CPU/null +
   opt-in Vulkan acceptance for mesh, graph, point cloud, camera, selection,
   outline, and UI.
+- [RUNTIME-097 — Default sandbox ECS-authored white triangle](../../done/RUNTIME-097-default-sandbox-ecs-triangle.md)
+  _(done 2026-06-07 at maturity `CPUContracted`)_: the default visible triangle
+  is an ordinary ECS mesh entity using the same runtime extraction and editor
+  inspection paths as loaded mesh objects.
 
 ## Cross-linked rendering tasks (runtime-owned)
 

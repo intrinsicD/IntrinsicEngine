@@ -361,9 +361,10 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   retired planning slice that locks down module placement
   (`Extrinsic.Runtime.ReferenceScene` at `src/runtime/Runtime.ReferenceScene.cppm`),
   bootstrap-seam shape (`IReferenceSceneProvider` + `ReferenceSceneRegistry`,
-  one default `TriangleProvider`), renderable composition (HARDEN-060 default
-  components plus `Graphics::Components::RenderSurface` and a future
-  `ECS::Components::ProceduralGeometryRef` from GRAPHICS-030-Impl-A), camera
+  one default `TriangleProvider`), original renderable composition (HARDEN-060
+  default components plus `Graphics::Components::RenderSurface`; RUNTIME-097
+  later updates the default triangle to selectable mesh-domain `GeometrySources`
+  instead of `ECS::Components::ProceduralGeometryRef`), camera
   authorship (provider-seeded `CameraViewInput` written into
   `RenderFrameInput::Camera`, forward-compatible with GRAPHICS-017Q
   `CameraControllers`), unlit-only first milestone, deterministic content via
@@ -372,8 +373,8 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   default-off plumbing, O(1) steady-state extraction overhead, and a layering
   audit confirming no new graphics/RHI/asset edges. Implementation children
   GRAPHICS-029-Impl-A/B/C are identified but not opened; Impl-B depends on
-  GRAPHICS-030-Impl-A landing `ProceduralGeometryRef`. Sandbox stays
-  policy-light; no GPU-typed ECS components.
+  GRAPHICS-030-Impl-A landing `ProceduralGeometryRef` for the original
+  procedural lane. Sandbox stays policy-light; no GPU-typed ECS components.
 - [GRAPHICS-030 — Procedural-source geometry residency bridge (planning)](../../done/GRAPHICS-030-runtime-geometry-residency-bridge.md):
   retired planning-only first concrete slice of the GRAPHICS-028 contract; locked
   the procedural-geometry descriptor shape (closed `ProceduralGeometryKind` enum

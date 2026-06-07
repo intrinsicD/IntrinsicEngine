@@ -65,11 +65,15 @@ namespace Extrinsic::Runtime
     //   - MetaData{EntityName = "ReferenceTriangle"}
     //   - Transform::Component + Transform::WorldMatrix (identity TRS)
     //   - Hierarchy::Component (no parent / no children)
+    //   - StableId + Selection::SelectableTag so runtime/editor tools treat
+    //     it like imported geometry.
     //   - Graphics::Components::RenderSurface{Domain = Vertex} so
     //     Runtime::RenderExtractionCache observes it as a renderable
     //     candidate and the renderer allocates a GPU instance.
-    //   - ECS::Components::ProceduralGeometryRef{Kind = Triangle} so
-    //     GRAPHICS-030B can later wire procedural geometry residency.
+    //   - GeometrySources mesh topology populated from a single triangle so
+    //     the default sandbox triangle follows the same residency lane as
+    //     loaded mesh objects.
+    //   - Graphics::Components::VisualizationConfig{UniformColor = white}.
     // Populate also returns a CameraViewInput seed (Position, Forward, Up,
     // NearPlane, FarPlane, Valid=true) consumed by
     // BuildReferenceCameraViewInput() to derive the runtime-aware

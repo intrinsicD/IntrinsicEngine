@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <exception>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -13,12 +14,16 @@ module Extrinsic.Runtime.ReferenceScene;
 
 import Extrinsic.ECS.Component.Hierarchy;
 import Extrinsic.ECS.Component.MetaData;
-import Extrinsic.ECS.Component.ProceduralGeometryRef;
+import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
+import Extrinsic.ECS.Components.GeometrySourcesPopulate;
+import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Scene.Bootstrap;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.RenderGeometry;
+import Extrinsic.Graphics.Component.VisualizationConfig;
+import Geometry.HalfedgeMesh;
 
 namespace Extrinsic::Runtime
 {
@@ -35,6 +40,10 @@ namespace Extrinsic::Runtime
         constexpr float     kReferenceCameraNear = 0.1f;
         constexpr float     kReferenceCameraFar  = 100.0f;
         constexpr float     kReferenceCameraFovY = glm::radians(45.0f);
+        constexpr ECS::Components::StableId kReferenceTriangleStableId{
+            0x52554E54494D4530ull,
+            0x545249414E474C45ull,
+        };
 
         [[nodiscard]] Graphics::CameraViewInput MakeReferenceCameraSeed() noexcept
         {
@@ -47,6 +56,17 @@ namespace Extrinsic::Runtime
             seed.Valid     = true;
             return seed;
         }
+
+        [[nodiscard]] Geometry::HalfedgeMesh::Mesh MakeReferenceTriangleMesh()
+        {
+            Geometry::HalfedgeMesh::Mesh mesh;
+            const auto v0 = mesh.AddVertex({-0.5f, -0.5f, 0.0f});
+            const auto v1 = mesh.AddVertex({ 0.5f, -0.5f, 0.0f});
+            const auto v2 = mesh.AddVertex({ 0.0f,  0.5f, 0.0f});
+            if (!mesh.AddTriangle(v0, v1, v2).has_value())
+                std::terminate();
+            return mesh;
+        }
     }
 
     ReferenceScenePopulation TriangleProvider::Populate(ECS::Scene::Registry& scene)
@@ -54,14 +74,19 @@ namespace Extrinsic::Runtime
         const ECS::EntityHandle entity = ECS::Scene::CreateDefault(scene, "ReferenceTriangle");
 
         auto& raw = scene.Raw();
+        raw.emplace<ECS::Components::StableId>(entity, kReferenceTriangleStableId);
+        raw.emplace<ECS::Components::Selection::SelectableTag>(entity);
         raw.emplace<Graphics::Components::RenderSurface>(entity,
             Graphics::Components::RenderSurface{
                 .Domain = Graphics::Components::RenderSurface::SourceDomain::Vertex,
             });
-        raw.emplace<ECS::Components::ProceduralGeometryRef>(entity,
-            ECS::Components::ProceduralGeometryRef{
-                .Kind = ECS::Components::ProceduralGeometryKind::Triangle,
-            });
+        Graphics::Components::VisualizationConfig visualization{};
+        visualization.Source = Graphics::Components::VisualizationConfig::ColorSource::UniformColor;
+        visualization.Color = glm::vec4{1.0f, 1.0f, 1.0f, 1.0f};
+        raw.emplace<Graphics::Components::VisualizationConfig>(entity, std::move(visualization));
+
+        Geometry::HalfedgeMesh::Mesh mesh = MakeReferenceTriangleMesh();
+        ECS::Components::GeometrySources::PopulateFromMesh(raw, entity, mesh);
 
         ReferenceScenePopulation population;
         population.Entities.push_back(ReferenceSceneEntity{entity});

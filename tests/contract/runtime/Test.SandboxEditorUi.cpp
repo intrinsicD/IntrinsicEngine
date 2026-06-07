@@ -88,6 +88,16 @@ namespace
         registry.Raw().emplace<G::RenderPoints>(entity);
     }
 
+    void SetNodePositions(GS::Nodes& nodes,
+                          const std::vector<glm::vec3>& positions)
+    {
+        nodes.Properties.Resize(positions.size());
+        auto pos = nodes.Properties.GetOrAdd<glm::vec3>(
+            std::string{PN::kPosition},
+            glm::vec3{0.0f});
+        pos.Vector() = positions;
+    }
+
     void SetPositions(GS::Vertices& vertices,
                       const std::vector<glm::vec3>& positions)
     {
@@ -163,6 +173,24 @@ namespace
                      {0u, 0u, 0u, kInvalidIndex, kInvalidIndex, kInvalidIndex});
         auto& faces = raw.emplace<GS::Faces>(entity);
         SetFaces(faces, {0u});
+    }
+
+    void AddGraphSource(ECS::Scene::Registry& registry,
+                        const ECS::EntityHandle entity)
+    {
+        auto& raw = registry.Raw();
+        auto& nodes = raw.emplace<GS::Nodes>(entity);
+        SetNodePositions(nodes,
+                         {
+                             {0.0f, 0.0f, 0.0f},
+                             {1.0f, 0.0f, 0.0f},
+                             {2.0f, 0.0f, 0.0f},
+                         });
+        auto& edges = raw.emplace<GS::Edges>(entity);
+        SetEdges(edges, {0u, 1u}, {1u, 2u});
+        raw.emplace<GS::HasGraphTopology>(entity);
+        raw.emplace<G::RenderLines>(entity);
+        raw.emplace<G::RenderPoints>(entity);
     }
 
     [[nodiscard]] Runtime::SandboxEditorContext MakeContext(
@@ -437,6 +465,229 @@ TEST(SandboxEditorUi, HierarchyInspectorModelReportsSelectionRenderHintsAndDomai
     ASSERT_EQ(frame.Selection.SelectedEntities.size(), 1u);
     EXPECT_EQ(frame.Selection.SelectedEntities[0].Name, "Cloud A");
     EXPECT_FALSE(frame.FileImport.Enabled);
+}
+
+TEST(SandboxEditorUi, DomainWindowModelsReportSelectedMeshGraphAndPointCloudState)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
+    AddTriangleMeshSource(registry, mesh);
+    registry.Raw().emplace<G::RenderSurface>(mesh);
+    registry.Raw().emplace<ECSC::SpatialDebugBinding>(
+        mesh,
+        ECSC::SpatialDebugBinding{
+            .Kind = ECSC::SpatialDebugGeometryKind::Bvh,
+            .RegistryKey = 77u,
+        });
+    G::VisualizationConfig meshVisualization{};
+    meshVisualization.Source = G::VisualizationConfig::ColorSource::UniformColor;
+    meshVisualization.Color = glm::vec4{1.0f};
+    registry.Raw().emplace<G::VisualizationConfig>(mesh, meshVisualization);
+
+    const ECS::EntityHandle graph = MakeSelectable(registry, "Graph");
+    AddGraphSource(registry, graph);
+
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "Cloud");
+    AddPointCloudSource(registry, cloud, 4u);
+
+    const std::uint32_t meshStableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.VisualizationCommandsAvailable = true;
+    context.PrimitiveViewCommands =
+        Runtime::SandboxEditorPrimitiveViewCommandSurface{
+            .GetSettings =
+                [meshStableId](const std::uint32_t stableId)
+                {
+                    EXPECT_EQ(stableId, meshStableId);
+                    return Runtime::SandboxEditorPrimitiveViewSettings{
+                        .EnableEdgeView = true,
+                        .EnableVertexView = false,
+                    };
+                },
+            .SetSettings =
+                [](std::uint32_t,
+                   Runtime::SandboxEditorPrimitiveViewSettings)
+                {
+                },
+            .ClearSettings =
+                [](std::uint32_t)
+                {
+                },
+        };
+
+    std::optional<Runtime::PrimitiveSelectionResult> primitive{
+        Runtime::PrimitiveSelectionResult{
+            .Status = Runtime::PrimitiveRefineStatus::Success,
+            .EntityId = meshStableId,
+            .StableId = meshStableId,
+            .Domain = GS::Domain::Mesh,
+            .Kind = Runtime::RefinedPrimitiveKind::Face,
+            .FaceId = 0u,
+            .EdgeId = Runtime::kInvalidPrimitiveIndex,
+            .VertexId = 2u,
+            .PointId = Runtime::kInvalidPrimitiveIndex,
+        }};
+    context.LastRefinedPrimitive = &primitive;
+
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    Runtime::SandboxEditorDomainWindowModel meshModel =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::Mesh);
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorDomainWindowKind(
+                     meshModel.Kind),
+                 "Mesh");
+    EXPECT_EQ(meshModel.ExpectedDomain, GS::Domain::Mesh);
+    EXPECT_TRUE(meshModel.HasSelectedEntity);
+    EXPECT_EQ(meshModel.SelectedEntity.Name, "Mesh");
+    EXPECT_EQ(meshModel.SelectedStableId, meshStableId);
+    EXPECT_EQ(meshModel.SelectedDomain, GS::Domain::Mesh);
+    EXPECT_TRUE(meshModel.DomainMatches);
+    EXPECT_TRUE(meshModel.RenderHints.HasRenderSurface);
+    EXPECT_TRUE(meshModel.PrimitiveViewControlsAvailable);
+    EXPECT_TRUE(meshModel.HasPrimitiveViewSettings);
+    EXPECT_TRUE(meshModel.PrimitiveView.EnableEdgeView);
+    EXPECT_FALSE(meshModel.PrimitiveView.EnableVertexView);
+    EXPECT_TRUE(meshModel.VisualizationControlsAvailable);
+    EXPECT_TRUE(meshModel.Visualization.HasSelectedEntity);
+    EXPECT_TRUE(meshModel.Visualization.SpatialDebug.HasBinding);
+    EXPECT_EQ(meshModel.Visualization.SpatialDebug.RegistryKey, 77u);
+    EXPECT_TRUE(meshModel.Visualization.Visualization.HasConfig);
+    ASSERT_TRUE(meshModel.Primitive.HasPrimitive);
+    EXPECT_TRUE(meshModel.Primitive.HasFaceId);
+    EXPECT_TRUE(meshModel.Primitive.HasVertexId);
+
+    const Runtime::SandboxEditorDomainWindowModel graphWhileMeshSelected =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::Graph);
+    EXPECT_FALSE(graphWhileMeshSelected.DomainMatches);
+    EXPECT_TRUE(HasDiagnostic(
+        graphWhileMeshSelected.Diagnostics,
+        Runtime::SandboxEditorDiagnosticCode::UnsupportedGeometryDomain));
+
+    const std::uint32_t graphStableId =
+        Runtime::SelectionController::ToStableEntityId(graph);
+    primitive = Runtime::PrimitiveSelectionResult{
+        .Status = Runtime::PrimitiveRefineStatus::Success,
+        .EntityId = graphStableId,
+        .StableId = graphStableId,
+        .Domain = GS::Domain::Graph,
+        .Kind = Runtime::RefinedPrimitiveKind::Edge,
+        .FaceId = Runtime::kInvalidPrimitiveIndex,
+        .EdgeId = 1u,
+        .VertexId = 2u,
+        .PointId = Runtime::kInvalidPrimitiveIndex,
+    };
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, graph));
+    const Runtime::SandboxEditorDomainWindowModel graphModel =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::Graph);
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorDomainWindowKind(
+                     graphModel.Kind),
+                 "Graph");
+    EXPECT_EQ(graphModel.SelectedDomain, GS::Domain::Graph);
+    EXPECT_TRUE(graphModel.DomainMatches);
+    EXPECT_TRUE(graphModel.RenderHints.HasRenderLines);
+    EXPECT_TRUE(graphModel.RenderHints.HasRenderPoints);
+    EXPECT_FALSE(graphModel.PrimitiveViewControlsAvailable);
+    ASSERT_TRUE(graphModel.Primitive.HasPrimitive);
+    EXPECT_TRUE(graphModel.Primitive.HasEdgeId);
+    EXPECT_TRUE(graphModel.Primitive.HasVertexId);
+
+    const std::uint32_t cloudStableId =
+        Runtime::SelectionController::ToStableEntityId(cloud);
+    primitive = Runtime::PrimitiveSelectionResult{
+        .Status = Runtime::PrimitiveRefineStatus::Success,
+        .EntityId = cloudStableId,
+        .StableId = cloudStableId,
+        .Domain = GS::Domain::PointCloud,
+        .Kind = Runtime::RefinedPrimitiveKind::Point,
+        .FaceId = Runtime::kInvalidPrimitiveIndex,
+        .EdgeId = Runtime::kInvalidPrimitiveIndex,
+        .VertexId = Runtime::kInvalidPrimitiveIndex,
+        .PointId = 3u,
+    };
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
+    const Runtime::SandboxEditorDomainWindowModel cloudModel =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::PointCloud);
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorDomainWindowKind(
+                     cloudModel.Kind),
+                 "PointCloud");
+    EXPECT_EQ(cloudModel.SelectedDomain, GS::Domain::PointCloud);
+    EXPECT_TRUE(cloudModel.DomainMatches);
+    EXPECT_TRUE(cloudModel.RenderHints.HasRenderPoints);
+    ASSERT_TRUE(cloudModel.Primitive.HasPrimitive);
+    EXPECT_TRUE(cloudModel.Primitive.HasPointId);
+}
+
+TEST(SandboxEditorUi, DomainWindowModelsReportNoSelectionStaleAndWrongDomain)
+{
+    const Runtime::SandboxEditorDomainWindowModel missingScene =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            Runtime::SandboxEditorContext{},
+            Runtime::SandboxEditorDomainWindowKind::Mesh);
+    EXPECT_TRUE(HasDiagnostic(
+        missingScene.Diagnostics,
+        Runtime::SandboxEditorDiagnosticCode::MissingScene));
+    EXPECT_FALSE(missingScene.HasSelectedEntity);
+
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+
+    Runtime::SandboxEditorContext missingSelection = MakeContext(registry, selection);
+    missingSelection.Selection = nullptr;
+    const Runtime::SandboxEditorDomainWindowModel missingSelectionModel =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            missingSelection,
+            Runtime::SandboxEditorDomainWindowKind::Mesh);
+    EXPECT_TRUE(HasDiagnostic(
+        missingSelectionModel.Diagnostics,
+        Runtime::SandboxEditorDiagnosticCode::MissingSelectionController));
+
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    const Runtime::SandboxEditorDomainWindowModel noSelection =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::Mesh);
+    EXPECT_TRUE(HasDiagnostic(
+        noSelection.Diagnostics,
+        Runtime::SandboxEditorDiagnosticCode::NoSelectedEntity));
+    EXPECT_FALSE(noSelection.DomainMatches);
+
+    const ECS::EntityHandle stale = MakeSelectable(registry, "Stale");
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, stale));
+    registry.Raw().destroy(stale);
+    const Runtime::SandboxEditorDomainWindowModel staleSelection =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::Mesh);
+    EXPECT_TRUE(HasDiagnostic(
+        staleSelection.Diagnostics,
+        Runtime::SandboxEditorDiagnosticCode::NoSelectedEntity));
+    EXPECT_FALSE(staleSelection.HasSelectedEntity);
+
+    selection.ClearSelection(registry);
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "Cloud");
+    AddPointCloudSource(registry, cloud, 2u);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
+    const Runtime::SandboxEditorDomainWindowModel wrongDomain =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::Mesh);
+    EXPECT_TRUE(wrongDomain.HasSelectedEntity);
+    EXPECT_EQ(wrongDomain.ExpectedDomain, GS::Domain::Mesh);
+    EXPECT_EQ(wrongDomain.SelectedDomain, GS::Domain::PointCloud);
+    EXPECT_FALSE(wrongDomain.DomainMatches);
+    EXPECT_TRUE(HasDiagnostic(
+        wrongDomain.Diagnostics,
+        Runtime::SandboxEditorDiagnosticCode::UnsupportedGeometryDomain));
 }
 
 TEST(SandboxEditorUi, SelectEntityCommandRoutesThroughSelectionController)
