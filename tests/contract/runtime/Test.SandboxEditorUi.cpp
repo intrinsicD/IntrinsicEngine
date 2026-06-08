@@ -29,6 +29,8 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.ImGuiOverlaySystem;
+import Extrinsic.Graphics.RenderGraph;
+import Extrinsic.Graphics.Renderer;
 import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.Engine;
@@ -49,6 +51,7 @@ namespace Dirty = Extrinsic::ECS::Components::DirtyTags;
 namespace GS = Extrinsic::ECS::Components::GeometrySources;
 namespace Sel = Extrinsic::ECS::Components::Selection;
 namespace G = Extrinsic::Graphics::Components;
+namespace Graphics = Extrinsic::Graphics;
 namespace Plat = Extrinsic::Platform;
 namespace PN = Extrinsic::ECS::Components::GeometrySources::PropertyNames;
 
@@ -339,8 +342,95 @@ TEST(SandboxEditorUi, EmptyContextProducesDeterministicDisabledDiagnostics)
     EXPECT_FALSE(frame.FileImport.Enabled);
     EXPECT_TRUE(HasDiagnostic(frame.FileImport.Diagnostics,
                               Runtime::SandboxEditorDiagnosticCode::AssetImportUnavailable));
+    EXPECT_FALSE(frame.RenderGraph.Enabled);
+    EXPECT_TRUE(HasDiagnostic(frame.RenderGraph.Diagnostics,
+                              Runtime::SandboxEditorDiagnosticCode::RenderGraphStatsUnavailable));
     EXPECT_TRUE(HasDiagnostic(frame.Inspector.Diagnostics,
                               Runtime::SandboxEditorDiagnosticCode::MissingScene));
+}
+
+TEST(SandboxEditorUi, RenderGraphPanelModelCopiesRendererStats)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+
+    Graphics::RenderGraphFrameStats stats{};
+    stats.Compile.Succeeded = true;
+    stats.Compile.PassCount = 14u;
+    stats.Compile.CulledPassCount = 2u;
+    stats.Compile.ResourceCount = 9u;
+    stats.Compile.BarrierCount = 17u;
+    stats.Compile.QueueHandoffEdgeCount = 3u;
+    stats.Compile.CrossQueueTimelineEdgeCount = 4u;
+    stats.Compile.CrossQueueTimelineSignalCount = 5u;
+    stats.Compile.CrossQueueTimelineWaitCount = 6u;
+    stats.Compile.CrossQueueOwnershipTransferCount = 7u;
+    stats.Compile.TransientMemoryEstimateBytes = 4096u;
+    stats.Compile.TimeMicros = 123u;
+    stats.Execute.Succeeded = true;
+    stats.Execute.DeviceOperational = true;
+    stats.Execute.TimeMicros = 456u;
+    stats.CommandRecords.Recorded = 2u;
+    stats.CommandRecords.Skipped = 1u;
+    stats.CommandRecords.SkippedNonOperational = 0u;
+    stats.CommandRecords.SkippedUnavailable = 1u;
+    stats.CommandRecords.Passes.push_back(
+        Graphics::RenderGraphCommandPassStats{
+            .Name = "DepthPrepass",
+            .Id = Graphics::FramePassId{11u},
+            .Status = Graphics::RenderCommandPassStatus::Recorded,
+        });
+    stats.CommandRecords.Passes.push_back(
+        Graphics::RenderGraphCommandPassStats{
+            .Name = "DebugViewPass",
+            .Id = Graphics::FramePassId{},
+            .Status = Graphics::RenderCommandPassStatus::SkippedUnavailable,
+        });
+    stats.AsyncComputeUtilizedFrames = 1u;
+    stats.DebugDump = "passes:\\n  DepthPrepass -> DebugViewPass";
+    stats.Diagnostic = "Frame graph diagnostic.";
+    stats.LifecycleDiagnostic = "Renderer lifecycle diagnostic.";
+    context.RenderGraphStats = &stats;
+
+    const Runtime::SandboxEditorPanelFrame frame =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+
+    EXPECT_TRUE(frame.RenderGraph.Enabled);
+    EXPECT_TRUE(frame.RenderGraph.CompileSucceeded);
+    EXPECT_TRUE(frame.RenderGraph.ExecuteSucceeded);
+    EXPECT_TRUE(frame.RenderGraph.DeviceOperational);
+    EXPECT_EQ(frame.RenderGraph.PassCount, 14u);
+    EXPECT_EQ(frame.RenderGraph.CulledPassCount, 2u);
+    EXPECT_EQ(frame.RenderGraph.ResourceCount, 9u);
+    EXPECT_EQ(frame.RenderGraph.BarrierCount, 17u);
+    EXPECT_EQ(frame.RenderGraph.QueueHandoffEdgeCount, 3u);
+    EXPECT_EQ(frame.RenderGraph.CrossQueueTimelineEdgeCount, 4u);
+    EXPECT_EQ(frame.RenderGraph.CrossQueueTimelineSignalCount, 5u);
+    EXPECT_EQ(frame.RenderGraph.CrossQueueTimelineWaitCount, 6u);
+    EXPECT_EQ(frame.RenderGraph.CrossQueueOwnershipTransferCount, 7u);
+    EXPECT_EQ(frame.RenderGraph.TransientMemoryEstimateBytes, 4096u);
+    EXPECT_EQ(frame.RenderGraph.CompileTimeMicros, 123u);
+    EXPECT_EQ(frame.RenderGraph.ExecuteTimeMicros, 456u);
+    EXPECT_EQ(frame.RenderGraph.CommandPassesRecorded, 2u);
+    EXPECT_EQ(frame.RenderGraph.CommandPassesSkipped, 1u);
+    EXPECT_EQ(frame.RenderGraph.CommandPassesSkippedNonOperational, 0u);
+    EXPECT_EQ(frame.RenderGraph.CommandPassesSkippedUnavailable, 1u);
+    EXPECT_EQ(frame.RenderGraph.AsyncComputeUtilizedFrames, 1u);
+    EXPECT_EQ(frame.RenderGraph.DebugDump,
+              "passes:\\n  DepthPrepass -> DebugViewPass");
+    EXPECT_EQ(frame.RenderGraph.StatusText, "Frame graph diagnostic.");
+    EXPECT_EQ(frame.RenderGraph.LifecycleDiagnostic,
+              "Renderer lifecycle diagnostic.");
+    ASSERT_EQ(frame.RenderGraph.CommandPasses.size(), 2u);
+    EXPECT_EQ(frame.RenderGraph.CommandPasses[0].Name, "DepthPrepass");
+    EXPECT_TRUE(frame.RenderGraph.CommandPasses[0].HasTypedId);
+    EXPECT_EQ(frame.RenderGraph.CommandPasses[0].TypedId, 11u);
+    EXPECT_EQ(frame.RenderGraph.CommandPasses[0].Status, "Recorded");
+    EXPECT_EQ(frame.RenderGraph.CommandPasses[1].Name, "DebugViewPass");
+    EXPECT_FALSE(frame.RenderGraph.CommandPasses[1].HasTypedId);
+    EXPECT_EQ(frame.RenderGraph.CommandPasses[1].Status,
+              "SkippedUnavailable");
 }
 
 TEST(SandboxEditorUi, FileImportCommandRoutesThroughRuntimeOwnedSurface)

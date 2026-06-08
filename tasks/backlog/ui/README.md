@@ -16,6 +16,7 @@ map.
 - [UI-003 — Sandbox EditorUI geometry processing capabilities](../../done/UI-003-sandbox-editor-geometry-processing-capabilities.md) (done, 2026-06-07, `CPUContracted`).
 - [UI-004 — Sandbox EditorUI K-Means execution command seam](../../done/UI-004-sandbox-editor-kmeans-execution.md) (done, 2026-06-07, `CPUContracted`).
 - [UI-005 — Sandbox EditorUI visualization property presets](../../done/UI-005-sandbox-editor-visualization-property-presets.md) (done, 2026-06-07, `CPUContracted`).
+- [UI-006 — Sandbox EditorUI render graph diagnostics panel](../../done/UI-006-sandbox-editor-rendergraph-panel.md) (done, 2026-06-08, `CPUContracted`).
 
 ## Convergence
 
@@ -46,6 +47,11 @@ map.
   supported presets through runtime-owned `VisualizationConfig` commands.
   Generic GPU residency/upload for arbitrary property arrays remains future
   runtime/renderer work.
+- UI-006 is a retired promoted EditorUI follow-up that reimplements the legacy
+  `Frame Graph` diagnostics panel against current `RenderGraphFrameStats`:
+  compile/execute counts, queue/timeline stats, command pass statuses,
+  diagnostics, and the compiler debug dump are copied through a runtime-owned
+  data model and rendered from the attached `SandboxEditorUi`.
 - UI work that depends on renderer overlays/handoff coordinates with the
   retired [`GRAPHICS-024`](../../done/GRAPHICS-024-overlays-presentation-editor-handoff.md)
   parity matrix and the rendering DAG in

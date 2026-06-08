@@ -36,6 +36,7 @@ import Extrinsic.ECS.Components.Selection;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.CameraSnapshots;
+import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.ImGuiAdapter;
@@ -1377,6 +1378,92 @@ namespace Extrinsic::Runtime
             return model;
         }
 
+        [[nodiscard]] const char* RenderCommandStatusName(
+            const Graphics::RenderCommandPassStatus status) noexcept
+        {
+            switch (status)
+            {
+            case Graphics::RenderCommandPassStatus::Recorded:
+                return "Recorded";
+            case Graphics::RenderCommandPassStatus::SkippedNonOperational:
+                return "SkippedNonOperational";
+            case Graphics::RenderCommandPassStatus::SkippedUnavailable:
+                return "SkippedUnavailable";
+            }
+            return "Unknown";
+        }
+
+        [[nodiscard]] SandboxEditorRenderGraphModel BuildRenderGraphModel(
+            const SandboxEditorContext& context)
+        {
+            SandboxEditorRenderGraphModel model{};
+            if (context.RenderGraphStats == nullptr)
+            {
+                model.StatusText =
+                    "Frame graph diagnostics are disabled: renderer stats are unavailable.";
+                AddDiagnostic(model.Diagnostics,
+                              SandboxEditorDiagnosticCode::RenderGraphStatsUnavailable,
+                              model.StatusText);
+                return model;
+            }
+
+            const Graphics::RenderGraphFrameStats& stats =
+                *context.RenderGraphStats;
+            model.Enabled = true;
+            model.CompileSucceeded = stats.Compile.Succeeded;
+            model.ExecuteSucceeded = stats.Execute.Succeeded;
+            model.DeviceOperational = stats.Execute.DeviceOperational;
+            model.PassCount = stats.Compile.PassCount;
+            model.CulledPassCount = stats.Compile.CulledPassCount;
+            model.ResourceCount = stats.Compile.ResourceCount;
+            model.BarrierCount = stats.Compile.BarrierCount;
+            model.QueueHandoffEdgeCount = stats.Compile.QueueHandoffEdgeCount;
+            model.CrossQueueTimelineEdgeCount =
+                stats.Compile.CrossQueueTimelineEdgeCount;
+            model.CrossQueueTimelineSignalCount =
+                stats.Compile.CrossQueueTimelineSignalCount;
+            model.CrossQueueTimelineWaitCount =
+                stats.Compile.CrossQueueTimelineWaitCount;
+            model.CrossQueueOwnershipTransferCount =
+                stats.Compile.CrossQueueOwnershipTransferCount;
+            model.TransientMemoryEstimateBytes =
+                stats.Compile.TransientMemoryEstimateBytes;
+            model.CompileTimeMicros = stats.Compile.TimeMicros;
+            model.ExecuteTimeMicros = stats.Execute.TimeMicros;
+            model.CommandPassesRecorded = stats.CommandRecords.Recorded;
+            model.CommandPassesSkipped = stats.CommandRecords.Skipped;
+            model.CommandPassesSkippedNonOperational =
+                stats.CommandRecords.SkippedNonOperational;
+            model.CommandPassesSkippedUnavailable =
+                stats.CommandRecords.SkippedUnavailable;
+            model.AsyncComputeUtilizedFrames =
+                stats.AsyncComputeUtilizedFrames;
+            model.Diagnostic = stats.Diagnostic;
+            model.LifecycleDiagnostic = stats.LifecycleDiagnostic;
+            model.DebugDump = stats.DebugDump;
+            model.StatusText = model.CompileSucceeded
+                ? "Frame graph compile succeeded."
+                : "Frame graph compile has not succeeded yet.";
+            if (!model.Diagnostic.empty())
+            {
+                model.StatusText = model.Diagnostic;
+            }
+
+            model.CommandPasses.reserve(stats.CommandRecords.Passes.size());
+            for (const Graphics::RenderGraphCommandPassStats& pass :
+                 stats.CommandRecords.Passes)
+            {
+                model.CommandPasses.push_back(
+                    SandboxEditorRenderGraphPassModel{
+                        .Name = pass.Name,
+                        .HasTypedId = pass.Id.IsValid(),
+                        .TypedId = pass.Id.Value,
+                        .Status = RenderCommandStatusName(pass.Status),
+                    });
+            }
+            return model;
+        }
+
         [[nodiscard]] SandboxEditorCameraRenderModel BuildCameraRenderModel(
             const SandboxEditorContext& context)
         {
@@ -1642,6 +1729,7 @@ namespace Extrinsic::Runtime
                             engine.ClearVisualizationAdapterBinding(stableEntityId);
                         },
                 },
+                .RenderGraphStats = &engine.GetRenderer().GetLastRenderGraphStats(),
                 .ImGuiAdapterAvailable = engine.GetImGuiAdapter().IsInitialized(),
                 .AssetImportCommandsAvailable = true,
                 .SceneFileCommandsAvailable = true,
@@ -2647,6 +2735,107 @@ namespace Extrinsic::Runtime
             }
             ImGui::End();
 
+            if (ImGui::Begin("Frame Graph"))
+            {
+                if (!frame.RenderGraph.Enabled)
+                {
+                    ImGui::TextDisabled("Renderer frame graph diagnostics are unavailable.");
+                    DrawDiagnostics(frame.RenderGraph.Diagnostics);
+                }
+                else
+                {
+                    ImGui::TextWrapped("%s",
+                                       frame.RenderGraph.StatusText.c_str());
+                    ImGui::Text("Compile: %s (%llu us)",
+                                frame.RenderGraph.CompileSucceeded ? "yes" : "no",
+                                static_cast<unsigned long long>(
+                                    frame.RenderGraph.CompileTimeMicros));
+                    ImGui::Text("Execute: %s (%llu us), device=%s",
+                                frame.RenderGraph.ExecuteSucceeded ? "yes" : "no",
+                                static_cast<unsigned long long>(
+                                    frame.RenderGraph.ExecuteTimeMicros),
+                                frame.RenderGraph.DeviceOperational ? "operational" : "not operational");
+                    ImGui::Text("Passes: %u live, %u culled",
+                                frame.RenderGraph.PassCount,
+                                frame.RenderGraph.CulledPassCount);
+                    ImGui::Text("Resources: %u, barriers=%u, transient=%llu bytes",
+                                frame.RenderGraph.ResourceCount,
+                                frame.RenderGraph.BarrierCount,
+                                static_cast<unsigned long long>(
+                                    frame.RenderGraph.TransientMemoryEstimateBytes));
+                    ImGui::Text("Queue handoffs: %u, timeline edges=%u signals=%u waits=%u ownership=%u",
+                                frame.RenderGraph.QueueHandoffEdgeCount,
+                                frame.RenderGraph.CrossQueueTimelineEdgeCount,
+                                frame.RenderGraph.CrossQueueTimelineSignalCount,
+                                frame.RenderGraph.CrossQueueTimelineWaitCount,
+                                frame.RenderGraph.CrossQueueOwnershipTransferCount);
+                    ImGui::Text("Command passes: recorded=%u skipped=%u nonOperational=%u unavailable=%u",
+                                frame.RenderGraph.CommandPassesRecorded,
+                                frame.RenderGraph.CommandPassesSkipped,
+                                frame.RenderGraph.CommandPassesSkippedNonOperational,
+                                frame.RenderGraph.CommandPassesSkippedUnavailable);
+                    ImGui::Text("Async compute frames: %u",
+                                frame.RenderGraph.AsyncComputeUtilizedFrames);
+                    if (!frame.RenderGraph.LifecycleDiagnostic.empty())
+                    {
+                        ImGui::TextWrapped("Lifecycle: %s",
+                                           frame.RenderGraph.LifecycleDiagnostic.c_str());
+                    }
+                    if (!frame.RenderGraph.Diagnostic.empty() &&
+                        frame.RenderGraph.Diagnostic != frame.RenderGraph.StatusText)
+                    {
+                        ImGui::TextWrapped("Diagnostic: %s",
+                                           frame.RenderGraph.Diagnostic.c_str());
+                    }
+
+                    if (ImGui::CollapsingHeader("Command Passes",
+                                                ImGuiTreeNodeFlags_DefaultOpen))
+                    {
+                        if (frame.RenderGraph.CommandPasses.empty())
+                        {
+                            ImGui::TextDisabled("No command pass records.");
+                        }
+                        for (const SandboxEditorRenderGraphPassModel& pass :
+                             frame.RenderGraph.CommandPasses)
+                        {
+                            if (pass.HasTypedId)
+                            {
+                                ImGui::BulletText(
+                                    "%s [%u] - %s",
+                                    pass.Name.c_str(),
+                                    pass.TypedId,
+                                    pass.Status.c_str());
+                            }
+                            else
+                            {
+                                ImGui::BulletText("%s - %s",
+                                                  pass.Name.c_str(),
+                                                  pass.Status.c_str());
+                            }
+                        }
+                    }
+
+                    if (ImGui::CollapsingHeader("Compiler Debug Dump"))
+                    {
+                        if (frame.RenderGraph.DebugDump.empty())
+                        {
+                            ImGui::TextDisabled("No debug dump available.");
+                        }
+                        else
+                        {
+                            ImGui::BeginChild("##FrameGraphDebugDump",
+                                              ImVec2(0.0f, 240.0f),
+                                              true,
+                                              ImGuiWindowFlags_HorizontalScrollbar);
+                            ImGui::TextUnformatted(
+                                frame.RenderGraph.DebugDump.c_str());
+                            ImGui::EndChild();
+                        }
+                    }
+                }
+            }
+            ImGui::End();
+
             if (ImGui::Begin("Camera / Render"))
             {
                 if (frame.CameraRender.HasMainCameraController)
@@ -2880,6 +3069,8 @@ namespace Extrinsic::Runtime
             return "InvalidVisualizationProperty";
         case SandboxEditorDiagnosticCode::GeometryProcessingFailed:
             return "GeometryProcessingFailed";
+        case SandboxEditorDiagnosticCode::RenderGraphStatsUnavailable:
+            return "RenderGraphStatsUnavailable";
         }
         return "Unknown";
     }
@@ -3409,6 +3600,7 @@ namespace Extrinsic::Runtime
         frame.Selection = BuildSelectionModel(context);
         frame.SceneFile = BuildSceneFileModel(context);
         frame.FileImport = BuildFileImportModel(context);
+        frame.RenderGraph = BuildRenderGraphModel(context);
         frame.CameraRender = BuildCameraRenderModel(context);
         frame.Visualization = BuildVisualizationModel(context);
         return frame;

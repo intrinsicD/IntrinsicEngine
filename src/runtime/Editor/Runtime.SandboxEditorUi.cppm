@@ -24,6 +24,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.Component.VisualizationConfig;
+import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
@@ -48,6 +49,7 @@ export namespace Extrinsic::Runtime
         VisualizationCommandsUnavailable,
         InvalidVisualizationProperty,
         GeometryProcessingFailed,
+        RenderGraphStatsUnavailable,
     };
 
     enum class SandboxEditorCommandStatus : std::uint8_t
@@ -478,6 +480,45 @@ export namespace Extrinsic::Runtime
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
+    struct SandboxEditorRenderGraphPassModel
+    {
+        std::string Name{};
+        bool HasTypedId{false};
+        std::uint32_t TypedId{0u};
+        std::string Status{};
+    };
+
+    struct SandboxEditorRenderGraphModel
+    {
+        bool Enabled{false};
+        bool CompileSucceeded{false};
+        bool ExecuteSucceeded{false};
+        bool DeviceOperational{false};
+        std::uint32_t PassCount{0u};
+        std::uint32_t CulledPassCount{0u};
+        std::uint32_t ResourceCount{0u};
+        std::uint32_t BarrierCount{0u};
+        std::uint32_t QueueHandoffEdgeCount{0u};
+        std::uint32_t CrossQueueTimelineEdgeCount{0u};
+        std::uint32_t CrossQueueTimelineSignalCount{0u};
+        std::uint32_t CrossQueueTimelineWaitCount{0u};
+        std::uint32_t CrossQueueOwnershipTransferCount{0u};
+        std::uint64_t TransientMemoryEstimateBytes{0u};
+        std::uint64_t CompileTimeMicros{0u};
+        std::uint64_t ExecuteTimeMicros{0u};
+        std::uint32_t CommandPassesRecorded{0u};
+        std::uint32_t CommandPassesSkipped{0u};
+        std::uint32_t CommandPassesSkippedNonOperational{0u};
+        std::uint32_t CommandPassesSkippedUnavailable{0u};
+        std::uint32_t AsyncComputeUtilizedFrames{0u};
+        std::string StatusText{};
+        std::string Diagnostic{};
+        std::string LifecycleDiagnostic{};
+        std::string DebugDump{};
+        std::vector<SandboxEditorRenderGraphPassModel> CommandPasses{};
+        std::vector<SandboxEditorDiagnostic> Diagnostics{};
+    };
+
     struct SandboxEditorPrimitiveViewSettings
     {
         bool EnableEdgeView{false};
@@ -639,6 +680,7 @@ export namespace Extrinsic::Runtime
         SandboxEditorSelectionModel         Selection{};
         SandboxEditorSceneFileModel        SceneFile{};
         SandboxEditorFileImportModel        FileImport{};
+        SandboxEditorRenderGraphModel       RenderGraph{};
         SandboxEditorCameraRenderModel      CameraRender{};
         SandboxEditorVisualizationModel     Visualization{};
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
@@ -662,6 +704,7 @@ export namespace Extrinsic::Runtime
         const SandboxEditorFileImportResult* LastAssetImportResult{nullptr};
         const SandboxEditorSceneFileResult* LastSceneFileResult{nullptr};
         const SandboxEditorKMeansResult* LastKMeansResult{nullptr};
+        const Graphics::RenderGraphFrameStats* RenderGraphStats{nullptr};
         bool ImGuiAdapterAvailable{false};
         bool AssetImportCommandsAvailable{false};
         bool SceneFileCommandsAvailable{false};
