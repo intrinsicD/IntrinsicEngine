@@ -15,10 +15,8 @@
 // GRAPHICS-030A Triangle packer (vec3 position + vec2 uv = 20 bytes/vertex)
 // and forwards the per-instance material slot plus the scene-table
 // MaterialBDA so the fragment shader can sample the material slot from a
-// buffer reference instead of a descriptor set. Vertex transform matches
-// the existing `depth_prepass.vert` BDA-only pattern: positions land in
-// `dyn.Model`-space until a camera contract is wired through the scene
-// table (out of scope for this slice; see GRAPHICS-031B follow-up).
+// buffer reference instead of a descriptor set. Clip-space transforms use
+// the current camera matrix published through `GpuSceneTable`.
 
 #include "../common/gpu_scene.glsl"
 
@@ -49,6 +47,6 @@ void main() {
 
     const ProceduralVertex v = ProceduralVertexRef(geo.VertexBufferBDA).Data[geo.VertexOffset + gl_VertexIndex];
 
-    gl_Position = dyn.Model * vec4(v.Position, 1.0);
+    gl_Position = scene.CameraViewProj * dyn.Model * vec4(v.Position, 1.0);
     fragMaterialSlot = inst.MaterialSlot;
 }

@@ -238,8 +238,24 @@ export namespace Extrinsic::RHI
         float ClusterFarZ                = 0.f;
         float ClusterProjectionScaleX    = 0.f;
         float ClusterProjectionScaleY    = 0.f;
+
+        alignas(16) glm::mat4 CameraView{1.f};
+        alignas(16) glm::mat4 CameraProj{1.f};
+        alignas(16) glm::mat4 CameraViewProj{1.f};
+        alignas(16) glm::mat4 CameraInvView{1.f};
+        alignas(16) glm::mat4 CameraInvProj{1.f};
+        alignas(16) glm::vec4 CameraPosition{0.f};
+        alignas(16) glm::vec4 CameraDirection{0.f, 0.f, -1.f, 0.f};
+        float CameraViewportWidth  = 0.f;
+        float CameraViewportHeight = 0.f;
+        float CameraNearPlane      = 0.01f;
+        float CameraFarPlane       = 1000.f;
+        std::uint32_t CameraFrameIndex  = 0;
+        std::uint32_t CameraCullingFlags = CameraCulling_None;
+        std::uint32_t _cameraPad0 = 0;
+        std::uint32_t _cameraPad1 = 0;
     };
-    static_assert(sizeof(GpuSceneTable) == 128);
+    static_assert(sizeof(GpuSceneTable) == 512);
 
     struct alignas(16) GpuScenePushConstants
     {

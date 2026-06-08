@@ -52,6 +52,24 @@ struct GpuSceneTable {
 
     float ClusterProjectionScaleX;
     float ClusterProjectionScaleY;
+
+    mat4 CameraView;
+    mat4 CameraProj;
+    mat4 CameraViewProj;
+    mat4 CameraInvView;
+    mat4 CameraInvProj;
+    vec4 CameraPosition;
+    vec4 CameraDirection;
+
+    float CameraViewportWidth;
+    float CameraViewportHeight;
+    float CameraNearPlane;
+    float CameraFarPlane;
+
+    uint CameraFrameIndex;
+    uint CameraCullingFlags;
+    uint CameraPad0;
+    uint CameraPad1;
 };
 
 struct GpuInstanceStatic {

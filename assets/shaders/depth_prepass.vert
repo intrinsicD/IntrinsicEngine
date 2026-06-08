@@ -41,5 +41,5 @@ void main()
     const GpuGeometryRecord geo = GpuGeometryRecordRef(scene.GeometryRecordBDA).Data[inst.GeometrySlot];
     const vec3 localPosition = ProceduralVertexRef(geo.VertexBufferBDA).Data[geo.VertexOffset + gl_VertexIndex].Position;
 
-    gl_Position = dyn.Model * vec4(localPosition, 1.0);
+    gl_Position = scene.CameraViewProj * dyn.Model * vec4(localPosition, 1.0);
 }

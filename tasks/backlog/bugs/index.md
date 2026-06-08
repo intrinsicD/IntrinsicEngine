@@ -5,11 +5,15 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- No active bug records as of 2026-06-08.
+No active bug records as of 2026-06-08.
 
 ---
 
 ## Verified / Closed
+
+- Closed 2026-06-08: [`BUG-022` — Sandbox reference triangle camera frustum visibility](../../done/BUG-022-sandbox-reference-triangle-camera-frustum-visibility.md). The reference camera seed and all controller modes now prove the triangle vertices are inside clip space, and promoted triangle-list/backface-culling pipelines use clockwise front-face winding to match the Vulkan Y-flipped camera projection so the centered triangle is not culled.
+
+- Closed 2026-06-08: [`BUG-021` — Sandbox camera scene-table shader wiring](../../done/BUG-021-sandbox-camera-scene-table-shader-wiring.md). The promoted runtime camera remains controller-backed rather than an ECS camera entity; the renderer now publishes the extracted camera into `GpuSceneTable` before `GpuWorld::SyncFrame()`, active BDA vertex shaders transform through `scene.CameraViewProj`, and focused CPU plus Vulkan smoke coverage proves default triangle/readback/sandbox visibility.
 
 - Closed 2026-06-08: [`BUG-020` — Sandbox reference triangle camera modes](../../done/BUG-020-sandbox-reference-triangle-camera-modes.md). The default `ReferenceTriangle` now round-trips through the promoted scene-document seam as a mesh-domain authored renderable with stable/selectable identity and white `VisualizationConfig`, and top-down camera seeding now uses the seed focus point so orbit, fly, free-look, and top-down modes keep the triangle centered.
 

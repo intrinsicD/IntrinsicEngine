@@ -919,6 +919,24 @@ namespace Extrinsic::Graphics
         m_Impl->RefreshSceneTable();
     }
 
+    void GpuWorld::SetCamera(const RHI::CameraUBO& camera)
+    {
+        m_Impl->SceneTableCpu.CameraView = camera.View;
+        m_Impl->SceneTableCpu.CameraProj = camera.Proj;
+        m_Impl->SceneTableCpu.CameraViewProj = camera.ViewProj;
+        m_Impl->SceneTableCpu.CameraInvView = camera.InvView;
+        m_Impl->SceneTableCpu.CameraInvProj = camera.InvProj;
+        m_Impl->SceneTableCpu.CameraPosition = camera.CameraPosition;
+        m_Impl->SceneTableCpu.CameraDirection = camera.CameraDirection;
+        m_Impl->SceneTableCpu.CameraViewportWidth = camera.ViewportWidth;
+        m_Impl->SceneTableCpu.CameraViewportHeight = camera.ViewportHeight;
+        m_Impl->SceneTableCpu.CameraNearPlane = camera.NearPlane;
+        m_Impl->SceneTableCpu.CameraFarPlane = camera.FarPlane;
+        m_Impl->SceneTableCpu.CameraFrameIndex = camera.FrameIndex;
+        m_Impl->SceneTableCpu.CameraCullingFlags = camera.CullingFlags;
+        m_Impl->DirtySceneTable = true;
+    }
+
     void GpuWorld::SetLights(std::span<const RHI::GpuLight> lights)
     {
         const std::size_t capped = std::min<std::size_t>(lights.size(), m_Impl->Desc.MaxLights);

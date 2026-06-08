@@ -940,7 +940,12 @@ namespace Extrinsic::Graphics
             // exposure-history mirror is never anchored to stale
             // pre-rebuild bytes.
             DrainCompletedHistogramSlots();
-            return m_Device->BeginFrame(outFrame);
+            const bool began = m_Device->BeginFrame(outFrame);
+            if (began)
+            {
+                m_CurrentFrame = outFrame;
+            }
+            return began;
         }
 
         // GRAPHICS-079 Slice A — receive the engine-owned `ImGuiOverlaySystem`
@@ -1347,6 +1352,11 @@ namespace Extrinsic::Graphics
                 return;
             }
             RuntimeSnapshotStorage* const activeSnapshot = &ActiveRuntimeSnapshotStorage();
+            if (m_Subsystems.GpuWorldSystem())
+            {
+                m_Subsystems.GpuWorldSystem()->SetCamera(
+                    BuildCameraUbo(renderWorld, m_CurrentFrame.FrameIndex));
+            }
 
             RenderPrepPipelineInputs inputs{
                 .PipelineManager = m_Subsystems.PipelineManager() ? &*m_Subsystems.PipelineManager() : nullptr,
@@ -2649,7 +2659,7 @@ namespace Extrinsic::Graphics
                 "shaders/forward/default_debug_surface.frag.spv");
             desc.PrimitiveTopology = RHI::Topology::TriangleList;
             desc.Rasterizer.Culling = RHI::CullMode::Back;
-            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
+            desc.Rasterizer.Winding = RHI::FrontFace::Clockwise;
             desc.Rasterizer.Fill = RHI::FillMode::Solid;
             desc.DepthStencil.DepthTestEnable = true;
             desc.DepthStencil.DepthWriteEnable = true;
@@ -2694,7 +2704,7 @@ namespace Extrinsic::Graphics
                 "shaders/forward/default_debug_surface.frag.spv");
             desc.PrimitiveTopology = RHI::Topology::TriangleList;
             desc.Rasterizer.Culling = RHI::CullMode::Back;
-            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
+            desc.Rasterizer.Winding = RHI::FrontFace::Clockwise;
             desc.Rasterizer.Fill = RHI::FillMode::Solid;
             desc.DepthStencil.DepthTestEnable = true;
             desc.DepthStencil.DepthWriteEnable = false;
@@ -2791,7 +2801,7 @@ namespace Extrinsic::Graphics
                 "shaders/depth_prepass.vert.spv");
             desc.PrimitiveTopology = RHI::Topology::TriangleList;
             desc.Rasterizer.Culling = RHI::CullMode::Back;
-            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
+            desc.Rasterizer.Winding = RHI::FrontFace::Clockwise;
             desc.Rasterizer.Fill = RHI::FillMode::Solid;
             desc.DepthStencil.DepthTestEnable = true;
             desc.DepthStencil.DepthWriteEnable = true;
@@ -2836,7 +2846,7 @@ namespace Extrinsic::Graphics
                 "shaders/deferred/default_debug_gbuffer.frag.spv");
             desc.PrimitiveTopology = RHI::Topology::TriangleList;
             desc.Rasterizer.Culling = RHI::CullMode::Back;
-            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
+            desc.Rasterizer.Winding = RHI::FrontFace::Clockwise;
             desc.Rasterizer.Fill = RHI::FillMode::Solid;
             desc.DepthStencil.DepthTestEnable = true;
             desc.DepthStencil.DepthWriteEnable = false;
@@ -2942,7 +2952,7 @@ namespace Extrinsic::Graphics
                 "shaders/selection/entity_id.frag.spv");
             desc.PrimitiveTopology = RHI::Topology::TriangleList;
             desc.Rasterizer.Culling = RHI::CullMode::Back;
-            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
+            desc.Rasterizer.Winding = RHI::FrontFace::Clockwise;
             desc.Rasterizer.Fill = RHI::FillMode::Solid;
             desc.DepthStencil.DepthTestEnable = true;
             desc.DepthStencil.DepthWriteEnable = false;
@@ -2982,7 +2992,7 @@ namespace Extrinsic::Graphics
                 "shaders/selection/face_id.frag.spv");
             desc.PrimitiveTopology = RHI::Topology::TriangleList;
             desc.Rasterizer.Culling = RHI::CullMode::Back;
-            desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
+            desc.Rasterizer.Winding = RHI::FrontFace::Clockwise;
             desc.Rasterizer.Fill = RHI::FillMode::Solid;
             desc.DepthStencil.DepthTestEnable = true;
             desc.DepthStencil.DepthWriteEnable = false;
@@ -3965,6 +3975,7 @@ namespace Extrinsic::Graphics
             RHI::PipelineDesc depthPrepassDesc{};
             depthPrepassDesc.VertexShaderPath = Core::Filesystem::GetShaderPath(
                 "shaders/depth_prepass.vert.spv");
+            depthPrepassDesc.Rasterizer.Winding = RHI::FrontFace::Clockwise;
             depthPrepassDesc.ColorTargetCount = 0u;
             depthPrepassDesc.DepthTargetFormat = RHI::Format::D32_FLOAT;
             depthPrepassDesc.PushConstantSize = sizeof(RHI::GpuScenePushConstants);
@@ -7291,6 +7302,7 @@ namespace Extrinsic::Graphics
         std::optional<RHI::BufferManager::BufferLease> m_ClusterLightCounterBuffer;
         ClusterGridDesc                                m_ClusterGridDesc{};
         ClusterGridProjection                          m_ClusterGridProjection{};
+        RHI::FrameHandle                               m_CurrentFrame{};
         std::array<RuntimeSnapshotStorage, kRuntimeSnapshotStorageSlots> m_RuntimeSnapshotSlots{};
         std::uint32_t                        m_ActiveRuntimeSnapshotReadSlot{0u};
         bool                                 m_CullingOutputAvailable{false};

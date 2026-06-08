@@ -240,11 +240,17 @@ void VulkanCommandContext::BeginRenderPass(const RHI::RenderPassDesc& desc)
         }
     }
 
-    // Determine render area from the first color target (or depth).
+    // Determine render area from the first color target, falling back to
+    // depth-only passes such as DepthPrepass.
     VkExtent2D extent{1, 1};
     if (!desc.ColorTargets.empty() && desc.ColorTargets[0].Target.IsValid())
     {
         const auto* img = m_Images->GetIfValid(desc.ColorTargets[0].Target);
+        if (img) extent = {img->Width, img->Height};
+    }
+    else if (desc.Depth.Target.IsValid())
+    {
+        const auto* img = m_Images->GetIfValid(desc.Depth.Target);
         if (img) extent = {img->Width, img->Height};
     }
 

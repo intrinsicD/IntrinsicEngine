@@ -42,7 +42,7 @@ void main() {
     PackedVertexRef vertices = PackedVertexRef(geo.VertexBufferBDA);
     const PackedVertex pv = vertices.Data[geo.VertexOffset + vertexId];
 
-    gl_Position = dyn.Model * vec4(pv.px, pv.py, pv.pz, 1.0);
+    gl_Position = scene.CameraViewProj * dyn.Model * vec4(pv.px, pv.py, pv.pz, 1.0);
 
     gl_PointSize = max(cfg.PointSize, 1.0);
 

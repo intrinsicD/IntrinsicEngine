@@ -48,6 +48,6 @@ void main() {
 
     const ProceduralVertex v = ProceduralVertexRef(geo.VertexBufferBDA).Data[geo.VertexOffset + gl_VertexIndex];
 
-    gl_Position = dyn.Model * vec4(v.Position, 1.0);
+    gl_Position = scene.CameraViewProj * dyn.Model * vec4(v.Position, 1.0);
     fragEntityID = inst.EntityID;
 }

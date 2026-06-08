@@ -186,6 +186,20 @@ Concretely:
   the shader files under `assets/shaders/forward/`,
   `assets/shaders/deferred/`, and the GpuScene-aware
   `assets/shaders/depth_prepass.vert`.
+- Promoted BDA retained shaders also read current camera state through
+  `GpuSceneTable` (`CameraView`, `CameraProj`, `CameraViewProj`, inverse
+  matrices, camera vectors, viewport, near/far, and frame/culling flags).
+  `NullRenderer::PrepareFrame()` publishes the extracted `RenderWorld.Camera`
+  into `GpuWorld` before `GpuWorld::SyncFrame()` writes the scene-table buffer,
+  so surface/depth/line/point/selection vertex shaders must transform
+  world-space positions with `scene.CameraViewProj` instead of declaring a
+  legacy `CameraBuffer` descriptor.
+- Triangle-list retained pipelines that keep backface culling enabled must use
+  clockwise front-face winding with the promoted camera path. Runtime camera
+  projections flip Y for Vulkan clip-space parity, and leaving these pipelines
+  at counter-clockwise front-face winding can cull the centered reference
+  triangle after `scene.CameraViewProj` is applied. Line, point, fullscreen, and
+  no-cull pipelines are not affected by this rule.
 - The legacy shader pairs under `assets/shaders/` root —
   `surface.vert`, `surface.frag`, `surface_gbuffer.frag`,
   `shadow_depth.vert`, etc. — declare the pre-GpuScene push block

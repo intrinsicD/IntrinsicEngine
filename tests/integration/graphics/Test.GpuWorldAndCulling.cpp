@@ -48,7 +48,7 @@ static_assert(sizeof(RHI::GpuInstanceDynamic) == 128);
 static_assert(sizeof(RHI::GpuEntityConfig) == 112);
 static_assert(sizeof(RHI::GpuBounds) == 64);
 static_assert(sizeof(RHI::GpuLight) == 64);
-static_assert(sizeof(RHI::GpuSceneTable) == 128);
+static_assert(sizeof(RHI::GpuSceneTable) == 512);
 static_assert(sizeof(RHI::GpuCullPushConstants) <= 128);
 static_assert(sizeof(RHI::GpuDrawIndexedCommand) == 20);
 static_assert(sizeof(RHI::GpuDrawCommand) == 16);

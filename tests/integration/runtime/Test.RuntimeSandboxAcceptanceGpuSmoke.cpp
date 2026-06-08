@@ -20,6 +20,7 @@
 // residency counts are covered by the Slice 1 CPU acceptance test.
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <limits>
 #include <memory>
@@ -44,6 +45,7 @@ import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.RenderGeometry;
+import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Platform.Backend.Glfw;
 import Extrinsic.RHI.Descriptors;
@@ -383,6 +385,69 @@ struct AcceptanceRunCapture
     return nonBlack;
 }
 
+struct RgbaPixel
+{
+    std::uint8_t R{0u};
+    std::uint8_t G{0u};
+    std::uint8_t B{0u};
+    std::uint8_t A{0u};
+};
+
+[[nodiscard]] RgbaPixel ReorderToRgba(
+    const Extrinsic::RHI::Format format,
+    const std::uint8_t b0,
+    const std::uint8_t b1,
+    const std::uint8_t b2,
+    const std::uint8_t b3) noexcept
+{
+    switch (format)
+    {
+    case Extrinsic::RHI::Format::BGRA8_UNORM:
+    case Extrinsic::RHI::Format::BGRA8_SRGB:
+        return RgbaPixel{.R = b2, .G = b1, .B = b0, .A = b3};
+    case Extrinsic::RHI::Format::RGBA8_UNORM:
+    case Extrinsic::RHI::Format::RGBA8_SRGB:
+    default:
+        return RgbaPixel{.R = b0, .G = b1, .B = b2, .A = b3};
+    }
+}
+
+[[nodiscard]] RgbaPixel ReadPixel(
+    const std::vector<std::uint8_t>& bytes,
+    const Extrinsic::RHI::Format format,
+    const std::uint32_t bytesPerPixel,
+    const Extrinsic::Core::Extent2D extent,
+    const std::uint32_t x,
+    const std::uint32_t y)
+{
+    const std::uint64_t rowStride =
+        static_cast<std::uint64_t>(bytesPerPixel) *
+        static_cast<std::uint64_t>(extent.Width);
+    const std::uint64_t offset =
+        static_cast<std::uint64_t>(y) * rowStride +
+        static_cast<std::uint64_t>(x) * static_cast<std::uint64_t>(bytesPerPixel);
+    if (offset + 4u > bytes.size())
+    {
+        return {};
+    }
+    return ReorderToRgba(format,
+                         bytes[static_cast<std::size_t>(offset + 0u)],
+                         bytes[static_cast<std::size_t>(offset + 1u)],
+                         bytes[static_cast<std::size_t>(offset + 2u)],
+                         bytes[static_cast<std::size_t>(offset + 3u)]);
+}
+
+[[nodiscard]] int RgbDistance(const RgbaPixel a, const RgbaPixel b) noexcept
+{
+    const auto absDiff = [](const std::uint8_t lhs, const std::uint8_t rhs) noexcept
+    {
+        return lhs > rhs
+            ? static_cast<int>(lhs - rhs)
+            : static_cast<int>(rhs - lhs);
+    };
+    return absDiff(a.R, b.R) + absDiff(a.G, b.G) + absDiff(a.B, b.B);
+}
+
 [[nodiscard]] EntityHandle FindEntityByName(
     Registry& scene,
     const std::string_view name)
@@ -397,6 +462,80 @@ struct AcceptanceRunCapture
         }
     });
     return found;
+}
+
+[[nodiscard]] bool IsReferenceTriangleEntityValid(Registry& scene, const EntityHandle triangle)
+{
+    if (triangle == Extrinsic::ECS::InvalidEntityHandle || !scene.IsValid(triangle))
+    {
+        return false;
+    }
+    auto& raw = scene.Raw();
+    const gs::ConstSourceView view = gs::BuildConstView(raw, triangle);
+    return raw.all_of<ECSC::MetaData,
+                      ECSC::Transform::Component,
+                      ECSC::Transform::WorldMatrix,
+                      ECSC::StableId,
+                      ECSC::Selection::SelectableTag,
+                      G::RenderSurface,
+                      G::VisualizationConfig,
+                      gs::Vertices,
+                      gs::Edges,
+                      gs::Halfedges,
+                      gs::Faces>(triangle) &&
+           view.Valid() &&
+           view.ActiveDomain == gs::Domain::Mesh;
+}
+
+[[nodiscard]] std::string BuildReferenceTriangleEntityDiagnostic(Registry& scene, const EntityHandle triangle)
+{
+    if (triangle == Extrinsic::ECS::InvalidEntityHandle)
+    {
+        return "handle=InvalidEntityHandle";
+    }
+    if (!scene.IsValid(triangle))
+    {
+        return "handle is not valid in registry";
+    }
+
+    auto& raw = scene.Raw();
+    std::string out;
+    const auto append = [&out](const char* name, const bool present)
+    {
+        if (!out.empty())
+            out += ", ";
+        out += name;
+        out += "=";
+        out += present ? "yes" : "no";
+    };
+
+    append("MetaData", raw.all_of<ECSC::MetaData>(triangle));
+    append("Transform", raw.all_of<ECSC::Transform::Component>(triangle));
+    append("WorldMatrix", raw.all_of<ECSC::Transform::WorldMatrix>(triangle));
+    append("StableId", raw.all_of<ECSC::StableId>(triangle));
+    append("SelectableTag", raw.all_of<ECSC::Selection::SelectableTag>(triangle));
+    append("RenderSurface", raw.all_of<G::RenderSurface>(triangle));
+    append("VisualizationConfig", raw.all_of<G::VisualizationConfig>(triangle));
+    append("Vertices", raw.all_of<gs::Vertices>(triangle));
+    append("Edges", raw.all_of<gs::Edges>(triangle));
+    append("Halfedges", raw.all_of<gs::Halfedges>(triangle));
+    append("Faces", raw.all_of<gs::Faces>(triangle));
+    append("HasMeshTopology", raw.all_of<gs::HasMeshTopology>(triangle));
+
+    const gs::ConstSourceView view = gs::BuildConstView(raw, triangle);
+    out += ", sourceViewValid=";
+    out += view.Valid() ? "yes" : "no";
+    out += ", activeDomain=";
+    out += std::to_string(static_cast<int>(view.ActiveDomain));
+    out += ", vertices=";
+    out += std::to_string(view.VerticesAlive());
+    out += ", edges=";
+    out += std::to_string(view.EdgesAlive());
+    out += ", halfedges=";
+    out += std::to_string(view.HalfedgesTotal());
+    out += ", faces=";
+    out += std::to_string(view.FacesAlive());
+    return out;
 }
 } // namespace
 
@@ -573,6 +712,142 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ExtrinsicSandboxDefaultConfigProducesVisi
         << "Sandbox default-config frame did not present a full-screen lit background; only "
         << nonBlackPixels << "/" << totalPixels << " pixels were non-black. This indicates the "
         << "postprocess present source regressed to black again (BUG-016).";
+
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+    device.DestroyBuffer(readbackBuffer);
+    engine.Shutdown();
+}
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke, ExtrinsicSandboxDefaultConfigPresentsReferenceTriangleAtFrameCenter)
+{
+    auto bootstrap = BootstrapDefaultSandboxAppEngine();
+    if (bootstrap.Skipped)
+    {
+        GTEST_SKIP() << bootstrap.SkipReason;
+    }
+    Engine& engine = *bootstrap.EnginePtr;
+
+    const EntityHandle triangle = FindEntityByName(engine.GetScene(), "ReferenceTriangle");
+    ASSERT_TRUE(IsReferenceTriangleEntityValid(engine.GetScene(), triangle))
+        << "ReferenceTriangle is not a valid first-class mesh renderable entity: "
+        << BuildReferenceTriangleEntityDiagnostic(engine.GetScene(), triangle);
+
+    auto& renderer = engine.GetRenderer();
+    auto& device = engine.GetDevice();
+    const Extrinsic::RHI::Format backbufferFormat = device.GetBackbufferFormat();
+    const std::uint32_t bytesPerPixel = Extrinsic::RHI::BytesPerBlock(backbufferFormat);
+    const Extrinsic::Core::Extent2D extent = device.GetBackbufferExtent();
+    if (bytesPerPixel < 4u || extent.Width <= 0 || extent.Height <= 0)
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style smoke readback.";
+    }
+
+    const std::uint64_t readbackSize =
+        static_cast<std::uint64_t>(bytesPerPixel) *
+        static_cast<std::uint64_t>(extent.Width) *
+        static_cast<std::uint64_t>(extent.Height);
+    const Extrinsic::RHI::BufferHandle readbackBuffer = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
+        .SizeBytes = readbackSize,
+        .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
+        .HostVisible = true,
+        .DebugName = "Sandbox.ReferenceTriangleCenter.Readback",
+    });
+    if (!readbackBuffer.IsValid())
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Readback buffer allocation failed; gpu;vulkan smoke is opt-in.";
+    }
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(readbackBuffer);
+
+    const auto run = DriveAcceptanceAndCapture(engine);
+
+    if (!run.DeviceOperational)
+    {
+        renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+        device.DestroyBuffer(readbackBuffer);
+        engine.Shutdown();
+        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach operational Vulkan for triangle readback: status="
+                      << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
+                      << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+        return;
+    }
+
+    const auto& ex = engine.GetLastRenderExtractionStats();
+    EXPECT_GE(ex.CandidateRenderableCount, 1u);
+    EXPECT_GE(ex.SubmittedTransformCount, 1u);
+    EXPECT_GE(ex.SubmittedVisualizationCount, 1u);
+    EXPECT_GE(ex.MeshGeometryUploads + ex.MeshGeometryReuseHits, 1u)
+        << "ReferenceTriangle did not remain resident on the mesh extraction lane.";
+
+    EXPECT_TRUE(run.Stats.Compile.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_TRUE(run.Stats.Execute.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_EQ(FindPassStatus(run.Stats, "DepthPrepass"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_EQ(FindPassStatus(run.Stats, "SurfacePass"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_EQ(FindPassStatus(run.Stats, "Present"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_GE(run.Stats.DefaultRecipeBackbufferReadbackCopyCount, 1u)
+        << "Sandbox triangle readback triplet did not record on an operational frame.";
+
+    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(readbackSize), 0u);
+    device.ReadBuffer(readbackBuffer, bytes.data(), readbackSize, 0u);
+
+    const std::uint32_t centerX = static_cast<std::uint32_t>(extent.Width / 2);
+    const std::uint32_t centerY = static_cast<std::uint32_t>(extent.Height / 2);
+    const RgbaPixel center =
+        ReadPixel(bytes, backbufferFormat, bytesPerPixel, extent, centerX, centerY);
+
+    const std::array<RgbaPixel, 4> backgroundSamples{{
+        ReadPixel(bytes, backbufferFormat, bytesPerPixel, extent,
+                  static_cast<std::uint32_t>((extent.Width * 7) / 8),
+                  centerY),
+        ReadPixel(bytes, backbufferFormat, bytesPerPixel, extent,
+                  static_cast<std::uint32_t>((extent.Width * 7) / 8),
+                  static_cast<std::uint32_t>(extent.Height / 4)),
+        ReadPixel(bytes, backbufferFormat, bytesPerPixel, extent,
+                  centerX,
+                  static_cast<std::uint32_t>((extent.Height * 7) / 8)),
+        ReadPixel(bytes, backbufferFormat, bytesPerPixel, extent,
+                  static_cast<std::uint32_t>((extent.Width * 15) / 16),
+                  static_cast<std::uint32_t>((extent.Height * 15) / 16)),
+    }};
+
+    int nearestBackgroundDistance = RgbDistance(center, backgroundSamples[0]);
+    for (const RgbaPixel sample : backgroundSamples)
+    {
+        nearestBackgroundDistance = std::min(nearestBackgroundDistance, RgbDistance(center, sample));
+    }
+
+    EXPECT_GT(nearestBackgroundDistance, 48)
+        << "The actual ECS ReferenceTriangle did not contribute a distinguishable center pixel. "
+        << "center=(" << static_cast<int>(center.R) << ","
+        << static_cast<int>(center.G) << ","
+        << static_cast<int>(center.B) << ","
+        << static_cast<int>(center.A) << ") "
+        << "background samples=("
+        << static_cast<int>(backgroundSamples[0].R) << ","
+        << static_cast<int>(backgroundSamples[0].G) << ","
+        << static_cast<int>(backgroundSamples[0].B) << "),("
+        << static_cast<int>(backgroundSamples[1].R) << ","
+        << static_cast<int>(backgroundSamples[1].G) << ","
+        << static_cast<int>(backgroundSamples[1].B) << "),("
+        << static_cast<int>(backgroundSamples[2].R) << ","
+        << static_cast<int>(backgroundSamples[2].G) << ","
+        << static_cast<int>(backgroundSamples[2].B) << "),("
+        << static_cast<int>(backgroundSamples[3].R) << ","
+        << static_cast<int>(backgroundSamples[3].G) << ","
+        << static_cast<int>(backgroundSamples[3].B) << ") "
+        << "extent=" << extent.Width << "x" << extent.Height
+        << " backbuffer format=" << static_cast<int>(backbufferFormat)
+        << " extraction candidates=" << ex.CandidateRenderableCount
+        << " transforms=" << ex.SubmittedTransformCount
+        << " visualizations=" << ex.SubmittedVisualizationCount
+        << " mesh uploads=" << ex.MeshGeometryUploads
+        << " mesh reuse=" << ex.MeshGeometryReuseHits
+        << " nearest background distance=" << nearestBackgroundDistance
+        << " pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
 
     renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
     device.DestroyBuffer(readbackBuffer);

@@ -62,7 +62,7 @@ void main() {
 
     const ProceduralVertex v = ProceduralVertexRef(geo.VertexBufferBDA).Data[geo.VertexOffset + gl_VertexIndex];
 
-    gl_Position = dyn.Model * vec4(v.Position, 1.0);
+    gl_Position = scene.CameraViewProj * dyn.Model * vec4(v.Position, 1.0);
     // Match `forward/point.vert`'s point-size publication so the picking
     // footprint covers the same pixels the visible point covers.
     gl_PointSize = max(cfg.PointSize, 1.0);

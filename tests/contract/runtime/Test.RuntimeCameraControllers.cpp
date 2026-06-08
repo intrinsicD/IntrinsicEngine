@@ -58,6 +58,30 @@ namespace
         EXPECT_NEAR(clip.x / clip.w, 0.0f, 0.0001f);
         EXPECT_NEAR(clip.y / clip.w, 0.0f, 0.0001f);
     }
+
+    void ExpectWorldPointInsideClipSpace(const Graphics::CameraViewInput& input,
+                                         const glm::vec3 point)
+    {
+        ExpectValidCameraView(input);
+        const glm::vec4 clip = input.Projection * input.View * glm::vec4(point, 1.0f);
+        ASSERT_TRUE(std::isfinite(clip.w));
+        ASSERT_GT(std::abs(clip.w), 0.000001f);
+        const glm::vec3 ndc = glm::vec3{clip} / clip.w;
+        EXPECT_GE(ndc.x, -1.0f);
+        EXPECT_LE(ndc.x, 1.0f);
+        EXPECT_GE(ndc.y, -1.0f);
+        EXPECT_LE(ndc.y, 1.0f);
+        EXPECT_GE(ndc.z, 0.0f);
+        EXPECT_LE(ndc.z, 1.0f);
+    }
+
+    void ExpectReferenceTriangleInsideClipSpace(const Graphics::CameraViewInput& input)
+    {
+        ExpectWorldPointCentered(input, glm::vec3{0.0f, 0.0f, 0.0f});
+        ExpectWorldPointInsideClipSpace(input, glm::vec3{-0.5f, -0.5f, 0.0f});
+        ExpectWorldPointInsideClipSpace(input, glm::vec3{ 0.5f, -0.5f, 0.0f});
+        ExpectWorldPointInsideClipSpace(input, glm::vec3{ 0.0f,  0.5f, 0.0f});
+    }
 }
 
 TEST(RuntimeCameraControllers, OrbitProducesValidFiniteViewAndClampsRadius)
@@ -122,6 +146,65 @@ TEST(RuntimeCameraControllers, FlyMovementScalesWithDeltaTime)
     EXPECT_NEAR(a.Position.z, b.Position.z, 0.0001f);
     ExpectValidCameraView(a);
     ExpectValidCameraView(b);
+}
+
+TEST(RuntimeCameraControllers, FlyMouseLookUsesLegacyRightButtonYawPitchSign)
+{
+    Runtime::FlyCameraController controller{MakeSeed()};
+    Platform::Input::Context input{};
+    input.SetMouseButtonState(1, true);
+    input.SetMousePosition(0.0f, 0.0f);
+    controller.Update(input, 1.0 / 60.0);
+
+    input.SetMousePosition(100.0f, 50.0f);
+    controller.Update(input, 1.0 / 60.0);
+
+    const Graphics::CameraViewInput view = controller.GetView(Core::Extent2D{1280, 720});
+    EXPECT_LT(view.Forward.x, -0.0001f)
+        << "Legacy fly camera subtracts positive mouse X from yaw.";
+    EXPECT_LT(view.Forward.y, -0.0001f)
+        << "Legacy fly camera subtracts positive mouse Y from pitch.";
+    ExpectValidCameraView(view);
+}
+
+TEST(RuntimeCameraControllers, FlyKeyboardMappingUsesLegacyAxesAndShiftScalar)
+{
+    Runtime::FlyCameraController forward{MakeSeed()};
+    Platform::Input::Context forwardInput{};
+    forwardInput.SetKeyState(Platform::Input::Key::W, true);
+    forward.Update(forwardInput, 1.0);
+    const Graphics::CameraViewInput forwardView = forward.GetView(Core::Extent2D{1280, 720});
+    EXPECT_NEAR(forwardView.Position.x, 0.0f, 0.0001f);
+    EXPECT_NEAR(forwardView.Position.y, 0.0f, 0.0001f);
+    EXPECT_NEAR(forwardView.Position.z, -2.0f, 0.0001f);
+
+    Runtime::FlyCameraController right{MakeSeed()};
+    Platform::Input::Context rightInput{};
+    rightInput.SetKeyState(Platform::Input::Key::D, true);
+    right.Update(rightInput, 1.0);
+    const Graphics::CameraViewInput rightView = right.GetView(Core::Extent2D{1280, 720});
+    EXPECT_NEAR(rightView.Position.x, 5.0f, 0.0001f);
+    EXPECT_NEAR(rightView.Position.y, 0.0f, 0.0001f);
+    EXPECT_NEAR(rightView.Position.z, 3.0f, 0.0001f);
+
+    Runtime::FlyCameraController up{MakeSeed()};
+    Platform::Input::Context upInput{};
+    upInput.SetKeyState(Platform::Input::Key::Space, true);
+    up.Update(upInput, 1.0);
+    const Graphics::CameraViewInput upView = up.GetView(Core::Extent2D{1280, 720});
+    EXPECT_NEAR(upView.Position.x, 0.0f, 0.0001f);
+    EXPECT_NEAR(upView.Position.y, 5.0f, 0.0001f);
+    EXPECT_NEAR(upView.Position.z, 3.0f, 0.0001f);
+
+    Runtime::FlyCameraController accelerated{MakeSeed()};
+    Platform::Input::Context acceleratedInput{};
+    acceleratedInput.SetKeyState(Platform::Input::Key::W, true);
+    acceleratedInput.SetKeyState(Platform::Input::Key::LeftShift, true);
+    accelerated.Update(acceleratedInput, 1.0);
+    const Graphics::CameraViewInput acceleratedView =
+        accelerated.GetView(Core::Extent2D{1280, 720});
+    EXPECT_NEAR(acceleratedView.Position.z, -7.0f, 0.0001f)
+        << "Legacy fly camera doubles movement while left shift is pressed.";
 }
 
 TEST(RuntimeCameraControllers, RegistryReplacementCanSeedNextControllerFromTerminalView)
@@ -209,8 +292,7 @@ TEST(RuntimeCameraControllers, FactorySeedsEveryControllerKindOnReferenceTriangl
         SCOPED_TRACE(static_cast<int>(kind));
         std::unique_ptr<Runtime::ICameraController> controller = Runtime::CreateCameraController(kind, MakeSeed());
         ASSERT_NE(controller, nullptr);
-        ExpectWorldPointCentered(controller->GetView(Core::Extent2D{1280, 720}),
-                                 glm::vec3{0.0f, 0.0f, 0.0f});
+        ExpectReferenceTriangleInsideClipSpace(controller->GetView(Core::Extent2D{1280, 720}));
     }
 }
 

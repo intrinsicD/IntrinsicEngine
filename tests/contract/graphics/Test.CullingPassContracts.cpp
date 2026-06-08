@@ -288,19 +288,19 @@ TEST(GraphicsCullingContracts, CullingPassResetsDispatchesAndPublishesAllBucketM
     EXPECT_EQ(event, cmd.Events.size());
 
     bool sawBucketTableWrite = false;
+    const std::uint64_t expectedBucketTableBda = cmd.LastCullPushConstants->CullBucketTableBDA;
+    ASSERT_NE(expectedBucketTableBda, 0u);
     for (const auto& write : device.BufferWrites)
     {
-        if (write.Data.size() != sizeof(RHI::GpuCullBucketTable))
+        if (device.GetBufferDeviceAddress(write.Handle) != expectedBucketTableBda)
         {
             continue;
         }
+        ASSERT_EQ(write.Offset, 0u);
+        ASSERT_EQ(write.Data.size(), sizeof(RHI::GpuCullBucketTable));
 
         RHI::GpuCullBucketTable table{};
         std::memcpy(&table, write.Data.data(), sizeof(table));
-        if (table.SurfaceOpaque.Phase1.Capacity == 0u)
-        {
-            continue;
-        }
         EXPECT_GT(table.SurfaceOpaque.Phase1.Capacity, 0u);
         EXPECT_GT(table.SurfaceOpaque.Phase2.Capacity, 0u);
         EXPECT_GT(table.SurfaceAlphaMask.Phase1.Capacity, 0u);
@@ -311,6 +311,7 @@ TEST(GraphicsCullingContracts, CullingPassResetsDispatchesAndPublishesAllBucketM
         EXPECT_GT(table.SelectionLines.Phase1.Capacity, 0u);
         EXPECT_GT(table.SelectionPoints.Phase1.Capacity, 0u);
         sawBucketTableWrite = true;
+        break;
     }
     EXPECT_TRUE(sawBucketTableWrite);
 

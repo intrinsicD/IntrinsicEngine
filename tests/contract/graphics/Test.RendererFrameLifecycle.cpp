@@ -4,13 +4,19 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <memory>
 #include <span>
+#include <sstream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
+import Extrinsic.Core.Filesystem.PathResolver;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.FrameRecipe;
@@ -39,6 +45,21 @@ import Extrinsic.RHI.Types;
 
 namespace
 {
+    constexpr Extrinsic::RHI::FrontFace kVulkanCameraTriangleFrontFace =
+        Extrinsic::RHI::FrontFace::Clockwise;
+
+    [[nodiscard]] const Extrinsic::RHI::PipelineDesc* FindCreatedPipelineDesc(
+        const Extrinsic::Tests::MockDevice& device,
+        const std::string_view debugName) noexcept
+    {
+        for (const Extrinsic::RHI::PipelineDesc& desc : device.CreatedPipelineDescs)
+        {
+            if (desc.DebugName == debugName)
+                return &desc;
+        }
+        return nullptr;
+    }
+
     [[nodiscard]] bool ContainsTextureBarrier(const Extrinsic::Tests::MockCommandContext& context,
                                               const Extrinsic::RHI::TextureHandle handle)
     {
@@ -189,6 +210,123 @@ namespace
         }
         return nullptr;
     }
+
+    [[nodiscard]] std::string ReadShaderSource(const std::string_view relativePath)
+    {
+        const std::filesystem::path path =
+            Extrinsic::Core::Filesystem::GetRoot() / "assets" / "shaders" /
+            std::filesystem::path{relativePath};
+        std::ifstream input{path};
+        EXPECT_TRUE(input.is_open()) << path.string();
+        std::ostringstream text;
+        text << input.rdbuf();
+        return text.str();
+    }
+
+    void ExpectMat4Near(const glm::mat4& actual,
+                        const glm::mat4& expected,
+                        const float epsilon)
+    {
+        for (int column = 0; column < 4; ++column)
+        {
+            for (int row = 0; row < 4; ++row)
+            {
+                EXPECT_NEAR(actual[column][row], expected[column][row], epsilon)
+                    << "column=" << column << " row=" << row;
+            }
+        }
+    }
+
+    void ExpectVec4Near(const glm::vec4& actual,
+                        const glm::vec4& expected,
+                        const float epsilon)
+    {
+        EXPECT_NEAR(actual.x, expected.x, epsilon);
+        EXPECT_NEAR(actual.y, expected.y, epsilon);
+        EXPECT_NEAR(actual.z, expected.z, epsilon);
+        EXPECT_NEAR(actual.w, expected.w, epsilon);
+    }
+}
+
+TEST(RendererFrameLifecycle, ActiveGpuSceneVertexShadersUseSceneTableCameraViewProjection)
+{
+    constexpr std::string_view kCameraAwareVertexShaders[] = {
+        "forward/default_debug_surface.vert",
+        "depth_prepass.vert",
+        "forward/line.vert",
+        "forward/point.vert",
+        "selection/entity_id.vert",
+        "selection/face_id.vert",
+        "selection/edge_id.vert",
+        "selection/point_id.vert",
+    };
+
+    for (const std::string_view shader : kCameraAwareVertexShaders)
+    {
+        SCOPED_TRACE(std::string{shader});
+        const std::string source = ReadShaderSource(shader);
+        EXPECT_NE(source.find("scene.CameraViewProj * dyn.Model"), std::string::npos);
+        EXPECT_EQ(source.find("gl_Position = dyn.Model *"), std::string::npos);
+    }
+}
+
+TEST(RendererFrameLifecycle, PrepareFramePublishesCameraIntoGpuSceneTable)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = true;
+    device.NextFrame = Extrinsic::RHI::FrameHandle{.FrameIndex = 37u, .SwapchainImageIndex = 1u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer =
+        Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    EXPECT_EQ(frame.FrameIndex, 37u);
+
+    const glm::vec3 position{1.0f, 2.0f, 6.0f};
+    const glm::vec3 forward = glm::normalize(glm::vec3{-0.25f, -0.15f, -1.0f});
+    const glm::vec3 up{0.0f, 1.0f, 0.0f};
+    Extrinsic::Graphics::CameraViewInput camera{};
+    camera.Position = position;
+    camera.Forward = forward;
+    camera.Up = up;
+    camera.View = glm::lookAt(position, position + forward, up);
+    camera.Projection = glm::perspective(glm::radians(55.0f), 16.0f / 9.0f, 0.25f, 250.0f);
+    camera.Projection[1][1] *= -1.0f;
+    camera.NearPlane = 0.25f;
+    camera.FarPlane = 250.0f;
+    camera.Valid = true;
+    camera.ExplicitCameraTransition = true;
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 640, .Height = 360},
+        .Camera = camera,
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    ASSERT_TRUE(world.Camera.Valid);
+    renderer->PrepareFrame(world);
+
+    const Extrinsic::RHI::GpuSceneTable* sceneTable =
+        FindLastSceneTableWrite(device, renderer->GetGpuWorld().GetSceneTableBuffer());
+    ASSERT_NE(sceneTable, nullptr);
+
+    ExpectMat4Near(sceneTable->CameraView, camera.View, 0.0001f);
+    ExpectMat4Near(sceneTable->CameraProj, camera.Projection, 0.0001f);
+    ExpectMat4Near(sceneTable->CameraViewProj, camera.Projection * camera.View, 0.0001f);
+    ExpectMat4Near(sceneTable->CameraInvView, glm::inverse(camera.View), 0.0001f);
+    ExpectMat4Near(sceneTable->CameraInvProj, glm::inverse(camera.Projection), 0.0001f);
+    ExpectVec4Near(sceneTable->CameraPosition, glm::vec4{position, 0.0f}, 0.0001f);
+    ExpectVec4Near(sceneTable->CameraDirection, glm::vec4{forward, 0.0f}, 0.0001f);
+    EXPECT_FLOAT_EQ(sceneTable->CameraViewportWidth, 640.0f);
+    EXPECT_FLOAT_EQ(sceneTable->CameraViewportHeight, 360.0f);
+    EXPECT_FLOAT_EQ(sceneTable->CameraNearPlane, 0.25f);
+    EXPECT_FLOAT_EQ(sceneTable->CameraFarPlane, 250.0f);
+    EXPECT_EQ(sceneTable->CameraFrameIndex, 37u);
+    EXPECT_EQ(sceneTable->CameraCullingFlags,
+              Extrinsic::RHI::CameraCulling_ExplicitTransition);
+
+    renderer->Shutdown();
 }
 
 TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext)
@@ -1103,9 +1241,16 @@ TEST(RendererFrameLifecycle, DefaultDebugSurfacePipelineSurvivesOperationalRebui
         "shaders/forward/default_debug_surface.frag.spv"))
         << initialDesc.FragmentShaderPath;
     EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::Back);
+    EXPECT_EQ(initialDesc.Rasterizer.Winding, kVulkanCameraTriangleFrontFace);
     EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::Less);
     EXPECT_FALSE(initialDesc.ColorBlend[0].Enable);
     EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
+
+    const Extrinsic::RHI::PipelineDesc* depthPrepass =
+        FindCreatedPipelineDesc(device, "Renderer.DepthPrepass");
+    ASSERT_NE(depthPrepass, nullptr);
+    EXPECT_EQ(depthPrepass->Rasterizer.Culling, Extrinsic::RHI::CullMode::Back);
+    EXPECT_EQ(depthPrepass->Rasterizer.Winding, kVulkanCameraTriangleFrontFace);
 
     EXPECT_TRUE(renderer->RebuildOperationalResources(device));
     const Extrinsic::RHI::PipelineHandle rebuiltPipeline = renderer->GetDefaultDebugSurfacePipeline();
@@ -1149,7 +1294,7 @@ TEST(RendererFrameLifecycle, ForwardSurfacePipelineSurvivesOperationalRebuild)
         << initialDesc.FragmentShaderPath;
     EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
     EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::Back);
-    EXPECT_EQ(initialDesc.Rasterizer.Winding, Extrinsic::RHI::FrontFace::CounterClockwise);
+    EXPECT_EQ(initialDesc.Rasterizer.Winding, kVulkanCameraTriangleFrontFace);
     EXPECT_TRUE(initialDesc.DepthStencil.DepthTestEnable);
     EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
     EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::Equal);
@@ -1251,6 +1396,7 @@ TEST(RendererFrameLifecycle, ShadowPipelineSurvivesOperationalRebuild)
     EXPECT_TRUE(initialShadowDesc.FragmentShaderPath.empty()) << initialShadowDesc.FragmentShaderPath;
     EXPECT_EQ(initialShadowDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
     EXPECT_EQ(initialShadowDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::Back);
+    EXPECT_EQ(initialShadowDesc.Rasterizer.Winding, kVulkanCameraTriangleFrontFace);
     EXPECT_TRUE(initialShadowDesc.DepthStencil.DepthTestEnable);
     EXPECT_TRUE(initialShadowDesc.DepthStencil.DepthWriteEnable);
     EXPECT_EQ(initialShadowDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::LessEqual);
@@ -1428,7 +1574,7 @@ TEST(RendererFrameLifecycle, DeferredGBufferPipelineSurvivesOperationalRebuild)
         << initialDesc.FragmentShaderPath;
     EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
     EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::Back);
-    EXPECT_EQ(initialDesc.Rasterizer.Winding, Extrinsic::RHI::FrontFace::CounterClockwise);
+    EXPECT_EQ(initialDesc.Rasterizer.Winding, kVulkanCameraTriangleFrontFace);
     EXPECT_TRUE(initialDesc.DepthStencil.DepthTestEnable);
     EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
     EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::Equal);
@@ -2099,7 +2245,7 @@ TEST(RendererFrameLifecycle, EntityIdPickingPipelineSurvivesOperationalRebuild)
         << initialDesc.FragmentShaderPath;
     EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
     EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::Back);
-    EXPECT_EQ(initialDesc.Rasterizer.Winding, Extrinsic::RHI::FrontFace::CounterClockwise);
+    EXPECT_EQ(initialDesc.Rasterizer.Winding, kVulkanCameraTriangleFrontFace);
     // Render-pass compatibility with the recipe-declared depth-read
     // PickingPass: depth-test on, depth-equal, depth-write off, D32_FLOAT.
     EXPECT_TRUE(initialDesc.DepthStencil.DepthTestEnable);
@@ -2159,7 +2305,7 @@ TEST(RendererFrameLifecycle, FaceIdPickingPipelineSurvivesOperationalRebuild)
         << initialDesc.FragmentShaderPath;
     EXPECT_EQ(initialDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
     EXPECT_EQ(initialDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::Back);
-    EXPECT_EQ(initialDesc.Rasterizer.Winding, Extrinsic::RHI::FrontFace::CounterClockwise);
+    EXPECT_EQ(initialDesc.Rasterizer.Winding, kVulkanCameraTriangleFrontFace);
     EXPECT_TRUE(initialDesc.DepthStencil.DepthTestEnable);
     EXPECT_FALSE(initialDesc.DepthStencil.DepthWriteEnable);
     EXPECT_EQ(initialDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::Equal);

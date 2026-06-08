@@ -179,6 +179,7 @@ export namespace Extrinsic::Graphics
         void SetBounds(GpuInstanceHandle instance, const RHI::GpuBounds& bounds);
 
         void SetMaterialBuffer(RHI::BufferHandle materialBuffer, std::uint32_t materialCapacity);
+        void SetCamera(const RHI::CameraUBO& camera);
         void SetLights(std::span<const RHI::GpuLight> lights);
         void SetClusterLightTable(const ClusterLightTableDesc& desc);
         void ClearClusterLightTable();
