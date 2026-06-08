@@ -32,7 +32,9 @@ import Extrinsic.ECS.Hierarchy.Mutation;
 import Extrinsic.ECS.Scene.Bootstrap;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.Component.RenderGeometry;
+import Extrinsic.Graphics.Component.VisualizationConfig;
 import Geometry.Properties;
 
 namespace Extrinsic::Runtime
@@ -66,6 +68,11 @@ namespace Extrinsic::Runtime
             return json::array({value.x, value.y, value.z});
         }
 
+        [[nodiscard]] json Vec4ToJson(const glm::vec4& value)
+        {
+            return json::array({value.x, value.y, value.z, value.w});
+        }
+
         [[nodiscard]] json QuatToJson(const glm::quat& value)
         {
             return json::array({value.w, value.x, value.y, value.z});
@@ -84,6 +91,24 @@ namespace Extrinsic::Runtime
                 value[0].get<float>(),
                 value[1].get<float>(),
                 value[2].get<float>(),
+            };
+            return true;
+        }
+
+        [[nodiscard]] bool TryReadVec4(const json& value, glm::vec4& out) noexcept
+        {
+            if (!IsArrayOfSize(value, 4u))
+                return false;
+            for (const json& element : value)
+            {
+                if (!element.is_number())
+                    return false;
+            }
+            out = glm::vec4{
+                value[0].get<float>(),
+                value[1].get<float>(),
+                value[2].get<float>(),
+                value[3].get<float>(),
             };
             return true;
         }
@@ -337,6 +362,106 @@ namespace Extrinsic::Runtime
             return true;
         }
 
+        [[nodiscard]] const char* VisualizationColorSourceToString(
+            const G::VisualizationConfig::ColorSource source) noexcept
+        {
+            switch (source)
+            {
+            case G::VisualizationConfig::ColorSource::Material: return "Material";
+            case G::VisualizationConfig::ColorSource::UniformColor: return "UniformColor";
+            case G::VisualizationConfig::ColorSource::ScalarField: return "ScalarField";
+            case G::VisualizationConfig::ColorSource::PerVertexBuffer: return "PerVertexBuffer";
+            case G::VisualizationConfig::ColorSource::PerEdgeBuffer: return "PerEdgeBuffer";
+            case G::VisualizationConfig::ColorSource::PerFaceBuffer: return "PerFaceBuffer";
+            }
+            return "Material";
+        }
+
+        [[nodiscard]] bool TryVisualizationColorSourceFromString(
+            const std::string_view value,
+            G::VisualizationConfig::ColorSource& out) noexcept
+        {
+            if (value == "Material")
+                out = G::VisualizationConfig::ColorSource::Material;
+            else if (value == "UniformColor")
+                out = G::VisualizationConfig::ColorSource::UniformColor;
+            else if (value == "ScalarField")
+                out = G::VisualizationConfig::ColorSource::ScalarField;
+            else if (value == "PerVertexBuffer")
+                out = G::VisualizationConfig::ColorSource::PerVertexBuffer;
+            else if (value == "PerEdgeBuffer")
+                out = G::VisualizationConfig::ColorSource::PerEdgeBuffer;
+            else if (value == "PerFaceBuffer")
+                out = G::VisualizationConfig::ColorSource::PerFaceBuffer;
+            else
+                return false;
+            return true;
+        }
+
+        [[nodiscard]] const char* VisualizationDomainToString(
+            const G::VisualizationConfig::Domain domain) noexcept
+        {
+            switch (domain)
+            {
+            case G::VisualizationConfig::Domain::Vertex: return "Vertex";
+            case G::VisualizationConfig::Domain::Edge: return "Edge";
+            case G::VisualizationConfig::Domain::Face: return "Face";
+            }
+            return "Vertex";
+        }
+
+        [[nodiscard]] bool TryVisualizationDomainFromString(
+            const std::string_view value,
+            G::VisualizationConfig::Domain& out) noexcept
+        {
+            if (value == "Vertex")
+                out = G::VisualizationConfig::Domain::Vertex;
+            else if (value == "Edge")
+                out = G::VisualizationConfig::Domain::Edge;
+            else if (value == "Face")
+                out = G::VisualizationConfig::Domain::Face;
+            else
+                return false;
+            return true;
+        }
+
+        [[nodiscard]] const char* ColormapToString(
+            const Graphics::Colormap::Type map) noexcept
+        {
+            switch (map)
+            {
+            case Graphics::Colormap::Type::Viridis: return "Viridis";
+            case Graphics::Colormap::Type::Inferno: return "Inferno";
+            case Graphics::Colormap::Type::Plasma: return "Plasma";
+            case Graphics::Colormap::Type::Jet: return "Jet";
+            case Graphics::Colormap::Type::Coolwarm: return "Coolwarm";
+            case Graphics::Colormap::Type::Heat: return "Heat";
+            case Graphics::Colormap::Type::Count: break;
+            }
+            return "Viridis";
+        }
+
+        [[nodiscard]] bool TryColormapFromString(
+            const std::string_view value,
+            Graphics::Colormap::Type& out) noexcept
+        {
+            if (value == "Viridis")
+                out = Graphics::Colormap::Type::Viridis;
+            else if (value == "Inferno")
+                out = Graphics::Colormap::Type::Inferno;
+            else if (value == "Plasma")
+                out = Graphics::Colormap::Type::Plasma;
+            else if (value == "Jet")
+                out = Graphics::Colormap::Type::Jet;
+            else if (value == "Coolwarm")
+                out = Graphics::Colormap::Type::Coolwarm;
+            else if (value == "Heat")
+                out = Graphics::Colormap::Type::Heat;
+            else
+                return false;
+            return true;
+        }
+
         [[nodiscard]] json SizeOrWidthSourceToJson(
             const std::variant<float, std::string>& value)
         {
@@ -377,6 +502,158 @@ namespace Extrinsic::Runtime
             return false;
         }
 
+        [[nodiscard]] json VisualizationConfigToJson(
+            const G::VisualizationConfig& config)
+        {
+            return json{
+                {"source", VisualizationColorSourceToString(config.Source)},
+                {"color", Vec4ToJson(config.Color)},
+                {"scalarFieldName", config.ScalarFieldName},
+                {"scalarDomain", VisualizationDomainToString(config.ScalarDomain)},
+                {"colorBufferName", config.ColorBufferName},
+                {"scalar", json{
+                    {"map", ColormapToString(config.Scalar.Map)},
+                    {"autoRange", config.Scalar.AutoRange},
+                    {"rangeMin", config.Scalar.RangeMin},
+                    {"rangeMax", config.Scalar.RangeMax},
+                    {"binCount", config.Scalar.BinCount},
+                    {"isolines", json{
+                        {"num", config.Scalar.Isolines.Num},
+                        {"color", Vec4ToJson(config.Scalar.Isolines.Color)},
+                        {"width", config.Scalar.Isolines.Width},
+                    }},
+                }},
+            };
+        }
+
+        [[nodiscard]] bool ApplyVisualizationConfigFromJson(
+            entt::registry& raw,
+            const ECS::EntityHandle entity,
+            const json& value)
+        {
+            if (!value.is_object() ||
+                !value.contains("source") ||
+                !value["source"].is_string())
+            {
+                return false;
+            }
+
+            G::VisualizationConfig config{};
+            if (!TryVisualizationColorSourceFromString(value["source"].get<std::string>(),
+                                                       config.Source))
+            {
+                return false;
+            }
+
+            if (value.contains("color") && !TryReadVec4(value["color"], config.Color))
+                return false;
+
+            if (value.contains("scalarFieldName"))
+            {
+                if (!value["scalarFieldName"].is_string())
+                    return false;
+                config.ScalarFieldName = value["scalarFieldName"].get<std::string>();
+            }
+
+            if (value.contains("scalarDomain"))
+            {
+                if (!value["scalarDomain"].is_string() ||
+                    !TryVisualizationDomainFromString(value["scalarDomain"].get<std::string>(),
+                                                      config.ScalarDomain))
+                {
+                    return false;
+                }
+            }
+
+            if (value.contains("colorBufferName"))
+            {
+                if (!value["colorBufferName"].is_string())
+                    return false;
+                config.ColorBufferName = value["colorBufferName"].get<std::string>();
+            }
+
+            if (value.contains("scalar"))
+            {
+                const json& scalar = value["scalar"];
+                if (!scalar.is_object())
+                    return false;
+
+                if (scalar.contains("map"))
+                {
+                    if (!scalar["map"].is_string() ||
+                        !TryColormapFromString(scalar["map"].get<std::string>(),
+                                               config.Scalar.Map))
+                    {
+                        return false;
+                    }
+                }
+
+                if (scalar.contains("autoRange"))
+                {
+                    if (!scalar["autoRange"].is_boolean())
+                        return false;
+                    config.Scalar.AutoRange = scalar["autoRange"].get<bool>();
+                }
+
+                if (scalar.contains("rangeMin"))
+                {
+                    if (!scalar["rangeMin"].is_number())
+                        return false;
+                    config.Scalar.RangeMin = scalar["rangeMin"].get<float>();
+                }
+
+                if (scalar.contains("rangeMax"))
+                {
+                    if (!scalar["rangeMax"].is_number())
+                        return false;
+                    config.Scalar.RangeMax = scalar["rangeMax"].get<float>();
+                }
+
+                if (scalar.contains("binCount"))
+                {
+                    if (!scalar["binCount"].is_number_unsigned())
+                        return false;
+                    const std::uint64_t bins = scalar["binCount"].get<std::uint64_t>();
+                    if (bins > UINT32_MAX)
+                        return false;
+                    config.Scalar.BinCount = static_cast<std::uint32_t>(bins);
+                }
+
+                if (scalar.contains("isolines"))
+                {
+                    const json& isolines = scalar["isolines"];
+                    if (!isolines.is_object())
+                        return false;
+
+                    if (isolines.contains("num"))
+                    {
+                        if (!isolines["num"].is_number_unsigned())
+                            return false;
+                        const std::uint64_t num = isolines["num"].get<std::uint64_t>();
+                        if (num > UINT32_MAX)
+                            return false;
+                        config.Scalar.Isolines.Num = static_cast<std::uint32_t>(num);
+                    }
+
+                    if (isolines.contains("color") &&
+                        !TryReadVec4(isolines["color"], config.Scalar.Isolines.Color))
+                    {
+                        return false;
+                    }
+
+                    if (isolines.contains("width"))
+                    {
+                        if (!isolines["width"].is_number())
+                            return false;
+                        config.Scalar.Isolines.Width = isolines["width"].get<float>();
+                    }
+                }
+            }
+
+            raw.emplace_or_replace<G::VisualizationConfig>(entity, std::move(config));
+            return true;
+        }
+
         [[nodiscard]] json RenderHintsToJson(const entt::registry& raw,
                                              const ECS::EntityHandle entity,
                                              SceneSerializationStats& stats)
@@ -407,6 +684,12 @@ namespace Extrinsic::Runtime
                     {"type", PointTypeToString(points->Type)},
                     {"size", SizeOrWidthSourceToJson(points->SizeSource)},
                 };
+                hasAny = true;
+            }
+
+            if (const auto* visualization = raw.try_get<G::VisualizationConfig>(entity))
+            {
+                render["visualization"] = VisualizationConfigToJson(*visualization);
                 hasAny = true;
             }
 
@@ -485,6 +768,17 @@ namespace Extrinsic::Runtime
                     return false;
                 }
                 raw.emplace_or_replace<G::RenderPoints>(entity, std::move(points));
+                hasAny = true;
+            }
+
+            if (render.contains("visualization"))
+            {
+                if (!ApplyVisualizationConfigFromJson(raw,
+                                                      entity,
+                                                      render["visualization"]))
+                {
+                    return false;
+                }
                 hasAny = true;
             }
 

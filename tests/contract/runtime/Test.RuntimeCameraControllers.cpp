@@ -1,4 +1,5 @@
 #include <cmath>
+#include <cstdint>
 #include <memory>
 
 #include <gtest/gtest.h>
@@ -45,6 +46,17 @@ namespace
             Core::Extent2D{1280, 720});
         EXPECT_TRUE(snapshot.Valid);
         EXPECT_TRUE(snapshot.FrustumPlanes[static_cast<std::uint32_t>(Graphics::FrustumPlaneIndex::Near)].Valid);
+    }
+
+    void ExpectWorldPointCentered(const Graphics::CameraViewInput& input,
+                                  const glm::vec3 point)
+    {
+        ExpectValidCameraView(input);
+        const glm::vec4 clip = input.Projection * input.View * glm::vec4(point, 1.0f);
+        ASSERT_TRUE(std::isfinite(clip.w));
+        ASSERT_GT(std::abs(clip.w), 0.000001f);
+        EXPECT_NEAR(clip.x / clip.w, 0.0f, 0.0001f);
+        EXPECT_NEAR(clip.y / clip.w, 0.0f, 0.0001f);
     }
 }
 
@@ -183,6 +195,25 @@ TEST(RuntimeCameraControllers, FactoryCreatesEveryControllerKindWithValidView)
     }
 }
 
+TEST(RuntimeCameraControllers, FactorySeedsEveryControllerKindOnReferenceTriangleFocus)
+{
+    constexpr Core::Config::CameraControllerKind kinds[] = {
+        Core::Config::CameraControllerKind::Orbit,
+        Core::Config::CameraControllerKind::Fly,
+        Core::Config::CameraControllerKind::FreeLook,
+        Core::Config::CameraControllerKind::TopDown,
+    };
+
+    for (const Core::Config::CameraControllerKind kind : kinds)
+    {
+        SCOPED_TRACE(static_cast<int>(kind));
+        std::unique_ptr<Runtime::ICameraController> controller = Runtime::CreateCameraController(kind, MakeSeed());
+        ASSERT_NE(controller, nullptr);
+        ExpectWorldPointCentered(controller->GetView(Core::Extent2D{1280, 720}),
+                                 glm::vec3{0.0f, 0.0f, 0.0f});
+    }
+}
+
 TEST(RuntimeCameraControllers, TopDownUsesOrthographicProjectionAndClampsZoom)
 {
     Runtime::TopDownCameraController controller{MakeSeed()};
@@ -198,6 +229,24 @@ TEST(RuntimeCameraControllers, TopDownUsesOrthographicProjectionAndClampsZoom)
     EXPECT_NEAR(view.Forward.y, -1.0f, 0.0001f);
     EXPECT_NEAR(view.Forward.z, 0.0f, 0.0001f);
     ExpectValidCameraView(view);
+}
+
+TEST(RuntimeCameraControllers, RegistryCanSeedTopDownFromTerminalReferenceView)
+{
+    Runtime::CameraControllerRegistry registry;
+    registry.Register(Runtime::CameraControllerSlot::Main,
+                      Runtime::CreateCameraController(Core::Config::CameraControllerKind::Orbit, MakeSeed()));
+
+    const Graphics::CameraViewInput terminal = registry.Resolve(Runtime::CameraControllerSlot::Main)
+        .GetView(Core::Extent2D{1280, 720});
+
+    registry.Replace(Runtime::CameraControllerSlot::Main,
+                     Runtime::CreateCameraController(Core::Config::CameraControllerKind::TopDown, terminal));
+    const Graphics::CameraViewInput replacement = registry.Resolve(Runtime::CameraControllerSlot::Main)
+        .GetView(Core::Extent2D{1280, 720});
+
+    EXPECT_EQ(registry.Resolve(Runtime::CameraControllerSlot::Main).Kind(), Core::Config::CameraControllerKind::TopDown);
+    ExpectWorldPointCentered(replacement, glm::vec3{0.0f, 0.0f, 0.0f});
 }
 
 TEST(RuntimeCameraControllers, FreeLookRollChangesUpVectorAndStaysValid)
@@ -231,4 +280,3 @@ TEST(RuntimeCameraControllers, RegistrySupportsMultipleCameraSlots)
     EXPECT_EQ(registry.Resolve(Runtime::CameraControllerSlot::TopDown).Kind(), Core::Config::CameraControllerKind::TopDown);
     EXPECT_EQ(registry.Resolve(Runtime::CameraControllerSlot::EditorSecondary).Kind(), Core::Config::CameraControllerKind::FreeLook);
 }
-

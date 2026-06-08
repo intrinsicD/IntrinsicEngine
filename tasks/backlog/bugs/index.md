@@ -5,11 +5,13 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- No active bug records as of 2026-06-06.
+- No active bug records as of 2026-06-08.
 
 ---
 
 ## Verified / Closed
+
+- Closed 2026-06-08: [`BUG-020` — Sandbox reference triangle camera modes](../../done/BUG-020-sandbox-reference-triangle-camera-modes.md). The default `ReferenceTriangle` now round-trips through the promoted scene-document seam as a mesh-domain authored renderable with stable/selectable identity and white `VisualizationConfig`, and top-down camera seeding now uses the seed focus point so orbit, fly, free-look, and top-down modes keep the triangle centered.
 
 - Closed 2026-06-07: [`BUG-019` — Sandbox selection, camera, and outline regressions](../../done/BUG-019-sandbox-selection-camera-outline-regressions.md). Selection outline now samples `EntityId` from dedicated frame-sampled descriptor slot 3, promoted Vulkan real bindless texture leases start at slot 4, camera controls accept right- or middle-mouse rotation with visible UI help, and the sandbox selection acceptance test covers the runtime input-to-pick bridge without depending on a concrete platform backend.
 

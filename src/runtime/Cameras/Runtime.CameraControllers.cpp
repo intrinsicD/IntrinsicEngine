@@ -411,10 +411,15 @@ namespace Extrinsic::Runtime
     void TopDownCameraController::Seed(const Graphics::CameraViewInput& seed) noexcept
     {
         const Graphics::CameraViewInput safeSeed = seed.Valid ? seed : Detail::DefaultSeed();
-        m_Target = {safeSeed.Position.x, 0.0f, safeSeed.Position.z};
-        m_Altitude = std::clamp(std::max(std::abs(safeSeed.Position.y), glm::length(safeSeed.Position)),
-                                m_MinAltitude,
-                                m_MaxAltitude);
+        const glm::vec3 forward = Detail::SafeNormalized(safeSeed.Forward, {0.0f, 0.0f, -1.0f});
+        const float seedDistance = glm::length(safeSeed.Position);
+        const float focusDistance =
+            std::isfinite(seedDistance) && seedDistance > m_MinAltitude
+                ? seedDistance
+                : m_Altitude;
+        m_Altitude = std::clamp(focusDistance, m_MinAltitude, m_MaxAltitude);
+        const glm::vec3 focus = safeSeed.Position + forward * m_Altitude;
+        m_Target = {focus.x, 0.0f, focus.z};
         m_OrthographicHeight = std::clamp(m_Altitude * 2.0f, m_MinOrthographicHeight, m_MaxOrthographicHeight);
         m_NearPlane = safeSeed.NearPlane > 0.0f ? safeSeed.NearPlane : Detail::kDefaultNearPlane;
         m_FarPlane = safeSeed.FarPlane > m_NearPlane ? safeSeed.FarPlane : Detail::kDefaultFarPlane;

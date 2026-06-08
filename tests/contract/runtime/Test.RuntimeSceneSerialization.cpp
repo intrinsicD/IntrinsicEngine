@@ -25,7 +25,9 @@ import Extrinsic.ECS.Hierarchy.Mutation;
 import Extrinsic.ECS.Scene.Bootstrap;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.Component.RenderGeometry;
+import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Runtime.SceneSerialization;
 import Geometry.Properties;
 
@@ -177,6 +179,22 @@ namespace
         lines.Domain = G::RenderLines::SourceDomain::Edge;
         lines.WidthSource = 2.5f;
         raw.emplace<G::RenderLines>(entity, lines);
+
+        G::VisualizationConfig visualization{};
+        visualization.Source = G::VisualizationConfig::ColorSource::ScalarField;
+        visualization.Color = glm::vec4{0.25f, 0.5f, 0.75f, 1.0f};
+        visualization.ScalarFieldName = "curvature";
+        visualization.Scalar.Map = Extrinsic::Graphics::Colormap::Type::Plasma;
+        visualization.Scalar.AutoRange = false;
+        visualization.Scalar.RangeMin = -1.0f;
+        visualization.Scalar.RangeMax = 2.0f;
+        visualization.Scalar.BinCount = 4u;
+        visualization.Scalar.Isolines.Num = 8u;
+        visualization.Scalar.Isolines.Color = glm::vec4{0.1f, 0.2f, 0.3f, 1.0f};
+        visualization.Scalar.Isolines.Width = 2.25f;
+        visualization.ScalarDomain = G::VisualizationConfig::Domain::Face;
+        visualization.ColorBufferName = "v:kmeans_color";
+        raw.emplace<G::VisualizationConfig>(entity, std::move(visualization));
         return entity;
     }
 
@@ -258,6 +276,9 @@ TEST(RuntimeSceneSerialization, SaveLoadRoundTripPreservesPromotedSandboxSceneDa
     ASSERT_EQ(parsed["version"].get<std::uint32_t>(), 1u);
     ASSERT_EQ(parsed["entities"].size(), 3u);
     EXPECT_EQ(parsed["stats"]["renderHintEntities"].get<std::uint32_t>(), 3u);
+    ASSERT_TRUE(parsed["entities"][0]["render"]["visualization"].is_object());
+    EXPECT_EQ(parsed["entities"][0]["render"]["visualization"]["source"].get<std::string>(),
+              "ScalarField");
 
     ECS::Scene::Registry loaded;
     auto loadedResult = Runtime::LoadSceneDocument(loaded, "scene.json", backend);
@@ -309,6 +330,21 @@ TEST(RuntimeSceneSerialization, SaveLoadRoundTripPreservesPromotedSandboxSceneDa
     EXPECT_EQ(lines.Domain, G::RenderLines::SourceDomain::Edge);
     ASSERT_NE(std::get_if<float>(&lines.WidthSource), nullptr);
     EXPECT_FLOAT_EQ(*std::get_if<float>(&lines.WidthSource), 2.5f);
+    ASSERT_TRUE(raw.all_of<G::VisualizationConfig>(loadedMesh));
+    const auto& visualization = raw.get<G::VisualizationConfig>(loadedMesh);
+    EXPECT_EQ(visualization.Source, G::VisualizationConfig::ColorSource::ScalarField);
+    EXPECT_EQ(visualization.Color, glm::vec4(0.25f, 0.5f, 0.75f, 1.0f));
+    EXPECT_EQ(visualization.ScalarFieldName, "curvature");
+    EXPECT_EQ(visualization.Scalar.Map, Extrinsic::Graphics::Colormap::Type::Plasma);
+    EXPECT_FALSE(visualization.Scalar.AutoRange);
+    EXPECT_FLOAT_EQ(visualization.Scalar.RangeMin, -1.0f);
+    EXPECT_FLOAT_EQ(visualization.Scalar.RangeMax, 2.0f);
+    EXPECT_EQ(visualization.Scalar.BinCount, 4u);
+    EXPECT_EQ(visualization.Scalar.Isolines.Num, 8u);
+    EXPECT_EQ(visualization.Scalar.Isolines.Color, glm::vec4(0.1f, 0.2f, 0.3f, 1.0f));
+    EXPECT_FLOAT_EQ(visualization.Scalar.Isolines.Width, 2.25f);
+    EXPECT_EQ(visualization.ScalarDomain, G::VisualizationConfig::Domain::Face);
+    EXPECT_EQ(visualization.ColorBufferName, "v:kmeans_color");
 
     const GS::ConstSourceView graphView = GS::BuildConstView(raw, loadedGraph);
     ASSERT_EQ(graphView.ActiveDomain, GS::Domain::Graph);

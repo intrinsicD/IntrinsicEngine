@@ -24,6 +24,7 @@ import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.ReferenceScene;
 import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SandboxEditorUi;
 import Extrinsic.Runtime.SelectionController;
 import Geometry.Properties;
@@ -223,6 +224,35 @@ TEST(TriangleProviderContract, PopulateCreatesNamedTriangleEntityWithExpectedCom
     EXPECT_EQ(seed.Up, glm::vec3(0.0f, 1.0f, 0.0f));
     EXPECT_FLOAT_EQ(seed.NearPlane, 0.1f);
     EXPECT_FLOAT_EQ(seed.FarPlane, 100.0f);
+}
+
+TEST(TriangleProviderContract, AuthoredTriangleSceneDocumentRoundTripsFullRenderableContract)
+{
+    Registry source;
+    TriangleProvider provider;
+    const ReferenceScenePopulation population = provider.Populate(source);
+    ASSERT_EQ(population.Entities.size(), 1u);
+
+    auto document = Extrinsic::Runtime::SerializeSceneDocument(source);
+    ASSERT_TRUE(document.has_value()) << static_cast<int>(document.error());
+
+    Registry loaded;
+    auto loadedResult = Extrinsic::Runtime::DeserializeSceneDocument(loaded, *document);
+    ASSERT_TRUE(loadedResult.has_value()) << static_cast<int>(loadedResult.error());
+    EXPECT_EQ(loadedResult->Stats.Entities, 1u);
+    EXPECT_EQ(loadedResult->Stats.MeshEntities, 1u);
+    EXPECT_EQ(loadedResult->Stats.RenderHintEntities, 1u);
+
+    auto& raw = loaded.Raw();
+    auto view = raw.view<E::MetaData,
+                         G::RenderSurface,
+                         G::VisualizationConfig,
+                         GS::Vertices,
+                         GS::Edges,
+                         GS::Halfedges,
+                         GS::Faces>();
+    ASSERT_EQ(view.size_hint(), 1u);
+    ExpectReferenceTriangleEntityContract(loaded, *view.begin());
 }
 
 TEST(TriangleProviderContract, TeardownDestroysAuthoredEntities)
