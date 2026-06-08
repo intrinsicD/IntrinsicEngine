@@ -338,9 +338,11 @@ namespace Extrinsic::Runtime
                 continue;
             }
 
-            if (task.Desc.ApplyOnMainThread && IsUploadRequest(*task.Result))
+            if (task.Desc.ApplyOnMainThread)
             {
-                task.State = StreamingTaskState::WaitingForGpuUpload;
+                task.State = IsUploadRequest(*task.Result)
+                    ? StreamingTaskState::WaitingForGpuUpload
+                    : StreamingTaskState::WaitingForMainThreadApply;
                 m_Impl->ReadyForApply.push_back(completion.Index);
             }
             else

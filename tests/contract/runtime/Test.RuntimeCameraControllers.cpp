@@ -296,6 +296,38 @@ TEST(RuntimeCameraControllers, FactorySeedsEveryControllerKindOnReferenceTriangl
     }
 }
 
+TEST(RuntimeCameraControllers, FocusCentersOffOriginTargetForEveryControllerKind)
+{
+    constexpr Core::Config::CameraControllerKind kinds[] = {
+        Core::Config::CameraControllerKind::Orbit,
+        Core::Config::CameraControllerKind::Fly,
+        Core::Config::CameraControllerKind::FreeLook,
+        Core::Config::CameraControllerKind::TopDown,
+    };
+    const Runtime::CameraFocusTarget target{
+        .Center = glm::vec3{12.0f, -1.5f, 4.0f},
+        .Radius = 2.0f,
+    };
+
+    for (const Core::Config::CameraControllerKind kind : kinds)
+    {
+        SCOPED_TRACE(static_cast<int>(kind));
+        std::unique_ptr<Runtime::ICameraController> controller =
+            Runtime::CreateCameraController(kind, MakeSeed());
+        ASSERT_NE(controller, nullptr);
+        controller->Focus(target);
+
+        const Graphics::CameraViewInput view =
+            controller->GetView(Core::Extent2D{1280, 720});
+        ExpectWorldPointCentered(view, target.Center);
+        ExpectWorldPointInsideClipSpace(
+            view,
+            target.Center + glm::vec3{target.Radius * 0.5f,
+                                      target.Radius * 0.5f,
+                                      0.0f});
+    }
+}
+
 TEST(RuntimeCameraControllers, TopDownUsesOrthographicProjectionAndClampsZoom)
 {
     Runtime::TopDownCameraController controller{MakeSeed()};

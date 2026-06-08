@@ -4,6 +4,7 @@ module;
 #include <functional>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -67,6 +68,20 @@ namespace Extrinsic::Runtime
         std::uint64_t TextureUploadRequests{0};
         bool MaterializedModelScene{false};
         bool RequestedTextureUpload{false};
+    };
+
+    export struct RuntimeAssetImportEvent
+    {
+        std::uint64_t Sequence{0};
+        std::string Path{};
+        Assets::AssetPayloadKind RequestedPayloadKind{Assets::AssetPayloadKind::Unknown};
+        Core::ErrorCode Error{Core::ErrorCode::Success};
+        std::optional<RuntimeAssetImportResult> Result{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Result.has_value() && Error == Core::ErrorCode::Success;
+        }
     };
 
     export [[nodiscard]] RuntimeDeviceSelection SelectRuntimeDeviceBackend(
@@ -203,9 +218,13 @@ namespace Extrinsic::Runtime
         [[nodiscard]] ECS::Scene::Registry&   GetScene()         noexcept;
         // UI-001 Slice D — runtime-owned file/import command seam. Editor UI
         // submits a path + payload hint here; Engine composes the promoted
-        // ASSETIO model/texture decoders, AssetService, and runtime handoffs.
+        // ASSETIO geometry/model/texture decoders, AssetService, and runtime
+        // handoffs. Platform drop events route through the same facade.
         [[nodiscard]] Core::Expected<RuntimeAssetImportResult> ImportAssetFromPath(
             RuntimeAssetImportRequest request);
+        [[nodiscard]] const std::optional<RuntimeAssetImportEvent>&
+            GetLastAssetImportEvent() const noexcept;
+        void ImportDroppedFilePaths(std::span<const std::string> paths);
         // RUNTIME-098 — promoted scene persistence facade. Editor/UI code
         // submits file paths here; Engine owns file IO, scene replacement, and
         // runtime sidecar cleanup while the serializer stays backend-neutral.
@@ -305,6 +324,16 @@ namespace Extrinsic::Runtime
 
     private:
         void RunFrame();      // executes one full frame — called by Run()
+        void HandlePlatformEvent(const Platform::Event& event);
+        void HandleWindowDropEvent(const Platform::WindowDropEvent& event);
+        void QueueDroppedGeometryImport(
+            std::string path,
+            std::vector<Assets::AssetPayloadKind> payloadKinds);
+        [[nodiscard]] Core::Expected<RuntimeAssetImportResult> ImportAssetFromPathImpl(
+            RuntimeAssetImportRequest request);
+        void RecordAssetImportEvent(
+            const RuntimeAssetImportRequest& request,
+            const Core::Expected<RuntimeAssetImportResult>& result);
 
         Core::Config::EngineConfig           m_Config;
         std::unique_ptr<IApplication>        m_Application;
@@ -375,6 +404,8 @@ namespace Extrinsic::Runtime
             Assets::AssetEventBus::InvalidToken};
         std::unique_ptr<AssetModelTextureHandoff> m_AssetModelTextureHandoff;
         std::unique_ptr<AssetModelSceneHandoff>   m_AssetModelSceneHandoff;
+        std::optional<RuntimeAssetImportEvent>     m_LastAssetImportEvent{};
+        std::uint64_t                              m_AssetImportEventSequence{0};
         // ECS scene registry
         std::unique_ptr<ECS::Scene::Registry>  m_Scene;
 

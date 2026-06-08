@@ -60,6 +60,15 @@ namespace Extrinsic::Runtime
         namespace A = Extrinsic::Assets;
         namespace GK = Geometry::KMeans;
 
+        inline constexpr std::array<A::AssetPayloadKind, 6> kImportPayloadKinds{{
+            A::AssetPayloadKind::Unknown,
+            A::AssetPayloadKind::Mesh,
+            A::AssetPayloadKind::PointCloud,
+            A::AssetPayloadKind::Graph,
+            A::AssetPayloadKind::ModelScene,
+            A::AssetPayloadKind::Texture2D,
+        }};
+
         struct KMeansUiState
         {
             std::optional<SandboxEditorKMeansResult>* LastResult{nullptr};
@@ -172,6 +181,40 @@ namespace Extrinsic::Runtime
             message += ErrorName(error);
             message += ".";
             return message;
+        }
+
+        [[nodiscard]] SandboxEditorFileImportResult BuildFileImportResultFromRuntimeEvent(
+            const RuntimeAssetImportEvent& event)
+        {
+            if (!event.Result.has_value())
+            {
+                return SandboxEditorFileImportResult{
+                    .Status = SandboxEditorCommandStatus::AssetImportFailed,
+                    .PayloadKind = event.RequestedPayloadKind,
+                    .Error = event.Error,
+                    .Message = BuildImportFailureMessage(event.Error),
+                };
+            }
+
+            const RuntimeAssetImportResult& imported = *event.Result;
+            SandboxEditorFileImportResult result{
+                .Status = SandboxEditorCommandStatus::Applied,
+                .Asset = imported.Asset,
+                .PayloadKind = imported.PayloadKind,
+                .Error = Core::ErrorCode::Success,
+                .PrimitiveEntitiesCreated = imported.PrimitiveEntitiesCreated,
+                .EmbeddedTextureAssetsCreated = imported.EmbeddedTextureAssetsCreated,
+                .TextureUploadRequests = imported.TextureUploadRequests,
+                .MaterializedModelScene = imported.MaterializedModelScene,
+                .RequestedTextureUpload = imported.RequestedTextureUpload,
+            };
+            result.Message = BuildImportSuccessMessage(
+                SandboxEditorFileImportCommand{
+                    .Path = event.Path,
+                    .PayloadKind = event.RequestedPayloadKind,
+                },
+                result);
+            return result;
         }
 
         [[nodiscard]] std::string BuildSceneFileSuccessMessage(
@@ -2424,6 +2467,7 @@ namespace Extrinsic::Runtime
             const SandboxEditorContext* context,
             std::array<char, 1024>* importPathBuffer,
             std::array<char, 1024>* scenePathBuffer,
+            A::AssetPayloadKind* importPayloadKind,
             std::optional<SandboxEditorFileImportResult>* lastImportResult,
             std::optional<SandboxEditorSceneFileResult>* lastSceneFileResult,
             std::array<bool, 12>* domainWindowOpen,
@@ -2667,6 +2711,7 @@ namespace Extrinsic::Runtime
                     frame.FileImport.Enabled &&
                     context != nullptr &&
                     importPathBuffer != nullptr &&
+                    importPayloadKind != nullptr &&
                     lastImportResult != nullptr;
                 if (!importControlsAvailable)
                     ImGui::BeginDisabled();
@@ -2680,13 +2725,38 @@ namespace Extrinsic::Runtime
                 {
                     ImGui::TextDisabled("Path input is not bound.");
                 }
+                if (importPayloadKind != nullptr)
+                {
+                    if (ImGui::BeginCombo(
+                            "Payload hint",
+                            A::DebugNameForAssetPayloadKind(*importPayloadKind)))
+                    {
+                        for (const A::AssetPayloadKind kind : kImportPayloadKinds)
+                        {
+                            const bool selected = *importPayloadKind == kind;
+                            if (ImGui::Selectable(
+                                    A::DebugNameForAssetPayloadKind(kind),
+                                    selected))
+                            {
+                                *importPayloadKind = kind;
+                            }
+                            if (selected)
+                                ImGui::SetItemDefaultFocus();
+                        }
+                        ImGui::EndCombo();
+                    }
+                }
+                else
+                {
+                    ImGui::TextDisabled("Payload hint is not bound.");
+                }
                 if (ImGui::Button("Import asset") && importControlsAvailable)
                 {
                     *lastImportResult = ApplySandboxEditorFileImportCommand(
                         *context,
                         SandboxEditorFileImportCommand{
                             .Path = std::string(importPathBuffer->data()),
-                            .PayloadKind = A::AssetPayloadKind::Unknown,
+                            .PayloadKind = *importPayloadKind,
                         });
                 }
                 if (!importControlsAvailable)
@@ -4262,6 +4332,7 @@ namespace Extrinsic::Runtime
                        nullptr,
                        nullptr,
                        nullptr,
+                       nullptr,
                        nullptr);
     }
 
@@ -4279,11 +4350,20 @@ namespace Extrinsic::Runtime
             {
                 if (m_Engine == nullptr)
                     return;
+                const std::optional<RuntimeAssetImportEvent>& runtimeImport =
+                    m_Engine->GetLastAssetImportEvent();
+                if (runtimeImport.has_value() &&
+                    runtimeImport->Sequence != m_LastObservedRuntimeImportSequence)
+                {
+                    m_LastImportResult =
+                        BuildFileImportResultFromRuntimeEvent(*runtimeImport);
+                    m_LastObservedRuntimeImportSequence = runtimeImport->Sequence;
+                }
                 SandboxEditorContext context = BuildContextFromEngine(*m_Engine);
                 context.PendingAssetImportPath =
                     std::string(m_ImportPathBuffer.data());
                 context.PendingAssetImportPayloadKind =
-                    Extrinsic::Assets::AssetPayloadKind::Unknown;
+                    m_ImportPayloadKind;
                 context.PendingSceneFilePath =
                     std::string(m_ScenePathBuffer.data());
                 if (m_LastSceneFileResult.has_value())
@@ -4307,6 +4387,7 @@ namespace Extrinsic::Runtime
                     &context,
                     &m_ImportPathBuffer,
                     &m_ScenePathBuffer,
+                    &m_ImportPayloadKind,
                     &m_LastImportResult,
                     &m_LastSceneFileResult,
                     &m_DomainWindowOpen,

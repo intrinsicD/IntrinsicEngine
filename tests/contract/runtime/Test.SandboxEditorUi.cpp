@@ -1,5 +1,7 @@
 #include <algorithm>
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -8,6 +10,7 @@
 #include <utility>
 #include <vector>
 
+#include <entt/entity/entity.hpp>
 #include <gtest/gtest.h>
 #include <glm/gtc/quaternion.hpp>
 
@@ -16,6 +19,9 @@ import Extrinsic.Asset.Registry;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Geometry2D;
+import Extrinsic.ECS.Component.Culling.Local;
+import Extrinsic.ECS.Component.Culling.World;
+import Extrinsic.ECS.Component.Hierarchy;
 import Extrinsic.ECS.Component.MetaData;
 import Extrinsic.ECS.Component.SpatialDebugBinding;
 import Extrinsic.ECS.Component.StableId;
@@ -315,12 +321,90 @@ namespace
         void OnShutdown(Runtime::Engine&) override {}
     };
 
+    class WaitForAssetImportEventApplication final : public Runtime::IApplication
+    {
+    public:
+        explicit WaitForAssetImportEventApplication(std::uint32_t maxFrames)
+            : m_MaxFrames(maxFrames)
+        {
+        }
+
+        void OnInitialize(Runtime::Engine&) override {}
+        void OnSimTick(Runtime::Engine&, double) override {}
+        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        {
+            ++m_ObservedFrames;
+            if (engine.GetLastAssetImportEvent().has_value() ||
+                m_ObservedFrames >= m_MaxFrames)
+            {
+                engine.RequestExit();
+            }
+        }
+        void OnShutdown(Runtime::Engine&) override {}
+
+    private:
+        std::uint32_t m_MaxFrames{1u};
+        std::uint32_t m_ObservedFrames{0u};
+    };
+
     [[nodiscard]] Extrinsic::Core::Config::EngineConfig HeadlessConfig()
     {
         Extrinsic::Core::Config::EngineConfig config{};
         config.ReferenceScene.Enabled = false;
         config.Camera.Enabled = false;
         return config;
+    }
+
+    struct TmpFile
+    {
+        std::filesystem::path Path;
+
+        TmpFile(std::string_view name, std::string_view contents)
+            : Path(std::filesystem::temp_directory_path() / std::string(name))
+        {
+            std::ofstream os(Path);
+            os << contents;
+        }
+
+        ~TmpFile()
+        {
+            std::error_code ec;
+            std::filesystem::remove(Path, ec);
+        }
+    };
+
+    [[nodiscard]] std::optional<ECS::EntityHandle> FindFirstEntityWithDomain(
+        ECS::Scene::Registry& registry,
+        const GS::Domain domain)
+    {
+        auto& raw = registry.Raw();
+        std::optional<ECS::EntityHandle> found{};
+        raw.view<entt::entity>().each([&](const ECS::EntityHandle entity)
+        {
+            if (!raw.all_of<Sel::SelectableTag>(entity))
+                return;
+            const GS::ConstSourceView source = GS::BuildConstView(raw, entity);
+            if (source.ActiveDomain == domain)
+                found = entity;
+        });
+        return found;
+    }
+
+    [[nodiscard]] std::size_t CountEntitiesWithDomain(
+        ECS::Scene::Registry& registry,
+        const GS::Domain domain)
+    {
+        std::size_t count = 0u;
+        auto& raw = registry.Raw();
+        raw.view<entt::entity>().each([&](const ECS::EntityHandle entity)
+        {
+            if (!raw.all_of<Sel::SelectableTag>(entity))
+                return;
+            const GS::ConstSourceView source = GS::BuildConstView(raw, entity);
+            if (source.ActiveDomain == domain)
+                ++count;
+        });
+        return count;
     }
 }
 
@@ -461,11 +545,13 @@ TEST(SandboxEditorUi, FileImportCommandRoutesThroughRuntimeOwnedSurface)
                 },
         };
     context.PendingAssetImportPath = "assets/models/Duck.gltf";
+    context.PendingAssetImportPayloadKind = Assets::AssetPayloadKind::Graph;
 
     Runtime::SandboxEditorPanelFrame frame =
         Runtime::BuildSandboxEditorPanelFrame(context);
     EXPECT_TRUE(frame.FileImport.Enabled);
     EXPECT_EQ(frame.FileImport.PendingPath, "assets/models/Duck.gltf");
+    EXPECT_EQ(frame.FileImport.PayloadKind, Assets::AssetPayloadKind::Graph);
     EXPECT_FALSE(HasDiagnostic(
         frame.FileImport.Diagnostics,
         Runtime::SandboxEditorDiagnosticCode::AssetImportUnavailable));
@@ -2308,6 +2394,225 @@ TEST(SandboxEditorUi, EngineImportFacadeReportsMissingFile)
     EXPECT_FALSE(imported.has_value());
     EXPECT_EQ(imported.error(), Core::ErrorCode::FileNotFound);
 
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorUi, EngineImportFacadeMaterializesStandaloneGeometryDomains)
+{
+    TmpFile meshFile(
+        "runtime_dragdrop_import_mesh.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+    TmpFile graphFile(
+        "runtime_dragdrop_import_graph.tgf",
+        "1 0 0 0 first\n"
+        "2 1 0 0 second\n"
+        "#\n"
+        "1 2 1.0 edge\n");
+    TmpFile cloudFile(
+        "runtime_dragdrop_import_cloud.xyz",
+        "0 0 0\n"
+        "1 2 3\n");
+
+    Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    engine.Initialize();
+
+    auto mesh = engine.ImportAssetFromPath(
+        Runtime::RuntimeAssetImportRequest{
+            .Path = meshFile.Path.string(),
+            .PayloadKind = Assets::AssetPayloadKind::Mesh,
+        });
+    ASSERT_TRUE(mesh.has_value()) << static_cast<int>(mesh.error());
+    EXPECT_TRUE(mesh->Asset.IsValid());
+    EXPECT_EQ(mesh->PayloadKind, Assets::AssetPayloadKind::Mesh);
+    EXPECT_EQ(mesh->PrimitiveEntitiesCreated, 1u);
+
+    auto graph = engine.ImportAssetFromPath(
+        Runtime::RuntimeAssetImportRequest{
+            .Path = graphFile.Path.string(),
+            .PayloadKind = Assets::AssetPayloadKind::Graph,
+        });
+    ASSERT_TRUE(graph.has_value()) << static_cast<int>(graph.error());
+    EXPECT_TRUE(graph->Asset.IsValid());
+    EXPECT_EQ(graph->PayloadKind, Assets::AssetPayloadKind::Graph);
+    EXPECT_EQ(graph->PrimitiveEntitiesCreated, 1u);
+
+    auto cloud = engine.ImportAssetFromPath(
+        Runtime::RuntimeAssetImportRequest{
+            .Path = cloudFile.Path.string(),
+            .PayloadKind = Assets::AssetPayloadKind::PointCloud,
+        });
+    ASSERT_TRUE(cloud.has_value()) << static_cast<int>(cloud.error());
+    EXPECT_TRUE(cloud->Asset.IsValid());
+    EXPECT_EQ(cloud->PayloadKind, Assets::AssetPayloadKind::PointCloud);
+    EXPECT_EQ(cloud->PrimitiveEntitiesCreated, 1u);
+
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Graph), 1u);
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::PointCloud), 1u);
+
+    auto& raw = engine.GetScene().Raw();
+    const std::optional<ECS::EntityHandle> meshEntity =
+        FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
+    ASSERT_TRUE(meshEntity.has_value());
+    EXPECT_TRUE(raw.all_of<G::RenderSurface>(*meshEntity));
+    EXPECT_TRUE(raw.all_of<G::VisualizationConfig>(*meshEntity));
+    ASSERT_TRUE((raw.all_of<ECSC::Culling::Local::Bounds,
+                            ECSC::Culling::World::Bounds>(*meshEntity)));
+    const auto& meshWorld =
+        raw.get<ECSC::Culling::World::Bounds>(*meshEntity);
+    EXPECT_NEAR(meshWorld.WorldBoundingSphere.Center.x, 0.5f, 1.0e-5f);
+    EXPECT_NEAR(meshWorld.WorldBoundingSphere.Center.y, 0.5f, 1.0e-5f);
+    EXPECT_GT(meshWorld.WorldBoundingSphere.Radius, 0.5f);
+
+    const std::optional<ECS::EntityHandle> graphEntity =
+        FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Graph);
+    ASSERT_TRUE(graphEntity.has_value());
+    EXPECT_TRUE(raw.all_of<G::RenderLines>(*graphEntity));
+    EXPECT_TRUE(raw.all_of<G::RenderPoints>(*graphEntity));
+    EXPECT_TRUE(raw.all_of<G::VisualizationConfig>(*graphEntity));
+    ASSERT_TRUE((raw.all_of<ECSC::Culling::Local::Bounds,
+                            ECSC::Culling::World::Bounds>(*graphEntity)));
+    const auto& graphWorld =
+        raw.get<ECSC::Culling::World::Bounds>(*graphEntity);
+    EXPECT_NEAR(graphWorld.WorldBoundingSphere.Center.x, 0.5f, 1.0e-5f);
+    EXPECT_NEAR(graphWorld.WorldBoundingSphere.Center.y, 0.0f, 1.0e-5f);
+    EXPECT_GT(graphWorld.WorldBoundingSphere.Radius, 0.4f);
+
+    const std::optional<ECS::EntityHandle> cloudEntity =
+        FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::PointCloud);
+    ASSERT_TRUE(cloudEntity.has_value());
+    EXPECT_TRUE(raw.all_of<G::RenderPoints>(*cloudEntity));
+    EXPECT_TRUE(raw.all_of<G::VisualizationConfig>(*cloudEntity));
+    ASSERT_TRUE((raw.all_of<ECSC::Culling::Local::Bounds,
+                            ECSC::Culling::World::Bounds>(*cloudEntity)));
+    const auto& cloudWorld =
+        raw.get<ECSC::Culling::World::Bounds>(*cloudEntity);
+    EXPECT_NEAR(cloudWorld.WorldBoundingSphere.Center.x, 0.5f, 1.0e-5f);
+    EXPECT_NEAR(cloudWorld.WorldBoundingSphere.Center.y, 1.0f, 1.0e-5f);
+    EXPECT_NEAR(cloudWorld.WorldBoundingSphere.Center.z, 1.5f, 1.0e-5f);
+    EXPECT_GT(cloudWorld.WorldBoundingSphere.Radius, 1.8f);
+
+    const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
+        engine.GetLastAssetImportEvent();
+    ASSERT_TRUE(lastEvent.has_value());
+    EXPECT_TRUE(lastEvent->Succeeded());
+    ASSERT_TRUE(lastEvent->Result.has_value());
+    EXPECT_EQ(lastEvent->Result->PayloadKind, Assets::AssetPayloadKind::PointCloud);
+    EXPECT_NE(lastEvent->Path.find("runtime_dragdrop_import_cloud.xyz"),
+              std::string::npos);
+
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorUi, EngineImportFacadeMaterializesNonManifoldObjAsRenderableMesh)
+{
+    TmpFile meshFile(
+        "runtime_dragdrop_import_nonmanifold.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "v 0 -1 0\n"
+        "v 0.5 0 1\n"
+        "f 1 2 3\n"
+        "f 2 1 4\n"
+        "f 1 2 5\n");
+
+    Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    engine.Initialize();
+
+    auto mesh = engine.ImportAssetFromPath(
+        Runtime::RuntimeAssetImportRequest{
+            .Path = meshFile.Path.string(),
+            .PayloadKind = Assets::AssetPayloadKind::Mesh,
+        });
+    ASSERT_TRUE(mesh.has_value()) << static_cast<int>(mesh.error());
+    EXPECT_TRUE(mesh->Asset.IsValid());
+    EXPECT_EQ(mesh->PayloadKind, Assets::AssetPayloadKind::Mesh);
+    EXPECT_EQ(mesh->PrimitiveEntitiesCreated, 1u);
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
+
+    auto& raw = engine.GetScene().Raw();
+    const std::optional<ECS::EntityHandle> meshEntity =
+        FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
+    ASSERT_TRUE(meshEntity.has_value());
+    EXPECT_TRUE((raw.all_of<ECSC::MetaData,
+                            ECSC::Hierarchy::Component,
+                            ECSC::Transform::Component,
+                            ECSC::Transform::WorldMatrix,
+                            Sel::SelectableTag,
+                            G::RenderSurface,
+                            G::VisualizationConfig,
+                            GS::Vertices,
+                            GS::Edges,
+                            GS::Halfedges,
+                            GS::Faces>(*meshEntity)));
+    EXPECT_EQ(raw.get<G::RenderSurface>(*meshEntity).Domain,
+              G::RenderSurface::SourceDomain::Vertex);
+
+    Runtime::RenderExtractionCache extraction;
+    const auto stats = extraction.ExtractAndSubmit(engine.GetScene(),
+                                                   engine.GetRenderer(),
+                                                   &engine.GetGpuAssetCache());
+    EXPECT_EQ(stats.CandidateRenderableCount, 1u);
+    EXPECT_EQ(stats.MeshGeometryUploads, 1u);
+    EXPECT_EQ(stats.MeshGeometryFailedPack, 0u);
+    EXPECT_EQ(stats.MeshGeometryMissingPositions, 0u);
+    EXPECT_EQ(stats.MeshGeometryInvalidTopology, 0u);
+    EXPECT_EQ(engine.GetRenderer().GetGpuWorld().GetLiveGeometryCount(), 1u);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorUi, DroppedFilePathsRouteAmbiguousPlyThroughRuntimeImportFacade)
+{
+    TmpFile cloudFile(
+        "runtime_dragdrop_event_cloud.ply",
+        "ply\n"
+        "format ascii 1.0\n"
+        "element vertex 3\n"
+        "property float x\n"
+        "property float y\n"
+        "property float z\n"
+        "end_header\n"
+        "0 0 0\n"
+        "1 0 0\n"
+        "2 0 0\n");
+
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<WaitForAssetImportEventApplication>(128u));
+    engine.Initialize();
+
+    Runtime::SandboxEditorUi ui;
+    ui.Attach(engine);
+
+    const std::vector<std::string> droppedPaths{cloudFile.Path.string()};
+    engine.ImportDroppedFilePaths(droppedPaths);
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::PointCloud), 0u);
+    EXPECT_FALSE(engine.GetLastAssetImportEvent().has_value());
+
+    engine.Run();
+
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::PointCloud), 1u);
+    const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
+        engine.GetLastAssetImportEvent();
+    ASSERT_TRUE(lastEvent.has_value());
+    EXPECT_TRUE(lastEvent->Succeeded());
+    ASSERT_TRUE(lastEvent->Result.has_value());
+    EXPECT_EQ(lastEvent->Result->PayloadKind, Assets::AssetPayloadKind::PointCloud);
+
+    ASSERT_TRUE(ui.GetLastFrame().FileImport.LastResult.has_value());
+    EXPECT_TRUE(ui.GetLastFrame().FileImport.LastResult->Succeeded());
+    EXPECT_EQ(ui.GetLastFrame().FileImport.LastResult->PayloadKind,
+              Assets::AssetPayloadKind::PointCloud);
+    EXPECT_FALSE(HasDiagnostic(ui.GetLastFrame().FileImport.Diagnostics,
+                               Runtime::SandboxEditorDiagnosticCode::AssetImportFailed));
+
+    ui.Detach();
     engine.Shutdown();
 }
 

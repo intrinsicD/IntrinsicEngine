@@ -12,10 +12,14 @@ module;
 #include <span>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
+#include <variant>
 #include <vector>
 
+#include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 module Extrinsic.Runtime.Engine;
 
@@ -46,6 +50,9 @@ import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.SelectionSystem;
+import Extrinsic.Graphics.Component.RenderGeometry;
+import Extrinsic.Graphics.Component.VisualizationConfig;
+import Extrinsic.Runtime.AssetGeometryIO;
 import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.AssetModelTextureIO;
@@ -61,13 +68,31 @@ import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.RenderWorldPool;
 import Extrinsic.Asset.EventBus;
+import Extrinsic.Asset.GeometryIOBridge;
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.ModelTextureIOBridge;
 import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.Service;
+import Extrinsic.ECS.Components.GeometrySourcesPopulate;
+import Extrinsic.ECS.Component.Culling.Local;
+import Extrinsic.ECS.Component.Culling.World;
+import Extrinsic.ECS.Components.Selection;
+import Extrinsic.ECS.Scene.Bootstrap;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Platform.Input;
+import Geometry.Graph.IO;
+import Geometry.Graph;
+import Geometry.AABB;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.IO;
+import Geometry.Mesh.Conversion;
+import Geometry.MeshSoup;
+import Geometry.OBB;
+import Geometry.PointCloud;
+import Geometry.PointCloud.IO;
+import Geometry.Properties;
+import Geometry.Sphere;
 
 namespace Extrinsic::Runtime
 {
@@ -177,6 +202,654 @@ namespace Extrinsic::Runtime
             return error == Core::ErrorCode::Success
                 ? Core::ErrorCode::Unknown
                 : error;
+        }
+
+        [[nodiscard]] std::string FileNameFromPath(const std::string_view path)
+        {
+            if (path.empty())
+            {
+                return {};
+            }
+
+            const std::size_t slash = path.find_last_of("/\\");
+            const std::size_t begin = slash == std::string_view::npos
+                ? 0u
+                : slash + 1u;
+            if (begin >= path.size())
+            {
+                return {};
+            }
+            return std::string(path.substr(begin));
+        }
+
+        [[nodiscard]] std::string GeometryEntityName(
+            const std::string_view path,
+            const Assets::AssetPayloadKind kind)
+        {
+            std::string name = FileNameFromPath(path);
+            if (!name.empty())
+            {
+                return name;
+            }
+            name = "Imported";
+            name += Assets::DebugNameForAssetPayloadKind(kind);
+            return name;
+        }
+
+        [[nodiscard]] Graphics::Components::VisualizationConfig
+            ImportedGeometryVisualization() noexcept
+        {
+            Graphics::Components::VisualizationConfig visualization{};
+            visualization.Source =
+                Graphics::Components::VisualizationConfig::ColorSource::UniformColor;
+            visualization.Color = glm::vec4{1.0f, 1.0f, 1.0f, 1.0f};
+            return visualization;
+        }
+
+        [[nodiscard]] bool CanUseDisconnectedRenderableFallback(
+            const Geometry::Mesh::Conversion::ToHalfedgeMeshResult& converted) noexcept
+        {
+            bool hasRenderableTopologyFailure = false;
+            for (const Geometry::Mesh::Conversion::ConversionDiagnostic& diagnostic :
+                 converted.Diagnostics)
+            {
+                if (diagnostic.Severity !=
+                    Geometry::MeshSoup::ValidationSeverity::Error)
+                {
+                    continue;
+                }
+
+                if (diagnostic.Kind ==
+                    Geometry::Mesh::Conversion::ConversionDiagnosticKind::AddFaceFailed)
+                {
+                    hasRenderableTopologyFailure = true;
+                    continue;
+                }
+
+                if (diagnostic.Kind !=
+                    Geometry::Mesh::Conversion::ConversionDiagnosticKind::ValidationDiagnostic)
+                {
+                    return false;
+                }
+
+                if (diagnostic.ValidationKind ==
+                        Geometry::MeshSoup::ValidationDiagnosticKind::NonManifoldEdge ||
+                    diagnostic.ValidationKind ==
+                        Geometry::MeshSoup::ValidationDiagnosticKind::InconsistentWinding)
+                {
+                    hasRenderableTopologyFailure = true;
+                    continue;
+                }
+
+                return false;
+            }
+            return hasRenderableTopologyFailure;
+        }
+
+        [[nodiscard]] std::optional<Geometry::HalfedgeMesh::Mesh>
+            BuildDisconnectedRenderableMesh(
+                const std::vector<glm::vec3>& positions,
+                const std::vector<std::vector<std::uint32_t>>& faces)
+        {
+            if (positions.empty() || faces.empty())
+            {
+                return std::nullopt;
+            }
+
+            Geometry::HalfedgeMesh::Mesh mesh;
+            std::vector<Geometry::VertexHandle> faceVertices;
+            for (const std::vector<std::uint32_t>& face : faces)
+            {
+                if (face.size() < 3u)
+                {
+                    return std::nullopt;
+                }
+
+                faceVertices.clear();
+                faceVertices.reserve(face.size());
+                for (const std::uint32_t index : face)
+                {
+                    if (index >= positions.size())
+                    {
+                        return std::nullopt;
+                    }
+                    faceVertices.push_back(mesh.AddVertex(positions[index]));
+                }
+
+                if (!mesh.AddFace(faceVertices).has_value())
+                {
+                    return std::nullopt;
+                }
+            }
+
+            return mesh;
+        }
+
+        [[nodiscard]] Core::Expected<Geometry::HalfedgeMesh::Mesh> BuildHalfedgeMesh(
+            const Geometry::MeshIO::MeshIOResult& meshPayload)
+        {
+            const auto positions = meshPayload.Vertices.Get<glm::vec3>("v:point");
+            if (!positions || positions.Vector().empty())
+            {
+                return Core::Err<Geometry::HalfedgeMesh::Mesh>(
+                    Core::ErrorCode::AssetInvalidData);
+            }
+
+            const auto faces =
+                meshPayload.Faces.Get<std::vector<std::uint32_t>>("f:vertices");
+            if (!faces || faces.Vector().empty())
+            {
+                return Core::Err<Geometry::HalfedgeMesh::Mesh>(
+                    Core::ErrorCode::AssetInvalidData);
+            }
+
+            Geometry::MeshSoup::IndexedMesh soup{};
+            for (const glm::vec3& position : positions.Vector())
+            {
+                static_cast<void>(soup.AddVertex(position));
+            }
+
+            for (const std::vector<std::uint32_t>& face : faces.Vector())
+            {
+                if (face.size() < 3u)
+                {
+                    return Core::Err<Geometry::HalfedgeMesh::Mesh>(
+                        Core::ErrorCode::InvalidFormat);
+                }
+                for (const std::uint32_t index : face)
+                {
+                    if (index >= soup.VertexCount())
+                    {
+                        return Core::Err<Geometry::HalfedgeMesh::Mesh>(
+                            Core::ErrorCode::OutOfRange);
+                    }
+                }
+                static_cast<void>(soup.AddFace(face));
+            }
+
+            auto converted = Geometry::Mesh::Conversion::ToHalfedgeMesh(soup);
+            if (!converted.Succeeded())
+            {
+                if (CanUseDisconnectedRenderableFallback(converted))
+                {
+                    if (std::optional<Geometry::HalfedgeMesh::Mesh> fallback =
+                            BuildDisconnectedRenderableMesh(
+                                positions.Vector(),
+                                faces.Vector()))
+                    {
+                        return std::move(*fallback);
+                    }
+                }
+                return Core::Err<Geometry::HalfedgeMesh::Mesh>(
+                    Core::ErrorCode::InvalidFormat);
+            }
+            return std::move(converted.Mesh);
+        }
+
+        struct DecodedMeshImport
+        {
+            Geometry::MeshIO::MeshIOResult Payload{};
+            Geometry::HalfedgeMesh::Mesh Mesh{};
+        };
+
+        struct DecodedGraphImport
+        {
+            Geometry::GraphIO::GraphIOResult Payload{};
+        };
+
+        struct DecodedPointCloudImport
+        {
+            Geometry::PointCloudIO::PointCloudIOResult Payload{};
+        };
+
+        using DecodedGeometryImportPayload =
+            std::variant<DecodedMeshImport, DecodedGraphImport, DecodedPointCloudImport>;
+
+        struct DecodedGeometryImport
+        {
+            std::string Path{};
+            Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
+            DecodedGeometryImportPayload Payload{};
+        };
+
+        struct DroppedGeometryImportState
+        {
+            RuntimeAssetImportRequest Request{};
+            std::optional<DecodedGeometryImport> Decoded{};
+            Core::ErrorCode Error{Core::ErrorCode::Unknown};
+        };
+
+        struct GeometryImportBounds
+        {
+            glm::vec3 Min{0.0f};
+            glm::vec3 Max{0.0f};
+            bool Valid{false};
+        };
+
+        struct MaterializedGeometryImport
+        {
+            RuntimeAssetImportResult Result{};
+            std::optional<GeometryImportBounds> Bounds{};
+        };
+
+        [[nodiscard]] bool IsFinitePosition(const glm::vec3& position) noexcept
+        {
+            return std::isfinite(position.x) &&
+                   std::isfinite(position.y) &&
+                   std::isfinite(position.z);
+        }
+
+        void AccumulateBounds(GeometryImportBounds& bounds,
+                              const glm::vec3& position) noexcept
+        {
+            if (!IsFinitePosition(position))
+                return;
+
+            if (!bounds.Valid)
+            {
+                bounds.Min = position;
+                bounds.Max = position;
+                bounds.Valid = true;
+                return;
+            }
+
+            bounds.Min = glm::min(bounds.Min, position);
+            bounds.Max = glm::max(bounds.Max, position);
+        }
+
+        [[nodiscard]] std::optional<GeometryImportBounds> BoundsFromHalfedgeMesh(
+            const Geometry::HalfedgeMesh::Mesh& mesh) noexcept
+        {
+            GeometryImportBounds bounds{};
+            for (std::size_t i = 0u; i < mesh.VerticesSize(); ++i)
+            {
+                const Geometry::VertexHandle vertex{
+                    static_cast<Geometry::PropertyIndex>(i)};
+                if (!mesh.IsValid(vertex) || mesh.IsDeleted(vertex))
+                    continue;
+                AccumulateBounds(bounds, mesh.Position(vertex));
+            }
+            if (!bounds.Valid)
+                return std::nullopt;
+            return bounds;
+        }
+
+        [[nodiscard]] std::optional<GeometryImportBounds> BoundsFromGraph(
+            const Geometry::Graph::Graph& graph) noexcept
+        {
+            GeometryImportBounds bounds{};
+            for (std::size_t i = 0u; i < graph.VerticesSize(); ++i)
+            {
+                const Geometry::VertexHandle vertex{
+                    static_cast<Geometry::PropertyIndex>(i)};
+                if (!graph.IsValid(vertex) || graph.IsDeleted(vertex))
+                    continue;
+                AccumulateBounds(bounds, graph.VertexPosition(vertex));
+            }
+            if (!bounds.Valid)
+                return std::nullopt;
+            return bounds;
+        }
+
+        [[nodiscard]] std::optional<GeometryImportBounds> BoundsFromCloud(
+            const Geometry::PointCloud::Cloud& cloud) noexcept
+        {
+            GeometryImportBounds bounds{};
+            for (const glm::vec3& position : cloud.Positions())
+            {
+                AccumulateBounds(bounds, position);
+            }
+            if (!bounds.Valid)
+                return std::nullopt;
+            return bounds;
+        }
+
+        [[nodiscard]] float RadiusForBounds(
+            const GeometryImportBounds& bounds) noexcept
+        {
+            constexpr float kMinimumVisibleRadius = 0.05f;
+            const float radius = 0.5f * glm::length(bounds.Max - bounds.Min);
+            if (!std::isfinite(radius) || radius <= 0.0f)
+                return kMinimumVisibleRadius;
+            return std::max(kMinimumVisibleRadius, radius);
+        }
+
+        [[nodiscard]] CameraFocusTarget ToCameraFocusTarget(
+            const GeometryImportBounds& bounds) noexcept
+        {
+            return CameraFocusTarget{
+                .Center = 0.5f * (bounds.Min + bounds.Max),
+                .Radius = RadiusForBounds(bounds),
+            };
+        }
+
+        void AttachGeometryBounds(entt::registry& raw,
+                                  const ECS::EntityHandle entity,
+                                  const GeometryImportBounds& bounds)
+        {
+            if (!bounds.Valid)
+                return;
+
+            const glm::vec3 center = 0.5f * (bounds.Min + bounds.Max);
+            const glm::vec3 extents = 0.5f * (bounds.Max - bounds.Min);
+            const float radius = RadiusForBounds(bounds);
+
+            ECS::Components::Culling::Local::Bounds local{};
+            local.LocalBoundingAABB.Min = bounds.Min;
+            local.LocalBoundingAABB.Max = bounds.Max;
+            local.LocalBoundingSphere.Center = center;
+            local.LocalBoundingSphere.Radius = radius;
+            raw.emplace_or_replace<ECS::Components::Culling::Local::Bounds>(
+                entity,
+                local);
+
+            ECS::Components::Culling::World::Bounds world{};
+            world.WorldBoundingOBB.Center = center;
+            world.WorldBoundingOBB.Extents = extents;
+            world.WorldBoundingOBB.Rotation = glm::quat{1.0f, 0.0f, 0.0f, 0.0f};
+            world.WorldBoundingSphere.Center = center;
+            world.WorldBoundingSphere.Radius = radius;
+            raw.emplace_or_replace<ECS::Components::Culling::World::Bounds>(
+                entity,
+                world);
+        }
+
+        void FocusMainCameraOnImportedGeometry(
+            CameraControllerRegistry& cameraControllers,
+            const Core::Config::CameraControllerKind controllerKind,
+            const bool cameraEnabled,
+            const std::optional<GeometryImportBounds>& bounds)
+        {
+            if (!cameraEnabled || !bounds.has_value() || !bounds->Valid)
+                return;
+
+            ICameraController* controller =
+                cameraControllers.ResolveOrNull(CameraControllerSlot::Main);
+            if (controller == nullptr)
+            {
+                cameraControllers.Register(
+                    CameraControllerSlot::Main,
+                    CreateCameraController(controllerKind));
+                controller = cameraControllers.ResolveOrNull(CameraControllerSlot::Main);
+            }
+            if (controller == nullptr)
+                return;
+
+            controller->Focus(ToCameraFocusTarget(*bounds));
+            cameraControllers.MarkCameraTransition(CameraControllerSlot::Main);
+        }
+
+        [[nodiscard]] Core::Expected<DecodedGeometryImport> DecodeGeometryImport(
+            const RuntimeAssetImportRequest& request)
+        {
+            auto route = Assets::ResolveAssetImportRoute(
+                request.Path,
+                Assets::AssetRouteOperation::Import,
+                Assets::AssetImportHint{.PayloadKind = request.PayloadKind});
+            if (!route.has_value())
+            {
+                return Core::Err<DecodedGeometryImport>(route.error());
+            }
+            if (!Assets::IsGeometryPayloadKind(route->PayloadKind))
+            {
+                return Core::Err<DecodedGeometryImport>(
+                    Core::ErrorCode::AssetUnsupportedFormat);
+            }
+
+            Assets::AssetGeometryIOBridge bridge;
+            if (Core::Result registered = RegisterPromotedGeometryIOCallbacks(bridge);
+                !registered.has_value())
+            {
+                return Core::Err<DecodedGeometryImport>(registered.error());
+            }
+
+            auto decoded = bridge.Import(
+                request.Path,
+                Assets::AssetImportHint{.PayloadKind = route->PayloadKind});
+            if (!decoded.has_value())
+            {
+                return Core::Err<DecodedGeometryImport>(decoded.error());
+            }
+
+            switch (route->PayloadKind)
+            {
+            case Assets::AssetPayloadKind::Mesh:
+            {
+                auto meshPayload =
+                    decoded->Read<Geometry::MeshIO::MeshIOResult>();
+                if (!meshPayload.has_value())
+                {
+                    return Core::Err<DecodedGeometryImport>(
+                        meshPayload.error());
+                }
+
+                auto mesh = BuildHalfedgeMesh(**meshPayload);
+                if (!mesh.has_value())
+                {
+                    return Core::Err<DecodedGeometryImport>(mesh.error());
+                }
+
+                return DecodedGeometryImport{
+                    .Path = request.Path,
+                    .PayloadKind = route->PayloadKind,
+                    .Payload = DecodedMeshImport{
+                        .Payload = **meshPayload,
+                        .Mesh = std::move(*mesh),
+                    },
+                };
+            }
+            case Assets::AssetPayloadKind::Graph:
+            {
+                auto graphPayload =
+                    decoded->Read<Geometry::GraphIO::GraphIOResult>();
+                if (!graphPayload.has_value())
+                {
+                    return Core::Err<DecodedGeometryImport>(
+                        graphPayload.error());
+                }
+
+                return DecodedGeometryImport{
+                    .Path = request.Path,
+                    .PayloadKind = route->PayloadKind,
+                    .Payload = DecodedGraphImport{.Payload = **graphPayload},
+                };
+            }
+            case Assets::AssetPayloadKind::PointCloud:
+            {
+                auto cloudPayload =
+                    decoded->Read<Geometry::PointCloudIO::PointCloudIOResult>();
+                if (!cloudPayload.has_value())
+                {
+                    return Core::Err<DecodedGeometryImport>(
+                        cloudPayload.error());
+                }
+
+                return DecodedGeometryImport{
+                    .Path = request.Path,
+                    .PayloadKind = route->PayloadKind,
+                    .Payload = DecodedPointCloudImport{.Payload = **cloudPayload},
+                };
+            }
+            default:
+                break;
+            }
+
+            return Core::Err<DecodedGeometryImport>(
+                Core::ErrorCode::AssetUnsupportedFormat);
+        }
+
+        [[nodiscard]] Core::Expected<MaterializedGeometryImport>
+        MaterializeDecodedGeometryImport(
+            Assets::AssetService& assetService,
+            ECS::Scene::Registry& scene,
+            const DecodedGeometryImport& decoded)
+        {
+            return std::visit(
+                [&](const auto& payload) -> Core::Expected<MaterializedGeometryImport>
+                {
+                    using PayloadT = std::decay_t<decltype(payload)>;
+                    if constexpr (std::is_same_v<PayloadT, DecodedMeshImport>)
+                    {
+                        auto asset =
+                            assetService.Load<Geometry::MeshIO::MeshIOResult>(
+                                decoded.Path,
+                                [&payload](std::string_view,
+                                           Assets::AssetId)
+                                    -> Core::Expected<Geometry::MeshIO::MeshIOResult>
+                                {
+                                    return payload.Payload;
+                                });
+                        if (!asset.has_value())
+                        {
+                            return Core::Err<MaterializedGeometryImport>(
+                                asset.error());
+                        }
+                        DrainAssetImportEvents(assetService);
+
+                        const ECS::EntityHandle entity =
+                            ECS::Scene::CreateDefault(
+                                scene,
+                                GeometryEntityName(decoded.Path, decoded.PayloadKind));
+                        auto& raw = scene.Raw();
+                        raw.emplace<ECS::Components::Selection::SelectableTag>(entity);
+                        raw.emplace<Graphics::Components::RenderSurface>(
+                            entity,
+                            Graphics::Components::RenderSurface{
+                                .Domain = Graphics::Components::RenderSurface::SourceDomain::Vertex,
+                            });
+                        raw.emplace<Graphics::Components::VisualizationConfig>(
+                            entity,
+                            ImportedGeometryVisualization());
+                        const std::optional<GeometryImportBounds> bounds =
+                            BoundsFromHalfedgeMesh(payload.Mesh);
+                        if (bounds.has_value())
+                        {
+                            AttachGeometryBounds(raw, entity, *bounds);
+                        }
+                        Geometry::HalfedgeMesh::Mesh mesh = payload.Mesh;
+                        ECS::Components::GeometrySources::PopulateFromMesh(
+                            raw,
+                            entity,
+                            mesh);
+
+                        return MaterializedGeometryImport{
+                            .Result = RuntimeAssetImportResult{
+                                .Asset = *asset,
+                                .PayloadKind = decoded.PayloadKind,
+                                .PrimitiveEntitiesCreated = 1u,
+                            },
+                            .Bounds = bounds,
+                        };
+                    }
+                    else if constexpr (std::is_same_v<PayloadT, DecodedGraphImport>)
+                    {
+                        auto asset =
+                            assetService.Load<Geometry::GraphIO::GraphIOResult>(
+                                decoded.Path,
+                                [&payload](std::string_view,
+                                           Assets::AssetId)
+                                    -> Core::Expected<Geometry::GraphIO::GraphIOResult>
+                                {
+                                    return payload.Payload;
+                                });
+                        if (!asset.has_value())
+                        {
+                            return Core::Err<MaterializedGeometryImport>(
+                                asset.error());
+                        }
+                        DrainAssetImportEvents(assetService);
+
+                        Geometry::Graph::Graph graph = payload.Payload.Graph;
+                        const std::optional<GeometryImportBounds> bounds =
+                            BoundsFromGraph(graph);
+                        const ECS::EntityHandle entity =
+                            ECS::Scene::CreateDefault(
+                                scene,
+                                GeometryEntityName(decoded.Path, decoded.PayloadKind));
+                        auto& raw = scene.Raw();
+                        raw.emplace<ECS::Components::Selection::SelectableTag>(entity);
+                        raw.emplace<Graphics::Components::RenderLines>(
+                            entity,
+                            Graphics::Components::RenderLines{
+                                .Domain = Graphics::Components::RenderLines::SourceDomain::Vertex,
+                            });
+                        raw.emplace<Graphics::Components::RenderPoints>(
+                            entity,
+                            Graphics::Components::RenderPoints{});
+                        raw.emplace<Graphics::Components::VisualizationConfig>(
+                            entity,
+                            ImportedGeometryVisualization());
+                        if (bounds.has_value())
+                        {
+                            AttachGeometryBounds(raw, entity, *bounds);
+                        }
+                        ECS::Components::GeometrySources::PopulateFromGraph(
+                            raw,
+                            entity,
+                            graph);
+
+                        return MaterializedGeometryImport{
+                            .Result = RuntimeAssetImportResult{
+                                .Asset = *asset,
+                                .PayloadKind = decoded.PayloadKind,
+                                .PrimitiveEntitiesCreated = 1u,
+                            },
+                            .Bounds = bounds,
+                        };
+                    }
+                    else
+                    {
+                        auto asset =
+                            assetService.Load<Geometry::PointCloudIO::PointCloudIOResult>(
+                                decoded.Path,
+                                [&payload](std::string_view,
+                                           Assets::AssetId)
+                                    -> Core::Expected<Geometry::PointCloudIO::PointCloudIOResult>
+                                {
+                                    return payload.Payload;
+                                });
+                        if (!asset.has_value())
+                        {
+                            return Core::Err<MaterializedGeometryImport>(
+                                asset.error());
+                        }
+                        DrainAssetImportEvents(assetService);
+
+                        Geometry::PointCloud::Cloud cloud = payload.Payload.Cloud;
+                        const std::optional<GeometryImportBounds> bounds =
+                            BoundsFromCloud(cloud);
+                        const ECS::EntityHandle entity =
+                            ECS::Scene::CreateDefault(
+                                scene,
+                                GeometryEntityName(decoded.Path, decoded.PayloadKind));
+                        auto& raw = scene.Raw();
+                        raw.emplace<ECS::Components::Selection::SelectableTag>(entity);
+                        raw.emplace<Graphics::Components::RenderPoints>(
+                            entity,
+                            Graphics::Components::RenderPoints{});
+                        raw.emplace<Graphics::Components::VisualizationConfig>(
+                            entity,
+                            ImportedGeometryVisualization());
+                        if (bounds.has_value())
+                        {
+                            AttachGeometryBounds(raw, entity, *bounds);
+                        }
+                        ECS::Components::GeometrySources::PopulateFromCloud(
+                            raw,
+                            entity,
+                            cloud);
+
+                        return MaterializedGeometryImport{
+                            .Result = RuntimeAssetImportResult{
+                                .Asset = *asset,
+                                .PayloadKind = decoded.PayloadKind,
+                                .PrimitiveEntitiesCreated = 1u,
+                            },
+                            .Bounds = bounds,
+                        };
+                    }
+                },
+                decoded.Payload);
         }
 
         [[nodiscard]] std::uint32_t ClampCursorPixel(const float value,
@@ -615,10 +1288,19 @@ namespace Extrinsic::Runtime
 
         m_Initialized = true;
         m_Running     = true;
+
+        m_Window->Listen(
+            [this](const Platform::Event& event)
+            {
+                HandlePlatformEvent(event);
+            });
     }
 
     void Engine::Shutdown()
     {
+        if (m_Window)
+            m_Window->Listen({});
+
         // GRAPHICS-079 Slice B — detach the renderer consumer before the adapter
         // shuts the shared overlay system down, so the renderer never observes a
         // borrowed but inactive overlay during the rest of teardown.
@@ -1371,6 +2053,213 @@ namespace Extrinsic::Runtime
     Core::Expected<RuntimeAssetImportResult> Engine::ImportAssetFromPath(
         RuntimeAssetImportRequest request)
     {
+        auto result = ImportAssetFromPathImpl(request);
+        RecordAssetImportEvent(request, result);
+        return result;
+    }
+
+    const std::optional<RuntimeAssetImportEvent>& Engine::GetLastAssetImportEvent()
+        const noexcept
+    {
+        return m_LastAssetImportEvent;
+    }
+
+    void Engine::HandlePlatformEvent(const Platform::Event& event)
+    {
+        if (const auto* dropped = std::get_if<Platform::WindowDropEvent>(&event))
+        {
+            HandleWindowDropEvent(*dropped);
+        }
+    }
+
+    void Engine::HandleWindowDropEvent(const Platform::WindowDropEvent& event)
+    {
+        ImportDroppedFilePaths(event.Paths);
+    }
+
+    void Engine::ImportDroppedFilePaths(std::span<const std::string> paths)
+    {
+        for (const std::string& path : paths)
+        {
+            if (path.empty())
+                continue;
+
+            const Assets::AssetRouteDiagnostic diagnostic =
+                Assets::DiagnoseAssetImportRoute(
+                    path,
+                    Assets::AssetRouteOperation::Import,
+                    Assets::AssetImportHint{
+                        .PayloadKind = Assets::AssetPayloadKind::Unknown,
+                    });
+            if (diagnostic.Status == Assets::AssetRouteStatus::AmbiguousPayloadKind)
+            {
+                const Assets::AssetFileFormatInfo* format =
+                    Assets::FindAssetFileFormat(path);
+                std::vector<Assets::AssetPayloadKind> geometryPayloads{};
+                if (format != nullptr)
+                {
+                    for (const Assets::AssetPayloadKind payloadKind :
+                         format->ImportPayloads)
+                    {
+                        if (!Assets::IsGeometryPayloadKind(payloadKind))
+                            continue;
+                        geometryPayloads.push_back(payloadKind);
+                    }
+                }
+                if (!geometryPayloads.empty())
+                {
+                    QueueDroppedGeometryImport(path, std::move(geometryPayloads));
+                    continue;
+                }
+            }
+
+            auto route = Assets::ResolveAssetImportRoute(
+                path,
+                Assets::AssetRouteOperation::Import,
+                Assets::AssetImportHint{
+                    .PayloadKind = Assets::AssetPayloadKind::Unknown,
+                });
+            if (route.has_value() &&
+                Assets::IsGeometryPayloadKind(route->PayloadKind))
+            {
+                QueueDroppedGeometryImport(path, {route->PayloadKind});
+                continue;
+            }
+
+            (void)ImportAssetFromPath(
+                RuntimeAssetImportRequest{
+                    .Path = path,
+                    .PayloadKind = Assets::AssetPayloadKind::Unknown,
+                });
+        }
+    }
+
+    void Engine::QueueDroppedGeometryImport(
+        std::string path,
+        std::vector<Assets::AssetPayloadKind> payloadKinds)
+    {
+        if (!m_Initialized ||
+            !m_StreamingExecutor ||
+            !m_AssetService ||
+            !m_Scene ||
+            path.empty() ||
+            payloadKinds.empty())
+        {
+            RuntimeAssetImportRequest request{
+                .Path = std::move(path),
+                .PayloadKind = payloadKinds.empty()
+                    ? Assets::AssetPayloadKind::Unknown
+                    : payloadKinds.front(),
+            };
+            RecordAssetImportEvent(
+                request,
+                Core::Err<RuntimeAssetImportResult>(Core::ErrorCode::InvalidState));
+            return;
+        }
+
+        auto state = std::make_shared<DroppedGeometryImportState>();
+        state->Request = RuntimeAssetImportRequest{
+            .Path = path,
+            .PayloadKind = payloadKinds.front(),
+        };
+
+        const StreamingTaskHandle handle = m_StreamingExecutor->Submit(
+            StreamingTaskDesc{
+                .Name = "Runtime.ImportDroppedGeometry." +
+                    FileNameFromPath(path),
+                .Kind = Core::Dag::TaskKind::AssetDecode,
+                .Priority = Core::Dag::TaskPriority::Normal,
+                .EstimatedCost = 4u,
+                .Execute = [
+                    state,
+                    path = std::move(path),
+                    payloadKinds = std::move(payloadKinds)]() mutable -> StreamingResult
+                {
+                    Core::ErrorCode lastError = Core::ErrorCode::Unknown;
+                    for (const Assets::AssetPayloadKind payloadKind : payloadKinds)
+                    {
+                        RuntimeAssetImportRequest request{
+                            .Path = path,
+                            .PayloadKind = payloadKind,
+                        };
+                        auto decoded = DecodeGeometryImport(request);
+                        state->Request = request;
+                        if (decoded.has_value())
+                        {
+                            state->Decoded = std::move(*decoded);
+                            state->Error = Core::ErrorCode::Success;
+                            return StreamingResult{
+                                StreamingCpuPayloadReady{.PayloadToken = 0u}};
+                        }
+                        lastError = decoded.error();
+                    }
+
+                    state->Error = lastError;
+                    return StreamingResult{
+                        StreamingCpuPayloadReady{.PayloadToken = 0u}};
+                },
+                .ApplyOnMainThread = [this, state](StreamingResult&&) mutable
+                {
+                    Core::Expected<RuntimeAssetImportResult> result =
+                        Core::Err<RuntimeAssetImportResult>(state->Error);
+                    if (state->Decoded.has_value())
+                    {
+                        auto materialized = MaterializeDecodedGeometryImport(
+                            *m_AssetService,
+                            *m_Scene,
+                            *state->Decoded);
+                        if (materialized.has_value())
+                        {
+                            FocusMainCameraOnImportedGeometry(
+                                m_CameraControllers,
+                                m_Config.Camera.Controller,
+                                m_Config.Camera.Enabled,
+                                materialized->Bounds);
+                            result = materialized->Result;
+                        }
+                        else
+                        {
+                            result = Core::Err<RuntimeAssetImportResult>(
+                                materialized.error());
+                        }
+                    }
+                    RecordAssetImportEvent(state->Request, result);
+                },
+            });
+
+        if (!handle.IsValid())
+        {
+            RuntimeAssetImportRequest request{
+                .Path = std::move(state->Request.Path),
+                .PayloadKind = state->Request.PayloadKind,
+            };
+            RecordAssetImportEvent(
+                request,
+                Core::Err<RuntimeAssetImportResult>(Core::ErrorCode::InvalidState));
+        }
+    }
+
+    void Engine::RecordAssetImportEvent(
+        const RuntimeAssetImportRequest& request,
+        const Core::Expected<RuntimeAssetImportResult>& result)
+    {
+        RuntimeAssetImportEvent event{};
+        event.Sequence = ++m_AssetImportEventSequence;
+        event.Path = request.Path;
+        event.RequestedPayloadKind = request.PayloadKind;
+        event.Error = result.has_value()
+            ? Core::ErrorCode::Success
+            : result.error();
+        if (result.has_value())
+        {
+            event.Result = *result;
+        }
+        m_LastAssetImportEvent = std::move(event);
+    }
+
+    Core::Expected<RuntimeAssetImportResult> Engine::ImportAssetFromPathImpl(
+        RuntimeAssetImportRequest request)
+    {
         if (!m_Initialized ||
             !m_AssetService ||
             !m_GpuAssetCache ||
@@ -1391,6 +2280,34 @@ namespace Extrinsic::Runtime
         if (!route.has_value())
         {
             return Core::Err<RuntimeAssetImportResult>(route.error());
+        }
+        if (Assets::IsGeometryPayloadKind(route->PayloadKind))
+        {
+            auto decoded = DecodeGeometryImport(
+                RuntimeAssetImportRequest{
+                    .Path = request.Path,
+                    .PayloadKind = route->PayloadKind,
+                });
+            if (!decoded.has_value())
+            {
+                return Core::Err<RuntimeAssetImportResult>(decoded.error());
+            }
+
+            auto materialized = MaterializeDecodedGeometryImport(
+                *m_AssetService,
+                *m_Scene,
+                *decoded);
+            if (!materialized.has_value())
+            {
+                return Core::Err<RuntimeAssetImportResult>(
+                    materialized.error());
+            }
+            FocusMainCameraOnImportedGeometry(
+                m_CameraControllers,
+                m_Config.Camera.Controller,
+                m_Config.Camera.Enabled,
+                materialized->Bounds);
+            return materialized->Result;
         }
         if (route->PayloadKind != Assets::AssetPayloadKind::ModelScene &&
             route->PayloadKind != Assets::AssetPayloadKind::Texture2D)

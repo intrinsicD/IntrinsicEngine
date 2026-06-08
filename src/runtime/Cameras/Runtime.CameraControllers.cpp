@@ -21,6 +21,8 @@ namespace Extrinsic::Runtime
         constexpr float kDefaultFovYRadians = std::numbers::pi_v<float> / 4.0f;
         constexpr float kDefaultNearPlane = 0.1f;
         constexpr float kDefaultFarPlane = 1000.0f;
+        constexpr float kMinFocusRadius = 0.05f;
+        constexpr float kFocusPadding = 1.35f;
         constexpr float kMinPitchRadians = -89.0f * std::numbers::pi_v<float> / 180.0f;
         constexpr float kMaxPitchRadians = 89.0f * std::numbers::pi_v<float> / 180.0f;
         constexpr float kTau = std::numbers::pi_v<float> * 2.0f;
@@ -31,6 +33,13 @@ namespace Extrinsic::Runtime
         {
             return input.IsMouseButtonPressed(kMouseButtonRight) ||
                    input.IsMouseButtonPressed(kMouseButtonMiddle);
+        }
+
+        [[nodiscard]] bool IsFinite(const glm::vec3 value) noexcept
+        {
+            return std::isfinite(value.x) &&
+                   std::isfinite(value.y) &&
+                   std::isfinite(value.z);
         }
 
         [[nodiscard]] float WrapRadians(float value) noexcept
@@ -81,6 +90,25 @@ namespace Extrinsic::Runtime
             if (!std::isfinite(len) || len <= 0.000001f)
                 return fallback;
             return value / len;
+        }
+
+        [[nodiscard]] float SafeFocusRadius(const CameraFocusTarget target) noexcept
+        {
+            if (!std::isfinite(target.Radius) || target.Radius <= 0.0f)
+                return kMinFocusRadius;
+            return std::max(kMinFocusRadius, target.Radius);
+        }
+
+        [[nodiscard]] float PerspectiveFocusDistance(const float radius) noexcept
+        {
+            const float halfFov = kDefaultFovYRadians * 0.5f;
+            return std::max(kMinFocusRadius,
+                            (radius * kFocusPadding) / std::sin(halfFov));
+        }
+
+        [[nodiscard]] float FocusFarPlane(const float distance, const float radius) noexcept
+        {
+            return std::max(kDefaultFarPlane, distance + radius * 4.0f + 1.0f);
         }
 
         [[nodiscard]] Graphics::CameraViewInput DefaultSeed() noexcept
@@ -163,6 +191,21 @@ namespace Extrinsic::Runtime
         m_Pitch = Detail::PitchFromForward(forward);
         m_NearPlane = safeSeed.NearPlane > 0.0f ? safeSeed.NearPlane : Detail::kDefaultNearPlane;
         m_FarPlane = safeSeed.FarPlane > m_NearPlane ? safeSeed.FarPlane : Detail::kDefaultFarPlane;
+        m_FirstMouse = true;
+    }
+
+    void OrbitCameraController::Focus(const CameraFocusTarget target) noexcept
+    {
+        if (!Detail::IsFinite(target.Center))
+            return;
+
+        const float radius = Detail::SafeFocusRadius(target);
+        const float distance = std::clamp(Detail::PerspectiveFocusDistance(radius),
+                                          m_MinRadius,
+                                          m_MaxRadius);
+        m_Target = target.Center;
+        m_Radius = distance;
+        m_FarPlane = Detail::FocusFarPlane(distance, radius);
         m_FirstMouse = true;
     }
 
@@ -256,6 +299,19 @@ namespace Extrinsic::Runtime
         m_FirstMouse = true;
     }
 
+    void FlyCameraController::Focus(const CameraFocusTarget target) noexcept
+    {
+        if (!Detail::IsFinite(target.Center))
+            return;
+
+        const float radius = Detail::SafeFocusRadius(target);
+        const float distance = Detail::PerspectiveFocusDistance(radius);
+        const glm::vec3 forward = Detail::ForwardFromYawPitch(m_Yaw, m_Pitch);
+        m_Position = target.Center - forward * distance;
+        m_FarPlane = Detail::FocusFarPlane(distance, radius);
+        m_FirstMouse = true;
+    }
+
     void FlyCameraController::Update(const Platform::Input::Context& input,
                                      const double deltaSeconds) noexcept
     {
@@ -331,6 +387,19 @@ namespace Extrinsic::Runtime
         m_Roll = 0.0f;
         m_NearPlane = safeSeed.NearPlane > 0.0f ? safeSeed.NearPlane : Detail::kDefaultNearPlane;
         m_FarPlane = safeSeed.FarPlane > m_NearPlane ? safeSeed.FarPlane : Detail::kDefaultFarPlane;
+        m_FirstMouse = true;
+    }
+
+    void FreeLookCameraController::Focus(const CameraFocusTarget target) noexcept
+    {
+        if (!Detail::IsFinite(target.Center))
+            return;
+
+        const float radius = Detail::SafeFocusRadius(target);
+        const float distance = Detail::PerspectiveFocusDistance(radius);
+        const glm::vec3 forward = Detail::ForwardFromYawPitch(m_Yaw, m_Pitch);
+        m_Position = target.Center - forward * distance;
+        m_FarPlane = Detail::FocusFarPlane(distance, radius);
         m_FirstMouse = true;
     }
 
@@ -423,6 +492,23 @@ namespace Extrinsic::Runtime
         m_OrthographicHeight = std::clamp(m_Altitude * 2.0f, m_MinOrthographicHeight, m_MaxOrthographicHeight);
         m_NearPlane = safeSeed.NearPlane > 0.0f ? safeSeed.NearPlane : Detail::kDefaultNearPlane;
         m_FarPlane = safeSeed.FarPlane > m_NearPlane ? safeSeed.FarPlane : Detail::kDefaultFarPlane;
+    }
+
+    void TopDownCameraController::Focus(const CameraFocusTarget target) noexcept
+    {
+        if (!Detail::IsFinite(target.Center))
+            return;
+
+        const float radius = Detail::SafeFocusRadius(target);
+        const float height = std::clamp(radius * 2.0f * Detail::kFocusPadding,
+                                        m_MinOrthographicHeight,
+                                        m_MaxOrthographicHeight);
+        m_Target = target.Center;
+        m_OrthographicHeight = height;
+        m_Altitude = std::clamp(radius * 2.0f * Detail::kFocusPadding,
+                                m_MinAltitude,
+                                m_MaxAltitude);
+        m_FarPlane = Detail::FocusFarPlane(m_Altitude, radius);
     }
 
     void TopDownCameraController::Update(const Platform::Input::Context& input,

@@ -21,21 +21,30 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
 #include <limits>
 #include <memory>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <vector>
 
 #include <gtest/gtest.h>
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include "OperationalCounterStability.hpp"
 
+import Extrinsic.Asset.ImportRouter;
+import Extrinsic.Asset.Registry;
 import Extrinsic.Backends.Vulkan;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Geometry2D;
+import Extrinsic.ECS.Component.Culling.Local;
+import Extrinsic.ECS.Component.Culling.World;
 import Extrinsic.ECS.Component.MetaData;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Component.Transform;
@@ -66,6 +75,7 @@ namespace ECSC = Extrinsic::ECS::Components;
 namespace gs = Extrinsic::ECS::Components::GeometrySources;
 namespace pn = Extrinsic::ECS::Components::GeometrySources::PropertyNames;
 namespace G = Extrinsic::Graphics::Components;
+namespace Assets = Extrinsic::Assets;
 
 using Extrinsic::Backends::Vulkan::EvaluateVulkanDeviceOperationalStatus;
 using Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs;
@@ -79,6 +89,27 @@ using Extrinsic::Runtime::IApplication;
 
 constexpr std::uint32_t kInvalidIndex = std::numeric_limits<std::uint32_t>::max();
 constexpr std::uint32_t kTargetFrames = 4u;
+
+class TempObjFile final
+{
+public:
+    TempObjFile(std::string_view stem, std::string_view contents)
+    {
+        const auto tick = std::chrono::steady_clock::now().time_since_epoch().count();
+        Path = std::filesystem::temp_directory_path() /
+               (std::string{stem} + "_" + std::to_string(tick) + ".obj");
+        std::ofstream out(Path);
+        out << contents;
+    }
+
+    ~TempObjFile()
+    {
+        std::error_code ignored;
+        std::filesystem::remove(Path, ignored);
+    }
+
+    std::filesystem::path Path;
+};
 
 // Bounded `engine.Run()` driver so the smoke cannot hang on a misconfigured
 // swapchain loop even when the operational Vulkan gate flips green. Mirrors the
@@ -446,6 +477,33 @@ struct RgbaPixel
             : static_cast<int>(rhs - lhs);
     };
     return absDiff(a.R, b.R) + absDiff(a.G, b.G) + absDiff(a.B, b.B);
+}
+
+void SetEntityPosition(Registry& scene, const EntityHandle entity, const glm::vec3 position)
+{
+    if (entity == Extrinsic::ECS::InvalidEntityHandle || !scene.IsValid(entity))
+    {
+        return;
+    }
+
+    auto& raw = scene.Raw();
+    auto* local = raw.try_get<ECSC::Transform::Component>(entity);
+    if (local != nullptr)
+    {
+        local->Position = position;
+        raw.emplace_or_replace<ECSC::Transform::IsDirtyTag>(entity);
+    }
+
+    glm::mat4 world{1.0f};
+    if (local != nullptr)
+    {
+        world = ECSC::Transform::GetMatrix(*local);
+    }
+    else
+    {
+        world = glm::translate(glm::mat4{1.0f}, position);
+    }
+    raw.emplace_or_replace<ECSC::Transform::WorldMatrix>(entity).Matrix = world;
 }
 
 [[nodiscard]] EntityHandle FindEntityByName(
@@ -844,6 +902,190 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ExtrinsicSandboxDefaultConfigPresentsRefe
         << " extraction candidates=" << ex.CandidateRenderableCount
         << " transforms=" << ex.SubmittedTransformCount
         << " visualizations=" << ex.SubmittedVisualizationCount
+        << " mesh uploads=" << ex.MeshGeometryUploads
+        << " mesh reuse=" << ex.MeshGeometryReuseHits
+        << " nearest background distance=" << nearestBackgroundDistance
+        << " pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+    device.DestroyBuffer(readbackBuffer);
+    engine.Shutdown();
+}
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedOffOriginObjTriangleAutoFramesAtCenter)
+{
+    auto bootstrap = BootstrapDefaultSandboxAppEngine();
+    if (bootstrap.Skipped)
+    {
+        GTEST_SKIP() << bootstrap.SkipReason;
+    }
+    Engine& engine = *bootstrap.EnginePtr;
+
+    // The default reference triangle already proves the authored in-memory mesh
+    // path. Move it out of the center so this test can only pass if the file-
+    // backed OBJ import contributes pixels. The imported OBJ is deliberately
+    // outside the default camera frustum; this test requires import-time bounds
+    // plus the one-shot camera focus path to make it visible.
+    SetEntityPosition(engine.GetScene(),
+                      FindEntityByName(engine.GetScene(), "ReferenceTriangle"),
+                      glm::vec3{4.0f, 0.0f, 0.0f});
+
+    TempObjFile obj{
+        "intrinsic_visible_imported_triangle",
+        "v 7.25 -0.75 0\n"
+        "v 8.75 -0.75 0\n"
+        "v 8 0.75 0\n"
+        "f 1 2 3\n",
+    };
+
+    auto imported = engine.ImportAssetFromPath(
+        Extrinsic::Runtime::RuntimeAssetImportRequest{
+            .Path = obj.Path.string(),
+            .PayloadKind = Assets::AssetPayloadKind::Mesh,
+        });
+    ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
+    EXPECT_EQ(imported->PayloadKind, Assets::AssetPayloadKind::Mesh);
+    EXPECT_EQ(imported->PrimitiveEntitiesCreated, 1u);
+
+    const EntityHandle importedEntity =
+        FindEntityByName(engine.GetScene(), obj.Path.filename().string());
+    ASSERT_NE(importedEntity, Extrinsic::ECS::InvalidEntityHandle);
+    ASSERT_TRUE(engine.GetScene().IsValid(importedEntity));
+
+    auto& raw = engine.GetScene().Raw();
+    ASSERT_TRUE((raw.all_of<ECSC::Transform::Component,
+                            ECSC::Transform::WorldMatrix,
+                            ECSC::Culling::Local::Bounds,
+                            ECSC::Culling::World::Bounds,
+                            ECSC::Selection::SelectableTag,
+                            G::RenderSurface,
+                            G::VisualizationConfig,
+                            gs::Vertices,
+                            gs::Edges,
+                            gs::Halfedges,
+                            gs::Faces>(importedEntity)));
+    const gs::ConstSourceView view = gs::BuildConstView(raw, importedEntity);
+    ASSERT_TRUE(view.Valid());
+    ASSERT_EQ(view.ActiveDomain, gs::Domain::Mesh);
+    const auto& worldBounds =
+        raw.get<ECSC::Culling::World::Bounds>(importedEntity);
+    EXPECT_NEAR(worldBounds.WorldBoundingSphere.Center.x, 8.0f, 0.001f);
+    EXPECT_NEAR(worldBounds.WorldBoundingSphere.Center.y, 0.0f, 0.001f);
+    EXPECT_GT(worldBounds.WorldBoundingSphere.Radius, 1.0f);
+
+    auto& visualization = raw.get<G::VisualizationConfig>(importedEntity);
+    visualization.Source = G::VisualizationConfig::ColorSource::UniformColor;
+    visualization.Color = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f};
+
+    auto& renderer = engine.GetRenderer();
+    auto& device = engine.GetDevice();
+    const Extrinsic::RHI::Format backbufferFormat = device.GetBackbufferFormat();
+    const std::uint32_t bytesPerPixel = Extrinsic::RHI::BytesPerBlock(backbufferFormat);
+    const Extrinsic::Core::Extent2D extent = device.GetBackbufferExtent();
+    if (bytesPerPixel < 4u || extent.Width <= 0 || extent.Height <= 0)
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style smoke readback.";
+    }
+
+    const std::uint64_t readbackSize =
+        static_cast<std::uint64_t>(bytesPerPixel) *
+        static_cast<std::uint64_t>(extent.Width) *
+        static_cast<std::uint64_t>(extent.Height);
+    const Extrinsic::RHI::BufferHandle readbackBuffer = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
+        .SizeBytes = readbackSize,
+        .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
+        .HostVisible = true,
+        .DebugName = "Sandbox.ImportedObjTriangle.Readback",
+    });
+    if (!readbackBuffer.IsValid())
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Readback buffer allocation failed; gpu;vulkan smoke is opt-in.";
+    }
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(readbackBuffer);
+
+    const auto run = DriveAcceptanceAndCapture(engine);
+
+    if (!run.DeviceOperational)
+    {
+        renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+        device.DestroyBuffer(readbackBuffer);
+        engine.Shutdown();
+        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach operational Vulkan for imported OBJ readback: status="
+                      << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
+                      << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+        return;
+    }
+
+    const auto& ex = engine.GetLastRenderExtractionStats();
+    EXPECT_GE(ex.CandidateRenderableCount, 1u);
+    EXPECT_GE(ex.MeshGeometryUploads + ex.MeshGeometryReuseHits, 1u)
+        << "Imported OBJ did not remain resident on the mesh extraction lane.";
+    EXPECT_EQ(ex.MeshGeometryFailedPack, 0u);
+    EXPECT_EQ(ex.MeshGeometryInvalidTopology, 0u);
+    EXPECT_EQ(ex.MeshGeometryMissingPositions, 0u);
+
+    EXPECT_TRUE(run.Stats.Compile.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_TRUE(run.Stats.Execute.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_EQ(FindPassStatus(run.Stats, "DepthPrepass"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_EQ(FindPassStatus(run.Stats, "SurfacePass"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_EQ(FindPassStatus(run.Stats, "Present"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_GE(run.Stats.DefaultRecipeBackbufferReadbackCopyCount, 1u)
+        << "Sandbox imported OBJ readback triplet did not record on an operational frame.";
+
+    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(readbackSize), 0u);
+    device.ReadBuffer(readbackBuffer, bytes.data(), readbackSize, 0u);
+
+    const std::uint32_t centerX = static_cast<std::uint32_t>(extent.Width / 2);
+    const std::uint32_t centerY = static_cast<std::uint32_t>(extent.Height / 2);
+    const RgbaPixel center =
+        ReadPixel(bytes, backbufferFormat, bytesPerPixel, extent, centerX, centerY);
+    const std::array<RgbaPixel, 4> backgroundSamples{{
+        ReadPixel(bytes, backbufferFormat, bytesPerPixel, extent,
+                  static_cast<std::uint32_t>((extent.Width * 7) / 8),
+                  centerY),
+        ReadPixel(bytes, backbufferFormat, bytesPerPixel, extent,
+                  static_cast<std::uint32_t>((extent.Width * 7) / 8),
+                  static_cast<std::uint32_t>(extent.Height / 4)),
+        ReadPixel(bytes, backbufferFormat, bytesPerPixel, extent,
+                  centerX,
+                  static_cast<std::uint32_t>((extent.Height * 7) / 8)),
+        ReadPixel(bytes, backbufferFormat, bytesPerPixel, extent,
+                  static_cast<std::uint32_t>((extent.Width * 15) / 16),
+                  static_cast<std::uint32_t>((extent.Height * 15) / 16)),
+    }};
+
+    int nearestBackgroundDistance = RgbDistance(center, backgroundSamples[0]);
+    for (const RgbaPixel sample : backgroundSamples)
+    {
+        nearestBackgroundDistance = std::min(nearestBackgroundDistance, RgbDistance(center, sample));
+    }
+
+    EXPECT_GT(nearestBackgroundDistance, 48)
+        << "The imported OBJ triangle did not contribute a distinguishable center pixel. "
+        << "center=(" << static_cast<int>(center.R) << ","
+        << static_cast<int>(center.G) << ","
+        << static_cast<int>(center.B) << ","
+        << static_cast<int>(center.A) << ") "
+        << "background samples=("
+        << static_cast<int>(backgroundSamples[0].R) << ","
+        << static_cast<int>(backgroundSamples[0].G) << ","
+        << static_cast<int>(backgroundSamples[0].B) << "),("
+        << static_cast<int>(backgroundSamples[1].R) << ","
+        << static_cast<int>(backgroundSamples[1].G) << ","
+        << static_cast<int>(backgroundSamples[1].B) << "),("
+        << static_cast<int>(backgroundSamples[2].R) << ","
+        << static_cast<int>(backgroundSamples[2].G) << ","
+        << static_cast<int>(backgroundSamples[2].B) << "),("
+        << static_cast<int>(backgroundSamples[3].R) << ","
+        << static_cast<int>(backgroundSamples[3].G) << ","
+        << static_cast<int>(backgroundSamples[3].B) << ") "
+        << "extent=" << extent.Width << "x" << extent.Height
+        << " extraction candidates=" << ex.CandidateRenderableCount
         << " mesh uploads=" << ex.MeshGeometryUploads
         << " mesh reuse=" << ex.MeshGeometryReuseHits
         << " nearest background distance=" << nearestBackgroundDistance

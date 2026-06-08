@@ -879,6 +879,9 @@ export namespace Extrinsic::Runtime
         std::array<char, 1024>  m_ImportPathBuffer{};
         std::array<char, 1024>  m_ScenePathBuffer{};
         std::array<bool, 12>    m_DomainWindowOpen{};
+        Assets::AssetPayloadKind m_ImportPayloadKind{
+            Assets::AssetPayloadKind::Unknown};
+        std::uint64_t m_LastObservedRuntimeImportSequence{0};
         std::optional<SandboxEditorFileImportResult> m_LastImportResult{};
         std::optional<SandboxEditorSceneFileResult> m_LastSceneFileResult{};
         std::optional<SandboxEditorKMeansResult> m_LastKMeansResult{};

@@ -203,6 +203,32 @@ namespace
         return state == TextureBarrierState::DepthRead || state == TextureBarrierState::DepthWrite;
     }
 
+    [[nodiscard]] bool TextureBarrierStateCompatibleWithUsage(const TextureBarrierState state,
+                                                              const TextureResourceDesc& desc) noexcept
+    {
+        switch (state)
+        {
+        case TextureBarrierState::Undefined:
+            return true;
+        case TextureBarrierState::ColorAttachmentWrite:
+            return desc.IsBackbuffer || HasTextureUsage(desc.Desc.Usage, RHI::TextureUsage::ColorTarget);
+        case TextureBarrierState::DepthRead:
+        case TextureBarrierState::DepthWrite:
+            return !desc.IsBackbuffer && HasTextureUsage(desc.Desc.Usage, RHI::TextureUsage::DepthTarget);
+        case TextureBarrierState::ShaderRead:
+            return !desc.IsBackbuffer && HasTextureUsage(desc.Desc.Usage, RHI::TextureUsage::Sampled);
+        case TextureBarrierState::ShaderWrite:
+            return !desc.IsBackbuffer && HasTextureUsage(desc.Desc.Usage, RHI::TextureUsage::Storage);
+        case TextureBarrierState::TransferSrc:
+            return desc.IsBackbuffer || HasTextureUsage(desc.Desc.Usage, RHI::TextureUsage::TransferSrc);
+        case TextureBarrierState::TransferDst:
+            return desc.IsBackbuffer || HasTextureUsage(desc.Desc.Usage, RHI::TextureUsage::TransferDst);
+        case TextureBarrierState::Present:
+            return desc.IsBackbuffer;
+        }
+        return false;
+    }
+
     [[nodiscard]] bool HasCompiledRenderPassAttachment(const CompiledRenderGraph& compiled,
                                                        const std::string_view passName)
     {
@@ -497,6 +523,54 @@ TEST(FrameRecipeContract, DefaultRecipeDoesNotDepthTransitionColorResources)
                 << "Texture \"" << name << "\" received a depth barrier in pass index "
                 << packet.PassIndex << ": before=" << static_cast<int>(barrier.Before)
                 << " after=" << static_cast<int>(barrier.After);
+        }
+    }
+}
+
+TEST(FrameRecipeContract, DefaultRecipeBarriersRespectTextureUsageCapabilities)
+{
+    RenderGraph graph;
+    FrameRecipeFeatures features{};
+    features.EnablePicking = true;
+    features.EnableShadows = true;
+    features.EnableSelectionOutline = true;
+    features.EnableDebugView = true;
+    features.EnableImGui = true;
+    features.EnablePostProcess = true;
+    features.EnableAntiAliasing = true;
+    features.EnableTransientDebugSurface = true;
+    features.EnableVisualizationOverlay = true;
+    const FrameRecipeAAOptions aaOptions{.Mode = FrameRecipeAAMode::SMAA};
+
+    const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
+        graph,
+        features,
+        MakeImports(),
+        FrameRecipeSizing{.Width = 256u, .Height = 256u},
+        aaOptions);
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    {
+        const auto& compileResult = graph.GetLastCompileValidationResult();
+        ASSERT_TRUE(compiled.has_value())
+            << (compileResult.Findings.empty() ? "<no findings>" : compileResult.Findings.front().Message);
+    }
+
+    for (const BarrierPacket& packet : compiled->BarrierPackets)
+    {
+        for (const TextureBarrierPacket& barrier : packet.TextureBarriers)
+        {
+            ASSERT_LT(barrier.TextureIndex, compiled->TextureNames.size());
+            const TextureResourceDesc* desc = graph.GetTextureDescByIndex(barrier.TextureIndex);
+            ASSERT_NE(desc, nullptr);
+            const std::string& name = compiled->TextureNames[barrier.TextureIndex];
+            EXPECT_TRUE(TextureBarrierStateCompatibleWithUsage(barrier.Before, *desc))
+                << "Texture \"" << name << "\" has incompatible source barrier state in pass index "
+                << packet.PassIndex << ": state=" << static_cast<int>(barrier.Before);
+            EXPECT_TRUE(TextureBarrierStateCompatibleWithUsage(barrier.After, *desc))
+                << "Texture \"" << name << "\" has incompatible destination barrier state in pass index "
+                << packet.PassIndex << ": state=" << static_cast<int>(barrier.After);
         }
     }
 }

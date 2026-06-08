@@ -25,12 +25,19 @@ namespace Extrinsic::Runtime
 
     export [[nodiscard]] Graphics::CameraViewInput DefaultCameraControllerSeed() noexcept;
 
+    export struct CameraFocusTarget
+    {
+        glm::vec3 Center{0.0f};
+        float Radius{1.0f};
+    };
+
     export class ICameraController
     {
     public:
         virtual ~ICameraController() = default;
 
         virtual void Seed(const Graphics::CameraViewInput& seed) noexcept = 0;
+        virtual void Focus(CameraFocusTarget target) noexcept = 0;
         virtual void Update(const Platform::Input::Context& input, double deltaSeconds) noexcept = 0;
         [[nodiscard]] virtual Graphics::CameraViewInput GetView(Core::Extent2D viewport) const noexcept = 0;
         [[nodiscard]] virtual Core::Config::CameraControllerKind Kind() const noexcept = 0;
@@ -43,6 +50,7 @@ namespace Extrinsic::Runtime
             const Graphics::CameraViewInput& seed = DefaultCameraControllerSeed()) noexcept;
 
         void Seed(const Graphics::CameraViewInput& seed) noexcept override;
+        void Focus(CameraFocusTarget target) noexcept override;
         void Update(const Platform::Input::Context& input, double deltaSeconds) noexcept override;
         [[nodiscard]] Graphics::CameraViewInput GetView(Core::Extent2D viewport) const noexcept override;
         [[nodiscard]] Core::Config::CameraControllerKind Kind() const noexcept override;
@@ -75,6 +83,7 @@ namespace Extrinsic::Runtime
             const Graphics::CameraViewInput& seed = DefaultCameraControllerSeed()) noexcept;
 
         void Seed(const Graphics::CameraViewInput& seed) noexcept override;
+        void Focus(CameraFocusTarget target) noexcept override;
         void Update(const Platform::Input::Context& input, double deltaSeconds) noexcept override;
         [[nodiscard]] Graphics::CameraViewInput GetView(Core::Extent2D viewport) const noexcept override;
         [[nodiscard]] Core::Config::CameraControllerKind Kind() const noexcept override;
@@ -99,6 +108,7 @@ namespace Extrinsic::Runtime
             const Graphics::CameraViewInput& seed = DefaultCameraControllerSeed()) noexcept;
 
         void Seed(const Graphics::CameraViewInput& seed) noexcept override;
+        void Focus(CameraFocusTarget target) noexcept override;
         void Update(const Platform::Input::Context& input, double deltaSeconds) noexcept override;
         [[nodiscard]] Graphics::CameraViewInput GetView(Core::Extent2D viewport) const noexcept override;
         [[nodiscard]] Core::Config::CameraControllerKind Kind() const noexcept override;
@@ -125,6 +135,7 @@ namespace Extrinsic::Runtime
             const Graphics::CameraViewInput& seed = DefaultCameraControllerSeed()) noexcept;
 
         void Seed(const Graphics::CameraViewInput& seed) noexcept override;
+        void Focus(CameraFocusTarget target) noexcept override;
         void Update(const Platform::Input::Context& input, double deltaSeconds) noexcept override;
         [[nodiscard]] Graphics::CameraViewInput GetView(Core::Extent2D viewport) const noexcept override;
         [[nodiscard]] Core::Config::CameraControllerKind Kind() const noexcept override;

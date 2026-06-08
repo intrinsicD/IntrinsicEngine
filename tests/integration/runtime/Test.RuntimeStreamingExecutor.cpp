@@ -260,6 +260,40 @@ TEST(RuntimeStreamingExecutor, UploadRequestResultEnqueuesMainThreadUploadCallba
     EXPECT_EQ(executor.GetState(handle), StreamingTaskState::Complete);
 }
 
+TEST(RuntimeStreamingExecutor, CpuPayloadResultEnqueuesMainThreadApplyCallback)
+{
+    StreamingExecutor executor{};
+
+    std::atomic<bool> cpuApplied = false;
+    const auto callerId = std::this_thread::get_id();
+    std::thread::id applyThread{};
+
+    const auto handle = executor.Submit(StreamingTaskDesc{
+        .Name = "CpuPayloadApply",
+        .Execute = []()
+        {
+            return StreamingResult{StreamingCpuPayloadReady{.PayloadToken = 5150}};
+        },
+        .ApplyOnMainThread = [&cpuApplied, &applyThread](StreamingResult&& result)
+        {
+            if (result.has_value() && std::holds_alternative<StreamingCpuPayloadReady>(*result))
+            {
+                cpuApplied.store(true, std::memory_order_release);
+                applyThread = std::this_thread::get_id();
+            }
+        },
+    });
+
+    executor.PumpBackground(1);
+    executor.DrainCompletions();
+    EXPECT_EQ(executor.GetState(handle), StreamingTaskState::WaitingForMainThreadApply);
+
+    executor.ApplyMainThreadResults();
+    EXPECT_TRUE(cpuApplied.load(std::memory_order_acquire));
+    EXPECT_EQ(applyThread, callerId);
+    EXPECT_EQ(executor.GetState(handle), StreamingTaskState::Complete);
+}
+
 TEST(RuntimeStreamingExecutor, CancelledUploadRequestSkipsUploadApplyCallback)
 {
     StreamingExecutor executor{};
