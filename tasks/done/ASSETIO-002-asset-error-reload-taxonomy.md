@@ -20,7 +20,7 @@
 
 ## Non-goals
 - No GPU upload implementation in `src/assets`; runtime and graphics remain responsible for upload handoff and residency.
-- No file-format decoder work; conditional KTX support is owned by `ASSETIO-003`, and representative file-format coverage is owned by `ASSETIO-004`.
+- No file-format decoder work; KTX/KTX2 is retired as unsupported by `ASSETIO-003`, and representative file-format coverage is owned by `ASSETIO-004`.
 - No legacy `Asset.*` compatibility module or re-export.
 
 ## Context

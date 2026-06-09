@@ -20,6 +20,13 @@ Graphics-owned bridge between `Assets::AssetId` and GPU resources.
   a `TextureLease`, queues transfer work, publishes a bindless index when a
   sampler is available, and transitions to `Ready` after `Tick()` observes the
   transfer token complete.
+- KTX/KTX2 is not a current promoted residency path. `Asset.ImportRouter`
+  recognizes the extensions, but `Asset.ModelTexturePayload` and
+  `Runtime.AssetModelTextureIO` reject KTX/KTX2 with
+  `AssetUnsupportedFormat` because no checked-in assets, renderer tests, or
+  material workflows require compressed/mip texture payloads today. A future
+  compressed texture slice must extend the asset payload contract and RHI upload
+  layout explicitly instead of relying on `GpuAssetCache` to infer it.
 - `InitializeFallbackTexture()` installs one deterministic sampled fallback
   texture. `GetViewOrFallback()` returns the requested ready view when present,
   or the fallback view for missing, pending, or failed texture assets while

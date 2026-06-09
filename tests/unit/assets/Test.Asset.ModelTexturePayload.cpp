@@ -253,3 +253,18 @@ TEST(AssetModelTexturePayload, RoutesMatchPromotedPayloadKinds)
     EXPECT_EQ(textureRoute->PayloadKind, AssetPayloadKind::Texture2D);
     EXPECT_TRUE(IsSupportedTextureImportFormat(textureRoute->Format));
 }
+
+TEST(AssetModelTexturePayload, KtxRouteIsRecognizedButPayloadIsUnsupported)
+{
+    const auto ktxRoute = ResolveAssetImportRoute("environment.ktx2");
+    ASSERT_TRUE(ktxRoute.has_value());
+    EXPECT_EQ(ktxRoute->Format, AssetFileFormat::KTX);
+    EXPECT_EQ(ktxRoute->PayloadKind, AssetPayloadKind::Texture2D);
+    EXPECT_FALSE(IsSupportedTextureImportFormat(AssetFileFormat::KTX));
+
+    AssetTexture2DPayload payload = MakeTexturePayload();
+    payload.Metadata.SourceFormat = AssetFileFormat::KTX;
+    EXPECT_EQ(
+        ValidateAssetTexture2DPayload(payload).error(),
+        ErrorCode::AssetUnsupportedFormat);
+}

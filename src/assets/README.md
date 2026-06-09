@@ -49,6 +49,11 @@ store, load pipeline, event bus, and path index behind a single façade.
   model-scene ECS/material handoff. Embedded images remain CPU payload records
   in the model scene until runtime mints deterministic child texture assets for
   GPU residency.
+- KTX/KTX2 extensions are recognized by `Asset.ImportRouter` only so import
+  attempts fail with deterministic `AssetUnsupportedFormat` diagnostics.
+  Current promoted workflows have no checked-in KTX assets or compressed/mip
+  texture requirement, so `Asset.ModelTexturePayload` does not accept KTX CPU
+  payloads and runtime registers no KTX decoder.
 - `Asset.OperationStatus` classifies promoted asset operation failures into a
   narrow CPU-side taxonomy: invalid argument, missing resource, invalid state,
   type mismatch, loader missing, callback failure, validation failure,

@@ -6,13 +6,15 @@ GPU-agnostic; GPU residency lives under `src/graphics/assets` and is wired by
 
 ## Tasks
 
-- [ASSETIO-003 — KTX texture import decision and handoff](ASSETIO-003-ktx-texture-import-handoff.md):
-  value-gates KTX/KTX2 before adding any decode route or runtime-to-GPU handoff.
 - [ASSETIO-004 — Representative file-format visual coverage](ASSETIO-004-broad-file-format-visual-parity.md):
   proves representative promoted import/materialization/visual workflows for
   current mesh, graph, point-cloud, model-scene, and texture needs.
 
 ## Retired
+- [ASSETIO-003 — KTX texture import decision and handoff](../../done/ASSETIO-003-ktx-texture-import-handoff.md):
+  retired at `CPUContracted` with KTX/KTX2 explicitly unsupported for current
+  promoted workflows; route recognition remains only to return deterministic
+  `AssetUnsupportedFormat` diagnostics.
 - [ASSETIO-002 — Asset error and reload taxonomy](../../done/ASSETIO-002-asset-error-reload-taxonomy.md):
   retired at `CPUContracted` with deterministic operation-status diagnostics,
   reload payload-ticket rollback, reload/ready event ordering, destroy-time

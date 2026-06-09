@@ -276,6 +276,30 @@ TEST(AssetModelTextureIOBridge, RejectsMissingCallbacksAndInvalidRegistrations)
         ErrorCode::AssetUnsupportedFormat);
 }
 
+TEST(AssetModelTextureIOBridge, KtxImportFailsClosedAsUnsupported)
+{
+    FakeIOBackend backend;
+    backend.Add("/assets/compressed.ktx2", "ktx2");
+
+    AssetModelTextureIOBridge bridge;
+    bool callbackInvoked = false;
+    auto ktxRegistration = bridge.RegisterTextureImporter(
+        AssetFileFormat::KTX,
+        [&callbackInvoked](const AssetModelTextureIORequest&)
+            -> Expected<AssetTexture2DPayload>
+        {
+            callbackInvoked = true;
+            return MakeTexturePayload(AssetFileFormat::KTX, "unused");
+        });
+    ASSERT_FALSE(ktxRegistration.has_value());
+    EXPECT_EQ(ktxRegistration.error(), ErrorCode::AssetUnsupportedFormat);
+
+    auto texture = bridge.ImportTexture2D("/assets/compressed.ktx2", backend);
+    ASSERT_FALSE(texture.has_value());
+    EXPECT_EQ(texture.error(), ErrorCode::AssetUnsupportedFormat);
+    EXPECT_FALSE(callbackInvoked);
+}
+
 TEST(AssetModelTextureIOBridge, PropagatesReadAndDecodeErrors)
 {
     FakeIOBackend backend;

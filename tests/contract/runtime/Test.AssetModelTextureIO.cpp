@@ -216,6 +216,20 @@ TEST(RuntimeAssetModelTextureIO, DecodesTextureBytesThroughPromotedBridge)
     EXPECT_EQ(texture->PixelBytes.size(), 4u);
 }
 
+TEST(RuntimeAssetModelTextureIO, KtxTextureImportFailsClosedWithoutDecoder)
+{
+    FakeIOBackend backend;
+    backend.AddText("/textures/compressed.ktx2", "ktx2");
+
+    AssetModelTextureIOBridge bridge;
+    ASSERT_TRUE(Extrinsic::Runtime::RegisterPromotedModelTextureIOCallbacks(bridge).has_value());
+    EXPECT_FALSE(bridge.HasTextureImporter(AssetFileFormat::KTX));
+
+    auto texture = bridge.ImportTexture2D("/textures/compressed.ktx2", backend);
+    ASSERT_FALSE(texture.has_value());
+    EXPECT_EQ(texture.error(), ErrorCode::AssetUnsupportedFormat);
+}
+
 TEST(RuntimeAssetModelTextureIO, DecodesGltfSceneGeometryImagesAndMaterials)
 {
     FakeIOBackend backend;

@@ -94,6 +94,10 @@ namespace Extrinsic::Runtime
             {
                 return Assets::AssetFileFormat::BMP;
             }
+            if (mimeType == "image/ktx" || mimeType == "image/ktx2")
+            {
+                return Assets::AssetFileFormat::KTX;
+            }
             if (HasExtension(uri, ".png"))
             {
                 return Assets::AssetFileFormat::PNG;
@@ -114,6 +118,10 @@ namespace Extrinsic::Runtime
             {
                 return Assets::AssetFileFormat::HDR;
             }
+            if (HasExtension(uri, ".ktx") || HasExtension(uri, ".ktx2"))
+            {
+                return Assets::AssetFileFormat::KTX;
+            }
             return Assets::AssetFileFormat::Unknown;
         }
 
@@ -122,7 +130,8 @@ namespace Extrinsic::Runtime
         {
             if (HasExtension(path, ".png") || HasExtension(path, ".jpg")
                 || HasExtension(path, ".jpeg") || HasExtension(path, ".tga")
-                || HasExtension(path, ".bmp") || HasExtension(path, ".hdr"))
+                || HasExtension(path, ".bmp") || HasExtension(path, ".hdr")
+                || HasExtension(path, ".ktx") || HasExtension(path, ".ktx2"))
             {
                 return Assets::AssetModelResourceKind::Image;
             }
@@ -756,9 +765,13 @@ namespace Extrinsic::Runtime
             const Assets::AssetFileFormat format,
             const std::string& fallbackSourcePath)
         {
+            if (!Assets::IsSupportedTextureImportFormat(format))
+            {
+                return Core::Err<Assets::AssetTexture2DPayload>(
+                    Core::ErrorCode::AssetUnsupportedFormat);
+            }
             if (image.width <= 0 || image.height <= 0 || image.component <= 0
-                || image.component > 4 || image.bits != 8 || image.image.empty()
-                || !Assets::IsSupportedTextureImportFormat(format))
+                || image.component > 4 || image.bits != 8 || image.image.empty())
             {
                 return Core::Err<Assets::AssetTexture2DPayload>(Core::ErrorCode::AssetInvalidData);
             }

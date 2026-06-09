@@ -128,8 +128,7 @@ namespace Extrinsic::Assets
             || format == AssetFileFormat::JPEG
             || format == AssetFileFormat::TGA
             || format == AssetFileFormat::BMP
-            || format == AssetFileFormat::HDR
-            || format == AssetFileFormat::KTX;
+            || format == AssetFileFormat::HDR;
     }
 
     bool IsSupportedModelSceneImportFormat(const AssetFileFormat format) noexcept
