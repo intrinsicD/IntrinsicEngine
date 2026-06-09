@@ -19,7 +19,8 @@ import Extrinsic.Asset.PathIndex;
 namespace Extrinsic::Assets
 {
     // Internal callback registry using the same StrongHandle machinery.
-    using InternalLoaderRegistry = Core::CallbackRegistry<Core::Result(std::string_view), AssetLoaderTag>;
+    using InternalLoaderRegistry =
+        Core::CallbackRegistry<Core::Expected<PayloadTicket>(std::string_view), AssetLoaderTag>;
     using InternalLoaderToken = InternalLoaderRegistry::Token;
 
     struct AssetService::Impl
@@ -124,6 +125,15 @@ namespace Extrinsic::Assets
         return LoaderToken{tokenOr->Index, tokenOr->Generation};
     }
 
+    [[nodiscard]] Core::Expected<PayloadTicket> AssetService::GetPayloadTicket(AssetId id) const
+    {
+        if (!m_Impl->registry.IsAlive(id))
+        {
+            return Core::Err<PayloadTicket>(Core::ErrorCode::ResourceNotFound);
+        }
+        return m_Impl->payloadStore.GetTicket(id);
+    }
+
     Core::Expected<AssetId> AssetService::LoadErased(
         std::string_view path,
         uint32_t typeId,
@@ -198,23 +208,17 @@ namespace Extrinsic::Assets
         }
 
         auto thunk = [loader = std::move(loader), this, id](
-                         std::string_view p) -> Core::Result {
+                         std::string_view p) -> Core::Expected<PayloadTicket> {
             if (!m_Impl->registry.IsAlive(id))
             {
-                return Core::Err(Core::ErrorCode::ResourceNotFound);
+                return Core::Err<PayloadTicket>(Core::ErrorCode::ResourceNotFound);
             }
             auto ticketInner = loader(p, id);
             if (!ticketInner.has_value())
             {
                 return std::unexpected(ticketInner.error());
             }
-            if (auto r = m_Impl->registry.SetPayloadSlot(
-                    id, static_cast<uint32_t>(ticketInner->slot));
-                !r.has_value())
-            {
-                return std::unexpected(r.error());
-            }
-            return Core::Ok();
+            return *ticketInner;
         };
 
         const InternalLoaderToken token = m_Impl->loaderRegistry.Register(std::move(thunk));
@@ -262,6 +266,23 @@ namespace Extrinsic::Assets
             return Core::Err(Core::ErrorCode::InvalidState);
         }
 
+        auto checkpoint = m_Impl->payloadStore.CaptureCheckpoint(id);
+        if (!checkpoint.has_value())
+        {
+            return std::unexpected(checkpoint.error());
+        }
+        const uint32_t previousPayloadSlot = meta->payloadSlot;
+        auto restorePreviousPayload = [&]()
+        {
+            (void)m_Impl->payloadStore.RestoreCheckpoint(id, *checkpoint);
+            (void)m_Impl->registry.SetPayloadSlot(id, previousPayloadSlot);
+            auto currentState = m_Impl->registry.GetState(id);
+            if (currentState.has_value() && *currentState != AssetState::Ready)
+            {
+                (void)m_Impl->registry.SetState(id, *currentState, AssetState::Ready);
+            }
+        };
+
         const auto tokenOr = m_Impl->FindLoaderToken(id);
         if (!tokenOr.has_value())
         {
@@ -280,29 +301,43 @@ namespace Extrinsic::Assets
             path = pathIt->second;
         }
 
-        auto toUnloaded = m_Impl->registry.SetState(id, AssetState::Ready, AssetState::Unloaded);
-        if (!toUnloaded.has_value())
-        {
-            return toUnloaded;
-        }
-
         auto invokeResult = m_Impl->loaderRegistry.InvokeOr(
             token, Core::ErrorCode::AssetLoaderMissing, std::string_view(path));
         if (!invokeResult.has_value())
         {
-            (void)m_Impl->registry.SetState(id, AssetState::Unloaded, AssetState::Ready);
-            return invokeResult;
+            restorePreviousPayload();
+            return std::unexpected(invokeResult.error());
+        }
+        if (auto slot = m_Impl->registry.SetPayloadSlot(
+                id, static_cast<uint32_t>(invokeResult->slot));
+            !slot.has_value())
+        {
+            restorePreviousPayload();
+            return slot;
         }
 
-        LoadRequest req{.id = id, .typeId = meta->typeId, .path = path, .needsGpuUpload = false};
+        auto toUnloaded = m_Impl->registry.SetState(id, AssetState::Ready, AssetState::Unloaded);
+        if (!toUnloaded.has_value())
+        {
+            restorePreviousPayload();
+            return toUnloaded;
+        }
+
+        LoadRequest req{
+            .id = id,
+            .typeId = meta->typeId,
+            .path = path,
+            .needsGpuUpload = false,
+            .publishQueuedEvent = true,
+            .queuedEvent = AssetEvent::Reloaded,
+        };
         auto result = m_Impl->loadPipeline.EnqueueIO(std::move(req));
         if (!result.has_value())
         {
-            (void)m_Impl->loadPipeline.MarkFailed(id);
+            restorePreviousPayload();
             return result;
         }
 
-        m_Impl->eventBus.Publish(id, AssetEvent::Reloaded);
         return Core::Ok();
     }
 
@@ -313,6 +348,8 @@ namespace Extrinsic::Assets
             return Core::Err(Core::ErrorCode::ResourceNotFound);
         }
 
+        m_Impl->loadPipeline.Cancel(id);
+        m_Impl->eventBus.Flush(id);
         m_Impl->EraseLoader(id);
 
         std::string path;

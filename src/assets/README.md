@@ -13,6 +13,7 @@ store, load pipeline, event bus, and path index behind a single façade.
 - `Extrinsic.Asset.GeometryIOBridge`
 - `Extrinsic.Asset.ModelTextureIOBridge`
 - `Extrinsic.Asset.ModelTexturePayload`
+- `Extrinsic.Asset.OperationStatus`
 - `Extrinsic.Asset.LoadPipeline`
 - `Extrinsic.Asset.EventBus`
 - `Extrinsic.Asset.PathIndex`
@@ -48,10 +49,19 @@ store, load pipeline, event bus, and path index behind a single façade.
   model-scene ECS/material handoff. Embedded images remain CPU payload records
   in the model scene until runtime mints deterministic child texture assets for
   GPU residency.
+- `Asset.OperationStatus` classifies promoted asset operation failures into a
+  narrow CPU-side taxonomy: invalid argument, missing resource, invalid state,
+  type mismatch, loader missing, callback failure, validation failure,
+  unsupported format, IO failure, upload handoff failure, resource busy, and
+  unknown failure.
 - `AssetLoadPipeline` tracks load stages, in-flight requests, GPU fence waits,
-  and failure / completion transitions.
+  and failure / completion transitions. Reload requests can queue a `Reloaded`
+  event immediately after entering `QueuedIO`, so main-thread subscribers see
+  `Reloaded` before the subsequent `Ready` event.
 - `AssetEventBus` batches `Ready`, `Failed`, `Reloaded`, and `Destroyed`
-  notifications for main-thread fanout.
+  notifications for main-thread fanout. It can also drain pending events for a
+  single asset while preserving unrelated pending events, which `AssetService`
+  uses during destroy.
 - `AssetPathIndex` resolves absolute paths to live assets.
 - `TypePools<Key>` in `Asset.TypePool.cppm` provides stable type IDs for
   payloads without requiring RTTI.
@@ -67,6 +77,7 @@ Asset.ImportRouter.cppm
 Asset.LoadPipeline.cppm
 Asset.ModelTextureIOBridge.cppm
 Asset.ModelTexturePayload.cppm
+Asset.OperationStatus.cppm
 Asset.PathIndex.cppm
 Asset.PayloadStore.cppm
 Asset.Registry.cppm
@@ -93,12 +104,37 @@ Asset.Service.cpp
 
 - `CMakeLists.txt` builds `ExtrinsicAssets` and links it publicly against
   `ExtrinsicCore`.
-- There is no separate `.cpp` implementation file for `Asset.TypePool.cppm`;
-  it is a header-only module interface.
+- There is no separate `.cpp` implementation file for
+  `Asset.OperationStatus.cppm` or `Asset.TypePool.cppm`; both are interface-only
+  module surfaces.
 
 ## Dependency note
 
 `Assets` depends on `Core`, but `Core` does not depend on `Assets`.
+
+## Operation Status And Reload/Destroy Contract
+
+Promoted asset errors reuse `Core::ErrorCode`; `Asset.OperationStatus` provides
+the replacement for legacy `Asset.Errors` grouping. Import bridges and
+`AssetService` preserve the original `Core::ErrorCode` while callers that need
+coarser UI/status decisions can classify it with
+`ClassifyAssetOperationStatus(...)` or `DiagnoseAssetOperation(...)`.
+
+Reload is transactional through `AssetService`:
+
+- Failed loader callbacks leave the last good payload, payload ticket
+  generation, registry payload slot, and `Ready` state intact.
+- Successful reload publishes a new payload ticket generation, then queues
+  `Reloaded` followed by `Ready` for same-asset subscribers.
+- Failed pre-commit transitions restore the previous payload checkpoint and do
+  not queue successful reload events.
+
+Destroy first cancels in-flight pipeline bookkeeping and drains queued events
+for the asset while its payload is still readable. It then unregisters reload
+callbacks, removes path-index state, retires the payload, destroys the registry
+entry, and queues `Destroyed`. Runtime/graphics subscribers therefore never
+receive a same-asset `Ready` event after `AssetService` has retired that
+asset's CPU payload.
 
 ## Assets ↔ Graphics boundary
 

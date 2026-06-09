@@ -22,6 +22,8 @@ export namespace Extrinsic::Assets
         uint32_t typeId{};
         std::string path{};
         bool needsGpuUpload = false;
+        bool publishQueuedEvent = false;
+        AssetEvent queuedEvent = AssetEvent::Ready;
     };
 
     class AssetLoadPipeline

@@ -4,12 +4,14 @@
 #include <expected>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include <string>
 #include <vector>
  
 import Extrinsic.Asset.Service;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.EventBus;
+import Extrinsic.Asset.PayloadStore;
 import Extrinsic.Core.Error;
  
 using namespace Extrinsic::Assets;
@@ -254,6 +256,66 @@ TEST(AssetService, ReloadFailedLoaderLeavesPreviousPayloadIntact)
     auto span = svc.Read<Mesh>(id).value();
     EXPECT_EQ(span[0].triangles, 42);
 }
+
+TEST(AssetService, ReloadFailurePreservesPayloadTicketAndPublishesNoSuccessEvents)
+{
+    TmpFile f("svc_reload_failure_ticket.bin");
+    AssetService svc;
+    auto id = svc.Load<Mesh>(f.path.string(), MeshLoader(42)).value();
+    svc.Tick(); // drain initial Ready before observing reload-specific events
+
+    const PayloadTicket before = svc.GetPayloadTicket(id).value();
+    std::vector<AssetEvent> events;
+    (void)svc.SubscribeAll([&](AssetId observed, AssetEvent event)
+    {
+        if (observed == id)
+        {
+            events.push_back(event);
+        }
+    });
+
+    auto r = svc.Reload<Mesh>(id, FailingLoader(ErrorCode::AssetDecodeFailed));
+    ASSERT_FALSE(r.has_value());
+    EXPECT_EQ(r.error(), ErrorCode::AssetDecodeFailed);
+
+    const PayloadTicket after = svc.GetPayloadTicket(id).value();
+    EXPECT_EQ(after, before);
+    EXPECT_EQ(svc.GetMeta(id).value().state, AssetState::Ready);
+    EXPECT_EQ(svc.Read<Mesh>(id).value()[0].triangles, 42);
+
+    svc.Tick();
+    EXPECT_TRUE(events.empty());
+}
+
+TEST(AssetService, ReloadAdvancesPayloadTicketAndQueuesReloadedBeforeReady)
+{
+    TmpFile f("svc_reload_event_order.bin");
+    AssetService svc;
+    auto id = svc.Load<Mesh>(f.path.string(), MeshLoader(1)).value();
+    svc.Tick(); // drain initial Ready before observing reload order
+
+    const PayloadTicket before = svc.GetPayloadTicket(id).value();
+    std::vector<AssetEvent> events;
+    (void)svc.SubscribeAll([&](AssetId observed, AssetEvent event)
+    {
+        if (observed == id)
+        {
+            events.push_back(event);
+        }
+    });
+
+    ASSERT_TRUE(svc.Reload<Mesh>(id, MeshLoader(999)).has_value());
+
+    const PayloadTicket after = svc.GetPayloadTicket(id).value();
+    EXPECT_EQ(after.slot, before.slot);
+    EXPECT_EQ(after.generation, before.generation + 1u);
+    EXPECT_EQ(svc.Read<Mesh>(id).value()[0].triangles, 999);
+
+    svc.Tick();
+    ASSERT_EQ(events.size(), 2u);
+    EXPECT_EQ(events[0], AssetEvent::Reloaded);
+    EXPECT_EQ(events[1], AssetEvent::Ready);
+}
  
 TEST(AssetService, ReloadRejectedFromNonReadyState)
 {
@@ -345,6 +407,43 @@ TEST(AssetService, ParameterlessReloadFailedLoaderKeepsPreviousPayload)
     // Old payload intact, asset still Ready.
     EXPECT_EQ(svc.GetMeta(id).value().state, AssetState::Ready);
     EXPECT_EQ(svc.Read<Mesh>(id).value()[0].triangles, 42);
+}
+
+TEST(AssetService, ParameterlessReloadQueuesReloadedBeforeReadyAndAdvancesTicket)
+{
+    TmpFile f("svc_reload_captured_event_order.bin");
+    AssetService svc;
+
+    auto counter = std::make_shared<int>(0);
+    auto loader = [counter](std::string_view, AssetId) -> Expected<Mesh>
+    {
+        return Mesh{.triangles = ++(*counter)};
+    };
+
+    auto id = svc.Load<Mesh>(f.path.string(), loader).value();
+    svc.Tick(); // drain initial Ready before observing reload order
+    const PayloadTicket before = svc.GetPayloadTicket(id).value();
+
+    std::vector<AssetEvent> events;
+    (void)svc.SubscribeAll([&](AssetId observed, AssetEvent event)
+    {
+        if (observed == id)
+        {
+            events.push_back(event);
+        }
+    });
+
+    ASSERT_TRUE(svc.Reload(id).has_value());
+    EXPECT_EQ(svc.Read<Mesh>(id).value()[0].triangles, 2);
+
+    const PayloadTicket after = svc.GetPayloadTicket(id).value();
+    EXPECT_EQ(after.slot, before.slot);
+    EXPECT_EQ(after.generation, before.generation + 1u);
+
+    svc.Tick();
+    ASSERT_EQ(events.size(), 2u);
+    EXPECT_EQ(events[0], AssetEvent::Reloaded);
+    EXPECT_EQ(events[1], AssetEvent::Ready);
 }
 
 TEST(AssetService, ParameterlessReloadRejectedFromNonReadyState)
@@ -447,6 +546,40 @@ TEST(AssetService, DestroyThenLoadSamePathYieldsFreshId)
     auto second = svc.Load<Mesh>(f.path.string(), MeshLoader(1)).value();
     EXPECT_NE(first, second);
     EXPECT_TRUE(svc.IsAlive(second));
+}
+
+TEST(AssetService, DestroyFlushesPendingReadyBeforeRetiringPayload)
+{
+    TmpFile f("svc_destroy_flushes_ready.bin");
+    AssetService svc;
+    std::vector<AssetEvent> events;
+    bool readyPayloadReadable = false;
+    int readyTriangles = 0;
+    (void)svc.SubscribeAll([&](AssetId observed, AssetEvent event)
+    {
+        events.push_back(event);
+        if (event == AssetEvent::Ready)
+        {
+            auto span = svc.Read<Mesh>(observed);
+            readyPayloadReadable = span.has_value();
+            if (span.has_value())
+            {
+                readyTriangles = (*span)[0].triangles;
+            }
+        }
+    });
+
+    auto id = svc.Load<Mesh>(f.path.string(), MeshLoader(7)).value();
+    ASSERT_TRUE(svc.Destroy(id).has_value());
+
+    ASSERT_EQ(events.size(), 1u);
+    EXPECT_EQ(events[0], AssetEvent::Ready);
+    EXPECT_TRUE(readyPayloadReadable);
+    EXPECT_EQ(readyTriangles, 7);
+
+    svc.Tick();
+    ASSERT_EQ(events.size(), 2u);
+    EXPECT_EQ(events[1], AssetEvent::Destroyed);
 }
  
 // -----------------------------------------------------------------------------

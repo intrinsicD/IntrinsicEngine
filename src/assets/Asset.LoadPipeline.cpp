@@ -75,7 +75,10 @@ namespace Extrinsic::Assets
     Core::Result AssetLoadPipeline::EnqueueIO(LoadRequest req)
     {
         const AssetId id = req.id;
+        const bool publishQueuedEvent = req.publishQueuedEvent;
+        const AssetEvent queuedEvent = req.queuedEvent;
         AssetRegistry* registry = nullptr;
+        AssetEventBus* eventBus = nullptr;
         {
             std::scoped_lock lock(m_Mutex);
             if (m_Registry == nullptr)
@@ -83,6 +86,7 @@ namespace Extrinsic::Assets
                 return Core::Err(Core::ErrorCode::InvalidState);
             }
             registry = m_Registry;
+            eventBus = m_EventBus;
         }
 
         if (auto state = SetStateChecked(registry, id, AssetState::Unloaded, AssetState::QueuedIO); !state.
@@ -100,6 +104,11 @@ namespace Extrinsic::Assets
             entry.uploadDone = false;
             entry.finalized = false;
             AppendStageStamp(entry, Stage::AssetIO);
+        }
+
+        if (publishQueuedEvent && eventBus != nullptr)
+        {
+            eventBus->Publish(id, queuedEvent);
         }
 
         if (Core::Tasks::Scheduler::IsInitialized())

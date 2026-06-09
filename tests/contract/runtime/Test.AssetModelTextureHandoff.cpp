@@ -11,6 +11,7 @@
 
 import Extrinsic.Asset.GeometryIOBridge;
 import Extrinsic.Asset.ImportRouter;
+import Extrinsic.Asset.EventBus;
 import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.Service;
@@ -196,6 +197,53 @@ TEST(RuntimeAssetModelTextureHandoff, ReadyTextureEventRequestsGpuUpload)
     ASSERT_TRUE(view.has_value()) << static_cast<int>(view.error());
     EXPECT_EQ(view->Kind, Graphics::GpuAssetKind::Texture);
     EXPECT_TRUE(view->Texture.IsValid());
+}
+
+TEST(RuntimeAssetModelTextureHandoff, ObservesReloadReadyDestroyOrder)
+{
+    HandoffFixture fx;
+    Runtime::AssetModelTextureHandoff handoff(fx.Service, fx.Cache);
+    TmpFile file("asset_texture_handoff_reload_destroy.png");
+
+    auto id = LoadTexture(fx.Service, file.Path.string(), MakeTexturePayload());
+    ASSERT_TRUE(id.has_value()) << static_cast<int>(id.error());
+    FlushAssetEvents(fx.Service); // initial Ready
+
+    std::vector<Assets::AssetEvent> events;
+    (void)fx.Service.SubscribeAll(
+        [&](Assets::AssetId observed, Assets::AssetEvent event)
+        {
+            if (observed == *id)
+            {
+                events.push_back(event);
+            }
+        });
+
+    Assets::AssetTexture2DPayload reloaded = MakeTexturePayload();
+    reloaded.PixelBytes[0] = std::byte{0x22};
+    auto reload = fx.Service.Reload<Assets::AssetTexture2DPayload>(
+        *id,
+        [payload = std::move(reloaded)](
+            std::string_view,
+            Assets::AssetId) -> Expected<Assets::AssetTexture2DPayload>
+        {
+            return payload;
+        });
+    ASSERT_TRUE(reload.has_value()) << static_cast<int>(reload.error());
+
+    ASSERT_TRUE(fx.Service.Destroy(*id).has_value());
+    FlushAssetEvents(fx.Service); // Destroyed was queued after destroy cleanup
+
+    ASSERT_EQ(events.size(), 3u);
+    EXPECT_EQ(events[0], Assets::AssetEvent::Reloaded);
+    EXPECT_EQ(events[1], Assets::AssetEvent::Ready);
+    EXPECT_EQ(events[2], Assets::AssetEvent::Destroyed);
+
+    const auto diagnostics = handoff.GetDiagnostics();
+    EXPECT_EQ(diagnostics.ReloadedEventsObserved, 1u);
+    EXPECT_EQ(diagnostics.DestroyedEventsObserved, 1u);
+    EXPECT_EQ(diagnostics.ReadyEventsObserved, 2u);
+    EXPECT_EQ(diagnostics.TextureReadyEvents, 2u);
 }
 
 TEST(RuntimeAssetModelTextureHandoff, UnsupportedTextureFormatMarksCacheFailed)

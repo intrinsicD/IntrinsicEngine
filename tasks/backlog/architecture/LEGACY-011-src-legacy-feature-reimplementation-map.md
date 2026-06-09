@@ -57,7 +57,7 @@ python3 tools/docs/check_doc_links.py --root .
 | Candidate | Current promoted state | Improvement if retained | Decision / planning owner |
 |---|---|---|---|
 | Command and feature catalogs | `Core.CallbackRegistry`, DAG scheduling, config, runtime/UI command surfaces already cover focused needs. | Avoids a global service locator while preserving only dependency-free descriptors or runtime/UI command history where a real consumer exists. | Retired as a global catalog by `CORE-002`; runtime/editor command history is owned by `RUNTIME-102`. |
-| Asset errors, reload, and destroy ordering | `AssetService`, payload store, event bus, import bridges, and runtime handoffs exist; reload atomicity is not yet explicit. | Deterministic fail-closed asset operations and no second asset manager. | Retain narrow CPU-only taxonomy. `ASSETIO-002`. |
+| Asset errors, reload, and destroy ordering | `AssetService`, payload store, event bus, import bridges, runtime handoffs, operation-status classification, payload-ticket reload atomicity, and destroy-time same-asset event draining exist. | Deterministic fail-closed asset operations and no second asset manager. | Retired by `ASSETIO-002`. |
 | KTX/KTX2 textures | Import routing recognizes KTX, but current editor workflows already handle common raster formats. | Useful only when checked-in assets or renderer tests need compressed/mip texture payloads; otherwise deterministic unsupported diagnostics are enough. | Conditional retain. `ASSETIO-003` must first choose supported subset or retire legacy KTX. |
 | File-format visual coverage | Geometry/model/texture import routes exist and `UI-007`/`RUNTIME-095` prove scoped sandbox use. | Representative fixture coverage prevents regressions without adding large datasets or every legacy format. | Retain representative matrix only. `ASSETIO-004`. |
 | ECS legacy components | Promoted scene, hierarchy, transform, metadata, geometry sources, dirty tags, selection, physics authoring, and stable IDs exist. | Retires demo/component clutter; keeps only mappings that current consumers need, such as `MetaData::EntityName`. | Mostly decision/retirement. `HARDEN-081`. |
@@ -76,7 +76,7 @@ python3 tools/docs/check_doc_links.py --root .
 ## Child task inventory
 
 - `CORE-002` (done): decision-first command / feature catalog replacement; retained promoted dependency-free utility/telemetry seams and retired the global catalog shape.
-- `ASSETIO-002`: asset error taxonomy, load-state, reload, and destroy-order rules that improve deterministic promoted asset behavior.
+- `ASSETIO-002` (done): asset error taxonomy, load-state, reload, and destroy-order rules that improve deterministic promoted asset behavior.
 - `ASSETIO-003`: conditional KTX texture subset decision plus handoff only when it improves current asset/render workflows.
 - `ASSETIO-004`: representative file-format coverage and material re-resolution, not an exhaustive legacy format sweep.
 - `HARDEN-081`: ECS legacy component decisions, with demo/clutter behavior retired or reassigned by default.

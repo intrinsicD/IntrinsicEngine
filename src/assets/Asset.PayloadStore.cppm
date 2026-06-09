@@ -26,6 +26,15 @@ namespace Extrinsic::Assets
     export class AssetPayloadStore
     {
     public:
+        struct PayloadCheckpoint
+        {
+            PayloadTicket ticket{};
+            TypePools<AssetId>::TypeId typeId = 0;
+            std::shared_ptr<const void> payload{};
+            std::size_t count = 0;
+            const void* (*dataFn)(const std::shared_ptr<const void>&) = nullptr;
+        };
+
         AssetPayloadStore();
         ~AssetPayloadStore();
 
@@ -40,6 +49,8 @@ namespace Extrinsic::Assets
         Core::Result Retire(AssetId id);
 
         [[nodiscard]] std::size_t Size() const;
+        [[nodiscard]] Core::Expected<PayloadCheckpoint> CaptureCheckpoint(AssetId id) const;
+        Core::Result RestoreCheckpoint(AssetId id, const PayloadCheckpoint& checkpoint);
 
     private:
         using TypeId = TypePools<AssetId>::TypeId;

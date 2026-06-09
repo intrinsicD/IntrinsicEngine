@@ -6,9 +6,6 @@ GPU-agnostic; GPU residency lives under `src/graphics/assets` and is wired by
 
 ## Tasks
 
-- [ASSETIO-002 — Asset error and reload taxonomy](ASSETIO-002-asset-error-reload-taxonomy.md):
-  promotes deterministic asset error/load-state/reload/destroy-order contracts
-  without recreating the legacy asset manager.
 - [ASSETIO-003 — KTX texture import decision and handoff](ASSETIO-003-ktx-texture-import-handoff.md):
   value-gates KTX/KTX2 before adding any decode route or runtime-to-GPU handoff.
 - [ASSETIO-004 — Representative file-format visual coverage](ASSETIO-004-broad-file-format-visual-parity.md):
@@ -16,6 +13,10 @@ GPU-agnostic; GPU residency lives under `src/graphics/assets` and is wired by
   current mesh, graph, point-cloud, model-scene, and texture needs.
 
 ## Retired
+- [ASSETIO-002 — Asset error and reload taxonomy](../../done/ASSETIO-002-asset-error-reload-taxonomy.md):
+  retired at `CPUContracted` with deterministic operation-status diagnostics,
+  reload payload-ticket rollback, reload/ready event ordering, destroy-time
+  same-asset event draining, and runtime handoff observation coverage.
 - [ASSETIO-001 — Asset model, texture, and import/export ingest ownership](../../done/ASSETIO-001-asset-model-texture-ingest-ownership.md):
   retired at `CPUContracted` with the owner split around legacy graphics IO
   registry, GLTF/GLB model ingest, CPU texture decode payloads, extension

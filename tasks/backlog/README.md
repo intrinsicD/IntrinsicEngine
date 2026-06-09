@@ -187,7 +187,7 @@ Members:
   follow-up for tests and non-legacy consumers that still import bare legacy
   module names after promoted equivalents exist.
 - [`CORE-002` (done)](../done/CORE-002-command-feature-catalog-contract.md).
-- [`assets/ASSETIO-002-asset-error-reload-taxonomy.md`](assets/ASSETIO-002-asset-error-reload-taxonomy.md),
+- [`ASSETIO-002` (done)](../done/ASSETIO-002-asset-error-reload-taxonomy.md),
   [`assets/ASSETIO-003-ktx-texture-import-handoff.md`](assets/ASSETIO-003-ktx-texture-import-handoff.md),
   and [`assets/ASSETIO-004-broad-file-format-visual-parity.md`](assets/ASSETIO-004-broad-file-format-visual-parity.md)
   for deterministic asset behavior, conditional KTX, and representative format

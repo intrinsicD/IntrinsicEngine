@@ -137,6 +137,36 @@ TEST(AssetEventBus, FlushWithNoSubscribersIsHarmless)
     bus.Flush();
     EXPECT_EQ(bus.PendingCount(), 0u);
 }
+
+TEST(AssetEventBus, FlushAssetDrainsOnlyMatchingIdInOrder)
+{
+    AssetEventBus bus;
+    std::vector<AssetEvent> drained;
+    std::atomic<int> other{0};
+    (void)bus.Subscribe(MakeId(1u), [&](AssetId, AssetEvent e)
+    {
+        drained.push_back(e);
+    });
+    (void)bus.Subscribe(MakeId(2u), [&](AssetId, AssetEvent)
+    {
+        ++other;
+    });
+
+    bus.Publish(MakeId(1u), AssetEvent::Reloaded);
+    bus.Publish(MakeId(2u), AssetEvent::Ready);
+    bus.Publish(MakeId(1u), AssetEvent::Ready);
+
+    bus.Flush(MakeId(1u));
+    ASSERT_EQ(drained.size(), 2u);
+    EXPECT_EQ(drained[0], AssetEvent::Reloaded);
+    EXPECT_EQ(drained[1], AssetEvent::Ready);
+    EXPECT_EQ(other.load(), 0);
+    EXPECT_EQ(bus.PendingCount(), 1u);
+
+    bus.Flush();
+    EXPECT_EQ(other.load(), 1);
+    EXPECT_EQ(bus.PendingCount(), 0u);
+}
  
 // -----------------------------------------------------------------------------
 // Broadcast subscribers

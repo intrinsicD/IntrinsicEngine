@@ -65,6 +65,7 @@ export namespace Extrinsic::Assets
         [[nodiscard]] Core::Expected<AssetMeta> GetMeta(AssetId id) const;
         [[nodiscard]] Core::Expected<std::string> GetPath(AssetId id) const;
         [[nodiscard]] Core::Expected<LoaderToken> GetReloadToken(AssetId id) const;
+        [[nodiscard]] Core::Expected<PayloadTicket> GetPayloadTicket(AssetId id) const;
         [[nodiscard]] bool IsAlive(AssetId id) const noexcept;
 
         Core::Result Destroy(AssetId id);
@@ -170,6 +171,24 @@ export namespace Extrinsic::Assets
             return Core::Err(Core::ErrorCode::InvalidState);
         }
 
+        auto checkpoint = PayloadStore().CaptureCheckpoint(id);
+        if (!checkpoint.has_value())
+        {
+            return std::unexpected(checkpoint.error());
+        }
+
+        const uint32_t previousPayloadSlot = meta->payloadSlot;
+        auto restorePreviousPayload = [&]()
+        {
+            (void)PayloadStore().RestoreCheckpoint(id, *checkpoint);
+            (void)Registry().SetPayloadSlot(id, previousPayloadSlot);
+            auto currentState = Registry().GetState(id);
+            if (currentState.has_value() && *currentState != AssetState::Ready)
+            {
+                (void)Registry().SetState(id, *currentState, AssetState::Ready);
+            }
+        };
+
         auto pathResult = GetPath(id);
         if (!pathResult.has_value())
         {
@@ -183,28 +202,39 @@ export namespace Extrinsic::Assets
             return std::unexpected(payload.error());
         }
 
-        auto toUnloaded = Registry().SetState(id, AssetState::Ready, AssetState::Unloaded);
-        if (!toUnloaded.has_value())
-        {
-            return toUnloaded;
-        }
-
         auto ticket = PayloadStore().Publish(id, std::move(*payload));
         if (!ticket.has_value())
         {
-            (void)LoadPipeline().MarkFailed(id);
             return std::unexpected(ticket.error());
         }
-        (void)Registry().SetPayloadSlot(id, static_cast<uint32_t>(ticket->slot));
+        if (auto slot = Registry().SetPayloadSlot(id, static_cast<uint32_t>(ticket->slot));
+            !slot.has_value())
+        {
+            restorePreviousPayload();
+            return slot;
+        }
 
-        LoadRequest req{.id = id, .typeId = meta->typeId, .path = path, .needsGpuUpload = false};
+        auto toUnloaded = Registry().SetState(id, AssetState::Ready, AssetState::Unloaded);
+        if (!toUnloaded.has_value())
+        {
+            restorePreviousPayload();
+            return toUnloaded;
+        }
+
+        LoadRequest req{
+            .id = id,
+            .typeId = meta->typeId,
+            .path = path,
+            .needsGpuUpload = false,
+            .publishQueuedEvent = true,
+            .queuedEvent = AssetEvent::Reloaded,
+        };
         if (auto r = LoadPipeline().EnqueueIO(std::move(req)); !r.has_value())
         {
-            (void)LoadPipeline().MarkFailed(id);
+            restorePreviousPayload();
             return r;
         }
 
-        EventBus().Publish(id, AssetEvent::Reloaded);
         return Core::Ok();
     }
 }

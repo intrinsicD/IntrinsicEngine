@@ -466,6 +466,7 @@ set(_asset_unit_test_files
     Test.Asset.ImportRouter.cpp
     Test.Asset.ModelTextureIOBridge.cpp
     Test.Asset.ModelTexturePayload.cpp
+    Test.Asset.OperationStatus.cpp
     Test.Asset.PathIndex.cpp
     Test.Asset.PayloadStore.cpp
     Test.Asset.Registry.cpp

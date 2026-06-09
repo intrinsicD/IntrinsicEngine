@@ -78,6 +78,7 @@ namespace Extrinsic::Core::Error
         case ErrorCode::FileWriteError: return "FileWriteError";
         case ErrorCode::InvalidPath: return "InvalidPath";
         case ErrorCode::PermissionDenied: return "PermissionDenied";
+        case ErrorCode::UnsupportedFormat: return "UnsupportedFormat";
         case ErrorCode::InvalidArgument: return "InvalidArgument";
         case ErrorCode::InvalidState: return "InvalidState";
         case ErrorCode::InvalidFormat: return "InvalidFormat";
@@ -91,6 +92,7 @@ namespace Extrinsic::Core::Error
         case ErrorCode::DeviceNotOperational: return "DeviceNotOperational";
         case ErrorCode::AssetNotLoaded: return "AssetNotLoaded";
         case ErrorCode::AssetLoadFailed: return "AssetLoadFailed";
+        case ErrorCode::AssetLoaderMissing: return "AssetLoaderMissing";
         case ErrorCode::AssetTypeMismatch: return "AssetTypeMismatch";
         case ErrorCode::AssetDecodeFailed: return "AssetDecodeFailed";
         case ErrorCode::AssetUploadFailed: return "AssetUploadFailed";

@@ -9,7 +9,7 @@ Root scanned: `src`
 | Layer | Module Count |
 |---|---:|
 | `app` | 1 |
-| `assets` | 11 |
+| `assets` | 12 |
 | `core` | 39 |
 | `ecs` | 28 |
 | `geometry` | 85 |
@@ -34,6 +34,7 @@ Root scanned: `src`
 | `Extrinsic.Asset.LoadPipeline` | `src/assets/Asset.LoadPipeline.cppm` | `assets` |
 | `Extrinsic.Asset.ModelTextureIOBridge` | `src/assets/Asset.ModelTextureIOBridge.cppm` | `assets` |
 | `Extrinsic.Asset.ModelTexturePayload` | `src/assets/Asset.ModelTexturePayload.cppm` | `assets` |
+| `Extrinsic.Asset.OperationStatus` | `src/assets/Asset.OperationStatus.cppm` | `assets` |
 | `Extrinsic.Asset.PathIndex` | `src/assets/Asset.PathIndex.cppm` | `assets` |
 | `Extrinsic.Asset.PayloadStore` | `src/assets/Asset.PayloadStore.cppm` | `assets` |
 | `Extrinsic.Asset.Registry` | `src/assets/Asset.Registry.cppm` | `assets` |
@@ -508,4 +509,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugAdapters` | `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **480**
+Total modules: **481**

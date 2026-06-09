@@ -10,6 +10,7 @@ target_sources(${target_name}
         Asset.LoadPipeline.cppm
         Asset.ModelTextureIOBridge.cppm
         Asset.ModelTexturePayload.cppm
+        Asset.OperationStatus.cppm
         Asset.PathIndex.cppm
         Asset.PayloadStore.cppm
         Asset.Registry.cppm

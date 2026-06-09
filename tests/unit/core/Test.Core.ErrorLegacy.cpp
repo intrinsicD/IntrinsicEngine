@@ -8,6 +8,8 @@ TEST(CoreError, ToUnderlyingAndString)
 {
     EXPECT_EQ(Error::ToUnderlying(ErrorCode::InvalidArgument), 300u);
     EXPECT_EQ(Error::ToString(ErrorCode::InvalidArgument), "InvalidArgument");
+    EXPECT_EQ(Error::ToString(ErrorCode::UnsupportedFormat), "UnsupportedFormat");
+    EXPECT_EQ(Error::ToString(ErrorCode::AssetLoaderMissing), "AssetLoaderMissing");
     EXPECT_EQ(Error::ToString(static_cast<ErrorCode>(123456u)), "Unknown");
 }
 

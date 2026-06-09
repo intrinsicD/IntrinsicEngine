@@ -126,6 +126,48 @@ namespace Extrinsic::Assets
         return it->second.ticket;
     }
 
+    Core::Expected<AssetPayloadStore::PayloadCheckpoint>
+    AssetPayloadStore::CaptureCheckpoint(AssetId id) const
+    {
+        const auto& shard = m_Impl->shards[ShardIndex(id)];
+        std::scoped_lock lock(shard.mutex);
+        const auto it = shard.entries.find(id);
+        if (it == shard.entries.end())
+        {
+            return Core::Err<PayloadCheckpoint>(Core::ErrorCode::AssetNotLoaded);
+        }
+
+        const Impl::Entry& entry = it->second;
+        return PayloadCheckpoint{
+            .ticket = entry.ticket,
+            .typeId = entry.typeId,
+            .payload = entry.payload,
+            .count = entry.count,
+            .dataFn = entry.dataFn,
+        };
+    }
+
+    Core::Result AssetPayloadStore::RestoreCheckpoint(
+        AssetId id,
+        const PayloadCheckpoint& checkpoint)
+    {
+        if (!id.IsValid() || !checkpoint.ticket.IsValid())
+        {
+            return Core::Err(Core::ErrorCode::InvalidArgument);
+        }
+
+        auto& shard = m_Impl->shards[ShardIndex(id)];
+        std::scoped_lock lock(shard.mutex);
+        shard.entries[id] = Impl::Entry{
+            .ticket = checkpoint.ticket,
+            .typeId = checkpoint.typeId,
+            .payload = checkpoint.payload,
+            .count = checkpoint.count,
+            .dataFn = checkpoint.dataFn,
+        };
+        return Core::Ok();
+    }
+
     std::size_t AssetPayloadStore::Size() const
     {
         std::size_t total = 0;

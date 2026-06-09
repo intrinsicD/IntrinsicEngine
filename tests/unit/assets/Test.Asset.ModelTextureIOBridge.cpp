@@ -300,6 +300,26 @@ TEST(AssetModelTextureIOBridge, PropagatesReadAndDecodeErrors)
     EXPECT_EQ(decodeFailed.error(), ErrorCode::AssetDecodeFailed);
 }
 
+TEST(AssetModelTextureIOBridge, PropagatesModelSceneCallbackErrors)
+{
+    FakeIOBackend backend;
+    backend.Add("/scene/broken.gltf", "gltf-json");
+
+    AssetModelTextureIOBridge bridge;
+    ASSERT_TRUE(bridge.RegisterModelSceneImporter(
+        AssetFileFormat::GLTF,
+        [](const AssetModelTextureIORequest&)
+            -> Expected<AssetModelScenePayload>
+        {
+            return Core::Err<AssetModelScenePayload>(
+                ErrorCode::AssetDecodeFailed);
+        }).has_value());
+
+    auto model = bridge.ImportModelScene("/scene/broken.gltf", backend);
+    ASSERT_FALSE(model.has_value());
+    EXPECT_EQ(model.error(), ErrorCode::AssetDecodeFailed);
+}
+
 TEST(AssetModelTextureIOBridge, RejectsDecodedPayloadsThatFailValidation)
 {
     FakeIOBackend backend;

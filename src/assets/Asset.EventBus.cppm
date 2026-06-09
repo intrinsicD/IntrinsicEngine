@@ -32,6 +32,7 @@ export namespace Extrinsic::Assets
         void UnsubscribeAll(ListenerToken token);
         void Publish(AssetId id, AssetEvent ev);
         void Flush(); // main-thread fanout
+        void Flush(AssetId id); // drain one asset while preserving other pending events
         [[nodiscard]] std::size_t PendingCount() const;
 
     private:

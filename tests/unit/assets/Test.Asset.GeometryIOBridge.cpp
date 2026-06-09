@@ -132,6 +132,22 @@ TEST(AssetGeometryIOBridge, RejectsMissingCallbacksAndInvalidRegistrations)
     EXPECT_EQ(unsupportedExport.error(), ErrorCode::AssetUnsupportedFormat);
 }
 
+TEST(AssetGeometryIOBridge, PropagatesImporterCallbackErrors)
+{
+    AssetGeometryIOBridge bridge;
+    ASSERT_TRUE(bridge.RegisterTypedImporter<FakeMesh>(
+        AssetFileFormat::OBJ,
+        AssetPayloadKind::Mesh,
+        [](const AssetGeometryIORequest&) -> Expected<FakeMesh>
+        {
+            return std::unexpected(ErrorCode::AssetDecodeFailed);
+        }).has_value());
+
+    auto decoded = bridge.Import("broken.obj");
+    ASSERT_FALSE(decoded.has_value());
+    EXPECT_EQ(decoded.error(), ErrorCode::AssetDecodeFailed);
+}
+
 TEST(AssetGeometryIOBridge, ExportsTypedPayloadAndRejectsTypeMismatch)
 {
     AssetGeometryIOBridge bridge;

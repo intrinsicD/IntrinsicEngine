@@ -133,6 +133,67 @@ namespace Extrinsic::Assets
         }
     }
 
+    void AssetEventBus::Flush(AssetId id)
+    {
+        std::vector<QueuedEvent> events;
+        std::vector<ListenerCallback> broadcastCallbacks;
+        std::vector<ListenerCallback> perAssetCallbacks;
+        {
+            std::scoped_lock lock(m_Mutex);
+            if (m_PendingEvents.empty())
+            {
+                return;
+            }
+
+            std::vector<QueuedEvent> remaining;
+            remaining.reserve(m_PendingEvents.size());
+            events.reserve(m_PendingEvents.size());
+            for (const QueuedEvent& evt : m_PendingEvents)
+            {
+                if (evt.id == id)
+                {
+                    events.push_back(evt);
+                }
+                else
+                {
+                    remaining.push_back(evt);
+                }
+            }
+            if (events.empty())
+            {
+                return;
+            }
+            m_PendingEvents.swap(remaining);
+
+            broadcastCallbacks.reserve(m_BroadcastListeners.size());
+            for (const auto& [_, cb] : m_BroadcastListeners)
+            {
+                broadcastCallbacks.push_back(cb);
+            }
+
+            if (const auto it = m_Listeners.find(id); it != m_Listeners.end())
+            {
+                perAssetCallbacks.reserve(it->second.size());
+                for (const auto& [_, cb] : it->second)
+                {
+                    perAssetCallbacks.push_back(cb);
+                }
+            }
+        }
+
+        for (const QueuedEvent& evt : events)
+        {
+            for (const auto& cb : broadcastCallbacks)
+            {
+                cb(evt.id, evt.ev);
+            }
+            for (const auto& cb : perAssetCallbacks)
+            {
+                cb(evt.id, evt.ev);
+            }
+        }
+    }
+
     [[nodiscard]] std::size_t AssetEventBus::PendingCount() const
     {
         std::scoped_lock lock(m_Mutex);
