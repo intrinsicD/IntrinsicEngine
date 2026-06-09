@@ -58,3 +58,7 @@ python3 tools/docs/check_doc_links.py --root .
 - Note: an open-task collision suspected during planning (three `RORG-031-*`
   filenames) turned out to be benign — their title-line IDs are distinct
   (`RORG-031C`/`E`/`F`); uniqueness is keyed on the title-line ID.
+- Review follow-up (PR #976, 2026-06-09): the grandfathered-duplicate
+  comparison was strengthened from basenames to full `tasks/`-relative
+  paths, so copying an allowed file into another lifecycle directory (same
+  basename, different location) no longer slips past the uniqueness rule.

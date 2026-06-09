@@ -59,42 +59,42 @@ SKIP_PATTERNS = [
 # Historical task-ID collisions frozen as-is: the files are link targets across
 # docs, reports, and the retirement record, so renaming them would damage the
 # audit trail for no behavioral gain. Each ID is allowed exactly the listed
-# filenames; any additional file claiming one of these IDs is a violation, as
-# is any new collision on an ID not listed here. Do not extend this allowlist
-# for collisions created after 2026-06-09 (PROC-002).
+# tasks/-relative paths; any file claiming one of these IDs from any other
+# path is a violation, as is any new collision on an ID not listed here. Do
+# not extend this allowlist for collisions created after 2026-06-09 (PROC-002).
 GRANDFATHERED_DUPLICATE_IDS: dict[str, frozenset[str]] = {
     # Two sandbox bug records opened concurrently under the same number.
     "BUG-021": frozenset(
         {
-            "BUG-021-sandbox-camera-scene-table-shader-wiring.md",
-            "BUG-021-sandbox-drop-import-blocks-platform-poll.md",
+            "done/BUG-021-sandbox-camera-scene-table-shader-wiring.md",
+            "done/BUG-021-sandbox-drop-import-blocks-platform-poll.md",
         }
     ),
     "BUG-022": frozenset(
         {
-            "BUG-022-sandbox-nonmanifold-obj-import.md",
-            "BUG-022-sandbox-reference-triangle-camera-frustum-visibility.md",
+            "done/BUG-022-sandbox-nonmanifold-obj-import.md",
+            "done/BUG-022-sandbox-reference-triangle-camera-frustum-visibility.md",
         }
     ),
     # Three HARDEN streams (ECS parity, sandbox boundary, task policy) each
     # took the next free number without cross-checking the other directories.
     "HARDEN-065": frozenset(
         {
-            "HARDEN-065-ecs-geometry-source-population-and-dirty-domains.md",
-            "HARDEN-065-sandbox-runtime-boundary.md",
-            "HARDEN-065-task-checkbox-todo-policy.md",
+            "done/HARDEN-065-ecs-geometry-source-population-and-dirty-domains.md",
+            "done/HARDEN-065-sandbox-runtime-boundary.md",
+            "done/HARDEN-065-task-checkbox-todo-policy.md",
         }
     ),
     "HARDEN-066": frozenset(
         {
-            "HARDEN-066-ecs-render-sync-export-policy.md",
-            "HARDEN-066-fix-halfedge-property-test-source-name.md",
+            "done/HARDEN-066-ecs-render-sync-export-policy.md",
+            "done/HARDEN-066-fix-halfedge-property-test-source-name.md",
         }
     ),
     "HARDEN-067": frozenset(
         {
-            "HARDEN-067-ecs-bounds-propagation-system.md",
-            "HARDEN-067-remove-stale-platform-linuxglfwvulkan.md",
+            "done/HARDEN-067-ecs-bounds-propagation-system.md",
+            "done/HARDEN-067-remove-stale-platform-linuxglfwvulkan.md",
         }
     ),
 }
@@ -352,18 +352,27 @@ def validate_front_matter(parsed_tasks: list[ParsedTask]) -> list[Finding]:
     return findings
 
 
-def validate_id_uniqueness(parsed_tasks: list[ParsedTask]) -> list[Finding]:
+def validate_id_uniqueness(parsed_tasks: list[ParsedTask], tasks_root: Path) -> list[Finding]:
     findings: list[Finding] = []
     by_id: dict[str, list[ParsedTask]] = {}
     for parsed in parsed_tasks:
         if parsed.task_id:
             by_id.setdefault(parsed.task_id, []).append(parsed)
 
+    def rel_path(owner: ParsedTask) -> str:
+        try:
+            return owner.path.relative_to(tasks_root).as_posix()
+        except ValueError:
+            return owner.path.as_posix()
+
     for task_id, owners in sorted(by_id.items()):
         if len(owners) <= 1:
             continue
-        names = {owner.path.name for owner in owners}
-        if names <= GRANDFATHERED_DUPLICATE_IDS.get(task_id, frozenset()):
+        # Compare full tasks/-relative paths, not basenames: a grandfathered
+        # file copied into another lifecycle directory keeps its basename but
+        # must still be rejected.
+        paths = {rel_path(owner) for owner in owners}
+        if paths <= GRANDFATHERED_DUPLICATE_IDS.get(task_id, frozenset()):
             continue
         listing = ", ".join(sorted(str(owner.path) for owner in owners))
         findings.append(
@@ -405,7 +414,7 @@ def main() -> int:
     for parsed in parsed_tasks:
         findings.extend(validate_task(parsed, mode=mode))
 
-    findings.extend(validate_id_uniqueness(parsed_tasks))
+    findings.extend(validate_id_uniqueness(parsed_tasks, root))
     findings.extend(validate_front_matter(parsed_tasks))
 
     prefix = root.parent
