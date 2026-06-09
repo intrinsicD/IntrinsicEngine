@@ -241,6 +241,54 @@ def validate_status_claims(
     return findings
 
 
+# Session-start index files must describe current state only: retired-task
+# history belongs in tasks/done/RETIREMENT-LOG.md, not in member lists. Any
+# link into tasks/done/ from these files (other than to the retirement log
+# itself) is regrowth of the pre-PROC-003 history clutter.
+STATE_ONLY_INDEX_FILES = (
+    Path("tasks/active/README.md"),
+    Path("tasks/backlog/README.md"),
+)
+
+RETIREMENT_LOG_NAME = "RETIREMENT-LOG.md"
+
+
+def validate_state_only_indexes(
+    md_file: Path,
+    content: str,
+    root: Path,
+    tasks_root: Path,
+) -> list[Finding]:
+    try:
+        rel = md_file.relative_to(root)
+    except ValueError:
+        return []
+    if rel not in STATE_ONLY_INDEX_FILES:
+        return []
+
+    findings: list[Finding] = []
+    content_wo_code = strip_fenced_code(content)
+    done_root = tasks_root / "done"
+    for match in LINK_PATTERN.finditer(content_wo_code):
+        raw_link = match.group(1).strip()
+        if is_ignored_link(raw_link):
+            continue
+        target = normalize_target(md_file, raw_link)
+        if target.name == RETIREMENT_LOG_NAME:
+            continue
+        if target.is_relative_to(done_root):
+            line = line_number_for_offset(content_wo_code, match.start())
+            findings.append(
+                Finding(
+                    md_file,
+                    line,
+                    f"state-only index links retired task {target.name}; move the entry "
+                    f"to tasks/done/{RETIREMENT_LOG_NAME} or the category README",
+                )
+            )
+    return findings
+
+
 def markdown_files_to_scan(root: Path, tasks_root: Path) -> list[Path]:
     files: list[Path] = []
     for base in (tasks_root, root / "docs" / "agent"):
@@ -268,6 +316,7 @@ def main() -> int:
         content = md_file.read_text(encoding="utf-8")
         findings.extend(validate_link_states(md_file, content, root, tasks_root, index))
         findings.extend(validate_status_claims(md_file, content, root, index))
+        findings.extend(validate_state_only_indexes(md_file, content, root, tasks_root))
 
     print(f"[check_task_state_links] Root: {root}")
     print(f"[check_task_state_links] Indexed task IDs: {len(index)}")

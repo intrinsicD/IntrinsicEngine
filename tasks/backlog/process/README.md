@@ -15,11 +15,12 @@ map.
 
 - [PROC-001 - Skill mirror sync generator and CI gate](../../done/PROC-001-skill-mirror-sync-generator-and-ci-gate.md) (done 2026-06-09).
 - [PROC-002 - Task ID uniqueness validation and allocation rule](../../done/PROC-002-task-id-uniqueness-and-allocation-rule.md) (done 2026-06-09).
-- [PROC-003 - Split task index state from retirement history](PROC-003-split-task-index-state-from-retirement-history.md).
+- [PROC-003 - Split task index state from retirement history](../../done/PROC-003-split-task-index-state-from-retirement-history.md) (done 2026-06-09).
 - [PROC-004 - Structured task front-matter and generated session brief](PROC-004-task-front-matter-and-generated-session-brief.md).
 - [PROC-005 - Align structural-check mode text with strict CI reality](../../done/PROC-005-align-structural-check-mode-contract-text.md) (done 2026-06-09).
 - [PROC-006 - Audit cadence lapse visibility](PROC-006-audit-cadence-lapse-visibility.md).
 - [PROC-007 - Onboarding prompt tightening and loop-mode defaults](../../done/PROC-007-onboarding-prompt-tightening.md) (done 2026-06-09).
+- [PROC-008 - Category README state/history split](PROC-008-category-readme-state-history-split.md).
 
 ## Convergence
 
@@ -38,6 +39,8 @@ map.
   `tasks/SESSION-BRIEF.md`.
 - `PROC-005` owns correcting the stale "warning mode" wording in the contract.
 - `PROC-006` owns surfacing lapsed audit cadences.
+- `PROC-008` owns extending the state/history split and link guard to the
+  per-category READMEs (follow-up opened by `PROC-003`).
 - `PROC-007` owns deduplicating contract restatements out of the onboarding
   prompt and giving loop mode explicit defaults and a checkpoint rule;
   `PROC-004` owns the prompt's reading-order change — the two prompt-touching

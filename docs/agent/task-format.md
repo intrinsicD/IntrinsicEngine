@@ -44,6 +44,25 @@ sections so task status is visible at a glance. Completed task files under
 `tasks/done/` should not contain unchecked actionable todos; unresolved work
 belongs in a follow-up task.
 
+## Retiring a task
+
+When a task completes:
+
+1. Mark all checkbox todos `- [x]` (unresolved work moves to a follow-up
+   task) and add a completion note with the date (`YYYY-MM-DD`) and a
+   commit/PR reference.
+2. `git mv` the file to `tasks/done/`.
+3. Append a short retirement narrative (what landed, maturity, what remains
+   owned elsewhere) to the top of
+   [`tasks/done/RETIREMENT-LOG.md`](../../tasks/done/RETIREMENT-LOG.md).
+   Do **not** add it to `tasks/active/README.md` or the backlog README —
+   those indexes describe current state only, and
+   `tools/agents/check_task_state_links.py` rejects links into `tasks/done/`
+   from them.
+4. Remove the task's entry from the open-member lists in
+   `tasks/backlog/README.md` and update its category README (category
+   READMEs may keep retired entries in their own lists).
+
 ## ID allocation
 
 Task IDs must be unique across `tasks/active/`, `tasks/backlog/`, and

@@ -151,16 +151,18 @@ found live skill-mirror drift, duplicate task IDs in `tasks/done/`,
 history-clogged session-start indexes, stale warning-mode contract text, and
 unwatched audit cadences. Docs/tooling/CI-policy surfaces only — no engine
 code. `PROC-001` (mirror sync gate), `PROC-002` (ID uniqueness), `PROC-005`
-(contract truth-up), and `PROC-007` (prompt tightening) are retired — see
+(contract truth-up), `PROC-007` (prompt tightening), and `PROC-003`
+(index state/history split) are retired — see
 [`process/README.md`](process/README.md) and the retirement log.
 
 Open members (in dependency order):
-- [`process/PROC-003`](process/PROC-003-split-task-index-state-from-retirement-history.md) —
-  split task index state from retirement history (after PROC-002).
 - [`process/PROC-004`](process/PROC-004-task-front-matter-and-generated-session-brief.md) —
   structured task front-matter and generated session brief (after PROC-003).
 - [`process/PROC-006`](process/PROC-006-audit-cadence-lapse-visibility.md) —
   audit cadence lapse visibility (brief surface after PROC-004 Slice B).
+- [`process/PROC-008`](process/PROC-008-category-readme-state-history-split.md) —
+  category README state/history split (after PROC-003; mechanical sweep,
+  lower priority).
 
 ## Cross-domain dependency anchors
 

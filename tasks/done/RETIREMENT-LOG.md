@@ -9,6 +9,31 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Previously-active
+[`PROC-003`](PROC-003-split-task-index-state-from-retirement-history.md),
+[`PROC-007`](PROC-007-onboarding-prompt-tightening.md),
+[`PROC-005`](PROC-005-align-structural-check-mode-contract-text.md),
+[`PROC-002`](PROC-002-task-id-uniqueness-and-allocation-rule.md), and
+[`PROC-001`](PROC-001-skill-mirror-sync-generator-and-ci-gate.md) —
+the first five Theme H agentic-workflow hardening slices retired to
+`tasks/done/` on 2026-06-09 on branch
+`claude/agentic-workflow-analysis-kohifk`. PROC-001 added
+`tools/agents/sync_skills.py` (generate-and-verify skill mirror sync with
+link rewriting and a `ci-docs.yml` gate) and repaired 11 drifted mirror
+files. PROC-002 added the task-ID uniqueness pass to `validate_tasks.py`
+with five grandfathered historical collisions and the max+1 allocation
+rule in `task-format.md`. PROC-005 replaced the stale "warning mode"
+structural-check claims in `AGENTS.md` §10 and `docs/agent/contract.md`
+with the strict-CI reality plus a tracked-exception rule. PROC-007
+deduplicated the onboarding prompt against `AGENTS.md` §2/§5/§7/§9/§12 and
+gave loop mode an `N = 3` default plus a per-iteration push checkpoint.
+PROC-003 created this retirement log, trimmed `tasks/active/README.md`
+532→21 lines and `tasks/backlog/README.md` 334→212 lines to state-only,
+and added the `validate_state_only_indexes` regrowth guard; category-README
+cleanup is owned by the follow-up `PROC-008`. Remaining Theme H leaves:
+`PROC-004` (front-matter + session brief), `PROC-006` (audit cadence
+visibility), `PROC-008`.
+
+Previously-active
 [`HARDEN-079`](../done/HARDEN-079-core-module-implementation-splits.md),
 [`GEOM-021`](../done/GEOM-021-meshsoup-module-implementation-split.md),
 [`GEOM-022`](../done/GEOM-022-remaining-geometry-module-implementation-splits.md),
