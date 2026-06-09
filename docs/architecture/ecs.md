@@ -37,6 +37,31 @@ sidecars, physics-to-ECS transform writeback, and contact/event routing.
 Compound colliders are explicit child-shape descriptors under a collider/body;
 the ECS scene hierarchy is not a compound-collider tree.
 
+## Legacy component compatibility decisions
+
+`HARDEN-081` closes the remaining legacy ECS component/system compatibility
+questions without adding compatibility wrappers or widening the ECS dependency
+surface:
+
+- Legacy `ECS::Components::NameTag::Component` maps to the promoted
+  `Extrinsic::ECS::Components::MetaData::EntityName` bootstrap naming contract.
+  No separate `NameTag` module or alias is promoted.
+- Legacy `AxisRotator` component/system behavior is demo/sample behavior, not
+  canonical ECS. Future sample rotation belongs in `runtime` or `app` behind a
+  concrete task; ECS owns only transform data, dirty markers, and the promoted
+  transform hierarchy/render-sync systems.
+- Legacy `ECS::Components::DEC` operator caches are not canonical ECS state.
+  `Geometry.DEC` remains the operator implementation owner, while methods,
+  runtime tools, or editor workflows that need cached operators must hold their
+  own sidecars keyed by ECS identity.
+- Shared system-feature tokens and catalogs are not promoted into ECS.
+  `CORE-002` retired the global catalog shape, and runtime activates promoted
+  ECS systems explicitly through `Extrinsic.Runtime.EcsSystemBundle`.
+
+Remaining bare `import ECS` consumers are legacy subtrees or compatibility
+tests and are cleanup work for `LEGACY-012` / mechanical subtree deletion
+tasks, not feature blockers that justify new promoted ECS compatibility APIs.
+
 ## Stable identity and scene metadata
 
 The volatile `entt::entity` value is unsuitable as a serialized

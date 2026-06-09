@@ -164,6 +164,7 @@ Members:
 - [`done/HARDEN-066`](../done/HARDEN-066-ecs-render-sync-export-policy.md) (done).
 - [`done/HARDEN-067-ecs-bounds-propagation-system.md`](../done/HARDEN-067-ecs-bounds-propagation-system.md) (done).
 - [`done/HARDEN-068`](../done/HARDEN-068-ecs-stable-identity-and-scene-metadata.md) (done).
+- [`done/HARDEN-081`](../done/HARDEN-081-ecs-legacy-component-compatibility-decisions.md) (done).
 
 ### Theme E — Geometry IO completion (P0)
 
@@ -192,7 +193,7 @@ Members:
   and [`ASSETIO-004` (done)](../done/ASSETIO-004-broad-file-format-visual-parity.md)
   for deterministic asset behavior, the retired KTX/KTX2 decision, and
   representative format coverage.
-- [`ecs/HARDEN-081-ecs-legacy-component-compatibility-decisions.md`](ecs/HARDEN-081-ecs-legacy-component-compatibility-decisions.md).
+- [`HARDEN-081` (done)](../done/HARDEN-081-ecs-legacy-component-compatibility-decisions.md).
 - [`platform/PLATFORM-006` (done)](../done/PLATFORM-006-platform-event-parity.md).
 - [`runtime/RORG-031-runtime-composition.md`](runtime/RORG-031-runtime-composition.md) (also Theme A).
 - [`runtime/RUNTIME-099-runtime-lifecycle-composition.md`](runtime/RUNTIME-099-runtime-lifecycle-composition.md),

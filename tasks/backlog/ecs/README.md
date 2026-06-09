@@ -21,8 +21,8 @@ map.
 - [HARDEN-067 — Add ECS world-bounds propagation system](../../done/HARDEN-067-ecs-bounds-propagation-system.md) (done).
 - [HARDEN-068 — Define ECS stable identity and scene metadata contract](../../done/HARDEN-068-ecs-stable-identity-and-scene-metadata.md) (done).
 - [HARDEN-080 — ECS module implementation splits](../../done/HARDEN-080-ecs-module-implementation-splits.md).
-- [HARDEN-081 — ECS legacy component compatibility decisions](HARDEN-081-ecs-legacy-component-compatibility-decisions.md):
-  resolves remaining legacy `NameTag`, `AxisRotator`, DEC wrapper, and
+- [HARDEN-081 — ECS legacy component compatibility decisions](../../done/HARDEN-081-ecs-legacy-component-compatibility-decisions.md) (done):
+  retired remaining legacy `NameTag`, `AxisRotator`, DEC wrapper, and
   feature-token compatibility gaps without moving runtime/graphics ownership
   into ECS.
 
@@ -54,9 +54,9 @@ map.
   targets found by the 2026-06-06 implementation-body audit. It must preserve
   the existing ECS contracts from HARDEN-060..068 and move only non-trivial
   non-template bodies plus implementation-only includes/imports.
-- HARDEN-081 is the final named ECS compatibility decision gate from
+- HARDEN-081 retired the final named ECS compatibility decision gate from
   [`LEGACY-011`](../architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md)
-  and must keep `ecs -> core` only.
+  while keeping `ecs -> core` only.
 - Forbidden across all members: physics-world handles, runtime sidecars,
   graphics handles, RHI handles, or live `AssetService` traffic in canonical
   ECS components.
