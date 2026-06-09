@@ -217,6 +217,9 @@ When code, structure, or policy changes:
 - Regenerate inventories when required by tooling.
 - After module surface changes, refresh `docs/api/generated/module_inventory.md` with
   `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`.
+- After opening, retiring, or re-gating any task, regenerate `tasks/SESSION-BRIEF.md` with
+  `python3 tools/agents/generate_session_brief.py`; after editing `docs/agent/*` or `tasks/templates/task.md`,
+  re-run `python3 tools/agents/sync_skills.py --write`. CI (`ci-docs.yml`) enforces freshness of both.
 - Keep docs factual (current state), not aspirational unless clearly labeled.
 
 ## 10. CI expectations
@@ -251,11 +254,12 @@ Every task execution should follow this sequence:
 8. Update generated inventories.
 9. Self-review against PR checklist.
 
-The current cross-domain backlog convergence map, including the working
-`ExtrinsicSandbox` app path from visible triangle to mesh/graph/point-cloud
-rendering with camera, selection, outline, and UI, is tracked in
-`tasks/backlog/README.md`. Keep roadmap details there rather than expanding this
-contract with task-specific plans.
+The generated `tasks/SESSION-BRIEF.md` is the authoritative open/unblocked
+view of the task tree (derived from task front-matter); consult it before
+picking work. The cross-domain convergence themes and their rationale are
+tracked in `tasks/backlog/README.md`; retirement narratives live in the
+append-only `tasks/done/RETIREMENT-LOG.md`. Keep roadmap details in those
+files rather than expanding this contract with task-specific plans.
 
 ## 12. Review checklist
 

@@ -184,7 +184,8 @@ full procedure and review checklist:
 - Commit messages: imperative subject ≤ 72 chars; body explains *why* and lists
   verification commands actually run.
 - Retire completed active tasks to `tasks/done/` with completion date (`YYYY-MM-DD`)
-  and commit/PR reference.
+  and commit/PR reference, append the narrative to `tasks/done/RETIREMENT-LOG.md`,
+  and regenerate `tasks/SESSION-BRIEF.md`.
 
 ## Temporary migration exceptions
 

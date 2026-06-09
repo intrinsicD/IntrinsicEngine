@@ -37,6 +37,9 @@ jobs:
             vulkan-tools \
             spirv-tools
 
+      - name: Install Python validation deps
+        run: python3 -m pip install --disable-pip-version-check pyyaml
+
       - name: Enforce task policy
         run: python3 tools/agents/check_task_policy.py --root . --strict
 

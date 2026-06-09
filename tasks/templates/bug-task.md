@@ -1,3 +1,8 @@
+---
+id: <BUG-ID>
+theme: <theme letter from tasks/backlog/README.md, or `none`>
+depends_on: []
+---
 # <BUG-ID> — <Bug title>
 
 ## Goal

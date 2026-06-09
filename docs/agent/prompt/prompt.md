@@ -79,6 +79,8 @@ Docs/task-only changes:
 python3 tools/agents/check_task_policy.py --root . --strict
 python3 tools/agents/check_task_state_links.py --root . --strict
 python3 tools/docs/check_doc_links.py --root .
+python3 tools/agents/generate_session_brief.py --check   # when tasks/ changed
+python3 tools/agents/sync_skills.py --check              # when docs/agent/* changed
 ```
 
 Layering-touching changes (in addition to default gate):
@@ -112,7 +114,7 @@ Scope expectations (one task per PR, no mixed mechanical/semantic changes, docs/
 - Stage only intentional changes; never include editor/build artifacts.
 - Never use `--no-verify`, `--amend` on shared history, or force-push to `main`/`master`.
 - Commit messages: imperative subject ≤ 72 chars, body explains *why* and lists verification commands actually run.
-- Retire completed active tasks to `tasks/done/` with completion date (YYYY-MM-DD) and commit/PR reference. Promote follow-up backlog tasks to active only when the current task is complete or the follow-up is genuinely required now.
+- Retire completed active tasks to `tasks/done/` with completion date (YYYY-MM-DD) and commit/PR reference, append the narrative to `tasks/done/RETIREMENT-LOG.md`, and regenerate `tasks/SESSION-BRIEF.md` (see `docs/agent/task-format.md`, "Retiring a task"). Promote follow-up backlog tasks to active only when the current task is complete or the follow-up is genuinely required now.
 
 # When stuck
 
