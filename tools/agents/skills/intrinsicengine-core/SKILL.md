@@ -18,12 +18,15 @@ aid, not a replacement.
 Read in this order, only as deep as the touched scope requires:
 
 1. `/AGENTS.md` — authoritative contract. Re-read every session.
-2. `tasks/active/README.md` and the contents of `tasks/active/` — any in-progress
-   work that may already be on your branch/owner.
-3. `tasks/backlog/README.md` — convergence themes, priorities, and cross-domain
-   dependency anchors. This is authoritative for what is in-scope and in what
-   order.
-4. The specialist procedure for your touched scope (see "Routing" below).
+2. `tasks/SESSION-BRIEF.md` — generated current state: active tasks plus
+   per-theme unblocked/blocked backlog. Authoritative for what is open and
+   unblocked; regenerate with
+   `python3 tools/agents/generate_session_brief.py` after opening, retiring,
+   or re-gating any task.
+3. The chosen task file — read completely before touching code.
+4. `tasks/active/README.md` / `tasks/backlog/README.md` — on demand only,
+   for theme priorities, rationale, and the promotion checklist.
+5. The specialist procedure for your touched scope (see "Routing" below).
 
 Then inspect repo state before choosing work:
 

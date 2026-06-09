@@ -56,25 +56,16 @@ Still-open Theme A stragglers:
 - [`runtime/RORG-031-runtime-composition.md`](runtime/RORG-031-runtime-composition.md)
   (also Theme F) — runtime composition backlog seed.
 
-### Theme B — Rendering modernization (P1, unblocked)
+### Theme B — Rendering modernization (P1)
 
 Promote the post-reorganization renderer toward 2026-era features without
-breaking the foundation. Theme A's scoped working-sandbox acceptance is
-retired, so Theme B leaves may be selected according to their own rendering
-DAG and task-level dependencies. The umbrella roadmap (`GRAPHICS-035`) is
-retired.
-
-Members:
-- `rendering/GRAPHICS-036..058` planning-only leaves: pipelined frames,
-  async compute and multi-queue scheduling, HZB occlusion culling, clustered
-  light binning, TAA and reconstructor seam, Slang shader pipeline, PBR
-  completeness and IBL, visibility buffer, meshlets, ray tracing RHI extension,
-  hybrid GI (ReSTIR/DDGI), virtual shadow maps, Gaussian splatting rasterizer,
-  neural radiance cache, neural texture compression, differentiable rendering
-  mode, deltaful GPU-resident scene, mesh shaders, work graphs, streaming
-  virtual textures, virtualized meshes with cluster LOD, GPU decompression,
-  frame generation. See [`rendering/README.md`](rendering/README.md) for the
-  full list, DAG, and per-leaf status.
+breaking the foundation. The umbrella roadmap (`GRAPHICS-035`) and all
+`GRAPHICS-036..058` planning/implementation leaves (pipelined frames, async
+compute, HZB occlusion, clustered lights, TAA, and the further modernization
+seams) are retired — see [`rendering/README.md`](rendering/README.md) and the
+retirement log. Theme B currently has **no open members**; new
+implementation children should be opened under `rendering/` per the rendering
+DAG when picked up.
 
 ### Theme C — Physics readiness (P1)
 
@@ -151,13 +142,12 @@ found live skill-mirror drift, duplicate task IDs in `tasks/done/`,
 history-clogged session-start indexes, stale warning-mode contract text, and
 unwatched audit cadences. Docs/tooling/CI-policy surfaces only — no engine
 code. `PROC-001` (mirror sync gate), `PROC-002` (ID uniqueness), `PROC-005`
-(contract truth-up), `PROC-007` (prompt tightening), and `PROC-003`
-(index state/history split) are retired — see
+(contract truth-up), `PROC-007` (prompt tightening), `PROC-003`
+(index state/history split), and `PROC-004` (front-matter + session brief)
+are retired — see
 [`process/README.md`](process/README.md) and the retirement log.
 
 Open members (in dependency order):
-- [`process/PROC-004`](process/PROC-004-task-front-matter-and-generated-session-brief.md) —
-  structured task front-matter and generated session brief (after PROC-003).
 - [`process/PROC-006`](process/PROC-006-audit-cadence-lapse-visibility.md) —
   audit cadence lapse visibility (brief surface after PROC-004 Slice B).
 - [`process/PROC-008`](process/PROC-008-category-readme-state-history-split.md) —

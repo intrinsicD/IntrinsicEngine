@@ -9,6 +9,21 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Previously-active
+[`PROC-004`](PROC-004-task-front-matter-and-generated-session-brief.md) —
+structured task front-matter + generated session brief retired to
+`tasks/done/` on 2026-06-09 at maturity `Operational`. Slice A gave all 44
+open tasks YAML front-matter (`id`/`theme`/`depends_on`) with strict
+validation in `validate_tasks.py` (id↔title match, resolvable dependency
+edges). Slice B added `tools/agents/generate_session_brief.py` and the
+committed, `ci-docs.yml`-freshness-checked `tasks/SESSION-BRIEF.md`
+(active tasks; per-theme unblocked/blocked with first unmet dependency),
+and adopted it as mandatory session reading in `docs/agent/prompt/prompt.md`
+and the `intrinsicengine-core` skill, demoting the two task READMEs to
+on-demand depth. Slice C (anchor-prose retirement) was skipped — PROC-003
+had already reduced anchors to open-endpoint entries. The audits surface in
+the brief is owned by `PROC-006`.
+
+Previously-active
 [`PROC-003`](PROC-003-split-task-index-state-from-retirement-history.md),
 [`PROC-007`](PROC-007-onboarding-prompt-tightening.md),
 [`PROC-005`](PROC-005-align-structural-check-mode-contract-text.md),

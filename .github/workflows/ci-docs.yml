@@ -55,3 +55,6 @@ jobs:
         run: |
           python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
           git diff --exit-code docs/api/generated/module_inventory.md
+
+      - name: Validate session brief freshness
+        run: python3 tools/agents/generate_session_brief.py --check

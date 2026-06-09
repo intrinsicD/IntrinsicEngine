@@ -8,6 +8,7 @@ Agent workflow and task policy tooling.
 - `check_task_maturity_followups.py` validates that open backend-facing `CPUContracted` maturity closures name an operational owner or explicitly state that no operational follow-up is owed.
 - `check_task_state_links.py` validates that task links and nearby lifecycle status claims agree with the actual `tasks/backlog/`, `tasks/active/`, and `tasks/done/` location of the referenced task ID.
 - `validate_tasks.py` validates task IDs, required sections, completion metadata for `tasks/done/`, and checkbox todos in actionable sections.
+- `generate_session_brief.py` derives `tasks/SESSION-BRIEF.md` from open-task front-matter (active tasks; per-theme unblocked/blocked backlog with first unmet dependency). Deterministic, committed, freshness-checked by `ci-docs.yml` (`--check`). Regenerate after opening, retiring, or re-gating any task.
 - `sync_skills.py` mirrors canonical `docs/agent/*` (plus `tasks/templates/task.md`) into the physical skill root `tools/agents/skills/`, rewriting relative links for the mirror location. `.claude/skills` and `.codex/skills` are symlinks to that root. `--write` regenerates; `--check` (the `ci-docs.yml` gate) fails on any divergence, missing file, or broken skills symlink. `resync_skills.sh` is a thin `--write` wrapper.
 
 ## Planned moves
