@@ -21,6 +21,10 @@ backend layout, selection policy, and dependency note.
   module-interface hygiene follow-up for `Platform.Input`, `Platform.Backend.Glfw`,
   and `Platform.Backend.Null`; moves non-trivial bodies and backend-only
   includes/imports out of `.cppm` interfaces without changing platform behavior.
+- [PLATFORM-006 — Platform event parity and editor boundary](PLATFORM-006-platform-event-parity.md):
+  resolves remaining `Core.Window` / `Core.Input` event semantics, text/IME and
+  multi-window decisions, and editor file-dialog ownership without adding
+  higher-layer imports to `src/platform`.
 
 Retired:
 
@@ -36,6 +40,9 @@ contributes to **Theme F — Architecture/runtime/UI foundation seeds** by
 keeping the platform port/backend split honest and discoverable. New
 dependency edges out of `platform` are forbidden by `AGENTS.md` §2/§4 and must
 not be introduced under cover of any task in this directory.
+`PLATFORM-006` is also a child of the
+[`LEGACY-011`](../architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md)
+legacy feature map.
 
 ## Promotion checklist
 

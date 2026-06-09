@@ -180,7 +180,31 @@ the convergence map.
 
 Members:
 - [`architecture/RORG-031A-architecture-foundation.md`](architecture/RORG-031A-architecture-foundation.md).
+- [`architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md`](architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md) —
+  value-gated cross-domain map for remaining legacy feature candidates before
+  mechanical `src/legacy/` subtree deletion.
+- [`architecture/LEGACY-012-migrate-legacy-consumer-tests.md`](architecture/LEGACY-012-migrate-legacy-consumer-tests.md) —
+  follow-up for tests and non-legacy consumers that still import bare legacy
+  module names after promoted equivalents exist.
+- [`architecture/CORE-002-command-feature-catalog-contract.md`](architecture/CORE-002-command-feature-catalog-contract.md).
+- [`assets/ASSETIO-002-asset-error-reload-taxonomy.md`](assets/ASSETIO-002-asset-error-reload-taxonomy.md),
+  [`assets/ASSETIO-003-ktx-texture-import-handoff.md`](assets/ASSETIO-003-ktx-texture-import-handoff.md),
+  and [`assets/ASSETIO-004-broad-file-format-visual-parity.md`](assets/ASSETIO-004-broad-file-format-visual-parity.md)
+  for deterministic asset behavior, conditional KTX, and representative format
+  coverage.
+- [`ecs/HARDEN-081-ecs-legacy-component-compatibility-decisions.md`](ecs/HARDEN-081-ecs-legacy-component-compatibility-decisions.md).
+- [`platform/PLATFORM-006-platform-event-parity.md`](platform/PLATFORM-006-platform-event-parity.md).
 - [`runtime/RORG-031-runtime-composition.md`](runtime/RORG-031-runtime-composition.md) (also Theme A).
+- [`runtime/RUNTIME-099-runtime-lifecycle-composition.md`](runtime/RUNTIME-099-runtime-lifecycle-composition.md),
+  [`runtime/RUNTIME-100-scene-manager-lifecycle.md`](runtime/RUNTIME-100-scene-manager-lifecycle.md),
+  [`runtime/RUNTIME-101-asset-ingest-state-machine.md`](runtime/RUNTIME-101-asset-ingest-state-machine.md),
+  [`runtime/RUNTIME-102-editor-command-history.md`](runtime/RUNTIME-102-editor-command-history.md),
+  [`runtime/RUNTIME-103-geometry-algorithm-execution-queue.md`](runtime/RUNTIME-103-geometry-algorithm-execution-queue.md),
+  and [`runtime/RUNTIME-104-derived-overlay-producer-lifecycle.md`](runtime/RUNTIME-104-derived-overlay-producer-lifecycle.md).
+- [`rendering/GRAPHICS-084-visualization-property-buffer-residency.md`](rendering/GRAPHICS-084-visualization-property-buffer-residency.md),
+  [`rendering/GRAPHICS-085-overlay-packet-backend-parity.md`](rendering/GRAPHICS-085-overlay-packet-backend-parity.md),
+  and [`rendering/GRAPHICS-086-rhi-retirement-parity-and-cuda-decision.md`](rendering/GRAPHICS-086-rhi-retirement-parity-and-cuda-decision.md).
+- [`ui/UI-008-editor-file-dialog-dirty-debug-workflows.md`](ui/UI-008-editor-file-dialog-dirty-debug-workflows.md).
 - [`done/RUNTIME-091`](../done/RUNTIME-091-promoted-ecs-system-bundle-activation.md) (done) (also Theme D).
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`ui/RORG-031-ui-integration.md`](ui/RORG-031-ui-integration.md).

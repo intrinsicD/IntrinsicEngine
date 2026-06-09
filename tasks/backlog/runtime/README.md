@@ -30,6 +30,25 @@ another backlog directory.
   save/load over current sandbox-authored ECS data, runtime `Engine` scene-file
   facades, and Sandbox editor `File / Scene` commands without reviving legacy
   serializer/editor modules.
+- [RUNTIME-099 — Runtime lifecycle composition pipeline](RUNTIME-099-runtime-lifecycle-composition.md):
+  implementation child for `RORG-031C`, replacing legacy render orchestration
+  with explicit runtime stage order and shutdown determinism.
+- [RUNTIME-100 — Scene manager lifecycle and persistence boundary](RUNTIME-100-scene-manager-lifecycle.md):
+  world reset, sidecar cleanup, stable-identity rebuild, and supported/deferred/
+  retired persistence decisions beyond `RUNTIME-098`.
+- [RUNTIME-101 — Asset ingest state-machine migration](RUNTIME-101-asset-ingest-state-machine.md):
+  promoted replacement for legacy `Runtime.AssetIngestService` over
+  `AssetService`, `StreamingExecutor`, and runtime materialization handoffs.
+- [RUNTIME-102 — Editor command history and undo/redo seam](RUNTIME-102-editor-command-history.md):
+  runtime/editor command history, dirty-state source, recursive delete/orphan
+  policy, and undo/redo contracts.
+- [RUNTIME-103 — Geometry algorithm execution queue](RUNTIME-103-geometry-algorithm-execution-queue.md):
+  value-gated asynchronous CPU geometry processing and CUDA keep/defer/remove
+  decision for legacy K-Means behavior.
+- [RUNTIME-104 — Derived overlay producer lifecycle](RUNTIME-104-derived-overlay-producer-lifecycle.md):
+  conditional runtime-owned persistent overlay descriptors, stable keys, parent
+  closure, and extraction packet production when existing packet lanes are not
+  sufficient.
 
 ### Sandbox / triangle path support tasks (runtime-owned)
 
@@ -158,6 +177,11 @@ these as runtime work when scheduling and review:
     the rendering DAG in
     [`tasks/backlog/rendering/README.md`](../rendering/README.md) for
     downstream ordering.
+- [GRAPHICS-084 — Visualization property-buffer residency](../rendering/GRAPHICS-084-visualization-property-buffer-residency.md):
+  consumes runtime visualization adapter/property selections but keeps GPU
+  upload ownership in graphics.
+- [GRAPHICS-085 — Overlay packet backend parity](../rendering/GRAPHICS-085-overlay-packet-backend-parity.md):
+  backend proof for packets produced by `RUNTIME-104`.
 
 ## Related docs
 

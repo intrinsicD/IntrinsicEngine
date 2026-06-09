@@ -10,6 +10,12 @@
 - Any temporary cross-layer exception inside `src/legacy/` must be tracked in a current task under `tasks/active/` with a removal task ID.
 - Layering allowlist rows must point at an open removal owner. As of `HARDEN-069`, `src/legacy/Interface/**` rows point at [`LEGACY-001`](../../tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md), and the remaining legacy subtree rows point at [`LEGACY-002`](../../tasks/backlog/architecture/LEGACY-002-seed-src-legacy-retirement-backlog.md). `LEGACY-002` has now seeded the per-subtree deletion tasks (`LEGACY-003`..`LEGACY-010`); rebinding each subtree's allowlist rows from the `LEGACY-002` umbrella owner to its specific per-subtree task is a metadata-only follow-up (`LEGACY-002` itself does not modify the allowlist, so it remains the open umbrella owner until that rebinding lands).
 - Promotion work from `src/legacy/` must keep mechanical path moves separate from semantic refactors.
+- Semantic reimplementation blockers are tracked in
+  [`LEGACY-011`](../../tasks/backlog/architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md)
+  and its child tasks. `LEGACY-011` is value-gated: candidates are retained only
+  when they are necessary or improve the current promoted architecture; otherwise
+  they are deferred or retired. The per-subtree `LEGACY-*` deletion tasks remain
+  mechanical and should not grow feature work.
 
 ## Exit criteria
 
@@ -47,6 +53,13 @@ As of `LEGACY-002` (2026-06-06), every remaining `src/legacy/<Subsystem>/` subtr
 - [`LEGACY-008`](../../tasks/backlog/architecture/LEGACY-008-delete-src-legacy-graphics.md) — `src/legacy/Graphics/` (largest subtree; gated on the GRAPHICS-033 + GRAPHICS-070..076 + GRAPHICS-081 chain — now retired — plus migration of the remaining legacy consumers).
 - [`LEGACY-009`](../../tasks/backlog/architecture/LEGACY-009-delete-src-legacy-rhi.md) — `src/legacy/RHI/`.
 - [`LEGACY-010`](../../tasks/backlog/architecture/LEGACY-010-delete-src-legacy-runtime.md) — `src/legacy/Runtime/`.
+- [`LEGACY-011`](../../tasks/backlog/architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md) —
+  value-gated feature-reimplementation map for remaining candidates that must
+  be retained, deferred, or retired before the open deletion tasks become pure
+  consumer-grep gates.
+- [`LEGACY-012`](../../tasks/backlog/architecture/LEGACY-012-migrate-legacy-consumer-tests.md) —
+  migrates or retires tests and other non-legacy consumers that still import
+  bare legacy module names after promoted feature owners exist.
 
 Deletion order is consumer-leaves first, foundation last (see the "Legacy retirement" section of [`tasks/backlog/architecture/README.md`](../../tasks/backlog/architecture/README.md) for the full ordering rationale). Current `find -type f` subtree sizes (including each `CMakeLists.txt`): `Graphics` 168, `RHI` 54, `Core` 40, `ECS` 29, `Runtime` 29, `Asset` 6.
 

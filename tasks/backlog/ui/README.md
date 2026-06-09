@@ -17,6 +17,11 @@ map.
 - [UI-004 — Sandbox EditorUI K-Means execution command seam](../../done/UI-004-sandbox-editor-kmeans-execution.md) (done, 2026-06-07, `CPUContracted`).
 - [UI-005 — Sandbox EditorUI visualization property presets](../../done/UI-005-sandbox-editor-visualization-property-presets.md) (done, 2026-06-07, `CPUContracted`).
 - [UI-006 — Sandbox EditorUI render graph diagnostics panel](../../done/UI-006-sandbox-editor-rendergraph-panel.md) (done, 2026-06-08, `CPUContracted`).
+- [UI-007 — Sandbox EditorUI drag/drop import status](../../done/UI-007-sandbox-editor-drag-drop-import.md) (done, 2026-06-08, `CPUContracted`).
+- [UI-008 — Editor file dialog, dirty-state, and debug workflows](UI-008-editor-file-dialog-dirty-debug-workflows.md):
+  value-gated editor path/file-boundary, dirty-state, undo/redo, and
+  headless-safe workflows over runtime-owned command/history and
+  platform-boundary decisions.
 
 ## Convergence
 
@@ -52,6 +57,15 @@ map.
   compile/execute counts, queue/timeline stats, command pass statuses,
   diagnostics, and the compiler debug dump are copied through a runtime-owned
   data model and rendered from the attached `SandboxEditorUi`.
+- UI-007 is a retired promoted EditorUI follow-up that exposes drag/drop import
+  status and payload hints while runtime/platform own events, decoding,
+  `AssetService`, and ECS materialization.
+- UI-008 is the remaining value-gated workflow child from
+  [`LEGACY-011`](../architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md);
+  it depends on `RUNTIME-102` for command history / dirty-state and on
+  `PLATFORM-006` for the file-dialog boundary. Native dialogs and sample/debug
+  scene expansion are deferred unless accepted by their owning runtime/platform
+  tasks.
 - UI work that depends on renderer overlays/handoff coordinates with the
   retired [`GRAPHICS-024`](../../done/GRAPHICS-024-overlays-presentation-editor-handoff.md)
   parity matrix and the rendering DAG in

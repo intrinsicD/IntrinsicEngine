@@ -21,6 +21,24 @@ without requiring them to read every file.
   mechanical cleanup task only; it must not change rendering, RHI, or backend
   behavior.
 
+## Legacy Parity Follow-Ups
+
+These are opened by
+[`LEGACY-011`](../architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md)
+as focused blockers for legacy graphics/RHI retirement. They are not part of
+the modernization feature DAG; select them when retiring legacy behavior is the
+priority.
+
+- [GRAPHICS-084 — Visualization property-buffer residency](GRAPHICS-084-visualization-property-buffer-residency.md):
+  selected graphics-owned upload/residency for visualization property arrays
+  used by current promoted runtime/UI seams.
+- [GRAPHICS-085 — Overlay packet backend parity](GRAPHICS-085-overlay-packet-backend-parity.md):
+  backend command-shape and optional visual proof only for overlay packet
+  classes retained by `RUNTIME-104`.
+- [GRAPHICS-086 — RHI retirement parity and CUDA decision](GRAPHICS-086-rhi-retirement-parity-and-cuda-decision.md):
+  final audit/decision task before accepting any legacy RHI command-helper,
+  descriptor, swapchain/image, scene-instance, or CUDA implementation.
+
 ## Dependency DAG
 
 The following list is the minimum dependency order for the rendering backlog.

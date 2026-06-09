@@ -10,6 +10,17 @@ map.
 
 ## Tasks
 
+- [CORE-002 — Command and feature catalog contract](CORE-002-command-feature-catalog-contract.md):
+  resolves remaining legacy `Core.Commands`, `Core.FeatureRegistry`, and
+  `Core.SystemFeatureCatalog` behavior as promoted narrow contracts, runtime/UI
+  follow-ups, or explicit retirements.
+- [LEGACY-011 — Value-gated legacy feature reimplementation map](LEGACY-011-src-legacy-feature-reimplementation-map.md):
+  cross-domain child-task map that compares current promoted behavior,
+  improvement, and retain/defer/retire decisions before the remaining
+  `src/legacy/` subtree deletion tasks become purely mechanical.
+- [LEGACY-012 — Migrate legacy consumer tests to promoted coverage](LEGACY-012-migrate-legacy-consumer-tests.md):
+  migrates or retires tests and non-legacy consumers that still import bare
+  legacy module names after their promoted feature owners exist.
 - [ARCH-005 — Resolve graphics/RHI platform layering violations](../../done/ARCH-005-resolve-graphics-platform-layering-violations.md)
   (done 2026-05-17): removed the four strict-layering failures where
   promoted graphics/RHI targets imported or linked `platform` for
@@ -129,6 +140,12 @@ backlog until its gate exits 0.
 - [LEGACY-008 — Delete `src/legacy/Graphics/`](LEGACY-008-delete-src-legacy-graphics.md) (168 files → `src/graphics/*`).
 - [LEGACY-009 — Delete `src/legacy/RHI/`](LEGACY-009-delete-src-legacy-rhi.md) (54 files → `src/graphics/rhi/`).
 - [LEGACY-010 — Delete `src/legacy/Runtime/`](LEGACY-010-delete-src-legacy-runtime.md) (29 files → `src/runtime/`).
+- [LEGACY-011 — Value-gated legacy feature reimplementation map](LEGACY-011-src-legacy-feature-reimplementation-map.md):
+  child-task inventory for retained/deferred feature candidates that block the
+  remaining deletion tasks from becoming pure consumer-grep/mechanical removals.
+- [LEGACY-012 — Migrate legacy consumer tests to promoted coverage](LEGACY-012-migrate-legacy-consumer-tests.md):
+  cleanup task for tests and non-legacy consumers that keep the deletion
+  consumer-grep gates red after semantic replacements land.
 
 Ordering hint — deletion is **consumer-leaves first, foundation last**: a
 subtree can only be mechanically deleted once no other subtree (and no promoted

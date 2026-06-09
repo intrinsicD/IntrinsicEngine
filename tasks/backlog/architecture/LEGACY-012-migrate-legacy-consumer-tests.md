@@ -1,0 +1,62 @@
+# LEGACY-012 — Migrate legacy consumer tests to promoted coverage
+
+## Goal
+- Move or retire tests and non-legacy consumers that still import bare legacy modules after their promoted feature owners exist, so `LEGACY-001`, `LEGACY-004`, `LEGACY-005`, `LEGACY-006`, `LEGACY-008`, `LEGACY-009`, and `LEGACY-010` consumer-grep gates can become pure deletion checks.
+
+## Non-goals
+- No feature implementation in this task; missing behavior is owned by `LEGACY-011` child tasks.
+- No deletion of `src/legacy/` subtrees.
+- No broad test-layout rewrite unrelated to legacy imports.
+- No compatibility re-export from promoted modules to legacy module names.
+
+## Context
+- Owner/layer: migration/test cleanup under the legacy retirement program.
+- Current consumer-grep gates in the open `LEGACY-*` deletion tasks include `tests/**`, and several tests still import legacy module names such as `Runtime.*`, `Graphics.*`, `RHI.*`, `Core.*`, `Asset.*`, `ECS`, or `Interface`.
+- This task should run after the relevant semantic replacement task retires; for example, migrate legacy runtime orchestration tests after `RUNTIME-099`, asset ingest tests after `RUNTIME-101`, and RHI/CUDA tests after `GRAPHICS-086`.
+
+## Value gate
+- Current state: some tests and non-legacy consumers still keep legacy subtree deletion gates red even when promoted equivalents may already exist.
+- Improvement: tests validate promoted contracts and deletion tasks become mechanical consumer-grep checks.
+- Scope decision: migrate only coverage that maps to retained promoted behavior. Delete legacy-only tests when the value-gated parent map records a retirement decision.
+
+## Required changes
+- [ ] Inventory every non-`src/legacy/**` import of bare legacy modules with the consumer-grep commands from the open `LEGACY-*` deletion tasks.
+- [ ] Classify each consumer as promoted-equivalent coverage, legacy-only coverage to delete, or coverage blocked by a named `LEGACY-011` child task.
+- [ ] Migrate promoted-equivalent tests to `Extrinsic.*` modules and current test labels/locations.
+- [ ] Delete legacy-only tests only after recording why the behavior is retired or covered elsewhere.
+- [ ] Update each affected `LEGACY-*` deletion task with the remaining consumer-grep blockers.
+
+## Tests
+- [ ] `python3 tools/repo/check_test_layout.py --root . --strict` passes after moved/deleted tests.
+- [ ] The focused migrated test targets pass under the default CPU/null gate labels.
+- [ ] Each affected `LEGACY-*` consumer-grep gate either exits 0 or reports only blockers tied to named open feature tasks.
+
+## Docs
+- [ ] Update `docs/migration/legacy-retirement.md` with migrated/deleted consumer-test status.
+- [ ] Update `docs/migration/nonlegacy-parity-matrix.md` if a legacy-only test is deleted because behavior is formally retired.
+- [ ] Update `tests/README.md` only if test labels or layout policy changes.
+
+## Acceptance criteria
+- [ ] No test imports a legacy module name when an equivalent promoted contract exists.
+- [ ] Remaining legacy test imports are explicitly blocked by named feature tasks or deleted with documented retirement rationale.
+- [ ] Open legacy deletion tasks have current consumer-grep blocker notes.
+
+## Verification
+```bash
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
+
+# Run the consumer-grep gates copied from the affected LEGACY-* deletion tasks.
+# Run focused CTest filters for every migrated test family.
+```
+
+## Forbidden changes
+- Mixing mechanical file moves with semantic refactors.
+- Introducing unrelated feature work.
+- Adding compatibility re-exports from promoted modules to legacy names.
+- Removing legacy coverage before its promoted replacement or explicit retirement decision exists.
+
+## Maturity
+- Target: `Retired` for legacy consumer-test imports.
+- No `Operational` follow-up is owed for test-consumer migration.
