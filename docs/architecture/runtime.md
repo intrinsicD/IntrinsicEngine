@@ -55,6 +55,27 @@ destruction, scheduler shutdown, and initialized-state clear. The Dear ImGui
 adapter is detached before this contract while the window and overlay system are
 still live.
 
+## Scene Replacement Lifecycle
+
+Scene load/new/close operations are runtime-owned lifecycle transitions.
+`Engine::LoadSceneFromPath(...)` deserializes into a temporary
+`ECS::Scene::Registry`; only a successful parse reaches the live scene. Before
+replacement, runtime drains scene-local sidecars through
+`RenderExtractionCache::ClearSceneState(...)`, clears selected/hovered/pending
+pick state through `SelectionController::ClearSceneState(...)`, and resets the
+refined-primitive cache. Load then swaps in the parsed registry and rebuilds
+`StableEntityLookup`; new/close clear the live registry and lookup.
+
+Scene JSON remains backend-neutral. Supported persistence is limited to current
+sandbox-authoring CPU state: metadata names, stable ids, transforms, hierarchy,
+selection eligibility, render hints, visualization configs, and
+mesh/graph/point-cloud `GeometrySources`. Unsupported families such as lights,
+shadow-caster tags, collider/rigid-body descriptors, spatial-debug bindings, and
+asset-instance source references are counted in `SceneSerializationStats` but
+not materialized on load. Renderer/RHI resources, GPU handles, adapter bindings,
+camera controller state, and editor document history are runtime/graphics/editor
+state and are not scene-file contents.
+
 ## Physics Bridge
 
 `Extrinsic.Runtime.PhysicsBridge` is the concrete runtime-owned ECS/physics

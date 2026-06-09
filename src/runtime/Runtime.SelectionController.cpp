@@ -365,6 +365,14 @@ namespace Extrinsic::Runtime
         SetSelectionSet(registry, {});
     }
 
+    void SelectionController::ClearSceneState(Registry& registry)
+    {
+        SetSelectionSet(registry, {});
+        ClearHover(registry);
+        m_PendingPick.reset();
+        m_InFlightPicks.clear();
+    }
+
     bool SelectionController::SetSelectedEntity(Registry& registry, EntityHandle entity)
     {
         if (!IsValidEntity(registry.Raw(), entity))

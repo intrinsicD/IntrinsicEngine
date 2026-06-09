@@ -300,6 +300,7 @@ if(TARGET ExtrinsicRuntime)
         Test.RuntimeCameraControllers.cpp
         Test.RuntimeEcsSystemBundle.cpp
         Test.RuntimeReferenceScene.cpp
+        Test.RuntimeSceneLifecycle.cpp
         Test.RuntimeSceneSerialization.cpp
         Test.RuntimeVulkanBreadcrumb.cpp
         Test.SandboxEditorUi.cpp

@@ -198,6 +198,35 @@ TEST(SelectionController, BackgroundHoverClearsHover)
     EXPECT_FALSE(HasHoveredTag(registry, a));
 }
 
+TEST(SelectionController, ClearSceneStateDropsSelectionHoverAndPickQueues)
+{
+    Registry           registry;
+    SelectionController controller;
+    const EntityHandle selected = MakeSelectable(registry);
+    const EntityHandle hovered = MakeSelectable(registry);
+
+    controller.RequestClickPick(1u, 2u);
+    ASSERT_TRUE(controller.ConsumePendingPick().has_value());
+    controller.ConsumeHit(registry, StableId(selected));
+    controller.RequestHoverPick(3u, 4u);
+    ASSERT_TRUE(controller.ConsumePendingPick().has_value());
+    controller.ConsumeHit(registry, StableId(hovered));
+    controller.RequestClickPick(5u, 6u);
+    ASSERT_TRUE(controller.HasPendingPick());
+    ASSERT_TRUE(controller.ConsumePendingPick().has_value());
+    ASSERT_EQ(controller.InFlightPickCount(), 1u);
+
+    controller.ClearSceneState(registry);
+
+    EXPECT_EQ(controller.SelectedCount(), 0u);
+    EXPECT_TRUE(controller.SelectedStableIds().empty());
+    EXPECT_FALSE(HasSelectedTag(registry, selected));
+    EXPECT_FALSE(controller.HasHovered());
+    EXPECT_FALSE(HasHoveredTag(registry, hovered));
+    EXPECT_FALSE(controller.HasPendingPick());
+    EXPECT_EQ(controller.InFlightPickCount(), 0u);
+}
+
 // --- background click ----------------------------------------------------
 
 TEST(SelectionController, BackgroundClickClearsSelectionInReplaceMode)

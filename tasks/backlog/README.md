@@ -197,7 +197,7 @@ Members:
 - [`platform/PLATFORM-006` (done)](../done/PLATFORM-006-platform-event-parity.md).
 - [`runtime/RORG-031-runtime-composition.md`](runtime/RORG-031-runtime-composition.md) (also Theme A).
 - [`RUNTIME-099` (done)](../done/RUNTIME-099-runtime-lifecycle-composition.md),
-  [`runtime/RUNTIME-100-scene-manager-lifecycle.md`](runtime/RUNTIME-100-scene-manager-lifecycle.md),
+  [`RUNTIME-100` (done)](../done/RUNTIME-100-scene-manager-lifecycle.md),
   [`runtime/RUNTIME-101-asset-ingest-state-machine.md`](runtime/RUNTIME-101-asset-ingest-state-machine.md),
   [`RUNTIME-102` (done)](../done/RUNTIME-102-editor-command-history.md),
   [`runtime/RUNTIME-103-geometry-algorithm-execution-queue.md`](runtime/RUNTIME-103-geometry-algorithm-execution-queue.md),

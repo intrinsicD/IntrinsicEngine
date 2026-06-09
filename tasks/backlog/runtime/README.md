@@ -36,9 +36,10 @@ another backlog directory.
   operational/shutdown phase ordering through promoted `Extrinsic.Core.FrameLoop`
   contracts, replacing legacy render orchestration with explicit runtime stage
   order and shutdown determinism.
-- [RUNTIME-100 — Scene manager lifecycle and persistence boundary](RUNTIME-100-scene-manager-lifecycle.md):
-  world reset, sidecar cleanup, stable-identity rebuild, and supported/deferred/
-  retired persistence decisions beyond `RUNTIME-098`.
+- [RUNTIME-100 — Scene manager lifecycle and persistence boundary](../../done/RUNTIME-100-scene-manager-lifecycle.md)
+  (done, 2026-06-09, `CPUContracted`): single runtime scene replacement
+  boundary, render-extraction/selection/physics reset contracts, and explicit
+  supported/deferred/retired persistence decisions beyond `RUNTIME-098`.
 - [RUNTIME-101 — Asset ingest state-machine migration](RUNTIME-101-asset-ingest-state-machine.md):
   promoted replacement for legacy `Runtime.AssetIngestService` over
   `AssetService`, `StreamingExecutor`, and runtime materialization handoffs.

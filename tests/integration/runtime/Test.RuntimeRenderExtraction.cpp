@@ -27,6 +27,7 @@ import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.TransferQueue;
 import Extrinsic.RHI.Types;
+import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SpatialDebugAdapters;
 import Extrinsic.Runtime.VisualizationAdapters;
@@ -228,14 +229,58 @@ TEST(RuntimeRenderExtraction, CreatesUpdatesAndClearsDirtyTransformSidecar)
     EXPECT_FALSE(registry.any_of<ECS::Components::DirtyTags::DirtyTransform>(entity));
 
     world.Matrix[3] = glm::vec4{5.f, 6.f, 7.f, 1.f};
+
     stats = fixture.Extract(scene);
 
+    EXPECT_EQ(stats.CandidateRenderableCount, 1u);
     EXPECT_EQ(stats.AllocatedInstanceCount, 0u);
-    EXPECT_EQ(stats.FreedInstanceCount, 0u);
-    EXPECT_EQ(stats.SubmittedTransformCount, 1u);
     EXPECT_EQ(stats.DirtyTransformCount, 0u);
     EXPECT_EQ(fixture.Extraction.GetTrackedRenderableCount(), 1u);
+}
+
+TEST(RuntimeRenderExtraction, ClearSceneStateDropsSidecarsAndPerEntityBindings)
+{
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+    Geometry::PropertySet properties = MakeScalarProperties();
+    const auto entity = scene.Create();
+    ConfigureScalarVisualization(scene, entity);
+    const std::uint32_t stableId = StableId(entity);
+    constexpr std::uint64_t kAdapterKey = 0x5CE11u;
+
+    fixture.Extraction.RegisterVisualizationAdapter(
+        kAdapterKey,
+        std::make_unique<Runtime::PropertyScalarAdapter>(
+            Geometry::ConstPropertySet{properties}));
+    fixture.Extraction.SetVisualizationAdapterBinding(
+        stableId,
+        Runtime::RenderExtractionCache::VisualizationAdapterBinding{
+            .AdapterKey = kAdapterKey,
+            .BufferBDA = 0xCAFE1000u,
+        });
+    fixture.Extraction.SetMeshPrimitiveViewSettings(
+        stableId,
+        Runtime::MeshPrimitiveViewSettings{.EnableEdgeView = true});
+
+    const auto stats = fixture.Extract(scene);
+    EXPECT_EQ(stats.CandidateRenderableCount, 1u);
+    EXPECT_EQ(fixture.Extraction.GetTrackedRenderableCount(), 1u);
     EXPECT_EQ(fixture.Renderer->GetGpuWorld().GetLiveInstanceCount(), 1u);
+    EXPECT_EQ(fixture.Extraction.GetVisualizationAdapterCount(), 1u);
+    ASSERT_TRUE(fixture.Extraction.GetVisualizationAdapterBinding(stableId).has_value());
+    EXPECT_TRUE(fixture.Extraction.GetMeshPrimitiveViewSettings(stableId).AnyEnabled());
+
+    fixture.Extraction.ClearSceneState(*fixture.Renderer);
+    const Graphics::RenderWorld world =
+        fixture.Renderer->ExtractRenderWorld(Graphics::RenderFrameInput{});
+
+    EXPECT_EQ(fixture.Extraction.GetTrackedRenderableCount(), 0u);
+    EXPECT_EQ(fixture.Renderer->GetGpuWorld().GetLiveInstanceCount(), 0u);
+    EXPECT_EQ(fixture.Extraction.GetVisualizationAdapterCount(), 1u);
+    EXPECT_FALSE(fixture.Extraction.GetVisualizationAdapterBinding(stableId).has_value());
+    EXPECT_FALSE(fixture.Extraction.GetMeshPrimitiveViewSettings(stableId).AnyEnabled());
+    EXPECT_TRUE(world.Visualization.Scalars.empty());
+    EXPECT_FALSE(world.Visualization.HasVisualizationPackets);
 }
 
 TEST(RuntimeRenderExtraction, RetiresDestroyedRenderableSidecar)

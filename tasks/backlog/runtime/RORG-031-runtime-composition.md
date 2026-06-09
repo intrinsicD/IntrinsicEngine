@@ -10,7 +10,7 @@
 ## Context
 - Runtime ownership and lifecycle gates are critical to the reorganization but were previously embedded in a broad narrative backlog.
 - [`RUNTIME-099`](../../done/RUNTIME-099-runtime-lifecycle-composition.md) is retired as the implementation child for the explicit lifecycle pipeline (`begin_frame`, input/UI, fixed-step simulation, extraction, prepare, execute, present/end, maintenance, shutdown).
-- Related runtime legacy-feature children are [`RUNTIME-100`](RUNTIME-100-scene-manager-lifecycle.md), [`RUNTIME-101`](RUNTIME-101-asset-ingest-state-machine.md), [`RUNTIME-102`](../../done/RUNTIME-102-editor-command-history.md), [`RUNTIME-103`](RUNTIME-103-geometry-algorithm-execution-queue.md), and [`RUNTIME-104`](RUNTIME-104-derived-overlay-producer-lifecycle.md).
+- Related runtime legacy-feature children are [`RUNTIME-100`](../../done/RUNTIME-100-scene-manager-lifecycle.md), [`RUNTIME-101`](RUNTIME-101-asset-ingest-state-machine.md), [`RUNTIME-102`](../../done/RUNTIME-102-editor-command-history.md), [`RUNTIME-103`](RUNTIME-103-geometry-algorithm-execution-queue.md), and [`RUNTIME-104`](RUNTIME-104-derived-overlay-producer-lifecycle.md).
 - Cross-layer feature-retirement map: [`LEGACY-011`](../architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md).
 
 ## Required changes

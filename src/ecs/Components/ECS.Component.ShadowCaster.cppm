@@ -1,7 +1,7 @@
 module;
 export module Extrinsic.ECS.Component.ShadowCaster;
 
-namespace Extrinsic::ECS::Components::Shadows
+export namespace Extrinsic::ECS::Components::Shadows
 {
     struct CasterTag
     {

@@ -14,8 +14,14 @@
 
 import Extrinsic.Core.Error;
 import Extrinsic.Core.IOBackend;
+import Extrinsic.ECS.Components.AssetInstance;
+import Extrinsic.ECS.Component.Collider;
 import Extrinsic.ECS.Component.Hierarchy;
+import Extrinsic.ECS.Component.Light;
 import Extrinsic.ECS.Component.MetaData;
+import Extrinsic.ECS.Component.RigidBody;
+import Extrinsic.ECS.Component.ShadowCaster;
+import Extrinsic.ECS.Component.SpatialDebugBinding;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
@@ -35,6 +41,11 @@ namespace Runtime = Extrinsic::Runtime;
 namespace Core = Extrinsic::Core;
 namespace ECS = Extrinsic::ECS;
 namespace ECSC = Extrinsic::ECS::Components;
+namespace AssetInstance = Extrinsic::ECS::Components::AssetInstance;
+namespace Collider = Extrinsic::ECS::Components::Collider;
+namespace Lights = Extrinsic::ECS::Components::Lights;
+namespace RigidBody = Extrinsic::ECS::Components::RigidBody;
+namespace Shadows = Extrinsic::ECS::Components::Shadows;
 namespace GS = Extrinsic::ECS::Components::GeometrySources;
 namespace Sel = Extrinsic::ECS::Components::Selection;
 namespace G = Extrinsic::Graphics::Components;
@@ -358,6 +369,53 @@ TEST(RuntimeSceneSerialization, SaveLoadRoundTripPreservesPromotedSandboxSceneDa
     ASSERT_EQ(cloudView.ActiveDomain, GS::Domain::PointCloud);
     ASSERT_NE(cloudView.VertexSource, nullptr);
     EXPECT_EQ(cloudView.VertexSource->Properties.Get<glm::vec3>(PN::kPosition).Vector().size(), 2u);
+}
+
+TEST(RuntimeSceneSerialization, UnsupportedPersistenceFamiliesReportDiagnosticsAndDropOnLoad)
+{
+    ECS::Scene::Registry source;
+    const ECS::EntityHandle entity = ECS::Scene::CreateDefault(source, "Unsupported Families");
+    auto& raw = source.Raw();
+    raw.emplace<Lights::PointLight>(entity);
+    raw.emplace<Shadows::CasterTag>(entity);
+    raw.emplace<Collider::Component>(
+        entity,
+        Collider::Component{{Collider::MakeSphere(0.5f)}, true});
+    raw.emplace<RigidBody::Component>(entity, RigidBody::MakeDynamic(1.0f));
+    raw.emplace<ECSC::SpatialDebugBinding>(entity);
+    raw.emplace<AssetInstance::Source>(entity, AssetInstance::Source{.AssetId = 42u});
+
+    MemoryIOBackend backend;
+    auto saved = Runtime::SaveSceneDocument(source, "unsupported.json", backend);
+    ASSERT_TRUE(saved.has_value()) << static_cast<int>(saved.error());
+    EXPECT_EQ(saved->Stats.Entities, 1u);
+    EXPECT_EQ(saved->Stats.UnsupportedPersistenceEntities, 1u);
+    EXPECT_EQ(saved->Stats.UnsupportedLightEntities, 1u);
+    EXPECT_EQ(saved->Stats.UnsupportedShadowEntities, 1u);
+    EXPECT_EQ(saved->Stats.UnsupportedPhysicsEntities, 1u);
+    EXPECT_EQ(saved->Stats.UnsupportedSpatialDebugEntities, 1u);
+    EXPECT_EQ(saved->Stats.UnsupportedAssetInstanceEntities, 1u);
+
+    const nlohmann::json parsed = nlohmann::json::parse(backend.Text("unsupported.json"));
+    EXPECT_EQ(parsed["stats"]["unsupportedPersistenceEntities"].get<std::uint32_t>(), 1u);
+    EXPECT_EQ(parsed["stats"]["unsupportedLightEntities"].get<std::uint32_t>(), 1u);
+    EXPECT_EQ(parsed["stats"]["unsupportedShadowEntities"].get<std::uint32_t>(), 1u);
+    EXPECT_EQ(parsed["stats"]["unsupportedPhysicsEntities"].get<std::uint32_t>(), 1u);
+    EXPECT_EQ(parsed["stats"]["unsupportedSpatialDebugEntities"].get<std::uint32_t>(), 1u);
+    EXPECT_EQ(parsed["stats"]["unsupportedAssetInstanceEntities"].get<std::uint32_t>(), 1u);
+
+    ECS::Scene::Registry loaded;
+    auto loadedResult = Runtime::LoadSceneDocument(loaded, "unsupported.json", backend);
+    ASSERT_TRUE(loadedResult.has_value()) << static_cast<int>(loadedResult.error());
+    const ECS::EntityHandle loadedEntity = FindEntityByName(loaded, "Unsupported Families");
+    ASSERT_NE(loadedEntity, ECS::InvalidEntityHandle);
+    const auto& loadedRaw = loaded.Raw();
+    EXPECT_FALSE(loadedRaw.any_of<Lights::PointLight>(loadedEntity));
+    EXPECT_FALSE(loadedRaw.any_of<Shadows::CasterTag>(loadedEntity));
+    EXPECT_FALSE(loadedRaw.any_of<Collider::Component>(loadedEntity));
+    EXPECT_FALSE(loadedRaw.any_of<RigidBody::Component>(loadedEntity));
+    EXPECT_FALSE(loadedRaw.any_of<ECSC::SpatialDebugBinding>(loadedEntity));
+    EXPECT_FALSE(loadedRaw.any_of<AssetInstance::Source>(loadedEntity));
 }
 
 TEST(RuntimeSceneSerialization, InvalidDocumentsFailClosed)

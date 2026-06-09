@@ -2487,6 +2487,15 @@ namespace Extrinsic::Runtime
         };
     }
 
+    void Engine::ClearSceneRuntimeState()
+    {
+        if (m_Renderer)
+            m_RenderExtraction.ClearSceneState(*m_Renderer);
+        if (m_Scene)
+            m_SelectionController.ClearSceneState(*m_Scene);
+        m_LastRefinedPrimitive.reset();
+    }
+
     Core::Expected<SceneSerializationResult> Engine::SaveSceneToPath(
         std::string path)
     {
@@ -2511,12 +2520,14 @@ namespace Extrinsic::Runtime
             return Core::Err<SceneDeserializationResult>(Core::ErrorCode::InvalidPath);
 
         Core::IO::FileIOBackend backend;
-        auto loaded = LoadSceneDocument(*m_Scene, path, backend);
+        ECS::Scene::Registry loadedScene;
+        auto loaded = LoadSceneDocument(loadedScene, path, backend);
         if (!loaded.has_value())
             return Core::Err<SceneDeserializationResult>(loaded.error());
 
-        m_SelectionController.ClearSelection(*m_Scene);
-        m_LastRefinedPrimitive.reset();
+        ClearSceneRuntimeState();
+        m_Scene->Clear();
+        m_Scene->Raw() = std::move(loadedScene.Raw());
         m_StableEntityLookup.Rebuild(*m_Scene);
         m_EditorCommandHistory.ResetDocument(path);
         return loaded;
@@ -2527,9 +2538,8 @@ namespace Extrinsic::Runtime
         if (!m_Initialized || !m_Scene)
             return Core::Err(Core::ErrorCode::InvalidState);
 
+        ClearSceneRuntimeState();
         m_Scene->Clear();
-        m_SelectionController.ClearSelection(*m_Scene);
-        m_LastRefinedPrimitive.reset();
         m_StableEntityLookup.Clear();
         m_EditorCommandHistory.ResetDocument();
         return Core::Ok();

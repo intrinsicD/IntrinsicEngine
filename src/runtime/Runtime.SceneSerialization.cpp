@@ -26,6 +26,12 @@ import Extrinsic.ECS.Component.MetaData;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
+import Extrinsic.ECS.Components.AssetInstance;
+import Extrinsic.ECS.Component.Collider;
+import Extrinsic.ECS.Component.Light;
+import Extrinsic.ECS.Component.RigidBody;
+import Extrinsic.ECS.Component.ShadowCaster;
+import Extrinsic.ECS.Component.SpatialDebugBinding;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Hierarchy.Mutation;
@@ -1218,6 +1224,51 @@ namespace Extrinsic::Runtime
             return true;
         }
 
+        void CountUnsupportedPersistenceDiagnostics(const entt::registry& raw,
+                                                    const ECS::EntityHandle entity,
+                                                    SceneSerializationStats& stats)
+        {
+            bool unsupported = false;
+
+            if (raw.any_of<ECSC::Lights::LightTag,
+                           ECSC::Lights::DirectionalLight,
+                           ECSC::Lights::PointLight,
+                           ECSC::Lights::SpotLight,
+                           ECSC::Lights::AmbientLight>(entity))
+            {
+                ++stats.UnsupportedLightEntities;
+                unsupported = true;
+            }
+
+            if (raw.any_of<ECSC::Shadows::CasterTag>(entity))
+            {
+                ++stats.UnsupportedShadowEntities;
+                unsupported = true;
+            }
+
+            if (raw.any_of<ECSC::Collider::Component,
+                           ECSC::RigidBody::Component>(entity))
+            {
+                ++stats.UnsupportedPhysicsEntities;
+                unsupported = true;
+            }
+
+            if (raw.any_of<ECSC::SpatialDebugBinding>(entity))
+            {
+                ++stats.UnsupportedSpatialDebugEntities;
+                unsupported = true;
+            }
+
+            if (raw.any_of<ECSC::AssetInstance::Source>(entity))
+            {
+                ++stats.UnsupportedAssetInstanceEntities;
+                unsupported = true;
+            }
+
+            if (unsupported)
+                ++stats.UnsupportedPersistenceEntities;
+        }
+
         [[nodiscard]] std::vector<ECS::EntityHandle> SortedEntities(
             const entt::registry& raw)
         {
@@ -1400,6 +1451,8 @@ namespace Extrinsic::Runtime
                 }
             }
 
+            CountUnsupportedPersistenceDiagnostics(raw, entity, stats);
+
             const json render = RenderHintsToJson(raw, entity, stats);
             if (!render.empty())
                 entityJson["render"] = render;
@@ -1420,6 +1473,12 @@ namespace Extrinsic::Runtime
             {"graphEntities", stats.GraphEntities},
             {"pointCloudEntities", stats.PointCloudEntities},
             {"renderHintEntities", stats.RenderHintEntities},
+            {"unsupportedPersistenceEntities", stats.UnsupportedPersistenceEntities},
+            {"unsupportedLightEntities", stats.UnsupportedLightEntities},
+            {"unsupportedShadowEntities", stats.UnsupportedShadowEntities},
+            {"unsupportedPhysicsEntities", stats.UnsupportedPhysicsEntities},
+            {"unsupportedSpatialDebugEntities", stats.UnsupportedSpatialDebugEntities},
+            {"unsupportedAssetInstanceEntities", stats.UnsupportedAssetInstanceEntities},
         };
         return root.dump(2);
     }
@@ -1457,6 +1516,18 @@ namespace Extrinsic::Runtime
             stats.GraphEntities = statsJson.value("graphEntities", 0u);
             stats.PointCloudEntities = statsJson.value("pointCloudEntities", 0u);
             stats.RenderHintEntities = statsJson.value("renderHintEntities", 0u);
+            stats.UnsupportedPersistenceEntities =
+                statsJson.value("unsupportedPersistenceEntities", 0u);
+            stats.UnsupportedLightEntities =
+                statsJson.value("unsupportedLightEntities", 0u);
+            stats.UnsupportedShadowEntities =
+                statsJson.value("unsupportedShadowEntities", 0u);
+            stats.UnsupportedPhysicsEntities =
+                statsJson.value("unsupportedPhysicsEntities", 0u);
+            stats.UnsupportedSpatialDebugEntities =
+                statsJson.value("unsupportedSpatialDebugEntities", 0u);
+            stats.UnsupportedAssetInstanceEntities =
+                statsJson.value("unsupportedAssetInstanceEntities", 0u);
         }
         return SceneSerializationResult{.Stats = stats};
     }

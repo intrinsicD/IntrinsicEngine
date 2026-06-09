@@ -160,6 +160,10 @@ export namespace Extrinsic::Runtime
 
         // --- programmatic selection (editor / tools; bypasses SelectableTag) ---
         void ClearSelection(Registry& registry);
+        // Scene replacement boundary: drop all scene-local selected/hovered state
+        // and outstanding pick correlation so stale entity handles cannot cross
+        // load/new/close operations.
+        void ClearSceneState(Registry& registry);
         bool SetSelectedEntity(Registry& registry, EntityHandle entity);
         bool SetSelectedByStableEntityId(Registry& registry, std::uint32_t stableEntityId);
 

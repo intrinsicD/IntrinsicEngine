@@ -340,6 +340,7 @@ namespace Extrinsic::Runtime
         void RecordAssetImportEvent(
             const RuntimeAssetImportRequest& request,
             const Core::Expected<RuntimeAssetImportResult>& result);
+        void ClearSceneRuntimeState();
 
         Core::Config::EngineConfig           m_Config;
         std::unique_ptr<IApplication>        m_Application;

@@ -93,6 +93,26 @@ TEST(RuntimePhysicsBridge, StableIdentityReusesHandleAndRemovalDestroysWorldBody
     EXPECT_GE(bridge.GetDiagnostics().BodiesRemoved, 1u);
 }
 
+TEST(RuntimePhysicsBridge, ClearDropsWorldBodiesSidecarsAndAccumulator)
+{
+    Registry scene;
+    PhysicsBridge bridge;
+    const Components::StableId stableId = Id(20u);
+    (void)CreateAuthoredBody(scene, stableId, RigidBody::MakeDynamic(1.0f));
+
+    bridge.TickFixedStep(scene, 1.0f / 120.0f);
+    ASSERT_TRUE(bridge.ResolveBody(stableId).has_value());
+    ASSERT_EQ(bridge.GetWorld().BodyCount(), 1u);
+    ASSERT_GT(bridge.GetAccumulatorSeconds(), 0.0f);
+
+    bridge.Clear();
+
+    EXPECT_FALSE(bridge.ResolveBody(stableId).has_value());
+    EXPECT_EQ(bridge.GetWorld().BodyCount(), 0u);
+    EXPECT_EQ(bridge.GetDiagnostics().SidecarCount, 0u);
+    EXPECT_FLOAT_EQ(bridge.GetAccumulatorSeconds(), 0.0f);
+}
+
 TEST(RuntimePhysicsBridge, FixedStepRunsSyncThenStepThenDynamicWriteback)
 {
     Registry scene;

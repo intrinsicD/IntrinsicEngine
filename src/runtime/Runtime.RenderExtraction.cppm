@@ -343,6 +343,11 @@ export namespace Extrinsic::Runtime
             const SelectionController* selection = nullptr,
             std::uint32_t runtimeSnapshotStorageSlot = 0u,
             std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos = {});
+        // Scene replacement boundary: free scene-owned renderable sidecars,
+        // collapse deferred retire queues, clear per-entity extraction settings
+        // and bindings, and submit an empty snapshot. Adapter registrations stay
+        // live because they are runtime/editor resources, not scene contents.
+        void ClearSceneState(Graphics::IRenderer& renderer);
         void Shutdown(Graphics::IRenderer& renderer);
 
         // Maintenance-phase hook called by Engine::RunFrame after

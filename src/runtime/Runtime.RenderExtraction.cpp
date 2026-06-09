@@ -2025,7 +2025,7 @@ namespace Extrinsic::Runtime
         }
     }
 
-    void RenderExtractionCache::Shutdown(Graphics::IRenderer& renderer)
+    void RenderExtractionCache::ClearSceneState(Graphics::IRenderer& renderer)
     {
         RuntimeRenderExtractionStats stats{};
         for (auto& [_, sidecar] : m_Renderables)
@@ -2081,10 +2081,22 @@ namespace Extrinsic::Runtime
         }
         m_Renderables.clear();
 
+        // Scene replacement is a hard boundary. Collapse procedural deferred
+        // retirement immediately so no previous-scene handles or retire deltas
+        // leak into the next scene's first extraction.
+        m_ProceduralGeometry.Tick(
+            std::numeric_limits<std::uint64_t>::max(),
+            0u,
+            [&renderer](Graphics::GpuGeometryHandle handle)
+            {
+                renderer.GetGpuWorld().FreeGeometry(handle);
+            });
+        m_PrevProceduralStats = m_ProceduralGeometry.Stats();
+
         // RUNTIME-085 Slice C — drain any pending mesh deferred-retire
-        // records inline. Shutdown is a hard teardown, so the
-        // `framesInFlight` window is collapsed and the handles are freed
-        // directly rather than waiting on `TickMeshGeometry`.
+        // records inline. Scene reset is a hard teardown, so the
+        // `framesInFlight` window is collapsed and handles are freed directly
+        // rather than waiting on `TickMeshGeometry`.
         for (auto& rec : m_MeshRetire)
         {
             if (rec.Handle.IsValid())
@@ -2127,22 +2139,33 @@ namespace Extrinsic::Runtime
         }
         m_MeshPrimitiveViewRetire.clear();
         m_MeshPrimitiveViewSettings.clear();
+        m_PrevMeshFreeRetires = m_MeshFreeRetires;
+        m_PrevGraphFreeRetires = m_GraphFreeRetires;
+        m_PrevPointCloudFreeRetires = m_PointCloudFreeRetires;
+        m_PrevMeshPrimitiveViewFreeRetires = m_MeshPrimitiveViewFreeRetires;
+
         m_Transforms.clear();
         m_Visualizations.clear();
         m_Lights.clear();
 
-        // RUNTIME-082 Slice D — drop owned adapters + clear the registry
-        // mirror. The registry must drop its raw pointers before the
-        // unique_ptr map destroys the adapter instances.
-        m_SpatialDebugRegistry.Clear();
-        m_SpatialDebugAdapters.clear();
         m_SpatialDebugBatch.Clear();
-        m_VisualizationState->Registry.Clear();
-        m_VisualizationState->Adapters.clear();
         m_VisualizationState->Bindings.clear();
         m_VisualizationState->Batch.Clear();
 
         renderer.SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{});
         m_LastStats = stats;
+    }
+
+    void RenderExtractionCache::Shutdown(Graphics::IRenderer& renderer)
+    {
+        ClearSceneState(renderer);
+
+        // RUNTIME-082 Slice D — shutdown drops owned adapters + clears the
+        // registry mirrors. Scene replacement intentionally preserves these
+        // registrations; full renderer teardown owns their destruction.
+        m_SpatialDebugRegistry.Clear();
+        m_SpatialDebugAdapters.clear();
+        m_VisualizationState->Registry.Clear();
+        m_VisualizationState->Adapters.clear();
     }
 }
