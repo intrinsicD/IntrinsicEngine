@@ -218,7 +218,7 @@ Reproducible correctness/regression fixes only. Origin:
 [`bugs/index.md`](bugs/index.md).
 
 Members:
-- No currently active bug records.
+- [`bugs/BUG-023-sandbox-transform-edit-rendering.md`](bugs/BUG-023-sandbox-transform-edit-rendering.md) — Sandbox Inspector transform edits should move the rendered `ReferenceTriangle`; first-pass analysis points at a runtime pre-render transform flush gap after UI/gizmo mutations.
 - Recently retired:
   [`BUG-015`](../done/BUG-015-extrinsic-sandbox-clustered-vulkan-validation-cascade.md)
   and
