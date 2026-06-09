@@ -187,3 +187,9 @@ Row numbers are stable so reports can reference them directly.
 - [`roles.md`](roles.md) — reviewer rotation.
 - [`/AGENTS.md`](../../AGENTS.md) — authoritative repository contract (§9 docs
   sync, §13 temporary exceptions).
+
+## Lapse visibility
+
+The cadence is not CI-enforced; lapses surface non-blockingly via
+`python3 tools/agents/check_audit_cadence.py` (run nightly in
+`nightly-deep.yml`) and the audits section of `tasks/SESSION-BRIEF.md`.

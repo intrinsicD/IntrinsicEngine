@@ -35,7 +35,9 @@ findings are saved under `docs/reports/<YYYY-MM-DD>-agent-output-audit.md`.
    cadence.
 
 5. Missing a week is not a failure; the next reviewer extends the
-   window. The cadence is *not* enforced by CI.
+   window. The cadence is *not* enforced by CI; lapses surface
+   non-blockingly via `python3 tools/agents/check_audit_cadence.py`
+   (nightly) and the audits section of `tasks/SESSION-BRIEF.md`.
 
 The cadence rotates: the reviewer is whoever picks up the audit that
 week, not a permanent role. See [`docs/agent/roles.md`](../../../../../docs/agent/roles.md).

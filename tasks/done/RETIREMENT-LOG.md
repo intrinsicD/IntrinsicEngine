@@ -9,6 +9,17 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Previously-active
+[`PROC-006`](PROC-006-audit-cadence-lapse-visibility.md) — audit cadence
+lapse visibility retired to `tasks/done/` on 2026-06-09. The slice added
+`tools/agents/check_audit_cadence.py` (agent-output limit 14d, drift limit
+42d, report-only by default, `--strict` for local use only), a non-blocking
+nightly-deep report step, last-report dates in the `tasks/SESSION-BRIEF.md`
+audits section (dates rather than ok/overdue so the brief stays
+deterministic under the CI freshness check), and lapse-visibility notes in
+both audit checklists. No PR gate depends on audit recency. Theme H's
+remaining open leaf is `PROC-008` (category README state/history split).
+
+Previously-active
 [`PROC-004`](PROC-004-task-front-matter-and-generated-session-brief.md) —
 structured task front-matter + generated session brief retired to
 `tasks/done/` on 2026-06-09 at maturity `Operational`. Slice A gave all 44

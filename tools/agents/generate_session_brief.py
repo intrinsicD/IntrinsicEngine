@@ -21,6 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from check_audit_cadence import cadence_status  # noqa: E402
 from validate_tasks import find_markdown_files, parse_task  # noqa: E402
 
 TITLE_RE = re.compile(r"^#\s+[A-Z]+-\d+[A-Z0-9-]*\s+—\s+(.+)$")
@@ -111,6 +112,20 @@ def generate(repo_root: Path) -> str:
                 lines.append(f"- blocked by `{unmet[0]}`: `{task_id}` — {title} ({rel})")
             else:
                 lines.append(f"- unblocked: `{task_id}` — {title} ({rel})")
+
+    lines.append("")
+    lines.append("## Audits")
+    lines.append("")
+    lines.append("Last recorded report per recurring human audit (dates are tree facts so")
+    lines.append("this file stays deterministic; overdue judgment comes from")
+    lines.append("`python3 tools/agents/check_audit_cadence.py`, also run nightly).")
+    lines.append("")
+    for name, date, path in cadence_status(repo_root / "docs" / "reports"):
+        if date is None:
+            lines.append(f"- {name}: no report yet")
+        else:
+            rel = path.relative_to(repo_root)
+            lines.append(f"- {name}: last report {date} ({rel})")
 
     lines.append("")
     return "\n".join(lines)

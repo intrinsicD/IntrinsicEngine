@@ -47,7 +47,6 @@ the authoritative open/unblocked view.
 
 ## Theme H — Agentic workflow hardening
 
-- unblocked: `PROC-006` — Audit cadence lapse visibility (tasks/backlog/process/PROC-006-audit-cadence-lapse-visibility.md)
 - unblocked: `PROC-008` — Category README state/history split (tasks/backlog/process/PROC-008-category-readme-state-history-split.md)
 
 ## Unthemed
@@ -67,3 +66,12 @@ the authoritative open/unblocked view.
 - unblocked: `METHOD-007` — Constrained Delaunay tetrahedralization reference backend (tasks/backlog/methods/METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md)
 - blocked by `METHOD-005`: `METHODS-001` — Pin signed heat as methods-pipeline pathfinder (tasks/backlog/methods/METHODS-001-signed-heat-pathfinder.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
+
+## Audits
+
+Last recorded report per recurring human audit (dates are tree facts so
+this file stays deterministic; overdue judgment comes from
+`python3 tools/agents/check_audit_cadence.py`, also run nightly).
+
+- agent-output audit: last report 2026-05-28 (docs/reports/2026-05-28-agent-output-audit.md)
+- drift audit: last report 2026-06-06 (docs/reports/2026-06-06-drift-audit.md)
