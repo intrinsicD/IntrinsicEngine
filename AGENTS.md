@@ -222,7 +222,9 @@ When code, structure, or policy changes:
 ## 10. CI expectations
 
 - PR checks must remain green for touched areas.
-- Structural checks (tasks/docs/layering/manifests) should run in warning mode until explicitly tightened.
+- Structural checks (tasks/docs/layering/manifests/skill mirrors) run strict in `ci-docs.yml`; treat their failures as
+  merge blockers, not advisories. A newly introduced check may run in warning mode only while a referenced task ID owns
+  its tightening (same idiom as §13 temporary exceptions); an untracked warning-mode check is a policy violation.
 - Workflow definitions must stay readable and split by purpose.
 - Agent/Codex verification must configure the `ci` preset, build a meaningful target such as `IntrinsicTests` (never
   `help` as a stand-in), and run CTest. The current Codex verification command mirrors the default CPU-supported gate

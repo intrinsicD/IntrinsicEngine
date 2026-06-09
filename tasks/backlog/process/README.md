@@ -17,7 +17,7 @@ map.
 - [PROC-002 - Task ID uniqueness validation and allocation rule](../../done/PROC-002-task-id-uniqueness-and-allocation-rule.md) (done 2026-06-09).
 - [PROC-003 - Split task index state from retirement history](PROC-003-split-task-index-state-from-retirement-history.md).
 - [PROC-004 - Structured task front-matter and generated session brief](PROC-004-task-front-matter-and-generated-session-brief.md).
-- [PROC-005 - Align structural-check mode text with strict CI reality](PROC-005-align-structural-check-mode-contract-text.md).
+- [PROC-005 - Align structural-check mode text with strict CI reality](../../done/PROC-005-align-structural-check-mode-contract-text.md) (done 2026-06-09).
 - [PROC-006 - Audit cadence lapse visibility](PROC-006-audit-cadence-lapse-visibility.md).
 - [PROC-007 - Onboarding prompt tightening and loop-mode defaults](PROC-007-onboarding-prompt-tightening.md).
 

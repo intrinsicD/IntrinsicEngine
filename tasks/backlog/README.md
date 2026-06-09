@@ -247,7 +247,7 @@ Members (in dependency order; see [`process/README.md`](process/README.md)):
   mirrored docs).
 - [`PROC-002` (done)](../done/PROC-002-task-id-uniqueness-and-allocation-rule.md) —
   task ID uniqueness validation and allocation rule.
-- [`process/PROC-005`](process/PROC-005-align-structural-check-mode-contract-text.md) —
+- [`PROC-005` (done)](../done/PROC-005-align-structural-check-mode-contract-text.md) —
   align structural-check mode text with strict CI reality (after PROC-001).
 - [`process/PROC-003`](process/PROC-003-split-task-index-state-from-retirement-history.md) —
   split task index state from retirement history (after PROC-002).

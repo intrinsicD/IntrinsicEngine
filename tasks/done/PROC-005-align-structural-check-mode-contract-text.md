@@ -14,24 +14,24 @@
 - Depends on `PROC-001` so the corrected text propagates to mirrors through a verified sync rather than a manual copy.
 
 ## Required changes
-- [ ] Rewrite `AGENTS.md` §10's structural-check bullet to state current reality: the structural checks listed run strict in `ci-docs.yml`; name the strict set or point to the workflow file.
-- [ ] Add the tracked-exception rule in the same bullet: a newly introduced check may run in warning mode only while a referenced task ID owns its tightening, mirroring the §13 temporary-exception idiom.
-- [ ] Apply the matching correction to `docs/agent/contract.md` (line ~90).
-- [ ] Re-run the skill mirror sync so `intrinsicengine-core` references carry the corrected text.
+- [x] Rewrite `AGENTS.md` §10's structural-check bullet to state current reality: the structural checks listed run strict in `ci-docs.yml`; name the strict set or point to the workflow file.
+- [x] Add the tracked-exception rule in the same bullet: a newly introduced check may run in warning mode only while a referenced task ID owns its tightening, mirroring the §13 temporary-exception idiom.
+- [x] Apply the matching correction to `docs/agent/contract.md` (line ~90).
+- [x] Re-run the skill mirror sync so `intrinsicengine-core` references carry the corrected text.
 
 ## Tests
-- [ ] `python3 tools/docs/check_doc_links.py --root .` passes.
-- [ ] `python3 tools/agents/sync_skills.py --check` (from `PROC-001`) passes after resync.
-- [ ] `python3 tools/agents/check_task_policy.py --root . --strict` passes.
+- [x] `python3 tools/docs/check_doc_links.py --root .` passes.
+- [x] `python3 tools/agents/sync_skills.py --check` (from `PROC-001`) passes after resync.
+- [x] `python3 tools/agents/check_task_policy.py --root . --strict` passes.
 
 ## Docs
-- [ ] `AGENTS.md` §10 and `docs/agent/contract.md` updated as above (this task is the docs change).
-- [ ] No other documents reference warning-mode structural checks; verify with `grep -rn "warning mode" docs/ AGENTS.md` and fix any stragglers found.
+- [x] `AGENTS.md` §10 and `docs/agent/contract.md` updated as above (this task is the docs change).
+- [x] No other documents reference warning-mode structural checks; verify with `grep -rn "warning mode" docs/ AGENTS.md` and fix any stragglers found.
 
 ## Acceptance criteria
-- [ ] No contract document claims structural checks run in warning mode.
-- [ ] The contract states the strict-by-default reality and the tracked-exception rule for future warning-mode checks.
-- [ ] Skill mirrors match the corrected sources.
+- [x] No contract document claims structural checks run in warning mode.
+- [x] The contract states the strict-by-default reality and the tracked-exception rule for future warning-mode checks.
+- [x] Skill mirrors match the corrected sources.
 
 ## Verification
 ```bash
@@ -46,3 +46,11 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Introducing unrelated feature work.
 - Changing any workflow step or check mode in `.github/workflows/`.
 - Loosening any currently strict check while "aligning" the text.
+
+## Completion
+
+- Completed 2026-06-09 on branch `claude/agentic-workflow-analysis-kohifk`.
+- Commit: the PROC-005 implementation commit on that branch (AGENTS.md §10
+  rewrite, `docs/agent/contract.md` CI expectations fix, mirror resync).
+- The repo-wide grep found no further stale warning-mode claims beyond the
+  two corrected lines.
