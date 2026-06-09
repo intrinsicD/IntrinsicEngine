@@ -3,12 +3,13 @@ module;
 #include <optional>
 #include <functional>
 #include <concepts>
+#include <cstdint>
 
 export module Geometry.SDFContact;
 
 import Geometry.ContactManifold;
 import Geometry.RobustPredicates;
-import Core.Telemetry;
+import Extrinsic.Core.Telemetry;
 
 export namespace Geometry::SDF
 {
@@ -21,8 +22,10 @@ export namespace Geometry::SDF
     template <SDFFunc Func>
     glm::vec3 CalculateGradient(const glm::vec3& p, Func&& sdf)
     {
-        static constexpr uint32_t kCpuHash = Core::Telemetry::HashString("Geometry.SDF.Evaluate.CPU");
-        Core::Telemetry::ScopedTimer timer("Geometry.SDF.Evaluate.CPU", kCpuHash);
+        static constexpr uint32_t kCpuHash =
+            Extrinsic::Core::Telemetry::HashString("Geometry.SDF.Evaluate.CPU");
+        Extrinsic::Core::Telemetry::ScopedTimer timer("Geometry.SDF.Evaluate.CPU",
+                                                      kCpuHash);
 
         const float h = 0.0001f;
         const float dx = sdf(p + glm::vec3(h, 0, 0)) - sdf(p - glm::vec3(h, 0, 0));
@@ -37,8 +40,12 @@ export namespace Geometry::SDF
         FuncB&& sdfB,
         glm::vec3 guess)
     {
-        static constexpr uint32_t kComputeStubHash = Core::Telemetry::HashString("Geometry.SDF.Evaluate.ComputeStub");
-        Core::Telemetry::ScopedTimer timer("Geometry.SDF.Evaluate.ComputeStub", kComputeStubHash);
+        static constexpr uint32_t kComputeStubHash =
+            Extrinsic::Core::Telemetry::HashString(
+                "Geometry.SDF.Evaluate.ComputeStub");
+        Extrinsic::Core::Telemetry::ScopedTimer timer(
+            "Geometry.SDF.Evaluate.ComputeStub",
+            kComputeStubHash);
 
         const int MAX_ITER = 32;
         const float TOLERANCE = 0.001f;

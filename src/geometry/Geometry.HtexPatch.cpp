@@ -9,10 +9,10 @@ module;
 #include <vector>
 
 #include <glm/glm.hpp>
-#include "Core.Profiling.Macros.hpp"
 
 module Geometry.HtexPatch;
 
+import Extrinsic.Core.Telemetry;
 import Geometry.HalfedgeMesh;
 import Geometry.Properties;
 import Core.Logging;
@@ -192,7 +192,11 @@ namespace Geometry::HtexPatch
         const HalfedgeMesh::Mesh& mesh,
         const PatchBuildParams& params)
     {
-        PROFILE_SCOPE("HtexPatch::BuildPatchMetadata");
+        static constexpr std::uint32_t kProfileHash =
+            Extrinsic::Core::Telemetry::HashString("HtexPatch::BuildPatchMetadata");
+        Extrinsic::Core::Telemetry::ScopedTimer profileTimer(
+            "HtexPatch::BuildPatchMetadata",
+            kProfileHash);
 
         if (mesh.EdgeCount() == 0u)
             return std::nullopt;
@@ -316,7 +320,12 @@ namespace Geometry::HtexPatch
                                     PatchAtlasLayout& outLayout,
                                     std::uint32_t invalidValue) noexcept
     {
-        PROFILE_SCOPE("HtexPatch::BuildCategoricalPatchAtlas");
+        static constexpr std::uint32_t kProfileHash =
+            Extrinsic::Core::Telemetry::HashString(
+                "HtexPatch::BuildCategoricalPatchAtlas");
+        Extrinsic::Core::Telemetry::ScopedTimer profileTimer(
+            "HtexPatch::BuildCategoricalPatchAtlas",
+            kProfileHash);
 
         outLayout = PatchAtlasLayout{};
         outLayout.Width = outLayout.TileSize;

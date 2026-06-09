@@ -114,3 +114,12 @@ consumes at composition time. Per-field ownership is:
 - Core intentionally does **not** expose Vulkan/resource-state/barrier semantics.
   Those remain in `Graphics.RenderGraph`.
 - Runtime owns phase orchestration; Graphics owns pass-level GPU behavior.
+- Core intentionally does **not** promote the legacy global
+  `Core.Commands`, `Core.FeatureRegistry`, or `Core.SystemFeatureCatalog`
+  model. `CORE-002` retired that catalog shape: command history and dirty state
+  are runtime/editor responsibilities, while render passes, ECS systems,
+  panels, geometry operators, shader reload, and GPU-memory policy stay with
+  their owning layers.
+- `Extrinsic.Core.BoundedHeap`, `Extrinsic.Core.RingBuffer`, and
+  `Extrinsic.Core.Telemetry` are the retained dependency-free utility and
+  instrumentation seams used by promoted consumers.

@@ -57,6 +57,12 @@ As of `LEGACY-002` (2026-06-06), every remaining `src/legacy/<Subsystem>/` subtr
   value-gated feature-reimplementation map for remaining candidates that must
   be retained, deferred, or retired before the open deletion tasks become pure
   consumer-grep gates.
+- [`CORE-002`](../../tasks/done/CORE-002-command-feature-catalog-contract.md)
+  is retired: legacy command/feature catalogs are not promoted as a global
+  service. Retained dependency-free core utility/telemetry seams use
+  `Extrinsic.Core.*`; runtime/editor command history is owned by `RUNTIME-102`.
+  Remaining `src/legacy/Core/` deletion blockers are consumer-grep cleanup and
+  legacy-only compatibility tests, not unnamed command/catalog feature gaps.
 - [`LEGACY-012`](../../tasks/backlog/architecture/LEGACY-012-migrate-legacy-consumer-tests.md) —
   migrates or retires tests and other non-legacy consumers that still import
   bare legacy module names after promoted feature owners exist.

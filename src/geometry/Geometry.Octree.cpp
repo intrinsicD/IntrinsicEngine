@@ -14,7 +14,7 @@ module;
 #include <glm/glm.hpp>
 
 module Geometry.Octree;
-import Utils.BoundedHeap;
+import Extrinsic.Core.BoundedHeap;
 import Geometry.Containment;
 import Geometry.Overlap;
 import Geometry.Support;
@@ -253,7 +253,7 @@ namespace Geometry
             }
 
             using QueueElement = std::pair<float, std::size_t>;
-            Utils::BoundedHeap<QueueElement> heap(k);
+            Extrinsic::Core::BoundedHeap<QueueElement> heap(k);
 
             using Trav = std::pair<float, NodeIndex>; // (node lower-bound d2, node index)
             std::priority_queue<Trav, std::vector<Trav>, std::greater<>> pq;

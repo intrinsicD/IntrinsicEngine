@@ -169,6 +169,7 @@ target_include_directories(${target_name} PUBLIC .)
 
 target_link_libraries(${target_name}
         PUBLIC
+        ExtrinsicCore
         IntrinsicCore
         glm::glm
         Eigen3::Eigen

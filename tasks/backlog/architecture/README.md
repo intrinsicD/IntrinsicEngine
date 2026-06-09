@@ -10,7 +10,8 @@ map.
 
 ## Tasks
 
-- [CORE-002 — Command and feature catalog contract](CORE-002-command-feature-catalog-contract.md):
+- [CORE-002 — Command and feature catalog contract](../../done/CORE-002-command-feature-catalog-contract.md)
+  (done, 2026-06-09, `CPUContracted` / explicit retirement decision):
   resolves remaining legacy `Core.Commands`, `Core.FeatureRegistry`, and
   `Core.SystemFeatureCatalog` behavior as promoted narrow contracts, runtime/UI
   follow-ups, or explicit retirements.

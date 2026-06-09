@@ -481,6 +481,7 @@ intrinsic_test_object_lib(AssetUnitTestObjs
 )
 
 set(_core_wrapper_unit_test_files
+    Test.Core.BoundedHeap.cpp
     Test.Core.CallbackRegistry.cpp
     Test.Core.Config.cpp
     Test.Core.DagScheduler.cpp
