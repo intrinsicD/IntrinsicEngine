@@ -17,6 +17,11 @@ This skill is the master entry point and routes to specialist skills for
 task workflow, review, methods, benchmarks, and docs sync. Load specialist
 skills on demand per the routing table inside `intrinsicengine-core`.
 
+Skill `references/` files are generated from `docs/agent/*` by
+`python3 tools/agents/sync_skills.py --write` and verified in CI
+(`ci-docs.yml`); edit the canonical doc and re-run the sync, never the
+mirror copy.
+
 If you are operating in an environment without auto-discovery of agent
 skills (e.g. Claude Code on the web, or any bare API client), treat the
 files under `tools/agents/skills/` as required reading mirroring

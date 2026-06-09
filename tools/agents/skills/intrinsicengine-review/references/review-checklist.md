@@ -11,7 +11,7 @@ Use this checklist before commit and PR creation.
 ## Maturity and closure
 
 - [ ] For tasks closing to `tasks/done/`: the reached maturity level is
-      named (see [`../../../../../docs/agent/task-maturity.md`](../../../../../docs/agent/task-maturity.md): `Scaffolded`,
+      named (see [`task-maturity.md`](../../../../../docs/agent/task-maturity.md): `Scaffolded`,
       `CPUContracted`, `Operational`, `ParityProven`, `Retired`). State it
       in the task `Status` block, retirement commit message, or completion
       summary — pick one and use it consistently.
@@ -29,6 +29,12 @@ Use this checklist before commit and PR creation.
 - [ ] Dependency flow follows `AGENTS.md` invariants.
 - [ ] No cross-layer convenience imports introduced.
 - [ ] Runtime wiring remains in `runtime`.
+- [ ] If the change touches a dependency boundary, a renderer subsystem/pass,
+      RHI/platform/runtime wiring, a scaffold/parity closure, or a layering
+      allowlist entry, run the clean-workshop scorecard
+      (`docs/agent/clean-workshop-review.md`, or
+      `tools/ci/run_clean_workshop_review.sh . --strict`) and record findings as
+      follow-up task IDs.
 - [ ] CMake `target_link_libraries(...)` edges between promoted targets
       treat the link as an architecture dependency, not a build-system
       convenience. `tools/repo/check_layering.py --root src --strict`
@@ -79,4 +85,6 @@ Use this checklist before commit and PR creation.
 - [ ] Any temporary shim is recorded in tracker with removal task and timeline.
 
 
-Related: `docs/agent/architecture-review-checklist.md`.
+Related: `docs/agent/architecture-review-checklist.md`,
+`docs/agent/clean-workshop-review.md` (drift/decomposition scorecard),
+`docs/agent/drift-audit-checklist.md` (whole-tree state audit).

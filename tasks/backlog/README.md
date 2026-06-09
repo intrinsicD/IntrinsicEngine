@@ -242,7 +242,7 @@ unwatched audit cadences. Docs/tooling/CI-policy surfaces only — no engine
 code.
 
 Members (in dependency order; see [`process/README.md`](process/README.md)):
-- [`process/PROC-001`](process/PROC-001-skill-mirror-sync-generator-and-ci-gate.md) —
+- [`PROC-001` (done)](../done/PROC-001-skill-mirror-sync-generator-and-ci-gate.md) —
   skill mirror sync generator and CI gate (first; everything else edits
   mirrored docs).
 - [`process/PROC-002`](process/PROC-002-task-id-uniqueness-and-allocation-rule.md) —

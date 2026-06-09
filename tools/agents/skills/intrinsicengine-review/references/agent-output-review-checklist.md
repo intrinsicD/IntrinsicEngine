@@ -2,7 +2,7 @@
 
 Use this checklist for the weekly human-led audit of agent-authored commits.
 The cadence is *additive* to the per-PR review at
-[`docs/agent/review-checklist.md`](review-checklist.md); it does not gate PR
+[`docs/agent/review-checklist.md`](../../../../../docs/agent/review-checklist.md); it does not gate PR
 merges and does not impose per-commit reviewer load. Each weekly sweep covers
 roughly one week of slices, runs in ≤ 60 minutes, and either records "pass" for
 each row or files a tracked follow-up task.
@@ -38,7 +38,7 @@ findings are saved under `docs/reports/<YYYY-MM-DD>-agent-output-audit.md`.
    window. The cadence is *not* enforced by CI.
 
 The cadence rotates: the reviewer is whoever picks up the audit that
-week, not a permanent role. See [`docs/agent/../../../../../docs/agent/roles.md`](../../../../../docs/agent/roles.md).
+week, not a permanent role. See [`docs/agent/roles.md`](../../../../../docs/agent/roles.md).
 
 ## Failure modes
 
@@ -180,11 +180,11 @@ reference rows directly.
 
 - [`/AGENTS.md`](../../../../../AGENTS.md) — authoritative repository contract; §9 (docs
   sync), §12 (per-PR review checklist), §13 (temporary migration exceptions).
-- [`docs/agent/../../../../../docs/agent/contract.md`](../../../../../docs/agent/contract.md) — expanded contract; cadence pointer
+- [`docs/agent/contract.md`](../../../../../docs/agent/contract.md) — expanded contract; cadence pointer
   lives in the testing/verification section.
-- [`docs/agent/review-checklist.md`](review-checklist.md) — per-PR review
+- [`docs/agent/review-checklist.md`](../../../../../docs/agent/review-checklist.md) — per-PR review
   checklist (not replaced by this cadence).
-- [`docs/agent/../../../../../docs/agent/roles.md`](../../../../../docs/agent/roles.md) — reviewer ownership for the weekly
+- [`docs/agent/roles.md`](../../../../../docs/agent/roles.md) — reviewer ownership for the weekly
   cadence.
 - [`tasks/done/REVIEW-001-human-led-agent-week-review-cadence.md`](../../../../../tasks/done/REVIEW-001-human-led-agent-week-review-cadence.md)
   — driving task; calibration window and acceptance criteria.

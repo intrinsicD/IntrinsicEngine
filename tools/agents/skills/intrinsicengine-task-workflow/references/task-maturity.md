@@ -141,7 +141,7 @@ A task that retires to `tasks/done/` at `Scaffolded` maturity must either:
    intended endpoint and that no follow-up gate is owed.
 
 The rule is enforced by review (see
-[`../../../../../docs/agent/review-checklist.md`](../../../../../docs/agent/review-checklist.md) "Scope and ownership" row), not
+[`review-checklist.md`](../../../../../docs/agent/review-checklist.md) "Scope and ownership" row), not
 by the validator, because the words "scaffold", "stub", "fail-closed", and
 "minimal" are domain language that legitimately appears in many tasks.
 Reviewers should challenge any done task whose body uses those words without
@@ -151,6 +151,16 @@ The same rule applies one level up: a task that retires at `CPUContracted`
 when the seam exists to be operational on a real backend (graphics, Vulkan,
 CUDA, runtime composition) should name the `Operational` follow-up or
 explicitly record the deferral.
+
+For open task files under `tasks/backlog/` and `tasks/active/`,
+`tools/agents/check_task_maturity_followups.py` enforces this rule when a
+backend-facing `## Maturity` section closes at `CPUContracted`. Use one of
+these exact forms:
+
+- `` `Operational` owned by `<TASK-ID>` `` when another task or later slice
+  owns the backend/runtime proof.
+- `` no `Operational` follow-up is owed `` when the CPU/null endpoint is the
+  intended final state.
 
 ## Vocabulary mapping for existing docs
 
@@ -170,12 +180,12 @@ authoritative vocabulary going forward; do not mass-edit older tasks.
 - [`/AGENTS.md`](../../../../../AGENTS.md) §6 (method implementation protocol — the
   CPU-reference-first flow is the canonical `Scaffolded → CPUContracted →
   Operational → ParityProven` sequence for method work).
-- [`task-format.md`](task-format.md) — task file structure; optional
+- [`task-format.md`](../../../../../docs/agent/task-format.md) — task file structure; optional
   `## Maturity` guidance.
-- [`../../../../../docs/agent/review-checklist.md`](../../../../../docs/agent/review-checklist.md) — per-PR review including the
+- [`review-checklist.md`](../../../../../docs/agent/review-checklist.md) — per-PR review including the
   `Scaffolded` closure rule.
-- [`../../../../../docs/agent/architecture-review-checklist.md`](../../../../../docs/agent/architecture-review-checklist.md) —
+- [`architecture-review-checklist.md`](../../../../../docs/agent/architecture-review-checklist.md) —
   architecture-impacting closure language.
-- [`../../../../../docs/migration/nonlegacy-parity-matrix.md`](../../../../../docs/migration/nonlegacy-parity-matrix.md)
+- [`../migration/nonlegacy-parity-matrix.md`](../../../../../docs/migration/nonlegacy-parity-matrix.md)
   — readiness cells use the taxonomy where it is more precise than the older
   `blocked`/`partial`/`done` triplet.
