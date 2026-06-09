@@ -18,10 +18,9 @@ map.
 - [UI-005 — Sandbox EditorUI visualization property presets](../../done/UI-005-sandbox-editor-visualization-property-presets.md) (done, 2026-06-07, `CPUContracted`).
 - [UI-006 — Sandbox EditorUI render graph diagnostics panel](../../done/UI-006-sandbox-editor-rendergraph-panel.md) (done, 2026-06-08, `CPUContracted`).
 - [UI-007 — Sandbox EditorUI drag/drop import status](../../done/UI-007-sandbox-editor-drag-drop-import.md) (done, 2026-06-08, `CPUContracted`).
-- [UI-008 — Editor file dialog, dirty-state, and debug workflows](UI-008-editor-file-dialog-dirty-debug-workflows.md):
-  value-gated editor path/file-boundary, dirty-state, undo/redo, and
-  headless-safe workflows over runtime-owned command/history and
-  platform-boundary decisions.
+- [UI-008 — Editor file dialog, dirty-state, and debug workflows](../../done/UI-008-editor-file-dialog-dirty-debug-workflows.md) (done, 2026-06-09, `CPUContracted`):
+  path-entry file boundary, dirty-state/undo-redo affordances, new/open/save/close
+  command routing, and app-to-runtime-only dependency proof.
 
 ## Convergence
 
@@ -60,14 +59,16 @@ map.
 - UI-007 is a retired promoted EditorUI follow-up that exposes drag/drop import
   status and payload hints while runtime/platform own events, decoding,
   `AssetService`, and ECS materialization.
-- UI-008 is the remaining value-gated workflow child from
+- UI-008 is a retired value-gated workflow child from
   [`LEGACY-011`](../architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md);
-  [`RUNTIME-102`](../../done/RUNTIME-102-editor-command-history.md) now provides
-  the command history / dirty-state source of truth. The
+  it consumes [`RUNTIME-102`](../../done/RUNTIME-102-editor-command-history.md)
+  for command history / dirty-state source of truth. The
   [`PLATFORM-006`](../../done/PLATFORM-006-platform-event-parity.md)
   file-dialog boundary is retired: current workflows use runtime/UI path entry
   plus platform dropped-path events, while native dialogs remain deferred unless
-  a new platform/runtime task accepts them.
+  a new platform/runtime task accepts them. Sample/debug scene expansion and
+  app-level debug workflow clones remain deferred until a runtime-owned command
+  accepts them.
 - UI work that depends on renderer overlays/handoff coordinates with the
   retired [`GRAPHICS-024`](../../done/GRAPHICS-024-overlays-presentation-editor-handoff.md)
   parity matrix and the rendering DAG in

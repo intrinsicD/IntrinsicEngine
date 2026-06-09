@@ -27,26 +27,43 @@
 - Scope decision: retain dirty/undo/path-entry/status workflows. Defer native dialogs, sample-scene expansion, and app-level debug clones unless runtime/platform tasks accept them first.
 
 ## Required changes
-- [ ] Extend the existing data-only document/file/import models for save-as/open/new/close/debug workflows and headless-safe diagnostics.
-- [ ] Add UI command routing for undo/redo, new scene, close scene, save-as/open path entry, and sample/debug scene creation using runtime-owned commands.
-- [ ] If `PLATFORM-006` selects platform-native dialogs, add a UI request surface without owning platform state; otherwise document path-entry as the intended endpoint.
-- [ ] Add app-level debug workflow commands only if runtime already owns the command and the workflow improves a current fixture or diagnostic path.
-- [ ] Preserve `app -> runtime only` for `ExtrinsicSandbox`.
+- [x] Extend the existing data-only document/file/import models for save-as/open/new/close/debug workflows and headless-safe diagnostics.
+- [x] Add UI command routing for undo/redo, new scene, close scene, save-as/open path entry, and sample/debug scene creation using runtime-owned commands.
+- [x] If `PLATFORM-006` selects platform-native dialogs, add a UI request surface without owning platform state; otherwise document path-entry as the intended endpoint.
+- [x] Add app-level debug workflow commands only if runtime already owns the command and the workflow improves a current fixture or diagnostic path.
+- [x] Preserve `app -> runtime only` for `ExtrinsicSandbox`.
 
 ## Tests
-- [ ] Add `contract;runtime` or `contract;ui` tests for editor model fields and command routing.
-- [ ] Add app-layer dependency tests proving Sandbox still imports runtime only.
-- [ ] Add headless-safe tests for command-line/path-entry workflows.
+- [x] Add `contract;runtime` or `contract;ui` tests for editor model fields and command routing.
+- [x] Add app-layer dependency tests proving Sandbox still imports runtime only.
+- [x] Add headless-safe tests for command-line/path-entry workflows.
 
 ## Docs
-- [ ] Update `tasks/backlog/ui/README.md`, `src/runtime/README.md`, and `docs/migration/nonlegacy-parity-matrix.md`.
-- [ ] Update app/runtime docs if command-line or sample-scene behavior changes.
-- [ ] Regenerate module inventory if public module surfaces change.
+- [x] Update `tasks/backlog/ui/README.md`, `src/runtime/README.md`, and `docs/migration/nonlegacy-parity-matrix.md`.
+- [x] Update app/runtime docs if command-line or sample-scene behavior changes.
+- [x] Regenerate module inventory if public module surfaces change.
 
 ## Acceptance criteria
-- [ ] Editor dirty-state and undo/redo controls reflect runtime state and fail closed when services are unavailable.
-- [ ] File-dialog/path-entry behavior has an explicit boundary and tests.
-- [ ] Sandbox app remains policy-light and imports runtime only.
+- [x] Editor dirty-state and undo/redo controls reflect runtime state and fail closed when services are unavailable.
+- [x] File-dialog/path-entry behavior has an explicit boundary and tests.
+- [x] Sandbox app remains policy-light and imports runtime only.
+
+## Status
+- Completed 2026-06-09 at maturity `CPUContracted`.
+- PR/commit: this retirement commit.
+- Extended `SandboxEditorSceneFileModel` with lifecycle, path-entry, native-dialog-boundary, and per-command availability fields.
+- Added runtime-owned `Engine::NewSceneDocument()` and `Engine::CloseSceneDocument()` facades, plus `SandboxEditorUi` command routing for New, Close, Save / Save As, and Open Path.
+- Kept native file dialogs deferred by data model and docs: current promoted endpoint is path entry plus platform dropped-path events.
+- Added a source-scan contract proving `ExtrinsicSandbox` imports only runtime modules plus its own app module and links only `ExtrinsicRuntime`.
+- Deferred sample/debug scene creation and app-level debug workflow clones because no runtime-owned command currently improves an accepted fixture without expanding scope. Future tasks must first accept the runtime command.
+
+## Verification results
+```bash
+cmake --build --preset ci --target IntrinsicRuntimeContractTests
+ctest --test-dir build/ci --output-on-failure -R 'SandboxEditorUi|Headless|Panel|Command' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+```
+
+Result: `IntrinsicRuntimeContractTests` built; filtered CTest passed 67/67.
 
 ## Verification
 ```bash

@@ -204,7 +204,7 @@ Members:
 - [`rendering/GRAPHICS-084-visualization-property-buffer-residency.md`](rendering/GRAPHICS-084-visualization-property-buffer-residency.md),
   [`rendering/GRAPHICS-085-overlay-packet-backend-parity.md`](rendering/GRAPHICS-085-overlay-packet-backend-parity.md),
   and [`rendering/GRAPHICS-086-rhi-retirement-parity-and-cuda-decision.md`](rendering/GRAPHICS-086-rhi-retirement-parity-and-cuda-decision.md).
-- [`ui/UI-008-editor-file-dialog-dirty-debug-workflows.md`](ui/UI-008-editor-file-dialog-dirty-debug-workflows.md).
+- [`UI-008` (done)](../done/UI-008-editor-file-dialog-dirty-debug-workflows.md).
 - [`done/RUNTIME-091`](../done/RUNTIME-091-promoted-ecs-system-bundle-activation.md) (done) (also Theme D).
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`ui/RORG-031-ui-integration.md`](ui/RORG-031-ui-integration.md).

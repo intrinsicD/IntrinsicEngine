@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -257,6 +258,18 @@ namespace
         raw.emplace<GS::HasGraphTopology>(entity);
         raw.emplace<G::RenderLines>(entity);
         raw.emplace<G::RenderPoints>(entity);
+    }
+
+    [[nodiscard]] std::string ReadRepositoryTextFile(
+        const std::filesystem::path& relativePath)
+    {
+        const std::filesystem::path path =
+            std::filesystem::path{ENGINE_ROOT_DIR} / relativePath;
+        std::ifstream file{path};
+        if (!file)
+            return {};
+        return std::string{std::istreambuf_iterator<char>{file},
+                           std::istreambuf_iterator<char>{}};
     }
 
     [[nodiscard]] Runtime::SandboxEditorContext MakeContext(
@@ -627,9 +640,21 @@ TEST(SandboxEditorUi, SceneFileCommandRoutesThroughRuntimeOwnedSurface)
 
     bool saveObserved = false;
     bool loadObserved = false;
+    bool newObserved = false;
+    bool closeObserved = false;
     Runtime::SandboxEditorSceneFileCommand observedSave{};
     Runtime::SandboxEditorSceneFileCommand observedLoad{};
     context.SceneFileCommands = Runtime::SandboxEditorSceneFileCommandSurface{
+        .New =
+            [&]()
+            {
+                newObserved = true;
+                return Runtime::SandboxEditorSceneFileResult{
+                    .Status = Runtime::SandboxEditorCommandStatus::Applied,
+                    .Operation = Runtime::SandboxEditorSceneFileOperation::New,
+                    .Message = "Created fake scene.",
+                };
+            },
         .Save =
             [&](const Runtime::SandboxEditorSceneFileCommand& command)
             {
@@ -659,12 +684,31 @@ TEST(SandboxEditorUi, SceneFileCommandRoutesThroughRuntimeOwnedSurface)
                     .Message = "Loaded fake scene.",
                 };
             },
+        .Close =
+            [&]()
+            {
+                closeObserved = true;
+                return Runtime::SandboxEditorSceneFileResult{
+                    .Status = Runtime::SandboxEditorCommandStatus::Applied,
+                    .Operation = Runtime::SandboxEditorSceneFileOperation::Close,
+                    .Message = "Closed fake scene.",
+                };
+            },
     };
     context.PendingSceneFilePath = "scene.extrinsic.json";
 
     Runtime::SandboxEditorPanelFrame frame =
         Runtime::BuildSandboxEditorPanelFrame(context);
     EXPECT_TRUE(frame.SceneFile.Enabled);
+    EXPECT_TRUE(frame.SceneFile.LifecycleEnabled);
+    EXPECT_TRUE(frame.SceneFile.CanNew);
+    EXPECT_TRUE(frame.SceneFile.CanClose);
+    EXPECT_TRUE(frame.SceneFile.CanSave);
+    EXPECT_TRUE(frame.SceneFile.CanOpen);
+    EXPECT_TRUE(frame.SceneFile.PathEntryEnabled);
+    EXPECT_FALSE(frame.SceneFile.NativeDialogsAvailable);
+    EXPECT_TRUE(frame.SceneFile.FileDialogBoundaryText.find("Native file dialogs") !=
+                std::string::npos);
     EXPECT_EQ(frame.SceneFile.PendingPath, "scene.extrinsic.json");
     EXPECT_FALSE(HasDiagnostic(
         frame.SceneFile.Diagnostics,
@@ -683,6 +727,15 @@ TEST(SandboxEditorUi, SceneFileCommandRoutesThroughRuntimeOwnedSurface)
     EXPECT_STREQ(Runtime::DebugNameForSandboxEditorCommandStatus(save.Status),
                  "Applied");
 
+    const Runtime::SandboxEditorSceneFileResult created =
+        Runtime::ApplySandboxEditorNewSceneCommand(context);
+    EXPECT_TRUE(newObserved);
+    EXPECT_TRUE(created.Succeeded());
+    EXPECT_EQ(created.Operation, Runtime::SandboxEditorSceneFileOperation::New);
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorCommandStatus(
+                     Runtime::SandboxEditorCommandStatus::SceneNewFailed),
+                 "SceneNewFailed");
+
     const Runtime::SandboxEditorSceneFileResult load =
         Runtime::ApplySandboxEditorSceneLoadCommand(
             context,
@@ -693,6 +746,15 @@ TEST(SandboxEditorUi, SceneFileCommandRoutesThroughRuntimeOwnedSurface)
     EXPECT_EQ(observedLoad.Path, "scene.extrinsic.json");
     EXPECT_TRUE(load.Succeeded());
     EXPECT_EQ(load.Stats.Entities, 2u);
+
+    const Runtime::SandboxEditorSceneFileResult closed =
+        Runtime::ApplySandboxEditorCloseSceneCommand(context);
+    EXPECT_TRUE(closeObserved);
+    EXPECT_TRUE(closed.Succeeded());
+    EXPECT_EQ(closed.Operation, Runtime::SandboxEditorSceneFileOperation::Close);
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorCommandStatus(
+                     Runtime::SandboxEditorCommandStatus::SceneCloseFailed),
+                 "SceneCloseFailed");
 
     context.LastSceneFileResult = &load;
     frame = Runtime::BuildSandboxEditorPanelFrame(context);
@@ -775,6 +837,53 @@ TEST(SandboxEditorUi, DocumentModelReportsRuntimeHistoryDirtyState)
     EXPECT_FALSE(frame.Document.Dirty);
     EXPECT_TRUE(frame.Document.HasActivePath);
     EXPECT_EQ(frame.Document.ActivePath, "scene.extrinsic.json");
+}
+
+TEST(SandboxEditorUi, ExtrinsicSandboxAppStaysRuntimeOnly)
+{
+    const std::string sandboxModule =
+        ReadRepositoryTextFile("src/app/Sandbox/Sandbox.cppm");
+    const std::string sandboxMain =
+        ReadRepositoryTextFile("src/app/Sandbox/main.cpp");
+    const std::string sandboxCMake =
+        ReadRepositoryTextFile("src/app/Sandbox/CMakeLists.txt");
+
+    ASSERT_FALSE(sandboxModule.empty());
+    ASSERT_FALSE(sandboxMain.empty());
+    ASSERT_FALSE(sandboxCMake.empty());
+
+    EXPECT_NE(sandboxModule.find("import Extrinsic.Runtime.Engine;"),
+              std::string::npos);
+    EXPECT_NE(sandboxModule.find("import Extrinsic.Runtime.SandboxEditorUi;"),
+              std::string::npos);
+    EXPECT_NE(sandboxMain.find("import Extrinsic.Runtime.Engine;"),
+              std::string::npos);
+    EXPECT_NE(sandboxMain.find("import Extrinsic.Sandbox;"),
+              std::string::npos);
+
+    for (const char* forbidden :
+         {
+             "import Extrinsic.Asset",
+             "import Extrinsic.Core",
+             "import Extrinsic.ECS",
+             "import Extrinsic.Graphics",
+             "import Extrinsic.Platform",
+             "import Extrinsic.RHI",
+             "import Extrinsic.Backends",
+         })
+    {
+        EXPECT_EQ(sandboxModule.find(forbidden), std::string::npos)
+            << forbidden;
+        EXPECT_EQ(sandboxMain.find(forbidden), std::string::npos)
+            << forbidden;
+    }
+
+    EXPECT_NE(sandboxCMake.find("target_link_libraries(ExtrinsicSandbox"),
+              std::string::npos);
+    EXPECT_NE(sandboxCMake.find("ExtrinsicRuntime"), std::string::npos);
+    EXPECT_EQ(sandboxCMake.find("ExtrinsicGraphics"), std::string::npos);
+    EXPECT_EQ(sandboxCMake.find("ExtrinsicPlatform"), std::string::npos);
+    EXPECT_EQ(sandboxCMake.find("ExtrinsicRHI"), std::string::npos);
 }
 
 TEST(SandboxEditorUi, HierarchyInspectorModelReportsSelectionRenderHintsAndDomain)

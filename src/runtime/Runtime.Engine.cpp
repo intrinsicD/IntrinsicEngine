@@ -2483,6 +2483,24 @@ namespace Extrinsic::Runtime
         return loaded;
     }
 
+    Core::Result Engine::NewSceneDocument()
+    {
+        if (!m_Initialized || !m_Scene)
+            return Core::Err(Core::ErrorCode::InvalidState);
+
+        m_Scene->Clear();
+        m_SelectionController.ClearSelection(*m_Scene);
+        m_LastRefinedPrimitive.reset();
+        m_StableEntityLookup.Clear();
+        m_EditorCommandHistory.ResetDocument();
+        return Core::Ok();
+    }
+
+    Core::Result Engine::CloseSceneDocument()
+    {
+        return NewSceneDocument();
+    }
+
     SelectionController&  Engine::GetSelectionController() noexcept { return m_SelectionController; }
     EditorCommandHistory& Engine::GetEditorCommandHistory() noexcept
     {

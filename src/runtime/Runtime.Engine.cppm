@@ -233,6 +233,8 @@ namespace Extrinsic::Runtime
             std::string path);
         [[nodiscard]] Core::Expected<SceneDeserializationResult> LoadSceneFromPath(
             std::string path);
+        [[nodiscard]] Core::Result NewSceneDocument();
+        [[nodiscard]] Core::Result CloseSceneDocument();
         // RUNTIME-089 Slice B — runtime/editor-owned selection authority.
         // Input ports / editor tools submit hover/click picks here; RunFrame
         // drains the coalesced pick into the renderer's SelectionSystem before

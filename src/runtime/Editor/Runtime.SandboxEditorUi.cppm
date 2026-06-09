@@ -66,8 +66,10 @@ export namespace Extrinsic::Runtime
         MissingPrimitiveViewCommands,
         MissingVisualizationCommands,
         AssetImportFailed,
+        SceneNewFailed,
         SceneSaveFailed,
         SceneLoadFailed,
+        SceneCloseFailed,
         StaleEntity,
         MissingTransform,
         UnsupportedGeometryDomain,
@@ -391,8 +393,10 @@ export namespace Extrinsic::Runtime
 
     enum class SandboxEditorSceneFileOperation : std::uint8_t
     {
+        New,
         Save,
         Load,
+        Close,
     };
 
     struct SandboxEditorSceneFileCommand
@@ -416,23 +420,39 @@ export namespace Extrinsic::Runtime
 
     struct SandboxEditorSceneFileCommandSurface
     {
+        std::function<SandboxEditorSceneFileResult()> New{};
         std::function<SandboxEditorSceneFileResult(
             const SandboxEditorSceneFileCommand&)> Save{};
         std::function<SandboxEditorSceneFileResult(
             const SandboxEditorSceneFileCommand&)> Load{};
+        std::function<SandboxEditorSceneFileResult()> Close{};
 
         [[nodiscard]] bool Available() const noexcept
         {
             return static_cast<bool>(Save) && static_cast<bool>(Load);
+        }
+
+        [[nodiscard]] bool LifecycleAvailable() const noexcept
+        {
+            return static_cast<bool>(New) && static_cast<bool>(Close);
         }
     };
 
     struct SandboxEditorSceneFileModel
     {
         bool        Enabled{false};
+        bool        LifecycleEnabled{false};
+        bool        PathEntryEnabled{true};
+        bool        NativeDialogsAvailable{false};
+        bool        CanNew{false};
+        bool        CanClose{false};
+        bool        CanSave{false};
+        bool        CanOpen{false};
         std::string PendingPath{};
         std::optional<SandboxEditorSceneFileResult> LastResult{};
         std::string StatusText{};
+        std::string FileDialogBoundaryText{
+            "Native file dialogs are deferred; use path entry or dropped paths."};
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
@@ -838,6 +858,12 @@ export namespace Extrinsic::Runtime
     SandboxEditorSceneFileResult ApplySandboxEditorSceneLoadCommand(
         const SandboxEditorContext& context,
         const SandboxEditorSceneFileCommand& command);
+
+    SandboxEditorSceneFileResult ApplySandboxEditorNewSceneCommand(
+        const SandboxEditorContext& context);
+
+    SandboxEditorSceneFileResult ApplySandboxEditorCloseSceneCommand(
+        const SandboxEditorContext& context);
 
     SandboxEditorCommandStatus ApplySandboxEditorTransformEdit(
         const SandboxEditorContext& context,
