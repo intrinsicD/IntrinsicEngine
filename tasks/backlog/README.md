@@ -12,6 +12,7 @@ Backlog tasks are approved or proposed work items that have not started yet.
 - [`methods/`](methods/) — paper/method packages following the method workflow.
 - [`physics/`](physics/) — physics layer ownership and phenomena roadmap.
 - [`platform/`](platform/) — windowing/input port and explicit platform backends.
+- [`process/`](process/) — agentic-workflow and process-infrastructure hardening.
 - [`rendering/`](rendering/) — renderer, frame graph, and RHI work.
 - [`runtime/`](runtime/) — runtime composition root and lifecycle.
 - [`ui/`](ui/) — editor/UI integration seams.
@@ -229,6 +230,31 @@ Members:
   (default-recipe `vkCmdPipelineBarrier2` SEGV) was resolved under
   GRAPHICS-076 on 2026-05-28; its resolved record was retired from
   `tasks/backlog/bugs/` to `tasks/done/` on 2026-06-06.
+
+### Theme H — Agentic workflow hardening (P1)
+
+Keep the agent contract mirrors, task indexes, task metadata, and audit
+cadences mechanically honest. Origin: agentic-workflow review (2026-06-09) of
+`AGENTS.md`, `docs/agent/*`, the skill mirrors, and the `tasks/` tree, which
+found live skill-mirror drift, duplicate task IDs in `tasks/done/`,
+history-clogged session-start indexes, stale warning-mode contract text, and
+unwatched audit cadences. Docs/tooling/CI-policy surfaces only — no engine
+code.
+
+Members (in dependency order; see [`process/README.md`](process/README.md)):
+- [`process/PROC-001`](process/PROC-001-skill-mirror-sync-generator-and-ci-gate.md) —
+  skill mirror sync generator and CI gate (first; everything else edits
+  mirrored docs).
+- [`process/PROC-002`](process/PROC-002-task-id-uniqueness-and-allocation-rule.md) —
+  task ID uniqueness validation and allocation rule.
+- [`process/PROC-005`](process/PROC-005-align-structural-check-mode-contract-text.md) —
+  align structural-check mode text with strict CI reality (after PROC-001).
+- [`process/PROC-003`](process/PROC-003-split-task-index-state-from-retirement-history.md) —
+  split task index state from retirement history (after PROC-002).
+- [`process/PROC-004`](process/PROC-004-task-front-matter-and-generated-session-brief.md) —
+  structured task front-matter and generated session brief (after PROC-003).
+- [`process/PROC-006`](process/PROC-006-audit-cadence-lapse-visibility.md) —
+  audit cadence lapse visibility (brief surface after PROC-004 Slice B).
 
 ## Cross-domain dependency anchors
 
