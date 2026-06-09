@@ -24,6 +24,12 @@ namespace Extrinsic::Runtime
                 || error == Core::ErrorCode::AssetTypeMismatch;
         }
 
+        [[nodiscard]] bool IsUploadDeferral(const Core::ErrorCode error) noexcept
+        {
+            return error == Core::ErrorCode::DeviceNotOperational
+                || error == Core::ErrorCode::ResourceBusy;
+        }
+
         [[nodiscard]] Core::Expected<RHI::Format> ToGpuFormat(
             const Assets::AssetTexture2DMetadata& metadata)
         {
@@ -66,6 +72,16 @@ namespace Extrinsic::Runtime
             {
                 ++diagnostics.TextureInvalidPayloads;
             }
+        }
+
+        void RecordDeferral(
+            AssetModelTextureHandoffDiagnostics& diagnostics,
+            const Assets::AssetId id,
+            const Core::ErrorCode error)
+        {
+            diagnostics.LastFailedAsset = id;
+            diagnostics.LastError = error;
+            ++diagnostics.TextureUploadDeferrals;
         }
     }
 
@@ -112,7 +128,9 @@ namespace Extrinsic::Runtime
 
         auto fail = [&cache, id, &options](const Core::ErrorCode error) -> Core::Result
         {
-            if (options.NotifyCacheFailedOnUploadError && !IsTypeMismatch(error))
+            if (options.NotifyCacheFailedOnUploadError
+                && !IsTypeMismatch(error)
+                && !IsUploadDeferral(error))
             {
                 cache.NotifyFailed(id);
             }
@@ -188,6 +206,11 @@ namespace Extrinsic::Runtime
             auto result = RequestTextureAssetUpload(Service, Cache, id, Options);
             if (!result.has_value())
             {
+                if (IsUploadDeferral(result.error()))
+                {
+                    RecordDeferral(Diagnostics, id, result.error());
+                    return result;
+                }
                 RecordFailure(Diagnostics, id, result.error());
                 return result;
             }

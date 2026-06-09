@@ -205,6 +205,13 @@ namespace Extrinsic::Runtime
                 : error;
         }
 
+        [[nodiscard]] bool IsTextureUploadDeferral(
+            const Core::ErrorCode error) noexcept
+        {
+            return error == Core::ErrorCode::DeviceNotOperational
+                || error == Core::ErrorCode::ResourceBusy;
+        }
+
         [[nodiscard]] std::string FileNameFromPath(const std::string_view path)
         {
             if (path.empty())
@@ -1901,17 +1908,20 @@ namespace Extrinsic::Runtime
         {
             Assets::AssetService&     AssetService;
             Graphics::GpuAssetCache*  GpuAssetCache;
+            AssetModelSceneHandoff*   ModelSceneHandoff;
             RHI::IDevice&             Device;
             RenderExtractionCache&    Extraction;
             Graphics::IRenderer&      Renderer;
 
             AssetHooks(Assets::AssetService& assetService,
                        Graphics::GpuAssetCache* gpuAssetCache,
+                       AssetModelSceneHandoff* modelSceneHandoff,
                        RHI::IDevice& device,
                        RenderExtractionCache& extraction,
                        Graphics::IRenderer& renderer)
                 : AssetService(assetService)
                 , GpuAssetCache(gpuAssetCache)
+                , ModelSceneHandoff(modelSceneHandoff)
                 , Device(device)
                 , Extraction(extraction)
                 , Renderer(renderer)
@@ -1930,6 +1940,11 @@ namespace Extrinsic::Runtime
                 if (GpuAssetCache)
                 {
                     GpuAssetCache->Tick(currentFrame, framesInFlight);
+                }
+                if (ModelSceneHandoff)
+                {
+                    static_cast<void>(
+                        ModelSceneHandoff->ResolvePendingMaterialTextureBindings());
                 }
                 // GRAPHICS-030C: drive the procedural geometry cache's
                 // deferred-retire window with the same CPU frame counter and
@@ -1953,6 +1968,7 @@ namespace Extrinsic::Runtime
         StreamingHooks streamingHooks(*m_StreamingGraph, *m_StreamingExecutor);
         AssetHooks assetHooks(*m_AssetService,
                               m_GpuAssetCache.get(),
+                              m_AssetModelSceneHandoff.get(),
                               *m_Device,
                               m_RenderExtraction,
                               *m_Renderer);
@@ -2419,18 +2435,28 @@ namespace Extrinsic::Runtime
         }
 
         DrainAssetImportEvents(*m_AssetService);
-        if (m_GpuAssetCache->GetState(*asset) == Graphics::GpuAssetState::NotRequested)
+        AssetModelTextureHandoffDiagnostics after =
+            m_AssetModelTextureHandoff->GetDiagnostics();
+        const bool uploadWasAlreadyHandled =
+            after.TextureUploadRequests > before.TextureUploadRequests ||
+            after.TextureUploadDeferrals > before.TextureUploadDeferrals ||
+            after.TextureUploadFailures > before.TextureUploadFailures;
+
+        if (!uploadWasAlreadyHandled &&
+            m_GpuAssetCache->GetState(*asset) == Graphics::GpuAssetState::NotRequested)
         {
             if (Core::Result uploaded =
                     m_AssetModelTextureHandoff->UploadReadyTexture(*asset);
                 !uploaded.has_value())
             {
-                return Core::Err<RuntimeAssetImportResult>(uploaded.error());
+                if (!IsTextureUploadDeferral(uploaded.error()))
+                {
+                    return Core::Err<RuntimeAssetImportResult>(uploaded.error());
+                }
             }
         }
 
-        const AssetModelTextureHandoffDiagnostics after =
-            m_AssetModelTextureHandoff->GetDiagnostics();
+        after = m_AssetModelTextureHandoff->GetDiagnostics();
         if (after.TextureUploadFailures > before.TextureUploadFailures &&
             after.LastFailedAsset == *asset)
         {

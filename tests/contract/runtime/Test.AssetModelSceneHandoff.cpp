@@ -13,6 +13,7 @@
 
 #include <glm/glm.hpp>
 
+import Extrinsic.Asset.EventBus;
 import Extrinsic.Asset.GeometryIOBridge;
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.ModelTexturePayload;
@@ -243,7 +244,8 @@ TEST(RuntimeAssetModelSceneHandoff, MaterializeModelSceneCreatesMeshEntityAndUpl
     EXPECT_EQ(diagnostics.EmbeddedTextureAssetsCreated, 1u);
     EXPECT_EQ(diagnostics.EmbeddedTextureUploadRequests, 1u);
     EXPECT_EQ(diagnostics.MaterialInstancesCreated, 1u);
-    EXPECT_EQ(diagnostics.MaterialTextureBindingFailures, 1u);
+    EXPECT_EQ(diagnostics.MaterialTextureBindingUploadDeferrals, 1u);
+    EXPECT_EQ(diagnostics.MaterialTextureBindingFailures, 0u);
 }
 
 TEST(RuntimeAssetModelSceneHandoff, ReadyModelSceneEventMaterializesRecordAndOwnsGeneratedEntities)
@@ -326,4 +328,127 @@ TEST(RuntimeAssetModelSceneHandoff, MaterialBindingsResolveWhenChildTextureAlrea
     EXPECT_TRUE(state->Record.Materials[0].TextureBindingsResolved);
     EXPECT_EQ(diagnostics.MaterialTextureBindingsResolved, 1u);
     EXPECT_EQ(diagnostics.MaterialTextureBindingFailures, 0u);
+}
+
+TEST(RuntimeAssetModelSceneHandoff, PendingMaterialBindingsResolveAfterTextureUploadTick)
+{
+    SceneHandoffFixture fx;
+    TmpFile modelFile("asset_model_scene_handoff_pending_resolve.gltf");
+
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(fx.Device);
+    Runtime::AssetModelSceneHandoff handoff(fx.Service, fx.Cache, fx.Scene, *renderer);
+
+    auto model = LoadModel(fx.Service, modelFile.Path.string(), MakeModelScenePayload());
+    ASSERT_TRUE(model.has_value()) << static_cast<int>(model.error());
+
+    FlushAssetEvents(fx.Service);
+    FlushAssetEvents(fx.Service);
+
+    const Runtime::AssetModelSceneHandoffRecord* record = handoff.FindRecord(*model);
+    ASSERT_NE(record, nullptr);
+    ASSERT_EQ(record->Materials.size(), 1u);
+    EXPECT_FALSE(record->Materials[0].TextureBindingsResolved);
+    ASSERT_EQ(record->EmbeddedTextureAssets.size(), 1u);
+    EXPECT_EQ(fx.Cache.GetState(record->EmbeddedTextureAssets[0]),
+              Graphics::GpuAssetState::GpuUploading);
+
+    fx.Cache.Tick(0u, 2u);
+    auto resolved = handoff.ResolvePendingMaterialTextureBindings();
+    ASSERT_TRUE(resolved.has_value()) << static_cast<int>(resolved.error());
+    EXPECT_EQ(*resolved, 1u);
+
+    record = handoff.FindRecord(*model);
+    ASSERT_NE(record, nullptr);
+    ASSERT_EQ(record->Materials.size(), 1u);
+    EXPECT_TRUE(record->Materials[0].TextureBindingsResolved);
+
+    const auto diagnostics = handoff.GetDiagnostics();
+    EXPECT_EQ(diagnostics.MaterialTextureBindingsResolved, 1u);
+    EXPECT_EQ(diagnostics.MaterialTextureBindingReresolveRequests, 2u);
+    EXPECT_EQ(diagnostics.MaterialTextureBindingReresolveSuccesses, 1u);
+    EXPECT_EQ(diagnostics.MaterialTextureBindingReresolveFailures, 0u);
+    EXPECT_GE(diagnostics.MaterialTextureBindingUploadDeferrals, 1u);
+}
+
+TEST(RuntimeAssetModelSceneHandoff, ReloadedEmbeddedTextureInvalidatesAndReresolvesBinding)
+{
+    SceneHandoffFixture fx;
+    TmpFile modelFile("asset_model_scene_handoff_reload_resolve.gltf");
+
+    const Assets::AssetEventBus::ListenerToken cacheToken = fx.Service.SubscribeAll(
+        [&cache = fx.Cache](const Assets::AssetId id, const Assets::AssetEvent event)
+        {
+            switch (event)
+            {
+            case Assets::AssetEvent::Failed:
+                cache.NotifyFailed(id);
+                break;
+            case Assets::AssetEvent::Reloaded:
+                cache.NotifyReloaded(id);
+                break;
+            case Assets::AssetEvent::Destroyed:
+                cache.NotifyDestroyed(id);
+                break;
+            case Assets::AssetEvent::Ready:
+                break;
+            }
+        });
+    Runtime::AssetModelTextureHandoff textureHandoff(fx.Service, fx.Cache);
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(fx.Device);
+    Runtime::AssetModelSceneHandoff handoff(fx.Service, fx.Cache, fx.Scene, *renderer);
+
+    auto model = LoadModel(fx.Service, modelFile.Path.string(), MakeModelScenePayload());
+    ASSERT_TRUE(model.has_value()) << static_cast<int>(model.error());
+
+    FlushAssetEvents(fx.Service);
+    FlushAssetEvents(fx.Service);
+
+    const Runtime::AssetModelSceneHandoffRecord* record = handoff.FindRecord(*model);
+    ASSERT_NE(record, nullptr);
+    ASSERT_EQ(record->EmbeddedTextureAssets.size(), 1u);
+    const Assets::AssetId childTexture = record->EmbeddedTextureAssets[0];
+
+    fx.Cache.Tick(0u, 2u);
+    ASSERT_TRUE(handoff.ResolvePendingMaterialTextureBindings().has_value());
+    record = handoff.FindRecord(*model);
+    ASSERT_NE(record, nullptr);
+    ASSERT_EQ(record->Materials.size(), 1u);
+    ASSERT_TRUE(record->Materials[0].TextureBindingsResolved);
+
+    ASSERT_TRUE(fx.Service.Reload<Assets::AssetTexture2DPayload>(
+        childTexture,
+        [](std::string_view, Assets::AssetId)
+            -> Core::Expected<Assets::AssetTexture2DPayload>
+        {
+            Assets::AssetTexture2DPayload payload = MakeEmbeddedTexturePayload();
+            payload.PixelBytes.assign(4u, std::byte{0x33});
+            return payload;
+        }).has_value());
+
+    FlushAssetEvents(fx.Service);
+
+    record = handoff.FindRecord(*model);
+    ASSERT_NE(record, nullptr);
+    ASSERT_EQ(record->Materials.size(), 1u);
+    EXPECT_FALSE(record->Materials[0].TextureBindingsResolved);
+    EXPECT_EQ(fx.Cache.GetState(childTexture), Graphics::GpuAssetState::GpuUploading);
+
+    fx.Cache.Tick(1u, 2u);
+    auto resolved = handoff.ResolvePendingMaterialTextureBindings();
+    ASSERT_TRUE(resolved.has_value()) << static_cast<int>(resolved.error());
+    EXPECT_EQ(*resolved, 1u);
+
+    record = handoff.FindRecord(*model);
+    ASSERT_NE(record, nullptr);
+    ASSERT_EQ(record->Materials.size(), 1u);
+    EXPECT_TRUE(record->Materials[0].TextureBindingsResolved);
+
+    const auto diagnostics = handoff.GetDiagnostics();
+    EXPECT_EQ(diagnostics.MaterialTextureBindingReloadInvalidations, 1u);
+    EXPECT_EQ(diagnostics.MaterialTextureBindingReresolveSuccesses, 2u);
+    EXPECT_EQ(diagnostics.MaterialTextureBindingReresolveFailures, 0u);
+
+    fx.Service.UnsubscribeAll(cacheToken);
 }

@@ -58,5 +58,5 @@ python3 tools/docs/check_doc_links.py --root .
 - Mutating ECS or asset state from worker threads.
 
 ## Maturity
-- Target: `CPUContracted` for the ingest state machine; broad visual proof remains `ASSETIO-004`.
-- `Operational` owned by `ASSETIO-004`.
+- Target: `CPUContracted` for the ingest state machine; representative CPU/null import coverage is retired by `ASSETIO-004`.
+- no `Operational` follow-up is owed for RUNTIME-101; broader file-backed GPU/readback proof requires a future value-gated task outside this ingest-state-machine scope.

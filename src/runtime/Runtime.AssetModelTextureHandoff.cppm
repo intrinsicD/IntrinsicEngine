@@ -25,6 +25,7 @@ export namespace Extrinsic::Runtime
         std::uint64_t ReadyEventsObserved{0};
         std::uint64_t TextureReadyEvents{0};
         std::uint64_t TextureUploadRequests{0};
+        std::uint64_t TextureUploadDeferrals{0};
         std::uint64_t TextureUploadFailures{0};
         std::uint64_t TextureUnsupportedFormat{0};
         std::uint64_t TextureInvalidPayloads{0};

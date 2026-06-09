@@ -27,6 +27,11 @@ namespace Extrinsic::Graphics
 {
     namespace
     {
+        [[nodiscard]] bool IsUploadDeferral(const Core::ErrorCode error) noexcept
+        {
+            return error == Core::ErrorCode::DeviceNotOperational;
+        }
+
         struct Slot
         {
             // Visible to GetView() once state == Ready.  Empty before then
@@ -193,11 +198,17 @@ namespace Extrinsic::Graphics
         auto leaseOr = m_Impl->Buffers.Create(req.Desc);
         if (!leaseOr.has_value())
         {
+            ++m_Impl->Diagnostics.UploadFailures;
+            if (IsUploadDeferral(leaseOr.error()))
+            {
+                ++m_Impl->Diagnostics.UploadDeferrals;
+                return Core::Err(leaseOr.error());
+            }
+
             // Allocation failure: keep any existing Current view valid;
             // tear down any old pending so we don't leak an in-flight token.
             m_Impl->RetirePending(slot);
             slot.State = GpuAssetState::Failed;
-            ++m_Impl->Diagnostics.UploadFailures;
             return Core::Err(leaseOr.error());
         }
 
@@ -241,9 +252,15 @@ namespace Extrinsic::Graphics
             auto samplerOr = m_Impl->CreateSamplerLease(req.SamplerDesc);
             if (!samplerOr.has_value())
             {
+                ++m_Impl->Diagnostics.UploadFailures;
+                if (IsUploadDeferral(samplerOr.error()))
+                {
+                    ++m_Impl->Diagnostics.UploadDeferrals;
+                    return Core::Err(samplerOr.error());
+                }
+
                 m_Impl->RetirePending(slot);
                 slot.State = GpuAssetState::Failed;
-                ++m_Impl->Diagnostics.UploadFailures;
                 return Core::Err(samplerOr.error());
             }
             samplerLease = std::move(*samplerOr);
@@ -253,9 +270,15 @@ namespace Extrinsic::Graphics
         auto leaseOr = m_Impl->Textures.Create(req.Desc, sampler);
         if (!leaseOr.has_value())
         {
+            ++m_Impl->Diagnostics.UploadFailures;
+            if (IsUploadDeferral(leaseOr.error()))
+            {
+                ++m_Impl->Diagnostics.UploadDeferrals;
+                return Core::Err(leaseOr.error());
+            }
+
             m_Impl->RetirePending(slot);
             slot.State = GpuAssetState::Failed;
-            ++m_Impl->Diagnostics.UploadFailures;
             ++m_Impl->Diagnostics.TextureCreateFailures;
             return Core::Err(leaseOr.error());
         }

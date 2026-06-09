@@ -39,10 +39,16 @@ export namespace Extrinsic::Runtime
         std::uint64_t PrimitiveEntitiesCreated{0};
         std::uint64_t EmbeddedTextureAssetsCreated{0};
         std::uint64_t EmbeddedTextureUploadRequests{0};
+        std::uint64_t EmbeddedTextureUploadDeferrals{0};
         std::uint64_t EmbeddedTextureUploadFailures{0};
         std::uint64_t MaterialInstancesCreated{0};
         std::uint64_t MaterialTextureBindingsResolved{0};
         std::uint64_t MaterialTextureBindingFailures{0};
+        std::uint64_t MaterialTextureBindingUploadDeferrals{0};
+        std::uint64_t MaterialTextureBindingReloadInvalidations{0};
+        std::uint64_t MaterialTextureBindingReresolveRequests{0};
+        std::uint64_t MaterialTextureBindingReresolveSuccesses{0};
+        std::uint64_t MaterialTextureBindingReresolveFailures{0};
         std::uint64_t NonModelSceneReadyEvents{0};
         Assets::AssetId LastFailedAsset{};
         Core::ErrorCode LastError{Core::ErrorCode::Success};
@@ -123,6 +129,7 @@ export namespace Extrinsic::Runtime
             Assets::AssetId modelAsset) const noexcept;
 
         [[nodiscard]] Core::Result MaterializeReadyModelScene(Assets::AssetId modelAsset);
+        [[nodiscard]] Core::Expected<std::uint64_t> ResolvePendingMaterialTextureBindings();
 
     private:
         struct Impl;

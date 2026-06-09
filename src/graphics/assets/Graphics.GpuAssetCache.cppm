@@ -34,6 +34,7 @@ import Extrinsic.RHI.TransferQueue;
 //   Ready        -- NotifyReloaded --------> CpuPending    (old lease retained)
 //   GpuUploading -- transfer complete -----> Ready
 //   GpuUploading -- create / queue fail ---> Failed
+//   *            -- non-operational GPU --> unchanged (retryable deferral)
 //   *            -- NotifyDestroyed -------> NotRequested  (lease retired)
 //
 // Old-view lifetime preservation:
@@ -115,6 +116,7 @@ export namespace Extrinsic::Graphics
         std::uint64_t UploadRequests = 0;
         std::uint64_t TextureUploadRequests = 0;
         std::uint64_t UploadFailures = 0;
+        std::uint64_t UploadDeferrals = 0;
         std::uint64_t TextureCreateFailures = 0;
         std::uint64_t SamplerCreateFailures = 0;
         std::uint64_t FallbackHits = 0;
@@ -180,8 +182,10 @@ export namespace Extrinsic::Graphics
         // Submit a CPU byte blob for upload.
         //   ResourceBusy      — entry is already GpuUploading; previous upload
         //                       is still in flight, retry after the next Tick.
-        //   OutOfDeviceMemory — Buffer/Texture allocation failed; entry
-        //                       transitions to Failed.
+        //   DeviceNotOperational — GPU backend cannot accept work yet; entry
+        //                          stays in its previous state for a retry.
+        //   OutOfDeviceMemory    — Buffer/Texture allocation failed; entry
+        //                          transitions to Failed.
         //   InvalidArgument   — Id is not valid.
         Core::Result RequestUpload(const GpuBufferRequest&  req);
         Core::Result RequestUpload(const GpuTextureRequest& req);

@@ -32,8 +32,11 @@ Graphics-owned bridge between `Assets::AssetId` and GPU resources.
   or the fallback view for missing, pending, or failed texture assets while
   reporting the `GpuAssetFallbackReason`.
 - `GpuAssetCacheDiagnostics` records upload counts, texture/sampler allocation
-  failures, fallback hits/misses, retire-queue size, and the explicit
-  non-evicting cache policy used for this first residency slice.
+  failures, retryable upload deferrals, fallback hits/misses, retire-queue
+  size, and the explicit non-evicting cache policy used for this first
+  residency slice. A non-operational GPU backend leaves the entry in its
+  previous state so runtime can retry later; allocation and payload failures
+  still fail closed.
 - The cache does not evict ready assets yet. Capacity/eviction work must be a
   later semantic task; callers can still observe deterministic diagnostics and
   retire-queue behavior today.
@@ -163,10 +166,10 @@ renderables.
   `MaterialTextureAssetBindings` keyed by the child `AssetId`s. The material
   system consumes those IDs through `ResolveTextureAssetBindings()`: ready
   children resolve to bindless indices, while pending/missing/failed children
-  use the fallback path when available. Post-upload material re-resolution after
-  an embedded child transitions from pending to ready is not a graphics-cache
-  subscription; final runtime/app consumption remains owned by the later
-  operational sandbox slice.
+  use the fallback path when available. Post-upload and post-reload material
+  re-resolution is runtime-owned through
+  `AssetModelSceneHandoff::ResolvePendingMaterialTextureBindings()`; graphics
+  continues to expose only cache state and material-resolution primitives.
   `AssetEvent::Destroyed` flows to `cache.NotifyDestroyed(id)` which queues
   live leases for retirement.
   Editor / app code may expose per-asset upload priority hints through

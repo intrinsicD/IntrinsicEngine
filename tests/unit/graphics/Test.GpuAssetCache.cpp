@@ -533,6 +533,44 @@ TEST(GpuAssetCache, TextureCreateAndSamplerCreateFailuresAreDiagnosed)
     EXPECT_EQ(diagnostics.TextureUploadRequests, 2u);
 }
 
+TEST(GpuAssetCache, NonOperationalUploadDefersWithoutFailingEntry)
+{
+    MockDevice device;
+    device.Operational = false;
+    RHI::BufferManager buffers(device);
+    RHI::TextureManager textures(device, device.Bindless);
+    RHI::SamplerManager samplers(device);
+    ControllableTransferQueue transfer;
+    Graphics::GpuAssetCache cache(buffers, textures, samplers, transfer);
+
+    const auto bufferId = MakeAssetId(17);
+    auto buffer = cache.RequestUpload(Graphics::GpuBufferRequest{
+        .Id = bufferId,
+        .Bytes = std::span{ZeroBytes64},
+        .Desc = AnyBufferDesc(),
+    });
+    EXPECT_FALSE(buffer.has_value());
+    EXPECT_EQ(buffer.error(), Core::ErrorCode::DeviceNotOperational);
+    EXPECT_EQ(cache.GetState(bufferId), Graphics::GpuAssetState::NotRequested);
+
+    const auto textureId = MakeAssetId(18);
+    auto texture = cache.RequestUpload(Graphics::GpuTextureRequest{
+        .Id = textureId,
+        .Bytes = std::span{ZeroBytes64},
+        .Desc = AnyTextureDesc(),
+        .Sampler = AnySampler(),
+    });
+    EXPECT_FALSE(texture.has_value());
+    EXPECT_EQ(texture.error(), Core::ErrorCode::DeviceNotOperational);
+    EXPECT_EQ(cache.GetState(textureId), Graphics::GpuAssetState::NotRequested);
+
+    const auto diagnostics = cache.GetDiagnostics();
+    EXPECT_EQ(diagnostics.UploadFailures, 2u);
+    EXPECT_EQ(diagnostics.UploadDeferrals, 2u);
+    EXPECT_EQ(diagnostics.TextureUploadRequests, 1u);
+    EXPECT_EQ(diagnostics.TextureCreateFailures, 0u);
+}
+
 TEST(GpuAssetCache, NonOperationalBackendReportsDeterministicFallbackMiss)
 {
     MockDevice device;
@@ -551,9 +589,8 @@ TEST(GpuAssetCache, NonOperationalBackendReportsDeterministicFallbackMiss)
     EXPECT_FALSE(fallback.has_value());
     EXPECT_EQ(fallback.error(), Core::ErrorCode::DeviceNotOperational);
 
-    auto resolved = cache.GetViewOrFallback(MakeAssetId(17));
+    auto resolved = cache.GetViewOrFallback(MakeAssetId(19));
     EXPECT_FALSE(resolved.has_value());
     EXPECT_EQ(resolved.error(), Core::ErrorCode::ResourceNotFound);
     EXPECT_EQ(cache.GetDiagnostics().FallbackMisses, 1u);
 }
-

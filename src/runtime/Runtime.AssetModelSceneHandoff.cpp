@@ -2,6 +2,7 @@ module;
 
 #include <cstddef>
 #include <cstdint>
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -59,6 +60,12 @@ namespace Extrinsic::Runtime
         {
             return error == Core::ErrorCode::TypeMismatch
                 || error == Core::ErrorCode::AssetTypeMismatch;
+        }
+
+        [[nodiscard]] bool IsUploadDeferral(const Core::ErrorCode error) noexcept
+        {
+            return error == Core::ErrorCode::DeviceNotOperational
+                || error == Core::ErrorCode::ResourceBusy;
         }
 
         [[nodiscard]] const char* ExtensionFor(
@@ -231,6 +238,67 @@ namespace Extrinsic::Runtime
             };
         }
 
+        [[nodiscard]] bool BindingHasTextureAsset(
+            const Graphics::MaterialTextureAssetBindings& bindings) noexcept
+        {
+            return bindings.Albedo.IsValid()
+                || bindings.Normal.IsValid()
+                || bindings.MetallicRoughness.IsValid()
+                || bindings.Emissive.IsValid();
+        }
+
+        [[nodiscard]] bool BindingReferencesTextureAsset(
+            const Graphics::MaterialTextureAssetBindings& bindings,
+            const Assets::AssetId id) noexcept
+        {
+            return id.IsValid()
+                && (bindings.Albedo == id
+                    || bindings.Normal == id
+                    || bindings.MetallicRoughness == id
+                    || bindings.Emissive == id);
+        }
+
+        [[nodiscard]] bool BindingTextureAssetsReady(
+            Graphics::GpuAssetCache& cache,
+            const Graphics::MaterialTextureAssetBindings& bindings) noexcept
+        {
+            const Assets::AssetId ids[] = {
+                bindings.Albedo,
+                bindings.Normal,
+                bindings.MetallicRoughness,
+                bindings.Emissive,
+            };
+            for (const Assets::AssetId id : ids)
+            {
+                if (id.IsValid()
+                    && cache.GetState(id) != Graphics::GpuAssetState::Ready)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        [[nodiscard]] Core::Result ResolveMaterialTextureBindingRecord(
+            Graphics::MaterialSystem& materials,
+            Graphics::GpuAssetCache& cache,
+            Graphics::MaterialHandle materialHandle,
+            const Graphics::MaterialTextureAssetBindings& bindings)
+        {
+            if (!BindingHasTextureAsset(bindings))
+            {
+                return Core::Ok();
+            }
+            if (!BindingTextureAssetsReady(cache, bindings))
+            {
+                return Core::Err(Core::ErrorCode::ResourceBusy);
+            }
+            return materials.ResolveTextureAssetBindings(
+                materialHandle,
+                bindings,
+                cache);
+        }
+
         [[nodiscard]] Core::Expected<std::vector<Assets::AssetId>> LoadEmbeddedTextures(
             Assets::AssetService& service,
             Graphics::GpuAssetCache& cache,
@@ -279,6 +347,14 @@ namespace Extrinsic::Runtime
                     }
                     else
                     {
+                        if (IsUploadDeferral(upload.error()))
+                        {
+                            if (diagnostics != nullptr)
+                            {
+                                ++diagnostics->EmbeddedTextureUploadDeferrals;
+                            }
+                            continue;
+                        }
                         if (diagnostics != nullptr)
                         {
                             ++diagnostics->EmbeddedTextureUploadFailures;
@@ -327,16 +403,21 @@ namespace Extrinsic::Runtime
                 bool resolved = false;
                 if (options.ResolveMaterialTextureBindings)
                 {
-                    auto resolve = materials.ResolveTextureAssetBindings(
+                    auto resolve = ResolveMaterialTextureBindingRecord(
+                        materials,
+                        cache,
                         lease.GetHandle(),
-                        bindings,
-                        cache);
+                        bindings);
                     resolved = resolve.has_value();
                     if (diagnostics != nullptr)
                     {
                         if (resolved)
                         {
                             ++diagnostics->MaterialTextureBindingsResolved;
+                        }
+                        else if (resolve.error() == Core::ErrorCode::ResourceBusy)
+                        {
+                            ++diagnostics->MaterialTextureBindingUploadDeferrals;
                         }
                         else
                         {
@@ -361,6 +442,81 @@ namespace Extrinsic::Runtime
             }
 
             return Core::Ok();
+        }
+
+        [[nodiscard]] Core::Expected<std::uint64_t> ResolvePendingMaterialTextureBindings(
+            Graphics::MaterialSystem& materials,
+            Graphics::GpuAssetCache& cache,
+            AssetModelSceneHandoffState& state,
+            AssetModelSceneHandoffDiagnostics* diagnostics)
+        {
+            std::uint64_t resolvedCount = 0u;
+            const std::size_t materialCount =
+                std::min(state.Record.Materials.size(), state.MaterialLeases.size());
+            for (std::size_t index = 0u; index < materialCount; ++index)
+            {
+                AssetModelSceneMaterialRecord& record = state.Record.Materials[index];
+                if (record.TextureBindingsResolved)
+                {
+                    continue;
+                }
+
+                if (diagnostics != nullptr)
+                {
+                    ++diagnostics->MaterialTextureBindingReresolveRequests;
+                }
+
+                auto result = ResolveMaterialTextureBindingRecord(
+                    materials,
+                    cache,
+                    state.MaterialLeases[index].GetHandle(),
+                    record.TextureBindings);
+                if (result.has_value())
+                {
+                    record.TextureBindingsResolved = true;
+                    ++resolvedCount;
+                    if (diagnostics != nullptr)
+                    {
+                        ++diagnostics->MaterialTextureBindingsResolved;
+                        ++diagnostics->MaterialTextureBindingReresolveSuccesses;
+                    }
+                    continue;
+                }
+
+                if (diagnostics != nullptr)
+                {
+                    if (result.error() == Core::ErrorCode::ResourceBusy)
+                    {
+                        ++diagnostics->MaterialTextureBindingUploadDeferrals;
+                    }
+                    else
+                    {
+                        ++diagnostics->MaterialTextureBindingFailures;
+                        ++diagnostics->MaterialTextureBindingReresolveFailures;
+                        diagnostics->LastFailedAsset = state.Record.ModelAsset;
+                        diagnostics->LastError = result.error();
+                    }
+                }
+            }
+
+            return resolvedCount;
+        }
+
+        void InvalidateMaterialTextureBindingsForAsset(
+            AssetModelSceneHandoffState& state,
+            const Assets::AssetId textureAsset,
+            AssetModelSceneHandoffDiagnostics& diagnostics)
+        {
+            for (AssetModelSceneMaterialRecord& material : state.Record.Materials)
+            {
+                if (!material.TextureBindingsResolved
+                    || !BindingReferencesTextureAsset(material.TextureBindings, textureAsset))
+                {
+                    continue;
+                }
+                material.TextureBindingsResolved = false;
+                ++diagnostics.MaterialTextureBindingReloadInvalidations;
+            }
         }
 
         void DestroyEntities(
@@ -597,6 +753,36 @@ namespace Extrinsic::Runtime
             return Core::Ok();
         }
 
+        [[nodiscard]] Core::Expected<std::uint64_t> ResolvePendingMaterialTextureBindings()
+        {
+            std::uint64_t resolvedCount = 0u;
+            for (auto& [_, record] : Records)
+            {
+                auto resolved = ::Extrinsic::Runtime::ResolvePendingMaterialTextureBindings(
+                    Renderer.GetMaterialSystem(),
+                    Cache,
+                    record.State,
+                    &Diagnostics);
+                if (!resolved.has_value())
+                {
+                    return Core::Err<std::uint64_t>(resolved.error());
+                }
+                resolvedCount += *resolved;
+            }
+            return resolvedCount;
+        }
+
+        void InvalidateMaterialTextureBindingsForAsset(const Assets::AssetId id)
+        {
+            for (auto& [_, record] : Records)
+            {
+                ::Extrinsic::Runtime::InvalidateMaterialTextureBindingsForAsset(
+                    record.State,
+                    id,
+                    Diagnostics);
+            }
+        }
+
         void HandleReady(const Assets::AssetId id)
         {
             ++Diagnostics.ReadyEventsObserved;
@@ -604,10 +790,19 @@ namespace Extrinsic::Runtime
             auto model = Service.Read<Assets::AssetModelScenePayload>(id);
             if (!model.has_value())
             {
-                if (IsTypeMismatch(model.error()))
+                if (!IsTypeMismatch(model.error()))
+                {
+                    return;
+                }
+
+                auto texture = Service.Read<Assets::AssetTexture2DPayload>(id);
+                if (texture.has_value())
                 {
                     ++Diagnostics.NonModelSceneReadyEvents;
+                    static_cast<void>(ResolvePendingMaterialTextureBindings());
+                    return;
                 }
+                ++Diagnostics.NonModelSceneReadyEvents;
                 return;
             }
 
@@ -620,6 +815,10 @@ namespace Extrinsic::Runtime
             if (event == Assets::AssetEvent::Ready)
             {
                 HandleReady(id);
+            }
+            else if (event == Assets::AssetEvent::Reloaded)
+            {
+                InvalidateMaterialTextureBindingsForAsset(id);
             }
         }
     };
@@ -676,5 +875,15 @@ namespace Extrinsic::Runtime
             return Core::Err(Core::ErrorCode::InvalidState);
         }
         return m_Impl->MaterializeReadyModelScene(modelAsset);
+    }
+
+    Core::Expected<std::uint64_t>
+    AssetModelSceneHandoff::ResolvePendingMaterialTextureBindings()
+    {
+        if (m_Impl == nullptr)
+        {
+            return Core::Err<std::uint64_t>(Core::ErrorCode::InvalidState);
+        }
+        return m_Impl->ResolvePendingMaterialTextureBindings();
     }
 }
