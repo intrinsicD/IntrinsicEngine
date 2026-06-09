@@ -9,6 +9,19 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`BUG-024B`](BUG-024B-sandbox-transform-edit-vulkan-pixel-shift-smoke.md) —
+Vulkan pixel-shift smoke for sandbox transform edits — retired to
+`tasks/done/` on 2026-06-10 at maturity `Operational`. The opt-in
+`gpu;vulkan` smoke `RuntimeSandboxAcceptanceGpuSmoke.InspectorTransformEditShiftsReferenceTrianglePixels`
+applies the promoted Inspector transform-edit command through the live
+`EditorCommandHistory` path on a mid-run frame (after that frame's
+fixed-step bundle) and asserts the rendered `ReferenceTriangle` moved: the
+frame center returns to the background and the analytically projected
+shifted sample contains the triangle. Passed on NVIDIA GeForce RTX 3050 /
+driver 590.48.01 (focused 1/1; full smoke suite 6/6), upgrading the BUG-024
+fix from `CPUContracted` to `Operational`. Theme G has no open members.
+
+Backlog
 [`BUG-024`](BUG-024-sandbox-transform-edit-rendering.md) — sandbox transform
 UI edits do not move rendered triangle — retired to `tasks/done/` on
 2026-06-10 at maturity `CPUContracted`. Root cause: Inspector/gizmo

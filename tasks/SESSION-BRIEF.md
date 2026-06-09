@@ -45,10 +45,6 @@ the authoritative open/unblocked view.
 - unblocked: `RUNTIME-103` — Geometry algorithm execution queue (tasks/backlog/runtime/RUNTIME-103-geometry-algorithm-execution-queue.md)
 - unblocked: `RUNTIME-104` — Derived overlay producer lifecycle (tasks/backlog/runtime/RUNTIME-104-derived-overlay-producer-lifecycle.md)
 
-## Theme G — Active bugs
-
-- unblocked: `BUG-024B` — Vulkan pixel-shift smoke for sandbox transform edits (tasks/backlog/bugs/BUG-024B-sandbox-transform-edit-vulkan-pixel-shift-smoke.md)
-
 ## Theme H — Agentic workflow hardening
 
 - unblocked: `PROC-008` — Category README state/history split (tasks/backlog/process/PROC-008-category-readme-state-history-split.md)

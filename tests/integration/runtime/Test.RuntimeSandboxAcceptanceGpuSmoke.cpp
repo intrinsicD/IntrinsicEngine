@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -30,6 +31,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -343,7 +345,8 @@ struct AcceptanceBootstrap
 
 // Reproduce the actual `src/app/Sandbox/main.cpp` config path: keep
 // `CreateReferenceEngineConfig()` defaults, including validation and VSync.
-[[nodiscard]] AcceptanceBootstrap BootstrapDefaultSandboxAppEngine()
+[[nodiscard]] AcceptanceBootstrap BootstrapDefaultSandboxAppEngineWithApp(
+    std::unique_ptr<IApplication> app)
 {
     if (!Extrinsic::Platform::Backends::Glfw::CanInitialize())
     {
@@ -355,8 +358,7 @@ struct AcceptanceBootstrap
     }
 
     auto config = Extrinsic::Runtime::CreateReferenceEngineConfig();
-    auto enginePtr = std::make_unique<Engine>(
-        config, std::make_unique<ExitAfterFramesApp>(kTargetFrames));
+    auto enginePtr = std::make_unique<Engine>(config, std::move(app));
     enginePtr->Initialize();
 
     const auto initInputs = GetVulkanDeviceOperationalInputs(&enginePtr->GetDevice());
@@ -371,6 +373,12 @@ struct AcceptanceBootstrap
     }
 
     return AcceptanceBootstrap{.EnginePtr = std::move(enginePtr), .Skipped = false, .SkipReason = {}};
+}
+
+[[nodiscard]] AcceptanceBootstrap BootstrapDefaultSandboxAppEngine()
+{
+    return BootstrapDefaultSandboxAppEngineWithApp(
+        std::make_unique<ExitAfterFramesApp>(kTargetFrames));
 }
 
 struct AcceptanceRunCapture
@@ -905,6 +913,240 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ExtrinsicSandboxDefaultConfigPresentsRefe
         << " mesh uploads=" << ex.MeshGeometryUploads
         << " mesh reuse=" << ex.MeshGeometryReuseHits
         << " nearest background distance=" << nearestBackgroundDistance
+        << " pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+    device.DestroyBuffer(readbackBuffer);
+    engine.Shutdown();
+}
+
+// --- BUG-024B: inspector transform edit shifts rendered pixels --------------
+
+namespace
+{
+// World-space offset applied to the ReferenceTriangle through the promoted
+// editor command path. Chosen so the shifted triangle stays well inside the
+// default reference camera frustum while clearing the frame center.
+constexpr glm::vec3 kBug024Shift{1.5f, 0.0f, 0.0f};
+constexpr std::uint32_t kBug024EditFrame = 3u;
+constexpr std::uint32_t kBug024TotalFrames = 8u;
+
+// Project a world point on the z=0 plane through the reference camera
+// (position (0,0,3), forward -z, fovy 45 deg, Vulkan Y-flip) to pixel
+// coordinates, mirroring Runtime.ReferenceScene's BuildReferenceCameraViewInput.
+[[nodiscard]] std::pair<std::uint32_t, std::uint32_t> ProjectReferenceCameraPixel(
+    const glm::vec3 world,
+    const Extrinsic::Core::Extent2D extent) noexcept
+{
+    const float aspect = static_cast<float>(extent.Width) /
+                         static_cast<float>(extent.Height > 0 ? extent.Height : 1);
+    const float tanHalfFovY = std::tan(glm::radians(45.0f) * 0.5f);
+    const float viewDepth = 3.0f - world.z;
+    const float ndcX = world.x / (tanHalfFovY * aspect * viewDepth);
+    // The reference projection flips Y for Vulkan clip space, so world +y
+    // maps to screen-up (smaller pixel y); ndcY here is already screen-space.
+    const float ndcY = -world.y / (tanHalfFovY * viewDepth);
+    const auto toPixel = [](const float ndc, const std::uint32_t size) noexcept
+    {
+        const float clamped = std::clamp(ndc, -0.99f, 0.99f);
+        return static_cast<std::uint32_t>((clamped + 1.0f) * 0.5f *
+                                          static_cast<float>(size));
+    };
+    return {toPixel(ndcX, static_cast<std::uint32_t>(extent.Width)),
+            toPixel(ndcY, static_cast<std::uint32_t>(extent.Height))};
+}
+
+// Sandbox app that applies the promoted Inspector transform-edit command (the
+// live EditorCommandHistory path) to the ReferenceTriangle on a mid-run frame
+// — i.e. after that frame's fixed-step bundle already ran — and exits after a
+// bounded number of frames so the readback captures post-edit pixels.
+class EditTriangleViaInspectorApp final : public IApplication
+{
+public:
+    void OnInitialize(Engine& engine) override
+    {
+        m_EditorUi.Attach(engine);
+    }
+
+    void OnSimTick(Engine&, double) override {}
+
+    void OnVariableTick(Engine& engine, double, double) override
+    {
+        ++m_Frames;
+        if (m_Frames == kBug024EditFrame)
+        {
+            const EntityHandle triangle =
+                FindEntityByName(engine.GetScene(), "ReferenceTriangle");
+            if (triangle != Extrinsic::ECS::InvalidEntityHandle)
+            {
+                const Extrinsic::Runtime::SandboxEditorContext context{
+                    .Scene = &engine.GetScene(),
+                    .Selection = &engine.GetSelectionController(),
+                    .CommandHistory = &engine.GetEditorCommandHistory(),
+                };
+                EditStatus = Extrinsic::Runtime::ApplySandboxEditorTransformEdit(
+                    context,
+                    Extrinsic::Runtime::SandboxEditorTransformEditCommand{
+                        .StableEntityId =
+                            Extrinsic::Runtime::SelectionController::ToStableEntityId(triangle),
+                        .SetPosition = true,
+                        .Position = kBug024Shift,
+                    });
+            }
+        }
+        if (m_Frames >= kBug024TotalFrames)
+        {
+            engine.RequestExit();
+        }
+    }
+
+    void OnShutdown(Engine&) override
+    {
+        m_EditorUi.Detach();
+    }
+
+    Extrinsic::Runtime::SandboxEditorCommandStatus EditStatus{
+        Extrinsic::Runtime::SandboxEditorCommandStatus::NoChange};
+
+private:
+    Extrinsic::Runtime::SandboxEditorUi m_EditorUi{};
+    std::uint32_t m_Frames{0u};
+};
+} // namespace
+
+// BUG-024B — Operational proof of the BUG-024 fix: a mid-run Inspector
+// transform edit through the promoted editor command path (not a direct
+// WorldMatrix write) moves the rendered ReferenceTriangle. The frame center
+// returns to the background color and the projected shifted location contains
+// the triangle. Without the runtime pre-render transform flush, the high-fps
+// bounded run schedules no fixed substep after the edit, so the triangle
+// would keep rendering at the origin.
+TEST(RuntimeSandboxAcceptanceGpuSmoke, InspectorTransformEditShiftsReferenceTrianglePixels)
+{
+    auto app = std::make_unique<EditTriangleViaInspectorApp>();
+    auto* appPtr = app.get();
+    auto bootstrap = BootstrapDefaultSandboxAppEngineWithApp(std::move(app));
+    if (bootstrap.Skipped)
+    {
+        GTEST_SKIP() << bootstrap.SkipReason;
+    }
+    Engine& engine = *bootstrap.EnginePtr;
+
+    const EntityHandle triangle = FindEntityByName(engine.GetScene(), "ReferenceTriangle");
+    ASSERT_NE(triangle, Extrinsic::ECS::InvalidEntityHandle);
+
+    auto& renderer = engine.GetRenderer();
+    auto& device = engine.GetDevice();
+    const Extrinsic::RHI::Format backbufferFormat = device.GetBackbufferFormat();
+    const std::uint32_t bytesPerPixel = Extrinsic::RHI::BytesPerBlock(backbufferFormat);
+    const Extrinsic::Core::Extent2D extent = device.GetBackbufferExtent();
+    if (bytesPerPixel < 4u || extent.Width <= 0 || extent.Height <= 0)
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style smoke readback.";
+    }
+
+    const std::uint64_t readbackSize =
+        static_cast<std::uint64_t>(bytesPerPixel) *
+        static_cast<std::uint64_t>(extent.Width) *
+        static_cast<std::uint64_t>(extent.Height);
+    const Extrinsic::RHI::BufferHandle readbackBuffer = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
+        .SizeBytes = readbackSize,
+        .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
+        .HostVisible = true,
+        .DebugName = "Sandbox.Bug024TransformEdit.Readback",
+    });
+    if (!readbackBuffer.IsValid())
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Readback buffer allocation failed; gpu;vulkan smoke is opt-in.";
+    }
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(readbackBuffer);
+
+    const auto run = DriveAcceptanceAndCapture(engine);
+
+    if (!run.DeviceOperational)
+    {
+        renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+        device.DestroyBuffer(readbackBuffer);
+        engine.Shutdown();
+        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach operational Vulkan for the BUG-024B edit smoke: status="
+                      << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
+                      << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+        return;
+    }
+
+    ASSERT_EQ(appPtr->EditStatus, Extrinsic::Runtime::SandboxEditorCommandStatus::Applied)
+        << "Inspector transform-edit command did not apply during the bounded run.";
+
+    // The CPU-side contract from BUG-024 must hold on the live engine: the
+    // edited local position reached the world matrix and the dirty tags were
+    // flushed + drained within the run.
+    auto& raw = engine.GetScene().Raw();
+    const glm::mat4& world = raw.get<ECSC::Transform::WorldMatrix>(triangle).Matrix;
+    EXPECT_FLOAT_EQ(world[3].x, kBug024Shift.x);
+    EXPECT_FLOAT_EQ(world[3].y, kBug024Shift.y);
+    EXPECT_FLOAT_EQ(world[3].z, kBug024Shift.z);
+    EXPECT_FALSE(raw.any_of<ECSC::Transform::IsDirtyTag>(triangle));
+
+    EXPECT_TRUE(run.Stats.Compile.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_TRUE(run.Stats.Execute.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_EQ(FindPassStatus(run.Stats, "SurfacePass"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_EQ(FindPassStatus(run.Stats, "Present"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_GE(run.Stats.DefaultRecipeBackbufferReadbackCopyCount, 1u)
+        << "BUG-024B readback triplet did not record on an operational frame.";
+
+    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(readbackSize), 0u);
+    device.ReadBuffer(readbackBuffer, bytes.data(), readbackSize, 0u);
+
+    const std::uint32_t centerX = static_cast<std::uint32_t>(extent.Width / 2);
+    const std::uint32_t centerY = static_cast<std::uint32_t>(extent.Height / 2);
+    const RgbaPixel center =
+        ReadPixel(bytes, backbufferFormat, bytesPerPixel, extent, centerX, centerY);
+
+    // Triangle interior sample: the shifted triangle's centroid column on the
+    // z=0 plane, projected through the reference camera.
+    const auto [shiftX, shiftY] = ProjectReferenceCameraPixel(kBug024Shift, extent);
+    const RgbaPixel shifted =
+        ReadPixel(bytes, backbufferFormat, bytesPerPixel, extent, shiftX, shiftY);
+
+    // Background probes far from both the original and shifted triangle and
+    // from the proven-background sample columns of the sibling smokes.
+    const RgbaPixel backgroundBottom = ReadPixel(
+        bytes, backbufferFormat, bytesPerPixel, extent,
+        centerX, static_cast<std::uint32_t>((extent.Height * 7) / 8));
+    const RgbaPixel backgroundCorner = ReadPixel(
+        bytes, backbufferFormat, bytesPerPixel, extent,
+        static_cast<std::uint32_t>((extent.Width * 15) / 16),
+        static_cast<std::uint32_t>((extent.Height * 15) / 16));
+
+    const auto pixelText = [](const RgbaPixel p)
+    {
+        return "(" + std::to_string(static_cast<int>(p.R)) + "," +
+               std::to_string(static_cast<int>(p.G)) + "," +
+               std::to_string(static_cast<int>(p.B)) + ")";
+    };
+
+    // The frame center returned to the background after the edit.
+    EXPECT_LT(RgbDistance(center, backgroundBottom), 48)
+        << "Frame center did not return to the background after the inspector edit. center="
+        << pixelText(center) << " backgroundBottom=" << pixelText(backgroundBottom)
+        << " backgroundCorner=" << pixelText(backgroundCorner)
+        << " shifted=" << pixelText(shifted) << " at (" << shiftX << "," << shiftY << ")"
+        << " extent=" << extent.Width << "x" << extent.Height;
+
+    // The shifted sample location contains the triangle.
+    const int shiftedToBackground = std::min(RgbDistance(shifted, backgroundBottom),
+                                             RgbDistance(shifted, backgroundCorner));
+    EXPECT_GT(shiftedToBackground, 48)
+        << "The rendered triangle did not appear at the shifted location after the inspector edit. "
+        << "shifted=" << pixelText(shifted) << " at (" << shiftX << "," << shiftY << ")"
+        << " center=" << pixelText(center)
+        << " backgroundBottom=" << pixelText(backgroundBottom)
+        << " backgroundCorner=" << pixelText(backgroundCorner)
+        << " extent=" << extent.Width << "x" << extent.Height
         << " pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
 
     renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});

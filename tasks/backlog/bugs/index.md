@@ -5,13 +5,15 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-024B` — Vulkan pixel-shift smoke for sandbox transform edits](BUG-024B-sandbox-transform-edit-vulkan-pixel-shift-smoke.md). Operational follow-up to `BUG-024`: an opt-in `gpu;vulkan` smoke must edit the `ReferenceTriangle` through the promoted UI/editor command path and observe the rendered pixels move.
+- None currently.
 
 ---
 
 ## Verified / Closed
 
-- Closed 2026-06-10: [`BUG-024` — Sandbox transform UI edits do not move rendered triangle](../../done/BUG-024-sandbox-transform-edit-rendering.md). Post-fixed-step Inspector/gizmo transform edits were never flushed through `TransformHierarchy`/`BoundsPropagation`/`RenderSync` before render extraction, so the snapshot model matrix stayed stale. `Engine::RunFrame()` now runs the runtime-owned `FlushPreRenderTransformState` after the variable tick, ImGui editor hook, and gizmo drive — before gizmo packet build and extraction — so UI edits reach the rendered model matrix in the same frame. Closed at `CPUContracted`; `Operational` owned by `BUG-024B`.
+- Closed 2026-06-10: [`BUG-024B` — Vulkan pixel-shift smoke for sandbox transform edits](../../done/BUG-024B-sandbox-transform-edit-vulkan-pixel-shift-smoke.md). The opt-in `gpu;vulkan` smoke `InspectorTransformEditShiftsReferenceTrianglePixels` applies the promoted Inspector transform-edit command mid-run (after the fixed-step phase) and proves the rendered `ReferenceTriangle` moves: the frame center returns to background and the projected shifted sample contains the triangle. Passed on NVIDIA RTX 3050 / driver 590.48.01 (suite 6/6), upgrading the BUG-024 fix to `Operational`.
+
+- Closed 2026-06-10: [`BUG-024` — Sandbox transform UI edits do not move rendered triangle](../../done/BUG-024-sandbox-transform-edit-rendering.md). Post-fixed-step Inspector/gizmo transform edits were never flushed through `TransformHierarchy`/`BoundsPropagation`/`RenderSync` before render extraction, so the snapshot model matrix stayed stale. `Engine::RunFrame()` now runs the runtime-owned `FlushPreRenderTransformState` after the variable tick, ImGui editor hook, and gizmo drive — before gizmo packet build and extraction — so UI edits reach the rendered model matrix in the same frame. Closed at `CPUContracted`; upgraded to `Operational` by `BUG-024B`.
 
 - Closed 2026-06-08: [`BUG-022` — Sandbox reference triangle camera frustum visibility](../../done/BUG-022-sandbox-reference-triangle-camera-frustum-visibility.md). The reference camera seed and all controller modes now prove the triangle vertices are inside clip space, and promoted triangle-list/backface-culling pipelines use clockwise front-face winding to match the Vulkan Y-flipped camera projection so the centered triangle is not culled.
 
