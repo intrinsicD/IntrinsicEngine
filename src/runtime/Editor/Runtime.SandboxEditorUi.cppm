@@ -26,6 +26,7 @@ import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
@@ -50,6 +51,7 @@ export namespace Extrinsic::Runtime
         InvalidVisualizationProperty,
         GeometryProcessingFailed,
         RenderGraphStatsUnavailable,
+        EditorCommandHistoryUnavailable,
     };
 
     enum class SandboxEditorCommandStatus : std::uint8_t
@@ -434,6 +436,22 @@ export namespace Extrinsic::Runtime
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
+    struct SandboxEditorDocumentModel
+    {
+        bool HistoryAvailable{false};
+        bool Dirty{false};
+        bool CanUndo{false};
+        bool CanRedo{false};
+        bool HasActivePath{false};
+        std::string ActivePath{};
+        std::string UndoLabel{};
+        std::string RedoLabel{};
+        std::uint64_t Revision{0u};
+        std::uint64_t SavedRevision{0u};
+        std::string StatusText{};
+        std::vector<SandboxEditorDiagnostic> Diagnostics{};
+    };
+
     struct SandboxEditorFileImportCommand
     {
         std::string Path{};
@@ -678,6 +696,7 @@ export namespace Extrinsic::Runtime
         std::vector<SandboxEditorEntityRow> Hierarchy{};
         SandboxEditorInspectorModel         Inspector{};
         SandboxEditorSelectionModel         Selection{};
+        SandboxEditorDocumentModel          Document{};
         SandboxEditorSceneFileModel        SceneFile{};
         SandboxEditorFileImportModel        FileImport{};
         SandboxEditorRenderGraphModel       RenderGraph{};
@@ -690,6 +709,7 @@ export namespace Extrinsic::Runtime
     {
         ECS::Scene::Registry* Scene{nullptr};
         SelectionController*  Selection{nullptr};
+        EditorCommandHistory* CommandHistory{nullptr};
         const std::optional<PrimitiveSelectionResult>* LastRefinedPrimitive{nullptr};
         CameraControllerRegistry* CameraControllers{nullptr};
         Core::Extent2D CameraViewport{};

@@ -26,6 +26,7 @@ import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
+import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.Runtime.ImGuiAdapter;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
@@ -229,7 +230,7 @@ namespace Extrinsic::Runtime
         // submits file paths here; Engine owns file IO, scene replacement, and
         // runtime sidecar cleanup while the serializer stays backend-neutral.
         [[nodiscard]] Core::Expected<SceneSerializationResult> SaveSceneToPath(
-            std::string path) const;
+            std::string path);
         [[nodiscard]] Core::Expected<SceneDeserializationResult> LoadSceneFromPath(
             std::string path);
         // RUNTIME-089 Slice B — runtime/editor-owned selection authority.
@@ -238,6 +239,9 @@ namespace Extrinsic::Runtime
         // extraction, consumes the readback after present, and mirrors the
         // controller snapshot into RenderWorld::Selection.
         [[nodiscard]] SelectionController&    GetSelectionController() noexcept;
+        [[nodiscard]] EditorCommandHistory&   GetEditorCommandHistory() noexcept;
+        [[nodiscard]] const EditorCommandHistory&
+            GetEditorCommandHistory() const noexcept;
         // RUNTIME-084 Slice B — runtime/editor-owned transform-gizmo authority.
         // Engine reads platform input and the active camera snapshot each frame,
         // drives hit-test / drag tick / commit against selected ECS authoring
@@ -370,6 +374,11 @@ namespace Extrinsic::Runtime
         // RUNTIME-089 Slice B — selection authority; persists across frames so
         // in-flight picks correlate with their later readbacks.
         SelectionController                   m_SelectionController{};
+        // RUNTIME-102 — runtime/editor-owned undo/redo and document dirty-state
+        // source. UI reads snapshots from this service and command facades mark
+        // save/load/import state here instead of keeping authoritative document
+        // state in panel objects.
+        EditorCommandHistory                  m_EditorCommandHistory{};
         // RUNTIME-084 Slice B — runtime/editor transform-gizmo interaction and
         // transient packet production. These are runtime-owned state; graphics
         // receives copied TransformGizmoRenderPacket values only.

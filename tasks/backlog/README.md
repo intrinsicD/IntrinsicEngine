@@ -198,7 +198,7 @@ Members:
 - [`runtime/RUNTIME-099-runtime-lifecycle-composition.md`](runtime/RUNTIME-099-runtime-lifecycle-composition.md),
   [`runtime/RUNTIME-100-scene-manager-lifecycle.md`](runtime/RUNTIME-100-scene-manager-lifecycle.md),
   [`runtime/RUNTIME-101-asset-ingest-state-machine.md`](runtime/RUNTIME-101-asset-ingest-state-machine.md),
-  [`runtime/RUNTIME-102-editor-command-history.md`](runtime/RUNTIME-102-editor-command-history.md),
+  [`RUNTIME-102` (done)](../done/RUNTIME-102-editor-command-history.md),
   [`runtime/RUNTIME-103-geometry-algorithm-execution-queue.md`](runtime/RUNTIME-103-geometry-algorithm-execution-queue.md),
   and [`runtime/RUNTIME-104-derived-overlay-producer-lifecycle.md`](runtime/RUNTIME-104-derived-overlay-producer-lifecycle.md).
 - [`rendering/GRAPHICS-084-visualization-property-buffer-residency.md`](rendering/GRAPHICS-084-visualization-property-buffer-residency.md),

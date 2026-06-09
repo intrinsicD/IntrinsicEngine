@@ -38,6 +38,7 @@ import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.ImGuiAdapter;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
@@ -710,6 +711,38 @@ namespace Extrinsic::Runtime
                    lhs.EnableVertexView == rhs.EnableVertexView;
         }
 
+        [[nodiscard]] SandboxEditorCommandStatus ToSandboxEditorCommandStatus(
+            const EditorCommandHistoryStatus status) noexcept
+        {
+            switch (status)
+            {
+            case EditorCommandHistoryStatus::Applied:
+            case EditorCommandHistoryStatus::Recorded:
+            case EditorCommandHistoryStatus::Undone:
+            case EditorCommandHistoryStatus::Redone:
+                return SandboxEditorCommandStatus::Applied;
+            case EditorCommandHistoryStatus::NoChange:
+                return SandboxEditorCommandStatus::NoChange;
+            case EditorCommandHistoryStatus::MissingScene:
+                return SandboxEditorCommandStatus::MissingScene;
+            case EditorCommandHistoryStatus::MissingSelectionController:
+                return SandboxEditorCommandStatus::MissingSelectionController;
+            case EditorCommandHistoryStatus::StaleEntity:
+                return SandboxEditorCommandStatus::StaleEntity;
+            case EditorCommandHistoryStatus::MissingTransform:
+                return SandboxEditorCommandStatus::MissingTransform;
+            case EditorCommandHistoryStatus::EmptyUndoStack:
+            case EditorCommandHistoryStatus::EmptyRedoStack:
+            case EditorCommandHistoryStatus::InvalidCommand:
+            case EditorCommandHistoryStatus::CommandFailed:
+            case EditorCommandHistoryStatus::UndoFailed:
+            case EditorCommandHistoryStatus::RedoFailed:
+            case EditorCommandHistoryStatus::UnsupportedOperation:
+                return SandboxEditorCommandStatus::NoChange;
+            }
+            return SandboxEditorCommandStatus::NoChange;
+        }
+
         [[nodiscard]] Core::Extent2D SafeViewport(
             const Core::Extent2D commandViewport,
             const Core::Extent2D contextViewport) noexcept
@@ -1348,6 +1381,42 @@ namespace Extrinsic::Runtime
             return model;
         }
 
+        [[nodiscard]] SandboxEditorDocumentModel BuildDocumentModel(
+            const SandboxEditorContext& context)
+        {
+            SandboxEditorDocumentModel model{};
+            if (context.CommandHistory == nullptr)
+            {
+                model.StatusText =
+                    "Document history is disabled: runtime command history is unavailable.";
+                AddDiagnostic(model.Diagnostics,
+                              SandboxEditorDiagnosticCode::EditorCommandHistoryUnavailable,
+                              model.StatusText);
+                return model;
+            }
+
+            const EditorCommandHistorySnapshot snapshot =
+                context.CommandHistory->Snapshot();
+            model.HistoryAvailable = true;
+            model.Dirty = snapshot.Dirty;
+            model.CanUndo = snapshot.CanUndo;
+            model.CanRedo = snapshot.CanRedo;
+            model.HasActivePath = snapshot.HasActivePath;
+            model.ActivePath = snapshot.ActivePath;
+            model.UndoLabel = snapshot.UndoLabel;
+            model.RedoLabel = snapshot.RedoLabel;
+            model.Revision = snapshot.Revision;
+            model.SavedRevision = snapshot.SavedRevision;
+
+            if (snapshot.Dirty)
+                model.StatusText = "Scene document has unsaved changes.";
+            else if (snapshot.HasActivePath)
+                model.StatusText = "Scene document is saved.";
+            else
+                model.StatusText = "Scene document has no active file path.";
+            return model;
+        }
+
         [[nodiscard]] SandboxEditorSceneFileModel BuildSceneFileModel(
             const SandboxEditorContext& context)
         {
@@ -1638,6 +1707,7 @@ namespace Extrinsic::Runtime
             return SandboxEditorContext{
                 .Scene = &engine.GetScene(),
                 .Selection = &engine.GetSelectionController(),
+                .CommandHistory = &engine.GetEditorCommandHistory(),
                 .LastRefinedPrimitive = &engine.GetLastRefinedPrimitiveSelection(),
                 .CameraControllers = &engine.GetCameraControllerRegistry(),
                 .CameraViewport = Core::Extent2D{
@@ -2647,6 +2717,37 @@ namespace Extrinsic::Runtime
 
             if (ImGui::Begin("File / Scene"))
             {
+                ImGui::TextWrapped("%s", frame.Document.StatusText.c_str());
+                ImGui::Text("Active path: %s",
+                            frame.Document.HasActivePath
+                                ? frame.Document.ActivePath.c_str()
+                                : "(none)");
+                ImGui::Text("Dirty: %s", frame.Document.Dirty ? "yes" : "no");
+                ImGui::Text("Revision: %llu saved: %llu",
+                            static_cast<unsigned long long>(frame.Document.Revision),
+                            static_cast<unsigned long long>(frame.Document.SavedRevision));
+                const bool historyControlsAvailable =
+                    context != nullptr && context->CommandHistory != nullptr;
+                if (!historyControlsAvailable || !frame.Document.CanUndo)
+                    ImGui::BeginDisabled();
+                if (ImGui::Button("Undo") && historyControlsAvailable)
+                    (void)context->CommandHistory->Undo();
+                if (!historyControlsAvailable || !frame.Document.CanUndo)
+                    ImGui::EndDisabled();
+                ImGui::SameLine();
+                if (!historyControlsAvailable || !frame.Document.CanRedo)
+                    ImGui::BeginDisabled();
+                if (ImGui::Button("Redo") && historyControlsAvailable)
+                    (void)context->CommandHistory->Redo();
+                if (!historyControlsAvailable || !frame.Document.CanRedo)
+                    ImGui::EndDisabled();
+                if (!frame.Document.UndoLabel.empty())
+                    ImGui::Text("Undo next: %s", frame.Document.UndoLabel.c_str());
+                if (!frame.Document.RedoLabel.empty())
+                    ImGui::Text("Redo next: %s", frame.Document.RedoLabel.c_str());
+                DrawDiagnostics(frame.Document.Diagnostics);
+                ImGui::Separator();
+
                 const bool sceneControlsAvailable =
                     frame.SceneFile.Enabled &&
                     context != nullptr &&
@@ -3141,6 +3242,8 @@ namespace Extrinsic::Runtime
             return "GeometryProcessingFailed";
         case SandboxEditorDiagnosticCode::RenderGraphStatsUnavailable:
             return "RenderGraphStatsUnavailable";
+        case SandboxEditorDiagnosticCode::EditorCommandHistoryUnavailable:
+            return "EditorCommandHistoryUnavailable";
         }
         return "Unknown";
     }
@@ -3668,6 +3771,7 @@ namespace Extrinsic::Runtime
 
         frame.Inspector = BuildInspectorModel(context);
         frame.Selection = BuildSelectionModel(context);
+        frame.Document = BuildDocumentModel(context);
         frame.SceneFile = BuildSceneFileModel(context);
         frame.FileImport = BuildFileImportModel(context);
         frame.RenderGraph = BuildRenderGraphModel(context);
@@ -3795,6 +3899,29 @@ namespace Extrinsic::Runtime
     {
         if (context.Scene == nullptr || context.Selection == nullptr)
             return false;
+        if (context.CommandHistory != nullptr)
+        {
+            std::optional<std::uint32_t> before{};
+            const auto selected = context.Selection->SelectedStableIds();
+            if (selected.size() == 1u)
+                before = selected.front();
+            else if (!selected.empty())
+                return context.Selection->SetSelectedByStableEntityId(
+                    *context.Scene,
+                    stableEntityId);
+
+            const EditorCommandHistoryResult result =
+                context.CommandHistory->Execute(
+                    MakeSelectionReplaceCommand(
+                        EditorSelectionReplaceCommand{
+                            .Scene = context.Scene,
+                            .Selection = context.Selection,
+                            .BeforeStableEntityId = before,
+                            .AfterStableEntityId = stableEntityId,
+                            .Label = "Select Entity",
+                        }));
+            return result.Succeeded();
+        }
         return context.Selection->SetSelectedByStableEntityId(*context.Scene,
                                                               stableEntityId);
     }
@@ -3938,6 +4065,29 @@ namespace Extrinsic::Runtime
         if (transform == nullptr)
             return SandboxEditorCommandStatus::MissingTransform;
 
+        if (context.CommandHistory != nullptr)
+        {
+            ECSC::Transform::Component next = *transform;
+            if (command.SetPosition)
+                next.Position = command.Position;
+            if (command.SetRotation)
+                next.Rotation = command.Rotation;
+            if (command.SetScale)
+                next.Scale = command.Scale;
+
+            const EditorCommandHistoryResult result =
+                context.CommandHistory->Execute(
+                    MakeTransformEditCommand(
+                        EditorTransformEditCommand{
+                            .Scene = context.Scene,
+                            .StableEntityId = command.StableEntityId,
+                            .Before = *transform,
+                            .After = next,
+                            .Label = "Edit Transform",
+                        }));
+            return ToSandboxEditorCommandStatus(result.Status);
+        }
+
         if (command.SetPosition)
             transform->Position = command.Position;
         if (command.SetRotation)
@@ -4007,6 +4157,29 @@ namespace Extrinsic::Runtime
 
         if (SamePrimitiveViewSettings(prior, settings))
             return SandboxEditorCommandStatus::NoChange;
+        if (context.CommandHistory != nullptr)
+        {
+            const auto setSettings = context.PrimitiveViewCommands.SetSettings;
+            const auto clearSettings = context.PrimitiveViewCommands.ClearSettings;
+            const EditorCommandHistoryResult result =
+                context.CommandHistory->Execute(
+                    MakePrimitiveViewSettingsCommand(
+                        EditorPrimitiveViewSettingsCommand{
+                            .StableEntityId = command.StableEntityId,
+                            .Before = ToRuntimeSettings(prior),
+                            .After = ToRuntimeSettings(settings),
+                            .SetSettings =
+                                [setSettings](const std::uint32_t id,
+                                              const MeshPrimitiveViewSettings next)
+                                {
+                                    setSettings(id, FromRuntimeSettings(next));
+                                },
+                            .ClearSettings = clearSettings,
+                            .Dirtying = false,
+                            .Label = "Change Primitive View",
+                        }));
+            return ToSandboxEditorCommandStatus(result.Status);
+        }
         if (settings.AnyEnabled())
             context.PrimitiveViewCommands.SetSettings(command.StableEntityId, settings);
         else
@@ -4029,20 +4202,46 @@ namespace Extrinsic::Runtime
         if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
             return SandboxEditorCommandStatus::StaleEntity;
 
-        if (!command.EnableBinding)
+        const auto* current = raw.try_get<ECSC::SpatialDebugBinding>(entity);
+        const std::optional<ECSC::SpatialDebugBinding> before =
+            current != nullptr
+                ? std::optional<ECSC::SpatialDebugBinding>{*current}
+                : std::nullopt;
+        const std::optional<ECSC::SpatialDebugBinding> after =
+            command.EnableBinding
+                ? std::optional<ECSC::SpatialDebugBinding>{ToSpatialDebugBinding(command)}
+                : std::nullopt;
+
+        if (!after.has_value())
         {
-            if (!raw.all_of<ECSC::SpatialDebugBinding>(entity))
+            if (!before.has_value())
                 return SandboxEditorCommandStatus::NoChange;
-            raw.remove<ECSC::SpatialDebugBinding>(entity);
-            return SandboxEditorCommandStatus::Applied;
+        }
+        else if (before.has_value() &&
+                 SameSpatialDebugBinding(*before, *after))
+        {
+            return SandboxEditorCommandStatus::NoChange;
         }
 
-        const ECSC::SpatialDebugBinding next = ToSpatialDebugBinding(command);
-        const auto* current = raw.try_get<ECSC::SpatialDebugBinding>(entity);
-        if (current != nullptr && SameSpatialDebugBinding(*current, next))
-            return SandboxEditorCommandStatus::NoChange;
+        if (context.CommandHistory != nullptr)
+        {
+            const EditorCommandHistoryResult result =
+                context.CommandHistory->Execute(
+                    MakeSpatialDebugBindingCommand(
+                        EditorSpatialDebugBindingCommand{
+                            .Scene = context.Scene,
+                            .StableEntityId = command.StableEntityId,
+                            .Before = before,
+                            .After = after,
+                            .Label = "Change Spatial Debug Binding",
+                        }));
+            return ToSandboxEditorCommandStatus(result.Status);
+        }
 
-        raw.emplace_or_replace<ECSC::SpatialDebugBinding>(entity, next);
+        if (after.has_value())
+            raw.emplace_or_replace<ECSC::SpatialDebugBinding>(entity, *after);
+        else
+            raw.remove<ECSC::SpatialDebugBinding>(entity);
         return SandboxEditorCommandStatus::Applied;
     }
 
@@ -4061,20 +4260,45 @@ namespace Extrinsic::Runtime
         if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
             return SandboxEditorCommandStatus::StaleEntity;
 
-        if (!command.EnableConfig)
+        const auto* current = raw.try_get<G::VisualizationConfig>(entity);
+        const std::optional<G::VisualizationConfig> before =
+            current != nullptr
+                ? std::optional<G::VisualizationConfig>{*current}
+                : std::nullopt;
+        const std::optional<G::VisualizationConfig> after =
+            command.EnableConfig
+                ? std::optional<G::VisualizationConfig>{ToVisualizationConfig(command)}
+                : std::nullopt;
+
+        if (!after.has_value())
         {
-            if (!raw.all_of<G::VisualizationConfig>(entity))
+            if (!before.has_value())
                 return SandboxEditorCommandStatus::NoChange;
-            raw.remove<G::VisualizationConfig>(entity);
-            return SandboxEditorCommandStatus::Applied;
+        }
+        else if (before.has_value() && SameVisualizationConfig(*before, *after))
+        {
+            return SandboxEditorCommandStatus::NoChange;
         }
 
-        const G::VisualizationConfig next = ToVisualizationConfig(command);
-        const auto* current = raw.try_get<G::VisualizationConfig>(entity);
-        if (current != nullptr && SameVisualizationConfig(*current, next))
-            return SandboxEditorCommandStatus::NoChange;
+        if (context.CommandHistory != nullptr)
+        {
+            const EditorCommandHistoryResult result =
+                context.CommandHistory->Execute(
+                    MakeVisualizationConfigCommand(
+                        EditorVisualizationConfigCommand{
+                            .Scene = context.Scene,
+                            .StableEntityId = command.StableEntityId,
+                            .Before = before,
+                            .After = after,
+                            .Label = "Change Visualization",
+                        }));
+            return ToSandboxEditorCommandStatus(result.Status);
+        }
 
-        raw.emplace_or_replace<G::VisualizationConfig>(entity, next);
+        if (after.has_value())
+            raw.emplace_or_replace<G::VisualizationConfig>(entity, *after);
+        else
+            raw.remove<G::VisualizationConfig>(entity);
         return SandboxEditorCommandStatus::Applied;
     }
 
@@ -4320,6 +4544,8 @@ namespace Extrinsic::Runtime
             .Error = Core::ErrorCode::Success,
         };
         result.Message = BuildKMeansSuccessMessage(command.Domain, result);
+        if (context.CommandHistory != nullptr)
+            (void)context.CommandHistory->MarkDirty("Run K-Means");
         return result;
     }
 

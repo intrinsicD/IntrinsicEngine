@@ -279,6 +279,7 @@ if(TARGET ExtrinsicRuntime)
         Test.AssetModelSceneHandoff.cpp
         Test.AssetModelTextureHandoff.cpp
         Test.AssetModelTextureIO.cpp
+        Test.EditorCommandHistory.cpp
         Test.ImGuiAdapter.cpp
         Test.ImGuiAdapterEngineWiring.cpp
         Test.MeshGeometryExtraction.cpp

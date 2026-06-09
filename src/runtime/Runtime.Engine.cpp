@@ -57,6 +57,7 @@ import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.AssetModelTextureIO;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.Runtime.ImGuiAdapter;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
@@ -2055,6 +2056,11 @@ namespace Extrinsic::Runtime
     {
         auto result = ImportAssetFromPathImpl(request);
         RecordAssetImportEvent(request, result);
+        if (result.has_value() &&
+            (result->PrimitiveEntitiesCreated > 0u || result->MaterializedModelScene))
+        {
+            (void)m_EditorCommandHistory.MarkDirty("Import Asset");
+        }
         return result;
     }
 
@@ -2443,7 +2449,7 @@ namespace Extrinsic::Runtime
     }
 
     Core::Expected<SceneSerializationResult> Engine::SaveSceneToPath(
-        std::string path) const
+        std::string path)
     {
         if (!m_Initialized || !m_Scene)
             return Core::Err<SceneSerializationResult>(Core::ErrorCode::InvalidState);
@@ -2451,7 +2457,10 @@ namespace Extrinsic::Runtime
             return Core::Err<SceneSerializationResult>(Core::ErrorCode::InvalidPath);
 
         Core::IO::FileIOBackend backend;
-        return SaveSceneDocument(*m_Scene, path, backend);
+        auto saved = SaveSceneDocument(*m_Scene, path, backend);
+        if (saved.has_value())
+            m_EditorCommandHistory.MarkSaved(path);
+        return saved;
     }
 
     Core::Expected<SceneDeserializationResult> Engine::LoadSceneFromPath(
@@ -2470,10 +2479,19 @@ namespace Extrinsic::Runtime
         m_SelectionController.ClearSelection(*m_Scene);
         m_LastRefinedPrimitive.reset();
         m_StableEntityLookup.Rebuild(*m_Scene);
+        m_EditorCommandHistory.ResetDocument(path);
         return loaded;
     }
 
     SelectionController&  Engine::GetSelectionController() noexcept { return m_SelectionController; }
+    EditorCommandHistory& Engine::GetEditorCommandHistory() noexcept
+    {
+        return m_EditorCommandHistory;
+    }
+    const EditorCommandHistory& Engine::GetEditorCommandHistory() const noexcept
+    {
+        return m_EditorCommandHistory;
+    }
     const std::optional<PrimitiveSelectionResult>&
     Engine::GetLastRefinedPrimitiveSelection() const noexcept { return m_LastRefinedPrimitive; }
     Core::FrameGraph&     Engine::GetFrameGraph()    noexcept { return *m_FrameGraph;    }

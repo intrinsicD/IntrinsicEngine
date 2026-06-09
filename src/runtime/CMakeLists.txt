@@ -13,6 +13,7 @@ target_sources(${target_name}
         Runtime.AssetModelTextureHandoff.cppm
         Runtime.AssetModelTextureIO.cppm
         Runtime.EcsSystemBundle.cppm
+        Runtime.EditorCommandHistory.cppm
         Runtime.Engine.cppm
         Runtime.PhysicsBridge.cppm
         Runtime.SceneSerialization.cppm
@@ -41,6 +42,7 @@ target_sources(${target_name}
         Runtime.AssetModelTextureHandoff.cpp
         Runtime.AssetModelTextureIO.cpp
         Runtime.EcsSystemBundle.cpp
+        Runtime.EditorCommandHistory.cpp
         Runtime.Engine.cpp
         Runtime.PhysicsBridge.cpp
         Runtime.SceneSerialization.cpp

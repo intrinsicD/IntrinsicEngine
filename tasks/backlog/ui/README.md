@@ -62,7 +62,8 @@ map.
   `AssetService`, and ECS materialization.
 - UI-008 is the remaining value-gated workflow child from
   [`LEGACY-011`](../architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md);
-  it depends on `RUNTIME-102` for command history / dirty-state. The
+  [`RUNTIME-102`](../../done/RUNTIME-102-editor-command-history.md) now provides
+  the command history / dirty-state source of truth. The
   [`PLATFORM-006`](../../done/PLATFORM-006-platform-event-parity.md)
   file-dialog boundary is retired: current workflows use runtime/UI path entry
   plus platform dropped-path events, while native dialogs remain deferred unless

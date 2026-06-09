@@ -39,6 +39,7 @@ import Extrinsic.Graphics.RenderGraph;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.ImGuiAdapter;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
@@ -732,6 +733,48 @@ TEST(SandboxEditorUi, SceneFileCommandRoutesThroughRuntimeOwnedSurface)
     EXPECT_TRUE(HasDiagnostic(
         frame.SceneFile.Diagnostics,
         Runtime::SandboxEditorDiagnosticCode::SceneFileFailed));
+}
+
+TEST(SandboxEditorUi, DocumentModelReportsRuntimeHistoryDirtyState)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    int value = 0;
+
+    ASSERT_TRUE(history.Execute(
+        Runtime::EditorCommandRecord{
+            .Label = "Edit Value",
+            .Redo = [&value]()
+            {
+                value = 1;
+                return Runtime::EditorCommandHistoryStatus::Applied;
+            },
+            .Undo = [&value]()
+            {
+                value = 0;
+                return Runtime::EditorCommandHistoryStatus::Applied;
+            },
+        }).Succeeded());
+
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    Runtime::SandboxEditorPanelFrame frame =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+
+    EXPECT_TRUE(frame.Document.HistoryAvailable);
+    EXPECT_TRUE(frame.Document.Dirty);
+    EXPECT_TRUE(frame.Document.CanUndo);
+    EXPECT_FALSE(frame.Document.CanRedo);
+    EXPECT_EQ(frame.Document.UndoLabel, "Edit Value");
+    EXPECT_TRUE(frame.Document.StatusText.find("unsaved") != std::string::npos);
+    EXPECT_TRUE(frame.Document.Diagnostics.empty());
+
+    history.MarkSaved("scene.extrinsic.json");
+    frame = Runtime::BuildSandboxEditorPanelFrame(context);
+    EXPECT_FALSE(frame.Document.Dirty);
+    EXPECT_TRUE(frame.Document.HasActivePath);
+    EXPECT_EQ(frame.Document.ActivePath, "scene.extrinsic.json");
 }
 
 TEST(SandboxEditorUi, HierarchyInspectorModelReportsSelectionRenderHintsAndDomain)

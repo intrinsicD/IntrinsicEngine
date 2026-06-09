@@ -13,7 +13,10 @@
 ## Context
 - Owner/layer: `ui` task over `Runtime.SandboxEditorUi`; UI emits command DTOs to runtime and observes data-only models.
 - `UI-001..007` promoted the editor shell, domain windows, processing discovery, CPU K-Means, visualization property presets, render-graph panel, and drag/drop import status. The app/parity matrix still lists file dialogs, dirty-tracker UX, command-line/headless modes, richer sample scenes, and app-level debug workflows as unproven.
-- Depends on `RUNTIME-102` for command history/dirty-state source of truth.
+- `RUNTIME-102` retired the command history/dirty-state source of truth:
+  `Extrinsic.Runtime.EditorCommandHistory` owns history/dirty state, and
+  `SandboxEditorUi` exposes a document model plus undo/redo buttons from that
+  runtime snapshot.
   `PLATFORM-006` retired the file-dialog boundary decision: current promoted
   workflows use runtime/UI path entry plus platform dropped-path events, while
   native dialogs remain deferred behind a future platform/runtime task.
@@ -24,7 +27,7 @@
 - Scope decision: retain dirty/undo/path-entry/status workflows. Defer native dialogs, sample-scene expansion, and app-level debug clones unless runtime/platform tasks accept them first.
 
 ## Required changes
-- [ ] Add data-only editor models for scene dirty state, undo/redo availability, active file path, last save/load/import result, and headless-safe diagnostics.
+- [ ] Extend the existing data-only document/file/import models for save-as/open/new/close/debug workflows and headless-safe diagnostics.
 - [ ] Add UI command routing for undo/redo, new scene, close scene, save-as/open path entry, and sample/debug scene creation using runtime-owned commands.
 - [ ] If `PLATFORM-006` selects platform-native dialogs, add a UI request surface without owning platform state; otherwise document path-entry as the intended endpoint.
 - [ ] Add app-level debug workflow commands only if runtime already owns the command and the workflow improves a current fixture or diagnostic path.

@@ -39,9 +39,10 @@ another backlog directory.
 - [RUNTIME-101 — Asset ingest state-machine migration](RUNTIME-101-asset-ingest-state-machine.md):
   promoted replacement for legacy `Runtime.AssetIngestService` over
   `AssetService`, `StreamingExecutor`, and runtime materialization handoffs.
-- [RUNTIME-102 — Editor command history and undo/redo seam](RUNTIME-102-editor-command-history.md):
-  runtime/editor command history, dirty-state source, recursive delete/orphan
-  policy, and undo/redo contracts.
+- [RUNTIME-102 — Editor command history and undo/redo seam](../../done/RUNTIME-102-editor-command-history.md)
+  (done, 2026-06-09, `CPUContracted`): runtime/editor command history,
+  dirty-state source, recursive delete/orphan policy, undo/redo contracts, and
+  Sandbox editor document-state model.
 - [RUNTIME-103 — Geometry algorithm execution queue](RUNTIME-103-geometry-algorithm-execution-queue.md):
   value-gated asynchronous CPU geometry processing and CUDA keep/defer/remove
   decision for legacy K-Means behavior.
