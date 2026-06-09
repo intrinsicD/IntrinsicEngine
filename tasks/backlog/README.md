@@ -245,7 +245,7 @@ Members (in dependency order; see [`process/README.md`](process/README.md)):
 - [`PROC-001` (done)](../done/PROC-001-skill-mirror-sync-generator-and-ci-gate.md) —
   skill mirror sync generator and CI gate (first; everything else edits
   mirrored docs).
-- [`process/PROC-002`](process/PROC-002-task-id-uniqueness-and-allocation-rule.md) —
+- [`PROC-002` (done)](../done/PROC-002-task-id-uniqueness-and-allocation-rule.md) —
   task ID uniqueness validation and allocation rule.
 - [`process/PROC-005`](process/PROC-005-align-structural-check-mode-contract-text.md) —
   align structural-check mode text with strict CI reality (after PROC-001).

@@ -44,6 +44,21 @@ sections so task status is visible at a glance. Completed task files under
 `tasks/done/` should not contain unchecked actionable todos; unresolved work
 belongs in a follow-up task.
 
+## ID allocation
+
+Task IDs must be unique across `tasks/active/`, `tasks/backlog/`, and
+`tasks/done/`; `tools/agents/validate_tasks.py` enforces this in strict mode
+(a small set of pre-2026-06-09 collisions is grandfathered in place). Before
+opening `<PREFIX>-<N>`, take the highest existing number for that prefix
+across **all three** directories and add one:
+
+```bash
+grep -rhoE '^# <PREFIX>-[0-9]+' tasks/active tasks/backlog tasks/done | sort -V | tail -1
+```
+
+Letter-suffixed child slices (e.g. `GRAPHICS-033A`) extend their parent's
+number and do not claim a new one.
+
 ## Optional `## Maturity` field
 
 For tasks where the stop-state is ambiguous — typically rendering, Vulkan,

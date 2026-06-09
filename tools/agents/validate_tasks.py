@@ -55,6 +55,49 @@ SKIP_PATTERNS = [
     re.compile(r"^task-\d+-.*\.md$"),
 ]
 
+# Historical task-ID collisions frozen as-is: the files are link targets across
+# docs, reports, and the retirement record, so renaming them would damage the
+# audit trail for no behavioral gain. Each ID is allowed exactly the listed
+# filenames; any additional file claiming one of these IDs is a violation, as
+# is any new collision on an ID not listed here. Do not extend this allowlist
+# for collisions created after 2026-06-09 (PROC-002).
+GRANDFATHERED_DUPLICATE_IDS: dict[str, frozenset[str]] = {
+    # Two sandbox bug records opened concurrently under the same number.
+    "BUG-021": frozenset(
+        {
+            "BUG-021-sandbox-camera-scene-table-shader-wiring.md",
+            "BUG-021-sandbox-drop-import-blocks-platform-poll.md",
+        }
+    ),
+    "BUG-022": frozenset(
+        {
+            "BUG-022-sandbox-nonmanifold-obj-import.md",
+            "BUG-022-sandbox-reference-triangle-camera-frustum-visibility.md",
+        }
+    ),
+    # Three HARDEN streams (ECS parity, sandbox boundary, task policy) each
+    # took the next free number without cross-checking the other directories.
+    "HARDEN-065": frozenset(
+        {
+            "HARDEN-065-ecs-geometry-source-population-and-dirty-domains.md",
+            "HARDEN-065-sandbox-runtime-boundary.md",
+            "HARDEN-065-task-checkbox-todo-policy.md",
+        }
+    ),
+    "HARDEN-066": frozenset(
+        {
+            "HARDEN-066-ecs-render-sync-export-policy.md",
+            "HARDEN-066-fix-halfedge-property-test-source-name.md",
+        }
+    ),
+    "HARDEN-067": frozenset(
+        {
+            "HARDEN-067-ecs-bounds-propagation-system.md",
+            "HARDEN-067-remove-stale-platform-linuxglfwvulkan.md",
+        }
+    ),
+}
+
 
 @dataclass
 class Finding:
@@ -203,6 +246,31 @@ def validate_task(parsed: ParsedTask, mode: str) -> list[Finding]:
     return findings
 
 
+def validate_id_uniqueness(parsed_tasks: list[ParsedTask]) -> list[Finding]:
+    findings: list[Finding] = []
+    by_id: dict[str, list[ParsedTask]] = {}
+    for parsed in parsed_tasks:
+        if parsed.task_id:
+            by_id.setdefault(parsed.task_id, []).append(parsed)
+
+    for task_id, owners in sorted(by_id.items()):
+        if len(owners) <= 1:
+            continue
+        names = {owner.path.name for owner in owners}
+        if names <= GRANDFATHERED_DUPLICATE_IDS.get(task_id, frozenset()):
+            continue
+        listing = ", ".join(sorted(str(owner.path) for owner in owners))
+        findings.append(
+            Finding(
+                "error",
+                owners[0].path,
+                f"duplicate task ID `{task_id}` claimed by multiple files: {listing}. "
+                "Allocate the next free number (see docs/agent/task-format.md, ID allocation).",
+            )
+        )
+    return findings
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Validate structured task markdown files.")
     parser.add_argument("--root", default="tasks", help="Path to the tasks root directory (default: tasks).")
@@ -226,9 +294,12 @@ def main() -> int:
     mode = "strict" if args.strict else "warning"
     findings: list[Finding] = []
 
-    for file in files:
-        parsed = parse_task(file)
+    parsed_tasks = [parse_task(file) for file in files]
+
+    for parsed in parsed_tasks:
         findings.extend(validate_task(parsed, mode=mode))
+
+    findings.extend(validate_id_uniqueness(parsed_tasks))
 
     prefix = root.parent
     for finding in findings:
