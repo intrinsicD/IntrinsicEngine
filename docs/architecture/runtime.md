@@ -16,6 +16,45 @@
 - Lower layers must remain reusable without runtime internals.
 - Physics world/state lives in `physics`; runtime owns only bridge sidecars and scheduling.
 
+## Lifecycle Composition
+
+`Engine::RunFrame()` is the promoted runtime lifecycle pipeline. Runtime owns the
+cross-layer composition, while reusable phase contracts live in
+`Extrinsic.Core.FrameLoop` so `core` stays dependency-free.
+
+The frame order is:
+
+1. poll platform events and handle minimized/resize skip paths;
+2. fixed-step simulation and CPU `FrameGraph` execution;
+3. ImGui begin-frame, variable application tick, and ImGui end-frame;
+4. build `Graphics::RenderFrameInput` and drain one coalesced selection pick;
+5. execute the render-frame contract: begin frame, runtime render extraction,
+   renderer world extraction, prepare, execute, and end frame;
+6. present the completed frame;
+7. execute maintenance: transfer retirement, streaming drain/apply/submit/pump,
+   asset-service tick, GPU asset cache tick, material texture re-resolution, and
+   render-extraction deferred-retire ticks;
+8. rebuild stable-entity lookup, drain completed pick readbacks, release the
+   consumed `RenderWorldPool` slot, and finalize the frame clock.
+
+The internal `RuntimeFrameContext` record carries the data that must survive
+between those phases: frame delta, fixed-step interpolation alpha, render frame
+index, render input, extraction stats, and the acquired render-world pool slot.
+It is intentionally not exported as public runtime API.
+
+Operational promotion is gated on `RHI::IDevice::IsOperational()` and renderer
+resource rebuild success. Vulkan-specific diagnostics are recorded by the Vulkan
+backend/runtime breadcrumb path, but runtime frame control does not branch on
+Vulkan diagnostics.
+
+Shutdown is deterministic and runs through `ExecuteShutdownContract`: stop
+running, wait idle, application shutdown, streaming shutdown/drain, scene
+teardown, asset/GPU-asset handoff teardown, streaming state teardown, frame graph
+teardown, render-extraction plus renderer shutdown, device shutdown, window
+destruction, scheduler shutdown, and initialized-state clear. The Dear ImGui
+adapter is detached before this contract while the window and overlay system are
+still live.
+
 ## Physics Bridge
 
 `Extrinsic.Runtime.PhysicsBridge` is the concrete runtime-owned ECS/physics

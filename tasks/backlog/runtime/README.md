@@ -30,9 +30,12 @@ another backlog directory.
   save/load over current sandbox-authored ECS data, runtime `Engine` scene-file
   facades, and Sandbox editor `File / Scene` commands without reviving legacy
   serializer/editor modules.
-- [RUNTIME-099 — Runtime lifecycle composition pipeline](RUNTIME-099-runtime-lifecycle-composition.md):
-  implementation child for `RORG-031C`, replacing legacy render orchestration
-  with explicit runtime stage order and shutdown determinism.
+- [RUNTIME-099 — Runtime lifecycle composition pipeline](../../done/RUNTIME-099-runtime-lifecycle-composition.md)
+  (done, 2026-06-09, `CPUContracted`): `Engine::RunFrame()` carries an
+  internal `RuntimeFrameContext` and delegates platform/render/maintenance/
+  operational/shutdown phase ordering through promoted `Extrinsic.Core.FrameLoop`
+  contracts, replacing legacy render orchestration with explicit runtime stage
+  order and shutdown determinism.
 - [RUNTIME-100 — Scene manager lifecycle and persistence boundary](RUNTIME-100-scene-manager-lifecycle.md):
   world reset, sidecar cleanup, stable-identity rebuild, and supported/deferred/
   retired persistence decisions beyond `RUNTIME-098`.

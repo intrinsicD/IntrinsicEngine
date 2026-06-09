@@ -196,7 +196,7 @@ Members:
 - [`HARDEN-081` (done)](../done/HARDEN-081-ecs-legacy-component-compatibility-decisions.md).
 - [`platform/PLATFORM-006` (done)](../done/PLATFORM-006-platform-event-parity.md).
 - [`runtime/RORG-031-runtime-composition.md`](runtime/RORG-031-runtime-composition.md) (also Theme A).
-- [`runtime/RUNTIME-099-runtime-lifecycle-composition.md`](runtime/RUNTIME-099-runtime-lifecycle-composition.md),
+- [`RUNTIME-099` (done)](../done/RUNTIME-099-runtime-lifecycle-composition.md),
   [`runtime/RUNTIME-100-scene-manager-lifecycle.md`](runtime/RUNTIME-100-scene-manager-lifecycle.md),
   [`runtime/RUNTIME-101-asset-ingest-state-machine.md`](runtime/RUNTIME-101-asset-ingest-state-machine.md),
   [`RUNTIME-102` (done)](../done/RUNTIME-102-editor-command-history.md),

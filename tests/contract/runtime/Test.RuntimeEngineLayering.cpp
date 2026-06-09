@@ -66,6 +66,7 @@ TEST(RuntimeEngineLayering, RunFrameDelegatesToPromotedContractsInDocumentedBroa
 {
     const auto content = ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
 
+    const auto frameContext = content.find("RuntimeFrameContext frameContext{};");
     const auto pollEvents = content.find("m_Window->PollEvents();");
     const auto simTick = content.find("m_Application->OnSimTick(*this, m_FixedDt);");
     const auto variableTick = content.find("m_Application->OnVariableTick(*this, alpha, frameDt);");
@@ -74,6 +75,7 @@ TEST(RuntimeEngineLayering, RunFrameDelegatesToPromotedContractsInDocumentedBroa
     const auto maintenance = content.find("Core::ExecuteMaintenanceContract(transferHooks, streamingHooks, assetHooks, 8);");
     const auto clockEnd = content.rfind("m_FrameClock.EndFrame();");
 
+    ASSERT_NE(frameContext, std::string::npos);
     ASSERT_NE(pollEvents, std::string::npos);
     ASSERT_NE(simTick, std::string::npos);
     ASSERT_NE(variableTick, std::string::npos);
@@ -82,12 +84,31 @@ TEST(RuntimeEngineLayering, RunFrameDelegatesToPromotedContractsInDocumentedBroa
     ASSERT_NE(maintenance, std::string::npos);
     ASSERT_NE(clockEnd, std::string::npos);
 
+    EXPECT_LT(frameContext, pollEvents);
     EXPECT_LT(pollEvents, simTick);
     EXPECT_LT(simTick, variableTick);
     EXPECT_LT(variableTick, renderContract);
     EXPECT_LT(renderContract, present);
     EXPECT_LT(present, maintenance);
     EXPECT_LT(maintenance, clockEnd);
+}
+
+TEST(RuntimeEngineLayering, RunFrameCarriesDataOnlyFrameContext)
+{
+    const auto content = ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+
+    EXPECT_NE(content.find("struct RuntimeFrameContext"), std::string::npos);
+    EXPECT_NE(content.find("double FrameDeltaSeconds"), std::string::npos);
+    EXPECT_NE(content.find("double FixedStepAlpha"), std::string::npos);
+    EXPECT_NE(content.find("std::uint64_t FrameIndex"), std::string::npos);
+    EXPECT_NE(content.find("Graphics::RenderFrameInput RenderInput"), std::string::npos);
+    EXPECT_NE(content.find("RuntimeRenderExtractionStats ExtractionStats"), std::string::npos);
+    EXPECT_NE(content.find("std::uint32_t PooledFrontSlot"), std::string::npos);
+    EXPECT_NE(content.find("frameContext.FrameDeltaSeconds = frameDt;"), std::string::npos);
+    EXPECT_NE(content.find("frameContext.FixedStepAlpha = alpha;"), std::string::npos);
+    EXPECT_NE(content.find("frameContext.FrameIndex = m_FrameIndex++;"), std::string::npos);
+    EXPECT_NE(content.find("frameContext.ExtractionStats"), std::string::npos);
+    EXPECT_NE(content.find("frameContext.PooledFrontSlot"), std::string::npos);
 }
 
 TEST(RuntimeEngineLayering, PromotedFrameLoopContractPreservesRendererAndMaintenanceOrder)

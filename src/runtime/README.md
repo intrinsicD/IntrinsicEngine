@@ -63,6 +63,13 @@ maintenance/shutdown phase contracts. The contract lives in `core` because it ha
 no higher-layer imports; `Runtime.Engine` supplies runtime-specific hook
 implementations during composition.
 
+`Engine::RunFrame()` keeps per-frame lifecycle state in an internal
+`RuntimeFrameContext` record: clamped frame delta, fixed-step interpolation
+alpha, monotonic render frame index, `RenderFrameInput`, extraction stats, and
+the acquired `RenderWorldPool` front slot. This keeps the stage data explicit
+without exporting a runtime API or reviving legacy `Runtime.FrameLoop`,
+`Runtime.RenderOrchestrator`, or `Runtime.ResourceMaintenance` modules.
+
 ## Engine initialisation ordering
 
 `Engine::Initialize()` runs the following ordered steps once per engine
@@ -123,7 +130,10 @@ freshly-constructed subsystems):
 
 ## Canonical frame loop phases (`Engine::RunFrame`)
 
-1. Platform events / resize handling.
+1. Platform events / resize handling. Minimized windows wait on platform events,
+   resample the frame clock, and return before ImGui or render-frame work begins;
+   resize requests idle the device, resize device/renderer resources, acknowledge
+   the request, and continue through the normal frame.
 2. Fixed-step simulation. Each substep calls `IApplication::OnSimTick`, then
    `RegisterPromotedEcsSystemBundle` to append `TransformHierarchy` /
    `BoundsPropagation` to the CPU `FrameGraph`, and finally compiles and
@@ -169,6 +179,15 @@ freshly-constructed subsystems):
 `Engine::RunFrame()` consumes `Extrinsic.Core.FrameClock` for wall-clock frame
 delta sampling and post-sleep resampling; runtime owns the phase orchestration,
 not the reusable clock value type.
+
+Shutdown is also delegated through `Extrinsic.Core.FrameLoop`: runtime clears
+the platform listener, detaches and tears down the ImGui adapter while the window
+and overlay system are live, then executes `ExecuteShutdownContract` in this
+order: stop running, wait device idle, application shutdown, streaming
+shutdown/drain, scene/reference-scene/camera-controller destruction, asset and
+GPU-asset handoff destruction, streaming state destruction, frame graph
+destruction, render-extraction shutdown plus renderer shutdown, device shutdown,
+window destruction, scheduler shutdown, and initialized-state clear.
 
 ### Pipelined render-world pool (`GRAPHICS-036C`/`GRAPHICS-036D`)
 

@@ -103,6 +103,16 @@ namespace Extrinsic::Runtime
         constexpr int kGizmoMouseButton = 0;
         constexpr int kSelectionMouseButton = 0;
 
+        struct RuntimeFrameContext
+        {
+            double FrameDeltaSeconds{0.0};
+            double FixedStepAlpha{0.0};
+            std::uint64_t FrameIndex{0};
+            Graphics::RenderFrameInput RenderInput{};
+            RuntimeRenderExtractionStats ExtractionStats{};
+            std::uint32_t PooledFrontSlot{RenderWorldPool::kInvalidSlot};
+        };
+
         // RUNTIME-070: runtime-baked fallback texture bytes for GpuAssetCache.
         // A 4×4 RGBA8_UNORM magenta-and-black checkerboard repeated from a 2×2
         // base pattern. The cache never reads files; runtime owns the bytes.
@@ -1521,6 +1531,8 @@ namespace Extrinsic::Runtime
 
     void Engine::RunFrame()
     {
+        RuntimeFrameContext frameContext{};
+
         // ── Phase 1: Platform ─────────────────────────────────────────────
         m_Window->PollEvents();
         m_FrameClock.BeginFrame();
@@ -1580,6 +1592,7 @@ namespace Extrinsic::Runtime
         // the ECS system DAG → reset for next tick.
 
         const double frameDt = m_FrameClock.FrameDeltaClamped(m_MaxFrameDelta);
+        frameContext.FrameDeltaSeconds = frameDt;
         m_Accumulator += frameDt;
 
         int substeps = 0;
@@ -1623,6 +1636,7 @@ namespace Extrinsic::Runtime
         }
 
         const double alpha = m_Accumulator / m_FixedDt;
+        frameContext.FixedStepAlpha = alpha;
 
         // ── RUNTIME-090 Slice B: open the Dear ImGui frame ────────────────
         // BeginFrame runs after Window::PollEvents (Phase 1) and the
@@ -1650,10 +1664,11 @@ namespace Extrinsic::Runtime
 
         // ── Phase 4: Build render snapshot ────────────────────────────────
         const Platform::Extent2D viewport = m_Window->GetFramebufferExtent();
-        Graphics::RenderFrameInput renderInput{
+        frameContext.RenderInput = Graphics::RenderFrameInput{
             .Alpha    = alpha,
             .Viewport = viewport,
         };
+        Graphics::RenderFrameInput& renderInput = frameContext.RenderInput;
 
         if (m_Config.Camera.Enabled)
         {
@@ -1735,9 +1750,7 @@ namespace Extrinsic::Runtime
         // consumer: AcquireFront) and the front reference is released after the
         // frame retires below. `frameIndex` stamps the acquired slot so the
         // consumer's frame-age diagnostic reads 0 in the synchronous baseline.
-        const std::uint64_t frameIndex = m_FrameIndex++;
-        RuntimeRenderExtractionStats extractionStats{};
-        std::uint32_t pooledFrontSlot = RenderWorldPool::kInvalidSlot;
+        frameContext.FrameIndex = m_FrameIndex++;
 
         struct RenderFrameHooks final : Core::IRenderFrameHooks
         {
@@ -1849,20 +1862,20 @@ namespace Extrinsic::Runtime
                                      m_SelectionController,
                                      *m_RenderWorldPool,
                                      m_Config.Render.SynchronousExtraction,
-                                     extractionStats,
-                                     frameIndex,
-                                     pooledFrontSlot,
+                                     frameContext.ExtractionStats,
+                                     frameContext.FrameIndex,
+                                     frameContext.PooledFrontSlot,
                                      frame,
                                      renderInput,
                                      transformGizmos,
                                      renderWorld);
 
         const Core::RenderFrameResult renderResult = Core::ExecuteRenderFrameContract(renderHooks);
-        m_LastExtractionStats = extractionStats;
+        m_LastExtractionStats = frameContext.ExtractionStats;
         if (!renderResult.BeganFrame)
         {
             // BeginFrame failed before extraction ran, so no slot was acquired
-            // (pooledFrontSlot stays kInvalidSlot) — nothing to release.
+            // (PooledFrontSlot stays kInvalidSlot) — nothing to release.
             m_FrameClock.EndFrame();
             return;
         }
@@ -2038,8 +2051,8 @@ namespace Extrinsic::Runtime
         // recorded by ExecuteFrame above). Synchronous mode releases the current
         // front; pipelined mode releases the previous front consumed by render-N
         // after extraction-N has already published the new front.
-        if (pooledFrontSlot != RenderWorldPool::kInvalidSlot)
-            m_RenderWorldPool->ReleaseFront(pooledFrontSlot);
+        if (frameContext.PooledFrontSlot != RenderWorldPool::kInvalidSlot)
+            m_RenderWorldPool->ReleaseFront(frameContext.PooledFrontSlot);
 
         // ── Phase 11: Clock EndFrame ──────────────────────────────────────
         m_FrameClock.EndFrame();
