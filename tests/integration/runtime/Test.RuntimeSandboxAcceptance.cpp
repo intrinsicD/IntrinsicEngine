@@ -22,6 +22,7 @@
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Geometry2D;
+import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Component.MetaData;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Component.Transform;
@@ -29,6 +30,7 @@ import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Scene.Handle;
+import Extrinsic.ECS.Scene.Bootstrap;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.Component.RenderGeometry;
@@ -415,3 +417,78 @@ TEST(RuntimeSandboxAcceptance, ViewportLeftClickSubmitsSelectionPick)
 
     engine.Shutdown();
 }
+
+// --- BUG-024: inspector transform edit reaches render state same-frame ------
+
+namespace
+{
+    constexpr glm::vec3 kBug024EditedPosition{7.f, 8.f, 9.f};
+
+    // Applies the promoted Sandbox Editor transform-edit command (through the
+    // live EditorCommandHistory path) during the variable tick — i.e. after
+    // the fixed-step ECS bundle already ran for this frame — and exits.
+    class EditTransformViaInspectorAndExitApplication final : public Runtime::IApplication
+    {
+    public:
+        void OnInitialize(Runtime::Engine& engine) override
+        {
+            auto& scene = engine.GetScene();
+            Entity = Extrinsic::ECS::Scene::CreateDefault(scene, "Bug024EditTarget");
+            scene.Raw().emplace<G::RenderSurface>(Entity);
+        }
+        void OnSimTick(Runtime::Engine&, double) override {}
+        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        {
+            const Runtime::SandboxEditorContext context{
+                .Scene = &engine.GetScene(),
+                .Selection = &engine.GetSelectionController(),
+                .CommandHistory = &engine.GetEditorCommandHistory(),
+            };
+            LastStatus = Runtime::ApplySandboxEditorTransformEdit(
+                context,
+                Runtime::SandboxEditorTransformEditCommand{
+                    .StableEntityId =
+                        Runtime::SelectionController::ToStableEntityId(Entity),
+                    .SetPosition = true,
+                    .Position = kBug024EditedPosition,
+                });
+            engine.RequestExit();
+        }
+        void OnShutdown(Runtime::Engine&) override {}
+
+        EntityHandle Entity{};
+        Runtime::SandboxEditorCommandStatus LastStatus{
+            Runtime::SandboxEditorCommandStatus::NoChange};
+    };
+}
+
+// BUG-024 regression: an Inspector "Local position" edit applied after the
+// fixed-step phase must be flushed (TransformHierarchy → BoundsPropagation →
+// RenderSync) before render extraction observes the scene. After the single
+// edited frame, the world matrix matches the authored position, IsDirtyTag is
+// cleared, and DirtyTransform was stamped by the flush and drained by the
+// same frame's extraction. Without the runtime pre-render flush the world
+// matrix stays stale and IsDirtyTag survives the frame.
+TEST(RuntimeSandboxAcceptance, InspectorTransformEditFlushedToRenderStateSameFrame)
+{
+    auto app = std::make_unique<EditTransformViaInspectorAndExitApplication>();
+    auto* appPtr = app.get();
+    Runtime::Engine engine(HeadlessConfig(), std::move(app));
+    engine.Initialize();
+
+    engine.Run();
+
+    ASSERT_EQ(appPtr->LastStatus, Runtime::SandboxEditorCommandStatus::Applied);
+    const EntityHandle entity = appPtr->Entity;
+    auto& raw = engine.GetScene().Raw();
+
+    const glm::mat4& world = raw.get<ECSC::Transform::WorldMatrix>(entity).Matrix;
+    EXPECT_FLOAT_EQ(world[3].x, kBug024EditedPosition.x);
+    EXPECT_FLOAT_EQ(world[3].y, kBug024EditedPosition.y);
+    EXPECT_FLOAT_EQ(world[3].z, kBug024EditedPosition.z);
+    EXPECT_FALSE(raw.any_of<ECSC::Transform::IsDirtyTag>(entity));
+    EXPECT_FALSE(raw.any_of<ECSC::DirtyTags::DirtyTransform>(entity));
+
+    engine.Shutdown();
+}
+

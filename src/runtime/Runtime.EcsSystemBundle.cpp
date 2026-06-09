@@ -32,4 +32,24 @@ namespace Extrinsic::Runtime
 
         return stats;
     }
+
+    PreRenderTransformFlushStats FlushPreRenderTransformState(
+        ECS::Scene::Registry& scene)
+    {
+        // Same system order the FrameGraph resolves for the fixed-step
+        // bundle: world matrices first, then bounds (which read
+        // WorldUpdatedTag), then the RenderSync tag forwarding (which
+        // clears WorldUpdatedTag and stamps DirtyTransform).
+        ECS::Systems::TransformHierarchy::OnUpdate(scene.Raw());
+        ECS::Systems::BoundsPropagation::OnUpdate(scene.Raw());
+
+        ECS::Systems::RenderSync::Stats renderSync{};
+        ECS::Systems::RenderSync::OnUpdate(scene.Raw(), renderSync);
+
+        return PreRenderTransformFlushStats{
+            .WorldUpdatedObserved = renderSync.WorldUpdatedObserved,
+            .DirtyTransformStamped = renderSync.DirtyTransformStamped,
+            .WorldUpdatedCleared = renderSync.WorldUpdatedCleared,
+        };
+    }
 }

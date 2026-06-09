@@ -23,6 +23,8 @@ using Extrinsic::ECS::EntityHandle;
 using Extrinsic::ECS::Hierarchy::Attach;
 using Extrinsic::ECS::Scene::CreateDefault;
 using Extrinsic::ECS::Scene::Registry;
+using Extrinsic::Runtime::FlushPreRenderTransformState;
+using Extrinsic::Runtime::PreRenderTransformFlushStats;
 using Extrinsic::Runtime::PromotedEcsSystemBundleStats;
 using Extrinsic::Runtime::RegisterPromotedEcsSystemBundle;
 namespace Components = Extrinsic::ECS::Components;
@@ -169,3 +171,66 @@ TEST(RuntimeEcsSystemBundle, AppPassMutatingTransformRunsBeforeTransformHierarch
     EXPECT_FALSE(raw.all_of<Components::Transform::WorldUpdatedTag>(entity));
     EXPECT_TRUE(raw.all_of<Components::DirtyTags::DirtyTransform>(entity));
 }
+
+// BUG-024 — a local-transform mutation made *after* the fixed-step bundle
+// (the inspector-edit / gizmo-drag shape) leaves WorldMatrix stale until the
+// runtime pre-render flush runs; the flush recomputes the world matrix,
+// clears IsDirtyTag, and stamps DirtyTransform for extraction to drain.
+TEST(RuntimeEcsSystemBundle, PreRenderFlushRefreshesPostFixedStepTransformEdit)
+{
+    Registry scene;
+    auto& raw = scene.Raw();
+
+    const EntityHandle entity = CreateDefault(scene, "EditedAfterFixedStep");
+    raw.get<Components::Transform::Component>(entity).Position = glm::vec3(1.0f, 0.0f, 0.0f);
+    raw.emplace_or_replace<Components::Transform::IsDirtyTag>(entity);
+
+    // Scheduled fixed-step bundle runs first and settles the scene.
+    FrameGraph graph;
+    (void)RegisterPromotedEcsSystemBundle(graph, scene);
+    ASSERT_TRUE(graph.Compile().has_value());
+    ASSERT_TRUE(graph.Execute().has_value());
+    raw.remove<Components::DirtyTags::DirtyTransform>(entity); // extraction drained it
+
+    // Post-fixed-step mutation (UI inspector edit / gizmo drag shape).
+    raw.get<Components::Transform::Component>(entity).Position = glm::vec3(4.0f, 5.0f, 6.0f);
+    raw.emplace_or_replace<Components::Transform::IsDirtyTag>(entity);
+
+    // Stale until the flush: this is the BUG-024 failure mode.
+    const glm::mat4 stale =
+        glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+    ASSERT_TRUE(MatricesNear(raw.get<Components::Transform::WorldMatrix>(entity).Matrix, stale));
+
+    const PreRenderTransformFlushStats stats = FlushPreRenderTransformState(scene);
+
+    EXPECT_EQ(stats.WorldUpdatedObserved, 1u);
+    EXPECT_EQ(stats.DirtyTransformStamped, 1u);
+    EXPECT_EQ(stats.WorldUpdatedCleared, 1u);
+    const glm::mat4 expected =
+        glm::translate(glm::mat4(1.0f), glm::vec3(4.0f, 5.0f, 6.0f));
+    EXPECT_TRUE(MatricesNear(raw.get<Components::Transform::WorldMatrix>(entity).Matrix, expected));
+    EXPECT_FALSE(raw.all_of<Components::Transform::IsDirtyTag>(entity));
+    EXPECT_FALSE(raw.all_of<Components::Transform::WorldUpdatedTag>(entity));
+    EXPECT_TRUE(raw.all_of<Components::DirtyTags::DirtyTransform>(entity));
+}
+
+// BUG-024 — a clean scene makes the pre-render flush a no-op: no world
+// matrices rewritten, no DirtyTransform stamped.
+TEST(RuntimeEcsSystemBundle, PreRenderFlushIsNoOpOnCleanScene)
+{
+    Registry scene;
+    const EntityHandle entity = CreateDefault(scene, "Clean");
+    (void)entity;
+
+    FrameGraph graph;
+    (void)RegisterPromotedEcsSystemBundle(graph, scene);
+    ASSERT_TRUE(graph.Compile().has_value());
+    ASSERT_TRUE(graph.Execute().has_value());
+
+    const PreRenderTransformFlushStats stats = FlushPreRenderTransformState(scene);
+
+    EXPECT_EQ(stats.WorldUpdatedObserved, 0u);
+    EXPECT_EQ(stats.DirtyTransformStamped, 0u);
+    EXPECT_EQ(stats.WorldUpdatedCleared, 0u);
+}
+

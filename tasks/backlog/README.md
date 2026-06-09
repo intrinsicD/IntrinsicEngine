@@ -130,7 +130,10 @@ Reproducible correctness/regression fixes only. Origin:
 [`bugs/index.md`](bugs/index.md).
 
 Members:
-- [`bugs/BUG-024-sandbox-transform-edit-rendering.md`](bugs/BUG-024-sandbox-transform-edit-rendering.md) — Sandbox Inspector transform edits should move the rendered `ReferenceTriangle`; first-pass analysis points at a runtime pre-render transform flush gap after UI/gizmo mutations.
+- [`bugs/BUG-024B-sandbox-transform-edit-vulkan-pixel-shift-smoke.md`](bugs/BUG-024B-sandbox-transform-edit-vulkan-pixel-shift-smoke.md) —
+  Operational follow-up to `BUG-024` (done): opt-in `gpu;vulkan` pixel-shift
+  smoke for sandbox transform edits through the promoted UI/editor command
+  path.
 
 Resolved bug history lives in [`bugs/index.md`](bugs/index.md) and the
 retirement log.

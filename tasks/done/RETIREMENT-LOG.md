@@ -8,6 +8,24 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+Backlog
+[`BUG-024`](BUG-024-sandbox-transform-edit-rendering.md) — sandbox transform
+UI edits do not move rendered triangle — retired to `tasks/done/` on
+2026-06-10 at maturity `CPUContracted`. Root cause: Inspector/gizmo
+transform edits run after the fixed-step ECS bundle, so render extraction
+observed a stale `Transform::WorldMatrix` and the rendered model matrix
+never moved within the frame. Fix: `Extrinsic.Runtime.EcsSystemBundle` now
+exports `FlushPreRenderTransformState` (direct `TransformHierarchy` →
+`BoundsPropagation` → `RenderSync` pass), invoked by `Engine::RunFrame()`
+after the variable tick, ImGui editor hook, and gizmo drive — before
+transform-gizmo packet build and extraction. Regression coverage:
+engine-level `RuntimeSandboxAcceptance.InspectorTransformEditFlushedToRenderStateSameFrame`
+(verified failing with the flush disabled), extraction-level
+`RuntimeRenderExtraction.UiTransformEditModelReachesRenderWorldAfterPreRenderFlush`
+(asserts the render-world model translation), and flush-helper contract
+tests in `RuntimeEcsSystemBundle`. Default CPU gate passed 2882/2882 at
+retirement. `Operational` (Vulkan pixel-shift smoke) owned by `BUG-024B`.
+
 Previously-active
 [`PROC-006`](PROC-006-audit-cadence-lapse-visibility.md) — audit cadence
 lapse visibility retired to `tasks/done/` on 2026-06-09. The slice added

@@ -9,10 +9,13 @@
 #include <glm/glm.hpp>
 
 import Extrinsic.Asset.Registry;
+import Extrinsic.Core.FrameGraph;
+import Extrinsic.ECS.Scene.Bootstrap;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.AssetInstance;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Component.SpatialDebugBinding;
+import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Component.Light;
 import Extrinsic.Graphics.GpuAssetCache;
@@ -28,7 +31,10 @@ import Extrinsic.RHI.FrameHandle;
 import Extrinsic.RHI.TransferQueue;
 import Extrinsic.RHI.Types;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
+import Extrinsic.Runtime.EcsSystemBundle;
 import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.SandboxEditorUi;
+import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SpatialDebugAdapters;
 import Extrinsic.Runtime.VisualizationAdapters;
 import Geometry.AABB;
@@ -236,6 +242,82 @@ TEST(RuntimeRenderExtraction, CreatesUpdatesAndClearsDirtyTransformSidecar)
     EXPECT_EQ(stats.AllocatedInstanceCount, 0u);
     EXPECT_EQ(stats.DirtyTransformCount, 0u);
     EXPECT_EQ(fixture.Extraction.GetTrackedRenderableCount(), 1u);
+}
+
+// BUG-024 — a Sandbox Editor transform edit applied after the fixed-step ECS
+// bundle reaches the render-world model only after the runtime pre-render
+// flush. Asserts the actual snapshot translation (not just submission
+// counts): stale before the flush, edited afterwards, with DirtyTransform
+// stamped by the flush and drained by extraction.
+TEST(RuntimeRenderExtraction, UiTransformEditModelReachesRenderWorldAfterPreRenderFlush)
+{
+    namespace ECSC = ECS::Components;
+
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+    auto& registry = scene.Raw();
+
+    const auto entity = ECS::Scene::CreateDefault(scene, "EditedTriangle");
+    registry.emplace<Graphics::Components::RenderSurface>(entity);
+    registry.get<ECSC::Transform::Component>(entity).Position = glm::vec3{1.f, 2.f, 3.f};
+    registry.emplace_or_replace<ECSC::Transform::IsDirtyTag>(entity);
+
+    // Scheduled fixed-step bundle settles the scene (engine Phase 2 shape).
+    Core::FrameGraph graph;
+    (void)Runtime::RegisterPromotedEcsSystemBundle(graph, scene);
+    ASSERT_TRUE(graph.Compile().has_value());
+    ASSERT_TRUE(graph.Execute().has_value());
+
+    auto stats = fixture.Extract(scene);
+    ASSERT_EQ(stats.AllocatedInstanceCount, 1u);
+    ASSERT_EQ(stats.DirtyTransformCount, 1u);
+
+    const auto modelTranslation = [&]() -> glm::vec3 {
+        const Graphics::RenderWorld world =
+            fixture.Renderer->ExtractRenderWorld(Graphics::RenderFrameInput{});
+        for (const auto& renderable : world.Renderables)
+        {
+            if (renderable.StableId == static_cast<std::uint32_t>(entity))
+                return glm::vec3{renderable.Model[3]};
+        }
+        ADD_FAILURE() << "renderable not found in render world";
+        return glm::vec3{0.f};
+    };
+    EXPECT_EQ(modelTranslation(), (glm::vec3{1.f, 2.f, 3.f}));
+
+    // Post-fixed-step editor command (the Inspector "Local position" edit).
+    Runtime::SelectionController selection;
+    const Runtime::SandboxEditorContext context{
+        .Scene = &scene,
+        .Selection = &selection,
+    };
+    const auto status = Runtime::ApplySandboxEditorTransformEdit(
+        context,
+        Runtime::SandboxEditorTransformEditCommand{
+            .StableEntityId = Runtime::SelectionController::ToStableEntityId(entity),
+            .SetPosition = true,
+            .Position = glm::vec3{7.f, 8.f, 9.f},
+        });
+    ASSERT_EQ(status, Runtime::SandboxEditorCommandStatus::Applied);
+
+    // Without the pre-render flush the snapshot stays at the stale
+    // translation — the BUG-024 failure mode.
+    stats = fixture.Extract(scene);
+    EXPECT_EQ(stats.DirtyTransformCount, 0u);
+    EXPECT_EQ(modelTranslation(), (glm::vec3{1.f, 2.f, 3.f}));
+
+    // The runtime-owned flush (Engine::RunFrame order: after UI/gizmo
+    // mutations, before extraction) propagates the edit into the snapshot.
+    const Runtime::PreRenderTransformFlushStats flush =
+        Runtime::FlushPreRenderTransformState(scene);
+    EXPECT_EQ(flush.DirtyTransformStamped, 1u);
+
+    stats = fixture.Extract(scene);
+    EXPECT_EQ(stats.DirtyTransformCount, 1u);
+    EXPECT_EQ(stats.SubmittedTransformCount, 1u);
+    EXPECT_EQ(modelTranslation(), (glm::vec3{7.f, 8.f, 9.f}));
+    EXPECT_FALSE(registry.any_of<ECSC::Transform::IsDirtyTag>(entity));
+    EXPECT_FALSE(registry.any_of<ECSC::DirtyTags::DirtyTransform>(entity));
 }
 
 TEST(RuntimeRenderExtraction, ClearSceneStateDropsSidecarsAndPerEntityBindings)

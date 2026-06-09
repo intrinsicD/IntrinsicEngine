@@ -70,4 +70,33 @@ export namespace Extrinsic::Runtime
     [[nodiscard]] PromotedEcsSystemBundleStats RegisterPromotedEcsSystemBundle(
         Core::FrameGraph& graph,
         ECS::Scene::Registry& scene);
+
+    // BUG-024 — Observables for the runtime-owned pre-render transform
+    // flush. `WorldUpdatedObserved` counts entities whose world matrix was
+    // rewritten by this flush invocation; `DirtyTransformStamped` counts
+    // entities forwarded into `DirtyTags::DirtyTransform` for the render
+    // extraction lane to drain this frame.
+    struct PreRenderTransformFlushStats
+    {
+        std::uint32_t WorldUpdatedObserved{0};
+        std::uint32_t DirtyTransformStamped{0};
+        std::uint32_t WorldUpdatedCleared{0};
+    };
+
+    // BUG-024 — Pre-render transform flush. Runs the promoted baseline ECS
+    // systems (`TransformHierarchy` → `BoundsPropagation` → `RenderSync`)
+    // directly, outside the fixed-step FrameGraph, so local-transform
+    // mutations made after the scheduled fixed-step bundle — Sandbox Editor
+    // UI inspector edits (via the ImGui editor hook), `OnVariableTick()`
+    // app mutations, and `GizmoInteraction` drags — are reflected in
+    // `Transform::WorldMatrix`, world bounds, and
+    // `DirtyTags::DirtyTransform` before render extraction observes the
+    // scene. Entities with no pending `Transform::IsDirtyTag` are untouched;
+    // a clean scene makes this a cheap no-op traversal.
+    //
+    // Runtime composition calls this from `Engine::RunFrame()` after the
+    // last pre-render mutation source and before transform-gizmo packet
+    // build + `RenderExtractionCache::ExtractAndSubmit()`.
+    PreRenderTransformFlushStats FlushPreRenderTransformState(
+        ECS::Scene::Registry& scene);
 }

@@ -47,7 +47,7 @@ the authoritative open/unblocked view.
 
 ## Theme G — Active bugs
 
-- unblocked: `BUG-024` — Sandbox transform UI edits do not move rendered triangle (tasks/backlog/bugs/BUG-024-sandbox-transform-edit-rendering.md)
+- unblocked: `BUG-024B` — Vulkan pixel-shift smoke for sandbox transform edits (tasks/backlog/bugs/BUG-024B-sandbox-transform-edit-vulkan-pixel-shift-smoke.md)
 
 ## Theme H — Agentic workflow hardening
 

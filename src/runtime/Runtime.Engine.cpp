@@ -1708,6 +1708,21 @@ namespace Extrinsic::Runtime
                                              viewport,
                                              m_ImGuiAdapter != nullptr && m_ImGuiAdapter->WantsMouseCapture(),
                                              m_GizmoInteraction.IsDragging());
+
+        // ── BUG-024: pre-render transform flush ───────────────────────────
+        // Local-transform mutations made after the fixed-step ECS bundle —
+        // Sandbox Editor UI inspector edits (applied inside the ImGui editor
+        // hook during EndFrame above), OnVariableTick app mutations, and the
+        // GizmoInteraction drag just driven — would otherwise reach render
+        // extraction with a stale Transform::WorldMatrix and only become
+        // visible one frame late (or never, when no further fixed-step tick
+        // runs). Flush TransformHierarchy → BoundsPropagation → RenderSync
+        // here, before the transform-gizmo packets are built and before
+        // ExtractRenderWorld observes the scene, so the rendered model
+        // matrix and the gizmo packets agree with the authored transform in
+        // the same frame.
+        (void)FlushPreRenderTransformState(*m_Scene);
+
         const std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos =
             m_GizmoPacketBuilder.Build(*m_Scene,
                                        m_GizmoSelectedEntities,
