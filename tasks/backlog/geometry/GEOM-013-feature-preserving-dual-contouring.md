@@ -1,3 +1,8 @@
+---
+id: GEOM-013
+theme: none
+depends_on: []
+---
 # GEOM-013 — Feature-preserving dual contouring
 
 ## Goal

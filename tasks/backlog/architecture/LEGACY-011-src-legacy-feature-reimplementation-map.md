@@ -1,3 +1,8 @@
+---
+id: LEGACY-011
+theme: F
+depends_on: []
+---
 # LEGACY-011 — Value-gated legacy feature reimplementation map
 
 ## Goal

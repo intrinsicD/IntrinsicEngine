@@ -1,3 +1,8 @@
+---
+id: METHOD-006
+theme: none
+depends_on: []
+---
 # METHOD-006 — Cross-field / frame-field design reference backend
 
 ## Goal

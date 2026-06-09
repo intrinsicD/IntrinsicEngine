@@ -1,3 +1,8 @@
+---
+id: LEGACY-009
+theme: F
+depends_on: []
+---
 # LEGACY-009 — Delete `src/legacy/RHI/`
 
 ## Goal

@@ -1,3 +1,8 @@
+---
+id: LEGACY-002
+theme: F
+depends_on: []
+---
 # LEGACY-002 — Seed retirement tasks for remaining `src/legacy/` subtrees
 
 ## Goal

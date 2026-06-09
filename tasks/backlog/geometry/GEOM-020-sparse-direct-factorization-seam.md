@@ -1,3 +1,8 @@
+---
+id: GEOM-020
+theme: none
+depends_on: []
+---
 # GEOM-020 — Sparse direct factorization solver seam (LDLT/LLT)
 
 ## Goal

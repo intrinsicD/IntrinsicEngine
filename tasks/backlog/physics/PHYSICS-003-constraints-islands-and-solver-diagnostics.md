@@ -1,3 +1,8 @@
+---
+id: PHYSICS-003
+theme: C
+depends_on: [PHYSICS-001, PHYSICS-002]
+---
 # PHYSICS-003 — Constraints, islands, sleep, and solver diagnostics
 
 ## Goal

@@ -1,3 +1,8 @@
+---
+id: LEGACY-001
+theme: F
+depends_on: []
+---
 # LEGACY-001 — Delete `src/legacy/Interface/`
 
 ## Goal

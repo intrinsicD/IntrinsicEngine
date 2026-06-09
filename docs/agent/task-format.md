@@ -5,6 +5,11 @@ Use this template for all new task files under `tasks/`.
 ## Required structure
 
 ```md
+---
+id: <TASK-ID>
+theme: <theme letter, or `none`>
+depends_on: []
+---
 # <TASK-ID> <Title>
 
 ## Goal
@@ -43,6 +48,26 @@ checkboxes (`- [ ]` for open work, `- [x]` for completed work) in actionable
 sections so task status is visible at a glance. Completed task files under
 `tasks/done/` should not contain unchecked actionable todos; unresolved work
 belongs in a follow-up task.
+
+## Front-matter (open tasks)
+
+Open tasks under `tasks/active/` and `tasks/backlog/` must start with a YAML
+front-matter block; it is the machine-readable home of dependency edges and
+feeds the generated `tasks/SESSION-BRIEF.md`:
+
+- `id` (required) — must equal the title-line task ID.
+- `theme` (required) — convergence-theme letter from
+  `tasks/backlog/README.md`, or `none` for unthemed work.
+- `depends_on` (required, may be `[]`) — task IDs this task is gated by;
+  every entry must resolve to a task file under `tasks/active|backlog|done`.
+  A dependency is satisfied when the referenced task is in `tasks/done/`.
+- `maturity_target` (optional) — intended stop-state per
+  [`task-maturity.md`](task-maturity.md).
+
+`tools/agents/validate_tasks.py --strict` enforces the schema for open tasks;
+retired tasks under `tasks/done/` are exempt. After opening, retiring, or
+re-gating a task, regenerate the session brief with
+`python3 tools/agents/generate_session_brief.py`.
 
 ## Retiring a task
 

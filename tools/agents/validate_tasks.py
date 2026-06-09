@@ -114,11 +114,25 @@ class ParsedTask:
     sections: set[str]
     section_bodies: dict[str, str]
     content: str
+    front_matter: str | None = None
+
+
+def split_front_matter(content: str) -> tuple[str | None, str]:
+    """Split a leading YAML front-matter block from the body, if present."""
+    if not content.startswith("---\n"):
+        return None, content
+    end = content.find("\n---\n", len("---\n"))
+    if end == -1:
+        return None, content
+    block = content[len("---\n") : end]
+    body = content[end + len("\n---\n") :]
+    return block, body
 
 
 def parse_task(path: Path) -> ParsedTask:
     content = path.read_text(encoding="utf-8")
-    lines = content.splitlines()
+    front_matter, body = split_front_matter(content)
+    lines = body.splitlines()
 
     task_id = None
     for line in lines:
@@ -150,7 +164,14 @@ def parse_task(path: Path) -> ParsedTask:
     if current_section is not None:
         section_bodies[current_section] = "\n".join(current_body)
 
-    return ParsedTask(path=path, task_id=task_id, sections=sections, section_bodies=section_bodies, content=content)
+    return ParsedTask(
+        path=path,
+        task_id=task_id,
+        sections=sections,
+        section_bodies=section_bodies,
+        content=content,
+        front_matter=front_matter,
+    )
 
 
 def find_markdown_files(root: Path) -> list[Path]:
@@ -247,6 +268,90 @@ def validate_task(parsed: ParsedTask, mode: str) -> list[Finding]:
     return findings
 
 
+def validate_front_matter(parsed_tasks: list[ParsedTask]) -> list[Finding]:
+    """Open (active/backlog) tasks must carry resolvable YAML front-matter.
+
+    Schema: required `id` (equals the title-line ID), `theme` (non-empty
+    string), `depends_on` (list of task IDs that exist somewhere under
+    tasks/); optional `maturity_target`. Done tasks are exempt — the brief
+    generator only needs their existence.
+    """
+    findings: list[Finding] = []
+    known_ids = {parsed.task_id for parsed in parsed_tasks if parsed.task_id}
+
+    try:
+        import yaml
+    except ImportError:
+        findings.append(
+            Finding(
+                "error",
+                parsed_tasks[0].path if parsed_tasks else Path("tasks"),
+                "pyyaml is required to validate task front-matter (pip install pyyaml).",
+            )
+        )
+        return findings
+
+    for parsed in parsed_tasks:
+        path_parts = {p.lower() for p in parsed.path.parts}
+        if "done" in path_parts:
+            continue
+
+        if parsed.front_matter is None:
+            findings.append(
+                Finding(
+                    "error",
+                    parsed.path,
+                    "open task is missing YAML front-matter (id/theme/depends_on); "
+                    "see docs/agent/task-format.md.",
+                )
+            )
+            continue
+
+        try:
+            data = yaml.safe_load(parsed.front_matter)
+        except yaml.YAMLError as exc:
+            findings.append(Finding("error", parsed.path, f"front-matter is not valid YAML: {exc}"))
+            continue
+        if not isinstance(data, dict):
+            findings.append(Finding("error", parsed.path, "front-matter must be a YAML mapping."))
+            continue
+
+        fm_id = data.get("id")
+        if not isinstance(fm_id, str) or fm_id != parsed.task_id:
+            findings.append(
+                Finding(
+                    "error",
+                    parsed.path,
+                    f"front-matter id `{fm_id}` must equal the title-line ID `{parsed.task_id}`.",
+                )
+            )
+
+        theme = data.get("theme")
+        if not isinstance(theme, str) or not theme.strip():
+            findings.append(
+                Finding("error", parsed.path, "front-matter `theme` must be a non-empty string.")
+            )
+
+        depends_on = data.get("depends_on")
+        if not isinstance(depends_on, list):
+            findings.append(
+                Finding("error", parsed.path, "front-matter `depends_on` must be a list (may be empty).")
+            )
+        else:
+            for dep in depends_on:
+                if not isinstance(dep, str) or dep not in known_ids:
+                    findings.append(
+                        Finding(
+                            "error",
+                            parsed.path,
+                            f"front-matter dependency `{dep}` does not resolve to any task "
+                            "under tasks/active|backlog|done.",
+                        )
+                    )
+
+    return findings
+
+
 def validate_id_uniqueness(parsed_tasks: list[ParsedTask]) -> list[Finding]:
     findings: list[Finding] = []
     by_id: dict[str, list[ParsedTask]] = {}
@@ -301,6 +406,7 @@ def main() -> int:
         findings.extend(validate_task(parsed, mode=mode))
 
     findings.extend(validate_id_uniqueness(parsed_tasks))
+    findings.extend(validate_front_matter(parsed_tasks))
 
     prefix = root.parent
     for finding in findings:

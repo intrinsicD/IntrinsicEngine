@@ -1,3 +1,8 @@
+---
+id: PROC-006
+theme: H
+depends_on: [PROC-004]
+---
 # PROC-006 — Audit cadence lapse visibility
 
 ## Goal

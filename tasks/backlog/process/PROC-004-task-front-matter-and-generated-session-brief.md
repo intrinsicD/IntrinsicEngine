@@ -1,3 +1,8 @@
+---
+id: PROC-004
+theme: H
+depends_on: [PROC-002, PROC-003]
+---
 # PROC-004 — Structured task front-matter and generated session brief
 
 ## Goal

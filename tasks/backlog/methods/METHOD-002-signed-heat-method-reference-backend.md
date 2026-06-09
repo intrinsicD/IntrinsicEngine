@@ -1,3 +1,8 @@
+---
+id: METHOD-002
+theme: none
+depends_on: []
+---
 # METHOD-002 — Signed Heat Method reference backend
 
 ## Goal

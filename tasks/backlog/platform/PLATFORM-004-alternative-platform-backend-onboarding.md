@@ -1,3 +1,8 @@
+---
+id: PLATFORM-004
+theme: F
+depends_on: []
+---
 # PLATFORM-004 — Alternative-platform backend onboarding policy (planning seed)
 
 ## Goal

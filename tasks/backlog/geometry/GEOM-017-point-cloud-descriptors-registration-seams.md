@@ -1,3 +1,8 @@
+---
+id: GEOM-017
+theme: none
+depends_on: [GEOM-008]
+---
 # GEOM-017 — Point-cloud descriptors and registration seams
 
 ## Goal

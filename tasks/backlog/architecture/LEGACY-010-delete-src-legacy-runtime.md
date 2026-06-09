@@ -1,3 +1,8 @@
+---
+id: LEGACY-010
+theme: F
+depends_on: []
+---
 # LEGACY-010 — Delete `src/legacy/Runtime/`
 
 ## Goal

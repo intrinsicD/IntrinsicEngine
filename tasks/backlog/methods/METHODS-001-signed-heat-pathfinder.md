@@ -1,3 +1,8 @@
+---
+id: METHODS-001
+theme: none
+depends_on: [GEOM-007, METHOD-005]
+---
 # METHODS-001 — Pin signed heat as methods-pipeline pathfinder
 
 ## Goal

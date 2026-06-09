@@ -1,3 +1,8 @@
+---
+id: PROC-008
+theme: H
+depends_on: [PROC-003]
+---
 # PROC-008 — Category README state/history split
 
 ## Goal
