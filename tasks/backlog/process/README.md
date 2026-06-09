@@ -19,7 +19,7 @@ map.
 - [PROC-004 - Structured task front-matter and generated session brief](PROC-004-task-front-matter-and-generated-session-brief.md).
 - [PROC-005 - Align structural-check mode text with strict CI reality](../../done/PROC-005-align-structural-check-mode-contract-text.md) (done 2026-06-09).
 - [PROC-006 - Audit cadence lapse visibility](PROC-006-audit-cadence-lapse-visibility.md).
-- [PROC-007 - Onboarding prompt tightening and loop-mode defaults](PROC-007-onboarding-prompt-tightening.md).
+- [PROC-007 - Onboarding prompt tightening and loop-mode defaults](../../done/PROC-007-onboarding-prompt-tightening.md) (done 2026-06-09).
 
 ## Convergence
 
