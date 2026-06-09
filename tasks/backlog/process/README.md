@@ -19,13 +19,15 @@ map.
 - [PROC-004 - Structured task front-matter and generated session brief](PROC-004-task-front-matter-and-generated-session-brief.md).
 - [PROC-005 - Align structural-check mode text with strict CI reality](PROC-005-align-structural-check-mode-contract-text.md).
 - [PROC-006 - Audit cadence lapse visibility](PROC-006-audit-cadence-lapse-visibility.md).
+- [PROC-007 - Onboarding prompt tightening and loop-mode defaults](PROC-007-onboarding-prompt-tightening.md).
 
 ## Convergence
 
 - These tasks anchor **Theme H — Agentic workflow hardening**.
 - Dependency order: `PROC-001` first (every other task edits docs that are
-  mirrored into skills), then `PROC-005` and `PROC-002` (independent of each
-  other), then `PROC-003`, then `PROC-004`, then `PROC-006`.
+  mirrored into skills), then `PROC-005`, `PROC-002`, and `PROC-007`
+  (independent of each other), then `PROC-003`, then `PROC-004`, then
+  `PROC-006`.
 - `PROC-001` owns the generate-and-verify sync between `docs/agent/*` and the
   three skill mirror roots.
 - `PROC-002` owns task-ID uniqueness enforcement and the ID allocation rule.
@@ -36,6 +38,10 @@ map.
   `tasks/SESSION-BRIEF.md`.
 - `PROC-005` owns correcting the stale "warning mode" wording in the contract.
 - `PROC-006` owns surfacing lapsed audit cadences.
+- `PROC-007` owns deduplicating contract restatements out of the onboarding
+  prompt and giving loop mode explicit defaults and a checkpoint rule;
+  `PROC-004` owns the prompt's reading-order change — the two prompt-touching
+  scopes are disjoint.
 
 Forbidden across all members: engine code changes, renaming retired task files,
 weakening any check that currently runs strict in CI, and embedding

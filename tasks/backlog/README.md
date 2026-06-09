@@ -255,6 +255,9 @@ Members (in dependency order; see [`process/README.md`](process/README.md)):
   structured task front-matter and generated session brief (after PROC-003).
 - [`process/PROC-006`](process/PROC-006-audit-cadence-lapse-visibility.md) —
   audit cadence lapse visibility (brief surface after PROC-004 Slice B).
+- [`process/PROC-007`](process/PROC-007-onboarding-prompt-tightening.md) —
+  onboarding prompt tightening and loop-mode defaults (after PROC-001;
+  disjoint from PROC-004's reading-order scope).
 
 ## Cross-domain dependency anchors
 

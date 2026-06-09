@@ -23,7 +23,7 @@
 - [ ] Slice A: extend `tools/agents/validate_tasks.py` to skip a leading YAML block when locating the title, and to validate on open tasks: parseable YAML, `id` matches filename and title, `depends_on` entries resolve to an existing task file in `active/`, `backlog/`, or `done/`.
 - [ ] Slice B: add `tools/agents/generate_session_brief.py` producing `tasks/SESSION-BRIEF.md` with: currently active tasks (status/owner/branch); per theme, open tasks whose `depends_on` all resolve to `tasks/done/` ("unblocked") and blocked tasks with their first unmet dependency; a generation timestamp and regeneration command. Deterministic output, target ≤ 60 lines.
 - [ ] Slice B: add a `Validate session brief freshness` step to `ci-docs.yml` (regenerate + `git diff --exit-code tasks/SESSION-BRIEF.md`), mirroring the module-inventory step.
-- [ ] Slice B: update the reading order in `docs/agent/prompt/prompt.md` and the `intrinsicengine-core` session-start sequence to `AGENTS.md` → `tasks/SESSION-BRIEF.md` → chosen task file, with the two READMEs demoted to on-demand depth.
+- [ ] Slice B: update the reading order in `docs/agent/prompt/prompt.md` and the `intrinsicengine-core` session-start sequence to `AGENTS.md` → `tasks/SESSION-BRIEF.md` → chosen task file, with the two READMEs demoted to on-demand depth. Touch only the reading-order section; broader prompt deduplication and loop-mode defaults are owned by `PROC-007`.
 - [ ] Slice C (optional, after the brief is exercised): reduce "Cross-domain dependency anchors" in `tasks/backlog/README.md` to rationale-only prose, with edges owned by front-matter.
 
 ## Tests
