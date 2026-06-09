@@ -53,6 +53,8 @@ def collect_task_files(tasks_root: Path) -> list[Path]:
                 continue
             if path.name == "legacy-todo.md":
                 continue
+            if path.name == "RETIREMENT-LOG.md":
+                continue
             task_files.append(path)
     return task_files
 

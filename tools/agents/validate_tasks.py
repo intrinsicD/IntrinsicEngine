@@ -45,6 +45,7 @@ SKIP_FILENAMES = {
     "legacy-todo.md",
     "0000-repo-reorganization-tracker.md",
     "RENDERING-CLEANUP-TASK-PACK.md",
+    "RETIREMENT-LOG.md",
 }
 
 # Queue/index meta-files (e.g. `tasks/active/task-NN-<slug>.md`) are
