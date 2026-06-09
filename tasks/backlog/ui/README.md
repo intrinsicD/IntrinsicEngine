@@ -62,10 +62,11 @@ map.
   `AssetService`, and ECS materialization.
 - UI-008 is the remaining value-gated workflow child from
   [`LEGACY-011`](../architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md);
-  it depends on `RUNTIME-102` for command history / dirty-state and on
-  `PLATFORM-006` for the file-dialog boundary. Native dialogs and sample/debug
-  scene expansion are deferred unless accepted by their owning runtime/platform
-  tasks.
+  it depends on `RUNTIME-102` for command history / dirty-state. The
+  [`PLATFORM-006`](../../done/PLATFORM-006-platform-event-parity.md)
+  file-dialog boundary is retired: current workflows use runtime/UI path entry
+  plus platform dropped-path events, while native dialogs remain deferred unless
+  a new platform/runtime task accepts them.
 - UI work that depends on renderer overlays/handoff coordinates with the
   retired [`GRAPHICS-024`](../../done/GRAPHICS-024-overlays-presentation-editor-handoff.md)
   parity matrix and the rendering DAG in

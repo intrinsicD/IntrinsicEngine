@@ -21,10 +21,6 @@ backend layout, selection policy, and dependency note.
   module-interface hygiene follow-up for `Platform.Input`, `Platform.Backend.Glfw`,
   and `Platform.Backend.Null`; moves non-trivial bodies and backend-only
   includes/imports out of `.cppm` interfaces without changing platform behavior.
-- [PLATFORM-006 — Platform event parity and editor boundary](PLATFORM-006-platform-event-parity.md):
-  resolves remaining `Core.Window` / `Core.Input` event semantics, text/IME and
-  multi-window decisions, and editor file-dialog ownership without adding
-  higher-layer imports to `src/platform`.
 
 Retired:
 
@@ -32,6 +28,12 @@ Retired:
   (done 2026-05-15): the orphaned pre-`PLATFORM-003` window/input duplicate
   has been deleted; the explicit-backend split now stands without dead-code
   remnants under `src/platform/`.
+- [PLATFORM-006 — Platform event parity and editor boundary](../../done/PLATFORM-006-platform-event-parity.md)
+  (done 2026-06-09, `CPUContracted`): current editor/runtime event contracts
+  are explicit for resize/minimize, key/mouse/scroll/cursor, text codepoints,
+  clipboard, cursor mode, and dropped paths. Native file dialogs,
+  multi-window, non-Linux backend parity, and IME composition remain deferred
+  until a concrete runtime/UI task accepts them.
 
 ## Convergence
 
@@ -40,7 +42,7 @@ contributes to **Theme F — Architecture/runtime/UI foundation seeds** by
 keeping the platform port/backend split honest and discoverable. New
 dependency edges out of `platform` are forbidden by `AGENTS.md` §2/§4 and must
 not be introduced under cover of any task in this directory.
-`PLATFORM-006` is also a child of the
+Retired `PLATFORM-006` is also a child of the
 [`LEGACY-011`](../architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md)
 legacy feature map.
 

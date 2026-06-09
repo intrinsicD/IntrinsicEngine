@@ -1,5 +1,11 @@
 # PLATFORM-006 — Platform event value gate and editor boundary
 
+## Status
+- Status: done.
+- Maturity: `CPUContracted`.
+- Completion date: 2026-06-09.
+- PR/commit: pending local commit.
+
 ## Goal
 - Promote only currently useful legacy `Core.Window` / `Core.Input` behavior into `src/platform` event contracts and document explicit non-goals or follow-up triggers for multi-window, IME/text input, and file-dialog ownership.
 
@@ -19,26 +25,26 @@
 - Scope decision: retain drop/focus/minimize/resize/cursor/clipboard/text events only when current consumers need them. Defer IME, multi-window, native dialogs, and non-Linux backends unless a concrete UI/runtime task depends on them.
 
 ## Required changes
-- [ ] Inventory legacy window/input event semantics against `Platform.IWindow` and `Platform.Input`.
-- [ ] Add or harden event payloads for text input, cursor, clipboard, dropped paths, focus/minimize/resize, and high-DPI framebuffer sizing where they are already required by runtime/UI.
-- [ ] Decide whether multi-window and IME are current implementation goals, explicit non-goals, or separate follow-up tasks.
-- [ ] Define the editor file-dialog boundary: platform-native service, app-owned shell integration, or explicit out-of-scope path-entry UI.
-- [ ] Preserve `INTRINSIC_PLATFORM_BACKEND=Null` as the default headless-safe route for CPU/null tests.
+- [x] Inventory legacy window/input event semantics against `Platform.IWindow` and `Platform.Input`.
+- [x] Add or harden event payloads for text input, cursor, clipboard, dropped paths, focus/minimize/resize, and high-DPI framebuffer sizing where they are already required by runtime/UI.
+- [x] Decide whether multi-window and IME are current implementation goals, explicit non-goals, or separate follow-up tasks.
+- [x] Define the editor file-dialog boundary: platform-native service, app-owned shell integration, or explicit out-of-scope path-entry UI.
+- [x] Preserve `INTRINSIC_PLATFORM_BACKEND=Null` as the default headless-safe route for CPU/null tests.
 
 ## Tests
-- [ ] Add `contract;platform` tests for Null backend event buffering and text/drop/clipboard/cursor semantics.
-- [ ] Add `integration;platform` GLFW smoke only where host capability is required and label it correctly.
-- [ ] Add layering regression coverage for `platform` imports.
+- [x] Add `contract;platform` tests for Null backend event buffering and text/drop/clipboard/cursor semantics.
+- [x] Add `integration;platform` GLFW smoke only where host capability is required and label it correctly. (No new GLFW smoke was needed; existing smoke remains labelled.)
+- [x] Add layering regression coverage for `platform` imports.
 
 ## Docs
-- [ ] Update `src/platform/README.md` and `docs/migration/nonlegacy-parity-matrix.md`.
-- [ ] Update `tasks/backlog/platform/README.md`.
-- [ ] Update `tests/README.md` and `tests/CMakeLists.txt` only if new labels are introduced.
+- [x] Update `src/platform/README.md` and `docs/migration/nonlegacy-parity-matrix.md`.
+- [x] Update `tasks/backlog/platform/README.md`.
+- [x] Update `tests/README.md` and `tests/CMakeLists.txt` only if new labels are introduced. (No new labels introduced.)
 
 ## Acceptance criteria
-- [ ] Runtime/UI consumers have a deterministic platform event contract for currently supported editor workflows.
-- [ ] Unsupported multi-window or IME behavior is explicitly recorded as non-goal or follow-up, not left as an unnamed legacy gap.
-- [ ] `src/platform` remains independent of graphics/runtime/UI/app.
+- [x] Runtime/UI consumers have a deterministic platform event contract for currently supported editor workflows.
+- [x] Unsupported multi-window or IME behavior is explicitly recorded as non-goal or follow-up, not left as an unnamed legacy gap.
+- [x] `src/platform` remains independent of graphics/runtime/UI/app.
 
 ## Verification
 ```bash
@@ -48,6 +54,12 @@ ctest --test-dir build/ci --output-on-failure -L 'platform' -LE 'gpu|vulkan|slow
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/check_test_layout.py --root . --strict
 python3 tools/docs/check_doc_links.py --root .
+python3 tools/agents/validate_tasks.py --root tasks --strict
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/agents/check_task_state_links.py --root . --strict
+python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main
+python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref HEAD
+git diff --check
 ```
 
 ## Forbidden changes

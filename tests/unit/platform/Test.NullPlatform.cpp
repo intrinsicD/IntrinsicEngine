@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include <variant>
 
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Platform.Backend.Null;
@@ -91,4 +92,47 @@ TEST(NullPlatform, SupportsHeadlessClipboardCursorMinimizeAndClose)
     EXPECT_TRUE(window.ShouldClose());
 }
 
+TEST(NullPlatform, BuffersTextAndDropEventsForEditorWorkflows)
+{
+    WindowConfig config;
+    config.Width = 128;
+    config.Height = 96;
+
+    NullWindow window{config};
+    std::vector<Extrinsic::Platform::Event> callbacks;
+    window.Listen([&callbacks](const Extrinsic::Platform::Event& event)
+    {
+        callbacks.push_back(event);
+    });
+
+    window.QueueEvent(Extrinsic::Platform::CharEvent{.Character = 'A'});
+    window.QueueEvent(Extrinsic::Platform::WindowDropEvent{
+        .Paths = {"scene.extrinsic.json", "assets/mesh.obj"},
+    });
+
+    window.PollEvents();
+
+    EXPECT_TRUE(window.ConsumeInputActivity());
+    EXPECT_FALSE(window.ConsumeInputActivity());
+
+    const auto drained = window.DrainEvents();
+    ASSERT_EQ(drained.size(), 2u);
+    ASSERT_EQ(callbacks.size(), 2u);
+
+    const auto* text = std::get_if<Extrinsic::Platform::CharEvent>(&drained[0]);
+    ASSERT_NE(text, nullptr);
+    EXPECT_EQ(text->Character, static_cast<unsigned int>('A'));
+
+    const auto* drop =
+        std::get_if<Extrinsic::Platform::WindowDropEvent>(&drained[1]);
+    ASSERT_NE(drop, nullptr);
+    ASSERT_EQ(drop->Paths.size(), 2u);
+    EXPECT_EQ(drop->Paths[0], "scene.extrinsic.json");
+    EXPECT_EQ(drop->Paths[1], "assets/mesh.obj");
+
+    EXPECT_NE(std::get_if<Extrinsic::Platform::CharEvent>(&callbacks[0]),
+              nullptr);
+    EXPECT_NE(std::get_if<Extrinsic::Platform::WindowDropEvent>(&callbacks[1]),
+              nullptr);
+}
 

@@ -60,3 +60,24 @@ Platform owns window/input ports only. It exposes input state/events to runtime;
 it does not create graphics camera snapshots, pick requests, gizmo packets, or
 transform mutations directly.
 
+## Event contract and editor file boundary
+
+`Extrinsic.Platform.Window` exposes the current editor/runtime event contract as
+data-only payloads:
+
+- `WindowResizeEvent` carries framebuffer-pixel width/height and drives
+  resize/minimize state (`0x0` is minimized for Null and GLFW).
+- `KeyEvent`, `MouseButtonEvent`, `ScrollEvent`, and `CursorEvent` update the
+  per-frame `Platform.Input::Context` state owned by the window port.
+- `CharEvent` is UTF-32 codepoint input for simple text entry. Full IME
+  composition is not a promoted platform goal yet.
+- `WindowDropEvent` carries dropped file paths only. Runtime owns import,
+  ingest, scene replacement, and status reporting.
+- Clipboard text and cursor mode are exposed through `IWindow` methods so ImGui
+  and editor adapters can remain backend-neutral.
+
+The platform layer does not own native file dialogs. Current editor workflows use
+runtime/UI path-entry commands and OS drag/drop (`WindowDropEvent`). A
+platform-native dialog service, multi-window behavior, non-Linux backend parity,
+or IME composition support requires a separate task with a concrete runtime/UI
+consumer; it must still preserve `platform -> core` only.

@@ -193,7 +193,7 @@ Members:
   for deterministic asset behavior, conditional KTX, and representative format
   coverage.
 - [`ecs/HARDEN-081-ecs-legacy-component-compatibility-decisions.md`](ecs/HARDEN-081-ecs-legacy-component-compatibility-decisions.md).
-- [`platform/PLATFORM-006-platform-event-parity.md`](platform/PLATFORM-006-platform-event-parity.md).
+- [`platform/PLATFORM-006` (done)](../done/PLATFORM-006-platform-event-parity.md).
 - [`runtime/RORG-031-runtime-composition.md`](runtime/RORG-031-runtime-composition.md) (also Theme A).
 - [`runtime/RUNTIME-099-runtime-lifecycle-composition.md`](runtime/RUNTIME-099-runtime-lifecycle-composition.md),
   [`runtime/RUNTIME-100-scene-manager-lifecycle.md`](runtime/RUNTIME-100-scene-manager-lifecycle.md),

@@ -13,7 +13,10 @@
 ## Context
 - Owner/layer: `ui` task over `Runtime.SandboxEditorUi`; UI emits command DTOs to runtime and observes data-only models.
 - `UI-001..007` promoted the editor shell, domain windows, processing discovery, CPU K-Means, visualization property presets, render-graph panel, and drag/drop import status. The app/parity matrix still lists file dialogs, dirty-tracker UX, command-line/headless modes, richer sample scenes, and app-level debug workflows as unproven.
-- Depends on `RUNTIME-102` for command history/dirty-state source of truth and `PLATFORM-006` for file-dialog boundary decisions.
+- Depends on `RUNTIME-102` for command history/dirty-state source of truth.
+  `PLATFORM-006` retired the file-dialog boundary decision: current promoted
+  workflows use runtime/UI path entry plus platform dropped-path events, while
+  native dialogs remain deferred behind a future platform/runtime task.
 
 ## Value gate
 - Current state: the editor shell and domain workflows exist, including drag/drop import status, K-Means, visualization presets, and rendergraph diagnostics.
