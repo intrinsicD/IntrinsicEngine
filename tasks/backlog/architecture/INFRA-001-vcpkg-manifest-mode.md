@@ -1,3 +1,8 @@
+---
+id: INFRA-001
+theme: F
+depends_on: []
+---
 # INFRA-001 — Move third-party dependencies to a vcpkg manifest
 
 ## Goal

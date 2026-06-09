@@ -1,3 +1,8 @@
+---
+id: <REVIEW-ID>
+theme: <theme letter from tasks/backlog/README.md, or `none`>
+depends_on: []
+---
 # <REVIEW-ID> — <Review task title>
 
 ## Goal

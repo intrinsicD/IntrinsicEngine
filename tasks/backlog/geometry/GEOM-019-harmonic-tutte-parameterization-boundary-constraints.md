@@ -1,3 +1,8 @@
+---
+id: GEOM-019
+theme: none
+depends_on: [GEOM-018]
+---
 # GEOM-019 — Harmonic/Tutte parameterization and boundary constraints
 
 ## Goal

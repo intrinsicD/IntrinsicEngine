@@ -17,6 +17,11 @@ This skill is the master entry point and routes to specialist skills for
 task workflow, review, methods, benchmarks, and docs sync. Load specialist
 skills on demand per the routing table inside `intrinsicengine-core`.
 
+Skill `references/` files are generated from `docs/agent/*` by
+`python3 tools/agents/sync_skills.py --write` and verified in CI
+(`ci-docs.yml`); edit the canonical doc and re-run the sync, never the
+mirror copy.
+
 If you are operating in an environment without auto-discovery of agent
 skills (e.g. Claude Code on the web, or any bare API client), treat the
 files under `tools/agents/skills/` as required reading mirroring
@@ -212,12 +217,17 @@ When code, structure, or policy changes:
 - Regenerate inventories when required by tooling.
 - After module surface changes, refresh `docs/api/generated/module_inventory.md` with
   `python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md`.
+- After opening, retiring, or re-gating any task, regenerate `tasks/SESSION-BRIEF.md` with
+  `python3 tools/agents/generate_session_brief.py`; after editing `docs/agent/*` or `tasks/templates/task.md`,
+  re-run `python3 tools/agents/sync_skills.py --write`. CI (`ci-docs.yml`) enforces freshness of both.
 - Keep docs factual (current state), not aspirational unless clearly labeled.
 
 ## 10. CI expectations
 
 - PR checks must remain green for touched areas.
-- Structural checks (tasks/docs/layering/manifests) should run in warning mode until explicitly tightened.
+- Structural checks (tasks/docs/layering/manifests/skill mirrors) run strict in `ci-docs.yml`; treat their failures as
+  merge blockers, not advisories. A newly introduced check may run in warning mode only while a referenced task ID owns
+  its tightening (same idiom as §13 temporary exceptions); an untracked warning-mode check is a policy violation.
 - Workflow definitions must stay readable and split by purpose.
 - Agent/Codex verification must configure the `ci` preset, build a meaningful target such as `IntrinsicTests` (never
   `help` as a stand-in), and run CTest. The current Codex verification command mirrors the default CPU-supported gate
@@ -244,11 +254,12 @@ Every task execution should follow this sequence:
 8. Update generated inventories.
 9. Self-review against PR checklist.
 
-The current cross-domain backlog convergence map, including the working
-`ExtrinsicSandbox` app path from visible triangle to mesh/graph/point-cloud
-rendering with camera, selection, outline, and UI, is tracked in
-`tasks/backlog/README.md`. Keep roadmap details there rather than expanding this
-contract with task-specific plans.
+The generated `tasks/SESSION-BRIEF.md` is the authoritative open/unblocked
+view of the task tree (derived from task front-matter); consult it before
+picking work. The cross-domain convergence themes and their rationale are
+tracked in `tasks/backlog/README.md`; retirement narratives live in the
+append-only `tasks/done/RETIREMENT-LOG.md`. Keep roadmap details in those
+files rather than expanding this contract with task-specific plans.
 
 ## 12. Review checklist
 

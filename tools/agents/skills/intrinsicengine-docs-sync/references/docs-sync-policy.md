@@ -20,6 +20,10 @@ Documentation updates are required in the same PR when code/structure/policy cha
 - Docs should describe current behavior/state, not aspirational plans, unless clearly labeled as roadmap/migration.
 - Cross-links must be valid.
 - Generated inventories should be refreshed when impacted by structure changes.
+- Generated agent-workflow artifacts are CI-freshness-checked: `tasks/SESSION-BRIEF.md`
+  (`python3 tools/agents/generate_session_brief.py`) after any task-tree change, and the
+  skill mirror (`python3 tools/agents/sync_skills.py --write`) after `docs/agent/*` or
+  `tasks/templates/task.md` changes.
 
 ## Automation
 

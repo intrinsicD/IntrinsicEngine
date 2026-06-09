@@ -39,4 +39,4 @@ This document defines how to create and review benchmark work.
 
 ## Review checklist
 
-- [Benchmark review checklist](benchmark-review-checklist.md)
+- [Benchmark review checklist](../../../../../docs/agent/benchmark-review-checklist.md)

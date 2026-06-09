@@ -1,3 +1,8 @@
+---
+id: GEOM-018
+theme: none
+depends_on: []
+---
 # GEOM-018 — Parameterization distortion and map-quality diagnostics
 
 ## Goal

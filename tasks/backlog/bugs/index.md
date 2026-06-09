@@ -5,7 +5,7 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-023` — Sandbox transform UI edits do not move rendered triangle](BUG-023-sandbox-transform-edit-rendering.md). Inspector `Local position` edits mutate the authored local transform and stamp `Transform::IsDirtyTag`, but the rendered `ReferenceTriangle` appears stationary. First-pass analysis points at a missing runtime-owned pre-render transform/world-matrix flush after post-fixed-step UI/gizmo mutations rather than a blanket shader-model-matrix omission.
+- [`BUG-024` — Sandbox transform UI edits do not move rendered triangle](BUG-024-sandbox-transform-edit-rendering.md). Inspector `Local position` edits mutate the authored local transform and stamp `Transform::IsDirtyTag`, but the rendered `ReferenceTriangle` appears stationary. First-pass analysis points at a missing runtime-owned pre-render transform/world-matrix flush after post-fixed-step UI/gizmo mutations rather than a blanket shader-model-matrix omission.
 
 ---
 

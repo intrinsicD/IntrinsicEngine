@@ -1,3 +1,8 @@
+---
+id: <TASK-ID>
+theme: <theme letter from tasks/backlog/README.md, or `none`>
+depends_on: []
+---
 # <TASK-ID> — <Task title>
 
 ## Goal

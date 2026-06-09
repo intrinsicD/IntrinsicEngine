@@ -1,4 +1,10 @@
-# BUG-023 — Sandbox transform UI edits do not move rendered triangle
+---
+id: BUG-024
+theme: G
+depends_on: []
+maturity_target: CPUContracted
+---
+# BUG-024 — Sandbox transform UI edits do not move rendered triangle
 
 ## Goal
 
@@ -37,7 +43,7 @@
 ## Maturity
 
 - Target: `CPUContracted` for the deterministic UI/edit-to-render-snapshot contract; `Operational` on Vulkan-capable hosts once the opt-in pixel-shift smoke passes.
-- If the implementation lands CPU/null-only first, `Operational` owned by a follow-up `BUG-023B` task unless this task also cites the `gpu;vulkan` run.
+- If the implementation lands CPU/null-only first, `Operational` owned by a follow-up `BUG-024B` task unless this task also cites the `gpu;vulkan` run.
 
 ## Required changes
 
@@ -67,13 +73,13 @@
 - [ ] `Transform::IsDirtyTag` is cleared, `DirtyTags::DirtyTransform` is stamped then drained by extraction, and the render snapshot/model translation matches the authored local position for a root entity.
 - [ ] The fix preserves layer boundaries: `ecs` remains free of runtime/graphics ownership, and `graphics` consumes snapshots/SSBO state only.
 - [ ] CPU/null regression coverage fails on the stale-`WorldMatrix` bug and passes after the fix.
-- [ ] Vulkan operational proof is either cited in this task's verification or explicitly deferred to `BUG-023B` using the maturity statement above.
+- [ ] Vulkan operational proof is either cited in this task's verification or explicitly deferred to `BUG-024B` using the maturity statement above.
 
 ## Verification
 
 ```bash
 cmake --build --preset ci --target IntrinsicTests
-ctest --test-dir build/ci --output-on-failure -R 'SandboxEditorUi|RuntimeRenderExtraction|FrameGraphSystems|BUG023|TransformEdit' --timeout 60
+ctest --test-dir build/ci --output-on-failure -R 'SandboxEditorUi|RuntimeRenderExtraction|FrameGraphSystems|BUG024|TransformEdit' --timeout 60
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 
 # If this task claims Operational Vulkan coverage:

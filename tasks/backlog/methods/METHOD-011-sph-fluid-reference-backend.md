@@ -1,3 +1,8 @@
+---
+id: METHOD-011
+theme: C
+depends_on: [ARCH-002]
+---
 # METHOD-011 — SPH fluid reference backend
 
 ## Goal

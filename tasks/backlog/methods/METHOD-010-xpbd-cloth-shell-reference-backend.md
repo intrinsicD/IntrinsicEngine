@@ -1,3 +1,8 @@
+---
+id: METHOD-010
+theme: C
+depends_on: [ARCH-002]
+---
 # METHOD-010 — XPBD cloth and shell reference backend
 
 ## Goal

@@ -87,7 +87,8 @@ When structure, policy, or behavior changes:
 ## CI expectations
 
 - PR checks remain green for touched areas.
-- Structural checks can start in warning mode and later tighten.
+- Structural checks run strict in `ci-docs.yml`; a new check may start in
+  warning mode only while a referenced task ID owns its tightening.
 - Workflows remain split by purpose and readable.
 
 ## Temporary migration exceptions

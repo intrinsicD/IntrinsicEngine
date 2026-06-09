@@ -5,6 +5,11 @@ Use this template for all new task files under `tasks/`.
 ## Required structure
 
 ```md
+---
+id: <TASK-ID>
+theme: <theme letter, or `none`>
+depends_on: []
+---
 # <TASK-ID> <Title>
 
 ## Goal
@@ -44,6 +49,60 @@ sections so task status is visible at a glance. Completed task files under
 `tasks/done/` should not contain unchecked actionable todos; unresolved work
 belongs in a follow-up task.
 
+## Front-matter (open tasks)
+
+Open tasks under `tasks/active/` and `tasks/backlog/` must start with a YAML
+front-matter block; it is the machine-readable home of dependency edges and
+feeds the generated `tasks/SESSION-BRIEF.md`:
+
+- `id` (required) — must equal the title-line task ID.
+- `theme` (required) — convergence-theme letter from
+  `tasks/backlog/README.md`, or `none` for unthemed work.
+- `depends_on` (required, may be `[]`) — task IDs this task is gated by;
+  every entry must resolve to a task file under `tasks/active|backlog|done`.
+  A dependency is satisfied when the referenced task is in `tasks/done/`.
+- `maturity_target` (optional) — intended stop-state per
+  [`task-maturity.md`](../../../../../docs/agent/task-maturity.md).
+
+`tools/agents/validate_tasks.py --strict` enforces the schema for open tasks;
+retired tasks under `tasks/done/` are exempt. After opening, retiring, or
+re-gating a task, regenerate the session brief with
+`python3 tools/agents/generate_session_brief.py`.
+
+## Retiring a task
+
+When a task completes:
+
+1. Mark all checkbox todos `- [x]` (unresolved work moves to a follow-up
+   task) and add a completion note with the date (`YYYY-MM-DD`) and a
+   commit/PR reference.
+2. `git mv` the file to `tasks/done/`.
+3. Append a short retirement narrative (what landed, maturity, what remains
+   owned elsewhere) to the top of
+   [`tasks/done/RETIREMENT-LOG.md`](../../../../../tasks/done/RETIREMENT-LOG.md).
+   Do **not** add it to `tasks/active/README.md` or the backlog README —
+   those indexes describe current state only, and
+   `tools/agents/check_task_state_links.py` rejects links into `tasks/done/`
+   from them.
+4. Remove the task's entry from the open-member lists in
+   `tasks/backlog/README.md` and update its category README (category
+   READMEs may keep retired entries in their own lists).
+
+## ID allocation
+
+Task IDs must be unique across `tasks/active/`, `tasks/backlog/`, and
+`tasks/done/`; `tools/agents/validate_tasks.py` enforces this in strict mode
+(a small set of pre-2026-06-09 collisions is grandfathered in place). Before
+opening `<PREFIX>-<N>`, take the highest existing number for that prefix
+across **all three** directories and add one:
+
+```bash
+grep -rhoE '^# <PREFIX>-[0-9]+' tasks/active tasks/backlog tasks/done | sort -V | tail -1
+```
+
+Letter-suffixed child slices (e.g. `GRAPHICS-033A`) extend their parent's
+number and do not claim a new one.
+
 ## Optional `## Maturity` field
 
 For tasks where the stop-state is ambiguous — typically rendering, Vulkan,
@@ -60,12 +119,14 @@ Suggested shape:
 
 - Target: `Operational` on Vulkan-capable hosts; `CPUContracted` everywhere
   else.
-- Slice 1 closes `Scaffolded → CPUContracted`; `Operational` is owned by
-  the follow-up <TASK-ID>.
+- Slice 1 closes `Scaffolded → CPUContracted`; `Operational` owned by `<TASK-ID>`.
+- For CPU/null-only endpoints: no `Operational` follow-up is owed.
 ```
 
-See [`task-maturity.md`](task-maturity.md) for the taxonomy and the
-`Scaffolded` closure rule that applies even when the field is absent.
+See [`task-maturity.md`](../../../../../docs/agent/task-maturity.md) for the taxonomy and the
+`Scaffolded` closure rule that applies even when the field is absent. Open
+backend-facing task files with `CPUContracted` maturity must use one of the
+accepted `Operational` follow-up statements above.
 
 ## Example
 

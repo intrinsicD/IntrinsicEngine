@@ -1,3 +1,8 @@
+---
+id: GEOM-014
+theme: none
+depends_on: []
+---
 # GEOM-014 — Feature-aware quadric error mesh simplification
 
 ## Goal

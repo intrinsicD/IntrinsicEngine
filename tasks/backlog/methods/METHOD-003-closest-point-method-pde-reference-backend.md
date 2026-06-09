@@ -1,3 +1,8 @@
+---
+id: METHOD-003
+theme: none
+depends_on: []
+---
 # METHOD-003 — Closest Point Method PDE solver reference backend
 
 ## Goal

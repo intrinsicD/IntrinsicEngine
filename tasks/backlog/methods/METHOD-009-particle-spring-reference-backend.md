@@ -1,3 +1,8 @@
+---
+id: METHOD-009
+theme: C
+depends_on: [ARCH-002]
+---
 # METHOD-009 — Particle and mass-spring reference backend
 
 ## Goal

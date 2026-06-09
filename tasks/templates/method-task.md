@@ -1,3 +1,8 @@
+---
+id: <METHOD-ID>
+theme: <theme letter from tasks/backlog/README.md, or `none`>
+depends_on: []
+---
 # <METHOD-ID> — <Method task title>
 
 ## Goal

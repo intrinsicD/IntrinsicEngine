@@ -1,3 +1,8 @@
+---
+id: GRAPHICS-086
+theme: F
+depends_on: []
+---
 # GRAPHICS-086 — RHI retirement parity and CUDA decision
 
 ## Goal

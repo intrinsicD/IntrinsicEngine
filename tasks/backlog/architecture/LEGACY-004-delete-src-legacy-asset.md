@@ -1,3 +1,8 @@
+---
+id: LEGACY-004
+theme: F
+depends_on: []
+---
 # LEGACY-004 — Delete `src/legacy/Asset/`
 
 ## Goal

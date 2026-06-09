@@ -8,7 +8,13 @@ Tasks move through this lifecycle:
 
 1. `tasks/backlog/` — planned but not yet active work.
 2. `tasks/active/` — currently in progress or currently blocked work.
-3. `tasks/done/` — completed work with completion metadata.
+3. `tasks/done/` — completed work with completion metadata; retirement
+   narratives are appended to [`done/RETIREMENT-LOG.md`](done/RETIREMENT-LOG.md).
+
+The generated [`SESSION-BRIEF.md`](SESSION-BRIEF.md) is the authoritative
+open/unblocked view of this tree; regenerate it with
+`python3 tools/agents/generate_session_brief.py` after opening, retiring, or
+re-gating any task.
 
 Do not keep long-lived planning checklists in root-level `tasks/backlog/legacy-todo.md` files once a task has been migrated into this structure.
 
@@ -27,6 +33,17 @@ Use stable task prefixes to reflect ownership and review routing:
 - `BENCH-` — benchmark manifests, runners, and baselines.
 - `CI-` — workflow and automation changes.
 - `HARDEN-` — post-reorganization hardening, verification, and cleanup.
+- `PHYSICS-` — physics world, collision, and solver work.
+- `PLATFORM-` — windowing/input ports and platform backends.
+- `LEGACY-` — `src/legacy/` retirement and deletion targets.
+- `BUG-` — reproducible correctness bugs and harness defects.
+- `BUILD-` — build wiring and CMake plumbing.
+- `CORE-` — core-layer contracts and promotions.
+- `GEOIO-` — geometry IO importer/exporter parity.
+- `DOCS-` — documentation restructuring.
+- `INFRA-` — repository infrastructure and dependency management.
+- `REVIEW-` — recurring review/audit cadences.
+- `PROC-` — agentic workflow and process-infrastructure hardening.
 - `WORKSHOP-` — clean-workshop pack: architecture guardrails, boundary fixes,
   typed routing, renderer decomposition, maturity taxonomy, and review gate.
 
@@ -45,7 +62,9 @@ Recently archived trackers:
 
 ## Required task shape
 
-All new task files should be based on templates in `tasks/templates/` and include:
+All new task files should be based on templates in `tasks/templates/` and
+must start with YAML front-matter (`id`, `theme`, `depends_on`; see
+[`docs/agent/task-format.md`](../docs/agent/task-format.md)) followed by:
 
 - Goal
 - Non-goals

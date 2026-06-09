@@ -1,3 +1,8 @@
+---
+id: GEOM-016
+theme: none
+depends_on: []
+---
 # GEOM-016 — Point-cloud filtering and density diagnostics contracts
 
 ## Goal

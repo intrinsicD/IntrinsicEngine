@@ -1,3 +1,8 @@
+---
+id: LEGACY-005
+theme: F
+depends_on: []
+---
 # LEGACY-005 — Delete `src/legacy/Core/`
 
 ## Goal

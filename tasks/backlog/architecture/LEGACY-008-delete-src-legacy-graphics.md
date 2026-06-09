@@ -1,3 +1,8 @@
+---
+id: LEGACY-008
+theme: F
+depends_on: []
+---
 # LEGACY-008 — Delete `src/legacy/Graphics/`
 
 ## Goal

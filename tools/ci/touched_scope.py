@@ -139,18 +139,24 @@ def analyze_changed_files(changed_files: list[str]) -> Plan:
             plan.structural_checks.add("docs")
             plan.reasons.append(f"{path}: documentation changed; selected doc link check")
             if path.startswith("docs/agent/"):
-                plan.structural_checks.add("task_state")
-                plan.reasons.append(f"{path}: agent workflow docs changed; selected task-state link check")
+                plan.structural_checks.update({"task_state", "skills_sync"})
+                plan.reasons.append(f"{path}: agent workflow docs changed; selected task-state link and skill mirror checks")
+            if path.startswith("docs/reports/"):
+                plan.structural_checks.add("session_brief")
+                plan.reasons.append(f"{path}: audit report changed; selected session brief freshness check")
             matched = True
 
         if path.startswith("tasks/"):
-            plan.structural_checks.update({"task_policy", "task_state"})
-            plan.reasons.append(f"{path}: task record changed; selected task policy and task-state checks")
+            plan.structural_checks.update({"task_policy", "task_state", "session_brief"})
+            plan.reasons.append(f"{path}: task record changed; selected task policy, task-state, and session brief checks")
+            if path.startswith("tasks/templates/"):
+                plan.structural_checks.add("skills_sync")
+                plan.reasons.append(f"{path}: task template changed; selected skill mirror check")
             matched = True
 
         if path.startswith("tools/agents/"):
-            plan.structural_checks.update({"task_policy", "task_state"})
-            plan.reasons.append(f"{path}: task tooling changed; selected task policy and task-state checks")
+            plan.structural_checks.update({"task_policy", "task_state", "skills_sync", "session_brief"})
+            plan.reasons.append(f"{path}: task tooling changed; selected task policy, task-state, skill mirror, and session brief checks")
             matched = True
         elif path.startswith("tools/docs/"):
             plan.structural_checks.add("docs")
@@ -249,6 +255,10 @@ def structural_commands(root_arg: str, checks: set[str]) -> list[Command]:
         commands.append(Command(("python3", "tools/agents/check_task_state_links.py", "--root", root_arg, "--strict"), "task-state links"))
     if "shader_outputs" in checks:
         commands.append(Command(("python3", "tools/repo/check_shader_outputs.py", "--root", root_arg), "shader output policy"))
+    if "skills_sync" in checks:
+        commands.append(Command(("python3", "tools/agents/sync_skills.py", "--check"), "agent skill mirror sync"))
+    if "session_brief" in checks:
+        commands.append(Command(("python3", "tools/agents/generate_session_brief.py", "--check"), "session brief freshness"))
     return commands
 
 

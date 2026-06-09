@@ -1,3 +1,8 @@
+---
+id: GRAPHICS-084
+theme: F
+depends_on: []
+---
 # GRAPHICS-084 — Visualization property-buffer residency
 
 ## Goal

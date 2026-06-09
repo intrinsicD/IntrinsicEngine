@@ -1,3 +1,8 @@
+---
+id: LEGACY-006
+theme: F
+depends_on: []
+---
 # LEGACY-006 — Delete `src/legacy/ECS/`
 
 ## Goal

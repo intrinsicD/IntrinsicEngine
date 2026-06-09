@@ -1,3 +1,8 @@
+---
+id: LEGACY-012
+theme: F
+depends_on: [LEGACY-011]
+---
 # LEGACY-012 — Migrate legacy consumer tests to promoted coverage
 
 ## Goal
