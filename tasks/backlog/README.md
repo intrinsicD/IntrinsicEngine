@@ -130,8 +130,10 @@ Reproducible correctness/regression fixes only. Origin:
 [`bugs/index.md`](bugs/index.md).
 
 Members:
-- No currently active bug records. Resolved bug history lives in
-  [`bugs/index.md`](bugs/index.md) and the retirement log.
+- [`bugs/BUG-024-sandbox-transform-edit-rendering.md`](bugs/BUG-024-sandbox-transform-edit-rendering.md) — Sandbox Inspector transform edits should move the rendered `ReferenceTriangle`; first-pass analysis points at a runtime pre-render transform flush gap after UI/gizmo mutations.
+
+Resolved bug history lives in [`bugs/index.md`](bugs/index.md) and the
+retirement log.
 
 ### Theme H — Agentic workflow hardening (P1)
 
