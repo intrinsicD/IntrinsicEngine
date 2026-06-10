@@ -9,6 +9,31 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`METHOD-011`](METHOD-011-sph-fluid-reference-backend.md) — SPH fluid
+reference backend — retired to `tasks/done/` on 2026-06-10 at maturity
+`CPUContracted`. `methods/physics/sph_fluid_reference/` ships the
+deterministic weakly compressible SPH `cpu_reference` backend (Mueller
+2003): Poly6 density with self-contribution, clamped ideal-gas pressure,
+symmetric Spiky-gradient pressure force, viscosity-Laplacian force,
+semi-implicit Euler, half-space boundary planes with restitution-scaled
+normal reflection, and deterministic O(N^2) index-ordered neighbor
+enumeration with an advisory `MaxNeighborLimit` whose overflow is
+reported, never truncated. Diagnostics cover validation codes, total
+mass, density statistics (average/min/max, `MaxCompression`
+incompressibility proxy, mean relative density error), neighbor counts,
+max velocity, kinetic energy drift, and the non-finite fail-closed
+fallback. Thirteen `unit;physics` tests pin kernel closed forms and
+numeric normalization, uniform-grid density recovery (~1% interior
+error), exact symmetric-pair momentum conservation, viscosity smoothing,
+the free-fall closed form, the toy column drop over a floor plane,
+overflow reporting, invalid-input validation, determinism, and the
+fallback. The `physics.sph_fluid_reference.smoke` benchmark emits
+validated result JSON (static-grid interior density error ~0.0098 vs
+0.05 threshold). With METHOD-009/010/011 all retired, Theme C has no
+open members; optimized/GPU backends and runtime integration open as new
+tasks per the roadmap gates.
+
+Backlog
 [`METHOD-010`](METHOD-010-xpbd-cloth-shell-reference-backend.md) — XPBD
 cloth and shell reference backend — retired to `tasks/done/` on 2026-06-10
 at maturity `CPUContracted`. `methods/physics/xpbd_cloth_reference/` ships

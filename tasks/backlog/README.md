@@ -76,10 +76,12 @@ reference method, ECS authoring contract, world/runtime bridge, and
 broadphase/narrowphase and constraint/island/sleep solver contracts are retired — see
 [`physics/README.md`](physics/README.md) and the retirement log.
 
-Open members:
-- [`methods/METHOD-011`](methods/METHOD-011-sph-fluid-reference-backend.md) —
-  CPU-reference-first non-rigid SPH method package opened by the phenomena
-  roadmap (particles/springs and XPBD cloth are done).
+Theme C currently has **no open members**: the rigid-body foundation
+(ADR-0019, METHOD-001, PHYSICS-001..003) and all three non-rigid reference
+method packages from the phenomena roadmap (METHOD-009 particles/springs,
+METHOD-010 XPBD cloth, METHOD-011 SPH fluid) are retired at
+`CPUContracted`. Optimized/GPU physics backends and runtime integration
+open as new tasks per the roadmap's engine-integration gates.
 
 ### Theme D — ECS hardening parity (P0, complete)
 

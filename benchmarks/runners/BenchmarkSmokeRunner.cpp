@@ -16,6 +16,7 @@
 #include "../geometry/Bench.GeometrySmoke.hpp"
 #include "../physics/Bench.ParticleSpringReferenceSmoke.hpp"
 #include "../physics/Bench.RigidBodyReferenceSmoke.hpp"
+#include "../physics/Bench.SphFluidReferenceSmoke.hpp"
 #include "../physics/Bench.XpbdClothReferenceSmoke.hpp"
 
 #include <cstdlib>
@@ -204,6 +205,41 @@ namespace
         return EmittedBenchmark{kXpbdClothReferenceSmokeBenchmarkId, out.str(), metrics.Succeeded};
     }
 
+    auto EmitSphFluidReferenceSmoke(const std::string& commit) -> EmittedBenchmark
+    {
+        using namespace Intrinsic::Bench::Physics;
+
+        const auto metrics = RunSphFluidReferenceSmoke();
+
+        std::ostringstream out;
+        out.setf(std::ios::fixed);
+        out.precision(6);
+        out << "{\n"
+            << "  \"benchmark_id\": \"" << EscapeJson(kSphFluidReferenceSmokeBenchmarkId) << "\",\n"
+            << "  \"method\": \""       << EscapeJson(kSphFluidReferenceSmokeMethod)      << "\",\n"
+            << "  \"backend\": \"cpu_reference\",\n"
+            << "  \"dataset\": \""      << EscapeJson(kSphFluidReferenceSmokeDataset)     << "\",\n"
+            << "  \"commit\": \""       << EscapeJson(commit)                             << "\",\n"
+            << "  \"metrics\": {\n"
+            << "    \"runtime_ms\": "       << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
+            << "  },\n"
+            << "  \"diagnostics\": {\n"
+            << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"smoke\",\n"
+            << "    \"warmup_iterations\": 1,\n"
+            << "    \"measured_iterations\": 4,\n"
+            << "    \"column_max_compression\": "      << metrics.ColumnMaxCompression << ",\n"
+            << "    \"column_avg_density_error\": "    << metrics.ColumnAverageDensityError << ",\n"
+            << "    \"column_max_neighbor_count\": "   << metrics.ColumnMaxNeighborCount << ",\n"
+            << "    \"column_stable\": "               << (metrics.ColumnStable ? "true" : "false") << "\n"
+            << "  },\n"
+            << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed") << "\"\n"
+            << "}\n";
+
+        return EmittedBenchmark{kSphFluidReferenceSmokeBenchmarkId, out.str(), metrics.Succeeded};
+    }
+
     auto WriteFile(const std::filesystem::path& path, std::string_view payload) -> bool
     {
         std::error_code ec;
@@ -235,6 +271,7 @@ auto main(int argc, char** argv) -> int
     emitted.push_back(EmitRigidBodyReferenceSmoke(commit));
     emitted.push_back(EmitParticleSpringReferenceSmoke(commit));
     emitted.push_back(EmitXpbdClothReferenceSmoke(commit));
+    emitted.push_back(EmitSphFluidReferenceSmoke(commit));
 
     // Output target: an existing directory or a path with no extension (or no
     // filename component) is treated as a directory and gets one JSON per

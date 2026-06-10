@@ -1,0 +1,31 @@
+id: physics.sph_fluid_reference
+name: SPH Particle Fluid Reference Backend
+domain: physics
+status: reference
+paper:
+  title: "Particle-Based Fluid Simulation for Interactive Applications"
+  authors: "Matthias Mueller, David Charypar, Markus Gross"
+  year: 2003
+  doi: "10.2312/SCA03/154-159"
+  url: "https://matthias-research.github.io/pages/publications/sca03.pdf"
+inputs:
+  - "Fluid particle states with position and velocity (uniform particle mass)."
+  - "Step parameters: fixed delta time, gravity, smoothing length, particle mass, rest density, gas stiffness, dynamic viscosity, boundary restitution, advisory neighbor limit, and static half-space boundary planes."
+outputs:
+  - "Reference particle states after one weakly compressible SPH step: Poly6 density, clamped ideal-gas pressure, symmetric Spiky-gradient pressure force, viscosity-Laplacian force, gravity, semi-implicit Euler integration, and boundary plane projection with restitution-scaled normal reflection."
+  - "Diagnostics for validation status, total mass, density statistics (average/min/max, compression proxy, mean relative density error), neighbor counts and advisory overflow, max velocity, kinetic energy drift, and fail-closed fallback status."
+backends:
+  - cpu_reference
+metrics:
+  - "quality_error_l2"
+  - "runtime_ms"
+correctness_tests:
+  - "../../../tests/unit/physics/Test.SphFluidReference.cpp"
+benchmarks:
+  - "../../../benchmarks/physics/manifests/sph_fluid_reference_smoke.yaml"
+known_limitations:
+  - "The reference solver is correctness-first and deterministic; it makes no runtime performance claim and uses O(N^2) all-pairs neighbor enumeration in index order (the advisory MaxNeighborLimit reports overflow but never truncates physics)."
+  - "Weakly compressible formulation with pressure clamped at zero (no tensile/suction pressure); free-surface particles report densities below rest density by construction, so density-error diagnostics are interior-flow proxies."
+  - "Boundary handling is static half-space planes with position projection and restitution-scaled normal reflection only: no solid coupling, no curved boundaries, no surface tension, no multiphase materials."
+  - "Explicit integration is conditionally stable; stiff gas constants or large timesteps can explode, and a non-finite post-step state fails closed to the input state with FallbackApplied set."
+  - "No grid-based FLIP/APIC, pressure-projection, or shallow-water solver; those are separate roadmap rows."

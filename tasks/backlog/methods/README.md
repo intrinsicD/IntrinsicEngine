@@ -44,7 +44,10 @@ map.
   `cpu_reference` backend with constraint residual/convergence diagnostics
   and smoke benchmark
   (physics roadmap follow-up from [`ARCH-002`](../../done/ARCH-002-physics-phenomena-roadmap.md)).
-- [METHOD-011 — SPH fluid reference backend](METHOD-011-sph-fluid-reference-backend.md)
+- [METHOD-011 — SPH fluid reference backend](../../done/METHOD-011-sph-fluid-reference-backend.md)
+  (done, 2026-06-10, `CPUContracted`): deterministic WCSPH `cpu_reference`
+  backend with density/compression and neighbor diagnostics and smoke
+  benchmark
   (physics roadmap follow-up from [`ARCH-002`](../../done/ARCH-002-physics-phenomena-roadmap.md)).
 
 ## Convergence

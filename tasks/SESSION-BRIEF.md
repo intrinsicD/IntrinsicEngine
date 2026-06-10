@@ -10,10 +10,6 @@ the authoritative open/unblocked view.
 
 - none
 
-## Theme C — Physics readiness
-
-- unblocked: `METHOD-011` — SPH fluid reference backend (tasks/backlog/methods/METHOD-011-sph-fluid-reference-backend.md)
-
 ## Theme F — Architecture/runtime/UI foundation seeds
 
 - unblocked: `GRAPHICS-084` — Visualization property-buffer residency (tasks/backlog/rendering/GRAPHICS-084-visualization-property-buffer-residency.md)

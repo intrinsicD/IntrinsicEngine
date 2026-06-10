@@ -37,7 +37,7 @@ map.
   follow-ups:
   [`METHOD-009`](../../done/METHOD-009-particle-spring-reference-backend.md) (done),
   [`METHOD-010`](../../done/METHOD-010-xpbd-cloth-shell-reference-backend.md) (done),
-  and [`METHOD-011`](../methods/METHOD-011-sph-fluid-reference-backend.md).
+  and [`METHOD-011`](../../done/METHOD-011-sph-fluid-reference-backend.md) (done).
 
 Forbidden across all members: physics solver code in ECS, runtime-owned solver
 internals, graphics/RHI dependencies in physics, or treating rendering
