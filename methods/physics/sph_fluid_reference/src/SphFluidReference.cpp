@@ -108,7 +108,8 @@ namespace Intrinsic::Methods::Physics::SphFluidReference
         for (const BoundaryPlane& plane : params.Boundaries)
         {
             if (!IsFinite(plane.Normal) || !std::isfinite(plane.Offset) ||
-                Length(plane.Normal) < kDistanceEpsilon)
+                Length(plane.Normal) < kDistanceEpsilon ||
+                !std::isfinite(Dot(plane.Normal, plane.Normal)))
             {
                 return ValidationCode::InvalidBoundary;
             }
@@ -263,15 +264,20 @@ namespace Intrinsic::Methods::Physics::SphFluidReference
 
         // Boundary half-spaces: project position back and reflect the normal
         // velocity scaled by the boundary restitution (0 = inelastic).
+        // Validated normals need not be unit length, so the projection and
+        // reflection scale by dot(N, N) to stay exact for any accepted plane.
         for (const BoundaryPlane& plane : params.Boundaries)
         {
+            const double normalLengthSquared = Dot(plane.Normal, plane.Normal);
             for (ParticleState& particle : result.Particles)
             {
-                const double distance = Dot(plane.Normal, particle.Position) - plane.Offset;
+                const double distance =
+                    (Dot(plane.Normal, particle.Position) - plane.Offset) / normalLengthSquared;
                 if (distance < 0.0)
                 {
                     particle.Position = particle.Position - plane.Normal * distance;
-                    const double normalVelocity = Dot(plane.Normal, particle.Velocity);
+                    const double normalVelocity =
+                        Dot(plane.Normal, particle.Velocity) / normalLengthSquared;
                     if (normalVelocity < 0.0)
                     {
                         particle.Velocity =

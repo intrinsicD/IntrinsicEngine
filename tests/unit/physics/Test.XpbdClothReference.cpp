@@ -226,6 +226,35 @@ TEST(XpbdClothReference, HalfSpaceColliderKeepsParticlesAbovePlane)
     }
 }
 
+TEST(XpbdClothReference, HalfSpaceColliderWithNonUnitNormalProjectsToPlane)
+{
+    // Directly-authored colliders pass Validate with any finite non-zero
+    // normal; the projection must land on the geometric plane
+    // dot(N, x) = Offset, not overshoot by |N|^2 (review finding on
+    // METHOD-010: {0,2,0}/0 used to project y=-1 to y=3 instead of y=0).
+    Cloth::ClothState state{};
+    state.Particles = {Cloth::MakeParticle(Cloth::Vec3{0.0, -1.0, 0.0}, 1.0)};
+
+    Cloth::StepParams params = NoGravityParams(0.01, 1);
+    Cloth::Collider collider{};
+    collider.Kind = Cloth::ColliderKind::HalfSpace;
+    collider.Normal = Cloth::Vec3{0.0, 2.0, 0.0};
+    collider.Offset = 0.0;
+    params.Colliders = {collider};
+
+    const Cloth::StepResult result = Cloth::Step(state, params);
+    ASSERT_EQ(result.Diagnostics.Code, Cloth::ValidationCode::Valid);
+    EXPECT_NEAR(result.State.Particles[0].Position.Y, 0.0, 1.0e-12);
+
+    // Scaled offset defines the same plane family: dot((0,2,0), x) >= 4 is
+    // the half-space y >= 2.
+    state.Particles[0].Position = Cloth::Vec3{0.0, 1.0, 0.0};
+    params.Colliders[0].Offset = 4.0;
+    const Cloth::StepResult offsetResult = Cloth::Step(state, params);
+    ASSERT_EQ(offsetResult.Diagnostics.Code, Cloth::ValidationCode::Valid);
+    EXPECT_NEAR(offsetResult.State.Particles[0].Position.Y, 2.0, 1.0e-12);
+}
+
 TEST(XpbdClothReference, SphereColliderReportedAsUnsupportedAndSkipped)
 {
     Cloth::ClothState state = PinnedPatch();

@@ -20,7 +20,9 @@ work validate against this backend as the correctness oracle.
   is never truncated.
 - Boundaries: static half-space planes; penetrating particles are projected
   to the surface and their inward normal velocity is reflected scaled by
-  `(1 + BoundaryRestitution)` (0 = inelastic).
+  `(1 + BoundaryRestitution)` (0 = inelastic). Plane normals need not be
+  unit length: `MakeBoundaryPlane` normalizes, and directly-authored planes
+  are projected/reflected exactly via the `dot(N, N)` scaling.
 
 ## Diagnostics
 

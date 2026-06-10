@@ -235,6 +235,37 @@ TEST(SphFluidReference, ToyColumnDropStaysStableAboveFloor)
     EXPECT_GE(lastDiagnostics.MaxCompression, 0.0);
 }
 
+TEST(SphFluidReference, BoundaryPlaneWithNonUnitNormalProjectsAndReflectsExactly)
+{
+    // Directly-authored planes pass Validate with any finite non-zero
+    // normal; projection and the restitution reflection must scale by
+    // dot(N, N) (review finding on METHOD-011: {0,2,0}/0 used to project
+    // y=-1 to y=3 and over-reflect the normal velocity).
+    std::vector<Sph::ParticleState> particles(1);
+    particles[0].Position = Sph::Vec3{0.0, -1.0, 0.0};
+    particles[0].Velocity = Sph::Vec3{0.0, -3.0, 0.0};
+
+    Sph::StepParams params{};
+    params.SmoothingLength = 0.1;
+    params.ParticleMass = 0.001;
+    params.RestDensity = 1000.0;
+    params.Stiffness = 0.0;
+    params.Gravity = Sph::Vec3{};
+    params.DeltaTime = 0.01;
+    params.Boundaries = {Sph::BoundaryPlane{Sph::Vec3{0.0, 2.0, 0.0}, 0.0}};
+
+    const Sph::StepResult inelastic = Sph::Step(particles, params);
+    ASSERT_EQ(inelastic.Diagnostics.Code, Sph::ValidationCode::Valid);
+    EXPECT_NEAR(inelastic.Particles[0].Position.Y, 0.0, 1.0e-12);
+    EXPECT_NEAR(inelastic.Particles[0].Velocity.Y, 0.0, 1.0e-12);
+
+    params.BoundaryRestitution = 1.0;
+    const Sph::StepResult bouncy = Sph::Step(particles, params);
+    ASSERT_EQ(bouncy.Diagnostics.Code, Sph::ValidationCode::Valid);
+    EXPECT_NEAR(bouncy.Particles[0].Position.Y, 0.0, 1.0e-12);
+    EXPECT_NEAR(bouncy.Particles[0].Velocity.Y, 3.0, 1.0e-12);
+}
+
 TEST(SphFluidReference, NeighborOverflowReportedAdvisory)
 {
     std::vector<Sph::ParticleState> particles(3);

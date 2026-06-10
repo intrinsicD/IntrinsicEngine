@@ -35,7 +35,7 @@ solve (per constraint, per iteration):
   lambda  += dlambda
   x_A     += w_A * grad * dlambda
   x_B     -= w_B * grad * dlambda
-collide:  x_i -= n * min(0, dot(n, x_i) - offset)   (half-space planes)
+collide:  x_i -= N * min(0, (dot(N, x_i) - offset) / dot(N, N))   (half-space planes)
 update:   v_i  = (x_i - x_i_prev) / dt;  v_i *= max(0, 1 - damping * dt)
 ```
 

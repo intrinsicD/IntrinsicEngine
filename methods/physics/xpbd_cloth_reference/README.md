@@ -22,7 +22,9 @@ correctness oracle.
   position change and apply global damping. Deterministic constraint order.
 - Collision-query inputs are method parameters only: static half-space planes
   are supported; sphere colliders are declared but unsupported and counted in
-  diagnostics. No self-collision, no friction.
+  diagnostics. No self-collision, no friction. Plane normals need not be unit
+  length: `MakeHalfSpaceCollider` normalizes, and directly-authored colliders
+  are projected exactly via the `dot(N, N)` scaling.
 - `BuildClothFromTriangles(...)` derives the constraint sets deterministically
   from triangle topology and input positions.
 

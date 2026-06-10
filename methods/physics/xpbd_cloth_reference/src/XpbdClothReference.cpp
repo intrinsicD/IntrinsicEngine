@@ -80,13 +80,17 @@ namespace Intrinsic::Methods::Physics::XpbdClothReference
                 {
                     continue; // unsupported kinds counted once per step elsewhere
                 }
+                // Validated normals need not be unit length, so the projection
+                // scales by dot(N, N) to stay exact for any accepted plane.
+                const double normalLengthSquared = Dot(collider.Normal, collider.Normal);
                 for (ParticleState& particle : particles)
                 {
                     if (particle.InverseMass <= 0.0)
                     {
                         continue;
                     }
-                    const double distance = Dot(collider.Normal, particle.Position) - collider.Offset;
+                    const double distance =
+                        (Dot(collider.Normal, particle.Position) - collider.Offset) / normalLengthSquared;
                     if (distance < 0.0)
                     {
                         particle.Position = particle.Position - collider.Normal * distance;
@@ -274,7 +278,9 @@ namespace Intrinsic::Methods::Physics::XpbdClothReference
         {
             return ValidationCode::InvalidCollider;
         }
-        if (collider.Kind == ColliderKind::HalfSpace && Length(collider.Normal) < kDegenerateLengthEpsilon)
+        if (collider.Kind == ColliderKind::HalfSpace &&
+            (Length(collider.Normal) < kDegenerateLengthEpsilon ||
+             !std::isfinite(Dot(collider.Normal, collider.Normal))))
         {
             return ValidationCode::InvalidCollider;
         }
