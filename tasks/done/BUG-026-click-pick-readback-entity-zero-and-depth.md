@@ -41,6 +41,7 @@ maturity_target: CPUContracted
 - [x] Publish `Depth` plus the request pixel (`PixelX`/`PixelY`) on `Graphics::PickReadbackResult`.
 - [x] Reconstruct the cursor position in runtime: `Engine` records per-sequence pick context (inverse view-projection, viewport, pixel, world pick ray) when it drains the pending pick; on readback consume it unprojects `(pixel, depth)` → world cursor position via the existing `BuildCameraViewSnapshot` NDC conventions.
 - [x] Extend `RefinePickReadbackResult` with the pick context so refinement receives the entity-local cursor anchor (`HasLocalHit`/`LocalHit`) and the entity-local pick ray + radius fallback; result reports world/local cursor hit and closest face/edge/vertex/point ids.
+- [x] Scale platform cursor positions from window (logical) coordinates into framebuffer pixels before pick submission and gizmo hit-testing (`WindowToFramebufferCursor`), so HiDPI hosts (content scale != 1) pick the pixel actually under the cursor.
 
 ## Tests
 

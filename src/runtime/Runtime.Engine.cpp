@@ -892,8 +892,31 @@ namespace Extrinsic::Runtime
                    cursor.y < static_cast<float>(viewport.Height);
         }
 
+        // BUG-026 — platform cursor positions are window (logical) coordinates
+        // (GLFW's cursor callback), while picking/gizmo math addresses
+        // framebuffer pixels. On HiDPI hosts (content scale != 1) the two
+        // differ; scale by the extent ratio so the pick pixel matches what is
+        // under the cursor. Degenerate extents pass the cursor through.
+        [[nodiscard]] Platform::Input::Context::XY WindowToFramebufferCursor(
+            const Platform::Input::Context::XY cursor,
+            const Core::Extent2D windowExtent,
+            const Core::Extent2D framebufferExtent) noexcept
+        {
+            if (windowExtent.Width <= 0 || windowExtent.Height <= 0 ||
+                framebufferExtent.Width <= 0 || framebufferExtent.Height <= 0)
+            {
+                return cursor;
+            }
+            const float scaleX = static_cast<float>(framebufferExtent.Width) /
+                                 static_cast<float>(windowExtent.Width);
+            const float scaleY = static_cast<float>(framebufferExtent.Height) /
+                                 static_cast<float>(windowExtent.Height);
+            return Platform::Input::Context::XY{cursor.x * scaleX, cursor.y * scaleY};
+        }
+
         void SubmitViewportSelectionClickForFrame(SelectionController& selection,
                                                   const Platform::Input::Context& input,
+                                                  const Core::Extent2D windowExtent,
                                                   const Core::Extent2D viewport,
                                                   const bool imguiCapturesMouse,
                                                   const bool gizmoCapturesMouse) noexcept
@@ -904,7 +927,8 @@ namespace Extrinsic::Runtime
                 return;
             }
 
-            const Platform::Input::Context::XY cursor = input.GetMousePosition();
+            const Platform::Input::Context::XY cursor =
+                WindowToFramebufferCursor(input.GetMousePosition(), windowExtent, viewport);
             if (!CursorInsideViewport(cursor, viewport))
                 return;
 
@@ -942,6 +966,7 @@ namespace Extrinsic::Runtime
             ECS::Scene::Registry& scene,
             const Platform::Input::Context& input,
             const Graphics::CameraViewInput& cameraInput,
+            const Core::Extent2D windowExtent,
             const Core::Extent2D viewport,
             std::span<const ECS::EntityHandle> selected)
         {
@@ -953,7 +978,8 @@ namespace Extrinsic::Runtime
                 return;
             }
 
-            const Platform::Input::Context::XY cursor = input.GetMousePosition();
+            const Platform::Input::Context::XY cursor =
+                WindowToFramebufferCursor(input.GetMousePosition(), windowExtent, viewport);
             const std::uint32_t pixelX = ClampCursorPixel(cursor.x, viewport.Width);
             const std::uint32_t pixelY = ClampCursorPixel(cursor.y, viewport.Height);
             const Graphics::CameraViewSnapshot camera =
@@ -1696,15 +1722,18 @@ namespace Extrinsic::Runtime
 
         RebuildSelectedGizmoEntities(m_SelectionController, *m_Scene, m_GizmoSelectedEntities);
         const Platform::IWindow& inputWindow = *m_Window;
+        const Platform::Extent2D windowExtent = inputWindow.GetWindowExtent();
         DriveGizmoInteractionForFrame(m_GizmoInteraction,
                                       m_GizmoUndoStack,
                                       *m_Scene,
                                       inputWindow.GetInput(),
                                       renderInput.Camera,
+                                      windowExtent,
                                       viewport,
                                       m_GizmoSelectedEntities);
         SubmitViewportSelectionClickForFrame(m_SelectionController,
                                              inputWindow.GetInput(),
+                                             windowExtent,
                                              viewport,
                                              m_ImGuiAdapter != nullptr && m_ImGuiAdapter->WantsMouseCapture(),
                                              m_GizmoInteraction.IsDragging());
