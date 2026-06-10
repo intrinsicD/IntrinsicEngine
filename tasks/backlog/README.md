@@ -146,10 +146,8 @@ code. `PROC-001` (mirror sync gate), `PROC-002` (ID uniqueness), `PROC-005`
 and `PROC-006` (audit cadence visibility) are retired — see
 [`process/README.md`](process/README.md) and the retirement log.
 
-Open members (in dependency order):
-- [`process/PROC-008`](process/PROC-008-category-readme-state-history-split.md) —
-  category README state/history split (after PROC-003; mechanical sweep,
-  lower priority).
+Theme H currently has **no open members**: `PROC-001..008` are all
+retired. New workflow-hardening findings open under `process/`.
 
 ## Cross-domain dependency anchors
 

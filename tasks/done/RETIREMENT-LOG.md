@@ -9,6 +9,28 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`PROC-008`](PROC-008-category-readme-state-history-split.md) — category
+README state/history split — retired to `tasks/done/` on 2026-06-10,
+completing Theme H. Slice A mechanically split every
+`tasks/backlog/<category>/README.md` into open lists and verbatim
+`## Retired` history sections (open entries cite retired tasks as plain
+code spans; emptied lists carry explicit none-open lines; the workshop
+pack's completed execution record was re-headed as history;
+`bugs/index.md` already conformed via `Verified / Closed`). Slice B
+extended `check_task_state_links.py` with `validate_category_indexes`:
+heading-stack scanning of category indexes where done-links are findings
+unless under a history-marked heading
+(retired/history/closed/completed/resolved/verified/done), ATX headings
+require a trailing space so inline PR references like `#921` cannot pop
+the stack, and sections that interleave done prerequisites with open work
+by design — the rendering dependency DAG — opt out explicitly with
+`<!-- state-link-guard: allow-done-links -->` while rendering's non-DAG
+sections were de-linked. `docs/agent/task-format.md` step 4 and the skill
+mirrors document the convention. The throwaway done-link probe produced
+exactly one finding and was removed. With PROC-001..008 retired, Theme H
+has no open members.
+
+Backlog
 [`METHOD-011`](METHOD-011-sph-fluid-reference-backend.md) — SPH fluid
 reference backend — retired to `tasks/done/` on 2026-06-10 at maturity
 `CPUContracted`. `methods/physics/sph_fluid_reference/` ships the

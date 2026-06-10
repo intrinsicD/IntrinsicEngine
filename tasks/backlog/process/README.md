@@ -13,7 +13,7 @@ map.
 
 ## Tasks
 
-- [PROC-008 - Category README state/history split](PROC-008-category-readme-state-history-split.md).
+No open process backlog tasks.
 
 ## Convergence
 
@@ -32,7 +32,7 @@ map.
   `tasks/SESSION-BRIEF.md`.
 - `PROC-005` owns correcting the stale "warning mode" wording in the contract.
 - `PROC-006` owns surfacing lapsed audit cadences.
-- `PROC-008` owns extending the state/history split and link guard to the
+- `PROC-008` (done 2026-06-10) extended the state/history split and link guard to the
   per-category READMEs (follow-up opened by `PROC-003`).
 - `PROC-007` owns deduplicating contract restatements out of the onboarding
   prompt and giving loop mode explicit defaults and a checkpoint rule;
@@ -55,3 +55,8 @@ split; narratives live in the retirement log.
 - [PROC-005 - Align structural-check mode text with strict CI reality](../../done/PROC-005-align-structural-check-mode-contract-text.md) (done 2026-06-09).
 - [PROC-006 - Audit cadence lapse visibility](../../done/PROC-006-audit-cadence-lapse-visibility.md) (done 2026-06-09).
 - [PROC-007 - Onboarding prompt tightening and loop-mode defaults](../../done/PROC-007-onboarding-prompt-tightening.md) (done 2026-06-09).
+- [PROC-008 - Category README state/history split](../../done/PROC-008-category-readme-state-history-split.md)
+  (done, 2026-06-10): split every category README into open lists and
+  history-marked retired sections and extended
+  `check_task_state_links.py` to enforce it, with the rendering DAG
+  exempted explicitly.

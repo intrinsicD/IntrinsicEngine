@@ -34,10 +34,6 @@ the authoritative open/unblocked view.
 - unblocked: `RUNTIME-103` — Geometry algorithm execution queue (tasks/backlog/runtime/RUNTIME-103-geometry-algorithm-execution-queue.md)
 - unblocked: `RUNTIME-104` — Derived overlay producer lifecycle (tasks/backlog/runtime/RUNTIME-104-derived-overlay-producer-lifecycle.md)
 
-## Theme H — Agentic workflow hardening
-
-- unblocked: `PROC-008` — Category README state/history split (tasks/backlog/process/PROC-008-category-readme-state-history-split.md)
-
 ## Unthemed
 
 - unblocked: `GEOM-013` — Feature-preserving dual contouring (tasks/backlog/geometry/GEOM-013-feature-preserving-dual-contouring.md)

@@ -250,6 +250,23 @@ STATE_ONLY_INDEX_FILES = (
     Path("tasks/backlog/README.md"),
 )
 
+# Category indexes may keep retired entries, but only under a heading whose
+# text marks it as history (PROC-008). Sections that legitimately interleave
+# done-links with open work — currently only the rendering dependency DAG —
+# opt out explicitly with the marker comment placed directly below their
+# heading.
+CATEGORY_INDEX_PATTERNS = (
+    "tasks/backlog/*/README.md",
+    "tasks/backlog/bugs/index.md",
+)
+HISTORY_HEADING_RE = re.compile(
+    r"retired|history|closed|completed|resolved|verified|done", re.IGNORECASE
+)
+CATEGORY_EXEMPT_MARKER = "state-link-guard: allow-done-links"
+# ATX heading: requires whitespace (or end of line) after the hash run, so
+# inline issue/PR references like "#921" never pop the heading stack.
+ATX_HEADING_RE = re.compile(r"^(#{1,6})(?:\s|$)")
+
 RETIREMENT_LOG_NAME = "RETIREMENT-LOG.md"
 
 
@@ -289,6 +306,65 @@ def validate_state_only_indexes(
     return findings
 
 
+def validate_category_indexes(
+    md_file: Path,
+    content: str,
+    root: Path,
+    tasks_root: Path,
+) -> list[Finding]:
+    try:
+        rel = md_file.relative_to(root).as_posix()
+    except ValueError:
+        return []
+    if not any(fnmatch.fnmatch(rel, pattern) for pattern in CATEGORY_INDEX_PATTERNS):
+        return []
+
+    findings: list[Finding] = []
+    done_root = tasks_root / "done"
+    heading_stack: list[tuple[int, bool]] = []  # (level, done-links allowed)
+    in_fence = False
+    for line_number, line in enumerate(content.splitlines(), start=1):
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        heading_match = ATX_HEADING_RE.match(stripped)
+        if heading_match:
+            level = len(heading_match.group(1))
+            while heading_stack and heading_stack[-1][0] >= level:
+                heading_stack.pop()
+            heading_stack.append((level, bool(HISTORY_HEADING_RE.search(stripped))))
+            continue
+        if CATEGORY_EXEMPT_MARKER in stripped:
+            if heading_stack:
+                level, _ = heading_stack[-1]
+                heading_stack[-1] = (level, True)
+            continue
+        allowed = any(flag for _, flag in heading_stack)
+        if allowed:
+            continue
+        for match in LINK_PATTERN.finditer(line):
+            raw_link = match.group(1).strip()
+            if is_ignored_link(raw_link):
+                continue
+            target = normalize_target(md_file, raw_link)
+            if target.name == RETIREMENT_LOG_NAME:
+                continue
+            if target.is_relative_to(done_root):
+                findings.append(
+                    Finding(
+                        md_file,
+                        line_number,
+                        f"category index links retired task {target.name} outside a "
+                        f"history-marked heading; move the entry under a history section "
+                        f"(e.g. '## Retired') or cite it as plain text",
+                    )
+                )
+    return findings
+
+
 def markdown_files_to_scan(root: Path, tasks_root: Path) -> list[Path]:
     files: list[Path] = []
     for base in (tasks_root, root / "docs" / "agent"):
@@ -317,6 +393,7 @@ def main() -> int:
         findings.extend(validate_link_states(md_file, content, root, tasks_root, index))
         findings.extend(validate_status_claims(md_file, content, root, index))
         findings.extend(validate_state_only_indexes(md_file, content, root, tasks_root))
+        findings.extend(validate_category_indexes(md_file, content, root, tasks_root))
 
     print(f"[check_task_state_links] Root: {root}")
     print(f"[check_task_state_links] Indexed task IDs: {len(index)}")
