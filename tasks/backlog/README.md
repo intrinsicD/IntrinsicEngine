@@ -52,9 +52,9 @@ Member-by-member history: retirement log and
 [`rendering/README.md`](rendering/README.md) /
 [`runtime/README.md`](runtime/README.md).
 
-Still-open Theme A stragglers:
-- [`runtime/RORG-031-runtime-composition.md`](runtime/RORG-031-runtime-composition.md)
-  (also Theme F) — runtime composition backlog seed.
+Theme A has **no open members**; the last straggler (`RORG-031C`, the
+runtime composition backlog seed) retired once its lifecycle children landed
+and the remaining runtime children became independently tracked tasks.
 
 ### Theme B — Rendering modernization (P1)
 
@@ -76,12 +76,12 @@ reference method, ECS authoring contract, world/runtime bridge, and
 broadphase/narrowphase and constraint/island/sleep solver contracts are retired — see
 [`physics/README.md`](physics/README.md) and the retirement log.
 
-Open members:
-- [`methods/METHOD-009`](methods/METHOD-009-particle-spring-reference-backend.md),
-  [`methods/METHOD-010`](methods/METHOD-010-xpbd-cloth-shell-reference-backend.md),
-  [`methods/METHOD-011`](methods/METHOD-011-sph-fluid-reference-backend.md) —
-  CPU-reference-first non-rigid method packages opened by the phenomena
-  roadmap.
+Theme C currently has **no open members**: the rigid-body foundation
+(ADR-0019, METHOD-001, PHYSICS-001..003) and all three non-rigid reference
+method packages from the phenomena roadmap (METHOD-009 particles/springs,
+METHOD-010 XPBD cloth, METHOD-011 SPH fluid) are retired at
+`CPUContracted`. Optimized/GPU physics backends and runtime integration
+open as new tasks per the roadmap's engine-integration gates.
 
 ### Theme D — ECS hardening parity (P0, complete)
 
@@ -104,17 +104,16 @@ the convergence map. Retired members are indexed in the category READMEs and
 the retirement log.
 
 Open members:
-- [`architecture/RORG-031A-architecture-foundation.md`](architecture/RORG-031A-architecture-foundation.md).
 - [`architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md`](architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md) —
   value-gated cross-domain map for remaining legacy feature candidates before
   mechanical `src/legacy/` subtree deletion.
 - [`architecture/LEGACY-012-migrate-legacy-consumer-tests.md`](architecture/LEGACY-012-migrate-legacy-consumer-tests.md) —
   follow-up for tests and non-legacy consumers that still import bare legacy
   module names after promoted equivalents exist.
-- [`runtime/RORG-031-runtime-composition.md`](runtime/RORG-031-runtime-composition.md) (also Theme A).
 - [`runtime/RUNTIME-101-asset-ingest-state-machine.md`](runtime/RUNTIME-101-asset-ingest-state-machine.md),
   [`runtime/RUNTIME-103-geometry-algorithm-execution-queue.md`](runtime/RUNTIME-103-geometry-algorithm-execution-queue.md),
-  [`runtime/RUNTIME-104-derived-overlay-producer-lifecycle.md`](runtime/RUNTIME-104-derived-overlay-producer-lifecycle.md).
+  [`runtime/RUNTIME-104-derived-overlay-producer-lifecycle.md`](runtime/RUNTIME-104-derived-overlay-producer-lifecycle.md),
+  [`runtime/RUNTIME-105-remove-streaming-graph-bridge.md`](runtime/RUNTIME-105-remove-streaming-graph-bridge.md).
 - [`rendering/GRAPHICS-084-visualization-property-buffer-residency.md`](rendering/GRAPHICS-084-visualization-property-buffer-residency.md),
   [`rendering/GRAPHICS-085-overlay-packet-backend-parity.md`](rendering/GRAPHICS-085-overlay-packet-backend-parity.md),
   [`rendering/GRAPHICS-086-rhi-retirement-parity-and-cuda-decision.md`](rendering/GRAPHICS-086-rhi-retirement-parity-and-cuda-decision.md).
@@ -147,10 +146,8 @@ code. `PROC-001` (mirror sync gate), `PROC-002` (ID uniqueness), `PROC-005`
 and `PROC-006` (audit cadence visibility) are retired — see
 [`process/README.md`](process/README.md) and the retirement log.
 
-Open members (in dependency order):
-- [`process/PROC-008`](process/PROC-008-category-readme-state-history-split.md) —
-  category README state/history split (after PROC-003; mechanical sweep,
-  lower priority).
+Theme H currently has **no open members**: `PROC-001..008` are all
+retired. New workflow-hardening findings open under `process/`.
 
 ## Cross-domain dependency anchors
 

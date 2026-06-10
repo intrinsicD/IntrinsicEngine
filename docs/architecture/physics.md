@@ -108,10 +108,10 @@ diagnostics; counters remain the authoritative aggregate.
   the integration counters. `WorldDiagnostics` mirrors the last solve in
   `LastSolveStep`/`SolveStepsExecuted`.
 - Physics-owned `ContactRecord` normals are enforced to the documented A→B
-  convention by orienting against the shape-center offset, because the
-  geometry kernel's analytic sphere-box path and GJK/EPA fallback currently
-  return B→A-oriented normals despite the documented kernel convention
-  (tracked as `BUG-025`).
+  convention by orienting against the shape-center offset. The geometry
+  kernel itself honors the A→B convention on every `ComputeContact` path
+  since `BUG-025` was fixed; the physics-side orientation guard stays as
+  defense in depth against future kernel regressions.
 
 Parity against the canonical reference is pinned by
 `tests/unit/physics/Test.PhysicsSolverParity.cpp` (free-fall integrator
@@ -215,4 +215,4 @@ and contact/event counts where applicable.
 - [`PHYSICS-002`](../../tasks/done/PHYSICS-002-collision-broadphase-narrowphase-contract.md) owns collision broadphase/narrowphase contracts.
 - [`PHYSICS-003`](../../tasks/done/PHYSICS-003-constraints-islands-and-solver-diagnostics.md) added constraints, islands, sleep, and solver diagnostics at `CPUContracted`.
 - [`ARCH-002`](../../tasks/done/ARCH-002-physics-phenomena-roadmap.md) records the non-rigid and multi-phenomena roadmap decisions.
-- [`METHOD-009`](../../tasks/backlog/methods/METHOD-009-particle-spring-reference-backend.md), [`METHOD-010`](../../tasks/backlog/methods/METHOD-010-xpbd-cloth-shell-reference-backend.md), and [`METHOD-011`](../../tasks/backlog/methods/METHOD-011-sph-fluid-reference-backend.md) are the first non-rigid physics method-package follow-ups. They remain CPU-reference-first and open no GPU backend.
+- [`METHOD-009`](../../tasks/done/METHOD-009-particle-spring-reference-backend.md), [`METHOD-010`](../../tasks/done/METHOD-010-xpbd-cloth-shell-reference-backend.md), and [`METHOD-011`](../../tasks/done/METHOD-011-sph-fluid-reference-backend.md) are the first non-rigid physics method-package follow-ups (all three are done). They remain CPU-reference-first and open no GPU backend.

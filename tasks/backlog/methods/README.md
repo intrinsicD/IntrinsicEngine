@@ -14,32 +14,15 @@ map.
 
 ## Tasks
 
-- [METHOD-001 — Rigid-body dynamics reference backend](../../done/METHOD-001-rigid-body-dynamics-reference-backend.md)
-  (done 2026-06-05 at `CPUContracted`; ownership gate accepted by
-  [`ARCH-001`](../../done/ARCH-001-physics-layer-ownership-and-ecs-integration.md)
-  / [ADR-0019](../../../docs/adr/0019-physics-layer-ownership-and-ecs-integration.md);
-  ECS authoring side handled by retired
-  [`HARDEN-064`](../../done/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md)).
 - [METHOD-002 — Signed Heat Method reference backend](METHOD-002-signed-heat-method-reference-backend.md)
   **(pathfinder method per [METHODS-001](METHODS-001-signed-heat-pathfinder.md))**.
 - [METHOD-003 — Closest Point Method PDE solver reference backend](METHOD-003-closest-point-method-pde-reference-backend.md).
 - [METHOD-004 — Walk on Spheres / Walk on Stars PDE solver reference backend](METHOD-004-walk-on-spheres-reference-backend.md).
 - [METHOD-005 — Robust mesh boolean reference backend](METHOD-005-robust-mesh-boolean-reference-backend.md)
-  (hard-gated by [`geometry/GEOM-007`](../../done/GEOM-007-robust-predicates-intersection-classification.md)).
+  (hard-gated by `geometry/GEOM-007`).
 - [METHOD-006 — Cross-field / frame-field design reference backend](METHOD-006-cross-field-design-reference-backend.md).
 - [METHOD-007 — Constrained Delaunay tetrahedralization reference backend](METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md)
-  (hard-gated by [`geometry/GEOM-007`](../../done/GEOM-007-robust-predicates-intersection-classification.md)).
-- [METHOD-008 — Resolve `_example_vector_heat` method manifest placeholders](../../done/METHOD-008-example-vector-heat-manifest-placeholders.md)
-  (done 2026-06-06, Outcome A): relocated the structure example from
-  `methods/geometry/_example_vector_heat/` to `methods/_examples/vector_heat/`
-  and resolved its `TODO`/`year: 0` paper placeholders; no CPU reference backend
-  (real Vector Heat Method intake remains a future METHOD-* task).
-- [METHOD-009 — Particle and mass-spring reference backend](METHOD-009-particle-spring-reference-backend.md)
-  (physics roadmap follow-up from [`ARCH-002`](../../done/ARCH-002-physics-phenomena-roadmap.md)).
-- [METHOD-010 — XPBD cloth and shell reference backend](METHOD-010-xpbd-cloth-shell-reference-backend.md)
-  (physics roadmap follow-up from [`ARCH-002`](../../done/ARCH-002-physics-phenomena-roadmap.md)).
-- [METHOD-011 — SPH fluid reference backend](METHOD-011-sph-fluid-reference-backend.md)
-  (physics roadmap follow-up from [`ARCH-002`](../../done/ARCH-002-physics-phenomena-roadmap.md)).
+  (hard-gated by `geometry/GEOM-007`).
 
 ## Convergence
 
@@ -48,7 +31,7 @@ map.
   out of scope for the method package and are owned by physics/runtime bridge
   follow-ups.
 - METHOD-009 through METHOD-011 are physics-roadmap follow-ups from
-  [`ARCH-002`](../../done/ARCH-002-physics-phenomena-roadmap.md). Promote them
+  `ARCH-002`. Promote them
   CPU-reference-first in numeric order unless a task records a stronger local
   dependency; do not open optimized CPU or GPU backends until the selected
   reference backend is implemented, tested, benchmark-manifested, and documented.
@@ -58,6 +41,40 @@ map.
   [`docs/reviews/2026-05-12-src-geometry-gap-analysis.md`](../../../docs/reviews/2026-05-12-src-geometry-gap-analysis.md).
   Each task lists explicit algorithm variants and requires the maintainer to mark
   one as the public-facing default backend before implementation begins.
+- Forbidden: importing runtime, graphics, platform, app, or live ECS ownership
+  into a method package; claiming performance wins without a baseline.
+
+## Retired
+
+Retired entries moved here verbatim by the PROC-008 state/history
+split; narratives live in the retirement log.
+
+- [METHOD-001 — Rigid-body dynamics reference backend](../../done/METHOD-001-rigid-body-dynamics-reference-backend.md)
+  (done 2026-06-05 at `CPUContracted`; ownership gate accepted by
+  [`ARCH-001`](../../done/ARCH-001-physics-layer-ownership-and-ecs-integration.md)
+  / [ADR-0019](../../../docs/adr/0019-physics-layer-ownership-and-ecs-integration.md);
+  ECS authoring side handled by retired
+  [`HARDEN-064`](../../done/HARDEN-064-ecs-collider-rigidbody-authoring-contract.md)).
+- [METHOD-008 — Resolve `_example_vector_heat` method manifest placeholders](../../done/METHOD-008-example-vector-heat-manifest-placeholders.md)
+  (done 2026-06-06, Outcome A): relocated the structure example from
+  `methods/geometry/_example_vector_heat/` to `methods/_examples/vector_heat/`
+  and resolved its `TODO`/`year: 0` paper placeholders; no CPU reference backend
+  (real Vector Heat Method intake remains a future METHOD-* task).
+- [METHOD-009 — Particle and mass-spring reference backend](../../done/METHOD-009-particle-spring-reference-backend.md)
+  (done, 2026-06-10, `CPUContracted`): deterministic particle/mass-spring
+  `cpu_reference` backend with stability/energy diagnostics and smoke
+  benchmark; physics roadmap follow-up from
+  [`ARCH-002`](../../done/ARCH-002-physics-phenomena-roadmap.md).
+- [METHOD-010 — XPBD cloth and shell reference backend](../../done/METHOD-010-xpbd-cloth-shell-reference-backend.md)
+  (done, 2026-06-10, `CPUContracted`): deterministic XPBD cloth/shell
+  `cpu_reference` backend with constraint residual/convergence diagnostics
+  and smoke benchmark
+  (physics roadmap follow-up from [`ARCH-002`](../../done/ARCH-002-physics-phenomena-roadmap.md)).
+- [METHOD-011 — SPH fluid reference backend](../../done/METHOD-011-sph-fluid-reference-backend.md)
+  (done, 2026-06-10, `CPUContracted`): deterministic WCSPH `cpu_reference`
+  backend with density/compression and neighbor diagnostics and smoke
+  benchmark
+  (physics roadmap follow-up from [`ARCH-002`](../../done/ARCH-002-physics-phenomena-roadmap.md)).
 - Ordering: [`geometry/GEOM-008`](../../done/GEOM-008-linear-algebra-solver-infrastructure.md)
   retired 2026-05-27 at `CPUContracted` shipping the CSR builder + CG /
   shifted-CG iterative solver. The direct sparse SPD factorization
@@ -72,5 +89,3 @@ map.
   (LOBPCG / shift-invert) which is shipped by neither GEOM-008 nor
   GEOM-020; a separate eigensolver follow-up must be filed before
   METHOD-006 can promote on variant B.
-- Forbidden: importing runtime, graphics, platform, app, or live ECS ownership
-  into a method package; claiming performance wins without a baseline.

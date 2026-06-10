@@ -85,8 +85,16 @@ When a task completes:
    `tools/agents/check_task_state_links.py` rejects links into `tasks/done/`
    from them.
 4. Remove the task's entry from the open-member lists in
-   `tasks/backlog/README.md` and update its category README (category
-   READMEs may keep retired entries in their own lists).
+   `tasks/backlog/README.md` and update its category README. Category
+   READMEs may keep retired entries, but only under a history-marked
+   heading (one whose text contains retired/history/closed/completed/
+   resolved/verified/done — e.g. `## Retired`); open lists cite retired
+   tasks as plain code spans, not links. `check_task_state_links.py`
+   enforces this for `tasks/backlog/*/README.md` and
+   `tasks/backlog/bugs/index.md`; sections that interleave done
+   prerequisites with open work by design (the rendering dependency DAG)
+   opt out with a `<!-- state-link-guard: allow-done-links -->` comment
+   directly below their heading.
 
 ## ID allocation
 

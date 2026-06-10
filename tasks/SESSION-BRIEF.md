@@ -10,25 +10,13 @@ the authoritative open/unblocked view.
 
 - none
 
-## Theme A — Shortest path to sandbox visible geometry
-
-- unblocked: `RORG-031C` — Runtime composition backlog seed (tasks/backlog/runtime/RORG-031-runtime-composition.md)
-
-## Theme C — Physics readiness
-
-- unblocked: `METHOD-009` — Particle and mass-spring reference backend (tasks/backlog/methods/METHOD-009-particle-spring-reference-backend.md)
-- unblocked: `METHOD-010` — XPBD cloth and shell reference backend (tasks/backlog/methods/METHOD-010-xpbd-cloth-shell-reference-backend.md)
-- unblocked: `METHOD-011` — SPH fluid reference backend (tasks/backlog/methods/METHOD-011-sph-fluid-reference-backend.md)
-
 ## Theme F — Architecture/runtime/UI foundation seeds
 
 - unblocked: `GRAPHICS-084` — Visualization property-buffer residency (tasks/backlog/rendering/GRAPHICS-084-visualization-property-buffer-residency.md)
 - unblocked: `GRAPHICS-085` — Overlay packet backend parity (tasks/backlog/rendering/GRAPHICS-085-overlay-packet-backend-parity.md)
 - unblocked: `GRAPHICS-086` — RHI retirement parity and CUDA decision (tasks/backlog/rendering/GRAPHICS-086-rhi-retirement-parity-and-cuda-decision.md)
-- unblocked: `HARDEN-078` — Track or resolve untracked TODO / temporary markers in promoted src (tasks/backlog/architecture/HARDEN-078-track-untracked-todo-temporary-markers.md)
 - unblocked: `INFRA-001` — Move third-party dependencies to a vcpkg manifest (tasks/backlog/architecture/INFRA-001-vcpkg-manifest-mode.md)
 - unblocked: `LEGACY-001` — Delete `src/legacy/Interface/` (tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md)
-- unblocked: `LEGACY-002` — Seed retirement tasks for remaining `src/legacy/` subtrees (tasks/backlog/architecture/LEGACY-002-seed-src-legacy-retirement-backlog.md)
 - unblocked: `LEGACY-004` — Delete `src/legacy/Asset/` (tasks/backlog/architecture/LEGACY-004-delete-src-legacy-asset.md)
 - unblocked: `LEGACY-005` — Delete `src/legacy/Core/` (tasks/backlog/architecture/LEGACY-005-delete-src-legacy-core.md)
 - unblocked: `LEGACY-006` — Delete `src/legacy/ECS/` (tasks/backlog/architecture/LEGACY-006-delete-src-legacy-ecs.md)
@@ -38,19 +26,11 @@ the authoritative open/unblocked view.
 - unblocked: `LEGACY-011` — Value-gated legacy feature reimplementation map (tasks/backlog/architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md)
 - blocked by `LEGACY-011`: `LEGACY-012` — Migrate legacy consumer tests to promoted coverage (tasks/backlog/architecture/LEGACY-012-migrate-legacy-consumer-tests.md)
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
-- unblocked: `RORG-031A` — Architecture foundation backlog seed (tasks/backlog/architecture/RORG-031A-architecture-foundation.md)
 - unblocked: `RORG-031F` — UI integration backlog seed (tasks/backlog/ui/RORG-031-ui-integration.md)
 - unblocked: `RUNTIME-101` — Asset ingest state-machine migration (tasks/backlog/runtime/RUNTIME-101-asset-ingest-state-machine.md)
 - unblocked: `RUNTIME-103` — Geometry algorithm execution queue (tasks/backlog/runtime/RUNTIME-103-geometry-algorithm-execution-queue.md)
 - unblocked: `RUNTIME-104` — Derived overlay producer lifecycle (tasks/backlog/runtime/RUNTIME-104-derived-overlay-producer-lifecycle.md)
-
-## Theme G — Active bugs
-
-- unblocked: `BUG-025` — Geometry contact manifold normals violate the documented A→B convention (tasks/backlog/bugs/BUG-025-contact-manifold-normal-convention.md)
-
-## Theme H — Agentic workflow hardening
-
-- unblocked: `PROC-008` — Category README state/history split (tasks/backlog/process/PROC-008-category-readme-state-history-split.md)
+- unblocked: `RUNTIME-105` — Remove the deprecated GetStreamingGraph() TaskGraph bridge (tasks/backlog/runtime/RUNTIME-105-remove-streaming-graph-bridge.md)
 
 ## Unthemed
 

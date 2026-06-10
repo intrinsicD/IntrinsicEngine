@@ -8,7 +8,7 @@ depends_on: []
 ## Goal
 - Give an owning task ID (or resolve) the two untracked migration markers in
   promoted (non-legacy) `src/` surfaced by the 2026-06-06 drift audit
-  ([`docs/reports/2026-06-06-drift-audit.md`](../../../docs/reports/2026-06-06-drift-audit.md)
+  ([`docs/reports/2026-06-06-drift-audit.md`](../../docs/reports/2026-06-06-drift-audit.md)
   Row 7), so no promoted source carries a bare `TODO:` or a "temporary"
   migration bridge without a tracked removal owner per `AGENTS.md` §13.
 
@@ -26,9 +26,12 @@ depends_on: []
   (`src/runtime/Runtime.Engine.cppm`, `src/runtime/README.md`). Each edit is
   independent.
 - Source of the finding: the calibration drift audit
-  ([`REVIEW-002`](../../done/REVIEW-002-recurring-drift-and-inconsistency-audit.md), report
-  [`2026-06-06-drift-audit.md`](../../../docs/reports/2026-06-06-drift-audit.md))
+  ([`REVIEW-002`](REVIEW-002-recurring-drift-and-inconsistency-audit.md), report
+  [`2026-06-06-drift-audit.md`](../../docs/reports/2026-06-06-drift-audit.md))
   Row 7 (untracked TODO/shim drift).
+- Resolved (2026-06-10): marker 1 took option (a) — the filewatcher keeps explicit per-watch `ChangeCallback` injection (the already-implemented behavior), so the dead commented `CallbackRegistry` import and its bare TODO are removed and replaced by a short policy note; no behavior change. Marker 2 took the bridge-tracking option — the new backlog task `RUNTIME-105` (`tasks/backlog/runtime/RUNTIME-105-remove-streaming-graph-bridge.md`) owns removing the `GetStreamingGraph()` TaskGraph bridge (which has zero promoted consumers already), and both the `[[deprecated(...)]]` message and the runtime README streaming note now name it. The Row 7 greps return only task-ID-tracked markers.
+- Completed: 2026-06-10.
+- PR/commit: branch `claude/pensive-albattani-pu2t14` (pending local commit).
 - The two markers:
   1. `src/core/Core.Filesystem.cppm:16` — a commented-out
      `import Extrinsic.Core.CallbackRegistry;` carrying a bare
@@ -43,38 +46,38 @@ depends_on: []
      rule is unmet.
 
 ## Required changes
-- [ ] For `Core.Filesystem.cppm`: either (a) make the filewatcher/callback
+- [x] For `Core.Filesystem.cppm`: either (a) make the filewatcher/callback
       design decision and remove the dead commented import + TODO, or (b) if the
       decision is deferred, convert the bare `//TODO:` into a `// TODO(<TASK-ID>)`
       form that names an owning backlog task (open that task if none fits) and
       fix the "CallbaclRegistry" typo.
-- [ ] For the `GetStreamingGraph()` deprecation: open (or name an existing)
+- [x] For the `GetStreamingGraph()` deprecation: open (or name an existing)
       streaming-migration removal task and reference its ID in both the
       `[[deprecated("...")]]` message and the `src/runtime/README.md`
       "Streaming integration" note, so the temporary bridge has a tracked
       removal owner per `AGENTS.md` §13.
-- [ ] Re-run the Row 7 grep from the drift-audit checklist and confirm both
+- [x] Re-run the Row 7 grep from the drift-audit checklist and confirm both
       markers now either are gone or carry a task ID.
 
 ## Tests
-- [ ] No behavior change, so no new tests. The default CPU gate
+- [x] No behavior change, so no new tests. The default CPU gate
       (`ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`)
       stays green for touched scope.
-- [ ] `git grep -nE '(TODO|FIXME|XXX|HACK)([^A-Za-z0-9]|$)' -- 'src/core/**' 'src/runtime/**'`
+- [x] `git grep -nE '(TODO|FIXME|XXX|HACK)([^A-Za-z0-9]|$)' -- 'src/core/**' 'src/runtime/**'`
       returns only task-ID-tracked markers for the two files above.
 
 ## Docs
-- [ ] `src/runtime/README.md` "Streaming integration" note references the
+- [x] `src/runtime/README.md` "Streaming integration" note references the
       removal task ID if option (b)/bridge-tracking is chosen.
-- [ ] No other docs change unless the design decision changes a public surface.
+- [x] No other docs change unless the design decision changes a public surface.
 
 ## Acceptance criteria
-- [ ] `src/core/Core.Filesystem.cppm` carries no bare `//TODO:` (either resolved
+- [x] `src/core/Core.Filesystem.cppm` carries no bare `//TODO:` (either resolved
       or task-ID-tracked); the typo is fixed if the line survives.
-- [ ] `Runtime.Engine.cppm::GetStreamingGraph()` deprecation and the runtime
+- [x] `Runtime.Engine.cppm::GetStreamingGraph()` deprecation and the runtime
       README both name a removal task ID, or the bridge is removed by the named
       migration task (out of scope here).
-- [ ] Default CPU gate green for touched scope.
+- [x] Default CPU gate green for touched scope.
 
 ## Verification
 ```bash

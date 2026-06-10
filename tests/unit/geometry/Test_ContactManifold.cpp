@@ -5,6 +5,8 @@
 // including symmetric argument ordering.
 #include <gtest/gtest.h>
 
+#include <type_traits>
+
 #include <glm/glm.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtc/quaternion.hpp>
@@ -114,6 +116,152 @@ TEST(ContactManifold, SphereAABB_CenterInsideBox)
 
     ASSERT_TRUE(contact.has_value());
     EXPECT_GT(contact->PenetrationDepth, 0.0f);
+}
+
+// ============================================================================
+// A->B Normal Convention (BUG-025)
+//
+// Every ComputeContact(a, b) path must return a Normal pointing from a to b.
+// Pinned per analytic overload, through the reversed-argument dispatcher, and
+// through the GJK/EPA fallback for sphere/capsule/OBB pairings in both
+// argument orders.
+// ============================================================================
+
+namespace
+{
+    template <typename Shape>
+    glm::vec3 ShapeCenter(const Shape& s)
+    {
+        if constexpr (std::is_same_v<Shape, Capsule>)
+            return (s.PointA + s.PointB) * 0.5f;
+        else if constexpr (std::is_same_v<Shape, AABB>)
+            return (s.Min + s.Max) * 0.5f;
+        else
+            return s.Center;
+    }
+
+    // Convention invariant: Normal is unit length and points from a toward b
+    // (positive projection on the center offset).
+    template <typename A, typename B>
+    void ExpectNormalPointsAToB(const A& a, const B& b, const ContactManifold& m)
+    {
+        EXPECT_NEAR(glm::length(m.Normal), 1.0f, kEps);
+        const glm::vec3 centerDelta = ShapeCenter(b) - ShapeCenter(a);
+        EXPECT_GT(glm::dot(m.Normal, centerDelta), 0.0f)
+            << "Normal (" << m.Normal.x << ", " << m.Normal.y << ", " << m.Normal.z
+            << ") must point from A toward B";
+    }
+}
+
+TEST(ContactManifold, Convention_SphereAABB_SphereAboveBox)
+{
+    // The PHYSICS-003 repro: dynamic sphere resting on a static floor slab.
+    // With the sphere as A, the convention requires Normal = (0, -1, 0).
+    Sphere s{glm::vec3(0, 1.4f, 0), 0.5f};
+    AABB box{glm::vec3(-5, 0, -5), glm::vec3(5, 1, 5)};
+    auto contact = ComputeContact(s, box);
+
+    ASSERT_TRUE(contact.has_value());
+    ExpectNear(contact->Normal, glm::vec3(0, -1, 0));
+    EXPECT_NEAR(contact->PenetrationDepth, 0.1f, kEps);
+    ExpectNear(contact->ContactPointA, glm::vec3(0, 0.9f, 0)); // sphere surface
+    ExpectNear(contact->ContactPointB, glm::vec3(0, 1.0f, 0)); // box top face
+}
+
+TEST(ContactManifold, Convention_SphereAABB_CenterInsideBox)
+{
+    // Deep-penetration branch: sphere center inside the box, nearest to the
+    // top face. The sphere escapes upward, so the A->B normal points down.
+    Sphere s{glm::vec3(0, 1.5f, 0), 0.25f};
+    AABB box{glm::vec3(-2, 0, -2), glm::vec3(2, 2, 2)};
+    auto contact = ComputeContact(s, box);
+
+    ASSERT_TRUE(contact.has_value());
+    ExpectNear(contact->Normal, glm::vec3(0, -1, 0));
+    EXPECT_NEAR(contact->PenetrationDepth, 0.5f + 0.25f, kEps); // overlap + radius
+    ExpectNear(contact->ContactPointB, glm::vec3(0, 2.0f, 0));  // nearest box face
+    ExpectNear(contact->ContactPointA, glm::vec3(0, 1.25f, 0)); // deepest sphere point
+}
+
+TEST(ContactManifold, Convention_AABBSphere_ReversedDispatch)
+{
+    // Same scene with the box as A: the dispatcher swaps arguments, so the
+    // normal must flip to point from the box toward the sphere.
+    Sphere s{glm::vec3(0, 1.4f, 0), 0.5f};
+    AABB box{glm::vec3(-5, 0, -5), glm::vec3(5, 1, 5)};
+    auto contact = ComputeContact(box, s);
+
+    ASSERT_TRUE(contact.has_value());
+    ExpectNear(contact->Normal, glm::vec3(0, 1, 0));
+    ExpectNear(contact->ContactPointA, glm::vec3(0, 1.0f, 0)); // box top face
+    ExpectNear(contact->ContactPointB, glm::vec3(0, 0.9f, 0)); // sphere surface
+}
+
+TEST(ContactManifold, Convention_SphereSphere_BothOrders)
+{
+    Sphere lower{glm::vec3(0, 0, 0), 1.0f};
+    Sphere upper{glm::vec3(0, 1.5f, 0), 1.0f};
+
+    auto ab = ComputeContact(lower, upper);
+    ASSERT_TRUE(ab.has_value());
+    ExpectNear(ab->Normal, glm::vec3(0, 1, 0));
+
+    auto ba = ComputeContact(upper, lower);
+    ASSERT_TRUE(ba.has_value());
+    ExpectNear(ba->Normal, glm::vec3(0, -1, 0));
+}
+
+TEST(ContactManifold, Convention_Fallback_SphereOBB_BothOrders)
+{
+    // The PHYSICS-003 fallback probe: sphere above an OBB, GJK/EPA path.
+    Sphere s{glm::vec3(0, 1.4f, 0), 0.5f};
+    OBB obb{glm::vec3(0, 0, 0), glm::vec3(2, 1, 2), glm::quat(1, 0, 0, 0)};
+
+    Core::Memory::LinearArena scratch(256 * 1024);
+    auto sphereFirst = ComputeContact(s, obb, scratch);
+    ASSERT_TRUE(sphereFirst.has_value());
+    ExpectNormalPointsAToB(s, obb, *sphereFirst);
+    EXPECT_NEAR(sphereFirst->Normal.y, -1.0f, 0.05f);
+
+    scratch.Reset();
+    auto obbFirst = ComputeContact(obb, s, scratch);
+    ASSERT_TRUE(obbFirst.has_value());
+    ExpectNormalPointsAToB(obb, s, *obbFirst);
+    EXPECT_NEAR(obbFirst->Normal.y, 1.0f, 0.05f);
+}
+
+TEST(ContactManifold, Convention_Fallback_CapsuleOBB_BothOrders)
+{
+    // Upright capsule straddling the +X face of an OBB.
+    Capsule cap{glm::vec3(1.8f, -0.5f, 0), glm::vec3(1.8f, 0.5f, 0), 0.5f};
+    OBB obb{glm::vec3(0, 0, 0), glm::vec3(1.5f, 1.5f, 1.5f), glm::quat(1, 0, 0, 0)};
+
+    Core::Memory::LinearArena scratch(256 * 1024);
+    auto capFirst = ComputeContact(cap, obb, scratch);
+    ASSERT_TRUE(capFirst.has_value());
+    ExpectNormalPointsAToB(cap, obb, *capFirst);
+
+    scratch.Reset();
+    auto obbFirst = ComputeContact(obb, cap, scratch);
+    ASSERT_TRUE(obbFirst.has_value());
+    ExpectNormalPointsAToB(obb, cap, *obbFirst);
+}
+
+TEST(ContactManifold, Convention_Fallback_SphereCapsule_BothOrders)
+{
+    // Sphere beside an upright capsule, offset along +X from the capsule axis.
+    Sphere s{glm::vec3(0.8f, 0, 0), 0.5f};
+    Capsule cap{glm::vec3(0, -1, 0), glm::vec3(0, 1, 0), 0.5f};
+
+    Core::Memory::LinearArena scratch(256 * 1024);
+    auto sphereFirst = ComputeContact(s, cap, scratch);
+    ASSERT_TRUE(sphereFirst.has_value());
+    ExpectNormalPointsAToB(s, cap, *sphereFirst);
+
+    scratch.Reset();
+    auto capFirst = ComputeContact(cap, s, scratch);
+    ASSERT_TRUE(capFirst.has_value());
+    ExpectNormalPointsAToB(cap, s, *capFirst);
 }
 
 // ============================================================================

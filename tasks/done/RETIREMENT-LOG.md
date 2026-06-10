@@ -9,6 +9,192 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`LEGACY-002`](LEGACY-002-seed-src-legacy-retirement-backlog.md) — seed
+retirement tasks for remaining `src/legacy/` subtrees — retired to
+`tasks/done/` on 2026-06-10. The deliverables had been complete since
+2026-06-06 (the `LEGACY-003..010` per-subtree deletion tasks, the
+architecture README "Legacy retirement" section with dependency-ordered
+hints, and the `docs/migration/legacy-retirement.md` sequencing links);
+the file stayed in backlog only because ~54 layering-allowlist rows still
+named `LEGACY-002` as their open umbrella owner. `HARDEN-082` (the
+metadata-only rebinding follow-up the task's context required) moved
+those rows to their per-subtree owners, so no allowlist row references
+`LEGACY-002` and the seed retires. Remaining legacy retirement is owned
+by `LEGACY-001` and `LEGACY-004..010`, each gated on its consumer-grep
+prerequisite.
+
+Backlog
+[`HARDEN-082`](HARDEN-082-rebind-legacy-allowlist-umbrella-rows.md) —
+rebind legacy allowlist umbrella rows to per-subtree owners — opened and
+retired to `tasks/done/` on 2026-06-10 at maturity `Retired`
+(metadata-only governance rebind). All 54
+`tools/repo/layering_allowlist.yaml` rows still naming the `LEGACY-002`
+seeding umbrella moved to their concrete per-subtree retirement owners by
+`file_glob` prefix (9 rows each to `LEGACY-004` Asset, `LEGACY-005` Core,
+`LEGACY-006` ECS, `LEGACY-008` Graphics, `LEGACY-009` RHI, `LEGACY-010`
+Runtime), with each row's `expires` text rewritten from the satisfied
+"until LEGACY-002 seeds ..." condition to "until LEGACY-00N deletes ...".
+No rows were added or removed and no glob changed; the strict layering
+check stays green with the allowlisted-violation count unchanged at 1187.
+This is the rebinding follow-up that `LEGACY-002`'s context required
+before the seed itself could retire.
+
+Backlog
+[`HARDEN-078`](HARDEN-078-track-untracked-todo-temporary-markers.md) —
+track or resolve untracked TODO / temporary markers in promoted src —
+retired to `tasks/done/` on 2026-06-10 at maturity `Retired` (pure marker
+hygiene). The `Core.Filesystem` dead commented `CallbackRegistry` import
+and bare TODO were resolved by decision (a): watchers keep explicit
+per-watch `ChangeCallback` injection (the already-implemented behavior),
+recorded as a short policy note; no behavior change. The
+`Engine::GetStreamingGraph()` temporary TaskGraph bridge now has a
+tracked removal owner per `AGENTS.md` §13: the new `RUNTIME-105` backlog
+task (the promoted tree already has zero bridge consumers), named in both
+the `[[deprecated(...)]]` message and the runtime README streaming note.
+The drift-audit Row 7 greps over `src/core/**` and `src/runtime/**`
+return only task-ID-tracked markers. Default CPU gate green at
+retirement.
+
+Backlog
+[`RORG-031A`](RORG-031A-architecture-foundation.md) — architecture
+foundation backlog seed — retired to `tasks/done/` on 2026-06-10. The
+seed's job was converting the legacy living backlog's architecture items
+into structured, independently executable tasks, and that exists: the
+`tasks/backlog/architecture/` queue carries the LEGACY-001..012 retirement
+series, `HARDEN-078`, `INFRA-001`, and a category README with explicit
+consumer-grep gates; architecture governance tooling
+(`check_layering.py`, `check_docs_sync.py`,
+`generate_module_inventory.py`) exists and runs strict in CI; and
+migration/CI dependencies are recorded as gates and front-matter
+`depends_on` edges. Open architecture work remains independently tracked
+by its own task files.
+
+Backlog
+[`PROC-008`](PROC-008-category-readme-state-history-split.md) — category
+README state/history split — retired to `tasks/done/` on 2026-06-10,
+completing Theme H. Slice A mechanically split every
+`tasks/backlog/<category>/README.md` into open lists and verbatim
+`## Retired` history sections (open entries cite retired tasks as plain
+code spans; emptied lists carry explicit none-open lines; the workshop
+pack's completed execution record was re-headed as history;
+`bugs/index.md` already conformed via `Verified / Closed`). Slice B
+extended `check_task_state_links.py` with `validate_category_indexes`:
+heading-stack scanning of category indexes where done-links are findings
+unless under a history-marked heading
+(retired/history/closed/completed/resolved/verified/done), ATX headings
+require a trailing space so inline PR references like `#921` cannot pop
+the stack, and sections that interleave done prerequisites with open work
+by design — the rendering dependency DAG — opt out explicitly with
+`<!-- state-link-guard: allow-done-links -->` while rendering's non-DAG
+sections were de-linked. `docs/agent/task-format.md` step 4 and the skill
+mirrors document the convention. The throwaway done-link probe produced
+exactly one finding and was removed. With PROC-001..008 retired, Theme H
+has no open members.
+
+Backlog
+[`METHOD-011`](METHOD-011-sph-fluid-reference-backend.md) — SPH fluid
+reference backend — retired to `tasks/done/` on 2026-06-10 at maturity
+`CPUContracted`. `methods/physics/sph_fluid_reference/` ships the
+deterministic weakly compressible SPH `cpu_reference` backend (Mueller
+2003): Poly6 density with self-contribution, clamped ideal-gas pressure,
+symmetric Spiky-gradient pressure force, viscosity-Laplacian force,
+semi-implicit Euler, half-space boundary planes with restitution-scaled
+normal reflection, and deterministic O(N^2) index-ordered neighbor
+enumeration with an advisory `MaxNeighborLimit` whose overflow is
+reported, never truncated. Diagnostics cover validation codes, total
+mass, density statistics (average/min/max, `MaxCompression`
+incompressibility proxy, mean relative density error), neighbor counts,
+max velocity, kinetic energy drift, and the non-finite fail-closed
+fallback. Thirteen `unit;physics` tests pin kernel closed forms and
+numeric normalization, uniform-grid density recovery (~1% interior
+error), exact symmetric-pair momentum conservation, viscosity smoothing,
+the free-fall closed form, the toy column drop over a floor plane,
+overflow reporting, invalid-input validation, determinism, and the
+fallback. The `physics.sph_fluid_reference.smoke` benchmark emits
+validated result JSON (static-grid interior density error ~0.0098 vs
+0.05 threshold). With METHOD-009/010/011 all retired, Theme C has no
+open members; optimized/GPU backends and runtime integration open as new
+tasks per the roadmap gates.
+
+Backlog
+[`METHOD-010`](METHOD-010-xpbd-cloth-shell-reference-backend.md) — XPBD
+cloth and shell reference backend — retired to `tasks/done/` on 2026-06-10
+at maturity `CPUContracted`. `methods/physics/xpbd_cloth_reference/` ships
+the deterministic XPBD `cpu_reference` backend over triangle-mesh cloth
+state: position prediction, iterative compliant constraint projection with
+per-constraint Lagrange multipliers (structural unique-edge constraints
+plus opposite-vertex bending pairs across interior edges, both built
+deterministically by `BuildClothFromTriangles`), half-space collision
+projection with collision inputs as pure method parameters (sphere
+colliders declared but unsupported and counted), and position-derived
+velocities. Diagnostics cover validation codes (including
+`InvalidTopology` for repeated/out-of-range triangle indices),
+degenerate-triangle and coincident-constraint counts, stretch/bend
+residuals (max, L2), convergence against the residual tolerance,
+kinetic/mechanical energy drift, and the non-finite fail-closed fallback.
+Fourteen `unit;physics` tests pin the builder topology, rigid projection,
+hanging-patch convergence, bend response, pinned vertices, collision
+floor, degenerate/invalid handling, non-convergence reporting,
+determinism, and the fallback. The `physics.xpbd_cloth_reference.smoke`
+benchmark emits validated result JSON (final max stretch residual
+~6.2e-4 vs 5e-3 threshold). Optimized CPU/GPU backends remain forbidden
+until a future task names this package as its oracle. Theme C's remaining
+open member is `METHOD-011` (SPH fluid).
+
+Backlog
+[`METHOD-009`](METHOD-009-particle-spring-reference-backend.md) — particle
+and mass-spring reference backend — retired to `tasks/done/` on 2026-06-10
+at maturity `CPUContracted`. `methods/physics/particle_spring_reference/`
+ships the deterministic `cpu_reference` backend for particle dynamics and
+mass-spring systems: semi-implicit Euler integration, Hooke springs with
+Provot-style axial damping, pinning via zero inverse mass, global drag, and
+machine-checkable diagnostics (validation codes for invalid
+timestep/particle/spring, pinned and degenerate-spring counts, post-step
+spring residuals max/L2, kinetic/total energy drift, the `omega*dt`
+stability ratio with limit flag, and a non-finite fail-closed fallback that
+returns the input state unchanged). Twelve `unit;physics` correctness
+tests pin free-fall closed form, rest-length equilibrium, exact
+momentum/center-of-mass conservation, bounded harmonic energy drift,
+damped hanging-spring analytic equilibrium, pinned/degenerate/invalid
+handling, instability fallback, and repeated-step determinism. The
+`physics.particle_spring_reference.smoke` benchmark manifest + workload
+emit validated result JSON with exact conservation error as the quality
+metric. Optimized CPU/GPU backends remain forbidden until a future task
+names this package as its oracle. Theme C's remaining open members are
+`METHOD-010` (XPBD cloth/shell) and `METHOD-011` (SPH fluid).
+
+Backlog
+[`RORG-031C`](RORG-031C-runtime-composition.md) — runtime composition
+backlog seed — retired to `tasks/done/` on 2026-06-10. The seed's job was
+to replace the unnamed runtime composition narrative gap with concrete
+child tasks, and that is done: `RUNTIME-099` (explicit lifecycle pipeline
+with shutdown determinism, `CPUContracted`), `RUNTIME-100` (scene
+lifecycle), and `RUNTIME-102` (editor command history) are retired, while
+`RUNTIME-101` (asset ingest state machine), `RUNTIME-103` (geometry
+algorithm execution queue), and `RUNTIME-104` (derived overlay producer
+lifecycle) remain independently tracked Theme F backlog tasks synchronized
+with the `LEGACY-011` feature map. Theme A now has no open members.
+
+Backlog
+[`BUG-025`](BUG-025-contact-manifold-normal-convention.md) — geometry
+contact manifold normals violate the documented A→B convention — retired to
+`tasks/done/` on 2026-06-10 at maturity `CPUContracted`. Root cause was two
+kernel inversions: `EPA_Solver` negated the closest-face outward normal of
+the A−B Minkowski polytope (which is already the A→B direction), and
+`Contact_Analytic(Sphere, AABB)` computed the normal from the box-closest
+point toward the sphere center (B→A) in both its shallow and
+deep-penetration branches. Fix: EPA returns `searchDir` directly,
+`Contact_Fallback` derives `ContactPointB = ContactPointA - Normal * Depth`
+(the same world point under the corrected normal), and the sphere-AABB
+analytic path is A→B in both branches with consistent contact points. New
+`unit;geometry` convention tests pin every analytic overload, the
+reversed-argument dispatcher, and the GJK/EPA fallback for
+sphere/capsule/OBB pairings in both argument orders
+(`ContactManifold.Convention_*`). The physics-layer orientation guard and
+its regression test stay as defense in depth. Geometry label 1263/1263 and
+physics label 21/21 at retirement. Theme G has no open members.
+
+Backlog
 [`BUG-024B`](BUG-024B-sandbox-transform-edit-vulkan-pixel-shift-smoke.md) —
 Vulkan pixel-shift smoke for sandbox transform edits — retired to
 `tasks/done/` on 2026-06-10 at maturity `Operational`. The opt-in

@@ -5,7 +5,7 @@ from slow drift: guardrail blindness, boundary leaks, stringly-typed routing,
 god-object accumulation, scaffold completion that masquerades as capability,
 and absence of a standing architecture-review gate.
 
-## Suggested order
+## Completed execution record (was: suggested order)
 
 1. [`WORKSHOP-001` (done)](../../done/WORKSHOP-001-layer-check-module-and-cmake-aware.md) —
    the architecture guardrail now catches real dependencies (C++23 module

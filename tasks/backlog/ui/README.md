@@ -11,16 +11,6 @@ map.
 ## Tasks
 
 - [RORG-031F — UI integration backlog seed](RORG-031-ui-integration.md).
-- [UI-001 — Sandbox editor shell and core panels](../../done/UI-001-sandbox-editor-shell-panels.md) (done, 2026-06-03, `CPUContracted`).
-- [UI-002 — Sandbox EditorUI domain menu windows](../../done/UI-002-editor-domain-menu-windows.md) (done, 2026-06-07, `CPUContracted`).
-- [UI-003 — Sandbox EditorUI geometry processing capabilities](../../done/UI-003-sandbox-editor-geometry-processing-capabilities.md) (done, 2026-06-07, `CPUContracted`).
-- [UI-004 — Sandbox EditorUI K-Means execution command seam](../../done/UI-004-sandbox-editor-kmeans-execution.md) (done, 2026-06-07, `CPUContracted`).
-- [UI-005 — Sandbox EditorUI visualization property presets](../../done/UI-005-sandbox-editor-visualization-property-presets.md) (done, 2026-06-07, `CPUContracted`).
-- [UI-006 — Sandbox EditorUI render graph diagnostics panel](../../done/UI-006-sandbox-editor-rendergraph-panel.md) (done, 2026-06-08, `CPUContracted`).
-- [UI-007 — Sandbox EditorUI drag/drop import status](../../done/UI-007-sandbox-editor-drag-drop-import.md) (done, 2026-06-08, `CPUContracted`).
-- [UI-008 — Editor file dialog, dirty-state, and debug workflows](../../done/UI-008-editor-file-dialog-dirty-debug-workflows.md) (done, 2026-06-09, `CPUContracted`):
-  path-entry file boundary, dirty-state/undo-redo affordances, new/open/save/close
-  command routing, and app-to-runtime-only dependency proof.
 
 ## Convergence
 
@@ -61,15 +51,31 @@ map.
   `AssetService`, and ECS materialization.
 - UI-008 is a retired value-gated workflow child from
   [`LEGACY-011`](../architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md);
-  it consumes [`RUNTIME-102`](../../done/RUNTIME-102-editor-command-history.md)
+  it consumes `RUNTIME-102`
   for command history / dirty-state source of truth. The
-  [`PLATFORM-006`](../../done/PLATFORM-006-platform-event-parity.md)
+  `PLATFORM-006`
   file-dialog boundary is retired: current workflows use runtime/UI path entry
   plus platform dropped-path events, while native dialogs remain deferred unless
   a new platform/runtime task accepts them. Sample/debug scene expansion and
   app-level debug workflow clones remain deferred until a runtime-owned command
   accepts them.
 - UI work that depends on renderer overlays/handoff coordinates with the
-  retired [`GRAPHICS-024`](../../done/GRAPHICS-024-overlays-presentation-editor-handoff.md)
+  retired `GRAPHICS-024`
   parity matrix and the rendering DAG in
   [`tasks/backlog/rendering/README.md`](../rendering/README.md).
+
+## Retired
+
+Retired entries moved here verbatim by the PROC-008 state/history
+split; narratives live in the retirement log.
+
+- [UI-001 — Sandbox editor shell and core panels](../../done/UI-001-sandbox-editor-shell-panels.md) (done, 2026-06-03, `CPUContracted`).
+- [UI-002 — Sandbox EditorUI domain menu windows](../../done/UI-002-editor-domain-menu-windows.md) (done, 2026-06-07, `CPUContracted`).
+- [UI-003 — Sandbox EditorUI geometry processing capabilities](../../done/UI-003-sandbox-editor-geometry-processing-capabilities.md) (done, 2026-06-07, `CPUContracted`).
+- [UI-004 — Sandbox EditorUI K-Means execution command seam](../../done/UI-004-sandbox-editor-kmeans-execution.md) (done, 2026-06-07, `CPUContracted`).
+- [UI-005 — Sandbox EditorUI visualization property presets](../../done/UI-005-sandbox-editor-visualization-property-presets.md) (done, 2026-06-07, `CPUContracted`).
+- [UI-006 — Sandbox EditorUI render graph diagnostics panel](../../done/UI-006-sandbox-editor-rendergraph-panel.md) (done, 2026-06-08, `CPUContracted`).
+- [UI-007 — Sandbox EditorUI drag/drop import status](../../done/UI-007-sandbox-editor-drag-drop-import.md) (done, 2026-06-08, `CPUContracted`).
+- [UI-008 — Editor file dialog, dirty-state, and debug workflows](../../done/UI-008-editor-file-dialog-dirty-debug-workflows.md) (done, 2026-06-09, `CPUContracted`):
+  path-entry file boundary, dirty-state/undo-redo affordances, new/open/save/close
+  command routing, and app-to-runtime-only dependency proof.

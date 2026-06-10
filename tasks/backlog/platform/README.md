@@ -7,7 +7,7 @@ work scoped to the platform layer.
 
 The current public surface (`Extrinsic.Platform.Window`,
 `Extrinsic.Platform.Input`) and the `Null` and `Glfw` backends were established
-by [`PLATFORM-003` (done)](../../done/PLATFORM-003-explicit-platform-backends.md).
+by `PLATFORM-003` (done).
 See [`src/platform/README.md`](../../../src/platform/README.md) for the current
 backend layout, selection policy, and dependency note.
 
@@ -17,23 +17,9 @@ backend layout, selection policy, and dependency note.
   planning-only umbrella for Wayland / Windows / macOS backends documented as
   future plug-in slots in `src/platform/README.md`. Stays planning-only until
   there is a concrete need.
-- [PLATFORM-005 — Platform module implementation splits](../../done/PLATFORM-005-platform-module-implementation-splits.md):
-  module-interface hygiene follow-up for `Platform.Input`, `Platform.Backend.Glfw`,
-  and `Platform.Backend.Null`; moves non-trivial bodies and backend-only
-  includes/imports out of `.cppm` interfaces without changing platform behavior.
 
 Retired:
 
-- [HARDEN-067 — Remove stale `src/platform/LinuxGlfwVulkan/` legacy subtree](../../done/HARDEN-067-remove-stale-platform-linuxglfwvulkan.md)
-  (done 2026-05-15): the orphaned pre-`PLATFORM-003` window/input duplicate
-  has been deleted; the explicit-backend split now stands without dead-code
-  remnants under `src/platform/`.
-- [PLATFORM-006 — Platform event parity and editor boundary](../../done/PLATFORM-006-platform-event-parity.md)
-  (done 2026-06-09, `CPUContracted`): current editor/runtime event contracts
-  are explicit for resize/minimize, key/mouse/scroll/cursor, text codepoints,
-  clipboard, cursor mode, and dropped paths. Native file dialogs,
-  multi-window, non-Linux backend parity, and IME composition remain deferred
-  until a concrete runtime/UI task accepts them.
 
 ## Convergence
 
@@ -63,7 +49,27 @@ In addition to the global promotion checklist in
 
 - [`src/platform/README.md`](../../../src/platform/README.md) — current
   backend layout and selection policy.
-- [`tasks/done/PLATFORM-003-explicit-platform-backends.md`](../../done/PLATFORM-003-explicit-platform-backends.md)
-  — establishment of the explicit backend split.
 - [`/AGENTS.md`](../../../AGENTS.md) §2, §4 — platform layering invariants and
   backend-selection policy.
+
+## Retired
+
+Retired entries moved here verbatim by the PROC-008 state/history
+split; narratives live in the retirement log.
+
+- [PLATFORM-005 — Platform module implementation splits](../../done/PLATFORM-005-platform-module-implementation-splits.md):
+  module-interface hygiene follow-up for `Platform.Input`, `Platform.Backend.Glfw`,
+  and `Platform.Backend.Null`; moves non-trivial bodies and backend-only
+  includes/imports out of `.cppm` interfaces without changing platform behavior.
+- [HARDEN-067 — Remove stale `src/platform/LinuxGlfwVulkan/` legacy subtree](../../done/HARDEN-067-remove-stale-platform-linuxglfwvulkan.md)
+  (done 2026-05-15): the orphaned pre-`PLATFORM-003` window/input duplicate
+  has been deleted; the explicit-backend split now stands without dead-code
+  remnants under `src/platform/`.
+- [PLATFORM-006 — Platform event parity and editor boundary](../../done/PLATFORM-006-platform-event-parity.md)
+  (done 2026-06-09, `CPUContracted`): current editor/runtime event contracts
+  are explicit for resize/minimize, key/mouse/scroll/cursor, text codepoints,
+  clipboard, cursor mode, and dropped paths. Native file dialogs,
+  multi-window, non-Linux backend parity, and IME composition remain deferred
+  until a concrete runtime/UI task accepts them.
+- [`tasks/done/PLATFORM-003-explicit-platform-backends.md`](../../done/PLATFORM-003-explicit-platform-backends.md)
+  — establishment of the explicit backend split.

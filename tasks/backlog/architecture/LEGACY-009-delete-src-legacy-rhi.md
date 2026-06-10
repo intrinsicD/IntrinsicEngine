@@ -25,7 +25,7 @@ depends_on: []
 - Owning subsystem/layer: `src/legacy/RHI/` removal; promoted owner
   `src/graphics/rhi/` (`Extrinsic.RHI.*`).
 - Driver: legacy-retirement program seeded by
-  [`LEGACY-002`](LEGACY-002-seed-src-legacy-retirement-backlog.md) under
+  [`LEGACY-002`](../../done/LEGACY-002-seed-src-legacy-retirement-backlog.md) under
   [`ARCH-004`](../../done/ARCH-004-legacy-retirement-first-deletion-target.md);
   structural template is
   [`LEGACY-001`](LEGACY-001-delete-src-legacy-interface.md).

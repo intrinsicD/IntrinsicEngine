@@ -1,0 +1,18 @@
+benchmark_id: physics.particle_spring_reference.smoke
+method: physics.particle_spring_reference
+dataset: builtin.particle_spring.symmetric_stretched_pair
+params:
+  intent: smoke
+  steps: 16
+  delta_time: 0.005
+  stiffness: 100.0
+  spring_damping: 0.0
+  gravity: 0.0
+  warmup_iterations: 1
+  measured_iterations: 8
+metrics:
+  - runtime_ms
+  - quality_error_l2
+thresholds:
+  smoke_runtime_ms_max: 50
+  quality_error_l2_max: 1.0e-12

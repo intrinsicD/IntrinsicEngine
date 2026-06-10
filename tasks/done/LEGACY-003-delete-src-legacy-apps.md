@@ -34,7 +34,7 @@
 - Owning subsystem/layer: `src/legacy/Apps/` removal; promoted owners
   `src/app/Sandbox/` (UI shell entry) and `src/platform/` (window/input ports).
 - Driver: legacy-retirement program seeded by
-  [`LEGACY-002`](../backlog/architecture/LEGACY-002-seed-src-legacy-retirement-backlog.md) under
+  [`LEGACY-002`](LEGACY-002-seed-src-legacy-retirement-backlog.md) under
   [`ARCH-004`](ARCH-004-legacy-retirement-first-deletion-target.md);
   structural template is
   [`LEGACY-001`](../backlog/architecture/LEGACY-001-delete-src-legacy-interface.md).

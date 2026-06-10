@@ -41,7 +41,9 @@ namespace Geometry::Internal
     std::optional<ContactManifold> Contact_Analytic(const Sphere& s, const AABB& b)
     {
         glm::vec3 closest = glm::clamp(s.Center, b.Min, b.Max);
-        glm::vec3 diff = s.Center - closest;
+        // A->B convention (BUG-025): the sphere is A, so the normal points
+        // from the sphere center toward the box.
+        glm::vec3 diff = closest - s.Center;
         float dist2 = glm::length2(diff);
 
         if (dist2 > s.Radius * s.Radius) return std::nullopt;
@@ -51,41 +53,40 @@ namespace Geometry::Internal
 
         if (dist < 1e-6f)
         {
+            // Sphere center inside the box: escape along the cheapest axis.
+            // The A->B normal opposes the sphere's escape direction.
             glm::vec3 center = (b.Min + b.Max) * 0.5f;
             glm::vec3 halfExt = (b.Max - b.Min) * 0.5f;
             glm::vec3 d = s.Center - center;
             glm::vec3 overlap = halfExt - glm::abs(d);
 
+            float minOverlap;
             if (overlap.x < overlap.y && overlap.x < overlap.z)
             {
-                m.Normal = glm::vec3(d.x > 0 ? 1 : -1, 0, 0);
-                m.PenetrationDepth = overlap.x + s.Radius;
+                m.Normal = glm::vec3(d.x > 0 ? -1 : 1, 0, 0);
+                minOverlap = overlap.x;
             }
             else if (overlap.y < overlap.z)
             {
-                m.Normal = glm::vec3(0, d.y > 0 ? 1 : -1, 0);
-                m.PenetrationDepth = overlap.y + s.Radius;
+                m.Normal = glm::vec3(0, d.y > 0 ? -1 : 1, 0);
+                minOverlap = overlap.y;
             }
             else
             {
-                m.Normal = glm::vec3(0, 0, d.z > 0 ? 1 : -1);
-                m.PenetrationDepth = overlap.z + s.Radius;
+                m.Normal = glm::vec3(0, 0, d.z > 0 ? -1 : 1);
+                minOverlap = overlap.z;
             }
 
-            float minOverlap = (overlap.x < overlap.y && overlap.x < overlap.z)
-                                   ? overlap.x
-                                   : (overlap.y < overlap.z)
-                                   ? overlap.y
-                                   : overlap.z;
+            m.PenetrationDepth = minOverlap + s.Radius;
             m.ContactPointB = s.Center - m.Normal * minOverlap;
-            m.ContactPointA = s.Center - m.Normal * s.Radius;
+            m.ContactPointA = s.Center + m.Normal * s.Radius;
         }
         else
         {
             m.Normal = diff / dist;
             m.PenetrationDepth = s.Radius - dist;
             m.ContactPointB = closest;
-            m.ContactPointA = s.Center - m.Normal * s.Radius;
+            m.ContactPointA = s.Center + m.Normal * s.Radius;
         }
 
         return m;

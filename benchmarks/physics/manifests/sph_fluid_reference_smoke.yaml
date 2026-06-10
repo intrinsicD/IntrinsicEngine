@@ -1,0 +1,22 @@
+benchmark_id: physics.sph_fluid_reference.smoke
+method: physics.sph_fluid_reference
+dataset: builtin.sph_fluid.uniform_grid_and_toy_column
+params:
+  intent: smoke
+  grid_side: 5
+  column_side: 3
+  column_steps: 30
+  spacing: 0.05
+  smoothing_length: 0.1
+  rest_density: 1000.0
+  stiffness: 50.0
+  viscosity: 0.2
+  delta_time: 0.0041667
+  warmup_iterations: 1
+  measured_iterations: 4
+metrics:
+  - runtime_ms
+  - quality_error_l2
+thresholds:
+  smoke_runtime_ms_max: 100
+  quality_error_l2_max: 5.0e-2

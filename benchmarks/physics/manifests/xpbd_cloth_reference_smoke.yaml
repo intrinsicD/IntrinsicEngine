@@ -1,0 +1,20 @@
+benchmark_id: physics.xpbd_cloth_reference.smoke
+method: physics.xpbd_cloth_reference
+dataset: builtin.xpbd_cloth.pinned_hanging_patch_3x3
+params:
+  intent: smoke
+  steps: 24
+  delta_time: 0.0166667
+  iterations: 20
+  stretch_compliance: 0.0
+  bend_compliance: 0.0
+  particle_mass: 0.1
+  residual_tolerance: 5.0e-3
+  warmup_iterations: 1
+  measured_iterations: 8
+metrics:
+  - runtime_ms
+  - quality_error_l2
+thresholds:
+  smoke_runtime_ms_max: 50
+  quality_error_l2_max: 5.0e-3

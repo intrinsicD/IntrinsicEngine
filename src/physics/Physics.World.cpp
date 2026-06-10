@@ -187,12 +187,11 @@ namespace Extrinsic::Physics
             record.IsTrigger = isTrigger;
 
             // PHYSICS-003: enforce the documented A->B normal convention on
-            // the physics-owned record. The geometry kernel's analytic
-            // sphere-box path and the GJK/EPA fallback currently return
-            // B->A-oriented normals despite the documented convention
-            // (tracked as BUG-025); orienting against the shape-center
-            // offset keeps the contact solver correct under either
-            // convention. A coincident-center manifold is left unchanged.
+            // the physics-owned record. The geometry kernel honors this
+            // convention since BUG-025; the shape-center orientation check
+            // stays as defense in depth so a future kernel regression
+            // degrades to a re-orientation instead of a tunneling solver.
+            // A coincident-center manifold is left unchanged.
             const glm::vec3 centerDelta = centerB - centerA;
             if (glm::dot(record.Normal, centerDelta) < 0.0f)
             {

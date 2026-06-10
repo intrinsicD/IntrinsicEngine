@@ -1,0 +1,32 @@
+id: physics.xpbd_cloth_reference
+name: XPBD Cloth and Shell Reference Backend
+domain: physics
+status: reference
+paper:
+  title: "XPBD: Position-Based Simulation of Compliant Constrained Dynamics"
+  authors: "Miles Macklin, Matthias Mueller, Nuttapong Chentanez"
+  year: 2016
+  doi: "10.1145/2994258.2994272"
+  url: "https://matthias-research.github.io/pages/publications/XPBD.pdf"
+inputs:
+  - "Cloth particle states over a triangle mesh: positions, velocities, inverse masses (inverse mass 0 pins a vertex)."
+  - "Triangle topology plus XPBD distance constraints: structural (unique edges) and bending (opposite-vertex pairs across interior edges), each with rest length and compliance."
+  - "Step parameters: fixed delta time, gravity, solver iterations, global damping, residual tolerance, and collision-query inputs as method parameters (half-space planes supported; sphere colliders declared but unsupported)."
+outputs:
+  - "Reference cloth state after one XPBD step: predicted positions, iterative compliant constraint projection, half-space collision projection, and position-derived velocities."
+  - "Diagnostics for validation status, topology and degeneracy counts, stretch/bend constraint residuals (max and L2), convergence against the residual tolerance, kinetic/mechanical energy drift, unsupported collider counts, and fail-closed fallback status."
+backends:
+  - cpu_reference
+metrics:
+  - "quality_error_l2"
+  - "runtime_ms"
+correctness_tests:
+  - "../../../tests/unit/physics/Test.XpbdClothReference.cpp"
+benchmarks:
+  - "../../../benchmarks/physics/manifests/xpbd_cloth_reference_smoke.yaml"
+known_limitations:
+  - "The reference solver is correctness-first and deterministic; it makes no runtime performance claim."
+  - "Bending uses opposite-vertex distance constraints across interior edges, not dihedral-angle constraints; shells with strong curvature response need a future dihedral extension."
+  - "Collision inputs are method parameters only: static half-space planes are projected inelastically; sphere colliders are declared but unsupported and reported via UnsupportedColliderCount. No self-collision, no friction."
+  - "Position-based dynamics dissipates energy by construction; mechanical energy drift diagnostics track kinetic + gravitational terms only (no elastic energy term for hard constraints)."
+  - "No volumetric soft-body FEM, no strain limiting, no runtime/ECS/renderer integration; engine integration requires separate physics/runtime tasks."

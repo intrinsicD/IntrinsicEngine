@@ -6,16 +6,17 @@ without requiring them to read every file.
 
 ## Canonical sources
 
-- [GRAPHICS-001 — Rendering parity inventory and task index](../../done/GRAPHICS-001-rendering-parity-inventory.md)
-  is the retired parity seed that originally opened and ordered
+- `GRAPHICS-001` — Rendering parity inventory and task index (retired to
+  `tasks/done/`) is the retired parity seed that originally opened and ordered
   GRAPHICS-002..025. It must not be selected as active backlog work; current
   rendering selection follows this README's DAG.
 - `RORG-031B`, if encountered in older notes, is **historical/superseded
   planning** that has been retired to
-  [`tasks/done/RORG-031B-rendering-pipeline-backlog-seed.md`](../../done/RORG-031B-rendering-pipeline-backlog-seed.md).
+  `tasks/done/RORG-031B-rendering-pipeline-backlog-seed.md`.
   It is not the active implementation path and must not be selected as
   next-active work.
-- [GRAPHICS-083 — Graphics/RHI module implementation splits](../../done/GRAPHICS-083-graphics-rhi-module-implementation-splits.md):
+- `GRAPHICS-083` — Graphics/RHI module implementation splits (retired to
+  `tasks/done/`):
   module-interface hygiene follow-up for promoted graphics, RHI, and Vulkan
   `.cppm` targets found by the 2026-06-06 implementation-body audit. This is a
   mechanical cleanup task only; it must not change rendering, RHI, or backend
@@ -40,6 +41,10 @@ priority.
   descriptor, swapchain/image, scene-instance, or CUDA implementation.
 
 ## Dependency DAG
+
+<!-- state-link-guard: allow-done-links -->
+<!-- The DAG interleaves done prerequisites with open work by design
+     (PROC-008 explicit exemption); done-links here stay navigable. -->
 
 The following list is the minimum dependency order for the rendering backlog.
 Each entry lists the upstream tasks that must be complete (or explicitly

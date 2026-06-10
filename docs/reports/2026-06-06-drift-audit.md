@@ -38,7 +38,7 @@ repo state*.
 
 ## Follow-ups
 
-- Row 7 → [`HARDEN-078 — Track or resolve untracked TODO / temporary markers in promoted src`](../../tasks/backlog/architecture/HARDEN-078-track-untracked-todo-temporary-markers.md).
+- Row 7 → [`HARDEN-078 — Track or resolve untracked TODO / temporary markers in promoted src`](../../tasks/done/HARDEN-078-track-untracked-todo-temporary-markers.md).
   Records an owning task ID for the `GetStreamingGraph()` temporary bridge and
   resolves/tracks the `Core.Filesystem` TODO. Remediation is **not** done in
   this audit.

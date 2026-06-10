@@ -1,0 +1,32 @@
+id: physics.particle_spring_reference
+name: Particle and Mass-Spring Dynamics Reference Backend
+domain: physics
+status: reference
+paper:
+  title: "Physically Based Modeling: Principles and Practice — Particle System Dynamics"
+  authors: "Andrew Witkin, David Baraff"
+  year: 2001
+  doi: ""
+  url: "https://www.cs.cmu.edu/~baraff/pbm/pbm.html"
+inputs:
+  - "Particle states with position, velocity, and inverse mass (inverse mass 0 pins a particle)."
+  - "Spring records with particle index pair, rest length, Hooke stiffness, and axial damping coefficient."
+  - "Step parameters: fixed delta time, gravity, and global linear damping."
+outputs:
+  - "Reference particle states after deterministic semi-implicit Euler integration of gravity, spring, and axial spring-damping forces."
+  - "Diagnostics for validation status, pinned/degenerate counts, post-step spring residuals, kinetic/total energy drift, stiffness-vs-timestep stability ratio, and fail-closed fallback status."
+backends:
+  - cpu_reference
+metrics:
+  - "quality_error_l2"
+  - "runtime_ms"
+correctness_tests:
+  - "../../../tests/unit/physics/Test.ParticleSpringReference.cpp"
+benchmarks:
+  - "../../../benchmarks/physics/manifests/particle_spring_reference_smoke.yaml"
+known_limitations:
+  - "The reference integrator is correctness-first and deterministic; it makes no runtime performance claim."
+  - "Springs are linear Hooke elements with axial damping only: no bending, area, volume, shear, or strain-limit constraints (cloth-specific models are owned by METHOD-010)."
+  - "No collision handling of any kind; particles pass through each other and through any geometry."
+  - "Explicit semi-implicit Euler is conditionally stable: springs with omega * dt >= 2 are reported via MaxStiffnessDtRatio/StabilityLimitExceeded, and a non-finite post-step state fails closed to the input state with FallbackApplied set."
+  - "Coincident particles joined by a spring have an undefined force direction; the spring force is skipped for the step and counted in DegenerateSpringCount."

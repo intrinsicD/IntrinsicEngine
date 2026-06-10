@@ -263,7 +263,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] const std::optional<PrimitiveSelectionResult>&
             GetLastRefinedPrimitiveSelection() const noexcept;
         [[nodiscard]] Core::FrameGraph&       GetFrameGraph()    noexcept;
-        [[deprecated("Use Runtime.StreamingExecutor integration; TaskGraph bridge is temporary.")]]
+        [[deprecated("Use Runtime.StreamingExecutor integration; TaskGraph bridge is temporary, removal owned by RUNTIME-105.")]]
         [[nodiscard]] Core::Dag::TaskGraph&   GetStreamingGraph() noexcept;
 
         // ── GRAPHICS-036C — pipelined-frames render-world pool ────────────

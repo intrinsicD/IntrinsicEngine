@@ -6,7 +6,7 @@
 ## Non-goals
 - Do not delete or migrate any code under `src/legacy/` in this task. Allowlist rebinding only.
 - Do not relax any layering rule. The set of allowlisted edges must remain identical (same `from`, `to`, `file_glob`) before and after this change.
-- Do not author the per-subtree LEGACY-* retirement tasks here. That work belongs to [`LEGACY-002`](../backlog/architecture/LEGACY-002-seed-src-legacy-retirement-backlog.md) and any per-subtree successors.
+- Do not author the per-subtree LEGACY-* retirement tasks here. That work belongs to [`LEGACY-002`](LEGACY-002-seed-src-legacy-retirement-backlog.md) and any per-subtree successors.
 - Do not change the layering checker scripts.
 
 ## Context
