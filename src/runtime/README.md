@@ -276,7 +276,9 @@ introduced.
 
 `Extrinsic.Runtime.StreamingExecutor` is the primary persistent async streaming
 execution path. `Engine` still carries a temporary compatibility bridge for
-legacy `GetStreamingGraph()` producers while migration is in progress.
+legacy `GetStreamingGraph()` producers while migration is in progress; the
+bridge's removal is owned by `RUNTIME-105`
+(`tasks/backlog/runtime/RUNTIME-105-remove-streaming-graph-bridge.md`).
 
 Shutdown order requirement:
 

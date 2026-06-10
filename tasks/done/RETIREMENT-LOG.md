@@ -9,6 +9,22 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`HARDEN-078`](HARDEN-078-track-untracked-todo-temporary-markers.md) —
+track or resolve untracked TODO / temporary markers in promoted src —
+retired to `tasks/done/` on 2026-06-10 at maturity `Retired` (pure marker
+hygiene). The `Core.Filesystem` dead commented `CallbackRegistry` import
+and bare TODO were resolved by decision (a): watchers keep explicit
+per-watch `ChangeCallback` injection (the already-implemented behavior),
+recorded as a short policy note; no behavior change. The
+`Engine::GetStreamingGraph()` temporary TaskGraph bridge now has a
+tracked removal owner per `AGENTS.md` §13: the new `RUNTIME-105` backlog
+task (the promoted tree already has zero bridge consumers), named in both
+the `[[deprecated(...)]]` message and the runtime README streaming note.
+The drift-audit Row 7 greps over `src/core/**` and `src/runtime/**`
+return only task-ID-tracked markers. Default CPU gate green at
+retirement.
+
+Backlog
 [`RORG-031A`](RORG-031A-architecture-foundation.md) — architecture
 foundation backlog seed — retired to `tasks/done/` on 2026-06-10. The
 seed's job was converting the legacy living backlog's architecture items

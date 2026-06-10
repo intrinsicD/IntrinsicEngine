@@ -23,10 +23,6 @@ map.
 - [LEGACY-002 — Seed retirement tasks for remaining `src/legacy/` subtrees](LEGACY-002-seed-src-legacy-retirement-backlog.md):
   opens one structured `LEGACY-*` retirement task per remaining legacy subtree
   so allowlist entries and migration docs can point at concrete removal owners.
-- [HARDEN-078 — Track or resolve untracked TODO / temporary markers in promoted src](HARDEN-078-track-untracked-todo-temporary-markers.md):
-  drift-audit Row 7 follow-up — gives the `Core.Filesystem` TODO and the
-  `Runtime.Engine::GetStreamingGraph()` temporary bridge a tracked owner per
-  `AGENTS.md` §13.
 
 ## Legacy retirement
 
@@ -162,7 +158,7 @@ split; narratives live in the retirement log.
   naming inconsistency, and ran the first calibration
   ([`docs/reports/2026-06-06-drift-audit.md`](../../../docs/reports/2026-06-06-drift-audit.md),
   ≈ 20 min). Eight rows clean; Row 7 (untracked TODO/temporary markers) filed
-  the follow-up `HARDEN-078`.
+  the follow-up `HARDEN-078` (done 2026-06-10).
 - [HARDEN-079 — Core module implementation splits](../../done/HARDEN-079-core-module-implementation-splits.md):
   module-interface hygiene follow-up for promoted `src/core/*.cppm` targets
   found by the 2026-06-06 implementation-body audit, including
@@ -178,3 +174,7 @@ split; narratives live in the retirement log.
   (done, 2026-06-10): the architecture backlog is fully structured and the
   layering/docs-sync/module-inventory governance tooling runs in CI; the
   seed retired once its tracked work existed as independent tasks.
+- [HARDEN-078 — Track or resolve untracked TODO / temporary markers in promoted src](../../done/HARDEN-078-track-untracked-todo-temporary-markers.md)
+  (done, 2026-06-10): resolved the `Core.Filesystem` dead-import TODO with an
+  explicit per-watch callback policy and gave the `GetStreamingGraph()`
+  temporary bridge its tracked removal owner `RUNTIME-105`.

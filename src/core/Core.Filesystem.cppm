@@ -13,7 +13,9 @@ module;
 export module Extrinsic.Core.Filesystem;
 
 import Extrinsic.Core.Hash;
-//import Extrinsic.Core.CallbackRegistry; //TODO: Should the Filewatcher use the CallbaclRegistry? own one itself, or dependency injection? Im unsure...
+// Filewatcher callback policy (HARDEN-078): watchers take an explicit
+// per-watch ChangeCallback (dependency injection); no CallbackRegistry
+// coupling - core stays dependency-light and consumers own any fan-out.
 
 namespace Extrinsic::Core::Filesystem
 {

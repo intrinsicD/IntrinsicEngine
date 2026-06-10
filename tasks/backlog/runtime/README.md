@@ -17,6 +17,9 @@ another backlog directory.
   conditional runtime-owned persistent overlay descriptors, stable keys, parent
   closure, and extraction packet production when existing packet lanes are not
   sufficient.
+- [RUNTIME-105 — Remove the deprecated GetStreamingGraph() TaskGraph bridge](RUNTIME-105-remove-streaming-graph-bridge.md):
+  pure bridge deletion opened by `HARDEN-078`; the promoted tree already has
+  zero consumers outside the Engine bridge itself.
 
 ### Runtime adapter umbrellas (clarified by Q tasks; producer modules)
 

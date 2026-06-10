@@ -15,7 +15,6 @@ the authoritative open/unblocked view.
 - unblocked: `GRAPHICS-084` — Visualization property-buffer residency (tasks/backlog/rendering/GRAPHICS-084-visualization-property-buffer-residency.md)
 - unblocked: `GRAPHICS-085` — Overlay packet backend parity (tasks/backlog/rendering/GRAPHICS-085-overlay-packet-backend-parity.md)
 - unblocked: `GRAPHICS-086` — RHI retirement parity and CUDA decision (tasks/backlog/rendering/GRAPHICS-086-rhi-retirement-parity-and-cuda-decision.md)
-- unblocked: `HARDEN-078` — Track or resolve untracked TODO / temporary markers in promoted src (tasks/backlog/architecture/HARDEN-078-track-untracked-todo-temporary-markers.md)
 - unblocked: `INFRA-001` — Move third-party dependencies to a vcpkg manifest (tasks/backlog/architecture/INFRA-001-vcpkg-manifest-mode.md)
 - unblocked: `LEGACY-001` — Delete `src/legacy/Interface/` (tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md)
 - unblocked: `LEGACY-002` — Seed retirement tasks for remaining `src/legacy/` subtrees (tasks/backlog/architecture/LEGACY-002-seed-src-legacy-retirement-backlog.md)
@@ -32,6 +31,7 @@ the authoritative open/unblocked view.
 - unblocked: `RUNTIME-101` — Asset ingest state-machine migration (tasks/backlog/runtime/RUNTIME-101-asset-ingest-state-machine.md)
 - unblocked: `RUNTIME-103` — Geometry algorithm execution queue (tasks/backlog/runtime/RUNTIME-103-geometry-algorithm-execution-queue.md)
 - unblocked: `RUNTIME-104` — Derived overlay producer lifecycle (tasks/backlog/runtime/RUNTIME-104-derived-overlay-producer-lifecycle.md)
+- unblocked: `RUNTIME-105` — Remove the deprecated GetStreamingGraph() TaskGraph bridge (tasks/backlog/runtime/RUNTIME-105-remove-streaming-graph-bridge.md)
 
 ## Unthemed
 
