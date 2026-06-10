@@ -6,7 +6,7 @@ depends_on: []
 # LEGACY-001 — Delete `src/legacy/Interface/`
 
 ## Goal
-- [ ] Remove the three-file `src/legacy/Interface/` subtree (`Gui.cpp`, `Gui.cppm`, `Interface.cppm`, `CMakeLists.txt`) from the repository as a single mechanical commit, retire its `add_subdirectory` entry from the top-level CMake graph, and drop any layering-allowlist rows that were granted only for this subtree.
+- [ ] Remove the four-file `src/legacy/Interface/` subtree (`Gui.cpp`, `Gui.cppm`, `Interface.cppm`, `CMakeLists.txt`) from the repository as a single mechanical commit, retire its `add_subdirectory` entry from the top-level CMake graph, and drop any layering-allowlist rows that were granted only for this subtree.
 - [ ] Land the first concrete deletion that retires part of `src/legacy/` from the engine, proving the legacy-retirement program documented in [`ARCH-004`](../../done/ARCH-004-legacy-retirement-first-deletion-target.md) is operational.
 
 ## Non-goals
@@ -27,7 +27,7 @@ depends_on: []
 - Layering allowlist (`tools/repo/layering_allowlist.yaml`) carries grandfathered entries for legacy modules. Drop only rows whose key path begins with `src/legacy/Interface/`.
 
 ## Required changes
-- [ ] (Prerequisite, verified before this task is moved to `tasks/active/`) Run the consumer-grep gate in the Verification section and confirm it exits 0 with `OK: no external consumers ...`. The gate must fail loudly when any match outside `src/legacy/Interface/**` is found; `git grep` exits 0 on match, so the verification block inverts that. Today (2026-06-07) the gate still fails across remaining legacy graphics/runtime consumers and `tests/contract/ui/Test_PanelRegistration.cpp`. The legacy Sandbox and legacy EditorUI consumers retired under `LEGACY-003` and `LEGACY-007`; remaining consumers must migrate to the promoted platform/app entry points. Record the empty grep output in the commit message as evidence the prerequisite passed.
+- [ ] (Prerequisite, verified before this task is moved to `tasks/active/`) Run the consumer-grep gate in the Verification section and confirm it exits 0 with `OK: no external consumers ...`. The gate must fail loudly when any match outside `src/legacy/Interface/**` is found; `git grep` exits 0 on match, so the verification block inverts that. Today (2026-06-10) the gate still fails across remaining legacy graphics/runtime consumers and `tests/contract/ui/Test_PanelRegistration.cpp`. The legacy Sandbox and legacy EditorUI consumers retired under `LEGACY-003` and `LEGACY-007`; remaining consumers must migrate to the promoted platform/app entry points. Record the empty grep output in the commit message as evidence the prerequisite passed.
 - [ ] Delete the four files under `src/legacy/Interface/`.
 - [ ] Remove the corresponding `add_subdirectory(${INTRINSIC_LEGACY_INTERFACE_SOURCE_ROOT})` line and the `INTRINSIC_LEGACY_INTERFACE_SOURCE_ROOT` variable assignment from `CMakeLists.txt`.
 - [ ] Drop the allowlist rows in `tools/repo/layering_allowlist.yaml` whose key begins with `src/legacy/Interface/`.
@@ -62,11 +62,13 @@ depends_on: []
 # check must invert that to block promotion. Record the (empty) output
 # in the commit message as evidence the prerequisite passed.
 #
-# Today (2026-05-16) this gate fails: ~248 matches across files including
-# src/legacy/Apps/Sandbox/main.cpp, src/legacy/Graphics/Graphics.RenderDriver.cpp,
-# src/legacy/Runtime/*, and
-# tests/contract/ui/Test_PanelRegistration.cpp. The gate stays failing
-# until consumers migrate to the promoted platform/app entry points.
+# Today (2026-06-10) this gate fails: 81 matches across
+# src/legacy/Graphics/* (RenderDriver, DebugView/ImGui passes),
+# src/legacy/Runtime/* (Engine, RenderOrchestrator), and
+# tests/contract/ui/Test_PanelRegistration.cpp. The legacy Sandbox consumer
+# retired with LEGACY-003. The gate stays failing until the remaining
+# consumers migrate to the promoted platform/app entry points or retire
+# with their owning subtrees (LEGACY-008/LEGACY-010, LEGACY-012 for tests).
 if git grep -nE 'import\s+Interface\b|Interface::GUI|#include\s*"Interface' \
        -- 'src/**' 'tests/**' ':!src/legacy/Interface/**'; then
     echo "ERROR: src/legacy/Interface/ consumers remain outside the doomed subtree." >&2
@@ -95,3 +97,8 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 - Disabling tests or sanitizer workflows to make this commit green.
 - Removing more than the `Interface/` subtree.
 - Promoting this task to `tasks/active/` before the consumer-grep prerequisite is satisfied per `ARCH-004`.
+
+## Maturity
+- Target: `Retired` (mechanical deletion of the legacy subtree).
+- No `Operational` follow-up is owed; promoted ownership lives in `src/platform/` (window/input ports) and `src/app/Sandbox` (UI shell). See `docs/migration/nonlegacy-parity-matrix.md` for the feature-by-feature map.
+- The consumer-grep gate in Verification must exit 0 before this task is promoted to `tasks/active/`; until then the remaining consumers are owned by `LEGACY-008`/`LEGACY-010` (legacy subtrees) and `LEGACY-012` (test consumers).

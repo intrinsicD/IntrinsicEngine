@@ -115,3 +115,12 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 - Removing more than the `ECS/` subtree.
 - Promoting this task to `tasks/active/` before the consumer-grep prerequisite
   is satisfied.
+
+## Maturity
+- Target: `Retired` (mechanical deletion of the legacy subtree).
+- No `Operational` follow-up is owed; promoted ownership lives in `src/ecs/`
+  (scene/hierarchy/component parity retired under Theme D, `HARDEN-060..068`
+  and `HARDEN-081`; see `docs/migration/nonlegacy-parity-matrix.md`).
+- The consumer-grep gate in Verification must exit 0 before this task is
+  promoted to `tasks/active/`; today the remaining consumers live in
+  `src/legacy/Graphics/` and `src/legacy/Runtime/`.

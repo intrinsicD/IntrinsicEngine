@@ -1,7 +1,7 @@
 ---
 id: RUNTIME-101
 theme: F
-depends_on: []
+depends_on: [RUNTIME-099]
 ---
 # RUNTIME-101 — Asset ingest state-machine migration
 
@@ -64,4 +64,9 @@ python3 tools/docs/check_doc_links.py --root .
 
 ## Maturity
 - Target: `CPUContracted` for the ingest state machine; representative CPU/null import coverage is retired by `ASSETIO-004`.
-- no `Operational` follow-up is owed for RUNTIME-101; broader file-backed GPU/readback proof requires a future value-gated task outside this ingest-state-machine scope.
+- No `Operational` follow-up is owed for RUNTIME-101; broader file-backed GPU/readback proof requires a future value-gated task outside this ingest-state-machine scope.
+
+## Slice plan
+- **Slice A — state machine and taxonomy.** Define the ingest request/result state machine (manual import, drag/drop, reimport, cancellation, duplicate requests, main-thread apply) and the diagnostics taxonomy, with `contract;runtime` transition tests. Defers entry-point wiring to Slice B.
+- **Slice B — entry-point wiring.** Route `Engine::ImportDroppedFilePaths(...)` and the manual import surface through the state machine over existing asset bridges; `integration;runtime` drag/drop and reimport tests through `StreamingExecutor`. Preserves the default CPU gate.
+- **Slice C — reimport policy and lifecycle drain.** Reimport semantics for existing asset IDs/scene entities, stale/duplicate completion regression tests, and streaming-completion drain in the `RUNTIME-099` lifecycle order.

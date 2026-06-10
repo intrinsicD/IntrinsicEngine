@@ -13,7 +13,7 @@ the authoritative open/unblocked view.
 ## Theme F — Architecture/runtime/UI foundation seeds
 
 - unblocked: `GRAPHICS-084` — Visualization property-buffer residency (tasks/backlog/rendering/GRAPHICS-084-visualization-property-buffer-residency.md)
-- unblocked: `GRAPHICS-085` — Overlay packet backend parity (tasks/backlog/rendering/GRAPHICS-085-overlay-packet-backend-parity.md)
+- blocked by `RUNTIME-104`: `GRAPHICS-085` — Overlay packet backend parity (tasks/backlog/rendering/GRAPHICS-085-overlay-packet-backend-parity.md)
 - unblocked: `GRAPHICS-086` — RHI retirement parity and CUDA decision (tasks/backlog/rendering/GRAPHICS-086-rhi-retirement-parity-and-cuda-decision.md)
 - unblocked: `INFRA-001` — Move third-party dependencies to a vcpkg manifest (tasks/backlog/architecture/INFRA-001-vcpkg-manifest-mode.md)
 - unblocked: `LEGACY-001` — Delete `src/legacy/Interface/` (tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md)
@@ -26,6 +26,7 @@ the authoritative open/unblocked view.
 - unblocked: `LEGACY-011` — Value-gated legacy feature reimplementation map (tasks/backlog/architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md)
 - blocked by `LEGACY-011`: `LEGACY-012` — Migrate legacy consumer tests to promoted coverage (tasks/backlog/architecture/LEGACY-012-migrate-legacy-consumer-tests.md)
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
+- unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RORG-031F` — UI integration backlog seed (tasks/backlog/ui/RORG-031-ui-integration.md)
 - unblocked: `RUNTIME-101` — Asset ingest state-machine migration (tasks/backlog/runtime/RUNTIME-101-asset-ingest-state-machine.md)
 - unblocked: `RUNTIME-103` — Geometry algorithm execution queue (tasks/backlog/runtime/RUNTIME-103-geometry-algorithm-execution-queue.md)
@@ -41,14 +42,15 @@ the authoritative open/unblocked view.
 - unblocked: `GEOM-018` — Parameterization distortion and map-quality diagnostics (tasks/backlog/geometry/GEOM-018-parameterization-distortion-map-quality-diagnostics.md)
 - blocked by `GEOM-018`: `GEOM-019` — Harmonic/Tutte parameterization and boundary constraints (tasks/backlog/geometry/GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md)
 - unblocked: `GEOM-020` — Sparse direct factorization solver seam (LDLT/LLT) (tasks/backlog/geometry/GEOM-020-sparse-direct-factorization-seam.md)
-- unblocked: `METHOD-002` — Signed Heat Method reference backend (tasks/backlog/methods/METHOD-002-signed-heat-method-reference-backend.md)
-- unblocked: `METHOD-003` — Closest Point Method PDE solver reference backend (tasks/backlog/methods/METHOD-003-closest-point-method-pde-reference-backend.md)
+- unblocked: `GEOM-023` — Sparse non-symmetric iterative solver seam (BiCGSTAB) (tasks/backlog/geometry/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md)
+- blocked by `GEOM-020`: `GEOM-024` — Sparse symmetric generalized eigensolver seam (tasks/backlog/geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
+- blocked by `GEOM-020`: `METHOD-002` — Signed Heat Method reference backend (tasks/backlog/methods/METHOD-002-signed-heat-method-reference-backend.md)
+- blocked by `GEOM-023`: `METHOD-003` — Closest Point Method PDE solver reference backend (tasks/backlog/methods/METHOD-003-closest-point-method-pde-reference-backend.md)
 - unblocked: `METHOD-004` — Walk on Spheres / Walk on Stars PDE solver reference backend (tasks/backlog/methods/METHOD-004-walk-on-spheres-reference-backend.md)
 - unblocked: `METHOD-005` — Robust mesh boolean reference backend (tasks/backlog/methods/METHOD-005-robust-mesh-boolean-reference-backend.md)
-- unblocked: `METHOD-006` — Cross-field / frame-field design reference backend (tasks/backlog/methods/METHOD-006-cross-field-design-reference-backend.md)
+- blocked by `GEOM-024`: `METHOD-006` — Cross-field / frame-field design reference backend (tasks/backlog/methods/METHOD-006-cross-field-design-reference-backend.md)
 - unblocked: `METHOD-007` — Constrained Delaunay tetrahedralization reference backend (tasks/backlog/methods/METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md)
-- blocked by `METHOD-005`: `METHODS-001` — Pin signed heat as methods-pipeline pathfinder (tasks/backlog/methods/METHODS-001-signed-heat-pathfinder.md)
-- unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
+- unblocked: `METHODS-001` — Pin signed heat as methods-pipeline pathfinder (tasks/backlog/methods/METHODS-001-signed-heat-pathfinder.md)
 
 ## Audits
 

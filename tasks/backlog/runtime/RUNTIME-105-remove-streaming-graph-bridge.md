@@ -20,6 +20,12 @@ depends_on: []
 - No `src/legacy/` edits (legacy callers retire with their subtrees under
   `LEGACY-001..010`).
 
+## Value gate
+
+- Not applicable: this is a pure dead-code bridge removal. The promoted tree
+  already has zero callers, so there is no workflow comparison to run; the
+  only value question is keeping the §13 temporary-exception ledger honest.
+
 ## Context
 
 - Owner/layer: `runtime` (`src/runtime/Runtime.Engine.cppm` /

@@ -70,3 +70,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Do not introduce renderer/runtime/ECS/assets/platform/app dependencies.
 - Do not claim performance improvements without a baseline comparison.
 
+## Maturity
+- Target: `CPUContracted` (diagnostics pack consumed by GEOM-019 and later parameterization solvers).
+- No `Operational` follow-up is owed; this task has no backend seam.
+

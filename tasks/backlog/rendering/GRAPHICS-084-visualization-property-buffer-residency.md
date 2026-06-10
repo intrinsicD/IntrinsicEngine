@@ -1,7 +1,7 @@
 ---
 id: GRAPHICS-084
 theme: F
-depends_on: []
+depends_on: [RUNTIME-083]
 ---
 # GRAPHICS-084 — Visualization property-buffer residency
 
@@ -18,6 +18,7 @@ depends_on: []
 - Owner/layer: `graphics` consumes immutable packet data and owns GPU upload/residency; runtime owns property selection and supplies copied metadata/snapshot inputs.
 - `RUNTIME-083` produces visualization adapter packets that currently rely on externally supplied buffer-device addresses. `UI-005` explicitly deferred graphics-owned residency for property arrays until current visualization workflows justify selected domains and types.
 - Reuse `Graphics.VisualizationOverlayUploadHelper`, `Graphics.GpuWorld` managed buffers, `Graphics.GpuAssetCache` retire patterns, frame-anchored deferred destruction, and existing visualization packet validation.
+- Current promoted packet surface (`Graphics.VisualizationPackets`): scalar-attribute, color-attribute, and vector-field overlay packets validated by `ValidateVisualizationPackets()`. The consuming workflows are the `UI-005` visualization presets (scalar, isoline, color-buffer), which bounds the property domains/types the inventory step should retain.
 
 ## Value gate
 - Current state: UI and runtime can select visualization properties, but current packets rely on externally supplied GPU addresses for some property-array workflows.
@@ -64,4 +65,10 @@ python3 tools/docs/check_doc_links.py --root .
 - Adding a second visualization packet validation system.
 
 ## Maturity
-- Target: `CPUContracted`; `Operational` GPU/Vulkan proof is required before claiming visual backend parity.
+- Target: `Operational` on Vulkan-capable hosts via the opt-in `gpu;vulkan` smoke in Slice C; `CPUContracted` everywhere else.
+- Slices A–B stop at `CPUContracted`; visual backend parity must not be claimed from them alone. If Slice C is descoped during implementation, re-target this task to `CPUContracted` and name the follow-up `Operational` owner here before retiring.
+
+## Slice plan
+- **Slice A — descriptor and validation contract.** Define the backend-neutral upload descriptor (element count, stride/type, domain, dirty stamp, diagnostic source key) plus fail-closed validation diagnostics, with CPU/null `contract;graphics` tests. Defers upload policy and packet publication to Slice B.
+- **Slice B — residency and packet publication.** Retained/per-frame upload policy through `Graphics.GpuWorld` managed buffers reusing `Graphics.VisualizationOverlayUploadHelper` patterns; publish stable buffer addresses/handles into visualization packets; `integration;runtime;graphics` binding tests. Preserves the default CPU gate.
+- **Slice C — backend proof.** Opt-in `gpu;vulkan` visualization smoke proving graphics-owned buffer-address consumption on a Vulkan-capable host.

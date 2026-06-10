@@ -124,3 +124,13 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 - Removing more than the `Runtime/` subtree.
 - Promoting this task to `tasks/active/` before the consumer-grep prerequisite
   is satisfied.
+
+## Maturity
+- Target: `Retired` (mechanical deletion of the legacy subtree).
+- No `Operational` follow-up is owed; promoted ownership lives in
+  `src/runtime/` (see `docs/migration/nonlegacy-parity-matrix.md`). Remaining
+  feature candidates that survive the value gate are owned by the
+  `LEGACY-011` map and its runtime children (`RUNTIME-101/103/104`), not by
+  this task; legacy-importing tests are owned by `LEGACY-012`.
+- The consumer-grep gate in Verification must exit 0 before this task is
+  promoted to `tasks/active/`.

@@ -19,14 +19,14 @@ depends_on: []
 - Owning subsystem/layer: `geometry` and `methods/geometry`.
 - Method package: `methods/geometry/constrained_delaunay_tet/`.
 - Seeded by [`docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md`](../../../docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md) Tier 1 #4.
-- **Hard prerequisite:** [`GEOM-007`](../../done/GEOM-007-robust-predicates-intersection-classification.md) (robust 3D orientation + insphere predicates).
+- **Hard prerequisite:** [`GEOM-007`](../../done/GEOM-007-robust-predicates-intersection-classification.md) (robust 3D orientation + insphere predicates). GEOM-007 retired 2026-05-27, so the prerequisite is satisfied and this task is unblocked.
 - Closes the P1 "volumetric and cell-complex containers" gap from `docs/reviews/2026-05-12-src-geometry-gap-analysis.md`.
 
 ## Variants and default selection
 
 Mark `[x]` next to the variant that should be the **public-facing default backend**. Unmarked variants become opt-in capabilities or follow-up tasks.
 
-- [ ] **A — Constrained Delaunay Tetrahedrization: A Robust and Practical Approach (Diazzi, Panozzo, Jacobson, Attene; arXiv:2309.09805).** Achieves 100% success on the 4408 valid Thingi10k models. Recommended default — best robustness story without TetGen's GPL or fTetWild's heavier pipeline.
+- [x] **A — Constrained Delaunay Tetrahedrization: A Robust and Practical Approach (Diazzi, Panozzo, Jacobson, Attene; arXiv:2309.09805).** Achieves 100% success on the 4408 valid Thingi10k models. **Selected as the default per the recommendation below** — best robustness story without TetGen's GPL or fTetWild's heavier pipeline.
 - [ ] **B — fTetWild (Hu, Schneider, Wang, Zorin, Panozzo; TOG 2020).** Floating-point tet-wild successor; very robust, produces high-quality tets, larger code surface and floating-point optimisation loop. Pick if mesh quality matters more than the build's strict reproducibility.
 - [ ] **C — TetGen-style incremental CDT (Si, ACM TOMS 2015).** Mature classical algorithm. **License caveat:** TetGen is AGPL; only viable if the engine ships an independent re-implementation, not a wrapper.
 
@@ -114,3 +114,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - No quality-driven refinement loop in this task (separate follow-up).
 - No FEM solver coupling.
 - No coupling to `runtime` / `graphics` / `ecs` / `assets` / `platform`.
+
+## Maturity
+- Target: `CPUContracted`. The CPU reference backend and `Geometry.TetMesh` container are the correctness oracle for any later optimized/GPU backend.
+- No `Operational` follow-up is owed by this task; optimized CPU and GPU backends open as separate method tasks per `AGENTS.md` §6 once reference parity exists.

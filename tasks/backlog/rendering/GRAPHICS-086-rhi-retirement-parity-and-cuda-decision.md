@@ -18,6 +18,8 @@ depends_on: []
 - Owner/layer: `graphics/rhi -> core`, `graphics/vulkan -> core + graphics/rhi + backend-local Vulkan dependencies`.
 - The parity matrix lists backend shader compilation, explicit swapchain/image ownership, command helper parity, persistent descriptor policy, CUDA device/error behavior, and scene-instance convenience APIs as unproven or open decisions.
 - Existing promoted pieces include `RHI.CommandContext`, `RHI.Descriptors`, `RHI.Bindless`, `RHI.TextureManager`, `RHI.TransferQueue`, `RHI.PipelineManager`, `RHI.PipelineRegistry`, `RHI.QueueAffinity`, `RHI.TimelineSemaphore`, `Backends.Vulkan.*`, and `GRAPHICS-037D` multi-queue recording.
+- Inventory ground truth (2026-06-10): legacy modules with **no** promoted equivalent are `RHI.SceneInstances` (scene-instance convenience APIs), `RHI.CudaDevice`, and `RHI.CudaError`. No promoted graphics or runtime module imports CUDA today; `INTRINSIC_ENABLE_CUDA` (default `OFF`) only gates the legacy CUDA modules. The audit step below confirms and completes this list rather than starting from scratch.
+- `RUNTIME-103` (geometry algorithm execution queue) defers its optional CUDA K-Means backend decision to this task; the CUDA decision here must name the consumer story it accepts or retires.
 
 ## Value gate
 - Current state: promoted RHI/Vulkan already expose command contexts, descriptors, bindless resources, transfers, pipelines, queue affinity, timeline semaphores, and backend-local Vulkan modules.
@@ -28,7 +30,10 @@ depends_on: []
 - [ ] Inventory legacy `src/legacy/RHI/**` modules against promoted RHI/Vulkan modules and tests.
 - [ ] Decide for each gap whether promoted coverage already exists, a narrow implementation task is needed, or the behavior is retired.
 - [ ] Add missing CPU/null contract tests for command helper parity, persistent descriptor semantics, swapchain/image state ownership, and scene-instance convenience replacement if needed.
-- [ ] Decide CUDA: remove as legacy-only, promote an optional `INTRINSIC_ENABLE_CUDA` backend seam, or defer to a compute-specific follow-up with task ID.
+- [ ] Decide CUDA with rationale recorded in the parity matrix, choosing exactly one:
+      (a) **remove** — record that no promoted compute seam is owed (deletion itself stays with `LEGACY-009`) and update `RUNTIME-103`'s deferral note;
+      (b) **promote** — port a minimal `INTRINSIC_ENABLE_CUDA`-gated device/error seam into `src/graphics/rhi/` with opt-in skip-safe tests, and name the follow-up task that owns `Operational` proof;
+      (c) **defer** — open a compute-backend follow-up task gated on `RUNTIME-103` identifying a real workload, and record its ID in the parity matrix.
 - [ ] Update `LEGACY-009` prerequisites with any remaining concrete blockers.
 
 ## Tests

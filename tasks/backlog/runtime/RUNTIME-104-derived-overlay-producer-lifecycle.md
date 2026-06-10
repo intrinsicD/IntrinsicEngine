@@ -67,3 +67,8 @@ python3 tools/docs/check_doc_links.py --root .
 
 ## Maturity
 - Target: `CPUContracted` for runtime overlay lifecycle; `Operational` backend proof is owned by `GRAPHICS-085`.
+
+## Slice plan
+- **Slice A — decision gate.** Compare existing transient debug, visualization, primitive-view, and selection lanes against each legacy overlay class and classify every class as retained (with the runtime-owned need), representable by an existing lane, or retired. The classification is the input `GRAPHICS-085` scopes against.
+- **Slice B — descriptors and lifecycle APIs.** For retained classes only: overlay descriptors, stable keys, create/update/destroy APIs with parent closure, transform inheritance, selection eligibility, and dirty-domain stamps, with `contract;runtime` tests. Preserves the default CPU gate.
+- **Slice C — extraction wiring.** Route retained overlays through extraction packet lanes into `RuntimeRenderSnapshotBatch`, preserve the vector-field parent/child destruction invariants, and land the regression tests. Backend consumption proof stays with `GRAPHICS-085`.

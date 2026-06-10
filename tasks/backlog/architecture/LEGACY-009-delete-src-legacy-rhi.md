@@ -115,3 +115,16 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 - Removing more than the `RHI/` subtree.
 - Promoting this task to `tasks/active/` before the consumer-grep prerequisite
   is satisfied.
+
+## Maturity
+- Target: `Retired` (mechanical deletion of the legacy subtree).
+- No `Operational` follow-up is owed by this deletion; promoted ownership
+  lives in `src/graphics/rhi/` and `src/graphics/vulkan/` (see
+  `docs/migration/nonlegacy-parity-matrix.md`). The remaining parity audit —
+  command helpers, persistent descriptors, swapchain/image state,
+  scene-instance convenience, and the CUDA decision — is owned by
+  `GRAPHICS-086`, which updates this task's prerequisites with any concrete
+  blockers it finds.
+- The consumer-grep gate in Verification must exit 0 before this task is
+  promoted to `tasks/active/`; this deletion is typically coordinated with
+  `LEGACY-008` (legacy Graphics) because the two subtrees import each other.
