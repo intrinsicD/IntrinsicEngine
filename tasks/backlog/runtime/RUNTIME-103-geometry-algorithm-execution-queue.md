@@ -42,7 +42,7 @@ depends_on: []
 - [ ] Regenerate module inventory if public module surfaces change.
 
 ## Acceptance criteria
-- [ ] Runtime has one reusable algorithm execution queue for editor-driven geometry operations.
+- [ ] Runtime has one reusable algorithm execution queue for editor-driven geometry operations, or the value gate records synchronous execution as the intended endpoint with the deciding evidence.
 - [ ] CPU K-Means keeps deterministic outputs and no longer requires legacy `Runtime.PointCloudKMeans`.
 - [ ] CUDA behavior is explicitly retained, deferred, or retired with a named task.
 
@@ -63,4 +63,9 @@ python3 tools/docs/check_doc_links.py --root .
 - Making CUDA a default requirement.
 
 ## Maturity
-- Target: `CPUContracted` for asynchronous CPU execution and apply semantics; optional CUDA `Operational` proof is separate and opt-in.
+- Target: `CPUContracted` for asynchronous CPU execution and apply semantics; optional CUDA `Operational` proof is separate, opt-in, and owned by the task `GRAPHICS-086`'s CUDA decision names.
+
+## Slice plan
+- **Slice A — decision and taxonomy.** Run the value gate against current editor workflows; define the request/result taxonomy (stable target identity, source domain, cancellation, progress, completion, fail-closed diagnostics). If the gate concludes synchronous execution suffices, document that endpoint and stop after Slice A.
+- **Slice B — queue routing and apply semantics.** Move CPU K-Means onto the shared queue, prove parity with the synchronous path, and pin deterministic main-thread apply ordering plus dirty-domain stamping with `contract;runtime` tests.
+- **Slice C — deferred.** CUDA backend integration is not owned here; it follows the `GRAPHICS-086` CUDA decision and its named follow-up task.

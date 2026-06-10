@@ -15,14 +15,18 @@ map.
 ## Tasks
 
 - [METHOD-002 — Signed Heat Method reference backend](METHOD-002-signed-heat-method-reference-backend.md)
-  **(pathfinder method per [METHODS-001](METHODS-001-signed-heat-pathfinder.md))**.
-- [METHOD-003 — Closest Point Method PDE solver reference backend](METHOD-003-closest-point-method-pde-reference-backend.md).
-- [METHOD-004 — Walk on Spheres / Walk on Stars PDE solver reference backend](METHOD-004-walk-on-spheres-reference-backend.md).
+  **(pathfinder method per [METHODS-001](METHODS-001-signed-heat-pathfinder.md))**;
+  gated on `geometry/GEOM-020` (LDLT seam) via `depends_on`.
+- [METHOD-003 — Closest Point Method PDE solver reference backend](METHOD-003-closest-point-method-pde-reference-backend.md)
+  (variant A default; gated on `geometry/GEOM-023` non-symmetric solver seam).
+- [METHOD-004 — Walk on Spheres / Walk on Stars PDE solver reference backend](METHOD-004-walk-on-spheres-reference-backend.md)
+  (variant A default; no solver gate — promotable now).
 - [METHOD-005 — Robust mesh boolean reference backend](METHOD-005-robust-mesh-boolean-reference-backend.md)
-  (hard-gated by `geometry/GEOM-007`).
-- [METHOD-006 — Cross-field / frame-field design reference backend](METHOD-006-cross-field-design-reference-backend.md).
+  (variant A default; `GEOM-007` gate satisfied 2026-05-27 — promotable now).
+- [METHOD-006 — Cross-field / frame-field design reference backend](METHOD-006-cross-field-design-reference-backend.md)
+  (variant B default; gated on `geometry/GEOM-024` eigensolver seam).
 - [METHOD-007 — Constrained Delaunay tetrahedralization reference backend](METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md)
-  (hard-gated by `geometry/GEOM-007`).
+  (variant A default; `GEOM-007` gate satisfied 2026-05-27 — promotable now).
 
 ## Convergence
 
@@ -39,8 +43,9 @@ map.
   [`docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md`](../../../docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md)
   and target gaps from
   [`docs/reviews/2026-05-12-src-geometry-gap-analysis.md`](../../../docs/reviews/2026-05-12-src-geometry-gap-analysis.md).
-  Each task lists explicit algorithm variants and requires the maintainer to mark
-  one as the public-facing default backend before implementation begins.
+  Each task lists explicit algorithm variants with a marked public-facing
+  default backend; changing a default re-opens the corresponding solver-seam
+  gating (see the per-task notes above).
 - Forbidden: importing runtime, graphics, platform, app, or live ECS ownership
   into a method package; claiming performance wins without a baseline.
 
@@ -78,14 +83,16 @@ split; narratives live in the retirement log.
 - Ordering: [`geometry/GEOM-008`](../../done/GEOM-008-linear-algebra-solver-infrastructure.md)
   retired 2026-05-27 at `CPUContracted` shipping the CSR builder + CG /
   shifted-CG iterative solver. The direct sparse SPD factorization
-  (LDLT/LLT) path that METHOD-002 (step 2) and METHOD-003 (step 5)
-  name is owed by the follow-up
+  (LDLT/LLT) path that METHOD-002 (step 2) names is owed by the follow-up
   [`geometry/GEOM-020`](../geometry/GEOM-020-sparse-direct-factorization-seam.md);
-  METHOD-002 and METHOD-003 must wait on `GEOM-020`, not on retired
-  `GEOM-008`. METHOD-004 needs no LDLT path and may proceed against
-  retired `GEOM-008` directly. METHOD-005 and METHOD-007 both wait on
-  [`geometry/GEOM-007`](../../done/GEOM-007-robust-predicates-intersection-classification.md).
-  METHOD-006 step 4 needs a sparse symmetric generalized eigensolver
-  (LOBPCG / shift-invert) which is shipped by neither GEOM-008 nor
-  GEOM-020; a separate eigensolver follow-up must be filed before
-  METHOD-006 can promote on variant B.
+  METHOD-002 must wait on `GEOM-020`, not on retired `GEOM-008`.
+  METHOD-003's variant-A non-symmetric operator waits on
+  [`geometry/GEOM-023`](../geometry/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md).
+  METHOD-004 needs no solver gate and may proceed against retired
+  `GEOM-008` directly. METHOD-005 and METHOD-007 waited on
+  [`geometry/GEOM-007`](../../done/GEOM-007-robust-predicates-intersection-classification.md),
+  which retired 2026-05-27, so both are promotable. METHOD-006 step 4's
+  sparse symmetric generalized eigensolver is owned by
+  [`geometry/GEOM-024`](../geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md).
+  All of these gates are encoded in the method tasks' `depends_on`
+  front-matter and surface in `tasks/SESSION-BRIEF.md`.

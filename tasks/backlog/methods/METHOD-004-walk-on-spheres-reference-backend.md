@@ -25,7 +25,7 @@ depends_on: []
 
 Mark `[x]` next to the variant that should be the **public-facing default backend**. Unmarked variants become opt-in capabilities or follow-up tasks.
 
-- [ ] **A — Walk on Stars (Sawhney, Miller, Crane; SIGGRAPH 2023).** Handles Dirichlet **and** Neumann boundary conditions; supersedes vanilla WoS for any non-trivial BC. Recommended default.
+- [x] **A — Walk on Stars (Sawhney, Miller, Crane; SIGGRAPH 2023).** Handles Dirichlet **and** Neumann boundary conditions; supersedes vanilla WoS for any non-trivial BC. **Selected as the default per the recommendation below.**
 - [ ] **B — Vanilla Walk on Spheres (Sawhney & Crane, SIGGRAPH 2020).** Dirichlet only; simpler. Pick if only Dirichlet problems are required in year-1 scope.
 - [ ] **C — Projected Walk on Spheres for surface PDEs (Sugimoto, Chen, Jiang, Batty, Hachisuka; arXiv:2410.03844).** Solves PDEs on surfaces via closest-point projection; pairs naturally with [`METHOD-003`](METHOD-003-closest-point-method-pde-reference-backend.md). Mark as a follow-up unless surface PDEs are the primary year-1 use case.
 
@@ -118,3 +118,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - No neural / learned guiding in this task.
 - No global per-thread RNG state; RNG must be derivable from `(seed, point_index, walk_index, step_index)`.
 - No use of `std::rand` / `rand()` / `std::default_random_engine` (non-portable).
+
+## Maturity
+- Target: `CPUContracted`. The CPU reference backend is the correctness oracle for any later optimized/GPU backend.
+- No `Operational` follow-up is owed by this task; optimized CPU and GPU backends open as separate method tasks per `AGENTS.md` §6 once reference parity exists.

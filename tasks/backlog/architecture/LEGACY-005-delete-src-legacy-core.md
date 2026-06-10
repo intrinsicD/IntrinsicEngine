@@ -119,3 +119,13 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 - Removing more than the `Core/` subtree.
 - Promoting this task to `tasks/active/` before the consumer-grep prerequisite
   is satisfied.
+
+## Maturity
+- Target: `Retired` (mechanical deletion of the legacy subtree).
+- No `Operational` follow-up is owed; promoted ownership lives in `src/core/`
+  (see `docs/migration/nonlegacy-parity-matrix.md` for the feature-by-feature
+  map).
+- The consumer-grep gate in Verification must exit 0 before this task is
+  promoted to `tasks/active/`. Legacy `Core` is the foundation subtree every
+  other legacy module imports, so this deletion sequences last in the
+  `LEGACY-001..010` series.

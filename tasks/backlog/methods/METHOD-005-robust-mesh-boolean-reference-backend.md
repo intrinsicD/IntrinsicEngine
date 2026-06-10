@@ -19,14 +19,14 @@ depends_on: []
 - Owning subsystem/layer: `geometry` and `methods/geometry`.
 - Method package: `methods/geometry/robust_boolean/`.
 - Seeded by [`docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md`](../../../docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md) Tier 2 #5.
-- **Hard prerequisite:** [`GEOM-007`](../../done/GEOM-007-robust-predicates-intersection-classification.md) (robust predicates + intersection classification) must land first. This task assumes orientation / incircle / segment-triangle classification predicates are available.
+- **Hard prerequisite:** [`GEOM-007`](../../done/GEOM-007-robust-predicates-intersection-classification.md) (robust predicates + intersection classification) must land first. This task assumes orientation / incircle / segment-triangle classification predicates are available. GEOM-007 retired 2026-05-27, so the prerequisite is satisfied and this task is unblocked.
 - The existing `Geometry.HalfedgeMesh.Boolean` produces wrong results on near-coincident and degenerate inputs from Thingi10k; this is the canonical robustness motivator.
 
 ## Variants and default selection
 
 Mark `[x]` next to the variant that should be the **public-facing default backend**. Unmarked variants become optional capability flags or follow-up tasks.
 
-- [ ] **A — Interactive and Robust Mesh Booleans (Cherchi, Livesu, Scateni, Attene; SIGGRAPH 2022, arXiv:2205.14151).** Hybrid floating-point + indirect predicates; ~200K-triangle inputs at interactive rates; public reference implementation. Recommended default for an engine-grade integration.
+- [x] **A — Interactive and Robust Mesh Booleans (Cherchi, Livesu, Scateni, Attene; SIGGRAPH 2022, arXiv:2205.14151).** Hybrid floating-point + indirect predicates; ~200K-triangle inputs at interactive rates; public reference implementation. **Selected as the default per the recommendation below.**
 - [ ] **B — EMBER: Exact Mesh Booleans via Efficient & Robust Local Arrangements (Trettner, Reitmayr, Kobbelt; TOG 2022).** Plane-based representation with homogeneous integer coordinates; produces topologically exact output; heavier to integrate. Pick if "exact" output matters more than throughput.
 - [ ] **C — Simple and Robust Boolean Operations for Triangulated Surfaces (Zhou, Grinspun, Zorin, Jacobson 2016).** Generalized-winding-number approach; simpler implementation; depends on `libigl`-style winding-number machinery. Pick only if implementation cost dominates and Thingi10k coverage is not a target.
 
@@ -113,3 +113,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - No CGAL / libigl dependency in the production code path. Reference implementations may be used as **out-of-build** comparison tools in `methods/.../reports/` only.
 - No reliance on `assert` for degeneracy handling — diagnostics must surface degeneracy as data.
 - No GPU backend before reference parity.
+
+## Maturity
+- Target: `CPUContracted`. The CPU reference backend is the correctness oracle for any later optimized/GPU backend; legacy `Geometry.HalfedgeMesh.Boolean` retirement is a separate parity-gated follow-up.
+- No `Operational` follow-up is owed by this task; optimized CPU and GPU backends open as separate method tasks per `AGENTS.md` §6 once reference parity exists.

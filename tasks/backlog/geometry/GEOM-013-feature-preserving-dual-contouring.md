@@ -26,7 +26,7 @@ depends_on: []
 Mark `[x]` next to the variant that should be the **public-facing default backend**. Unmarked variants become opt-in capabilities or follow-up tasks.
 
 - [ ] **A — Classical Dual Contouring with QEF (Ju, Losasso, Schaefer, Warren; SIGGRAPH 2002).** Per-cell quadratic-error-function vertex placement using SDF + gradient samples. Mature, deterministic, no manifold guarantees on highly twisted topology. Recommended default for a baseline reference.
-- [ ] **B — Manifold Dual Contouring (Schaefer, Ju, Warren; IEEE Vis 2007).** Adds explicit per-cell vertex splitting to guarantee a manifold output. Heavier code; required if downstream consumers (e.g. halfedge mesh) cannot accept non-manifold input.
+- [x] **B — Manifold Dual Contouring (Schaefer, Ju, Warren; IEEE Vis 2007).** Adds explicit per-cell vertex splitting to guarantee a manifold output. Heavier code; required if downstream consumers (e.g. halfedge mesh) cannot accept non-manifold input. **Selected as the default per the recommendation below.**
 - [ ] **C — Power Diagram Enhanced Adaptive Isosurface Extraction (arXiv:2506.09579, 2025).** Power-diagram-based adaptive vertex placement; the current SOTA for feature preservation without ML. Recommended if state-of-the-art quality is the priority.
 - [ ] **D — Neural Dual Contouring (Chen et al., arXiv:2202.01999) / Self-Supervised Dual Contouring (arXiv:2405.18131).** Learned vertex placement; depends on ML stack.
 
@@ -93,6 +93,8 @@ cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -R 'DualContouring|MarchingCubes|SDF' --timeout 60
 python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
 python3 tools/docs/check_doc_links.py --root .
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
@@ -102,3 +104,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - No neural variant as the default until a non-neural reference exists.
 - No external ML framework dependency in production code.
 - No coupling to `runtime` / `graphics` / `ecs` / `assets` / `platform`.
+
+## Maturity
+- Target: `CPUContracted` (pure CPU geometry contract under the default gate).
+- No `Operational` follow-up is owed; this task has no backend seam.

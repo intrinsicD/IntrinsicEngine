@@ -22,7 +22,7 @@ depends_on: []
 - Use `GEOM-005` API/numeric policy, `GEOM-007` robust predicate/tolerance policy where scale-sensitive decisions are needed, `GEOM-008` numerical helpers only behind geometry-owned APIs, and `GEOM-009` benchmark manifest conventions.
 
 ## Required changes
-- [ ] Audit `Geometry.PointCloud.Utils` public APIs and normalize result diagnostics for filtering, downsampling, density, radius, and outlier operations.
+- [ ] Audit `Geometry.PointCloud.Utils` public APIs and normalize result diagnostics for filtering, downsampling, density, radius, and outlier operations. New APIs land in `Geometry.PointCloud.Utils` (no new module); split a sub-module only if the implementation unit grows past the interface-hygiene bar in `AGENTS.md` §5.
 - [ ] Add explicit statistical-outlier-removal and radius-outlier-removal APIs that return owned result clouds or stable kept/rejected index lists with diagnostics.
 - [ ] Preserve deterministic ordering for voxel/downsampling/removal outputs, including stable tie-breaking for equal voxel or distance keys.
 - [ ] Preserve seed-controlled deterministic behavior for random subsampling and report the seed in diagnostics.
@@ -67,4 +67,8 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Do not silently mutate borrowed input clouds for APIs documented as returning filtered owned results.
 - Do not introduce renderer/runtime/ECS/assets/platform/app dependencies.
 - Do not claim performance improvements without a baseline comparison.
+
+## Maturity
+- Target: `CPUContracted` (contract hardening of an existing CPU pack).
+- No `Operational` follow-up is owed; this task has no backend seam.
 

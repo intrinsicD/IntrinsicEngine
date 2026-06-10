@@ -117,3 +117,13 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 - Removing more than the `Asset/` subtree.
 - Promoting this task to `tasks/active/` before the consumer-grep prerequisite
   is satisfied.
+
+## Maturity
+- Target: `Retired` (mechanical deletion of the legacy subtree).
+- No `Operational` follow-up is owed; promoted CPU asset ownership lives in
+  `src/assets/` (see `docs/migration/nonlegacy-parity-matrix.md` for the
+  feature-by-feature map).
+- The consumer-grep gate in Verification must exit 0 before this task is
+  promoted to `tasks/active/`; today the remaining consumers live in
+  `src/legacy/Graphics/` and `src/legacy/Runtime/`, so this deletion lands
+  with or after `LEGACY-008`/`LEGACY-010`.

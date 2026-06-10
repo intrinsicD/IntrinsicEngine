@@ -1,7 +1,7 @@
 ---
 id: METHOD-006
 theme: none
-depends_on: []
+depends_on: [GEOM-024]
 ---
 # METHOD-006 — Cross-field / frame-field design reference backend
 
@@ -20,14 +20,14 @@ depends_on: []
 - Method package: `methods/geometry/cross_field/`.
 - Seeded by [`docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md`](../../../docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md) Tier 2 #6.
 - Gap analysis explicitly lists "vector-field design, cross fields, frame fields, and singularity indexing" as a P1 missing capability.
-- Reuses `Geometry.HalfedgeMesh.Curvature` (principal curvature alignment), `Geometry.HalfedgeMesh.DEC` (Laplacian), `Geometry.HalfedgeMesh.VectorHeatMethod` (parallel transport on the surface), and the CSR builder / CG iterative solver from retired [`GEOM-008`](../../done/GEOM-008-linear-algebra-solver-infrastructure.md). **Solver gap (Step 4):** variant B's generalized smallest-eigenvalue problem `A z = λ M z` needs a sparse symmetric eigensolver (LOBPCG / shift-invert). That seam is **not** shipped by GEOM-008 (which ships only CG / shifted CG) and is **not** owned by the LDLT follow-up [`GEOM-020`](../geometry/GEOM-020-sparse-direct-factorization-seam.md). A separate eigensolver follow-up (likely adding Spectra as a dependency) must be filed and retired before this task can promote on variant B; on variants A / C / D the gap may differ.
+- Reuses `Geometry.HalfedgeMesh.Curvature` (principal curvature alignment), `Geometry.HalfedgeMesh.DEC` (Laplacian), `Geometry.HalfedgeMesh.VectorHeatMethod` (parallel transport on the surface), and the CSR builder / CG iterative solver from retired [`GEOM-008`](../../done/GEOM-008-linear-algebra-solver-infrastructure.md). **Solver gap (Step 4):** variant B's generalized smallest-eigenvalue problem `A z = λ M z` needs a sparse symmetric eigensolver (LOBPCG / shift-invert). That seam is **not** shipped by GEOM-008 (which ships only CG / shifted CG) and is **not** owned by the LDLT follow-up [`GEOM-020`](../geometry/GEOM-020-sparse-direct-factorization-seam.md). That eigensolver seam is owned by [`GEOM-024`](../geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md), which gates this task now that variant B is the marked default; on variants A / C / D the gap may differ.
 
 ## Variants and default selection
 
 Mark `[x]` next to the variant that should be the **public-facing default backend**. Unmarked variants become opt-in capabilities or follow-up tasks.
 
 - [ ] **A — Mixed-Integer Quadrangulation cross fields (Bommes, Zimmer, Kobbelt; SIGGRAPH 2009).** Period-jump / integer-rotation formulation; mature, deterministic, no ML. Most faithful to the engine's "CPU reference first" policy. Recommended default for a numerical reference.
-- [ ] **B — N-RoSy via globally optimal direction fields (Knöppel, Crane, Pinkall, Schröder; SIGGRAPH 2013).** Sparse generalized eigenvalue problem; tighter integration with the existing DEC / vector-heat stack. Recommended default if alignment-with-the-rest-of-the-engine matters more than direct paper-match.
+- [x] **B — N-RoSy via globally optimal direction fields (Knöppel, Crane, Pinkall, Schröder; SIGGRAPH 2013).** Sparse generalized eigenvalue problem; tighter integration with the existing DEC / vector-heat stack. **Selected as the default per the recommendation below; its eigensolver need is owned by `GEOM-024`, which gates this task.**
 - [ ] **C — NeurCross (Dong et al., arXiv:2405.13745).** Jointly optimises a cross field and a neural SDF, principal-curvature-aligned. Pulls in a neural training step; not a reference-first backend.
 - [ ] **D — CrossGen (Liu et al., arXiv:2506.07020).** Feed-forward generative model in a joint latent space; ≤1 s per shape; depends on a pretrained model checkpoint.
 
@@ -71,7 +71,7 @@ Default recommendation: **B** (Knöppel et al. globally-optimal direction fields
 - [ ] Step 1: build per-face local frames using `Geometry.HalfedgeMesh.Curvature` tangent basis.
 - [ ] Step 2: compute edge-based parallel-transport rotations between adjacent face frames (reuse `Geometry.HalfedgeMesh.VectorHeatMethod` connection internals).
 - [ ] Step 3: assemble Dirichlet energy in `z = e^{iNθ}` per face; alignment constraints become soft / hard pins.
-- [ ] Step 4: solve the smallest-eigenvalue generalized eigenproblem `A z = λ M z` via a sparse symmetric (generalized) eigensolver (LOBPCG or shift-invert). Neither retired GEOM-008 nor follow-up GEOM-020 ship this seam; this step is blocked on a separate sparse-eigensolver follow-up (Spectra-backed) that must be filed before this slice is implementable.
+- [ ] Step 4: solve the smallest-eigenvalue generalized eigenproblem `A z = λ M z` via the sparse symmetric (generalized) eigensolver seam from [`GEOM-024`](../geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md) (LOBPCG or shift-invert).
 - [ ] Step 5: compute singularity indices by accumulating period jumps around each vertex.
 
 ## Tests
@@ -109,3 +109,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - No neural backend as the default until the reference exists.
 - No external ML framework dependency in production code (PyTorch, ONNX runtime) — variants C/D require their own enabling task and capability flag.
 - No GPU backend before reference parity.
+
+## Maturity
+- Target: `CPUContracted`. The CPU reference backend is the correctness oracle for any later optimized/GPU backend.
+- No `Operational` follow-up is owed by this task; optimized CPU and GPU backends open as separate method tasks per `AGENTS.md` §6 once reference parity exists.

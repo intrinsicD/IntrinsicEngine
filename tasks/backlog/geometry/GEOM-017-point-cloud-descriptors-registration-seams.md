@@ -20,7 +20,8 @@ depends_on: [GEOM-008]
 - Owning subsystem/layer: `geometry` (`geometry -> core` only); future paper-specific robust/global registration variants belong under `methods/geometry`.
 - Spawned by [`GEOM-010`](../../done/GEOM-010-point-cloud-algorithm-pack-roadmap.md) and the [point-cloud algorithm roadmap](../../../docs/architecture/point-cloud-algorithm-roadmap.md).
 - Existing `Geometry.Registration` provides point-to-point and point-to-plane ICP; this task adds the reusable descriptor/correspondence/coarse-alignment contracts that can initialize ICP and feed later robust method packages.
-- Depends on `GEOM-008` dense numerical helpers for covariance/eigen local frames and on `GEOM-012` domain-view semantics when algorithms borrow mesh/graph point positions.
+- Depends on `GEOM-008` dense numerical helpers for covariance/eigen local frames and on `GEOM-012` domain-view semantics when algorithms borrow mesh/graph point positions. Both prerequisites are retired, so this task is unblocked.
+- The keypoint/descriptor/correspondence contracts defined here are the prerequisite seam for future paper-specific robust/global registration method packages under `methods/geometry` (TEASER/FGR/CPD-class follow-ups per `docs/roadmap.md`); those method tasks should declare this task in `depends_on` when opened.
 
 ## Required changes
 - [ ] Define public descriptor/keypoint/correspondence records with stable ownership, dimensions, backend identity, and diagnostics.
@@ -67,4 +68,8 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Do not remove or silently replace the existing ICP API.
 - Do not require normals/descriptors without an explicit precondition or documented generation path.
 - Do not introduce renderer/runtime/ECS/assets/platform/app dependencies.
+
+## Maturity
+- Target: `CPUContracted` (generic CPU seams; the reference correctness oracle for later method packages).
+- No `Operational` follow-up is owed; this task has no backend seam.
 

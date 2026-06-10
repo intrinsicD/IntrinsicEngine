@@ -26,7 +26,7 @@ depends_on: []
 Mark `[x]` next to the variant that should become the **default error metric**. Other metrics remain selectable via the `Params::metric` enum.
 
 - [ ] **A — Classical QEM (Garland & Heckbert, SIGGRAPH 1997).** Plane-distance quadric only. Fastest, smallest code. Current behaviour.
-- [ ] **B — FA-QEM: Feature-Aware QEM (Cao et al., arXiv:2605.14029, 2025).** Joint encoding of geometric deviation, boundary curvature, and surface normal consistency. Recommended new default for asset / LOD pipelines.
+- [x] **B — FA-QEM: Feature-Aware QEM (Cao et al., arXiv:2605.14029, 2025).** Joint encoding of geometric deviation, boundary curvature, and surface normal consistency. **Selected as the new default per the recommendation below.**
 - [ ] **C — Surface Simplification Using Intrinsic Error Metrics (arXiv:2305.06410).** Intrinsic-Delaunay-aware error metric; pairs well with future intrinsic-triangulation work. Pick if intrinsic geometry is a year-1 priority.
 - [ ] **D — Line-quadric variant (Hsueh-Ti Derek Liu et al., controlling QEM with line constraints).** Adds line-feature pinning. Useful for CAD / architectural assets.
 
@@ -86,6 +86,8 @@ cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -R 'Simplification' --timeout 60
 python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
 python3 tools/docs/check_doc_links.py --root .
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
@@ -95,3 +97,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - No silent change of default semantics for existing callers — if `Metric` is unset, document the chosen default in the module header and update one consumer test at a time.
 - No neural / learned variant in this task.
 - No GPU backend.
+
+## Maturity
+- Target: `CPUContracted` (in-place extension of the existing CPU simplification module).
+- No `Operational` follow-up is owed; this task has no backend seam.

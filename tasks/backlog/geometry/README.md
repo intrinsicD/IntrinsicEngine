@@ -16,24 +16,35 @@ map.
 - [GEOM-018 — Parameterization distortion and map-quality diagnostics](GEOM-018-parameterization-distortion-map-quality-diagnostics.md).
 - [GEOM-019 — Harmonic/Tutte parameterization and boundary constraints](GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md).
 - [GEOM-020 — Sparse direct factorization solver seam (LDLT/LLT)](GEOM-020-sparse-direct-factorization-seam.md)
-  (follow-up to retired `GEOM-008`; gates `methods/METHOD-002` /
-  `METHOD-003` LDLT paths).
+  (follow-up to retired `GEOM-008`; gates `methods/METHOD-002` and the
+  shift-invert inner solve of `GEOM-024`).
+- [GEOM-023 — Sparse non-symmetric iterative solver seam (BiCGSTAB)](GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md)
+  (gates `methods/METHOD-003` variant A; promote when METHOD-003 is the
+  next-priority method).
+- [GEOM-024 — Sparse symmetric generalized eigensolver seam](GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
+  (gates `methods/METHOD-006` variant B; depends on `GEOM-020`; promote when
+  METHOD-006 is the next-priority method).
 - [RORG-031E — Geometry and method-readiness backlog seed](RORG-031-geometry-method-readiness.md).
 
 ## Convergence
 
-- GEOM-006 through GEOM-008 are the remaining foundational tasks from the
-  [`src/geometry` gap analysis](../../../docs/reviews/2026-05-12-src-geometry-gap-analysis.md):
-  mesh/soup contracts, robust predicates, and linear algebra. GEOM-009
-  (benchmark manifests) is retired in
-  `tasks/done/`
-  and provides the manifest-driven smoke harness future geometry method
-  packages plug into.
+- The foundational tasks from the
+  [`src/geometry` gap analysis](../../../docs/reviews/2026-05-12-src-geometry-gap-analysis.md)
+  — mesh/soup contracts (GEOM-006), robust predicates (GEOM-007), and linear
+  algebra (GEOM-008) — are all retired. GEOM-009 (benchmark manifests) is
+  retired in `tasks/done/` and provides the manifest-driven smoke harness
+  future geometry method packages plug into.
 - GEOM-020 is the named follow-up to retired GEOM-008 for the direct
   sparse SPD factorization (LDLT/LLT) seam that GEOM-008 deferred but
   that methods/METHOD-002 (step 2) and METHOD-003 (step 5) already
   reference as "the LDLT path from GEOM-008". Method tasks gated on the
-  LDLT path must wait on GEOM-020, not on retired GEOM-008.
+  LDLT path must wait on GEOM-020, not on retired GEOM-008; the gates are
+  encoded in the method tasks' `depends_on` front-matter.
+- GEOM-023 (non-symmetric BiCGSTAB) and GEOM-024 (generalized symmetric
+  eigensolver, Spectra-backed, gated on GEOM-020) complete the solver-seam
+  family: they own the gaps GEOM-020 explicitly deferred and gate
+  METHOD-003 variant A and METHOD-006 variant B respectively. Promote each
+  only when its consuming method is the next-priority method.
 - GEOM-021 is a module-hygiene follow-up for retired GEOM-006: it keeps the
   `Geometry.MeshSoup` public module interface declarative by moving
   non-trivial validation/container bodies into a matching implementation unit
@@ -45,8 +56,8 @@ map.
   property storage through explicit borrowed views instead of accidental copies.
 - GEOM-013 and GEOM-014 are seeded by the geometry paper survey
   [`docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md`](../../../docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md).
-  Each lists explicit algorithm variants and requires the maintainer to mark one
-  as the default before implementation begins. GEOM-013 (dual contouring) is a
+  Each lists explicit algorithm variants with a marked default (Manifold DC
+  for GEOM-013, FA-QEM for GEOM-014). GEOM-013 (dual contouring) is a
   peer of the existing `Geometry.MarchingCubes`; GEOM-014 (FA-QEM) is an in-place
   extension of `Geometry.HalfedgeMesh.Simplification`.
 - RORG-031E is part of **Theme F — Architecture/runtime/UI foundation seeds**.

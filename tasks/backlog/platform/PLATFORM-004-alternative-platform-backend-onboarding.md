@@ -53,12 +53,29 @@ depends_on: []
   - CTest labels: `platform` for headless-safe tests; `<name>` (e.g.
     `wayland`, `win32`, `cocoa`) for opt-in platform-specific smoke tests
     excluded from the default CPU gate.
+- Candidate backends and promotion triggers (pick exactly one per promotion):
+  - **Wayland** — justified when native Linux windowing without the GLFW
+    dependency becomes a requirement, or a GLFW Wayland gap blocks a
+    runtime/graphics task.
+  - **Windows (Win32)** — justified when a Windows host enters the supported
+    matrix (CI or developer demand); coordinates with the `INFRA-001`
+    dependency-toolchain work.
+  - **macOS (Cocoa)** — justified when macOS parity becomes a requirement;
+    implies a MoltenVK decision inside the backend's Vulkan surface helper.
+  - In all cases the implementing task records the concrete trigger (which
+    task or host-matrix change demanded the backend) in its Context section.
+- Policy landing site: the promoted execution of this seed captures the
+  agreed onboarding policy in `docs/architecture/platform-backends.md`
+  (superseding the brief sketch in `src/platform/README.md`), covering the
+  module/naming conventions above, the promotion-trigger criteria, the
+  test-label conventions, and the non-negotiable `platform -> core` rule.
 
 ## Required changes
 - [ ] This task remains planning-only. No source or build changes.
 - [ ] When promoting this task, the promoting agent must:
   - Pick a single concrete backend (not a bundle).
-  - Create `PLATFORM-005-<backend>-backend.md` (or next free `PLATFORM-` ID)
+  - Create `PLATFORM-007-<backend>-backend.md` (or the next free
+    `PLATFORM-` ID — `PLATFORM-005`/`PLATFORM-006` are already retired)
     under `tasks/backlog/platform/` using `tasks/templates/task.md`.
   - Cite this task in the new task's Context section.
 

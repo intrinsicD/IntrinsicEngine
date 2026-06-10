@@ -1,7 +1,7 @@
 ---
 id: METHOD-002
 theme: none
-depends_on: []
+depends_on: [GEOM-020]
 ---
 # METHOD-002 — Signed Heat Method reference backend
 
@@ -104,3 +104,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - No replacement of `Geometry.HalfedgeMesh.Geodesic` or `Geometry.HalfedgeMesh.VectorHeatMethod`.
 - No public Eigen types in `Geometry.HalfedgeMesh.SignedHeatMethod.cppm`.
 - No dependency on geometry-central or libigl in production code paths (parity comparison only, in tests, behind an opt-in flag).
+
+## Maturity
+- Target: `CPUContracted`. The CPU reference backend is the correctness oracle for any later optimized/GPU backend.
+- No `Operational` follow-up is owed by this task; optimized CPU and GPU backends open as separate method tasks per `AGENTS.md` §6 once reference parity exists.

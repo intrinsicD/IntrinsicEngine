@@ -153,3 +153,27 @@ python3 tools/docs/check_doc_links.py --root .
   Operational-quality external package manager. Closure requires the
   cold-clone test in the Tests section to pass on at least one CI host.
 
+## Slice plan
+
+Landing order respects the Forbidden-changes deprecation window (the
+FetchContent path and `tools/setup/populate_deps.sh` survive until the
+final slice):
+
+- **Slice A — manifest + bootstrap (no behavior change).** Add `vcpkg.json`,
+  `vcpkg-configuration.json`, and `tools/setup/bootstrap_vcpkg.sh`; nothing
+  consumes them yet. Defers preset wiring to Slice B.
+- **Slice B — preset cutover + ADR + docs.** Wire the vcpkg toolchain into
+  the `ci` preset, reduce `cmake/Dependencies.cmake` to `find_package` calls
+  plus the ImGui docking shim, keep the FetchContent path available for the
+  deprecation window, land the ADR, and rewrite the dependency section of
+  `docs/build-troubleshooting.md`. Default CPU gate green; headless build
+  skips `glfw3`/`imguizmo` via manifest features.
+- **Slice C — CI binary cache + timings.** Wire the GHA binary cache,
+  capture cold/warm configure timings in the PR, and run the Vulkan smoke
+  gate on a capable host.
+- **Slice D — deprecation cleanup (separate PR, one release window later).**
+  Delete the FetchContent helpers, the `INTRINSIC_OFFLINE_DEPS` /
+  `INTRINSIC_UPDATE_DEPS` / `INTRINSIC_DEPS_SEAL` knobs,
+  `tools/setup/populate_deps.sh`, and remaining `external/cache/`
+  references; update `AGENTS.md` §5.
+
