@@ -104,7 +104,6 @@ the convergence map. Retired members are indexed in the category READMEs and
 the retirement log.
 
 Open members:
-- [`architecture/RORG-031A-architecture-foundation.md`](architecture/RORG-031A-architecture-foundation.md).
 - [`architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md`](architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md) —
   value-gated cross-domain map for remaining legacy feature candidates before
   mechanical `src/legacy/` subtree deletion.

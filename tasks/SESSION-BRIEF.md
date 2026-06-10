@@ -28,7 +28,6 @@ the authoritative open/unblocked view.
 - unblocked: `LEGACY-011` — Value-gated legacy feature reimplementation map (tasks/backlog/architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md)
 - blocked by `LEGACY-011`: `LEGACY-012` — Migrate legacy consumer tests to promoted coverage (tasks/backlog/architecture/LEGACY-012-migrate-legacy-consumer-tests.md)
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
-- unblocked: `RORG-031A` — Architecture foundation backlog seed (tasks/backlog/architecture/RORG-031A-architecture-foundation.md)
 - unblocked: `RORG-031F` — UI integration backlog seed (tasks/backlog/ui/RORG-031-ui-integration.md)
 - unblocked: `RUNTIME-101` — Asset ingest state-machine migration (tasks/backlog/runtime/RUNTIME-101-asset-ingest-state-machine.md)
 - unblocked: `RUNTIME-103` — Geometry algorithm execution queue (tasks/backlog/runtime/RUNTIME-103-geometry-algorithm-execution-queue.md)

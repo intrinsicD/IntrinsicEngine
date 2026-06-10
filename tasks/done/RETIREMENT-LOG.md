@@ -9,6 +9,20 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`RORG-031A`](RORG-031A-architecture-foundation.md) — architecture
+foundation backlog seed — retired to `tasks/done/` on 2026-06-10. The
+seed's job was converting the legacy living backlog's architecture items
+into structured, independently executable tasks, and that exists: the
+`tasks/backlog/architecture/` queue carries the LEGACY-001..012 retirement
+series, `HARDEN-078`, `INFRA-001`, and a category README with explicit
+consumer-grep gates; architecture governance tooling
+(`check_layering.py`, `check_docs_sync.py`,
+`generate_module_inventory.py`) exists and runs strict in CI; and
+migration/CI dependencies are recorded as gates and front-matter
+`depends_on` edges. Open architecture work remains independently tracked
+by its own task files.
+
+Backlog
 [`PROC-008`](PROC-008-category-readme-state-history-split.md) — category
 README state/history split — retired to `tasks/done/` on 2026-06-10,
 completing Theme H. Slice A mechanically split every

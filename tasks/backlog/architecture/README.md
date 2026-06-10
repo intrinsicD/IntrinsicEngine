@@ -17,9 +17,6 @@ map.
 - [LEGACY-012 — Migrate legacy consumer tests to promoted coverage](LEGACY-012-migrate-legacy-consumer-tests.md):
   migrates or retires tests and non-legacy consumers that still import bare
   legacy module names after their promoted feature owners exist.
-- [RORG-031A — Architecture foundation backlog seed](RORG-031A-architecture-foundation.md):
-  tracks architecture-doc normalization, layering-checker, docs-sync-checker,
-  and module-inventory governance work.
 - [LEGACY-001 — Delete `src/legacy/Interface/`](LEGACY-001-delete-src-legacy-interface.md):
   first concrete deletion under `ARCH-004`. Backlog until the consumer-grep
   prerequisite passes; promotion to `tasks/active/` is gated by `ARCH-004`.
@@ -177,3 +174,7 @@ split; narratives live in the retirement log.
 - [LEGACY-007 — Delete `src/legacy/EditorUI/`](../../done/LEGACY-007-delete-src-legacy-editorui.md)
   (done 2026-06-07): removed the legacy editor UI subtree after promoted
   `SandboxEditorUi` coverage replaced its remaining consumers.
+- [RORG-031A — Architecture foundation backlog seed](../../done/RORG-031A-architecture-foundation.md)
+  (done, 2026-06-10): the architecture backlog is fully structured and the
+  layering/docs-sync/module-inventory governance tooling runs in CI; the
+  seed retired once its tracked work existed as independent tasks.
