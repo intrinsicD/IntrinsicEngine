@@ -77,10 +77,9 @@ broadphase/narrowphase and constraint/island/sleep solver contracts are retired 
 [`physics/README.md`](physics/README.md) and the retirement log.
 
 Open members:
-- [`methods/METHOD-010`](methods/METHOD-010-xpbd-cloth-shell-reference-backend.md),
-  [`methods/METHOD-011`](methods/METHOD-011-sph-fluid-reference-backend.md) —
-  CPU-reference-first non-rigid method packages opened by the phenomena
-  roadmap.
+- [`methods/METHOD-011`](methods/METHOD-011-sph-fluid-reference-backend.md) —
+  CPU-reference-first non-rigid SPH method package opened by the phenomena
+  roadmap (particles/springs and XPBD cloth are done).
 
 ### Theme D — ECS hardening parity (P0, complete)
 

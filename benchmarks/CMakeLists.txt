@@ -10,8 +10,10 @@ add_executable(IntrinsicBenchmarkSmoke
     geometry/Bench_ExampleSmoke.cpp
     physics/Bench_RigidBodyReferenceSmoke.cpp
     physics/Bench_ParticleSpringReferenceSmoke.cpp
+    physics/Bench_XpbdClothReferenceSmoke.cpp
     ${CMAKE_SOURCE_DIR}/methods/physics/rigid_body_reference/src/RigidBodyReference.cpp
     ${CMAKE_SOURCE_DIR}/methods/physics/particle_spring_reference/src/ParticleSpringReference.cpp
+    ${CMAKE_SOURCE_DIR}/methods/physics/xpbd_cloth_reference/src/XpbdClothReference.cpp
 )
 
 set_target_properties(IntrinsicBenchmarkSmoke PROPERTIES CXX_SCAN_FOR_MODULES ON)
@@ -22,6 +24,7 @@ target_link_options(IntrinsicBenchmarkSmoke PRIVATE ${INTRINSIC_LINK_FLAGS})
 target_include_directories(IntrinsicBenchmarkSmoke PRIVATE
     ${CMAKE_SOURCE_DIR}/methods/physics/rigid_body_reference/include
     ${CMAKE_SOURCE_DIR}/methods/physics/particle_spring_reference/include
+    ${CMAKE_SOURCE_DIR}/methods/physics/xpbd_cloth_reference/include
 )
 
 target_link_libraries(IntrinsicBenchmarkSmoke

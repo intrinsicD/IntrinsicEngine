@@ -39,7 +39,10 @@ map.
   `cpu_reference` backend with stability/energy diagnostics and smoke
   benchmark; physics roadmap follow-up from
   [`ARCH-002`](../../done/ARCH-002-physics-phenomena-roadmap.md).
-- [METHOD-010 — XPBD cloth and shell reference backend](METHOD-010-xpbd-cloth-shell-reference-backend.md)
+- [METHOD-010 — XPBD cloth and shell reference backend](../../done/METHOD-010-xpbd-cloth-shell-reference-backend.md)
+  (done, 2026-06-10, `CPUContracted`): deterministic XPBD cloth/shell
+  `cpu_reference` backend with constraint residual/convergence diagnostics
+  and smoke benchmark
   (physics roadmap follow-up from [`ARCH-002`](../../done/ARCH-002-physics-phenomena-roadmap.md)).
 - [METHOD-011 — SPH fluid reference backend](METHOD-011-sph-fluid-reference-backend.md)
   (physics roadmap follow-up from [`ARCH-002`](../../done/ARCH-002-physics-phenomena-roadmap.md)).

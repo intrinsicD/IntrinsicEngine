@@ -36,7 +36,7 @@ map.
   its CPU reference path exists. It retired with first non-rigid physics method
   follow-ups:
   [`METHOD-009`](../../done/METHOD-009-particle-spring-reference-backend.md) (done),
-  [`METHOD-010`](../methods/METHOD-010-xpbd-cloth-shell-reference-backend.md),
+  [`METHOD-010`](../../done/METHOD-010-xpbd-cloth-shell-reference-backend.md) (done),
   and [`METHOD-011`](../methods/METHOD-011-sph-fluid-reference-backend.md).
 
 Forbidden across all members: physics solver code in ECS, runtime-owned solver

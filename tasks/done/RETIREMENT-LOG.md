@@ -9,6 +9,31 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`METHOD-010`](METHOD-010-xpbd-cloth-shell-reference-backend.md) — XPBD
+cloth and shell reference backend — retired to `tasks/done/` on 2026-06-10
+at maturity `CPUContracted`. `methods/physics/xpbd_cloth_reference/` ships
+the deterministic XPBD `cpu_reference` backend over triangle-mesh cloth
+state: position prediction, iterative compliant constraint projection with
+per-constraint Lagrange multipliers (structural unique-edge constraints
+plus opposite-vertex bending pairs across interior edges, both built
+deterministically by `BuildClothFromTriangles`), half-space collision
+projection with collision inputs as pure method parameters (sphere
+colliders declared but unsupported and counted), and position-derived
+velocities. Diagnostics cover validation codes (including
+`InvalidTopology` for repeated/out-of-range triangle indices),
+degenerate-triangle and coincident-constraint counts, stretch/bend
+residuals (max, L2), convergence against the residual tolerance,
+kinetic/mechanical energy drift, and the non-finite fail-closed fallback.
+Fourteen `unit;physics` tests pin the builder topology, rigid projection,
+hanging-patch convergence, bend response, pinned vertices, collision
+floor, degenerate/invalid handling, non-convergence reporting,
+determinism, and the fallback. The `physics.xpbd_cloth_reference.smoke`
+benchmark emits validated result JSON (final max stretch residual
+~6.2e-4 vs 5e-3 threshold). Optimized CPU/GPU backends remain forbidden
+until a future task names this package as its oracle. Theme C's remaining
+open member is `METHOD-011` (SPH fluid).
+
+Backlog
 [`METHOD-009`](METHOD-009-particle-spring-reference-backend.md) — particle
 and mass-spring reference backend — retired to `tasks/done/` on 2026-06-10
 at maturity `CPUContracted`. `methods/physics/particle_spring_reference/`
