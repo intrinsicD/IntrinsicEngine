@@ -152,7 +152,11 @@ export namespace Geometry::Internal
             if (std::abs(sDist - minDist) < Config::EPA_EPSILON)
             {
                 EPAResult result{};
-                result.Normal = -searchDir; // Normal A->B (unit vector, scale-invariant)
+                // The polytope lives in the Minkowski difference A - B, so the
+                // outward face normal closest to the origin is the direction A
+                // must move *against* to separate — i.e. the A->B normal under
+                // the documented contact convention (BUG-025).
+                result.Normal = searchDir; // Normal A->B (unit vector, scale-invariant)
                 result.Depth = sDist * scale; // Unscale penetration depth to world space
                 result.ContactPoint = Geometry::Support(a, searchDir); // Already in world space
                 return result;

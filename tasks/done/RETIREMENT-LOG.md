@@ -9,6 +9,25 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`BUG-025`](BUG-025-contact-manifold-normal-convention.md) — geometry
+contact manifold normals violate the documented A→B convention — retired to
+`tasks/done/` on 2026-06-10 at maturity `CPUContracted`. Root cause was two
+kernel inversions: `EPA_Solver` negated the closest-face outward normal of
+the A−B Minkowski polytope (which is already the A→B direction), and
+`Contact_Analytic(Sphere, AABB)` computed the normal from the box-closest
+point toward the sphere center (B→A) in both its shallow and
+deep-penetration branches. Fix: EPA returns `searchDir` directly,
+`Contact_Fallback` derives `ContactPointB = ContactPointA - Normal * Depth`
+(the same world point under the corrected normal), and the sphere-AABB
+analytic path is A→B in both branches with consistent contact points. New
+`unit;geometry` convention tests pin every analytic overload, the
+reversed-argument dispatcher, and the GJK/EPA fallback for
+sphere/capsule/OBB pairings in both argument orders
+(`ContactManifold.Convention_*`). The physics-layer orientation guard and
+its regression test stay as defense in depth. Geometry label 1263/1263 and
+physics label 21/21 at retirement. Theme G has no open members.
+
+Backlog
 [`BUG-024B`](BUG-024B-sandbox-transform-edit-vulkan-pixel-shift-smoke.md) —
 Vulkan pixel-shift smoke for sandbox transform edits — retired to
 `tasks/done/` on 2026-06-10 at maturity `Operational`. The opt-in

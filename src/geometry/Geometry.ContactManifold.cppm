@@ -117,13 +117,14 @@ export namespace Geometry
                 if (epa)
                 {
                     ContactManifold m{};
-                    m.Normal = epa->Normal;
+                    m.Normal = epa->Normal; // A->B per EPAResult contract
                     m.PenetrationDepth = epa->Depth;
 
-                    // EPA gives us ContactPoint on A (roughly).
-                    // B = A + Normal * Depth
+                    // EPA gives us the deepest point of A inside B (roughly).
+                    // Backing out along the A->B normal by the penetration
+                    // depth lands on the surface of B.
                     m.ContactPointA = epa->ContactPoint;
-                    m.ContactPointB = m.ContactPointA + (m.Normal * m.PenetrationDepth);
+                    m.ContactPointB = m.ContactPointA - (m.Normal * m.PenetrationDepth);
 
                     return m;
                 }

@@ -26,27 +26,30 @@ maturity_target: CPUContracted
   - The reversed-dispatch branch in `ComputeContact` negates normals for swapped analytic overloads, which is only correct if the underlying overloads honor the documented convention — fixing the leaves fixes the dispatcher.
 - Physics-side mitigation (keep): `src/physics/Physics.World.cpp::AppendContactIfPresent` orients the record normal against the shape-center offset, with regression coverage in `PhysicsWorld.ContactRecordNormalFollowsAToBConvention`.
 - Owning layer: `geometry` (kernel correctness); consumers are physics and any future geometry queries.
+- Fix landed (2026-06-10): `EPA_Solver` now returns `Normal = searchDir` (the closest-face outward normal of the A−B Minkowski polytope is the A→B direction; the previous negation was the inversion), `Contact_Fallback` derives `ContactPointB = ContactPointA - Normal * Depth` (same world point as before, consistent with the corrected normal), and `Contact_Analytic(Sphere, AABB)` computes `diff = closest - s.Center` plus an inverted deep-penetration escape-axis normal so both branches are A→B. The physics-layer guard is unchanged and now acts purely as defense in depth.
+- Completed: 2026-06-10.
+- PR/commit: branch `claude/pensive-albattani-pu2t14` (pending local commit).
 
 ## Required changes
 
-- [ ] Audit every `Contact_Analytic` overload and the EPA fallback for normal orientation; fix the sphere-AABB analytic path and any EPA support-direction inversion so `ComputeContact(a, b)` is A→B for all pairs.
-- [ ] Add geometry unit tests that pin the convention per analytic overload and through the GJK/EPA fallback (sphere/capsule/OBB pairings, both argument orders).
-- [ ] Keep the physics-layer orientation guard and its regression test in place (defense in depth; do not remove).
+- [x] Audit every `Contact_Analytic` overload and the EPA fallback for normal orientation; fix the sphere-AABB analytic path and any EPA support-direction inversion so `ComputeContact(a, b)` is A→B for all pairs.
+- [x] Add geometry unit tests that pin the convention per analytic overload and through the GJK/EPA fallback (sphere/capsule/OBB pairings, both argument orders).
+- [x] Keep the physics-layer orientation guard and its regression test in place (defense in depth; do not remove).
 
 ## Tests
 
-- [ ] New `unit;geometry` tests for manifold normal direction across all supported pairs and argument orders.
-- [ ] Existing physics tests (`ctest -L physics`) stay green, including `PhysicsWorld.ContactRecordNormalFollowsAToBConvention`.
+- [x] New `unit;geometry` tests for manifold normal direction across all supported pairs and argument orders.
+- [x] Existing physics tests (`ctest -L physics`) stay green, including `PhysicsWorld.ContactRecordNormalFollowsAToBConvention`.
 
 ## Docs
 
-- [ ] Update the convention comment block in `Geometry.ContactManifold.cppm` only if behavior intentionally diverges (it should not).
-- [ ] Note the fix in `docs/architecture/physics.md` (remove the BUG-025 caveat) when closing.
+- [x] Update the convention comment block in `Geometry.ContactManifold.cppm` only if behavior intentionally diverges (it should not).
+- [x] Note the fix in `docs/architecture/physics.md` (remove the BUG-025 caveat) when closing.
 
 ## Acceptance criteria
 
-- [ ] All `ComputeContact` paths return A→B normals, proven by per-pair unit tests.
-- [ ] Physics tests pass unchanged.
+- [x] All `ComputeContact` paths return A→B normals, proven by per-pair unit tests.
+- [x] Physics tests pass unchanged.
 
 ## Verification
 

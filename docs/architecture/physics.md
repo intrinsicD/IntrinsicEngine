@@ -108,10 +108,10 @@ diagnostics; counters remain the authoritative aggregate.
   the integration counters. `WorldDiagnostics` mirrors the last solve in
   `LastSolveStep`/`SolveStepsExecuted`.
 - Physics-owned `ContactRecord` normals are enforced to the documented A→B
-  convention by orienting against the shape-center offset, because the
-  geometry kernel's analytic sphere-box path and GJK/EPA fallback currently
-  return B→A-oriented normals despite the documented kernel convention
-  (tracked as `BUG-025`).
+  convention by orienting against the shape-center offset. The geometry
+  kernel itself honors the A→B convention on every `ComputeContact` path
+  since `BUG-025` was fixed; the physics-side orientation guard stays as
+  defense in depth against future kernel regressions.
 
 Parity against the canonical reference is pinned by
 `tests/unit/physics/Test.PhysicsSolverParity.cpp` (free-fall integrator
