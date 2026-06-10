@@ -1754,6 +1754,50 @@ namespace Extrinsic::Runtime
                 .PixelX = pick->PixelX,
                 .PixelY = pick->PixelY,
             });
+
+            // BUG-026 — capture the issuing frame's camera context, keyed by
+            // the pick's correlation Sequence. The readback completes frames
+            // later (the camera may have moved), so the depth-to-world cursor
+            // reconstruction and the CPU ray fallback must replay *this*
+            // frame's inverse view-projection / pick ray, not the consume
+            // frame's. Bounded mirror of the controller's in-flight FIFO.
+            const Graphics::CameraViewSnapshot pickCamera =
+                Graphics::BuildCameraViewSnapshot(renderInput.Camera,
+                                                  viewport,
+                                                  renderInput.Pick);
+            if (pickCamera.Valid)
+            {
+                const std::uint32_t viewportWidth =
+                    viewport.Width > 0 ? static_cast<std::uint32_t>(viewport.Width) : 0u;
+                const std::uint32_t viewportHeight =
+                    viewport.Height > 0 ? static_cast<std::uint32_t>(viewport.Height) : 0u;
+                PickReadbackContext context{};
+                context.InverseViewProjection = pickCamera.InverseViewProjection;
+                context.ViewportWidth         = viewportWidth;
+                context.ViewportHeight        = viewportHeight;
+                context.HasWorldRay           = pickCamera.HasPickRay;
+                context.WorldRayOrigin        = pickCamera.PickRayOrigin;
+                context.WorldRayDirection     = pickCamera.PickRayDirection;
+                // 2 * tan(fovY / 2) / viewportHeight from the projection's
+                // [1][1] = 1 / tan(fovY / 2) (sign carries the Vulkan Y flip).
+                const float projectionScaleY =
+                    std::abs(renderInput.Camera.Projection[1][1]);
+                if (projectionScaleY > 0.000001f && viewportHeight > 0u)
+                {
+                    context.WorldUnitsPerPixelAtUnitDepth =
+                        2.0f / (projectionScaleY *
+                                static_cast<float>(viewportHeight));
+                }
+                constexpr std::size_t kMaxInFlightPickContexts = 32u;
+                if (m_InFlightPickContexts.size() >= kMaxInFlightPickContexts)
+                {
+                    m_InFlightPickContexts.erase(m_InFlightPickContexts.begin());
+                }
+                m_InFlightPickContexts.push_back(InFlightPickContext{
+                    .Sequence = pick->Sequence,
+                    .Context  = context,
+                });
+            }
         }
 
         // ── Phases 5–9: promoted render-frame contract ───────────────────
@@ -2051,7 +2095,27 @@ namespace Extrinsic::Runtime
                 // refinement wins, matching the controller's latest-pick-wins
                 // coalescing; a background (no-hit) readback clears the cache. The
                 // bridge mutates nothing and only ever reads the live registry.
-                m_LastRefinedPrimitive = RefinePickReadbackResult(*m_Scene, *result);
+                //
+                // BUG-026 — replay the issuing frame's camera context (matched by
+                // the correlation Sequence) so the readback's depth sample
+                // reconstructs the world/local cursor position and anchors the
+                // closest-vertex/edge/face refinement.
+                const PickReadbackContext* pickContext = nullptr;
+                auto contextIt = m_InFlightPickContexts.end();
+                if (result->Sequence != 0u)
+                {
+                    contextIt = std::find_if(
+                        m_InFlightPickContexts.begin(),
+                        m_InFlightPickContexts.end(),
+                        [seq = result->Sequence](const InFlightPickContext& entry)
+                        { return entry.Sequence == seq; });
+                    if (contextIt != m_InFlightPickContexts.end())
+                        pickContext = &contextIt->Context;
+                }
+                m_LastRefinedPrimitive =
+                    RefinePickReadbackResult(*m_Scene, *result, pickContext);
+                if (contextIt != m_InFlightPickContexts.end())
+                    m_InFlightPickContexts.erase(contextIt);
             }
         }
 

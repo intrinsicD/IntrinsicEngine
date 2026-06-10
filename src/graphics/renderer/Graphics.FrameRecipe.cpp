@@ -203,6 +203,21 @@ namespace Extrinsic::Graphics
             RHI::ColorAttachment{.Target = RenderPassAttachmentToken(), .Load = RHI::LoadOp::Clear, .Store = RHI::StoreOp::Store},
         };
 
+        // BUG-026 — clear pair for the two R32_UINT selection-ID targets
+        // (`EntityId`, `PrimitiveId`). All four channels must be exactly 0.0f:
+        // the Vulkan backend forwards clear colors through the
+        // `VkClearColorValue` union, and only a zero float bit-pattern reads
+        // back as the `EntityId == 0` background sentinel the picking readback
+        // drain keys on. Reusing the scene-color light-blue clear here made
+        // background pixels read back as 0x3DCCCCCD (bits of 0.10f) and
+        // produced phantom "hits" on every background click.
+        constexpr RHI::ColorAttachment kSelectionIdClearColorAttachments[] = {
+            RHI::ColorAttachment{.Target = RenderPassAttachmentToken(), .Load = RHI::LoadOp::Clear, .Store = RHI::StoreOp::Store,
+                                 .ClearR = 0.0f, .ClearG = 0.0f, .ClearB = 0.0f, .ClearA = 0.0f},
+            RHI::ColorAttachment{.Target = RenderPassAttachmentToken(), .Load = RHI::LoadOp::Clear, .Store = RHI::StoreOp::Store,
+                                 .ClearR = 0.0f, .ClearG = 0.0f, .ClearB = 0.0f, .ClearA = 0.0f},
+        };
+
         constexpr RHI::ColorAttachment kDefaultClearThreeColorAttachments[] = {
             RHI::ColorAttachment{.Target = RenderPassAttachmentToken(), .Load = RHI::LoadOp::Clear, .Store = RHI::StoreOp::Store},
             RHI::ColorAttachment{.Target = RenderPassAttachmentToken(), .Load = RHI::LoadOp::Clear, .Store = RHI::StoreOp::Store},
@@ -1004,7 +1019,16 @@ namespace Extrinsic::Graphics
         const auto pointDrawIndirect = importBuffer("Cull.Points.NonIndexedArgs", imports.PointsNonIndexedArgs, BufferState::ShaderWrite, BufferState::IndirectRead, FrameRecipeResourceKind::PointsNonIndexedArgs);
         const auto pointDrawCount = importBuffer("Cull.Points.Count", imports.PointsCount, BufferState::ShaderWrite, BufferState::IndirectRead, FrameRecipeResourceKind::PointsCount);
 
-        const auto depth = createTexture("SceneDepth", DepthTargetDesc(inputWidth, inputHeight, sizing.DepthFormat, "SceneDepth"), FrameRecipeResourceKind::SceneDepth);
+        // BUG-026 — when picking readback is active the PickingPass executor
+        // copies the pick pixel out of SceneDepth (cursor world-position
+        // reconstruction), so the depth target must be a valid transfer source.
+        RHI::TextureDesc sceneDepthDesc =
+            DepthTargetDesc(inputWidth, inputHeight, sizing.DepthFormat, "SceneDepth");
+        if (pickingActive)
+        {
+            sceneDepthDesc.Usage = sceneDepthDesc.Usage | RHI::TextureUsage::TransferSrc;
+        }
+        const auto depth = createTexture("SceneDepth", sceneDepthDesc, FrameRecipeResourceKind::SceneDepth);
         const auto hdr = createTexture("SceneColorHDR", ColorTargetDesc(inputWidth, inputHeight, RHI::Format::RGBA16_FLOAT, "SceneColorHDR"), FrameRecipeResourceKind::SceneColorHDR);
         TextureRef entityId{};
         TextureRef primitiveId{};
@@ -1377,7 +1401,9 @@ namespace Extrinsic::Graphics
                     builder.Write(pickingReadback, BufferUsage::TransferDst);
                 }
                 builder.SetRenderPass(RHI::RenderPassDesc{
-                    .ColorTargets = kDefaultClearTwoColorAttachments,
+                    // BUG-026: ID targets must clear to the background
+                    // sentinel 0, not the scene-color blue.
+                    .ColorTargets = kSelectionIdClearColorAttachments,
                     .Depth = RHI::DepthAttachment{
                         .Target = RenderPassAttachmentToken(),
                         .Load = RHI::LoadOp::Load,

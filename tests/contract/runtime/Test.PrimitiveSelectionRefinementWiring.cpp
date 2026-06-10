@@ -30,6 +30,7 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.SelectionSystem;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
+import Extrinsic.Runtime.StableEntityLookup;
 import Geometry.Properties;
 
 using Extrinsic::ECS::EntityHandle;
@@ -76,7 +77,9 @@ namespace
 
     [[nodiscard]] std::uint32_t RenderId(EntityHandle entity) noexcept
     {
-        return static_cast<std::uint32_t>(entity);
+        // BUG-026: render id = entt handle + 1 (0 = background sentinel),
+        // owned by StableEntityLookup::ToRenderId.
+        return Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
     }
 
     // Emplaces a single CCW triangle mesh (v0,v1,v2) onto `entity`, mirroring the
@@ -318,4 +321,217 @@ TEST(PrimitiveSelectionRefinementWiring, EmptyDrainRetainsPriorCache)
     ASSERT_TRUE(after.has_value());
     EXPECT_EQ(after->Kind, RefinedPrimitiveKind::Face);
     EXPECT_EQ(after->FaceId, 0u);
+}
+
+// --- BUG-026: depth-anchored cursor reconstruction + closest primitives ----
+
+namespace
+{
+    using Extrinsic::Runtime::PickReadbackContext;
+    using Extrinsic::Runtime::UnprojectPickDepth;
+
+    [[nodiscard]] PickReadbackResult HitWithDepth(EntityHandle entity,
+                                                  SelectionPrimitiveDomain domain,
+                                                  std::uint32_t payload,
+                                                  std::uint32_t pixelX,
+                                                  std::uint32_t pixelY,
+                                                  float depth)
+    {
+        return PickReadbackResult{
+            .EncodedId = EncodeSelectionId(domain, payload),
+            .StableEntityId = RenderId(entity),
+            .Hit = true,
+            .Sequence = 7u,
+            .HasDepth = true,
+            .Depth = depth,
+            .PixelX = pixelX,
+            .PixelY = pixelY,
+        };
+    }
+}
+
+// Golden math: unprojecting (pixel, depth) through the inverse of a Vulkan-style
+// view-projection must land on the production pick ray for the same pixel, at
+// the parametric depth that re-projects to the same clip-space sample.
+TEST(PrimitiveSelectionRefinementWiring, UnprojectPickDepthLandsOnCameraPickRay)
+{
+    const glm::vec3 eye{0.0f, 0.0f, 3.0f};
+    const glm::mat4 view = glm::lookAt(eye, glm::vec3{0.0f}, glm::vec3{0.0f, 1.0f, 0.0f});
+    glm::mat4 projection = glm::perspective(glm::radians(45.0f), 4.0f / 3.0f, 0.1f, 100.0f);
+    projection[1][1] *= -1.0f; // Vulkan Y flip, mirroring BuildReferenceCameraViewInput.
+    const glm::mat4 viewProjection = projection * view;
+    const glm::mat4 inverseViewProjection = glm::inverse(viewProjection);
+
+    constexpr std::uint32_t kWidth = 640u;
+    constexpr std::uint32_t kHeight = 480u;
+    constexpr std::uint32_t kPixelX = 137u;
+    constexpr std::uint32_t kPixelY = 89u;
+    constexpr float kDepth = 0.7f;
+
+    const std::optional<glm::vec3> world = UnprojectPickDepth(
+        inverseViewProjection, kPixelX, kPixelY, kWidth, kHeight, kDepth);
+    ASSERT_TRUE(world.has_value());
+
+    // Re-project: the round trip must reproduce the pixel-center NDC + depth.
+    const glm::vec4 clip = viewProjection * glm::vec4{*world, 1.0f};
+    ASSERT_GT(std::abs(clip.w), 0.000001f);
+    const glm::vec3 ndc = glm::vec3{clip} / clip.w;
+    const float expectedNdcX = ((static_cast<float>(kPixelX) + 0.5f) / kWidth) * 2.f - 1.f;
+    const float expectedNdcY = 1.f - ((static_cast<float>(kPixelY) + 0.5f) / kHeight) * 2.f;
+    EXPECT_NEAR(ndc.x, expectedNdcX, 1.0e-4f);
+    EXPECT_NEAR(ndc.y, expectedNdcY, 1.0e-4f);
+    EXPECT_NEAR(ndc.z, kDepth, 1.0e-4f);
+
+    // Degenerate inputs fail closed.
+    EXPECT_FALSE(UnprojectPickDepth(inverseViewProjection, kPixelX, kPixelY, 0u, 0u, kDepth)
+                     .has_value());
+    EXPECT_FALSE(UnprojectPickDepth(inverseViewProjection, kWidth, kPixelY, kWidth, kHeight, kDepth)
+                     .has_value());
+}
+
+// A face hit with a depth-reconstructed cursor anchors the closest-vertex and
+// closest-edge refinement on the hinted face and reports the cursor in both
+// entity-local and world space. Identity camera (InverseViewProjection = I)
+// makes the expected cursor analytic: pixel (99, 24) of a 100x100 viewport
+// maps to NDC (0.99, 0.51), depth 0.5 -> world (0.99, 0.51, 0.5).
+TEST(PrimitiveSelectionRefinementWiring, FaceHitWithDepthContextAnchorsClosestVertexAndEdge)
+{
+    Registry registry;
+    const EntityHandle entity = registry.Create();
+    EmplaceTriangleMesh(registry, entity);
+
+    PickReadbackContext context{};
+    context.InverseViewProjection = glm::mat4{1.0f};
+    context.ViewportWidth = 100u;
+    context.ViewportHeight = 100u;
+
+    const std::optional<PrimitiveSelectionResult> result = RefinePickReadbackResult(
+        registry,
+        HitWithDepth(entity, SelectionPrimitiveDomain::Face, 0u, 99u, 24u, 0.5f),
+        &context);
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Status, PrimitiveRefineStatus::Success);
+    EXPECT_EQ(result->Kind, RefinedPrimitiveKind::Face);
+    EXPECT_EQ(result->FaceId, 0u);
+    // Cursor (0.99, 0.51, 0.5): nearest face vertex is v1 = (1, 0, 0); nearest
+    // boundary edge is (v1, v2), the edge row (1, 2) = EdgeId 1.
+    EXPECT_EQ(result->VertexId, 1u);
+    EXPECT_EQ(result->EdgeId, 1u);
+
+    EXPECT_TRUE(result->CursorFromDepth);
+    EXPECT_FLOAT_EQ(result->Depth, 0.5f);
+    EXPECT_NEAR(result->LocalCursor.x, 0.99f, 1.0e-4f);
+    EXPECT_NEAR(result->LocalCursor.y, 0.51f, 1.0e-4f);
+    EXPECT_NEAR(result->LocalCursor.z, 0.5f, 1.0e-4f);
+    ASSERT_TRUE(result->HasHitPosition);
+    // Hint-anchored refinement reports the cursor as the hit position too.
+    EXPECT_NEAR(result->LocalHit.x, 0.99f, 1.0e-4f);
+    EXPECT_NEAR(result->LocalHit.y, 0.51f, 1.0e-4f);
+    EXPECT_NEAR(result->LocalHit.z, 0.5f, 1.0e-4f);
+    // Identity transform: world cursor == local cursor.
+    EXPECT_NEAR(result->WorldCursor.x, result->LocalCursor.x, 1.0e-5f);
+    EXPECT_NEAR(result->WorldCursor.y, result->LocalCursor.y, 1.0e-5f);
+    EXPECT_NEAR(result->WorldCursor.z, result->LocalCursor.z, 1.0e-5f);
+}
+
+// The entity transform maps the world cursor into entity-local space before
+// anchoring: with the mesh translated by (5, 0, 0) the same world cursor
+// anchors relative to local coordinates, and the reported WorldHit stays the
+// cursor in world space.
+TEST(PrimitiveSelectionRefinementWiring, DepthCursorIsTransformedIntoEntityLocalSpace)
+{
+    Registry registry;
+    const EntityHandle entity = registry.Create();
+    EmplaceTriangleMesh(registry, entity);
+    registry.Raw().emplace<WorldMatrix>(entity).Matrix =
+        glm::translate(glm::mat4{1.0f}, glm::vec3{5.0f, 0.0f, 0.0f});
+
+    PickReadbackContext context{};
+    context.InverseViewProjection =
+        glm::translate(glm::mat4{1.0f}, glm::vec3{5.0f, 0.0f, 0.0f});
+    context.ViewportWidth = 100u;
+    context.ViewportHeight = 100u;
+
+    // NDC (0.99, 0.51, 0.5) -> world (5.99, 0.51, 0.5) -> local (0.99, 0.51, 0.5).
+    const std::optional<PrimitiveSelectionResult> result = RefinePickReadbackResult(
+        registry,
+        HitWithDepth(entity, SelectionPrimitiveDomain::Face, 0u, 99u, 24u, 0.5f),
+        &context);
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Status, PrimitiveRefineStatus::Success);
+    EXPECT_EQ(result->VertexId, 1u);
+    EXPECT_EQ(result->EdgeId, 1u);
+    EXPECT_TRUE(result->CursorFromDepth);
+    EXPECT_NEAR(result->LocalCursor.x, 0.99f, 1.0e-4f);
+    EXPECT_NEAR(result->WorldCursor.x, 5.99f, 1.0e-4f);
+    EXPECT_NEAR(result->WorldCursor.y, 0.51f, 1.0e-4f);
+}
+
+// Depth 1.0 is the clear value — no geometry under the cursor — so no anchor
+// is derived: the face hint still resolves but reports the representative
+// (centroid) position rather than a cursor.
+TEST(PrimitiveSelectionRefinementWiring, DepthClearValueSkipsCursorAnchor)
+{
+    Registry registry;
+    const EntityHandle entity = registry.Create();
+    EmplaceTriangleMesh(registry, entity);
+
+    PickReadbackContext context{};
+    context.InverseViewProjection = glm::mat4{1.0f};
+    context.ViewportWidth = 100u;
+    context.ViewportHeight = 100u;
+
+    const std::optional<PrimitiveSelectionResult> result = RefinePickReadbackResult(
+        registry,
+        HitWithDepth(entity, SelectionPrimitiveDomain::Face, 0u, 99u, 24u, 1.0f),
+        &context);
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Status, PrimitiveRefineStatus::Success);
+    EXPECT_EQ(result->Kind, RefinedPrimitiveKind::Face);
+    EXPECT_FALSE(result->CursorFromDepth);
+    // Without an anchor the nearest-vertex/edge refinement does not run.
+    EXPECT_EQ(result->VertexId, Extrinsic::Runtime::kInvalidPrimitiveIndex);
+}
+
+// A hit with no sub-primitive hint resolves through the context-supplied pick
+// ray: the entity-local ray fallback picks the nearest mesh vertex within the
+// distance-scaled pixel radius.
+TEST(PrimitiveSelectionRefinementWiring, MissingHintResolvesThroughContextRayFallback)
+{
+    Registry registry;
+    const EntityHandle entity = registry.Create();
+    EmplaceTriangleMesh(registry, entity);
+
+    PickReadbackContext context{};
+    context.InverseViewProjection = glm::mat4{1.0f};
+    context.ViewportWidth = 100u;
+    context.ViewportHeight = 100u;
+    context.HasWorldRay = true;
+    context.WorldRayOrigin = glm::vec3{0.99f, 0.51f, -1.0f};
+    context.WorldRayDirection = glm::vec3{0.0f, 0.0f, 1.0f};
+    context.WorldUnitsPerPixelAtUnitDepth = 0.05f;
+    context.PickRadiusPixels = 12.0f;
+
+    // Domain None = no usable hint; the cursor depth keeps the radius scaled
+    // at the hit distance. v1 = (1, 0, 0) is within radius of the ray; v0/v2
+    // are not.
+    const std::optional<PrimitiveSelectionResult> result = RefinePickReadbackResult(
+        registry,
+        HitWithDepth(entity, SelectionPrimitiveDomain::None, 0u, 99u, 24u, 0.5f),
+        &context);
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Status, PrimitiveRefineStatus::CpuFallbackResolved);
+    EXPECT_EQ(result->Kind, RefinedPrimitiveKind::Vertex);
+    EXPECT_EQ(result->VertexId, 1u);
+    // The fallback reports the resolved vertex as the hit position while the
+    // depth-derived cursor stays available in the dedicated cursor fields.
+    EXPECT_NEAR(result->LocalHit.x, 1.0f, 1.0e-5f);
+    EXPECT_TRUE(result->CursorFromDepth);
+    EXPECT_NEAR(result->WorldCursor.x, 0.99f, 1.0e-4f);
+    EXPECT_NEAR(result->WorldCursor.y, 0.51f, 1.0e-4f);
+    EXPECT_NEAR(result->WorldCursor.z, 0.5f, 1.0e-4f);
 }

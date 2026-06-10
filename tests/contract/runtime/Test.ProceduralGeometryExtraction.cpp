@@ -15,6 +15,7 @@ import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.StableEntityLookup;
 
 using Extrinsic::ECS::EntityHandle;
 using Extrinsic::ECS::Scene::Registry;
@@ -132,7 +133,7 @@ TEST(ProceduralGeometryExtraction, GpuWorldReportsBoundGeometryForProceduralInst
     ASSERT_EQ(gpuWorld.GetLiveInstanceCount(), 1u);
     ASSERT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
 
-    const auto stableId = static_cast<std::uint32_t>(entity);
+    const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
     const auto view = extraction.FindRenderableSidecarForTest(stableId);
     ASSERT_TRUE(view.has_value());
     EXPECT_TRUE(view->Instance.IsValid());
@@ -281,7 +282,7 @@ TEST(ProceduralGeometryExtraction, RecreateProceduralEntityCancelsRetireAndKeeps
     ASSERT_EQ(stats.ProceduralGeometryUploads, 1u);
 
     const auto firstView =
-        extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(first));
+        extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(first));
     ASSERT_TRUE(firstView.has_value());
     const auto originalHandle = firstView->Geometry;
     ASSERT_TRUE(originalHandle.IsValid());
@@ -306,7 +307,7 @@ TEST(ProceduralGeometryExtraction, RecreateProceduralEntityCancelsRetireAndKeeps
     EXPECT_EQ(stats.ProceduralGeometryFreeRetires, 0u);
 
     const auto secondView =
-        extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(second));
+        extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(second));
     ASSERT_TRUE(secondView.has_value());
     EXPECT_EQ(secondView->Geometry, originalHandle);
 

@@ -3623,13 +3623,15 @@ TEST(RendererFrameLifecycle, SelectionOutlinePushConstantsMatchRecipeInputs)
 // *not* re-allocate it on subsequent `RebuildOperationalResources()` calls,
 // so the handle Slice D.2 will import into the recipe stays byte-identical
 // across rebuilds (same pattern `ShadowSystem` uses for its depth atlas).
-// The buffer is sized for `8 * frames-in-flight` bytes per `GRAPHICS-012Q`'s
-// `EncodedSelectionId` payload (one 4-byte `EntityId` word + one 4-byte
-// `EncodedSelectionId` word per in-flight frame slot) and allocated with
-// `HostVisible = true` + `BufferUsage::TransferDst` so Slice D.2 can record
-// `CopyTextureToBuffer(EntityId/PrimitiveId, ..., m_PickingReadbackBuffer,
-// slot * 8 [+4])` after the four selection-ID sub-passes and Slice D.3 can
-// map the buffer on `BeginFrame()` once the issuing frame has completed.
+// The buffer is sized for `16 * frames-in-flight` bytes: one 4-byte
+// `EntityId` word + one 4-byte `EncodedSelectionId` word (`GRAPHICS-012Q`)
+// + one 4-byte `SceneDepth` R32 float sample (BUG-026) + 4 pad bytes per
+// in-flight frame slot, allocated with `HostVisible = true` +
+// `BufferUsage::TransferDst` so the executor can record
+// `CopyTextureToBuffer(EntityId/PrimitiveId/SceneDepth, ...,
+// m_PickingReadbackBuffer, slot * 16 [+4|+8])` after the four selection-ID
+// sub-passes and the drain can map the buffer on `BeginFrame()` once the
+// issuing frame has completed.
 // ---------------------------------------------------------------------------
 
 TEST(RendererFrameLifecycle, PickingReadbackBufferSurvivesOperationalRebuild)
@@ -3644,11 +3646,11 @@ TEST(RendererFrameLifecycle, PickingReadbackBufferSurvivesOperationalRebuild)
     const Extrinsic::RHI::BufferHandle initialBuffer = renderer->GetPickingReadbackBuffer();
     EXPECT_TRUE(initialBuffer.IsValid());
 
-    // Size = 8 bytes per in-flight frame slot (one 4-byte `EntityId` word +
-    // one 4-byte `EncodedSelectionId` word). `MockDevice::GetFramesInFlight()`
-    // returns 2, so the allocation must be 16 bytes.
+    // Size = 16 bytes per in-flight frame slot (EntityId word +
+    // EncodedSelectionId word + SceneDepth float + pad, BUG-026).
+    // `MockDevice::GetFramesInFlight()` returns 2, so 32 bytes.
     const std::uint64_t initialSize = renderer->GetPickingReadbackBufferSize();
-    EXPECT_EQ(initialSize, static_cast<std::uint64_t>(8u) *
+    EXPECT_EQ(initialSize, static_cast<std::uint64_t>(16u) *
                                static_cast<std::uint64_t>(device.GetFramesInFlight()));
 
     EXPECT_TRUE(renderer->RebuildOperationalResources(device));
@@ -3675,8 +3677,8 @@ TEST(RendererFrameLifecycle, PickingReadbackBufferSurvivesOperationalRebuild)
 // GRAPHICS-074 Slice D.1 — when `RebuildOperationalResources()` runs against
 // a device whose `GetFramesInFlight()` differs from the previous allocation
 // (e.g. a swapchain rebuild changed the in-flight count), the lazy allocator
-// must drop the old lease and re-create the buffer so Slice D.2's
-// `slot * 8` per-frame copy addressing never overruns the allocation.
+// must drop the old lease and re-create the buffer so the executor's
+// `slot * 16` per-frame copy addressing never overruns the allocation.
 TEST(RendererFrameLifecycle, PickingReadbackBufferReallocatesWhenFramesInFlightChanges)
 {
     Extrinsic::Tests::MockDevice device;
@@ -3690,7 +3692,7 @@ TEST(RendererFrameLifecycle, PickingReadbackBufferReallocatesWhenFramesInFlightC
     const Extrinsic::RHI::BufferHandle initialBuffer = renderer->GetPickingReadbackBuffer();
     ASSERT_TRUE(initialBuffer.IsValid());
     EXPECT_EQ(renderer->GetPickingReadbackBufferSize(),
-              static_cast<std::uint64_t>(8u) * 2u);
+              static_cast<std::uint64_t>(16u) * 2u);
 
     // Simulate a swapchain rebuild that promotes the device from
     // double- to triple-buffered. The lease must be reallocated so the
@@ -3701,7 +3703,7 @@ TEST(RendererFrameLifecycle, PickingReadbackBufferReallocatesWhenFramesInFlightC
     const Extrinsic::RHI::BufferHandle resizedBuffer = renderer->GetPickingReadbackBuffer();
     ASSERT_TRUE(resizedBuffer.IsValid());
     EXPECT_EQ(renderer->GetPickingReadbackBufferSize(),
-              static_cast<std::uint64_t>(8u) * 3u);
+              static_cast<std::uint64_t>(16u) * 3u);
     // The reallocation must surface as a *different* handle so downstream
     // recipe imports (Slice D.2) re-import the new buffer rather than
     // continuing to copy into the freed allocation. `BufferManager`
@@ -3722,7 +3724,7 @@ TEST(RendererFrameLifecycle, PickingReadbackBufferReallocatesWhenFramesInFlightC
     EXPECT_EQ(stableBuffer.Index, resizedBuffer.Index);
     EXPECT_EQ(stableBuffer.Generation, resizedBuffer.Generation);
     EXPECT_EQ(renderer->GetPickingReadbackBufferSize(),
-              static_cast<std::uint64_t>(8u) * 3u);
+              static_cast<std::uint64_t>(16u) * 3u);
 
     renderer->Shutdown();
 }
@@ -3882,22 +3884,24 @@ TEST(RendererFrameLifecycle, PickingReadbackCopySkippedWhenNotPending)
 
 namespace
 {
-    // Helper: encode 8 bytes for slot 0 (`EntityId` word + `EncodedSelectionId`
-    // word) into `MockDevice::BufferContents` so the next `BeginFrame()`
-    // drain reads them back. The slot mirrors the
-    // `slot * 8 [+4]` offsets the D.2 executor records.
+    // Helper: encode one slot's words (`EntityId` + `EncodedSelectionId` +
+    // `SceneDepth` float bits, BUG-026) into `MockDevice::BufferContents` so
+    // the next `BeginFrame()` drain reads them back. The slot mirrors the
+    // `slot * 16 [+4|+8]` offsets the executor records.
     void SeedPickingReadbackSlot(Extrinsic::Tests::MockDevice& device,
                                  const Extrinsic::RHI::BufferHandle& buffer,
                                  const std::uint64_t bufferSize,
                                  const std::size_t slot,
                                  const std::uint32_t entityId,
-                                 const Extrinsic::Graphics::EncodedSelectionId encoded)
+                                 const Extrinsic::Graphics::EncodedSelectionId encoded,
+                                 const float depth = 1.0f)
     {
         std::vector<std::byte>& contents = device.BufferContents[buffer.Index];
         contents.assign(static_cast<std::size_t>(bufferSize), std::byte{0});
-        const std::size_t offset = slot * 8u;
+        const std::size_t offset = slot * 16u;
         std::memcpy(contents.data() + offset,                &entityId,         sizeof(entityId));
-        std::memcpy(contents.data() + offset + sizeof(std::uint32_t), &encoded.Value, sizeof(encoded.Value));
+        std::memcpy(contents.data() + offset + 4u, &encoded.Value, sizeof(encoded.Value));
+        std::memcpy(contents.data() + offset + 8u, &depth, sizeof(depth));
     }
 }
 
@@ -3941,11 +3945,12 @@ TEST(RendererFrameLifecycle, PickingReadbackPublishesPickResultForHitPixel)
     // `EncodedSelectionId = EncodeSelectionId(Entity, 0)`. The drain at the
     // next BeginFrame reads these via `MockDevice::ReadBuffer`.
     constexpr std::uint32_t hitStableEntityId = 42u;
+    constexpr float hitDepth = 0.625f;
     const Extrinsic::Graphics::EncodedSelectionId hitEncoded =
         Extrinsic::Graphics::EncodeSelectionId(
             Extrinsic::Graphics::SelectionPrimitiveDomain::Entity, 0u);
     SeedPickingReadbackSlot(device, pickingBuffer, pickingBufferSize,
-                            /*slot=*/0u, hitStableEntityId, hitEncoded);
+                            /*slot=*/0u, hitStableEntityId, hitEncoded, hitDepth);
 
     // Frame 1 — the drain runs at the top of `BeginFrame()` before
     // `m_Device->BeginFrame(...)`. Slot 0 has `IssuedFrame=0 <
@@ -3961,6 +3966,12 @@ TEST(RendererFrameLifecycle, PickingReadbackPublishesPickResultForHitPixel)
     EXPECT_TRUE(last->Hit);
     EXPECT_EQ(last->StableEntityId, hitStableEntityId);
     EXPECT_EQ(last->EncodedId.Value, hitEncoded.Value);
+    // BUG-026 — the drain publishes the SceneDepth sample and the request
+    // pixel so the runtime can unproject the world-space cursor position.
+    EXPECT_TRUE(last->HasDepth);
+    EXPECT_EQ(last->Depth, hitDepth);
+    EXPECT_EQ(last->PixelX, 17u);
+    EXPECT_EQ(last->PixelY, 23u);
 
     const Extrinsic::Graphics::SelectionSystemDiagnostics diag = selection.GetDiagnostics();
     EXPECT_EQ(diag.PickHitCount, 1u);
@@ -4009,11 +4020,12 @@ TEST(RendererFrameLifecycle, PickingReadbackPreservesCorrelationSequence)
     [[maybe_unused]] const std::uint64_t completedFrame = renderer->EndFrame(frame);
 
     constexpr std::uint32_t hitStableEntityId = 42u;
+    constexpr float hitDepth = 0.625f;
     const Extrinsic::Graphics::EncodedSelectionId hitEncoded =
         Extrinsic::Graphics::EncodeSelectionId(
             Extrinsic::Graphics::SelectionPrimitiveDomain::Entity, 0u);
     SeedPickingReadbackSlot(device, pickingBuffer, pickingBufferSize,
-                            /*slot=*/0u, hitStableEntityId, hitEncoded);
+                            /*slot=*/0u, hitStableEntityId, hitEncoded, hitDepth);
 
     device.NextFrame.FrameIndex = 1u;
     Extrinsic::RHI::FrameHandle nextFrame{};
@@ -4188,7 +4200,7 @@ TEST(RendererFrameLifecycle, PickingReadbackPublishesNoHitForTruncatedSlotOnFifS
     const Extrinsic::RHI::BufferHandle pickingBuffer = renderer->GetPickingReadbackBuffer();
     ASSERT_TRUE(pickingBuffer.IsValid());
     ASSERT_EQ(renderer->GetPickingReadbackBufferSize(),
-              static_cast<std::uint64_t>(8u) * 3u);
+              static_cast<std::uint64_t>(16u) * 3u);
 
     // Step the device's `FrameIndex` to 2 so the executor populates the
     // tail slot (slot 2) inside `m_PickingSlot*`. Run BeginFrame +
@@ -4223,7 +4235,7 @@ TEST(RendererFrameLifecycle, PickingReadbackPublishesNoHitForTruncatedSlotOnFifS
 
     // Simulate the swapchain demoting the device from triple- to
     // double-buffered. `RebuildOperationalResources()` reallocates the
-    // buffer (size shrinks to 16 bytes) and truncates the per-slot
+    // buffer (size shrinks to two slots) and truncates the per-slot
     // bookkeeping to 2 entries. Slot 2 was `Pending=true` — without the
     // truncation-time NoHit publish, that pending readback would leak
     // silently and the SelectionSystem would keep showing the pre-rebuild
@@ -4231,7 +4243,7 @@ TEST(RendererFrameLifecycle, PickingReadbackPublishesNoHitForTruncatedSlotOnFifS
     device.FramesInFlight = 2u;
     ASSERT_TRUE(renderer->RebuildOperationalResources(device));
     ASSERT_EQ(renderer->GetPickingReadbackBufferSize(),
-              static_cast<std::uint64_t>(8u) * 2u);
+              static_cast<std::uint64_t>(16u) * 2u);
 
     const Extrinsic::Graphics::SelectionSystem& selection = renderer->GetSelectionSystem();
     const std::optional<Extrinsic::Graphics::PickReadbackResult> last = selection.GetLastPickResult();

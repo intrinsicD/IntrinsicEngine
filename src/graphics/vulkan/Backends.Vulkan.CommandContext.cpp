@@ -201,10 +201,14 @@ void VulkanCommandContext::BeginRenderPass(const RHI::RenderPassDesc& desc)
     {
         VkRenderingAttachmentInfo info{};
         info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+        // Backbuffer (invalid handle) keeps the float path: swapchain formats
+        // are UNORM/SRGB.
+        VkFormat attachmentFormat = VK_FORMAT_UNDEFINED;
         if (ca.Target.IsValid())
         {
             const auto* img = m_Images->GetIfValid(ca.Target);
             info.imageView   = img ? img->View : VK_NULL_HANDLE;
+            attachmentFormat = img ? img->Format : VK_FORMAT_UNDEFINED;
         }
         // Invalid handle = backbuffer; VulkanDevice::BeginFrame sets its view
         // into a special slot that TextureBarrier recognises.  When using dynamic
@@ -215,7 +219,11 @@ void VulkanCommandContext::BeginRenderPass(const RHI::RenderPassDesc& desc)
                                                               : VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         info.storeOp     = ca.Store == RHI::StoreOp::Store   ? VK_ATTACHMENT_STORE_OP_STORE
                                                               : VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        info.clearValue.color = {{ca.ClearR, ca.ClearG, ca.ClearB, ca.ClearA}};
+        // BUG-026: integer attachments need value-converted clears; the float
+        // bit pattern is wrong for UINT/SINT formats (R32_UINT selection IDs).
+        info.clearValue.color = ToVkClearColorValue(attachmentFormat,
+                                                    ca.ClearR, ca.ClearG,
+                                                    ca.ClearB, ca.ClearA);
         colorInfos.push_back(info);
     }
 

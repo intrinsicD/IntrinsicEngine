@@ -21,6 +21,7 @@ import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.StableEntityLookup;
 import Geometry.Properties;
 
 namespace gs = Extrinsic::ECS::Components::GeometrySources;
@@ -145,7 +146,7 @@ TEST(MeshGeometryExtraction, SingleMeshEntityUploadsOnceAndBindsInstanceGeometry
     EXPECT_EQ(gpuWorld.GetLiveInstanceCount(), 1u);
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
 
-    const auto stableId = static_cast<std::uint32_t>(entity);
+    const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
     const auto view = extraction.FindRenderableSidecarForTest(stableId);
     ASSERT_TRUE(view.has_value());
     EXPECT_TRUE(view->Instance.IsValid());
@@ -181,7 +182,7 @@ TEST(MeshGeometryExtraction, RepeatedExtractionReusesMeshHandleWithoutReupload)
     ASSERT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
 
     const auto firstView =
-        extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(entity));
+        extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(firstView.has_value());
     const auto firstHandle = firstView->MeshGeometry;
 
@@ -194,7 +195,7 @@ TEST(MeshGeometryExtraction, RepeatedExtractionReusesMeshHandleWithoutReupload)
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
 
     const auto secondView =
-        extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(entity));
+        extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(secondView.has_value());
     EXPECT_EQ(secondView->MeshGeometry, firstHandle);
 
@@ -339,7 +340,7 @@ TEST(MeshGeometryExtraction, ProceduralRefPreemptsMeshPathOnSameEntity)
     EXPECT_EQ(stats.MeshGeometryFailedPack, 0u);
 
     const auto view = extraction.FindRenderableSidecarForTest(
-        static_cast<std::uint32_t>(entity));
+        Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(view.has_value());
     EXPECT_FALSE(view->HasMeshResidency);
     EXPECT_TRUE(view->ProceduralKey.has_value());
@@ -374,7 +375,7 @@ TEST(MeshGeometryExtraction, AssetSourcePresentPreemptsMeshPathOnSameEntity)
     EXPECT_EQ(stats.MeshGeometryFailedPack, 0u);
 
     const auto view = extraction.FindRenderableSidecarForTest(
-        static_cast<std::uint32_t>(entity));
+        Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(view.has_value());
     EXPECT_FALSE(view->HasMeshResidency);
 
@@ -549,7 +550,7 @@ TEST(MeshGeometryExtraction, AddingProceduralRefAfterMeshUploadReleasesMeshResid
     EXPECT_EQ(stats.ProceduralGeometryUploads, 1u);
 
     const auto view = extraction.FindRenderableSidecarForTest(
-        static_cast<std::uint32_t>(entity));
+        Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(view.has_value());
     EXPECT_FALSE(view->HasMeshResidency);
     ASSERT_TRUE(view->ProceduralKey.has_value());
@@ -612,7 +613,7 @@ TEST(MeshGeometryExtraction, AddingAssetSourceAfterMeshUploadReleasesMeshResiden
     EXPECT_EQ(stats.SourceAssetObservationCount, 1u);
 
     const auto view = extraction.FindRenderableSidecarForTest(
-        static_cast<std::uint32_t>(entity));
+        Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(view.has_value());
     EXPECT_FALSE(view->HasMeshResidency);
     // Slice C — the instance is explicitly detached from the queued
@@ -673,7 +674,7 @@ TEST(MeshGeometryExtraction, LosingMeshDomainTopologyReleasesMeshResidency)
     EXPECT_EQ(stats.MeshGeometryFreeRetires, 0u);
 
     const auto view = extraction.FindRenderableSidecarForTest(
-        static_cast<std::uint32_t>(entity));
+        Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(view.has_value());
     EXPECT_FALSE(view->HasMeshResidency);
     EXPECT_FALSE(gpuWorld.GetInstanceGeometry(view->Instance).IsValid());
@@ -722,7 +723,7 @@ TEST(MeshGeometryExtraction, NonMeshDomainEntityIsIgnoredByMeshPath)
     EXPECT_EQ(stats.MeshGeometryInvalidTopology, 0u);
 
     const auto view = extraction.FindRenderableSidecarForTest(
-        static_cast<std::uint32_t>(entity));
+        Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(view.has_value());
     EXPECT_FALSE(view->HasMeshResidency);
 
@@ -776,7 +777,7 @@ TEST_P(MeshGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
     ASSERT_EQ(stats.MeshGeometryReuploads, 0u);
 
     const auto firstView =
-        extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(entity));
+        extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(firstView.has_value());
     const auto firstHandle = firstView->MeshGeometry;
     ASSERT_TRUE(firstHandle.IsValid());
@@ -804,7 +805,7 @@ TEST_P(MeshGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
     EXPECT_EQ(stats.MeshGeometryFreeRetires, 0u);
 
     const auto secondView =
-        extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(entity));
+        extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(secondView.has_value());
     EXPECT_TRUE(secondView->HasMeshResidency);
     EXPECT_NE(secondView->MeshGeometry, firstHandle);
@@ -914,7 +915,7 @@ TEST(MeshGeometryExtraction, ReuploadFailureReleasesStaleResidencyAndPreservesDi
 
     auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
     const auto firstView =
-        extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(entity));
+        extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(firstView.has_value());
 
     // Corrupt the mesh so the next pack returns `InvalidTopology` (face
@@ -936,7 +937,7 @@ TEST(MeshGeometryExtraction, ReuploadFailureReleasesStaleResidencyAndPreservesDi
     EXPECT_EQ(stats.MeshGeometryFreeRetires, 0u);
 
     const auto secondView =
-        extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(entity));
+        extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(secondView.has_value());
     EXPECT_FALSE(secondView->HasMeshResidency);
     EXPECT_FALSE(gpuWorld.GetInstanceGeometry(secondView->Instance).IsValid());

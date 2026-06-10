@@ -132,8 +132,59 @@ export namespace Extrinsic::Runtime
         glm::vec3 LocalHit{0.0f};
         glm::vec3 WorldHit{0.0f};
 
+        // BUG-026 — cursor position reconstructed from the GPU depth readback,
+        // reported in world space (`WorldCursor`) and entity-local space
+        // (`LocalCursor`) when `CursorFromDepth` is true. `Depth` echoes the
+        // raw [0..1] depth-buffer sample used (1.0 = depth clear / no sample).
+        // Distinct from `LocalHit`/`WorldHit`: hint-anchored refinement reports
+        // the cursor there too, but the ray-fallback path reports the resolved
+        // primitive's position in `LocalHit`/`WorldHit` while the cursor stays
+        // available here.
+        bool CursorFromDepth{false};
+        float Depth{1.0f};
+        glm::vec3 LocalCursor{0.0f};
+        glm::vec3 WorldCursor{0.0f};
+
         [[nodiscard]] bool Resolved() const noexcept { return IsResolved(Status); }
     };
+
+    // BUG-026 — per-pick camera/cursor context the runtime captures when it
+    // drains a pick into the renderer, replayed when the matching readback
+    // arrives so cursor positions are reconstructed against the *issuing*
+    // frame's camera (the camera may have moved by the time the GPU readback
+    // completes).
+    struct PickReadbackContext
+    {
+        // Inverse of the issuing frame's (projection * view); the same matrix
+        // `Graphics::BuildCameraViewSnapshot` derives for the pick ray.
+        glm::mat4 InverseViewProjection{1.0f};
+        std::uint32_t ViewportWidth{0u};
+        std::uint32_t ViewportHeight{0u};
+        // World-space pick ray through the pick pixel (from the camera
+        // snapshot); drives the missing-hint CPU fallback in entity-local space.
+        bool HasWorldRay{false};
+        glm::vec3 WorldRayOrigin{0.0f};
+        glm::vec3 WorldRayDirection{0.0f, 0.0f, -1.0f};
+        // World units spanned by one pixel at view depth 1 —
+        // `2 * tan(fovY / 2) / viewportHeight`, derived from the projection —
+        // so the pixel pick radius scales with the hit distance.
+        float WorldUnitsPerPixelAtUnitDepth{0.0f};
+        float PickRadiusPixels{12.0f};
+    };
+
+    // Reconstruct the world-space position of `(pixelX, pixelY)` at
+    // depth-buffer sample `depth` ([0 (near) .. 1 (far)], Vulkan convention)
+    // through `inverseViewProjection`. Pixel -> NDC mapping mirrors
+    // `Graphics::BuildCameraViewSnapshot`'s pick-ray derivation (pixel center
+    // at +0.5, NDC Y up). Returns std::nullopt for a degenerate viewport, a
+    // near-zero homogeneous w, or a non-finite result.
+    [[nodiscard]] std::optional<glm::vec3> UnprojectPickDepth(
+        const glm::mat4& inverseViewProjection,
+        std::uint32_t pixelX,
+        std::uint32_t pixelY,
+        std::uint32_t viewportWidth,
+        std::uint32_t viewportHeight,
+        float depth) noexcept;
 
     // Refine one graphics primitive hint into an authoritative selection result
     // against the entity's promoted `GeometrySources` view. Pure CPU, stateless,
@@ -148,18 +199,31 @@ export namespace Extrinsic::Runtime
     // primitive selection result, owned by `runtime` (the only layer allowed to
     // bridge graphics pick output with the CPU `GeometrySources` authority).
     //
-    // The readback's `StableEntityId` is the *render id* (the `entt::entity`
-    // handle cast to `uint32`, the identity encoding `RenderExtractionCache` /
-    // `SelectionController` share). This function resolves it to a live entity by
+    // The readback's `StableEntityId` is the *render id* owned by
+    // `StableEntityLookup::ToRenderId` (`entt::entity` handle cast + 1, with 0
+    // reserved for background — BUG-026), shared with `RenderExtractionCache` /
+    // `SelectionController`. This function resolves it to a live entity by
     // decoding + a `registry.valid()` version check, so a stale render id naming a
     // recycled/destroyed slot reports a deterministic `StaleEntity` result rather
     // than refining the slot's new occupant. The entity's `Transform::WorldMatrix`
     // (identity when absent) supplies `LocalToWorld`, the `GeometrySources` view is
     // built from the live registry, and `RefinePrimitiveSelection` does the rest.
     //
+    // When `context` is non-null and the readback carries a valid depth sample,
+    // the bridge reconstructs the world-space cursor position (BUG-026), feeds
+    // its entity-local equivalent as the refinement anchor (driving the
+    // nearest-vertex/edge resolution on the hinted face/edge), and supplies the
+    // entity-local pick ray + distance-scaled radius for the missing-hint CPU
+    // fallback. The result then reports the cursor in both spaces
+    // (`CursorFromDepth`, `LocalCursor`, `WorldCursor`, `Depth`).
+    //
     // A background (no-hit) readback resolves to no sub-primitive (`std::nullopt`).
     // Pure read: it mutates neither the registry nor any selection state — the
     // caller (`Engine::RunFrame`) owns the editor-facing cache it is stored in.
+    [[nodiscard]] std::optional<PrimitiveSelectionResult> RefinePickReadbackResult(
+        ECS::Scene::Registry& scene,
+        const Extrinsic::Graphics::PickReadbackResult& readback,
+        const PickReadbackContext* context);
     [[nodiscard]] std::optional<PrimitiveSelectionResult> RefinePickReadbackResult(
         ECS::Scene::Registry& scene,
         const Extrinsic::Graphics::PickReadbackResult& readback);

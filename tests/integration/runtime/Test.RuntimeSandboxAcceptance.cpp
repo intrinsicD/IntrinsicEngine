@@ -47,6 +47,7 @@ import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxEditorUi;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.StableEntityLookup;
 import Geometry.Properties;
 
 namespace ECS = Extrinsic::ECS;
@@ -203,9 +204,12 @@ TEST(RuntimeSandboxAcceptance, MeshGraphPointCloudAllResideThroughOneExtraction)
     EXPECT_EQ(gpuWorld.GetLiveInstanceCount(), 3u);
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 3u);
 
-    const auto meshView = extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(mesh));
-    const auto graphView = extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(graph));
-    const auto cloudView = extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(cloud));
+    const auto meshView = extraction.FindRenderableSidecarForTest(
+        Runtime::SelectionController::ToStableEntityId(mesh));
+    const auto graphView = extraction.FindRenderableSidecarForTest(
+        Runtime::SelectionController::ToStableEntityId(graph));
+    const auto cloudView = extraction.FindRenderableSidecarForTest(
+        Runtime::SelectionController::ToStableEntityId(cloud));
     ASSERT_TRUE(meshView.has_value());
     ASSERT_TRUE(graphView.has_value());
     ASSERT_TRUE(cloudView.has_value());
@@ -329,7 +333,8 @@ namespace
     {
         return Graphics::PickReadbackResult{
             .EncodedId = Graphics::EncodeSelectionId(domain, payload),
-            .StableEntityId = static_cast<std::uint32_t>(entity),
+            // BUG-026: render id = entt handle + 1 (0 = background sentinel).
+            .StableEntityId = Runtime::SelectionController::ToStableEntityId(entity),
             .Hit = true,
             .Sequence = 1u,
         };
@@ -353,7 +358,7 @@ TEST(RuntimeSandboxAcceptance, PrimitiveRefinementResolvesOneDomainPerFamily)
     ASSERT_TRUE(meshHit.has_value());
     EXPECT_TRUE(meshHit->Resolved());
     EXPECT_EQ(meshHit->Kind, Runtime::RefinedPrimitiveKind::Face);
-    EXPECT_EQ(meshHit->EntityId, static_cast<std::uint32_t>(mesh));
+    EXPECT_EQ(meshHit->EntityId, Extrinsic::Runtime::StableEntityLookup::ToRenderId(mesh));
 
     const auto graphHit =
         Runtime::RefinePickReadbackResult(scene, MockPick(graph, Graphics::SelectionPrimitiveDomain::Edge, 0u));

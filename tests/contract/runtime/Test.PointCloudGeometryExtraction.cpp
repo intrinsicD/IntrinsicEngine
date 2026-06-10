@@ -20,6 +20,7 @@ import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.StableEntityLookup;
 import Geometry.PointCloud;
 import Geometry.Properties;
 
@@ -113,7 +114,7 @@ TEST(PointCloudGeometryExtraction, CloudUploadsOnceAndBindsInstanceGeometry)
     EXPECT_EQ(gpuWorld.GetLiveInstanceCount(), 1u);
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
 
-    const auto stableId = static_cast<std::uint32_t>(entity);
+    const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
     const auto view = extraction.FindRenderableSidecarForTest(stableId);
     ASSERT_TRUE(view.has_value());
     EXPECT_TRUE(view->Instance.IsValid());
@@ -167,7 +168,7 @@ TEST(PointCloudGeometryExtraction, PopulateFromCloudResolvesPointCloudDomainAndU
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
 
     const auto view =
-        extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(entity));
+        extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(view.has_value());
     EXPECT_TRUE(view->HasPointCloudResidency);
     EXPECT_EQ(gpuWorld.GetInstanceGeometry(view->Instance), view->PointCloudGeometry);
@@ -195,7 +196,7 @@ TEST(PointCloudGeometryExtraction, RepeatedExtractionReusesPointCloudHandleWitho
     ASSERT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
 
     const auto firstView =
-        extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(entity));
+        extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(firstView.has_value());
     const auto firstHandle = firstView->PointCloudGeometry;
 
@@ -208,7 +209,7 @@ TEST(PointCloudGeometryExtraction, RepeatedExtractionReusesPointCloudHandleWitho
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
 
     const auto secondView =
-        extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(entity));
+        extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(secondView.has_value());
     EXPECT_EQ(secondView->PointCloudGeometry, firstHandle);
 
@@ -348,7 +349,7 @@ TEST(PointCloudGeometryExtraction, ProceduralRefPreemptsPointCloudPathOnSameEnti
     EXPECT_EQ(stats.PointCloudGeometryFailedPack, 0u);
 
     const auto view = extraction.FindRenderableSidecarForTest(
-        static_cast<std::uint32_t>(entity));
+        Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(view.has_value());
     EXPECT_FALSE(view->HasPointCloudResidency);
     EXPECT_TRUE(view->ProceduralKey.has_value());
@@ -454,7 +455,7 @@ TEST(PointCloudGeometryExtraction, PerPointSizeSourceFailsClosedAsFailedPack)
     EXPECT_EQ(stats.PointCloudGeometryInvalidPoints, 0u);
 
     const auto view = extraction.FindRenderableSidecarForTest(
-        static_cast<std::uint32_t>(entity));
+        Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(view.has_value());
     EXPECT_FALSE(view->HasPointCloudResidency);
 
@@ -498,7 +499,7 @@ TEST(PointCloudGeometryExtraction, AddingProceduralRefAfterUploadReleasesPointCl
     EXPECT_EQ(stats.ProceduralGeometryUploads, 1u);
 
     const auto view = extraction.FindRenderableSidecarForTest(
-        static_cast<std::uint32_t>(entity));
+        Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(view.has_value());
     EXPECT_FALSE(view->HasPointCloudResidency);
     ASSERT_TRUE(view->ProceduralKey.has_value());
@@ -561,7 +562,7 @@ TEST(PointCloudGeometryExtraction, LosingPointHintReleasesPointCloudResidency)
     EXPECT_EQ(stats.PointCloudGeometryFreeRetires, 0u);
 
     const auto view = extraction.FindRenderableSidecarForTest(
-        static_cast<std::uint32_t>(entity));
+        Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(view.has_value());
     EXPECT_FALSE(view->HasPointCloudResidency);
     EXPECT_FALSE(gpuWorld.GetInstanceGeometry(view->Instance).IsValid());
@@ -624,7 +625,7 @@ TEST_P(PointCloudGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
     ASSERT_EQ(stats.PointCloudGeometryReuploads, 0u);
 
     const auto firstView =
-        extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(entity));
+        extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(firstView.has_value());
     const auto firstHandle = firstView->PointCloudGeometry;
     ASSERT_TRUE(firstHandle.IsValid());
@@ -649,7 +650,7 @@ TEST_P(PointCloudGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
     EXPECT_EQ(stats.PointCloudGeometryFreeRetires, 0u);
 
     const auto secondView =
-        extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(entity));
+        extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(secondView.has_value());
     EXPECT_TRUE(secondView->HasPointCloudResidency);
     EXPECT_NE(secondView->PointCloudGeometry, firstHandle);
@@ -736,7 +737,7 @@ TEST(PointCloudGeometryExtraction, ReuploadFailureReleasesStaleResidencyAndPrese
     EXPECT_EQ(stats.PointCloudGeometryFreeRetires, 0u);
 
     const auto view =
-        extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(entity));
+        extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(view.has_value());
     EXPECT_FALSE(view->HasPointCloudResidency);
     EXPECT_FALSE(gpuWorld.GetInstanceGeometry(view->Instance).IsValid());
@@ -792,7 +793,7 @@ TEST(PointCloudGeometryExtraction, SwitchingToUnsupportedSizeSourceReleasesResid
     EXPECT_EQ(stats.PointCloudGeometryFreeRetires, 0u);
 
     const auto view =
-        extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(entity));
+        extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(view.has_value());
     EXPECT_FALSE(view->HasPointCloudResidency);
     EXPECT_FALSE(gpuWorld.GetInstanceGeometry(view->Instance).IsValid());

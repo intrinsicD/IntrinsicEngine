@@ -20,6 +20,7 @@ import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.StableEntityLookup;
 import Geometry.Properties;
 
 namespace gs = Extrinsic::ECS::Components::GeometrySources;
@@ -176,7 +177,7 @@ TEST(MeshPrimitiveViewExtraction, EnableEdgeViewUploadsSeparateLineRenderable)
 
     auto& scene = engine.GetScene();
     const EntityHandle entity = MakeMeshRenderable(scene);
-    const auto stableId = static_cast<std::uint32_t>(entity);
+    const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
     extraction.SetMeshPrimitiveViewSettings(stableId, MeshPrimitiveViewSettings{.EnableEdgeView = true});
@@ -220,7 +221,7 @@ TEST(MeshPrimitiveViewExtraction, EnableVertexViewUploadsSeparatePointRenderable
 
     auto& scene = engine.GetScene();
     const EntityHandle entity = MakeMeshRenderable(scene);
-    const auto stableId = static_cast<std::uint32_t>(entity);
+    const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
     extraction.SetMeshPrimitiveViewSettings(stableId, MeshPrimitiveViewSettings{.EnableVertexView = true});
@@ -257,7 +258,7 @@ TEST(MeshPrimitiveViewExtraction, EnableBothViewsAllocatesThreeIndependentRender
 
     auto& scene = engine.GetScene();
     const EntityHandle entity = MakeMeshRenderable(scene);
-    const auto stableId = static_cast<std::uint32_t>(entity);
+    const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
     extraction.SetMeshPrimitiveViewSettings(
@@ -297,7 +298,7 @@ TEST(MeshPrimitiveViewExtraction, RepeatedExtractionReusesViewsWithoutReupload)
 
     auto& scene = engine.GetScene();
     const EntityHandle entity = MakeMeshRenderable(scene);
-    const auto stableId = static_cast<std::uint32_t>(entity);
+    const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
     extraction.SetMeshPrimitiveViewSettings(
@@ -342,7 +343,7 @@ TEST(MeshPrimitiveViewExtraction, VertexPositionDirtyRepacksBothViews)
     auto& scene = engine.GetScene();
     auto& raw = scene.Raw();
     const EntityHandle entity = MakeMeshRenderable(scene);
-    const auto stableId = static_cast<std::uint32_t>(entity);
+    const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
     extraction.SetMeshPrimitiveViewSettings(
@@ -404,7 +405,7 @@ TEST(MeshPrimitiveViewExtraction, DisablingEdgeViewReleasesItsGeometryAfterWindo
 
     auto& scene = engine.GetScene();
     const EntityHandle entity = MakeMeshRenderable(scene);
-    const auto stableId = static_cast<std::uint32_t>(entity);
+    const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
     extraction.SetMeshPrimitiveViewSettings(
@@ -451,7 +452,7 @@ TEST(MeshPrimitiveViewExtraction, EntityDestructionReleasesViewsAfterWindow)
 
     auto& scene = engine.GetScene();
     const EntityHandle entity = MakeMeshRenderable(scene);
-    const auto stableId = static_cast<std::uint32_t>(entity);
+    const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
     extraction.SetMeshPrimitiveViewSettings(
@@ -493,7 +494,7 @@ TEST(MeshPrimitiveViewExtraction, ShutdownReleasesViewResidency)
 
     auto& scene = engine.GetScene();
     const EntityHandle entity = MakeMeshRenderable(scene);
-    const auto stableId = static_cast<std::uint32_t>(entity);
+    const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
     extraction.SetMeshPrimitiveViewSettings(
@@ -523,7 +524,7 @@ TEST(MeshPrimitiveViewExtraction, ProceduralRefFlipReleasesViews)
 
     auto& scene = engine.GetScene();
     const EntityHandle entity = MakeMeshRenderable(scene);
-    const auto stableId = static_cast<std::uint32_t>(entity);
+    const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
     extraction.SetMeshPrimitiveViewSettings(
@@ -564,7 +565,7 @@ TEST(MeshPrimitiveViewExtraction, MissingEdgeTopologyFailsEdgeViewButKeepsSurfac
     auto& scene = engine.GetScene();
     // Triangle mesh whose `Edges` PropertySet is empty (no explicit edges).
     const EntityHandle entity = MakeMeshRenderable(scene, /*withEdges=*/false);
-    const auto stableId = static_cast<std::uint32_t>(entity);
+    const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
     extraction.SetMeshPrimitiveViewSettings(stableId, MeshPrimitiveViewSettings{.EnableEdgeView = true});
@@ -601,7 +602,7 @@ TEST(MeshPrimitiveViewExtraction, OutOfRangeEdgeEndpointIncrementsInvalidEdgesCo
     auto& scene = engine.GetScene();
     auto& raw = scene.Raw();
     const EntityHandle entity = MakeMeshRenderable(scene);
-    const auto stableId = static_cast<std::uint32_t>(entity);
+    const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
     // Corrupt one edge endpoint to reference a non-existent vertex.
     auto& edges = raw.get<gs::Edges>(entity);
@@ -645,7 +646,7 @@ TEST(MeshPrimitiveViewExtraction, NonMeshEntityWithSettingsCreatesNoViews)
     // Point-cloud shape: Vertices only → DetectDomain resolves PointCloud, not Mesh.
     auto& vertices = raw.emplace<gs::Vertices>(entity);
     SetPositions(vertices, {{0.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}});
-    const auto stableId = static_cast<std::uint32_t>(entity);
+    const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
     extraction.SetMeshPrimitiveViewSettings(

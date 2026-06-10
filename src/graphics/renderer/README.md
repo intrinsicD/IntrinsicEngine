@@ -1767,14 +1767,28 @@ Concretely:
   adding a parallel buffer-readback API on `DebugViewSystem`.
 - `SelectionSystem` is the CPU-visible reporting-only seam for picking.
   Selection ID passes write `EntityId` (stable extracted entity ID, `0`
-  reserved for "no hit") and `PrimitiveId` (packed via `EncodedSelectionId`
-  with the high 4 bits = `SelectionPrimitiveDomain` and the low 28 bits =
-  authoritative face/edge/point payload). The renderer copies the requested
-  pixel into the graphics-owned host-visible `Picking.Readback` buffer at
-  frame-record time and drains it on the next `BeginFrame()` after the
-  issuing frame's fences complete, calling `PublishPickResult` for valid
-  samples (and an explicit no-hit `PickReadbackResult` for `EntityId == 0` /
-  invalidated requests / deterministic readback failures). Because several
+  reserved for "no hit"; the runtime emits `entt handle + 1` render ids so a
+  live entity never encodes to the sentinel — BUG-026) and `PrimitiveId`
+  (packed via `EncodedSelectionId` with the high 4 bits =
+  `SelectionPrimitiveDomain` and the low 28 bits = authoritative
+  face/edge/point payload). The `PickingPass` clears both R32_UINT targets to
+  exactly zero (`kSelectionIdClearColorAttachments`); a non-zero float clear
+  would bit-pun into a garbage UINT background value (BUG-026 — the old
+  scene-color blue read back as `0x3DCCCCCD` and produced phantom hits on
+  every background click), and the Vulkan backend additionally
+  value-converts clear colors for UINT/SINT attachments
+  (`ToVkClearColorValue`). The renderer copies the requested pixel out of
+  `EntityId`, `PrimitiveId`, **and `SceneDepth`** (BUG-026; the depth target
+  gains `TransferSrc` usage when picking readback is active) into the
+  graphics-owned host-visible `Picking.Readback` buffer at frame-record time
+  — 16-byte slots per in-flight frame: `EntityId` word at `+0`,
+  `EncodedSelectionId` word at `+4`, `SceneDepth` R32 float at `+8`, 4 pad
+  bytes — and drains it on the next `BeginFrame()` after the issuing frame's
+  fences complete, calling `PublishPickResult` for valid samples (carrying
+  `HasDepth`/`Depth` plus the request pixel so the runtime can unproject the
+  world-space cursor position) and an explicit no-hit `PickReadbackResult`
+  for `EntityId == 0` / invalidated requests / deterministic readback
+  failures. Because several
   picking slots can complete in one `BeginFrame()`, `PublishPickResult`
   appends to a **FIFO queue** of completed readbacks (not a single
   last-result holder) so no result is dropped; consumers drain it in order

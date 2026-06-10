@@ -18,6 +18,7 @@ import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.StableEntityLookup;
 
 namespace
 {
@@ -104,7 +105,7 @@ TEST(GizmoInteractionEngineWiring, ExtractionSubmitsTransformGizmoPackets)
     EXPECT_TRUE(world.Gizmos.HasGizmos);
     ASSERT_EQ(world.Gizmos.TransformGizmoCount, 1u);
     EXPECT_EQ(world.Gizmos.TransformGizmos[0].StableId,
-              static_cast<std::uint32_t>(entity));
+              Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     EXPECT_NEAR(world.Gizmos.TransformGizmos[0].AxisLength, 1.25f, 1.0e-4f);
     EXPECT_NEAR(world.Gizmos.TransformGizmos[0].Transform[3].x, 2.f, 1.0e-4f);
     EXPECT_NEAR(world.Gizmos.TransformGizmos[0].Transform[3].y, 3.f, 1.0e-4f);
@@ -140,7 +141,7 @@ TEST(GizmoInteractionEngineWiring, RunFramePublishesSelectedEntityGizmoPacket)
     EXPECT_TRUE(world.Gizmos.HasGizmos);
     ASSERT_EQ(world.Gizmos.TransformGizmoCount, 1u);
     EXPECT_EQ(world.Gizmos.TransformGizmos[0].StableId,
-              static_cast<std::uint32_t>(appRaw->Entity));
+              Extrinsic::Runtime::StableEntityLookup::ToRenderId(appRaw->Entity));
 
     engine.Shutdown();
 }

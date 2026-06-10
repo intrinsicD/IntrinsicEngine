@@ -14,6 +14,7 @@ module;
 module Extrinsic.Runtime.GizmoInteraction;
 
 import Extrinsic.ECS.Component.Transform;
+import Extrinsic.Runtime.StableEntityLookup;
 
 namespace Extrinsic::Runtime
 {
@@ -504,7 +505,9 @@ namespace Extrinsic::Runtime
             }
 
             Extrinsic::Graphics::TransformGizmoRenderPacket packet{};
-            packet.StableId = static_cast<std::uint32_t>(entity);
+            // BUG-026: graphics-facing ids use the render-id encoding
+            // (entt handle + 1, 0 reserved) shared with extraction/selection.
+            packet.StableId = StableEntityLookup::ToRenderId(entity);
             packet.Transform = gizmoTransform;
             packet.AxisLength = length;
             packet.ShowTranslate = (mode == GizmoMode::Translate);

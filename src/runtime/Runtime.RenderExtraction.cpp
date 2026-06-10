@@ -46,6 +46,7 @@ import Extrinsic.RHI.Types;
 import Extrinsic.Runtime.GraphGeometryPacker;
 import Extrinsic.Runtime.MeshGeometryPacker;
 import Extrinsic.Runtime.PointCloudGeometryPacker;
+import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Runtime.ProceduralGeometry;
 import Extrinsic.Runtime.ProceduralGeometryPacker;
 import Extrinsic.Runtime.RenderWorldPool;
@@ -224,7 +225,10 @@ namespace Extrinsic::Runtime
     {
         [[nodiscard]] std::uint32_t StableEntityId(entt::entity entity) noexcept
         {
-            return static_cast<std::uint32_t>(entity);
+            // Render-id authority: entt handle + 1 so id 0 stays the GPU
+            // background sentinel (BUG-026). Decoders must use
+            // StableEntityLookup::ToEntityHandle.
+            return StableEntityLookup::ToRenderId(entity);
         }
 
         [[nodiscard]] bool HasRenderableHint(const entt::registry& registry, entt::entity entity)

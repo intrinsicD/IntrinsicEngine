@@ -184,18 +184,18 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] const SelectionControllerConfig&      GetConfig() const noexcept;
 
         // --- runtime-owned lookup seam (RUNTIME-092) ---
-        // The stable entity id used by extraction / graphics is the
-        // `entt::entity` value cast to uint32, mirroring
-        // `RenderExtractionCache::StableEntityId`. The bare cast is the
-        // identity encoding; centralising it here keeps the encode/decode in
-        // one place.
+        // The stable entity id used by extraction / graphics is the render id
+        // owned by `StableEntityLookup::ToRenderId` (`entt::entity` cast + 1,
+        // 0 reserved for background — BUG-026), mirroring
+        // `RenderExtractionCache::StableEntityId`. Delegating keeps the
+        // encode/decode in exactly one place.
         [[nodiscard]] static std::uint32_t ToStableEntityId(EntityHandle entity) noexcept
         {
-            return static_cast<std::uint32_t>(entity);
+            return StableEntityLookup::ToRenderId(entity);
         }
         [[nodiscard]] static EntityHandle ToEntityHandle(std::uint32_t stableEntityId) noexcept
         {
-            return static_cast<EntityHandle>(stableEntityId);
+            return StableEntityLookup::ToEntityHandle(stableEntityId);
         }
 
         // RUNTIME-092 Slice B: route render-id resolution through the
