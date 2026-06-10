@@ -65,3 +65,11 @@ The reference backend is covered by
 [`tests/unit/physics/Test.RigidBodyReference.cpp`](../../../tests/unit/physics/Test.RigidBodyReference.cpp).
 The PR-fast smoke benchmark manifest is
 [`benchmarks/physics/manifests/rigid_body_reference_smoke.yaml`](../../../benchmarks/physics/manifests/rigid_body_reference_smoke.yaml).
+
+This backend is also the canonical parity target for the promoted
+`Extrinsic.Physics.World` constraint solver (`PHYSICS-003`):
+[`tests/unit/physics/Test.PhysicsSolverParity.cpp`](../../../tests/unit/physics/Test.PhysicsSolverParity.cpp)
+runs shared free-fall and overlapping-sphere fixtures through both
+implementations with matched parameters (absolute tolerance `1e-4`,
+float-vs-double accumulation). The world's damping factor follows this
+reference (`max(0, 1 - c·dt)`).

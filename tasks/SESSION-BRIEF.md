@@ -19,7 +19,6 @@ the authoritative open/unblocked view.
 - unblocked: `METHOD-009` — Particle and mass-spring reference backend (tasks/backlog/methods/METHOD-009-particle-spring-reference-backend.md)
 - unblocked: `METHOD-010` — XPBD cloth and shell reference backend (tasks/backlog/methods/METHOD-010-xpbd-cloth-shell-reference-backend.md)
 - unblocked: `METHOD-011` — SPH fluid reference backend (tasks/backlog/methods/METHOD-011-sph-fluid-reference-backend.md)
-- unblocked: `PHYSICS-003` — Constraints, islands, sleep, and solver diagnostics (tasks/backlog/physics/PHYSICS-003-constraints-islands-and-solver-diagnostics.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 
@@ -44,6 +43,10 @@ the authoritative open/unblocked view.
 - unblocked: `RUNTIME-101` — Asset ingest state-machine migration (tasks/backlog/runtime/RUNTIME-101-asset-ingest-state-machine.md)
 - unblocked: `RUNTIME-103` — Geometry algorithm execution queue (tasks/backlog/runtime/RUNTIME-103-geometry-algorithm-execution-queue.md)
 - unblocked: `RUNTIME-104` — Derived overlay producer lifecycle (tasks/backlog/runtime/RUNTIME-104-derived-overlay-producer-lifecycle.md)
+
+## Theme G — Active bugs
+
+- unblocked: `BUG-025` — Geometry contact manifold normals violate the documented A→B convention (tasks/backlog/bugs/BUG-025-contact-manifold-normal-convention.md)
 
 ## Theme H — Agentic workflow hardening
 

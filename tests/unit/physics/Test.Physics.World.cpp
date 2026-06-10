@@ -273,3 +273,295 @@ TEST(PhysicsWorld, CollisionReportsFilteringTriggersAndDynamicNonUniformScale)
     EXPECT_TRUE(collisions.Contacts.front().IsTrigger);
     EXPECT_EQ(collisions.Diagnostics.TriggerContacts, 1u);
 }
+
+// ── PHYSICS-003: islands, sleep, and solver diagnostics ─────────────────────
+
+namespace
+{
+    [[nodiscard]] Physics::BodyDescriptor DynamicSphereAt(const glm::vec3 position,
+                                                          float mass = 1.0f)
+    {
+        Physics::BodyDescriptor body = DynamicSphere(mass);
+        body.Pose.Position = position;
+        return body;
+    }
+
+    [[nodiscard]] Physics::BodyDescriptor StaticBoxAt(const glm::vec3 position,
+                                                      const glm::vec3 halfExtents)
+    {
+        Physics::BodyDescriptor body = Physics::MakeStaticBody();
+        body.Pose.Position = position;
+        body.Shapes = {Physics::MakeBox(halfExtents)};
+        return body;
+    }
+
+    // Zero-gravity step input so contact/sleep behavior is isolated from
+    // integration unless a test wants gravity.
+    [[nodiscard]] Physics::StepInput ZeroGravityStep()
+    {
+        Physics::StepInput input{};
+        input.Gravity = glm::vec3{0.0f};
+        return input;
+    }
+}
+
+// The physics-owned ContactRecord enforces the documented A->B normal
+// convention regardless of the geometry kernel's per-pair orientation
+// (the kernel's sphere-box analytic and GJK/EPA fallback paths currently
+// return B->A normals; tracked as BUG-025). A sphere above a static box
+// must report a downward normal so the solver separates instead of
+// tunnelling.
+TEST(PhysicsWorld, ContactRecordNormalFollowsAToBConvention)
+{
+    Physics::World world;
+    ASSERT_TRUE(world.AddBody(DynamicSphereAt({0.0f, 0.45f, 0.0f})).IsValid());
+    ASSERT_TRUE(world
+                    .AddBody(StaticBoxAt({0.0f, -0.5f, 0.0f}, {5.0f, 0.5f, 5.0f}))
+                    .IsValid());
+
+    const Physics::CollisionResult collision = world.ComputeCollisionContacts();
+    ASSERT_EQ(collision.Contacts.size(), 1u);
+    const Physics::ContactRecord& contact = collision.Contacts.front();
+    EXPECT_EQ(contact.A.Body.Index, 0u);
+    EXPECT_EQ(contact.B.Body.Index, 1u);
+    // Normal points from A (sphere, above) toward B (box, below).
+    EXPECT_LT(contact.Normal.y, -0.9f);
+    EXPECT_NEAR(contact.PenetrationDepth, 0.05f, 0.01f);
+}
+
+TEST(PhysicsWorld, IslandsGroupContactConnectedDynamicBodiesDeterministically)
+{
+    Physics::World world;
+
+    // Pair A-B overlap; C is isolated; D rests on a static anchor.
+    const Physics::BodyHandle a = world.AddBody(DynamicSphereAt({0.0f, 0.0f, 0.0f}));
+    const Physics::BodyHandle b = world.AddBody(DynamicSphereAt({0.8f, 0.0f, 0.0f}));
+    const Physics::BodyHandle c = world.AddBody(DynamicSphereAt({10.0f, 0.0f, 0.0f}));
+    const Physics::BodyHandle d = world.AddBody(DynamicSphereAt({20.0f, 0.4f, 0.0f}));
+    const Physics::BodyHandle anchor =
+        world.AddBody(StaticBoxAt({20.0f, -0.5f, 0.0f}, {1.0f, 0.5f, 1.0f}));
+    ASSERT_TRUE(a.IsValid() && b.IsValid() && c.IsValid() && d.IsValid() && anchor.IsValid());
+
+    const Physics::CollisionResult collision = world.ComputeCollisionContacts();
+    const Physics::IslandBuildResult islands = world.BuildIslands(collision);
+
+    ASSERT_EQ(islands.Islands.size(), 3u);
+    EXPECT_EQ(islands.Diagnostics.IslandCount, 3u);
+    EXPECT_EQ(islands.Diagnostics.IslandedDynamicBodies, 4u);
+    EXPECT_GE(islands.Diagnostics.StaticAnchoredContacts, 1u);
+
+    // Deterministic ordering: islands by smallest member index, members
+    // sorted ascending.
+    ASSERT_EQ(islands.Islands[0].Bodies.size(), 2u);
+    EXPECT_EQ(islands.Islands[0].Bodies[0], a);
+    EXPECT_EQ(islands.Islands[0].Bodies[1], b);
+    ASSERT_EQ(islands.Islands[1].Bodies.size(), 1u);
+    EXPECT_EQ(islands.Islands[1].Bodies[0], c);
+    ASSERT_EQ(islands.Islands[2].Bodies.size(), 1u);
+    EXPECT_EQ(islands.Islands[2].Bodies[0], d);
+
+    // The A-B contact belongs to island 0; the D-anchor contact to island 2;
+    // isolated C carries no contacts.
+    EXPECT_FALSE(islands.Islands[0].ContactIndices.empty());
+    EXPECT_TRUE(islands.Islands[1].ContactIndices.empty());
+    EXPECT_FALSE(islands.Islands[2].ContactIndices.empty());
+
+    // Rebuilding from the same state yields the same grouping.
+    const Physics::IslandBuildResult again = world.BuildIslands(world.ComputeCollisionContacts());
+    ASSERT_EQ(again.Islands.size(), islands.Islands.size());
+    for (std::size_t i = 0; i < again.Islands.size(); ++i)
+        EXPECT_EQ(again.Islands[i].Bodies, islands.Islands[i].Bodies);
+}
+
+TEST(PhysicsWorld, IslandsExcludeTriggerContacts)
+{
+    Physics::World world;
+
+    Physics::BodyDescriptor trigger = DynamicSphere();
+    trigger.Shapes.front().IsTrigger = true;
+    const Physics::BodyHandle a = world.AddBody(DynamicSphereAt({0.0f, 0.0f, 0.0f}));
+    const Physics::BodyHandle b = world.AddBody(trigger);
+    ASSERT_TRUE(a.IsValid() && b.IsValid());
+
+    const Physics::CollisionResult collision = world.ComputeCollisionContacts();
+    ASSERT_EQ(collision.Contacts.size(), 1u);
+    ASSERT_TRUE(collision.Contacts.front().IsTrigger);
+
+    const Physics::IslandBuildResult islands = world.BuildIslands(collision);
+    EXPECT_EQ(islands.Diagnostics.TriggerContactsExcluded, 1u);
+    // Two singleton islands: the trigger contact creates no constraint edge.
+    ASSERT_EQ(islands.Islands.size(), 2u);
+    EXPECT_TRUE(islands.Islands[0].ContactIndices.empty());
+    EXPECT_TRUE(islands.Islands[1].ContactIndices.empty());
+}
+
+TEST(PhysicsWorld, SolveStepSeparatesOverlappingSpheresAndConverges)
+{
+    Physics::World world;
+    const Physics::BodyHandle a = world.AddBody(DynamicSphereAt({0.0f, 0.0f, 0.0f}));
+    const Physics::BodyHandle b = world.AddBody(DynamicSphereAt({0.8f, 0.0f, 0.0f}));
+    ASSERT_TRUE(a.IsValid() && b.IsValid());
+
+    const Physics::SolveStepDiagnostics diagnostics = world.SolveStep(ZeroGravityStep());
+
+    EXPECT_EQ(diagnostics.Status, Physics::ValidationStatus::Valid);
+    EXPECT_EQ(diagnostics.Solve, Physics::SolveStatus::Converged);
+    EXPECT_GT(diagnostics.MaxPenetrationBefore, 0.1f);
+    EXPECT_LE(diagnostics.MaxPenetrationAfter, 0.001f + 1.0e-6f);
+    EXPECT_GT(diagnostics.IterationsUsed, 0u);
+    EXPECT_GT(diagnostics.ContactsSolved, 0u);
+    EXPECT_EQ(diagnostics.NonConvergedIslands, 0u);
+
+    // Symmetric separation along the contact normal (equal masses).
+    const Physics::BodyDescriptor* bodyA = world.GetBody(a);
+    const Physics::BodyDescriptor* bodyB = world.GetBody(b);
+    ASSERT_NE(bodyA, nullptr);
+    ASSERT_NE(bodyB, nullptr);
+    EXPECT_LT(bodyA->Pose.Position.x, 0.0f);
+    EXPECT_GT(bodyB->Pose.Position.x, 0.8f);
+    EXPECT_TRUE(Near(bodyA->Pose.Position.x + bodyB->Pose.Position.x, 0.8f, 1.0e-4f));
+}
+
+TEST(PhysicsWorld, SolveStepReportsNonConvergenceUnderStarvedIterationBudget)
+{
+    Physics::World world;
+    // Deep overlap with a starved budget and a tiny correction percent so a
+    // single pass cannot reach the tolerance.
+    const Physics::BodyHandle a = world.AddBody(DynamicSphereAt({0.0f, 0.0f, 0.0f}));
+    const Physics::BodyHandle b = world.AddBody(DynamicSphereAt({0.1f, 0.0f, 0.0f}));
+    ASSERT_TRUE(a.IsValid() && b.IsValid());
+
+    Physics::SolverSettings settings{};
+    settings.MaxIterations = 1u;
+    settings.PositionCorrectionPercent = 0.05f;
+
+    const Physics::SolveStepDiagnostics diagnostics =
+        world.SolveStep(ZeroGravityStep(), settings);
+
+    EXPECT_EQ(diagnostics.Status, Physics::ValidationStatus::Valid);
+    EXPECT_EQ(diagnostics.Solve, Physics::SolveStatus::MaxIterationsReached);
+    EXPECT_EQ(diagnostics.IterationsUsed, 1u);
+    EXPECT_GT(diagnostics.MaxPenetrationAfter, 0.001f);
+    EXPECT_GE(diagnostics.NonConvergedIslands, 1u);
+}
+
+TEST(PhysicsWorld, SolveStepRejectsInvalidSolverSettings)
+{
+    Physics::World world;
+    ASSERT_TRUE(world.AddBody(DynamicSphere()).IsValid());
+
+    Physics::SolverSettings settings{};
+    settings.MaxIterations = 0u;
+
+    const Physics::SolveStepDiagnostics diagnostics =
+        world.SolveStep(ZeroGravityStep(), settings);
+    EXPECT_EQ(diagnostics.Status, Physics::ValidationStatus::InvalidSolverSettings);
+    EXPECT_EQ(world.GetDiagnostics().SolveStepsExecuted, 0u);
+}
+
+TEST(PhysicsWorld, SleepPolicyTransitionsLowMotionBodyAndWakeOnUpdate)
+{
+    Physics::World world;
+    const Physics::BodyHandle handle = world.AddBody(DynamicSphereAt({0.0f, 0.0f, 0.0f}));
+    ASSERT_TRUE(handle.IsValid());
+
+    Physics::SolverSettings settings{};
+    settings.TimeToSleepSeconds = 3.0f / 60.0f; // sleeps on the third step
+
+    Physics::SolveStepDiagnostics diagnostics{};
+    for (int i = 0; i < 3; ++i)
+        diagnostics = world.SolveStep(ZeroGravityStep(), settings);
+
+    EXPECT_TRUE(world.IsBodyAsleep(handle));
+    EXPECT_EQ(diagnostics.Sleep.SleepTransitions, 1u);
+    EXPECT_EQ(diagnostics.Sleep.SleepingDynamicBodies, 1u);
+    EXPECT_EQ(diagnostics.Sleep.AwakeDynamicBodies, 0u);
+
+    // A sleeping body is not integrated by SolveStep, even under gravity.
+    const glm::vec3 positionBefore = world.GetBody(handle)->Pose.Position;
+    (void)world.SolveStep(Physics::StepInput{}, settings);
+    EXPECT_TRUE(NearVec(world.GetBody(handle)->Pose.Position, positionBefore));
+    EXPECT_TRUE(world.IsBodyAsleep(handle));
+
+    // A descriptor update is an external mutation and wakes the body.
+    Physics::BodyDescriptor descriptor = *world.GetBody(handle);
+    descriptor.LinearVelocity = glm::vec3{1.0f, 0.0f, 0.0f};
+    ASSERT_TRUE(world.UpdateBody(handle, descriptor));
+    EXPECT_FALSE(world.IsBodyAsleep(handle));
+
+    const Physics::SolveStepDiagnostics moving =
+        world.SolveStep(ZeroGravityStep(), settings);
+    EXPECT_EQ(moving.Sleep.AwakeDynamicBodies, 1u);
+    EXPECT_GT(world.GetBody(handle)->Pose.Position.x, 0.0f);
+}
+
+TEST(PhysicsWorld, SolveStepIsDeterministicForRepeatedIdenticalInputs)
+{
+    const auto buildWorld = [](Physics::World& world)
+    {
+        ASSERT_TRUE(world.AddBody(DynamicSphereAt({0.0f, 0.5f, 0.0f})).IsValid());
+        ASSERT_TRUE(world.AddBody(DynamicSphereAt({0.6f, 0.5f, 0.0f})).IsValid());
+        ASSERT_TRUE(world
+                        .AddBody(StaticBoxAt({0.0f, -0.5f, 0.0f}, {5.0f, 0.5f, 5.0f}))
+                        .IsValid());
+    };
+
+    Physics::World first;
+    Physics::World second;
+    buildWorld(first);
+    buildWorld(second);
+
+    for (int step = 0; step < 30; ++step)
+    {
+        const Physics::SolveStepDiagnostics da = first.SolveStep();
+        const Physics::SolveStepDiagnostics db = second.SolveStep();
+        EXPECT_EQ(da.Solve, db.Solve);
+        EXPECT_EQ(da.ContactsSolved, db.ContactsSolved);
+        EXPECT_EQ(da.MaxPenetrationAfter, db.MaxPenetrationAfter);
+    }
+
+    for (std::uint32_t index = 0u; index < 2u; ++index)
+    {
+        const Physics::BodyHandle handle{index, 1u};
+        const Physics::BodyDescriptor* bodyA = first.GetBody(handle);
+        const Physics::BodyDescriptor* bodyB = second.GetBody(handle);
+        ASSERT_NE(bodyA, nullptr);
+        ASSERT_NE(bodyB, nullptr);
+        // Bitwise-identical evolution: same code path, same iteration order.
+        EXPECT_EQ(bodyA->Pose.Position.x, bodyB->Pose.Position.x);
+        EXPECT_EQ(bodyA->Pose.Position.y, bodyB->Pose.Position.y);
+        EXPECT_EQ(bodyA->Pose.Position.z, bodyB->Pose.Position.z);
+        EXPECT_EQ(bodyA->LinearVelocity.x, bodyB->LinearVelocity.x);
+        EXPECT_EQ(bodyA->LinearVelocity.y, bodyB->LinearVelocity.y);
+        EXPECT_EQ(bodyA->LinearVelocity.z, bodyB->LinearVelocity.z);
+    }
+}
+
+TEST(PhysicsWorld, SolveStepEnergyDriftIsReportedAndBoundedForRestingContact)
+{
+    Physics::World world;
+    ASSERT_TRUE(world.AddBody(DynamicSphereAt({0.0f, 0.45f, 0.0f})).IsValid());
+    ASSERT_TRUE(world
+                    .AddBody(StaticBoxAt({0.0f, -0.5f, 0.0f}, {5.0f, 0.5f, 5.0f}))
+                    .IsValid());
+
+    Physics::SolverSettings settings{};
+    settings.EnableSleep = false;
+    // Small iteration budget keeps the captured-manifold positional
+    // projection close to the true penetration so the resting sphere is not
+    // catapulted; two passes fully clear the slop-adjusted depth.
+    settings.MaxIterations = 2u;
+
+    Physics::SolveStepDiagnostics diagnostics{};
+    for (int step = 0; step < 60; ++step)
+        diagnostics = world.SolveStep(Physics::StepInput{}, settings);
+
+    // Resting contact: the solver cancels the gravity-injected approach
+    // velocity each step, so the reported energy after the solve stays
+    // bounded near zero instead of accumulating.
+    EXPECT_EQ(diagnostics.Solve, Physics::SolveStatus::Converged);
+    EXPECT_LT(diagnostics.KineticEnergyAfter, 0.05f);
+    EXPECT_TRUE(std::isfinite(diagnostics.EnergyDrift));
+    EXPECT_EQ(world.GetDiagnostics().SolveStepsExecuted, 60u);
+    EXPECT_EQ(world.GetDiagnostics().LastSolveStep.Solve, diagnostics.Solve);
+}

@@ -67,7 +67,56 @@ pair count, generated contact count, trigger contact count, invalid body/shape
 rejects, dynamic non-uniform scale rejects, and unsupported pair count.
 `LastRejectReason` records the most recent skip/reject category for focused
 diagnostics; counters remain the authoritative aggregate.
-Constraint/island/sleep diagnostics are still owned by `PHYSICS-003`.
+
+## Constraint Solver, Islands, and Sleep (`PHYSICS-003`)
+
+`PHYSICS-003` adds the first CPU-only constraint/island/sleep layer at
+`CPUContracted` maturity, all owned by `Extrinsic.Physics.World`:
+
+- `SolveStep(StepInput, SolverSettings)` is the sleep-aware step: it integrates
+  awake bodies (same integrator as `Step`, which remains the raw PHYSICS-001
+  path and ignores sleep), computes contacts, builds islands, runs the
+  iterative linear contact solver per awake island, and applies the sleep
+  policy. Repeated identical inputs produce bitwise-identical evolution
+  (slot-index iteration order, deterministic islands).
+- `BuildIslands(CollisionResult)` groups dynamic bodies transitively connected
+  through non-trigger contacts using union-find over slot indices.
+  Static/kinematic endpoints anchor islands but never merge them; trigger
+  contacts are excluded. Deterministic ordering contract: islands ordered by
+  smallest member index, members sorted, contact indices ascending.
+- The contact solve mirrors the canonical `METHOD-001` reference
+  (`methods/physics/rigid_body_reference`): per-iteration linear normal
+  impulses (restitution-scaled, applied only to approaching contacts) plus
+  positional Baumgarte projection (`PositionCorrectionPercent` of the
+  slop-adjusted penetration) on the captured manifold. The world's damping
+  factor was aligned to the reference (`max(0, 1 - c·dt)`) so parity fixtures
+  track the reference exactly. Angular inertia is not modeled in contact
+  response (linear-only, like the reference); reported kinetic energy is
+  linear-only and documented as such.
+- Sleep policy: a dynamic body accumulates low-motion time while both velocity
+  magnitudes stay below thresholds; it sleeps (velocities zeroed) when the
+  accumulated time reaches `TimeToSleepSeconds`, is skipped by `SolveStep`
+  integration while asleep, and wakes when its island gains an awake member or
+  its descriptor is updated (`UpdateBody`/`WakeBody`). Sleep state lives in
+  world slots, never in ECS.
+- `SolveStepDiagnostics` reports validation status, solve status
+  (`Converged` / `MaxIterationsReached` / `Degraded` fail-closed on non-finite
+  state), iterations used, contacts solved, non-converged island count,
+  max penetration before/after (residual recomputed from live shapes),
+  max approaching normal-velocity residual, linear kinetic energy
+  before/after with drift, island diagnostics, sleep transition counters, and
+  the integration counters. `WorldDiagnostics` mirrors the last solve in
+  `LastSolveStep`/`SolveStepsExecuted`.
+- Physics-owned `ContactRecord` normals are enforced to the documented A→B
+  convention by orienting against the shape-center offset, because the
+  geometry kernel's analytic sphere-box path and GJK/EPA fallback currently
+  return B→A-oriented normals despite the documented kernel convention
+  (tracked as `BUG-025`).
+
+Parity against the canonical reference is pinned by
+`tests/unit/physics/Test.PhysicsSolverParity.cpp` (free-fall integrator
+parity over 60 steps and an overlapping-sphere contact solve with matched
+parameters, absolute tolerance `1e-4` for float-vs-double accumulation).
 
 ## Collision Contract Surface
 
@@ -164,6 +213,6 @@ and contact/event counts where applicable.
 - [`METHOD-001`](../../tasks/done/METHOD-001-rigid-body-dynamics-reference-backend.md) defines the CPU reference rigid-body method backend.
 - [`PHYSICS-001`](../../tasks/done/PHYSICS-001-physics-world-state-and-runtime-sync.md) defines the first physics world/state module and runtime bridge at `CPUContracted` maturity.
 - [`PHYSICS-002`](../../tasks/done/PHYSICS-002-collision-broadphase-narrowphase-contract.md) owns collision broadphase/narrowphase contracts.
-- [`PHYSICS-003`](../../tasks/backlog/physics/PHYSICS-003-constraints-islands-and-solver-diagnostics.md) owns constraints, islands, sleep, and solver diagnostics.
+- [`PHYSICS-003`](../../tasks/done/PHYSICS-003-constraints-islands-and-solver-diagnostics.md) added constraints, islands, sleep, and solver diagnostics at `CPUContracted`.
 - [`ARCH-002`](../../tasks/done/ARCH-002-physics-phenomena-roadmap.md) records the non-rigid and multi-phenomena roadmap decisions.
 - [`METHOD-009`](../../tasks/backlog/methods/METHOD-009-particle-spring-reference-backend.md), [`METHOD-010`](../../tasks/backlog/methods/METHOD-010-xpbd-cloth-shell-reference-backend.md), and [`METHOD-011`](../../tasks/backlog/methods/METHOD-011-sph-fluid-reference-backend.md) are the first non-rigid physics method-package follow-ups. They remain CPU-reference-first and open no GPU backend.

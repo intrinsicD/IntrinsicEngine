@@ -343,8 +343,12 @@ intrinsic_test_object_lib(BenchmarkTestObjs
 )
 
 # --- Physics method reference tests (CPU-only; methods/ package, no runtime/ECS) ---
+# Test.PhysicsSolverParity.cpp (PHYSICS-003) compares the promoted
+# `Extrinsic.Physics.World` solver against the canonical METHOD-001 CPU
+# reference, so this object lib also depends on ExtrinsicPhysics.
 set(_physics_method_test_files
     Test.RigidBodyReference.cpp
+    Test.PhysicsSolverParity.cpp
 )
 intrinsic_resolve_test_sources(_physics_method_test_sources
     SEARCH_DIRS unit/physics
@@ -354,7 +358,7 @@ intrinsic_test_object_lib(PhysicsMethodTestObjs
     SOURCES
         ${_physics_method_test_sources}
         ${CMAKE_SOURCE_DIR}/methods/physics/rigid_body_reference/src/RigidBodyReference.cpp
-    DEPS IntrinsicCore
+    DEPS IntrinsicCore ExtrinsicPhysics
 )
 target_include_directories(PhysicsMethodTestObjs PRIVATE
     ${CMAKE_SOURCE_DIR}/methods/physics/rigid_body_reference/include
@@ -1018,7 +1022,7 @@ intrinsic_test_executable(IntrinsicBenchmarkTests
 # --- Physics method reference tests (CPU-only) ---
 intrinsic_test_executable(IntrinsicPhysicsMethodTests
     OBJECTS PhysicsMethodTestObjs
-    LINK_LIBS IntrinsicCore
+    LINK_LIBS IntrinsicCore ExtrinsicPhysics
     LABELS unit physics
 )
 

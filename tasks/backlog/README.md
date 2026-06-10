@@ -73,12 +73,10 @@ Define physics layer ownership before any solver code lands; then implement
 the ECS authoring, CPU reference, and physics-world/runtime bridge behind that
 contract. The ownership decision (ADR-0019), phenomena roadmap, rigid-body
 reference method, ECS authoring contract, world/runtime bridge, and
-broadphase/narrowphase contract are retired — see
+broadphase/narrowphase and constraint/island/sleep solver contracts are retired — see
 [`physics/README.md`](physics/README.md) and the retirement log.
 
 Open members:
-- [`physics/PHYSICS-003-constraints-islands-and-solver-diagnostics.md`](physics/PHYSICS-003-constraints-islands-and-solver-diagnostics.md) —
-  unblocked; next physics leaf.
 - [`methods/METHOD-009`](methods/METHOD-009-particle-spring-reference-backend.md),
   [`methods/METHOD-010`](methods/METHOD-010-xpbd-cloth-shell-reference-backend.md),
   [`methods/METHOD-011`](methods/METHOD-011-sph-fluid-reference-backend.md) —
@@ -161,9 +159,6 @@ promoting backlog tasks to active so per-category DAGs do not diverge. Only
 anchors with at least one open endpoint are listed; fully satisfied anchors
 are preserved in the retirement log.
 
-- **PHYSICS-003 ⇐ PHYSICS-001, PHYSICS-002.** Constraint/island/sleep solver
-  diagnostics depend on world lifecycle and collision contacts. Both upstream
-  tasks are retired, so `PHYSICS-003` is unblocked.
 - **GRAPHICS-035..058 ⇐ Theme A.** Theme A's visible-geometry foundation is
   complete; rendering modernization leaves are now gated by their individual
   task dependencies and the rendering DAG.

@@ -15,8 +15,8 @@
 - `Operational` engine-frame composition and solver/island/sleep behavior
   remain deferred. Collision contracts are now `CPUContracted` by
   [`PHYSICS-002`](PHYSICS-002-collision-broadphase-narrowphase-contract.md);
-  constraints/islands/sleep diagnostics are owned by
-  [`PHYSICS-003`](../backlog/physics/PHYSICS-003-constraints-islands-and-solver-diagnostics.md).
+  constraints/islands/sleep diagnostics are now `CPUContracted` by
+  [`PHYSICS-003`](PHYSICS-003-constraints-islands-and-solver-diagnostics.md).
 
 ## Goal
 - Add the first `src/physics` world/state module and runtime-owned fixed-step bridge that maps ECS physics authoring descriptors to physics-world handles without leaking handles back into ECS.

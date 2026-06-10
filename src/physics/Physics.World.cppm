@@ -44,6 +44,7 @@ export namespace Extrinsic::Physics
         InvalidDamping,
         InvalidGravityScale,
         InvalidStep,
+        InvalidSolverSettings,
     };
 
     struct Transform
@@ -156,6 +157,106 @@ export namespace Extrinsic::Physics
         CollisionDiagnostics Diagnostics{};
     };
 
+    // ── PHYSICS-003: constraints, islands, sleep, and solver diagnostics ──
+    //
+    // All records below are physics-owned. Solver state, island membership,
+    // and sleep timers are world internals; runtime consumes these records
+    // through the diagnostics surface and never stores them in ECS.
+
+    // Tuning knobs for the CPU contact solver and the sleep policy. Mirrors
+    // the `physics.rigid_body_reference` (`METHOD-001`) StepParams shape so
+    // parity fixtures can share values.
+    struct SolverSettings
+    {
+        std::uint32_t MaxIterations{8u};
+        float Restitution{0.0f};
+        float PenetrationSlop{0.001f};
+        float PositionCorrectionPercent{0.8f};
+        // Sleep policy: a dynamic body accumulates low-motion time while both
+        // velocity magnitudes stay below the thresholds; it sleeps when the
+        // accumulated time reaches TimeToSleepSeconds. Whole-island wake: a
+        // contact island containing any awake member wakes all members.
+        bool EnableSleep{true};
+        float SleepLinearVelocityThreshold{0.05f};
+        float SleepAngularVelocityThreshold{0.05f};
+        float TimeToSleepSeconds{0.5f};
+    };
+
+    // One contact island: dynamic bodies transitively connected through
+    // non-trigger contacts. Static/kinematic bodies anchor islands but never
+    // merge them. Deterministic ordering contract: `Bodies` is sorted by
+    // (Index, Generation) ascending, `ContactIndices` (indices into the
+    // CollisionResult::Contacts the islands were built from) is ascending,
+    // and islands are ordered by their smallest body index.
+    struct IslandRecord
+    {
+        std::vector<BodyHandle> Bodies{};
+        std::vector<std::uint32_t> ContactIndices{};
+    };
+
+    struct IslandDiagnostics
+    {
+        std::uint32_t IslandCount{0u};
+        std::uint32_t IslandedDynamicBodies{0u};
+        std::uint32_t ContactsConsidered{0u};
+        std::uint32_t TriggerContactsExcluded{0u};
+        std::uint32_t StaticAnchoredContacts{0u};
+        std::uint32_t NonDynamicContactsIgnored{0u};
+    };
+
+    struct IslandBuildResult
+    {
+        std::vector<IslandRecord> Islands{};
+        IslandDiagnostics Diagnostics{};
+    };
+
+    struct SleepDiagnostics
+    {
+        std::uint32_t AwakeDynamicBodies{0u};
+        std::uint32_t SleepingDynamicBodies{0u};
+        std::uint32_t SleepTransitions{0u};
+        std::uint32_t WakeTransitions{0u};
+    };
+
+    enum class SolveStatus : std::uint8_t
+    {
+        // Residual penetration reached max(PenetrationSlop, epsilon) within
+        // MaxIterations passes.
+        Converged,
+        // Iteration budget exhausted with residual penetration above the
+        // tolerance; NonConvergedIslands counts the islands that still carry
+        // residual contacts.
+        MaxIterationsReached,
+        // A non-finite body state was produced or observed during the solve;
+        // the offending island is left at its last finite state and the step
+        // reports fail-closed degradation.
+        Degraded,
+    };
+
+    struct SolveStepDiagnostics
+    {
+        ValidationStatus Status{ValidationStatus::Valid};
+        SolveStatus Solve{SolveStatus::Converged};
+        std::uint32_t IterationsUsed{0u};
+        std::uint32_t ContactsSolved{0u};
+        std::uint32_t NonConvergedIslands{0u};
+        float MaxPenetrationBefore{0.0f};
+        // Residual penetration recomputed from live shapes after the solve.
+        float MaxPenetrationAfter{0.0f};
+        // Largest approaching normal speed remaining across solved contacts
+        // at the end of the final iteration pass.
+        float MaxNormalVelocityResidual{0.0f};
+        // Linear kinetic energy of awake dynamic bodies (the world models no
+        // angular inertia yet; angular energy is intentionally excluded and
+        // documented in docs/architecture/physics.md).
+        float KineticEnergyBefore{0.0f};
+        float KineticEnergyAfter{0.0f};
+        float EnergyDrift{0.0f};
+        IslandDiagnostics Islands{};
+        SleepDiagnostics Sleep{};
+        StepDiagnostics Integration{};
+    };
+
     struct WorldDiagnostics
     {
         std::uint32_t BodyCount{0u};
@@ -166,6 +267,8 @@ export namespace Extrinsic::Physics
         std::uint32_t StaleHandleRejects{0u};
         std::uint32_t StepsExecuted{0u};
         StepDiagnostics LastStep{};
+        std::uint32_t SolveStepsExecuted{0u};
+        SolveStepDiagnostics LastSolveStep{};
     };
 
     [[nodiscard]] ShapeDescriptor MakeSphere(float radius, const Transform& local = {});
@@ -182,6 +285,7 @@ export namespace Extrinsic::Physics
     [[nodiscard]] ValidationStatus Validate(const ShapeDescriptor& descriptor) noexcept;
     [[nodiscard]] ValidationStatus Validate(const BodyDescriptor& descriptor) noexcept;
     [[nodiscard]] ValidationStatus Validate(const StepInput& input) noexcept;
+    [[nodiscard]] ValidationStatus Validate(const SolverSettings& settings) noexcept;
 
     class World
     {
@@ -197,17 +301,44 @@ export namespace Extrinsic::Physics
 
         [[nodiscard]] StepDiagnostics Step(const StepInput& input = {});
         [[nodiscard]] CollisionResult ComputeCollisionContacts() const;
+
+        // ── PHYSICS-003 ───────────────────────────────────────────────────
+        // Sleep-aware integrate + contact solve. Integrates awake bodies
+        // (gravity, damping), computes contacts, builds deterministic
+        // islands, runs the iterative linear contact solver per awake
+        // island, and applies the sleep policy. `Step()` remains the raw
+        // PHYSICS-001 integrator and ignores sleep state.
+        [[nodiscard]] SolveStepDiagnostics SolveStep(const StepInput& input = {},
+                                                     const SolverSettings& settings = {});
+
+        // Group the supplied contacts into deterministic dynamic-body
+        // islands (see IslandRecord ordering contract). Pure with respect
+        // to body state; trigger contacts are excluded.
+        [[nodiscard]] IslandBuildResult BuildIslands(const CollisionResult& collision) const;
+
+        // Sleep state queries/mutation. Sleep state is world-internal;
+        // UpdateBody() wakes the body because its descriptor changed.
+        [[nodiscard]] bool IsBodyAsleep(BodyHandle handle) const noexcept;
+        bool WakeBody(BodyHandle handle) noexcept;
+
         void Clear() noexcept;
 
         [[nodiscard]] std::size_t BodyCount() const noexcept { return m_Diagnostics.BodyCount; }
         [[nodiscard]] const WorldDiagnostics& GetDiagnostics() const noexcept { return m_Diagnostics; }
 
     private:
+        struct SleepState
+        {
+            bool Asleep{false};
+            float LowMotionSeconds{0.0f};
+        };
+
         struct Slot
         {
             std::uint32_t Generation{1u};
             bool Occupied{false};
             BodyDescriptor Body{};
+            SleepState Sleep{};
         };
 
         [[nodiscard]] Slot* ResolveSlot(BodyHandle handle) noexcept;

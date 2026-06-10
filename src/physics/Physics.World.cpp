@@ -37,7 +37,14 @@ namespace Extrinsic::Physics
 
         [[nodiscard]] float DampingFactor(float damping, float dt) noexcept
         {
-            return 1.0f / (1.0f + damping * dt);
+            // Matches the canonical METHOD-001 reference
+            // (methods/physics/rigid_body_reference): explicit linear decay
+            // clamped at zero. PHYSICS-003 aligned this from the previous
+            // 1/(1+c*dt) variant so solver parity fixtures track the
+            // reference exactly; the two agree to first order in c*dt.
+            if (!std::isfinite(damping) || damping <= 0.0f)
+                return 1.0f;
+            return std::max(0.0f, 1.0f - damping * dt);
         }
 
         void IntegrateAngular(Transform& pose, const glm::vec3& angularVelocity, float dt)
@@ -142,12 +149,28 @@ namespace Extrinsic::Physics
             return built;
         }
 
+        [[nodiscard]] glm::vec3 ShapeWorldCenter(const BuiltCollisionShape& shape) noexcept
+        {
+            switch (shape.Kind)
+            {
+            case ShapeKind::Sphere:
+                return shape.Sphere.Center;
+            case ShapeKind::Capsule:
+                return (shape.Capsule.PointA + shape.Capsule.PointB) * 0.5f;
+            case ShapeKind::Box:
+                return shape.Box.Center;
+            }
+            return glm::vec3{0.0f};
+        }
+
         template <typename ShapeA, typename ShapeB>
         void AppendContactIfPresent(const ShapeReference& refA,
                                     const ShapeReference& refB,
                                     bool isTrigger,
                                     const ShapeA& a,
                                     const ShapeB& b,
+                                    const glm::vec3& centerA,
+                                    const glm::vec3& centerB,
                                     CollisionResult& result)
         {
             const std::optional<Geometry::ContactManifold> contact = Geometry::ComputeContact(a, b);
@@ -162,6 +185,21 @@ namespace Extrinsic::Physics
             record.ContactPointA = contact->ContactPointA;
             record.ContactPointB = contact->ContactPointB;
             record.IsTrigger = isTrigger;
+
+            // PHYSICS-003: enforce the documented A->B normal convention on
+            // the physics-owned record. The geometry kernel's analytic
+            // sphere-box path and the GJK/EPA fallback currently return
+            // B->A-oriented normals despite the documented convention
+            // (tracked as BUG-025); orienting against the shape-center
+            // offset keeps the contact solver correct under either
+            // convention. A coincident-center manifold is left unchanged.
+            const glm::vec3 centerDelta = centerB - centerA;
+            if (glm::dot(record.Normal, centerDelta) < 0.0f)
+            {
+                record.Normal = -record.Normal;
+                std::swap(record.ContactPointA, record.ContactPointB);
+            }
+
             result.Contacts.push_back(record);
             ++result.Diagnostics.ContactsGenerated;
             if (isTrigger)
@@ -171,19 +209,21 @@ namespace Extrinsic::Physics
         void DispatchContact(const BuiltCollisionShape& a, const BuiltCollisionShape& b, CollisionResult& result)
         {
             const bool trigger = a.IsTrigger || b.IsTrigger;
+            const glm::vec3 centerA = ShapeWorldCenter(a);
+            const glm::vec3 centerB = ShapeWorldCenter(b);
             switch (a.Kind)
             {
             case ShapeKind::Sphere:
                 switch (b.Kind)
                 {
                 case ShapeKind::Sphere:
-                    AppendContactIfPresent(a.Reference, b.Reference, trigger, a.Sphere, b.Sphere, result);
+                    AppendContactIfPresent(a.Reference, b.Reference, trigger, a.Sphere, b.Sphere, centerA, centerB, result);
                     return;
                 case ShapeKind::Capsule:
-                    AppendContactIfPresent(a.Reference, b.Reference, trigger, a.Sphere, b.Capsule, result);
+                    AppendContactIfPresent(a.Reference, b.Reference, trigger, a.Sphere, b.Capsule, centerA, centerB, result);
                     return;
                 case ShapeKind::Box:
-                    AppendContactIfPresent(a.Reference, b.Reference, trigger, a.Sphere, b.Box, result);
+                    AppendContactIfPresent(a.Reference, b.Reference, trigger, a.Sphere, b.Box, centerA, centerB, result);
                     return;
                 }
                 break;
@@ -191,13 +231,13 @@ namespace Extrinsic::Physics
                 switch (b.Kind)
                 {
                 case ShapeKind::Sphere:
-                    AppendContactIfPresent(a.Reference, b.Reference, trigger, a.Capsule, b.Sphere, result);
+                    AppendContactIfPresent(a.Reference, b.Reference, trigger, a.Capsule, b.Sphere, centerA, centerB, result);
                     return;
                 case ShapeKind::Capsule:
-                    AppendContactIfPresent(a.Reference, b.Reference, trigger, a.Capsule, b.Capsule, result);
+                    AppendContactIfPresent(a.Reference, b.Reference, trigger, a.Capsule, b.Capsule, centerA, centerB, result);
                     return;
                 case ShapeKind::Box:
-                    AppendContactIfPresent(a.Reference, b.Reference, trigger, a.Capsule, b.Box, result);
+                    AppendContactIfPresent(a.Reference, b.Reference, trigger, a.Capsule, b.Box, centerA, centerB, result);
                     return;
                 }
                 break;
@@ -205,13 +245,13 @@ namespace Extrinsic::Physics
                 switch (b.Kind)
                 {
                 case ShapeKind::Sphere:
-                    AppendContactIfPresent(a.Reference, b.Reference, trigger, a.Box, b.Sphere, result);
+                    AppendContactIfPresent(a.Reference, b.Reference, trigger, a.Box, b.Sphere, centerA, centerB, result);
                     return;
                 case ShapeKind::Capsule:
-                    AppendContactIfPresent(a.Reference, b.Reference, trigger, a.Box, b.Capsule, result);
+                    AppendContactIfPresent(a.Reference, b.Reference, trigger, a.Box, b.Capsule, centerA, centerB, result);
                     return;
                 case ShapeKind::Box:
-                    AppendContactIfPresent(a.Reference, b.Reference, trigger, a.Box, b.Box, result);
+                    AppendContactIfPresent(a.Reference, b.Reference, trigger, a.Box, b.Box, centerA, centerB, result);
                     return;
                 }
                 break;
@@ -411,6 +451,7 @@ namespace Extrinsic::Physics
             Slot& slot = m_Slots[index];
             slot.Occupied = true;
             slot.Body = descriptor;
+            slot.Sleep = {};
         }
         else
         {
@@ -437,6 +478,7 @@ namespace Extrinsic::Physics
 
         slot->Occupied = false;
         slot->Body = {};
+        slot->Sleep = {};
         slot->Generation = BumpGeneration(slot->Generation);
         m_FreeList.push_back(handle.Index);
         --m_Diagnostics.BodyCount;
@@ -460,6 +502,9 @@ namespace Extrinsic::Physics
         }
 
         slot->Body = descriptor;
+        // PHYSICS-003: a descriptor update is an external mutation; the body
+        // must observe it, so it wakes and restarts its low-motion window.
+        slot->Sleep = {};
         ++m_Diagnostics.DescriptorUpdates;
         return true;
     }
@@ -604,6 +649,427 @@ namespace Extrinsic::Physics
         }
 
         return result;
+    }
+
+    [[nodiscard]] ValidationStatus Validate(const SolverSettings& settings) noexcept
+    {
+        if (settings.MaxIterations == 0u ||
+            !std::isfinite(settings.Restitution) || settings.Restitution < 0.0f || settings.Restitution > 1.0f ||
+            !std::isfinite(settings.PenetrationSlop) || settings.PenetrationSlop < 0.0f ||
+            !std::isfinite(settings.PositionCorrectionPercent) ||
+            settings.PositionCorrectionPercent < 0.0f || settings.PositionCorrectionPercent > 1.0f ||
+            !std::isfinite(settings.SleepLinearVelocityThreshold) || settings.SleepLinearVelocityThreshold < 0.0f ||
+            !std::isfinite(settings.SleepAngularVelocityThreshold) || settings.SleepAngularVelocityThreshold < 0.0f ||
+            !std::isfinite(settings.TimeToSleepSeconds) || settings.TimeToSleepSeconds < 0.0f)
+        {
+            return ValidationStatus::InvalidSolverSettings;
+        }
+        return ValidationStatus::Valid;
+    }
+
+    [[nodiscard]] IslandBuildResult World::BuildIslands(const CollisionResult& collision) const
+    {
+        IslandBuildResult result{};
+
+        // Union-find over slot indices, restricted to occupied dynamic
+        // bodies. Static/kinematic endpoints anchor contacts but never join
+        // (or merge) islands.
+        std::vector<std::uint32_t> parent(m_Slots.size());
+        for (std::uint32_t i = 0u; i < parent.size(); ++i)
+            parent[i] = i;
+
+        const auto findRoot = [&parent](std::uint32_t index) noexcept
+        {
+            while (parent[index] != index)
+            {
+                parent[index] = parent[parent[index]];
+                index = parent[index];
+            }
+            return index;
+        };
+
+        const auto isLiveDynamic = [this](const BodyHandle handle) noexcept
+        {
+            const Slot* slot = ResolveSlot(handle);
+            return slot != nullptr && slot->Body.Enabled && slot->Body.Motion == MotionType::Dynamic;
+        };
+
+        for (std::uint32_t contactIndex = 0u;
+             contactIndex < collision.Contacts.size();
+             ++contactIndex)
+        {
+            const ContactRecord& contact = collision.Contacts[contactIndex];
+            ++result.Diagnostics.ContactsConsidered;
+            if (contact.IsTrigger)
+            {
+                ++result.Diagnostics.TriggerContactsExcluded;
+                continue;
+            }
+
+            const bool dynamicA = isLiveDynamic(contact.A.Body);
+            const bool dynamicB = isLiveDynamic(contact.B.Body);
+            if (!dynamicA && !dynamicB)
+            {
+                ++result.Diagnostics.NonDynamicContactsIgnored;
+                continue;
+            }
+            if (dynamicA != dynamicB)
+            {
+                ++result.Diagnostics.StaticAnchoredContacts;
+            }
+            if (dynamicA && dynamicB)
+            {
+                const std::uint32_t rootA = findRoot(contact.A.Body.Index);
+                const std::uint32_t rootB = findRoot(contact.B.Body.Index);
+                if (rootA != rootB)
+                    parent[rootB < rootA ? rootA : rootB] = rootB < rootA ? rootB : rootA;
+            }
+        }
+
+        // Bucket dynamic bodies and qualifying contacts by island root. The
+        // root choice above (smaller index wins) plus the index-ordered scans
+        // below give the deterministic ordering contract.
+        const std::uint32_t kNoIsland = static_cast<std::uint32_t>(m_Slots.size());
+        std::vector<std::uint32_t> rootToIsland(m_Slots.size(), kNoIsland);
+        for (std::uint32_t index = 0u; index < m_Slots.size(); ++index)
+        {
+            const Slot& slot = m_Slots[index];
+            if (!slot.Occupied || !slot.Body.Enabled || slot.Body.Motion != MotionType::Dynamic)
+                continue;
+
+            const std::uint32_t root = findRoot(index);
+            if (rootToIsland[root] == kNoIsland)
+            {
+                rootToIsland[root] = static_cast<std::uint32_t>(result.Islands.size());
+                result.Islands.emplace_back();
+            }
+            result.Islands[rootToIsland[root]].Bodies.push_back(
+                BodyHandle{index, slot.Generation});
+            ++result.Diagnostics.IslandedDynamicBodies;
+        }
+
+        for (std::uint32_t contactIndex = 0u;
+             contactIndex < collision.Contacts.size();
+             ++contactIndex)
+        {
+            const ContactRecord& contact = collision.Contacts[contactIndex];
+            if (contact.IsTrigger)
+                continue;
+            const bool dynamicA = isLiveDynamic(contact.A.Body);
+            const bool dynamicB = isLiveDynamic(contact.B.Body);
+            if (!dynamicA && !dynamicB)
+                continue;
+            const std::uint32_t anchorIndex =
+                dynamicA ? contact.A.Body.Index : contact.B.Body.Index;
+            const std::uint32_t island = rootToIsland[findRoot(anchorIndex)];
+            if (island < result.Islands.size())
+                result.Islands[island].ContactIndices.push_back(contactIndex);
+        }
+
+        result.Diagnostics.IslandCount = static_cast<std::uint32_t>(result.Islands.size());
+        return result;
+    }
+
+    [[nodiscard]] bool World::IsBodyAsleep(BodyHandle handle) const noexcept
+    {
+        const Slot* slot = ResolveSlot(handle);
+        return slot != nullptr && slot->Sleep.Asleep;
+    }
+
+    bool World::WakeBody(BodyHandle handle) noexcept
+    {
+        Slot* slot = ResolveSlot(handle);
+        if (slot == nullptr)
+            return false;
+        slot->Sleep = {};
+        return true;
+    }
+
+    [[nodiscard]] SolveStepDiagnostics World::SolveStep(const StepInput& input,
+                                                        const SolverSettings& settings)
+    {
+        SolveStepDiagnostics diagnostics{};
+        diagnostics.Status = Validate(input);
+        if (diagnostics.Status == ValidationStatus::Valid)
+            diagnostics.Status = Validate(settings);
+        if (diagnostics.Status != ValidationStatus::Valid)
+        {
+            m_Diagnostics.LastSolveStep = diagnostics;
+            return diagnostics;
+        }
+
+        const float dt = input.DeltaSeconds;
+
+        // Linear kinetic energy of awake dynamic bodies. The world models no
+        // angular inertia, so angular energy is intentionally excluded.
+        const auto kineticEnergy = [this]() noexcept
+        {
+            float energy = 0.0f;
+            for (const Slot& slot : m_Slots)
+            {
+                if (!slot.Occupied || slot.Sleep.Asleep)
+                    continue;
+                const BodyDescriptor& body = slot.Body;
+                if (!body.Enabled || body.Motion != MotionType::Dynamic || body.Mass <= 0.0f)
+                    continue;
+                energy += 0.5f * body.Mass * glm::dot(body.LinearVelocity, body.LinearVelocity);
+            }
+            return energy;
+        };
+        diagnostics.KineticEnergyBefore = kineticEnergy();
+
+        // ── Integration (sleep-aware Step) ────────────────────────────────
+        for (Slot& slot : m_Slots)
+        {
+            if (!slot.Occupied)
+                continue;
+
+            BodyDescriptor& body = slot.Body;
+            ++diagnostics.Integration.BodiesVisited;
+            if (!body.Enabled)
+            {
+                ++diagnostics.Integration.DisabledBodiesSkipped;
+                continue;
+            }
+            if (slot.Sleep.Asleep)
+                continue;
+
+            switch (body.Motion)
+            {
+            case MotionType::Static:
+                ++diagnostics.Integration.StaticBodiesSkipped;
+                break;
+            case MotionType::Kinematic:
+                body.Pose.Position += body.LinearVelocity * dt;
+                IntegrateAngular(body.Pose, body.AngularVelocity, dt);
+                ++diagnostics.Integration.KinematicBodiesIntegrated;
+                break;
+            case MotionType::Dynamic:
+                body.LinearVelocity += input.Gravity * body.GravityScale * dt;
+                body.LinearVelocity *= DampingFactor(body.LinearDamping, dt);
+                body.AngularVelocity *= DampingFactor(body.AngularDamping, dt);
+                body.Pose.Position += body.LinearVelocity * dt;
+                IntegrateAngular(body.Pose, body.AngularVelocity, dt);
+                ++diagnostics.Integration.DynamicBodiesIntegrated;
+                break;
+            }
+        }
+
+        // ── Contacts + islands ────────────────────────────────────────────
+        const CollisionResult collision = ComputeCollisionContacts();
+        for (const ContactRecord& contact : collision.Contacts)
+        {
+            if (!contact.IsTrigger)
+                diagnostics.MaxPenetrationBefore =
+                    std::max(diagnostics.MaxPenetrationBefore, contact.PenetrationDepth);
+        }
+
+        const IslandBuildResult islands = BuildIslands(collision);
+        diagnostics.Islands = islands.Diagnostics;
+
+        // ── Wake propagation: any awake member wakes the whole island ─────
+        for (const IslandRecord& island : islands.Islands)
+        {
+            bool anyAwake = false;
+            for (const BodyHandle handle : island.Bodies)
+            {
+                const Slot* slot = ResolveSlot(handle);
+                if (slot != nullptr && !slot->Sleep.Asleep)
+                {
+                    anyAwake = true;
+                    break;
+                }
+            }
+            if (!anyAwake)
+                continue;
+            for (const BodyHandle handle : island.Bodies)
+            {
+                Slot* slot = ResolveSlot(handle);
+                if (slot != nullptr && slot->Sleep.Asleep)
+                {
+                    slot->Sleep = {};
+                    ++diagnostics.Sleep.WakeTransitions;
+                }
+            }
+        }
+
+        // ── Iterative linear contact solve per awake island ───────────────
+        const auto inverseMass = [](const BodyDescriptor& body) noexcept
+        {
+            if (body.Motion != MotionType::Dynamic || body.Mass <= 0.0f)
+                return 0.0f;
+            return 1.0f / body.Mass;
+        };
+
+        bool degraded = false;
+        for (const IslandRecord& island : islands.Islands)
+        {
+            if (island.ContactIndices.empty())
+                continue;
+
+            bool islandAsleep = true;
+            for (const BodyHandle handle : island.Bodies)
+            {
+                const Slot* slot = ResolveSlot(handle);
+                if (slot != nullptr && !slot->Sleep.Asleep)
+                {
+                    islandAsleep = false;
+                    break;
+                }
+            }
+            if (islandAsleep)
+                continue;
+
+            std::uint32_t iterationsUsed = 0u;
+            for (std::uint32_t iteration = 0u; iteration < settings.MaxIterations; ++iteration)
+            {
+                bool anyApplied = false;
+                ++iterationsUsed;
+                for (const std::uint32_t contactIndex : island.ContactIndices)
+                {
+                    const ContactRecord& contact = collision.Contacts[contactIndex];
+                    Slot* slotA = ResolveSlot(contact.A.Body);
+                    Slot* slotB = ResolveSlot(contact.B.Body);
+                    if (slotA == nullptr || slotB == nullptr)
+                        continue;
+
+                    BodyDescriptor& a = slotA->Body;
+                    BodyDescriptor& b = slotB->Body;
+                    const float invA = inverseMass(a);
+                    const float invB = inverseMass(b);
+                    const float invSum = invA + invB;
+                    if (invSum <= 0.0f)
+                        continue;
+
+                    // Contact normal points from A to B (Geometry
+                    // ContactManifold convention, same as METHOD-001).
+                    const glm::vec3 relativeVelocity = b.LinearVelocity - a.LinearVelocity;
+                    const float normalSpeed = glm::dot(relativeVelocity, contact.Normal);
+                    if (normalSpeed < 0.0f)
+                    {
+                        const float impulse =
+                            (-(1.0f + settings.Restitution) * normalSpeed) / invSum;
+                        a.LinearVelocity -= contact.Normal * (impulse * invA);
+                        b.LinearVelocity += contact.Normal * (impulse * invB);
+                        anyApplied = true;
+                    }
+
+                    const float correctionDepth =
+                        std::max(contact.PenetrationDepth - settings.PenetrationSlop, 0.0f);
+                    if (correctionDepth > 0.0f)
+                    {
+                        // Positional Baumgarte projection on the captured
+                        // manifold, applied per iteration exactly like the
+                        // METHOD-001 reference ResolveContact so parity
+                        // fixtures match; the residual below is recomputed
+                        // from live shapes.
+                        const glm::vec3 correction = contact.Normal *
+                            ((settings.PositionCorrectionPercent * correctionDepth) / invSum);
+                        a.Pose.Position -= correction * invA;
+                        b.Pose.Position += correction * invB;
+                        anyApplied = true;
+                    }
+
+                    if (!IsFinite(a.Pose.Position) || !IsFinite(b.Pose.Position) ||
+                        !IsFinite(a.LinearVelocity) || !IsFinite(b.LinearVelocity))
+                    {
+                        degraded = true;
+                    }
+                    ++diagnostics.ContactsSolved;
+                }
+                if (!anyApplied || degraded)
+                    break;
+            }
+            diagnostics.IterationsUsed = std::max(diagnostics.IterationsUsed, iterationsUsed);
+        }
+
+        // ── Residuals from live shapes ────────────────────────────────────
+        const CollisionResult residual = ComputeCollisionContacts();
+        for (const ContactRecord& contact : residual.Contacts)
+        {
+            if (contact.IsTrigger)
+                continue;
+            diagnostics.MaxPenetrationAfter =
+                std::max(diagnostics.MaxPenetrationAfter, contact.PenetrationDepth);
+
+            const Slot* slotA = ResolveSlot(contact.A.Body);
+            const Slot* slotB = ResolveSlot(contact.B.Body);
+            if (slotA == nullptr || slotB == nullptr)
+                continue;
+            const glm::vec3 relativeVelocity =
+                slotB->Body.LinearVelocity - slotA->Body.LinearVelocity;
+            const float normalSpeed = glm::dot(relativeVelocity, contact.Normal);
+            diagnostics.MaxNormalVelocityResidual =
+                std::max(diagnostics.MaxNormalVelocityResidual, std::max(0.0f, -normalSpeed));
+        }
+
+        const float convergenceTolerance = std::max(settings.PenetrationSlop, 1.0e-6f);
+        if (degraded)
+        {
+            diagnostics.Solve = SolveStatus::Degraded;
+        }
+        else if (diagnostics.MaxPenetrationAfter > convergenceTolerance)
+        {
+            diagnostics.Solve = SolveStatus::MaxIterationsReached;
+            // Count islands that still anchor residual penetration.
+            const IslandBuildResult residualIslands = BuildIslands(residual);
+            for (const IslandRecord& island : residualIslands.Islands)
+            {
+                for (const std::uint32_t contactIndex : island.ContactIndices)
+                {
+                    if (residual.Contacts[contactIndex].PenetrationDepth > convergenceTolerance)
+                    {
+                        ++diagnostics.NonConvergedIslands;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // ── Sleep policy ──────────────────────────────────────────────────
+        for (Slot& slot : m_Slots)
+        {
+            if (!slot.Occupied)
+                continue;
+            const BodyDescriptor& body = slot.Body;
+            if (!body.Enabled || body.Motion != MotionType::Dynamic)
+                continue;
+
+            if (slot.Sleep.Asleep)
+            {
+                ++diagnostics.Sleep.SleepingDynamicBodies;
+                continue;
+            }
+
+            if (settings.EnableSleep &&
+                glm::length(body.LinearVelocity) <= settings.SleepLinearVelocityThreshold &&
+                glm::length(body.AngularVelocity) <= settings.SleepAngularVelocityThreshold)
+            {
+                slot.Sleep.LowMotionSeconds += dt;
+                if (slot.Sleep.LowMotionSeconds >= settings.TimeToSleepSeconds)
+                {
+                    slot.Sleep.Asleep = true;
+                    slot.Body.LinearVelocity = glm::vec3{0.0f};
+                    slot.Body.AngularVelocity = glm::vec3{0.0f};
+                    ++diagnostics.Sleep.SleepTransitions;
+                    ++diagnostics.Sleep.SleepingDynamicBodies;
+                    continue;
+                }
+            }
+            else
+            {
+                slot.Sleep.LowMotionSeconds = 0.0f;
+            }
+            ++diagnostics.Sleep.AwakeDynamicBodies;
+        }
+
+        diagnostics.KineticEnergyAfter = kineticEnergy();
+        diagnostics.EnergyDrift =
+            diagnostics.KineticEnergyAfter - diagnostics.KineticEnergyBefore;
+
+        ++m_Diagnostics.SolveStepsExecuted;
+        m_Diagnostics.LastSolveStep = diagnostics;
+        return diagnostics;
     }
 
     void World::Clear() noexcept
