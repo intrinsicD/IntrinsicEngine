@@ -52,9 +52,9 @@ Member-by-member history: retirement log and
 [`rendering/README.md`](rendering/README.md) /
 [`runtime/README.md`](runtime/README.md).
 
-Still-open Theme A stragglers:
-- [`runtime/RORG-031-runtime-composition.md`](runtime/RORG-031-runtime-composition.md)
-  (also Theme F) — runtime composition backlog seed.
+Theme A has **no open members**; the last straggler (`RORG-031C`, the
+runtime composition backlog seed) retired once its lifecycle children landed
+and the remaining runtime children became independently tracked tasks.
 
 ### Theme B — Rendering modernization (P1)
 
@@ -111,7 +111,6 @@ Open members:
 - [`architecture/LEGACY-012-migrate-legacy-consumer-tests.md`](architecture/LEGACY-012-migrate-legacy-consumer-tests.md) —
   follow-up for tests and non-legacy consumers that still import bare legacy
   module names after promoted equivalents exist.
-- [`runtime/RORG-031-runtime-composition.md`](runtime/RORG-031-runtime-composition.md) (also Theme A).
 - [`runtime/RUNTIME-101-asset-ingest-state-machine.md`](runtime/RUNTIME-101-asset-ingest-state-machine.md),
   [`runtime/RUNTIME-103-geometry-algorithm-execution-queue.md`](runtime/RUNTIME-103-geometry-algorithm-execution-queue.md),
   [`runtime/RUNTIME-104-derived-overlay-producer-lifecycle.md`](runtime/RUNTIME-104-derived-overlay-producer-lifecycle.md).

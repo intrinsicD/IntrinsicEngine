@@ -9,6 +9,18 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`RORG-031C`](RORG-031C-runtime-composition.md) — runtime composition
+backlog seed — retired to `tasks/done/` on 2026-06-10. The seed's job was
+to replace the unnamed runtime composition narrative gap with concrete
+child tasks, and that is done: `RUNTIME-099` (explicit lifecycle pipeline
+with shutdown determinism, `CPUContracted`), `RUNTIME-100` (scene
+lifecycle), and `RUNTIME-102` (editor command history) are retired, while
+`RUNTIME-101` (asset ingest state machine), `RUNTIME-103` (geometry
+algorithm execution queue), and `RUNTIME-104` (derived overlay producer
+lifecycle) remain independently tracked Theme F backlog tasks synchronized
+with the `LEGACY-011` feature map. Theme A now has no open members.
+
+Backlog
 [`BUG-025`](BUG-025-contact-manifold-normal-convention.md) — geometry
 contact manifold normals violate the documented A→B convention — retired to
 `tasks/done/` on 2026-06-10 at maturity `CPUContracted`. Root cause was two

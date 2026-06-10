@@ -10,10 +10,6 @@ the authoritative open/unblocked view.
 
 - none
 
-## Theme A — Shortest path to sandbox visible geometry
-
-- unblocked: `RORG-031C` — Runtime composition backlog seed (tasks/backlog/runtime/RORG-031-runtime-composition.md)
-
 ## Theme C — Physics readiness
 
 - unblocked: `METHOD-009` — Particle and mass-spring reference backend (tasks/backlog/methods/METHOD-009-particle-spring-reference-backend.md)

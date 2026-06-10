@@ -7,9 +7,12 @@ another backlog directory.
 
 ## Runtime backlog tasks
 
-- [RORG-031C — Runtime composition backlog seed](RORG-031-runtime-composition.md):
-  composition-root and lifecycle backlog work for `begin_frame`, extraction,
-  prepare, execute, end, shutdown determinism, and subsystem wiring.
+- [RORG-031C — Runtime composition backlog seed](../../done/RORG-031C-runtime-composition.md)
+  (done, 2026-06-10): composition-root and lifecycle backlog work for
+  `begin_frame`, extraction, prepare, execute, end, shutdown determinism, and
+  subsystem wiring; executed via `RUNTIME-099`/`RUNTIME-100`/`RUNTIME-102`
+  with `RUNTIME-101`/`RUNTIME-103`/`RUNTIME-104` remaining as independently
+  tracked children.
 - [RUNTIME-091 — Activate promoted ECS system bundle in fixed-step runtime](../../done/RUNTIME-091-promoted-ecs-system-bundle-activation.md)
   (done): runtime-owned activation of promoted ECS systems via
   `Extrinsic.Runtime.EcsSystemBundle::RegisterPromotedEcsSystemBundle`, called

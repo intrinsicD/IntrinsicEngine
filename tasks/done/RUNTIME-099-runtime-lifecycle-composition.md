@@ -19,7 +19,7 @@
 
 ## Context
 - Owner/layer: `runtime` composition root; runtime may depend on lower layers and owns cross-layer wiring.
-- [`RORG-031-runtime-composition.md`](../backlog/runtime/RORG-031-runtime-composition.md) is the seed task for this area.
+- [`RORG-031C`](RORG-031C-runtime-composition.md) is the seed task for this area.
 - Reused promoted pieces: `Extrinsic.Core.FrameLoop`, `Runtime.Engine`, `Runtime.EcsSystemBundle`, `Runtime.RenderWorldPool`, `Runtime.RenderExtraction`, `Runtime.PhysicsBridge`, `Runtime.ImGuiAdapter`, `Graphics.RenderPrepPipeline`, and `IRenderer::IsOperational()`.
 - The runtime gates operational promotion on `RHI::IDevice::IsOperational()`, not Vulkan diagnostics.
 - Legacy `Runtime.FrameLoop`, `Runtime.RenderOrchestrator`, and `Runtime.ResourceMaintenance` are not imported by the promoted runtime path; the equivalent stage contracts are `Extrinsic.Core.FrameLoop` plus runtime-owned hooks and `RuntimeFrameContext` data.
