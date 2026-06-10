@@ -9,6 +9,21 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`LEGACY-002`](LEGACY-002-seed-src-legacy-retirement-backlog.md) — seed
+retirement tasks for remaining `src/legacy/` subtrees — retired to
+`tasks/done/` on 2026-06-10. The deliverables had been complete since
+2026-06-06 (the `LEGACY-003..010` per-subtree deletion tasks, the
+architecture README "Legacy retirement" section with dependency-ordered
+hints, and the `docs/migration/legacy-retirement.md` sequencing links);
+the file stayed in backlog only because ~54 layering-allowlist rows still
+named `LEGACY-002` as their open umbrella owner. `HARDEN-082` (the
+metadata-only rebinding follow-up the task's context required) moved
+those rows to their per-subtree owners, so no allowlist row references
+`LEGACY-002` and the seed retires. Remaining legacy retirement is owned
+by `LEGACY-001` and `LEGACY-004..010`, each gated on its consumer-grep
+prerequisite.
+
+Backlog
 [`HARDEN-082`](HARDEN-082-rebind-legacy-allowlist-umbrella-rows.md) —
 rebind legacy allowlist umbrella rows to per-subtree owners — opened and
 retired to `tasks/done/` on 2026-06-10 at maturity `Retired`

@@ -20,13 +20,10 @@ map.
 - [LEGACY-001 — Delete `src/legacy/Interface/`](LEGACY-001-delete-src-legacy-interface.md):
   first concrete deletion under `ARCH-004`. Backlog until the consumer-grep
   prerequisite passes; promotion to `tasks/active/` is gated by `ARCH-004`.
-- [LEGACY-002 — Seed retirement tasks for remaining `src/legacy/` subtrees](LEGACY-002-seed-src-legacy-retirement-backlog.md):
-  opens one structured `LEGACY-*` retirement task per remaining legacy subtree
-  so allowlist entries and migration docs can point at concrete removal owners.
 
 ## Legacy retirement
 
-`LEGACY-002` seeds one structured deletion task per remaining
+`LEGACY-002` (done 2026-06-10) seeded one structured deletion task per remaining
 `src/legacy/<Subsystem>/` subtree so the layering allowlist and migration docs
 can name a concrete owning task per subtree. Each task follows the
 [`LEGACY-001`](LEGACY-001-delete-src-legacy-interface.md) shape (scope,
@@ -182,3 +179,7 @@ split; narratives live in the retirement log.
   (done, 2026-06-10): metadata-only rebind of the 54 `LEGACY-002` umbrella
   allowlist rows to `LEGACY-004..006`/`LEGACY-008..010`, unblocking the
   `LEGACY-002` seed retirement.
+- [LEGACY-002 — Seed retirement tasks for remaining `src/legacy/` subtrees](../../done/LEGACY-002-seed-src-legacy-retirement-backlog.md)
+  (done, 2026-06-10): seeded `LEGACY-003..010` (landed 2026-06-06) and
+  retired once `HARDEN-082` rebound the umbrella allowlist rows to the
+  per-subtree owners.

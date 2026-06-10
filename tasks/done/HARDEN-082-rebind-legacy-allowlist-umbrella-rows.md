@@ -24,7 +24,7 @@ depends_on: []
 - `LEGACY-002` seeded the per-subtree retirement tasks but recorded (Context,
   2026-06-06) that ~54 allowlist rows still name `LEGACY-002` as their open
   umbrella owner, and that a metadata-only rebinding follow-up mirroring
-  [`HARDEN-069`](../../done/HARDEN-069-rebind-legacy-layering-allowlist-to-active-retirement-tasks.md)
+  [`HARDEN-069`](HARDEN-069-rebind-legacy-layering-allowlist-to-active-retirement-tasks.md)
   must move each subtree's rows to its specific `LEGACY-00N` task before
   `LEGACY-002` can retire. This is that follow-up.
 - Mapping by `file_glob` prefix: `src/legacy/Asset/**` → `LEGACY-004`,

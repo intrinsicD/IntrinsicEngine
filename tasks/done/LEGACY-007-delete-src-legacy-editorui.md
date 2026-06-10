@@ -31,7 +31,7 @@
 - Owning subsystem/layer: `src/legacy/EditorUI/` removal; promoted owner
   `src/app/` (editor shell + panels, `UI-001`).
 - Driver: legacy-retirement program seeded by
-  [`LEGACY-002`](../backlog/architecture/LEGACY-002-seed-src-legacy-retirement-backlog.md) under
+  [`LEGACY-002`](LEGACY-002-seed-src-legacy-retirement-backlog.md) under
   [`ARCH-004`](ARCH-004-legacy-retirement-first-deletion-target.md);
   structural template is
   [`LEGACY-001`](../backlog/architecture/LEGACY-001-delete-src-legacy-interface.md). This is sequencing

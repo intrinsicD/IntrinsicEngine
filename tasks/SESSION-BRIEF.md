@@ -17,7 +17,6 @@ the authoritative open/unblocked view.
 - unblocked: `GRAPHICS-086` — RHI retirement parity and CUDA decision (tasks/backlog/rendering/GRAPHICS-086-rhi-retirement-parity-and-cuda-decision.md)
 - unblocked: `INFRA-001` — Move third-party dependencies to a vcpkg manifest (tasks/backlog/architecture/INFRA-001-vcpkg-manifest-mode.md)
 - unblocked: `LEGACY-001` — Delete `src/legacy/Interface/` (tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md)
-- unblocked: `LEGACY-002` — Seed retirement tasks for remaining `src/legacy/` subtrees (tasks/backlog/architecture/LEGACY-002-seed-src-legacy-retirement-backlog.md)
 - unblocked: `LEGACY-004` — Delete `src/legacy/Asset/` (tasks/backlog/architecture/LEGACY-004-delete-src-legacy-asset.md)
 - unblocked: `LEGACY-005` — Delete `src/legacy/Core/` (tasks/backlog/architecture/LEGACY-005-delete-src-legacy-core.md)
 - unblocked: `LEGACY-006` — Delete `src/legacy/ECS/` (tasks/backlog/architecture/LEGACY-006-delete-src-legacy-ecs.md)
