@@ -178,3 +178,7 @@ split; narratives live in the retirement log.
   (done, 2026-06-10): resolved the `Core.Filesystem` dead-import TODO with an
   explicit per-watch callback policy and gave the `GetStreamingGraph()`
   temporary bridge its tracked removal owner `RUNTIME-105`.
+- [HARDEN-082 — Rebind legacy allowlist umbrella rows to per-subtree owners](../../done/HARDEN-082-rebind-legacy-allowlist-umbrella-rows.md)
+  (done, 2026-06-10): metadata-only rebind of the 54 `LEGACY-002` umbrella
+  allowlist rows to `LEGACY-004..006`/`LEGACY-008..010`, unblocking the
+  `LEGACY-002` seed retirement.

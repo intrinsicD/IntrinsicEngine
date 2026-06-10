@@ -5,26 +5,26 @@ exceptions:
   - from: legacy
     to: core
     file_glob: "src/legacy/Asset/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Asset/ retirement task"
+    task: "LEGACY-004"
+    expires: "until LEGACY-004 deletes src/legacy/Asset/"
     reason: "Temporary legacy layering exception for Asset while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: core
     file_glob: "src/legacy/Core/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Core/ retirement task"
+    task: "LEGACY-005"
+    expires: "until LEGACY-005 deletes src/legacy/Core/"
     reason: "Temporary legacy layering exception for Core while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: core
     file_glob: "src/legacy/ECS/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/ECS/ retirement task"
+    task: "LEGACY-006"
+    expires: "until LEGACY-006 deletes src/legacy/ECS/"
     reason: "Temporary legacy layering exception for ECS while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: core
     file_glob: "src/legacy/Graphics/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Graphics/ retirement task"
+    task: "LEGACY-008"
+    expires: "until LEGACY-008 deletes src/legacy/Graphics/"
     reason: "Temporary legacy layering exception for Graphics while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: core
@@ -35,38 +35,38 @@ exceptions:
   - from: legacy
     to: core
     file_glob: "src/legacy/RHI/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/RHI/ retirement task"
+    task: "LEGACY-009"
+    expires: "until LEGACY-009 deletes src/legacy/RHI/"
     reason: "Temporary legacy layering exception for RHI while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: core
     file_glob: "src/legacy/Runtime/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Runtime/ retirement task"
+    task: "LEGACY-010"
+    expires: "until LEGACY-010 deletes src/legacy/Runtime/"
     reason: "Temporary legacy layering exception for Runtime while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: geometry
     file_glob: "src/legacy/Asset/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Asset/ retirement task"
+    task: "LEGACY-004"
+    expires: "until LEGACY-004 deletes src/legacy/Asset/"
     reason: "Temporary legacy layering exception for Asset while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: geometry
     file_glob: "src/legacy/Core/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Core/ retirement task"
+    task: "LEGACY-005"
+    expires: "until LEGACY-005 deletes src/legacy/Core/"
     reason: "Temporary legacy layering exception for Core while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: geometry
     file_glob: "src/legacy/ECS/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/ECS/ retirement task"
+    task: "LEGACY-006"
+    expires: "until LEGACY-006 deletes src/legacy/ECS/"
     reason: "Temporary legacy layering exception for ECS while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: geometry
     file_glob: "src/legacy/Graphics/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Graphics/ retirement task"
+    task: "LEGACY-008"
+    expires: "until LEGACY-008 deletes src/legacy/Graphics/"
     reason: "Temporary legacy layering exception for Graphics while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: geometry
@@ -77,38 +77,38 @@ exceptions:
   - from: legacy
     to: geometry
     file_glob: "src/legacy/RHI/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/RHI/ retirement task"
+    task: "LEGACY-009"
+    expires: "until LEGACY-009 deletes src/legacy/RHI/"
     reason: "Temporary legacy layering exception for RHI while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: geometry
     file_glob: "src/legacy/Runtime/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Runtime/ retirement task"
+    task: "LEGACY-010"
+    expires: "until LEGACY-010 deletes src/legacy/Runtime/"
     reason: "Temporary legacy layering exception for Runtime while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: assets
     file_glob: "src/legacy/Asset/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Asset/ retirement task"
+    task: "LEGACY-004"
+    expires: "until LEGACY-004 deletes src/legacy/Asset/"
     reason: "Temporary legacy layering exception for Asset while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: assets
     file_glob: "src/legacy/Core/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Core/ retirement task"
+    task: "LEGACY-005"
+    expires: "until LEGACY-005 deletes src/legacy/Core/"
     reason: "Temporary legacy layering exception for Core while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: assets
     file_glob: "src/legacy/ECS/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/ECS/ retirement task"
+    task: "LEGACY-006"
+    expires: "until LEGACY-006 deletes src/legacy/ECS/"
     reason: "Temporary legacy layering exception for ECS while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: assets
     file_glob: "src/legacy/Graphics/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Graphics/ retirement task"
+    task: "LEGACY-008"
+    expires: "until LEGACY-008 deletes src/legacy/Graphics/"
     reason: "Temporary legacy layering exception for Graphics while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: assets
@@ -119,38 +119,38 @@ exceptions:
   - from: legacy
     to: assets
     file_glob: "src/legacy/RHI/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/RHI/ retirement task"
+    task: "LEGACY-009"
+    expires: "until LEGACY-009 deletes src/legacy/RHI/"
     reason: "Temporary legacy layering exception for RHI while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: assets
     file_glob: "src/legacy/Runtime/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Runtime/ retirement task"
+    task: "LEGACY-010"
+    expires: "until LEGACY-010 deletes src/legacy/Runtime/"
     reason: "Temporary legacy layering exception for Runtime while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: ecs
     file_glob: "src/legacy/Asset/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Asset/ retirement task"
+    task: "LEGACY-004"
+    expires: "until LEGACY-004 deletes src/legacy/Asset/"
     reason: "Temporary legacy layering exception for Asset while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: ecs
     file_glob: "src/legacy/Core/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Core/ retirement task"
+    task: "LEGACY-005"
+    expires: "until LEGACY-005 deletes src/legacy/Core/"
     reason: "Temporary legacy layering exception for Core while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: ecs
     file_glob: "src/legacy/ECS/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/ECS/ retirement task"
+    task: "LEGACY-006"
+    expires: "until LEGACY-006 deletes src/legacy/ECS/"
     reason: "Temporary legacy layering exception for ECS while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: ecs
     file_glob: "src/legacy/Graphics/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Graphics/ retirement task"
+    task: "LEGACY-008"
+    expires: "until LEGACY-008 deletes src/legacy/Graphics/"
     reason: "Temporary legacy layering exception for Graphics while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: ecs
@@ -161,38 +161,38 @@ exceptions:
   - from: legacy
     to: ecs
     file_glob: "src/legacy/RHI/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/RHI/ retirement task"
+    task: "LEGACY-009"
+    expires: "until LEGACY-009 deletes src/legacy/RHI/"
     reason: "Temporary legacy layering exception for RHI while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: ecs
     file_glob: "src/legacy/Runtime/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Runtime/ retirement task"
+    task: "LEGACY-010"
+    expires: "until LEGACY-010 deletes src/legacy/Runtime/"
     reason: "Temporary legacy layering exception for Runtime while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: graphics_rhi
     file_glob: "src/legacy/Asset/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Asset/ retirement task"
+    task: "LEGACY-004"
+    expires: "until LEGACY-004 deletes src/legacy/Asset/"
     reason: "Temporary legacy layering exception for Asset while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: graphics_rhi
     file_glob: "src/legacy/Core/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Core/ retirement task"
+    task: "LEGACY-005"
+    expires: "until LEGACY-005 deletes src/legacy/Core/"
     reason: "Temporary legacy layering exception for Core while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: graphics_rhi
     file_glob: "src/legacy/ECS/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/ECS/ retirement task"
+    task: "LEGACY-006"
+    expires: "until LEGACY-006 deletes src/legacy/ECS/"
     reason: "Temporary legacy layering exception for ECS while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: graphics_rhi
     file_glob: "src/legacy/Graphics/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Graphics/ retirement task"
+    task: "LEGACY-008"
+    expires: "until LEGACY-008 deletes src/legacy/Graphics/"
     reason: "Temporary legacy layering exception for Graphics while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: graphics_rhi
@@ -203,38 +203,38 @@ exceptions:
   - from: legacy
     to: graphics_rhi
     file_glob: "src/legacy/RHI/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/RHI/ retirement task"
+    task: "LEGACY-009"
+    expires: "until LEGACY-009 deletes src/legacy/RHI/"
     reason: "Temporary legacy layering exception for RHI while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: graphics_rhi
     file_glob: "src/legacy/Runtime/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Runtime/ retirement task"
+    task: "LEGACY-010"
+    expires: "until LEGACY-010 deletes src/legacy/Runtime/"
     reason: "Temporary legacy layering exception for Runtime while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: graphics
     file_glob: "src/legacy/Asset/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Asset/ retirement task"
+    task: "LEGACY-004"
+    expires: "until LEGACY-004 deletes src/legacy/Asset/"
     reason: "Temporary legacy layering exception for Asset while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: graphics
     file_glob: "src/legacy/Core/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Core/ retirement task"
+    task: "LEGACY-005"
+    expires: "until LEGACY-005 deletes src/legacy/Core/"
     reason: "Temporary legacy layering exception for Core while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: graphics
     file_glob: "src/legacy/ECS/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/ECS/ retirement task"
+    task: "LEGACY-006"
+    expires: "until LEGACY-006 deletes src/legacy/ECS/"
     reason: "Temporary legacy layering exception for ECS while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: graphics
     file_glob: "src/legacy/Graphics/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Graphics/ retirement task"
+    task: "LEGACY-008"
+    expires: "until LEGACY-008 deletes src/legacy/Graphics/"
     reason: "Temporary legacy layering exception for Graphics while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: graphics
@@ -245,38 +245,38 @@ exceptions:
   - from: legacy
     to: graphics
     file_glob: "src/legacy/RHI/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/RHI/ retirement task"
+    task: "LEGACY-009"
+    expires: "until LEGACY-009 deletes src/legacy/RHI/"
     reason: "Temporary legacy layering exception for RHI while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: graphics
     file_glob: "src/legacy/Runtime/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Runtime/ retirement task"
+    task: "LEGACY-010"
+    expires: "until LEGACY-010 deletes src/legacy/Runtime/"
     reason: "Temporary legacy layering exception for Runtime while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: runtime
     file_glob: "src/legacy/Asset/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Asset/ retirement task"
+    task: "LEGACY-004"
+    expires: "until LEGACY-004 deletes src/legacy/Asset/"
     reason: "Temporary legacy layering exception for Asset while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: runtime
     file_glob: "src/legacy/Core/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Core/ retirement task"
+    task: "LEGACY-005"
+    expires: "until LEGACY-005 deletes src/legacy/Core/"
     reason: "Temporary legacy layering exception for Core while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: runtime
     file_glob: "src/legacy/ECS/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/ECS/ retirement task"
+    task: "LEGACY-006"
+    expires: "until LEGACY-006 deletes src/legacy/ECS/"
     reason: "Temporary legacy layering exception for ECS while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: runtime
     file_glob: "src/legacy/Graphics/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Graphics/ retirement task"
+    task: "LEGACY-008"
+    expires: "until LEGACY-008 deletes src/legacy/Graphics/"
     reason: "Temporary legacy layering exception for Graphics while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: runtime
@@ -287,38 +287,38 @@ exceptions:
   - from: legacy
     to: runtime
     file_glob: "src/legacy/RHI/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/RHI/ retirement task"
+    task: "LEGACY-009"
+    expires: "until LEGACY-009 deletes src/legacy/RHI/"
     reason: "Temporary legacy layering exception for RHI while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: runtime
     file_glob: "src/legacy/Runtime/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Runtime/ retirement task"
+    task: "LEGACY-010"
+    expires: "until LEGACY-010 deletes src/legacy/Runtime/"
     reason: "Temporary legacy layering exception for Runtime while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: platform
     file_glob: "src/legacy/Asset/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Asset/ retirement task"
+    task: "LEGACY-004"
+    expires: "until LEGACY-004 deletes src/legacy/Asset/"
     reason: "Temporary legacy layering exception for Asset while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: platform
     file_glob: "src/legacy/Core/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Core/ retirement task"
+    task: "LEGACY-005"
+    expires: "until LEGACY-005 deletes src/legacy/Core/"
     reason: "Temporary legacy layering exception for Core while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: platform
     file_glob: "src/legacy/ECS/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/ECS/ retirement task"
+    task: "LEGACY-006"
+    expires: "until LEGACY-006 deletes src/legacy/ECS/"
     reason: "Temporary legacy layering exception for ECS while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: platform
     file_glob: "src/legacy/Graphics/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Graphics/ retirement task"
+    task: "LEGACY-008"
+    expires: "until LEGACY-008 deletes src/legacy/Graphics/"
     reason: "Temporary legacy layering exception for Graphics while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: platform
@@ -329,38 +329,38 @@ exceptions:
   - from: legacy
     to: platform
     file_glob: "src/legacy/RHI/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/RHI/ retirement task"
+    task: "LEGACY-009"
+    expires: "until LEGACY-009 deletes src/legacy/RHI/"
     reason: "Temporary legacy layering exception for RHI while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: platform
     file_glob: "src/legacy/Runtime/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Runtime/ retirement task"
+    task: "LEGACY-010"
+    expires: "until LEGACY-010 deletes src/legacy/Runtime/"
     reason: "Temporary legacy layering exception for Runtime while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: app
     file_glob: "src/legacy/Asset/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Asset/ retirement task"
+    task: "LEGACY-004"
+    expires: "until LEGACY-004 deletes src/legacy/Asset/"
     reason: "Temporary legacy layering exception for Asset while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: app
     file_glob: "src/legacy/Core/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Core/ retirement task"
+    task: "LEGACY-005"
+    expires: "until LEGACY-005 deletes src/legacy/Core/"
     reason: "Temporary legacy layering exception for Core while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: app
     file_glob: "src/legacy/ECS/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/ECS/ retirement task"
+    task: "LEGACY-006"
+    expires: "until LEGACY-006 deletes src/legacy/ECS/"
     reason: "Temporary legacy layering exception for ECS while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: app
     file_glob: "src/legacy/Graphics/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Graphics/ retirement task"
+    task: "LEGACY-008"
+    expires: "until LEGACY-008 deletes src/legacy/Graphics/"
     reason: "Temporary legacy layering exception for Graphics while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: app
@@ -371,12 +371,12 @@ exceptions:
   - from: legacy
     to: app
     file_glob: "src/legacy/RHI/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/RHI/ retirement task"
+    task: "LEGACY-009"
+    expires: "until LEGACY-009 deletes src/legacy/RHI/"
     reason: "Temporary legacy layering exception for RHI while hardening preserves strict boundaries for promoted layers."
   - from: legacy
     to: app
     file_glob: "src/legacy/Runtime/**"
-    task: "LEGACY-002"
-    expires: "until LEGACY-002 seeds the src/legacy/Runtime/ retirement task"
+    task: "LEGACY-010"
+    expires: "until LEGACY-010 deletes src/legacy/Runtime/"
     reason: "Temporary legacy layering exception for Runtime while hardening preserves strict boundaries for promoted layers."

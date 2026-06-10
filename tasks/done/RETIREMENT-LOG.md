@@ -9,6 +9,22 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`HARDEN-082`](HARDEN-082-rebind-legacy-allowlist-umbrella-rows.md) —
+rebind legacy allowlist umbrella rows to per-subtree owners — opened and
+retired to `tasks/done/` on 2026-06-10 at maturity `Retired`
+(metadata-only governance rebind). All 54
+`tools/repo/layering_allowlist.yaml` rows still naming the `LEGACY-002`
+seeding umbrella moved to their concrete per-subtree retirement owners by
+`file_glob` prefix (9 rows each to `LEGACY-004` Asset, `LEGACY-005` Core,
+`LEGACY-006` ECS, `LEGACY-008` Graphics, `LEGACY-009` RHI, `LEGACY-010`
+Runtime), with each row's `expires` text rewritten from the satisfied
+"until LEGACY-002 seeds ..." condition to "until LEGACY-00N deletes ...".
+No rows were added or removed and no glob changed; the strict layering
+check stays green with the allowlisted-violation count unchanged at 1187.
+This is the rebinding follow-up that `LEGACY-002`'s context required
+before the seed itself could retire.
+
+Backlog
 [`HARDEN-078`](HARDEN-078-track-untracked-todo-temporary-markers.md) —
 track or resolve untracked TODO / temporary markers in promoted src —
 retired to `tasks/done/` on 2026-06-10 at maturity `Retired` (pure marker
