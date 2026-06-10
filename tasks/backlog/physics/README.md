@@ -35,7 +35,7 @@ map.
 - ARCH-002 must not bless GPU/optimized backend tasks for any phenomenon before
   its CPU reference path exists. It retired with first non-rigid physics method
   follow-ups:
-  [`METHOD-009`](../methods/METHOD-009-particle-spring-reference-backend.md),
+  [`METHOD-009`](../../done/METHOD-009-particle-spring-reference-backend.md) (done),
   [`METHOD-010`](../methods/METHOD-010-xpbd-cloth-shell-reference-backend.md),
   and [`METHOD-011`](../methods/METHOD-011-sph-fluid-reference-backend.md).
 

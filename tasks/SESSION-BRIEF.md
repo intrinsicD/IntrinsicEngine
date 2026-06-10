@@ -12,7 +12,6 @@ the authoritative open/unblocked view.
 
 ## Theme C — Physics readiness
 
-- unblocked: `METHOD-009` — Particle and mass-spring reference backend (tasks/backlog/methods/METHOD-009-particle-spring-reference-backend.md)
 - unblocked: `METHOD-010` — XPBD cloth and shell reference backend (tasks/backlog/methods/METHOD-010-xpbd-cloth-shell-reference-backend.md)
 - unblocked: `METHOD-011` — SPH fluid reference backend (tasks/backlog/methods/METHOD-011-sph-fluid-reference-backend.md)
 

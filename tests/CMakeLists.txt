@@ -348,6 +348,7 @@ intrinsic_test_object_lib(BenchmarkTestObjs
 # reference, so this object lib also depends on ExtrinsicPhysics.
 set(_physics_method_test_files
     Test.RigidBodyReference.cpp
+    Test.ParticleSpringReference.cpp
     Test.PhysicsSolverParity.cpp
 )
 intrinsic_resolve_test_sources(_physics_method_test_sources
@@ -358,10 +359,12 @@ intrinsic_test_object_lib(PhysicsMethodTestObjs
     SOURCES
         ${_physics_method_test_sources}
         ${CMAKE_SOURCE_DIR}/methods/physics/rigid_body_reference/src/RigidBodyReference.cpp
+        ${CMAKE_SOURCE_DIR}/methods/physics/particle_spring_reference/src/ParticleSpringReference.cpp
     DEPS IntrinsicCore ExtrinsicPhysics
 )
 target_include_directories(PhysicsMethodTestObjs PRIVATE
     ${CMAKE_SOURCE_DIR}/methods/physics/rigid_body_reference/include
+    ${CMAKE_SOURCE_DIR}/methods/physics/particle_spring_reference/include
 )
 
 # --- Physics world tests (CPU-only promoted src/physics contract) ---

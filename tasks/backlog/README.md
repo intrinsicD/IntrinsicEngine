@@ -77,8 +77,7 @@ broadphase/narrowphase and constraint/island/sleep solver contracts are retired 
 [`physics/README.md`](physics/README.md) and the retirement log.
 
 Open members:
-- [`methods/METHOD-009`](methods/METHOD-009-particle-spring-reference-backend.md),
-  [`methods/METHOD-010`](methods/METHOD-010-xpbd-cloth-shell-reference-backend.md),
+- [`methods/METHOD-010`](methods/METHOD-010-xpbd-cloth-shell-reference-backend.md),
   [`methods/METHOD-011`](methods/METHOD-011-sph-fluid-reference-backend.md) —
   CPU-reference-first non-rigid method packages opened by the phenomena
   roadmap.

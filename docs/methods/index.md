@@ -32,7 +32,7 @@ This index is the canonical entry point for method/paper implementation document
   method roadmap from
   [`ARCH-002`](../../tasks/done/ARCH-002-physics-phenomena-roadmap.md). The
   first non-rigid follow-ups are
-  [`METHOD-009`](../../tasks/backlog/methods/METHOD-009-particle-spring-reference-backend.md),
+  [`METHOD-009`](../../tasks/done/METHOD-009-particle-spring-reference-backend.md),
   [`METHOD-010`](../../tasks/backlog/methods/METHOD-010-xpbd-cloth-shell-reference-backend.md),
   and [`METHOD-011`](../../tasks/backlog/methods/METHOD-011-sph-fluid-reference-backend.md).
   Each remains CPU-reference-first; GPU backends require later parity-proven

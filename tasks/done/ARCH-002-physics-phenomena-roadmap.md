@@ -33,7 +33,7 @@
 - [x] Create follow-up `METHOD-*`, `ARCH-*`, or `HARDEN-*` tasks for the top-ranked items.
 
 ## Follow-up Tasks
-- [`METHOD-009`](../backlog/methods/METHOD-009-particle-spring-reference-backend.md) — particle and mass-spring CPU reference backend.
+- [`METHOD-009`](METHOD-009-particle-spring-reference-backend.md) — particle and mass-spring CPU reference backend.
 - [`METHOD-010`](../backlog/methods/METHOD-010-xpbd-cloth-shell-reference-backend.md) — XPBD cloth and shell CPU reference backend.
 - [`METHOD-011`](../backlog/methods/METHOD-011-sph-fluid-reference-backend.md) — SPH fluid CPU reference backend.
 - [`PHYSICS-002`](PHYSICS-002-collision-broadphase-narrowphase-contract.md) and [`PHYSICS-003`](PHYSICS-003-constraints-islands-and-solver-diagnostics.md) retired the engine-side rigid-body collision/solver follow-ups.

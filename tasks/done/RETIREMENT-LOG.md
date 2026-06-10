@@ -9,6 +9,28 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`METHOD-009`](METHOD-009-particle-spring-reference-backend.md) — particle
+and mass-spring reference backend — retired to `tasks/done/` on 2026-06-10
+at maturity `CPUContracted`. `methods/physics/particle_spring_reference/`
+ships the deterministic `cpu_reference` backend for particle dynamics and
+mass-spring systems: semi-implicit Euler integration, Hooke springs with
+Provot-style axial damping, pinning via zero inverse mass, global drag, and
+machine-checkable diagnostics (validation codes for invalid
+timestep/particle/spring, pinned and degenerate-spring counts, post-step
+spring residuals max/L2, kinetic/total energy drift, the `omega*dt`
+stability ratio with limit flag, and a non-finite fail-closed fallback that
+returns the input state unchanged). Twelve `unit;physics` correctness
+tests pin free-fall closed form, rest-length equilibrium, exact
+momentum/center-of-mass conservation, bounded harmonic energy drift,
+damped hanging-spring analytic equilibrium, pinned/degenerate/invalid
+handling, instability fallback, and repeated-step determinism. The
+`physics.particle_spring_reference.smoke` benchmark manifest + workload
+emit validated result JSON with exact conservation error as the quality
+metric. Optimized CPU/GPU backends remain forbidden until a future task
+names this package as its oracle. Theme C's remaining open members are
+`METHOD-010` (XPBD cloth/shell) and `METHOD-011` (SPH fluid).
+
+Backlog
 [`RORG-031C`](RORG-031C-runtime-composition.md) — runtime composition
 backlog seed — retired to `tasks/done/` on 2026-06-10. The seed's job was
 to replace the unnamed runtime composition narrative gap with concrete

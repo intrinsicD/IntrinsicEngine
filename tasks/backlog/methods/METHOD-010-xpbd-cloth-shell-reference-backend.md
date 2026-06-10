@@ -17,7 +17,7 @@ depends_on: [ARCH-002]
 ## Context
 - Owning area: `methods/physics` method package, with any engine-runtime integration deferred to later `physics`/`runtime` tasks.
 - Roadmap source: [`ARCH-002`](../../done/ARCH-002-physics-phenomena-roadmap.md).
-- Depends conceptually on the particle/spring diagnostics shape from [`METHOD-009`](METHOD-009-particle-spring-reference-backend.md), but may be implemented independently if it duplicates the minimal particle state locally.
+- Depends conceptually on the particle/spring diagnostics shape from [`METHOD-009`](../../done/METHOD-009-particle-spring-reference-backend.md), but may be implemented independently if it duplicates the minimal particle state locally.
 
 ## Required changes
 - [ ] Create `methods/physics/xpbd_cloth_reference/` from the method template.
