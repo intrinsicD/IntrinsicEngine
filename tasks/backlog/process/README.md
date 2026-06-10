@@ -13,13 +13,6 @@ map.
 
 ## Tasks
 
-- [PROC-001 - Skill mirror sync generator and CI gate](../../done/PROC-001-skill-mirror-sync-generator-and-ci-gate.md) (done 2026-06-09).
-- [PROC-002 - Task ID uniqueness validation and allocation rule](../../done/PROC-002-task-id-uniqueness-and-allocation-rule.md) (done 2026-06-09).
-- [PROC-003 - Split task index state from retirement history](../../done/PROC-003-split-task-index-state-from-retirement-history.md) (done 2026-06-09).
-- [PROC-004 - Structured task front-matter and generated session brief](../../done/PROC-004-task-front-matter-and-generated-session-brief.md) (done 2026-06-09).
-- [PROC-005 - Align structural-check mode text with strict CI reality](../../done/PROC-005-align-structural-check-mode-contract-text.md) (done 2026-06-09).
-- [PROC-006 - Audit cadence lapse visibility](../../done/PROC-006-audit-cadence-lapse-visibility.md) (done 2026-06-09).
-- [PROC-007 - Onboarding prompt tightening and loop-mode defaults](../../done/PROC-007-onboarding-prompt-tightening.md) (done 2026-06-09).
 - [PROC-008 - Category README state/history split](PROC-008-category-readme-state-history-split.md).
 
 ## Convergence
@@ -49,3 +42,16 @@ map.
 Forbidden across all members: engine code changes, renaming retired task files,
 weakening any check that currently runs strict in CI, and embedding
 task-specific policy into `docs/agent/prompt/prompt.md`.
+
+## Retired
+
+Retired entries moved here verbatim by the PROC-008 state/history
+split; narratives live in the retirement log.
+
+- [PROC-001 - Skill mirror sync generator and CI gate](../../done/PROC-001-skill-mirror-sync-generator-and-ci-gate.md) (done 2026-06-09).
+- [PROC-002 - Task ID uniqueness validation and allocation rule](../../done/PROC-002-task-id-uniqueness-and-allocation-rule.md) (done 2026-06-09).
+- [PROC-003 - Split task index state from retirement history](../../done/PROC-003-split-task-index-state-from-retirement-history.md) (done 2026-06-09).
+- [PROC-004 - Structured task front-matter and generated session brief](../../done/PROC-004-task-front-matter-and-generated-session-brief.md) (done 2026-06-09).
+- [PROC-005 - Align structural-check mode text with strict CI reality](../../done/PROC-005-align-structural-check-mode-contract-text.md) (done 2026-06-09).
+- [PROC-006 - Audit cadence lapse visibility](../../done/PROC-006-audit-cadence-lapse-visibility.md) (done 2026-06-09).
+- [PROC-007 - Onboarding prompt tightening and loop-mode defaults](../../done/PROC-007-onboarding-prompt-tightening.md) (done 2026-06-09).

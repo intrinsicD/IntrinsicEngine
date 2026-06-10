@@ -7,6 +7,54 @@ another backlog directory.
 
 ## Runtime backlog tasks
 
+- [RUNTIME-101 — Asset ingest state-machine migration](RUNTIME-101-asset-ingest-state-machine.md):
+  promoted replacement for legacy `Runtime.AssetIngestService` over
+  `AssetService`, `StreamingExecutor`, and runtime materialization handoffs.
+- [RUNTIME-103 — Geometry algorithm execution queue](RUNTIME-103-geometry-algorithm-execution-queue.md):
+  value-gated asynchronous CPU geometry processing and CUDA keep/defer/remove
+  decision for legacy K-Means behavior.
+- [RUNTIME-104 — Derived overlay producer lifecycle](RUNTIME-104-derived-overlay-producer-lifecycle.md):
+  conditional runtime-owned persistent overlay descriptors, stable keys, parent
+  closure, and extraction packet production when existing packet lanes are not
+  sufficient.
+
+### Runtime adapter umbrellas (clarified by Q tasks; producer modules)
+
+These open the runtime-side producer/owner umbrellas already clarified by the
+done-task `Q` follow-ups. Each unblocks one or more rendering pass families.
+
+
+### Working sandbox runtime path
+
+These tasks fill the runtime-owned gaps between the renderer pass DAG and a
+usable sandbox that can show authored mesh, graph, and point-cloud data with
+selection and UI. They are ordered after the visible-triangle foundation and
+compose with the rendering tasks listed in `tasks/backlog/rendering/README.md`.
+
+
+## Cross-linked rendering tasks (runtime-owned)
+
+Some rendering backlog tasks are runtime-owned for extraction/wiring even
+though they may be filed under another task queue. Runtime reviewers must treat
+these as runtime work when scheduling and review:
+
+- [GRAPHICS-084 — Visualization property-buffer residency](../rendering/GRAPHICS-084-visualization-property-buffer-residency.md):
+  consumes runtime visualization adapter/property selections but keeps GPU
+  upload ownership in graphics.
+- [GRAPHICS-085 — Overlay packet backend parity](../rendering/GRAPHICS-085-overlay-packet-backend-parity.md):
+  backend proof for packets produced by `RUNTIME-104`.
+
+## Related docs
+
+- [`AGENTS.md`](../../../AGENTS.md) — authoritative repository agent contract.
+- [`tasks/backlog/rendering/README.md`](../rendering/README.md) — rendering
+  backlog DAG and selection rules.
+
+## Retired
+
+Retired entries moved here verbatim by the PROC-008 state/history
+split; narratives live in the retirement log.
+
 - [RORG-031C — Runtime composition backlog seed](../../done/RORG-031C-runtime-composition.md)
   (done, 2026-06-10): composition-root and lifecycle backlog work for
   `begin_frame`, extraction, prepare, execute, end, shutdown determinism, and
@@ -43,24 +91,10 @@ another backlog directory.
   (done, 2026-06-09, `CPUContracted`): single runtime scene replacement
   boundary, render-extraction/selection/physics reset contracts, and explicit
   supported/deferred/retired persistence decisions beyond `RUNTIME-098`.
-- [RUNTIME-101 — Asset ingest state-machine migration](RUNTIME-101-asset-ingest-state-machine.md):
-  promoted replacement for legacy `Runtime.AssetIngestService` over
-  `AssetService`, `StreamingExecutor`, and runtime materialization handoffs.
 - [RUNTIME-102 — Editor command history and undo/redo seam](../../done/RUNTIME-102-editor-command-history.md)
   (done, 2026-06-09, `CPUContracted`): runtime/editor command history,
   dirty-state source, recursive delete/orphan policy, undo/redo contracts, and
   Sandbox editor document-state model.
-- [RUNTIME-103 — Geometry algorithm execution queue](RUNTIME-103-geometry-algorithm-execution-queue.md):
-  value-gated asynchronous CPU geometry processing and CUDA keep/defer/remove
-  decision for legacy K-Means behavior.
-- [RUNTIME-104 — Derived overlay producer lifecycle](RUNTIME-104-derived-overlay-producer-lifecycle.md):
-  conditional runtime-owned persistent overlay descriptors, stable keys, parent
-  closure, and extraction packet production when existing packet lanes are not
-  sufficient.
-
-### Sandbox / triangle path support tasks (runtime-owned)
-
-Completed support tasks:
 - [RUNTIME-070 — Bootstrap GpuAssetCache fallback texture in Engine::Initialize](../../done/RUNTIME-070-fallback-texture-bootstrap.md):
   runtime-side graphics-bootstrap step initializing the canonical 4×4 magenta
   fallback texture per GRAPHICS-015Q (done).
@@ -71,12 +105,6 @@ Completed support tasks:
 - [RUNTIME-081 — `Extrinsic.Runtime.CameraControllers`](../../done/RUNTIME-081-camera-controllers.md):
   Orbit / Fly / FreeLook / TopDown camera controllers producing
   `RenderFrameInput::Camera` (clarified by GRAPHICS-017Q; done).
-
-### Runtime adapter umbrellas (clarified by Q tasks; producer modules)
-
-These open the runtime-side producer/owner umbrellas already clarified by the
-done-task `Q` follow-ups. Each unblocks one or more rendering pass families.
-
 - [RUNTIME-080 — `Extrinsic.Runtime.AssetBridges.Texture`](../../done/RUNTIME-080-asset-bridges-texture.md)
   _(superseded, retired 2026-06-03)_: texture-typed asset event subscriber
   producing `GpuAssetCache::RequestUpload` calls (clarified by GRAPHICS-015Q).
@@ -104,14 +132,6 @@ done-task `Q` follow-ups. Each unblocks one or more rendering pass families.
   (done, 2026-06-02, `CPUContracted`): Dear ImGui platform/renderer adapter
   producing `ImGuiOverlayFrame` records for `ImGuiOverlaySystem::SubmitFrame`
   (clarified by GRAPHICS-013CQ).
-
-### Working sandbox runtime path
-
-These tasks fill the runtime-owned gaps between the renderer pass DAG and a
-usable sandbox that can show authored mesh, graph, and point-cloud data with
-selection and UI. They are ordered after the visible-triangle foundation and
-compose with the rendering tasks listed in `tasks/backlog/rendering/README.md`.
-
 - [RUNTIME-085 — `GeometrySources` mesh residency bridge](../../done/RUNTIME-085-geometrysources-mesh-residency.md)
   (retired to `tasks/done/` 2026-05-28 at `CPUContracted`):
   runtime-authored ECS mesh data (`Vertices`/`Edges`/`Halfedges`/`Faces`) to
@@ -167,13 +187,6 @@ compose with the rendering tasks listed in `tasks/backlog/rendering/README.md`.
   _(done 2026-06-07 at maturity `CPUContracted`)_: scene save/load persists
   current sandbox-authored mesh/graph/point-cloud ECS data and is exposed
   through the runtime-owned Sandbox editor scene-file command surface.
-
-## Cross-linked rendering tasks (runtime-owned)
-
-Some rendering backlog tasks are runtime-owned for extraction/wiring even
-though they may be filed under another task queue. Runtime reviewers must treat
-these as runtime work when scheduling and review:
-
 - [GRAPHICS-016 — Runtime extraction and graphics handoff](../../done/GRAPHICS-016-runtime-extraction-handoff.md):
   - Runtime owns live ECS access, extraction, sidecar/cache mappings from ECS
     entities and asset/source handles to graphics handles, dirty-domain
@@ -185,17 +198,6 @@ these as runtime work when scheduling and review:
     the rendering DAG in
     [`tasks/backlog/rendering/README.md`](../rendering/README.md) for
     downstream ordering.
-- [GRAPHICS-084 — Visualization property-buffer residency](../rendering/GRAPHICS-084-visualization-property-buffer-residency.md):
-  consumes runtime visualization adapter/property selections but keeps GPU
-  upload ownership in graphics.
-- [GRAPHICS-085 — Overlay packet backend parity](../rendering/GRAPHICS-085-overlay-packet-backend-parity.md):
-  backend proof for packets produced by `RUNTIME-104`.
-
-## Related docs
-
-- [`AGENTS.md`](../../../AGENTS.md) — authoritative repository agent contract.
-- [`tasks/backlog/rendering/README.md`](../rendering/README.md) — rendering
-  backlog DAG and selection rules.
 - [`GRAPHICS-001 — Rendering parity inventory and task index`](../../done/GRAPHICS-001-rendering-parity-inventory.md) —
   retired rendering parity seed; current rendering selection lives in the
   rendering backlog DAG above.
