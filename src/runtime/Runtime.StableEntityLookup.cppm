@@ -15,6 +15,11 @@ import Extrinsic.ECS.Scene.Registry;
 
 export namespace Extrinsic::Runtime
 {
+    // Render id reserved for "no entity": the GPU selection-ID targets clear to
+    // 0 and the picking readback drain treats `EntityId == 0` as background, so
+    // no live entity may ever encode to it (BUG-026).
+    inline constexpr std::uint32_t kBackgroundRenderId = 0u;
+
     // Diagnostics the lookup surfaces for editor overlays / tests.
     //
     // `TrackedStableIds` is *state* (it mirrors the current winner-map size);
@@ -49,11 +54,16 @@ export namespace Extrinsic::Runtime
     //    save-load), so the mapping must be materialized.
     //  * **By render/extraction stable id** (`std::uint32_t`) — the id
     //    `RenderExtractionCache::StableEntityId` / `SelectionController` emit is
-    //    `static_cast<std::uint32_t>(entt::entity)`, a reversible encoding of the
-    //    live handle (index + version). Resolution therefore decodes the handle
-    //    and validates it against the registry; no separate container is stored
-    //    because the id *is* the key. A recycled slot carries a bumped version,
-    //    so a stale render id fails `registry.IsValid` and is rejected.
+    //    `static_cast<std::uint32_t>(entt::entity) + 1`, a reversible encoding
+    //    of the live handle (index + version) shifted so render id 0 stays
+    //    reserved for the GPU background sentinel (`kBackgroundRenderId`; the
+    //    first entity of a fresh registry casts to 0 and would otherwise be
+    //    unpickable — BUG-026). `entt::null` (0xFFFFFFFF) wraps to 0 under the
+    //    shift, so "no entity" and "background" coincide. Resolution decodes
+    //    the handle and validates it against the registry; no separate
+    //    container is stored because the id *is* the key. A recycled slot
+    //    carries a bumped version, so a stale render id fails
+    //    `registry.IsValid` and is rejected.
     //
     // Duplicate-`StableId` policy: **keep one deterministic winner** — the live
     // entity with the smallest `ToRenderId` value wins, independent of insertion
@@ -111,15 +121,19 @@ export namespace Extrinsic::Runtime
         // number pruned.
         std::size_t PruneStale(const Registry& registry);
 
-        // --- render-id derivation seam (mirrors RenderExtractionCache /
-        //     SelectionController::ToStableEntityId) ------------------------
+        // --- render-id derivation seam (the single authority; mirrored by
+        //     RenderExtractionCache / SelectionController::ToStableEntityId) --
+        // `+1` keeps render id 0 reserved for the GPU background sentinel;
+        // `entt::null` (0xFFFFFFFF) intentionally wraps to 0 = "no entity".
         [[nodiscard]] static std::uint32_t ToRenderId(EntityHandle entity) noexcept
         {
-            return static_cast<std::uint32_t>(entity);
+            return static_cast<std::uint32_t>(entity) + 1u;
         }
         [[nodiscard]] static EntityHandle ToEntityHandle(std::uint32_t renderId) noexcept
         {
-            return static_cast<EntityHandle>(renderId);
+            if (renderId == kBackgroundRenderId)
+                return Extrinsic::ECS::InvalidEntityHandle;
+            return static_cast<EntityHandle>(renderId - 1u);
         }
 
         // --- introspection -------------------------------------------------

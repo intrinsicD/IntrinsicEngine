@@ -10,6 +10,7 @@
 
 import Extrinsic.Graphics.FrameRecipe;
 import Extrinsic.Graphics.RenderGraph;
+import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.QueueAffinity;
@@ -2160,4 +2161,86 @@ TEST(FrameRecipeContract, ShadowAtlasTransientPathAcceptsTypedShadowSizing)
         EXPECT_FALSE(compiled->TextureImported[idx]);
     }
     EXPECT_TRUE(foundShadow);
+}
+
+// --- BUG-026: selection-ID targets clear to the background sentinel --------
+// The R32_UINT `EntityId` / `PrimitiveId` targets must clear to exactly 0.0f
+// on every channel: the readback drain reserves `EntityId == 0` for
+// background, and a non-zero float clear bit-puns into a garbage UINT value
+// (the old scene-color blue cleared EntityId to 0x3DCCCCCD, turning every
+// background click into a phantom hit on a non-existent entity).
+
+TEST(FrameRecipeContract, PickingPassClearsSelectionIdTargetsToZero)
+{
+    FrameRecipeFeatures features{};
+    features.EnablePicking = true;
+
+    FrameRecipeImports imports = MakeImports();
+    imports.PickingReadback = Extrinsic::RHI::BufferHandle{0xAB13u, 1u};
+
+    RenderGraph graph;
+    const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
+        graph,
+        features,
+        imports,
+        FrameRecipeSizing{.Width = 640u, .Height = 480u});
+    ASSERT_TRUE(build.Succeeded) << build.Diagnostic;
+
+    const auto compiled = graph.Compile();
+    ASSERT_TRUE(compiled.has_value());
+
+    const std::uint32_t pickingIndex = PassIndexByName(*compiled, "PickingPass");
+    ASSERT_LT(pickingIndex, compiled->PassNames.size());
+
+    std::size_t colorAttachments = 0;
+    for (const CompiledRenderPassAttachment& attachment : compiled->RenderPassAttachments)
+    {
+        if (attachment.PassIndex != pickingIndex || attachment.IsDepthAttachment)
+        {
+            continue;
+        }
+        ++colorAttachments;
+        EXPECT_EQ(attachment.Load, RHI::LoadOp::Clear);
+        EXPECT_EQ(attachment.Format, RHI::Format::R32_UINT);
+        EXPECT_EQ(attachment.ClearR, 0.0f);
+        EXPECT_EQ(attachment.ClearG, 0.0f);
+        EXPECT_EQ(attachment.ClearB, 0.0f);
+        EXPECT_EQ(attachment.ClearA, 0.0f);
+    }
+    EXPECT_EQ(colorAttachments, 2u)
+        << "PickingPass must declare exactly the EntityId + PrimitiveId color targets.";
+}
+
+// BUG-026: when picking readback is active the PickingPass executor copies the
+// pick pixel out of SceneDepth (world-space cursor reconstruction), so the
+// depth target must carry transfer-source usage; without active picking the
+// depth target keeps its lean usage set.
+TEST(FrameRecipeContract, SceneDepthGainsTransferSrcUsageWhenPickingActive)
+{
+    const auto sceneDepthUsage = [](const bool enablePicking) {
+        FrameRecipeFeatures features{};
+        features.EnablePicking = enablePicking;
+        FrameRecipeImports imports = MakeImports();
+        if (enablePicking)
+        {
+            imports.PickingReadback = Extrinsic::RHI::BufferHandle{0xAB14u, 1u};
+        }
+        RenderGraph graph;
+        const FrameRecipeBuildResult build = BuildDefaultFrameRecipe(
+            graph,
+            features,
+            imports,
+            FrameRecipeSizing{.Width = 640u, .Height = 480u});
+        EXPECT_TRUE(build.Succeeded) << build.Diagnostic;
+        const auto compiled = graph.Compile();
+        EXPECT_TRUE(compiled.has_value());
+        const std::uint32_t depthIndex = TextureIndexByName(*compiled, "SceneDepth");
+        EXPECT_LT(depthIndex, compiled->TextureNames.size());
+        const TextureResourceDesc* desc = graph.GetTextureDescByIndex(depthIndex);
+        EXPECT_NE(desc, nullptr);
+        return desc != nullptr ? desc->Desc.Usage : RHI::TextureUsage{};
+    };
+
+    EXPECT_TRUE(HasTextureUsage(sceneDepthUsage(true), RHI::TextureUsage::TransferSrc));
+    EXPECT_FALSE(HasTextureUsage(sceneDepthUsage(false), RHI::TextureUsage::TransferSrc));
 }

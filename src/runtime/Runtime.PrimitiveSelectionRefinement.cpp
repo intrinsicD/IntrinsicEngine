@@ -1,5 +1,6 @@
 module;
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -16,6 +17,7 @@ import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.SelectionSystem;
 import Extrinsic.Runtime.MeshGeometryPacker;
+import Extrinsic.Runtime.StableEntityLookup;
 import Geometry.Properties;
 
 namespace Extrinsic::Runtime
@@ -663,9 +665,53 @@ namespace Extrinsic::Runtime
         }
     }
 
+    bool IsOrthographicProjection(const glm::mat4& projection) noexcept
+    {
+        // GLM perspective projections write -1 into the w-row coefficient of
+        // view-space z (column-major: projection[2][3]); orthographic
+        // projections leave it 0 and keep w constant. The Vulkan Y flip only
+        // negates [1][1], so it does not affect this signal.
+        return std::abs(projection[2][3]) <= 1.0e-6f;
+    }
+
+    std::optional<glm::vec3> UnprojectPickDepth(const glm::mat4& inverseViewProjection,
+                                                const std::uint32_t pixelX,
+                                                const std::uint32_t pixelY,
+                                                const std::uint32_t viewportWidth,
+                                                const std::uint32_t viewportHeight,
+                                                const float depth) noexcept
+    {
+        if (viewportWidth == 0u || viewportHeight == 0u ||
+            pixelX >= viewportWidth || pixelY >= viewportHeight ||
+            !std::isfinite(depth))
+        {
+            return std::nullopt;
+        }
+        // Pixel-center -> NDC mapping mirrors BuildCameraViewSnapshot's pick-ray
+        // derivation (Graphics.CameraSnapshots.cpp); the depth-buffer sample is
+        // the Vulkan [0..1] clip-space z and plugs in directly.
+        const float ndcX =
+            ((static_cast<float>(pixelX) + 0.5f) / static_cast<float>(viewportWidth)) * 2.f - 1.f;
+        const float ndcY =
+            1.f - ((static_cast<float>(pixelY) + 0.5f) / static_cast<float>(viewportHeight)) * 2.f;
+        const glm::vec4 clip{ndcX, ndcY, depth, 1.0f};
+        const glm::vec4 world = inverseViewProjection * clip;
+        if (!std::isfinite(world.w) || std::abs(world.w) <= 0.000001f)
+        {
+            return std::nullopt;
+        }
+        const glm::vec3 position = glm::vec3{world} / world.w;
+        if (!std::isfinite(position.x) || !std::isfinite(position.y) || !std::isfinite(position.z))
+        {
+            return std::nullopt;
+        }
+        return position;
+    }
+
     std::optional<PrimitiveSelectionResult> RefinePickReadbackResult(
         ECS::Scene::Registry& scene,
-        const Extrinsic::Graphics::PickReadbackResult& readback)
+        const Extrinsic::Graphics::PickReadbackResult& readback,
+        const PickReadbackContext* context)
     {
         // A background (no-hit) readback resolves to no sub-primitive.
         if (!readback.Hit)
@@ -674,13 +720,15 @@ namespace Extrinsic::Runtime
         }
 
         PrimitiveRefineRequest request{};
-        // The readback carries the render id (entt handle cast to uint32); echo it
-        // as the result's correlation key. The durable StableId is resolved by the
-        // separate StableEntityLookup path and is left 0 here.
+        // The readback carries the render id (entt handle + 1, 0 = background;
+        // see StableEntityLookup::ToRenderId); echo it as the result's
+        // correlation key. The durable StableId is resolved by the separate
+        // StableEntityLookup path and is left 0 here.
         request.EntityId = readback.StableEntityId;
         request.Hint     = readback.EncodedId;
 
-        const auto entity = static_cast<entt::entity>(readback.StableEntityId);
+        const entt::entity entity =
+            StableEntityLookup::ToEntityHandle(readback.StableEntityId);
 
         // Recycling safety: a stale render id naming a destroyed/recycled slot has
         // a mismatched version, so the live registry rejects it and the bridge
@@ -700,8 +748,81 @@ namespace Extrinsic::Runtime
             request.LocalToWorld = world->Matrix;
         }
 
+        // BUG-026 — reconstruct the cursor from the depth readback and feed it
+        // (plus the pick ray) into the refinement request in entity-local
+        // space. Depth 1.0 is the clear value (no geometry); an ID hit with
+        // clear depth is contradictory, so the anchor is simply skipped and
+        // refinement falls back to hint-representative positions.
+        const glm::mat4 worldToLocal = glm::inverse(request.LocalToWorld);
+        std::optional<glm::vec3> worldCursor{};
+        float cursorDepth = 1.0f;
+        if (context != nullptr && readback.HasDepth && readback.Depth < 1.0f)
+        {
+            worldCursor = UnprojectPickDepth(context->InverseViewProjection,
+                                             readback.PixelX,
+                                             readback.PixelY,
+                                             context->ViewportWidth,
+                                             context->ViewportHeight,
+                                             readback.Depth);
+            if (worldCursor.has_value())
+            {
+                cursorDepth = readback.Depth;
+                request.HasLocalHit = true;
+                request.LocalHit = glm::vec3{worldToLocal * glm::vec4{*worldCursor, 1.0f}};
+            }
+        }
+        if (context != nullptr && context->HasWorldRay)
+        {
+            // Entity-local pick ray for the missing-hint CPU fallback. The
+            // fallback radius converts the pixel radius to world units, then
+            // to local units via the largest inverse scale axis so
+            // non-uniform scaling stays conservative. Perspective: one pixel
+            // spans more world units the farther the hit, so scale by the
+            // hit distance (the cursor when a depth anchor exists, else the
+            // entity origin's distance). Orthographic: units-per-pixel is
+            // depth-invariant, so the radius stays the constant pixel
+            // footprint — multiplying by the hit distance would grow the
+            // top-down pick radius with camera altitude (BUG-026 review
+            // follow-up).
+            float worldRadius =
+                context->PickRadiusPixels * context->WorldUnitsPerPixelAtUnitDepth;
+            if (!context->OrthographicProjection)
+            {
+                const glm::vec3 radiusReference = worldCursor.has_value()
+                    ? *worldCursor
+                    : glm::vec3{request.LocalToWorld[3]};
+                worldRadius *= glm::max(
+                    glm::length(radiusReference - context->WorldRayOrigin), 0.0f);
+            }
+            worldRadius = glm::max(worldRadius, 1.0e-5f);
+            const glm::mat3 invLinear{worldToLocal};
+            const float maxInverseScale = glm::max(
+                glm::length(invLinear[0]),
+                glm::max(glm::length(invLinear[1]), glm::length(invLinear[2])));
+            request.HasPickRay = true;
+            request.RayOrigin =
+                glm::vec3{worldToLocal * glm::vec4{context->WorldRayOrigin, 1.0f}};
+            request.RayDirection = invLinear * context->WorldRayDirection;
+            request.FallbackRadius = glm::max(worldRadius * maxInverseScale, 1.0e-6f);
+        }
+
         const ConstSourceView view =
             ECS::Components::GeometrySources::BuildConstView(scene.Raw(), entity);
-        return RefinePrimitiveSelection(view, request);
+        PrimitiveSelectionResult result = RefinePrimitiveSelection(view, request);
+        if (request.HasLocalHit && worldCursor.has_value())
+        {
+            result.CursorFromDepth = true;
+            result.Depth = cursorDepth;
+            result.LocalCursor = request.LocalHit;
+            result.WorldCursor = *worldCursor;
+        }
+        return result;
+    }
+
+    std::optional<PrimitiveSelectionResult> RefinePickReadbackResult(
+        ECS::Scene::Registry& scene,
+        const Extrinsic::Graphics::PickReadbackResult& readback)
+    {
+        return RefinePickReadbackResult(scene, readback, nullptr);
     }
 }

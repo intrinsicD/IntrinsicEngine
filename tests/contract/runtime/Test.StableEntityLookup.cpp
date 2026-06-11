@@ -338,3 +338,54 @@ TEST(StableEntityLookup, RebuildReplacesPriorStateAndClearEmptiesMap)
     EXPECT_EQ(lookup.GetDiagnostics().TrackedStableIds, 0u);
     EXPECT_FALSE(lookup.ResolveByStableId(registry, StableId{1u, 0u}).has_value());
 }
+
+// --- BUG-026: render-id encoding ------------------------------------------
+// The render id written to the GPU instance table must never collide with the
+// `EntityId == 0` background sentinel of the picking readback. A fresh
+// registry's first entity casts to 0, so the encoding is `entt handle + 1`,
+// `0` = background, and `entt::null` (0xFFFFFFFF) wraps to 0 = "no entity".
+
+TEST(StableEntityLookup, RenderIdOfFirstRegistryEntityIsNotBackgroundSentinel)
+{
+    Registry registry;
+    const EntityHandle first = registry.Create();
+    // Regression guard: this is exactly the default-sandbox ReferenceTriangle
+    // case — first entity of a fresh registry casts to 0.
+    ASSERT_EQ(static_cast<std::uint32_t>(first), 0u);
+
+    const std::uint32_t renderId = StableEntityLookup::ToRenderId(first);
+    EXPECT_NE(renderId, Extrinsic::Runtime::kBackgroundRenderId);
+    EXPECT_EQ(renderId, 1u);
+    EXPECT_EQ(StableEntityLookup::ToEntityHandle(renderId), first);
+}
+
+TEST(StableEntityLookup, BackgroundRenderIdDecodesToInvalidHandle)
+{
+    EXPECT_EQ(StableEntityLookup::ToEntityHandle(Extrinsic::Runtime::kBackgroundRenderId),
+              Extrinsic::ECS::InvalidEntityHandle);
+    // entt::null encodes to the background sentinel (the +1 wraps 0xFFFFFFFF).
+    EXPECT_EQ(StableEntityLookup::ToRenderId(Extrinsic::ECS::InvalidEntityHandle),
+              Extrinsic::Runtime::kBackgroundRenderId);
+}
+
+TEST(StableEntityLookup, RenderIdRoundTripsAcrossRecycledVersions)
+{
+    Registry registry;
+    const EntityHandle first = registry.Create();
+    registry.Destroy(first);
+    const EntityHandle recycled = registry.Create(); // same index, bumped version
+    ASSERT_NE(recycled, first);
+
+    EXPECT_EQ(StableEntityLookup::ToEntityHandle(StableEntityLookup::ToRenderId(recycled)),
+              recycled);
+    EXPECT_NE(StableEntityLookup::ToRenderId(recycled), StableEntityLookup::ToRenderId(first));
+
+    StableEntityLookup lookup;
+    const std::optional<EntityHandle> resolved =
+        lookup.ResolveByRenderId(registry, StableEntityLookup::ToRenderId(recycled));
+    ASSERT_TRUE(resolved.has_value());
+    EXPECT_EQ(*resolved, recycled);
+    // The destroyed handle's render id is stale and must not resolve.
+    EXPECT_FALSE(lookup.ResolveByRenderId(registry, StableEntityLookup::ToRenderId(first))
+                     .has_value());
+}

@@ -15,6 +15,7 @@ import Extrinsic.Graphics.Renderer;
 import Extrinsic.RHI.FrameHandle;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.RenderWorldPool;
+import Extrinsic.Runtime.StableEntityLookup;
 
 #include "MockRHI.hpp"
 
@@ -44,7 +45,7 @@ namespace
 
     [[nodiscard]] std::uint32_t StableId(const entt::entity entity) noexcept
     {
-        return static_cast<std::uint32_t>(entity);
+        return Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
     }
 
     void WriteFrameMarker(ECS::Components::Transform::WorldMatrix& world,

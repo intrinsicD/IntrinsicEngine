@@ -5,11 +5,13 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- None currently.
+- [`BUG-026B`](BUG-026B-vulkan-click-pick-readback-smoke.md) — on-host `gpu;vulkan` click-pick readback smoke proving the BUG-026 fix `Operational` (entity-id + depth round trip through the real Vulkan readback; needs a Vulkan-capable host, this container has no GPU/display).
 
 ---
 
 ## Verified / Closed
+
+- Closed 2026-06-10: [`BUG-026` — Viewport click selection dead: render-id zero collision, UINT clear punning, and missing depth readback](../../done/BUG-026-click-pick-readback-entity-zero-and-depth.md). Clicking selected nothing because the raw-entt render id of the first registry entity (the default triangle) collided with the `EntityId == 0` background sentinel, and the light-blue float clear bit-punned the R32_UINT background into a phantom-hit garbage id. Render ids are now `entt handle + 1` (0 reserved, owned by `StableEntityLookup::ToRenderId`), the ID targets clear to zero with format-aware Vulkan clear conversion, and the picking readback gained the designed `SceneDepth` sample: 16-byte slots, per-`Sequence` camera context replay, `UnprojectPickDepth` world/local cursor reconstruction, and depth-anchored closest face/edge/vertex (mesh), edge/node (graph), and point (cloud) refinement. `Operational` Vulkan click smoke owned by `BUG-026B`.
 
 - Closed 2026-06-10: [`BUG-025` — Geometry contact manifold normals violate the documented A→B convention](../../done/BUG-025-contact-manifold-normal-convention.md). `EPA_Solver` negated the A−B polytope's closest-face outward normal (already the A→B direction) and the sphere-AABB analytic path computed B→A normals in both branches; both now honor the documented convention with per-pair `ContactManifold.Convention_*` unit tests across analytic, reversed-dispatch, and GJK/EPA fallback paths in both argument orders. The physics-layer orientation guard stays as defense in depth.
 

@@ -20,6 +20,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Runtime.GizmoInteraction;
+import Extrinsic.Runtime.StableEntityLookup;
 
 using Extrinsic::ECS::EntityHandle;
 using Extrinsic::ECS::Scene::Registry;
@@ -304,7 +305,7 @@ TEST(GizmoInteraction, RenderPacketBuilderMapsOnlyFrozenFields)
 
     ASSERT_EQ(translatePackets.size(), 1u);
     const TransformGizmoRenderPacket& packet = translatePackets[0];
-    EXPECT_EQ(packet.StableId, static_cast<std::uint32_t>(entity));
+    EXPECT_EQ(packet.StableId, Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     EXPECT_NEAR(packet.AxisLength, 1.5f, 1.0e-4f);
     EXPECT_NEAR(packet.Transform[3].x, 2.f, 1.0e-4f);
     EXPECT_NEAR(packet.Transform[3].y, 3.f, 1.0e-4f);

@@ -58,6 +58,17 @@ export namespace Extrinsic::Graphics
 		// PickPixelRequest::Sequence so the runtime resolves the exact in-flight
 		// request. 0 means "uncorrelated".
 		std::uint64_t Sequence{0u};
+		// BUG-026 — scene-depth sample at the pick pixel, in the depth buffer's
+		// native [0 (near) .. 1 (far)] range, plus the request pixel it was
+		// sampled at. The runtime unprojects (PixelX, PixelY, Depth) through the
+		// issuing frame's inverse view-projection to recover the world-space
+		// cursor position. 1.0 (the depth clear) means "no geometry under the
+		// cursor"; HasDepth is false when the readback predates the depth copy
+		// or the depth target was unavailable.
+		bool HasDepth{false};
+		float Depth{1.0f};
+		std::uint32_t PixelX{0u};
+		std::uint32_t PixelY{0u};
 	};
 
 	struct SelectionSystemDiagnostics

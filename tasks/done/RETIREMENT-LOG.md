@@ -8,6 +8,42 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+Active
+[`BUG-026`](BUG-026-click-pick-readback-entity-zero-and-depth.md) — viewport
+click selection dead: render-id zero collision, UINT clear punning, and
+missing depth readback — opened and retired on 2026-06-10 at maturity
+`CPUContracted`. Clicking in the sandbox selected nothing because two
+defects stacked: (1) the render id written to the GPU instance table was the
+raw `entt::entity` cast, so the default `ReferenceTriangle` (first entity of
+a fresh registry, handle 0) collided with the picking drain's
+`EntityId == 0` background sentinel and every click on it published NoHit;
+(2) `PickingPass` cleared its `R32_UINT` ID targets with the scene-color
+light-blue float clear, which the Vulkan backend bit-punned into
+`0x3DCCCCCD`, so background clicks published phantom hits silently rejected
+as stale. Fixed by centralizing the render-id convention as
+`entt handle + 1` (`StableEntityLookup::ToRenderId`, 0 reserved for
+background, `entt::null` wraps to 0) across extraction / selection /
+refinement / gizmo packets, dedicating a zero-clear attachment pair to the
+ID targets, and making the Vulkan backend value-convert clear colors for
+integer formats (`ToVkClearColorValue`). The same task added the missing
+depth readback the original selection design called for: 16-byte
+`Picking.Readback` slots now carry a `SceneDepth` pixel sample, the drain
+publishes `HasDepth`/`Depth` + the request pixel, `Engine` captures a
+per-`Sequence` pick context (inverse view-projection, viewport, pick ray,
+pixel-radius scale) and replays it on readback consume, and
+`RefinePickReadbackResult` unprojects the cursor (`UnprojectPickDepth`),
+reports it in world + entity-local space (`CursorFromDepth`, `WorldCursor`,
+`LocalCursor`), anchors the closest-vertex/edge/face refinement with it, and
+feeds the ray fallback for hint-less hits (pixel radius scaled by hit
+distance under perspective; kept at the depth-invariant pixel footprint
+under orthographic cameras such as the top-down controller — review
+follow-up, 2026-06-11). Why the gates
+missed it: CPU contracts seeded readback bytes directly (never entity 0,
+never the real clear), and the `gpu;vulkan` smokes exercised hierarchy
+selection, which bypasses the readback path. 12 new regression tests lock
+the conventions; `Operational` (real Vulkan click round trip) owned by
+`BUG-026B`.
+
 Backlog
 [`LEGACY-002`](LEGACY-002-seed-src-legacy-retirement-backlog.md) — seed
 retirement tasks for remaining `src/legacy/` subtrees — retired to

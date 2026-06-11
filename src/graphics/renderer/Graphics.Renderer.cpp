@@ -123,6 +123,17 @@ namespace Extrinsic::Graphics
         // each in-flight frame copies into its own slot without aliasing.
         constexpr std::uint64_t kHistogramReadbackSlotBytes =
             256ull * sizeof(std::uint32_t);
+        // BUG-026 — `Picking.Readback` per-slot layout. Each in-flight frame
+        // slot holds the three single-pixel samples the PickingPass copies at
+        // the pick pixel plus 4 pad bytes for a 16-byte stride:
+        //   +0  EntityId            (R32_UINT;  0 = background sentinel)
+        //   +4  EncodedSelectionId  (R32_UINT;  domain<<28 | payload)
+        //   +8  SceneDepth          (R32_SFLOAT bits; 1.0 = depth clear)
+        //   +12 pad
+        constexpr std::uint64_t kPickingReadbackSlotStride          = 16ull;
+        constexpr std::uint64_t kPickingReadbackEntityIdOffset      = 0ull;
+        constexpr std::uint64_t kPickingReadbackEncodedIdOffset     = 4ull;
+        constexpr std::uint64_t kPickingReadbackDepthOffset         = 8ull;
         constexpr std::uint32_t kFrameSampledDescriptorSlotDefault = 0u;
         constexpr std::uint32_t kFrameSampledDescriptorSlotDebugView = 1u;
         constexpr std::uint32_t kFrameSampledDescriptorSlotPresent = 2u;
@@ -840,6 +851,7 @@ namespace Extrinsic::Graphics
             m_PickingSlotRequest.clear();
             m_PickingSlotInvalidated.clear();
             m_PickingSlotSequence.clear();
+            m_PickingSlotDepthCopied.clear();
             // GRAPHICS-075 Slice E.2 — drop the renderer-owned
             // `Histogram.Readback` lease + per-slot metadata before the
             // BufferManager is torn down, mirroring the picking pattern.
@@ -923,11 +935,12 @@ namespace Extrinsic::Graphics
             // and a follow-up task may specialise this check via a
             // dedicated `GetCompletedFrameNumber()` / `HasFrameCompleted()`
             // IDevice seam once that lifecycle is plumbed. Each drained
-            // slot decodes one 4-byte `EntityId` + one 4-byte
-            // `EncodedSelectionId` word at `slot * 8` per `GRAPHICS-012Q`
-            // and is routed to the `SelectionSystem` via
-            // `PublishPickResult` (live hit) or `PublishNoHit` (zero
-            // EntityId, invalidated request, or read failure).
+            // slot decodes the `EntityId` word, the `EncodedSelectionId`
+            // word (`GRAPHICS-012Q`), and the `SceneDepth` float sample
+            // (BUG-026) at `slot * kPickingReadbackSlotStride` and is
+            // routed to the `SelectionSystem` via `PublishPickResult`
+            // (live hit) or `PublishNoHit` (zero EntityId, invalidated
+            // request, or read failure).
             DrainCompletedPickingSlots();
             // GRAPHICS-075 Slice E.2 — drain completed histogram-readback
             // slots before acquiring the next frame. Mirrors the picking
@@ -4171,19 +4184,20 @@ namespace Extrinsic::Graphics
             // `m_Subsystems.BufferManager()` itself is torn down in `Shutdown()` along
             // with the lease, so a fresh `Initialize(device)` after
             // `Shutdown()` will allocate a new buffer against the new
-            // manager. Sized for `8 * frames-in-flight` bytes per
-            // `GRAPHICS-012Q`'s `EncodedSelectionId` payload (one 4-byte
-            // `EntityId` word + one 4-byte `EncodedSelectionId` word per
-            // in-flight frame slot). If the expected size differs from the
+            // manager. Sized for `kPickingReadbackSlotStride *
+            // frames-in-flight` bytes: one 4-byte `EntityId` word, one 4-byte
+            // `EncodedSelectionId` word (`GRAPHICS-012Q`), one 4-byte
+            // `SceneDepth` R32 float sample (BUG-026), and 4 pad bytes per
+            // in-flight frame slot. If the expected size differs from the
             // current allocation (e.g. the device reports a different
             // frames-in-flight after a swapchain rebuild), the lease is
-            // dropped and re-created so Slice D.2's `slot * 8` addressing
-            // never overruns the buffer. Slice D.2 imports the handle into
-            // the recipe and records `CopyTextureToBuffer(...)`; Slice D.3
-            // drains it on `BeginFrame()`.
+            // dropped and re-created so the per-slot addressing never
+            // overruns the buffer. The handle is imported into the recipe and
+            // the copies are recorded in `RecordPickingCommandRoute`; the
+            // drain runs on `BeginFrame()`.
             const std::uint32_t pickingFramesInFlight = std::max(1u, device.GetFramesInFlight());
             const std::uint64_t pickingReadbackBytes =
-                static_cast<std::uint64_t>(8u) *
+                kPickingReadbackSlotStride *
                 static_cast<std::uint64_t>(pickingFramesInFlight);
             const bool pickingReadbackNeedsAllocation =
                 !m_PickingReadbackBuffer.has_value() ||
@@ -4255,6 +4269,7 @@ namespace Extrinsic::Graphics
                 m_PickingSlotRequest.resize(newSlotCount);
                 m_PickingSlotInvalidated.resize(newSlotCount);
                 m_PickingSlotSequence.resize(newSlotCount);
+                m_PickingSlotDepthCopied.resize(newSlotCount);
             }
             for (std::size_t slot = 0; slot < m_PickingSlotPending.size(); ++slot)
             {
@@ -4270,6 +4285,7 @@ namespace Extrinsic::Graphics
                 m_PickingSlotRequest.resize(newSlotCount, PickPixelRequest{});
                 m_PickingSlotInvalidated.resize(newSlotCount, false);
                 m_PickingSlotSequence.resize(newSlotCount, 0u);
+                m_PickingSlotDepthCopied.resize(newSlotCount, false);
             }
 
             // GRAPHICS-075 Slice E.2 — renderer-owned host-visible
@@ -5408,11 +5424,19 @@ namespace Extrinsic::Graphics
                 }
                 std::uint32_t entityId    = 0u;
                 std::uint32_t encodedBits = 0u;
-                const std::uint64_t slotOffset = static_cast<std::uint64_t>(slot) * 8ull;
-                if (slotOffset + 8ull <= m_PickingReadbackBufferSize)
+                float         depth       = 1.0f;
+                bool          hasDepth    = false;
+                const std::uint64_t slotOffset =
+                    static_cast<std::uint64_t>(slot) * kPickingReadbackSlotStride;
+                if (slotOffset + kPickingReadbackSlotStride <= m_PickingReadbackBufferSize)
                 {
-                    m_Device->ReadBuffer(bufferHandle, &entityId,    sizeof(entityId),    slotOffset);
-                    m_Device->ReadBuffer(bufferHandle, &encodedBits, sizeof(encodedBits), slotOffset + 4ull);
+                    m_Device->ReadBuffer(bufferHandle, &entityId,    sizeof(entityId),
+                                         slotOffset + kPickingReadbackEntityIdOffset);
+                    m_Device->ReadBuffer(bufferHandle, &encodedBits, sizeof(encodedBits),
+                                         slotOffset + kPickingReadbackEncodedIdOffset);
+                    m_Device->ReadBuffer(bufferHandle, &depth,       sizeof(depth),
+                                         slotOffset + kPickingReadbackDepthOffset);
+                    hasDepth = m_PickingSlotDepthCopied[slot] && std::isfinite(depth);
                 }
                 const EncodedSelectionId encoded{.Value = encodedBits};
                 // RUNTIME-089 — replay the slot's correlation Sequence on the
@@ -5425,6 +5449,8 @@ namespace Extrinsic::Graphics
                     m_Subsystems.SelectionSystemRegistry()->PublishPickResult(PickReadbackResult{
                         .Hit      = false,
                         .Sequence = slotSequence,
+                        .PixelX   = m_PickingSlotRequest[slot].X,
+                        .PixelY   = m_PickingSlotRequest[slot].Y,
                     });
                 }
                 else
@@ -5434,6 +5460,12 @@ namespace Extrinsic::Graphics
                         .StableEntityId = entityId,
                         .Hit            = true,
                         .Sequence       = slotSequence,
+                        // BUG-026 — depth sample + pick pixel so the runtime can
+                        // unproject the world-space cursor position.
+                        .HasDepth       = hasDepth,
+                        .Depth          = depth,
+                        .PixelX         = m_PickingSlotRequest[slot].X,
+                        .PixelY         = m_PickingSlotRequest[slot].Y,
                     });
                 }
                 m_PickingSlotPending[slot] = false;
@@ -5441,6 +5473,7 @@ namespace Extrinsic::Graphics
                 m_PickingSlotIssuedFrame[slot] = 0u;
                 m_PickingSlotRequest[slot] = PickPixelRequest{};
                 m_PickingSlotSequence[slot] = 0u;
+                m_PickingSlotDepthCopied[slot] = false;
             }
         }
 
@@ -7230,11 +7263,11 @@ namespace Extrinsic::Graphics
         // buffer. Allocated by `InitializeOperationalPassResources()` when
         // the device first becomes operational and re-used across
         // `RebuildOperationalResources()` calls as long as the expected
-        // `8 * device.GetFramesInFlight()` size matches the current
-        // `m_PickingReadbackBufferSize` (same pattern `ShadowSystem` follows
-        // for its depth atlas). When the device reports a different
-        // frames-in-flight after a swapchain rebuild the lease is dropped
-        // and re-created so Slice D.2's `slot * 8` per-frame copy
+        // `kPickingReadbackSlotStride * device.GetFramesInFlight()` size
+        // matches the current `m_PickingReadbackBufferSize` (same pattern
+        // `ShadowSystem` follows for its depth atlas). When the device
+        // reports a different frames-in-flight after a swapchain rebuild
+        // the lease is dropped and re-created so the per-frame copy
         // addressing never overruns the allocation. The lease is reset in
         // `Shutdown()` before `m_Subsystems.BufferManager()` so the destruction order
         // matches the rest of the lease-owning members above. Slice D.1
@@ -7273,6 +7306,10 @@ namespace Extrinsic::Graphics
         // and replayed on the published PickReadbackResult so the runtime
         // resolves the exact in-flight pick regardless of slot publish order.
         std::vector<std::uint64_t>                     m_PickingSlotSequence;
+        // BUG-026 — true when the slot's copy pass also recorded the SceneDepth
+        // pixel copy (the depth target can be unavailable in degenerate
+        // recipes); gates `PickReadbackResult::HasDepth` on the drain.
+        std::vector<bool>                              m_PickingSlotDepthCopied;
         // GRAPHICS-075 Slice E.2 — renderer-owned host-visible
         // `Histogram.Readback` buffer + per-slot drain metadata. Sized for
         // `kHistogramReadbackSlotBytes * frames-in-flight` bytes (256 uint32
@@ -7377,6 +7414,7 @@ namespace Extrinsic::Graphics
                 m_PickingReadbackBuffer->GetHandle();
             RHI::TextureHandle entityIdHandle{};
             RHI::TextureHandle primitiveIdHandle{};
+            RHI::TextureHandle sceneDepthHandle{};
             for (std::size_t i = 0; i < compiled.TextureNames.size(); ++i)
             {
                 if (i >= compiled.TextureHandles.size())
@@ -7391,6 +7429,10 @@ namespace Extrinsic::Graphics
                 {
                     primitiveIdHandle = compiled.TextureHandles[i];
                 }
+                else if (compiled.TextureNames[i] == std::string_view{"SceneDepth"})
+                {
+                    sceneDepthHandle = compiled.TextureHandles[i];
+                }
             }
             if (entityIdHandle.IsValid() && primitiveIdHandle.IsValid())
             {
@@ -7400,7 +7442,7 @@ namespace Extrinsic::Graphics
                 const std::uint32_t slot =
                     frame.FrameIndex % framesInFlight;
                 const std::uint64_t slotOffset =
-                    static_cast<std::uint64_t>(slot) * 8ull;
+                    static_cast<std::uint64_t>(slot) * kPickingReadbackSlotStride;
                 const std::uint32_t pickX = renderWorld.PickRequest.X;
                 const std::uint32_t pickY = renderWorld.PickRequest.Y;
 
@@ -7414,14 +7456,14 @@ namespace Extrinsic::Graphics
                                         RHI::TextureLayout::TransferSrc,
                                         0u, 0u,
                                         pickingBuffer,
-                                        slotOffset,
+                                        slotOffset + kPickingReadbackEntityIdOffset,
                                         pickX, pickY,
                                         1u, 1u);
                 cmd.CopyTextureToBuffer(primitiveIdHandle,
                                         RHI::TextureLayout::TransferSrc,
                                         0u, 0u,
                                         pickingBuffer,
-                                        slotOffset + 4ull,
+                                        slotOffset + kPickingReadbackEncodedIdOffset,
                                         pickX, pickY,
                                         1u, 1u);
                 cmd.TextureBarrier(entityIdHandle,
@@ -7430,6 +7472,28 @@ namespace Extrinsic::Graphics
                 cmd.TextureBarrier(primitiveIdHandle,
                                    RHI::TextureLayout::TransferSrc,
                                    RHI::TextureLayout::ColorAttachment);
+                // BUG-026 — sample the pick pixel's scene depth alongside the
+                // IDs so the runtime can reconstruct the world-space cursor
+                // position. The PickingPass reads SceneDepth as DepthRead, so
+                // the round-trip restores DepthReadOnly for the downstream
+                // surface pass barriers derived from the declared usages.
+                const bool depthCopied = sceneDepthHandle.IsValid();
+                if (depthCopied)
+                {
+                    cmd.TextureBarrier(sceneDepthHandle,
+                                       RHI::TextureLayout::DepthReadOnly,
+                                       RHI::TextureLayout::TransferSrc);
+                    cmd.CopyTextureToBuffer(sceneDepthHandle,
+                                            RHI::TextureLayout::TransferSrc,
+                                            0u, 0u,
+                                            pickingBuffer,
+                                            slotOffset + kPickingReadbackDepthOffset,
+                                            pickX, pickY,
+                                            1u, 1u);
+                    cmd.TextureBarrier(sceneDepthHandle,
+                                       RHI::TextureLayout::TransferSrc,
+                                       RHI::TextureLayout::DepthReadOnly);
+                }
                 ++m_LastRenderGraphStats.PickingReadbackCopyCount;
 
                 if (slot < m_PickingSlotPending.size())
@@ -7443,6 +7507,7 @@ namespace Extrinsic::Graphics
                     };
                     m_PickingSlotInvalidated[slot] = false;
                     m_PickingSlotSequence[slot] = renderWorld.PickRequest.Sequence;
+                    m_PickingSlotDepthCopied[slot] = depthCopied;
                 }
             }
         }

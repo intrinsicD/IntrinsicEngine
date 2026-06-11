@@ -21,6 +21,7 @@ import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.StableEntityLookup;
 import Geometry.Properties;
 
 namespace gs = Extrinsic::ECS::Components::GeometrySources;
@@ -167,7 +168,7 @@ TEST(GraphGeometryExtraction, LineGraphUploadsOnceAndBindsInstanceGeometry)
     EXPECT_EQ(gpuWorld.GetLiveInstanceCount(), 1u);
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
 
-    const auto stableId = static_cast<std::uint32_t>(entity);
+    const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
     const auto view = extraction.FindRenderableSidecarForTest(stableId);
     ASSERT_TRUE(view.has_value());
     EXPECT_TRUE(view->Instance.IsValid());
@@ -204,7 +205,7 @@ TEST(GraphGeometryExtraction, PointGraphUploadsOnceAndBindsInstanceGeometry)
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
 
     const auto view =
-        extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(entity));
+        extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(view.has_value());
     EXPECT_TRUE(view->HasGraphResidency);
     EXPECT_EQ(gpuWorld.GetInstanceGeometry(view->Instance), view->GraphGeometry);
@@ -236,7 +237,7 @@ TEST(GraphGeometryExtraction, LineAndPointGraphUploadsSingleHandleForBothLanes)
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
 
     const auto view =
-        extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(entity));
+        extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(view.has_value());
     EXPECT_TRUE(view->HasGraphResidency);
     EXPECT_EQ(view->GraphGeometry, view->Geometry);
@@ -265,7 +266,7 @@ TEST(GraphGeometryExtraction, RepeatedExtractionReusesGraphHandleWithoutReupload
     ASSERT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
 
     const auto firstView =
-        extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(entity));
+        extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(firstView.has_value());
     const auto firstHandle = firstView->GraphGeometry;
 
@@ -278,7 +279,7 @@ TEST(GraphGeometryExtraction, RepeatedExtractionReusesGraphHandleWithoutReupload
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
 
     const auto secondView =
-        extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(entity));
+        extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(secondView.has_value());
     EXPECT_EQ(secondView->GraphGeometry, firstHandle);
 
@@ -418,7 +419,7 @@ TEST(GraphGeometryExtraction, ProceduralRefPreemptsGraphPathOnSameEntity)
     EXPECT_EQ(stats.GraphGeometryFailedPack, 0u);
 
     const auto view = extraction.FindRenderableSidecarForTest(
-        static_cast<std::uint32_t>(entity));
+        Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(view.has_value());
     EXPECT_FALSE(view->HasGraphResidency);
     EXPECT_TRUE(view->ProceduralKey.has_value());
@@ -523,7 +524,7 @@ TEST(GraphGeometryExtraction, SurfaceOnlyGraphEntityFailsClosedAsFailedPack)
     EXPECT_EQ(stats.GraphGeometryInvalidEdges, 0u);
 
     const auto view = extraction.FindRenderableSidecarForTest(
-        static_cast<std::uint32_t>(entity));
+        Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(view.has_value());
     EXPECT_FALSE(view->HasGraphResidency);
 
@@ -564,7 +565,7 @@ TEST(GraphGeometryExtraction, AddingProceduralRefAfterGraphUploadReleasesGraphRe
     EXPECT_EQ(stats.ProceduralGeometryUploads, 1u);
 
     const auto view = extraction.FindRenderableSidecarForTest(
-        static_cast<std::uint32_t>(entity));
+        Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(view.has_value());
     EXPECT_FALSE(view->HasGraphResidency);
     ASSERT_TRUE(view->ProceduralKey.has_value());
@@ -630,7 +631,7 @@ TEST(GraphGeometryExtraction, LosingGraphHintReleasesGraphResidency)
     EXPECT_EQ(stats.GraphGeometryFreeRetires, 0u);
 
     const auto view = extraction.FindRenderableSidecarForTest(
-        static_cast<std::uint32_t>(entity));
+        Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(view.has_value());
     EXPECT_FALSE(view->HasGraphResidency);
     EXPECT_FALSE(gpuWorld.GetInstanceGeometry(view->Instance).IsValid());
@@ -677,7 +678,7 @@ TEST(GraphGeometryExtraction, GainingLineHintRepacksGraphWithoutDirtyTag)
     ASSERT_EQ(stats.GraphGeometryUploads, 1u);
     ASSERT_EQ(stats.GraphGeometryReuploads, 0u);
 
-    const auto stableId = static_cast<std::uint32_t>(entity);
+    const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
     const auto firstView = extraction.FindRenderableSidecarForTest(stableId);
     ASSERT_TRUE(firstView.has_value());
     const auto firstHandle = firstView->GraphGeometry;
@@ -734,7 +735,7 @@ TEST(GraphGeometryExtraction, LosingLineHintRepacksGraphWithoutDirtyTag)
                                              &engine.GetGpuAssetCache());
     ASSERT_EQ(stats.GraphGeometryUploads, 1u);
 
-    const auto stableId = static_cast<std::uint32_t>(entity);
+    const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
     const auto firstHandle =
         extraction.FindRenderableSidecarForTest(stableId)->GraphGeometry;
 
@@ -805,7 +806,7 @@ TEST_P(GraphGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
     ASSERT_EQ(stats.GraphGeometryReuploads, 0u);
 
     const auto firstView =
-        extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(entity));
+        extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(firstView.has_value());
     const auto firstHandle = firstView->GraphGeometry;
     ASSERT_TRUE(firstHandle.IsValid());
@@ -832,7 +833,7 @@ TEST_P(GraphGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
     EXPECT_EQ(stats.GraphGeometryFreeRetires, 0u);
 
     const auto secondView =
-        extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(entity));
+        extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(secondView.has_value());
     EXPECT_TRUE(secondView->HasGraphResidency);
     EXPECT_NE(secondView->GraphGeometry, firstHandle);
@@ -922,7 +923,7 @@ TEST(GraphGeometryExtraction, ReuploadFailureReleasesStaleResidencyAndPreservesD
     EXPECT_EQ(stats.GraphGeometryFreeRetires, 0u);
 
     const auto view =
-        extraction.FindRenderableSidecarForTest(static_cast<std::uint32_t>(entity));
+        extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(view.has_value());
     EXPECT_FALSE(view->HasGraphResidency);
     EXPECT_FALSE(gpuWorld.GetInstanceGeometry(view->Instance).IsValid());

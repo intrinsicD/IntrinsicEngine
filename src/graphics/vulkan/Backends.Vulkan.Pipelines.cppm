@@ -35,6 +35,14 @@ namespace Extrinsic::Backends::Vulkan
     export [[nodiscard]] VkBlendOp             ToVkBlendOp(RHI::BlendOp o);
     export [[nodiscard]] VkCompareOp           ToVkDepthOp(RHI::DepthOp o);
     export [[nodiscard]] VkImageAspectFlags    AspectFromFormat(VkFormat f);
+    // BUG-026: clear colors are authored as floats on RHI::ColorAttachment, but
+    // Vulkan reads the VkClearColorValue union member matching the attachment's
+    // numeric format. UINT/SINT formats must receive value-converted integers,
+    // not the bit pattern of the float (0.10f would clear an R32_UINT target to
+    // 0x3DCCCCCD).
+    export [[nodiscard]] VkClearColorValue     ToVkClearColorValue(VkFormat f,
+                                                                   float r, float g,
+                                                                   float b, float a);
     export [[nodiscard]] VkBufferUsageFlags    ToVkBufferUsage(RHI::BufferUsage u);
     export [[nodiscard]] VkImageUsageFlags     ToVkTextureUsage(RHI::TextureUsage u);
     export [[nodiscard]] VkAccessFlags2        ToVkAccess(RHI::MemoryAccess a);

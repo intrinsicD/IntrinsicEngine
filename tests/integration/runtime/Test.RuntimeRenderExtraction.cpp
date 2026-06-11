@@ -37,6 +37,7 @@ import Extrinsic.Runtime.SandboxEditorUi;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SpatialDebugAdapters;
 import Extrinsic.Runtime.VisualizationAdapters;
+import Extrinsic.Runtime.StableEntityLookup;
 import Geometry.AABB;
 import Geometry.BVH;
 import Geometry.ConvexHull;
@@ -133,7 +134,7 @@ namespace
 
     [[nodiscard]] std::uint32_t StableId(entt::entity entity) noexcept
     {
-        return static_cast<std::uint32_t>(entity);
+        return Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
     }
 
     [[nodiscard]] Geometry::PropertySet MakeScalarProperties()
@@ -277,7 +278,7 @@ TEST(RuntimeRenderExtraction, UiTransformEditModelReachesRenderWorldAfterPreRend
             fixture.Renderer->ExtractRenderWorld(Graphics::RenderFrameInput{});
         for (const auto& renderable : world.Renderables)
         {
-            if (renderable.StableId == static_cast<std::uint32_t>(entity))
+            if (renderable.StableId == Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity))
                 return glm::vec3{renderable.Model[3]};
         }
         ADD_FAILURE() << "renderable not found in render world";

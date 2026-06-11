@@ -565,3 +565,28 @@ TEST(SelectionController, ReadbackCountersReconcile)
     EXPECT_EQ(diag.Hits, 1u);
     EXPECT_EQ(diag.NoHits, 1u);
 }
+
+// --- BUG-026: first registry entity (entt id 0) is clickable ---------------
+// The default-sandbox ReferenceTriangle is the first entity of a fresh
+// registry, whose raw handle casts to 0. Under the pre-BUG-026 identity
+// encoding its GPU render id collided with the `EntityId == 0` background
+// sentinel, so every click on it published NoHit and selection never changed.
+// The `entt handle + 1` render-id encoding keeps it selectable.
+
+TEST(SelectionController, ClickHitSelectsFirstRegistryEntityWithRawIdZero)
+{
+    Registry            registry;
+    SelectionController controller;
+    const EntityHandle entity = MakeSelectable(registry);
+    ASSERT_EQ(static_cast<std::uint32_t>(entity), 0u);
+    ASSERT_NE(StableId(entity), 0u);
+
+    controller.RequestClickPick(10u, 20u);
+    ASSERT_TRUE(controller.ConsumePendingPick().has_value());
+    controller.ConsumeHit(registry, StableId(entity));
+
+    EXPECT_TRUE(HasSelectedTag(registry, entity));
+    ASSERT_EQ(controller.SelectedStableIds().size(), 1u);
+    EXPECT_EQ(controller.SelectedStableIds()[0], StableId(entity));
+    EXPECT_EQ(controller.GetDiagnostics().StaleEntityHits, 0u);
+}

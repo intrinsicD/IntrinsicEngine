@@ -222,6 +222,52 @@ VkImageAspectFlags AspectFromFormat(VkFormat f)
     }
 }
 
+VkClearColorValue ToVkClearColorValue(VkFormat f, float r, float g, float b, float a)
+{
+    VkClearColorValue value{};
+    switch (f)
+    {
+    // BUG-026: integer attachments read the matching union member, so the
+    // authored float clear must be value-converted, never bit-punned. The RHI
+    // only exposes UINT color formats today (R16_UINT/R32_UINT); the wider
+    // Vulkan UINT/SINT lists keep future RHI format additions correct.
+    case VK_FORMAT_R8_UINT:
+    case VK_FORMAT_R8G8_UINT:
+    case VK_FORMAT_R8G8B8A8_UINT:
+    case VK_FORMAT_R16_UINT:
+    case VK_FORMAT_R16G16_UINT:
+    case VK_FORMAT_R16G16B16A16_UINT:
+    case VK_FORMAT_R32_UINT:
+    case VK_FORMAT_R32G32_UINT:
+    case VK_FORMAT_R32G32B32A32_UINT:
+        value.uint32[0] = static_cast<uint32_t>(r);
+        value.uint32[1] = static_cast<uint32_t>(g);
+        value.uint32[2] = static_cast<uint32_t>(b);
+        value.uint32[3] = static_cast<uint32_t>(a);
+        return value;
+    case VK_FORMAT_R8_SINT:
+    case VK_FORMAT_R8G8_SINT:
+    case VK_FORMAT_R8G8B8A8_SINT:
+    case VK_FORMAT_R16_SINT:
+    case VK_FORMAT_R16G16_SINT:
+    case VK_FORMAT_R16G16B16A16_SINT:
+    case VK_FORMAT_R32_SINT:
+    case VK_FORMAT_R32G32_SINT:
+    case VK_FORMAT_R32G32B32A32_SINT:
+        value.int32[0] = static_cast<int32_t>(r);
+        value.int32[1] = static_cast<int32_t>(g);
+        value.int32[2] = static_cast<int32_t>(b);
+        value.int32[3] = static_cast<int32_t>(a);
+        return value;
+    default:
+        value.float32[0] = r;
+        value.float32[1] = g;
+        value.float32[2] = b;
+        value.float32[3] = a;
+        return value;
+    }
+}
+
 
 VkIndexType ToVkIndexType(RHI::IndexType t)
 {

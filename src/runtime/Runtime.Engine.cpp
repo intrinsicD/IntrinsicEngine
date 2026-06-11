@@ -892,8 +892,31 @@ namespace Extrinsic::Runtime
                    cursor.y < static_cast<float>(viewport.Height);
         }
 
+        // BUG-026 — platform cursor positions are window (logical) coordinates
+        // (GLFW's cursor callback), while picking/gizmo math addresses
+        // framebuffer pixels. On HiDPI hosts (content scale != 1) the two
+        // differ; scale by the extent ratio so the pick pixel matches what is
+        // under the cursor. Degenerate extents pass the cursor through.
+        [[nodiscard]] Platform::Input::Context::XY WindowToFramebufferCursor(
+            const Platform::Input::Context::XY cursor,
+            const Core::Extent2D windowExtent,
+            const Core::Extent2D framebufferExtent) noexcept
+        {
+            if (windowExtent.Width <= 0 || windowExtent.Height <= 0 ||
+                framebufferExtent.Width <= 0 || framebufferExtent.Height <= 0)
+            {
+                return cursor;
+            }
+            const float scaleX = static_cast<float>(framebufferExtent.Width) /
+                                 static_cast<float>(windowExtent.Width);
+            const float scaleY = static_cast<float>(framebufferExtent.Height) /
+                                 static_cast<float>(windowExtent.Height);
+            return Platform::Input::Context::XY{cursor.x * scaleX, cursor.y * scaleY};
+        }
+
         void SubmitViewportSelectionClickForFrame(SelectionController& selection,
                                                   const Platform::Input::Context& input,
+                                                  const Core::Extent2D windowExtent,
                                                   const Core::Extent2D viewport,
                                                   const bool imguiCapturesMouse,
                                                   const bool gizmoCapturesMouse) noexcept
@@ -904,7 +927,8 @@ namespace Extrinsic::Runtime
                 return;
             }
 
-            const Platform::Input::Context::XY cursor = input.GetMousePosition();
+            const Platform::Input::Context::XY cursor =
+                WindowToFramebufferCursor(input.GetMousePosition(), windowExtent, viewport);
             if (!CursorInsideViewport(cursor, viewport))
                 return;
 
@@ -942,6 +966,7 @@ namespace Extrinsic::Runtime
             ECS::Scene::Registry& scene,
             const Platform::Input::Context& input,
             const Graphics::CameraViewInput& cameraInput,
+            const Core::Extent2D windowExtent,
             const Core::Extent2D viewport,
             std::span<const ECS::EntityHandle> selected)
         {
@@ -953,7 +978,8 @@ namespace Extrinsic::Runtime
                 return;
             }
 
-            const Platform::Input::Context::XY cursor = input.GetMousePosition();
+            const Platform::Input::Context::XY cursor =
+                WindowToFramebufferCursor(input.GetMousePosition(), windowExtent, viewport);
             const std::uint32_t pixelX = ClampCursorPixel(cursor.x, viewport.Width);
             const std::uint32_t pixelY = ClampCursorPixel(cursor.y, viewport.Height);
             const Graphics::CameraViewSnapshot camera =
@@ -1696,15 +1722,18 @@ namespace Extrinsic::Runtime
 
         RebuildSelectedGizmoEntities(m_SelectionController, *m_Scene, m_GizmoSelectedEntities);
         const Platform::IWindow& inputWindow = *m_Window;
+        const Platform::Extent2D windowExtent = inputWindow.GetWindowExtent();
         DriveGizmoInteractionForFrame(m_GizmoInteraction,
                                       m_GizmoUndoStack,
                                       *m_Scene,
                                       inputWindow.GetInput(),
                                       renderInput.Camera,
+                                      windowExtent,
                                       viewport,
                                       m_GizmoSelectedEntities);
         SubmitViewportSelectionClickForFrame(m_SelectionController,
                                              inputWindow.GetInput(),
+                                             windowExtent,
                                              viewport,
                                              m_ImGuiAdapter != nullptr && m_ImGuiAdapter->WantsMouseCapture(),
                                              m_GizmoInteraction.IsDragging());
@@ -1754,6 +1783,57 @@ namespace Extrinsic::Runtime
                 .PixelX = pick->PixelX,
                 .PixelY = pick->PixelY,
             });
+
+            // BUG-026 — capture the issuing frame's camera context, keyed by
+            // the pick's correlation Sequence. The readback completes frames
+            // later (the camera may have moved), so the depth-to-world cursor
+            // reconstruction and the CPU ray fallback must replay *this*
+            // frame's inverse view-projection / pick ray, not the consume
+            // frame's. Bounded mirror of the controller's in-flight FIFO.
+            const Graphics::CameraViewSnapshot pickCamera =
+                Graphics::BuildCameraViewSnapshot(renderInput.Camera,
+                                                  viewport,
+                                                  renderInput.Pick);
+            if (pickCamera.Valid)
+            {
+                const std::uint32_t viewportWidth =
+                    viewport.Width > 0 ? static_cast<std::uint32_t>(viewport.Width) : 0u;
+                const std::uint32_t viewportHeight =
+                    viewport.Height > 0 ? static_cast<std::uint32_t>(viewport.Height) : 0u;
+                PickReadbackContext context{};
+                context.InverseViewProjection = pickCamera.InverseViewProjection;
+                context.ViewportWidth         = viewportWidth;
+                context.ViewportHeight        = viewportHeight;
+                context.HasWorldRay           = pickCamera.HasPickRay;
+                context.WorldRayOrigin        = pickCamera.PickRayOrigin;
+                context.WorldRayDirection     = pickCamera.PickRayDirection;
+                // `2 / (|P[1][1]| * H)`: for perspective ([1][1] =
+                // ±1/tan(fovY/2)) this is the world-units-per-pixel at view
+                // depth 1; for orthographic ([1][1] = ±2/orthoHeight, e.g.
+                // the promoted TopDownCameraController) the same expression
+                // is the depth-invariant orthoHeight/H, and the flag tells
+                // refinement not to scale it by the hit distance. The sign
+                // carries the Vulkan Y flip in both cases.
+                const float projectionScaleY =
+                    std::abs(renderInput.Camera.Projection[1][1]);
+                if (projectionScaleY > 0.000001f && viewportHeight > 0u)
+                {
+                    context.WorldUnitsPerPixelAtUnitDepth =
+                        2.0f / (projectionScaleY *
+                                static_cast<float>(viewportHeight));
+                }
+                context.OrthographicProjection =
+                    IsOrthographicProjection(renderInput.Camera.Projection);
+                constexpr std::size_t kMaxInFlightPickContexts = 32u;
+                if (m_InFlightPickContexts.size() >= kMaxInFlightPickContexts)
+                {
+                    m_InFlightPickContexts.erase(m_InFlightPickContexts.begin());
+                }
+                m_InFlightPickContexts.push_back(InFlightPickContext{
+                    .Sequence = pick->Sequence,
+                    .Context  = context,
+                });
+            }
         }
 
         // ── Phases 5–9: promoted render-frame contract ───────────────────
@@ -2051,7 +2131,27 @@ namespace Extrinsic::Runtime
                 // refinement wins, matching the controller's latest-pick-wins
                 // coalescing; a background (no-hit) readback clears the cache. The
                 // bridge mutates nothing and only ever reads the live registry.
-                m_LastRefinedPrimitive = RefinePickReadbackResult(*m_Scene, *result);
+                //
+                // BUG-026 — replay the issuing frame's camera context (matched by
+                // the correlation Sequence) so the readback's depth sample
+                // reconstructs the world/local cursor position and anchors the
+                // closest-vertex/edge/face refinement.
+                const PickReadbackContext* pickContext = nullptr;
+                auto contextIt = m_InFlightPickContexts.end();
+                if (result->Sequence != 0u)
+                {
+                    contextIt = std::find_if(
+                        m_InFlightPickContexts.begin(),
+                        m_InFlightPickContexts.end(),
+                        [seq = result->Sequence](const InFlightPickContext& entry)
+                        { return entry.Sequence == seq; });
+                    if (contextIt != m_InFlightPickContexts.end())
+                        pickContext = &contextIt->Context;
+                }
+                m_LastRefinedPrimitive =
+                    RefinePickReadbackResult(*m_Scene, *result, pickContext);
+                if (contextIt != m_InFlightPickContexts.end())
+                    m_InFlightPickContexts.erase(contextIt);
             }
         }
 

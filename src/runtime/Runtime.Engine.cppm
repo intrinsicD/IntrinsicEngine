@@ -398,6 +398,17 @@ namespace Extrinsic::Runtime
         // pick hit. Updated from the pick-readback drain in RunFrame; never read
         // by graphics. Empty until the first pick resolves.
         std::optional<PrimitiveSelectionResult> m_LastRefinedPrimitive{};
+        // BUG-026 — per-sequence pick context captured when RunFrame drains a
+        // pending pick (issuing frame's inverse view-projection, viewport,
+        // pick ray, pixel-radius scale). Replayed when the matching readback
+        // arrives so the depth sample unprojects against the camera that
+        // issued the pick. Bounded mirror of the controller's in-flight FIFO.
+        struct InFlightPickContext
+        {
+            std::uint64_t       Sequence{0u};
+            PickReadbackContext Context{};
+        };
+        std::vector<InFlightPickContext>        m_InFlightPickContexts{};
 
         // CPU task graph — ECS system scheduling
         std::unique_ptr<Core::FrameGraph>      m_FrameGraph;
