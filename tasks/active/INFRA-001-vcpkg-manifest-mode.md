@@ -92,7 +92,7 @@ depends_on: []
       is green.
 - [x] Vulkan GPU smoke gate (`IntrinsicGraphicsVulkanSmokeTests`) is
       green on a Vulkan-capable host.
-- [ ] Headless build with `INTRINSIC_HEADLESS_NO_GLFW=ON` succeeds
+- [x] Headless build with `INTRINSIC_HEADLESS_NO_GLFW=ON` succeeds
       without pulling `glfw3` / `imguizmo` from vcpkg (manifest
       feature-flag gates them).
 
@@ -137,6 +137,10 @@ depends_on: []
   binary cache took 103.2 s for `ci` and 63.3 s for `ci-vulkan` on this host;
   subsequent warm configure with the installed tree present took 1.9 s. CI
   warm-cache timing remains to be observed on GitHub Actions.
+- Headless no-windowing verification used `VCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON`
+  and `INTRINSIC_HEADLESS_NO_GLFW=ON`: vcpkg restored 11 non-windowing packages
+  from the binary cache and excluded `glfw3`, `imguizmo`, `volk`, and
+  `vulkan-memory-allocator`.
 - Vulkan smoke passed locally under the `ci-vulkan` preset. Final
   FetchContent-helper deletion remains deferred to Slice D.
 - Slice A verification 2026-06-11:
@@ -200,6 +204,18 @@ depends_on: []
       -L 'vulkan' -LE 'slow|flaky-quarantine' --no-tests=ignore
       --timeout 120 -j$(nproc)` — passed; 38 selected, 0 failed, 1 skipped,
       elapsed 21.42 s.
+    - `cmake -S . -B build/ci-headless-vcpkg -G Ninja
+      -DCMAKE_TOOLCHAIN_FILE=$PWD/external/vcpkg/scripts/buildsystems/vcpkg.cmake
+      -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$PWD/cmake/IntrinsicClangToolchain.cmake
+      -DVCPKG_INSTALLED_DIR=$PWD/external/vcpkg-installed/ci-headless-vcpkg
+      -DVCPKG_MANIFEST_MODE=ON -DVCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON
+      -DINTRINSIC_BUILD_SANDBOX=OFF -DINTRINSIC_BUILD_TESTS=ON
+      -DINTRINSIC_ENABLE_CUDA=OFF -DINTRINSIC_ENABLE_SANITIZERS=ON
+      -DINTRINSIC_HEADLESS_NO_GLFW=ON` — passed in 7.85 s; vcpkg restored 11
+      packages from `external/vcpkg-bincache/` and did not install `glfw3`,
+      `imguizmo`, `volk`, or `vulkan-memory-allocator`.
+    - `cmake --build build/ci-headless-vcpkg --target IntrinsicTests` —
+      passed in 5:02.05.
 
 ## Verification
 ```bash
