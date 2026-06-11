@@ -28,6 +28,8 @@
 #include <fstream>
 #include <limits>
 #include <memory>
+#include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -64,6 +66,7 @@ import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.TextureUpload;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxEditorUi;
 import Extrinsic.Runtime.SelectionController;
@@ -1335,6 +1338,259 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedOffOriginObjTriangleAutoFramesAtC
 
     renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
     device.DestroyBuffer(readbackBuffer);
+    engine.Shutdown();
+}
+
+// --- BUG-026B: Vulkan click-pick readback round trip -----------------------
+
+namespace
+{
+constexpr std::uint32_t kBug026MaxFrames = 24u;
+constexpr float kBug026PlaneTolerance = 0.05f;
+
+class ClickPickRoundTripApp final : public IApplication
+{
+public:
+    void OnInitialize(Engine& engine) override
+    {
+        m_EditorUi.Attach(engine);
+        m_Triangle = FindEntityByName(engine.GetScene(), "ReferenceTriangle");
+    }
+
+    void OnSimTick(Engine&, double) override {}
+
+    void OnVariableTick(Engine& engine, double, double) override
+    {
+        ++m_Frames;
+        if (m_Triangle == Extrinsic::ECS::InvalidEntityHandle ||
+            !engine.GetScene().IsValid(m_Triangle))
+        {
+            FailureReason = "ReferenceTriangle was not present while driving the click-pick smoke.";
+            engine.RequestExit();
+            return;
+        }
+
+        const Extrinsic::Core::Extent2D extent = engine.GetDevice().GetBackbufferExtent();
+        if (extent.Width == 0u || extent.Height == 0u)
+        {
+            FailureReason = "Backbuffer extent was zero while driving the click-pick smoke.";
+            engine.RequestExit();
+            return;
+        }
+
+        switch (m_Phase)
+        {
+        case Phase::SubmitTriangleClick:
+        {
+            if (!engine.GetDevice().IsOperational())
+            {
+                break;
+            }
+            TrianglePixel = ProjectReferenceCameraPixel(glm::vec3{0.0f, 0.0f, 0.0f}, extent);
+            engine.GetSelectionController().RequestClickPick(TrianglePixel.first, TrianglePixel.second);
+            TriangleClickSubmitted = true;
+            m_Phase = Phase::AwaitTriangleHit;
+            break;
+        }
+        case Phase::AwaitTriangleHit:
+            if (ObserveTriangleHit(engine))
+            {
+                const auto diagnostics = engine.GetSelectionController().GetDiagnostics();
+                m_NoHitsBeforeBackground = diagnostics.NoHits;
+                BackgroundPixel = FarBackgroundPixel(extent);
+                engine.GetSelectionController().RequestClickPick(BackgroundPixel.first, BackgroundPixel.second);
+                BackgroundClickSubmitted = true;
+                m_Phase = Phase::AwaitBackgroundNoHit;
+            }
+            break;
+        case Phase::AwaitBackgroundNoHit:
+            if (ObserveBackgroundNoHit(engine))
+            {
+                BackgroundNoHitObserved = true;
+                m_Phase = Phase::Done;
+                engine.RequestExit();
+            }
+            break;
+        case Phase::Done:
+            engine.RequestExit();
+            break;
+        }
+
+        if (m_Frames >= kBug026MaxFrames && m_Phase != Phase::Done)
+        {
+            FailureReason = "Timed out waiting for Vulkan click-pick readbacks to complete.";
+            engine.RequestExit();
+        }
+    }
+
+    void OnShutdown(Engine&) override
+    {
+        m_EditorUi.Detach();
+    }
+
+    bool TriangleClickSubmitted{false};
+    bool TriangleHitObserved{false};
+    bool BackgroundClickSubmitted{false};
+    bool BackgroundNoHitObserved{false};
+    std::string FailureReason;
+    std::pair<std::uint32_t, std::uint32_t> TrianglePixel{};
+    std::pair<std::uint32_t, std::uint32_t> BackgroundPixel{};
+    std::optional<Extrinsic::Runtime::PrimitiveSelectionResult> TriangleHitResult{};
+
+private:
+    enum class Phase
+    {
+        SubmitTriangleClick,
+        AwaitTriangleHit,
+        AwaitBackgroundNoHit,
+        Done,
+    };
+
+    [[nodiscard]] static std::pair<std::uint32_t, std::uint32_t> FarBackgroundPixel(
+        const Extrinsic::Core::Extent2D extent) noexcept
+    {
+        return {
+            std::min(static_cast<std::uint32_t>(extent.Width - 1u),
+                     static_cast<std::uint32_t>((extent.Width * 15u) / 16u)),
+            std::min(static_cast<std::uint32_t>(extent.Height - 1u),
+                     static_cast<std::uint32_t>((extent.Height * 15u) / 16u)),
+        };
+    }
+
+    [[nodiscard]] bool ObserveTriangleHit(Engine& engine)
+    {
+        auto& scene = engine.GetScene();
+        auto& selection = engine.GetSelectionController();
+        const std::uint32_t triangleId =
+            Extrinsic::Runtime::SelectionController::ToStableEntityId(m_Triangle);
+
+        const std::span<const std::uint32_t> selected = selection.SelectedStableIds();
+        if (selection.SelectedCount() != 1u || selected.size() != 1u || selected[0] != triangleId)
+        {
+            return false;
+        }
+        if (!scene.Raw().all_of<ECSC::Selection::SelectedTag>(m_Triangle))
+        {
+            return false;
+        }
+
+        const auto& primitive = engine.GetLastRefinedPrimitiveSelection();
+        if (!primitive.has_value())
+        {
+            return false;
+        }
+        const Extrinsic::Runtime::PrimitiveSelectionResult& result = *primitive;
+        if (!result.Resolved() ||
+            result.EntityId != triangleId ||
+            result.Domain != gs::Domain::Mesh ||
+            result.Kind != Extrinsic::Runtime::RefinedPrimitiveKind::Face ||
+            result.FaceId == Extrinsic::Runtime::kInvalidPrimitiveIndex ||
+            result.EdgeId == Extrinsic::Runtime::kInvalidPrimitiveIndex ||
+            result.VertexId == Extrinsic::Runtime::kInvalidPrimitiveIndex ||
+            !result.CursorFromDepth ||
+            result.Depth >= 0.999f ||
+            std::abs(result.WorldCursor.z) > kBug026PlaneTolerance ||
+            std::abs(result.LocalCursor.z) > kBug026PlaneTolerance)
+        {
+            return false;
+        }
+
+        TriangleHitResult = result;
+        TriangleHitObserved = true;
+        return true;
+    }
+
+    [[nodiscard]] bool ObserveBackgroundNoHit(Engine& engine) const
+    {
+        const auto& selection = engine.GetSelectionController();
+        const auto diagnostics = selection.GetDiagnostics();
+        return diagnostics.NoHits > m_NoHitsBeforeBackground &&
+               selection.SelectedCount() == 0u &&
+               !engine.GetScene().Raw().all_of<ECSC::Selection::SelectedTag>(m_Triangle) &&
+               !engine.GetLastRefinedPrimitiveSelection().has_value();
+    }
+
+    Extrinsic::Runtime::SandboxEditorUi m_EditorUi{};
+    EntityHandle m_Triangle{Extrinsic::ECS::InvalidEntityHandle};
+    Phase m_Phase{Phase::SubmitTriangleClick};
+    std::uint32_t m_Frames{0u};
+    std::uint32_t m_NoHitsBeforeBackground{0u};
+};
+} // namespace
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke, ClickPickReadbackSelectsReferenceTriangleAndBackgroundClears)
+{
+    auto app = std::make_unique<ClickPickRoundTripApp>();
+    auto* appPtr = app.get();
+    auto bootstrap = BootstrapDefaultSandboxAppEngineWithApp(std::move(app));
+    if (bootstrap.Skipped)
+    {
+        GTEST_SKIP() << bootstrap.SkipReason;
+    }
+    Engine& engine = *bootstrap.EnginePtr;
+
+    const EntityHandle triangle = FindEntityByName(engine.GetScene(), "ReferenceTriangle");
+    ASSERT_TRUE(IsReferenceTriangleEntityValid(engine.GetScene(), triangle))
+        << "ReferenceTriangle is not a valid first-class mesh renderable entity: "
+        << BuildReferenceTriangleEntityDiagnostic(engine.GetScene(), triangle);
+
+    const Extrinsic::Core::Extent2D extent = engine.GetDevice().GetBackbufferExtent();
+    if (extent.Width == 0u || extent.Height == 0u)
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Backbuffer extent cannot support click-pick smoke coordinates.";
+    }
+
+    const auto run = DriveAcceptanceAndCapture(engine);
+
+    if (!run.DeviceOperational)
+    {
+        engine.Shutdown();
+        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach operational Vulkan for the BUG-026B click-pick smoke: status="
+                      << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
+                      << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+        return;
+    }
+
+    ASSERT_TRUE(appPtr->FailureReason.empty()) << appPtr->FailureReason;
+    ASSERT_TRUE(appPtr->TriangleClickSubmitted)
+        << "The click-pick smoke never submitted its center-pixel triangle click.";
+    ASSERT_TRUE(appPtr->TriangleHitObserved)
+        << "The Vulkan pick readback did not select ReferenceTriangle before timeout. "
+        << "triangle pixel=(" << appPtr->TrianglePixel.first << "," << appPtr->TrianglePixel.second << ") "
+        << "background pixel=(" << appPtr->BackgroundPixel.first << "," << appPtr->BackgroundPixel.second << ")";
+    ASSERT_TRUE(appPtr->TriangleHitResult.has_value())
+        << "The triangle click selected the entity but did not publish a refined primitive.";
+    ASSERT_TRUE(appPtr->BackgroundClickSubmitted)
+        << "The smoke observed the triangle hit but never submitted its background click.";
+    ASSERT_TRUE(appPtr->BackgroundNoHitObserved)
+        << "The background pick did not publish a no-hit clear before timeout.";
+
+    const Extrinsic::Runtime::PrimitiveSelectionResult& hit = *appPtr->TriangleHitResult;
+    EXPECT_EQ(hit.Status, Extrinsic::Runtime::PrimitiveRefineStatus::Success);
+    EXPECT_EQ(hit.EntityId, Extrinsic::Runtime::SelectionController::ToStableEntityId(triangle));
+    EXPECT_EQ(hit.Domain, gs::Domain::Mesh);
+    EXPECT_EQ(hit.Kind, Extrinsic::Runtime::RefinedPrimitiveKind::Face);
+    EXPECT_EQ(hit.FaceId, 0u);
+    EXPECT_NE(hit.EdgeId, Extrinsic::Runtime::kInvalidPrimitiveIndex);
+    EXPECT_NE(hit.VertexId, Extrinsic::Runtime::kInvalidPrimitiveIndex);
+    EXPECT_TRUE(hit.CursorFromDepth);
+    EXPECT_GT(hit.Depth, 0.0f);
+    EXPECT_LT(hit.Depth, 0.999f);
+    EXPECT_NEAR(hit.WorldCursor.z, 0.0f, kBug026PlaneTolerance);
+    EXPECT_NEAR(hit.LocalCursor.z, 0.0f, kBug026PlaneTolerance);
+
+    const auto diagnostics = engine.GetSelectionController().GetDiagnostics();
+    EXPECT_EQ(diagnostics.ClickRequestsSubmitted, 2u);
+    EXPECT_EQ(diagnostics.PicksDrained, 2u);
+    EXPECT_EQ(diagnostics.Hits, 1u);
+    EXPECT_EQ(diagnostics.NoHits, 1u);
+    EXPECT_EQ(engine.GetSelectionController().SelectedCount(), 0u);
+    EXPECT_FALSE(engine.GetScene().Raw().all_of<ECSC::Selection::SelectedTag>(triangle));
+    EXPECT_FALSE(engine.GetLastRefinedPrimitiveSelection().has_value());
+    EXPECT_EQ(FindPassStatus(run.Stats, "Present"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+
     engine.Shutdown();
 }
 

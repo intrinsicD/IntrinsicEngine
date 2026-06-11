@@ -5,11 +5,13 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- [`BUG-026B`](BUG-026B-vulkan-click-pick-readback-smoke.md) — on-host `gpu;vulkan` click-pick readback smoke proving the BUG-026 fix `Operational` (entity-id + depth round trip through the real Vulkan readback; needs a Vulkan-capable host, this container has no GPU/display).
+- None.
 
 ---
 
 ## Verified / Closed
+
+- Closed 2026-06-11: [`BUG-026B` — Vulkan click-pick readback smoke (entity id + depth round trip)](../../done/BUG-026B-vulkan-click-pick-readback-smoke.md). The opt-in `gpu;vulkan` smoke `ClickPickReadbackSelectsReferenceTriangleAndBackgroundClears` waits for the promoted Vulkan device to become operational, submits a real center-pixel click pick against `ReferenceTriangle`, verifies the GPU readback selects the entity and refines a mesh face with depth-derived cursor data on the triangle plane, then submits a far-background click and verifies the no-hit clear. Passed on NVIDIA RTX 3050 / driver 590.48.01, upgrading the BUG-026 fix to `Operational`.
 
 - Closed 2026-06-11: [`BUG-027` — Sandbox drag/drop, close, and mesh primitive-view regression](../../done/BUG-027-sandbox-dragdrop-close-mesh-views.md). Platform `WindowCloseEvent` now requests engine exit, `Engine::RunFrame()` aborts immediately after `PollEvents()` observes close before entering ImGui/render work, and standalone geometry materialization records/selects the imported entity after direct and dropped imports. Drag/drop platform-event regression coverage imports OBJ and OFF meshes through the runtime event handler, verifies the imported mesh becomes the active selection, drives the promoted mesh primitive-view command surface, and proves edge/vertex view uploads through `RenderExtractionCache`; frame-loop/layering regressions pin the live close-button timing.
 

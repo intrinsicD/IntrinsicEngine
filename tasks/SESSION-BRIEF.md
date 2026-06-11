@@ -29,10 +29,6 @@ the authoritative open/unblocked view.
 - unblocked: `RUNTIME-103` — Geometry algorithm execution queue (tasks/backlog/runtime/RUNTIME-103-geometry-algorithm-execution-queue.md)
 - unblocked: `RUNTIME-105` — Remove the deprecated GetStreamingGraph() TaskGraph bridge (tasks/backlog/runtime/RUNTIME-105-remove-streaming-graph-bridge.md)
 
-## Theme G — Active bugs
-
-- unblocked: `BUG-026B` — Vulkan click-pick readback smoke (entity id + depth round trip) (tasks/backlog/bugs/BUG-026B-vulkan-click-pick-readback-smoke.md)
-
 ## Unthemed
 
 - unblocked: `GEOM-013` — Feature-preserving dual contouring (tasks/backlog/geometry/GEOM-013-feature-preserving-dual-contouring.md)

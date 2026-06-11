@@ -9,6 +9,20 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`BUG-026B`](BUG-026B-vulkan-click-pick-readback-smoke.md) — Vulkan
+click-pick readback smoke — retired on 2026-06-11 at maturity `Operational`.
+The opt-in `gpu;vulkan` runtime sandbox smoke now waits for the promoted Vulkan
+device to become operational, submits a real `SelectionController::RequestClickPick`
+at the projected center of `ReferenceTriangle`, and verifies the GPU readback
+selects the triangle through the runtime controller rather than the hierarchy
+selection shortcut. The smoke asserts `Engine::GetLastRefinedPrimitiveSelection()`
+reports a mesh face hit with resolved face/edge/vertex IDs plus a depth-derived
+world/local cursor on the triangle plane, then submits a far-background click
+and verifies the no-hit readback clears selection and the refined primitive
+cache. The run passed on NVIDIA RTX 3050 / NVIDIA driver 590.48.01, upgrading
+the BUG-026 fix to `Operational`.
+
+Backlog
 [`GRAPHICS-086`](GRAPHICS-086-rhi-retirement-parity-and-cuda-decision.md) —
 RHI retirement parity and CUDA decision — retired on 2026-06-11 at maturity
 `CPUContracted`. The audit maps legacy `RHI.CommandUtils`,
