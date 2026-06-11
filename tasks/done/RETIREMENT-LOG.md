@@ -9,6 +9,22 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`GRAPHICS-085`](GRAPHICS-085-overlay-packet-backend-parity.md) — overlay
+packet backend parity — retired on 2026-06-11 at maturity `CPUContracted`.
+The task composes the retained overlay-like backend lanes classified by
+`RUNTIME-104` without adding a runtime/editor overlay creation API or a new
+graphics packet class. A new graphics contract test submits transient debug
+triangle, line, and point packets together with visualization vector-field and
+isoline packets in one frame, then proves both `TransientDebugSurfacePass` and
+`VisualizationOverlayPass` record with per-lane submitted/recorded diagnostics
+and no missing-pipeline skips. Selectable overlay-like workflows remain covered
+by ordinary renderable and primitive-view selection/outline snapshots; packet-
+only visualization overlays remain visual-only because no immutable selection
+metadata is added. Existing opt-in transient-debug and visualization-overlay
+`gpu;vulkan` smokes remain the operational evidence path, but this retirement
+does not claim a fresh Vulkan host run.
+
+Backlog
 [`RUNTIME-104`](RUNTIME-104-derived-overlay-producer-lifecycle.md) — derived
 overlay producer lifecycle — retired on 2026-06-11 at maturity
 `CPUContracted`. The value gate found no current promoted workflow requiring a

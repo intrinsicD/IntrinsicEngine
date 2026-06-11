@@ -1072,6 +1072,19 @@ Concretely:
   `VisualizationOverlaySurfaceGpuSmoke.MixedLanesReadBackExpectedSampleColors`,
   which samples deterministic vector-field red, isoline green, and
   clear pixels.
+- GRAPHICS-085 retires the legacy overlay-packet backend proof at
+  `CPUContracted` by composing the already-promoted lanes rather than adding a
+  new overlay API. The contract pin
+  `VisualizationOverlayPassContract.RetainedOverlayPacketLanesRecordTogether`
+  submits one transient debug triangle, line, and point plus one
+  vector-field and one isoline packet in the same frame and verifies that
+  `TransientDebugSurfacePass` and `VisualizationOverlayPass` both record with
+  per-lane submitted/recorded counters and no missing-pipeline skips. Selectable
+  overlay-like renderables remain ordinary renderables or runtime primitive-view
+  sidecars covered by immutable selection/outline snapshots; packet-only
+  visualization overlays remain visual-only because no selection metadata is
+  added. Existing opt-in `TransientDebugSurfaceGpuSmoke` and
+  `VisualizationOverlaySurfaceGpuSmoke` remain the Vulkan evidence path.
 - GRAPHICS-079 wires the canonical default-recipe `Pass.ImGui`
   (`Extrinsic.Graphics.Pass.ImGui`) executor route on the CPU/null path.
   Slice A added the typed `ImGuiPass` route registration, the renderer-owned

@@ -82,7 +82,7 @@ vector-field and isoline workflows use `Extrinsic.Runtime.VisualizationAdapters`
 to emit data-only visualization packets (`VectorFieldOverlayPacket` and
 `IsolineOverlayPacket`) into `RuntimeRenderSnapshotBatch`; that path creates no
 child ECS entity, stores no graphics/RHI handle in ECS, and leaves backend
-command-shape proof to `GRAPHICS-085`.
+command-shape proof retired by `GRAPHICS-085`.
 
 The retired overlay snapshot sketches in
 `docs/migration/nonlegacy-parity-matrix.md` are historical planning notes, not

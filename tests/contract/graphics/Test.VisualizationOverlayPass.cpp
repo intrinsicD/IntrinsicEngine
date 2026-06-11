@@ -927,6 +927,113 @@ TEST(VisualizationOverlayPassContract, MixedLaneVectorFieldAndIsolineBothRecord)
     renderer->Shutdown();
 }
 
+TEST(VisualizationOverlayPassContract, RetainedOverlayPacketLanesRecordTogether)
+{
+    static const std::array<Graphics::DebugTrianglePacket, 1> kTriangles{{
+        Graphics::DebugTrianglePacket{
+            .A = glm::vec3{0.0f, 0.4f, 0.0f},
+            .B = glm::vec3{-0.4f, -0.4f, 0.0f},
+            .C = glm::vec3{0.4f, -0.4f, 0.0f},
+            .Color = glm::vec4{1.0f, 0.2f, 0.2f, 1.0f},
+            .DepthTested = true,
+        },
+    }};
+    static const std::array<Graphics::DebugLinePacket, 1> kLines{{
+        Graphics::DebugLinePacket{
+            .Start = glm::vec3{-0.5f, 0.0f, 0.0f},
+            .End = glm::vec3{0.5f, 0.0f, 0.0f},
+            .Color = glm::vec4{0.2f, 1.0f, 0.2f, 1.0f},
+            .Width = 1.0f,
+            .DepthTested = false,
+        },
+    }};
+    static const std::array<Graphics::DebugPointPacket, 1> kPoints{{
+        Graphics::DebugPointPacket{
+            .Position = glm::vec3{0.0f, 0.0f, 0.0f},
+            .Color = glm::vec4{0.2f, 0.2f, 1.0f, 1.0f},
+            .Radius = 0.05f,
+            .DepthTested = true,
+        },
+    }};
+    static const std::array<Graphics::VectorFieldOverlayPacket, 1> kVectorFields{{
+        Graphics::VectorFieldOverlayPacket{
+            .Name = "GRAPHICS-085.VectorField",
+            .Domain = Graphics::VisualizationAttributeDomain::Vertex,
+            .ElementCount = 1u,
+            .Scale = 1.0f,
+            .Color = glm::vec4{1.0f},
+            .DepthTested = true,
+        },
+    }};
+    static const std::array<Graphics::IsolineOverlayPacket, 1> kIsolines{{
+        Graphics::IsolineOverlayPacket{
+            .SourceScalarName = "GRAPHICS-085.Isoline",
+            .Domain = Graphics::VisualizationAttributeDomain::Face,
+            .IsoValueCount = 1u,
+            .RangeMin = 0.0f,
+            .RangeMax = 1.0f,
+            .LineWidth = 1.0f,
+            .Color = glm::vec4{1.0f},
+            .DepthTested = false,
+        },
+    }};
+
+    MockDevice device;
+    device.BackbufferHandle = RHI::TextureHandle{798u, 1u};
+
+    std::unique_ptr<Graphics::IRenderer> renderer = Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+    renderer->SubmitRuntimeSnapshots(Graphics::RuntimeRenderSnapshotBatch{
+        .VisualizationVectorFields = std::span<const Graphics::VectorFieldOverlayPacket>{
+            kVectorFields.data(), kVectorFields.size()},
+        .VisualizationIsolines = std::span<const Graphics::IsolineOverlayPacket>{
+            kIsolines.data(), kIsolines.size()},
+        .DebugLines = std::span<const Graphics::DebugLinePacket>{
+            kLines.data(), kLines.size()},
+        .DebugPoints = std::span<const Graphics::DebugPointPacket>{
+            kPoints.data(), kPoints.size()},
+        .DebugTriangles = std::span<const Graphics::DebugTrianglePacket>{
+            kTriangles.data(), kTriangles.size()},
+    });
+
+    const Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 128, .Height = 128},
+    };
+    Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Graphics::RenderGraphFrameStats& stats = renderer->GetLastRenderGraphStats();
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.DeviceOperational);
+
+    const auto* transientPass = FindCommandPass(stats, "TransientDebugSurfacePass");
+    ASSERT_NE(transientPass, nullptr);
+    EXPECT_EQ(transientPass->Status, Graphics::RenderCommandPassStatus::Recorded);
+    EXPECT_EQ(stats.TransientDebugUpload.TriangleRecordsSubmitted, 1u);
+    EXPECT_EQ(stats.TransientDebugUpload.TriangleRecordsRecorded, 1u);
+    EXPECT_EQ(stats.TransientDebugUpload.LineRecordsSubmitted, 1u);
+    EXPECT_EQ(stats.TransientDebugUpload.LineRecordsRecorded, 1u);
+    EXPECT_EQ(stats.TransientDebugUpload.PointRecordsSubmitted, 1u);
+    EXPECT_EQ(stats.TransientDebugUpload.PointRecordsRecorded, 1u);
+    EXPECT_EQ(stats.TransientDebugUpload.MissingPipelineSkipCount, 0u);
+
+    const auto* visualizationPass = FindCommandPass(stats, "VisualizationOverlayPass");
+    ASSERT_NE(visualizationPass, nullptr);
+    EXPECT_EQ(visualizationPass->Status, Graphics::RenderCommandPassStatus::Recorded);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.VectorFieldRecordsSubmitted, 1u);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.VectorFieldRecordsRecorded, 1u);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.IsolineRecordsSubmitted, 1u);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.IsolineRecordsRecorded, 1u);
+    EXPECT_EQ(stats.VisualizationOverlayUpload.MissingPipelineSkipCount, 0u);
+
+    renderer->Shutdown();
+}
+
 TEST(VisualizationOverlayPassContract, VisualizationReadbackDefaultDisabledEvenWhenPassRecords)
 {
     MockDevice device;

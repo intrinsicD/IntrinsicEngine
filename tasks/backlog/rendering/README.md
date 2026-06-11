@@ -33,10 +33,6 @@ priority.
 - [GRAPHICS-084 — Visualization property-buffer residency](GRAPHICS-084-visualization-property-buffer-residency.md):
   selected graphics-owned upload/residency for visualization property arrays
   used by current promoted runtime/UI seams.
-- [GRAPHICS-085 — Overlay packet backend parity](GRAPHICS-085-overlay-packet-backend-parity.md):
-  backend command-shape and optional visual proof only for overlay packet
-  lanes retained by the retired `RUNTIME-104` no-new-persistent-overlay
-  decision.
 - [GRAPHICS-086 — RHI retirement parity and CUDA decision](GRAPHICS-086-rhi-retirement-parity-and-cuda-decision.md):
   final audit/decision task before accepting any legacy RHI command-helper,
   descriptor, swapchain/image, scene-instance, or CUDA implementation.
@@ -740,6 +736,13 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   contract coverage, deterministic placeholder lane geometry, and an opt-in
   Vulkan readback/sample-color smoke for vector-field, isoline, and clear
   pixels without reusing canonical or transient-debug readback diagnostics.
+- [GRAPHICS-085 — Overlay packet backend parity](../../done/GRAPHICS-085-overlay-packet-backend-parity.md):
+  done 2026-06-11 at `CPUContracted`. Retired the retained overlay packet
+  backend proof by composing existing transient debug triangle/line/point and
+  visualization vector-field/isoline command routes in one CPU/null frame,
+  while keeping selectable overlay-like behavior on ordinary renderable and
+  primitive-view selection/outline snapshots. Existing opt-in transient-debug
+  and visualization-overlay Vulkan smokes remain the operational evidence path.
 - [GRAPHICS-079 — Default-recipe `Pass.ImGui` wiring](../../done/GRAPHICS-079-default-recipe-imgui-pass-wiring.md)
   (done): depends on GRAPHICS-076 (PresentSource finalization) and
   `runtime/RUNTIME-090` (ImGui adapter producer). It wires the renderer

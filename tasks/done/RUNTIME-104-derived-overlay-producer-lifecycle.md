@@ -53,7 +53,7 @@ depends_on: []
 - Completed 2026-06-11 at maturity `CPUContracted`.
 - PR/commit: this retirement commit.
 - Classification: mesh/graph/point child overlays are represented by ordinary promoted `GeometrySources` entities when users import or author data; mesh edge/vertex overlays use runtime-owned primitive-view sidecars; transient line/point/triangle debug overlays stay on transient debug packets; vector-field and isoline overlays stay on data-only visualization packets. No persistent derived-overlay creation/update/destroy API is retained for current workflows.
-- Backend packet command-shape proof remains open under `GRAPHICS-085`; selected visualization property-buffer residency remains `GRAPHICS-084`.
+- Backend packet command-shape proof is retired by `GRAPHICS-085`; selected visualization property-buffer residency remains `GRAPHICS-084`.
 
 ## Verification
 ```bash
@@ -92,7 +92,7 @@ clean-workshop automated scorecard rows passed.
 - Storing live graphics/RHI handles in ECS.
 
 ## Maturity
-- Target: `CPUContracted` for runtime overlay lifecycle; `Operational` backend proof is owned by `GRAPHICS-085`.
+- Target: `CPUContracted` for runtime overlay lifecycle; backend packet proof is retired by `GRAPHICS-085`.
 
 ## Slice plan
 - **Slice A — decision gate.** Compare existing transient debug, visualization, primitive-view, and selection lanes against each legacy overlay class and classify every class as retained (with the runtime-owned need), representable by an existing lane, or retired. The classification is the input `GRAPHICS-085` scopes against.

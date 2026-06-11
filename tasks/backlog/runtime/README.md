@@ -40,9 +40,6 @@ these as runtime work when scheduling and review:
 - [GRAPHICS-084 — Visualization property-buffer residency](../rendering/GRAPHICS-084-visualization-property-buffer-residency.md):
   consumes runtime visualization adapter/property selections but keeps GPU
   upload ownership in graphics.
-- [GRAPHICS-085 — Overlay packet backend parity](../rendering/GRAPHICS-085-overlay-packet-backend-parity.md):
-  backend proof for visualization/debug packet lanes retained after the
-  `RUNTIME-104` no-new-persistent-overlay decision.
 
 ## Related docs
 
@@ -68,7 +65,8 @@ split; narratives live in the retirement log.
   to ordinary `GeometrySources` entities, mesh edge/vertex overlays use
   primitive-view sidecars, and vector-field/isoline overlays use runtime
   visualization packets without child ECS entities. Backend command-shape proof
-  remains open under `GRAPHICS-085`.
+  is retired by
+  [GRAPHICS-085](../../done/GRAPHICS-085-overlay-packet-backend-parity.md).
 - [RUNTIME-091 — Activate promoted ECS system bundle in fixed-step runtime](../../done/RUNTIME-091-promoted-ecs-system-bundle-activation.md)
   (done): runtime-owned activation of promoted ECS systems via
   `Extrinsic.Runtime.EcsSystemBundle::RegisterPromotedEcsSystemBundle`, called
