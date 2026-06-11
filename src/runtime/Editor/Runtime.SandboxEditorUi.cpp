@@ -693,6 +693,21 @@ namespace Extrinsic::Runtime
             return "Unknown";
         }
 
+        [[nodiscard]] const char* MeshVertexViewRenderModeName(
+            const MeshVertexViewRenderMode mode) noexcept
+        {
+            switch (mode)
+            {
+            case MeshVertexViewRenderMode::FlatCircle:
+                return "Flat circle";
+            case MeshVertexViewRenderMode::SurfaceAlignedCircle:
+                return "Surface aligned circle";
+            case MeshVertexViewRenderMode::ImpostorSphere:
+                return "Impostor sphere";
+            }
+            return "Unknown";
+        }
+
         struct SandboxEditorRenderHintState
         {
             std::optional<G::RenderSurface> Surface{};
@@ -964,6 +979,8 @@ namespace Extrinsic::Runtime
             return SandboxEditorPrimitiveViewSettings{
                 .EnableEdgeView = settings.EnableEdgeView,
                 .EnableVertexView = settings.EnableVertexView,
+                .VertexRenderMode = settings.VertexRenderMode,
+                .VertexPointRadiusPx = settings.VertexPointRadiusPx,
             };
         }
 
@@ -973,6 +990,8 @@ namespace Extrinsic::Runtime
             return MeshPrimitiveViewSettings{
                 .EnableEdgeView = settings.EnableEdgeView,
                 .EnableVertexView = settings.EnableVertexView,
+                .VertexRenderMode = settings.VertexRenderMode,
+                .VertexPointRadiusPx = settings.VertexPointRadiusPx,
             };
         }
 
@@ -981,7 +1000,9 @@ namespace Extrinsic::Runtime
             const SandboxEditorPrimitiveViewSettings rhs) noexcept
         {
             return lhs.EnableEdgeView == rhs.EnableEdgeView &&
-                   lhs.EnableVertexView == rhs.EnableVertexView;
+                   lhs.EnableVertexView == rhs.EnableVertexView &&
+                   lhs.VertexRenderMode == rhs.VertexRenderMode &&
+                   lhs.VertexPointRadiusPx == rhs.VertexPointRadiusPx;
         }
 
         [[nodiscard]] SandboxEditorCommandStatus ToSandboxEditorCommandStatus(
@@ -2359,6 +2380,70 @@ namespace Extrinsic::Runtime
             return true;
         }
 
+        [[nodiscard]] bool DrawMeshVertexViewRenderModeCombo(
+            MeshVertexViewRenderMode* mode)
+        {
+            if (!ImGui::BeginCombo("Vertex style",
+                                   MeshVertexViewRenderModeName(*mode)))
+            {
+                return false;
+            }
+
+            bool changed = false;
+            constexpr MeshVertexViewRenderMode kModes[]{
+                MeshVertexViewRenderMode::FlatCircle,
+                MeshVertexViewRenderMode::SurfaceAlignedCircle,
+                MeshVertexViewRenderMode::ImpostorSphere,
+            };
+            for (const MeshVertexViewRenderMode candidate : kModes)
+            {
+                const bool selected = *mode == candidate;
+                if (ImGui::Selectable(
+                        MeshVertexViewRenderModeName(candidate), selected))
+                {
+                    *mode = candidate;
+                    changed = true;
+                }
+                if (selected)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+            return changed;
+        }
+
+        void DrawMeshPrimitiveVertexViewControls(
+            const std::uint32_t stableEntityId,
+            const SandboxEditorPrimitiveViewSettings& primitiveView,
+            const SandboxEditorContext& context,
+            const bool canEditPrimitiveView)
+        {
+            MeshVertexViewRenderMode mode = primitiveView.VertexRenderMode;
+            if (DrawMeshVertexViewRenderModeCombo(&mode) && canEditPrimitiveView)
+            {
+                (void)ApplySandboxEditorPrimitiveViewCommand(
+                    context,
+                    SandboxEditorPrimitiveViewCommand{
+                        .StableEntityId = stableEntityId,
+                        .SetVertexRenderMode = true,
+                        .VertexRenderMode = mode,
+                    });
+            }
+
+            float radius = primitiveView.VertexPointRadiusPx;
+            if (ImGui::DragFloat(
+                    "Vertex radius (px)", &radius, 0.25f, 1.0f, 64.0f, "%.1f") &&
+                canEditPrimitiveView)
+            {
+                (void)ApplySandboxEditorPrimitiveViewCommand(
+                    context,
+                    SandboxEditorPrimitiveViewCommand{
+                        .StableEntityId = stableEntityId,
+                        .SetVertexPointRadius = true,
+                        .VertexPointRadiusPx = radius,
+                    });
+            }
+        }
+
         void DrawMeshRenderHintControls(
             const SandboxEditorDomainWindowModel& model,
             const SandboxEditorContext& context,
@@ -2657,6 +2742,13 @@ namespace Extrinsic::Runtime
                         .SetVertexView = true,
                         .EnableVertexView = vertexView,
                     });
+            }
+            if (model.PrimitiveView.EnableVertexView)
+            {
+                DrawMeshPrimitiveVertexViewControls(model.SelectedStableId,
+                                                    model.PrimitiveView,
+                                                    context,
+                                                    canEditPrimitiveView);
             }
 
             if (!canEditPrimitiveView)
@@ -3659,6 +3751,15 @@ namespace Extrinsic::Runtime
                                 .SetVertexView = true,
                                 .EnableVertexView = vertexView,
                             });
+                    }
+                    if (frame.CameraRender.PrimitiveView.EnableVertexView &&
+                        context != nullptr)
+                    {
+                        DrawMeshPrimitiveVertexViewControls(
+                            frame.CameraRender.PrimitiveViewStableId,
+                            frame.CameraRender.PrimitiveView,
+                            *context,
+                            true);
                     }
                 }
                 DrawDiagnostics(frame.CameraRender.Diagnostics);
@@ -4760,12 +4861,22 @@ namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const SandboxEditorPrimitiveViewCommand& command)
     {
-        if (!command.SetEdgeView && !command.SetVertexView)
+        if (!command.SetEdgeView &&
+            !command.SetVertexView &&
+            !command.SetVertexRenderMode &&
+            !command.SetVertexPointRadius)
+        {
             return SandboxEditorCommandStatus::NoChange;
+        }
         if (context.Scene == nullptr)
             return SandboxEditorCommandStatus::MissingScene;
         if (!context.PrimitiveViewCommands.Available())
             return SandboxEditorCommandStatus::MissingPrimitiveViewCommands;
+        if (command.SetVertexPointRadius &&
+            !IsFinitePositive(command.VertexPointRadiusPx))
+        {
+            return SandboxEditorCommandStatus::InvalidProcessingParameters;
+        }
 
         entt::registry& raw = context.Scene->Raw();
         const ECS::EntityHandle entity =
@@ -4784,6 +4895,10 @@ namespace Extrinsic::Runtime
             settings.EnableEdgeView = command.EnableEdgeView;
         if (command.SetVertexView)
             settings.EnableVertexView = command.EnableVertexView;
+        if (command.SetVertexRenderMode)
+            settings.VertexRenderMode = command.VertexRenderMode;
+        if (command.SetVertexPointRadius)
+            settings.VertexPointRadiusPx = command.VertexPointRadiusPx;
 
         if (SamePrimitiveViewSettings(prior, settings))
             return SandboxEditorCommandStatus::NoChange;

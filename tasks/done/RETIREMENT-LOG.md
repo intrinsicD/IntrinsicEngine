@@ -9,6 +9,25 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`BUG-028`](BUG-028-mesh-primitive-view-ui-rendering.md) — Mesh primitive view
+UI toggles do not render — retired on 2026-06-11 at maturity `CPUContracted`.
+The promoted mesh edge/vertex view path is runtime extraction-cache sidecar
+state, not legacy ECS `MeshEdgeView` / `MeshVertexView` components. The fix
+extends `MeshPrimitiveViewSettings` with vertex style/radius, exposes those
+controls through sandbox UI commands and command history, writes retained point
+`GpuEntityConfig::PointMode` / `PointSize` for the derived vertex sidecar every
+frame, derives edge-view wireframes from halfedge/face topology when explicit
+edge rows are absent, and updates the forward point shader to draw flat
+circles, screen-space sphere impostors, and normal-aligned surfel ellipses from
+the shared UV normal payload. Mesh vertex views compute face-area weighted
+normals from promoted halfedge/face topology, point clouds forward `v:normal`
+when present, and graph nodes carry the no-normal sentinel. Focused CPU/null
+tests prove the UI command path, edge/vertex sidecar extraction, derived
+wireframe fallback, OBJ mesh primitive views, config reuse updates, and shader
+compilation; broader GPU screenshot proof remains in the working-sandbox
+acceptance lane.
+
+Backlog
 [`UI-013`](UI-013-domain-render-hint-controls.md) — Sandbox EditorUI domain
 render hint controls — retired on 2026-06-11 at maturity `CPUContracted`.
 Promoted mesh, graph, and point-cloud rendering paths were already present in

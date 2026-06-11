@@ -29,6 +29,7 @@ import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SceneSerialization;
@@ -568,6 +569,9 @@ export namespace Extrinsic::Runtime
     {
         bool EnableEdgeView{false};
         bool EnableVertexView{false};
+        MeshVertexViewRenderMode VertexRenderMode{
+            MeshVertexViewRenderMode::ImpostorSphere};
+        float VertexPointRadiusPx{6.0f};
 
         [[nodiscard]] bool AnyEnabled() const noexcept
         {
@@ -786,6 +790,11 @@ export namespace Extrinsic::Runtime
         bool EnableEdgeView{false};
         bool SetVertexView{false};
         bool EnableVertexView{false};
+        bool SetVertexRenderMode{false};
+        MeshVertexViewRenderMode VertexRenderMode{
+            MeshVertexViewRenderMode::ImpostorSphere};
+        bool SetVertexPointRadius{false};
+        float VertexPointRadiusPx{6.0f};
     };
 
     struct SandboxEditorRenderHintCommand

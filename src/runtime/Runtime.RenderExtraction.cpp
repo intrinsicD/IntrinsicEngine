@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <limits>
 #include <memory>
@@ -436,6 +437,30 @@ namespace Extrinsic::Runtime
             if (registry.all_of<G::RenderPoints>(entity))
                 flags |= RHI::GpuRender_Point | RHI::GpuRender_Unlit;
             return flags;
+        }
+
+        [[nodiscard]] std::uint32_t ToMeshVertexPointMode(
+            const MeshVertexViewRenderMode mode) noexcept
+        {
+            switch (mode)
+            {
+            case MeshVertexViewRenderMode::FlatCircle:
+                return 0u;
+            case MeshVertexViewRenderMode::ImpostorSphere:
+                return 1u;
+            case MeshVertexViewRenderMode::SurfaceAlignedCircle:
+                return 2u;
+            }
+            return 1u;
+        }
+
+        [[nodiscard]] float ClampMeshVertexPointRadiusPx(const float radius) noexcept
+        {
+            if (!std::isfinite(radius))
+            {
+                return 6.0f;
+            }
+            return std::clamp(radius, 1.0f, 64.0f);
         }
 
         [[nodiscard]] glm::vec3 TranslationOf(const glm::mat4& model) noexcept
@@ -1229,6 +1254,7 @@ namespace Extrinsic::Runtime
         const RHI::GpuBounds& bounds,
         std::uint32_t stableId,
         bool desired,
+        const MeshPrimitiveViewSettings& viewSettings,
         bool meshDirty,
         Graphics::IRenderer& renderer,
         RuntimeRenderExtractionStats& stats)
@@ -1257,6 +1283,18 @@ namespace Extrinsic::Runtime
             const std::uint32_t laneFlag = isEdge
                 ? (RHI::GpuRender_Line | RHI::GpuRender_Unlit)
                 : (RHI::GpuRender_Point | RHI::GpuRender_Unlit);
+            if (!isEdge)
+            {
+                RHI::GpuEntityConfig cfg{};
+                cfg.ColorSourceMode = 1u;
+                cfg.VisualizationAlpha = 1.0f;
+                cfg.UniformColor = {1.0f, 1.0f, 1.0f, 1.0f};
+                cfg.PointSize =
+                    ClampMeshVertexPointRadiusPx(viewSettings.VertexPointRadiusPx);
+                cfg.PointMode =
+                    ToMeshVertexPointMode(viewSettings.VertexRenderMode);
+                renderer.GetGpuWorld().SetEntityConfig(instance, cfg);
+            }
             m_Transforms.push_back(Graphics::TransformSyncRecord{
                 .StableId = stableId,
                 .Instance = instance,
@@ -1620,6 +1658,7 @@ namespace Extrinsic::Runtime
                                                    viewBounds,
                                                    stableId,
                                                    viewSettings.EnableEdgeView,
+                                                   viewSettings,
                                                    meshDirtyThisFrame,
                                                    renderer,
                                                    stats);
@@ -1631,6 +1670,7 @@ namespace Extrinsic::Runtime
                                                    viewBounds,
                                                    stableId,
                                                    viewSettings.EnableVertexView,
+                                                   viewSettings,
                                                    meshDirtyThisFrame,
                                                    renderer,
                                                    stats);

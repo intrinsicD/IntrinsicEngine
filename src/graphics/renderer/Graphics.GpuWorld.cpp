@@ -901,6 +901,16 @@ namespace Extrinsic::Graphics
         m_Impl->DirtyEntityConfig[instance.Index] = true;
     }
 
+    RHI::GpuEntityConfig GpuWorld::GetEntityConfigForTest(
+        const GpuInstanceHandle instance) const noexcept
+    {
+        if (!m_Impl->InstanceSlots.Resolve(instance))
+        {
+            return {};
+        }
+        return m_Impl->EntityConfigCpu[instance.Index];
+    }
+
     void GpuWorld::SetBounds(GpuInstanceHandle instance, const RHI::GpuBounds& bounds)
     {
         if (!m_Impl->InstanceSlots.ResolveForUse(instance))

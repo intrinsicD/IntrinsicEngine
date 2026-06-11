@@ -99,6 +99,8 @@ TEST(GraphGeometryPacker, PointAndLineLanesPackNodesAndEdges)
     const GraphVertex v1 = ReadVertex(buffer, 1);
     EXPECT_FLOAT_EQ(v0.Px, 0.0f);
     EXPECT_FLOAT_EQ(v1.Px, 1.0f);
+    EXPECT_FLOAT_EQ(v0.U, 2.0f);
+    EXPECT_FLOAT_EQ(v0.V, 2.0f);
 }
 
 TEST(GraphGeometryPacker, PointOnlyLaneProducesNoLineIndices)
@@ -235,5 +237,4 @@ TEST(GraphGeometryPacker, LocalSphereCoversNodeBounds)
     EXPECT_FLOAT_EQ(sphere.x, 0.0f);
     EXPECT_FLOAT_EQ(sphere.w, 1.0f);
 }
-
 

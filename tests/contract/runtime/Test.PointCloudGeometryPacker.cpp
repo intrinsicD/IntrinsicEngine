@@ -47,6 +47,13 @@ namespace
         pos.Vector() = positions;
     }
 
+    void SetNormals(Vertices& v, const std::vector<glm::vec3>& normals)
+    {
+        auto normal = v.Properties.GetOrAdd<glm::vec3>(
+            std::string{pn::kNormal}, glm::vec3(0.0f, 0.0f, 1.0f));
+        normal.Vector() = normals;
+    }
+
     [[nodiscard]] PointCloudVertex ReadVertex(const PointCloudPackBuffer& buffer, std::size_t i)
     {
         PointCloudVertex v{};
@@ -77,6 +84,35 @@ TEST(PointCloudGeometryPacker, PacksPositionsWithoutIndices)
     const PointCloudVertex v1 = ReadVertex(buffer, 1);
     EXPECT_FLOAT_EQ(v0.Px, 0.0f);
     EXPECT_FLOAT_EQ(v1.Px, 1.0f);
+    EXPECT_FLOAT_EQ(v0.U, 2.0f);
+    EXPECT_FLOAT_EQ(v0.V, 2.0f);
+}
+
+TEST(PointCloudGeometryPacker, EncodesNormalsWhenPresent)
+{
+    CloudScratch c{};
+    SetPositions(c.VertexSource, {
+        {0.0f, 0.0f, 0.0f},
+        {1.0f, 0.0f, 0.0f},
+    });
+    SetNormals(c.VertexSource, {
+        {0.0f, 0.0f, 1.0f},
+        {1.0f, 0.0f, 0.0f},
+    });
+
+    PointCloudPackBuffer buffer{};
+    const PointCloudPackResult result = PackCloud(c.View(), buffer);
+
+    ASSERT_EQ(result.Status, PointCloudPackStatus::Success);
+    ASSERT_TRUE(result.Upload.has_value());
+
+    const PointCloudVertex zNormal = ReadVertex(buffer, 0);
+    EXPECT_FLOAT_EQ(zNormal.U, 0.0f);
+    EXPECT_FLOAT_EQ(zNormal.V, 0.0f);
+
+    const PointCloudVertex xNormal = ReadVertex(buffer, 1);
+    EXPECT_FLOAT_EQ(xNormal.U, 1.0f);
+    EXPECT_FLOAT_EQ(xNormal.V, 0.0f);
 }
 
 TEST(PointCloudGeometryPacker, WrongDomainFailsClosed)

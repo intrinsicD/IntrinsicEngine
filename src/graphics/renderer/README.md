@@ -262,15 +262,18 @@ Concretely:
   the existing retained-renderable `ForwardLinePass` and `ForwardPointPass`
   bodies. `NullRenderer` owns `m_ForwardLinePass`, `m_ForwardPointPass`,
   `m_ForwardLinePipelineLease`, and `m_ForwardPointPipelineLease` alongside the
-  forward surface pass. The line pipeline uses `shaders/line.vert.spv` +
-  `shaders/line.frag.spv` with `Topology::LineList`; the point pipeline uses
-  `shaders/point.vert.spv` + `shaders/point_retained.frag.spv` with
+  forward surface pass. The line pipeline uses
+  `shaders/forward/line.vert.spv` + `shaders/forward/line.frag.spv` with
+  `Topology::LineList`; the point pipeline uses
+  `shaders/forward/point.vert.spv` + `shaders/forward/point.frag.spv` with
   `Topology::PointList`. Both load `SceneDepth`, append into `SceneColorHDR`,
   disable depth writes, enable alpha blending, use `CullMode::None`, and carry
-  the canonical `GpuScenePushConstants` block. `point_retained.frag` is the
-  canonical retained-renderable point variant for this path; transient
-  debug-point expansion remains owned by GRAPHICS-077 and must not route through
-  the retained `Points` cull bucket.
+  the canonical `GpuScenePushConstants` block. The forward point shader consumes
+  `GpuEntityConfig::PointSize` and `PointMode`: mode 0 draws flat circles, mode
+  1 draws screen-space impostor spheres, and mode 2 draws normal-aligned surfel
+  ellipses from the optional octahedral normal stored in the shared UV slot.
+  Transient debug-point expansion remains owned by GRAPHICS-077 and must not
+  route through the retained `Points` cull bucket.
 - GRAPHICS-073 Slice A wires the default-recipe `"ShadowPass"` to the
   existing `ShadowPass` body. `NullRenderer` owns `m_ShadowPass` (constructed
   against `m_ShadowSystem`) and the depth-only `m_ShadowPipelineLease`. The

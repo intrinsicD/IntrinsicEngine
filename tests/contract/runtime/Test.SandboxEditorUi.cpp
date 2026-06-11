@@ -1734,6 +1734,9 @@ TEST(SandboxEditorUi, DomainWindowModelsReportSelectedMeshGraphAndPointCloudStat
                     return Runtime::SandboxEditorPrimitiveViewSettings{
                         .EnableEdgeView = true,
                         .EnableVertexView = false,
+                        .VertexRenderMode =
+                            Runtime::MeshVertexViewRenderMode::SurfaceAlignedCircle,
+                        .VertexPointRadiusPx = 11.0f,
                     };
                 },
             .SetSettings =
@@ -1780,6 +1783,9 @@ TEST(SandboxEditorUi, DomainWindowModelsReportSelectedMeshGraphAndPointCloudStat
     EXPECT_TRUE(meshModel.HasPrimitiveViewSettings);
     EXPECT_TRUE(meshModel.PrimitiveView.EnableEdgeView);
     EXPECT_FALSE(meshModel.PrimitiveView.EnableVertexView);
+    EXPECT_EQ(meshModel.PrimitiveView.VertexRenderMode,
+              Runtime::MeshVertexViewRenderMode::SurfaceAlignedCircle);
+    EXPECT_FLOAT_EQ(meshModel.PrimitiveView.VertexPointRadiusPx, 11.0f);
     EXPECT_TRUE(meshModel.VisualizationControlsAvailable);
     EXPECT_TRUE(meshModel.Visualization.HasSelectedEntity);
     EXPECT_TRUE(meshModel.Visualization.SpatialDebug.HasBinding);
@@ -2338,6 +2344,11 @@ TEST(SandboxEditorUi, PrimitiveViewCommandRoutesThroughRuntimeSettings)
                       .EnableEdgeView = true,
                       .SetVertexView = true,
                       .EnableVertexView = true,
+                      .SetVertexRenderMode = true,
+                      .VertexRenderMode =
+                          Runtime::MeshVertexViewRenderMode::SurfaceAlignedCircle,
+                      .SetVertexPointRadius = true,
+                      .VertexPointRadiusPx = 11.0f,
                   }),
               Runtime::SandboxEditorCommandStatus::Applied);
     EXPECT_EQ(setCount, 1u);
@@ -2345,10 +2356,26 @@ TEST(SandboxEditorUi, PrimitiveViewCommandRoutesThroughRuntimeSettings)
     ASSERT_TRUE(storedSettings.has_value());
     EXPECT_TRUE(storedSettings->EnableEdgeView);
     EXPECT_TRUE(storedSettings->EnableVertexView);
+    EXPECT_EQ(storedSettings->VertexRenderMode,
+              Runtime::MeshVertexViewRenderMode::SurfaceAlignedCircle);
+    EXPECT_FLOAT_EQ(storedSettings->VertexPointRadiusPx, 11.0f);
 
     frame = Runtime::BuildSandboxEditorPanelFrame(context);
     EXPECT_TRUE(frame.CameraRender.PrimitiveView.EnableEdgeView);
     EXPECT_TRUE(frame.CameraRender.PrimitiveView.EnableVertexView);
+    EXPECT_EQ(frame.CameraRender.PrimitiveView.VertexRenderMode,
+              Runtime::MeshVertexViewRenderMode::SurfaceAlignedCircle);
+    EXPECT_FLOAT_EQ(frame.CameraRender.PrimitiveView.VertexPointRadiusPx, 11.0f);
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorPrimitiveViewCommand(
+                  context,
+                  Runtime::SandboxEditorPrimitiveViewCommand{
+                      .StableEntityId = meshStableId,
+                      .SetVertexPointRadius = true,
+                      .VertexPointRadiusPx = 0.0f,
+                  }),
+              Runtime::SandboxEditorCommandStatus::InvalidProcessingParameters);
+    EXPECT_EQ(setCount, 1u);
 
     EXPECT_EQ(Runtime::ApplySandboxEditorPrimitiveViewCommand(
                   context,
@@ -2994,6 +3021,8 @@ TEST(SandboxEditorUi, PlatformDropEventImportsObjMeshSelectsItAndEnablesPrimitiv
                     return Runtime::SandboxEditorPrimitiveViewSettings{
                         .EnableEdgeView = settings.EnableEdgeView,
                         .EnableVertexView = settings.EnableVertexView,
+                        .VertexRenderMode = settings.VertexRenderMode,
+                        .VertexPointRadiusPx = settings.VertexPointRadiusPx,
                     };
                 },
             .SetSettings =
@@ -3006,6 +3035,8 @@ TEST(SandboxEditorUi, PlatformDropEventImportsObjMeshSelectsItAndEnablesPrimitiv
                         Runtime::MeshPrimitiveViewSettings{
                             .EnableEdgeView = settings.EnableEdgeView,
                             .EnableVertexView = settings.EnableVertexView,
+                            .VertexRenderMode = settings.VertexRenderMode,
+                            .VertexPointRadiusPx = settings.VertexPointRadiusPx,
                         });
                 },
             .ClearSettings =
@@ -3030,6 +3061,11 @@ TEST(SandboxEditorUi, PlatformDropEventImportsObjMeshSelectsItAndEnablesPrimitiv
                       .EnableEdgeView = true,
                       .SetVertexView = true,
                       .EnableVertexView = true,
+                      .SetVertexRenderMode = true,
+                      .VertexRenderMode =
+                          Runtime::MeshVertexViewRenderMode::ImpostorSphere,
+                      .SetVertexPointRadius = true,
+                      .VertexPointRadiusPx = 10.0f,
                   }),
               Runtime::SandboxEditorCommandStatus::Applied);
 
@@ -3037,6 +3073,9 @@ TEST(SandboxEditorUi, PlatformDropEventImportsObjMeshSelectsItAndEnablesPrimitiv
         engine.GetMeshPrimitiveViewSettings(stableId);
     EXPECT_TRUE(stored.EnableEdgeView);
     EXPECT_TRUE(stored.EnableVertexView);
+    EXPECT_EQ(stored.VertexRenderMode,
+              Runtime::MeshVertexViewRenderMode::ImpostorSphere);
+    EXPECT_FLOAT_EQ(stored.VertexPointRadiusPx, 10.0f);
 
     Runtime::RenderExtractionCache extraction;
     extraction.SetMeshPrimitiveViewSettings(stableId, stored);
@@ -3047,6 +3086,13 @@ TEST(SandboxEditorUi, PlatformDropEventImportsObjMeshSelectsItAndEnablesPrimitiv
     EXPECT_EQ(stats.MeshGeometryUploads, 1u);
     EXPECT_EQ(stats.MeshEdgeViewUploads, 1u);
     EXPECT_EQ(stats.MeshVertexViewUploads, 1u);
+    const auto sidecar = extraction.FindRenderableSidecarForTest(stableId);
+    ASSERT_TRUE(sidecar.has_value());
+    const auto config = engine.GetRenderer()
+                            .GetGpuWorld()
+                            .GetEntityConfigForTest(sidecar->MeshVertexViewInstance);
+    EXPECT_EQ(config.PointMode, 1u);
+    EXPECT_FLOAT_EQ(config.PointSize, 10.0f);
 
     extraction.Shutdown(engine.GetRenderer());
     ui.Detach();

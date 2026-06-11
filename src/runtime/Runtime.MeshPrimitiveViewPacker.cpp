@@ -6,6 +6,7 @@ module;
 #include <limits>
 #include <optional>
 #include <span>
+#include <unordered_set>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -22,6 +23,8 @@ namespace Extrinsic::Runtime
     {
         constexpr const char* kEdgeViewDebugName = "Runtime.MeshEdgeView";
         constexpr const char* kVertexViewDebugName = "Runtime.MeshVertexView";
+        constexpr glm::vec2 kNoNormalUv{2.0f, 2.0f};
+        constexpr std::uint32_t kInvalidIndex = std::numeric_limits<std::uint32_t>::max();
 
         [[nodiscard]] MeshPrimitiveViewResult Failure(MeshPrimitiveViewStatus status,
                                                       MeshPrimitiveViewBuffer& outBuffer) noexcept
@@ -33,6 +36,113 @@ namespace Extrinsic::Runtime
         [[nodiscard]] bool IsFinite(const glm::vec3& p) noexcept
         {
             return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z);
+        }
+
+        [[nodiscard]] float SignNotZero(const float value) noexcept
+        {
+            return value < 0.0f ? -1.0f : 1.0f;
+        }
+
+        [[nodiscard]] glm::vec2 EncodeOctNormal(glm::vec3 normal) noexcept
+        {
+            const float len = glm::length(normal);
+            if (!std::isfinite(len) || len <= 1.0e-6f)
+            {
+                return kNoNormalUv;
+            }
+            normal /= len;
+
+            const float denom =
+                std::abs(normal.x) + std::abs(normal.y) + std::abs(normal.z);
+            if (denom <= 1.0e-6f)
+            {
+                return kNoNormalUv;
+            }
+
+            glm::vec2 encoded{normal.x / denom, normal.y / denom};
+            if (normal.z < 0.0f)
+            {
+                encoded = glm::vec2{
+                    (1.0f - std::abs(encoded.y)) * SignNotZero(encoded.x),
+                    (1.0f - std::abs(encoded.x)) * SignNotZero(encoded.y),
+                };
+            }
+            return encoded;
+        }
+
+        enum class FaceRingOutcome : std::uint8_t
+        {
+            Triangulate,
+            Skip,
+            Invalid,
+        };
+
+        [[nodiscard]] FaceRingOutcome ProduceFaceRing(
+            const std::vector<std::uint32_t>& faceHe,
+            const std::vector<std::uint32_t>& halfedgeFace,
+            const std::vector<std::uint32_t>& nextHe,
+            const std::vector<std::uint32_t>& toVertex,
+            const std::uint32_t faceCountU32,
+            const std::uint32_t vertexCount,
+            const std::size_t f,
+            std::vector<std::uint32_t>& outRing)
+        {
+            outRing.clear();
+
+            const std::size_t halfedgeCount = toVertex.size();
+            const std::uint32_t first = faceHe[f];
+            if (first == kInvalidIndex)
+            {
+                return FaceRingOutcome::Skip;
+            }
+            if (first >= halfedgeCount)
+            {
+                return FaceRingOutcome::Invalid;
+            }
+
+            const std::uint32_t firstOwner = halfedgeFace[first];
+            if (firstOwner == kInvalidIndex || firstOwner >= faceCountU32)
+            {
+                return FaceRingOutcome::Skip;
+            }
+            if (firstOwner != static_cast<std::uint32_t>(f))
+            {
+                return FaceRingOutcome::Skip;
+            }
+
+            std::uint32_t h = first;
+            for (std::size_t step = 0; step <= halfedgeCount; ++step)
+            {
+                if (h >= halfedgeCount)
+                {
+                    return FaceRingOutcome::Invalid;
+                }
+                if (halfedgeFace[h] != static_cast<std::uint32_t>(f))
+                {
+                    return FaceRingOutcome::Invalid;
+                }
+                const std::uint32_t targetV = toVertex[h];
+                if (targetV >= vertexCount)
+                {
+                    return FaceRingOutcome::Invalid;
+                }
+                outRing.push_back(targetV);
+
+                const std::uint32_t next = nextHe[h];
+                if (next == first)
+                {
+                    break;
+                }
+                if (next == kInvalidIndex || step == halfedgeCount)
+                {
+                    return FaceRingOutcome::Invalid;
+                }
+                h = next;
+            }
+
+            return outRing.size() < 3u
+                ? FaceRingOutcome::Skip
+                : FaceRingOutcome::Triangulate;
         }
 
         // Resolve and validate the mesh vertex positions shared by both views.
@@ -73,11 +183,13 @@ namespace Extrinsic::Runtime
         // Write the shared vertex buffer from `positions`, validating finiteness
         // and accumulating the local AABB. Returns false (and fills `status`)
         // on a non-finite position.
-        [[nodiscard]] bool WriteVertexBuffer(const std::vector<glm::vec3>& positions,
-                                             MeshPrimitiveViewBuffer& outBuffer,
-                                             glm::vec3& minP,
-                                             glm::vec3& maxP,
-                                             MeshPrimitiveViewStatus& status) noexcept
+        [[nodiscard]] bool WriteVertexBuffer(
+            const std::vector<glm::vec3>& positions,
+            MeshPrimitiveViewBuffer& outBuffer,
+            glm::vec3& minP,
+            glm::vec3& maxP,
+            MeshPrimitiveViewStatus& status,
+            const std::vector<glm::vec3>* normals = nullptr) noexcept
         {
             const std::size_t vertexCount = positions.size();
             outBuffer.VertexBytes.resize(sizeof(MeshPrimitiveVertex) * vertexCount);
@@ -95,12 +207,215 @@ namespace Extrinsic::Runtime
                     status = MeshPrimitiveViewStatus::NonFinitePosition;
                     return false;
                 }
-                vData[i] = MeshPrimitiveVertex{p.x, p.y, p.z, 0.0f, 0.0f};
+                const glm::vec2 normalUv =
+                    normals != nullptr && i < normals->size()
+                        ? EncodeOctNormal((*normals)[i])
+                        : kNoNormalUv;
+                vData[i] = MeshPrimitiveVertex{p.x, p.y, p.z, normalUv.x, normalUv.y};
                 minP = glm::min(minP, p);
                 maxP = glm::max(maxP, p);
             }
             status = MeshPrimitiveViewStatus::Success;
             return true;
+        }
+
+        [[nodiscard]] std::vector<glm::vec3> ComputeVertexNormalsOrEmpty(
+            const ECS::Components::GeometrySources::ConstSourceView& view,
+            const std::vector<glm::vec3>& positions)
+        {
+            using namespace ECS::Components::GeometrySources;
+
+            if (view.HalfedgeSource == nullptr || view.FaceSource == nullptr)
+            {
+                return {};
+            }
+            const auto toVertexProp = view.HalfedgeSource->Properties.Get<std::uint32_t>(
+                PropertyNames::kHalfedgeToVertex);
+            const auto nextProp = view.HalfedgeSource->Properties.Get<std::uint32_t>(
+                PropertyNames::kHalfedgeNext);
+            const auto faceProp = view.HalfedgeSource->Properties.Get<std::uint32_t>(
+                PropertyNames::kHalfedgeFace);
+            const auto faceHeProp = view.FaceSource->Properties.Get<std::uint32_t>(
+                PropertyNames::kFaceHalfedge);
+            if (!toVertexProp || !nextProp || !faceProp || !faceHeProp)
+            {
+                return {};
+            }
+
+            const auto& toVertex = toVertexProp.Vector();
+            const auto& nextHe = nextProp.Vector();
+            const auto& halfedgeFace = faceProp.Vector();
+            const auto& faceHe = faceHeProp.Vector();
+            const std::size_t halfedgeCount = toVertex.size();
+            const std::size_t faceCount = faceHe.size();
+            const std::size_t vertexCount = positions.size();
+            if (halfedgeCount == 0u ||
+                faceCount == 0u ||
+                nextHe.size() != halfedgeCount ||
+                halfedgeFace.size() != halfedgeCount ||
+                vertexCount > std::numeric_limits<std::uint32_t>::max() ||
+                faceCount > std::numeric_limits<std::uint32_t>::max())
+            {
+                return {};
+            }
+
+            std::vector<glm::vec3> normals(vertexCount, glm::vec3{0.0f});
+            std::vector<std::uint32_t> ringScratch;
+            ringScratch.reserve(8u);
+
+            const auto faceCountU32 = static_cast<std::uint32_t>(faceCount);
+            const auto vertexCountU32 = static_cast<std::uint32_t>(vertexCount);
+            for (std::size_t f = 0; f < faceCount; ++f)
+            {
+                const FaceRingOutcome outcome =
+                    ProduceFaceRing(faceHe,
+                                    halfedgeFace,
+                                    nextHe,
+                                    toVertex,
+                                    faceCountU32,
+                                    vertexCountU32,
+                                    f,
+                                    ringScratch);
+                if (outcome != FaceRingOutcome::Triangulate)
+                {
+                    continue;
+                }
+
+                for (std::size_t i = 1; i + 1 < ringScratch.size(); ++i)
+                {
+                    const std::uint32_t a = ringScratch[0];
+                    const std::uint32_t b = ringScratch[i];
+                    const std::uint32_t c = ringScratch[i + 1u];
+                    const glm::vec3 n =
+                        glm::cross(positions[b] - positions[a],
+                                   positions[c] - positions[a]);
+                    if (!IsFinite(n) || glm::length(n) <= 1.0e-12f)
+                    {
+                        continue;
+                    }
+                    normals[a] += n;
+                    normals[b] += n;
+                    normals[c] += n;
+                }
+            }
+
+            bool anyNormal = false;
+            for (glm::vec3& normal : normals)
+            {
+                const float len = glm::length(normal);
+                if (std::isfinite(len) && len > 1.0e-6f)
+                {
+                    normal /= len;
+                    anyNormal = true;
+                }
+                else
+                {
+                    normal = glm::vec3{0.0f};
+                }
+            }
+
+            return anyNormal ? normals : std::vector<glm::vec3>{};
+        }
+
+        enum class SurfaceWireEdgeOutcome : std::uint8_t
+        {
+            Emitted,
+            NoTopology,
+            Empty,
+            Invalid,
+        };
+
+        [[nodiscard]] SurfaceWireEdgeOutcome AppendSurfaceWireEdges(
+            const ECS::Components::GeometrySources::ConstSourceView& view,
+            const std::uint32_t vertexCountU32,
+            MeshPrimitiveViewBuffer& outBuffer)
+        {
+            using namespace ECS::Components::GeometrySources;
+
+            if (view.HalfedgeSource == nullptr || view.FaceSource == nullptr)
+            {
+                return SurfaceWireEdgeOutcome::NoTopology;
+            }
+            const auto toVertexProp = view.HalfedgeSource->Properties.Get<std::uint32_t>(
+                PropertyNames::kHalfedgeToVertex);
+            const auto nextProp = view.HalfedgeSource->Properties.Get<std::uint32_t>(
+                PropertyNames::kHalfedgeNext);
+            const auto faceProp = view.HalfedgeSource->Properties.Get<std::uint32_t>(
+                PropertyNames::kHalfedgeFace);
+            const auto faceHeProp = view.FaceSource->Properties.Get<std::uint32_t>(
+                PropertyNames::kFaceHalfedge);
+            if (!toVertexProp || !nextProp || !faceProp || !faceHeProp)
+            {
+                return SurfaceWireEdgeOutcome::NoTopology;
+            }
+
+            const auto& toVertex = toVertexProp.Vector();
+            const auto& nextHe = nextProp.Vector();
+            const auto& halfedgeFace = faceProp.Vector();
+            const auto& faceHe = faceHeProp.Vector();
+            const std::size_t halfedgeCount = toVertex.size();
+            const std::size_t faceCount = faceHe.size();
+            if (halfedgeCount == 0u || faceCount == 0u)
+            {
+                return SurfaceWireEdgeOutcome::Empty;
+            }
+            if (nextHe.size() != halfedgeCount ||
+                halfedgeFace.size() != halfedgeCount ||
+                faceCount > std::numeric_limits<std::uint32_t>::max())
+            {
+                return SurfaceWireEdgeOutcome::Invalid;
+            }
+
+            std::unordered_set<std::uint64_t> seenEdges;
+            seenEdges.reserve(faceCount * 4u);
+            std::vector<std::uint32_t> ringScratch;
+            ringScratch.reserve(8u);
+
+            const auto faceCountU32 = static_cast<std::uint32_t>(faceCount);
+            for (std::size_t f = 0; f < faceCount; ++f)
+            {
+                const FaceRingOutcome outcome =
+                    ProduceFaceRing(faceHe,
+                                    halfedgeFace,
+                                    nextHe,
+                                    toVertex,
+                                    faceCountU32,
+                                    vertexCountU32,
+                                    f,
+                                    ringScratch);
+                if (outcome == FaceRingOutcome::Skip)
+                {
+                    continue;
+                }
+                if (outcome == FaceRingOutcome::Invalid)
+                {
+                    return SurfaceWireEdgeOutcome::Invalid;
+                }
+
+                for (std::size_t i = 0; i < ringScratch.size(); ++i)
+                {
+                    const std::uint32_t a = ringScratch[i];
+                    const std::uint32_t b = ringScratch[(i + 1u) % ringScratch.size()];
+                    if (a == b)
+                    {
+                        continue;
+                    }
+                    const std::uint32_t lo = a < b ? a : b;
+                    const std::uint32_t hi = a < b ? b : a;
+                    const std::uint64_t key =
+                        (static_cast<std::uint64_t>(lo) << 32u) |
+                        static_cast<std::uint64_t>(hi);
+                    if (seenEdges.insert(key).second)
+                    {
+                        outBuffer.LineIndices.push_back(a);
+                        outBuffer.LineIndices.push_back(b);
+                    }
+                }
+            }
+
+            return outBuffer.LineIndices.empty()
+                ? SurfaceWireEdgeOutcome::Empty
+                : SurfaceWireEdgeOutcome::Emitted;
         }
 
         void FillLocalSphere(Extrinsic::Graphics::GpuWorld::GeometryUploadDesc& desc,
@@ -150,36 +465,64 @@ namespace Extrinsic::Runtime
         }
         const std::size_t vertexCount = positions->size();
 
-        // Edge endpoints index into the mesh vertex rows. Validate the `Edges`
-        // PropertySet and emit a line-list before writing the vertex buffer so a
-        // failure leaves the buffer cleared.
-        if (view.EdgeSource == nullptr)
+        const auto vertexCountU32 = static_cast<std::uint32_t>(vertexCount);
+        bool hasExplicitEdgeTopology = false;
+        bool usedExplicitEdges = false;
+        if (view.EdgeSource != nullptr)
         {
-            return Failure(MeshPrimitiveViewStatus::MissingEdgeTopology, outBuffer);
-        }
-        const auto v0Prop = view.EdgeSource->Properties.Get<std::uint32_t>(PropertyNames::kEdgeV0);
-        const auto v1Prop = view.EdgeSource->Properties.Get<std::uint32_t>(PropertyNames::kEdgeV1);
-        if (!v0Prop || !v1Prop)
-        {
-            return Failure(MeshPrimitiveViewStatus::MissingEdgeTopology, outBuffer);
-        }
-        const auto& v0 = v0Prop.Vector();
-        const auto& v1 = v1Prop.Vector();
-        if (v0.size() != v1.size())
-        {
-            return Failure(MeshPrimitiveViewStatus::MissingEdgeTopology, outBuffer);
+            const auto v0Prop = view.EdgeSource->Properties.Get<std::uint32_t>(
+                PropertyNames::kEdgeV0);
+            const auto v1Prop = view.EdgeSource->Properties.Get<std::uint32_t>(
+                PropertyNames::kEdgeV1);
+            if (v0Prop || v1Prop)
+            {
+                if (!v0Prop || !v1Prop)
+                {
+                    return Failure(MeshPrimitiveViewStatus::MissingEdgeTopology, outBuffer);
+                }
+                const auto& v0 = v0Prop.Vector();
+                const auto& v1 = v1Prop.Vector();
+                if (v0.size() != v1.size())
+                {
+                    return Failure(MeshPrimitiveViewStatus::MissingEdgeTopology, outBuffer);
+                }
+
+                hasExplicitEdgeTopology = true;
+                if (!v0.empty())
+                {
+                    outBuffer.LineIndices.reserve(v0.size() * 2u);
+                    for (std::size_t e = 0; e < v0.size(); ++e)
+                    {
+                        if (v0[e] >= vertexCountU32 || v1[e] >= vertexCountU32)
+                        {
+                            return Failure(MeshPrimitiveViewStatus::InvalidEdge, outBuffer);
+                        }
+                        outBuffer.LineIndices.push_back(v0[e]);
+                        outBuffer.LineIndices.push_back(v1[e]);
+                    }
+                    usedExplicitEdges = true;
+                }
+            }
         }
 
-        const auto vertexCountU32 = static_cast<std::uint32_t>(vertexCount);
-        outBuffer.LineIndices.reserve(v0.size() * 2u);
-        for (std::size_t e = 0; e < v0.size(); ++e)
+        if (!usedExplicitEdges)
         {
-            if (v0[e] >= vertexCountU32 || v1[e] >= vertexCountU32)
+            const std::size_t priorLineCount = outBuffer.LineIndices.size();
+            const SurfaceWireEdgeOutcome derived =
+                AppendSurfaceWireEdges(view, vertexCountU32, outBuffer);
+            if (derived == SurfaceWireEdgeOutcome::Invalid)
             {
-                return Failure(MeshPrimitiveViewStatus::InvalidEdge, outBuffer);
+                outBuffer.LineIndices.resize(priorLineCount);
+                if (!hasExplicitEdgeTopology)
+                {
+                    return Failure(MeshPrimitiveViewStatus::InvalidEdge, outBuffer);
+                }
             }
-            outBuffer.LineIndices.push_back(v0[e]);
-            outBuffer.LineIndices.push_back(v1[e]);
+            else if (derived != SurfaceWireEdgeOutcome::Emitted &&
+                     !hasExplicitEdgeTopology)
+            {
+                return Failure(MeshPrimitiveViewStatus::MissingEdgeTopology, outBuffer);
+            }
         }
 
         glm::vec3 minP{};
@@ -215,7 +558,14 @@ namespace Extrinsic::Runtime
 
         glm::vec3 minP{};
         glm::vec3 maxP{};
-        if (!WriteVertexBuffer(*positions, outBuffer, minP, maxP, status))
+        const std::vector<glm::vec3> normals =
+            ComputeVertexNormalsOrEmpty(view, *positions);
+        if (!WriteVertexBuffer(*positions,
+                               outBuffer,
+                               minP,
+                               maxP,
+                               status,
+                               normals.empty() ? nullptr : &normals))
         {
             return Failure(status, outBuffer);
         }

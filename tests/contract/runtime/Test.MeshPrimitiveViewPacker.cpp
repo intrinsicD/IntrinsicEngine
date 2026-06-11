@@ -17,6 +17,8 @@ import Geometry.Properties;
 using Extrinsic::ECS::Components::GeometrySources::ConstSourceView;
 using Extrinsic::ECS::Components::GeometrySources::Domain;
 using Extrinsic::ECS::Components::GeometrySources::Edges;
+using Extrinsic::ECS::Components::GeometrySources::Faces;
+using Extrinsic::ECS::Components::GeometrySources::Halfedges;
 using Extrinsic::ECS::Components::GeometrySources::Vertices;
 using Extrinsic::Runtime::MeshPrimitiveVertex;
 using Extrinsic::Runtime::MeshPrimitiveViewBuffer;
@@ -30,14 +32,15 @@ namespace pn = Extrinsic::ECS::Components::GeometrySources::PropertyNames;
 
 namespace
 {
-    // Minimal mesh-domain scratch. A `Domain::Mesh` entity also owns Halfedges
-    // and Faces, but the primitive-view packers read only `Vertices` (positions,
-    // shared by both views) and `Edges` (line endpoints for the edge view), so
-    // the scratch carries just those two PropertySets.
+    // Minimal mesh-domain scratch. Edge views prefer `Edges` and fall back to
+    // halfedge/face topology; vertex views also consult halfedge/face topology
+    // when available to encode surface normals.
     struct MeshScratch
     {
         Vertices VertexSource{};
         Edges EdgeSource{};
+        Halfedges HalfedgeSource{};
+        Faces FaceSource{};
 
         [[nodiscard]] ConstSourceView View() const noexcept
         {
@@ -45,6 +48,8 @@ namespace
             view.ActiveDomain = Domain::Mesh;
             view.VertexSource = &VertexSource;
             view.EdgeSource = &EdgeSource;
+            view.HalfedgeSource = &HalfedgeSource;
+            view.FaceSource = &FaceSource;
             return view;
         }
     };
@@ -67,6 +72,27 @@ namespace
         p1.Vector() = v1;
     }
 
+    void SetHalfedges(Halfedges& h,
+                      const std::vector<std::uint32_t>& toVertex,
+                      const std::vector<std::uint32_t>& next,
+                      const std::vector<std::uint32_t>& face)
+    {
+        h.Properties.Resize(toVertex.size());
+        auto pt = h.Properties.GetOrAdd<std::uint32_t>(std::string{pn::kHalfedgeToVertex}, 0u);
+        auto pnxt = h.Properties.GetOrAdd<std::uint32_t>(std::string{pn::kHalfedgeNext}, 0u);
+        auto pf = h.Properties.GetOrAdd<std::uint32_t>(std::string{pn::kHalfedgeFace}, 0u);
+        pt.Vector() = toVertex;
+        pnxt.Vector() = next;
+        pf.Vector() = face;
+    }
+
+    void SetFaces(Faces& f, const std::vector<std::uint32_t>& faceHe)
+    {
+        f.Properties.Resize(faceHe.size());
+        auto p = f.Properties.GetOrAdd<std::uint32_t>(std::string{pn::kFaceHalfedge}, 0u);
+        p.Vector() = faceHe;
+    }
+
     // A single triangle: three vertices, three edges.
     MeshScratch BuildTriangle()
     {
@@ -77,6 +103,33 @@ namespace
             {0.0f, 1.0f, 0.0f},
         });
         SetEdges(m.EdgeSource, {0u, 1u, 2u}, {1u, 2u, 0u});
+        return m;
+    }
+
+    MeshScratch BuildTriangleWithSurfaceTopology()
+    {
+        MeshScratch m = BuildTriangle();
+        SetHalfedges(m.HalfedgeSource,
+                     /*toVertex*/ {1u, 2u, 0u},
+                     /*next*/ {1u, 2u, 0u},
+                     /*face*/ {0u, 0u, 0u});
+        SetFaces(m.FaceSource, {0u});
+        return m;
+    }
+
+    MeshScratch BuildTriangleWithSurfaceTopologyOnly()
+    {
+        MeshScratch m{};
+        SetPositions(m.VertexSource, {
+            {0.0f, 0.0f, 0.0f},
+            {1.0f, 0.0f, 0.0f},
+            {0.0f, 1.0f, 0.0f},
+        });
+        SetHalfedges(m.HalfedgeSource,
+                     /*toVertex*/ {1u, 2u, 0u},
+                     /*next*/ {1u, 2u, 0u},
+                     /*face*/ {0u, 0u, 0u});
+        SetFaces(m.FaceSource, {0u});
         return m;
     }
 
@@ -114,6 +167,8 @@ TEST(MeshPrimitiveViewPacker, EdgeViewPacksVerticesAndLineIndices)
 
     const MeshPrimitiveVertex v1 = ReadVertex(buffer, 1);
     EXPECT_FLOAT_EQ(v1.Px, 1.0f);
+    EXPECT_FLOAT_EQ(v1.U, 2.0f);
+    EXPECT_FLOAT_EQ(v1.V, 2.0f);
 }
 
 TEST(MeshPrimitiveViewPacker, VertexViewPacksPointsWithoutIndices)
@@ -130,6 +185,46 @@ TEST(MeshPrimitiveViewPacker, VertexViewPacksPointsWithoutIndices)
 
     const MeshPrimitiveVertex v2 = ReadVertex(buffer, 2);
     EXPECT_FLOAT_EQ(v2.Py, 1.0f);
+    EXPECT_FLOAT_EQ(v2.U, 2.0f);
+    EXPECT_FLOAT_EQ(v2.V, 2.0f);
+}
+
+TEST(MeshPrimitiveViewPacker, VertexViewEncodesFaceNormalForSurfaceAlignedMode)
+{
+    const MeshScratch m = BuildTriangleWithSurfaceTopology();
+    MeshPrimitiveViewBuffer buffer{};
+    const MeshPrimitiveViewResult result = PackMeshVertexView(m.View(), buffer);
+
+    ASSERT_EQ(result.Status, MeshPrimitiveViewStatus::Success);
+    ASSERT_TRUE(result.Upload.has_value());
+
+    const MeshPrimitiveVertex v0 = ReadVertex(buffer, 0);
+    const MeshPrimitiveVertex v1 = ReadVertex(buffer, 1);
+    const MeshPrimitiveVertex v2 = ReadVertex(buffer, 2);
+    EXPECT_FLOAT_EQ(v0.U, 0.0f);
+    EXPECT_FLOAT_EQ(v0.V, 0.0f);
+    EXPECT_FLOAT_EQ(v1.U, 0.0f);
+    EXPECT_FLOAT_EQ(v1.V, 0.0f);
+    EXPECT_FLOAT_EQ(v2.U, 0.0f);
+    EXPECT_FLOAT_EQ(v2.V, 0.0f);
+}
+
+TEST(MeshPrimitiveViewPacker, EdgeViewDerivesWireframeFromSurfaceTopologyWhenEdgesMissing)
+{
+    const MeshScratch m = BuildTriangleWithSurfaceTopologyOnly();
+    MeshPrimitiveViewBuffer buffer{};
+    const MeshPrimitiveViewResult result = PackMeshEdgeView(m.View(), buffer);
+
+    ASSERT_EQ(result.Status, MeshPrimitiveViewStatus::Success);
+    ASSERT_TRUE(result.Upload.has_value());
+    EXPECT_EQ(result.Upload->VertexCount, 3u);
+    ASSERT_EQ(result.Upload->LineIndices.size(), 6u);
+    EXPECT_EQ(result.Upload->LineIndices[0], 1u);
+    EXPECT_EQ(result.Upload->LineIndices[1], 2u);
+    EXPECT_EQ(result.Upload->LineIndices[2], 2u);
+    EXPECT_EQ(result.Upload->LineIndices[3], 0u);
+    EXPECT_EQ(result.Upload->LineIndices[4], 0u);
+    EXPECT_EQ(result.Upload->LineIndices[5], 1u);
 }
 
 TEST(MeshPrimitiveViewPacker, EdgeViewWithZeroEdgesIsValid)
@@ -185,7 +280,8 @@ TEST(MeshPrimitiveViewPacker, MissingEdgeTopologyFailsClosedForEdgeView)
 {
     MeshScratch m{};
     SetPositions(m.VertexSource, {{0.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}});
-    // EdgeSource present but no `e:v0`/`e:v1` slots.
+    // EdgeSource present but no `e:v0`/`e:v1` slots and no face topology to
+    // derive a wireframe from.
 
     MeshPrimitiveViewBuffer buffer{};
     const MeshPrimitiveViewResult result = PackMeshEdgeView(m.View(), buffer);

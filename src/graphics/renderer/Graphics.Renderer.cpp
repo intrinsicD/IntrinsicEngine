@@ -2965,10 +2965,9 @@ namespace Extrinsic::Graphics
             return desc;
         }
 
-        // GRAPHICS-071 — retained point renderables use the BDA-backed
-        // `point.vert` + `point_retained.frag` shader pair. `point_retained` is
-        // the canonical retained-renderable variant; transient debug-point
-        // expansion stays out-of-scope for GRAPHICS-077.
+        // GRAPHICS-071 — retained point renderables use the GpuScene BDA-backed
+        // `forward/point.vert` + `forward/point.frag` shader pair. Transient
+        // debug-point expansion stays out-of-scope for GRAPHICS-077.
         [[nodiscard]] static RHI::PipelineDesc BuildForwardPointPipelineDesc() noexcept
         {
             RHI::PipelineDesc desc{};

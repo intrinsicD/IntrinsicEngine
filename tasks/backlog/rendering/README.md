@@ -629,8 +629,8 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
 - [GRAPHICS-071 — Default-recipe `Pass.Forward.Line` and `Pass.Forward.Point` wiring (done)](../../done/GRAPHICS-071-default-recipe-forward-line-point-wiring.md):
   depended on GRAPHICS-070. Landed retained line/point `NullRenderer`
   ownership, pipeline leases, executor routing, CPU contract coverage, and the
-  documented `point.vert` + `point_retained.frag` canonical retained point
-  variant.
+  documented `forward/line` and `forward/point` canonical retained line/point
+  variants.
 - [GRAPHICS-072 — Default-recipe deferred GBuffer + lighting pass wiring (done)](../../done/GRAPHICS-072-default-recipe-deferred-gbuffer-and-lighting-wiring.md):
   depends on GRAPHICS-070 (done), GRAPHICS-073 (done). Now also owns the
   shadow-atlas deferred-lighting binding (at `set 1, binding 1` per

@@ -11,7 +11,8 @@ Each active task should include:
 
 ## Currently active
 
-No currently active tasks.
+- [`INFRA-001` — Move third-party dependencies to a vcpkg manifest](INFRA-001-vcpkg-manifest-mode.md):
+  active dependency-management migration slice; unrelated to current runtime/UI work.
 
 ## History
 

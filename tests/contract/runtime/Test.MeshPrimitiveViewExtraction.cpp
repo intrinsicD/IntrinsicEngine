@@ -28,6 +28,7 @@ namespace pn = Extrinsic::ECS::Components::GeometrySources::PropertyNames;
 
 using Extrinsic::ECS::EntityHandle;
 using Extrinsic::ECS::Scene::Registry;
+using Extrinsic::Runtime::MeshVertexViewRenderMode;
 using Extrinsic::Runtime::MeshPrimitiveViewSettings;
 
 namespace
@@ -116,9 +117,8 @@ namespace
         SetFaces(faces, {0u});
     }
 
-    // Same as above but without explicit edges: `Edges` is empty so
-    // `PackMeshEdgeView` reports `MissingEdgeTopology`, while the surface mesh
-    // still resolves `Domain::Mesh` (halfedge/face topology present).
+    // Same as above but without explicit edges: the edge-view packer derives
+    // wireframe lines from halfedge/face topology.
     void AttachTriangleMeshWithoutEdges(Registry& scene, EntityHandle entity)
     {
         auto& raw = scene.Raw();
@@ -224,7 +224,13 @@ TEST(MeshPrimitiveViewExtraction, EnableVertexViewUploadsSeparatePointRenderable
     const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
-    extraction.SetMeshPrimitiveViewSettings(stableId, MeshPrimitiveViewSettings{.EnableVertexView = true});
+    extraction.SetMeshPrimitiveViewSettings(
+        stableId,
+        MeshPrimitiveViewSettings{
+            .EnableVertexView = true,
+            .VertexRenderMode = MeshVertexViewRenderMode::FlatCircle,
+            .VertexPointRadiusPx = 9.0f,
+        });
 
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                    engine.GetRenderer(),
@@ -246,6 +252,72 @@ TEST(MeshPrimitiveViewExtraction, EnableVertexViewUploadsSeparatePointRenderable
     EXPECT_FALSE(view->HasMeshEdgeView);
     EXPECT_NE(view->MeshVertexViewGeometry, view->MeshGeometry);
     EXPECT_EQ(gpuWorld.GetInstanceGeometry(view->MeshVertexViewInstance), view->MeshVertexViewGeometry);
+    const auto config = gpuWorld.GetEntityConfigForTest(view->MeshVertexViewInstance);
+    EXPECT_FLOAT_EQ(config.PointSize, 9.0f);
+    EXPECT_EQ(config.PointMode, 0u);
+    EXPECT_EQ(config.ColorSourceMode, 1u);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
+TEST(MeshPrimitiveViewExtraction, VertexViewConfigUpdateReusesGeometry)
+{
+    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.Initialize();
+
+    auto& scene = engine.GetScene();
+    const EntityHandle entity = MakeMeshRenderable(scene);
+    const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    extraction.SetMeshPrimitiveViewSettings(
+        stableId,
+        MeshPrimitiveViewSettings{
+            .EnableVertexView = true,
+            .VertexRenderMode = MeshVertexViewRenderMode::FlatCircle,
+            .VertexPointRadiusPx = 9.0f,
+        });
+
+    auto stats = extraction.ExtractAndSubmit(scene,
+                                             engine.GetRenderer(),
+                                             &engine.GetGpuAssetCache());
+    ASSERT_EQ(stats.MeshVertexViewUploads, 1u);
+
+    auto view = extraction.FindRenderableSidecarForTest(stableId);
+    ASSERT_TRUE(view.has_value());
+    const auto firstGeometry = view->MeshVertexViewGeometry;
+    const auto firstInstance = view->MeshVertexViewInstance;
+    ASSERT_TRUE(firstGeometry.IsValid());
+    ASSERT_TRUE(firstInstance.IsValid());
+
+    auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
+    auto config = gpuWorld.GetEntityConfigForTest(firstInstance);
+    EXPECT_FLOAT_EQ(config.PointSize, 9.0f);
+    EXPECT_EQ(config.PointMode, 0u);
+
+    extraction.SetMeshPrimitiveViewSettings(
+        stableId,
+        MeshPrimitiveViewSettings{
+            .EnableVertexView = true,
+            .VertexRenderMode = MeshVertexViewRenderMode::SurfaceAlignedCircle,
+            .VertexPointRadiusPx = 12.0f,
+        });
+
+    stats = extraction.ExtractAndSubmit(scene,
+                                        engine.GetRenderer(),
+                                        &engine.GetGpuAssetCache());
+    EXPECT_EQ(stats.MeshVertexViewUploads, 0u);
+    EXPECT_EQ(stats.MeshVertexViewReuseHits, 1u);
+    EXPECT_EQ(stats.MeshVertexViewReuploads, 0u);
+
+    view = extraction.FindRenderableSidecarForTest(stableId);
+    ASSERT_TRUE(view.has_value());
+    EXPECT_EQ(view->MeshVertexViewGeometry, firstGeometry);
+    EXPECT_EQ(view->MeshVertexViewInstance, firstInstance);
+    config = gpuWorld.GetEntityConfigForTest(firstInstance);
+    EXPECT_FLOAT_EQ(config.PointSize, 12.0f);
+    EXPECT_EQ(config.PointMode, 2u);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();
@@ -557,7 +629,7 @@ TEST(MeshPrimitiveViewExtraction, ProceduralRefFlipReleasesViews)
     engine.Shutdown();
 }
 
-TEST(MeshPrimitiveViewExtraction, MissingEdgeTopologyFailsEdgeViewButKeepsSurface)
+TEST(MeshPrimitiveViewExtraction, EdgeViewDerivesWireframeWithoutExplicitEdges)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
@@ -575,20 +647,23 @@ TEST(MeshPrimitiveViewExtraction, MissingEdgeTopologyFailsEdgeViewButKeepsSurfac
                                                    &engine.GetGpuAssetCache());
 
     EXPECT_EQ(stats.MeshGeometryUploads, 1u);
-    EXPECT_EQ(stats.MeshEdgeViewUploads, 0u);
-    EXPECT_EQ(stats.MeshEdgeViewMissingEdgeTopology, 1u);
+    EXPECT_EQ(stats.MeshEdgeViewUploads, 1u);
+    EXPECT_EQ(stats.MeshEdgeViewMissingEdgeTopology, 0u);
     EXPECT_EQ(stats.MeshEdgeViewInvalidEdges, 0u);
     EXPECT_EQ(stats.MeshEdgeViewFailedPack, 0u);
 
     auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
-    // Only the surface mesh is resident; no edge view instance/geometry.
-    EXPECT_EQ(gpuWorld.GetLiveInstanceCount(), 1u);
-    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
+    // Parent surface instance + derived edge view instance.
+    EXPECT_EQ(gpuWorld.GetLiveInstanceCount(), 2u);
+    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 2u);
 
     const auto view = extraction.FindRenderableSidecarForTest(stableId);
     ASSERT_TRUE(view.has_value());
     EXPECT_TRUE(view->HasMeshResidency);
-    EXPECT_FALSE(view->HasMeshEdgeView);
+    EXPECT_TRUE(view->HasMeshEdgeView);
+    EXPECT_TRUE(view->MeshEdgeViewInstance.IsValid());
+    EXPECT_TRUE(view->MeshEdgeViewGeometry.IsValid());
+    EXPECT_EQ(gpuWorld.GetInstanceGeometry(view->MeshEdgeViewInstance), view->MeshEdgeViewGeometry);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();

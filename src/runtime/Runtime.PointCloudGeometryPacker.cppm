@@ -14,9 +14,10 @@ export namespace Extrinsic::Runtime
 {
     // Vertex layout for the runtime point-cloud packer. Identical to
     // `MeshVertex` / `GraphVertex` (position + UV, 20 bytes) so the retained
-    // point pipeline (`point.vert` / `point_retained.frag`, GRAPHICS-071)
-    // consumes point-cloud geometry without a second vertex format. UV is
-    // zeroed; point-cloud UV/attribute propagation is owned by later slices.
+    // point pipeline (`forward/point.vert` / `forward/point.frag`, GRAPHICS-071)
+    // consumes point-cloud geometry without a second vertex format. UV carries
+    // an octahedral-encoded `v:normal` when present; `{2, 2}` is the no-normal
+    // sentinel. Point-cloud UV/attribute propagation is owned by later slices.
     struct PointCloudVertex
     {
         float Px = 0.0f;

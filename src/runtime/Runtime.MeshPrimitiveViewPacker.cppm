@@ -14,9 +14,13 @@ export namespace Extrinsic::Runtime
 {
     // Vertex layout for the runtime mesh-primitive-view packer. Identical to
     // `MeshVertex` / `GraphVertex` / `PointCloudVertex` (position + UV, 20
-    // bytes) so the retained line (`line.vert`) and point (`point.vert` /
-    // `point_retained.frag`, GRAPHICS-071) pipelines consume mesh edge / vertex
-    // view geometry without a second vertex format. UV is zeroed; mesh-driven
+    // bytes) so the retained line (`forward/line.vert`) and point
+    // (`forward/point.vert` / `forward/point.frag`, GRAPHICS-071) pipelines
+    // consume mesh edge / vertex view geometry without a second vertex format.
+    // Edge views prefer explicit `Edges` rows and can derive a unique
+    // wireframe line list from surface halfedge/face topology. For vertex point
+    // views, UV carries an octahedral-encoded local normal when surface
+    // topology is available; `{2, 2}` is the no-normal sentinel. Mesh-driven
     // UV/attribute propagation onto primitive views is owned by later slices.
     struct MeshPrimitiveVertex
     {
@@ -27,6 +31,13 @@ export namespace Extrinsic::Runtime
         float V = 0.0f;
     };
     static_assert(sizeof(MeshPrimitiveVertex) == 20);
+
+    enum class MeshVertexViewRenderMode : std::uint8_t
+    {
+        FlatCircle,
+        SurfaceAlignedCircle,
+        ImpostorSphere,
+    };
 
     // Runtime/editor-facing control surface (RUNTIME-088). A mesh entity always
     // renders its filled faces through the `RUNTIME-085` surface-residency
@@ -40,6 +51,9 @@ export namespace Extrinsic::Runtime
     {
         bool EnableEdgeView = false;
         bool EnableVertexView = false;
+        MeshVertexViewRenderMode VertexRenderMode =
+            MeshVertexViewRenderMode::ImpostorSphere;
+        float VertexPointRadiusPx = 6.0f;
 
         [[nodiscard]] bool AnyEnabled() const noexcept
         {

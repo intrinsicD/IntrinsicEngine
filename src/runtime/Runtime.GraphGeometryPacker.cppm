@@ -14,10 +14,11 @@ export namespace Extrinsic::Runtime
 {
     // Vertex layout for the runtime graph packer. Identical to
     // `MeshVertex` (position + UV, 20 bytes) so the retained line
-    // (`line.vert`) and point (`point.vert` / `point_retained.frag`,
+    // (`forward/line.vert`) and point (`forward/point.vert` / `forward/point.frag`,
     // GRAPHICS-071) pipelines consume graph node geometry without a second
-    // vertex format. UV is zeroed; graph-driven UV/attribute propagation is
-    // owned by later slices.
+    // vertex format. UV is set to `{2, 2}` (the retained point shader's
+    // no-normal sentinel); graph-driven UV/attribute propagation is owned by
+    // later slices.
     struct GraphVertex
     {
         float Px = 0.0f;

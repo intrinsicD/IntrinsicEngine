@@ -628,6 +628,7 @@ export namespace Extrinsic::Runtime
                                         const RHI::GpuBounds& bounds,
                                         std::uint32_t stableId,
                                         bool desired,
+                                        const MeshPrimitiveViewSettings& viewSettings,
                                         bool meshDirty,
                                         Graphics::IRenderer& renderer,
                                         RuntimeRenderExtractionStats& stats);

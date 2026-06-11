@@ -37,6 +37,31 @@ startup/shutdown.
 | `Extrinsic.Runtime.GizmoInteraction` | Runtime/editor-owned transform-gizmo interaction (`RUNTIME-084`). Exports `GizmoMode` (`Translate`/`Rotate`/`Scale`), `GizmoAxis`, `GizmoOrientation` (`Global`/`Local`), `GizmoModifier` flags (`Snap`/`Clone`), `PickRay`, `GizmoConfig` (pick radius, axis length, translate/rotate/scale snap and scale clamps), `GizmoHitResult`, full-transform `GizmoTransformEdit` records, `GizmoUndoStack`, `GizmoInteractionDiagnostics`, `GizmoInteraction`, and `TransformGizmoRenderPacketBuilder`. `HitTest(registry, CameraViewSnapshot, cursorPixel, viewport, selected)` projects each axis handle line to screen space and resolves the nearest handle within the pixel pick radius; empty/off-handle picks are a background no-hit. `BeginDrag`/`DragTick`/`DragCommit`/`DragCancel` apply axis-constrained translate/rotate/scale edits by projecting the world `PickRay` onto the locked axis line, mutate ECS authoring transforms in runtime only, stamp `Transform::IsDirtyTag`, latch mode at drag start, honor `Snap`, and emit one before/after position-rotation-scale edit per changed entity on commit. `Engine` owns the interaction, undo stack, packet builder, selected-entity scratch, and default input binding (left mouse drag, left shift snap); extraction forwards the builder's copied `TransformGizmoRenderPacket` span through `RuntimeRenderSnapshotBatch::TransformGizmos`. Graphics sees only the frozen render packet field set and never receives drag state, pointer pixels, modifier keys, undo data, or ECS handles. |
 | `Extrinsic.Runtime.StreamingExecutor` | Persistent background streaming task execution |
 
+### Point And Primitive View Payloads
+
+BUG-028 extends the mesh primitive-view control surface with
+`MeshVertexViewRenderMode` (`FlatCircle`, `SurfaceAlignedCircle`,
+`ImpostorSphere`) and `VertexPointRadiusPx`. The values remain runtime/editor
+sidecar state (`MeshPrimitiveViewSettings`), not ECS components. The sandbox UI
+edits them through `ApplySandboxEditorPrimitiveViewCommand`, `Engine` stores them
+on `RenderExtractionCache`, and extraction writes the selected vertex mode/radius
+to the derived point-sidecar `GpuEntityConfig::PointMode` / `PointSize` every
+frame, including clean reuse frames.
+
+Edge view sidecars prefer authored mesh `Edges` rows, but BUG-028 also derives a
+unique wireframe line list from valid halfedge/face surface topology when a mesh
+has no explicit edge rows. Graphics still consumes only the immutable retained
+line renderable; topology traversal remains in runtime.
+
+The shared retained point vertex format is still 20 bytes (`pos.xyz, uv`).
+For point lanes, UV is now the optional normal channel: mesh vertex views
+octahedral-encode face-area weighted vertex normals when halfedge/face topology
+is valid, point-cloud uploads encode `v:normal` when present, and graph uploads
+write `{2,2}` as the no-normal sentinel. The promoted
+`assets/shaders/forward/point.vert/frag` pair consumes that payload: mode 0 draws
+flat circles, mode 1 draws screen-space impostor spheres, and mode 2 draws
+normal-aligned surfel ellipses with no topology traversal in graphics.
+
 `Extrinsic.Runtime.Engine` exports `CreateReferenceEngineConfig()` so reference
 applications can request the standard runtime configuration without importing
 lower-layer `core` config modules directly. Applications may pass the returned
@@ -599,8 +624,8 @@ The point-cloud counter fields on `RuntimeRenderExtractionStats` are
 
 On top of the surface-mesh residency bridge, a mesh entity can opt into optional
 **edge** and/or **vertex** primitive views (RUNTIME-088 Slice B). The toggle lives
-in the cache-owned `MeshPrimitiveViewSettings` (`EnableEdgeView` /
-`EnableVertexView`), set through
+in the cache-owned `MeshPrimitiveViewSettings` (`EnableEdgeView`,
+`EnableVertexView`, `VertexRenderMode`, and `VertexPointRadiusPx`), set through
 `RenderExtractionCache::SetMeshPrimitiveViewSettings(stableId, settings)` /
 `ClearMeshPrimitiveViewSettings(stableId)` / `GetMeshPrimitiveViewSettings(stableId)`
 from runtime/editor state — the flags never live in ECS components and never carry
@@ -614,9 +639,12 @@ in the parent mesh's sidecar (`MeshEdgeViewInstance`/`MeshEdgeViewGeometry`,
 `MeshVertexViewInstance`/`MeshVertexViewGeometry`), and re-submitted to
 `m_Transforms` every frame as an extra `GpuRender_Line | GpuRender_Unlit`
 (edge) or `GpuRender_Point | GpuRender_Unlit` (vertex) lane carrying the parent
-surface's transform/bounds/material slot. Faces, edges, and vertices therefore
-render as three independent retained renderables over a single mesh data source,
-with no ECS storage of graphics handles and no mesh-topology traversal pushed into
+surface's transform/bounds/material slot. The vertex lane also writes
+`GpuEntityConfig::PointSize` and `PointMode` on its sidecar instance every frame
+so flat-circle, surface-aligned-circle, and impostor-sphere mode changes apply
+without forcing a geometry reupload. Faces, edges, and vertices therefore render
+as three independent retained renderables over a single mesh data source, with no
+ECS storage of graphics handles and no mesh-topology traversal pushed into
 `src/graphics/*`. Views are reconciled only while the parent surface is resident
 (`MeshGeometry.IsValid()` after `BindMeshGeometry`, so a fail-closed surface pack
 keeps its prior upload and the views follow it); a resident-and-clean frame hits
@@ -628,8 +656,9 @@ edge-topology edit updates the edge view's line indices; a repack enqueues the
 prior view handle into a shared mesh-primitive-view deferred-retire queue and
 increments `Mesh{Edge,Vertex}ViewReuploads` + `Mesh{Edge,Vertex}ViewReleases`. The
 bridge is fail-closed: the edge view folds `MissingPositions`/`EmptyMesh` into
-`MeshEdgeViewMissingPositions`, reports `MissingEdgeTopology` and out-of-range
-endpoints in `MeshEdgeViewMissingEdgeTopology` / `MeshEdgeViewInvalidEdges`, and
+`MeshEdgeViewMissingPositions`, reports `MissingEdgeTopology` only when neither
+explicit edges nor derivable surface topology are available, reports out-of-range
+explicit endpoints or malformed derived rings in `MeshEdgeViewInvalidEdges`, and
 folds `WrongDomain`/`NonFinitePosition` into `MeshEdgeViewFailedPack`; the vertex
 view (no edge topology) uses only `MeshVertexViewMissingPositions` and
 `MeshVertexViewFailedPack`. A failed view pack drops just that view (its instance
@@ -650,8 +679,10 @@ vertex view handles share one retire queue driven from the maintenance phase by
 `MeshVertexViewUploads`, `MeshVertexViewReuseHits`, `MeshVertexViewReuploads`,
 `MeshVertexViewReleases`, `MeshVertexViewFailedPack`,
 `MeshVertexViewMissingPositions`, and `MeshPrimitiveViewFreeRetires`
-(RUNTIME-088 Slice B). `Operational` visual proof of the three lanes is owned by
-the final working-sandbox acceptance task (RUNTIME-095).
+(RUNTIME-088 Slice B). BUG-028 adds CPU/null regression proof for the UI command
+surface, sidecar extraction, point config propagation, and GLSL mode selection;
+broader file-backed GPU screenshot proof remains owned by the working-sandbox
+acceptance lane.
 
 `FindRenderableSidecarForTest(stableId)` returns a `RenderableSidecarView`
 exposing the per-entity `Instance`, currently bound `Geometry`,

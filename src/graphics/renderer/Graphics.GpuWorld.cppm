@@ -176,6 +176,8 @@ export namespace Extrinsic::Graphics
         void SetInstanceRenderFlags(GpuInstanceHandle instance, std::uint32_t flags);
         void SetInstanceTransform(GpuInstanceHandle instance, const glm::mat4& model, const glm::mat4& prevModel);
         void SetEntityConfig(GpuInstanceHandle instance, const RHI::GpuEntityConfig& config);
+        [[nodiscard]] RHI::GpuEntityConfig GetEntityConfigForTest(
+            GpuInstanceHandle instance) const noexcept;
         void SetBounds(GpuInstanceHandle instance, const RHI::GpuBounds& bounds);
 
         void SetMaterialBuffer(RHI::BufferHandle materialBuffer, std::uint32_t materialCapacity);
