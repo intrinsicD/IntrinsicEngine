@@ -84,10 +84,12 @@ Cross-layer convenience imports that violate this table are prohibited.
   it owns algorithm/control-flow bodies, allocation-heavy work, topology/container
   traversal, backend calls, diagnostics assembly, file/IO handling, or imports
   other modules only needed by the implementation rather than the public API.
-- FetchContent deps go through `cmake/Dependencies.cmake` and `external/cache/`. By default
-  FetchContent does not probe remotes for updates; `INTRINSIC_UPDATE_DEPS=ON` re-enables update
-  probes, `INTRINSIC_OFFLINE_DEPS=ON` enforces strict offline use of the cache (only when
-  populated), and `INTRINSIC_DEPS_CACHE_DIR` sets the cache root (default `external/cache/`).
+- Third-party C/C++ deps go through `vcpkg.json` and the repository-local vcpkg
+  toolchain (`external/vcpkg/scripts/buildsystems/vcpkg.cmake`) chainloaded with
+  `cmake/IntrinsicClangToolchain.cmake`. Run `tools/setup/bootstrap_vcpkg.sh` on
+  fresh checkouts; use `VCPKG_BINARY_SOURCES` for local/CI binary caching. The
+  old FetchContent path in `cmake/Dependencies.cmake` is a temporary
+  `INFRA-001` deprecation fallback only (`INTRINSIC_USE_VCPKG_DEPS=OFF`).
 
 ## Default build and test commands
 

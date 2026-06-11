@@ -48,23 +48,28 @@ depends_on: []
 - [x] Add `vcpkg.json` at the repo root with every dependency currently
       declared in `cmake/Dependencies.cmake`, pinned via
       `builtin-baseline` to a known-good vcpkg commit.
-- [ ] Add `vcpkg-configuration.json` registering the binary cache and any
-      custom overlays (e.g. for the ImGui docking branch).
+- [x] Add `vcpkg-configuration.json` registering custom overlays (e.g. for the
+      ImGui docking branch). Binary cache sources are configured through
+      `VCPKG_BINARY_SOURCES` / CI wiring because vcpkg does not make them a
+      manifest-configuration field.
 - [x] Add a bootstrap script `tools/setup/bootstrap_vcpkg.sh` that clones
       `microsoft/vcpkg` into `external/vcpkg/` at the baseline commit and
       runs `bootstrap-vcpkg.sh -disableMetrics`.
-- [ ] Update `CMakePresets.json` to set
+- [x] Update `CMakePresets.json` to set
       `CMAKE_TOOLCHAIN_FILE=${sourceDir}/external/vcpkg/scripts/buildsystems/vcpkg.cmake`
       and `VCPKG_MANIFEST_MODE=ON` for the `ci` preset (and any future
       presets).
-- [ ] Strip `cmake/Dependencies.cmake` down to:
+- [x] Route the default `cmake/Dependencies.cmake` path through:
     - `find_package` calls for each dependency.
-    - A `target_link_libraries` helper for ImGui where vcpkg's port
-      already provides `imgui::imgui` and the docking-branch backends.
+    - Repository-facing compatibility targets for vcpkg package names that
+      differ from the old FetchContent targets.
+    - An ImGui overlay-port helper where vcpkg provides `imgui::imgui` and the
+      repository-owned `imgui_lib` still compiles GLFW/Vulkan backend source
+      files without pulling the Vulkan SDK from vcpkg.
     - Removal of `intrinsic_make_available`, `intrinsic_populate_source`,
       `intrinsic_validate_dependency_source`, lock helpers, and
       `INTRINSIC_OFFLINE_DEPS` / `INTRINSIC_UPDATE_DEPS` /
-      `INTRINSIC_DEPS_SEAL` knobs (deprecate, then delete).
+      `INTRINSIC_DEPS_SEAL` knobs (deprecation fallback remains until Slice D).
 - [ ] Wire a vcpkg binary cache for CI:
     - GitHub Actions: `actions/cache` keyed on the manifest hash +
       vcpkg baseline; OR `vcpkg` GHA binary cache provider.
@@ -73,7 +78,7 @@ depends_on: []
 - [ ] Retire `external/cache/` (delete `tools/setup/populate_deps.sh`
       once vcpkg is the single source of truth and no developer flows
       depend on the old layout).
-- [ ] Update `cmake/IntrinsicModule.cmake` only if a vcpkg port name
+- [x] Update `cmake/IntrinsicModule.cmake` only if a vcpkg port name
       differs from the current target alias; provide an alias shim if so.
 
 ## Tests
@@ -81,7 +86,7 @@ depends_on: []
       `git clean -fdx && tools/setup/bootstrap_vcpkg.sh && cmake --preset ci`
       completes in < 60 s with a populated binary cache and < 10 min
       without one. Capture wall-clock numbers in the PR.
-- [ ] `cmake --build --preset ci --target IntrinsicTests` followed by
+- [x] `cmake --build --preset ci --target IntrinsicTests` followed by
       the default CPU correctness gate
       (`ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`)
       is green.
@@ -92,13 +97,13 @@ depends_on: []
       feature-flag gates them).
 
 ## Docs
-- [ ] Replace the dependency section of `docs/build-troubleshooting.md`
+- [x] Replace the dependency section of `docs/build-troubleshooting.md`
       with the vcpkg workflow (bootstrap, manifest edits, binary cache,
       version bumps via `vcpkg x-update-baseline`).
-- [ ] Update `AGENTS.md` §5 "Coding rules" to drop the
+- [x] Update `AGENTS.md` §5 "Coding rules" to drop the
       `INTRINSIC_OFFLINE_DEPS` / `external/cache/` mention and point at
       the vcpkg toolchain file instead.
-- [ ] Add an ADR under `docs/adr/` recording the move from FetchContent
+- [x] Add an ADR under `docs/adr/` recording the move from FetchContent
       to vcpkg (drivers: cold configure time, deterministic version
       solver, binary caching, removal of the in-tree validator + cache).
 - [ ] Update `tasks/backlog/README.md` to mark INFRA Option C done
@@ -118,14 +123,15 @@ depends_on: []
 
 ## Status
 - Active 2026-06-11; owner: Codex; branch: `main`.
-- Current slice: Slice A — manifest + bootstrap (no behavior change). CMake
-  presets and `cmake/Dependencies.cmake` still use the existing FetchContent
-  path until Slice B.
-- Slice A stages `vcpkg-configuration.json` with empty overlay lists. The
-  binary cache remains configured by `VCPKG_BINARY_SOURCES` / CI wiring in
-  Slice C because vcpkg binary sources are not a manifest configuration field.
-- Next verification step: validate the vcpkg manifest/bootstrap script and keep
-  the existing `ci` configure/build path green.
+- Current slice: Slice B — preset cutover + ADR + docs. The default preset path
+  now uses vcpkg manifest mode and chainloads `cmake/IntrinsicClangToolchain.cmake`.
+- The old FetchContent code path remains under `INTRINSIC_USE_VCPKG_DEPS=OFF`
+  only for the Slice D deprecation window; new dependency work must not add to
+  `external/cache/`.
+- Binary cache CI wiring, measured warm/cold timings, Vulkan smoke, and final
+  FetchContent-helper deletion remain deferred to Slices C/D.
+- Slice B is locally verified. Next slice is Slice C — CI binary cache, measured
+  cold/warm timings, and Vulkan smoke on a capable host.
 - Slice A verification 2026-06-11:
     - `tools/setup/bootstrap_vcpkg.sh` — passed; checked out baseline
       `06a7fdd564234908731c59ac46a624f808e87b1c` under ignored
@@ -138,6 +144,43 @@ depends_on: []
       `imguizmo`, `volk`, and `vulkan-memory-allocator`.
     - `cmake --preset ci`; `cmake --build --preset ci --target
       IntrinsicTests`; default CPU CTest gate — all passed.
+- Slice B verification 2026-06-11:
+    - `external/vcpkg/vcpkg format-manifest vcpkg.json
+      tools/vcpkg/overlay-ports/imgui/vcpkg.json` — passed.
+    - `external/vcpkg/vcpkg install --dry-run --no-print-usage` — passed;
+      the default plan uses the repository ImGui overlay and includes the
+      `windowing` feature dependencies.
+    - `external/vcpkg/vcpkg install --dry-run --x-no-default-features
+      --no-print-usage` — passed; the headless plan excludes `glfw3`,
+      `imguizmo`, `volk`, and `vulkan-memory-allocator`.
+    - `cmake --preset ci` — passed with the vcpkg toolchain and Clang 23
+      chainload.
+    - `cmake --build --preset ci --target IntrinsicTests` — passed; the
+      aggregate now builds `IntrinsicBenchmarkSmoke` before CTest.
+    - `ctest --test-dir build/ci --output-on-failure -LE
+      'gpu|vulkan|slow|flaky-quarantine' --timeout 60` — passed,
+      2967/2967.
+    - `ctest --test-dir build/ci --output-on-failure -R
+      '^IntrinsicBenchmarkSmoke\.' --timeout 60` — passed, including result
+      validation.
+    - `python3 tools/benchmark/validate_benchmark_manifests.py` — passed.
+    - `python3 tools/benchmark/validate_benchmark_results.py --root
+      build/ci/benchmark/IntrinsicBenchmarkSmokeTest --strict` — passed.
+    - `cmake -S . -B build/ci-fetchcontent-fallback -G Ninja
+      -DCMAKE_TOOLCHAIN_FILE=cmake/IntrinsicClangToolchain.cmake
+      -DCMAKE_BUILD_TYPE=Debug -DINTRINSIC_BUILD_SANDBOX=OFF
+      -DINTRINSIC_BUILD_TESTS=ON -DINTRINSIC_ENABLE_CUDA=OFF
+      -DINTRINSIC_ENABLE_SANITIZERS=ON -DINTRINSIC_USE_VCPKG_DEPS=OFF` —
+      passed; FetchContent fallback remains configurable for the deprecation
+      window.
+    - Structural/documentation checks passed:
+      `check_task_policy.py --strict`, `check_task_state_links.py --strict`,
+      `generate_session_brief.py --check`, `check_doc_links.py`,
+      `check_docs_sync.py --diff-mode --base-ref origin/main`,
+      `sync_skills.py --check`, `check_layering.py --strict`,
+      `check_test_layout.py --strict`, `check_root_hygiene.py --root .`, and
+      `git diff --check`. Root hygiene still reports only the pre-existing
+      `.agents/` and `imgui.ini` warning-mode entries.
 
 ## Verification
 ```bash

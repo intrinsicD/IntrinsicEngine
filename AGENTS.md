@@ -134,10 +134,12 @@ Every new dependency edge must be justifiable by layer policy and reflected in d
   them as private target sources. Treat an implementation as non-trivial when it owns algorithm/control-flow bodies,
   allocation-heavy work, topology/container traversal, backend calls, diagnostics assembly, file/IO handling, or imports
   other modules only needed by the implementation rather than the public API.
-- FetchContent dependencies are centralized through `cmake/Dependencies.cmake` and `external/cache/`; use
-  `INTRINSIC_OFFLINE_DEPS=ON` only when the cache is already populated. By default FetchContent does not probe remotes
-  for updates; set `INTRINSIC_UPDATE_DEPS=ON` to re-enable update probes, or `INTRINSIC_OFFLINE_DEPS=ON` to enforce
-  strict offline use of the cache. The cache root is `INTRINSIC_DEPS_CACHE_DIR` (default `external/cache/`).
+- Third-party C/C++ dependencies are declared in `vcpkg.json` and resolved by presets through the repository-local
+  vcpkg toolchain at `external/vcpkg/scripts/buildsystems/vcpkg.cmake`, chainloaded with
+  `cmake/IntrinsicClangToolchain.cmake` so Clang module scanning remains enforced. Run
+  `tools/setup/bootstrap_vcpkg.sh` on fresh checkouts; use `VCPKG_BINARY_SOURCES` for local/CI binary caching. The
+  legacy FetchContent path in `cmake/Dependencies.cmake` is a temporary `INFRA-001` deprecation fallback only
+  (`INTRINSIC_USE_VCPKG_DEPS=OFF`); do not add new dependency traffic to `external/cache/`.
 - CUDA compute support is optional and off by default (`INTRINSIC_ENABLE_CUDA=OFF` in `ci`/`dev` presets); enable it
   only for tasks that explicitly require CUDA seams, using `dev-cuda` or an equivalent configure with a valid
   `CUDAToolkit` install.

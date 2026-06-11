@@ -5,6 +5,7 @@ module;
 #include <limits>
 
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
 

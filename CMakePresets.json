@@ -10,13 +10,16 @@
       "name": "base",
       "hidden": true,
       "generator": "Ninja",
-      "toolchainFile": "${sourceDir}/cmake/IntrinsicClangToolchain.cmake",
+      "toolchainFile": "${sourceDir}/external/vcpkg/scripts/buildsystems/vcpkg.cmake",
       "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "INTRINSIC_BUILD_SANDBOX": "ON",
         "INTRINSIC_BUILD_TESTS": "ON",
-        "INTRINSIC_ENABLE_SANITIZERS": "ON"
+        "INTRINSIC_ENABLE_SANITIZERS": "ON",
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/cmake/IntrinsicClangToolchain.cmake",
+        "VCPKG_INSTALLED_DIR": "${sourceDir}/external/vcpkg-installed/${presetName}",
+        "VCPKG_MANIFEST_MODE": "ON"
       }
     },
     {

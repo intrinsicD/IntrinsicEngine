@@ -74,31 +74,42 @@ its tools package (for example `clang-20`, `clang++-20`, and
 
 Some containers do not provide X11 RandR headers; CMake enables `INTRINSIC_HEADLESS_NO_GLFW=ON` in that case. This disables GLFW-dependent runtime/sandbox modules but still allows core libraries and headless tests to build.
 
-## Dependency cache recovery
+## Dependency bootstrap and recovery
 
-The repository centralizes FetchContent checkouts under `external/cache/`. CMake
-serializes dependency population with per-dependency locks and validates required
-marker files before reusing an existing `<name>-src` directory. A hot cache is
-treated as sealed by default, so normal configures run without network access.
-
-If an interrupted configure leaves a partial checkout, the validator fails closed
-with a deterministic recovery message instead of deleting dependency sources.
-Repopulate missing entries online with `tools/setup/populate_deps.sh --refresh`,
-or manually remove the affected `<name>-src`, `<name>-build`, and
-`<name>-subbuild` directories before refreshing.
-
-Safe manual recovery steps:
+Repository presets resolve third-party C/C++ libraries through the root
+`vcpkg.json` manifest. On a fresh checkout, bootstrap the repository-local vcpkg
+tool first:
 
 ```bash
-rm -rf external/cache/glm-src external/cache/glm-build external/cache/glm-subbuild
-rm -rf external/cache/eigen-src external/cache/eigen-build external/cache/eigen-subbuild
-rm -rf external/cache/json-src external/cache/json-build external/cache/json-subbuild
-rm -rf external/cache/volk-src external/cache/volk-build external/cache/volk-subbuild
-tools/setup/populate_deps.sh --refresh
+tools/setup/bootstrap_vcpkg.sh
+cmake --preset ci
 ```
 
-For offline workflows, repopulate the missing dependency directories first, then
-configure with `INTRINSIC_OFFLINE_DEPS=ON`.
+`CMakePresets.json` points `CMAKE_TOOLCHAIN_FILE` at
+`external/vcpkg/scripts/buildsystems/vcpkg.cmake` and chainloads
+`cmake/IntrinsicClangToolchain.cmake`, so the same Clang 20+ module-scanning
+requirements still apply. Installed packages live under
+`external/vcpkg-installed/<preset>/`.
+
+For repeat local builds, use a filesystem binary cache:
+
+```bash
+export VCPKG_BINARY_SOURCES="clear;files,$PWD/external/vcpkg-bincache,readwrite"
+cmake --preset ci
+```
+
+Version bumps flow through the manifest:
+
+```bash
+external/vcpkg/vcpkg x-update-baseline
+external/vcpkg/vcpkg format-manifest vcpkg.json
+```
+
+During the `INFRA-001` deprecation window only, the old FetchContent path remains
+available with `-DINTRINSIC_USE_VCPKG_DEPS=OFF`. That fallback still uses
+`external/cache/`, `tools/setup/populate_deps.sh`, `INTRINSIC_OFFLINE_DEPS`,
+`INTRINSIC_UPDATE_DEPS`, and `INTRINSIC_DEPS_SEAL`; do not add new dependency
+traffic to it.
 
 ## Blocked follow-on CI steps
 
@@ -135,4 +146,3 @@ cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```
-

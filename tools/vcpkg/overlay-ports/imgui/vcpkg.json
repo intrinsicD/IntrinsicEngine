@@ -1,0 +1,22 @@
+{
+  "name": "imgui",
+  "version": "1.92.8",
+  "description": "Bloat-free Immediate Mode Graphical User interface for C++ with repository-installed backend sources.",
+  "homepage": "https://github.com/ocornut/imgui",
+  "license": "MIT",
+  "dependencies": [
+    {
+      "name": "vcpkg-cmake",
+      "host": true
+    },
+    {
+      "name": "vcpkg-cmake-config",
+      "host": true
+    }
+  ],
+  "features": {
+    "docking-experimental": {
+      "description": "Build from the upstream docking branch."
+    }
+  }
+}

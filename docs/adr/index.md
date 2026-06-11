@@ -23,6 +23,7 @@ This index tracks long-lived architecture decisions for IntrinsicEngine.
 17. [0017 — Default debug surface material (slot 0)](0017-default-debug-surface-material.md)
 18. [0018 — Missing-material fallback substitution and diagnostics](0018-missing-material-fallback-substitution.md)
 19. [0019 — Physics layer ownership and ECS integration](0019-physics-layer-ownership-and-ecs-integration.md)
+20. [0020 — vcpkg manifest dependency management](0020-vcpkg-manifest-dependency-management.md)
 
 ## Conventions
 

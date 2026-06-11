@@ -53,6 +53,8 @@ add_custom_target(IntrinsicBenchmarks
 # validator script is invoked as a follow-up fixture so the JSON is
 # structurally checked on every run.
 if(BUILD_TESTING)
+    set_property(GLOBAL APPEND PROPERTY INTRINSIC_REGISTERED_TEST_TARGETS IntrinsicBenchmarkSmoke)
+
     set(_intrinsic_bench_smoke_test_dir "${CMAKE_BINARY_DIR}/benchmark/IntrinsicBenchmarkSmokeTest")
 
     add_test(
