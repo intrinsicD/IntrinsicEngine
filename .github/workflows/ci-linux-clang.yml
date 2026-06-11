@@ -40,6 +40,20 @@ jobs:
       - name: Install Python validation deps
         run: python3 -m pip install --disable-pip-version-check pyyaml
 
+      - name: Cache vcpkg binary packages
+        uses: actions/cache@v4
+        with:
+          path: external/vcpkg-bincache
+          key: ${{ runner.os }}-vcpkg-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'tools/vcpkg/**', 'tools/setup/bootstrap_vcpkg.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-vcpkg-
+
+      - name: Bootstrap vcpkg
+        run: tools/setup/bootstrap_vcpkg.sh
+
+      - name: Enable vcpkg binary cache
+        run: echo "VCPKG_BINARY_SOURCES=clear;files,${GITHUB_WORKSPACE}/external/vcpkg-bincache,readwrite" >> "$GITHUB_ENV"
+
       - name: Enforce task policy
         run: python3 tools/agents/check_task_policy.py --root . --strict
 

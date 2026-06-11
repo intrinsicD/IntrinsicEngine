@@ -98,6 +98,13 @@ export VCPKG_BINARY_SOURCES="clear;files,$PWD/external/vcpkg-bincache,readwrite"
 cmake --preset ci
 ```
 
+CI workflows run the same bootstrap before configure and cache
+`external/vcpkg-bincache/` with `actions/cache`. The cache key is derived from
+`vcpkg.json`, `vcpkg-configuration.json`, `tools/vcpkg/**`, and
+`tools/setup/bootstrap_vcpkg.sh`; a manifest, overlay, or bootstrap-policy edit
+therefore starts a new binary-cache line while older archives remain available
+through restore keys.
+
 Version bumps flow through the manifest:
 
 ```bash

@@ -70,7 +70,7 @@ depends_on: []
       `intrinsic_validate_dependency_source`, lock helpers, and
       `INTRINSIC_OFFLINE_DEPS` / `INTRINSIC_UPDATE_DEPS` /
       `INTRINSIC_DEPS_SEAL` knobs (deprecation fallback remains until Slice D).
-- [ ] Wire a vcpkg binary cache for CI:
+- [x] Wire a vcpkg binary cache for CI:
     - GitHub Actions: `actions/cache` keyed on the manifest hash +
       vcpkg baseline; OR `vcpkg` GHA binary cache provider.
     - Document a manual local cache path under `external/vcpkg-bincache/`
@@ -90,7 +90,7 @@ depends_on: []
       the default CPU correctness gate
       (`ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`)
       is green.
-- [ ] Vulkan GPU smoke gate (`IntrinsicGraphicsVulkanSmokeTests`) is
+- [x] Vulkan GPU smoke gate (`IntrinsicGraphicsVulkanSmokeTests`) is
       green on a Vulkan-capable host.
 - [ ] Headless build with `INTRINSIC_HEADLESS_NO_GLFW=ON` succeeds
       without pulling `glfw3` / `imguizmo` from vcpkg (manifest
@@ -123,15 +123,22 @@ depends_on: []
 
 ## Status
 - Active 2026-06-11; owner: Codex; branch: `main`.
-- Current slice: Slice B — preset cutover + ADR + docs. The default preset path
+- Current slice: Slice C — CI binary-cache wiring + timing/smoke evidence.
+  Slice B cut over the default preset path: it
   now uses vcpkg manifest mode and chainloads `cmake/IntrinsicClangToolchain.cmake`.
 - The old FetchContent code path remains under `INTRINSIC_USE_VCPKG_DEPS=OFF`
   only for the Slice D deprecation window; new dependency work must not add to
   `external/cache/`.
-- Binary cache CI wiring, measured warm/cold timings, Vulkan smoke, and final
-  FetchContent-helper deletion remain deferred to Slices C/D.
-- Slice B is locally verified. Next slice is Slice C — CI binary cache, measured
-  cold/warm timings, and Vulkan smoke on a capable host.
+- GitHub Actions workflows now cache `external/vcpkg-bincache/`, bootstrap
+  `external/vcpkg/`, and export `VCPKG_BINARY_SOURCES` before configure. The
+  cache key covers `vcpkg.json`, `vcpkg-configuration.json`, `tools/vcpkg/**`,
+  and `tools/setup/bootstrap_vcpkg.sh`.
+- Local timing evidence so far: vcpkg cold install/configure without a populated
+  binary cache took 103.2 s for `ci` and 63.3 s for `ci-vulkan` on this host;
+  subsequent warm configure with the installed tree present took 1.9 s. CI
+  warm-cache timing remains to be observed on GitHub Actions.
+- Vulkan smoke passed locally under the `ci-vulkan` preset. Final
+  FetchContent-helper deletion remains deferred to Slice D.
 - Slice A verification 2026-06-11:
     - `tools/setup/bootstrap_vcpkg.sh` — passed; checked out baseline
       `06a7fdd564234908731c59ac46a624f808e87b1c` under ignored
@@ -181,6 +188,18 @@ depends_on: []
       `check_test_layout.py --strict`, `check_root_hygiene.py --root .`, and
       `git diff --check`. Root hygiene still reports only the pre-existing
       `.agents/` and `imgui.ini` warning-mode entries.
+- Slice C verification 2026-06-11:
+    - `VCPKG_BINARY_SOURCES="clear;files,$PWD/external/vcpkg-bincache,readwrite"
+      cmake --preset ci-vulkan` — passed from a clean `build/ci-vulkan` and
+      `external/vcpkg-installed/ci-vulkan`; empty binary cache restored 0
+      packages and configure completed in 63.3 s.
+    - `VCPKG_BINARY_SOURCES="clear;files,$PWD/external/vcpkg-bincache,readwrite"
+      cmake --build --preset ci-vulkan --target ExtrinsicSandbox
+      IntrinsicTests` — passed in 9:27.05.
+    - `ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu'
+      -L 'vulkan' -LE 'slow|flaky-quarantine' --no-tests=ignore
+      --timeout 120 -j$(nproc)` — passed; 38 selected, 0 failed, 1 skipped,
+      elapsed 21.42 s.
 
 ## Verification
 ```bash
