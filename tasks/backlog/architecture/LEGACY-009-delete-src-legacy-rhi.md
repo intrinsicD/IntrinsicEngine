@@ -38,10 +38,17 @@ depends_on: []
   `if(NOT INTRINSIC_HEADLESS_NO_GLFW)` (~L272).
 - Layering allowlist (`tools/repo/layering_allowlist.yaml`) carries
   grandfathered rows keyed under `src/legacy/RHI/`; drop only those.
-- Prerequisite (today, 2026-06-06): the consumer-grep gate FAILS — legacy
+- Prerequisite (today, 2026-06-11): the consumer-grep gate FAILS — legacy
   `RHI`/`RHI.*` modules are still imported by `src/legacy/Graphics/`,
-  `src/legacy/Asset/`, and `src/legacy/Runtime/`. Promotion is blocked until
-  those migrate to `Extrinsic.RHI.*` (typically alongside `LEGACY-008`).
+  `src/legacy/Asset/`, `src/legacy/Runtime/`, `src/legacy/Interface/`, and
+  legacy compatibility tests. Promotion is blocked until those migrate to
+  promoted APIs or retire with their owning legacy subtrees (typically alongside
+  `LEGACY-008`, `LEGACY-010`, and `LEGACY-012`).
+- `GRAPHICS-086` retired the semantic RHI/CUDA parity audit: legacy
+  command helpers, persistent descriptors, swapchain/image ownership,
+  scene-instance convenience APIs, and CUDA no longer represent unnamed
+  blockers for this deletion. Future CUDA work must open a new opt-in
+  method/backend task with a concrete workload.
 
 ## Required changes
 - [ ] (Prerequisite, verified before promotion to `tasks/active/`) Run the
@@ -122,9 +129,9 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
   lives in `src/graphics/rhi/` and `src/graphics/vulkan/` (see
   `docs/migration/nonlegacy-parity-matrix.md`). The remaining parity audit —
   command helpers, persistent descriptors, swapchain/image state,
-  scene-instance convenience, and the CUDA decision — is owned by
-  `GRAPHICS-086`, which updates this task's prerequisites with any concrete
-  blockers it finds.
+  scene-instance convenience, and the CUDA decision — was retired by
+  `GRAPHICS-086`; this deletion should now be promoted only after the
+  consumer-grep gate is clean.
 - The consumer-grep gate in Verification must exit 0 before this task is
   promoted to `tasks/active/`; this deletion is typically coordinated with
   `LEGACY-008` (legacy Graphics) because the two subtrees import each other.

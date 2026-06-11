@@ -83,6 +83,31 @@ This directory contains the `RHI` module/files.
   count, and pending reload count so last-known-good fallback is covered by
   CPU/null tests.
 
+## Legacy RHI retirement decisions
+
+`GRAPHICS-086` closes the remaining legacy RHI parity audit at
+`CPUContracted` without adding new public RHI modules:
+
+- Legacy `RHI.CommandUtils` one-shot Vulkan helpers are not retained as a public
+  RHI convenience API. Promoted code records through `ICommandContext`,
+  `FrameQueueSubmitPlanDesc`, and `ITransferQueue`; backend-local helpers stay
+  inside `src/graphics/vulkan/`.
+- Legacy `RHI.PersistentDescriptors` is replaced by promoted bindless,
+  descriptor, and manager/lease contracts plus backend-local Vulkan descriptor
+  pools. RHI callers do not hold native descriptor sets.
+- Legacy `RHI.Swapchain`/`RHI.Image` ownership is split: RHI exposes
+  backend-neutral texture descriptors, handles, present modes, and backbuffer
+  handles, while Vulkan owns concrete swapchain/image state internally. RHI must
+  stay platform-free; runtime supplies the platform-native window handle through
+  `DeviceCreateDesc`.
+- Legacy `RHI.SceneInstances` is replaced by the promoted `GpuInstanceData`
+  record in `RHI.Types` plus renderer-owned `GpuWorld`/culling/material state.
+  No separate scene-instance convenience module is retained.
+- Legacy `RHI.CudaDevice` and `RHI.CudaError` are removed from the promoted
+  default path. No current runtime, graphics, method, or benchmark consumer
+  requires a CUDA compute seam; future CUDA work must open a new opt-in
+  method/backend task with a concrete workload and verification plan.
+
 ## Module ABI hygiene (clang-20 / C++23 modules)
 
 `RHI::ICommandContext` (`RHI.CommandContext.cppm`) is an **exported polymorphic

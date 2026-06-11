@@ -9,6 +9,20 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`GRAPHICS-086`](GRAPHICS-086-rhi-retirement-parity-and-cuda-decision.md) —
+RHI retirement parity and CUDA decision — retired on 2026-06-11 at maturity
+`CPUContracted`. The audit maps legacy `RHI.CommandUtils`,
+`RHI.PersistentDescriptors`, `RHI.Swapchain`/`RHI.Image`, and
+`RHI.SceneInstances` to promoted `ICommandContext`/`ITransferQueue`/submit-plan
+seams, backend-local Vulkan descriptor/swapchain/image ownership,
+backend-neutral RHI handles/descriptors/present modes, and renderer-owned
+`GpuWorld`/`RHI::GpuInstanceData` state. CUDA is removed from the promoted
+default path because no current runtime, graphics, method, or benchmark
+consumer needs it; future CUDA must open a new opt-in method/backend task with a
+concrete workload and verification plan. `LEGACY-009` is now blocked by
+consumer-grep/subtree ordering rather than an unnamed RHI/CUDA parity gap.
+
+Backlog
 [`GRAPHICS-084C`](GRAPHICS-084C-visualization-property-buffer-vulkan-smoke.md) —
 visualization property-buffer Vulkan smoke — retired on 2026-06-11 at maturity
 `Operational`. The existing visualization-overlay GPU smoke now submits
@@ -16,8 +30,8 @@ graphics-owned property-buffer upload descriptors for vector-field position and
 vector arrays, verifies `RenderGraphFrameStats::VisualizationPropertyBuffers`
 accepted/uploaded both descriptors without deferral or resource errors, and
 records `VisualizationOverlayPass` on the promoted Vulkan path only after
-packet BDA publication succeeds. The task keeps runtime/ECS out of graphics and
-leaves broader RHI/CUDA retirement decisions to `GRAPHICS-086`.
+packet BDA publication succeeds. The task keeps runtime/ECS out of graphics;
+`GRAPHICS-086` later retired the broader RHI/CUDA audit.
 
 Backlog
 [`GRAPHICS-084`](GRAPHICS-084-visualization-property-buffer-residency.md) —

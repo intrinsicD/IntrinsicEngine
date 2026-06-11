@@ -12,7 +12,7 @@ depends_on: [GRAPHICS-084]
 - No new visualization packet family.
 - No arbitrary property-array editor UI.
 - No runtime-owned GPU resource lifetime.
-- No RHI/CUDA retirement decision; `GRAPHICS-086` owns that audit.
+- No RHI/CUDA retirement decision; `GRAPHICS-086` later retired that audit.
 
 ## Context
 - Owner/layer: `graphics/vulkan` consumes renderer-owned visualization packets and buffers; runtime remains a data-only producer of copied property arrays and packet metadata.

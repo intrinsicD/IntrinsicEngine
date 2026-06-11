@@ -30,6 +30,12 @@ available through the Vulkan 1.2/1.3 feature chain.
 
 - `CreateVulkanDevice()` returns an `RHI::IDevice` instance without exposing
   concrete Vulkan types across renderer/RHI boundaries.
+- `GRAPHICS-086` keeps Vulkan-specific command helpers, persistent descriptor
+  pools, swapchain/image state, and CUDA/Vulkan interop out of public RHI.
+  Promoted callers use RHI command contexts, transfer queues, bindless/manager
+  leases, texture handles, and backend-neutral present modes; concrete
+  `VkCommandBuffer`, `VkDescriptorSet`, `VkSwapchainKHR`, and `VkImage` state
+  remains backend-local here.
 - Runtime selection is explicitly opt-in. `GraphicsBackend::Vulkan` continues to
   use the Null fallback unless `RenderConfig::EnablePromotedVulkanDevice` is true
   and the build enables `INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN=ON` in a

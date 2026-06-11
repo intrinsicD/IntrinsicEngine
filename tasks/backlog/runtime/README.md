@@ -11,8 +11,8 @@ another backlog directory.
   promoted replacement for legacy `Runtime.AssetIngestService` over
   `AssetService`, `StreamingExecutor`, and runtime materialization handoffs.
 - [RUNTIME-103 — Geometry algorithm execution queue](RUNTIME-103-geometry-algorithm-execution-queue.md):
-  value-gated asynchronous CPU geometry processing and CUDA keep/defer/remove
-  decision for legacy K-Means behavior.
+  value-gated asynchronous CPU geometry processing for legacy K-Means behavior;
+  `GRAPHICS-086` retired CUDA from the promoted default path.
 - [RUNTIME-105 — Remove the deprecated GetStreamingGraph() TaskGraph bridge](RUNTIME-105-remove-streaming-graph-bridge.md):
   pure bridge deletion opened by `HARDEN-078`; the promoted tree already has
   zero consumers outside the Engine bridge itself.

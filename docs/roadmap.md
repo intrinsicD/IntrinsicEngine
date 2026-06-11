@@ -267,18 +267,18 @@ Click-based sub-element selection is implemented with GPU-native entity picking 
 
 ### GPU Geometry Processing Backend
 
-Infrastructure required to move heavyweight geometry operators from CPU to GPU.
-
-- **CUDA support (Phase 1 — done):** `RHI::CudaDevice` wrapper with driver API lifecycle (init, context, streams, memory alloc/free), `RHI::CudaError` domain error type, conditional CMake build via `INTRINSIC_ENABLE_CUDA`. Runtime tests skip gracefully when no CUDA driver is present.
-- **CUDA-Vulkan interop (Phase 2 — next):** Export Vulkan buffers/timeline semaphores for zero-copy import into CUDA. `RHI::CudaInterop` class with explicit cross-API synchronization.
-- **Compute dispatch abstraction (Phase 3):** `Runtime::ComputeBackend` subsystem owned by `Engine`, selecting between Vulkan Compute, CUDA, and CPU based on availability.
-- **First GPU workload (Phase 4):** GPU-accelerated K-means clustering for point clouds, validating the compute pipeline end-to-end.
+`GRAPHICS-086` removed legacy CUDA from the promoted default path: no current
+runtime, graphics, method, or benchmark consumer requires a CUDA compute seam.
+Future GPU-accelerated geometry work must open a method/backend task with a
+concrete workload, backend choice, benchmark/verification plan, and opt-in
+build/test gates.
 
 ### Geometry Processing — Remaining
 
 Core operators are complete (16 mesh operators + DEC + graph builders/layouts + collision/spatial queries). Remaining:
 - **Exact Boolean CSG:** Robust triangle clipping + stitched remeshing for partial-overlap union/intersection/difference. The baseline (disjoint/full-containment) is done.
-- **Ultra-fast GPU K-means clustering:** CUDA-accelerated k-means for point clouds and feature-space segmentation workflows.
+- **GPU K-means clustering:** deferred until a method/backend task proves a
+  concrete workload and chooses an opt-in compute backend.
 - ~~**Mesh and point cloud denoising:**~~ Bilateral filter (edge-preserving smoothing), outlier probability estimation (LOF-inspired), and Gaussian KDE density estimation implemented in `Geometry.PointCloud.Utils`. All three wired to editor UI. Remaining: mesh-specific denoising, spectral denoising.
 - **Mesh parameterization:** Robust UV/atlas generation and distortion-controlled parameterization methods.
 - **Spectral mesh processing:** Laplacian/eigendecomposition-driven filters, embeddings, and editing operators.

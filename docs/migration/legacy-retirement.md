@@ -52,6 +52,10 @@ As of `LEGACY-002` (2026-06-06), every remaining `src/legacy/<Subsystem>/` subtr
 - [`LEGACY-006`](../../tasks/backlog/architecture/LEGACY-006-delete-src-legacy-ecs.md) — `src/legacy/ECS/`.
 - [`LEGACY-008`](../../tasks/backlog/architecture/LEGACY-008-delete-src-legacy-graphics.md) — `src/legacy/Graphics/` (largest subtree; gated on the GRAPHICS-033 + GRAPHICS-070..076 + GRAPHICS-081 chain — now retired — plus migration of the remaining legacy consumers).
 - [`LEGACY-009`](../../tasks/backlog/architecture/LEGACY-009-delete-src-legacy-rhi.md) — `src/legacy/RHI/`.
+  `GRAPHICS-086` retired the command-helper, persistent-descriptor,
+  swapchain/image, scene-instance, and CUDA decision blockers; remaining
+  prerequisites are consumer-grep/subtree ordering and any independently named
+  Vulkan operational evidence.
 - [`LEGACY-010`](../../tasks/backlog/architecture/LEGACY-010-delete-src-legacy-runtime.md) — `src/legacy/Runtime/`.
 - [`LEGACY-011`](../../tasks/backlog/architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md) —
   value-gated feature-reimplementation map for remaining candidates that must

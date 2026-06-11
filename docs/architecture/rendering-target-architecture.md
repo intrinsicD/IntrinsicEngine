@@ -858,7 +858,7 @@ SceneManager (CPU, authoritative)
 | §13.10 | **Htex + Deferred Pipeline** — Htex atlas indices must reach `GBufferPass` fragment shader. Existing `HtexPatchPreviewPass` is forward-only. Integration path unspecified. | Stable GBuffer pass |
 | §13.11 | **Vector Field Arrowheads** — Options: geometry-shader cone, billboard quad tip, pre-baked arrow mesh per vector. No implementation yet. | Vector field pipeline stable |
 | — | **Transparency for point clouds** — Sorted splat blending (alpha-composited PointPass). | OIT / transparency pass |
-| — | **GPU K-means / spectral clustering** — Heavy geometry compute on Vulkan compute queues (CUDA-Vulkan interop for CUDA path). | CUDA-Vulkan interop (C14) |
+| — | **GPU K-means / spectral clustering** — Deferred until a method/backend task proves a concrete workload and chooses an opt-in compute backend. | Method/backend task |
 | — | **SSAO / GTAO** — Screen-space AO pass between `DeferredLightingPass` and `ForwardPass`. Requires depth prepass for HiZ. | Stable deferred pipeline |
 
 ---

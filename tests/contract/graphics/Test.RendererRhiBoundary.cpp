@@ -104,6 +104,36 @@ TEST(RendererRhiBoundary, RhiLayerDoesNotImportVulkan)
     }
 }
 
+TEST(RendererRhiBoundary, PromotedGraphicsAndRuntimeDoNotImportCuda)
+{
+    const std::vector<std::filesystem::path> roots{
+        RepoRoot() / "src/graphics/rhi",
+        RepoRoot() / "src/graphics/vulkan",
+        RepoRoot() / "src/graphics/renderer",
+        RepoRoot() / "src/runtime",
+    };
+    const std::vector<std::string> forbiddenTokens{
+        "CudaDevice",
+        "CudaError",
+        "INTRINSIC_HAS_CUDA",
+        "#include <cuda",
+        "#include <cuda.h>",
+        "CUdevice",
+        "CUcontext",
+        "CUstream",
+    };
+
+    for (const auto& root : roots)
+    {
+        for (const auto& path : FilesUnder(root))
+        {
+            const auto content = ReadFile(path);
+            for (const auto& token : forbiddenTokens)
+                EXPECT_EQ(content.find(token), std::string::npos) << path.string() << " contains " << token;
+        }
+    }
+}
+
 TEST(RendererRhiBoundary, SamplerBorderColorStaysBackendNeutralAndMapsInVulkanBackend)
 {
     const Extrinsic::RHI::SamplerDesc defaultDesc{};
@@ -167,6 +197,5 @@ TEST(RendererRhiBoundary, VulkanBackendDefinesPromotedSymbols)
     for (const auto& symbol : requiredSymbols)
         EXPECT_NE(content.find(symbol), std::string::npos) << symbol;
 }
-
 
 

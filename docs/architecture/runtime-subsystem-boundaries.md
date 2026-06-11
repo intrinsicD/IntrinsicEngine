@@ -32,7 +32,7 @@ Engine
 │   ├── DescriptorLayout / DescriptorAllocator
 │   ├── BindlessDescriptorSystem
 │   ├── TextureSystem
-│   └── optional CudaDevice
+│   └── no promoted CUDA backend (legacy CudaDevice retired by GRAPHICS-086)
 ├── AssetPipeline
 │   ├── AssetManager
 │   ├── pending transfer completion state

@@ -30,10 +30,6 @@ as focused blockers for legacy graphics/RHI retirement. They are not part of
 the modernization feature DAG; select them when retiring legacy behavior is the
 priority.
 
-- [GRAPHICS-086 — RHI retirement parity and CUDA decision](GRAPHICS-086-rhi-retirement-parity-and-cuda-decision.md):
-  final audit/decision task before accepting any legacy RHI command-helper,
-  descriptor, swapchain/image, scene-instance, or CUDA implementation.
-
 ## Dependency DAG
 
 <!-- state-link-guard: allow-done-links -->
@@ -753,6 +749,12 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   position/vector data, verifies renderer property-buffer diagnostics, and
   records `VisualizationOverlayPass` on the promoted Vulkan path after packet
   BDA publication.
+- [GRAPHICS-086 — RHI retirement parity and CUDA decision](../../done/GRAPHICS-086-rhi-retirement-parity-and-cuda-decision.md):
+  done 2026-06-11 at `CPUContracted`. The audit maps legacy command helpers,
+  persistent descriptors, swapchain/image ownership, and scene-instance
+  convenience to promoted RHI/Vulkan/renderer seams, records CUDA as removed
+  from the promoted default path, and leaves `LEGACY-009` blocked by consumer
+  grep/subtree ordering rather than an unnamed RHI parity gap.
 - [GRAPHICS-079 — Default-recipe `Pass.ImGui` wiring](../../done/GRAPHICS-079-default-recipe-imgui-pass-wiring.md)
   (done): depends on GRAPHICS-076 (PresentSource finalization) and
   `runtime/RUNTIME-090` (ImGui adapter producer). It wires the renderer

@@ -27,29 +27,41 @@ depends_on: []
 - Scope decision: audit first. Do not implement legacy convenience APIs or CUDA seams unless a current promoted consumer or benchmark/method task requires them.
 
 ## Required changes
-- [ ] Inventory legacy `src/legacy/RHI/**` modules against promoted RHI/Vulkan modules and tests.
-- [ ] Decide for each gap whether promoted coverage already exists, a narrow implementation task is needed, or the behavior is retired.
-- [ ] Add missing CPU/null contract tests for command helper parity, persistent descriptor semantics, swapchain/image state ownership, and scene-instance convenience replacement if needed.
-- [ ] Decide CUDA with rationale recorded in the parity matrix, choosing exactly one:
+- [x] Inventory legacy `src/legacy/RHI/**` modules against promoted RHI/Vulkan modules and tests.
+- [x] Decide for each gap whether promoted coverage already exists, a narrow implementation task is needed, or the behavior is retired.
+- [x] Add missing CPU/null contract tests for command helper parity, persistent descriptor semantics, swapchain/image state ownership, and scene-instance convenience replacement if needed.
+- [x] Decide CUDA with rationale recorded in the parity matrix, choosing exactly one:
       (a) **remove** — record that no promoted compute seam is owed (deletion itself stays with `LEGACY-009`) and update `RUNTIME-103`'s deferral note;
       (b) **promote** — port a minimal `INTRINSIC_ENABLE_CUDA`-gated device/error seam into `src/graphics/rhi/` with opt-in skip-safe tests, and name the follow-up task that owns `Operational` proof;
       (c) **defer** — open a compute-backend follow-up task gated on `RUNTIME-103` identifying a real workload, and record its ID in the parity matrix.
-- [ ] Update `LEGACY-009` prerequisites with any remaining concrete blockers.
+- [x] Update `LEGACY-009` prerequisites with any remaining concrete blockers.
 
 ## Tests
-- [ ] Add or update `contract;graphics` RHI tests for any retained parity behavior.
-- [ ] Keep CUDA tests opt-in and skip-safe under `INTRINSIC_ENABLE_CUDA=ON` when no driver is present.
-- [ ] Run strict layering checks to prove RHI remains platform-free.
+- [x] Add or update `contract;graphics` RHI tests for any retained parity behavior.
+- [x] Keep CUDA tests opt-in and skip-safe under `INTRINSIC_ENABLE_CUDA=ON` when no driver is present.
+- [x] Run strict layering checks to prove RHI remains platform-free.
 
 ## Docs
-- [ ] Update `docs/migration/nonlegacy-parity-matrix.md` RHI and legacy RHI rows.
-- [ ] Update `src/graphics/rhi/README.md` and `src/graphics/vulkan/README.md` if contracts change.
-- [ ] Update `tasks/backlog/rendering/README.md` and `docs/migration/legacy-retirement.md` with final blockers.
+- [x] Update `docs/migration/nonlegacy-parity-matrix.md` RHI and legacy RHI rows.
+- [x] Update `src/graphics/rhi/README.md` and `src/graphics/vulkan/README.md` if contracts change.
+- [x] Update `tasks/backlog/rendering/README.md` and `docs/migration/legacy-retirement.md` with final blockers.
 
 ## Acceptance criteria
-- [ ] Every legacy RHI module has a promoted replacement, explicit retirement decision, or named follow-up task.
-- [ ] CUDA has a concrete keep/remove/defer decision with verification expectations.
-- [ ] `LEGACY-009` is blocked only by consumer-grep results or named implementation tasks.
+- [x] Every legacy RHI module has a promoted replacement, explicit retirement decision, or named follow-up task.
+- [x] CUDA has a concrete keep/remove/defer decision with verification expectations.
+- [x] `LEGACY-009` is blocked only by consumer-grep results or named implementation tasks.
+
+## Status
+- Completed 2026-06-11 at maturity `CPUContracted`.
+- PR/commit: this retirement commit.
+- Decision: CUDA is **removed** from the promoted default path. No current
+  runtime, graphics, method, or benchmark consumer requires a CUDA compute seam;
+  future CUDA work must open a new opt-in method/backend task with a concrete
+  workload and verification plan.
+- Inventory result: promoted RHI/Vulkan/renderer seams cover legacy command
+  helpers, persistent descriptors, swapchain/image ownership, and
+  scene-instance convenience for current scope. `LEGACY-009` remains blocked by
+  consumer-grep/subtree ordering, not by unnamed RHI parity gaps.
 
 ## Verification
 ```bash
@@ -60,6 +72,22 @@ python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/check_test_layout.py --root . --strict
 python3 tools/docs/check_doc_links.py --root .
 ```
+
+## Verification results
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -L 'graphics|contract' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+python3 tools/docs/check_doc_links.py --root .
+python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main
+tools/ci/run_clean_workshop_review.sh . --strict
+```
+
+Result: passed on 2026-06-11. The CTest selection ran 978 tests with 0
+failures. Clean workshop automated rows passed; manual rows 3-6 remain a
+human-review activity.
 
 ## Forbidden changes
 - Mixing mechanical file moves with semantic refactors.
