@@ -36,6 +36,10 @@ the authoritative open/unblocked view.
 ## Theme G — Active bugs
 
 - unblocked: `BUG-026B` — Vulkan click-pick readback smoke (entity id + depth round trip) (tasks/backlog/bugs/BUG-026B-vulkan-click-pick-readback-smoke.md)
+- unblocked: `BUG-027` — Mesh IO trusts header-declared counts: unbounded reserve aborts and wrap-prone bounds checks (tasks/backlog/bugs/BUG-027-mesh-io-untrusted-header-counts.md)
+- unblocked: `BUG-028` — VulkanDevice never reclaims ResourcePool slots: unbounded pending-kill growth and handle-space leak (tasks/backlog/bugs/BUG-028-vulkan-resource-pool-reclamation.md)
+- blocked by `BUG-028`: `BUG-028B` — Vulkan slot-recycling smoke (handle reuse through the real frame loop) (tasks/backlog/bugs/BUG-028B-vulkan-slot-recycling-smoke.md)
+- unblocked: `BUG-029` — Ray/AABB slab tests NaN-poisoned for axis-parallel rays on slab planes; ray/sphere raycast emits NaN normal (tasks/backlog/bugs/BUG-029-ray-aabb-slab-nan-poisoning.md)
 
 ## Unthemed
 
