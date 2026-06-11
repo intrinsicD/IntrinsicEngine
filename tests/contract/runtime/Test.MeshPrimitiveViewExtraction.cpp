@@ -28,8 +28,6 @@ namespace pn = Extrinsic::ECS::Components::GeometrySources::PropertyNames;
 
 using Extrinsic::ECS::EntityHandle;
 using Extrinsic::ECS::Scene::Registry;
-using Extrinsic::Runtime::MeshVertexViewRenderMode;
-using Extrinsic::Runtime::MeshPrimitiveViewSettings;
 
 namespace
 {
@@ -157,6 +155,26 @@ namespace
         return entity;
     }
 
+    void EnableEdgeView(Registry& scene, EntityHandle entity)
+    {
+        namespace G = Extrinsic::Graphics::Components;
+        scene.Raw().emplace_or_replace<G::RenderEdges>(entity);
+    }
+
+    void EnableVertexView(
+        Registry& scene,
+        EntityHandle entity,
+        Extrinsic::Graphics::Components::RenderPoints::RenderType type =
+            Extrinsic::Graphics::Components::RenderPoints::RenderType::Sphere,
+        float size = 6.0f)
+    {
+        namespace G = Extrinsic::Graphics::Components;
+        G::RenderPoints points{};
+        points.Type = type;
+        points.SizeSource = size;
+        scene.Raw().emplace_or_replace<G::RenderPoints>(entity, points);
+    }
+
     void DriveViewDeferredRetireWindow(Extrinsic::Runtime::RenderExtractionCache& extraction,
                                        Extrinsic::Graphics::IRenderer& renderer,
                                        std::uint64_t baseFrame,
@@ -170,7 +188,7 @@ namespace
     }
 }
 
-TEST(MeshPrimitiveViewExtraction, EnableEdgeViewUploadsSeparateLineRenderable)
+TEST(MeshPrimitiveViewExtraction, EnableEdgeViewUploadsSeparateEdgeRenderable)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
@@ -180,7 +198,7 @@ TEST(MeshPrimitiveViewExtraction, EnableEdgeViewUploadsSeparateLineRenderable)
     const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
-    extraction.SetMeshPrimitiveViewSettings(stableId, MeshPrimitiveViewSettings{.EnableEdgeView = true});
+    EnableEdgeView(scene, entity);
 
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                    engine.GetRenderer(),
@@ -224,13 +242,11 @@ TEST(MeshPrimitiveViewExtraction, EnableVertexViewUploadsSeparatePointRenderable
     const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
-    extraction.SetMeshPrimitiveViewSettings(
-        stableId,
-        MeshPrimitiveViewSettings{
-            .EnableVertexView = true,
-            .VertexRenderMode = MeshVertexViewRenderMode::FlatCircle,
-            .VertexPointRadiusPx = 9.0f,
-        });
+    EnableVertexView(
+        scene,
+        entity,
+        Extrinsic::Graphics::Components::RenderPoints::RenderType::Flat,
+        9.0f);
 
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                    engine.GetRenderer(),
@@ -271,13 +287,11 @@ TEST(MeshPrimitiveViewExtraction, VertexViewConfigUpdateReusesGeometry)
     const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
-    extraction.SetMeshPrimitiveViewSettings(
-        stableId,
-        MeshPrimitiveViewSettings{
-            .EnableVertexView = true,
-            .VertexRenderMode = MeshVertexViewRenderMode::FlatCircle,
-            .VertexPointRadiusPx = 9.0f,
-        });
+    EnableVertexView(
+        scene,
+        entity,
+        Extrinsic::Graphics::Components::RenderPoints::RenderType::Flat,
+        9.0f);
 
     auto stats = extraction.ExtractAndSubmit(scene,
                                              engine.GetRenderer(),
@@ -296,13 +310,11 @@ TEST(MeshPrimitiveViewExtraction, VertexViewConfigUpdateReusesGeometry)
     EXPECT_FLOAT_EQ(config.PointSize, 9.0f);
     EXPECT_EQ(config.PointMode, 0u);
 
-    extraction.SetMeshPrimitiveViewSettings(
-        stableId,
-        MeshPrimitiveViewSettings{
-            .EnableVertexView = true,
-            .VertexRenderMode = MeshVertexViewRenderMode::SurfaceAlignedCircle,
-            .VertexPointRadiusPx = 12.0f,
-        });
+    EnableVertexView(
+        scene,
+        entity,
+        Extrinsic::Graphics::Components::RenderPoints::RenderType::Surfel,
+        12.0f);
 
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
@@ -333,8 +345,8 @@ TEST(MeshPrimitiveViewExtraction, EnableBothViewsAllocatesThreeIndependentRender
     const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
-    extraction.SetMeshPrimitiveViewSettings(
-        stableId, MeshPrimitiveViewSettings{.EnableEdgeView = true, .EnableVertexView = true});
+    EnableEdgeView(scene, entity);
+    EnableVertexView(scene, entity);
 
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                    engine.GetRenderer(),
@@ -363,6 +375,54 @@ TEST(MeshPrimitiveViewExtraction, EnableBothViewsAllocatesThreeIndependentRender
     engine.Shutdown();
 }
 
+TEST(MeshPrimitiveViewExtraction, EdgeAndPointComponentsDoNotRequireRenderSurface)
+{
+    namespace G = Extrinsic::Graphics::Components;
+
+    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.Initialize();
+
+    auto& scene = engine.GetScene();
+    const EntityHandle entity = MakeMeshRenderable(scene);
+    scene.Raw().remove<G::RenderSurface>(entity);
+    EnableEdgeView(scene, entity);
+    EnableVertexView(
+        scene,
+        entity,
+        G::RenderPoints::RenderType::Flat,
+        8.0f);
+    const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    const auto stats = extraction.ExtractAndSubmit(scene,
+                                                   engine.GetRenderer(),
+                                                   &engine.GetGpuAssetCache());
+
+    EXPECT_EQ(stats.MeshGeometryUploads, 0u);
+    EXPECT_EQ(stats.MeshEdgeViewUploads, 1u);
+    EXPECT_EQ(stats.MeshVertexViewUploads, 1u);
+
+    auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
+    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 2u);
+
+    const auto view = extraction.FindRenderableSidecarForTest(stableId);
+    ASSERT_TRUE(view.has_value());
+    EXPECT_FALSE(view->HasMeshResidency);
+    EXPECT_TRUE(view->HasMeshEdgeView);
+    EXPECT_TRUE(view->HasMeshVertexView);
+    EXPECT_EQ(gpuWorld.GetInstanceGeometry(view->MeshEdgeViewInstance),
+              view->MeshEdgeViewGeometry);
+    EXPECT_EQ(gpuWorld.GetInstanceGeometry(view->MeshVertexViewInstance),
+              view->MeshVertexViewGeometry);
+    const auto config =
+        gpuWorld.GetEntityConfigForTest(view->MeshVertexViewInstance);
+    EXPECT_EQ(config.PointMode, 0u);
+    EXPECT_FLOAT_EQ(config.PointSize, 8.0f);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
 TEST(MeshPrimitiveViewExtraction, RepeatedExtractionReusesViewsWithoutReupload)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
@@ -373,8 +433,8 @@ TEST(MeshPrimitiveViewExtraction, RepeatedExtractionReusesViewsWithoutReupload)
     const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
-    extraction.SetMeshPrimitiveViewSettings(
-        stableId, MeshPrimitiveViewSettings{.EnableEdgeView = true, .EnableVertexView = true});
+    EnableEdgeView(scene, entity);
+    EnableVertexView(scene, entity);
 
     auto stats = extraction.ExtractAndSubmit(scene, engine.GetRenderer(), &engine.GetGpuAssetCache());
     ASSERT_EQ(stats.MeshEdgeViewUploads, 1u);
@@ -418,8 +478,8 @@ TEST(MeshPrimitiveViewExtraction, VertexPositionDirtyRepacksBothViews)
     const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
-    extraction.SetMeshPrimitiveViewSettings(
-        stableId, MeshPrimitiveViewSettings{.EnableEdgeView = true, .EnableVertexView = true});
+    EnableEdgeView(scene, entity);
+    EnableVertexView(scene, entity);
 
     auto stats = extraction.ExtractAndSubmit(scene, engine.GetRenderer(), &engine.GetGpuAssetCache());
     ASSERT_EQ(stats.MeshEdgeViewUploads, 1u);
@@ -480,8 +540,8 @@ TEST(MeshPrimitiveViewExtraction, DisablingEdgeViewReleasesItsGeometryAfterWindo
     const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
-    extraction.SetMeshPrimitiveViewSettings(
-        stableId, MeshPrimitiveViewSettings{.EnableEdgeView = true, .EnableVertexView = true});
+    EnableEdgeView(scene, entity);
+    EnableVertexView(scene, entity);
 
     auto stats = extraction.ExtractAndSubmit(scene, engine.GetRenderer(), &engine.GetGpuAssetCache());
     ASSERT_EQ(stats.MeshEdgeViewUploads, 1u);
@@ -491,7 +551,7 @@ TEST(MeshPrimitiveViewExtraction, DisablingEdgeViewReleasesItsGeometryAfterWindo
     ASSERT_EQ(gpuWorld.GetLiveGeometryCount(), 3u);
 
     // Disable just the edge view; the vertex view stays resident.
-    extraction.SetMeshPrimitiveViewSettings(stableId, MeshPrimitiveViewSettings{.EnableVertexView = true});
+    scene.Raw().remove<Extrinsic::Graphics::Components::RenderEdges>(entity);
 
     stats = extraction.ExtractAndSubmit(scene, engine.GetRenderer(), &engine.GetGpuAssetCache());
     EXPECT_EQ(stats.MeshEdgeViewReleases, 1u);
@@ -524,11 +584,10 @@ TEST(MeshPrimitiveViewExtraction, EntityDestructionReleasesViewsAfterWindow)
 
     auto& scene = engine.GetScene();
     const EntityHandle entity = MakeMeshRenderable(scene);
-    const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
-    extraction.SetMeshPrimitiveViewSettings(
-        stableId, MeshPrimitiveViewSettings{.EnableEdgeView = true, .EnableVertexView = true});
+    EnableEdgeView(scene, entity);
+    EnableVertexView(scene, entity);
 
     auto stats = extraction.ExtractAndSubmit(scene, engine.GetRenderer(), &engine.GetGpuAssetCache());
     ASSERT_EQ(stats.MeshEdgeViewUploads, 1u);
@@ -566,11 +625,10 @@ TEST(MeshPrimitiveViewExtraction, ShutdownReleasesViewResidency)
 
     auto& scene = engine.GetScene();
     const EntityHandle entity = MakeMeshRenderable(scene);
-    const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
-    extraction.SetMeshPrimitiveViewSettings(
-        stableId, MeshPrimitiveViewSettings{.EnableEdgeView = true, .EnableVertexView = true});
+    EnableEdgeView(scene, entity);
+    EnableVertexView(scene, entity);
 
     auto stats = extraction.ExtractAndSubmit(scene, engine.GetRenderer(), &engine.GetGpuAssetCache());
     ASSERT_EQ(stats.MeshEdgeViewUploads, 1u);
@@ -599,8 +657,8 @@ TEST(MeshPrimitiveViewExtraction, ProceduralRefFlipReleasesViews)
     const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
-    extraction.SetMeshPrimitiveViewSettings(
-        stableId, MeshPrimitiveViewSettings{.EnableEdgeView = true, .EnableVertexView = true});
+    EnableEdgeView(scene, entity);
+    EnableVertexView(scene, entity);
 
     auto stats = extraction.ExtractAndSubmit(scene, engine.GetRenderer(), &engine.GetGpuAssetCache());
     ASSERT_EQ(stats.MeshEdgeViewUploads, 1u);
@@ -640,7 +698,7 @@ TEST(MeshPrimitiveViewExtraction, EdgeViewDerivesWireframeWithoutExplicitEdges)
     const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
-    extraction.SetMeshPrimitiveViewSettings(stableId, MeshPrimitiveViewSettings{.EnableEdgeView = true});
+    EnableEdgeView(scene, entity);
 
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                    engine.GetRenderer(),
@@ -684,7 +742,7 @@ TEST(MeshPrimitiveViewExtraction, OutOfRangeEdgeEndpointIncrementsInvalidEdgesCo
     SetEdges(edges, /*v0*/ {0u, 1u, 2u}, /*v1*/ {1u, 2u, 9u});
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
-    extraction.SetMeshPrimitiveViewSettings(stableId, MeshPrimitiveViewSettings{.EnableEdgeView = true});
+    EnableEdgeView(scene, entity);
 
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                    engine.GetRenderer(),
@@ -706,7 +764,7 @@ TEST(MeshPrimitiveViewExtraction, OutOfRangeEdgeEndpointIncrementsInvalidEdgesCo
     engine.Shutdown();
 }
 
-TEST(MeshPrimitiveViewExtraction, NonMeshEntityWithSettingsCreatesNoViews)
+TEST(MeshPrimitiveViewExtraction, NonMeshEntityWithRenderComponentsCreatesNoMeshViews)
 {
     namespace G = Extrinsic::Graphics::Components;
 
@@ -718,14 +776,13 @@ TEST(MeshPrimitiveViewExtraction, NonMeshEntityWithSettingsCreatesNoViews)
     const EntityHandle entity = scene.Create();
     raw.emplace<Extrinsic::ECS::Components::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
     raw.emplace<G::RenderPoints>(entity);
+    raw.emplace<G::RenderEdges>(entity);
     // Point-cloud shape: Vertices only → DetectDomain resolves PointCloud, not Mesh.
     auto& vertices = raw.emplace<gs::Vertices>(entity);
     SetPositions(vertices, {{0.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}});
     const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
 
     Extrinsic::Runtime::RenderExtractionCache extraction;
-    extraction.SetMeshPrimitiveViewSettings(
-        stableId, MeshPrimitiveViewSettings{.EnableEdgeView = true, .EnableVertexView = true});
 
     const auto stats = extraction.ExtractAndSubmit(scene,
                                                    engine.GetRenderer(),

@@ -19,8 +19,10 @@ import Extrinsic.Graphics.Colormap;
 //                             (scalar fields, colormaps, isolation lines)
 //   2. MaterialInstance     — baseline PBR / custom material appearance
 //
-// One of the three render components is present on each renderable
-// entity; its presence is the toggle — no boolean flags.
+// Render components compose per geometric domain. Meshes may carry
+// RenderSurface, RenderEdges, and/or RenderPoints; graphs may carry
+// RenderEdges and/or RenderPoints; point clouds may carry RenderPoints.
+// Component presence is the toggle — no boolean flags.
 // ============================================================
 
 export namespace Extrinsic::Graphics::Components
@@ -67,9 +69,9 @@ export namespace Extrinsic::Graphics::Components
     };
 
     // ----------------------------------------------------------------
-    // RenderLines — thick anti-aliased edge rendering hint.
+    // RenderEdges — thick anti-aliased edge rendering hint.
     // ----------------------------------------------------------------
-    struct RenderLines
+    struct RenderEdges
     {
         enum class SourceDomain : std::uint8_t
         {
@@ -77,7 +79,7 @@ export namespace Extrinsic::Graphics::Components
             Edge     ///< Colour constant per edge.
         } Domain = SourceDomain::Vertex;
 
-        /// Uniform line width (world-space) or name of a per-edge
+        /// Uniform edge width or name of a per-edge
         /// width buffer in GpuSceneSlot::Buffers.
         std::variant<float, std::string> WidthSource = 1.0f;
     };

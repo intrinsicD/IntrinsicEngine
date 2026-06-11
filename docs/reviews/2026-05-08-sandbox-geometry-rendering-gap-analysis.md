@@ -54,7 +54,7 @@ The null renderer is useful for CPU-testable contracts: frame lifecycle, render 
 `src/runtime/Runtime.RenderExtraction.cppm` currently identifies renderable entities by requiring:
 
 - `ECS::Components::Transform::WorldMatrix`; and
-- at least one render hint from `Graphics::Components::RenderSurface`, `RenderLines`, or `RenderPoints`.
+- at least one render hint from `Graphics::Components::RenderSurface`, `RenderEdges`, or `RenderPoints`.
 
 For candidates, extraction can allocate a render sidecar and submit transform records. It also observes `ECS::Components::AssetInstance::Source` through the GPU asset cache path.
 

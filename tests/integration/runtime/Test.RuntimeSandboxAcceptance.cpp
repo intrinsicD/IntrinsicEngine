@@ -149,7 +149,7 @@ namespace
         const EntityHandle entity = scene.Create();
         StampCommon(scene, entity, "AcceptanceGraph", 102u);
         auto& raw = scene.Raw();
-        raw.emplace<G::RenderLines>(entity);
+        raw.emplace<G::RenderEdges>(entity);
 
         auto& nodes = raw.emplace<gs::Nodes>(entity);
         SetPositions(nodes.Properties, {{0.f, 0.f, 0.f}, {1.f, 0.f, 0.f}, {0.f, 1.f, 0.f}});

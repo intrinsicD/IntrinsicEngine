@@ -580,6 +580,82 @@ TEST(PointCloudGeometryExtraction, LosingPointHintReleasesPointCloudResidency)
     engine.Shutdown();
 }
 
+TEST(PointCloudGeometryExtraction, UnsupportedSurfaceAndEdgeHintsFailClosed)
+{
+    namespace E = Extrinsic::ECS::Components;
+    namespace G = Extrinsic::Graphics::Components;
+
+    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.Initialize();
+
+    auto& scene = engine.GetScene();
+    auto& raw = scene.Raw();
+    const EntityHandle entity = scene.Create();
+    raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
+    AttachPointCloudSources(scene, entity);
+    raw.emplace<G::RenderSurface>(entity);
+    raw.emplace<G::RenderEdges>(entity);
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    const auto stats = extraction.ExtractAndSubmit(scene,
+                                                    engine.GetRenderer(),
+                                                    &engine.GetGpuAssetCache());
+
+    EXPECT_EQ(stats.CandidateRenderableCount, 1u);
+    EXPECT_EQ(stats.PointCloudGeometryUploads, 0u);
+    EXPECT_EQ(stats.PointCloudGeometryFailedPack, 1u);
+    EXPECT_EQ(stats.PointCloudGeometryReleases, 0u);
+
+    const auto view = extraction.FindRenderableSidecarForTest(
+        Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
+    ASSERT_TRUE(view.has_value());
+    EXPECT_FALSE(view->HasPointCloudResidency);
+    EXPECT_FALSE(engine.GetRenderer().GetGpuWorld().GetInstanceGeometry(view->Instance).IsValid());
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
+TEST(PointCloudGeometryExtraction, UnsupportedSurfaceAndEdgeHintsReleasePriorResidency)
+{
+    namespace G = Extrinsic::Graphics::Components;
+
+    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.Initialize();
+
+    auto& scene = engine.GetScene();
+    const EntityHandle entity = MakePointCloudRenderable(scene);
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    auto stats = extraction.ExtractAndSubmit(scene,
+                                             engine.GetRenderer(),
+                                             &engine.GetGpuAssetCache());
+    ASSERT_EQ(stats.PointCloudGeometryUploads, 1u);
+
+    auto& raw = scene.Raw();
+    raw.remove<G::RenderPoints>(entity);
+    raw.emplace<G::RenderSurface>(entity);
+    raw.emplace<G::RenderEdges>(entity);
+
+    stats = extraction.ExtractAndSubmit(scene,
+                                        engine.GetRenderer(),
+                                        &engine.GetGpuAssetCache());
+
+    EXPECT_EQ(stats.PointCloudGeometryUploads, 0u);
+    EXPECT_EQ(stats.PointCloudGeometryFailedPack, 1u);
+    EXPECT_EQ(stats.PointCloudGeometryReuseHits, 0u);
+    EXPECT_EQ(stats.PointCloudGeometryReleases, 1u);
+
+    const auto view = extraction.FindRenderableSidecarForTest(
+        Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
+    ASSERT_TRUE(view.has_value());
+    EXPECT_FALSE(view->HasPointCloudResidency);
+    EXPECT_FALSE(engine.GetRenderer().GetGpuWorld().GetInstanceGeometry(view->Instance).IsValid());
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
 namespace
 {
     void DrivePointCloudDeferredRetireWindow(Extrinsic::Runtime::RenderExtractionCache& extraction,

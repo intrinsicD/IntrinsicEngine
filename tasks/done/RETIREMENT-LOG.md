@@ -9,6 +9,27 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`RUNTIME-106`](RUNTIME-106-render-component-domain-composition.md) — Render
+component domain composition — retired on 2026-06-12 at maturity
+`CPUContracted`. Mesh, graph, and point-cloud rendering now share the promoted
+user-facing composition contract: `GeometrySources::BuildConstView(...)`
+selects the geometric domain, while `RenderSurface`, `RenderEdges`, and
+`RenderPoints` component presence selects render lanes supported by that domain.
+Mesh `RenderEdges` and `RenderPoints` reuse the existing runtime primitive-view
+sidecars directly from ECS components, so mesh wireframe and vertex rendering no
+longer require `RenderSurface` or `MeshPrimitiveViewSettings`. The legacy
+primitive-view editor/engine command surfaces translate to `RenderEdges` /
+`RenderPoints` for compatibility, and extraction no longer treats the settings
+map as authority. Graph lane toggles remain on the shared graph residency handle
+but repack deterministically on component changes, and point-cloud
+`RenderSurface` / `RenderEdges` requests fail closed with diagnostics and no
+stale point residency. Focused CPU/null coverage proves mesh edge-only,
+point-only, and combined lanes, graph lane toggles, point-cloud unsupported
+lanes, UI render-hint command routing, scene serialization of `edges`, and
+engine compatibility translation; the default CPU gate remains the retirement
+gate and no `Operational` follow-up is owed by default.
+
+Backlog
 [`BUG-028`](BUG-028-mesh-primitive-view-ui-rendering.md) — Mesh primitive view
 UI toggles do not render — retired on 2026-06-11 at maturity `CPUContracted`.
 The promoted mesh edge/vertex view path is runtime extraction-cache sidecar
@@ -34,8 +55,8 @@ Promoted mesh, graph, and point-cloud rendering paths were already present in
 runtime extraction and renderer passes; this slice closed the editor workflow
 gap by adding `ApplySandboxEditorRenderHintCommand(...)`, typed render-hint
 domain-window model fields, and ImGui controls for selected-domain
-`RenderSurface`, `RenderLines`, and `RenderPoints` components. Commands are
-undoable through `EditorCommandHistory` when available, graph line-lane edits
+`RenderSurface`, `RenderEdges`, and `RenderPoints` components. Commands are
+undoable through `EditorCommandHistory` when available, graph edge-lane edits
 force runtime graph residency to repack, and uniform retained-point radius/type
 settings now flow through `VisualizationSyncRecord` into `GpuEntityConfig`.
 Retained-line per-entity width rasterization remains renderer-owned future
@@ -118,8 +139,8 @@ overlay producer lifecycle — retired on 2026-06-11 at maturity
 `CPUContracted`. The value gate found no current promoted workflow requiring a
 new persistent runtime overlay producer API. Legacy mesh/graph/point child
 overlays are represented by ordinary `GeometrySources` entities when runtime/UI
-imports or authors data; mesh edge/vertex overlays use runtime-owned
-primitive-view sidecars; transient line/point/triangle overlays remain on
+imports or authors data; mesh edge/vertex overlays use component-driven
+runtime-owned primitive-view sidecars; transient line/point/triangle overlays remain on
 transient debug packets; vector-field and isoline overlays remain data-only
 visualization packets emitted by `Runtime.VisualizationAdapters`. The
 vector-field packet path is covered by runtime extraction regression coverage
@@ -867,7 +888,7 @@ together on `claude/intrinsicengine-agent-onboarding-c9ql3` because the
 extraction upload path is not leak-free without the retire/shutdown lifecycle,
 so the smallest robust slice is the full residency mirror of `RUNTIME-085`.
 `RenderExtractionCache` now routes `Domain::Graph` entities carrying
-`RenderLines`/`RenderPoints` through `BindGraphGeometry` (upload/reuse/
+`RenderEdges`/`RenderPoints` through `BindGraphGeometry` (upload/reuse/
 dirty-reupload), owns the per-entity `GraphGeometry` handle, drains the graph
 dirty-domain tags, releases on eligibility flip / destruction / shutdown through
 `EnqueueGraphRetire` + the `TickGraphGeometry` deferred-retire window

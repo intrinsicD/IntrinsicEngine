@@ -1083,8 +1083,8 @@ Concretely:
   vector-field and one isoline packet in the same frame and verifies that
   `TransientDebugSurfacePass` and `VisualizationOverlayPass` both record with
   per-lane submitted/recorded counters and no missing-pipeline skips. Selectable
-  overlay-like renderables remain ordinary renderables or runtime primitive-view
-  sidecars covered by immutable selection/outline snapshots; packet-only
+  overlay-like renderables remain ordinary renderables or component-driven
+  runtime primitive-view sidecars covered by immutable selection/outline snapshots; packet-only
   visualization overlays remain visual-only because no selection metadata is
   added. Existing opt-in `TransientDebugSurfaceGpuSmoke` and
   `VisualizationOverlaySurfaceGpuSmoke` remain the Vulkan evidence path.

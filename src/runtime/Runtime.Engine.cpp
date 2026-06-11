@@ -113,6 +113,38 @@ namespace Extrinsic::Runtime
             std::uint32_t PooledFrontSlot{RenderWorldPool::kInvalidSlot};
         };
 
+        [[nodiscard]] Graphics::Components::RenderPoints::RenderType ToRenderPointType(
+            const MeshVertexViewRenderMode mode) noexcept
+        {
+            namespace G = Graphics::Components;
+            switch (mode)
+            {
+            case MeshVertexViewRenderMode::FlatCircle:
+                return G::RenderPoints::RenderType::Flat;
+            case MeshVertexViewRenderMode::SurfaceAlignedCircle:
+                return G::RenderPoints::RenderType::Surfel;
+            case MeshVertexViewRenderMode::ImpostorSphere:
+                return G::RenderPoints::RenderType::Sphere;
+            }
+            return G::RenderPoints::RenderType::Sphere;
+        }
+
+        [[nodiscard]] MeshVertexViewRenderMode ToMeshVertexViewRenderMode(
+            const Graphics::Components::RenderPoints::RenderType type) noexcept
+        {
+            namespace G = Graphics::Components;
+            switch (type)
+            {
+            case G::RenderPoints::RenderType::Flat:
+                return MeshVertexViewRenderMode::FlatCircle;
+            case G::RenderPoints::RenderType::Surfel:
+                return MeshVertexViewRenderMode::SurfaceAlignedCircle;
+            case G::RenderPoints::RenderType::Sphere:
+                return MeshVertexViewRenderMode::ImpostorSphere;
+            }
+            return MeshVertexViewRenderMode::ImpostorSphere;
+        }
+
         // RUNTIME-070: runtime-baked fallback texture bytes for GpuAssetCache.
         // A 4×4 RGBA8_UNORM magenta-and-black checkerboard repeated from a 2×2
         // base pattern. The cache never reads files; runtime owns the bytes.
@@ -788,10 +820,10 @@ namespace Extrinsic::Runtime
                                 GeometryEntityName(decoded.Path, decoded.PayloadKind));
                         auto& raw = scene.Raw();
                         raw.emplace<ECS::Components::Selection::SelectableTag>(entity);
-                        raw.emplace<Graphics::Components::RenderLines>(
+                        raw.emplace<Graphics::Components::RenderEdges>(
                             entity,
-                            Graphics::Components::RenderLines{
-                                .Domain = Graphics::Components::RenderLines::SourceDomain::Vertex,
+                            Graphics::Components::RenderEdges{
+                                .Domain = Graphics::Components::RenderEdges::SourceDomain::Vertex,
                             });
                         raw.emplace<Graphics::Components::RenderPoints>(
                             entity,
@@ -2755,19 +2787,93 @@ namespace Extrinsic::Runtime
         const std::uint32_t stableEntityId,
         const MeshPrimitiveViewSettings settings)
     {
-        m_RenderExtraction.SetMeshPrimitiveViewSettings(stableEntityId, settings);
+        if (!m_Scene)
+        {
+            return;
+        }
+
+        namespace G = Graphics::Components;
+        const ECS::EntityHandle entity =
+            SelectionController::ToEntityHandle(stableEntityId);
+        entt::registry& raw = m_Scene->Raw();
+        if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
+        {
+            return;
+        }
+
+        if (settings.EnableEdgeView)
+        {
+            raw.emplace_or_replace<G::RenderEdges>(entity);
+        }
+        else if (raw.all_of<G::RenderEdges>(entity))
+        {
+            raw.remove<G::RenderEdges>(entity);
+        }
+
+        if (settings.EnableVertexView)
+        {
+            G::RenderPoints points =
+                raw.all_of<G::RenderPoints>(entity)
+                    ? raw.get<G::RenderPoints>(entity)
+                    : G::RenderPoints{};
+            points.Type = ToRenderPointType(settings.VertexRenderMode);
+            points.SizeSource = settings.VertexPointRadiusPx;
+            raw.emplace_or_replace<G::RenderPoints>(entity, points);
+        }
+        else if (raw.all_of<G::RenderPoints>(entity))
+        {
+            raw.remove<G::RenderPoints>(entity);
+        }
+
+        m_RenderExtraction.ClearMeshPrimitiveViewSettings(stableEntityId);
     }
 
     void Engine::ClearMeshPrimitiveViewSettings(
         const std::uint32_t stableEntityId) noexcept
     {
+        if (m_Scene)
+        {
+            namespace G = Graphics::Components;
+            const ECS::EntityHandle entity =
+                SelectionController::ToEntityHandle(stableEntityId);
+            entt::registry& raw = m_Scene->Raw();
+            if (entity != ECS::InvalidEntityHandle && raw.valid(entity))
+            {
+                raw.remove<G::RenderEdges, G::RenderPoints>(entity);
+            }
+        }
         m_RenderExtraction.ClearMeshPrimitiveViewSettings(stableEntityId);
     }
 
     MeshPrimitiveViewSettings Engine::GetMeshPrimitiveViewSettings(
         const std::uint32_t stableEntityId) const noexcept
     {
-        return m_RenderExtraction.GetMeshPrimitiveViewSettings(stableEntityId);
+        MeshPrimitiveViewSettings settings{};
+        if (!m_Scene)
+        {
+            return settings;
+        }
+
+        namespace G = Graphics::Components;
+        const ECS::EntityHandle entity =
+            SelectionController::ToEntityHandle(stableEntityId);
+        const entt::registry& raw = m_Scene->Raw();
+        if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
+        {
+            return settings;
+        }
+
+        settings.EnableEdgeView = raw.all_of<G::RenderEdges>(entity);
+        if (const auto* points = raw.try_get<G::RenderPoints>(entity))
+        {
+            settings.EnableVertexView = true;
+            settings.VertexRenderMode = ToMeshVertexViewRenderMode(points->Type);
+            if (const auto* uniform = std::get_if<float>(&points->SizeSource))
+            {
+                settings.VertexPointRadiusPx = *uniform;
+            }
+        }
+        return settings;
     }
 
     void Engine::SetVisualizationAdapterBinding(

@@ -321,22 +321,22 @@ namespace Extrinsic::Runtime
             return true;
         }
 
-        [[nodiscard]] const char* LineDomainToString(
-            const G::RenderLines::SourceDomain domain) noexcept
+        [[nodiscard]] const char* EdgeDomainToString(
+            const G::RenderEdges::SourceDomain domain) noexcept
         {
-            return domain == G::RenderLines::SourceDomain::Edge
+            return domain == G::RenderEdges::SourceDomain::Edge
                 ? "Edge"
                 : "Vertex";
         }
 
-        [[nodiscard]] bool TryLineDomainFromString(
+        [[nodiscard]] bool TryEdgeDomainFromString(
             const std::string_view value,
-            G::RenderLines::SourceDomain& out) noexcept
+            G::RenderEdges::SourceDomain& out) noexcept
         {
             if (value == "Edge")
-                out = G::RenderLines::SourceDomain::Edge;
+                out = G::RenderEdges::SourceDomain::Edge;
             else if (value == "Vertex")
-                out = G::RenderLines::SourceDomain::Vertex;
+                out = G::RenderEdges::SourceDomain::Vertex;
             else
                 return false;
             return true;
@@ -675,11 +675,11 @@ namespace Extrinsic::Runtime
                 hasAny = true;
             }
 
-            if (const auto* lines = raw.try_get<G::RenderLines>(entity))
+            if (const auto* edges = raw.try_get<G::RenderEdges>(entity))
             {
-                render["lines"] = json{
-                    {"domain", LineDomainToString(lines->Domain)},
-                    {"width", SizeOrWidthSourceToJson(lines->WidthSource)},
+                render["edges"] = json{
+                    {"domain", EdgeDomainToString(edges->Domain)},
+                    {"width", SizeOrWidthSourceToJson(edges->WidthSource)},
                 };
                 hasAny = true;
             }
@@ -733,25 +733,26 @@ namespace Extrinsic::Runtime
                 hasAny = true;
             }
 
-            if (render.contains("lines"))
+            if (render.contains("edges") || render.contains("lines"))
             {
-                const json& linesJson = render["lines"];
-                if (!linesJson.is_object() ||
-                    !linesJson.contains("domain") ||
-                    !linesJson["domain"].is_string() ||
-                    !linesJson.contains("width"))
+                const json& edgesJson =
+                    render.contains("edges") ? render["edges"] : render["lines"];
+                if (!edgesJson.is_object() ||
+                    !edgesJson.contains("domain") ||
+                    !edgesJson["domain"].is_string() ||
+                    !edgesJson.contains("width"))
                 {
                     return false;
                 }
 
-                G::RenderLines lines{};
-                if (!TryLineDomainFromString(linesJson["domain"].get<std::string>(),
-                                             lines.Domain) ||
-                    !TrySourceFromJson(linesJson["width"], lines.WidthSource))
+                G::RenderEdges edges{};
+                if (!TryEdgeDomainFromString(edgesJson["domain"].get<std::string>(),
+                                             edges.Domain) ||
+                    !TrySourceFromJson(edgesJson["width"], edges.WidthSource))
                 {
                     return false;
                 }
-                raw.emplace_or_replace<G::RenderLines>(entity, std::move(lines));
+                raw.emplace_or_replace<G::RenderEdges>(entity, std::move(edges));
                 hasAny = true;
             }
 

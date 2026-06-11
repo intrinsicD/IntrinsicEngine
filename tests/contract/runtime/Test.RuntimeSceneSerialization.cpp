@@ -186,10 +186,10 @@ namespace
         G::RenderSurface surface{};
         surface.Domain = G::RenderSurface::SourceDomain::Face;
         raw.emplace<G::RenderSurface>(entity, surface);
-        G::RenderLines lines{};
-        lines.Domain = G::RenderLines::SourceDomain::Edge;
-        lines.WidthSource = 2.5f;
-        raw.emplace<G::RenderLines>(entity, lines);
+        G::RenderEdges renderEdges{};
+        renderEdges.Domain = G::RenderEdges::SourceDomain::Edge;
+        renderEdges.WidthSource = 2.5f;
+        raw.emplace<G::RenderEdges>(entity, renderEdges);
 
         G::VisualizationConfig visualization{};
         visualization.Source = G::VisualizationConfig::ColorSource::ScalarField;
@@ -224,7 +224,7 @@ namespace
         auto& edges = raw.emplace<GS::Edges>(entity);
         SetEdges(edges, {0u, 1u}, {1u, 2u});
         raw.emplace<GS::HasGraphTopology>(entity);
-        raw.emplace<G::RenderLines>(entity);
+        raw.emplace<G::RenderEdges>(entity);
         G::RenderPoints points{};
         points.Type = G::RenderPoints::RenderType::Flat;
         points.SizeSource = std::string{"node:radius"};
@@ -337,10 +337,10 @@ TEST(RuntimeSceneSerialization, SaveLoadRoundTripPreservesPromotedSandboxSceneDa
 
     const auto& surface = raw.get<G::RenderSurface>(loadedMesh);
     EXPECT_EQ(surface.Domain, G::RenderSurface::SourceDomain::Face);
-    const auto& lines = raw.get<G::RenderLines>(loadedMesh);
-    EXPECT_EQ(lines.Domain, G::RenderLines::SourceDomain::Edge);
-    ASSERT_NE(std::get_if<float>(&lines.WidthSource), nullptr);
-    EXPECT_FLOAT_EQ(*std::get_if<float>(&lines.WidthSource), 2.5f);
+    const auto& renderEdges = raw.get<G::RenderEdges>(loadedMesh);
+    EXPECT_EQ(renderEdges.Domain, G::RenderEdges::SourceDomain::Edge);
+    ASSERT_NE(std::get_if<float>(&renderEdges.WidthSource), nullptr);
+    EXPECT_FLOAT_EQ(*std::get_if<float>(&renderEdges.WidthSource), 2.5f);
     ASSERT_TRUE(raw.all_of<G::VisualizationConfig>(loadedMesh));
     const auto& visualization = raw.get<G::VisualizationConfig>(loadedMesh);
     EXPECT_EQ(visualization.Source, G::VisualizationConfig::ColorSource::ScalarField);

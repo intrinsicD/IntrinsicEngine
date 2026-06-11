@@ -62,7 +62,7 @@ export namespace Extrinsic::Graphics::Components
     //
     // Buffers
     //   All uploaded geometry buffers for this renderable, keyed by canonical name.
-    //   Render geometry components (RenderPoints, RenderLines, RenderSurface) and
+    //   Render geometry components (RenderPoints, RenderEdges, RenderSurface) and
     //   visualization configs (ScalarFieldDataSource, ColorDataSource) name their
     //   required buffer here; the render pass resolves name → handle at extraction time.
     struct GpuSceneSlot

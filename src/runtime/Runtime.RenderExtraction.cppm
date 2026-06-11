@@ -143,7 +143,7 @@ export namespace Extrinsic::Runtime
 
         // RUNTIME-086 Slices B/C — runtime-authored graph `GeometrySources`
         // residency counters, mirroring the mesh accounting above. A graph
-        // entity carrying `RenderLines` and/or `RenderPoints` packs its node
+        // entity carrying `RenderEdges` and/or `RenderPoints` packs its node
         // positions (shared vertex buffer) plus optional `(e:v0, e:v1)` line
         // indices into one `GpuGeometryHandle`. `Uploads` is incremented once
         // per entity on the first frame the graph is packed and uploaded;
@@ -183,9 +183,10 @@ export namespace Extrinsic::Runtime
         // two position-shape pack rejections (`MissingPositions`, `EmptyCloud`)
         // and `InvalidPoints` the non-finite-position rejection because those
         // are the likeliest structural authoring bugs in cloud sources; every
-        // other bind-level rejection (`WrongDomain`, plus an unsupported
-        // per-point `RenderPoints::SizeSource` buffer variant — only a uniform
-        // float radius is supported in this slice) folds into `FailedPack`.
+        // other bind-level rejection (`WrongDomain`, unsupported
+        // `RenderSurface`/`RenderEdges` requests, plus an unsupported per-point
+        // `RenderPoints::SizeSource` buffer variant — only a uniform float
+        // radius is supported in this slice) folds into `FailedPack`.
         // `Releases` is incremented per release-initiated event (entity
         // destruction, eligibility flip away from point-cloud, or dirty
         // reupload superseding an older handle); the actual free runs through
@@ -202,22 +203,20 @@ export namespace Extrinsic::Runtime
         std::uint32_t PointCloudGeometryReleases{0};
         std::uint32_t PointCloudGeometryFreeRetires{0};
 
-        // RUNTIME-088 Slice B — runtime-owned mesh *primitive view* residency
-        // counters. A mesh entity that opts into edge and/or vertex views (via
-        // the cache-owned `MeshPrimitiveViewSettings`, set by runtime/editor
-        // state — the flags never live in ECS components) derives one extra
-        // retained renderable per enabled view from the *same* authoritative
-        // mesh `GeometrySources`: the edge view binds a line-list
-        // (`GpuRender_Line`) and the vertex view a point list
+        // RUNTIME-106 — runtime-owned mesh *primitive view* residency counters.
+        // A mesh entity that carries `RenderEdges` and/or `RenderPoints`
+        // derives one extra retained renderable per requested lane from the
+        // same authoritative mesh `GeometrySources`: the edge view binds a
+        // line-list (`GpuRender_Line`) and the vertex view a point list
         // (`GpuRender_Point`), each through its own `GpuWorld` instance +
-        // `GpuGeometryHandle` recorded in the parent mesh's sidecar. Each view
-        // is a single-owner residency stream mirroring the surface-mesh
-        // accounting: `Uploads` once on the frame a view is first created,
-        // `ReuseHits` on clean frames, `Reuploads` when the parent mesh is
-        // dirty (every mesh dirty domain is coalesced — views repack whenever
-        // the surface repacks), `Releases` per release-initiated event (view
-        // disabled, parent flips away from a resident mesh, dirty reupload
-        // superseding an older handle, entity destruction, or shutdown). The
+        // `GpuGeometryHandle` recorded in the mesh entity's sidecar. These
+        // sidecars do not require `RenderSurface`; surface, edge, and point
+        // lanes compose independently. Each view is a single-owner residency
+        // stream: `Uploads` once on the frame a view is first created,
+        // `ReuseHits` on clean frames, `Reuploads` when the mesh source is
+        // dirty, `Releases` per release-initiated event (component removed,
+        // entity flips away from mesh, dirty reupload superseding an older
+        // handle, entity destruction, or shutdown). The
         // edge view folds `MissingPositions`/`EmptyMesh` into
         // `MissingPositions`, reports `MissingEdgeTopology` and out-of-range
         // endpoints in their own counters, and folds every other rejection into
@@ -543,12 +542,12 @@ export namespace Extrinsic::Runtime
             // the handles are tracked separately so an entity that flips
             // domain releases the stale handle while the other path uploads.
             Graphics::GpuGeometryHandle GraphGeometry{};
-            // RUNTIME-086 — the render-lane hints (`RenderLines` /
+            // RUNTIME-086 — the render-lane hints (`RenderEdges` /
             // `RenderPoints`) the resident `GraphGeometry` upload was packed
             // for. The line lane's presence changes the packed upload (line
             // indices), so a change in requested lanes must force a repack even
             // when no geometry dirty tag is set — otherwise a points-only graph
-            // that later gains `RenderLines` would rebind a lineless upload and
+            // that later gains `RenderEdges` would rebind a lineless upload and
             // draw no lines until an unrelated dirty tag forced a repack.
             bool GraphPackedLines{false};
             bool GraphPackedPoints{false};
@@ -564,8 +563,9 @@ export namespace Extrinsic::Runtime
             // its own `GpuWorld` instance (rendered as an extra line/point lane
             // with the same transform/bounds as the parent surface) plus a
             // single-owner geometry handle the cache frees on retirement.
-            // Mutually independent of the surface `MeshGeometry`; both views are
-            // released whenever the parent stops being a resident mesh.
+            // Mutually independent of the surface `MeshGeometry`; both views
+            // are released whenever the entity stops being a mesh-domain
+            // renderable or drops the matching render component.
             Graphics::GpuInstanceHandle MeshEdgeViewInstance{};
             Graphics::GpuGeometryHandle MeshEdgeViewGeometry{};
             Graphics::GpuInstanceHandle MeshVertexViewInstance{};
@@ -611,16 +611,15 @@ export namespace Extrinsic::Runtime
                                                   Graphics::IRenderer& renderer,
                                                   RuntimeRenderExtractionStats& stats);
 
-        // RUNTIME-088 Slice B — reconcile one mesh primitive view against its
-        // desired state for the frame. `desired` already folds the parent's
-        // residency and the per-entity `MeshPrimitiveViewSettings` flag; when
-        // true the view is created/reused/repacked (driven by `meshDirty`) and
-        // a `TransformSyncRecord` is appended so it renders as an extra
-        // line/point lane, and when false any existing view is released. `view`
-        // must resolve `Domain::Mesh` (the caller only invokes this for a
-        // resident mesh). `model`/`bounds`/`materialSlot` mirror the parent
-        // surface so the view tracks the same transform.
-        void ReconcileMeshPrimitiveView(MeshPrimitiveViewKind kind,
+        // RUNTIME-106 — reconcile one mesh primitive view against the ECS
+        // render component set for the frame. `desired` is the matching
+        // `RenderEdges` / `RenderPoints` component presence; when true the view
+        // is created/reused/repacked (driven by `meshDirty`) and a
+        // `TransformSyncRecord` is appended so it renders as an extra line/point
+        // lane. `view` must resolve `Domain::Mesh`. `model`/`bounds`/
+        // `materialSlot` mirror the domain entity transform/material so the
+        // view tracks the same entity even when no `RenderSurface` lane exists.
+        [[nodiscard]] bool ReconcileMeshPrimitiveView(MeshPrimitiveViewKind kind,
                                         const ECS::Components::GeometrySources::ConstSourceView& view,
                                         RenderableSidecar& sidecar,
                                         const glm::mat4& model,
@@ -628,7 +627,7 @@ export namespace Extrinsic::Runtime
                                         const RHI::GpuBounds& bounds,
                                         std::uint32_t stableId,
                                         bool desired,
-                                        const MeshPrimitiveViewSettings& viewSettings,
+                                        const Graphics::Components::RenderPoints* points,
                                         bool meshDirty,
                                         Graphics::IRenderer& renderer,
                                         RuntimeRenderExtractionStats& stats);
@@ -712,8 +711,9 @@ export namespace Extrinsic::Runtime
         // serially across the edge then vertex pack each frame), shared
         // deferred-retire queue for both view lanes, and the FreeRetires
         // accumulator/prev-snapshot the per-tick delta is derived from.
-        // `m_MeshPrimitiveViewSettings` is the cache-owned runtime/editor
-        // control surface keyed by stable entity id.
+        // `m_MeshPrimitiveViewSettings` is retained as a temporary compatibility
+        // shim for older editor/tests APIs; RUNTIME-106 extraction uses ECS
+        // `RenderEdges` / `RenderPoints` components as the authority.
         MeshPrimitiveViewBuffer m_MeshPrimitiveViewPack{};
         std::vector<GeometryRetireRecord> m_MeshPrimitiveViewRetire{};
         std::uint32_t m_MeshPrimitiveViewFreeRetires{0};

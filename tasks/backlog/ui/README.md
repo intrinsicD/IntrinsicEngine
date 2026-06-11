@@ -63,8 +63,8 @@ map.
   accepts them.
 - UI-013 is a retired promoted EditorUI follow-up that turns the UI-002
   render-hint status windows into controls for the existing promoted
-  `RenderSurface`, `RenderLines`, and `RenderPoints` value components.
-  Commands are undoable through `EditorCommandHistory`, graph line-lane edits
+  `RenderSurface`, `RenderEdges`, and `RenderPoints` value components.
+  Commands are undoable through `EditorCommandHistory`, graph edge-lane edits
   repack runtime graph residency, and uniform point settings flow to retained
   point GPU config. Retained-line per-entity width rasterization remains a
   future renderer task.

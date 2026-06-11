@@ -107,7 +107,7 @@ namespace
         const EntityHandle entity = scene.Create();
         auto& raw = scene.Raw();
         raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
-        raw.emplace<G::RenderLines>(entity);
+        raw.emplace<G::RenderEdges>(entity);
         AttachLineGraphSources(scene, entity);
         return entity;
     }
@@ -131,7 +131,7 @@ namespace
         const EntityHandle entity = scene.Create();
         auto& raw = scene.Raw();
         raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
-        raw.emplace<G::RenderLines>(entity);
+        raw.emplace<G::RenderEdges>(entity);
         raw.emplace<G::RenderPoints>(entity);
         AttachLineGraphSources(scene, entity);
         return entity;
@@ -403,7 +403,7 @@ TEST(GraphGeometryExtraction, ProceduralRefPreemptsGraphPathOnSameEntity)
     auto& raw = scene.Raw();
     const EntityHandle entity = scene.Create();
     raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
-    raw.emplace<G::RenderLines>(entity);
+    raw.emplace<G::RenderEdges>(entity);
     raw.emplace<E::ProceduralGeometryRef>(entity);
     AttachLineGraphSources(scene, entity);
 
@@ -474,7 +474,7 @@ TEST(GraphGeometryExtraction, OutOfRangeEdgeIncrementsInvalidEdgesCounter)
     auto& raw = scene.Raw();
     const EntityHandle entity = scene.Create();
     raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
-    raw.emplace<G::RenderLines>(entity);
+    raw.emplace<G::RenderEdges>(entity);
     auto& nodes = raw.emplace<gs::Nodes>(entity);
     SetNodePositions(nodes, {{0.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}});
     auto& edges = raw.emplace<gs::Edges>(entity);
@@ -619,7 +619,7 @@ TEST(GraphGeometryExtraction, LosingGraphHintReleasesGraphResidency)
     raw.remove<gs::Nodes>(entity);
     raw.remove<gs::Edges>(entity);
     raw.remove<gs::HasGraphTopology>(entity);
-    raw.remove<G::RenderLines>(entity);
+    raw.remove<G::RenderEdges>(entity);
     raw.emplace<G::RenderSurface>(entity);
 
     stats = extraction.ExtractAndSubmit(scene,
@@ -651,7 +651,7 @@ TEST(GraphGeometryExtraction, LosingGraphHintReleasesGraphResidency)
 
 // RUNTIME-086 — a change in requested render lanes must repack even when no
 // geometry dirty tag is set, because the line lane's presence changes the
-// packed upload. A points-only graph that later gains `RenderLines` must
+// packed upload. A points-only graph that later gains `RenderEdges` must
 // repack (with line indices) rather than rebind the lineless cached upload.
 TEST(GraphGeometryExtraction, GainingLineHintRepacksGraphWithoutDirtyTag)
 {
@@ -686,7 +686,7 @@ TEST(GraphGeometryExtraction, GainingLineHintRepacksGraphWithoutDirtyTag)
 
     // Gain a line hint. No geometry dirty tag is set, so the old reuse guard
     // would have rebound the lineless upload.
-    raw.emplace<G::RenderLines>(entity);
+    raw.emplace<G::RenderEdges>(entity);
     ASSERT_FALSE((raw.any_of<D::GpuDirty,
                              D::DirtyVertexPositions,
                              D::DirtyVertexAttributes,
@@ -741,7 +741,7 @@ TEST(GraphGeometryExtraction, LosingLineHintRepacksGraphWithoutDirtyTag)
 
     // Drop the line lane; RenderPoints keeps the entity a graph renderable.
     auto& raw = scene.Raw();
-    raw.remove<G::RenderLines>(entity);
+    raw.remove<G::RenderEdges>(entity);
     ASSERT_FALSE((raw.any_of<D::GpuDirty,
                              D::DirtyVertexPositions,
                              D::DirtyVertexAttributes,

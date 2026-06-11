@@ -5,9 +5,9 @@
   (`fade19e` runtime graph geometry packer); Slices B + C on branch
   `claude/intrinsicengine-agent-onboarding-c9ql3` (this PR). PR: _TBD_.
 - 2026-05-30 (post-review fix, same PR): the `BindGraphGeometry` reuse guard
-  now tracks the packed render-lane mask (`RenderLines` / `RenderPoints`) and
+  now tracks the packed render-lane mask (`RenderEdges` / `RenderPoints`) and
   repacks when the requested lanes change even without a geometry dirty tag —
-  otherwise a points-only graph that later gains `RenderLines` would rebind a
+  otherwise a points-only graph that later gains `RenderEdges` would rebind a
   lineless upload. Covered by
   `GainingLineHintRepacksGraphWithoutDirtyTag` /
   `LosingLineHintRepacksGraphWithoutDirtyTag`.
@@ -46,7 +46,7 @@
   indices (line lane), with fail-closed status codes and `contract;runtime`
   packer unit tests. No extraction wiring yet.
 - **Slice B:** Wire `RenderExtractionCache::ExtractAndSubmit` to detect
-  graph-domain entities carrying `RenderLines`/`RenderPoints`, upload/reuse
+  graph-domain entities carrying `RenderEdges`/`RenderPoints`, upload/reuse
   the packed handle, set line/point render flags, bind instance geometry,
   add the `GraphGeometry*` diagnostics counters, and handle
   eligibility-flip releases.
@@ -65,7 +65,7 @@
   single-renderable-instance contract.
 
 ## Goal
-- Implement the runtime-owned bridge that converts promoted ECS graph `GeometrySources` (`Nodes` + `Edges` + `HasGraphTopology`) plus `RenderLines` / `RenderPoints` hints into retained `GpuWorld` line and point geometry bindings.
+- Implement the runtime-owned bridge that converts promoted ECS graph `GeometrySources` (`Nodes` + `Edges` + `HasGraphTopology`) plus `RenderEdges` / `RenderPoints` hints into retained `GpuWorld` line and point geometry bindings.
 
 ## Non-goals
 - No mesh residency (`RUNTIME-085`) or point-cloud residency (`RUNTIME-087`).
@@ -77,20 +77,20 @@
 ## Context
 - Owner/layer: `runtime`; reads ECS `GeometrySources` and owns extraction sidecars / residency maps.
 - Upstream completed contracts: `HARDEN-065` can populate graph `GeometrySources`; `GRAPHICS-071` wires retained line/point command bodies; `Runtime.RenderExtraction` already sets `GpuRender_Line` and `GpuRender_Point` when render hints are present.
-- Graph rendering should treat edges and nodes as equal retained renderable lanes: `RenderLines` drives edge geometry; `RenderPoints` drives node geometry.
+- Graph rendering should treat edges and nodes as equal retained renderable lanes: `RenderEdges` drives edge geometry; `RenderPoints` drives node geometry.
 - The bridge must preserve the canonical instance-slot contract: cull buckets use `firstInstance` as the renderable identity and graphics never queries live graph data.
 
 ## Required changes
 - [x] Add a runtime graph packer that reads canonical node positions (`v:position` on `Nodes`) and edge endpoints (`e:v0`, `e:v1` on `Edges`) and emits upload descriptors for line-list edge indices and point-list node positions. _(Slice A: `Extrinsic.Runtime.GraphGeometryPacker::PackGraph`.)_
 - [x] Define the sidecar model for graph entities that request only lines, only points, or both; document whether one `GpuGeometryHandle` or two handles are used and how they bind to the single renderable instance contract. _(Decision recorded in Slice plan + `src/runtime/README.md`: one handle; node positions are the shared vertex buffer, point lane draws it directly, line lane indexes it via `LineIndices`. Sidecar wiring lands in Slice B.)_
-- [x] Extend `RenderExtractionCache::ExtractAndSubmit` to detect graph-domain entities with `RenderLines` and/or `RenderPoints`, upload/reuse graph geometry, set line/point render flags, and bind valid geometry before snapshot submission. _(Slice B: `BindGraphGeometry`; render flags already set by the existing `BuildRenderFlags` from `RenderLines`/`RenderPoints` presence.)_
+- [x] Extend `RenderExtractionCache::ExtractAndSubmit` to detect graph-domain entities with `RenderEdges` and/or `RenderPoints`, upload/reuse graph geometry, set line/point render flags, and bind valid geometry before snapshot submission. _(Slice B: `BindGraphGeometry`; render flags already set by the existing `BuildRenderFlags` from `RenderEdges`/`RenderPoints` presence.)_
 - [x] Drain graph-relevant dirty tags (`DirtyVertexPositions`, `DirtyEdgeTopology`, `DirtyVertexAttributes`, `GpuDirty`) for processed graph entities. _(Slice C: `BindGraphGeometry` drains the four tags on (re)upload. Note: no `DirtyEdgeAttributes` tag exists; see Slice plan clarification.)_
 - [x] Release/deferred-retire graph residency when graph entities disappear or no longer carry graph render hints. _(Slice C: eligibility-flip release + `RetireMissingRenderables` + `Shutdown` route through `EnqueueGraphRetire`/`TickGraphGeometry`.)_
 - [x] Add diagnostics such as `GraphGeometryUploads`, `GraphGeometryReuseHits`, `GraphGeometryReuploads`, `GraphGeometryInvalidEdges`, `GraphGeometryMissingNodes`, `GraphGeometryReleases`. _(Slice B/C: plus `GraphGeometryFailedPack` and `GraphGeometryFreeRetires`.)_
 - [x] Fail closed for empty graphs, missing node positions, non-finite positions, out-of-range edge endpoints, and contradictory render-source hints. _(Slice A: `GraphPackStatus` covers `EmptyGraph`, `MissingNodes`, `NonFinitePosition`, `InvalidEdge`, `MissingEdgeTopology`, `NoRenderLane`.)_
 
 ## Tests
-- [x] Add `contract;runtime` coverage for a two-node/one-edge graph with `RenderLines`: extraction uploads/binds line geometry and submits one line renderable. _(Slice B: `Test.GraphGeometryExtraction.cpp::LineGraphUploadsOnceAndBindsInstanceGeometry`.)_
+- [x] Add `contract;runtime` coverage for a two-node/one-edge graph with `RenderEdges`: extraction uploads/binds line geometry and submits one line renderable. _(Slice B: `Test.GraphGeometryExtraction.cpp::LineGraphUploadsOnceAndBindsInstanceGeometry`.)_
 - [x] Add `contract;runtime` coverage for a graph with `RenderPoints`: extraction uploads/binds point geometry and submits one point renderable. _(Slice B: `PointGraphUploadsOnceAndBindsInstanceGeometry`.)_
 - [x] Add `contract;runtime` coverage for a graph with both hints and deterministic line/point render flags. _(Slice B: `LineAndPointGraphUploadsSingleHandleForBothLanes` — one upload / one handle bound; render flags are produced by the unchanged `BuildRenderFlags`.)_
 - [x] Add dirty topology and position reupload tests. _(Slice C: parameterized `GraphGeometryExtractionDirtyTag` over `GpuDirty`/`DirtyVertexPositions`/`DirtyVertexAttributes`/`DirtyEdgeTopology`.)_
@@ -130,4 +130,3 @@ python3 tools/repo/generate_module_inventory.py --root src --out docs/api/genera
 ## Maturity
 - Target: `CPUContracted` for retained graph residency with CPU/null verification.
 - `Operational` visual proof is owned by the final sandbox acceptance task after default line/point and present wiring are complete.
-

@@ -336,14 +336,14 @@ export namespace Extrinsic::Runtime
         std::string SurfaceDomain{};
         Graphics::Components::RenderSurface::SourceDomain SurfaceDomainValue{
             Graphics::Components::RenderSurface::SourceDomain::Vertex};
-        bool HasRenderLines{false};
-        std::string LineDomain{};
-        Graphics::Components::RenderLines::SourceDomain LineDomainValue{
-            Graphics::Components::RenderLines::SourceDomain::Vertex};
-        bool        HasUniformLineWidth{false};
-        float       UniformLineWidth{0.0f};
-        bool        HasNamedLineWidth{false};
-        std::string LineWidthName{};
+        bool HasRenderEdges{false};
+        std::string EdgeDomain{};
+        Graphics::Components::RenderEdges::SourceDomain EdgeDomainValue{
+            Graphics::Components::RenderEdges::SourceDomain::Vertex};
+        bool        HasUniformEdgeWidth{false};
+        float       UniformEdgeWidth{0.0f};
+        bool        HasNamedEdgeWidth{false};
+        std::string EdgeWidthName{};
         bool HasRenderPoints{false};
         std::string PointRenderType{};
         Graphics::Components::RenderPoints::RenderType PointRenderTypeValue{
@@ -806,12 +806,12 @@ export namespace Extrinsic::Runtime
         Graphics::Components::RenderSurface::SourceDomain SurfaceDomain{
             Graphics::Components::RenderSurface::SourceDomain::Vertex};
 
-        bool SetLines{false};
-        bool EnableLines{false};
-        Graphics::Components::RenderLines::SourceDomain LineDomain{
-            Graphics::Components::RenderLines::SourceDomain::Vertex};
-        bool SetUniformLineWidth{false};
-        float UniformLineWidth{1.0f};
+        bool SetEdges{false};
+        bool EnableEdges{false};
+        Graphics::Components::RenderEdges::SourceDomain EdgeDomain{
+            Graphics::Components::RenderEdges::SourceDomain::Vertex};
+        bool SetUniformEdgeWidth{false};
+        float UniformEdgeWidth{1.0f};
 
         bool SetPoints{false};
         bool EnablePoints{false};

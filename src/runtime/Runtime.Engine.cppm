@@ -303,10 +303,11 @@ namespace Extrinsic::Runtime
         // RenderFrameInput::Camera.
         [[nodiscard]] const std::optional<Graphics::CameraViewInput>&
             GetReferenceCameraSeed() const noexcept;
-        // UI-001 Slice C — editor/runtime command seams. The engine remains
-        // the owner of camera-controller slots and mesh primitive-view state;
-        // editor code can request replacements/toggles without storing
-        // authoritative camera or render state in UI objects.
+        // UI-001 Slice C / RUNTIME-106 — editor/runtime command seams. The
+        // engine remains the owner of camera-controller slots. The legacy mesh
+        // primitive-view accessors are compatibility shims that translate to
+        // ECS `RenderEdges` / `RenderPoints`; render components are the
+        // authoritative view toggles.
         [[nodiscard]] CameraControllerRegistry& GetCameraControllerRegistry() noexcept;
         void SetMeshPrimitiveViewSettings(std::uint32_t stableEntityId,
                                           MeshPrimitiveViewSettings settings);

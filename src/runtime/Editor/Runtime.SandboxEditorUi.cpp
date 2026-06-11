@@ -670,13 +670,13 @@ namespace Extrinsic::Runtime
             return "Unknown";
         }
 
-        [[nodiscard]] const char* RenderLineDomainName(
-            const G::RenderLines::SourceDomain domain) noexcept
+        [[nodiscard]] const char* RenderEdgeDomainName(
+            const G::RenderEdges::SourceDomain domain) noexcept
         {
             switch (domain)
             {
-            case G::RenderLines::SourceDomain::Vertex: return "Vertex";
-            case G::RenderLines::SourceDomain::Edge: return "Edge";
+            case G::RenderEdges::SourceDomain::Vertex: return "Vertex";
+            case G::RenderEdges::SourceDomain::Edge: return "Edge";
             }
             return "Unknown";
         }
@@ -693,25 +693,10 @@ namespace Extrinsic::Runtime
             return "Unknown";
         }
 
-        [[nodiscard]] const char* MeshVertexViewRenderModeName(
-            const MeshVertexViewRenderMode mode) noexcept
-        {
-            switch (mode)
-            {
-            case MeshVertexViewRenderMode::FlatCircle:
-                return "Flat circle";
-            case MeshVertexViewRenderMode::SurfaceAlignedCircle:
-                return "Surface aligned circle";
-            case MeshVertexViewRenderMode::ImpostorSphere:
-                return "Impostor sphere";
-            }
-            return "Unknown";
-        }
-
         struct SandboxEditorRenderHintState
         {
             std::optional<G::RenderSurface> Surface{};
-            std::optional<G::RenderLines> Lines{};
+            std::optional<G::RenderEdges> Edges{};
             std::optional<G::RenderPoints> Points{};
         };
 
@@ -722,8 +707,8 @@ namespace Extrinsic::Runtime
             SandboxEditorRenderHintState state{};
             if (const auto* surface = raw.try_get<G::RenderSurface>(entity))
                 state.Surface = *surface;
-            if (const auto* lines = raw.try_get<G::RenderLines>(entity))
-                state.Lines = *lines;
+            if (const auto* lines = raw.try_get<G::RenderEdges>(entity))
+                state.Edges = *lines;
             if (const auto* points = raw.try_get<G::RenderPoints>(entity))
                 state.Points = *points;
             return state;
@@ -736,9 +721,9 @@ namespace Extrinsic::Runtime
             return lhs.Domain == rhs.Domain;
         }
 
-        [[nodiscard]] bool SameRenderLines(
-            const G::RenderLines& lhs,
-            const G::RenderLines& rhs)
+        [[nodiscard]] bool SameRenderEdges(
+            const G::RenderEdges& lhs,
+            const G::RenderEdges& rhs)
         {
             return lhs.Domain == rhs.Domain &&
                    lhs.WidthSource == rhs.WidthSource;
@@ -772,7 +757,7 @@ namespace Extrinsic::Runtime
             return SameOptionalRenderComponent(
                        lhs.Surface, rhs.Surface, SameRenderSurface) &&
                    SameOptionalRenderComponent(
-                       lhs.Lines, rhs.Lines, SameRenderLines) &&
+                       lhs.Edges, rhs.Edges, SameRenderEdges) &&
                    SameOptionalRenderComponent(
                        lhs.Points, rhs.Points, SameRenderPoints);
         }
@@ -786,8 +771,8 @@ namespace Extrinsic::Runtime
             const SandboxEditorRenderHintCommand& command) noexcept
         {
             return command.SetSurface ||
-                   command.SetLines ||
-                   command.SetUniformLineWidth ||
+                   command.SetEdges ||
+                   command.SetUniformEdgeWidth ||
                    command.SetPoints ||
                    command.SetPointRenderType ||
                    command.SetUniformPointSize;
@@ -798,8 +783,8 @@ namespace Extrinsic::Runtime
             const GS::Domain domain) noexcept
         {
             const bool editsSurface = command.SetSurface;
-            const bool editsLines =
-                command.SetLines || command.SetUniformLineWidth;
+            const bool editsEdges =
+                command.SetEdges || command.SetUniformEdgeWidth;
             const bool editsPoints =
                 command.SetPoints ||
                 command.SetPointRenderType ||
@@ -808,11 +793,11 @@ namespace Extrinsic::Runtime
             switch (domain)
             {
             case GS::Domain::Mesh:
-                return editsSurface && !editsLines && !editsPoints;
+                return editsSurface || editsEdges || editsPoints;
             case GS::Domain::Graph:
-                return !editsSurface && (editsLines || editsPoints);
+                return !editsSurface && (editsEdges || editsPoints);
             case GS::Domain::PointCloud:
-                return !editsSurface && !editsLines && editsPoints;
+                return !editsSurface && !editsEdges && editsPoints;
             case GS::Domain::None:
             case GS::Domain::Unknown:
                 return false;
@@ -839,25 +824,25 @@ namespace Extrinsic::Runtime
                 }
             }
 
-            if (command.SetLines)
+            if (command.SetEdges)
             {
-                if (command.EnableLines)
+                if (command.EnableEdges)
                 {
-                    G::RenderLines lines =
-                        state.Lines.value_or(G::RenderLines{});
-                    lines.Domain = command.LineDomain;
-                    if (command.SetUniformLineWidth)
-                        lines.WidthSource = command.UniformLineWidth;
-                    state.Lines = lines;
+                    G::RenderEdges lines =
+                        state.Edges.value_or(G::RenderEdges{});
+                    lines.Domain = command.EdgeDomain;
+                    if (command.SetUniformEdgeWidth)
+                        lines.WidthSource = command.UniformEdgeWidth;
+                    state.Edges = lines;
                 }
                 else
                 {
-                    state.Lines.reset();
+                    state.Edges.reset();
                 }
             }
-            else if (command.SetUniformLineWidth && state.Lines.has_value())
+            else if (command.SetUniformEdgeWidth && state.Edges.has_value())
             {
-                state.Lines->WidthSource = command.UniformLineWidth;
+                state.Edges->WidthSource = command.UniformEdgeWidth;
             }
 
             if (command.SetPoints)
@@ -906,10 +891,10 @@ namespace Extrinsic::Runtime
             else if (raw.all_of<G::RenderSurface>(entity))
                 raw.remove<G::RenderSurface>(entity);
 
-            if (state.Lines.has_value())
-                raw.emplace_or_replace<G::RenderLines>(entity, *state.Lines);
-            else if (raw.all_of<G::RenderLines>(entity))
-                raw.remove<G::RenderLines>(entity);
+            if (state.Edges.has_value())
+                raw.emplace_or_replace<G::RenderEdges>(entity, *state.Edges);
+            else if (raw.all_of<G::RenderEdges>(entity))
+                raw.remove<G::RenderEdges>(entity);
 
             if (state.Points.has_value())
                 raw.emplace_or_replace<G::RenderPoints>(entity, *state.Points);
@@ -973,36 +958,19 @@ namespace Extrinsic::Runtime
                    SameVisualizationAdapterOptions(lhs.Options, rhs.Options);
         }
 
-        [[nodiscard]] SandboxEditorPrimitiveViewSettings FromRuntimeSettings(
-            const MeshPrimitiveViewSettings settings) noexcept
+        [[nodiscard]] G::RenderPoints::RenderType ToRenderPointType(
+            const MeshVertexViewRenderMode mode) noexcept
         {
-            return SandboxEditorPrimitiveViewSettings{
-                .EnableEdgeView = settings.EnableEdgeView,
-                .EnableVertexView = settings.EnableVertexView,
-                .VertexRenderMode = settings.VertexRenderMode,
-                .VertexPointRadiusPx = settings.VertexPointRadiusPx,
-            };
-        }
-
-        [[nodiscard]] MeshPrimitiveViewSettings ToRuntimeSettings(
-            const SandboxEditorPrimitiveViewSettings settings) noexcept
-        {
-            return MeshPrimitiveViewSettings{
-                .EnableEdgeView = settings.EnableEdgeView,
-                .EnableVertexView = settings.EnableVertexView,
-                .VertexRenderMode = settings.VertexRenderMode,
-                .VertexPointRadiusPx = settings.VertexPointRadiusPx,
-            };
-        }
-
-        [[nodiscard]] bool SamePrimitiveViewSettings(
-            const SandboxEditorPrimitiveViewSettings lhs,
-            const SandboxEditorPrimitiveViewSettings rhs) noexcept
-        {
-            return lhs.EnableEdgeView == rhs.EnableEdgeView &&
-                   lhs.EnableVertexView == rhs.EnableVertexView &&
-                   lhs.VertexRenderMode == rhs.VertexRenderMode &&
-                   lhs.VertexPointRadiusPx == rhs.VertexPointRadiusPx;
+            switch (mode)
+            {
+            case MeshVertexViewRenderMode::FlatCircle:
+                return G::RenderPoints::RenderType::Flat;
+            case MeshVertexViewRenderMode::SurfaceAlignedCircle:
+                return G::RenderPoints::RenderType::Surfel;
+            case MeshVertexViewRenderMode::ImpostorSphere:
+                return G::RenderPoints::RenderType::Sphere;
+            }
+            return G::RenderPoints::RenderType::Sphere;
         }
 
         [[nodiscard]] SandboxEditorCommandStatus ToSandboxEditorCommandStatus(
@@ -1198,20 +1166,20 @@ namespace Extrinsic::Runtime
                 model.SurfaceDomain = RenderSurfaceDomainName(surface->Domain);
             }
 
-            if (const auto* lines = raw.try_get<G::RenderLines>(entity))
+            if (const auto* lines = raw.try_get<G::RenderEdges>(entity))
             {
-                model.HasRenderLines = true;
-                model.LineDomainValue = lines->Domain;
-                model.LineDomain = RenderLineDomainName(lines->Domain);
+                model.HasRenderEdges = true;
+                model.EdgeDomainValue = lines->Domain;
+                model.EdgeDomain = RenderEdgeDomainName(lines->Domain);
                 if (const auto* width = std::get_if<float>(&lines->WidthSource))
                 {
-                    model.HasUniformLineWidth = true;
-                    model.UniformLineWidth = *width;
+                    model.HasUniformEdgeWidth = true;
+                    model.UniformEdgeWidth = *width;
                 }
                 else if (const auto* name = std::get_if<std::string>(&lines->WidthSource))
                 {
-                    model.HasNamedLineWidth = true;
-                    model.LineWidthName = *name;
+                    model.HasNamedEdgeWidth = true;
+                    model.EdgeWidthName = *name;
                 }
             }
 
@@ -1870,8 +1838,6 @@ namespace Extrinsic::Runtime
             SandboxEditorCameraRenderModel model{};
             model.CameraControlsAvailable = context.CameraControllers != nullptr;
             model.RenderSettingsAvailable = context.CameraControllers != nullptr;
-            model.PrimitiveViewControlsAvailable =
-                context.PrimitiveViewCommands.Available();
 
             if (context.CameraControllers != nullptr)
             {
@@ -1884,34 +1850,7 @@ namespace Extrinsic::Runtime
                 }
             }
 
-            if (context.Scene != nullptr && context.PrimitiveViewCommands.Available())
-            {
-                if (const std::optional<ECS::EntityHandle> selected =
-                        ResolveFirstSelectedEntity(context);
-                    selected.has_value())
-                {
-                    const GS::ConstSourceView view =
-                        GS::BuildConstView(context.Scene->Raw(), *selected);
-                    if (view.ActiveDomain == GS::Domain::Mesh)
-                    {
-                        model.HasPrimitiveViewEntity = true;
-                        model.PrimitiveViewStableId =
-                            SelectionController::ToStableEntityId(*selected);
-                        model.PrimitiveView =
-                            context.PrimitiveViewCommands.GetSettings(
-                                model.PrimitiveViewStableId);
-                    }
-                    else if (view.ActiveDomain != GS::Domain::None)
-                    {
-                        AddDiagnostic(model.Diagnostics,
-                                      SandboxEditorDiagnosticCode::UnsupportedGeometryDomain,
-                                      "Mesh primitive views require a mesh-domain selection.");
-                    }
-                }
-            }
-
-            if (!model.CameraControlsAvailable &&
-                !model.PrimitiveViewControlsAvailable)
+            if (!model.CameraControlsAvailable)
             {
                 AddDiagnostic(model.Diagnostics,
                               SandboxEditorDiagnosticCode::CameraRenderCommandsUnavailable,
@@ -2132,27 +2071,6 @@ namespace Extrinsic::Runtime
                             return result;
                         },
                 },
-                .PrimitiveViewCommands = SandboxEditorPrimitiveViewCommandSurface{
-                    .GetSettings =
-                        [&engine](const std::uint32_t stableEntityId)
-                        {
-                            return FromRuntimeSettings(
-                                engine.GetMeshPrimitiveViewSettings(stableEntityId));
-                        },
-                    .SetSettings =
-                        [&engine](const std::uint32_t stableEntityId,
-                                  const SandboxEditorPrimitiveViewSettings settings)
-                        {
-                            engine.SetMeshPrimitiveViewSettings(
-                                stableEntityId,
-                                ToRuntimeSettings(settings));
-                        },
-                    .ClearSettings =
-                        [&engine](const std::uint32_t stableEntityId)
-                        {
-                            engine.ClearMeshPrimitiveViewSettings(stableEntityId);
-                        },
-                },
                 .VisualizationAdapterBindings = SandboxEditorVisualizationAdapterBindingCommandSurface{
                     .GetBinding =
                         [&engine](const std::uint32_t stableEntityId)
@@ -2290,17 +2208,17 @@ namespace Extrinsic::Runtime
         {
             ImGui::Text("Surface: %s",
                         hints.HasRenderSurface ? hints.SurfaceDomain.c_str() : "none");
-            if (hints.HasRenderLines)
+            if (hints.HasRenderEdges)
             {
-                ImGui::Text("Lines: %s", hints.LineDomain.c_str());
-                if (hints.HasUniformLineWidth)
-                    ImGui::Text("Line width: %.3f", hints.UniformLineWidth);
-                if (hints.HasNamedLineWidth)
-                    ImGui::Text("Line width source: %s", hints.LineWidthName.c_str());
+                ImGui::Text("Edges: %s", hints.EdgeDomain.c_str());
+                if (hints.HasUniformEdgeWidth)
+                    ImGui::Text("Edge width: %.3f", hints.UniformEdgeWidth);
+                if (hints.HasNamedEdgeWidth)
+                    ImGui::Text("Edge width source: %s", hints.EdgeWidthName.c_str());
             }
             else
             {
-                ImGui::TextDisabled("Lines: none");
+                ImGui::TextDisabled("Edges: none");
             }
 
             if (hints.HasRenderPoints)
@@ -2331,17 +2249,17 @@ namespace Extrinsic::Runtime
             return true;
         }
 
-        [[nodiscard]] bool DrawLineDomainCombo(
-            G::RenderLines::SourceDomain* domain)
+        [[nodiscard]] bool DrawEdgeDomainCombo(
+            G::RenderEdges::SourceDomain* domain)
         {
             constexpr const char* kItems[]{"Vertex", "Edge"};
             int current =
-                *domain == G::RenderLines::SourceDomain::Edge ? 1 : 0;
-            if (!ImGui::Combo("Line domain", &current, kItems, 2))
+                *domain == G::RenderEdges::SourceDomain::Edge ? 1 : 0;
+            if (!ImGui::Combo("Edge domain", &current, kItems, 2))
                 return false;
             *domain = current == 1
-                ? G::RenderLines::SourceDomain::Edge
-                : G::RenderLines::SourceDomain::Vertex;
+                ? G::RenderEdges::SourceDomain::Edge
+                : G::RenderEdges::SourceDomain::Vertex;
             return true;
         }
 
@@ -2380,67 +2298,61 @@ namespace Extrinsic::Runtime
             return true;
         }
 
-        [[nodiscard]] bool DrawMeshVertexViewRenderModeCombo(
-            MeshVertexViewRenderMode* mode)
-        {
-            if (!ImGui::BeginCombo("Vertex style",
-                                   MeshVertexViewRenderModeName(*mode)))
-            {
-                return false;
-            }
-
-            bool changed = false;
-            constexpr MeshVertexViewRenderMode kModes[]{
-                MeshVertexViewRenderMode::FlatCircle,
-                MeshVertexViewRenderMode::SurfaceAlignedCircle,
-                MeshVertexViewRenderMode::ImpostorSphere,
-            };
-            for (const MeshVertexViewRenderMode candidate : kModes)
-            {
-                const bool selected = *mode == candidate;
-                if (ImGui::Selectable(
-                        MeshVertexViewRenderModeName(candidate), selected))
-                {
-                    *mode = candidate;
-                    changed = true;
-                }
-                if (selected)
-                    ImGui::SetItemDefaultFocus();
-            }
-            ImGui::EndCombo();
-            return changed;
-        }
-
-        void DrawMeshPrimitiveVertexViewControls(
-            const std::uint32_t stableEntityId,
-            const SandboxEditorPrimitiveViewSettings& primitiveView,
+        void DrawPointRenderHintControls(
+            const SandboxEditorDomainWindowModel& model,
             const SandboxEditorContext& context,
-            const bool canEditPrimitiveView)
+            bool canEditRenderHints);
+
+        void DrawEdgeRenderHintControls(
+            const SandboxEditorDomainWindowModel& model,
+            const SandboxEditorContext& context,
+            const bool canEditRenderHints)
         {
-            MeshVertexViewRenderMode mode = primitiveView.VertexRenderMode;
-            if (DrawMeshVertexViewRenderModeCombo(&mode) && canEditPrimitiveView)
+            bool edges = model.RenderHints.HasRenderEdges;
+            if (ImGui::Checkbox("Edges", &edges) && canEditRenderHints)
             {
-                (void)ApplySandboxEditorPrimitiveViewCommand(
+                (void)ApplySandboxEditorRenderHintCommand(
                     context,
-                    SandboxEditorPrimitiveViewCommand{
-                        .StableEntityId = stableEntityId,
-                        .SetVertexRenderMode = true,
-                        .VertexRenderMode = mode,
+                    SandboxEditorRenderHintCommand{
+                        .StableEntityId = model.SelectedStableId,
+                        .SetEdges = true,
+                        .EnableEdges = edges,
+                        .EdgeDomain = model.RenderHints.EdgeDomainValue,
                     });
             }
 
-            float radius = primitiveView.VertexPointRadiusPx;
-            if (ImGui::DragFloat(
-                    "Vertex radius (px)", &radius, 0.25f, 1.0f, 64.0f, "%.1f") &&
-                canEditPrimitiveView)
+            if (!model.RenderHints.HasRenderEdges)
+                return;
+
+            G::RenderEdges::SourceDomain edgeDomain =
+                model.RenderHints.EdgeDomainValue;
+            if (DrawEdgeDomainCombo(&edgeDomain) && canEditRenderHints)
             {
-                (void)ApplySandboxEditorPrimitiveViewCommand(
+                (void)ApplySandboxEditorRenderHintCommand(
                     context,
-                    SandboxEditorPrimitiveViewCommand{
-                        .StableEntityId = stableEntityId,
-                        .SetVertexPointRadius = true,
-                        .VertexPointRadiusPx = radius,
+                    SandboxEditorRenderHintCommand{
+                        .StableEntityId = model.SelectedStableId,
+                        .SetEdges = true,
+                        .EnableEdges = true,
+                        .EdgeDomain = edgeDomain,
                     });
+            }
+
+            if (model.RenderHints.HasUniformEdgeWidth)
+            {
+                float edgeWidth = model.RenderHints.UniformEdgeWidth;
+                if (ImGui::DragFloat(
+                        "Edge width", &edgeWidth, 0.05f, 0.1f, 32.0f) &&
+                    canEditRenderHints)
+                {
+                    (void)ApplySandboxEditorRenderHintCommand(
+                        context,
+                        SandboxEditorRenderHintCommand{
+                            .StableEntityId = model.SelectedStableId,
+                            .SetUniformEdgeWidth = true,
+                            .UniformEdgeWidth = edgeWidth,
+                        });
+                }
             }
         }
 
@@ -2478,6 +2390,9 @@ namespace Extrinsic::Runtime
                         });
                 }
             }
+
+            DrawEdgeRenderHintControls(model, context, canEditRenderHints);
+            DrawPointRenderHintControls(model, context, canEditRenderHints);
         }
 
         void DrawPointRenderHintControls(
@@ -2537,53 +2452,7 @@ namespace Extrinsic::Runtime
             const SandboxEditorContext& context,
             const bool canEditRenderHints)
         {
-            bool lines = model.RenderHints.HasRenderLines;
-            if (ImGui::Checkbox("Lines", &lines) && canEditRenderHints)
-            {
-                (void)ApplySandboxEditorRenderHintCommand(
-                    context,
-                    SandboxEditorRenderHintCommand{
-                        .StableEntityId = model.SelectedStableId,
-                        .SetLines = true,
-                        .EnableLines = lines,
-                        .LineDomain = model.RenderHints.LineDomainValue,
-                    });
-            }
-
-            if (model.RenderHints.HasRenderLines)
-            {
-                G::RenderLines::SourceDomain lineDomain =
-                    model.RenderHints.LineDomainValue;
-                if (DrawLineDomainCombo(&lineDomain) && canEditRenderHints)
-                {
-                    (void)ApplySandboxEditorRenderHintCommand(
-                        context,
-                        SandboxEditorRenderHintCommand{
-                            .StableEntityId = model.SelectedStableId,
-                            .SetLines = true,
-                            .EnableLines = true,
-                            .LineDomain = lineDomain,
-                        });
-                }
-
-                if (model.RenderHints.HasUniformLineWidth)
-                {
-                    float lineWidth = model.RenderHints.UniformLineWidth;
-                    if (ImGui::DragFloat(
-                            "Line width", &lineWidth, 0.05f, 0.1f, 32.0f) &&
-                        canEditRenderHints)
-                    {
-                        (void)ApplySandboxEditorRenderHintCommand(
-                            context,
-                            SandboxEditorRenderHintCommand{
-                                .StableEntityId = model.SelectedStableId,
-                                .SetUniformLineWidth = true,
-                                .UniformLineWidth = lineWidth,
-                            });
-                    }
-                }
-            }
-
+            DrawEdgeRenderHintControls(model, context, canEditRenderHints);
             DrawPointRenderHintControls(model, context, canEditRenderHints);
         }
 
@@ -2707,51 +2576,6 @@ namespace Extrinsic::Runtime
                 break;
             }
             if (!canEditRenderHints)
-                ImGui::EndDisabled();
-
-            if (model.Kind != SandboxEditorDomainWindowKind::Mesh)
-                return;
-
-            ImGui::SeparatorText("Mesh primitive views");
-            const bool canEditPrimitiveView =
-                DomainWindowReady(model) &&
-                model.PrimitiveViewControlsAvailable &&
-                model.HasPrimitiveViewSettings;
-            if (!canEditPrimitiveView)
-                ImGui::BeginDisabled();
-
-            bool edgeView = model.PrimitiveView.EnableEdgeView;
-            if (ImGui::Checkbox("Edge view", &edgeView) && canEditPrimitiveView)
-            {
-                (void)ApplySandboxEditorPrimitiveViewCommand(
-                    context,
-                    SandboxEditorPrimitiveViewCommand{
-                        .StableEntityId = model.SelectedStableId,
-                        .SetEdgeView = true,
-                        .EnableEdgeView = edgeView,
-                    });
-            }
-
-            bool vertexView = model.PrimitiveView.EnableVertexView;
-            if (ImGui::Checkbox("Vertex view", &vertexView) && canEditPrimitiveView)
-            {
-                (void)ApplySandboxEditorPrimitiveViewCommand(
-                    context,
-                    SandboxEditorPrimitiveViewCommand{
-                        .StableEntityId = model.SelectedStableId,
-                        .SetVertexView = true,
-                        .EnableVertexView = vertexView,
-                    });
-            }
-            if (model.PrimitiveView.EnableVertexView)
-            {
-                DrawMeshPrimitiveVertexViewControls(model.SelectedStableId,
-                                                    model.PrimitiveView,
-                                                    context,
-                                                    canEditPrimitiveView);
-            }
-
-            if (!canEditPrimitiveView)
                 ImGui::EndDisabled();
         }
 
@@ -3261,23 +3085,23 @@ namespace Extrinsic::Runtime
                     }
                     if (inspector.Transform.HasWorldTransform)
                         DrawVec3("World position", inspector.Transform.WorldPosition);
-                    ImGui::Text("Render hints: surface=%s lines=%s points=%s",
+                    ImGui::Text("Render hints: surface=%s edges=%s points=%s",
                                 inspector.RenderHints.HasRenderSurface ? "yes" : "no",
-                                inspector.RenderHints.HasRenderLines ? "yes" : "no",
+                                inspector.RenderHints.HasRenderEdges ? "yes" : "no",
                                 inspector.RenderHints.HasRenderPoints ? "yes" : "no");
                     if (inspector.RenderHints.HasRenderSurface)
                         ImGui::Text("Surface domain: %s",
                                     inspector.RenderHints.SurfaceDomain.c_str());
-                    if (inspector.RenderHints.HasRenderLines)
+                    if (inspector.RenderHints.HasRenderEdges)
                     {
-                        ImGui::Text("Line domain: %s",
-                                    inspector.RenderHints.LineDomain.c_str());
-                        if (inspector.RenderHints.HasUniformLineWidth)
-                            ImGui::Text("Line width: %.3f",
-                                        inspector.RenderHints.UniformLineWidth);
-                        if (inspector.RenderHints.HasNamedLineWidth)
-                            ImGui::Text("Line width source: %s",
-                                        inspector.RenderHints.LineWidthName.c_str());
+                        ImGui::Text("Edge domain: %s",
+                                    inspector.RenderHints.EdgeDomain.c_str());
+                        if (inspector.RenderHints.HasUniformEdgeWidth)
+                            ImGui::Text("Edge width: %.3f",
+                                        inspector.RenderHints.UniformEdgeWidth);
+                        if (inspector.RenderHints.HasNamedEdgeWidth)
+                            ImGui::Text("Edge width source: %s",
+                                        inspector.RenderHints.EdgeWidthName.c_str());
                     }
                     if (inspector.RenderHints.HasRenderPoints)
                     {
@@ -3721,47 +3545,6 @@ namespace Extrinsic::Runtime
                     }
                 }
 
-                if (frame.CameraRender.HasPrimitiveViewEntity)
-                {
-                    bool edgeView =
-                        frame.CameraRender.PrimitiveView.EnableEdgeView;
-                    if (context != nullptr &&
-                        ImGui::Checkbox("Mesh edge view", &edgeView))
-                    {
-                        (void)ApplySandboxEditorPrimitiveViewCommand(
-                            *context,
-                            SandboxEditorPrimitiveViewCommand{
-                                .StableEntityId =
-                                    frame.CameraRender.PrimitiveViewStableId,
-                                .SetEdgeView = true,
-                                .EnableEdgeView = edgeView,
-                            });
-                    }
-
-                    bool vertexView =
-                        frame.CameraRender.PrimitiveView.EnableVertexView;
-                    if (context != nullptr &&
-                        ImGui::Checkbox("Mesh vertex view", &vertexView))
-                    {
-                        (void)ApplySandboxEditorPrimitiveViewCommand(
-                            *context,
-                            SandboxEditorPrimitiveViewCommand{
-                                .StableEntityId =
-                                    frame.CameraRender.PrimitiveViewStableId,
-                                .SetVertexView = true,
-                                .EnableVertexView = vertexView,
-                            });
-                    }
-                    if (frame.CameraRender.PrimitiveView.EnableVertexView &&
-                        context != nullptr)
-                    {
-                        DrawMeshPrimitiveVertexViewControls(
-                            frame.CameraRender.PrimitiveViewStableId,
-                            frame.CameraRender.PrimitiveView,
-                            *context,
-                            true);
-                    }
-                }
                 DrawDiagnostics(frame.CameraRender.Diagnostics);
             }
             ImGui::End();
@@ -4460,9 +4243,6 @@ namespace Extrinsic::Runtime
         SandboxEditorDomainWindowModel model{};
         model.Kind = kind;
         model.ExpectedDomain = ExpectedDomainForWindowKind(kind);
-        model.PrimitiveViewControlsAvailable =
-            kind == SandboxEditorDomainWindowKind::Mesh &&
-            context.PrimitiveViewCommands.Available();
         model.VisualizationControlsAvailable =
             context.VisualizationCommandsAvailable;
 
@@ -4520,24 +4300,6 @@ namespace Extrinsic::Runtime
             AddDiagnostic(model.Diagnostics,
                           SandboxEditorDiagnosticCode::UnsupportedGeometryDomain,
                           std::move(message));
-        }
-
-        if (kind == SandboxEditorDomainWindowKind::Mesh)
-        {
-            if (context.PrimitiveViewCommands.Available())
-            {
-                model.HasPrimitiveViewSettings = model.DomainMatches;
-                if (model.HasPrimitiveViewSettings)
-                    model.PrimitiveView =
-                        context.PrimitiveViewCommands.GetSettings(
-                            model.SelectedStableId);
-            }
-            else
-            {
-                AddDiagnostic(model.Diagnostics,
-                              SandboxEditorDiagnosticCode::CameraRenderCommandsUnavailable,
-                              "Mesh primitive view command seam is unavailable.");
-            }
         }
 
         if (!context.VisualizationCommandsAvailable)
@@ -4870,8 +4632,6 @@ namespace Extrinsic::Runtime
         }
         if (context.Scene == nullptr)
             return SandboxEditorCommandStatus::MissingScene;
-        if (!context.PrimitiveViewCommands.Available())
-            return SandboxEditorCommandStatus::MissingPrimitiveViewCommands;
         if (command.SetVertexPointRadius &&
             !IsFinitePositive(command.VertexPointRadiusPx))
         {
@@ -4888,48 +4648,66 @@ namespace Extrinsic::Runtime
         if (view.ActiveDomain != GS::Domain::Mesh)
             return SandboxEditorCommandStatus::UnsupportedGeometryDomain;
 
-        SandboxEditorPrimitiveViewSettings settings =
-            context.PrimitiveViewCommands.GetSettings(command.StableEntityId);
-        const SandboxEditorPrimitiveViewSettings prior = settings;
+        const SandboxEditorRenderHintState before =
+            ReadRenderHintState(raw, entity);
+        SandboxEditorRenderHintState after = before;
         if (command.SetEdgeView)
-            settings.EnableEdgeView = command.EnableEdgeView;
+        {
+            if (command.EnableEdgeView)
+            {
+                after.Edges = after.Edges.value_or(G::RenderEdges{});
+            }
+            else
+            {
+                after.Edges.reset();
+            }
+        }
         if (command.SetVertexView)
-            settings.EnableVertexView = command.EnableVertexView;
-        if (command.SetVertexRenderMode)
-            settings.VertexRenderMode = command.VertexRenderMode;
-        if (command.SetVertexPointRadius)
-            settings.VertexPointRadiusPx = command.VertexPointRadiusPx;
+        {
+            if (command.EnableVertexView)
+            {
+                after.Points = after.Points.value_or(G::RenderPoints{});
+            }
+            else
+            {
+                after.Points.reset();
+            }
+        }
+        if (after.Points.has_value())
+        {
+            if (command.SetVertexRenderMode)
+                after.Points->Type = ToRenderPointType(command.VertexRenderMode);
+            if (command.SetVertexPointRadius)
+                after.Points->SizeSource = command.VertexPointRadiusPx;
+        }
 
-        if (SamePrimitiveViewSettings(prior, settings))
+        if (SameRenderHintState(before, after))
             return SandboxEditorCommandStatus::NoChange;
         if (context.CommandHistory != nullptr)
         {
-            const auto setSettings = context.PrimitiveViewCommands.SetSettings;
-            const auto clearSettings = context.PrimitiveViewCommands.ClearSettings;
+            const std::uint32_t stableEntityId = command.StableEntityId;
+            ECS::Scene::Registry* scene = context.Scene;
             const EditorCommandHistoryResult result =
                 context.CommandHistory->Execute(
-                    MakePrimitiveViewSettingsCommand(
-                        EditorPrimitiveViewSettingsCommand{
-                            .StableEntityId = command.StableEntityId,
-                            .Before = ToRuntimeSettings(prior),
-                            .After = ToRuntimeSettings(settings),
-                            .SetSettings =
-                                [setSettings](const std::uint32_t id,
-                                              const MeshPrimitiveViewSettings next)
-                                {
-                                    setSettings(id, FromRuntimeSettings(next));
-                                },
-                            .ClearSettings = clearSettings,
-                            .Dirtying = false,
-                            .Label = "Change Primitive View",
-                        }));
+                    EditorCommandRecord{
+                        .Label = "Change Render Hints",
+                        .Redo =
+                            [scene, stableEntityId, after]()
+                            {
+                                return ApplyRenderHintState(
+                                    scene, stableEntityId, after);
+                            },
+                        .Undo =
+                            [scene, stableEntityId, before]()
+                            {
+                                return ApplyRenderHintState(
+                                    scene, stableEntityId, before);
+                            },
+                    });
             return ToSandboxEditorCommandStatus(result.Status);
         }
-        if (settings.AnyEnabled())
-            context.PrimitiveViewCommands.SetSettings(command.StableEntityId, settings);
-        else
-            context.PrimitiveViewCommands.ClearSettings(command.StableEntityId);
-        return SandboxEditorCommandStatus::Applied;
+        return ToSandboxEditorCommandStatus(
+            ApplyRenderHintState(context.Scene, command.StableEntityId, after));
     }
 
     SandboxEditorCommandStatus ApplySandboxEditorRenderHintCommand(
@@ -4940,8 +4718,8 @@ namespace Extrinsic::Runtime
             return SandboxEditorCommandStatus::NoChange;
         if (context.Scene == nullptr)
             return SandboxEditorCommandStatus::MissingScene;
-        if ((command.SetUniformLineWidth &&
-             !IsFinitePositive(command.UniformLineWidth)) ||
+        if ((command.SetUniformEdgeWidth &&
+             !IsFinitePositive(command.UniformEdgeWidth)) ||
             (command.SetUniformPointSize &&
              !IsFinitePositive(command.UniformPointSize)))
         {

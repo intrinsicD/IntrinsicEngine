@@ -7,7 +7,7 @@ maturity_target: CPUContracted
 # UI-013 — Sandbox EditorUI domain render hint controls
 
 ## Goal
-- Let the promoted sandbox editor edit mesh, graph, and point-cloud render hints through runtime/editor command seams so selected-domain windows can enable/disable and tune the existing `RenderSurface`, `RenderLines`, and `RenderPoints` components.
+- Let the promoted sandbox editor edit mesh, graph, and point-cloud render hints through runtime/editor command seams so selected-domain windows can enable/disable and tune the existing `RenderSurface`, `RenderEdges`, and `RenderPoints` components.
 
 ## Non-goals
 - No new renderer pass, Vulkan pipeline, geometry packer, or GPU readback implementation.
@@ -16,7 +16,7 @@ maturity_target: CPUContracted
 
 ## Context
 - Owner/layer: `runtime/editor` UI command surface mutates ECS and graphics render-hint value components; renderer and RHI remain consumers of immutable extraction snapshots.
-- Legacy had mesh/graph/point-cloud render controls. Promoted renderer/runtime already expose retained surface, line, and point rendering via `GeometrySources`, `RenderSurface`, `RenderLines`, `RenderPoints`, and the `RUNTIME-085..087` residency bridges.
+- Legacy had mesh/graph/point-cloud render controls. Promoted renderer/runtime already expose retained surface, edge, and point rendering via `GeometrySources`, `RenderSurface`, `RenderEdges`, `RenderPoints`, and the `RUNTIME-085..087` residency bridges.
 - `UI-002` intentionally stopped at render-hint status windows and called out follow-up workflow tasks for render-hint edits once justified.
 
 ## Required changes
@@ -34,12 +34,12 @@ maturity_target: CPUContracted
 
 ## Acceptance criteria
 - [x] Mesh render windows can toggle surface rendering and mesh edge/vertex primitive views.
-- [x] Graph render windows can independently toggle line and point lanes and edit uniform line width / point radius.
+- [x] Graph render windows can independently toggle edge and point lanes and edit uniform edge width / point radius.
 - [x] Point-cloud render windows can toggle point rendering and edit point render type / uniform radius.
 - [x] Existing import materialization still creates renderable mesh, graph, and point-cloud entities with compatible defaults.
 
 ## Completion
-- Completed 2026-06-11 in this change. The slice retired at `CPUContracted`: editor commands and domain render windows now mutate promoted render-hint value components, graph line-lane edits repack runtime graph residency, and uniform point settings flow into retained point `GpuEntityConfig`.
+- Completed 2026-06-11 in this change. The slice retired at `CPUContracted`: editor commands and domain render windows now mutate promoted render-hint value components, graph edge-lane edits repack runtime graph residency, and uniform point settings flow into retained point `GpuEntityConfig`.
 - PR/commit: this retirement commit.
 
 ## Verification

@@ -6,6 +6,7 @@
 #include <glm/glm.hpp>
 
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
+import Extrinsic.ECS.Component.ProceduralGeometryRef;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Core.Config.Render;
 import Extrinsic.Graphics.Component.RenderGeometry;
@@ -76,6 +77,7 @@ TEST(RenderWorldPoolPipelined, ConsumesRenderNMinusOneWhileExtractionWritesN)
     const entt::entity entity = scene.Create();
     auto& world = registry.emplace<ECS::Components::Transform::WorldMatrix>(entity);
     registry.emplace<Graphics::Components::RenderSurface>(entity);
+    registry.emplace<ECS::Components::ProceduralGeometryRef>(entity);
 
     std::uint32_t previousPublishedFront = kInvalid;
     Runtime::RuntimeRenderExtractionStats stats{};

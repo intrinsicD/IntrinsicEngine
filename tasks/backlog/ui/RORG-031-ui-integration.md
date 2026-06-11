@@ -33,7 +33,7 @@ depends_on: []
   [`tasks/backlog/ui/README.md`](README.md) and the retirement log.
 - `UI-013` retired the render-hint editing follow-up: mesh, graph, and
   point-cloud domain render windows now command the promoted `RenderSurface`,
-  `RenderLines`, and `RenderPoints` value components, with graph lane repack
+  `RenderEdges`, and `RenderPoints` value components, with graph lane repack
   coverage and retained-point GPU config propagation.
 - Deferred-by-design workflows and their owners:
   - IME composition and multi-window support — deferred until an alternative

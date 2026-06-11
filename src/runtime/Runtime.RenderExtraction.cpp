@@ -237,7 +237,7 @@ namespace Extrinsic::Runtime
         [[nodiscard]] bool HasRenderableHint(const entt::registry& registry, entt::entity entity)
         {
             namespace G = Graphics::Components;
-            return registry.any_of<G::RenderSurface, G::RenderLines, G::RenderPoints>(entity);
+            return registry.any_of<G::RenderSurface, G::RenderEdges, G::RenderPoints>(entity);
         }
 
         [[nodiscard]] Graphics::VisualizationAttributeDomain ToVisualizationAttributeDomain(
@@ -432,35 +432,38 @@ namespace Extrinsic::Runtime
             std::uint32_t flags = RHI::GpuRender_Visible | RHI::GpuRender_Opaque;
             if (registry.all_of<G::RenderSurface>(entity))
                 flags |= RHI::GpuRender_Surface;
-            if (registry.all_of<G::RenderLines>(entity))
+            if (registry.all_of<G::RenderEdges>(entity))
                 flags |= RHI::GpuRender_Line | RHI::GpuRender_Unlit;
             if (registry.all_of<G::RenderPoints>(entity))
                 flags |= RHI::GpuRender_Point | RHI::GpuRender_Unlit;
             return flags;
         }
 
-        [[nodiscard]] std::uint32_t ToMeshVertexPointMode(
-            const MeshVertexViewRenderMode mode) noexcept
+        [[nodiscard]] std::uint32_t ToRenderPointMode(
+            const Graphics::Components::RenderPoints::RenderType type) noexcept
         {
-            switch (mode)
+            namespace G = Graphics::Components;
+            switch (type)
             {
-            case MeshVertexViewRenderMode::FlatCircle:
+            case G::RenderPoints::RenderType::Flat:
                 return 0u;
-            case MeshVertexViewRenderMode::ImpostorSphere:
+            case G::RenderPoints::RenderType::Sphere:
                 return 1u;
-            case MeshVertexViewRenderMode::SurfaceAlignedCircle:
+            case G::RenderPoints::RenderType::Surfel:
                 return 2u;
             }
             return 1u;
         }
 
-        [[nodiscard]] float ClampMeshVertexPointRadiusPx(const float radius) noexcept
+        [[nodiscard]] float UniformPointSizeOrDefault(
+            const Graphics::Components::RenderPoints* points) noexcept
         {
-            if (!std::isfinite(radius))
+            if (points == nullptr)
             {
-                return 6.0f;
+                return 1.0f;
             }
-            return std::clamp(radius, 1.0f, 64.0f);
+            const auto* uniform = std::get_if<float>(&points->SizeSource);
+            return uniform != nullptr ? *uniform : 1.0f;
         }
 
         [[nodiscard]] glm::vec3 TranslationOf(const glm::mat4& model) noexcept
@@ -868,10 +871,10 @@ namespace Extrinsic::Runtime
         namespace D = ECS::Components::DirtyTags;
         namespace G = Graphics::Components;
 
-        // The render hints select the lanes: `RenderLines` packs edge line
+        // The render hints select the lanes: `RenderEdges` packs edge line
         // indices, `RenderPoints` packs the node point lane. Both share the
         // single node-position vertex buffer (one handle per graph entity).
-        const bool wantLines = registry.all_of<G::RenderLines>(entity);
+        const bool wantLines = registry.all_of<G::RenderEdges>(entity);
         const bool wantPoints = registry.all_of<G::RenderPoints>(entity);
 
         const bool dirty = registry.any_of<D::GpuDirty,
@@ -1245,7 +1248,7 @@ namespace Extrinsic::Runtime
         stats.VisualizationAdapterFlatAutoRangeExpandedCount += perAdapter.FlatAutoRangeExpandedCount;
     }
 
-    void RenderExtractionCache::ReconcileMeshPrimitiveView(
+    bool RenderExtractionCache::ReconcileMeshPrimitiveView(
         MeshPrimitiveViewKind kind,
         const ECS::Components::GeometrySources::ConstSourceView& view,
         RenderableSidecar& sidecar,
@@ -1254,7 +1257,7 @@ namespace Extrinsic::Runtime
         const RHI::GpuBounds& bounds,
         std::uint32_t stableId,
         bool desired,
-        const MeshPrimitiveViewSettings& viewSettings,
+        const Graphics::Components::RenderPoints* points,
         bool meshDirty,
         Graphics::IRenderer& renderer,
         RuntimeRenderExtractionStats& stats)
@@ -1269,7 +1272,15 @@ namespace Extrinsic::Runtime
         if (!desired)
         {
             ReleaseMeshPrimitiveView(kind, sidecar, renderer, stats);
-            return;
+            return false;
+        }
+
+        if (!isEdge &&
+            (points == nullptr || !std::holds_alternative<float>(points->SizeSource)))
+        {
+            ++stats.MeshVertexViewFailedPack;
+            ReleaseMeshPrimitiveView(kind, sidecar, renderer, stats);
+            return false;
         }
 
         const bool hadView = geometry.IsValid();
@@ -1289,10 +1300,8 @@ namespace Extrinsic::Runtime
                 cfg.ColorSourceMode = 1u;
                 cfg.VisualizationAlpha = 1.0f;
                 cfg.UniformColor = {1.0f, 1.0f, 1.0f, 1.0f};
-                cfg.PointSize =
-                    ClampMeshVertexPointRadiusPx(viewSettings.VertexPointRadiusPx);
-                cfg.PointMode =
-                    ToMeshVertexPointMode(viewSettings.VertexRenderMode);
+                cfg.PointSize = UniformPointSizeOrDefault(points);
+                cfg.PointMode = ToRenderPointMode(points->Type);
                 renderer.GetGpuWorld().SetEntityConfig(instance, cfg);
             }
             m_Transforms.push_back(Graphics::TransformSyncRecord{
@@ -1318,7 +1327,7 @@ namespace Extrinsic::Runtime
                 ++stats.MeshVertexViewReuseHits;
             }
             submitTransform();
-            return;
+            return true;
         }
 
         // Pack (first upload, or parent-dirty reupload). The shared scratch
@@ -1366,7 +1375,7 @@ namespace Extrinsic::Runtime
             // a missing/invalid edge view simply disappears until the source
             // recovers on a later dirty frame.
             ReleaseMeshPrimitiveView(kind, sidecar, renderer, stats);
-            return;
+            return false;
         }
 
         const Graphics::GpuGeometryHandle handle =
@@ -1382,7 +1391,7 @@ namespace Extrinsic::Runtime
                 ++stats.MeshVertexViewFailedPack;
             }
             ReleaseMeshPrimitiveView(kind, sidecar, renderer, stats);
-            return;
+            return false;
         }
 
         // Ensure the view has its own instance. Allocated lazily on first
@@ -1403,7 +1412,7 @@ namespace Extrinsic::Runtime
                     ++stats.MeshVertexViewFailedPack;
                 }
                 ReleaseMeshPrimitiveView(kind, sidecar, renderer, stats);
-                return;
+                return false;
             }
             ++stats.AllocatedInstanceCount;
         }
@@ -1440,6 +1449,7 @@ namespace Extrinsic::Runtime
         geometry = handle;
         renderer.GetGpuWorld().SetInstanceGeometry(instance, handle);
         submitTransform();
+        return true;
     }
 
     void RenderExtractionCache::RetireMissingRenderables(const std::unordered_set<std::uint32_t>& liveKeys,
@@ -1609,6 +1619,7 @@ namespace Extrinsic::Runtime
             bool graphDomainThisFrame = false;
             bool pointCloudBoundThisFrame = false;
             bool pointCloudDomainThisFrame = false;
+            bool pointCloudResidencyDesiredThisFrame = false;
             // RUNTIME-088 Slice B — captured before `BindMeshGeometry` drains
             // the mesh dirty tags so the edge/vertex views can repack on the
             // same dirty frame; `meshViewsResident` records whether the views
@@ -1623,57 +1634,88 @@ namespace Extrinsic::Runtime
                 if (view.ActiveDomain == GS::Domain::Mesh)
                 {
                     namespace D = ECS::Components::DirtyTags;
+                    namespace G = Graphics::Components;
                     meshDomainThisFrame = true;
+                    const bool wantsSurface =
+                        registry.all_of<G::RenderSurface>(entity);
+                    const bool wantsEdges =
+                        registry.all_of<G::RenderEdges>(entity);
+                    const auto* pointHint =
+                        registry.try_get<G::RenderPoints>(entity);
+                    const bool wantsPoints = pointHint != nullptr;
                     // Snapshot the mesh dirty state before BindMeshGeometry
-                    // drains the tags; the views key their reupload off the
-                    // same coalesced signal the surface mesh repacks on.
+                    // may drain the tags; all mesh render lanes key their
+                    // reupload off the same coalesced signal.
                     meshDirtyThisFrame = registry.any_of<D::GpuDirty,
                                                          D::DirtyVertexPositions,
                                                          D::DirtyFaceTopology,
                                                          D::DirtyEdgeTopology>(entity);
-                    meshBoundThisFrame = BindMeshGeometry(registry,
-                                                          entity,
-                                                          view,
-                                                          *sidecar,
-                                                          renderer,
-                                                          stats);
-
-                    // RUNTIME-088 Slice B — reconcile optional edge/vertex views
-                    // while the parent surface is resident. A transient surface
-                    // pack failure keeps the prior surface upload bound
-                    // (fail-closed), so the views follow `MeshGeometry`
-                    // validity, not `meshBoundThisFrame`.
-                    if (sidecar->MeshGeometry.IsValid())
+                    if (wantsSurface)
                     {
-                        meshViewsResident = true;
-                        const MeshPrimitiveViewSettings viewSettings =
-                            GetMeshPrimitiveViewSettings(stableId);
+                        meshBoundThisFrame = BindMeshGeometry(registry,
+                                                              entity,
+                                                              view,
+                                                              *sidecar,
+                                                              renderer,
+                                                              stats);
+                    }
+
+                    // RUNTIME-106 — mesh render lanes compose through the same
+                    // ECS-facing components as graph/point-cloud domains.
+                    // Surface residency is no longer a prerequisite for edge
+                    // or vertex rendering; the sidecars derive directly from
+                    // the mesh domain view when their components are present.
+                    if (wantsEdges || wantsPoints)
+                    {
                         const RHI::GpuBounds viewBounds =
                             ExtractBounds(registry, entity, world.Matrix);
-                        ReconcileMeshPrimitiveView(MeshPrimitiveViewKind::Edge,
-                                                   view,
-                                                   *sidecar,
-                                                   world.Matrix,
-                                                   sidecar->Material.EffectiveSlot,
-                                                   viewBounds,
-                                                   stableId,
-                                                   viewSettings.EnableEdgeView,
-                                                   viewSettings,
-                                                   meshDirtyThisFrame,
-                                                   renderer,
-                                                   stats);
-                        ReconcileMeshPrimitiveView(MeshPrimitiveViewKind::Vertex,
-                                                   view,
-                                                   *sidecar,
-                                                   world.Matrix,
-                                                   sidecar->Material.EffectiveSlot,
-                                                   viewBounds,
-                                                   stableId,
-                                                   viewSettings.EnableVertexView,
-                                                   viewSettings,
-                                                   meshDirtyThisFrame,
-                                                   renderer,
-                                                   stats);
+                        meshViewsResident = true;
+                        const bool edgeSubmitted =
+                            ReconcileMeshPrimitiveView(MeshPrimitiveViewKind::Edge,
+                                                       view,
+                                                       *sidecar,
+                                                       world.Matrix,
+                                                       sidecar->Material.EffectiveSlot,
+                                                       viewBounds,
+                                                       stableId,
+                                                       wantsEdges,
+                                                       nullptr,
+                                                       meshDirtyThisFrame,
+                                                       renderer,
+                                                       stats);
+                        const bool pointSubmitted =
+                            ReconcileMeshPrimitiveView(MeshPrimitiveViewKind::Vertex,
+                                                       view,
+                                                       *sidecar,
+                                                       world.Matrix,
+                                                       sidecar->Material.EffectiveSlot,
+                                                       viewBounds,
+                                                       stableId,
+                                                       wantsPoints,
+                                                       pointHint,
+                                                       meshDirtyThisFrame,
+                                                       renderer,
+                                                       stats);
+                        if (!wantsSurface &&
+                            meshDirtyThisFrame &&
+                            (edgeSubmitted || pointSubmitted))
+                        {
+                            registry.remove<D::GpuDirty,
+                                            D::DirtyVertexPositions,
+                                            D::DirtyFaceTopology,
+                                            D::DirtyEdgeTopology>(entity);
+                        }
+                    }
+                    else
+                    {
+                        ReleaseMeshPrimitiveView(MeshPrimitiveViewKind::Edge,
+                                                 *sidecar,
+                                                 renderer,
+                                                 stats);
+                        ReleaseMeshPrimitiveView(MeshPrimitiveViewKind::Vertex,
+                                                 *sidecar,
+                                                 renderer,
+                                                 stats);
                     }
                 }
                 else if (view.ActiveDomain == GS::Domain::Graph)
@@ -1686,24 +1728,31 @@ namespace Extrinsic::Runtime
                                                             renderer,
                                                             stats);
                 }
-                else if (view.ActiveDomain == GS::Domain::PointCloud
-                         && registry.all_of<Graphics::Components::RenderPoints>(entity))
+                else if (view.ActiveDomain == GS::Domain::PointCloud)
                 {
-                    // A point cloud is only a renderable in this slice through
-                    // the `RenderPoints` hint — `RenderSurface`/`RenderLines`
-                    // have no faces/edges to draw from a cloud. A point-cloud-
-                    // domain entity without `RenderPoints` therefore is not a
-                    // point-cloud renderable (it falls through and any prior
-                    // point-cloud residency is released by the eligibility-flip
-                    // block below), so a mesh that loses its topology back to a
-                    // bare vertex set does not get silently re-bound as points.
                     pointCloudDomainThisFrame = true;
-                    pointCloudBoundThisFrame = BindPointCloudGeometry(registry,
-                                                                      entity,
-                                                                      view,
-                                                                      *sidecar,
-                                                                      renderer,
-                                                                      stats);
+                    pointCloudResidencyDesiredThisFrame =
+                        registry.all_of<Graphics::Components::RenderPoints>(entity);
+                    if (pointCloudResidencyDesiredThisFrame)
+                    {
+                        // A point cloud is only renderable through the
+                        // `RenderPoints` hint — `RenderSurface`/`RenderEdges`
+                        // have no faces/edges to draw from a cloud.
+                        pointCloudBoundThisFrame = BindPointCloudGeometry(registry,
+                                                                          entity,
+                                                                          view,
+                                                                          *sidecar,
+                                                                          renderer,
+                                                                          stats);
+                    }
+                    else if (registry.any_of<Graphics::Components::RenderSurface,
+                                             Graphics::Components::RenderEdges>(entity))
+                    {
+                        // Unsupported point-cloud lanes fail closed with a
+                        // deterministic diagnostic instead of silently keeping
+                        // or creating stale residency.
+                        ++stats.PointCloudGeometryFailedPack;
+                    }
                 }
             }
 
@@ -1722,17 +1771,25 @@ namespace Extrinsic::Runtime
             // still-mesh-domain entity do NOT release: the old residency
             // remains bound so a later frame can recover, mirroring the
             // dirty-reupload fail-closed contract inside `BindMeshGeometry`.
-            const bool stillMeshAttached = sourceEligible && meshDomainThisFrame;
+            const bool stillMeshAttached =
+                sourceEligible &&
+                meshDomainThisFrame &&
+                registry.all_of<Graphics::Components::RenderSurface>(entity);
             if (!stillMeshAttached && sidecar->MeshGeometry.IsValid())
             {
                 EnqueueMeshRetire(sidecar->MeshGeometry);
+                const bool replacementBoundThisFrame =
+                    proceduralBound || graphBoundThisFrame || pointCloudBoundThisFrame;
                 // Only detach if nothing else re-bound the instance this frame
-                // (procedural take-over, or a graph/point-cloud rebind after a
-                // mesh→graph / mesh→point-cloud domain flip).
-                if (!proceduralBound && !graphBoundThisFrame && !pointCloudBoundThisFrame)
+                // (procedural take-over, a graph/point-cloud rebind after a
+                // mesh→graph / mesh→point-cloud domain flip, or a mesh surface
+                // reupload in the surface lane).
+                if (!replacementBoundThisFrame)
                 {
                     renderer.GetGpuWorld().SetInstanceGeometry(sidecar->Instance,
                                                                 Graphics::GpuGeometryHandle{});
+                    sidecar->Geometry = {};
+                    sidecar->GpuSlot.SetGeometryHandle(Graphics::GpuGeometryHandle{});
                 }
                 sidecar->MeshGeometry = {};
                 ++stats.MeshGeometryReleases;
@@ -1766,7 +1823,10 @@ namespace Extrinsic::Runtime
             // transient pack failure on a still-point-cloud-domain entity does
             // NOT release (old residency stays bound), matching the
             // dirty-reupload fail-closed contract.
-            const bool stillPointCloudAttached = sourceEligible && pointCloudDomainThisFrame;
+            const bool stillPointCloudAttached =
+                sourceEligible &&
+                pointCloudDomainThisFrame &&
+                pointCloudResidencyDesiredThisFrame;
             if (!stillPointCloudAttached && sidecar->PointCloudGeometry.IsValid())
             {
                 EnqueuePointCloudRetire(sidecar->PointCloudGeometry);
@@ -1815,15 +1875,30 @@ namespace Extrinsic::Runtime
             });
             AppendVisualizationAdapters(stableId, *sidecar, stats);
 
-            m_Transforms.push_back(Graphics::TransformSyncRecord{
-                .StableId = stableId,
-                .Instance = sidecar->Instance,
-                .Model = world.Matrix,
-                .RenderFlags = BuildRenderFlags(registry, entity),
-                .Bounds = ExtractBounds(registry, entity, world.Matrix),
-                .MaterialSlot = sidecar->Material.EffectiveSlot,
-                .HasMaterialSlot = true,
-            });
+            const bool primaryRenderableSubmitted =
+                proceduralBound ||
+                meshBoundThisFrame ||
+                graphBoundThisFrame ||
+                pointCloudBoundThisFrame ||
+                assetSource != nullptr;
+            if (primaryRenderableSubmitted)
+            {
+                std::uint32_t renderFlags = BuildRenderFlags(registry, entity);
+                if (meshDomainThisFrame)
+                {
+                    renderFlags &= ~(RHI::GpuRender_Line | RHI::GpuRender_Point);
+                    renderFlags &= ~RHI::GpuRender_Unlit;
+                }
+                m_Transforms.push_back(Graphics::TransformSyncRecord{
+                    .StableId = stableId,
+                    .Instance = sidecar->Instance,
+                    .Model = world.Matrix,
+                    .RenderFlags = renderFlags,
+                    .Bounds = ExtractBounds(registry, entity, world.Matrix),
+                    .MaterialSlot = sidecar->Material.EffectiveSlot,
+                    .HasMaterialSlot = true,
+                });
+            }
         }
 
         RetireMissingRenderables(liveRenderableKeys, renderer, stats);

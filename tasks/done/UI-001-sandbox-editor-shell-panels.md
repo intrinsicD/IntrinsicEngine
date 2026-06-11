@@ -33,10 +33,12 @@
   import execution, camera/render settings beyond local transform edits, and
   visualization adapter routing.
 - **Slice C.1.** Add runtime-owned command seams for active
-  camera-controller replacement and mesh edge/vertex primitive-view toggles.
-  These commands route through `Engine::GetCameraControllerRegistry()` and
+  camera-controller replacement and the legacy mesh edge/vertex primitive-view
+  toggle command surface. These commands route through
+  `Engine::GetCameraControllerRegistry()` and
   `Engine::{Set,Get,Clear}MeshPrimitiveViewSettings(...)`, so UI state remains
-  presentation-only.
+  presentation-only; RUNTIME-106 later made those mesh view methods translate to
+  `RenderEdges` / `RenderPoints`.
 - **Slice C.2.** Add the runtime-owned command seams for
   selected-entity spatial-debug settings and visualization-config selection
   without making UI state authoritative. The slice routes through
@@ -72,7 +74,7 @@
 ## Required changes
 - [x] Add a promoted sandbox/editor UI module that registers a draw callback with the runtime ImGui adapter without adding app-layer graphics/runtime shortcuts.
 - [x] Implement a scene hierarchy panel that lists live scene entities by `MetaData::EntityName` and selection state, and emits selection commands through `RUNTIME-089` APIs.
-- [x] Implement an inspector panel that shows transform, stable ID/metadata, render hints (`RenderSurface`/`RenderLines`/`RenderPoints`), and available `GeometrySources` domains read through runtime/editor-facing views.
+- [x] Implement an inspector panel that shows transform, stable ID/metadata, render hints (`RenderSurface`/`RenderEdges`/`RenderPoints`), and available `GeometrySources` domains read through runtime/editor-facing views.
 - [x] Implement a selection/primitive details panel that displays current entity/face/edge/vertex/point selection results from `RUNTIME-089` / `RUNTIME-093`. Slice B models selected/hovered entity rows and refined primitive status/domain/kind/id/hit details; richer interaction remains for later command-surface slices.
 - [x] Implement a file/import entry panel that calls asset/runtime import commands when promoted asset/runtime ingest is available and otherwise displays a deterministic disabled-state diagnostic. Slice A implements the deterministic disabled diagnostic; Slice D routes command execution through `Engine::ImportAssetFromPath(...)` on top of the retired `ASSETIO-001` runtime/asset seams.
 - [x] Implement camera/render settings controls for active camera controller selection, debug overlay toggles, and primitive view toggles using runtime-owned APIs. Slice C.1 implements active camera-controller replacement and mesh edge/vertex primitive-view toggles; Slice C.2 implements selected-entity spatial-debug binding controls.

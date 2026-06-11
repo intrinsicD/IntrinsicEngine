@@ -67,10 +67,16 @@ split; narratives live in the retirement log.
   `Graphics.OverlayEntityFactory` behavior for current workflows and retained no
   persistent runtime overlay producer API. Mesh/graph/point child overlays map
   to ordinary `GeometrySources` entities, mesh edge/vertex overlays use
-  primitive-view sidecars, and vector-field/isoline overlays use runtime
+  component-driven primitive-view sidecars, and vector-field/isoline overlays use runtime
   visualization packets without child ECS entities. Backend command-shape proof
   is retired by
   [GRAPHICS-085](../../done/GRAPHICS-085-overlay-packet-backend-parity.md).
+- [RUNTIME-106 — Render component domain composition](../../done/RUNTIME-106-render-component-domain-composition.md)
+  (done, 2026-06-12, `CPUContracted`): aligned mesh, graph, and point-cloud
+  rendering around `RenderSurface`, `RenderEdges`, and `RenderPoints`
+  component presence; mesh edge/vertex sidecars are now driven by render
+  components rather than `MeshPrimitiveViewSettings`, and unsupported
+  point-cloud surface/edge requests fail closed with diagnostics.
 - [RUNTIME-091 — Activate promoted ECS system bundle in fixed-step runtime](../../done/RUNTIME-091-promoted-ecs-system-bundle-activation.md)
   (done): runtime-owned activation of promoted ECS systems via
   `Extrinsic.Runtime.EcsSystemBundle::RegisterPromotedEcsSystemBundle`, called

@@ -258,7 +258,7 @@ namespace
         auto& edges = raw.emplace<GS::Edges>(entity);
         SetEdges(edges, {0u, 1u}, {1u, 2u});
         raw.emplace<GS::HasGraphTopology>(entity);
-        raw.emplace<G::RenderLines>(entity);
+        raw.emplace<G::RenderEdges>(entity);
         raw.emplace<G::RenderPoints>(entity);
     }
 
@@ -918,8 +918,8 @@ TEST(SandboxEditorUi, HierarchyInspectorModelReportsSelectionRenderHintsAndDomai
 
     auto& surface = raw.emplace<G::RenderSurface>(first);
     surface.Domain = G::RenderSurface::SourceDomain::Face;
-    auto& lines = raw.emplace<G::RenderLines>(first);
-    lines.Domain = G::RenderLines::SourceDomain::Edge;
+    auto& lines = raw.emplace<G::RenderEdges>(first);
+    lines.Domain = G::RenderEdges::SourceDomain::Edge;
     lines.WidthSource = 2.5f;
     auto& points = raw.get<G::RenderPoints>(first);
     points.Type = G::RenderPoints::RenderType::Surfel;
@@ -961,10 +961,10 @@ TEST(SandboxEditorUi, HierarchyInspectorModelReportsSelectionRenderHintsAndDomai
     EXPECT_FLOAT_EQ(frame.Inspector.Transform.WorldPosition.z, 9.0f);
     EXPECT_TRUE(frame.Inspector.RenderHints.HasRenderSurface);
     EXPECT_EQ(frame.Inspector.RenderHints.SurfaceDomain, "Face");
-    EXPECT_TRUE(frame.Inspector.RenderHints.HasRenderLines);
-    EXPECT_EQ(frame.Inspector.RenderHints.LineDomain, "Edge");
-    EXPECT_TRUE(frame.Inspector.RenderHints.HasUniformLineWidth);
-    EXPECT_FLOAT_EQ(frame.Inspector.RenderHints.UniformLineWidth, 2.5f);
+    EXPECT_TRUE(frame.Inspector.RenderHints.HasRenderEdges);
+    EXPECT_EQ(frame.Inspector.RenderHints.EdgeDomain, "Edge");
+    EXPECT_TRUE(frame.Inspector.RenderHints.HasUniformEdgeWidth);
+    EXPECT_FLOAT_EQ(frame.Inspector.RenderHints.UniformEdgeWidth, 2.5f);
     EXPECT_TRUE(frame.Inspector.RenderHints.HasRenderPoints);
     EXPECT_EQ(frame.Inspector.RenderHints.PointRenderType, "Surfel");
     EXPECT_TRUE(frame.Inspector.RenderHints.HasNamedPointSize);
@@ -1725,30 +1725,6 @@ TEST(SandboxEditorUi, DomainWindowModelsReportSelectedMeshGraphAndPointCloudStat
         Runtime::SelectionController::ToStableEntityId(mesh);
     Runtime::SandboxEditorContext context = MakeContext(registry, selection);
     context.VisualizationCommandsAvailable = true;
-    context.PrimitiveViewCommands =
-        Runtime::SandboxEditorPrimitiveViewCommandSurface{
-            .GetSettings =
-                [meshStableId](const std::uint32_t stableId)
-                {
-                    EXPECT_EQ(stableId, meshStableId);
-                    return Runtime::SandboxEditorPrimitiveViewSettings{
-                        .EnableEdgeView = true,
-                        .EnableVertexView = false,
-                        .VertexRenderMode =
-                            Runtime::MeshVertexViewRenderMode::SurfaceAlignedCircle,
-                        .VertexPointRadiusPx = 11.0f,
-                    };
-                },
-            .SetSettings =
-                [](std::uint32_t,
-                   Runtime::SandboxEditorPrimitiveViewSettings)
-                {
-                },
-            .ClearSettings =
-                [](std::uint32_t)
-                {
-                },
-        };
 
     std::optional<Runtime::PrimitiveSelectionResult> primitive{
         Runtime::PrimitiveSelectionResult{
@@ -1779,13 +1755,8 @@ TEST(SandboxEditorUi, DomainWindowModelsReportSelectedMeshGraphAndPointCloudStat
     EXPECT_EQ(meshModel.SelectedDomain, GS::Domain::Mesh);
     EXPECT_TRUE(meshModel.DomainMatches);
     EXPECT_TRUE(meshModel.RenderHints.HasRenderSurface);
-    EXPECT_TRUE(meshModel.PrimitiveViewControlsAvailable);
-    EXPECT_TRUE(meshModel.HasPrimitiveViewSettings);
-    EXPECT_TRUE(meshModel.PrimitiveView.EnableEdgeView);
-    EXPECT_FALSE(meshModel.PrimitiveView.EnableVertexView);
-    EXPECT_EQ(meshModel.PrimitiveView.VertexRenderMode,
-              Runtime::MeshVertexViewRenderMode::SurfaceAlignedCircle);
-    EXPECT_FLOAT_EQ(meshModel.PrimitiveView.VertexPointRadiusPx, 11.0f);
+    EXPECT_FALSE(meshModel.PrimitiveViewControlsAvailable);
+    EXPECT_FALSE(meshModel.HasPrimitiveViewSettings);
     EXPECT_TRUE(meshModel.VisualizationControlsAvailable);
     EXPECT_TRUE(meshModel.Visualization.HasSelectedEntity);
     EXPECT_TRUE(meshModel.Visualization.SpatialDebug.HasBinding);
@@ -1836,7 +1807,7 @@ TEST(SandboxEditorUi, DomainWindowModelsReportSelectedMeshGraphAndPointCloudStat
                  "Graph");
     EXPECT_EQ(graphModel.SelectedDomain, GS::Domain::Graph);
     EXPECT_TRUE(graphModel.DomainMatches);
-    EXPECT_TRUE(graphModel.RenderHints.HasRenderLines);
+    EXPECT_TRUE(graphModel.RenderHints.HasRenderEdges);
     EXPECT_TRUE(graphModel.RenderHints.HasRenderPoints);
     EXPECT_FALSE(graphModel.PrimitiveViewControlsAvailable);
     ASSERT_TRUE(graphModel.Primitive.HasPrimitive);
@@ -1914,6 +1885,40 @@ TEST(SandboxEditorUi, RenderHintCommandEditsDomainComponentsAndHistory)
     EXPECT_EQ(raw.get<G::RenderSurface>(mesh).Domain,
               G::RenderSurface::SourceDomain::Face);
 
+    EXPECT_EQ(Runtime::ApplySandboxEditorRenderHintCommand(
+                  context,
+                  Runtime::SandboxEditorRenderHintCommand{
+                      .StableEntityId = meshStableId,
+                      .SetEdges = true,
+                      .EnableEdges = true,
+                      .EdgeDomain = G::RenderEdges::SourceDomain::Edge,
+                      .SetUniformEdgeWidth = true,
+                      .UniformEdgeWidth = 3.0f,
+                  }),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    ASSERT_TRUE(raw.all_of<G::RenderEdges>(mesh));
+    const G::RenderEdges& meshEdges = raw.get<G::RenderEdges>(mesh);
+    EXPECT_EQ(meshEdges.Domain, G::RenderEdges::SourceDomain::Edge);
+    ASSERT_NE(std::get_if<float>(&meshEdges.WidthSource), nullptr);
+    EXPECT_FLOAT_EQ(*std::get_if<float>(&meshEdges.WidthSource), 3.0f);
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorRenderHintCommand(
+                  context,
+                  Runtime::SandboxEditorRenderHintCommand{
+                      .StableEntityId = meshStableId,
+                      .SetPoints = true,
+                      .EnablePoints = true,
+                      .PointType = G::RenderPoints::RenderType::Surfel,
+                      .SetUniformPointSize = true,
+                      .UniformPointSize = 7.0f,
+                  }),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    ASSERT_TRUE(raw.all_of<G::RenderPoints>(mesh));
+    const G::RenderPoints& meshPoints = raw.get<G::RenderPoints>(mesh);
+    EXPECT_EQ(meshPoints.Type, G::RenderPoints::RenderType::Surfel);
+    ASSERT_NE(std::get_if<float>(&meshPoints.SizeSource), nullptr);
+    EXPECT_FLOAT_EQ(*std::get_if<float>(&meshPoints.SizeSource), 7.0f);
+
     const ECS::EntityHandle graph = MakeSelectable(registry, "Graph");
     AddGraphSource(registry, graph);
     const std::uint32_t graphStableId =
@@ -1922,13 +1927,13 @@ TEST(SandboxEditorUi, RenderHintCommandEditsDomainComponentsAndHistory)
                   context,
                   Runtime::SandboxEditorRenderHintCommand{
                       .StableEntityId = graphStableId,
-                      .SetLines = true,
-                      .EnableLines = false,
+                      .SetEdges = true,
+                      .EnableEdges = false,
                   }),
               Runtime::SandboxEditorCommandStatus::Applied);
-    EXPECT_FALSE(raw.all_of<G::RenderLines>(graph));
+    EXPECT_FALSE(raw.all_of<G::RenderEdges>(graph));
     EXPECT_TRUE(history.Undo().Succeeded());
-    EXPECT_TRUE(raw.all_of<G::RenderLines>(graph));
+    EXPECT_TRUE(raw.all_of<G::RenderEdges>(graph));
 
     EXPECT_EQ(Runtime::ApplySandboxEditorRenderHintCommand(
                   context,
@@ -1966,8 +1971,8 @@ TEST(SandboxEditorUi, RenderHintCommandEditsDomainComponentsAndHistory)
                   context,
                   Runtime::SandboxEditorRenderHintCommand{
                       .StableEntityId = cloudStableId,
-                      .SetLines = true,
-                      .EnableLines = true,
+                      .SetEdges = true,
+                      .EnableEdges = true,
                   }),
               Runtime::SandboxEditorCommandStatus::UnsupportedGeometryDomain);
     EXPECT_EQ(Runtime::ApplySandboxEditorRenderHintCommand(
@@ -2007,7 +2012,7 @@ TEST(SandboxEditorUi, RenderHintCommandRepackagesGraphLaneResidency)
     const ECS::EntityHandle graph = MakeSelectable(scene, "Graph");
     AddGraphSource(scene, graph);
     auto& raw = scene.Raw();
-    raw.remove<G::RenderLines>(graph);
+    raw.remove<G::RenderEdges>(graph);
 
     Runtime::RenderExtractionCache extraction;
     const Runtime::RuntimeRenderExtractionStats first =
@@ -2024,12 +2029,12 @@ TEST(SandboxEditorUi, RenderHintCommandRepackagesGraphLaneResidency)
                   context,
                   Runtime::SandboxEditorRenderHintCommand{
                       .StableEntityId = stableId,
-                      .SetLines = true,
-                      .EnableLines = true,
-                      .LineDomain = G::RenderLines::SourceDomain::Vertex,
+                      .SetEdges = true,
+                      .EnableEdges = true,
+                      .EdgeDomain = G::RenderEdges::SourceDomain::Vertex,
                   }),
               Runtime::SandboxEditorCommandStatus::Applied);
-    ASSERT_TRUE(raw.all_of<G::RenderLines>(graph));
+    ASSERT_TRUE(raw.all_of<G::RenderEdges>(graph));
 
     const Runtime::RuntimeRenderExtractionStats second =
         extraction.ExtractAndSubmit(scene,
@@ -2285,7 +2290,7 @@ TEST(SandboxEditorUi, CameraControllerCommandReplacesMainController)
               Runtime::SandboxEditorCommandStatus::MissingCameraControllerRegistry);
 }
 
-TEST(SandboxEditorUi, PrimitiveViewCommandRoutesThroughRuntimeSettings)
+TEST(SandboxEditorUi, PrimitiveViewCommandTranslatesToRenderHintComponents)
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
@@ -2293,48 +2298,10 @@ TEST(SandboxEditorUi, PrimitiveViewCommandRoutesThroughRuntimeSettings)
     AddTriangleMeshSource(registry, mesh);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
 
-    std::optional<Runtime::SandboxEditorPrimitiveViewSettings> storedSettings;
-    bool hasStoredSettings = false;
-    std::uint32_t setCount = 0u;
-    std::uint32_t clearCount = 0u;
     const std::uint32_t meshStableId =
         Runtime::SelectionController::ToStableEntityId(mesh);
 
     Runtime::SandboxEditorContext context = MakeContext(registry, selection);
-    context.PrimitiveViewCommands =
-        Runtime::SandboxEditorPrimitiveViewCommandSurface{
-            .GetSettings =
-                [&](const std::uint32_t stableId)
-                {
-                    EXPECT_EQ(stableId, meshStableId);
-                    if (hasStoredSettings && storedSettings.has_value())
-                        return *storedSettings;
-                    return Runtime::SandboxEditorPrimitiveViewSettings{};
-                },
-            .SetSettings =
-                [&](const std::uint32_t stableId,
-                    const Runtime::SandboxEditorPrimitiveViewSettings settings)
-                {
-                    EXPECT_EQ(stableId, meshStableId);
-                    storedSettings = settings;
-                    hasStoredSettings = true;
-                    ++setCount;
-                },
-            .ClearSettings =
-                [&](const std::uint32_t stableId)
-                {
-                    EXPECT_EQ(stableId, meshStableId);
-                    hasStoredSettings = false;
-                    ++clearCount;
-                },
-        };
-
-    Runtime::SandboxEditorPanelFrame frame =
-        Runtime::BuildSandboxEditorPanelFrame(context);
-    ASSERT_TRUE(frame.CameraRender.PrimitiveViewControlsAvailable);
-    ASSERT_TRUE(frame.CameraRender.HasPrimitiveViewEntity);
-    EXPECT_FALSE(frame.CameraRender.PrimitiveView.EnableEdgeView);
-    EXPECT_FALSE(frame.CameraRender.PrimitiveView.EnableVertexView);
 
     EXPECT_EQ(Runtime::ApplySandboxEditorPrimitiveViewCommand(
                   context,
@@ -2351,21 +2318,12 @@ TEST(SandboxEditorUi, PrimitiveViewCommandRoutesThroughRuntimeSettings)
                       .VertexPointRadiusPx = 11.0f,
                   }),
               Runtime::SandboxEditorCommandStatus::Applied);
-    EXPECT_EQ(setCount, 1u);
-    ASSERT_TRUE(hasStoredSettings);
-    ASSERT_TRUE(storedSettings.has_value());
-    EXPECT_TRUE(storedSettings->EnableEdgeView);
-    EXPECT_TRUE(storedSettings->EnableVertexView);
-    EXPECT_EQ(storedSettings->VertexRenderMode,
-              Runtime::MeshVertexViewRenderMode::SurfaceAlignedCircle);
-    EXPECT_FLOAT_EQ(storedSettings->VertexPointRadiusPx, 11.0f);
-
-    frame = Runtime::BuildSandboxEditorPanelFrame(context);
-    EXPECT_TRUE(frame.CameraRender.PrimitiveView.EnableEdgeView);
-    EXPECT_TRUE(frame.CameraRender.PrimitiveView.EnableVertexView);
-    EXPECT_EQ(frame.CameraRender.PrimitiveView.VertexRenderMode,
-              Runtime::MeshVertexViewRenderMode::SurfaceAlignedCircle);
-    EXPECT_FLOAT_EQ(frame.CameraRender.PrimitiveView.VertexPointRadiusPx, 11.0f);
+    ASSERT_TRUE(registry.Raw().all_of<G::RenderEdges>(mesh));
+    ASSERT_TRUE(registry.Raw().all_of<G::RenderPoints>(mesh));
+    const G::RenderPoints& points = registry.Raw().get<G::RenderPoints>(mesh);
+    EXPECT_EQ(points.Type, G::RenderPoints::RenderType::Surfel);
+    ASSERT_NE(std::get_if<float>(&points.SizeSource), nullptr);
+    EXPECT_FLOAT_EQ(*std::get_if<float>(&points.SizeSource), 11.0f);
 
     EXPECT_EQ(Runtime::ApplySandboxEditorPrimitiveViewCommand(
                   context,
@@ -2375,7 +2333,7 @@ TEST(SandboxEditorUi, PrimitiveViewCommandRoutesThroughRuntimeSettings)
                       .VertexPointRadiusPx = 0.0f,
                   }),
               Runtime::SandboxEditorCommandStatus::InvalidProcessingParameters);
-    EXPECT_EQ(setCount, 1u);
+    EXPECT_TRUE(registry.Raw().all_of<G::RenderPoints>(mesh));
 
     EXPECT_EQ(Runtime::ApplySandboxEditorPrimitiveViewCommand(
                   context,
@@ -2387,8 +2345,8 @@ TEST(SandboxEditorUi, PrimitiveViewCommandRoutesThroughRuntimeSettings)
                       .EnableVertexView = false,
                   }),
               Runtime::SandboxEditorCommandStatus::Applied);
-    EXPECT_EQ(clearCount, 1u);
-    EXPECT_FALSE(hasStoredSettings);
+    EXPECT_FALSE(registry.Raw().all_of<G::RenderEdges>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<G::RenderPoints>(mesh));
 
     EXPECT_EQ(Runtime::ApplySandboxEditorPrimitiveViewCommand(
                   context,
@@ -2824,7 +2782,7 @@ TEST(SandboxEditorUi, EngineImportFacadeMaterializesStandaloneGeometryDomains)
     const std::optional<ECS::EntityHandle> graphEntity =
         FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Graph);
     ASSERT_TRUE(graphEntity.has_value());
-    EXPECT_TRUE(raw.all_of<G::RenderLines>(*graphEntity));
+    EXPECT_TRUE(raw.all_of<G::RenderEdges>(*graphEntity));
     EXPECT_TRUE(raw.all_of<G::RenderPoints>(*graphEntity));
     EXPECT_TRUE(raw.all_of<G::VisualizationConfig>(*graphEntity));
     ASSERT_TRUE((raw.all_of<ECSC::Culling::Local::Bounds,
@@ -2970,7 +2928,7 @@ TEST(SandboxEditorUi, DroppedFilePathsRouteAmbiguousPlyThroughRuntimeImportFacad
     engine.Shutdown();
 }
 
-TEST(SandboxEditorUi, PlatformDropEventImportsObjMeshSelectsItAndEnablesPrimitiveViews)
+TEST(SandboxEditorUi, PlatformDropEventImportsObjMeshSelectsItAndEnablesRenderComponents)
 {
     TmpFile meshFile(
         "runtime_platform_drop_mesh.obj",
@@ -3011,47 +2969,6 @@ TEST(SandboxEditorUi, PlatformDropEventImportsObjMeshSelectsItAndEnablesPrimitiv
 
     Runtime::SandboxEditorContext commandContext =
         MakeContext(engine.GetScene(), engine.GetSelectionController());
-    commandContext.PrimitiveViewCommands =
-        Runtime::SandboxEditorPrimitiveViewCommandSurface{
-            .GetSettings =
-                [&engine](const std::uint32_t id)
-                {
-                    const Runtime::MeshPrimitiveViewSettings settings =
-                        engine.GetMeshPrimitiveViewSettings(id);
-                    return Runtime::SandboxEditorPrimitiveViewSettings{
-                        .EnableEdgeView = settings.EnableEdgeView,
-                        .EnableVertexView = settings.EnableVertexView,
-                        .VertexRenderMode = settings.VertexRenderMode,
-                        .VertexPointRadiusPx = settings.VertexPointRadiusPx,
-                    };
-                },
-            .SetSettings =
-                [&engine](
-                    const std::uint32_t id,
-                    const Runtime::SandboxEditorPrimitiveViewSettings settings)
-                {
-                    engine.SetMeshPrimitiveViewSettings(
-                        id,
-                        Runtime::MeshPrimitiveViewSettings{
-                            .EnableEdgeView = settings.EnableEdgeView,
-                            .EnableVertexView = settings.EnableVertexView,
-                            .VertexRenderMode = settings.VertexRenderMode,
-                            .VertexPointRadiusPx = settings.VertexPointRadiusPx,
-                        });
-                },
-            .ClearSettings =
-                [&engine](const std::uint32_t id)
-                {
-                    engine.ClearMeshPrimitiveViewSettings(id);
-                },
-        };
-
-    const Runtime::SandboxEditorPanelFrame frame =
-        Runtime::BuildSandboxEditorPanelFrame(commandContext);
-    ASSERT_TRUE(frame.CameraRender.HasPrimitiveViewEntity);
-    EXPECT_EQ(frame.CameraRender.PrimitiveViewStableId, stableId);
-    EXPECT_FALSE(frame.CameraRender.PrimitiveView.EnableEdgeView);
-    EXPECT_FALSE(frame.CameraRender.PrimitiveView.EnableVertexView);
 
     EXPECT_EQ(Runtime::ApplySandboxEditorPrimitiveViewCommand(
                   commandContext,
@@ -3069,16 +2986,15 @@ TEST(SandboxEditorUi, PlatformDropEventImportsObjMeshSelectsItAndEnablesPrimitiv
                   }),
               Runtime::SandboxEditorCommandStatus::Applied);
 
-    const Runtime::MeshPrimitiveViewSettings stored =
-        engine.GetMeshPrimitiveViewSettings(stableId);
-    EXPECT_TRUE(stored.EnableEdgeView);
-    EXPECT_TRUE(stored.EnableVertexView);
-    EXPECT_EQ(stored.VertexRenderMode,
-              Runtime::MeshVertexViewRenderMode::ImpostorSphere);
-    EXPECT_FLOAT_EQ(stored.VertexPointRadiusPx, 10.0f);
+    auto& raw = engine.GetScene().Raw();
+    ASSERT_TRUE(raw.all_of<G::RenderEdges>(*meshEntity));
+    ASSERT_TRUE(raw.all_of<G::RenderPoints>(*meshEntity));
+    const G::RenderPoints& points = raw.get<G::RenderPoints>(*meshEntity);
+    EXPECT_EQ(points.Type, G::RenderPoints::RenderType::Sphere);
+    ASSERT_NE(std::get_if<float>(&points.SizeSource), nullptr);
+    EXPECT_FLOAT_EQ(*std::get_if<float>(&points.SizeSource), 10.0f);
 
     Runtime::RenderExtractionCache extraction;
-    extraction.SetMeshPrimitiveViewSettings(stableId, stored);
     const Runtime::RuntimeRenderExtractionStats stats =
         extraction.ExtractAndSubmit(engine.GetScene(),
                                     engine.GetRenderer(),

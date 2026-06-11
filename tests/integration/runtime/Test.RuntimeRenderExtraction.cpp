@@ -4,6 +4,7 @@
 #include <memory>
 #include <span>
 #include <string>
+#include <vector>
 
 #include <entt/entity/entity.hpp>
 #include <gtest/gtest.h>
@@ -14,7 +15,9 @@ import Extrinsic.Core.FrameGraph;
 import Extrinsic.ECS.Scene.Bootstrap;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Components.AssetInstance;
+import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Component.DirtyTags;
+import Extrinsic.ECS.Component.ProceduralGeometryRef;
 import Extrinsic.ECS.Component.SpatialDebugBinding;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
@@ -138,6 +141,30 @@ namespace
         return Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
     }
 
+    void AttachProceduralTriangle(ECS::Scene::Registry& scene,
+                                  entt::entity entity)
+    {
+        scene.Raw().emplace_or_replace<ECS::Components::ProceduralGeometryRef>(entity);
+    }
+
+    void AttachPointCloudSources(ECS::Scene::Registry& scene,
+                                 entt::entity entity)
+    {
+        namespace GS = ECS::Components::GeometrySources;
+        namespace PN = ECS::Components::GeometrySources::PropertyNames;
+
+        auto& vertices = scene.Raw().emplace_or_replace<GS::Vertices>(entity);
+        vertices.Properties.Resize(3u);
+        auto positions = vertices.Properties.GetOrAdd<glm::vec3>(
+            std::string{PN::kPosition},
+            glm::vec3{0.0f});
+        positions.Vector() = std::vector<glm::vec3>{
+            {0.0f, 0.0f, 0.0f},
+            {1.0f, 0.0f, 0.0f},
+            {0.0f, 1.0f, 0.0f},
+        };
+    }
+
     [[nodiscard]] Geometry::PropertySet MakeScalarProperties()
     {
         Geometry::PropertySet properties;
@@ -183,6 +210,7 @@ namespace
         auto& registry = scene.Raw();
         registry.emplace<ECS::Components::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
         registry.emplace<Graphics::Components::RenderPoints>(entity);
+        AttachPointCloudSources(scene, entity);
 
         auto& visualization = registry.emplace<Graphics::Components::VisualizationConfig>(entity);
         visualization.Source = Graphics::Components::VisualizationConfig::ColorSource::ScalarField;
@@ -197,6 +225,7 @@ namespace
         auto& registry = scene.Raw();
         registry.emplace<ECS::Components::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
         registry.emplace<Graphics::Components::RenderPoints>(entity);
+        AttachPointCloudSources(scene, entity);
 
         auto& visualization = registry.emplace<Graphics::Components::VisualizationConfig>(entity);
         visualization.Source = Graphics::Components::VisualizationConfig::ColorSource::PerVertexBuffer;
@@ -209,6 +238,7 @@ namespace
         auto& registry = scene.Raw();
         registry.emplace<ECS::Components::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
         registry.emplace<Graphics::Components::RenderPoints>(entity);
+        AttachPointCloudSources(scene, entity);
     }
 }
 
@@ -223,6 +253,7 @@ TEST(RuntimeRenderExtraction, CreatesUpdatesAndClearsDirtyTransformSidecar)
     world.Matrix = glm::mat4{1.f};
     world.Matrix[3] = glm::vec4{2.f, 3.f, 4.f, 1.f};
     registry.emplace<Graphics::Components::RenderSurface>(entity);
+    AttachProceduralTriangle(scene, entity);
     registry.emplace<ECS::Components::DirtyTags::DirtyTransform>(entity);
 
     auto stats = fixture.Extract(scene);
@@ -261,6 +292,7 @@ TEST(RuntimeRenderExtraction, UiTransformEditModelReachesRenderWorldAfterPreRend
 
     const auto entity = ECS::Scene::CreateDefault(scene, "EditedTriangle");
     registry.emplace<Graphics::Components::RenderSurface>(entity);
+    AttachProceduralTriangle(scene, entity);
     registry.get<ECSC::Transform::Component>(entity).Position = glm::vec3{1.f, 2.f, 3.f};
     registry.emplace_or_replace<ECSC::Transform::IsDirtyTag>(entity);
 
@@ -375,7 +407,7 @@ TEST(RuntimeRenderExtraction, RetiresDestroyedRenderableSidecar)
 
     const auto entity = scene.Create();
     registry.emplace<ECS::Components::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
-    registry.emplace<Graphics::Components::RenderLines>(entity);
+    registry.emplace<Graphics::Components::RenderEdges>(entity);
 
     auto stats = fixture.Extract(scene);
     ASSERT_EQ(stats.AllocatedInstanceCount, 1u);
@@ -400,6 +432,7 @@ TEST(RuntimeRenderExtraction, ExtractsVisualizationAndLightsWithoutRenderableOwn
     const auto visualized = scene.Create();
     registry.emplace<ECS::Components::Transform::WorldMatrix>(visualized).Matrix = glm::mat4{1.f};
     registry.emplace<Graphics::Components::RenderPoints>(visualized);
+    AttachPointCloudSources(scene, visualized);
     registry.emplace<Graphics::Components::VisualizationConfig>(visualized).Source =
         Graphics::Components::VisualizationConfig::ColorSource::UniformColor;
 

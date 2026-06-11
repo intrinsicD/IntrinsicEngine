@@ -312,7 +312,7 @@ TEST(RuntimeAssetImportFormatCoverage, RepresentativePromotedFormatsMaterializeD
     const std::optional<ECS::EntityHandle> graphEntity =
         FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Graph);
     ASSERT_TRUE(graphEntity.has_value());
-    EXPECT_TRUE(raw.all_of<G::RenderLines>(*graphEntity));
+    EXPECT_TRUE(raw.all_of<G::RenderEdges>(*graphEntity));
     EXPECT_TRUE(raw.all_of<G::RenderPoints>(*graphEntity));
 
     const std::optional<ECS::EntityHandle> cloudEntity =

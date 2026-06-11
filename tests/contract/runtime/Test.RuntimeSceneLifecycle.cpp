@@ -1,10 +1,12 @@
 #include <memory>
+#include <variant>
 
 #include <gtest/gtest.h>
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Scene.Handle;
+import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.RenderExtraction;
@@ -12,6 +14,7 @@ import Extrinsic.Runtime.SelectionController;
 
 namespace Runtime = Extrinsic::Runtime;
 namespace ECS = Extrinsic::ECS;
+namespace G = Extrinsic::Graphics::Components;
 namespace Sel = Extrinsic::ECS::Components::Selection;
 
 namespace
@@ -52,9 +55,13 @@ TEST(RuntimeSceneLifecycle, NewSceneDocumentClearsSceneSelectionAndExtractionSid
     ASSERT_TRUE(engine.GetSelectionController().ConsumePendingPick().has_value());
     ASSERT_EQ(engine.GetSelectionController().InFlightPickCount(), 1u);
 
-    engine.SetMeshPrimitiveViewSettings(
-        stableId,
-        Runtime::MeshPrimitiveViewSettings{.EnableEdgeView = true});
+    Runtime::MeshPrimitiveViewSettings primitiveSettings{};
+    primitiveSettings.EnableEdgeView = true;
+    primitiveSettings.EnableVertexView = true;
+    primitiveSettings.VertexRenderMode =
+        Runtime::MeshVertexViewRenderMode::SurfaceAlignedCircle;
+    primitiveSettings.VertexPointRadiusPx = 4.0f;
+    engine.SetMeshPrimitiveViewSettings(stableId, primitiveSettings);
     engine.SetVisualizationAdapterBinding(
         stableId,
         Runtime::RenderExtractionCache::VisualizationAdapterBinding{
@@ -62,6 +69,13 @@ TEST(RuntimeSceneLifecycle, NewSceneDocumentClearsSceneSelectionAndExtractionSid
             .BufferBDA = 0xCAFE1000u,
         });
     ASSERT_TRUE(engine.GetMeshPrimitiveViewSettings(stableId).AnyEnabled());
+    ASSERT_TRUE(scene.Raw().all_of<G::RenderEdges>(entity));
+    ASSERT_TRUE(scene.Raw().all_of<G::RenderPoints>(entity));
+    const G::RenderPoints& translatedPoints =
+        scene.Raw().get<G::RenderPoints>(entity);
+    EXPECT_EQ(translatedPoints.Type, G::RenderPoints::RenderType::Surfel);
+    ASSERT_TRUE(std::holds_alternative<float>(translatedPoints.SizeSource));
+    EXPECT_FLOAT_EQ(std::get<float>(translatedPoints.SizeSource), 4.0f);
     ASSERT_TRUE(engine.GetVisualizationAdapterBinding(stableId).has_value());
 
     const auto reset = engine.NewSceneDocument();
