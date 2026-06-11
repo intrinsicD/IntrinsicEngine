@@ -165,12 +165,26 @@ export namespace Extrinsic::Runtime
         bool HasWorldRay{false};
         glm::vec3 WorldRayOrigin{0.0f};
         glm::vec3 WorldRayDirection{0.0f, 0.0f, -1.0f};
-        // World units spanned by one pixel at view depth 1 —
-        // `2 * tan(fovY / 2) / viewportHeight`, derived from the projection —
-        // so the pixel pick radius scales with the hit distance.
+        // World units spanned by one pixel, derived from the projection's
+        // `|[1][1]|` and the viewport height (`2 / (|P[1][1]| * H)`).
+        // Perspective (`P[1][1] = ±1/tan(fovY/2)`): this is the span at view
+        // depth 1 and the pixel pick radius scales linearly with the hit
+        // distance. Orthographic (`P[1][1] = ±2/orthoHeight`): the span is
+        // depth-invariant — the same expression already yields the absolute
+        // `orthoHeight / H` — and `OrthographicProjection` must be set so the
+        // fallback radius is NOT multiplied by the hit distance (otherwise a
+        // top-down pick radius grows with camera altitude and resolves
+        // primitives far outside the intended pixel radius).
         float WorldUnitsPerPixelAtUnitDepth{0.0f};
         float PickRadiusPixels{12.0f};
+        bool OrthographicProjection{false};
     };
+
+    // True when `projection` has no perspective divide on view-space z (the
+    // GLM/Vulkan orthographic shape: `P[2][3] == 0`, vs `-1` for perspective;
+    // the Vulkan Y flip touches neither). Used by the runtime to set
+    // `PickReadbackContext::OrthographicProjection` from the issuing camera.
+    [[nodiscard]] bool IsOrthographicProjection(const glm::mat4& projection) noexcept;
 
     // Reconstruct the world-space position of `(pixelX, pixelY)` at
     // depth-buffer sample `depth` ([0 (near) .. 1 (far)], Vulkan convention)

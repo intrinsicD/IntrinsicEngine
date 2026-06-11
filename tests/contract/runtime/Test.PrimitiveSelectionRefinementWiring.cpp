@@ -535,3 +535,100 @@ TEST(PrimitiveSelectionRefinementWiring, MissingHintResolvesThroughContextRayFal
     EXPECT_NEAR(result->WorldCursor.y, 0.51f, 1.0e-4f);
     EXPECT_NEAR(result->WorldCursor.z, 0.5f, 1.0e-4f);
 }
+
+// --- BUG-026 review follow-up: orthographic pick radius -------------------
+
+// The promoted TopDownCameraController renders through glm::ortho (with the
+// Vulkan Y flip); perspective cameras come from glm::perspective. The
+// projection-kind detector keys off the perspective divide coefficient.
+TEST(PrimitiveSelectionRefinementWiring, IsOrthographicProjectionDistinguishesProjectionKinds)
+{
+    using Extrinsic::Runtime::IsOrthographicProjection;
+
+    glm::mat4 ortho = glm::ortho(-4.0f, 4.0f, -3.0f, 3.0f, 0.1f, 100.0f);
+    EXPECT_TRUE(IsOrthographicProjection(ortho));
+    ortho[1][1] *= -1.0f; // Vulkan Y flip must not change the answer.
+    EXPECT_TRUE(IsOrthographicProjection(ortho));
+
+    glm::mat4 perspective =
+        glm::perspective(glm::radians(45.0f), 4.0f / 3.0f, 0.1f, 100.0f);
+    EXPECT_FALSE(IsOrthographicProjection(perspective));
+    perspective[1][1] *= -1.0f;
+    EXPECT_FALSE(IsOrthographicProjection(perspective));
+}
+
+// Orthographic units-per-pixel is depth-invariant, so the missing-hint
+// fallback radius must stay the constant pixel footprint instead of growing
+// with the hit distance. The same context resolves a vertex under perspective
+// scaling (radius 12 * 0.03 * 1.5 = 0.54 > the 0.51 ray-to-vertex distance)
+// but must fail closed under the orthographic flag (radius 12 * 0.03 = 0.36):
+// without the flag, a top-down pick radius grows with camera altitude and
+// resolves primitives far outside the intended 12-pixel radius.
+TEST(PrimitiveSelectionRefinementWiring, OrthographicFallbackRadiusDoesNotScaleWithHitDistance)
+{
+    Registry registry;
+    const EntityHandle entity = registry.Create();
+    EmplaceTriangleMesh(registry, entity);
+
+    PickReadbackContext context{};
+    context.InverseViewProjection = glm::mat4{1.0f};
+    context.ViewportWidth = 100u;
+    context.ViewportHeight = 100u;
+    context.HasWorldRay = true;
+    context.WorldRayOrigin = glm::vec3{0.99f, 0.51f, -1.0f};
+    context.WorldRayDirection = glm::vec3{0.0f, 0.0f, 1.0f};
+    context.WorldUnitsPerPixelAtUnitDepth = 0.03f;
+    context.PickRadiusPixels = 12.0f;
+
+    const Extrinsic::Graphics::PickReadbackResult readback =
+        HitWithDepth(entity, SelectionPrimitiveDomain::None, 0u, 99u, 24u, 0.5f);
+
+    // Perspective semantics (flag off): the hit distance (1.5) inflates the
+    // radius past v1's 0.51 perpendicular distance and the fallback resolves.
+    context.OrthographicProjection = false;
+    const std::optional<PrimitiveSelectionResult> perspectiveResult =
+        RefinePickReadbackResult(registry, readback, &context);
+    ASSERT_TRUE(perspectiveResult.has_value());
+    EXPECT_EQ(perspectiveResult->Status, PrimitiveRefineStatus::CpuFallbackResolved);
+    EXPECT_EQ(perspectiveResult->VertexId, 1u);
+
+    // Orthographic semantics (flag on): the radius stays the 0.36 pixel
+    // footprint, v1 is outside it, and the fallback fails closed.
+    context.OrthographicProjection = true;
+    const std::optional<PrimitiveSelectionResult> orthographicResult =
+        RefinePickReadbackResult(registry, readback, &context);
+    ASSERT_TRUE(orthographicResult.has_value());
+    EXPECT_EQ(orthographicResult->Status, PrimitiveRefineStatus::CpuFallbackMiss);
+    EXPECT_EQ(orthographicResult->VertexId, Extrinsic::Runtime::kInvalidPrimitiveIndex);
+}
+
+// A vertex genuinely inside the orthographic pixel footprint still resolves:
+// the flag tightens the radius, it does not disable the fallback.
+TEST(PrimitiveSelectionRefinementWiring, OrthographicFallbackStillResolvesWithinPixelFootprint)
+{
+    Registry registry;
+    const EntityHandle entity = registry.Create();
+    EmplaceTriangleMesh(registry, entity);
+
+    PickReadbackContext context{};
+    context.InverseViewProjection = glm::mat4{1.0f};
+    context.ViewportWidth = 100u;
+    context.ViewportHeight = 100u;
+    context.HasWorldRay = true;
+    // Perpendicular distance to v1 = (1, 0, 0) is ~0.2002 < the 0.36 radius.
+    context.WorldRayOrigin = glm::vec3{0.99f, 0.2f, -1.0f};
+    context.WorldRayDirection = glm::vec3{0.0f, 0.0f, 1.0f};
+    context.WorldUnitsPerPixelAtUnitDepth = 0.03f;
+    context.PickRadiusPixels = 12.0f;
+    context.OrthographicProjection = true;
+
+    const std::optional<PrimitiveSelectionResult> result = RefinePickReadbackResult(
+        registry,
+        HitWithDepth(entity, SelectionPrimitiveDomain::None, 0u, 99u, 24u, 0.5f),
+        &context);
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Status, PrimitiveRefineStatus::CpuFallbackResolved);
+    EXPECT_EQ(result->Kind, RefinedPrimitiveKind::Vertex);
+    EXPECT_EQ(result->VertexId, 1u);
+}

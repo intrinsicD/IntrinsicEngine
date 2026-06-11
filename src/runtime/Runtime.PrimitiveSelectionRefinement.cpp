@@ -665,6 +665,15 @@ namespace Extrinsic::Runtime
         }
     }
 
+    bool IsOrthographicProjection(const glm::mat4& projection) noexcept
+    {
+        // GLM perspective projections write -1 into the w-row coefficient of
+        // view-space z (column-major: projection[2][3]); orthographic
+        // projections leave it 0 and keep w constant. The Vulkan Y flip only
+        // negates [1][1], so it does not affect this signal.
+        return std::abs(projection[2][3]) <= 1.0e-6f;
+    }
+
     std::optional<glm::vec3> UnprojectPickDepth(const glm::mat4& inverseViewProjection,
                                                 const std::uint32_t pixelX,
                                                 const std::uint32_t pixelY,
@@ -765,20 +774,27 @@ namespace Extrinsic::Runtime
         if (context != nullptr && context->HasWorldRay)
         {
             // Entity-local pick ray for the missing-hint CPU fallback. The
-            // fallback radius converts the pixel radius to world units at the
-            // hit distance (or the entity origin's distance when no depth
-            // anchor exists), then to local units via the largest inverse
-            // scale axis so non-uniform scaling stays conservative.
-            const glm::vec3 radiusReference = worldCursor.has_value()
-                ? *worldCursor
-                : glm::vec3{request.LocalToWorld[3]};
-            const float viewDistance =
-                glm::length(radiusReference - context->WorldRayOrigin);
-            const float worldRadius = glm::max(
-                context->PickRadiusPixels *
-                    context->WorldUnitsPerPixelAtUnitDepth *
-                    glm::max(viewDistance, 0.0f),
-                1.0e-5f);
+            // fallback radius converts the pixel radius to world units, then
+            // to local units via the largest inverse scale axis so
+            // non-uniform scaling stays conservative. Perspective: one pixel
+            // spans more world units the farther the hit, so scale by the
+            // hit distance (the cursor when a depth anchor exists, else the
+            // entity origin's distance). Orthographic: units-per-pixel is
+            // depth-invariant, so the radius stays the constant pixel
+            // footprint — multiplying by the hit distance would grow the
+            // top-down pick radius with camera altitude (BUG-026 review
+            // follow-up).
+            float worldRadius =
+                context->PickRadiusPixels * context->WorldUnitsPerPixelAtUnitDepth;
+            if (!context->OrthographicProjection)
+            {
+                const glm::vec3 radiusReference = worldCursor.has_value()
+                    ? *worldCursor
+                    : glm::vec3{request.LocalToWorld[3]};
+                worldRadius *= glm::max(
+                    glm::length(radiusReference - context->WorldRayOrigin), 0.0f);
+            }
+            worldRadius = glm::max(worldRadius, 1.0e-5f);
             const glm::mat3 invLinear{worldToLocal};
             const float maxInverseScale = glm::max(
                 glm::length(invLinear[0]),

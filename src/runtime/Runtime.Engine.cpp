@@ -1807,8 +1807,13 @@ namespace Extrinsic::Runtime
                 context.HasWorldRay           = pickCamera.HasPickRay;
                 context.WorldRayOrigin        = pickCamera.PickRayOrigin;
                 context.WorldRayDirection     = pickCamera.PickRayDirection;
-                // 2 * tan(fovY / 2) / viewportHeight from the projection's
-                // [1][1] = 1 / tan(fovY / 2) (sign carries the Vulkan Y flip).
+                // `2 / (|P[1][1]| * H)`: for perspective ([1][1] =
+                // ±1/tan(fovY/2)) this is the world-units-per-pixel at view
+                // depth 1; for orthographic ([1][1] = ±2/orthoHeight, e.g.
+                // the promoted TopDownCameraController) the same expression
+                // is the depth-invariant orthoHeight/H, and the flag tells
+                // refinement not to scale it by the hit distance. The sign
+                // carries the Vulkan Y flip in both cases.
                 const float projectionScaleY =
                     std::abs(renderInput.Camera.Projection[1][1]);
                 if (projectionScaleY > 0.000001f && viewportHeight > 0u)
@@ -1817,6 +1822,8 @@ namespace Extrinsic::Runtime
                         2.0f / (projectionScaleY *
                                 static_cast<float>(viewportHeight));
                 }
+                context.OrthographicProjection =
+                    IsOrthographicProjection(renderInput.Camera.Projection);
                 constexpr std::size_t kMaxInFlightPickContexts = 32u;
                 if (m_InFlightPickContexts.size() >= kMaxInFlightPickContexts)
                 {

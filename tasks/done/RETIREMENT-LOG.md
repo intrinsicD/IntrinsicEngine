@@ -34,7 +34,10 @@ pixel-radius scale) and replays it on readback consume, and
 `RefinePickReadbackResult` unprojects the cursor (`UnprojectPickDepth`),
 reports it in world + entity-local space (`CursorFromDepth`, `WorldCursor`,
 `LocalCursor`), anchors the closest-vertex/edge/face refinement with it, and
-feeds the distance-scaled ray fallback for hint-less hits. Why the gates
+feeds the ray fallback for hint-less hits (pixel radius scaled by hit
+distance under perspective; kept at the depth-invariant pixel footprint
+under orthographic cameras such as the top-down controller — review
+follow-up, 2026-06-11). Why the gates
 missed it: CPU contracts seeded readback bytes directly (never entity 0,
 never the real clear), and the `gpu;vulkan` smokes exercised hierarchy
 selection, which bypasses the readback path. 12 new regression tests lock
