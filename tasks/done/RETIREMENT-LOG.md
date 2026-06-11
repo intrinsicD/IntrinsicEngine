@@ -8,6 +8,29 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+Backlog
+[`BUG-027`](BUG-027-sandbox-dragdrop-close-mesh-views.md) — sandbox
+drag/drop, close, and mesh primitive-view regression — opened and retired on
+2026-06-11 at maturity `CPUContracted`. The reported sandbox path had three
+runtime-wiring failures: direct platform close events reached the engine
+listener but were ignored, the live frame loop polled the X-button close event
+and continued into ImGui/render work before re-checking `ShouldClose()`,
+dropped/direct standalone geometry imports materialized entities without
+selecting them, and the promoted mesh primitive-view UI therefore had no
+selected mesh to control after drag/drop. The fix wires `WindowCloseEvent` to
+`Engine::RequestExit()`, delegates the `RunFrame()` platform phase to
+`Core::ExecutePlatformBeginFrameContract(...)` so a close observed during
+`PollEvents()` returns before renderer work, carries the materialized entity
+handle out of standalone mesh/graph/point-cloud import, and selects that entity
+after geometry import and camera focus. Regression coverage replays
+`WindowDropEvent`/`WindowCloseEvent` through the runtime platform-event handler,
+imports OBJ and OFF meshes through `Engine::Run()`, proves the imported mesh is
+the active selection, drives the promoted primitive-view command surface,
+asserts edge/vertex view uploads through `RenderExtractionCache`, and pins the
+close-button timing with frame-loop/layering contracts. A narrow
+`Engine::DispatchPlatformEventForTest(...)` seam exists only to replay platform
+events through the same handler installed as the live window listener.
+
 Active
 [`BUG-026`](BUG-026-click-pick-readback-entity-zero-and-depth.md) — viewport
 click selection dead: render-id zero collision, UINT clear punning, and

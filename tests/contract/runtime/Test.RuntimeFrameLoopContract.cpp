@@ -209,6 +209,24 @@ TEST(RuntimeFrameLoopContract, PlatformBeginFramePollsBeforeMinimizedWait)
                      }));
 }
 
+TEST(RuntimeFrameLoopContract, PlatformBeginFrameStopsWhenPollRequestsClose)
+{
+    Trace trace;
+    FakePlatformHooks platform(trace);
+    platform.CloseRequested = true;
+
+    const Extrinsic::Core::PlatformFrameResult result =
+        Extrinsic::Core::ExecutePlatformBeginFrameContract(platform, 0.25);
+
+    EXPECT_FALSE(result.ContinueFrame);
+    EXPECT_TRUE(result.ShouldClose);
+    EXPECT_FALSE(result.Minimized);
+    EXPECT_EQ(trace, (Trace{
+                         "platform:poll_events",
+                         "platform:should_close",
+                     }));
+}
+
 TEST(RuntimeFrameLoopContract, RenderFrameOrdersPromotedRendererPhases)
 {
     Trace trace;
@@ -338,4 +356,3 @@ TEST(RuntimeFrameLoopContract, ShutdownOrdersApplicationStreamingAndSubsystemTea
                          "shutdown:mark_uninitialized",
                      }));
 }
-

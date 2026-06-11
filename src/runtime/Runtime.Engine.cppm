@@ -169,8 +169,10 @@ namespace Extrinsic::Runtime
     //
     // Frame shape (executed inside Run()):
     //
-    //   PollEvents → BeginFrame(clock)
-    //     [if minimized: WaitForEventsTimeout → Resample → continue]
+    //   PollEvents → ShouldClose
+    //     [if close: RequestExit → return before renderer work]
+    //     [if minimized: WaitForEventsTimeout → BeginFrame/Resample → continue]
+    //   BeginFrame(clock)
     //     [if resized:   WaitIdle → Resize]
     //   FixedStepLoop {
     //     OnSimTick × N
@@ -226,6 +228,9 @@ namespace Extrinsic::Runtime
         [[nodiscard]] const std::optional<RuntimeAssetImportEvent>&
             GetLastAssetImportEvent() const noexcept;
         void ImportDroppedFilePaths(std::span<const std::string> paths);
+        // Contract-test seam: replay a platform event through the same runtime
+        // handler installed as the window listener during Initialize().
+        void DispatchPlatformEventForTest(const Platform::Event& event);
         // RUNTIME-098 — promoted scene persistence facade. Editor/UI code
         // submits file paths here; Engine owns file IO, scene replacement, and
         // runtime sidecar cleanup while the serializer stays backend-neutral.

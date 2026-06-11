@@ -448,6 +448,7 @@ namespace Extrinsic::Runtime
         {
             RuntimeAssetImportResult Result{};
             std::optional<GeometryImportBounds> Bounds{};
+            ECS::EntityHandle Entity{ECS::InvalidEntityHandle};
         };
 
         [[nodiscard]] bool IsFinitePosition(const glm::vec3& position) noexcept
@@ -757,6 +758,7 @@ namespace Extrinsic::Runtime
                                 .PrimitiveEntitiesCreated = 1u,
                             },
                             .Bounds = bounds,
+                            .Entity = entity,
                         };
                     }
                     else if constexpr (std::is_same_v<PayloadT, DecodedGraphImport>)
@@ -813,6 +815,7 @@ namespace Extrinsic::Runtime
                                 .PrimitiveEntitiesCreated = 1u,
                             },
                             .Bounds = bounds,
+                            .Entity = entity,
                         };
                     }
                     else
@@ -864,6 +867,7 @@ namespace Extrinsic::Runtime
                                 .PrimitiveEntitiesCreated = 1u,
                             },
                             .Bounds = bounds,
+                            .Entity = entity,
                         };
                     }
                 },
@@ -1560,12 +1564,44 @@ namespace Extrinsic::Runtime
         RuntimeFrameContext frameContext{};
 
         // ── Phase 1: Platform ─────────────────────────────────────────────
-        m_Window->PollEvents();
+        struct PlatformFrameHooks final : Core::IPlatformFrameHooks
+        {
+            Platform::IWindow& Window;
+
+            explicit PlatformFrameHooks(Platform::IWindow& window)
+                : Window(window)
+            {
+            }
+
+            void PollEvents() override { Window.PollEvents(); }
+            [[nodiscard]] bool ShouldClose() const override
+            {
+                return Window.ShouldClose();
+            }
+            [[nodiscard]] bool IsMinimized() const override
+            {
+                return Window.IsMinimized();
+            }
+            void WaitForEventsTimeout(double seconds) override
+            {
+                Window.WaitForEventsTimeout(seconds);
+            }
+        };
+
+        PlatformFrameHooks platformHooks{*m_Window};
+        const Core::PlatformFrameResult platformResult =
+            Core::ExecutePlatformBeginFrameContract(platformHooks,
+                                                    kIdleSleepSeconds);
+        if (platformResult.ShouldClose || !m_Running)
+        {
+            RequestExit();
+            return;
+        }
+
         m_FrameClock.BeginFrame();
 
-        if (m_Window->IsMinimized())
+        if (!platformResult.ContinueFrame)
         {
-            m_Window->WaitForEventsTimeout(kIdleSleepSeconds);
             m_FrameClock.Resample();
             return;
         }
@@ -2216,10 +2252,21 @@ namespace Extrinsic::Runtime
 
     void Engine::HandlePlatformEvent(const Platform::Event& event)
     {
+        if (std::holds_alternative<Platform::WindowCloseEvent>(event))
+        {
+            RequestExit();
+            return;
+        }
+
         if (const auto* dropped = std::get_if<Platform::WindowDropEvent>(&event))
         {
             HandleWindowDropEvent(*dropped);
         }
+    }
+
+    void Engine::DispatchPlatformEventForTest(const Platform::Event& event)
+    {
+        HandlePlatformEvent(event);
     }
 
     void Engine::HandleWindowDropEvent(const Platform::WindowDropEvent& event)
@@ -2365,6 +2412,9 @@ namespace Extrinsic::Runtime
                                 m_Config.Camera.Controller,
                                 m_Config.Camera.Enabled,
                                 materialized->Bounds);
+                            (void)m_SelectionController.SetSelectedEntity(
+                                *m_Scene,
+                                materialized->Entity);
                             result = materialized->Result;
                         }
                         else
@@ -2457,6 +2507,8 @@ namespace Extrinsic::Runtime
                 m_Config.Camera.Controller,
                 m_Config.Camera.Enabled,
                 materialized->Bounds);
+            (void)m_SelectionController.SetSelectedEntity(*m_Scene,
+                                                          materialized->Entity);
             return materialized->Result;
         }
         if (route->PayloadKind != Assets::AssetPayloadKind::ModelScene &&

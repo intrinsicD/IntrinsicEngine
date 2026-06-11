@@ -43,6 +43,7 @@ import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.ImGuiAdapter;
+import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxEditorUi;
@@ -332,6 +333,15 @@ namespace
         {
             engine.RequestExit();
         }
+        void OnShutdown(Runtime::Engine&) override {}
+    };
+
+    class PassiveApplication final : public Runtime::IApplication
+    {
+    public:
+        void OnInitialize(Runtime::Engine&) override {}
+        void OnSimTick(Runtime::Engine&, double) override {}
+        void OnVariableTick(Runtime::Engine&, double, double) override {}
         void OnShutdown(Runtime::Engine&) override {}
     };
 
@@ -2765,6 +2775,170 @@ TEST(SandboxEditorUi, DroppedFilePathsRouteAmbiguousPlyThroughRuntimeImportFacad
                                Runtime::SandboxEditorDiagnosticCode::AssetImportFailed));
 
     ui.Detach();
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorUi, PlatformDropEventImportsObjMeshSelectsItAndEnablesPrimitiveViews)
+{
+    TmpFile meshFile(
+        "runtime_platform_drop_mesh.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<WaitForAssetImportEventApplication>(128u));
+    engine.Initialize();
+
+    Runtime::SandboxEditorUi ui;
+    ui.Attach(engine);
+
+    engine.DispatchPlatformEventForTest(Plat::WindowDropEvent{
+        .Paths = {meshFile.Path.string()},
+    });
+    engine.Run();
+
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
+    const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
+        engine.GetLastAssetImportEvent();
+    ASSERT_TRUE(lastEvent.has_value());
+    EXPECT_TRUE(lastEvent->Succeeded());
+    ASSERT_TRUE(lastEvent->Result.has_value());
+    EXPECT_EQ(lastEvent->Result->PayloadKind, Assets::AssetPayloadKind::Mesh);
+
+    const std::optional<ECS::EntityHandle> meshEntity =
+        FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
+    ASSERT_TRUE(meshEntity.has_value());
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(*meshEntity);
+    const auto selectedIds = engine.GetSelectionController().SelectedStableIds();
+    ASSERT_EQ(selectedIds.size(), 1u);
+    EXPECT_EQ(selectedIds[0], stableId);
+
+    Runtime::SandboxEditorContext commandContext =
+        MakeContext(engine.GetScene(), engine.GetSelectionController());
+    commandContext.PrimitiveViewCommands =
+        Runtime::SandboxEditorPrimitiveViewCommandSurface{
+            .GetSettings =
+                [&engine](const std::uint32_t id)
+                {
+                    const Runtime::MeshPrimitiveViewSettings settings =
+                        engine.GetMeshPrimitiveViewSettings(id);
+                    return Runtime::SandboxEditorPrimitiveViewSettings{
+                        .EnableEdgeView = settings.EnableEdgeView,
+                        .EnableVertexView = settings.EnableVertexView,
+                    };
+                },
+            .SetSettings =
+                [&engine](
+                    const std::uint32_t id,
+                    const Runtime::SandboxEditorPrimitiveViewSettings settings)
+                {
+                    engine.SetMeshPrimitiveViewSettings(
+                        id,
+                        Runtime::MeshPrimitiveViewSettings{
+                            .EnableEdgeView = settings.EnableEdgeView,
+                            .EnableVertexView = settings.EnableVertexView,
+                        });
+                },
+            .ClearSettings =
+                [&engine](const std::uint32_t id)
+                {
+                    engine.ClearMeshPrimitiveViewSettings(id);
+                },
+        };
+
+    const Runtime::SandboxEditorPanelFrame frame =
+        Runtime::BuildSandboxEditorPanelFrame(commandContext);
+    ASSERT_TRUE(frame.CameraRender.HasPrimitiveViewEntity);
+    EXPECT_EQ(frame.CameraRender.PrimitiveViewStableId, stableId);
+    EXPECT_FALSE(frame.CameraRender.PrimitiveView.EnableEdgeView);
+    EXPECT_FALSE(frame.CameraRender.PrimitiveView.EnableVertexView);
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorPrimitiveViewCommand(
+                  commandContext,
+                  Runtime::SandboxEditorPrimitiveViewCommand{
+                      .StableEntityId = stableId,
+                      .SetEdgeView = true,
+                      .EnableEdgeView = true,
+                      .SetVertexView = true,
+                      .EnableVertexView = true,
+                  }),
+              Runtime::SandboxEditorCommandStatus::Applied);
+
+    const Runtime::MeshPrimitiveViewSettings stored =
+        engine.GetMeshPrimitiveViewSettings(stableId);
+    EXPECT_TRUE(stored.EnableEdgeView);
+    EXPECT_TRUE(stored.EnableVertexView);
+
+    Runtime::RenderExtractionCache extraction;
+    extraction.SetMeshPrimitiveViewSettings(stableId, stored);
+    const Runtime::RuntimeRenderExtractionStats stats =
+        extraction.ExtractAndSubmit(engine.GetScene(),
+                                    engine.GetRenderer(),
+                                    &engine.GetGpuAssetCache());
+    EXPECT_EQ(stats.MeshGeometryUploads, 1u);
+    EXPECT_EQ(stats.MeshEdgeViewUploads, 1u);
+    EXPECT_EQ(stats.MeshVertexViewUploads, 1u);
+
+    extraction.Shutdown(engine.GetRenderer());
+    ui.Detach();
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorUi, PlatformDropEventImportsOffMesh)
+{
+    TmpFile meshFile(
+        "runtime_platform_drop_mesh.off",
+        "OFF\n"
+        "3 1 3\n"
+        "0 0 0\n"
+        "1 0 0\n"
+        "0 1 0\n"
+        "3 0 1 2\n");
+
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<WaitForAssetImportEventApplication>(128u));
+    engine.Initialize();
+
+    engine.DispatchPlatformEventForTest(Plat::WindowDropEvent{
+        .Paths = {meshFile.Path.string()},
+    });
+    engine.Run();
+
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
+    const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
+        engine.GetLastAssetImportEvent();
+    ASSERT_TRUE(lastEvent.has_value());
+    EXPECT_TRUE(lastEvent->Succeeded());
+    ASSERT_TRUE(lastEvent->Result.has_value());
+    EXPECT_EQ(lastEvent->Result->PayloadKind, Assets::AssetPayloadKind::Mesh);
+
+    const std::optional<ECS::EntityHandle> meshEntity =
+        FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
+    ASSERT_TRUE(meshEntity.has_value());
+    const auto selectedIds = engine.GetSelectionController().SelectedStableIds();
+    ASSERT_EQ(selectedIds.size(), 1u);
+    EXPECT_EQ(selectedIds[0],
+              Runtime::SelectionController::ToStableEntityId(*meshEntity));
+
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorUi, PlatformCloseEventStopsEngineRunState)
+{
+    Runtime::Engine engine(HeadlessConfig(), std::make_unique<PassiveApplication>());
+    engine.Initialize();
+
+    ASSERT_TRUE(engine.IsRunning());
+    engine.DispatchPlatformEventForTest(Plat::WindowCloseEvent{});
+    engine.Run();
+
+    EXPECT_FALSE(engine.IsRunning());
+
     engine.Shutdown();
 }
 

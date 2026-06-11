@@ -65,18 +65,21 @@ TEST(RuntimeEngineLayering, RunFrameDoesNotUseGpuResourceOrPassLevelDetails)
 TEST(RuntimeEngineLayering, RunFrameDelegatesToPromotedContractsInDocumentedBroadPhaseOrder)
 {
     const auto content = ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto runFrame = SliceBetween(content,
+                                       "void Engine::RunFrame()",
+                                       "bool Engine::IsRunning() const noexcept");
 
-    const auto frameContext = content.find("RuntimeFrameContext frameContext{};");
-    const auto pollEvents = content.find("m_Window->PollEvents();");
-    const auto simTick = content.find("m_Application->OnSimTick(*this, m_FixedDt);");
-    const auto variableTick = content.find("m_Application->OnVariableTick(*this, alpha, frameDt);");
-    const auto renderContract = content.find("Core::ExecuteRenderFrameContract(renderHooks)");
-    const auto present = content.find("m_Device->Present(frame);");
-    const auto maintenance = content.find("Core::ExecuteMaintenanceContract(transferHooks, streamingHooks, assetHooks, 8);");
-    const auto clockEnd = content.rfind("m_FrameClock.EndFrame();");
+    const auto frameContext = runFrame.find("RuntimeFrameContext frameContext{};");
+    const auto platformContract = runFrame.find("Core::ExecutePlatformBeginFrameContract(platformHooks");
+    const auto simTick = runFrame.find("m_Application->OnSimTick(*this, m_FixedDt);");
+    const auto variableTick = runFrame.find("m_Application->OnVariableTick(*this, alpha, frameDt);");
+    const auto renderContract = runFrame.find("Core::ExecuteRenderFrameContract(renderHooks)");
+    const auto present = runFrame.find("m_Device->Present(frame);");
+    const auto maintenance = runFrame.find("Core::ExecuteMaintenanceContract(transferHooks, streamingHooks, assetHooks, 8);");
+    const auto clockEnd = runFrame.rfind("m_FrameClock.EndFrame();");
 
     ASSERT_NE(frameContext, std::string::npos);
-    ASSERT_NE(pollEvents, std::string::npos);
+    ASSERT_NE(platformContract, std::string::npos);
     ASSERT_NE(simTick, std::string::npos);
     ASSERT_NE(variableTick, std::string::npos);
     ASSERT_NE(renderContract, std::string::npos);
@@ -84,13 +87,38 @@ TEST(RuntimeEngineLayering, RunFrameDelegatesToPromotedContractsInDocumentedBroa
     ASSERT_NE(maintenance, std::string::npos);
     ASSERT_NE(clockEnd, std::string::npos);
 
-    EXPECT_LT(frameContext, pollEvents);
-    EXPECT_LT(pollEvents, simTick);
+    EXPECT_LT(frameContext, platformContract);
+    EXPECT_LT(platformContract, simTick);
     EXPECT_LT(simTick, variableTick);
     EXPECT_LT(variableTick, renderContract);
     EXPECT_LT(renderContract, present);
     EXPECT_LT(present, maintenance);
     EXPECT_LT(maintenance, clockEnd);
+}
+
+TEST(RuntimeEngineLayering, RunFrameStopsAfterPlatformCloseBeforeRendererContract)
+{
+    const auto content = ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
+    const auto runFrame = SliceBetween(content,
+                                       "void Engine::RunFrame()",
+                                       "bool Engine::IsRunning() const noexcept");
+
+    const auto platformContract = runFrame.find("Core::ExecutePlatformBeginFrameContract(platformHooks");
+    const auto closeBranch = runFrame.find("platformResult.ShouldClose");
+    const auto requestExit = runFrame.find("RequestExit();", closeBranch);
+    const auto returnFromClose = runFrame.find("return;", requestExit);
+    const auto renderContract = runFrame.find("Core::ExecuteRenderFrameContract(renderHooks)");
+
+    ASSERT_NE(platformContract, std::string::npos);
+    ASSERT_NE(closeBranch, std::string::npos);
+    ASSERT_NE(requestExit, std::string::npos);
+    ASSERT_NE(returnFromClose, std::string::npos);
+    ASSERT_NE(renderContract, std::string::npos);
+
+    EXPECT_LT(platformContract, closeBranch);
+    EXPECT_LT(closeBranch, requestExit);
+    EXPECT_LT(requestExit, returnFromClose);
+    EXPECT_LT(returnFromClose, renderContract);
 }
 
 TEST(RuntimeEngineLayering, RunFrameCarriesDataOnlyFrameContext)
