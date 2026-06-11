@@ -36,7 +36,7 @@ depends_on: []
   for CI, manual recovery still required when a dependency genuinely
   corrupts.
 - Every dependency we currently fetch is already a first-class vcpkg port:
-  `glm`, `glfw3`, `entt`, `imgui[docking-experimental]`, `imguizmo`,
+  `glm`, `eigen3`, `glfw3`, `entt`, `imgui[docking-experimental]`, `imguizmo`,
   `nlohmann-json`, `vulkan-memory-allocator`, `volk`, `stb`, `draco`,
   `tinygltf`, `gtest`.
 - Vulkan SDK stays out of vcpkg; `find_package(Vulkan REQUIRED)` keeps
@@ -45,12 +45,12 @@ depends_on: []
   so configure cost amortizes to a few seconds across the fleet.
 
 ## Required changes
-- [ ] Add `vcpkg.json` at the repo root with every dependency currently
+- [x] Add `vcpkg.json` at the repo root with every dependency currently
       declared in `cmake/Dependencies.cmake`, pinned via
       `builtin-baseline` to a known-good vcpkg commit.
 - [ ] Add `vcpkg-configuration.json` registering the binary cache and any
       custom overlays (e.g. for the ImGui docking branch).
-- [ ] Add a bootstrap script `tools/setup/bootstrap_vcpkg.sh` that clones
+- [x] Add a bootstrap script `tools/setup/bootstrap_vcpkg.sh` that clones
       `microsoft/vcpkg` into `external/vcpkg/` at the baseline commit and
       runs `bootstrap-vcpkg.sh -disableMetrics`.
 - [ ] Update `CMakePresets.json` to set
@@ -116,6 +116,29 @@ depends_on: []
 - [ ] Version bumps flow through `vcpkg x-update-baseline` + manifest
       edit only — no hand-edits to any `GIT_TAG` strings anywhere.
 
+## Status
+- Active 2026-06-11; owner: Codex; branch: `main`.
+- Current slice: Slice A — manifest + bootstrap (no behavior change). CMake
+  presets and `cmake/Dependencies.cmake` still use the existing FetchContent
+  path until Slice B.
+- Slice A stages `vcpkg-configuration.json` with empty overlay lists. The
+  binary cache remains configured by `VCPKG_BINARY_SOURCES` / CI wiring in
+  Slice C because vcpkg binary sources are not a manifest configuration field.
+- Next verification step: validate the vcpkg manifest/bootstrap script and keep
+  the existing `ci` configure/build path green.
+- Slice A verification 2026-06-11:
+    - `tools/setup/bootstrap_vcpkg.sh` — passed; checked out baseline
+      `06a7fdd564234908731c59ac46a624f808e87b1c` under ignored
+      `external/vcpkg/`.
+    - `external/vcpkg/vcpkg format-manifest vcpkg.json` — passed.
+    - `external/vcpkg/vcpkg install --dry-run --no-print-usage` — passed; the
+      default plan includes the `windowing` feature dependencies.
+    - `external/vcpkg/vcpkg install --dry-run --x-no-default-features
+      --no-print-usage` — passed; the headless plan excludes `glfw3`,
+      `imguizmo`, `volk`, and `vulkan-memory-allocator`.
+    - `cmake --preset ci`; `cmake --build --preset ci --target
+      IntrinsicTests`; default CPU CTest gate — all passed.
+
 ## Verification
 ```bash
 # Cold path (binary cache empty)
@@ -176,4 +199,3 @@ final slice):
   `INTRINSIC_UPDATE_DEPS` / `INTRINSIC_DEPS_SEAL` knobs,
   `tools/setup/populate_deps.sh`, and remaining `external/cache/`
   references; update `AGENTS.md` §5.
-

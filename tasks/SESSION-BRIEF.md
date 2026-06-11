@@ -8,11 +8,10 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `INFRA-001` — Move third-party dependencies to a vcpkg manifest (tasks/active/INFRA-001-vcpkg-manifest-mode.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 
-- unblocked: `INFRA-001` — Move third-party dependencies to a vcpkg manifest (tasks/backlog/architecture/INFRA-001-vcpkg-manifest-mode.md)
 - unblocked: `LEGACY-001` — Delete `src/legacy/Interface/` (tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md)
 - unblocked: `LEGACY-004` — Delete `src/legacy/Asset/` (tasks/backlog/architecture/LEGACY-004-delete-src-legacy-asset.md)
 - unblocked: `LEGACY-005` — Delete `src/legacy/Core/` (tasks/backlog/architecture/LEGACY-005-delete-src-legacy-core.md)

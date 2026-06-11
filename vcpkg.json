@@ -1,0 +1,36 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "intrinsicengine",
+  "version-string": "0.1.0",
+  "builtin-baseline": "06a7fdd564234908731c59ac46a624f808e87b1c",
+  "dependencies": [
+    "draco",
+    "eigen3",
+    "entt",
+    "glm",
+    "gtest",
+    {
+      "name": "imgui",
+      "features": [
+        "docking-experimental"
+      ]
+    },
+    "nlohmann-json",
+    "stb",
+    "tinygltf"
+  ],
+  "default-features": [
+    "windowing"
+  ],
+  "features": {
+    "windowing": {
+      "description": "Dependencies used by GLFW/Vulkan-backed interactive builds. Headless presets can disable default features before the vcpkg toolchain cutover.",
+      "dependencies": [
+        "glfw3",
+        "imguizmo",
+        "volk",
+        "vulkan-memory-allocator"
+      ]
+    }
+  }
+}
