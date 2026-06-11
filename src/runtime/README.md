@@ -70,6 +70,27 @@ the acquired `RenderWorldPool` front slot. This keeps the stage data explicit
 without exporting a runtime API or reviving legacy `Runtime.FrameLoop`,
 `Runtime.RenderOrchestrator`, or `Runtime.ResourceMaintenance` modules.
 
+## Derived overlay producer decision
+
+`RUNTIME-104` classifies legacy `Graphics.OverlayEntityFactory` behavior for
+current promoted workflows and deliberately adds no `DerivedOverlayProducer`
+module. Cross-domain mesh, graph, and point-cloud child overlays are represented
+by ordinary promoted `GeometrySources` entities when a runtime/editor command
+imports or authors data; mesh edge/vertex overlays use the existing
+runtime-owned `MeshPrimitiveViewSettings` sidecar over the parent mesh. Current
+vector-field and isoline workflows use `Extrinsic.Runtime.VisualizationAdapters`
+to emit data-only visualization packets (`VectorFieldOverlayPacket` and
+`IsolineOverlayPacket`) into `RuntimeRenderSnapshotBatch`; that path creates no
+child ECS entity, stores no graphics/RHI handle in ECS, and leaves backend
+command-shape proof to `GRAPHICS-085`.
+
+The retired overlay snapshot sketches in
+`docs/migration/nonlegacy-parity-matrix.md` are historical planning notes, not
+current API debt. Reopen a value-gated runtime/editor task only if a concrete
+current workflow cannot be represented by ordinary geometry entities,
+primitive-view sidecars, transient debug packets, or existing visualization
+packet spans.
+
 ## Scene lifecycle and persistence boundary
 
 `RUNTIME-100` defines the promoted scene-manager replacement as a runtime-owned

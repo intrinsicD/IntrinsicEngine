@@ -35,7 +35,8 @@ priority.
   used by current promoted runtime/UI seams.
 - [GRAPHICS-085 — Overlay packet backend parity](GRAPHICS-085-overlay-packet-backend-parity.md):
   backend command-shape and optional visual proof only for overlay packet
-  classes retained by `RUNTIME-104`.
+  lanes retained by the retired `RUNTIME-104` no-new-persistent-overlay
+  decision.
 - [GRAPHICS-086 — RHI retirement parity and CUDA decision](GRAPHICS-086-rhi-retirement-parity-and-cuda-decision.md):
   final audit/decision task before accepting any legacy RHI command-helper,
   descriptor, swapchain/image, scene-instance, or CUDA implementation.

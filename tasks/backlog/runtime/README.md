@@ -13,10 +13,6 @@ another backlog directory.
 - [RUNTIME-103 — Geometry algorithm execution queue](RUNTIME-103-geometry-algorithm-execution-queue.md):
   value-gated asynchronous CPU geometry processing and CUDA keep/defer/remove
   decision for legacy K-Means behavior.
-- [RUNTIME-104 — Derived overlay producer lifecycle](RUNTIME-104-derived-overlay-producer-lifecycle.md):
-  conditional runtime-owned persistent overlay descriptors, stable keys, parent
-  closure, and extraction packet production when existing packet lanes are not
-  sufficient.
 - [RUNTIME-105 — Remove the deprecated GetStreamingGraph() TaskGraph bridge](RUNTIME-105-remove-streaming-graph-bridge.md):
   pure bridge deletion opened by `HARDEN-078`; the promoted tree already has
   zero consumers outside the Engine bridge itself.
@@ -45,7 +41,8 @@ these as runtime work when scheduling and review:
   consumes runtime visualization adapter/property selections but keeps GPU
   upload ownership in graphics.
 - [GRAPHICS-085 — Overlay packet backend parity](../rendering/GRAPHICS-085-overlay-packet-backend-parity.md):
-  backend proof for packets produced by `RUNTIME-104`.
+  backend proof for visualization/debug packet lanes retained after the
+  `RUNTIME-104` no-new-persistent-overlay decision.
 
 ## Related docs
 
@@ -62,8 +59,16 @@ split; narratives live in the retirement log.
   (done, 2026-06-10): composition-root and lifecycle backlog work for
   `begin_frame`, extraction, prepare, execute, end, shutdown determinism, and
   subsystem wiring; executed via `RUNTIME-099`/`RUNTIME-100`/`RUNTIME-102`
-  with `RUNTIME-101`/`RUNTIME-103`/`RUNTIME-104` remaining as independently
+  with `RUNTIME-101`/`RUNTIME-103` remaining as independently
   tracked children.
+- [RUNTIME-104 — Derived overlay producer lifecycle](../../done/RUNTIME-104-derived-overlay-producer-lifecycle.md)
+  (done, 2026-06-11, `CPUContracted`): classified legacy
+  `Graphics.OverlayEntityFactory` behavior for current workflows and retained no
+  persistent runtime overlay producer API. Mesh/graph/point child overlays map
+  to ordinary `GeometrySources` entities, mesh edge/vertex overlays use
+  primitive-view sidecars, and vector-field/isoline overlays use runtime
+  visualization packets without child ECS entities. Backend command-shape proof
+  remains open under `GRAPHICS-085`.
 - [RUNTIME-091 — Activate promoted ECS system bundle in fixed-step runtime](../../done/RUNTIME-091-promoted-ecs-system-bundle-activation.md)
   (done): runtime-owned activation of promoted ECS systems via
   `Extrinsic.Runtime.EcsSystemBundle::RegisterPromotedEcsSystemBundle`, called

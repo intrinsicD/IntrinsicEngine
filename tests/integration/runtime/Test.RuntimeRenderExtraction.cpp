@@ -623,9 +623,14 @@ TEST(RuntimeRenderExtraction, VisualizationNonScalarAdapterBindingsReachRenderWo
             },
         });
 
+    const auto entityCountBeforeExtraction =
+        scene.Raw().storage<entt::entity>().size();
+
     const auto stats = fixture.Extract(scene);
     const Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
 
+    EXPECT_EQ(scene.Raw().storage<entt::entity>().size(),
+              entityCountBeforeExtraction);
     EXPECT_EQ(stats.VisualizationAdapterScalarConfigsObserved, 1u);
     EXPECT_EQ(stats.VisualizationAdapterBindingsMissing, 0u);
     EXPECT_EQ(stats.VisualizationAdapterMissingAdapterCount, 0u);

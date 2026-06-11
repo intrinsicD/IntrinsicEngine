@@ -13,7 +13,7 @@ the authoritative open/unblocked view.
 ## Theme F — Architecture/runtime/UI foundation seeds
 
 - unblocked: `GRAPHICS-084` — Visualization property-buffer residency (tasks/backlog/rendering/GRAPHICS-084-visualization-property-buffer-residency.md)
-- blocked by `RUNTIME-104`: `GRAPHICS-085` — Overlay packet backend parity (tasks/backlog/rendering/GRAPHICS-085-overlay-packet-backend-parity.md)
+- unblocked: `GRAPHICS-085` — Overlay packet backend parity (tasks/backlog/rendering/GRAPHICS-085-overlay-packet-backend-parity.md)
 - unblocked: `GRAPHICS-086` — RHI retirement parity and CUDA decision (tasks/backlog/rendering/GRAPHICS-086-rhi-retirement-parity-and-cuda-decision.md)
 - unblocked: `INFRA-001` — Move third-party dependencies to a vcpkg manifest (tasks/backlog/architecture/INFRA-001-vcpkg-manifest-mode.md)
 - unblocked: `LEGACY-001` — Delete `src/legacy/Interface/` (tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md)
@@ -30,7 +30,6 @@ the authoritative open/unblocked view.
 - unblocked: `RORG-031F` — UI integration backlog seed (tasks/backlog/ui/RORG-031-ui-integration.md)
 - unblocked: `RUNTIME-101` — Asset ingest state-machine migration (tasks/backlog/runtime/RUNTIME-101-asset-ingest-state-machine.md)
 - unblocked: `RUNTIME-103` — Geometry algorithm execution queue (tasks/backlog/runtime/RUNTIME-103-geometry-algorithm-execution-queue.md)
-- unblocked: `RUNTIME-104` — Derived overlay producer lifecycle (tasks/backlog/runtime/RUNTIME-104-derived-overlay-producer-lifecycle.md)
 - unblocked: `RUNTIME-105` — Remove the deprecated GetStreamingGraph() TaskGraph bridge (tasks/backlog/runtime/RUNTIME-105-remove-streaming-graph-bridge.md)
 
 ## Theme G — Active bugs

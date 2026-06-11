@@ -112,7 +112,6 @@ Open members:
   module names after promoted equivalents exist.
 - [`runtime/RUNTIME-101-asset-ingest-state-machine.md`](runtime/RUNTIME-101-asset-ingest-state-machine.md),
   [`runtime/RUNTIME-103-geometry-algorithm-execution-queue.md`](runtime/RUNTIME-103-geometry-algorithm-execution-queue.md),
-  [`runtime/RUNTIME-104-derived-overlay-producer-lifecycle.md`](runtime/RUNTIME-104-derived-overlay-producer-lifecycle.md),
   [`runtime/RUNTIME-105-remove-streaming-graph-bridge.md`](runtime/RUNTIME-105-remove-streaming-graph-bridge.md).
 - [`rendering/GRAPHICS-084-visualization-property-buffer-residency.md`](rendering/GRAPHICS-084-visualization-property-buffer-residency.md),
   [`rendering/GRAPHICS-085-overlay-packet-backend-parity.md`](rendering/GRAPHICS-085-overlay-packet-backend-parity.md),

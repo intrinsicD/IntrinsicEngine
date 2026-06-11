@@ -61,7 +61,8 @@ map.
   accepts them.
 - UI work that depends on renderer overlays/handoff coordinates with the
   retired `GRAPHICS-024`
-  parity matrix and the rendering DAG in
+  parity matrix, the `RUNTIME-104` decision not to retain a persistent
+  derived-overlay producer for current workflows, and the rendering DAG in
   [`tasks/backlog/rendering/README.md`](../rendering/README.md).
 
 ## Retired

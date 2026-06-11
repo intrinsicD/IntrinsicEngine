@@ -9,6 +9,22 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`RUNTIME-104`](RUNTIME-104-derived-overlay-producer-lifecycle.md) — derived
+overlay producer lifecycle — retired on 2026-06-11 at maturity
+`CPUContracted`. The value gate found no current promoted workflow requiring a
+new persistent runtime overlay producer API. Legacy mesh/graph/point child
+overlays are represented by ordinary `GeometrySources` entities when runtime/UI
+imports or authors data; mesh edge/vertex overlays use runtime-owned
+primitive-view sidecars; transient line/point/triangle overlays remain on
+transient debug packets; vector-field and isoline overlays remain data-only
+visualization packets emitted by `Runtime.VisualizationAdapters`. The
+vector-field packet path is covered by runtime extraction regression coverage
+and creates no child ECS entity, so the legacy parent/child cleanup invariant is
+satisfied for current workflows without graphics importing ECS or storing RHI
+handles in components. Backend command-shape proof remains open under
+`GRAPHICS-085`; selected property-buffer residency remains `GRAPHICS-084`.
+
+Backlog
 [`BUG-027`](BUG-027-sandbox-dragdrop-close-mesh-views.md) — sandbox
 drag/drop, close, and mesh primitive-view regression — opened and retired on
 2026-06-11 at maturity `CPUContracted`. The reported sandbox path had three
