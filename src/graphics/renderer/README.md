@@ -1128,7 +1128,10 @@ Concretely:
 - `TransformSyncSystem`, `LightSystem`, and `VisualizationSyncSystem` consume
   graphics-owned snapshot records (`TransformSyncRecord`, `LightSnapshot`, and
   `VisualizationSyncRecord`) instead of querying live ECS registries. Runtime is
-  responsible for building those records from ECS/assets/geometry state.
+  responsible for building those records from ECS/assets/geometry state,
+  including optional retained-point render settings (`RenderPoints`) that
+  `VisualizationSyncSystem` copies into `GpuEntityConfig::PointSize` and
+  `PointMode`.
 - `IRenderer::SubmitRuntimeSnapshots(..., storageSlot)` is the promoted handoff
   from runtime to graphics. The renderer copies snapshot records into retained
   storage keyed by the runtime `RenderWorldPool` slot before

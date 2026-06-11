@@ -8,6 +8,7 @@ module;
 #include <span>
 #include <string_view>
 #include <unordered_map>
+#include <variant>
 #include <vector>
 #include <glm/glm.hpp>
 
@@ -23,6 +24,7 @@ import Extrinsic.Graphics.ColormapSystem;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Component.Material;
 import Extrinsic.Graphics.Component.GpuSceneSlot;
+import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 
 // ============================================================
@@ -157,8 +159,40 @@ namespace Extrinsic::Graphics
             return p;
         }
 
+        [[nodiscard]] static std::uint32_t ToPointMode(
+            const Components::RenderPoints::RenderType type) noexcept
+        {
+            switch (type)
+            {
+            case Components::RenderPoints::RenderType::Flat:
+                return 0u;
+            case Components::RenderPoints::RenderType::Sphere:
+                return 1u;
+            case Components::RenderPoints::RenderType::Surfel:
+                return 2u;
+            }
+            return 1u;
+        }
+
+        static void ApplyPointRenderConfig(
+            RHI::GpuEntityConfig& cfg,
+            const Components::RenderPoints* points) noexcept
+        {
+            if (points == nullptr)
+                return;
+
+            cfg.PointMode = ToPointMode(points->Type);
+            if (const auto* uniform =
+                    std::get_if<float>(&points->SizeSource);
+                uniform != nullptr)
+            {
+                cfg.PointSize = *uniform;
+            }
+        }
+
         RHI::GpuEntityConfig BuildEntityConfig(
             const Components::VisualizationConfig* visCfg,
+            const Components::RenderPoints* points,
             const Components::GpuSceneSlot&        gpuSlot,
             ColormapSystem&                        colormapSys) const
         {
@@ -166,6 +200,7 @@ namespace Extrinsic::Graphics
             cfg.ColorSourceMode = kMode_Material;
             cfg.VisualizationAlpha = 1.f;
             cfg.UniformColor = {1.f, 1.f, 1.f, 1.f};
+            ApplyPointRenderConfig(cfg, points);
 
             if (!visCfg)
                 return cfg;
@@ -303,7 +338,8 @@ namespace Extrinsic::Graphics
             {
                 gpuWorld.SetEntityConfig(
                     gpuSlot.ToInstanceHandle(),
-                    m_Impl->BuildEntityConfig(visCfg, gpuSlot, colormapSys));
+                    m_Impl->BuildEntityConfig(
+                        visCfg, record.Points, gpuSlot, colormapSys));
             }
 
             if (!visCfg || visCfg->Source == ColorSource::Material)

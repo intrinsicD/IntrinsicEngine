@@ -9,6 +9,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <entt/entity/entity.hpp>
@@ -1870,6 +1871,170 @@ TEST(SandboxEditorUi, DomainWindowModelsReportSelectedMeshGraphAndPointCloudStat
     ASSERT_EQ(cloudModel.Processing.KMeansDomains.size(), 1u);
     EXPECT_EQ(cloudModel.Processing.KMeansDomains[0],
               Runtime::SandboxEditorGeometryProcessingDomain::PointCloudPoints);
+}
+
+TEST(SandboxEditorUi, RenderHintCommandEditsDomainComponentsAndHistory)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    auto& raw = registry.Raw();
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
+    AddTriangleMeshSource(registry, mesh);
+    const std::uint32_t meshStableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+    EXPECT_EQ(Runtime::ApplySandboxEditorRenderHintCommand(
+                  context,
+                  Runtime::SandboxEditorRenderHintCommand{
+                      .StableEntityId = meshStableId,
+                      .SetSurface = true,
+                      .EnableSurface = true,
+                      .SurfaceDomain = G::RenderSurface::SourceDomain::Face,
+                  }),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    ASSERT_TRUE(raw.all_of<G::RenderSurface>(mesh));
+    EXPECT_EQ(raw.get<G::RenderSurface>(mesh).Domain,
+              G::RenderSurface::SourceDomain::Face);
+    EXPECT_TRUE(history.Snapshot().Dirty);
+
+    EXPECT_TRUE(history.Undo().Succeeded());
+    EXPECT_FALSE(raw.all_of<G::RenderSurface>(mesh));
+    EXPECT_TRUE(history.Redo().Succeeded());
+    ASSERT_TRUE(raw.all_of<G::RenderSurface>(mesh));
+    EXPECT_EQ(raw.get<G::RenderSurface>(mesh).Domain,
+              G::RenderSurface::SourceDomain::Face);
+
+    const ECS::EntityHandle graph = MakeSelectable(registry, "Graph");
+    AddGraphSource(registry, graph);
+    const std::uint32_t graphStableId =
+        Runtime::SelectionController::ToStableEntityId(graph);
+    EXPECT_EQ(Runtime::ApplySandboxEditorRenderHintCommand(
+                  context,
+                  Runtime::SandboxEditorRenderHintCommand{
+                      .StableEntityId = graphStableId,
+                      .SetLines = true,
+                      .EnableLines = false,
+                  }),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    EXPECT_FALSE(raw.all_of<G::RenderLines>(graph));
+    EXPECT_TRUE(history.Undo().Succeeded());
+    EXPECT_TRUE(raw.all_of<G::RenderLines>(graph));
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorRenderHintCommand(
+                  context,
+                  Runtime::SandboxEditorRenderHintCommand{
+                      .StableEntityId = graphStableId,
+                      .PointType = G::RenderPoints::RenderType::Flat,
+                      .SetPointRenderType = true,
+                      .SetUniformPointSize = true,
+                      .UniformPointSize = 0.25f,
+                  }),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    ASSERT_TRUE(raw.all_of<G::RenderPoints>(graph));
+    const G::RenderPoints& graphPoints = raw.get<G::RenderPoints>(graph);
+    EXPECT_EQ(graphPoints.Type, G::RenderPoints::RenderType::Flat);
+    ASSERT_NE(std::get_if<float>(&graphPoints.SizeSource), nullptr);
+    EXPECT_FLOAT_EQ(*std::get_if<float>(&graphPoints.SizeSource), 0.25f);
+
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, graph));
+    const Runtime::SandboxEditorDomainWindowModel graphModel =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::Graph);
+    EXPECT_TRUE(graphModel.RenderHints.HasRenderPoints);
+    EXPECT_EQ(graphModel.RenderHints.PointRenderType, "Flat");
+    EXPECT_EQ(graphModel.RenderHints.PointRenderTypeValue,
+              G::RenderPoints::RenderType::Flat);
+    EXPECT_TRUE(graphModel.RenderHints.HasUniformPointSize);
+    EXPECT_FLOAT_EQ(graphModel.RenderHints.UniformPointSize, 0.25f);
+
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "Cloud");
+    AddPointCloudSource(registry, cloud, 3u);
+    const std::uint32_t cloudStableId =
+        Runtime::SelectionController::ToStableEntityId(cloud);
+    EXPECT_EQ(Runtime::ApplySandboxEditorRenderHintCommand(
+                  context,
+                  Runtime::SandboxEditorRenderHintCommand{
+                      .StableEntityId = cloudStableId,
+                      .SetLines = true,
+                      .EnableLines = true,
+                  }),
+              Runtime::SandboxEditorCommandStatus::UnsupportedGeometryDomain);
+    EXPECT_EQ(Runtime::ApplySandboxEditorRenderHintCommand(
+                  context,
+                  Runtime::SandboxEditorRenderHintCommand{
+                      .StableEntityId = cloudStableId,
+                      .SetPoints = true,
+                      .EnablePoints = false,
+                  }),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    EXPECT_FALSE(raw.all_of<G::RenderPoints>(cloud));
+    EXPECT_EQ(Runtime::ApplySandboxEditorRenderHintCommand(
+                  context,
+                  Runtime::SandboxEditorRenderHintCommand{
+                      .StableEntityId = cloudStableId,
+                      .SetPoints = true,
+                      .EnablePoints = true,
+                      .PointType = G::RenderPoints::RenderType::Surfel,
+                      .SetUniformPointSize = true,
+                      .UniformPointSize = 0.05f,
+                  }),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    ASSERT_TRUE(raw.all_of<G::RenderPoints>(cloud));
+    const G::RenderPoints& cloudPoints = raw.get<G::RenderPoints>(cloud);
+    EXPECT_EQ(cloudPoints.Type, G::RenderPoints::RenderType::Surfel);
+    ASSERT_NE(std::get_if<float>(&cloudPoints.SizeSource), nullptr);
+    EXPECT_FLOAT_EQ(*std::get_if<float>(&cloudPoints.SizeSource), 0.05f);
+}
+
+TEST(SandboxEditorUi, RenderHintCommandRepackagesGraphLaneResidency)
+{
+    Runtime::Engine engine(HeadlessConfig(), std::make_unique<PassiveApplication>());
+    engine.Initialize();
+
+    ECS::Scene::Registry& scene = engine.GetScene();
+    Runtime::SelectionController& selection = engine.GetSelectionController();
+    const ECS::EntityHandle graph = MakeSelectable(scene, "Graph");
+    AddGraphSource(scene, graph);
+    auto& raw = scene.Raw();
+    raw.remove<G::RenderLines>(graph);
+
+    Runtime::RenderExtractionCache extraction;
+    const Runtime::RuntimeRenderExtractionStats first =
+        extraction.ExtractAndSubmit(scene,
+                                    engine.GetRenderer(),
+                                    &engine.GetGpuAssetCache());
+    EXPECT_EQ(first.GraphGeometryUploads, 1u);
+    EXPECT_EQ(first.GraphGeometryReuploads, 0u);
+
+    Runtime::SandboxEditorContext context = MakeContext(scene, selection);
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(graph);
+    EXPECT_EQ(Runtime::ApplySandboxEditorRenderHintCommand(
+                  context,
+                  Runtime::SandboxEditorRenderHintCommand{
+                      .StableEntityId = stableId,
+                      .SetLines = true,
+                      .EnableLines = true,
+                      .LineDomain = G::RenderLines::SourceDomain::Vertex,
+                  }),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    ASSERT_TRUE(raw.all_of<G::RenderLines>(graph));
+
+    const Runtime::RuntimeRenderExtractionStats second =
+        extraction.ExtractAndSubmit(scene,
+                                    engine.GetRenderer(),
+                                    &engine.GetGpuAssetCache());
+    EXPECT_EQ(second.GraphGeometryUploads, 0u);
+    EXPECT_EQ(second.GraphGeometryReuploads, 1u);
+    EXPECT_EQ(second.GraphGeometryReleases, 1u);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
 }
 
 TEST(SandboxEditorUi, DomainWindowModelsReportNoSelectionStaleAndWrongDomain)

@@ -23,6 +23,7 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.CameraControllers;
@@ -332,14 +333,20 @@ export namespace Extrinsic::Runtime
     {
         bool HasRenderSurface{false};
         std::string SurfaceDomain{};
+        Graphics::Components::RenderSurface::SourceDomain SurfaceDomainValue{
+            Graphics::Components::RenderSurface::SourceDomain::Vertex};
         bool HasRenderLines{false};
         std::string LineDomain{};
+        Graphics::Components::RenderLines::SourceDomain LineDomainValue{
+            Graphics::Components::RenderLines::SourceDomain::Vertex};
         bool        HasUniformLineWidth{false};
         float       UniformLineWidth{0.0f};
         bool        HasNamedLineWidth{false};
         std::string LineWidthName{};
         bool HasRenderPoints{false};
         std::string PointRenderType{};
+        Graphics::Components::RenderPoints::RenderType PointRenderTypeValue{
+            Graphics::Components::RenderPoints::RenderType::Sphere};
         bool        HasUniformPointSize{false};
         float       UniformPointSize{0.0f};
         bool        HasNamedPointSize{false};
@@ -781,6 +788,31 @@ export namespace Extrinsic::Runtime
         bool EnableVertexView{false};
     };
 
+    struct SandboxEditorRenderHintCommand
+    {
+        std::uint32_t StableEntityId{0u};
+
+        bool SetSurface{false};
+        bool EnableSurface{false};
+        Graphics::Components::RenderSurface::SourceDomain SurfaceDomain{
+            Graphics::Components::RenderSurface::SourceDomain::Vertex};
+
+        bool SetLines{false};
+        bool EnableLines{false};
+        Graphics::Components::RenderLines::SourceDomain LineDomain{
+            Graphics::Components::RenderLines::SourceDomain::Vertex};
+        bool SetUniformLineWidth{false};
+        float UniformLineWidth{1.0f};
+
+        bool SetPoints{false};
+        bool EnablePoints{false};
+        Graphics::Components::RenderPoints::RenderType PointType{
+            Graphics::Components::RenderPoints::RenderType::Sphere};
+        bool SetPointRenderType{false};
+        bool SetUniformPointSize{false};
+        float UniformPointSize{0.008f};
+    };
+
     struct SandboxEditorSpatialDebugBindingCommand
     {
         std::uint32_t StableEntityId{0u};
@@ -876,6 +908,10 @@ export namespace Extrinsic::Runtime
     SandboxEditorCommandStatus ApplySandboxEditorPrimitiveViewCommand(
         const SandboxEditorContext& context,
         const SandboxEditorPrimitiveViewCommand& command);
+
+    SandboxEditorCommandStatus ApplySandboxEditorRenderHintCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorRenderHintCommand& command);
 
     SandboxEditorCommandStatus ApplySandboxEditorSpatialDebugBindingCommand(
         const SandboxEditorContext& context,

@@ -9,6 +9,21 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`UI-013`](UI-013-domain-render-hint-controls.md) — Sandbox EditorUI domain
+render hint controls — retired on 2026-06-11 at maturity `CPUContracted`.
+Promoted mesh, graph, and point-cloud rendering paths were already present in
+runtime extraction and renderer passes; this slice closed the editor workflow
+gap by adding `ApplySandboxEditorRenderHintCommand(...)`, typed render-hint
+domain-window model fields, and ImGui controls for selected-domain
+`RenderSurface`, `RenderLines`, and `RenderPoints` components. Commands are
+undoable through `EditorCommandHistory` when available, graph line-lane edits
+force runtime graph residency to repack, and uniform retained-point radius/type
+settings now flow through `VisualizationSyncRecord` into `GpuEntityConfig`.
+Retained-line per-entity width rasterization remains renderer-owned future
+work; this slice stores the promoted component value and keeps graphics free of
+live ECS reads.
+
+Backlog
 [`BUG-026B`](BUG-026B-vulkan-click-pick-readback-smoke.md) — Vulkan
 click-pick readback smoke — retired on 2026-06-11 at maturity `Operational`.
 The opt-in `gpu;vulkan` runtime sandbox smoke now waits for the promoted Vulkan

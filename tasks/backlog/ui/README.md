@@ -61,6 +61,13 @@ map.
   a new platform/runtime task accepts them. Sample/debug scene expansion and
   app-level debug workflow clones remain deferred until a runtime-owned command
   accepts them.
+- UI-013 is a retired promoted EditorUI follow-up that turns the UI-002
+  render-hint status windows into controls for the existing promoted
+  `RenderSurface`, `RenderLines`, and `RenderPoints` value components.
+  Commands are undoable through `EditorCommandHistory`, graph line-lane edits
+  repack runtime graph residency, and uniform point settings flow to retained
+  point GPU config. Retained-line per-entity width rasterization remains a
+  future renderer task.
 - UI work that depends on renderer overlays/handoff coordinates with the
   retired `GRAPHICS-024`
   parity matrix, the `RUNTIME-104` decision not to retain a persistent
@@ -82,3 +89,4 @@ split; narratives live in the retirement log.
 - [UI-008 — Editor file dialog, dirty-state, and debug workflows](../../done/UI-008-editor-file-dialog-dirty-debug-workflows.md) (done, 2026-06-09, `CPUContracted`):
   path-entry file boundary, dirty-state/undo-redo affordances, new/open/save/close
   command routing, and app-to-runtime-only dependency proof.
+- [UI-013 — Sandbox EditorUI domain render hint controls](../../done/UI-013-domain-render-hint-controls.md) (done, 2026-06-11, `CPUContracted`).

@@ -1771,6 +1771,7 @@ namespace Extrinsic::Runtime
                 .Material = &sidecar->Material,
                 .GpuSlot = &sidecar->GpuSlot,
                 .Visualization = sidecar->HasVisualization ? &sidecar->Visualization : nullptr,
+                .Points = registry.try_get<Graphics::Components::RenderPoints>(entity),
             });
             AppendVisualizationAdapters(stableId, *sidecar, stats);
 

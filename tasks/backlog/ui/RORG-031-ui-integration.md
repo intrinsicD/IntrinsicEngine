@@ -31,6 +31,10 @@ depends_on: []
   dirty-state, undo/redo, file-path entry, and headless-safe workflows
   (UI-008). Member-by-member history lives in
   [`tasks/backlog/ui/README.md`](README.md) and the retirement log.
+- `UI-013` retired the render-hint editing follow-up: mesh, graph, and
+  point-cloud domain render windows now command the promoted `RenderSurface`,
+  `RenderLines`, and `RenderPoints` value components, with graph lane repack
+  coverage and retained-point GPU config propagation.
 - Deferred-by-design workflows and their owners:
   - IME composition and multi-window support — deferred until an alternative
     platform backend lands (`PLATFORM-004` seed; platform owns the events).
@@ -58,7 +62,8 @@ depends_on: []
   gate re-evaluates in favor of a runtime-owned scene-authoring command.
 
 Each child cites this seed in its Context and declares which deferred
-workflow it resolves; IDs continue from `UI-009` (UI-001..008 are taken).
+workflow it resolves; IDs continue from `UI-014` for new children because
+`UI-001..008` and `UI-013` are taken while `UI-009..012` remain named triggers.
 
 ## Required changes
 - [ ] Keep the current-state inventory and deferred-workflow list above

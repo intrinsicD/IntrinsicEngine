@@ -659,6 +659,251 @@ namespace Extrinsic::Runtime
             };
         }
 
+        [[nodiscard]] const char* RenderSurfaceDomainName(
+            const G::RenderSurface::SourceDomain domain) noexcept
+        {
+            switch (domain)
+            {
+            case G::RenderSurface::SourceDomain::Vertex: return "Vertex";
+            case G::RenderSurface::SourceDomain::Face: return "Face";
+            }
+            return "Unknown";
+        }
+
+        [[nodiscard]] const char* RenderLineDomainName(
+            const G::RenderLines::SourceDomain domain) noexcept
+        {
+            switch (domain)
+            {
+            case G::RenderLines::SourceDomain::Vertex: return "Vertex";
+            case G::RenderLines::SourceDomain::Edge: return "Edge";
+            }
+            return "Unknown";
+        }
+
+        [[nodiscard]] const char* RenderPointTypeName(
+            const G::RenderPoints::RenderType type) noexcept
+        {
+            switch (type)
+            {
+            case G::RenderPoints::RenderType::Flat: return "Flat";
+            case G::RenderPoints::RenderType::Sphere: return "Sphere";
+            case G::RenderPoints::RenderType::Surfel: return "Surfel";
+            }
+            return "Unknown";
+        }
+
+        struct SandboxEditorRenderHintState
+        {
+            std::optional<G::RenderSurface> Surface{};
+            std::optional<G::RenderLines> Lines{};
+            std::optional<G::RenderPoints> Points{};
+        };
+
+        [[nodiscard]] SandboxEditorRenderHintState ReadRenderHintState(
+            const entt::registry& raw,
+            const ECS::EntityHandle entity)
+        {
+            SandboxEditorRenderHintState state{};
+            if (const auto* surface = raw.try_get<G::RenderSurface>(entity))
+                state.Surface = *surface;
+            if (const auto* lines = raw.try_get<G::RenderLines>(entity))
+                state.Lines = *lines;
+            if (const auto* points = raw.try_get<G::RenderPoints>(entity))
+                state.Points = *points;
+            return state;
+        }
+
+        [[nodiscard]] bool SameRenderSurface(
+            const G::RenderSurface& lhs,
+            const G::RenderSurface& rhs) noexcept
+        {
+            return lhs.Domain == rhs.Domain;
+        }
+
+        [[nodiscard]] bool SameRenderLines(
+            const G::RenderLines& lhs,
+            const G::RenderLines& rhs)
+        {
+            return lhs.Domain == rhs.Domain &&
+                   lhs.WidthSource == rhs.WidthSource;
+        }
+
+        [[nodiscard]] bool SameRenderPoints(
+            const G::RenderPoints& lhs,
+            const G::RenderPoints& rhs)
+        {
+            return lhs.Type == rhs.Type &&
+                   lhs.SizeSource == rhs.SizeSource;
+        }
+
+        template <typename T, typename SameFn>
+        [[nodiscard]] bool SameOptionalRenderComponent(
+            const std::optional<T>& lhs,
+            const std::optional<T>& rhs,
+            SameFn same)
+        {
+            if (lhs.has_value() != rhs.has_value())
+                return false;
+            if (!lhs.has_value())
+                return true;
+            return same(*lhs, *rhs);
+        }
+
+        [[nodiscard]] bool SameRenderHintState(
+            const SandboxEditorRenderHintState& lhs,
+            const SandboxEditorRenderHintState& rhs)
+        {
+            return SameOptionalRenderComponent(
+                       lhs.Surface, rhs.Surface, SameRenderSurface) &&
+                   SameOptionalRenderComponent(
+                       lhs.Lines, rhs.Lines, SameRenderLines) &&
+                   SameOptionalRenderComponent(
+                       lhs.Points, rhs.Points, SameRenderPoints);
+        }
+
+        [[nodiscard]] bool IsFinitePositive(const float value) noexcept
+        {
+            return std::isfinite(value) && value > 0.0f;
+        }
+
+        [[nodiscard]] bool AnyRenderHintEdit(
+            const SandboxEditorRenderHintCommand& command) noexcept
+        {
+            return command.SetSurface ||
+                   command.SetLines ||
+                   command.SetUniformLineWidth ||
+                   command.SetPoints ||
+                   command.SetPointRenderType ||
+                   command.SetUniformPointSize;
+        }
+
+        [[nodiscard]] bool RenderHintCommandMatchesDomain(
+            const SandboxEditorRenderHintCommand& command,
+            const GS::Domain domain) noexcept
+        {
+            const bool editsSurface = command.SetSurface;
+            const bool editsLines =
+                command.SetLines || command.SetUniformLineWidth;
+            const bool editsPoints =
+                command.SetPoints ||
+                command.SetPointRenderType ||
+                command.SetUniformPointSize;
+
+            switch (domain)
+            {
+            case GS::Domain::Mesh:
+                return editsSurface && !editsLines && !editsPoints;
+            case GS::Domain::Graph:
+                return !editsSurface && (editsLines || editsPoints);
+            case GS::Domain::PointCloud:
+                return !editsSurface && !editsLines && editsPoints;
+            case GS::Domain::None:
+            case GS::Domain::Unknown:
+                return false;
+            }
+            return false;
+        }
+
+        [[nodiscard]] SandboxEditorRenderHintState ApplyRenderHintCommandToState(
+            SandboxEditorRenderHintState state,
+            const SandboxEditorRenderHintCommand& command)
+        {
+            if (command.SetSurface)
+            {
+                if (command.EnableSurface)
+                {
+                    G::RenderSurface surface =
+                        state.Surface.value_or(G::RenderSurface{});
+                    surface.Domain = command.SurfaceDomain;
+                    state.Surface = surface;
+                }
+                else
+                {
+                    state.Surface.reset();
+                }
+            }
+
+            if (command.SetLines)
+            {
+                if (command.EnableLines)
+                {
+                    G::RenderLines lines =
+                        state.Lines.value_or(G::RenderLines{});
+                    lines.Domain = command.LineDomain;
+                    if (command.SetUniformLineWidth)
+                        lines.WidthSource = command.UniformLineWidth;
+                    state.Lines = lines;
+                }
+                else
+                {
+                    state.Lines.reset();
+                }
+            }
+            else if (command.SetUniformLineWidth && state.Lines.has_value())
+            {
+                state.Lines->WidthSource = command.UniformLineWidth;
+            }
+
+            if (command.SetPoints)
+            {
+                if (command.EnablePoints)
+                {
+                    G::RenderPoints points =
+                        state.Points.value_or(G::RenderPoints{});
+                    points.Type = command.PointType;
+                    if (command.SetUniformPointSize)
+                        points.SizeSource = command.UniformPointSize;
+                    state.Points = points;
+                }
+                else
+                {
+                    state.Points.reset();
+                }
+            }
+            else if (state.Points.has_value())
+            {
+                if (command.SetPointRenderType)
+                    state.Points->Type = command.PointType;
+                if (command.SetUniformPointSize)
+                    state.Points->SizeSource = command.UniformPointSize;
+            }
+
+            return state;
+        }
+
+        [[nodiscard]] EditorCommandHistoryStatus ApplyRenderHintState(
+            ECS::Scene::Registry* scene,
+            const std::uint32_t stableEntityId,
+            const SandboxEditorRenderHintState& state)
+        {
+            if (scene == nullptr)
+                return EditorCommandHistoryStatus::MissingScene;
+
+            entt::registry& raw = scene->Raw();
+            const ECS::EntityHandle entity =
+                SelectionController::ToEntityHandle(stableEntityId);
+            if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
+                return EditorCommandHistoryStatus::StaleEntity;
+
+            if (state.Surface.has_value())
+                raw.emplace_or_replace<G::RenderSurface>(entity, *state.Surface);
+            else if (raw.all_of<G::RenderSurface>(entity))
+                raw.remove<G::RenderSurface>(entity);
+
+            if (state.Lines.has_value())
+                raw.emplace_or_replace<G::RenderLines>(entity, *state.Lines);
+            else if (raw.all_of<G::RenderLines>(entity))
+                raw.remove<G::RenderLines>(entity);
+
+            if (state.Points.has_value())
+                raw.emplace_or_replace<G::RenderPoints>(entity, *state.Points);
+            else if (raw.all_of<G::RenderPoints>(entity))
+                raw.remove<G::RenderPoints>(entity);
+
+            return EditorCommandHistoryStatus::Applied;
+        }
+
         [[nodiscard]] bool SameVec4(
             const glm::vec4 lhs,
             const glm::vec4 rhs) noexcept
@@ -928,19 +1173,15 @@ namespace Extrinsic::Runtime
             if (const auto* surface = raw.try_get<G::RenderSurface>(entity))
             {
                 model.HasRenderSurface = true;
-                model.SurfaceDomain =
-                    surface->Domain == G::RenderSurface::SourceDomain::Face
-                        ? "Face"
-                        : "Vertex";
+                model.SurfaceDomainValue = surface->Domain;
+                model.SurfaceDomain = RenderSurfaceDomainName(surface->Domain);
             }
 
             if (const auto* lines = raw.try_get<G::RenderLines>(entity))
             {
                 model.HasRenderLines = true;
-                model.LineDomain =
-                    lines->Domain == G::RenderLines::SourceDomain::Edge
-                        ? "Edge"
-                        : "Vertex";
+                model.LineDomainValue = lines->Domain;
+                model.LineDomain = RenderLineDomainName(lines->Domain);
                 if (const auto* width = std::get_if<float>(&lines->WidthSource))
                 {
                     model.HasUniformLineWidth = true;
@@ -956,18 +1197,8 @@ namespace Extrinsic::Runtime
             if (const auto* points = raw.try_get<G::RenderPoints>(entity))
             {
                 model.HasRenderPoints = true;
-                switch (points->Type)
-                {
-                case G::RenderPoints::RenderType::Flat:
-                    model.PointRenderType = "Flat";
-                    break;
-                case G::RenderPoints::RenderType::Sphere:
-                    model.PointRenderType = "Sphere";
-                    break;
-                case G::RenderPoints::RenderType::Surfel:
-                    model.PointRenderType = "Surfel";
-                    break;
-                }
+                model.PointRenderTypeValue = points->Type;
+                model.PointRenderType = RenderPointTypeName(points->Type);
 
                 if (const auto* size = std::get_if<float>(&points->SizeSource))
                 {
@@ -2065,6 +2296,212 @@ namespace Extrinsic::Runtime
             }
         }
 
+        [[nodiscard]] bool DrawSurfaceDomainCombo(
+            G::RenderSurface::SourceDomain* domain)
+        {
+            constexpr const char* kItems[]{"Vertex", "Face"};
+            int current =
+                *domain == G::RenderSurface::SourceDomain::Face ? 1 : 0;
+            if (!ImGui::Combo("Surface domain", &current, kItems, 2))
+                return false;
+            *domain = current == 1
+                ? G::RenderSurface::SourceDomain::Face
+                : G::RenderSurface::SourceDomain::Vertex;
+            return true;
+        }
+
+        [[nodiscard]] bool DrawLineDomainCombo(
+            G::RenderLines::SourceDomain* domain)
+        {
+            constexpr const char* kItems[]{"Vertex", "Edge"};
+            int current =
+                *domain == G::RenderLines::SourceDomain::Edge ? 1 : 0;
+            if (!ImGui::Combo("Line domain", &current, kItems, 2))
+                return false;
+            *domain = current == 1
+                ? G::RenderLines::SourceDomain::Edge
+                : G::RenderLines::SourceDomain::Vertex;
+            return true;
+        }
+
+        [[nodiscard]] bool DrawPointTypeCombo(
+            G::RenderPoints::RenderType* type)
+        {
+            constexpr const char* kItems[]{"Flat", "Sphere", "Surfel"};
+            int current = 1;
+            switch (*type)
+            {
+            case G::RenderPoints::RenderType::Flat:
+                current = 0;
+                break;
+            case G::RenderPoints::RenderType::Sphere:
+                current = 1;
+                break;
+            case G::RenderPoints::RenderType::Surfel:
+                current = 2;
+                break;
+            }
+            if (!ImGui::Combo("Point type", &current, kItems, 3))
+                return false;
+            switch (current)
+            {
+            case 0:
+                *type = G::RenderPoints::RenderType::Flat;
+                break;
+            case 2:
+                *type = G::RenderPoints::RenderType::Surfel;
+                break;
+            case 1:
+            default:
+                *type = G::RenderPoints::RenderType::Sphere;
+                break;
+            }
+            return true;
+        }
+
+        void DrawMeshRenderHintControls(
+            const SandboxEditorDomainWindowModel& model,
+            const SandboxEditorContext& context,
+            const bool canEditRenderHints)
+        {
+            bool surface = model.RenderHints.HasRenderSurface;
+            if (ImGui::Checkbox("Surface", &surface) && canEditRenderHints)
+            {
+                (void)ApplySandboxEditorRenderHintCommand(
+                    context,
+                    SandboxEditorRenderHintCommand{
+                        .StableEntityId = model.SelectedStableId,
+                        .SetSurface = true,
+                        .EnableSurface = surface,
+                        .SurfaceDomain = model.RenderHints.SurfaceDomainValue,
+                    });
+            }
+
+            if (model.RenderHints.HasRenderSurface)
+            {
+                G::RenderSurface::SourceDomain domain =
+                    model.RenderHints.SurfaceDomainValue;
+                if (DrawSurfaceDomainCombo(&domain) && canEditRenderHints)
+                {
+                    (void)ApplySandboxEditorRenderHintCommand(
+                        context,
+                        SandboxEditorRenderHintCommand{
+                            .StableEntityId = model.SelectedStableId,
+                            .SetSurface = true,
+                            .EnableSurface = true,
+                            .SurfaceDomain = domain,
+                        });
+                }
+            }
+        }
+
+        void DrawPointRenderHintControls(
+            const SandboxEditorDomainWindowModel& model,
+            const SandboxEditorContext& context,
+            const bool canEditRenderHints)
+        {
+            bool points = model.RenderHints.HasRenderPoints;
+            if (ImGui::Checkbox("Points", &points) && canEditRenderHints)
+            {
+                (void)ApplySandboxEditorRenderHintCommand(
+                    context,
+                    SandboxEditorRenderHintCommand{
+                        .StableEntityId = model.SelectedStableId,
+                        .SetPoints = true,
+                        .EnablePoints = points,
+                        .PointType = model.RenderHints.PointRenderTypeValue,
+                    });
+            }
+
+            if (!model.RenderHints.HasRenderPoints)
+                return;
+
+            G::RenderPoints::RenderType pointType =
+                model.RenderHints.PointRenderTypeValue;
+            if (DrawPointTypeCombo(&pointType) && canEditRenderHints)
+            {
+                (void)ApplySandboxEditorRenderHintCommand(
+                    context,
+                        SandboxEditorRenderHintCommand{
+                            .StableEntityId = model.SelectedStableId,
+                            .PointType = pointType,
+                            .SetPointRenderType = true,
+                        });
+            }
+
+            if (model.RenderHints.HasUniformPointSize)
+            {
+                float pointSize = model.RenderHints.UniformPointSize;
+                if (ImGui::DragFloat(
+                        "Point radius", &pointSize, 0.001f, 0.0001f, 1.0f) &&
+                    canEditRenderHints)
+                {
+                    (void)ApplySandboxEditorRenderHintCommand(
+                        context,
+                        SandboxEditorRenderHintCommand{
+                            .StableEntityId = model.SelectedStableId,
+                            .SetUniformPointSize = true,
+                            .UniformPointSize = pointSize,
+                        });
+                }
+            }
+        }
+
+        void DrawGraphRenderHintControls(
+            const SandboxEditorDomainWindowModel& model,
+            const SandboxEditorContext& context,
+            const bool canEditRenderHints)
+        {
+            bool lines = model.RenderHints.HasRenderLines;
+            if (ImGui::Checkbox("Lines", &lines) && canEditRenderHints)
+            {
+                (void)ApplySandboxEditorRenderHintCommand(
+                    context,
+                    SandboxEditorRenderHintCommand{
+                        .StableEntityId = model.SelectedStableId,
+                        .SetLines = true,
+                        .EnableLines = lines,
+                        .LineDomain = model.RenderHints.LineDomainValue,
+                    });
+            }
+
+            if (model.RenderHints.HasRenderLines)
+            {
+                G::RenderLines::SourceDomain lineDomain =
+                    model.RenderHints.LineDomainValue;
+                if (DrawLineDomainCombo(&lineDomain) && canEditRenderHints)
+                {
+                    (void)ApplySandboxEditorRenderHintCommand(
+                        context,
+                        SandboxEditorRenderHintCommand{
+                            .StableEntityId = model.SelectedStableId,
+                            .SetLines = true,
+                            .EnableLines = true,
+                            .LineDomain = lineDomain,
+                        });
+                }
+
+                if (model.RenderHints.HasUniformLineWidth)
+                {
+                    float lineWidth = model.RenderHints.UniformLineWidth;
+                    if (ImGui::DragFloat(
+                            "Line width", &lineWidth, 0.05f, 0.1f, 32.0f) &&
+                        canEditRenderHints)
+                    {
+                        (void)ApplySandboxEditorRenderHintCommand(
+                            context,
+                            SandboxEditorRenderHintCommand{
+                                .StableEntityId = model.SelectedStableId,
+                                .SetUniformLineWidth = true,
+                                .UniformLineWidth = lineWidth,
+                            });
+                    }
+                }
+            }
+
+            DrawPointRenderHintControls(model, context, canEditRenderHints);
+        }
+
         void DrawVisualizationPropertyPresets(
             const std::vector<SandboxEditorVisualizationPropertyInfo>& properties,
             const SandboxEditorContext& context,
@@ -2167,6 +2604,25 @@ namespace Extrinsic::Runtime
             DrawDomainWindowHeader(model);
             ImGui::SeparatorText("Render hint status");
             DrawRenderHintStatus(model.RenderHints);
+
+            ImGui::SeparatorText("Render controls");
+            const bool canEditRenderHints = DomainWindowReady(model);
+            if (!canEditRenderHints)
+                ImGui::BeginDisabled();
+            switch (model.Kind)
+            {
+            case SandboxEditorDomainWindowKind::Mesh:
+                DrawMeshRenderHintControls(model, context, canEditRenderHints);
+                break;
+            case SandboxEditorDomainWindowKind::Graph:
+                DrawGraphRenderHintControls(model, context, canEditRenderHints);
+                break;
+            case SandboxEditorDomainWindowKind::PointCloud:
+                DrawPointRenderHintControls(model, context, canEditRenderHints);
+                break;
+            }
+            if (!canEditRenderHints)
+                ImGui::EndDisabled();
 
             if (model.Kind != SandboxEditorDomainWindowKind::Mesh)
                 return;
@@ -4359,6 +4815,68 @@ namespace Extrinsic::Runtime
         else
             context.PrimitiveViewCommands.ClearSettings(command.StableEntityId);
         return SandboxEditorCommandStatus::Applied;
+    }
+
+    SandboxEditorCommandStatus ApplySandboxEditorRenderHintCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorRenderHintCommand& command)
+    {
+        if (!AnyRenderHintEdit(command))
+            return SandboxEditorCommandStatus::NoChange;
+        if (context.Scene == nullptr)
+            return SandboxEditorCommandStatus::MissingScene;
+        if ((command.SetUniformLineWidth &&
+             !IsFinitePositive(command.UniformLineWidth)) ||
+            (command.SetUniformPointSize &&
+             !IsFinitePositive(command.UniformPointSize)))
+        {
+            return SandboxEditorCommandStatus::InvalidProcessingParameters;
+        }
+
+        entt::registry& raw = context.Scene->Raw();
+        const ECS::EntityHandle entity =
+            SelectionController::ToEntityHandle(command.StableEntityId);
+        if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
+            return SandboxEditorCommandStatus::StaleEntity;
+
+        const GS::Domain domain = GS::BuildConstView(raw, entity).ActiveDomain;
+        if (!RenderHintCommandMatchesDomain(command, domain))
+            return SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+
+        const SandboxEditorRenderHintState before =
+            ReadRenderHintState(raw, entity);
+        const SandboxEditorRenderHintState after =
+            ApplyRenderHintCommandToState(before, command);
+        if (SameRenderHintState(before, after))
+            return SandboxEditorCommandStatus::NoChange;
+
+        if (context.CommandHistory != nullptr)
+        {
+            const std::uint32_t stableEntityId = command.StableEntityId;
+            ECS::Scene::Registry* scene = context.Scene;
+            const EditorCommandHistoryResult result =
+                context.CommandHistory->Execute(
+                    EditorCommandRecord{
+                        .Label = "Change Render Hints",
+                        .Redo =
+                            [scene, stableEntityId, after]()
+                            {
+                                return ApplyRenderHintState(
+                                    scene, stableEntityId, after);
+                            },
+                        .Undo =
+                            [scene, stableEntityId, before]()
+                            {
+                                return ApplyRenderHintState(
+                                    scene, stableEntityId, before);
+                            },
+                        .Dirtying = true,
+                    });
+            return ToSandboxEditorCommandStatus(result.Status);
+        }
+
+        return ToSandboxEditorCommandStatus(
+            ApplyRenderHintState(context.Scene, command.StableEntityId, after));
     }
 
     SandboxEditorCommandStatus ApplySandboxEditorSpatialDebugBindingCommand(

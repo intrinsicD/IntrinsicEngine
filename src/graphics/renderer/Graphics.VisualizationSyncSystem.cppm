@@ -12,6 +12,7 @@ import Extrinsic.Graphics.ColormapSystem;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Component.GpuSceneSlot;
 import Extrinsic.Graphics.Component.Material;
+import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 
 // ============================================================
@@ -62,6 +63,7 @@ export namespace Extrinsic::Graphics
         Components::MaterialInstance* Material{nullptr};
         const Components::GpuSceneSlot* GpuSlot{nullptr};
         const Components::VisualizationConfig* Visualization{nullptr};
+        const Components::RenderPoints* Points{nullptr};
     };
 
     class VisualizationSyncSystem
