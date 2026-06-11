@@ -59,6 +59,12 @@ inline constexpr std::uint32_t kReadbackHeight = 256u;
 	};
 }
 
+template <typename T, std::size_t N>
+[[nodiscard]] std::span<const std::byte> BytesOf(const std::array<T, N>& values) noexcept
+{
+	return std::as_bytes(std::span<const T>{values.data(), values.size()});
+}
+
 struct VisualizationOverlaySamplePoint
 {
 	std::string_view Label;
@@ -249,17 +255,47 @@ struct VisualizationOverlayRunCapture
 
 [[nodiscard]] VisualizationOverlayRunCapture DriveVisualizationOverlayFrameAndCapture(Engine& engine)
 {
-	static const std::array<Extrinsic::Graphics::VectorFieldOverlayPacket, 1> kVectorFields{{
+	const std::array<glm::vec3, 2> vectorPositions{{
+		glm::vec3{-0.25f, 0.0f, 0.0f},
+		glm::vec3{0.25f, 0.0f, 0.0f},
+	}};
+	const std::array<glm::vec3, 2> vectorDirections{{
+		glm::vec3{0.1f, 0.0f, 0.0f},
+		glm::vec3{0.0f, 0.1f, 0.0f},
+	}};
+	const std::array<Extrinsic::Graphics::VisualizationPropertyBufferUploadDescriptor, 2> propertyBuffers{{
+		Extrinsic::Graphics::VisualizationPropertyBufferUploadDescriptor{
+			.SourceKey = "GpuSmoke.VectorPositions",
+			.Domain = Extrinsic::Graphics::VisualizationAttributeDomain::Vertex,
+			.ValueType = Extrinsic::Graphics::VisualizationValueType::VectorFloat3,
+			.ElementCount = static_cast<std::uint32_t>(vectorPositions.size()),
+			.StrideBytes = sizeof(glm::vec3),
+			.DirtyStamp = 1u,
+			.Bytes = BytesOf(vectorPositions),
+		},
+		Extrinsic::Graphics::VisualizationPropertyBufferUploadDescriptor{
+			.SourceKey = "GpuSmoke.VectorDirections",
+			.Domain = Extrinsic::Graphics::VisualizationAttributeDomain::Vertex,
+			.ValueType = Extrinsic::Graphics::VisualizationValueType::VectorFloat3,
+			.ElementCount = static_cast<std::uint32_t>(vectorDirections.size()),
+			.StrideBytes = sizeof(glm::vec3),
+			.DirtyStamp = 1u,
+			.Bytes = BytesOf(vectorDirections),
+		},
+	}};
+	const std::array<Extrinsic::Graphics::VectorFieldOverlayPacket, 1> vectorFields{{
 		Extrinsic::Graphics::VectorFieldOverlayPacket{
 			.Name = "GpuSmoke.VectorField",
+			.PositionBufferSourceKey = "GpuSmoke.VectorPositions",
+			.VectorBufferSourceKey = "GpuSmoke.VectorDirections",
 			.Domain = Extrinsic::Graphics::VisualizationAttributeDomain::Vertex,
-			.ElementCount = 2u,
+			.ElementCount = static_cast<std::uint32_t>(vectorPositions.size()),
 			.Scale = 1.0f,
 			.Color = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
 			.DepthTested = false,
 		},
 	}};
-	static const std::array<Extrinsic::Graphics::IsolineOverlayPacket, 1> kIsolines{{
+	const std::array<Extrinsic::Graphics::IsolineOverlayPacket, 1> isolines{{
 		Extrinsic::Graphics::IsolineOverlayPacket{
 			.SourceScalarName = "GpuSmoke.Iso",
 			.Domain = Extrinsic::Graphics::VisualizationAttributeDomain::Face,
@@ -290,10 +326,12 @@ struct VisualizationOverlayRunCapture
 	}
 
 	renderer.SubmitRuntimeSnapshots(Extrinsic::Graphics::RuntimeRenderSnapshotBatch{
+		.VisualizationPropertyBuffers = std::span<const Extrinsic::Graphics::VisualizationPropertyBufferUploadDescriptor>{
+			propertyBuffers.data(), propertyBuffers.size()},
 		.VisualizationVectorFields = std::span<const Extrinsic::Graphics::VectorFieldOverlayPacket>{
-			kVectorFields.data(), kVectorFields.size()},
+			vectorFields.data(), vectorFields.size()},
 		.VisualizationIsolines = std::span<const Extrinsic::Graphics::IsolineOverlayPacket>{
-			kIsolines.data(), kIsolines.size()},
+			isolines.data(), isolines.size()},
 	});
 
 	const Extrinsic::Graphics::RenderFrameInput input{
@@ -314,7 +352,7 @@ struct VisualizationOverlayRunCapture
 }
 } // namespace
 
-TEST(VisualizationOverlaySurfaceGpuSmoke, MixedLanesRecordOnOperationalVulkanCommandStream)
+TEST(VisualizationOverlaySurfaceGpuSmoke, PropertyBuffersPublishBdasBeforeOperationalVulkanCommandStream)
 {
 	auto bootstrap = BootstrapOperationalDefaultRecipe();
 	if (bootstrap.Skipped)
@@ -340,6 +378,12 @@ TEST(VisualizationOverlaySurfaceGpuSmoke, MixedLanesRecordOnOperationalVulkanCom
 	EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
 	EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
 	EXPECT_TRUE(stats.Execute.DeviceOperational);
+	EXPECT_EQ(stats.VisualizationPropertyBuffers.InputBufferCount, 2u);
+	EXPECT_EQ(stats.VisualizationPropertyBuffers.AcceptedBufferCount, 2u);
+	EXPECT_EQ(stats.VisualizationPropertyBuffers.UploadedBufferCount, 2u);
+	EXPECT_EQ(stats.VisualizationPropertyBuffers.UploadDeferralCount, 0u);
+	EXPECT_EQ(stats.VisualizationPropertyBuffers.InvalidResourceCount, 0u);
+	EXPECT_FALSE(stats.VisualizationPropertyBuffers.HasErrors);
 
 	const auto* pass = FindCommandPass(stats, "VisualizationOverlayPass");
 	ASSERT_NE(pass, nullptr)
@@ -419,6 +463,10 @@ TEST(VisualizationOverlaySurfaceGpuSmoke, MixedLanesReadBackExpectedSampleColors
 	EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
 	EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
 	EXPECT_TRUE(stats.Execute.DeviceOperational);
+	EXPECT_EQ(stats.VisualizationPropertyBuffers.InputBufferCount, 2u);
+	EXPECT_EQ(stats.VisualizationPropertyBuffers.AcceptedBufferCount, 2u);
+	EXPECT_EQ(stats.VisualizationPropertyBuffers.UploadedBufferCount, 2u);
+	EXPECT_FALSE(stats.VisualizationPropertyBuffers.HasErrors);
 
 	const auto* pass = FindCommandPass(stats, "VisualizationOverlayPass");
 	ASSERT_NE(pass, nullptr)

@@ -30,9 +30,6 @@ as focused blockers for legacy graphics/RHI retirement. They are not part of
 the modernization feature DAG; select them when retiring legacy behavior is the
 priority.
 
-- [GRAPHICS-084C — Visualization property-buffer Vulkan smoke](GRAPHICS-084C-visualization-property-buffer-vulkan-smoke.md):
-  opt-in Vulkan smoke proving graphics-owned visualization property buffers
-  are consumed through promoted packet BDA publication.
 - [GRAPHICS-086 — RHI retirement parity and CUDA decision](GRAPHICS-086-rhi-retirement-parity-and-cuda-decision.md):
   final audit/decision task before accepting any legacy RHI command-helper,
   descriptor, swapchain/image, scene-instance, or CUDA implementation.
@@ -749,7 +746,13 @@ gates. CPU/null testable; `gpu;vulkan` coverage opts in alongside
   BDAs are absent; graphics owns validation, `RHI::BufferManager` residency,
   packet BDA publication, dirty-stamp reuse, stale-stamp rejection, upload
   deferral diagnostics, and renderer stats. The opt-in Vulkan operational
-  proof remains `GRAPHICS-084C`.
+  proof is retired by `GRAPHICS-084C`.
+- [GRAPHICS-084C — Visualization property-buffer Vulkan smoke](../../done/GRAPHICS-084C-visualization-property-buffer-vulkan-smoke.md):
+  done 2026-06-11 at `Operational`. The visualization-overlay `gpu;vulkan`
+  smoke now submits graphics-owned property-buffer descriptors for vector-field
+  position/vector data, verifies renderer property-buffer diagnostics, and
+  records `VisualizationOverlayPass` on the promoted Vulkan path after packet
+  BDA publication.
 - [GRAPHICS-079 — Default-recipe `Pass.ImGui` wiring](../../done/GRAPHICS-079-default-recipe-imgui-pass-wiring.md)
   (done): depends on GRAPHICS-076 (PresentSource finalization) and
   `runtime/RUNTIME-090` (ImGui adapter producer). It wires the renderer

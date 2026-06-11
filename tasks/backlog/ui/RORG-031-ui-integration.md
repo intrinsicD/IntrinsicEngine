@@ -42,7 +42,7 @@ depends_on: []
     fixture).
   - Generic GPU residency for arbitrary property arrays — visualization
     presets only today; the selected residency seam is retired by
-    `GRAPHICS-084`; `GRAPHICS-084C` owns only opt-in Vulkan smoke evidence.
+    `GRAPHICS-084`; `GRAPHICS-084C` retired the opt-in Vulkan smoke evidence.
 
 ## Child tasks (open when the trigger fires)
 - **UI-009 — IME and multi-window editor support.** Trigger: an alternative

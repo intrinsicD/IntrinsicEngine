@@ -52,7 +52,7 @@ depends_on: [RUNTIME-083]
 - Completed 2026-06-11 at maturity `CPUContracted`.
 - PR/commit: this retirement commit.
 - Scope: runtime adapters emit copied CPU property-array descriptors when external BDAs are absent; graphics owns residency, validates descriptors, publishes BDAs into scalar/color/vector/isoline packets, and reports property-buffer diagnostics without importing runtime/ECS.
-- Operational note: `GRAPHICS-084C` owns the opt-in Vulkan smoke; this retirement does not claim a fresh `gpu;vulkan` host run.
+- Operational note: `GRAPHICS-084C` retired the opt-in Vulkan smoke; this retirement did not claim a fresh `gpu;vulkan` host run.
 
 ## Verification
 ```bash
@@ -87,8 +87,8 @@ CTest passed 195/195, including `VisualizationPropertyBufferResidencyContract.*`
 plus the stable-id-scoped source-key collision regression.
 Layering, test layout, doc links, task policy, task-state links, session-brief
 freshness, docs-sync diff checks, clean-workshop automated scorecard rows, and
-`git diff --check` passed. The `gpu;vulkan` smoke was not run; `GRAPHICS-084C`
-owns that operational proof. Root hygiene remains warning-mode with pre-existing
+`git diff --check` passed. The `gpu;vulkan` smoke was not run in this slice;
+`GRAPHICS-084C` retired that operational proof. Root hygiene remains warning-mode with pre-existing
 `.agents/` and `imgui.ini` root entries.
 
 ## Forbidden changes
@@ -98,7 +98,7 @@ owns that operational proof. Root hygiene remains warning-mode with pre-existing
 - Adding a second visualization packet validation system.
 
 ## Maturity
-- Target: `CPUContracted` for this retirement; `Operational` owned by `GRAPHICS-084C`.
+- Target: `CPUContracted` for this retirement; `Operational` retired by `GRAPHICS-084C`.
 - Slices A–B closed the backend-neutral contract. Slice C is descoped to `GRAPHICS-084C`, so visual backend parity is not claimed here.
 
 ## Slice plan

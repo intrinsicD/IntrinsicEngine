@@ -39,7 +39,7 @@ these as runtime work when scheduling and review:
 
 - No open runtime-owned rendering tasks are currently queued here. `GRAPHICS-084`
   retired the runtime-adapter/property-selection side of visualization
-  property-buffer residency; `GRAPHICS-084C` owns only opt-in Vulkan smoke
+  property-buffer residency; `GRAPHICS-084C` retired the opt-in Vulkan smoke
   evidence.
 
 ## Related docs

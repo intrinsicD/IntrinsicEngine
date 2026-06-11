@@ -1274,8 +1274,9 @@ Concretely:
   submissions. Runtime extraction scopes descriptor source keys with the
   stable renderable id so two entities using the same property name cannot
   collide during BDA publication. Runtime and UI still own property selection
-  and CPU data production only; graphics owns all GPU residency. The remaining
-  Vulkan operational proof is `GRAPHICS-084C`.
+  and CPU data production only; graphics owns all GPU residency.
+  `GRAPHICS-084C` proves this property-buffer-backed path through the opt-in
+  Vulkan visualization-overlay smoke.
   Per `GRAPHICS-014Q`, runtime extraction (`Extrinsic.Runtime.RenderExtraction`)
   is the sole owner of translating PropertySet attributes, KMeans labels,
   isoline results, vector fields, and Htex metadata into the

@@ -9,6 +9,17 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`GRAPHICS-084C`](GRAPHICS-084C-visualization-property-buffer-vulkan-smoke.md) —
+visualization property-buffer Vulkan smoke — retired on 2026-06-11 at maturity
+`Operational`. The existing visualization-overlay GPU smoke now submits
+graphics-owned property-buffer upload descriptors for vector-field position and
+vector arrays, verifies `RenderGraphFrameStats::VisualizationPropertyBuffers`
+accepted/uploaded both descriptors without deferral or resource errors, and
+records `VisualizationOverlayPass` on the promoted Vulkan path only after
+packet BDA publication succeeds. The task keeps runtime/ECS out of graphics and
+leaves broader RHI/CUDA retirement decisions to `GRAPHICS-086`.
+
+Backlog
 [`GRAPHICS-084`](GRAPHICS-084-visualization-property-buffer-residency.md) —
 visualization property-buffer residency — retired on 2026-06-11 at maturity
 `CPUContracted`. Runtime visualization adapters now emit copied CPU property
@@ -20,7 +31,7 @@ into scalar/color/vector/isoline packets before `ValidateVisualizationPackets`
 runs, and reports diagnostics for unsupported types, invalid shape,
 non-finite values, stale dirty stamps, upload deferral, and invalid resources.
 Runtime/UI stay data-only and do not own GPU resources. The opt-in Vulkan
-operational proof remains open as `GRAPHICS-084C`; this retirement does not
+operational proof was retired by `GRAPHICS-084C`; this retirement does not
 claim a fresh `gpu;vulkan` host run.
 
 Backlog
