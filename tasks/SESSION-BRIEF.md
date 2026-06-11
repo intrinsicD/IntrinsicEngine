@@ -12,7 +12,7 @@ the authoritative open/unblocked view.
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 
-- unblocked: `GRAPHICS-084` — Visualization property-buffer residency (tasks/backlog/rendering/GRAPHICS-084-visualization-property-buffer-residency.md)
+- unblocked: `GRAPHICS-084C` — Visualization property-buffer Vulkan smoke (tasks/backlog/rendering/GRAPHICS-084C-visualization-property-buffer-vulkan-smoke.md)
 - unblocked: `GRAPHICS-086` — RHI retirement parity and CUDA decision (tasks/backlog/rendering/GRAPHICS-086-rhi-retirement-parity-and-cuda-decision.md)
 - unblocked: `INFRA-001` — Move third-party dependencies to a vcpkg manifest (tasks/backlog/architecture/INFRA-001-vcpkg-manifest-mode.md)
 - unblocked: `LEGACY-001` — Delete `src/legacy/Interface/` (tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md)

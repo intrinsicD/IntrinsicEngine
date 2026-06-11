@@ -41,7 +41,8 @@ depends_on: []
     value gate (no runtime-owned command currently improves an accepted
     fixture).
   - Generic GPU residency for arbitrary property arrays — visualization
-    presets only today; the residency seam is owned by `GRAPHICS-084`.
+    presets only today; the selected residency seam is retired by
+    `GRAPHICS-084`; `GRAPHICS-084C` owns only opt-in Vulkan smoke evidence.
 
 ## Child tasks (open when the trigger fires)
 - **UI-009 — IME and multi-window editor support.** Trigger: an alternative
@@ -51,7 +52,7 @@ depends_on: []
   runtime task accepts native-dialog ownership and defines the request
   surface; until then path-entry + drop events remain the endpoint.
 - **UI-011 — Arbitrary property-array visualization UI.** Trigger:
-  `GRAPHICS-084` retires its residency seam; extends the preset-only
+  `GRAPHICS-084` retired its selected residency seam; extends the preset-only
   visualization controls to arbitrary scalar/color/vector arrays.
 - **UI-012 — Sample/debug scene workflows.** Trigger: the `LEGACY-011` value
   gate re-evaluates in favor of a runtime-owned scene-authoring command.

@@ -22,6 +22,7 @@ import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.ColormapSystem;
 import Extrinsic.Graphics.VisualizationPackets;
+import Extrinsic.Graphics.VisualizationPropertyBufferResidency;
 import Extrinsic.Graphics.VisualizationSyncSystem;
 import Extrinsic.Graphics.CullingSystem;
 import Extrinsic.Graphics.LightSystem;
@@ -231,6 +232,7 @@ namespace Extrinsic::Graphics
         // existing `m_LastRenderGraphStats = {}` cadence in
         // `ExecuteFrame()`.
         VisualizationOverlayUploadDiagnostics VisualizationOverlayUpload{};
+        VisualizationPropertyBufferDiagnostics VisualizationPropertyBuffers{};
         // GRAPHICS-040C — temporal reconstruction diagnostics surfaced on
         // the renderer stats path. These remain CPU/null observable and do
         // not expose backend/vendor details.
@@ -245,6 +247,7 @@ namespace Extrinsic::Graphics
         std::span<const TransformSyncRecord>     Transforms{};
         std::span<const LightSnapshot>           Lights{};
         std::span<const VisualizationSyncRecord> Visualizations{};
+        std::span<const VisualizationPropertyBufferUploadDescriptor> VisualizationPropertyBuffers{};
         std::span<const VisualizationAttributeBufferPacket> VisualizationAttributeBuffers{};
         std::span<const ScalarAttributePacket>              VisualizationScalars{};
         std::span<const ColorAttributePacket>               VisualizationColors{};

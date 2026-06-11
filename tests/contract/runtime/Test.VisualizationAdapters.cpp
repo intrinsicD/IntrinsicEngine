@@ -172,12 +172,6 @@ TEST(VisualizationAdapters, PropertyScalarAdapterRejectsInvalidSources)
     adapter.Append(batch,
                    R::VisualizationAdapterOptions{
                        .SourceName = "curvature",
-                       .BufferBDA = 0u,
-                   },
-                   stats);
-    adapter.Append(batch,
-                   R::VisualizationAdapterOptions{
-                       .SourceName = "curvature",
                        .BufferBDA = 0x4000u,
                        .AutoRange = false,
                        .RangeMin = 5.0f,
@@ -186,11 +180,44 @@ TEST(VisualizationAdapters, PropertyScalarAdapterRejectsInvalidSources)
                    stats);
 
     EXPECT_TRUE(batch.Scalars.empty());
-    EXPECT_EQ(stats.AdapterInvocationCount, 4u);
+    EXPECT_EQ(stats.AdapterInvocationCount, 3u);
     EXPECT_EQ(stats.MissingSourceCount, 1u);
     EXPECT_EQ(stats.UnsupportedSourceTypeCount, 1u);
-    EXPECT_EQ(stats.InvalidBufferCount, 1u);
+    EXPECT_EQ(stats.InvalidBufferCount, 0u);
     EXPECT_EQ(stats.InvalidRangeCount, 1u);
+}
+
+TEST(VisualizationAdapters, PropertyScalarAdapterEmitsPropertyBufferWhenBdaMissing)
+{
+    Geometry::PropertySet properties = MakeScalarProperties();
+    const R::PropertyScalarAdapter adapter{
+        Geometry::ConstPropertySet{properties}};
+
+    R::VisualizationAdapterBatch batch{};
+    R::VisualizationAdapterStats stats{};
+    adapter.Append(batch,
+                   R::VisualizationAdapterOptions{
+                       .SourceName = "curvature",
+                       .Domain = G::VisualizationAttributeDomain::Vertex,
+                       .DirtyStamp = 9u,
+                   },
+                   stats);
+
+    ASSERT_EQ(batch.Scalars.size(), 1u);
+    EXPECT_EQ(batch.Scalars.front().SourceBufferKey, "curvature");
+    EXPECT_EQ(batch.Scalars.front().ScalarBufferBDA, 0u);
+    ASSERT_EQ(batch.PropertyBuffers.size(), 1u);
+    const G::VisualizationPropertyBufferUploadDescriptor& descriptor =
+        batch.PropertyBuffers.front();
+    EXPECT_EQ(descriptor.SourceKey, "curvature");
+    EXPECT_EQ(descriptor.Domain, G::VisualizationAttributeDomain::Vertex);
+    EXPECT_EQ(descriptor.ValueType, G::VisualizationValueType::ScalarFloat);
+    EXPECT_EQ(descriptor.ElementCount, 4u);
+    EXPECT_EQ(descriptor.StrideBytes, sizeof(float));
+    EXPECT_EQ(descriptor.DirtyStamp, 9u);
+    EXPECT_EQ(descriptor.Bytes.size(), 4u * sizeof(float));
+    EXPECT_EQ(stats.PacketAppendCount, 1u);
+    EXPECT_EQ(stats.InvalidBufferCount, 0u);
 }
 
 TEST(VisualizationAdapters, PropertyScalarAdapterRejectsEmptyAndNonFiniteSources)
@@ -284,12 +311,6 @@ TEST(VisualizationAdapters, KMeansLabelAdapterRejectsInvalidSources)
                        .ColorBufferBDA = 0x7000u,
                    },
                    stats);
-    adapter.Append(batch,
-                   R::VisualizationAdapterOptions{
-                       .SourceName = "v:kmeans_color",
-                       .ColorBufferBDA = 0u,
-                   },
-                   stats);
 
     Geometry::PropertySet badProperties;
     badProperties.Resize(2u);
@@ -305,11 +326,45 @@ TEST(VisualizationAdapters, KMeansLabelAdapterRejectsInvalidSources)
                       stats);
 
     EXPECT_TRUE(batch.Colors.empty());
-    EXPECT_EQ(stats.AdapterInvocationCount, 4u);
+    EXPECT_EQ(stats.AdapterInvocationCount, 3u);
     EXPECT_EQ(stats.MissingSourceCount, 1u);
     EXPECT_EQ(stats.UnsupportedSourceTypeCount, 1u);
-    EXPECT_EQ(stats.InvalidBufferCount, 1u);
+    EXPECT_EQ(stats.InvalidBufferCount, 0u);
     EXPECT_EQ(stats.NonFiniteValueCount, 1u);
+}
+
+TEST(VisualizationAdapters, KMeansLabelAdapterEmitsPropertyBufferWhenBdaMissing)
+{
+    Geometry::PropertySet properties = MakeScalarProperties();
+    const R::KMeansLabelAdapter adapter{
+        Geometry::ConstPropertySet{properties}};
+
+    R::VisualizationAdapterBatch batch{};
+    R::VisualizationAdapterStats stats{};
+    adapter.Append(batch,
+                   R::VisualizationAdapterOptions{
+                       .SourceName = "v:kmeans_color",
+                       .OutputName = "clusters",
+                       .Domain = G::VisualizationAttributeDomain::Vertex,
+                       .DirtyStamp = 10u,
+                   },
+                   stats);
+
+    ASSERT_EQ(batch.Colors.size(), 1u);
+    EXPECT_EQ(batch.Colors.front().Name, "clusters");
+    EXPECT_EQ(batch.Colors.front().SourceBufferKey, "clusters");
+    EXPECT_EQ(batch.Colors.front().ColorBufferBDA, 0u);
+    ASSERT_EQ(batch.PropertyBuffers.size(), 1u);
+    const G::VisualizationPropertyBufferUploadDescriptor& descriptor =
+        batch.PropertyBuffers.front();
+    EXPECT_EQ(descriptor.SourceKey, "clusters");
+    EXPECT_EQ(descriptor.ValueType, G::VisualizationValueType::RgbaFloat4);
+    EXPECT_EQ(descriptor.ElementCount, 4u);
+    EXPECT_EQ(descriptor.StrideBytes, sizeof(glm::vec4));
+    EXPECT_EQ(descriptor.DirtyStamp, 10u);
+    EXPECT_EQ(descriptor.Bytes.size(), 4u * sizeof(glm::vec4));
+    EXPECT_EQ(stats.PacketAppendCount, 1u);
+    EXPECT_EQ(stats.InvalidBufferCount, 0u);
 }
 
 TEST(VisualizationAdapters, VectorFieldAdapterAppendsVectorFieldPacket)
@@ -440,6 +495,8 @@ TEST(VisualizationAdapters, IsolineAdapterAppendsIsolinePacket)
     ASSERT_EQ(batch.Isolines.size(), 1u);
     const G::IsolineOverlayPacket& packet = batch.Isolines.front();
     EXPECT_EQ(packet.SourceScalarName, "curvature_isolines");
+    EXPECT_EQ(packet.ScalarBufferSourceKey, "curvature_isolines");
+    EXPECT_EQ(packet.ScalarBufferBDA, 0u);
     EXPECT_EQ(packet.Domain, G::VisualizationAttributeDomain::Vertex);
     EXPECT_EQ(packet.IsoValueCount, 3u);
     EXPECT_FLOAT_EQ(packet.RangeMin, -1.0f);
@@ -449,6 +506,10 @@ TEST(VisualizationAdapters, IsolineAdapterAppendsIsolinePacket)
     EXPECT_FALSE(packet.DepthTested);
     EXPECT_EQ(stats.AdapterInvocationCount, 1u);
     EXPECT_EQ(stats.PacketAppendCount, 1u);
+    ASSERT_EQ(batch.PropertyBuffers.size(), 1u);
+    EXPECT_EQ(batch.PropertyBuffers.front().SourceKey, "curvature_isolines");
+    EXPECT_EQ(batch.PropertyBuffers.front().ValueType,
+              G::VisualizationValueType::ScalarFloat);
 
     const G::VisualizationDiagnostics diagnostics =
         G::ValidateVisualizationPackets(batch.AsPacketBatch(
@@ -719,6 +780,7 @@ TEST(VisualizationAdapters, BatchClearAndPacketViewReflectAllPacketLanes)
     const G::VisualizationPacketBatch packetView =
         batch.AsPacketBatch(true, G::VisualizationAttributeDomain::Vertex);
     EXPECT_EQ(packetView.AttributeBuffers.size(), 1u);
+    EXPECT_EQ(packetView.PropertyBuffers.size(), 0u);
     EXPECT_EQ(packetView.Scalars.size(), 1u);
     EXPECT_EQ(packetView.Colors.size(), 1u);
     EXPECT_EQ(packetView.VectorFields.size(), 1u);
@@ -728,6 +790,8 @@ TEST(VisualizationAdapters, BatchClearAndPacketViewReflectAllPacketLanes)
     EXPECT_TRUE(packetView.EnforceDomain);
 
     batch.Clear();
+    EXPECT_TRUE(batch.PropertyBuffers.empty());
+    EXPECT_TRUE(batch.PropertyBufferPayloads.empty());
     EXPECT_TRUE(batch.AttributeBuffers.empty());
     EXPECT_TRUE(batch.Scalars.empty());
     EXPECT_TRUE(batch.Colors.empty());

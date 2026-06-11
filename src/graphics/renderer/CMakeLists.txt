@@ -19,6 +19,7 @@ target_sources(${target_name}
         Graphics.MaterialSystem.cppm
         Graphics.ColormapSystem.cppm
         Graphics.VisualizationPackets.cppm
+        Graphics.VisualizationPropertyBufferResidency.cppm
         Graphics.VisualizationSyncSystem.cppm
         Graphics.CullingSystem.cppm
         Graphics.DebugViewSystem.cppm
@@ -51,6 +52,7 @@ target_sources(${target_name}
         Graphics.MaterialSystem.cpp
         Graphics.ColormapSystem.cpp
         Graphics.VisualizationPackets.cpp
+        Graphics.VisualizationPropertyBufferResidency.cpp
         Graphics.VisualizationSyncSystem.cpp
         Graphics.GpuScene.cpp
         Graphics.CullingSystem.cpp

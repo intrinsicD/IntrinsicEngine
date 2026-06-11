@@ -2,6 +2,9 @@ module;
 
 #include <cmath>
 #include <cstdint>
+#include <cstring>
+#include <limits>
+#include <span>
 
 #include <glm/glm.hpp>
 
@@ -52,6 +55,156 @@ namespace Extrinsic::Graphics
                 diagnostics.HasErrors = true;
             }
         }
+
+        template <typename T>
+        [[nodiscard]] bool IsFinitePayload(const std::span<const std::byte> bytes,
+                                           const std::uint64_t componentCount) noexcept
+        {
+            const std::uint64_t expectedBytes =
+                componentCount * sizeof(T);
+            if (bytes.size() != expectedBytes)
+            {
+                return false;
+            }
+
+            for (std::uint64_t i = 0u; i < componentCount; ++i)
+            {
+                T value{};
+                std::memcpy(&value,
+                            bytes.data() + i * sizeof(T),
+                            sizeof(T));
+                if (!std::isfinite(static_cast<double>(value)))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+    }
+
+    std::uint32_t ExpectedVisualizationValueStride(
+        const VisualizationValueType type) noexcept
+    {
+        switch (type)
+        {
+        case VisualizationValueType::ScalarFloat:
+            return sizeof(float);
+        case VisualizationValueType::Rgba8:
+            return 4u;
+        case VisualizationValueType::VectorFloat3:
+            return sizeof(float) * 3u;
+        case VisualizationValueType::LabelUint32:
+            return sizeof(std::uint32_t);
+        case VisualizationValueType::ScalarDouble:
+            return sizeof(double);
+        case VisualizationValueType::RgbaFloat4:
+            return sizeof(float) * 4u;
+        case VisualizationValueType::Count:
+            break;
+        }
+        return 0u;
+    }
+
+    bool ValidateVisualizationPropertyBufferUploadDescriptor(
+        const VisualizationPropertyBufferUploadDescriptor& descriptor,
+        VisualizationPropertyBufferDiagnostics& diagnostics) noexcept
+    {
+        ++diagnostics.InputBufferCount;
+
+        bool valid = true;
+        if (descriptor.SourceKey.empty())
+        {
+            ++diagnostics.InvalidSourceKeyCount;
+            valid = false;
+        }
+
+        const std::uint32_t expectedStride =
+            ExpectedVisualizationValueStride(descriptor.ValueType);
+        if (expectedStride == 0u)
+        {
+            ++diagnostics.UnsupportedTypeCount;
+            valid = false;
+        }
+        else if (descriptor.StrideBytes != expectedStride)
+        {
+            ++diagnostics.InvalidStrideCount;
+            valid = false;
+        }
+        if (descriptor.ElementCount == 0u)
+        {
+            ++diagnostics.ZeroElementCount;
+            valid = false;
+        }
+
+        const std::uint64_t expectedByteSize =
+            static_cast<std::uint64_t>(descriptor.ElementCount) *
+            static_cast<std::uint64_t>(descriptor.StrideBytes);
+        if (expectedByteSize > static_cast<std::uint64_t>(
+                std::numeric_limits<std::size_t>::max()) ||
+            descriptor.Bytes.size() != expectedByteSize)
+        {
+            ++diagnostics.InvalidByteSizeCount;
+            valid = false;
+        }
+
+        if (valid)
+        {
+            bool finite = true;
+            switch (descriptor.ValueType)
+            {
+            case VisualizationValueType::ScalarFloat:
+                finite = IsFinitePayload<float>(
+                    descriptor.Bytes, descriptor.ElementCount);
+                break;
+            case VisualizationValueType::VectorFloat3:
+                finite = IsFinitePayload<float>(
+                    descriptor.Bytes,
+                    static_cast<std::uint64_t>(descriptor.ElementCount) * 3u);
+                break;
+            case VisualizationValueType::ScalarDouble:
+                finite = IsFinitePayload<double>(
+                    descriptor.Bytes, descriptor.ElementCount);
+                break;
+            case VisualizationValueType::RgbaFloat4:
+                finite = IsFinitePayload<float>(
+                    descriptor.Bytes,
+                    static_cast<std::uint64_t>(descriptor.ElementCount) * 4u);
+                break;
+            case VisualizationValueType::Rgba8:
+            case VisualizationValueType::LabelUint32:
+                break;
+            case VisualizationValueType::Count:
+                finite = false;
+                break;
+            }
+
+            if (!finite)
+            {
+                ++diagnostics.NonFiniteValueCount;
+                valid = false;
+            }
+        }
+
+        if (valid)
+        {
+            ++diagnostics.AcceptedBufferCount;
+        }
+        else
+        {
+            diagnostics.HasErrors = true;
+        }
+        return valid;
+    }
+
+    VisualizationPropertyBufferDiagnostics ValidateVisualizationPropertyBufferUploads(
+        const std::span<const VisualizationPropertyBufferUploadDescriptor> descriptors) noexcept
+    {
+        VisualizationPropertyBufferDiagnostics diagnostics{};
+        for (const VisualizationPropertyBufferUploadDescriptor& descriptor : descriptors)
+        {
+            (void)ValidateVisualizationPropertyBufferUploadDescriptor(descriptor, diagnostics);
+        }
+        return diagnostics;
     }
 
     VisualizationDiagnostics ValidateVisualizationPackets(const VisualizationPacketBatch& batch) noexcept
@@ -251,5 +404,3 @@ namespace Extrinsic::Graphics
         return summary;
     }
 }
-
-

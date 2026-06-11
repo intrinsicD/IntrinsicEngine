@@ -1,6 +1,7 @@
 module;
 
 #include <cstdint>
+#include <cstddef>
 #include <span>
 #include <string>
 
@@ -26,6 +27,9 @@ export namespace Extrinsic::Graphics
         Rgba8,
         VectorFloat3,
         LabelUint32,
+        ScalarDouble,
+        RgbaFloat4,
+        Count,
     };
 
     enum class VisualizationFragmentBakeMapping : std::uint8_t
@@ -38,6 +42,7 @@ export namespace Extrinsic::Graphics
     struct VisualizationAttributeBufferPacket
     {
         std::string Name{};
+        std::string SourceBufferKey{};
         VisualizationAttributeDomain Domain{VisualizationAttributeDomain::Vertex};
         VisualizationValueType ValueType{VisualizationValueType::ScalarFloat};
         std::uint32_t ElementCount{0u};
@@ -47,6 +52,7 @@ export namespace Extrinsic::Graphics
     struct ScalarAttributePacket
     {
         std::string Name{};
+        std::string SourceBufferKey{};
         VisualizationAttributeDomain Domain{VisualizationAttributeDomain::Vertex};
         std::uint32_t ElementCount{0u};
         float RangeMin{0.f};
@@ -58,6 +64,7 @@ export namespace Extrinsic::Graphics
     struct ColorAttributePacket
     {
         std::string Name{};
+        std::string SourceBufferKey{};
         VisualizationAttributeDomain Domain{VisualizationAttributeDomain::Vertex};
         std::uint32_t ElementCount{0u};
         std::uint64_t ColorBufferBDA{0u};
@@ -66,6 +73,8 @@ export namespace Extrinsic::Graphics
     struct VectorFieldOverlayPacket
     {
         std::string Name{};
+        std::string PositionBufferSourceKey{};
+        std::string VectorBufferSourceKey{};
         VisualizationAttributeDomain Domain{VisualizationAttributeDomain::Vertex};
         std::uint32_t ElementCount{0u};
         std::uint64_t PositionBufferBDA{0u};
@@ -84,8 +93,10 @@ export namespace Extrinsic::Graphics
     struct IsolineOverlayPacket
     {
         std::string SourceScalarName{};
+        std::string ScalarBufferSourceKey{};
         VisualizationAttributeDomain Domain{VisualizationAttributeDomain::Face};
         std::uint32_t IsoValueCount{0u};
+        std::uint64_t ScalarBufferBDA{0u};
         float RangeMin{0.f};
         float RangeMax{1.f};
         float LineWidth{1.f};
@@ -111,6 +122,7 @@ export namespace Extrinsic::Graphics
     {
         std::string Name{};
         std::string SourceAttributeName{};
+        std::string TexcoordBufferSourceKey{};
         VisualizationFragmentBakeMapping Mapping{VisualizationFragmentBakeMapping::ExistingTexcoords};
         bool MeshHasTexcoords{false};
         std::uint32_t FaceCount{0u};
@@ -119,8 +131,51 @@ export namespace Extrinsic::Graphics
         std::uint64_t TexcoordBufferBDA{0u};
     };
 
+    struct VisualizationPropertyBufferUploadDescriptor
+    {
+        std::string SourceKey{};
+        VisualizationAttributeDomain Domain{VisualizationAttributeDomain::Vertex};
+        VisualizationValueType ValueType{VisualizationValueType::ScalarFloat};
+        std::uint32_t ElementCount{0u};
+        std::uint32_t StrideBytes{0u};
+        // DirtyStamp == 0 means the producer has no stable dirty stamp yet,
+        // so residency must upload this descriptor every submission.
+        std::uint64_t DirtyStamp{0u};
+        std::span<const std::byte> Bytes{};
+    };
+
+    struct VisualizationPropertyBufferAddress
+    {
+        std::string SourceKey{};
+        VisualizationAttributeDomain Domain{VisualizationAttributeDomain::Vertex};
+        VisualizationValueType ValueType{VisualizationValueType::ScalarFloat};
+        std::uint32_t ElementCount{0u};
+        std::uint32_t StrideBytes{0u};
+        std::uint64_t DirtyStamp{0u};
+        std::uint64_t BufferBDA{0u};
+    };
+
+    struct VisualizationPropertyBufferDiagnostics
+    {
+        std::uint32_t InputBufferCount{0u};
+        std::uint32_t AcceptedBufferCount{0u};
+        std::uint32_t UploadedBufferCount{0u};
+        std::uint32_t ReusedBufferCount{0u};
+        std::uint32_t UnsupportedTypeCount{0u};
+        std::uint32_t InvalidSourceKeyCount{0u};
+        std::uint32_t ZeroElementCount{0u};
+        std::uint32_t InvalidStrideCount{0u};
+        std::uint32_t InvalidByteSizeCount{0u};
+        std::uint32_t NonFiniteValueCount{0u};
+        std::uint32_t StaleDirtyStampCount{0u};
+        std::uint32_t UploadDeferralCount{0u};
+        std::uint32_t InvalidResourceCount{0u};
+        bool HasErrors{false};
+    };
+
     struct VisualizationPacketBatch
     {
+        std::span<const VisualizationPropertyBufferUploadDescriptor> PropertyBuffers{};
         std::span<const VisualizationAttributeBufferPacket> AttributeBuffers{};
         std::span<const ScalarAttributePacket> Scalars{};
         std::span<const ColorAttributePacket> Colors{};
@@ -160,7 +215,12 @@ export namespace Extrinsic::Graphics
         bool RequiresTextureResidency{false};
     };
 
+    [[nodiscard]] std::uint32_t ExpectedVisualizationValueStride(VisualizationValueType type) noexcept;
+    [[nodiscard]] bool ValidateVisualizationPropertyBufferUploadDescriptor(
+        const VisualizationPropertyBufferUploadDescriptor& descriptor,
+        VisualizationPropertyBufferDiagnostics& diagnostics) noexcept;
+    [[nodiscard]] VisualizationPropertyBufferDiagnostics ValidateVisualizationPropertyBufferUploads(
+        std::span<const VisualizationPropertyBufferUploadDescriptor> descriptors) noexcept;
     [[nodiscard]] VisualizationDiagnostics ValidateVisualizationPackets(const VisualizationPacketBatch& batch) noexcept;
     [[nodiscard]] VisualizationOverlaySummary BuildVisualizationOverlaySummary(const VisualizationPacketBatch& batch) noexcept;
 }
-

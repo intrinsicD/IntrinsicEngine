@@ -113,7 +113,7 @@ Open members:
 - [`runtime/RUNTIME-101-asset-ingest-state-machine.md`](runtime/RUNTIME-101-asset-ingest-state-machine.md),
   [`runtime/RUNTIME-103-geometry-algorithm-execution-queue.md`](runtime/RUNTIME-103-geometry-algorithm-execution-queue.md),
   [`runtime/RUNTIME-105-remove-streaming-graph-bridge.md`](runtime/RUNTIME-105-remove-streaming-graph-bridge.md).
-- [`rendering/GRAPHICS-084-visualization-property-buffer-residency.md`](rendering/GRAPHICS-084-visualization-property-buffer-residency.md),
+- [`rendering/GRAPHICS-084C-visualization-property-buffer-vulkan-smoke.md`](rendering/GRAPHICS-084C-visualization-property-buffer-vulkan-smoke.md),
   [`rendering/GRAPHICS-086-rhi-retirement-parity-and-cuda-decision.md`](rendering/GRAPHICS-086-rhi-retirement-parity-and-cuda-decision.md).
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`ui/RORG-031-ui-integration.md`](ui/RORG-031-ui-integration.md).

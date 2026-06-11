@@ -6,6 +6,8 @@ module;
 #include <memory>
 #include <optional>
 #include <span>
+#include <string>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -288,7 +290,21 @@ namespace Extrinsic::Runtime
             }
         }
 
+        [[nodiscard]] std::string BuildVisualizationPropertySourceKey(
+            const std::uint32_t stableId,
+            const std::string_view lane,
+            const std::string_view sourceName)
+        {
+            std::string key = std::to_string(stableId);
+            key += ':';
+            key += lane;
+            key += ':';
+            key += sourceName;
+            return key;
+        }
+
         [[nodiscard]] VisualizationAdapterOptions BuildVisualizationAdapterOptions(
+            const std::uint32_t stableId,
             const RenderExtractionCache::VisualizationAdapterBinding& binding,
             const Graphics::Components::VisualizationConfig* visualization)
         {
@@ -309,6 +325,19 @@ namespace Extrinsic::Runtime
                     options.RangeMax = visualization->Scalar.RangeMax;
                     options.Colormap = visualization->Scalar.Map;
                 }
+                if (options.PropertyBufferSourceKey.empty())
+                {
+                    const std::string_view scalarName =
+                        options.OutputName.empty()
+                            ? std::string_view{options.SourceName}
+                            : std::string_view{options.OutputName};
+                    if (!scalarName.empty())
+                    {
+                        options.PropertyBufferSourceKey =
+                            BuildVisualizationPropertySourceKey(
+                                stableId, "scalar", scalarName);
+                    }
+                }
                 if (options.BufferBDA == 0u)
                 {
                     options.BufferBDA = binding.BufferBDA;
@@ -321,12 +350,38 @@ namespace Extrinsic::Runtime
                     options.OutputName = visualization->ColorBufferName;
                     options.Domain = ToColorBufferDomain(visualization->Source);
                 }
+                if (options.PropertyBufferSourceKey.empty())
+                {
+                    const std::string_view colorName =
+                        options.OutputName.empty()
+                            ? std::string_view{options.SourceName}
+                            : std::string_view{options.OutputName};
+                    if (!colorName.empty())
+                    {
+                        options.PropertyBufferSourceKey =
+                            BuildVisualizationPropertySourceKey(
+                                stableId, "color", colorName);
+                    }
+                }
                 if (options.ColorBufferBDA == 0u)
                 {
                     options.ColorBufferBDA = binding.BufferBDA;
                 }
                 break;
             case BindingKind::VectorField:
+                if (options.PropertyBufferSourceKey.empty())
+                {
+                    const std::string_view vectorName =
+                        options.OutputName.empty()
+                            ? std::string_view{options.SourceName}
+                            : std::string_view{options.OutputName};
+                    if (!vectorName.empty())
+                    {
+                        options.PropertyBufferSourceKey =
+                            BuildVisualizationPropertySourceKey(
+                                stableId, "vector", vectorName);
+                    }
+                }
                 if (options.VectorBufferBDA == 0u)
                 {
                     options.VectorBufferBDA = binding.BufferBDA;
@@ -345,6 +400,19 @@ namespace Extrinsic::Runtime
                     options.IsoValueCount = visualization->Scalar.Isolines.Num;
                     options.LineWidth = visualization->Scalar.Isolines.Width;
                     options.OverlayColor = visualization->Scalar.Isolines.Color;
+                }
+                if (options.PropertyBufferSourceKey.empty())
+                {
+                    const std::string_view scalarName =
+                        options.OutputName.empty()
+                            ? std::string_view{options.SourceName}
+                            : std::string_view{options.OutputName};
+                    if (!scalarName.empty())
+                    {
+                        options.PropertyBufferSourceKey =
+                            BuildVisualizationPropertySourceKey(
+                                stableId, "isoline", scalarName);
+                    }
                 }
                 break;
             case BindingKind::HtexMetadata:
@@ -1133,7 +1201,8 @@ namespace Extrinsic::Runtime
 
         VisualizationAdapterStats perAdapter{};
         const VisualizationAdapterOptions options =
-            BuildVisualizationAdapterOptions(bindingIt->second, visualization);
+            BuildVisualizationAdapterOptions(
+                stableId, bindingIt->second, visualization);
         adapter->Append(m_VisualizationState->Batch, options, perAdapter);
 
         ++stats.VisualizationAdapterInvokedCount;
@@ -1846,6 +1915,7 @@ namespace Extrinsic::Runtime
             .Transforms                     = m_Transforms,
             .Lights                         = m_Lights,
             .Visualizations                 = m_Visualizations,
+            .VisualizationPropertyBuffers   = m_VisualizationState->Batch.PropertyBuffers,
             .VisualizationAttributeBuffers  = m_VisualizationState->Batch.AttributeBuffers,
             .VisualizationScalars           = m_VisualizationState->Batch.Scalars,
             .VisualizationColors            = m_VisualizationState->Batch.Colors,

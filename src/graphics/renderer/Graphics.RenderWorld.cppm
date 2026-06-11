@@ -155,6 +155,7 @@ namespace Extrinsic::Graphics
         std::span<const HtexPatchPreviewAtlasPacket> HtexAtlases{};
         std::span<const FragmentBakeAtlasPacket> FragmentBakeAtlases{};
         VisualizationDiagnostics Diagnostics{};
+        VisualizationPropertyBufferDiagnostics PropertyBufferDiagnostics{};
         VisualizationOverlaySummary OverlaySummary{};
         bool HasVisualizationPackets{false};
     };

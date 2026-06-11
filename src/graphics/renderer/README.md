@@ -1261,6 +1261,21 @@ Concretely:
   validates domains, ranges, colormap IDs, BDA/resource seams, missing texcoords,
   and Htex atlas descriptors while leaving texture residency and geometry
   algorithm generation to later graphics-assets/runtime/geometry owners.
+  `GRAPHICS-084` adds the selected property-buffer residency seam for current
+  promoted visualization adapters: `VisualizationPropertyBufferUploadDescriptor`
+  carries source key, domain, value type, element count, stride, dirty stamp,
+  and copied bytes; `VisualizationPropertyBufferResidency` validates those
+  descriptors, rejects unsupported/zero/non-finite/stale inputs, uploads or
+  reuses renderer-owned `RHI::BufferManager` storage buffers, and publishes
+  BDAs into scalar/color/vector/isoline packets before
+  `ValidateVisualizationPackets(...)` runs. A dirty stamp of zero means the
+  producer has no stable stamp and the buffer is uploaded every submission;
+  positive stamps can reuse equal metadata/stamp buffers and reject older
+  submissions. Runtime extraction scopes descriptor source keys with the
+  stable renderable id so two entities using the same property name cannot
+  collide during BDA publication. Runtime and UI still own property selection
+  and CPU data production only; graphics owns all GPU residency. The remaining
+  Vulkan operational proof is `GRAPHICS-084C`.
   Per `GRAPHICS-014Q`, runtime extraction (`Extrinsic.Runtime.RenderExtraction`)
   is the sole owner of translating PropertySet attributes, KMeans labels,
   isoline results, vector fields, and Htex metadata into the

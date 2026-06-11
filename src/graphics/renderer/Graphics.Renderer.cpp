@@ -2,6 +2,7 @@ module;
 
 #include <array>
 #include <cstdint>
+#include <cstddef>
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -33,6 +34,7 @@ import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.ColormapSystem;
 import Extrinsic.Graphics.VisualizationPackets;
+import Extrinsic.Graphics.VisualizationPropertyBufferResidency;
 import Extrinsic.Graphics.VisualizationSyncSystem;
 import Extrinsic.Graphics.CullingSystem;
 import Extrinsic.Graphics.LightSystem;
@@ -331,6 +333,8 @@ namespace Extrinsic::Graphics
         struct RuntimeSnapshotStorage
         {
             std::vector<VisualizationSyncRecord>           VisualizationSyncRecords;
+            std::vector<VisualizationPropertyBufferUploadDescriptor> VisualizationPropertyBuffers;
+            std::vector<std::vector<std::byte>>             VisualizationPropertyBufferPayloads;
             std::vector<VisualizationAttributeBufferPacket> VisualizationAttributeBuffers;
             std::vector<ScalarAttributePacket>              VisualizationScalars;
             std::vector<ColorAttributePacket>               VisualizationColors;
@@ -339,6 +343,7 @@ namespace Extrinsic::Graphics
             std::vector<HtexPatchPreviewAtlasPacket>        VisualizationHtexAtlases;
             std::vector<FragmentBakeAtlasPacket>            VisualizationFragmentBakeAtlases;
             VisualizationDiagnostics                        VisualizationDiagnostics{};
+            VisualizationPropertyBufferDiagnostics          VisualizationPropertyBufferDiagnostics{};
             VisualizationOverlaySummary                     VisualizationOverlaySummary{};
             std::vector<TransformSyncRecord>                TransformSyncRecords;
             std::vector<LightSnapshot>                      LightSnapshots;
@@ -355,6 +360,8 @@ namespace Extrinsic::Graphics
             void Clear()
             {
                 VisualizationSyncRecords.clear();
+                VisualizationPropertyBuffers.clear();
+                VisualizationPropertyBufferPayloads.clear();
                 VisualizationAttributeBuffers.clear();
                 VisualizationScalars.clear();
                 VisualizationColors.clear();
@@ -363,6 +370,7 @@ namespace Extrinsic::Graphics
                 VisualizationHtexAtlases.clear();
                 VisualizationFragmentBakeAtlases.clear();
                 VisualizationDiagnostics = {};
+                VisualizationPropertyBufferDiagnostics = {};
                 VisualizationOverlaySummary = {};
                 TransformSyncRecords.clear();
                 LightSnapshots.clear();
@@ -447,6 +455,14 @@ namespace Extrinsic::Graphics
             // with GRAPHICS-078 Slice D.
             m_VisualizationOverlayUploadHelper =
                 std::make_unique<VisualizationOverlayUploadHelper>(device, *m_Subsystems.BufferManager());
+            // GRAPHICS-084 — graphics-owned visualization property-buffer
+            // residency. Constructed beside the other upload helpers so
+            // runtime/editor code can submit copied CPU property arrays while
+            // the renderer owns BufferManager leases and publishes BDAs into
+            // visualization packets before validation.
+            m_VisualizationPropertyBufferResidency =
+                std::make_unique<VisualizationPropertyBufferResidency>(
+                    device, *m_Subsystems.BufferManager());
             // GRAPHICS-079 Slice C — backend-neutral ImGui upload helper.
             // Mirrors the transient-debug / visualization-overlay helpers:
             // one growing host-visible vertex buffer and one growing index
@@ -901,6 +917,10 @@ namespace Extrinsic::Graphics
             // `BufferManager::BufferLease` destructor observes a live
             // manager.
             m_VisualizationOverlayUploadHelper.reset();
+            // GRAPHICS-084 — release property-buffer leases before the
+            // BufferManager is destroyed, matching the upload-helper
+            // lifetime contract above.
+            m_VisualizationPropertyBufferResidency.reset();
             // GRAPHICS-079 Slice C — release the ImGui helper before the
             // BufferManager for the same lease-lifetime reason as the other
             // renderer-owned upload helpers.
@@ -1006,6 +1026,8 @@ namespace Extrinsic::Graphics
             auto& m_TransformSyncRecords = storage.TransformSyncRecords;
             auto& m_LightSnapshots = storage.LightSnapshots;
             auto& m_VisualizationSyncRecords = storage.VisualizationSyncRecords;
+            auto& m_VisualizationPropertyBuffers = storage.VisualizationPropertyBuffers;
+            auto& m_VisualizationPropertyBufferPayloads = storage.VisualizationPropertyBufferPayloads;
             auto& m_VisualizationAttributeBuffers = storage.VisualizationAttributeBuffers;
             auto& m_VisualizationScalars = storage.VisualizationScalars;
             auto& m_VisualizationColors = storage.VisualizationColors;
@@ -1014,6 +1036,7 @@ namespace Extrinsic::Graphics
             auto& m_VisualizationHtexAtlases = storage.VisualizationHtexAtlases;
             auto& m_VisualizationFragmentBakeAtlases = storage.VisualizationFragmentBakeAtlases;
             auto& m_VisualizationDiagnostics = storage.VisualizationDiagnostics;
+            auto& m_VisualizationPropertyBufferDiagnostics = storage.VisualizationPropertyBufferDiagnostics;
             auto& m_VisualizationOverlaySummary = storage.VisualizationOverlaySummary;
             auto& m_DebugLinePackets = storage.DebugLinePackets;
             auto& m_DebugPointPackets = storage.DebugPointPackets;
@@ -1028,6 +1051,20 @@ namespace Extrinsic::Graphics
             m_TransformSyncRecords.assign(snapshots.Transforms.begin(), snapshots.Transforms.end());
             m_LightSnapshots.assign(snapshots.Lights.begin(), snapshots.Lights.end());
             m_VisualizationSyncRecords.assign(snapshots.Visualizations.begin(), snapshots.Visualizations.end());
+            m_VisualizationPropertyBuffers.clear();
+            m_VisualizationPropertyBufferPayloads.clear();
+            m_VisualizationPropertyBuffers.reserve(snapshots.VisualizationPropertyBuffers.size());
+            m_VisualizationPropertyBufferPayloads.reserve(snapshots.VisualizationPropertyBuffers.size());
+            for (const VisualizationPropertyBufferUploadDescriptor& descriptor :
+                 snapshots.VisualizationPropertyBuffers)
+            {
+                std::vector<std::byte>& payload =
+                    m_VisualizationPropertyBufferPayloads.emplace_back(
+                        descriptor.Bytes.begin(), descriptor.Bytes.end());
+                VisualizationPropertyBufferUploadDescriptor copied = descriptor;
+                copied.Bytes = std::span<const std::byte>{payload.data(), payload.size()};
+                m_VisualizationPropertyBuffers.push_back(std::move(copied));
+            }
             m_VisualizationAttributeBuffers.assign(snapshots.VisualizationAttributeBuffers.begin(), snapshots.VisualizationAttributeBuffers.end());
             m_VisualizationScalars.assign(snapshots.VisualizationScalars.begin(), snapshots.VisualizationScalars.end());
             m_VisualizationColors.assign(snapshots.VisualizationColors.begin(), snapshots.VisualizationColors.end());
@@ -1042,7 +1079,167 @@ namespace Extrinsic::Graphics
                                                 snapshots.SelectionSelectedStableIds.end());
             m_SelectionHoveredStableId = snapshots.SelectionHoveredStableId;
             m_SelectionHasHovered      = snapshots.SelectionHasHovered;
+
+            if (m_VisualizationPropertyBufferResidency)
+            {
+                m_VisualizationPropertyBufferDiagnostics =
+                    m_VisualizationPropertyBufferResidency->Update(
+                        m_VisualizationPropertyBuffers);
+
+                auto findAddress = [this](
+                    const std::string_view explicitKey,
+                    const std::string_view fallbackKey,
+                    const VisualizationAttributeDomain domain,
+                    const auto typeMatches)
+                    -> const VisualizationPropertyBufferAddress*
+                {
+                    const std::string_view key =
+                        explicitKey.empty() ? fallbackKey : explicitKey;
+                    if (key.empty())
+                    {
+                        return nullptr;
+                    }
+
+                    const VisualizationPropertyBufferAddress* address =
+                        m_VisualizationPropertyBufferResidency->Find(key);
+                    if (address == nullptr || address->Domain != domain ||
+                        !typeMatches(address->ValueType))
+                    {
+                        return nullptr;
+                    }
+                    return address;
+                };
+
+                for (VisualizationAttributeBufferPacket& packet :
+                     m_VisualizationAttributeBuffers)
+                {
+                    if (packet.BufferBDA != 0u)
+                    {
+                        continue;
+                    }
+                    const VisualizationPropertyBufferAddress* address =
+                        findAddress(packet.SourceBufferKey, packet.Name,
+                                    packet.Domain,
+                                    [valueType = packet.ValueType](
+                                        const VisualizationValueType candidate)
+                                    {
+                                        return candidate == valueType;
+                                    });
+                    if (address != nullptr)
+                    {
+                        packet.BufferBDA = address->BufferBDA;
+                    }
+                }
+
+                for (ScalarAttributePacket& packet : m_VisualizationScalars)
+                {
+                    if (packet.ScalarBufferBDA != 0u)
+                    {
+                        continue;
+                    }
+                    const VisualizationPropertyBufferAddress* address =
+                        findAddress(packet.SourceBufferKey, packet.Name,
+                                    packet.Domain,
+                                    [](const VisualizationValueType candidate)
+                                    {
+                                        return candidate == VisualizationValueType::ScalarFloat ||
+                                               candidate == VisualizationValueType::ScalarDouble;
+                                    });
+                    if (address != nullptr)
+                    {
+                        packet.ScalarBufferBDA = address->BufferBDA;
+                    }
+                }
+
+                for (ColorAttributePacket& packet : m_VisualizationColors)
+                {
+                    if (packet.ColorBufferBDA != 0u)
+                    {
+                        continue;
+                    }
+                    const VisualizationPropertyBufferAddress* address =
+                        findAddress(packet.SourceBufferKey, packet.Name,
+                                    packet.Domain,
+                                    [](const VisualizationValueType candidate)
+                                    {
+                                        return candidate == VisualizationValueType::Rgba8 ||
+                                               candidate == VisualizationValueType::RgbaFloat4;
+                                    });
+                    if (address != nullptr)
+                    {
+                        packet.ColorBufferBDA = address->BufferBDA;
+                    }
+                }
+
+                for (VectorFieldOverlayPacket& packet : m_VisualizationVectorFields)
+                {
+                    if (packet.PositionBufferBDA == 0u)
+                    {
+                        const VisualizationPropertyBufferAddress* address =
+                            findAddress(packet.PositionBufferSourceKey, {},
+                                        packet.Domain,
+                                        [](const VisualizationValueType candidate)
+                                        {
+                                            return candidate == VisualizationValueType::VectorFloat3;
+                                        });
+                        if (address != nullptr)
+                        {
+                            packet.PositionBufferBDA = address->BufferBDA;
+                        }
+                    }
+                    if (packet.VectorBufferBDA == 0u)
+                    {
+                        const VisualizationPropertyBufferAddress* address =
+                            findAddress(packet.VectorBufferSourceKey, packet.Name,
+                                        packet.Domain,
+                                        [](const VisualizationValueType candidate)
+                                        {
+                                            return candidate == VisualizationValueType::VectorFloat3;
+                                        });
+                        if (address != nullptr)
+                        {
+                            packet.VectorBufferBDA = address->BufferBDA;
+                        }
+                    }
+                }
+
+                for (IsolineOverlayPacket& packet : m_VisualizationIsolines)
+                {
+                    if (packet.ScalarBufferBDA != 0u)
+                    {
+                        continue;
+                    }
+                    const VisualizationPropertyBufferAddress* address =
+                        findAddress(packet.ScalarBufferSourceKey,
+                                    packet.SourceScalarName,
+                                    packet.Domain,
+                                    [](const VisualizationValueType candidate)
+                                    {
+                                        return candidate == VisualizationValueType::ScalarFloat ||
+                                               candidate == VisualizationValueType::ScalarDouble;
+                                    });
+                    if (address != nullptr)
+                    {
+                        packet.ScalarBufferBDA = address->BufferBDA;
+                    }
+                }
+            }
+            else
+            {
+                m_VisualizationPropertyBufferDiagnostics =
+                    ValidateVisualizationPropertyBufferUploads(
+                        m_VisualizationPropertyBuffers);
+                if (!m_VisualizationPropertyBuffers.empty())
+                {
+                    m_VisualizationPropertyBufferDiagnostics.UploadDeferralCount +=
+                        static_cast<std::uint32_t>(
+                            m_VisualizationPropertyBuffers.size());
+                    m_VisualizationPropertyBufferDiagnostics.HasErrors = true;
+                }
+            }
+
             const VisualizationPacketBatch visualizationBatch{
+                .PropertyBuffers = m_VisualizationPropertyBuffers,
                 .AttributeBuffers = m_VisualizationAttributeBuffers,
                 .Scalars = m_VisualizationScalars,
                 .Colors = m_VisualizationColors,
@@ -1273,6 +1470,7 @@ namespace Extrinsic::Graphics
             const auto& m_VisualizationHtexAtlases = storage.VisualizationHtexAtlases;
             const auto& m_VisualizationFragmentBakeAtlases = storage.VisualizationFragmentBakeAtlases;
             const auto& m_VisualizationDiagnostics = storage.VisualizationDiagnostics;
+            const auto& m_VisualizationPropertyBufferDiagnostics = storage.VisualizationPropertyBufferDiagnostics;
             const auto& m_VisualizationOverlaySummary = storage.VisualizationOverlaySummary;
             const auto& m_DebugLinePackets = storage.DebugLinePackets;
             const auto& m_DebugPointPackets = storage.DebugPointPackets;
@@ -1343,6 +1541,7 @@ namespace Extrinsic::Graphics
                     .HtexAtlases = m_VisualizationHtexAtlases,
                     .FragmentBakeAtlases = m_VisualizationFragmentBakeAtlases,
                     .Diagnostics = m_VisualizationDiagnostics,
+                    .PropertyBufferDiagnostics = m_VisualizationPropertyBufferDiagnostics,
                     .OverlaySummary = m_VisualizationOverlaySummary,
                     .HasVisualizationPackets = m_VisualizationDiagnostics.InputPacketCount > 0u,
                 },
@@ -1405,6 +1604,8 @@ namespace Extrinsic::Graphics
                           const RenderWorld& renderWorld) override
         {
             m_LastRenderGraphStats = {};
+            m_LastRenderGraphStats.VisualizationPropertyBuffers =
+                renderWorld.Visualization.PropertyBufferDiagnostics;
             if (!m_HasPreparedFrame)
             {
                 m_LastRenderGraphStats.Diagnostic = m_LastRenderPrepResult.Diagnostic.empty()
@@ -7207,6 +7408,7 @@ namespace Extrinsic::Graphics
         // helper's internal lease destructor observes a live
         // manager.
         std::unique_ptr<IVisualizationOverlayUploadHelper> m_VisualizationOverlayUploadHelper;
+        std::unique_ptr<VisualizationPropertyBufferResidency> m_VisualizationPropertyBufferResidency;
         // GRAPHICS-079 Slice C — renderer-owned ImGui transient upload helper.
         // Held as an interface pointer for parity with the transient-debug and
         // visualization-overlay helpers and reset before BufferManager teardown.

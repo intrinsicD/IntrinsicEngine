@@ -9,6 +9,21 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`GRAPHICS-084`](GRAPHICS-084-visualization-property-buffer-residency.md) —
+visualization property-buffer residency — retired on 2026-06-11 at maturity
+`CPUContracted`. Runtime visualization adapters now emit copied CPU property
+arrays as `VisualizationPropertyBufferUploadDescriptor` records when external
+BDAs are absent. The renderer copies descriptor payloads into retained snapshot
+storage, validates supported scalar/color/vector descriptors centrally, uploads
+or reuses renderer-owned `RHI::BufferManager` storage buffers, publishes BDAs
+into scalar/color/vector/isoline packets before `ValidateVisualizationPackets`
+runs, and reports diagnostics for unsupported types, invalid shape,
+non-finite values, stale dirty stamps, upload deferral, and invalid resources.
+Runtime/UI stay data-only and do not own GPU resources. The opt-in Vulkan
+operational proof remains open as `GRAPHICS-084C`; this retirement does not
+claim a fresh `gpu;vulkan` host run.
+
+Backlog
 [`GRAPHICS-085`](GRAPHICS-085-overlay-packet-backend-parity.md) — overlay
 packet backend parity — retired on 2026-06-11 at maturity `CPUContracted`.
 The task composes the retained overlay-like backend lanes classified by

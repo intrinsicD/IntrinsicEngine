@@ -21,6 +21,8 @@ export namespace Extrinsic::Runtime
 {
     struct VisualizationAdapterBatch
     {
+        std::vector<Graphics::VisualizationPropertyBufferUploadDescriptor> PropertyBuffers{};
+        std::vector<std::vector<std::byte>> PropertyBufferPayloads{};
         std::vector<Graphics::VisualizationAttributeBufferPacket> AttributeBuffers{};
         std::vector<Graphics::ScalarAttributePacket> Scalars{};
         std::vector<Graphics::ColorAttributePacket> Colors{};
@@ -47,6 +49,10 @@ export namespace Extrinsic::Runtime
         std::uint64_t ColorBufferBDA{0u};
         std::uint64_t PositionBufferBDA{0u};
         std::uint64_t VectorBufferBDA{0u};
+        std::string PropertyBufferSourceKey{};
+        std::string PositionBufferSourceKey{};
+        std::string VectorBufferSourceKey{};
+        std::uint64_t DirtyStamp{0u};
         bool AutoRange{true};
         float RangeMin{0.0f};
         float RangeMax{1.0f};

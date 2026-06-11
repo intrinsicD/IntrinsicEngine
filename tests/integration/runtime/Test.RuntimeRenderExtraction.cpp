@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <memory>
 #include <span>
+#include <string>
 
 #include <entt/entity/entity.hpp>
 #include <gtest/gtest.h>
@@ -488,7 +489,7 @@ TEST(RuntimeRenderExtraction, VisualizationScalarAdapterMissingBindingDoesNotSub
     EXPECT_FALSE(world.Visualization.HasVisualizationPackets);
 }
 
-TEST(RuntimeRenderExtraction, VisualizationScalarAdapterInvalidBdaIsCounted)
+TEST(RuntimeRenderExtraction, VisualizationScalarAdapterMissingBdaUploadsPropertyBuffer)
 {
     RendererFixture fixture;
     ECS::Scene::Registry scene;
@@ -514,11 +515,68 @@ TEST(RuntimeRenderExtraction, VisualizationScalarAdapterInvalidBdaIsCounted)
 
     EXPECT_EQ(stats.VisualizationAdapterScalarConfigsObserved, 1u);
     EXPECT_EQ(stats.VisualizationAdapterInvokedCount, 1u);
-    EXPECT_EQ(stats.VisualizationAdapterInvalidBufferCount, 1u);
-    EXPECT_EQ(stats.VisualizationAdapterPacketAppendCount, 0u);
-    EXPECT_EQ(stats.VisualizationScalarPacketCount, 0u);
-    EXPECT_TRUE(world.Visualization.Scalars.empty());
-    EXPECT_EQ(world.Visualization.Diagnostics.InputPacketCount, 0u);
+    EXPECT_EQ(stats.VisualizationAdapterInvalidBufferCount, 0u);
+    EXPECT_EQ(stats.VisualizationAdapterPacketAppendCount, 1u);
+    EXPECT_EQ(stats.VisualizationScalarPacketCount, 1u);
+    ASSERT_EQ(world.Visualization.Scalars.size(), 1u);
+    EXPECT_NE(world.Visualization.Scalars.front().ScalarBufferBDA, 0u);
+    EXPECT_EQ(world.Visualization.Scalars.front().SourceBufferKey,
+              std::to_string(StableId(entity)) + ":scalar:curvature");
+    EXPECT_EQ(world.Visualization.Diagnostics.InputPacketCount, 1u);
+    EXPECT_EQ(world.Visualization.Diagnostics.AcceptedPacketCount, 1u);
+    EXPECT_EQ(world.Visualization.PropertyBufferDiagnostics.InputBufferCount, 1u);
+    EXPECT_EQ(world.Visualization.PropertyBufferDiagnostics.UploadedBufferCount, 1u);
+    EXPECT_FALSE(world.Visualization.Diagnostics.HasErrors);
+}
+
+TEST(RuntimeRenderExtraction, VisualizationPropertyBufferKeysAreStableIdScoped)
+{
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+
+    Geometry::PropertySet properties = MakeScalarProperties();
+    const auto first = scene.Create();
+    const auto second = scene.Create();
+    ConfigureScalarVisualization(scene, first);
+    ConfigureScalarVisualization(scene, second);
+
+    constexpr std::uint64_t kAdapterKey = 0x5151u;
+    fixture.Extraction.RegisterVisualizationAdapter(
+        kAdapterKey,
+        std::make_unique<Runtime::PropertyScalarAdapter>(
+            Geometry::ConstPropertySet{properties}));
+    fixture.Extraction.SetVisualizationAdapterBinding(
+        StableId(first),
+        Runtime::RenderExtractionCache::VisualizationAdapterBinding{
+            .AdapterKey = kAdapterKey,
+            .BufferBDA = 0u,
+        });
+    fixture.Extraction.SetVisualizationAdapterBinding(
+        StableId(second),
+        Runtime::RenderExtractionCache::VisualizationAdapterBinding{
+            .AdapterKey = kAdapterKey,
+            .BufferBDA = 0u,
+        });
+
+    const auto stats = fixture.Extract(scene);
+    const Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
+
+    EXPECT_EQ(stats.VisualizationAdapterInvokedCount, 2u);
+    EXPECT_EQ(stats.VisualizationAdapterInvalidBufferCount, 0u);
+    EXPECT_EQ(stats.VisualizationAdapterPacketAppendCount, 2u);
+    EXPECT_EQ(stats.VisualizationScalarPacketCount, 2u);
+    ASSERT_EQ(world.Visualization.Scalars.size(), 2u);
+    EXPECT_NE(world.Visualization.Scalars[0].SourceBufferKey,
+              world.Visualization.Scalars[1].SourceBufferKey);
+    EXPECT_NE(world.Visualization.Scalars[0].SourceBufferKey, "curvature");
+    EXPECT_NE(world.Visualization.Scalars[1].SourceBufferKey, "curvature");
+    EXPECT_NE(world.Visualization.Scalars[0].ScalarBufferBDA, 0u);
+    EXPECT_NE(world.Visualization.Scalars[1].ScalarBufferBDA, 0u);
+    EXPECT_NE(world.Visualization.Scalars[0].ScalarBufferBDA,
+              world.Visualization.Scalars[1].ScalarBufferBDA);
+    EXPECT_EQ(world.Visualization.PropertyBufferDiagnostics.InputBufferCount, 2u);
+    EXPECT_EQ(world.Visualization.PropertyBufferDiagnostics.UploadedBufferCount, 2u);
+    EXPECT_FALSE(world.Visualization.Diagnostics.HasErrors);
 }
 
 TEST(RuntimeRenderExtraction, VisualizationNonScalarAdapterBindingsReachRenderWorld)
@@ -659,6 +717,9 @@ TEST(RuntimeRenderExtraction, VisualizationNonScalarAdapterBindingsReachRenderWo
     ASSERT_EQ(world.Visualization.Isolines.size(), 1u);
     EXPECT_EQ(world.Visualization.Isolines.front().SourceScalarName,
               "curvature");
+    EXPECT_EQ(world.Visualization.Isolines.front().ScalarBufferSourceKey,
+              std::to_string(StableId(isolineEntity)) + ":isoline:curvature");
+    EXPECT_NE(world.Visualization.Isolines.front().ScalarBufferBDA, 0u);
     EXPECT_EQ(world.Visualization.Isolines.front().IsoValueCount, 3u);
     EXPECT_FLOAT_EQ(world.Visualization.Isolines.front().RangeMin, -1.0f);
     EXPECT_FLOAT_EQ(world.Visualization.Isolines.front().RangeMax, 2.0f);
@@ -678,6 +739,8 @@ TEST(RuntimeRenderExtraction, VisualizationNonScalarAdapterBindingsReachRenderWo
     EXPECT_EQ(world.Visualization.Diagnostics.InputPacketCount, 5u);
     EXPECT_EQ(world.Visualization.Diagnostics.AcceptedPacketCount, 5u);
     EXPECT_EQ(world.Visualization.Diagnostics.TextureResidencyDeferredCount, 2u);
+    EXPECT_EQ(world.Visualization.PropertyBufferDiagnostics.InputBufferCount, 1u);
+    EXPECT_EQ(world.Visualization.PropertyBufferDiagnostics.UploadedBufferCount, 1u);
     EXPECT_FALSE(world.Visualization.Diagnostics.HasErrors);
     EXPECT_EQ(world.Visualization.OverlaySummary.VectorFieldCount, 1u);
     EXPECT_EQ(world.Visualization.OverlaySummary.VectorGlyphCount, 3u);

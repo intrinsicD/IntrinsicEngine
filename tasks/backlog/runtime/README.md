@@ -37,9 +37,10 @@ Some rendering backlog tasks are runtime-owned for extraction/wiring even
 though they may be filed under another task queue. Runtime reviewers must treat
 these as runtime work when scheduling and review:
 
-- [GRAPHICS-084 — Visualization property-buffer residency](../rendering/GRAPHICS-084-visualization-property-buffer-residency.md):
-  consumes runtime visualization adapter/property selections but keeps GPU
-  upload ownership in graphics.
+- No open runtime-owned rendering tasks are currently queued here. `GRAPHICS-084`
+  retired the runtime-adapter/property-selection side of visualization
+  property-buffer residency; `GRAPHICS-084C` owns only opt-in Vulkan smoke
+  evidence.
 
 ## Related docs
 
@@ -52,6 +53,9 @@ these as runtime work when scheduling and review:
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [GRAPHICS-084 — Visualization property-buffer residency](../../done/GRAPHICS-084-visualization-property-buffer-residency.md)
+  (done, 2026-06-11, `CPUContracted`): consumed runtime visualization adapter/
+  property selections while keeping GPU upload ownership in graphics.
 - [RORG-031C — Runtime composition backlog seed](../../done/RORG-031C-runtime-composition.md)
   (done, 2026-06-10): composition-root and lifecycle backlog work for
   `begin_frame`, extraction, prepare, execute, end, shutdown determinism, and

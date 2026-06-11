@@ -2,12 +2,15 @@ module;
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
+#include <cstring>
 #include <cstdint>
 #include <limits>
 #include <span>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include <glm/glm.hpp>
 
@@ -55,6 +58,56 @@ namespace Extrinsic::Runtime
 
             out = converted;
             return true;
+        }
+
+        template <typename T>
+        [[nodiscard]] std::vector<std::byte> CopyBytes(
+            const std::span<const T> values)
+        {
+            std::vector<std::byte> bytes(values.size_bytes());
+            if (!values.empty())
+            {
+                std::memcpy(bytes.data(), values.data(), values.size_bytes());
+            }
+            return bytes;
+        }
+
+        void AppendPropertyBuffer(
+            VisualizationAdapterBatch& out,
+            const std::string& sourceKey,
+            const Graphics::VisualizationAttributeDomain domain,
+            const Graphics::VisualizationValueType valueType,
+            const std::uint32_t elementCount,
+            const std::uint32_t strideBytes,
+            const std::uint64_t dirtyStamp,
+            std::vector<std::byte> payload)
+        {
+            out.PropertyBufferPayloads.push_back(std::move(payload));
+            const std::vector<std::byte>& stored =
+                out.PropertyBufferPayloads.back();
+            out.PropertyBuffers.push_back(
+                Graphics::VisualizationPropertyBufferUploadDescriptor{
+                    .SourceKey = sourceKey,
+                    .Domain = domain,
+                    .ValueType = valueType,
+                    .ElementCount = elementCount,
+                    .StrideBytes = strideBytes,
+                    .DirtyStamp = dirtyStamp,
+                    .Bytes = std::span<const std::byte>{stored.data(), stored.size()},
+                });
+        }
+
+        template <typename T>
+        [[nodiscard]] std::vector<std::byte> CopyScalarFloats(
+            const std::span<const T> values)
+        {
+            std::vector<float> converted;
+            converted.reserve(values.size());
+            for (const T value : values)
+            {
+                converted.push_back(static_cast<float>(value));
+            }
+            return CopyBytes(std::span<const float>{converted.data(), converted.size()});
         }
 
         template <typename T>
@@ -142,10 +195,38 @@ namespace Extrinsic::Runtime
                     ++stats.InvalidRangeCount;
                     return false;
                 }
+                for (const T value : values)
+                {
+                    float converted = 0.0f;
+                    if (!ToFiniteFloat(value, converted))
+                    {
+                        ++stats.NonFiniteValueCount;
+                        return false;
+                    }
+                }
+            }
+
+            const std::string sourceKey =
+                options.OutputName.empty() ? options.SourceName : options.OutputName;
+            const std::string bufferSourceKey =
+                options.PropertyBufferSourceKey.empty()
+                    ? sourceKey
+                    : options.PropertyBufferSourceKey;
+            if (options.BufferBDA == 0u)
+            {
+                AppendPropertyBuffer(out,
+                                     bufferSourceKey,
+                                     options.Domain,
+                                     Graphics::VisualizationValueType::ScalarFloat,
+                                     static_cast<std::uint32_t>(values.size()),
+                                     sizeof(float),
+                                     options.DirtyStamp,
+                                     CopyScalarFloats(values));
             }
 
             out.Scalars.push_back(Graphics::ScalarAttributePacket{
-                .Name = options.OutputName.empty() ? options.SourceName : options.OutputName,
+                .Name = sourceKey,
+                .SourceBufferKey = bufferSourceKey,
                 .Domain = options.Domain,
                 .ElementCount = static_cast<std::uint32_t>(values.size()),
                 .RangeMin = minValue,
@@ -218,14 +299,27 @@ namespace Extrinsic::Runtime
             if (!ValidateSourceSpan(values, stats))
                 return false;
 
+            const std::string sourceKey =
+                options.OutputName.empty() ? options.SourceName : options.OutputName;
+            const std::string bufferSourceKey =
+                options.PropertyBufferSourceKey.empty()
+                    ? sourceKey
+                    : options.PropertyBufferSourceKey;
             if (options.ColorBufferBDA == 0u)
             {
-                ++stats.InvalidBufferCount;
-                return false;
+                AppendPropertyBuffer(out,
+                                     bufferSourceKey,
+                                     options.Domain,
+                                     Graphics::VisualizationValueType::RgbaFloat4,
+                                     static_cast<std::uint32_t>(values.size()),
+                                     sizeof(glm::vec4),
+                                     options.DirtyStamp,
+                                     CopyBytes(values));
             }
 
             out.Colors.push_back(Graphics::ColorAttributePacket{
-                .Name = options.OutputName.empty() ? options.SourceName : options.OutputName,
+                .Name = sourceKey,
+                .SourceBufferKey = bufferSourceKey,
                 .Domain = options.Domain,
                 .ElementCount = static_cast<std::uint32_t>(values.size()),
                 .ColorBufferBDA = options.ColorBufferBDA,
@@ -266,12 +360,34 @@ namespace Extrinsic::Runtime
                     ++stats.InvalidRangeCount;
                     return false;
                 }
+                if (!ValidateFiniteScalarSource(values, stats))
+                    return false;
+            }
+
+            const std::string sourceKey =
+                options.OutputName.empty() ? options.SourceName : options.OutputName;
+            const std::string bufferSourceKey =
+                options.PropertyBufferSourceKey.empty()
+                    ? sourceKey
+                    : options.PropertyBufferSourceKey;
+            if (options.BufferBDA == 0u)
+            {
+                AppendPropertyBuffer(out,
+                                     bufferSourceKey,
+                                     options.Domain,
+                                     Graphics::VisualizationValueType::ScalarFloat,
+                                     static_cast<std::uint32_t>(values.size()),
+                                     sizeof(float),
+                                     options.DirtyStamp,
+                                     CopyScalarFloats(values));
             }
 
             out.Isolines.push_back(Graphics::IsolineOverlayPacket{
-                .SourceScalarName = options.OutputName.empty() ? options.SourceName : options.OutputName,
+                .SourceScalarName = sourceKey,
+                .ScalarBufferSourceKey = bufferSourceKey,
                 .Domain = options.Domain,
                 .IsoValueCount = options.IsoValueCount,
+                .ScalarBufferBDA = options.BufferBDA,
                 .RangeMin = minValue,
                 .RangeMax = maxValue,
                 .LineWidth = options.LineWidth,
@@ -291,7 +407,8 @@ namespace Extrinsic::Runtime
             if (!ValidateSourceSpan(values, stats))
                 return false;
 
-            if (options.PositionBufferBDA == 0u || options.VectorBufferBDA == 0u)
+            if (options.PositionBufferBDA == 0u &&
+                options.PositionBufferSourceKey.empty())
             {
                 ++stats.InvalidBufferCount;
                 return false;
@@ -303,8 +420,30 @@ namespace Extrinsic::Runtime
                 return false;
             }
 
+            const std::string sourceKey =
+                options.OutputName.empty() ? options.SourceName : options.OutputName;
+            const std::string vectorSourceKey =
+                options.VectorBufferSourceKey.empty()
+                    ? (options.PropertyBufferSourceKey.empty()
+                           ? sourceKey
+                           : options.PropertyBufferSourceKey)
+                    : options.VectorBufferSourceKey;
+            if (options.VectorBufferBDA == 0u)
+            {
+                AppendPropertyBuffer(out,
+                                     vectorSourceKey,
+                                     options.Domain,
+                                     Graphics::VisualizationValueType::VectorFloat3,
+                                     static_cast<std::uint32_t>(values.size()),
+                                     sizeof(glm::vec3),
+                                     options.DirtyStamp,
+                                     CopyBytes(values));
+            }
+
             out.VectorFields.push_back(Graphics::VectorFieldOverlayPacket{
-                .Name = options.OutputName.empty() ? options.SourceName : options.OutputName,
+                .Name = sourceKey,
+                .PositionBufferSourceKey = options.PositionBufferSourceKey,
+                .VectorBufferSourceKey = vectorSourceKey,
                 .Domain = options.Domain,
                 .ElementCount = static_cast<std::uint32_t>(values.size()),
                 .PositionBufferBDA = options.PositionBufferBDA,
@@ -375,6 +514,8 @@ namespace Extrinsic::Runtime
 
     void VisualizationAdapterBatch::Clear() noexcept
     {
+        PropertyBuffers.clear();
+        PropertyBufferPayloads.clear();
         AttributeBuffers.clear();
         Scalars.clear();
         Colors.clear();
@@ -389,6 +530,7 @@ namespace Extrinsic::Runtime
         const Graphics::VisualizationAttributeDomain expectedDomain) const noexcept
     {
         return Graphics::VisualizationPacketBatch{
+            .PropertyBuffers = PropertyBuffers,
             .AttributeBuffers = AttributeBuffers,
             .Scalars = Scalars,
             .Colors = Colors,
@@ -416,11 +558,6 @@ namespace Extrinsic::Runtime
         if (options.SourceName.empty())
         {
             ++stats.MissingSourceCount;
-            return;
-        }
-        if (options.BufferBDA == 0u)
-        {
-            ++stats.InvalidBufferCount;
             return;
         }
 

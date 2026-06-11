@@ -15,7 +15,7 @@ Root scanned: `src`
 | `geometry` | 85 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
-| `graphics/renderer` | 61 |
+| `graphics/renderer` | 62 |
 | `graphics/rhi` | 19 |
 | `graphics/vulkan` | 13 |
 | `legacy` | 181 |
@@ -237,6 +237,7 @@ Root scanned: `src`
 | `Extrinsic.Graphics.TransientDebugUploadHelper` | `src/graphics/renderer/Graphics.TransientDebugUploadHelper.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.VisualizationOverlayUploadHelper` | `src/graphics/renderer/Graphics.VisualizationOverlayUploadHelper.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.VisualizationPackets` | `src/graphics/renderer/Graphics.VisualizationPackets.cppm` | `graphics/renderer` |
+| `Extrinsic.Graphics.VisualizationPropertyBufferResidency` | `src/graphics/renderer/Graphics.VisualizationPropertyBufferResidency.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.VisualizationSyncSystem` | `src/graphics/renderer/Graphics.VisualizationSyncSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Pass.Culling` | `src/graphics/renderer/Passes/Pass.Culling.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Pass.DebugView` | `src/graphics/renderer/Passes/Pass.DebugView.cppm` | `graphics/renderer` |
@@ -509,4 +510,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugAdapters` | `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **481**
+Total modules: **482**
