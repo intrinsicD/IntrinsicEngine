@@ -445,6 +445,15 @@ namespace Extrinsic::Runtime
         return ImGui::GetIO().WantCaptureMouse;
     }
 
+    bool ImGuiAdapter::WantsKeyboardCapture() const noexcept
+    {
+        if (m_Context == nullptr)
+            return false;
+
+        ImGui::SetCurrentContext(m_Context);
+        return ImGui::GetIO().WantCaptureKeyboard;
+    }
+
     const char* ImGuiAdapter::ClipboardGet(ImGuiContext* /*ctx*/)
     {
         auto* self = static_cast<ImGuiAdapter*>(ImGui::GetPlatformIO().Platform_ClipboardUserData);

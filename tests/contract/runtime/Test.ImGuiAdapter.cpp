@@ -315,6 +315,26 @@ TEST(ImGuiAdapter, PumpsInputAndResizeReportsFramebufferPixelsWithoutDoubleScali
     }
 }
 
+TEST(ImGuiAdapter, ExposesMouseAndKeyboardCaptureRequests)
+{
+    FakeWindow         window(400, 300);
+    ImGuiOverlaySystem overlay;
+    ImGuiAdapter       adapter(window, overlay);
+
+    ASSERT_TRUE(adapter.Initialize());
+    EXPECT_FALSE(adapter.WantsMouseCapture());
+    EXPECT_FALSE(adapter.WantsKeyboardCapture());
+
+    ImGui::SetNextFrameWantCaptureMouse(true);
+    ImGui::SetNextFrameWantCaptureKeyboard(true);
+
+    adapter.BeginFrame(kFrameDelta);
+    adapter.EndFrame();
+
+    EXPECT_TRUE(adapter.WantsMouseCapture());
+    EXPECT_TRUE(adapter.WantsKeyboardCapture());
+}
+
 // --- DPI / font rebuild -------------------------------------------------------
 
 TEST(ImGuiAdapter, RebuildForDisplayChangeCyclesOverlayExactlyOnce)

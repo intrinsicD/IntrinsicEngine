@@ -89,6 +89,7 @@ export namespace Extrinsic::Runtime
 
         [[nodiscard]] bool IsInitialized() const noexcept { return m_Context != nullptr; }
         [[nodiscard]] bool WantsMouseCapture() const noexcept;
+        [[nodiscard]] bool WantsKeyboardCapture() const noexcept;
         [[nodiscard]] const ImGuiAdapterDiagnostics& GetDiagnostics() const noexcept { return m_Diagnostics; }
 
     private:

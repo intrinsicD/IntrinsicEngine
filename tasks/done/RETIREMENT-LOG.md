@@ -8,6 +8,19 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+Active
+[`BUG-036`](BUG-036-ui-input-capture-leak.md) — UI-captured input leaks into
+engine controls — retired on 2026-06-12 at maturity `CPUContracted`. Dear
+ImGui capture state is now surfaced through `ImGuiAdapter` for both mouse and
+keyboard input, and `Engine::RunFrame()` samples that state once after the UI
+frame before routing runtime input consumers. Mouse capture continues to block
+viewport-selection picks, while mouse or keyboard capture suppresses camera
+controller updates and transform-gizmo input for the frame without mutating the
+platform raw input context. Focused contract coverage red-gated the leak by
+forcing Dear ImGui capture while raw `W`, Shift, and mouse input were present;
+the fixed path leaves runtime camera, gizmo, and selection consumers idle under
+UI capture and keeps existing behavior when the UI does not capture input.
+
 Backlog
 [`RUNTIME-106`](RUNTIME-106-render-component-domain-composition.md) — Render
 component domain composition — retired on 2026-06-12 at maturity

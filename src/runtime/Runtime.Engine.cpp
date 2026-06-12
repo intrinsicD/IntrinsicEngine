@@ -1004,8 +1004,17 @@ namespace Extrinsic::Runtime
             const Graphics::CameraViewInput& cameraInput,
             const Core::Extent2D windowExtent,
             const Core::Extent2D viewport,
+            const bool imguiCapturesInput,
             std::span<const ECS::EntityHandle> selected)
         {
+            if (imguiCapturesInput)
+            {
+                gizmo.SetModifierMask(0u);
+                if (gizmo.IsDragging())
+                    gizmo.DragCancel(scene);
+                return;
+            }
+
             gizmo.SetModifierMask(BuildGizmoModifierMask(input));
             if (Core::IsEmpty(viewport))
             {
@@ -1756,6 +1765,12 @@ namespace Extrinsic::Runtime
         if (m_ImGuiAdapter)
             m_ImGuiAdapter->EndFrame();
 
+        const bool imguiCapturesMouse =
+            m_ImGuiAdapter != nullptr && m_ImGuiAdapter->WantsMouseCapture();
+        const bool imguiCapturesKeyboard =
+            m_ImGuiAdapter != nullptr && m_ImGuiAdapter->WantsKeyboardCapture();
+        const bool imguiCapturesInput = imguiCapturesMouse || imguiCapturesKeyboard;
+
         // ── Phase 4: Build render snapshot ────────────────────────────────
         const Platform::Extent2D viewport = m_Window->GetFramebufferExtent();
         frameContext.RenderInput = Graphics::RenderFrameInput{
@@ -1781,7 +1796,8 @@ namespace Extrinsic::Runtime
             if (controller != nullptr)
             {
                 const Platform::IWindow& window = *m_Window;
-                controller->Update(window.GetInput(), frameDt);
+                if (!imguiCapturesInput)
+                    controller->Update(window.GetInput(), frameDt);
                 renderInput.Camera = controller->GetView(viewport);
                 renderInput.Camera.ExplicitCameraTransition =
                     m_CameraControllers.ConsumeCameraTransition(CameraControllerSlot::Main);
@@ -1798,12 +1814,13 @@ namespace Extrinsic::Runtime
                                       renderInput.Camera,
                                       windowExtent,
                                       viewport,
+                                      imguiCapturesInput,
                                       m_GizmoSelectedEntities);
         SubmitViewportSelectionClickForFrame(m_SelectionController,
                                              inputWindow.GetInput(),
                                              windowExtent,
                                              viewport,
-                                             m_ImGuiAdapter != nullptr && m_ImGuiAdapter->WantsMouseCapture(),
+                                             imguiCapturesMouse,
                                              m_GizmoInteraction.IsDragging());
 
         // ── BUG-024: pre-render transform flush ───────────────────────────

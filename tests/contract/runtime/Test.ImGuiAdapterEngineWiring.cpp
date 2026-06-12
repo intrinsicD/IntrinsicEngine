@@ -22,15 +22,27 @@
 #include <string>
 
 #include <gtest/gtest.h>
+#include <glm/glm.hpp>
 #include <imgui.h>
 
 import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Geometry2D;
+import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.Renderer;
+import Extrinsic.Platform.Input;
 import Extrinsic.Platform.Window;
+import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.Runtime.ImGuiAdapter;
+import Extrinsic.Runtime.SelectionController;
 
 using Extrinsic::Runtime::Engine;
+
+namespace Core = Extrinsic::Core;
+namespace Graphics = Extrinsic::Graphics;
+namespace Platform = Extrinsic::Platform;
+namespace Runtime = Extrinsic::Runtime;
 
 namespace
 {
@@ -62,6 +74,84 @@ namespace
         std::uint32_t m_VariableTicks{0u};
     };
 
+    class RecordingCameraController final : public Runtime::ICameraController
+    {
+    public:
+        void Seed(const Graphics::CameraViewInput& seed) noexcept override
+        {
+            if (seed.Valid)
+                m_View = seed;
+        }
+
+        void Focus(Runtime::CameraFocusTarget target) noexcept override
+        {
+            m_View.Position = target.Center + glm::vec3{0.0f, 0.0f, 3.0f};
+        }
+
+        void Update(const Platform::Input::Context& input,
+                    double /*deltaSeconds*/) noexcept override
+        {
+            ++Updates;
+            if (input.IsKeyPressed(Platform::Input::Key::W))
+                ++KeyboardUpdates;
+            if (input.IsMouseButtonJustPressed(0))
+                ++MouseClickUpdates;
+        }
+
+        [[nodiscard]] Graphics::CameraViewInput GetView(Core::Extent2D /*viewport*/)
+            const noexcept override
+        {
+            return m_View;
+        }
+
+        [[nodiscard]] Core::Config::CameraControllerKind Kind() const noexcept override
+        {
+            return Core::Config::CameraControllerKind::Fly;
+        }
+
+        std::uint32_t Updates{0u};
+        std::uint32_t KeyboardUpdates{0u};
+        std::uint32_t MouseClickUpdates{0u};
+
+    private:
+        Graphics::CameraViewInput m_View{Runtime::DefaultCameraControllerSeed()};
+    };
+
+    class UiCapturedInputApplication final : public Runtime::IApplication
+    {
+    public:
+        void OnInitialize(Engine& engine) override
+        {
+            auto controller = std::make_unique<RecordingCameraController>();
+            Controller = controller.get();
+            engine.GetCameraControllerRegistry().Register(Runtime::CameraControllerSlot::Main,
+                                                          std::move(controller));
+        }
+
+        void OnSimTick(Engine& /*engine*/, double /*fixedDt*/) override {}
+
+        void OnVariableTick(Engine& engine, double /*alpha*/, double /*dt*/) override
+        {
+            ++VariableTicks;
+            if (VariableTicks == 2u)
+            {
+                const auto& window = engine.GetWindow();
+                auto& input = const_cast<Platform::Input::Context&>(
+                    window.GetInput());
+                input.SetKeyState(Platform::Input::Key::W, true);
+                input.SetKeyState(Platform::Input::Key::LeftShift, true);
+                input.SetMousePosition(32.0f, 48.0f);
+                input.SetMouseButtonState(0, true);
+                engine.RequestExit();
+            }
+        }
+
+        void OnShutdown(Engine& /*engine*/) override {}
+
+        RecordingCameraController* Controller{nullptr};
+        std::uint32_t              VariableTicks{0u};
+    };
+
     // Camera and reference scene are disabled so the bounded run exercises the
     // minimal frame path (no controller creation, no scene population). The
     // default 1920x1080 window is never minimized, so under a live window every
@@ -71,6 +161,14 @@ namespace
         Extrinsic::Core::Config::EngineConfig config{};
         config.ReferenceScene.Enabled = false;
         config.Camera.Enabled         = false;
+        return config;
+    }
+
+    [[nodiscard]] Extrinsic::Core::Config::EngineConfig InputRoutingConfig()
+    {
+        Extrinsic::Core::Config::EngineConfig config{};
+        config.ReferenceScene.Enabled = false;
+        config.Camera.Enabled = true;
         return config;
     }
 
@@ -180,6 +278,53 @@ TEST(ImGuiAdapterEngineWiring, EditorHookInvokedOncePerFrameAndProducesDrawLists
     ASSERT_NE(imguiPass, nullptr);
     EXPECT_EQ(imguiPass->Status,
               Extrinsic::Graphics::RenderCommandPassStatus::SkippedNonOperational);
+
+    engine.Shutdown();
+}
+
+TEST(ImGuiAdapterEngineWiring, UiCaptureSuppressesRuntimeInputConsumers)
+{
+    auto app = std::make_unique<UiCapturedInputApplication>();
+    auto* appPtr = app.get();
+    Engine engine(InputRoutingConfig(), std::move(app));
+    engine.Initialize();
+
+    std::uint32_t editorFrames = 0u;
+    engine.SetImGuiEditorCallback(
+        [&editorFrames]
+        {
+            ++editorFrames;
+            if (editorFrames == 1u)
+            {
+                ImGui::SetNextFrameWantCaptureMouse(true);
+                ImGui::SetNextFrameWantCaptureKeyboard(true);
+            }
+        });
+
+    if (engine.GetWindow().ShouldClose())
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "window backend unavailable; input-routing coverage requires a live window";
+    }
+
+    engine.Run();
+
+    ASSERT_NE(appPtr->Controller, nullptr);
+    EXPECT_EQ(appPtr->VariableTicks, 2u);
+    EXPECT_EQ(editorFrames, 2u);
+    EXPECT_TRUE(engine.GetImGuiAdapter().WantsMouseCapture());
+    EXPECT_TRUE(engine.GetImGuiAdapter().WantsKeyboardCapture());
+
+    EXPECT_EQ(appPtr->Controller->Updates, 1u);
+    EXPECT_EQ(appPtr->Controller->KeyboardUpdates, 0u);
+    EXPECT_EQ(appPtr->Controller->MouseClickUpdates, 0u);
+
+    const auto selectionDiagnostics =
+        engine.GetSelectionController().GetDiagnostics();
+    EXPECT_EQ(selectionDiagnostics.ClickRequestsSubmitted, 0u);
+    EXPECT_EQ(selectionDiagnostics.PicksDrained, 0u);
+    EXPECT_EQ(engine.GetSelectionController().InFlightPickCount(), 0u);
+    EXPECT_EQ(engine.GetGizmoInteraction().ModifierMask(), 0u);
 
     engine.Shutdown();
 }
