@@ -11,6 +11,8 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Verified / Closed
 
+- Closed 2026-06-12: [`BUG-039` — Orbit camera rotation lock](../../done/BUG-039-orbit-camera-rotation-lock.md). Promoted orbit now matches the legacy trackball model: seed forward/up become accumulated orientation state, drag deltas rotate around the current camera-local up/right axes, view up is no longer fixed world-up, and the focused regression proves a vertical drag can cross the pitch pole and invert camera up while existing orbit/focus/controller coverage still passes.
+
 - Closed 2026-06-12: [`BUG-038` — Dropped file imports fail silently in the sandbox](../../done/BUG-038-sandbox-dropped-file-diagnostics.md). Runtime now logs file-drop receipt, per-path routing/queue decisions, and shared import completion. Focused contract coverage pins a missing OBJ drop producing receipt/queue/failure logs plus a failed `RuntimeAssetImportEvent`, while existing drop/import coverage keeps valid OBJ/OFF/materialization paths covered.
 
 - Closed 2026-06-12: [`BUG-035` — Vulkan slot-recycling smoke](../../done/BUG-035-vulkan-slot-recycling-smoke.md). Added an opt-in `gpu;vulkan` smoke that destroys buffer/texture resources, advances the real promoted Vulkan frame loop past the retirement window, and observes the destroyed slots return through public handle reuse with bumped generations. This upgrades BUG-034's Vulkan proof to `Operational`.

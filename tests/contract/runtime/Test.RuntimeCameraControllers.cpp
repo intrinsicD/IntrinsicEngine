@@ -128,6 +128,25 @@ TEST(RuntimeCameraControllers, OrbitAlsoRotatesWithMiddleMouseDrag)
     ExpectValidCameraView(controller.GetView(Core::Extent2D{1280, 720}));
 }
 
+TEST(RuntimeCameraControllers, OrbitDragCanCrossPitchPoleAndInvertUpVector)
+{
+    Runtime::OrbitCameraController controller{MakeSeed()};
+    Platform::Input::Context input{};
+    input.SetMouseButtonState(1, true);
+    input.SetMousePosition(0.0f, 0.0f);
+    controller.Update(input, 1.0 / 60.0);
+
+    input.SetMousePosition(0.0f, -600.0f);
+    controller.Update(input, 1.0 / 60.0);
+
+    const Graphics::CameraViewInput view = controller.GetView(Core::Extent2D{1280, 720});
+    EXPECT_GT(view.Forward.z, 0.25f)
+        << "Legacy orbit trackball continues through the pitch pole instead of clamping.";
+    EXPECT_LT(view.Up.y, -0.25f)
+        << "Legacy orbit trackball carries accumulated orientation and can invert camera up.";
+    ExpectWorldPointCentered(view, glm::vec3{0.0f, 0.0f, 0.0f});
+}
+
 TEST(RuntimeCameraControllers, FlyMovementScalesWithDeltaTime)
 {
     Runtime::FlyCameraController singleStep{MakeSeed()};

@@ -5,6 +5,7 @@ module;
 #include <vector>
 
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 export module Extrinsic.Runtime.CameraControllers;
 
@@ -64,8 +65,8 @@ namespace Extrinsic::Runtime
         float m_Radius{5.0f};
         float m_MinRadius{0.1f};
         float m_MaxRadius{500.0f};
+        glm::quat m_Orientation{1.0f, 0.0f, 0.0f, 0.0f};
         float m_Yaw{0.0f};
-        float m_Pitch{0.0f};
         float m_NearPlane{0.1f};
         float m_FarPlane{1000.0f};
         float m_RotateSensitivityDegrees{0.2f};

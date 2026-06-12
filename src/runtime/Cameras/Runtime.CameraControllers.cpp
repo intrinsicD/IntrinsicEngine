@@ -11,6 +11,7 @@ module;
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 module Extrinsic.Runtime.CameraControllers;
 
@@ -92,6 +93,15 @@ namespace Extrinsic::Runtime
             return value / len;
         }
 
+        [[nodiscard]] glm::quat SafeNormalized(const glm::quat value,
+                                               const glm::quat fallback) noexcept
+        {
+            const float len = glm::length(value);
+            if (!std::isfinite(len) || len <= 0.000001f)
+                return fallback;
+            return glm::normalize(value);
+        }
+
         [[nodiscard]] float SafeFocusRadius(const CameraFocusTarget target) noexcept
         {
             if (!std::isfinite(target.Radius) || target.Radius <= 0.0f)
@@ -144,6 +154,54 @@ namespace Extrinsic::Runtime
             return std::clamp(std::asin(std::clamp(f.y, -1.0f, 1.0f)), kMinPitchRadians, kMaxPitchRadians);
         }
 
+        [[nodiscard]] glm::vec3 NonParallelUpForForward(const glm::vec3 forward) noexcept
+        {
+            constexpr glm::vec3 kWorldUp{0.0f, 1.0f, 0.0f};
+            if (std::abs(glm::dot(forward, kWorldUp)) < 0.95f)
+                return kWorldUp;
+            return {1.0f, 0.0f, 0.0f};
+        }
+
+        [[nodiscard]] glm::quat OrientationFromForwardUp(const glm::vec3 forward,
+                                                         const glm::vec3 up) noexcept
+        {
+            const glm::vec3 f = SafeNormalized(forward, {0.0f, 0.0f, -1.0f});
+            glm::vec3 upCandidate = SafeNormalized(up, NonParallelUpForForward(f));
+            glm::vec3 right = glm::cross(f, upCandidate);
+            if (!IsFinite(right) || glm::length(right) <= 0.000001f)
+            {
+                upCandidate = NonParallelUpForForward(f);
+                right = glm::cross(f, upCandidate);
+            }
+
+            right = SafeNormalized(right, {1.0f, 0.0f, 0.0f});
+            const glm::vec3 correctedUp = SafeNormalized(glm::cross(right, f), NonParallelUpForForward(f));
+
+            glm::mat3 basis{1.0f};
+            basis[0] = right;
+            basis[1] = correctedUp;
+            basis[2] = -f;
+            return SafeNormalized(glm::quat_cast(basis), glm::quat{1.0f, 0.0f, 0.0f, 0.0f});
+        }
+
+        [[nodiscard]] glm::vec3 ForwardFromOrientation(const glm::quat orientation) noexcept
+        {
+            return SafeNormalized(orientation * glm::vec3{0.0f, 0.0f, -1.0f},
+                                  {0.0f, 0.0f, -1.0f});
+        }
+
+        [[nodiscard]] glm::vec3 RightFromOrientation(const glm::quat orientation) noexcept
+        {
+            return SafeNormalized(orientation * glm::vec3{1.0f, 0.0f, 0.0f},
+                                  {1.0f, 0.0f, 0.0f});
+        }
+
+        [[nodiscard]] glm::vec3 UpFromOrientation(const glm::quat orientation) noexcept
+        {
+            return SafeNormalized(orientation * glm::vec3{0.0f, 1.0f, 0.0f},
+                                  {0.0f, 1.0f, 0.0f});
+        }
+
         [[nodiscard]] glm::vec3 RightFromForward(const glm::vec3 forward) noexcept
         {
             return SafeNormalized(glm::cross(forward, glm::vec3{0.0f, 1.0f, 0.0f}), {1.0f, 0.0f, 0.0f});
@@ -187,8 +245,8 @@ namespace Extrinsic::Runtime
         const float seedDistance = glm::length(safeSeed.Position);
         m_Radius = std::clamp(seedDistance > m_MinRadius ? seedDistance : m_Radius, m_MinRadius, m_MaxRadius);
         m_Target = safeSeed.Position + forward * m_Radius;
-        m_Yaw = Detail::YawFromForward(forward);
-        m_Pitch = Detail::PitchFromForward(forward);
+        m_Orientation = Detail::OrientationFromForwardUp(forward, safeSeed.Up);
+        m_Yaw = Detail::YawFromForward(Detail::ForwardFromOrientation(m_Orientation));
         m_NearPlane = safeSeed.NearPlane > 0.0f ? safeSeed.NearPlane : Detail::kDefaultNearPlane;
         m_FarPlane = safeSeed.FarPlane > m_NearPlane ? safeSeed.FarPlane : Detail::kDefaultFarPlane;
         m_FirstMouse = true;
@@ -226,8 +284,13 @@ namespace Extrinsic::Runtime
 
             const float xDelta = (pos.x - m_LastX) * m_RotateSensitivityDegrees;
             const float yDelta = (pos.y - m_LastY) * m_RotateSensitivityDegrees;
-            m_Yaw = Detail::WrapRadians(m_Yaw - glm::radians(xDelta));
-            m_Pitch = std::clamp(m_Pitch - glm::radians(yDelta), Detail::kMinPitchRadians, Detail::kMaxPitchRadians);
+            const glm::vec3 right = Detail::RightFromOrientation(m_Orientation);
+            const glm::vec3 up = Detail::UpFromOrientation(m_Orientation);
+            const glm::quat yawRotation = glm::angleAxis(glm::radians(-xDelta), up);
+            const glm::quat pitchRotation = glm::angleAxis(glm::radians(-yDelta), right);
+            m_Orientation = Detail::SafeNormalized(yawRotation * pitchRotation * m_Orientation,
+                                                   m_Orientation);
+            m_Yaw = Detail::YawFromForward(Detail::ForwardFromOrientation(m_Orientation));
             m_LastX = pos.x;
             m_LastY = pos.y;
         }
@@ -247,11 +310,16 @@ namespace Extrinsic::Runtime
         if (input.IsKeyPressed(Platform::Input::Key::LeftShift))
             velocity *= 2.5f;
 
-        const glm::vec3 forward = Detail::ForwardFromYawPitch(m_Yaw, m_Pitch);
+        const glm::vec3 forward = Detail::ForwardFromOrientation(m_Orientation);
+        const glm::vec3 up = Detail::UpFromOrientation(m_Orientation);
         glm::vec3 horizontalForward{forward.x, 0.0f, forward.z};
+        if (glm::length(horizontalForward) < 0.001f)
+            horizontalForward = {up.x, 0.0f, up.z};
         horizontalForward = Detail::SafeNormalized(horizontalForward, {0.0f, 0.0f, -1.0f});
-        glm::vec3 horizontalRight = Detail::SafeNormalized(glm::cross(horizontalForward, glm::vec3{0.0f, 1.0f, 0.0f}),
-                                                           {1.0f, 0.0f, 0.0f});
+
+        const glm::vec3 right = Detail::RightFromOrientation(m_Orientation);
+        glm::vec3 horizontalRight{right.x, 0.0f, right.z};
+        horizontalRight = Detail::SafeNormalized(horizontalRight, {1.0f, 0.0f, 0.0f});
 
         glm::vec3 pan{0.0f};
         if (input.IsKeyPressed(Platform::Input::Key::W)) pan += horizontalForward * velocity;
@@ -263,12 +331,13 @@ namespace Extrinsic::Runtime
 
     Graphics::CameraViewInput OrbitCameraController::GetView(const Core::Extent2D viewport) const noexcept
     {
-        const glm::vec3 forward = Detail::ForwardFromYawPitch(m_Yaw, m_Pitch);
+        const glm::vec3 forward = Detail::ForwardFromOrientation(m_Orientation);
+        const glm::vec3 up = Detail::UpFromOrientation(m_Orientation);
         const glm::vec3 position = m_Target - forward * m_Radius;
         Graphics::CameraViewInput view{};
         view.Position = position;
         view.Forward = forward;
-        view.Up = {0.0f, 1.0f, 0.0f};
+        view.Up = up;
         view.NearPlane = m_NearPlane;
         view.FarPlane = m_FarPlane;
         view.View = glm::lookAt(position, position + forward, view.Up);

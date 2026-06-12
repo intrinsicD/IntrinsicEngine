@@ -9,6 +9,19 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`BUG-039`](BUG-039-orbit-camera-rotation-lock.md) — Orbit camera rotation
+lock — retired on 2026-06-12 at maturity `CPUContracted`. The promoted orbit
+controller had reused scalar yaw/pitch state and a fixed world-up view, so a
+large vertical drag clamped at the pitch pole instead of continuing like the
+legacy trackball camera. Orbit now stores accumulated orientation derived from
+the seed forward/up vectors, applies drag deltas as quaternion rotations around
+the current camera-local up/right axes, derives view forward/up from that
+orientation, and keeps existing radius, zoom, focus, yaw diagnostic, and WASD
+panning behavior. The new runtime contract regression red-gated the lock with
+`Forward.z == -0.0174523834` and `Up.y == 1`, then passed after the quaternion
+orbit fix; the full camera-controller suite and default CPU gate passed.
+
+Backlog
 [`BUG-038`](BUG-038-sandbox-dropped-file-diagnostics.md) — Dropped file
 imports fail silently in the sandbox — retired on 2026-06-12 at maturity
 `CPUContracted`. The event path itself was already wired: focused contracts
