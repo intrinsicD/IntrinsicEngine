@@ -1598,6 +1598,9 @@ namespace Extrinsic::Runtime
     {
         while (m_Running && !m_Window->ShouldClose())
             RunFrame();
+
+        if (m_Running && m_Window != nullptr && m_Window->ShouldClose())
+            RequestExit();
     }
 
     void Engine::RunFrame()

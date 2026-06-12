@@ -223,6 +223,11 @@ freshly-constructed subsystems):
 
 ## Canonical frame loop phases (`Engine::RunFrame`)
 
+`Engine::Run()` owns the outer loop state: if the loop exits because
+`IWindow::ShouldClose()` is already true before a frame starts or becomes true
+after a frame, it normalizes that path through `RequestExit()` so
+`Engine::IsRunning()` is false when `Run()` returns.
+
 1. Platform events / resize handling. Minimized windows wait on platform events,
    resample the frame clock, and return before ImGui or render-frame work begins;
    resize requests idle the device, resize device/renderer resources, acknowledge

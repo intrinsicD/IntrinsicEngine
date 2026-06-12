@@ -9,6 +9,19 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`BUG-037`](BUG-037-window-close-stale-run-state.md) — Window close can leave
+runtime running — retired on 2026-06-12 at maturity `CPUContracted`. The
+runtime close path now normalizes native `IWindow::ShouldClose()` exits through
+`Engine::RequestExit()` when `Engine::Run()` leaves its outer loop, closing the
+state gap where a platform/native close flag could end the loop while
+`Engine::IsRunning()` still reported true. `RunFrame()` continues to handle
+close before renderer work when the flag is observed at the platform-frame
+boundary. New runtime/ImGui wiring regressions cover native close before the
+first frame and native close after representative camera/UI/selection input,
+red-gating the stale run-state bug before the fix and passing after the runtime
+state normalization. The default CPU-supported correctness gate passed.
+
+Active
 [`BUG-036`](BUG-036-ui-input-capture-leak.md) — UI-captured input leaks into
 engine controls — retired on 2026-06-12 at maturity `CPUContracted`. Dear
 ImGui capture state is now surfaced through `ImGuiAdapter` for both mouse and

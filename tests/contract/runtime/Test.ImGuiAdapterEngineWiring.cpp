@@ -46,6 +46,18 @@ namespace Runtime = Extrinsic::Runtime;
 
 namespace
 {
+    struct GLFWwindow;
+    extern "C" void glfwSetWindowShouldClose(GLFWwindow*, int) __attribute__((weak));
+
+    [[nodiscard]] bool RequestNativeWindowClose(Platform::IWindow& window)
+    {
+        if (window.GetNativeHandle() == nullptr || glfwSetWindowShouldClose == nullptr)
+            return false;
+
+        glfwSetWindowShouldClose(static_cast<GLFWwindow*>(window.GetNativeHandle()), 1);
+        return true;
+    }
+
     // Stub application that drives a bounded run: it counts variable ticks and
     // calls `Engine::RequestExit()` once `TargetFrames` ticks have run, so
     // `Engine::Run()` executes exactly `TargetFrames` full frames. The editor
@@ -150,6 +162,42 @@ namespace
 
         RecordingCameraController* Controller{nullptr};
         std::uint32_t              VariableTicks{0u};
+    };
+
+    class CloseAfterInteractiveInputApplication final : public Runtime::IApplication
+    {
+    public:
+        void OnInitialize(Engine& engine) override
+        {
+            auto controller = std::make_unique<RecordingCameraController>();
+            Controller = controller.get();
+            engine.GetCameraControllerRegistry().Register(Runtime::CameraControllerSlot::Main,
+                                                          std::move(controller));
+        }
+
+        void OnSimTick(Engine& /*engine*/, double /*fixedDt*/) override {}
+
+        void OnVariableTick(Engine& engine, double /*alpha*/, double /*dt*/) override
+        {
+            ++VariableTicks;
+
+            const auto& window = engine.GetWindow();
+            auto& input = const_cast<Platform::Input::Context&>(window.GetInput());
+            input.SetKeyState(Platform::Input::Key::W, true);
+            input.SetMousePosition(32.0f, 48.0f);
+            input.SetMouseButtonState(0, true);
+            input.SetMouseButtonState(1, true);
+
+            NativeCloseRequested = RequestNativeWindowClose(engine.GetWindow());
+            if (!NativeCloseRequested)
+                engine.RequestExit();
+        }
+
+        void OnShutdown(Engine& /*engine*/) override {}
+
+        RecordingCameraController* Controller{nullptr};
+        std::uint32_t              VariableTicks{0u};
+        bool                       NativeCloseRequested{false};
     };
 
     // Camera and reference scene are disabled so the bounded run exercises the
@@ -325,6 +373,67 @@ TEST(ImGuiAdapterEngineWiring, UiCaptureSuppressesRuntimeInputConsumers)
     EXPECT_EQ(selectionDiagnostics.PicksDrained, 0u);
     EXPECT_EQ(engine.GetSelectionController().InFlightPickCount(), 0u);
     EXPECT_EQ(engine.GetGizmoInteraction().ModifierMask(), 0u);
+
+    engine.Shutdown();
+}
+
+TEST(ImGuiAdapterEngineWiring, RunNormalizesNativeCloseBeforeFirstFrame)
+{
+    auto app = std::make_unique<UiCapturedInputApplication>();
+    auto* appPtr = app.get();
+    Engine engine(InputRoutingConfig(), std::move(app));
+    engine.Initialize();
+
+    if (!RequestNativeWindowClose(engine.GetWindow()))
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "window backend unavailable; native close-state coverage requires a live GLFW window";
+    }
+
+    engine.Run();
+
+    EXPECT_TRUE(engine.GetWindow().ShouldClose());
+    EXPECT_FALSE(engine.IsRunning());
+    EXPECT_EQ(appPtr->VariableTicks, 0u);
+
+    engine.Shutdown();
+}
+
+TEST(ImGuiAdapterEngineWiring, RunNormalizesNativeCloseAfterInteractiveInput)
+{
+    auto app = std::make_unique<CloseAfterInteractiveInputApplication>();
+    auto* appPtr = app.get();
+    Engine engine(InputRoutingConfig(), std::move(app));
+    engine.Initialize();
+
+    std::uint32_t editorFrames = 0u;
+    engine.SetImGuiEditorCallback(
+        [&editorFrames]
+        {
+            ++editorFrames;
+            if (editorFrames == 1u)
+            {
+                ImGui::SetNextFrameWantCaptureMouse(true);
+                ImGui::SetNextFrameWantCaptureKeyboard(true);
+            }
+        });
+
+    if (engine.GetWindow().ShouldClose() ||
+        engine.GetWindow().GetNativeHandle() == nullptr ||
+        glfwSetWindowShouldClose == nullptr)
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "window backend unavailable; native close-state coverage requires a live GLFW window";
+    }
+
+    engine.Run();
+
+    ASSERT_NE(appPtr->Controller, nullptr);
+    EXPECT_EQ(appPtr->VariableTicks, 1u);
+    EXPECT_TRUE(appPtr->NativeCloseRequested);
+    EXPECT_EQ(editorFrames, 1u);
+    EXPECT_TRUE(engine.GetWindow().ShouldClose());
+    EXPECT_FALSE(engine.IsRunning());
 
     engine.Shutdown();
 }
