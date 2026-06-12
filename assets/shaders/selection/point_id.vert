@@ -7,7 +7,7 @@
 //
 // Pairs with `selection/point_id.frag`. Mirrors `selection/entity_id.vert`
 // for the position fetch chain and `assets/shaders/forward/point.vert` for
-// the `gl_PointSize` write. PointIdPass dispatches against the `Points`
+// the `gl_PointSize` write. PointIdPass dispatches against the `SelectionPoints`
 // cull bucket through `DrawIndirectCount` (non-indexed), so this shader
 // sees point-list draws over the managed vertex stream. The fragment
 // shader writes `EncodeSelectionId(Point, pointIndex)` where `pointIndex`

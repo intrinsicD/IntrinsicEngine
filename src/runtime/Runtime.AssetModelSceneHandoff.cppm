@@ -26,7 +26,14 @@ export namespace Extrinsic::Runtime
     {
         AssetModelTextureHandoffOptions TextureOptions{};
         bool RequestEmbeddedTextureUploads{true};
+        bool RequestGeneratedTextureUploads{true};
         bool ResolveMaterialTextureBindings{true};
+        bool GenerateMissingNormalTextures{true};
+        bool GenerateMissingAlbedoTextures{true};
+        std::string GeneratedNormalPropertyName{"v:normal"};
+        std::string GeneratedAlbedoPropertyName{"v:color"};
+        std::uint32_t GeneratedTextureWidth{64u};
+        std::uint32_t GeneratedTextureHeight{64u};
     };
 
     struct AssetModelSceneHandoffDiagnostics
@@ -41,6 +48,13 @@ export namespace Extrinsic::Runtime
         std::uint64_t EmbeddedTextureUploadRequests{0};
         std::uint64_t EmbeddedTextureUploadDeferrals{0};
         std::uint64_t EmbeddedTextureUploadFailures{0};
+        std::uint64_t GeneratedTextureAssetsCreated{0};
+        std::uint64_t GeneratedTextureUploadRequests{0};
+        std::uint64_t GeneratedTextureUploadDeferrals{0};
+        std::uint64_t GeneratedTextureUploadFailures{0};
+        std::uint64_t GeneratedTextureBakeFailures{0};
+        std::uint64_t GeneratedNormalTextureBakeFailures{0};
+        std::uint64_t GeneratedAlbedoTextureBakeFailures{0};
         std::uint64_t MaterialInstancesCreated{0};
         std::uint64_t MaterialTextureBindingsResolved{0};
         std::uint64_t MaterialTextureBindingFailures{0};
@@ -77,6 +91,7 @@ export namespace Extrinsic::Runtime
     {
         Assets::AssetId ModelAsset{};
         std::vector<Assets::AssetId> EmbeddedTextureAssets{};
+        std::vector<Assets::AssetId> GeneratedTextureAssets{};
         std::vector<AssetModelSceneMaterialRecord> Materials{};
         std::vector<AssetModelScenePrimitiveRecord> Primitives{};
     };
@@ -97,6 +112,17 @@ export namespace Extrinsic::Runtime
         std::string_view modelPath,
         std::uint32_t imageIndex,
         const Assets::AssetTexture2DPayload& image);
+
+    [[nodiscard]] std::string BuildGeneratedTextureAssetPath(
+        std::string_view modelPath,
+        std::uint32_t materialIndex,
+        std::string_view semantic,
+        std::string_view propertyName);
+
+    [[nodiscard]] Core::Expected<Assets::AssetId> LoadGeneratedTextureAsset(
+        Assets::AssetService& service,
+        std::string_view assetPath,
+        const Assets::AssetTexture2DPayload& texture);
 
     [[nodiscard]] Core::Expected<AssetModelSceneHandoffState> MaterializeModelSceneAsset(
         Assets::AssetService& service,

@@ -16,9 +16,10 @@ export namespace Extrinsic::Runtime
     // `ProceduralVertex` layout (position + UV, 20 bytes) so the same
     // `Material.DefaultDebugSurface` pipeline (GRAPHICS-031A) consumes both
     // runtime-authored and procedural surface geometry without a second
-    // vertex format. When mesh-domain `v:normal` is present with one vector per
-    // vertex, U/V carry the octahedral-encoded normal; otherwise they remain
-    // zero. Mesh-driven texture UV propagation is owned by later slices.
+    // vertex format. When mesh-domain `v:texcoord` is present with one vector
+    // per vertex, U/V carry texture coordinates. Otherwise, when
+    // mesh-domain `v:normal` is present with one vector per vertex, U/V carry
+    // the octahedral-encoded normal fallback used by no-texture paths.
     struct MeshVertex
     {
         float Px = 0.0f;

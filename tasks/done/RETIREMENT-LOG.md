@@ -8,6 +8,43 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+Active
+[`GRAPHICS-087`](GRAPHICS-087-vertex-color-property-texture-bake.md) —
+Bake vec3/vec4 vertex color properties to surface albedo textures — retired
+on 2026-06-12 at maturity `CPUContracted`. Runtime now exposes the shared
+`Extrinsic.Runtime.MeshAttributeTextureBake` helper for finite mesh vertex
+`glm::vec3`/`glm::vec4` properties with `v:texcoord`, preserves typed vertex
+properties through asset mesh materialization, and lets model-scene handoff
+create generated albedo child texture assets when authored base-color textures
+are absent. Generated albedo textures route through the existing texture
+upload/material binding path and surface shaders consume them via
+`MaterialParams::AlbedoID`. Focused runtime/graphics/asset tests passed,
+`IntrinsicTests` built, and the default CPU-supported CTest gate passed.
+
+Active
+[`BUG-042`](BUG-042-point-sphere-impostor-depth.md) — Promoted impostor
+spheres do not intersect surfaces correctly — retired on 2026-06-12 at
+maturity `CPUContracted`. The promoted retained point path now matches the
+legacy shape: the `Points` cull bucket emits six vertices per source point,
+the forward point pipeline is triangle-list with depth writes enabled, and
+sphere mode reconstructs the front sphere surface in view space before writing
+corrected `gl_FragDepth`. Point selection remains on the unexpanded
+`SelectionPoints` bucket. Focused renderer lifecycle/selection regressions
+passed, including `ForwardPointSphereImpostorsWriteCorrectedDepth`, and the
+default CPU-supported CTest gate passed.
+
+Active
+[`ASSETIO-006`](ASSETIO-006-generated-normal-map-bake.md) — Generated
+normal-map bake from mesh vertex normals — retired on 2026-06-12 at maturity
+`CPUContracted`. Runtime now bakes generated linear RGBA8 normal textures from
+named mesh vertex `glm::vec3` properties plus `v:texcoord`, preserves decoded
+texture coordinates through asset mesh materialization, and creates generated
+normal child assets for model-scene materials that lack authored normal maps.
+The generated texture uses the existing texture handoff/material binding lane,
+so shaders consume it through `MaterialParams::NormalID` without asset or
+graphics layer ownership inversions. Focused bake/handoff regressions and the
+default CPU-supported CTest gate passed.
+
 Backlog
 [`BUG-041`](BUG-041-asset-mesh-vertex-normals.md) — Asset mesh vertex normals
 are lost during runtime materialization — retired on 2026-06-12 at maturity

@@ -245,11 +245,15 @@ Concretely:
   path (otherwise the first frame would observe a `has_value()` pipeline
   lease but a default-constructed handle on the pass and `Execute()` would
   early-return on `!m_Pipeline.IsValid()` while the executor still
-  reported `Recorded`). The legacy `assets/shaders/surface.vert/frag` pair
-  predates the GpuScene seam (it declares `mat4 Model` + `PtrPositions`
-  push constants plus `set = 0/2/3` descriptor sets) and is deliberately
-  *not* referenced by the new pipeline; a dedicated lit forward-surface
-  shader is a GRAPHICS-072 follow-up. The typed `SurfacePass` command route
+  reported `Recorded`). The forward shader pair forwards the packed surface
+  UV channel and samples `MaterialParams::AlbedoID` / `NormalID` through the
+  bindless texture set before falling back to material factors, so authored
+  and runtime-generated material textures affect the promoted default forward
+  surface path. The legacy `assets/shaders/surface.vert/frag` pair predates
+  the GpuScene seam (it declares `mat4 Model` + `PtrPositions` push constants
+  plus `set = 0/2/3` descriptor sets) and is deliberately *not* referenced by
+  the new pipeline. A fully lit PBR forward-surface shader remains a
+  GRAPHICS-072 follow-up. The typed `SurfacePass` command route
   invokes `RecordForwardSurfacePass(...)` only when the active
   default-recipe features select the forward lighting path; deferred mode
   routes to `RecordDeferredGBufferPass(...)` per GRAPHICS-072 Slice A. While
@@ -266,14 +270,22 @@ Concretely:
   `shaders/forward/line.vert.spv` + `shaders/forward/line.frag.spv` with
   `Topology::LineList`; the point pipeline uses
   `shaders/forward/point.vert.spv` + `shaders/forward/point.frag.spv` with
-  `Topology::PointList`. Both load `SceneDepth`, append into `SceneColorHDR`,
-  disable depth writes, enable alpha blending, use `CullMode::None`, and carry
-  the canonical `GpuScenePushConstants` block. The forward point shader consumes
-  `GpuEntityConfig::PointSize` and `PointMode`: mode 0 draws flat circles, mode
-  1 draws screen-space impostor spheres, and mode 2 draws normal-aligned surfel
-  ellipses from the optional octahedral normal stored in the shared UV slot.
-  Transient debug-point expansion remains owned by GRAPHICS-077 and must not
-  route through the retained `Points` cull bucket.
+  `Topology::TriangleList`. The retained `Points` cull bucket expands one
+  source point to six vertices in the cull shader and the point vertex shader
+  reconstructs a camera-facing billboard from `gl_VertexIndex / 6`; the
+  selection point-id pass uses the separate `SelectionPoints` bucket so picking
+  continues to draw the unexpanded point-id shader path. Both forward pipelines
+  load `SceneDepth`, append into `SceneColorHDR`, enable alpha blending, use
+  `CullMode::None`, and carry the canonical `GpuScenePushConstants` block. The
+  line pipeline disables depth writes; the point pipeline enables depth writes
+  because mode 1 computes the front sphere surface in view space and writes
+  corrected `gl_FragDepth` so impostor spheres intersect and occlude retained
+  surfaces instead of using flat billboard depth. The forward point shader
+  consumes `GpuEntityConfig::PointSize` and `PointMode`: mode 0 draws flat
+  circles, mode 1 draws depth-corrected impostor spheres, and mode 2 draws
+  normal-aligned surfel ellipses from the optional octahedral normal stored in
+  the shared UV slot. Transient debug-point expansion remains owned by
+  GRAPHICS-077 and must not route through the retained `Points` cull bucket.
 - GRAPHICS-073 Slice A wires the default-recipe `"ShadowPass"` to the
   existing `ShadowPass` body. `NullRenderer` owns `m_ShadowPass` (constructed
   against `m_ShadowSystem`) and the depth-only `m_ShadowPipelineLease`. The
@@ -1383,7 +1395,14 @@ Concretely:
   tangent normal, `MetallicRoughness` -> `MetallicFactor`/`RoughnessFactor`
   scalars treated as `metallic = 0`, `roughness = 1` when factors are
   absent, `Emissive` -> per-material `EmissiveFactor` defaulting to
-  `0.0` so unbound emissive assets do not silently glow). Visualization
+  `0.0` so unbound emissive assets do not silently glow). Surface shaders
+  sample `MaterialParams::AlbedoID` for base color before falling back to
+  material factors, and sample `MaterialParams::NormalID` for the retained
+  surface/GBuffer normal path when the slot resolves to an uploaded texture.
+  Runtime-generated vertex-property textures are therefore consumed through the
+  same albedo/normal material slots as authored texture assets; graphics never
+  imports `AssetService` or knows whether a bindless index came from an
+  authored file, embedded image, or generated CPU bake. Visualization
   and Htex/UV bake atlas references do not use the magenta fallback: per
   `GRAPHICS-014Q`, deferred-residency atlas descriptors are dropped from
   `RenderWorld::Visualization` and counted in

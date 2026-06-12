@@ -111,7 +111,9 @@ namespace
         return payload;
     }
 
-    [[nodiscard]] Geometry::MeshIO::MeshIOResult MakeTriangleMeshPayload()
+    [[nodiscard]] Geometry::MeshIO::MeshIOResult MakeTriangleMeshPayload(
+        const bool includeTexcoords = true,
+        const bool includeVertexColor = true)
     {
         Geometry::MeshIO::MeshIOResult mesh{};
         mesh.SourcePath = "/models/triangle.gltf";
@@ -125,6 +127,20 @@ namespace
         normals[0] = glm::vec3{1.0f, 0.0f, 0.0f};
         normals[1] = glm::vec3{0.0f, 1.0f, 0.0f};
         normals[2] = glm::vec3{0.0f, 0.0f, -1.0f};
+        if (includeTexcoords)
+        {
+            auto texcoords = mesh.Vertices.GetOrAdd<glm::vec2>("v:texcoord", glm::vec2{0.0f});
+            texcoords[0] = glm::vec2{0.0f, 0.0f};
+            texcoords[1] = glm::vec2{1.0f, 0.0f};
+            texcoords[2] = glm::vec2{0.0f, 1.0f};
+        }
+        if (includeVertexColor)
+        {
+            auto colors = mesh.Vertices.GetOrAdd<glm::vec4>("v:color", glm::vec4{1.0f});
+            colors[0] = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f};
+            colors[1] = glm::vec4{0.0f, 1.0f, 0.0f, 1.0f};
+            colors[2] = glm::vec4{0.0f, 0.0f, 1.0f, 1.0f};
+        }
 
         mesh.Faces.Resize(1u);
         auto faces = mesh.Faces.GetOrAdd<std::vector<std::uint32_t>>("f:vertices", {});
@@ -132,7 +148,9 @@ namespace
         return mesh;
     }
 
-    [[nodiscard]] Assets::AssetModelScenePayload MakeModelScenePayload()
+    [[nodiscard]] Assets::AssetModelScenePayload MakeModelScenePayload(
+        const bool includeTexcoords = true,
+        const bool includeVertexColor = true)
     {
         Assets::AssetModelScenePayload payload{};
         payload.SourcePath = "/models/triangle.gltf";
@@ -148,7 +166,7 @@ namespace
 
         payload.GeometryPayloads.push_back(Assets::AssetGeometryPayload::Make(
             Assets::AssetPayloadKind::Mesh,
-            MakeTriangleMeshPayload(),
+            MakeTriangleMeshPayload(includeTexcoords, includeVertexColor),
             "Geometry::MeshIO::MeshIOResult"));
         payload.Primitives.push_back(Assets::AssetModelPrimitivePayload{
             .Name = "Triangle",
@@ -220,8 +238,19 @@ TEST(RuntimeAssetModelSceneHandoff, MaterializeModelSceneCreatesMeshEntityAndUpl
     const Assets::AssetId childTexture = state->Record.EmbeddedTextureAssets[0];
     EXPECT_TRUE(childTexture.IsValid());
     EXPECT_EQ(fx.Cache.GetState(childTexture), Graphics::GpuAssetState::GpuUploading);
-    ASSERT_EQ(fx.Transfer.TextureUploads.size(), 1u);
+    ASSERT_EQ(fx.Transfer.TextureUploads.size(), 2u);
     EXPECT_EQ(fx.Transfer.TextureUploads[0].SizeBytes, 4u);
+
+    ASSERT_EQ(state->Record.GeneratedTextureAssets.size(), 1u);
+    const Assets::AssetId generatedNormal = state->Record.GeneratedTextureAssets[0];
+    EXPECT_TRUE(generatedNormal.IsValid());
+    EXPECT_EQ(fx.Cache.GetState(generatedNormal), Graphics::GpuAssetState::GpuUploading);
+    EXPECT_EQ(fx.Transfer.TextureUploads[1].SizeBytes, 64u * 64u * 4u);
+    auto generatedPayload = fx.Service.Read<Assets::AssetTexture2DPayload>(generatedNormal);
+    ASSERT_TRUE(generatedPayload.has_value()) << static_cast<int>(generatedPayload.error());
+    ASSERT_EQ(generatedPayload->size(), 1u);
+    EXPECT_EQ((*generatedPayload)[0].Metadata.SourceKind, Assets::AssetTextureSourceKind::Generated);
+    EXPECT_EQ((*generatedPayload)[0].Metadata.ColorSpace, Assets::AssetTextureColorSpace::Linear);
 
     ASSERT_EQ(state->Record.Primitives.size(), 1u);
     const auto entity = state->Record.Primitives[0].Entity;
@@ -241,9 +270,20 @@ TEST(RuntimeAssetModelSceneHandoff, MaterializeModelSceneCreatesMeshEntityAndUpl
     EXPECT_EQ(normals[0], glm::vec3(1.0f, 0.0f, 0.0f));
     EXPECT_EQ(normals[1], glm::vec3(0.0f, 1.0f, 0.0f));
     EXPECT_EQ(normals[2], glm::vec3(0.0f, 0.0f, -1.0f));
+    auto texcoords = view.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
+    ASSERT_TRUE(texcoords.IsValid());
+    ASSERT_EQ(texcoords.Vector().size(), 3u);
+    EXPECT_EQ(texcoords[0], glm::vec2(0.0f, 0.0f));
+    EXPECT_EQ(texcoords[1], glm::vec2(1.0f, 0.0f));
+    EXPECT_EQ(texcoords[2], glm::vec2(0.0f, 1.0f));
+    auto colors = view.VertexSource->Properties.Get<glm::vec4>("v:color");
+    ASSERT_TRUE(colors.IsValid());
+    ASSERT_EQ(colors.Vector().size(), 3u);
+    EXPECT_EQ(colors[0], glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
 
     ASSERT_EQ(state->Record.Materials.size(), 1u);
     EXPECT_EQ(state->Record.Materials[0].TextureBindings.Albedo, childTexture);
+    EXPECT_EQ(state->Record.Materials[0].TextureBindings.Normal, generatedNormal);
     EXPECT_TRUE(state->Record.Materials[0].HasMaterialSlot);
     EXPECT_FALSE(state->Record.Materials[0].TextureBindingsResolved)
         << "The texture is pending and this fixture has no fallback texture; "
@@ -254,6 +294,9 @@ TEST(RuntimeAssetModelSceneHandoff, MaterializeModelSceneCreatesMeshEntityAndUpl
     EXPECT_EQ(diagnostics.PrimitiveEntitiesCreated, 1u);
     EXPECT_EQ(diagnostics.EmbeddedTextureAssetsCreated, 1u);
     EXPECT_EQ(diagnostics.EmbeddedTextureUploadRequests, 1u);
+    EXPECT_EQ(diagnostics.GeneratedTextureAssetsCreated, 1u);
+    EXPECT_EQ(diagnostics.GeneratedTextureUploadRequests, 1u);
+    EXPECT_EQ(diagnostics.GeneratedTextureBakeFailures, 0u);
     EXPECT_EQ(diagnostics.MaterialInstancesCreated, 1u);
     EXPECT_EQ(diagnostics.MaterialTextureBindingUploadDeferrals, 1u);
     EXPECT_EQ(diagnostics.MaterialTextureBindingFailures, 0u);
@@ -281,7 +324,10 @@ TEST(RuntimeAssetModelSceneHandoff, ReadyModelSceneEventMaterializesRecordAndOwn
         const Runtime::AssetModelSceneHandoffRecord* record = handoff.FindRecord(modelAsset);
         ASSERT_NE(record, nullptr);
         ASSERT_EQ(record->EmbeddedTextureAssets.size(), 1u);
+        ASSERT_EQ(record->GeneratedTextureAssets.size(), 1u);
         EXPECT_EQ(fx.Cache.GetState(record->EmbeddedTextureAssets[0]),
+                  Graphics::GpuAssetState::GpuUploading);
+        EXPECT_EQ(fx.Cache.GetState(record->GeneratedTextureAssets[0]),
                   Graphics::GpuAssetState::GpuUploading);
         ASSERT_EQ(record->Primitives.size(), 1u);
         generated = record->Primitives[0].Entity;
@@ -289,11 +335,12 @@ TEST(RuntimeAssetModelSceneHandoff, ReadyModelSceneEventMaterializesRecordAndOwn
         EXPECT_TRUE(fx.Scene.Raw().all_of<Graphics::Components::RenderSurface>(generated));
 
         const auto diagnostics = handoff.GetDiagnostics();
-        EXPECT_EQ(diagnostics.ReadyEventsObserved, 2u);
+        EXPECT_EQ(diagnostics.ReadyEventsObserved, 3u);
         EXPECT_EQ(diagnostics.ModelSceneReadyEvents, 1u);
-        EXPECT_EQ(diagnostics.NonModelSceneReadyEvents, 1u);
+        EXPECT_EQ(diagnostics.NonModelSceneReadyEvents, 2u);
         EXPECT_EQ(diagnostics.ModelSceneMaterializeSuccesses, 1u);
         EXPECT_EQ(diagnostics.EmbeddedTextureUploadRequests, 1u);
+        EXPECT_EQ(diagnostics.GeneratedTextureUploadRequests, 1u);
     }
 
     EXPECT_TRUE(modelAsset.IsValid());
@@ -323,6 +370,7 @@ TEST(RuntimeAssetModelSceneHandoff, MaterialBindingsResolveWhenChildTextureAlrea
     Runtime::AssetModelSceneHandoffDiagnostics diagnostics{};
     Runtime::AssetModelSceneHandoffOptions options{};
     options.RequestEmbeddedTextureUploads = false;
+    options.GenerateMissingNormalTextures = false;
     auto state = Runtime::MaterializeModelSceneAsset(
         fx.Service,
         fx.Cache,
@@ -339,6 +387,85 @@ TEST(RuntimeAssetModelSceneHandoff, MaterialBindingsResolveWhenChildTextureAlrea
     EXPECT_TRUE(state->Record.Materials[0].TextureBindingsResolved);
     EXPECT_EQ(diagnostics.MaterialTextureBindingsResolved, 1u);
     EXPECT_EQ(diagnostics.MaterialTextureBindingFailures, 0u);
+}
+
+TEST(RuntimeAssetModelSceneHandoff, GeneratesMissingAlbedoTextureFromVertexColorProperty)
+{
+    SceneHandoffFixture fx;
+    TmpFile modelFile("asset_model_scene_handoff_generated_albedo.gltf");
+    Assets::AssetModelScenePayload payload = MakeModelScenePayload();
+    payload.EmbeddedImages.clear();
+    payload.Materials[0].BaseColorTexture = {};
+
+    auto model = LoadModel(fx.Service, modelFile.Path.string(), std::move(payload));
+    ASSERT_TRUE(model.has_value()) << static_cast<int>(model.error());
+
+    Runtime::AssetModelSceneHandoffDiagnostics diagnostics{};
+    Runtime::AssetModelSceneHandoffOptions options{};
+    options.GenerateMissingNormalTextures = false;
+
+    auto state = Runtime::MaterializeModelSceneAsset(
+        fx.Service,
+        fx.Cache,
+        fx.Scene,
+        fx.Materials,
+        *model,
+        options,
+        &diagnostics);
+    ASSERT_TRUE(state.has_value()) << static_cast<int>(state.error());
+
+    ASSERT_EQ(state->Record.EmbeddedTextureAssets.size(), 0u);
+    ASSERT_EQ(state->Record.GeneratedTextureAssets.size(), 1u);
+    const Assets::AssetId generatedAlbedo = state->Record.GeneratedTextureAssets[0];
+    EXPECT_TRUE(generatedAlbedo.IsValid());
+    auto generatedPayload = fx.Service.Read<Assets::AssetTexture2DPayload>(generatedAlbedo);
+    ASSERT_TRUE(generatedPayload.has_value()) << static_cast<int>(generatedPayload.error());
+    ASSERT_EQ(generatedPayload->size(), 1u);
+    EXPECT_EQ((*generatedPayload)[0].Metadata.SourceKind, Assets::AssetTextureSourceKind::Generated);
+    EXPECT_EQ((*generatedPayload)[0].Metadata.ColorSpace, Assets::AssetTextureColorSpace::SRGB);
+
+    ASSERT_EQ(state->Record.Materials.size(), 1u);
+    EXPECT_EQ(state->Record.Materials[0].TextureBindings.Albedo, generatedAlbedo);
+    EXPECT_FALSE(state->Record.Materials[0].TextureBindings.Normal.IsValid());
+    EXPECT_EQ(diagnostics.GeneratedTextureAssetsCreated, 1u);
+    EXPECT_EQ(diagnostics.GeneratedTextureUploadRequests, 1u);
+    EXPECT_EQ(diagnostics.GeneratedTextureBakeFailures, 0u);
+}
+
+TEST(RuntimeAssetModelSceneHandoff, MissingTexcoordsSkipGeneratedNormalTexture)
+{
+    SceneHandoffFixture fx;
+    TmpFile modelFile("asset_model_scene_handoff_missing_texcoords.gltf");
+    Assets::AssetModelScenePayload payload = MakeModelScenePayload(
+        false,
+        false);
+    payload.EmbeddedImages.clear();
+    payload.Materials[0].BaseColorTexture = {};
+    payload.Materials[0].NormalTexture = {};
+
+    auto model = LoadModel(fx.Service, modelFile.Path.string(), std::move(payload));
+    ASSERT_TRUE(model.has_value()) << static_cast<int>(model.error());
+
+    Runtime::AssetModelSceneHandoffDiagnostics diagnostics{};
+    Runtime::AssetModelSceneHandoffOptions options{};
+    options.GenerateMissingAlbedoTextures = false;
+
+    auto state = Runtime::MaterializeModelSceneAsset(
+        fx.Service,
+        fx.Cache,
+        fx.Scene,
+        fx.Materials,
+        *model,
+        options,
+        &diagnostics);
+    ASSERT_TRUE(state.has_value()) << static_cast<int>(state.error());
+
+    EXPECT_TRUE(state->Record.GeneratedTextureAssets.empty());
+    ASSERT_EQ(state->Record.Materials.size(), 1u);
+    EXPECT_FALSE(state->Record.Materials[0].TextureBindings.Normal.IsValid());
+    EXPECT_EQ(diagnostics.GeneratedTextureAssetsCreated, 0u);
+    EXPECT_EQ(diagnostics.GeneratedTextureBakeFailures, 1u);
+    EXPECT_EQ(diagnostics.GeneratedNormalTextureBakeFailures, 1u);
 }
 
 TEST(RuntimeAssetModelSceneHandoff, PendingMaterialBindingsResolveAfterTextureUploadTick)
@@ -363,6 +490,9 @@ TEST(RuntimeAssetModelSceneHandoff, PendingMaterialBindingsResolveAfterTextureUp
     ASSERT_EQ(record->EmbeddedTextureAssets.size(), 1u);
     EXPECT_EQ(fx.Cache.GetState(record->EmbeddedTextureAssets[0]),
               Graphics::GpuAssetState::GpuUploading);
+    ASSERT_EQ(record->GeneratedTextureAssets.size(), 1u);
+    EXPECT_EQ(fx.Cache.GetState(record->GeneratedTextureAssets[0]),
+              Graphics::GpuAssetState::GpuUploading);
 
     fx.Cache.Tick(0u, 2u);
     auto resolved = handoff.ResolvePendingMaterialTextureBindings();
@@ -376,7 +506,7 @@ TEST(RuntimeAssetModelSceneHandoff, PendingMaterialBindingsResolveAfterTextureUp
 
     const auto diagnostics = handoff.GetDiagnostics();
     EXPECT_EQ(diagnostics.MaterialTextureBindingsResolved, 1u);
-    EXPECT_EQ(diagnostics.MaterialTextureBindingReresolveRequests, 2u);
+    EXPECT_EQ(diagnostics.MaterialTextureBindingReresolveRequests, 3u);
     EXPECT_EQ(diagnostics.MaterialTextureBindingReresolveSuccesses, 1u);
     EXPECT_EQ(diagnostics.MaterialTextureBindingReresolveFailures, 0u);
     EXPECT_GE(diagnostics.MaterialTextureBindingUploadDeferrals, 1u);

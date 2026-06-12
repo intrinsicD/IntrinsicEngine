@@ -1267,6 +1267,14 @@ TEST(RendererFrameLifecycle, DefaultDebugSurfacePipelineSurvivesOperationalRebui
 
 TEST(RendererFrameLifecycle, ForwardSurfacePipelineSurvivesOperationalRebuild)
 {
+    const std::string surfaceVertex = ReadShaderSource("forward/default_debug_surface.vert");
+    const std::string surfaceFragment = ReadShaderSource("forward/default_debug_surface.frag");
+
+    EXPECT_NE(surfaceVertex.find("fragUv = v.UV"), std::string::npos);
+    EXPECT_NE(surfaceFragment.find("mat.AlbedoID"), std::string::npos);
+    EXPECT_NE(surfaceFragment.find("mat.NormalID"), std::string::npos);
+    EXPECT_NE(surfaceFragment.find("normalShade"), std::string::npos);
+
     Extrinsic::Tests::MockDevice device;
     device.Operational = true;
     device.BackbufferHandle = Extrinsic::RHI::TextureHandle{181u, 1u};
@@ -1351,10 +1359,10 @@ TEST(RendererFrameLifecycle, ForwardLinePointPipelinesSurviveOperationalRebuild)
         << initialPointDesc.VertexShaderPath;
     EXPECT_TRUE(initialPointDesc.FragmentShaderPath.ends_with("shaders/forward/point.frag.spv"))
         << initialPointDesc.FragmentShaderPath;
-    EXPECT_EQ(initialPointDesc.PrimitiveTopology, Extrinsic::RHI::Topology::PointList);
+    EXPECT_EQ(initialPointDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
     EXPECT_EQ(initialPointDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::None);
     EXPECT_TRUE(initialPointDesc.DepthStencil.DepthTestEnable);
-    EXPECT_FALSE(initialPointDesc.DepthStencil.DepthWriteEnable);
+    EXPECT_TRUE(initialPointDesc.DepthStencil.DepthWriteEnable);
     EXPECT_EQ(initialPointDesc.DepthStencil.DepthFunc, Extrinsic::RHI::DepthOp::LessEqual);
     EXPECT_TRUE(initialPointDesc.ColorBlend[0].Enable);
     EXPECT_EQ(initialPointDesc.ColorTargetFormats[0], Extrinsic::RHI::Format::RGBA16_FLOAT);
@@ -1368,6 +1376,20 @@ TEST(RendererFrameLifecycle, ForwardLinePointPipelinesSurviveOperationalRebuild)
     EXPECT_TRUE(PipelineDescBytesEqual(initialPointDesc, renderer->GetForwardPointPipelineDesc()));
 
     renderer->Shutdown();
+}
+
+TEST(RendererFrameLifecycle, ForwardPointSphereImpostorsWriteCorrectedDepth)
+{
+    const std::string pointVertex = ReadShaderSource("forward/point.vert");
+    const std::string pointFragment = ReadShaderSource("forward/point.frag");
+    const std::string cullShader = ReadShaderSource("culling/instance_cull.comp");
+
+    EXPECT_NE(pointVertex.find("/ 6u"), std::string::npos);
+    EXPECT_NE(pointVertex.find("vDiscUV"), std::string::npos);
+    EXPECT_NE(pointFragment.find("surfaceViewPos"), std::string::npos);
+    EXPECT_NE(pointFragment.find("gl_FragDepth = depth"), std::string::npos);
+    EXPECT_NE(cullShader.find("geo.PointVertexCount * 6u"), std::string::npos);
+    EXPECT_NE(cullShader.find("geo.PointFirstVertex * 6u"), std::string::npos);
 }
 
 // ---------------------------------------------------------------------------

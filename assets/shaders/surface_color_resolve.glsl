@@ -8,6 +8,11 @@ layout(buffer_reference, scalar) readonly buffer CentroidBuf {
     vec4 entries[];  // .xyz = position, floatBitsToUint(.w) = packedColor
 };
 
+bool IsValidSurfaceTextureID(uint id)
+{
+    return id != 0u && id != 0xFFFFFFFFu;
+}
+
 vec4 ResolveSurfaceBaseColor()
 {
     // Priority 1: Centroid-based Voronoi (PtrCentroids != 0).
@@ -122,6 +127,15 @@ vec4 ResolveSurfaceBaseColor()
 
     // Fallback: material (texture * base color factor).
     MaterialData mat = materials.Materials[fragMaterialSlot];
-    vec4 albedoTex = texture(globalTextures[nonuniformEXT(fragTexID)], fragTexCoord);
-    return albedoTex * mat.BaseColorFactor;
+    if (IsValidSurfaceTextureID(mat.AlbedoID))
+    {
+        vec4 albedoTex = texture(globalTextures[nonuniformEXT(mat.AlbedoID)], fragTexCoord);
+        return albedoTex * mat.BaseColorFactor;
+    }
+    if (IsValidSurfaceTextureID(fragTexID))
+    {
+        vec4 albedoTex = texture(globalTextures[nonuniformEXT(fragTexID)], fragTexCoord);
+        return albedoTex * mat.BaseColorFactor;
+    }
+    return mat.BaseColorFactor;
 }

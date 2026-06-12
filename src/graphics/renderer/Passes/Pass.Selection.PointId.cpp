@@ -29,7 +29,7 @@ namespace Extrinsic::Graphics
             return;
         }
 
-        const auto& bucket = culling.GetBucket(RHI::GpuDrawBucketKind::Points);
+        const auto& bucket = culling.GetBucket(RHI::GpuDrawBucketKind::SelectionPoints);
         if (bucket.Indexed || !bucket.NonIndexedArgsBuffer.IsValid() ||
             !bucket.CountBuffer.IsValid() || bucket.Capacity == 0u)
         {
@@ -41,7 +41,7 @@ namespace Extrinsic::Graphics
         RHI::GpuScenePushConstants pc{};
         pc.SceneTableBDA = gpuWorld.GetSceneTableBDA();
         pc.FrameIndex    = frameIndex;
-        pc.DrawBucket    = static_cast<std::uint32_t>(RHI::GpuDrawBucketKind::Points);
+        pc.DrawBucket    = static_cast<std::uint32_t>(RHI::GpuDrawBucketKind::SelectionPoints);
         cmd.PushConstants(&pc, sizeof(pc));
 
         cmd.DrawIndirectCount(bucket.NonIndexedArgsBuffer, 0, bucket.CountBuffer, 0, bucket.Capacity);

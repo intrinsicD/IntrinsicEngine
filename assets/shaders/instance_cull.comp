@@ -217,8 +217,8 @@ void main() {
 
     if ((inst.RenderFlags & GpuRender_Point) != 0u) {
         emitNonIndexed(buckets.Points,
-                       geo.PointVertexCount,
-                       geo.PointFirstVertex,
+                       geo.PointVertexCount * 6u,
+                       geo.PointFirstVertex * 6u,
                        slot);
 
         if (selectable) {

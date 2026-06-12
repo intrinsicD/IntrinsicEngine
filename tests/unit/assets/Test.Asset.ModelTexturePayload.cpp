@@ -115,6 +115,16 @@ TEST(AssetModelTexturePayload, TexturePayloadValidationAcceptsCpuPixelsAndMetada
         "SRGB");
 }
 
+TEST(AssetModelTexturePayload, TexturePayloadValidationAcceptsGeneratedTexturesWithoutSourceFormat)
+{
+    AssetTexture2DPayload payload = MakeTexturePayload();
+    payload.Metadata.SourceKind = AssetTextureSourceKind::Generated;
+    payload.Metadata.SourceFormat = AssetFileFormat::Unknown;
+    payload.Metadata.SourcePath = "generated://v:normal";
+
+    EXPECT_TRUE(ValidateAssetTexture2DPayload(payload).has_value());
+}
+
 TEST(AssetModelTexturePayload, TexturePayloadValidationRejectsBadMetadata)
 {
     AssetTexture2DPayload wrongSize = MakeTexturePayload();

@@ -34,6 +34,7 @@ import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.AssetMeshNormals;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
+import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Geometry.HalfedgeMesh.IO;
 
 namespace Extrinsic::Runtime
@@ -47,6 +48,12 @@ namespace Extrinsic::Runtime
             std::uint32_t MaterialIndex{Assets::kInvalidAssetModelIndex};
             std::string Name{};
             Geometry::HalfedgeMesh::Mesh Mesh{};
+        };
+
+        struct GeneratedMaterialTextureAssets
+        {
+            Assets::AssetId Albedo{};
+            Assets::AssetId Normal{};
         };
 
         struct RuntimeModelSceneRecord
@@ -86,6 +93,30 @@ namespace Extrinsic::Runtime
             default:
                 return ".texture";
             }
+        }
+
+        [[nodiscard]] bool IsStablePathCharacter(const char c) noexcept
+        {
+            return (c >= 'a' && c <= 'z') ||
+                   (c >= 'A' && c <= 'Z') ||
+                   (c >= '0' && c <= '9') ||
+                   c == '-' ||
+                   c == '_';
+        }
+
+        [[nodiscard]] std::string SanitizePathToken(const std::string_view token)
+        {
+            std::string sanitized{};
+            sanitized.reserve(token.size());
+            for (const char c : token)
+            {
+                sanitized.push_back(IsStablePathCharacter(c) ? c : '-');
+            }
+            if (sanitized.empty())
+            {
+                return "property";
+            }
+            return sanitized;
         }
 
         void RecordFailure(
@@ -179,16 +210,247 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] Graphics::MaterialTextureAssetBindings BuildTextureBindings(
             const Assets::AssetModelMaterialPayload& material,
-            const std::vector<Assets::AssetId>& embeddedTextureAssets) noexcept
+            const std::vector<Assets::AssetId>& embeddedTextureAssets,
+            const GeneratedMaterialTextureAssets& generatedTextureAssets) noexcept
         {
+            const Assets::AssetId authoredAlbedo =
+                ResolveTextureReference(material.BaseColorTexture, embeddedTextureAssets);
+            const Assets::AssetId authoredNormal =
+                ResolveTextureReference(material.NormalTexture, embeddedTextureAssets);
             return Graphics::MaterialTextureAssetBindings{
-                .Albedo = ResolveTextureReference(material.BaseColorTexture, embeddedTextureAssets),
-                .Normal = ResolveTextureReference(material.NormalTexture, embeddedTextureAssets),
+                .Albedo = authoredAlbedo.IsValid() ? authoredAlbedo : generatedTextureAssets.Albedo,
+                .Normal = authoredNormal.IsValid() ? authoredNormal : generatedTextureAssets.Normal,
                 .MetallicRoughness = ResolveTextureReference(
                     material.MetallicRoughnessTexture,
                     embeddedTextureAssets),
                 .Emissive = {},
             };
+        }
+
+        [[nodiscard]] bool MeshHasVertexProperty(
+            const Geometry::HalfedgeMesh::Mesh& mesh,
+            const std::string_view propertyName)
+        {
+            return !propertyName.empty() && mesh.VertexProperties().Exists(propertyName);
+        }
+
+        void RecordGeneratedBakeFailure(
+            AssetModelSceneHandoffDiagnostics* diagnostics,
+            const bool normal)
+        {
+            if (diagnostics == nullptr)
+            {
+                return;
+            }
+            ++diagnostics->GeneratedTextureBakeFailures;
+            if (normal)
+            {
+                ++diagnostics->GeneratedNormalTextureBakeFailures;
+            }
+            else
+            {
+                ++diagnostics->GeneratedAlbedoTextureBakeFailures;
+            }
+        }
+
+        [[nodiscard]] Core::Expected<Assets::AssetId> LoadAndMaybeUploadGeneratedTexture(
+            Assets::AssetService& service,
+            Graphics::GpuAssetCache& cache,
+            const std::string_view textureAssetPath,
+            const Assets::AssetTexture2DPayload& payload,
+            const AssetModelSceneHandoffOptions& options,
+            AssetModelSceneHandoffState& state,
+            AssetModelSceneHandoffDiagnostics* diagnostics)
+        {
+            auto asset = LoadGeneratedTextureAsset(service, textureAssetPath, payload);
+            if (!asset.has_value())
+            {
+                return Core::Err<Assets::AssetId>(asset.error());
+            }
+
+            state.Record.GeneratedTextureAssets.push_back(*asset);
+            if (diagnostics != nullptr)
+            {
+                ++diagnostics->GeneratedTextureAssetsCreated;
+            }
+
+            if (!options.RequestGeneratedTextureUploads)
+            {
+                return *asset;
+            }
+
+            auto upload = RequestTextureAssetUpload(
+                service,
+                cache,
+                *asset,
+                options.TextureOptions);
+            if (upload.has_value())
+            {
+                if (diagnostics != nullptr)
+                {
+                    ++diagnostics->GeneratedTextureUploadRequests;
+                }
+                return *asset;
+            }
+
+            if (IsUploadDeferral(upload.error()))
+            {
+                if (diagnostics != nullptr)
+                {
+                    ++diagnostics->GeneratedTextureUploadDeferrals;
+                }
+                return *asset;
+            }
+
+            if (diagnostics != nullptr)
+            {
+                ++diagnostics->GeneratedTextureUploadFailures;
+            }
+            return Core::Err<Assets::AssetId>(upload.error());
+        }
+
+        [[nodiscard]] Core::Expected<Assets::AssetId> TryGenerateMaterialTexture(
+            Assets::AssetService& service,
+            Graphics::GpuAssetCache& cache,
+            const std::string_view modelPath,
+            const std::uint32_t materialIndex,
+            const std::string_view semantic,
+            const bool normal,
+            const Geometry::HalfedgeMesh::Mesh& mesh,
+            const std::string_view propertyName,
+            const AssetModelSceneHandoffOptions& options,
+            AssetModelSceneHandoffState& state,
+            AssetModelSceneHandoffDiagnostics* diagnostics)
+        {
+            if (propertyName.empty())
+            {
+                return Assets::AssetId{};
+            }
+            if (!normal && !MeshHasVertexProperty(mesh, propertyName))
+            {
+                return Assets::AssetId{};
+            }
+
+            MeshAttributeTextureBakeOptions bakeOptions{};
+            bakeOptions.SourcePropertyName = std::string{propertyName};
+            bakeOptions.Width = options.GeneratedTextureWidth;
+            bakeOptions.Height = options.GeneratedTextureHeight;
+            bakeOptions.DebugName =
+                std::string{"generated-"} + std::string{semantic} + "-" + std::string{propertyName};
+
+            MeshAttributeTextureBakeResult bake = normal
+                ? BakeMeshVertexNormalTexture(mesh, bakeOptions)
+                : BakeMeshVertexColorTexture(mesh, bakeOptions);
+            if (bake.Status != MeshAttributeTextureBakeStatus::Success)
+            {
+                RecordGeneratedBakeFailure(diagnostics, normal);
+                return Assets::AssetId{};
+            }
+
+            bake.Payload.Metadata.SourcePath = std::string{modelPath};
+            const std::string generatedPath = BuildGeneratedTextureAssetPath(
+                modelPath,
+                materialIndex,
+                semantic,
+                propertyName);
+            return LoadAndMaybeUploadGeneratedTexture(
+                service,
+                cache,
+                generatedPath,
+                bake.Payload,
+                options,
+                state,
+                diagnostics);
+        }
+
+        [[nodiscard]] Core::Expected<std::vector<GeneratedMaterialTextureAssets>>
+        GenerateMaterialTextureAssets(
+            Assets::AssetService& service,
+            Graphics::GpuAssetCache& cache,
+            const Assets::AssetModelScenePayload& model,
+            const std::vector<PreparedPrimitive>& primitives,
+            const std::string_view modelPath,
+            const AssetModelSceneHandoffOptions& options,
+            AssetModelSceneHandoffState& state,
+            AssetModelSceneHandoffDiagnostics* diagnostics)
+        {
+            std::vector<GeneratedMaterialTextureAssets> generated(model.Materials.size());
+            for (std::size_t materialIndex = 0u;
+                 materialIndex < model.Materials.size();
+                 ++materialIndex)
+            {
+                const Assets::AssetModelMaterialPayload& material = model.Materials[materialIndex];
+                const bool needsNormal =
+                    options.GenerateMissingNormalTextures && !material.NormalTexture.IsValid();
+                const bool needsAlbedo =
+                    options.GenerateMissingAlbedoTextures &&
+                    !material.BaseColorTexture.IsValid() &&
+                    !options.GeneratedAlbedoPropertyName.empty();
+                if (!needsNormal && !needsAlbedo)
+                {
+                    continue;
+                }
+
+                for (const PreparedPrimitive& primitive : primitives)
+                {
+                    if (primitive.MaterialIndex != materialIndex)
+                    {
+                        continue;
+                    }
+
+                    if (needsNormal && !generated[materialIndex].Normal.IsValid())
+                    {
+                        auto normal = TryGenerateMaterialTexture(
+                            service,
+                            cache,
+                            modelPath,
+                            static_cast<std::uint32_t>(materialIndex),
+                            "normal",
+                            true,
+                            primitive.Mesh,
+                            options.GeneratedNormalPropertyName,
+                            options,
+                            state,
+                            diagnostics);
+                        if (!normal.has_value())
+                        {
+                            return Core::Err<std::vector<GeneratedMaterialTextureAssets>>(
+                                normal.error());
+                        }
+                        generated[materialIndex].Normal = *normal;
+                    }
+
+                    if (needsAlbedo && !generated[materialIndex].Albedo.IsValid())
+                    {
+                        auto albedo = TryGenerateMaterialTexture(
+                            service,
+                            cache,
+                            modelPath,
+                            static_cast<std::uint32_t>(materialIndex),
+                            "albedo",
+                            false,
+                            primitive.Mesh,
+                            options.GeneratedAlbedoPropertyName,
+                            options,
+                            state,
+                            diagnostics);
+                        if (!albedo.has_value())
+                        {
+                            return Core::Err<std::vector<GeneratedMaterialTextureAssets>>(
+                                albedo.error());
+                        }
+                        generated[materialIndex].Albedo = *albedo;
+                    }
+
+                    if ((!needsNormal || generated[materialIndex].Normal.IsValid()) &&
+                        (!needsAlbedo || generated[materialIndex].Albedo.IsValid()))
+                    {
+                        break;
+                    }
+                }
+            }
+
+            return generated;
         }
 
         [[nodiscard]] bool BindingHasTextureAsset(
@@ -326,6 +588,7 @@ namespace Extrinsic::Runtime
             Graphics::GpuAssetCache& cache,
             const Assets::AssetModelScenePayload& model,
             const std::vector<Assets::AssetId>& embeddedTextureAssets,
+            const std::vector<GeneratedMaterialTextureAssets>& generatedTextureAssets,
             const AssetModelSceneHandoffOptions& options,
             AssetModelSceneHandoffState& state,
             AssetModelSceneHandoffDiagnostics* diagnostics)
@@ -345,7 +608,12 @@ namespace Extrinsic::Runtime
             {
                 const Assets::AssetModelMaterialPayload& material = model.Materials[materialIndex];
                 const Graphics::MaterialTextureAssetBindings bindings =
-                    BuildTextureBindings(material, embeddedTextureAssets);
+                    BuildTextureBindings(
+                        material,
+                        embeddedTextureAssets,
+                        materialIndex < generatedTextureAssets.size()
+                            ? generatedTextureAssets[materialIndex]
+                            : GeneratedMaterialTextureAssets{});
 
                 auto lease = materials.CreateInstance(standardType, BuildMaterialParams(material));
                 if (!lease.IsValid())
@@ -516,6 +784,39 @@ namespace Extrinsic::Runtime
             });
     }
 
+    std::string BuildGeneratedTextureAssetPath(
+        const std::string_view modelPath,
+        const std::uint32_t materialIndex,
+        const std::string_view semantic,
+        const std::string_view propertyName)
+    {
+        const std::string_view base = modelPath.empty()
+            ? std::string_view{"model-scene"}
+            : modelPath;
+        return std::string{base}
+            + ".generated-texture-material-"
+            + std::to_string(materialIndex)
+            + "-"
+            + SanitizePathToken(semantic)
+            + "-"
+            + SanitizePathToken(propertyName)
+            + ".texture";
+    }
+
+    Core::Expected<Assets::AssetId> LoadGeneratedTextureAsset(
+        Assets::AssetService& service,
+        const std::string_view assetPath,
+        const Assets::AssetTexture2DPayload& texture)
+    {
+        return service.Load<Assets::AssetTexture2DPayload>(
+            assetPath,
+            [texture](std::string_view, Assets::AssetId)
+                -> Core::Expected<Assets::AssetTexture2DPayload>
+            {
+                return texture;
+            });
+    }
+
     Core::Expected<AssetModelSceneHandoffState> MaterializeModelSceneAsset(
         Assets::AssetService& service,
         Graphics::GpuAssetCache& cache,
@@ -580,11 +881,27 @@ namespace Extrinsic::Runtime
         }
         state.Record.EmbeddedTextureAssets = std::move(*embeddedTextures);
 
+        auto generatedTextures = GenerateMaterialTextureAssets(
+            service,
+            cache,
+            model,
+            *prepared,
+            modelPath,
+            options,
+            state,
+            diagnostics);
+        if (!generatedTextures.has_value())
+        {
+            RecordFailure(diagnostics, modelAsset, generatedTextures.error());
+            return Core::Err<AssetModelSceneHandoffState>(generatedTextures.error());
+        }
+
         if (auto materialRecords = CreateMaterialRecords(
                 materials,
                 cache,
                 model,
                 state.Record.EmbeddedTextureAssets,
+                *generatedTextures,
                 options,
                 state,
                 diagnostics);

@@ -194,7 +194,8 @@ namespace Extrinsic::Assets
         {
             return Core::Err(Core::ErrorCode::AssetInvalidData);
         }
-        if (!IsSupportedTextureImportFormat(metadata.SourceFormat))
+        if (metadata.SourceKind != AssetTextureSourceKind::Generated &&
+            !IsSupportedTextureImportFormat(metadata.SourceFormat))
         {
             return Core::Err(Core::ErrorCode::AssetUnsupportedFormat);
         }

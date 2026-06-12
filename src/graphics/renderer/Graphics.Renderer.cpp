@@ -2965,9 +2965,10 @@ namespace Extrinsic::Graphics
             return desc;
         }
 
-        // GRAPHICS-071 — retained point renderables use the GpuScene BDA-backed
-        // `forward/point.vert` + `forward/point.frag` shader pair. Transient
-        // debug-point expansion stays out-of-scope for GRAPHICS-077.
+        // GRAPHICS-071 / BUG-042 — retained point renderables use the
+        // GpuScene BDA-backed `forward/point.vert` + `forward/point.frag`
+        // shader pair. The cull shader emits six vertices per point so sphere
+        // impostors can restore legacy billboard expansion and corrected depth.
         [[nodiscard]] static RHI::PipelineDesc BuildForwardPointPipelineDesc() noexcept
         {
             RHI::PipelineDesc desc{};
@@ -2975,12 +2976,12 @@ namespace Extrinsic::Graphics
                 "shaders/forward/point.vert.spv");
             desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
                 "shaders/forward/point.frag.spv");
-            desc.PrimitiveTopology = RHI::Topology::PointList;
+            desc.PrimitiveTopology = RHI::Topology::TriangleList;
             desc.Rasterizer.Culling = RHI::CullMode::None;
             desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
             desc.Rasterizer.Fill = RHI::FillMode::Solid;
             desc.DepthStencil.DepthTestEnable = true;
-            desc.DepthStencil.DepthWriteEnable = false;
+            desc.DepthStencil.DepthWriteEnable = true;
             desc.DepthStencil.DepthFunc = RHI::DepthOp::LessEqual;
             desc.DepthStencil.StencilEnable = false;
             desc.ColorBlend[0].Enable = true;

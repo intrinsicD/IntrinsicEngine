@@ -214,11 +214,11 @@ TEST(GraphicsSelectionPassContracts, EdgeAndPointIdPassesDrawLineAndPointBuckets
     pointPass.SetPipeline(RHI::PipelineHandle{704u, 1u});
     RecordingCommandContext pointCmd;
     pointPass.Execute(pointCmd, camera, world, culling, 6u);
-    const auto& pointBucket = culling.GetBucket(RHI::GpuDrawBucketKind::Points);
+    const auto& pointBucket = culling.GetBucket(RHI::GpuDrawBucketKind::SelectionPoints);
     ASSERT_EQ(pointCmd.Events.size(), 3u);
     EXPECT_EQ(pointCmd.Events[2].Kind, EventKind::DrawIndirectCount);
     EXPECT_EQ(pointCmd.LastIndirectArgs, pointBucket.NonIndexedArgsBuffer);
-    ExpectScenePushConstants(pointCmd, world, RHI::GpuDrawBucketKind::Points, 6u);
+    ExpectScenePushConstants(pointCmd, world, RHI::GpuDrawBucketKind::SelectionPoints, 6u);
 
     culling.Shutdown();
     world.Shutdown();
@@ -258,4 +258,3 @@ TEST(GraphicsSelectionPassContracts, SelectionOutlinePassDrawsFullscreenTriangle
         EXPECT_EQ(b, std::byte{0});
     }
 }
-

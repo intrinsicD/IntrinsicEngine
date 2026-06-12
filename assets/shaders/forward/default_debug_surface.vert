@@ -38,6 +38,7 @@ layout(push_constant, scalar) uniform ScenePC {
 } pc;
 
 layout(location = 0) flat out uint fragMaterialSlot;
+layout(location = 1) out vec2 fragUv;
 
 void main() {
     const GpuSceneTable scene = GpuSceneTableRef(pc.SceneTableBDA).Value;
@@ -51,4 +52,5 @@ void main() {
 
     gl_Position = scene.CameraViewProj * dyn.Model * vec4(v.Position, 1.0);
     fragMaterialSlot = inst.MaterialSlot;
+    fragUv = v.UV;
 }

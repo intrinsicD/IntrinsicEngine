@@ -284,6 +284,7 @@ if(TARGET ExtrinsicRuntime)
         Test.ImGuiAdapter.cpp
         Test.ImGuiAdapterEngineWiring.cpp
         Test.MeshGeometryExtraction.cpp
+        Test.MeshAttributeTextureBake.cpp
         Test.MeshGeometryPacker.cpp
         Test.MeshPrimitiveViewPacker.cpp
         Test.MeshPrimitiveViewExtraction.cpp

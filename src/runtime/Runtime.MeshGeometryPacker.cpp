@@ -40,6 +40,11 @@ namespace Extrinsic::Runtime
             return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z);
         }
 
+        [[nodiscard]] bool IsFinite(const glm::vec2& p) noexcept
+        {
+            return std::isfinite(p.x) && std::isfinite(p.y);
+        }
+
         [[nodiscard]] glm::vec2 EncodeOctNormalOrZero(glm::vec3 normal) noexcept
         {
             const float len = glm::length(normal);
@@ -271,6 +276,14 @@ namespace Extrinsic::Runtime
             normals = &normalProp.Vector();
         }
 
+        const auto texcoordProp =
+            view.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
+        const std::vector<glm::vec2>* texcoords = nullptr;
+        if (texcoordProp && texcoordProp.Vector().size() == vertexCount)
+        {
+            texcoords = &texcoordProp.Vector();
+        }
+
         for (std::size_t f = 0; f < faceCount; ++f)
         {
             const FaceRingOutcome outcome = ProduceFaceRing(
@@ -311,9 +324,16 @@ namespace Extrinsic::Runtime
             {
                 return Failure(MeshPackStatus::NonFinitePosition, outBuffer);
             }
-            const glm::vec2 normalUv =
-                normals != nullptr ? EncodeOctNormalOrZero((*normals)[i]) : glm::vec2{0.0f};
-            vData[i] = MeshVertex{p.x, p.y, p.z, normalUv.x, normalUv.y};
+            glm::vec2 uv{0.0f};
+            if (texcoords != nullptr)
+            {
+                uv = IsFinite((*texcoords)[i]) ? (*texcoords)[i] : glm::vec2{0.0f};
+            }
+            else if (normals != nullptr)
+            {
+                uv = EncodeOctNormalOrZero((*normals)[i]);
+            }
+            vData[i] = MeshVertex{p.x, p.y, p.z, uv.x, uv.y};
             minP = glm::min(minP, p);
             maxP = glm::max(maxP, p);
         }

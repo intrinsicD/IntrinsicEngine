@@ -5,6 +5,7 @@ module;
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -25,6 +26,129 @@ namespace Extrinsic::Runtime
         constexpr const char* kPositionProperty = "v:point";
         constexpr const char* kNormalProperty = "v:normal";
         constexpr const char* kFaceVerticesProperty = "f:vertices";
+
+        [[nodiscard]] bool ShouldCopyVertexProperty(const std::string_view name) noexcept
+        {
+            return name != kPositionProperty && name != kNormalProperty;
+        }
+
+        template <typename T>
+        void CopyVertexProperty(
+            const Geometry::PropertySet& source,
+            Geometry::PropertySet& target,
+            const std::string_view name,
+            const std::size_t vertexCount)
+        {
+            if (!ShouldCopyVertexProperty(name))
+            {
+                return;
+            }
+
+            const auto property = source.Get<T>(name);
+            if (!property || property.Vector().size() != vertexCount)
+            {
+                return;
+            }
+
+            auto targetProperty = target.GetOrAdd<T>(std::string{name}, T{});
+            targetProperty.Vector() = property.Vector();
+        }
+
+        template <typename T>
+        void CopyVertexPropertyRemapped(
+            const Geometry::PropertySet& source,
+            Geometry::PropertySet& target,
+            const std::string_view name,
+            const std::vector<std::uint32_t>& sourceVertexForTargetVertex)
+        {
+            if (!ShouldCopyVertexProperty(name))
+            {
+                return;
+            }
+
+            const auto property = source.Get<T>(name);
+            if (!property)
+            {
+                return;
+            }
+            const auto& values = property.Vector();
+            for (const std::uint32_t sourceIndex : sourceVertexForTargetVertex)
+            {
+                if (sourceIndex >= values.size())
+                {
+                    return;
+                }
+            }
+
+            auto targetProperty = target.GetOrAdd<T>(std::string{name}, T{});
+            auto& out = targetProperty.Vector();
+            out.resize(sourceVertexForTargetVertex.size());
+            for (std::size_t i = 0u; i < sourceVertexForTargetVertex.size(); ++i)
+            {
+                out[i] = values[sourceVertexForTargetVertex[i]];
+            }
+        }
+
+        void CopySupportedVertexProperties(
+            const Geometry::MeshIO::MeshIOResult& meshPayload,
+            Geometry::HalfedgeMesh::Mesh& mesh,
+            const std::size_t vertexCount)
+        {
+            Geometry::PropertySet& target = mesh.VertexProperties();
+            for (const std::string& name : meshPayload.Vertices.Properties())
+            {
+                CopyVertexProperty<glm::vec2>(meshPayload.Vertices, target, name, vertexCount);
+                CopyVertexProperty<glm::vec3>(meshPayload.Vertices, target, name, vertexCount);
+                CopyVertexProperty<glm::vec4>(meshPayload.Vertices, target, name, vertexCount);
+                CopyVertexProperty<float>(meshPayload.Vertices, target, name, vertexCount);
+                CopyVertexProperty<std::uint32_t>(meshPayload.Vertices, target, name, vertexCount);
+            }
+        }
+
+        void CopySupportedVertexPropertiesRemapped(
+            const Geometry::MeshIO::MeshIOResult& meshPayload,
+            Geometry::HalfedgeMesh::Mesh& mesh,
+            const std::vector<std::uint32_t>& sourceVertexForTargetVertex)
+        {
+            Geometry::PropertySet& target = mesh.VertexProperties();
+            for (const std::string& name : meshPayload.Vertices.Properties())
+            {
+                CopyVertexPropertyRemapped<glm::vec2>(
+                    meshPayload.Vertices, target, name, sourceVertexForTargetVertex);
+                CopyVertexPropertyRemapped<glm::vec3>(
+                    meshPayload.Vertices, target, name, sourceVertexForTargetVertex);
+                CopyVertexPropertyRemapped<glm::vec4>(
+                    meshPayload.Vertices, target, name, sourceVertexForTargetVertex);
+                CopyVertexPropertyRemapped<float>(
+                    meshPayload.Vertices, target, name, sourceVertexForTargetVertex);
+                CopyVertexPropertyRemapped<std::uint32_t>(
+                    meshPayload.Vertices, target, name, sourceVertexForTargetVertex);
+            }
+        }
+
+        void WriteVertexNormalsRemapped(
+            Geometry::HalfedgeMesh::Mesh& mesh,
+            const std::vector<glm::vec3>& normals,
+            const std::vector<std::uint32_t>& sourceVertexForTargetVertex)
+        {
+            if (mesh.VerticesSize() != sourceVertexForTargetVertex.size())
+            {
+                return;
+            }
+
+            auto normalProperty = mesh.VertexProperties().GetOrAdd<glm::vec3>(
+                std::string{kNormalProperty},
+                glm::vec3{0.0f});
+            auto& out = normalProperty.Vector();
+            out.resize(sourceVertexForTargetVertex.size());
+            for (std::size_t i = 0u; i < sourceVertexForTargetVertex.size(); ++i)
+            {
+                const std::uint32_t sourceIndex = sourceVertexForTargetVertex[i];
+                out[i] = sourceIndex < normals.size()
+                    ? normals[sourceIndex]
+                    : glm::vec3{0.0f};
+            }
+        }
 
         [[nodiscard]] std::vector<glm::vec3> ComputeAreaWeightedVertexNormals(
             const std::vector<glm::vec3>& positions,
@@ -154,6 +278,7 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] std::optional<Geometry::HalfedgeMesh::Mesh>
         BuildDisconnectedRenderableMesh(
+            const Geometry::MeshIO::MeshIOResult& meshPayload,
             const std::vector<glm::vec3>& positions,
             const std::vector<std::vector<std::uint32_t>>& faces,
             const std::vector<glm::vec3>& normals)
@@ -164,10 +289,8 @@ namespace Extrinsic::Runtime
             }
 
             Geometry::HalfedgeMesh::Mesh mesh;
-            auto normalProperty = mesh.VertexProperties().GetOrAdd<glm::vec3>(
-                std::string{kNormalProperty},
-                glm::vec3{0.0f});
             std::vector<Geometry::VertexHandle> faceVertices;
+            std::vector<std::uint32_t> sourceVertexForTargetVertex;
 
             for (const std::vector<std::uint32_t>& face : faces)
             {
@@ -189,7 +312,7 @@ namespace Extrinsic::Runtime
                     {
                         return std::nullopt;
                     }
-                    normalProperty.Vector()[vertex.Index] = normals[index];
+                    sourceVertexForTargetVertex.push_back(index);
                     faceVertices.push_back(vertex);
                 }
 
@@ -199,6 +322,11 @@ namespace Extrinsic::Runtime
                 }
             }
 
+            CopySupportedVertexPropertiesRemapped(
+                meshPayload,
+                mesh,
+                sourceVertexForTargetVertex);
+            WriteVertexNormalsRemapped(mesh, normals, sourceVertexForTargetVertex);
             return mesh;
         }
     }
@@ -259,6 +387,7 @@ namespace Extrinsic::Runtime
             {
                 if (std::optional<Geometry::HalfedgeMesh::Mesh> fallback =
                         BuildDisconnectedRenderableMesh(
+                            meshPayload,
                             positions.Vector(),
                             faces.Vector(),
                             normals))
@@ -270,6 +399,7 @@ namespace Extrinsic::Runtime
                 Core::ErrorCode::InvalidFormat);
         }
 
+        CopySupportedVertexProperties(meshPayload, converted.Mesh, positions.Vector().size());
         WriteVertexNormals(converted.Mesh, normals);
         return std::move(converted.Mesh);
     }

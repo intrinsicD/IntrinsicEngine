@@ -34,6 +34,10 @@ layout(location = 1) out vec4 GBuf_Albedo;
 layout(location = 2) out vec4 GBuf_Material;
 layout(location = 3) out uvec4 GBuf_EntityId;
 
+bool IsValidTextureID(uint id) {
+    return id != 0u && id != 0xFFFFFFFFu;
+}
+
 void main() {
     const GpuSceneTable scene = GpuSceneTableRef(pc.SceneTableBDA).Value;
 
@@ -46,7 +50,7 @@ void main() {
     const GpuMaterialSlot mat = materials.Data[inst.MaterialSlot];
 
     vec4 baseColor = mat.BaseColorFactor;
-    if (mat.AlbedoID != 0u) {
+    if (IsValidTextureID(mat.AlbedoID)) {
         baseColor *= texture(globalTextures[nonuniformEXT(mat.AlbedoID)], vUv);
     }
 
@@ -54,7 +58,14 @@ void main() {
         baseColor = cfg.UniformColor;
     }
 
-    const vec3 n = normalize(vWorldNormal);
+    vec3 n = normalize(vWorldNormal);
+    if (IsValidTextureID(mat.NormalID)) {
+        vec3 normalTex = texture(globalTextures[nonuniformEXT(mat.NormalID)], vUv).xyz * 2.0 - 1.0;
+        float normalTexLength = length(normalTex);
+        if (normalTexLength > 1.0e-6) {
+            n = normalTex / normalTexLength;
+        }
+    }
     GBuf_Normal = vec4(n, 0.0);
     GBuf_Albedo = baseColor;
     GBuf_Material = vec4(mat.RoughnessFactor, mat.MetallicFactor, float(cfg.ColorSourceMode), 0.0);
