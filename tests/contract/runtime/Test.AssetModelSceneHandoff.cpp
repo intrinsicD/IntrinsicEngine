@@ -121,6 +121,10 @@ namespace
         positions[0] = glm::vec3{0.0f, 0.0f, 0.0f};
         positions[1] = glm::vec3{1.0f, 0.0f, 0.0f};
         positions[2] = glm::vec3{0.0f, 1.0f, 0.0f};
+        auto normals = mesh.Vertices.GetOrAdd<glm::vec3>("v:normal", glm::vec3{0.0f});
+        normals[0] = glm::vec3{1.0f, 0.0f, 0.0f};
+        normals[1] = glm::vec3{0.0f, 1.0f, 0.0f};
+        normals[2] = glm::vec3{0.0f, 0.0f, -1.0f};
 
         mesh.Faces.Resize(1u);
         auto faces = mesh.Faces.GetOrAdd<std::vector<std::uint32_t>>("f:vertices", {});
@@ -230,6 +234,13 @@ TEST(RuntimeAssetModelSceneHandoff, MaterializeModelSceneCreatesMeshEntityAndUpl
     EXPECT_EQ(view.ActiveDomain, ECS::Components::GeometrySources::Domain::Mesh);
     EXPECT_EQ(view.VerticesAlive(), 3u);
     EXPECT_EQ(view.FacesAlive(), 1u);
+    ASSERT_NE(view.VertexSource, nullptr);
+    auto normals = view.VertexSource->Properties.Get<glm::vec3>("v:normal");
+    ASSERT_TRUE(normals.IsValid());
+    ASSERT_EQ(normals.Vector().size(), 3u);
+    EXPECT_EQ(normals[0], glm::vec3(1.0f, 0.0f, 0.0f));
+    EXPECT_EQ(normals[1], glm::vec3(0.0f, 1.0f, 0.0f));
+    EXPECT_EQ(normals[2], glm::vec3(0.0f, 0.0f, -1.0f));
 
     ASSERT_EQ(state->Record.Materials.size(), 1u);
     EXPECT_EQ(state->Record.Materials[0].TextureBindings.Albedo, childTexture);

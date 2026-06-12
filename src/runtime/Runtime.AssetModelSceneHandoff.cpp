@@ -32,11 +32,9 @@ import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.Renderer;
+import Extrinsic.Runtime.AssetMeshNormals;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Geometry.HalfedgeMesh.IO;
-import Geometry.Mesh.Conversion;
-import Geometry.MeshSoup;
-import Geometry.Properties;
 
 namespace Extrinsic::Runtime
 {
@@ -104,51 +102,6 @@ namespace Extrinsic::Runtime
             ++diagnostics->ModelSceneMaterializeFailures;
         }
 
-        [[nodiscard]] Core::Expected<Geometry::HalfedgeMesh::Mesh> BuildHalfedgeMesh(
-            const Geometry::MeshIO::MeshIOResult& meshPayload)
-        {
-            const auto positions = meshPayload.Vertices.Get<glm::vec3>("v:point");
-            if (!positions || positions.Vector().empty())
-            {
-                return Core::Err<Geometry::HalfedgeMesh::Mesh>(Core::ErrorCode::AssetInvalidData);
-            }
-
-            const auto faces = meshPayload.Faces.Get<std::vector<std::uint32_t>>("f:vertices");
-            if (!faces || faces.Vector().empty())
-            {
-                return Core::Err<Geometry::HalfedgeMesh::Mesh>(Core::ErrorCode::AssetInvalidData);
-            }
-
-            Geometry::MeshSoup::IndexedMesh soup{};
-            for (const glm::vec3& position : positions.Vector())
-            {
-                static_cast<void>(soup.AddVertex(position));
-            }
-
-            for (const std::vector<std::uint32_t>& face : faces.Vector())
-            {
-                if (face.size() < 3u)
-                {
-                    return Core::Err<Geometry::HalfedgeMesh::Mesh>(Core::ErrorCode::InvalidFormat);
-                }
-                for (const std::uint32_t index : face)
-                {
-                    if (index >= soup.VertexCount())
-                    {
-                        return Core::Err<Geometry::HalfedgeMesh::Mesh>(Core::ErrorCode::OutOfRange);
-                    }
-                }
-                static_cast<void>(soup.AddFace(face));
-            }
-
-            auto converted = Geometry::Mesh::Conversion::ToHalfedgeMesh(soup);
-            if (!converted.Succeeded())
-            {
-                return Core::Err<Geometry::HalfedgeMesh::Mesh>(Core::ErrorCode::InvalidFormat);
-            }
-            return std::move(converted.Mesh);
-        }
-
         [[nodiscard]] Core::Expected<std::vector<PreparedPrimitive>> PreparePrimitives(
             const Assets::AssetModelScenePayload& model)
         {
@@ -178,7 +131,7 @@ namespace Extrinsic::Runtime
                     return Core::Err<std::vector<PreparedPrimitive>>(meshPayload.error());
                 }
 
-                auto mesh = BuildHalfedgeMesh(**meshPayload);
+                auto mesh = BuildRuntimeHalfedgeMeshWithNormals(**meshPayload);
                 if (!mesh.has_value())
                 {
                     return Core::Err<std::vector<PreparedPrimitive>>(mesh.error());

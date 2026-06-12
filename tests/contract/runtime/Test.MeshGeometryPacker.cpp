@@ -60,6 +60,12 @@ namespace
         pos.Vector() = positions;
     }
 
+    void SetNormals(Vertices& v, const std::vector<glm::vec3>& normals)
+    {
+        auto normal = v.Properties.GetOrAdd<glm::vec3>(std::string{pn::kNormal}, glm::vec3(0.0f));
+        normal.Vector() = normals;
+    }
+
     void SetEdges(Edges& e,
                   const std::vector<std::uint32_t>& v0,
                   const std::vector<std::uint32_t>& v1)
@@ -174,6 +180,29 @@ TEST(MeshGeometryPackerTest, SingleTriangleVertexBytesMatchPositions)
     EXPECT_FLOAT_EQ(verts[2].Py, 1.0f);
     EXPECT_FLOAT_EQ(verts[0].U, 0.0f);
     EXPECT_FLOAT_EQ(verts[0].V, 0.0f);
+}
+
+TEST(MeshGeometryPackerTest, EncodesExplicitVertexNormalsInPackedUvSlot)
+{
+    MeshScratch mesh = BuildSingleTriangle();
+    SetNormals(mesh.VertexSource, {
+        {1.0f, 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f},
+        {0.0f, 0.0f, 1.0f},
+    });
+    MeshPackBuffer scratch;
+
+    const MeshPackResult result = PackMesh(mesh.View(), scratch);
+    ASSERT_EQ(result.Status, MeshPackStatus::Success);
+    ASSERT_TRUE(result.Upload.has_value());
+
+    const auto* verts = reinterpret_cast<const MeshVertex*>(result.Upload->PackedVertexBytes.data());
+    EXPECT_FLOAT_EQ(verts[0].U, 1.0f);
+    EXPECT_FLOAT_EQ(verts[0].V, 0.0f);
+    EXPECT_FLOAT_EQ(verts[1].U, 0.0f);
+    EXPECT_FLOAT_EQ(verts[1].V, 1.0f);
+    EXPECT_FLOAT_EQ(verts[2].U, 0.0f);
+    EXPECT_FLOAT_EQ(verts[2].V, 0.0f);
 }
 
 TEST(MeshGeometryPackerTest, SingleTriangleLocalSphereCentersAtAabbMidpoint)

@@ -9,6 +9,7 @@ target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Runtime.AssetGeometryIO.cppm
+        Runtime.AssetMeshNormals.cppm
         Runtime.AssetModelSceneHandoff.cppm
         Runtime.AssetModelTextureHandoff.cppm
         Runtime.AssetModelTextureIO.cppm
@@ -38,6 +39,7 @@ target_sources(${target_name}
         Visualization/Runtime.VisualizationAdapters.cppm
         PRIVATE
         Runtime.AssetGeometryIO.cpp
+        Runtime.AssetMeshNormals.cpp
         Runtime.AssetModelSceneHandoff.cpp
         Runtime.AssetModelTextureHandoff.cpp
         Runtime.AssetModelTextureIO.cpp

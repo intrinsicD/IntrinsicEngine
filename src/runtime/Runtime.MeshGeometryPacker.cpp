@@ -24,6 +24,11 @@ namespace Extrinsic::Runtime
         constexpr std::uint32_t kInvalidIndex = std::numeric_limits<std::uint32_t>::max();
         constexpr const char* kMeshDebugName = "Runtime.Mesh";
 
+        [[nodiscard]] float SignNotZero(const float value) noexcept
+        {
+            return value < 0.0f ? -1.0f : 1.0f;
+        }
+
         [[nodiscard]] MeshPackResult Failure(MeshPackStatus status, MeshPackBuffer& outBuffer) noexcept
         {
             outBuffer.Clear();
@@ -33,6 +38,33 @@ namespace Extrinsic::Runtime
         [[nodiscard]] bool IsFinite(const glm::vec3& p) noexcept
         {
             return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z);
+        }
+
+        [[nodiscard]] glm::vec2 EncodeOctNormalOrZero(glm::vec3 normal) noexcept
+        {
+            const float len = glm::length(normal);
+            if (!std::isfinite(len) || len <= 1.0e-6f)
+            {
+                return glm::vec2{0.0f};
+            }
+            normal /= len;
+
+            const float denom =
+                std::abs(normal.x) + std::abs(normal.y) + std::abs(normal.z);
+            if (denom <= 1.0e-6f)
+            {
+                return glm::vec2{0.0f};
+            }
+
+            glm::vec2 encoded{normal.x / denom, normal.y / denom};
+            if (normal.z < 0.0f)
+            {
+                encoded = glm::vec2{
+                    (1.0f - std::abs(encoded.y)) * SignNotZero(encoded.x),
+                    (1.0f - std::abs(encoded.x)) * SignNotZero(encoded.y),
+                };
+            }
+            return encoded;
         }
 
         // Outcome of walking one face slot's halfedge ring.
@@ -231,6 +263,14 @@ namespace Extrinsic::Runtime
 
         const std::uint32_t vertexCountU32 = static_cast<std::uint32_t>(vertexCount);
 
+        const auto normalProp =
+            view.VertexSource->Properties.Get<glm::vec3>(PropertyNames::kNormal);
+        const std::vector<glm::vec3>* normals = nullptr;
+        if (normalProp && normalProp.Vector().size() == vertexCount)
+        {
+            normals = &normalProp.Vector();
+        }
+
         for (std::size_t f = 0; f < faceCount; ++f)
         {
             const FaceRingOutcome outcome = ProduceFaceRing(
@@ -271,7 +311,9 @@ namespace Extrinsic::Runtime
             {
                 return Failure(MeshPackStatus::NonFinitePosition, outBuffer);
             }
-            vData[i] = MeshVertex{p.x, p.y, p.z, 0.0f, 0.0f};
+            const glm::vec2 normalUv =
+                normals != nullptr ? EncodeOctNormalOrZero((*normals)[i]) : glm::vec2{0.0f};
+            vData[i] = MeshVertex{p.x, p.y, p.z, normalUv.x, normalUv.y};
             minP = glm::min(minP, p);
             maxP = glm::max(maxP, p);
         }

@@ -14,6 +14,7 @@
 #include <vector>
 
 #include <entt/entity/entity.hpp>
+#include <glm/glm.hpp>
 
 import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.ImportRouter;
@@ -211,6 +212,99 @@ namespace
         });
         return found;
     }
+
+    void ExpectMeshVertexNormals(
+        ECS::Scene::Registry& registry,
+        const ECS::EntityHandle entity,
+        const std::vector<glm::vec3>& expected)
+    {
+        auto& raw = registry.Raw();
+        const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
+        ASSERT_TRUE(view.Valid());
+        ASSERT_EQ(view.ActiveDomain, GS::Domain::Mesh);
+        ASSERT_NE(view.VertexSource, nullptr);
+
+        auto normals = view.VertexSource->Properties.Get<glm::vec3>(
+            GS::PropertyNames::kNormal);
+        ASSERT_TRUE(normals.IsValid());
+        ASSERT_EQ(normals.Vector().size(), expected.size());
+        for (std::size_t i = 0u; i < expected.size(); ++i)
+        {
+            EXPECT_EQ(normals[i], expected[i]);
+        }
+    }
+}
+
+TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesVertexNormalsInGeometrySources)
+{
+    TempAssetFile meshFile(
+        "assetio041_normals.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "vn 1 0 0\n"
+        "vn 0 1 0\n"
+        "vn 0 0 -1\n"
+        "f 1//1 2//2 3//3\n");
+
+    Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    engine.Initialize();
+
+    auto imported = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+        .Path = meshFile.Path.string(),
+        .PayloadKind = Assets::AssetPayloadKind::Mesh,
+    });
+    ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
+    EXPECT_EQ(imported->PayloadKind, Assets::AssetPayloadKind::Mesh);
+    EXPECT_EQ(imported->PrimitiveEntitiesCreated, 1u);
+
+    const std::optional<ECS::EntityHandle> meshEntity =
+        FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
+    ASSERT_TRUE(meshEntity.has_value());
+    ExpectMeshVertexNormals(
+        engine.GetScene(),
+        *meshEntity,
+        {
+            {1.0f, 0.0f, 0.0f},
+            {0.0f, 1.0f, 0.0f},
+            {0.0f, 0.0f, -1.0f},
+        });
+
+    engine.Shutdown();
+}
+
+TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesVertexNormalsWhenMissing)
+{
+    TempAssetFile meshFile(
+        "assetio041_no_normals.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+
+    Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    engine.Initialize();
+
+    auto imported = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+        .Path = meshFile.Path.string(),
+        .PayloadKind = Assets::AssetPayloadKind::Mesh,
+    });
+    ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
+    EXPECT_EQ(imported->PrimitiveEntitiesCreated, 1u);
+
+    const std::optional<ECS::EntityHandle> meshEntity =
+        FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
+    ASSERT_TRUE(meshEntity.has_value());
+    ExpectMeshVertexNormals(
+        engine.GetScene(),
+        *meshEntity,
+        {
+            {0.0f, 0.0f, 1.0f},
+            {0.0f, 0.0f, 1.0f},
+            {0.0f, 0.0f, 1.0f},
+        });
+
+    engine.Shutdown();
 }
 
 TEST(RuntimeAssetImportFormatCoverage, RepresentativePromotedFormatsMaterializeDeterministically)

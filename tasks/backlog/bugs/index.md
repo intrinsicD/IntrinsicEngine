@@ -5,11 +5,13 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- No active BUG issues; new issues should be opened as focused BUG tasks before implementation.
+- No active BUG issues are tracked here.
 
 ---
 
 ## Verified / Closed
+
+- Closed 2026-06-12: [`BUG-041` — Asset mesh vertex normals are lost during runtime materialization](../../done/BUG-041-asset-mesh-vertex-normals.md). Runtime mesh materialization now copies explicit decoded `v:normal` vectors, computes deterministic area-weighted fallback normals when source normals are absent, applies the shared path to direct mesh imports and model-scene primitive handoff, and packs available mesh normals into the retained surface vertex layout's octahedral U/V channel.
 
 - Closed 2026-06-12: [`BUG-040` — Orbit camera vertical drag sign](../../done/BUG-040-orbit-camera-vertical-drag-sign.md). Orbit pitch drag now uses `+yDelta` in the quaternion trackball update, so mouse-up moves the camera above the target and mouse-down moves it below while keeping target centering, yaw, cross-pole rotation, focus, and other camera-controller coverage passing.
 

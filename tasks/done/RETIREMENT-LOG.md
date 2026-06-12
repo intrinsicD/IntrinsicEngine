@@ -9,6 +9,23 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`BUG-041`](BUG-041-asset-mesh-vertex-normals.md) — Asset mesh vertex normals
+are lost during runtime materialization — retired on 2026-06-12 at maturity
+`CPUContracted`. Geometry/model decoders already produced `v:normal` payloads
+for formats that supplied normals, but both runtime halfedge materialization
+paths rebuilt meshes from positions and face indices only, dropping the normal
+property before ECS `GeometrySources` population. Runtime now shares
+`BuildRuntimeHalfedgeMeshWithNormals(...)` across direct mesh imports and
+model-scene primitive handoff: explicit per-vertex normals are copied, missing
+source normals are filled with deterministic area-weighted unit normals, and
+the direct-import renderable fallback preserves the same normal data when
+strict shared topology fails only for renderable non-manifold/winding
+diagnostics. `MeshGeometryPacker` also encodes available mesh normals into the
+existing 20-byte surface vertex layout's U/V channel. Focused runtime
+regressions cover explicit OBJ normals, computed fallback normals, model-scene
+handoff, and packer output; the default CPU gate passed.
+
+Backlog
 [`BUG-040`](BUG-040-orbit-camera-vertical-drag-sign.md) — Orbit camera
 vertical drag sign — retired on 2026-06-12 at maturity `CPUContracted`. The
 `BUG-039` quaternion orbit fix preserved the legacy algebraic `-yDelta` pitch

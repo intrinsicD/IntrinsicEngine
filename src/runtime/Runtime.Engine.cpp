@@ -53,6 +53,7 @@ import Extrinsic.Graphics.SelectionSystem;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Runtime.AssetGeometryIO;
+import Extrinsic.Runtime.AssetMeshNormals;
 import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.AssetModelTextureIO;
@@ -87,8 +88,6 @@ import Geometry.Graph;
 import Geometry.AABB;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.IO;
-import Geometry.Mesh.Conversion;
-import Geometry.MeshSoup;
 import Geometry.OBB;
 import Geometry.PointCloud;
 import Geometry.PointCloud.IO;
@@ -294,146 +293,6 @@ namespace Extrinsic::Runtime
                 Graphics::Components::VisualizationConfig::ColorSource::UniformColor;
             visualization.Color = glm::vec4{1.0f, 1.0f, 1.0f, 1.0f};
             return visualization;
-        }
-
-        [[nodiscard]] bool CanUseDisconnectedRenderableFallback(
-            const Geometry::Mesh::Conversion::ToHalfedgeMeshResult& converted) noexcept
-        {
-            bool hasRenderableTopologyFailure = false;
-            for (const Geometry::Mesh::Conversion::ConversionDiagnostic& diagnostic :
-                 converted.Diagnostics)
-            {
-                if (diagnostic.Severity !=
-                    Geometry::MeshSoup::ValidationSeverity::Error)
-                {
-                    continue;
-                }
-
-                if (diagnostic.Kind ==
-                    Geometry::Mesh::Conversion::ConversionDiagnosticKind::AddFaceFailed)
-                {
-                    hasRenderableTopologyFailure = true;
-                    continue;
-                }
-
-                if (diagnostic.Kind !=
-                    Geometry::Mesh::Conversion::ConversionDiagnosticKind::ValidationDiagnostic)
-                {
-                    return false;
-                }
-
-                if (diagnostic.ValidationKind ==
-                        Geometry::MeshSoup::ValidationDiagnosticKind::NonManifoldEdge ||
-                    diagnostic.ValidationKind ==
-                        Geometry::MeshSoup::ValidationDiagnosticKind::InconsistentWinding)
-                {
-                    hasRenderableTopologyFailure = true;
-                    continue;
-                }
-
-                return false;
-            }
-            return hasRenderableTopologyFailure;
-        }
-
-        [[nodiscard]] std::optional<Geometry::HalfedgeMesh::Mesh>
-            BuildDisconnectedRenderableMesh(
-                const std::vector<glm::vec3>& positions,
-                const std::vector<std::vector<std::uint32_t>>& faces)
-        {
-            if (positions.empty() || faces.empty())
-            {
-                return std::nullopt;
-            }
-
-            Geometry::HalfedgeMesh::Mesh mesh;
-            std::vector<Geometry::VertexHandle> faceVertices;
-            for (const std::vector<std::uint32_t>& face : faces)
-            {
-                if (face.size() < 3u)
-                {
-                    return std::nullopt;
-                }
-
-                faceVertices.clear();
-                faceVertices.reserve(face.size());
-                for (const std::uint32_t index : face)
-                {
-                    if (index >= positions.size())
-                    {
-                        return std::nullopt;
-                    }
-                    faceVertices.push_back(mesh.AddVertex(positions[index]));
-                }
-
-                if (!mesh.AddFace(faceVertices).has_value())
-                {
-                    return std::nullopt;
-                }
-            }
-
-            return mesh;
-        }
-
-        [[nodiscard]] Core::Expected<Geometry::HalfedgeMesh::Mesh> BuildHalfedgeMesh(
-            const Geometry::MeshIO::MeshIOResult& meshPayload)
-        {
-            const auto positions = meshPayload.Vertices.Get<glm::vec3>("v:point");
-            if (!positions || positions.Vector().empty())
-            {
-                return Core::Err<Geometry::HalfedgeMesh::Mesh>(
-                    Core::ErrorCode::AssetInvalidData);
-            }
-
-            const auto faces =
-                meshPayload.Faces.Get<std::vector<std::uint32_t>>("f:vertices");
-            if (!faces || faces.Vector().empty())
-            {
-                return Core::Err<Geometry::HalfedgeMesh::Mesh>(
-                    Core::ErrorCode::AssetInvalidData);
-            }
-
-            Geometry::MeshSoup::IndexedMesh soup{};
-            for (const glm::vec3& position : positions.Vector())
-            {
-                static_cast<void>(soup.AddVertex(position));
-            }
-
-            for (const std::vector<std::uint32_t>& face : faces.Vector())
-            {
-                if (face.size() < 3u)
-                {
-                    return Core::Err<Geometry::HalfedgeMesh::Mesh>(
-                        Core::ErrorCode::InvalidFormat);
-                }
-                for (const std::uint32_t index : face)
-                {
-                    if (index >= soup.VertexCount())
-                    {
-                        return Core::Err<Geometry::HalfedgeMesh::Mesh>(
-                            Core::ErrorCode::OutOfRange);
-                    }
-                }
-                static_cast<void>(soup.AddFace(face));
-            }
-
-            auto converted = Geometry::Mesh::Conversion::ToHalfedgeMesh(soup);
-            if (!converted.Succeeded())
-            {
-                if (CanUseDisconnectedRenderableFallback(converted))
-                {
-                    if (std::optional<Geometry::HalfedgeMesh::Mesh> fallback =
-                            BuildDisconnectedRenderableMesh(
-                                positions.Vector(),
-                                faces.Vector()))
-                    {
-                        return std::move(*fallback);
-                    }
-                }
-                return Core::Err<Geometry::HalfedgeMesh::Mesh>(
-                    Core::ErrorCode::InvalidFormat);
-            }
-            return std::move(converted.Mesh);
         }
 
         struct DecodedMeshImport
@@ -674,7 +533,11 @@ namespace Extrinsic::Runtime
                         meshPayload.error());
                 }
 
-                auto mesh = BuildHalfedgeMesh(**meshPayload);
+                auto mesh = BuildRuntimeHalfedgeMeshWithNormals(
+                    **meshPayload,
+                    RuntimeMeshMaterializationOptions{
+                        .AllowDisconnectedRenderableFallback = true,
+                    });
                 if (!mesh.has_value())
                 {
                     return Core::Err<DecodedGeometryImport>(mesh.error());
