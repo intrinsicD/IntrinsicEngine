@@ -38,6 +38,12 @@ Use `flaky-quarantine` only as a temporary quarantine. Any test or executable
 with this label must have a linked task ID, a reason, and a removal condition in
 the relevant source or task record.
 
+Tests that drive `Engine::Run()` through a platform window must either force a
+headless-capable backend or guard a born-closed window with the established
+`ShouldClose() -> GTEST_SKIP()` pattern before asserting per-frame effects.
+Without that guard, headless GLFW hosts execute zero frames and report unrelated
+assertion failures instead of an explicit environment skip.
+
 Common gates:
 
 ```bash

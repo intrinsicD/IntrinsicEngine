@@ -1,5 +1,6 @@
 module;
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <span>
@@ -17,6 +18,45 @@ namespace Geometry
 {
     namespace Internal
     {
+        [[nodiscard]] bool RayAabbSlabInterval(const Ray& r,
+                                               const AABB& b,
+                                               float& tmin,
+                                               float& tmax)
+        {
+            tmin = -std::numeric_limits<float>::infinity();
+            tmax = std::numeric_limits<float>::infinity();
+
+            const auto updateAxis =
+                [&](const float origin,
+                    const float direction,
+                    const float slabMin,
+                    const float slabMax) -> bool
+            {
+                if (direction == 0.0f)
+                {
+                    return origin >= slabMin && origin <= slabMax;
+                }
+
+                const float invDir = 1.0f / direction;
+                float nearT = (slabMin - origin) * invDir;
+                float farT = (slabMax - origin) * invDir;
+                if (nearT > farT)
+                {
+                    const float tmp = nearT;
+                    nearT = farT;
+                    farT = tmp;
+                }
+
+                tmin = std::max(tmin, nearT);
+                tmax = std::min(tmax, farT);
+                return tmax >= tmin;
+            };
+
+            return updateAxis(r.Origin.x, r.Direction.x, b.Min.x, b.Max.x) &&
+                updateAxis(r.Origin.y, r.Direction.y, b.Min.y, b.Max.y) &&
+                updateAxis(r.Origin.z, r.Direction.z, b.Min.z, b.Max.z);
+        }
+
         bool SAT_TestAxis(const glm::vec3& axis, const std::span<const glm::vec3>& vertsA,
                           const std::span<const glm::vec3>& vertsB)
         {
@@ -167,17 +207,9 @@ namespace Geometry
 
         bool Overlap_Analytic(const Ray& r, const AABB& b)
         {
-            glm::vec3 invDir = 1.0f / r.Direction;
-            glm::vec3 t0s = (b.Min - r.Origin) * invDir;
-            glm::vec3 t1s = (b.Max - r.Origin) * invDir;
-
-            glm::vec3 tsmaller = glm::min(t0s, t1s);
-            glm::vec3 tbigger = glm::max(t0s, t1s);
-
-            float tmin = glm::max(tsmaller.x, glm::max(tsmaller.y, tsmaller.z));
-            float tmax = glm::min(tbigger.x, glm::min(tbigger.y, tbigger.z));
-
-            return (tmax >= tmin && tmax >= 0.0f);
+            float tmin = 0.0f;
+            float tmax = 0.0f;
+            return RayAabbSlabInterval(r, b, tmin, tmax) && tmax >= 0.0f;
         }
 
         bool Overlap_Analytic(const Ray& r, const Sphere& s)

@@ -1,6 +1,8 @@
 module;
 
+#include <algorithm>
 #include <cmath>
+#include <limits>
 #include <optional>
 
 #include <glm/glm.hpp>
@@ -11,6 +13,45 @@ module Geometry.ContactManifold;
 
 namespace Geometry::Internal
 {
+    [[nodiscard]] bool RayAabbSlabInterval(const Ray& r,
+                                           const AABB& b,
+                                           float& tmin,
+                                           float& tmax)
+    {
+        tmin = -std::numeric_limits<float>::infinity();
+        tmax = std::numeric_limits<float>::infinity();
+
+        const auto updateAxis =
+            [&](const float origin,
+                const float direction,
+                const float slabMin,
+                const float slabMax) -> bool
+        {
+            if (direction == 0.0f)
+            {
+                return origin >= slabMin && origin <= slabMax;
+            }
+
+            const float invDir = 1.0f / direction;
+            float nearT = (slabMin - origin) * invDir;
+            float farT = (slabMax - origin) * invDir;
+            if (nearT > farT)
+            {
+                const float tmp = nearT;
+                nearT = farT;
+                farT = tmp;
+            }
+
+            tmin = std::max(tmin, nearT);
+            tmax = std::min(tmax, farT);
+            return tmax >= tmin;
+        };
+
+        return updateAxis(r.Origin.x, r.Direction.x, b.Min.x, b.Max.x) &&
+            updateAxis(r.Origin.y, r.Direction.y, b.Min.y, b.Max.y) &&
+            updateAxis(r.Origin.z, r.Direction.z, b.Min.z, b.Max.z);
+    }
+
     std::optional<ContactManifold> Contact_Analytic(const Sphere& a, const Sphere& b)
     {
         glm::vec3 diff = b.Center - a.Center;
@@ -109,23 +150,31 @@ namespace Geometry::Internal
         RayHit hit{};
         hit.Distance = t;
         hit.Point = r.Origin + r.Direction * t;
-        hit.Normal = glm::normalize(hit.Point - s.Center);
+        const glm::vec3 centerToHit = hit.Point - s.Center;
+        if (glm::length2(centerToHit) > 1e-12f)
+        {
+            hit.Normal = glm::normalize(centerToHit);
+        }
+        else if (glm::length2(r.Direction) > 1e-12f)
+        {
+            hit.Normal = -glm::normalize(r.Direction);
+        }
+        else
+        {
+            hit.Normal = glm::vec3(0.0f, 1.0f, 0.0f);
+        }
         return hit;
     }
 
     std::optional<RayHit> RayCast_Analytic(const Ray& r, const AABB& box)
     {
-        glm::vec3 invDir = 1.0f / r.Direction;
-        glm::vec3 t0s = (box.Min - r.Origin) * invDir;
-        glm::vec3 t1s = (box.Max - r.Origin) * invDir;
+        float tmin = 0.0f;
+        float tmax = 0.0f;
 
-        glm::vec3 tsmaller = glm::min(t0s, t1s);
-        glm::vec3 tbigger = glm::max(t0s, t1s);
-
-        float tmin = glm::max(tsmaller.x, glm::max(tsmaller.y, tsmaller.z));
-        float tmax = glm::min(tbigger.x, glm::min(tbigger.y, tbigger.z));
-
-        if (tmax < tmin || tmax < 0.0f) return std::nullopt;
+        if (!RayAabbSlabInterval(r, box, tmin, tmax) || tmax < 0.0f)
+        {
+            return std::nullopt;
+        }
 
         RayHit hit{};
         hit.Distance = tmin > 0 ? tmin : tmax;

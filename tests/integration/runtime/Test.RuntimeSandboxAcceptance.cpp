@@ -412,6 +412,12 @@ TEST(RuntimeSandboxAcceptance, ViewportLeftClickSubmitsSelectionPick)
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<InjectClickAndExitApplication>());
     engine.Initialize();
 
+    if (engine.GetWindow().ShouldClose())
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "window backend unavailable; viewport click coverage requires a live window";
+    }
+
     engine.Run();
 
     const Runtime::SelectionControllerDiagnostics diagnostics =
@@ -481,6 +487,12 @@ TEST(RuntimeSandboxAcceptance, InspectorTransformEditFlushedToRenderStateSameFra
     Runtime::Engine engine(HeadlessConfig(), std::move(app));
     engine.Initialize();
 
+    if (engine.GetWindow().ShouldClose())
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "window backend unavailable; inspector edit coverage requires a live window";
+    }
+
     engine.Run();
 
     ASSERT_EQ(appPtr->LastStatus, Runtime::SandboxEditorCommandStatus::Applied);
@@ -496,4 +508,3 @@ TEST(RuntimeSandboxAcceptance, InspectorTransformEditFlushedToRenderStateSameFra
 
     engine.Shutdown();
 }
-

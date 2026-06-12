@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <array>
 #include <vector>
 
@@ -86,3 +87,19 @@ TEST(BVH, HandlesCoincidentCentroidsWithoutDroppingElements)
     EXPECT_EQ(overlaps[2], 2u);
 }
 
+TEST(BVH, QueryRayIncludesBoundaryCoincidentBoxes)
+{
+    std::vector<Geometry::AABB> boxes{
+        Geometry::AABB{{0.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 1.0f}},
+        Geometry::AABB{{3.0f, 0.0f, 0.0f}, {4.0f, 1.0f, 1.0f}},
+    };
+
+    Geometry::BVH bvh;
+    ASSERT_TRUE(bvh.Build(boxes).has_value());
+
+    std::vector<Geometry::BVH::ElementIndex> overlaps;
+    bvh.QueryRay(Geometry::Ray{{0.0f, 5.0f, 0.0f}, {0.0f, -1.0f, 0.0f}}, overlaps);
+
+    EXPECT_NE(std::find(overlaps.begin(), overlaps.end(), 0u), overlaps.end());
+    EXPECT_EQ(std::find(overlaps.begin(), overlaps.end(), 1u), overlaps.end());
+}

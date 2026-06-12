@@ -358,6 +358,53 @@ namespace Geometry::MeshIO
             return scalar == PlyScalar::Float32 || scalar == PlyScalar::Float64;
         }
 
+        [[nodiscard]] bool IsPlyIntegralScalar(PlyScalar scalar)
+        {
+            return !IsPlyFloatingScalar(scalar);
+        }
+
+        [[nodiscard]] bool IsPlySignedIntegralScalar(PlyScalar scalar)
+        {
+            return scalar == PlyScalar::Int8 ||
+                scalar == PlyScalar::Int16 ||
+                scalar == PlyScalar::Int32;
+        }
+
+        [[nodiscard]] bool CheckedRecordByteCount(std::size_t count,
+                                                  std::size_t stride,
+                                                  std::size_t& outBytes)
+        {
+            if (stride != 0 && count > std::numeric_limits<std::size_t>::max() / stride)
+            {
+                return false;
+            }
+            outBytes = count * stride;
+            return true;
+        }
+
+        [[nodiscard]] bool HasRemainingRecords(const std::byte* cursor,
+                                               const std::byte* end,
+                                               std::size_t count,
+                                               std::size_t stride)
+        {
+            std::size_t byteCount = 0;
+            return CheckedRecordByteCount(count, stride, byteCount) &&
+                static_cast<std::size_t>(end - cursor) >= byteCount;
+        }
+
+        [[nodiscard]] std::size_t TextBoundedReserveCount(std::string_view text,
+                                                          std::size_t cursor,
+                                                          std::size_t declaredCount,
+                                                          std::size_t minBytesPerRow)
+        {
+            const std::size_t remaining = cursor <= text.size() ? text.size() - cursor : 0u;
+            if (minBytesPerRow == 0)
+            {
+                return declaredCount;
+            }
+            return std::min(declaredCount, remaining / minBytesPerRow);
+        }
+
         void ByteSwap(std::byte* p, std::size_t n);
 
         [[nodiscard]] float ReadFloatingScalarAt(const std::byte* base,
@@ -476,6 +523,26 @@ namespace Geometry::MeshIO
             return T{};
         }
 
+        [[nodiscard]] std::optional<std::uint64_t> ReadPlyListCount(const std::byte*& cursor,
+                                                                    PlyScalar type,
+                                                                    bool bigEndian)
+        {
+            if (IsPlySignedIntegralScalar(type))
+            {
+                const auto value = ReadScalarAs<std::int64_t>(cursor, type, bigEndian);
+                if (value < 0)
+                {
+                    return std::nullopt;
+                }
+                return static_cast<std::uint64_t>(value);
+            }
+            if (IsPlyIntegralScalar(type))
+            {
+                return ReadScalarAs<std::uint64_t>(cursor, type, bigEndian);
+            }
+            return std::nullopt;
+        }
+
         [[nodiscard]] Core::Expected<MeshIOResult> ParseAsciiPLY(std::string_view text,
                                                                 std::size_t cursor,
                                                                 const std::vector<PlyElement>& elements,
@@ -557,22 +624,29 @@ namespace Geometry::MeshIO
             const auto texVIndex = firstPropertyOf({"t", "v", "texture_v", "texcoord_v", "v0"});
             const bool hasTexcoords = texUIndex && texVIndex;
 
+            const std::size_t vertexReserve = TextBoundedReserveCount(text, cursor, vertexCount, 2u);
+            const std::size_t faceReserve = TextBoundedReserveCount(text, cursor, faceCount, 2u);
+            if (vertexReserve < vertexCount || faceReserve < faceCount)
+            {
+                return InvalidMeshFormat();
+            }
+
             std::vector<glm::vec3> vertices;
-            vertices.reserve(vertexCount);
+            vertices.reserve(vertexReserve);
             std::vector<glm::vec3> normals;
             if (hasNormals)
             {
-                normals.reserve(vertexCount);
+                normals.reserve(vertexReserve);
             }
             std::vector<glm::vec4> colors;
             if (hasColors)
             {
-                colors.reserve(vertexCount);
+                colors.reserve(vertexReserve);
             }
             std::vector<glm::vec2> texcoords;
             if (hasTexcoords)
             {
-                texcoords.reserve(vertexCount);
+                texcoords.reserve(vertexReserve);
             }
             std::string_view line;
             for (std::size_t i = 0; i < vertexCount; ++i)
@@ -653,7 +727,7 @@ namespace Geometry::MeshIO
             }
 
             std::vector<std::vector<std::uint32_t>> faces;
-            faces.reserve(faceCount);
+            faces.reserve(faceReserve);
             for (std::size_t i = 0; i < faceCount; ++i)
             {
                 if (!NextLine(text, cursor, line))
@@ -666,7 +740,7 @@ namespace Geometry::MeshIO
                     return InvalidMeshFormat();
                 }
                 const auto count = ParseNumber<std::size_t>(tokens[0]);
-                if (!count || *count < 3 || tokens.size() < *count + 1)
+                if (!count || *count < 3 || *count > tokens.size() - 1)
                 {
                     return InvalidMeshFormat();
                 }
@@ -811,7 +885,12 @@ namespace Geometry::MeshIO
                 {
                     texVIndex = static_cast<int>(i);
                 }
-                vertexStride += PlyScalarBytes(p.ScalarType);
+                const std::size_t scalarBytes = PlyScalarBytes(p.ScalarType);
+                if (vertexStride > std::numeric_limits<std::size_t>::max() - scalarBytes)
+                {
+                    return InvalidMeshFormat();
+                }
+                vertexStride += scalarBytes;
             }
             if (xIndex < 0 || yIndex < 0 || zIndex < 0)
             {
@@ -849,6 +928,17 @@ namespace Geometry::MeshIO
             const std::byte* cursor = body.data();
             const std::byte* const end = body.data() + body.size();
 
+            std::size_t vertexBytes = 0;
+            if (!CheckedRecordByteCount(vertexElement->Count, vertexStride, vertexBytes) ||
+                static_cast<std::size_t>(end - cursor) < vertexBytes)
+            {
+                return InvalidMeshFormat();
+            }
+            if (!HasRemainingRecords(cursor + vertexBytes, end, faceElement->Count, 1u))
+            {
+                return InvalidMeshFormat();
+            }
+
             std::vector<glm::vec3> vertices;
             vertices.reserve(vertexElement->Count);
             std::vector<glm::vec3> normals;
@@ -879,7 +969,11 @@ namespace Geometry::MeshIO
             {
                 if (&element == vertexElement)
                 {
-                    const std::size_t total = element.Count * vertexStride;
+                    std::size_t total = 0;
+                    if (!CheckedRecordByteCount(element.Count, vertexStride, total))
+                    {
+                        return InvalidMeshFormat();
+                    }
                     if (static_cast<std::size_t>(end - cursor) < total)
                     {
                         return InvalidMeshFormat();
@@ -957,10 +1051,18 @@ namespace Geometry::MeshIO
                             {
                                 return InvalidMeshFormat();
                             }
-                            const auto count = ReadScalarAs<std::uint64_t>(cursor, prop.ListCountType, bigEndian);
+                            const auto count = ReadPlyListCount(cursor, prop.ListCountType, bigEndian);
+                            if (!count || *count > std::numeric_limits<std::size_t>::max())
+                            {
+                                return InvalidMeshFormat();
+                            }
 
                             const std::size_t elemBytes = PlyScalarBytes(prop.ScalarType);
-                            const std::size_t totalBytes = static_cast<std::size_t>(count) * elemBytes;
+                            std::size_t totalBytes = 0;
+                            if (!CheckedRecordByteCount(static_cast<std::size_t>(*count), elemBytes, totalBytes))
+                            {
+                                return InvalidMeshFormat();
+                            }
                             if (static_cast<std::size_t>(end - cursor) < totalBytes)
                             {
                                 return InvalidMeshFormat();
@@ -968,12 +1070,12 @@ namespace Geometry::MeshIO
 
                             if (static_cast<int>(i) == faceListIndex)
                             {
-                                if (count < 3)
+                                if (*count < 3)
                                 {
                                     return InvalidMeshFormat();
                                 }
-                                face.reserve(static_cast<std::size_t>(count));
-                                for (std::uint64_t j = 0; j < count; ++j)
+                                face.reserve(static_cast<std::size_t>(*count));
+                                for (std::uint64_t j = 0; j < *count; ++j)
                                 {
                                     const auto idx = ReadScalarAs<std::uint64_t>(cursor, prop.ScalarType, bigEndian);
                                     if (idx >= vertexElement->Count)
@@ -1010,13 +1112,22 @@ namespace Geometry::MeshIO
                             hasList = true;
                             break;
                         }
-                        scalarStride += PlyScalarBytes(p.ScalarType);
+                        const std::size_t scalarBytes = PlyScalarBytes(p.ScalarType);
+                        if (scalarStride > std::numeric_limits<std::size_t>::max() - scalarBytes)
+                        {
+                            return InvalidMeshFormat();
+                        }
+                        scalarStride += scalarBytes;
                     }
                     if (hasList)
                     {
                         return InvalidMeshFormat();
                     }
-                    const std::size_t total = element.Count * scalarStride;
+                    std::size_t total = 0;
+                    if (!CheckedRecordByteCount(element.Count, scalarStride, total))
+                    {
+                        return InvalidMeshFormat();
+                    }
                     if (static_cast<std::size_t>(end - cursor) < total)
                     {
                         return InvalidMeshFormat();
@@ -1468,17 +1579,24 @@ namespace Geometry::MeshIO
             return InvalidMeshFormat();
         }
 
+        const std::size_t vertexReserve = TextBoundedReserveCount(*text, cursor, *vertexCount, 2u);
+        const std::size_t faceReserve = TextBoundedReserveCount(*text, cursor, *faceCount, 2u);
+        if (vertexReserve < *vertexCount || faceReserve < *faceCount)
+        {
+            return InvalidMeshFormat();
+        }
+
         std::vector<glm::vec3> vertices;
-        vertices.reserve(*vertexCount);
+        vertices.reserve(vertexReserve);
         std::vector<glm::vec3> normals;
         if (hasNormals)
         {
-            normals.reserve(*vertexCount);
+            normals.reserve(vertexReserve);
         }
         std::vector<glm::vec4> colors;
         if (hasColors)
         {
-            colors.reserve(*vertexCount);
+            colors.reserve(vertexReserve);
         }
         for (std::size_t i = 0; i < *vertexCount; ++i)
         {
@@ -1564,7 +1682,7 @@ namespace Geometry::MeshIO
         }
 
         std::vector<std::vector<std::uint32_t>> faces;
-        faces.reserve(*faceCount);
+        faces.reserve(faceReserve);
         for (std::size_t i = 0; i < *faceCount; ++i)
         {
             if (!NextLine(*text, cursor, line))
@@ -1584,9 +1702,9 @@ namespace Geometry::MeshIO
             const auto count = ParseNumber<std::size_t>(tokens[0]);
             if (!count || *count < 3)
             {
-                continue;
+                return InvalidMeshFormat();
             }
-            if (tokens.size() < *count + 1)
+            if (*count > tokens.size() - 1)
             {
                 return InvalidMeshFormat();
             }
@@ -1711,7 +1829,7 @@ namespace Geometry::MeshIO
                 {
                     const auto countType = ParsePlyScalarType(tokens[2]);
                     const auto elemType = ParsePlyScalarType(tokens[3]);
-                    if (!countType || !elemType)
+                    if (!countType || !elemType || !IsPlyIntegralScalar(*countType))
                     {
                         return InvalidMeshFormat();
                     }
@@ -2671,5 +2789,3 @@ namespace Geometry::MeshIO
         return MeshIOWriteStatus::Success;
     }
 }
-
-

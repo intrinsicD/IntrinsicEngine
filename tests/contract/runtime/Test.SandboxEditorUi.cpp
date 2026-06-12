@@ -2907,6 +2907,13 @@ TEST(SandboxEditorUi, DroppedFilePathsRouteAmbiguousPlyThroughRuntimeImportFacad
     EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::PointCloud), 0u);
     EXPECT_FALSE(engine.GetLastAssetImportEvent().has_value());
 
+    if (engine.GetWindow().ShouldClose())
+    {
+        ui.Detach();
+        engine.Shutdown();
+        GTEST_SKIP() << "window backend unavailable; dropped-file import coverage requires a live window";
+    }
+
     engine.Run();
 
     EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::PointCloud), 1u);
@@ -2948,6 +2955,14 @@ TEST(SandboxEditorUi, PlatformDropEventImportsObjMeshSelectsItAndEnablesRenderCo
     engine.DispatchPlatformEventForTest(Plat::WindowDropEvent{
         .Paths = {meshFile.Path.string()},
     });
+
+    if (engine.GetWindow().ShouldClose())
+    {
+        ui.Detach();
+        engine.Shutdown();
+        GTEST_SKIP() << "window backend unavailable; platform drop coverage requires a live window";
+    }
+
     engine.Run();
 
     EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
@@ -3034,6 +3049,13 @@ TEST(SandboxEditorUi, PlatformDropEventImportsOffMesh)
     engine.DispatchPlatformEventForTest(Plat::WindowDropEvent{
         .Paths = {meshFile.Path.string()},
     });
+
+    if (engine.GetWindow().ShouldClose())
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "window backend unavailable; platform drop coverage requires a live window";
+    }
+
     engine.Run();
 
     EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
@@ -3061,6 +3083,12 @@ TEST(SandboxEditorUi, PlatformCloseEventStopsEngineRunState)
     engine.Initialize();
 
     ASSERT_TRUE(engine.IsRunning());
+    if (engine.GetWindow().ShouldClose())
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "window backend unavailable; close-event loop coverage requires a live window";
+    }
+
     engine.DispatchPlatformEventForTest(Plat::WindowCloseEvent{});
     engine.Run();
 

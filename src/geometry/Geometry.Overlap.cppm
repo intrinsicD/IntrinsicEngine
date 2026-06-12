@@ -13,6 +13,9 @@ export namespace Geometry
 {
     namespace Internal
     {
+        // Ray/AABB overlap treats slab boundaries as inclusive. Axis-parallel
+        // rays with zero or negative-zero components are valid when their
+        // origin lies inside the corresponding slab.
         bool Overlap_Analytic(const OBB& a, const OBB& b);
         bool Overlap_Analytic(const OBB& a, const Sphere& b);
         bool Overlap_Analytic(const Frustum& f, const AABB& box);

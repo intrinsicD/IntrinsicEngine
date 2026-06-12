@@ -1,5 +1,8 @@
 // tests/Test_Overlap.cpp — Primitive overlap / intersection tests.
 #include <gtest/gtest.h>
+
+#include <array>
+
 #include <glm/glm.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtc/quaternion.hpp>
@@ -99,6 +102,34 @@ TEST(Overlap, RayAABBInsideBox)
     Ray ray{glm::vec3(0, 0, 0), glm::vec3(1, 0, 0)};
     AABB box{glm::vec3(-1), glm::vec3(1)};
     EXPECT_TRUE(TestOverlap(ray, box));
+}
+
+TEST(Overlap, RayAABBOnSlabBoundaryAxisParallel)
+{
+    const AABB box{glm::vec3(0, 0, 0), glm::vec3(1, 1, 1)};
+
+    EXPECT_TRUE(TestOverlap(Ray{glm::vec3(0, 5, 0), glm::vec3(0, -1, 0)}, box));
+    EXPECT_TRUE(TestOverlap(Ray{glm::vec3(1, 5, 1), glm::vec3(0, -1, 0)}, box));
+    EXPECT_TRUE(TestOverlap(Ray{glm::vec3(-0.0f, 5, 0), glm::vec3(-0.0f, -1, 0)}, box));
+    EXPECT_FALSE(TestOverlap(Ray{glm::vec3(0, 5, 2), glm::vec3(0, -1, 0)}, box));
+}
+
+TEST(Overlap, RayAABBOverlapMatchesRayCastForBoundaryCorpus)
+{
+    const AABB box{glm::vec3(0, 0, 0), glm::vec3(1, 1, 1)};
+    const std::array<Ray, 6> rays{
+        Ray{glm::vec3(0, 5, 0), glm::vec3(0, -1, 0)},
+        Ray{glm::vec3(1, 5, 1), glm::vec3(0, -1, 0)},
+        Ray{glm::vec3(0.5f, 0.5f, 0.5f), glm::vec3(0, 0, 1)},
+        Ray{glm::vec3(2, 5, 0), glm::vec3(0, -1, 0)},
+        Ray{glm::vec3(0, 5, 2), glm::vec3(0, -1, 0)},
+        Ray{glm::vec3(0, -5, 1), glm::vec3(0, 1, 0)},
+    };
+
+    for (const Ray& ray : rays)
+    {
+        EXPECT_EQ(TestOverlap(ray, box), RayCast(ray, box).has_value());
+    }
 }
 
 // ============================================================================

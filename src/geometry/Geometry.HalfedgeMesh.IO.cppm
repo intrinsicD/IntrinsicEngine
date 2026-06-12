@@ -10,6 +10,9 @@ import Core.Error;
 
 export namespace Geometry::MeshIO
 {
+    // Importers treat file-declared row counts as untrusted input: payload
+    // capacity is validated before allocation, byte-size arithmetic is
+    // overflow-checked, and malformed/degenerate topology rows fail closed.
     struct MeshIOResult
     {
         PropertySet Vertices{};

@@ -26,23 +26,23 @@ maturity_target: CPUContracted
 
 ## Required changes
 
-- [ ] Make `IntrinsicBenchmarkSmoke` part of the `IntrinsicTests` aggregate: in `benchmarks/CMakeLists.txt`, guard-add `if(TARGET IntrinsicTests) add_dependencies(IntrinsicTests IntrinsicBenchmarkSmoke) endif()` next to the CTest registration (or register through the same global-property helper the test tree uses — pick whichever keeps a single registration idiom and note the choice in the PR).
-- [ ] Confirm ordering: `benchmarks/` must be added after the aggregate target exists (check `add_subdirectory` order in the root `CMakeLists.txt`; if `benchmarks/` precedes `tests/`, use the global-property route instead of `if(TARGET …)`).
+- [x] Make `IntrinsicBenchmarkSmoke` part of the `IntrinsicTests` aggregate: in `benchmarks/CMakeLists.txt`, guard-add `if(TARGET IntrinsicTests) add_dependencies(IntrinsicTests IntrinsicBenchmarkSmoke) endif()` next to the CTest registration (or register through the same global-property helper the test tree uses — pick whichever keeps a single registration idiom and note the choice in the PR).
+- [x] Confirm ordering: `benchmarks/` must be added after the aggregate target exists (check `add_subdirectory` order in the root `CMakeLists.txt`; if `benchmarks/` precedes `tests/`, use the global-property route instead of `if(TARGET …)`).
 
 ## Tests
 
-- [ ] Fresh-tree proof: clean configure, build **only** `IntrinsicTests`, run the default gate — `IntrinsicBenchmarkSmoke.Run` and `.Validate` execute and pass (no "Not Run").
-- [ ] Full-preset build still green (CI parity).
+- [x] Fresh-tree proof: clean configure, build **only** `IntrinsicTests`, run the default gate — `IntrinsicBenchmarkSmoke.Run` and `.Validate` execute and pass (no "Not Run").
+- [x] Full-preset build still green (CI parity).
 
 ## Docs
 
-- [ ] None expected; AGENTS.md §5/§7/§10 already describe the intended flow — this change makes the tree match the docs. Update `benchmarks/README.md` only if it documents the target relationships.
+- [x] None expected; AGENTS.md §5/§7/§10 already describe the intended flow — this change makes the tree match the docs. Update `benchmarks/README.md` only if it documents the target relationships.
 
 ## Acceptance criteria
 
-- [ ] `cmake --build --preset ci --target IntrinsicTests` produces `build/ci/bin/IntrinsicBenchmarkSmoke`.
-- [ ] Default CPU gate on a fresh tree has zero "Not Run" entries from the benchmark smoke pair.
-- [ ] No duplicate/conflicting registration of the smoke runner.
+- [x] `cmake --build --preset ci --target IntrinsicTests` produces `build/ci/bin/IntrinsicBenchmarkSmoke`.
+- [x] Default CPU gate on a fresh tree has zero "Not Run" entries from the benchmark smoke pair.
+- [x] No duplicate/conflicting registration of the smoke runner.
 
 ## Verification
 
@@ -53,6 +53,13 @@ cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -R 'IntrinsicBenchmarkSmoke' --timeout 60
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 ```
+
+2026-06-12 results:
+- Commit: pending local BUG loop closure commit.
+- The current tree already registers `IntrinsicBenchmarkSmoke` through the shared `INTRINSIC_REGISTERED_TEST_TARGETS` aggregate path in `benchmarks/CMakeLists.txt`.
+- `cmake --build --preset ci --target IntrinsicTests` produced `build/ci/bin/IntrinsicBenchmarkSmoke`.
+- Focused BUG regression set passed `IntrinsicBenchmarkSmoke.Run` and `IntrinsicBenchmarkSmoke.Validate` (2/2).
+- Default CPU-supported CTest gate passed with no benchmark "Not Run" entries.
 
 ## Forbidden changes
 

@@ -112,7 +112,8 @@ Open members:
   module names after promoted equivalents exist.
 - [`runtime/RUNTIME-101-asset-ingest-state-machine.md`](runtime/RUNTIME-101-asset-ingest-state-machine.md),
   [`runtime/RUNTIME-103-geometry-algorithm-execution-queue.md`](runtime/RUNTIME-103-geometry-algorithm-execution-queue.md),
-  [`runtime/RUNTIME-105-remove-streaming-graph-bridge.md`](runtime/RUNTIME-105-remove-streaming-graph-bridge.md).
+  [`runtime/RUNTIME-105-remove-streaming-graph-bridge.md`](runtime/RUNTIME-105-remove-streaming-graph-bridge.md),
+  [`runtime/RUNTIME-107-headless-engine-loop-coverage.md`](runtime/RUNTIME-107-headless-engine-loop-coverage.md).
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`ui/RORG-031-ui-integration.md`](ui/RORG-031-ui-integration.md).
 - [`platform/PLATFORM-004-alternative-platform-backend-onboarding.md`](platform/PLATFORM-004-alternative-platform-backend-onboarding.md) (planning-only seed).
@@ -122,13 +123,11 @@ Open members:
 Reproducible correctness/regression fixes only. Origin:
 [`bugs/index.md`](bugs/index.md).
 
-Open members are tracked in [`bugs/index.md`](bugs/index.md) — currently the
-2026-06-11 severe-bug audit set (`BUG-030` headless default-gate red on main,
-`BUG-031` benchmark smoke missing from the `IntrinsicTests` aggregate,
-`BUG-033` mesh-IO untrusted header counts, `BUG-034`/`BUG-035` Vulkan
-resource-pool reclamation, `BUG-029` ray/AABB slab NaN poisoning, and
-`BUG-032` triangle edge/point Vulkan rendering. New reproducible bugs open
-under `bugs/` per the index.
+Open members are tracked in [`bugs/index.md`](bugs/index.md). The 2026-06-11
+severe-bug audit set (`BUG-029` through `BUG-035`) is retired; BUG-030's
+non-bug headless loop coverage follow-up is tracked by
+[`runtime/RUNTIME-107-headless-engine-loop-coverage.md`](runtime/RUNTIME-107-headless-engine-loop-coverage.md).
+New reproducible bugs open under `bugs/` per the index.
 
 Resolved bug history lives in [`bugs/index.md`](bugs/index.md) and the
 retirement log.

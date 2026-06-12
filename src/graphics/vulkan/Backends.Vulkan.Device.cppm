@@ -229,6 +229,7 @@ namespace Extrinsic::Backends::Vulkan
 
         void DeferDelete(VulkanDeferredDelete fn);
         void FlushDeletionQueue(uint32_t frameSlot);
+        void ProcessResourcePoolDeletions();
 
         VkInstance               m_Instance       = VK_NULL_HANDLE;
         VkDebugUtilsMessengerEXT m_Messenger      = VK_NULL_HANDLE;

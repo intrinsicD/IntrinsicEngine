@@ -33,35 +33,35 @@ maturity_target: CPUContracted
 
 ## Required changes
 
-- [ ] Add an overflow-safe size-guard helper (file-local, in the module implementation unit) for "does the remaining payload hold `count` records of `stride` bytes": reject when `stride != 0 && count > remaining / stride` — division, never multiplication.
-- [ ] Binary PLY: validate `vertexElement->Count` / `faceElement->Count` against `end - cursor` with the helper **before** the reserves at 853-870; replace the multiply-checks at 882-886 and 955-967 with the helper (face rows have a ≥1-byte/record lower bound via the list-count scalar; use that as the stride floor for `faceElement->Count`).
-- [ ] ASCII PLY and OFF: before reserving (561-576, 656, 1472-1481, 1567), clamp the reserve argument by a conservative payload bound (remaining text bytes / minimal bytes-per-row, e.g. 2 for "0\n") so a hostile count cannot drive allocation; keep the parse loops themselves driven by the declared counts so truncated files still fail with `InvalidMeshFormat`.
-- [ ] Reject non-integral `ListCountType` at header parse (1710-1721) per PLY spec, and reject negative list counts for signed integral count types explicitly at 960 before any use.
-- [ ] OFF face rows with unparseable or `< 3` vertex counts return `InvalidMeshFormat` (1584-1588) instead of silently skipping, matching the binary-PLY policy. If a deliberate lenient mode is ever wanted it must be opt-in and diagnosed, not default-silent.
-- [ ] Sweep the remaining `reserve(` sites in this file (561, 565, 570, 575, 656, 674, 853, 857, 862, 867, 870, 975, 1101, 1103, 1279, 1594…) and confirm each is bounded by validated data (STL at 1101/1103 is already safe; document per-site disposition in the PR description).
+- [x] Add an overflow-safe size-guard helper (file-local, in the module implementation unit) for "does the remaining payload hold `count` records of `stride` bytes": reject when `stride != 0 && count > remaining / stride` — division, never multiplication.
+- [x] Binary PLY: validate `vertexElement->Count` / `faceElement->Count` against `end - cursor` with the helper **before** the reserves at 853-870; replace the multiply-checks at 882-886 and 955-967 with the helper (face rows have a ≥1-byte/record lower bound via the list-count scalar; use that as the stride floor for `faceElement->Count`).
+- [x] ASCII PLY and OFF: before reserving (561-576, 656, 1472-1481, 1567), clamp the reserve argument by a conservative payload bound (remaining text bytes / minimal bytes-per-row, e.g. 2 for "0\n") so a hostile count cannot drive allocation; keep the parse loops themselves driven by the declared counts so truncated files still fail with `InvalidMeshFormat`.
+- [x] Reject non-integral `ListCountType` at header parse (1710-1721) per PLY spec, and reject negative list counts for signed integral count types explicitly at 960 before any use.
+- [x] OFF face rows with unparseable or `< 3` vertex counts return `InvalidMeshFormat` (1584-1588) instead of silently skipping, matching the binary-PLY policy. If a deliberate lenient mode is ever wanted it must be opt-in and diagnosed, not default-silent.
+- [x] Sweep the remaining `reserve(` sites in this file (561, 565, 570, 575, 656, 674, 853, 857, 862, 867, 870, 975, 1101, 1103, 1279, 1594…) and confirm each is bounded by validated data (STL at 1101/1103 is already safe; document per-site disposition in the PR description).
 
 ## Tests
 
-- [ ] Extend `tests/unit/geometry/Test.GeometryIO.cpp` (or add a sibling `Test.GeometryIOUntrustedInput.cpp`, label `unit;geometry`) with in-memory/temp-file cases:
-  - [ ] PLY (ascii + binary) declaring a huge `element vertex` count with a tiny body → `InvalidMeshFormat`, process survives.
-  - [ ] Binary PLY whose `Count * stride` would wrap `size_t` → `InvalidMeshFormat`.
-  - [ ] PLY `property list float32 …` (non-integral count type) → `InvalidMeshFormat` at header parse.
-  - [ ] Binary PLY with a negative `int32` list count → `InvalidMeshFormat`.
-  - [ ] OFF declaring a huge vertex/face count with a tiny body → `InvalidMeshFormat`.
-  - [ ] OFF with a `2 0 1` face row → `InvalidMeshFormat` (new strict policy).
-  - [ ] Guard cases that must keep passing: comment/empty line before the first OFF vertex and first OFF face row still parse (pins the correct `--i` wrap behavior).
-- [ ] Default CPU gate stays green: `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`.
+- [x] Extend `tests/unit/geometry/Test.GeometryIO.cpp` (or add a sibling `Test.GeometryIOUntrustedInput.cpp`, label `unit;geometry`) with in-memory/temp-file cases:
+  - [x] PLY (ascii + binary) declaring a huge `element vertex` count with a tiny body → `InvalidMeshFormat`, process survives.
+  - [x] Binary PLY whose `Count * stride` would wrap `size_t` → `InvalidMeshFormat`.
+  - [x] PLY `property list float32 …` (non-integral count type) → `InvalidMeshFormat` at header parse.
+  - [x] Binary PLY with a negative `int32` list count → `InvalidMeshFormat`.
+  - [x] OFF declaring a huge vertex/face count with a tiny body → `InvalidMeshFormat`.
+  - [x] OFF with a `2 0 1` face row → `InvalidMeshFormat` (new strict policy).
+  - [x] Guard cases that must keep passing: comment/empty line before the first OFF vertex and first OFF face row still parse (pins the correct `--i` wrap behavior).
+- [x] Default CPU gate stays green: `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`.
 
 ## Docs
 
-- [ ] Note the untrusted-input policy (counts validated against payload before allocation; strict degenerate-face rejection) in the geometry IO module README or the module's header comment, whichever exists — keep it factual current-state.
+- [x] Note the untrusted-input policy (counts validated against payload before allocation; strict degenerate-face rejection) in the geometry IO module README or the module's header comment, whichever exists — keep it factual current-state.
 
 ## Acceptance criteria
 
-- [ ] All listed malformed inputs return `InvalidMeshFormat`; none abort, hang, or read out of bounds (verify the worst cases under the sanitizer preset if available locally).
-- [ ] Valid OFF/PLY/OBJ/STL fixtures that parsed before still parse identically (existing `Test.GeometryIO` cases stay green).
-- [ ] No public module-surface change; no layering change.
-- [ ] OFF/PLY degenerate-face policy is consistent and documented.
+- [x] All listed malformed inputs return `InvalidMeshFormat`; none abort, hang, or read out of bounds (verify the worst cases under the sanitizer preset if available locally).
+- [x] Valid OFF/PLY/OBJ/STL fixtures that parsed before still parse identically (existing `Test.GeometryIO` cases stay green).
+- [x] No public module-surface change; no layering change.
+- [x] OFF/PLY degenerate-face policy is consistent and documented.
 
 ## Verification
 
@@ -72,6 +72,12 @@ ctest --test-dir build/ci --output-on-failure -R 'GeometryIO' --timeout 60
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+2026-06-12 results:
+- Commit: pending local BUG loop closure commit.
+- `cmake --build --preset ci --target IntrinsicTests` passed.
+- Focused BUG regression set passed the new OFF/PLY malformed-count, non-integral list-count, negative binary-list-count, degenerate OFF face, and comment-preservation cases.
+- Default CPU-supported CTest gate passed after the parser hardening.
 
 ## Forbidden changes
 

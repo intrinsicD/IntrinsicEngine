@@ -29,33 +29,33 @@ maturity_target: CPUContracted
 
 ## Required changes
 
-- [ ] Extract one shared slab-interval helper (file-local duplication is acceptable if a shared internal header is overkill, but the two implementations must be byte-equivalent in logic) that handles zero direction components explicitly: for each axis with `|d| == 0`, miss immediately if the origin component is outside `[Min, Max]`, otherwise leave that axis unconstrained; compute `tmin/tmax` only from constrained axes. (Equivalent NaN-filtering min/max formulations are acceptable; document the chosen scheme and why it is NaN-free, including the `−0.0` direction case.)
-- [ ] Apply it in `Overlap_Analytic(Ray, AABB)` (Geometry.Overlap.cpp:168-181) and `RayCast_Analytic(Ray, AABB)` (Geometry.ContactManifold.cpp:116-143); keep the existing inside-origin convention (`Distance = tmin > 0 ? tmin : tmax`) but computed from NaN-free intervals.
-- [ ] `RayCast_Analytic(Ray, Sphere)`: when `length(hit.Point − s.Center)` is below epsilon, set a documented deterministic fallback normal (recommend `−r.Direction`, unit by `Ray` contract) instead of normalizing a zero vector (Geometry.ContactManifold.cpp:112).
-- [ ] Sweep for sibling copies of the unguarded `1.0f / r.Direction` slab idiom under `src/geometry/` (non-legacy) and fix any further hits with the same helper; record the sweep result in the PR description.
+- [x] Extract one shared slab-interval helper (file-local duplication is acceptable if a shared internal header is overkill, but the two implementations must be byte-equivalent in logic) that handles zero direction components explicitly: for each axis with `|d| == 0`, miss immediately if the origin component is outside `[Min, Max]`, otherwise leave that axis unconstrained; compute `tmin/tmax` only from constrained axes. (Equivalent NaN-filtering min/max formulations are acceptable; document the chosen scheme and why it is NaN-free, including the `−0.0` direction case.)
+- [x] Apply it in `Overlap_Analytic(Ray, AABB)` (Geometry.Overlap.cpp:168-181) and `RayCast_Analytic(Ray, AABB)` (Geometry.ContactManifold.cpp:116-143); keep the existing inside-origin convention (`Distance = tmin > 0 ? tmin : tmax`) but computed from NaN-free intervals.
+- [x] `RayCast_Analytic(Ray, Sphere)`: when `length(hit.Point − s.Center)` is below epsilon, set a documented deterministic fallback normal (recommend `−r.Direction`, unit by `Ray` contract) instead of normalizing a zero vector (Geometry.ContactManifold.cpp:112).
+- [x] Sweep for sibling copies of the unguarded `1.0f / r.Direction` slab idiom under `src/geometry/` (non-legacy) and fix any further hits with the same helper; record the sweep result in the PR description.
 
 ## Tests
 
-- [ ] New unit cases (label `unit;geometry`, extend `tests/unit/geometry/Test_Overlap.cpp` coverage area or add `Test.RaySlabDegenerate.cpp` following the `Test.<Name>.cpp` convention):
-  - [ ] Axis-parallel ray, origin component exactly on `Min` face plane / on `Max` face plane, ray passing through the box → overlap true, raycast hit with entry distance.
-  - [ ] Axis-parallel ray exactly along a box edge and through a corner → consistent hit policy (document inclusive boundary).
-  - [ ] Axis-parallel ray on the slab plane of a box it misses (offset in another axis) → false, no NaN.
-  - [ ] Ray origin inside the box → hit with `Distance == tmax` (pins the inside convention).
-  - [ ] Degenerate consistency property over a deterministic corpus including axis-parallel/on-boundary rays: `TestOverlap(ray, box) == RayCast(ray, box).has_value()`.
-  - [ ] Sphere: ray origin at center and just-off-center → finite unit normal (documented fallback), `Distance == 0` at center.
-  - [ ] KD-tree/BVH `QueryRay` regression: elements in a node whose AABB boundary coincides with an axis-parallel query ray are still returned (pins the traversal-level symptom, not just the kernel).
-- [ ] Default CPU gate stays green.
+- [x] New unit cases (label `unit;geometry`, extend `tests/unit/geometry/Test_Overlap.cpp` coverage area or add `Test.RaySlabDegenerate.cpp` following the `Test.<Name>.cpp` convention):
+  - [x] Axis-parallel ray, origin component exactly on `Min` face plane / on `Max` face plane, ray passing through the box → overlap true, raycast hit with entry distance.
+  - [x] Axis-parallel ray exactly along a box edge and through a corner → consistent hit policy (document inclusive boundary).
+  - [x] Axis-parallel ray on the slab plane of a box it misses (offset in another axis) → false, no NaN.
+  - [x] Ray origin inside the box → hit with `Distance == tmax` (pins the inside convention).
+  - [x] Degenerate consistency property over a deterministic corpus including axis-parallel/on-boundary rays: `TestOverlap(ray, box) == RayCast(ray, box).has_value()`.
+  - [x] Sphere: ray origin at center and just-off-center → finite unit normal (documented fallback), `Distance == 0` at center.
+  - [x] KD-tree/BVH `QueryRay` regression: elements in a node whose AABB boundary coincides with an axis-parallel query ray are still returned (pins the traversal-level symptom, not just the kernel).
+- [x] Default CPU gate stays green.
 
 ## Docs
 
-- [ ] Document the boundary/degenerate conventions (inclusive slab boundaries, inside-origin distance, sphere center-origin normal fallback) where the query contracts are described (module interface comments).
+- [x] Document the boundary/degenerate conventions (inclusive slab boundaries, inside-origin distance, sphere center-origin normal fallback) where the query contracts are described (module interface comments).
 
 ## Acceptance criteria
 
-- [ ] No NaN can reach `tmin`/`tmax`/`Normal` in the three touched kernels for any finite ray/shape input (including `±0.0` direction components).
-- [ ] `Overlap` and `RayCast` agree on hit/miss for the regression corpus.
-- [ ] KD-tree/BVH ray queries return boundary-coincident elements.
-- [ ] Existing overlap/raycast tests pass unchanged.
+- [x] No NaN can reach `tmin`/`tmax`/`Normal` in the three touched kernels for any finite ray/shape input (including `±0.0` direction components).
+- [x] `Overlap` and `RayCast` agree on hit/miss for the regression corpus.
+- [x] KD-tree/BVH ray queries return boundary-coincident elements.
+- [x] Existing overlap/raycast tests pass unchanged.
 
 ## Verification
 
@@ -66,6 +66,12 @@ ctest --test-dir build/ci --output-on-failure -R 'Overlap|Raycast|RaySlab' --tim
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+2026-06-12 results:
+- Commit: pending local BUG loop closure commit.
+- `cmake --build --preset ci --target IntrinsicTests` passed.
+- Focused BUG regression set passed 31/31, including the new ray/AABB overlap, ray/AABB raycast, sphere center-origin normal, and BVH boundary-query cases.
+- Default CPU-supported CTest gate passed after the geometry query fixes.
 
 ## Forbidden changes
 

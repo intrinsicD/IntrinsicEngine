@@ -548,6 +548,117 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ReferenceTriangleDebugViewReadbackMatchesMini
     engine.Shutdown();
 }
 
+TEST(DefaultRecipeSurfaceGpuSmoke, VulkanResourceSlotsRecycleAfterRetirementWindow)
+{
+    auto bootstrap = BootstrapEngineForDefaultRecipe(
+        4u,
+        "Intrinsic Vulkan resource slot recycling smoke");
+    if (bootstrap.Skipped)
+    {
+        GTEST_SKIP() << bootstrap.SkipReason;
+    }
+
+    Engine& engine = *bootstrap.EnginePtr;
+    auto initial = DriveDefaultRecipeAndCapture(engine);
+    if (!initial.DeviceOperational)
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Promoted Vulkan device did not become operational; resource slot recycling smoke is opt-in.";
+    }
+
+    auto& device = engine.GetDevice();
+    const Extrinsic::RHI::BufferDesc bufferDesc{
+        .SizeBytes = 256u,
+        .Usage = Extrinsic::RHI::BufferUsage::Storage |
+                 Extrinsic::RHI::BufferUsage::TransferDst,
+        .HostVisible = false,
+        .DebugName = "BUG-035.RecycleBuffer",
+    };
+    const Extrinsic::RHI::TextureDesc textureDesc{
+        .Width = 4u,
+        .Height = 4u,
+        .DepthOrArrayLayers = 1u,
+        .MipLevels = 1u,
+        .Fmt = Extrinsic::RHI::Format::RGBA8_UNORM,
+        .Dimension = Extrinsic::RHI::TextureDimension::Tex2D,
+        .Usage = Extrinsic::RHI::TextureUsage::Sampled |
+                 Extrinsic::RHI::TextureUsage::TransferDst,
+        .DebugName = "BUG-035.RecycleTexture",
+    };
+
+    const Extrinsic::RHI::BufferHandle firstBuffer = device.CreateBuffer(bufferDesc);
+    const Extrinsic::RHI::TextureHandle firstTexture = device.CreateTexture(textureDesc);
+    ASSERT_TRUE(firstBuffer.IsValid());
+    ASSERT_TRUE(firstTexture.IsValid());
+
+    device.DestroyBuffer(firstBuffer);
+    device.DestroyTexture(firstTexture);
+
+    for (std::uint32_t i = 0; i < device.GetFramesInFlight() + 2u; ++i)
+    {
+        auto capture = DriveDefaultRecipeDebugViewFrameAndCapture(engine);
+        ASSERT_TRUE(capture.DeviceOperational);
+    }
+
+    std::vector<Extrinsic::RHI::BufferHandle> allocatedBuffers{};
+    std::vector<Extrinsic::RHI::TextureHandle> allocatedTextures{};
+    bool sawRecycledBuffer = false;
+    bool sawRecycledTexture = false;
+    constexpr std::uint32_t kRecycleProbeSlack = 256u;
+
+    const std::uint32_t maxBufferAttempts = std::max(firstBuffer.Index + 8u, kRecycleProbeSlack);
+    for (std::uint32_t i = 0; i < maxBufferAttempts; ++i)
+    {
+        const Extrinsic::RHI::BufferHandle handle = device.CreateBuffer(bufferDesc);
+        if (!handle.IsValid())
+        {
+            ADD_FAILURE() << "Failed to allocate probe buffer " << i;
+            break;
+        }
+        allocatedBuffers.push_back(handle);
+        if (handle.Index == firstBuffer.Index)
+        {
+            sawRecycledBuffer = true;
+            EXPECT_GT(handle.Generation, firstBuffer.Generation);
+            break;
+        }
+    }
+
+    const std::uint32_t maxTextureAttempts = std::max(firstTexture.Index + 8u, kRecycleProbeSlack);
+    for (std::uint32_t i = 0; i < maxTextureAttempts; ++i)
+    {
+        const Extrinsic::RHI::TextureHandle handle = device.CreateTexture(textureDesc);
+        if (!handle.IsValid())
+        {
+            ADD_FAILURE() << "Failed to allocate probe texture " << i;
+            break;
+        }
+        allocatedTextures.push_back(handle);
+        if (handle.Index == firstTexture.Index)
+        {
+            sawRecycledTexture = true;
+            EXPECT_GT(handle.Generation, firstTexture.Generation);
+            break;
+        }
+    }
+
+    for (const Extrinsic::RHI::BufferHandle handle : allocatedBuffers)
+    {
+        device.DestroyBuffer(handle);
+    }
+    for (const Extrinsic::RHI::TextureHandle handle : allocatedTextures)
+    {
+        device.DestroyTexture(handle);
+    }
+
+    EXPECT_TRUE(sawRecycledBuffer)
+        << "The destroyed buffer slot was not returned to the ResourcePool free queue.";
+    EXPECT_TRUE(sawRecycledTexture)
+        << "The destroyed texture slot was not returned to the ResourcePool free queue.";
+
+    engine.Shutdown();
+}
+
 TEST(DefaultRecipeSurfaceGpuSmoke, AsyncComputeHistogramQueueReadbackMatchesMinimalHarnessSamples)
 {
     auto bootstrap = BootstrapEngineForDefaultRecipe(

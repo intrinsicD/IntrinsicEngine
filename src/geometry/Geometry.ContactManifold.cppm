@@ -49,7 +49,7 @@ export namespace Geometry
     {
         float Distance;             // Distance along ray to hit point (t parameter)
         glm::vec3 Point;            // World-space hit point
-        glm::vec3 Normal;           // Surface normal at hit point (points outward from surface)
+        glm::vec3 Normal;           // Finite surface normal at hit point (points outward from surface)
     };
 
     namespace Internal
@@ -60,6 +60,11 @@ export namespace Geometry
         std::optional<ContactManifold> Contact_Analytic(const Sphere& s, const AABB& b);
 
         // --- Ray Cast Solvers ---
+        //
+        // Ray/AABB uses inclusive slab boundaries, so rays exactly on Min/Max
+        // planes are valid queries. A ray starting inside the box reports the
+        // exit distance. Ray/Sphere returns a deterministic finite fallback
+        // normal when the hit point is numerically at the sphere center.
 
         std::optional<RayHit> RayCast_Analytic(const Ray& r, const Sphere& s);
         std::optional<RayHit> RayCast_Analytic(const Ray& r, const AABB& box);

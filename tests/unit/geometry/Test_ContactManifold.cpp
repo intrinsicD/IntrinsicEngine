@@ -5,6 +5,7 @@
 // including symmetric argument ordering.
 #include <gtest/gtest.h>
 
+#include <cmath>
 #include <type_traits>
 
 #include <glm/glm.hpp>
@@ -349,6 +350,22 @@ TEST(ContactManifold, RayCast_Sphere_Miss)
     EXPECT_FALSE(hit.has_value());
 }
 
+TEST(ContactManifold, RayCast_Sphere_CenterOriginHasFiniteFallbackNormal)
+{
+    Ray ray{glm::vec3(0, 0, 0), glm::vec3(1, 0, 0)};
+    Sphere s{glm::vec3(0, 0, 0), 1.0f};
+    auto hit = RayCast(ray, s);
+
+    ASSERT_TRUE(hit.has_value());
+    EXPECT_NEAR(hit->Distance, 0.0f, kEps);
+    ExpectNear(hit->Point, glm::vec3(0, 0, 0));
+    EXPECT_TRUE(std::isfinite(hit->Normal.x));
+    EXPECT_TRUE(std::isfinite(hit->Normal.y));
+    EXPECT_TRUE(std::isfinite(hit->Normal.z));
+    EXPECT_NEAR(glm::length(hit->Normal), 1.0f, kEps);
+    ExpectNear(hit->Normal, glm::vec3(-1, 0, 0));
+}
+
 TEST(ContactManifold, RayCast_AABB_Hit)
 {
     Ray ray{glm::vec3(-5, 0, 0), glm::vec3(1, 0, 0)};
@@ -368,6 +385,25 @@ TEST(ContactManifold, RayCast_AABB_Miss)
     EXPECT_FALSE(hit.has_value());
 }
 
+TEST(ContactManifold, RayCast_AABB_OnSlabBoundaryAxisParallel)
+{
+    const AABB box{glm::vec3(0, 0, 0), glm::vec3(1, 1, 1)};
+
+    const auto minPlaneHit =
+        RayCast(Ray{glm::vec3(0, 5, 0), glm::vec3(0, -1, 0)}, box);
+    ASSERT_TRUE(minPlaneHit.has_value());
+    EXPECT_NEAR(minPlaneHit->Distance, 4.0f, kEps);
+    ExpectNear(minPlaneHit->Point, glm::vec3(0, 1, 0));
+
+    const auto maxPlaneCornerHit =
+        RayCast(Ray{glm::vec3(1, 5, 1), glm::vec3(0, -1, 0)}, box);
+    ASSERT_TRUE(maxPlaneCornerHit.has_value());
+    EXPECT_NEAR(maxPlaneCornerHit->Distance, 4.0f, kEps);
+    ExpectNear(maxPlaneCornerHit->Point, glm::vec3(1, 1, 1));
+
+    EXPECT_FALSE(RayCast(Ray{glm::vec3(0, 5, 2), glm::vec3(0, -1, 0)}, box).has_value());
+}
+
 TEST(ContactManifold, RayCast_AABB_InsideBox)
 {
     Ray ray{glm::vec3(0, 0, 0), glm::vec3(1, 0, 0)};
@@ -375,4 +411,5 @@ TEST(ContactManifold, RayCast_AABB_InsideBox)
     auto hit = RayCast(ray, box);
     // Origin inside box — should still return a hit
     ASSERT_TRUE(hit.has_value());
+    EXPECT_NEAR(hit->Distance, 2.0f, kEps);
 }

@@ -336,6 +336,14 @@ available through the Vulkan 1.2/1.3 feature chain.
   destroys per-frame command/sync resources, then tears down VMA/device/surface/
   instance state so partial bring-up slices do not leak backend resources when
   callers omit explicit per-resource destroys.
+- Runtime resource-slot reclamation is separate from deferred Vulkan-object
+  destruction. `DestroyBuffer`/`DestroyTexture`/`DestroySampler`/
+  `DestroyPipeline` move the live Vulkan handles into the per-frame deletion
+  queue, then soft-delete the CPU `ResourcePool` slot. `VulkanDevice` runs
+  `ProcessResourcePoolDeletions()` from the frame loop after retired work is
+  fence-safe and from fail-closed `EndFrame()` exits, so buffer/image/sampler/
+  pipeline slots return to the free list after the frames-in-flight retirement
+  window without collapsing the GPU-safe `DeletionQueue` lifetime.
 - `GRAPHICS-018` brought up all major guarded Vulkan paths: instance/surface/
   physical-device probing with required Vulkan 1.2/1.3 feature negotiation,
   logical-device/queue/allocator/per-frame resource acquisition, swapchain

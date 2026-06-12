@@ -16,6 +16,10 @@ another backlog directory.
 - [RUNTIME-105 — Remove the deprecated GetStreamingGraph() TaskGraph bridge](RUNTIME-105-remove-streaming-graph-bridge.md):
   pure bridge deletion opened by `HARDEN-078`; the promoted tree already has
   zero consumers outside the Engine bridge itself.
+- [RUNTIME-107 — Headless-capable Engine::Run loop coverage](RUNTIME-107-headless-engine-loop-coverage.md):
+  follow-up split from BUG-030 to make currently guarded sandbox/runtime
+  `Engine::Run()` regressions execute through an explicit headless-capable loop
+  instead of skipping on displayless hosts.
 
 ### Runtime adapter umbrellas (clarified by Q tasks; producer modules)
 

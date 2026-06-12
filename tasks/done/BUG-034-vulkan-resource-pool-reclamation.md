@@ -30,26 +30,26 @@ maturity_target: CPUContracted
 
 ## Required changes
 
-- [ ] Add a private `VulkanDevice` maintenance step that calls `ProcessDeletions(m_GlobalFrameNumber)` on `m_Buffers`, `m_Images`, `m_Samplers`, and `m_Pipelines` once per frame, placed so **all** frame outcomes reach it (recommended: at the top of `BeginFrame` after the frame-slot fence wait, or as the unconditional tail of `EndFrame` covering both submit paths and the failure early-returns — pick one site, document why in a short comment).
-- [ ] Audit `Shutdown`/destructor ordering: pending-kill entries hold moved-out (nulled) structs, and live slots are destroyed via the existing teardown path — confirm `Clear()`/teardown still releases everything with the new per-frame reclamation active (no double-destroy, since `Destroy*` nulls the handles before `Remove`).
-- [ ] Confirm no consumer holds raw pool indices across more than `kMaxFramesInFlight` frames (the `GetByIndex` bulk-upload readers are the ones to check) — record the audit result in the PR description.
+- [x] Add a private `VulkanDevice` maintenance step that calls `ProcessDeletions(m_GlobalFrameNumber)` on `m_Buffers`, `m_Images`, `m_Samplers`, and `m_Pipelines` once per frame, placed so **all** frame outcomes reach it (recommended: at the top of `BeginFrame` after the frame-slot fence wait, or as the unconditional tail of `EndFrame` covering both submit paths and the failure early-returns — pick one site, document why in a short comment).
+- [x] Audit `Shutdown`/destructor ordering: pending-kill entries hold moved-out (nulled) structs, and live slots are destroyed via the existing teardown path — confirm `Clear()`/teardown still releases everything with the new per-frame reclamation active (no double-destroy, since `Destroy*` nulls the handles before `Remove`).
+- [x] Confirm no consumer holds raw pool indices across more than `kMaxFramesInFlight` frames (the `GetByIndex` bulk-upload readers are the ones to check) — record the audit result in the PR description.
 
 ## Tests
 
-- [ ] New RHI device contract test (CPU gate, runs on the Null device today and pins the contract the Vulkan fix must meet): create a buffer, destroy it, advance `RetirementFrames + 1` frames via `BeginFrame`/`EndFrame`, create again — assert the new handle **reuses the freed index with a bumped generation** (observable through public handles; today this passes on Null and the equivalent behavior is what BUG-035 proves on Vulkan).
-- [ ] Extend `tests/unit/core/Test.Core.ResourcePool.cpp` if reclamation timing (`KillFrame + RetirementFrames` boundary, free-list refill, generation bump on reuse) is not already covered.
-- [ ] Default CPU gate stays green.
+- [x] New RHI device contract test (CPU gate, runs on the Null device today and pins the contract the Vulkan fix must meet): create a buffer, destroy it, advance `RetirementFrames + 1` frames via `BeginFrame`/`EndFrame`, create again — assert the new handle **reuses the freed index with a bumped generation** (observable through public handles; today this passes on Null and the equivalent behavior is what BUG-035 proves on Vulkan).
+- [x] Extend `tests/unit/core/Test.Core.ResourcePool.cpp` if reclamation timing (`KillFrame + RetirementFrames` boundary, free-list refill, generation bump on reuse) is not already covered.
+- [x] Default CPU gate stays green.
 
 ## Docs
 
-- [ ] Update `src/graphics/vulkan/README.md` (or the device module comment) to state the per-frame resource-maintenance contract: which call site runs `ProcessDeletions`, and why the deferred `DeletionQueue` is a separate mechanism.
+- [x] Update `src/graphics/vulkan/README.md` (or the device module comment) to state the per-frame resource-maintenance contract: which call site runs `ProcessDeletions`, and why the deferred `DeletionQueue` is a separate mechanism.
 
 ## Acceptance criteria
 
-- [ ] `ProcessDeletions` runs for all four pools every frame on the promoted Vulkan device, including failed-submit frames.
-- [ ] The Null-device slot-recycling contract test exists, is labeled into the default CPU gate, and passes.
-- [ ] Repeated create/destroy of a buffer across bounded frames yields a bounded set of handle indices (no monotonic growth) — asserted in the contract test on Null; the Vulkan-host proof is `BUG-035`.
-- [ ] No change to RHI interfaces or renderer behavior.
+- [x] `ProcessDeletions` runs for all four pools every frame on the promoted Vulkan device, including failed-submit frames.
+- [x] The Null-device slot-recycling contract test exists, is labeled into the default CPU gate, and passes.
+- [x] Repeated create/destroy of a buffer across bounded frames yields a bounded set of handle indices (no monotonic growth) — asserted in the contract test on Null; the Vulkan-host proof is `BUG-035`.
+- [x] No change to RHI interfaces or renderer behavior.
 
 ## Verification
 
@@ -60,6 +60,13 @@ ctest --test-dir build/ci --output-on-failure -R 'ResourcePool|SlotRecycl|Handle
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+2026-06-12 results:
+- Commit: pending local BUG loop closure commit.
+- `cmake --build --preset ci --target IntrinsicTests` passed.
+- Focused BUG regression set passed `RHIResourceSlotRecycling.NullDeviceReusesDestroyedBufferSlotWithNewGeneration`.
+- `DefaultRecipeSurfaceGpuSmoke.VulkanResourceSlotsRecycleAfterRetirementWindow` passed and retires BUG-035 as the promoted-Vulkan operational proof.
+- Default CPU-supported CTest gate passed after the Vulkan maintenance wiring and contract test.
 
 ## Forbidden changes
 

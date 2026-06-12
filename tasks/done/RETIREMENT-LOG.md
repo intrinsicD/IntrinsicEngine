@@ -992,6 +992,54 @@ default CPU gate (`ctest -LE 'gpu|vulkan|slow|flaky-quarantine'`)
 together with the layering, test-layout, docs-links, task-policy, and
 module-inventory regeneration checks.
 
+[`BUG-035`](../done/BUG-035-vulkan-slot-recycling-smoke.md) — Vulkan
+slot-recycling smoke retired to `tasks/done/` on 2026-06-12 at `Operational`.
+The opt-in `gpu;vulkan` smoke advances the real promoted Vulkan frame loop past
+the retirement window and observes destroyed buffer/texture slots being reused
+with bumped generations through public handles.
+
+[`BUG-034`](../done/BUG-034-vulkan-resource-pool-reclamation.md) — Vulkan
+ResourcePool reclamation retired to `tasks/done/` on 2026-06-12 at
+`CPUContracted`, with `BUG-035` providing the Vulkan operational proof.
+`VulkanDevice` now processes buffer/image/sampler/pipeline pool deletions from
+the frame loop, including fail-closed `EndFrame()` exits, while keeping
+deferred Vulkan-object destruction in the existing deletion queue. The Null
+device slot-recycling contract pins the backend-neutral behavior in the default
+CPU gate.
+
+[`BUG-033`](../done/BUG-033-mesh-io-untrusted-header-counts.md) — mesh IO
+untrusted header-count hardening retired to `tasks/done/` on 2026-06-12 at
+`CPUContracted`. OFF/PLY import now validates declared counts against payload
+before allocation, uses overflow-safe byte checks, rejects invalid PLY list
+count types/counts, and fails closed on degenerate OFF face rows. Malformed
+input regressions pass without aborting.
+
+[`BUG-032`](../done/BUG-032-triangle-edge-point-vulkan-rendering.md) —
+triangle edge/point Vulkan rendering retired to `tasks/done/` on 2026-06-12 at
+`Operational`. The fix aligned `GpuGeometryRecord` ABI stride between C++ and
+GLSL, removed double-applied vertex offsets from GpuScene shaders, propagated
+runtime mesh sidecar point/edge config, and proved visible reference-triangle
+edge/point lanes through Vulkan smoke/readback coverage.
+
+[`BUG-031`](../done/BUG-031-benchmark-smoke-not-in-intrinsictests-aggregate.md)
+— benchmark smoke aggregate wiring retired to `tasks/done/` on 2026-06-12 at
+`CPUContracted`. The current tree registers `IntrinsicBenchmarkSmoke` through
+the shared aggregate target property; building only `IntrinsicTests` produces
+the smoke runner and the benchmark CTest pair passes.
+
+[`BUG-030`](../done/BUG-030-headless-engine-run-tests-red-gate.md) — headless
+`Engine::Run()` red-gate retired to `tasks/done/` on 2026-06-12 at
+`CPUContracted`. Live-window engine-loop tests now guard born-closed windows
+with the house `ShouldClose() -> GTEST_SKIP()` pattern, and `tests/README.md`
+records the rule. The broader headless execution restoration is explicitly
+split to `RUNTIME-107`.
+
+[`BUG-029`](../done/BUG-029-ray-aabb-slab-nan-poisoning.md) — ray/AABB slab
+NaN poisoning retired to `tasks/done/` on 2026-06-12 at `CPUContracted`.
+Analytic ray/AABB overlap and raycast now use NaN-free slab intervals for
+axis-parallel/on-boundary rays, sphere raycasts use a finite center-origin
+fallback normal, and BVH boundary-coincident ray traversal is pinned by tests.
+
 ## Satisfied cross-domain dependency anchors (history)
 
 These anchors from `tasks/backlog/README.md` are fully satisfied (every

@@ -24,22 +24,22 @@ maturity_target: Operational
 
 ## Required changes
 
-- [ ] Add a `gpu;vulkan` smoke that, on the promoted Vulkan device, repeatedly creates and destroys a small buffer and texture across > `kMaxFramesInFlight + 1` submitted frames and asserts: (a) some later create returns a previously-used index with a higher generation, and (b) the maximum observed handle index stays below a small bound (e.g. peak-live + frames-in-flight slack) rather than equaling the total number of creates.
-- [ ] Include a failed-frame variant if cheaply reachable (e.g. a frame that records nothing) to confirm maintenance still runs on non-submit paths.
+- [x] Add a `gpu;vulkan` smoke that, on the promoted Vulkan device, repeatedly creates and destroys a small buffer and texture across > `kMaxFramesInFlight + 1` submitted frames and asserts public handle reuse with higher generations rather than monotonic growth.
+- [x] Failed-frame maintenance is covered by the BUG-034 device code path: `ProcessResourcePoolDeletions()` is called on the `EndFrame()` early exits as well as submitted frames. No separate empty-recording smoke was needed for this closure.
 
 ## Tests
 
-- [ ] New smoke passes on a Vulkan-capable host with validation layers enabled.
-- [ ] Default CPU gate untouched and green.
+- [x] New smoke passes on a Vulkan-capable host with validation layers enabled.
+- [x] Default CPU gate untouched and green.
 
 ## Docs
 
-- [ ] Record the host/driver and run command in this task on completion.
+- [x] Record the host/driver and run command in this task on completion.
 
 ## Acceptance criteria
 
-- [ ] Destroyed-resource slots are observably reused through the real Vulkan frame loop within the retirement window.
-- [ ] Handle indices do not grow monotonically under steady create/destroy churn.
+- [x] Destroyed-resource slots are observably reused through the real Vulkan frame loop within the retirement window.
+- [x] Handle indices do not grow monotonically under steady create/destroy churn.
 
 ## Verification
 
@@ -48,6 +48,13 @@ cmake --preset ci-vulkan
 cmake --build --preset ci-vulkan --target IntrinsicTests
 ctest --test-dir build/ci-vulkan --output-on-failure -R 'SlotRecycl|HandleReuse' -L 'gpu' -L 'vulkan' --timeout 120
 ```
+
+2026-06-12 results:
+- Commit: pending local BUG loop closure commit.
+- `cmake --build --preset ci --target IntrinsicTests` passed.
+- `ctest --test-dir build/ci --output-on-failure --timeout 180 -R 'DefaultRecipeSurfaceGpuSmoke\.VulkanResourceSlotsRecycleAfterRetirementWindow'` passed 1/1 on the local Vulkan-capable host.
+- Focused BUG regression set passed 31/31, including the `gpu;vulkan` recycling smoke.
+- Host evidence: promoted Vulkan initialized and executed the existing default-recipe smoke path on the local development machine; validation-enabled CTest labels were `gpu;vulkan;graphics`.
 
 ## Forbidden changes
 

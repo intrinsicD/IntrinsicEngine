@@ -304,11 +304,11 @@ TEST(GeometryIO_MeshIO, LoadsCNOFFTriangleWithNormalsAndColors)
     EXPECT_EQ(colors[2], glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
 }
 
-TEST(GeometryIO_MeshIO, LoadOFFSkipsDegenerateFaceRows)
+TEST(GeometryIO_MeshIO, LoadOFFRejectsDegenerateFaceRows)
 {
     // The face counts header declares two face rows so the loop
-    // iterates both; the first is degenerate (count < 3) and must be
-    // soft-skipped without aborting the load.
+    // iterates both; the first is degenerate (count < 3) and must fail
+    // closed instead of silently dropping authored topology.
     TempFile file(".off",
                   "OFF\n"
                   "3 2 0\n"
@@ -319,22 +319,14 @@ TEST(GeometryIO_MeshIO, LoadOFFSkipsDegenerateFaceRows)
                   "3 0 1 2\n");
 
     const auto result = Geometry::MeshIO::LoadOFF(file.Path);
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result->Vertices.Size(), 3u);
-    auto faceVertices = result->Faces.Get<std::vector<std::uint32_t>>("f:vertices");
-    ASSERT_TRUE(faceVertices.IsValid());
-    ASSERT_EQ(faceVertices.Vector().size(), 1u);
-    ASSERT_EQ(faceVertices[0].size(), 3u);
-    EXPECT_EQ(faceVertices[0][0], 0u);
-    EXPECT_EQ(faceVertices[0][1], 1u);
-    EXPECT_EQ(faceVertices[0][2], 2u);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);
 }
 
 TEST(GeometryIO_MeshIO, LoadOFFRejectsAllDegenerateFaces)
 {
     // Every declared face row is degenerate (count < 3); the loader
-    // soft-skips each row but must still reject the load because no
-    // usable face topology was populated.
+    // rejects the first malformed row.
     TempFile file(".off",
                   "OFF\n"
                   "3 1 0\n"
@@ -346,6 +338,35 @@ TEST(GeometryIO_MeshIO, LoadOFFRejectsAllDegenerateFaces)
     const auto result = Geometry::MeshIO::LoadOFF(file.Path);
     ASSERT_FALSE(result.has_value());
     EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);
+}
+
+TEST(GeometryIO_MeshIO, LoadOFFRejectsHugeHeaderCountsBeforeReserve)
+{
+    TempFile file(".off",
+                  "OFF\n"
+                  "1000000000 1 0\n"
+                  "0 0 0\n");
+
+    const auto result = Geometry::MeshIO::LoadOFF(file.Path);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);
+}
+
+TEST(GeometryIO_MeshIO, LoadOFFPreservesCommentBeforeFirstVertexAndFaceRows)
+{
+    TempFile file(".off",
+                  "OFF\n"
+                  "3 1 0\n"
+                  "# vertex comment\n"
+                  "0 0 0\n"
+                  "1 0 0\n"
+                  "0 1 0\n"
+                  "# face comment\n"
+                  "3 0 1 2\n");
+
+    const auto result = Geometry::MeshIO::LoadOFF(file.Path);
+    ASSERT_TRUE(result.has_value());
+    ExpectTriangleMeshProperties(*result);
 }
 
 TEST(GeometryIO_MeshIO, LoadOFFRejectsUnknownMagic)
@@ -3794,6 +3815,97 @@ TEST(GeometryIO_MeshIO, LoadPLYRejectsTruncatedBinaryBody)
     // vertex and the face list.
     TempBinaryPLY file(vertices, faces, BinaryPlyEndian::Little, 0, /*truncateBody=*/true);
 
+    const auto result = Geometry::MeshIO::LoadPLY(file.Path);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);
+}
+
+TEST(GeometryIO_MeshIO, LoadPLYRejectsHugeAsciiHeaderCountsBeforeReserve)
+{
+    TempFile file(".ply",
+                  "ply\n"
+                  "format ascii 1.0\n"
+                  "element vertex 1000000000\n"
+                  "property float x\n"
+                  "property float y\n"
+                  "property float z\n"
+                  "element face 1\n"
+                  "property list uchar int vertex_indices\n"
+                  "end_header\n"
+                  "0 0 0\n");
+
+    const auto result = Geometry::MeshIO::LoadPLY(file.Path);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);
+}
+
+TEST(GeometryIO_MeshIO, LoadPLYRejectsHugeBinaryHeaderCountsBeforeReserve)
+{
+    TempFile file(".ply",
+                  "ply\n"
+                  "format binary_little_endian 1.0\n"
+                  "element vertex 1000000000\n"
+                  "property float x\n"
+                  "property float y\n"
+                  "property float z\n"
+                  "element face 1\n"
+                  "property list uchar int vertex_indices\n"
+                  "end_header\n");
+
+    const auto result = Geometry::MeshIO::LoadPLY(file.Path);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);
+}
+
+TEST(GeometryIO_MeshIO, LoadPLYRejectsNonIntegralListCountType)
+{
+    TempFile file(".ply",
+                  "ply\n"
+                  "format ascii 1.0\n"
+                  "element vertex 3\n"
+                  "property float x\n"
+                  "property float y\n"
+                  "property float z\n"
+                  "element face 1\n"
+                  "property list float int vertex_indices\n"
+                  "end_header\n"
+                  "0 0 0\n"
+                  "1 0 0\n"
+                  "0 1 0\n"
+                  "3 0 1 2\n");
+
+    const auto result = Geometry::MeshIO::LoadPLY(file.Path);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);
+}
+
+TEST(GeometryIO_MeshIO, LoadPLYRejectsNegativeBinaryListCount)
+{
+    std::string contents =
+        "ply\n"
+        "format binary_little_endian 1.0\n"
+        "element vertex 3\n"
+        "property float x\n"
+        "property float y\n"
+        "property float z\n"
+        "element face 1\n"
+        "property list int int vertex_indices\n"
+        "end_header\n";
+    const std::array<glm::vec3, 3> vertices{
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+    };
+    for (const glm::vec3& vertex : vertices)
+    {
+        AppendPod(contents, vertex.x);
+        AppendPod(contents, vertex.y);
+        AppendPod(contents, vertex.z);
+    }
+    const std::int32_t negativeCount = -1;
+    AppendPod(contents, negativeCount);
+
+    TempFile file(".ply", contents);
     const auto result = Geometry::MeshIO::LoadPLY(file.Path);
     ASSERT_FALSE(result.has_value());
     EXPECT_EQ(result.error(), Core::ErrorCode::InvalidFormat);

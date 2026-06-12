@@ -2400,6 +2400,14 @@ void VulkanDevice::Shutdown()
     m_DeviceLost       = false;
 }
 
+void VulkanDevice::ProcessResourcePoolDeletions()
+{
+    m_Buffers.ProcessDeletions(m_GlobalFrameNumber);
+    m_Images.ProcessDeletions(m_GlobalFrameNumber);
+    m_Samplers.ProcessDeletions(m_GlobalFrameNumber);
+    m_Pipelines.ProcessDeletions(m_GlobalFrameNumber);
+}
+
 void VulkanDevice::WaitIdle()
 {
     if (m_Device != VK_NULL_HANDLE)
@@ -2440,6 +2448,7 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
         });
         if (count == 1)
             Core::Log::Warn("[VulkanDevice::BeginFrame] device non-operational; returning fail-closed (no frame produced)");
+        ProcessResourcePoolDeletions();
         return false;
     }
 
@@ -2490,6 +2499,12 @@ bool VulkanDevice::BeginFrame(RHI::FrameHandle& outFrame)
         Core::Log::Error("[VulkanDevice::BeginFrame] vkWaitForFences failed; guarded Vulkan frame acquire skipped");
         return false;
     }
+
+    // BUG-034: resource-pool slot reclamation is CPU bookkeeping, separate
+    // from deferred Vulkan-object destruction. The frame-slot fence has
+    // retired prior GPU work, so old pool indices can safely re-enter the
+    // free-list before this slot records a new frame.
+    ProcessResourcePoolDeletions();
 
     const auto commandPoolForQueue = [&frame](const RHI::QueueAffinity queue) noexcept
     {
@@ -2716,6 +2731,7 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
             snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
         });
         Core::Log::Warn("[VulkanDevice::EndFrame] guarded Vulkan frame has no acquired image or command buffer; submit skipped");
+        ProcessResourcePoolDeletions();
         return;
     }
 
@@ -2734,6 +2750,7 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
             snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
         });
         Core::Log::Error("[VulkanDevice::EndFrame] vkResetFences failed; guarded submit skipped");
+        ProcessResourcePoolDeletions();
         return;
     }
 
@@ -2815,6 +2832,7 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
                     snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
                 });
                 Core::Log::Error("[VulkanDevice::EndFrame] vkResetFences failed for optional queue submit fences; guarded submit skipped");
+                ProcessResourcePoolDeletions();
                 return;
             }
         }
@@ -2953,6 +2971,7 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
                 snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
             });
             Core::Log::Error("[VulkanDevice::EndFrame] vkQueueSubmit2 failed for guarded multi-queue Vulkan frame");
+            ProcessResourcePoolDeletions();
             return;
         }
 
@@ -2974,6 +2993,7 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
             snapshot.SwapchainAvailable = m_Swapchain != VK_NULL_HANDLE;
             snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
         });
+        ProcessResourcePoolDeletions();
         return;
     }
 
@@ -3007,6 +3027,7 @@ void VulkanDevice::EndFrame(const RHI::FrameHandle& frame)
             snapshot.SwapchainImagesAvailable = !m_SwapchainHandles.empty();
         });
         Core::Log::Error("[VulkanDevice::EndFrame] vkQueueSubmit failed for guarded Vulkan frame");
+        ProcessResourcePoolDeletions();
         return;
     }
 
