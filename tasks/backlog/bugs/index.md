@@ -11,6 +11,8 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Verified / Closed
 
+- Closed 2026-06-12: [`BUG-040` — Orbit camera vertical drag sign](../../done/BUG-040-orbit-camera-vertical-drag-sign.md). Orbit pitch drag now uses `+yDelta` in the quaternion trackball update, so mouse-up moves the camera above the target and mouse-down moves it below while keeping target centering, yaw, cross-pole rotation, focus, and other camera-controller coverage passing.
+
 - Closed 2026-06-12: [`BUG-039` — Orbit camera rotation lock](../../done/BUG-039-orbit-camera-rotation-lock.md). Promoted orbit now matches the legacy trackball model: seed forward/up become accumulated orientation state, drag deltas rotate around the current camera-local up/right axes, view up is no longer fixed world-up, and the focused regression proves a vertical drag can cross the pitch pole and invert camera up while existing orbit/focus/controller coverage still passes.
 
 - Closed 2026-06-12: [`BUG-038` — Dropped file imports fail silently in the sandbox](../../done/BUG-038-sandbox-dropped-file-diagnostics.md). Runtime now logs file-drop receipt, per-path routing/queue decisions, and shared import completion. Focused contract coverage pins a missing OBJ drop producing receipt/queue/failure logs plus a failed `RuntimeAssetImportEvent`, while existing drop/import coverage keeps valid OBJ/OFF/materialization paths covered.

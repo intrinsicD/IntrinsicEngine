@@ -287,7 +287,7 @@ namespace Extrinsic::Runtime
             const glm::vec3 right = Detail::RightFromOrientation(m_Orientation);
             const glm::vec3 up = Detail::UpFromOrientation(m_Orientation);
             const glm::quat yawRotation = glm::angleAxis(glm::radians(-xDelta), up);
-            const glm::quat pitchRotation = glm::angleAxis(glm::radians(-yDelta), right);
+            const glm::quat pitchRotation = glm::angleAxis(glm::radians(yDelta), right);
             m_Orientation = Detail::SafeNormalized(yawRotation * pitchRotation * m_Orientation,
                                                    m_Orientation);
             m_Yaw = Detail::YawFromForward(Detail::ForwardFromOrientation(m_Orientation));

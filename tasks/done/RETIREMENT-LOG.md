@@ -9,6 +9,18 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`BUG-040`](BUG-040-orbit-camera-vertical-drag-sign.md) — Orbit camera
+vertical drag sign — retired on 2026-06-12 at maturity `CPUContracted`. The
+`BUG-039` quaternion orbit fix preserved the legacy algebraic `-yDelta` pitch
+sign, but in the promoted app's screen-space input convention Y grows downward.
+That made a mouse-up drag place the camera below the target and point upward;
+mouse-down did the inverse. A new runtime controller regression red-gated the
+small-drag sign with `Position.y == -0.62373507` and `Forward.y == 0.2079117`
+for mouse-up. Orbit pitch now applies `+yDelta` around the camera-local right
+axis; fly/free-look signs are unchanged. The focused sign regression,
+`RuntimeCameraControllers` suite, and default CPU gate passed.
+
+Backlog
 [`BUG-039`](BUG-039-orbit-camera-rotation-lock.md) — Orbit camera rotation
 lock — retired on 2026-06-12 at maturity `CPUContracted`. The promoted orbit
 controller had reused scalar yaw/pitch state and a fixed world-up view, so a
