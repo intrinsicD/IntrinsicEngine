@@ -127,10 +127,12 @@ Reproducible correctness/regression fixes only. Origin:
 [`bugs/index.md`](bugs/index.md).
 
 Open members are tracked in [`bugs/index.md`](bugs/index.md) — currently the
-2026-06-11 severe-bug audit set (`BUG-027` mesh-IO untrusted header counts,
-`BUG-028`/`BUG-028B` Vulkan resource-pool reclamation, `BUG-029` ray/AABB slab
-NaN poisoning) plus the `BUG-026B` operational smoke. New reproducible bugs
-open under `bugs/` per the index.
+2026-06-11 severe-bug audit set (`BUG-030` headless default-gate red on main,
+`BUG-031` benchmark smoke missing from the `IntrinsicTests` aggregate,
+`BUG-027` mesh-IO untrusted header counts, `BUG-028`/`BUG-028B` Vulkan
+resource-pool reclamation, `BUG-029` ray/AABB slab NaN poisoning) plus the
+`BUG-026B` operational smoke. New reproducible bugs open under `bugs/` per
+the index.
 
 Resolved bug history lives in [`bugs/index.md`](bugs/index.md) and the
 retirement log.

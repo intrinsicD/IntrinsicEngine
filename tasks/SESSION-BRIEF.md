@@ -40,6 +40,8 @@ the authoritative open/unblocked view.
 - unblocked: `BUG-028` — VulkanDevice never reclaims ResourcePool slots: unbounded pending-kill growth and handle-space leak (tasks/backlog/bugs/BUG-028-vulkan-resource-pool-reclamation.md)
 - blocked by `BUG-028`: `BUG-028B` — Vulkan slot-recycling smoke (handle reuse through the real frame loop) (tasks/backlog/bugs/BUG-028B-vulkan-slot-recycling-smoke.md)
 - unblocked: `BUG-029` — Ray/AABB slab tests NaN-poisoned for axis-parallel rays on slab planes; ray/sphere raycast emits NaN normal (tasks/backlog/bugs/BUG-029-ray-aabb-slab-nan-poisoning.md)
+- unblocked: `BUG-030` — Default CPU gate red on headless hosts: `engine.Run()` tests lack the windowless guard (main CI failing since 2026-06-09) (tasks/backlog/bugs/BUG-030-headless-engine-run-tests-red-gate.md)
+- unblocked: `BUG-031` — Documented agent gate cannot pass a fresh tree: benchmark smoke binary missing from the `IntrinsicTests` aggregate (tasks/backlog/bugs/BUG-031-benchmark-smoke-not-in-intrinsictests-aggregate.md)
 
 ## Unthemed
 
