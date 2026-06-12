@@ -6,7 +6,8 @@ GPU-agnostic; GPU residency lives under `src/graphics/assets` and is wired by
 
 ## Tasks
 
-No active asset backlog tasks.
+- [ASSETIO-005 — Asset import queue and progress UI](ASSETIO-005-asset-import-queue-progress.md):
+  expose runtime-owned AssetIO queue snapshots and display queued/running/apply/upload/terminal import progress in the sandbox editor.
 
 ## Retired
 - [ASSETIO-004 — Representative file-format visual coverage](../../done/ASSETIO-004-broad-file-format-visual-parity.md):

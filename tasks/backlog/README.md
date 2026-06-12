@@ -110,6 +110,9 @@ Open members:
 - [`architecture/LEGACY-012-migrate-legacy-consumer-tests.md`](architecture/LEGACY-012-migrate-legacy-consumer-tests.md) —
   follow-up for tests and non-legacy consumers that still import bare legacy
   module names after promoted equivalents exist.
+- [`assets/ASSETIO-005-asset-import-queue-progress.md`](assets/ASSETIO-005-asset-import-queue-progress.md) —
+  runtime-owned AssetIO queue snapshots and sandbox editor progress rows for
+  long-running imports.
 - [`runtime/RUNTIME-101-asset-ingest-state-machine.md`](runtime/RUNTIME-101-asset-ingest-state-machine.md),
   [`runtime/RUNTIME-103-geometry-algorithm-execution-queue.md`](runtime/RUNTIME-103-geometry-algorithm-execution-queue.md),
   [`runtime/RUNTIME-105-remove-streaming-graph-bridge.md`](runtime/RUNTIME-105-remove-streaming-graph-bridge.md),

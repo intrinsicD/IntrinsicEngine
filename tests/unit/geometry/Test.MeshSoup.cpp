@@ -97,6 +97,18 @@ TEST(MeshSoup, DuplicateVerticesAreWarnings)
     EXPECT_EQ(result.Count(ValidationDiagnosticKind::DuplicateVertex), 1u);
 }
 
+TEST(MeshSoup, DuplicateVerticesTreatSignedZeroAsEqual)
+{
+    IndexedMesh mesh;
+    AddVertex(mesh, {0.0f, 0.0f, 0.0f});
+    AddVertex(mesh, {-0.0f, 0.0f, 0.0f});
+
+    const auto result = Geometry::MeshSoup::Validate(mesh);
+
+    EXPECT_FALSE(result.HasErrors());
+    EXPECT_EQ(result.Count(ValidationDiagnosticKind::DuplicateVertex), 1u);
+}
+
 TEST(MeshSoup, InvalidIndicesAreErrors)
 {
     IndexedMesh mesh = MakeTriangleSoup();
@@ -234,5 +246,4 @@ TEST(MeshSoup, AttributeArityMismatchesUsePropertySetDomainCardinality)
     EXPECT_EQ(result.Diagnostics.back().ExpectedCount, 3u);
     EXPECT_EQ(result.Diagnostics.back().ActualCount, 2u);
 }
-
 
