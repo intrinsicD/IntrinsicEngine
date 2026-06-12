@@ -8,6 +8,22 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+Backlog
+[`BUG-038`](BUG-038-sandbox-dropped-file-diagnostics.md) — Dropped file
+imports fail silently in the sandbox — retired on 2026-06-12 at maturity
+`CPUContracted`. The event path itself was already wired: focused contracts
+showed runtime platform-drop dispatch and valid dropped OBJ/OFF imports reach
+the import/materialization path, so asset IO, generic IO, GPU upload, and
+renderer visibility were downstream of the reported silence. The actual bug was
+observability at the runtime boundary: dropped imports recorded last-import
+state for the editor panel but did not log receipt, route/queue decisions, or
+completion. `Engine` now logs file-drop receipt, empty-path rejection,
+geometry-vs-synchronous import routing, successful streaming queue submission,
+queue-submission rejection, and shared import success/failure from
+`RecordAssetImportEvent`. A new runtime contract regression red-gated a missing
+OBJ drop with no logs, then proved receipt/queue/failure breadcrumbs plus a
+failed `RuntimeAssetImportEvent` with payload `Mesh` and `FileNotFound`.
+
 Active
 [`BUG-037`](BUG-037-window-close-stale-run-state.md) — Window close can leave
 runtime running — retired on 2026-06-12 at maturity `CPUContracted`. The

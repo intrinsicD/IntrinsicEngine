@@ -5,13 +5,13 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-No active BUG issues are currently queued. New reproducible correctness bugs,
-flaky tests, or test-harness defects should open here with a deterministic
-repro and an owner/layer note.
+- No active BUG issues; new issues should be opened as focused BUG tasks before implementation.
 
 ---
 
 ## Verified / Closed
+
+- Closed 2026-06-12: [`BUG-038` — Dropped file imports fail silently in the sandbox](../../done/BUG-038-sandbox-dropped-file-diagnostics.md). Runtime now logs file-drop receipt, per-path routing/queue decisions, and shared import completion. Focused contract coverage pins a missing OBJ drop producing receipt/queue/failure logs plus a failed `RuntimeAssetImportEvent`, while existing drop/import coverage keeps valid OBJ/OFF/materialization paths covered.
 
 - Closed 2026-06-12: [`BUG-035` — Vulkan slot-recycling smoke](../../done/BUG-035-vulkan-slot-recycling-smoke.md). Added an opt-in `gpu;vulkan` smoke that destroys buffer/texture resources, advances the real promoted Vulkan frame loop past the retirement window, and observes the destroyed slots return through public handle reuse with bumped generations. This upgrades BUG-034's Vulkan proof to `Operational`.
 

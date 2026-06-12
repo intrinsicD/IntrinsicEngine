@@ -21,6 +21,7 @@ import Extrinsic.Asset.Registry;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Geometry2D;
+import Extrinsic.Core.Logging;
 import Extrinsic.ECS.Component.Culling.Local;
 import Extrinsic.ECS.Component.Culling.World;
 import Extrinsic.ECS.Component.Hierarchy;
@@ -77,6 +78,18 @@ namespace
         for (const Runtime::SandboxEditorDiagnostic& diagnostic : diagnostics)
         {
             if (diagnostic.Code == code)
+                return true;
+        }
+        return false;
+    }
+
+    [[nodiscard]] bool LogSnapshotContains(
+        const Core::Log::LogSnapshot& snapshot,
+        const std::string_view needle)
+    {
+        for (const Core::Log::LogEntry& entry : snapshot.Entries)
+        {
+            if (entry.Message.find(needle) != std::string::npos)
                 return true;
         }
         return false;
@@ -3027,6 +3040,57 @@ TEST(SandboxEditorUi, PlatformDropEventImportsObjMeshSelectsItAndEnablesRenderCo
 
     extraction.Shutdown(engine.GetRenderer());
     ui.Detach();
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorUi, DroppedFileImportFailureLogsDiagnostics)
+{
+    const std::filesystem::path missingMeshPath =
+        std::filesystem::temp_directory_path() /
+        "runtime_platform_drop_missing_mesh.obj";
+    std::error_code ec;
+    std::filesystem::remove(missingMeshPath, ec);
+
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<WaitForAssetImportEventApplication>(128u));
+    engine.Initialize();
+
+    Core::Log::ClearEntries();
+
+    engine.DispatchPlatformEventForTest(Plat::WindowDropEvent{
+        .Paths = {missingMeshPath.string()},
+    });
+
+    const Core::Log::LogSnapshot queuedLogs = Core::Log::TakeSnapshot();
+    EXPECT_TRUE(LogSnapshotContains(queuedLogs, "File drop received"))
+        << "The platform drop boundary must log receipt before deferred import work completes.";
+    EXPECT_TRUE(LogSnapshotContains(queuedLogs, "Queued dropped geometry import"))
+        << "Dropped geometry imports must log that they were queued off the platform polling path.";
+    EXPECT_FALSE(engine.GetLastAssetImportEvent().has_value());
+
+    if (engine.GetWindow().ShouldClose())
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "window backend unavailable; deferred dropped-file completion coverage requires a live window";
+    }
+
+    engine.Run();
+
+    const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
+        engine.GetLastAssetImportEvent();
+    ASSERT_TRUE(lastEvent.has_value());
+    EXPECT_FALSE(lastEvent->Succeeded());
+    EXPECT_EQ(lastEvent->RequestedPayloadKind, Assets::AssetPayloadKind::Mesh);
+    EXPECT_EQ(lastEvent->Error, Core::ErrorCode::FileNotFound);
+
+    const Core::Log::LogSnapshot completedLogs = Core::Log::TakeSnapshot();
+    EXPECT_TRUE(LogSnapshotContains(completedLogs, "Asset import failed"));
+    EXPECT_TRUE(LogSnapshotContains(completedLogs, "FileNotFound"));
+    EXPECT_TRUE(LogSnapshotContains(completedLogs, "Mesh"));
+    EXPECT_TRUE(LogSnapshotContains(completedLogs,
+                                    missingMeshPath.filename().string()));
+
     engine.Shutdown();
 }
 
