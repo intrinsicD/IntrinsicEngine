@@ -65,6 +65,7 @@ import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.TextureUpload;
+import Extrinsic.RHI.Types;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
@@ -488,6 +489,218 @@ struct RgbaPixel
             : static_cast<int>(rhs - lhs);
     };
     return absDiff(a.R, b.R) + absDiff(a.G, b.G) + absDiff(a.B, b.B);
+}
+
+[[nodiscard]] bool IsDarkOverlayPixel(const RgbaPixel pixel) noexcept
+{
+    const std::uint8_t minChannel = std::min({pixel.R, pixel.G, pixel.B});
+    const std::uint8_t maxChannel = std::max({pixel.R, pixel.G, pixel.B});
+    return maxChannel <= 112u && static_cast<std::uint32_t>(maxChannel - minChannel) <= 16u;
+}
+
+[[nodiscard]] std::uint32_t CountDarkOverlayPixels(
+    const std::vector<std::uint8_t>& bytes,
+    const Extrinsic::RHI::Format format,
+    const std::uint32_t bytesPerPixel,
+    const Extrinsic::Core::Extent2D extent,
+    const std::uint32_t centerX,
+    const std::uint32_t centerY,
+    const std::uint32_t radius)
+{
+    if (extent.Width == 0u || extent.Height == 0u)
+        return 0u;
+
+    const auto minX = static_cast<std::uint32_t>(
+        std::max<int>(0, static_cast<int>(centerX) - static_cast<int>(radius)));
+    const auto minY = static_cast<std::uint32_t>(
+        std::max<int>(0, static_cast<int>(centerY) - static_cast<int>(radius)));
+    const auto maxX = static_cast<std::uint32_t>(
+        std::min<int>(static_cast<int>(extent.Width) - 1,
+                      static_cast<int>(centerX) + static_cast<int>(radius)));
+    const auto maxY = static_cast<std::uint32_t>(
+        std::min<int>(static_cast<int>(extent.Height) - 1,
+                      static_cast<int>(centerY) + static_cast<int>(radius)));
+
+    std::uint32_t count = 0u;
+    for (std::uint32_t y = minY; y <= maxY; ++y)
+    {
+        for (std::uint32_t x = minX; x <= maxX; ++x)
+        {
+            if (IsDarkOverlayPixel(ReadPixel(bytes, format, bytesPerPixel, extent, x, y)))
+                ++count;
+        }
+    }
+    return count;
+}
+
+struct GpuSceneInputSummary
+{
+    std::uint32_t InstanceCapacity{0u};
+    std::uint32_t GeometryCapacity{0u};
+    std::uint32_t LiveInstanceCount{0u};
+    std::uint32_t VisibleInstances{0u};
+    std::uint32_t LineInstances{0u};
+    std::uint32_t PointInstances{0u};
+    std::uint32_t LineInstancesWithZeroBounds{0u};
+    std::uint32_t PointInstancesWithZeroBounds{0u};
+    std::uint32_t LineInstancesWithZeroIndexCount{0u};
+    std::uint32_t PointInstancesWithZeroVertexCount{0u};
+    std::uint32_t LineInstancesWithInvalidGeometry{0u};
+    std::uint32_t PointInstancesWithInvalidGeometry{0u};
+    std::uint32_t FirstLineSlot{kInvalidIndex};
+    std::uint32_t FirstPointSlot{kInvalidIndex};
+    Extrinsic::RHI::GpuInstanceStatic FirstLineInstance{};
+    Extrinsic::RHI::GpuInstanceStatic FirstPointInstance{};
+    Extrinsic::RHI::GpuGeometryRecord FirstLineGeometry{};
+    Extrinsic::RHI::GpuGeometryRecord FirstPointGeometry{};
+    Extrinsic::RHI::GpuBounds FirstLineBounds{};
+    Extrinsic::RHI::GpuBounds FirstPointBounds{};
+};
+
+[[nodiscard]] GpuSceneInputSummary SummarizeGpuSceneInputs(
+    Extrinsic::RHI::IDevice& device,
+    Extrinsic::Graphics::IRenderer& renderer)
+{
+    auto& gpuWorld = renderer.GetGpuWorld();
+    GpuSceneInputSummary summary{};
+    summary.InstanceCapacity = gpuWorld.GetInstanceCapacity();
+    summary.GeometryCapacity = gpuWorld.GetGeometryCapacity();
+    summary.LiveInstanceCount = gpuWorld.GetLiveInstanceCount();
+
+    std::vector<Extrinsic::RHI::GpuInstanceStatic> instances(summary.InstanceCapacity);
+    std::vector<Extrinsic::RHI::GpuBounds> bounds(summary.InstanceCapacity);
+    std::vector<Extrinsic::RHI::GpuGeometryRecord> geometries(summary.GeometryCapacity);
+
+    if (!instances.empty() && gpuWorld.GetInstanceStaticBuffer().IsValid())
+    {
+        device.ReadBuffer(gpuWorld.GetInstanceStaticBuffer(),
+                          instances.data(),
+                          static_cast<std::uint64_t>(instances.size() * sizeof(instances.front())),
+                          0u);
+    }
+    if (!bounds.empty() && gpuWorld.GetBoundsBuffer().IsValid())
+    {
+        device.ReadBuffer(gpuWorld.GetBoundsBuffer(),
+                          bounds.data(),
+                          static_cast<std::uint64_t>(bounds.size() * sizeof(bounds.front())),
+                          0u);
+    }
+    if (!geometries.empty() && gpuWorld.GetGeometryRecordBuffer().IsValid())
+    {
+        device.ReadBuffer(gpuWorld.GetGeometryRecordBuffer(),
+                          geometries.data(),
+                          static_cast<std::uint64_t>(geometries.size() * sizeof(geometries.front())),
+                          0u);
+    }
+
+    for (std::uint32_t slot = 0u; slot < instances.size(); ++slot)
+    {
+        const auto& inst = instances[slot];
+        if ((inst.RenderFlags & Extrinsic::RHI::GpuRender_Visible) == 0u)
+            continue;
+
+        ++summary.VisibleInstances;
+        const bool hasLine = (inst.RenderFlags & Extrinsic::RHI::GpuRender_Line) != 0u;
+        const bool hasPoint = (inst.RenderFlags & Extrinsic::RHI::GpuRender_Point) != 0u;
+        if (!hasLine && !hasPoint)
+            continue;
+
+        const bool validGeometry =
+            inst.GeometrySlot != Extrinsic::RHI::GpuInstanceStatic::InvalidGeometrySlot &&
+            inst.GeometrySlot < geometries.size();
+        const auto& slotBounds = bounds[slot];
+        const auto geometry = validGeometry ? geometries[inst.GeometrySlot]
+                                            : Extrinsic::RHI::GpuGeometryRecord{};
+
+        if (hasLine)
+        {
+            ++summary.LineInstances;
+            if (!validGeometry)
+                ++summary.LineInstancesWithInvalidGeometry;
+            if (slotBounds.WorldSphere.w <= 0.0f)
+                ++summary.LineInstancesWithZeroBounds;
+            if (validGeometry && geometry.LineIndexCount == 0u)
+                ++summary.LineInstancesWithZeroIndexCount;
+            if (summary.FirstLineSlot == kInvalidIndex)
+            {
+                summary.FirstLineSlot = slot;
+                summary.FirstLineInstance = inst;
+                summary.FirstLineGeometry = geometry;
+                summary.FirstLineBounds = slotBounds;
+            }
+        }
+
+        if (hasPoint)
+        {
+            ++summary.PointInstances;
+            if (!validGeometry)
+                ++summary.PointInstancesWithInvalidGeometry;
+            if (slotBounds.WorldSphere.w <= 0.0f)
+                ++summary.PointInstancesWithZeroBounds;
+            if (validGeometry && geometry.PointVertexCount == 0u)
+                ++summary.PointInstancesWithZeroVertexCount;
+            if (summary.FirstPointSlot == kInvalidIndex)
+            {
+                summary.FirstPointSlot = slot;
+                summary.FirstPointInstance = inst;
+                summary.FirstPointGeometry = geometry;
+                summary.FirstPointBounds = slotBounds;
+            }
+        }
+    }
+
+    return summary;
+}
+
+struct PixelNeighborhoodStats
+{
+    RgbaPixel Min{};
+    RgbaPixel Max{};
+    RgbaPixel Center{};
+};
+
+[[nodiscard]] PixelNeighborhoodStats DescribePixelNeighborhood(
+    const std::vector<std::uint8_t>& bytes,
+    const Extrinsic::RHI::Format format,
+    const std::uint32_t bytesPerPixel,
+    const Extrinsic::Core::Extent2D extent,
+    const std::uint32_t centerX,
+    const std::uint32_t centerY,
+    const std::uint32_t radius)
+{
+    PixelNeighborhoodStats stats{};
+    stats.Min = RgbaPixel{.R = 255u, .G = 255u, .B = 255u, .A = 255u};
+    stats.Center = ReadPixel(bytes, format, bytesPerPixel, extent, centerX, centerY);
+    if (extent.Width == 0u || extent.Height == 0u)
+        return stats;
+
+    const auto minX = static_cast<std::uint32_t>(
+        std::max<int>(0, static_cast<int>(centerX) - static_cast<int>(radius)));
+    const auto minY = static_cast<std::uint32_t>(
+        std::max<int>(0, static_cast<int>(centerY) - static_cast<int>(radius)));
+    const auto maxX = static_cast<std::uint32_t>(
+        std::min<int>(static_cast<int>(extent.Width) - 1,
+                      static_cast<int>(centerX) + static_cast<int>(radius)));
+    const auto maxY = static_cast<std::uint32_t>(
+        std::min<int>(static_cast<int>(extent.Height) - 1,
+                      static_cast<int>(centerY) + static_cast<int>(radius)));
+
+    for (std::uint32_t y = minY; y <= maxY; ++y)
+    {
+        for (std::uint32_t x = minX; x <= maxX; ++x)
+        {
+            const RgbaPixel pixel = ReadPixel(bytes, format, bytesPerPixel, extent, x, y);
+            stats.Min.R = std::min(stats.Min.R, pixel.R);
+            stats.Min.G = std::min(stats.Min.G, pixel.G);
+            stats.Min.B = std::min(stats.Min.B, pixel.B);
+            stats.Min.A = std::min(stats.Min.A, pixel.A);
+            stats.Max.R = std::max(stats.Max.R, pixel.R);
+            stats.Max.G = std::max(stats.Max.G, pixel.G);
+            stats.Max.B = std::max(stats.Max.B, pixel.B);
+            stats.Max.A = std::max(stats.Max.A, pixel.A);
+        }
+    }
+    return stats;
 }
 
 void SetEntityPosition(Registry& scene, const EntityHandle entity, const glm::vec3 position)
@@ -957,6 +1170,243 @@ constexpr std::uint32_t kBug024TotalFrames = 8u;
     };
     return {toPixel(ndcX, static_cast<std::uint32_t>(extent.Width)),
             toPixel(ndcY, static_cast<std::uint32_t>(extent.Height))};
+}
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleMeshEdgeAndPointLanesPresentBrightOverlay)
+{
+    auto bootstrap = BootstrapDefaultSandboxAppEngine();
+    if (bootstrap.Skipped)
+    {
+        GTEST_SKIP() << bootstrap.SkipReason;
+    }
+    Engine& engine = *bootstrap.EnginePtr;
+
+    const EntityHandle triangle = FindEntityByName(engine.GetScene(), "ReferenceTriangle");
+    ASSERT_TRUE(IsReferenceTriangleEntityValid(engine.GetScene(), triangle))
+        << "ReferenceTriangle is not a valid first-class mesh renderable entity: "
+        << BuildReferenceTriangleEntityDiagnostic(engine.GetScene(), triangle);
+
+    auto& raw = engine.GetScene().Raw();
+    raw.emplace_or_replace<G::RenderEdges>(triangle);
+    G::RenderPoints points{};
+    raw.emplace_or_replace<G::RenderPoints>(triangle, points);
+
+    auto& renderer = engine.GetRenderer();
+    auto& device = engine.GetDevice();
+    const Extrinsic::RHI::Format backbufferFormat = device.GetBackbufferFormat();
+    const std::uint32_t bytesPerPixel = Extrinsic::RHI::BytesPerBlock(backbufferFormat);
+    const Extrinsic::Core::Extent2D extent = device.GetBackbufferExtent();
+    if (bytesPerPixel < 4u || extent.Width <= 0 || extent.Height <= 0)
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style smoke readback.";
+    }
+
+    const std::uint64_t readbackSize =
+        static_cast<std::uint64_t>(bytesPerPixel) *
+        static_cast<std::uint64_t>(extent.Width) *
+        static_cast<std::uint64_t>(extent.Height);
+    const Extrinsic::RHI::BufferHandle readbackBuffer = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
+        .SizeBytes = readbackSize,
+        .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
+        .HostVisible = true,
+        .DebugName = "Sandbox.ReferenceTriangleEdgePoint.Readback",
+    });
+    if (!readbackBuffer.IsValid())
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Readback buffer allocation failed; gpu;vulkan smoke is opt-in.";
+    }
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(readbackBuffer);
+
+    const auto run = DriveAcceptanceAndCapture(engine);
+
+    if (!run.DeviceOperational)
+    {
+        renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+        device.DestroyBuffer(readbackBuffer);
+        engine.Shutdown();
+        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach operational Vulkan for edge/point readback: status="
+                      << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
+                      << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+        return;
+    }
+
+    EXPECT_TRUE(run.Stats.Compile.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_TRUE(run.Stats.Execute.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_EQ(FindPassStatus(run.Stats, "LinePass"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_EQ(FindPassStatus(run.Stats, "PointPass"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_GE(run.Stats.DefaultRecipeBackbufferReadbackCopyCount, 1u)
+        << "Sandbox edge/point readback copy did not record on an operational frame.";
+
+    const auto& ex = engine.GetLastRenderExtractionStats();
+    EXPECT_GE(ex.MeshEdgeViewUploads + ex.MeshEdgeViewReuseHits, 1u)
+        << "ReferenceTriangle did not submit the mesh edge sidecar.";
+    EXPECT_GE(ex.MeshVertexViewUploads + ex.MeshVertexViewReuseHits, 1u)
+        << "ReferenceTriangle did not submit the mesh vertex sidecar.";
+    EXPECT_EQ(ex.MeshEdgeViewFailedPack, 0u);
+    EXPECT_EQ(ex.MeshVertexViewFailedPack, 0u);
+
+    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(readbackSize), 0u);
+    device.ReadBuffer(readbackBuffer, bytes.data(), readbackSize, 0u);
+
+    std::uint32_t lineCullCount = 0u;
+    std::uint32_t pointCullCount = 0u;
+    Extrinsic::RHI::GpuDrawIndexedCommand firstLineCmd{};
+    Extrinsic::RHI::GpuDrawCommand firstPointCmd{};
+    const GpuSceneInputSummary sceneInputs = SummarizeGpuSceneInputs(device, renderer);
+    {
+        const auto& lineBucket = renderer.GetCullingSystem().GetBucket(
+            Extrinsic::RHI::GpuDrawBucketKind::Lines);
+        const auto& pointBucket = renderer.GetCullingSystem().GetBucket(
+            Extrinsic::RHI::GpuDrawBucketKind::Points);
+        if (lineBucket.CountBuffer.IsValid())
+        {
+            device.ReadBuffer(lineBucket.CountBuffer, &lineCullCount, sizeof(lineCullCount), 0u);
+        }
+        if (lineBucket.IndexedArgsBuffer.IsValid())
+        {
+            device.ReadBuffer(lineBucket.IndexedArgsBuffer, &firstLineCmd, sizeof(firstLineCmd), 0u);
+        }
+        if (pointBucket.CountBuffer.IsValid())
+        {
+            device.ReadBuffer(pointBucket.CountBuffer, &pointCullCount, sizeof(pointCullCount), 0u);
+        }
+        if (pointBucket.NonIndexedArgsBuffer.IsValid())
+        {
+            device.ReadBuffer(pointBucket.NonIndexedArgsBuffer, &firstPointCmd, sizeof(firstPointCmd), 0u);
+        }
+    }
+
+    const auto [edgeX, edgeY] = ProjectReferenceCameraPixel(glm::vec3{0.0f, -0.5f, 0.0f}, extent);
+    const auto [vertexX, vertexY] = ProjectReferenceCameraPixel(glm::vec3{0.0f, 0.5f, 0.0f}, extent);
+    const std::uint32_t pointSampleY = vertexY;
+    const std::uint32_t darkEdgePixels =
+        CountDarkOverlayPixels(bytes, backbufferFormat, bytesPerPixel, extent, edgeX, edgeY, 4u);
+    const std::uint32_t darkVertexPixels =
+        CountDarkOverlayPixels(bytes, backbufferFormat, bytesPerPixel, extent, vertexX, pointSampleY, 4u);
+    const PixelNeighborhoodStats edgeStats =
+        DescribePixelNeighborhood(bytes, backbufferFormat, bytesPerPixel, extent, edgeX, edgeY, 4u);
+    const PixelNeighborhoodStats vertexStats =
+        DescribePixelNeighborhood(bytes, backbufferFormat, bytesPerPixel, extent, vertexX, pointSampleY, 4u);
+
+    EXPECT_GE(lineCullCount, 1u)
+        << "ReferenceTriangle mesh edge lane did not emit a line draw command."
+        << " lineCmd={indexCount=" << firstLineCmd.IndexCount
+        << ", instanceCount=" << firstLineCmd.InstanceCount
+        << ", firstIndex=" << firstLineCmd.FirstIndex
+        << ", vertexOffset=" << firstLineCmd.VertexOffset
+        << ", firstInstance=" << firstLineCmd.FirstInstance << "}";
+    EXPECT_GE(pointCullCount, 1u)
+        << "ReferenceTriangle mesh point lane did not emit a point draw command."
+        << " pointCmd={vertexCount=" << firstPointCmd.VertexCount
+        << ", instanceCount=" << firstPointCmd.InstanceCount
+        << ", firstVertex=" << firstPointCmd.FirstVertex
+        << ", firstInstance=" << firstPointCmd.FirstInstance << "}";
+
+    EXPECT_GE(darkEdgePixels, 1u)
+        << "ReferenceTriangle mesh edge lane did not leave a dark overlay near the projected bottom-edge midpoint. "
+        << "sample=(" << edgeX << "," << edgeY << ")"
+        << " center=(" << static_cast<int>(edgeStats.Center.R) << ","
+        << static_cast<int>(edgeStats.Center.G) << ","
+        << static_cast<int>(edgeStats.Center.B) << ")"
+        << " min=(" << static_cast<int>(edgeStats.Min.R) << ","
+        << static_cast<int>(edgeStats.Min.G) << ","
+        << static_cast<int>(edgeStats.Min.B) << ")"
+        << " max=(" << static_cast<int>(edgeStats.Max.R) << ","
+        << static_cast<int>(edgeStats.Max.G) << ","
+        << static_cast<int>(edgeStats.Max.B) << ")"
+        << " lineCullCount=" << lineCullCount
+        << " lineCmd={indexCount=" << firstLineCmd.IndexCount
+        << ", instanceCount=" << firstLineCmd.InstanceCount
+        << ", firstIndex=" << firstLineCmd.FirstIndex
+        << ", vertexOffset=" << firstLineCmd.VertexOffset
+        << ", firstInstance=" << firstLineCmd.FirstInstance << "}"
+        << " pointCullCount=" << pointCullCount
+        << " pointCmd={vertexCount=" << firstPointCmd.VertexCount
+        << ", instanceCount=" << firstPointCmd.InstanceCount
+        << ", firstVertex=" << firstPointCmd.FirstVertex
+        << ", firstInstance=" << firstPointCmd.FirstInstance << "}"
+        << " sceneInputs={live=" << sceneInputs.LiveInstanceCount
+        << ", capacity=" << sceneInputs.InstanceCapacity
+        << ", visible=" << sceneInputs.VisibleInstances
+        << ", lines=" << sceneInputs.LineInstances
+        << ", points=" << sceneInputs.PointInstances
+        << ", lineZeroBounds=" << sceneInputs.LineInstancesWithZeroBounds
+        << ", pointZeroBounds=" << sceneInputs.PointInstancesWithZeroBounds
+        << ", lineZeroIndices=" << sceneInputs.LineInstancesWithZeroIndexCount
+        << ", pointZeroVertices=" << sceneInputs.PointInstancesWithZeroVertexCount
+        << ", lineInvalidGeometry=" << sceneInputs.LineInstancesWithInvalidGeometry
+        << ", pointInvalidGeometry=" << sceneInputs.PointInstancesWithInvalidGeometry
+        << ", firstLineSlot=" << sceneInputs.FirstLineSlot
+        << ", firstLineFlags=" << sceneInputs.FirstLineInstance.RenderFlags
+        << ", firstLineGeometrySlot=" << sceneInputs.FirstLineInstance.GeometrySlot
+        << ", firstLineIndexCount=" << sceneInputs.FirstLineGeometry.LineIndexCount
+        << ", firstLineFirstIndex=" << sceneInputs.FirstLineGeometry.LineFirstIndex
+        << ", firstLineVertexOffset=" << sceneInputs.FirstLineGeometry.VertexOffset
+        << ", firstLineBoundsRadius=" << sceneInputs.FirstLineBounds.WorldSphere.w
+        << ", firstPointSlot=" << sceneInputs.FirstPointSlot
+        << ", firstPointFlags=" << sceneInputs.FirstPointInstance.RenderFlags
+        << ", firstPointGeometrySlot=" << sceneInputs.FirstPointInstance.GeometrySlot
+        << ", firstPointVertexCount=" << sceneInputs.FirstPointGeometry.PointVertexCount
+        << ", firstPointFirstVertex=" << sceneInputs.FirstPointGeometry.PointFirstVertex
+        << ", firstPointBoundsRadius=" << sceneInputs.FirstPointBounds.WorldSphere.w << "}"
+        << " pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+    EXPECT_GE(darkVertexPixels, 1u)
+        << "ReferenceTriangle mesh point lane did not leave a visible dark overlay near the projected top vertex. "
+        << "sample=(" << vertexX << "," << pointSampleY << ")"
+        << " darkPixels=" << darkVertexPixels
+        << " center=(" << static_cast<int>(vertexStats.Center.R) << ","
+        << static_cast<int>(vertexStats.Center.G) << ","
+        << static_cast<int>(vertexStats.Center.B) << ")"
+        << " min=(" << static_cast<int>(vertexStats.Min.R) << ","
+        << static_cast<int>(vertexStats.Min.G) << ","
+        << static_cast<int>(vertexStats.Min.B) << ")"
+        << " max=(" << static_cast<int>(vertexStats.Max.R) << ","
+        << static_cast<int>(vertexStats.Max.G) << ","
+        << static_cast<int>(vertexStats.Max.B) << ")"
+        << " lineCullCount=" << lineCullCount
+        << " lineCmd={indexCount=" << firstLineCmd.IndexCount
+        << ", instanceCount=" << firstLineCmd.InstanceCount
+        << ", firstIndex=" << firstLineCmd.FirstIndex
+        << ", vertexOffset=" << firstLineCmd.VertexOffset
+        << ", firstInstance=" << firstLineCmd.FirstInstance << "}"
+        << " pointCullCount=" << pointCullCount
+        << " pointCmd={vertexCount=" << firstPointCmd.VertexCount
+        << ", instanceCount=" << firstPointCmd.InstanceCount
+        << ", firstVertex=" << firstPointCmd.FirstVertex
+        << ", firstInstance=" << firstPointCmd.FirstInstance << "}"
+        << " sceneInputs={live=" << sceneInputs.LiveInstanceCount
+        << ", capacity=" << sceneInputs.InstanceCapacity
+        << ", visible=" << sceneInputs.VisibleInstances
+        << ", lines=" << sceneInputs.LineInstances
+        << ", points=" << sceneInputs.PointInstances
+        << ", lineZeroBounds=" << sceneInputs.LineInstancesWithZeroBounds
+        << ", pointZeroBounds=" << sceneInputs.PointInstancesWithZeroBounds
+        << ", lineZeroIndices=" << sceneInputs.LineInstancesWithZeroIndexCount
+        << ", pointZeroVertices=" << sceneInputs.PointInstancesWithZeroVertexCount
+        << ", lineInvalidGeometry=" << sceneInputs.LineInstancesWithInvalidGeometry
+        << ", pointInvalidGeometry=" << sceneInputs.PointInstancesWithInvalidGeometry
+        << ", firstLineSlot=" << sceneInputs.FirstLineSlot
+        << ", firstLineFlags=" << sceneInputs.FirstLineInstance.RenderFlags
+        << ", firstLineGeometrySlot=" << sceneInputs.FirstLineInstance.GeometrySlot
+        << ", firstLineIndexCount=" << sceneInputs.FirstLineGeometry.LineIndexCount
+        << ", firstLineFirstIndex=" << sceneInputs.FirstLineGeometry.LineFirstIndex
+        << ", firstLineVertexOffset=" << sceneInputs.FirstLineGeometry.VertexOffset
+        << ", firstLineBoundsRadius=" << sceneInputs.FirstLineBounds.WorldSphere.w
+        << ", firstPointSlot=" << sceneInputs.FirstPointSlot
+        << ", firstPointFlags=" << sceneInputs.FirstPointInstance.RenderFlags
+        << ", firstPointGeometrySlot=" << sceneInputs.FirstPointInstance.GeometrySlot
+        << ", firstPointVertexCount=" << sceneInputs.FirstPointGeometry.PointVertexCount
+        << ", firstPointFirstVertex=" << sceneInputs.FirstPointGeometry.PointFirstVertex
+        << ", firstPointBoundsRadius=" << sceneInputs.FirstPointBounds.WorldSphere.w << "}"
+        << " pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+    device.DestroyBuffer(readbackBuffer);
+    engine.Shutdown();
 }
 
 // Sandbox app that applies the promoted Inspector transform-edit command (the

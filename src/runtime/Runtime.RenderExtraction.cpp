@@ -1014,11 +1014,11 @@ namespace Extrinsic::Runtime
             ++stats.PointCloudGeometryReleases;
         };
 
-        // Size-source policy for this slice: only a uniform world-space radius
+        // Size-source policy for this slice: only a uniform screen-space size
         // (the `float` alternative of `RenderPoints::SizeSource`) is supported.
         // A per-point size buffer (the `std::string` alternative) requires a
-        // per-point radius upload that is not implemented here, so it fails
-        // closed rather than silently rendering with a default radius. The
+        // per-point size upload that is not implemented here, so it fails
+        // closed rather than silently rendering with a default size. The
         // render-type enum (`Flat`/`Sphere`/`Surfel`) only selects the
         // downstream point shader and does not affect the position-only upload,
         // so all three are accepted by the geometry-residency bridge.
@@ -1294,16 +1294,16 @@ namespace Extrinsic::Runtime
             const std::uint32_t laneFlag = isEdge
                 ? (RHI::GpuRender_Line | RHI::GpuRender_Unlit)
                 : (RHI::GpuRender_Point | RHI::GpuRender_Unlit);
+            RHI::GpuEntityConfig cfg{};
+            cfg.ColorSourceMode = 1u;
+            cfg.VisualizationAlpha = 1.0f;
+            cfg.UniformColor = {0.02f, 0.02f, 0.02f, 1.0f};
             if (!isEdge)
             {
-                RHI::GpuEntityConfig cfg{};
-                cfg.ColorSourceMode = 1u;
-                cfg.VisualizationAlpha = 1.0f;
-                cfg.UniformColor = {1.0f, 1.0f, 1.0f, 1.0f};
                 cfg.PointSize = UniformPointSizeOrDefault(points);
                 cfg.PointMode = ToRenderPointMode(points->Type);
-                renderer.GetGpuWorld().SetEntityConfig(instance, cfg);
             }
+            renderer.GetGpuWorld().SetEntityConfig(instance, cfg);
             m_Transforms.push_back(Graphics::TransformSyncRecord{
                 .StableId = stableId,
                 .Instance = instance,

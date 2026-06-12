@@ -39,7 +39,9 @@ void main()
     const GpuInstanceStatic inst = GpuInstanceStaticRef(scene.InstanceStaticBDA).Data[instanceSlot];
     const GpuInstanceDynamic dyn = GpuInstanceDynamicRef(scene.InstanceDynamicBDA).Data[instanceSlot];
     const GpuGeometryRecord geo = GpuGeometryRecordRef(scene.GeometryRecordBDA).Data[inst.GeometrySlot];
-    const vec3 localPosition = ProceduralVertexRef(geo.VertexBufferBDA).Data[geo.VertexOffset + gl_VertexIndex].Position;
+    // The culling indirect command supplies firstIndex + vertexOffset, so
+    // gl_VertexIndex is already in managed-buffer vertex units.
+    const vec3 localPosition = ProceduralVertexRef(geo.VertexBufferBDA).Data[gl_VertexIndex].Position;
 
     gl_Position = scene.CameraViewProj * dyn.Model * vec4(localPosition, 1.0);
 }

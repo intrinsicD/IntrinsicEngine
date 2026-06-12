@@ -18,8 +18,8 @@
 // to emit a valid `gl_PointSize` — without it Vulkan pipeline creation can
 // fail point-size validation, and even when accepted the rasterizer falls
 // back to 1-pixel points and picking misses every entity rendered with a
-// larger configured point size. `forward/point.vert` already publishes
-// `gl_PointSize = max(cfg.PointSize, 1.0)`, so picking must match for the
+// larger configured point size. `forward/point.vert` already publishes the
+// clamped configured point size, so picking must match for the
 // visible point to be hittable. This shader therefore reads
 // `GpuEntityConfig::PointSize` through `scene.EntityConfigBDA` indexed by
 // `inst.ConfigSlot` (the same chain `forward/point.vert` uses) and writes
@@ -60,11 +60,13 @@ void main() {
     const GpuGeometryRecord geo = GpuGeometryRecordRef(scene.GeometryRecordBDA).Data[inst.GeometrySlot];
     const GpuEntityConfig cfg = GpuEntityConfigRef(scene.EntityConfigBDA).Data[inst.ConfigSlot];
 
-    const ProceduralVertex v = ProceduralVertexRef(geo.VertexBufferBDA).Data[geo.VertexOffset + gl_VertexIndex];
+    // The culling indirect command supplies firstVertex, so gl_VertexIndex is
+    // already in managed-buffer vertex units.
+    const ProceduralVertex v = ProceduralVertexRef(geo.VertexBufferBDA).Data[gl_VertexIndex];
 
     gl_Position = scene.CameraViewProj * dyn.Model * vec4(v.Position, 1.0);
     // Match `forward/point.vert`'s point-size publication so the picking
     // footprint covers the same pixels the visible point covers.
-    gl_PointSize = max(cfg.PointSize, 1.0);
+    gl_PointSize = clamp(cfg.PointSize, 0.5, 32.0);
     fragEntityID = inst.EntityID;
 }

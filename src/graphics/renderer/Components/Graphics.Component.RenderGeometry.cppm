@@ -96,8 +96,8 @@ export namespace Extrinsic::Graphics::Components
             Surfel   ///< Surface-aligned disc; requires vertex normals.
         } Type = RenderType::Sphere;
 
-        /// Uniform world-space radius or name of a per-point size buffer
+        /// Uniform screen-space diameter in pixels or name of a per-point size buffer
         /// in GpuSceneSlot::Buffers.
-        std::variant<float, std::string> SizeSource = 0.008f;
+        std::variant<float, std::string> SizeSource = 6.0f;
     };
 }

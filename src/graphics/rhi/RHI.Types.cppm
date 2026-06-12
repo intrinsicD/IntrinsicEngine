@@ -146,6 +146,8 @@ export namespace Extrinsic::RHI
         std::uint32_t PointVertexCount = 0;
         std::uint32_t BufferID = 0;
         std::uint32_t Flags = 0;
+        std::uint32_t _pad0 = 0;
+        std::uint32_t _pad1 = 0;
     };
     static_assert(sizeof(GpuGeometryRecord) == 64);
 

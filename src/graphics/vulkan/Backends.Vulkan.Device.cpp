@@ -3840,14 +3840,10 @@ void VulkanDevice::WriteBuffer(RHI::BufferHandle handle, const void* data,
 }
 
 // GRAPHICS-076E — host-visible buffer drain used by the opt-in
-// `gpu;vulkan` default-recipe visible-triangle smoke. Mirrors the host-visible
-// fast path of WriteBuffer in reverse: WaitIdle so any prior
-// `vkCmdCopyImageToBuffer` recorded into the in-flight command buffer has
-// finished, then memcpy out of the persistently-mapped pointer. Device-local
-// buffers are not supported by this slice (would need a staging round-trip via
-// a temporary host-visible buffer + EndOneShot); we log once and return so
-// callers see the fallback behaviour rather than silent garbage. The smoke
-// drives the only known caller and supplies a HostVisible buffer.
+// `gpu;vulkan` default-recipe visible-triangle smoke. Host-visible buffers use
+// the direct persistent-map path. Device-local buffers use a synchronous
+// staging round-trip so GPU smoke tests can inspect draw/culling state without
+// changing production allocation policy.
 void VulkanDevice::ReadBuffer(RHI::BufferHandle handle, void* data,
                                uint64_t size, uint64_t offset)
 {
@@ -3859,47 +3855,107 @@ void VulkanDevice::ReadBuffer(RHI::BufferHandle handle, void* data,
     if (!buf) return;
     if (offset > buf->SizeBytes || size > buf->SizeBytes - offset) return;
 
-    if (!buf->HostVisible)
+    if (buf->HostVisible)
     {
-        Core::Log::Warn("[VulkanDevice::ReadBuffer] device-local buffer readback is not supported in this slice; skipping");
+        assert(buf->MappedPtr && "HostVisible buffer has null MappedPtr");
+
+        // WaitIdle bounds the readback to GPU-completed bytes. The in-flight
+        // command buffer that wrote into this buffer is submitted by EndFrame
+        // and signals through the present semaphore chain; vkDeviceWaitIdle is
+        // the most defensive synchronisation primitive available without
+        // exposing per-frame fences here. The smoke calls ReadBuffer after
+        // Run(), so the throughput cost is irrelevant.
+        if (m_Device != VK_NULL_HANDLE)
+        {
+            std::scoped_lock lock{m_QueueMutex};
+            (void)vkDeviceWaitIdle(m_Device);
+        }
+
+        if (m_Vma != VK_NULL_HANDLE && buf->Allocation != VK_NULL_HANDLE)
+        {
+            const VkResult invalidateResult =
+                vmaInvalidateAllocation(m_Vma, buf->Allocation, offset, size);
+            if (invalidateResult != VK_SUCCESS)
+            {
+                Core::Log::Warn("[VulkanDevice::ReadBuffer] vmaInvalidateAllocation reported VkResult={}; readback bytes may reflect stale CPU cache on non-coherent memory.",
+                                static_cast<int>(invalidateResult));
+            }
+        }
+
+        std::memcpy(data, static_cast<const char*>(buf->MappedPtr) + offset, size);
         return;
     }
 
-    assert(buf->MappedPtr && "HostVisible buffer has null MappedPtr");
+    VkBufferCreateInfo stagingCI{};
+    stagingCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    stagingCI.size = size;
+    stagingCI.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
-    // WaitIdle bounds the readback to GPU-completed bytes. The in-flight
-    // command buffer that wrote into this buffer is submitted by EndFrame and
-    // signals through the present semaphore chain; vkDeviceWaitIdle is the
-    // most defensive synchronisation primitive available without exposing
-    // per-frame fences here. The smoke calls ReadBuffer once after Run() so
-    // the throughput cost is irrelevant.
-    if (m_Device != VK_NULL_HANDLE)
+    VmaAllocationCreateInfo stagingACI{};
+    stagingACI.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+    stagingACI.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT
+                     | VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
+
+    VkBuffer stagingBuf{};
+    VmaAllocation stagingAlloc{};
+    VmaAllocationInfo stagingInfo{};
+
+    VkResult result = vmaCreateBuffer(m_Vma, &stagingCI, &stagingACI,
+                                      &stagingBuf, &stagingAlloc, &stagingInfo);
+    if (result != VK_SUCCESS)
     {
-        std::scoped_lock lock{m_QueueMutex};
-        (void)vkDeviceWaitIdle(m_Device);
+        NoteDeviceLostIfNeeded(result);
+        Core::Log::Error("[VulkanDevice::ReadBuffer] Failed to allocate staging buffer");
+        return;
     }
 
-    // Invalidate the non-coherent CPU cache before memcpy so the host sees
-    // the GPU writes the prior copy produced. vkDeviceWaitIdle proves the
-    // copy completed device-side; on memory types that lack HOST_COHERENT
-    // (typical on discrete GPUs once the allocator can no longer satisfy
-    // CPU_TO_GPU with a HOST_COHERENT type) the mapped pointer can still
-    // reflect stale cache lines without this call. vmaInvalidateAllocation
-    // is a documented no-op when the underlying memory type is
-    // HOST_COHERENT, so this stays correct on the integrated/desktop hosts
-    // where VMA selects HOST_COHERENT today.
-    if (m_Vma != VK_NULL_HANDLE && buf->Allocation != VK_NULL_HANDLE)
+    bool copyComplete = false;
     {
-        const VkResult invalidateResult =
-            vmaInvalidateAllocation(m_Vma, buf->Allocation, offset, size);
-        if (invalidateResult != VK_SUCCESS)
+        std::scoped_lock oneShotLock{m_OneShotMutex};
+        VkCommandBuffer cmd = BeginOneShot();
+        if (cmd != VK_NULL_HANDLE)
         {
-            Core::Log::Warn("[VulkanDevice::ReadBuffer] vmaInvalidateAllocation reported VkResult={}; readback bytes may reflect stale CPU cache on non-coherent memory.",
-                            static_cast<int>(invalidateResult));
+            VkBufferMemoryBarrier2 beforeCopy{};
+            beforeCopy.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+            beforeCopy.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+            beforeCopy.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
+            beforeCopy.dstStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+            beforeCopy.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
+            beforeCopy.buffer = buf->Buffer;
+            beforeCopy.offset = offset;
+            beforeCopy.size = size;
+
+            VkDependencyInfo dependency{};
+            dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+            dependency.bufferMemoryBarrierCount = 1;
+            dependency.pBufferMemoryBarriers = &beforeCopy;
+            vkCmdPipelineBarrier2(cmd, &dependency);
+
+            VkBufferCopy region{};
+            region.srcOffset = offset;
+            region.dstOffset = 0;
+            region.size = size;
+            vkCmdCopyBuffer(cmd, buf->Buffer, stagingBuf, 1, &region);
+            copyComplete = EndOneShot(cmd);
         }
     }
 
-    std::memcpy(data, static_cast<const char*>(buf->MappedPtr) + offset, size);
+    if (copyComplete && stagingInfo.pMappedData != nullptr)
+    {
+        if (m_Vma != VK_NULL_HANDLE && stagingAlloc != VK_NULL_HANDLE)
+        {
+            const VkResult invalidateResult =
+                vmaInvalidateAllocation(m_Vma, stagingAlloc, 0, size);
+            if (invalidateResult != VK_SUCCESS)
+            {
+                Core::Log::Warn("[VulkanDevice::ReadBuffer] staging vmaInvalidateAllocation reported VkResult={}; readback bytes may reflect stale CPU cache on non-coherent memory.",
+                                static_cast<int>(invalidateResult));
+            }
+        }
+        std::memcpy(data, stagingInfo.pMappedData, static_cast<std::size_t>(size));
+    }
+
+    vmaDestroyBuffer(m_Vma, stagingBuf, stagingAlloc);
 }
 
 uint64_t VulkanDevice::GetBufferDeviceAddress(RHI::BufferHandle handle) const

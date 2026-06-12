@@ -50,9 +50,10 @@ void main() {
     const GpuInstanceDynamic dyn = instanceDynamic.Data[instanceSlot];
     const GpuGeometryRecord geo = geometryRecords.Data[inst.GeometrySlot];
 
-    const uint vertexId = uint(gl_VertexIndex);
     PackedVertexRef vertices = PackedVertexRef(geo.VertexBufferBDA);
-    const PackedVertex pv = vertices.Data[geo.VertexOffset + vertexId];
+    // The culling indirect command supplies firstIndex + vertexOffset, so
+    // gl_VertexIndex is already in managed-buffer vertex units.
+    const PackedVertex pv = vertices.Data[uint(gl_VertexIndex)];
 
     vec3 localPos = vec3(pv.px, pv.py, pv.pz);
     vec4 worldPos = dyn.Model * vec4(localPos, 1.0);

@@ -8,6 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
+- `BUG-032` — Triangle edge and point rendering is invisible on Vulkan (tasks/active/BUG-032-triangle-edge-point-vulkan-rendering.md)
 - `INFRA-001` — Move third-party dependencies to a vcpkg manifest (tasks/active/INFRA-001-vcpkg-manifest-mode.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds
@@ -27,6 +28,15 @@ the authoritative open/unblocked view.
 - unblocked: `RUNTIME-101` — Asset ingest state-machine migration (tasks/backlog/runtime/RUNTIME-101-asset-ingest-state-machine.md)
 - unblocked: `RUNTIME-103` — Geometry algorithm execution queue (tasks/backlog/runtime/RUNTIME-103-geometry-algorithm-execution-queue.md)
 - unblocked: `RUNTIME-105` — Remove the deprecated GetStreamingGraph() TaskGraph bridge (tasks/backlog/runtime/RUNTIME-105-remove-streaming-graph-bridge.md)
+
+## Theme G — Active bugs
+
+- unblocked: `BUG-029` — Ray/AABB slab tests NaN-poisoned for axis-parallel rays on slab planes; ray/sphere raycast emits NaN normal (tasks/backlog/bugs/BUG-029-ray-aabb-slab-nan-poisoning.md)
+- unblocked: `BUG-030` — Default CPU gate red on headless hosts: `engine.Run()` tests lack the windowless guard (main CI failing since 2026-06-09) (tasks/backlog/bugs/BUG-030-headless-engine-run-tests-red-gate.md)
+- unblocked: `BUG-031` — Documented agent gate cannot pass a fresh tree: benchmark smoke binary missing from the `IntrinsicTests` aggregate (tasks/backlog/bugs/BUG-031-benchmark-smoke-not-in-intrinsictests-aggregate.md)
+- unblocked: `BUG-033` — Mesh IO trusts header-declared counts: unbounded reserve aborts and wrap-prone bounds checks (tasks/backlog/bugs/BUG-033-mesh-io-untrusted-header-counts.md)
+- unblocked: `BUG-034` — VulkanDevice never reclaims ResourcePool slots: unbounded pending-kill growth and handle-space leak (tasks/backlog/bugs/BUG-034-vulkan-resource-pool-reclamation.md)
+- blocked by `BUG-034`: `BUG-035` — Vulkan slot-recycling smoke (handle reuse through the real frame loop) (tasks/backlog/bugs/BUG-035-vulkan-slot-recycling-smoke.md)
 
 ## Unthemed
 

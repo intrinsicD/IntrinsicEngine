@@ -2433,7 +2433,7 @@ namespace Extrinsic::Runtime
             {
                 float pointSize = model.RenderHints.UniformPointSize;
                 if (ImGui::DragFloat(
-                        "Point radius", &pointSize, 0.001f, 0.0001f, 1.0f) &&
+                        "Point size", &pointSize, 0.05f, 0.5f, 32.0f) &&
                     canEditRenderHints)
                 {
                     (void)ApplySandboxEditorRenderHintCommand(

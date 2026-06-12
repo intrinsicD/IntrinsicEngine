@@ -59,13 +59,14 @@ void main() {
     const GpuGeometryRecord geo = geometryRecords.Data[inst.GeometrySlot];
     const GpuEntityConfig cfg = entityConfigs.Data[inst.ConfigSlot];
 
-    const uint vertexId = uint(gl_VertexIndex);
     PackedVertexRef vertices = PackedVertexRef(geo.VertexBufferBDA);
-    const PackedVertex pv = vertices.Data[geo.VertexOffset + vertexId];
+    // The culling indirect command supplies firstVertex, so gl_VertexIndex is
+    // already in managed-buffer vertex units.
+    const PackedVertex pv = vertices.Data[uint(gl_VertexIndex)];
 
     gl_Position = scene.CameraViewProj * dyn.Model * vec4(pv.px, pv.py, pv.pz, 1.0);
 
-    gl_PointSize = max(cfg.PointSize, 1.0);
+    gl_PointSize = clamp(cfg.PointSize, 0.5, 32.0);
     vPointMode = cfg.PointMode;
 
     vColor = (cfg.ColorSourceMode == 1u) ? cfg.UniformColor : vec4(1.0);

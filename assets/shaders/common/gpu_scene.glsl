@@ -107,6 +107,8 @@ struct GpuGeometryRecord {
 
     uint BufferID;
     uint Flags;
+    uint _pad0;
+    uint _pad1;
 };
 
 struct GpuEntityConfig {

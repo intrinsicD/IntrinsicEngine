@@ -14,6 +14,7 @@ import Graphics;
 import Geometry;
 import ECS;
 import RHI;
+import Extrinsic.RHI.Types;
 
 // =============================================================================
 // Render Pass Contract Tests (B6)
@@ -138,6 +139,28 @@ TEST(RenderPassContract_Surface, MeshPushConstantsBDADefaultsToZero)
     EXPECT_EQ(pc.PtrFaceAttr, 0u);
     EXPECT_EQ(pc.PtrVertexAttr, 0u);
     EXPECT_EQ(pc.PtrIndices, 0u);
+}
+
+TEST(RenderPassContract_GpuScene, GpuGeometryRecordLayoutMatchesShader)
+{
+    using Record = Extrinsic::RHI::GpuGeometryRecord;
+
+    EXPECT_EQ(sizeof(Record), 64u);
+    EXPECT_EQ(alignof(Record), 16u);
+    EXPECT_EQ(offsetof(Record, VertexBufferBDA), 0u);
+    EXPECT_EQ(offsetof(Record, IndexBufferBDA), 8u);
+    EXPECT_EQ(offsetof(Record, VertexOffset), 16u);
+    EXPECT_EQ(offsetof(Record, VertexCount), 20u);
+    EXPECT_EQ(offsetof(Record, SurfaceFirstIndex), 24u);
+    EXPECT_EQ(offsetof(Record, SurfaceIndexCount), 28u);
+    EXPECT_EQ(offsetof(Record, LineFirstIndex), 32u);
+    EXPECT_EQ(offsetof(Record, LineIndexCount), 36u);
+    EXPECT_EQ(offsetof(Record, PointFirstVertex), 40u);
+    EXPECT_EQ(offsetof(Record, PointVertexCount), 44u);
+    EXPECT_EQ(offsetof(Record, BufferID), 48u);
+    EXPECT_EQ(offsetof(Record, Flags), 52u);
+    EXPECT_EQ(offsetof(Record, _pad0), 56u);
+    EXPECT_EQ(offsetof(Record, _pad1), 60u);
 }
 
 TEST(RenderPassContract_Surface, CullWorkgroupSizeIs64)
@@ -479,10 +502,10 @@ TEST(RenderPassContract_Safeguards, LineWidthClampRange)
 
 TEST(RenderPassContract_Safeguards, PointSizeClampRange)
 {
-    // Point radii clamped to [0.0001, 1.0] world-space.
-    EXPECT_FLOAT_EQ(std::clamp(0.0f, 0.0001f, 1.0f), 0.0001f);
-    EXPECT_FLOAT_EQ(std::clamp(5.0f, 0.0001f, 1.0f), 1.0f);
-    EXPECT_FLOAT_EQ(std::clamp(0.5f, 0.0001f, 1.0f), 0.5f);
+    // Retained forward point sizes are screen-space diameters in pixels.
+    EXPECT_FLOAT_EQ(std::clamp(0.0f, 0.5f, 32.0f), 0.5f);
+    EXPECT_FLOAT_EQ(std::clamp(50.0f, 0.5f, 32.0f), 32.0f);
+    EXPECT_FLOAT_EQ(std::clamp(6.0f, 0.5f, 32.0f), 6.0f);
 }
 
 // =============================================================================

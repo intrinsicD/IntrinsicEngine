@@ -472,7 +472,8 @@ gate. It consumes `tests/support/MinimalTriangleReadback.hpp` and
 and fallback-counter stability contract. The backbuffer-to-host readback seam is
 provided by `RHI::ICommandContext::CopyTextureToBuffer` (Vulkan:
 `vkCmdCopyImageToBuffer`) plus `RHI::IDevice::ReadBuffer` (Vulkan:
-`vkDeviceWaitIdle` + `memcpy` from a HostVisible buffer's persistent map). The
+`vkDeviceWaitIdle` + `memcpy` from a HostVisible buffer's persistent map, or a
+synchronous one-shot staging-copy round trip for DeviceLocal buffers). The
 renderer exposes an opt-in `IRenderer::SetDefaultRecipeBackbufferReadbackBuffer`
 hook that, when armed on an operational device, inserts a
 `Present -> TransferSrc -> CopyTextureToBuffer -> Present` triplet after the

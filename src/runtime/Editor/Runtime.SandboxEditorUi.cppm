@@ -819,7 +819,7 @@ export namespace Extrinsic::Runtime
             Graphics::Components::RenderPoints::RenderType::Sphere};
         bool SetPointRenderType{false};
         bool SetUniformPointSize{false};
-        float UniformPointSize{0.008f};
+        float UniformPointSize{6.0f};
     };
 
     struct SandboxEditorSpatialDebugBindingCommand

@@ -438,7 +438,7 @@ TEST(PointCloudGeometryExtraction, PerPointSizeSourceFailsClosedAsFailedPack)
     const EntityHandle entity = scene.Create();
     raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
     // A per-point size buffer (string SizeSource) is unsupported in this slice
-    // — only a uniform float radius is. The bridge fails closed rather than
+    // — only a uniform float point size is. The bridge fails closed rather than
     // uploading geometry that the point pass cannot size correctly.
     auto& points = raw.emplace<G::RenderPoints>(entity);
     points.SizeSource = std::string{"v:radius"};

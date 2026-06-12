@@ -31,16 +31,19 @@ void main() {
     GpuInstanceStaticRef instanceStatic = GpuInstanceStaticRef(scene.InstanceStaticBDA);
     GpuInstanceDynamicRef instanceDynamic = GpuInstanceDynamicRef(scene.InstanceDynamicBDA);
     GpuGeometryRecordRef geometryRecords = GpuGeometryRecordRef(scene.GeometryRecordBDA);
+    GpuEntityConfigRef entityConfigs = GpuEntityConfigRef(scene.EntityConfigBDA);
 
     const GpuInstanceStatic inst = instanceStatic.Data[instanceSlot];
     const GpuInstanceDynamic dyn = instanceDynamic.Data[instanceSlot];
     const GpuGeometryRecord geo = geometryRecords.Data[inst.GeometrySlot];
+    const GpuEntityConfig cfg = entityConfigs.Data[inst.ConfigSlot];
 
-    const uint vertexId = uint(gl_VertexIndex);
     PackedVertexRef vertices = PackedVertexRef(geo.VertexBufferBDA);
-    const PackedVertex pv = vertices.Data[geo.VertexOffset + vertexId];
+    // The culling indirect command supplies firstIndex + vertexOffset, so
+    // gl_VertexIndex is already in managed-buffer vertex units.
+    const PackedVertex pv = vertices.Data[uint(gl_VertexIndex)];
 
     gl_Position = scene.CameraViewProj * dyn.Model * vec4(pv.px, pv.py, pv.pz, 1.0);
 
-    vColor = vec4(1.0);
+    vColor = (cfg.ColorSourceMode == 1u) ? cfg.UniformColor : vec4(1.0);
 }

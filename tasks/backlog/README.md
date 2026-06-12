@@ -122,8 +122,13 @@ Open members:
 Reproducible correctness/regression fixes only. Origin:
 [`bugs/index.md`](bugs/index.md).
 
-Theme G currently has **no open members**; new reproducible bugs open under
-`bugs/` per [`bugs/index.md`](bugs/index.md).
+Open members are tracked in [`bugs/index.md`](bugs/index.md) — currently the
+2026-06-11 severe-bug audit set (`BUG-030` headless default-gate red on main,
+`BUG-031` benchmark smoke missing from the `IntrinsicTests` aggregate,
+`BUG-033` mesh-IO untrusted header counts, `BUG-034`/`BUG-035` Vulkan
+resource-pool reclamation, `BUG-029` ray/AABB slab NaN poisoning, and
+`BUG-032` triangle edge/point Vulkan rendering. New reproducible bugs open
+under `bugs/` per the index.
 
 Resolved bug history lives in [`bugs/index.md`](bugs/index.md) and the
 retirement log.

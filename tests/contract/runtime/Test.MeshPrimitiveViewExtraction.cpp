@@ -227,6 +227,12 @@ TEST(MeshPrimitiveViewExtraction, EnableEdgeViewUploadsSeparateEdgeRenderable)
     EXPECT_NE(view->MeshEdgeViewInstance, view->Instance);
     EXPECT_FALSE(view->HasMeshVertexView);
     EXPECT_EQ(gpuWorld.GetInstanceGeometry(view->MeshEdgeViewInstance), view->MeshEdgeViewGeometry);
+    const auto config = gpuWorld.GetEntityConfigForTest(view->MeshEdgeViewInstance);
+    EXPECT_EQ(config.ColorSourceMode, 1u);
+    EXPECT_FLOAT_EQ(config.UniformColor.r, 0.02f);
+    EXPECT_FLOAT_EQ(config.UniformColor.g, 0.02f);
+    EXPECT_FLOAT_EQ(config.UniformColor.b, 0.02f);
+    EXPECT_FLOAT_EQ(config.UniformColor.a, 1.0f);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();
@@ -272,6 +278,10 @@ TEST(MeshPrimitiveViewExtraction, EnableVertexViewUploadsSeparatePointRenderable
     EXPECT_FLOAT_EQ(config.PointSize, 9.0f);
     EXPECT_EQ(config.PointMode, 0u);
     EXPECT_EQ(config.ColorSourceMode, 1u);
+    EXPECT_FLOAT_EQ(config.UniformColor.r, 0.02f);
+    EXPECT_FLOAT_EQ(config.UniformColor.g, 0.02f);
+    EXPECT_FLOAT_EQ(config.UniformColor.b, 0.02f);
+    EXPECT_FLOAT_EQ(config.UniformColor.a, 1.0f);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();

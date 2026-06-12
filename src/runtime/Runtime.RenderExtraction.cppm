@@ -186,7 +186,7 @@ export namespace Extrinsic::Runtime
         // other bind-level rejection (`WrongDomain`, unsupported
         // `RenderSurface`/`RenderEdges` requests, plus an unsupported per-point
         // `RenderPoints::SizeSource` buffer variant — only a uniform float
-        // radius is supported in this slice) folds into `FailedPack`.
+        // point size is supported in this slice) folds into `FailedPack`.
         // `Releases` is incremented per release-initiated event (entity
         // destruction, eligibility flip away from point-cloud, or dirty
         // reupload superseding an older handle); the actual free runs through

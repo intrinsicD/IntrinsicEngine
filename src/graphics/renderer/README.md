@@ -925,7 +925,7 @@ Concretely:
   16-byte push block (BDA + per-draw `FirstVertex`) — type-distinct
   as `TransientDebugLinePushConstants` /
   `TransientDebugPointPushConstants` to keep room for per-lane push
-  evolution (e.g. line width, point radius) in a follow-up task.
+  evolution (e.g. line width, point size) in a follow-up task.
   `TransientDebugUploadHelper` grows three independent host-visible
   vertex buffers (one per lane), each capped at 256 K vertices, with
   geometric doubling under load. `RecordTransientDebugSurfacePass`
