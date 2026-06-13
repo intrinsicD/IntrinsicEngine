@@ -110,6 +110,9 @@ namespace Extrinsic::Runtime
             .MeshVertexViewInstance = it->second.MeshVertexViewInstance,
             .MeshVertexViewGeometry = it->second.MeshVertexViewGeometry,
             .HasMeshVertexView = it->second.MeshVertexViewGeometry.IsValid(),
+            .MaterialHandle = it->second.Material.Lease.GetHandle(),
+            .MaterialSlot = it->second.Material.EffectiveSlot,
+            .HasMaterialLease = it->second.Material.Lease.IsValid(),
         };
     }
 
@@ -134,6 +137,35 @@ namespace Extrinsic::Runtime
     {
         const auto it = m_MeshPrimitiveViewSettings.find(stableEntityId);
         return it != m_MeshPrimitiveViewSettings.end() ? it->second : MeshPrimitiveViewSettings{};
+    }
+
+    void RenderExtractionCache::SetMaterialTextureAssetBindings(
+        const std::uint32_t stableEntityId,
+        Graphics::MaterialTextureAssetBindings bindings)
+    {
+        if (stableEntityId == 0u)
+        {
+            return;
+        }
+        m_MaterialTextureBindings.insert_or_assign(stableEntityId, bindings);
+    }
+
+    void RenderExtractionCache::ClearMaterialTextureAssetBindings(
+        const std::uint32_t stableEntityId) noexcept
+    {
+        m_MaterialTextureBindings.erase(stableEntityId);
+    }
+
+    std::optional<Graphics::MaterialTextureAssetBindings>
+    RenderExtractionCache::GetMaterialTextureAssetBindings(
+        const std::uint32_t stableEntityId) const noexcept
+    {
+        const auto it = m_MaterialTextureBindings.find(stableEntityId);
+        if (it == m_MaterialTextureBindings.end())
+        {
+            return std::nullopt;
+        }
+        return it->second;
     }
 
     void RenderExtractionCache::RegisterSpatialDebugAdapter(std::uint64_t key,
@@ -680,6 +712,43 @@ namespace Extrinsic::Runtime
         auto [it, inserted] = m_Renderables.emplace(stableId, std::move(sidecar));
         (void)inserted;
         return &it->second;
+    }
+
+    void RenderExtractionCache::ApplyMaterialTextureBindings(
+        const std::uint32_t stableId,
+        RenderableSidecar& sidecar,
+        Graphics::IRenderer& renderer,
+        Graphics::GpuAssetCache* gpuAssets,
+        RuntimeRenderExtractionStats& stats)
+    {
+        const auto it = m_MaterialTextureBindings.find(stableId);
+        if (it == m_MaterialTextureBindings.end())
+        {
+            return;
+        }
+
+        ++stats.MaterialTextureBindingRecordCount;
+        if (gpuAssets == nullptr || !sidecar.Material.Lease.IsValid())
+        {
+            ++stats.MaterialTextureBindingResolveFailureCount;
+            return;
+        }
+
+        auto resolved = renderer.GetMaterialSystem().ResolveTextureAssetBindings(
+            sidecar.Material.Lease.GetHandle(),
+            it->second,
+            *gpuAssets);
+        if (resolved.has_value())
+        {
+            sidecar.Material.EffectiveSlot =
+                renderer.GetMaterialSystem().GetMaterialSlot(
+                    sidecar.Material.Lease.GetHandle());
+            ++stats.MaterialTextureBindingResolveCount;
+        }
+        else
+        {
+            ++stats.MaterialTextureBindingResolveFailureCount;
+        }
     }
 
     bool RenderExtractionCache::BindProceduralGeometry(const ECS::Components::ProceduralGeometryRef& ref,
@@ -1499,6 +1568,7 @@ namespace Extrinsic::Runtime
             ReleaseMeshPrimitiveView(MeshPrimitiveViewKind::Edge, it->second, renderer, stats);
             ReleaseMeshPrimitiveView(MeshPrimitiveViewKind::Vertex, it->second, renderer, stats);
             m_MeshPrimitiveViewSettings.erase(it->first);
+            m_MaterialTextureBindings.erase(it->first);
             renderer.GetGpuWorld().FreeInstance(it->second.Instance);
             it = m_Renderables.erase(it);
             ++stats.FreedInstanceCount;
@@ -1560,6 +1630,12 @@ namespace Extrinsic::Runtime
             {
                 continue;
             }
+            ApplyMaterialTextureBindings(
+                stableId,
+                *sidecar,
+                renderer,
+                gpuAssets,
+                stats);
 
             const bool dirtyTransform = registry.any_of<ECS::Components::DirtyTags::DirtyTransform>(entity);
             if (dirtyTransform)
@@ -2329,6 +2405,7 @@ namespace Extrinsic::Runtime
         }
         m_MeshPrimitiveViewRetire.clear();
         m_MeshPrimitiveViewSettings.clear();
+        m_MaterialTextureBindings.clear();
         m_PrevMeshFreeRetires = m_MeshFreeRetires;
         m_PrevGraphFreeRetires = m_GraphFreeRetires;
         m_PrevPointCloudFreeRetires = m_PointCloudFreeRetires;

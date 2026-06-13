@@ -1,12 +1,16 @@
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <span>
 #include <string>
 #include <vector>
 
 #include <gtest/gtest.h>
 #include <glm/glm.hpp>
 
+import Extrinsic.Asset.Registry;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.ECS.Components.AssetInstance;
 import Extrinsic.ECS.Components.GeometrySources;
@@ -18,11 +22,20 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.GpuSceneSlot;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.Graphics.GpuAssetCache;
+import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.Renderer;
+import Extrinsic.RHI.Bindless;
+import Extrinsic.RHI.BufferManager;
+import Extrinsic.RHI.Descriptors;
+import Extrinsic.RHI.SamplerManager;
+import Extrinsic.RHI.TextureManager;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.StableEntityLookup;
 import Geometry.Properties;
+
+#include "MockRHI.hpp"
 
 namespace gs = Extrinsic::ECS::Components::GeometrySources;
 namespace pn = Extrinsic::ECS::Components::GeometrySources::PropertyNames;
@@ -33,6 +46,7 @@ using Extrinsic::ECS::Scene::Registry;
 namespace
 {
     constexpr std::uint32_t kInvalidIndex = std::numeric_limits<std::uint32_t>::max();
+    std::array<std::byte, 64u> ZeroTextureBytes{};
 
     class StubApplication final : public Extrinsic::Runtime::IApplication
     {
@@ -115,6 +129,32 @@ namespace
         AttachTriangleMeshSources(scene, entity);
         return entity;
     }
+
+    Extrinsic::RHI::TextureDesc TestTextureDesc()
+    {
+        return Extrinsic::RHI::TextureDesc{
+            .Width = 4u,
+            .Height = 4u,
+            .MipLevels = 1u,
+            .Fmt = Extrinsic::RHI::Format::RGBA8_UNORM,
+            .Usage = Extrinsic::RHI::TextureUsage::Sampled |
+                     Extrinsic::RHI::TextureUsage::TransferDst,
+            .DebugName = "runtime-extraction-material-binding-texture",
+        };
+    }
+
+    Extrinsic::RHI::SamplerDesc TestSamplerDesc()
+    {
+        return Extrinsic::RHI::SamplerDesc{
+            .MagFilter = Extrinsic::RHI::FilterMode::Nearest,
+            .MinFilter = Extrinsic::RHI::FilterMode::Nearest,
+            .MipFilter = Extrinsic::RHI::MipmapMode::Nearest,
+            .AddressU = Extrinsic::RHI::AddressMode::ClampToEdge,
+            .AddressV = Extrinsic::RHI::AddressMode::ClampToEdge,
+            .AddressW = Extrinsic::RHI::AddressMode::ClampToEdge,
+            .DebugName = "runtime-extraction-material-binding-sampler",
+        };
+    }
 }
 
 TEST(MeshGeometryExtraction, SingleMeshEntityUploadsOnceAndBindsInstanceGeometry)
@@ -159,6 +199,51 @@ TEST(MeshGeometryExtraction, SingleMeshEntityUploadsOnceAndBindsInstanceGeometry
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();
+}
+
+TEST(MeshGeometryExtraction, MaterialTextureBindingsResolveOntoExtractionMaterialSidecar)
+{
+    Extrinsic::Tests::MockDevice device{};
+    Extrinsic::RHI::BufferManager buffers{device};
+    Extrinsic::RHI::TextureManager textures{device, device.Bindless};
+    Extrinsic::RHI::SamplerManager samplers{device};
+    Extrinsic::Tests::MockTransferQueue transfer{};
+    Extrinsic::Graphics::GpuAssetCache cache{buffers, textures, samplers, transfer};
+    ASSERT_TRUE(cache.InitializeFallbackTexture(
+        Extrinsic::Graphics::GpuTextureFallbackDesc{
+            .Bytes = std::span{ZeroTextureBytes},
+            .Desc = TestTextureDesc(),
+            .SamplerDesc = TestSamplerDesc(),
+        }).has_value());
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer =
+        Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    Registry scene;
+    const EntityHandle entity = MakeMeshRenderable(scene);
+    const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
+    const Extrinsic::Assets::AssetId normalAsset{91u, 1u};
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    extraction.SetMaterialTextureAssetBindings(
+        stableId,
+        Extrinsic::Graphics::MaterialTextureAssetBindings{.Normal = normalAsset});
+
+    const auto stats = extraction.ExtractAndSubmit(scene, *renderer, &cache);
+    EXPECT_EQ(stats.MaterialTextureBindingRecordCount, 1u);
+    EXPECT_EQ(stats.MaterialTextureBindingResolveCount, 1u);
+    EXPECT_EQ(stats.MaterialTextureBindingResolveFailureCount, 0u);
+
+    const auto sidecar = extraction.FindRenderableSidecarForTest(stableId);
+    ASSERT_TRUE(sidecar.has_value());
+    ASSERT_TRUE(sidecar->HasMaterialLease);
+    const Extrinsic::Graphics::MaterialParams params =
+        renderer->GetMaterialSystem().GetParams(sidecar->MaterialHandle);
+    EXPECT_NE(params.NormalID, Extrinsic::RHI::kInvalidBindlessIndex);
+
+    extraction.Shutdown(*renderer);
+    renderer->Shutdown();
 }
 
 TEST(MeshGeometryExtraction, RepeatedExtractionReusesMeshHandleWithoutReupload)

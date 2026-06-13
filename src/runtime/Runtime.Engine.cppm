@@ -22,6 +22,7 @@ import Extrinsic.Platform.Window;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.ImGuiOverlaySystem;
+import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.AssetModelSceneHandoff;
@@ -66,7 +67,9 @@ namespace Extrinsic::Runtime
         Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
         std::uint64_t PrimitiveEntitiesCreated{0};
         std::uint64_t EmbeddedTextureAssetsCreated{0};
+        std::uint64_t GeneratedTextureAssetsCreated{0};
         std::uint64_t TextureUploadRequests{0};
+        std::uint64_t GeneratedTextureUploadRequests{0};
         bool MaterializedModelScene{false};
         bool RequestedTextureUpload{false};
     };
@@ -287,6 +290,8 @@ namespace Extrinsic::Runtime
         // Zero-initialized until the first frame extracts.
         [[nodiscard]] const RuntimeRenderExtractionStats&
             GetLastRenderExtractionStats() const noexcept;
+        [[nodiscard]] std::optional<Graphics::MaterialTextureAssetBindings>
+            GetMaterialTextureAssetBindingsForTest(std::uint32_t stableEntityId) const noexcept;
 
         // ── Reference scene seam (GRAPHICS-029A/B) ────────────────────────
         // Accessible before Initialize() so tests and downstream impl

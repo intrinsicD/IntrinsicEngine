@@ -9,6 +9,22 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`ASSETIO-007`](ASSETIO-007-direct-mesh-generated-normal-texture.md) —
+Direct mesh generated normal texture binding — retired on 2026-06-13 at
+maturity `CPUContracted`. Direct mesh imports now use the same default normal
+policy as model-scene imports: authored `v:normal` vectors are preserved when
+present and area-weighted unit normals are synthesized when absent. When the
+CPU mesh also has matching `v:texcoord`, runtime bakes that `v:normal`
+property into a generated normal texture asset, requests texture upload, and
+registers a data-only `MaterialTextureAssetBindings` record keyed by stable
+render id. `RenderExtractionCache` resolves the binding onto the
+extraction-owned material sidecar during extraction, keeping ECS free of
+graphics handles. Meshes without bakeable texture coordinates still import and
+render through the existing material fallback with CPU normals intact. Focused
+runtime contract tests passed, `IntrinsicTests` built, and the default
+CPU-supported CTest gate passed.
+
+Active
 [`GRAPHICS-087`](GRAPHICS-087-vertex-color-property-texture-bake.md) —
 Bake vec3/vec4 vertex color properties to surface albedo textures — retired
 on 2026-06-12 at maturity `CPUContracted`. Runtime now exposes the shared

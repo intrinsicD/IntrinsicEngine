@@ -303,6 +303,14 @@ export namespace Extrinsic::Runtime
         std::uint64_t RenderWorldPipelineStallCount{0};
         std::uint64_t RenderWorldExtractionSkipCount{0};
         std::uint64_t RenderWorldFrameAgeFrames{0};
+
+        // ASSETIO-007 — data-only material texture bindings registered by
+        // runtime import paths and resolved against extraction-owned material
+        // sidecars. Failures are retryable because the texture asset may still
+        // be pending or the CPU/null gate may have no fallback texture.
+        std::uint32_t MaterialTextureBindingRecordCount{0};
+        std::uint32_t MaterialTextureBindingResolveCount{0};
+        std::uint32_t MaterialTextureBindingResolveFailureCount{0};
     };
 
     // GRAPHICS-036B — copy the authoritative `RenderWorldPool` diagnostics
@@ -416,6 +424,18 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] MeshPrimitiveViewSettings GetMeshPrimitiveViewSettings(
             std::uint32_t stableEntityId) const noexcept;
 
+        // ASSETIO-007 — data-only texture binding surface for renderables
+        // whose material sidecar is owned by extraction. Callers key bindings
+        // by stable render id; extraction resolves the AssetIds through the
+        // provided GpuAssetCache when the renderable is submitted. No ECS
+        // component stores graphics-owned material slots or handles.
+        void SetMaterialTextureAssetBindings(
+            std::uint32_t stableEntityId,
+            Graphics::MaterialTextureAssetBindings bindings);
+        void ClearMaterialTextureAssetBindings(std::uint32_t stableEntityId) noexcept;
+        [[nodiscard]] std::optional<Graphics::MaterialTextureAssetBindings>
+            GetMaterialTextureAssetBindings(std::uint32_t stableEntityId) const noexcept;
+
         [[nodiscard]] const RuntimeRenderExtractionStats& GetLastStats() const noexcept;
         [[nodiscard]] std::uint32_t GetTrackedRenderableCount() const noexcept;
 
@@ -459,6 +479,9 @@ export namespace Extrinsic::Runtime
             Graphics::GpuInstanceHandle MeshVertexViewInstance{};
             Graphics::GpuGeometryHandle MeshVertexViewGeometry{};
             bool HasMeshVertexView = false;
+            Graphics::MaterialHandle MaterialHandle{};
+            std::uint32_t MaterialSlot = Graphics::kDefaultMaterialSlotIndex;
+            bool HasMaterialLease = false;
         };
 
         [[nodiscard]] std::optional<RenderableSidecarView> FindRenderableSidecarForTest(
@@ -585,6 +608,11 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] RenderableSidecar* EnsureRenderable(std::uint32_t stableId,
                                                           Graphics::IRenderer& renderer,
                                                           RuntimeRenderExtractionStats& stats);
+        void ApplyMaterialTextureBindings(std::uint32_t stableId,
+                                          RenderableSidecar& sidecar,
+                                          Graphics::IRenderer& renderer,
+                                          Graphics::GpuAssetCache* gpuAssets,
+                                          RuntimeRenderExtractionStats& stats);
         void RetireMissingRenderables(const std::unordered_set<std::uint32_t>& liveKeys,
                                       Graphics::IRenderer& renderer,
                                       RuntimeRenderExtractionStats& stats);
@@ -719,6 +747,7 @@ export namespace Extrinsic::Runtime
         std::uint32_t m_MeshPrimitiveViewFreeRetires{0};
         std::uint32_t m_PrevMeshPrimitiveViewFreeRetires{0};
         std::unordered_map<std::uint32_t, MeshPrimitiveViewSettings> m_MeshPrimitiveViewSettings{};
+        std::unordered_map<std::uint32_t, Graphics::MaterialTextureAssetBindings> m_MaterialTextureBindings{};
 
         // RUNTIME-082 Slice D — owned adapter instances + a registry mirror
         // resolved per-entity by `ExtractAndSubmit`. The batch buffer is

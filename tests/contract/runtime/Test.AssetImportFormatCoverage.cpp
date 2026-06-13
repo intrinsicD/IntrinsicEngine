@@ -27,7 +27,9 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.GpuAssetCache;
+import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.StableEntityLookup;
 
 namespace Assets = Extrinsic::Assets;
 namespace Core = Extrinsic::Core;
@@ -35,6 +37,7 @@ namespace ECS = Extrinsic::ECS;
 namespace GS = Extrinsic::ECS::Components::GeometrySources;
 namespace Sel = Extrinsic::ECS::Components::Selection;
 namespace G = Extrinsic::Graphics::Components;
+namespace Graphics = Extrinsic::Graphics;
 namespace Runtime = Extrinsic::Runtime;
 
 namespace
@@ -233,6 +236,34 @@ namespace
             EXPECT_EQ(normals[i], expected[i]);
         }
     }
+
+    void ExpectGeneratedNormalTextureBinding(
+        Runtime::Engine& engine,
+        const ECS::EntityHandle entity,
+        const std::string_view meshPath)
+    {
+        const std::string generatedPath =
+            Runtime::BuildGeneratedTextureAssetPath(
+                meshPath,
+                0u,
+                "normal",
+                "v:normal");
+        EXPECT_TRUE(engine.GetAssetService().PathIndexContains(generatedPath));
+
+        const std::uint32_t stableId =
+            Runtime::StableEntityLookup::ToRenderId(entity);
+        const auto binding =
+            engine.GetMaterialTextureAssetBindingsForTest(stableId);
+        ASSERT_TRUE(binding.has_value());
+        EXPECT_FALSE(binding->Albedo.IsValid());
+        ASSERT_TRUE(binding->Normal.IsValid());
+
+        auto boundPath = engine.GetAssetService().GetPath(binding->Normal);
+        ASSERT_TRUE(boundPath.has_value()) << static_cast<int>(boundPath.error());
+        EXPECT_EQ(*boundPath, generatedPath);
+        EXPECT_EQ(engine.GetGpuAssetCache().GetState(binding->Normal),
+                  Graphics::GpuAssetState::NotRequested);
+    }
 }
 
 TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesVertexNormalsInGeometrySources)
@@ -273,6 +304,49 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesVertexNormalsInGe
     engine.Shutdown();
 }
 
+TEST(RuntimeAssetImportFormatCoverage, DirectObjImportBakesGeneratedNormalTextureFromAuthoredVertexNormals)
+{
+    TempAssetFile meshFile(
+        "assetio007_normals_texcoords.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "vt 0 0\n"
+        "vt 1 0\n"
+        "vt 0 1\n"
+        "vn 1 0 0\n"
+        "vn 0 1 0\n"
+        "vn 0 0 -1\n"
+        "f 1/1/1 2/2/2 3/3/3\n");
+
+    Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    engine.Initialize();
+
+    auto imported = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+        .Path = meshFile.Path.string(),
+        .PayloadKind = Assets::AssetPayloadKind::Mesh,
+    });
+    ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
+    EXPECT_EQ(imported->GeneratedTextureAssetsCreated, 1u);
+    EXPECT_EQ(imported->TextureUploadRequests,
+              imported->GeneratedTextureUploadRequests);
+
+    const std::optional<ECS::EntityHandle> meshEntity =
+        FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
+    ASSERT_TRUE(meshEntity.has_value());
+    ExpectMeshVertexNormals(
+        engine.GetScene(),
+        *meshEntity,
+        {
+            {1.0f, 0.0f, 0.0f},
+            {0.0f, 1.0f, 0.0f},
+            {0.0f, 0.0f, -1.0f},
+        });
+    ExpectGeneratedNormalTextureBinding(engine, *meshEntity, meshFile.Path.string());
+
+    engine.Shutdown();
+}
+
 TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesVertexNormalsWhenMissing)
 {
     TempAssetFile meshFile(
@@ -303,6 +377,46 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesVertexNormalsWhenM
             {0.0f, 0.0f, 1.0f},
             {0.0f, 0.0f, 1.0f},
         });
+
+    engine.Shutdown();
+}
+
+TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesAndBakesGeneratedNormalTextureWhenMissingNormals)
+{
+    TempAssetFile meshFile(
+        "assetio007_no_normals_texcoords.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "vt 0 0\n"
+        "vt 1 0\n"
+        "vt 0 1\n"
+        "f 1/1 2/2 3/3\n");
+
+    Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    engine.Initialize();
+
+    auto imported = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+        .Path = meshFile.Path.string(),
+        .PayloadKind = Assets::AssetPayloadKind::Mesh,
+    });
+    ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
+    EXPECT_EQ(imported->GeneratedTextureAssetsCreated, 1u);
+    EXPECT_EQ(imported->TextureUploadRequests,
+              imported->GeneratedTextureUploadRequests);
+
+    const std::optional<ECS::EntityHandle> meshEntity =
+        FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
+    ASSERT_TRUE(meshEntity.has_value());
+    ExpectMeshVertexNormals(
+        engine.GetScene(),
+        *meshEntity,
+        {
+            {0.0f, 0.0f, 1.0f},
+            {0.0f, 0.0f, 1.0f},
+            {0.0f, 0.0f, 1.0f},
+        });
+    ExpectGeneratedNormalTextureBinding(engine, *meshEntity, meshFile.Path.string());
 
     engine.Shutdown();
 }

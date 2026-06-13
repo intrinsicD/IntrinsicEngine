@@ -205,7 +205,9 @@ namespace Extrinsic::Runtime
                 .Error = Core::ErrorCode::Success,
                 .PrimitiveEntitiesCreated = imported.PrimitiveEntitiesCreated,
                 .EmbeddedTextureAssetsCreated = imported.EmbeddedTextureAssetsCreated,
+                .GeneratedTextureAssetsCreated = imported.GeneratedTextureAssetsCreated,
                 .TextureUploadRequests = imported.TextureUploadRequests,
+                .GeneratedTextureUploadRequests = imported.GeneratedTextureUploadRequests,
                 .MaterializedModelScene = imported.MaterializedModelScene,
                 .RequestedTextureUpload = imported.RequestedTextureUpload,
             };
@@ -1967,8 +1969,12 @@ namespace Extrinsic::Runtime
                                     imported->PrimitiveEntitiesCreated,
                                 .EmbeddedTextureAssetsCreated =
                                     imported->EmbeddedTextureAssetsCreated,
+                                .GeneratedTextureAssetsCreated =
+                                    imported->GeneratedTextureAssetsCreated,
                                 .TextureUploadRequests =
                                     imported->TextureUploadRequests,
+                                .GeneratedTextureUploadRequests =
+                                    imported->GeneratedTextureUploadRequests,
                                 .MaterializedModelScene =
                                     imported->MaterializedModelScene,
                                 .RequestedTextureUpload =
@@ -3379,11 +3385,23 @@ namespace Extrinsic::Runtime
                                     static_cast<unsigned long long>(
                                         result->EmbeddedTextureAssetsCreated));
                     }
+                    if (result->GeneratedTextureAssetsCreated > 0u)
+                    {
+                        ImGui::Text("Generated textures: %llu",
+                                    static_cast<unsigned long long>(
+                                        result->GeneratedTextureAssetsCreated));
+                    }
                     if (result->TextureUploadRequests > 0u)
                     {
                         ImGui::Text("Texture upload requests: %llu",
                                     static_cast<unsigned long long>(
                                         result->TextureUploadRequests));
+                    }
+                    if (result->GeneratedTextureUploadRequests > 0u)
+                    {
+                        ImGui::Text("Generated texture upload requests: %llu",
+                                    static_cast<unsigned long long>(
+                                        result->GeneratedTextureUploadRequests));
                     }
                 }
                 DrawDiagnostics(frame.FileImport.Diagnostics);

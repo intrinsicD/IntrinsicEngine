@@ -494,7 +494,9 @@ export namespace Extrinsic::Runtime
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::uint64_t PrimitiveEntitiesCreated{0};
         std::uint64_t EmbeddedTextureAssetsCreated{0};
+        std::uint64_t GeneratedTextureAssetsCreated{0};
         std::uint64_t TextureUploadRequests{0};
+        std::uint64_t GeneratedTextureUploadRequests{0};
         bool MaterializedModelScene{false};
         bool RequestedTextureUpload{false};
         std::string Message{};

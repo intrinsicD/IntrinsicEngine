@@ -45,6 +45,7 @@ import Extrinsic.RHI.SamplerManager;
 import Extrinsic.RHI.TransferQueue;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.ImGuiOverlaySystem;
+import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
@@ -61,6 +62,7 @@ import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.Runtime.ImGuiAdapter;
+import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Core.FrameLoop;
 import Extrinsic.Runtime.EcsSystemBundle;
@@ -69,6 +71,7 @@ import Extrinsic.Runtime.ReferenceScene;
 import Extrinsic.Runtime.StreamingExecutor;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.RenderWorldPool;
+import Extrinsic.Runtime.StableEntityLookup;
 import Extrinsic.Asset.EventBus;
 import Extrinsic.Asset.GeometryIOBridge;
 import Extrinsic.Asset.ImportRouter;
@@ -342,6 +345,13 @@ namespace Extrinsic::Runtime
             ECS::EntityHandle Entity{ECS::InvalidEntityHandle};
         };
 
+        struct DirectMeshGeneratedTextureResult
+        {
+            Assets::AssetId NormalTexture{};
+            std::uint64_t GeneratedTextureAssetsCreated{0u};
+            std::uint64_t GeneratedTextureUploadRequests{0u};
+        };
+
         [[nodiscard]] bool IsFinitePosition(const glm::vec3& position) noexcept
         {
             return std::isfinite(position.x) &&
@@ -489,6 +499,73 @@ namespace Extrinsic::Runtime
             cameraControllers.MarkCameraTransition(CameraControllerSlot::Main);
         }
 
+        [[nodiscard]] Core::Expected<DirectMeshGeneratedTextureResult>
+        TryRegisterDirectMeshGeneratedNormalTexture(
+            Assets::AssetService& assetService,
+            Graphics::GpuAssetCache& gpuAssetCache,
+            RenderExtractionCache& extraction,
+            const std::string_view meshPath,
+            const ECS::EntityHandle entity,
+            const Geometry::HalfedgeMesh::Mesh& mesh)
+        {
+            DirectMeshGeneratedTextureResult result{};
+
+            MeshAttributeTextureBakeOptions options{};
+            options.SourcePropertyName = "v:normal";
+            options.Width = 64u;
+            options.Height = 64u;
+            options.DebugName = "generated-direct-mesh-normal-v:normal";
+
+            MeshAttributeTextureBakeResult bake =
+                BakeMeshVertexNormalTexture(mesh, options);
+            if (bake.Status != MeshAttributeTextureBakeStatus::Success)
+            {
+                return result;
+            }
+
+            bake.Payload.Metadata.SourcePath = std::string{meshPath};
+            const std::string generatedPath = BuildGeneratedTextureAssetPath(
+                meshPath,
+                0u,
+                "normal",
+                "v:normal");
+            auto texture = LoadGeneratedTextureAsset(
+                assetService,
+                generatedPath,
+                bake.Payload);
+            if (!texture.has_value())
+            {
+                return Core::Err<DirectMeshGeneratedTextureResult>(texture.error());
+            }
+
+            result.NormalTexture = *texture;
+            result.GeneratedTextureAssetsCreated = 1u;
+
+            auto upload = RequestTextureAssetUpload(
+                assetService,
+                gpuAssetCache,
+                *texture);
+            if (upload.has_value())
+            {
+                result.GeneratedTextureUploadRequests = 1u;
+            }
+            else if (!IsTextureUploadDeferral(upload.error()))
+            {
+                return Core::Err<DirectMeshGeneratedTextureResult>(upload.error());
+            }
+
+            extraction.SetMaterialTextureAssetBindings(
+                StableEntityLookup::ToRenderId(entity),
+                Graphics::MaterialTextureAssetBindings{
+                    .Albedo = {},
+                    .Normal = *texture,
+                    .MetallicRoughness = {},
+                    .Emissive = {},
+                });
+
+            return result;
+        }
+
         [[nodiscard]] Core::Expected<DecodedGeometryImport> DecodeGeometryImport(
             const RuntimeAssetImportRequest& request)
         {
@@ -595,6 +672,8 @@ namespace Extrinsic::Runtime
         [[nodiscard]] Core::Expected<MaterializedGeometryImport>
         MaterializeDecodedGeometryImport(
             Assets::AssetService& assetService,
+            Graphics::GpuAssetCache& gpuAssetCache,
+            RenderExtractionCache& extraction,
             ECS::Scene::Registry& scene,
             const DecodedGeometryImport& decoded)
         {
@@ -646,11 +725,31 @@ namespace Extrinsic::Runtime
                             entity,
                             mesh);
 
+                        auto generatedTexture =
+                            TryRegisterDirectMeshGeneratedNormalTexture(
+                                assetService,
+                                gpuAssetCache,
+                                extraction,
+                                decoded.Path,
+                                entity,
+                                payload.Mesh);
+                        if (!generatedTexture.has_value())
+                        {
+                            return Core::Err<MaterializedGeometryImport>(
+                                generatedTexture.error());
+                        }
+
                         return MaterializedGeometryImport{
                             .Result = RuntimeAssetImportResult{
                                 .Asset = *asset,
                                 .PayloadKind = decoded.PayloadKind,
                                 .PrimitiveEntitiesCreated = 1u,
+                                .GeneratedTextureAssetsCreated =
+                                    generatedTexture->GeneratedTextureAssetsCreated,
+                                .TextureUploadRequests =
+                                    generatedTexture->GeneratedTextureUploadRequests,
+                                .GeneratedTextureUploadRequests =
+                                    generatedTexture->GeneratedTextureUploadRequests,
                             },
                             .Bounds = bounds,
                             .Entity = entity,
@@ -2146,6 +2245,13 @@ namespace Extrinsic::Runtime
         return m_LastExtractionStats;
     }
 
+    std::optional<Graphics::MaterialTextureAssetBindings>
+    Engine::GetMaterialTextureAssetBindingsForTest(
+        const std::uint32_t stableEntityId) const noexcept
+    {
+        return m_RenderExtraction.GetMaterialTextureAssetBindings(stableEntityId);
+    }
+
     Core::Expected<RuntimeAssetImportResult> Engine::ImportAssetFromPath(
         RuntimeAssetImportRequest request)
     {
@@ -2342,6 +2448,8 @@ namespace Extrinsic::Runtime
                     {
                         auto materialized = MaterializeDecodedGeometryImport(
                             *m_AssetService,
+                            *m_GpuAssetCache,
+                            m_RenderExtraction,
                             *m_Scene,
                             *state->Decoded);
                         if (materialized.has_value())
@@ -2405,13 +2513,15 @@ namespace Extrinsic::Runtime
         {
             event.Result = *result;
             Core::Log::Info(
-                "[Runtime] Asset import succeeded: path='{}' requested_payload={} result_payload={} primitive_entities={} embedded_textures={} texture_upload_requests={} materialized_model_scene={} requested_texture_upload={}",
+                "[Runtime] Asset import succeeded: path='{}' requested_payload={} result_payload={} primitive_entities={} embedded_textures={} generated_textures={} texture_upload_requests={} generated_texture_upload_requests={} materialized_model_scene={} requested_texture_upload={}",
                 event.Path,
                 Assets::DebugNameForAssetPayloadKind(event.RequestedPayloadKind),
                 Assets::DebugNameForAssetPayloadKind(result->PayloadKind),
                 result->PrimitiveEntitiesCreated,
                 result->EmbeddedTextureAssetsCreated,
+                result->GeneratedTextureAssetsCreated,
                 result->TextureUploadRequests,
+                result->GeneratedTextureUploadRequests,
                 result->MaterializedModelScene,
                 result->RequestedTextureUpload);
         }
@@ -2464,6 +2574,8 @@ namespace Extrinsic::Runtime
 
             auto materialized = MaterializeDecodedGeometryImport(
                 *m_AssetService,
+                *m_GpuAssetCache,
+                m_RenderExtraction,
                 *m_Scene,
                 *decoded);
             if (!materialized.has_value())
@@ -2552,9 +2664,17 @@ namespace Extrinsic::Runtime
                 .EmbeddedTextureAssetsCreated =
                     Delta(after.EmbeddedTextureAssetsCreated,
                           before.EmbeddedTextureAssetsCreated),
+                .GeneratedTextureAssetsCreated =
+                    Delta(after.GeneratedTextureAssetsCreated,
+                          before.GeneratedTextureAssetsCreated),
                 .TextureUploadRequests =
                     Delta(after.EmbeddedTextureUploadRequests,
-                          before.EmbeddedTextureUploadRequests),
+                          before.EmbeddedTextureUploadRequests) +
+                    Delta(after.GeneratedTextureUploadRequests,
+                          before.GeneratedTextureUploadRequests),
+                .GeneratedTextureUploadRequests =
+                    Delta(after.GeneratedTextureUploadRequests,
+                          before.GeneratedTextureUploadRequests),
                 .MaterializedModelScene =
                     after.ModelSceneMaterializeSuccesses >
                         before.ModelSceneMaterializeSuccesses,
