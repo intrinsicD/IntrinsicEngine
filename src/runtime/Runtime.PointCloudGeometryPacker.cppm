@@ -12,12 +12,11 @@ import Extrinsic.Graphics.GpuWorld;
 
 export namespace Extrinsic::Runtime
 {
-    // Vertex layout for the runtime point-cloud packer. Identical to
-    // `MeshVertex` / `GraphVertex` (position + UV, 20 bytes) so the retained
-    // point pipeline (`forward/point.vert` / `forward/point.frag`, GRAPHICS-071)
-    // consumes point-cloud geometry without a second vertex format. UV carries
-    // an octahedral-encoded `v:normal` when present; `{2, 2}` is the no-normal
-    // sentinel. Point-cloud UV/attribute propagation is owned by later slices.
+    // Vertex layout for the runtime point-cloud packer. Point-cloud rendering
+    // keeps the retained point 20-byte format (position + neutral UV) consumed
+    // by `forward/point.vert` / `forward/point.frag`. UV fields are not used for
+    // normal encoding; dedicated normal-buffer residency for point/surfel
+    // rendering is owned by a later slice.
     struct PointCloudVertex
     {
         float Px = 0.0f;

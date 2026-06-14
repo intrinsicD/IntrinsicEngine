@@ -13,11 +13,12 @@
 // (`stageFlags = VK_SHADER_STAGE_ALL`) so re-reading the scene table here
 // avoids passing the 64-bit BDA through a varying.
 //
-// Reads the material slot from the per-instance index forwarded by the
-// vertex shader and emits `BaseColorFactor`. Slot 0 carries the recorded
-// `Material.DefaultDebugSurface` params (`MaterialFlags::Unlit`, purple
-// `BaseColorFactor`) so any invalid material handle resolves to a visible
-// missing-material surface.
+// Reads the material slot from the per-instance index forwarded by the vertex
+// shader, samples supported material textures through resolved UVs, and uses
+// the packed vertex normal as the default lighting normal. Slot 0 carries the
+// recorded `Material.DefaultDebugSurface` params (`MaterialFlags::Unlit`,
+// purple `BaseColorFactor`) so any invalid material handle resolves to a
+// visible missing-material surface.
 
 #include "../common/gpu_scene.glsl"
 
@@ -33,6 +34,7 @@ layout(push_constant, scalar) uniform ScenePC {
 
 layout(location = 0) flat in uint fragMaterialSlot;
 layout(location = 1) in vec2 fragUv;
+layout(location = 2) in vec3 fragWorldNormal;
 
 layout(location = 0) out vec4 outColor;
 
@@ -62,12 +64,22 @@ void main() {
     }
 
     vec3 sampledNormal = vec3(0.0, 0.0, 1.0);
+    const float vertexNormalLen = length(fragWorldNormal);
+    if (vertexNormalLen > 1.0e-6) {
+        sampledNormal = fragWorldNormal / vertexNormalLen;
+    }
     if (IsValidTextureID(mat.NormalID)) {
         vec3 normalTex = texture(globalTextures[nonuniformEXT(mat.NormalID)], fragUv).xyz * 2.0 - 1.0;
         float normalTexLen = length(normalTex);
         if (normalTexLen > 1.0e-6) {
             sampledNormal = normalTex / normalTexLen;
         }
+    }
+
+    if ((mat.Flags & GpuMaterialFlag_Unlit) != 0u ||
+        mat.MaterialTypeID == GpuMaterialType_DefaultDebugSurface) {
+        outColor = baseColor;
+        return;
     }
 
     const float positiveViewZ = GpuPositiveViewZFromDeviceDepth(gl_FragCoord.z, scene);

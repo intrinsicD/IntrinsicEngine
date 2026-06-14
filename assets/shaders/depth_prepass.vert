@@ -5,17 +5,17 @@
 
 #include "common/gpu_scene.glsl"
 
-// Runtime procedural geometry uploads vertices as vec3 position + vec2 uv
-// (20-byte scalar layout). Match the forward default-debug-surface shader so
-// depth prepass and surface pass rasterize identical positions for the
-// reference triangle.
-struct ProceduralVertex {
+// Runtime surface geometry uploads vertices as vec3 position + vec2 uv +
+// vec3 normal (32-byte scalar layout). Match the forward default-debug-surface
+// shader so depth prepass and surface pass rasterize identical positions.
+struct SurfaceVertex {
     vec3 Position;
     vec2 UV;
+    vec3 Normal;
 };
 
-layout(buffer_reference, scalar) readonly buffer ProceduralVertexRef {
-    ProceduralVertex Data[];
+layout(buffer_reference, scalar) readonly buffer SurfaceVertexRef {
+    SurfaceVertex Data[];
 };
 
 layout(push_constant, scalar) uniform ScenePC {
@@ -41,7 +41,7 @@ void main()
     const GpuGeometryRecord geo = GpuGeometryRecordRef(scene.GeometryRecordBDA).Data[inst.GeometrySlot];
     // The culling indirect command supplies firstIndex + vertexOffset, so
     // gl_VertexIndex is already in managed-buffer vertex units.
-    const vec3 localPosition = ProceduralVertexRef(geo.VertexBufferBDA).Data[gl_VertexIndex].Position;
+    const vec3 localPosition = SurfaceVertexRef(geo.VertexBufferBDA).Data[gl_VertexIndex].Position;
 
     gl_Position = scene.CameraViewProj * dyn.Model * vec4(localPosition, 1.0);
 }

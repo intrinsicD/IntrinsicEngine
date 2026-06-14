@@ -21,6 +21,16 @@ namespace Extrinsic::Graphics
     {
         constexpr std::uint32_t kInvalidSlot = 0xFFFF'FFFFu;
 
+        [[nodiscard]] std::uint64_t AlignUp(const std::uint64_t value, const std::uint32_t alignment) noexcept
+        {
+            if (alignment <= 1u)
+            {
+                return value;
+            }
+            const std::uint64_t remainder = value % static_cast<std::uint64_t>(alignment);
+            return remainder == 0u ? value : value + (static_cast<std::uint64_t>(alignment) - remainder);
+        }
+
         struct SlotMeta
         {
             std::uint32_t Generation = 1;
@@ -717,7 +727,11 @@ namespace Extrinsic::Graphics
         const std::uint64_t surfSize = desc.SurfaceIndices.size_bytes();
         const std::uint64_t lineSize = desc.LineIndices.size_bytes();
 
-        const std::uint64_t vbOffset = m_Impl->VertexBumpOffset;
+        const std::uint32_t vertexStride =
+            (desc.VertexCount > 0u) ? static_cast<std::uint32_t>(vbSize / desc.VertexCount) : 0u;
+        assert(desc.VertexCount == 0u || (vbSize % desc.VertexCount) == 0u);
+
+        const std::uint64_t vbOffset = AlignUp(m_Impl->VertexBumpOffset, vertexStride);
         const std::uint64_t surfOffset = m_Impl->IndexBumpOffset;
         const std::uint64_t lineOffset = surfOffset + surfSize;
 
@@ -761,9 +775,6 @@ namespace Extrinsic::Graphics
             }
         }
 
-        const std::uint32_t vertexStride =
-            (desc.VertexCount > 0u) ? static_cast<std::uint32_t>(vbSize / desc.VertexCount) : 0u;
-        assert(desc.VertexCount == 0u || (vbSize % desc.VertexCount) == 0u);
         assert(vertexStride == 0u || (vbOffset % vertexStride) == 0u);
 
         auto& allocation = m_Impl->GeometryAllocations[h.Index];
@@ -783,7 +794,7 @@ namespace Extrinsic::Graphics
 
         m_Impl->RewriteGeometryRecord(h.Index);
 
-        m_Impl->VertexBumpOffset += vbSize;
+        m_Impl->VertexBumpOffset = vbOffset + vbSize;
         m_Impl->IndexBumpOffset = lineOffset + lineSize;
         return h;
     }
@@ -1005,7 +1016,7 @@ namespace Extrinsic::Graphics
             const std::uint64_t oldVertexOffset = allocation.VertexByteOffset;
             const std::uint64_t oldIndexOffset = allocation.IndexByteOffset;
             const std::uint64_t oldLineOffset = oldIndexOffset + allocation.SurfaceIndexByteCount;
-            const std::uint64_t newVertexOffset = nextVertexOffset;
+            const std::uint64_t newVertexOffset = AlignUp(nextVertexOffset, allocation.VertexStride);
             const std::uint64_t newIndexOffset = nextIndexOffset;
             const std::uint64_t newLineOffset = newIndexOffset + allocation.SurfaceIndexByteCount;
 
@@ -1041,7 +1052,7 @@ namespace Extrinsic::Graphics
                 });
             }
 
-            nextVertexOffset += allocation.VertexByteCount;
+            nextVertexOffset = newVertexOffset + allocation.VertexByteCount;
             nextIndexOffset += allocation.IndexByteCount();
         }
 

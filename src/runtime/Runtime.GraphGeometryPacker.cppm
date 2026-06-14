@@ -12,13 +12,11 @@ import Extrinsic.Graphics.GpuWorld;
 
 export namespace Extrinsic::Runtime
 {
-    // Vertex layout for the runtime graph packer. Identical to
-    // `MeshVertex` (position + UV, 20 bytes) so the retained line
-    // (`forward/line.vert`) and point (`forward/point.vert` / `forward/point.frag`,
-    // GRAPHICS-071) pipelines consume graph node geometry without a second
-    // vertex format. UV is set to `{2, 2}` (the retained point shader's
-    // no-normal sentinel); graph-driven UV/attribute propagation is owned by
-    // later slices.
+    // Vertex layout for the runtime graph packer. Graph rendering keeps the
+    // retained line/point 20-byte format (position + neutral UV) consumed by
+    // `forward/line.vert` and `forward/point.vert`. UV fields are not used for
+    // normal encoding; graph-driven UV/attribute propagation is owned by later
+    // slices.
     struct GraphVertex
     {
         float Px = 0.0f;

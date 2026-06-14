@@ -25,6 +25,12 @@ maturity_target: Operational
   now gated on source-authored valid `v:texcoord`. Runtime projection fallback
   UVs still keep no-UV meshes renderable, but they are not treated as a
   material-bake atlas until the xatlas/default-atlas task replaces the fallback.
+- 2026-06-14 bunny OBJ shading debug: promoted surface geometry now packs
+  dedicated vertex normals alongside resolved UVs, the forward/deferred surface
+  shaders use those normals when no normal texture is bound, retained
+  graph/point/primitive-view UV fields no longer carry oct-encoded normals, and
+  `GpuWorld` aligns mixed-stride managed geometry uploads. This fixes unshaded
+  no-authored-UV OBJ imports without reusing texture coordinates for normals.
 
 ## Goal
 - Wire the renderer/material path so resolved mesh UVs are the canonical surface texture coordinate source for material sampling, generated bakes, UV debug inspection, and UV-backed visualization bake atlases.
@@ -74,6 +80,9 @@ maturity_target: Operational
 - [x] Add graphics/material contract tests proving surface material sampling consumes the resolved UV channel for albedo and normal generated bindings.
 - [x] Add visualization packet tests proving `ExistingTexcoords` packets with resolved UV metadata are accepted and missing-UV packets are rejected before backend use.
 - [x] Add CPU renderer tests for UV debug/checker mode selection and diagnostics.
+- [x] Add runtime/graphics regression coverage proving surface vertex normals
+      are packed separately from UVs and mixed 20-byte/32-byte geometry strides
+      stay aligned in `GpuWorld`.
 - [ ] Add `gpu;vulkan` smoke proving a mesh that originally lacked authored UVs renders through generated UVs and a generated texture binding.
 - [x] Add regression coverage proving Htex recreation remains explicit and is not silently triggered when resolved UVs exist.
 

@@ -246,10 +246,13 @@ Concretely:
   lease but a default-constructed handle on the pass and `Execute()` would
   early-return on `!m_Pipeline.IsValid()` while the executor still
   reported `Recorded`). The forward shader pair forwards the packed surface
-  UV channel and samples `MaterialParams::AlbedoID` / `NormalID` through the
-  bindless texture set before falling back to material factors, so authored
-  and runtime-generated material textures affect the promoted default forward
-  surface path. The legacy `assets/shaders/surface.vert/frag` pair predates
+  UV channel plus the packed vertex normal; it samples
+  `MaterialParams::AlbedoID` / `NormalID` through the bindless texture set when
+  those IDs are valid, otherwise it falls back to `BaseColorFactor` and the
+  transformed vertex normal. The fragment stage is still a debug Lambert-style
+  surface shader, not full PBR lighting; metallic/roughness/emissive texture
+  evaluation remains future surface-shading work. The legacy
+  `assets/shaders/surface.vert/frag` pair predates
   the GpuScene seam (it declares `mat4 Model` + `PtrPositions` push constants
   plus `set = 0/2/3` descriptor sets) and is deliberately *not* referenced by
   the new pipeline. A fully lit PBR forward-surface shader remains a
@@ -282,9 +285,10 @@ Concretely:
   corrected `gl_FragDepth` so impostor spheres intersect and occlude retained
   surfaces instead of using flat billboard depth. The forward point shader
   consumes `GpuEntityConfig::PointSize` and `PointMode`: mode 0 draws flat
-  circles, mode 1 draws depth-corrected impostor spheres, and mode 2 draws
-  normal-aligned surfel ellipses from the optional octahedral normal stored in
-  the shared UV slot. Transient debug-point expansion remains owned by
+  circles, mode 1 draws depth-corrected impostor spheres, and mode 2 currently
+  uses a neutral fallback normal until a dedicated point/surfel normal-buffer
+  residency path lands. The retained point UV slot is not used for normal
+  encoding. Transient debug-point expansion remains owned by
   GRAPHICS-077 and must not route through the retained `Points` cull bucket.
 - GRAPHICS-073 Slice A wires the default-recipe `"ShadowPass"` to the
   existing `ShadowPass` body. `NullRenderer` owns `m_ShadowPass` (constructed
@@ -1391,18 +1395,15 @@ Concretely:
   `TextureManager::Reupload()`, and increment a `StreamingMipUploads`
   counter on `GpuAssetCacheDiagnostics`. A single deterministic 4x4
   magenta-and-black checkerboard fallback texture (RGBA8_UNORM, alpha
-  0xFF, nearest filter, clamp-to-edge) covers every sampled
-  `MaterialParams` texture slot (`Albedo`/`Normal`/`MetallicRoughness`/
-  `Emissive`); per-channel "neutral" interpretation is enforced by
-  material shader code observing the resolved `UsedFallback` bit, not by
-  allocating per-slot fallback textures (`Normal` -> flat `(0.5, 0.5, 1.0)`
-  tangent normal, `MetallicRoughness` -> `MetallicFactor`/`RoughnessFactor`
-  scalars treated as `metallic = 0`, `roughness = 1` when factors are
-  absent, `Emissive` -> per-material `EmissiveFactor` defaulting to
-  `0.0` so unbound emissive assets do not silently glow). Surface shaders
-  sample `MaterialParams::AlbedoID` for base color before falling back to
-  material factors, and sample `MaterialParams::NormalID` for the retained
-  surface/GBuffer normal path when the slot resolves to an uploaded texture.
+  0xFF, nearest filter, clamp-to-edge) exists for missing/pending texture
+  assets and is observable through `TextureAssetFallbackResolveCount`.
+  Surface shaders sample `MaterialParams::AlbedoID` for base color and
+  `MaterialParams::NormalID` for the retained surface/GBuffer normal path only
+  when those bindless IDs are valid; invalid IDs fall back to
+  `BaseColorFactor` and the packed vertex normal. Metallic/roughness factors
+  are carried in `MaterialParams` and the deferred GBuffer metadata, but full
+  PBR texture/factor lighting is not implemented in the current default
+  forward shader.
   Runtime-generated vertex-property textures are therefore consumed through the
   same albedo/normal material slots as authored texture assets; graphics never
   imports `AssetService` or knows whether a bindless index came from an
@@ -1991,9 +1992,10 @@ Concretely:
   `VK_SHADER_STAGE_ALL`-visible push constants), so all per-frame data
   is reached via `GpuScenePushConstants::SceneTableBDA` plus the
   `buffer_reference` chain declared in `common/gpu_scene.glsl`
-  (position read from the procedural vertex buffer at the GRAPHICS-030A
-  `{vec3 pos, vec2 uv}` 20-byte stride; material slot read via
-  `scene.MaterialBDA`). No `set = 0` camera UBO and no `set = 3`
+  (position, resolved UV, and vertex normal read from the promoted surface
+  vertex buffer at the GRAPHICS-088 `{vec3 pos, vec2 uv, vec3 normal}`
+  32-byte stride; material slot read via `scene.MaterialBDA`). No `set = 0`
+  camera UBO and no `set = 3`
   material SSBO are declared — those would collide with the bindless
   descriptor set or reference an unbound set; no per-material descriptor
   set or new cull bucket is introduced (the lane reuses `SurfaceOpaque`).
@@ -2008,9 +2010,9 @@ Concretely:
   so they reference the compiled SPV artifacts emitted by
   `intrinsic_add_glsl_shaders()` rather than the raw GLSL sources
   (`VulkanDevice::CreatePipeline()` reads the path verbatim as a SPIR-V
-  binary). Vertex transform currently lands in `dyn.Model`-space because
-  the scene table does not yet expose a camera matrix BDA; wiring view-
-  projection into the scene-table contract is a GRAPHICS-031B follow-up. The graphics-owned snapshot-consumption
+  binary). Vertex transform uses `scene.CameraViewProj * dyn.Model`; the
+  vertex normal is transformed with the model normal matrix before the
+  fragment shader applies the current debug Lambert-style lighting. The graphics-owned snapshot-consumption
   substitution at the renderer span-copy step replaces unset/out-of-range
   material slots with `kDefaultMaterialSlotIndex` and increments one of
   three additive `MaterialSystemDiagnostics` counters:

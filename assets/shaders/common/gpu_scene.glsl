@@ -26,6 +26,7 @@ const uint GpuMaterialType_StandardPBR = 0u;
 const uint GpuMaterialType_SciVis = 1u;
 const uint GpuMaterialType_DefaultDebugSurface = 2u;
 const uint GpuMaterialType_DefaultDebugUVs = 3u;
+const uint GpuMaterialFlag_Unlit = 1u << 3;
 
 struct GpuSceneTable {
     uint64_t InstanceStaticBDA;

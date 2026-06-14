@@ -29,25 +29,6 @@ layout(location = 3) out vec2 vDiscUV;
 layout(location = 4) out vec3 vViewCenter;
 layout(location = 5) out float vViewRadius;
 
-float SignNotZero(float value) {
-    return value < 0.0 ? -1.0 : 1.0;
-}
-
-bool HasEncodedNormal(vec2 encoded) {
-    return abs(encoded.x) <= 1.0001 && abs(encoded.y) <= 1.0001;
-}
-
-vec3 DecodeOctNormal(vec2 encoded) {
-    vec3 n = vec3(encoded.xy, 1.0 - abs(encoded.x) - abs(encoded.y));
-    if (n.z < 0.0) {
-        n.xy = vec2(
-            (1.0 - abs(n.y)) * SignNotZero(n.x),
-            (1.0 - abs(n.x)) * SignNotZero(n.y));
-    }
-    float len = length(n);
-    return (len > 1.0e-6) ? (n / len) : vec3(0.0, 0.0, 1.0);
-}
-
 void main() {
     const uint instanceSlot = gl_InstanceIndex;
     const GpuSceneTable scene = GpuSceneTableRef(pc.SceneTableBDA).Value;
@@ -101,14 +82,4 @@ void main() {
 
     vColor = (cfg.ColorSourceMode == 1u) ? cfg.UniformColor : vec4(1.0);
     vViewNormal = vec3(0.0, 0.0, 1.0);
-    if (HasEncodedNormal(vec2(pv.u, pv.v))) {
-        const vec3 localNormal = DecodeOctNormal(vec2(pv.u, pv.v));
-        const mat3 normalMatrix = transpose(inverse(mat3(dyn.Model)));
-        const vec3 worldNormal = normalize(normalMatrix * localNormal);
-        const vec3 viewNormal = mat3(scene.CameraView) * worldNormal;
-        const float viewNormalLength = length(viewNormal);
-        if (viewNormalLength > 1.0e-6) {
-            vViewNormal = viewNormal / viewNormalLength;
-        }
-    }
 }

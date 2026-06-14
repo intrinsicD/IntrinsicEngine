@@ -19,10 +19,23 @@ namespace
         float U, V;
     };
 
+    struct SurfaceVertex
+    {
+        float Px, Py, Pz;
+        float U, V;
+        float Nx, Ny, Nz;
+    };
+
     constexpr std::array<PackedVertex, 3> kTriangleVerts{{
         {-0.5f, -0.5f, 0.0f, 0.0f, 0.0f},
         { 0.5f, -0.5f, 0.0f, 1.0f, 0.0f},
         { 0.0f,  0.5f, 0.0f, 0.5f, 1.0f},
+    }};
+
+    constexpr std::array<SurfaceVertex, 3> kSurfaceTriangleVerts{{
+        {-0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f},
+        { 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f},
+        { 0.0f,  0.5f, 0.0f, 0.5f, 1.0f, 0.0f, 0.0f, 1.0f},
     }};
 
     constexpr std::array<std::uint32_t, 3> kTriangleIndices{{0u, 1u, 2u}};
@@ -30,6 +43,11 @@ namespace
     [[nodiscard]] std::span<const std::byte> VertexBytes()
     {
         return std::as_bytes(std::span<const PackedVertex>{kTriangleVerts});
+    }
+
+    [[nodiscard]] std::span<const std::byte> SurfaceVertexBytes()
+    {
+        return std::as_bytes(std::span<const SurfaceVertex>{kSurfaceTriangleVerts});
     }
 
     [[nodiscard]] Extrinsic::Graphics::GpuWorld::GeometryUploadDesc TriangleUpload()
@@ -41,6 +59,18 @@ namespace
             .VertexCount = static_cast<std::uint32_t>(kTriangleVerts.size()),
             .LocalBounds = {},
             .DebugName = "contract-triangle",
+        };
+    }
+
+    [[nodiscard]] Extrinsic::Graphics::GpuWorld::GeometryUploadDesc SurfaceTriangleUpload()
+    {
+        return Extrinsic::Graphics::GpuWorld::GeometryUploadDesc{
+            .PackedVertexBytes = SurfaceVertexBytes(),
+            .SurfaceIndices = std::span<const std::uint32_t>{kTriangleIndices},
+            .LineIndices = {},
+            .VertexCount = static_cast<std::uint32_t>(kSurfaceTriangleVerts.size()),
+            .LocalBounds = {},
+            .DebugName = "contract-surface-triangle",
         };
     }
 }
@@ -113,6 +143,37 @@ TEST(GpuWorldLifetimeContract, GeometryOverflowAndStaleHandlesAreDiagnostic)
     EXPECT_EQ(world.GetDiagnostics().Geometry.InvalidHandleCount, 1u);
 }
 
+TEST(GpuWorldLifetimeContract, MixedVertexStridesAreAlignedForShaderIndexing)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.Operational = false;
+    Extrinsic::RHI::BufferManager buffers{device};
+    Extrinsic::Graphics::GpuWorld world;
+
+    Extrinsic::Graphics::GpuWorld::InitDesc init{};
+    init.MaxInstances = 1u;
+    init.MaxGeometryRecords = 2u;
+    init.MaxLights = 1u;
+    init.VertexBufferBytes = 1u << 10;
+    init.IndexBufferBytes = 1u << 10;
+    init.DeferredFreeFrames = 0u;
+    ASSERT_TRUE(world.Initialize(device, buffers, init));
+
+    const auto primitive = world.UploadGeometry(TriangleUpload());
+    const auto surface = world.UploadGeometry(SurfaceTriangleUpload());
+    ASSERT_TRUE(primitive.IsValid());
+    ASSERT_TRUE(surface.IsValid());
+
+    const auto diagnostics = world.GetDiagnostics();
+    EXPECT_EQ(diagnostics.VertexBytesUsed,
+              64u + SurfaceVertexBytes().size_bytes())
+        << "32-byte surface vertices uploaded after a 20-byte primitive view "
+           "must be aligned before computing GpuGeometryRecord::VertexOffset";
+
+    const auto managed = world.GetManagedBufferDiagnostics();
+    EXPECT_EQ(managed.Vertex.FragmentedBytes, 4u);
+}
+
 TEST(GpuWorldLifetimeContract, NullDeviceModeKeepsCpuLifetimeDiagnosticsObservable)
 {
     Extrinsic::Tests::MockDevice device;
@@ -136,4 +197,3 @@ TEST(GpuWorldLifetimeContract, NullDeviceModeKeepsCpuLifetimeDiagnosticsObservab
     world.SyncFrame();
     EXPECT_EQ(world.GetDiagnostics().Instances.LiveCount, 1u);
 }
-

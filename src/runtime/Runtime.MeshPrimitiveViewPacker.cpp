@@ -23,7 +23,6 @@ namespace Extrinsic::Runtime
     {
         constexpr const char* kEdgeViewDebugName = "Runtime.MeshEdgeView";
         constexpr const char* kVertexViewDebugName = "Runtime.MeshVertexView";
-        constexpr glm::vec2 kNoNormalUv{2.0f, 2.0f};
         constexpr std::uint32_t kInvalidIndex = std::numeric_limits<std::uint32_t>::max();
 
         [[nodiscard]] MeshPrimitiveViewResult Failure(MeshPrimitiveViewStatus status,
@@ -36,38 +35,6 @@ namespace Extrinsic::Runtime
         [[nodiscard]] bool IsFinite(const glm::vec3& p) noexcept
         {
             return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z);
-        }
-
-        [[nodiscard]] float SignNotZero(const float value) noexcept
-        {
-            return value < 0.0f ? -1.0f : 1.0f;
-        }
-
-        [[nodiscard]] glm::vec2 EncodeOctNormal(glm::vec3 normal) noexcept
-        {
-            const float len = glm::length(normal);
-            if (!std::isfinite(len) || len <= 1.0e-6f)
-            {
-                return kNoNormalUv;
-            }
-            normal /= len;
-
-            const float denom =
-                std::abs(normal.x) + std::abs(normal.y) + std::abs(normal.z);
-            if (denom <= 1.0e-6f)
-            {
-                return kNoNormalUv;
-            }
-
-            glm::vec2 encoded{normal.x / denom, normal.y / denom};
-            if (normal.z < 0.0f)
-            {
-                encoded = glm::vec2{
-                    (1.0f - std::abs(encoded.y)) * SignNotZero(encoded.x),
-                    (1.0f - std::abs(encoded.x)) * SignNotZero(encoded.y),
-                };
-            }
-            return encoded;
         }
 
         enum class FaceRingOutcome : std::uint8_t
@@ -188,8 +155,7 @@ namespace Extrinsic::Runtime
             MeshPrimitiveViewBuffer& outBuffer,
             glm::vec3& minP,
             glm::vec3& maxP,
-            MeshPrimitiveViewStatus& status,
-            const std::vector<glm::vec3>* normals = nullptr) noexcept
+            MeshPrimitiveViewStatus& status) noexcept
         {
             const std::size_t vertexCount = positions.size();
             outBuffer.VertexBytes.resize(sizeof(MeshPrimitiveVertex) * vertexCount);
@@ -207,114 +173,12 @@ namespace Extrinsic::Runtime
                     status = MeshPrimitiveViewStatus::NonFinitePosition;
                     return false;
                 }
-                const glm::vec2 normalUv =
-                    normals != nullptr && i < normals->size()
-                        ? EncodeOctNormal((*normals)[i])
-                        : kNoNormalUv;
-                vData[i] = MeshPrimitiveVertex{p.x, p.y, p.z, normalUv.x, normalUv.y};
+                vData[i] = MeshPrimitiveVertex{p.x, p.y, p.z, 0.0f, 0.0f};
                 minP = glm::min(minP, p);
                 maxP = glm::max(maxP, p);
             }
             status = MeshPrimitiveViewStatus::Success;
             return true;
-        }
-
-        [[nodiscard]] std::vector<glm::vec3> ComputeVertexNormalsOrEmpty(
-            const ECS::Components::GeometrySources::ConstSourceView& view,
-            const std::vector<glm::vec3>& positions)
-        {
-            using namespace ECS::Components::GeometrySources;
-
-            if (view.HalfedgeSource == nullptr || view.FaceSource == nullptr)
-            {
-                return {};
-            }
-            const auto toVertexProp = view.HalfedgeSource->Properties.Get<std::uint32_t>(
-                PropertyNames::kHalfedgeToVertex);
-            const auto nextProp = view.HalfedgeSource->Properties.Get<std::uint32_t>(
-                PropertyNames::kHalfedgeNext);
-            const auto faceProp = view.HalfedgeSource->Properties.Get<std::uint32_t>(
-                PropertyNames::kHalfedgeFace);
-            const auto faceHeProp = view.FaceSource->Properties.Get<std::uint32_t>(
-                PropertyNames::kFaceHalfedge);
-            if (!toVertexProp || !nextProp || !faceProp || !faceHeProp)
-            {
-                return {};
-            }
-
-            const auto& toVertex = toVertexProp.Vector();
-            const auto& nextHe = nextProp.Vector();
-            const auto& halfedgeFace = faceProp.Vector();
-            const auto& faceHe = faceHeProp.Vector();
-            const std::size_t halfedgeCount = toVertex.size();
-            const std::size_t faceCount = faceHe.size();
-            const std::size_t vertexCount = positions.size();
-            if (halfedgeCount == 0u ||
-                faceCount == 0u ||
-                nextHe.size() != halfedgeCount ||
-                halfedgeFace.size() != halfedgeCount ||
-                vertexCount > std::numeric_limits<std::uint32_t>::max() ||
-                faceCount > std::numeric_limits<std::uint32_t>::max())
-            {
-                return {};
-            }
-
-            std::vector<glm::vec3> normals(vertexCount, glm::vec3{0.0f});
-            std::vector<std::uint32_t> ringScratch;
-            ringScratch.reserve(8u);
-
-            const auto faceCountU32 = static_cast<std::uint32_t>(faceCount);
-            const auto vertexCountU32 = static_cast<std::uint32_t>(vertexCount);
-            for (std::size_t f = 0; f < faceCount; ++f)
-            {
-                const FaceRingOutcome outcome =
-                    ProduceFaceRing(faceHe,
-                                    halfedgeFace,
-                                    nextHe,
-                                    toVertex,
-                                    faceCountU32,
-                                    vertexCountU32,
-                                    f,
-                                    ringScratch);
-                if (outcome != FaceRingOutcome::Triangulate)
-                {
-                    continue;
-                }
-
-                for (std::size_t i = 1; i + 1 < ringScratch.size(); ++i)
-                {
-                    const std::uint32_t a = ringScratch[0];
-                    const std::uint32_t b = ringScratch[i];
-                    const std::uint32_t c = ringScratch[i + 1u];
-                    const glm::vec3 n =
-                        glm::cross(positions[b] - positions[a],
-                                   positions[c] - positions[a]);
-                    if (!IsFinite(n) || glm::length(n) <= 1.0e-12f)
-                    {
-                        continue;
-                    }
-                    normals[a] += n;
-                    normals[b] += n;
-                    normals[c] += n;
-                }
-            }
-
-            bool anyNormal = false;
-            for (glm::vec3& normal : normals)
-            {
-                const float len = glm::length(normal);
-                if (std::isfinite(len) && len > 1.0e-6f)
-                {
-                    normal /= len;
-                    anyNormal = true;
-                }
-                else
-                {
-                    normal = glm::vec3{0.0f};
-                }
-            }
-
-            return anyNormal ? normals : std::vector<glm::vec3>{};
         }
 
         enum class SurfaceWireEdgeOutcome : std::uint8_t
@@ -558,14 +422,7 @@ namespace Extrinsic::Runtime
 
         glm::vec3 minP{};
         glm::vec3 maxP{};
-        const std::vector<glm::vec3> normals =
-            ComputeVertexNormalsOrEmpty(view, *positions);
-        if (!WriteVertexBuffer(*positions,
-                               outBuffer,
-                               minP,
-                               maxP,
-                               status,
-                               normals.empty() ? nullptr : &normals))
+        if (!WriteVertexBuffer(*positions, outBuffer, minP, maxP, status))
         {
             return Failure(status, outBuffer);
         }

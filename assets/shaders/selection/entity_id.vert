@@ -21,13 +21,14 @@
 
 #include "../common/gpu_scene.glsl"
 
-struct ProceduralVertex {
+struct SurfaceVertex {
     vec3 Position;
     vec2 UV;
+    vec3 Normal;
 };
 
-layout(buffer_reference, scalar) readonly buffer ProceduralVertexRef {
-    ProceduralVertex Data[];
+layout(buffer_reference, scalar) readonly buffer SurfaceVertexRef {
+    SurfaceVertex Data[];
 };
 
 layout(push_constant, scalar) uniform ScenePC {
@@ -48,7 +49,7 @@ void main() {
 
     // The culling indirect command supplies firstIndex + vertexOffset, so
     // gl_VertexIndex is already in managed-buffer vertex units.
-    const ProceduralVertex v = ProceduralVertexRef(geo.VertexBufferBDA).Data[gl_VertexIndex];
+    const SurfaceVertex v = SurfaceVertexRef(geo.VertexBufferBDA).Data[gl_VertexIndex];
 
     gl_Position = scene.CameraViewProj * dyn.Model * vec4(v.Position, 1.0);
     fragEntityID = inst.EntityID;

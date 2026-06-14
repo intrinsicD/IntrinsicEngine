@@ -33,8 +33,8 @@ namespace pn = Extrinsic::ECS::Components::GeometrySources::PropertyNames;
 namespace
 {
     // Minimal mesh-domain scratch. Edge views prefer `Edges` and fall back to
-    // halfedge/face topology; vertex views also consult halfedge/face topology
-    // when available to encode surface normals.
+    // halfedge/face topology. Vertex views keep UV fields neutral; normals
+    // require a dedicated future buffer rather than UV overloading.
     struct MeshScratch
     {
         Vertices VertexSource{};
@@ -167,8 +167,8 @@ TEST(MeshPrimitiveViewPacker, EdgeViewPacksVerticesAndLineIndices)
 
     const MeshPrimitiveVertex v1 = ReadVertex(buffer, 1);
     EXPECT_FLOAT_EQ(v1.Px, 1.0f);
-    EXPECT_FLOAT_EQ(v1.U, 2.0f);
-    EXPECT_FLOAT_EQ(v1.V, 2.0f);
+    EXPECT_FLOAT_EQ(v1.U, 0.0f);
+    EXPECT_FLOAT_EQ(v1.V, 0.0f);
 }
 
 TEST(MeshPrimitiveViewPacker, VertexViewPacksPointsWithoutIndices)
@@ -185,11 +185,11 @@ TEST(MeshPrimitiveViewPacker, VertexViewPacksPointsWithoutIndices)
 
     const MeshPrimitiveVertex v2 = ReadVertex(buffer, 2);
     EXPECT_FLOAT_EQ(v2.Py, 1.0f);
-    EXPECT_FLOAT_EQ(v2.U, 2.0f);
-    EXPECT_FLOAT_EQ(v2.V, 2.0f);
+    EXPECT_FLOAT_EQ(v2.U, 0.0f);
+    EXPECT_FLOAT_EQ(v2.V, 0.0f);
 }
 
-TEST(MeshPrimitiveViewPacker, VertexViewEncodesFaceNormalForSurfaceAlignedMode)
+TEST(MeshPrimitiveViewPacker, VertexViewDoesNotEncodeFaceNormalIntoUv)
 {
     const MeshScratch m = BuildTriangleWithSurfaceTopology();
     MeshPrimitiveViewBuffer buffer{};

@@ -205,6 +205,9 @@ TEST(MeshGeometryPackerTest, SingleTriangleVertexBytesMatchPositions)
     EXPECT_FLOAT_EQ(verts[2].Py, 1.0f);
     EXPECT_FLOAT_EQ(verts[0].U, 0.0f);
     EXPECT_FLOAT_EQ(verts[0].V, 0.0f);
+    EXPECT_FLOAT_EQ(verts[0].Nx, 0.0f);
+    EXPECT_FLOAT_EQ(verts[0].Ny, 0.0f);
+    EXPECT_FLOAT_EQ(verts[0].Nz, 1.0f);
 }
 
 TEST(MeshGeometryPackerTest, MissingTexcoordsAreRejectedEvenWhenNormalsExist)
@@ -252,6 +255,76 @@ TEST(MeshGeometryPackerTest, UsesVertexTexcoordsAsOnlyUvSource)
     EXPECT_FLOAT_EQ(verts[1].V, 0.25f);
     EXPECT_FLOAT_EQ(verts[2].U, 1.00f);
     EXPECT_FLOAT_EQ(verts[2].V, 0.00f);
+}
+
+TEST(MeshGeometryPackerTest, PacksVertexNormalsWithoutUsingUvFields)
+{
+    MeshScratch mesh = BuildSingleTriangle();
+    SetNormals(mesh.VertexSource, {
+        {2.0f, 0.0f, 0.0f},
+        {0.0f, 3.0f, 0.0f},
+        {0.0f, 0.0f, 4.0f},
+    });
+    SetTexcoords(mesh.VertexSource, {
+        {0.25f, 0.75f},
+        {0.50f, 0.25f},
+        {1.00f, 0.00f},
+    });
+    MeshPackBuffer scratch;
+
+    const MeshPackResult result = PackMesh(mesh.View(), scratch);
+    ASSERT_EQ(result.Status, MeshPackStatus::Success);
+    ASSERT_TRUE(result.Upload.has_value());
+
+    const auto* verts = reinterpret_cast<const MeshVertex*>(result.Upload->PackedVertexBytes.data());
+    EXPECT_FLOAT_EQ(verts[0].U, 0.25f);
+    EXPECT_FLOAT_EQ(verts[0].V, 0.75f);
+    EXPECT_FLOAT_EQ(verts[0].Nx, 1.0f);
+    EXPECT_FLOAT_EQ(verts[0].Ny, 0.0f);
+    EXPECT_FLOAT_EQ(verts[0].Nz, 0.0f);
+    EXPECT_FLOAT_EQ(verts[1].U, 0.50f);
+    EXPECT_FLOAT_EQ(verts[1].V, 0.25f);
+    EXPECT_FLOAT_EQ(verts[1].Nx, 0.0f);
+    EXPECT_FLOAT_EQ(verts[1].Ny, 1.0f);
+    EXPECT_FLOAT_EQ(verts[1].Nz, 0.0f);
+    EXPECT_FLOAT_EQ(verts[2].U, 1.00f);
+    EXPECT_FLOAT_EQ(verts[2].V, 0.00f);
+    EXPECT_FLOAT_EQ(verts[2].Nx, 0.0f);
+    EXPECT_FLOAT_EQ(verts[2].Ny, 0.0f);
+    EXPECT_FLOAT_EQ(verts[2].Nz, 1.0f);
+}
+
+TEST(MeshGeometryPackerTest, InvalidVertexNormalFallsBackWithoutChangingUv)
+{
+    MeshScratch mesh = BuildSingleTriangle();
+    SetNormals(mesh.VertexSource, {
+        {std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f},
+        {0.0f, 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f},
+    });
+    SetTexcoords(mesh.VertexSource, {
+        {0.25f, 0.75f},
+        {0.50f, 0.25f},
+        {1.00f, 0.00f},
+    });
+    MeshPackBuffer scratch;
+
+    const MeshPackResult result = PackMesh(mesh.View(), scratch);
+    ASSERT_EQ(result.Status, MeshPackStatus::Success);
+    ASSERT_TRUE(result.Upload.has_value());
+
+    const auto* verts = reinterpret_cast<const MeshVertex*>(result.Upload->PackedVertexBytes.data());
+    EXPECT_FLOAT_EQ(verts[0].U, 0.25f);
+    EXPECT_FLOAT_EQ(verts[0].V, 0.75f);
+    EXPECT_FLOAT_EQ(verts[0].Nx, 0.0f);
+    EXPECT_FLOAT_EQ(verts[0].Ny, 0.0f);
+    EXPECT_FLOAT_EQ(verts[0].Nz, 1.0f);
+    EXPECT_FLOAT_EQ(verts[1].Nx, 0.0f);
+    EXPECT_FLOAT_EQ(verts[1].Ny, 0.0f);
+    EXPECT_FLOAT_EQ(verts[1].Nz, 1.0f);
+    EXPECT_FLOAT_EQ(verts[2].Nx, 0.0f);
+    EXPECT_FLOAT_EQ(verts[2].Ny, 1.0f);
+    EXPECT_FLOAT_EQ(verts[2].Nz, 0.0f);
 }
 
 TEST(MeshGeometryPackerTest, MismatchedTexcoordCountIsRejected)

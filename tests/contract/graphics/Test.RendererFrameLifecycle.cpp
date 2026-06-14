@@ -1271,8 +1271,10 @@ TEST(RendererFrameLifecycle, ForwardSurfacePipelineSurvivesOperationalRebuild)
     const std::string surfaceFragment = ReadShaderSource("forward/default_debug_surface.frag");
 
     EXPECT_NE(surfaceVertex.find("fragUv = v.UV"), std::string::npos);
+    EXPECT_NE(surfaceVertex.find("fragWorldNormal"), std::string::npos);
     EXPECT_NE(surfaceFragment.find("mat.AlbedoID"), std::string::npos);
     EXPECT_NE(surfaceFragment.find("mat.NormalID"), std::string::npos);
+    EXPECT_NE(surfaceFragment.find("fragWorldNormal"), std::string::npos);
     EXPECT_NE(surfaceFragment.find("GpuMaterialType_DefaultDebugUVs"), std::string::npos);
     EXPECT_NE(surfaceFragment.find("DebugUvChecker(fragUv)"), std::string::npos);
     EXPECT_NE(surfaceFragment.find("normalShade"), std::string::npos);

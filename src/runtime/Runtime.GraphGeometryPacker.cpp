@@ -21,7 +21,6 @@ namespace Extrinsic::Runtime
     namespace
     {
         constexpr const char* kGraphDebugName = "Runtime.Graph";
-        constexpr glm::vec2 kNoNormalUv{2.0f, 2.0f};
 
         [[nodiscard]] GraphPackResult Failure(GraphPackStatus status, GraphPackBuffer& outBuffer) noexcept
         {
@@ -142,7 +141,7 @@ namespace Extrinsic::Runtime
             {
                 return Failure(GraphPackStatus::NonFinitePosition, outBuffer);
             }
-            vData[i] = GraphVertex{p.x, p.y, p.z, kNoNormalUv.x, kNoNormalUv.y};
+            vData[i] = GraphVertex{p.x, p.y, p.z, 0.0f, 0.0f};
             minP = glm::min(minP, p);
             maxP = glm::max(maxP, p);
         }

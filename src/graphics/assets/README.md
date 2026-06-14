@@ -86,21 +86,17 @@ renderables.
   emit `NotifyReloaded` followed by `RequestUpload`, accepting the
   bindless rebind and one retire-queue entry per stream step.
 - **Fallback texture content.** A single deterministic fallback texture
-  covers every sampled material texture slot (`Albedo`, `Normal`,
-  `MetallicRoughness`, `Emissive`). The fallback is a 4x4
-  magenta-and-black checkerboard (`RGBA8_UNORM`, alpha `0xFF`, nearest
-  filter, clamp-to-edge addressing); `GetViewOrFallback()` returns it
-  with `UsedFallback = true` and the matching
-  `GpuAssetFallbackReason` for missing / pending / failed assets so the
-  magenta checker is visually obvious in development builds. Per-channel
-  "neutral" interpretation is enforced by material shader code that
-  observes the resolved `UsedFallback` bit, not by allocating per-slot
-  fallback textures: `Normal` reverts to a flat `(0.5, 0.5, 1.0)`
-  tangent normal, `MetallicRoughness` reverts to per-material
-  `MetallicFactor`/`RoughnessFactor` scalars (treated as `metallic = 0`,
-  `roughness = 1` when factors are absent), and `Emissive` is multiplied
-  by per-material `EmissiveFactor` defaulting to `0.0` so unbound
-  emissive assets do not silently glow. Visualization and Htex/UV bake
+  covers missing / pending / failed material texture assets. The fallback is a
+  4x4 magenta-and-black checkerboard (`RGBA8_UNORM`, alpha `0xFF`, nearest
+  filter, clamp-to-edge addressing); `GetViewOrFallback()` returns it with
+  `UsedFallback = true` and the matching `GpuAssetFallbackReason` so the
+  missing asset is visually obvious in development builds and observable
+  through `TextureAssetFallbackResolveCount`. Semantic neutral defaults are the
+  shader invalid-ID path, not a hidden per-slot fallback texture: surfaces use
+  `BaseColorFactor` when `AlbedoID` is invalid and the packed vertex normal
+  when `NormalID` is invalid. Metallic/roughness/emissive texture evaluation is
+  not part of the current default forward surface shader. Visualization and
+  Htex/UV bake
   atlas references do **not** use this fallback: per `GRAPHICS-014Q`
   visualization atlas descriptors with deferred residency are dropped
   from `RenderWorld::Visualization` and counted in

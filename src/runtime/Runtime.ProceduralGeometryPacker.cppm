@@ -13,10 +13,10 @@ import Extrinsic.Runtime.ProceduralGeometry;
 
 export namespace Extrinsic::Runtime
 {
-    // Vertex layout for the runtime-owned procedural surface packer. Matches the
-    // existing minimal-triangle GpuWorld upload contract: position (3 * float32)
-    // followed by uv (2 * float32) for 20 bytes per vertex. GRAPHICS-031 owns
-    // any future expansion; the layout is fixed for this implementation slice.
+    // Vertex layout for the runtime-owned procedural surface packer. Matches
+    // `MeshVertex` so the promoted surface, depth, and face-selection shaders
+    // consume one surface vertex format: position, texture coordinate, and a
+    // dedicated normal. U/V carry texture coordinates only.
     struct ProceduralVertex
     {
         float Px = 0.0f;
@@ -24,8 +24,11 @@ export namespace Extrinsic::Runtime
         float Pz = 0.0f;
         float U = 0.0f;
         float V = 0.0f;
+        float Nx = 0.0f;
+        float Ny = 0.0f;
+        float Nz = 1.0f;
     };
-    static_assert(sizeof(ProceduralVertex) == 20);
+    static_assert(sizeof(ProceduralVertex) == 32);
 
     struct ProceduralGeometryPackBuffer
     {

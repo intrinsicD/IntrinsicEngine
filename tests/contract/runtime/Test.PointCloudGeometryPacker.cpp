@@ -84,11 +84,11 @@ TEST(PointCloudGeometryPacker, PacksPositionsWithoutIndices)
     const PointCloudVertex v1 = ReadVertex(buffer, 1);
     EXPECT_FLOAT_EQ(v0.Px, 0.0f);
     EXPECT_FLOAT_EQ(v1.Px, 1.0f);
-    EXPECT_FLOAT_EQ(v0.U, 2.0f);
-    EXPECT_FLOAT_EQ(v0.V, 2.0f);
+    EXPECT_FLOAT_EQ(v0.U, 0.0f);
+    EXPECT_FLOAT_EQ(v0.V, 0.0f);
 }
 
-TEST(PointCloudGeometryPacker, EncodesNormalsWhenPresent)
+TEST(PointCloudGeometryPacker, DoesNotEncodeNormalsIntoUv)
 {
     CloudScratch c{};
     SetPositions(c.VertexSource, {
@@ -111,7 +111,7 @@ TEST(PointCloudGeometryPacker, EncodesNormalsWhenPresent)
     EXPECT_FLOAT_EQ(zNormal.V, 0.0f);
 
     const PointCloudVertex xNormal = ReadVertex(buffer, 1);
-    EXPECT_FLOAT_EQ(xNormal.U, 1.0f);
+    EXPECT_FLOAT_EQ(xNormal.U, 0.0f);
     EXPECT_FLOAT_EQ(xNormal.V, 0.0f);
 }
 

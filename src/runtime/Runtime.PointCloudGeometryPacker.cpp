@@ -21,7 +21,6 @@ namespace Extrinsic::Runtime
     namespace
     {
         constexpr const char* kCloudDebugName = "Runtime.PointCloud";
-        constexpr glm::vec2 kNoNormalUv{2.0f, 2.0f};
 
         [[nodiscard]] PointCloudPackResult Failure(PointCloudPackStatus status,
                                                    PointCloudPackBuffer& outBuffer) noexcept
@@ -35,37 +34,6 @@ namespace Extrinsic::Runtime
             return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z);
         }
 
-        [[nodiscard]] float SignNotZero(const float value) noexcept
-        {
-            return value < 0.0f ? -1.0f : 1.0f;
-        }
-
-        [[nodiscard]] glm::vec2 EncodeOctNormal(glm::vec3 normal) noexcept
-        {
-            const float len = glm::length(normal);
-            if (!std::isfinite(len) || len <= 1.0e-6f)
-            {
-                return kNoNormalUv;
-            }
-            normal /= len;
-
-            const float denom =
-                std::abs(normal.x) + std::abs(normal.y) + std::abs(normal.z);
-            if (denom <= 1.0e-6f)
-            {
-                return kNoNormalUv;
-            }
-
-            glm::vec2 encoded{normal.x / denom, normal.y / denom};
-            if (normal.z < 0.0f)
-            {
-                encoded = glm::vec2{
-                    (1.0f - std::abs(encoded.y)) * SignNotZero(encoded.x),
-                    (1.0f - std::abs(encoded.x)) * SignNotZero(encoded.y),
-                };
-            }
-            return encoded;
-        }
     }
 
     const char* DebugNameForPointCloudPackStatus(PointCloudPackStatus status) noexcept
@@ -114,14 +82,6 @@ namespace Extrinsic::Runtime
         {
             return Failure(PointCloudPackStatus::EmptyCloud, outBuffer);
         }
-        const auto normalProp =
-            view.VertexSource->Properties.Get<glm::vec3>(PropertyNames::kNormal);
-        const std::vector<glm::vec3>* normals = nullptr;
-        if (normalProp && normalProp.Vector().size() == pointCount)
-        {
-            normals = &normalProp.Vector();
-        }
-
         outBuffer.VertexBytes.resize(sizeof(PointCloudVertex) * pointCount);
         auto* vData = reinterpret_cast<PointCloudVertex*>(outBuffer.VertexBytes.data());
 
@@ -136,9 +96,7 @@ namespace Extrinsic::Runtime
             {
                 return Failure(PointCloudPackStatus::NonFinitePosition, outBuffer);
             }
-            const glm::vec2 normalUv =
-                normals != nullptr ? EncodeOctNormal((*normals)[i]) : kNoNormalUv;
-            vData[i] = PointCloudVertex{p.x, p.y, p.z, normalUv.x, normalUv.y};
+            vData[i] = PointCloudVertex{p.x, p.y, p.z, 0.0f, 0.0f};
             minP = glm::min(minP, p);
             maxP = glm::max(maxP, p);
         }

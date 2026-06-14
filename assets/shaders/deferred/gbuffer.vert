@@ -27,6 +27,9 @@ struct PackedVertex {
     float pz;
     float u;
     float v;
+    float nx;
+    float ny;
+    float nz;
 };
 
 layout(buffer_reference, scalar) readonly buffer PackedVertexRef {
@@ -60,7 +63,13 @@ void main() {
 
     gl_Position = camera.proj * camera.view * worldPos;
 
-    vWorldNormal = vec3(0.0, 0.0, 1.0);
+    vec3 localNormal = vec3(pv.nx, pv.ny, pv.nz);
+    const float localNormalLength = length(localNormal);
+    localNormal = (localNormalLength > 1.0e-6) ? (localNormal / localNormalLength) : vec3(0.0, 0.0, 1.0);
+    const mat3 normalMatrix = transpose(inverse(mat3(dyn.Model)));
+    vec3 worldNormal = normalMatrix * localNormal;
+    const float worldNormalLength = length(worldNormal);
+    vWorldNormal = (worldNormalLength > 1.0e-6) ? (worldNormal / worldNormalLength) : vec3(0.0, 0.0, 1.0);
     vUv = vec2(pv.u, pv.v);
     vInstanceSlot = instanceSlot;
     vEntityId = inst.EntityID;

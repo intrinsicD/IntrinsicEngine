@@ -3,10 +3,10 @@
 - **Status:** Accepted
 - **Date:** 2026-05-17
 - **Owners:** Graphics (`Extrinsic.Graphics.MaterialSystem` slot 0 registration, default debug surface shader pair, forward graphics pipeline)
-- **Related tasks:** [`tasks/done/GRAPHICS-031`](../../tasks/done/GRAPHICS-031-default-debug-surface-material.md) (parent planning), [`GRAPHICS-031A`](../../tasks/done/GRAPHICS-031A-default-debug-surface-shaders-and-pipeline.md) (shader pair + pipeline implementation)
+- **Related tasks:** [`tasks/done/GRAPHICS-031`](../../tasks/done/GRAPHICS-031-default-debug-surface-material.md) (parent planning), [`GRAPHICS-031A`](../../tasks/done/GRAPHICS-031A-default-debug-surface-shaders-and-pipeline.md) (shader pair + pipeline implementation), [`GRAPHICS-088`](../../tasks/active/GRAPHICS-088-resolved-uv-rendering-and-bake-residency.md) (resolved-UV sampling and dedicated surface vertex normals)
 - **Related docs:** [`docs/architecture/graphics.md`](../architecture/graphics.md), [`src/graphics/renderer/README.md`](../../src/graphics/renderer/README.md)
 - **Supersedes:** none. Extracted from the `## Material registry and slot contract` GRAPHICS-031 paragraph (lines 727–746) in `docs/architecture/graphics.md` per [`DOCS-001`](../../tasks/done/DOCS-001-reduce-graphics-architecture-prose.md).
-- **Related ADRs:** [ADR-0018](0018-missing-material-fallback-substitution.md) records the substitution policy that uses this material as the fallback. [ADR-0014](0014-procedural-source-residency-bridge.md) records the `Triangle` packer whose vertex format this material consumes. [ADR-0015](0015-reference-scene-bootstrap.md) records the `TriangleProvider` reference entity that depends on this material to compose a frame.
+- **Related ADRs:** [ADR-0018](0018-missing-material-fallback-substitution.md) records the substitution policy that uses this material as the fallback. [ADR-0014](0014-procedural-source-residency-bridge.md) records the original `Triangle` packer whose surface lane now uses the promoted `GRAPHICS-088` vertex format. [ADR-0015](0015-reference-scene-bootstrap.md) records the `TriangleProvider` reference entity that depends on this material to compose a frame.
 
 ## Context
 
@@ -15,8 +15,8 @@
 Three forces shape the decision:
 
 1. Slot 0 must produce a deterministic non-black, non-magenta, immediately-visible surface so missing or fallback materials are obvious to a developer without being confused with the GRAPHICS-015 magenta texture fallback ([ADR-0016](0016-texture-residency-and-asset-cache-policy.md) §3).
-2. Slot 0 must not introduce new descriptor sets, new cull buckets, new passes, or new frame-recipe resources — it has to thread through the existing `SurfaceOpaque` cull bucket and `MaterialBuffer` SSBO so it is a backend-neutral addition.
-3. The vertex format must match the `Triangle` packer planned by GRAPHICS-030-Impl-A (retired as [GRAPHICS-030A](../../tasks/done/GRAPHICS-030A-procedural-geometry-descriptor-cache.md)) so the [ADR-0015](0015-reference-scene-bootstrap.md) reference triangle composes through slot 0 by default.
+2. Slot 0 must not introduce new descriptor sets, new cull buckets, new passes, or new frame-recipe resources — it has to thread through the existing `SurfaceOpaque` cull bucket and scene-table material data so it is a backend-neutral addition.
+3. The vertex format must match the promoted surface packers: the `Triangle` packer planned by GRAPHICS-030-Impl-A (retired as [GRAPHICS-030A](../../tasks/done/GRAPHICS-030A-procedural-geometry-descriptor-cache.md)) and the runtime mesh packer extended by `GRAPHICS-088` both feed the same surface shader lane, so the [ADR-0015](0015-reference-scene-bootstrap.md) reference triangle and imported meshes compose through slot 0 by default.
 
 This ADR captures the slot-0 material definition (registration name, type ID, flags, base-color factor, pre-population timing, shader pair, vertex format, pipeline state, cull-bucket reuse) plus the debug-variant naming family. The substitution / diagnostics half lives in [ADR-0018](0018-missing-material-fallback-substitution.md) as a separately traceable decision.
 
@@ -44,7 +44,8 @@ The shader pair lives at:
 The shaders consume:
 
 - The canonical `GpuScenePushConstants` scene-table BDA.
-- The existing `MaterialBuffer` SSBO at `set = 3, binding = 0`.
+- The BDA scene-table chain declared in `assets/shaders/common/gpu_scene.glsl`, including `scene.MaterialBDA`.
+- The global bindless texture descriptor set for optional material texture slots.
 
 **No per-material descriptor set is added.** Slot 0 reuses the canonical material binding surface.
 
@@ -53,9 +54,10 @@ The shaders consume:
 The vertex format is:
 
 - Position: `vec3`.
-- Optional packed RGBA8 vertex color: `uint32`.
+- Resolved texture coordinate: `vec2`.
+- Vertex normal: `vec3`.
 
-This matches the `Triangle` packer from [ADR-0014](0014-procedural-source-residency-bridge.md) so the [ADR-0015](0015-reference-scene-bootstrap.md) reference triangle composes through slot 0 by default.
+This is the 32-byte scalar-layout promoted surface vertex format shared by the procedural triangle packer and runtime mesh packer. UVs remain texture coordinates only; the normal is carried in its own fields so meshes without a bound normal texture still shade from CPU vertex normals or the deterministic `+Z` packer default.
 
 ### 4. Forward graphics pipeline state
 
@@ -94,8 +96,8 @@ Positive:
 
 - Slot 0 produces a deterministic visible purple surface, immediately distinguishable from the magenta-and-black texture fallback in [ADR-0016](0016-texture-residency-and-asset-cache-policy.md).
 - The slot 0 contents are pre-populated by `Initialize()` and republished byte-identically by `RebuildGpuResources()`, so the slot survives operational transitions without re-authoring.
-- The shader pair reuses the canonical `MaterialBuffer` SSBO binding (`set = 3, binding = 0`) and the `GpuScenePushConstants` scene-table BDA — no per-material descriptor set is added.
-- The vertex format aligns with the `Triangle` packer from [ADR-0014](0014-procedural-source-residency-bridge.md), so the [ADR-0015](0015-reference-scene-bootstrap.md) reference triangle composes end-to-end through slot 0.
+- The shader pair reuses the canonical `GpuScenePushConstants` scene-table BDA and global bindless texture set — no per-material descriptor set is added.
+- The vertex format aligns with the promoted procedural and mesh surface packers, so the [ADR-0015](0015-reference-scene-bootstrap.md) reference triangle and imported mesh surfaces compose end-to-end through slot 0.
 - No new cull bucket, no new pass, no new descriptor set, no new frame-recipe resource is introduced. Backends pick up slot 0 with zero structural changes.
 - The debug-variant naming family is explicit, so future `Wireframe` / `Normals` debug materials land as additive registrations rather than parallel material systems. The UV checker variant already follows this rule as the type-only `Material.DefaultDebugUVs` registration.
 
@@ -113,7 +115,7 @@ Follow-up tasks required: none from this ADR. The debug-variant family registrat
 
 - **Black or transparent slot-0 surface.** Rejected per §1: invisible fallbacks hide problems instead of surfacing them; the visible purple is the safety property.
 - **Magenta slot-0 to match the texture fallback.** Rejected per §1: would confuse the "missing material" and "missing texture" signals; the texture fallback is magenta-and-black checkerboard, this material is solid purple.
-- **Per-material descriptor set for slot 0.** Rejected per §2: would add a binding surface that every backend must thread; reusing `MaterialBuffer` at `set = 3, binding = 0` keeps the slot-0 shader pair backend-neutral.
+- **Per-material descriptor set for slot 0.** Rejected per §2: would add a binding surface that every backend must thread; reusing the scene-table material BDA and global bindless texture set keeps the slot-0 shader pair backend-neutral.
 - **New `Material.DefaultDebugSurface` cull bucket or pass.** Rejected per §5: would force frame-recipe additions and break the "no structural change" property; slot 0 routes through `SurfaceOpaque`.
 - **Slot-0 contents authored at first use rather than at `Initialize()`.** Rejected per §1: would produce a one-frame "no fallback" window and would race operational transitions; pre-population + byte-identical republish is the deterministic shape.
 - **Parallel naming families for debug variants (`Material.WireframeOverlay`, `Material.NormalsPreview`).** Rejected per §6: forks the family. The `Material.DefaultDebug<Variant>` shape keeps consumers' grouping rules stable.

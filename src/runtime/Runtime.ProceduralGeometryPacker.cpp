@@ -15,9 +15,9 @@ namespace Extrinsic::Runtime
     namespace
     {
         constexpr std::array<ProceduralVertex, 3> kTriangleVertices{{
-            {-0.5f, -0.5f, 0.0f, 0.0f, 0.0f},
-            { 0.5f, -0.5f, 0.0f, 1.0f, 0.0f},
-            { 0.0f,  0.5f, 0.0f, 0.5f, 1.0f},
+            {-0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f},
+            { 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f},
+            { 0.0f,  0.5f, 0.0f, 0.5f, 1.0f, 0.0f, 0.0f, 1.0f},
         }};
 
         constexpr std::array<std::uint32_t, 3> kTriangleSurfaceIndices{{0u, 1u, 2u}};

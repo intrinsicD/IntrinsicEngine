@@ -40,6 +40,16 @@ namespace Extrinsic::Runtime
             return std::isfinite(p.x) && std::isfinite(p.y);
         }
 
+        [[nodiscard]] glm::vec3 NormalizeOrDefaultNormal(const glm::vec3 normal) noexcept
+        {
+            if (!IsFinite(normal))
+            {
+                return glm::vec3{0.0f, 0.0f, 1.0f};
+            }
+            const float len = glm::length(normal);
+            return len > 1.0e-6f ? normal / len : glm::vec3{0.0f, 0.0f, 1.0f};
+        }
+
         // Outcome of walking one face slot's halfedge ring.
         enum class FaceRingOutcome : std::uint8_t
         {
@@ -245,6 +255,10 @@ namespace Extrinsic::Runtime
             return Failure(MeshPackStatus::MissingTexcoords, outBuffer);
         }
         const auto& texcoords = texcoordProp.Vector();
+        const auto normalProp =
+            view.VertexSource->Properties.Get<glm::vec3>(PropertyNames::kNormal);
+        const bool hasCountMatchedNormals =
+            normalProp && normalProp.Vector().size() == vertexCount;
 
         for (std::size_t f = 0; f < faceCount; ++f)
         {
@@ -291,7 +305,10 @@ namespace Extrinsic::Runtime
             {
                 return Failure(MeshPackStatus::NonFiniteTexcoord, outBuffer);
             }
-            vData[i] = MeshVertex{p.x, p.y, p.z, uv.x, uv.y};
+            const glm::vec3 n = hasCountMatchedNormals
+                ? NormalizeOrDefaultNormal(normalProp.Vector()[i])
+                : glm::vec3{0.0f, 0.0f, 1.0f};
+            vData[i] = MeshVertex{p.x, p.y, p.z, uv.x, uv.y, n.x, n.y, n.z};
             minP = glm::min(minP, p);
             maxP = glm::max(maxP, p);
         }

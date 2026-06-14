@@ -12,12 +12,13 @@ import Extrinsic.Graphics.GpuWorld;
 
 export namespace Extrinsic::Runtime
 {
-    // Vertex layout for the runtime mesh packer. Matches the
-    // `ProceduralVertex` layout (position + UV, 20 bytes) so the same
-    // `Material.DefaultDebugSurface` pipeline (GRAPHICS-031A) consumes both
-    // runtime-authored and procedural surface geometry without a second
-    // vertex format. Mesh-domain `v:texcoord` must be present with one finite
-    // vector per vertex; U/V carry texture coordinates only.
+    // Vertex layout for the runtime mesh surface packer. Matches the
+    // `ProceduralVertex` surface layout consumed by the promoted surface,
+    // depth, and face-selection shaders. Mesh-domain `v:texcoord` must be
+    // present with one finite vector per vertex; U/V carry texture coordinates
+    // only. Normals are carried in dedicated fields from `v:normal` when
+    // available and default to +Z otherwise, so UVs are never reused for
+    // normal encoding.
     struct MeshVertex
     {
         float Px = 0.0f;
@@ -25,8 +26,11 @@ export namespace Extrinsic::Runtime
         float Pz = 0.0f;
         float U = 0.0f;
         float V = 0.0f;
+        float Nx = 0.0f;
+        float Ny = 0.0f;
+        float Nz = 1.0f;
     };
-    static_assert(sizeof(MeshVertex) == 20);
+    static_assert(sizeof(MeshVertex) == 32);
 
     // Reusable scratch buffers fed to `PackMesh`. Callers own one buffer per
     // extraction-cache instance and reuse it across frames; `PackMesh` clears
@@ -83,7 +87,9 @@ export namespace Extrinsic::Runtime
     // passed the ownership check indicates a corrupt mesh and is rejected as
     // `InvalidTopology`. Vertex bytes are written in input order so surface
     // indices index directly into the source `Vertices` PropertySet, with
-    // `MeshVertex::U/V` populated only from `v:texcoord`. `LocalSphere` is
+    // `MeshVertex::U/V` populated only from `v:texcoord` and `MeshVertex::N*`
+    // populated from `v:normal` when present or the +Z default otherwise.
+    // `LocalSphere` is
     // filled from the local AABB center and half-diagonal so downstream
     // culling/transform sync has a deterministic non-empty local bound even
     // before `RUNTIME-082`-style adapters publish a tighter sphere;

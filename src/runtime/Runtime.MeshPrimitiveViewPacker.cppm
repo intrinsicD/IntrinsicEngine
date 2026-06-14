@@ -12,16 +12,13 @@ import Extrinsic.Graphics.GpuWorld;
 
 export namespace Extrinsic::Runtime
 {
-    // Vertex layout for the runtime mesh-primitive-view packer. Identical to
-    // `MeshVertex` / `GraphVertex` / `PointCloudVertex` (position + UV, 20
-    // bytes) so the retained line (`forward/line.vert`) and point
-    // (`forward/point.vert` / `forward/point.frag`, GRAPHICS-071) pipelines
-    // consume mesh edge / vertex view geometry without a second vertex format.
-    // Edge views prefer explicit `Edges` rows and can derive a unique
-    // wireframe line list from surface halfedge/face topology. For vertex point
-    // views, UV carries an octahedral-encoded local normal when surface
-    // topology is available; `{2, 2}` is the no-normal sentinel. Mesh-driven
-    // UV/attribute propagation onto primitive views is owned by later slices.
+    // Vertex layout for the runtime mesh-primitive-view packer. Primitive
+    // views keep the retained line/point 20-byte format (position + neutral
+    // UV) consumed by `forward/line.vert` and `forward/point.vert`. Edge views
+    // prefer explicit `Edges` rows and can derive a unique wireframe line list
+    // from surface halfedge/face topology. UV fields are not used for normal
+    // encoding; dedicated normal-buffer residency for point/surfel rendering is
+    // owned by a later slice.
     struct MeshPrimitiveVertex
     {
         float Px = 0.0f;

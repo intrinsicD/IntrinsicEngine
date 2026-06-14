@@ -10,7 +10,12 @@
 
 - **BufferManager-managed geometry.** No per-entity vertex/index buffers. Geometry lives in managed buffers owned by `BufferManager`. Each entity holds a `BufferView` referencing a region within a managed buffer. Multiple managed buffers may exist (for capacity or format reasons); entities can reference different buffers from the manager.
 - **GPU drives execution.** A GPU-side LBVH determines visibility. The CPU hands the GPU a scene description; the GPU builds indirect draw commands.
-- **Positions and UVs in the vertex buffer only.** Everything else (normals, tangents, per-vertex scalars, colors) lives in per-entity attribute SSBOs accessed by BDA, or in textures (material data). This keeps managed vertex buffers compact and stable.
+- **Compact surface vertex buffers.** The long-term target keeps only positions
+  and UVs in surface vertex buffers, with tangents, scalars, colors, and other
+  attributes in per-entity attribute SSBOs or textures. The current promoted
+  `GRAPHICS-088` surface lane also carries a dedicated vertex normal in the
+  surface vertex record so imported meshes without normal textures still shade
+  correctly; UV fields are not reused for normal encoding.
 - **Deferred by default.** All opaque surfaces write to a G-buffer. Lighting is a single full-screen pass. Lines, points, and transparent objects are a forward sub-pass composited on top.
 - **Components are switches.** Presence of `SurfaceComponent`, `LineComponent`, or `PointComponent` determines which pipelines render an entity — no boolean flags, no enum routing.
 - **Push constants + SSBOs.** Per-entity rendering parameters go in two per-entity SSBOs — `GpuInstanceData` (transform, identity — updated frequently) and `GpuEntityConfig` (visualization, BDA pointers — updated rarely). Push constants carry only the per-draw-call slot index. No per-entity descriptor sets.
@@ -96,10 +101,11 @@ All geometry buffers are owned and managed by `BufferManager`. `GpuWorld::Global
 
 | Buffer type | Content | Layout |
 |-------------|---------|--------|
-| **Managed Vertex Buffer(s)** | `vec3 position`, `vec2 uv` per vertex | interleaved: `[x,y,z, u,v]` → 20 bytes/vertex |
+| **Managed Surface Vertex Buffer(s)** | `vec3 position`, `vec2 uv`, `vec3 normal` per surface vertex in the current promoted implementation | interleaved: `[x,y,z, u,v, nx,ny,nz]` -> 32 bytes/vertex |
+| **Managed Retained Primitive Vertex Buffer(s)** | `vec3 position`, neutral `vec2 uv` for retained line/point lanes | interleaved: `[x,y,z, u,v]` -> 20 bytes/vertex |
 | **Managed Index Buffer(s)** | `uint32_t` triangle indices (reused for edge pairs) | flat uint32 array |
 
-**Invariant:** Normals, tangents, per-vertex scalars, per-vertex colors, and all other per-vertex attributes are **never** stored in vertex buffers. They come from:
+**Target invariant:** Tangents, per-vertex scalars, per-vertex colors, and all other per-vertex attributes are not stored in vertex buffers. Normals are the current promoted-surface exception until dedicated normal-buffer residency replaces the interim lane. These attributes otherwise come from:
 - **Material textures** (albedo, normal map, metallic-roughness) — sampled by UV.
 - **Per-entity attribute SSBOs** (normals, visualization scalars/colors) — addressed by BDA pointer stored in `GpuEntityConfig`, indexed by `vertex_id` / `face_id` / `edge_id`.
 

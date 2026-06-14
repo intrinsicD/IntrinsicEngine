@@ -150,9 +150,8 @@ namespace Extrinsic::Runtime
         // RUNTIME-070: runtime-baked fallback texture bytes for GpuAssetCache.
         // A 4×4 RGBA8_UNORM magenta-and-black checkerboard repeated from a 2×2
         // base pattern. The cache never reads files; runtime owns the bytes.
-        // Layout: row-major, top-left origin, RGBA8 with alpha 0xFF so the
-        // sampled colour is visually unambiguous when material code observes
-        // `UsedFallback = true`.
+        // Layout: row-major, top-left origin, RGBA8 with alpha 0xFF so sampled
+        // fallback assets are visually unambiguous in development builds.
         consteval std::array<std::byte, 4 * 4 * 4> MakeFallbackTextureBytes() noexcept
         {
             std::array<std::byte, 4 * 4 * 4> bytes{};
