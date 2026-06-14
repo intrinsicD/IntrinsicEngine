@@ -59,6 +59,9 @@ depends_on: []
       `CMAKE_TOOLCHAIN_FILE=${sourceDir}/external/vcpkg/scripts/buildsystems/vcpkg.cmake`
       and `VCPKG_MANIFEST_MODE=ON` for the `ci` preset (and any future
       presets).
+- [x] Support raw IDE-generated configure commands that do not pass
+      `CMAKE_TOOLCHAIN_FILE` by selecting the repository-local vcpkg toolchain
+      before the first `project()` call.
 - [x] Route the default `cmake/Dependencies.cmake` path through:
     - `find_package` calls for each dependency.
     - Repository-facing compatibility targets for vcpkg package names that
@@ -95,6 +98,9 @@ depends_on: []
 - [x] Headless build with `INTRINSIC_HEADLESS_NO_GLFW=ON` succeeds
       without pulling `glfw3` / `imguizmo` from vcpkg (manifest
       feature-flag gates them).
+- [x] CLion-style raw configure without `CMAKE_TOOLCHAIN_FILE` succeeds after
+      bootstrap and still routes dependency resolution through vcpkg manifest
+      mode.
 
 ## Docs
 - [x] Replace the dependency section of `docs/build-troubleshooting.md`
@@ -108,6 +114,8 @@ depends_on: []
       solver, binary caching, removal of the in-tree validator + cache).
 - [x] Update `tasks/backlog/README.md` to mark INFRA Option C done
       and link to the ADR.
+- [x] Document the supported non-preset IDE configure path in
+      `docs/build-troubleshooting.md`.
 
 ## Acceptance criteria
 - [x] No `FetchContent_*` calls remain in `cmake/`.
@@ -129,6 +137,15 @@ depends_on: []
   repository vcpkg toolchain. Slice B cut over the default preset path and
   chainloads `cmake/IntrinsicClangToolchain.cmake`; Slice C wired CI/local
   binary-cache flow.
+- Raw IDE-generated CMake configure commands are supported when they leave
+  `CMAKE_TOOLCHAIN_FILE` unset: top-level CMake selects the repository vcpkg
+  toolchain before `project()`, chainloads the Intrinsic Clang toolchain, and
+  stores packages under `external/vcpkg-installed/<build-tree-name>/`.
+- Existing build directories that were first configured without the vcpkg
+  toolchain still need a one-time CMake cache reset because CMake does not
+  retrofit toolchains into an initialized cache. `cmake/Dependencies.cmake`
+  now detects this half-state before `find_package(...)` and reports the reset
+  action explicitly.
 - GitHub Actions workflows now cache `external/vcpkg-bincache/`, bootstrap
   `external/vcpkg/`, and export `VCPKG_BINARY_SOURCES` before configure. The
   cache key covers `vcpkg.json`, `vcpkg-configuration.json`, `tools/vcpkg/**`,
@@ -217,10 +234,27 @@ depends_on: []
     - `cmake --build build/ci-headless-vcpkg --target IntrinsicTests` —
       passed in 5:02.05.
 - Slice D verification 2026-06-14:
+    - CLion raw-configure failure was reproduced before the fix with the
+      reported command shape: no `CMAKE_TOOLCHAIN_FILE`, quoted blank
+      arguments, `-DINTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN=ON`, and
+      `-DINTRINSIC_BUILD_SANDBOX=ON`; configure stopped in
+      `cmake/Dependencies.cmake` before compiler information could be loaded.
+    - Re-running the same raw command shape against a fresh
+      `build/clion-vcpkg-repro` tree now passes. Top-level CMake reports
+      `IntrinsicEngine defaulting to repository vcpkg toolchain`, vcpkg uses
+      `external/vcpkg-installed/clion-vcpkg-repro`, and configure/generate
+      completes in 8.0 s. The ignored quoted-blank-path warning remains
+      non-fatal.
+    - The original `cmake-build-debug` tree required one `cmake --fresh`
+      reload because it had first been initialized without the vcpkg toolchain;
+      after that reset, the exact CLion reload command passes normally and
+      configures/generates in 2.1 s.
+    - `cmake --build /home/alex/Documents/IntrinsicEngine/cmake-build-debug
+      --target ExtrinsicSandbox` — passed.
     - `rg -n
-      "external/cache|populate_deps|INTRINSIC_OFFLINE_DEPS|INTRINSIC_UPDATE_DEPS|INTRINSIC_DEPS_SEAL|INTRINSIC_USE_VCPKG_DEPS"
-      cmake tools tests docs AGENTS.md --glob '!docs/reports/**' --glob
-      '!docs/reviews/**'` — no matches.
+      "external/cache|populate_deps|INTRINSIC_OFFLINE_DEPS|INTRINSIC_UPDATE_DEPS|INTRINSIC_DEPS_CACHE_DIR|INTRINSIC_DEPS_SEAL|INTRINSIC_USE_VCPKG_DEPS"
+      CMakeLists.txt cmake tools tests docs AGENTS.md --glob
+      '!docs/reports/**' --glob '!docs/reviews/**'` — no matches.
     - `rg -n "FetchContent_" cmake CMakeLists.txt` — no matches.
     - `rg -n "GIT_TAG|FetchContent_" cmake CMakeLists.txt vcpkg.json
       vcpkg-configuration.json tools/vcpkg` — no matches.

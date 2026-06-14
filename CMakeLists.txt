@@ -14,6 +14,67 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
         "created in the source root before this guard can take effect.")
 endif()
 
+# ------------------------------------------------------------------------------
+# Dependency toolchain selection
+#
+# Presets pass this explicitly, but IDEs such as CLion often generate raw CMake
+# configure commands. If the caller did not choose a toolchain, select the
+# repository-local vcpkg toolchain before the first project() call so dependency
+# discovery still runs through the manifest path.
+# ------------------------------------------------------------------------------
+set(_INTRINSIC_REPO_VCPKG_TOOLCHAIN
+    "${CMAKE_CURRENT_SOURCE_DIR}/external/vcpkg/scripts/buildsystems/vcpkg.cmake")
+set(_INTRINSIC_REPO_CLANG_CHAINLOAD
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/IntrinsicClangToolchain.cmake")
+
+if(NOT DEFINED CMAKE_TOOLCHAIN_FILE OR CMAKE_TOOLCHAIN_FILE STREQUAL "")
+    if(EXISTS "${_INTRINSIC_REPO_VCPKG_TOOLCHAIN}")
+        set(CMAKE_TOOLCHAIN_FILE "${_INTRINSIC_REPO_VCPKG_TOOLCHAIN}" CACHE FILEPATH
+            "IntrinsicEngine repository vcpkg toolchain" FORCE)
+        message(STATUS
+            "IntrinsicEngine defaulting to repository vcpkg toolchain: "
+            "${CMAKE_TOOLCHAIN_FILE}")
+    else()
+        message(FATAL_ERROR
+            "IntrinsicEngine dependencies require the repository-local vcpkg "
+            "toolchain at '${_INTRINSIC_REPO_VCPKG_TOOLCHAIN}'. Run "
+            "tools/setup/bootstrap_vcpkg.sh or configure with an explicit "
+            "vcpkg CMAKE_TOOLCHAIN_FILE.")
+    endif()
+endif()
+
+get_filename_component(_INTRINSIC_ACTIVE_TOOLCHAIN
+    "${CMAKE_TOOLCHAIN_FILE}" ABSOLUTE BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+get_filename_component(_INTRINSIC_REPO_VCPKG_TOOLCHAIN_ABS
+    "${_INTRINSIC_REPO_VCPKG_TOOLCHAIN}" ABSOLUTE)
+
+if("${_INTRINSIC_ACTIVE_TOOLCHAIN}" STREQUAL "${_INTRINSIC_REPO_VCPKG_TOOLCHAIN_ABS}")
+    if(NOT DEFINED VCPKG_CHAINLOAD_TOOLCHAIN_FILE
+        OR VCPKG_CHAINLOAD_TOOLCHAIN_FILE STREQUAL "")
+        set(VCPKG_CHAINLOAD_TOOLCHAIN_FILE "${_INTRINSIC_REPO_CLANG_CHAINLOAD}"
+            CACHE FILEPATH "IntrinsicEngine Clang toolchain chainloaded by vcpkg" FORCE)
+    endif()
+    if(NOT DEFINED VCPKG_INSTALLED_DIR OR VCPKG_INSTALLED_DIR STREQUAL "")
+        get_filename_component(_INTRINSIC_BUILD_TREE_NAME "${CMAKE_BINARY_DIR}" NAME)
+        if(_INTRINSIC_BUILD_TREE_NAME STREQUAL "")
+            set(_INTRINSIC_BUILD_TREE_NAME "local")
+        endif()
+        set(VCPKG_INSTALLED_DIR
+            "${CMAKE_CURRENT_SOURCE_DIR}/external/vcpkg-installed/${_INTRINSIC_BUILD_TREE_NAME}"
+            CACHE PATH "IntrinsicEngine vcpkg package install tree" FORCE)
+    endif()
+    if(NOT DEFINED VCPKG_MANIFEST_MODE)
+        set(VCPKG_MANIFEST_MODE ON CACHE BOOL
+            "Resolve IntrinsicEngine dependencies through vcpkg manifest mode" FORCE)
+    endif()
+endif()
+
+unset(_INTRINSIC_ACTIVE_TOOLCHAIN)
+unset(_INTRINSIC_BUILD_TREE_NAME)
+unset(_INTRINSIC_REPO_CLANG_CHAINLOAD)
+unset(_INTRINSIC_REPO_VCPKG_TOOLCHAIN)
+unset(_INTRINSIC_REPO_VCPKG_TOOLCHAIN_ABS)
+
 # Project Definition
 project(IntrinsicEngine
         VERSION 0.1.0
@@ -153,17 +214,6 @@ option(INTRINSIC_BUILD_TESTS "Build test targets" ON)
 option(INTRINSIC_BUILD_BENCHMARKS "Build benchmark scaffold targets" ON)
 option(INTRINSIC_HEADLESS_NO_GLFW
     "Headless build mode that skips GLFW-dependent modules when X11 RandR headers are unavailable"
-    OFF
-)
-option(INTRINSIC_OFFLINE_DEPS
-    "Disable network dependency fetches and require pre-populated external/cache/<name>-src trees"
-    OFF
-)
-set(INTRINSIC_DEPS_CACHE_DIR "${CMAKE_SOURCE_DIR}/external/cache" CACHE PATH
-    "Shared FetchContent dependency cache directory used by all build trees"
-)
-option(INTRINSIC_UPDATE_DEPS
-    "Allow FetchContent to contact remotes to update existing dependency sources"
     OFF
 )
 

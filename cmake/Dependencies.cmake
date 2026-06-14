@@ -30,8 +30,21 @@ endif()
 if(NOT VCPKG_MANIFEST_MODE)
     message(FATAL_ERROR
         "IntrinsicEngine dependencies are resolved through vcpkg manifest mode. "
-        "Run tools/setup/bootstrap_vcpkg.sh and configure with a repository preset "
-        "so CMAKE_TOOLCHAIN_FILE points at external/vcpkg/scripts/buildsystems/vcpkg.cmake."
+        "Run tools/setup/bootstrap_vcpkg.sh and configure with a repository preset, "
+        "or leave CMAKE_TOOLCHAIN_FILE unset so top-level CMake can select "
+        "external/vcpkg/scripts/buildsystems/vcpkg.cmake before project()."
+    )
+endif()
+
+if(NOT DEFINED Z_VCPKG_ROOT_DIR)
+    message(FATAL_ERROR
+        "VCPKG_MANIFEST_MODE is enabled, but the vcpkg toolchain did not "
+        "initialize this build tree. If this directory was first configured "
+        "without the vcpkg toolchain, reset the CMake cache once "
+        "(for example: cmake --fresh ... or CLion 'Reset Cache and Reload'). "
+        "New raw IDE configure commands may leave CMAKE_TOOLCHAIN_FILE unset "
+        "so top-level CMake can select the repository vcpkg toolchain before "
+        "project()."
     )
 endif()
 

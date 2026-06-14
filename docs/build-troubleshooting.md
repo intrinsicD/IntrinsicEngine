@@ -91,6 +91,22 @@ cmake --preset ci
 requirements still apply. Installed packages live under
 `external/vcpkg-installed/<preset>/`.
 
+Raw IDE-generated configure commands are supported after bootstrap when they do
+not set `CMAKE_TOOLCHAIN_FILE`: the top-level `CMakeLists.txt` selects the
+repository vcpkg toolchain before `project()` and uses
+`external/vcpkg-installed/<build-tree-name>/` for packages. If an IDE profile
+sets a toolchain manually, point it at
+`external/vcpkg/scripts/buildsystems/vcpkg.cmake`; do not point it directly at
+`cmake/IntrinsicClangToolchain.cmake`, because that file is chainloaded by
+vcpkg.
+
+Build trees that were first configured before the vcpkg toolchain was active
+must be reset once. Use CLion's "Reset Cache and Reload" action or rerun the
+same configure command with `cmake --fresh`; after that, normal reloads reuse
+the generated cache. A warning about an ignored path containing only spaces is
+an IDE argument-list issue and is non-fatal; remove the blank argument from the
+profile to silence it.
+
 For repeat local builds, use a filesystem binary cache:
 
 ```bash
@@ -114,8 +130,9 @@ external/vcpkg/vcpkg format-manifest vcpkg.json
 
 The vcpkg manifest is now the only supported third-party dependency path.
 `cmake/Dependencies.cmake` fails closed when configure is not running in vcpkg
-manifest mode; use the repository presets rather than retired CMake
-dependency-cache flags.
+manifest mode; use the repository presets, or leave `CMAKE_TOOLCHAIN_FILE`
+unset in IDE profiles so the top-level configure can select the repository
+vcpkg toolchain. Retired CMake dependency-cache flags are unsupported.
 
 ## Blocked follow-on CI steps
 
