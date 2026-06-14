@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -137,6 +138,15 @@ namespace
         pos.Vector() = positions;
     }
 
+    void SetTexcoords(GS::Vertices& vertices,
+                      const std::vector<glm::vec2>& texcoords)
+    {
+        auto uv = vertices.Properties.GetOrAdd<glm::vec2>(
+            "v:texcoord",
+            glm::vec2{0.0f});
+        uv.Vector() = texcoords;
+    }
+
     void ExpectKMeansVertexProperties(Geometry::PropertySet& properties,
                                       const std::size_t expectedCount,
                                       const bool pointCloudNames)
@@ -245,6 +255,12 @@ namespace
                          {0.0f, 0.0f, 0.0f},
                          {1.0f, 0.0f, 0.0f},
                          {0.0f, 1.0f, 0.0f},
+                     });
+        SetTexcoords(vertices,
+                     {
+                         {0.0f, 0.0f},
+                         {1.0f, 0.0f},
+                         {0.0f, 1.0f},
                      });
         auto& edges = raw.emplace<GS::Edges>(entity);
         SetEdges(edges, {0u, 1u, 2u}, {1u, 2u, 0u});
@@ -2729,7 +2745,10 @@ TEST(SandboxEditorUi, EngineImportFacadeMaterializesStandaloneGeometryDomains)
         "v 0 0 0\n"
         "v 1 0 0\n"
         "v 0 1 0\n"
-        "f 1 2 3\n");
+        "vt 0 0\n"
+        "vt 1 0\n"
+        "vt 0 1\n"
+        "f 1/1 2/2 3/3\n");
     TmpFile graphFile(
         "runtime_dragdrop_import_graph.tgf",
         "1 0 0 0 first\n"
@@ -2841,9 +2860,14 @@ TEST(SandboxEditorUi, EngineImportFacadeMaterializesNonManifoldObjAsRenderableMe
         "v 0 1 0\n"
         "v 0 -1 0\n"
         "v 0.5 0 1\n"
-        "f 1 2 3\n"
-        "f 2 1 4\n"
-        "f 1 2 5\n");
+        "vt 0 0\n"
+        "vt 1 0\n"
+        "vt 0 1\n"
+        "vt 0 -1\n"
+        "vt 0.5 0.5\n"
+        "f 1/1 2/2 3/3\n"
+        "f 2/2 1/1 4/4\n"
+        "f 1/1 2/2 5/5\n");
 
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
     engine.Initialize();
@@ -2886,6 +2910,66 @@ TEST(SandboxEditorUi, EngineImportFacadeMaterializesNonManifoldObjAsRenderableMe
     EXPECT_EQ(stats.MeshGeometryFailedPack, 0u);
     EXPECT_EQ(stats.MeshGeometryMissingPositions, 0u);
     EXPECT_EQ(stats.MeshGeometryInvalidTopology, 0u);
+    EXPECT_EQ(engine.GetRenderer().GetGpuWorld().GetLiveGeometryCount(), 1u);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorUi, EngineImportFacadeMaterializesObjWithoutAuthoredTexcoordsAsRenderableMesh)
+{
+    TmpFile meshFile(
+        "runtime_dragdrop_import_missing_uv.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+
+    Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    engine.Initialize();
+
+    auto mesh = engine.ImportAssetFromPath(
+        Runtime::RuntimeAssetImportRequest{
+            .Path = meshFile.Path.string(),
+            .PayloadKind = Assets::AssetPayloadKind::Mesh,
+        });
+    ASSERT_TRUE(mesh.has_value()) << static_cast<int>(mesh.error());
+    EXPECT_TRUE(mesh->Asset.IsValid());
+    EXPECT_EQ(mesh->PayloadKind, Assets::AssetPayloadKind::Mesh);
+    EXPECT_EQ(mesh->PrimitiveEntitiesCreated, 1u);
+
+    const std::optional<ECS::EntityHandle> meshEntity =
+        FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
+    ASSERT_TRUE(meshEntity.has_value());
+
+    auto& raw = engine.GetScene().Raw();
+    ASSERT_TRUE(raw.all_of<G::RenderSurface>(*meshEntity));
+    const GS::ConstSourceView view = GS::BuildConstView(raw, *meshEntity);
+    ASSERT_TRUE(view.Valid());
+    ASSERT_NE(view.VertexSource, nullptr);
+    const auto texcoords = view.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
+    ASSERT_TRUE(texcoords);
+    ASSERT_EQ(texcoords.Vector().size(), 3u);
+
+    bool sawNonZeroTexcoord = false;
+    for (const glm::vec2 uv : texcoords.Vector())
+    {
+        EXPECT_TRUE(std::isfinite(uv.x));
+        EXPECT_TRUE(std::isfinite(uv.y));
+        sawNonZeroTexcoord = sawNonZeroTexcoord ||
+            std::abs(uv.x) > 1.0e-6f ||
+            std::abs(uv.y) > 1.0e-6f;
+    }
+    EXPECT_TRUE(sawNonZeroTexcoord);
+
+    Runtime::RenderExtractionCache extraction;
+    const auto stats = extraction.ExtractAndSubmit(engine.GetScene(),
+                                                   engine.GetRenderer(),
+                                                   &engine.GetGpuAssetCache());
+    EXPECT_EQ(stats.CandidateRenderableCount, 1u);
+    EXPECT_EQ(stats.MeshGeometryUploads, 1u);
+    EXPECT_EQ(stats.MeshGeometryFailedPack, 0u);
+    EXPECT_EQ(stats.MeshGeometryMissingTexcoords, 0u);
     EXPECT_EQ(engine.GetRenderer().GetGpuWorld().GetLiveGeometryCount(), 1u);
 
     extraction.Shutdown(engine.GetRenderer());
@@ -2955,7 +3039,10 @@ TEST(SandboxEditorUi, PlatformDropEventImportsObjMeshSelectsItAndEnablesRenderCo
         "v 0 0 0\n"
         "v 1 0 0\n"
         "v 0 1 0\n"
-        "f 1 2 3\n");
+        "vt 0 0\n"
+        "vt 1 0\n"
+        "vt 0 1\n"
+        "f 1/1 2/2 3/3\n");
 
     Runtime::Engine engine(
         HeadlessConfig(),

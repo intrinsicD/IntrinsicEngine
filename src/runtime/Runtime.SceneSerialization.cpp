@@ -69,6 +69,11 @@ namespace Extrinsic::Runtime
             return value.is_array() && value.size() == expected;
         }
 
+        [[nodiscard]] json Vec2ToJson(const glm::vec2& value)
+        {
+            return json::array({value.x, value.y});
+        }
+
         [[nodiscard]] json Vec3ToJson(const glm::vec3& value)
         {
             return json::array({value.x, value.y, value.z});
@@ -82,6 +87,22 @@ namespace Extrinsic::Runtime
         [[nodiscard]] json QuatToJson(const glm::quat& value)
         {
             return json::array({value.w, value.x, value.y, value.z});
+        }
+
+        [[nodiscard]] bool TryReadVec2(const json& value, glm::vec2& out) noexcept
+        {
+            if (!IsArrayOfSize(value, 2u))
+                return false;
+            for (const json& element : value)
+            {
+                if (!element.is_number())
+                    return false;
+            }
+            out = glm::vec2{
+                value[0].get<float>(),
+                value[1].get<float>(),
+            };
+            return true;
         }
 
         [[nodiscard]] bool TryReadVec3(const json& value, glm::vec3& out) noexcept
@@ -137,6 +158,14 @@ namespace Extrinsic::Runtime
             return true;
         }
 
+        [[nodiscard]] json Vec2ArrayToJson(const std::vector<glm::vec2>& values)
+        {
+            json out = json::array();
+            for (const glm::vec2& value : values)
+                out.push_back(Vec2ToJson(value));
+            return out;
+        }
+
         [[nodiscard]] json Vec3ArrayToJson(const std::vector<glm::vec3>& values)
         {
             json out = json::array();
@@ -151,6 +180,24 @@ namespace Extrinsic::Runtime
             for (const std::uint32_t value : values)
                 out.push_back(value);
             return out;
+        }
+
+        [[nodiscard]] bool TryReadVec2Array(const json& value,
+                                            std::vector<glm::vec2>& out)
+        {
+            if (!value.is_array())
+                return false;
+            std::vector<glm::vec2> decoded;
+            decoded.reserve(value.size());
+            for (const json& element : value)
+            {
+                glm::vec2 vec{0.0f};
+                if (!TryReadVec2(element, vec))
+                    return false;
+                decoded.push_back(vec);
+            }
+            out = std::move(decoded);
+            return true;
         }
 
         [[nodiscard]] bool TryReadVec3Array(const json& value,
@@ -207,6 +254,15 @@ namespace Extrinsic::Runtime
             return true;
         }
 
+        [[nodiscard]] const std::vector<glm::vec2>* FindVec2Property(
+            const Geometry::PropertySet& properties,
+            const std::string_view name)
+        {
+            const Geometry::Property<glm::vec2> property =
+                properties.Get<glm::vec2>(name);
+            return property.IsValid() ? &property.Vector() : nullptr;
+        }
+
         [[nodiscard]] const std::vector<glm::vec3>* FindVec3Property(
             const Geometry::PropertySet& properties,
             const std::string_view name)
@@ -223,6 +279,19 @@ namespace Extrinsic::Runtime
             const Geometry::Property<std::uint32_t> property =
                 properties.Get<std::uint32_t>(name);
             return property.IsValid() ? &property.Vector() : nullptr;
+        }
+
+        [[nodiscard]] bool AddVec2Property(json& object,
+                                           const char* key,
+                                           const Geometry::PropertySet& properties,
+                                           const std::string_view propertyName,
+                                           const bool required)
+        {
+            const std::vector<glm::vec2>* values = FindVec2Property(properties, propertyName);
+            if (values == nullptr)
+                return !required;
+            object[key] = Vec2ArrayToJson(*values);
+            return true;
         }
 
         [[nodiscard]] bool AddVec3Property(json& object,
@@ -249,6 +318,16 @@ namespace Extrinsic::Runtime
                 return !required;
             object[key] = UIntArrayToJson(*values);
             return true;
+        }
+
+        void WriteVec2Property(Geometry::PropertySet& properties,
+                               const std::string_view name,
+                               std::vector<glm::vec2> values)
+        {
+            properties.Resize(values.size());
+            Geometry::Property<glm::vec2> property =
+                properties.GetOrAdd<glm::vec2>(std::string{name}, glm::vec2{0.0f});
+            property.Vector() = std::move(values);
         }
 
         void WriteVec3Property(Geometry::PropertySet& properties,
@@ -810,6 +889,11 @@ namespace Extrinsic::Runtime
             {
                 return false;
             }
+            if (!AddVec2Property(out, "texcoords", vertices.Properties,
+                                 "v:texcoord", false))
+            {
+                return false;
+            }
             geometry["vertices"] = std::move(out);
             return true;
         }
@@ -969,6 +1053,16 @@ namespace Extrinsic::Runtime
                     return false;
                 }
                 WriteVec3Property(vertices.Properties, PN::kNormal, std::move(normals));
+            }
+            if (value.contains("texcoords"))
+            {
+                std::vector<glm::vec2> texcoords;
+                if (!TryReadVec2Array(value["texcoords"], texcoords) ||
+                    texcoords.size() != vertices.Properties.Size())
+                {
+                    return false;
+                }
+                WriteVec2Property(vertices.Properties, "v:texcoord", std::move(texcoords));
             }
             vertices.NumDeleted = deleted;
             out = &raw.emplace_or_replace<GS::Vertices>(entity, std::move(vertices));

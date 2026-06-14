@@ -778,6 +778,12 @@ namespace Extrinsic::Runtime
                 .AtlasWidth = options.AtlasWidth,
                 .AtlasHeight = options.AtlasHeight,
                 .TexcoordBufferBDA = options.TexcoordBufferBDA,
+                .TexcoordProvenance =
+                    options.FragmentBakeMapping ==
+                            Graphics::VisualizationFragmentBakeMapping::ExistingTexcoords
+                        ? Graphics::VisualizationTexcoordProvenance::RuntimeResolved
+                        : Graphics::VisualizationTexcoordProvenance::Unknown,
+                .TexcoordDirtyStamp = options.DirtyStamp,
             };
             hasBakePacket = true;
         }

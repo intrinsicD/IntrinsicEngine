@@ -103,6 +103,12 @@ Keep cross-cutting backlog stubs honest with current state and reachable from
 the convergence map. Retired members are indexed in the category READMEs and
 the retirement log.
 
+INFRA Option C is accepted through
+[ADR-0020](../../docs/adr/0020-vcpkg-manifest-dependency-management.md): the
+repository dependency path is vcpkg manifest mode with CI/local binary-cache
+wiring. Active `INFRA-001` now tracks only final deprecation cleanup and
+warm-cache CI timing evidence.
+
 Open members:
 - [`architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md`](architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md) —
   value-gated cross-domain map for remaining legacy feature candidates before

@@ -16,10 +16,8 @@ export namespace Extrinsic::Runtime
     // `ProceduralVertex` layout (position + UV, 20 bytes) so the same
     // `Material.DefaultDebugSurface` pipeline (GRAPHICS-031A) consumes both
     // runtime-authored and procedural surface geometry without a second
-    // vertex format. When mesh-domain `v:texcoord` is present with one vector
-    // per vertex, U/V carry texture coordinates. Otherwise, when
-    // mesh-domain `v:normal` is present with one vector per vertex, U/V carry
-    // the octahedral-encoded normal fallback used by no-texture paths.
+    // vertex format. Mesh-domain `v:texcoord` must be present with one finite
+    // vector per vertex; U/V carry texture coordinates only.
     struct MeshVertex
     {
         float Px = 0.0f;
@@ -54,6 +52,8 @@ export namespace Extrinsic::Runtime
         EmptyMesh,                  // No vertices, no halfedges, or no faces.
         InvalidTopology,            // Out-of-range halfedge/face index, mismatched halfedge property arrays, or non-closed face ring.
         NonFinitePosition,          // `v:position` contains NaN / infinity.
+        MissingTexcoords,           // `v:texcoord` absent / wrong-typed / not one `glm::vec2` per vertex.
+        NonFiniteTexcoord,          // `v:texcoord` contains NaN / infinity.
         DegenerateAllFaces,         // Every face produced fewer than three triangle indices (all faces deleted or degenerate).
     };
 
@@ -68,26 +68,28 @@ export namespace Extrinsic::Runtime
     // Pack a promoted ECS mesh `GeometrySources` view into the canonical
     // `Graphics::GpuWorld::GeometryUploadDesc` triangle-list shape.
     //
-    // Algorithm: validate `v:position`, `h:to_vertex`, `h:next`, `h:face`,
-    // `f:halfedge`; for each face slot resolve its first halfedge and skip
-    // the slot when that halfedge's `h:face` no longer claims the face
-    // (`PopulateFromMesh` writes `f:halfedge` for every slot including
-    // deleted faces, while `HalfedgeMesh::DeleteFace` clears only the
-    // halfedges' `h:face` — so the deleted-face ring is still walkable and
-    // must be detected via `h:face` ownership). For live face slots walk
-    // the ring (capped at `halfedgeCount` to fail closed on malformed
-    // `h:next` cycles), fan-triangulate from the first ring vertex, and
-    // emit (ring[0], ring[i], ring[i+1]) surface indices. A ring halfedge
-    // whose `h:face` disagrees with the current face after the first
-    // halfedge has passed the ownership check indicates a corrupt mesh and
-    // is rejected as `InvalidTopology`. Vertex bytes are written in input
-    // order so surface indices index directly into the source `Vertices`
-    // PropertySet. `LocalSphere` is filled from the local AABB center and
-    // half-diagonal so downstream culling/transform sync has a deterministic
-    // non-empty local bound even before `RUNTIME-082`-style adapters publish
-    // a tighter sphere; `WorldSphere`/`WorldAabb*` remain zero — runtime
-    // extraction overwrites them with the per-frame world transform via
-    // `ExtractBounds` (see `Runtime.RenderExtraction`).
+    // Algorithm: validate `v:position`, count-matched finite `v:texcoord`,
+    // `h:to_vertex`, `h:next`, `h:face`, `f:halfedge`; for each face slot
+    // resolve its first halfedge and skip the slot when that halfedge's
+    // `h:face` no longer claims the face (`PopulateFromMesh` writes
+    // `f:halfedge` for every slot including deleted faces, while
+    // `HalfedgeMesh::DeleteFace` clears only the halfedges' `h:face` — so
+    // the deleted-face ring is still walkable and must be detected via
+    // `h:face` ownership). For live face slots walk the ring (capped at
+    // `halfedgeCount` to fail closed on malformed `h:next` cycles),
+    // fan-triangulate from the first ring vertex, and emit
+    // (ring[0], ring[i], ring[i+1]) surface indices. A ring halfedge whose
+    // `h:face` disagrees with the current face after the first halfedge has
+    // passed the ownership check indicates a corrupt mesh and is rejected as
+    // `InvalidTopology`. Vertex bytes are written in input order so surface
+    // indices index directly into the source `Vertices` PropertySet, with
+    // `MeshVertex::U/V` populated only from `v:texcoord`. `LocalSphere` is
+    // filled from the local AABB center and half-diagonal so downstream
+    // culling/transform sync has a deterministic non-empty local bound even
+    // before `RUNTIME-082`-style adapters publish a tighter sphere;
+    // `WorldSphere`/`WorldAabb*` remain zero — runtime extraction overwrites
+    // them with the per-frame world transform via `ExtractBounds` (see
+    // `Runtime.RenderExtraction`).
     //
     // `outBuffer` is cleared on entry. The returned `Upload.PackedVertexBytes`
     // and `Upload.SurfaceIndices` view into `outBuffer`; callers must hand the

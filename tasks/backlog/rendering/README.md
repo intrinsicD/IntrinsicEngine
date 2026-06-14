@@ -429,9 +429,9 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   visibility guarantee tied to a pixel-readback test; performance bounds
   (≤ 32 vertex / ≤ 16 fragment SPIR-V instructions, one pipeline at init,
   no per-frame state churn); extensibility family
-  (`Material.DefaultDebug<Variant>` /
-  `kDefaultDebug<Variant>MaterialSlotIndex` for `Wireframe`, `Line`,
-  `Point`, `Normals`, `UVs`, `Depth`, `InstanceId`); and a layering audit
+  (`Material.DefaultDebug<Variant>` for `Wireframe`, `Line`, `Point`,
+  `Normals`, `Depth`, `InstanceId`; `Material.DefaultDebugUVs` is the
+  type-only checker material added by active `GRAPHICS-088`); and a layering audit
   confirming zero new dependency edges. Implementation children
   `GRAPHICS-031-Impl-A` (shader sources + pipeline + slot-0
   repopulation), `GRAPHICS-031-Impl-B` (substitution wiring + diagnostics
@@ -774,6 +774,14 @@ Cross-layer Theme B′ leaves outside `rendering/`:
 - [`runtime/RUNTIME-083` — Visualization adapters](../../done/RUNTIME-083-visualization-adapters.md).
 - [`runtime/RUNTIME-084` — Gizmo interaction](../../done/RUNTIME-084-gizmo-interaction.md) (retired 2026-06-06 at `CPUContracted`).
 - [`runtime/RUNTIME-090` — Dear ImGui platform/renderer adapter](../../done/RUNTIME-090-imgui-platform-renderer-adapter.md) (retired 2026-06-02 at `CPUContracted`; Slice A standalone adapter module plus Slice B `Engine` frame-loop wiring landed).
+
+Open post-acceptance rendering leaves:
+- [GRAPHICS-088 — Resolved UV rendering and bake texture residency](../../active/GRAPHICS-088-resolved-uv-rendering-and-bake-residency.md):
+  consumes the runtime resolved-UV contract and generic bake pipeline so surface
+  materials, generated textures, UV debug inspection, and UV-backed fragment
+  bakes all use the canonical texture-coordinate channel. Slice A is active for
+  the backend-neutral graphics contract; full `Operational` proof remains gated
+  by `RUNTIME-109` / `ASSETIO-008`.
 
 Cross-layer Theme A leaves retired for the full working sandbox path:
 - [`RUNTIME-085` — `GeometrySources` mesh residency bridge](../../done/RUNTIME-085-geometrysources-mesh-residency.md) (retired 2026-05-28 at `CPUContracted`; Slices A–C landed the mesh packer, extraction wiring, and dirty-domain reupload/retire ordering).

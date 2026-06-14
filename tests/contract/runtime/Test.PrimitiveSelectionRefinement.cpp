@@ -42,6 +42,12 @@ namespace
         pos.Vector() = positions;
     }
 
+    void SetTexcoords(Geometry::PropertySet& set, const std::vector<glm::vec2>& texcoords)
+    {
+        auto uv = set.GetOrAdd<glm::vec2>("v:texcoord", glm::vec2(0.0f));
+        uv.Vector() = texcoords;
+    }
+
     void SetU32(Geometry::PropertySet& set,
                 std::string_view name,
                 const std::vector<std::uint32_t>& values,
@@ -72,6 +78,11 @@ namespace
                 {0.0f, 0.0f, 0.0f},
                 {1.0f, 0.0f, 0.0f},
                 {0.0f, 1.0f, 0.0f},
+            });
+            SetTexcoords(VertexSource.Properties, {
+                {0.0f, 0.0f},
+                {1.0f, 0.0f},
+                {0.0f, 1.0f},
             });
             SetU32(EdgeSource.Properties, pn::kEdgeV0, {0u, 1u, 2u}, 3);
             SetU32(EdgeSource.Properties, pn::kEdgeV1, {1u, 2u, 0u}, 3);
@@ -108,6 +119,10 @@ namespace
             SetPositions(VertexSource.Properties, {
                 {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f},
                 {5.0f, 0.0f, 0.0f}, {6.0f, 0.0f, 0.0f}, {5.0f, 1.0f, 0.0f},
+            });
+            SetTexcoords(VertexSource.Properties, {
+                {0.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f},
+                {5.0f, 0.0f}, {6.0f, 0.0f}, {5.0f, 1.0f},
             });
             // h0..h3 = quad ring (face 0), h4..h6 = triangle ring (face 1).
             SetU32(HalfedgeSource.Properties, pn::kHalfedgeToVertex, {1u, 2u, 3u, 0u, 5u, 6u, 4u}, 7);

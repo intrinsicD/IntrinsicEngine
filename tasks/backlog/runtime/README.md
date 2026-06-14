@@ -20,6 +20,9 @@ another backlog directory.
   follow-up split from BUG-030 to make currently guarded sandbox/runtime
   `Engine::Run()` regressions execute through an explicit headless-capable loop
   instead of skipping on displayless hosts.
+- [RUNTIME-109 — Extensible mesh attribute texture bake pipeline](RUNTIME-109-extensible-mesh-attribute-texture-bakes.md):
+  generalize CPU mesh attribute texture bakes for 1D-4D vertex/face algorithm
+  results over resolved UVs.
 
 ### Runtime adapter umbrellas (clarified by Q tasks; producer modules)
 
@@ -57,6 +60,11 @@ these as runtime work when scheduling and review:
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [RUNTIME-108 — Remove mesh UV normal fallback](../../done/RUNTIME-108-resolved-uv-render-residency.md)
+  (done, 2026-06-13, `CPUContracted`): mesh surface packing now requires
+  count-matched finite `v:texcoord` and never substitutes oct-encoded normals
+  into `MeshVertex::U/V`; missing or invalid texture coordinates fail closed
+  with explicit runtime extraction diagnostics.
 - [GRAPHICS-084 — Visualization property-buffer residency](../../done/GRAPHICS-084-visualization-property-buffer-residency.md)
   (done, 2026-06-11, `CPUContracted`): consumed runtime visualization adapter/
   property selections while keeping GPU upload ownership in graphics.

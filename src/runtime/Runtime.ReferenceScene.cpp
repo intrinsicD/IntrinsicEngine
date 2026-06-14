@@ -24,6 +24,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Geometry.HalfedgeMesh;
+import Geometry.Properties;
 
 namespace Extrinsic::Runtime
 {
@@ -65,6 +66,11 @@ namespace Extrinsic::Runtime
             const auto v2 = mesh.AddVertex({ 0.0f,  0.5f, 0.0f});
             if (!mesh.AddTriangle(v0, v1, v2).has_value())
                 std::terminate();
+            auto uv = Geometry::VertexProperty<glm::vec2>(
+                mesh.VertexProperties().GetOrAdd<glm::vec2>("v:texcoord", glm::vec2{0.0f}));
+            uv[v0] = glm::vec2{0.0f, 0.0f};
+            uv[v1] = glm::vec2{1.0f, 0.0f};
+            uv[v2] = glm::vec2{0.5f, 1.0f};
             return mesh;
         }
     }

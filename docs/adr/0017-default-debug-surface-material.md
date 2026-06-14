@@ -79,12 +79,12 @@ The default debug surface lane consumes the existing **`SurfaceOpaque` cull buck
 
 ### 6. Debug-variant naming family
 
-Follow-up debug-material variants attach as additional `MaterialTypeDesc` registrations and additional well-known slot constants under the naming family:
+Follow-up debug-material variants attach as additional `MaterialTypeDesc` registrations under the naming family. Substitution-style variants may also reserve well-known slot constants when they need global fallback counters:
 
 - `Material.DefaultDebug<Variant>`.
-- `kDefaultDebug<Variant>MaterialSlotIndex`.
+- `kDefaultDebug<Variant>MaterialSlotIndex` only when a global slot is required.
 
-Anticipated variants: `Wireframe`, `Line`, `Point`, `Normals`, `UVs`, `Depth`, `InstanceId`. They share the same descriptor layout family.
+Anticipated variants: `Wireframe`, `Line`, `Point`, `Normals`, `Depth`, `InstanceId`. They share the same descriptor layout family. `GRAPHICS-088` implements the UV checker variant as `Material.DefaultDebugUVs`, a registered material type (`MaterialTypeID = 3`) that callers opt into by creating a material instance; it deliberately does not reserve a global fallback slot because it is an inspection mode rather than a substitution target.
 
 These variants are identified but **not opened** by `GRAPHICS-031`. Each variant lands under its own follow-up task ID when needed.
 
@@ -97,7 +97,7 @@ Positive:
 - The shader pair reuses the canonical `MaterialBuffer` SSBO binding (`set = 3, binding = 0`) and the `GpuScenePushConstants` scene-table BDA — no per-material descriptor set is added.
 - The vertex format aligns with the `Triangle` packer from [ADR-0014](0014-procedural-source-residency-bridge.md), so the [ADR-0015](0015-reference-scene-bootstrap.md) reference triangle composes end-to-end through slot 0.
 - No new cull bucket, no new pass, no new descriptor set, no new frame-recipe resource is introduced. Backends pick up slot 0 with zero structural changes.
-- The debug-variant naming family is explicit, so future `Wireframe` / `Normals` / `UVs` debug materials land as additive registrations rather than parallel material systems.
+- The debug-variant naming family is explicit, so future `Wireframe` / `Normals` debug materials land as additive registrations rather than parallel material systems. The UV checker variant already follows this rule as the type-only `Material.DefaultDebugUVs` registration.
 
 Trade-offs and risks:
 

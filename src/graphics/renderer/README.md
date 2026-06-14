@@ -1341,7 +1341,11 @@ Concretely:
   descriptors whose texture residency is intentionally deferred. Bake mapping
   selection is runtime/editor-owned: the editor UI maps directly to
   `VisualizationFragmentBakeMapping` (`ExistingTexcoords`/`ExistingHtex`/
-  `RecreateHtex`), and `RecreateHtex` is an explicit user-driven request
+  `RecreateHtex`). UV-backed bake descriptors may also carry
+  `TexcoordProvenance`, `TexcoordDirtyStamp`, and an optional generated
+  `AtlasTextureAsset` `AssetId` for later `GpuAssetCache` residency; these
+  fields are diagnostics/residency inputs and never trigger graphics-side UV
+  generation. `RecreateHtex` is an explicit user-driven request
   scheduled by runtime/geometry on a background task through
   `Extrinsic.Runtime.StreamingExecutor` (async visualization baking remains
   CPU/runtime-only). Graphics increments
@@ -2017,17 +2021,17 @@ Concretely:
   the existing `MaterialSystemDiagnostics::FallbackSlotResolveCount`
   continues to track the separate `GetMaterialSlot()` stale-handle path.
   Follow-up debug-material variants (`Wireframe`, `Line`, `Point`,
-  `Normals`, `UVs`, `Depth`, `InstanceId`) attach as additional
-  `MaterialTypeDesc` registrations and additional well-known slot
-  constants under the naming family `Material.DefaultDebug<Variant>` /
-  `kDefaultDebug<Variant>MaterialSlotIndex`; they are identified but not
-  opened. Implementation children GRAPHICS-031-Impl-A (shader sources +
+  `Normals`, `Depth`, `InstanceId`) attach as additional
+  `MaterialTypeDesc` registrations under the naming family
+  `Material.DefaultDebug<Variant>`; they are identified but not opened.
+  `Material.DefaultDebugUVs` is the type-only checker material added by
+  GRAPHICS-088. Implementation children GRAPHICS-031-Impl-A (shader sources +
   pipeline + slot-0 repopulation; landed by
   [`GRAPHICS-031A`](../../../tasks/done/GRAPHICS-031A-default-debug-surface-shaders-and-pipeline.md):
   the shaders are authored at
   `assets/shaders/forward/default_debug_surface.vert/frag`,
-  `MaterialSystem::Initialize()` registers the three built-in types
-  StandardPBR/SciVis/DefaultDebugSurface and packs slot 0 with
+  `MaterialSystem::Initialize()` registers the four built-in types
+  StandardPBR/SciVis/DefaultDebugSurface/DefaultDebugUVs and packs slot 0 with
   `kDefaultDebugSurfaceBaseColor` and `MaterialFlags::Unlit`, and the
   renderer caches a `m_DefaultDebugSurfacePipelineLease` built from a
   byte-identical `BuildDefaultDebugSurfacePipelineDesc()` whose
@@ -2059,8 +2063,11 @@ Concretely:
   snapshot slots themselves are not cleared by `ResetFrameState()`; they are
   cleared only when their slot is rewritten so pipelined render-N-1 spans remain
   stable), and
-  the optional Impl-C (one additional debug variant) is identified
-  but not opened.
+  GRAPHICS-088 adds `Material.DefaultDebugUVs` as an opt-in material type
+  (`MaterialTypeID = kMaterialTypeID_DefaultDebugUVs = 3u`) that renders a
+  checker from the same resolved `fragUv` lane used by albedo/normal sampling.
+  It does not reserve a global fallback slot or add a pass; callers create a
+  normal material instance of that type when they want UV inspection.
 - GRAPHICS-023 closes the promoted material-layout reload contract as a
   CPU-testable value seam: `GetCanonicalMaterialLayoutContract()` describes the
   shader-visible SSBO layout, while

@@ -276,9 +276,9 @@ namespace Extrinsic::Graphics
         [[maybe_unused]] bool ok = m_Impl->EnsureCapacity(kInitialCapacity);
         assert(ok && "MaterialSystem: initial SSBO allocation failed");
 
-        // Register the built-in type triplet in a fixed order so the
-        // well-known TypeIDs (StandardPBR=0, SciVis=1, DefaultDebugSurface=2)
-        // are reserved before any subsystem-specific registration runs.
+        // Register the built-in types in a fixed order so the well-known
+        // TypeIDs (StandardPBR=0, SciVis=1, DefaultDebugSurface=2,
+        // DefaultDebugUVs=3) are reserved before subsystem registration runs.
         const auto registerBuiltIn = [&](std::string_view name,
                                          std::vector<CustomParamDesc> customParams,
                                          std::uint32_t expectedTypeID)
@@ -301,6 +301,7 @@ namespace Extrinsic::Graphics
             },
             kMaterialTypeID_SciVis);
         registerBuiltIn(kMaterialTypeName_DefaultDebugSurface, {}, kMaterialTypeID_DefaultDebugSurface);
+        registerBuiltIn(kMaterialTypeName_DefaultDebugUVs, {}, kMaterialTypeID_DefaultDebugUVs);
 
         // Reserve slot 0 for the default material without going through
         // the normal Create path so its index is always 0. Slot 0 carries
@@ -702,4 +703,3 @@ namespace Extrinsic::Graphics
     }
 
 } // namespace Extrinsic::Graphics
-

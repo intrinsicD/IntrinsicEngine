@@ -874,6 +874,12 @@ namespace Extrinsic::Runtime
             case MeshPackStatus::InvalidTopology:
                 ++stats.MeshGeometryInvalidTopology;
                 break;
+            case MeshPackStatus::MissingTexcoords:
+                ++stats.MeshGeometryMissingTexcoords;
+                break;
+            case MeshPackStatus::NonFiniteTexcoord:
+                ++stats.MeshGeometryNonFiniteTexcoords;
+                break;
             default:
                 ++stats.MeshGeometryFailedPack;
                 break;

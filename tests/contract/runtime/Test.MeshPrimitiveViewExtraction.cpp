@@ -58,6 +58,12 @@ namespace
         pos.Vector() = positions;
     }
 
+    void SetTexcoords(gs::Vertices& v, const std::vector<glm::vec2>& texcoords)
+    {
+        auto uv = v.Properties.GetOrAdd<glm::vec2>("v:texcoord", glm::vec2(0.0f));
+        uv.Vector() = texcoords;
+    }
+
     void SetEdges(gs::Edges& e,
                   const std::vector<std::uint32_t>& v0,
                   const std::vector<std::uint32_t>& v1)
@@ -104,6 +110,11 @@ namespace
             {1.0f, 0.0f, 0.0f},
             {0.0f, 1.0f, 0.0f},
         });
+        SetTexcoords(vertices, {
+            {0.0f, 0.0f},
+            {1.0f, 0.0f},
+            {0.0f, 1.0f},
+        });
         auto& edges = raw.emplace<gs::Edges>(entity);
         SetEdges(edges, /*v0*/ {0u, 1u, 2u}, /*v1*/ {1u, 2u, 0u});
         auto& halfedges = raw.emplace<gs::Halfedges>(entity);
@@ -125,6 +136,11 @@ namespace
             {0.0f, 0.0f, 0.0f},
             {1.0f, 0.0f, 0.0f},
             {0.0f, 1.0f, 0.0f},
+        });
+        SetTexcoords(vertices, {
+            {0.0f, 0.0f},
+            {1.0f, 0.0f},
+            {0.0f, 1.0f},
         });
         (void)raw.emplace<gs::Edges>(entity); // empty: no `e:v0`/`e:v1`.
         auto& halfedges = raw.emplace<gs::Halfedges>(entity);

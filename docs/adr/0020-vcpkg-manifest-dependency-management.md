@@ -7,10 +7,10 @@
 
 ## Context
 
-The FetchContent cache under `external/cache/` made hot configures workable, but
-it still left cold clones slow and fragile: every dependency tag had to be
-resolved, source trees had to be extracted locally, cache corruption recovery was
-repository-owned, and CI had no shared binary package cache.
+The former CMake source-population path made hot configures workable, but it
+still left cold clones slow and fragile: every dependency tag had to be
+resolved, source trees had to be extracted locally, cache corruption recovery
+was repository-owned, and CI had no shared binary package cache.
 
 IntrinsicEngine also has a non-negotiable compiler requirement for C++23 modules:
 all presets must keep selecting Clang 20+ plus matching `clang-scan-deps`. Any
@@ -43,9 +43,9 @@ branch and installs backend sources/headers for the repository-owned
   force through vcpkg chainloading.
 - The ImGui overlay port is repository-owned package metadata and must be kept
   in sync when the ImGui baseline changes.
-- During the `INFRA-001` deprecation window, the old FetchContent path remains
-  available via `INTRINSIC_USE_VCPKG_DEPS=OFF`; new dependency work must not add
-  to that fallback.
+- The old FetchContent path has been retired. Dependency additions and version
+  bumps now flow through `vcpkg.json`, `vcpkg-configuration.json`, and the
+  repository overlay ports only.
 
 ## Alternatives Considered
 

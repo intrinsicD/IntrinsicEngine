@@ -118,6 +118,13 @@ namespace
         EXPECT_EQ(view.EdgesAlive(), 3u);
         EXPECT_EQ(view.HalfedgesTotal(), 6u);
         EXPECT_EQ(view.FacesAlive(), 1u);
+
+        auto texcoords = view.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
+        ASSERT_TRUE(texcoords);
+        ASSERT_EQ(texcoords.Vector().size(), 3u);
+        EXPECT_EQ(texcoords.Vector()[0], glm::vec2(0.0f, 0.0f));
+        EXPECT_EQ(texcoords.Vector()[1], glm::vec2(1.0f, 0.0f));
+        EXPECT_EQ(texcoords.Vector()[2], glm::vec2(0.5f, 1.0f));
     }
 }
 

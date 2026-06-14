@@ -596,6 +596,7 @@ TEST(VisualizationAdapters, HtexMetadataAdapterAppendsPreviewAndUvBakePackets)
                    R::VisualizationAdapterOptions{
                        .SourceName = "curvature",
                        .OutputName = "curvature_uv_bake",
+                       .DirtyStamp = 99u,
                        .EmitHtexPreview = true,
                        .EmitFragmentBake = true,
                        .SourceAttributeName = "curvature",
@@ -628,6 +629,9 @@ TEST(VisualizationAdapters, HtexMetadataAdapterAppendsPreviewAndUvBakePackets)
     EXPECT_EQ(bake.AtlasWidth, 512u);
     EXPECT_EQ(bake.AtlasHeight, 256u);
     EXPECT_EQ(bake.TexcoordBufferBDA, 0xCAFEu);
+    EXPECT_EQ(bake.TexcoordProvenance,
+              G::VisualizationTexcoordProvenance::RuntimeResolved);
+    EXPECT_EQ(bake.TexcoordDirtyStamp, 99u);
     EXPECT_EQ(stats.AdapterInvocationCount, 1u);
     EXPECT_EQ(stats.PacketAppendCount, 2u);
 
@@ -637,6 +641,12 @@ TEST(VisualizationAdapters, HtexMetadataAdapterAppendsPreviewAndUvBakePackets)
     EXPECT_EQ(diagnostics.AcceptedPacketCount, 2u);
     EXPECT_EQ(diagnostics.TextureResidencyDeferredCount, 2u);
     EXPECT_FALSE(diagnostics.HasErrors);
+
+    const G::VisualizationOverlaySummary summary =
+        G::BuildVisualizationOverlaySummary(batch.AsPacketBatch());
+    EXPECT_EQ(summary.UvBakeAtlasDescriptorCount, 1u);
+    EXPECT_EQ(summary.RuntimeResolvedUvBakeAtlasDescriptorCount, 1u);
+    EXPECT_EQ(summary.HtexBakeAtlasDescriptorCount, 0u);
 }
 
 TEST(VisualizationAdapters, HtexMetadataAdapterSchedulesRecreateHtexTask)

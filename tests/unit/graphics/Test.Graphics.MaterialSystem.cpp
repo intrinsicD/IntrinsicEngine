@@ -134,8 +134,8 @@ TEST(GraphicsMaterialSystem, DefaultAndStaleMaterialSlotsResolveToFallbackWithDi
     const auto diagnostics = materials.GetDiagnostics();
     EXPECT_EQ(diagnostics.FallbackSlotResolveCount, 1u);
     EXPECT_EQ(diagnostics.LiveInstanceCount, 2u); // slot 0 default + one instance
-    // StandardPBR + SciVis + DefaultDebugSurface — all registered by Initialize().
-    EXPECT_EQ(diagnostics.RegisteredTypeCount, 3u);
+    // StandardPBR + SciVis + DefaultDebugSurface + DefaultDebugUVs.
+    EXPECT_EQ(diagnostics.RegisteredTypeCount, 4u);
     EXPECT_GE(diagnostics.Capacity, 2u);
 
     lease.Reset();
@@ -164,8 +164,8 @@ TEST(GraphicsMaterialSystem, RejectsIncompatibleMaterialTypeLayoutsDeterministic
     EXPECT_EQ(diagnostics.IncompatibleLayoutCount, 1u);
     EXPECT_EQ(diagnostics.DuplicateTypeNameCount, 1u);
     EXPECT_EQ(diagnostics.InvalidCreateTypeCount, 1u);
-    // StandardPBR + SciVis + DefaultDebugSurface registered by Initialize().
-    EXPECT_EQ(diagnostics.RegisteredTypeCount, 3u);
+    // StandardPBR + SciVis + DefaultDebugSurface + DefaultDebugUVs.
+    EXPECT_EQ(diagnostics.RegisteredTypeCount, 4u);
 
     materials.Shutdown();
 }
@@ -242,6 +242,61 @@ TEST(GraphicsMaterialSystem, ResolvesReadyTextureAssetBindingsToBindlessMaterial
     const Graphics::MaterialParams params = materials.GetParams(material.GetHandle());
     EXPECT_EQ(params.AlbedoID, albedoView->BindlessIdx);
     EXPECT_EQ(materials.GetDiagnostics().TextureAssetResolveCount, 1u);
+    EXPECT_EQ(materials.GetDiagnostics().TextureAssetFallbackResolveCount, 0u);
+    EXPECT_EQ(materials.GetDiagnostics().TextureAssetResolveFailureCount, 0u);
+
+    material.Reset();
+    materials.Shutdown();
+}
+
+TEST(GraphicsMaterialSystem, GeneratedTextureAssetBindingsUseStandardMaterialSlots)
+{
+    MockDevice device;
+    RHI::BufferManager buffers{device};
+    RHI::TextureManager textures{device, device.Bindless};
+    RHI::SamplerManager samplers{device};
+    Graphics::GpuAssetCache assets{buffers, textures, samplers, device.TransferQueue};
+    Graphics::MaterialSystem materials;
+    materials.Initialize(device, buffers);
+
+    const auto generatedAlbedo = MakeAssetId(201u);
+    const auto generatedNormal = MakeAssetId(202u);
+    ASSERT_TRUE(assets.RequestUpload(Graphics::GpuTextureRequest{
+        .Id = generatedAlbedo,
+        .Bytes = std::span{ZeroBytes64},
+        .Desc = AnyTextureDesc(),
+        .SamplerDesc = AnySamplerDesc(),
+    }).has_value());
+    ASSERT_TRUE(assets.RequestUpload(Graphics::GpuTextureRequest{
+        .Id = generatedNormal,
+        .Bytes = std::span{ZeroBytes64},
+        .Desc = AnyTextureDesc(),
+        .SamplerDesc = AnySamplerDesc(),
+    }).has_value());
+    assets.Tick(0, 2);
+
+    const auto albedoView = assets.GetView(generatedAlbedo);
+    const auto normalView = assets.GetView(generatedNormal);
+    ASSERT_TRUE(albedoView.has_value());
+    ASSERT_TRUE(normalView.has_value());
+
+    auto material = materials.CreateInstance(materials.FindType(Graphics::kMaterialTypeName_StandardPBR), {});
+    ASSERT_TRUE(material.IsValid());
+
+    ASSERT_TRUE(materials.ResolveTextureAssetBindings(
+        material.GetHandle(),
+        Graphics::MaterialTextureAssetBindings{
+            .Albedo = generatedAlbedo,
+            .Normal = generatedNormal,
+        },
+        assets).has_value());
+
+    const Graphics::MaterialParams params = materials.GetParams(material.GetHandle());
+    EXPECT_EQ(params.AlbedoID, albedoView->BindlessIdx);
+    EXPECT_EQ(params.NormalID, normalView->BindlessIdx);
+    EXPECT_EQ(params.MetallicRoughnessID, RHI::kInvalidBindlessIndex);
+    EXPECT_EQ(params.EmissiveID, RHI::kInvalidBindlessIndex);
+    EXPECT_EQ(materials.GetDiagnostics().TextureAssetResolveCount, 2u);
     EXPECT_EQ(materials.GetDiagnostics().TextureAssetFallbackResolveCount, 0u);
     EXPECT_EQ(materials.GetDiagnostics().TextureAssetResolveFailureCount, 0u);
 
@@ -344,6 +399,11 @@ TEST(GraphicsMaterialSystem, RegistersDefaultDebugSurfaceWithStableTypeId)
     const auto sciVis = materials.FindType(Graphics::kMaterialTypeName_SciVis);
     ASSERT_TRUE(sciVis.IsValid());
     EXPECT_EQ(sciVis.Index, Graphics::kMaterialTypeID_SciVis);
+
+    const auto debugUvs =
+        materials.FindType(Graphics::kMaterialTypeName_DefaultDebugUVs);
+    ASSERT_TRUE(debugUvs.IsValid());
+    EXPECT_EQ(debugUvs.Index, Graphics::kMaterialTypeID_DefaultDebugUVs);
 
     materials.Shutdown();
 }

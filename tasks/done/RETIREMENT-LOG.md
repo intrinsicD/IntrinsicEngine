@@ -9,6 +9,33 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`BUG-043`](BUG-043-dropped-obj-missing-uvs-invisible.md) — Dropped OBJ without
+UVs loads but is invisible — retired on 2026-06-14 at maturity
+`CPUContracted`. Runtime mesh materialization now preserves valid authored
+`v:texcoord` and writes deterministic finite projection fallback UVs when
+imported OBJ/model-scene mesh payloads omit or invalidate texture coordinates.
+The fallback runs before direct ECS materialization, model-scene handoff, and
+generated attribute texture bakes, so render extraction can upload the mesh
+surface instead of failing closed with `MeshGeometryMissingTexcoords`. The
+renderer packer remains strict: surface `MeshVertex::U/V` still comes only from
+`v:texcoord`, never oct-encoded normals or shader-side fabrication. Focused
+runtime contract tests, adjacent mesh/import coverage, and the full
+CPU-supported CTest gate passed; xatlas-quality default atlas work remains
+owned by `ASSETIO-008` and `GEOM-025`.
+
+Backlog
+[`RUNTIME-108`](RUNTIME-108-resolved-uv-render-residency.md) — Remove mesh UV
+normal fallback — retired on 2026-06-13 at maturity `CPUContracted`. Runtime
+mesh surface packing now treats `MeshVertex::U/V` as texture coordinates only:
+`PackMesh` and `BuildSurfaceTriangleFaceMap` require count-matched finite
+`v:texcoord`, report `MissingTexcoords` or `NonFiniteTexcoord` for invalid
+inputs, and extraction records matching counters while skipping unrenderable
+surface uploads. Reference/procedural meshes and runtime test fixtures now
+author UVs. Generated atlas/materialization remains with `ASSETIO-008` and
+`GEOM-025`, renderer operational proof remains with `GRAPHICS-088`, and generic
+texture-bake expansion remains with `RUNTIME-109`.
+
+Active
 [`ASSETIO-007`](ASSETIO-007-direct-mesh-generated-normal-texture.md) —
 Direct mesh generated normal texture binding — retired on 2026-06-13 at
 maturity `CPUContracted`. Direct mesh imports now use the same default normal

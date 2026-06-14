@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 #
 # Bootstrap the repository-local vcpkg checkout for the manifest introduced by
-# INFRA-001 Slice A. The CMake presets do not consume this checkout until Slice
-# B wires the vcpkg toolchain into the configure path.
+# INFRA-001. CMake presets consume this checkout through vcpkg manifest mode.
 
 set -euo pipefail
 
@@ -62,9 +61,9 @@ cat <<EOF
 [bootstrap_vcpkg] baseline      : ${baseline}
 [bootstrap_vcpkg] binary cache  : ${binary_cache}
 
-For local binary caching before Slice C, export:
+For local binary caching, export:
   export VCPKG_BINARY_SOURCES="clear;files,${binary_cache},readwrite"
 
-Slice B will wire CMake with:
-  -DCMAKE_TOOLCHAIN_FILE=${vcpkg_root}/scripts/buildsystems/vcpkg.cmake
+Repository presets configure CMake with:
+  CMAKE_TOOLCHAIN_FILE=${vcpkg_root}/scripts/buildsystems/vcpkg.cmake
 EOF

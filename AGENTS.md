@@ -84,8 +84,9 @@ Target source layout:
 Supporting architecture roots are mandatory parts of the system contract:
 
 - `methods/`, `benchmarks/`, `tests/`, `docs/`, `tasks/`, `tools/`, `cmake/`, `.github/workflows/`.
-- `assets/` contains checked-in shaders/models/fonts used by app, graphics, and tests; `external/cache/` and
-  `third_party/` contain dependency sources/cache state and are not engine layers.
+- `assets/` contains checked-in shaders/models/fonts used by app, graphics, and tests; `external/vcpkg/`,
+  `external/vcpkg-installed/`, `external/vcpkg-bincache/`, and `third_party/` contain dependency
+  tool/cache state and are not engine layers.
 
 ## 4. Layering rules
 
@@ -137,9 +138,9 @@ Every new dependency edge must be justifiable by layer policy and reflected in d
 - Third-party C/C++ dependencies are declared in `vcpkg.json` and resolved by presets through the repository-local
   vcpkg toolchain at `external/vcpkg/scripts/buildsystems/vcpkg.cmake`, chainloaded with
   `cmake/IntrinsicClangToolchain.cmake` so Clang module scanning remains enforced. Run
-  `tools/setup/bootstrap_vcpkg.sh` on fresh checkouts; use `VCPKG_BINARY_SOURCES` for local/CI binary caching. The
-  legacy FetchContent path in `cmake/Dependencies.cmake` is a temporary `INFRA-001` deprecation fallback only
-  (`INTRINSIC_USE_VCPKG_DEPS=OFF`); do not add new dependency traffic to `external/cache/`.
+  `tools/setup/bootstrap_vcpkg.sh` on fresh checkouts; use `VCPKG_BINARY_SOURCES` for local/CI binary caching.
+  `cmake/Dependencies.cmake` is vcpkg-manifest-only; new dependency traffic must go through `vcpkg.json`,
+  `vcpkg-configuration.json`, or repository overlay ports.
 - CUDA compute support is optional and off by default (`INTRINSIC_ENABLE_CUDA=OFF` in `ci`/`dev` presets); enable it
   only for tasks that explicitly require CUDA seams, using `dev-cuda` or an equivalent configure with a valid
   `CUDAToolkit` install.

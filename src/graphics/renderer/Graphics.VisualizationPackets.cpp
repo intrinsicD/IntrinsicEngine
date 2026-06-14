@@ -56,6 +56,25 @@ namespace Extrinsic::Graphics
             }
         }
 
+        void CountTexcoordProvenance(const VisualizationTexcoordProvenance provenance,
+                                     VisualizationOverlaySummary& summary) noexcept
+        {
+            switch (provenance)
+            {
+            case VisualizationTexcoordProvenance::Authored:
+                ++summary.AuthoredUvBakeAtlasDescriptorCount;
+                break;
+            case VisualizationTexcoordProvenance::GeneratedAtlas:
+                ++summary.GeneratedUvBakeAtlasDescriptorCount;
+                break;
+            case VisualizationTexcoordProvenance::RuntimeResolved:
+                ++summary.RuntimeResolvedUvBakeAtlasDescriptorCount;
+                break;
+            case VisualizationTexcoordProvenance::Unknown:
+                break;
+            }
+        }
+
         template <typename T>
         [[nodiscard]] bool IsFinitePayload(const std::span<const std::byte> bytes,
                                            const std::uint64_t componentCount) noexcept
@@ -380,6 +399,10 @@ namespace Extrinsic::Graphics
             {
                 continue;
             }
+            if (packet.AtlasTextureAsset.IsValid())
+            {
+                ++summary.FragmentBakeTextureAssetDescriptorCount;
+            }
 
             switch (packet.Mapping)
             {
@@ -387,6 +410,7 @@ namespace Extrinsic::Graphics
                 if (packet.MeshHasTexcoords && packet.TexcoordBufferBDA != 0u)
                 {
                     ++summary.UvBakeAtlasDescriptorCount;
+                    CountTexcoordProvenance(packet.TexcoordProvenance, summary);
                     summary.RequiresTextureResidency = true;
                 }
                 break;

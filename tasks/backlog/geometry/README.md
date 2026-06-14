@@ -24,6 +24,9 @@ map.
 - [GEOM-024 — Sparse symmetric generalized eigensolver seam](GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
   (gates `methods/METHOD-006` variant B; depends on `GEOM-020`; promote when
   METHOD-006 is the next-priority method).
+- [GEOM-025 — UV atlas backend contract and xatlas default](GEOM-025-uv-atlas-backend-xatlas.md)
+  (depends on `INFRA-001` and `GEOM-018`; defines the replaceable atlas backend
+  seam consumed by runtime UV materialization).
 - [RORG-031E — Geometry and method-readiness backlog seed](RORG-031-geometry-method-readiness.md).
 
 ## Convergence

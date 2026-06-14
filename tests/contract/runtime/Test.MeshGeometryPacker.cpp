@@ -72,6 +72,14 @@ namespace
         texcoord.Vector() = texcoords;
     }
 
+    void RemoveTexcoords(Vertices& v)
+    {
+        auto& registry = v.Properties.Registry();
+        const auto id = registry.Find("v:texcoord");
+        ASSERT_TRUE(id.has_value());
+        EXPECT_TRUE(registry.Remove(*id));
+    }
+
     void SetEdges(Edges& e,
                   const std::vector<std::uint32_t>& v0,
                   const std::vector<std::uint32_t>& v1)
@@ -115,6 +123,11 @@ namespace
             {1.0f, 0.0f, 0.0f},
             {0.0f, 1.0f, 0.0f},
         });
+        SetTexcoords(m.VertexSource, {
+            {0.0f, 0.0f},
+            {1.0f, 0.0f},
+            {0.0f, 1.0f},
+        });
         SetEdges(m.EdgeSource, {0u, 1u, 2u}, {1u, 2u, 0u});
 
         // halfedge i targets vertex (i+1)%3; next walks 0->1->2->0.
@@ -136,6 +149,12 @@ namespace
             {1.0f, 0.0f, 0.0f},
             {1.0f, 1.0f, 0.0f},
             {0.0f, 1.0f, 0.0f},
+        });
+        SetTexcoords(m.VertexSource, {
+            {0.0f, 0.0f},
+            {1.0f, 0.0f},
+            {1.0f, 1.0f},
+            {0.0f, 1.0f},
         });
         SetEdges(m.EdgeSource, {0u, 1u, 2u, 3u}, {1u, 2u, 3u, 0u});
         SetHalfedges(m.HalfedgeSource,
@@ -188,9 +207,10 @@ TEST(MeshGeometryPackerTest, SingleTriangleVertexBytesMatchPositions)
     EXPECT_FLOAT_EQ(verts[0].V, 0.0f);
 }
 
-TEST(MeshGeometryPackerTest, EncodesExplicitVertexNormalsInPackedUvSlot)
+TEST(MeshGeometryPackerTest, MissingTexcoordsAreRejectedEvenWhenNormalsExist)
 {
     MeshScratch mesh = BuildSingleTriangle();
+    RemoveTexcoords(mesh.VertexSource);
     SetNormals(mesh.VertexSource, {
         {1.0f, 0.0f, 0.0f},
         {0.0f, 1.0f, 0.0f},
@@ -199,19 +219,14 @@ TEST(MeshGeometryPackerTest, EncodesExplicitVertexNormalsInPackedUvSlot)
     MeshPackBuffer scratch;
 
     const MeshPackResult result = PackMesh(mesh.View(), scratch);
-    ASSERT_EQ(result.Status, MeshPackStatus::Success);
-    ASSERT_TRUE(result.Upload.has_value());
 
-    const auto* verts = reinterpret_cast<const MeshVertex*>(result.Upload->PackedVertexBytes.data());
-    EXPECT_FLOAT_EQ(verts[0].U, 1.0f);
-    EXPECT_FLOAT_EQ(verts[0].V, 0.0f);
-    EXPECT_FLOAT_EQ(verts[1].U, 0.0f);
-    EXPECT_FLOAT_EQ(verts[1].V, 1.0f);
-    EXPECT_FLOAT_EQ(verts[2].U, 0.0f);
-    EXPECT_FLOAT_EQ(verts[2].V, 0.0f);
+    EXPECT_EQ(result.Status, MeshPackStatus::MissingTexcoords);
+    EXPECT_FALSE(result.Upload.has_value());
+    EXPECT_TRUE(scratch.SurfaceIndices.empty());
+    EXPECT_TRUE(scratch.VertexBytes.empty());
 }
 
-TEST(MeshGeometryPackerTest, UsesVertexTexcoordsBeforeNormalFallback)
+TEST(MeshGeometryPackerTest, UsesVertexTexcoordsAsOnlyUvSource)
 {
     MeshScratch mesh = BuildSingleTriangle();
     SetNormals(mesh.VertexSource, {
@@ -237,6 +252,39 @@ TEST(MeshGeometryPackerTest, UsesVertexTexcoordsBeforeNormalFallback)
     EXPECT_FLOAT_EQ(verts[1].V, 0.25f);
     EXPECT_FLOAT_EQ(verts[2].U, 1.00f);
     EXPECT_FLOAT_EQ(verts[2].V, 0.00f);
+}
+
+TEST(MeshGeometryPackerTest, MismatchedTexcoordCountIsRejected)
+{
+    MeshScratch mesh = BuildSingleTriangle();
+    SetTexcoords(mesh.VertexSource, {
+        {0.0f, 0.0f},
+        {1.0f, 0.0f},
+    });
+    MeshPackBuffer scratch;
+
+    const MeshPackResult result = PackMesh(mesh.View(), scratch);
+
+    EXPECT_EQ(result.Status, MeshPackStatus::MissingTexcoords);
+    EXPECT_FALSE(result.Upload.has_value());
+    EXPECT_TRUE(scratch.SurfaceIndices.empty());
+    EXPECT_TRUE(scratch.VertexBytes.empty());
+}
+
+TEST(MeshGeometryPackerTest, NonFiniteTexcoordIsRejected)
+{
+    MeshScratch mesh = BuildSingleTriangle();
+    auto texcoord = mesh.VertexSource.Properties.Get<glm::vec2>("v:texcoord");
+    ASSERT_TRUE(texcoord);
+    texcoord.Vector()[1].x = std::numeric_limits<float>::quiet_NaN();
+    MeshPackBuffer scratch;
+
+    const MeshPackResult result = PackMesh(mesh.View(), scratch);
+
+    EXPECT_EQ(result.Status, MeshPackStatus::NonFiniteTexcoord);
+    EXPECT_FALSE(result.Upload.has_value());
+    EXPECT_TRUE(scratch.SurfaceIndices.empty());
+    EXPECT_TRUE(scratch.VertexBytes.empty());
 }
 
 TEST(MeshGeometryPackerTest, SingleTriangleLocalSphereCentersAtAabbMidpoint)
@@ -537,6 +585,14 @@ TEST(MeshGeometryPackerTest, AliveFaceSurvivesAlongsideDeletedFaceSlot)
         {3.0f, 0.0f, 0.0f},
         {2.0f, 1.0f, 0.0f},
     });
+    SetTexcoords(mesh.VertexSource, {
+        {0.0f, 0.0f},
+        {1.0f, 0.0f},
+        {0.0f, 1.0f},
+        {2.0f, 0.0f},
+        {3.0f, 0.0f},
+        {2.0f, 1.0f},
+    });
     SetEdges(mesh.EdgeSource, {0u, 1u, 2u, 3u, 4u, 5u}, {1u, 2u, 0u, 4u, 5u, 3u});
     // halfedges 0..2 belong to live face 0; 3..5 form a still-walkable ring
     // but their `h:face` has been cleared by a (simulated) DeleteFace.
@@ -588,4 +644,8 @@ TEST(MeshGeometryPackerTest, DebugNameForStatusReturnsStableStrings)
                  "Mesh.InvalidTopology");
     EXPECT_STREQ(Extrinsic::Runtime::DebugNameForMeshPackStatus(MeshPackStatus::NonFinitePosition),
                  "Mesh.NonFinitePosition");
+    EXPECT_STREQ(Extrinsic::Runtime::DebugNameForMeshPackStatus(MeshPackStatus::MissingTexcoords),
+                 "Mesh.MissingTexcoords");
+    EXPECT_STREQ(Extrinsic::Runtime::DebugNameForMeshPackStatus(MeshPackStatus::NonFiniteTexcoord),
+                 "Mesh.NonFiniteTexcoord");
 }

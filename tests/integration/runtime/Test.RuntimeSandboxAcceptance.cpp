@@ -119,6 +119,12 @@ namespace
         pos.Vector() = positions;
     }
 
+    void SetTexcoords(Geometry::PropertySet& props, const std::vector<glm::vec2>& texcoords)
+    {
+        auto uv = props.GetOrAdd<glm::vec2>("v:texcoord", glm::vec2(0.0f));
+        uv.Vector() = texcoords;
+    }
+
     EntityHandle MakeMesh(Registry& scene)
     {
         const EntityHandle entity = scene.Create();
@@ -128,6 +134,7 @@ namespace
 
         auto& vertices = raw.emplace<gs::Vertices>(entity);
         SetPositions(vertices.Properties, {{0.f, 0.f, 0.f}, {1.f, 0.f, 0.f}, {0.f, 1.f, 0.f}});
+        SetTexcoords(vertices.Properties, {{0.f, 0.f}, {1.f, 0.f}, {0.f, 1.f}});
         raw.emplace<gs::Edges>(entity);
         auto& halfedges = raw.emplace<gs::Halfedges>(entity);
         halfedges.Properties.Resize(6);

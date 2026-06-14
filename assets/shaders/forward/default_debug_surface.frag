@@ -40,9 +40,22 @@ bool IsValidTextureID(uint id) {
     return id != 0u && id != 0xFFFFFFFFu;
 }
 
+vec3 DebugUvChecker(vec2 uv) {
+    vec2 wrapped = fract(uv);
+    float checker = mod(floor(uv.x * 16.0) + floor(uv.y * 16.0), 2.0);
+    vec3 low = vec3(wrapped, 0.25);
+    vec3 high = vec3(1.0 - wrapped.x, 1.0 - wrapped.y, 1.0);
+    return mix(low, high, checker);
+}
+
 void main() {
     const GpuSceneTable scene = GpuSceneTableRef(pc.SceneTableBDA).Value;
     const GpuMaterialSlot mat = GpuMaterialSlotRef(scene.MaterialBDA).Data[fragMaterialSlot];
+    if (mat.MaterialTypeID == GpuMaterialType_DefaultDebugUVs) {
+        outColor = vec4(DebugUvChecker(fragUv), 1.0);
+        return;
+    }
+
     vec4 baseColor = mat.BaseColorFactor;
     if (IsValidTextureID(mat.AlbedoID)) {
         baseColor *= texture(globalTextures[nonuniformEXT(mat.AlbedoID)], fragUv);

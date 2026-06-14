@@ -11,7 +11,9 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Verified / Closed
 
-- Closed 2026-06-12: [`BUG-041` — Asset mesh vertex normals are lost during runtime materialization](../../done/BUG-041-asset-mesh-vertex-normals.md). Runtime mesh materialization now copies explicit decoded `v:normal` vectors, computes deterministic area-weighted fallback normals when source normals are absent, applies the shared path to direct mesh imports and model-scene primitive handoff, and packs available mesh normals into the retained surface vertex layout's octahedral U/V channel.
+- Closed 2026-06-14: [`BUG-043` — Dropped OBJ without UVs loads but is invisible](../../done/BUG-043-dropped-obj-missing-uvs-invisible.md). Runtime mesh materialization now preserves authored `v:texcoord` and writes finite deterministic projection fallback UVs for imported meshes whose source payload omits or invalidates texture coordinates. Direct OBJ imports without `vt` lines now upload surface geometry under CPU/null extraction instead of reporting `MeshGeometryMissingTexcoords`; xatlas-quality atlas replacement remains tracked by `ASSETIO-008` and `GEOM-025`.
+
+- Closed 2026-06-12: [`BUG-041` — Asset mesh vertex normals are lost during runtime materialization](../../done/BUG-041-asset-mesh-vertex-normals.md). Runtime mesh materialization now copies explicit decoded `v:normal` vectors, computes deterministic area-weighted fallback normals when source normals are absent, and applies the shared path to direct mesh imports and model-scene primitive handoff; surface mesh U/V packing is now owned by `RUNTIME-108` and carries texture coordinates only.
 
 - Closed 2026-06-12: [`BUG-040` — Orbit camera vertical drag sign](../../done/BUG-040-orbit-camera-vertical-drag-sign.md). Orbit pitch drag now uses `+yDelta` in the quaternion trackball update, so mouse-up moves the camera above the target and mouse-down moves it below while keeping target centering, yaw, cross-pole rotation, focus, and other camera-controller coverage passing.
 

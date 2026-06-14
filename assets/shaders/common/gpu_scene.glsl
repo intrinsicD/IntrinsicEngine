@@ -22,6 +22,10 @@ const uint GpuCullPhase_Phase1 = 0u;
 const uint GpuCullPhase_Phase2 = 1u;
 const uint GpuCullFlag_HZBStaleSkip = 1u << 0;
 const uint GpuCullFlag_SelectionBucketOcclusionExempt = 1u << 1;
+const uint GpuMaterialType_StandardPBR = 0u;
+const uint GpuMaterialType_SciVis = 1u;
+const uint GpuMaterialType_DefaultDebugSurface = 2u;
+const uint GpuMaterialType_DefaultDebugUVs = 3u;
 
 struct GpuSceneTable {
     uint64_t InstanceStaticBDA;

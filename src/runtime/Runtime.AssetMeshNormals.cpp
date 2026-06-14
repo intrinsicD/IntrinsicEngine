@@ -1,9 +1,12 @@
 module;
 
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -25,6 +28,7 @@ namespace Extrinsic::Runtime
     {
         constexpr const char* kPositionProperty = "v:point";
         constexpr const char* kNormalProperty = "v:normal";
+        constexpr const char* kTexcoordProperty = "v:texcoord";
         constexpr const char* kFaceVerticesProperty = "f:vertices";
 
         [[nodiscard]] bool ShouldCopyVertexProperty(const std::string_view name) noexcept
@@ -236,6 +240,95 @@ namespace Extrinsic::Runtime
             normalProperty.Vector() = normals;
         }
 
+        [[nodiscard]] bool IsFinite(const glm::vec2 value) noexcept
+        {
+            return std::isfinite(value.x) && std::isfinite(value.y);
+        }
+
+        [[nodiscard]] bool HasValidTexcoords(const Geometry::HalfedgeMesh::Mesh& mesh)
+        {
+            const auto texcoords = mesh.VertexProperties().Get<glm::vec2>(kTexcoordProperty);
+            if (!texcoords || texcoords.Vector().size() != mesh.VerticesSize())
+            {
+                return false;
+            }
+            for (const glm::vec2 texcoord : texcoords.Vector())
+            {
+                if (!IsFinite(texcoord))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        [[nodiscard]] float NormalizeAxis(
+            const float value,
+            const float minValue,
+            const float extent,
+            const std::size_t index,
+            const std::size_t count) noexcept
+        {
+            if (std::isfinite(extent) && extent > 1.0e-6f)
+            {
+                return (value - minValue) / extent;
+            }
+            return count > 1u
+                ? static_cast<float>(index) / static_cast<float>(count - 1u)
+                : 0.0f;
+        }
+
+        void WriteFallbackTexcoords(Geometry::HalfedgeMesh::Mesh& mesh)
+        {
+            const std::span<const glm::vec3> positions = mesh.Positions();
+            auto texcoords = mesh.VertexProperties().GetOrAdd<glm::vec2>(
+                std::string{kTexcoordProperty},
+                glm::vec2{0.0f});
+            auto& out = texcoords.Vector();
+            out.assign(positions.size(), glm::vec2{0.0f});
+            if (positions.empty())
+            {
+                return;
+            }
+
+            glm::vec3 minP{positions[0]};
+            glm::vec3 maxP{positions[0]};
+            for (const glm::vec3 position : positions)
+            {
+                minP = glm::min(minP, position);
+                maxP = glm::max(maxP, position);
+            }
+
+            const glm::vec3 extent = maxP - minP;
+            std::array<int, 3u> axes{0, 1, 2};
+            std::sort(
+                axes.begin(),
+                axes.end(),
+                [extent](const int lhs, const int rhs)
+                {
+                    return extent[lhs] > extent[rhs];
+                });
+            const int uAxis = axes[0];
+            const int vAxis = axes[1];
+
+            for (std::size_t i = 0u; i < positions.size(); ++i)
+            {
+                const glm::vec3 position = positions[i];
+                out[i] = glm::vec2{
+                    NormalizeAxis(position[uAxis], minP[uAxis], extent[uAxis], i, positions.size()),
+                    NormalizeAxis(position[vAxis], minP[vAxis], extent[vAxis], i, positions.size()),
+                };
+            }
+        }
+
+        void EnsureRuntimeMeshTexcoords(Geometry::HalfedgeMesh::Mesh& mesh)
+        {
+            if (!HasValidTexcoords(mesh))
+            {
+                WriteFallbackTexcoords(mesh);
+            }
+        }
+
         [[nodiscard]] bool CanUseDisconnectedRenderableFallback(
             const Geometry::Mesh::Conversion::ToHalfedgeMeshResult& converted) noexcept
         {
@@ -392,6 +485,7 @@ namespace Extrinsic::Runtime
                             faces.Vector(),
                             normals))
                 {
+                    EnsureRuntimeMeshTexcoords(*fallback);
                     return std::move(*fallback);
                 }
             }
@@ -401,6 +495,7 @@ namespace Extrinsic::Runtime
 
         CopySupportedVertexProperties(meshPayload, converted.Mesh, positions.Vector().size());
         WriteVertexNormals(converted.Mesh, normals);
+        EnsureRuntimeMeshTexcoords(converted.Mesh);
         return std::move(converted.Mesh);
     }
 }

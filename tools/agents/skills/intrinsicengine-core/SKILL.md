@@ -87,9 +87,10 @@ Cross-layer convenience imports that violate this table are prohibited.
 - Third-party C/C++ deps go through `vcpkg.json` and the repository-local vcpkg
   toolchain (`external/vcpkg/scripts/buildsystems/vcpkg.cmake`) chainloaded with
   `cmake/IntrinsicClangToolchain.cmake`. Run `tools/setup/bootstrap_vcpkg.sh` on
-  fresh checkouts; use `VCPKG_BINARY_SOURCES` for local/CI binary caching. The
-  old FetchContent path in `cmake/Dependencies.cmake` is a temporary
-  `INFRA-001` deprecation fallback only (`INTRINSIC_USE_VCPKG_DEPS=OFF`).
+  fresh checkouts; use `VCPKG_BINARY_SOURCES` for local/CI binary caching.
+  `cmake/Dependencies.cmake` is vcpkg-manifest-only; new dependency traffic must
+  go through `vcpkg.json`, `vcpkg-configuration.json`, or repository overlay
+  ports.
 
 ## Default build and test commands
 

@@ -73,6 +73,12 @@ namespace
         pos.Vector() = positions;
     }
 
+    void SetTexcoords(gs::Vertices& v, const std::vector<glm::vec2>& texcoords)
+    {
+        auto uv = v.Properties.GetOrAdd<glm::vec2>("v:texcoord", glm::vec2(0.0f));
+        uv.Vector() = texcoords;
+    }
+
     void SetHalfedges(gs::Halfedges& h,
                       const std::vector<std::uint32_t>& toVertex,
                       const std::vector<std::uint32_t>& next,
@@ -106,6 +112,11 @@ namespace
             {0.0f, 0.0f, 0.0f},
             {1.0f, 0.0f, 0.0f},
             {0.0f, 1.0f, 0.0f},
+        });
+        SetTexcoords(vertices, {
+            {0.0f, 0.0f},
+            {1.0f, 0.0f},
+            {0.0f, 1.0f},
         });
         auto& edges = raw.emplace<gs::Edges>(entity);
         (void)edges; // empty Edges PropertySet is sufficient for `DetectDomain`.
@@ -177,6 +188,8 @@ TEST(MeshGeometryExtraction, SingleMeshEntityUploadsOnceAndBindsInstanceGeometry
     EXPECT_EQ(stats.MeshGeometryFailedPack, 0u);
     EXPECT_EQ(stats.MeshGeometryMissingPositions, 0u);
     EXPECT_EQ(stats.MeshGeometryInvalidTopology, 0u);
+    EXPECT_EQ(stats.MeshGeometryMissingTexcoords, 0u);
+    EXPECT_EQ(stats.MeshGeometryNonFiniteTexcoords, 0u);
     EXPECT_EQ(stats.MeshGeometryReleases, 0u);
     EXPECT_EQ(stats.ProceduralRenderablesEnumerated, 0u);
     EXPECT_EQ(stats.ProceduralGeometryUploads, 0u);
@@ -511,6 +524,69 @@ TEST(MeshGeometryExtraction, MissingPositionsIncrementsMissingPositionsCounter)
     engine.Shutdown();
 }
 
+TEST(MeshGeometryExtraction, MissingTexcoordsIncrementsMissingTexcoordsCounter)
+{
+    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.Initialize();
+
+    auto& scene = engine.GetScene();
+    auto& raw = scene.Raw();
+    const EntityHandle entity = MakeMeshRenderable(scene);
+
+    auto& vertices = raw.get<gs::Vertices>(entity);
+    auto& registry = vertices.Properties.Registry();
+    const auto id = registry.Find("v:texcoord");
+    ASSERT_TRUE(id.has_value());
+    ASSERT_TRUE(registry.Remove(*id));
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    const auto stats = extraction.ExtractAndSubmit(scene,
+                                                    engine.GetRenderer(),
+                                                    &engine.GetGpuAssetCache());
+
+    EXPECT_EQ(stats.MeshGeometryUploads, 0u);
+    EXPECT_EQ(stats.MeshGeometryMissingTexcoords, 1u);
+    EXPECT_EQ(stats.MeshGeometryNonFiniteTexcoords, 0u);
+    EXPECT_EQ(stats.MeshGeometryMissingPositions, 0u);
+    EXPECT_EQ(stats.MeshGeometryInvalidTopology, 0u);
+    EXPECT_EQ(stats.MeshGeometryFailedPack, 0u);
+    EXPECT_EQ(engine.GetRenderer().GetGpuWorld().GetLiveGeometryCount(), 0u);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
+TEST(MeshGeometryExtraction, NonFiniteTexcoordsIncrementsNonFiniteTexcoordsCounter)
+{
+    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.Initialize();
+
+    auto& scene = engine.GetScene();
+    auto& raw = scene.Raw();
+    const EntityHandle entity = MakeMeshRenderable(scene);
+
+    auto& vertices = raw.get<gs::Vertices>(entity);
+    auto texcoords = vertices.Properties.Get<glm::vec2>("v:texcoord");
+    ASSERT_TRUE(texcoords);
+    texcoords.Vector()[1].y = std::numeric_limits<float>::infinity();
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    const auto stats = extraction.ExtractAndSubmit(scene,
+                                                    engine.GetRenderer(),
+                                                    &engine.GetGpuAssetCache());
+
+    EXPECT_EQ(stats.MeshGeometryUploads, 0u);
+    EXPECT_EQ(stats.MeshGeometryMissingTexcoords, 0u);
+    EXPECT_EQ(stats.MeshGeometryNonFiniteTexcoords, 1u);
+    EXPECT_EQ(stats.MeshGeometryMissingPositions, 0u);
+    EXPECT_EQ(stats.MeshGeometryInvalidTopology, 0u);
+    EXPECT_EQ(stats.MeshGeometryFailedPack, 0u);
+    EXPECT_EQ(engine.GetRenderer().GetGpuWorld().GetLiveGeometryCount(), 0u);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
 TEST(MeshGeometryExtraction, InvalidTopologyIncrementsInvalidTopologyCounter)
 {
     namespace E = Extrinsic::ECS::Components;
@@ -531,6 +607,11 @@ TEST(MeshGeometryExtraction, InvalidTopologyIncrementsInvalidTopologyCounter)
         {1.0f, 0.0f, 0.0f},
         {0.0f, 1.0f, 0.0f},
     });
+    SetTexcoords(vertices, {
+        {0.0f, 0.0f},
+        {1.0f, 0.0f},
+        {0.0f, 1.0f},
+    });
     (void)raw.emplace<gs::Edges>(entity);
     auto& halfedges = raw.emplace<gs::Halfedges>(entity);
     SetHalfedges(halfedges,
@@ -549,6 +630,8 @@ TEST(MeshGeometryExtraction, InvalidTopologyIncrementsInvalidTopologyCounter)
     EXPECT_EQ(stats.MeshGeometryUploads, 0u);
     EXPECT_EQ(stats.MeshGeometryInvalidTopology, 1u);
     EXPECT_EQ(stats.MeshGeometryMissingPositions, 0u);
+    EXPECT_EQ(stats.MeshGeometryMissingTexcoords, 0u);
+    EXPECT_EQ(stats.MeshGeometryNonFiniteTexcoords, 0u);
     EXPECT_EQ(stats.MeshGeometryFailedPack, 0u);
 
     extraction.Shutdown(engine.GetRenderer());
@@ -575,6 +658,11 @@ TEST(MeshGeometryExtraction, DegenerateAllFacesIncrementsFailedPackCounter)
         {1.0f, 0.0f, 0.0f},
         {0.0f, 1.0f, 0.0f},
     });
+    SetTexcoords(vertices, {
+        {0.0f, 0.0f},
+        {1.0f, 0.0f},
+        {0.0f, 1.0f},
+    });
     (void)raw.emplace<gs::Edges>(entity);
     auto& halfedges = raw.emplace<gs::Halfedges>(entity);
     SetHalfedges(halfedges,
@@ -596,6 +684,8 @@ TEST(MeshGeometryExtraction, DegenerateAllFacesIncrementsFailedPackCounter)
     EXPECT_EQ(stats.MeshGeometryFailedPack, 1u);
     EXPECT_EQ(stats.MeshGeometryMissingPositions, 0u);
     EXPECT_EQ(stats.MeshGeometryInvalidTopology, 0u);
+    EXPECT_EQ(stats.MeshGeometryMissingTexcoords, 0u);
+    EXPECT_EQ(stats.MeshGeometryNonFiniteTexcoords, 0u);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();

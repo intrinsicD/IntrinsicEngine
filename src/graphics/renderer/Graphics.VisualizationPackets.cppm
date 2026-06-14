@@ -9,6 +9,7 @@ module;
 
 export module Extrinsic.Graphics.VisualizationPackets;
 
+import Extrinsic.Asset.Registry;
 import Extrinsic.Graphics.Colormap;
 
 export namespace Extrinsic::Graphics
@@ -37,6 +38,14 @@ export namespace Extrinsic::Graphics
         ExistingTexcoords = 0,
         ExistingHtex,
         RecreateHtex,
+    };
+
+    enum class VisualizationTexcoordProvenance : std::uint8_t
+    {
+        Unknown = 0,
+        Authored,
+        GeneratedAtlas,
+        RuntimeResolved,
     };
 
     struct VisualizationAttributeBufferPacket
@@ -129,6 +138,10 @@ export namespace Extrinsic::Graphics
         std::uint32_t AtlasWidth{0u};
         std::uint32_t AtlasHeight{0u};
         std::uint64_t TexcoordBufferBDA{0u};
+        Assets::AssetId AtlasTextureAsset{};
+        VisualizationTexcoordProvenance TexcoordProvenance{
+            VisualizationTexcoordProvenance::Unknown};
+        std::uint64_t TexcoordDirtyStamp{0u};
     };
 
     struct VisualizationPropertyBufferUploadDescriptor
@@ -210,8 +223,12 @@ export namespace Extrinsic::Graphics
         std::uint32_t IsolineValueCount{0u};
         std::uint32_t HtexAtlasDescriptorCount{0u};
         std::uint32_t UvBakeAtlasDescriptorCount{0u};
+        std::uint32_t AuthoredUvBakeAtlasDescriptorCount{0u};
+        std::uint32_t GeneratedUvBakeAtlasDescriptorCount{0u};
+        std::uint32_t RuntimeResolvedUvBakeAtlasDescriptorCount{0u};
         std::uint32_t HtexBakeAtlasDescriptorCount{0u};
         std::uint32_t HtexRecreateRequestCount{0u};
+        std::uint32_t FragmentBakeTextureAssetDescriptorCount{0u};
         bool RequiresTextureResidency{false};
     };
 

@@ -112,11 +112,10 @@ external/vcpkg/vcpkg x-update-baseline
 external/vcpkg/vcpkg format-manifest vcpkg.json
 ```
 
-During the `INFRA-001` deprecation window only, the old FetchContent path remains
-available with `-DINTRINSIC_USE_VCPKG_DEPS=OFF`. That fallback still uses
-`external/cache/`, `tools/setup/populate_deps.sh`, `INTRINSIC_OFFLINE_DEPS`,
-`INTRINSIC_UPDATE_DEPS`, and `INTRINSIC_DEPS_SEAL`; do not add new dependency
-traffic to it.
+The vcpkg manifest is now the only supported third-party dependency path.
+`cmake/Dependencies.cmake` fails closed when configure is not running in vcpkg
+manifest mode; use the repository presets rather than retired CMake
+dependency-cache flags.
 
 ## Blocked follow-on CI steps
 

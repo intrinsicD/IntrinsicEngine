@@ -11,6 +11,9 @@ map.
 ## Tasks
 
 - [RORG-031F — UI integration backlog seed](RORG-031-ui-integration.md).
+- [UI-014 — UV backend and texture bake controls](UI-014-uv-backend-and-texture-bake-controls.md):
+  expose resolved-UV provenance, backend selection/regeneration, and generic
+  mesh attribute texture bake commands through runtime-owned UI command seams.
 
 ## Convergence
 

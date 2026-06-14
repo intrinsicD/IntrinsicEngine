@@ -69,13 +69,13 @@ depends_on: []
     - Removal of `intrinsic_make_available`, `intrinsic_populate_source`,
       `intrinsic_validate_dependency_source`, lock helpers, and
       `INTRINSIC_OFFLINE_DEPS` / `INTRINSIC_UPDATE_DEPS` /
-      `INTRINSIC_DEPS_SEAL` knobs (deprecation fallback remains until Slice D).
+      `INTRINSIC_DEPS_SEAL` knobs.
 - [x] Wire a vcpkg binary cache for CI:
     - GitHub Actions: `actions/cache` keyed on the manifest hash +
       vcpkg baseline; OR `vcpkg` GHA binary cache provider.
     - Document a manual local cache path under `external/vcpkg-bincache/`
       for offline / repeat developer builds.
-- [ ] Retire `external/cache/` (delete `tools/setup/populate_deps.sh`
+- [x] Retire `external/cache/` (delete `tools/setup/populate_deps.sh`
       once vcpkg is the single source of truth and no developer flows
       depend on the old layout).
 - [x] Update `cmake/IntrinsicModule.cmake` only if a vcpkg port name
@@ -106,29 +106,29 @@ depends_on: []
 - [x] Add an ADR under `docs/adr/` recording the move from FetchContent
       to vcpkg (drivers: cold configure time, deterministic version
       solver, binary caching, removal of the in-tree validator + cache).
-- [ ] Update `tasks/backlog/README.md` to mark INFRA Option C done
+- [x] Update `tasks/backlog/README.md` to mark INFRA Option C done
       and link to the ADR.
 
 ## Acceptance criteria
-- [ ] No `FetchContent_*` calls remain in `cmake/`.
-- [ ] `external/cache/` is no longer referenced anywhere in `cmake/`,
-      `tools/`, `tests/`, or `docs/` (the directory itself may remain
-      until the next housekeeping pass).
+- [x] No `FetchContent_*` calls remain in `cmake/`.
+- [x] `external/cache/` is no longer referenced anywhere in `cmake/`,
+      `tools/`, `tests/`, or current workflow docs (historical reports/reviews
+      may retain old command evidence; the directory itself may remain until
+      the next housekeeping pass).
 - [ ] A fresh `git clone` followed by the documented bootstrap commands
       configures and builds `IntrinsicTests` without any in-tree
       validator code path firing.
 - [ ] CI uses a shared binary cache; warm-cache configure is ≤ 10 s.
-- [ ] Version bumps flow through `vcpkg x-update-baseline` + manifest
+- [x] Version bumps flow through `vcpkg x-update-baseline` + manifest
       edit only — no hand-edits to any `GIT_TAG` strings anywhere.
 
 ## Status
 - Active 2026-06-11; owner: Codex; branch: `main`.
-- Current slice: Slice C — CI binary-cache wiring + timing/smoke evidence.
-  Slice B cut over the default preset path: it
-  now uses vcpkg manifest mode and chainloads `cmake/IntrinsicClangToolchain.cmake`.
-- The old FetchContent code path remains under `INTRINSIC_USE_VCPKG_DEPS=OFF`
-  only for the Slice D deprecation window; new dependency work must not add to
-  `external/cache/`.
+- Current slice: Slice D — deprecation cleanup. `cmake/Dependencies.cmake` is
+  vcpkg-manifest-only and fails closed when configure does not run through the
+  repository vcpkg toolchain. Slice B cut over the default preset path and
+  chainloads `cmake/IntrinsicClangToolchain.cmake`; Slice C wired CI/local
+  binary-cache flow.
 - GitHub Actions workflows now cache `external/vcpkg-bincache/`, bootstrap
   `external/vcpkg/`, and export `VCPKG_BINARY_SOURCES` before configure. The
   cache key covers `vcpkg.json`, `vcpkg-configuration.json`, `tools/vcpkg/**`,
@@ -141,8 +141,9 @@ depends_on: []
   and `INTRINSIC_HEADLESS_NO_GLFW=ON`: vcpkg restored 11 non-windowing packages
   from the binary cache and excluded `glfw3`, `imguizmo`, `volk`, and
   `vulkan-memory-allocator`.
-- Vulkan smoke passed locally under the `ci-vulkan` preset. Final
-  FetchContent-helper deletion remains deferred to Slice D.
+- Vulkan smoke passed locally under the `ci-vulkan` preset. Final retirement
+  still requires observing the CI warm-cache timing gate after this cleanup
+  lands.
 - Slice A verification 2026-06-11:
     - `tools/setup/bootstrap_vcpkg.sh` — passed; checked out baseline
       `06a7fdd564234908731c59ac46a624f808e87b1c` under ignored
@@ -182,8 +183,7 @@ depends_on: []
       -DCMAKE_BUILD_TYPE=Debug -DINTRINSIC_BUILD_SANDBOX=OFF
       -DINTRINSIC_BUILD_TESTS=ON -DINTRINSIC_ENABLE_CUDA=OFF
       -DINTRINSIC_ENABLE_SANITIZERS=ON -DINTRINSIC_USE_VCPKG_DEPS=OFF` —
-      passed; FetchContent fallback remains configurable for the deprecation
-      window.
+      passed at the time; this fallback was intentionally removed by Slice D.
     - Structural/documentation checks passed:
       `check_task_policy.py --strict`, `check_task_state_links.py --strict`,
       `generate_session_brief.py --check`, `check_doc_links.py`,
@@ -216,6 +216,40 @@ depends_on: []
       `imguizmo`, `volk`, or `vulkan-memory-allocator`.
     - `cmake --build build/ci-headless-vcpkg --target IntrinsicTests` —
       passed in 5:02.05.
+- Slice D verification 2026-06-14:
+    - `rg -n
+      "external/cache|populate_deps|INTRINSIC_OFFLINE_DEPS|INTRINSIC_UPDATE_DEPS|INTRINSIC_DEPS_SEAL|INTRINSIC_USE_VCPKG_DEPS"
+      cmake tools tests docs AGENTS.md --glob '!docs/reports/**' --glob
+      '!docs/reviews/**'` — no matches.
+    - `rg -n "FetchContent_" cmake CMakeLists.txt` — no matches.
+    - `rg -n "GIT_TAG|FetchContent_" cmake CMakeLists.txt vcpkg.json
+      vcpkg-configuration.json tools/vcpkg` — no matches.
+    - `cmake --preset ci` — passed through vcpkg manifest mode and
+      chainloaded Clang 23.
+    - `cmake --build --preset ci --target IntrinsicTests` — passed.
+    - `ctest --test-dir build/ci --output-on-failure -LE
+      'gpu|vulkan|slow|flaky-quarantine' --timeout 60` — passed,
+      3018/3018.
+    - `cmake -S . -B build/ci-headless-vcpkg -G Ninja
+      -DCMAKE_TOOLCHAIN_FILE=$PWD/external/vcpkg/scripts/buildsystems/vcpkg.cmake
+      -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$PWD/cmake/IntrinsicClangToolchain.cmake
+      -DVCPKG_INSTALLED_DIR=$PWD/external/vcpkg-installed/ci-headless-vcpkg
+      -DVCPKG_MANIFEST_MODE=ON -DVCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON
+      -DINTRINSIC_BUILD_SANDBOX=OFF -DINTRINSIC_BUILD_TESTS=ON
+      -DINTRINSIC_ENABLE_CUDA=OFF -DINTRINSIC_ENABLE_SANITIZERS=ON
+      -DINTRINSIC_HEADLESS_NO_GLFW=ON` — passed; vcpkg reported only the
+      non-windowing package set and did not install `glfw3`, `imguizmo`,
+      `volk`, or `vulkan-memory-allocator`.
+    - `cmake --build build/ci-headless-vcpkg --target IntrinsicTests` —
+      passed.
+    - Structural/documentation checks passed:
+      `check_task_policy.py --strict`, `validate_tasks.py --strict`,
+      `check_task_state_links.py --strict`, `check_doc_links.py`,
+      `check_docs_sync.py --diff-mode --base-ref origin/main`,
+      `sync_skills.py --check`, `check_layering.py --strict`,
+      `check_test_layout.py --strict`, `check_root_hygiene.py --root .`, and
+      `git diff --check`. Root hygiene still reports only the pre-existing
+      `imgui.ini` warning-mode entry.
 
 ## Verification
 ```bash
@@ -240,10 +274,8 @@ python3 tools/docs/check_doc_links.py --root .
 ## Forbidden changes
 - Mixing the vcpkg migration with any unrelated refactor (no module-graph
   reshuffles, no test-layout reorgs).
-- Removing `tools/setup/populate_deps.sh` or the `INTRINSIC_DEPS_SEAL`
-  knob in the same PR as the vcpkg cut-over; leave them in place as a
-  one-release deprecation window so contributors with hot
-  `external/cache/` trees are not surprised.
+- Reintroducing `tools/setup/populate_deps.sh`, retired dependency-cache knobs,
+  or a non-vcpkg dependency fallback after Slice D.
 - Introducing a second package manager (Conan, CPM, system apt) as a
   fallback inside the same change.
 
@@ -256,9 +288,8 @@ python3 tools/docs/check_doc_links.py --root .
 
 ## Slice plan
 
-Landing order respects the Forbidden-changes deprecation window (the
-FetchContent path and `tools/setup/populate_deps.sh` survive until the
-final slice):
+Landing order respected the one-release deprecation window; Slice D now removes
+the retired fallback and makes vcpkg manifest mode the single dependency path:
 
 - **Slice A — manifest + bootstrap (no behavior change).** Add `vcpkg.json`,
   `vcpkg-configuration.json`, and `tools/setup/bootstrap_vcpkg.sh`; nothing
@@ -272,7 +303,7 @@ final slice):
 - **Slice C — CI binary cache + timings.** Wire the GHA binary cache,
   capture cold/warm configure timings in the PR, and run the Vulkan smoke
   gate on a capable host.
-- **Slice D — deprecation cleanup (separate PR, one release window later).**
+- **Slice D — deprecation cleanup (current slice).**
   Delete the FetchContent helpers, the `INTRINSIC_OFFLINE_DEPS` /
   `INTRINSIC_UPDATE_DEPS` / `INTRINSIC_DEPS_SEAL` knobs,
   `tools/setup/populate_deps.sh`, and remaining `external/cache/`

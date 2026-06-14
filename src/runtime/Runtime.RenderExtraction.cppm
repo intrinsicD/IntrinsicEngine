@@ -120,11 +120,11 @@ export namespace Extrinsic::Runtime
         // tags (`DirtyVertexPositions`, `DirtyFaceTopology`,
         // `DirtyEdgeTopology`, `GpuDirty`) and repacks the mesh.
         // `FailedPack` aggregates non-input-shape pack rejections
-        // (`InvalidTopology`, `DegenerateAllFaces`, `EmptyMesh`,
-        // `NonFinitePosition`, `MissingHalfedgeTopology`,
-        // `MissingFaceTopology`, `WrongDomain`); `MissingPositions` and
-        // `InvalidTopology` get their own counters because they are the
-        // two most likely structural authoring bugs in mesh sources.
+        // (`DegenerateAllFaces`, `EmptyMesh`, `NonFinitePosition`,
+        // `MissingHalfedgeTopology`, `MissingFaceTopology`, `WrongDomain`);
+        // `MissingPositions`, `InvalidTopology`, and texture-coordinate
+        // failures get their own counters because they are the most likely
+        // structural authoring bugs in mesh sources.
         // `Releases` is incremented per release-initiated event: entity
         // destruction, eligibility flip away from mesh, or dirty
         // reupload superseding an older handle; the actual free runs
@@ -138,6 +138,8 @@ export namespace Extrinsic::Runtime
         std::uint32_t MeshGeometryFailedPack{0};
         std::uint32_t MeshGeometryMissingPositions{0};
         std::uint32_t MeshGeometryInvalidTopology{0};
+        std::uint32_t MeshGeometryMissingTexcoords{0};
+        std::uint32_t MeshGeometryNonFiniteTexcoords{0};
         std::uint32_t MeshGeometryReleases{0};
         std::uint32_t MeshGeometryFreeRetires{0};
 

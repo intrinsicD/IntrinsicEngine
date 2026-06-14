@@ -62,6 +62,12 @@ namespace
         pos.Vector() = positions;
     }
 
+    void SetTexcoords(Geometry::PropertySet& set, const std::vector<glm::vec2>& texcoords)
+    {
+        auto uv = set.GetOrAdd<glm::vec2>("v:texcoord", glm::vec2(0.0f));
+        uv.Vector() = texcoords;
+    }
+
     void SetU32(Geometry::PropertySet& set,
                 std::string_view name,
                 const std::vector<std::uint32_t>& values,
@@ -92,6 +98,11 @@ namespace
             {0.0f, 0.0f, 0.0f},
             {1.0f, 0.0f, 0.0f},
             {0.0f, 1.0f, 0.0f},
+        });
+        SetTexcoords(vertices.Properties, {
+            {0.0f, 0.0f},
+            {1.0f, 0.0f},
+            {0.0f, 1.0f},
         });
 
         Edges edges{};

@@ -24,11 +24,6 @@ namespace Extrinsic::Runtime
         constexpr std::uint32_t kInvalidIndex = std::numeric_limits<std::uint32_t>::max();
         constexpr const char* kMeshDebugName = "Runtime.Mesh";
 
-        [[nodiscard]] float SignNotZero(const float value) noexcept
-        {
-            return value < 0.0f ? -1.0f : 1.0f;
-        }
-
         [[nodiscard]] MeshPackResult Failure(MeshPackStatus status, MeshPackBuffer& outBuffer) noexcept
         {
             outBuffer.Clear();
@@ -43,33 +38,6 @@ namespace Extrinsic::Runtime
         [[nodiscard]] bool IsFinite(const glm::vec2& p) noexcept
         {
             return std::isfinite(p.x) && std::isfinite(p.y);
-        }
-
-        [[nodiscard]] glm::vec2 EncodeOctNormalOrZero(glm::vec3 normal) noexcept
-        {
-            const float len = glm::length(normal);
-            if (!std::isfinite(len) || len <= 1.0e-6f)
-            {
-                return glm::vec2{0.0f};
-            }
-            normal /= len;
-
-            const float denom =
-                std::abs(normal.x) + std::abs(normal.y) + std::abs(normal.z);
-            if (denom <= 1.0e-6f)
-            {
-                return glm::vec2{0.0f};
-            }
-
-            glm::vec2 encoded{normal.x / denom, normal.y / denom};
-            if (normal.z < 0.0f)
-            {
-                encoded = glm::vec2{
-                    (1.0f - std::abs(encoded.y)) * SignNotZero(encoded.x),
-                    (1.0f - std::abs(encoded.x)) * SignNotZero(encoded.y),
-                };
-            }
-            return encoded;
         }
 
         // Outcome of walking one face slot's halfedge ring.
@@ -175,6 +143,8 @@ namespace Extrinsic::Runtime
             case MeshPackStatus::EmptyMesh:               return "Mesh.EmptyMesh";
             case MeshPackStatus::InvalidTopology:         return "Mesh.InvalidTopology";
             case MeshPackStatus::NonFinitePosition:       return "Mesh.NonFinitePosition";
+            case MeshPackStatus::MissingTexcoords:        return "Mesh.MissingTexcoords";
+            case MeshPackStatus::NonFiniteTexcoord:       return "Mesh.NonFiniteTexcoord";
             case MeshPackStatus::DegenerateAllFaces:      return "Mesh.DegenerateAllFaces";
         }
         return "Mesh.Unknown";
@@ -268,21 +238,13 @@ namespace Extrinsic::Runtime
 
         const std::uint32_t vertexCountU32 = static_cast<std::uint32_t>(vertexCount);
 
-        const auto normalProp =
-            view.VertexSource->Properties.Get<glm::vec3>(PropertyNames::kNormal);
-        const std::vector<glm::vec3>* normals = nullptr;
-        if (normalProp && normalProp.Vector().size() == vertexCount)
-        {
-            normals = &normalProp.Vector();
-        }
-
         const auto texcoordProp =
             view.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
-        const std::vector<glm::vec2>* texcoords = nullptr;
-        if (texcoordProp && texcoordProp.Vector().size() == vertexCount)
+        if (!texcoordProp || texcoordProp.Vector().size() != vertexCount)
         {
-            texcoords = &texcoordProp.Vector();
+            return Failure(MeshPackStatus::MissingTexcoords, outBuffer);
         }
+        const auto& texcoords = texcoordProp.Vector();
 
         for (std::size_t f = 0; f < faceCount; ++f)
         {
@@ -324,14 +286,10 @@ namespace Extrinsic::Runtime
             {
                 return Failure(MeshPackStatus::NonFinitePosition, outBuffer);
             }
-            glm::vec2 uv{0.0f};
-            if (texcoords != nullptr)
+            const glm::vec2 uv = texcoords[i];
+            if (!IsFinite(uv))
             {
-                uv = IsFinite((*texcoords)[i]) ? (*texcoords)[i] : glm::vec2{0.0f};
-            }
-            else if (normals != nullptr)
-            {
-                uv = EncodeOctNormalOrZero((*normals)[i]);
+                return Failure(MeshPackStatus::NonFiniteTexcoord, outBuffer);
             }
             vData[i] = MeshVertex{p.x, p.y, p.z, uv.x, uv.y};
             minP = glm::min(minP, p);
@@ -380,6 +338,18 @@ namespace Extrinsic::Runtime
         if (vertexCount == 0)
         {
             return MeshPackStatus::EmptyMesh;
+        }
+        const auto texcoordProp = view.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
+        if (!texcoordProp || texcoordProp.Vector().size() != vertexCount)
+        {
+            return MeshPackStatus::MissingTexcoords;
+        }
+        for (const glm::vec2 uv : texcoordProp.Vector())
+        {
+            if (!IsFinite(uv))
+            {
+                return MeshPackStatus::NonFiniteTexcoord;
+            }
         }
 
         if (view.HalfedgeSource == nullptr)

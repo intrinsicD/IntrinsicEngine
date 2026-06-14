@@ -112,12 +112,14 @@ export namespace Extrinsic::Graphics
     inline constexpr std::uint32_t kMaterialTypeID_StandardPBR         = 0u;
     inline constexpr std::uint32_t kMaterialTypeID_SciVis              = 1u;
     inline constexpr std::uint32_t kMaterialTypeID_DefaultDebugSurface = 2u;
+    inline constexpr std::uint32_t kMaterialTypeID_DefaultDebugUVs     = 3u;
 
     // Built-in type registration names — referenced by MaterialSystem::Initialize()
     // and by subsystems that look up the registered handles (e.g. VisualizationSyncSystem).
     inline constexpr const char* kMaterialTypeName_StandardPBR         = "StandardPBR";
     inline constexpr const char* kMaterialTypeName_SciVis              = "SciVis";
     inline constexpr const char* kMaterialTypeName_DefaultDebugSurface = "Material.DefaultDebugSurface";
+    inline constexpr const char* kMaterialTypeName_DefaultDebugUVs     = "Material.DefaultDebugUVs";
 
     // Slot 0 carries the canonical missing-material fallback so any
     // invalid MaterialHandle resolves to a visible purple debug surface.

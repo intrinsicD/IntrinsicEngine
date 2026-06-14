@@ -5,6 +5,7 @@
 
 #include <glm/glm.hpp>
 
+import Extrinsic.Asset.Registry;
 import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.VisualizationPackets;
 
@@ -210,6 +211,10 @@ TEST(GraphicsVisualizationPackets, FragmentBakesCanUseExistingTexcoordsOrForcedH
             .AtlasWidth = 512u,
             .AtlasHeight = 512u,
             .TexcoordBufferBDA = 0xCAFEu,
+            .AtlasTextureAsset = Assets::AssetId{301u, 1u},
+            .TexcoordProvenance =
+                Graphics::VisualizationTexcoordProvenance::GeneratedAtlas,
+            .TexcoordDirtyStamp = 42u,
         },
         Graphics::FragmentBakeAtlasPacket{
             .Name = "kmeans_labels_htex_bake",
@@ -242,9 +247,67 @@ TEST(GraphicsVisualizationPackets, FragmentBakesCanUseExistingTexcoordsOrForcedH
 
     const Graphics::VisualizationOverlaySummary summary = Graphics::BuildVisualizationOverlaySummary(batch);
     EXPECT_EQ(summary.UvBakeAtlasDescriptorCount, 1u);
+    EXPECT_EQ(summary.GeneratedUvBakeAtlasDescriptorCount, 1u);
+    EXPECT_EQ(summary.AuthoredUvBakeAtlasDescriptorCount, 0u);
+    EXPECT_EQ(summary.RuntimeResolvedUvBakeAtlasDescriptorCount, 0u);
     EXPECT_EQ(summary.HtexBakeAtlasDescriptorCount, 2u);
     EXPECT_EQ(summary.HtexRecreateRequestCount, 1u);
+    EXPECT_EQ(summary.FragmentBakeTextureAssetDescriptorCount, 1u);
     EXPECT_TRUE(summary.RequiresTextureResidency);
+}
+
+TEST(GraphicsVisualizationPackets, ResolvedUvBakeProvenanceIsReportedWithoutImplicitHtex)
+{
+    const std::array<Graphics::FragmentBakeAtlasPacket, 3> bakes{{
+        Graphics::FragmentBakeAtlasPacket{
+            .Name = "authored_uv_bake",
+            .SourceAttributeName = "albedo",
+            .Mapping = Graphics::VisualizationFragmentBakeMapping::ExistingTexcoords,
+            .MeshHasTexcoords = true,
+            .FaceCount = 8u,
+            .AtlasWidth = 128u,
+            .AtlasHeight = 128u,
+            .TexcoordBufferBDA = 0x1000u,
+            .TexcoordProvenance =
+                Graphics::VisualizationTexcoordProvenance::Authored,
+        },
+        Graphics::FragmentBakeAtlasPacket{
+            .Name = "runtime_resolved_uv_bake",
+            .SourceAttributeName = "normal",
+            .Mapping = Graphics::VisualizationFragmentBakeMapping::ExistingTexcoords,
+            .MeshHasTexcoords = true,
+            .FaceCount = 8u,
+            .AtlasWidth = 128u,
+            .AtlasHeight = 128u,
+            .TexcoordBufferBDA = 0x2000u,
+            .TexcoordProvenance =
+                Graphics::VisualizationTexcoordProvenance::RuntimeResolved,
+        },
+        Graphics::FragmentBakeAtlasPacket{
+            .Name = "forced_htex_bake",
+            .SourceAttributeName = "labels",
+            .Mapping = Graphics::VisualizationFragmentBakeMapping::ExistingHtex,
+            .MeshHasTexcoords = true,
+            .FaceCount = 8u,
+            .AtlasWidth = 128u,
+            .AtlasHeight = 128u,
+        },
+    }};
+
+    const Graphics::VisualizationPacketBatch batch{.FragmentBakeAtlases = bakes};
+    const Graphics::VisualizationDiagnostics diagnostics =
+        Graphics::ValidateVisualizationPackets(batch);
+    EXPECT_EQ(diagnostics.AcceptedPacketCount, 3u);
+    EXPECT_EQ(diagnostics.MissingTexcoordCount, 0u);
+    EXPECT_FALSE(diagnostics.HasErrors);
+
+    const Graphics::VisualizationOverlaySummary summary =
+        Graphics::BuildVisualizationOverlaySummary(batch);
+    EXPECT_EQ(summary.UvBakeAtlasDescriptorCount, 2u);
+    EXPECT_EQ(summary.AuthoredUvBakeAtlasDescriptorCount, 1u);
+    EXPECT_EQ(summary.RuntimeResolvedUvBakeAtlasDescriptorCount, 1u);
+    EXPECT_EQ(summary.HtexBakeAtlasDescriptorCount, 1u);
+    EXPECT_EQ(summary.HtexRecreateRequestCount, 0u);
 }
 
 TEST(GraphicsVisualizationPackets, TexcoordBakesRequireExistingUvData)
@@ -285,4 +348,3 @@ TEST(GraphicsVisualizationPackets, TexcoordBakesRequireExistingUvData)
     EXPECT_EQ(summary.UvBakeAtlasDescriptorCount, 0u);
     EXPECT_EQ(summary.HtexBakeAtlasDescriptorCount, 0u);
 }
-

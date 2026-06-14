@@ -110,6 +110,15 @@ namespace
         property.Vector() = std::move(positions);
     }
 
+    void SetTexcoords(GS::Vertices& vertices,
+                      std::vector<glm::vec2> texcoords)
+    {
+        auto property = vertices.Properties.GetOrAdd<glm::vec2>(
+            "v:texcoord",
+            glm::vec2{0.0f});
+        property.Vector() = std::move(texcoords);
+    }
+
     void SetEdges(GS::Edges& edges,
                   std::vector<std::uint32_t> v0,
                   std::vector<std::uint32_t> v1)
@@ -171,6 +180,12 @@ namespace
                          {0.0f, 0.0f, 0.0f},
                          {1.0f, 0.0f, 0.0f},
                          {0.0f, 1.0f, 0.0f},
+                     });
+        SetTexcoords(vertices,
+                     {
+                         {0.0f, 0.0f},
+                         {1.0f, 0.0f},
+                         {0.0f, 1.0f},
                      });
         auto& edges = raw.emplace<GS::Edges>(entity);
         SetEdges(edges, {0u, 1u, 2u}, {1u, 2u, 0u});
@@ -290,6 +305,8 @@ TEST(RuntimeSceneSerialization, SaveLoadRoundTripPreservesPromotedSandboxSceneDa
     ASSERT_TRUE(parsed["entities"][0]["render"]["visualization"].is_object());
     EXPECT_EQ(parsed["entities"][0]["render"]["visualization"]["source"].get<std::string>(),
               "ScalarField");
+    ASSERT_TRUE(parsed["entities"][0]["geometrySources"]["vertices"]["texcoords"].is_array());
+    EXPECT_EQ(parsed["entities"][0]["geometrySources"]["vertices"]["texcoords"].size(), 3u);
 
     ECS::Scene::Registry loaded;
     auto loadedResult = Runtime::LoadSceneDocument(loaded, "scene.json", backend);
@@ -333,6 +350,12 @@ TEST(RuntimeSceneSerialization, SaveLoadRoundTripPreservesPromotedSandboxSceneDa
     ASSERT_TRUE(meshPositions.IsValid());
     ASSERT_EQ(meshPositions.Vector().size(), 3u);
     EXPECT_FLOAT_EQ(meshPositions.Vector()[1].x, 1.0f);
+    const auto meshTexcoords = meshView.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
+    ASSERT_TRUE(meshTexcoords.IsValid());
+    ASSERT_EQ(meshTexcoords.Vector().size(), 3u);
+    EXPECT_EQ(meshTexcoords.Vector()[0], glm::vec2(0.0f, 0.0f));
+    EXPECT_EQ(meshTexcoords.Vector()[1], glm::vec2(1.0f, 0.0f));
+    EXPECT_EQ(meshTexcoords.Vector()[2], glm::vec2(0.0f, 1.0f));
     EXPECT_EQ(meshView.FaceSource->Properties.Get<std::uint32_t>(PN::kFaceHalfedge).Vector()[0], 0u);
 
     const auto& surface = raw.get<G::RenderSurface>(loadedMesh);

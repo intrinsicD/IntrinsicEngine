@@ -1273,6 +1273,8 @@ TEST(RendererFrameLifecycle, ForwardSurfacePipelineSurvivesOperationalRebuild)
     EXPECT_NE(surfaceVertex.find("fragUv = v.UV"), std::string::npos);
     EXPECT_NE(surfaceFragment.find("mat.AlbedoID"), std::string::npos);
     EXPECT_NE(surfaceFragment.find("mat.NormalID"), std::string::npos);
+    EXPECT_NE(surfaceFragment.find("GpuMaterialType_DefaultDebugUVs"), std::string::npos);
+    EXPECT_NE(surfaceFragment.find("DebugUvChecker(fragUv)"), std::string::npos);
     EXPECT_NE(surfaceFragment.find("normalShade"), std::string::npos);
 
     Extrinsic::Tests::MockDevice device;
