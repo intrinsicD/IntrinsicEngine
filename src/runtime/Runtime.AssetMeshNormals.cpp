@@ -262,6 +262,26 @@ namespace Extrinsic::Runtime
             return true;
         }
 
+        [[nodiscard]] bool HasValidTexcoords(
+            const Geometry::MeshIO::MeshIOResult& meshPayload) noexcept
+        {
+            const auto texcoords =
+                meshPayload.Vertices.Get<glm::vec2>(kTexcoordProperty);
+            if (!texcoords ||
+                texcoords.Vector().size() != meshPayload.Vertices.Size())
+            {
+                return false;
+            }
+            for (const glm::vec2 texcoord : texcoords.Vector())
+            {
+                if (!IsFinite(texcoord))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         [[nodiscard]] float NormalizeAxis(
             const float value,
             const float minValue,
@@ -422,6 +442,12 @@ namespace Extrinsic::Runtime
             WriteVertexNormalsRemapped(mesh, normals, sourceVertexForTargetVertex);
             return mesh;
         }
+    }
+
+    bool MeshPayloadHasValidVertexTexcoords(
+        const Geometry::MeshIO::MeshIOResult& meshPayload) noexcept
+    {
+        return HasValidTexcoords(meshPayload);
     }
 
     Core::Expected<Geometry::HalfedgeMesh::Mesh> BuildRuntimeHalfedgeMeshWithNormals(

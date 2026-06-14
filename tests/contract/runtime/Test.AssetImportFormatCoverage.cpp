@@ -18,6 +18,7 @@
 
 import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.ImportRouter;
+import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Error;
 import Extrinsic.ECS.Components.GeometrySources;
@@ -261,8 +262,39 @@ namespace
         auto boundPath = engine.GetAssetService().GetPath(binding->Normal);
         ASSERT_TRUE(boundPath.has_value()) << static_cast<int>(boundPath.error());
         EXPECT_EQ(*boundPath, generatedPath);
+        auto payload = engine.GetAssetService().Read<Assets::AssetTexture2DPayload>(
+            binding->Normal);
+        ASSERT_TRUE(payload.has_value()) << static_cast<int>(payload.error());
+        ASSERT_EQ(payload->size(), 1u);
+        EXPECT_EQ((*payload)[0].Metadata.Width, 64u);
+        EXPECT_EQ((*payload)[0].Metadata.Height, 64u);
+        EXPECT_EQ((*payload)[0].Metadata.PixelFormat,
+                  Assets::AssetTexturePixelFormat::Rgba8Unorm);
+        EXPECT_EQ((*payload)[0].Metadata.ColorSpace,
+                  Assets::AssetTextureColorSpace::Linear);
+        EXPECT_EQ((*payload)[0].Metadata.SourceKind,
+                  Assets::AssetTextureSourceKind::Generated);
+        EXPECT_EQ((*payload)[0].PixelBytes.size(), 64u * 64u * 4u);
         EXPECT_EQ(engine.GetGpuAssetCache().GetState(binding->Normal),
                   Graphics::GpuAssetState::NotRequested);
+    }
+
+    void ExpectNoGeneratedNormalTextureBinding(
+        Runtime::Engine& engine,
+        const ECS::EntityHandle entity,
+        const std::string_view meshPath)
+    {
+        const std::string generatedPath =
+            Runtime::BuildGeneratedTextureAssetPath(
+                meshPath,
+                0u,
+                "normal",
+                "v:normal");
+        EXPECT_FALSE(engine.GetAssetService().PathIndexContains(generatedPath));
+
+        const std::uint32_t stableId =
+            Runtime::StableEntityLookup::ToRenderId(entity);
+        EXPECT_FALSE(engine.GetMaterialTextureAssetBindingsForTest(stableId).has_value());
     }
 }
 
@@ -288,6 +320,8 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesVertexNormalsInGe
     ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
     EXPECT_EQ(imported->PayloadKind, Assets::AssetPayloadKind::Mesh);
     EXPECT_EQ(imported->PrimitiveEntitiesCreated, 1u);
+    EXPECT_EQ(imported->GeneratedTextureAssetsCreated, 0u);
+    EXPECT_EQ(imported->GeneratedTextureUploadRequests, 0u);
 
     const std::optional<ECS::EntityHandle> meshEntity =
         FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
@@ -300,6 +334,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesVertexNormalsInGe
             {0.0f, 1.0f, 0.0f},
             {0.0f, 0.0f, -1.0f},
         });
+    ExpectNoGeneratedNormalTextureBinding(engine, *meshEntity, meshFile.Path.string());
 
     engine.Shutdown();
 }
@@ -365,6 +400,8 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesVertexNormalsWhenM
     });
     ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
     EXPECT_EQ(imported->PrimitiveEntitiesCreated, 1u);
+    EXPECT_EQ(imported->GeneratedTextureAssetsCreated, 0u);
+    EXPECT_EQ(imported->GeneratedTextureUploadRequests, 0u);
 
     const std::optional<ECS::EntityHandle> meshEntity =
         FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
@@ -377,6 +414,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesVertexNormalsWhenM
             {0.0f, 0.0f, 1.0f},
             {0.0f, 0.0f, 1.0f},
         });
+    ExpectNoGeneratedNormalTextureBinding(engine, *meshEntity, meshFile.Path.string());
 
     engine.Shutdown();
 }

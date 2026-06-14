@@ -21,6 +21,10 @@ maturity_target: Operational
 - Latest verification: focused graphics/runtime targets and the default
   CPU-supported correctness gate pass. Vulkan generated-UV smoke remains
   pending by design.
+- 2026-06-14 rendering-artifact debug: direct/model generated material bakes are
+  now gated on source-authored valid `v:texcoord`. Runtime projection fallback
+  UVs still keep no-UV meshes renderable, but they are not treated as a
+  material-bake atlas until the xatlas/default-atlas task replaces the fallback.
 
 ## Goal
 - Wire the renderer/material path so resolved mesh UVs are the canonical surface texture coordinate source for material sampling, generated bakes, UV debug inspection, and UV-backed visualization bake atlases.
@@ -59,7 +63,7 @@ maturity_target: Operational
 - [x] Audit forward/deferred surface shader inputs and material binding code so the surface UV channel is consistently treated as resolved texture coordinates.
 - [x] Add or update renderer diagnostics that report missing/invalid UV attempts as upstream extraction failures rather than shader-side fallbacks.
 - [x] Add a UV debug/checker material or debug-view mode for inspecting resolved UVs and atlas seams.
-- [x] Ensure generated normal and albedo texture bindings flow through existing `GpuAssetCache` and material texture slots.
+- [x] Ensure generated normal and albedo texture bindings flow through existing `GpuAssetCache` and material texture slots when source UVs are valid, and skip material-bake bindings for projection fallback UVs.
 - [x] Add explicit visualization texture asset descriptors/provenance for generated UV-backed bake atlases.
 - [ ] Extend generic scalar, vector, future PBR, and displacement generated texture bindings after `RUNTIME-109` exposes the runtime bake request contract.
 - [x] Update UV-backed `FragmentBakeAtlasPacket` handling so resolved-UV mesh bakes do not require Htex recreation and report provenance/diagnostics when available.
@@ -81,7 +85,7 @@ maturity_target: Operational
 
 ## Acceptance criteria
 - [x] Renderer-visible mesh UVs always mean resolved texture coordinates, never encoded normals or placeholder zero UVs.
-- [x] Generated normal/albedo texture bindings produced by runtime bakes are sampled through the normal graphics texture residency/material path.
+- [x] Generated normal/albedo texture bindings produced by runtime bakes are sampled through the normal graphics texture residency/material path; projection fallback UVs are render-valid only and do not trigger material-bake bindings.
 - [x] UV-backed visualization bakes use resolved UVs by default; Htex is retained as an explicit alternate mapping.
 - [ ] A Vulkan-capable host has opt-in smoke evidence for generated-UV texture sampling.
 - [x] Graphics layering remains free of live `AssetService`, ECS, runtime, geometry backend, or `xatlas` dependencies.

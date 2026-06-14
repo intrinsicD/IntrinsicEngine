@@ -48,6 +48,7 @@ namespace Extrinsic::Runtime
             std::uint32_t MaterialIndex{Assets::kInvalidAssetModelIndex};
             std::string Name{};
             Geometry::HalfedgeMesh::Mesh Mesh{};
+            bool SourceHasValidTexcoords{false};
         };
 
         struct GeneratedMaterialTextureAssets
@@ -162,6 +163,8 @@ namespace Extrinsic::Runtime
                     return Core::Err<std::vector<PreparedPrimitive>>(meshPayload.error());
                 }
 
+                const bool sourceHasValidTexcoords =
+                    MeshPayloadHasValidVertexTexcoords(**meshPayload);
                 auto mesh = BuildRuntimeHalfedgeMeshWithNormals(**meshPayload);
                 if (!mesh.has_value())
                 {
@@ -176,6 +179,7 @@ namespace Extrinsic::Runtime
                         ? "model-primitive-" + std::to_string(primitiveIndex)
                         : primitive.Name,
                     .Mesh = std::move(*mesh),
+                    .SourceHasValidTexcoords = sourceHasValidTexcoords,
                 });
             }
 
@@ -394,6 +398,10 @@ namespace Extrinsic::Runtime
                 for (const PreparedPrimitive& primitive : primitives)
                 {
                     if (primitive.MaterialIndex != materialIndex)
+                    {
+                        continue;
+                    }
+                    if (!primitive.SourceHasValidTexcoords)
                     {
                         continue;
                     }

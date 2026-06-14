@@ -302,6 +302,7 @@ namespace Extrinsic::Runtime
         {
             Geometry::MeshIO::MeshIOResult Payload{};
             Geometry::HalfedgeMesh::Mesh Mesh{};
+            bool SourceHasValidTexcoords{false};
         };
 
         struct DecodedGraphImport
@@ -506,9 +507,14 @@ namespace Extrinsic::Runtime
             RenderExtractionCache& extraction,
             const std::string_view meshPath,
             const ECS::EntityHandle entity,
-            const Geometry::HalfedgeMesh::Mesh& mesh)
+            const Geometry::HalfedgeMesh::Mesh& mesh,
+            const bool sourceHasValidTexcoords)
         {
             DirectMeshGeneratedTextureResult result{};
+            if (!sourceHasValidTexcoords)
+            {
+                return result;
+            }
 
             MeshAttributeTextureBakeOptions options{};
             options.SourcePropertyName = "v:normal";
@@ -626,6 +632,8 @@ namespace Extrinsic::Runtime
                     .Payload = DecodedMeshImport{
                         .Payload = **meshPayload,
                         .Mesh = std::move(*mesh),
+                        .SourceHasValidTexcoords =
+                            MeshPayloadHasValidVertexTexcoords(**meshPayload),
                     },
                 };
             }
@@ -732,7 +740,8 @@ namespace Extrinsic::Runtime
                                 extraction,
                                 decoded.Path,
                                 entity,
-                                payload.Mesh);
+                                payload.Mesh,
+                                payload.SourceHasValidTexcoords);
                         if (!generatedTexture.has_value())
                         {
                             return Core::Err<MaterializedGeometryImport>(

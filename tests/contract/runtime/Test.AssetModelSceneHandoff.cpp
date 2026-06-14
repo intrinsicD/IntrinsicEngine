@@ -433,7 +433,7 @@ TEST(RuntimeAssetModelSceneHandoff, GeneratesMissingAlbedoTextureFromVertexColor
     EXPECT_EQ(diagnostics.GeneratedTextureBakeFailures, 0u);
 }
 
-TEST(RuntimeAssetModelSceneHandoff, MissingTexcoordsReceiveFallbackAndGenerateNormalTexture)
+TEST(RuntimeAssetModelSceneHandoff, MissingTexcoordsReceiveFallbackAndSkipGeneratedMaterialTextures)
 {
     SceneHandoffFixture fx;
     TmpFile modelFile("asset_model_scene_handoff_missing_texcoords.gltf");
@@ -481,16 +481,13 @@ TEST(RuntimeAssetModelSceneHandoff, MissingTexcoordsReceiveFallbackAndGenerateNo
     }
     EXPECT_TRUE(sawNonZeroTexcoord);
 
-    ASSERT_EQ(state->Record.GeneratedTextureAssets.size(), 1u);
-    const Assets::AssetId generatedNormal = state->Record.GeneratedTextureAssets[0];
-    EXPECT_TRUE(generatedNormal.IsValid());
-    EXPECT_EQ(fx.Cache.GetState(generatedNormal), Graphics::GpuAssetState::GpuUploading);
-    ASSERT_EQ(fx.Transfer.TextureUploads.size(), 1u);
-    EXPECT_EQ(fx.Transfer.TextureUploads[0].SizeBytes, 64u * 64u * 4u);
+    EXPECT_TRUE(state->Record.GeneratedTextureAssets.empty());
+    EXPECT_TRUE(fx.Transfer.TextureUploads.empty());
     ASSERT_EQ(state->Record.Materials.size(), 1u);
-    EXPECT_EQ(state->Record.Materials[0].TextureBindings.Normal, generatedNormal);
-    EXPECT_EQ(diagnostics.GeneratedTextureAssetsCreated, 1u);
-    EXPECT_EQ(diagnostics.GeneratedTextureUploadRequests, 1u);
+    EXPECT_FALSE(state->Record.Materials[0].TextureBindings.Albedo.IsValid());
+    EXPECT_FALSE(state->Record.Materials[0].TextureBindings.Normal.IsValid());
+    EXPECT_EQ(diagnostics.GeneratedTextureAssetsCreated, 0u);
+    EXPECT_EQ(diagnostics.GeneratedTextureUploadRequests, 0u);
     EXPECT_EQ(diagnostics.GeneratedTextureBakeFailures, 0u);
     EXPECT_EQ(diagnostics.GeneratedNormalTextureBakeFailures, 0u);
 }

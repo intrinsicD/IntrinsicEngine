@@ -15,6 +15,9 @@ export namespace Extrinsic::Runtime
         bool AllowDisconnectedRenderableFallback{false};
     };
 
+    [[nodiscard]] bool MeshPayloadHasValidVertexTexcoords(
+        const Geometry::MeshIO::MeshIOResult& meshPayload) noexcept;
+
     [[nodiscard]] Core::Expected<Geometry::HalfedgeMesh::Mesh>
     BuildRuntimeHalfedgeMeshWithNormals(
         const Geometry::MeshIO::MeshIOResult& meshPayload,
