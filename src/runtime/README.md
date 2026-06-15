@@ -187,7 +187,7 @@ freshly-constructed subsystems):
    surface does not exist in that build). Runtime never aborts solely
    because requested Vulkan falls back to Null — see the truth table in
    `src/graphics/vulkan/README.md`.
-3. CPU `FrameGraph` and streaming `TaskGraph` + `StreamingExecutor`.
+3. CPU `FrameGraph` and `StreamingExecutor`.
 4. `Assets::AssetService`.
 5. `Graphics::GpuAssetCache` construction with the renderer's
    `BufferManager`, `TextureManager`, `SamplerManager`, and the device's
@@ -329,10 +329,9 @@ introduced.
 ## Streaming integration
 
 `Extrinsic.Runtime.StreamingExecutor` is the primary persistent async streaming
-execution path. `Engine` still carries a temporary compatibility bridge for
-legacy `GetStreamingGraph()` producers while migration is in progress; the
-bridge's removal is owned by `RUNTIME-105`
-(`tasks/backlog/runtime/RUNTIME-105-remove-streaming-graph-bridge.md`).
+execution path. Runtime-owned async asset IO, visualization baking, and geometry
+processing callers submit persistent executor work directly; `Engine` no longer
+exposes a frame-recorded streaming `TaskGraph` bridge.
 
 Shutdown order requirement:
 

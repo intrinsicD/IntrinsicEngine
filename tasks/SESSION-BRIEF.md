@@ -27,7 +27,6 @@ the authoritative open/unblocked view.
 - unblocked: `RORG-031F` — UI integration backlog seed (tasks/backlog/ui/RORG-031-ui-integration.md)
 - unblocked: `RUNTIME-101` — Asset ingest state-machine migration (tasks/backlog/runtime/RUNTIME-101-asset-ingest-state-machine.md)
 - unblocked: `RUNTIME-103` — Geometry algorithm execution queue (tasks/backlog/runtime/RUNTIME-103-geometry-algorithm-execution-queue.md)
-- unblocked: `RUNTIME-105` — Remove the deprecated GetStreamingGraph() TaskGraph bridge (tasks/backlog/runtime/RUNTIME-105-remove-streaming-graph-bridge.md)
 - unblocked: `RUNTIME-107` — Headless-capable Engine::Run loop coverage (tasks/backlog/runtime/RUNTIME-107-headless-engine-loop-coverage.md)
 
 ## Unthemed

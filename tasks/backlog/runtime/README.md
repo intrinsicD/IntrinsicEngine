@@ -13,9 +13,6 @@ another backlog directory.
 - [RUNTIME-103 — Geometry algorithm execution queue](RUNTIME-103-geometry-algorithm-execution-queue.md):
   value-gated asynchronous CPU geometry processing for legacy K-Means behavior;
   `GRAPHICS-086` retired CUDA from the promoted default path.
-- [RUNTIME-105 — Remove the deprecated GetStreamingGraph() TaskGraph bridge](RUNTIME-105-remove-streaming-graph-bridge.md):
-  pure bridge deletion opened by `HARDEN-078`; the promoted tree already has
-  zero consumers outside the Engine bridge itself.
 - [RUNTIME-107 — Headless-capable Engine::Run loop coverage](RUNTIME-107-headless-engine-loop-coverage.md):
   follow-up split from BUG-030 to make currently guarded sandbox/runtime
   `Engine::Run()` regressions execute through an explicit headless-capable loop
@@ -65,6 +62,11 @@ split; narratives live in the retirement log.
   count-matched finite `v:texcoord` and never substitutes oct-encoded normals
   into `MeshVertex::U/V`; missing or invalid texture coordinates fail closed
   with explicit runtime extraction diagnostics.
+- [RUNTIME-105 — Remove the deprecated GetStreamingGraph() TaskGraph bridge](../../done/RUNTIME-105-remove-streaming-graph-bridge.md)
+  (done, 2026-06-15, `Retired`): deleted the promoted runtime
+  `Engine::GetStreamingGraph()` compatibility accessor, the private streaming
+  task graph, and the per-frame TaskGraph-to-`StreamingExecutor` conversion.
+  `StreamingExecutor` is now the only promoted runtime streaming path.
 - [GRAPHICS-084 — Visualization property-buffer residency](../../done/GRAPHICS-084-visualization-property-buffer-residency.md)
   (done, 2026-06-11, `CPUContracted`): consumed runtime visualization adapter/
   property selections while keeping GPU upload ownership in graphics.

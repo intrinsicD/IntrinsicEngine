@@ -8,6 +8,21 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+Backlog
+[`RUNTIME-105`](RUNTIME-105-remove-streaming-graph-bridge.md) — Remove the
+deprecated `GetStreamingGraph()` TaskGraph bridge — retired on 2026-06-15 at
+maturity `Retired`. The promoted runtime no longer exports
+`Engine::GetStreamingGraph()`, no longer owns a private streaming
+`TaskGraph`, and no longer converts per-frame graph passes into
+`StreamingExecutor` tasks during maintenance. `Runtime.Engine` now owns only
+the persistent `StreamingExecutor` path for async asset IO / geometry
+processing work, and `src/runtime/README.md` documents that current state.
+The `RuntimeEngineLayering` source-inspection harness was corrected to inspect
+`Core.FrameLoop.cpp`, where the promoted frame-loop implementation lives, so
+the existing runtime layering prefix covers the bridge deletion. Focused
+runtime frame-loop, streaming-executor, and layering prefixes passed, and the
+default CPU-supported CTest gate passed.
+
 Active
 [`INFRA-001`](INFRA-001-vcpkg-manifest-mode.md) — Move third-party
 dependencies to a vcpkg manifest — retired on 2026-06-15 at maturity

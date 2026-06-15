@@ -39,7 +39,7 @@ namespace
 TEST(RuntimeEngineLayering, RunFrameDoesNotUseGpuResourceOrPassLevelDetails)
 {
     const auto content = ReadFile(RepoRoot() / "src/runtime/Runtime.Engine.cpp");
-    const auto frameLoop = ReadFile(RepoRoot() / "src/core/Core.FrameLoop.cppm");
+    const auto frameLoop = ReadFile(RepoRoot() / "src/core/Core.FrameLoop.cpp");
     const auto runFrame = SliceBetween(content,
                                        "void Engine::RunFrame()",
                                        "bool Engine::IsRunning() const noexcept");
@@ -141,7 +141,7 @@ TEST(RuntimeEngineLayering, RunFrameCarriesDataOnlyFrameContext)
 
 TEST(RuntimeEngineLayering, PromotedFrameLoopContractPreservesRendererAndMaintenanceOrder)
 {
-    const auto content = ReadFile(RepoRoot() / "src/core/Core.FrameLoop.cppm");
+    const auto content = ReadFile(RepoRoot() / "src/core/Core.FrameLoop.cpp");
 
     const auto beginFrame = content.find("hooks.BeginFrame()");
     const auto extract = content.find("hooks.ExtractRenderWorld()");

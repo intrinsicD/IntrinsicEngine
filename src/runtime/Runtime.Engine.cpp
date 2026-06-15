@@ -7,7 +7,6 @@ module;
 #include <cstdint>
 #include <functional>
 #include <memory>
-#include <limits>
 #include <optional>
 #include <span>
 #include <string>
@@ -29,7 +28,6 @@ import Extrinsic.Backends.Vulkan;
 import Extrinsic.Backends.Null;
 import Extrinsic.Core.Config.Render;
 import Extrinsic.Core.Dag.Scheduler;
-import Extrinsic.Core.Dag.TaskGraph;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.FrameClock;
 import Extrinsic.Core.FrameGraph;
@@ -1039,68 +1037,6 @@ namespace Extrinsic::Runtime
             }
         }
 
-        // Converts frame-recorded streaming passes into persistent executor tasks.
-        // Kept as compatibility bridge while call sites still populate GetStreamingGraph().
-        void SubmitStreamingGraphToExecutor(Core::Dag::TaskGraph& graph, StreamingExecutor& executor)
-        {
-            if (graph.PassCount() == 0)
-                return;
-
-            if (auto r = graph.Compile(); !r.has_value())
-            {
-                Core::Log::Error("[Runtime] StreamingGraph Compile() failed: error={}",
-                           static_cast<int>(r.error()));
-                graph.Reset();
-                return;
-            }
-
-            auto plan = graph.BuildPlan();
-            if (!plan.has_value())
-            {
-                Core::Log::Error("[Runtime] StreamingGraph BuildPlan() failed: error={}",
-                           static_cast<int>(plan.error()));
-                graph.Reset();
-                return;
-            }
-
-            // Convert layer order into coarse dependencies:
-            // every task in batch N depends on all submitted tasks from batches < N.
-            // This preserves correctness and determinism with possible over-serialization.
-            std::vector<StreamingTaskHandle> priorBatches{};
-            std::vector<StreamingTaskHandle> currentBatch{};
-            std::uint32_t activeBatch = std::numeric_limits<std::uint32_t>::max();
-
-            for (const auto& task : *plan)
-            {
-                if (task.batch != activeBatch)
-                {
-                    priorBatches.insert(priorBatches.end(), currentBatch.begin(), currentBatch.end());
-                    currentBatch.clear();
-                    activeBatch = task.batch;
-                }
-
-                auto fn = graph.TakePassExecute(task.id.Index);
-                if (fn)
-                {
-                    auto handle = executor.Submit(StreamingTaskDesc{
-                        .Name = "StreamingPass",
-                        .DependsOn = priorBatches,
-                        .Execute = [f = std::move(fn)]() mutable
-                        {
-                            f();
-                            return StreamingResult{};
-                        },
-                    });
-
-                    if (handle.IsValid())
-                    {
-                        currentBatch.push_back(handle);
-                    }
-                }
-            }
-
-            graph.Reset();
-        }
     }
 
     RuntimeDeviceSelection SelectRuntimeDeviceBackend(
@@ -1247,8 +1183,7 @@ namespace Extrinsic::Runtime
         // ── 3. CPU task graph (ECS system scheduling) ─────────────────────
         m_FrameGraph = std::make_unique<Core::FrameGraph>();
 
-        // ── 4. Streaming task graph (asset IO / geometry processing) ──────
-        m_StreamingGraph = Core::Dag::CreateTaskGraph(Core::Dag::QueueDomain::Streaming);
+        // ── 4. Streaming executor (asset IO / geometry processing) ────────
         m_StreamingExecutor = std::make_unique<StreamingExecutor>();
 
         // ── 5. Asset service ──────────────────────────────────────────────
@@ -1381,7 +1316,6 @@ namespace Extrinsic::Runtime
             std::unique_ptr<RHI::IDevice>& Device;
             std::unique_ptr<Graphics::IRenderer>& Renderer;
             std::unique_ptr<Core::FrameGraph>& FrameGraph;
-            std::unique_ptr<Core::Dag::TaskGraph>& StreamingGraph;
             std::unique_ptr<StreamingExecutor>& StreamingExecutorPtr;
             std::unique_ptr<Assets::AssetService>& AssetService;
             std::unique_ptr<Graphics::GpuAssetCache>& GpuAssetCache;
@@ -1405,7 +1339,6 @@ namespace Extrinsic::Runtime
                           std::unique_ptr<RHI::IDevice>& device,
                           std::unique_ptr<Graphics::IRenderer>& renderer,
                           std::unique_ptr<Core::FrameGraph>& frameGraph,
-                          std::unique_ptr<Core::Dag::TaskGraph>& streamingGraph,
                           std::unique_ptr<StreamingExecutor>& streamingExecutor,
                           std::unique_ptr<Assets::AssetService>& assetService,
                           std::unique_ptr<Graphics::GpuAssetCache>& gpuAssetCache,
@@ -1428,7 +1361,6 @@ namespace Extrinsic::Runtime
                 , Device(device)
                 , Renderer(renderer)
                 , FrameGraph(frameGraph)
-                , StreamingGraph(streamingGraph)
                 , StreamingExecutorPtr(streamingExecutor)
                 , AssetService(assetService)
                 , GpuAssetCache(gpuAssetCache)
@@ -1506,7 +1438,6 @@ namespace Extrinsic::Runtime
             void DestroyStreamingState() override
             {
                 StreamingExecutorPtr.reset();
-                StreamingGraph.reset();
             }
             void DestroyFrameGraph() override { FrameGraph.reset(); }
             void ShutdownRenderer() override
@@ -1544,7 +1475,6 @@ namespace Extrinsic::Runtime
                             m_Device,
                             m_Renderer,
                             m_FrameGraph,
-                            m_StreamingGraph,
                             m_StreamingExecutor,
                             m_AssetService,
                             m_GpuAssetCache,
@@ -2055,18 +1985,16 @@ namespace Extrinsic::Runtime
 
         struct StreamingHooks final : Core::IStreamingFrameHooks
         {
-            Core::Dag::TaskGraph& Graph;
             StreamingExecutor& Executor;
 
-            StreamingHooks(Core::Dag::TaskGraph& graph, StreamingExecutor& executor)
-                : Graph(graph)
-                , Executor(executor)
+            explicit StreamingHooks(StreamingExecutor& executor)
+                : Executor(executor)
             {
             }
 
             void DrainCompletions() override { Executor.DrainCompletions(); }
             void ApplyMainThreadResults() override { Executor.ApplyMainThreadResults(); }
-            void SubmitFrameWork() override { SubmitStreamingGraphToExecutor(Graph, Executor); }
+            void SubmitFrameWork() override {}
             void PumpBackground(std::uint32_t maxLaunches) override { Executor.PumpBackground(maxLaunches); }
         };
 
@@ -2131,7 +2059,7 @@ namespace Extrinsic::Runtime
         };
 
         TransferHooks transferHooks(*m_Device);
-        StreamingHooks streamingHooks(*m_StreamingGraph, *m_StreamingExecutor);
+        StreamingHooks streamingHooks(*m_StreamingExecutor);
         AssetHooks assetHooks(*m_AssetService,
                               m_GpuAssetCache.get(),
                               m_AssetModelSceneHandoff.get(),
@@ -2826,7 +2754,6 @@ namespace Extrinsic::Runtime
     const std::optional<PrimitiveSelectionResult>&
     Engine::GetLastRefinedPrimitiveSelection() const noexcept { return m_LastRefinedPrimitive; }
     Core::FrameGraph&     Engine::GetFrameGraph()    noexcept { return *m_FrameGraph;    }
-    Core::Dag::TaskGraph& Engine::GetStreamingGraph() noexcept { return *m_StreamingGraph; }
 
     ReferenceSceneRegistry& Engine::GetReferenceSceneRegistry() noexcept
     {

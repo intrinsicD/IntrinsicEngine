@@ -5,6 +5,20 @@ depends_on: []
 ---
 # RUNTIME-105 — Remove the deprecated GetStreamingGraph() TaskGraph bridge
 
+## Status
+
+- State: `done` — retiring to `tasks/done/` on 2026-06-15 at maturity
+  `Retired`.
+- Owner: agent. Branch: `main`.
+- PR/commit: this retirement commit.
+- Resolution: `Engine::GetStreamingGraph()`, `m_StreamingGraph`, and the
+  per-frame `SubmitStreamingGraphToExecutor` compatibility conversion are
+  deleted. `Engine` now owns only the persistent `StreamingExecutor` path for
+  runtime async asset IO / geometry processing work. The stale
+  `RuntimeEngineLayering` harness was corrected to inspect
+  `Core.FrameLoop.cpp`, where the promoted frame-loop implementation lives.
+- Verification: see the commands listed below.
+
 ## Goal
 
 - Delete the temporary `Engine::GetStreamingGraph()` TaskGraph compatibility
@@ -42,40 +56,63 @@ depends_on: []
 
 ## Required changes
 
-- [ ] Confirm the consumer grep is still empty outside `src/legacy/`; if a
+- [x] Confirm the consumer grep is still empty outside `src/legacy/`; if a
       promoted consumer appeared, migrate it to `StreamingExecutor` first.
-- [ ] Remove the `GetStreamingGraph()` accessor (declaration + definition),
+- [x] Remove the `GetStreamingGraph()` accessor (declaration + definition),
       the `m_StreamingGraph` member, and `SubmitStreamingGraphToExecutor`
       plus its RunFrame call site.
-- [ ] Update the `src/runtime/README.md` "Streaming integration" note to
+- [x] Update the `src/runtime/README.md` "Streaming integration" note to
       state that `StreamingExecutor` is the only streaming path.
 
 ## Tests
 
-- [ ] Default CPU gate stays green:
+- [x] Default CPU gate stays green:
       `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`.
-- [ ] No new tests; the bridge is dead code on the promoted path.
+- [x] No new behavior tests; the bridge is dead code on the promoted path.
+      The stale `RuntimeEngineLayering` source-inspection harness was corrected
+      so the existing runtime layering prefix can cover this deletion.
 
 ## Docs
 
-- [ ] `src/runtime/README.md` streaming note updated.
-- [ ] Regenerate `docs/api/generated/module_inventory.md` (public Engine
+- [x] `src/runtime/README.md` streaming note updated.
+- [x] Regenerate `docs/api/generated/module_inventory.md` (public Engine
       surface shrinks).
 
 ## Acceptance criteria
 
-- [ ] `git grep -n "GetStreamingGraph\|SubmitStreamingGraphToExecutor" -- src tests ':!src/legacy'`
+- [x] `git grep -n "GetStreamingGraph\|SubmitStreamingGraphToExecutor" -- src tests ':!src/legacy'`
       returns nothing.
-- [ ] Default CPU gate green.
+- [x] Default CPU gate green.
 
 ## Verification
 
 ```bash
 git grep -n "GetStreamingGraph\|SubmitStreamingGraphToExecutor" -- src tests ':!src/legacy'
-cmake --build --preset ci --target IntrinsicTests
-ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
-python3 tools/repo/check_layering.py --root src --strict
+# Passed: no output.
+
 python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
+# Passed: wrote docs/api/generated/module_inventory.md (484 modules).
+
+cmake --build --preset ci --target IntrinsicTests
+# Passed.
+
+cmake --build --preset ci --target IntrinsicRuntimeIntegrationTests IntrinsicRuntimeGraphicsCpuTests
+# Passed.
+
+ctest --test-dir build/ci --output-on-failure -R RuntimeFrameLoopContract --timeout 60
+# Passed: 18/18 tests.
+
+ctest --test-dir build/ci --output-on-failure -R RuntimeStreamingExecutor --timeout 60
+# Passed: 15/15 tests.
+
+ctest --test-dir build/ci --output-on-failure -R RuntimeEngineLayering --timeout 60
+# Passed: 9/9 tests.
+
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+# Passed: 2972/2972 tests.
+
+python3 tools/repo/check_layering.py --root src --strict
+# Passed: no layering violations found.
 ```
 
 ## Forbidden changes

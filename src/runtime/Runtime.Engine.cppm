@@ -12,7 +12,6 @@ export module Extrinsic.Runtime.Engine;
 
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Render;
-import Extrinsic.Core.Dag.TaskGraph;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.FrameClock;
 import Extrinsic.Core.FrameGraph;
@@ -153,9 +152,9 @@ namespace Extrinsic::Runtime
     // Owns: Window, IDevice, IRenderer, FrameClock,
     //       Tasks::Scheduler (static — initialized/shutdown here),
     //       AssetService, Scene::Registry, FrameGraph (CPU),
-    //       Streaming TaskGraph.
+    //       StreamingExecutor.
     //
-    // Three task graphs:
+    // Scheduling surfaces:
     //   CPU     — Core::FrameGraph wrapping a Dag::TaskGraph(Cpu).
     //             Drives ECS system scheduling each sim tick.
     //             IApplication::OnSimTick adds passes; Engine calls
@@ -164,11 +163,10 @@ namespace Extrinsic::Runtime
     //   GPU     — Owned internally by IRenderer.
     //             Engine drives it via BeginFrame / ExecuteFrame / EndFrame.
     //
-    //   Streaming — Dag::TaskGraph(Streaming) owned by Engine.
-    //               Asset IO / geometry processing tasks.
-    //               IApplication or systems add passes; Engine calls
-    //               Compile → BuildPlan → dispatches via Tasks::Scheduler
-    //               in Phase 10 (maintenance lane) each frame.
+    //   Streaming — Runtime.StreamingExecutor owned by Engine.
+    //               Asset IO / geometry processing tasks submit persistent
+    //               executor work and publish main-thread apply callbacks in
+    //               Phase 10 (maintenance lane) each frame.
     //
     // Frame shape (executed inside Run()):
     //
@@ -192,9 +190,7 @@ namespace Extrinsic::Runtime
     //   Renderer::EndFrame → completedGpuValue
     //   Device::Present
     //   Device::CollectCompletedTransfers
-    //   StreamingGraph: Compile → BuildPlan → dispatch (Streaming task graph)
     //   AssetService::Tick
-    //   StreamingGraph: Reset
     //   EndFrame(clock)
     // ============================================================
 
@@ -271,8 +267,6 @@ namespace Extrinsic::Runtime
         [[nodiscard]] const std::optional<PrimitiveSelectionResult>&
             GetLastRefinedPrimitiveSelection() const noexcept;
         [[nodiscard]] Core::FrameGraph&       GetFrameGraph()    noexcept;
-        [[deprecated("Use Runtime.StreamingExecutor integration; TaskGraph bridge is temporary, removal owned by RUNTIME-105.")]]
-        [[nodiscard]] Core::Dag::TaskGraph&   GetStreamingGraph() noexcept;
 
         // ── GRAPHICS-036C — pipelined-frames render-world pool ────────────
         // Runtime-owned slot-lifecycle pool (`GRAPHICS-036A`) driven by RunFrame:
@@ -423,8 +417,6 @@ namespace Extrinsic::Runtime
 
         // CPU task graph — ECS system scheduling
         std::unique_ptr<Core::FrameGraph>      m_FrameGraph;
-        // Streaming task graph — async asset IO / geometry processing
-        std::unique_ptr<Core::Dag::TaskGraph>  m_StreamingGraph;
         // Persistent streaming executor — cross-frame background work
         std::unique_ptr<StreamingExecutor>      m_StreamingExecutor;
         // Asset service — CPU payload authority
