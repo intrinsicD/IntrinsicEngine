@@ -226,7 +226,10 @@ freshly-constructed subsystems):
 `Engine::Run()` owns the outer loop state: if the loop exits because
 `IWindow::ShouldClose()` is already true before a frame starts or becomes true
 after a frame, it normalizes that path through `RequestExit()` so
-`Engine::IsRunning()` is false when `Run()` returns.
+`Engine::IsRunning()` is false when `Run()` returns. A configured platform
+window that initializes already closed logs a deterministic runtime warning
+instead of falling back to Null silently; tests that need headless frame-loop
+execution should request `Core::Config::WindowBackend::Null` explicitly.
 
 1. Platform events / resize handling. Minimized windows wait on platform events,
    resample the frame clock, and return before ImGui or render-frame work begins;

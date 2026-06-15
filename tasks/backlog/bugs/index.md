@@ -31,7 +31,7 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 - Closed 2026-06-12: [`BUG-031` — Benchmark smoke missing from `IntrinsicTests`](../../done/BUG-031-benchmark-smoke-not-in-intrinsictests-aggregate.md). The current tree registers `IntrinsicBenchmarkSmoke` through the shared aggregate target path; `cmake --build --preset ci --target IntrinsicTests` now builds the smoke runner and the focused benchmark CTest pair passes.
 
-- Closed 2026-06-12: [`BUG-030` — Headless `Engine::Run()` tests red-gate](../../done/BUG-030-headless-engine-run-tests-red-gate.md). Guarded live-window `Engine::Run()` tests with the house `ShouldClose() -> GTEST_SKIP()` pattern and documented the rule in `tests/README.md`; the broader headless execution follow-up is split to [`RUNTIME-107`](../runtime/RUNTIME-107-headless-engine-loop-coverage.md).
+- Closed 2026-06-12: [`BUG-030` — Headless `Engine::Run()` tests red-gate](../../done/BUG-030-headless-engine-run-tests-red-gate.md). Guarded live-window `Engine::Run()` tests with the house `ShouldClose() -> GTEST_SKIP()` pattern and documented the rule in `tests/README.md`; the broader headless execution follow-up is retired by [`RUNTIME-107`](../../done/RUNTIME-107-headless-engine-loop-coverage.md).
 
 - Closed 2026-06-12: [`BUG-029` — Ray/AABB slab NaN poisoning](../../done/BUG-029-ray-aabb-slab-nan-poisoning.md). Ray/AABB overlap and raycast now use NaN-free slab intervals for axis-parallel/on-boundary rays, `RayCast(Ray, Sphere)` uses a deterministic finite center-origin fallback normal, and BVH/query regressions pin boundary-coincident traversal.
 

@@ -20,6 +20,7 @@
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.Core.Logging;
@@ -406,6 +407,7 @@ namespace
         Extrinsic::Core::Config::EngineConfig config{};
         config.ReferenceScene.Enabled = false;
         config.Camera.Enabled = false;
+        config.Window.Backend = Core::Config::WindowBackend::Null;
         return config;
     }
 
@@ -3004,12 +3006,8 @@ TEST(SandboxEditorUi, DroppedFilePathsRouteAmbiguousPlyThroughRuntimeImportFacad
     EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::PointCloud), 0u);
     EXPECT_FALSE(engine.GetLastAssetImportEvent().has_value());
 
-    if (engine.GetWindow().ShouldClose())
-    {
-        ui.Detach();
-        engine.Shutdown();
-        GTEST_SKIP() << "window backend unavailable; dropped-file import coverage requires a live window";
-    }
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
 
     engine.Run();
 
@@ -3056,12 +3054,8 @@ TEST(SandboxEditorUi, PlatformDropEventImportsObjMeshSelectsItAndEnablesRenderCo
         .Paths = {meshFile.Path.string()},
     });
 
-    if (engine.GetWindow().ShouldClose())
-    {
-        ui.Detach();
-        engine.Shutdown();
-        GTEST_SKIP() << "window backend unavailable; platform drop coverage requires a live window";
-    }
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
 
     engine.Run();
 
@@ -3156,11 +3150,8 @@ TEST(SandboxEditorUi, DroppedFileImportFailureLogsDiagnostics)
         << "Dropped geometry imports must log that they were queued off the platform polling path.";
     EXPECT_FALSE(engine.GetLastAssetImportEvent().has_value());
 
-    if (engine.GetWindow().ShouldClose())
-    {
-        engine.Shutdown();
-        GTEST_SKIP() << "window backend unavailable; deferred dropped-file completion coverage requires a live window";
-    }
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
 
     engine.Run();
 
@@ -3201,11 +3192,8 @@ TEST(SandboxEditorUi, PlatformDropEventImportsOffMesh)
         .Paths = {meshFile.Path.string()},
     });
 
-    if (engine.GetWindow().ShouldClose())
-    {
-        engine.Shutdown();
-        GTEST_SKIP() << "window backend unavailable; platform drop coverage requires a live window";
-    }
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
 
     engine.Run();
 
@@ -3228,17 +3216,27 @@ TEST(SandboxEditorUi, PlatformDropEventImportsOffMesh)
     engine.Shutdown();
 }
 
+TEST(SandboxEditorUi, ConfiguredBackendBornClosedLogsZeroFrameRunDiagnostic)
+{
+    const std::string engineSource =
+        ReadRepositoryTextFile("src/runtime/Runtime.Engine.cpp");
+    ASSERT_FALSE(engineSource.empty());
+    EXPECT_NE(engineSource.find("m_Window && m_Window->ShouldClose()"),
+              std::string::npos);
+    EXPECT_NE(engineSource.find("Platform window initialized closed"),
+              std::string::npos);
+    EXPECT_NE(engineSource.find("Engine::Run() will execute zero frames"),
+              std::string::npos);
+}
+
 TEST(SandboxEditorUi, PlatformCloseEventStopsEngineRunState)
 {
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<PassiveApplication>());
     engine.Initialize();
 
     ASSERT_TRUE(engine.IsRunning());
-    if (engine.GetWindow().ShouldClose())
-    {
-        engine.Shutdown();
-        GTEST_SKIP() << "window backend unavailable; close-event loop coverage requires a live window";
-    }
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
 
     engine.DispatchPlatformEventForTest(Plat::WindowCloseEvent{});
     engine.Run();
@@ -3257,12 +3255,8 @@ TEST(SandboxEditorUi, EngineAttachmentRegistersEditorCallback)
     ui.Attach(engine);
     EXPECT_TRUE(ui.IsAttached());
 
-    if (engine.GetWindow().ShouldClose())
-    {
-        ui.Detach();
-        engine.Shutdown();
-        GTEST_SKIP() << "window backend unavailable; frame callback coverage requires a live window";
-    }
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
 
     engine.Run();
 

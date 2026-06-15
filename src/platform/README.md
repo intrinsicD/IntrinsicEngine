@@ -31,6 +31,13 @@ cmake --preset ci -DINTRINSIC_PLATFORM_BACKEND=Glfw
 builds and `Null` otherwise. `INTRINSIC_HEADLESS_NO_GLFW=ON` forces the null
 backend unless `Glfw` is requested explicitly, which is a configure error.
 
+At runtime, `Core::Config::WindowConfig::Backend` defaults to
+`WindowBackend::Configured`, which preserves the CMake-selected backend above.
+Tests that need deterministic headless `Engine::Run()` coverage can explicitly
+set `WindowBackend::Null`; this routes `Platform::CreateWindow` to the
+always-compiled Null backend. A failed configured GLFW window remains born
+closed and does not silently fall back to Null.
+
 ## Directory layout
 
 ```text

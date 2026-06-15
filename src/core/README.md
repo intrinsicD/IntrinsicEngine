@@ -98,6 +98,10 @@ Core owns reusable graph/scheduling primitives, not domain-specific GPU policy.
 consumes at composition time. Per-field ownership is:
 
 - `Render`, `Simulation`, `Window` — see the per-partition modules.
+- `Window.Backend` — defaults to `WindowBackend::Configured`, preserving the
+  platform backend selected by CMake. Tests can set `WindowBackend::Null` to
+  force the deterministic headless platform window without importing platform
+  modules into core config.
 - `ReferenceScene { Enabled, Selector }` — opt-in seam consumed by
   `Runtime::Engine::Initialize()` to populate a deterministic reference
   renderable through the runtime-owned `Extrinsic.Runtime.ReferenceScene`

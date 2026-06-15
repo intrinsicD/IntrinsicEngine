@@ -38,14 +38,14 @@ maturity_target: CPUContracted
 - [x] Slice A: guard `RuntimeSandboxAcceptance.ViewportLeftClickSubmitsSelectionPick` with the house `ShouldClose() → GTEST_SKIP` pattern after `Initialize()`.
 - [x] Slice A: same for `RuntimeSandboxAcceptance.InspectorTransformEditFlushedToRenderStateSameFrame`.
 - [x] Slice A: same for `SandboxEditorUi.DroppedFilePathsRouteAmbiguousPlyThroughRuntimeImportFacade` (guard before the `engine.Run()` at Test.SandboxEditorUi.cpp:2750; keep the pre-`Run` negative assertions unguarded — they don't need the loop).
-- [x] Slice B split to [`RUNTIME-107`](../backlog/runtime/RUNTIME-107-headless-engine-loop-coverage.md) so the headless loop-coverage gap remains explicit after BUG-030 retires.
+- [x] Slice B split to [`RUNTIME-107`](RUNTIME-107-headless-engine-loop-coverage.md) so the headless loop-coverage gap remains explicit after BUG-030 retires; `RUNTIME-107` later retired the gap.
 - [x] Sweep for any other unguarded `engine.Run()` call sites in `tests/` and guard them in Slice A (grep `engine.Run()` across tests; the five wiring tests are already guarded).
 
 ## Tests
 
 - [x] Slice A: default CPU gate green in a headless container: guarded `Engine::Run()` tests skip when the live window is born closed and pass on display-capable hosts.
 - [x] Slice A: display-capable local host proof recorded in focused CTest results below.
-- [x] Slice B headless loop execution is deferred to [`RUNTIME-107`](../backlog/runtime/RUNTIME-107-headless-engine-loop-coverage.md), not silently retired here.
+- [x] Slice B headless loop execution is owned by [`RUNTIME-107`](RUNTIME-107-headless-engine-loop-coverage.md), not silently retired here.
 
 ## Docs
 
@@ -55,7 +55,7 @@ maturity_target: CPUContracted
 
 - [x] `ci-linux-clang` "Run full CPU test suite" step has a green path after merge because the born-closed window path no longer fails assertions.
 - [x] Default CPU gate green in a headless agent container (this environment).
-- [x] The coverage location for BUG-017/019/024 regression pins is explicit: skipped-headless in this slice; headless-capable loop execution is tracked by [`RUNTIME-107`](../backlog/runtime/RUNTIME-107-headless-engine-loop-coverage.md).
+- [x] The coverage location for BUG-017/019/024 regression pins is explicit: skipped-headless in this slice; headless-capable loop execution is retired by [`RUNTIME-107`](RUNTIME-107-headless-engine-loop-coverage.md).
 - [x] No assertion weakened; no test deleted.
 
 ## Verification
@@ -84,4 +84,4 @@ python3 tools/agents/check_task_policy.py --root . --strict
 ## Maturity
 
 - Closed at `CPUContracted`: the default CPU gate is green and skip behavior is explicit for born-closed live windows.
-- `Operational` headless loop execution is owned by [`RUNTIME-107`](../backlog/runtime/RUNTIME-107-headless-engine-loop-coverage.md).
+- `Operational` headless loop execution is retired by [`RUNTIME-107`](RUNTIME-107-headless-engine-loop-coverage.md).

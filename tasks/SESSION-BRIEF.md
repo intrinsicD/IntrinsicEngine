@@ -26,7 +26,6 @@ the authoritative open/unblocked view.
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RORG-031F` — UI integration backlog seed (tasks/backlog/ui/RORG-031-ui-integration.md)
 - unblocked: `RUNTIME-101` — Asset ingest state-machine migration (tasks/backlog/runtime/RUNTIME-101-asset-ingest-state-machine.md)
-- unblocked: `RUNTIME-107` — Headless-capable Engine::Run loop coverage (tasks/backlog/runtime/RUNTIME-107-headless-engine-loop-coverage.md)
 
 ## Unthemed
 

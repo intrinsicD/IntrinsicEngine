@@ -119,8 +119,7 @@ Open members:
 - [`assets/ASSETIO-005-asset-import-queue-progress.md`](assets/ASSETIO-005-asset-import-queue-progress.md) —
   runtime-owned AssetIO queue snapshots and sandbox editor progress rows for
   long-running imports.
-- [`runtime/RUNTIME-101-asset-ingest-state-machine.md`](runtime/RUNTIME-101-asset-ingest-state-machine.md),
-  [`runtime/RUNTIME-107-headless-engine-loop-coverage.md`](runtime/RUNTIME-107-headless-engine-loop-coverage.md).
+- [`runtime/RUNTIME-101-asset-ingest-state-machine.md`](runtime/RUNTIME-101-asset-ingest-state-machine.md).
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`ui/RORG-031-ui-integration.md`](ui/RORG-031-ui-integration.md).
 - [`platform/PLATFORM-004-alternative-platform-backend-onboarding.md`](platform/PLATFORM-004-alternative-platform-backend-onboarding.md) (planning-only seed).
@@ -132,9 +131,8 @@ Reproducible correctness/regression fixes only. Origin:
 
 Open members are tracked in [`bugs/index.md`](bugs/index.md). The 2026-06-11
 severe-bug audit set (`BUG-029` through `BUG-035`) is retired; BUG-030's
-non-bug headless loop coverage follow-up is tracked by
-[`runtime/RUNTIME-107-headless-engine-loop-coverage.md`](runtime/RUNTIME-107-headless-engine-loop-coverage.md).
-New reproducible bugs open under `bugs/` per the index.
+non-bug headless loop coverage follow-up is also retired. New reproducible bugs
+open under `bugs/` per the index.
 
 Resolved bug history lives in [`bugs/index.md`](bugs/index.md) and the
 retirement log.

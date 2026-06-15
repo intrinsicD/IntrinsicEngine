@@ -10,10 +10,6 @@ another backlog directory.
 - [RUNTIME-101 — Asset ingest state-machine migration](RUNTIME-101-asset-ingest-state-machine.md):
   promoted replacement for legacy `Runtime.AssetIngestService` over
   `AssetService`, `StreamingExecutor`, and runtime materialization handoffs.
-- [RUNTIME-107 — Headless-capable Engine::Run loop coverage](RUNTIME-107-headless-engine-loop-coverage.md):
-  follow-up split from BUG-030 to make currently guarded sandbox/runtime
-  `Engine::Run()` regressions execute through an explicit headless-capable loop
-  instead of skipping on displayless hosts.
 - [RUNTIME-109 — Extensible mesh attribute texture bake pipeline](RUNTIME-109-extensible-mesh-attribute-texture-bakes.md):
   generalize CPU mesh attribute texture bakes for 1D-4D vertex/face algorithm
   results over resolved UVs.
@@ -69,6 +65,11 @@ split; narratives live in the retirement log.
   geometry-processing path and retained synchronous CPU K-Means as the intended
   endpoint for current workflows. No runtime async algorithm queue or CUDA
   follow-up is owed without a new concrete workload.
+- [RUNTIME-107 — Headless-capable Engine::Run loop coverage](../../done/RUNTIME-107-headless-engine-loop-coverage.md)
+  (done, 2026-06-15, `Operational`): added an explicit
+  `WindowBackend::Null` test-facing window backend selector and routed the
+  BUG-030 `Engine::Run()` regressions through it so they execute on headless
+  hosts instead of skipping.
 - [GRAPHICS-084 — Visualization property-buffer residency](../../done/GRAPHICS-084-visualization-property-buffer-residency.md)
   (done, 2026-06-11, `CPUContracted`): consumed runtime visualization adapter/
   property selections while keeping GPU upload ownership in graphics.

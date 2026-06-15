@@ -1116,6 +1116,11 @@ namespace Extrinsic::Runtime
         // neutral, so we fill a backend-agnostic `RHI::DeviceCreateDesc`
         // from the live `IWindow` here.
         m_Window   = Platform::CreateWindow(m_Config.Window);
+        if (m_Window && m_Window->ShouldClose())
+        {
+            Core::Log::Warn(
+                "[Runtime] Platform window initialized closed; Engine::Run() will execute zero frames unless the test or caller requests a headless-capable window backend.");
+        }
         m_Device   = CreateDevice(m_Config.Render);
         const Platform::Extent2D initialExtent = m_Window->GetFramebufferExtent();
         m_Device->Initialize(RHI::MakeDeviceCreateDesc(

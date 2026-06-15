@@ -9,6 +9,20 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`RUNTIME-107`](RUNTIME-107-headless-engine-loop-coverage.md) —
+Headless-capable `Engine::Run()` loop coverage — retired on 2026-06-15 at
+maturity `Operational`. `Core::Config::WindowConfig` now exposes an explicit
+`WindowBackend` selector: `Configured` preserves the CMake-selected platform
+backend, while `Null` routes `Platform::CreateWindow` to the deterministic
+headless backend that is always compiled. The BUG-030 `Engine::Run()`
+regressions now set `WindowBackend::Null`, so viewport click selection,
+inspector transform flush, platform/drop import, and close-event assertions
+execute on displayless hosts instead of skipping. Configured GLFW windows that
+initialize already closed log a runtime zero-frame warning and still do not
+fall back to Null silently. Focused runtime contract/integration coverage
+passed 7/7 with no skips.
+
+Backlog
 [`RUNTIME-103`](RUNTIME-103-geometry-algorithm-execution-queue.md) —
 Geometry algorithm execution queue — retired on 2026-06-15 at maturity
 `CPUContracted`. The value gate found that current promoted editor workflows
@@ -1241,8 +1255,8 @@ the smoke runner and the benchmark CTest pair passes.
 `Engine::Run()` red-gate retired to `tasks/done/` on 2026-06-12 at
 `CPUContracted`. Live-window engine-loop tests now guard born-closed windows
 with the house `ShouldClose() -> GTEST_SKIP()` pattern, and `tests/README.md`
-records the rule. The broader headless execution restoration is explicitly
-split to `RUNTIME-107`.
+records the rule. The broader headless execution restoration is retired by
+`RUNTIME-107`.
 
 [`BUG-029`](../done/BUG-029-ray-aabb-slab-nan-poisoning.md) — ray/AABB slab
 NaN poisoning retired to `tasks/done/` on 2026-06-12 at `CPUContracted`.

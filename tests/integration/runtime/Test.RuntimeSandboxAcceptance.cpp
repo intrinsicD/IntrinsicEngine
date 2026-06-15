@@ -21,6 +21,7 @@
 #include <glm/glm.hpp>
 
 import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Component.MetaData;
@@ -96,6 +97,7 @@ namespace
     {
         Core::Config::EngineConfig config{};
         config.ReferenceScene.Enabled = false;
+        config.Window.Backend = Core::Config::WindowBackend::Null;
         return config;
     }
 
@@ -419,11 +421,8 @@ TEST(RuntimeSandboxAcceptance, ViewportLeftClickSubmitsSelectionPick)
     Runtime::Engine engine(HeadlessConfig(), std::make_unique<InjectClickAndExitApplication>());
     engine.Initialize();
 
-    if (engine.GetWindow().ShouldClose())
-    {
-        engine.Shutdown();
-        GTEST_SKIP() << "window backend unavailable; viewport click coverage requires a live window";
-    }
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
 
     engine.Run();
 
@@ -494,11 +493,8 @@ TEST(RuntimeSandboxAcceptance, InspectorTransformEditFlushedToRenderStateSameFra
     Runtime::Engine engine(HeadlessConfig(), std::move(app));
     engine.Initialize();
 
-    if (engine.GetWindow().ShouldClose())
-    {
-        engine.Shutdown();
-        GTEST_SKIP() << "window backend unavailable; inspector edit coverage requires a live window";
-    }
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
 
     engine.Run();
 
