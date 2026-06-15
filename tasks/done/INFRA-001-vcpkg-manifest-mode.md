@@ -129,14 +129,17 @@ depends_on: []
 - [x] A fresh `git clone` followed by the documented bootstrap commands
       configures and builds `IntrinsicTests` without any in-tree
       validator code path firing.
-- [ ] CI exact-cache-hit runs pass the shared-binary-cache configure timing
+- [x] CI exact-cache-hit runs pass the shared-binary-cache configure timing
       gate (≤ 10 s) and record the elapsed time in the GitHub step summary.
 - [x] Version bumps flow through `vcpkg x-update-baseline` + manifest
       edit only — no hand-edits to any `GIT_TAG` strings anywhere.
 
 ## Status
-- Active 2026-06-11; owner: Codex; branch: `main`.
-- Current slice: Slice E — CI configure timing instrumentation. Slice D made
+- Done 2026-06-15; owner: Codex; branch: `main`; maturity: `Operational`.
+- Retirement commit: this commit; implementation commits include `f0b9cdb8`
+  and `62c84817`; final CI evidence is GitHub Actions run
+  `27533474526`, job `81376962604`.
+- Slice E — CI configure timing instrumentation — is complete. Slice D made
   `cmake/Dependencies.cmake` vcpkg-manifest-only and fail-closed when configure
   does not run through the repository vcpkg toolchain. Slice B cut over the
   default preset path and chainloads `cmake/IntrinsicClangToolchain.cmake`;
@@ -156,26 +159,32 @@ depends_on: []
   and `tools/setup/bootstrap_vcpkg.sh`.
 - Local timing evidence so far: vcpkg cold install/configure without a populated
   binary cache took 103.2 s for `ci` and 63.3 s for `ci-vulkan` on this host;
-  subsequent warm configure with the installed tree present took 1.9 s. CI
-  warm-cache timing remains to be observed on GitHub Actions.
+  subsequent warm configure with the installed tree present took 1.9 s. Final
+  GitHub Actions exact-cache-hit configure evidence is recorded below.
 - Headless no-windowing verification used `VCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON`
   and `INTRINSIC_HEADLESS_NO_GLFW=ON`: vcpkg restored 11 non-windowing packages
   from the binary cache and excluded `glfw3`, `imguizmo`, `volk`, and
   `vulkan-memory-allocator`.
-- Vulkan smoke passed locally under the `ci-vulkan` preset. Final retirement
-  still requires observing the CI warm-cache timing gate after this cleanup
-  lands.
+- Vulkan smoke passed locally under the `ci-vulkan` preset. The final
+  post-commit CI warm-cache timing gate is recorded below.
 - 2026-06-15 CI timing instrumentation: the initial GitHub workflow configure
   steps that consume the vcpkg binary cache now run through
   `tools/ci/time_command.py`. Exact `actions/cache` hits enforce the 10 s
   warm-cache configure budget and append elapsed time to the GitHub step
-  summary. Retirement still waits for a post-commit CI run with exact-hit
-  timing evidence plus the fresh-clone build evidence below.
+  summary. The post-commit exact-hit timing evidence and fresh-clone build
+  evidence are recorded below.
 - 2026-06-15 scripted fresh-clone evidence: a temporary clone from committed
   `main` at `/tmp/intrinsic-fresh-3bIBHl/IntrinsicEngine` bootstrapped vcpkg,
   configured `ci` through the shared binary cache in 8.363 s, and built
-  `IntrinsicTests`. Fresh-clone acceptance is satisfied; final retirement now
-  waits only on a post-commit GitHub Actions exact-cache-hit timing run.
+  `IntrinsicTests`. Fresh-clone acceptance is satisfied.
+- 2026-06-15 final CI exact-hit evidence: GitHub Actions `ci-linux-clang` run
+  `27533474526`, job `81376962604`, completed successfully for commit
+  `62c84817f6b667e4fbcbc982e10ce311be34528b`. `actions/cache` reported
+  `Cache hit for: Linux-vcpkg-5f306cc3191a9fbd5a3016979d449534fb46052a3ed2adac6c9320522d2ddcf8`
+  and post-job cleanup confirmed `Cache hit occurred on the primary key ...,
+  not saving cache`. The configure step ran `--warm-cache-hit 'true'`,
+  configured in 7.6 s, and `tools/ci/time_command.py` reported
+  `Configure (ci preset) elapsed: 8.271 s`, below the 10 s gate.
 - Slice E verification 2026-06-15:
     - `python3 -m py_compile tools/ci/time_command.py` — passed.
     - `python3 tools/ci/time_command.py --label "time wrapper smoke" --warm-cache-hit true --max-warm-seconds 10 -- python3 -c "print('ok')"` — passed; elapsed 0.011 s.
@@ -196,6 +205,7 @@ depends_on: []
     - `python3 tools/repo/check_root_hygiene.py --root .` — passed.
     - `python3 tools/repo/check_test_layout.py --root . --strict` — passed.
     - Scripted temp clone from committed `main`: `git clone --local /home/alex/Documents/IntrinsicEngine /tmp/intrinsic-fresh-3bIBHl/IntrinsicEngine`; `tools/setup/bootstrap_vcpkg.sh`; `VCPKG_BINARY_SOURCES="clear;files,/home/alex/Documents/IntrinsicEngine/external/vcpkg-bincache,readwrite" python3 tools/ci/time_command.py --label "Fresh clone configure (ci preset)" --warm-cache-hit true --max-warm-seconds 60 --json-out build/ci/fresh_clone_configure_timing.json -- cmake --preset ci`; `cmake --build --preset ci --target IntrinsicTests` — passed; configure elapsed 8.363 s.
+    - `gh run view 27533474526 --repo intrinsicD/IntrinsicEngine --job 81376962604 --log` — passed; exact primary-key cache hit, configure elapsed 8.271 s, job conclusion success.
     - `git diff --check` — passed.
 - Slice A verification 2026-06-11:
     - `tools/setup/bootstrap_vcpkg.sh` — passed; checked out baseline
@@ -358,8 +368,7 @@ python3 tools/docs/check_doc_links.py --root .
   and for every developer flow currently covered by the `ci` preset.
 - This slice replaces a Scaffolded-quality in-tree validator with an
   Operational-quality external package manager. Fresh-clone scripted evidence
-  is captured; closure now requires the post-commit CI exact-cache-hit timing
-  gate.
+  and post-commit CI exact-cache-hit timing evidence are captured.
 
 ## Slice plan
 
@@ -383,8 +392,8 @@ retired fallback and made vcpkg manifest mode the single dependency path:
   `INTRINSIC_UPDATE_DEPS` / `INTRINSIC_DEPS_SEAL` knobs,
   `tools/setup/populate_deps.sh`, and remaining `external/cache/`
   references; update `AGENTS.md` §5.
-- **Slice E — CI configure timing instrumentation (current slice).**
+- **Slice E — CI configure timing instrumentation.**
   Wrap initial cache-backed CI configure steps with `tools/ci/time_command.py`,
   report elapsed time in GitHub summaries, and fail exact vcpkg binary-cache
-  hits above 10 s. Defers task retirement until a post-commit CI run records
-  exact-hit timing evidence and the fresh-clone build check is captured.
+  hits above 10 s. The post-commit CI run recorded exact-hit timing evidence,
+  and the fresh-clone build check is captured.

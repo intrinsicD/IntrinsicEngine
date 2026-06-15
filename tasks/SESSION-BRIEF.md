@@ -9,7 +9,6 @@ the authoritative open/unblocked view.
 ## Active tasks
 
 - `GRAPHICS-088` — Resolved UV rendering and bake texture residency (tasks/active/GRAPHICS-088-resolved-uv-rendering-and-bake-residency.md)
-- `INFRA-001` — Move third-party dependencies to a vcpkg manifest (tasks/active/INFRA-001-vcpkg-manifest-mode.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 
@@ -43,7 +42,7 @@ the authoritative open/unblocked view.
 - unblocked: `GEOM-020` — Sparse direct factorization solver seam (LDLT/LLT) (tasks/backlog/geometry/GEOM-020-sparse-direct-factorization-seam.md)
 - unblocked: `GEOM-023` — Sparse non-symmetric iterative solver seam (BiCGSTAB) (tasks/backlog/geometry/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md)
 - blocked by `GEOM-020`: `GEOM-024` — Sparse symmetric generalized eigensolver seam (tasks/backlog/geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
-- blocked by `INFRA-001`: `GEOM-025` — UV atlas backend contract and xatlas default (tasks/backlog/geometry/GEOM-025-uv-atlas-backend-xatlas.md)
+- blocked by `GEOM-018`: `GEOM-025` — UV atlas backend contract and xatlas default (tasks/backlog/geometry/GEOM-025-uv-atlas-backend-xatlas.md)
 - blocked by `GEOM-020`: `METHOD-002` — Signed Heat Method reference backend (tasks/backlog/methods/METHOD-002-signed-heat-method-reference-backend.md)
 - blocked by `GEOM-023`: `METHOD-003` — Closest Point Method PDE solver reference backend (tasks/backlog/methods/METHOD-003-closest-point-method-pde-reference-backend.md)
 - unblocked: `METHOD-004` — Walk on Spheres / Walk on Stars PDE solver reference backend (tasks/backlog/methods/METHOD-004-walk-on-spheres-reference-backend.md)

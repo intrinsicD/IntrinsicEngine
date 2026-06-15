@@ -9,6 +9,21 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`INFRA-001`](INFRA-001-vcpkg-manifest-mode.md) — Move third-party
+dependencies to a vcpkg manifest — retired on 2026-06-15 at maturity
+`Operational`. The build now resolves third-party C/C++ packages through the
+root `vcpkg.json` manifest, the repository-local vcpkg toolchain, and
+repository overlay ports. The retired FetchContent fallback, dependency-cache
+knobs, and `external/cache` developer flow are gone from current build/tooling
+docs. CI workflows bootstrap vcpkg, restore `external/vcpkg-bincache/`, export
+`VCPKG_BINARY_SOURCES`, and time cache-backed configure with
+`tools/ci/time_command.py`; exact primary-key cache hits over 10 s fail the
+configure step. Local CPU, Vulkan, headless, raw-IDE, and fresh-clone checks
+passed. Final GitHub Actions evidence came from `ci-linux-clang` run
+`27533474526`, job `81376962604`: exact primary-key cache hit and
+`Configure (ci preset) elapsed: 8.271 s`, with the job concluding success.
+
+Active
 [`BUG-043`](BUG-043-dropped-obj-missing-uvs-invisible.md) — Dropped OBJ without
 UVs loads but is invisible — retired on 2026-06-14 at maturity
 `CPUContracted`. Runtime mesh materialization now preserves valid authored

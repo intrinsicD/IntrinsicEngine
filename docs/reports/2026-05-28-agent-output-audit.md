@@ -33,7 +33,7 @@ window closed.
   [`HARDEN-072`](../../tasks/done/HARDEN-072-rhi-surface-fixes-for-default-recipe-pipeline-bringup.md)
   (retired; push-constant limit + virtual default-arg fix),
   INFRA Option A (seal hot dependency cache; backlog
-  [`INFRA-001`](../../tasks/active/INFRA-001-vcpkg-manifest-mode.md)
+  [`INFRA-001`](../../tasks/done/INFRA-001-vcpkg-manifest-mode.md)
   tracks the follow-on vcpkg move).
 - Sampling: rows 1–9 spot-checked against representative substantive commits
   per task family, with heavy weight on the new module surfaces introduced this
