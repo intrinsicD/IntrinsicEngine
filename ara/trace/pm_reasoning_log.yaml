@@ -1,0 +1,11 @@
+entries:
+  - turn: "2026-06-15_001#1"
+    notes:
+      - "Initialized ara/ because no prior research artifact existed and this turn contained implementation, verification, and task-retirement events."
+      - "Routed task retirement and verification as direct journey facts rather than staged claims."
+      - "Did not crystallize claims; the turn produced engineering evidence but no new user-affirmed research assertion."
+  - turn: "2026-06-15_001#2"
+    notes:
+      - "Routed GRAPHICS-088 retirement, GRAPHICS-089 follow-up creation, and verification as direct journey facts."
+      - "Treated the prior keep-active decision as superseded by new task evidence and explicit operational follow-up, not as a contradiction."
+      - "Did not stage or crystallize claims; the turn produced engineering/task-state evidence rather than a new research assertion."

@@ -13,6 +13,7 @@ module;
 export module Extrinsic.Runtime.VisualizationAdapters;
 
 import Geometry.Properties;
+import Extrinsic.Asset.Registry;
 import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.Runtime.StreamingExecutor;
@@ -74,6 +75,10 @@ export namespace Extrinsic::Runtime
         std::uint32_t AtlasWidth{0u};
         std::uint32_t AtlasHeight{0u};
         std::uint64_t TexcoordBufferBDA{0u};
+        Assets::AssetId AtlasTextureAsset{};
+        Graphics::VisualizationGeneratedTextureSemantic GeneratedTextureSemantic{
+            Graphics::VisualizationGeneratedTextureSemantic::Unknown};
+        std::uint64_t SourceAttributeDirtyStamp{0u};
         std::uint64_t HtexRecreatePayloadToken{0u};
     };
 

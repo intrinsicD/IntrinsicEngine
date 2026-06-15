@@ -1,0 +1,8 @@
+sessions:
+  - id: "2026-06-15_001"
+    date: "2026-06-15"
+    summary: "Implemented and retired RUNTIME-109 CPU mesh attribute texture bakes; retired GRAPHICS-088 at CPUContracted with GRAPHICS-089 tracking the Vulkan generated-UV proof."
+    turn_count: 2
+    events_count: 6
+    claims_touched: []
+    open_threads: 2

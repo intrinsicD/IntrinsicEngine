@@ -310,6 +310,121 @@ TEST(GraphicsVisualizationPackets, ResolvedUvBakeProvenanceIsReportedWithoutImpl
     EXPECT_EQ(summary.HtexRecreateRequestCount, 0u);
 }
 
+TEST(GraphicsVisualizationPackets, GeneratedBakeTextureSemanticsAreSummarized)
+{
+    const std::array<Graphics::FragmentBakeAtlasPacket, 7> bakes{{
+        Graphics::FragmentBakeAtlasPacket{
+            .Name = "scalar_bake",
+            .SourceAttributeName = "curvature",
+            .Mapping = Graphics::VisualizationFragmentBakeMapping::ExistingTexcoords,
+            .MeshHasTexcoords = true,
+            .FaceCount = 4u,
+            .AtlasWidth = 64u,
+            .AtlasHeight = 64u,
+            .TexcoordBufferBDA = 0x1000u,
+            .AtlasTextureAsset = Assets::AssetId{501u, 1u},
+            .GeneratedTextureSemantic =
+                Graphics::VisualizationGeneratedTextureSemantic::ScalarAttribute,
+            .SourceAttributeDirtyStamp = 11u,
+        },
+        Graphics::FragmentBakeAtlasPacket{
+            .Name = "label_bake",
+            .SourceAttributeName = "cluster_id",
+            .Mapping = Graphics::VisualizationFragmentBakeMapping::ExistingTexcoords,
+            .MeshHasTexcoords = true,
+            .FaceCount = 4u,
+            .AtlasWidth = 64u,
+            .AtlasHeight = 64u,
+            .TexcoordBufferBDA = 0x1000u,
+            .AtlasTextureAsset = Assets::AssetId{502u, 1u},
+            .GeneratedTextureSemantic =
+                Graphics::VisualizationGeneratedTextureSemantic::LabelAttribute,
+        },
+        Graphics::FragmentBakeAtlasPacket{
+            .Name = "vector2_bake",
+            .SourceAttributeName = "uv_flow",
+            .Mapping = Graphics::VisualizationFragmentBakeMapping::ExistingTexcoords,
+            .MeshHasTexcoords = true,
+            .FaceCount = 4u,
+            .AtlasWidth = 64u,
+            .AtlasHeight = 64u,
+            .TexcoordBufferBDA = 0x1000u,
+            .AtlasTextureAsset = Assets::AssetId{503u, 1u},
+            .GeneratedTextureSemantic =
+                Graphics::VisualizationGeneratedTextureSemantic::Vector2Attribute,
+        },
+        Graphics::FragmentBakeAtlasPacket{
+            .Name = "vector4_bake",
+            .SourceAttributeName = "weights",
+            .Mapping = Graphics::VisualizationFragmentBakeMapping::ExistingTexcoords,
+            .MeshHasTexcoords = true,
+            .FaceCount = 4u,
+            .AtlasWidth = 64u,
+            .AtlasHeight = 64u,
+            .TexcoordBufferBDA = 0x1000u,
+            .AtlasTextureAsset = Assets::AssetId{504u, 1u},
+            .GeneratedTextureSemantic =
+                Graphics::VisualizationGeneratedTextureSemantic::Vector4Attribute,
+        },
+        Graphics::FragmentBakeAtlasPacket{
+            .Name = "pbr_albedo_bake",
+            .SourceAttributeName = "v:color",
+            .Mapping = Graphics::VisualizationFragmentBakeMapping::ExistingTexcoords,
+            .MeshHasTexcoords = true,
+            .FaceCount = 4u,
+            .AtlasWidth = 64u,
+            .AtlasHeight = 64u,
+            .TexcoordBufferBDA = 0x1000u,
+            .AtlasTextureAsset = Assets::AssetId{505u, 1u},
+            .GeneratedTextureSemantic =
+                Graphics::VisualizationGeneratedTextureSemantic::PbrAlbedo,
+        },
+        Graphics::FragmentBakeAtlasPacket{
+            .Name = "pbr_normal_bake",
+            .SourceAttributeName = "v:normal",
+            .Mapping = Graphics::VisualizationFragmentBakeMapping::ExistingTexcoords,
+            .MeshHasTexcoords = true,
+            .FaceCount = 4u,
+            .AtlasWidth = 64u,
+            .AtlasHeight = 64u,
+            .TexcoordBufferBDA = 0x1000u,
+            .AtlasTextureAsset = Assets::AssetId{506u, 1u},
+            .GeneratedTextureSemantic =
+                Graphics::VisualizationGeneratedTextureSemantic::PbrNormal,
+        },
+        Graphics::FragmentBakeAtlasPacket{
+            .Name = "displacement_bake",
+            .SourceAttributeName = "height",
+            .Mapping = Graphics::VisualizationFragmentBakeMapping::ExistingTexcoords,
+            .MeshHasTexcoords = true,
+            .FaceCount = 4u,
+            .AtlasWidth = 64u,
+            .AtlasHeight = 64u,
+            .TexcoordBufferBDA = 0x1000u,
+            .AtlasTextureAsset = Assets::AssetId{507u, 1u},
+            .GeneratedTextureSemantic =
+                Graphics::VisualizationGeneratedTextureSemantic::Displacement,
+        },
+    }};
+
+    const Graphics::VisualizationPacketBatch batch{.FragmentBakeAtlases = bakes};
+    const Graphics::VisualizationDiagnostics diagnostics =
+        Graphics::ValidateVisualizationPackets(batch);
+    EXPECT_EQ(diagnostics.AcceptedPacketCount, bakes.size());
+    EXPECT_EQ(diagnostics.InvalidResourceCount, 0u);
+    EXPECT_FALSE(diagnostics.HasErrors);
+
+    const Graphics::VisualizationOverlaySummary summary =
+        Graphics::BuildVisualizationOverlaySummary(batch);
+    EXPECT_EQ(summary.FragmentBakeTextureAssetDescriptorCount, 7u);
+    EXPECT_EQ(summary.ScalarBakeTextureAssetDescriptorCount, 1u);
+    EXPECT_EQ(summary.LabelBakeTextureAssetDescriptorCount, 1u);
+    EXPECT_EQ(summary.VectorBakeTextureAssetDescriptorCount, 2u);
+    EXPECT_EQ(summary.PbrBakeTextureAssetDescriptorCount, 2u);
+    EXPECT_EQ(summary.DisplacementBakeTextureAssetDescriptorCount, 1u);
+    EXPECT_TRUE(summary.RequiresTextureResidency);
+}
+
 TEST(GraphicsVisualizationPackets, TexcoordBakesRequireExistingUvData)
 {
     const std::array<Graphics::FragmentBakeAtlasPacket, 2> bakes{{

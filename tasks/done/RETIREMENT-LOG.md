@@ -9,6 +9,34 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`GRAPHICS-088`](GRAPHICS-088-resolved-uv-rendering-and-bake-residency.md) —
+Resolved UV rendering and bake texture residency — retired on 2026-06-15 at
+maturity `CPUContracted`. Graphics now treats packed mesh UVs as resolved
+texture coordinates for surface material sampling, generated normal/albedo
+bindings, the `Material.DefaultDebugUVs` checker material, and UV-backed
+fragment-bake descriptors. The generic `RUNTIME-109` bake contract is consumed
+through data-only generated texture semantics and source dirty stamps for
+scalar, label, vector, standard material, and displacement-intent bake
+descriptors; graphics still does not generate UVs or import runtime, ECS,
+`AssetService`, geometry backends, or `xatlas`. Operational generated-UV Vulkan
+sampling proof is deferred to `GRAPHICS-089` after `ASSETIO-008`.
+
+Backlog
+[`RUNTIME-109`](RUNTIME-109-extensible-mesh-attribute-texture-bakes.md) —
+Extensible mesh attribute texture bake pipeline — retired on 2026-06-15 at
+maturity `CPUContracted`. Runtime now exposes a generic CPU mesh attribute
+texture bake request over resolved UVs for vertex and face source domains,
+finite scalar float/double, label `uint32`, and `glm::vec2`/`glm::vec3`/
+`glm::vec4` properties. Encoders cover scalar colormap, linear scalar,
+label palette, vector2, vector3, normal, and RGBA outputs, while the existing
+generated normal/albedo helpers remain wrappers over the generic seam. Stable
+generated texture keys omit dirty stamp so rebakes target reload of the
+intended CPU payload instead of minting unbounded generated assets. The baker
+does not generate UVs; missing-UV import materialization remains under
+`ASSETIO-008`, and operational renderer/Vulkan proof remains under
+`GRAPHICS-088`. Focused runtime bake coverage passed.
+
+Active
 [`RUNTIME-101`](RUNTIME-101-asset-ingest-state-machine.md) — Asset ingest
 state-machine migration — retired on 2026-06-15 at maturity `CPUContracted`.
 Runtime now owns a backend-neutral ingest request/result state machine for

@@ -1,0 +1,96 @@
+tree:
+  - id: N01
+    type: decision
+    title: "Retire RUNTIME-109 at CPUContracted"
+    provenance: ai-executed
+    timestamp: "2026-06-15T16:27"
+    choice: >
+      Implemented the RUNTIME-109 generic CPU mesh attribute texture bake contract
+      and retired the task at CPUContracted maturity while preserving ASSETIO-008
+      as the owner of missing UV import materialization.
+    alternatives:
+      - "Leave RUNTIME-109 blocked until ASSETIO-008 completes."
+      - "Expand RUNTIME-109 into graphics residency or importer work."
+    evidence:
+      - "tasks/done/RUNTIME-109-extensible-mesh-attribute-texture-bakes.md"
+      - "src/runtime/Runtime.MeshAttributeTextureBake.cppm"
+      - "tests/contract/runtime/Test.MeshAttributeTextureBake.cpp"
+    status: resolved
+  - id: N02
+    type: experiment
+    title: "RUNTIME-109 verification"
+    provenance: ai-executed
+    timestamp: "2026-06-15T16:27"
+    evidence:
+      - "cmake --build --preset ci --target IntrinsicRuntimeContractTests"
+      - "ctest --test-dir build/ci --output-on-failure -R 'RuntimeMeshAttributeTextureBake'"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+    result: >
+      Runtime focused tests passed 13/13, focused runtime/import handoff tests passed
+      29/29, and the default CPU-supported CTest gate passed 3043/3043.
+    status: resolved
+  - id: N03
+    type: decision
+    title: "Keep GRAPHICS-088 active"
+    provenance: ai-executed
+    timestamp: "2026-06-15T16:27"
+    choice: >
+      Updated GRAPHICS-088 task state to consume the retired RUNTIME-109 bake
+      contract, but did not retire GRAPHICS-088 because ASSETIO-008 and opt-in
+      Vulkan generated-UV smoke coverage remain open.
+    alternatives:
+      - "Mark GRAPHICS-088 complete without upstream UV materialization and Vulkan smoke evidence."
+    evidence:
+      - "tasks/active/GRAPHICS-088-resolved-uv-rendering-and-bake-residency.md"
+    status: resolved
+  - id: N04
+    type: decision
+    title: "Retire GRAPHICS-088 at CPUContracted"
+    provenance: ai-executed
+    timestamp: "2026-06-15T21:00"
+    also_depends_on: [N03]
+    choice: >
+      Retired GRAPHICS-088 after adding data-only generated bake texture
+      semantics and source dirty stamps to visualization descriptors, while
+      explicitly deferring operational generated-UV Vulkan sampling proof.
+    alternatives:
+      - "Keep GRAPHICS-088 active until ASSETIO-008 and Vulkan smoke evidence land."
+      - "Claim Operational maturity without generated-UV Vulkan proof."
+    evidence:
+      - "tasks/done/GRAPHICS-088-resolved-uv-rendering-and-bake-residency.md"
+      - "src/graphics/renderer/Graphics.VisualizationPackets.cppm"
+      - "src/runtime/Visualization/Runtime.VisualizationAdapters.cppm"
+    status: resolved
+  - id: N05
+    type: experiment
+    title: "GRAPHICS-088 retirement verification"
+    provenance: ai-executed
+    timestamp: "2026-06-15T21:00"
+    evidence:
+      - "cmake --build --preset ci --target IntrinsicTests"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+    result: >
+      Full IntrinsicTests build passed, default CPU-supported CTest passed
+      3044/3044, task policy/state-link checks passed, docs sync passed for
+      33 changed paths, and layering/test-layout/doc-link checks passed.
+    status: resolved
+  - id: N06
+    type: decision
+    title: "Open GRAPHICS-089 operational follow-up"
+    provenance: ai-executed
+    timestamp: "2026-06-15T21:00"
+    also_depends_on: [N04]
+    choice: >
+      Created GRAPHICS-089 to own the Vulkan-capable generated-UV texture
+      sampling smoke after ASSETIO-008 materializes generated UVs for imported
+      missing-UV meshes.
+    alternatives:
+      - "Leave the operational Vulkan proof implicit in GRAPHICS-088."
+      - "Move ASSETIO-generated UV materialization into graphics."
+    evidence:
+      - "tasks/backlog/rendering/GRAPHICS-089-generated-uv-texture-sampling-vulkan-smoke.md"
+      - "tasks/backlog/rendering/README.md"
+      - "tasks/SESSION-BRIEF.md"
+    status: open

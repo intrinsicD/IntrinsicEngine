@@ -1346,10 +1346,13 @@ Concretely:
   selection is runtime/editor-owned: the editor UI maps directly to
   `VisualizationFragmentBakeMapping` (`ExistingTexcoords`/`ExistingHtex`/
   `RecreateHtex`). UV-backed bake descriptors may also carry
-  `TexcoordProvenance`, `TexcoordDirtyStamp`, and an optional generated
-  `AtlasTextureAsset` `AssetId` for later `GpuAssetCache` residency; these
-  fields are diagnostics/residency inputs and never trigger graphics-side UV
-  generation. `RecreateHtex` is an explicit user-driven request
+  `TexcoordProvenance`, `TexcoordDirtyStamp`, a source-attribute dirty stamp,
+  an optional generated `AtlasTextureAsset` `AssetId`, and a
+  `VisualizationGeneratedTextureSemantic` describing scalar/label/vector,
+  standard material, or displacement intent for later `GpuAssetCache`
+  residency; these fields are diagnostics/residency inputs and never trigger
+  graphics-side UV generation or new shading features. `RecreateHtex` is an
+  explicit user-driven request
   scheduled by runtime/geometry on a background task through
   `Extrinsic.Runtime.StreamingExecutor` (async visualization baking remains
   CPU/runtime-only). Graphics increments

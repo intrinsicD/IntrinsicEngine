@@ -1,0 +1,92 @@
+session:
+  id: "2026-06-15_001"
+  date: "2026-06-15"
+  started: "2026-06-15T16:27"
+  last_turn: "2026-06-15T21:00"
+  turn_count: 2
+  summary: "Implemented and retired RUNTIME-109 CPU mesh attribute texture bakes; retired GRAPHICS-088 at CPUContracted with GRAPHICS-089 tracking the Vulkan generated-UV proof."
+
+events_logged:
+  - turn: 1
+    type: decision
+    id: "N01"
+    routing: direct
+    provenance: ai-executed
+    summary: "RUNTIME-109 retired at CPUContracted with generic CPU bake contract."
+  - turn: 1
+    type: experiment
+    id: "N02"
+    routing: direct
+    provenance: ai-executed
+    summary: "Focused runtime tests and default CPU CTest gate passed."
+  - turn: 1
+    type: decision
+    id: "N03"
+    routing: direct
+    provenance: ai-executed
+    summary: "GRAPHICS-088 kept active because ASSETIO-008 and Vulkan smoke gates remain open."
+  - turn: 2
+    type: decision
+    id: "N04"
+    routing: direct
+    provenance: ai-executed
+    summary: "GRAPHICS-088 retired at CPUContracted after adding generated bake texture descriptor semantics."
+  - turn: 2
+    type: experiment
+    id: "N05"
+    routing: direct
+    provenance: ai-executed
+    summary: "Full build, default CPU CTest gate, and structural checks passed."
+  - turn: 2
+    type: decision
+    id: "N06"
+    routing: direct
+    provenance: ai-executed
+    summary: "GRAPHICS-089 opened for generated-UV Vulkan texture sampling proof after ASSETIO-008."
+
+ai_actions:
+  - turn: 1
+    action: "Extended Runtime.MeshAttributeTextureBake with generic scalar, label, vector2, vector3, vector4, vertex-domain, and face-domain bake requests."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Runtime.MeshAttributeTextureBake.cppm"
+      - "src/runtime/Runtime.MeshAttributeTextureBake.cpp"
+      - "tests/contract/runtime/Test.MeshAttributeTextureBake.cpp"
+  - turn: 1
+    action: "Retired RUNTIME-109 task records and updated GRAPHICS-088 status without claiming full graphics completion."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/done/RUNTIME-109-extensible-mesh-attribute-texture-bakes.md"
+      - "tasks/done/RETIREMENT-LOG.md"
+      - "tasks/active/GRAPHICS-088-resolved-uv-rendering-and-bake-residency.md"
+  - turn: 2
+    action: "Extended visualization bake atlas descriptors with generated texture asset semantics and source attribute dirty stamps."
+    provenance: ai-executed
+    files_changed:
+      - "src/graphics/renderer/Graphics.VisualizationPackets.cppm"
+      - "src/graphics/renderer/Graphics.VisualizationPackets.cpp"
+      - "src/runtime/Visualization/Runtime.VisualizationAdapters.cppm"
+      - "src/runtime/Visualization/Runtime.VisualizationAdapters.cpp"
+  - turn: 2
+    action: "Retired GRAPHICS-088, opened GRAPHICS-089, regenerated session brief, and updated architecture/ADR docs."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/done/GRAPHICS-088-resolved-uv-rendering-and-bake-residency.md"
+      - "tasks/backlog/rendering/GRAPHICS-089-generated-uv-texture-sampling-vulkan-smoke.md"
+      - "tasks/SESSION-BRIEF.md"
+      - "docs/adr/0009-visualization-packets-and-overlay-upload.md"
+      - "docs/architecture/graphics.md"
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: "User requested the agentic workflow for backlog RUNTIME-109, then finishing active GRAPHICS-088 if possible."
+  - turn: 2
+    excerpt: "User requested finishing active GRAPHICS-088 and committing all changes."
+
+open_threads:
+  - "ASSETIO-008 still owns missing generated-UV import materialization."
+  - "GRAPHICS-089 owns opt-in Vulkan generated-UV smoke coverage before Operational closure."
+
+ai_suggestions_pending: []

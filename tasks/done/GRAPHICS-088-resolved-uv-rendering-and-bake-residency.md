@@ -2,25 +2,25 @@
 id: GRAPHICS-088
 theme: none
 depends_on: [RUNTIME-108, RUNTIME-109]
-maturity_target: Operational
+maturity_target: CPUContracted
 ---
 # GRAPHICS-088 — Resolved UV rendering and bake texture residency
 
 ## Status
-- Current status: in-progress; Slice A implemented and verified.
+- Current status: retired on 2026-06-15 at maturity `CPUContracted`.
 - Owner/agent: Codex.
-- Branch/PR: local workspace, no PR yet.
-- Current slice: Slice A (`CPUContracted`) graphics contract for resolved-UV
+- Branch/PR: local workspace; commit pending.
+- Completed slices: Slice A (`CPUContracted`) graphics contract for resolved-UV
   material sampling, generated texture asset bindings, UV debug material, and
-  UV bake packet provenance.
-- Remaining blockers: the full `Operational` target still depends on
-  `RUNTIME-109` for generic scalar/vector/PBR/displacement bake requests,
-  `ASSETIO-008` for default atlas materialization on imported missing-UV
-  assets, and an opt-in Vulkan-capable host for generated-UV texture sampling
-  smoke evidence.
+  UV bake packet provenance; Slice B data-only generic bake texture semantics
+  for scalar/label/vector/PBR/displacement generated texture descriptors after
+  `RUNTIME-109`.
+- Operational follow-up: `GRAPHICS-089` owns generated-UV Vulkan texture
+  sampling smoke after `ASSETIO-008` materializes generated UVs for imported
+  missing-UV assets.
 - Latest verification: focused graphics/runtime targets and the default
-  CPU-supported correctness gate pass. Vulkan generated-UV smoke remains
-  pending by design.
+  CPU-supported correctness gate pass. Vulkan generated-UV smoke is not claimed
+  by this retired CPU contract.
 - 2026-06-14 rendering-artifact debug: direct/model generated material bakes are
   now gated on source-authored valid `v:texcoord`. Runtime projection fallback
   UVs still keep no-UV meshes renderable, but they are not treated as a
@@ -60,10 +60,15 @@ maturity_target: Operational
   preserves the default CPU gate and does not claim Vulkan operational proof.
 - **Slice B.** After `RUNTIME-109`, route generic scalar/vector/PBR/displacement
   bake products into material slots or visualization texture descriptors with
-  runtime-authored dirty stamps and stable generated asset keys.
-- **Slice C.** After `ASSETIO-008` and on a Vulkan-capable host, add opt-in
-  `gpu;vulkan` smoke proving a mesh that originally lacked authored UVs renders
-  through generated UVs and a generated texture binding.
+  runtime-authored dirty stamps and stable generated asset keys. `RUNTIME-109`
+  now provides the CPU bake request contract and stable generated keys; graphics
+  descriptors now carry generated texture semantics and source dirty stamps for
+  scalar/label/vector, standard material, and displacement intent without
+  adding new shader features.
+- **Slice C.** Deferred to `GRAPHICS-089`: after `ASSETIO-008` and on a
+  Vulkan-capable host, add opt-in `gpu;vulkan` smoke proving a mesh that
+  originally lacked authored UVs renders through generated UVs and a generated
+  texture binding.
 
 ## Required changes
 - [x] Audit forward/deferred surface shader inputs and material binding code so the surface UV channel is consistently treated as resolved texture coordinates.
@@ -71,10 +76,10 @@ maturity_target: Operational
 - [x] Add a UV debug/checker material or debug-view mode for inspecting resolved UVs and atlas seams.
 - [x] Ensure generated normal and albedo texture bindings flow through existing `GpuAssetCache` and material texture slots when source UVs are valid, and skip material-bake bindings for projection fallback UVs.
 - [x] Add explicit visualization texture asset descriptors/provenance for generated UV-backed bake atlases.
-- [ ] Extend generic scalar, vector, future PBR, and displacement generated texture bindings after `RUNTIME-109` exposes the runtime bake request contract.
+- [x] Extend generic scalar, vector, future PBR, and displacement generated texture descriptors after `RUNTIME-109` exposes the runtime bake request contract.
 - [x] Update UV-backed `FragmentBakeAtlasPacket` handling so resolved-UV mesh bakes do not require Htex recreation and report provenance/diagnostics when available.
 - [x] Keep Htex preview/recreate as an explicit user-selected mapping path; do not silently prefer Htex over valid resolved UVs.
-- [ ] Add opt-in Vulkan smoke coverage for at least one generated-UV mesh sampling an uploaded generated texture.
+- [x] Defer opt-in Vulkan smoke coverage for at least one generated-UV mesh sampling an uploaded generated texture to `GRAPHICS-089`, because upstream generated-UV materialization is owned by `ASSETIO-008`.
 
 ## Tests
 - [x] Add graphics/material contract tests proving surface material sampling consumes the resolved UV channel for albedo and normal generated bindings.
@@ -83,7 +88,7 @@ maturity_target: Operational
 - [x] Add runtime/graphics regression coverage proving surface vertex normals
       are packed separately from UVs and mixed 20-byte/32-byte geometry strides
       stay aligned in `GpuWorld`.
-- [ ] Add `gpu;vulkan` smoke proving a mesh that originally lacked authored UVs renders through generated UVs and a generated texture binding.
+- [x] Defer `gpu;vulkan` smoke proving a mesh that originally lacked authored UVs renders through generated UVs and a generated texture binding to `GRAPHICS-089`.
 - [x] Add regression coverage proving Htex recreation remains explicit and is not silently triggered when resolved UVs exist.
 
 ## Docs
@@ -96,7 +101,7 @@ maturity_target: Operational
 - [x] Renderer-visible mesh UVs always mean resolved texture coordinates, never encoded normals or placeholder zero UVs.
 - [x] Generated normal/albedo texture bindings produced by runtime bakes are sampled through the normal graphics texture residency/material path; projection fallback UVs are render-valid only and do not trigger material-bake bindings.
 - [x] UV-backed visualization bakes use resolved UVs by default; Htex is retained as an explicit alternate mapping.
-- [ ] A Vulkan-capable host has opt-in smoke evidence for generated-UV texture sampling.
+- [x] Operational Vulkan generated-UV texture sampling evidence is assigned to `GRAPHICS-089` after `ASSETIO-008`.
 - [x] Graphics layering remains free of live `AssetService`, ECS, runtime, geometry backend, or `xatlas` dependencies.
 
 ## Verification
@@ -131,9 +136,16 @@ Slice A verification completed locally:
 - `python3 tools/repo/check_test_layout.py --root . --strict` — passed.
 - `git diff --check` — passed.
 
-Not run for Slice A: `ci-vulkan` and `gpu;vulkan` UV smoke. That remains a
-Slice C acceptance item after `ASSETIO-008` and a Vulkan-capable host are
-available.
+Slice B / retirement verification completed locally:
+
+- `cmake --build --preset ci --target IntrinsicGraphicsRendererCpuUnitTests IntrinsicGraphicsContractTests IntrinsicRuntimeContractTests` — passed.
+- `ctest --test-dir build/ci --output-on-failure -R 'GraphicsVisualizationPackets|VisualizationAdapters|GraphicsMaterialSystem|RuntimeMeshAttributeTextureBake' --timeout 60` — passed, 50/50.
+- `cmake --build --preset ci --target IntrinsicTests` — passed.
+- `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60` — passed, 3044/3044.
+
+Not run for this retirement: `ci-vulkan` and `gpu;vulkan` generated-UV smoke.
+That is now owned by `GRAPHICS-089` after `ASSETIO-008` and a Vulkan-capable
+host are available.
 
 ## Forbidden changes
 - Do not import `xatlas`, geometry algorithm modules, runtime, ECS, or `AssetService` into graphics or Vulkan layers.
@@ -142,5 +154,7 @@ available.
 - Do not make Htex regeneration implicit when resolved UVs are available.
 
 ## Maturity
-- Target: `Operational` on Vulkan-capable hosts; `CPUContracted` everywhere else.
-- This task closes render-path use of resolved UVs. UI controls are owned by `UI-014`.
+- Completed at `CPUContracted`.
+- This task closes render-path use of resolved UVs and the data-only generated
+  bake texture descriptor contract. `Operational` generated-UV Vulkan smoke is
+  owned by `GRAPHICS-089`; UI controls are owned by `UI-014`.

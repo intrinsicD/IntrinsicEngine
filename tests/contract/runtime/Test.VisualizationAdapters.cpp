@@ -5,11 +5,13 @@
 #include <glm/glm.hpp>
 
 import Geometry.Properties;
+import Extrinsic.Asset.Registry;
 import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.Runtime.VisualizationAdapters;
 import Extrinsic.Runtime.StreamingExecutor;
 
+namespace Assets = Extrinsic::Assets;
 namespace G = Extrinsic::Graphics;
 namespace R = Extrinsic::Runtime;
 
@@ -608,6 +610,10 @@ TEST(VisualizationAdapters, HtexMetadataAdapterAppendsPreviewAndUvBakePackets)
                        .AtlasWidth = 512u,
                        .AtlasHeight = 256u,
                        .TexcoordBufferBDA = 0xCAFEu,
+                       .AtlasTextureAsset = Assets::AssetId{800u, 1u},
+                       .GeneratedTextureSemantic =
+                           G::VisualizationGeneratedTextureSemantic::ScalarAttribute,
+                       .SourceAttributeDirtyStamp = 1234u,
                    },
                    stats);
 
@@ -632,6 +638,10 @@ TEST(VisualizationAdapters, HtexMetadataAdapterAppendsPreviewAndUvBakePackets)
     EXPECT_EQ(bake.TexcoordProvenance,
               G::VisualizationTexcoordProvenance::RuntimeResolved);
     EXPECT_EQ(bake.TexcoordDirtyStamp, 99u);
+    EXPECT_EQ(bake.AtlasTextureAsset, (Assets::AssetId{800u, 1u}));
+    EXPECT_EQ(bake.GeneratedTextureSemantic,
+              G::VisualizationGeneratedTextureSemantic::ScalarAttribute);
+    EXPECT_EQ(bake.SourceAttributeDirtyStamp, 1234u);
     EXPECT_EQ(stats.AdapterInvocationCount, 1u);
     EXPECT_EQ(stats.PacketAppendCount, 2u);
 
@@ -646,6 +656,8 @@ TEST(VisualizationAdapters, HtexMetadataAdapterAppendsPreviewAndUvBakePackets)
         G::BuildVisualizationOverlaySummary(batch.AsPacketBatch());
     EXPECT_EQ(summary.UvBakeAtlasDescriptorCount, 1u);
     EXPECT_EQ(summary.RuntimeResolvedUvBakeAtlasDescriptorCount, 1u);
+    EXPECT_EQ(summary.FragmentBakeTextureAssetDescriptorCount, 1u);
+    EXPECT_EQ(summary.ScalarBakeTextureAssetDescriptorCount, 1u);
     EXPECT_EQ(summary.HtexBakeAtlasDescriptorCount, 0u);
 }
 

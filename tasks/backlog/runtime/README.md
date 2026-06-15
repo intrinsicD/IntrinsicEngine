@@ -7,9 +7,7 @@ another backlog directory.
 
 ## Runtime backlog tasks
 
-- [RUNTIME-109 — Extensible mesh attribute texture bake pipeline](RUNTIME-109-extensible-mesh-attribute-texture-bakes.md):
-  generalize CPU mesh attribute texture bakes for 1D-4D vertex/face algorithm
-  results over resolved UVs.
+- No open runtime-owned backlog tasks are currently queued here.
 
 ### Runtime adapter umbrellas (clarified by Q tasks; producer modules)
 
@@ -47,6 +45,10 @@ these as runtime work when scheduling and review:
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [RUNTIME-109 — Extensible mesh attribute texture bake pipeline](../../done/RUNTIME-109-extensible-mesh-attribute-texture-bakes.md)
+  (done, 2026-06-15, `CPUContracted`): generic runtime CPU mesh-attribute
+  texture bakes now cover resolved-UV vertex/face scalar, label, vector2,
+  vector3/normal, and RGBA outputs with stable generated texture keys.
 - [RUNTIME-101 — Asset ingest state-machine migration](../../done/RUNTIME-101-asset-ingest-state-machine.md)
   (done, 2026-06-15, `CPUContracted`): promoted the runtime ingest
   request/result state machine for manual import, dropped files, and reimport;

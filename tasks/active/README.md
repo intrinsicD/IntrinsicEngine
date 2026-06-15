@@ -11,11 +11,7 @@ Each active task should include:
 
 ## Currently active
 
-- [`GRAPHICS-088` — Resolved UV rendering and bake texture residency](GRAPHICS-088-resolved-uv-rendering-and-bake-residency.md):
-  active CPU-contracted graphics slice for resolved-UV material sampling,
-  generated texture asset bindings, UV debug material, and UV bake packet
-  provenance; full operational Vulkan/generated-bake proof remains gated by
-  `RUNTIME-109` / `ASSETIO-008`.
+None.
 
 ## History
 

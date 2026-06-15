@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `GRAPHICS-088` — Resolved UV rendering and bake texture residency (tasks/active/GRAPHICS-088-resolved-uv-rendering-and-bake-residency.md)
+- none
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 
@@ -39,6 +39,7 @@ the authoritative open/unblocked view.
 - unblocked: `GEOM-023` — Sparse non-symmetric iterative solver seam (BiCGSTAB) (tasks/backlog/geometry/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md)
 - blocked by `GEOM-020`: `GEOM-024` — Sparse symmetric generalized eigensolver seam (tasks/backlog/geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
 - blocked by `GEOM-018`: `GEOM-025` — UV atlas backend contract and xatlas default (tasks/backlog/geometry/GEOM-025-uv-atlas-backend-xatlas.md)
+- blocked by `ASSETIO-008`: `GRAPHICS-089` — Generated-UV texture sampling Vulkan smoke (tasks/backlog/rendering/GRAPHICS-089-generated-uv-texture-sampling-vulkan-smoke.md)
 - blocked by `GEOM-020`: `METHOD-002` — Signed Heat Method reference backend (tasks/backlog/methods/METHOD-002-signed-heat-method-reference-backend.md)
 - blocked by `GEOM-023`: `METHOD-003` — Closest Point Method PDE solver reference backend (tasks/backlog/methods/METHOD-003-closest-point-method-pde-reference-backend.md)
 - unblocked: `METHOD-004` — Walk on Spheres / Walk on Stars PDE solver reference backend (tasks/backlog/methods/METHOD-004-walk-on-spheres-reference-backend.md)
@@ -46,7 +47,6 @@ the authoritative open/unblocked view.
 - blocked by `GEOM-024`: `METHOD-006` — Cross-field / frame-field design reference backend (tasks/backlog/methods/METHOD-006-cross-field-design-reference-backend.md)
 - unblocked: `METHOD-007` — Constrained Delaunay tetrahedralization reference backend (tasks/backlog/methods/METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md)
 - unblocked: `METHODS-001` — Pin signed heat as methods-pipeline pathfinder (tasks/backlog/methods/METHODS-001-signed-heat-pathfinder.md)
-- blocked by `ASSETIO-008`: `RUNTIME-109` — Extensible mesh attribute texture bake pipeline (tasks/backlog/runtime/RUNTIME-109-extensible-mesh-attribute-texture-bakes.md)
 - blocked by `ASSETIO-008`: `UI-014` — UV backend and texture bake controls (tasks/backlog/ui/UI-014-uv-backend-and-texture-bake-controls.md)
 
 ## Audits

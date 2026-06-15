@@ -48,6 +48,22 @@ export namespace Extrinsic::Graphics
         RuntimeResolved,
     };
 
+    enum class VisualizationGeneratedTextureSemantic : std::uint8_t
+    {
+        Unknown = 0,
+        ScalarAttribute,
+        LabelAttribute,
+        Vector2Attribute,
+        Vector3Attribute,
+        Vector4Attribute,
+        PbrAlbedo,
+        PbrNormal,
+        PbrMetallicRoughness,
+        PbrEmissive,
+        Displacement,
+        Count,
+    };
+
     struct VisualizationAttributeBufferPacket
     {
         std::string Name{};
@@ -139,9 +155,12 @@ export namespace Extrinsic::Graphics
         std::uint32_t AtlasHeight{0u};
         std::uint64_t TexcoordBufferBDA{0u};
         Assets::AssetId AtlasTextureAsset{};
+        VisualizationGeneratedTextureSemantic GeneratedTextureSemantic{
+            VisualizationGeneratedTextureSemantic::Unknown};
         VisualizationTexcoordProvenance TexcoordProvenance{
             VisualizationTexcoordProvenance::Unknown};
         std::uint64_t TexcoordDirtyStamp{0u};
+        std::uint64_t SourceAttributeDirtyStamp{0u};
     };
 
     struct VisualizationPropertyBufferUploadDescriptor
@@ -229,6 +248,11 @@ export namespace Extrinsic::Graphics
         std::uint32_t HtexBakeAtlasDescriptorCount{0u};
         std::uint32_t HtexRecreateRequestCount{0u};
         std::uint32_t FragmentBakeTextureAssetDescriptorCount{0u};
+        std::uint32_t ScalarBakeTextureAssetDescriptorCount{0u};
+        std::uint32_t LabelBakeTextureAssetDescriptorCount{0u};
+        std::uint32_t VectorBakeTextureAssetDescriptorCount{0u};
+        std::uint32_t PbrBakeTextureAssetDescriptorCount{0u};
+        std::uint32_t DisplacementBakeTextureAssetDescriptorCount{0u};
         bool RequiresTextureResidency{false};
     };
 

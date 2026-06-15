@@ -75,6 +75,46 @@ namespace Extrinsic::Graphics
             }
         }
 
+        [[nodiscard]] bool SupportedGeneratedTextureSemantic(
+            const VisualizationGeneratedTextureSemantic semantic) noexcept
+        {
+            return static_cast<std::uint8_t>(semantic) <
+                   static_cast<std::uint8_t>(
+                       VisualizationGeneratedTextureSemantic::Count);
+        }
+
+        void CountGeneratedTextureSemantic(
+            const VisualizationGeneratedTextureSemantic semantic,
+            VisualizationOverlaySummary& summary) noexcept
+        {
+            switch (semantic)
+            {
+            case VisualizationGeneratedTextureSemantic::ScalarAttribute:
+                ++summary.ScalarBakeTextureAssetDescriptorCount;
+                break;
+            case VisualizationGeneratedTextureSemantic::LabelAttribute:
+                ++summary.LabelBakeTextureAssetDescriptorCount;
+                break;
+            case VisualizationGeneratedTextureSemantic::Vector2Attribute:
+            case VisualizationGeneratedTextureSemantic::Vector3Attribute:
+            case VisualizationGeneratedTextureSemantic::Vector4Attribute:
+                ++summary.VectorBakeTextureAssetDescriptorCount;
+                break;
+            case VisualizationGeneratedTextureSemantic::PbrAlbedo:
+            case VisualizationGeneratedTextureSemantic::PbrNormal:
+            case VisualizationGeneratedTextureSemantic::PbrMetallicRoughness:
+            case VisualizationGeneratedTextureSemantic::PbrEmissive:
+                ++summary.PbrBakeTextureAssetDescriptorCount;
+                break;
+            case VisualizationGeneratedTextureSemantic::Displacement:
+                ++summary.DisplacementBakeTextureAssetDescriptorCount;
+                break;
+            case VisualizationGeneratedTextureSemantic::Unknown:
+            case VisualizationGeneratedTextureSemantic::Count:
+                break;
+            }
+        }
+
         template <typename T>
         [[nodiscard]] bool IsFinitePayload(const std::span<const std::byte> bytes,
                                            const std::uint64_t componentCount) noexcept
@@ -336,6 +376,12 @@ namespace Extrinsic::Graphics
             {
                 ++diagnostics.InvalidResourceCount;
             }
+            if (!SupportedGeneratedTextureSemantic(
+                    packet.GeneratedTextureSemantic))
+            {
+                valid = false;
+                ++diagnostics.InvalidResourceCount;
+            }
 
             switch (packet.Mapping)
             {
@@ -402,6 +448,9 @@ namespace Extrinsic::Graphics
             if (packet.AtlasTextureAsset.IsValid())
             {
                 ++summary.FragmentBakeTextureAssetDescriptorCount;
+                CountGeneratedTextureSemantic(
+                    packet.GeneratedTextureSemantic,
+                    summary);
             }
 
             switch (packet.Mapping)

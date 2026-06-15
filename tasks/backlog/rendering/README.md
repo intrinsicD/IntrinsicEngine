@@ -431,7 +431,7 @@ out-of-scope) before the entry is eligible for "in-progress" selection.
   no per-frame state churn); extensibility family
   (`Material.DefaultDebug<Variant>` for `Wireframe`, `Line`, `Point`,
   `Normals`, `Depth`, `InstanceId`; `Material.DefaultDebugUVs` is the
-  type-only checker material added by active `GRAPHICS-088`); and a layering audit
+  type-only checker material added by retired `GRAPHICS-088`); and a layering audit
   confirming zero new dependency edges. Implementation children
   `GRAPHICS-031-Impl-A` (shader sources + pipeline + slot-0
   repopulation), `GRAPHICS-031-Impl-B` (substitution wiring + diagnostics
@@ -776,12 +776,16 @@ Cross-layer Theme B′ leaves outside `rendering/`:
 - [`runtime/RUNTIME-090` — Dear ImGui platform/renderer adapter](../../done/RUNTIME-090-imgui-platform-renderer-adapter.md) (retired 2026-06-02 at `CPUContracted`; Slice A standalone adapter module plus Slice B `Engine` frame-loop wiring landed).
 
 Open post-acceptance rendering leaves:
-- [GRAPHICS-088 — Resolved UV rendering and bake texture residency](../../active/GRAPHICS-088-resolved-uv-rendering-and-bake-residency.md):
-  consumes the runtime resolved-UV contract and generic bake pipeline so surface
-  materials, generated textures, UV debug inspection, and UV-backed fragment
-  bakes all use the canonical texture-coordinate channel. Slice A is active for
-  the backend-neutral graphics contract; full `Operational` proof remains gated
-  by `RUNTIME-109` / `ASSETIO-008`.
+- [GRAPHICS-088 — Resolved UV rendering and bake texture residency](../../done/GRAPHICS-088-resolved-uv-rendering-and-bake-residency.md):
+  retired CPU-contracted resolved-UV renderer/material/generic generated-bake
+  descriptor contract. Surface materials, generated textures, UV debug
+  inspection, and UV-backed fragment bakes now use the canonical texture-
+  coordinate channel without graphics-side UV generation.
+- [GRAPHICS-089 — Generated-UV texture sampling Vulkan smoke](GRAPHICS-089-generated-uv-texture-sampling-vulkan-smoke.md):
+  blocked by `ASSETIO-008`; owns the opt-in `gpu;vulkan` proof that an
+  imported mesh that originally lacked authored UVs can render through generated
+  UVs and an uploaded generated texture binding once runtime materialization
+  supplies those generated UVs.
 
 Cross-layer Theme A leaves retired for the full working sandbox path:
 - [`RUNTIME-085` — `GeometrySources` mesh residency bridge](../../done/RUNTIME-085-geometrysources-mesh-residency.md) (retired 2026-05-28 at `CPUContracted`; Slices A–C landed the mesh packer, extraction wiring, and dirty-domain reupload/retire ordering).
