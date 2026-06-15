@@ -38,6 +38,7 @@ jobs:
             spirv-tools
 
       - name: Cache vcpkg binary packages
+        id: vcpkg-cache
         uses: actions/cache@v4
         with:
           path: external/vcpkg-bincache
@@ -52,7 +53,12 @@ jobs:
         run: echo "VCPKG_BINARY_SOURCES=clear;files,${GITHUB_WORKSPACE}/external/vcpkg-bincache,readwrite" >> "$GITHUB_ENV"
 
       - name: Configure (ci preset)
-        run: cmake --preset ci
+        run: |
+          python3 tools/ci/time_command.py \
+            --label "Configure (ci preset)" \
+            --warm-cache-hit '${{ steps.vcpkg-cache.outputs.cache-hit }}' \
+            --max-warm-seconds 10 \
+            -- cmake --preset ci
 
       - name: Build full CPU targets
         run: cmake --build --preset ci
@@ -170,6 +176,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Cache vcpkg binary packages
+        id: vcpkg-cache
         uses: actions/cache@v4
         with:
           path: external/vcpkg-bincache
@@ -184,7 +191,12 @@ jobs:
         run: echo "VCPKG_BINARY_SOURCES=clear;files,${GITHUB_WORKSPACE}/external/vcpkg-bincache,readwrite" >> "$GITHUB_ENV"
 
       - name: Configure (ci preset)
-        run: cmake --preset ci
+        run: |
+          python3 tools/ci/time_command.py \
+            --label "Configure (ci preset)" \
+            --warm-cache-hit '${{ steps.vcpkg-cache.outputs.cache-hit }}' \
+            --max-warm-seconds 10 \
+            -- cmake --preset ci
 
       - name: Build IntrinsicTests for GPU-labeled coverage
         run: cmake --build --preset ci --target IntrinsicTests

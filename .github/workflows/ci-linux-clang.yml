@@ -41,6 +41,7 @@ jobs:
         run: python3 -m pip install --disable-pip-version-check pyyaml
 
       - name: Cache vcpkg binary packages
+        id: vcpkg-cache
         uses: actions/cache@v4
         with:
           path: external/vcpkg-bincache
@@ -58,7 +59,12 @@ jobs:
         run: python3 tools/agents/check_task_policy.py --root . --strict
 
       - name: Configure (ci preset)
-        run: cmake --preset ci
+        run: |
+          python3 tools/ci/time_command.py \
+            --label "Configure (ci preset)" \
+            --warm-cache-hit '${{ steps.vcpkg-cache.outputs.cache-hit }}' \
+            --max-warm-seconds 10 \
+            -- cmake --preset ci
 
       - name: Build full CPU targets
         run: cmake --build --preset ci

@@ -36,6 +36,7 @@ jobs:
             spirv-tools
 
       - name: Cache vcpkg binary packages
+        id: vcpkg-cache
         uses: actions/cache@v4
         with:
           path: external/vcpkg-bincache
@@ -50,7 +51,12 @@ jobs:
         run: echo "VCPKG_BINARY_SOURCES=clear;files,${GITHUB_WORKSPACE}/external/vcpkg-bincache,readwrite" >> "$GITHUB_ENV"
 
       - name: Configure (ci-vulkan preset)
-        run: cmake --preset ci-vulkan
+        run: |
+          python3 tools/ci/time_command.py \
+            --label "Configure (ci-vulkan preset)" \
+            --warm-cache-hit '${{ steps.vcpkg-cache.outputs.cache-hit }}' \
+            --max-warm-seconds 10 \
+            -- cmake --preset ci-vulkan
 
       - name: Build promoted Vulkan targets
         run: cmake --build --preset ci-vulkan --target ExtrinsicSandbox IntrinsicTests

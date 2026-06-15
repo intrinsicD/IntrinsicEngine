@@ -121,6 +121,12 @@ CI workflows run the same bootstrap before configure and cache
 therefore starts a new binary-cache line while older archives remain available
 through restore keys.
 
+Initial cache-backed configure steps in CI run through
+`tools/ci/time_command.py`, which records the wall-clock configure duration in
+the GitHub step summary. When `actions/cache` reports an exact vcpkg
+binary-cache hit, the wrapper enforces the INFRA-001 warm-cache budget by
+failing configure runs that exceed 10 seconds.
+
 Version bumps flow through the manifest:
 
 ```bash

@@ -31,6 +31,7 @@ jobs:
             python3
 
       - name: Cache vcpkg binary packages
+        id: vcpkg-cache
         uses: actions/cache@v4
         with:
           path: external/vcpkg-bincache
@@ -46,7 +47,11 @@ jobs:
 
       - name: Configure (${{ matrix.sanitizer.name }})
         run: |
-          cmake --preset ci \
+          python3 tools/ci/time_command.py \
+            --label "Configure (${{ matrix.sanitizer.name }})" \
+            --warm-cache-hit '${{ steps.vcpkg-cache.outputs.cache-hit }}' \
+            --max-warm-seconds 10 \
+            -- cmake --preset ci \
             -DINTRINSIC_ENABLE_SANITIZERS=OFF \
             -DCMAKE_CXX_FLAGS_DEBUG="-fsanitize=${{ matrix.sanitizer.flag }} -fno-omit-frame-pointer" \
             -DCMAKE_EXE_LINKER_FLAGS_DEBUG="-fsanitize=${{ matrix.sanitizer.flag }}" \

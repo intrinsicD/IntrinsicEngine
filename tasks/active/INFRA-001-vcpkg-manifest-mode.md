@@ -78,6 +78,9 @@ depends_on: []
       vcpkg baseline; OR `vcpkg` GHA binary cache provider.
     - Document a manual local cache path under `external/vcpkg-bincache/`
       for offline / repeat developer builds.
+- [x] Instrument initial cache-backed CI configure steps so exact vcpkg
+      binary-cache hits report elapsed time and fail when the warm-cache
+      configure budget exceeds 10 s.
 - [x] Retire `external/cache/` (delete `tools/setup/populate_deps.sh`
       once vcpkg is the single source of truth and no developer flows
       depend on the old layout).
@@ -126,17 +129,18 @@ depends_on: []
 - [ ] A fresh `git clone` followed by the documented bootstrap commands
       configures and builds `IntrinsicTests` without any in-tree
       validator code path firing.
-- [ ] CI uses a shared binary cache; warm-cache configure is ≤ 10 s.
+- [ ] CI exact-cache-hit runs pass the shared-binary-cache configure timing
+      gate (≤ 10 s) and record the elapsed time in the GitHub step summary.
 - [x] Version bumps flow through `vcpkg x-update-baseline` + manifest
       edit only — no hand-edits to any `GIT_TAG` strings anywhere.
 
 ## Status
 - Active 2026-06-11; owner: Codex; branch: `main`.
-- Current slice: Slice D — deprecation cleanup. `cmake/Dependencies.cmake` is
-  vcpkg-manifest-only and fails closed when configure does not run through the
-  repository vcpkg toolchain. Slice B cut over the default preset path and
-  chainloads `cmake/IntrinsicClangToolchain.cmake`; Slice C wired CI/local
-  binary-cache flow.
+- Current slice: Slice E — CI configure timing instrumentation. Slice D made
+  `cmake/Dependencies.cmake` vcpkg-manifest-only and fail-closed when configure
+  does not run through the repository vcpkg toolchain. Slice B cut over the
+  default preset path and chainloads `cmake/IntrinsicClangToolchain.cmake`;
+  Slice C wired CI/local binary-cache flow.
 - Raw IDE-generated CMake configure commands are supported when they leave
   `CMAKE_TOOLCHAIN_FILE` unset: top-level CMake selects the repository vcpkg
   toolchain before `project()`, chainloads the Intrinsic Clang toolchain, and
@@ -161,6 +165,32 @@ depends_on: []
 - Vulkan smoke passed locally under the `ci-vulkan` preset. Final retirement
   still requires observing the CI warm-cache timing gate after this cleanup
   lands.
+- 2026-06-15 CI timing instrumentation: the initial GitHub workflow configure
+  steps that consume the vcpkg binary cache now run through
+  `tools/ci/time_command.py`. Exact `actions/cache` hits enforce the 10 s
+  warm-cache configure budget and append elapsed time to the GitHub step
+  summary. Retirement still waits for a post-commit CI run with exact-hit
+  timing evidence plus the fresh-clone build evidence below.
+- Slice E verification 2026-06-15:
+    - `python3 -m py_compile tools/ci/time_command.py` — passed.
+    - `python3 tools/ci/time_command.py --label "time wrapper smoke" --warm-cache-hit true --max-warm-seconds 10 -- python3 -c "print('ok')"` — passed; elapsed 0.011 s.
+    - Python YAML parse of all `.github/workflows/*.yml` files — passed.
+    - `tools/setup/bootstrap_vcpkg.sh` — passed; checked out baseline
+      `06a7fdd564234908731c59ac46a624f808e87b1c`.
+    - `VCPKG_BINARY_SOURCES="clear;files,$PWD/external/vcpkg-bincache,readwrite" python3 tools/ci/time_command.py --label "Configure (ci preset)" --warm-cache-hit false --json-out build/ci/configure_timing.json -- cmake --preset ci --fresh` — passed; elapsed 58.754 s.
+    - `rm -rf build/ci` followed by `VCPKG_BINARY_SOURCES="clear;files,$PWD/external/vcpkg-bincache,readwrite" python3 tools/ci/time_command.py --label "Configure (ci preset warm)" --warm-cache-hit true --max-warm-seconds 10 --json-out build/ci/configure_timing_warm.json -- cmake --preset ci` — passed; elapsed 7.818 s.
+    - `cmake --build --preset ci --target IntrinsicTests` — passed.
+    - `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60` — passed, 2972/2972.
+    - `python3 tools/agents/check_task_policy.py --root . --strict` — passed.
+    - `python3 tools/agents/check_task_state_links.py --root . --strict` — passed.
+    - `python3 tools/agents/generate_session_brief.py --check` — passed.
+    - `python3 tools/ci/check_workflow_names.py --root .github/workflows` — passed.
+    - `python3 tools/docs/check_doc_links.py --root .` — passed.
+    - `python3 tools/docs/check_docs_sync.py --root . --strict --files $(git diff --name-only --diff-filter=ACMR) $(git ls-files --others --exclude-standard)` — passed.
+    - `python3 tools/repo/check_pr_contract.py --root . --mode ci` — passed.
+    - `python3 tools/repo/check_root_hygiene.py --root .` — passed.
+    - `python3 tools/repo/check_test_layout.py --root . --strict` — passed.
+    - `git diff --check` — passed.
 - Slice A verification 2026-06-11:
     - `tools/setup/bootstrap_vcpkg.sh` — passed; checked out baseline
       `06a7fdd564234908731c59ac46a624f808e87b1c` under ignored
@@ -297,7 +327,11 @@ ctest --test-dir build/ci --output-on-failure \
 
 # Warm path (binary cache hot) — should finish in seconds
 rm -rf build/ci
-time cmake --preset ci
+python3 tools/ci/time_command.py \
+    --label "Configure (ci preset)" \
+    --warm-cache-hit true \
+    --max-warm-seconds 10 \
+    -- cmake --preset ci
 
 # Structural checks
 python3 tools/agents/check_task_policy.py --root . --strict
@@ -322,8 +356,8 @@ python3 tools/docs/check_doc_links.py --root .
 
 ## Slice plan
 
-Landing order respected the one-release deprecation window; Slice D now removes
-the retired fallback and makes vcpkg manifest mode the single dependency path:
+Landing order respected the one-release deprecation window; Slice D removed the
+retired fallback and made vcpkg manifest mode the single dependency path:
 
 - **Slice A — manifest + bootstrap (no behavior change).** Add `vcpkg.json`,
   `vcpkg-configuration.json`, and `tools/setup/bootstrap_vcpkg.sh`; nothing
@@ -337,8 +371,13 @@ the retired fallback and makes vcpkg manifest mode the single dependency path:
 - **Slice C — CI binary cache + timings.** Wire the GHA binary cache,
   capture cold/warm configure timings in the PR, and run the Vulkan smoke
   gate on a capable host.
-- **Slice D — deprecation cleanup (current slice).**
+- **Slice D — deprecation cleanup.**
   Delete the FetchContent helpers, the `INTRINSIC_OFFLINE_DEPS` /
   `INTRINSIC_UPDATE_DEPS` / `INTRINSIC_DEPS_SEAL` knobs,
   `tools/setup/populate_deps.sh`, and remaining `external/cache/`
   references; update `AGENTS.md` §5.
+- **Slice E — CI configure timing instrumentation (current slice).**
+  Wrap initial cache-backed CI configure steps with `tools/ci/time_command.py`,
+  report elapsed time in GitHub summaries, and fail exact vcpkg binary-cache
+  hits above 10 s. Defers task retirement until a post-commit CI run records
+  exact-hit timing evidence and the fresh-clone build check is captured.

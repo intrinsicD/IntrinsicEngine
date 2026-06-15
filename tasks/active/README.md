@@ -17,7 +17,9 @@ Each active task should include:
   provenance; full operational Vulkan/generated-bake proof remains gated by
   `RUNTIME-109` / `ASSETIO-008`.
 - [`INFRA-001` — Move third-party dependencies to a vcpkg manifest](INFRA-001-vcpkg-manifest-mode.md):
-  active dependency-management migration slice; unrelated to current runtime/UI work.
+  active dependency-management migration slice; CI configure timing is now
+  instrumented, with retirement waiting on post-commit exact-hit timing and
+  fresh-clone build evidence.
 
 ## History
 
