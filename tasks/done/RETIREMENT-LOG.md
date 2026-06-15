@@ -8,6 +8,20 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+Active
+[`RUNTIME-101`](RUNTIME-101-asset-ingest-state-machine.md) — Asset ingest
+state-machine migration — retired on 2026-06-15 at maturity `CPUContracted`.
+Runtime now owns a backend-neutral ingest request/result state machine for
+manual imports, dropped files, and reimport over promoted `AssetService`,
+`Asset.ImportRouter`, `Runtime.StreamingExecutor`, and existing materialization
+handoffs. `Engine::ImportAssetFromPath(...)`, synchronous dropped non-geometry
+imports, deferred dropped-geometry main-thread apply, and
+`Engine::ReimportAsset(...)` share deterministic diagnostics, duplicate active
+request suppression, and stale completion guards. Reimport reloads the same
+`AssetId` transactionally through `AssetService` and does not recreate
+standalone geometry entities or revive scene-file `AssetSourceRef` coupling.
+Focused runtime/import coverage and strict docs/task/layering checks passed.
+
 Backlog
 [`RUNTIME-107`](RUNTIME-107-headless-engine-loop-coverage.md) —
 Headless-capable `Engine::Run()` loop coverage — retired on 2026-06-15 at
@@ -594,10 +608,10 @@ child tasks, and that is done: `RUNTIME-099` (explicit lifecycle pipeline
 with shutdown determinism, `CPUContracted`), `RUNTIME-100` (scene
 lifecycle), `RUNTIME-102` (editor command history), `RUNTIME-103`
 (geometry algorithm execution queue decision), and `RUNTIME-104` (derived
-overlay producer lifecycle) are retired, while `RUNTIME-101` (asset ingest
-state machine) remains an independently tracked Theme F backlog task
-synchronized with the `LEGACY-011` feature map. Theme A now has no open
-members.
+overlay producer lifecycle) are retired. `RUNTIME-101` (asset ingest state
+machine) was independently tracked after this seed and retired on
+2026-06-15, synchronized with the `LEGACY-011` feature map. Theme A now has
+no open members.
 
 Backlog
 [`BUG-025`](BUG-025-contact-manifold-normal-convention.md) — geometry

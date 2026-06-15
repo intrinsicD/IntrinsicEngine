@@ -52,6 +52,7 @@ import Extrinsic.Graphics.SelectionSystem;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Runtime.AssetGeometryIO;
+import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.AssetMeshNormals;
 import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
@@ -324,6 +325,7 @@ namespace Extrinsic::Runtime
 
         struct DroppedGeometryImportState
         {
+            RuntimeAssetIngestHandle IngestHandle{};
             RuntimeAssetImportRequest Request{};
             std::optional<DecodedGeometryImport> Decoded{};
             Core::ErrorCode Error{Core::ErrorCode::Unknown};
@@ -349,6 +351,107 @@ namespace Extrinsic::Runtime
             std::uint64_t GeneratedTextureAssetsCreated{0u};
             std::uint64_t GeneratedTextureUploadRequests{0u};
         };
+
+        [[nodiscard]] RuntimeAssetIngestRequest MakeRuntimeAssetIngestRequest(
+            const RuntimeAssetImportRequest& request,
+            const RuntimeAssetIngestSource source,
+            const Assets::AssetId existingAsset = {})
+        {
+            return RuntimeAssetIngestRequest{
+                .Source = source,
+                .Path = request.Path,
+                .PayloadKind = request.PayloadKind,
+                .ExistingAsset = existingAsset,
+            };
+        }
+
+        [[nodiscard]] RuntimeAssetIngestResult ToRuntimeAssetIngestResult(
+            const RuntimeAssetImportResult& result) noexcept
+        {
+            return RuntimeAssetIngestResult{
+                .PayloadKind = result.PayloadKind,
+                .Asset = result.Asset,
+                .PrimitiveEntitiesCreated =
+                    static_cast<std::uint32_t>(result.PrimitiveEntitiesCreated),
+                .EmbeddedTextureAssetsCreated =
+                    static_cast<std::uint32_t>(result.EmbeddedTextureAssetsCreated),
+                .GeneratedTextureAssetsCreated =
+                    static_cast<std::uint32_t>(result.GeneratedTextureAssetsCreated),
+                .TextureUploadRequests =
+                    static_cast<std::uint32_t>(result.TextureUploadRequests),
+                .MaterializedModelScene = result.MaterializedModelScene,
+                .RequestedTextureUpload = result.RequestedTextureUpload,
+            };
+        }
+
+        [[nodiscard]] RuntimeAssetIngestDiagnostic DiagnosticForImportError(
+            const Core::ErrorCode error) noexcept
+        {
+            switch (error)
+            {
+            case Core::ErrorCode::FileNotFound:
+                return RuntimeAssetIngestDiagnostic::MissingFile;
+            case Core::ErrorCode::AssetUnsupportedFormat:
+                return RuntimeAssetIngestDiagnostic::UnsupportedExtension;
+            case Core::ErrorCode::AssetLoaderMissing:
+                return RuntimeAssetIngestDiagnostic::CallbackFailed;
+            case Core::ErrorCode::AssetDecodeFailed:
+                return RuntimeAssetIngestDiagnostic::DecodeFailed;
+            case Core::ErrorCode::AssetInvalidData:
+                return RuntimeAssetIngestDiagnostic::MaterializationFailed;
+            case Core::ErrorCode::InvalidPath:
+                return RuntimeAssetIngestDiagnostic::MissingPath;
+            case Core::ErrorCode::ResourceBusy:
+                return RuntimeAssetIngestDiagnostic::DuplicateActiveRequest;
+            default:
+                break;
+            }
+            return RuntimeAssetIngestDiagnostic::DecodeFailed;
+        }
+
+        [[nodiscard]] RuntimeAssetIngestDiagnostic DiagnosticForImportError(
+            const Core::ErrorCode error,
+            const RuntimeAssetIngestSource source) noexcept
+        {
+            if (source == RuntimeAssetIngestSource::Reimport &&
+                (error == Core::ErrorCode::ResourceNotFound ||
+                 error == Core::ErrorCode::TypeMismatch ||
+                 error == Core::ErrorCode::AssetTypeMismatch ||
+                 error == Core::ErrorCode::InvalidArgument))
+            {
+                return RuntimeAssetIngestDiagnostic::InvalidReimportTarget;
+            }
+            return DiagnosticForImportError(error);
+        }
+
+        [[nodiscard]] Core::ErrorCode ErrorFromIngestTransition(
+            const RuntimeAssetIngestTransition& transition) noexcept
+        {
+            if (transition.Error != Core::ErrorCode::Success)
+                return transition.Error;
+            switch (transition.Diagnostic)
+            {
+            case RuntimeAssetIngestDiagnostic::None:
+                return Core::ErrorCode::Success;
+            case RuntimeAssetIngestDiagnostic::MissingPath:
+                return Core::ErrorCode::InvalidPath;
+            case RuntimeAssetIngestDiagnostic::MissingFile:
+                return Core::ErrorCode::FileNotFound;
+            case RuntimeAssetIngestDiagnostic::DuplicateActiveRequest:
+                return Core::ErrorCode::ResourceBusy;
+            case RuntimeAssetIngestDiagnostic::UnknownHandle:
+                return Core::ErrorCode::ResourceNotFound;
+            default:
+                return Core::ErrorCode::InvalidState;
+            }
+        }
+
+        [[nodiscard]] bool CreatesOrChangesScene(
+            const RuntimeAssetImportResult& result) noexcept
+        {
+            return result.PrimitiveEntitiesCreated > 0u ||
+                   result.MaterializedModelScene;
+        }
 
         [[nodiscard]] bool IsFinitePosition(const glm::vec3& position) noexcept
         {
@@ -872,6 +975,121 @@ namespace Extrinsic::Runtime
                     }
                 },
                 decoded.Payload);
+        }
+
+        [[nodiscard]] Core::Expected<Assets::AssetPayloadKind>
+        PayloadKindForExistingAsset(
+            Assets::AssetService& assetService,
+            const Assets::AssetId asset)
+        {
+            if (!asset.IsValid() || !assetService.IsAlive(asset))
+            {
+                return Core::Err<Assets::AssetPayloadKind>(
+                    Core::ErrorCode::ResourceNotFound);
+            }
+
+            const auto meta = assetService.GetMeta(asset);
+            if (!meta.has_value())
+            {
+                return Core::Err<Assets::AssetPayloadKind>(meta.error());
+            }
+
+            if (meta->typeId == Assets::AssetService::TypeIdOf<
+                    Geometry::MeshIO::MeshIOResult>())
+            {
+                return Assets::AssetPayloadKind::Mesh;
+            }
+            if (meta->typeId == Assets::AssetService::TypeIdOf<
+                    Geometry::GraphIO::GraphIOResult>())
+            {
+                return Assets::AssetPayloadKind::Graph;
+            }
+            if (meta->typeId == Assets::AssetService::TypeIdOf<
+                    Geometry::PointCloudIO::PointCloudIOResult>())
+            {
+                return Assets::AssetPayloadKind::PointCloud;
+            }
+            if (meta->typeId == Assets::AssetService::TypeIdOf<
+                    Assets::AssetModelScenePayload>())
+            {
+                return Assets::AssetPayloadKind::ModelScene;
+            }
+            if (meta->typeId == Assets::AssetService::TypeIdOf<
+                    Assets::AssetTexture2DPayload>())
+            {
+                return Assets::AssetPayloadKind::Texture2D;
+            }
+
+            return Core::Err<Assets::AssetPayloadKind>(
+                Core::ErrorCode::AssetTypeMismatch);
+        }
+
+        [[nodiscard]] Core::Expected<RuntimeAssetImportResult>
+        ReloadDecodedGeometryImport(
+            Assets::AssetService& assetService,
+            const Assets::AssetId existingAsset,
+            const DecodedGeometryImport& decoded)
+        {
+            auto reloadResult = std::visit(
+                [&](const auto& payload) -> Core::Result
+                {
+                    using PayloadT = std::decay_t<decltype(payload)>;
+                    if constexpr (std::is_same_v<PayloadT, DecodedMeshImport>)
+                    {
+                        const Geometry::MeshIO::MeshIOResult storedPayload =
+                            payload.Payload;
+                        return assetService.Reload<
+                            Geometry::MeshIO::MeshIOResult>(
+                            existingAsset,
+                            [storedPayload](std::string_view,
+                                            Assets::AssetId)
+                                -> Core::Expected<Geometry::MeshIO::MeshIOResult>
+                            {
+                                return storedPayload;
+                            });
+                    }
+                    else if constexpr (std::is_same_v<PayloadT, DecodedGraphImport>)
+                    {
+                        const Geometry::GraphIO::GraphIOResult storedPayload =
+                            payload.Payload;
+                        return assetService.Reload<
+                            Geometry::GraphIO::GraphIOResult>(
+                            existingAsset,
+                            [storedPayload](std::string_view,
+                                            Assets::AssetId)
+                                -> Core::Expected<Geometry::GraphIO::GraphIOResult>
+                            {
+                                return storedPayload;
+                            });
+                    }
+                    else
+                    {
+                        const Geometry::PointCloudIO::PointCloudIOResult storedPayload =
+                            payload.Payload;
+                        return assetService.Reload<
+                            Geometry::PointCloudIO::PointCloudIOResult>(
+                            existingAsset,
+                            [storedPayload](std::string_view,
+                                            Assets::AssetId)
+                                -> Core::Expected<Geometry::PointCloudIO::PointCloudIOResult>
+                            {
+                                return storedPayload;
+                            });
+                    }
+                },
+                decoded.Payload);
+
+            if (!reloadResult.has_value())
+            {
+                return Core::Err<RuntimeAssetImportResult>(
+                    reloadResult.error());
+            }
+
+            DrainAssetImportEvents(assetService);
+            return RuntimeAssetImportResult{
+                .Asset = existingAsset,
+                .PayloadKind = decoded.PayloadKind,
+            };
         }
 
         [[nodiscard]] std::uint32_t ClampCursorPixel(const float value,
@@ -2196,12 +2414,58 @@ namespace Extrinsic::Runtime
     Core::Expected<RuntimeAssetImportResult> Engine::ImportAssetFromPath(
         RuntimeAssetImportRequest request)
     {
-        auto result = ImportAssetFromPathImpl(request);
-        RecordAssetImportEvent(request, result);
-        if (result.has_value() &&
-            (result->PrimitiveEntitiesCreated > 0u || result->MaterializedModelScene))
+        auto result = ImportAssetFromPathWithIngest(
+            std::move(request),
+            RuntimeAssetIngestSource::ManualImport,
+            {});
+        if (result.has_value() && CreatesOrChangesScene(*result))
         {
             (void)m_EditorCommandHistory.MarkDirty("Import Asset");
+        }
+        return result;
+    }
+
+    Core::Expected<RuntimeAssetImportResult> Engine::ReimportAsset(
+        RuntimeAssetReimportRequest request)
+    {
+        RuntimeAssetImportRequest importRequest{
+            .PayloadKind = request.PayloadKind,
+        };
+
+        if (m_AssetService && request.Asset.IsValid() &&
+            m_AssetService->IsAlive(request.Asset))
+        {
+            auto path = m_AssetService->GetPath(request.Asset);
+            if (path.has_value())
+            {
+                importRequest.Path = std::move(*path);
+            }
+            else
+            {
+                importRequest.Path = "<invalid-reimport-target>";
+            }
+            if (importRequest.PayloadKind == Assets::AssetPayloadKind::Unknown)
+            {
+                auto payloadKind =
+                    PayloadKindForExistingAsset(*m_AssetService, request.Asset);
+                if (payloadKind.has_value())
+                {
+                    importRequest.PayloadKind = *payloadKind;
+                }
+            }
+        }
+        else if (request.Asset.IsValid())
+        {
+            importRequest.Path = "<invalid-reimport-target>";
+        }
+
+        auto result = ImportAssetFromPathWithIngest(
+            std::move(importRequest),
+            RuntimeAssetIngestSource::Reimport,
+            request.Asset);
+        if (result.has_value() && CreatesOrChangesScene(*result))
+        {
+            (void)m_EditorCommandHistory.MarkDirty("Reimport Asset");
         }
         return result;
     }
@@ -2210,6 +2474,12 @@ namespace Extrinsic::Runtime
         const noexcept
     {
         return m_LastAssetImportEvent;
+    }
+
+    std::vector<RuntimeAssetIngestRecord>
+    Engine::GetAssetIngestRecordsForTest() const
+    {
+        return m_AssetIngestStateMachine.SnapshotAll();
     }
 
     void Engine::HandlePlatformEvent(const Platform::Event& event)
@@ -2304,10 +2574,17 @@ namespace Extrinsic::Runtime
                 path,
                 Assets::DebugNameForAssetRouteStatus(diagnostic.Status),
                 Core::Error::ToString(diagnostic.Error));
-            (void)ImportAssetFromPath(RuntimeAssetImportRequest{
-                .Path = path,
-                .PayloadKind = Assets::AssetPayloadKind::Unknown,
-            });
+            auto result = ImportAssetFromPathWithIngest(
+                RuntimeAssetImportRequest{
+                    .Path = path,
+                    .PayloadKind = Assets::AssetPayloadKind::Unknown,
+                },
+                RuntimeAssetIngestSource::DroppedFile,
+                {});
+            if (result.has_value() && CreatesOrChangesScene(*result))
+            {
+                (void)m_EditorCommandHistory.MarkDirty("Import Asset");
+            }
         }
     }
 
@@ -2315,6 +2592,33 @@ namespace Extrinsic::Runtime
         std::string path,
         std::vector<Assets::AssetPayloadKind> payloadKinds)
     {
+        RuntimeAssetImportRequest request{
+            .Path = path,
+            .PayloadKind = payloadKinds.empty()
+                ? Assets::AssetPayloadKind::Unknown
+                : payloadKinds.front(),
+        };
+        RuntimeAssetIngestTransition submit =
+            m_AssetIngestStateMachine.Submit(
+                MakeRuntimeAssetIngestRequest(
+                    request,
+                    RuntimeAssetIngestSource::DroppedFile));
+        if (!submit.Succeeded())
+        {
+            Core::Log::Warn(
+                "[Runtime] Dropped geometry import rejected by ingest state machine: path='{}' payload={} diagnostic={} error={}",
+                request.Path,
+                Assets::DebugNameForAssetPayloadKind(request.PayloadKind),
+                DebugNameForRuntimeAssetIngestDiagnostic(submit.Diagnostic),
+                Core::Error::ToString(ErrorFromIngestTransition(submit)));
+            RecordAssetImportEvent(
+                request,
+                Core::Err<RuntimeAssetImportResult>(
+                    ErrorFromIngestTransition(submit)),
+                submit.Diagnostic);
+            return;
+        }
+
         if (!m_Initialized ||
             !m_StreamingExecutor ||
             !m_AssetService ||
@@ -2322,12 +2626,10 @@ namespace Extrinsic::Runtime
             path.empty() ||
             payloadKinds.empty())
         {
-            RuntimeAssetImportRequest request{
-                .Path = std::move(path),
-                .PayloadKind = payloadKinds.empty()
-                    ? Assets::AssetPayloadKind::Unknown
-                    : payloadKinds.front(),
-            };
+            RuntimeAssetIngestTransition failed =
+                m_AssetIngestStateMachine.FailCallback(
+                    submit.Handle,
+                    Core::ErrorCode::InvalidState);
             Core::Log::Warn(
                 "[Runtime] Dropped geometry import rejected before queueing: path='{}' payload={} error={}",
                 request.Path,
@@ -2335,15 +2637,57 @@ namespace Extrinsic::Runtime
                 Core::Error::ToString(Core::ErrorCode::InvalidState));
             RecordAssetImportEvent(
                 request,
-                Core::Err<RuntimeAssetImportResult>(Core::ErrorCode::InvalidState));
+                Core::Err<RuntimeAssetImportResult>(Core::ErrorCode::InvalidState),
+                failed.Diagnostic);
+            return;
+        }
+
+        const Assets::AssetRouteDiagnostic routeDiagnostic =
+            Assets::DiagnoseAssetImportRoute(
+                path,
+                Assets::AssetRouteOperation::Import,
+                Assets::AssetImportHint{.PayloadKind = request.PayloadKind});
+        RuntimeAssetIngestTransition routeResolved =
+            m_AssetIngestStateMachine.ResolveRoute(
+                submit.Handle,
+                routeDiagnostic);
+        if (!routeResolved.Succeeded())
+        {
+            RecordAssetImportEvent(
+                request,
+                Core::Err<RuntimeAssetImportResult>(
+                    ErrorFromIngestTransition(routeResolved)),
+                routeResolved.Diagnostic);
+            return;
+        }
+
+        RuntimeAssetIngestTransition decodeQueued =
+            m_AssetIngestStateMachine.QueueDecode(submit.Handle);
+        if (!decodeQueued.Succeeded())
+        {
+            RecordAssetImportEvent(
+                request,
+                Core::Err<RuntimeAssetImportResult>(
+                    ErrorFromIngestTransition(decodeQueued)),
+                decodeQueued.Diagnostic);
+            return;
+        }
+
+        RuntimeAssetIngestTransition decoding =
+            m_AssetIngestStateMachine.MarkDecoding(submit.Handle);
+        if (!decoding.Succeeded())
+        {
+            RecordAssetImportEvent(
+                request,
+                Core::Err<RuntimeAssetImportResult>(
+                    ErrorFromIngestTransition(decoding)),
+                decoding.Diagnostic);
             return;
         }
 
         auto state = std::make_shared<DroppedGeometryImportState>();
-        state->Request = RuntimeAssetImportRequest{
-            .Path = path,
-            .PayloadKind = payloadKinds.front(),
-        };
+        state->IngestHandle = submit.Handle;
+        state->Request = request;
         const std::size_t candidateCount = payloadKinds.size();
 
         const StreamingTaskHandle handle = m_StreamingExecutor->Submit(
@@ -2381,37 +2725,110 @@ namespace Extrinsic::Runtime
                     return StreamingResult{
                         StreamingCpuPayloadReady{.PayloadToken = 0u}};
                 },
-                .ApplyOnMainThread = [this, state](StreamingResult&&) mutable
+                .ApplyOnMainThread = [this, state](StreamingResult&& streamingResult) mutable
                 {
                     Core::Expected<RuntimeAssetImportResult> result =
-                        Core::Err<RuntimeAssetImportResult>(state->Error);
-                    if (state->Decoded.has_value())
+                        Core::Err<RuntimeAssetImportResult>(
+                            streamingResult.has_value()
+                                ? state->Error
+                                : streamingResult.error());
+                    RuntimeAssetIngestDiagnostic eventDiagnostic =
+                        DiagnosticForImportError(result.error());
+
+                    if (!streamingResult.has_value() || !state->Decoded.has_value())
                     {
-                        auto materialized = MaterializeDecodedGeometryImport(
-                            *m_AssetService,
-                            *m_GpuAssetCache,
-                            m_RenderExtraction,
+                        RuntimeAssetIngestTransition failed =
+                            result.error() == Core::ErrorCode::FileNotFound
+                                ? m_AssetIngestStateMachine.MarkMissingFile(
+                                      state->IngestHandle)
+                                : m_AssetIngestStateMachine.FailDecode(
+                                      state->IngestHandle,
+                                      state->IngestHandle.Generation,
+                                      result.error());
+                        eventDiagnostic = failed.Diagnostic;
+                        RecordAssetImportEvent(
+                            state->Request,
+                            result,
+                            eventDiagnostic);
+                        return;
+                    }
+
+                    RuntimeAssetIngestTransition decodeComplete =
+                        m_AssetIngestStateMachine.CompleteDecode(
+                            state->IngestHandle,
+                            state->IngestHandle.Generation);
+                    if (!decodeComplete.Succeeded())
+                    {
+                        result = Core::Err<RuntimeAssetImportResult>(
+                            ErrorFromIngestTransition(decodeComplete));
+                        RecordAssetImportEvent(
+                            state->Request,
+                            result,
+                            decodeComplete.Diagnostic);
+                        return;
+                    }
+
+                    RuntimeAssetIngestTransition applying =
+                        m_AssetIngestStateMachine.BeginApply(state->IngestHandle);
+                    if (!applying.Succeeded())
+                    {
+                        result = Core::Err<RuntimeAssetImportResult>(
+                            ErrorFromIngestTransition(applying));
+                        RecordAssetImportEvent(
+                            state->Request,
+                            result,
+                            applying.Diagnostic);
+                        return;
+                    }
+
+                    auto materialized = MaterializeDecodedGeometryImport(
+                        *m_AssetService,
+                        *m_GpuAssetCache,
+                        m_RenderExtraction,
+                        *m_Scene,
+                        *state->Decoded);
+                    if (materialized.has_value())
+                    {
+                        FocusMainCameraOnImportedGeometry(
+                            m_CameraControllers,
+                            m_Config.Camera.Controller,
+                            m_Config.Camera.Enabled,
+                            materialized->Bounds);
+                        (void)m_SelectionController.SetSelectedEntity(
                             *m_Scene,
-                            *state->Decoded);
-                        if (materialized.has_value())
-                        {
-                            FocusMainCameraOnImportedGeometry(
-                                m_CameraControllers,
-                                m_Config.Camera.Controller,
-                                m_Config.Camera.Enabled,
-                                materialized->Bounds);
-                            (void)m_SelectionController.SetSelectedEntity(
-                                *m_Scene,
-                                materialized->Entity);
-                            result = materialized->Result;
-                        }
-                        else
+                            materialized->Entity);
+                        result = materialized->Result;
+                        RuntimeAssetIngestTransition complete =
+                            m_AssetIngestStateMachine.CompleteApply(
+                                state->IngestHandle,
+                                state->IngestHandle.Generation,
+                                ToRuntimeAssetIngestResult(*result));
+                        eventDiagnostic = complete.Diagnostic;
+                        if (!complete.Succeeded())
                         {
                             result = Core::Err<RuntimeAssetImportResult>(
-                                materialized.error());
+                                ErrorFromIngestTransition(complete));
+                        }
+                        if (complete.Succeeded() && CreatesOrChangesScene(*result))
+                        {
+                            (void)m_EditorCommandHistory.MarkDirty("Import Asset");
                         }
                     }
-                    RecordAssetImportEvent(state->Request, result);
+                    else
+                    {
+                        result = Core::Err<RuntimeAssetImportResult>(
+                            materialized.error());
+                        RuntimeAssetIngestTransition failed =
+                            m_AssetIngestStateMachine.FailApply(
+                                state->IngestHandle,
+                                state->IngestHandle.Generation,
+                                materialized.error());
+                        eventDiagnostic = failed.Diagnostic;
+                    }
+                    RecordAssetImportEvent(
+                        state->Request,
+                        result,
+                        eventDiagnostic);
                 },
             });
 
@@ -2426,9 +2843,14 @@ namespace Extrinsic::Runtime
                 request.Path,
                 Assets::DebugNameForAssetPayloadKind(request.PayloadKind),
                 Core::Error::ToString(Core::ErrorCode::InvalidState));
+            RuntimeAssetIngestTransition failed =
+                m_AssetIngestStateMachine.FailCallback(
+                    state->IngestHandle,
+                    Core::ErrorCode::InvalidState);
             RecordAssetImportEvent(
                 request,
-                Core::Err<RuntimeAssetImportResult>(Core::ErrorCode::InvalidState));
+                Core::Err<RuntimeAssetImportResult>(Core::ErrorCode::InvalidState),
+                failed.Diagnostic);
             return;
         }
 
@@ -2439,9 +2861,207 @@ namespace Extrinsic::Runtime
             candidateCount);
     }
 
+    Core::Expected<RuntimeAssetImportResult>
+    Engine::ImportAssetFromPathWithIngest(
+        RuntimeAssetImportRequest request,
+        const RuntimeAssetIngestSource source,
+        const Assets::AssetId existingAsset)
+    {
+        RuntimeAssetIngestTransition submit =
+            m_AssetIngestStateMachine.Submit(
+                MakeRuntimeAssetIngestRequest(request, source, existingAsset));
+        if (!submit.Succeeded())
+        {
+            Core::Expected<RuntimeAssetImportResult> result =
+                Core::Err<RuntimeAssetImportResult>(
+                    ErrorFromIngestTransition(submit));
+            RecordAssetImportEvent(request, result, submit.Diagnostic);
+            return result;
+        }
+
+        if (source == RuntimeAssetIngestSource::Reimport)
+        {
+            Core::ErrorCode targetError = Core::ErrorCode::Success;
+            if (!existingAsset.IsValid())
+            {
+                targetError = Core::ErrorCode::InvalidArgument;
+            }
+            else if (!m_AssetService || !m_AssetService->IsAlive(existingAsset))
+            {
+                targetError = Core::ErrorCode::ResourceNotFound;
+            }
+            else if (request.Path == "<invalid-reimport-target>")
+            {
+                targetError = Core::ErrorCode::ResourceNotFound;
+            }
+            else if (request.PayloadKind == Assets::AssetPayloadKind::Unknown)
+            {
+                targetError = Core::ErrorCode::AssetTypeMismatch;
+            }
+
+            if (targetError != Core::ErrorCode::Success)
+            {
+                RuntimeAssetIngestTransition failed =
+                    m_AssetIngestStateMachine.MarkInvalidReimportTarget(
+                        submit.Handle,
+                        targetError);
+                Core::Expected<RuntimeAssetImportResult> result =
+                    Core::Err<RuntimeAssetImportResult>(targetError);
+                RecordAssetImportEvent(request, result, failed.Diagnostic);
+                return result;
+            }
+        }
+
+        const Assets::AssetRouteDiagnostic routeDiagnostic =
+            Assets::DiagnoseAssetImportRoute(
+                request.Path,
+                Assets::AssetRouteOperation::Import,
+                Assets::AssetImportHint{.PayloadKind = request.PayloadKind});
+        RuntimeAssetIngestTransition routeResolved =
+            m_AssetIngestStateMachine.ResolveRoute(
+                submit.Handle,
+                routeDiagnostic);
+        if (!routeResolved.Succeeded())
+        {
+            Core::Expected<RuntimeAssetImportResult> result =
+                Core::Err<RuntimeAssetImportResult>(
+                    ErrorFromIngestTransition(routeResolved));
+            RecordAssetImportEvent(
+                request,
+                result,
+                routeResolved.Diagnostic);
+            return result;
+        }
+
+        RuntimeAssetIngestTransition decodeQueued =
+            m_AssetIngestStateMachine.QueueDecode(submit.Handle);
+        if (!decodeQueued.Succeeded())
+        {
+            Core::Expected<RuntimeAssetImportResult> result =
+                Core::Err<RuntimeAssetImportResult>(
+                    ErrorFromIngestTransition(decodeQueued));
+            RecordAssetImportEvent(
+                request,
+                result,
+                decodeQueued.Diagnostic);
+            return result;
+        }
+
+        RuntimeAssetIngestTransition decoding =
+            m_AssetIngestStateMachine.MarkDecoding(submit.Handle);
+        if (!decoding.Succeeded())
+        {
+            Core::Expected<RuntimeAssetImportResult> result =
+                Core::Err<RuntimeAssetImportResult>(
+                    ErrorFromIngestTransition(decoding));
+            RecordAssetImportEvent(request, result, decoding.Diagnostic);
+            return result;
+        }
+
+        Core::Expected<RuntimeAssetImportResult> result =
+            ImportAssetFromPathImpl(request, existingAsset);
+        RuntimeAssetIngestDiagnostic eventDiagnostic =
+            result.has_value()
+                ? RuntimeAssetIngestDiagnostic::None
+                : DiagnosticForImportError(result.error(), source);
+        if (!result.has_value())
+        {
+            RuntimeAssetIngestTransition failed{};
+            switch (eventDiagnostic)
+            {
+            case RuntimeAssetIngestDiagnostic::MissingFile:
+                failed = m_AssetIngestStateMachine.MarkMissingFile(submit.Handle);
+                break;
+            case RuntimeAssetIngestDiagnostic::InvalidReimportTarget:
+                failed = m_AssetIngestStateMachine.MarkInvalidReimportTarget(
+                    submit.Handle,
+                    result.error());
+                break;
+            case RuntimeAssetIngestDiagnostic::CallbackFailed:
+                failed = m_AssetIngestStateMachine.FailCallback(
+                    submit.Handle,
+                    result.error());
+                break;
+            case RuntimeAssetIngestDiagnostic::MaterializationFailed:
+            {
+                RuntimeAssetIngestTransition decodeComplete =
+                    m_AssetIngestStateMachine.CompleteDecode(
+                        submit.Handle,
+                        submit.Handle.Generation);
+                if (!decodeComplete.Succeeded())
+                {
+                    failed = decodeComplete;
+                    break;
+                }
+                RuntimeAssetIngestTransition applying =
+                    m_AssetIngestStateMachine.BeginApply(submit.Handle);
+                if (!applying.Succeeded())
+                {
+                    failed = applying;
+                    break;
+                }
+                failed = m_AssetIngestStateMachine.FailApply(
+                    submit.Handle,
+                    submit.Handle.Generation,
+                    result.error());
+                break;
+            }
+            default:
+                failed = m_AssetIngestStateMachine.FailDecode(
+                    submit.Handle,
+                    submit.Handle.Generation,
+                    result.error());
+                break;
+            }
+            eventDiagnostic = failed.Diagnostic;
+            RecordAssetImportEvent(request, result, eventDiagnostic);
+            return result;
+        }
+
+        RuntimeAssetIngestTransition decodeComplete =
+            m_AssetIngestStateMachine.CompleteDecode(
+                submit.Handle,
+                submit.Handle.Generation);
+        if (!decodeComplete.Succeeded())
+        {
+            result = Core::Err<RuntimeAssetImportResult>(
+                ErrorFromIngestTransition(decodeComplete));
+            RecordAssetImportEvent(
+                request,
+                result,
+                decodeComplete.Diagnostic);
+            return result;
+        }
+
+        RuntimeAssetIngestTransition applying =
+            m_AssetIngestStateMachine.BeginApply(submit.Handle);
+        if (!applying.Succeeded())
+        {
+            result = Core::Err<RuntimeAssetImportResult>(
+                ErrorFromIngestTransition(applying));
+            RecordAssetImportEvent(request, result, applying.Diagnostic);
+            return result;
+        }
+
+        RuntimeAssetIngestTransition complete =
+            m_AssetIngestStateMachine.CompleteApply(
+                submit.Handle,
+                submit.Handle.Generation,
+                ToRuntimeAssetIngestResult(*result));
+        eventDiagnostic = complete.Diagnostic;
+        if (!complete.Succeeded())
+        {
+            result = Core::Err<RuntimeAssetImportResult>(
+                ErrorFromIngestTransition(complete));
+        }
+        RecordAssetImportEvent(request, result, eventDiagnostic);
+        return result;
+    }
+
     void Engine::RecordAssetImportEvent(
         const RuntimeAssetImportRequest& request,
-        const Core::Expected<RuntimeAssetImportResult>& result)
+        const Core::Expected<RuntimeAssetImportResult>& result,
+        const RuntimeAssetIngestDiagnostic ingestDiagnostic)
     {
         RuntimeAssetImportEvent event{};
         event.Sequence = ++m_AssetImportEventSequence;
@@ -2450,14 +3070,16 @@ namespace Extrinsic::Runtime
         event.Error = result.has_value()
             ? Core::ErrorCode::Success
             : result.error();
+        event.IngestDiagnostic = ingestDiagnostic;
         if (result.has_value())
         {
             event.Result = *result;
             Core::Log::Info(
-                "[Runtime] Asset import succeeded: path='{}' requested_payload={} result_payload={} primitive_entities={} embedded_textures={} generated_textures={} texture_upload_requests={} generated_texture_upload_requests={} materialized_model_scene={} requested_texture_upload={}",
+                "[Runtime] Asset import succeeded: path='{}' requested_payload={} result_payload={} ingest_diagnostic={} primitive_entities={} embedded_textures={} generated_textures={} texture_upload_requests={} generated_texture_upload_requests={} materialized_model_scene={} requested_texture_upload={}",
                 event.Path,
                 Assets::DebugNameForAssetPayloadKind(event.RequestedPayloadKind),
                 Assets::DebugNameForAssetPayloadKind(result->PayloadKind),
+                DebugNameForRuntimeAssetIngestDiagnostic(event.IngestDiagnostic),
                 result->PrimitiveEntitiesCreated,
                 result->EmbeddedTextureAssetsCreated,
                 result->GeneratedTextureAssetsCreated,
@@ -2469,16 +3091,18 @@ namespace Extrinsic::Runtime
         else
         {
             Core::Log::Warn(
-                "[Runtime] Asset import failed: path='{}' requested_payload={} error={}",
+                "[Runtime] Asset import failed: path='{}' requested_payload={} ingest_diagnostic={} error={}",
                 event.Path,
                 Assets::DebugNameForAssetPayloadKind(event.RequestedPayloadKind),
+                DebugNameForRuntimeAssetIngestDiagnostic(event.IngestDiagnostic),
                 Core::Error::ToString(event.Error));
         }
         m_LastAssetImportEvent = std::move(event);
     }
 
     Core::Expected<RuntimeAssetImportResult> Engine::ImportAssetFromPathImpl(
-        RuntimeAssetImportRequest request)
+        RuntimeAssetImportRequest request,
+        const Assets::AssetId existingAsset)
     {
         if (!m_Initialized ||
             !m_AssetService ||
@@ -2511,6 +3135,14 @@ namespace Extrinsic::Runtime
             if (!decoded.has_value())
             {
                 return Core::Err<RuntimeAssetImportResult>(decoded.error());
+            }
+
+            if (existingAsset.IsValid())
+            {
+                return ReloadDecodedGeometryImport(
+                    *m_AssetService,
+                    existingAsset,
+                    *decoded);
             }
 
             auto materialized = MaterializeDecodedGeometryImport(
@@ -2562,6 +3194,60 @@ namespace Extrinsic::Runtime
                     std::move(*decoded));
             const AssetModelSceneHandoffDiagnostics before =
                 m_AssetModelSceneHandoff->GetDiagnostics();
+            if (existingAsset.IsValid())
+            {
+                Core::Result reloaded =
+                    m_AssetService->Reload<Assets::AssetModelScenePayload>(
+                        existingAsset,
+                        [payload](std::string_view,
+                                  Assets::AssetId)
+                            -> Core::Expected<Assets::AssetModelScenePayload>
+                        {
+                            return *payload;
+                        });
+                if (!reloaded.has_value())
+                {
+                    return Core::Err<RuntimeAssetImportResult>(
+                        reloaded.error());
+                }
+
+                DrainAssetImportEvents(*m_AssetService);
+                const AssetModelSceneHandoffDiagnostics after =
+                    m_AssetModelSceneHandoff->GetDiagnostics();
+                if (after.ModelSceneMaterializeFailures >
+                        before.ModelSceneMaterializeFailures &&
+                    after.LastFailedAsset == existingAsset)
+                {
+                    return Core::Err<RuntimeAssetImportResult>(
+                        NormalizeImportError(after.LastError));
+                }
+
+                return RuntimeAssetImportResult{
+                    .Asset = existingAsset,
+                    .PayloadKind = route->PayloadKind,
+                    .PrimitiveEntitiesCreated =
+                        Delta(after.PrimitiveEntitiesCreated,
+                              before.PrimitiveEntitiesCreated),
+                    .EmbeddedTextureAssetsCreated =
+                        Delta(after.EmbeddedTextureAssetsCreated,
+                              before.EmbeddedTextureAssetsCreated),
+                    .GeneratedTextureAssetsCreated =
+                        Delta(after.GeneratedTextureAssetsCreated,
+                              before.GeneratedTextureAssetsCreated),
+                    .TextureUploadRequests =
+                        Delta(after.EmbeddedTextureUploadRequests,
+                              before.EmbeddedTextureUploadRequests) +
+                        Delta(after.GeneratedTextureUploadRequests,
+                              before.GeneratedTextureUploadRequests),
+                    .GeneratedTextureUploadRequests =
+                        Delta(after.GeneratedTextureUploadRequests,
+                              before.GeneratedTextureUploadRequests),
+                    .MaterializedModelScene =
+                        after.ModelSceneMaterializeSuccesses >
+                            before.ModelSceneMaterializeSuccesses,
+                };
+            }
+
             auto asset = m_AssetService->Load<Assets::AssetModelScenePayload>(
                 request.Path,
                 [payload](std::string_view,
@@ -2632,6 +3318,43 @@ namespace Extrinsic::Runtime
             std::make_shared<Assets::AssetTexture2DPayload>(std::move(*decoded));
         const AssetModelTextureHandoffDiagnostics before =
             m_AssetModelTextureHandoff->GetDiagnostics();
+        if (existingAsset.IsValid())
+        {
+            Core::Result reloaded =
+                m_AssetService->Reload<Assets::AssetTexture2DPayload>(
+                    existingAsset,
+                    [payload](std::string_view,
+                              Assets::AssetId)
+                        -> Core::Expected<Assets::AssetTexture2DPayload>
+                    {
+                        return *payload;
+                    });
+            if (!reloaded.has_value())
+            {
+                return Core::Err<RuntimeAssetImportResult>(
+                    reloaded.error());
+            }
+
+            DrainAssetImportEvents(*m_AssetService);
+            const AssetModelTextureHandoffDiagnostics after =
+                m_AssetModelTextureHandoff->GetDiagnostics();
+            if (after.TextureUploadFailures > before.TextureUploadFailures &&
+                after.LastFailedAsset == existingAsset)
+            {
+                return Core::Err<RuntimeAssetImportResult>(
+                    NormalizeImportError(after.LastError));
+            }
+
+            return RuntimeAssetImportResult{
+                .Asset = existingAsset,
+                .PayloadKind = route->PayloadKind,
+                .TextureUploadRequests =
+                    Delta(after.TextureUploadRequests, before.TextureUploadRequests),
+                .RequestedTextureUpload =
+                    after.TextureUploadRequests > before.TextureUploadRequests,
+            };
+        }
+
         auto asset = m_AssetService->Load<Assets::AssetTexture2DPayload>(
             request.Path,
             [payload](std::string_view,

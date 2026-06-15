@@ -28,9 +28,11 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.GpuAssetCache;
+import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.StableEntityLookup;
+import Geometry.HalfedgeMesh.IO;
 
 namespace Assets = Extrinsic::Assets;
 namespace Core = Extrinsic::Core;
@@ -335,6 +337,156 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesVertexNormalsInGe
             {0.0f, 0.0f, -1.0f},
         });
     ExpectNoGeneratedNormalTextureBinding(engine, *meshEntity, meshFile.Path.string());
+
+    engine.Shutdown();
+}
+
+TEST(RuntimeAssetImportFormatCoverage, DirectImportCompletesIngestStateMachineRecord)
+{
+    TempAssetFile meshFile(
+        "assetio101_direct_ingest.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+
+    Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    engine.Initialize();
+
+    auto imported = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+        .Path = meshFile.Path.string(),
+        .PayloadKind = Assets::AssetPayloadKind::Mesh,
+    });
+    ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
+
+    const std::vector<Runtime::RuntimeAssetIngestRecord> records =
+        engine.GetAssetIngestRecordsForTest();
+    ASSERT_EQ(records.size(), 1u);
+    EXPECT_EQ(records[0].Request.Source,
+              Runtime::RuntimeAssetIngestSource::ManualImport);
+    EXPECT_EQ(records[0].Request.Path, meshFile.Path.string());
+    EXPECT_EQ(records[0].Request.PayloadKind, Assets::AssetPayloadKind::Mesh);
+    EXPECT_EQ(records[0].Phase, Runtime::RuntimeAssetIngestPhase::Complete);
+    EXPECT_EQ(records[0].Diagnostic, Runtime::RuntimeAssetIngestDiagnostic::None);
+    ASSERT_TRUE(records[0].Result.has_value());
+    EXPECT_EQ(records[0].Result->Asset, imported->Asset);
+
+    const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
+        engine.GetLastAssetImportEvent();
+    ASSERT_TRUE(lastEvent.has_value());
+    EXPECT_TRUE(lastEvent->Succeeded());
+    EXPECT_EQ(lastEvent->IngestDiagnostic,
+              Runtime::RuntimeAssetIngestDiagnostic::None);
+
+    engine.Shutdown();
+}
+
+TEST(RuntimeAssetImportFormatCoverage, ReimportExistingMeshReloadsAssetWithoutDuplicatingSceneEntities)
+{
+    TempAssetFile meshFile(
+        "assetio101_reimport_mesh.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+
+    Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    engine.Initialize();
+
+    auto imported = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+        .Path = meshFile.Path.string(),
+        .PayloadKind = Assets::AssetPayloadKind::Mesh,
+    });
+    ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
+    ASSERT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
+    const auto firstTicket =
+        engine.GetAssetService().GetPayloadTicket(imported->Asset);
+    ASSERT_TRUE(firstTicket.has_value());
+
+    {
+        std::ofstream out(meshFile.Path, std::ios::binary | std::ios::trunc);
+        out << "v 0 0 0\n"
+               "v 1 0 0\n"
+               "v 0 1 0\n"
+               "v 0 0 1\n"
+               "f 1 2 3\n"
+               "f 1 3 4\n";
+    }
+
+    auto reimported = engine.ReimportAsset(Runtime::RuntimeAssetReimportRequest{
+        .Asset = imported->Asset,
+    });
+    ASSERT_TRUE(reimported.has_value()) << static_cast<int>(reimported.error());
+    EXPECT_EQ(reimported->Asset, imported->Asset);
+    EXPECT_EQ(reimported->PayloadKind, Assets::AssetPayloadKind::Mesh);
+    EXPECT_EQ(reimported->PrimitiveEntitiesCreated, 0u);
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
+
+    const auto secondTicket =
+        engine.GetAssetService().GetPayloadTicket(imported->Asset);
+    ASSERT_TRUE(secondTicket.has_value());
+    EXPECT_EQ(secondTicket->slot, firstTicket->slot);
+    EXPECT_GT(secondTicket->generation, firstTicket->generation);
+
+    const auto meshPayload =
+        engine.GetAssetService().Read<Geometry::MeshIO::MeshIOResult>(
+            imported->Asset);
+    ASSERT_TRUE(meshPayload.has_value());
+    ASSERT_EQ(meshPayload->size(), 1u);
+    EXPECT_EQ((*meshPayload)[0].Vertices.Size(), 4u);
+    EXPECT_EQ((*meshPayload)[0].Faces.Size(), 2u);
+
+    const std::vector<Runtime::RuntimeAssetIngestRecord> records =
+        engine.GetAssetIngestRecordsForTest();
+    ASSERT_EQ(records.size(), 2u);
+    EXPECT_EQ(records[1].Request.Source,
+              Runtime::RuntimeAssetIngestSource::Reimport);
+    EXPECT_EQ(records[1].Request.ExistingAsset, imported->Asset);
+    EXPECT_EQ(records[1].Phase, Runtime::RuntimeAssetIngestPhase::Complete);
+    EXPECT_EQ(records[1].Diagnostic, Runtime::RuntimeAssetIngestDiagnostic::None);
+    ASSERT_TRUE(records[1].Result.has_value());
+    EXPECT_EQ(records[1].Result->Asset, imported->Asset);
+    EXPECT_EQ(records[1].Result->PrimitiveEntitiesCreated, 0u);
+
+    const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
+        engine.GetLastAssetImportEvent();
+    ASSERT_TRUE(lastEvent.has_value());
+    EXPECT_TRUE(lastEvent->Succeeded());
+    EXPECT_EQ(lastEvent->IngestDiagnostic,
+              Runtime::RuntimeAssetIngestDiagnostic::None);
+    ASSERT_TRUE(lastEvent->Result.has_value());
+    EXPECT_EQ(lastEvent->Result->Asset, imported->Asset);
+
+    engine.Shutdown();
+}
+
+TEST(RuntimeAssetImportFormatCoverage, ReimportInvalidAssetReportsDeterministicIngestDiagnostic)
+{
+    Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    engine.Initialize();
+
+    auto reimported = engine.ReimportAsset(Runtime::RuntimeAssetReimportRequest{
+        .Asset = Assets::AssetId{999u, 1u},
+    });
+    EXPECT_FALSE(reimported.has_value());
+    EXPECT_EQ(reimported.error(), Core::ErrorCode::ResourceNotFound);
+
+    const std::vector<Runtime::RuntimeAssetIngestRecord> records =
+        engine.GetAssetIngestRecordsForTest();
+    ASSERT_EQ(records.size(), 1u);
+    EXPECT_EQ(records[0].Request.Source,
+              Runtime::RuntimeAssetIngestSource::Reimport);
+    EXPECT_EQ(records[0].Phase, Runtime::RuntimeAssetIngestPhase::Failed);
+    EXPECT_EQ(records[0].Diagnostic,
+              Runtime::RuntimeAssetIngestDiagnostic::InvalidReimportTarget);
+
+    const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
+        engine.GetLastAssetImportEvent();
+    ASSERT_TRUE(lastEvent.has_value());
+    EXPECT_FALSE(lastEvent->Succeeded());
+    EXPECT_EQ(lastEvent->Error, Core::ErrorCode::ResourceNotFound);
+    EXPECT_EQ(lastEvent->IngestDiagnostic,
+              Runtime::RuntimeAssetIngestDiagnostic::InvalidReimportTarget);
 
     engine.Shutdown();
 }

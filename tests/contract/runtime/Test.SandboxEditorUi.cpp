@@ -43,6 +43,7 @@ import Extrinsic.Graphics.ImGuiOverlaySystem;
 import Extrinsic.Graphics.RenderGraph;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Platform.Window;
+import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
@@ -391,6 +392,31 @@ namespace
             ++m_ObservedFrames;
             if (engine.GetLastAssetImportEvent().has_value() ||
                 m_ObservedFrames >= m_MaxFrames)
+            {
+                engine.RequestExit();
+            }
+        }
+        void OnShutdown(Runtime::Engine&) override {}
+
+    private:
+        std::uint32_t m_MaxFrames{1u};
+        std::uint32_t m_ObservedFrames{0u};
+    };
+
+    class FixedFrameApplication final : public Runtime::IApplication
+    {
+    public:
+        explicit FixedFrameApplication(std::uint32_t maxFrames)
+            : m_MaxFrames(maxFrames)
+        {
+        }
+
+        void OnInitialize(Runtime::Engine&) override {}
+        void OnSimTick(Runtime::Engine&, double) override {}
+        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        {
+            ++m_ObservedFrames;
+            if (m_ObservedFrames >= m_MaxFrames)
             {
                 engine.RequestExit();
             }
@@ -3027,6 +3053,148 @@ TEST(SandboxEditorUi, DroppedFilePathsRouteAmbiguousPlyThroughRuntimeImportFacad
                                Runtime::SandboxEditorDiagnosticCode::AssetImportFailed));
 
     ui.Detach();
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorUi, DuplicateDroppedGeometryImportUsesSingleIngestRecord)
+{
+    TmpFile meshFile(
+        "runtime_duplicate_drop_mesh.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<FixedFrameApplication>(128u));
+    engine.Initialize();
+
+    const std::vector<std::string> droppedPaths{
+        meshFile.Path.string(),
+        meshFile.Path.string(),
+    };
+    engine.ImportDroppedFilePaths(droppedPaths);
+
+    std::vector<Runtime::RuntimeAssetIngestRecord> records =
+        engine.GetAssetIngestRecordsForTest();
+    ASSERT_EQ(records.size(), 1u);
+    EXPECT_EQ(records[0].Request.Source,
+              Runtime::RuntimeAssetIngestSource::DroppedFile);
+    EXPECT_EQ(records[0].Request.Path, meshFile.Path.string());
+    EXPECT_EQ(records[0].Phase, Runtime::RuntimeAssetIngestPhase::Decoding);
+
+    const std::optional<Runtime::RuntimeAssetImportEvent>& duplicateEvent =
+        engine.GetLastAssetImportEvent();
+    ASSERT_TRUE(duplicateEvent.has_value());
+    EXPECT_FALSE(duplicateEvent->Succeeded());
+    EXPECT_EQ(duplicateEvent->Error, Core::ErrorCode::ResourceBusy);
+    EXPECT_EQ(duplicateEvent->IngestDiagnostic,
+              Runtime::RuntimeAssetIngestDiagnostic::DuplicateActiveRequest);
+
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+
+    engine.Run();
+
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
+    records = engine.GetAssetIngestRecordsForTest();
+    ASSERT_EQ(records.size(), 1u);
+    EXPECT_EQ(records[0].Phase, Runtime::RuntimeAssetIngestPhase::Complete);
+    EXPECT_EQ(records[0].Diagnostic, Runtime::RuntimeAssetIngestDiagnostic::None);
+    ASSERT_TRUE(records[0].Result.has_value());
+    EXPECT_EQ(records[0].Result->PrimitiveEntitiesCreated, 1u);
+
+    const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
+        engine.GetLastAssetImportEvent();
+    ASSERT_TRUE(lastEvent.has_value());
+    EXPECT_TRUE(lastEvent->Succeeded());
+    EXPECT_EQ(lastEvent->IngestDiagnostic,
+              Runtime::RuntimeAssetIngestDiagnostic::None);
+
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorUi, DroppedGeometryAssetReimportReloadsSameAssetWithoutDuplicateEntity)
+{
+    TmpFile meshFile(
+        "runtime_drop_reimport_mesh.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<WaitForAssetImportEventApplication>(128u));
+    engine.Initialize();
+
+    const std::vector<std::string> droppedPaths{meshFile.Path.string()};
+    engine.ImportDroppedFilePaths(droppedPaths);
+
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+
+    engine.Run();
+
+    const std::optional<Runtime::RuntimeAssetImportEvent>& droppedEvent =
+        engine.GetLastAssetImportEvent();
+    ASSERT_TRUE(droppedEvent.has_value());
+    ASSERT_TRUE(droppedEvent->Succeeded());
+    ASSERT_TRUE(droppedEvent->Result.has_value());
+    const Assets::AssetId droppedAsset = droppedEvent->Result->Asset;
+    ASSERT_TRUE(droppedAsset.IsValid());
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
+    const auto firstTicket =
+        engine.GetAssetService().GetPayloadTicket(droppedAsset);
+    ASSERT_TRUE(firstTicket.has_value());
+
+    {
+        std::ofstream out(meshFile.Path, std::ios::binary | std::ios::trunc);
+        out << "v 0 0 0\n"
+               "v 1 0 0\n"
+               "v 0 1 0\n"
+               "v 0 0 1\n"
+               "f 1 2 3\n"
+               "f 1 3 4\n";
+    }
+
+    auto reimported = engine.ReimportAsset(Runtime::RuntimeAssetReimportRequest{
+        .Asset = droppedAsset,
+    });
+    ASSERT_TRUE(reimported.has_value()) << static_cast<int>(reimported.error());
+    EXPECT_EQ(reimported->Asset, droppedAsset);
+    EXPECT_EQ(reimported->PayloadKind, Assets::AssetPayloadKind::Mesh);
+    EXPECT_EQ(reimported->PrimitiveEntitiesCreated, 0u);
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
+
+    const auto secondTicket =
+        engine.GetAssetService().GetPayloadTicket(droppedAsset);
+    ASSERT_TRUE(secondTicket.has_value());
+    EXPECT_EQ(secondTicket->slot, firstTicket->slot);
+    EXPECT_GT(secondTicket->generation, firstTicket->generation);
+
+    const std::vector<Runtime::RuntimeAssetIngestRecord> records =
+        engine.GetAssetIngestRecordsForTest();
+    ASSERT_EQ(records.size(), 2u);
+    EXPECT_EQ(records[0].Request.Source,
+              Runtime::RuntimeAssetIngestSource::DroppedFile);
+    EXPECT_EQ(records[0].Phase, Runtime::RuntimeAssetIngestPhase::Complete);
+    EXPECT_EQ(records[1].Request.Source,
+              Runtime::RuntimeAssetIngestSource::Reimport);
+    EXPECT_EQ(records[1].Request.ExistingAsset, droppedAsset);
+    EXPECT_EQ(records[1].Phase, Runtime::RuntimeAssetIngestPhase::Complete);
+    EXPECT_EQ(records[1].Diagnostic, Runtime::RuntimeAssetIngestDiagnostic::None);
+
+    const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
+        engine.GetLastAssetImportEvent();
+    ASSERT_TRUE(lastEvent.has_value());
+    EXPECT_TRUE(lastEvent->Succeeded());
+    EXPECT_EQ(lastEvent->IngestDiagnostic,
+              Runtime::RuntimeAssetIngestDiagnostic::None);
+    ASSERT_TRUE(lastEvent->Result.has_value());
+    EXPECT_EQ(lastEvent->Result->Asset, droppedAsset);
+
     engine.Shutdown();
 }
 

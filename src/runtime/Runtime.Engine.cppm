@@ -24,6 +24,7 @@ import Extrinsic.Graphics.ImGuiOverlaySystem;
 import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.EditorCommandHistory;
@@ -60,6 +61,12 @@ namespace Extrinsic::Runtime
         Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
     };
 
+    export struct RuntimeAssetReimportRequest
+    {
+        Assets::AssetId Asset{};
+        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
+    };
+
     export struct RuntimeAssetImportResult
     {
         Assets::AssetId Asset{};
@@ -79,6 +86,7 @@ namespace Extrinsic::Runtime
         std::string Path{};
         Assets::AssetPayloadKind RequestedPayloadKind{Assets::AssetPayloadKind::Unknown};
         Core::ErrorCode Error{Core::ErrorCode::Success};
+        RuntimeAssetIngestDiagnostic IngestDiagnostic{RuntimeAssetIngestDiagnostic::None};
         std::optional<RuntimeAssetImportResult> Result{};
 
         [[nodiscard]] bool Succeeded() const noexcept
@@ -224,8 +232,12 @@ namespace Extrinsic::Runtime
         // handoffs. Platform drop events route through the same facade.
         [[nodiscard]] Core::Expected<RuntimeAssetImportResult> ImportAssetFromPath(
             RuntimeAssetImportRequest request);
+        [[nodiscard]] Core::Expected<RuntimeAssetImportResult> ReimportAsset(
+            RuntimeAssetReimportRequest request);
         [[nodiscard]] const std::optional<RuntimeAssetImportEvent>&
             GetLastAssetImportEvent() const noexcept;
+        [[nodiscard]] std::vector<RuntimeAssetIngestRecord>
+            GetAssetIngestRecordsForTest() const;
         void ImportDroppedFilePaths(std::span<const std::string> paths);
         // Contract-test seam: replay a platform event through the same runtime
         // handler installed as the window listener during Initialize().
@@ -340,11 +352,17 @@ namespace Extrinsic::Runtime
         void QueueDroppedGeometryImport(
             std::string path,
             std::vector<Assets::AssetPayloadKind> payloadKinds);
+        [[nodiscard]] Core::Expected<RuntimeAssetImportResult> ImportAssetFromPathWithIngest(
+            RuntimeAssetImportRequest request,
+            RuntimeAssetIngestSource source,
+            Assets::AssetId existingAsset);
         [[nodiscard]] Core::Expected<RuntimeAssetImportResult> ImportAssetFromPathImpl(
-            RuntimeAssetImportRequest request);
+            RuntimeAssetImportRequest request,
+            Assets::AssetId existingAsset);
         void RecordAssetImportEvent(
             const RuntimeAssetImportRequest& request,
-            const Core::Expected<RuntimeAssetImportResult>& result);
+            const Core::Expected<RuntimeAssetImportResult>& result,
+            RuntimeAssetIngestDiagnostic ingestDiagnostic);
         void ClearSceneRuntimeState();
 
         Core::Config::EngineConfig           m_Config;
@@ -430,6 +448,7 @@ namespace Extrinsic::Runtime
             Assets::AssetEventBus::InvalidToken};
         std::unique_ptr<AssetModelTextureHandoff> m_AssetModelTextureHandoff;
         std::unique_ptr<AssetModelSceneHandoff>   m_AssetModelSceneHandoff;
+        RuntimeAssetIngestStateMachine             m_AssetIngestStateMachine{};
         std::optional<RuntimeAssetImportEvent>     m_LastAssetImportEvent{};
         std::uint64_t                              m_AssetImportEventSequence{0};
         // ECS scene registry

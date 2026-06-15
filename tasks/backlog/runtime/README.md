@@ -7,9 +7,6 @@ another backlog directory.
 
 ## Runtime backlog tasks
 
-- [RUNTIME-101 — Asset ingest state-machine migration](RUNTIME-101-asset-ingest-state-machine.md):
-  promoted replacement for legacy `Runtime.AssetIngestService` over
-  `AssetService`, `StreamingExecutor`, and runtime materialization handoffs.
 - [RUNTIME-109 — Extensible mesh attribute texture bake pipeline](RUNTIME-109-extensible-mesh-attribute-texture-bakes.md):
   generalize CPU mesh attribute texture bakes for 1D-4D vertex/face algorithm
   results over resolved UVs.
@@ -50,6 +47,12 @@ these as runtime work when scheduling and review:
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [RUNTIME-101 — Asset ingest state-machine migration](../../done/RUNTIME-101-asset-ingest-state-machine.md)
+  (done, 2026-06-15, `CPUContracted`): promoted the runtime ingest
+  request/result state machine for manual import, dropped files, and reimport;
+  routed Engine import entry points through shared diagnostics and duplicate/
+  stale guards; and kept reimport as same-`AssetId` `AssetService` reload
+  without reviving ECS or scene-file asset-source coupling.
 - [RUNTIME-108 — Remove mesh UV normal fallback](../../done/RUNTIME-108-resolved-uv-render-residency.md)
   (done, 2026-06-13, `CPUContracted`): mesh surface packing now requires
   count-matched finite `v:texcoord` and never substitutes oct-encoded normals
@@ -77,7 +80,8 @@ split; narratives live in the retirement log.
   (done, 2026-06-10): composition-root and lifecycle backlog work for
   `begin_frame`, extraction, prepare, execute, end, shutdown determinism, and
   subsystem wiring; executed via `RUNTIME-099`/`RUNTIME-100`/`RUNTIME-102`
-  with `RUNTIME-101` remaining as an independently tracked child.
+  with `RUNTIME-101` later retired as the independently tracked asset-ingest
+  child.
 - [RUNTIME-104 — Derived overlay producer lifecycle](../../done/RUNTIME-104-derived-overlay-producer-lifecycle.md)
   (done, 2026-06-11, `CPUContracted`): classified legacy
   `Graphics.OverlayEntityFactory` behavior for current workflows and retained no

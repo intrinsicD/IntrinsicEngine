@@ -119,7 +119,6 @@ Open members:
 - [`assets/ASSETIO-005-asset-import-queue-progress.md`](assets/ASSETIO-005-asset-import-queue-progress.md) —
   runtime-owned AssetIO queue snapshots and sandbox editor progress rows for
   long-running imports.
-- [`runtime/RUNTIME-101-asset-ingest-state-machine.md`](runtime/RUNTIME-101-asset-ingest-state-machine.md).
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`ui/RORG-031-ui-integration.md`](ui/RORG-031-ui-integration.md).
 - [`platform/PLATFORM-004-alternative-platform-backend-onboarding.md`](platform/PLATFORM-004-alternative-platform-backend-onboarding.md) (planning-only seed).
