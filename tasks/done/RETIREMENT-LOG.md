@@ -9,6 +9,21 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`RUNTIME-103`](RUNTIME-103-geometry-algorithm-execution-queue.md) —
+Geometry algorithm execution queue — retired on 2026-06-15 at maturity
+`CPUContracted`. The value gate found that current promoted editor workflows
+do not justify a runtime async geometry algorithm queue: `UI-004` already
+routes CPU K-Means over mesh vertices, graph nodes, and point-cloud points
+through one deterministic synchronous `SandboxEditorUi` command that publishes
+label/color properties, stamps `DirtyVertexAttributes`, and fails closed for
+invalid targets or inputs. No request/result/cancellation/progress queue API
+or CUDA follow-up is owed for current workflows. Future asynchronous
+scheduling, centroid entities, topology mutation, broader algorithms, or
+compute backends require new value-gated tasks with concrete consumers.
+Focused K-Means/SandboxEditorUi runtime coverage and strict task/docs/layering
+checks passed.
+
+Backlog
 [`RUNTIME-105`](RUNTIME-105-remove-streaming-graph-bridge.md) — Remove the
 deprecated `GetStreamingGraph()` TaskGraph bridge — retired on 2026-06-15 at
 maturity `Retired`. The promoted runtime no longer exports
@@ -563,11 +578,12 @@ backlog seed — retired to `tasks/done/` on 2026-06-10. The seed's job was
 to replace the unnamed runtime composition narrative gap with concrete
 child tasks, and that is done: `RUNTIME-099` (explicit lifecycle pipeline
 with shutdown determinism, `CPUContracted`), `RUNTIME-100` (scene
-lifecycle), and `RUNTIME-102` (editor command history) are retired, while
-`RUNTIME-101` (asset ingest state machine), `RUNTIME-103` (geometry
-algorithm execution queue), and `RUNTIME-104` (derived overlay producer
-lifecycle) remain independently tracked Theme F backlog tasks synchronized
-with the `LEGACY-011` feature map. Theme A now has no open members.
+lifecycle), `RUNTIME-102` (editor command history), `RUNTIME-103`
+(geometry algorithm execution queue decision), and `RUNTIME-104` (derived
+overlay producer lifecycle) are retired, while `RUNTIME-101` (asset ingest
+state machine) remains an independently tracked Theme F backlog task
+synchronized with the `LEGACY-011` feature map. Theme A now has no open
+members.
 
 Backlog
 [`BUG-025`](BUG-025-contact-manifold-normal-convention.md) — geometry

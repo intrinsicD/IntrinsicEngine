@@ -34,11 +34,12 @@ map.
 - UI-004 is a retired promoted EditorUI follow-up that reimplements the first
   legacy geometry-processing execution seam: CPU K-Means over mesh vertices,
   graph nodes, and point-cloud points. The command writes legacy-compatible
-  label/color properties and marks vertex attributes dirty; asynchronous
-  scheduling, centroid entities, topology mutation, and broader algorithm
-  execution remain future runtime/editor work. `GRAPHICS-086` retires CUDA from
-  the promoted default path unless a future method/backend task supplies a
-  concrete workload.
+  label/color properties and marks vertex attributes dirty. `RUNTIME-103`
+  records synchronous CPU K-Means as the intended endpoint for current
+  workflows; asynchronous scheduling, centroid entities, topology mutation, and
+  broader algorithm execution require a future value-gated runtime/method task
+  with a concrete workload. `GRAPHICS-086` retires CUDA from the promoted
+  default path unless a future method/backend task supplies that workload.
 - UI-005 is a retired promoted EditorUI follow-up that reimplements the legacy
   property-enumeration-to-visualization seam for current `GeometrySources`.
   Selected mesh, graph, and point-cloud visualization windows now list eligible

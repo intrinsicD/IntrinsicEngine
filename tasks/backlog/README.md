@@ -120,7 +120,6 @@ Open members:
   runtime-owned AssetIO queue snapshots and sandbox editor progress rows for
   long-running imports.
 - [`runtime/RUNTIME-101-asset-ingest-state-machine.md`](runtime/RUNTIME-101-asset-ingest-state-machine.md),
-  [`runtime/RUNTIME-103-geometry-algorithm-execution-queue.md`](runtime/RUNTIME-103-geometry-algorithm-execution-queue.md),
   [`runtime/RUNTIME-107-headless-engine-loop-coverage.md`](runtime/RUNTIME-107-headless-engine-loop-coverage.md).
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`ui/RORG-031-ui-integration.md`](ui/RORG-031-ui-integration.md).

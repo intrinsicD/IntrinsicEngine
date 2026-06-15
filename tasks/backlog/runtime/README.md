@@ -10,9 +10,6 @@ another backlog directory.
 - [RUNTIME-101 — Asset ingest state-machine migration](RUNTIME-101-asset-ingest-state-machine.md):
   promoted replacement for legacy `Runtime.AssetIngestService` over
   `AssetService`, `StreamingExecutor`, and runtime materialization handoffs.
-- [RUNTIME-103 — Geometry algorithm execution queue](RUNTIME-103-geometry-algorithm-execution-queue.md):
-  value-gated asynchronous CPU geometry processing for legacy K-Means behavior;
-  `GRAPHICS-086` retired CUDA from the promoted default path.
 - [RUNTIME-107 — Headless-capable Engine::Run loop coverage](RUNTIME-107-headless-engine-loop-coverage.md):
   follow-up split from BUG-030 to make currently guarded sandbox/runtime
   `Engine::Run()` regressions execute through an explicit headless-capable loop
@@ -67,6 +64,11 @@ split; narratives live in the retirement log.
   `Engine::GetStreamingGraph()` compatibility accessor, the private streaming
   task graph, and the per-frame TaskGraph-to-`StreamingExecutor` conversion.
   `StreamingExecutor` is now the only promoted runtime streaming path.
+- [RUNTIME-103 — Geometry algorithm execution queue](../../done/RUNTIME-103-geometry-algorithm-execution-queue.md)
+  (done, 2026-06-15, `CPUContracted`): value-gated the promoted editor
+  geometry-processing path and retained synchronous CPU K-Means as the intended
+  endpoint for current workflows. No runtime async algorithm queue or CUDA
+  follow-up is owed without a new concrete workload.
 - [GRAPHICS-084 — Visualization property-buffer residency](../../done/GRAPHICS-084-visualization-property-buffer-residency.md)
   (done, 2026-06-11, `CPUContracted`): consumed runtime visualization adapter/
   property selections while keeping GPU upload ownership in graphics.
@@ -74,8 +76,7 @@ split; narratives live in the retirement log.
   (done, 2026-06-10): composition-root and lifecycle backlog work for
   `begin_frame`, extraction, prepare, execute, end, shutdown determinism, and
   subsystem wiring; executed via `RUNTIME-099`/`RUNTIME-100`/`RUNTIME-102`
-  with `RUNTIME-101`/`RUNTIME-103` remaining as independently
-  tracked children.
+  with `RUNTIME-101` remaining as an independently tracked child.
 - [RUNTIME-104 — Derived overlay producer lifecycle](../../done/RUNTIME-104-derived-overlay-producer-lifecycle.md)
   (done, 2026-06-11, `CPUContracted`): classified legacy
   `Graphics.OverlayEntityFactory` behavior for current workflows and retained no

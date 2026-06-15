@@ -19,7 +19,7 @@ depends_on: []
 - The parity matrix lists backend shader compilation, explicit swapchain/image ownership, command helper parity, persistent descriptor policy, CUDA device/error behavior, and scene-instance convenience APIs as unproven or open decisions.
 - Existing promoted pieces include `RHI.CommandContext`, `RHI.Descriptors`, `RHI.Bindless`, `RHI.TextureManager`, `RHI.TransferQueue`, `RHI.PipelineManager`, `RHI.PipelineRegistry`, `RHI.QueueAffinity`, `RHI.TimelineSemaphore`, `Backends.Vulkan.*`, and `GRAPHICS-037D` multi-queue recording.
 - Inventory ground truth (2026-06-10): legacy modules with **no** promoted equivalent are `RHI.SceneInstances` (scene-instance convenience APIs), `RHI.CudaDevice`, and `RHI.CudaError`. No promoted graphics or runtime module imports CUDA today; `INTRINSIC_ENABLE_CUDA` (default `OFF`) only gates the legacy CUDA modules. The audit step below confirms and completes this list rather than starting from scratch.
-- `RUNTIME-103` (geometry algorithm execution queue) defers its optional CUDA K-Means backend decision to this task; the CUDA decision here must name the consumer story it accepts or retires.
+- `RUNTIME-103` (geometry algorithm execution queue) consumes this CUDA decision: the promoted runtime/editor K-Means path remains synchronous CPU work unless a future method/backend task names a concrete compute workload.
 
 ## Value gate
 - Current state: promoted RHI/Vulkan already expose command contexts, descriptors, bindless resources, transfers, pipelines, queue affinity, timeline semaphores, and backend-local Vulkan modules.
