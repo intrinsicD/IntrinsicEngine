@@ -134,3 +134,16 @@ Result: `ci` configured with Clang 23, `IntrinsicTests` built, the task
 runtime/import filter passed 238/238, clean-workshop automated rows passed, and
 the default CPU-supported CTest gate passed 3034/3034. Structural/task/doc,
 root-hygiene, PR-contract, and whitespace checks passed.
+
+## Clean-workshop scorecard
+- Rows 1-2: pass via `bash tools/ci/run_clean_workshop_review.sh . --strict`.
+- Row 3: pass. The new runtime public API exports runtime-owned ingest request,
+  result, record, transition, and diagnostic types plus lower-layer `Asset` and
+  `Core` handles/status values; no lower layer exposes a higher-layer type.
+- Rows 4-6: n/a. This task adds no renderer subsystem/member, frame-graph pass,
+  string-routed pass, or frame-recipe dependency.
+- Row 7: pass. The task retires at `CPUContracted`, and the `## Maturity`
+  section records that no `Operational` follow-up is owed for this
+  ingest-state-machine scope.
+- Row 8: pass. No layering allowlist entries, temporary shims, or migration
+  exceptions were added or changed.
