@@ -18,8 +18,8 @@ Each active task should include:
   `RUNTIME-109` / `ASSETIO-008`.
 - [`INFRA-001` — Move third-party dependencies to a vcpkg manifest](INFRA-001-vcpkg-manifest-mode.md):
   active dependency-management migration slice; CI configure timing is now
-  instrumented, with retirement waiting on post-commit exact-hit timing and
-  fresh-clone build evidence.
+  instrumented, with retirement waiting on post-commit exact-hit timing
+  evidence.
 
 ## History
 

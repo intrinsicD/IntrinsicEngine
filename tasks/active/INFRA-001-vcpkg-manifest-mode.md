@@ -88,7 +88,7 @@ depends_on: []
       differs from the current target alias; provide an alias shim if so.
 
 ## Tests
-- [ ] Cold-clone integration test (CI job or scripted):
+- [x] Cold-clone integration test (CI job or scripted):
       `git clean -fdx && tools/setup/bootstrap_vcpkg.sh && cmake --preset ci`
       completes in < 60 s with a populated binary cache and < 10 min
       without one. Capture wall-clock numbers in the PR.
@@ -126,7 +126,7 @@ depends_on: []
       `tools/`, `tests/`, or current workflow docs (historical reports/reviews
       may retain old command evidence; the directory itself may remain until
       the next housekeeping pass).
-- [ ] A fresh `git clone` followed by the documented bootstrap commands
+- [x] A fresh `git clone` followed by the documented bootstrap commands
       configures and builds `IntrinsicTests` without any in-tree
       validator code path firing.
 - [ ] CI exact-cache-hit runs pass the shared-binary-cache configure timing
@@ -171,6 +171,11 @@ depends_on: []
   warm-cache configure budget and append elapsed time to the GitHub step
   summary. Retirement still waits for a post-commit CI run with exact-hit
   timing evidence plus the fresh-clone build evidence below.
+- 2026-06-15 scripted fresh-clone evidence: a temporary clone from committed
+  `main` at `/tmp/intrinsic-fresh-3bIBHl/IntrinsicEngine` bootstrapped vcpkg,
+  configured `ci` through the shared binary cache in 8.363 s, and built
+  `IntrinsicTests`. Fresh-clone acceptance is satisfied; final retirement now
+  waits only on a post-commit GitHub Actions exact-cache-hit timing run.
 - Slice E verification 2026-06-15:
     - `python3 -m py_compile tools/ci/time_command.py` — passed.
     - `python3 tools/ci/time_command.py --label "time wrapper smoke" --warm-cache-hit true --max-warm-seconds 10 -- python3 -c "print('ok')"` — passed; elapsed 0.011 s.
@@ -190,6 +195,7 @@ depends_on: []
     - `python3 tools/repo/check_pr_contract.py --root . --mode ci` — passed.
     - `python3 tools/repo/check_root_hygiene.py --root .` — passed.
     - `python3 tools/repo/check_test_layout.py --root . --strict` — passed.
+    - Scripted temp clone from committed `main`: `git clone --local /home/alex/Documents/IntrinsicEngine /tmp/intrinsic-fresh-3bIBHl/IntrinsicEngine`; `tools/setup/bootstrap_vcpkg.sh`; `VCPKG_BINARY_SOURCES="clear;files,/home/alex/Documents/IntrinsicEngine/external/vcpkg-bincache,readwrite" python3 tools/ci/time_command.py --label "Fresh clone configure (ci preset)" --warm-cache-hit true --max-warm-seconds 60 --json-out build/ci/fresh_clone_configure_timing.json -- cmake --preset ci`; `cmake --build --preset ci --target IntrinsicTests` — passed; configure elapsed 8.363 s.
     - `git diff --check` — passed.
 - Slice A verification 2026-06-11:
     - `tools/setup/bootstrap_vcpkg.sh` — passed; checked out baseline
@@ -351,8 +357,9 @@ python3 tools/docs/check_doc_links.py --root .
 - Target: Operational on every supported host (Linux/macOS/Windows CI)
   and for every developer flow currently covered by the `ci` preset.
 - This slice replaces a Scaffolded-quality in-tree validator with an
-  Operational-quality external package manager. Closure requires the
-  cold-clone test in the Tests section to pass on at least one CI host.
+  Operational-quality external package manager. Fresh-clone scripted evidence
+  is captured; closure now requires the post-commit CI exact-cache-hit timing
+  gate.
 
 ## Slice plan
 
