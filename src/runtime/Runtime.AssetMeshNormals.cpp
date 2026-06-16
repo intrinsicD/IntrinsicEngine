@@ -1,7 +1,6 @@
 module;
 
 #include <algorithm>
-#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -21,6 +20,7 @@ import Extrinsic.Core.Error;
 import Geometry.Mesh.Conversion;
 import Geometry.MeshSoup;
 import Geometry.Properties;
+import Geometry.UvAtlas;
 
 namespace Extrinsic::Runtime
 {
@@ -30,6 +30,8 @@ namespace Extrinsic::Runtime
         constexpr const char* kNormalProperty = "v:normal";
         constexpr const char* kTexcoordProperty = "v:texcoord";
         constexpr const char* kFaceVerticesProperty = "f:vertices";
+        constexpr const char* kSourceVertexProperty = "v:source_vertex";
+        constexpr const char* kSourceFaceProperty = "f:source_face";
 
         [[nodiscard]] bool ShouldCopyVertexProperty(const std::string_view name) noexcept
         {
@@ -38,7 +40,7 @@ namespace Extrinsic::Runtime
 
         template <typename T>
         void CopyVertexProperty(
-            const Geometry::PropertySet& source,
+            const Geometry::ConstPropertySet& source,
             Geometry::PropertySet& target,
             const std::string_view name,
             const std::size_t vertexCount)
@@ -60,10 +62,10 @@ namespace Extrinsic::Runtime
 
         template <typename T>
         void CopyVertexPropertyRemapped(
-            const Geometry::PropertySet& source,
+            const Geometry::ConstPropertySet& source,
             Geometry::PropertySet& target,
             const std::string_view name,
-            const std::vector<std::uint32_t>& sourceVertexForTargetVertex)
+            const std::span<const std::uint32_t> sourceVertexForTargetVertex)
         {
             if (!ShouldCopyVertexProperty(name))
             {
@@ -94,46 +96,55 @@ namespace Extrinsic::Runtime
         }
 
         void CopySupportedVertexProperties(
-            const Geometry::MeshIO::MeshIOResult& meshPayload,
+            const Geometry::ConstPropertySet& source,
             Geometry::HalfedgeMesh::Mesh& mesh,
             const std::size_t vertexCount)
         {
             Geometry::PropertySet& target = mesh.VertexProperties();
-            for (const std::string& name : meshPayload.Vertices.Properties())
+            for (const std::string& name : source.Properties())
             {
-                CopyVertexProperty<glm::vec2>(meshPayload.Vertices, target, name, vertexCount);
-                CopyVertexProperty<glm::vec3>(meshPayload.Vertices, target, name, vertexCount);
-                CopyVertexProperty<glm::vec4>(meshPayload.Vertices, target, name, vertexCount);
-                CopyVertexProperty<float>(meshPayload.Vertices, target, name, vertexCount);
-                CopyVertexProperty<std::uint32_t>(meshPayload.Vertices, target, name, vertexCount);
+                CopyVertexProperty<glm::vec2>(source, target, name, vertexCount);
+                CopyVertexProperty<glm::vec3>(source, target, name, vertexCount);
+                CopyVertexProperty<glm::vec4>(source, target, name, vertexCount);
+                CopyVertexProperty<float>(source, target, name, vertexCount);
+                CopyVertexProperty<double>(source, target, name, vertexCount);
+                CopyVertexProperty<std::uint32_t>(source, target, name, vertexCount);
+                CopyVertexProperty<std::int32_t>(source, target, name, vertexCount);
+                CopyVertexProperty<bool>(source, target, name, vertexCount);
             }
         }
 
         void CopySupportedVertexPropertiesRemapped(
-            const Geometry::MeshIO::MeshIOResult& meshPayload,
+            const Geometry::ConstPropertySet& source,
             Geometry::HalfedgeMesh::Mesh& mesh,
-            const std::vector<std::uint32_t>& sourceVertexForTargetVertex)
+            const std::span<const std::uint32_t> sourceVertexForTargetVertex)
         {
             Geometry::PropertySet& target = mesh.VertexProperties();
-            for (const std::string& name : meshPayload.Vertices.Properties())
+            for (const std::string& name : source.Properties())
             {
                 CopyVertexPropertyRemapped<glm::vec2>(
-                    meshPayload.Vertices, target, name, sourceVertexForTargetVertex);
+                    source, target, name, sourceVertexForTargetVertex);
                 CopyVertexPropertyRemapped<glm::vec3>(
-                    meshPayload.Vertices, target, name, sourceVertexForTargetVertex);
+                    source, target, name, sourceVertexForTargetVertex);
                 CopyVertexPropertyRemapped<glm::vec4>(
-                    meshPayload.Vertices, target, name, sourceVertexForTargetVertex);
+                    source, target, name, sourceVertexForTargetVertex);
                 CopyVertexPropertyRemapped<float>(
-                    meshPayload.Vertices, target, name, sourceVertexForTargetVertex);
+                    source, target, name, sourceVertexForTargetVertex);
+                CopyVertexPropertyRemapped<double>(
+                    source, target, name, sourceVertexForTargetVertex);
                 CopyVertexPropertyRemapped<std::uint32_t>(
-                    meshPayload.Vertices, target, name, sourceVertexForTargetVertex);
+                    source, target, name, sourceVertexForTargetVertex);
+                CopyVertexPropertyRemapped<std::int32_t>(
+                    source, target, name, sourceVertexForTargetVertex);
+                CopyVertexPropertyRemapped<bool>(
+                    source, target, name, sourceVertexForTargetVertex);
             }
         }
 
         void WriteVertexNormalsRemapped(
             Geometry::HalfedgeMesh::Mesh& mesh,
             const std::vector<glm::vec3>& normals,
-            const std::vector<std::uint32_t>& sourceVertexForTargetVertex)
+            const std::span<const std::uint32_t> sourceVertexForTargetVertex)
         {
             if (mesh.VerticesSize() != sourceVertexForTargetVertex.size())
             {
@@ -152,6 +163,38 @@ namespace Extrinsic::Runtime
                     ? normals[sourceIndex]
                     : glm::vec3{0.0f};
             }
+        }
+
+        void WriteSourceVertexXrefs(
+            Geometry::HalfedgeMesh::Mesh& mesh,
+            const std::span<const std::uint32_t> sourceVertexForTargetVertex)
+        {
+            if (mesh.VerticesSize() != sourceVertexForTargetVertex.size())
+            {
+                return;
+            }
+
+            auto property = mesh.VertexProperties().GetOrAdd<std::uint32_t>(
+                std::string{kSourceVertexProperty},
+                0u);
+            auto& out = property.Vector();
+            out.assign(sourceVertexForTargetVertex.begin(), sourceVertexForTargetVertex.end());
+        }
+
+        void WriteSourceFaceXrefs(
+            Geometry::HalfedgeMesh::Mesh& mesh,
+            const std::span<const std::uint32_t> sourceFaceForTargetFace)
+        {
+            if (mesh.FacesSize() != sourceFaceForTargetFace.size())
+            {
+                return;
+            }
+
+            auto property = mesh.FaceProperties().GetOrAdd<std::uint32_t>(
+                std::string{kSourceFaceProperty},
+                0u);
+            auto& out = property.Vector();
+            out.assign(sourceFaceForTargetFace.begin(), sourceFaceForTargetFace.end());
         }
 
         [[nodiscard]] std::vector<glm::vec3> ComputeAreaWeightedVertexNormals(
@@ -225,30 +268,37 @@ namespace Extrinsic::Runtime
             return ComputeAreaWeightedVertexNormals(positions, faces);
         }
 
-        void WriteVertexNormals(
-            Geometry::HalfedgeMesh::Mesh& mesh,
-            const std::vector<glm::vec3>& normals)
-        {
-            if (mesh.VerticesSize() != normals.size())
-            {
-                return;
-            }
-
-            auto normalProperty = mesh.VertexProperties().GetOrAdd<glm::vec3>(
-                std::string{kNormalProperty},
-                glm::vec3{0.0f});
-            normalProperty.Vector() = normals;
-        }
-
         [[nodiscard]] bool IsFinite(const glm::vec2 value) noexcept
         {
             return std::isfinite(value.x) && std::isfinite(value.y);
+        }
+
+        [[nodiscard]] bool IsFinite(const glm::vec3 value) noexcept
+        {
+            return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
         }
 
         [[nodiscard]] bool HasValidTexcoords(const Geometry::HalfedgeMesh::Mesh& mesh)
         {
             const auto texcoords = mesh.VertexProperties().Get<glm::vec2>(kTexcoordProperty);
             if (!texcoords || texcoords.Vector().size() != mesh.VerticesSize())
+            {
+                return false;
+            }
+            for (const glm::vec2 texcoord : texcoords.Vector())
+            {
+                if (!IsFinite(texcoord))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        [[nodiscard]] bool HasValidTexcoords(const Geometry::MeshSoup::IndexedMesh& mesh)
+        {
+            const auto texcoords = mesh.VertexProperties().Get<glm::vec2>(kTexcoordProperty);
+            if (!texcoords || texcoords.Vector().size() != mesh.VertexCount())
             {
                 return false;
             }
@@ -280,73 +330,6 @@ namespace Extrinsic::Runtime
                 }
             }
             return true;
-        }
-
-        [[nodiscard]] float NormalizeAxis(
-            const float value,
-            const float minValue,
-            const float extent,
-            const std::size_t index,
-            const std::size_t count) noexcept
-        {
-            if (std::isfinite(extent) && extent > 1.0e-6f)
-            {
-                return (value - minValue) / extent;
-            }
-            return count > 1u
-                ? static_cast<float>(index) / static_cast<float>(count - 1u)
-                : 0.0f;
-        }
-
-        void WriteFallbackTexcoords(Geometry::HalfedgeMesh::Mesh& mesh)
-        {
-            const std::span<const glm::vec3> positions = mesh.Positions();
-            auto texcoords = mesh.VertexProperties().GetOrAdd<glm::vec2>(
-                std::string{kTexcoordProperty},
-                glm::vec2{0.0f});
-            auto& out = texcoords.Vector();
-            out.assign(positions.size(), glm::vec2{0.0f});
-            if (positions.empty())
-            {
-                return;
-            }
-
-            glm::vec3 minP{positions[0]};
-            glm::vec3 maxP{positions[0]};
-            for (const glm::vec3 position : positions)
-            {
-                minP = glm::min(minP, position);
-                maxP = glm::max(maxP, position);
-            }
-
-            const glm::vec3 extent = maxP - minP;
-            std::array<int, 3u> axes{0, 1, 2};
-            std::sort(
-                axes.begin(),
-                axes.end(),
-                [extent](const int lhs, const int rhs)
-                {
-                    return extent[lhs] > extent[rhs];
-                });
-            const int uAxis = axes[0];
-            const int vAxis = axes[1];
-
-            for (std::size_t i = 0u; i < positions.size(); ++i)
-            {
-                const glm::vec3 position = positions[i];
-                out[i] = glm::vec2{
-                    NormalizeAxis(position[uAxis], minP[uAxis], extent[uAxis], i, positions.size()),
-                    NormalizeAxis(position[vAxis], minP[vAxis], extent[vAxis], i, positions.size()),
-                };
-            }
-        }
-
-        void EnsureRuntimeMeshTexcoords(Geometry::HalfedgeMesh::Mesh& mesh)
-        {
-            if (!HasValidTexcoords(mesh))
-            {
-                WriteFallbackTexcoords(mesh);
-            }
         }
 
         [[nodiscard]] bool CanUseDisconnectedRenderableFallback(
@@ -389,43 +372,176 @@ namespace Extrinsic::Runtime
             return hasRenderableTopologyFailure;
         }
 
+        struct TriangulatedSourceMesh
+        {
+            Geometry::MeshSoup::IndexedMesh Mesh{};
+            std::vector<std::uint32_t> OriginalFaceForTriangle{};
+        };
+
+        [[nodiscard]] Core::Expected<TriangulatedSourceMesh> BuildTriangulatedSourceMesh(
+            const std::vector<glm::vec3>& positions,
+            const std::vector<std::vector<std::uint32_t>>& faces)
+        {
+            TriangulatedSourceMesh source{};
+            for (const glm::vec3 position : positions)
+            {
+                if (!IsFinite(position))
+                {
+                    return Core::Err<TriangulatedSourceMesh>(Core::ErrorCode::AssetInvalidData);
+                }
+                static_cast<void>(source.Mesh.AddVertex(position));
+            }
+
+            for (std::size_t faceIndex = 0u; faceIndex < faces.size(); ++faceIndex)
+            {
+                const std::vector<std::uint32_t>& face = faces[faceIndex];
+                if (face.size() < 3u)
+                {
+                    return Core::Err<TriangulatedSourceMesh>(Core::ErrorCode::InvalidFormat);
+                }
+                for (const std::uint32_t index : face)
+                {
+                    if (index >= positions.size())
+                    {
+                        return Core::Err<TriangulatedSourceMesh>(Core::ErrorCode::OutOfRange);
+                    }
+                }
+
+                const std::uint32_t root = face[0];
+                for (std::size_t i = 1u; i + 1u < face.size(); ++i)
+                {
+                    static_cast<void>(source.Mesh.AddTriangle(root, face[i], face[i + 1u]));
+                    source.OriginalFaceForTriangle.push_back(
+                        static_cast<std::uint32_t>(faceIndex));
+                }
+            }
+
+            return source;
+        }
+
+        [[nodiscard]] std::span<const glm::vec2> AuthoredTexcoordSpan(
+            const Geometry::MeshIO::MeshIOResult& meshPayload) noexcept
+        {
+            const auto texcoords = meshPayload.Vertices.Get<glm::vec2>(kTexcoordProperty);
+            if (!texcoords)
+            {
+                return {};
+            }
+            return texcoords.Vector();
+        }
+
+        [[nodiscard]] Geometry::UvAtlas::UvAtlasOptions MakeUvAtlasOptions(
+            const RuntimeMeshUvResolutionOptions& options)
+        {
+            Geometry::UvAtlas::UvAtlasOptions atlasOptions{};
+            atlasOptions.PreserveValidAuthoredUvs = options.PreserveValidAuthoredUvs;
+            atlasOptions.ForceRegenerate = options.ForceRegenerate;
+            atlasOptions.CopySourceVertexProperties = true;
+            atlasOptions.Resolution = options.Resolution;
+            atlasOptions.Padding = options.Padding;
+            atlasOptions.TexelsPerUnit = options.TexelsPerUnit;
+            return atlasOptions;
+        }
+
+        [[nodiscard]] RuntimeMeshResolvedUvProvenance ToRuntimeProvenance(
+            const Geometry::UvAtlas::UvAtlasProvenance provenance) noexcept
+        {
+            switch (provenance)
+            {
+            case Geometry::UvAtlas::UvAtlasProvenance::AuthoredPreserved:
+                return RuntimeMeshResolvedUvProvenance::AuthoredPreserved;
+            case Geometry::UvAtlas::UvAtlasProvenance::Generated:
+                return RuntimeMeshResolvedUvProvenance::GeneratedAtlas;
+            case Geometry::UvAtlas::UvAtlasProvenance::None:
+                return RuntimeMeshResolvedUvProvenance::None;
+            }
+            return RuntimeMeshResolvedUvProvenance::None;
+        }
+
+        [[nodiscard]] RuntimeMeshMaterializationDiagnostics MakeRuntimeDiagnostics(
+            const Geometry::UvAtlas::UvAtlasResult& atlas,
+            const Geometry::UvAtlas::UvAtlasStatus authoredStatus,
+            const std::size_t sourceVertexCount,
+            const std::size_t sourceFaceCount)
+        {
+            RuntimeMeshMaterializationDiagnostics diagnostics{};
+            diagnostics.TexcoordProvenance = ToRuntimeProvenance(atlas.Provenance);
+            diagnostics.UvAtlasStatus = atlas.Status;
+            diagnostics.AuthoredTexcoordsValid =
+                authoredStatus == Geometry::UvAtlas::UvAtlasStatus::Success;
+            diagnostics.AuthoredTexcoordsRejected =
+                authoredStatus != Geometry::UvAtlas::UvAtlasStatus::Success &&
+                authoredStatus != Geometry::UvAtlas::UvAtlasStatus::MissingAuthoredUvs;
+            diagnostics.ResolvedTexcoordsValid = HasValidTexcoords(atlas.OutputMesh);
+            diagnostics.SourceVertexCount = sourceVertexCount;
+            diagnostics.SourceFaceCount = sourceFaceCount;
+            diagnostics.ResolvedVertexCount = atlas.OutputMesh.VertexCount();
+            diagnostics.ResolvedFaceCount = atlas.OutputMesh.FaceCount();
+            diagnostics.SeamSplitVertexCount =
+                diagnostics.ResolvedVertexCount > sourceVertexCount
+                    ? diagnostics.ResolvedVertexCount - sourceVertexCount
+                    : 0u;
+            diagnostics.ChartCount = atlas.Diagnostics.ChartCount;
+            diagnostics.AtlasWidth = atlas.Diagnostics.AtlasWidth;
+            diagnostics.AtlasHeight = atlas.Diagnostics.AtlasHeight;
+            return diagnostics;
+        }
+
+        [[nodiscard]] std::vector<std::uint32_t> MapOutputFacesToOriginalFaces(
+            const std::span<const std::uint32_t> sourceFaceForOutputFace,
+            const std::span<const std::uint32_t> originalFaceForTriangle)
+        {
+            std::vector<std::uint32_t> originalFaces(sourceFaceForOutputFace.size(), 0u);
+            for (std::size_t i = 0u; i < sourceFaceForOutputFace.size(); ++i)
+            {
+                const std::uint32_t triangleFace = sourceFaceForOutputFace[i];
+                originalFaces[i] = triangleFace < originalFaceForTriangle.size()
+                    ? originalFaceForTriangle[triangleFace]
+                    : triangleFace;
+            }
+            return originalFaces;
+        }
+
         [[nodiscard]] std::optional<Geometry::HalfedgeMesh::Mesh>
         BuildDisconnectedRenderableMesh(
-            const Geometry::MeshIO::MeshIOResult& meshPayload,
-            const std::vector<glm::vec3>& positions,
-            const std::vector<std::vector<std::uint32_t>>& faces,
+            const Geometry::MeshSoup::IndexedMesh& source,
+            const std::span<const std::uint32_t> sourceVertexForOutputVertex,
+            const std::span<const std::uint32_t> sourceFaceForOutputFace,
             const std::vector<glm::vec3>& normals)
         {
-            if (positions.empty() || faces.empty() || normals.size() != positions.size())
+            if (source.VertexCount() == 0u || source.FaceCount() == 0u ||
+                source.VertexCount() != sourceVertexForOutputVertex.size())
             {
                 return std::nullopt;
             }
 
             Geometry::HalfedgeMesh::Mesh mesh;
             std::vector<Geometry::VertexHandle> faceVertices;
+            std::vector<std::uint32_t> outputVertexForTargetVertex;
             std::vector<std::uint32_t> sourceVertexForTargetVertex;
 
-            for (const std::vector<std::uint32_t>& face : faces)
+            for (const Geometry::MeshSoup::PolygonFace& face : source.Faces())
             {
-                if (face.size() < 3u)
+                if (face.Indices.size() < 3u)
                 {
                     return std::nullopt;
                 }
 
                 faceVertices.clear();
-                faceVertices.reserve(face.size());
-                for (const std::uint32_t index : face)
+                faceVertices.reserve(face.Indices.size());
+                for (const std::uint32_t index : face.Indices)
                 {
-                    if (index >= positions.size())
+                    if (index >= source.VertexCount())
                     {
                         return std::nullopt;
                     }
-                    const Geometry::VertexHandle vertex = mesh.AddVertex(positions[index]);
+                    const Geometry::VertexHandle vertex = mesh.AddVertex(source.Position(index));
                     if (!vertex.IsValid())
                     {
                         return std::nullopt;
                     }
-                    sourceVertexForTargetVertex.push_back(index);
+                    outputVertexForTargetVertex.push_back(index);
+                    sourceVertexForTargetVertex.push_back(sourceVertexForOutputVertex[index]);
                     faceVertices.push_back(vertex);
                 }
 
@@ -436,12 +552,52 @@ namespace Extrinsic::Runtime
             }
 
             CopySupportedVertexPropertiesRemapped(
-                meshPayload,
+                source.VertexProperties(),
                 mesh,
-                sourceVertexForTargetVertex);
+                outputVertexForTargetVertex);
             WriteVertexNormalsRemapped(mesh, normals, sourceVertexForTargetVertex);
+            WriteSourceVertexXrefs(mesh, sourceVertexForTargetVertex);
+            WriteSourceFaceXrefs(mesh, sourceFaceForOutputFace);
             return mesh;
         }
+
+        [[nodiscard]] Core::Expected<Geometry::HalfedgeMesh::Mesh> ConvertResolvedMeshToHalfedge(
+            const Geometry::MeshSoup::IndexedMesh& resolved,
+            const std::span<const std::uint32_t> sourceVertexForOutputVertex,
+            const std::span<const std::uint32_t> originalFaceForOutputFace,
+            const std::vector<glm::vec3>& normals,
+            const bool allowDisconnectedRenderableFallback)
+        {
+            auto converted = Geometry::Mesh::Conversion::ToHalfedgeMesh(resolved);
+            if (!converted.Succeeded())
+            {
+                if (allowDisconnectedRenderableFallback &&
+                    CanUseDisconnectedRenderableFallback(converted))
+                {
+                    if (std::optional<Geometry::HalfedgeMesh::Mesh> fallback =
+                            BuildDisconnectedRenderableMesh(
+                                resolved,
+                                sourceVertexForOutputVertex,
+                                originalFaceForOutputFace,
+                                normals))
+                    {
+                        return std::move(*fallback);
+                    }
+                }
+                return Core::Err<Geometry::HalfedgeMesh::Mesh>(
+                    Core::ErrorCode::InvalidFormat);
+            }
+
+            CopySupportedVertexProperties(
+                resolved.VertexProperties(),
+                converted.Mesh,
+                resolved.VertexCount());
+            WriteVertexNormalsRemapped(converted.Mesh, normals, sourceVertexForOutputVertex);
+            WriteSourceVertexXrefs(converted.Mesh, sourceVertexForOutputVertex);
+            WriteSourceFaceXrefs(converted.Mesh, originalFaceForOutputFace);
+            return std::move(converted.Mesh);
+        }
+
     }
 
     bool MeshPayloadHasValidVertexTexcoords(
@@ -450,14 +606,14 @@ namespace Extrinsic::Runtime
         return HasValidTexcoords(meshPayload);
     }
 
-    Core::Expected<Geometry::HalfedgeMesh::Mesh> BuildRuntimeHalfedgeMeshWithNormals(
+    Core::Expected<RuntimeMeshMaterializationResult> BuildRuntimeHalfedgeMeshMaterialization(
         const Geometry::MeshIO::MeshIOResult& meshPayload,
         const RuntimeMeshMaterializationOptions options)
     {
         const auto positions = meshPayload.Vertices.Get<glm::vec3>(kPositionProperty);
         if (!positions || positions.Vector().empty())
         {
-            return Core::Err<Geometry::HalfedgeMesh::Mesh>(
+            return Core::Err<RuntimeMeshMaterializationResult>(
                 Core::ErrorCode::AssetInvalidData);
         }
 
@@ -465,32 +621,14 @@ namespace Extrinsic::Runtime
             meshPayload.Faces.Get<std::vector<std::uint32_t>>(kFaceVerticesProperty);
         if (!faces || faces.Vector().empty())
         {
-            return Core::Err<Geometry::HalfedgeMesh::Mesh>(
+            return Core::Err<RuntimeMeshMaterializationResult>(
                 Core::ErrorCode::AssetInvalidData);
         }
 
-        Geometry::MeshSoup::IndexedMesh soup{};
-        for (const glm::vec3& position : positions.Vector())
+        auto source = BuildTriangulatedSourceMesh(positions.Vector(), faces.Vector());
+        if (!source.has_value())
         {
-            static_cast<void>(soup.AddVertex(position));
-        }
-
-        for (const std::vector<std::uint32_t>& face : faces.Vector())
-        {
-            if (face.size() < 3u)
-            {
-                return Core::Err<Geometry::HalfedgeMesh::Mesh>(
-                    Core::ErrorCode::InvalidFormat);
-            }
-            for (const std::uint32_t index : face)
-            {
-                if (index >= soup.VertexCount())
-                {
-                    return Core::Err<Geometry::HalfedgeMesh::Mesh>(
-                        Core::ErrorCode::OutOfRange);
-                }
-            }
-            static_cast<void>(soup.AddFace(face));
+            return Core::Err<RuntimeMeshMaterializationResult>(source.error());
         }
 
         std::vector<glm::vec3> normals = ResolveVertexNormals(
@@ -498,30 +636,116 @@ namespace Extrinsic::Runtime
             positions.Vector(),
             faces.Vector());
 
-        auto converted = Geometry::Mesh::Conversion::ToHalfedgeMesh(soup);
-        if (!converted.Succeeded())
+        const Geometry::UvAtlas::UvAtlasInput input{
+            .Positions = positions.Vector(),
+            .Faces = source->Mesh.Faces(),
+            .AuthoredTexcoords = AuthoredTexcoordSpan(meshPayload),
+            .VertexProperties = Geometry::ConstPropertySet(meshPayload.Vertices),
+            .HasVertexProperties = true,
+        };
+        const Geometry::UvAtlas::UvAtlasDiagnostics authoredValidation =
+            Geometry::UvAtlas::ValidateAuthoredUvs(input);
+        Geometry::UvAtlas::UvAtlasResult atlas = Geometry::UvAtlas::ResolveUvAtlas(
+            input,
+            MakeUvAtlasOptions(options.UvResolution),
+            options.UvResolution.Backend);
+
+        RuntimeMeshMaterializationDiagnostics diagnostics = MakeRuntimeDiagnostics(
+            atlas,
+            authoredValidation.Status,
+            positions.Vector().size(),
+            faces.Vector().size());
+
+        if (!atlas.Succeeded() || !diagnostics.ResolvedTexcoordsValid)
         {
-            if (options.AllowDisconnectedRenderableFallback &&
-                CanUseDisconnectedRenderableFallback(converted))
+            if (options.UvResolution.FailurePolicy == RuntimeMeshUvFailurePolicy::Required)
             {
-                if (std::optional<Geometry::HalfedgeMesh::Mesh> fallback =
-                        BuildDisconnectedRenderableMesh(
-                            meshPayload,
-                            positions.Vector(),
-                            faces.Vector(),
-                            normals))
-                {
-                    EnsureRuntimeMeshTexcoords(*fallback);
-                    return std::move(*fallback);
-                }
+                return Core::Err<RuntimeMeshMaterializationResult>(
+                    Core::ErrorCode::AssetInvalidData);
             }
-            return Core::Err<Geometry::HalfedgeMesh::Mesh>(
-                Core::ErrorCode::InvalidFormat);
+
+            Geometry::MeshSoup::IndexedMesh optionalOutput = source->Mesh;
+            std::vector<std::uint32_t> identityVertexXrefs(optionalOutput.VertexCount(), 0u);
+            for (std::size_t i = 0u; i < identityVertexXrefs.size(); ++i)
+            {
+                identityVertexXrefs[i] = static_cast<std::uint32_t>(i);
+            }
+            static_cast<void>(Geometry::UvAtlas::CopySourceVertexPropertiesByXref(
+                Geometry::ConstPropertySet(meshPayload.Vertices),
+                identityVertexXrefs,
+                optionalOutput.VertexProperties()));
+
+            auto mesh = ConvertResolvedMeshToHalfedge(
+                optionalOutput,
+                identityVertexXrefs,
+                source->OriginalFaceForTriangle,
+                normals,
+                options.AllowDisconnectedRenderableFallback);
+            if (!mesh.has_value())
+            {
+                return Core::Err<RuntimeMeshMaterializationResult>(mesh.error());
+            }
+
+            diagnostics.TexcoordProvenance = RuntimeMeshResolvedUvProvenance::None;
+            diagnostics.ResolvedTexcoordsValid = HasValidTexcoords(*mesh);
+            diagnostics.ResolvedVertexCount = mesh->VerticesSize();
+            diagnostics.ResolvedFaceCount = mesh->FacesSize();
+            return RuntimeMeshMaterializationResult{
+                .Mesh = std::move(*mesh),
+                .Diagnostics = diagnostics,
+            };
         }
 
-        CopySupportedVertexProperties(meshPayload, converted.Mesh, positions.Vector().size());
-        WriteVertexNormals(converted.Mesh, normals);
-        EnsureRuntimeMeshTexcoords(converted.Mesh);
-        return std::move(converted.Mesh);
+        if (atlas.SourceVertexForOutputVertex.size() != atlas.OutputMesh.VertexCount() ||
+            atlas.SourceFaceForOutputFace.size() != atlas.OutputMesh.FaceCount())
+        {
+            return Core::Err<RuntimeMeshMaterializationResult>(
+                Core::ErrorCode::AssetInvalidData);
+        }
+
+        const std::vector<std::uint32_t> originalFaceForOutputFace =
+            MapOutputFacesToOriginalFaces(
+                atlas.SourceFaceForOutputFace,
+                source->OriginalFaceForTriangle);
+        auto mesh = ConvertResolvedMeshToHalfedge(
+            atlas.OutputMesh,
+            atlas.SourceVertexForOutputVertex,
+            originalFaceForOutputFace,
+            normals,
+            options.AllowDisconnectedRenderableFallback);
+        if (!mesh.has_value())
+        {
+            return Core::Err<RuntimeMeshMaterializationResult>(mesh.error());
+        }
+        diagnostics.ResolvedTexcoordsValid = HasValidTexcoords(*mesh);
+        diagnostics.ResolvedVertexCount = mesh->VerticesSize();
+        diagnostics.ResolvedFaceCount = mesh->FacesSize();
+        diagnostics.SeamSplitVertexCount =
+            diagnostics.ResolvedVertexCount > diagnostics.SourceVertexCount
+                ? diagnostics.ResolvedVertexCount - diagnostics.SourceVertexCount
+                : 0u;
+        if (!diagnostics.ResolvedTexcoordsValid &&
+            options.UvResolution.FailurePolicy == RuntimeMeshUvFailurePolicy::Required)
+        {
+            return Core::Err<RuntimeMeshMaterializationResult>(
+                Core::ErrorCode::AssetInvalidData);
+        }
+
+        return RuntimeMeshMaterializationResult{
+            .Mesh = std::move(*mesh),
+            .Diagnostics = diagnostics,
+        };
+    }
+
+    Core::Expected<Geometry::HalfedgeMesh::Mesh> BuildRuntimeHalfedgeMeshWithNormals(
+        const Geometry::MeshIO::MeshIOResult& meshPayload,
+        const RuntimeMeshMaterializationOptions options)
+    {
+        auto result = BuildRuntimeHalfedgeMeshMaterialization(meshPayload, options);
+        if (!result.has_value())
+        {
+            return Core::Err<Geometry::HalfedgeMesh::Mesh>(result.error());
+        }
+        return std::move(result->Mesh);
     }
 }

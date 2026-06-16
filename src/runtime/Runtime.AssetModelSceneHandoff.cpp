@@ -48,7 +48,9 @@ namespace Extrinsic::Runtime
             std::uint32_t MaterialIndex{Assets::kInvalidAssetModelIndex};
             std::string Name{};
             Geometry::HalfedgeMesh::Mesh Mesh{};
-            bool SourceHasValidTexcoords{false};
+            bool HasResolvedTexcoords{false};
+            RuntimeMeshResolvedUvProvenance TexcoordProvenance{
+                RuntimeMeshResolvedUvProvenance::None};
         };
 
         struct GeneratedMaterialTextureAssets
@@ -134,8 +136,42 @@ namespace Extrinsic::Runtime
             ++diagnostics->ModelSceneMaterializeFailures;
         }
 
+        void RecordUvMaterializationDiagnostics(
+            AssetModelSceneHandoffDiagnostics* diagnostics,
+            const RuntimeMeshMaterializationDiagnostics& uvDiagnostics)
+        {
+            if (diagnostics == nullptr)
+            {
+                return;
+            }
+
+            if (uvDiagnostics.UvAtlasStatus != Geometry::UvAtlas::UvAtlasStatus::Success)
+            {
+                ++diagnostics->UvAtlasFailures;
+            }
+            if (uvDiagnostics.AuthoredTexcoordsRejected)
+            {
+                ++diagnostics->InvalidAuthoredUvPrimitives;
+            }
+            if (uvDiagnostics.TexcoordProvenance ==
+                RuntimeMeshResolvedUvProvenance::AuthoredPreserved)
+            {
+                ++diagnostics->AuthoredUvPrimitives;
+            }
+            else if (uvDiagnostics.TexcoordProvenance ==
+                     RuntimeMeshResolvedUvProvenance::GeneratedAtlas)
+            {
+                ++diagnostics->GeneratedUvAtlasPrimitives;
+            }
+            diagnostics->UvAtlasSeamSplitVertices += uvDiagnostics.SeamSplitVertexCount;
+            diagnostics->LastUvAtlasChartCount = uvDiagnostics.ChartCount;
+            diagnostics->LastUvAtlasWidth = uvDiagnostics.AtlasWidth;
+            diagnostics->LastUvAtlasHeight = uvDiagnostics.AtlasHeight;
+        }
+
         [[nodiscard]] Core::Expected<std::vector<PreparedPrimitive>> PreparePrimitives(
-            const Assets::AssetModelScenePayload& model)
+            const Assets::AssetModelScenePayload& model,
+            AssetModelSceneHandoffDiagnostics* diagnostics)
         {
             std::vector<PreparedPrimitive> prepared{};
             prepared.reserve(model.Primitives.size());
@@ -163,13 +199,14 @@ namespace Extrinsic::Runtime
                     return Core::Err<std::vector<PreparedPrimitive>>(meshPayload.error());
                 }
 
-                const bool sourceHasValidTexcoords =
-                    MeshPayloadHasValidVertexTexcoords(**meshPayload);
-                auto mesh = BuildRuntimeHalfedgeMeshWithNormals(**meshPayload);
-                if (!mesh.has_value())
+                auto materialized = BuildRuntimeHalfedgeMeshMaterialization(**meshPayload);
+                if (!materialized.has_value())
                 {
-                    return Core::Err<std::vector<PreparedPrimitive>>(mesh.error());
+                    return Core::Err<std::vector<PreparedPrimitive>>(materialized.error());
                 }
+                RecordUvMaterializationDiagnostics(
+                    diagnostics,
+                    materialized->Diagnostics);
 
                 prepared.push_back(PreparedPrimitive{
                     .PrimitiveIndex = static_cast<std::uint32_t>(primitiveIndex),
@@ -178,8 +215,11 @@ namespace Extrinsic::Runtime
                     .Name = primitive.Name.empty()
                         ? "model-primitive-" + std::to_string(primitiveIndex)
                         : primitive.Name,
-                    .Mesh = std::move(*mesh),
-                    .SourceHasValidTexcoords = sourceHasValidTexcoords,
+                    .Mesh = std::move(materialized->Mesh),
+                    .HasResolvedTexcoords =
+                        materialized->Diagnostics.ResolvedTexcoordsValid,
+                    .TexcoordProvenance =
+                        materialized->Diagnostics.TexcoordProvenance,
                 });
             }
 
@@ -401,7 +441,7 @@ namespace Extrinsic::Runtime
                     {
                         continue;
                     }
-                    if (!primitive.SourceHasValidTexcoords)
+                    if (!primitive.HasResolvedTexcoords)
                     {
                         continue;
                     }
@@ -858,7 +898,7 @@ namespace Extrinsic::Runtime
             return Core::Err<AssetModelSceneHandoffState>(valid.error());
         }
 
-        auto prepared = PreparePrimitives(model);
+        auto prepared = PreparePrimitives(model, diagnostics);
         if (!prepared.has_value())
         {
             RecordFailure(diagnostics, modelAsset, prepared.error());

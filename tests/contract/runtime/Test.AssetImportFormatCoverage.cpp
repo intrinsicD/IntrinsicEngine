@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -240,6 +241,26 @@ namespace
         }
     }
 
+    void ExpectMeshVertexTexcoordsFinite(
+        ECS::Scene::Registry& registry,
+        const ECS::EntityHandle entity)
+    {
+        auto& raw = registry.Raw();
+        const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
+        ASSERT_TRUE(view.Valid());
+        ASSERT_EQ(view.ActiveDomain, GS::Domain::Mesh);
+        ASSERT_NE(view.VertexSource, nullptr);
+
+        auto texcoords = view.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
+        ASSERT_TRUE(texcoords.IsValid());
+        ASSERT_EQ(texcoords.Vector().size(), view.VerticesAlive());
+        for (const glm::vec2 texcoord : texcoords.Vector())
+        {
+            EXPECT_TRUE(std::isfinite(texcoord.x));
+            EXPECT_TRUE(std::isfinite(texcoord.y));
+        }
+    }
+
     void ExpectGeneratedNormalTextureBinding(
         Runtime::Engine& engine,
         const ECS::EntityHandle entity,
@@ -281,23 +302,6 @@ namespace
                   Graphics::GpuAssetState::NotRequested);
     }
 
-    void ExpectNoGeneratedNormalTextureBinding(
-        Runtime::Engine& engine,
-        const ECS::EntityHandle entity,
-        const std::string_view meshPath)
-    {
-        const std::string generatedPath =
-            Runtime::BuildGeneratedTextureAssetPath(
-                meshPath,
-                0u,
-                "normal",
-                "v:normal");
-        EXPECT_FALSE(engine.GetAssetService().PathIndexContains(generatedPath));
-
-        const std::uint32_t stableId =
-            Runtime::StableEntityLookup::ToRenderId(entity);
-        EXPECT_FALSE(engine.GetMaterialTextureAssetBindingsForTest(stableId).has_value());
-    }
 }
 
 TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesVertexNormalsInGeometrySources)
@@ -322,12 +326,14 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesVertexNormalsInGe
     ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
     EXPECT_EQ(imported->PayloadKind, Assets::AssetPayloadKind::Mesh);
     EXPECT_EQ(imported->PrimitiveEntitiesCreated, 1u);
-    EXPECT_EQ(imported->GeneratedTextureAssetsCreated, 0u);
-    EXPECT_EQ(imported->GeneratedTextureUploadRequests, 0u);
+    EXPECT_EQ(imported->GeneratedTextureAssetsCreated, 1u);
+    EXPECT_EQ(imported->TextureUploadRequests,
+              imported->GeneratedTextureUploadRequests);
 
     const std::optional<ECS::EntityHandle> meshEntity =
         FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
     ASSERT_TRUE(meshEntity.has_value());
+    ExpectMeshVertexTexcoordsFinite(engine.GetScene(), *meshEntity);
     ExpectMeshVertexNormals(
         engine.GetScene(),
         *meshEntity,
@@ -336,7 +342,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesVertexNormalsInGe
             {0.0f, 1.0f, 0.0f},
             {0.0f, 0.0f, -1.0f},
         });
-    ExpectNoGeneratedNormalTextureBinding(engine, *meshEntity, meshFile.Path.string());
+    ExpectGeneratedNormalTextureBinding(engine, *meshEntity, meshFile.Path.string());
 
     engine.Shutdown();
 }
@@ -552,12 +558,14 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesVertexNormalsWhenM
     });
     ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
     EXPECT_EQ(imported->PrimitiveEntitiesCreated, 1u);
-    EXPECT_EQ(imported->GeneratedTextureAssetsCreated, 0u);
-    EXPECT_EQ(imported->GeneratedTextureUploadRequests, 0u);
+    EXPECT_EQ(imported->GeneratedTextureAssetsCreated, 1u);
+    EXPECT_EQ(imported->TextureUploadRequests,
+              imported->GeneratedTextureUploadRequests);
 
     const std::optional<ECS::EntityHandle> meshEntity =
         FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
     ASSERT_TRUE(meshEntity.has_value());
+    ExpectMeshVertexTexcoordsFinite(engine.GetScene(), *meshEntity);
     ExpectMeshVertexNormals(
         engine.GetScene(),
         *meshEntity,
@@ -566,7 +574,7 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesVertexNormalsWhenM
             {0.0f, 0.0f, 1.0f},
             {0.0f, 0.0f, 1.0f},
         });
-    ExpectNoGeneratedNormalTextureBinding(engine, *meshEntity, meshFile.Path.string());
+    ExpectGeneratedNormalTextureBinding(engine, *meshEntity, meshFile.Path.string());
 
     engine.Shutdown();
 }

@@ -782,10 +782,10 @@ Open post-acceptance rendering leaves:
   inspection, and UV-backed fragment bakes now use the canonical texture-
   coordinate channel without graphics-side UV generation.
 - [GRAPHICS-089 — Generated-UV texture sampling Vulkan smoke](GRAPHICS-089-generated-uv-texture-sampling-vulkan-smoke.md):
-  blocked by `ASSETIO-008`; owns the opt-in `gpu;vulkan` proof that an
-  imported mesh that originally lacked authored UVs can render through generated
-  UVs and an uploaded generated texture binding once runtime materialization
-  supplies those generated UVs.
+  unblocked after `ASSETIO-008`; owns the opt-in `gpu;vulkan` proof that an
+  imported mesh that originally lacked authored UVs renders through generated
+  UVs and an uploaded generated texture binding supplied by runtime
+  materialization.
 
 Cross-layer Theme A leaves retired for the full working sandbox path:
 - [`RUNTIME-085` — `GeometrySources` mesh residency bridge](../../done/RUNTIME-085-geometrysources-mesh-residency.md) (retired 2026-05-28 at `CPUContracted`; Slices A–C landed the mesh packer, extraction wiring, and dirty-domain reupload/retire ordering).

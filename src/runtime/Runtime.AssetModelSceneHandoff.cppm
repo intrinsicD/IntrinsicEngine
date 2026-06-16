@@ -55,6 +55,14 @@ export namespace Extrinsic::Runtime
         std::uint64_t GeneratedTextureBakeFailures{0};
         std::uint64_t GeneratedNormalTextureBakeFailures{0};
         std::uint64_t GeneratedAlbedoTextureBakeFailures{0};
+        std::uint64_t AuthoredUvPrimitives{0};
+        std::uint64_t GeneratedUvAtlasPrimitives{0};
+        std::uint64_t InvalidAuthoredUvPrimitives{0};
+        std::uint64_t UvAtlasFailures{0};
+        std::uint64_t UvAtlasSeamSplitVertices{0};
+        std::uint64_t LastUvAtlasChartCount{0};
+        std::uint64_t LastUvAtlasWidth{0};
+        std::uint64_t LastUvAtlasHeight{0};
         std::uint64_t MaterialInstancesCreated{0};
         std::uint64_t MaterialTextureBindingsResolved{0};
         std::uint64_t MaterialTextureBindingFailures{0};

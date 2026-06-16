@@ -300,7 +300,9 @@ namespace Extrinsic::Runtime
         {
             Geometry::MeshIO::MeshIOResult Payload{};
             Geometry::HalfedgeMesh::Mesh Mesh{};
-            bool SourceHasValidTexcoords{false};
+            bool HasResolvedTexcoords{false};
+            RuntimeMeshResolvedUvProvenance TexcoordProvenance{
+                RuntimeMeshResolvedUvProvenance::None};
         };
 
         struct DecodedGraphImport
@@ -655,10 +657,10 @@ namespace Extrinsic::Runtime
             const std::string_view meshPath,
             const ECS::EntityHandle entity,
             const Geometry::HalfedgeMesh::Mesh& mesh,
-            const bool sourceHasValidTexcoords)
+            const bool hasResolvedTexcoords)
         {
             DirectMeshGeneratedTextureResult result{};
-            if (!sourceHasValidTexcoords)
+            if (!hasResolvedTexcoords)
             {
                 return result;
             }
@@ -763,14 +765,14 @@ namespace Extrinsic::Runtime
                         meshPayload.error());
                 }
 
-                auto mesh = BuildRuntimeHalfedgeMeshWithNormals(
+                auto materialized = BuildRuntimeHalfedgeMeshMaterialization(
                     **meshPayload,
                     RuntimeMeshMaterializationOptions{
                         .AllowDisconnectedRenderableFallback = true,
                     });
-                if (!mesh.has_value())
+                if (!materialized.has_value())
                 {
-                    return Core::Err<DecodedGeometryImport>(mesh.error());
+                    return Core::Err<DecodedGeometryImport>(materialized.error());
                 }
 
                 return DecodedGeometryImport{
@@ -778,9 +780,11 @@ namespace Extrinsic::Runtime
                     .PayloadKind = route->PayloadKind,
                     .Payload = DecodedMeshImport{
                         .Payload = **meshPayload,
-                        .Mesh = std::move(*mesh),
-                        .SourceHasValidTexcoords =
-                            MeshPayloadHasValidVertexTexcoords(**meshPayload),
+                        .Mesh = std::move(materialized->Mesh),
+                        .HasResolvedTexcoords =
+                            materialized->Diagnostics.ResolvedTexcoordsValid,
+                        .TexcoordProvenance =
+                            materialized->Diagnostics.TexcoordProvenance,
                     },
                 };
             }
@@ -888,7 +892,7 @@ namespace Extrinsic::Runtime
                                 decoded.Path,
                                 entity,
                                 payload.Mesh,
-                                payload.SourceHasValidTexcoords);
+                                payload.HasResolvedTexcoords);
                         if (!generatedTexture.has_value())
                         {
                             return Core::Err<MaterializedGeometryImport>(

@@ -27,7 +27,6 @@ the authoritative open/unblocked view.
 
 ## Unthemed
 
-- unblocked: `ASSETIO-008` — Default UV atlas materialization for imported meshes (tasks/backlog/assets/ASSETIO-008-default-uv-atlas-materialization.md)
 - unblocked: `GEOM-013` — Feature-preserving dual contouring (tasks/backlog/geometry/GEOM-013-feature-preserving-dual-contouring.md)
 - unblocked: `GEOM-014` — Feature-aware quadric error mesh simplification (tasks/backlog/geometry/GEOM-014-feature-aware-quadric-error-simplification.md)
 - unblocked: `GEOM-016` — Point-cloud filtering and density diagnostics contracts (tasks/backlog/geometry/GEOM-016-point-cloud-filtering-density-contracts.md)
@@ -36,7 +35,7 @@ the authoritative open/unblocked view.
 - unblocked: `GEOM-020` — Sparse direct factorization solver seam (LDLT/LLT) (tasks/backlog/geometry/GEOM-020-sparse-direct-factorization-seam.md)
 - unblocked: `GEOM-023` — Sparse non-symmetric iterative solver seam (BiCGSTAB) (tasks/backlog/geometry/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md)
 - blocked by `GEOM-020`: `GEOM-024` — Sparse symmetric generalized eigensolver seam (tasks/backlog/geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
-- blocked by `ASSETIO-008`: `GRAPHICS-089` — Generated-UV texture sampling Vulkan smoke (tasks/backlog/rendering/GRAPHICS-089-generated-uv-texture-sampling-vulkan-smoke.md)
+- unblocked: `GRAPHICS-089` — Generated-UV texture sampling Vulkan smoke (tasks/backlog/rendering/GRAPHICS-089-generated-uv-texture-sampling-vulkan-smoke.md)
 - blocked by `GEOM-020`: `METHOD-002` — Signed Heat Method reference backend (tasks/backlog/methods/METHOD-002-signed-heat-method-reference-backend.md)
 - blocked by `GEOM-023`: `METHOD-003` — Closest Point Method PDE solver reference backend (tasks/backlog/methods/METHOD-003-closest-point-method-pde-reference-backend.md)
 - unblocked: `METHOD-004` — Walk on Spheres / Walk on Stars PDE solver reference backend (tasks/backlog/methods/METHOD-004-walk-on-spheres-reference-backend.md)
@@ -44,7 +43,7 @@ the authoritative open/unblocked view.
 - blocked by `GEOM-024`: `METHOD-006` — Cross-field / frame-field design reference backend (tasks/backlog/methods/METHOD-006-cross-field-design-reference-backend.md)
 - unblocked: `METHOD-007` — Constrained Delaunay tetrahedralization reference backend (tasks/backlog/methods/METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md)
 - unblocked: `METHODS-001` — Pin signed heat as methods-pipeline pathfinder (tasks/backlog/methods/METHODS-001-signed-heat-pathfinder.md)
-- blocked by `ASSETIO-008`: `UI-014` — UV backend and texture bake controls (tasks/backlog/ui/UI-014-uv-backend-and-texture-bake-controls.md)
+- unblocked: `UI-014` — UV backend and texture bake controls (tasks/backlog/ui/UI-014-uv-backend-and-texture-bake-controls.md)
 
 ## Audits
 

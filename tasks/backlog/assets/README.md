@@ -6,12 +6,14 @@ GPU-agnostic; GPU residency lives under `src/graphics/assets` and is wired by
 
 ## Tasks
 
-- [ASSETIO-008 — Default UV atlas materialization for imported meshes](ASSETIO-008-default-uv-atlas-materialization.md):
-  preserve valid authored mesh UVs or precompute generated UV atlases through
-  the default geometry backend before generated texture bakes and ECS
-  materialization.
+No open asset backlog tasks.
 
 ## Retired
+- [ASSETIO-008 — Default UV atlas materialization for imported meshes](../../done/ASSETIO-008-default-uv-atlas-materialization.md):
+  retired at `CPUContracted` with runtime-owned resolved-UV materialization
+  for imported renderable meshes, preserving valid authored UVs or generating
+  xatlas-backed atlas UVs before direct/model generated texture bakes, while
+  preserving seam-split vertex properties and provenance diagnostics.
 - [ASSETIO-005 — Asset import queue and progress UI](../../done/ASSETIO-005-asset-import-queue-progress.md):
   retired at `Operational` with runtime-owned AssetIO queue snapshots and
   sandbox editor File / Import progress rows for queued/running/apply/upload

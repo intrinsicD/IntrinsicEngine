@@ -9,6 +9,24 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`ASSETIO-008`](ASSETIO-008-default-uv-atlas-materialization.md) — Default UV
+atlas materialization for imported meshes — retired on 2026-06-16 at maturity
+`CPUContracted`. Runtime mesh materialization now validates authored UVs through
+the `Geometry.UvAtlas` contract, preserves valid authored coordinates by
+default, and invokes the xatlas-backed default atlas backend when UVs are
+missing or invalid before ECS population and generated texture bakes. The
+materialization options expose preserve/regenerate policy, atlas resolution,
+padding, texels-per-unit, required-vs-optional UV failure behavior, and a
+replaceable backend for tests/future algorithms. Seam-split output preserves
+normals, colors, scalar/vector fields, and `v:source_vertex` / `f:source_face`
+provenance; diagnostics distinguish authored-preserved vs generated UVs,
+invalid authored UVs, backend failures, seam splits, chart count, and atlas
+dimensions. Direct mesh imports and model-scene handoff generated normal/albedo
+bakes now use resolved UVs instead of skipping solely because the source omitted
+UVs. Focused runtime/UV atlas tests, module inventory regeneration, strict
+layering/test-layout/task checks, and doc-link checks passed.
+
+Active
 [`GEOM-025`](GEOM-025-uv-atlas-backend-xatlas.md) — UV atlas backend contract
 and xatlas default — retired on 2026-06-16 at maturity `CPUContracted`.
 Geometry now exposes `Geometry.UvAtlas`, a backend-neutral UV atlas API with
