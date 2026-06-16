@@ -21,7 +21,7 @@ Root scanned: `src`
 | `legacy` | 181 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 31 |
+| `runtime` | 34 |
 
 ## Modules
 
@@ -493,6 +493,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.AssetModelSceneHandoff` | `src/runtime/Runtime.AssetModelSceneHandoff.cppm` | `runtime` |
 | `Extrinsic.Runtime.AssetModelTextureHandoff` | `src/runtime/Runtime.AssetModelTextureHandoff.cppm` | `runtime` |
 | `Extrinsic.Runtime.AssetModelTextureIO` | `src/runtime/Runtime.AssetModelTextureIO.cppm` | `runtime` |
+| `Extrinsic.Runtime.DerivedJobGraph` | `src/runtime/Runtime.DerivedJobGraph.cppm` | `runtime` |
 | `Extrinsic.Runtime.EcsSystemBundle` | `src/runtime/Runtime.EcsSystemBundle.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorCommandHistory` | `src/runtime/Runtime.EditorCommandHistory.cppm` | `runtime` |
 | `Extrinsic.Runtime.Engine` | `src/runtime/Runtime.Engine.cppm` | `runtime` |
@@ -505,6 +506,8 @@ Root scanned: `src`
 | `Extrinsic.Runtime.PrimitiveSelectionRefinement` | `src/runtime/Runtime.PrimitiveSelectionRefinement.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProceduralGeometry` | `src/runtime/Runtime.ProceduralGeometry.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProceduralGeometryPacker` | `src/runtime/Runtime.ProceduralGeometryPacker.cppm` | `runtime` |
+| `Extrinsic.Runtime.ProgressivePresentationExtraction` | `src/runtime/Runtime.ProgressivePresentationExtraction.cppm` | `runtime` |
+| `Extrinsic.Runtime.ProgressiveRenderData` | `src/runtime/Runtime.ProgressiveRenderData.cppm` | `runtime` |
 | `Extrinsic.Runtime.ReferenceScene` | `src/runtime/Runtime.ReferenceScene.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderExtraction` | `src/runtime/Runtime.RenderExtraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderWorldPool` | `src/runtime/Runtime.RenderWorldPool.cppm` | `runtime` |
@@ -515,4 +518,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugAdapters` | `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **487**
+Total modules: **490**

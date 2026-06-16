@@ -6,6 +6,22 @@ maturity_target: CPUContracted
 ---
 # RUNTIME-113 — Progressive domain presentation extraction
 
+## Completion
+- Completed: 2026-06-16. Commit/PR: this retirement commit.
+- Maturity: `CPUContracted`.
+- Fix summary: added `Extrinsic.Runtime.ProgressivePresentationExtraction`
+  and wired `RenderExtraction` stats/material binding observation so mesh
+  surface slots, graph vertex/edge property buffers, and point-cloud property
+  buffers can resolve defaults, pending/failed/unsupported state, ready
+  textures, ready property buffers, and previous-output retention without
+  blocking on derived work.
+- Evidence: focused runtime contract tests cover mesh defaults and generated
+  texture readiness, mesh face/unsupported diagnostics, graph vertex/edge
+  property-buffer domains, point-cloud color/scalar/size/normal descriptors,
+  and previous-output retention.
+- Operational proof: `GRAPHICS-090` supplies the opt-in Vulkan smoke for the
+  renderer-consuming side of this contract.
+
 ## Goal
 - Make runtime extraction consume progressive render-data descriptors so mesh,
   graph, and point-cloud lanes can render with defaults, authored/generated
@@ -30,57 +46,57 @@ maturity_target: CPUContracted
 - Mesh, graph, and point-cloud paths must be handled with equal priority.
 
 ## Required changes
-- [ ] Teach extraction to resolve lane-to-presentation bindings for
+- [x] Teach extraction to resolve lane-to-presentation bindings for
       `RenderSurface`, `RenderEdges`, and `RenderPoints` without storing full
       materials in those render-lane components.
-- [ ] For mesh surface lanes, submit uniform defaults immediately and attach
+- [x] For mesh surface lanes, submit uniform defaults immediately and attach
       authored/generated texture slots only when each slot is ready.
-- [ ] For mesh face-color and scalar-field slots, resolve exact face-domain
+- [x] For mesh face-color and scalar-field slots, resolve exact face-domain
       presentation to a texture-backed or equivalent data path with explicit
       unsupported diagnostics where a backend is not yet available.
-- [ ] For graph lanes, resolve vertex/node and edge property buffers
+- [x] For graph lanes, resolve vertex/node and edge property buffers
       independently so selected vertices and selected edges can be highlighted
       or colored separately.
-- [ ] For point-cloud lanes, resolve color, scalar, size, and
+- [x] For point-cloud lanes, resolve color, scalar, size, and
       normal/orientation property buffers where compatible properties exist.
-- [ ] Preserve previous valid generated outputs during pending or failed
+- [x] Preserve previous valid generated outputs during pending or failed
       replacement states.
-- [ ] Surface extraction diagnostics for missing properties, incompatible
+- [x] Surface extraction diagnostics for missing properties, incompatible
       types, stale generations, pending generated outputs, unsupported domains,
       and fallback/default usage.
-- [ ] Keep graphics-facing data free of live ECS, raw property pointers,
+- [x] Keep graphics-facing data free of live ECS, raw property pointers,
       `AssetService`, and runtime ownership.
 
 ## Tests
-- [ ] Add CPU/null extraction tests for mesh surface default rendering with
+- [x] Add CPU/null extraction tests for mesh surface default rendering with
       pending normal/albedo/scalar slots.
-- [ ] Add CPU/null extraction tests for mesh face-domain color/scalar
+- [x] Add CPU/null extraction tests for mesh face-domain color/scalar
       presentation diagnostics and ready-state handling.
-- [ ] Add CPU/null extraction tests for graph vertex/node and edge property
+- [x] Add CPU/null extraction tests for graph vertex/node and edge property
       buffers, including separate selected vertex/edge highlight domains.
-- [ ] Add CPU/null extraction tests for point-cloud color, scalar, size, and
+- [x] Add CPU/null extraction tests for point-cloud color, scalar, size, and
       normal/orientation property-buffer descriptors.
-- [ ] Add stale/pending/failure tests proving previous valid outputs remain
+- [x] Add stale/pending/failure tests proving previous valid outputs remain
       bound until replacement output is ready.
-- [ ] Preserve existing render-lane component and geometry residency coverage.
+- [x] Preserve existing render-lane component and geometry residency coverage.
 
 ## Docs
-- [ ] Update `src/runtime/README.md` with progressive extraction behavior and
+- [x] Update `src/runtime/README.md` with progressive extraction behavior and
       descriptor-to-snapshot mapping.
-- [ ] Update renderer/runtime docs if snapshot material or property-buffer
+- [x] Update renderer/runtime docs if snapshot material or property-buffer
       ownership changes.
-- [ ] Regenerate `docs/api/generated/module_inventory.md` after module surface
+- [x] Regenerate `docs/api/generated/module_inventory.md` after module surface
       changes.
 
 ## Acceptance criteria
-- [ ] A mesh with only positions, UVs, and indices extracts a surface lane with
+- [x] A mesh with only positions, UVs, and indices extracts a surface lane with
       defaults before normals or generated textures are ready.
-- [ ] Graph vertex and edge presentation can resolve separate property domains
+- [x] Graph vertex and edge presentation can resolve separate property domains
       and report independent diagnostics.
-- [ ] Point-cloud presentation can resolve point-domain color/scalar/size/
+- [x] Point-cloud presentation can resolve point-domain color/scalar/size/
       normal descriptors or fall back to defaults with visible diagnostics.
-- [ ] Extraction never blocks on derived jobs and never applies worker results.
-- [ ] The default CPU-supported CTest gate verifies cross-domain presentation
+- [x] Extraction never blocks on derived jobs and never applies worker results.
+- [x] The default CPU-supported CTest gate verifies cross-domain presentation
       extraction.
 
 ## Verification

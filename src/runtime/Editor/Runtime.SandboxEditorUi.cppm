@@ -28,9 +28,12 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
+import Extrinsic.Runtime.ProgressivePresentationExtraction;
+import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SceneSerialization;
@@ -367,6 +370,90 @@ export namespace Extrinsic::Runtime
         std::size_t NodeCount{0u};
     };
 
+    struct SandboxEditorProgressivePropertyOptionModel
+    {
+        ProgressivePropertyBindingDescriptor Descriptor{};
+        ProgressivePropertyValueKind ActualValueKind{
+            ProgressivePropertyValueKind::Unknown};
+        std::size_t ElementCount{0u};
+        bool Compatible{false};
+        std::string DisabledReason{};
+    };
+
+    struct SandboxEditorProgressiveSlotModel
+    {
+        ProgressiveRenderLane Lane{ProgressiveRenderLane::Surface};
+        std::string PresentationKey{};
+        ProgressivePresentationKind PresentationKind{
+            ProgressivePresentationKind::SurfaceMaterial};
+        ProgressiveSlotSemantic Semantic{ProgressiveSlotSemantic::Albedo};
+        ProgressiveSlotSourceKind SourceKind{
+            ProgressiveSlotSourceKind::UniformDefault};
+        ProgressiveReadinessState Readiness{ProgressiveReadinessState::Unset};
+        ProgressiveDefaultValue UniformDefault{};
+        ProgressivePropertyBindingDescriptor Property{};
+        ProgressivePropertyResolution PropertyResolution{};
+        Assets::AssetId AuthoredTexture{};
+        Assets::AssetId GeneratedTexture{};
+        Assets::AssetId TextureAsset{};
+        bool Enabled{false};
+        bool UsesUniformDefault{false};
+        bool TextureReady{false};
+        bool PropertyBufferReady{false};
+        bool PreviousOutputRetained{false};
+        bool Unsupported{false};
+        std::string Diagnostic{};
+        std::vector<SandboxEditorProgressivePropertyOptionModel> PropertyOptions{};
+    };
+
+    struct SandboxEditorProgressiveJobDependencyModel
+    {
+        DerivedJobHandle Job{};
+        std::string Reason{};
+    };
+
+    struct SandboxEditorProgressiveJobModel
+    {
+        DerivedJobHandle Handle{};
+        DerivedJobKey Key{};
+        std::string Name{};
+        ProgressiveJobDomain RequestedJobDomain{ProgressiveJobDomain::Cpu};
+        ProgressiveJobDomain ResolvedJobDomain{ProgressiveJobDomain::Cpu};
+        DerivedJobStatus Status{DerivedJobStatus::Queued};
+        std::vector<SandboxEditorProgressiveJobDependencyModel> Dependencies{};
+        float NormalizedProgress{0.0f};
+        bool ProgressDeterminate{true};
+        bool PreviousOutputRetained{false};
+        std::uint64_t PayloadToken{0u};
+        std::uint64_t ElapsedMilliseconds{0u};
+        std::string Diagnostic{};
+    };
+
+    struct SandboxEditorProgressiveCompositionSummary
+    {
+        bool HasChildren{false};
+        std::uint32_t ChildCount{0u};
+        std::uint32_t ChildBindingsCount{0u};
+        std::uint32_t ChildSlotCount{0u};
+        std::uint32_t ChildPendingSlotCount{0u};
+        std::uint32_t ChildFailedSlotCount{0u};
+        std::uint32_t ChildJobCount{0u};
+        std::uint32_t ChildActiveJobCount{0u};
+        std::uint32_t ChildFailedJobCount{0u};
+    };
+
+    struct SandboxEditorProgressiveRenderDataModel
+    {
+        bool HasBindings{false};
+        ProgressiveEntityShape Shape{ProgressiveEntityShape::Unknown};
+        std::uint64_t BindingGeneration{0u};
+        ProgressivePresentationExtractionStats Stats{};
+        std::vector<SandboxEditorProgressiveSlotModel> Slots{};
+        std::vector<SandboxEditorProgressiveJobModel> Jobs{};
+        SandboxEditorProgressiveCompositionSummary Composition{};
+        std::vector<SandboxEditorDiagnostic> Diagnostics{};
+    };
+
     struct SandboxEditorInspectorModel
     {
         bool                             HasEntity{false};
@@ -374,6 +461,7 @@ export namespace Extrinsic::Runtime
         SandboxEditorTransformModel     Transform{};
         SandboxEditorRenderHintModel    RenderHints{};
         SandboxEditorGeometryDomainModel Geometry{};
+        SandboxEditorProgressiveRenderDataModel Progressive{};
         SandboxEditorGeometryProcessingCapabilities Processing{};
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
@@ -803,6 +891,7 @@ export namespace Extrinsic::Runtime
         SandboxEditorPrimitiveViewCommandSurface PrimitiveViewCommands{};
         SandboxEditorVisualizationAdapterBindingCommandSurface VisualizationAdapterBindings{};
         RuntimeAssetImportQueueSnapshot AssetImportQueue{};
+        const DerivedJobQueueSnapshot* DerivedJobs{nullptr};
         std::string PendingAssetImportPath{};
         std::string PendingSceneFilePath{};
         Assets::AssetPayloadKind PendingAssetImportPayloadKind{
@@ -933,6 +1022,27 @@ export namespace Extrinsic::Runtime
         VisualizationAdapterOptions Options{};
     };
 
+    struct SandboxEditorProgressiveSlotDefaultCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        std::string PresentationKey{};
+        ProgressiveSlotSemantic Semantic{ProgressiveSlotSemantic::Albedo};
+        ProgressiveDefaultValue Value{};
+        bool Enabled{true};
+    };
+
+    struct SandboxEditorProgressiveSlotPropertyCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        std::string PresentationKey{};
+        ProgressiveSlotSemantic Semantic{ProgressiveSlotSemantic::Albedo};
+        ProgressiveSlotSourceKind SourceKind{ProgressiveSlotSourceKind::PropertyBake};
+        ProgressiveGeometryDomain Domain{ProgressiveGeometryDomain::Unknown};
+        ProgressivePropertyValueKind ExpectedValueKind{
+            ProgressivePropertyValueKind::Any};
+        std::string PropertyName{};
+    };
+
     [[nodiscard]] SandboxEditorPanelFrame BuildSandboxEditorPanelFrame(
         const SandboxEditorContext& context);
 
@@ -992,6 +1102,14 @@ export namespace Extrinsic::Runtime
     SandboxEditorCommandStatus ApplySandboxEditorVisualizationAdapterBindingCommand(
         const SandboxEditorContext& context,
         const SandboxEditorVisualizationAdapterBindingCommand& command);
+
+    SandboxEditorCommandStatus ApplySandboxEditorProgressiveSlotDefaultCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorProgressiveSlotDefaultCommand& command);
+
+    SandboxEditorCommandStatus ApplySandboxEditorProgressiveSlotPropertyCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorProgressiveSlotPropertyCommand& command);
 
     SandboxEditorKMeansResult ApplySandboxEditorKMeansCommand(
         const SandboxEditorContext& context,

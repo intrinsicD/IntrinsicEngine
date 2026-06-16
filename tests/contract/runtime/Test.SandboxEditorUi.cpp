@@ -38,6 +38,7 @@ import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.Selection;
+import Extrinsic.ECS.Hierarchy.Mutation;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
@@ -48,10 +49,12 @@ import Extrinsic.Graphics.Renderer;
 import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.ImGuiAdapter;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
+import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxEditorUi;
@@ -276,6 +279,69 @@ namespace
                      {0u, 0u, 0u, kInvalidIndex, kInvalidIndex, kInvalidIndex});
         auto& faces = raw.emplace<GS::Faces>(entity);
         SetFaces(faces, {0u});
+    }
+
+    [[nodiscard]] Runtime::ProgressivePresentationBindings
+    MakeProgressiveMeshPresentationBindings()
+    {
+        Runtime::ProgressiveSlotBinding albedo{};
+        albedo.Semantic = Runtime::ProgressiveSlotSemantic::Albedo;
+        albedo.SourceKind = Runtime::ProgressiveSlotSourceKind::UniformDefault;
+        albedo.UniformDefault = Runtime::ProgressiveDefaultValue{
+            .Kind = Runtime::ProgressivePropertyValueKind::Vec4,
+            .Vector = glm::vec4{0.2f, 0.4f, 0.8f, 1.0f},
+        };
+        albedo.Readiness = Runtime::ProgressiveReadinessState::DefaultValue;
+        albedo.Provenance =
+            Runtime::ProgressiveGeneratedOutputProvenance::UniformDefault;
+
+        Runtime::ProgressiveSlotBinding normal{};
+        normal.Semantic = Runtime::ProgressiveSlotSemantic::Normal;
+        normal.SourceKind = Runtime::ProgressiveSlotSourceKind::PropertyBake;
+        normal.Property = Runtime::ProgressivePropertyBindingDescriptor{
+            .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
+            .PropertyName = "v:normal",
+            .ExpectedValueKind = Runtime::ProgressivePropertyValueKind::Vec3,
+            .ExpectedElementCount = 3u,
+        };
+        normal.Readiness = Runtime::ProgressiveReadinessState::Pending;
+        normal.GeneratedPolicy =
+            Runtime::ProgressiveGeneratedOutputPolicy::DeterministicChildAsset;
+        normal.Provenance =
+            Runtime::ProgressiveGeneratedOutputProvenance::PropertyBinding;
+        normal.LastDiagnostic = "waiting for normal bake";
+
+        return Runtime::ProgressivePresentationBindings{
+            .Shape = Runtime::ProgressiveEntityShape::MeshLeaf,
+            .Lanes = {
+                Runtime::ProgressiveRenderLaneBinding{
+                    .Lane = Runtime::ProgressiveRenderLane::Surface,
+                    .PresentationKey = "mesh.surface",
+                },
+            },
+            .Presentations = {
+                Runtime::ProgressivePresentationBinding{
+                    .Key = "mesh.surface",
+                    .Kind = Runtime::ProgressivePresentationKind::SurfaceMaterial,
+                    .Slots = {albedo, normal},
+                },
+            },
+            .BindingGeneration = 7u,
+        };
+    }
+
+    [[nodiscard]] const Runtime::SandboxEditorProgressiveSlotModel*
+    FindProgressiveSlot(
+        const Runtime::SandboxEditorProgressiveRenderDataModel& model,
+        const Runtime::ProgressiveSlotSemantic semantic)
+    {
+        for (const Runtime::SandboxEditorProgressiveSlotModel& slot :
+             model.Slots)
+        {
+            if (slot.Semantic == semantic)
+                return &slot;
+        }
+        return nullptr;
     }
 
     void AddGraphSource(ECS::Scene::Registry& registry,
@@ -2882,6 +2948,280 @@ TEST(SandboxEditorUi, VisualizationAdapterBindingCommandRoutesThroughRuntimeSurf
                       .AdapterKey = 0xF00Du,
                   }),
               Runtime::SandboxEditorCommandStatus::StaleEntity);
+}
+
+TEST(SandboxEditorUi, ProgressiveInspectorReportsSlotsPropertiesAndJobs)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "ProgressiveMesh");
+    AddTriangleMeshSource(registry, mesh);
+    auto& vertices = registry.Raw().get<GS::Vertices>(mesh);
+    vertices.Properties.GetOrAdd<glm::vec3>("v:normal", glm::vec3{0.0f, 0.0f, 1.0f})
+        .Vector() = {
+            glm::vec3{0.0f, 0.0f, 1.0f},
+            glm::vec3{0.0f, 0.0f, 1.0f},
+            glm::vec3{0.0f, 0.0f, 1.0f},
+        };
+    vertices.Properties.GetOrAdd<glm::vec4>("v:paint", glm::vec4{1.0f})
+        .Vector() = {
+            glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
+            glm::vec4{0.0f, 1.0f, 0.0f, 1.0f},
+            glm::vec4{0.0f, 0.0f, 1.0f, 1.0f},
+        };
+    vertices.Properties.GetOrAdd<float>("v:temperature", 0.0f)
+        .Vector() = {0.0f, 0.5f, 1.0f};
+    registry.Raw().emplace<Runtime::ProgressivePresentationBindings>(
+        mesh,
+        MakeProgressiveMeshPresentationBindings());
+
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+
+    const Runtime::DerivedJobHandle dependencyHandle{99u, 1u};
+    Runtime::DerivedJobQueueSnapshot jobs{};
+    const std::vector<Runtime::DerivedJobStatus> statuses{
+        Runtime::DerivedJobStatus::Blocked,
+        Runtime::DerivedJobStatus::Queued,
+        Runtime::DerivedJobStatus::Running,
+        Runtime::DerivedJobStatus::Applying,
+        Runtime::DerivedJobStatus::Complete,
+        Runtime::DerivedJobStatus::Failed,
+        Runtime::DerivedJobStatus::Cancelled,
+        Runtime::DerivedJobStatus::StaleDiscarded,
+    };
+    for (std::size_t i = 0u; i < statuses.size(); ++i)
+    {
+        jobs.Entries.push_back(Runtime::DerivedJobSnapshot{
+            .Handle = Runtime::DerivedJobHandle{
+                static_cast<std::uint32_t>(10u + i),
+                1u},
+            .Key = Runtime::DerivedJobKey{
+                .EntityId = stableId,
+                .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
+                .OutputSemantic = Runtime::ProgressiveSlotSemantic::Normal,
+                .BindingGeneration = 7u,
+                .OutputName = "normal",
+            },
+            .Name = "progressive job",
+            .Status = statuses[i],
+            .Dependencies = {
+                Runtime::DerivedJobDependency{
+                    .Job = dependencyHandle,
+                    .Reason = "normal requires uv",
+                },
+            },
+            .NormalizedProgress = static_cast<float>(i) /
+                                  static_cast<float>(statuses.size()),
+            .Diagnostic = i == 5u ? "failed bake" : std::string{},
+        });
+    }
+
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.DerivedJobs = &jobs;
+
+    const Runtime::SandboxEditorPanelFrame frame =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+
+    ASSERT_TRUE(frame.Inspector.HasEntity);
+    const Runtime::SandboxEditorProgressiveRenderDataModel& progressive =
+        frame.Inspector.Progressive;
+    ASSERT_TRUE(progressive.HasBindings);
+    EXPECT_EQ(progressive.Shape, Runtime::ProgressiveEntityShape::MeshLeaf);
+    EXPECT_EQ(progressive.BindingGeneration, 7u);
+    EXPECT_EQ(progressive.Slots.size(), 2u);
+    EXPECT_EQ(progressive.Jobs.size(), statuses.size());
+    EXPECT_EQ(progressive.Jobs[0].Status, Runtime::DerivedJobStatus::Blocked);
+    ASSERT_EQ(progressive.Jobs[0].Dependencies.size(), 1u);
+    EXPECT_EQ(progressive.Jobs[0].Dependencies[0].Reason, "normal requires uv");
+    EXPECT_EQ(progressive.Jobs[5].Diagnostic, "failed bake");
+
+    const Runtime::SandboxEditorProgressiveSlotModel* normal =
+        FindProgressiveSlot(progressive, Runtime::ProgressiveSlotSemantic::Normal);
+    ASSERT_NE(normal, nullptr);
+    EXPECT_EQ(normal->Readiness, Runtime::ProgressiveReadinessState::Pending);
+    EXPECT_EQ(normal->Property.PropertyName, "v:normal");
+    ASSERT_FALSE(normal->PropertyOptions.empty());
+    EXPECT_TRUE(normal->PropertyOptions.front().Compatible);
+
+    const auto disabled = std::find_if(
+        normal->PropertyOptions.begin(),
+        normal->PropertyOptions.end(),
+        [](const Runtime::SandboxEditorProgressivePropertyOptionModel& option)
+        {
+            return option.Descriptor.PropertyName == "v:temperature";
+        });
+    ASSERT_NE(disabled, normal->PropertyOptions.end());
+    EXPECT_FALSE(disabled->Compatible);
+    EXPECT_FALSE(disabled->DisabledReason.empty());
+}
+
+TEST(SandboxEditorUi, ProgressiveInspectorInfersGraphPointCloudAndComposition)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+
+    const ECS::EntityHandle graph = MakeSelectable(registry, "ProgressiveGraph");
+    AddGraphSource(registry, graph);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, graph));
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    Runtime::SandboxEditorPanelFrame frame =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+    EXPECT_EQ(frame.Inspector.Progressive.Shape,
+              Runtime::ProgressiveEntityShape::GraphLeaf);
+
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "ProgressiveCloud");
+    AddPointCloudSource(registry, cloud, 3u);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
+    frame = Runtime::BuildSandboxEditorPanelFrame(context);
+    EXPECT_EQ(frame.Inspector.Progressive.Shape,
+              Runtime::ProgressiveEntityShape::PointCloudLeaf);
+
+    const ECS::EntityHandle parent = MakeSelectable(registry, "ProgressiveModel");
+    const ECS::EntityHandle child = MakeSelectable(registry, "ProgressiveChild");
+    AddTriangleMeshSource(registry, child);
+    auto& childVertices = registry.Raw().get<GS::Vertices>(child);
+    childVertices.Properties.GetOrAdd<glm::vec3>("v:normal", glm::vec3{0.0f, 0.0f, 1.0f})
+        .Vector() = {
+            glm::vec3{0.0f, 0.0f, 1.0f},
+            glm::vec3{0.0f, 0.0f, 1.0f},
+            glm::vec3{0.0f, 0.0f, 1.0f},
+        };
+    registry.Raw().emplace<Runtime::ProgressivePresentationBindings>(
+        child,
+        MakeProgressiveMeshPresentationBindings());
+    ECS::Hierarchy::Attach(registry.Raw(), child, parent);
+
+    Runtime::DerivedJobQueueSnapshot jobs{};
+    jobs.Entries.push_back(Runtime::DerivedJobSnapshot{
+        .Handle = Runtime::DerivedJobHandle{77u, 1u},
+        .Key = Runtime::DerivedJobKey{
+            .EntityId = Runtime::SelectionController::ToStableEntityId(child),
+            .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
+            .OutputSemantic = Runtime::ProgressiveSlotSemantic::Normal,
+            .BindingGeneration = 7u,
+            .OutputName = "normal",
+        },
+        .Name = "child normal bake",
+        .Status = Runtime::DerivedJobStatus::Running,
+    });
+    context.DerivedJobs = &jobs;
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, parent));
+    frame = Runtime::BuildSandboxEditorPanelFrame(context);
+
+    EXPECT_EQ(frame.Inspector.Progressive.Shape,
+              Runtime::ProgressiveEntityShape::Composition);
+    EXPECT_TRUE(frame.Inspector.Progressive.Composition.HasChildren);
+    EXPECT_EQ(frame.Inspector.Progressive.Composition.ChildCount, 1u);
+    EXPECT_EQ(frame.Inspector.Progressive.Composition.ChildBindingsCount, 1u);
+    EXPECT_EQ(frame.Inspector.Progressive.Composition.ChildPendingSlotCount, 1u);
+    EXPECT_EQ(frame.Inspector.Progressive.Composition.ChildJobCount, 1u);
+    EXPECT_EQ(frame.Inspector.Progressive.Composition.ChildActiveJobCount, 1u);
+}
+
+TEST(SandboxEditorUi, ProgressiveSlotCommandsUseCommandHistory)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "ProgressiveCommands");
+    AddTriangleMeshSource(registry, mesh);
+    auto& vertices = registry.Raw().get<GS::Vertices>(mesh);
+    vertices.Properties.GetOrAdd<glm::vec4>("v:paint", glm::vec4{1.0f})
+        .Vector() = {
+            glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
+            glm::vec4{0.0f, 1.0f, 0.0f, 1.0f},
+            glm::vec4{0.0f, 0.0f, 1.0f, 1.0f},
+        };
+    vertices.Properties.GetOrAdd<float>("v:temperature", 0.0f)
+        .Vector() = {0.0f, 0.5f, 1.0f};
+    registry.Raw().emplace<Runtime::ProgressivePresentationBindings>(
+        mesh,
+        MakeProgressiveMeshPresentationBindings());
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    const Runtime::ProgressiveDefaultValue newColor{
+        .Kind = Runtime::ProgressivePropertyValueKind::Vec4,
+        .Vector = glm::vec4{0.9f, 0.1f, 0.2f, 1.0f},
+    };
+    EXPECT_EQ(Runtime::ApplySandboxEditorProgressiveSlotDefaultCommand(
+                  context,
+                  Runtime::SandboxEditorProgressiveSlotDefaultCommand{
+                      .StableEntityId = stableId,
+                      .PresentationKey = "mesh.surface",
+                      .Semantic = Runtime::ProgressiveSlotSemantic::Albedo,
+                      .Value = newColor,
+                  }),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    EXPECT_TRUE(history.IsDirty());
+    auto& bindings =
+        registry.Raw().get<Runtime::ProgressivePresentationBindings>(mesh);
+    EXPECT_EQ(bindings.BindingGeneration, 8u);
+    auto* presentation =
+        Runtime::FindPresentationBinding(bindings, "mesh.surface");
+    ASSERT_NE(presentation, nullptr);
+    auto* albedo =
+        Runtime::FindSlotBinding(*presentation,
+                                 Runtime::ProgressiveSlotSemantic::Albedo);
+    ASSERT_NE(albedo, nullptr);
+    EXPECT_EQ(albedo->SourceKind,
+              Runtime::ProgressiveSlotSourceKind::UniformDefault);
+    EXPECT_EQ(albedo->UniformDefault.Vector, newColor.Vector);
+
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    const auto& restored =
+        registry.Raw().get<Runtime::ProgressivePresentationBindings>(mesh);
+    EXPECT_EQ(restored.BindingGeneration, 7u);
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorProgressiveSlotPropertyCommand(
+                  context,
+                  Runtime::SandboxEditorProgressiveSlotPropertyCommand{
+                      .StableEntityId = stableId,
+                      .PresentationKey = "mesh.surface",
+                      .Semantic = Runtime::ProgressiveSlotSemantic::Albedo,
+                      .SourceKind =
+                          Runtime::ProgressiveSlotSourceKind::PropertyBake,
+                      .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
+                      .ExpectedValueKind =
+                          Runtime::ProgressivePropertyValueKind::Vec4,
+                      .PropertyName = "v:paint",
+                  }),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    auto& propertyBindings =
+        registry.Raw().get<Runtime::ProgressivePresentationBindings>(mesh);
+    EXPECT_EQ(propertyBindings.BindingGeneration, 8u);
+    presentation = Runtime::FindPresentationBinding(propertyBindings, "mesh.surface");
+    ASSERT_NE(presentation, nullptr);
+    albedo =
+        Runtime::FindSlotBinding(*presentation,
+                                 Runtime::ProgressiveSlotSemantic::Albedo);
+    ASSERT_NE(albedo, nullptr);
+    EXPECT_EQ(albedo->SourceKind,
+              Runtime::ProgressiveSlotSourceKind::PropertyBake);
+    EXPECT_EQ(albedo->Property.PropertyName, "v:paint");
+    EXPECT_EQ(albedo->Readiness, Runtime::ProgressiveReadinessState::Pending);
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorProgressiveSlotPropertyCommand(
+                  context,
+                  Runtime::SandboxEditorProgressiveSlotPropertyCommand{
+                      .StableEntityId = stableId,
+                      .PresentationKey = "mesh.surface",
+                      .Semantic = Runtime::ProgressiveSlotSemantic::Albedo,
+                      .SourceKind =
+                          Runtime::ProgressiveSlotSourceKind::PropertyBake,
+                      .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
+                      .ExpectedValueKind =
+                          Runtime::ProgressivePropertyValueKind::Vec4,
+                      .PropertyName = "v:temperature",
+                  }),
+              Runtime::SandboxEditorCommandStatus::InvalidVisualizationProperty);
 }
 
 TEST(SandboxEditorUi, AdapterCallbackDrawsDeterministicDisabledPanelFrame)

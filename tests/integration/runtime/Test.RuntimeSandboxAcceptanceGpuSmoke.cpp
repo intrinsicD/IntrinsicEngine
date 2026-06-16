@@ -67,6 +67,8 @@ import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.TextureUpload;
 import Extrinsic.RHI.Types;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.ProgressivePresentationExtraction;
+import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxEditorUi;
@@ -82,6 +84,7 @@ namespace gs = Extrinsic::ECS::Components::GeometrySources;
 namespace pn = Extrinsic::ECS::Components::GeometrySources::PropertyNames;
 namespace G = Extrinsic::Graphics::Components;
 namespace Assets = Extrinsic::Assets;
+namespace RT = Extrinsic::Runtime;
 
 using Extrinsic::Backends::Vulkan::EvaluateVulkanDeviceOperationalStatus;
 using Extrinsic::Backends::Vulkan::GetVulkanDeviceOperationalInputs;
@@ -191,10 +194,12 @@ void SetTexcoords(Geometry::PropertySet& props, const std::vector<glm::vec2>& te
     uv.Vector() = texcoords;
 }
 
-EntityHandle MakeMesh(Registry& scene)
+EntityHandle MakeMesh(Registry& scene,
+                      std::string name = "AcceptanceMesh",
+                      const std::uint32_t stableId = 101u)
 {
     const EntityHandle entity = scene.Create();
-    StampCommon(scene, entity, "AcceptanceMesh", 101u);
+    StampCommon(scene, entity, std::move(name), stableId);
     auto& raw = scene.Raw();
     raw.emplace<G::RenderSurface>(entity);
 
@@ -217,10 +222,12 @@ EntityHandle MakeMesh(Registry& scene)
     return entity;
 }
 
-EntityHandle MakeGraph(Registry& scene)
+EntityHandle MakeGraph(Registry& scene,
+                       std::string name = "AcceptanceGraph",
+                       const std::uint32_t stableId = 102u)
 {
     const EntityHandle entity = scene.Create();
-    StampCommon(scene, entity, "AcceptanceGraph", 102u);
+    StampCommon(scene, entity, std::move(name), stableId);
     auto& raw = scene.Raw();
     raw.emplace<G::RenderEdges>(entity);
 
@@ -253,6 +260,174 @@ void SeedAcceptanceScene(Registry& scene)
     (void)MakeMesh(scene);
     (void)MakeGraph(scene);
     (void)MakePointCloud(scene);
+}
+
+[[nodiscard]] RT::ProgressivePresentationBindings MakeProgressiveMeshBindings(
+    const bool normalReady)
+{
+    RT::ProgressiveSlotBinding albedo{};
+    albedo.Semantic = RT::ProgressiveSlotSemantic::Albedo;
+    albedo.SourceKind = RT::ProgressiveSlotSourceKind::UniformDefault;
+    albedo.UniformDefault = RT::ProgressiveDefaultValue{
+        .Kind = RT::ProgressivePropertyValueKind::Vec4,
+        .Vector = glm::vec4{0.25f, 0.45f, 0.85f, 1.0f},
+    };
+    albedo.Readiness = RT::ProgressiveReadinessState::DefaultValue;
+
+    RT::ProgressiveSlotBinding normal{};
+    normal.Semantic = RT::ProgressiveSlotSemantic::Normal;
+    normal.SourceKind = RT::ProgressiveSlotSourceKind::PropertyBake;
+    normal.Property = RT::ProgressivePropertyBindingDescriptor{
+        .Domain = RT::ProgressiveGeometryDomain::MeshVertex,
+        .PropertyName = "v:normal",
+        .ExpectedValueKind = RT::ProgressivePropertyValueKind::Vec3,
+        .ExpectedElementCount = 3u,
+    };
+    normal.GeneratedPolicy =
+        RT::ProgressiveGeneratedOutputPolicy::DeterministicChildAsset;
+    normal.Provenance =
+        RT::ProgressiveGeneratedOutputProvenance::PropertyBinding;
+    normal.Readiness = normalReady
+        ? RT::ProgressiveReadinessState::Ready
+        : RT::ProgressiveReadinessState::Pending;
+    if (normalReady)
+        normal.GeneratedTexture = Assets::AssetId{501u, 1u};
+
+    RT::ProgressiveSlotBinding roughness{};
+    roughness.Semantic = RT::ProgressiveSlotSemantic::Roughness;
+    roughness.SourceKind = RT::ProgressiveSlotSourceKind::AuthoredTextureAsset;
+    roughness.Readiness = RT::ProgressiveReadinessState::Unset;
+    roughness.Provenance =
+        RT::ProgressiveGeneratedOutputProvenance::AuthoredAsset;
+
+    RT::ProgressiveSlotBinding metallic{};
+    metallic.Semantic = RT::ProgressiveSlotSemantic::Metallic;
+    metallic.SourceKind = RT::ProgressiveSlotSourceKind::PropertyBake;
+    metallic.Property = RT::ProgressivePropertyBindingDescriptor{
+        .Domain = RT::ProgressiveGeometryDomain::MeshVertex,
+        .PropertyName = "v:metallic",
+        .ExpectedValueKind = RT::ProgressivePropertyValueKind::ScalarFloat,
+        .ExpectedElementCount = 3u,
+    };
+    metallic.GeneratedTexture = Assets::AssetId{502u, 1u};
+    metallic.GeneratedPolicy =
+        RT::ProgressiveGeneratedOutputPolicy::DeterministicChildAsset;
+    metallic.Provenance =
+        RT::ProgressiveGeneratedOutputProvenance::PropertyBinding;
+    metallic.Readiness = RT::ProgressiveReadinessState::Failed;
+    metallic.LastDiagnostic = "previous metallic texture retained after failed bake";
+
+    RT::ProgressiveSlotBinding faceScalar{};
+    faceScalar.Semantic = RT::ProgressiveSlotSemantic::ScalarField;
+    faceScalar.SourceKind = RT::ProgressiveSlotSourceKind::PropertyBuffer;
+    faceScalar.Property = RT::ProgressivePropertyBindingDescriptor{
+        .Domain = RT::ProgressiveGeometryDomain::MeshFace,
+        .PropertyName = "f:heat",
+        .ExpectedValueKind = RT::ProgressivePropertyValueKind::ScalarFloat,
+        .ExpectedElementCount = 1u,
+    };
+    faceScalar.Readiness = RT::ProgressiveReadinessState::Ready;
+    faceScalar.Provenance =
+        RT::ProgressiveGeneratedOutputProvenance::PropertyBuffer;
+
+    return RT::ProgressivePresentationBindings{
+        .Shape = RT::ProgressiveEntityShape::MeshLeaf,
+        .Lanes = {
+            RT::ProgressiveRenderLaneBinding{
+                .Lane = RT::ProgressiveRenderLane::Surface,
+                .PresentationKey = "progressive.mesh.surface",
+            },
+        },
+        .Presentations = {
+            RT::ProgressivePresentationBinding{
+                .Key = "progressive.mesh.surface",
+                .Kind = RT::ProgressivePresentationKind::SurfaceMaterial,
+                .Slots = {albedo, normal, roughness, metallic, faceScalar},
+            },
+        },
+        .BindingGeneration = normalReady ? 2u : 1u,
+    };
+}
+
+[[nodiscard]] RT::ProgressivePresentationBindings MakeProgressiveGraphBindings()
+{
+    RT::ProgressiveSlotBinding edgeColor{};
+    edgeColor.Semantic = RT::ProgressiveSlotSemantic::LineColor;
+    edgeColor.SourceKind = RT::ProgressiveSlotSourceKind::PropertyBuffer;
+    edgeColor.Property = RT::ProgressivePropertyBindingDescriptor{
+        .Domain = RT::ProgressiveGeometryDomain::GraphEdge,
+        .PropertyName = "e:debug_color",
+        .ExpectedValueKind = RT::ProgressivePropertyValueKind::Vec4,
+        .ExpectedElementCount = 2u,
+    };
+    edgeColor.Readiness = RT::ProgressiveReadinessState::Ready;
+    edgeColor.Provenance =
+        RT::ProgressiveGeneratedOutputProvenance::PropertyBuffer;
+
+    return RT::ProgressivePresentationBindings{
+        .Shape = RT::ProgressiveEntityShape::GraphLeaf,
+        .Lanes = {
+            RT::ProgressiveRenderLaneBinding{
+                .Lane = RT::ProgressiveRenderLane::Edges,
+                .PresentationKey = "progressive.graph.lines",
+            },
+        },
+        .Presentations = {
+            RT::ProgressivePresentationBinding{
+                .Key = "progressive.graph.lines",
+                .Kind = RT::ProgressivePresentationKind::LinePresentation,
+                .Slots = {edgeColor},
+            },
+        },
+        .BindingGeneration = 1u,
+    };
+}
+
+[[nodiscard]] EntityHandle SeedProgressiveMeshScene(Registry& scene)
+{
+    const EntityHandle mesh = MakeMesh(scene, "ProgressiveGpuMesh", 201u);
+    auto& raw = scene.Raw();
+    auto& vertices = raw.get<gs::Vertices>(mesh);
+    vertices.Properties.GetOrAdd<glm::vec3>("v:normal", glm::vec3{0.0f, 0.0f, 1.0f}).Vector() =
+        {glm::vec3{0.0f, 0.0f, 1.0f},
+         glm::vec3{0.0f, 0.0f, 1.0f},
+         glm::vec3{0.0f, 0.0f, 1.0f}};
+    vertices.Properties.GetOrAdd<float>("v:metallic", 0.0f).Vector() =
+        {0.0f, 0.0f, 0.0f};
+    auto& faces = raw.get<gs::Faces>(mesh);
+    faces.Properties.GetOrAdd<float>("f:heat", 0.0f).Vector() = {0.5f};
+    raw.emplace<RT::ProgressivePresentationBindings>(
+        mesh,
+        MakeProgressiveMeshBindings(false));
+    return mesh;
+}
+
+[[nodiscard]] EntityHandle SeedProgressiveGraphScene(Registry& scene)
+{
+    const EntityHandle graph = MakeGraph(scene, "ProgressiveGpuGraph", 202u);
+    auto& edges = scene.Raw().get<gs::Edges>(graph);
+    edges.Properties.GetOrAdd<glm::vec4>("e:debug_color", glm::vec4{1.0f}).Vector() =
+        {glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
+         glm::vec4{0.0f, 1.0f, 0.0f, 1.0f}};
+    scene.Raw().emplace<RT::ProgressivePresentationBindings>(
+        graph,
+        MakeProgressiveGraphBindings());
+    return graph;
+}
+
+void MarkProgressiveMeshNormalReady(Registry& scene, const EntityHandle mesh)
+{
+    auto& bindings =
+        scene.Raw().get<RT::ProgressivePresentationBindings>(mesh);
+    RT::ProgressivePresentationBinding* presentation =
+        RT::FindPresentationBinding(bindings, "progressive.mesh.surface");
+    ASSERT_NE(presentation, nullptr);
+    RT::ProgressiveSlotBinding* normal =
+        RT::FindSlotBinding(*presentation, RT::ProgressiveSlotSemantic::Normal);
+    ASSERT_NE(normal, nullptr);
+    normal->Readiness = RT::ProgressiveReadinessState::Ready;
+    normal->GeneratedTexture = Assets::AssetId{501u, 1u};
+    ++bindings.BindingGeneration;
 }
 
 // --- Pass-status helpers (local to this fixture) ---
@@ -902,6 +1077,98 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, AcceptanceSceneReachesOperationalDefaultR
 
     EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
         << "Vulkan fallback counters incremented across operational sandbox acceptance frames: "
+        << "fallbackToNull " << run.Before.FallbackToNull << " -> " << run.After.FallbackToNull
+        << ", initFailure " << run.Before.InitFailure << " -> " << run.After.InitFailure
+        << ", validationError " << run.Before.ValidationError << " -> " << run.After.ValidationError
+        << ", gateFailure " << run.Before.OperationalGateFailure << " -> " << run.After.OperationalGateFailure;
+
+    engine.Shutdown();
+}
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke, ProgressiveRenderDataReachesOperationalFrame)
+{
+    auto bootstrap = BootstrapAcceptanceEngine();
+    if (bootstrap.Skipped)
+    {
+        GTEST_SKIP() << bootstrap.SkipReason;
+    }
+    Engine& engine = *bootstrap.EnginePtr;
+
+    Registry& scene = engine.GetScene();
+    const EntityHandle mesh = SeedProgressiveMeshScene(scene);
+    const EntityHandle graph = SeedProgressiveGraphScene(scene);
+
+    const gs::ConstSourceView initialMeshView =
+        gs::BuildConstView(scene.Raw(), mesh);
+    const auto& initialMeshBindings =
+        scene.Raw().get<RT::ProgressivePresentationBindings>(mesh);
+    const RT::ProgressivePresentationExtractionSnapshot initialMesh =
+        RT::BuildProgressivePresentationSnapshot(initialMeshView,
+                                                initialMeshBindings);
+    EXPECT_GE(initialMesh.Stats.DefaultSlotCount, 1u);
+    EXPECT_GE(initialMesh.Stats.PendingSlotCount, 1u);
+    EXPECT_GE(initialMesh.Stats.FailedSlotCount, 1u);
+    EXPECT_GE(initialMesh.Stats.UnsupportedSlotCount, 1u);
+    EXPECT_GE(initialMesh.Stats.PreviousOutputRetainedCount, 1u);
+
+    MarkProgressiveMeshNormalReady(scene, mesh);
+
+    const gs::ConstSourceView readyMeshView =
+        gs::BuildConstView(scene.Raw(), mesh);
+    const auto& readyMeshBindings =
+        scene.Raw().get<RT::ProgressivePresentationBindings>(mesh);
+    const RT::ProgressivePresentationExtractionSnapshot readyMesh =
+        RT::BuildProgressivePresentationSnapshot(readyMeshView,
+                                                readyMeshBindings);
+    EXPECT_GE(readyMesh.Stats.ReadyTextureSlotCount, 2u);
+    EXPECT_EQ(readyMesh.Stats.PendingSlotCount, 0u);
+    EXPECT_GE(readyMesh.Stats.UnsupportedSlotCount, 1u);
+    EXPECT_GE(readyMesh.Stats.PreviousOutputRetainedCount, 1u);
+
+    const gs::ConstSourceView graphView = gs::BuildConstView(scene.Raw(), graph);
+    const auto& graphBindings =
+        scene.Raw().get<RT::ProgressivePresentationBindings>(graph);
+    const RT::ProgressivePresentationExtractionSnapshot graphSnapshot =
+        RT::BuildProgressivePresentationSnapshot(graphView, graphBindings);
+    EXPECT_GE(graphSnapshot.Stats.PropertyBufferReadyCount, 1u);
+
+    const auto run = DriveAcceptanceAndCapture(engine);
+    if (!run.DeviceOperational)
+    {
+        engine.Shutdown();
+        ADD_FAILURE() << "Progressive render-data smoke did not reach operational Vulkan: status="
+                      << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
+                      << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+        return;
+    }
+
+    EXPECT_TRUE(run.Stats.Compile.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_TRUE(run.Stats.Execute.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_EQ(FindPassStatus(run.Stats, "Present"),
+              RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+
+    const auto& ex = engine.GetLastRenderExtractionStats();
+    EXPECT_GE(ex.ProgressivePresentationEntityCount, 2u);
+    EXPECT_GE(ex.ProgressivePresentationSlotCount,
+              readyMesh.Stats.SlotCount + graphSnapshot.Stats.SlotCount);
+    EXPECT_GE(ex.ProgressiveDefaultSlotCount, readyMesh.Stats.DefaultSlotCount);
+    EXPECT_GE(ex.ProgressiveReadyTextureSlotCount,
+              readyMesh.Stats.ReadyTextureSlotCount);
+    EXPECT_GE(ex.ProgressivePropertyBufferReadyCount,
+              readyMesh.Stats.PropertyBufferReadyCount +
+                  graphSnapshot.Stats.PropertyBufferReadyCount);
+    EXPECT_GE(ex.ProgressiveUnsupportedSlotCount,
+              readyMesh.Stats.UnsupportedSlotCount);
+    EXPECT_GE(ex.ProgressivePreviousOutputRetainedCount,
+              readyMesh.Stats.PreviousOutputRetainedCount);
+    EXPECT_GE(ex.ProgressiveDiagnosticCount,
+              readyMesh.Stats.DiagnosticCount);
+    EXPECT_GE(ex.ProgressiveMaterialTextureBindingResolveFailureCount, 1u)
+        << "Generated progressive texture slots should attempt material binding resolution and fail closed when the smoke uses synthetic AssetIds.";
+
+    EXPECT_TRUE(Counters::IsStable(run.Before, run.After))
+        << "Vulkan fallback counters incremented across operational progressive frames: "
         << "fallbackToNull " << run.Before.FallbackToNull << " -> " << run.After.FallbackToNull
         << ", initFailure " << run.Before.InitFailure << " -> " << run.After.InitFailure
         << ", validationError " << run.Before.ValidationError << " -> " << run.After.ValidationError

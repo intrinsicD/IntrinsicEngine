@@ -27,6 +27,7 @@ import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Component.MetaData;
+import Extrinsic.ECS.Component.Hierarchy;
 import Extrinsic.ECS.Component.SpatialDebugBinding;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Component.Transform;
@@ -40,10 +41,13 @@ import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.ImGuiAdapter;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
+import Extrinsic.Runtime.ProgressivePresentationExtraction;
+import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SceneSerialization;
@@ -962,6 +966,268 @@ namespace Extrinsic::Runtime
                    SameVisualizationAdapterOptions(lhs.Options, rhs.Options);
         }
 
+        [[nodiscard]] bool SameProgressiveDefaultValue(
+            const ProgressiveDefaultValue& lhs,
+            const ProgressiveDefaultValue& rhs) noexcept
+        {
+            return lhs.Kind == rhs.Kind &&
+                   SameVec4(lhs.Vector, rhs.Vector) &&
+                   lhs.Scalar == rhs.Scalar &&
+                   lhs.UInt == rhs.UInt;
+        }
+
+        [[nodiscard]] bool IsFiniteDefaultValue(
+            const ProgressiveDefaultValue& value) noexcept
+        {
+            return std::isfinite(value.Vector.x) &&
+                   std::isfinite(value.Vector.y) &&
+                   std::isfinite(value.Vector.z) &&
+                   std::isfinite(value.Vector.w) &&
+                   std::isfinite(value.Scalar);
+        }
+
+        [[nodiscard]] bool SameProgressivePropertyDescriptor(
+            const ProgressivePropertyBindingDescriptor& lhs,
+            const ProgressivePropertyBindingDescriptor& rhs) noexcept
+        {
+            return lhs.Domain == rhs.Domain &&
+                   lhs.PropertyName == rhs.PropertyName &&
+                   lhs.ExpectedValueKind == rhs.ExpectedValueKind &&
+                   lhs.ExpectedElementCount == rhs.ExpectedElementCount &&
+                   lhs.SourceGeneration == rhs.SourceGeneration;
+        }
+
+        [[nodiscard]] bool IsActiveDerivedJobStatus(
+            const DerivedJobStatus status) noexcept
+        {
+            return status == DerivedJobStatus::Blocked ||
+                   status == DerivedJobStatus::Queued ||
+                   status == DerivedJobStatus::Running ||
+                   status == DerivedJobStatus::Applying;
+        }
+
+        [[nodiscard]] bool IsFailedDerivedJobStatus(
+            const DerivedJobStatus status) noexcept
+        {
+            return status == DerivedJobStatus::Failed ||
+                   status == DerivedJobStatus::Cancelled ||
+                   status == DerivedJobStatus::StaleDiscarded;
+        }
+
+        [[nodiscard]] ProgressivePropertyValueKind DefaultExpectedValueKindForSlot(
+            const ProgressiveSlotSemantic semantic) noexcept
+        {
+            switch (semantic)
+            {
+            case ProgressiveSlotSemantic::Normal:
+            case ProgressiveSlotSemantic::PointNormalOrientation:
+                return ProgressivePropertyValueKind::Vec3;
+            case ProgressiveSlotSemantic::Albedo:
+            case ProgressiveSlotSemantic::PointColor:
+            case ProgressiveSlotSemantic::LineColor:
+                return ProgressivePropertyValueKind::Vec4;
+            case ProgressiveSlotSemantic::Roughness:
+            case ProgressiveSlotSemantic::Metallic:
+            case ProgressiveSlotSemantic::ScalarField:
+            case ProgressiveSlotSemantic::Displacement:
+            case ProgressiveSlotSemantic::PointScalarField:
+            case ProgressiveSlotSemantic::PointSize:
+            case ProgressiveSlotSemantic::LineScalarField:
+            case ProgressiveSlotSemantic::LineWidth:
+                return ProgressivePropertyValueKind::ScalarFloat;
+            }
+            return ProgressivePropertyValueKind::Any;
+        }
+
+        [[nodiscard]] ProgressiveGeometryDomain DefaultDomainForProgressiveSlot(
+            const GS::Domain sourceDomain,
+            const ProgressiveRenderLane lane,
+            const ProgressiveSlotSemantic semantic) noexcept
+        {
+            switch (sourceDomain)
+            {
+            case GS::Domain::Mesh:
+                if (semantic == ProgressiveSlotSemantic::LineColor ||
+                    semantic == ProgressiveSlotSemantic::LineScalarField ||
+                    semantic == ProgressiveSlotSemantic::LineWidth)
+                {
+                    return ProgressiveGeometryDomain::MeshEdge;
+                }
+                if (semantic == ProgressiveSlotSemantic::ScalarField)
+                    return ProgressiveGeometryDomain::MeshFace;
+                if (lane == ProgressiveRenderLane::Edges)
+                    return ProgressiveGeometryDomain::MeshEdge;
+                return ProgressiveGeometryDomain::MeshVertex;
+            case GS::Domain::Graph:
+                if (lane == ProgressiveRenderLane::Edges ||
+                    semantic == ProgressiveSlotSemantic::LineColor ||
+                    semantic == ProgressiveSlotSemantic::LineScalarField ||
+                    semantic == ProgressiveSlotSemantic::LineWidth)
+                {
+                    return ProgressiveGeometryDomain::GraphEdge;
+                }
+                return ProgressiveGeometryDomain::GraphVertex;
+            case GS::Domain::PointCloud:
+                return ProgressiveGeometryDomain::Point;
+            case GS::Domain::None:
+            case GS::Domain::Unknown:
+                break;
+            }
+            return ProgressiveGeometryDomain::Unknown;
+        }
+
+        [[nodiscard]] SandboxEditorProgressivePropertyOptionModel
+        ToProgressivePropertyOptionModel(const ProgressivePropertyOption& option)
+        {
+            return SandboxEditorProgressivePropertyOptionModel{
+                .Descriptor = option.Descriptor,
+                .ActualValueKind = option.ActualValueKind,
+                .ElementCount = option.ElementCount,
+                .Compatible = option.Compatible,
+                .DisabledReason = option.DisabledReason,
+            };
+        }
+
+        [[nodiscard]] SandboxEditorProgressiveJobDependencyModel
+        ToProgressiveJobDependencyModel(const DerivedJobDependency& dependency)
+        {
+            return SandboxEditorProgressiveJobDependencyModel{
+                .Job = dependency.Job,
+                .Reason = dependency.Reason,
+            };
+        }
+
+        [[nodiscard]] SandboxEditorProgressiveJobModel ToProgressiveJobModel(
+            const DerivedJobSnapshot& job)
+        {
+            SandboxEditorProgressiveJobModel model{
+                .Handle = job.Handle,
+                .Key = job.Key,
+                .Name = job.Name,
+                .RequestedJobDomain = job.RequestedJobDomain,
+                .ResolvedJobDomain = job.ResolvedJobDomain,
+                .Status = job.Status,
+                .NormalizedProgress = job.NormalizedProgress,
+                .ProgressDeterminate = job.ProgressDeterminate,
+                .PreviousOutputRetained = job.PreviousOutputRetained,
+                .PayloadToken = job.PayloadToken,
+                .ElapsedMilliseconds = job.ElapsedMilliseconds,
+                .Diagnostic = job.Diagnostic,
+            };
+            model.Dependencies.reserve(job.Dependencies.size());
+            for (const DerivedJobDependency& dependency : job.Dependencies)
+                model.Dependencies.push_back(
+                    ToProgressiveJobDependencyModel(dependency));
+            return model;
+        }
+
+        [[nodiscard]] EditorCommandHistoryStatus ApplyProgressiveBindingsState(
+            ECS::Scene::Registry* scene,
+            const std::uint32_t stableEntityId,
+            const ProgressivePresentationBindings& state)
+        {
+            if (scene == nullptr)
+                return EditorCommandHistoryStatus::MissingScene;
+
+            entt::registry& raw = scene->Raw();
+            const ECS::EntityHandle entity =
+                SelectionController::ToEntityHandle(stableEntityId);
+            if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
+                return EditorCommandHistoryStatus::StaleEntity;
+
+            raw.emplace_or_replace<ProgressivePresentationBindings>(entity, state);
+            return EditorCommandHistoryStatus::Applied;
+        }
+
+        struct ProgressiveSlotLookup
+        {
+            ProgressivePresentationBinding* Presentation{nullptr};
+            ProgressiveSlotBinding* Slot{nullptr};
+        };
+
+        [[nodiscard]] ProgressiveSlotLookup FindMutableProgressiveSlot(
+            ProgressivePresentationBindings& bindings,
+            const std::string& presentationKey,
+            const ProgressiveSlotSemantic semantic)
+        {
+            if (!presentationKey.empty())
+            {
+                ProgressivePresentationBinding* presentation =
+                    FindPresentationBinding(bindings, presentationKey);
+                if (presentation == nullptr)
+                    return {};
+                return ProgressiveSlotLookup{
+                    .Presentation = presentation,
+                    .Slot = FindSlotBinding(*presentation, semantic),
+                };
+            }
+
+            for (ProgressivePresentationBinding& presentation :
+                 bindings.Presentations)
+            {
+                if (ProgressiveSlotBinding* slot =
+                        FindSlotBinding(presentation, semantic))
+                {
+                    return ProgressiveSlotLookup{
+                        .Presentation = &presentation,
+                        .Slot = slot,
+                    };
+                }
+            }
+            return {};
+        }
+
+        [[nodiscard]] SandboxEditorCommandStatus ToSandboxEditorCommandStatus(
+            EditorCommandHistoryStatus status) noexcept;
+
+        [[nodiscard]] SandboxEditorCommandStatus CommitProgressiveBindingsChange(
+            const SandboxEditorContext& context,
+            const std::uint32_t stableEntityId,
+            ProgressivePresentationBindings before,
+            ProgressivePresentationBindings after)
+        {
+            if (context.CommandHistory != nullptr)
+            {
+                ECS::Scene::Registry* scene = context.Scene;
+                const EditorCommandHistoryResult result =
+                    context.CommandHistory->Execute(
+                        EditorCommandRecord{
+                            .Label = "Change Progressive Presentation",
+                            .Redo =
+                                [scene, stableEntityId, after]()
+                                {
+                                    return ApplyProgressiveBindingsState(
+                                        scene,
+                                        stableEntityId,
+                                        after);
+                                },
+                            .Undo =
+                                [scene, stableEntityId, before]()
+                                {
+                                    return ApplyProgressiveBindingsState(
+                                        scene,
+                                        stableEntityId,
+                                        before);
+                                },
+                            .Dirtying = true,
+                        });
+                return ToSandboxEditorCommandStatus(result.Status);
+            }
+
+            return ToSandboxEditorCommandStatus(
+                ApplyProgressiveBindingsState(
+                    context.Scene,
+                    stableEntityId,
+                    after));
+        }
+
+        [[nodiscard]] bool PropertySourceKindAllowedForProgressiveSlotCommand(
+            const ProgressiveSlotSourceKind sourceKind) noexcept
+        {
+            return sourceKind == ProgressiveSlotSourceKind::PropertyBake ||
+                   sourceKind == ProgressiveSlotSourceKind::PropertyBuffer;
+        }
+
         [[nodiscard]] G::RenderPoints::RenderType ToRenderPointType(
             const MeshVertexViewRenderMode mode) noexcept
         {
@@ -1222,6 +1488,252 @@ namespace Extrinsic::Runtime
                 .FaceCount = view.FacesAlive(),
                 .NodeCount = view.NodesAlive(),
             };
+        }
+
+        [[nodiscard]] ProgressiveEntityShape InferProgressiveEntityShape(
+            const entt::registry& raw,
+            const ECS::EntityHandle entity,
+            const GS::ConstSourceView& view)
+        {
+            if (const auto* hierarchy =
+                    raw.try_get<ECSC::Hierarchy::Component>(entity);
+                hierarchy != nullptr && hierarchy->ChildCount > 0u)
+            {
+                return ProgressiveEntityShape::Composition;
+            }
+
+            switch (view.ActiveDomain)
+            {
+            case GS::Domain::Mesh:
+                return ProgressiveEntityShape::MeshLeaf;
+            case GS::Domain::Graph:
+                return ProgressiveEntityShape::GraphLeaf;
+            case GS::Domain::PointCloud:
+                return ProgressiveEntityShape::PointCloudLeaf;
+            case GS::Domain::None:
+            case GS::Domain::Unknown:
+                break;
+            }
+            return ProgressiveEntityShape::Unknown;
+        }
+
+        void AppendProgressiveJobRowsForEntity(
+            SandboxEditorProgressiveRenderDataModel& model,
+            const DerivedJobQueueSnapshot* jobs,
+            const std::uint32_t stableEntityId)
+        {
+            if (jobs == nullptr)
+                return;
+
+            for (const DerivedJobSnapshot& job : jobs->Entries)
+            {
+                if (job.Key.EntityId == stableEntityId)
+                    model.Jobs.push_back(ToProgressiveJobModel(job));
+            }
+        }
+
+        void AccumulateProgressiveJobSummaryForEntity(
+            SandboxEditorProgressiveCompositionSummary& summary,
+            const DerivedJobQueueSnapshot* jobs,
+            const std::uint32_t stableEntityId)
+        {
+            if (jobs == nullptr)
+                return;
+
+            for (const DerivedJobSnapshot& job : jobs->Entries)
+            {
+                if (job.Key.EntityId != stableEntityId)
+                    continue;
+
+                ++summary.ChildJobCount;
+                if (IsActiveDerivedJobStatus(job.Status))
+                    ++summary.ChildActiveJobCount;
+                if (IsFailedDerivedJobStatus(job.Status))
+                    ++summary.ChildFailedJobCount;
+            }
+        }
+
+        [[nodiscard]] std::vector<SandboxEditorProgressivePropertyOptionModel>
+        BuildProgressiveSlotPropertyOptions(
+            const GS::ConstSourceView& view,
+            const ProgressiveSlotExtraction& extractedSlot)
+        {
+            ProgressiveGeometryDomain domain = extractedSlot.Property.Domain;
+            if (domain == ProgressiveGeometryDomain::Unknown)
+            {
+                domain = DefaultDomainForProgressiveSlot(
+                    view.ActiveDomain,
+                    extractedSlot.Lane,
+                    extractedSlot.Semantic);
+            }
+            if (domain == ProgressiveGeometryDomain::Unknown)
+                return {};
+
+            ProgressivePropertyValueKind expected =
+                extractedSlot.Property.ExpectedValueKind;
+            if (expected == ProgressivePropertyValueKind::Any ||
+                expected == ProgressivePropertyValueKind::Unknown)
+            {
+                expected = DefaultExpectedValueKindForSlot(extractedSlot.Semantic);
+            }
+
+            const std::size_t expectedCount =
+                ResolvePropertyElementCount(view, domain);
+            std::vector<ProgressivePropertyOption> options =
+                EnumeratePropertyOptions(view, domain, expected, expectedCount);
+
+            std::vector<SandboxEditorProgressivePropertyOptionModel> out{};
+            out.reserve(options.size());
+            for (const ProgressivePropertyOption& option : options)
+                out.push_back(ToProgressivePropertyOptionModel(option));
+            return out;
+        }
+
+        [[nodiscard]] SandboxEditorProgressiveSlotModel ToProgressiveSlotModel(
+            const GS::ConstSourceView& view,
+            const ProgressivePresentationBindings& bindings,
+            const ProgressiveSlotExtraction& extractedSlot)
+        {
+            SandboxEditorProgressiveSlotModel model{
+                .Lane = extractedSlot.Lane,
+                .PresentationKey = extractedSlot.PresentationKey,
+                .PresentationKind = extractedSlot.PresentationKind,
+                .Semantic = extractedSlot.Semantic,
+                .SourceKind = extractedSlot.SourceKind,
+                .Readiness = extractedSlot.Readiness,
+                .UniformDefault = extractedSlot.UniformDefault,
+                .Property = extractedSlot.Property,
+                .PropertyResolution = extractedSlot.PropertyResolution,
+                .TextureAsset = extractedSlot.TextureAsset,
+                .Enabled = extractedSlot.Enabled,
+                .UsesUniformDefault = extractedSlot.UsesUniformDefault,
+                .TextureReady = extractedSlot.TextureReady,
+                .PropertyBufferReady = extractedSlot.PropertyBufferReady,
+                .PreviousOutputRetained = extractedSlot.PreviousOutputRetained,
+                .Unsupported = extractedSlot.Unsupported,
+                .Diagnostic = extractedSlot.Diagnostic,
+            };
+
+            if (const ProgressivePresentationBinding* presentation =
+                    FindPresentationBinding(bindings, extractedSlot.PresentationKey))
+            {
+                if (const ProgressiveSlotBinding* slot =
+                        FindSlotBinding(*presentation, extractedSlot.Semantic))
+                {
+                    model.AuthoredTexture = slot->AuthoredTexture;
+                    model.GeneratedTexture = slot->GeneratedTexture;
+                }
+            }
+
+            model.PropertyOptions =
+                BuildProgressiveSlotPropertyOptions(view, extractedSlot);
+            return model;
+        }
+
+        void AccumulateProgressiveChildSummary(
+            const entt::registry& raw,
+            SandboxEditorProgressiveCompositionSummary& summary,
+            const ECS::EntityHandle child,
+            const DerivedJobQueueSnapshot* jobs)
+        {
+            if (!raw.valid(child))
+                return;
+
+            ++summary.ChildCount;
+            const std::uint32_t childStableId =
+                SelectionController::ToStableEntityId(child);
+            AccumulateProgressiveJobSummaryForEntity(summary, jobs, childStableId);
+
+            const auto* bindings =
+                raw.try_get<ProgressivePresentationBindings>(child);
+            if (bindings == nullptr)
+                return;
+
+            ++summary.ChildBindingsCount;
+            const GS::ConstSourceView childView = GS::BuildConstView(raw, child);
+            const ProgressivePresentationExtractionSnapshot snapshot =
+                BuildProgressivePresentationSnapshot(childView, *bindings);
+
+            summary.ChildSlotCount += snapshot.Stats.SlotCount;
+            summary.ChildPendingSlotCount += snapshot.Stats.PendingSlotCount;
+            summary.ChildFailedSlotCount += snapshot.Stats.FailedSlotCount;
+            summary.ChildFailedSlotCount += snapshot.Stats.UnsupportedSlotCount;
+        }
+
+        void AccumulateProgressiveCompositionSummary(
+            const entt::registry& raw,
+            SandboxEditorProgressiveCompositionSummary& summary,
+            const ECS::EntityHandle entity,
+            const DerivedJobQueueSnapshot* jobs)
+        {
+            const auto* hierarchy =
+                raw.try_get<ECSC::Hierarchy::Component>(entity);
+            if (hierarchy == nullptr || hierarchy->ChildCount == 0u)
+                return;
+
+            summary.HasChildren = true;
+            ECS::EntityHandle child = hierarchy->FirstChild;
+            std::uint32_t guard = 0u;
+            while (child != ECS::InvalidEntityHandle &&
+                   raw.valid(child) &&
+                   guard < hierarchy->ChildCount)
+            {
+                AccumulateProgressiveChildSummary(raw, summary, child, jobs);
+                const auto* childHierarchy =
+                    raw.try_get<ECSC::Hierarchy::Component>(child);
+                child = childHierarchy != nullptr
+                    ? childHierarchy->NextSibling
+                    : ECS::InvalidEntityHandle;
+                ++guard;
+            }
+        }
+
+        [[nodiscard]] SandboxEditorProgressiveRenderDataModel
+        BuildProgressiveRenderDataModel(
+            const SandboxEditorContext& context,
+            const entt::registry& raw,
+            const ECS::EntityHandle entity)
+        {
+            SandboxEditorProgressiveRenderDataModel model{};
+            const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
+            model.Shape = InferProgressiveEntityShape(raw, entity, view);
+
+            const std::uint32_t stableEntityId =
+                SelectionController::ToStableEntityId(entity);
+            AppendProgressiveJobRowsForEntity(
+                model,
+                context.DerivedJobs,
+                stableEntityId);
+            AccumulateProgressiveCompositionSummary(
+                raw,
+                model.Composition,
+                entity,
+                context.DerivedJobs);
+
+            const auto* bindings =
+                raw.try_get<ProgressivePresentationBindings>(entity);
+            if (bindings == nullptr)
+                return model;
+
+            model.HasBindings = true;
+            model.Shape = bindings->Shape;
+            model.BindingGeneration = bindings->BindingGeneration;
+
+            const ProgressivePresentationExtractionSnapshot snapshot =
+                BuildProgressivePresentationSnapshot(view, *bindings);
+            model.Stats = snapshot.Stats;
+            model.Slots.reserve(snapshot.Slots.size());
+            for (const ProgressiveSlotExtraction& slot : snapshot.Slots)
+                model.Slots.push_back(ToProgressiveSlotModel(view, *bindings, slot));
+
+            if (snapshot.Stats.DiagnosticCount > 0u)
+            {
+                AddDiagnostic(
+                    model.Diagnostics,
+                    SandboxEditorDiagnosticCode::InvalidVisualizationProperty,
+                    "Progressive render-data has slot diagnostics.");
+            }
+            return model;
         }
 
         [[nodiscard]] std::optional<ECS::EntityHandle> ResolveFirstSelectedEntity(
@@ -1554,6 +2066,8 @@ namespace Extrinsic::Runtime
             model.Transform = BuildTransformModel(raw, *selected);
             model.RenderHints = BuildRenderHintModel(raw, *selected);
             model.Geometry = BuildGeometryDomainModel(raw, *selected);
+            model.Progressive =
+                BuildProgressiveRenderDataModel(context, raw, *selected);
             model.Processing =
                 GetSandboxEditorGeometryProcessingCapabilities(
                     *context.Scene,
@@ -3367,6 +3881,149 @@ namespace Extrinsic::Runtime
                                 inspector.Geometry.HalfedgeCount,
                                 inspector.Geometry.FaceCount,
                                 inspector.Geometry.NodeCount);
+                    const SandboxEditorProgressiveRenderDataModel& progressive =
+                        inspector.Progressive;
+                    ImGui::SeparatorText("Progressive render data");
+                    ImGui::Text("Shape: %s",
+                                std::string(ToString(progressive.Shape)).c_str());
+                    ImGui::Text("Bindings: %s generation=%llu",
+                                progressive.HasBindings ? "yes" : "no",
+                                static_cast<unsigned long long>(
+                                    progressive.BindingGeneration));
+                    if (progressive.Composition.HasChildren)
+                    {
+                        ImGui::Text("Composition: children=%u bindings=%u slots=%u pending=%u failed=%u jobs=%u active=%u job failures=%u",
+                                    progressive.Composition.ChildCount,
+                                    progressive.Composition.ChildBindingsCount,
+                                    progressive.Composition.ChildSlotCount,
+                                    progressive.Composition.ChildPendingSlotCount,
+                                    progressive.Composition.ChildFailedSlotCount,
+                                    progressive.Composition.ChildJobCount,
+                                    progressive.Composition.ChildActiveJobCount,
+                                    progressive.Composition.ChildFailedJobCount);
+                    }
+                    if (!progressive.Slots.empty())
+                    {
+                        ImGui::Text("Slots: %zu", progressive.Slots.size());
+                        for (std::size_t slotIndex = 0u;
+                             slotIndex < progressive.Slots.size();
+                             ++slotIndex)
+                        {
+                            const SandboxEditorProgressiveSlotModel& slot =
+                                progressive.Slots[slotIndex];
+                            ImGui::PushID(static_cast<int>(slotIndex));
+                            ImGui::Text("%s / %s / %s / %s",
+                                        std::string(ToString(slot.Lane)).c_str(),
+                                        slot.PresentationKey.c_str(),
+                                        std::string(ToString(slot.Semantic)).c_str(),
+                                        std::string(ToString(slot.Readiness)).c_str());
+                            ImGui::Text("Source: %s property=%s",
+                                        std::string(ToString(slot.SourceKind)).c_str(),
+                                        slot.Property.PropertyName.empty()
+                                            ? "(none)"
+                                            : slot.Property.PropertyName.c_str());
+                            if (!slot.Diagnostic.empty())
+                                ImGui::TextWrapped("%s", slot.Diagnostic.c_str());
+
+                            if (context != nullptr &&
+                                (slot.Semantic == ProgressiveSlotSemantic::Albedo ||
+                                 slot.Semantic == ProgressiveSlotSemantic::PointColor ||
+                                 slot.Semantic == ProgressiveSlotSemantic::LineColor))
+                            {
+                                glm::vec4 color = slot.UniformDefault.Vector;
+                                if (ImGui::ColorEdit4("Default color", &color.x))
+                                {
+                                    ProgressiveDefaultValue value =
+                                        slot.UniformDefault;
+                                    value.Kind = ProgressivePropertyValueKind::Vec4;
+                                    value.Vector = color;
+                                    (void)ApplySandboxEditorProgressiveSlotDefaultCommand(
+                                        *context,
+                                        SandboxEditorProgressiveSlotDefaultCommand{
+                                            .StableEntityId =
+                                                inspector.Entity.StableEntityId,
+                                            .PresentationKey =
+                                                slot.PresentationKey,
+                                            .Semantic = slot.Semantic,
+                                            .Value = value,
+                                            .Enabled = slot.Enabled,
+                                        });
+                                }
+                            }
+
+                            if (context != nullptr &&
+                                !slot.PropertyOptions.empty())
+                            {
+                                const char* currentProperty =
+                                    slot.Property.PropertyName.empty()
+                                        ? "(uniform/default)"
+                                        : slot.Property.PropertyName.c_str();
+                                if (ImGui::BeginCombo("Source property",
+                                                      currentProperty))
+                                {
+                                    for (const SandboxEditorProgressivePropertyOptionModel&
+                                             option : slot.PropertyOptions)
+                                    {
+                                        if (!option.Compatible)
+                                            ImGui::BeginDisabled();
+                                        const bool selected =
+                                            option.Descriptor.PropertyName ==
+                                            slot.Property.PropertyName;
+                                        if (ImGui::Selectable(
+                                                option.Descriptor.PropertyName.c_str(),
+                                                selected) &&
+                                            option.Compatible)
+                                        {
+                                            (void)ApplySandboxEditorProgressiveSlotPropertyCommand(
+                                                *context,
+                                                SandboxEditorProgressiveSlotPropertyCommand{
+                                                    .StableEntityId =
+                                                        inspector.Entity.StableEntityId,
+                                                    .PresentationKey =
+                                                        slot.PresentationKey,
+                                                    .Semantic = slot.Semantic,
+                                                    .SourceKind =
+                                                        IsSurfaceTextureSemantic(
+                                                            slot.Semantic)
+                                                            ? ProgressiveSlotSourceKind::PropertyBake
+                                                            : ProgressiveSlotSourceKind::PropertyBuffer,
+                                                    .Domain =
+                                                        option.Descriptor.Domain,
+                                                    .ExpectedValueKind =
+                                                        option.Descriptor.ExpectedValueKind,
+                                                    .PropertyName =
+                                                        option.Descriptor.PropertyName,
+                                                });
+                                        }
+                                        if (!option.Compatible)
+                                        {
+                                            ImGui::SameLine();
+                                            ImGui::TextDisabled("%s",
+                                                option.DisabledReason.c_str());
+                                            ImGui::EndDisabled();
+                                        }
+                                    }
+                                    ImGui::EndCombo();
+                                }
+                            }
+                            ImGui::PopID();
+                        }
+                    }
+                    if (!progressive.Jobs.empty())
+                    {
+                        ImGui::Text("Derived jobs: %zu", progressive.Jobs.size());
+                        for (const SandboxEditorProgressiveJobModel& job :
+                             progressive.Jobs)
+                        {
+                            ImGui::BulletText("%s %s %.0f%% deps=%zu %s",
+                                              job.Name.c_str(),
+                                              std::string(ToString(job.Status)).c_str(),
+                                              job.NormalizedProgress * 100.0f,
+                                              job.Dependencies.size(),
+                                              job.Diagnostic.c_str());
+                        }
+                    }
+                    DrawDiagnostics(progressive.Diagnostics);
                     DrawDiagnostics(inspector.Diagnostics);
                 }
             }
@@ -5275,6 +5932,146 @@ namespace Extrinsic::Runtime
             command.StableEntityId,
             next);
         return SandboxEditorCommandStatus::Applied;
+    }
+
+    SandboxEditorCommandStatus ApplySandboxEditorProgressiveSlotDefaultCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorProgressiveSlotDefaultCommand& command)
+    {
+        if (context.Scene == nullptr)
+            return SandboxEditorCommandStatus::MissingScene;
+        if (!IsFiniteDefaultValue(command.Value))
+            return SandboxEditorCommandStatus::InvalidProcessingParameters;
+
+        entt::registry& raw = context.Scene->Raw();
+        const ECS::EntityHandle entity =
+            SelectionController::ToEntityHandle(command.StableEntityId);
+        if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
+            return SandboxEditorCommandStatus::StaleEntity;
+
+        const auto* current =
+            raw.try_get<ProgressivePresentationBindings>(entity);
+        if (current == nullptr)
+            return SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+
+        ProgressivePresentationBindings before = *current;
+        ProgressivePresentationBindings after = before;
+        const ProgressiveSlotLookup lookup = FindMutableProgressiveSlot(
+            after,
+            command.PresentationKey,
+            command.Semantic);
+        if (lookup.Slot == nullptr)
+            return SandboxEditorCommandStatus::InvalidVisualizationProperty;
+
+        ProgressiveSlotBinding& slot = *lookup.Slot;
+        if (slot.SourceKind == ProgressiveSlotSourceKind::UniformDefault &&
+            slot.Enabled == command.Enabled &&
+            SameProgressiveDefaultValue(slot.UniformDefault, command.Value))
+        {
+            return SandboxEditorCommandStatus::NoChange;
+        }
+
+        slot.SourceKind = ProgressiveSlotSourceKind::UniformDefault;
+        slot.UniformDefault = command.Value;
+        slot.Property = {};
+        slot.AuthoredTexture = {};
+        slot.GeneratedTexture = {};
+        slot.GeneratedPolicy =
+            DefaultGeneratedOutputPolicyFor(slot.SourceKind);
+        slot.Provenance = ProgressiveGeneratedOutputProvenance::UniformDefault;
+        slot.Readiness = ProgressiveReadinessState::DefaultValue;
+        slot.LastDiagnostic.clear();
+        slot.Enabled = command.Enabled;
+        ++after.BindingGeneration;
+
+        return CommitProgressiveBindingsChange(
+            context,
+            command.StableEntityId,
+            std::move(before),
+            std::move(after));
+    }
+
+    SandboxEditorCommandStatus ApplySandboxEditorProgressiveSlotPropertyCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorProgressiveSlotPropertyCommand& command)
+    {
+        if (context.Scene == nullptr)
+            return SandboxEditorCommandStatus::MissingScene;
+        if (!PropertySourceKindAllowedForProgressiveSlotCommand(command.SourceKind) ||
+            command.PropertyName.empty())
+        {
+            return SandboxEditorCommandStatus::InvalidVisualizationProperty;
+        }
+
+        entt::registry& raw = context.Scene->Raw();
+        const ECS::EntityHandle entity =
+            SelectionController::ToEntityHandle(command.StableEntityId);
+        if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
+            return SandboxEditorCommandStatus::StaleEntity;
+
+        const auto* current =
+            raw.try_get<ProgressivePresentationBindings>(entity);
+        if (current == nullptr)
+            return SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+
+        const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
+        const std::size_t expectedCount =
+            ResolvePropertyElementCount(view, command.Domain);
+        ProgressivePropertyBindingDescriptor descriptor{
+            .Domain = command.Domain,
+            .PropertyName = command.PropertyName,
+            .ExpectedValueKind = command.ExpectedValueKind,
+            .ExpectedElementCount = expectedCount,
+        };
+        ProgressivePropertyResolution resolution =
+            ResolvePropertyBinding(view, descriptor);
+        if (!resolution.Compatible())
+            return SandboxEditorCommandStatus::InvalidVisualizationProperty;
+
+        ProgressivePresentationBindings before = *current;
+        ProgressivePresentationBindings after = before;
+        const ProgressiveSlotLookup lookup = FindMutableProgressiveSlot(
+            after,
+            command.PresentationKey,
+            command.Semantic);
+        if (lookup.Slot == nullptr)
+            return SandboxEditorCommandStatus::InvalidVisualizationProperty;
+
+        ProgressiveSlotBinding& slot = *lookup.Slot;
+        const ProgressiveReadinessState nextReadiness =
+            command.SourceKind == ProgressiveSlotSourceKind::PropertyBuffer
+                ? ProgressiveReadinessState::Ready
+                : ProgressiveReadinessState::Pending;
+        const ProgressiveGeneratedOutputProvenance nextProvenance =
+            command.SourceKind == ProgressiveSlotSourceKind::PropertyBuffer
+                ? ProgressiveGeneratedOutputProvenance::PropertyBuffer
+                : ProgressiveGeneratedOutputProvenance::PropertyBinding;
+
+        if (slot.SourceKind == command.SourceKind &&
+            slot.Enabled &&
+            slot.Readiness == nextReadiness &&
+            SameProgressivePropertyDescriptor(slot.Property, descriptor))
+        {
+            return SandboxEditorCommandStatus::NoChange;
+        }
+
+        slot.SourceKind = command.SourceKind;
+        slot.Property = std::move(descriptor);
+        slot.AuthoredTexture = {};
+        slot.GeneratedTexture = {};
+        slot.GeneratedPolicy =
+            DefaultGeneratedOutputPolicyFor(slot.SourceKind);
+        slot.Provenance = nextProvenance;
+        slot.Readiness = nextReadiness;
+        slot.LastDiagnostic.clear();
+        slot.Enabled = true;
+        ++after.BindingGeneration;
+
+        return CommitProgressiveBindingsChange(
+            context,
+            command.StableEntityId,
+            std::move(before),
+            std::move(after));
     }
 
     SandboxEditorKMeansResult ApplySandboxEditorKMeansCommand(

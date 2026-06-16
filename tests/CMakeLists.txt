@@ -282,6 +282,7 @@ if(TARGET ExtrinsicRuntime)
         Test.AssetModelSceneHandoff.cpp
         Test.AssetModelTextureHandoff.cpp
         Test.AssetModelTextureIO.cpp
+        Test.DerivedJobGraph.cpp
         Test.EditorCommandHistory.cpp
         Test.ImGuiAdapter.cpp
         Test.ImGuiAdapterEngineWiring.cpp
@@ -290,6 +291,8 @@ if(TARGET ExtrinsicRuntime)
         Test.MeshGeometryPacker.cpp
         Test.MeshPrimitiveViewPacker.cpp
         Test.MeshPrimitiveViewExtraction.cpp
+        Test.ProgressivePresentationExtraction.cpp
+        Test.ProgressiveRenderData.cpp
         Test.GizmoInteraction.cpp
         Test.GizmoInteractionEngineWiring.cpp
         Test.GraphGeometryExtraction.cpp

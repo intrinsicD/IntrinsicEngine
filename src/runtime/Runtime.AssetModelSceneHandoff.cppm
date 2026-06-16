@@ -19,6 +19,7 @@ import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
+import Extrinsic.Runtime.DerivedJobGraph;
 
 export namespace Extrinsic::Runtime
 {
@@ -30,6 +31,8 @@ export namespace Extrinsic::Runtime
         bool ResolveMaterialTextureBindings{true};
         bool GenerateMissingNormalTextures{true};
         bool GenerateMissingAlbedoTextures{true};
+        bool ProgressiveRawGeometryFirst{false};
+        DerivedJobRegistry* ProgressiveJobs{nullptr};
         std::string GeneratedNormalPropertyName{"v:normal"};
         std::string GeneratedAlbedoPropertyName{"v:color"};
         std::uint32_t GeneratedTextureWidth{64u};
@@ -55,6 +58,11 @@ export namespace Extrinsic::Runtime
         std::uint64_t GeneratedTextureBakeFailures{0};
         std::uint64_t GeneratedNormalTextureBakeFailures{0};
         std::uint64_t GeneratedAlbedoTextureBakeFailures{0};
+        std::uint64_t ProgressiveRawPrimitiveEntitiesPublished{0};
+        std::uint64_t ProgressivePresentationBindingsCreated{0};
+        std::uint64_t ProgressiveUvAtlasJobsQueued{0};
+        std::uint64_t ProgressiveNormalJobsQueued{0};
+        std::uint64_t ProgressiveTextureBakeJobsQueued{0};
         std::uint64_t AuthoredUvPrimitives{0};
         std::uint64_t GeneratedUvAtlasPrimitives{0};
         std::uint64_t InvalidAuthoredUvPrimitives{0};

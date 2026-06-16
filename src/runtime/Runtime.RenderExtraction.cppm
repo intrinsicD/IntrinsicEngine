@@ -46,6 +46,7 @@ import Extrinsic.Runtime.GraphGeometryPacker;
 import Extrinsic.Runtime.MeshGeometryPacker;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.PointCloudGeometryPacker;
+import Extrinsic.Runtime.ProgressivePresentationExtraction;
 import Extrinsic.Runtime.ProceduralGeometry;
 import Extrinsic.Runtime.ProceduralGeometryPacker;
 import Extrinsic.Runtime.RenderWorldPool;
@@ -313,6 +314,24 @@ export namespace Extrinsic::Runtime
         std::uint32_t MaterialTextureBindingRecordCount{0};
         std::uint32_t MaterialTextureBindingResolveCount{0};
         std::uint32_t MaterialTextureBindingResolveFailureCount{0};
+
+        // RUNTIME-113 — progressive descriptor consumption during extraction.
+        // These counters are backend-neutral: they report descriptor readiness,
+        // fallback/default use, property-buffer availability, and material
+        // texture binding attempts without exposing ECS/property pointers or GPU
+        // handles to graphics snapshots.
+        std::uint32_t ProgressivePresentationEntityCount{0};
+        std::uint32_t ProgressivePresentationLaneCount{0};
+        std::uint32_t ProgressivePresentationSlotCount{0};
+        std::uint32_t ProgressiveDefaultSlotCount{0};
+        std::uint32_t ProgressiveReadyTextureSlotCount{0};
+        std::uint32_t ProgressivePropertyBufferReadyCount{0};
+        std::uint32_t ProgressivePendingSlotCount{0};
+        std::uint32_t ProgressiveUnsupportedSlotCount{0};
+        std::uint32_t ProgressivePreviousOutputRetainedCount{0};
+        std::uint32_t ProgressiveDiagnosticCount{0};
+        std::uint32_t ProgressiveMaterialTextureBindingResolveCount{0};
+        std::uint32_t ProgressiveMaterialTextureBindingResolveFailureCount{0};
     };
 
     // GRAPHICS-036B — copy the authoritative `RenderWorldPool` diagnostics
@@ -615,6 +634,14 @@ export namespace Extrinsic::Runtime
                                           Graphics::IRenderer& renderer,
                                           Graphics::GpuAssetCache* gpuAssets,
                                           RuntimeRenderExtractionStats& stats);
+        void ApplyProgressivePresentationBindings(
+            entt::registry& registry,
+            entt::entity entity,
+            const ECS::Components::GeometrySources::ConstSourceView& view,
+            RenderableSidecar& sidecar,
+            Graphics::IRenderer& renderer,
+            Graphics::GpuAssetCache* gpuAssets,
+            RuntimeRenderExtractionStats& stats);
         void RetireMissingRenderables(const std::unordered_set<std::uint32_t>& liveKeys,
                                       Graphics::IRenderer& renderer,
                                       RuntimeRenderExtractionStats& stats);

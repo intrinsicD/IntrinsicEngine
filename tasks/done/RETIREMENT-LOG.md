@@ -9,6 +9,64 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`GRAPHICS-090`](GRAPHICS-090-progressive-render-data-operational-smoke.md) —
+Progressive render-data operational smoke — retired on 2026-06-16 at maturity
+`Operational`. The promoted runtime sandbox GPU smoke now exercises a
+progressive scene with mesh defaults/pending slots, a generated mesh texture
+slot becoming ready, graph edge property-buffer presentation, unsupported and
+previous-output-retained states, extraction diagnostics, and material texture
+binding resolution counters. The `ci-vulkan` target built on this host and the
+`gpu;vulkan` `ProgressiveRenderDataReachesOperationalFrame` test passed without
+introducing live runtime/ECS/AssetService imports into graphics.
+
+Backlog
+[`UI-015`](UI-015-progressive-render-data-inspector.md) — Progressive render-data
+inspector — retired on 2026-06-16 at maturity `CPUContracted`. The sandbox
+editor inspector now exposes data-only progressive entity shape, lane/slot
+state, compatible and incompatible property choices, slot default/property
+commands routed through `EditorCommandHistory`, per-entity derived-job rows, and
+composition child summaries. The UI remains a command/model consumer and does
+not own geometry algorithms, asset IO, worker state, texture baking, or graphics
+resources.
+
+Backlog
+[`RUNTIME-114`](RUNTIME-114-progressive-import-enrichment-pipeline.md) —
+Progressive import enrichment pipeline — retired on 2026-06-16 at maturity
+`CPUContracted`. Model-scene mesh leaves can now publish raw decoded geometry
+immediately, attach progressive surface bindings, and queue observable
+`StreamingExecutor`-backed UV atlas, vertex-normal, normal-bake, and albedo-bake
+jobs through `DerivedJobRegistry`. Main-thread apply updates current ECS
+properties and generated presentation descriptors only; generated texture upload
+and material binding residency remain on the existing runtime texture handoff
+path.
+
+Backlog
+[`RUNTIME-113`](RUNTIME-113-progressive-domain-presentation-extraction.md) —
+Progressive domain presentation extraction — retired on 2026-06-16 at maturity
+`CPUContracted`. Runtime extraction now consumes progressive descriptor
+snapshots for mesh surface defaults/texture slots, mesh face-domain diagnostics,
+graph vertex/edge property-buffer domains, point-cloud color/scalar/size/normal
+descriptors, pending/failed/unsupported states, and previous-output retention
+without blocking on derived jobs.
+
+Backlog
+[`RUNTIME-112`](RUNTIME-112-entity-derived-job-graph.md) — Entity derived-job
+graph and snapshots — retired on 2026-06-16 at maturity `CPUContracted`.
+Runtime now owns a `StreamingExecutor`-backed derived-job registry with stable
+entity/domain/source/binding keys, explicit dependencies, deterministic
+snapshots, follow-up scheduling, stale-result discard, cancellation/delete
+handling, previous-output retention, main-thread apply, and fail-closed GPU
+domain diagnostics.
+
+Backlog
+[`RUNTIME-111`](RUNTIME-111-progressive-render-data-descriptors.md) —
+Progressive render-data descriptor contracts — retired on 2026-06-16 at
+maturity `CPUContracted`. Runtime now has shared mesh/graph/point-cloud
+presentation descriptors, slot/source/readiness/generated-output policy,
+property compatibility diagnostics, and scene serialization for progressive
+bindings while excluding raw property pointers, transient jobs, and GPU handles.
+
+Backlog
 [`RUNTIME-110`](RUNTIME-110-progressive-entity-render-data-pipeline.md) —
 Progressive entity render-data pipeline clarification — retired on 2026-06-16
 at maturity `Scaffolded`. The accepted planning contract makes mesh, graph,

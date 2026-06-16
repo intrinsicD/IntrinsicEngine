@@ -7,24 +7,10 @@ another backlog directory.
 
 ## Runtime backlog tasks
 
-- [RUNTIME-111 — Progressive render-data descriptor contracts](RUNTIME-111-progressive-render-data-descriptors.md)
-  (`CPUContracted`): first implementation slice from `RUNTIME-110`, defining
-  shared property/material/presentation descriptors, readiness state,
-  generated-output policy, lane binding maps, compatibility diagnostics, and
-  serialization for mesh, graph, and point-cloud entities.
-- [RUNTIME-112 — Entity derived-job graph and snapshots](RUNTIME-112-entity-derived-job-graph.md)
-  (`CPUContracted`): runtime-owned `StreamingExecutor` job graph with
-  per-entity/global snapshots, dependencies, follow-up scheduling,
-  stale-result discard, previous-output retention, and CPU-first job-domain
-  metadata.
-- [RUNTIME-113 — Progressive domain presentation extraction](RUNTIME-113-progressive-domain-presentation-extraction.md)
-  (`CPUContracted`): runtime extraction consumes descriptors and lane bindings
-  so mesh surfaces, mesh face-domain data, graph vertex/edge data, and
-  point-cloud data render with defaults, ready textures, or property buffers.
-- [RUNTIME-114 — Progressive import enrichment pipeline](RUNTIME-114-progressive-import-enrichment-pipeline.md)
-  (`CPUContracted`): import publishes raw geometry leaves immediately, then
-  schedules missing-UV atlases, normals, bakes, uploads, and binding updates as
-  observable derived jobs.
+No open runtime backlog tasks are currently queued here for the progressive
+render-data pipeline. `RUNTIME-111` through `RUNTIME-114` retired on
+2026-06-16; new runtime follow-ups should open as value-gated tasks with a
+concrete consumer.
 
 ### Runtime adapter umbrellas (clarified by Q tasks; producer modules)
 
@@ -66,6 +52,26 @@ split; narratives live in the retirement log.
   (done, 2026-06-15, `CPUContracted`): generic runtime CPU mesh-attribute
   texture bakes now cover resolved-UV vertex/face scalar, label, vector2,
   vector3/normal, and RGBA outputs with stable generated texture keys.
+- [RUNTIME-114 — Progressive import enrichment pipeline](../../done/RUNTIME-114-progressive-import-enrichment-pipeline.md)
+  (done, 2026-06-16, `CPUContracted`): model-scene mesh leaves can publish raw
+  geometry immediately, attach progressive surface bindings, and queue
+  observable UV, normal, normal-bake, and albedo-bake jobs through
+  `DerivedJobRegistry` while GPU residency remains texture-handoff owned.
+- [RUNTIME-113 — Progressive domain presentation extraction](../../done/RUNTIME-113-progressive-domain-presentation-extraction.md)
+  (done, 2026-06-16, `CPUContracted`): runtime extraction consumes progressive
+  presentation descriptors for mesh surface slots, graph vertex/edge property
+  buffers, point-cloud property buffers, diagnostics, and previous-output
+  retention without blocking on derived jobs.
+- [RUNTIME-112 — Entity derived-job graph and snapshots](../../done/RUNTIME-112-entity-derived-job-graph.md)
+  (done, 2026-06-16, `CPUContracted`): `StreamingExecutor`-backed derived-job
+  registry now exposes entity/global snapshots, explicit dependencies,
+  follow-up scheduling, stale/cancel/failure diagnostics, and previous-output
+  retention.
+- [RUNTIME-111 — Progressive render-data descriptor contracts](../../done/RUNTIME-111-progressive-render-data-descriptors.md)
+  (done, 2026-06-16, `CPUContracted`): shared mesh/graph/point-cloud
+  progressive descriptors, slot/source/readiness/generated-output policy,
+  property compatibility diagnostics, and scene serialization now exist without
+  raw property pointers or GPU handles.
 - [RUNTIME-110 — Progressive entity render-data pipeline clarification](../../done/RUNTIME-110-progressive-entity-render-data-pipeline.md)
   (done, 2026-06-16, `Scaffolded`): accepted ADR-0021's progressive
   mesh/graph/point-cloud render-data model and split implementation into

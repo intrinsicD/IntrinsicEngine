@@ -42,6 +42,7 @@ import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Geometry.Properties;
+import Extrinsic.Runtime.ProgressiveRenderData;
 
 namespace Extrinsic::Runtime
 {
@@ -87,6 +88,36 @@ namespace Extrinsic::Runtime
         [[nodiscard]] json QuatToJson(const glm::quat& value)
         {
             return json::array({value.w, value.x, value.y, value.z});
+        }
+
+        [[nodiscard]] json AssetIdToJson(const Assets::AssetId asset)
+        {
+            if (!asset.IsValid())
+                return nullptr;
+            return json{
+                {"index", asset.Index},
+                {"generation", asset.Generation},
+            };
+        }
+
+        [[nodiscard]] bool TryReadAssetId(const json& value, Assets::AssetId& out) noexcept
+        {
+            out = {};
+            if (value.is_null())
+                return true;
+            if (!value.is_object() ||
+                !value.contains("index") || !value["index"].is_number_unsigned() ||
+                !value.contains("generation") || !value["generation"].is_number_unsigned())
+            {
+                return false;
+            }
+            const std::uint64_t index = value["index"].get<std::uint64_t>();
+            const std::uint64_t generation = value["generation"].get<std::uint64_t>();
+            if (index > UINT32_MAX || generation > UINT32_MAX)
+                return false;
+            out = Assets::AssetId{static_cast<std::uint32_t>(index),
+                                  static_cast<std::uint32_t>(generation)};
+            return true;
         }
 
         [[nodiscard]] bool TryReadVec2(const json& value, glm::vec2& out) noexcept
@@ -137,6 +168,52 @@ namespace Extrinsic::Runtime
                 value[2].get<float>(),
                 value[3].get<float>(),
             };
+            return true;
+        }
+
+        [[nodiscard]] json ProgressiveDefaultValueToJson(
+            const ProgressiveDefaultValue& value)
+        {
+            return json{
+                {"kind", std::string(ToString(value.Kind))},
+                {"vector", Vec4ToJson(value.Vector)},
+                {"scalar", value.Scalar},
+                {"uint", value.UInt},
+            };
+        }
+
+        [[nodiscard]] bool TryReadProgressiveDefaultValue(
+            const json& value,
+            ProgressiveDefaultValue& out)
+        {
+            if (!value.is_object())
+                return false;
+            if (value.contains("kind"))
+            {
+                if (!value["kind"].is_string() ||
+                    !TryParseProgressivePropertyValueKind(value["kind"].get<std::string>(),
+                                                          out.Kind))
+                {
+                    return false;
+                }
+            }
+            if (value.contains("vector") && !TryReadVec4(value["vector"], out.Vector))
+                return false;
+            if (value.contains("scalar"))
+            {
+                if (!value["scalar"].is_number())
+                    return false;
+                out.Scalar = value["scalar"].get<double>();
+            }
+            if (value.contains("uint"))
+            {
+                if (!value["uint"].is_number_unsigned())
+                    return false;
+                const std::uint64_t wide = value["uint"].get<std::uint64_t>();
+                if (wide > UINT32_MAX)
+                    return false;
+                out.UInt = static_cast<std::uint32_t>(wide);
+            }
             return true;
         }
 
@@ -873,6 +950,271 @@ namespace Extrinsic::Runtime
             return true;
         }
 
+        [[nodiscard]] json ProgressivePropertyDescriptorToJson(
+            const ProgressivePropertyBindingDescriptor& descriptor)
+        {
+            return json{
+                {"domain", std::string(ToString(descriptor.Domain))},
+                {"propertyName", descriptor.PropertyName},
+                {"expectedValueKind", std::string(ToString(descriptor.ExpectedValueKind))},
+                {"expectedElementCount", descriptor.ExpectedElementCount},
+                {"sourceGeneration", descriptor.SourceGeneration},
+            };
+        }
+
+        [[nodiscard]] bool TryReadProgressivePropertyDescriptor(
+            const json& value,
+            ProgressivePropertyBindingDescriptor& out)
+        {
+            if (!value.is_object() ||
+                !value.contains("domain") || !value["domain"].is_string() ||
+                !value.contains("propertyName") || !value["propertyName"].is_string())
+            {
+                return false;
+            }
+            if (!TryParseProgressiveGeometryDomain(value["domain"].get<std::string>(),
+                                                   out.Domain))
+            {
+                return false;
+            }
+            out.PropertyName = value["propertyName"].get<std::string>();
+            if (value.contains("expectedValueKind"))
+            {
+                if (!value["expectedValueKind"].is_string() ||
+                    !TryParseProgressivePropertyValueKind(value["expectedValueKind"].get<std::string>(),
+                                                          out.ExpectedValueKind))
+                {
+                    return false;
+                }
+            }
+            if (value.contains("expectedElementCount"))
+            {
+                if (!value["expectedElementCount"].is_number_unsigned())
+                    return false;
+                out.ExpectedElementCount = value["expectedElementCount"].get<std::size_t>();
+            }
+            if (value.contains("sourceGeneration"))
+            {
+                if (!value["sourceGeneration"].is_number_unsigned())
+                    return false;
+                out.SourceGeneration = value["sourceGeneration"].get<std::uint64_t>();
+            }
+            return true;
+        }
+
+        [[nodiscard]] json ProgressiveSlotBindingToJson(
+            const ProgressiveSlotBinding& slot)
+        {
+            return json{
+                {"semantic", std::string(ToString(slot.Semantic))},
+                {"sourceKind", std::string(ToString(slot.SourceKind))},
+                {"enabled", slot.Enabled},
+                {"uniformDefault", ProgressiveDefaultValueToJson(slot.UniformDefault)},
+                {"property", ProgressivePropertyDescriptorToJson(slot.Property)},
+                {"authoredTexture", AssetIdToJson(slot.AuthoredTexture)},
+                {"generatedTexture", AssetIdToJson(slot.GeneratedTexture)},
+                {"generatedPolicy", std::string(ToString(slot.GeneratedPolicy))},
+                {"provenance", std::string(ToString(slot.Provenance))},
+            };
+        }
+
+        [[nodiscard]] bool TryReadProgressiveSlotBinding(
+            const json& value,
+            ProgressiveSlotBinding& out)
+        {
+            if (!value.is_object() ||
+                !value.contains("semantic") || !value["semantic"].is_string() ||
+                !value.contains("sourceKind") || !value["sourceKind"].is_string())
+            {
+                return false;
+            }
+            if (!TryParseProgressiveSlotSemantic(value["semantic"].get<std::string>(),
+                                                 out.Semantic) ||
+                !TryParseProgressiveSlotSourceKind(value["sourceKind"].get<std::string>(),
+                                                   out.SourceKind))
+            {
+                return false;
+            }
+            out.GeneratedPolicy = DefaultGeneratedOutputPolicyFor(out.SourceKind);
+            out.Provenance = ProgressiveGeneratedOutputProvenance::None;
+            out.Readiness = out.SourceKind == ProgressiveSlotSourceKind::UniformDefault
+                ? ProgressiveReadinessState::DefaultValue
+                : ProgressiveReadinessState::Pending;
+            out.LastDiagnostic.clear();
+
+            if (value.contains("enabled"))
+            {
+                if (!value["enabled"].is_boolean())
+                    return false;
+                out.Enabled = value["enabled"].get<bool>();
+            }
+            if (value.contains("uniformDefault") &&
+                !TryReadProgressiveDefaultValue(value["uniformDefault"], out.UniformDefault))
+            {
+                return false;
+            }
+            if (value.contains("property") &&
+                !TryReadProgressivePropertyDescriptor(value["property"], out.Property))
+            {
+                return false;
+            }
+            if (value.contains("authoredTexture") &&
+                !TryReadAssetId(value["authoredTexture"], out.AuthoredTexture))
+            {
+                return false;
+            }
+            if (value.contains("generatedTexture") &&
+                !TryReadAssetId(value["generatedTexture"], out.GeneratedTexture))
+            {
+                return false;
+            }
+            if (value.contains("generatedPolicy"))
+            {
+                if (!value["generatedPolicy"].is_string() ||
+                    !TryParseProgressiveGeneratedOutputPolicy(value["generatedPolicy"].get<std::string>(),
+                                                              out.GeneratedPolicy))
+                {
+                    return false;
+                }
+            }
+            if (value.contains("provenance"))
+            {
+                if (!value["provenance"].is_string() ||
+                    !TryParseProgressiveGeneratedOutputProvenance(value["provenance"].get<std::string>(),
+                                                                  out.Provenance))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        [[nodiscard]] json ProgressivePresentationToJson(
+            const ProgressivePresentationBinding& presentation)
+        {
+            json slots = json::array();
+            for (const ProgressiveSlotBinding& slot : presentation.Slots)
+                slots.push_back(ProgressiveSlotBindingToJson(slot));
+            return json{
+                {"key", presentation.Key},
+                {"kind", std::string(ToString(presentation.Kind))},
+                {"slots", std::move(slots)},
+            };
+        }
+
+        [[nodiscard]] bool TryReadProgressivePresentation(
+            const json& value,
+            ProgressivePresentationBinding& out)
+        {
+            if (!value.is_object() ||
+                !value.contains("key") || !value["key"].is_string() ||
+                !value.contains("kind") || !value["kind"].is_string() ||
+                !value.contains("slots") || !value["slots"].is_array())
+            {
+                return false;
+            }
+            out.Key = value["key"].get<std::string>();
+            if (!TryParseProgressivePresentationKind(value["kind"].get<std::string>(),
+                                                     out.Kind))
+            {
+                return false;
+            }
+            out.Slots.clear();
+            out.Slots.reserve(value["slots"].size());
+            for (const json& slotJson : value["slots"])
+            {
+                ProgressiveSlotBinding slot{};
+                if (!TryReadProgressiveSlotBinding(slotJson, slot))
+                    return false;
+                out.Slots.push_back(std::move(slot));
+            }
+            return true;
+        }
+
+        [[nodiscard]] json ProgressiveBindingsToJson(
+            const ProgressivePresentationBindings& bindings)
+        {
+            json lanes = json::array();
+            for (const ProgressiveRenderLaneBinding& lane : bindings.Lanes)
+            {
+                lanes.push_back(json{
+                    {"lane", std::string(ToString(lane.Lane))},
+                    {"presentationKey", lane.PresentationKey},
+                });
+            }
+
+            json presentations = json::array();
+            for (const ProgressivePresentationBinding& presentation : bindings.Presentations)
+                presentations.push_back(ProgressivePresentationToJson(presentation));
+
+            return json{
+                {"shape", std::string(ToString(bindings.Shape))},
+                {"bindingGeneration", bindings.BindingGeneration},
+                {"lanes", std::move(lanes)},
+                {"presentations", std::move(presentations)},
+            };
+        }
+
+        [[nodiscard]] bool TryApplyProgressiveBindingsFromJson(
+            entt::registry& raw,
+            const ECS::EntityHandle entity,
+            const json& value,
+            SceneSerializationStats& stats)
+        {
+            if (!value.is_object() ||
+                !value.contains("shape") || !value["shape"].is_string() ||
+                !value.contains("lanes") || !value["lanes"].is_array() ||
+                !value.contains("presentations") || !value["presentations"].is_array())
+            {
+                return false;
+            }
+
+            ProgressivePresentationBindings bindings{};
+            if (!TryParseProgressiveEntityShape(value["shape"].get<std::string>(),
+                                                bindings.Shape))
+            {
+                return false;
+            }
+            if (value.contains("bindingGeneration"))
+            {
+                if (!value["bindingGeneration"].is_number_unsigned())
+                    return false;
+                bindings.BindingGeneration = value["bindingGeneration"].get<std::uint64_t>();
+            }
+
+            bindings.Lanes.reserve(value["lanes"].size());
+            for (const json& laneJson : value["lanes"])
+            {
+                if (!laneJson.is_object() ||
+                    !laneJson.contains("lane") || !laneJson["lane"].is_string() ||
+                    !laneJson.contains("presentationKey") || !laneJson["presentationKey"].is_string())
+                {
+                    return false;
+                }
+                ProgressiveRenderLaneBinding lane{};
+                if (!TryParseProgressiveRenderLane(laneJson["lane"].get<std::string>(),
+                                                   lane.Lane))
+                {
+                    return false;
+                }
+                lane.PresentationKey = laneJson["presentationKey"].get<std::string>();
+                bindings.Lanes.push_back(std::move(lane));
+            }
+
+            bindings.Presentations.reserve(value["presentations"].size());
+            for (const json& presentationJson : value["presentations"])
+            {
+                ProgressivePresentationBinding presentation{};
+                if (!TryReadProgressivePresentation(presentationJson, presentation))
+                    return false;
+                bindings.Presentations.push_back(std::move(presentation));
+            }
+
+            raw.emplace_or_replace<ProgressivePresentationBindings>(entity, std::move(bindings));
+            ++stats.ProgressiveRenderDataEntities;
+            return true;
+        }
+
         [[nodiscard]] bool AddVertices(json& geometry,
                                        const GS::Vertices& vertices,
                                        const bool requirePositions)
@@ -1456,6 +1798,15 @@ namespace Extrinsic::Runtime
                     return Core::Err<SceneDeserializationResult>(Core::ErrorCode::InvalidFormat);
                 }
 
+                if (entityJson.contains("progressiveRenderData") &&
+                    !TryApplyProgressiveBindingsFromJson(raw,
+                                                         entity,
+                                                         entityJson["progressiveRenderData"],
+                                                         result.Stats))
+                {
+                    return Core::Err<SceneDeserializationResult>(Core::ErrorCode::InvalidFormat);
+                }
+
                 if (entityJson.contains("parentId"))
                 {
                     std::uint32_t parentId = 0u;
@@ -1555,6 +1906,12 @@ namespace Extrinsic::Runtime
             if (!AddGeometry(entityJson, raw, entity, stats))
                 return Core::Err<std::string>(Core::ErrorCode::InvalidFormat);
 
+            if (const auto* progressive = raw.try_get<ProgressivePresentationBindings>(entity))
+            {
+                entityJson["progressiveRenderData"] = ProgressiveBindingsToJson(*progressive);
+                ++stats.ProgressiveRenderDataEntities;
+            }
+
             root["entities"].push_back(std::move(entityJson));
             ++stats.Entities;
         }
@@ -1568,6 +1925,7 @@ namespace Extrinsic::Runtime
             {"graphEntities", stats.GraphEntities},
             {"pointCloudEntities", stats.PointCloudEntities},
             {"renderHintEntities", stats.RenderHintEntities},
+            {"progressiveRenderDataEntities", stats.ProgressiveRenderDataEntities},
             {"unsupportedPersistenceEntities", stats.UnsupportedPersistenceEntities},
             {"unsupportedLightEntities", stats.UnsupportedLightEntities},
             {"unsupportedShadowEntities", stats.UnsupportedShadowEntities},
@@ -1611,6 +1969,8 @@ namespace Extrinsic::Runtime
             stats.GraphEntities = statsJson.value("graphEntities", 0u);
             stats.PointCloudEntities = statsJson.value("pointCloudEntities", 0u);
             stats.RenderHintEntities = statsJson.value("renderHintEntities", 0u);
+            stats.ProgressiveRenderDataEntities =
+                statsJson.value("progressiveRenderDataEntities", 0u);
             stats.UnsupportedPersistenceEntities =
                 statsJson.value("unsupportedPersistenceEntities", 0u);
             stats.UnsupportedLightEntities =

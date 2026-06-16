@@ -14,7 +14,10 @@ target_sources(${target_name}
         Runtime.AssetModelSceneHandoff.cppm
         Runtime.AssetModelTextureHandoff.cppm
         Runtime.AssetModelTextureIO.cppm
+        Runtime.DerivedJobGraph.cppm
         Runtime.MeshAttributeTextureBake.cppm
+        Runtime.ProgressivePresentationExtraction.cppm
+        Runtime.ProgressiveRenderData.cppm
         Runtime.EcsSystemBundle.cppm
         Runtime.EditorCommandHistory.cppm
         Runtime.Engine.cppm
@@ -46,7 +49,10 @@ target_sources(${target_name}
         Runtime.AssetModelSceneHandoff.cpp
         Runtime.AssetModelTextureHandoff.cpp
         Runtime.AssetModelTextureIO.cpp
+        Runtime.DerivedJobGraph.cpp
         Runtime.MeshAttributeTextureBake.cpp
+        Runtime.ProgressivePresentationExtraction.cpp
+        Runtime.ProgressiveRenderData.cpp
         Runtime.EcsSystemBundle.cpp
         Runtime.EditorCommandHistory.cpp
         Runtime.Engine.cpp

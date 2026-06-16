@@ -14,14 +14,10 @@ map.
 - [UI-014 — UV backend and texture bake controls](UI-014-uv-backend-and-texture-bake-controls.md):
   expose resolved-UV provenance, backend selection/regeneration, and generic
   mesh attribute texture bake commands through runtime-owned UI command seams.
-- [UI-015 — Progressive render-data inspector](UI-015-progressive-render-data-inspector.md):
-  expose entity shape, render-lane bindings, slot defaults, source-property
-  pickers, and per-entity/global derived-job status for the progressive
-  render-data pipeline accepted by `RUNTIME-110`.
 
 ## Convergence
 
-- RORG-031F and UI-015 are part of
+- RORG-031F is part of
   **Theme F — Architecture/runtime/UI foundation seeds**.
 - UI-001 is retired as part of **Theme A — Working sandbox app path** and depends on
   `RUNTIME-090` + `GRAPHICS-079` for ImGui frame production/presentation plus
@@ -99,3 +95,8 @@ split; narratives live in the retirement log.
   path-entry file boundary, dirty-state/undo-redo affordances, new/open/save/close
   command routing, and app-to-runtime-only dependency proof.
 - [UI-013 — Sandbox EditorUI domain render hint controls](../../done/UI-013-domain-render-hint-controls.md) (done, 2026-06-11, `CPUContracted`).
+- [UI-015 — Progressive render-data inspector](../../done/UI-015-progressive-render-data-inspector.md)
+  (done, 2026-06-16, `CPUContracted`): selected-entity progressive inspector
+  models and ImGui rows now expose entity shape, presentation slots, uniform
+  defaults, source-property pickers, compatible/incompatible reasons, derived
+  jobs, and composition summaries through runtime-owned command/history seams.

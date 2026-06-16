@@ -786,11 +786,11 @@ Open post-acceptance rendering leaves:
   imported mesh that originally lacked authored UVs renders through generated
   UVs and an uploaded generated texture binding supplied by runtime
   materialization.
-- [GRAPHICS-090 — Progressive render-data operational smoke](GRAPHICS-090-progressive-render-data-operational-smoke.md):
-  unblocked after `RUNTIME-113` and `RUNTIME-114`; owns the opt-in
-  `gpu;vulkan` proof that progressive generated mesh texture slots and graph or
-  point-cloud property-buffer presentation are consumed by the promoted
-  renderer without graphics importing live runtime/ECS/asset ownership.
+- [GRAPHICS-090 — Progressive render-data operational smoke](../../done/GRAPHICS-090-progressive-render-data-operational-smoke.md):
+  retired 2026-06-16 at `Operational`; opt-in `gpu;vulkan` coverage now proves
+  generated mesh texture slots and graph property-buffer presentation are
+  consumed by the promoted renderer without graphics importing live
+  runtime/ECS/asset ownership.
 
 Cross-layer Theme A leaves retired for the full working sandbox path:
 - [`RUNTIME-085` — `GeometrySources` mesh residency bridge](../../done/RUNTIME-085-geometrysources-mesh-residency.md) (retired 2026-05-28 at `CPUContracted`; Slices A–C landed the mesh packer, extraction wiring, and dirty-domain reupload/retire ordering).

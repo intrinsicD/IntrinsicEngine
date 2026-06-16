@@ -22,6 +22,7 @@ export namespace Extrinsic::Runtime
         std::uint32_t GraphEntities{0u};
         std::uint32_t PointCloudEntities{0u};
         std::uint32_t RenderHintEntities{0u};
+        std::uint32_t ProgressiveRenderDataEntities{0u};
         std::uint32_t UnsupportedPersistenceEntities{0u};
         std::uint32_t UnsupportedLightEntities{0u};
         std::uint32_t UnsupportedShadowEntities{0u};

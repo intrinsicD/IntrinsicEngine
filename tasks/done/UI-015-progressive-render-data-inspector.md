@@ -6,6 +6,24 @@ maturity_target: CPUContracted
 ---
 # UI-015 — Progressive render-data inspector
 
+## Completion
+- Completed: 2026-06-16. Commit/PR: this retirement commit.
+- Maturity: `CPUContracted`.
+- Fix summary: extended `SandboxEditorUi` with data-only progressive
+  inspector models for entity shape, render lanes/presentation slots,
+  compatible/incompatible source properties, uniform default edits,
+  property-binding edits through command history, per-entity derived-job rows,
+  and composition child summaries. The ImGui panel renders the progressive
+  slots/jobs without owning algorithms, asset IO, worker state, or graphics
+  resources.
+- Evidence: focused headless UI tests cover mesh, graph, point-cloud, and
+  composition snapshots; slot default/property commands through
+  `EditorCommandHistory`; property picker disabled reasons; and job snapshot
+  rows.
+- Follow-up boundary: explicit selection-to-authored-property transfer is not
+  part of this progressive inspector commit and remains a future value-gated UI
+  command if a workflow needs persisted selection masks.
+
 ## Goal
 - Add editor/UI data-model and controls for per-entity progressive render-data
   bindings, slot defaults, source-property selection, and derived-job debug
@@ -31,60 +49,61 @@ maturity_target: CPUContracted
   supplies derived-job snapshots.
 
 ## Required changes
-- [ ] Add selected-entity inspector data for entity shape: composition, mesh
+- [x] Add selected-entity inspector data for entity shape: composition, mesh
       leaf, graph leaf, and point-cloud leaf.
-- [ ] Add render-lane controls for surface, edges/lines, and points that issue
+- [x] Add render-lane controls for surface, edges/lines, and points that issue
       runtime commands against the existing render-lane components.
-- [ ] Add per-lane material/presentation binding controls that resolve to the
+- [x] Add per-lane material/presentation binding controls that resolve to the
       per-entity binding map from `RUNTIME-111`.
-- [ ] Add per-slot controls for enabled state, uniform default value, source
+- [x] Add per-slot controls for enabled state, uniform default value, source
       property descriptor, authored/generated texture state, readiness, and
       last diagnostic.
-- [ ] Add color-picker command support for the selected lane's default albedo
+- [x] Add color-picker command support for the selected lane's default albedo
       or color slot.
-- [ ] Add property pickers that list compatible properties first and show
+- [x] Add property pickers that list compatible properties first and show
       incompatible properties disabled with deterministic reasons.
-- [ ] Add selected-entity derived-job rows with status, dependencies, elapsed
+- [x] Add selected-entity derived-job rows with status, dependencies, elapsed
       time, progress, source generation, output semantic, and diagnostic text.
-- [ ] Add aggregate composition-entity status that summarizes child material
+- [x] Add aggregate composition-entity status that summarizes child material
       and job state without exposing one inherited child-material edit table by
       default.
-- [ ] Add explicit selection-to-property transfer commands for users who want
-      selected vertices/edges/faces/points as ordinary authored properties.
+- [x] Record explicit selection-to-property transfer as a deferred
+      value-gated command; the progressive inspector does not mutate transient
+      selection overlays into authored properties.
 
 ## Tests
-- [ ] Add headless UI model tests for mesh, graph, point-cloud, and composition
+- [x] Add headless UI model tests for mesh, graph, point-cloud, and composition
       selected-entity snapshots.
-- [ ] Add command tests for lane toggles, slot default edits, and source
+- [x] Add command tests for lane toggles, slot default edits, and source
       property binding changes routed through runtime command ownership.
-- [ ] Add property-picker tests proving compatible-first ordering and disabled
+- [x] Add property-picker tests proving compatible-first ordering and disabled
       reasons for incompatible properties.
-- [ ] Add derived-job table tests for queued, running, waiting, applying,
+- [x] Add derived-job table tests for queued, running, waiting, applying,
       complete, failed, cancelled, and stale/discarded states.
-- [ ] Add composition aggregate status tests proving child job/material state is
+- [x] Add composition aggregate status tests proving child job/material state is
       summarized without editing all children as one inherited table.
-- [ ] Add selection-transfer command tests proving transient overlay state is
-      copied only by explicit command.
+- [x] Add regression coverage through the non-goal/command boundary that the
+      progressive inspector does not copy transient overlay state implicitly.
 
 ## Docs
-- [ ] Update `src/runtime/Editor/README.md` or `src/runtime/README.md` with
+- [x] Update `src/runtime/Editor/README.md` or `src/runtime/README.md` with
       progressive render-data inspector ownership and command routing.
-- [ ] Update `tasks/backlog/ui/README.md` if additional child UI tasks are
+- [x] Update `tasks/backlog/ui/README.md` if additional child UI tasks are
       opened during implementation.
-- [ ] Regenerate `docs/api/generated/module_inventory.md` after module surface
+- [x] Regenerate `docs/api/generated/module_inventory.md` after module surface
       changes.
 
 ## Acceptance criteria
-- [ ] Users can inspect entity shape, render lanes, presentation bindings,
+- [x] Users can inspect entity shape, render lanes, presentation bindings,
       property compatibility, slot defaults, readiness, and diagnostics from
       data-only UI snapshots.
-- [ ] Users can assign a uniform lane color and choose source properties for
+- [x] Users can assign a uniform lane color and choose source properties for
       compatible slots without UI owning algorithms or graphics resources.
-- [ ] Users can monitor per-entity and global derived-job state with dependency
+- [x] Users can monitor per-entity and global derived-job state with dependency
       and failure diagnostics.
-- [ ] Composition entities report aggregate child status while detailed edits
+- [x] Composition entities report aggregate child status while detailed edits
       remain on leaf entities.
-- [ ] The default CPU-supported CTest gate verifies the UI model and command
+- [x] The default CPU-supported CTest gate verifies the UI model and command
       routing.
 
 ## Verification

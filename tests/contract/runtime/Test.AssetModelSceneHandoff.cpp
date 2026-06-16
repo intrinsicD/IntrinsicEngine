@@ -42,6 +42,10 @@ import Extrinsic.RHI.Transfer;
 import Extrinsic.RHI.TransferQueue;
 import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
+import Extrinsic.Runtime.DerivedJobGraph;
+import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.StableEntityLookup;
+import Extrinsic.Runtime.StreamingExecutor;
 import Geometry.HalfedgeMesh.IO;
 import Geometry.Properties;
 
@@ -114,7 +118,8 @@ namespace
 
     [[nodiscard]] Geometry::MeshIO::MeshIOResult MakeTriangleMeshPayload(
         const bool includeTexcoords = true,
-        const bool includeVertexColor = true)
+        const bool includeVertexColor = true,
+        const bool includeNormals = true)
     {
         Geometry::MeshIO::MeshIOResult mesh{};
         mesh.SourcePath = "/models/triangle.gltf";
@@ -124,10 +129,13 @@ namespace
         positions[0] = glm::vec3{0.0f, 0.0f, 0.0f};
         positions[1] = glm::vec3{1.0f, 0.0f, 0.0f};
         positions[2] = glm::vec3{0.0f, 1.0f, 0.0f};
-        auto normals = mesh.Vertices.GetOrAdd<glm::vec3>("v:normal", glm::vec3{0.0f});
-        normals[0] = glm::vec3{1.0f, 0.0f, 0.0f};
-        normals[1] = glm::vec3{0.0f, 1.0f, 0.0f};
-        normals[2] = glm::vec3{0.0f, 0.0f, -1.0f};
+        if (includeNormals)
+        {
+            auto normals = mesh.Vertices.GetOrAdd<glm::vec3>("v:normal", glm::vec3{0.0f});
+            normals[0] = glm::vec3{1.0f, 0.0f, 0.0f};
+            normals[1] = glm::vec3{0.0f, 1.0f, 0.0f};
+            normals[2] = glm::vec3{0.0f, 0.0f, -1.0f};
+        }
         if (includeTexcoords)
         {
             auto texcoords = mesh.Vertices.GetOrAdd<glm::vec2>("v:texcoord", glm::vec2{0.0f});
@@ -151,7 +159,8 @@ namespace
 
     [[nodiscard]] Assets::AssetModelScenePayload MakeModelScenePayload(
         const bool includeTexcoords = true,
-        const bool includeVertexColor = true)
+        const bool includeVertexColor = true,
+        const bool includeNormals = true)
     {
         Assets::AssetModelScenePayload payload{};
         payload.SourcePath = "/models/triangle.gltf";
@@ -167,7 +176,7 @@ namespace
 
         payload.GeometryPayloads.push_back(Assets::AssetGeometryPayload::Make(
             Assets::AssetPayloadKind::Mesh,
-            MakeTriangleMeshPayload(includeTexcoords, includeVertexColor),
+            MakeTriangleMeshPayload(includeTexcoords, includeVertexColor, includeNormals),
             "Geometry::MeshIO::MeshIOResult"));
         payload.Primitives.push_back(Assets::AssetModelPrimitivePayload{
             .Name = "Triangle",
@@ -301,6 +310,91 @@ TEST(RuntimeAssetModelSceneHandoff, MaterializeModelSceneCreatesMeshEntityAndUpl
     EXPECT_EQ(diagnostics.MaterialInstancesCreated, 1u);
     EXPECT_EQ(diagnostics.MaterialTextureBindingUploadDeferrals, 1u);
     EXPECT_EQ(diagnostics.MaterialTextureBindingFailures, 0u);
+}
+
+TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstQueuesUvNormalAndBakeJobs)
+{
+    SceneHandoffFixture fx;
+    Runtime::StreamingExecutor streaming{};
+    Runtime::DerivedJobRegistry jobs{streaming};
+    TmpFile modelFile("asset_model_scene_handoff_progressive_triangle.gltf");
+    auto payload = MakeModelScenePayload(
+        /*includeTexcoords*/ false,
+        /*includeVertexColor*/ true,
+        /*includeNormals*/ false);
+    payload.Materials[0].BaseColorTexture = {};
+    auto model = LoadModel(
+        fx.Service,
+        modelFile.Path.string(),
+        std::move(payload));
+    ASSERT_TRUE(model.has_value()) << static_cast<int>(model.error());
+
+    Runtime::AssetModelSceneHandoffDiagnostics diagnostics{};
+    Runtime::AssetModelSceneHandoffOptions options{};
+    options.ProgressiveRawGeometryFirst = true;
+    options.ProgressiveJobs = &jobs;
+    auto state = Runtime::MaterializeModelSceneAsset(
+        fx.Service,
+        fx.Cache,
+        fx.Scene,
+        fx.Materials,
+        *model,
+        options,
+        &diagnostics);
+    ASSERT_TRUE(state.has_value()) << static_cast<int>(state.error());
+    ASSERT_EQ(state->Record.Primitives.size(), 1u);
+    EXPECT_TRUE(state->Record.GeneratedTextureAssets.empty());
+    EXPECT_EQ(diagnostics.ProgressiveRawPrimitiveEntitiesPublished, 1u);
+    EXPECT_EQ(diagnostics.ProgressivePresentationBindingsCreated, 1u);
+    EXPECT_EQ(diagnostics.ProgressiveUvAtlasJobsQueued, 1u);
+    EXPECT_EQ(diagnostics.ProgressiveNormalJobsQueued, 1u);
+    EXPECT_EQ(diagnostics.ProgressiveTextureBakeJobsQueued, 2u);
+
+    const ECS::EntityHandle entity = state->Record.Primitives[0].Entity;
+    ASSERT_TRUE(fx.Scene.IsValid(entity));
+    ASSERT_TRUE(fx.Scene.Raw().all_of<Runtime::ProgressivePresentationBindings>(entity));
+    const auto jobSnapshot = jobs.SnapshotEntity(Runtime::StableEntityLookup::ToRenderId(entity));
+    ASSERT_EQ(jobSnapshot.Entries.size(), 4u);
+    EXPECT_EQ(jobSnapshot.Entries[0].Name, "generate mesh uv atlas");
+    EXPECT_EQ(jobSnapshot.Entries[1].Name, "compute mesh vertex normals");
+    EXPECT_EQ(jobSnapshot.Entries[2].Name, "bake normal texture");
+    EXPECT_EQ(jobSnapshot.Entries[3].Name, "bake albedo texture");
+    EXPECT_EQ(jobSnapshot.Entries[2].Dependencies.size(), 2u);
+    EXPECT_EQ(jobSnapshot.Entries[3].Dependencies.size(), 1u);
+
+    jobs.Pump(2u);
+    jobs.DrainCompletions();
+    jobs.ApplyMainThreadResults();
+    jobs.Pump(2u);
+    jobs.DrainCompletions();
+    jobs.ApplyMainThreadResults();
+
+    const auto* vertices = fx.Scene.Raw().try_get<ECS::Components::GeometrySources::Vertices>(entity);
+    ASSERT_NE(vertices, nullptr);
+    EXPECT_TRUE(vertices->Properties.Exists("v:texcoord"));
+    EXPECT_TRUE(vertices->Properties.Exists("v:normal"));
+    EXPECT_EQ(jobs.SnapshotEntity(Runtime::StableEntityLookup::ToRenderId(entity)).Entries[2].Status,
+              Runtime::DerivedJobStatus::Complete);
+
+    auto& bindings =
+        fx.Scene.Raw().get<Runtime::ProgressivePresentationBindings>(entity);
+    const Runtime::ProgressivePresentationBinding* presentation =
+        Runtime::FindPresentationBinding(bindings, "mesh.surface");
+    ASSERT_NE(presentation, nullptr);
+    const Runtime::ProgressiveSlotBinding* normal =
+        Runtime::FindSlotBinding(*presentation,
+                                 Runtime::ProgressiveSlotSemantic::Normal);
+    ASSERT_NE(normal, nullptr);
+    EXPECT_EQ(normal->Readiness, Runtime::ProgressiveReadinessState::Ready);
+    EXPECT_TRUE(normal->GeneratedTexture.IsValid());
+    EXPECT_NE(normal->LastDiagnostic.find("without upload"), std::string::npos);
+    const Runtime::ProgressiveSlotBinding* albedo =
+        Runtime::FindSlotBinding(*presentation,
+                                 Runtime::ProgressiveSlotSemantic::Albedo);
+    ASSERT_NE(albedo, nullptr);
+    EXPECT_EQ(albedo->Readiness, Runtime::ProgressiveReadinessState::Ready);
+    EXPECT_TRUE(albedo->GeneratedTexture.IsValid());
+    EXPECT_NE(albedo->LastDiagnostic.find("without upload"), std::string::npos);
 }
 
 TEST(RuntimeAssetModelSceneHandoff, ReadyModelSceneEventMaterializesRecordAndOwnsGeneratedEntities)

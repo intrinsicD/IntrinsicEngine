@@ -6,6 +6,20 @@ maturity_target: CPUContracted
 ---
 # RUNTIME-111 — Progressive render-data descriptor contracts
 
+## Completion
+- Completed: 2026-06-16. Commit/PR: this retirement commit.
+- Maturity: `CPUContracted`.
+- Fix summary: added the `Extrinsic.Runtime.ProgressiveRenderData` descriptor
+  model for mesh, graph, and point-cloud presentation bindings, generated
+  output policy, property-source compatibility diagnostics, and scene
+  serialization without raw property pointers, worker state, or GPU handles.
+- Evidence: focused runtime contract coverage exercises cross-domain
+  descriptors, property picker compatibility/disabled reasons,
+  render-lane/component separation, and scene serialization round trips.
+- Follow-up boundary: runtime consumption, async work, UI, and backend
+  operational proof are owned by `RUNTIME-112` through `RUNTIME-114`,
+  `UI-015`, and `GRAPHICS-090`.
+
 ## Goal
 - Add data-only descriptor contracts for progressive render-data bindings,
   readiness, generated-output policy, and serialization across mesh, graph, and
@@ -32,56 +46,56 @@ maturity_target: CPUContracted
   bindings.
 
 ## Required changes
-- [ ] Define stable enum/value contracts for geometry domains, lane types,
+- [x] Define stable enum/value contracts for geometry domains, lane types,
       property value kinds, presentation kinds, surface/point/line slot
       semantics, readiness states, generated-output provenance, and job-domain
       metadata.
-- [ ] Define `PropertyBindingDescriptor` records with geometry domain, property
+- [x] Define `PropertyBindingDescriptor` records with geometry domain, property
       name, expected value type, source generation/count expectations, and
       diagnostic-ready resolution status without persisting raw property
       pointers.
-- [ ] Define per-slot binding records that can represent uniform defaults,
+- [x] Define per-slot binding records that can represent uniform defaults,
       authored texture assets, generated texture assets, property-bake
       requests, and direct property-buffer presentation.
-- [ ] Define per-entity lane-to-presentation binding records for
+- [x] Define per-entity lane-to-presentation binding records for
       `RenderSurface`, `RenderEdges`, and `RenderPoints` without moving full
       material state into those components.
-- [ ] Define generated-output policy records with at least `SessionCache`,
+- [x] Define generated-output policy records with at least `SessionCache`,
       `DeterministicChildAsset`, and `PersistOnSave`, using ADR-0021 defaults
       for generated textures and generated property buffers.
-- [ ] Add descriptor validation helpers that report compatible, incompatible,
+- [x] Add descriptor validation helpers that report compatible, incompatible,
       missing, stale, and unsupported source properties for mesh, graph, and
       point-cloud domains.
-- [ ] Add serialization/deserialization support for material/presentation
+- [x] Add serialization/deserialization support for material/presentation
       bindings and generated-output policy while excluding transient job state,
       borrowed property views, and GPU handles.
 
 ## Tests
-- [ ] Add CPU/null descriptor tests for mesh, graph, and point-cloud leaf
+- [x] Add CPU/null descriptor tests for mesh, graph, and point-cloud leaf
       entities proving all accepted domains can be represented.
-- [ ] Add validation tests for compatible and incompatible property bindings,
+- [x] Add validation tests for compatible and incompatible property bindings,
       including disabled-with-reason entries for UI property pickers.
-- [ ] Add serialization round-trip tests proving bindings and generated-output
+- [x] Add serialization round-trip tests proving bindings and generated-output
       policy persist while transient readiness/job state does not.
-- [ ] Add regression tests proving render-lane components remain primitive
+- [x] Add regression tests proving render-lane components remain primitive
       toggles and presentation records live in the separate binding model.
 
 ## Docs
-- [ ] Update `src/runtime/README.md` with descriptor ownership, persistence,
+- [x] Update `src/runtime/README.md` with descriptor ownership, persistence,
       and no-raw-pointer/no-GPU-handle rules.
-- [ ] Link ADR-0021 from the runtime descriptor documentation.
-- [ ] Regenerate `docs/api/generated/module_inventory.md` after module surface
+- [x] Link ADR-0021 from the runtime descriptor documentation.
+- [x] Regenerate `docs/api/generated/module_inventory.md` after module surface
       changes.
 
 ## Acceptance criteria
-- [ ] One shared descriptor model represents surface, point, and edge/line
+- [x] One shared descriptor model represents surface, point, and edge/line
       presentation for mesh, graph, and point-cloud entities.
-- [ ] Compatible property-source discovery is deterministic and reports
+- [x] Compatible property-source discovery is deterministic and reports
       disabled reasons for incompatible choices.
-- [ ] Scene serialization can round-trip presentation bindings and
+- [x] Scene serialization can round-trip presentation bindings and
       generated-output policy without serializing transient jobs or raw property
       pointers.
-- [ ] The default CPU-supported CTest gate verifies the descriptor contract.
+- [x] The default CPU-supported CTest gate verifies the descriptor contract.
 
 ## Verification
 ```bash

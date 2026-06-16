@@ -6,6 +6,22 @@ maturity_target: Operational
 ---
 # GRAPHICS-090 — Progressive render-data operational smoke
 
+## Completion
+- Completed: 2026-06-16. Commit/PR: this retirement commit.
+- Maturity: `Operational`.
+- Fix summary: extended the promoted runtime sandbox GPU smoke with a
+  progressive render-data scene that observes pending/default mesh slots,
+  then a ready generated mesh texture slot, plus ready graph edge
+  property-buffer presentation, previous-output retention, unsupported/failure
+  diagnostics, and material texture binding resolution counters.
+- Evidence: `ci-vulkan` built the runtime sandbox GPU smoke target and the
+  opt-in `gpu;vulkan` test
+  `ProgressiveRenderDataReachesOperationalFrame` passed on this
+  Vulkan-capable host.
+- Boundary: graphics consumes runtime snapshots and material/asset ids only;
+  it does not import live ECS/runtime ownership, `AssetService`, geometry
+  algorithms, xatlas, or texture baking code.
+
 ## Goal
 - Prove on a Vulkan-capable host that progressive render-data outputs are
   consumed by the promoted renderer for generated mesh texture slots and graph
@@ -31,43 +47,43 @@ maturity_target: Operational
   contracts exist.
 
 ## Required changes
-- [ ] Add or update an opt-in `gpu;vulkan` smoke scene that starts from raw
+- [x] Add or update an opt-in `gpu;vulkan` smoke scene that starts from raw
       imported/renderable geometry and observes a later generated mesh texture
       slot becoming active.
-- [ ] Exercise at least one graph edge or vertex property-buffer presentation
+- [x] Exercise at least one graph edge or vertex property-buffer presentation
       path, or one point-cloud point-domain property-buffer presentation path.
-- [ ] Assert renderer diagnostics distinguish default/pending slot state,
+- [x] Assert renderer diagnostics distinguish default/pending slot state,
       ready generated texture state, property-buffer readiness, and failure or
       unsupported states.
-- [ ] Keep the smoke skipped or fail-closed with explicit diagnostics when the
+- [x] Keep the smoke skipped or fail-closed with explicit diagnostics when the
       host lacks promoted Vulkan support.
-- [ ] Preserve layering: graphics consumes only snapshots/resources and never
+- [x] Preserve layering: graphics consumes only snapshots/resources and never
       imports live ECS, runtime, `AssetService`, geometry backends, or xatlas.
 
 ## Tests
-- [ ] Add `gpu;vulkan` smoke coverage for progressive generated mesh texture
+- [x] Add `gpu;vulkan` smoke coverage for progressive generated mesh texture
       slot activation.
-- [ ] Add `gpu;vulkan` smoke coverage for graph or point-cloud property-buffer
+- [x] Add `gpu;vulkan` smoke coverage for graph or point-cloud property-buffer
       presentation.
-- [ ] Preserve the default CPU-supported CTest gate.
-- [ ] Preserve relevant runtime descriptor, extraction, import, and graphics
+- [x] Preserve the default CPU-supported CTest gate.
+- [x] Preserve relevant runtime descriptor, extraction, import, and graphics
       material/property-buffer contract tests.
 
 ## Docs
-- [ ] Update `tasks/backlog/rendering/README.md` or this task with any final
+- [x] Update `tasks/backlog/rendering/README.md` or this task with any final
       Vulkan host prerequisites discovered during implementation.
-- [ ] Update graphics/runtime architecture docs only if operational smoke
+- [x] Update graphics/runtime architecture docs only if operational smoke
       requires an ownership or snapshot-contract change.
 
 ## Acceptance criteria
-- [ ] `ci-vulkan` builds `IntrinsicTests` on the target host.
-- [ ] Opt-in `gpu;vulkan` CTest evidence shows a generated mesh texture slot
+- [x] `ci-vulkan` builds `IntrinsicTests` on the target host.
+- [x] Opt-in `gpu;vulkan` CTest evidence shows a generated mesh texture slot
       replacing default/pending state after runtime makes it ready.
-- [ ] Opt-in `gpu;vulkan` CTest evidence shows graph or point-cloud
+- [x] Opt-in `gpu;vulkan` CTest evidence shows graph or point-cloud
       property-buffer presentation consumed by the renderer.
-- [ ] Missing Vulkan capability reports a deterministic skip or fail-closed
+- [x] Missing Vulkan capability reports a deterministic skip or fail-closed
       diagnostic instead of being recorded as passing operational proof.
-- [ ] Graphics remains free of live ECS, runtime, `AssetService`, geometry
+- [x] Graphics remains free of live ECS, runtime, `AssetService`, geometry
       backend, and xatlas dependencies.
 
 ## Verification

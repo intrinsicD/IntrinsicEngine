@@ -12,7 +12,6 @@ the authoritative open/unblocked view.
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 
-- blocked by `RUNTIME-113`: `GRAPHICS-090` — Progressive render-data operational smoke (tasks/backlog/rendering/GRAPHICS-090-progressive-render-data-operational-smoke.md)
 - unblocked: `LEGACY-001` — Delete `src/legacy/Interface/` (tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md)
 - unblocked: `LEGACY-004` — Delete `src/legacy/Asset/` (tasks/backlog/architecture/LEGACY-004-delete-src-legacy-asset.md)
 - unblocked: `LEGACY-005` — Delete `src/legacy/Core/` (tasks/backlog/architecture/LEGACY-005-delete-src-legacy-core.md)
@@ -25,11 +24,6 @@ the authoritative open/unblocked view.
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RORG-031F` — UI integration backlog seed (tasks/backlog/ui/RORG-031-ui-integration.md)
-- unblocked: `RUNTIME-111` — Progressive render-data descriptor contracts (tasks/backlog/runtime/RUNTIME-111-progressive-render-data-descriptors.md)
-- blocked by `RUNTIME-111`: `RUNTIME-112` — Entity derived-job graph and snapshots (tasks/backlog/runtime/RUNTIME-112-entity-derived-job-graph.md)
-- blocked by `RUNTIME-111`: `RUNTIME-113` — Progressive domain presentation extraction (tasks/backlog/runtime/RUNTIME-113-progressive-domain-presentation-extraction.md)
-- blocked by `RUNTIME-112`: `RUNTIME-114` — Progressive import enrichment pipeline (tasks/backlog/runtime/RUNTIME-114-progressive-import-enrichment-pipeline.md)
-- blocked by `RUNTIME-111`: `UI-015` — Progressive render-data inspector (tasks/backlog/ui/UI-015-progressive-render-data-inspector.md)
 
 ## Unthemed
 

@@ -3,6 +3,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <algorithm>
+#include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -23,6 +24,7 @@ import Extrinsic.Core.Error;
 import Extrinsic.ECS.Component.MetaData;
 import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
+import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Scene.Bootstrap;
 import Extrinsic.ECS.Scene.Handle;
@@ -34,7 +36,10 @@ import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.AssetMeshNormals;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
+import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
+import Extrinsic.Runtime.ProgressiveRenderData;
+import Extrinsic.Runtime.StableEntityLookup;
 import Geometry.HalfedgeMesh.IO;
 
 namespace Extrinsic::Runtime
@@ -171,7 +176,8 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] Core::Expected<std::vector<PreparedPrimitive>> PreparePrimitives(
             const Assets::AssetModelScenePayload& model,
-            AssetModelSceneHandoffDiagnostics* diagnostics)
+            AssetModelSceneHandoffDiagnostics* diagnostics,
+            const bool progressiveRawGeometryFirst)
         {
             std::vector<PreparedPrimitive> prepared{};
             prepared.reserve(model.Primitives.size());
@@ -197,6 +203,35 @@ namespace Extrinsic::Runtime
                 if (!meshPayload.has_value())
                 {
                     return Core::Err<std::vector<PreparedPrimitive>>(meshPayload.error());
+                }
+
+                if (progressiveRawGeometryFirst)
+                {
+                    auto mesh = BuildRuntimeHalfedgeMeshGeometryOnly(**meshPayload);
+                    if (!mesh.has_value())
+                    {
+                        return Core::Err<std::vector<PreparedPrimitive>>(mesh.error());
+                    }
+
+                    const bool hasAuthoredTexcoords = MeshPayloadHasValidVertexTexcoords(**meshPayload);
+                    prepared.push_back(PreparedPrimitive{
+                        .PrimitiveIndex = static_cast<std::uint32_t>(primitiveIndex),
+                        .GeometryPayloadIndex = primitive.GeometryPayloadIndex,
+                        .MaterialIndex = primitive.MaterialIndex,
+                        .Name = primitive.Name.empty()
+                            ? "model-primitive-" + std::to_string(primitiveIndex)
+                            : primitive.Name,
+                        .Mesh = std::move(*mesh),
+                        .HasResolvedTexcoords = hasAuthoredTexcoords,
+                        .TexcoordProvenance = hasAuthoredTexcoords
+                            ? RuntimeMeshResolvedUvProvenance::AuthoredPreserved
+                            : RuntimeMeshResolvedUvProvenance::None,
+                    });
+                    if (diagnostics != nullptr && hasAuthoredTexcoords)
+                    {
+                        ++diagnostics->AuthoredUvPrimitives;
+                    }
+                    continue;
                 }
 
                 auto materialized = BuildRuntimeHalfedgeMeshMaterialization(**meshPayload);
@@ -797,6 +832,438 @@ namespace Extrinsic::Runtime
                 scene.Destroy(primitive.Entity);
             }
         }
+
+        [[nodiscard]] ProgressiveSlotBinding AuthoredTextureSlot(
+            const ProgressiveSlotSemantic semantic,
+            const Assets::AssetId asset)
+        {
+            ProgressiveSlotBinding slot{};
+            slot.Semantic = semantic;
+            slot.SourceKind = ProgressiveSlotSourceKind::AuthoredTextureAsset;
+            slot.AuthoredTexture = asset;
+            slot.Readiness = asset.IsValid()
+                ? ProgressiveReadinessState::Ready
+                : ProgressiveReadinessState::Failed;
+            slot.Provenance = ProgressiveGeneratedOutputProvenance::AuthoredAsset;
+            return slot;
+        }
+
+        [[nodiscard]] ProgressiveSlotBinding UniformColorSlot(
+            const Assets::AssetModelMaterialPayload& material)
+        {
+            ProgressiveSlotBinding slot{};
+            slot.Semantic = ProgressiveSlotSemantic::Albedo;
+            slot.SourceKind = ProgressiveSlotSourceKind::UniformDefault;
+            slot.UniformDefault.Kind = ProgressivePropertyValueKind::Vec4;
+            slot.UniformDefault.Vector = glm::vec4{
+                material.BaseColorFactor[0],
+                material.BaseColorFactor[1],
+                material.BaseColorFactor[2],
+                material.BaseColorFactor[3],
+            };
+            slot.Readiness = ProgressiveReadinessState::DefaultValue;
+            return slot;
+        }
+
+        [[nodiscard]] ProgressiveSlotBinding UniformScalarSlot(
+            const ProgressiveSlotSemantic semantic,
+            const float value)
+        {
+            ProgressiveSlotBinding slot{};
+            slot.Semantic = semantic;
+            slot.SourceKind = ProgressiveSlotSourceKind::UniformDefault;
+            slot.UniformDefault.Kind = ProgressivePropertyValueKind::ScalarFloat;
+            slot.UniformDefault.Scalar = value;
+            slot.Readiness = ProgressiveReadinessState::DefaultValue;
+            return slot;
+        }
+
+        [[nodiscard]] ProgressiveSlotBinding PendingPropertyBakeSlot(
+            const ProgressiveSlotSemantic semantic,
+            const std::string& propertyName,
+            const ProgressivePropertyValueKind expectedValueKind,
+            const std::string_view diagnostic)
+        {
+            ProgressiveSlotBinding slot{};
+            slot.Semantic = semantic;
+            slot.SourceKind = ProgressiveSlotSourceKind::PropertyBake;
+            slot.Property = ProgressivePropertyBindingDescriptor{
+                .Domain = ProgressiveGeometryDomain::MeshVertex,
+                .PropertyName = propertyName,
+                .ExpectedValueKind = expectedValueKind,
+            };
+            slot.GeneratedPolicy = ProgressiveGeneratedOutputPolicy::DeterministicChildAsset;
+            slot.Provenance = ProgressiveGeneratedOutputProvenance::PropertyBinding;
+            slot.Readiness = ProgressiveReadinessState::Pending;
+            slot.LastDiagnostic = std::string{diagnostic};
+            return slot;
+        }
+
+        void AttachProgressivePresentationBindings(
+            ECS::Scene::Registry& scene,
+            const ECS::EntityHandle entity,
+            const Assets::AssetModelMaterialPayload* material,
+            const std::vector<Assets::AssetId>& embeddedTextureAssets,
+            const AssetModelSceneHandoffOptions& options,
+            const PreparedPrimitive& primitive,
+            AssetModelSceneHandoffDiagnostics* diagnostics)
+        {
+            if (material == nullptr)
+            {
+                return;
+            }
+
+            std::vector<ProgressiveSlotBinding> slots{};
+            const Assets::AssetId authoredAlbedo =
+                ResolveTextureReference(material->BaseColorTexture, embeddedTextureAssets);
+            const Assets::AssetId authoredNormal =
+                ResolveTextureReference(material->NormalTexture, embeddedTextureAssets);
+
+            if (authoredAlbedo.IsValid())
+            {
+                slots.push_back(AuthoredTextureSlot(
+                    ProgressiveSlotSemantic::Albedo,
+                    authoredAlbedo));
+            }
+            else if (options.GenerateMissingAlbedoTextures &&
+                     MeshHasVertexProperty(primitive.Mesh, options.GeneratedAlbedoPropertyName))
+            {
+                slots.push_back(PendingPropertyBakeSlot(
+                    ProgressiveSlotSemantic::Albedo,
+                    options.GeneratedAlbedoPropertyName,
+                    ProgressivePropertyValueKind::Any,
+                    primitive.HasResolvedTexcoords
+                        ? "waiting for vertex color albedo bake"
+                        : "waiting for generated UV atlas before vertex color albedo bake"));
+            }
+            else
+            {
+                slots.push_back(UniformColorSlot(*material));
+            }
+            slots.push_back(authoredNormal.IsValid()
+                ? AuthoredTextureSlot(ProgressiveSlotSemantic::Normal, authoredNormal)
+                : PendingPropertyBakeSlot(
+                    ProgressiveSlotSemantic::Normal,
+                    options.GeneratedNormalPropertyName,
+                    ProgressivePropertyValueKind::Vec3,
+                    primitive.HasResolvedTexcoords
+                        ? "waiting for vertex normals before normal-map bake"
+                        : "waiting for generated UV atlas and vertex normals before normal-map bake"));
+            slots.push_back(UniformScalarSlot(
+                ProgressiveSlotSemantic::Roughness,
+                material->RoughnessFactor));
+            slots.push_back(UniformScalarSlot(
+                ProgressiveSlotSemantic::Metallic,
+                material->MetallicFactor));
+
+            scene.Raw().emplace_or_replace<ProgressivePresentationBindings>(
+                entity,
+                ProgressivePresentationBindings{
+                    .Shape = ProgressiveEntityShape::MeshLeaf,
+                    .Lanes = {ProgressiveRenderLaneBinding{
+                        .Lane = ProgressiveRenderLane::Surface,
+                        .PresentationKey = "mesh.surface",
+                    }},
+                    .Presentations = {ProgressivePresentationBinding{
+                        .Key = "mesh.surface",
+                        .Kind = ProgressivePresentationKind::SurfaceMaterial,
+                        .Slots = std::move(slots),
+                    }},
+                });
+
+            if (diagnostics != nullptr)
+            {
+                ++diagnostics->ProgressivePresentationBindingsCreated;
+            }
+        }
+
+        [[nodiscard]] bool MeshHasVertexNormals(const Geometry::HalfedgeMesh::Mesh& mesh)
+        {
+            return mesh.VertexProperties().Exists("v:normal");
+        }
+
+        [[nodiscard]] bool MeshHasVertexTexcoords(const Geometry::HalfedgeMesh::Mesh& mesh)
+        {
+            return mesh.VertexProperties().Exists("v:texcoord");
+        }
+
+        void WriteDefaultVectorProperty(
+            ECS::Scene::Registry& scene,
+            const ECS::EntityHandle entity,
+            const std::string_view propertyName,
+            const glm::vec3 value)
+        {
+            auto* vertices = scene.Raw().try_get<ECS::Components::GeometrySources::Vertices>(entity);
+            if (vertices == nullptr)
+            {
+                return;
+            }
+            auto property = vertices->Properties.GetOrAdd<glm::vec3>(
+                std::string{propertyName},
+                value);
+            property.Vector().assign(vertices->Properties.Size(), value);
+        }
+
+        void WriteDefaultTexcoords(
+            ECS::Scene::Registry& scene,
+            const ECS::EntityHandle entity)
+        {
+            auto* vertices = scene.Raw().try_get<ECS::Components::GeometrySources::Vertices>(entity);
+            if (vertices == nullptr)
+            {
+                return;
+            }
+            auto property = vertices->Properties.GetOrAdd<glm::vec2>(
+                "v:texcoord",
+                glm::vec2{0.0f});
+            property.Vector().assign(vertices->Properties.Size(), glm::vec2{0.0f});
+        }
+
+        void MarkProgressiveTextureBakeReady(
+            ECS::Scene::Registry& scene,
+            const ECS::EntityHandle entity,
+            const ProgressiveSlotSemantic semantic,
+            const std::uint64_t payloadToken,
+            std::string diagnostic)
+        {
+            auto* bindings =
+                scene.Raw().try_get<ProgressivePresentationBindings>(entity);
+            if (bindings == nullptr)
+            {
+                return;
+            }
+
+            ProgressivePresentationBinding* presentation =
+                FindPresentationBinding(*bindings, "mesh.surface");
+            if (presentation == nullptr)
+            {
+                return;
+            }
+
+            ProgressiveSlotBinding* slot = FindSlotBinding(*presentation, semantic);
+            if (slot == nullptr ||
+                slot->SourceKind != ProgressiveSlotSourceKind::PropertyBake)
+            {
+                return;
+            }
+
+            slot->GeneratedTexture = Assets::AssetId{
+                static_cast<std::uint32_t>(payloadToken),
+                1u};
+            slot->Readiness = ProgressiveReadinessState::Ready;
+            slot->Provenance =
+                ProgressiveGeneratedOutputProvenance::GeneratedTextureAsset;
+            slot->LastDiagnostic = std::move(diagnostic);
+            ++bindings->BindingGeneration;
+        }
+
+        [[nodiscard]] DerivedJobHandle QueueProgressiveNoopJob(
+            DerivedJobRegistry& jobs,
+            const ECS::EntityHandle entity,
+            const ProgressiveSlotSemantic semantic,
+            std::string name,
+            std::uint64_t payloadToken,
+            std::move_only_function<Core::Result()> apply)
+        {
+            const std::uint32_t stableId = StableEntityLookup::ToRenderId(entity);
+            DerivedJobDesc desc{};
+            desc.Key = DerivedJobKey{
+                .EntityId = stableId,
+                .Domain = ProgressiveGeometryDomain::MeshVertex,
+                .OutputSemantic = semantic,
+                .EntityGeneration = static_cast<std::uint64_t>(entity),
+                .GeometryGeneration = 1u,
+                .SourcePropertyGeneration = 1u,
+                .BindingGeneration = 1u,
+                .OutputName = name,
+            };
+            desc.Name = std::move(name);
+            desc.Execute = [payloadToken]() -> DerivedJobWorkerResult
+            {
+                return DerivedJobOutput{.PayloadToken = payloadToken};
+            };
+            desc.ApplyOnMainThread =
+                [apply = std::move(apply)](DerivedJobApplyContext&) mutable -> Core::Result
+            {
+                return apply ? apply() : Core::Ok();
+            };
+            return jobs.Submit(std::move(desc));
+        }
+
+        void QueueProgressiveEnrichmentJobs(
+            ECS::Scene::Registry& scene,
+            const ECS::EntityHandle entity,
+            const Assets::AssetModelMaterialPayload* material,
+            const PreparedPrimitive& primitive,
+            const AssetModelSceneHandoffOptions& options,
+            AssetModelSceneHandoffDiagnostics* diagnostics)
+        {
+            if (options.ProgressiveJobs == nullptr)
+            {
+                return;
+            }
+
+            DerivedJobHandle uvJob{};
+            DerivedJobHandle normalJob{};
+
+            if (!MeshHasVertexTexcoords(primitive.Mesh))
+            {
+                uvJob = QueueProgressiveNoopJob(
+                    *options.ProgressiveJobs,
+                    entity,
+                    ProgressiveSlotSemantic::Normal,
+                    "generate mesh uv atlas",
+                    1001u,
+                    [&scene, entity]() -> Core::Result
+                    {
+                        if (!scene.IsValid(entity))
+                        {
+                            return Core::Err(Core::ErrorCode::InvalidState);
+                        }
+                        WriteDefaultTexcoords(scene, entity);
+                        return Core::Ok();
+                    });
+                if (diagnostics != nullptr)
+                {
+                    ++diagnostics->ProgressiveUvAtlasJobsQueued;
+                }
+            }
+
+            if (!MeshHasVertexNormals(primitive.Mesh))
+            {
+                normalJob = QueueProgressiveNoopJob(
+                    *options.ProgressiveJobs,
+                    entity,
+                    ProgressiveSlotSemantic::Normal,
+                    "compute mesh vertex normals",
+                    1002u,
+                    [&scene, entity, propertyName = options.GeneratedNormalPropertyName]() -> Core::Result
+                    {
+                        if (!scene.IsValid(entity))
+                        {
+                            return Core::Err(Core::ErrorCode::InvalidState);
+                        }
+                        WriteDefaultVectorProperty(
+                            scene,
+                            entity,
+                            propertyName.empty() ? std::string_view{"v:normal"} : std::string_view{propertyName},
+                            glm::vec3{0.0f, 0.0f, 1.0f});
+                        return Core::Ok();
+                    });
+                if (diagnostics != nullptr)
+                {
+                    ++diagnostics->ProgressiveNormalJobsQueued;
+                }
+            }
+
+            DerivedJobDesc bake{};
+            bake.Key = DerivedJobKey{
+                .EntityId = StableEntityLookup::ToRenderId(entity),
+                .Domain = ProgressiveGeometryDomain::MeshVertex,
+                .OutputSemantic = ProgressiveSlotSemantic::Normal,
+                .EntityGeneration = static_cast<std::uint64_t>(entity),
+                .GeometryGeneration = 1u,
+                .SourcePropertyGeneration = 1u,
+                .BindingGeneration = 1u,
+                .OutputName = "bake normal texture",
+            };
+            bake.Name = "bake normal texture";
+            if (uvJob.IsValid())
+            {
+                bake.DependsOn.push_back(DerivedJobDependency{
+                    .Job = uvJob,
+                    .Reason = "uv atlas ready",
+                });
+            }
+            if (normalJob.IsValid())
+            {
+                bake.DependsOn.push_back(DerivedJobDependency{
+                    .Job = normalJob,
+                    .Reason = "vertex normals ready",
+                });
+            }
+            bake.Execute = []() -> DerivedJobWorkerResult
+            {
+                return DerivedJobOutput{
+                    .PayloadToken = 1003u,
+                    .Diagnostic = "normal texture bake completed without upload in CPU contract path",
+                };
+            };
+            bake.ApplyOnMainThread =
+                [&scene, entity](DerivedJobApplyContext& context) -> Core::Result
+            {
+                if (!scene.IsValid(entity))
+                {
+                    return Core::Err(Core::ErrorCode::InvalidState);
+                }
+                MarkProgressiveTextureBakeReady(
+                    scene,
+                    entity,
+                    ProgressiveSlotSemantic::Normal,
+                    context.Output.PayloadToken,
+                    context.Output.Diagnostic);
+                return Core::Ok();
+            };
+            (void)options.ProgressiveJobs->Submit(std::move(bake));
+            if (diagnostics != nullptr)
+            {
+                ++diagnostics->ProgressiveTextureBakeJobsQueued;
+            }
+
+            const bool materialHasAuthoredAlbedo =
+                material != nullptr && material->BaseColorTexture.IsValid();
+            if (options.GenerateMissingAlbedoTextures &&
+                !materialHasAuthoredAlbedo &&
+                MeshHasVertexProperty(primitive.Mesh, options.GeneratedAlbedoPropertyName))
+            {
+                DerivedJobDesc albedoBake{};
+                albedoBake.Key = DerivedJobKey{
+                    .EntityId = StableEntityLookup::ToRenderId(entity),
+                    .Domain = ProgressiveGeometryDomain::MeshVertex,
+                    .OutputSemantic = ProgressiveSlotSemantic::Albedo,
+                    .EntityGeneration = static_cast<std::uint64_t>(entity),
+                    .GeometryGeneration = 1u,
+                    .SourcePropertyGeneration = 1u,
+                    .BindingGeneration = 1u,
+                    .OutputName = "bake albedo texture",
+                };
+                albedoBake.Name = "bake albedo texture";
+                if (uvJob.IsValid())
+                {
+                    albedoBake.DependsOn.push_back(DerivedJobDependency{
+                        .Job = uvJob,
+                        .Reason = "uv atlas ready",
+                    });
+                }
+                albedoBake.Execute = []() -> DerivedJobWorkerResult
+                {
+                    return DerivedJobOutput{
+                        .PayloadToken = 1004u,
+                        .Diagnostic = "albedo texture bake completed without upload in CPU contract path",
+                    };
+                };
+                albedoBake.ApplyOnMainThread =
+                    [&scene, entity](DerivedJobApplyContext& context) -> Core::Result
+                {
+                    if (!scene.IsValid(entity))
+                    {
+                        return Core::Err(Core::ErrorCode::InvalidState);
+                    }
+                    MarkProgressiveTextureBakeReady(
+                        scene,
+                        entity,
+                        ProgressiveSlotSemantic::Albedo,
+                        context.Output.PayloadToken,
+                        context.Output.Diagnostic);
+                    return Core::Ok();
+                };
+                (void)options.ProgressiveJobs->Submit(std::move(albedoBake));
+                if (diagnostics != nullptr)
+                {
+                    ++diagnostics->ProgressiveTextureBakeJobsQueued;
+                }
+            }
+        }
     }
 
     std::string BuildEmbeddedTextureAssetPath(
@@ -898,7 +1365,10 @@ namespace Extrinsic::Runtime
             return Core::Err<AssetModelSceneHandoffState>(valid.error());
         }
 
-        auto prepared = PreparePrimitives(model, diagnostics);
+        auto prepared = PreparePrimitives(
+            model,
+            diagnostics,
+            options.ProgressiveRawGeometryFirst);
         if (!prepared.has_value())
         {
             RecordFailure(diagnostics, modelAsset, prepared.error());
@@ -929,19 +1399,28 @@ namespace Extrinsic::Runtime
         }
         state.Record.EmbeddedTextureAssets = std::move(*embeddedTextures);
 
-        auto generatedTextures = GenerateMaterialTextureAssets(
-            service,
-            cache,
-            model,
-            *prepared,
-            modelPath,
-            options,
-            state,
-            diagnostics);
-        if (!generatedTextures.has_value())
+        std::vector<GeneratedMaterialTextureAssets> generatedTextureValues{};
+        if (options.ProgressiveRawGeometryFirst)
         {
-            RecordFailure(diagnostics, modelAsset, generatedTextures.error());
-            return Core::Err<AssetModelSceneHandoffState>(generatedTextures.error());
+            generatedTextureValues.resize(model.Materials.size());
+        }
+        else
+        {
+            auto generatedTextures = GenerateMaterialTextureAssets(
+                service,
+                cache,
+                model,
+                *prepared,
+                modelPath,
+                options,
+                state,
+                diagnostics);
+            if (!generatedTextures.has_value())
+            {
+                RecordFailure(diagnostics, modelAsset, generatedTextures.error());
+                return Core::Err<AssetModelSceneHandoffState>(generatedTextures.error());
+            }
+            generatedTextureValues = std::move(*generatedTextures);
         }
 
         if (auto materialRecords = CreateMaterialRecords(
@@ -949,7 +1428,7 @@ namespace Extrinsic::Runtime
                 cache,
                 model,
                 state.Record.EmbeddedTextureAssets,
-                *generatedTextures,
+                generatedTextureValues,
                 options,
                 state,
                 diagnostics);
@@ -969,6 +1448,26 @@ namespace Extrinsic::Runtime
                 raw,
                 entity,
                 primitive.Mesh);
+            if (options.ProgressiveRawGeometryFirst)
+            {
+                const Assets::AssetModelMaterialPayload* material =
+                    primitive.MaterialIndex < model.Materials.size()
+                        ? &model.Materials[primitive.MaterialIndex]
+                        : nullptr;
+                AttachProgressivePresentationBindings(scene,
+                                                       entity,
+                                                       material,
+                                                       state.Record.EmbeddedTextureAssets,
+                                                       options,
+                                                       primitive,
+                                                       diagnostics);
+                QueueProgressiveEnrichmentJobs(scene,
+                                                entity,
+                                                material,
+                                                primitive,
+                                                options,
+                                                diagnostics);
+            }
 
             std::uint32_t materialSlot = Graphics::kDefaultMaterialSlotIndex;
             bool hasMaterialSlot = false;
@@ -991,6 +1490,10 @@ namespace Extrinsic::Runtime
             if (diagnostics != nullptr)
             {
                 ++diagnostics->PrimitiveEntitiesCreated;
+                if (options.ProgressiveRawGeometryFirst)
+                {
+                    ++diagnostics->ProgressiveRawPrimitiveEntitiesPublished;
+                }
             }
         }
 

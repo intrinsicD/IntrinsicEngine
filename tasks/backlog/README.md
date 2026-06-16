@@ -117,25 +117,7 @@ Open members:
   follow-up for tests and non-legacy consumers that still import bare legacy
   module names after promoted equivalents exist.
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
-- [`runtime/RUNTIME-111-progressive-render-data-descriptors.md`](runtime/RUNTIME-111-progressive-render-data-descriptors.md) —
-  first CPU-contracted descriptor/persistence slice for the progressive
-  entity render-data pipeline accepted by `RUNTIME-110`.
-- [`runtime/RUNTIME-112-entity-derived-job-graph.md`](runtime/RUNTIME-112-entity-derived-job-graph.md) —
-  entity-scoped derived-job scheduling, snapshots, dependencies, stale discard,
-  and follow-up scheduling over the promoted `StreamingExecutor`.
-- [`runtime/RUNTIME-113-progressive-domain-presentation-extraction.md`](runtime/RUNTIME-113-progressive-domain-presentation-extraction.md) —
-  cross-domain extraction for mesh, graph, and point-cloud presentation
-  descriptors.
-- [`runtime/RUNTIME-114-progressive-import-enrichment-pipeline.md`](runtime/RUNTIME-114-progressive-import-enrichment-pipeline.md) —
-  import-time raw visibility followed by observable async UV, normal, bake,
-  upload, and binding enrichment.
-- [`rendering/GRAPHICS-090-progressive-render-data-operational-smoke.md`](rendering/GRAPHICS-090-progressive-render-data-operational-smoke.md) —
-  opt-in Vulkan proof for generated mesh texture slots and graph/point
-  property-buffer presentation after runtime CPU contracts land.
 - [`ui/RORG-031-ui-integration.md`](ui/RORG-031-ui-integration.md).
-- [`ui/UI-015-progressive-render-data-inspector.md`](ui/UI-015-progressive-render-data-inspector.md) —
-  selected-entity and global UI/debug visibility for progressive render-data
-  bindings, slot defaults, property pickers, and derived jobs.
 - [`platform/PLATFORM-004-alternative-platform-backend-onboarding.md`](platform/PLATFORM-004-alternative-platform-backend-onboarding.md) (planning-only seed).
 
 ### Theme G — Active bugs
