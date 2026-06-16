@@ -247,3 +247,43 @@ tree:
       default CPU-supported CTest passed 3069/3069, and strict layering/
       test-layout/doc-link/task checks passed.
     status: resolved
+  - id: N15
+    type: decision
+    title: "Retire BUG-044 at CPUContracted"
+    provenance: ai-executed
+    timestamp: "2026-06-16T14:35"
+    also_depends_on: [N13]
+    choice: >
+      Split direct runtime mesh import so decoded raw geometry publishes
+      immediately, while missing-normal synthesis, UV atlas resolution, and
+      generated normal texture baking run as downstream Runtime.StreamingExecutor
+      work that applies back to the same entity.
+    alternatives:
+      - "Keep direct mesh import synchronous through full ASSETIO-008 materialization."
+      - "Create a second post-processed ECS entity instead of updating the imported entity."
+      - "Move fallback UV or normal fabrication into renderer extraction."
+    evidence:
+      - "tasks/done/BUG-044-runtime-import-postprocess-queue.md"
+      - "src/runtime/Runtime.Engine.cpp"
+      - "src/runtime/Runtime.AssetMeshNormals.cpp"
+      - "tests/contract/runtime/Test.AssetImportFormatCoverage.cpp"
+    status: resolved
+  - id: N16
+    type: experiment
+    title: "BUG-044 verification"
+    provenance: ai-executed
+    timestamp: "2026-06-16T14:35"
+    also_depends_on: [N15]
+    evidence:
+      - "cmake --build --preset ci --target IntrinsicRuntimeContractTests"
+      - "ctest --test-dir build/ci --output-on-failure -R 'RuntimeAssetImportFormatCoverage|SandboxEditorUi.*Dropped|SandboxEditorUi\\.EngineImportFacadeMaterializes(NonManifoldObj|ObjWithoutAuthoredTexcoords)AsRenderableMesh|RuntimeAssetMeshNormals|RuntimeAssetModelSceneHandoff' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "cmake --build --preset ci --target IntrinsicTests"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+    result: >
+      Focused runtime import and sandbox tests passed 29/29, IntrinsicTests
+      built successfully, default CPU-supported CTest passed 3069/3069, task
+      policy/session brief/docs-sync/layering/test-layout/doc-link checks passed,
+      and git diff whitespace check passed.
+    status: resolved

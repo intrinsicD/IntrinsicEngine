@@ -2,9 +2,9 @@ session:
   id: "2026-06-16_001"
   date: "2026-06-16"
   started: "2026-06-16T11:33"
-  last_turn: "2026-06-16T12:55"
-  turn_count: 2
-  summary: "Implemented and retired ASSETIO-005, GEOM-018, GEOM-025, and ASSETIO-008; resolved runtime UV materialization now unblocks generated-UV graphics smoke follow-up."
+  last_turn: "2026-06-16T14:35"
+  turn_count: 3
+  summary: "Implemented and retired ASSETIO-005, GEOM-018, GEOM-025, ASSETIO-008, and BUG-044; direct mesh import now publishes raw geometry before queued derived post-processing."
 
 events_logged:
   - turn: 1
@@ -55,6 +55,18 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "ASSETIO-008 focused tests passed 40/40 and default CPU-supported CTest passed 3069/3069."
+  - turn: 3
+    type: decision
+    id: "N15"
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired BUG-044 with direct mesh import publishing raw geometry before queued derived post-processing."
+  - turn: 3
+    type: experiment
+    id: "N16"
+    routing: direct
+    provenance: ai-executed
+    summary: "BUG-044 focused runtime tests passed 29/29 and default CPU-supported CTest passed 3069/3069."
 
 ai_actions:
   - turn: 1
@@ -103,6 +115,16 @@ ai_actions:
       - "tests/contract/runtime/Test.AssetImportFormatCoverage.cpp"
       - "tests/contract/runtime/Test.AssetModelSceneHandoff.cpp"
       - "tasks/done/ASSETIO-008-default-uv-atlas-materialization.md"
+  - turn: 3
+    action: "Implemented BUG-044 deferred direct mesh post-processing, tests, docs, task retirement, verification, and commit 704b4b7b."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Runtime.Engine.cpp"
+      - "src/runtime/Runtime.AssetMeshNormals.cppm"
+      - "src/runtime/Runtime.AssetMeshNormals.cpp"
+      - "tests/contract/runtime/Test.AssetImportFormatCoverage.cpp"
+      - "tests/contract/runtime/Test.SandboxEditorUi.cpp"
+      - "tasks/done/BUG-044-runtime-import-postprocess-queue.md"
 
 claims_touched: []
 
@@ -111,6 +133,8 @@ key_context:
     excerpt: "User requested the agentic workflow to implement ASSETIO backlog tasks and commit all changes; generated task state showed ASSETIO-005 unblocked and ASSETIO-008 blocked by GEOM-025."
   - turn: 2
     excerpt: "User requested the agentic workflow in multi-task loop mode for GEOM-018, then GEOM-025, then ASSETIO-008, with planning, implementation, verification, and commits."
+  - turn: 3
+    excerpt: "User reported extremely long object loading and expected geometry to load first, with derived normal/UV/bake work queued and applied when ready."
 
 open_threads:
   - "GRAPHICS-089 generated-UV Vulkan smoke is now unblocked by ASSETIO-008 and remains pending opt-in Vulkan coverage."

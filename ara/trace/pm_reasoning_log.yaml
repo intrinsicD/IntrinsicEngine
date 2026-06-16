@@ -19,3 +19,8 @@ entries:
       - "Routed GEOM-018, GEOM-025, and ASSETIO-008 retirements plus verification as direct journey facts."
       - "Did not stage interpretive observations; the turn produced committed engineering artifacts, generated task-state movement, and deterministic verification evidence."
       - "Updated the open thread from ASSETIO-008 blocked state to GRAPHICS-089 pending opt-in Vulkan smoke coverage because GEOM-025 and ASSETIO-008 were retired."
+  - turn: "2026-06-16_001#3"
+    notes:
+      - "Routed BUG-044 implementation/retirement and verification as direct journey facts."
+      - "Did not stage interpretive observations; the turn produced committed engineering evidence and deterministic verification results rather than a new research assertion."
+      - "Kept GRAPHICS-089 as the only open thread; BUG-044 closed at CPUContracted and did not change the pending opt-in Vulkan smoke scope."
