@@ -26,6 +26,7 @@ import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.Renderer;
+import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
@@ -528,6 +529,55 @@ export namespace Extrinsic::Runtime
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
+    struct SandboxEditorAssetImportQueueCommandSurface
+    {
+        std::function<std::size_t()> ClearCompleted{};
+        std::function<Core::Result(RuntimeAssetIngestHandle)> Cancel{};
+
+        [[nodiscard]] bool ClearAvailable() const noexcept
+        {
+            return static_cast<bool>(ClearCompleted);
+        }
+
+        [[nodiscard]] bool CancelAvailable() const noexcept
+        {
+            return static_cast<bool>(Cancel);
+        }
+    };
+
+    struct SandboxEditorAssetImportQueueRow
+    {
+        RuntimeAssetIngestHandle Operation{};
+        std::uint64_t Sequence{0u};
+        RuntimeAssetIngestSource Source{RuntimeAssetIngestSource::ManualImport};
+        std::string SourcePath{};
+        std::string PathBasename{};
+        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
+        Assets::AssetId Asset{};
+        RuntimeAssetImportQueueStage Stage{RuntimeAssetImportQueueStage::Queued};
+        RuntimeAssetImportQueueTerminalStatus TerminalStatus{
+            RuntimeAssetImportQueueTerminalStatus::None};
+        bool ProgressDeterminate{true};
+        float NormalizedProgress{0.0f};
+        std::string StageText{};
+        std::string DiagnosticText{};
+        double ElapsedSeconds{0.0};
+        bool CanCancel{false};
+        std::string CancelDisabledReason{};
+    };
+
+    struct SandboxEditorAssetImportQueueModel
+    {
+        std::vector<SandboxEditorAssetImportQueueRow> Rows{};
+        std::size_t ActiveCount{0u};
+        std::size_t TerminalCount{0u};
+        bool ClearCompletedAvailable{false};
+        bool CanClearCompleted{false};
+        std::string ClearCompletedDisabledReason{};
+        std::string StatusText{};
+        std::vector<SandboxEditorDiagnostic> Diagnostics{};
+    };
+
     struct SandboxEditorRenderGraphPassModel
     {
         std::string Name{};
@@ -732,6 +782,7 @@ export namespace Extrinsic::Runtime
         SandboxEditorDocumentModel          Document{};
         SandboxEditorSceneFileModel        SceneFile{};
         SandboxEditorFileImportModel        FileImport{};
+        SandboxEditorAssetImportQueueModel  AssetImportQueue{};
         SandboxEditorRenderGraphModel       RenderGraph{};
         SandboxEditorCameraRenderModel      CameraRender{};
         SandboxEditorVisualizationModel     Visualization{};
@@ -747,9 +798,11 @@ export namespace Extrinsic::Runtime
         CameraControllerRegistry* CameraControllers{nullptr};
         Core::Extent2D CameraViewport{};
         SandboxEditorAssetImportCommandSurface AssetImportCommands{};
+        SandboxEditorAssetImportQueueCommandSurface AssetImportQueueCommands{};
         SandboxEditorSceneFileCommandSurface SceneFileCommands{};
         SandboxEditorPrimitiveViewCommandSurface PrimitiveViewCommands{};
         SandboxEditorVisualizationAdapterBindingCommandSurface VisualizationAdapterBindings{};
+        RuntimeAssetImportQueueSnapshot AssetImportQueue{};
         std::string PendingAssetImportPath{};
         std::string PendingSceneFilePath{};
         Assets::AssetPayloadKind PendingAssetImportPayloadKind{

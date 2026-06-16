@@ -3,12 +3,16 @@ module;
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <chrono>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 module Extrinsic.Runtime.AssetIngestStateMachine;
+
+import Extrinsic.Core.Error;
 
 namespace Extrinsic::Runtime
 {
@@ -21,6 +25,37 @@ namespace Extrinsic::Runtime
             return lhs.Path == rhs.Path &&
                    lhs.PayloadKind == rhs.PayloadKind &&
                    lhs.ExistingAsset == rhs.ExistingAsset;
+        }
+
+        [[nodiscard]] RuntimeAssetImportQueueTimePoint Now() noexcept
+        {
+            return std::chrono::steady_clock::now();
+        }
+
+        void MarkUpdated(RuntimeAssetIngestRecord& record) noexcept
+        {
+            record.LastUpdatedAt = Now();
+        }
+
+        void MarkStarted(RuntimeAssetIngestRecord& record) noexcept
+        {
+            const RuntimeAssetImportQueueTimePoint now = Now();
+            if (!record.StartedAt.has_value())
+            {
+                record.StartedAt = now;
+            }
+            record.LastUpdatedAt = now;
+        }
+
+        void MarkFinished(RuntimeAssetIngestRecord& record) noexcept
+        {
+            const RuntimeAssetImportQueueTimePoint now = Now();
+            if (!record.StartedAt.has_value())
+            {
+                record.StartedAt = now;
+            }
+            record.FinishedAt = now;
+            record.LastUpdatedAt = now;
         }
 
         [[nodiscard]] RuntimeAssetIngestTransition MakeTransition(
@@ -64,6 +99,167 @@ namespace Extrinsic::Runtime
             }
             return RuntimeAssetIngestDiagnostic::UnsupportedExtension;
         }
+
+        [[nodiscard]] std::string PathBasename(const std::string_view path)
+        {
+            if (path.empty())
+            {
+                return {};
+            }
+            const std::size_t slash = path.find_last_of("/\\");
+            const std::size_t begin = slash == std::string_view::npos
+                ? 0u
+                : slash + 1u;
+            if (begin >= path.size())
+            {
+                return {};
+            }
+            return std::string(path.substr(begin));
+        }
+
+        [[nodiscard]] RuntimeAssetImportQueueTerminalStatus TerminalStatusForPhase(
+            const RuntimeAssetIngestPhase phase) noexcept
+        {
+            switch (phase)
+            {
+            case RuntimeAssetIngestPhase::Complete:
+                return RuntimeAssetImportQueueTerminalStatus::Complete;
+            case RuntimeAssetIngestPhase::Failed:
+                return RuntimeAssetImportQueueTerminalStatus::Failed;
+            case RuntimeAssetIngestPhase::Cancelled:
+                return RuntimeAssetImportQueueTerminalStatus::Cancelled;
+            case RuntimeAssetIngestPhase::Queued:
+            case RuntimeAssetIngestPhase::RouteResolved:
+            case RuntimeAssetIngestPhase::DecodeQueued:
+            case RuntimeAssetIngestPhase::Decoding:
+            case RuntimeAssetIngestPhase::AwaitingMainThreadApply:
+            case RuntimeAssetIngestPhase::Applying:
+            case RuntimeAssetIngestPhase::AwaitingGpuUpload:
+                return RuntimeAssetImportQueueTerminalStatus::None;
+            }
+            return RuntimeAssetImportQueueTerminalStatus::Failed;
+        }
+
+        [[nodiscard]] RuntimeAssetImportQueueStage StageForPhase(
+            const RuntimeAssetIngestPhase phase) noexcept
+        {
+            switch (phase)
+            {
+            case RuntimeAssetIngestPhase::Queued:
+                return RuntimeAssetImportQueueStage::Queued;
+            case RuntimeAssetIngestPhase::RouteResolved:
+                return RuntimeAssetImportQueueStage::Routing;
+            case RuntimeAssetIngestPhase::DecodeQueued:
+                return RuntimeAssetImportQueueStage::DecodeQueued;
+            case RuntimeAssetIngestPhase::Decoding:
+                return RuntimeAssetImportQueueStage::Decoding;
+            case RuntimeAssetIngestPhase::AwaitingMainThreadApply:
+            case RuntimeAssetIngestPhase::Applying:
+                return RuntimeAssetImportQueueStage::MainThreadApply;
+            case RuntimeAssetIngestPhase::AwaitingGpuUpload:
+                return RuntimeAssetImportQueueStage::GpuUpload;
+            case RuntimeAssetIngestPhase::Complete:
+                return RuntimeAssetImportQueueStage::Complete;
+            case RuntimeAssetIngestPhase::Failed:
+                return RuntimeAssetImportQueueStage::Failed;
+            case RuntimeAssetIngestPhase::Cancelled:
+                return RuntimeAssetImportQueueStage::Cancelled;
+            }
+            return RuntimeAssetImportQueueStage::Failed;
+        }
+
+        [[nodiscard]] bool IsIndeterminateProgressStage(
+            const RuntimeAssetImportQueueStage stage) noexcept
+        {
+            switch (stage)
+            {
+            case RuntimeAssetImportQueueStage::Decoding:
+            case RuntimeAssetImportQueueStage::MainThreadApply:
+            case RuntimeAssetImportQueueStage::GpuUpload:
+                return true;
+            case RuntimeAssetImportQueueStage::Queued:
+            case RuntimeAssetImportQueueStage::Routing:
+            case RuntimeAssetImportQueueStage::DecodeQueued:
+            case RuntimeAssetImportQueueStage::Complete:
+            case RuntimeAssetImportQueueStage::Failed:
+            case RuntimeAssetImportQueueStage::Cancelled:
+                return false;
+            }
+            return false;
+        }
+
+        [[nodiscard]] float ProgressForStage(
+            const RuntimeAssetImportQueueStage stage) noexcept
+        {
+            switch (stage)
+            {
+            case RuntimeAssetImportQueueStage::Queued:
+                return 0.0f;
+            case RuntimeAssetImportQueueStage::Routing:
+                return 0.15f;
+            case RuntimeAssetImportQueueStage::DecodeQueued:
+                return 0.25f;
+            case RuntimeAssetImportQueueStage::Decoding:
+                return 0.45f;
+            case RuntimeAssetImportQueueStage::MainThreadApply:
+                return 0.80f;
+            case RuntimeAssetImportQueueStage::GpuUpload:
+                return 0.90f;
+            case RuntimeAssetImportQueueStage::Complete:
+            case RuntimeAssetImportQueueStage::Failed:
+            case RuntimeAssetImportQueueStage::Cancelled:
+                return 1.0f;
+            }
+            return 0.0f;
+        }
+
+        [[nodiscard]] std::string DiagnosticTextForRecord(
+            const RuntimeAssetIngestRecord& record)
+        {
+            if (record.Diagnostic == RuntimeAssetIngestDiagnostic::None &&
+                record.Error == Core::ErrorCode::Success)
+            {
+                return {};
+            }
+
+            std::string text =
+                DebugNameForRuntimeAssetIngestDiagnostic(record.Diagnostic);
+            if (record.Error != Core::ErrorCode::Success)
+            {
+                text += ": ";
+                text += Core::Error::ToString(record.Error);
+            }
+            return text;
+        }
+
+        [[nodiscard]] RuntimeAssetImportQueueEntry QueueEntryForRecord(
+            const RuntimeAssetIngestRecord& record)
+        {
+            const RuntimeAssetImportQueueStage stage = StageForPhase(record.Phase);
+            RuntimeAssetImportQueueEntry entry{};
+            entry.Operation = record.Handle;
+            entry.Sequence = record.Sequence;
+            entry.Source = record.Request.Source;
+            entry.SourcePath = record.Request.Path;
+            entry.PathBasename = PathBasename(record.Request.Path);
+            entry.PayloadKind = record.Result.has_value()
+                ? record.Result->PayloadKind
+                : record.Request.PayloadKind;
+            entry.Asset = record.Result.has_value()
+                ? record.Result->Asset
+                : record.Request.ExistingAsset;
+            entry.Stage = stage;
+            entry.TerminalStatus = TerminalStatusForPhase(record.Phase);
+            entry.EnqueuedAt = record.EnqueuedAt;
+            entry.StartedAt = record.StartedAt;
+            entry.FinishedAt = record.FinishedAt;
+            entry.LastUpdatedAt = record.LastUpdatedAt;
+            entry.ProgressDeterminate = !IsIndeterminateProgressStage(stage);
+            entry.NormalizedProgress = ProgressForStage(stage);
+            entry.StageText = DebugNameForRuntimeAssetImportQueueStage(stage);
+            entry.DiagnosticText = DiagnosticTextForRecord(record);
+            return entry;
+        }
     }
 
     bool RuntimeAssetIngestTransition::Succeeded() const noexcept
@@ -86,6 +282,7 @@ namespace Extrinsic::Runtime
         case RuntimeAssetIngestPhase::Decoding:
         case RuntimeAssetIngestPhase::AwaitingMainThreadApply:
         case RuntimeAssetIngestPhase::Applying:
+        case RuntimeAssetIngestPhase::AwaitingGpuUpload:
             return false;
         }
         return true;
@@ -123,6 +320,8 @@ namespace Extrinsic::Runtime
             return "AwaitingMainThreadApply";
         case RuntimeAssetIngestPhase::Applying:
             return "Applying";
+        case RuntimeAssetIngestPhase::AwaitingGpuUpload:
+            return "AwaitingGpuUpload";
         case RuntimeAssetIngestPhase::Complete:
             return "Complete";
         case RuntimeAssetIngestPhase::Failed:
@@ -174,6 +373,50 @@ namespace Extrinsic::Runtime
         return "Unknown";
     }
 
+    const char* DebugNameForRuntimeAssetImportQueueStage(
+        const RuntimeAssetImportQueueStage stage) noexcept
+    {
+        switch (stage)
+        {
+        case RuntimeAssetImportQueueStage::Queued:
+            return "Queued";
+        case RuntimeAssetImportQueueStage::Routing:
+            return "Routing";
+        case RuntimeAssetImportQueueStage::DecodeQueued:
+            return "DecodeQueued";
+        case RuntimeAssetImportQueueStage::Decoding:
+            return "Decoding";
+        case RuntimeAssetImportQueueStage::MainThreadApply:
+            return "MainThreadApply";
+        case RuntimeAssetImportQueueStage::GpuUpload:
+            return "GpuUpload";
+        case RuntimeAssetImportQueueStage::Complete:
+            return "Complete";
+        case RuntimeAssetImportQueueStage::Failed:
+            return "Failed";
+        case RuntimeAssetImportQueueStage::Cancelled:
+            return "Cancelled";
+        }
+        return "Unknown";
+    }
+
+    const char* DebugNameForRuntimeAssetImportQueueTerminalStatus(
+        const RuntimeAssetImportQueueTerminalStatus status) noexcept
+    {
+        switch (status)
+        {
+        case RuntimeAssetImportQueueTerminalStatus::None:
+            return "None";
+        case RuntimeAssetImportQueueTerminalStatus::Complete:
+            return "Complete";
+        case RuntimeAssetImportQueueTerminalStatus::Failed:
+            return "Failed";
+        case RuntimeAssetImportQueueTerminalStatus::Cancelled:
+            return "Cancelled";
+        }
+        return "Unknown";
+    }
+
     RuntimeAssetIngestDiagnostic RuntimeAssetIngestDiagnosticFromRouteStatus(
         const Assets::AssetRouteStatus status) noexcept
     {
@@ -205,12 +448,15 @@ namespace Extrinsic::Runtime
 
         RuntimeAssetIngestDiagnostic diagnostic = RuntimeAssetIngestDiagnostic::None;
         Core::ErrorCode error = Core::ErrorCode::Success;
+        record.EnqueuedAt = Now();
+        record.LastUpdatedAt = record.EnqueuedAt;
         if (record.Request.Source == RuntimeAssetIngestSource::Reimport &&
             !record.Request.ExistingAsset.IsValid())
         {
             record.Phase = RuntimeAssetIngestPhase::Failed;
             record.Diagnostic = RuntimeAssetIngestDiagnostic::InvalidReimportTarget;
             record.Error = Core::ErrorCode::InvalidArgument;
+            MarkFinished(record);
             diagnostic = record.Diagnostic;
             error = record.Error;
         }
@@ -219,6 +465,7 @@ namespace Extrinsic::Runtime
             record.Phase = RuntimeAssetIngestPhase::Failed;
             record.Diagnostic = RuntimeAssetIngestDiagnostic::MissingPath;
             record.Error = Core::ErrorCode::InvalidPath;
+            MarkFinished(record);
             diagnostic = record.Diagnostic;
             error = record.Error;
         }
@@ -273,12 +520,14 @@ namespace Extrinsic::Runtime
             record.Phase = RuntimeAssetIngestPhase::Failed;
             record.Diagnostic = mapped;
             record.Error = diagnostic.Error;
+            MarkFinished(record);
             return MakeTransition(record, mapped, diagnostic.Error, true);
         }
 
         record.Phase = RuntimeAssetIngestPhase::RouteResolved;
         record.Diagnostic = RuntimeAssetIngestDiagnostic::None;
         record.Error = Core::ErrorCode::Success;
+        MarkUpdated(record);
         return MakeTransition(
             record,
             RuntimeAssetIngestDiagnostic::None,
@@ -336,6 +585,7 @@ namespace Extrinsic::Runtime
         record.Phase = RuntimeAssetIngestPhase::AwaitingMainThreadApply;
         record.Diagnostic = RuntimeAssetIngestDiagnostic::None;
         record.Error = Core::ErrorCode::Success;
+        MarkUpdated(record);
         return MakeTransition(
             record,
             RuntimeAssetIngestDiagnostic::None,
@@ -376,6 +626,7 @@ namespace Extrinsic::Runtime
         record.Phase = RuntimeAssetIngestPhase::Failed;
         record.Diagnostic = RuntimeAssetIngestDiagnostic::DecodeFailed;
         record.Error = error;
+        MarkFinished(record);
         return MakeTransition(
             record,
             RuntimeAssetIngestDiagnostic::DecodeFailed,
@@ -402,6 +653,15 @@ namespace Extrinsic::Runtime
             RuntimeAssetIngestPhase::Applying);
     }
 
+    RuntimeAssetIngestTransition RuntimeAssetIngestStateMachine::BeginGpuUpload(
+        const RuntimeAssetIngestHandle handle)
+    {
+        return SetPhase(
+            handle,
+            RuntimeAssetIngestPhase::Applying,
+            RuntimeAssetIngestPhase::AwaitingGpuUpload);
+    }
+
     RuntimeAssetIngestTransition RuntimeAssetIngestStateMachine::CompleteApply(
         const RuntimeAssetIngestHandle handle,
         const std::uint32_t completionGeneration,
@@ -422,7 +682,8 @@ namespace Extrinsic::Runtime
                 Core::ErrorCode::InvalidState,
                 false);
         }
-        if (record.Phase != RuntimeAssetIngestPhase::Applying)
+        if (record.Phase != RuntimeAssetIngestPhase::Applying &&
+            record.Phase != RuntimeAssetIngestPhase::AwaitingGpuUpload)
         {
             return MakeTransition(
                 record,
@@ -435,6 +696,7 @@ namespace Extrinsic::Runtime
         record.Phase = RuntimeAssetIngestPhase::Complete;
         record.Diagnostic = RuntimeAssetIngestDiagnostic::None;
         record.Error = Core::ErrorCode::Success;
+        MarkFinished(record);
         return MakeTransition(
             record,
             RuntimeAssetIngestDiagnostic::None,
@@ -462,7 +724,8 @@ namespace Extrinsic::Runtime
                 Core::ErrorCode::InvalidState,
                 false);
         }
-        if (record.Phase != RuntimeAssetIngestPhase::Applying)
+        if (record.Phase != RuntimeAssetIngestPhase::Applying &&
+            record.Phase != RuntimeAssetIngestPhase::AwaitingGpuUpload)
         {
             return MakeTransition(
                 record,
@@ -474,6 +737,7 @@ namespace Extrinsic::Runtime
         record.Phase = RuntimeAssetIngestPhase::Failed;
         record.Diagnostic = RuntimeAssetIngestDiagnostic::MaterializationFailed;
         record.Error = error;
+        MarkFinished(record);
         return MakeTransition(
             record,
             RuntimeAssetIngestDiagnostic::MaterializationFailed,
@@ -502,6 +766,7 @@ namespace Extrinsic::Runtime
         record.Phase = RuntimeAssetIngestPhase::Cancelled;
         record.Diagnostic = RuntimeAssetIngestDiagnostic::Cancelled;
         record.Error = Core::ErrorCode::InvalidState;
+        MarkFinished(record);
         return MakeTransition(
             record,
             RuntimeAssetIngestDiagnostic::Cancelled,
@@ -526,6 +791,51 @@ namespace Extrinsic::Runtime
     RuntimeAssetIngestStateMachine::SnapshotAll() const
     {
         return m_Records;
+    }
+
+    RuntimeAssetImportQueueSnapshot
+    RuntimeAssetIngestStateMachine::SnapshotQueue() const
+    {
+        RuntimeAssetImportQueueSnapshot snapshot{};
+        for (const RuntimeAssetIngestRecord& record : m_Records)
+        {
+            if (!record.VisibleInQueue)
+            {
+                continue;
+            }
+
+            if (IsTerminal(record.Phase))
+            {
+                ++snapshot.TerminalCount;
+            }
+            else
+            {
+                ++snapshot.ActiveCount;
+            }
+            snapshot.Entries.push_back(QueueEntryForRecord(record));
+        }
+        snapshot.CanClearCompleted = snapshot.TerminalCount > 0u;
+        if (!snapshot.CanClearCompleted)
+        {
+            snapshot.ClearCompletedDisabledReason =
+                "No completed, failed, or cancelled imports are visible.";
+        }
+        return snapshot;
+    }
+
+    std::size_t RuntimeAssetIngestStateMachine::ClearCompletedQueueEntries()
+    {
+        std::size_t cleared = 0u;
+        for (RuntimeAssetIngestRecord& record : m_Records)
+        {
+            if (!record.VisibleInQueue || !IsTerminal(record.Phase))
+            {
+                continue;
+            }
+            record.VisibleInQueue = false;
+            ++cleared;
+        }
+        return cleared;
     }
 
     std::size_t RuntimeAssetIngestStateMachine::ActiveCount() const noexcept
@@ -568,6 +878,15 @@ namespace Extrinsic::Runtime
         record.Phase = next;
         record.Diagnostic = RuntimeAssetIngestDiagnostic::None;
         record.Error = Core::ErrorCode::Success;
+        if (next == RuntimeAssetIngestPhase::Decoding ||
+            next == RuntimeAssetIngestPhase::Applying)
+        {
+            MarkStarted(record);
+        }
+        else
+        {
+            MarkUpdated(record);
+        }
         return MakeTransition(
             record,
             RuntimeAssetIngestDiagnostic::None,
@@ -599,6 +918,7 @@ namespace Extrinsic::Runtime
         record.Phase = RuntimeAssetIngestPhase::Failed;
         record.Diagnostic = diagnostic;
         record.Error = error;
+        MarkFinished(record);
         return MakeTransition(record, diagnostic, error, true);
     }
 }

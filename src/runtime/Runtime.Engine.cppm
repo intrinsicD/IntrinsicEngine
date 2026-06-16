@@ -238,6 +238,11 @@ namespace Extrinsic::Runtime
             GetLastAssetImportEvent() const noexcept;
         [[nodiscard]] std::vector<RuntimeAssetIngestRecord>
             GetAssetIngestRecordsForTest() const;
+        [[nodiscard]] RuntimeAssetImportQueueSnapshot
+            GetAssetImportQueueSnapshot() const;
+        [[nodiscard]] std::size_t ClearCompletedAssetImports();
+        [[nodiscard]] Core::Result CancelAssetImport(
+            RuntimeAssetIngestHandle operation);
         void ImportDroppedFilePaths(std::span<const std::string> paths);
         // Contract-test seam: replay a platform event through the same runtime
         // handler installed as the window listener during Initialize().
@@ -449,6 +454,12 @@ namespace Extrinsic::Runtime
         std::unique_ptr<AssetModelTextureHandoff> m_AssetModelTextureHandoff;
         std::unique_ptr<AssetModelSceneHandoff>   m_AssetModelSceneHandoff;
         RuntimeAssetIngestStateMachine             m_AssetIngestStateMachine{};
+        struct RuntimeAssetImportStreamingTask
+        {
+            RuntimeAssetIngestHandle Ingest{};
+            StreamingTaskHandle Streaming{};
+        };
+        std::vector<RuntimeAssetImportStreamingTask> m_AssetImportStreamingTasks{};
         std::optional<RuntimeAssetImportEvent>     m_LastAssetImportEvent{};
         std::uint64_t                              m_AssetImportEventSequence{0};
         // ECS scene registry

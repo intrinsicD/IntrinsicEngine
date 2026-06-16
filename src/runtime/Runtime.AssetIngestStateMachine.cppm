@@ -2,6 +2,7 @@ module;
 
 #include <cstddef>
 #include <cstdint>
+#include <chrono>
 #include <optional>
 #include <string>
 #include <vector>
@@ -33,6 +34,7 @@ export namespace Extrinsic::Runtime
         Decoding,
         AwaitingMainThreadApply,
         Applying,
+        AwaitingGpuUpload,
         Complete,
         Failed,
         Cancelled,
@@ -57,6 +59,30 @@ export namespace Extrinsic::Runtime
         InvalidTransition,
         UnknownHandle,
     };
+
+    enum class RuntimeAssetImportQueueStage : std::uint8_t
+    {
+        Queued,
+        Routing,
+        DecodeQueued,
+        Decoding,
+        MainThreadApply,
+        GpuUpload,
+        Complete,
+        Failed,
+        Cancelled,
+    };
+
+    enum class RuntimeAssetImportQueueTerminalStatus : std::uint8_t
+    {
+        None,
+        Complete,
+        Failed,
+        Cancelled,
+    };
+
+    using RuntimeAssetImportQueueTimePoint =
+        std::chrono::steady_clock::time_point;
 
     struct RuntimeAssetIngestRequest
     {
@@ -89,6 +115,44 @@ export namespace Extrinsic::Runtime
         Core::ErrorCode Error{Core::ErrorCode::Success};
         Assets::AssetRouteStatus RouteStatus{Assets::AssetRouteStatus::Ready};
         std::optional<RuntimeAssetIngestResult> Result{};
+        RuntimeAssetImportQueueTimePoint EnqueuedAt{};
+        std::optional<RuntimeAssetImportQueueTimePoint> StartedAt{};
+        std::optional<RuntimeAssetImportQueueTimePoint> FinishedAt{};
+        RuntimeAssetImportQueueTimePoint LastUpdatedAt{};
+        bool VisibleInQueue{true};
+    };
+
+    struct RuntimeAssetImportQueueEntry
+    {
+        RuntimeAssetIngestHandle Operation{};
+        std::uint64_t Sequence{0u};
+        RuntimeAssetIngestSource Source{RuntimeAssetIngestSource::ManualImport};
+        std::string SourcePath{};
+        std::string PathBasename{};
+        Assets::AssetPayloadKind PayloadKind{Assets::AssetPayloadKind::Unknown};
+        Assets::AssetId Asset{};
+        RuntimeAssetImportQueueStage Stage{RuntimeAssetImportQueueStage::Queued};
+        RuntimeAssetImportQueueTerminalStatus TerminalStatus{
+            RuntimeAssetImportQueueTerminalStatus::None};
+        RuntimeAssetImportQueueTimePoint EnqueuedAt{};
+        std::optional<RuntimeAssetImportQueueTimePoint> StartedAt{};
+        std::optional<RuntimeAssetImportQueueTimePoint> FinishedAt{};
+        RuntimeAssetImportQueueTimePoint LastUpdatedAt{};
+        bool ProgressDeterminate{true};
+        float NormalizedProgress{0.0f};
+        std::string StageText{};
+        std::string DiagnosticText{};
+        bool CanCancel{false};
+        std::string CancelDisabledReason{"Cancellation is not available for this import stage."};
+    };
+
+    struct RuntimeAssetImportQueueSnapshot
+    {
+        std::vector<RuntimeAssetImportQueueEntry> Entries{};
+        std::size_t ActiveCount{0u};
+        std::size_t TerminalCount{0u};
+        bool CanClearCompleted{false};
+        std::string ClearCompletedDisabledReason{};
     };
 
     struct RuntimeAssetIngestTransition
@@ -112,6 +176,10 @@ export namespace Extrinsic::Runtime
         RuntimeAssetIngestPhase phase) noexcept;
     [[nodiscard]] const char* DebugNameForRuntimeAssetIngestDiagnostic(
         RuntimeAssetIngestDiagnostic diagnostic) noexcept;
+    [[nodiscard]] const char* DebugNameForRuntimeAssetImportQueueStage(
+        RuntimeAssetImportQueueStage stage) noexcept;
+    [[nodiscard]] const char* DebugNameForRuntimeAssetImportQueueTerminalStatus(
+        RuntimeAssetImportQueueTerminalStatus status) noexcept;
 
     [[nodiscard]] RuntimeAssetIngestDiagnostic
         RuntimeAssetIngestDiagnosticFromRouteStatus(
@@ -147,6 +215,8 @@ export namespace Extrinsic::Runtime
             Core::ErrorCode error);
         [[nodiscard]] RuntimeAssetIngestTransition BeginApply(
             RuntimeAssetIngestHandle handle);
+        [[nodiscard]] RuntimeAssetIngestTransition BeginGpuUpload(
+            RuntimeAssetIngestHandle handle);
         [[nodiscard]] RuntimeAssetIngestTransition CompleteApply(
             RuntimeAssetIngestHandle handle,
             std::uint32_t completionGeneration,
@@ -161,6 +231,8 @@ export namespace Extrinsic::Runtime
         [[nodiscard]] std::optional<RuntimeAssetIngestRecord> Snapshot(
             RuntimeAssetIngestHandle handle) const;
         [[nodiscard]] std::vector<RuntimeAssetIngestRecord> SnapshotAll() const;
+        [[nodiscard]] RuntimeAssetImportQueueSnapshot SnapshotQueue() const;
+        [[nodiscard]] std::size_t ClearCompletedQueueEntries();
         [[nodiscard]] std::size_t ActiveCount() const noexcept;
         [[nodiscard]] std::size_t TotalCount() const noexcept;
 

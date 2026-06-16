@@ -24,6 +24,15 @@ decoding, `AssetService` mutation, model-scene materialization, and
 texture-upload requests remain runtime/asset owned; the sandbox app
 implementation does not special-case asset authority.
 
+The `File / Import` editor window also polls
+`Engine::GetAssetImportQueueSnapshot()` for the runtime-owned AssetIO queue.
+Rows show queued/running/apply/upload/terminal import stages, payload kind,
+path basename, elapsed time, determinate progress where available, indeterminate
+stage labels where decoder progress is unknown, and failure/cancellation
+diagnostics. Clear-completed and cancellable dropped-geometry commands route
+back to `Engine`; the sandbox app and UI never own asset, ECS, or graphics
+state.
+
 The promoted EditorUI also exposes stable top-level ImGui menu slots for
 `PointCloud`, `Graph`, and `Mesh`. Their submenu items open selected-entity
 domain windows for render-hint status, visualization/spatial-debug controls,

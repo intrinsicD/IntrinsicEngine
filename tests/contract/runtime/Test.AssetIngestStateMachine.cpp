@@ -160,6 +160,138 @@ TEST(RuntimeAssetIngestStateMachine, SuppressesDuplicateActiveRequestsUntilTermi
     EXPECT_EQ(machine.ActiveCount(), 1u);
 }
 
+TEST(RuntimeAssetIngestStateMachine, QueueSnapshotReportsStagesProgressAndTimestamps)
+{
+    Runtime::RuntimeAssetIngestStateMachine machine;
+
+    const auto submitted = machine.Submit(ManualMeshRequest("/tmp/mesh.obj"));
+    ASSERT_TRUE(submitted.Succeeded());
+
+    Runtime::RuntimeAssetImportQueueSnapshot queue = machine.SnapshotQueue();
+    ASSERT_EQ(queue.Entries.size(), 1u);
+    EXPECT_EQ(queue.ActiveCount, 1u);
+    EXPECT_EQ(queue.TerminalCount, 0u);
+    EXPECT_FALSE(queue.CanClearCompleted);
+    EXPECT_EQ(queue.Entries[0].Operation, submitted.Handle);
+    EXPECT_EQ(queue.Entries[0].SourcePath, "/tmp/mesh.obj");
+    EXPECT_EQ(queue.Entries[0].PathBasename, "mesh.obj");
+    EXPECT_EQ(queue.Entries[0].Stage,
+              Runtime::RuntimeAssetImportQueueStage::Queued);
+    EXPECT_EQ(queue.Entries[0].TerminalStatus,
+              Runtime::RuntimeAssetImportQueueTerminalStatus::None);
+    EXPECT_TRUE(queue.Entries[0].ProgressDeterminate);
+    EXPECT_FLOAT_EQ(queue.Entries[0].NormalizedProgress, 0.0f);
+    EXPECT_FALSE(queue.Entries[0].StartedAt.has_value());
+    EXPECT_FALSE(queue.Entries[0].FinishedAt.has_value());
+
+    ASSERT_TRUE(machine.ResolveRoute(submitted.Handle, ReadyRoute()).Succeeded());
+    queue = machine.SnapshotQueue();
+    ASSERT_EQ(queue.Entries.size(), 1u);
+    EXPECT_EQ(queue.Entries[0].Stage,
+              Runtime::RuntimeAssetImportQueueStage::Routing);
+
+    ASSERT_TRUE(machine.QueueDecode(submitted.Handle).Succeeded());
+    queue = machine.SnapshotQueue();
+    ASSERT_EQ(queue.Entries.size(), 1u);
+    EXPECT_EQ(queue.Entries[0].Stage,
+              Runtime::RuntimeAssetImportQueueStage::DecodeQueued);
+
+    ASSERT_TRUE(machine.MarkDecoding(submitted.Handle).Succeeded());
+    queue = machine.SnapshotQueue();
+    ASSERT_EQ(queue.Entries.size(), 1u);
+    EXPECT_EQ(queue.Entries[0].Stage,
+              Runtime::RuntimeAssetImportQueueStage::Decoding);
+    EXPECT_FALSE(queue.Entries[0].ProgressDeterminate);
+    EXPECT_TRUE(queue.Entries[0].StartedAt.has_value());
+
+    ASSERT_TRUE(machine.CompleteDecode(
+        submitted.Handle,
+        submitted.Handle.Generation).Succeeded());
+    ASSERT_TRUE(machine.BeginApply(submitted.Handle).Succeeded());
+    queue = machine.SnapshotQueue();
+    ASSERT_EQ(queue.Entries.size(), 1u);
+    EXPECT_EQ(queue.Entries[0].Stage,
+              Runtime::RuntimeAssetImportQueueStage::MainThreadApply);
+    EXPECT_FALSE(queue.Entries[0].ProgressDeterminate);
+
+    ASSERT_TRUE(machine.BeginGpuUpload(submitted.Handle).Succeeded());
+    queue = machine.SnapshotQueue();
+    ASSERT_EQ(queue.Entries.size(), 1u);
+    EXPECT_EQ(queue.Entries[0].Stage,
+              Runtime::RuntimeAssetImportQueueStage::GpuUpload);
+    EXPECT_FALSE(queue.Entries[0].ProgressDeterminate);
+    EXPECT_STREQ(Runtime::DebugNameForRuntimeAssetImportQueueStage(
+                     Runtime::RuntimeAssetImportQueueStage::GpuUpload),
+                 "GpuUpload");
+
+    Runtime::RuntimeAssetIngestResult result{};
+    result.PayloadKind = Assets::AssetPayloadKind::Mesh;
+    result.Asset = Assets::AssetId{42u, 5u};
+    result.PrimitiveEntitiesCreated = 1u;
+    ASSERT_TRUE(machine.CompleteApply(
+        submitted.Handle,
+        submitted.Handle.Generation,
+        result).Succeeded());
+
+    queue = machine.SnapshotQueue();
+    ASSERT_EQ(queue.Entries.size(), 1u);
+    EXPECT_EQ(queue.ActiveCount, 0u);
+    EXPECT_EQ(queue.TerminalCount, 1u);
+    EXPECT_TRUE(queue.CanClearCompleted);
+    EXPECT_EQ(queue.Entries[0].Stage,
+              Runtime::RuntimeAssetImportQueueStage::Complete);
+    EXPECT_EQ(queue.Entries[0].TerminalStatus,
+              Runtime::RuntimeAssetImportQueueTerminalStatus::Complete);
+    EXPECT_TRUE(queue.Entries[0].ProgressDeterminate);
+    EXPECT_FLOAT_EQ(queue.Entries[0].NormalizedProgress, 1.0f);
+    EXPECT_EQ(queue.Entries[0].Asset, (Assets::AssetId{42u, 5u}));
+    EXPECT_TRUE(queue.Entries[0].FinishedAt.has_value());
+    EXPECT_STREQ(Runtime::DebugNameForRuntimeAssetImportQueueTerminalStatus(
+                     Runtime::RuntimeAssetImportQueueTerminalStatus::Complete),
+                 "Complete");
+}
+
+TEST(RuntimeAssetIngestStateMachine, QueueSnapshotReportsFailedCancelledAndClearCompleted)
+{
+    Runtime::RuntimeAssetIngestStateMachine machine;
+
+    const auto failed = machine.Submit(ManualMeshRequest("missing.obj"));
+    ASSERT_TRUE(failed.Succeeded());
+    ASSERT_TRUE(machine.MarkMissingFile(failed.Handle).Mutated);
+
+    const auto cancelled = machine.Submit(ManualMeshRequest("cancel.obj"));
+    ASSERT_TRUE(cancelled.Succeeded());
+    DriveToDecodeQueued(machine, cancelled.Handle);
+    ASSERT_TRUE(machine.MarkDecoding(cancelled.Handle).Succeeded());
+    ASSERT_TRUE(machine.Cancel(cancelled.Handle).Mutated);
+
+    Runtime::RuntimeAssetImportQueueSnapshot queue = machine.SnapshotQueue();
+    ASSERT_EQ(queue.Entries.size(), 2u);
+    EXPECT_EQ(queue.ActiveCount, 0u);
+    EXPECT_EQ(queue.TerminalCount, 2u);
+    EXPECT_TRUE(queue.CanClearCompleted);
+    EXPECT_EQ(queue.Entries[0].Stage,
+              Runtime::RuntimeAssetImportQueueStage::Failed);
+    EXPECT_EQ(queue.Entries[0].TerminalStatus,
+              Runtime::RuntimeAssetImportQueueTerminalStatus::Failed);
+    EXPECT_NE(queue.Entries[0].DiagnosticText.find("MissingFile"),
+              std::string::npos);
+    EXPECT_EQ(queue.Entries[1].Stage,
+              Runtime::RuntimeAssetImportQueueStage::Cancelled);
+    EXPECT_EQ(queue.Entries[1].TerminalStatus,
+              Runtime::RuntimeAssetImportQueueTerminalStatus::Cancelled);
+    EXPECT_NE(queue.Entries[1].DiagnosticText.find("Cancelled"),
+              std::string::npos);
+
+    EXPECT_EQ(machine.ClearCompletedQueueEntries(), 2u);
+    queue = machine.SnapshotQueue();
+    EXPECT_TRUE(queue.Entries.empty());
+    EXPECT_EQ(queue.ActiveCount, 0u);
+    EXPECT_EQ(queue.TerminalCount, 0u);
+    EXPECT_FALSE(queue.CanClearCompleted);
+    EXPECT_EQ(machine.SnapshotAll().size(), 2u);
+}
+
 TEST(RuntimeAssetIngestStateMachine, MapsRouteDiagnosticsToFailureTaxonomy)
 {
     Runtime::RuntimeAssetIngestStateMachine machine;

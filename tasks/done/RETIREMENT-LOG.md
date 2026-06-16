@@ -9,6 +9,19 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`ASSETIO-005`](ASSETIO-005-asset-import-queue-progress.md) — Asset import
+queue and progress UI — retired on 2026-06-16 at maturity `Operational`.
+Runtime now exposes stable AssetIO queue snapshots over the promoted ingest
+state machine, including operation identity, source/path metadata, coarse
+queued/running/apply/upload/terminal stages, timestamps, determinate or
+indeterminate progress, diagnostics, cancellation, and clear-completed
+behavior. `Engine` owns snapshot polling plus command routing, while the
+sandbox editor's File / Import window consumes data-only rows and does not own
+asset, ECS, graphics, or worker-thread state. Focused runtime/UI queue coverage,
+the default CPU-supported CTest gate, and strict layering/task/docs checks
+passed.
+
+Active
 [`GRAPHICS-088`](GRAPHICS-088-resolved-uv-rendering-and-bake-residency.md) —
 Resolved UV rendering and bake texture residency — retired on 2026-06-15 at
 maturity `CPUContracted`. Graphics now treats packed mesh UVs as resolved

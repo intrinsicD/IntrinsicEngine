@@ -6,14 +6,17 @@ GPU-agnostic; GPU residency lives under `src/graphics/assets` and is wired by
 
 ## Tasks
 
-- [ASSETIO-005 — Asset import queue and progress UI](ASSETIO-005-asset-import-queue-progress.md):
-  expose runtime-owned AssetIO queue snapshots and display queued/running/apply/upload/terminal import progress in the sandbox editor.
 - [ASSETIO-008 — Default UV atlas materialization for imported meshes](ASSETIO-008-default-uv-atlas-materialization.md):
   preserve valid authored mesh UVs or precompute generated UV atlases through
   the default geometry backend before generated texture bakes and ECS
   materialization.
 
 ## Retired
+- [ASSETIO-005 — Asset import queue and progress UI](../../done/ASSETIO-005-asset-import-queue-progress.md):
+  retired at `Operational` with runtime-owned AssetIO queue snapshots and
+  sandbox editor File / Import progress rows for queued/running/apply/upload
+  and terminal import states, including diagnostics, cancellation, and
+  clear-completed commands.
 - [ASSETIO-004 — Representative file-format visual coverage](../../done/ASSETIO-004-broad-file-format-visual-parity.md):
   retired at `CPUContracted` with a generated representative runtime import
   matrix for OBJ mesh, TGF graph, ASCII PLY point cloud, GLTF model-scene with

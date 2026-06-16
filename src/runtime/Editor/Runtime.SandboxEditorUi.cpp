@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <chrono>
 #include <array>
 #include <cmath>
 #include <cstddef>
@@ -37,6 +38,7 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.CameraSnapshots;
 import Extrinsic.Graphics.Renderer;
+import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
@@ -1748,6 +1750,93 @@ namespace Extrinsic::Runtime
             return model;
         }
 
+        [[nodiscard]] double QueueElapsedSeconds(
+            const RuntimeAssetImportQueueEntry& entry,
+            const RuntimeAssetImportQueueTimePoint now) noexcept
+        {
+            const RuntimeAssetImportQueueTimePoint end =
+                entry.FinishedAt.value_or(now);
+            if (end <= entry.EnqueuedAt)
+            {
+                return 0.0;
+            }
+            return std::chrono::duration<double>(end - entry.EnqueuedAt).count();
+        }
+
+        [[nodiscard]] SandboxEditorAssetImportQueueRow
+        BuildAssetImportQueueRow(
+            const RuntimeAssetImportQueueEntry& entry,
+            const RuntimeAssetImportQueueTimePoint now)
+        {
+            SandboxEditorAssetImportQueueRow row{};
+            row.Operation = entry.Operation;
+            row.Sequence = entry.Sequence;
+            row.Source = entry.Source;
+            row.SourcePath = entry.SourcePath;
+            row.PathBasename = entry.PathBasename.empty()
+                ? entry.SourcePath
+                : entry.PathBasename;
+            row.PayloadKind = entry.PayloadKind;
+            row.Asset = entry.Asset;
+            row.Stage = entry.Stage;
+            row.TerminalStatus = entry.TerminalStatus;
+            row.ProgressDeterminate = entry.ProgressDeterminate;
+            row.NormalizedProgress = std::clamp(entry.NormalizedProgress, 0.0f, 1.0f);
+            row.StageText = entry.StageText.empty()
+                ? DebugNameForRuntimeAssetImportQueueStage(entry.Stage)
+                : entry.StageText;
+            row.DiagnosticText = entry.DiagnosticText;
+            row.ElapsedSeconds = QueueElapsedSeconds(entry, now);
+            row.CanCancel = entry.CanCancel;
+            row.CancelDisabledReason = entry.CancelDisabledReason;
+            return row;
+        }
+
+        [[nodiscard]] SandboxEditorAssetImportQueueModel
+        BuildAssetImportQueueModel(const SandboxEditorContext& context)
+        {
+            SandboxEditorAssetImportQueueModel model{};
+            model.ActiveCount = context.AssetImportQueue.ActiveCount;
+            model.TerminalCount = context.AssetImportQueue.TerminalCount;
+            model.ClearCompletedAvailable =
+                context.AssetImportQueueCommands.ClearAvailable();
+            model.CanClearCompleted =
+                model.ClearCompletedAvailable &&
+                context.AssetImportQueue.CanClearCompleted;
+            model.ClearCompletedDisabledReason =
+                context.AssetImportQueue.ClearCompletedDisabledReason;
+
+            const RuntimeAssetImportQueueTimePoint now =
+                std::chrono::steady_clock::now();
+            model.Rows.reserve(context.AssetImportQueue.Entries.size());
+            for (const RuntimeAssetImportQueueEntry& entry :
+                 context.AssetImportQueue.Entries)
+            {
+                model.Rows.push_back(BuildAssetImportQueueRow(entry, now));
+            }
+
+            if (model.Rows.empty())
+            {
+                model.StatusText = "No asset imports are queued.";
+            }
+            else
+            {
+                model.StatusText =
+                    "AssetIO queue: active=" +
+                    std::to_string(model.ActiveCount) +
+                    " terminal=" +
+                    std::to_string(model.TerminalCount) + ".";
+            }
+
+            if (!model.ClearCompletedAvailable)
+            {
+                AddDiagnostic(model.Diagnostics,
+                              SandboxEditorDiagnosticCode::AssetImportUnavailable,
+                              "Asset import queue commands are unavailable.");
+            }
+            return model;
+        }
+
         [[nodiscard]] const char* RenderCommandStatusName(
             const Graphics::RenderCommandPassStatus status) noexcept
         {
@@ -1985,6 +2074,18 @@ namespace Extrinsic::Runtime
                             return result;
                         },
                 },
+                .AssetImportQueueCommands = SandboxEditorAssetImportQueueCommandSurface{
+                    .ClearCompleted =
+                        [&engine]()
+                        {
+                            return engine.ClearCompletedAssetImports();
+                        },
+                    .Cancel =
+                        [&engine](const RuntimeAssetIngestHandle operation)
+                        {
+                            return engine.CancelAssetImport(operation);
+                        },
+                },
                 .SceneFileCommands = SandboxEditorSceneFileCommandSurface{
                     .New =
                         [&engine]()
@@ -2098,6 +2199,7 @@ namespace Extrinsic::Runtime
                             engine.ClearVisualizationAdapterBinding(stableEntityId);
                         },
                 },
+                .AssetImportQueue = engine.GetAssetImportQueueSnapshot(),
                 .RenderGraphStats = &engine.GetRenderer().GetLastRenderGraphStats(),
                 .ImGuiAdapterAvailable = engine.GetImGuiAdapter().IsInitialized(),
                 .AssetImportCommandsAvailable = true,
@@ -2115,6 +2217,142 @@ namespace Extrinsic::Runtime
                                     DebugNameForSandboxEditorDiagnosticCode(diagnostic.Code),
                                     diagnostic.Message.c_str());
             }
+        }
+
+        [[nodiscard]] std::string ProgressOverlayText(
+            const SandboxEditorAssetImportQueueRow& row)
+        {
+            if (!row.ProgressDeterminate)
+            {
+                return row.StageText.empty() ? "active" : row.StageText;
+            }
+            const int percent = static_cast<int>(
+                std::round(std::clamp(row.NormalizedProgress, 0.0f, 1.0f) * 100.0f));
+            return std::to_string(percent) + "%";
+        }
+
+        void DrawAssetImportQueue(
+            const SandboxEditorAssetImportQueueModel& model,
+            const SandboxEditorContext* context)
+        {
+            ImGui::SeparatorText("AssetIO Queue");
+            ImGui::TextWrapped("%s", model.StatusText.c_str());
+
+            const bool clearAvailable =
+                model.CanClearCompleted &&
+                context != nullptr &&
+                context->AssetImportQueueCommands.ClearAvailable();
+            if (!clearAvailable)
+            {
+                ImGui::BeginDisabled();
+            }
+            if (ImGui::Button("Clear completed") && clearAvailable)
+            {
+                (void)context->AssetImportQueueCommands.ClearCompleted();
+            }
+            if (!clearAvailable)
+            {
+                ImGui::EndDisabled();
+                if (!model.ClearCompletedDisabledReason.empty())
+                {
+                    ImGui::TextDisabled(
+                        "%s",
+                        model.ClearCompletedDisabledReason.c_str());
+                }
+            }
+
+            if (model.Rows.empty())
+            {
+                ImGui::TextDisabled("No asset import rows.");
+                DrawDiagnostics(model.Diagnostics);
+                return;
+            }
+
+            constexpr ImGuiTableFlags tableFlags =
+                ImGuiTableFlags_Borders |
+                ImGuiTableFlags_RowBg |
+                ImGuiTableFlags_Resizable |
+                ImGuiTableFlags_SizingStretchProp;
+            if (ImGui::BeginTable("AssetIOQueueTable", 8, tableFlags))
+            {
+                ImGui::TableSetupColumn("ID");
+                ImGui::TableSetupColumn("Payload");
+                ImGui::TableSetupColumn("Path");
+                ImGui::TableSetupColumn("Stage");
+                ImGui::TableSetupColumn("Progress");
+                ImGui::TableSetupColumn("Elapsed");
+                ImGui::TableSetupColumn("Diagnostic");
+                ImGui::TableSetupColumn("Cancel");
+                ImGui::TableHeadersRow();
+
+                for (const SandboxEditorAssetImportQueueRow& row : model.Rows)
+                {
+                    ImGui::PushID(static_cast<int>(row.Sequence));
+                    ImGui::TableNextRow();
+
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::Text("%llu",
+                                static_cast<unsigned long long>(row.Sequence));
+
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::TextUnformatted(
+                        A::DebugNameForAssetPayloadKind(row.PayloadKind));
+
+                    ImGui::TableSetColumnIndex(2);
+                    ImGui::TextUnformatted(row.PathBasename.c_str());
+
+                    ImGui::TableSetColumnIndex(3);
+                    ImGui::TextUnformatted(row.StageText.c_str());
+
+                    ImGui::TableSetColumnIndex(4);
+                    const std::string overlay = ProgressOverlayText(row);
+                    ImGui::ProgressBar(
+                        row.ProgressDeterminate ? row.NormalizedProgress : 0.0f,
+                        ImVec2(-1.0f, 0.0f),
+                        overlay.c_str());
+
+                    ImGui::TableSetColumnIndex(5);
+                    ImGui::Text("%.2fs", row.ElapsedSeconds);
+
+                    ImGui::TableSetColumnIndex(6);
+                    if (row.DiagnosticText.empty())
+                    {
+                        ImGui::TextDisabled("-");
+                    }
+                    else
+                    {
+                        ImGui::TextWrapped("%s", row.DiagnosticText.c_str());
+                    }
+
+                    ImGui::TableSetColumnIndex(7);
+                    const bool cancelAvailable =
+                        row.CanCancel &&
+                        context != nullptr &&
+                        context->AssetImportQueueCommands.CancelAvailable();
+                    if (!cancelAvailable)
+                    {
+                        ImGui::BeginDisabled();
+                    }
+                    if (ImGui::Button("Cancel") && cancelAvailable)
+                    {
+                        (void)context->AssetImportQueueCommands.Cancel(row.Operation);
+                    }
+                    if (!cancelAvailable)
+                    {
+                        ImGui::EndDisabled();
+                        if (!row.CancelDisabledReason.empty())
+                        {
+                            ImGui::TextDisabled("%s",
+                                                row.CancelDisabledReason.c_str());
+                        }
+                    }
+
+                    ImGui::PopID();
+                }
+                ImGui::EndTable();
+            }
+
+            DrawDiagnostics(model.Diagnostics);
         }
 
         void DrawVec3(const char* label, const glm::vec3 value)
@@ -3404,6 +3642,7 @@ namespace Extrinsic::Runtime
                                         result->GeneratedTextureUploadRequests));
                     }
                 }
+                DrawAssetImportQueue(frame.AssetImportQueue, context);
                 DrawDiagnostics(frame.FileImport.Diagnostics);
             }
             ImGui::End();
@@ -4248,6 +4487,7 @@ namespace Extrinsic::Runtime
         frame.Document = BuildDocumentModel(context);
         frame.SceneFile = BuildSceneFileModel(context);
         frame.FileImport = BuildFileImportModel(context);
+        frame.AssetImportQueue = BuildAssetImportQueueModel(context);
         frame.RenderGraph = BuildRenderGraphModel(context);
         frame.CameraRender = BuildCameraRenderModel(context);
         frame.Visualization = BuildVisualizationModel(context);

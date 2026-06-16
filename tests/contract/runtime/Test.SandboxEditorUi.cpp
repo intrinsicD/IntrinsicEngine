@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
@@ -698,6 +699,111 @@ TEST(SandboxEditorUi, FileImportCommandRoutesThroughRuntimeOwnedSurface)
     EXPECT_TRUE(HasDiagnostic(
         frame.FileImport.Diagnostics,
         Runtime::SandboxEditorDiagnosticCode::AssetImportFailed));
+}
+
+TEST(SandboxEditorUi, AssetImportQueueModelCopiesRowsProgressAndCommands)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+
+    const auto now = std::chrono::steady_clock::now();
+    const Runtime::RuntimeAssetIngestHandle activeHandle{3u, 1u};
+    const Runtime::RuntimeAssetIngestHandle failedHandle{4u, 1u};
+
+    context.AssetImportQueue = Runtime::RuntimeAssetImportQueueSnapshot{
+        .Entries = {
+            Runtime::RuntimeAssetImportQueueEntry{
+                .Operation = activeHandle,
+                .Sequence = 10u,
+                .Source = Runtime::RuntimeAssetIngestSource::DroppedFile,
+                .SourcePath = "/tmp/mesh.obj",
+                .PathBasename = "mesh.obj",
+                .PayloadKind = Assets::AssetPayloadKind::Mesh,
+                .Stage = Runtime::RuntimeAssetImportQueueStage::Decoding,
+                .TerminalStatus =
+                    Runtime::RuntimeAssetImportQueueTerminalStatus::None,
+                .EnqueuedAt = now - std::chrono::seconds(3),
+                .StartedAt = now - std::chrono::seconds(2),
+                .LastUpdatedAt = now - std::chrono::seconds(1),
+                .ProgressDeterminate = false,
+                .NormalizedProgress = 0.45f,
+                .StageText = "Decoding",
+                .CanCancel = true,
+            },
+            Runtime::RuntimeAssetImportQueueEntry{
+                .Operation = failedHandle,
+                .Sequence = 11u,
+                .Source = Runtime::RuntimeAssetIngestSource::ManualImport,
+                .SourcePath = "/tmp/missing.obj",
+                .PathBasename = "missing.obj",
+                .PayloadKind = Assets::AssetPayloadKind::Mesh,
+                .Stage = Runtime::RuntimeAssetImportQueueStage::Failed,
+                .TerminalStatus =
+                    Runtime::RuntimeAssetImportQueueTerminalStatus::Failed,
+                .EnqueuedAt = now - std::chrono::seconds(5),
+                .FinishedAt = now - std::chrono::seconds(4),
+                .LastUpdatedAt = now - std::chrono::seconds(4),
+                .ProgressDeterminate = true,
+                .NormalizedProgress = 1.0f,
+                .StageText = "Failed",
+                .DiagnosticText = "MissingFile: FileNotFound",
+                .CanCancel = false,
+                .CancelDisabledReason =
+                    "Import has already reached a terminal state.",
+            },
+        },
+        .ActiveCount = 1u,
+        .TerminalCount = 1u,
+        .CanClearCompleted = true,
+    };
+
+    std::size_t clearObserved = 0u;
+    Runtime::RuntimeAssetIngestHandle cancelled{};
+    context.AssetImportQueueCommands =
+        Runtime::SandboxEditorAssetImportQueueCommandSurface{
+            .ClearCompleted =
+                [&clearObserved]()
+                {
+                    clearObserved = 1u;
+                    return 1u;
+                },
+            .Cancel =
+                [&cancelled](Runtime::RuntimeAssetIngestHandle operation)
+                {
+                    cancelled = operation;
+                    return Core::Ok();
+                },
+        };
+
+    const Runtime::SandboxEditorPanelFrame frame =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+    EXPECT_EQ(frame.AssetImportQueue.ActiveCount, 1u);
+    EXPECT_EQ(frame.AssetImportQueue.TerminalCount, 1u);
+    EXPECT_TRUE(frame.AssetImportQueue.CanClearCompleted);
+    ASSERT_EQ(frame.AssetImportQueue.Rows.size(), 2u);
+    EXPECT_EQ(frame.AssetImportQueue.Rows[0].Operation, activeHandle);
+    EXPECT_EQ(frame.AssetImportQueue.Rows[0].PathBasename, "mesh.obj");
+    EXPECT_EQ(frame.AssetImportQueue.Rows[0].Stage,
+              Runtime::RuntimeAssetImportQueueStage::Decoding);
+    EXPECT_FALSE(frame.AssetImportQueue.Rows[0].ProgressDeterminate);
+    EXPECT_TRUE(frame.AssetImportQueue.Rows[0].CanCancel);
+    EXPECT_GE(frame.AssetImportQueue.Rows[0].ElapsedSeconds, 0.0);
+    EXPECT_EQ(frame.AssetImportQueue.Rows[1].TerminalStatus,
+              Runtime::RuntimeAssetImportQueueTerminalStatus::Failed);
+    EXPECT_EQ(frame.AssetImportQueue.Rows[1].DiagnosticText,
+              "MissingFile: FileNotFound");
+    EXPECT_FALSE(frame.AssetImportQueue.Rows[1].CanCancel);
+    EXPECT_FALSE(HasDiagnostic(
+        frame.AssetImportQueue.Diagnostics,
+        Runtime::SandboxEditorDiagnosticCode::AssetImportUnavailable));
+
+    ASSERT_TRUE(context.AssetImportQueueCommands.CancelAvailable());
+    EXPECT_TRUE(context.AssetImportQueueCommands.Cancel(activeHandle).has_value());
+    EXPECT_EQ(cancelled, activeHandle);
+    ASSERT_TRUE(context.AssetImportQueueCommands.ClearAvailable());
+    EXPECT_EQ(context.AssetImportQueueCommands.ClearCompleted(), 1u);
+    EXPECT_EQ(clearObserved, 1u);
 }
 
 TEST(SandboxEditorUi, SceneFileCommandRoutesThroughRuntimeOwnedSurface)
@@ -3111,6 +3217,104 @@ TEST(SandboxEditorUi, DuplicateDroppedGeometryImportUsesSingleIngestRecord)
     EXPECT_TRUE(lastEvent->Succeeded());
     EXPECT_EQ(lastEvent->IngestDiagnostic,
               Runtime::RuntimeAssetIngestDiagnostic::None);
+
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorUi, DroppedFileQueuePreservesOrderDiagnosticsAndClearCompleted)
+{
+    TmpFile meshFile(
+        "runtime_queue_drop_mesh.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+    const std::filesystem::path missingFile =
+        std::filesystem::temp_directory_path() / "runtime_queue_missing.obj";
+    std::filesystem::remove(missingFile);
+
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<FixedFrameApplication>(128u));
+    engine.Initialize();
+
+    const std::vector<std::string> droppedPaths{
+        meshFile.Path.string(),
+        missingFile.string(),
+    };
+    engine.ImportDroppedFilePaths(droppedPaths);
+
+    Runtime::RuntimeAssetImportQueueSnapshot queue =
+        engine.GetAssetImportQueueSnapshot();
+    ASSERT_EQ(queue.Entries.size(), 2u);
+    EXPECT_EQ(queue.ActiveCount, 2u);
+    EXPECT_EQ(queue.Entries[0].SourcePath, meshFile.Path.string());
+    EXPECT_EQ(queue.Entries[1].SourcePath, missingFile.string());
+    EXPECT_EQ(queue.Entries[0].Stage,
+              Runtime::RuntimeAssetImportQueueStage::Decoding);
+    EXPECT_TRUE(queue.Entries[0].CanCancel);
+
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+    engine.Run();
+
+    queue = engine.GetAssetImportQueueSnapshot();
+    ASSERT_EQ(queue.Entries.size(), 2u);
+    EXPECT_EQ(queue.ActiveCount, 0u);
+    EXPECT_EQ(queue.TerminalCount, 2u);
+    EXPECT_TRUE(queue.CanClearCompleted);
+    EXPECT_EQ(queue.Entries[0].SourcePath, meshFile.Path.string());
+    EXPECT_EQ(queue.Entries[0].TerminalStatus,
+              Runtime::RuntimeAssetImportQueueTerminalStatus::Complete);
+    EXPECT_EQ(queue.Entries[1].SourcePath, missingFile.string());
+    EXPECT_EQ(queue.Entries[1].TerminalStatus,
+              Runtime::RuntimeAssetImportQueueTerminalStatus::Failed);
+    EXPECT_FALSE(queue.Entries[1].DiagnosticText.empty());
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
+
+    EXPECT_EQ(engine.ClearCompletedAssetImports(), 2u);
+    queue = engine.GetAssetImportQueueSnapshot();
+    EXPECT_TRUE(queue.Entries.empty());
+
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorUi, DroppedGeometryQueueCancellationPreventsMainThreadApply)
+{
+    TmpFile meshFile(
+        "runtime_queue_cancel_mesh.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<FixedFrameApplication>(16u));
+    engine.Initialize();
+
+    const std::vector<std::string> droppedPaths{meshFile.Path.string()};
+    engine.ImportDroppedFilePaths(droppedPaths);
+
+    Runtime::RuntimeAssetImportQueueSnapshot queue =
+        engine.GetAssetImportQueueSnapshot();
+    ASSERT_EQ(queue.Entries.size(), 1u);
+    EXPECT_TRUE(queue.Entries[0].CanCancel);
+    EXPECT_TRUE(engine.CancelAssetImport(queue.Entries[0].Operation).has_value());
+
+    queue = engine.GetAssetImportQueueSnapshot();
+    ASSERT_EQ(queue.Entries.size(), 1u);
+    EXPECT_EQ(queue.Entries[0].TerminalStatus,
+              Runtime::RuntimeAssetImportQueueTerminalStatus::Cancelled);
+    EXPECT_FALSE(queue.Entries[0].CanCancel);
+    EXPECT_NE(queue.Entries[0].DiagnosticText.find("Cancelled"),
+              std::string::npos);
+
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+    engine.Run();
+
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 0u);
 
     engine.Shutdown();
 }

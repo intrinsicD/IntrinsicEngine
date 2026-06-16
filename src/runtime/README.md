@@ -346,6 +346,19 @@ imports from the executor's main-thread apply lane, and routes reimport through
 same-`AssetId` `AssetService` reloads without reintroducing ECS asset-source
 coupling.
 
+`ASSETIO-005` adds the runtime-owned AssetIO queue snapshot on top of that
+state machine. `Runtime.AssetIngestStateMachine` exports queue DTOs with stable
+operation handles, source paths, payload kinds, asset ids when known,
+enqueue/start/finish timestamps, coarse stages (`Queued`, route/decode,
+main-thread apply, GPU upload, terminal states), determinate vs indeterminate
+progress, and terminal diagnostics. `Engine::GetAssetImportQueueSnapshot()`
+polls those records for editor/UI consumers, marks only active deferred
+`StreamingExecutor` geometry imports as cancellable, and exposes
+`CancelAssetImport(...)` / `ClearCompletedAssetImports()` without moving asset,
+ECS, graphics, or UI ownership below runtime. Manual imports and reimports still
+use the same state-machine records, but they usually reach a terminal queue row
+inside the synchronous command call.
+
 Shutdown order requirement:
 
 1. `StreamingExecutor::ShutdownAndDrain()`

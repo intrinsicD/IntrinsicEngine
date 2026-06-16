@@ -446,11 +446,58 @@ namespace Extrinsic::Runtime
             }
         }
 
+        [[nodiscard]] bool StreamingTaskStateCanCancel(
+            const StreamingTaskState state) noexcept
+        {
+            switch (state)
+            {
+            case StreamingTaskState::Pending:
+            case StreamingTaskState::Ready:
+            case StreamingTaskState::Running:
+                return true;
+            case StreamingTaskState::WaitingForMainThreadApply:
+            case StreamingTaskState::WaitingForGpuUpload:
+            case StreamingTaskState::Complete:
+            case StreamingTaskState::Failed:
+            case StreamingTaskState::Cancelled:
+                return false;
+            }
+            return false;
+        }
+
+        [[nodiscard]] bool QueueStageCanUseStreamingCancellation(
+            const RuntimeAssetImportQueueStage stage) noexcept
+        {
+            switch (stage)
+            {
+            case RuntimeAssetImportQueueStage::DecodeQueued:
+            case RuntimeAssetImportQueueStage::Decoding:
+                return true;
+            case RuntimeAssetImportQueueStage::Queued:
+            case RuntimeAssetImportQueueStage::Routing:
+            case RuntimeAssetImportQueueStage::MainThreadApply:
+            case RuntimeAssetImportQueueStage::GpuUpload:
+            case RuntimeAssetImportQueueStage::Complete:
+            case RuntimeAssetImportQueueStage::Failed:
+            case RuntimeAssetImportQueueStage::Cancelled:
+                return false;
+            }
+            return false;
+        }
+
         [[nodiscard]] bool CreatesOrChangesScene(
             const RuntimeAssetImportResult& result) noexcept
         {
             return result.PrimitiveEntitiesCreated > 0u ||
                    result.MaterializedModelScene;
+        }
+
+        [[nodiscard]] bool RequestsGpuUpload(
+            const RuntimeAssetImportResult& result) noexcept
+        {
+            return result.RequestedTextureUpload ||
+                   result.TextureUploadRequests > 0u ||
+                   result.GeneratedTextureUploadRequests > 0u;
         }
 
         [[nodiscard]] bool IsFinitePosition(const glm::vec3& position) noexcept
@@ -2482,6 +2529,119 @@ namespace Extrinsic::Runtime
         return m_AssetIngestStateMachine.SnapshotAll();
     }
 
+    RuntimeAssetImportQueueSnapshot Engine::GetAssetImportQueueSnapshot() const
+    {
+        RuntimeAssetImportQueueSnapshot snapshot =
+            m_AssetIngestStateMachine.SnapshotQueue();
+
+        for (RuntimeAssetImportQueueEntry& entry : snapshot.Entries)
+        {
+            if (entry.TerminalStatus != RuntimeAssetImportQueueTerminalStatus::None)
+            {
+                entry.CanCancel = false;
+                entry.CancelDisabledReason =
+                    "Import has already reached a terminal state.";
+                continue;
+            }
+
+            const auto taskIt = std::find_if(
+                m_AssetImportStreamingTasks.begin(),
+                m_AssetImportStreamingTasks.end(),
+                [&entry](const RuntimeAssetImportStreamingTask& task)
+                {
+                    return task.Ingest == entry.Operation;
+                });
+
+            if (taskIt == m_AssetImportStreamingTasks.end() ||
+                !taskIt->Streaming.IsValid() ||
+                !m_StreamingExecutor)
+            {
+                entry.CanCancel = false;
+                entry.CancelDisabledReason =
+                    "Import is running synchronously or has no cancellable streaming task.";
+                continue;
+            }
+
+            const StreamingTaskState streamingState =
+                m_StreamingExecutor->GetState(taskIt->Streaming);
+            entry.CanCancel =
+                QueueStageCanUseStreamingCancellation(entry.Stage) &&
+                StreamingTaskStateCanCancel(streamingState);
+            if (!entry.CanCancel)
+            {
+                entry.CancelDisabledReason =
+                    "Import can no longer be cancelled before main-thread apply.";
+            }
+            else
+            {
+                entry.CancelDisabledReason.clear();
+            }
+        }
+
+        return snapshot;
+    }
+
+    std::size_t Engine::ClearCompletedAssetImports()
+    {
+        return m_AssetIngestStateMachine.ClearCompletedQueueEntries();
+    }
+
+    Core::Result Engine::CancelAssetImport(
+        const RuntimeAssetIngestHandle operation)
+    {
+        const std::optional<RuntimeAssetIngestRecord> record =
+            m_AssetIngestStateMachine.Snapshot(operation);
+        if (!record.has_value())
+        {
+            return Core::Err(Core::ErrorCode::ResourceNotFound);
+        }
+        if (IsTerminal(record->Phase))
+        {
+            return Core::Err(Core::ErrorCode::InvalidState);
+        }
+
+        auto taskIt = std::find_if(
+            m_AssetImportStreamingTasks.begin(),
+            m_AssetImportStreamingTasks.end(),
+            [operation](const RuntimeAssetImportStreamingTask& task)
+            {
+                return task.Ingest == operation;
+            });
+        if (taskIt == m_AssetImportStreamingTasks.end() ||
+            !taskIt->Streaming.IsValid() ||
+            !m_StreamingExecutor)
+        {
+            return Core::Err(Core::ErrorCode::InvalidState);
+        }
+
+        const StreamingTaskState state =
+            m_StreamingExecutor->GetState(taskIt->Streaming);
+        if (!StreamingTaskStateCanCancel(state))
+        {
+            return Core::Err(Core::ErrorCode::InvalidState);
+        }
+
+        m_StreamingExecutor->Cancel(taskIt->Streaming);
+        RuntimeAssetIngestTransition cancelled =
+            m_AssetIngestStateMachine.Cancel(operation);
+        const bool cancelledRecord =
+            cancelled.Mutated &&
+            cancelled.Diagnostic == RuntimeAssetIngestDiagnostic::Cancelled;
+        if (!cancelledRecord)
+        {
+            return Core::Err(ErrorFromIngestTransition(cancelled));
+        }
+
+        RecordAssetImportEvent(
+            RuntimeAssetImportRequest{
+                .Path = record->Request.Path,
+                .PayloadKind = record->Request.PayloadKind,
+            },
+            Core::Err<RuntimeAssetImportResult>(Core::ErrorCode::InvalidState),
+            cancelled.Diagnostic);
+        return Core::Ok();
+    }
+
     void Engine::HandlePlatformEvent(const Platform::Event& event)
     {
         if (std::holds_alternative<Platform::WindowCloseEvent>(event))
@@ -2798,20 +2958,37 @@ namespace Extrinsic::Runtime
                             *m_Scene,
                             materialized->Entity);
                         result = materialized->Result;
-                        RuntimeAssetIngestTransition complete =
-                            m_AssetIngestStateMachine.CompleteApply(
-                                state->IngestHandle,
-                                state->IngestHandle.Generation,
-                                ToRuntimeAssetIngestResult(*result));
-                        eventDiagnostic = complete.Diagnostic;
-                        if (!complete.Succeeded())
+                        if (RequestsGpuUpload(*result))
                         {
-                            result = Core::Err<RuntimeAssetImportResult>(
-                                ErrorFromIngestTransition(complete));
+                            RuntimeAssetIngestTransition upload =
+                                m_AssetIngestStateMachine.BeginGpuUpload(
+                                    state->IngestHandle);
+                            eventDiagnostic = upload.Diagnostic;
+                            if (!upload.Succeeded())
+                            {
+                                result = Core::Err<RuntimeAssetImportResult>(
+                                    ErrorFromIngestTransition(upload));
+                            }
                         }
-                        if (complete.Succeeded() && CreatesOrChangesScene(*result))
+                        RuntimeAssetIngestTransition complete =
+                            result.has_value()
+                                ? m_AssetIngestStateMachine.CompleteApply(
+                                      state->IngestHandle,
+                                      state->IngestHandle.Generation,
+                                      ToRuntimeAssetIngestResult(*result))
+                                : RuntimeAssetIngestTransition{};
+                        if (result.has_value())
                         {
-                            (void)m_EditorCommandHistory.MarkDirty("Import Asset");
+                            eventDiagnostic = complete.Diagnostic;
+                            if (!complete.Succeeded())
+                            {
+                                result = Core::Err<RuntimeAssetImportResult>(
+                                    ErrorFromIngestTransition(complete));
+                            }
+                            else if (CreatesOrChangesScene(*result))
+                            {
+                                (void)m_EditorCommandHistory.MarkDirty("Import Asset");
+                            }
                         }
                     }
                     else
@@ -2853,6 +3030,11 @@ namespace Extrinsic::Runtime
                 failed.Diagnostic);
             return;
         }
+
+        m_AssetImportStreamingTasks.push_back(RuntimeAssetImportStreamingTask{
+            .Ingest = state->IngestHandle,
+            .Streaming = handle,
+        });
 
         Core::Log::Info(
             "[Runtime] Queued dropped geometry import: path='{}' payload={} candidate_count={}",
@@ -3044,10 +3226,20 @@ namespace Extrinsic::Runtime
         }
 
         RuntimeAssetIngestTransition complete =
-            m_AssetIngestStateMachine.CompleteApply(
-                submit.Handle,
-                submit.Handle.Generation,
-                ToRuntimeAssetIngestResult(*result));
+            RequestsGpuUpload(*result)
+                ? m_AssetIngestStateMachine.BeginGpuUpload(submit.Handle)
+                : RuntimeAssetIngestTransition{};
+        if (RequestsGpuUpload(*result) && !complete.Succeeded())
+        {
+            result = Core::Err<RuntimeAssetImportResult>(
+                ErrorFromIngestTransition(complete));
+            RecordAssetImportEvent(request, result, complete.Diagnostic);
+            return result;
+        }
+        complete = m_AssetIngestStateMachine.CompleteApply(
+            submit.Handle,
+            submit.Handle.Generation,
+            ToRuntimeAssetIngestResult(*result));
         eventDiagnostic = complete.Diagnostic;
         if (!complete.Succeeded())
         {

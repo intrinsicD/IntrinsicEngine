@@ -12,7 +12,6 @@ the authoritative open/unblocked view.
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 
-- unblocked: `ASSETIO-005` — Asset import queue and progress UI (tasks/backlog/assets/ASSETIO-005-asset-import-queue-progress.md)
 - unblocked: `LEGACY-001` — Delete `src/legacy/Interface/` (tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md)
 - unblocked: `LEGACY-004` — Delete `src/legacy/Asset/` (tasks/backlog/architecture/LEGACY-004-delete-src-legacy-asset.md)
 - unblocked: `LEGACY-005` — Delete `src/legacy/Core/` (tasks/backlog/architecture/LEGACY-005-delete-src-legacy-core.md)
