@@ -8,8 +8,8 @@ sessions:
     open_threads: 2
   - id: "2026-06-16_001"
     date: "2026-06-16"
-    summary: "Implemented and retired ASSETIO-005, GEOM-018, GEOM-025, ASSETIO-008, and BUG-044; direct mesh import now publishes raw geometry before queued derived post-processing."
-    turn_count: 3
-    events_count: 10
+    summary: "Implemented and retired ASSETIO-005, GEOM-018, GEOM-025, ASSETIO-008, and BUG-044; accepted ADR-0021; retired RUNTIME-110 into follow-up runtime/UI/rendering implementation slices."
+    turn_count: 9
+    events_count: 26
     claims_touched: []
-    open_threads: 1
+    open_threads: 2

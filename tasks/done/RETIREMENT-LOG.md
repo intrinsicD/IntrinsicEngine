@@ -8,6 +8,21 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+Backlog
+[`RUNTIME-110`](RUNTIME-110-progressive-entity-render-data-pipeline.md) —
+Progressive entity render-data pipeline clarification — retired on 2026-06-16
+at maturity `Scaffolded`. The accepted planning contract makes mesh, graph,
+and point-cloud leaves equal first-class render-data domains; separates
+render-lane intent components from per-entity presentation bindings; records
+stable property/slot/generated-output descriptors instead of raw property
+pointers or GPU handles; and defines asynchronous derived jobs with dependency
+visibility, stale-result discard, previous-output retention, and main-thread
+apply. ADR-0021 now captures the hard-to-reverse architecture decision.
+Implementation is split into `RUNTIME-111` descriptor contracts,
+`RUNTIME-112` entity derived-job graph, `RUNTIME-113` progressive extraction,
+`RUNTIME-114` import enrichment, `UI-015` inspector/debug visibility, and
+`GRAPHICS-090` opt-in backend smoke.
+
 Active
 [`BUG-044`](BUG-044-runtime-import-postprocess-queue.md) — Runtime mesh import
 post-process queue — retired on 2026-06-16 at maturity `CPUContracted`.

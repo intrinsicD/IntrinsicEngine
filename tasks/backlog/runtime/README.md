@@ -7,7 +7,24 @@ another backlog directory.
 
 ## Runtime backlog tasks
 
-- No open runtime-owned backlog tasks are currently queued here.
+- [RUNTIME-111 — Progressive render-data descriptor contracts](RUNTIME-111-progressive-render-data-descriptors.md)
+  (`CPUContracted`): first implementation slice from `RUNTIME-110`, defining
+  shared property/material/presentation descriptors, readiness state,
+  generated-output policy, lane binding maps, compatibility diagnostics, and
+  serialization for mesh, graph, and point-cloud entities.
+- [RUNTIME-112 — Entity derived-job graph and snapshots](RUNTIME-112-entity-derived-job-graph.md)
+  (`CPUContracted`): runtime-owned `StreamingExecutor` job graph with
+  per-entity/global snapshots, dependencies, follow-up scheduling,
+  stale-result discard, previous-output retention, and CPU-first job-domain
+  metadata.
+- [RUNTIME-113 — Progressive domain presentation extraction](RUNTIME-113-progressive-domain-presentation-extraction.md)
+  (`CPUContracted`): runtime extraction consumes descriptors and lane bindings
+  so mesh surfaces, mesh face-domain data, graph vertex/edge data, and
+  point-cloud data render with defaults, ready textures, or property buffers.
+- [RUNTIME-114 — Progressive import enrichment pipeline](RUNTIME-114-progressive-import-enrichment-pipeline.md)
+  (`CPUContracted`): import publishes raw geometry leaves immediately, then
+  schedules missing-UV atlases, normals, bakes, uploads, and binding updates as
+  observable derived jobs.
 
 ### Runtime adapter umbrellas (clarified by Q tasks; producer modules)
 
@@ -49,6 +66,10 @@ split; narratives live in the retirement log.
   (done, 2026-06-15, `CPUContracted`): generic runtime CPU mesh-attribute
   texture bakes now cover resolved-UV vertex/face scalar, label, vector2,
   vector3/normal, and RGBA outputs with stable generated texture keys.
+- [RUNTIME-110 — Progressive entity render-data pipeline clarification](../../done/RUNTIME-110-progressive-entity-render-data-pipeline.md)
+  (done, 2026-06-16, `Scaffolded`): accepted ADR-0021's progressive
+  mesh/graph/point-cloud render-data model and split implementation into
+  `RUNTIME-111` through `RUNTIME-114`, `UI-015`, and `GRAPHICS-090`.
 - [RUNTIME-101 — Asset ingest state-machine migration](../../done/RUNTIME-101-asset-ingest-state-machine.md)
   (done, 2026-06-15, `CPUContracted`): promoted the runtime ingest
   request/result state machine for manual import, dropped files, and reimport;

@@ -44,9 +44,12 @@ depends_on: []
   - Sample/debug scene creation workflows — deferred by the `LEGACY-011`
     value gate (no runtime-owned command currently improves an accepted
     fixture).
-  - Generic GPU residency for arbitrary property arrays — visualization
-    presets only today; the selected residency seam is retired by
-    `GRAPHICS-084`; `GRAPHICS-084C` retired the opt-in Vulkan smoke evidence.
+- Generic GPU residency for arbitrary property arrays — visualization
+  presets only today; the selected residency seam is retired by
+  `GRAPHICS-084`; `GRAPHICS-084C` retired the opt-in Vulkan smoke evidence.
+- Progressive render-data inspection — opened as `UI-015` after `RUNTIME-110`
+  accepted the cross-domain material/property binding, slot-default, and
+  derived-job visibility contract.
 
 ## Child tasks (open when the trigger fires)
 - **UI-009 — IME and multi-window editor support.** Trigger: an alternative
@@ -63,7 +66,8 @@ depends_on: []
 
 Each child cites this seed in its Context and declares which deferred
 workflow it resolves; IDs continue from `UI-014` for new children because
-`UI-001..008` and `UI-013` are taken while `UI-009..012` remain named triggers.
+`UI-001..008`, `UI-013`, `UI-014`, and `UI-015` are taken while
+`UI-009..012` remain named triggers.
 
 ## Required changes
 - [ ] Keep the current-state inventory and deferred-workflow list above

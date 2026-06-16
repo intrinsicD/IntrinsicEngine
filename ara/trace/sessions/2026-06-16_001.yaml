@@ -2,9 +2,9 @@ session:
   id: "2026-06-16_001"
   date: "2026-06-16"
   started: "2026-06-16T11:33"
-  last_turn: "2026-06-16T14:35"
-  turn_count: 3
-  summary: "Implemented and retired ASSETIO-005, GEOM-018, GEOM-025, ASSETIO-008, and BUG-044; direct mesh import now publishes raw geometry before queued derived post-processing."
+  last_turn: "2026-06-16T22:45"
+  turn_count: 9
+  summary: "Implemented and retired ASSETIO-005, GEOM-018, GEOM-025, ASSETIO-008, and BUG-044; accepted ADR-0021; retired RUNTIME-110 into follow-up runtime/UI/rendering implementation slices."
 
 events_logged:
   - turn: 1
@@ -67,6 +67,102 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "BUG-044 focused runtime tests passed 29/29 and default CPU-supported CTest passed 3069/3069."
+  - turn: 4
+    type: question
+    id: "N17"
+    routing: direct
+    provenance: user
+    summary: "User requested analysis of a data-based progressive geometry pipeline with per-entity async jobs, UI debug visibility, domain property rendering, and material texture slots."
+  - turn: 4
+    type: observation
+    id: "O01"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Entity-scoped derived-job DAG appears necessary beyond the import queue."
+  - turn: 4
+    type: observation
+    id: "O02"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Mesh first-render residency needs separation from UV-dependent texture binding."
+  - turn: 4
+    type: observation
+    id: "O03"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Domain presentation descriptors appear necessary for point, graph, and mesh property rendering."
+  - turn: 5
+    type: decision
+    id: "N18"
+    routing: direct
+    provenance: ai-executed
+    summary: "Opened RUNTIME-110 as the backlog clarification artifact for progressive entity render-data pipeline design."
+  - turn: 5
+    type: experiment
+    id: "N19"
+    routing: direct
+    provenance: ai-executed
+    summary: "Regenerated session brief; strict task policy passed with zero findings."
+  - turn: 6
+    type: decision
+    id: "N20"
+    routing: direct
+    provenance: user-revised
+    summary: "Normalized RUNTIME-110 user answers into resolved contract language and remaining open questions."
+  - turn: 6
+    type: observation
+    id: "O01"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized entity-scoped derived-job visibility through RUNTIME-110 artifact commitment."
+  - turn: 6
+    type: observation
+    id: "O02"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized immediate geometry visibility versus UV-dependent texture binding through RUNTIME-110 artifact commitment."
+  - turn: 6
+    type: observation
+    id: "O03"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized domain presentation descriptors through RUNTIME-110 artifact commitment."
+  - turn: 7
+    type: question
+    id: "N21"
+    routing: direct
+    provenance: user
+    summary: "User asked for recommendations and rationale for RUNTIME-110 remaining open questions."
+  - turn: 7
+    type: observation
+    id: "O04"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Staged recommended RUNTIME-110 defaults for abstraction, slots, output persistence, GPU metadata, inheritance, atlas eagerness, and in-progress visuals."
+  - turn: 8
+    type: decision
+    id: "N22"
+    routing: direct
+    provenance: user
+    summary: "User accepted the recommended RUNTIME-110 defaults and asked to apply them."
+  - turn: 8
+    type: observation
+    id: "O04"
+    routing: crystallized
+    provenance: user-revised
+    summary: "Crystallized accepted RUNTIME-110 defaults through verbal affirmation."
+  - turn: 9
+    type: decision
+    id: "N23"
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired RUNTIME-110 into ADR-0021 and follow-up tasks RUNTIME-111..114, UI-015, and GRAPHICS-090."
+  - turn: 9
+    type: experiment
+    id: "N24"
+    routing: direct
+    provenance: ai-executed
+    summary: "RUNTIME-110 retirement task policy, doc-link, docs-sync, and diff checks passed."
 
 ai_actions:
   - turn: 1
@@ -125,6 +221,50 @@ ai_actions:
       - "tests/contract/runtime/Test.AssetImportFormatCoverage.cpp"
       - "tests/contract/runtime/Test.SandboxEditorUi.cpp"
       - "tasks/done/BUG-044-runtime-import-postprocess-queue.md"
+  - turn: 4
+    action: "Inspected repository state, session brief, streaming executor, render components, material texture slots, mesh/graph/point packers, asset import queue DTOs, and sandbox editor inspector/queue models for progressive-pipeline analysis."
+    provenance: ai-executed
+    files_changed: []
+  - turn: 5
+    action: "Created RUNTIME-110 progressive entity render-data pipeline clarification task, updated the runtime backlog index, regenerated the session brief, and ran task policy validation."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/done/RUNTIME-110-progressive-entity-render-data-pipeline.md"
+      - "tasks/backlog/runtime/README.md"
+      - "tasks/SESSION-BRIEF.md"
+  - turn: 6
+    action: "Rewrote RUNTIME-110 answered Q/A into resolved decisions, added remaining open questions, regenerated session brief, and ran task policy plus diff checks."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/done/RUNTIME-110-progressive-entity-render-data-pipeline.md"
+      - "tasks/SESSION-BRIEF.md"
+      - "ara/logic/solution/architecture.md"
+      - "ara/logic/solution/constraints.md"
+  - turn: 7
+    action: "Analyzed RUNTIME-110 remaining open questions and prepared recommendation rationale without editing the task."
+    provenance: ai-executed
+    files_changed: []
+  - turn: 8
+    action: "Applied accepted RUNTIME-110 recommended defaults to the task, regenerated the session brief, ran task policy and diff checks, and crystallized the accepted design defaults."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/done/RUNTIME-110-progressive-entity-render-data-pipeline.md"
+      - "tasks/SESSION-BRIEF.md"
+      - "ara/logic/solution/architecture.md"
+  - turn: 9
+    action: "Accepted ADR-0021, created progressive render-data implementation follow-up tasks, retired RUNTIME-110, updated backlog indexes, regenerated the session brief, and ran task/docs validation."
+    provenance: ai-executed
+    files_changed:
+      - "docs/adr/0021-progressive-entity-render-data-pipeline.md"
+      - "docs/adr/index.md"
+      - "tasks/done/RUNTIME-110-progressive-entity-render-data-pipeline.md"
+      - "tasks/backlog/runtime/RUNTIME-111-progressive-render-data-descriptors.md"
+      - "tasks/backlog/runtime/RUNTIME-112-entity-derived-job-graph.md"
+      - "tasks/backlog/runtime/RUNTIME-113-progressive-domain-presentation-extraction.md"
+      - "tasks/backlog/runtime/RUNTIME-114-progressive-import-enrichment-pipeline.md"
+      - "tasks/backlog/ui/UI-015-progressive-render-data-inspector.md"
+      - "tasks/backlog/rendering/GRAPHICS-090-progressive-render-data-operational-smoke.md"
+      - "tasks/SESSION-BRIEF.md"
 
 claims_touched: []
 
@@ -135,8 +275,21 @@ key_context:
     excerpt: "User requested the agentic workflow in multi-task loop mode for GEOM-018, then GEOM-025, then ASSETIO-008, with planning, implementation, verification, and commits."
   - turn: 3
     excerpt: "User reported extremely long object loading and expected geometry to load first, with derived normal/UV/bake work queued and applied when ready."
+  - turn: 4
+    excerpt: "User clarified that entities can carry multiple components and asked for a data-based model with per-entity async job visibility, point/graph property buffers, graph vertex/edge domains, mesh material texture slots, PBR slots, and displacement slots."
+  - turn: 5
+    excerpt: "User asked to create a Markdown file organizing unresolved questions around entity composition, render-lane components, material texture slots, property binding, general abstractions, async job chaining, equal mesh/graph/point-cloud priority, property baking, progressive mesh enrichment, and UI controls."
+  - turn: 6
+    excerpt: "User asked to update RUNTIME-110 using the answers they gave and identify remaining open points/questions."
+  - turn: 7
+    excerpt: "User asked what recommendations and rationale apply to the remaining RUNTIME-110 open questions."
+  - turn: 8
+    excerpt: "User affirmed the recommendations and asked to use them in RUNTIME-110."
+  - turn: 9
+    excerpt: "User asked to use the agentic workflow to work on and finish RUNTIME-110 from the backlog, plan everything thoroughly, create the respective tasks, and commit the changes."
 
 open_threads:
   - "GRAPHICS-089 generated-UV Vulkan smoke is now unblocked by ASSETIO-008 and remains pending opt-in Vulkan coverage."
+  - "RUNTIME-111 is the unblocked first CPU-contracted implementation slice for the progressive entity render-data pipeline; RUNTIME-112..114, UI-015, and GRAPHICS-090 are gated follow-ups."
 
 ai_suggestions_pending: []

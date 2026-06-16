@@ -24,6 +24,7 @@ This index tracks long-lived architecture decisions for IntrinsicEngine.
 18. [0018 — Missing-material fallback substitution and diagnostics](0018-missing-material-fallback-substitution.md)
 19. [0019 — Physics layer ownership and ECS integration](0019-physics-layer-ownership-and-ecs-integration.md)
 20. [0020 — vcpkg manifest dependency management](0020-vcpkg-manifest-dependency-management.md)
+21. [0021 — Progressive entity render-data pipeline](0021-progressive-entity-render-data-pipeline.md)
 
 ## Conventions
 

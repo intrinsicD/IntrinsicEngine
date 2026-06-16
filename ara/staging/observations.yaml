@@ -1,1 +1,45 @@
-observations: []
+observations:
+  - id: O01
+    timestamp: "2026-06-16T20:40"
+    provenance: ai-suggested
+    content: "Progressive geometry loading needs an entity-scoped derived-job DAG with UI-visible state; the existing import queue alone cannot represent post-load UV, normal, bake, upload, and bind work."
+    context: "Analysis of the user's requested per-entity asynchronous workflow against Runtime.StreamingExecutor and the sandbox editor import queue model."
+    potential_type: architecture
+    bound_to: [N17]
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A01"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O02
+    timestamp: "2026-06-16T20:40"
+    provenance: ai-suggested
+    content: "Mesh residency must distinguish immediate untextured geometry visibility from UV-dependent texture binding; otherwise missing UVs keep blocking first render."
+    context: "Analysis found Runtime.MeshGeometryPacker currently treats missing v:texcoord as a pack failure while the desired workflow expects geometry to appear before atlas and bake jobs complete."
+    potential_type: constraint
+    bound_to: [N17]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K01"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O03
+    timestamp: "2026-06-16T20:40"
+    provenance: ai-suggested
+    content: "The render data model likely needs explicit domain presentation descriptors: point/graph property buffers for interactive visualization, graph node and edge domains independently, and mesh face-domain data via either a domain buffer or UV-baked texture."
+    context: "Analysis of the user's point-cloud, graph, mesh, face-color, and material-slot requirements."
+    potential_type: architecture
+    bound_to: [N17]
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A02"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O04
+    timestamp: "2026-06-16T22:24"
+    provenance: user-revised
+    content: "Recommended RUNTIME-110 defaults: shared descriptors plus domain adapters; render-lane components remain primitive toggles with bindings mapped elsewhere; first surface slots albedo/normal/roughness/metallic/scalar with displacement descriptor-only; point/line slots color/scalar/size-or-width plus point normal; generated textures as deterministic child assets and property buffers as session caches by default; GPU job domains as metadata first; parent transforms compose hierarchically and material defaults inherit only when leaf slots are unset; missing-UV atlas jobs run automatically after import; in-progress slots render slot defaults with UI status rather than checker textures."
+    context: "AI recommendation pass for RUNTIME-110 remaining open questions."
+    potential_type: architecture
+    bound_to: [N21]
+    promoted: true
+    promoted_to: "logic/solution/architecture.md:A03"
+    crystallized_via: verbal-affirmation
+    stale: false

@@ -14,10 +14,15 @@ map.
 - [UI-014 — UV backend and texture bake controls](UI-014-uv-backend-and-texture-bake-controls.md):
   expose resolved-UV provenance, backend selection/regeneration, and generic
   mesh attribute texture bake commands through runtime-owned UI command seams.
+- [UI-015 — Progressive render-data inspector](UI-015-progressive-render-data-inspector.md):
+  expose entity shape, render-lane bindings, slot defaults, source-property
+  pickers, and per-entity/global derived-job status for the progressive
+  render-data pipeline accepted by `RUNTIME-110`.
 
 ## Convergence
 
-- RORG-031F is part of **Theme F — Architecture/runtime/UI foundation seeds**.
+- RORG-031F and UI-015 are part of
+  **Theme F — Architecture/runtime/UI foundation seeds**.
 - UI-001 is retired as part of **Theme A — Working sandbox app path** and depends on
   `RUNTIME-090` + `GRAPHICS-079` for ImGui frame production/presentation plus
   runtime selection/geometry-residency tasks for live content. RUNTIME-095 closes

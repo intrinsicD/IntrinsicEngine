@@ -287,3 +287,147 @@ tree:
       policy/session brief/docs-sync/layering/test-layout/doc-link checks passed,
       and git diff whitespace check passed.
     status: resolved
+  - id: N17
+    type: question
+    title: "Define data-based progressive geometry pipeline"
+    provenance: user
+    timestamp: "2026-06-16T20:40"
+    description: >
+      User revised the target from monolithic mesh post-processing to a data-based
+      per-entity model: asynchronous jobs/tasks need UI debug visibility; point
+      clouds and graphs render property buffers; graphs need independently
+      addressable vertex/node and edge domains; meshes should keep geometry
+      minimal while normals, colors, PBR properties, and displacement flow through
+      material texture slots or equivalent domain data; the UI must make the data
+      contract understandable.
+    status: open
+  - id: N18
+    type: decision
+    title: "Open RUNTIME-110 clarification task"
+    provenance: ai-executed
+    timestamp: "2026-06-16T21:26"
+    also_depends_on: [N17]
+    choice: >
+      Created a backlog clarification task to organize the progressive entity
+      render-data pipeline before implementation, covering entity composition,
+      render-lane semantics, material/property slot bindings, cross-domain
+      property presentation, asynchronous derived jobs, example import flow,
+      and UI controls.
+    alternatives:
+      - "Keep the clarification only in chat."
+      - "Promote directly to an active implementation task before resolving the open decisions."
+      - "Create separate mesh-first implementation tasks before the graph and point-cloud contracts are clarified."
+    evidence:
+      - "tasks/done/RUNTIME-110-progressive-entity-render-data-pipeline.md"
+      - "tasks/backlog/runtime/README.md"
+      - "tasks/SESSION-BRIEF.md"
+    status: resolved
+  - id: N19
+    type: experiment
+    title: "RUNTIME-110 task validation"
+    provenance: ai-executed
+    timestamp: "2026-06-16T21:26"
+    also_depends_on: [N18]
+    evidence:
+      - "python3 tools/agents/generate_session_brief.py"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/agents/validate_tasks.py --root ."
+    result: >
+      Session brief regenerated and strict task policy passed with 421 task
+      files validated and zero findings. The broader validate_tasks helper
+      exited successfully but reported no discovered task markdown files.
+    status: resolved
+  - id: N20
+    type: decision
+    title: "Resolve RUNTIME-110 answered decisions"
+    provenance: user-revised
+    timestamp: "2026-06-16T22:13"
+    also_depends_on: [N18]
+    choice: >
+      Updated RUNTIME-110 from inline Q/A into resolved architecture text based
+      on the user's answers: one geometry domain per leaf entity, composition
+      entities aggregate child status, RenderEdges keeps its name, render lanes
+      resolve separate presentation/material bindings, halfedge properties are
+      user-facing, selection overlays can be transferred to properties, mesh UVs
+      are mandatory for texture work with xatlas jobs when missing, graph and
+      point-cloud domains use property buffers, derived jobs can chain and
+      schedule follow-ups, previous valid outputs remain bound until replacement,
+      and UI controls expose per-lane defaults plus compatible property pickers.
+    alternatives:
+      - "Leave answered choices as inline Answer bullets."
+      - "Start implementation before resolving the remaining open questions."
+    evidence:
+      - "tasks/done/RUNTIME-110-progressive-entity-render-data-pipeline.md"
+    status: resolved
+  - id: N21
+    type: question
+    title: "Recommend RUNTIME-110 remaining decisions"
+    provenance: user
+    timestamp: "2026-06-16T22:24"
+    also_depends_on: [N20]
+    description: >
+      User asked for recommendations and rationale for RUNTIME-110's remaining
+      open design questions: abstraction boundary, render-lane binding location,
+      first-slot set, generated-output persistence, GPU job-domain metadata,
+      composition inheritance, UV atlas eagerness, and in-progress visuals.
+    status: resolved
+  - id: N22
+    type: decision
+    title: "Accept RUNTIME-110 recommended defaults"
+    provenance: user
+    timestamp: "2026-06-16T22:30"
+    also_depends_on: [N21]
+    choice: >
+      User accepted the recommended defaults and asked to apply them to
+      RUNTIME-110.
+    alternatives:
+      - "Keep the recommended defaults staged as unconfirmed suggestions."
+      - "Revise individual recommended defaults before updating RUNTIME-110."
+    evidence:
+      - "tasks/done/RUNTIME-110-progressive-entity-render-data-pipeline.md"
+    status: resolved
+  - id: N23
+    type: decision
+    title: "Retire RUNTIME-110 into ADR and implementation slices"
+    provenance: ai-executed
+    timestamp: "2026-06-16T22:45"
+    also_depends_on: [N22]
+    choice: >
+      Accepted ADR-0021 for the progressive entity render-data pipeline, retired
+      RUNTIME-110 at Scaffolded planning maturity, and split implementation into
+      reviewable follow-up tasks: RUNTIME-111 descriptor contracts, RUNTIME-112
+      derived-job graph snapshots, RUNTIME-113 progressive extraction,
+      RUNTIME-114 import enrichment, UI-015 inspector/debug visibility, and
+      GRAPHICS-090 backend smoke.
+    alternatives:
+      - "Keep RUNTIME-110 open as a broad implementation umbrella."
+      - "Start engine-code implementation before recording the ADR and follow-up task chain."
+      - "Split only mesh work and defer graph/point-cloud contracts."
+    evidence:
+      - "docs/adr/0021-progressive-entity-render-data-pipeline.md"
+      - "tasks/done/RUNTIME-110-progressive-entity-render-data-pipeline.md"
+      - "tasks/backlog/runtime/RUNTIME-111-progressive-render-data-descriptors.md"
+      - "tasks/backlog/runtime/RUNTIME-112-entity-derived-job-graph.md"
+      - "tasks/backlog/runtime/RUNTIME-113-progressive-domain-presentation-extraction.md"
+      - "tasks/backlog/runtime/RUNTIME-114-progressive-import-enrichment-pipeline.md"
+      - "tasks/backlog/ui/UI-015-progressive-render-data-inspector.md"
+      - "tasks/backlog/rendering/GRAPHICS-090-progressive-render-data-operational-smoke.md"
+    status: resolved
+  - id: N24
+    type: experiment
+    title: "RUNTIME-110 retirement validation"
+    provenance: ai-executed
+    timestamp: "2026-06-16T22:45"
+    also_depends_on: [N23]
+    evidence:
+      - "python3 tools/agents/generate_session_brief.py"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/docs/check_doc_links.py --root ."
+      - "python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main"
+      - "git diff --check"
+    result: >
+      Session brief regenerated with RUNTIME-111 as the unblocked first slice;
+      strict task policy passed across 427 task files with no maturity
+      follow-up findings; doc-link and docs-sync checks passed; and git diff
+      whitespace checks passed.
+    status: resolved

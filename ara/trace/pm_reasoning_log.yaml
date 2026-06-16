@@ -24,3 +24,33 @@ entries:
       - "Routed BUG-044 implementation/retirement and verification as direct journey facts."
       - "Did not stage interpretive observations; the turn produced committed engineering evidence and deterministic verification results rather than a new research assertion."
       - "Kept GRAPHICS-089 as the only open thread; BUG-044 closed at CPUContracted and did not change the pending opt-in Vulkan smoke scope."
+  - turn: "2026-06-16_001#4"
+    notes:
+      - "Routed the user's revised progressive geometry pipeline request as an open question because it changes the design target before a task file exists."
+      - "Staged architecture/constraint observations instead of crystallizing them; they are AI-suggested interpretations awaiting user answers."
+      - "Kept prior BUG-044 retirement resolved but recorded this turn as a design pivot for the next active task scope."
+  - turn: "2026-06-16_001#5"
+    notes:
+      - "Routed the creation of RUNTIME-110 as a direct journey decision because the artifact now anchors the open design thread."
+      - "Did not crystallize the staged observations; the task file records open decisions rather than accepted architecture."
+      - "Recorded task-policy validation as an experiment-like journey fact with the validate_tasks discovery quirk noted."
+  - turn: "2026-06-16_001#6"
+    notes:
+      - "Routed the RUNTIME-110 rewrite as a user-revised decision because the user's answers became the task's resolved contract text."
+      - "Crystallized O01, O02, and O03 via artifact commitment: RUNTIME-110 now depends on these staged observations."
+      - "Left implementation-specific choices as open questions rather than crystallizing them."
+  - turn: "2026-06-16_001#7"
+    notes:
+      - "Routed the user's request as an open question and staged the AI recommendations as O04."
+      - "Did not crystallize O04 because the user has not yet accepted or revised the recommendations."
+      - "No task files were edited this turn."
+  - turn: "2026-06-16_001#8"
+    notes:
+      - "Routed the user's affirmation as N22 and crystallized O04 via verbal affirmation."
+      - "Updated RUNTIME-110 so accepted recommendations are task contract rather than open questions."
+      - "Open thread now moves from design clarification to ADR and implementation-task split."
+  - turn: "2026-06-16_001#9"
+    notes:
+      - "Routed ADR-0021 acceptance, RUNTIME-110 retirement, and the follow-up task split as direct journey facts because they are artifact commitments."
+      - "Crystallized A04 from the committed ADR/task split; no new staged observation was needed because the user had already accepted the design defaults."
+      - "Closed the ADR/split open thread and replaced it with RUNTIME-111 as the next unblocked implementation slice."
