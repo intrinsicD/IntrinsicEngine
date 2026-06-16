@@ -65,6 +65,11 @@ export namespace Extrinsic::Runtime
         RuntimeMeshUvResolutionOptions UvResolution{};
     };
 
+    struct RuntimeMeshGeometryOnlyOptions
+    {
+        bool AllowDisconnectedRenderableFallback{false};
+    };
+
     [[nodiscard]] bool MeshPayloadHasValidVertexTexcoords(
         const Geometry::MeshIO::MeshIOResult& meshPayload) noexcept;
 
@@ -72,6 +77,11 @@ export namespace Extrinsic::Runtime
     BuildRuntimeHalfedgeMeshMaterialization(
         const Geometry::MeshIO::MeshIOResult& meshPayload,
         RuntimeMeshMaterializationOptions options = {});
+
+    [[nodiscard]] Core::Expected<Geometry::HalfedgeMesh::Mesh>
+    BuildRuntimeHalfedgeMeshGeometryOnly(
+        const Geometry::MeshIO::MeshIOResult& meshPayload,
+        RuntimeMeshGeometryOnlyOptions options = {});
 
     [[nodiscard]] Core::Expected<Geometry::HalfedgeMesh::Mesh>
     BuildRuntimeHalfedgeMeshWithNormals(

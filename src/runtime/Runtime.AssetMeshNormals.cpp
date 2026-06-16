@@ -146,6 +146,10 @@ namespace Extrinsic::Runtime
             const std::vector<glm::vec3>& normals,
             const std::span<const std::uint32_t> sourceVertexForTargetVertex)
         {
+            if (normals.empty())
+            {
+                return;
+            }
             if (mesh.VerticesSize() != sourceVertexForTargetVertex.size())
             {
                 return;
@@ -266,6 +270,21 @@ namespace Extrinsic::Runtime
             }
 
             return ComputeAreaWeightedVertexNormals(positions, faces);
+        }
+
+        [[nodiscard]] std::vector<glm::vec3> ResolveAuthoredVertexNormals(
+            const Geometry::MeshIO::MeshIOResult& meshPayload,
+            const std::size_t vertexCount)
+        {
+            const auto explicitNormals =
+                meshPayload.Vertices.Get<glm::vec3>(kNormalProperty);
+            if (explicitNormals &&
+                explicitNormals.Vector().size() == vertexCount)
+            {
+                return explicitNormals.Vector();
+            }
+
+            return {};
         }
 
         [[nodiscard]] bool IsFinite(const glm::vec2 value) noexcept
@@ -735,6 +754,50 @@ namespace Extrinsic::Runtime
             .Mesh = std::move(*mesh),
             .Diagnostics = diagnostics,
         };
+    }
+
+    Core::Expected<Geometry::HalfedgeMesh::Mesh> BuildRuntimeHalfedgeMeshGeometryOnly(
+        const Geometry::MeshIO::MeshIOResult& meshPayload,
+        const RuntimeMeshGeometryOnlyOptions options)
+    {
+        const auto positions = meshPayload.Vertices.Get<glm::vec3>(kPositionProperty);
+        if (!positions || positions.Vector().empty())
+        {
+            return Core::Err<Geometry::HalfedgeMesh::Mesh>(
+                Core::ErrorCode::AssetInvalidData);
+        }
+
+        const auto faces =
+            meshPayload.Faces.Get<std::vector<std::uint32_t>>(kFaceVerticesProperty);
+        if (!faces || faces.Vector().empty())
+        {
+            return Core::Err<Geometry::HalfedgeMesh::Mesh>(
+                Core::ErrorCode::AssetInvalidData);
+        }
+
+        auto source = BuildTriangulatedSourceMesh(positions.Vector(), faces.Vector());
+        if (!source.has_value())
+        {
+            return Core::Err<Geometry::HalfedgeMesh::Mesh>(source.error());
+        }
+
+        std::vector<std::uint32_t> identityVertexXrefs(source->Mesh.VertexCount(), 0u);
+        for (std::size_t i = 0u; i < identityVertexXrefs.size(); ++i)
+        {
+            identityVertexXrefs[i] = static_cast<std::uint32_t>(i);
+        }
+
+        static_cast<void>(Geometry::UvAtlas::CopySourceVertexPropertiesByXref(
+            Geometry::ConstPropertySet(meshPayload.Vertices),
+            identityVertexXrefs,
+            source->Mesh.VertexProperties()));
+
+        return ConvertResolvedMeshToHalfedge(
+            source->Mesh,
+            identityVertexXrefs,
+            source->OriginalFaceForTriangle,
+            ResolveAuthoredVertexNormals(meshPayload, positions.Vector().size()),
+            options.AllowDisconnectedRenderableFallback);
     }
 
     Core::Expected<Geometry::HalfedgeMesh::Mesh> BuildRuntimeHalfedgeMeshWithNormals(

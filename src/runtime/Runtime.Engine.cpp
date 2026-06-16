@@ -78,6 +78,7 @@ import Extrinsic.Asset.ModelTextureIOBridge;
 import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.Service;
+import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Component.Culling.Local;
 import Extrinsic.ECS.Component.Culling.World;
@@ -299,10 +300,6 @@ namespace Extrinsic::Runtime
         struct DecodedMeshImport
         {
             Geometry::MeshIO::MeshIOResult Payload{};
-            Geometry::HalfedgeMesh::Mesh Mesh{};
-            bool HasResolvedTexcoords{false};
-            RuntimeMeshResolvedUvProvenance TexcoordProvenance{
-                RuntimeMeshResolvedUvProvenance::None};
         };
 
         struct DecodedGraphImport
@@ -352,6 +349,16 @@ namespace Extrinsic::Runtime
             Assets::AssetId NormalTexture{};
             std::uint64_t GeneratedTextureAssetsCreated{0u};
             std::uint64_t GeneratedTextureUploadRequests{0u};
+        };
+
+        struct DirectMeshPostProcessState
+        {
+            std::string Path{};
+            Geometry::MeshIO::MeshIOResult Payload{};
+            ECS::EntityHandle Entity{ECS::InvalidEntityHandle};
+            Core::ErrorCode Error{Core::ErrorCode::Success};
+            std::optional<RuntimeMeshMaterializationResult> Materialized{};
+            std::optional<Assets::AssetTexture2DPayload> GeneratedNormalTexture{};
         };
 
         [[nodiscard]] RuntimeAssetIngestRequest MakeRuntimeAssetIngestRequest(
@@ -649,20 +656,15 @@ namespace Extrinsic::Runtime
             cameraControllers.MarkCameraTransition(CameraControllerSlot::Main);
         }
 
-        [[nodiscard]] Core::Expected<DirectMeshGeneratedTextureResult>
-        TryRegisterDirectMeshGeneratedNormalTexture(
-            Assets::AssetService& assetService,
-            Graphics::GpuAssetCache& gpuAssetCache,
-            RenderExtractionCache& extraction,
+        [[nodiscard]] std::optional<Assets::AssetTexture2DPayload>
+        BakeDirectMeshGeneratedNormalTexturePayload(
             const std::string_view meshPath,
-            const ECS::EntityHandle entity,
             const Geometry::HalfedgeMesh::Mesh& mesh,
             const bool hasResolvedTexcoords)
         {
-            DirectMeshGeneratedTextureResult result{};
             if (!hasResolvedTexcoords)
             {
-                return result;
+                return std::nullopt;
             }
 
             MeshAttributeTextureBakeOptions options{};
@@ -675,10 +677,23 @@ namespace Extrinsic::Runtime
                 BakeMeshVertexNormalTexture(mesh, options);
             if (bake.Status != MeshAttributeTextureBakeStatus::Success)
             {
-                return result;
+                return std::nullopt;
             }
 
             bake.Payload.Metadata.SourcePath = std::string{meshPath};
+            return std::move(bake.Payload);
+        }
+
+        [[nodiscard]] Core::Expected<DirectMeshGeneratedTextureResult>
+        RegisterDirectMeshGeneratedNormalTexture(
+            Assets::AssetService& assetService,
+            Graphics::GpuAssetCache& gpuAssetCache,
+            RenderExtractionCache& extraction,
+            const std::string_view meshPath,
+            const ECS::EntityHandle entity,
+            const Assets::AssetTexture2DPayload& payload)
+        {
+            DirectMeshGeneratedTextureResult result{};
             const std::string generatedPath = BuildGeneratedTextureAssetPath(
                 meshPath,
                 0u,
@@ -687,7 +702,7 @@ namespace Extrinsic::Runtime
             auto texture = LoadGeneratedTextureAsset(
                 assetService,
                 generatedPath,
-                bake.Payload);
+                payload);
             if (!texture.has_value())
             {
                 return Core::Err<DirectMeshGeneratedTextureResult>(texture.error());
@@ -719,6 +734,135 @@ namespace Extrinsic::Runtime
                 });
 
             return result;
+        }
+
+        void MarkMeshGeometryDirty(entt::registry& raw, const ECS::EntityHandle entity)
+        {
+            ECS::Components::DirtyTags::MarkGpuDirty(raw, entity);
+            ECS::Components::DirtyTags::MarkVertexPositionsDirty(raw, entity);
+            ECS::Components::DirtyTags::MarkFaceTopologyDirty(raw, entity);
+            ECS::Components::DirtyTags::MarkEdgeTopologyDirty(raw, entity);
+        }
+
+        void QueueDirectMeshPostProcess(
+            StreamingExecutor* streamingExecutor,
+            Assets::AssetService& assetService,
+            Graphics::GpuAssetCache& gpuAssetCache,
+            RenderExtractionCache& extraction,
+            ECS::Scene::Registry& scene,
+            std::string meshPath,
+            const Geometry::MeshIO::MeshIOResult& meshPayload,
+            const ECS::EntityHandle entity)
+        {
+            if (streamingExecutor == nullptr || entity == ECS::InvalidEntityHandle)
+            {
+                return;
+            }
+
+            auto state = std::make_shared<DirectMeshPostProcessState>();
+            state->Path = std::move(meshPath);
+            state->Payload = meshPayload;
+            state->Entity = entity;
+
+            const StreamingTaskHandle handle = streamingExecutor->Submit(
+                StreamingTaskDesc{
+                    .Name = "Runtime.DirectMeshPostProcess." +
+                        FileNameFromPath(state->Path),
+                    .Kind = Core::Dag::TaskKind::AssetDecode,
+                    .Priority = Core::Dag::TaskPriority::Low,
+                    .EstimatedCost = 8u,
+                    .Execute = [state]() mutable -> StreamingResult
+                    {
+                        auto materialized = BuildRuntimeHalfedgeMeshMaterialization(
+                            state->Payload,
+                            RuntimeMeshMaterializationOptions{
+                                .AllowDisconnectedRenderableFallback = true,
+                            });
+                        if (!materialized.has_value())
+                        {
+                            state->Error = materialized.error();
+                            return StreamingResult{
+                                StreamingCpuPayloadReady{.PayloadToken = 0u}};
+                        }
+
+                        state->GeneratedNormalTexture =
+                            BakeDirectMeshGeneratedNormalTexturePayload(
+                                state->Path,
+                                materialized->Mesh,
+                                materialized->Diagnostics.ResolvedTexcoordsValid);
+                        state->Materialized = std::move(*materialized);
+                        state->Error = Core::ErrorCode::Success;
+                        return StreamingResult{
+                            StreamingCpuPayloadReady{.PayloadToken = 0u}};
+                    },
+                    .ApplyOnMainThread = [
+                        state,
+                        &assetService,
+                        &gpuAssetCache,
+                        &extraction,
+                        &scene](StreamingResult&& result) mutable
+                    {
+                        if (!result.has_value() ||
+                            state->Error != Core::ErrorCode::Success ||
+                            !state->Materialized.has_value())
+                        {
+                            Core::Log::Warn(
+                                "[Runtime] Deferred mesh post-process failed: path='{}' error={}",
+                                state->Path,
+                                Core::Error::ToString(
+                                    result.has_value()
+                                        ? state->Error
+                                        : result.error()));
+                            return;
+                        }
+
+                        if (!scene.IsValid(state->Entity))
+                        {
+                            return;
+                        }
+
+                        auto& raw = scene.Raw();
+                        Geometry::HalfedgeMesh::Mesh mesh =
+                            std::move(state->Materialized->Mesh);
+                        ECS::Components::GeometrySources::PopulateFromMesh(
+                            raw,
+                            state->Entity,
+                            mesh);
+                        MarkMeshGeometryDirty(raw, state->Entity);
+
+                        if (state->GeneratedNormalTexture.has_value())
+                        {
+                            auto generated = RegisterDirectMeshGeneratedNormalTexture(
+                                assetService,
+                                gpuAssetCache,
+                                extraction,
+                                state->Path,
+                                state->Entity,
+                                *state->GeneratedNormalTexture);
+                            if (!generated.has_value())
+                            {
+                                Core::Log::Warn(
+                                    "[Runtime] Deferred generated normal texture registration failed: path='{}' error={}",
+                                    state->Path,
+                                    Core::Error::ToString(generated.error()));
+                            }
+                        }
+                    },
+                });
+
+            if (handle.IsValid())
+            {
+                streamingExecutor->PumpBackground(1u);
+                Core::Log::Info(
+                    "[Runtime] Queued direct mesh post-process: path='{}'",
+                    state->Path);
+            }
+            else
+            {
+                Core::Log::Warn(
+                    "[Runtime] Direct mesh post-process queue submission failed: path='{}'",
+                    state->Path);
+            }
         }
 
         [[nodiscard]] Core::Expected<DecodedGeometryImport> DecodeGeometryImport(
@@ -765,26 +909,11 @@ namespace Extrinsic::Runtime
                         meshPayload.error());
                 }
 
-                auto materialized = BuildRuntimeHalfedgeMeshMaterialization(
-                    **meshPayload,
-                    RuntimeMeshMaterializationOptions{
-                        .AllowDisconnectedRenderableFallback = true,
-                    });
-                if (!materialized.has_value())
-                {
-                    return Core::Err<DecodedGeometryImport>(materialized.error());
-                }
-
                 return DecodedGeometryImport{
                     .Path = request.Path,
                     .PayloadKind = route->PayloadKind,
                     .Payload = DecodedMeshImport{
                         .Payload = **meshPayload,
-                        .Mesh = std::move(materialized->Mesh),
-                        .HasResolvedTexcoords =
-                            materialized->Diagnostics.ResolvedTexcoordsValid,
-                        .TexcoordProvenance =
-                            materialized->Diagnostics.TexcoordProvenance,
                     },
                 };
             }
@@ -834,6 +963,7 @@ namespace Extrinsic::Runtime
             Graphics::GpuAssetCache& gpuAssetCache,
             RenderExtractionCache& extraction,
             ECS::Scene::Registry& scene,
+            StreamingExecutor* streamingExecutor,
             const DecodedGeometryImport& decoded)
         {
             return std::visit(
@@ -858,6 +988,17 @@ namespace Extrinsic::Runtime
                         }
                         DrainAssetImportEvents(assetService);
 
+                        auto rawMesh = BuildRuntimeHalfedgeMeshGeometryOnly(
+                            payload.Payload,
+                            RuntimeMeshGeometryOnlyOptions{
+                                .AllowDisconnectedRenderableFallback = true,
+                            });
+                        if (!rawMesh.has_value())
+                        {
+                            return Core::Err<MaterializedGeometryImport>(
+                                rawMesh.error());
+                        }
+
                         const ECS::EntityHandle entity =
                             ECS::Scene::CreateDefault(
                                 scene,
@@ -873,43 +1014,30 @@ namespace Extrinsic::Runtime
                             entity,
                             ImportedGeometryVisualization());
                         const std::optional<GeometryImportBounds> bounds =
-                            BoundsFromHalfedgeMesh(payload.Mesh);
+                            BoundsFromHalfedgeMesh(*rawMesh);
                         if (bounds.has_value())
                         {
                             AttachGeometryBounds(raw, entity, *bounds);
                         }
-                        Geometry::HalfedgeMesh::Mesh mesh = payload.Mesh;
                         ECS::Components::GeometrySources::PopulateFromMesh(
                             raw,
                             entity,
-                            mesh);
-
-                        auto generatedTexture =
-                            TryRegisterDirectMeshGeneratedNormalTexture(
-                                assetService,
-                                gpuAssetCache,
-                                extraction,
-                                decoded.Path,
-                                entity,
-                                payload.Mesh,
-                                payload.HasResolvedTexcoords);
-                        if (!generatedTexture.has_value())
-                        {
-                            return Core::Err<MaterializedGeometryImport>(
-                                generatedTexture.error());
-                        }
+                            *rawMesh);
+                        QueueDirectMeshPostProcess(
+                            streamingExecutor,
+                            assetService,
+                            gpuAssetCache,
+                            extraction,
+                            scene,
+                            decoded.Path,
+                            payload.Payload,
+                            entity);
 
                         return MaterializedGeometryImport{
                             .Result = RuntimeAssetImportResult{
                                 .Asset = *asset,
                                 .PayloadKind = decoded.PayloadKind,
                                 .PrimitiveEntitiesCreated = 1u,
-                                .GeneratedTextureAssetsCreated =
-                                    generatedTexture->GeneratedTextureAssetsCreated,
-                                .TextureUploadRequests =
-                                    generatedTexture->GeneratedTextureUploadRequests,
-                                .GeneratedTextureUploadRequests =
-                                    generatedTexture->GeneratedTextureUploadRequests,
                             },
                             .Bounds = bounds,
                             .Entity = entity,
@@ -2950,6 +3078,7 @@ namespace Extrinsic::Runtime
                         *m_GpuAssetCache,
                         m_RenderExtraction,
                         *m_Scene,
+                        m_StreamingExecutor.get(),
                         *state->Decoded);
                     if (materialized.has_value())
                     {
@@ -3346,6 +3475,7 @@ namespace Extrinsic::Runtime
                 *m_GpuAssetCache,
                 m_RenderExtraction,
                 *m_Scene,
+                m_StreamingExecutor.get(),
                 *decoded);
             if (!materialized.has_value())
             {

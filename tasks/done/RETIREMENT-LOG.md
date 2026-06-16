@@ -9,6 +9,18 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`BUG-044`](BUG-044-runtime-import-postprocess-queue.md) — Runtime mesh import
+post-process queue — retired on 2026-06-16 at maturity `CPUContracted`.
+Direct mesh imports now publish decoded raw geometry before derived
+materialization work. Missing normals, missing/invalid UV resolution, atlas
+generation, and generated normal texture baking run on `Runtime.StreamingExecutor`
+and apply back to the same ECS entity on the main thread with geometry dirty
+tags. The import result reports the mesh entity immediately with zero generated
+texture counts, while a later frame resolves finite texcoords/normals and
+registers the generated normal material binding. Focused direct import,
+model-scene, dropped-file, and mesh-normal runtime contract tests passed.
+
+Active
 [`ASSETIO-008`](ASSETIO-008-default-uv-atlas-materialization.md) — Default UV
 atlas materialization for imported meshes — retired on 2026-06-16 at maturity
 `CPUContracted`. Runtime mesh materialization now validates authored UVs through

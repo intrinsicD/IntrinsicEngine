@@ -5,11 +5,13 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- No active BUG issues are tracked here.
+- No active BUG issues are currently tracked.
 
 ---
 
 ## Verified / Closed
+
+- Closed 2026-06-16: [`BUG-044` — Runtime mesh import blocks on derived post-processing](../../done/BUG-044-runtime-import-postprocess-queue.md). Direct mesh import now publishes decoded raw geometry before derived missing-normal, UV-atlas, and generated-texture work. The derived work runs through `Runtime.StreamingExecutor`, applies back to the same entity, stamps geometry dirty tags, and registers the generated normal material binding after the deferred result is ready.
 
 - Closed 2026-06-14: [`BUG-043` — Dropped OBJ without UVs loads but is invisible](../../done/BUG-043-dropped-obj-missing-uvs-invisible.md). Runtime mesh materialization now preserves authored `v:texcoord`; after `ASSETIO-008`, missing or invalid source UVs are replaced by generated xatlas-backed atlas UVs before ECS population and generated texture bakes. Direct OBJ imports without `vt` lines upload surface geometry under CPU/null extraction instead of reporting `MeshGeometryMissingTexcoords`.
 

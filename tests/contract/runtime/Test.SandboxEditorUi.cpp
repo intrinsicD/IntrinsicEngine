@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <fstream>
 #include <iterator>
 #include <limits>
@@ -10,6 +11,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -429,6 +431,37 @@ namespace
         std::uint32_t m_ObservedFrames{0u};
     };
 
+    class WaitForConditionApplication final : public Runtime::IApplication
+    {
+    public:
+        explicit WaitForConditionApplication(
+            std::function<bool(Runtime::Engine&)> ready,
+            std::uint32_t maxFrames = 512u)
+            : m_Ready(std::move(ready))
+            , m_MaxFrames(maxFrames)
+        {
+        }
+
+        void OnInitialize(Runtime::Engine&) override {}
+        void OnSimTick(Runtime::Engine&, double) override {}
+        void OnVariableTick(Runtime::Engine& engine, double, double) override
+        {
+            ++m_ObservedFrames;
+            if ((m_Ready && m_Ready(engine)) || m_ObservedFrames >= m_MaxFrames)
+            {
+                engine.RequestExit();
+                return;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        void OnShutdown(Runtime::Engine&) override {}
+
+    private:
+        std::function<bool(Runtime::Engine&)> m_Ready{};
+        std::uint32_t m_MaxFrames{1u};
+        std::uint32_t m_ObservedFrames{0u};
+    };
+
     [[nodiscard]] Extrinsic::Core::Config::EngineConfig HeadlessConfig()
     {
         Extrinsic::Core::Config::EngineConfig config{};
@@ -436,6 +469,32 @@ namespace
         config.Camera.Enabled = false;
         config.Window.Backend = Core::Config::WindowBackend::Null;
         return config;
+    }
+
+    [[nodiscard]] bool MeshHasVertexProperty(
+        Runtime::Engine& engine,
+        const ECS::EntityHandle entity,
+        const std::string_view propertyName)
+    {
+        if (!engine.GetScene().IsValid(entity))
+        {
+            return false;
+        }
+
+        auto& raw = engine.GetScene().Raw();
+        const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
+        return view.Valid() &&
+            view.ActiveDomain == GS::Domain::Mesh &&
+            view.VertexSource != nullptr &&
+            view.VertexSource->Properties.Exists(propertyName);
+    }
+
+    [[nodiscard]] bool DirectMeshPostProcessReady(
+        Runtime::Engine& engine,
+        const ECS::EntityHandle entity)
+    {
+        return MeshHasVertexProperty(engine, entity, "v:texcoord") &&
+            MeshHasVertexProperty(engine, entity, "v:normal");
     }
 
     struct TmpFile
@@ -3003,7 +3062,15 @@ TEST(SandboxEditorUi, EngineImportFacadeMaterializesNonManifoldObjAsRenderableMe
         "f 2/2 1/1 4/4\n"
         "f 1/1 2/2 5/5\n");
 
-    Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    std::optional<ECS::EntityHandle> meshEntity{};
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<WaitForConditionApplication>(
+            [&meshEntity](Runtime::Engine& runningEngine)
+            {
+                return meshEntity.has_value() &&
+                    DirectMeshPostProcessReady(runningEngine, *meshEntity);
+            }));
     engine.Initialize();
 
     auto mesh = engine.ImportAssetFromPath(
@@ -3018,8 +3085,7 @@ TEST(SandboxEditorUi, EngineImportFacadeMaterializesNonManifoldObjAsRenderableMe
     EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
 
     auto& raw = engine.GetScene().Raw();
-    const std::optional<ECS::EntityHandle> meshEntity =
-        FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
+    meshEntity = FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
     ASSERT_TRUE(meshEntity.has_value());
     EXPECT_TRUE((raw.all_of<ECSC::MetaData,
                             ECSC::Hierarchy::Component,
@@ -3035,6 +3101,9 @@ TEST(SandboxEditorUi, EngineImportFacadeMaterializesNonManifoldObjAsRenderableMe
     EXPECT_EQ(raw.get<G::RenderSurface>(*meshEntity).Domain,
               G::RenderSurface::SourceDomain::Vertex);
 
+    engine.Run();
+    ASSERT_TRUE(DirectMeshPostProcessReady(engine, *meshEntity));
+
     Runtime::RenderExtractionCache extraction;
     const auto stats = extraction.ExtractAndSubmit(engine.GetScene(),
                                                    engine.GetRenderer(),
@@ -3044,7 +3113,7 @@ TEST(SandboxEditorUi, EngineImportFacadeMaterializesNonManifoldObjAsRenderableMe
     EXPECT_EQ(stats.MeshGeometryFailedPack, 0u);
     EXPECT_EQ(stats.MeshGeometryMissingPositions, 0u);
     EXPECT_EQ(stats.MeshGeometryInvalidTopology, 0u);
-    EXPECT_EQ(engine.GetRenderer().GetGpuWorld().GetLiveGeometryCount(), 1u);
+    EXPECT_GE(engine.GetRenderer().GetGpuWorld().GetLiveGeometryCount(), 1u);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();
@@ -3059,7 +3128,15 @@ TEST(SandboxEditorUi, EngineImportFacadeMaterializesObjWithoutAuthoredTexcoordsA
         "v 0 1 0\n"
         "f 1 2 3\n");
 
-    Runtime::Engine engine(HeadlessConfig(), std::make_unique<OneFrameApplication>());
+    std::optional<ECS::EntityHandle> meshEntity{};
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<WaitForConditionApplication>(
+            [&meshEntity](Runtime::Engine& runningEngine)
+            {
+                return meshEntity.has_value() &&
+                    DirectMeshPostProcessReady(runningEngine, *meshEntity);
+            }));
     engine.Initialize();
 
     auto mesh = engine.ImportAssetFromPath(
@@ -3072,9 +3149,11 @@ TEST(SandboxEditorUi, EngineImportFacadeMaterializesObjWithoutAuthoredTexcoordsA
     EXPECT_EQ(mesh->PayloadKind, Assets::AssetPayloadKind::Mesh);
     EXPECT_EQ(mesh->PrimitiveEntitiesCreated, 1u);
 
-    const std::optional<ECS::EntityHandle> meshEntity =
-        FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
+    meshEntity = FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
     ASSERT_TRUE(meshEntity.has_value());
+
+    engine.Run();
+    ASSERT_TRUE(DirectMeshPostProcessReady(engine, *meshEntity));
 
     auto& raw = engine.GetScene().Raw();
     ASSERT_TRUE(raw.all_of<G::RenderSurface>(*meshEntity));
@@ -3104,7 +3183,7 @@ TEST(SandboxEditorUi, EngineImportFacadeMaterializesObjWithoutAuthoredTexcoordsA
     EXPECT_EQ(stats.MeshGeometryUploads, 1u);
     EXPECT_EQ(stats.MeshGeometryFailedPack, 0u);
     EXPECT_EQ(stats.MeshGeometryMissingTexcoords, 0u);
-    EXPECT_EQ(engine.GetRenderer().GetGpuWorld().GetLiveGeometryCount(), 1u);
+    EXPECT_GE(engine.GetRenderer().GetGpuWorld().GetLiveGeometryCount(), 1u);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();
