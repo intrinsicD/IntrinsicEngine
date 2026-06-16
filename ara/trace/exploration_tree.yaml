@@ -94,3 +94,42 @@ tree:
       - "tasks/backlog/rendering/README.md"
       - "tasks/SESSION-BRIEF.md"
     status: open
+  - id: N07
+    type: decision
+    title: "Retire ASSETIO-005 at Operational"
+    provenance: ai-executed
+    timestamp: "2026-06-16T11:33"
+    choice: >
+      Implemented the runtime-owned AssetIO queue snapshot and sandbox editor
+      File / Import progress rows, then retired ASSETIO-005 at Operational
+      maturity while leaving ASSETIO-008 blocked by GEOM-025.
+    alternatives:
+      - "Promote ASSETIO-008 despite its GEOM-025 blocker."
+      - "Keep ASSETIO-005 in backlog after adding only a queue scaffold."
+    evidence:
+      - "tasks/done/ASSETIO-005-asset-import-queue-progress.md"
+      - "src/runtime/Runtime.AssetIngestStateMachine.cppm"
+      - "src/runtime/Runtime.Engine.cppm"
+      - "src/runtime/Editor/Runtime.SandboxEditorUi.cppm"
+      - "tests/contract/runtime/Test.AssetIngestStateMachine.cpp"
+      - "tests/contract/runtime/Test.SandboxEditorUi.cpp"
+    status: resolved
+  - id: N08
+    type: experiment
+    title: "ASSETIO-005 verification"
+    provenance: ai-executed
+    timestamp: "2026-06-16T11:33"
+    also_depends_on: [N07]
+    evidence:
+      - "cmake --preset ci"
+      - "cmake --build --preset ci --target IntrinsicTests"
+      - "ctest --test-dir build/ci --output-on-failure -R 'Asset|Import|Streaming|SandboxEditorUi' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+    result: >
+      Full IntrinsicTests build passed, focused Asset/Import/Streaming/
+      SandboxEditorUi tests passed 244/244, default CPU-supported CTest passed
+      3049/3049, strict layering/test-layout/task/docs checks passed, and
+      post-commit PR-contract/docs-sync checks passed.
+    status: resolved

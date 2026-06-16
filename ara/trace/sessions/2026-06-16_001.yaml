@@ -1,0 +1,47 @@
+session:
+  id: "2026-06-16_001"
+  date: "2026-06-16"
+  started: "2026-06-16T11:33"
+  last_turn: "2026-06-16T11:33"
+  turn_count: 1
+  summary: "Implemented and retired ASSETIO-005 at Operational with runtime-owned import queue snapshots and sandbox File / Import progress rows."
+
+events_logged:
+  - turn: 1
+    type: decision
+    id: "N07"
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired ASSETIO-005 at Operational; ASSETIO-008 remains blocked by GEOM-025."
+  - turn: 1
+    type: experiment
+    id: "N08"
+    routing: direct
+    provenance: ai-executed
+    summary: "ASSETIO-005 build, focused CTest, default CPU CTest, and strict structural checks passed."
+
+ai_actions:
+  - turn: 1
+    action: "Implemented AssetIO queue DTOs, Engine queue commands, sandbox editor queue rows, tests, docs, task retirement, and commits."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Runtime.AssetIngestStateMachine.cppm"
+      - "src/runtime/Runtime.AssetIngestStateMachine.cpp"
+      - "src/runtime/Runtime.Engine.cppm"
+      - "src/runtime/Runtime.Engine.cpp"
+      - "src/runtime/Editor/Runtime.SandboxEditorUi.cppm"
+      - "src/runtime/Editor/Runtime.SandboxEditorUi.cpp"
+      - "tests/contract/runtime/Test.AssetIngestStateMachine.cpp"
+      - "tests/contract/runtime/Test.SandboxEditorUi.cpp"
+      - "tasks/done/ASSETIO-005-asset-import-queue-progress.md"
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: "User requested the agentic workflow to implement ASSETIO backlog tasks and commit all changes; generated task state showed ASSETIO-005 unblocked and ASSETIO-008 blocked by GEOM-025."
+
+open_threads:
+  - "ASSETIO-008 remains blocked by GEOM-025; dependent GRAPHICS-089 and UI-014 remain blocked behind ASSETIO-008."
+
+ai_suggestions_pending: []

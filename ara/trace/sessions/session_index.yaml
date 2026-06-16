@@ -6,3 +6,10 @@ sessions:
     events_count: 6
     claims_touched: []
     open_threads: 2
+  - id: "2026-06-16_001"
+    date: "2026-06-16"
+    summary: "Implemented and retired ASSETIO-005 at Operational with runtime-owned import queue snapshots and sandbox File / Import progress rows."
+    turn_count: 1
+    events_count: 2
+    claims_touched: []
+    open_threads: 1

@@ -9,3 +9,8 @@ entries:
       - "Routed GRAPHICS-088 retirement, GRAPHICS-089 follow-up creation, and verification as direct journey facts."
       - "Treated the prior keep-active decision as superseded by new task evidence and explicit operational follow-up, not as a contradiction."
       - "Did not stage or crystallize claims; the turn produced engineering/task-state evidence rather than a new research assertion."
+  - turn: "2026-06-16_001#1"
+    notes:
+      - "Routed ASSETIO-005 implementation/retirement and verification as direct journey facts."
+      - "Did not stage interpretive observations; the turn produced committed engineering evidence, task-state movement, and verification results."
+      - "Kept ASSETIO-008 as an open thread because the session brief showed it remains blocked by GEOM-025."
