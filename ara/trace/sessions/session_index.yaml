@@ -8,8 +8,8 @@ sessions:
     open_threads: 2
   - id: "2026-06-16_001"
     date: "2026-06-16"
-    summary: "Implemented and retired ASSETIO-005 at Operational with runtime-owned import queue snapshots and sandbox File / Import progress rows."
-    turn_count: 1
-    events_count: 2
+    summary: "Implemented and retired ASSETIO-005, GEOM-018, GEOM-025, and ASSETIO-008; resolved runtime UV materialization now unblocks generated-UV graphics smoke follow-up."
+    turn_count: 2
+    events_count: 8
     claims_touched: []
     open_threads: 1

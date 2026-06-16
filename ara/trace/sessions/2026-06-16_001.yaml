@@ -2,9 +2,9 @@ session:
   id: "2026-06-16_001"
   date: "2026-06-16"
   started: "2026-06-16T11:33"
-  last_turn: "2026-06-16T11:33"
-  turn_count: 1
-  summary: "Implemented and retired ASSETIO-005 at Operational with runtime-owned import queue snapshots and sandbox File / Import progress rows."
+  last_turn: "2026-06-16T12:55"
+  turn_count: 2
+  summary: "Implemented and retired ASSETIO-005, GEOM-018, GEOM-025, and ASSETIO-008; resolved runtime UV materialization now unblocks generated-UV graphics smoke follow-up."
 
 events_logged:
   - turn: 1
@@ -19,6 +19,42 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "ASSETIO-005 build, focused CTest, default CPU CTest, and strict structural checks passed."
+  - turn: 2
+    type: decision
+    id: "N09"
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired GEOM-018 with shared parameterization diagnostics and smoke benchmark coverage."
+  - turn: 2
+    type: experiment
+    id: "N10"
+    routing: direct
+    provenance: ai-executed
+    summary: "GEOM-018 configure/build, focused tests, benchmark manifest validation, and strict structural checks passed."
+  - turn: 2
+    type: decision
+    id: "N11"
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired GEOM-025 with xatlas-backed Geometry.UvAtlas, authored-UV preservation, and source xrefs."
+  - turn: 2
+    type: experiment
+    id: "N12"
+    routing: direct
+    provenance: ai-executed
+    summary: "GEOM-025 focused UV atlas tests, broad build, and strict structural checks passed."
+  - turn: 2
+    type: decision
+    id: "N13"
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired ASSETIO-008 with runtime resolved-UV materialization, explicit failure policy, and generated bake gating."
+  - turn: 2
+    type: experiment
+    id: "N14"
+    routing: direct
+    provenance: ai-executed
+    summary: "ASSETIO-008 focused tests passed 40/40 and default CPU-supported CTest passed 3069/3069."
 
 ai_actions:
   - turn: 1
@@ -34,14 +70,49 @@ ai_actions:
       - "tests/contract/runtime/Test.AssetIngestStateMachine.cpp"
       - "tests/contract/runtime/Test.SandboxEditorUi.cpp"
       - "tasks/done/ASSETIO-005-asset-import-queue-progress.md"
+  - turn: 2
+    action: "Implemented GEOM-018 parameterization diagnostics, tests, benchmark manifest, docs, task retirement, and commit."
+    provenance: ai-executed
+    files_changed:
+      - "src/geometry/Geometry.Parameterization.Diagnostics.cppm"
+      - "src/geometry/Geometry.Parameterization.Diagnostics.cpp"
+      - "src/geometry/Geometry.HalfedgeMesh.Parameterization.cpp"
+      - "tests/unit/geometry/Test.ParameterizationDiagnostics.cpp"
+      - "benchmarks/geometry/parameterization_diagnostics_smoke.yaml"
+      - "tasks/done/GEOM-018-parameterization-diagnostics-and-smoke-benchmarks.md"
+  - turn: 2
+    action: "Implemented GEOM-025 xatlas-backed UV atlas backend, tests, vcpkg overlay dependency, docs, task retirement, and commit."
+    provenance: ai-executed
+    files_changed:
+      - "src/geometry/Geometry.UvAtlas.cppm"
+      - "src/geometry/Geometry.UvAtlas.cpp"
+      - "src/geometry/CMakeLists.txt"
+      - "tests/unit/geometry/Test.UvAtlas.cpp"
+      - "tools/vcpkg/overlay-ports/xatlas/vcpkg.json"
+      - "vcpkg.json"
+  - turn: 2
+    action: "Implemented ASSETIO-008 runtime UV materialization through Geometry.UvAtlas, updated direct/model-scene import handoff, tests, docs, task retirement, and commit."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Runtime.AssetMeshNormals.cppm"
+      - "src/runtime/Runtime.AssetMeshNormals.cpp"
+      - "src/runtime/Runtime.AssetModelSceneHandoff.cppm"
+      - "src/runtime/Runtime.AssetModelSceneHandoff.cpp"
+      - "src/runtime/Runtime.Engine.cpp"
+      - "tests/contract/runtime/Test.AssetMeshNormals.cpp"
+      - "tests/contract/runtime/Test.AssetImportFormatCoverage.cpp"
+      - "tests/contract/runtime/Test.AssetModelSceneHandoff.cpp"
+      - "tasks/done/ASSETIO-008-default-uv-atlas-materialization.md"
 
 claims_touched: []
 
 key_context:
   - turn: 1
     excerpt: "User requested the agentic workflow to implement ASSETIO backlog tasks and commit all changes; generated task state showed ASSETIO-005 unblocked and ASSETIO-008 blocked by GEOM-025."
+  - turn: 2
+    excerpt: "User requested the agentic workflow in multi-task loop mode for GEOM-018, then GEOM-025, then ASSETIO-008, with planning, implementation, verification, and commits."
 
 open_threads:
-  - "ASSETIO-008 remains blocked by GEOM-025; dependent GRAPHICS-089 and UI-014 remain blocked behind ASSETIO-008."
+  - "GRAPHICS-089 generated-UV Vulkan smoke is now unblocked by ASSETIO-008 and remains pending opt-in Vulkan coverage."
 
 ai_suggestions_pending: []
