@@ -42,6 +42,23 @@ module/file/namespace alignment, public state and mutability, count terminology,
 failure reporting, deterministic diagnostics, numeric tolerances, and the current
 `Geometry.LinearSolver` narrow-module decision.
 
+### Parameterization diagnostics
+
+`Geometry.Parameterization.Diagnostics` is the shared CPU diagnostics surface for
+UV parameterizations and surface-map quality checks. It evaluates a
+`HalfedgeMesh::Mesh` plus per-vertex `glm::vec2` UV span without mutating mesh
+storage and reports explicit status/count fields for missing UV coordinates,
+non-triangle faces, non-finite positions or UVs, degenerate 3D triangles,
+degenerate UV triangles, skipped faces, and flipped UV elements. The metric
+record includes conformal distortion, identity-normalized conformal error,
+area ratio and authalic area distortion, symmetric Dirichlet energy/excess,
+stretch, deterministic boundary length distortion, and seam-discontinuity
+placeholders for future chart/map records.
+
+Existing LSCM quality fields in `Geometry.Parameterization` are now populated
+from this shared evaluator, so future harmonic/Tutte, ARAP, atlas, and
+map-storage work can compare against the same metric vocabulary.
+
 ## Topology connectivity ownership
 
 - `Geometry::Graph::VertexConnectivity` and `Geometry::Graph::HalfedgeConnectivity`
@@ -479,4 +496,3 @@ As of RORG-093, canonical Geometry code is promoted to `src/geometry`. Remaining
   splits UV parameterization, atlas, distortion, and surface-map gaps into
   method-compliant diagnostics, harmonic/Tutte, ARAP/SLIM, charting, and map
   representation packs without claiming those packs are already implemented.
-

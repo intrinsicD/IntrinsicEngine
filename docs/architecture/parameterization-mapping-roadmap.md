@@ -16,6 +16,7 @@ This document splits parameterization, atlas, distortion, and surface-map work i
 The current promoted geometry layer already provides useful parameterization and mapping foundations:
 
 - `Geometry.Parameterization` provides LSCM for disk-topology triangle meshes, including pinned-vertex selection, UV output, conformal distortion summaries, flipped-triangle counts, and optional mesh-backed `v:texcoord` / `v:lscm_pinned` properties.
+- `Geometry.Parameterization.Diagnostics` provides the reusable diagnostics record for mesh positions plus per-vertex UVs, including evaluated/skipped counts, invalid-input classification, flipped elements, conformal/area/symmetric-Dirichlet/stretch metrics, deterministic boundary length distortion, and seam-discontinuity placeholders.
 - `Geometry.DEC` and the reusable `Geometry.Sparse` seam provide sparse matrix and conjugate-gradient infrastructure that future parameterization solvers can share.
 - `Geometry.Linalg` provides dense decomposition, covariance, least-squares, and GLM/Eigen adapter utilities behind an explicit geometry-owned numerical module.
 - `Geometry.HalfedgeMesh.Boundary`, `Geometry.HalfedgeMesh.Analysis`, `Geometry.HalfedgeMesh.Quality`, and mesh/soup conversion contracts provide topology and fixture utilities for disk topology, boundary loops, degenerate faces, and validation.
@@ -26,7 +27,7 @@ The gaps below come from the [`src/geometry` gap analysis](../reviews/2026-05-12
 
 ## Pack 1 — Distortion and map-quality diagnostics
 
-Follow-up task: [`GEOM-018`](../../tasks/backlog/geometry/GEOM-018-parameterization-distortion-map-quality-diagnostics.md).
+Follow-up task: [`GEOM-018`](../../tasks/done/GEOM-018-parameterization-distortion-map-quality-diagnostics.md).
 
 Scope:
 
@@ -59,7 +60,7 @@ Diagnostics:
 Benchmark manifests:
 
 - Smoke: small built-in disk fixtures with `benchmark_id` similar to `geometry.parameterization.diagnostics.smoke`.
-- Metrics: `runtime_ms`, `quality_error_l2`, and `quality_error_linf` mapped to deterministic distortion errors against analytic fixtures.
+- Metrics: `runtime_ms` and `quality_error_l2` in the current smoke schema, with deterministic diagnostic fields for conformal distortion, area distortion, stretch, evaluated faces, and flipped elements. Larger error-vector reporting remains a future benchmark-schema extension.
 - Heavy/nightly follow-up: larger atlas/map corpora; not part of the smoke task.
 
 Forbidden shortcuts:
@@ -215,8 +216,7 @@ Parameterization and mapping tasks must make topology, boundary, and degeneracy 
 
 The first two implementation packs are:
 
-1. [`GEOM-018`](../../tasks/backlog/geometry/GEOM-018-parameterization-distortion-map-quality-diagnostics.md) — distortion and map-quality diagnostics. This pack gives all later parameterization and mapping solvers a shared acceptance vocabulary and can harden the existing LSCM quality path without adding a new solver.
+1. [`GEOM-018`](../../tasks/done/GEOM-018-parameterization-distortion-map-quality-diagnostics.md) — distortion and map-quality diagnostics. This pack gives all later parameterization and mapping solvers a shared acceptance vocabulary and can harden the existing LSCM quality path without adding a new solver.
 2. [`GEOM-019`](../../tasks/backlog/geometry/GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md) — harmonic/Tutte embedding and boundary constraints. This is the smallest new solver family after diagnostics and provides an initialization path for ARAP/SLIM.
 
 Later packs should not begin until their prerequisites are retired to `tasks/done/` or recorded as explicit out-of-scope assumptions in the candidate task file.
-

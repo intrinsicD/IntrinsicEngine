@@ -62,6 +62,7 @@ export import Geometry.HalfedgeMesh.Quality;
 export import Geometry.HalfedgeMesh.Analysis;
 export import Geometry.NormalEstimation;
 export import Geometry.SurfaceReconstruction;
+export import Geometry.Parameterization.Diagnostics;
 export import Geometry.Parameterization;
 export import Geometry.Quadric;
 export import Geometry.HalfedgeMesh.AdaptiveRemeshing;

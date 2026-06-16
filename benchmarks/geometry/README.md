@@ -30,10 +30,11 @@ document; the smoke runner currently emits `runtime_ms` and
 `quality_error_l2`.
 
 The `benchmark_id` in the manifest must match the value embedded in the
-runner output JSON for the same workload. The runner reads
-`Intrinsic::Bench::Geometry::kHalfedgeSmokeBenchmarkId` from
-[`Bench.GeometrySmoke.hpp`](Bench.GeometrySmoke.hpp); the manifest copies the
-same string. Keeping the constant in the header is the binding mechanism.
+runner output JSON for the same workload. The runner reads stable constants
+such as `Intrinsic::Bench::Geometry::kHalfedgeSmokeBenchmarkId` and
+`kParameterizationDiagnosticsSmokeBenchmarkId` from
+[`Bench.GeometrySmoke.hpp`](Bench.GeometrySmoke.hpp); manifests copy the same
+strings. Keeping the constants in the header is the binding mechanism.
 
 ## Fixture policy
 

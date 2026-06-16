@@ -7,6 +7,7 @@ module;
 #include <limits>
 #include <numeric>
 #include <optional>
+#include <span>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -18,6 +19,7 @@ import Geometry.Properties;
 import Geometry.HalfedgeMesh;
 import Geometry.DEC;
 import Geometry.HalfedgeMesh.Utils;
+import Geometry.Parameterization.Diagnostics;
 
 namespace Geometry::Parameterization
 {
@@ -413,101 +415,10 @@ namespace Geometry::Parameterization
             result.UVs[vi] = glm::vec2(u, v);
         }
 
-        // ------------------------------------------------------------------
-        // Step 8: Quality metrics — conformal distortion and flipped triangles
-        // ------------------------------------------------------------------
-        double sumDistortion = 0.0;
-        double maxDistortion = 0.0;
-        std::size_t flipped = 0;
-        std::size_t validTriangles = 0;
-
-        for (std::size_t fi = 0; fi < nF; ++fi)
-        {
-            FaceHandle fh{static_cast<PropertyIndex>(fi)};
-            if (mesh.IsDeleted(fh)) continue;
-
-            HalfedgeHandle h0 = mesh.Halfedge(fh);
-            HalfedgeHandle h1 = mesh.NextHalfedge(h0);
-            HalfedgeHandle h2 = mesh.NextHalfedge(h1);
-
-            VertexHandle va = mesh.ToVertex(h0);
-            VertexHandle vb = mesh.ToVertex(h1);
-            VertexHandle vc = mesh.ToVertex(h2);
-
-            // 3D triangle
-            glm::vec3 pa = mesh.Position(va);
-            glm::vec3 pb = mesh.Position(vb);
-            glm::vec3 pc = mesh.Position(vc);
-
-            // UV triangle
-            glm::vec2 ua = result.UVs[va.Index];
-            glm::vec2 ub = result.UVs[vb.Index];
-            glm::vec2 uc = result.UVs[vc.Index];
-
-            // Signed UV area
-            double uvArea = 0.5 * static_cast<double>(
-                (ub.x - ua.x) * (uc.y - ua.y) - (uc.x - ua.x) * (ub.y - ua.y));
-            if (uvArea < 0.0) ++flipped;
-
-            // Compute Jacobian singular values for conformal distortion
-            // Using local 2D frame in 3D
-            glm::vec3 e1_3d = pb - pa;
-            glm::vec3 e2_3d = pc - pa;
-            glm::vec2 e1_uv = ub - ua;
-            glm::vec2 e2_uv = uc - ua;
-
-            double area3d = 0.5 * static_cast<double>(glm::length(glm::cross(e1_3d, e2_3d)));
-            if (area3d < 1e-12) continue;
-
-            // Jacobian J maps from 3D local coords to UV:
-            // J = [du/ds, du/dt; dv/ds, dv/dt]
-            // Using local 2D coords in the triangle
-            glm::vec3 sAxis = glm::normalize(e1_3d);
-            glm::vec3 normal = glm::cross(e1_3d, e2_3d);
-            glm::vec3 tAxis = glm::normalize(glm::cross(normal, e1_3d));
-
-            double s1 = static_cast<double>(glm::dot(e1_3d, sAxis));
-            double t1 = static_cast<double>(glm::dot(e1_3d, tAxis));
-            double s2 = static_cast<double>(glm::dot(e2_3d, sAxis));
-            double t2 = static_cast<double>(glm::dot(e2_3d, tAxis));
-
-            double det = s1 * t2 - s2 * t1;
-            if (std::abs(det) < 1e-12) continue;
-
-            double invDet = 1.0 / det;
-
-            // J = [du1, du2; dv1, dv2] * inv([s1,s2;t1,t2])
-            double du1 = static_cast<double>(e1_uv.x);
-            double du2 = static_cast<double>(e2_uv.x);
-            double dv1 = static_cast<double>(e1_uv.y);
-            double dv2 = static_cast<double>(e2_uv.y);
-
-            double j00 = (du1 * t2 - du2 * t1) * invDet;
-            double j01 = (-du1 * s2 + du2 * s1) * invDet;
-            double j10 = (dv1 * t2 - dv2 * t1) * invDet;
-            double j11 = (-dv1 * s2 + dv2 * s1) * invDet;
-
-            // SVD of 2x2: singular values from eigenvalues of J^T*J
-            double a = j00 * j00 + j10 * j10;
-            double b = j00 * j01 + j10 * j11;
-            double c = j01 * j01 + j11 * j11;
-
-            double disc = std::sqrt(std::max(0.0, (a - c) * (a - c) + 4.0 * b * b));
-            double sigma1 = std::sqrt(std::max(0.0, (a + c + disc) / 2.0));
-            double sigma2 = std::sqrt(std::max(0.0, (a + c - disc) / 2.0));
-
-            double sigMax = std::max(sigma1, sigma2);
-            double sigMin = std::min(sigma1, sigma2);
-
-            double distortion = (sigMin > 1e-12) ? sigMax / sigMin : 1e6;
-            sumDistortion += distortion;
-            if (distortion > maxDistortion) maxDistortion = distortion;
-            ++validTriangles;
-        }
-
-        result.FlippedTriangleCount = flipped;
-        result.MeanConformalDistortion = (validTriangles > 0) ? sumDistortion / static_cast<double>(validTriangles) : 0.0;
-        result.MaxConformalDistortion = maxDistortion;
+        const auto diagnostics = EvaluateParameterizationDiagnostics(mesh, std::span<const glm::vec2>(result.UVs));
+        result.FlippedTriangleCount = diagnostics.FlippedElementCount;
+        result.MeanConformalDistortion = diagnostics.MeanConformalDistortion;
+        result.MaxConformalDistortion = diagnostics.MaxConformalDistortion;
 
         return result;
     }

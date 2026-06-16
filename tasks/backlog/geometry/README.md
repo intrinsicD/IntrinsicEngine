@@ -13,7 +13,6 @@ map.
 - [GEOM-014 — Feature-aware quadric error mesh simplification](GEOM-014-feature-aware-quadric-error-simplification.md).
 - [GEOM-016 — Point-cloud filtering and density diagnostics contracts](GEOM-016-point-cloud-filtering-density-contracts.md).
 - [GEOM-017 — Point-cloud descriptors and registration seams](GEOM-017-point-cloud-descriptors-registration-seams.md).
-- [GEOM-018 — Parameterization distortion and map-quality diagnostics](GEOM-018-parameterization-distortion-map-quality-diagnostics.md).
 - [GEOM-019 — Harmonic/Tutte parameterization and boundary constraints](GEOM-019-harmonic-tutte-parameterization-boundary-constraints.md).
 - [GEOM-020 — Sparse direct factorization solver seam (LDLT/LLT)](GEOM-020-sparse-direct-factorization-seam.md)
   (follow-up to retired `GEOM-008`; gates `methods/METHOD-002` and the
@@ -82,6 +81,7 @@ split; narratives live in the retirement log.
 - [GEOM-010 — Point-cloud algorithm pack roadmap](../../done/GEOM-010-point-cloud-algorithm-pack-roadmap.md) (done; roadmap: [`docs/architecture/point-cloud-algorithm-roadmap.md`](../../../docs/architecture/point-cloud-algorithm-roadmap.md)).
 - [GEOM-011 — Parameterization and mapping roadmap](../../done/GEOM-011-parameterization-mapping-roadmap.md) (done; roadmap: [`docs/architecture/parameterization-mapping-roadmap.md`](../../../docs/architecture/parameterization-mapping-roadmap.md)).
 - [GEOM-012 — Symmetric mesh, graph, and point-cloud domain views](../../done/GEOM-012-symmetric-domain-views-property-sharing.md) (done).
+- [GEOM-018 — Parameterization distortion and map-quality diagnostics](../../done/GEOM-018-parameterization-distortion-map-quality-diagnostics.md) (done).
 - [GEOM-015 — GJK termination diagnostics and scale-aware tolerance policy](../../done/GEOM-015-gjk-termination-diagnostics.md) (done).
 - [GEOM-021 — MeshSoup module implementation split](../../done/GEOM-021-meshsoup-module-implementation-split.md).
 - [GEOM-022 — Remaining geometry module implementation splits](../../done/GEOM-022-remaining-geometry-module-implementation-splits.md).

@@ -9,10 +9,14 @@
 #include "Bench.GeometrySmoke.hpp"
 
 #include <chrono>
+#include <vector>
+
+#include <glm/glm.hpp>
 
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Builder;
 import Geometry.HalfedgeMesh.Quality;
+import Geometry.Parameterization.Diagnostics;
 
 namespace Intrinsic::Bench::Geometry
 {
@@ -44,6 +48,52 @@ namespace Intrinsic::Bench::Geometry
             }
             return result;
         }
+
+        struct DiagnosticsTickResult
+        {
+            double      MeanConformalDistortion{0.0};
+            double      MaxAreaDistortion{0.0};
+            double      MeanStretch{0.0};
+            std::size_t EvaluatedFaceCount{0};
+            std::size_t FlippedElementCount{0};
+            bool        Succeeded{false};
+        };
+
+        [[nodiscard]] auto MakeSquareDisk() -> ::Geometry::HalfedgeMesh::Mesh
+        {
+            ::Geometry::HalfedgeMesh::Mesh mesh;
+            const auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+            const auto v1 = mesh.AddVertex({1.0f, 0.0f, 0.0f});
+            const auto v2 = mesh.AddVertex({1.0f, 1.0f, 0.0f});
+            const auto v3 = mesh.AddVertex({0.0f, 1.0f, 0.0f});
+            (void)mesh.AddTriangle(v0, v1, v2);
+            (void)mesh.AddTriangle(v0, v2, v3);
+            return mesh;
+        }
+
+        [[nodiscard]] auto DiagnosticsTick() -> DiagnosticsTickResult
+        {
+            const auto mesh = MakeSquareDisk();
+            const std::vector<glm::vec2> uvs{
+                glm::vec2{0.0f, 0.0f},
+                glm::vec2{2.0f, 0.0f},
+                glm::vec2{2.0f, 1.0f},
+                glm::vec2{0.0f, 1.0f},
+            };
+
+            const auto diagnostics = ::Geometry::Parameterization::EvaluateParameterizationDiagnostics(mesh, uvs);
+
+            DiagnosticsTickResult result{};
+            result.MeanConformalDistortion = diagnostics.MeanConformalDistortion;
+            result.MaxAreaDistortion = diagnostics.MaxAreaDistortion;
+            result.MeanStretch = diagnostics.MeanStretch;
+            result.EvaluatedFaceCount = diagnostics.EvaluatedFaceCount;
+            result.FlippedElementCount = diagnostics.FlippedElementCount;
+            result.Succeeded = diagnostics.Status == ::Geometry::Parameterization::ParameterizationDiagnosticsStatus::Success
+                && diagnostics.EvaluatedFaceCount == 2u
+                && diagnostics.FlippedElementCount == 0u;
+            return result;
+        }
     } // namespace
 
     auto RunHalfedgeSmoke() -> HalfedgeSmokeMetrics
@@ -72,6 +122,35 @@ namespace Intrinsic::Bench::Geometry
         metrics.VertexCount         = last.VertexCount;
         metrics.FaceCount           = last.FaceCount;
         metrics.Succeeded           = last.Succeeded;
+        return metrics;
+    }
+
+    auto RunParameterizationDiagnosticsSmoke() -> ParameterizationDiagnosticsSmokeMetrics
+    {
+        for (int i = 0; i < kWarmupIterations; ++i)
+        {
+            (void)DiagnosticsTick();
+        }
+
+        DiagnosticsTickResult last{};
+        const auto t0 = std::chrono::steady_clock::now();
+        for (int i = 0; i < kMeasuredIterations; ++i)
+        {
+            last = DiagnosticsTick();
+        }
+        const auto t1 = std::chrono::steady_clock::now();
+
+        const auto   totalNs = std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count();
+        const double meanMs  = (static_cast<double>(totalNs) / static_cast<double>(kMeasuredIterations)) * 1.0e-6;
+
+        ParameterizationDiagnosticsSmokeMetrics metrics{};
+        metrics.RuntimeMilliseconds = meanMs;
+        metrics.MeanConformalDistortion = last.MeanConformalDistortion;
+        metrics.MaxAreaDistortion = last.MaxAreaDistortion;
+        metrics.MeanStretch = last.MeanStretch;
+        metrics.EvaluatedFaceCount = last.EvaluatedFaceCount;
+        metrics.FlippedElementCount = last.FlippedElementCount;
+        metrics.Succeeded = last.Succeeded;
         return metrics;
     }
 } // namespace Intrinsic::Bench::Geometry

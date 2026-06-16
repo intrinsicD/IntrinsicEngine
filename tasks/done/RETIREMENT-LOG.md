@@ -9,6 +9,20 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`GEOM-018`](GEOM-018-parameterization-distortion-map-quality-diagnostics.md)
+— Parameterization distortion and map-quality diagnostics — retired on
+2026-06-16 at maturity `CPUContracted`. Geometry now exposes
+`Geometry.Parameterization.Diagnostics`, a deterministic CPU diagnostics
+surface for mesh positions plus per-vertex UVs that reports explicit invalid
+input counts, flipped elements, conformal/area/symmetric-Dirichlet/stretch
+metrics, boundary length distortion, and seam-discontinuity placeholders.
+Existing LSCM quality summaries are populated through the shared evaluator, and
+the smoke benchmark runner now emits
+`geometry.parameterization.diagnostics.smoke`. Focused geometry tests,
+benchmark validation, module inventory regeneration, strict layering/test
+layout/task checks, and doc-link checks passed.
+
+Active
 [`ASSETIO-005`](ASSETIO-005-asset-import-queue-progress.md) — Asset import
 queue and progress UI — retired on 2026-06-16 at maturity `Operational`.
 Runtime now exposes stable AssetIO queue snapshots over the promoted ingest

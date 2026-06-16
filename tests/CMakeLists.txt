@@ -425,6 +425,7 @@ set(_geometry_test_files
     Test_MeshQuality.cpp
     Test_MeshAnalysis.cpp
     Test_Parameterization.cpp
+    Test.ParameterizationDiagnostics.cpp
     Test_AdaptiveRemeshing.cpp
     Test_ConvexHull.cpp
     Test_PointCloud.cpp

@@ -1,0 +1,18 @@
+# GEOM-018 — parameterization diagnostics smoke manifest.
+#
+# Stable benchmark contract for the workload defined by
+# benchmarks/geometry/Bench_ExampleSmoke.cpp and emitted by the
+# IntrinsicBenchmarkSmoke runner. The benchmark_id below must match
+# kParameterizationDiagnosticsSmokeBenchmarkId.
+
+benchmark_id: geometry.parameterization.diagnostics.smoke
+method: geometry.parameterization.diagnostics
+dataset: builtin.square_disk_stretch
+params:
+  fixture: two_triangle_square
+  uv_scale_x: 2
+metrics:
+  - runtime_ms
+  - quality_error_l2
+thresholds:
+  smoke_runtime_ms_max: 50

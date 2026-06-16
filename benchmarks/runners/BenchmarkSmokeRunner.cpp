@@ -100,6 +100,42 @@ namespace
         return EmittedBenchmark{kHalfedgeSmokeBenchmarkId, out.str(), metrics.Succeeded};
     }
 
+    auto EmitParameterizationDiagnosticsSmoke(const std::string& commit) -> EmittedBenchmark
+    {
+        using namespace Intrinsic::Bench::Geometry;
+
+        const auto metrics = RunParameterizationDiagnosticsSmoke();
+
+        std::ostringstream out;
+        out.setf(std::ios::fixed);
+        out.precision(6);
+        out << "{\n"
+            << "  \"benchmark_id\": \"" << EscapeJson(kParameterizationDiagnosticsSmokeBenchmarkId) << "\",\n"
+            << "  \"method\": \""       << EscapeJson(kParameterizationDiagnosticsSmokeMethod)      << "\",\n"
+            << "  \"backend\": \"cpu_reference\",\n"
+            << "  \"dataset\": \""      << EscapeJson(kParameterizationDiagnosticsSmokeDataset)     << "\",\n"
+            << "  \"commit\": \""       << EscapeJson(commit)                                      << "\",\n"
+            << "  \"metrics\": {\n"
+            << "    \"runtime_ms\": "      << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"quality_error_l2\": 0.0\n"
+            << "  },\n"
+            << "  \"diagnostics\": {\n"
+            << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"smoke\",\n"
+            << "    \"warmup_iterations\": 1,\n"
+            << "    \"measured_iterations\": 8,\n"
+            << "    \"mean_conformal_distortion\": " << metrics.MeanConformalDistortion << ",\n"
+            << "    \"max_area_distortion\": "       << metrics.MaxAreaDistortion << ",\n"
+            << "    \"mean_stretch\": "              << metrics.MeanStretch << ",\n"
+            << "    \"evaluated_face_count\": "      << metrics.EvaluatedFaceCount << ",\n"
+            << "    \"flipped_element_count\": "     << metrics.FlippedElementCount << "\n"
+            << "  },\n"
+            << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed") << "\"\n"
+            << "}\n";
+
+        return EmittedBenchmark{kParameterizationDiagnosticsSmokeBenchmarkId, out.str(), metrics.Succeeded};
+    }
+
     auto EmitRigidBodyReferenceSmoke(const std::string& commit) -> EmittedBenchmark
     {
         using namespace Intrinsic::Bench::Physics;
@@ -268,6 +304,7 @@ auto main(int argc, char** argv) -> int
 
     std::vector<EmittedBenchmark> emitted;
     emitted.push_back(EmitHalfedgeSmoke(commit));
+    emitted.push_back(EmitParameterizationDiagnosticsSmoke(commit));
     emitted.push_back(EmitRigidBodyReferenceSmoke(commit));
     emitted.push_back(EmitParticleSpringReferenceSmoke(commit));
     emitted.push_back(EmitXpbdClothReferenceSmoke(commit));
