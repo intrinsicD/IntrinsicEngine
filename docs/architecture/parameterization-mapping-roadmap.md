@@ -17,6 +17,7 @@ The current promoted geometry layer already provides useful parameterization and
 
 - `Geometry.Parameterization` provides LSCM for disk-topology triangle meshes, including pinned-vertex selection, UV output, conformal distortion summaries, flipped-triangle counts, and optional mesh-backed `v:texcoord` / `v:lscm_pinned` properties.
 - `Geometry.Parameterization.Diagnostics` provides the reusable diagnostics record for mesh positions plus per-vertex UVs, including evaluated/skipped counts, invalid-input classification, flipped elements, conformal/area/symmetric-Dirichlet/stretch metrics, deterministic boundary length distortion, and seam-discontinuity placeholders.
+- `Geometry.UvAtlas` provides the backend-neutral UV atlas seam with authored-UV preservation, source xrefs for seam splits, GEOM-018 quality diagnostics, and `jpcy/xatlas` as the default CPU backend through the repository vcpkg overlay.
 - `Geometry.DEC` and the reusable `Geometry.Sparse` seam provide sparse matrix and conjugate-gradient infrastructure that future parameterization solvers can share.
 - `Geometry.Linalg` provides dense decomposition, covariance, least-squares, and GLM/Eigen adapter utilities behind an explicit geometry-owned numerical module.
 - `Geometry.HalfedgeMesh.Boundary`, `Geometry.HalfedgeMesh.Analysis`, `Geometry.HalfedgeMesh.Quality`, and mesh/soup conversion contracts provide topology and fixture utilities for disk topology, boundary loops, degenerate faces, and validation.
@@ -156,9 +157,11 @@ Correctness and benchmarks:
 
 ## Pack 5 — Atlas segmentation, seam generation, and chart packing
 
+Implementation task: [`GEOM-025`](../../tasks/done/GEOM-025-uv-atlas-backend-xatlas.md).
+
 Scope:
 
-- Add geometry-owned chart records, seam cuts, atlas segmentation, and CPU chart packing suitable for later renderer/material consumers without depending on those layers.
+- Add geometry-owned chart records, seam cuts, atlas segmentation, and CPU chart packing suitable for later renderer/material consumers without depending on those layers. Current promoted state is the `Geometry.UvAtlas` backend contract with xatlas as the default CPU backend; future chart-editing tasks can build richer seam records on top of this seam.
 - Clarify how `Geometry.HtexPatch` patch metadata relates to UV charts and atlas tiles.
 
 Primary home: `src/geometry`.
@@ -168,6 +171,7 @@ Dependencies:
 - Pack 1 diagnostics for per-chart and whole-atlas quality.
 - Boundary and mesh analysis helpers for seams, connected charts, and non-manifold rejection.
 - Mesh/soup conversion contracts where atlas generation consumes imported polygon soup or emits charted mesh data.
+- `INFRA-001` vcpkg manifest mode for the pinned `xatlas` overlay port.
 
 Correctness and benchmarks:
 

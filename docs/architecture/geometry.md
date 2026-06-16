@@ -59,6 +59,25 @@ Existing LSCM quality fields in `Geometry.Parameterization` are now populated
 from this shared evaluator, so future harmonic/Tutte, ARAP, atlas, and
 map-storage work can compare against the same metric vocabulary.
 
+### UV atlas backend contract
+
+`Geometry.UvAtlas` owns the backend-neutral UV atlas contract for generated
+texture coordinates. Callers pass positions, triangle faces, optional authored
+UVs, and optional read-only vertex properties through `UvAtlasInput`; the result
+returns a `MeshSoup::IndexedMesh` with finite `v:texcoord`, source-vertex and
+source-face xrefs, output chart IDs, provenance (`AuthoredPreserved` or
+`Generated`), backend identity, atlas resolution, and GEOM-018 quality
+diagnostics. The default backend is the repository-pinned `jpcy/xatlas` overlay
+port, but callers can supply an `UvAtlasBackend` function to replace it without
+importing runtime, assets, ECS, graphics, platform, or app layers.
+
+Valid authored UVs are preserved by default when they are finite, count-matched,
+and triangle-usable. Missing or invalid authored UVs fall through to the
+selected backend unless the input mesh itself is invalid. Seam-split output may
+duplicate vertices, and the `SourceVertexForOutputVertex` table is the
+canonical way for runtime or future geometry consumers to remap normals, colors,
+scalar/vector attributes, selection data, and bake sources.
+
 ## Topology connectivity ownership
 
 - `Geometry::Graph::VertexConnectivity` and `Geometry::Graph::HalfedgeConnectivity`

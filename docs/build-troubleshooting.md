@@ -140,6 +140,14 @@ manifest mode; use the repository presets, or leave `CMAKE_TOOLCHAIN_FILE`
 unset in IDE profiles so the top-level configure can select the repository
 vcpkg toolchain. Retired CMake dependency-cache flags are unsupported.
 
+`xatlas` is supplied by the repository overlay port at
+`tools/vcpkg/overlay-ports/xatlas` because the pinned baseline does not provide
+a first-class port for the GEOM-025 UV atlas backend. If configure fails while
+installing `xatlas`, delete the failed package/buildtree under
+`external/vcpkg-installed/<preset>/` and `external/vcpkg/buildtrees/xatlas`, then
+rerun `cmake --preset ci`; do not add a FetchContent fallback or write into
+`external/cache`.
+
 ## Blocked follow-on CI steps
 
 Some local CI sweeps intentionally continue after a build failure to collect logs.

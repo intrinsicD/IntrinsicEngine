@@ -58,6 +58,7 @@ find_package(nlohmann_json CONFIG REQUIRED)
 find_package(draco CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 find_package(Stb REQUIRED)
+find_package(xatlas CONFIG REQUIRED)
 
 if(NOT TARGET glm AND TARGET glm::glm)
     add_library(glm INTERFACE IMPORTED)

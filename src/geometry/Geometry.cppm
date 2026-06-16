@@ -9,6 +9,7 @@ export import Geometry.Ellipsoid;
 export import Geometry.PCA;
 export import Geometry.Segment;
 export import Geometry.Triangle;
+export import Geometry.UvAtlas;
 export import Geometry.Plane;
 export import Geometry.ConvexHull;
 export import Geometry.Frustum;

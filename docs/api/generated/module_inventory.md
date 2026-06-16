@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 12 |
 | `core` | 39 |
 | `ecs` | 28 |
-| `geometry` | 86 |
+| `geometry` | 87 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 62 |
@@ -191,6 +191,7 @@ Root scanned: `src`
 | `Geometry.Support` | `src/geometry/Geometry.Support.cppm` | `geometry` |
 | `Geometry.SurfaceReconstruction` | `src/geometry/Geometry.SurfaceReconstruction.cppm` | `geometry` |
 | `Geometry.Triangle` | `src/geometry/Geometry.Triangle.cppm` | `geometry` |
+| `Geometry.UvAtlas` | `src/geometry/Geometry.UvAtlas.cppm` | `geometry` |
 | `Geometry.Validation` | `src/geometry/Geometry.Validation.cppm` | `geometry` |
 | `Geometry` | `src/geometry/Geometry.cppm` | `geometry` |
 | `Extrinsic.Graphics.GpuAssetCache` | `src/graphics/assets/Graphics.GpuAssetCache.cppm` | `graphics/assets` |
@@ -514,4 +515,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugAdapters` | `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **486**
+Total modules: **487**

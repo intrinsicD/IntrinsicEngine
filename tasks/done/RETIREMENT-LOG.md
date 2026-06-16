@@ -9,6 +9,19 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`GEOM-025`](GEOM-025-uv-atlas-backend-xatlas.md) — UV atlas backend contract
+and xatlas default — retired on 2026-06-16 at maturity `CPUContracted`.
+Geometry now exposes `Geometry.UvAtlas`, a backend-neutral UV atlas API with
+authored-UV validation/preservation, explicit failure/provenance diagnostics,
+source-vertex/source-face xrefs, seam-aware `MeshSoup::IndexedMesh` output,
+GEOM-018 quality metrics, and a caller-supplied backend replacement seam. The
+default CPU backend is pinned to `jpcy/xatlas` through the repository vcpkg
+overlay port and linked privately by geometry; no runtime/assets/graphics/ECS
+layer imports or public xatlas headers were introduced. Focused geometry tests,
+`IntrinsicTests` target build, module inventory regeneration, strict layering
+and test-layout checks, task checks, and doc-link checks passed.
+
+Active
 [`GEOM-018`](GEOM-018-parameterization-distortion-map-quality-diagnostics.md)
 — Parameterization distortion and map-quality diagnostics — retired on
 2026-06-16 at maturity `CPUContracted`. Geometry now exposes

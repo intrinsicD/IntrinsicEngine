@@ -85,6 +85,7 @@ target_sources(${target_name}
         Geometry.Support.cppm
         Geometry.SurfaceReconstruction.cppm
         Geometry.Triangle.cppm
+        Geometry.UvAtlas.cppm
         Geometry.Validation.cppm
         Geometry.cppm
         PRIVATE
@@ -159,6 +160,7 @@ target_sources(${target_name}
         Geometry.Sparse.cpp
         Geometry.SurfaceReconstruction.cpp
         Geometry.Triangle.cpp
+        Geometry.UvAtlas.cpp
         Geometry.Validation.cpp
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
@@ -176,5 +178,7 @@ target_link_libraries(${target_name}
         glm::glm
         Eigen3::Eigen
 )
+
+target_link_libraries(${target_name} PRIVATE xatlas::xatlas)
 
 target_compile_definitions(${target_name} PUBLIC EIGEN_MPL2_ONLY)

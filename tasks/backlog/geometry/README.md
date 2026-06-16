@@ -23,9 +23,6 @@ map.
 - [GEOM-024 — Sparse symmetric generalized eigensolver seam](GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
   (gates `methods/METHOD-006` variant B; depends on `GEOM-020`; promote when
   METHOD-006 is the next-priority method).
-- [GEOM-025 — UV atlas backend contract and xatlas default](GEOM-025-uv-atlas-backend-xatlas.md)
-  (depends on `INFRA-001` and `GEOM-018`; defines the replaceable atlas backend
-  seam consumed by runtime UV materialization).
 - [RORG-031E — Geometry and method-readiness backlog seed](RORG-031-geometry-method-readiness.md).
 
 ## Convergence
@@ -85,6 +82,7 @@ split; narratives live in the retirement log.
 - [GEOM-015 — GJK termination diagnostics and scale-aware tolerance policy](../../done/GEOM-015-gjk-termination-diagnostics.md) (done).
 - [GEOM-021 — MeshSoup module implementation split](../../done/GEOM-021-meshsoup-module-implementation-split.md).
 - [GEOM-022 — Remaining geometry module implementation splits](../../done/GEOM-022-remaining-geometry-module-implementation-splits.md).
+- [GEOM-025 — UV atlas backend contract and xatlas default](../../done/GEOM-025-uv-atlas-backend-xatlas.md) (done).
 - GEOIO-002 is retired in [`tasks/done`](../../done/GEOIO-002-geometry-io-parity-hardening.md)
   and contributed to **Theme E — Geometry IO completion** as the upstream gate
   for retired [`ASSETIO-001`](../../done/ASSETIO-001-asset-model-texture-ingest-ownership.md)
