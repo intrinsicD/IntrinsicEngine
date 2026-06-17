@@ -54,3 +54,8 @@ entries:
       - "Routed ADR-0021 acceptance, RUNTIME-110 retirement, and the follow-up task split as direct journey facts because they are artifact commitments."
       - "Crystallized A04 from the committed ADR/task split; no new staged observation was needed because the user had already accepted the design defaults."
       - "Closed the ADR/split open thread and replaced it with RUNTIME-111 as the next unblocked implementation slice."
+  - turn: "2026-06-17_001#1"
+    notes:
+      - "Routed UI-018 implementation, verification, retirement, and commit as direct journey facts because this turn produced committed engineering/task evidence."
+      - "Did not stage or crystallize observations; menu-first sandbox startup is a concrete implementation outcome, not a new research claim."
+      - "Recorded the root-hygiene warning as verification context only because ara/ and imgui.ini were pre-existing and not part of the committed change."

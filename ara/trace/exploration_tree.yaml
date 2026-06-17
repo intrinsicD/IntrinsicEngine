@@ -431,3 +431,50 @@ tree:
       follow-up findings; doc-link and docs-sync checks passed; and git diff
       whitespace checks passed.
     status: resolved
+  - id: N25
+    type: decision
+    title: "Retire UI-018 menu-first sandbox defaults"
+    provenance: ai-executed
+    timestamp: "2026-06-17T22:04"
+    choice: >
+      Created, activated, implemented, and retired UI-018 so the promoted
+      sandbox editor starts with only the main menu bar visible. Top-level
+      sandbox panels are controlled by a View menu, and existing
+      PointCloud/Graph/Mesh domain windows remain menu-controlled and closed
+      by default.
+    alternatives:
+      - "Leave existing top-level sandbox panels open unconditionally."
+      - "Only close domain windows, preserving unconditional core panels."
+      - "Add persistent UI preference storage before fixing default startup state."
+    evidence:
+      - "tasks/done/UI-018-sandbox-menu-first-ui.md"
+      - "src/runtime/Editor/Runtime.SandboxEditorUi.cpp"
+      - "src/runtime/Editor/Runtime.SandboxEditorUi.cppm"
+      - "tests/contract/runtime/Test.SandboxEditorUi.cpp"
+      - "3abc5e5b"
+    status: resolved
+  - id: N26
+    type: experiment
+    title: "UI-018 verification"
+    provenance: ai-executed
+    timestamp: "2026-06-17T22:04"
+    also_depends_on: [N25]
+    evidence:
+      - "cmake --preset ci"
+      - "cmake --build --preset ci --target IntrinsicRuntimeContractTests"
+      - "ctest --test-dir build/ci --output-on-failure -R '^SandboxEditorUi\\.DefaultDrawStartsWithOnlyMenuBarVisible$' --timeout 60"
+      - "ctest --test-dir build/ci --output-on-failure -R '^SandboxEditorUi\\.' --timeout 120"
+      - "python3 tools/agents/validate_tasks.py --root tasks --strict"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/docs/check_doc_links.py --root ."
+      - "python3 tools/repo/check_layering.py --root src --strict"
+      - "python3 tools/repo/check_test_layout.py --root . --strict"
+      - "python3 tools/repo/check_root_hygiene.py --root ."
+      - "python3 tools/repo/check_pr_contract.py"
+    result: >
+      Focused runtime contract target built; the new menu-only default test
+      passed; the full SandboxEditorUi CTest subset passed 51/51 tests; strict
+      task policy, task validation, doc-link, layering, and test-layout checks
+      passed. Root hygiene remained warning-only with pre-existing ara/ and
+      imgui.ini entries.
+    status: resolved

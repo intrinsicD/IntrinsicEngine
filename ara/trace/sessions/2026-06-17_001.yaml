@@ -1,0 +1,44 @@
+session:
+  id: "2026-06-17_001"
+  date: "2026-06-17"
+  started: "2026-06-17T22:04"
+  last_turn: "2026-06-17T22:04"
+  turn_count: 1
+  summary: "Implemented, verified, committed, and retired UI-018 so the sandbox editor starts menu-first with all panels closed by default."
+
+events_logged:
+  - turn: 1
+    type: decision
+    id: "N25"
+    routing: direct
+    provenance: ai-executed
+    summary: "Retired UI-018; sandbox editor top-level panels now open from View and start closed."
+  - turn: 1
+    type: experiment
+    id: "N26"
+    routing: direct
+    provenance: ai-executed
+    summary: "Built IntrinsicRuntimeContractTests; SandboxEditorUi CTest subset passed 51/51; structural checks passed."
+
+ai_actions:
+  - turn: 1
+    action: "Created and retired UI-018 task; implemented runtime-owned top-level panel open state; added menu-only default ImGui contract test; updated runtime/UI docs; committed 3abc5e5b."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Editor/Runtime.SandboxEditorUi.cpp"
+      - "src/runtime/Editor/Runtime.SandboxEditorUi.cppm"
+      - "tests/contract/runtime/Test.SandboxEditorUi.cpp"
+      - "src/runtime/README.md"
+      - "tasks/backlog/ui/README.md"
+      - "tasks/backlog/ui/RORG-031-ui-integration.md"
+      - "tasks/done/UI-018-sandbox-menu-first-ui.md"
+      - "tasks/done/RETIREMENT-LOG.md"
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: "User requested sandbox UI startup with only the menu visible and all other UI windows closed, using the task lifecycle workflow and committing the result."
+
+open_threads: []
+ai_suggestions_pending: []
