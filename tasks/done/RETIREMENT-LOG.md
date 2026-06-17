@@ -49,6 +49,17 @@ scalar/label/vector properties show selected-value previews, and compatible
 binding targets keep dimension/domain mismatches visible with deterministic
 disabled reasons.
 
+Active
+[`BUG-045`](BUG-045-progressive-raw-mesh-uv-fallback.md) — Progressive raw mesh
+surface UV fallback — retired on 2026-06-17 at maturity `CPUContracted`.
+Raw mesh surface packing now falls back to zero GPU U/V values when imported
+geometry has missing, mismatched, or non-finite `v:texcoord`, while extraction
+still records UV fallback diagnostics. Dropped no-UV OBJ files now create a
+mesh entity and upload a raw surface in the frame where the import event becomes
+visible; deferred UV atlas generation and UV-dependent texture bakes still wait
+for real resolved UVs. Existing direct import, dropped-file, progressive
+model-scene, and close-path runtime regressions passed.
+
 Backlog
 [`GRAPHICS-090`](GRAPHICS-090-progressive-render-data-operational-smoke.md) —
 Progressive render-data operational smoke — retired on 2026-06-16 at maturity

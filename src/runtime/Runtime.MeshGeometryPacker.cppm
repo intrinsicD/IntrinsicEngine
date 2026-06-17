@@ -14,11 +14,12 @@ export namespace Extrinsic::Runtime
 {
     // Vertex layout for the runtime mesh surface packer. Matches the
     // `ProceduralVertex` surface layout consumed by the promoted surface,
-    // depth, and face-selection shaders. Mesh-domain `v:texcoord` must be
-    // present with one finite vector per vertex; U/V carry texture coordinates
-    // only. Normals are carried in dedicated fields from `v:normal` when
-    // available and default to +Z otherwise, so UVs are never reused for
-    // normal encoding.
+    // depth, and face-selection shaders. Mesh-domain `v:texcoord` is copied
+    // into U/V when present with one finite vector per vertex; otherwise U/V
+    // default to zero so raw imported geometry can render while progressive UV
+    // generation is still pending. Normals are carried in dedicated fields from
+    // `v:normal` when available and default to +Z otherwise, so UVs are never
+    // reused for normal encoding.
     struct MeshVertex
     {
         float Px = 0.0f;
@@ -56,8 +57,8 @@ export namespace Extrinsic::Runtime
         EmptyMesh,                  // No vertices, no halfedges, or no faces.
         InvalidTopology,            // Out-of-range halfedge/face index, mismatched halfedge property arrays, or non-closed face ring.
         NonFinitePosition,          // `v:position` contains NaN / infinity.
-        MissingTexcoords,           // `v:texcoord` absent / wrong-typed / not one `glm::vec2` per vertex.
-        NonFiniteTexcoord,          // `v:texcoord` contains NaN / infinity.
+        MissingTexcoords,           // Legacy diagnostic name for absent / wrong-typed / count-mismatched `v:texcoord`; packing now falls back to zero U/V.
+        NonFiniteTexcoord,          // Legacy diagnostic name for NaN / infinity `v:texcoord`; packing now falls back to zero U/V for invalid entries.
         DegenerateAllFaces,         // Every face produced fewer than three triangle indices (all faces deleted or degenerate).
     };
 
@@ -72,8 +73,9 @@ export namespace Extrinsic::Runtime
     // Pack a promoted ECS mesh `GeometrySources` view into the canonical
     // `Graphics::GpuWorld::GeometryUploadDesc` triangle-list shape.
     //
-    // Algorithm: validate `v:position`, count-matched finite `v:texcoord`,
-    // `h:to_vertex`, `h:next`, `h:face`, `f:halfedge`; for each face slot
+    // Algorithm: validate `v:position`, `h:to_vertex`, `h:next`, `h:face`,
+    // `f:halfedge`; copy count-matched finite `v:texcoord` into U/V or use
+    // zero U/V while progressive UV generation is pending; for each face slot
     // resolve its first halfedge and skip the slot when that halfedge's
     // `h:face` no longer claims the face (`PopulateFromMesh` writes
     // `f:halfedge` for every slot including deleted faces, while

@@ -250,11 +250,8 @@ namespace Extrinsic::Runtime
 
         const auto texcoordProp =
             view.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
-        if (!texcoordProp || texcoordProp.Vector().size() != vertexCount)
-        {
-            return Failure(MeshPackStatus::MissingTexcoords, outBuffer);
-        }
-        const auto& texcoords = texcoordProp.Vector();
+        const bool hasCountMatchedTexcoords =
+            texcoordProp && texcoordProp.Vector().size() == vertexCount;
         const auto normalProp =
             view.VertexSource->Properties.Get<glm::vec3>(PropertyNames::kNormal);
         const bool hasCountMatchedNormals =
@@ -300,10 +297,14 @@ namespace Extrinsic::Runtime
             {
                 return Failure(MeshPackStatus::NonFinitePosition, outBuffer);
             }
-            const glm::vec2 uv = texcoords[i];
-            if (!IsFinite(uv))
+            glm::vec2 uv{0.0f, 0.0f};
+            if (hasCountMatchedTexcoords)
             {
-                return Failure(MeshPackStatus::NonFiniteTexcoord, outBuffer);
+                const glm::vec2 sourceUv = texcoordProp.Vector()[i];
+                if (IsFinite(sourceUv))
+                {
+                    uv = sourceUv;
+                }
             }
             const glm::vec3 n = hasCountMatchedNormals
                 ? NormalizeOrDefaultNormal(normalProp.Vector()[i])
@@ -356,19 +357,6 @@ namespace Extrinsic::Runtime
         {
             return MeshPackStatus::EmptyMesh;
         }
-        const auto texcoordProp = view.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
-        if (!texcoordProp || texcoordProp.Vector().size() != vertexCount)
-        {
-            return MeshPackStatus::MissingTexcoords;
-        }
-        for (const glm::vec2 uv : texcoordProp.Vector())
-        {
-            if (!IsFinite(uv))
-            {
-                return MeshPackStatus::NonFiniteTexcoord;
-            }
-        }
-
         if (view.HalfedgeSource == nullptr)
         {
             return MeshPackStatus::MissingHalfedgeTopology;

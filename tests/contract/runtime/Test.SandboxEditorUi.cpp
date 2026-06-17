@@ -4422,6 +4422,51 @@ TEST(SandboxEditorUi, PlatformDropEventImportsObjMeshSelectsItAndEnablesRenderCo
     engine.Shutdown();
 }
 
+TEST(SandboxEditorUi, PlatformDropNoUvObjUploadsRawSurfaceBeforeDeferredPostProcess)
+{
+    TmpFile meshFile(
+        "runtime_platform_drop_no_uv_mesh.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "f 1 2 3\n");
+
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<WaitForAssetImportEventApplication>(128u));
+    engine.Initialize();
+
+    engine.DispatchPlatformEventForTest(Plat::WindowDropEvent{
+        .Paths = {meshFile.Path.string()},
+    });
+
+    ASSERT_FALSE(engine.GetWindow().ShouldClose())
+        << "explicit Null window backend must keep Engine::Run() drivable on headless hosts";
+
+    engine.Run();
+
+    EXPECT_EQ(CountEntitiesWithDomain(engine.GetScene(), GS::Domain::Mesh), 1u);
+    const std::optional<Runtime::RuntimeAssetImportEvent>& lastEvent =
+        engine.GetLastAssetImportEvent();
+    ASSERT_TRUE(lastEvent.has_value());
+    EXPECT_TRUE(lastEvent->Succeeded());
+    ASSERT_TRUE(lastEvent->Result.has_value());
+    EXPECT_EQ(lastEvent->Result->PayloadKind, Assets::AssetPayloadKind::Mesh);
+    EXPECT_EQ(lastEvent->Result->PrimitiveEntitiesCreated, 1u);
+
+    const Runtime::RuntimeRenderExtractionStats& stats =
+        engine.GetLastRenderExtractionStats();
+    EXPECT_EQ(stats.CandidateRenderableCount, 1u);
+    EXPECT_EQ(stats.MeshGeometryUploads, 1u);
+    EXPECT_EQ(stats.MeshGeometryMissingTexcoords, 1u);
+    EXPECT_EQ(stats.MeshGeometryNonFiniteTexcoords, 0u);
+    EXPECT_EQ(stats.MeshGeometryFailedPack, 0u);
+    EXPECT_EQ(stats.MeshGeometryInvalidTopology, 0u);
+    EXPECT_GE(engine.GetRenderer().GetGpuWorld().GetLiveGeometryCount(), 1u);
+
+    engine.Shutdown();
+}
+
 TEST(SandboxEditorUi, DroppedFileImportFailureLogsDiagnostics)
 {
     const std::filesystem::path missingMeshPath =

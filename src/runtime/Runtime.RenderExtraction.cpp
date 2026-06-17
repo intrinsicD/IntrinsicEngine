@@ -601,6 +601,54 @@ namespace Extrinsic::Runtime
                 break;
             }
         }
+
+        struct MeshTexcoordFallbackDiagnostics
+        {
+            bool MissingOrMismatched{false};
+            bool NonFinite{false};
+        };
+
+        [[nodiscard]] MeshTexcoordFallbackDiagnostics DiagnoseMeshTexcoordFallback(
+            const ECS::Components::GeometrySources::ConstSourceView& view) noexcept
+        {
+            using namespace ECS::Components::GeometrySources;
+
+            MeshTexcoordFallbackDiagnostics diagnostics{};
+            if (view.ActiveDomain != Domain::Mesh || view.VertexSource == nullptr)
+            {
+                return diagnostics;
+            }
+
+            const auto positions =
+                view.VertexSource->Properties.Get<glm::vec3>(PropertyNames::kPosition);
+            if (!positions)
+            {
+                return diagnostics;
+            }
+            const std::size_t vertexCount = positions.Vector().size();
+            if (vertexCount == 0u)
+            {
+                return diagnostics;
+            }
+
+            const auto texcoords =
+                view.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
+            if (!texcoords || texcoords.Vector().size() != vertexCount)
+            {
+                diagnostics.MissingOrMismatched = true;
+                return diagnostics;
+            }
+
+            for (const glm::vec2 uv : texcoords.Vector())
+            {
+                if (!std::isfinite(uv.x) || !std::isfinite(uv.y))
+                {
+                    diagnostics.NonFinite = true;
+                    return diagnostics;
+                }
+            }
+            return diagnostics;
+        }
     }
 
     RuntimeRenderableAssetGenerationObservation ObserveRenderableAssetGeneration(
@@ -967,6 +1015,8 @@ namespace Extrinsic::Runtime
             return true;
         }
 
+        const MeshTexcoordFallbackDiagnostics texcoordFallback =
+            DiagnoseMeshTexcoordFallback(view);
         MeshPackResult packResult = PackMesh(view, m_MeshPack);
         if (packResult.Status != MeshPackStatus::Success)
         {
@@ -993,6 +1043,14 @@ namespace Extrinsic::Runtime
             // later frame can recover the input.
             releaseStaleResidency();
             return false;
+        }
+        if (texcoordFallback.MissingOrMismatched)
+        {
+            ++stats.MeshGeometryMissingTexcoords;
+        }
+        if (texcoordFallback.NonFinite)
+        {
+            ++stats.MeshGeometryNonFiniteTexcoords;
         }
 
         const Graphics::GpuGeometryHandle handle =

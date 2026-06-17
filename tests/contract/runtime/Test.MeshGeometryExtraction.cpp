@@ -597,7 +597,7 @@ TEST(MeshGeometryExtraction, MissingPositionsIncrementsMissingPositionsCounter)
     engine.Shutdown();
 }
 
-TEST(MeshGeometryExtraction, MissingTexcoordsIncrementsMissingTexcoordsCounter)
+TEST(MeshGeometryExtraction, MissingTexcoordsUploadsWithDefaultUvFallback)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
@@ -617,19 +617,19 @@ TEST(MeshGeometryExtraction, MissingTexcoordsIncrementsMissingTexcoordsCounter)
                                                     engine.GetRenderer(),
                                                     &engine.GetGpuAssetCache());
 
-    EXPECT_EQ(stats.MeshGeometryUploads, 0u);
+    EXPECT_EQ(stats.MeshGeometryUploads, 1u);
     EXPECT_EQ(stats.MeshGeometryMissingTexcoords, 1u);
     EXPECT_EQ(stats.MeshGeometryNonFiniteTexcoords, 0u);
     EXPECT_EQ(stats.MeshGeometryMissingPositions, 0u);
     EXPECT_EQ(stats.MeshGeometryInvalidTopology, 0u);
     EXPECT_EQ(stats.MeshGeometryFailedPack, 0u);
-    EXPECT_EQ(engine.GetRenderer().GetGpuWorld().GetLiveGeometryCount(), 0u);
+    EXPECT_EQ(engine.GetRenderer().GetGpuWorld().GetLiveGeometryCount(), 1u);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();
 }
 
-TEST(MeshGeometryExtraction, NonFiniteTexcoordsIncrementsNonFiniteTexcoordsCounter)
+TEST(MeshGeometryExtraction, NonFiniteTexcoordsUploadWithDefaultUvFallback)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
     engine.Initialize();
@@ -648,13 +648,13 @@ TEST(MeshGeometryExtraction, NonFiniteTexcoordsIncrementsNonFiniteTexcoordsCount
                                                     engine.GetRenderer(),
                                                     &engine.GetGpuAssetCache());
 
-    EXPECT_EQ(stats.MeshGeometryUploads, 0u);
+    EXPECT_EQ(stats.MeshGeometryUploads, 1u);
     EXPECT_EQ(stats.MeshGeometryMissingTexcoords, 0u);
     EXPECT_EQ(stats.MeshGeometryNonFiniteTexcoords, 1u);
     EXPECT_EQ(stats.MeshGeometryMissingPositions, 0u);
     EXPECT_EQ(stats.MeshGeometryInvalidTopology, 0u);
     EXPECT_EQ(stats.MeshGeometryFailedPack, 0u);
-    EXPECT_EQ(engine.GetRenderer().GetGpuWorld().GetLiveGeometryCount(), 0u);
+    EXPECT_EQ(engine.GetRenderer().GetGpuWorld().GetLiveGeometryCount(), 1u);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();
