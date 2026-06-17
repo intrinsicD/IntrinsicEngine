@@ -18,6 +18,7 @@ target_sources(${target_name}
         Runtime.MeshAttributeTextureBake.cppm
         Runtime.ProgressivePresentationExtraction.cppm
         Runtime.ProgressiveRenderData.cppm
+        Runtime.SelectedMeshTextureBake.cppm
         Runtime.EcsSystemBundle.cppm
         Runtime.EditorCommandHistory.cppm
         Runtime.Engine.cppm
@@ -53,6 +54,7 @@ target_sources(${target_name}
         Runtime.MeshAttributeTextureBake.cpp
         Runtime.ProgressivePresentationExtraction.cpp
         Runtime.ProgressiveRenderData.cpp
+        Runtime.SelectedMeshTextureBake.cpp
         Runtime.EcsSystemBundle.cpp
         Runtime.EditorCommandHistory.cpp
         Runtime.Engine.cpp

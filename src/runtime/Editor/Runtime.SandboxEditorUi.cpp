@@ -6,6 +6,7 @@ module;
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <span>
@@ -34,6 +35,7 @@ import Extrinsic.ECS.Component.Transform;
 import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.Component.RenderGeometry;
@@ -45,15 +47,20 @@ import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.ImGuiAdapter;
+import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.ProgressivePresentationExtraction;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SceneSerialization;
+import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.SelectionController;
 import Geometry.KMeans;
+import Geometry.Mesh.Conversion;
+import Geometry.MeshSoup;
 import Geometry.Properties;
+import Geometry.UvAtlas;
 
 namespace Extrinsic::Runtime
 {
@@ -76,6 +83,43 @@ namespace Extrinsic::Runtime
             A::AssetPayloadKind::Texture2D,
         }};
 
+        inline constexpr std::array<ProgressiveSlotSemantic, 6> kTextureBakeTargetSemantics{{
+            ProgressiveSlotSemantic::Albedo,
+            ProgressiveSlotSemantic::Normal,
+            ProgressiveSlotSemantic::Roughness,
+            ProgressiveSlotSemantic::Metallic,
+            ProgressiveSlotSemantic::ScalarField,
+            ProgressiveSlotSemantic::Displacement,
+        }};
+
+        inline constexpr std::array<MeshAttributeTextureBakeEncoder, 8> kTextureBakeEncoders{{
+            MeshAttributeTextureBakeEncoder::Auto,
+            MeshAttributeTextureBakeEncoder::RgbaColor,
+            MeshAttributeTextureBakeEncoder::Normal,
+            MeshAttributeTextureBakeEncoder::ScalarColormap,
+            MeshAttributeTextureBakeEncoder::LinearScalar,
+            MeshAttributeTextureBakeEncoder::LabelPalette,
+            MeshAttributeTextureBakeEncoder::Vector2,
+            MeshAttributeTextureBakeEncoder::Vector3,
+        }};
+
+        [[nodiscard]] const char* DebugNameForTextureBakeEncoder(
+            const MeshAttributeTextureBakeEncoder encoder) noexcept
+        {
+            switch (encoder)
+            {
+            case MeshAttributeTextureBakeEncoder::Auto: return "auto";
+            case MeshAttributeTextureBakeEncoder::LinearScalar: return "linear scalar";
+            case MeshAttributeTextureBakeEncoder::ScalarColormap: return "scalar colormap";
+            case MeshAttributeTextureBakeEncoder::LabelPalette: return "label palette";
+            case MeshAttributeTextureBakeEncoder::Vector2: return "vector2";
+            case MeshAttributeTextureBakeEncoder::Vector3: return "vector3";
+            case MeshAttributeTextureBakeEncoder::Normal: return "normal";
+            case MeshAttributeTextureBakeEncoder::RgbaColor: return "rgba color";
+            }
+            return "unknown";
+        }
+
         struct KMeansUiState
         {
             std::optional<SandboxEditorKMeansResult>* LastResult{nullptr};
@@ -86,13 +130,28 @@ namespace Extrinsic::Runtime
             bool* UseHierarchicalInitialization{nullptr};
         };
 
+        struct TextureBakeUiState
+        {
+            std::int32_t* SourceIndex{nullptr};
+            std::int32_t* TargetSemanticIndex{nullptr};
+            std::int32_t* EncoderIndex{nullptr};
+            std::int32_t* Width{nullptr};
+            std::int32_t* Height{nullptr};
+            std::int32_t* UvResolution{nullptr};
+            std::int32_t* UvPadding{nullptr};
+            float* UvTexelsPerUnit{nullptr};
+            bool* UvForceRegenerate{nullptr};
+            bool* UvPreserveAuthored{nullptr};
+        };
+
         enum class DomainWindowSection : std::uint8_t
         {
             Render = 0,
-            Visualization = 1,
-            Selection = 2,
-            Processing = 3,
-            Count = 4,
+            Properties = 1,
+            Visualization = 2,
+            Selection = 3,
+            Processing = 4,
+            Count = 5,
         };
 
         [[nodiscard]] GS::Domain ExpectedDomainForWindowKind(
@@ -120,6 +179,7 @@ namespace Extrinsic::Runtime
                 switch (section)
                 {
                 case DomainWindowSection::Render: return "Mesh / Render";
+                case DomainWindowSection::Properties: return "Mesh / Properties";
                 case DomainWindowSection::Visualization: return "Mesh / Visualization";
                 case DomainWindowSection::Selection: return "Mesh / Selection";
                 case DomainWindowSection::Processing: return "Mesh / Processing";
@@ -130,6 +190,7 @@ namespace Extrinsic::Runtime
                 switch (section)
                 {
                 case DomainWindowSection::Render: return "Graph / Render";
+                case DomainWindowSection::Properties: return "Graph / Properties";
                 case DomainWindowSection::Visualization: return "Graph / Visualization";
                 case DomainWindowSection::Selection: return "Graph / Selection";
                 case DomainWindowSection::Processing: return "Graph / Processing";
@@ -140,6 +201,7 @@ namespace Extrinsic::Runtime
                 switch (section)
                 {
                 case DomainWindowSection::Render: return "PointCloud / Render";
+                case DomainWindowSection::Properties: return "PointCloud / Properties";
                 case DomainWindowSection::Visualization: return "PointCloud / Visualization";
                 case DomainWindowSection::Selection: return "PointCloud / Selection";
                 case DomainWindowSection::Processing: return "PointCloud / Processing";
@@ -624,6 +686,484 @@ namespace Extrinsic::Runtime
                 break;
             }
             return out;
+        }
+
+        [[nodiscard]] ProgressivePropertyValueKind DefaultExpectedValueKindForSlot(
+            ProgressiveSlotSemantic semantic) noexcept;
+
+        [[nodiscard]] ProgressiveGeometryDomain DefaultDomainForProgressiveSlot(
+            GS::Domain sourceDomain,
+            ProgressiveRenderLane lane,
+            ProgressiveSlotSemantic semantic) noexcept;
+        void AddDiagnostic(
+            std::vector<SandboxEditorDiagnostic>& diagnostics,
+            SandboxEditorDiagnosticCode code,
+            std::string message);
+
+        [[nodiscard]] const Geometry::PropertySet* PropertySetForCatalogDomain(
+            const GS::ConstSourceView& view,
+            const SandboxEditorPropertyCatalogDomain domain) noexcept
+        {
+            using Domain = SandboxEditorPropertyCatalogDomain;
+            switch (domain)
+            {
+            case Domain::MeshVertices:
+                return view.ActiveDomain == GS::Domain::Mesh &&
+                               view.VertexSource != nullptr
+                           ? &view.VertexSource->Properties
+                           : nullptr;
+            case Domain::MeshEdges:
+                return view.ActiveDomain == GS::Domain::Mesh &&
+                               view.EdgeSource != nullptr
+                           ? &view.EdgeSource->Properties
+                           : nullptr;
+            case Domain::MeshHalfedges:
+                return view.ActiveDomain == GS::Domain::Mesh &&
+                               view.HalfedgeSource != nullptr
+                           ? &view.HalfedgeSource->Properties
+                           : nullptr;
+            case Domain::MeshFaces:
+                return view.ActiveDomain == GS::Domain::Mesh &&
+                               view.FaceSource != nullptr
+                           ? &view.FaceSource->Properties
+                           : nullptr;
+            case Domain::GraphVertices:
+                return view.ActiveDomain == GS::Domain::Graph &&
+                               view.NodeSource != nullptr
+                           ? &view.NodeSource->Properties
+                           : nullptr;
+            case Domain::GraphEdges:
+                return view.ActiveDomain == GS::Domain::Graph &&
+                               view.EdgeSource != nullptr
+                           ? &view.EdgeSource->Properties
+                           : nullptr;
+            case Domain::PointCloudPoints:
+                return view.ActiveDomain == GS::Domain::PointCloud &&
+                               view.VertexSource != nullptr
+                           ? &view.VertexSource->Properties
+                           : nullptr;
+            }
+            return nullptr;
+        }
+
+        [[nodiscard]] ProgressiveGeometryDomain ToProgressiveGeometryDomain(
+            const SandboxEditorPropertyCatalogDomain domain) noexcept
+        {
+            using Domain = SandboxEditorPropertyCatalogDomain;
+            switch (domain)
+            {
+            case Domain::MeshVertices:
+                return ProgressiveGeometryDomain::MeshVertex;
+            case Domain::MeshEdges:
+                return ProgressiveGeometryDomain::MeshEdge;
+            case Domain::MeshHalfedges:
+                return ProgressiveGeometryDomain::MeshHalfedge;
+            case Domain::MeshFaces:
+                return ProgressiveGeometryDomain::MeshFace;
+            case Domain::GraphVertices:
+                return ProgressiveGeometryDomain::GraphVertex;
+            case Domain::GraphEdges:
+                return ProgressiveGeometryDomain::GraphEdge;
+            case Domain::PointCloudPoints:
+                return ProgressiveGeometryDomain::Point;
+            }
+            return ProgressiveGeometryDomain::Unknown;
+        }
+
+        [[nodiscard]] SandboxEditorPropertyCatalogValueKind ToPropertyCatalogValueKind(
+            const ProgressivePropertyValueKind kind) noexcept
+        {
+            using Out = SandboxEditorPropertyCatalogValueKind;
+            switch (kind)
+            {
+            case ProgressivePropertyValueKind::ScalarFloat:
+                return Out::ScalarFloat;
+            case ProgressivePropertyValueKind::ScalarDouble:
+                return Out::ScalarDouble;
+            case ProgressivePropertyValueKind::UInt32:
+                return Out::UInt32;
+            case ProgressivePropertyValueKind::Vec2:
+                return Out::Vec2;
+            case ProgressivePropertyValueKind::Vec3:
+                return Out::Vec3;
+            case ProgressivePropertyValueKind::Vec4:
+                return Out::Vec4;
+            case ProgressivePropertyValueKind::Any:
+            case ProgressivePropertyValueKind::Unknown:
+                break;
+            }
+            return Out::Unknown;
+        }
+
+        [[nodiscard]] ProgressivePropertyValueKind ToProgressivePropertyValueKind(
+            const SandboxEditorPropertyCatalogValueKind kind) noexcept
+        {
+            using Kind = SandboxEditorPropertyCatalogValueKind;
+            switch (kind)
+            {
+            case Kind::ScalarFloat:
+                return ProgressivePropertyValueKind::ScalarFloat;
+            case Kind::ScalarDouble:
+                return ProgressivePropertyValueKind::ScalarDouble;
+            case Kind::UInt32:
+                return ProgressivePropertyValueKind::UInt32;
+            case Kind::Vec2:
+                return ProgressivePropertyValueKind::Vec2;
+            case Kind::Vec3:
+                return ProgressivePropertyValueKind::Vec3;
+            case Kind::Vec4:
+                return ProgressivePropertyValueKind::Vec4;
+            case Kind::Unknown:
+                break;
+            }
+            return ProgressivePropertyValueKind::Unknown;
+        }
+
+        [[nodiscard]] std::uint8_t ComponentCountForPropertyCatalogKind(
+            const SandboxEditorPropertyCatalogValueKind kind) noexcept
+        {
+            using Kind = SandboxEditorPropertyCatalogValueKind;
+            switch (kind)
+            {
+            case Kind::ScalarFloat:
+            case Kind::ScalarDouble:
+            case Kind::UInt32:
+                return 1u;
+            case Kind::Vec2:
+                return 2u;
+            case Kind::Vec3:
+                return 3u;
+            case Kind::Vec4:
+                return 4u;
+            case Kind::Unknown:
+                break;
+            }
+            return 0u;
+        }
+
+        [[nodiscard]] bool IsGeneratedCatalogProperty(
+            const std::string& name) noexcept
+        {
+            return name.find("kmeans") != std::string::npos ||
+                   name.find("generated") != std::string::npos ||
+                   name.find("bake") != std::string::npos;
+        }
+
+        [[nodiscard]] std::string FormatVec2(const glm::vec2 value)
+        {
+            return "(" + std::to_string(value.x) + ", " +
+                   std::to_string(value.y) + ")";
+        }
+
+        [[nodiscard]] std::string FormatVec3(const glm::vec3 value)
+        {
+            return "(" + std::to_string(value.x) + ", " +
+                   std::to_string(value.y) + ", " +
+                   std::to_string(value.z) + ")";
+        }
+
+        [[nodiscard]] std::string FormatVec4(const glm::vec4 value)
+        {
+            return "(" + std::to_string(value.x) + ", " +
+                   std::to_string(value.y) + ", " +
+                   std::to_string(value.z) + ", " +
+                   std::to_string(value.w) + ")";
+        }
+
+        [[nodiscard]] SandboxEditorPropertyValuePreview BuildPropertyValuePreview(
+            const Geometry::PropertySet& properties,
+            const std::string& name,
+            const SandboxEditorPropertyCatalogValueKind kind,
+            const std::optional<std::size_t> index)
+        {
+            if (!index.has_value() || *index >= properties.Size())
+                return {};
+
+            SandboxEditorPropertyValuePreview preview{
+                .HasValue = true,
+                .ElementIndex = *index,
+            };
+
+            using Kind = SandboxEditorPropertyCatalogValueKind;
+            switch (kind)
+            {
+            case Kind::ScalarFloat:
+                if (const auto prop = properties.Get<float>(name); prop)
+                    preview.Text = std::to_string(prop.Vector()[*index]);
+                break;
+            case Kind::ScalarDouble:
+                if (const auto prop = properties.Get<double>(name); prop)
+                    preview.Text = std::to_string(prop.Vector()[*index]);
+                break;
+            case Kind::UInt32:
+                if (const auto prop = properties.Get<std::uint32_t>(name); prop)
+                    preview.Text = std::to_string(prop.Vector()[*index]);
+                break;
+            case Kind::Vec2:
+                if (const auto prop = properties.Get<glm::vec2>(name); prop)
+                    preview.Text = FormatVec2(prop.Vector()[*index]);
+                break;
+            case Kind::Vec3:
+                if (const auto prop = properties.Get<glm::vec3>(name); prop)
+                    preview.Text = FormatVec3(prop.Vector()[*index]);
+                break;
+            case Kind::Vec4:
+                if (const auto prop = properties.Get<glm::vec4>(name); prop)
+                    preview.Text = FormatVec4(prop.Vector()[*index]);
+                break;
+            case Kind::Unknown:
+                preview.HasValue = false;
+                break;
+            }
+
+            if (preview.Text.empty())
+                preview.HasValue = false;
+            return preview;
+        }
+
+        [[nodiscard]] std::optional<std::size_t> PreviewIndexForCatalogDomain(
+            const SandboxEditorPropertyCatalogDomain domain,
+            const PrimitiveSelectionResult* primitive,
+            const std::uint32_t selectedStableId) noexcept
+        {
+            if (primitive == nullptr)
+                return std::nullopt;
+            const bool sameEntity =
+                primitive->EntityId == selectedStableId ||
+                primitive->StableId == selectedStableId;
+            if (!sameEntity)
+                return std::nullopt;
+
+            using Domain = SandboxEditorPropertyCatalogDomain;
+            switch (domain)
+            {
+            case Domain::MeshVertices:
+                if (primitive->Domain == GS::Domain::Mesh &&
+                    primitive->VertexId != kInvalidPrimitiveIndex)
+                    return primitive->VertexId;
+                break;
+            case Domain::MeshEdges:
+                if (primitive->Domain == GS::Domain::Mesh &&
+                    primitive->EdgeId != kInvalidPrimitiveIndex)
+                    return primitive->EdgeId;
+                break;
+            case Domain::MeshFaces:
+                if (primitive->Domain == GS::Domain::Mesh &&
+                    primitive->FaceId != kInvalidPrimitiveIndex)
+                    return primitive->FaceId;
+                break;
+            case Domain::GraphVertices:
+                if (primitive->Domain == GS::Domain::Graph &&
+                    primitive->VertexId != kInvalidPrimitiveIndex)
+                    return primitive->VertexId;
+                break;
+            case Domain::GraphEdges:
+                if (primitive->Domain == GS::Domain::Graph &&
+                    primitive->EdgeId != kInvalidPrimitiveIndex)
+                    return primitive->EdgeId;
+                break;
+            case Domain::PointCloudPoints:
+                if (primitive->Domain == GS::Domain::PointCloud &&
+                    primitive->PointId != kInvalidPrimitiveIndex)
+                    return primitive->PointId;
+                break;
+            case Domain::MeshHalfedges:
+                break;
+            }
+            return std::nullopt;
+        }
+
+        void AppendPropertyCatalogRowsForDomain(
+            std::vector<SandboxEditorPropertyCatalogRow>& out,
+            const Geometry::PropertySet& properties,
+            const SandboxEditorPropertyCatalogDomain domain,
+            const std::optional<std::size_t> previewIndex)
+        {
+            for (const std::string& name : properties.Properties())
+            {
+                const SandboxEditorPropertyCatalogValueKind kind =
+                    ToPropertyCatalogValueKind(
+                        DetectPropertyValueKind(properties, name));
+                const bool supported =
+                    kind != SandboxEditorPropertyCatalogValueKind::Unknown;
+                SandboxEditorPropertyCatalogRow row{
+                    .Name = name,
+                    .Domain = domain,
+                    .ValueKind = kind,
+                    .ElementCount = properties.Size(),
+                    .ComponentCount = ComponentCountForPropertyCatalogKind(kind),
+                    .Supported = supported,
+                    .Bindable = supported,
+                    .Canonical = IsInternalVisualizationProperty(name),
+                    .Internal = IsInternalVisualizationProperty(name),
+                    .Connectivity = IsConnectivityVisualizationProperty(name),
+                    .Generated = IsGeneratedCatalogProperty(name),
+                    .Descriptor = ProgressivePropertyBindingDescriptor{
+                        .Domain = ToProgressiveGeometryDomain(domain),
+                        .PropertyName = name,
+                        .ExpectedValueKind =
+                            ToProgressivePropertyValueKind(kind),
+                        .ExpectedElementCount = properties.Size(),
+                    },
+                    .Preview = BuildPropertyValuePreview(
+                        properties,
+                        name,
+                        kind,
+                        previewIndex),
+                };
+                if (!supported)
+                    row.UnsupportedReason = "unsupported property value type";
+                out.push_back(std::move(row));
+            }
+        }
+
+        void AppendPropertyCatalogRows(
+            std::vector<SandboxEditorPropertyCatalogRow>& out,
+            const GS::ConstSourceView& view,
+            const PrimitiveSelectionResult* primitive,
+            const std::uint32_t selectedStableId)
+        {
+            const auto append =
+                [&](const SandboxEditorPropertyCatalogDomain domain)
+                {
+                    const Geometry::PropertySet* properties =
+                        PropertySetForCatalogDomain(view, domain);
+                    if (properties == nullptr)
+                        return;
+                    AppendPropertyCatalogRowsForDomain(
+                        out,
+                        *properties,
+                        domain,
+                        PreviewIndexForCatalogDomain(
+                            domain,
+                            primitive,
+                            selectedStableId));
+                };
+
+            switch (view.ActiveDomain)
+            {
+            case GS::Domain::Mesh:
+                append(SandboxEditorPropertyCatalogDomain::MeshVertices);
+                append(SandboxEditorPropertyCatalogDomain::MeshEdges);
+                append(SandboxEditorPropertyCatalogDomain::MeshHalfedges);
+                append(SandboxEditorPropertyCatalogDomain::MeshFaces);
+                break;
+            case GS::Domain::Graph:
+                append(SandboxEditorPropertyCatalogDomain::GraphVertices);
+                append(SandboxEditorPropertyCatalogDomain::GraphEdges);
+                break;
+            case GS::Domain::PointCloud:
+                append(SandboxEditorPropertyCatalogDomain::PointCloudPoints);
+                break;
+            case GS::Domain::None:
+            case GS::Domain::Unknown:
+                break;
+            }
+        }
+
+        [[nodiscard]] SandboxEditorPropertyBindingTargetModel
+        BuildPropertyBindingTargetModel(
+            const GS::ConstSourceView& view,
+            const ProgressiveSlotExtraction& slot)
+        {
+            ProgressiveGeometryDomain domain = slot.Property.Domain;
+            if (domain == ProgressiveGeometryDomain::Unknown)
+            {
+                domain = DefaultDomainForProgressiveSlot(
+                    view.ActiveDomain,
+                    slot.Lane,
+                    slot.Semantic);
+            }
+
+            ProgressivePropertyValueKind expected =
+                slot.Property.ExpectedValueKind;
+            if (expected == ProgressivePropertyValueKind::Any ||
+                expected == ProgressivePropertyValueKind::Unknown)
+            {
+                expected = DefaultExpectedValueKindForSlot(slot.Semantic);
+            }
+
+            SandboxEditorPropertyBindingTargetModel model{
+                .Lane = slot.Lane,
+                .PresentationKey = slot.PresentationKey,
+                .PresentationKind = slot.PresentationKind,
+                .Semantic = slot.Semantic,
+                .SourceKind = slot.SourceKind,
+                .RequiredDomain = domain,
+                .ExpectedValueKind = expected,
+                .ExpectedElementCount = ResolvePropertyElementCount(
+                    view,
+                    domain),
+            };
+
+            if (domain != ProgressiveGeometryDomain::Unknown)
+            {
+                std::vector<ProgressivePropertyOption> options =
+                    EnumeratePropertyOptions(
+                        view,
+                        domain,
+                        expected,
+                        model.ExpectedElementCount);
+                model.Options.reserve(options.size());
+                for (const ProgressivePropertyOption& option : options)
+                {
+                    model.Options.push_back(
+                        SandboxEditorProgressivePropertyOptionModel{
+                            .Descriptor = option.Descriptor,
+                            .ActualValueKind = option.ActualValueKind,
+                            .ElementCount = option.ElementCount,
+                            .Compatible = option.Compatible,
+                            .DisabledReason = option.DisabledReason,
+                        });
+                }
+            }
+            return model;
+        }
+
+        [[nodiscard]] SandboxEditorPropertyCatalogModel BuildPropertyCatalogModel(
+            const SandboxEditorContext& context,
+            const entt::registry& raw,
+            const ECS::EntityHandle entity)
+        {
+            SandboxEditorPropertyCatalogModel model{};
+            model.HasSelectedEntity = true;
+            model.SelectedStableId = SelectionController::ToStableEntityId(entity);
+            const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
+            model.SelectedDomain = view.ActiveDomain;
+
+            const PrimitiveSelectionResult* primitive = nullptr;
+            if (context.LastRefinedPrimitive != nullptr &&
+                context.LastRefinedPrimitive->has_value())
+            {
+                primitive = &**context.LastRefinedPrimitive;
+            }
+
+            AppendPropertyCatalogRows(
+                model.Rows,
+                view,
+                primitive,
+                model.SelectedStableId);
+
+            if (const auto* bindings =
+                    raw.try_get<ProgressivePresentationBindings>(entity);
+                bindings != nullptr)
+            {
+                const ProgressivePresentationExtractionSnapshot snapshot =
+                    BuildProgressivePresentationSnapshot(view, *bindings);
+                model.BindingTargets.reserve(snapshot.Slots.size());
+                for (const ProgressiveSlotExtraction& slot : snapshot.Slots)
+                    model.BindingTargets.push_back(
+                        BuildPropertyBindingTargetModel(view, slot));
+            }
+
+            if (!view.Valid() && model.Rows.empty())
+            {
+                AddDiagnostic(
+                    model.Diagnostics,
+                    SandboxEditorDiagnosticCode::UnsupportedGeometryDomain,
+                    "Selected entity has no valid geometry property catalog.");
+            }
+            return model;
         }
 
         [[nodiscard]] bool PropertySupportsPreset(
@@ -1736,6 +2276,650 @@ namespace Extrinsic::Runtime
             return model;
         }
 
+        [[nodiscard]] std::optional<std::size_t> FindCatalogMatchIndex(
+            const SandboxEditorPropertyCatalogModel& catalog,
+            const ProgressivePropertyBindingDescriptor& descriptor)
+        {
+            if (descriptor.Domain == ProgressiveGeometryDomain::Unknown ||
+                descriptor.PropertyName.empty())
+            {
+                return std::nullopt;
+            }
+
+            for (std::size_t i = 0u; i < catalog.Rows.size(); ++i)
+            {
+                const SandboxEditorPropertyCatalogRow& row = catalog.Rows[i];
+                if (row.Descriptor.Domain == descriptor.Domain &&
+                    row.Name == descriptor.PropertyName)
+                {
+                    return i;
+                }
+            }
+            return std::nullopt;
+        }
+
+        [[nodiscard]] SandboxEditorBoundRenderStateRow MakeRenderHintRow(
+            std::string label,
+            const ProgressiveRenderLane lane,
+            const bool enabled,
+            std::string sourceDescription,
+            std::string disabledReason = {})
+        {
+            return SandboxEditorBoundRenderStateRow{
+                .Kind = SandboxEditorBoundRenderStateRowKind::RenderHint,
+                .Label = std::move(label),
+                .Lane = lane,
+                .Readiness = enabled
+                    ? ProgressiveReadinessState::Ready
+                    : ProgressiveReadinessState::Unset,
+                .Enabled = enabled,
+                .SourceDescription = std::move(sourceDescription),
+                .DisabledReason = std::move(disabledReason),
+            };
+        }
+
+        void AppendRenderHintRows(
+            std::vector<SandboxEditorBoundRenderStateRow>& rows,
+            const SandboxEditorRenderHintModel& hints)
+        {
+            rows.push_back(
+                MakeRenderHintRow(
+                    "Surface render hint",
+                    ProgressiveRenderLane::Surface,
+                    hints.HasRenderSurface,
+                    hints.HasRenderSurface ? hints.SurfaceDomain : "not enabled",
+                    hints.HasRenderSurface ? std::string{} : "surface rendering is not enabled"));
+
+            std::string edgeSource = "not enabled";
+            if (hints.HasRenderEdges)
+            {
+                if (hints.HasNamedEdgeWidth)
+                    edgeSource = "property:" + hints.EdgeWidthName;
+                else if (hints.HasUniformEdgeWidth)
+                    edgeSource = "uniform:" + std::to_string(hints.UniformEdgeWidth);
+                else
+                    edgeSource = hints.EdgeDomain;
+            }
+            rows.push_back(
+                MakeRenderHintRow(
+                    "Edge render hint",
+                    ProgressiveRenderLane::Edges,
+                    hints.HasRenderEdges,
+                    std::move(edgeSource),
+                    hints.HasRenderEdges ? std::string{} : "edge rendering is not enabled"));
+
+            std::string pointSource = "not enabled";
+            if (hints.HasRenderPoints)
+            {
+                if (hints.HasNamedPointSize)
+                    pointSource = "property:" + hints.PointSizeName;
+                else if (hints.HasUniformPointSize)
+                    pointSource = "uniform:" + std::to_string(hints.UniformPointSize);
+                else
+                    pointSource = hints.PointRenderType;
+            }
+            rows.push_back(
+                MakeRenderHintRow(
+                    "Point render hint",
+                    ProgressiveRenderLane::Points,
+                    hints.HasRenderPoints,
+                    std::move(pointSource),
+                    hints.HasRenderPoints ? std::string{} : "point rendering is not enabled"));
+        }
+
+        void AppendBoundSlotRows(
+            std::vector<SandboxEditorBoundRenderStateRow>& rows,
+            const SandboxEditorPropertyCatalogModel& catalog,
+            const SandboxEditorProgressiveRenderDataModel& progressive)
+        {
+            for (const SandboxEditorProgressiveSlotModel& slot :
+                 progressive.Slots)
+            {
+                const std::optional<std::size_t> match =
+                    FindCatalogMatchIndex(catalog, slot.Property);
+                rows.push_back(SandboxEditorBoundRenderStateRow{
+                    .Kind = SandboxEditorBoundRenderStateRowKind::ProgressiveSlot,
+                    .Label = std::string{ToString(slot.Semantic)},
+                    .Lane = slot.Lane,
+                    .PresentationKey = slot.PresentationKey,
+                    .PresentationKind = slot.PresentationKind,
+                    .Semantic = slot.Semantic,
+                    .SourceKind = slot.SourceKind,
+                    .Readiness = slot.Readiness,
+                    .Property = slot.Property,
+                    .PropertyResolution = slot.PropertyResolution,
+                    .AuthoredTexture = slot.AuthoredTexture,
+                    .GeneratedTexture = slot.GeneratedTexture,
+                    .TextureAsset = slot.TextureAsset,
+                    .Enabled = slot.Enabled,
+                    .UsesUniformDefault = slot.UsesUniformDefault,
+                    .TextureReady = slot.TextureReady,
+                    .PropertyBufferReady = slot.PropertyBufferReady,
+                    .PreviousOutputRetained = slot.PreviousOutputRetained,
+                    .Unsupported = slot.Unsupported,
+                    .HasCatalogMatch = match.has_value(),
+                    .CatalogRowIndex = match,
+                    .SourceDescription = std::string{ToString(slot.SourceKind)},
+                    .DisabledReason = slot.Enabled ? std::string{} : "slot is disabled",
+                    .Diagnostic = slot.Diagnostic,
+                });
+            }
+        }
+
+        void AppendBoundJobRows(
+            std::vector<SandboxEditorBoundRenderStateRow>& rows,
+            const SandboxEditorProgressiveRenderDataModel& progressive)
+        {
+            for (const SandboxEditorProgressiveJobModel& job :
+                 progressive.Jobs)
+            {
+                rows.push_back(SandboxEditorBoundRenderStateRow{
+                    .Kind = SandboxEditorBoundRenderStateRowKind::DerivedJob,
+                    .Label = job.Name,
+                    .Lane = ProgressiveRenderLane::Surface,
+                    .Semantic = job.Key.OutputSemantic,
+                    .Readiness = IsFailedDerivedJobStatus(job.Status)
+                        ? ProgressiveReadinessState::Failed
+                        : (IsActiveDerivedJobStatus(job.Status)
+                               ? ProgressiveReadinessState::Pending
+                               : ProgressiveReadinessState::Ready),
+                    .Job = job.Handle,
+                    .JobStatus = job.Status,
+                    .JobProgress = job.NormalizedProgress,
+                    .JobProgressDeterminate = job.ProgressDeterminate,
+                    .Enabled = true,
+                    .PreviousOutputRetained = job.PreviousOutputRetained,
+                    .SourceDescription = job.Key.OutputName,
+                    .Diagnostic = job.Diagnostic,
+                });
+            }
+        }
+
+        [[nodiscard]] SandboxEditorBoundRenderStateModel BuildBoundRenderStateModel(
+            const SandboxEditorPropertyCatalogModel& catalog,
+            const SandboxEditorProgressiveRenderDataModel& progressive,
+            const SandboxEditorRenderHintModel& renderHints,
+            const SandboxEditorGeometryDomainModel& geometry,
+            const std::uint32_t stableEntityId)
+        {
+            SandboxEditorBoundRenderStateModel model{};
+            model.HasSelectedEntity = true;
+            model.SelectedStableId = stableEntityId;
+            model.Shape = progressive.Shape;
+            model.BindingGeneration = progressive.BindingGeneration;
+            model.Composition = progressive.Composition;
+
+            AppendRenderHintRows(model.Rows, renderHints);
+            AppendBoundSlotRows(model.Rows, catalog, progressive);
+            AppendBoundJobRows(model.Rows, progressive);
+
+            if (progressive.Composition.HasChildren)
+            {
+                model.Rows.push_back(SandboxEditorBoundRenderStateRow{
+                    .Kind = SandboxEditorBoundRenderStateRowKind::CompositionSummary,
+                    .Label = "Composition summary",
+                    .Readiness = progressive.Composition.ChildFailedSlotCount > 0u ||
+                                         progressive.Composition.ChildFailedJobCount > 0u
+                                     ? ProgressiveReadinessState::Failed
+                                     : (progressive.Composition.ChildPendingSlotCount > 0u ||
+                                                progressive.Composition.ChildActiveJobCount > 0u
+                                            ? ProgressiveReadinessState::Pending
+                                            : ProgressiveReadinessState::Ready),
+                    .Enabled = true,
+                    .SourceDescription =
+                        "children:" + std::to_string(progressive.Composition.ChildCount),
+                });
+            }
+
+            if (!progressive.HasBindings)
+            {
+                model.Rows.push_back(SandboxEditorBoundRenderStateRow{
+                    .Kind = SandboxEditorBoundRenderStateRowKind::DisabledCommand,
+                    .Label = "Progressive bindings",
+                    .Readiness = ProgressiveReadinessState::Unsupported,
+                    .Enabled = false,
+                    .DisabledReason =
+                        "selected entity has no progressive presentation bindings",
+                });
+            }
+
+            if (geometry.Domain == GS::Domain::Graph ||
+                geometry.Domain == GS::Domain::PointCloud)
+            {
+                model.Rows.push_back(SandboxEditorBoundRenderStateRow{
+                    .Kind = SandboxEditorBoundRenderStateRowKind::DisabledCommand,
+                    .Label = "Texture bake",
+                    .Readiness = ProgressiveReadinessState::Unsupported,
+                    .Enabled = false,
+                    .DisabledReason =
+                        "texture baking is available for mesh surface slots only",
+                });
+            }
+
+            if (model.Rows.empty())
+            {
+                AddDiagnostic(
+                    model.Diagnostics,
+                    SandboxEditorDiagnosticCode::InvalidVisualizationProperty,
+                    "No bound render state rows were available.");
+            }
+            return model;
+        }
+
+        enum class MeshFaceRingStatus : std::uint8_t
+        {
+            Triangulate,
+            Skip,
+            Invalid,
+        };
+
+        [[nodiscard]] MeshFaceRingStatus BuildMeshFaceRing(
+            const std::vector<std::uint32_t>& faceHalfedges,
+            const std::vector<std::uint32_t>& halfedgeFaces,
+            const std::vector<std::uint32_t>& nextHalfedges,
+            const std::vector<std::uint32_t>& toVertices,
+            const std::size_t faceIndex,
+            const std::uint32_t vertexCount,
+            std::vector<std::uint32_t>& outRing)
+        {
+            constexpr std::uint32_t invalid = std::numeric_limits<std::uint32_t>::max();
+            outRing.clear();
+            if (faceIndex >= faceHalfedges.size())
+                return MeshFaceRingStatus::Invalid;
+
+            const std::size_t halfedgeCount = toVertices.size();
+            const std::uint32_t first = faceHalfedges[faceIndex];
+            if (first == invalid)
+                return MeshFaceRingStatus::Skip;
+            if (first >= halfedgeCount)
+                return MeshFaceRingStatus::Invalid;
+
+            const std::uint32_t owner = halfedgeFaces[first];
+            if (owner == invalid || owner >= faceHalfedges.size())
+                return MeshFaceRingStatus::Skip;
+            if (owner != static_cast<std::uint32_t>(faceIndex))
+                return MeshFaceRingStatus::Skip;
+
+            std::uint32_t halfedge = first;
+            for (std::size_t step = 0u; step <= halfedgeCount; ++step)
+            {
+                if (halfedge >= halfedgeCount)
+                    return MeshFaceRingStatus::Invalid;
+                if (halfedgeFaces[halfedge] != static_cast<std::uint32_t>(faceIndex))
+                    return MeshFaceRingStatus::Invalid;
+
+                const std::uint32_t vertex = toVertices[halfedge];
+                if (vertex >= vertexCount)
+                    return MeshFaceRingStatus::Invalid;
+                outRing.push_back(vertex);
+
+                const std::uint32_t next = nextHalfedges[halfedge];
+                if (next == first)
+                    break;
+                if (next == invalid || step == halfedgeCount)
+                    return MeshFaceRingStatus::Invalid;
+                halfedge = next;
+            }
+
+            return outRing.size() >= 3u
+                ? MeshFaceRingStatus::Triangulate
+                : MeshFaceRingStatus::Skip;
+        }
+
+        struct MeshSoupFromGeometrySourcesResult
+        {
+            Geometry::MeshSoup::IndexedMesh Mesh{};
+            std::vector<std::uint32_t> SourceFaceForSoupFace{};
+            SandboxEditorCommandStatus Status{
+                SandboxEditorCommandStatus::NoChange};
+            std::string Diagnostic{};
+
+            [[nodiscard]] bool Succeeded() const noexcept
+            {
+                return Status == SandboxEditorCommandStatus::Applied;
+            }
+        };
+
+        [[nodiscard]] MeshSoupFromGeometrySourcesResult BuildMeshSoupFromGeometrySources(
+            const GS::ConstSourceView& view)
+        {
+            MeshSoupFromGeometrySourcesResult result{};
+            if (view.ActiveDomain != GS::Domain::Mesh ||
+                view.VertexSource == nullptr ||
+                view.HalfedgeSource == nullptr ||
+                view.FaceSource == nullptr)
+            {
+                result.Status = SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+                result.Diagnostic = "UV regeneration requires selected mesh GeometrySources.";
+                return result;
+            }
+
+            const auto positions =
+                view.VertexSource->Properties.Get<glm::vec3>(
+                    GS::PropertyNames::kPosition);
+            if (!positions || positions.Vector().empty())
+            {
+                result.Status = SandboxEditorCommandStatus::InvalidProcessingParameters;
+                result.Diagnostic = "selected mesh has no vertex position property";
+                return result;
+            }
+            if (positions.Vector().size() >
+                static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max()))
+            {
+                result.Status = SandboxEditorCommandStatus::InvalidProcessingParameters;
+                result.Diagnostic = "selected mesh has too many vertices for UV regeneration";
+                return result;
+            }
+
+            const auto toVertices =
+                view.HalfedgeSource->Properties.Get<std::uint32_t>(
+                    GS::PropertyNames::kHalfedgeToVertex);
+            const auto nextHalfedges =
+                view.HalfedgeSource->Properties.Get<std::uint32_t>(
+                    GS::PropertyNames::kHalfedgeNext);
+            const auto halfedgeFaces =
+                view.HalfedgeSource->Properties.Get<std::uint32_t>(
+                    GS::PropertyNames::kHalfedgeFace);
+            const auto faceHalfedges =
+                view.FaceSource->Properties.Get<std::uint32_t>(
+                    GS::PropertyNames::kFaceHalfedge);
+            if (!toVertices || !nextHalfedges || !halfedgeFaces || !faceHalfedges ||
+                toVertices.Vector().size() != nextHalfedges.Vector().size() ||
+                toVertices.Vector().size() != halfedgeFaces.Vector().size() ||
+                faceHalfedges.Vector().empty())
+            {
+                result.Status = SandboxEditorCommandStatus::InvalidProcessingParameters;
+                result.Diagnostic = "selected mesh has invalid halfedge/face topology";
+                return result;
+            }
+
+            for (const glm::vec3 position : positions.Vector())
+                (void)result.Mesh.AddVertex(position);
+
+            std::vector<std::uint32_t> ring;
+            ring.reserve(8u);
+            for (std::size_t faceIndex = 0u;
+                 faceIndex < faceHalfedges.Vector().size();
+                 ++faceIndex)
+            {
+                const MeshFaceRingStatus status = BuildMeshFaceRing(
+                    faceHalfedges.Vector(),
+                    halfedgeFaces.Vector(),
+                    nextHalfedges.Vector(),
+                    toVertices.Vector(),
+                    faceIndex,
+                    static_cast<std::uint32_t>(positions.Vector().size()),
+                    ring);
+                if (status == MeshFaceRingStatus::Invalid)
+                {
+                    result.Status = SandboxEditorCommandStatus::InvalidProcessingParameters;
+                    result.Diagnostic = "selected mesh topology is not valid for UV regeneration";
+                    return result;
+                }
+                if (status == MeshFaceRingStatus::Skip)
+                    continue;
+
+                for (std::size_t i = 1u; i + 1u < ring.size(); ++i)
+                {
+                    (void)result.Mesh.AddTriangle(ring[0u], ring[i], ring[i + 1u]);
+                    result.SourceFaceForSoupFace.push_back(
+                        static_cast<std::uint32_t>(faceIndex));
+                }
+            }
+
+            if (result.Mesh.FaceCount() == 0u)
+            {
+                result.Status = SandboxEditorCommandStatus::InvalidProcessingParameters;
+                result.Diagnostic = "selected mesh has no valid surface faces";
+                return result;
+            }
+
+            result.Status = SandboxEditorCommandStatus::Applied;
+            return result;
+        }
+
+        template <typename T>
+        void CopyTypedPropertyByXref(
+            const Geometry::ConstPropertySet& source,
+            const std::string& name,
+            const std::span<const std::uint32_t> xrefs,
+            Geometry::PropertySet& target)
+        {
+            const auto sourceProperty = source.Get<T>(name);
+            if (!sourceProperty)
+                return;
+
+            auto targetProperty = target.GetOrAdd<T>(name, T{});
+            for (std::size_t outputIndex = 0u; outputIndex < xrefs.size(); ++outputIndex)
+            {
+                const std::uint32_t sourceIndex = xrefs[outputIndex];
+                if (sourceIndex < sourceProperty.Vector().size())
+                    targetProperty[outputIndex] = sourceProperty[sourceIndex];
+            }
+        }
+
+        void CopyKnownPropertiesByXref(
+            const Geometry::ConstPropertySet& source,
+            const std::span<const std::uint32_t> xrefs,
+            Geometry::PropertySet& target)
+        {
+            for (const std::string& name : source.Properties())
+            {
+                CopyTypedPropertyByXref<float>(source, name, xrefs, target);
+                CopyTypedPropertyByXref<double>(source, name, xrefs, target);
+                CopyTypedPropertyByXref<std::uint32_t>(source, name, xrefs, target);
+                CopyTypedPropertyByXref<std::int32_t>(source, name, xrefs, target);
+                CopyTypedPropertyByXref<bool>(source, name, xrefs, target);
+                CopyTypedPropertyByXref<glm::vec2>(source, name, xrefs, target);
+                CopyTypedPropertyByXref<glm::vec3>(source, name, xrefs, target);
+                CopyTypedPropertyByXref<glm::vec4>(source, name, xrefs, target);
+            }
+        }
+
+        void CopyUvOutputPropertiesToHalfedgeMesh(
+            const GS::ConstSourceView& source,
+            const MeshSoupFromGeometrySourcesResult& soup,
+            Geometry::UvAtlas::UvAtlasResult& atlas,
+            Geometry::HalfedgeMesh::Mesh& mesh)
+        {
+            std::vector<std::uint32_t> sourceVertexForOutputVertex;
+            sourceVertexForOutputVertex.reserve(atlas.OutputMesh.VertexCount());
+            for (std::size_t i = 0u; i < atlas.OutputMesh.VertexCount(); ++i)
+                sourceVertexForOutputVertex.push_back(static_cast<std::uint32_t>(i));
+
+            CopyKnownPropertiesByXref(
+                Geometry::ConstPropertySet(atlas.OutputMesh.VertexProperties()),
+                sourceVertexForOutputVertex,
+                mesh.VertexProperties());
+
+            if (source.FaceSource == nullptr)
+                return;
+
+            std::vector<std::uint32_t> sourceFaceForOutputFace;
+            sourceFaceForOutputFace.reserve(atlas.SourceFaceForOutputFace.size());
+            for (const std::uint32_t soupFace : atlas.SourceFaceForOutputFace)
+            {
+                sourceFaceForOutputFace.push_back(
+                    soupFace < soup.SourceFaceForSoupFace.size()
+                        ? soup.SourceFaceForSoupFace[soupFace]
+                        : std::numeric_limits<std::uint32_t>::max());
+            }
+
+            CopyKnownPropertiesByXref(
+                Geometry::ConstPropertySet(source.FaceSource->Properties),
+                sourceFaceForOutputFace,
+                mesh.FaceProperties());
+        }
+
+        [[nodiscard]] bool IsTextureBakeSourceDomain(
+            const SandboxEditorPropertyCatalogDomain domain) noexcept
+        {
+            return domain == SandboxEditorPropertyCatalogDomain::MeshVertices ||
+                   domain == SandboxEditorPropertyCatalogDomain::MeshFaces;
+        }
+
+        [[nodiscard]] bool IsNonBakeableMeshAttribute(
+            const std::string& name) noexcept
+        {
+            return name == GS::PropertyNames::kPosition ||
+                   name == "v:point" ||
+                   name == "v:texcoord" ||
+                   name == "v:tex";
+        }
+
+        [[nodiscard]] SandboxEditorTextureBakeSourceRow BuildTextureBakeSourceRow(
+            const SandboxEditorPropertyCatalogRow& row)
+        {
+            SandboxEditorTextureBakeSourceRow out{
+                .Name = row.Name,
+                .CatalogDomain = row.Domain,
+                .BakeDomain = ToProgressiveGeometryDomain(row.Domain),
+                .ValueKind = row.ValueKind,
+                .ExpectedValueKind = ToProgressivePropertyValueKind(row.ValueKind),
+                .ElementCount = row.ElementCount,
+                .Descriptor = row.Descriptor,
+            };
+
+            if (!IsTextureBakeSourceDomain(row.Domain))
+            {
+                out.Category = SandboxEditorTextureBakeSourceCategory::WrongDomain;
+                out.DisabledReason = "texture baking supports mesh vertex and face properties";
+                return out;
+            }
+            if (row.Connectivity || IsNonBakeableMeshAttribute(row.Name))
+            {
+                out.Category = row.Connectivity
+                    ? SandboxEditorTextureBakeSourceCategory::Connectivity
+                    : SandboxEditorTextureBakeSourceCategory::Internal;
+                out.DisabledReason = row.Connectivity
+                    ? "connectivity properties are visible but not texture-bake sources"
+                    : "internal mesh coordinate properties are visible but not bake sources";
+                return out;
+            }
+            if (!row.Supported ||
+                row.ValueKind == SandboxEditorPropertyCatalogValueKind::Unknown)
+            {
+                out.Category = SandboxEditorTextureBakeSourceCategory::Unsupported;
+                out.DisabledReason = row.UnsupportedReason.empty()
+                    ? "unsupported property value type"
+                    : row.UnsupportedReason;
+                return out;
+            }
+
+            out.Category = row.Internal
+                ? SandboxEditorTextureBakeSourceCategory::Internal
+                : SandboxEditorTextureBakeSourceCategory::Bakeable;
+            out.Bakeable = true;
+            return out;
+        }
+
+        [[nodiscard]] SandboxEditorUvDiagnosticsModel BuildUvDiagnosticsModel(
+            const GS::ConstSourceView& view)
+        {
+            SandboxEditorUvDiagnosticsModel model{};
+            model.HasSelectedEntity = true;
+            model.IsMesh = view.ActiveDomain == GS::Domain::Mesh;
+            if (!model.IsMesh)
+            {
+                model.Provenance = "unavailable";
+                model.UvRegenerationDisabledReason =
+                    "UV diagnostics require a selected mesh";
+                return model;
+            }
+
+            model.VertexCount = view.VerticesAlive();
+            model.FaceCount = view.FacesAlive();
+            model.BackendId = "xatlas";
+            model.Provenance = "missing";
+            model.UvRegenerationAvailable = true;
+
+            if (view.VertexSource == nullptr)
+                return model;
+
+            const auto texcoords =
+                view.VertexSource->Properties.Get<glm::vec2>(
+                    model.TexcoordPropertyName);
+            model.HasTexcoords = texcoords.IsValid();
+            if (model.HasTexcoords)
+            {
+                model.TexcoordCount = texcoords.Vector().size();
+                model.TexcoordCountMatchesVertices =
+                    model.TexcoordCount == model.VertexCount;
+                model.Provenance = "geometry property";
+                model.CheckerPreviewAvailable =
+                    model.TexcoordCountMatchesVertices;
+                if (!model.TexcoordCountMatchesVertices)
+                {
+                    model.LastFailure =
+                        "texcoord count does not match mesh vertex count";
+                }
+                else
+                {
+                    model.TexcoordsFinite = true;
+                    for (const glm::vec2 uv : texcoords.Vector())
+                    {
+                        if (!std::isfinite(uv.x) || !std::isfinite(uv.y))
+                        {
+                            model.TexcoordsFinite = false;
+                            model.LastFailure =
+                                "texcoord property contains non-finite values";
+                            break;
+                        }
+                    }
+                    model.CheckerPreviewAvailable = model.TexcoordsFinite;
+                }
+            }
+            return model;
+        }
+
+        [[nodiscard]] SandboxEditorTextureBakeControlsModel
+        BuildTextureBakeControlsModel(
+            const SandboxEditorContext& context,
+            const GS::ConstSourceView& view,
+            const SandboxEditorPropertyCatalogModel& catalog,
+            const std::uint32_t stableEntityId)
+        {
+            SandboxEditorTextureBakeControlsModel model{};
+            model.HasSelectedEntity = true;
+            model.SelectedStableId = stableEntityId;
+            model.IsMesh = view.ActiveDomain == GS::Domain::Mesh;
+            model.HasRuntimeBakeCommand = context.AssetService != nullptr;
+            model.Uv = BuildUvDiagnosticsModel(view);
+
+            model.Sources.reserve(catalog.Rows.size());
+            for (const SandboxEditorPropertyCatalogRow& row : catalog.Rows)
+                model.Sources.push_back(BuildTextureBakeSourceRow(row));
+
+            const bool hasBakeableSource =
+                std::any_of(
+                    model.Sources.begin(),
+                    model.Sources.end(),
+                    [](const SandboxEditorTextureBakeSourceRow& row)
+                    {
+                        return row.Bakeable;
+                    });
+
+            model.CanBake = model.IsMesh &&
+                            model.HasRuntimeBakeCommand &&
+                            model.Uv.HasTexcoords &&
+                            model.Uv.TexcoordCountMatchesVertices &&
+                            model.Uv.TexcoordsFinite &&
+                            hasBakeableSource;
+            if (!model.IsMesh)
+                model.DisabledReason = "texture baking requires a selected mesh";
+            else if (!model.HasRuntimeBakeCommand)
+                model.DisabledReason = "runtime selected-mesh bake command is unavailable";
+            else if (!model.Uv.HasTexcoords)
+                model.DisabledReason = "selected mesh has no resolved texcoord property";
+            else if (!model.Uv.TexcoordCountMatchesVertices)
+                model.DisabledReason = model.Uv.LastFailure;
+            else if (!model.Uv.TexcoordsFinite)
+                model.DisabledReason = model.Uv.LastFailure;
+            else if (!hasBakeableSource)
+                model.DisabledReason = "no bakeable mesh vertex or face properties";
+            return model;
+        }
+
         [[nodiscard]] std::optional<ECS::EntityHandle> ResolveFirstSelectedEntity(
             const SandboxEditorContext& context)
         {
@@ -2066,8 +3250,23 @@ namespace Extrinsic::Runtime
             model.Transform = BuildTransformModel(raw, *selected);
             model.RenderHints = BuildRenderHintModel(raw, *selected);
             model.Geometry = BuildGeometryDomainModel(raw, *selected);
+            model.PropertyCatalog =
+                BuildPropertyCatalogModel(context, raw, *selected);
             model.Progressive =
                 BuildProgressiveRenderDataModel(context, raw, *selected);
+            model.BoundState =
+                BuildBoundRenderStateModel(
+                    model.PropertyCatalog,
+                    model.Progressive,
+                    model.RenderHints,
+                    model.Geometry,
+                    model.Entity.StableEntityId);
+            model.TextureBake =
+                BuildTextureBakeControlsModel(
+                    context,
+                    GS::BuildConstView(raw, *selected),
+                    model.PropertyCatalog,
+                    model.Entity.StableEntityId);
             model.Processing =
                 GetSandboxEditorGeometryProcessingCapabilities(
                     *context.Scene,
@@ -2886,7 +4085,7 @@ namespace Extrinsic::Runtime
 
         void DrawDomainMenu(
             const SandboxEditorDomainWindowKind kind,
-            std::array<bool, 12>* domainWindowOpen)
+            std::array<bool, 15>* domainWindowOpen)
         {
             if (!ImGui::BeginMenu(DebugNameForSandboxEditorDomainWindowKind(kind)))
                 return;
@@ -2901,6 +4100,10 @@ namespace Extrinsic::Runtime
                     "Render hints",
                     nullptr,
                     &(*domainWindowOpen)[DomainWindowSlotIndex(kind, DomainWindowSection::Render)]);
+                ImGui::MenuItem(
+                    "Properties",
+                    nullptr,
+                    &(*domainWindowOpen)[DomainWindowSlotIndex(kind, DomainWindowSection::Properties)]);
                 ImGui::MenuItem(
                     "Visualization",
                     nullptr,
@@ -2917,6 +4120,7 @@ namespace Extrinsic::Runtime
             else
             {
                 (void)ImGui::MenuItem("Render hints", nullptr, false, false);
+                (void)ImGui::MenuItem("Properties", nullptr, false, false);
                 (void)ImGui::MenuItem("Visualization", nullptr, false, false);
                 (void)ImGui::MenuItem("Selection details", nullptr, false, false);
                 (void)ImGui::MenuItem("Processing", nullptr, false, false);
@@ -2927,7 +4131,7 @@ namespace Extrinsic::Runtime
             ImGui::EndMenu();
         }
 
-        void DrawDomainMenus(std::array<bool, 12>* domainWindowOpen)
+        void DrawDomainMenus(std::array<bool, 15>* domainWindowOpen)
         {
             if (!ImGui::BeginMainMenuBar())
                 return;
@@ -2960,6 +4164,503 @@ namespace Extrinsic::Runtime
                 ImGui::TextDisabled("Selected: none");
             }
             DrawDiagnostics(model.Diagnostics);
+        }
+
+        void DrawPropertyCatalogRows(
+            const SandboxEditorPropertyCatalogModel& catalog)
+        {
+            ImGui::Text("Properties: %zu", catalog.Rows.size());
+            if (catalog.Rows.empty())
+            {
+                ImGui::TextDisabled("No geometry properties.");
+                return;
+            }
+
+            constexpr ImGuiTableFlags tableFlags =
+                ImGuiTableFlags_Borders |
+                ImGuiTableFlags_RowBg |
+                ImGuiTableFlags_Resizable |
+                ImGuiTableFlags_SizingStretchProp;
+            if (ImGui::BeginTable("PropertyCatalog", 7, tableFlags))
+            {
+                ImGui::TableSetupColumn("Domain");
+                ImGui::TableSetupColumn("Name");
+                ImGui::TableSetupColumn("Kind");
+                ImGui::TableSetupColumn("Count");
+                ImGui::TableSetupColumn("Tags");
+                ImGui::TableSetupColumn("Preview");
+                ImGui::TableSetupColumn("Reason");
+                ImGui::TableHeadersRow();
+
+                for (const SandboxEditorPropertyCatalogRow& row : catalog.Rows)
+                {
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::TextUnformatted(
+                        DebugNameForSandboxEditorPropertyCatalogDomain(row.Domain));
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::TextUnformatted(row.Name.c_str());
+                    ImGui::TableSetColumnIndex(2);
+                    ImGui::Text("%s/%u",
+                                DebugNameForSandboxEditorPropertyCatalogValueKind(
+                                    row.ValueKind),
+                                row.ComponentCount);
+                    ImGui::TableSetColumnIndex(3);
+                    ImGui::Text("%zu", row.ElementCount);
+                    ImGui::TableSetColumnIndex(4);
+                    std::string tags{};
+                    if (row.Bindable)
+                        tags += "bindable ";
+                    if (row.Internal)
+                        tags += "internal ";
+                    if (row.Connectivity)
+                        tags += "connectivity ";
+                    if (row.Generated)
+                        tags += "generated ";
+                    ImGui::TextUnformatted(tags.empty() ? "-" : tags.c_str());
+                    ImGui::TableSetColumnIndex(5);
+                    if (row.Preview.HasValue)
+                    {
+                        ImGui::Text("[%zu] %s",
+                                    row.Preview.ElementIndex,
+                                    row.Preview.Text.c_str());
+                    }
+                    else
+                    {
+                        ImGui::TextDisabled("-");
+                    }
+                    ImGui::TableSetColumnIndex(6);
+                    ImGui::TextDisabled("%s",
+                                        row.UnsupportedReason.empty()
+                                            ? "-"
+                                            : row.UnsupportedReason.c_str());
+                }
+                ImGui::EndTable();
+            }
+        }
+
+        void DrawPropertyBindingTargets(
+            const SandboxEditorPropertyCatalogModel& catalog)
+        {
+            if (catalog.BindingTargets.empty())
+                return;
+
+            ImGui::SeparatorText("Binding targets");
+            for (std::size_t i = 0u; i < catalog.BindingTargets.size(); ++i)
+            {
+                const SandboxEditorPropertyBindingTargetModel& target =
+                    catalog.BindingTargets[i];
+                ImGui::PushID(static_cast<int>(i));
+                ImGui::Text("%s / %s / %s requires %s %zu",
+                            std::string(ToString(target.Lane)).c_str(),
+                            target.PresentationKey.c_str(),
+                            std::string(ToString(target.Semantic)).c_str(),
+                            std::string(ToString(target.ExpectedValueKind)).c_str(),
+                            target.ExpectedElementCount);
+                for (const SandboxEditorProgressivePropertyOptionModel& option :
+                     target.Options)
+                {
+                    if (option.Compatible)
+                    {
+                        ImGui::BulletText("%s",
+                                          option.Descriptor.PropertyName.c_str());
+                    }
+                    else
+                    {
+                        ImGui::BulletText("%s",
+                                          option.Descriptor.PropertyName.c_str());
+                        ImGui::SameLine();
+                        ImGui::TextDisabled("%s",
+                                            option.DisabledReason.c_str());
+                    }
+                }
+                ImGui::PopID();
+            }
+        }
+
+        void DrawBoundRenderStateRows(
+            const SandboxEditorBoundRenderStateModel& bound)
+        {
+            ImGui::SeparatorText("Bound render state");
+            ImGui::Text("Rows: %zu generation=%llu",
+                        bound.Rows.size(),
+                        static_cast<unsigned long long>(
+                            bound.BindingGeneration));
+            if (bound.Rows.empty())
+            {
+                ImGui::TextDisabled("No bound render state rows.");
+                DrawDiagnostics(bound.Diagnostics);
+                return;
+            }
+
+            constexpr ImGuiTableFlags tableFlags =
+                ImGuiTableFlags_Borders |
+                ImGuiTableFlags_RowBg |
+                ImGuiTableFlags_Resizable |
+                ImGuiTableFlags_SizingStretchProp;
+            if (ImGui::BeginTable("BoundRenderState", 8, tableFlags))
+            {
+                ImGui::TableSetupColumn("Kind");
+                ImGui::TableSetupColumn("Lane");
+                ImGui::TableSetupColumn("Label");
+                ImGui::TableSetupColumn("Source");
+                ImGui::TableSetupColumn("Readiness");
+                ImGui::TableSetupColumn("Property");
+                ImGui::TableSetupColumn("Job");
+                ImGui::TableSetupColumn("Diagnostic");
+                ImGui::TableHeadersRow();
+
+                for (const SandboxEditorBoundRenderStateRow& row :
+                     bound.Rows)
+                {
+                    const std::string laneText{ToString(row.Lane)};
+                    const std::string sourceText =
+                        row.SourceDescription.empty()
+                            ? std::string{ToString(row.SourceKind)}
+                            : row.SourceDescription;
+                    const std::string readinessText{ToString(row.Readiness)};
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::TextUnformatted(
+                        DebugNameForSandboxEditorBoundRenderStateRowKind(row.Kind));
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::TextUnformatted(laneText.c_str());
+                    ImGui::TableSetColumnIndex(2);
+                    ImGui::TextUnformatted(row.Label.c_str());
+                    ImGui::TableSetColumnIndex(3);
+                    ImGui::TextUnformatted(sourceText.c_str());
+                    ImGui::TableSetColumnIndex(4);
+                    ImGui::TextUnformatted(readinessText.c_str());
+                    ImGui::TableSetColumnIndex(5);
+                    if (!row.Property.PropertyName.empty())
+                    {
+                        ImGui::Text("%s%s",
+                                    row.Property.PropertyName.c_str(),
+                                    row.HasCatalogMatch ? " catalog" : "");
+                    }
+                    else
+                    {
+                        ImGui::TextDisabled("-");
+                    }
+                    ImGui::TableSetColumnIndex(6);
+                    if (row.Kind == SandboxEditorBoundRenderStateRowKind::DerivedJob)
+                    {
+                        ImGui::Text("%s %.2f",
+                                    std::string(ToString(row.JobStatus)).c_str(),
+                                    row.JobProgress);
+                    }
+                    else if (row.TextureAsset.IsValid() ||
+                             row.AuthoredTexture.IsValid() ||
+                             row.GeneratedTexture.IsValid())
+                    {
+                        ImGui::Text("texture");
+                    }
+                    else
+                    {
+                        ImGui::TextDisabled("-");
+                    }
+                    ImGui::TableSetColumnIndex(7);
+                    if (!row.Diagnostic.empty())
+                        ImGui::TextWrapped("%s", row.Diagnostic.c_str());
+                    else if (!row.DisabledReason.empty())
+                        ImGui::TextDisabled("%s", row.DisabledReason.c_str());
+                    else
+                        ImGui::TextDisabled("-");
+                }
+                ImGui::EndTable();
+            }
+            DrawDiagnostics(bound.Diagnostics);
+        }
+
+        void DrawTextureBakeControls(
+            const SandboxEditorTextureBakeControlsModel& model,
+            const SandboxEditorContext* context,
+            TextureBakeUiState* state)
+        {
+            std::int32_t fallbackSourceIndex{0};
+            std::int32_t fallbackSemanticIndex{0};
+            std::int32_t fallbackEncoderIndex{0};
+            std::int32_t fallbackWidth{
+                static_cast<std::int32_t>(model.DefaultWidth)};
+            std::int32_t fallbackHeight{
+                static_cast<std::int32_t>(model.DefaultHeight)};
+            std::int32_t fallbackUvResolution{1024};
+            std::int32_t fallbackUvPadding{2};
+            float fallbackUvTexelsPerUnit{0.0f};
+            bool fallbackUvForceRegenerate{true};
+            bool fallbackUvPreserveAuthored{false};
+
+            std::int32_t& sourceIndex =
+                state != nullptr && state->SourceIndex != nullptr
+                    ? *state->SourceIndex
+                    : fallbackSourceIndex;
+            std::int32_t& semanticIndex =
+                state != nullptr && state->TargetSemanticIndex != nullptr
+                    ? *state->TargetSemanticIndex
+                    : fallbackSemanticIndex;
+            std::int32_t& encoderIndex =
+                state != nullptr && state->EncoderIndex != nullptr
+                    ? *state->EncoderIndex
+                    : fallbackEncoderIndex;
+            std::int32_t& bakeWidth =
+                state != nullptr && state->Width != nullptr
+                    ? *state->Width
+                    : fallbackWidth;
+            std::int32_t& bakeHeight =
+                state != nullptr && state->Height != nullptr
+                    ? *state->Height
+                    : fallbackHeight;
+            std::int32_t& uvResolution =
+                state != nullptr && state->UvResolution != nullptr
+                    ? *state->UvResolution
+                    : fallbackUvResolution;
+            std::int32_t& uvPadding =
+                state != nullptr && state->UvPadding != nullptr
+                    ? *state->UvPadding
+                    : fallbackUvPadding;
+            float& uvTexelsPerUnit =
+                state != nullptr && state->UvTexelsPerUnit != nullptr
+                    ? *state->UvTexelsPerUnit
+                    : fallbackUvTexelsPerUnit;
+            bool& uvForceRegenerate =
+                state != nullptr && state->UvForceRegenerate != nullptr
+                    ? *state->UvForceRegenerate
+                    : fallbackUvForceRegenerate;
+            bool& uvPreserveAuthored =
+                state != nullptr && state->UvPreserveAuthored != nullptr
+                    ? *state->UvPreserveAuthored
+                    : fallbackUvPreserveAuthored;
+
+            semanticIndex = std::clamp<std::int32_t>(
+                semanticIndex,
+                0,
+                static_cast<std::int32_t>(kTextureBakeTargetSemantics.size() - 1u));
+            encoderIndex = std::clamp<std::int32_t>(
+                encoderIndex,
+                0,
+                static_cast<std::int32_t>(kTextureBakeEncoders.size() - 1u));
+            bakeWidth = std::clamp<std::int32_t>(bakeWidth, 1, 8192);
+            bakeHeight = std::clamp<std::int32_t>(bakeHeight, 1, 8192);
+            uvResolution = std::clamp<std::int32_t>(uvResolution, 1, 16384);
+            uvPadding = std::clamp<std::int32_t>(uvPadding, 0, uvResolution - 1);
+            if (!std::isfinite(uvTexelsPerUnit) || uvTexelsPerUnit < 0.0f)
+                uvTexelsPerUnit = 0.0f;
+
+            ImGui::SeparatorText("UV / texture bake");
+            ImGui::Text("UV: %s texcoords=%s count=%zu/%zu",
+                        model.Uv.Provenance.c_str(),
+                        model.Uv.HasTexcoords ? "yes" : "no",
+                        model.Uv.TexcoordCount,
+                        model.Uv.VertexCount);
+            if (!model.Uv.LastFailure.empty())
+                ImGui::TextDisabled("%s", model.Uv.LastFailure.c_str());
+            if (!model.Uv.UvRegenerationAvailable)
+                ImGui::TextDisabled("%s",
+                                    model.Uv.UvRegenerationDisabledReason.c_str());
+
+            ImGui::Checkbox("Force regenerate", &uvForceRegenerate);
+            ImGui::SameLine();
+            ImGui::Checkbox("Preserve valid authored", &uvPreserveAuthored);
+            ImGui::InputInt("UV resolution", &uvResolution);
+            ImGui::InputInt("UV padding", &uvPadding);
+            ImGui::InputFloat("Texels per unit", &uvTexelsPerUnit, 0.0f, 0.0f, "%.3f");
+            uvResolution = std::clamp<std::int32_t>(uvResolution, 1, 16384);
+            uvPadding = std::clamp<std::int32_t>(uvPadding, 0, uvResolution - 1);
+            if (!std::isfinite(uvTexelsPerUnit) || uvTexelsPerUnit < 0.0f)
+                uvTexelsPerUnit = 0.0f;
+
+            const bool canRegenerateUvs =
+                model.Uv.UvRegenerationAvailable &&
+                context != nullptr &&
+                model.SelectedStableId != 0u;
+            if (!canRegenerateUvs)
+                ImGui::BeginDisabled();
+            if (ImGui::Button("Regenerate UVs") && canRegenerateUvs)
+            {
+                (void)ApplySandboxEditorUvRegenerationCommand(
+                    *context,
+                    SandboxEditorUvRegenerationCommand{
+                        .StableEntityId = model.SelectedStableId,
+                        .PreserveValidAuthoredUvs = uvPreserveAuthored,
+                        .ForceRegenerate = uvForceRegenerate,
+                        .Resolution = static_cast<std::uint32_t>(uvResolution),
+                        .Padding = static_cast<std::uint32_t>(uvPadding),
+                        .TexelsPerUnit = uvTexelsPerUnit,
+                    });
+            }
+            if (!canRegenerateUvs)
+                ImGui::EndDisabled();
+
+            std::vector<std::size_t> bakeableIndices;
+            bakeableIndices.reserve(model.Sources.size());
+            for (std::size_t i = 0u; i < model.Sources.size(); ++i)
+            {
+                if (model.Sources[i].Bakeable)
+                    bakeableIndices.push_back(i);
+            }
+            if (bakeableIndices.empty())
+                sourceIndex = 0;
+            else
+                sourceIndex = std::clamp<std::int32_t>(
+                    sourceIndex,
+                    0,
+                    static_cast<std::int32_t>(bakeableIndices.size() - 1u));
+
+            const SandboxEditorTextureBakeSourceRow* selectedSource =
+                bakeableIndices.empty()
+                    ? nullptr
+                    : &model.Sources[bakeableIndices[static_cast<std::size_t>(sourceIndex)]];
+
+            if (ImGui::BeginCombo("Bake source",
+                                  selectedSource != nullptr
+                                      ? selectedSource->Name.c_str()
+                                      : "none"))
+            {
+                for (std::size_t i = 0u; i < bakeableIndices.size(); ++i)
+                {
+                    const SandboxEditorTextureBakeSourceRow& row =
+                        model.Sources[bakeableIndices[i]];
+                    const bool selected = sourceIndex == static_cast<std::int32_t>(i);
+                    if (ImGui::Selectable(row.Name.c_str(), selected))
+                        sourceIndex = static_cast<std::int32_t>(i);
+                    if (selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+
+            if (ImGui::BeginCombo(
+                    "Target",
+                    std::string(ToString(kTextureBakeTargetSemantics[
+                        static_cast<std::size_t>(semanticIndex)])).c_str()))
+            {
+                for (std::size_t i = 0u; i < kTextureBakeTargetSemantics.size(); ++i)
+                {
+                    const std::string label{
+                        ToString(kTextureBakeTargetSemantics[i])};
+                    const bool selected = semanticIndex == static_cast<std::int32_t>(i);
+                    if (ImGui::Selectable(label.c_str(), selected))
+                        semanticIndex = static_cast<std::int32_t>(i);
+                    if (selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+
+            if (ImGui::BeginCombo(
+                    "Encoder",
+                    DebugNameForTextureBakeEncoder(
+                        kTextureBakeEncoders[static_cast<std::size_t>(encoderIndex)])))
+            {
+                for (std::size_t i = 0u; i < kTextureBakeEncoders.size(); ++i)
+                {
+                    const bool selected = encoderIndex == static_cast<std::int32_t>(i);
+                    if (ImGui::Selectable(
+                            DebugNameForTextureBakeEncoder(kTextureBakeEncoders[i]),
+                            selected))
+                    {
+                        encoderIndex = static_cast<std::int32_t>(i);
+                    }
+                    if (selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+            ImGui::InputInt("Bake width", &bakeWidth);
+            ImGui::InputInt("Bake height", &bakeHeight);
+            bakeWidth = std::clamp<std::int32_t>(bakeWidth, 1, 8192);
+            bakeHeight = std::clamp<std::int32_t>(bakeHeight, 1, 8192);
+
+            const bool canBake =
+                model.CanBake &&
+                context != nullptr &&
+                selectedSource != nullptr;
+            if (!canBake)
+                ImGui::BeginDisabled();
+            if (ImGui::Button("Bake") && canBake)
+            {
+                (void)ApplySandboxEditorTextureBakeCommand(
+                    *context,
+                    SandboxEditorTextureBakeCommand{
+                        .StableEntityId = model.SelectedStableId,
+                        .TargetSemantic =
+                            kTextureBakeTargetSemantics[
+                                static_cast<std::size_t>(semanticIndex)],
+                        .SourceDomain = selectedSource->BakeDomain,
+                        .ExpectedValueKind = selectedSource->ExpectedValueKind,
+                        .PropertyName = selectedSource->Name,
+                        .Encoder =
+                            kTextureBakeEncoders[
+                                static_cast<std::size_t>(encoderIndex)],
+                        .Width = static_cast<std::uint32_t>(bakeWidth),
+                        .Height = static_cast<std::uint32_t>(bakeHeight),
+                        .GeneratedKey = selectedSource->Name,
+                        .BindGeneratedTexture = true,
+                    });
+            }
+            if (!canBake)
+            {
+                ImGui::EndDisabled();
+                if (!model.DisabledReason.empty())
+                    ImGui::TextDisabled("%s", model.DisabledReason.c_str());
+            }
+
+            if (ImGui::BeginTable("TextureBakeSources", 5,
+                                  ImGuiTableFlags_Borders |
+                                      ImGuiTableFlags_RowBg |
+                                      ImGuiTableFlags_Resizable |
+                                      ImGuiTableFlags_SizingStretchProp))
+            {
+                ImGui::TableSetupColumn("Property");
+                ImGui::TableSetupColumn("Domain");
+                ImGui::TableSetupColumn("Kind");
+                ImGui::TableSetupColumn("Bake");
+                ImGui::TableSetupColumn("Reason");
+                ImGui::TableHeadersRow();
+
+                const std::size_t limit =
+                    std::min<std::size_t>(model.Sources.size(), 12u);
+                for (std::size_t i = 0u; i < limit; ++i)
+                {
+                    const SandboxEditorTextureBakeSourceRow& row =
+                        model.Sources[i];
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::TextUnformatted(row.Name.c_str());
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::TextUnformatted(
+                        DebugNameForSandboxEditorPropertyCatalogDomain(
+                            row.CatalogDomain));
+                    ImGui::TableSetColumnIndex(2);
+                    ImGui::TextUnformatted(
+                        DebugNameForSandboxEditorPropertyCatalogValueKind(
+                            row.ValueKind));
+                    ImGui::TableSetColumnIndex(3);
+                    ImGui::TextUnformatted(row.Bakeable ? "yes" : "no");
+                    ImGui::TableSetColumnIndex(4);
+                    ImGui::TextDisabled("%s",
+                                        row.DisabledReason.empty()
+                                            ? "-"
+                                            : row.DisabledReason.c_str());
+                }
+                ImGui::EndTable();
+            }
+            DrawDiagnostics(model.Diagnostics);
+        }
+
+        void DrawDomainPropertyWindow(
+            const SandboxEditorDomainWindowModel& model,
+            const SandboxEditorContext* context,
+            TextureBakeUiState* textureBakeState)
+        {
+            DrawDomainWindowHeader(model);
+            if (!DomainWindowReady(model))
+                return;
+            DrawBoundRenderStateRows(model.BoundState);
+            DrawTextureBakeControls(model.TextureBake, context, textureBakeState);
+            DrawPropertyCatalogRows(model.PropertyCatalog);
+            DrawPropertyBindingTargets(model.PropertyCatalog);
+            DrawDiagnostics(model.PropertyCatalog.Diagnostics);
         }
 
         void DrawRenderHintStatus(const SandboxEditorRenderHintModel& hints)
@@ -3676,8 +5377,9 @@ namespace Extrinsic::Runtime
             const SandboxEditorContext& context,
             const SandboxEditorDomainWindowKind kind,
             const DomainWindowSection section,
-            std::array<bool, 12>& domainWindowOpen,
-            KMeansUiState* kmeansState)
+            std::array<bool, 15>& domainWindowOpen,
+            KMeansUiState* kmeansState,
+            TextureBakeUiState* textureBakeState)
         {
             const std::size_t slot = DomainWindowSlotIndex(kind, section);
             if (!domainWindowOpen[slot])
@@ -3692,6 +5394,9 @@ namespace Extrinsic::Runtime
                 {
                 case DomainWindowSection::Render:
                     DrawDomainRenderWindow(model, context);
+                    break;
+                case DomainWindowSection::Properties:
+                    DrawDomainPropertyWindow(model, &context, textureBakeState);
                     break;
                 case DomainWindowSection::Visualization:
                     DrawDomainVisualizationWindow(model, context);
@@ -3711,8 +5416,9 @@ namespace Extrinsic::Runtime
 
         void DrawDomainWindows(
             const SandboxEditorContext* context,
-            std::array<bool, 12>* domainWindowOpen,
-            KMeansUiState* kmeansState)
+            std::array<bool, 15>* domainWindowOpen,
+            KMeansUiState* kmeansState,
+            TextureBakeUiState* textureBakeState)
         {
             if (context == nullptr || domainWindowOpen == nullptr)
                 return;
@@ -3722,8 +5428,9 @@ namespace Extrinsic::Runtime
                 SandboxEditorDomainWindowKind::Graph,
                 SandboxEditorDomainWindowKind::Mesh,
             };
-            constexpr std::array<DomainWindowSection, 4> kSections{
+            constexpr std::array<DomainWindowSection, 5> kSections{
                 DomainWindowSection::Render,
+                DomainWindowSection::Properties,
                 DomainWindowSection::Visualization,
                 DomainWindowSection::Selection,
                 DomainWindowSection::Processing,
@@ -3737,7 +5444,8 @@ namespace Extrinsic::Runtime
                         kind,
                         section,
                         *domainWindowOpen,
-                        kmeansState);
+                        kmeansState,
+                        textureBakeState);
                 }
             }
         }
@@ -3750,11 +5458,12 @@ namespace Extrinsic::Runtime
             A::AssetPayloadKind* importPayloadKind,
             std::optional<SandboxEditorFileImportResult>* lastImportResult,
             std::optional<SandboxEditorSceneFileResult>* lastSceneFileResult,
-            std::array<bool, 12>* domainWindowOpen,
-            KMeansUiState* kmeansState)
+            std::array<bool, 15>* domainWindowOpen,
+            KMeansUiState* kmeansState,
+            TextureBakeUiState* textureBakeState)
         {
             DrawDomainMenus(domainWindowOpen);
-            DrawDomainWindows(context, domainWindowOpen, kmeansState);
+            DrawDomainWindows(context, domainWindowOpen, kmeansState, textureBakeState);
 
             ImGui::SetNextWindowSize(ImVec2(360.0f, 520.0f), ImGuiCond_FirstUseEver);
             if (ImGui::Begin("Sandbox Editor"))
@@ -3881,8 +5590,28 @@ namespace Extrinsic::Runtime
                                 inspector.Geometry.HalfedgeCount,
                                 inspector.Geometry.FaceCount,
                                 inspector.Geometry.NodeCount);
+                    ImGui::SeparatorText("Property catalog");
+                    ImGui::Text("Rows: %zu binding targets: %zu",
+                                inspector.PropertyCatalog.Rows.size(),
+                                inspector.PropertyCatalog.BindingTargets.size());
+                    for (std::size_t propertyIndex = 0u;
+                         propertyIndex < inspector.PropertyCatalog.Rows.size() &&
+                         propertyIndex < 8u;
+                         ++propertyIndex)
+                    {
+                        const SandboxEditorPropertyCatalogRow& row =
+                            inspector.PropertyCatalog.Rows[propertyIndex];
+                        ImGui::BulletText("%s / %s / %s",
+                                          DebugNameForSandboxEditorPropertyCatalogDomain(
+                                              row.Domain),
+                                          row.Name.c_str(),
+                                          DebugNameForSandboxEditorPropertyCatalogValueKind(
+                                              row.ValueKind));
+                    }
                     const SandboxEditorProgressiveRenderDataModel& progressive =
                         inspector.Progressive;
+                    DrawBoundRenderStateRows(inspector.BoundState);
+                    DrawTextureBakeControls(inspector.TextureBake, context, textureBakeState);
                     ImGui::SeparatorText("Progressive render data");
                     ImGui::Text("Shape: %s",
                                 std::string(ToString(progressive.Shape)).c_str());
@@ -4866,6 +6595,74 @@ namespace Extrinsic::Runtime
         return "Unknown";
     }
 
+    const char* DebugNameForSandboxEditorPropertyCatalogDomain(
+        const SandboxEditorPropertyCatalogDomain domain) noexcept
+    {
+        using Domain = SandboxEditorPropertyCatalogDomain;
+        switch (domain)
+        {
+        case Domain::MeshVertices:
+            return "MeshVertices";
+        case Domain::MeshEdges:
+            return "MeshEdges";
+        case Domain::MeshHalfedges:
+            return "MeshHalfedges";
+        case Domain::MeshFaces:
+            return "MeshFaces";
+        case Domain::GraphVertices:
+            return "GraphVertices";
+        case Domain::GraphEdges:
+            return "GraphEdges";
+        case Domain::PointCloudPoints:
+            return "PointCloudPoints";
+        }
+        return "Unknown";
+    }
+
+    const char* DebugNameForSandboxEditorPropertyCatalogValueKind(
+        const SandboxEditorPropertyCatalogValueKind kind) noexcept
+    {
+        using Kind = SandboxEditorPropertyCatalogValueKind;
+        switch (kind)
+        {
+        case Kind::Unknown:
+            return "Unknown";
+        case Kind::ScalarFloat:
+            return "ScalarFloat";
+        case Kind::ScalarDouble:
+            return "ScalarDouble";
+        case Kind::UInt32:
+            return "UInt32";
+        case Kind::Vec2:
+            return "Vec2";
+        case Kind::Vec3:
+            return "Vec3";
+        case Kind::Vec4:
+            return "Vec4";
+        }
+        return "Unknown";
+    }
+
+    const char* DebugNameForSandboxEditorBoundRenderStateRowKind(
+        const SandboxEditorBoundRenderStateRowKind kind) noexcept
+    {
+        using Kind = SandboxEditorBoundRenderStateRowKind;
+        switch (kind)
+        {
+        case Kind::RenderHint:
+            return "RenderHint";
+        case Kind::ProgressiveSlot:
+            return "ProgressiveSlot";
+        case Kind::DerivedJob:
+            return "DerivedJob";
+        case Kind::CompositionSummary:
+            return "CompositionSummary";
+        case Kind::DisabledCommand:
+            return "DisabledCommand";
+        }
+        return "Unknown";
+    }
+
     SandboxEditorGeometryProcessingDomain
     GetSandboxEditorSupportedGeometryProcessingDomains(
         const SandboxEditorGeometryProcessingAlgorithm algorithm) noexcept
@@ -5197,6 +6994,25 @@ namespace Extrinsic::Runtime
         model.RenderHints = BuildRenderHintModel(raw, *selected);
         model.SelectedDomain = GS::BuildConstView(raw, *selected).ActiveDomain;
         model.DomainMatches = model.SelectedDomain == model.ExpectedDomain;
+        model.PropertyCatalog =
+            BuildPropertyCatalogModel(context, raw, *selected);
+        const SandboxEditorGeometryDomainModel geometry =
+            BuildGeometryDomainModel(raw, *selected);
+        const SandboxEditorProgressiveRenderDataModel progressive =
+            BuildProgressiveRenderDataModel(context, raw, *selected);
+        model.BoundState =
+            BuildBoundRenderStateModel(
+                model.PropertyCatalog,
+                progressive,
+                model.RenderHints,
+                geometry,
+                model.SelectedStableId);
+        model.TextureBake =
+            BuildTextureBakeControlsModel(
+                context,
+                GS::BuildConstView(raw, *selected),
+                model.PropertyCatalog,
+                model.SelectedStableId);
         if (model.DomainMatches)
         {
             model.Processing = BuildGeometryProcessingModel(context);
@@ -6074,6 +7890,272 @@ namespace Extrinsic::Runtime
             std::move(after));
     }
 
+    SandboxEditorTextureBakeCommandResult ApplySandboxEditorTextureBakeCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorTextureBakeCommand& command)
+    {
+        if (context.Scene == nullptr)
+        {
+            return SandboxEditorTextureBakeCommandResult{
+                .Status = SandboxEditorCommandStatus::MissingScene,
+                .BakeStatus = SelectedMeshTextureBakeStatus::MissingScene,
+                .Diagnostic = "Scene registry is unavailable.",
+            };
+        }
+        if (context.AssetService == nullptr)
+        {
+            return SandboxEditorTextureBakeCommandResult{
+                .Status = SandboxEditorCommandStatus::AssetImportFailed,
+                .BakeStatus = SelectedMeshTextureBakeStatus::MissingAssetService,
+                .Diagnostic = "Asset service is unavailable for generated texture payloads.",
+            };
+        }
+        if (command.PropertyName.empty() ||
+            command.Width == 0u ||
+            command.Height == 0u)
+        {
+            return SandboxEditorTextureBakeCommandResult{
+                .Status = SandboxEditorCommandStatus::InvalidVisualizationProperty,
+                .BakeStatus = command.PropertyName.empty()
+                    ? SelectedMeshTextureBakeStatus::MissingProperty
+                    : SelectedMeshTextureBakeStatus::InvalidResolution,
+                .Diagnostic = "Texture bake command has invalid parameters.",
+            };
+        }
+
+        SelectedMeshTextureBakeRequest request{};
+        request.StableEntityId = command.StableEntityId;
+        request.SourceDomain = command.SourceDomain;
+        request.SourcePropertyName = command.PropertyName;
+        request.ExpectedValueKind = command.ExpectedValueKind;
+        request.Encoder = command.Encoder;
+        request.RangePolicy = command.RangePolicy;
+        request.RangeMin = command.RangeMin;
+        request.RangeMax = command.RangeMax;
+        request.Width = command.Width;
+        request.Height = command.Height;
+        request.TargetPresentationKey = command.PresentationKey;
+        request.TargetSemantic = command.TargetSemantic;
+        request.GeneratedKey = command.GeneratedKey.empty()
+            ? command.PropertyName
+            : command.GeneratedKey;
+        request.BindGeneratedTexture = command.BindGeneratedTexture;
+
+        const SelectedMeshTextureBakeResult bake =
+            ApplySelectedMeshTextureBakeCommand(
+                SelectedMeshTextureBakeContext{
+                    .Scene = context.Scene,
+                    .AssetService = context.AssetService,
+                    .CommandHistory = context.CommandHistory,
+                },
+                request);
+
+        SandboxEditorCommandStatus status =
+            SandboxEditorCommandStatus::Applied;
+        if (!bake.Succeeded())
+        {
+            switch (bake.Status)
+            {
+            case SelectedMeshTextureBakeStatus::MissingScene:
+                status = SandboxEditorCommandStatus::MissingScene;
+                break;
+            case SelectedMeshTextureBakeStatus::MissingAssetService:
+            case SelectedMeshTextureBakeStatus::AssetLoadFailed:
+                status = SandboxEditorCommandStatus::AssetImportFailed;
+                break;
+            case SelectedMeshTextureBakeStatus::StaleEntity:
+                status = SandboxEditorCommandStatus::StaleEntity;
+                break;
+            case SelectedMeshTextureBakeStatus::NonMeshSelection:
+            case SelectedMeshTextureBakeStatus::UnsupportedSourceDomain:
+                status = SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+                break;
+            case SelectedMeshTextureBakeStatus::CommandFailed:
+                status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+                break;
+            case SelectedMeshTextureBakeStatus::Success:
+            case SelectedMeshTextureBakeStatus::Scheduled:
+            case SelectedMeshTextureBakeStatus::MissingProgressiveBindings:
+            case SelectedMeshTextureBakeStatus::MissingPresentation:
+            case SelectedMeshTextureBakeStatus::MissingSlot:
+            case SelectedMeshTextureBakeStatus::UnsupportedTargetSemantic:
+            case SelectedMeshTextureBakeStatus::IncompatibleTargetSlot:
+            case SelectedMeshTextureBakeStatus::InvalidResolution:
+            case SelectedMeshTextureBakeStatus::InvalidRange:
+            case SelectedMeshTextureBakeStatus::MissingProperty:
+            case SelectedMeshTextureBakeStatus::UnsupportedPropertyType:
+            case SelectedMeshTextureBakeStatus::MismatchedPropertyCount:
+            case SelectedMeshTextureBakeStatus::MissingTexcoords:
+            case SelectedMeshTextureBakeStatus::NonFiniteTexcoord:
+            case SelectedMeshTextureBakeStatus::NonFinitePropertyValue:
+            case SelectedMeshTextureBakeStatus::DegenerateAllTriangles:
+            case SelectedMeshTextureBakeStatus::DegenerateUvTriangles:
+            case SelectedMeshTextureBakeStatus::ZeroCoverageBake:
+            case SelectedMeshTextureBakeStatus::BakeFailed:
+            case SelectedMeshTextureBakeStatus::JobSubmitFailed:
+            case SelectedMeshTextureBakeStatus::StaleCompletion:
+                status = SandboxEditorCommandStatus::InvalidVisualizationProperty;
+                break;
+            }
+        }
+
+        return SandboxEditorTextureBakeCommandResult{
+            .Status = status,
+            .BakeStatus = bake.Status,
+            .GeneratedTexture = bake.GeneratedTexture,
+            .Job = bake.Job,
+            .Scheduled = bake.Status == SelectedMeshTextureBakeStatus::Scheduled,
+            .BoundGeneratedTexture = bake.BoundGeneratedTexture,
+            .GeneratedAssetPath = bake.GeneratedAssetPath,
+            .Diagnostic = bake.Diagnostic,
+        };
+    }
+
+    SandboxEditorUvRegenerationCommandResult ApplySandboxEditorUvRegenerationCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorUvRegenerationCommand& command)
+    {
+        if (context.Scene == nullptr)
+        {
+            return SandboxEditorUvRegenerationCommandResult{
+                .Status = SandboxEditorCommandStatus::MissingScene,
+                .UvStatus = Geometry::UvAtlas::UvAtlasStatus::EmptyInput,
+                .Diagnostic = "Scene registry is unavailable.",
+            };
+        }
+        if (command.Resolution == 0u || command.Padding >= command.Resolution)
+        {
+            return SandboxEditorUvRegenerationCommandResult{
+                .Status = SandboxEditorCommandStatus::InvalidProcessingParameters,
+                .UvStatus = Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput,
+                .Diagnostic = "UV regeneration requires a positive resolution and padding smaller than the atlas.",
+            };
+        }
+        if (!command.BackendName.empty() && command.BackendName != "xatlas")
+        {
+            return SandboxEditorUvRegenerationCommandResult{
+                .Status = SandboxEditorCommandStatus::InvalidProcessingParameters,
+                .UvStatus = Geometry::UvAtlas::UvAtlasStatus::BackendUnavailable,
+                .Diagnostic = "Only the promoted xatlas UV backend is available.",
+            };
+        }
+
+        entt::registry& raw = context.Scene->Raw();
+        const std::optional<ECS::EntityHandle> entity =
+            ResolveStableEntity(raw, command.StableEntityId);
+        if (!entity.has_value())
+        {
+            return SandboxEditorUvRegenerationCommandResult{
+                .Status = SandboxEditorCommandStatus::StaleEntity,
+                .UvStatus = Geometry::UvAtlas::UvAtlasStatus::EmptyInput,
+                .Diagnostic = "UV regeneration target entity is stale or no longer live.",
+            };
+        }
+
+        const GS::ConstSourceView view = GS::BuildConstView(raw, *entity);
+        MeshSoupFromGeometrySourcesResult soup =
+            BuildMeshSoupFromGeometrySources(view);
+        if (!soup.Succeeded())
+        {
+            return SandboxEditorUvRegenerationCommandResult{
+                .Status = soup.Status,
+                .UvStatus = Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput,
+                .Diagnostic = soup.Diagnostic,
+            };
+        }
+
+        std::vector<glm::vec2> authoredTexcoords;
+        if (view.VertexSource != nullptr)
+        {
+            const auto texcoords =
+                view.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
+            if (texcoords && texcoords.Vector().size() == soup.Mesh.VertexCount())
+                authoredTexcoords = texcoords.Vector();
+        }
+
+        Geometry::UvAtlas::UvAtlasOptions options{};
+        options.PreserveValidAuthoredUvs = command.PreserveValidAuthoredUvs;
+        options.ForceRegenerate = command.ForceRegenerate;
+        options.Resolution = command.Resolution;
+        options.Padding = command.Padding;
+        options.TexelsPerUnit = command.TexelsPerUnit;
+        options.BackendName = "xatlas";
+
+        Geometry::UvAtlas::UvAtlasInput input{};
+        input.Positions = soup.Mesh.Positions();
+        input.Faces = soup.Mesh.Faces();
+        input.AuthoredTexcoords = authoredTexcoords;
+        input.VertexProperties =
+            view.VertexSource != nullptr
+                ? Geometry::ConstPropertySet(view.VertexSource->Properties)
+                : Geometry::ConstPropertySet{};
+        input.HasVertexProperties = view.VertexSource != nullptr;
+
+        Geometry::UvAtlas::UvAtlasResult atlas =
+            Geometry::UvAtlas::ResolveUvAtlas(input, options, nullptr);
+        if (!atlas.Succeeded())
+        {
+            const bool backendFailure =
+                atlas.Status == Geometry::UvAtlas::UvAtlasStatus::BackendUnavailable ||
+                atlas.Status == Geometry::UvAtlas::UvAtlasStatus::BackendRejectedInput ||
+                atlas.Status == Geometry::UvAtlas::UvAtlasStatus::BackendFailed;
+            return SandboxEditorUvRegenerationCommandResult{
+                .Status = backendFailure
+                    ? SandboxEditorCommandStatus::GeometryProcessingFailed
+                    : SandboxEditorCommandStatus::InvalidProcessingParameters,
+                .UvStatus = atlas.Status,
+                .Provenance = atlas.Provenance,
+                .AtlasWidth = atlas.Diagnostics.AtlasWidth,
+                .AtlasHeight = atlas.Diagnostics.AtlasHeight,
+                .ChartCount = atlas.Diagnostics.ChartCount,
+                .SeamSplitVertexCount = atlas.Diagnostics.OutputVertexCount >
+                                                atlas.Diagnostics.InputVertexCount
+                                            ? atlas.Diagnostics.OutputVertexCount -
+                                                  atlas.Diagnostics.InputVertexCount
+                                            : 0u,
+                .Diagnostic = atlas.Diagnostics.BackendDetail.empty()
+                    ? std::string{Geometry::UvAtlas::ToString(atlas.Status)}
+                    : atlas.Diagnostics.BackendDetail,
+            };
+        }
+
+        auto converted = Geometry::Mesh::Conversion::ToHalfedgeMesh(atlas.OutputMesh);
+        if (!converted.Succeeded())
+        {
+            return SandboxEditorUvRegenerationCommandResult{
+                .Status = SandboxEditorCommandStatus::GeometryProcessingFailed,
+                .UvStatus = atlas.Status,
+                .Provenance = atlas.Provenance,
+                .Diagnostic = "generated UV mesh could not be converted back to halfedge topology",
+            };
+        }
+
+        CopyUvOutputPropertiesToHalfedgeMesh(view, soup, atlas, converted.Mesh);
+        GS::PopulateFromMesh(raw, *entity, converted.Mesh);
+        Dirty::MarkVertexPositionsDirty(raw, *entity);
+        Dirty::MarkVertexAttributesDirty(raw, *entity);
+        Dirty::MarkEdgeTopologyDirty(raw, *entity);
+        Dirty::MarkFaceTopologyDirty(raw, *entity);
+        Dirty::MarkGpuDirty(raw, *entity);
+        if (context.CommandHistory != nullptr)
+            (void)context.CommandHistory->MarkDirty("Regenerate UVs");
+
+        return SandboxEditorUvRegenerationCommandResult{
+            .Status = SandboxEditorCommandStatus::Applied,
+            .UvStatus = atlas.Status,
+            .Provenance = atlas.Provenance,
+            .AtlasWidth = atlas.Diagnostics.AtlasWidth,
+            .AtlasHeight = atlas.Diagnostics.AtlasHeight,
+            .ChartCount = atlas.Diagnostics.ChartCount,
+            .SeamSplitVertexCount = atlas.Diagnostics.OutputVertexCount >
+                                            atlas.Diagnostics.InputVertexCount
+                                        ? atlas.Diagnostics.OutputVertexCount -
+                                              atlas.Diagnostics.InputVertexCount
+                                        : 0u,
+            .Diagnostic = atlas.Diagnostics.BackendDetail,
+        };
+    }
+
     SandboxEditorKMeansResult ApplySandboxEditorKMeansCommand(
         const SandboxEditorContext& context,
         const SandboxEditorKMeansCommand& command)
@@ -6199,6 +8281,7 @@ namespace Extrinsic::Runtime
                        nullptr,
                        nullptr,
                        nullptr,
+                       nullptr,
                        nullptr);
     }
 
@@ -6248,6 +8331,18 @@ namespace Extrinsic::Runtime
                     .UseHierarchicalInitialization =
                         &m_KMeansUseHierarchicalInitialization,
                 };
+                TextureBakeUiState textureBakeState{
+                    .SourceIndex = &m_TextureBakeSourceIndex,
+                    .TargetSemanticIndex = &m_TextureBakeTargetSemanticIndex,
+                    .EncoderIndex = &m_TextureBakeEncoderIndex,
+                    .Width = &m_TextureBakeWidth,
+                    .Height = &m_TextureBakeHeight,
+                    .UvResolution = &m_UvAtlasResolution,
+                    .UvPadding = &m_UvAtlasPadding,
+                    .UvTexelsPerUnit = &m_UvAtlasTexelsPerUnit,
+                    .UvForceRegenerate = &m_UvAtlasForceRegenerate,
+                    .UvPreserveAuthored = &m_UvAtlasPreserveAuthored,
+                };
                 DrawPanelFrame(
                     m_LastFrame,
                     &context,
@@ -6257,7 +8352,8 @@ namespace Extrinsic::Runtime
                     &m_LastImportResult,
                     &m_LastSceneFileResult,
                     &m_DomainWindowOpen,
-                    &kmeansState);
+                    &kmeansState,
+                    &textureBakeState);
             });
     }
 

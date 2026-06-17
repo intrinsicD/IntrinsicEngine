@@ -8,9 +8,9 @@ another backlog directory.
 ## Runtime backlog tasks
 
 No open runtime backlog tasks are currently queued here for the progressive
-render-data pipeline. `RUNTIME-111` through `RUNTIME-114` retired on
-2026-06-16; new runtime follow-ups should open as value-gated tasks with a
-concrete consumer.
+render-data pipeline. `RUNTIME-111` through `RUNTIME-115` are retired;
+additional runtime follow-ups should open as value-gated tasks with a concrete
+consumer.
 
 ### Runtime adapter umbrellas (clarified by Q tasks; producer modules)
 
@@ -52,6 +52,12 @@ split; narratives live in the retirement log.
   (done, 2026-06-15, `CPUContracted`): generic runtime CPU mesh-attribute
   texture bakes now cover resolved-UV vertex/face scalar, label, vector2,
   vector3/normal, and RGBA outputs with stable generated texture keys.
+- [RUNTIME-115 — Selected mesh bake command surface](../../done/RUNTIME-115-selected-mesh-bake-command-surface.md)
+  (done, 2026-06-17, `CPUContracted`): selected mesh property texture bakes
+  now route through a runtime-owned command surface with validation, generated
+  texture payload reload, optional progressive binding updates, command-history
+  dirtying, synchronous test hooks, and observable derived-job apply/stale
+  diagnostics.
 - [RUNTIME-114 — Progressive import enrichment pipeline](../../done/RUNTIME-114-progressive-import-enrichment-pipeline.md)
   (done, 2026-06-16, `CPUContracted`): model-scene mesh leaves can publish raw
   geometry immediately, attach progressive surface bindings, and queue

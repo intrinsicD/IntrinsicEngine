@@ -15,6 +15,7 @@ export module Extrinsic.Runtime.SandboxEditorUi;
 
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.Registry;
+import Extrinsic.Asset.Service;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Error;
 import Extrinsic.Core.Geometry2D;
@@ -31,13 +32,16 @@ import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.ProgressivePresentationExtraction;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SceneSerialization;
+import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.SelectionController;
+import Geometry.UvAtlas;
 
 export namespace Extrinsic::Runtime
 {
@@ -380,6 +384,89 @@ export namespace Extrinsic::Runtime
         std::string DisabledReason{};
     };
 
+    enum class SandboxEditorPropertyCatalogDomain : std::uint8_t
+    {
+        MeshVertices,
+        MeshEdges,
+        MeshHalfedges,
+        MeshFaces,
+        GraphVertices,
+        GraphEdges,
+        PointCloudPoints,
+    };
+
+    enum class SandboxEditorPropertyCatalogValueKind : std::uint8_t
+    {
+        Unknown,
+        ScalarFloat,
+        ScalarDouble,
+        UInt32,
+        Vec2,
+        Vec3,
+        Vec4,
+    };
+
+    [[nodiscard]] const char* DebugNameForSandboxEditorPropertyCatalogDomain(
+        SandboxEditorPropertyCatalogDomain domain) noexcept;
+
+    [[nodiscard]] const char* DebugNameForSandboxEditorPropertyCatalogValueKind(
+        SandboxEditorPropertyCatalogValueKind kind) noexcept;
+
+    struct SandboxEditorPropertyValuePreview
+    {
+        bool HasValue{false};
+        std::size_t ElementIndex{0u};
+        std::string Text{};
+    };
+
+    struct SandboxEditorPropertyCatalogRow
+    {
+        std::string Name{};
+        SandboxEditorPropertyCatalogDomain Domain{
+            SandboxEditorPropertyCatalogDomain::MeshVertices};
+        SandboxEditorPropertyCatalogValueKind ValueKind{
+            SandboxEditorPropertyCatalogValueKind::Unknown};
+        std::size_t ElementCount{0u};
+        std::uint8_t ComponentCount{0u};
+        bool Supported{false};
+        bool Bindable{false};
+        bool Canonical{false};
+        bool Internal{false};
+        bool Connectivity{false};
+        bool Generated{false};
+        std::string UnsupportedReason{};
+        ProgressivePropertyBindingDescriptor Descriptor{};
+        SandboxEditorPropertyValuePreview Preview{};
+    };
+
+    struct SandboxEditorPropertyBindingTargetModel
+    {
+        ProgressiveRenderLane Lane{ProgressiveRenderLane::Surface};
+        std::string PresentationKey{};
+        ProgressivePresentationKind PresentationKind{
+            ProgressivePresentationKind::SurfaceMaterial};
+        ProgressiveSlotSemantic Semantic{ProgressiveSlotSemantic::Albedo};
+        ProgressiveSlotSourceKind SourceKind{
+            ProgressiveSlotSourceKind::UniformDefault};
+        ProgressiveGeometryDomain RequiredDomain{
+            ProgressiveGeometryDomain::Unknown};
+        ProgressivePropertyValueKind ExpectedValueKind{
+            ProgressivePropertyValueKind::Any};
+        std::size_t ExpectedElementCount{0u};
+        std::vector<SandboxEditorProgressivePropertyOptionModel> Options{};
+    };
+
+    struct SandboxEditorPropertyCatalogModel
+    {
+        bool HasSelectedEntity{false};
+        std::uint32_t SelectedStableId{0u};
+        ECS::Components::GeometrySources::Domain SelectedDomain{
+            ECS::Components::GeometrySources::Domain::None};
+        std::vector<SandboxEditorPropertyCatalogRow> Rows{};
+        std::vector<SandboxEditorPropertyBindingTargetModel> BindingTargets{};
+        std::vector<SandboxEditorDiagnostic> Diagnostics{};
+    };
+
     struct SandboxEditorProgressiveSlotModel
     {
         ProgressiveRenderLane Lane{ProgressiveRenderLane::Surface};
@@ -454,6 +541,133 @@ export namespace Extrinsic::Runtime
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
+    enum class SandboxEditorBoundRenderStateRowKind : std::uint8_t
+    {
+        RenderHint,
+        ProgressiveSlot,
+        DerivedJob,
+        CompositionSummary,
+        DisabledCommand,
+    };
+
+    [[nodiscard]] const char* DebugNameForSandboxEditorBoundRenderStateRowKind(
+        SandboxEditorBoundRenderStateRowKind kind) noexcept;
+
+    struct SandboxEditorBoundRenderStateRow
+    {
+        SandboxEditorBoundRenderStateRowKind Kind{
+            SandboxEditorBoundRenderStateRowKind::ProgressiveSlot};
+        std::string Label{};
+        ProgressiveRenderLane Lane{ProgressiveRenderLane::Surface};
+        std::string PresentationKey{};
+        ProgressivePresentationKind PresentationKind{
+            ProgressivePresentationKind::SurfaceMaterial};
+        ProgressiveSlotSemantic Semantic{ProgressiveSlotSemantic::Albedo};
+        ProgressiveSlotSourceKind SourceKind{
+            ProgressiveSlotSourceKind::UniformDefault};
+        ProgressiveReadinessState Readiness{ProgressiveReadinessState::Unset};
+        ProgressivePropertyBindingDescriptor Property{};
+        ProgressivePropertyResolution PropertyResolution{};
+        Assets::AssetId AuthoredTexture{};
+        Assets::AssetId GeneratedTexture{};
+        Assets::AssetId TextureAsset{};
+        DerivedJobHandle Job{};
+        DerivedJobStatus JobStatus{DerivedJobStatus::Queued};
+        float JobProgress{0.0f};
+        bool JobProgressDeterminate{true};
+        bool Enabled{false};
+        bool UsesUniformDefault{false};
+        bool TextureReady{false};
+        bool PropertyBufferReady{false};
+        bool PreviousOutputRetained{false};
+        bool Unsupported{false};
+        bool HasCatalogMatch{false};
+        std::optional<std::size_t> CatalogRowIndex{};
+        std::string SourceDescription{};
+        std::string DisabledReason{};
+        std::string Diagnostic{};
+    };
+
+    struct SandboxEditorBoundRenderStateModel
+    {
+        bool HasSelectedEntity{false};
+        std::uint32_t SelectedStableId{0u};
+        ProgressiveEntityShape Shape{ProgressiveEntityShape::Unknown};
+        std::uint64_t BindingGeneration{0u};
+        std::vector<SandboxEditorBoundRenderStateRow> Rows{};
+        SandboxEditorProgressiveCompositionSummary Composition{};
+        std::vector<SandboxEditorDiagnostic> Diagnostics{};
+    };
+
+    enum class SandboxEditorTextureBakeSourceCategory : std::uint8_t
+    {
+        Bakeable,
+        Internal,
+        Connectivity,
+        Unsupported,
+        WrongDomain,
+    };
+
+    struct SandboxEditorTextureBakeSourceRow
+    {
+        std::string Name{};
+        SandboxEditorPropertyCatalogDomain CatalogDomain{
+            SandboxEditorPropertyCatalogDomain::MeshVertices};
+        ProgressiveGeometryDomain BakeDomain{ProgressiveGeometryDomain::Unknown};
+        SandboxEditorPropertyCatalogValueKind ValueKind{
+            SandboxEditorPropertyCatalogValueKind::Unknown};
+        ProgressivePropertyValueKind ExpectedValueKind{
+            ProgressivePropertyValueKind::Any};
+        std::size_t ElementCount{0u};
+        SandboxEditorTextureBakeSourceCategory Category{
+            SandboxEditorTextureBakeSourceCategory::Unsupported};
+        bool Bakeable{false};
+        std::string DisabledReason{};
+        ProgressivePropertyBindingDescriptor Descriptor{};
+    };
+
+    struct SandboxEditorUvDiagnosticsModel
+    {
+        bool HasSelectedEntity{false};
+        bool IsMesh{false};
+        bool HasTexcoords{false};
+        bool TexcoordCountMatchesVertices{false};
+        bool TexcoordsFinite{false};
+        std::string TexcoordPropertyName{"v:texcoord"};
+        std::size_t VertexCount{0u};
+        std::size_t TexcoordCount{0u};
+        std::size_t FaceCount{0u};
+        std::uint32_t AtlasWidth{0u};
+        std::uint32_t AtlasHeight{0u};
+        std::uint32_t ChartCount{0u};
+        std::uint32_t SeamSplitVertexCount{0u};
+        std::string Provenance{};
+        std::string BackendId{};
+        std::string LastFailure{};
+        bool CheckerPreviewAvailable{false};
+        bool UvRegenerationAvailable{false};
+        std::string UvRegenerationDisabledReason{};
+    };
+
+    struct SandboxEditorTextureBakeControlsModel
+    {
+        bool HasSelectedEntity{false};
+        std::uint32_t SelectedStableId{0u};
+        bool IsMesh{false};
+        bool HasRuntimeBakeCommand{false};
+        bool CanBake{false};
+        std::string DisabledReason{};
+        ProgressiveSlotSemantic DefaultTargetSemantic{
+            ProgressiveSlotSemantic::Albedo};
+        MeshAttributeTextureBakeEncoder DefaultEncoder{
+            MeshAttributeTextureBakeEncoder::Auto};
+        std::uint32_t DefaultWidth{64u};
+        std::uint32_t DefaultHeight{64u};
+        SandboxEditorUvDiagnosticsModel Uv{};
+        std::vector<SandboxEditorTextureBakeSourceRow> Sources{};
+        std::vector<SandboxEditorDiagnostic> Diagnostics{};
+    };
+
     struct SandboxEditorInspectorModel
     {
         bool                             HasEntity{false};
@@ -461,7 +675,10 @@ export namespace Extrinsic::Runtime
         SandboxEditorTransformModel     Transform{};
         SandboxEditorRenderHintModel    RenderHints{};
         SandboxEditorGeometryDomainModel Geometry{};
+        SandboxEditorPropertyCatalogModel PropertyCatalog{};
         SandboxEditorProgressiveRenderDataModel Progressive{};
+        SandboxEditorBoundRenderStateModel BoundState{};
+        SandboxEditorTextureBakeControlsModel TextureBake{};
         SandboxEditorGeometryProcessingCapabilities Processing{};
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
@@ -857,6 +1074,9 @@ export namespace Extrinsic::Runtime
         SandboxEditorPrimitiveViewSettings PrimitiveView{};
         bool VisualizationControlsAvailable{false};
         SandboxEditorVisualizationModel Visualization{};
+        SandboxEditorPropertyCatalogModel PropertyCatalog{};
+        SandboxEditorBoundRenderStateModel BoundState{};
+        SandboxEditorTextureBakeControlsModel TextureBake{};
         SandboxEditorGeometryProcessingModel Processing{};
         SandboxEditorPrimitiveDetailModel Primitive{};
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
@@ -882,6 +1102,7 @@ export namespace Extrinsic::Runtime
         ECS::Scene::Registry* Scene{nullptr};
         SelectionController*  Selection{nullptr};
         EditorCommandHistory* CommandHistory{nullptr};
+        Assets::AssetService* AssetService{nullptr};
         const std::optional<PrimitiveSelectionResult>* LastRefinedPrimitive{nullptr};
         CameraControllerRegistry* CameraControllers{nullptr};
         Core::Extent2D CameraViewport{};
@@ -1043,6 +1264,76 @@ export namespace Extrinsic::Runtime
         std::string PropertyName{};
     };
 
+    struct SandboxEditorTextureBakeCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        std::string PresentationKey{"mesh.surface"};
+        ProgressiveSlotSemantic TargetSemantic{ProgressiveSlotSemantic::Albedo};
+        ProgressiveGeometryDomain SourceDomain{ProgressiveGeometryDomain::MeshVertex};
+        ProgressivePropertyValueKind ExpectedValueKind{
+            ProgressivePropertyValueKind::Any};
+        std::string PropertyName{};
+        MeshAttributeTextureBakeEncoder Encoder{
+            MeshAttributeTextureBakeEncoder::Auto};
+        MeshAttributeTextureBakeRangePolicy RangePolicy{
+            MeshAttributeTextureBakeRangePolicy::AutoFinite};
+        float RangeMin{0.0f};
+        float RangeMax{1.0f};
+        std::uint32_t Width{64u};
+        std::uint32_t Height{64u};
+        std::string GeneratedKey{};
+        bool BindGeneratedTexture{true};
+    };
+
+    struct SandboxEditorTextureBakeCommandResult
+    {
+        SandboxEditorCommandStatus Status{SandboxEditorCommandStatus::NoChange};
+        SelectedMeshTextureBakeStatus BakeStatus{
+            SelectedMeshTextureBakeStatus::Success};
+        Assets::AssetId GeneratedTexture{};
+        DerivedJobHandle Job{};
+        bool Scheduled{false};
+        bool BoundGeneratedTexture{false};
+        std::string GeneratedAssetPath{};
+        std::string Diagnostic{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == SandboxEditorCommandStatus::Applied ||
+                   Status == SandboxEditorCommandStatus::NoChange;
+        }
+    };
+
+    struct SandboxEditorUvRegenerationCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        bool PreserveValidAuthoredUvs{false};
+        bool ForceRegenerate{true};
+        std::uint32_t Resolution{1024u};
+        std::uint32_t Padding{2u};
+        float TexelsPerUnit{0.0f};
+        std::string BackendName{"xatlas"};
+    };
+
+    struct SandboxEditorUvRegenerationCommandResult
+    {
+        SandboxEditorCommandStatus Status{SandboxEditorCommandStatus::NoChange};
+        Geometry::UvAtlas::UvAtlasStatus UvStatus{
+            Geometry::UvAtlas::UvAtlasStatus::Success};
+        Geometry::UvAtlas::UvAtlasProvenance Provenance{
+            Geometry::UvAtlas::UvAtlasProvenance::None};
+        std::uint32_t AtlasWidth{0u};
+        std::uint32_t AtlasHeight{0u};
+        std::uint32_t ChartCount{0u};
+        std::size_t SeamSplitVertexCount{0u};
+        std::string Diagnostic{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == SandboxEditorCommandStatus::Applied;
+        }
+    };
+
     [[nodiscard]] SandboxEditorPanelFrame BuildSandboxEditorPanelFrame(
         const SandboxEditorContext& context);
 
@@ -1111,6 +1402,14 @@ export namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const SandboxEditorProgressiveSlotPropertyCommand& command);
 
+    SandboxEditorTextureBakeCommandResult ApplySandboxEditorTextureBakeCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorTextureBakeCommand& command);
+
+    SandboxEditorUvRegenerationCommandResult ApplySandboxEditorUvRegenerationCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorUvRegenerationCommand& command);
+
     SandboxEditorKMeansResult ApplySandboxEditorKMeansCommand(
         const SandboxEditorContext& context,
         const SandboxEditorKMeansCommand& command);
@@ -1142,7 +1441,7 @@ export namespace Extrinsic::Runtime
         SandboxEditorPanelFrame m_LastFrame{};
         std::array<char, 1024>  m_ImportPathBuffer{};
         std::array<char, 1024>  m_ScenePathBuffer{};
-        std::array<bool, 12>    m_DomainWindowOpen{};
+        std::array<bool, 15>    m_DomainWindowOpen{};
         Assets::AssetPayloadKind m_ImportPayloadKind{
             Assets::AssetPayloadKind::Unknown};
         std::uint64_t m_LastObservedRuntimeImportSequence{0};
@@ -1155,5 +1454,15 @@ export namespace Extrinsic::Runtime
         std::int32_t m_KMeansMaxIterations{32};
         std::int32_t m_KMeansSeed{42};
         bool m_KMeansUseHierarchicalInitialization{true};
+        std::int32_t m_TextureBakeSourceIndex{0};
+        std::int32_t m_TextureBakeTargetSemanticIndex{0};
+        std::int32_t m_TextureBakeEncoderIndex{0};
+        std::int32_t m_TextureBakeWidth{64};
+        std::int32_t m_TextureBakeHeight{64};
+        std::int32_t m_UvAtlasResolution{1024};
+        std::int32_t m_UvAtlasPadding{2};
+        float m_UvAtlasTexelsPerUnit{0.0f};
+        bool m_UvAtlasForceRegenerate{true};
+        bool m_UvAtlasPreserveAuthored{false};
     };
 }

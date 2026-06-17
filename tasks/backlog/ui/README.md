@@ -11,9 +11,7 @@ map.
 ## Tasks
 
 - [RORG-031F — UI integration backlog seed](RORG-031-ui-integration.md).
-- [UI-014 — UV backend and texture bake controls](UI-014-uv-backend-and-texture-bake-controls.md):
-  expose resolved-UV provenance, backend selection/regeneration, and generic
-  mesh attribute texture bake commands through runtime-owned UI command seams.
+No backlog UI implementation tasks are currently queued.
 
 ## Convergence
 
@@ -73,6 +71,13 @@ map.
   repack runtime graph residency, and uniform point settings flow to retained
   point GPU config. Retained-line per-entity width rasterization remains a
   future renderer task.
+- UI-014, UI-016, and UI-017 retired the framework24-style selected-geometry
+  usability follow-up after `UI-015`: all geometry properties remain visible,
+  compatible binding choices show their reasons, bound-state rows report render
+  lanes, slots, defaults, properties, textures, readiness, diagnostics, and
+  derived-job/bake progress, and mesh UV/bake controls route through runtime
+  command surfaces without UI owning geometry, runtime, asset, or graphics
+  state.
 - UI work that depends on renderer overlays/handoff coordinates with the
   retired `GRAPHICS-024`
   parity matrix, the `RUNTIME-104` decision not to retain a persistent
@@ -100,3 +105,18 @@ split; narratives live in the retirement log.
   models and ImGui rows now expose entity shape, presentation slots, uniform
   defaults, source-property pickers, compatible/incompatible reasons, derived
   jobs, and composition summaries through runtime-owned command/history seams.
+- [UI-016 — Geometry property catalog and binding usability](../../done/UI-016-geometry-property-catalog-and-binding-usability.md)
+  (done, 2026-06-17, `CPUContracted`): selected mesh, graph, and point-cloud
+  property catalogs now list internal/connectivity/user/generated properties,
+  supported value previews, unsupported diagnostics, and compatible binding
+  targets without raw property pointers.
+- [UI-017 — Bound render state inspector](../../done/UI-017-bound-render-state-inspector.md)
+  (done, 2026-06-17, `CPUContracted`): selected mesh, graph, point-cloud, and
+  composition models now expose render lanes, progressive slots, source kind,
+  bound defaults/properties/textures, readiness diagnostics, and derived-job
+  progress rows.
+- [UI-014 — UV backend and texture bake controls](../../done/UI-014-uv-backend-and-texture-bake-controls.md)
+  (done, 2026-06-17, `CPUContracted`): selected-mesh UV diagnostics,
+  xatlas-backed regeneration commands, property-catalog-driven bake sources,
+  target semantic/encoder/output-size controls, and selected-mesh bake command
+  routing are now present in the runtime-owned sandbox editor UI.

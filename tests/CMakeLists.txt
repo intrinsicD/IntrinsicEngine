@@ -310,6 +310,7 @@ if(TARGET ExtrinsicRuntime)
         Test.RuntimeSceneSerialization.cpp
         Test.RuntimeVulkanBreadcrumb.cpp
         Test.SandboxEditorUi.cpp
+        Test.SelectedMeshTextureBake.cpp
         Test.SelectionController.cpp
         Test.SelectionReadbackCorrelation.cpp
         Test.SelectionSnapshotExtraction.cpp

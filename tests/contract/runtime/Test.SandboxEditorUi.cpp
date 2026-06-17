@@ -21,7 +21,9 @@
 #include <glm/gtc/quaternion.hpp>
 
 import Extrinsic.Asset.ImportRouter;
+import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Asset.Registry;
+import Extrinsic.Asset.Service;
 import Extrinsic.Core.Config.Engine;
 import Extrinsic.Core.Config.Window;
 import Extrinsic.Core.Error;
@@ -53,6 +55,7 @@ import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.ImGuiAdapter;
+import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
@@ -60,7 +63,9 @@ import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxEditorUi;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Geometry.Properties;
+import Geometry.UvAtlas;
 
 namespace Runtime = Extrinsic::Runtime;
 namespace Assets = Extrinsic::Assets;
@@ -204,6 +209,63 @@ namespace
         {
             if (property.Domain == domain && property.Name == name)
                 return &property;
+        }
+        return nullptr;
+    }
+
+    [[nodiscard]] const Runtime::SandboxEditorPropertyCatalogRow*
+    FindCatalogProperty(
+        const Runtime::SandboxEditorPropertyCatalogModel& catalog,
+        const Runtime::SandboxEditorPropertyCatalogDomain domain,
+        const std::string& name)
+    {
+        for (const Runtime::SandboxEditorPropertyCatalogRow& row :
+             catalog.Rows)
+        {
+            if (row.Domain == domain && row.Name == name)
+                return &row;
+        }
+        return nullptr;
+    }
+
+    [[nodiscard]] const Runtime::SandboxEditorBoundRenderStateRow* FindBoundRow(
+        const Runtime::SandboxEditorBoundRenderStateModel& bound,
+        const Runtime::SandboxEditorBoundRenderStateRowKind kind,
+        const Runtime::ProgressiveSlotSemantic semantic)
+    {
+        for (const Runtime::SandboxEditorBoundRenderStateRow& row :
+             bound.Rows)
+        {
+            if (row.Kind == kind && row.Semantic == semantic)
+                return &row;
+        }
+        return nullptr;
+    }
+
+    [[nodiscard]] const Runtime::SandboxEditorBoundRenderStateRow* FindBoundRowLabel(
+        const Runtime::SandboxEditorBoundRenderStateModel& bound,
+        const Runtime::SandboxEditorBoundRenderStateRowKind kind,
+        const std::string& label)
+    {
+        for (const Runtime::SandboxEditorBoundRenderStateRow& row :
+             bound.Rows)
+        {
+            if (row.Kind == kind && row.Label == label)
+                return &row;
+        }
+        return nullptr;
+    }
+
+    [[nodiscard]] const Runtime::SandboxEditorTextureBakeSourceRow*
+    FindTextureBakeSource(
+        const Runtime::SandboxEditorTextureBakeControlsModel& model,
+        const std::string& name)
+    {
+        for (const Runtime::SandboxEditorTextureBakeSourceRow& row :
+             model.Sources)
+        {
+            if (row.Name == name)
+                return &row;
         }
         return nullptr;
     }
@@ -1772,6 +1834,391 @@ TEST(SandboxEditorUi, VisualizationModelEnumeratesPromotedGeometryProperties)
                  "Vec4");
 }
 
+TEST(SandboxEditorUi, PropertyCatalogListsAllMeshPropertiesAndPreviewsSelection)
+{
+    using Domain = Runtime::SandboxEditorPropertyCatalogDomain;
+    using Kind = Runtime::SandboxEditorPropertyCatalogValueKind;
+
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "CatalogMesh");
+    AddTriangleMeshSource(registry, mesh);
+    auto& vertices = registry.Raw().get<GS::Vertices>(mesh);
+    vertices.Properties.GetOrAdd<glm::vec3>("v:normal", glm::vec3{0.0f, 0.0f, 1.0f})
+        .Vector() = {
+            glm::vec3{0.0f, 0.0f, 1.0f},
+            glm::vec3{0.0f, 1.0f, 0.0f},
+            glm::vec3{1.0f, 0.0f, 0.0f},
+        };
+    vertices.Properties.GetOrAdd<float>("v:temperature", 0.0f)
+        .Vector() = {0.0f, 0.5f, 1.0f};
+    vertices.Properties.GetOrAdd<int>("v:unsupported_int", 0)
+        .Vector() = {1, 2, 3};
+
+    auto& edges = registry.Raw().get<GS::Edges>(mesh);
+    edges.Properties.GetOrAdd<double>("e:weight", 0.0)
+        .Vector() = {1.0, 2.0, 3.0};
+
+    auto& faces = registry.Raw().get<GS::Faces>(mesh);
+    faces.Properties.GetOrAdd<glm::vec4>("f:debug_color", glm::vec4{1.0f})
+        .Vector() = {glm::vec4{0.1f, 0.2f, 0.3f, 1.0f}};
+
+    registry.Raw().emplace<Runtime::ProgressivePresentationBindings>(
+        mesh,
+        MakeProgressiveMeshPresentationBindings());
+
+    Runtime::PrimitiveSelectionResult primitive{};
+    primitive.Status = Runtime::PrimitiveRefineStatus::Success;
+    primitive.EntityId = Runtime::SelectionController::ToStableEntityId(mesh);
+    primitive.StableId = Runtime::SelectionController::ToStableEntityId(mesh);
+    primitive.Domain = GS::Domain::Mesh;
+    primitive.Kind = Runtime::RefinedPrimitiveKind::Vertex;
+    primitive.VertexId = 1u;
+    primitive.EdgeId = 2u;
+    primitive.FaceId = 0u;
+    const std::optional<Runtime::PrimitiveSelectionResult> lastPrimitive{primitive};
+
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    Runtime::SandboxEditorContext context =
+        MakeContext(registry, selection, true, &lastPrimitive);
+
+    const Runtime::SandboxEditorPanelFrame frame =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+    ASSERT_TRUE(frame.Inspector.HasEntity);
+    const Runtime::SandboxEditorPropertyCatalogModel& catalog =
+        frame.Inspector.PropertyCatalog;
+    EXPECT_TRUE(catalog.HasSelectedEntity);
+    EXPECT_EQ(catalog.SelectedDomain, GS::Domain::Mesh);
+    EXPECT_FALSE(catalog.Rows.empty());
+
+    const auto* position =
+        FindCatalogProperty(catalog, Domain::MeshVertices, std::string{PN::kPosition});
+    ASSERT_NE(position, nullptr);
+    EXPECT_EQ(position->ValueKind, Kind::Vec3);
+    EXPECT_TRUE(position->Internal);
+    EXPECT_TRUE(position->Connectivity);
+    EXPECT_TRUE(position->Bindable);
+    EXPECT_TRUE(position->Preview.HasValue);
+    EXPECT_EQ(position->Preview.ElementIndex, 1u);
+
+    const auto* texcoord =
+        FindCatalogProperty(catalog, Domain::MeshVertices, "v:texcoord");
+    ASSERT_NE(texcoord, nullptr);
+    EXPECT_EQ(texcoord->ValueKind, Kind::Vec2);
+    EXPECT_EQ(texcoord->ComponentCount, 2u);
+
+    const auto* unsupported =
+        FindCatalogProperty(catalog, Domain::MeshVertices, "v:unsupported_int");
+    ASSERT_NE(unsupported, nullptr);
+    EXPECT_EQ(unsupported->ValueKind, Kind::Unknown);
+    EXPECT_FALSE(unsupported->Supported);
+    EXPECT_FALSE(unsupported->UnsupportedReason.empty());
+
+    const auto* edgeV0 =
+        FindCatalogProperty(catalog, Domain::MeshEdges, std::string{PN::kEdgeV0});
+    ASSERT_NE(edgeV0, nullptr);
+    EXPECT_TRUE(edgeV0->Connectivity);
+
+    EXPECT_NE(FindCatalogProperty(catalog,
+                                  Domain::MeshHalfedges,
+                                  std::string{PN::kHalfedgeToVertex}),
+              nullptr);
+    EXPECT_NE(FindCatalogProperty(catalog,
+                                  Domain::MeshFaces,
+                                  std::string{PN::kFaceHalfedge}),
+              nullptr);
+
+    const auto* faceColor =
+        FindCatalogProperty(catalog, Domain::MeshFaces, "f:debug_color");
+    ASSERT_NE(faceColor, nullptr);
+    EXPECT_EQ(faceColor->ValueKind, Kind::Vec4);
+    EXPECT_TRUE(faceColor->Preview.HasValue);
+    EXPECT_EQ(faceColor->Preview.ElementIndex, 0u);
+
+    ASSERT_FALSE(catalog.BindingTargets.empty());
+    const auto normalTarget = std::find_if(
+        catalog.BindingTargets.begin(),
+        catalog.BindingTargets.end(),
+        [](const Runtime::SandboxEditorPropertyBindingTargetModel& target)
+        {
+            return target.Semantic == Runtime::ProgressiveSlotSemantic::Normal;
+        });
+    ASSERT_NE(normalTarget, catalog.BindingTargets.end());
+    EXPECT_EQ(normalTarget->RequiredDomain,
+              Runtime::ProgressiveGeometryDomain::MeshVertex);
+    EXPECT_EQ(normalTarget->ExpectedValueKind,
+              Runtime::ProgressivePropertyValueKind::Vec3);
+    ASSERT_FALSE(normalTarget->Options.empty());
+    EXPECT_TRUE(normalTarget->Options.front().Compatible);
+
+    const Runtime::SandboxEditorDomainWindowModel meshWindow =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::Mesh);
+    EXPECT_EQ(meshWindow.PropertyCatalog.Rows.size(), catalog.Rows.size());
+    EXPECT_FALSE(meshWindow.BoundState.Rows.empty());
+    EXPECT_NE(FindBoundRow(meshWindow.BoundState,
+                           Runtime::SandboxEditorBoundRenderStateRowKind::ProgressiveSlot,
+                           Runtime::ProgressiveSlotSemantic::Normal),
+              nullptr);
+
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorPropertyCatalogDomain(
+                     Domain::MeshHalfedges),
+                 "MeshHalfedges");
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorPropertyCatalogValueKind(
+                     Kind::Vec2),
+                 "Vec2");
+}
+
+TEST(SandboxEditorUi, PropertyCatalogReportsGraphAndPointCloudDomains)
+{
+    using Domain = Runtime::SandboxEditorPropertyCatalogDomain;
+    using Kind = Runtime::SandboxEditorPropertyCatalogValueKind;
+
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+
+    const ECS::EntityHandle graph = MakeSelectable(registry, "CatalogGraph");
+    AddGraphSource(registry, graph);
+    auto& graphNodes = registry.Raw().get<GS::Nodes>(graph);
+    graphNodes.Properties.GetOrAdd<float>("v:centrality", 0.0f)
+        .Vector() = {0.0f, 1.0f, 2.0f};
+    auto& graphEdges = registry.Raw().get<GS::Edges>(graph);
+    graphEdges.Properties.GetOrAdd<glm::vec4>("e:color", glm::vec4{1.0f})
+        .Vector() = {glm::vec4{1.0f}, glm::vec4{0.0f, 1.0f, 0.0f, 1.0f}};
+
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, graph));
+    Runtime::SandboxEditorPanelFrame frame =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+    const Runtime::SandboxEditorPropertyCatalogModel& graphCatalog =
+        frame.Inspector.PropertyCatalog;
+    EXPECT_NE(FindCatalogProperty(graphCatalog, Domain::GraphVertices, "v:centrality"),
+              nullptr);
+    const auto* graphEdgeColor =
+        FindCatalogProperty(graphCatalog, Domain::GraphEdges, "e:color");
+    ASSERT_NE(graphEdgeColor, nullptr);
+    EXPECT_EQ(graphEdgeColor->ValueKind, Kind::Vec4);
+    EXPECT_NE(FindCatalogProperty(graphCatalog,
+                                  Domain::GraphEdges,
+                                  std::string{PN::kEdgeV0}),
+              nullptr);
+
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "CatalogCloud");
+    AddPointCloudSource(registry, cloud, 2u);
+    auto& cloudVertices = registry.Raw().get<GS::Vertices>(cloud);
+    cloudVertices.Properties.GetOrAdd<glm::vec4>("p:kmeans_color", glm::vec4{1.0f})
+        .Vector() = {glm::vec4{1.0f}, glm::vec4{0.0f, 1.0f, 0.0f, 1.0f}};
+    cloudVertices.Properties.GetOrAdd<std::uint32_t>("p:label", 0u)
+        .Vector() = {7u, 9u};
+
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
+    frame = Runtime::BuildSandboxEditorPanelFrame(context);
+    const Runtime::SandboxEditorPropertyCatalogModel& cloudCatalog =
+        frame.Inspector.PropertyCatalog;
+    const auto* pointColor =
+        FindCatalogProperty(cloudCatalog,
+                            Domain::PointCloudPoints,
+                            "p:kmeans_color");
+    ASSERT_NE(pointColor, nullptr);
+    EXPECT_EQ(pointColor->ValueKind, Kind::Vec4);
+    EXPECT_TRUE(pointColor->Generated);
+    EXPECT_NE(FindCatalogProperty(cloudCatalog,
+                                  Domain::PointCloudPoints,
+                                  "p:label"),
+              nullptr);
+}
+
+TEST(SandboxEditorUi, UvRegenerationCommandRepairsSelectedMeshTexcoords)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "UvRepairMesh");
+    AddTriangleMeshSource(registry, mesh);
+    auto& vertices = registry.Raw().get<GS::Vertices>(mesh);
+    auto texcoords = vertices.Properties.Get<glm::vec2>("v:texcoord");
+    ASSERT_TRUE(texcoords);
+    texcoords[1] = glm::vec2{
+        std::numeric_limits<float>::quiet_NaN(),
+        0.0f,
+    };
+    vertices.Properties.GetOrAdd<glm::vec4>("v:paint", glm::vec4{1.0f})
+        .Vector() = {
+            glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
+            glm::vec4{0.0f, 1.0f, 0.0f, 1.0f},
+            glm::vec4{0.0f, 0.0f, 1.0f, 1.0f},
+        };
+    auto& faces = registry.Raw().get<GS::Faces>(mesh);
+    faces.Properties.GetOrAdd<std::uint32_t>("f:material", 0u).Vector() = {7u};
+
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    const Runtime::SandboxEditorPanelFrame before =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+    ASSERT_TRUE(before.Inspector.TextureBake.HasSelectedEntity);
+    EXPECT_TRUE(before.Inspector.TextureBake.Uv.UvRegenerationAvailable);
+    EXPECT_TRUE(before.Inspector.TextureBake.Uv.HasTexcoords);
+    EXPECT_TRUE(before.Inspector.TextureBake.Uv.TexcoordCountMatchesVertices);
+    EXPECT_FALSE(before.Inspector.TextureBake.Uv.TexcoordsFinite);
+    EXPECT_FALSE(before.Inspector.TextureBake.CanBake);
+
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+    const Runtime::SandboxEditorUvRegenerationCommandResult result =
+        Runtime::ApplySandboxEditorUvRegenerationCommand(
+            context,
+            Runtime::SandboxEditorUvRegenerationCommand{
+                .StableEntityId = stableId,
+                .Resolution = 64u,
+                .Padding = 2u,
+            });
+
+    ASSERT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Applied);
+    EXPECT_EQ(result.UvStatus, Geometry::UvAtlas::UvAtlasStatus::Success);
+    EXPECT_EQ(result.Provenance, Geometry::UvAtlas::UvAtlasProvenance::Generated);
+    EXPECT_GT(result.AtlasWidth, 0u);
+    EXPECT_GT(result.AtlasHeight, 0u);
+    EXPECT_TRUE(history.IsDirty());
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::GpuDirty>(mesh));
+
+    const GS::ConstSourceView repaired = GS::BuildConstView(registry.Raw(), mesh);
+    ASSERT_EQ(repaired.ActiveDomain, GS::Domain::Mesh);
+    ASSERT_NE(repaired.VertexSource, nullptr);
+    const auto repairedTexcoords =
+        repaired.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
+    ASSERT_TRUE(repairedTexcoords);
+    ASSERT_EQ(repairedTexcoords.Vector().size(), repaired.VerticesAlive());
+    for (const glm::vec2 uv : repairedTexcoords.Vector())
+    {
+        EXPECT_TRUE(std::isfinite(uv.x));
+        EXPECT_TRUE(std::isfinite(uv.y));
+    }
+    const auto repairedPaint =
+        repaired.VertexSource->Properties.Get<glm::vec4>("v:paint");
+    ASSERT_TRUE(repairedPaint);
+    EXPECT_EQ(repairedPaint.Vector().size(), repairedTexcoords.Vector().size());
+
+    ASSERT_NE(repaired.FaceSource, nullptr);
+    const auto repairedMaterial =
+        repaired.FaceSource->Properties.Get<std::uint32_t>("f:material");
+    ASSERT_TRUE(repairedMaterial);
+    ASSERT_FALSE(repairedMaterial.Vector().empty());
+    EXPECT_EQ(repairedMaterial[0], 7u);
+
+    const Runtime::SandboxEditorPanelFrame after =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+    EXPECT_TRUE(after.Inspector.TextureBake.Uv.TexcoordsFinite);
+    EXPECT_TRUE(after.Inspector.TextureBake.Uv.CheckerPreviewAvailable);
+}
+
+TEST(SandboxEditorUi, TextureBakeControlsReportUvSourcesAndRouteCommand)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Assets::AssetService assets;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "TextureBakeMesh");
+    AddTriangleMeshSource(registry, mesh);
+    auto& vertices = registry.Raw().get<GS::Vertices>(mesh);
+    vertices.Properties.GetOrAdd<glm::vec4>("v:paint", glm::vec4{1.0f})
+        .Vector() = {
+            glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
+            glm::vec4{0.0f, 1.0f, 0.0f, 1.0f},
+            glm::vec4{0.0f, 0.0f, 1.0f, 1.0f},
+        };
+    registry.Raw().emplace<Runtime::ProgressivePresentationBindings>(
+        mesh,
+        MakeProgressiveMeshPresentationBindings());
+
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    context.AssetService = &assets;
+
+    const Runtime::SandboxEditorPanelFrame frame =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+    const Runtime::SandboxEditorTextureBakeControlsModel& bake =
+        frame.Inspector.TextureBake;
+    ASSERT_TRUE(bake.HasSelectedEntity);
+    EXPECT_TRUE(bake.IsMesh);
+    EXPECT_TRUE(bake.Uv.HasTexcoords);
+    EXPECT_TRUE(bake.Uv.TexcoordCountMatchesVertices);
+    EXPECT_TRUE(bake.Uv.TexcoordsFinite);
+    EXPECT_TRUE(bake.HasRuntimeBakeCommand);
+    EXPECT_TRUE(bake.CanBake);
+    EXPECT_TRUE(bake.Uv.UvRegenerationAvailable);
+    EXPECT_TRUE(bake.Uv.UvRegenerationDisabledReason.empty());
+
+    const Runtime::SandboxEditorTextureBakeSourceRow* paint =
+        FindTextureBakeSource(bake, "v:paint");
+    ASSERT_NE(paint, nullptr);
+    EXPECT_TRUE(paint->Bakeable);
+    EXPECT_EQ(paint->BakeDomain, Runtime::ProgressiveGeometryDomain::MeshVertex);
+    EXPECT_EQ(paint->ExpectedValueKind, Runtime::ProgressivePropertyValueKind::Vec4);
+
+    const Runtime::SandboxEditorTextureBakeSourceRow* position =
+        FindTextureBakeSource(bake, std::string{PN::kPosition});
+    ASSERT_NE(position, nullptr);
+    EXPECT_FALSE(position->Bakeable);
+    EXPECT_EQ(position->Category,
+              Runtime::SandboxEditorTextureBakeSourceCategory::Connectivity);
+    EXPECT_FALSE(position->DisabledReason.empty());
+
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+    const Runtime::SandboxEditorTextureBakeCommandResult result =
+        Runtime::ApplySandboxEditorTextureBakeCommand(
+            context,
+            Runtime::SandboxEditorTextureBakeCommand{
+                .StableEntityId = stableId,
+                .PresentationKey = "mesh.surface",
+                .TargetSemantic = Runtime::ProgressiveSlotSemantic::Albedo,
+                .SourceDomain = Runtime::ProgressiveGeometryDomain::MeshVertex,
+                .ExpectedValueKind = Runtime::ProgressivePropertyValueKind::Vec4,
+                .PropertyName = "v:paint",
+                .Encoder = Runtime::MeshAttributeTextureBakeEncoder::RgbaColor,
+                .Width = 4u,
+                .Height = 4u,
+                .GeneratedKey = "paint",
+                .BindGeneratedTexture = true,
+            });
+
+    ASSERT_EQ(result.Status, Runtime::SandboxEditorCommandStatus::Applied);
+    EXPECT_EQ(result.BakeStatus,
+              Runtime::SelectedMeshTextureBakeStatus::Success);
+    ASSERT_TRUE(result.GeneratedTexture.IsValid());
+    EXPECT_TRUE(result.BoundGeneratedTexture);
+    EXPECT_TRUE(history.IsDirty());
+
+    const auto texture =
+        assets.Read<Assets::AssetTexture2DPayload>(result.GeneratedTexture);
+    ASSERT_TRUE(texture.has_value());
+    ASSERT_EQ(texture->size(), 1u);
+    EXPECT_EQ((*texture)[0].Metadata.Width, 4u);
+
+    const auto& bindings =
+        registry.Raw().get<Runtime::ProgressivePresentationBindings>(mesh);
+    const auto* presentation =
+        Runtime::FindPresentationBinding(bindings, "mesh.surface");
+    ASSERT_NE(presentation, nullptr);
+    const auto* albedo =
+        Runtime::FindSlotBinding(*presentation,
+                                 Runtime::ProgressiveSlotSemantic::Albedo);
+    ASSERT_NE(albedo, nullptr);
+    EXPECT_EQ(albedo->SourceKind,
+              Runtime::ProgressiveSlotSourceKind::GeneratedTextureAsset);
+    EXPECT_EQ(albedo->GeneratedTexture, result.GeneratedTexture);
+}
+
 TEST(SandboxEditorUi, VisualizationPropertyPresetCommandRoutesThroughConfig)
 {
     using Domain = Runtime::SandboxEditorVisualizationPropertyDomain;
@@ -3055,6 +3502,42 @@ TEST(SandboxEditorUi, ProgressiveInspectorReportsSlotsPropertiesAndJobs)
     ASSERT_NE(disabled, normal->PropertyOptions.end());
     EXPECT_FALSE(disabled->Compatible);
     EXPECT_FALSE(disabled->DisabledReason.empty());
+
+    const Runtime::SandboxEditorBoundRenderStateModel& bound =
+        frame.Inspector.BoundState;
+    EXPECT_TRUE(bound.HasSelectedEntity);
+    EXPECT_EQ(bound.SelectedStableId, stableId);
+    EXPECT_EQ(bound.BindingGeneration, progressive.BindingGeneration);
+    EXPECT_GE(bound.Rows.size(), progressive.Slots.size() + progressive.Jobs.size());
+
+    const Runtime::SandboxEditorBoundRenderStateRow* normalBound =
+        FindBoundRow(bound,
+                     Runtime::SandboxEditorBoundRenderStateRowKind::ProgressiveSlot,
+                     Runtime::ProgressiveSlotSemantic::Normal);
+    ASSERT_NE(normalBound, nullptr);
+    EXPECT_EQ(normalBound->SourceKind,
+              Runtime::ProgressiveSlotSourceKind::PropertyBake);
+    EXPECT_EQ(normalBound->Readiness, Runtime::ProgressiveReadinessState::Pending);
+    EXPECT_EQ(normalBound->Property.PropertyName, "v:normal");
+    EXPECT_TRUE(normalBound->HasCatalogMatch);
+    ASSERT_TRUE(normalBound->CatalogRowIndex.has_value());
+    EXPECT_EQ(frame.Inspector.PropertyCatalog.Rows[*normalBound->CatalogRowIndex].Name,
+              "v:normal");
+
+    const auto failedJob = std::find_if(
+        bound.Rows.begin(),
+        bound.Rows.end(),
+        [](const Runtime::SandboxEditorBoundRenderStateRow& row)
+        {
+            return row.Kind ==
+                       Runtime::SandboxEditorBoundRenderStateRowKind::DerivedJob &&
+                   row.JobStatus == Runtime::DerivedJobStatus::Failed;
+        });
+    ASSERT_NE(failedJob, bound.Rows.end());
+    EXPECT_EQ(failedJob->Diagnostic, "failed bake");
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorBoundRenderStateRowKind(
+                     Runtime::SandboxEditorBoundRenderStateRowKind::DerivedJob),
+                 "DerivedJob");
 }
 
 TEST(SandboxEditorUi, ProgressiveInspectorInfersGraphPointCloudAndComposition)
@@ -3070,6 +3553,14 @@ TEST(SandboxEditorUi, ProgressiveInspectorInfersGraphPointCloudAndComposition)
         Runtime::BuildSandboxEditorPanelFrame(context);
     EXPECT_EQ(frame.Inspector.Progressive.Shape,
               Runtime::ProgressiveEntityShape::GraphLeaf);
+    const Runtime::SandboxEditorBoundRenderStateRow* graphBake =
+        FindBoundRowLabel(
+            frame.Inspector.BoundState,
+            Runtime::SandboxEditorBoundRenderStateRowKind::DisabledCommand,
+            "Texture bake");
+    ASSERT_NE(graphBake, nullptr);
+    EXPECT_FALSE(graphBake->Enabled);
+    EXPECT_FALSE(graphBake->DisabledReason.empty());
 
     const ECS::EntityHandle cloud = MakeSelectable(registry, "ProgressiveCloud");
     AddPointCloudSource(registry, cloud, 3u);
@@ -3077,6 +3568,13 @@ TEST(SandboxEditorUi, ProgressiveInspectorInfersGraphPointCloudAndComposition)
     frame = Runtime::BuildSandboxEditorPanelFrame(context);
     EXPECT_EQ(frame.Inspector.Progressive.Shape,
               Runtime::ProgressiveEntityShape::PointCloudLeaf);
+    const Runtime::SandboxEditorBoundRenderStateRow* cloudBake =
+        FindBoundRowLabel(
+            frame.Inspector.BoundState,
+            Runtime::SandboxEditorBoundRenderStateRowKind::DisabledCommand,
+            "Texture bake");
+    ASSERT_NE(cloudBake, nullptr);
+    EXPECT_FALSE(cloudBake->Enabled);
 
     const ECS::EntityHandle parent = MakeSelectable(registry, "ProgressiveModel");
     const ECS::EntityHandle child = MakeSelectable(registry, "ProgressiveChild");
@@ -3118,6 +3616,15 @@ TEST(SandboxEditorUi, ProgressiveInspectorInfersGraphPointCloudAndComposition)
     EXPECT_EQ(frame.Inspector.Progressive.Composition.ChildPendingSlotCount, 1u);
     EXPECT_EQ(frame.Inspector.Progressive.Composition.ChildJobCount, 1u);
     EXPECT_EQ(frame.Inspector.Progressive.Composition.ChildActiveJobCount, 1u);
+    const Runtime::SandboxEditorBoundRenderStateRow* composition =
+        FindBoundRowLabel(
+            frame.Inspector.BoundState,
+            Runtime::SandboxEditorBoundRenderStateRowKind::CompositionSummary,
+            "Composition summary");
+    ASSERT_NE(composition, nullptr);
+    EXPECT_EQ(composition->Readiness,
+              Runtime::ProgressiveReadinessState::Pending);
+    EXPECT_EQ(frame.Inspector.BoundState.Composition.ChildCount, 1u);
 }
 
 TEST(SandboxEditorUi, ProgressiveSlotCommandsUseCommandHistory)

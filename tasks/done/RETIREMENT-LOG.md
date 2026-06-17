@@ -8,6 +8,47 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+Active
+[`UI-014`](UI-014-uv-backend-and-texture-bake-controls.md) — UV backend and
+texture bake controls — retired on 2026-06-17 at maturity `CPUContracted`.
+The sandbox editor now exposes selected-mesh UV diagnostics, xatlas-backed UV
+regeneration commands, property-catalog-driven bake source controls, generated
+texture bake command routing, and live ImGui controls for preserve/regenerate
+policy, atlas settings, target semantic, encoder, and output size. UI remains
+headless-safe and routes geometry mutation, bake work, generated texture
+payloads, and binding updates through runtime-owned command/history surfaces.
+
+Active
+[`UI-017`](UI-017-bound-render-state-inspector.md) — Bound render state
+inspector — retired on 2026-06-17 at maturity `CPUContracted`. Selected mesh,
+graph, point-cloud, and composition models now expose bound-state rows for
+render lanes, presentation slots, defaults, property buffers, authored and
+generated textures, readiness diagnostics, disabled command surfaces, and
+derived-job/bake progress without UI storing renderer handles, raw property
+pointers, worker state, or live asset-service references.
+
+Active
+[`RUNTIME-115`](RUNTIME-115-selected-mesh-bake-command-surface.md) — Selected
+mesh bake command surface — retired on 2026-06-17 at maturity
+`CPUContracted`. Runtime now owns a selected-mesh texture-bake command surface
+that validates source entity/domain/property, encoder, UV availability,
+resolution, generated texture key, and binding compatibility before work is
+scheduled. Successful synchronous or derived-job bakes reload generated
+`AssetTexture2DPayload` data through `AssetService` and optionally update
+progressive presentation bindings through `EditorCommandHistory`; stale
+derived-job applies are discarded deterministically.
+
+Active
+[`UI-016`](UI-016-geometry-property-catalog-and-binding-usability.md) —
+Geometry property catalog and binding usability — retired on 2026-06-17 at
+maturity `CPUContracted`. `Extrinsic.Runtime.SandboxEditorUi` now builds
+selected-entity property catalogs for mesh vertex/edge/halfedge/face, graph
+vertex/edge, and point-cloud point domains, including internal/connectivity,
+canonical, user, generated, supported, and unsupported rows. Supported
+scalar/label/vector properties show selected-value previews, and compatible
+binding targets keep dimension/domain mismatches visible with deterministic
+disabled reasons.
+
 Backlog
 [`GRAPHICS-090`](GRAPHICS-090-progressive-render-data-operational-smoke.md) —
 Progressive render-data operational smoke — retired on 2026-06-16 at maturity

@@ -43,7 +43,6 @@ the authoritative open/unblocked view.
 - blocked by `GEOM-024`: `METHOD-006` — Cross-field / frame-field design reference backend (tasks/backlog/methods/METHOD-006-cross-field-design-reference-backend.md)
 - unblocked: `METHOD-007` — Constrained Delaunay tetrahedralization reference backend (tasks/backlog/methods/METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md)
 - unblocked: `METHODS-001` — Pin signed heat as methods-pipeline pathfinder (tasks/backlog/methods/METHODS-001-signed-heat-pathfinder.md)
-- unblocked: `UI-014` — UV backend and texture bake controls (tasks/backlog/ui/UI-014-uv-backend-and-texture-bake-controls.md)
 
 ## Audits
 
