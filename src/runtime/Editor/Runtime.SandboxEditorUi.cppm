@@ -43,6 +43,11 @@ import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.SelectionController;
 import Geometry.UvAtlas;
 
+namespace Extrinsic::Runtime::Detail
+{
+    inline constexpr std::size_t kSandboxEditorPanelWindowCount = 9u;
+}
+
 export namespace Extrinsic::Runtime
 {
     enum class SandboxEditorDiagnosticCode : std::uint8_t
@@ -1441,6 +1446,8 @@ export namespace Extrinsic::Runtime
         SandboxEditorPanelFrame m_LastFrame{};
         std::array<char, 1024>  m_ImportPathBuffer{};
         std::array<char, 1024>  m_ScenePathBuffer{};
+        std::array<bool, Detail::kSandboxEditorPanelWindowCount>
+            m_PanelWindowOpen{};
         std::array<bool, 15>    m_DomainWindowOpen{};
         Assets::AssetPayloadKind m_ImportPayloadKind{
             Assets::AssetPayloadKind::Unknown};

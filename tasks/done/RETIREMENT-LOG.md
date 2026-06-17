@@ -9,6 +9,14 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`UI-018`](UI-018-sandbox-menu-first-ui.md) — Sandbox menu-first UI defaults —
+retired on 2026-06-17 at maturity `CPUContracted`. The sandbox editor now
+starts with only the main menu bar visible. Top-level panels open from `View`,
+and PointCloud/Graph/Mesh domain windows remain closed until selected from
+their menus, without changing panel models, command routing, or runtime
+ownership.
+
+Active
 [`UI-014`](UI-014-uv-backend-and-texture-bake-controls.md) — UV backend and
 texture bake controls — retired on 2026-06-17 at maturity `CPUContracted`.
 The sandbox editor now exposes selected-mesh UV diagnostics, xatlas-backed UV

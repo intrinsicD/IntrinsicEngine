@@ -56,6 +56,9 @@ depends_on: []
   property-to-slot selection, bound property/texture/default inspection,
   bake/job progress visibility, and runtime-owned mesh UV/bake commands over
   selected mesh, graph, point-cloud, and composition entities.
+- Sandbox startup organization — retired as `UI-018`; the first sandbox UI
+  frame is menu-first, with all top-level and domain windows closed until the
+  user opens them from the main menu bar.
 
 ## Child tasks (open when the trigger fires)
 - **UI-009 — IME and multi-window editor support.** Trigger: an alternative
@@ -72,8 +75,8 @@ depends_on: []
 
 Each child cites this seed in its Context and declares which deferred
 workflow it resolves; IDs continue from `UI-014` for new children because
-`UI-001..008`, `UI-013`, `UI-014`, `UI-015`, `UI-016`, and `UI-017` are taken
-while `UI-009..012` remain named triggers.
+`UI-001..008`, `UI-013`, `UI-014`, `UI-015`, `UI-016`, `UI-017`, and
+`UI-018` are taken while `UI-009..012` remain named triggers.
 
 ## Required changes
 - [ ] Keep the current-state inventory and deferred-workflow list above

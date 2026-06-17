@@ -154,6 +154,95 @@ namespace Extrinsic::Runtime
             Count = 5,
         };
 
+        enum class SandboxEditorPanelWindowKind : std::uint8_t
+        {
+            Shell = 0,
+            SceneHierarchy,
+            Inspector,
+            SelectionDetails,
+            FileScene,
+            FileImport,
+            FrameGraph,
+            CameraRender,
+            GeometryVisualization,
+            Count,
+        };
+
+        static_assert(
+            static_cast<std::size_t>(SandboxEditorPanelWindowKind::Count) ==
+            Detail::kSandboxEditorPanelWindowCount);
+
+        inline constexpr std::array<SandboxEditorPanelWindowKind,
+                                    Detail::kSandboxEditorPanelWindowCount>
+            kSandboxEditorPanelWindows{{
+                SandboxEditorPanelWindowKind::Shell,
+                SandboxEditorPanelWindowKind::SceneHierarchy,
+                SandboxEditorPanelWindowKind::Inspector,
+                SandboxEditorPanelWindowKind::SelectionDetails,
+                SandboxEditorPanelWindowKind::FileScene,
+                SandboxEditorPanelWindowKind::FileImport,
+                SandboxEditorPanelWindowKind::FrameGraph,
+                SandboxEditorPanelWindowKind::CameraRender,
+                SandboxEditorPanelWindowKind::GeometryVisualization,
+            }};
+
+        [[nodiscard]] const char* PanelWindowTitle(
+            const SandboxEditorPanelWindowKind kind) noexcept
+        {
+            switch (kind)
+            {
+            case SandboxEditorPanelWindowKind::Shell:
+                return "Sandbox Editor";
+            case SandboxEditorPanelWindowKind::SceneHierarchy:
+                return "Scene Hierarchy";
+            case SandboxEditorPanelWindowKind::Inspector:
+                return "Inspector";
+            case SandboxEditorPanelWindowKind::SelectionDetails:
+                return "Selection Details";
+            case SandboxEditorPanelWindowKind::FileScene:
+                return "File / Scene";
+            case SandboxEditorPanelWindowKind::FileImport:
+                return "File / Import";
+            case SandboxEditorPanelWindowKind::FrameGraph:
+                return "Frame Graph";
+            case SandboxEditorPanelWindowKind::CameraRender:
+                return "Camera / Render";
+            case SandboxEditorPanelWindowKind::GeometryVisualization:
+                return "Geometry Visualization";
+            case SandboxEditorPanelWindowKind::Count:
+                break;
+            }
+            return "Sandbox Window";
+        }
+
+        [[nodiscard]] std::size_t PanelWindowIndex(
+            const SandboxEditorPanelWindowKind kind) noexcept
+        {
+            return static_cast<std::size_t>(kind);
+        }
+
+        [[nodiscard]] bool BeginPanelWindow(
+            std::array<bool, Detail::kSandboxEditorPanelWindowCount>* panelWindowOpen,
+            const SandboxEditorPanelWindowKind kind,
+            const ImVec2 firstUseSize)
+        {
+            if (panelWindowOpen == nullptr)
+                return false;
+
+            bool& open = (*panelWindowOpen)[PanelWindowIndex(kind)];
+            if (!open)
+                return false;
+
+            if (firstUseSize.x > 0.0f && firstUseSize.y > 0.0f)
+                ImGui::SetNextWindowSize(firstUseSize, ImGuiCond_FirstUseEver);
+
+            if (ImGui::Begin(PanelWindowTitle(kind), &open))
+                return true;
+
+            ImGui::End();
+            return false;
+        }
+
         [[nodiscard]] GS::Domain ExpectedDomainForWindowKind(
             const SandboxEditorDomainWindowKind kind) noexcept
         {
@@ -4131,10 +4220,53 @@ namespace Extrinsic::Runtime
             ImGui::EndMenu();
         }
 
-        void DrawDomainMenus(std::array<bool, 15>* domainWindowOpen)
+        void DrawPanelWindowMenu(
+            std::array<bool, Detail::kSandboxEditorPanelWindowCount>*
+                panelWindowOpen)
+        {
+            if (!ImGui::BeginMenu("View"))
+                return;
+
+            const bool menuEnabled = panelWindowOpen != nullptr;
+            if (!menuEnabled)
+                ImGui::BeginDisabled();
+
+            if (panelWindowOpen != nullptr)
+            {
+                for (const SandboxEditorPanelWindowKind kind :
+                     kSandboxEditorPanelWindows)
+                {
+                    ImGui::MenuItem(
+                        PanelWindowTitle(kind),
+                        nullptr,
+                        &(*panelWindowOpen)[PanelWindowIndex(kind)]);
+                }
+            }
+            else
+            {
+                for (const SandboxEditorPanelWindowKind kind :
+                     kSandboxEditorPanelWindows)
+                {
+                    (void)ImGui::MenuItem(PanelWindowTitle(kind),
+                                          nullptr,
+                                          false,
+                                          false);
+                }
+            }
+
+            if (!menuEnabled)
+                ImGui::EndDisabled();
+            ImGui::EndMenu();
+        }
+
+        void DrawMainMenuBar(
+            std::array<bool, Detail::kSandboxEditorPanelWindowCount>*
+                panelWindowOpen,
+            std::array<bool, 15>* domainWindowOpen)
         {
             if (!ImGui::BeginMainMenuBar())
                 return;
+            DrawPanelWindowMenu(panelWindowOpen);
             DrawDomainMenu(SandboxEditorDomainWindowKind::PointCloud, domainWindowOpen);
             DrawDomainMenu(SandboxEditorDomainWindowKind::Graph, domainWindowOpen);
             DrawDomainMenu(SandboxEditorDomainWindowKind::Mesh, domainWindowOpen);
@@ -5458,23 +5590,27 @@ namespace Extrinsic::Runtime
             A::AssetPayloadKind* importPayloadKind,
             std::optional<SandboxEditorFileImportResult>* lastImportResult,
             std::optional<SandboxEditorSceneFileResult>* lastSceneFileResult,
+            std::array<bool, Detail::kSandboxEditorPanelWindowCount>*
+                panelWindowOpen,
             std::array<bool, 15>* domainWindowOpen,
             KMeansUiState* kmeansState,
             TextureBakeUiState* textureBakeState)
         {
-            DrawDomainMenus(domainWindowOpen);
+            DrawMainMenuBar(panelWindowOpen, domainWindowOpen);
             DrawDomainWindows(context, domainWindowOpen, kmeansState, textureBakeState);
 
-            ImGui::SetNextWindowSize(ImVec2(360.0f, 520.0f), ImGuiCond_FirstUseEver);
-            if (ImGui::Begin("Sandbox Editor"))
+            if (BeginPanelWindow(panelWindowOpen,
+                                 SandboxEditorPanelWindowKind::Shell,
+                                 ImVec2(360.0f, 520.0f)))
             {
                 ImGui::TextUnformatted("Promoted runtime editor shell");
                 DrawDiagnostics(frame.Diagnostics);
+                ImGui::End();
             }
-            ImGui::End();
 
-            ImGui::SetNextWindowSize(ImVec2(280.0f, 420.0f), ImGuiCond_FirstUseEver);
-            if (ImGui::Begin("Scene Hierarchy"))
+            if (BeginPanelWindow(panelWindowOpen,
+                                 SandboxEditorPanelWindowKind::SceneHierarchy,
+                                 ImVec2(280.0f, 420.0f)))
             {
                 if (frame.Hierarchy.empty())
                 {
@@ -5494,11 +5630,12 @@ namespace Extrinsic::Runtime
                         ImGui::TextDisabled("(hover)");
                     }
                 }
+                ImGui::End();
             }
-            ImGui::End();
 
-            ImGui::SetNextWindowSize(ImVec2(360.0f, 420.0f), ImGuiCond_FirstUseEver);
-            if (ImGui::Begin("Inspector"))
+            if (BeginPanelWindow(panelWindowOpen,
+                                 SandboxEditorPanelWindowKind::Inspector,
+                                 ImVec2(360.0f, 420.0f)))
             {
                 if (!frame.Inspector.HasEntity)
                 {
@@ -5755,10 +5892,12 @@ namespace Extrinsic::Runtime
                     DrawDiagnostics(progressive.Diagnostics);
                     DrawDiagnostics(inspector.Diagnostics);
                 }
+                ImGui::End();
             }
-            ImGui::End();
 
-            if (ImGui::Begin("Selection Details"))
+            if (BeginPanelWindow(panelWindowOpen,
+                                 SandboxEditorPanelWindowKind::SelectionDetails,
+                                 ImVec2(0.0f, 0.0f)))
             {
                 ImGui::Text("Selected entities: %zu", frame.Selection.SelectedStableIds.size());
                 for (const SandboxEditorEntityRow& row : frame.Selection.SelectedEntities)
@@ -5794,10 +5933,12 @@ namespace Extrinsic::Runtime
                     }
                 }
                 DrawDiagnostics(frame.Selection.Diagnostics);
+                ImGui::End();
             }
-            ImGui::End();
 
-            if (ImGui::Begin("File / Scene"))
+            if (BeginPanelWindow(panelWindowOpen,
+                                 SandboxEditorPanelWindowKind::FileScene,
+                                 ImVec2(0.0f, 0.0f)))
             {
                 ImGui::TextWrapped("%s", frame.Document.StatusText.c_str());
                 ImGui::Text("Active path: %s",
@@ -5917,10 +6058,12 @@ namespace Extrinsic::Runtime
                                 result->Stats.PointCloudEntities);
                 }
                 DrawDiagnostics(frame.SceneFile.Diagnostics);
+                ImGui::End();
             }
-            ImGui::End();
 
-            if (ImGui::Begin("File / Import"))
+            if (BeginPanelWindow(panelWindowOpen,
+                                 SandboxEditorPanelWindowKind::FileImport,
+                                 ImVec2(0.0f, 0.0f)))
             {
                 const bool importControlsAvailable =
                     frame.FileImport.Enabled &&
@@ -6030,10 +6173,12 @@ namespace Extrinsic::Runtime
                 }
                 DrawAssetImportQueue(frame.AssetImportQueue, context);
                 DrawDiagnostics(frame.FileImport.Diagnostics);
+                ImGui::End();
             }
-            ImGui::End();
 
-            if (ImGui::Begin("Frame Graph"))
+            if (BeginPanelWindow(panelWindowOpen,
+                                 SandboxEditorPanelWindowKind::FrameGraph,
+                                 ImVec2(0.0f, 0.0f)))
             {
                 if (!frame.RenderGraph.Enabled)
                 {
@@ -6131,10 +6276,12 @@ namespace Extrinsic::Runtime
                         }
                     }
                 }
+                ImGui::End();
             }
-            ImGui::End();
 
-            if (ImGui::Begin("Camera / Render"))
+            if (BeginPanelWindow(panelWindowOpen,
+                                 SandboxEditorPanelWindowKind::CameraRender,
+                                 ImVec2(0.0f, 0.0f)))
             {
                 if (frame.CameraRender.HasMainCameraController)
                 {
@@ -6189,10 +6336,12 @@ namespace Extrinsic::Runtime
                 }
 
                 DrawDiagnostics(frame.CameraRender.Diagnostics);
+                ImGui::End();
             }
-            ImGui::End();
 
-            if (ImGui::Begin("Geometry Visualization"))
+            if (BeginPanelWindow(panelWindowOpen,
+                                 SandboxEditorPanelWindowKind::GeometryVisualization,
+                                 ImVec2(0.0f, 0.0f)))
             {
                 if (frame.Visualization.HasSelectedEntity)
                 {
@@ -6299,8 +6448,8 @@ namespace Extrinsic::Runtime
                     }
                 }
                 DrawDiagnostics(frame.Visualization.Diagnostics);
+                ImGui::End();
             }
-            ImGui::End();
         }
     }
 
@@ -8282,6 +8431,7 @@ namespace Extrinsic::Runtime
                        nullptr,
                        nullptr,
                        nullptr,
+                       nullptr,
                        nullptr);
     }
 
@@ -8351,6 +8501,7 @@ namespace Extrinsic::Runtime
                     &m_ImportPayloadKind,
                     &m_LastImportResult,
                     &m_LastSceneFileResult,
+                    &m_PanelWindowOpen,
                     &m_DomainWindowOpen,
                     &kmeansState,
                     &textureBakeState);

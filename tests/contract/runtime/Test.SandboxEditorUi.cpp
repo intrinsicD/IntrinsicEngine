@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -19,6 +20,10 @@
 #include <entt/entity/entity.hpp>
 #include <gtest/gtest.h>
 #include <glm/gtc/quaternion.hpp>
+#include <imgui.h>
+#include <imgui_internal.h>
+
+#include "TestImGuiFrameScope.hpp"
 
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Asset.ModelTexturePayload;
@@ -84,6 +89,23 @@ namespace
 {
     constexpr std::uint32_t kInvalidIndex =
         std::numeric_limits<std::uint32_t>::max();
+
+    [[nodiscard]] bool ImGuiWindowExists(const std::string_view name)
+    {
+        const ImGuiContext* context = ImGui::GetCurrentContext();
+        if (context == nullptr)
+            return false;
+
+        for (const ImGuiWindow* window : context->Windows)
+        {
+            if (window != nullptr &&
+                std::string_view{window->Name} == name)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
 
     [[nodiscard]] bool HasDiagnostic(
         const std::vector<Runtime::SandboxEditorDiagnostic>& diagnostics,
@@ -701,6 +723,49 @@ TEST(SandboxEditorUi, EmptyContextProducesDeterministicDisabledDiagnostics)
                               Runtime::SandboxEditorDiagnosticCode::RenderGraphStatsUnavailable));
     EXPECT_TRUE(HasDiagnostic(frame.Inspector.Diagnostics,
                               Runtime::SandboxEditorDiagnosticCode::MissingScene));
+}
+
+TEST(SandboxEditorUi, DefaultDrawStartsWithOnlyMenuBarVisible)
+{
+    TestSupport::ImGuiFrameScope imguiFrame;
+    const Runtime::SandboxEditorPanelFrame frame =
+        Runtime::BuildSandboxEditorPanelFrame(Runtime::SandboxEditorContext{});
+
+    Runtime::DrawSandboxEditorPanelFrame(frame);
+
+    EXPECT_TRUE(ImGuiWindowExists("##MainMenuBar"));
+
+    constexpr std::array<std::string_view, 24> kClosedByDefaultWindows{{
+        "Sandbox Editor",
+        "Scene Hierarchy",
+        "Inspector",
+        "Selection Details",
+        "File / Scene",
+        "File / Import",
+        "Frame Graph",
+        "Camera / Render",
+        "Geometry Visualization",
+        "PointCloud / Render",
+        "PointCloud / Properties",
+        "PointCloud / Visualization",
+        "PointCloud / Selection",
+        "PointCloud / Processing",
+        "Graph / Render",
+        "Graph / Properties",
+        "Graph / Visualization",
+        "Graph / Selection",
+        "Graph / Processing",
+        "Mesh / Render",
+        "Mesh / Properties",
+        "Mesh / Visualization",
+        "Mesh / Selection",
+        "Mesh / Processing",
+    }};
+
+    for (const std::string_view title : kClosedByDefaultWindows)
+    {
+        EXPECT_FALSE(ImGuiWindowExists(title)) << std::string(title);
+    }
 }
 
 TEST(SandboxEditorUi, RenderGraphPanelModelCopiesRendererStats)
@@ -3731,7 +3796,7 @@ TEST(SandboxEditorUi, ProgressiveSlotCommandsUseCommandHistory)
               Runtime::SandboxEditorCommandStatus::InvalidVisualizationProperty);
 }
 
-TEST(SandboxEditorUi, AdapterCallbackDrawsDeterministicDisabledPanelFrame)
+TEST(SandboxEditorUi, AdapterCallbackDrawsDeterministicMenuOnlyFrame)
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;

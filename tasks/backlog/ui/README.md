@@ -78,6 +78,9 @@ No backlog UI implementation tasks are currently queued.
   derived-job/bake progress, and mesh UV/bake controls route through runtime
   command surfaces without UI owning geometry, runtime, asset, or graphics
   state.
+- UI-018 retired the sandbox startup organization follow-up: the editor now
+  starts menu-first, with top-level panels available from `View` and all
+  sandbox/domain windows closed until explicitly opened.
 - UI work that depends on renderer overlays/handoff coordinates with the
   retired `GRAPHICS-024`
   parity matrix, the `RUNTIME-104` decision not to retain a persistent
@@ -120,3 +123,7 @@ split; narratives live in the retirement log.
   xatlas-backed regeneration commands, property-catalog-driven bake sources,
   target semantic/encoder/output-size controls, and selected-mesh bake command
   routing are now present in the runtime-owned sandbox editor UI.
+- [UI-018 — Sandbox menu-first UI defaults](../../done/UI-018-sandbox-menu-first-ui.md)
+  (done, 2026-06-17, `CPUContracted`): sandbox startup now shows only the
+  main menu bar; top-level panels open from `View`, while domain windows remain
+  closed until opened from the PointCloud/Graph/Mesh menus.

@@ -44,6 +44,16 @@ startup/shutdown.
 | `Extrinsic.Runtime.GizmoInteraction` | Runtime/editor-owned transform-gizmo interaction (`RUNTIME-084`). Exports `GizmoMode` (`Translate`/`Rotate`/`Scale`), `GizmoAxis`, `GizmoOrientation` (`Global`/`Local`), `GizmoModifier` flags (`Snap`/`Clone`), `PickRay`, `GizmoConfig` (pick radius, axis length, translate/rotate/scale snap and scale clamps), `GizmoHitResult`, full-transform `GizmoTransformEdit` records, `GizmoUndoStack`, `GizmoInteractionDiagnostics`, `GizmoInteraction`, and `TransformGizmoRenderPacketBuilder`. `HitTest(registry, CameraViewSnapshot, cursorPixel, viewport, selected)` projects each axis handle line to screen space and resolves the nearest handle within the pixel pick radius; empty/off-handle picks are a background no-hit. `BeginDrag`/`DragTick`/`DragCommit`/`DragCancel` apply axis-constrained translate/rotate/scale edits by projecting the world `PickRay` onto the locked axis line, mutate ECS authoring transforms in runtime only, stamp `Transform::IsDirtyTag`, latch mode at drag start, honor `Snap`, and emit one before/after position-rotation-scale edit per changed entity on commit. `Engine` owns the interaction, undo stack, packet builder, selected-entity scratch, and default input binding (left mouse drag, left shift snap); extraction forwards the builder's copied `TransformGizmoRenderPacket` span through `RuntimeRenderSnapshotBatch::TransformGizmos`. Graphics sees only the frozen render packet field set and never receives drag state, pointer pixels, modifier keys, undo data, or ECS handles. |
 | `Extrinsic.Runtime.StreamingExecutor` | Persistent background streaming task execution |
 
+### Sandbox Editor Startup Layout
+
+`UI-018` makes `Extrinsic.Runtime.SandboxEditorUi` menu-first on startup. The
+first sandbox ImGui frame draws the main menu bar only; `Sandbox Editor`,
+`Scene Hierarchy`, `Inspector`, `Selection Details`, `File / Scene`,
+`File / Import`, `Frame Graph`, `Camera / Render`, `Geometry Visualization`,
+and all PointCloud/Graph/Mesh domain windows stay closed until toggled from the
+menu. The open/closed bits live in the attached `SandboxEditorUi` instance and
+do not change panel models, command routing, or runtime ownership.
+
 ### Progressive Editor Inspector
 
 `UI-015` extends `Extrinsic.Runtime.SandboxEditorUi` with data-only progressive
