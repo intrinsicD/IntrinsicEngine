@@ -86,8 +86,13 @@ split; narratives live in the retirement log.
 - [LEGACY-015 — Migrate CoreError test to promoted Core](../../done/LEGACY-015-core-error-test-promoted.md)
   (done, 2026-06-18, `CPUContracted`):
   migrated the CoreError unit test to `Extrinsic.Core.Error` and renamed it to
-  `tests/unit/core/Test.CoreError.cpp`; remaining Core deletion blockers are 42
-  tests and legacy-internal subtree ordering.
+  `tests/unit/core/Test.CoreError.cpp`; `LEGACY-016` later reduced the
+  remaining Core test-consumer set to 41 files.
+- [LEGACY-016 — Migrate LogRingBuffer test to promoted Core](../../done/LEGACY-016-log-ring-buffer-test-promoted.md)
+  (done, 2026-06-18, `CPUContracted`):
+  migrated the LogRingBuffer unit test to `Extrinsic.Core.Logging` and renamed
+  it to `tests/unit/core/Test.LogRingBuffer.cpp`; remaining Core deletion
+  blockers are 41 tests and legacy-internal subtree ordering.
 - [CORE-002 — Command and feature catalog contract](../../done/CORE-002-command-feature-catalog-contract.md)
   (done, 2026-06-09, `CPUContracted` / explicit retirement decision):
   resolves remaining legacy `Core.Commands`, `Core.FeatureRegistry`, and

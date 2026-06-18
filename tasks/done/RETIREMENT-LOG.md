@@ -9,6 +9,16 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`LEGACY-016`](LEGACY-016-log-ring-buffer-test-promoted.md) — Migrate
+LogRingBuffer test to promoted Core — retired on 2026-06-18 at maturity
+`CPUContracted`. `tests/unit/core/Test.LogRingBuffer.cpp` now imports promoted
+`Extrinsic.Core.Logging` instead of bare legacy `Core.Logging`, and the touched
+independent test uses the `Test.<Name>.cpp` naming convention. The focused core
+target and `LogRingBuffer` CTest filter passed. `LEGACY-005` remains blocked by
+41 remaining test consumers and 133 legacy-internal consumers; `LEGACY-012`
+owns the remaining test cleanup.
+
+Backlog
 [`LEGACY-015`](LEGACY-015-core-error-test-promoted.md) — Migrate CoreError test
 to promoted Core — retired on 2026-06-18 at maturity `CPUContracted`.
 `tests/unit/core/Test.CoreError.cpp` now imports promoted

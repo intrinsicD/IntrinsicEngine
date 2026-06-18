@@ -4,7 +4,9 @@
 #include <cstdint>
 #include <string>
 
-import Core.Logging;
+import Extrinsic.Core.Logging;
+
+namespace Core = Extrinsic::Core;
 
 // Each test clears the ring buffer to avoid cross-test contamination.
 

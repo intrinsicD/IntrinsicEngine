@@ -197,7 +197,7 @@ set(_core_test_files
     Test_InplaceFunction.cpp
     Test_Profiling.cpp
     Test.CoreError.cpp
-    Test_LogRingBuffer.cpp
+    Test.LogRingBuffer.cpp
 )
 intrinsic_resolve_test_sources(_core_test_sources
     SEARCH_DIRS unit/core
