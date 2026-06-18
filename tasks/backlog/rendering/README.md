@@ -801,15 +801,16 @@ Open post-acceptance rendering leaves:
   unblocked; structural sibling of `GRAPHICS-091`. Groups the flat-mixed point-only
   fields (`PointMode`/`PointSize`/`PointSizeBDA`) into named per-domain sub-blocks.
   Slice A has landed the 128-byte `GpuEntityConfig` layout with `Point` and `Line`
-  sub-blocks and defaulted `Line.LineWidth` / `Line.LineWidthBDA`; Slice B remains
-  open for `RenderEdges::WidthSource` population and `forward/line.vert`
-  width consumption on the `LineQuads` topology. Target `Operational` on
-  Vulkan-capable hosts.
+  sub-blocks and defaulted `Line.LineWidth` / `Line.LineWidthBDA`; Slice B has
+  landed CPU/null line-width residency and `forward/line.vert` consumption on the
+  `LineQuads` topology. The remaining open slice is the opt-in `gpu;vulkan`
+  operational line-width smoke on Vulkan-capable hosts.
 - [GRAPHICS-093 — Define forward-line quad topology for retained GpuScene lines (done)](../../done/GRAPHICS-093-forward-line-quad-topology.md):
   retired 2026-06-18 at `CPUContracted`; appended the non-indexed `LineQuads`
   bucket, switched retained `LinePass` to `DrawIndirectCount()` / `TriangleList`,
-  and preserved the indexed `Lines` bucket for edge-id selection. Dynamic line-width
-  consumption remains under `GRAPHICS-092`.
+  and preserved the indexed `Lines` bucket for edge-id selection. CPU/null dynamic
+  line-width consumption is now covered by `GRAPHICS-092`; Vulkan operational proof
+  remains there.
 
 Cross-layer Theme A leaves retired for the full working sandbox path:
 - [`RUNTIME-085` — `GeometrySources` mesh residency bridge](../../done/RUNTIME-085-geometrysources-mesh-residency.md) (retired 2026-05-28 at `CPUContracted`; Slices A–C landed the mesh packer, extraction wiring, and dirty-domain reupload/retire ordering).

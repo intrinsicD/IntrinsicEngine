@@ -64,7 +64,11 @@ void main() {
     const vec2 tangent = directionLength > 1.0e-6 ? direction / directionLength : vec2(1.0, 0.0);
     const vec2 normal = vec2(-tangent.y, tangent.x);
     const vec2 viewport = max(vec2(scene.CameraViewportWidth, scene.CameraViewportHeight), vec2(1.0));
-    const float halfWidthPx = 0.5;
+    float lineWidthPx = cfg.Line.LineWidth;
+    if (cfg.Line.LineWidthBDA != uint64_t(0)) {
+        lineWidthPx = GpuFloatBufferRef(cfg.Line.LineWidthBDA).Data[segmentIndex];
+    }
+    const float halfWidthPx = clamp(lineWidthPx, 0.5, 32.0) * 0.5;
     const vec2 clipOffset = normal * side * vec2((2.0 * halfWidthPx) / viewport.x,
                                                  (2.0 * halfWidthPx) / viewport.y) * centerClip.w;
 

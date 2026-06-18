@@ -1494,6 +1494,7 @@ namespace Extrinsic::Runtime
         const RHI::GpuBounds& bounds,
         std::uint32_t stableId,
         bool desired,
+        const Graphics::Components::RenderEdges* edges,
         const Graphics::Components::RenderPoints* points,
         bool meshDirty,
         Graphics::IRenderer& renderer,
@@ -1535,7 +1536,19 @@ namespace Extrinsic::Runtime
             cfg.ColorSourceMode = 1u;
             cfg.VisualizationAlpha = 1.0f;
             cfg.UniformColor = {0.02f, 0.02f, 0.02f, 1.0f};
-            if (!isEdge)
+            if (isEdge)
+            {
+                if (edges != nullptr)
+                {
+                    if (const auto* uniform =
+                            std::get_if<float>(&edges->WidthSource);
+                        uniform != nullptr)
+                    {
+                        cfg.Line.LineWidth = *uniform;
+                    }
+                }
+            }
+            else
             {
                 cfg.Point.PointSize = UniformPointSizeOrDefault(points);
                 cfg.Point.PointMode = ToRenderPointMode(points->Type);
@@ -1891,6 +1904,8 @@ namespace Extrinsic::Runtime
                         registry.all_of<G::RenderSurface>(entity);
                     const bool wantsEdges =
                         registry.all_of<G::RenderEdges>(entity);
+                    const auto* edgeHint =
+                        registry.try_get<G::RenderEdges>(entity);
                     const auto* pointHint =
                         registry.try_get<G::RenderPoints>(entity);
                     const bool wantsPoints = pointHint != nullptr;
@@ -1930,6 +1945,7 @@ namespace Extrinsic::Runtime
                                                        viewBounds,
                                                        stableId,
                                                        wantsEdges,
+                                                       edgeHint,
                                                        nullptr,
                                                        meshDirtyThisFrame,
                                                        renderer,
@@ -1943,6 +1959,7 @@ namespace Extrinsic::Runtime
                                                        viewBounds,
                                                        stableId,
                                                        wantsPoints,
+                                                       nullptr,
                                                        pointHint,
                                                        meshDirtyThisFrame,
                                                        renderer,
@@ -2122,6 +2139,7 @@ namespace Extrinsic::Runtime
                 .Material = &sidecar->Material,
                 .GpuSlot = &sidecar->GpuSlot,
                 .Visualization = sidecar->HasVisualization ? &sidecar->Visualization : nullptr,
+                .Edges = registry.try_get<Graphics::Components::RenderEdges>(entity),
                 .Points = registry.try_get<Graphics::Components::RenderPoints>(entity),
             });
             AppendVisualizationAdapters(stableId, *sidecar, stats);

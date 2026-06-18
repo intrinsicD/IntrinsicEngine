@@ -566,7 +566,7 @@ Point clouds render in the **ForwardPass** (PointPass sub-pass), after deferred 
 | `ImpostorSphere`| Billboard with per-fragment sphere depth correction | `point_sphere.vert/frag` | ✅ |
 | `GaussianSplat` | Oriented anisotropic splat, view-dependent color | `point_splat.vert/frag` | **[DEFERRED — §13.8]** |
 
-Point size is per-entity (`GpuEntityConfig.Point.PointSize`) or per-point (`GpuEntityConfig.Point.PointSizeBDA[point_id]`). UI sliders write to `Point::Component` which propagates to `GpuEntityConfig` on the next dirty sync. Line width has the same storage venue under `GpuEntityConfig.Line`, with population and screen-space quad expansion owned by the remaining `GRAPHICS-092` slice.
+Point size is per-entity (`GpuEntityConfig.Point.PointSize`) or per-point (`GpuEntityConfig.Point.PointSizeBDA[point_id]`). UI sliders write to `Point::Component` which propagates to `GpuEntityConfig` on the next dirty sync. Line width has the same storage venue under `GpuEntityConfig.Line`; `RenderEdges::WidthSource` writes uniform widths to `Line.LineWidth` or named per-edge width-buffer addresses to `Line.LineWidthBDA`, and `forward/line.vert` expands retained `LineQuads` in screen space from that config.
 
 ---
 

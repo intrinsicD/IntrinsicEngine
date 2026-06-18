@@ -190,8 +190,24 @@ namespace Extrinsic::Graphics
             }
         }
 
+        static void ApplyLineRenderConfig(
+            RHI::GpuEntityConfig& cfg,
+            const Components::RenderEdges* edges) noexcept
+        {
+            if (edges == nullptr)
+                return;
+
+            if (const auto* uniform =
+                    std::get_if<float>(&edges->WidthSource);
+                uniform != nullptr)
+            {
+                cfg.Line.LineWidth = *uniform;
+            }
+        }
+
         RHI::GpuEntityConfig BuildEntityConfig(
             const Components::VisualizationConfig* visCfg,
+            const Components::RenderEdges* edges,
             const Components::RenderPoints* points,
             const Components::GpuSceneSlot&        gpuSlot,
             ColormapSystem&                        colormapSys) const
@@ -200,7 +216,44 @@ namespace Extrinsic::Graphics
             cfg.ColorSourceMode = kMode_Material;
             cfg.VisualizationAlpha = 1.f;
             cfg.UniformColor = {1.f, 1.f, 1.f, 1.f};
+            ApplyLineRenderConfig(cfg, edges);
             ApplyPointRenderConfig(cfg, points);
+
+            if (Device)
+            {
+                auto setBda = [&](std::string_view name, std::uint64_t& outBda)
+                {
+                    const RHI::BufferHandle handle = gpuSlot.Find(name);
+                    if (handle.IsValid())
+                    {
+                        outBda = Device->GetBufferDeviceAddress(handle);
+                    }
+                };
+
+                setBda("normals", cfg.VertexNormalBDA);
+                if (points != nullptr)
+                {
+                    if (const auto* sizeName =
+                            std::get_if<std::string>(&points->SizeSource);
+                        sizeName != nullptr)
+                    {
+                        setBda(*sizeName, cfg.Point.PointSizeBDA);
+                    }
+                    else
+                    {
+                        setBda("sizes", cfg.Point.PointSizeBDA);
+                    }
+                }
+                if (edges != nullptr)
+                {
+                    if (const auto* widthName =
+                            std::get_if<std::string>(&edges->WidthSource);
+                        widthName != nullptr)
+                    {
+                        setBda(*widthName, cfg.Line.LineWidthBDA);
+                    }
+                }
+            }
 
             if (!visCfg)
                 return cfg;
@@ -248,8 +301,6 @@ namespace Extrinsic::Graphics
                 setBdaAndCount(visCfg->ColorBufferName, cfg.ColorBDA);
             }
 
-            setBdaAndCount("normals", cfg.VertexNormalBDA);
-            setBdaAndCount("sizes", cfg.Point.PointSizeBDA);
             return cfg;
         }
     };
@@ -339,7 +390,7 @@ namespace Extrinsic::Graphics
                 gpuWorld.SetEntityConfig(
                     gpuSlot.ToInstanceHandle(),
                     m_Impl->BuildEntityConfig(
-                        visCfg, record.Points, gpuSlot, colormapSys));
+                        visCfg, record.Edges, record.Points, gpuSlot, colormapSys));
             }
 
             if (!visCfg || visCfg->Source == ColorSource::Material)

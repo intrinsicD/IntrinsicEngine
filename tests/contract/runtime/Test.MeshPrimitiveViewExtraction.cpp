@@ -171,10 +171,12 @@ namespace
         return entity;
     }
 
-    void EnableEdgeView(Registry& scene, EntityHandle entity)
+    void EnableEdgeView(Registry& scene, EntityHandle entity, float width = 1.0f)
     {
         namespace G = Extrinsic::Graphics::Components;
-        scene.Raw().emplace_or_replace<G::RenderEdges>(entity);
+        G::RenderEdges edges{};
+        edges.WidthSource = width;
+        scene.Raw().emplace_or_replace<G::RenderEdges>(entity, edges);
     }
 
     void EnableVertexView(
@@ -244,11 +246,63 @@ TEST(MeshPrimitiveViewExtraction, EnableEdgeViewUploadsSeparateEdgeRenderable)
     EXPECT_FALSE(view->HasMeshVertexView);
     EXPECT_EQ(gpuWorld.GetInstanceGeometry(view->MeshEdgeViewInstance), view->MeshEdgeViewGeometry);
     const auto config = gpuWorld.GetEntityConfigForTest(view->MeshEdgeViewInstance);
+    EXPECT_FLOAT_EQ(config.Line.LineWidth, 1.0f);
+    EXPECT_EQ(config.Line.LineWidthBDA, 0u);
     EXPECT_EQ(config.ColorSourceMode, 1u);
     EXPECT_FLOAT_EQ(config.UniformColor.r, 0.02f);
     EXPECT_FLOAT_EQ(config.UniformColor.g, 0.02f);
     EXPECT_FLOAT_EQ(config.UniformColor.b, 0.02f);
     EXPECT_FLOAT_EQ(config.UniformColor.a, 1.0f);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
+TEST(MeshPrimitiveViewExtraction, EdgeViewWidthConfigUpdateReusesGeometry)
+{
+    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.Initialize();
+
+    auto& scene = engine.GetScene();
+    const EntityHandle entity = MakeMeshRenderable(scene);
+    const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    EnableEdgeView(scene, entity, 2.5f);
+
+    auto stats = extraction.ExtractAndSubmit(scene,
+                                             engine.GetRenderer(),
+                                             &engine.GetGpuAssetCache());
+    ASSERT_EQ(stats.MeshEdgeViewUploads, 1u);
+
+    auto view = extraction.FindRenderableSidecarForTest(stableId);
+    ASSERT_TRUE(view.has_value());
+    const auto firstGeometry = view->MeshEdgeViewGeometry;
+    const auto firstInstance = view->MeshEdgeViewInstance;
+    ASSERT_TRUE(firstGeometry.IsValid());
+    ASSERT_TRUE(firstInstance.IsValid());
+
+    auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
+    auto config = gpuWorld.GetEntityConfigForTest(firstInstance);
+    EXPECT_FLOAT_EQ(config.Line.LineWidth, 2.5f);
+    EXPECT_EQ(config.Line.LineWidthBDA, 0u);
+
+    EnableEdgeView(scene, entity, 4.75f);
+
+    stats = extraction.ExtractAndSubmit(scene,
+                                        engine.GetRenderer(),
+                                        &engine.GetGpuAssetCache());
+    EXPECT_EQ(stats.MeshEdgeViewUploads, 0u);
+    EXPECT_EQ(stats.MeshEdgeViewReuseHits, 1u);
+    EXPECT_EQ(stats.MeshEdgeViewReuploads, 0u);
+
+    view = extraction.FindRenderableSidecarForTest(stableId);
+    ASSERT_TRUE(view.has_value());
+    EXPECT_EQ(view->MeshEdgeViewGeometry, firstGeometry);
+    EXPECT_EQ(view->MeshEdgeViewInstance, firstInstance);
+    config = gpuWorld.GetEntityConfigForTest(firstInstance);
+    EXPECT_FLOAT_EQ(config.Line.LineWidth, 4.75f);
+    EXPECT_EQ(config.Line.LineWidthBDA, 0u);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();

@@ -28,27 +28,28 @@ depends_on: []
   `assets/shaders/common/gpu_scene.glsl`, and the modern forward line vertex shader
   `assets/shaders/forward/line.vert`. Runtime/graphics extraction populates the
   config (`Runtime.RenderExtraction`, `Graphics.VisualizationSyncSystem`).
-- Current state after Slice A (verified 2026-06-18): `GpuEntityConfig`
+- Current state after Slice B (verified 2026-06-18): `GpuEntityConfig`
   (`RHI.Types.cppm`, 128 bytes, `static_assert(sizeof == 128)` plus offset
   assertions) keeps shared visualization/color fields in the parent config and
   stores domain-specific settings in `cfg.Point` and `cfg.Line`. Point size has
   full residency: uniform `RenderPoints::SizeSource` → `cfg.Point.PointSize`,
   per-point buffer → `cfg.Point.PointSizeBDA`, consumed by `forward/point.vert`
-  quad expansion. `cfg.Line.LineWidth` / `cfg.Line.LineWidthBDA` now exist with
-  deterministic defaults; population from `RenderEdges::WidthSource` and line
-  quad expansion remain open for Slice B.
-- Line-width gap: `RenderEdges::WidthSource`
+  quad expansion. `RenderEdges::WidthSource` now populates
+  `cfg.Line.LineWidth` for uniform widths and `cfg.Line.LineWidthBDA` for named
+  per-edge width buffers, and `forward/line.vert` consumes that config while
+  expanding retained `LineQuads`.
+- Remaining operational gap: `RenderEdges::WidthSource`
   (`Graphics.Component.RenderGeometry.cppm:84`, `variant<float,string>`) is authored,
   serialized (`Runtime.SceneSerialization`), and editor-driven (`SandboxEditorUi`),
-  but is **not consumed** on the modern GpuScene forward line path —
-  `forward/line.vert` emits a native 1px line list with no width expansion. (The
-  legacy retained line path and the overlay-packet `LineWidth` are separate and
-  out of scope.)
+  and consumed on the CPU/null modern GpuScene forward line path, but the opt-in
+  `gpu;vulkan` line-width visual smoke is still open. (The legacy retained line
+  path and the overlay-packet `LineWidth` are separate and out of scope.)
 - `GRAPHICS-093` retired the draw-topology blocker for Slice B: retained forward
   lines now consume the non-indexed `LineQuads` bucket through `DrawIndirectCount()`
   and `Topology::TriangleList`, while edge-id selection keeps the indexed `Lines`
-  bucket. Slice B can now focus on `RenderEdges::WidthSource` population and
-  `GpuEntityConfig::Line.LineWidth` / `Line.LineWidthBDA` consumption.
+  bucket. Slice B used that topology to wire `RenderEdges::WidthSource`
+  population and `GpuEntityConfig::Line.LineWidth` / `Line.LineWidthBDA`
+  consumption under CPU/null coverage; Vulkan operational proof remains open.
 - One entity can be surface+line+point simultaneously (`RenderFlags` bits in
   `gpu_scene.glsl`), so per-domain params must be **grouped sub-blocks, not a union** —
   point and line params can be live at the same time.
@@ -71,18 +72,18 @@ depends_on: []
       buffer) to the line block.
 - [x] Mirror the new layout in `assets/shaders/common/gpu_scene.glsl` (byte-identical
       scalar block) and update the `static_assert(sizeof(GpuEntityConfig) == …)`.
-- [ ] Populate line-width residency in extraction/sync at parity with point size:
+- [x] Populate line-width residency in extraction/sync at parity with point size:
       uniform `RenderEdges::WidthSource` (float) → `cfg.Line.LineWidth`; named per-edge
       buffer → `cfg.Line.LineWidthBDA` (`Runtime.RenderExtraction` and/or
       `Graphics.VisualizationSyncSystem`, mirroring `PointSize`/`PointSizeBDA`).
-- [ ] Consume line width in `assets/shaders/forward/line.vert`: expand the segment to
+- [x] Consume line width in `assets/shaders/forward/line.vert`: expand the segment to
       a screen-space quad (mirroring `forward/point.vert` size expansion) so uniform
       and per-edge widths render; keep a deterministic default when no width is set.
 - [x] Update `forward/point.*` and any other readers to the regrouped field names
       (mechanical, behavior-preserving).
 
 ## Tests
-- [ ] CPU/null `contract;graphics` (or `contract;runtime`) coverage asserting
+- [x] CPU/null `contract;graphics` (or `contract;runtime`) coverage asserting
       extraction/sync writes `cfg.Line.LineWidth`/`cfg.Line.LineWidthBDA` from
       `RenderEdges::WidthSource` at parity with `PointSize`/`PointSizeBDA`.
 - [x] A layout/parity check (the updated `static_assert` plus a GLSL-compile check)
@@ -90,7 +91,7 @@ depends_on: []
 - [ ] Opt-in `gpu;vulkan` smoke proving a thick / per-edge line renders with the
       configured width on the modern forward line path; skip/fail-closed without
       promoted Vulkan.
-- [ ] Preserve the default CPU gate and existing point-size/line coverage
+- [x] Preserve the default CPU gate and existing point-size/line coverage
       (behavior-preserving for points and surfaces).
 
 ## Docs
@@ -102,15 +103,17 @@ depends_on: []
       regenerate `tasks/SESSION-BRIEF.md`.
 
 ## Acceptance criteria
-- [ ] `GpuEntityConfig` shared fields are unchanged in semantics; point/line params
+- [x] `GpuEntityConfig` shared fields are unchanged in semantics; point/line params
       live in clearly-named sub-blocks; C++ and GLSL layouts match with an updated
       `static_assert`.
-- [ ] Uniform and per-edge line widths authored via `RenderEdges::WidthSource` render
-      on the modern forward line path.
-- [ ] Point and surface rendering are unchanged (parity).
-- [ ] Default CPU gate stays green; the new `gpu;vulkan` line-width smoke passes on a
-      Vulkan-capable host or skips deterministically.
-- [ ] Layering preserved: no new graphics→ECS/runtime/asset edges.
+- [x] Uniform and per-edge line widths authored via `RenderEdges::WidthSource` are
+      populated into `GpuEntityConfig::Line` and consumed by the modern forward line
+      shader's `LineQuads` expansion under CPU/null contract coverage.
+- [x] Point and surface rendering are unchanged (parity).
+- [x] Default CPU gate stays green.
+- [ ] The new `gpu;vulkan` line-width smoke passes on a Vulkan-capable host or skips
+      deterministically.
+- [x] Layering preserved: no new graphics→ECS/runtime/asset edges.
 
 ## Verification
 ```bash
@@ -149,4 +152,6 @@ python3 tools/agents/check_task_policy.py --root . --strict
     `Scaffolded → CPUContracted`.
   - **Slice B.** Line-width residency population (extraction/sync) +
     `forward/line.vert` width consumption on the `LineQuads` topology + CPU parity
-    tests + `gpu;vulkan` line-width smoke. Closes `Operational`.
+    tests. Closes the CPU/null line-width contract.
+  - **Slice C.** Opt-in `gpu;vulkan` line-width smoke for uniform and per-edge
+    widths on the retained forward line path. Closes `Operational`.

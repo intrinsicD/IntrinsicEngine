@@ -29,6 +29,8 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 //           shading-mode constants, then write per-renderable BDA/config
 //           into GpuWorld::GpuEntityConfig and set EffectiveSlot
 //           to the override slot.
+//      Line and point render hints populate the per-domain
+//      GpuEntityConfig::Line / ::Point blocks on the same record.
 //      Additionally applies TintOverride to the base material when set.
 //
 //   2. Clean up override leases when VisualizationConfig is removed.
@@ -64,6 +66,7 @@ export namespace Extrinsic::Graphics
         Components::MaterialInstance* Material{nullptr};
         const Components::GpuSceneSlot* GpuSlot{nullptr};
         const Components::VisualizationConfig* Visualization{nullptr};
+        const Components::RenderEdges* Edges{nullptr};
         const Components::RenderPoints* Points{nullptr};
     };
 

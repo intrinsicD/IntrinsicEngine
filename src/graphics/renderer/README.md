@@ -276,8 +276,10 @@ Concretely:
   `shaders/forward/point.vert.spv` + `shaders/forward/point.frag.spv` with
   `Topology::TriangleList`. The retained `LineQuads` cull bucket expands one
   line segment to six vertices and `forward/line.vert` fetches the two endpoint
-  indices from `GpuGeometryRecord::IndexBufferBDA` before emitting a minimal
-  screen-space quad; the indexed `Lines` bucket remains available for edge-id
+  indices from `GpuGeometryRecord::IndexBufferBDA` before emitting a
+  screen-space quad whose pixel width comes from `GpuEntityConfig::Line`
+  (`LineWidth` or explicit `LineWidthBDA[segment]`); the indexed `Lines`
+  bucket remains available for edge-id
   selection. The retained `Points` cull bucket expands one source point to six
   vertices in the cull shader and the point vertex shader reconstructs a
   camera-facing billboard from `gl_VertexIndex / 6`; the
@@ -1153,12 +1155,13 @@ Concretely:
   graphics-owned snapshot records (`TransformSyncRecord`, `LightSnapshot`, and
   `VisualizationSyncRecord`) instead of querying live ECS registries. Runtime is
   responsible for building those records from ECS/assets/geometry state,
-  including optional retained-point render settings (`RenderPoints`) that
-  `VisualizationSyncSystem` copies into `GpuEntityConfig::Point.PointSize` and
-  `Point.PointMode`. Domain-specific point and line settings live in
-  `GpuEntityConfig::Point` and `GpuEntityConfig::Line`; line-width residency is
-  stored as `Line.LineWidth` / `Line.LineWidthBDA` and is consumed by the
-  follow-up `GRAPHICS-092` line-expansion slice.
+  including optional retained-line and retained-point render settings
+  (`RenderEdges`, `RenderPoints`) that `VisualizationSyncSystem` copies into
+  `GpuEntityConfig::Line` and `GpuEntityConfig::Point`. Domain-specific point
+  and line settings live in `GpuEntityConfig::Point` and
+  `GpuEntityConfig::Line`; line-width residency is stored as `Line.LineWidth` /
+  `Line.LineWidthBDA` and consumed by the retained forward line shader's
+  screen-space quad expansion.
 - `IRenderer::SubmitRuntimeSnapshots(..., storageSlot)` is the promoted handoff
   from runtime to graphics. The renderer copies snapshot records into retained
   storage keyed by the runtime `RenderWorldPool` slot before

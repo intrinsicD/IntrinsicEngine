@@ -684,6 +684,7 @@ export namespace Extrinsic::Runtime
                                         const RHI::GpuBounds& bounds,
                                         std::uint32_t stableId,
                                         bool desired,
+                                        const Graphics::Components::RenderEdges* edges,
                                         const Graphics::Components::RenderPoints* points,
                                         bool meshDirty,
                                         Graphics::IRenderer& renderer,

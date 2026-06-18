@@ -41,6 +41,7 @@ export namespace Extrinsic::Graphics::Components
     //   "colors"      — vec4 per-vertex or per-edge colors
     //   "scalars"     — float per-element scalar field values
     //   "sizes"       — float per-point world-space radii
+    //   RenderEdges::WidthSource names — float per-edge screen-space widths
     struct BufferEntry
     {
         std::string    Name;

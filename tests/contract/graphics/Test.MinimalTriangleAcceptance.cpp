@@ -253,3 +253,64 @@ TEST(GraphicsMinimalAcceptance, Triangle_FirstImplementationContract)
     matSys.Shutdown();
     world.Shutdown();
 }
+
+TEST(GraphicsMinimalAcceptance, VisualizationSyncWritesLineWidthConfig)
+{
+    MockDevice device;
+    RHI::BufferManager bufferMgr{device};
+
+    Graphics::GpuWorld world;
+    Graphics::GpuWorld::InitDesc worldInit{};
+    worldInit.MaxInstances = 4;
+    worldInit.MaxGeometryRecords = 1;
+    worldInit.MaxLights = 1;
+    worldInit.VertexBufferBytes = 1024;
+    worldInit.IndexBufferBytes = 1024;
+    ASSERT_TRUE(world.Initialize(device, bufferMgr, worldInit));
+
+    Graphics::MaterialSystem matSys;
+    matSys.Initialize(device, bufferMgr);
+
+    Graphics::VisualizationSyncSystem visSync;
+    visSync.Initialize(matSys, device);
+
+    Graphics::ColormapSystem colorSys;
+
+    const auto instance = world.AllocateInstance(41u);
+    ASSERT_TRUE(instance.IsValid());
+
+    Graphics::Components::GpuSceneSlot gpuSlot{};
+    gpuSlot.SetInstanceHandle(instance);
+    const RHI::BufferHandle widthBuffer{77u, 1u};
+    gpuSlot.Upsert("edge_widths", widthBuffer, 2u, sizeof(float));
+
+    Graphics::Components::MaterialInstance materialInstance{};
+    Graphics::Components::RenderEdges edges{};
+    edges.WidthSource = std::string{"edge_widths"};
+
+    std::array<Graphics::VisualizationSyncRecord, 1> records{{
+        Graphics::VisualizationSyncRecord{
+            .StableId = 41u,
+            .Material = &materialInstance,
+            .GpuSlot = &gpuSlot,
+            .Edges = &edges,
+        },
+    }};
+
+    visSync.Sync(records, matSys, colorSys, world);
+
+    RHI::GpuEntityConfig config = world.GetEntityConfigForTest(instance);
+    EXPECT_FLOAT_EQ(config.Line.LineWidth, 1.0f);
+    EXPECT_EQ(config.Line.LineWidthBDA, device.GetBufferDeviceAddress(widthBuffer));
+
+    edges.WidthSource = 3.5f;
+    visSync.Sync(records, matSys, colorSys, world);
+
+    config = world.GetEntityConfigForTest(instance);
+    EXPECT_FLOAT_EQ(config.Line.LineWidth, 3.5f);
+    EXPECT_EQ(config.Line.LineWidthBDA, 0u);
+
+    visSync.Shutdown();
+    matSys.Shutdown();
+    world.Shutdown();
+}
