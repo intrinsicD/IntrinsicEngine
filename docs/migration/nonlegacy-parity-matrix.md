@@ -133,6 +133,15 @@ promoted `Extrinsic.Runtime.SelectionController` contract tests. The old raw
 selected-entity-list helper (`GetSelectedEntities`) is not promoted; promoted
 runtime consumers use stable-id snapshots and explicit selection queries.
 
+### Legacy Element-Selection State Retirement
+
+`LEGACY-039` retires the legacy `Runtime.Selection::SubElementSelection`
+compatibility test. Current promoted sub-primitive workflows use
+`Extrinsic.Runtime.PrimitiveSelectionRefinement` to resolve mesh face/edge/vertex,
+graph node/edge, and point-cloud point picks, cache the latest refined result in
+the runtime engine, and expose it through editor selection models. The old
+mutable per-entity vertex/edge/face selection set API is not promoted.
+
 ## Legacy graphics IO ownership inventory (`GRAPHICS-019`)
 
 `GRAPHICS-019` records the owner split for legacy graphics import/export/model

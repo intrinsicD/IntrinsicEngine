@@ -54,10 +54,10 @@ Consumer counts are distinct files matched outside the doomed subtree.
 | `Interface/` ([LEGACY-001](../../tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md)) | 4 | 6 | 0 | none |
 | `Asset/` ([LEGACY-004](../../tasks/backlog/architecture/LEGACY-004-delete-src-legacy-asset.md)) | 6 | 50 | 9 | 9 tests, 0 promoted-src |
 | `Core/` ([LEGACY-005](../../tasks/backlog/architecture/LEGACY-005-delete-src-legacy-core.md)) | 40 | 133 | 21 | 21 tests, 0 promoted-src |
-| `ECS/` ([LEGACY-006](../../tasks/backlog/architecture/LEGACY-006-delete-src-legacy-ecs.md)) | 29 | 37 | 20 | 20 tests, 0 promoted-src |
+| `ECS/` ([LEGACY-006](../../tasks/backlog/architecture/LEGACY-006-delete-src-legacy-ecs.md)) | 29 | 37 | 19 | 19 tests, 0 promoted-src |
 | `Graphics/` ([LEGACY-008](../../tasks/backlog/architecture/LEGACY-008-delete-src-legacy-graphics.md)) | 168 | 22 | 37 | 37 tests, 0 promoted-src |
 | `RHI/` ([LEGACY-009](../../tasks/backlog/architecture/LEGACY-009-delete-src-legacy-rhi.md)) | 54 | 83 | 16 | 16 tests, 0 promoted-src |
-| `Runtime/` ([LEGACY-010](../../tasks/backlog/architecture/LEGACY-010-delete-src-legacy-runtime.md)) | 29 | 0 | 12 | 12 tests, 0 promoted-src |
+| `Runtime/` ([LEGACY-010](../../tasks/backlog/architecture/LEGACY-010-delete-src-legacy-runtime.md)) | 29 | 0 | 11 | 11 tests, 0 promoted-src |
 
 "Files" includes each subtree's `CMakeLists.txt`.
 
@@ -75,7 +75,7 @@ Consumer counts are distinct files matched outside the doomed subtree.
   `Interface::GUI` API; `LEGACY-001` remains blocked only by six
   legacy-internal Graphics/Runtime consumers.
 - **`Runtime/` has zero legacy-internal consumers** — nothing else in
-  `src/legacy/` imports the doomed `Runtime.*` modules. Once its 12 test
+  `src/legacy/` imports the doomed `Runtime.*` modules. Once its 11 test
   consumers migrate, `LEGACY-010` becomes a pure mechanical deletion.
 
 ## Promoted-engine-code blocker status
@@ -220,6 +220,12 @@ files, Graphics to 37 files, RHI to 16 files, and Runtime to 13 files.
 multi-selection behavior in promoted `Extrinsic.Runtime.SelectionController`
 tests. This reduces the remaining ECS external test-consumer set to 20 files
 and Runtime to 12 files.
+`LEGACY-039` retired the legacy persistent `SubElementSelection` compatibility
+test because promoted primitive selection is represented by
+`Extrinsic.Runtime.PrimitiveSelectionRefinement`, engine-owned refined-pick
+caching, and editor selection models rather than mutable per-entity
+vertex/edge/face sets. This reduces the remaining ECS external test-consumer
+set to 19 files and Runtime to 11 files.
 
 **`LEGACY-013` clears only the promoted-src subset of the `LEGACY-005`
 gate.** The
@@ -268,7 +274,7 @@ Removal is gated by consumer migration only. The safe path:
    ([`LEGACY-012`](../../tasks/backlog/architecture/LEGACY-012-migrate-legacy-consumer-tests.md)).
    This is required for every subtree that still has external consumers,
    including `Runtime` — even the subtree with zero legacy-internal consumers
-   still has 12 test consumers, so no gate exits clean until its
+   still has 11 test consumers, so no gate exits clean until its
    `LEGACY-012`-owned tests migrate or retire. `Interface/` already has zero
    external test consumers after `LEGACY-018`; it remains blocked by six
    legacy-internal Graphics/Runtime consumers until subtree ordering removes or

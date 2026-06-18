@@ -778,7 +778,6 @@ if(TARGET ExtrinsicRuntime AND NOT INTRINSIC_HEADLESS_NO_GLFW)
         Test_RuntimeGraphics.cpp
         Test_RuntimeRHI.cpp
         Test_RuntimeSelection.cpp
-        Test_ElementSelection.cpp
         Test_TextureMaterialHotReload.cpp
         Test_RuntimeCulling.cpp
         Test_GraphicsBackend.cpp

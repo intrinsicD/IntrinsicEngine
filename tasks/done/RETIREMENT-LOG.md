@@ -9,6 +9,19 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`LEGACY-039`](LEGACY-039-retire-legacy-element-selection-test.md) — Retire
+legacy element-selection test — retired on 2026-06-18 at maturity
+`CPUContracted`. Legacy
+`tests/integration/runtime/Test_ElementSelection.cpp` was removed because the
+old mutable `Runtime.Selection::SubElementSelection` vertex/edge/face set API is
+not promoted. Current sub-primitive workflows use
+`Extrinsic.Runtime.PrimitiveSelectionRefinement`, engine-owned refined-pick
+caching, and editor selection models. `LEGACY-006` remains blocked by 19
+remaining test consumers and 37 legacy-internal consumers; `LEGACY-010` remains
+blocked by 11 remaining test consumers; `LEGACY-012` owns the remaining test
+cleanup.
+
+Backlog
 [`LEGACY-038`](LEGACY-038-retire-runtime-selection-modes-test.md) — Retire
 legacy runtime selection modes test — retired on 2026-06-18 at maturity
 `CPUContracted`. Legacy

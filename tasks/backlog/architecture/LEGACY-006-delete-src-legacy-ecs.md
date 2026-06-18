@@ -40,10 +40,10 @@ depends_on: []
   grandfathered rows keyed under `src/legacy/ECS/`; drop only those.
 - Prerequisite update (2026-06-18): the consumer-grep gate FAILS — legacy
   `ECS` is still imported by other legacy subtrees (`Graphics`, `Runtime`) and
-  by 20 tests after `LEGACY-038` retired the legacy runtime selection
-  mode/module compatibility test. The legacy Sandbox consumer retired under
-  `LEGACY-003`; remaining consumers must migrate to `Extrinsic.ECS` or retire
-  under `LEGACY-012` before promotion.
+  by 19 tests after `LEGACY-039` retired the legacy element-selection
+  compatibility test. The legacy Sandbox consumer retired under `LEGACY-003`;
+  remaining consumers must migrate to `Extrinsic.ECS` or retire under
+  `LEGACY-012` before promotion.
 
 ## Required changes
 - [ ] (Prerequisite, verified before promotion to `tasks/active/`) Run the

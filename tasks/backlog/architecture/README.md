@@ -231,6 +231,13 @@ split; narratives live in the retirement log.
   preserving retained add/toggle/replace/background multi-selection behavior in
   promoted `SelectionController` tests; remaining ECS external blockers are 20
   tests and remaining Runtime external blockers are 12 tests.
+- [LEGACY-039 — Retire legacy element-selection test](../../done/LEGACY-039-retire-legacy-element-selection-test.md)
+  (done, 2026-06-18, `CPUContracted`):
+  retired legacy `tests/integration/runtime/Test_ElementSelection.cpp` because
+  promoted primitive selection uses `PrimitiveSelectionRefinement`,
+  engine-owned refined-pick caching, and editor selection models rather than
+  mutable per-entity sub-element sets; remaining ECS external blockers are 19
+  tests and remaining Runtime external blockers are 11 tests.
 - [LEGACY-018 — Retire legacy Interface panel-registration test](../../done/LEGACY-018-retire-interface-panel-registration-test.md)
   (done, 2026-06-18, `CPUContracted`):
   retired legacy-only `tests/contract/ui/Test_PanelRegistration.cpp`;
