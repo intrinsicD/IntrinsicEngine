@@ -35,6 +35,9 @@ layout(push_constant, scalar) uniform ScenePC {
 layout(location = 0) flat in uint fragMaterialSlot;
 layout(location = 1) in vec2 fragUv;
 layout(location = 2) in vec3 fragWorldNormal;
+layout(location = 3) flat in uint fragConfigSlot;
+layout(location = 4) in float fragVisualizationScalar;
+layout(location = 5) in vec4 fragVisualizationColor;
 
 layout(location = 0) out vec4 outColor;
 
@@ -62,6 +65,26 @@ void main() {
     if (IsValidTextureID(mat.AlbedoID)) {
         baseColor *= texture(globalTextures[nonuniformEXT(mat.AlbedoID)], fragUv);
     }
+    const GpuEntityConfig cfg = GpuEntityConfigRef(scene.EntityConfigBDA).Data[fragConfigSlot];
+    float visualizationScalar = fragVisualizationScalar;
+    vec4 visualizationColor = fragVisualizationColor;
+    if (cfg.VisDomain == GpuVisualizationDomain_Face) {
+        const uint faceId = uint(gl_PrimitiveID);
+        visualizationScalar = GpuVisualizationReadScalar(cfg, faceId, cfg.ScalarRangeMin);
+        visualizationColor = GpuVisualizationReadColor(cfg, faceId, baseColor);
+    }
+    baseColor = (cfg.ColorSourceMode == GpuColorSource_ScalarField &&
+                 GpuVisualizationHasValidBindless(cfg.ColormapID))
+        ? GpuResolveVisualizationColorWithColormap(
+            cfg,
+            visualizationScalar,
+            visualizationColor,
+            baseColor,
+            globalTextures[nonuniformEXT(cfg.ColormapID)])
+        : GpuResolveVisualizationColorFallback(
+            cfg,
+            visualizationColor,
+            baseColor);
 
     vec3 sampledNormal = vec3(0.0, 0.0, 1.0);
     const float vertexNormalLen = length(fragWorldNormal);

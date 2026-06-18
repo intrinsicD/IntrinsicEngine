@@ -1376,6 +1376,14 @@ Concretely:
   deterministically instead of sampling an in-flight upload. The synchronous
   `IDevice::WriteTexture()` helper remains only as the guarded backend
   fail-closed baseline, not a renderer/runtime upload path.
+- Promoted surface visualization resolves material, uniform, scalar-field, and
+  per-element RGBA color sources through `GpuEntityConfig` and the shared
+  `assets/shaders/common/gpu_scene.glsl` helper in both
+  `forward/default_debug_surface.*` and `deferred/gbuffer.*`. Vertex-domain
+  scalar/color values are forwarded as interpolants; face-domain values are
+  read in the fragment shader by `gl_PrimitiveID`. Line and point colormap
+  parity remains the later `GRAPHICS-091` slice and must reuse the same GPU-side
+  BDA resolver instead of introducing a CPU-baked color buffer.
 - `Graphics.FrameRecipe` imports explicit cull bucket resources for surface,
   line, and point lanes. `LinePass` consumes `Cull.Lines.IndexedArgs` /
   `Cull.Lines.Count`; `PointPass` consumes `Cull.Points.NonIndexedArgs` /

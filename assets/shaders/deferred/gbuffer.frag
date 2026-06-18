@@ -28,6 +28,8 @@ layout(location = 0) in vec3 vWorldNormal;
 layout(location = 1) in vec2 vUv;
 layout(location = 2) flat in uint vInstanceSlot;
 layout(location = 3) flat in uint vEntityId;
+layout(location = 4) in float vVisualizationScalar;
+layout(location = 5) in vec4 vVisualizationColor;
 
 layout(location = 0) out vec4 GBuf_Normal;
 layout(location = 1) out vec4 GBuf_Albedo;
@@ -53,10 +55,25 @@ void main() {
     if (IsValidTextureID(mat.AlbedoID)) {
         baseColor *= texture(globalTextures[nonuniformEXT(mat.AlbedoID)], vUv);
     }
-
-    if (cfg.ColorSourceMode == 1u) {
-        baseColor = cfg.UniformColor;
+    float visualizationScalar = vVisualizationScalar;
+    vec4 visualizationColor = vVisualizationColor;
+    if (cfg.VisDomain == GpuVisualizationDomain_Face) {
+        const uint faceId = uint(gl_PrimitiveID);
+        visualizationScalar = GpuVisualizationReadScalar(cfg, faceId, cfg.ScalarRangeMin);
+        visualizationColor = GpuVisualizationReadColor(cfg, faceId, baseColor);
     }
+    baseColor = (cfg.ColorSourceMode == GpuColorSource_ScalarField &&
+                 GpuVisualizationHasValidBindless(cfg.ColormapID))
+        ? GpuResolveVisualizationColorWithColormap(
+            cfg,
+            visualizationScalar,
+            visualizationColor,
+            baseColor,
+            globalTextures[nonuniformEXT(cfg.ColormapID)])
+        : GpuResolveVisualizationColorFallback(
+            cfg,
+            visualizationColor,
+            baseColor);
 
     vec3 n = normalize(vWorldNormal);
     if (IsValidTextureID(mat.NormalID)) {

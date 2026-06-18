@@ -40,20 +40,32 @@ layout(push_constant, scalar) uniform ScenePC {
 layout(location = 0) flat out uint fragMaterialSlot;
 layout(location = 1) out vec2 fragUv;
 layout(location = 2) out vec3 fragWorldNormal;
+layout(location = 3) flat out uint fragConfigSlot;
+layout(location = 4) out float fragVisualizationScalar;
+layout(location = 5) out vec4 fragVisualizationColor;
 
 void main() {
     const GpuSceneTable scene = GpuSceneTableRef(pc.SceneTableBDA).Value;
     const GpuInstanceStatic inst = GpuInstanceStaticRef(scene.InstanceStaticBDA).Data[gl_InstanceIndex];
     const GpuInstanceDynamic dyn = GpuInstanceDynamicRef(scene.InstanceDynamicBDA).Data[gl_InstanceIndex];
     const GpuGeometryRecord geo = GpuGeometryRecordRef(scene.GeometryRecordBDA).Data[inst.GeometrySlot];
+    const GpuEntityConfig cfg = GpuEntityConfigRef(scene.EntityConfigBDA).Data[inst.ConfigSlot];
 
     // The culling indirect command supplies firstIndex + vertexOffset, so
     // gl_VertexIndex is already in managed-buffer vertex units.
-    const SurfaceVertex v = SurfaceVertexRef(geo.VertexBufferBDA).Data[gl_VertexIndex];
+    const uint vertexIndex = uint(gl_VertexIndex);
+    const SurfaceVertex v = SurfaceVertexRef(geo.VertexBufferBDA).Data[vertexIndex];
 
     gl_Position = scene.CameraViewProj * dyn.Model * vec4(v.Position, 1.0);
     fragMaterialSlot = inst.MaterialSlot;
     fragUv = v.UV;
+    fragConfigSlot = inst.ConfigSlot;
+    fragVisualizationScalar = cfg.VisDomain == GpuVisualizationDomain_Vertex
+        ? GpuVisualizationReadScalar(cfg, vertexIndex, cfg.ScalarRangeMin)
+        : cfg.ScalarRangeMin;
+    fragVisualizationColor = cfg.VisDomain == GpuVisualizationDomain_Vertex
+        ? GpuVisualizationReadColor(cfg, vertexIndex, vec4(1.0))
+        : vec4(1.0);
 
     const float localNormalLen = length(v.Normal);
     const vec3 localNormal = (localNormalLen > 1.0e-6)

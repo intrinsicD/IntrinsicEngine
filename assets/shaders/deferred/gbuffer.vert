@@ -40,6 +40,8 @@ layout(location = 0) out vec3 vWorldNormal;
 layout(location = 1) out vec2 vUv;
 layout(location = 2) flat out uint vInstanceSlot;
 layout(location = 3) flat out uint vEntityId;
+layout(location = 4) out float vVisualizationScalar;
+layout(location = 5) out vec4 vVisualizationColor;
 
 void main() {
     const uint instanceSlot = gl_InstanceIndex;
@@ -48,15 +50,18 @@ void main() {
     GpuInstanceStaticRef instanceStatic = GpuInstanceStaticRef(scene.InstanceStaticBDA);
     GpuInstanceDynamicRef instanceDynamic = GpuInstanceDynamicRef(scene.InstanceDynamicBDA);
     GpuGeometryRecordRef geometryRecords = GpuGeometryRecordRef(scene.GeometryRecordBDA);
+    GpuEntityConfigRef entityConfigs = GpuEntityConfigRef(scene.EntityConfigBDA);
 
     const GpuInstanceStatic inst = instanceStatic.Data[instanceSlot];
     const GpuInstanceDynamic dyn = instanceDynamic.Data[instanceSlot];
     const GpuGeometryRecord geo = geometryRecords.Data[inst.GeometrySlot];
+    const GpuEntityConfig cfg = entityConfigs.Data[inst.ConfigSlot];
 
     PackedVertexRef vertices = PackedVertexRef(geo.VertexBufferBDA);
     // The culling indirect command supplies firstIndex + vertexOffset, so
     // gl_VertexIndex is already in managed-buffer vertex units.
-    const PackedVertex pv = vertices.Data[uint(gl_VertexIndex)];
+    const uint vertexIndex = uint(gl_VertexIndex);
+    const PackedVertex pv = vertices.Data[vertexIndex];
 
     vec3 localPos = vec3(pv.px, pv.py, pv.pz);
     vec4 worldPos = dyn.Model * vec4(localPos, 1.0);
@@ -73,4 +78,10 @@ void main() {
     vUv = vec2(pv.u, pv.v);
     vInstanceSlot = instanceSlot;
     vEntityId = inst.EntityID;
+    vVisualizationScalar = cfg.VisDomain == GpuVisualizationDomain_Vertex
+        ? GpuVisualizationReadScalar(cfg, vertexIndex, cfg.ScalarRangeMin)
+        : cfg.ScalarRangeMin;
+    vVisualizationColor = cfg.VisDomain == GpuVisualizationDomain_Vertex
+        ? GpuVisualizationReadColor(cfg, vertexIndex, vec4(1.0))
+        : vec4(1.0);
 }

@@ -27,6 +27,14 @@ const uint GpuMaterialType_SciVis = 1u;
 const uint GpuMaterialType_DefaultDebugSurface = 2u;
 const uint GpuMaterialType_DefaultDebugUVs = 3u;
 const uint GpuMaterialFlag_Unlit = 1u << 3;
+const uint GpuColorSource_Material = 0u;
+const uint GpuColorSource_UniformColor = 1u;
+const uint GpuColorSource_ScalarField = 2u;
+const uint GpuColorSource_PerElementRgba = 3u;
+const uint GpuVisualizationDomain_Vertex = 0u;
+const uint GpuVisualizationDomain_Face = 1u;
+const uint GpuVisualizationDomain_Edge = 2u;
+const uint GpuInvalidBindlessIndex = 0u;
 
 struct GpuSceneTable {
     uint64_t InstanceStaticBDA;
@@ -260,6 +268,14 @@ layout(buffer_reference, scalar) readonly buffer GpuEntityConfigRef {
     GpuEntityConfig Data[];
 };
 
+layout(buffer_reference, scalar) readonly buffer GpuFloatBufferRef {
+    float Data[];
+};
+
+layout(buffer_reference, scalar) readonly buffer GpuVec4BufferRef {
+    vec4 Data[];
+};
+
 layout(buffer_reference, scalar) readonly buffer GpuBoundsRef {
     GpuBounds Data[];
 };
@@ -296,6 +312,93 @@ layout(buffer_reference, scalar) buffer GpuCounterRef {
 layout(buffer_reference, scalar) readonly buffer GpuCullBucketTableRef {
     GpuCullBucketTable Value;
 };
+
+bool GpuVisualizationHasElement(GpuEntityConfig cfg, uint elementId)
+{
+    return elementId < cfg.ElementCount;
+}
+
+bool GpuVisualizationHasValidBindless(uint id)
+{
+    return id != GpuInvalidBindlessIndex;
+}
+
+float GpuVisualizationReadScalar(GpuEntityConfig cfg, uint elementId, float fallback)
+{
+    if (cfg.ScalarBDA == uint64_t(0) || !GpuVisualizationHasElement(cfg, elementId)) {
+        return fallback;
+    }
+    return GpuFloatBufferRef(cfg.ScalarBDA).Data[elementId];
+}
+
+vec4 GpuVisualizationReadColor(GpuEntityConfig cfg, uint elementId, vec4 fallback)
+{
+    if (cfg.ColorBDA == uint64_t(0) || !GpuVisualizationHasElement(cfg, elementId)) {
+        return fallback;
+    }
+    return GpuVec4BufferRef(cfg.ColorBDA).Data[elementId];
+}
+
+float GpuVisualizationNormalizedScalar(GpuEntityConfig cfg, float scalarValue)
+{
+    const float range = cfg.ScalarRangeMax - cfg.ScalarRangeMin;
+    if (abs(range) <= 1.0e-20) {
+        return 0.0;
+    }
+
+    float t = clamp((scalarValue - cfg.ScalarRangeMin) / range, 0.0, 1.0);
+    if (cfg.BinCount > 0u) {
+        const float bins = float(cfg.BinCount);
+        t = (floor(t * bins) + 0.5) / bins;
+        t = clamp(t, 0.0, 1.0);
+    }
+    return t;
+}
+
+vec4 GpuVisualizationApplyIsolines(GpuEntityConfig cfg, float t, vec4 color)
+{
+    if (cfg.IsolineCount <= 0.0 || cfg.IsolineWidth <= 0.0) {
+        return color;
+    }
+
+    const float phase = abs(fract(t * cfg.IsolineCount) - 0.5);
+    const float width = clamp(cfg.IsolineWidth / 128.0, 0.001, 0.5);
+    const float lineMix = 1.0 - smoothstep(0.0, width, phase);
+    color.rgb = mix(color.rgb, cfg.IsolineColor.rgb, lineMix * cfg.IsolineColor.a);
+    return color;
+}
+
+vec4 GpuResolveVisualizationColorFallback(GpuEntityConfig cfg,
+                                          vec4 perElementColor,
+                                          vec4 baseColor)
+{
+    if (cfg.ColorSourceMode == GpuColorSource_UniformColor) {
+        return cfg.UniformColor;
+    }
+    if (cfg.ColorSourceMode == GpuColorSource_PerElementRgba) {
+        vec4 color = perElementColor;
+        color.a *= cfg.VisualizationAlpha;
+        return color;
+    }
+    return baseColor;
+}
+
+vec4 GpuResolveVisualizationColorWithColormap(GpuEntityConfig cfg,
+                                              float scalarValue,
+                                              vec4 perElementColor,
+                                              vec4 baseColor,
+                                              sampler2D colormapLut)
+{
+    if (cfg.ColorSourceMode != GpuColorSource_ScalarField) {
+        return GpuResolveVisualizationColorFallback(cfg, perElementColor, baseColor);
+    }
+
+    const float t = GpuVisualizationNormalizedScalar(cfg, scalarValue);
+    vec4 color = texture(colormapLut, vec2(t, 0.5));
+    color = GpuVisualizationApplyIsolines(cfg, t, color);
+    color.a *= cfg.VisualizationAlpha;
+    return color;
+}
 
 bool GpuClusterLightingAvailable(GpuSceneTable scene)
 {

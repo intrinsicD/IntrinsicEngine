@@ -790,21 +790,27 @@ Open post-acceptance rendering leaves:
   consumed by the promoted renderer without graphics importing live
   runtime/ECS/asset ownership.
 - [GRAPHICS-091 — Unify scalar-field / colormap visualization across surface, line, and point passes](GRAPHICS-091-unify-scalar-colormap-across-surface-line-point.md):
-  unblocked; brings the modern GpuScene forward line/point passes to colormap /
-  per-element-color parity with the surface pass through one shared
-  `common/gpu_scene.glsl` resolution path. Today only the surface frag applies the
-  scalar→colormap; `forward/line.*` and `forward/point.*` resolve uniform/white only.
-  Also corrects the stale `vis_colors_baked` CPU-bake description (no such bake
-  exists). Target `Operational` on Vulkan-capable hosts. Sibling of `GRAPHICS-092`
-  (shared "venue", color/colormap side).
+  unblocked; Slice A has landed the shared `common/gpu_scene.glsl`
+  visualization color resolver and promoted surface consumers in
+  `forward/default_debug_surface.*` and `deferred/gbuffer.*`. Remaining slices bring
+  `forward/line.*` and `forward/point.*` to scalar-field / per-element-color parity;
+  they still resolve uniform/white only today. Target `Operational` on
+  Vulkan-capable hosts. Sibling of `GRAPHICS-092` (shared "venue",
+  color/colormap side).
 - [GRAPHICS-092 — Group per-domain params in `GpuEntityConfig` and add line-width residency](GRAPHICS-092-group-per-domain-params-and-line-width-residency.md):
-  unblocked; structural sibling of `GRAPHICS-091`. Groups the flat-mixed point-only
+  blocked by `GRAPHICS-093`; structural sibling of `GRAPHICS-091`. Groups the flat-mixed point-only
   fields (`PointMode`/`PointSize`/`PointSizeBDA`) into named per-domain sub-blocks.
   Slice A has landed the 128-byte `GpuEntityConfig` layout with `Point` and `Line`
   sub-blocks and defaulted `Line.LineWidth` / `Line.LineWidthBDA`; Slice B remains
   open for `RenderEdges::WidthSource` population and `forward/line.vert`
-  screen-space quad expansion at parity with point size. Target `Operational` on
+  screen-space quad expansion after the line draw topology blocker. Target `Operational` on
   Vulkan-capable hosts.
+- [GRAPHICS-093 — Define forward-line quad topology for retained GpuScene lines](GRAPHICS-093-forward-line-quad-topology.md):
+  unblocked; blocker for `GRAPHICS-092` Slice B. The current promoted forward line
+  pass consumes indexed `LineList` draws through `DrawIndexedIndirectCount()`, which
+  cannot support screen-space quad expansion in the vertex shader alone. This task
+  owns the backend-portable topology/bucket decision before retained line width can
+  become operational.
 
 Cross-layer Theme A leaves retired for the full working sandbox path:
 - [`RUNTIME-085` — `GeometrySources` mesh residency bridge](../../done/RUNTIME-085-geometrysources-mesh-residency.md) (retired 2026-05-28 at `CPUContracted`; Slices A–C landed the mesh packer, extraction wiring, and dirty-domain reupload/retire ordering).

@@ -33,11 +33,12 @@ import Extrinsic.Graphics.Component.VisualizationConfig;
 //
 //   2. Clean up override leases when VisualizationConfig is removed.
 //
-//   3. CPU-baking path for Line and Point passes:
-//        ScalarField/PerDomain colours are baked from CPU data into a
-//        "vis_colors_baked" buffer in GpuSceneSlot so that line/point
-//        shaders can read them through the existing colour-buffer BDA
-//        without any push-constant budget changes.
+//   3. GpuScene visualization config:
+//        ScalarField/PerDomain colour sources publish BDA pointers and metadata
+//        into GpuWorld::GpuEntityConfig. Promoted surface shaders resolve these
+//        GPU-side through common/gpu_scene.glsl; line/point parity is tracked by
+//        GRAPHICS-091 and must use the same BDA path rather than CPU colour
+//        baking.
 //
 // Call order within a frame:
 //   1. MaterialSystem::SyncGpuBuffer()     — flush dirty base materials
