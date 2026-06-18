@@ -40,7 +40,7 @@ depends_on: []
   grandfathered rows keyed under `src/legacy/ECS/`; drop only those.
 - Prerequisite update (2026-06-18): the consumer-grep gate FAILS — legacy
   `ECS` is still imported by other legacy subtrees (`Graphics`, `Runtime`) and
-  by 24 tests after `LEGACY-030` retired duplicate legacy entity-command
+  by 23 tests after `LEGACY-031` retired legacy ECS frame-graph systems
   compatibility coverage. The legacy Sandbox consumer retired under
   `LEGACY-003`; remaining consumers must migrate to `Extrinsic.ECS` or retire
   under `LEGACY-012` before promotion.

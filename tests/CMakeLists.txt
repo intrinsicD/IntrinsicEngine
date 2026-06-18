@@ -200,7 +200,6 @@ intrinsic_test_object_lib(CoreTestObjs
 # --- ECS tests (FrameGraph system integration) ---
 set(_ecs_test_files
     Test_RuntimeECS.cpp
-    Test_FrameGraphSystems.cpp
     Test.ECS.SceneRegistry.cpp
     Test.ECS.SceneBootstrap.cpp
     Test.ECS.Hierarchy.cpp

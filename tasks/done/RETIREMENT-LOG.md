@@ -9,6 +9,18 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`LEGACY-031`](LEGACY-031-retire-ecs-framegraph-systems-test.md) — Retire
+legacy ECS frame-graph systems test — retired on 2026-06-18 at maturity
+`CPUContracted`. Legacy `tests/unit/ecs/Test_FrameGraphSystems.cpp` coverage was
+removed instead of migrated because promoted ECS transform hierarchy, bounds
+propagation, render-sync, and `Extrinsic.Runtime.EcsSystemBundle` contract tests
+cover the retained fixed-step bundle behavior, while `AxisRotator` is recorded
+as sample/demo behavior rather than canonical ECS. `LEGACY-005` remains blocked
+by 25 remaining test consumers and 133 legacy-internal consumers; `LEGACY-006`
+remains blocked by 23 remaining test consumers and 37 legacy-internal
+consumers; `LEGACY-012` owns the remaining test cleanup.
+
+Backlog
 [`LEGACY-030`](LEGACY-030-retire-ecs-entity-commands-test.md) — Retire legacy
 ECS entity-command test — retired on 2026-06-18 at maturity `CPUContracted`.
 Duplicate legacy `tests/unit/ecs/Test_EntityCommands.cpp` coverage was removed

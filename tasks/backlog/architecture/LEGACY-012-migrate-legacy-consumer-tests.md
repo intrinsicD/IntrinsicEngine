@@ -34,9 +34,10 @@ depends_on: [LEGACY-011]
   CoreMemory coverage to promoted Core, and `LEGACY-028` migrated Architecture
   SLO coverage to promoted Core, and `LEGACY-029` retired legacy Core.Benchmark
   coverage while preserving promoted telemetry assertions, and `LEGACY-030`
-  retired duplicate legacy entity-command compatibility coverage, so this task
-  is now the external cleanup owner for the remaining Core gate as well as the
-  other subtree gates.
+  retired duplicate legacy entity-command compatibility coverage, and
+  `LEGACY-031` retired legacy ECS frame-graph systems compatibility coverage,
+  so this task is now the external cleanup owner for the remaining Core gate as
+  well as the other subtree gates.
 - `LEGACY-018` retired the only external `LEGACY-001` test consumer,
   `tests/contract/ui/Test_PanelRegistration.cpp`, because `Interface::GUI`
   panel registration is not a promoted endpoint. `LEGACY-001` now has zero

@@ -172,6 +172,14 @@ split; narratives live in the retirement log.
   tests own the retained undo/redo, lifecycle, and hierarchy contracts;
   remaining Core deletion blockers are 26 tests and remaining ECS external
   blockers are 24 tests.
+- [LEGACY-031 — Retire legacy ECS frame-graph systems test](../../done/LEGACY-031-retire-ecs-framegraph-systems-test.md)
+  (done, 2026-06-18, `CPUContracted`):
+  retired legacy `tests/unit/ecs/Test_FrameGraphSystems.cpp` coverage because
+  promoted ECS transform/bounds/render-sync and
+  `Test.RuntimeEcsSystemBundle.cpp` own the retained system-bundle contracts,
+  while legacy `AxisRotator` stays sample-only behavior; remaining Core
+  deletion blockers are 25 tests and remaining ECS external blockers are 23
+  tests.
 - [LEGACY-018 — Retire legacy Interface panel-registration test](../../done/LEGACY-018-retire-interface-panel-registration-test.md)
   (done, 2026-06-18, `CPUContracted`):
   retired legacy-only `tests/contract/ui/Test_PanelRegistration.cpp`;
