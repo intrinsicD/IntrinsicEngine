@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `RUNTIME-116` — Focus-camera-on-selection command (F key) (tasks/active/RUNTIME-116-focus-camera-on-selection-command.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 

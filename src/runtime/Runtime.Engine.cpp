@@ -58,6 +58,7 @@ import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.AssetModelTextureIO;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.CameraFocusCommand;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.Runtime.ImGuiAdapter;
@@ -2103,6 +2104,7 @@ namespace Extrinsic::Runtime
                 const Platform::IWindow& window = *m_Window;
                 if (!imguiCapturesInput)
                     controller->Update(window.GetInput(), frameDt);
+
                 renderInput.Camera = controller->GetView(viewport);
                 renderInput.Camera.ExplicitCameraTransition =
                     m_CameraControllers.ConsumeCameraTransition(CameraControllerSlot::Main);
@@ -2141,6 +2143,31 @@ namespace Extrinsic::Runtime
         // matrix and the gizmo packets agree with the authored transform in
         // the same frame.
         (void)FlushPreRenderTransformState(*m_Scene);
+
+        // RUNTIME-116: `F` (focus) reframes the Main camera on the current
+        // selection so the selected object(s) are centered and fully visible.
+        // It runs *after* the pre-render flush above (BUG-024) so it gathers
+        // refreshed `World::Bounds` that already reflect this frame's
+        // OnVariableTick / editor-hook / gizmo transform edits, not the stale
+        // pre-flush bounds. Edge-triggered and suppressed while Dear ImGui owns
+        // the keyboard (e.g. typing in a field). On a successful reframe the
+        // camera view is rebuilt so the snapped camera reaches the transform-
+        // gizmo packets and render extraction this same frame.
+        if (m_Config.Camera.Enabled && !imguiCapturesKeyboard &&
+            inputWindow.GetInput().IsKeyJustPressed(Platform::Input::Key::F) &&
+            FocusCameraOnSelection(m_CameraControllers,
+                                   m_SelectionController,
+                                   *m_Scene,
+                                   CameraControllerSlot::Main))
+        {
+            if (ICameraController* focused =
+                    m_CameraControllers.ResolveOrNull(CameraControllerSlot::Main))
+            {
+                renderInput.Camera = focused->GetView(viewport);
+                renderInput.Camera.ExplicitCameraTransition =
+                    m_CameraControllers.ConsumeCameraTransition(CameraControllerSlot::Main);
+            }
+        }
 
         const std::span<const Graphics::TransformGizmoRenderPacket> transformGizmos =
             m_GizmoPacketBuilder.Build(*m_Scene,
