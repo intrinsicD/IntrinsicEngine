@@ -7,9 +7,11 @@
 #include <numeric>
 #include <random>
 
-import Core;
+import Extrinsic.Core.Tasks;
+import Extrinsic.Core.Tasks.CounterEvent;
+import Extrinsic.Core.Telemetry;
 
-using namespace Core::Tasks;
+using namespace Extrinsic::Core::Tasks;
 
 namespace
 {
@@ -477,25 +479,42 @@ TEST(CoreTasks, SchedulerStatsCanBeExportedToFrameTelemetry)
     ASSERT_GE(schedulerStats.ParkCount, 1u);
     ASSERT_GE(schedulerStats.UnparkCount, 1u);
 
-    auto& telemetry = Core::Telemetry::TelemetrySystem::Get();
+    auto& telemetry = Extrinsic::Core::Telemetry::TelemetrySystem::Get();
+    Extrinsic::Core::Telemetry::TaskSchedulerStats telemetryStats{};
+    telemetryStats.InFlightTasks = schedulerStats.InFlightTasks;
+    telemetryStats.QueuedTasks = schedulerStats.QueuedTasks;
+    telemetryStats.ParkCount = schedulerStats.ParkCount;
+    telemetryStats.UnparkCount = schedulerStats.UnparkCount;
+    telemetryStats.ParkLatencyP50Ns = schedulerStats.ParkLatencyP50Ns;
+    telemetryStats.ParkLatencyP95Ns = schedulerStats.ParkLatencyP95Ns;
+    telemetryStats.ParkLatencyP99Ns = schedulerStats.ParkLatencyP99Ns;
+    telemetryStats.UnparkLatencyP50Ns = schedulerStats.UnparkLatencyP50Ns;
+    telemetryStats.UnparkLatencyP95Ns = schedulerStats.UnparkLatencyP95Ns;
+    telemetryStats.UnparkLatencyP99Ns = schedulerStats.UnparkLatencyP99Ns;
+    telemetryStats.UnparkLatencyTailSpreadNs = schedulerStats.UnparkLatencyTailSpreadNs;
+    telemetryStats.IdleWaitCount = schedulerStats.IdleWaitCount;
+    telemetryStats.IdleWaitTotalNs = schedulerStats.IdleWaitTotalNs;
+    telemetryStats.QueueContentionCount = schedulerStats.QueueContentionCount;
+    telemetryStats.StealSuccessRatio = schedulerStats.StealSuccessRatio;
+
     telemetry.BeginFrame();
-    telemetry.SetTaskSchedulerStats(schedulerStats);
+    telemetry.SetTaskStats(telemetryStats);
     telemetry.SetFrameGraphTimings(100, 200, 150);
     telemetry.EndFrame();
 
     const auto& frameStats = telemetry.GetFrameStats(0);
-    EXPECT_EQ(frameStats.TaskParkCount, schedulerStats.ParkCount);
-    EXPECT_EQ(frameStats.TaskUnparkCount, schedulerStats.UnparkCount);
-    EXPECT_EQ(frameStats.TaskParkP50Ns, schedulerStats.ParkLatencyP50Ns);
-    EXPECT_EQ(frameStats.TaskParkP95Ns, schedulerStats.ParkLatencyP95Ns);
-    EXPECT_EQ(frameStats.TaskParkP99Ns, schedulerStats.ParkLatencyP99Ns);
-    EXPECT_EQ(frameStats.TaskUnparkP50Ns, schedulerStats.UnparkLatencyP50Ns);
-    EXPECT_EQ(frameStats.TaskUnparkP95Ns, schedulerStats.UnparkLatencyP95Ns);
-    EXPECT_EQ(frameStats.TaskUnparkP99Ns, schedulerStats.UnparkLatencyP99Ns);
-    EXPECT_EQ(frameStats.TaskIdleWaitCount, schedulerStats.IdleWaitCount);
-    EXPECT_EQ(frameStats.TaskIdleWaitTotalNs, schedulerStats.IdleWaitTotalNs);
-    EXPECT_EQ(frameStats.TaskQueueContentionCount, schedulerStats.QueueContentionCount);
-    EXPECT_DOUBLE_EQ(frameStats.TaskStealSuccessRatio, schedulerStats.StealSuccessRatio);
+    EXPECT_EQ(frameStats.Tasks.ParkCount, schedulerStats.ParkCount);
+    EXPECT_EQ(frameStats.Tasks.UnparkCount, schedulerStats.UnparkCount);
+    EXPECT_EQ(frameStats.Tasks.ParkLatencyP50Ns, schedulerStats.ParkLatencyP50Ns);
+    EXPECT_EQ(frameStats.Tasks.ParkLatencyP95Ns, schedulerStats.ParkLatencyP95Ns);
+    EXPECT_EQ(frameStats.Tasks.ParkLatencyP99Ns, schedulerStats.ParkLatencyP99Ns);
+    EXPECT_EQ(frameStats.Tasks.UnparkLatencyP50Ns, schedulerStats.UnparkLatencyP50Ns);
+    EXPECT_EQ(frameStats.Tasks.UnparkLatencyP95Ns, schedulerStats.UnparkLatencyP95Ns);
+    EXPECT_EQ(frameStats.Tasks.UnparkLatencyP99Ns, schedulerStats.UnparkLatencyP99Ns);
+    EXPECT_EQ(frameStats.Tasks.IdleWaitCount, schedulerStats.IdleWaitCount);
+    EXPECT_EQ(frameStats.Tasks.IdleWaitTotalNs, schedulerStats.IdleWaitTotalNs);
+    EXPECT_EQ(frameStats.Tasks.QueueContentionCount, schedulerStats.QueueContentionCount);
+    EXPECT_DOUBLE_EQ(frameStats.Tasks.StealSuccessRatio, schedulerStats.StealSuccessRatio);
     EXPECT_EQ(frameStats.FrameGraphCompileTimeNs, 100u);
     EXPECT_EQ(frameStats.FrameGraphExecuteTimeNs, 200u);
     EXPECT_EQ(frameStats.FrameGraphCriticalPathTimeNs, 150u);

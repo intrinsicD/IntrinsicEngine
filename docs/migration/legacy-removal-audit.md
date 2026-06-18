@@ -53,7 +53,7 @@ Consumer counts are distinct files matched outside the doomed subtree.
 |---|---|---|---|---|
 | `Interface/` ([LEGACY-001](../../tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md)) | 4 | 6 | 0 | none |
 | `Asset/` ([LEGACY-004](../../tasks/backlog/architecture/LEGACY-004-delete-src-legacy-asset.md)) | 6 | 50 | 10 | 10 tests, 0 promoted-src |
-| `Core/` ([LEGACY-005](../../tasks/backlog/architecture/LEGACY-005-delete-src-legacy-core.md)) | 40 | 133 | 39 | 39 tests, 0 promoted-src |
+| `Core/` ([LEGACY-005](../../tasks/backlog/architecture/LEGACY-005-delete-src-legacy-core.md)) | 40 | 133 | 38 | 38 tests, 0 promoted-src |
 | `ECS/` ([LEGACY-006](../../tasks/backlog/architecture/LEGACY-006-delete-src-legacy-ecs.md)) | 29 | 37 | 25 | 25 tests, 0 promoted-src |
 | `Graphics/` ([LEGACY-008](../../tasks/backlog/architecture/LEGACY-008-delete-src-legacy-graphics.md)) | 168 | 22 | 39 | 39 tests, 0 promoted-src |
 | `RHI/` ([LEGACY-009](../../tasks/backlog/architecture/LEGACY-009-delete-src-legacy-rhi.md)) | 54 | 83 | 18 | 18 tests, 0 promoted-src |
@@ -129,12 +129,16 @@ registration endpoint.
 `Extrinsic.Core.StrongHandle`, renamed it to `Test.CoreStrongHandle.cpp`, and
 removed the smaller legacy-suffixed promoted wrapper test, reducing the
 remaining Core test-consumer set to 39 files.
+`LEGACY-020` migrated the full CoreTasks scheduler/counter-event unit test to
+`Extrinsic.Core.Tasks` plus promoted telemetry stats, renamed it to
+`Test.CoreTasks.cpp`, and removed the smaller legacy-suffixed promoted wrapper
+test, reducing the remaining Core test-consumer set to 38 files.
 
 **`LEGACY-013` clears only the promoted-src subset of the `LEGACY-005`
 gate.** The
 `LEGACY-005` consumer-grep searches every consumer of legacy `Core.*` outside
 `src/legacy/Core/**`, which the table above now counts as 133 legacy-internal +
-39 test files. `LEGACY-005` stays blocked by its 39 test consumers
+38 test files. `LEGACY-005` stays blocked by its 38 test consumers
 (`LEGACY-012`) and by all 133 legacy-internal consumers until the subtrees above
 Core have been deleted. This is why the `LEGACY-005` row in
 `legacy-retirement.md` says Core "retires last".

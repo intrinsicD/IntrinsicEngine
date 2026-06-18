@@ -185,7 +185,6 @@ endfunction()
 set(_core_test_files
     Test_BoundedHeap.cpp
     Test_CoreMemory.cpp
-    Test_CoreTasks.cpp
     Test_CoreCommands.cpp
     Test_CoreFrameGraph.cpp
     Test_FrameGraphTypeTokenHelper.cpp
@@ -520,7 +519,7 @@ set(_core_wrapper_unit_test_files
     Test.Core.ResourcePool.cpp
     Test.CoreStrongHandle.cpp
     Test.Core.TaskGraphLegacy.cpp
-    Test.Core.TasksLegacy.cpp
+    Test.CoreTasks.cpp
 )
 intrinsic_resolve_test_sources(_core_wrapper_unit_test_sources
     SEARCH_DIRS unit/core

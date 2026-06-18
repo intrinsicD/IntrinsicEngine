@@ -103,7 +103,14 @@ split; narratives live in the retirement log.
   migrated the full strong-handle unit test to promoted
   `Extrinsic.Core.StrongHandle`, renamed it to
   `tests/unit/core/Test.CoreStrongHandle.cpp`, and removed the smaller
-  legacy-suffixed wrapper test; remaining Core deletion blockers are 39 tests
+  legacy-suffixed wrapper test; `LEGACY-020` later reduced the remaining Core
+  test-consumer set to 38 files.
+- [LEGACY-020 — Migrate CoreTasks test to promoted Core](../../done/LEGACY-020-core-tasks-test-promoted.md)
+  (done, 2026-06-18, `CPUContracted`):
+  migrated the full scheduler/counter-event unit test to promoted
+  `Extrinsic.Core.Tasks` and promoted telemetry stats, renamed it to
+  `tests/unit/core/Test.CoreTasks.cpp`, and removed the smaller
+  legacy-suffixed wrapper test; remaining Core deletion blockers are 38 tests
   and legacy-internal subtree ordering.
 - [LEGACY-018 — Retire legacy Interface panel-registration test](../../done/LEGACY-018-retire-interface-panel-registration-test.md)
   (done, 2026-06-18, `CPUContracted`):

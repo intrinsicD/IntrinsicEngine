@@ -9,6 +9,18 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`LEGACY-020`](LEGACY-020-core-tasks-test-promoted.md) — Migrate CoreTasks test
+to promoted Core — retired on 2026-06-18 at maturity `CPUContracted`. The full
+`tests/unit/core/Test_CoreTasks.cpp` scheduler, coroutine, `CounterEvent`,
+wait-token, telemetry-export, and job lifetime coverage now imports promoted
+`Extrinsic.Core.Tasks`, `Extrinsic.Core.Tasks.CounterEvent`, and
+`Extrinsic.Core.Telemetry` as `tests/unit/core/Test.CoreTasks.cpp`. The smaller
+legacy-suffixed promoted wrapper test was removed as duplicate coverage. The
+focused core targets and `CoreTasks` CTest filter passed. `LEGACY-005` remains
+blocked by 38 remaining test consumers and 133 legacy-internal consumers;
+`LEGACY-012` owns the remaining test cleanup.
+
+Backlog
 [`LEGACY-019`](LEGACY-019-strong-handle-test-promoted.md) — Migrate
 StrongHandle test to promoted Core — retired on 2026-06-18 at maturity
 `CPUContracted`. The full `tests/unit/core/Test_CoreHandle.cpp` coverage now
