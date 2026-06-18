@@ -55,6 +55,7 @@ export namespace Extrinsic::RHI
         SelectionSurface,
         SelectionLines,
         SelectionPoints,
+        LineQuads,
         Count
     };
 
@@ -91,6 +92,7 @@ export namespace Extrinsic::RHI
             return true;
         case GpuDrawBucketKind::Points:
         case GpuDrawBucketKind::SelectionPoints:
+        case GpuDrawBucketKind::LineQuads:
         case GpuDrawBucketKind::Count:
             return false;
         }
@@ -110,6 +112,7 @@ export namespace Extrinsic::RHI
         case GpuDrawBucketKind::Lines:
         case GpuDrawBucketKind::Points:
         case GpuDrawBucketKind::ShadowOpaque:
+        case GpuDrawBucketKind::LineQuads:
         case GpuDrawBucketKind::Count:
             return false;
         }
@@ -128,6 +131,7 @@ export namespace Extrinsic::RHI
         case GpuDrawBucketKind::SelectionSurface: return "SelectionSurface";
         case GpuDrawBucketKind::SelectionLines: return "SelectionLines";
         case GpuDrawBucketKind::SelectionPoints: return "SelectionPoints";
+        case GpuDrawBucketKind::LineQuads: return "LineQuads";
         case GpuDrawBucketKind::Count: return "Count";
         }
         return "Unknown";
@@ -356,13 +360,14 @@ export namespace Extrinsic::RHI
         GpuCullBucketPhases SurfaceOpaque{};
         GpuCullBucketPhases SurfaceAlphaMask{};
         GpuCullBucketPhases Lines{};
+        GpuCullBucketPhases LineQuads{};
         GpuCullBucketPhases Points{};
         GpuCullBucketPhases ShadowOpaque{};
         GpuCullBucketPhases SelectionSurface{};
         GpuCullBucketPhases SelectionLines{};
         GpuCullBucketPhases SelectionPoints{};
     };
-    static_assert(sizeof(GpuCullBucketTable) == 512);
+    static_assert(sizeof(GpuCullBucketTable) == 576);
     static_assert(alignof(GpuCullBucketTable) == 8);
     // -------------------------------------------------------
     // Per-frame camera + lighting UBO  (set 0, binding 0)

@@ -798,19 +798,18 @@ Open post-acceptance rendering leaves:
   Vulkan-capable hosts. Sibling of `GRAPHICS-092` (shared "venue",
   color/colormap side).
 - [GRAPHICS-092 — Group per-domain params in `GpuEntityConfig` and add line-width residency](GRAPHICS-092-group-per-domain-params-and-line-width-residency.md):
-  blocked by `GRAPHICS-093`; structural sibling of `GRAPHICS-091`. Groups the flat-mixed point-only
+  unblocked; structural sibling of `GRAPHICS-091`. Groups the flat-mixed point-only
   fields (`PointMode`/`PointSize`/`PointSizeBDA`) into named per-domain sub-blocks.
   Slice A has landed the 128-byte `GpuEntityConfig` layout with `Point` and `Line`
   sub-blocks and defaulted `Line.LineWidth` / `Line.LineWidthBDA`; Slice B remains
   open for `RenderEdges::WidthSource` population and `forward/line.vert`
-  screen-space quad expansion after the line draw topology blocker. Target `Operational` on
+  width consumption on the `LineQuads` topology. Target `Operational` on
   Vulkan-capable hosts.
-- [GRAPHICS-093 — Define forward-line quad topology for retained GpuScene lines](GRAPHICS-093-forward-line-quad-topology.md):
-  unblocked; blocker for `GRAPHICS-092` Slice B. The current promoted forward line
-  pass consumes indexed `LineList` draws through `DrawIndexedIndirectCount()`, which
-  cannot support screen-space quad expansion in the vertex shader alone. This task
-  owns the backend-portable topology/bucket decision before retained line width can
-  become operational.
+- [GRAPHICS-093 — Define forward-line quad topology for retained GpuScene lines (done)](../../done/GRAPHICS-093-forward-line-quad-topology.md):
+  retired 2026-06-18 at `CPUContracted`; appended the non-indexed `LineQuads`
+  bucket, switched retained `LinePass` to `DrawIndirectCount()` / `TriangleList`,
+  and preserved the indexed `Lines` bucket for edge-id selection. Dynamic line-width
+  consumption remains under `GRAPHICS-092`.
 
 Cross-layer Theme A leaves retired for the full working sandbox path:
 - [`RUNTIME-085` — `GeometrySources` mesh residency bridge](../../done/RUNTIME-085-geometrysources-mesh-residency.md) (retired 2026-05-28 at `CPUContracted`; Slices A–C landed the mesh packer, extraction wiring, and dirty-domain reupload/retire ordering).

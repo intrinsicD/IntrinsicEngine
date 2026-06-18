@@ -39,6 +39,8 @@ namespace Extrinsic::Graphics
             case FrameRecipeResourceKind::SurfaceOpaqueCount:
             case FrameRecipeResourceKind::LinesIndexedArgs:
             case FrameRecipeResourceKind::LinesCount:
+            case FrameRecipeResourceKind::LineQuadsNonIndexedArgs:
+            case FrameRecipeResourceKind::LineQuadsCount:
             case FrameRecipeResourceKind::PointsNonIndexedArgs:
             case FrameRecipeResourceKind::PointsCount:
             case FrameRecipeResourceKind::PickingReadback:

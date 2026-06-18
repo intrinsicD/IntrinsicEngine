@@ -108,6 +108,7 @@ namespace
     constexpr std::array kNonIndexedBuckets{
         RHI::GpuDrawBucketKind::Points,
         RHI::GpuDrawBucketKind::SelectionPoints,
+        RHI::GpuDrawBucketKind::LineQuads,
     };
 
     Graphics::GpuWorld::InitDesc TinyWorldDesc()
@@ -122,19 +123,21 @@ namespace
     }
 }
 
-static_assert(static_cast<std::uint32_t>(RHI::GpuDrawBucketKind::Count) == 8u);
+static_assert(static_cast<std::uint32_t>(RHI::GpuDrawBucketKind::Count) == 9u);
 static_assert(static_cast<std::uint32_t>(RHI::GpuCullPhase::Count) == 2u);
 static_assert(sizeof(RHI::GpuCullBucketOutput) == 24u);
 static_assert(sizeof(RHI::GpuCullBucketDiagnosticsCounters) == 16u);
 static_assert(sizeof(RHI::GpuCullBucketPhases) == 64u);
-static_assert(sizeof(RHI::GpuCullBucketTable) == 512u);
+static_assert(sizeof(RHI::GpuCullBucketTable) == 576u);
 static_assert(RHI::IsIndexedDrawBucket(RHI::GpuDrawBucketKind::SelectionSurface));
 static_assert(RHI::IsIndexedDrawBucket(RHI::GpuDrawBucketKind::SelectionLines));
 static_assert(!RHI::IsIndexedDrawBucket(RHI::GpuDrawBucketKind::SelectionPoints));
+static_assert(!RHI::IsIndexedDrawBucket(RHI::GpuDrawBucketKind::LineQuads));
 static_assert(RHI::IsSelectionDrawBucket(RHI::GpuDrawBucketKind::SelectionSurface));
 static_assert(RHI::IsSelectionDrawBucket(RHI::GpuDrawBucketKind::SelectionLines));
 static_assert(RHI::IsSelectionDrawBucket(RHI::GpuDrawBucketKind::SelectionPoints));
 static_assert(!RHI::IsSelectionDrawBucket(RHI::GpuDrawBucketKind::SurfaceOpaque));
+static_assert(!RHI::IsSelectionDrawBucket(RHI::GpuDrawBucketKind::LineQuads));
 
 TEST(GraphicsCullingContracts, BucketsCoverSurfaceLinePointShadowAndSelectionDomains)
 {

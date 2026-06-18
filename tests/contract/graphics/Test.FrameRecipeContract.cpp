@@ -36,23 +36,25 @@ namespace
             .SurfaceOpaqueCount = Extrinsic::RHI::BufferHandle{11u, 1u},
             .LinesIndexedArgs = Extrinsic::RHI::BufferHandle{12u, 1u},
             .LinesCount = Extrinsic::RHI::BufferHandle{13u, 1u},
-            .PointsNonIndexedArgs = Extrinsic::RHI::BufferHandle{14u, 1u},
-            .PointsCount = Extrinsic::RHI::BufferHandle{15u, 1u},
+            .LineQuadsNonIndexedArgs = Extrinsic::RHI::BufferHandle{14u, 1u},
+            .LineQuadsCount = Extrinsic::RHI::BufferHandle{15u, 1u},
+            .PointsNonIndexedArgs = Extrinsic::RHI::BufferHandle{16u, 1u},
+            .PointsCount = Extrinsic::RHI::BufferHandle{17u, 1u},
             // GRAPHICS-074 Slice D.2 — renderer-owned host-visible
             // `Picking.Readback` buffer is now imported by the recipe rather
             // than transient; supply a valid handle so picking-enabled
             // contract tests keep their compile path. Tests that disable
             // picking ignore this import (recipe drops the resource).
-            .PickingReadback = Extrinsic::RHI::BufferHandle{16u, 1u},
+            .PickingReadback = Extrinsic::RHI::BufferHandle{18u, 1u},
             // GRAPHICS-075 Slice E.2 — renderer-owned host-visible
             // `Histogram.Readback` buffer; same import-or-skip pattern as
             // picking above. Tests that disable postprocess ignore this
             // import (the recipe drops the histogram pass altogether).
-            .HistogramReadback = Extrinsic::RHI::BufferHandle{17u, 1u},
+            .HistogramReadback = Extrinsic::RHI::BufferHandle{19u, 1u},
             // GRAPHICS-038B — renderer-owned retained HZB.Current texture.
             // Tests opt into `EnableHZBBuild`; default recipe tests leave the
             // feature off so this import is ignored.
-            .HZBCurrent = Extrinsic::RHI::TextureHandle{18u, 1u},
+            .HZBCurrent = Extrinsic::RHI::TextureHandle{20u, 1u},
             // GRAPHICS-039A — renderer-owned cluster AABB storage buffer.
             // Tests opt into `EnableClusterGridBuild`; default recipe tests
             // leave the feature off so this import is ignored.
@@ -1642,13 +1644,15 @@ TEST(FrameRecipeContract, IntrospectionReportsPassResourceReadsAndWrites)
     EXPECT_TRUE(Contains(culling->Reads, "GpuWorld.SceneTable"));
     EXPECT_TRUE(Contains(culling->Writes, "Cull.SurfaceOpaque.IndexedArgs"));
     EXPECT_TRUE(Contains(culling->Writes, "Cull.Lines.IndexedArgs"));
+    EXPECT_TRUE(Contains(culling->Writes, "Cull.LineQuads.NonIndexedArgs"));
+    EXPECT_TRUE(Contains(culling->Writes, "Cull.LineQuads.Count"));
     EXPECT_TRUE(Contains(culling->Writes, "Cull.Points.NonIndexedArgs"));
 
     const auto* line = FindPass(description, FrameRecipePassKind::Line);
     ASSERT_NE(line, nullptr);
     EXPECT_TRUE(Contains(line->Reads, "SceneDepth"));
-    EXPECT_TRUE(Contains(line->Reads, "Cull.Lines.IndexedArgs"));
-    EXPECT_TRUE(Contains(line->Reads, "Cull.Lines.Count"));
+    EXPECT_TRUE(Contains(line->Reads, "Cull.LineQuads.NonIndexedArgs"));
+    EXPECT_TRUE(Contains(line->Reads, "Cull.LineQuads.Count"));
     EXPECT_TRUE(Contains(line->Writes, "SceneColorHDR"));
 
     const auto* point = FindPass(description, FrameRecipePassKind::Point);

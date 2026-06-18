@@ -205,6 +205,10 @@ void main() {
                     geo.LineFirstIndex,
                     int(geo.VertexOffset),
                     slot);
+        emitNonIndexed(buckets.LineQuads,
+                       (geo.LineIndexCount / 2u) * 6u,
+                       (geo.LineFirstIndex / 2u) * 6u,
+                       slot);
 
         if (selectable) {
             emitIndexedSelection(buckets.SelectionLines,

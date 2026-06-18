@@ -158,20 +158,19 @@ TEST(GraphicsLinePointPassContracts, LinePassSkipsInvalidStateAndDrawsLineBucket
     RecordingCommandContext cmd;
     pass.Execute(cmd, camera, world, culling, 11u);
 
-    ASSERT_EQ(cmd.Events.size(), 4u);
+    ASSERT_EQ(cmd.Events.size(), 3u);
     EXPECT_EQ(cmd.Events[0].Kind, EventKind::BindPipeline);
-    EXPECT_EQ(cmd.Events[1].Kind, EventKind::BindIndexBuffer);
-    EXPECT_EQ(cmd.Events[2].Kind, EventKind::PushConstants);
-    EXPECT_EQ(cmd.Events[3].Kind, EventKind::DrawIndexedIndirectCount);
+    EXPECT_EQ(cmd.Events[1].Kind, EventKind::PushConstants);
+    EXPECT_EQ(cmd.Events[2].Kind, EventKind::DrawIndirectCount);
     EXPECT_EQ(cmd.LastPipeline, pipeline);
-    EXPECT_EQ(cmd.LastIndexBuffer, world.GetManagedIndexBuffer());
+    EXPECT_FALSE(cmd.LastIndexBuffer.IsValid());
 
-    const auto& bucket = culling.GetBucket(RHI::GpuDrawBucketKind::Lines);
-    EXPECT_TRUE(bucket.Indexed);
-    EXPECT_EQ(cmd.LastIndirectArgs, bucket.IndexedArgsBuffer);
+    const auto& bucket = culling.GetBucket(RHI::GpuDrawBucketKind::LineQuads);
+    EXPECT_FALSE(bucket.Indexed);
+    EXPECT_EQ(cmd.LastIndirectArgs, bucket.NonIndexedArgsBuffer);
     EXPECT_EQ(cmd.LastIndirectCount, bucket.CountBuffer);
     EXPECT_EQ(cmd.LastMaxDrawCount, bucket.Capacity);
-    ExpectScenePushConstants(cmd, world, RHI::GpuDrawBucketKind::Lines, 11u);
+    ExpectScenePushConstants(cmd, world, RHI::GpuDrawBucketKind::LineQuads, 11u);
 
     culling.Shutdown();
     forward.Shutdown();
@@ -223,4 +222,3 @@ TEST(GraphicsLinePointPassContracts, PointPassSkipsInvalidStateAndDrawsPointBuck
     forward.Shutdown();
     world.Shutdown();
 }
-

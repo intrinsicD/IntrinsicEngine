@@ -271,11 +271,16 @@ Concretely:
   `m_ForwardLinePipelineLease`, and `m_ForwardPointPipelineLease` alongside the
   forward surface pass. The line pipeline uses
   `shaders/forward/line.vert.spv` + `shaders/forward/line.frag.spv` with
-  `Topology::LineList`; the point pipeline uses
+  `Topology::TriangleList` over the non-indexed `LineQuads` bucket; the point
+  pipeline uses
   `shaders/forward/point.vert.spv` + `shaders/forward/point.frag.spv` with
-  `Topology::TriangleList`. The retained `Points` cull bucket expands one
-  source point to six vertices in the cull shader and the point vertex shader
-  reconstructs a camera-facing billboard from `gl_VertexIndex / 6`; the
+  `Topology::TriangleList`. The retained `LineQuads` cull bucket expands one
+  line segment to six vertices and `forward/line.vert` fetches the two endpoint
+  indices from `GpuGeometryRecord::IndexBufferBDA` before emitting a minimal
+  screen-space quad; the indexed `Lines` bucket remains available for edge-id
+  selection. The retained `Points` cull bucket expands one source point to six
+  vertices in the cull shader and the point vertex shader reconstructs a
+  camera-facing billboard from `gl_VertexIndex / 6`; the
   selection point-id pass uses the separate `SelectionPoints` bucket so picking
   continues to draw the unexpanded point-id shader path. Both forward pipelines
   load `SceneDepth`, append into `SceneColorHDR`, enable alpha blending, use
@@ -1385,11 +1390,13 @@ Concretely:
   parity remains the later `GRAPHICS-091` slice and must reuse the same GPU-side
   BDA resolver instead of introducing a CPU-baked color buffer.
 - `Graphics.FrameRecipe` imports explicit cull bucket resources for surface,
-  line, and point lanes. `LinePass` consumes `Cull.Lines.IndexedArgs` /
-  `Cull.Lines.Count`; `PointPass` consumes `Cull.Points.NonIndexedArgs` /
+  line, and point lanes. `LinePass` consumes
+  `Cull.LineQuads.NonIndexedArgs` / `Cull.LineQuads.Count`; the indexed
+  `Cull.Lines.IndexedArgs` / `Cull.Lines.Count` resources stay available for
+  edge-id selection. `PointPass` consumes `Cull.Points.NonIndexedArgs` /
   `Cull.Points.Count`. These cull-bucket resources stay reserved for retained
-  `GpuRender_Line`/`GpuRender_Point` renderables and are not the transient
-  debug expansion path.
+  `GpuRender_Line`/`GpuRender_Point` renderables and are not the transient debug
+  expansion path.
 - `Graphics.GpuAssetCache` and `MaterialSystem` own the texture residency
   contract. Per `GRAPHICS-015Q`, the cache stays explicitly non-evicting in
   the `GRAPHICS-015` slice; capacity introspection comes from

@@ -302,12 +302,13 @@ namespace Extrinsic::Graphics
             const bool surfaceOk = AllocateBucket(RHI::GpuDrawBucketKind::SurfaceOpaque, true, capacity);
             const bool alphaOk   = AllocateBucket(RHI::GpuDrawBucketKind::SurfaceAlphaMask, true, capacity);
             const bool lineOk    = AllocateBucket(RHI::GpuDrawBucketKind::Lines, true, capacity);
+            const bool lineQuadOk = AllocateBucket(RHI::GpuDrawBucketKind::LineQuads, false, capacity);
             const bool pointOk   = AllocateBucket(RHI::GpuDrawBucketKind::Points, false, capacity);
             const bool shadowOk  = AllocateBucket(RHI::GpuDrawBucketKind::ShadowOpaque, true, capacity);
             const bool selectionSurfaceOk = AllocateBucket(RHI::GpuDrawBucketKind::SelectionSurface, true, capacity);
             const bool selectionLinesOk   = AllocateBucket(RHI::GpuDrawBucketKind::SelectionLines, true, capacity);
             const bool selectionPointsOk  = AllocateBucket(RHI::GpuDrawBucketKind::SelectionPoints, false, capacity);
-            if (!(surfaceOk && alphaOk && lineOk && pointOk && shadowOk &&
+            if (!(surfaceOk && alphaOk && lineOk && lineQuadOk && pointOk && shadowOk &&
                   selectionSurfaceOk && selectionLinesOk && selectionPointsOk))
             {
                 return false;
@@ -552,6 +553,7 @@ namespace Extrinsic::Graphics
         const auto& surface = m_Impl->Buckets[ToIndex(RHI::GpuDrawBucketKind::SurfaceOpaque)];
         const auto& alpha   = m_Impl->Buckets[ToIndex(RHI::GpuDrawBucketKind::SurfaceAlphaMask)];
         const auto& lines   = m_Impl->Buckets[ToIndex(RHI::GpuDrawBucketKind::Lines)];
+        const auto& lineQuads = m_Impl->Buckets[ToIndex(RHI::GpuDrawBucketKind::LineQuads)];
         const auto& points  = m_Impl->Buckets[ToIndex(RHI::GpuDrawBucketKind::Points)];
         const auto& shadow  = m_Impl->Buckets[ToIndex(RHI::GpuDrawBucketKind::ShadowOpaque)];
         const auto& selectionSurface = m_Impl->Buckets[ToIndex(RHI::GpuDrawBucketKind::SelectionSurface)];
@@ -570,6 +572,7 @@ namespace Extrinsic::Graphics
         bucketTable.SurfaceOpaque = makeBucketPhases(surface);
         bucketTable.SurfaceAlphaMask = makeBucketPhases(alpha);
         bucketTable.Lines = makeBucketPhases(lines);
+        bucketTable.LineQuads = makeBucketPhases(lineQuads);
         bucketTable.Points = makeBucketPhases(points);
         bucketTable.ShadowOpaque = makeBucketPhases(shadow);
         bucketTable.SelectionSurface = makeBucketPhases(selectionSurface);

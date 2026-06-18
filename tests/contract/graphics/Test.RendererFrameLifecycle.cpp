@@ -529,9 +529,9 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     EXPECT_EQ(stats.ClusterGridBuildDispatchCount, 1u);
     EXPECT_EQ(stats.ClusterLightAssignmentRecordedFrames, 1u);
     EXPECT_EQ(stats.ClusterLightAssignmentDispatchCount, 1u);
-    EXPECT_EQ(device.CommandContext.BindIndexBufferCalls, 3);
-    EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 3);
-    EXPECT_EQ(device.CommandContext.DrawIndirectCountCalls, 1);
+    EXPECT_EQ(device.CommandContext.BindIndexBufferCalls, 2);
+    EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 2);
+    EXPECT_EQ(device.CommandContext.DrawIndirectCountCalls, 2);
     EXPECT_EQ(device.CommandContext.LastMaxDrawCount, Extrinsic::RHI::kMaxIndirectDrawCount);
 
     const int dispatchEvent = FindEventIndex(device.CommandContext,
@@ -853,8 +853,8 @@ TEST(RendererFrameLifecycle, OperationalRebuildAfterNonOperationalStartupRecords
     EXPECT_EQ(stats.HZBBuildFallbackFrames, 1u);
     EXPECT_EQ(stats.ClusterGridBuildRecordedFrames, 1u);
     EXPECT_EQ(stats.ClusterLightAssignmentRecordedFrames, 1u);
-    EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 3);
-    EXPECT_EQ(device.CommandContext.DrawIndirectCountCalls, 1);
+    EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 2);
+    EXPECT_EQ(device.CommandContext.DrawIndirectCountCalls, 2);
 
     renderer->Shutdown();
 }
@@ -950,8 +950,8 @@ TEST(RendererFrameLifecycle, DepthPrepassPipelineFailureSkipsUnavailableCommandP
     EXPECT_EQ(FindCommandPass(stats, "PostProcessAABlendPass"), nullptr);
     EXPECT_EQ(FindCommandPass(stats, "PostProcessAAResolvePass"), nullptr);
     EXPECT_EQ(device.CommandContext.DispatchCalls, 3);
-    EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 2);
-    EXPECT_EQ(device.CommandContext.DrawIndirectCountCalls, 1);
+    EXPECT_EQ(device.CommandContext.DrawIndexedIndirectCountCalls, 1);
+    EXPECT_EQ(device.CommandContext.DrawIndirectCountCalls, 2);
 
     renderer->Shutdown();
 }
@@ -1348,7 +1348,7 @@ TEST(RendererFrameLifecycle, ForwardLinePointPipelinesSurviveOperationalRebuild)
         << initialLineDesc.VertexShaderPath;
     EXPECT_TRUE(initialLineDesc.FragmentShaderPath.ends_with("shaders/forward/line.frag.spv"))
         << initialLineDesc.FragmentShaderPath;
-    EXPECT_EQ(initialLineDesc.PrimitiveTopology, Extrinsic::RHI::Topology::LineList);
+    EXPECT_EQ(initialLineDesc.PrimitiveTopology, Extrinsic::RHI::Topology::TriangleList);
     EXPECT_EQ(initialLineDesc.Rasterizer.Culling, Extrinsic::RHI::CullMode::None);
     EXPECT_TRUE(initialLineDesc.DepthStencil.DepthTestEnable);
     EXPECT_FALSE(initialLineDesc.DepthStencil.DepthWriteEnable);

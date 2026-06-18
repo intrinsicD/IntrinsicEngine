@@ -5,6 +5,27 @@ depends_on: []
 ---
 # GRAPHICS-093 — Define forward-line quad topology for retained GpuScene lines
 
+## Completion
+- Completed: 2026-06-18. Commit/PR: this retirement commit.
+- Maturity: `CPUContracted`.
+- Fix summary: appended a non-indexed `GpuDrawBucketKind::LineQuads` culling
+  bucket for retained forward lines, emitted six vertices per line segment from
+  the culling shader, switched `Pass.Forward.Line` to
+  `DrawIndirectCount()`/`Topology::TriangleList`, and updated
+  `forward/line.vert` to expand one-pixel screen-space quads from managed line
+  endpoint indices.
+- Selection boundary: the indexed `Lines` bucket remains intact for edge-id
+  selection, so primitive-id behavior stays deterministic and no native wide-line
+  dependency is introduced.
+- Evidence: focused `glslc` compile for `assets/shaders/culling/instance_cull.comp`
+  and `assets/shaders/forward/line.vert`; `cmake --preset ci`;
+  `cmake --build --preset ci --target IntrinsicTests`; focused
+  line/culling/selection/frame-recipe CTest; default CPU CTest gate
+  (`2930/2930`); shader-output check; layering, test-layout, doc-link, task,
+  session-brief, docs-sync, and whitespace checks.
+- Follow-up: dynamic `GpuEntityConfig::Line.LineWidth` and `Line.LineWidthBDA`
+  population/consumption remain owned by `GRAPHICS-092`.
+
 ## Goal
 - Establish the promoted forward-line draw topology needed for screen-space thick
   lines, so `GRAPHICS-092` can consume `GpuEntityConfig::Line.LineWidth` /
@@ -23,10 +44,10 @@ depends_on: []
 - Owning subsystem/layer: `graphics/renderer` pass and culling contracts, with shader
   assets under `assets/shaders/forward/` and draw bucket structs in
   `src/graphics/rhi/RHI.Types.cppm`.
-- Current state verified 2026-06-18: `Pass.Forward.Line` consumes the indexed
-  `GpuDrawBucketKind::Lines` bucket through `DrawIndexedIndirectCount()`, binds the
-  managed index buffer, and its pipeline is `Topology::LineList`. The culling shader
-  emits `geo.LineIndexCount`, `geo.LineFirstIndex`, and `geo.VertexOffset` into that
+- Pre-fix state verified 2026-06-18: `Pass.Forward.Line` consumed the indexed
+  `GpuDrawBucketKind::Lines` bucket through `DrawIndexedIndirectCount()`, bound the
+  managed index buffer, and used `Topology::LineList`. The culling shader emitted
+  `geo.LineIndexCount`, `geo.LineFirstIndex`, and `geo.VertexOffset` into that
   indexed bucket.
 - `GRAPHICS-092` Slice B asks `forward/line.vert` to expand each line segment to a
   screen-space quad. A vertex shader receiving an indexed `LineList` invocation sees
@@ -38,38 +59,38 @@ depends_on: []
   the indexed `Lines` cull bucket.
 
 ## Required changes
-- [ ] Decide and document the promoted thick-line topology: an expanded non-indexed
+- [x] Decide and document the promoted thick-line topology: an expanded non-indexed
       line-quad bucket, an expanded index buffer, or another backend-portable contract
       that does not require native wide-line support.
-- [ ] Update the RHI/culling bucket contract for retained forward lines if the chosen
+- [x] Update the RHI/culling bucket contract for retained forward lines if the chosen
       topology is no longer the current indexed `LineList`.
-- [ ] Update `Pass.Forward.Line`, pipeline descriptor creation, and related pass
+- [x] Update `Pass.Forward.Line`, pipeline descriptor creation, and related pass
       contract tests to consume the chosen topology.
-- [ ] Preserve or explicitly split the selection edge-id bucket so primitive-id
+- [x] Preserve or explicitly split the selection edge-id bucket so primitive-id
       encoding remains deterministic.
-- [ ] Leave `GpuEntityConfig::Line` width population/consumption to `GRAPHICS-092`
+- [x] Leave `GpuEntityConfig::Line` width population/consumption to `GRAPHICS-092`
       after this topology blocker lands.
 
 ## Tests
-- [ ] Add/extend `contract;graphics` coverage for the new forward-line command shape
+- [x] Add/extend `contract;graphics` coverage for the new forward-line command shape
       (draw kind, bucket kind, push constants, index-buffer binding policy).
-- [ ] Add/extend culling contract coverage for the chosen line bucket emission.
-- [ ] Add shader-compile coverage for any new or modified forward-line shader inputs.
-- [ ] Preserve the default CPU gate.
+- [x] Add/extend culling contract coverage for the chosen line bucket emission.
+- [x] Add shader-compile coverage for any new or modified forward-line shader inputs.
+- [x] Preserve the default CPU gate.
 
 ## Docs
-- [ ] Update `src/graphics/renderer/README.md` and the rendering backlog index with
+- [x] Update `src/graphics/renderer/README.md` and the rendering backlog index with
       the chosen forward-line topology and its relationship to selection edge-id.
-- [ ] Regenerate `tasks/SESSION-BRIEF.md`.
+- [x] Regenerate `tasks/SESSION-BRIEF.md`.
 
 ## Acceptance criteria
-- [ ] Forward retained lines have a backend-portable draw topology that can support
+- [x] Forward retained lines have a backend-portable draw topology that can support
       screen-space quad expansion in `GRAPHICS-092`.
-- [ ] Selection edge-id rendering remains deterministic or has an explicitly documented
+- [x] Selection edge-id rendering remains deterministic or has an explicitly documented
       split bucket.
-- [ ] No native wide-line dependency is introduced.
-- [ ] Default CPU gate stays green.
-- [ ] Layering preserved: renderer/RHI contracts change without importing runtime/ECS
+- [x] No native wide-line dependency is introduced.
+- [x] Default CPU gate stays green.
+- [x] Layering preserved: renderer/RHI contracts change without importing runtime/ECS
       ownership into graphics.
 
 ## Verification

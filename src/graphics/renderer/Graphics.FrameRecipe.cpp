@@ -324,6 +324,8 @@ namespace Extrinsic::Graphics
         case FrameRecipeResourceKind::SurfaceOpaqueCount: return "Cull.SurfaceOpaque.Count";
         case FrameRecipeResourceKind::LinesIndexedArgs: return "Cull.Lines.IndexedArgs";
         case FrameRecipeResourceKind::LinesCount: return "Cull.Lines.Count";
+        case FrameRecipeResourceKind::LineQuadsNonIndexedArgs: return "Cull.LineQuads.NonIndexedArgs";
+        case FrameRecipeResourceKind::LineQuadsCount: return "Cull.LineQuads.Count";
         case FrameRecipeResourceKind::PointsNonIndexedArgs: return "Cull.Points.NonIndexedArgs";
         case FrameRecipeResourceKind::PointsCount: return "Cull.Points.Count";
         case FrameRecipeResourceKind::PickingReadback: return "Picking.Readback";
@@ -453,7 +455,7 @@ namespace Extrinsic::Graphics
 
         AddPass(out, FrameRecipePassKind::Culling, "CullingPass", true, false,
                 {"GpuWorld.SceneTable", "GpuWorld.InstanceStatic", "GpuWorld.InstanceDynamic", "GpuWorld.EntityConfig", "GpuWorld.GeometryRecords", "GpuWorld.Bounds", "Material.Buffer", "GpuWorld.Lights"},
-                {"Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count", "Cull.Lines.IndexedArgs", "Cull.Lines.Count", "Cull.Points.NonIndexedArgs", "Cull.Points.Count"});
+                {"Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count", "Cull.Lines.IndexedArgs", "Cull.Lines.Count", "Cull.LineQuads.NonIndexedArgs", "Cull.LineQuads.Count", "Cull.Points.NonIndexedArgs", "Cull.Points.Count"});
         AddPass(out, FrameRecipePassKind::DepthPrepass, "DepthPrepass", features.EnableDepthPrepass, false,
                 {"Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count"}, {"SceneDepth"});
         AddPass(out, FrameRecipePassKind::HZBBuild, "HZBBuildPass", hzbBuildActive, false,
@@ -475,7 +477,7 @@ namespace Extrinsic::Graphics
         }
         AddPassWithVectors(out, FrameRecipePassKind::Picking, "PickingPass",
                            selectionIdActive, false,
-                           {"SceneDepth", "Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count", "Cull.Lines.IndexedArgs", "Cull.Lines.Count", "Cull.Points.NonIndexedArgs", "Cull.Points.Count"},
+                           {"SceneDepth", "Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count", "Cull.Lines.IndexedArgs", "Cull.Lines.Count", "Cull.LineQuads.NonIndexedArgs", "Cull.LineQuads.Count", "Cull.Points.NonIndexedArgs", "Cull.Points.Count"},
                            std::move(pickingWrites));
         AddPass(out, FrameRecipePassKind::Shadow, "ShadowPass", features.EnableShadows, false,
                 {"Cull.SurfaceOpaque.IndexedArgs", "Cull.SurfaceOpaque.Count"}, {"ShadowAtlas"});
@@ -552,7 +554,7 @@ namespace Extrinsic::Graphics
                            std::move(compositionReads),
                            {"SceneColorHDR"});
         AddPass(out, FrameRecipePassKind::Line, "LinePass", true, false,
-                {"SceneDepth", "Cull.Lines.IndexedArgs", "Cull.Lines.Count"}, {"SceneColorHDR"});
+                {"SceneDepth", "Cull.LineQuads.NonIndexedArgs", "Cull.LineQuads.Count"}, {"SceneColorHDR"});
         AddPass(out, FrameRecipePassKind::Point, "PointPass", true, false,
                 {"SceneDepth", "Cull.Points.NonIndexedArgs", "Cull.Points.Count"}, {"SceneColorHDR"});
         // GRAPHICS-077 Slice A — transient-debug surface overlay. Placed
@@ -679,6 +681,8 @@ namespace Extrinsic::Graphics
         AddResource(out, FrameRecipeResourceKind::SurfaceOpaqueCount, "Cull.SurfaceOpaque.Count", true, true, false, false, true);
         AddResource(out, FrameRecipeResourceKind::LinesIndexedArgs, "Cull.Lines.IndexedArgs", true, true, false, false, true);
         AddResource(out, FrameRecipeResourceKind::LinesCount, "Cull.Lines.Count", true, true, false, false, true);
+        AddResource(out, FrameRecipeResourceKind::LineQuadsNonIndexedArgs, "Cull.LineQuads.NonIndexedArgs", true, true, false, false, true);
+        AddResource(out, FrameRecipeResourceKind::LineQuadsCount, "Cull.LineQuads.Count", true, true, false, false, true);
         AddResource(out, FrameRecipeResourceKind::PointsNonIndexedArgs, "Cull.Points.NonIndexedArgs", true, true, false, false, true);
         AddResource(out, FrameRecipeResourceKind::PointsCount, "Cull.Points.Count", true, true, false, false, true);
         // GRAPHICS-074 Slice D.2 — the Picking.Readback buffer is now the
@@ -1016,6 +1020,8 @@ namespace Extrinsic::Graphics
         const auto drawCount = importBuffer("Cull.SurfaceOpaque.Count", imports.SurfaceOpaqueCount, BufferState::ShaderWrite, BufferState::IndirectRead, FrameRecipeResourceKind::SurfaceOpaqueCount);
         const auto lineDrawIndirect = importBuffer("Cull.Lines.IndexedArgs", imports.LinesIndexedArgs, BufferState::ShaderWrite, BufferState::IndirectRead, FrameRecipeResourceKind::LinesIndexedArgs);
         const auto lineDrawCount = importBuffer("Cull.Lines.Count", imports.LinesCount, BufferState::ShaderWrite, BufferState::IndirectRead, FrameRecipeResourceKind::LinesCount);
+        const auto lineQuadDrawIndirect = importBuffer("Cull.LineQuads.NonIndexedArgs", imports.LineQuadsNonIndexedArgs, BufferState::ShaderWrite, BufferState::IndirectRead, FrameRecipeResourceKind::LineQuadsNonIndexedArgs);
+        const auto lineQuadDrawCount = importBuffer("Cull.LineQuads.Count", imports.LineQuadsCount, BufferState::ShaderWrite, BufferState::IndirectRead, FrameRecipeResourceKind::LineQuadsCount);
         const auto pointDrawIndirect = importBuffer("Cull.Points.NonIndexedArgs", imports.PointsNonIndexedArgs, BufferState::ShaderWrite, BufferState::IndirectRead, FrameRecipeResourceKind::PointsNonIndexedArgs);
         const auto pointDrawCount = importBuffer("Cull.Points.Count", imports.PointsCount, BufferState::ShaderWrite, BufferState::IndirectRead, FrameRecipeResourceKind::PointsCount);
 
@@ -1327,6 +1333,8 @@ namespace Extrinsic::Graphics
             builder.Write(drawCount, BufferUsage::ShaderWrite);
             builder.Write(lineDrawIndirect, BufferUsage::ShaderWrite);
             builder.Write(lineDrawCount, BufferUsage::ShaderWrite);
+            builder.Write(lineQuadDrawIndirect, BufferUsage::ShaderWrite);
+            builder.Write(lineQuadDrawCount, BufferUsage::ShaderWrite);
             builder.Write(pointDrawIndirect, BufferUsage::ShaderWrite);
             builder.Write(pointDrawCount, BufferUsage::ShaderWrite);
         });
@@ -1545,8 +1553,8 @@ namespace Extrinsic::Graphics
 
         addRecipePass(FrameRecipePassKind::Line, "LinePass", [=](RenderGraphBuilder& builder) {
             builder.Read(depth, TextureUsage::DepthRead);
-            builder.Read(lineDrawIndirect, BufferUsage::IndirectRead);
-            builder.Read(lineDrawCount, BufferUsage::IndirectRead);
+            builder.Read(lineQuadDrawIndirect, BufferUsage::IndirectRead);
+            builder.Read(lineQuadDrawCount, BufferUsage::IndirectRead);
             builder.Write(hdr, TextureUsage::ColorAttachmentWrite);
             builder.SetRenderPass(RHI::RenderPassDesc{
                 .ColorTargets = kDefaultLoadColorAttachments,

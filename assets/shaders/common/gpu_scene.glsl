@@ -241,6 +241,7 @@ struct GpuCullBucketTable {
     GpuCullBucketPhases SurfaceOpaque;
     GpuCullBucketPhases SurfaceAlphaMask;
     GpuCullBucketPhases Lines;
+    GpuCullBucketPhases LineQuads;
     GpuCullBucketPhases Points;
     GpuCullBucketPhases ShadowOpaque;
     GpuCullBucketPhases SelectionSurface;
@@ -274,6 +275,10 @@ layout(buffer_reference, scalar) readonly buffer GpuFloatBufferRef {
 
 layout(buffer_reference, scalar) readonly buffer GpuVec4BufferRef {
     vec4 Data[];
+};
+
+layout(buffer_reference, scalar) readonly buffer GpuUIntBufferRef {
+    uint Data[];
 };
 
 layout(buffer_reference, scalar) readonly buffer GpuBoundsRef {

@@ -1938,6 +1938,11 @@ endpoint retired); they are preserved here verbatim for traceability.
 - **PHYSICS-002 ⇐ PHYSICS-001.** Satisfied 2026-06-06:
   collision broadphase/narrowphase contracts are retired at `CPUContracted`
   on top of the physics world/body descriptor surface.
+- **GRAPHICS-093 ⇐ GRAPHICS-092 Slice B blocker.** Satisfied 2026-06-18:
+  retained forward lines now have a backend-portable non-indexed `LineQuads`
+  topology (`DrawIndirectCount()` / `TriangleList`) while edge-id selection keeps
+  the indexed `Lines` bucket. Dynamic line-width residency and Vulkan operational
+  proof remain owned by `GRAPHICS-092`.
 - **GRAPHICS-033B ⇐ GRAPHICS-033A (done).** Diagnostics counters and the
   `VulkanRequestedButNotOperational` startup breadcrumb depend on the
   status / reason enums and the reconciliation matrix wiring.

@@ -23,25 +23,24 @@ namespace Extrinsic::Graphics
             return;
         }
 
-        const auto& bucket = culling.GetBucket(RHI::GpuDrawBucketKind::Lines);
-        if (!bucket.Indexed || !bucket.IndexedArgsBuffer.IsValid() ||
+        const auto& bucket = culling.GetBucket(RHI::GpuDrawBucketKind::LineQuads);
+        if (bucket.Indexed || !bucket.NonIndexedArgsBuffer.IsValid() ||
             !bucket.CountBuffer.IsValid() || bucket.Capacity == 0u)
         {
             return;
         }
 
         cmd.BindPipeline(m_Pipeline);
-        cmd.BindIndexBuffer(gpuWorld.GetManagedIndexBuffer(), 0, RHI::IndexType::Uint32);
 
         RHI::GpuScenePushConstants pc{};
         pc.SceneTableBDA = gpuWorld.GetSceneTableBDA();
         pc.FrameIndex    = frameIndex;
-        pc.DrawBucket    = static_cast<std::uint32_t>(RHI::GpuDrawBucketKind::Lines);
+        pc.DrawBucket    = static_cast<std::uint32_t>(RHI::GpuDrawBucketKind::LineQuads);
 
         cmd.PushConstants(&pc, sizeof(pc));
 
-        cmd.DrawIndexedIndirectCount(
-            bucket.IndexedArgsBuffer,
+        cmd.DrawIndirectCount(
+            bucket.NonIndexedArgsBuffer,
             0,
             bucket.CountBuffer,
             0,

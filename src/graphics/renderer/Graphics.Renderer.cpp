@@ -1623,6 +1623,7 @@ namespace Extrinsic::Graphics
             m_RenderGraph.Reset();
             const auto& surfaceOpaque = m_Subsystems.CullingSystemRegistry()->GetBucket(RHI::GpuDrawBucketKind::SurfaceOpaque);
             const auto& lines = m_Subsystems.CullingSystemRegistry()->GetBucket(RHI::GpuDrawBucketKind::Lines);
+            const auto& lineQuads = m_Subsystems.CullingSystemRegistry()->GetBucket(RHI::GpuDrawBucketKind::LineQuads);
             const auto& points = m_Subsystems.CullingSystemRegistry()->GetBucket(RHI::GpuDrawBucketKind::Points);
             const FrameRecipeSizing sizing{
                 .Width = renderWorld.Viewport.Width > 0 ? static_cast<std::uint32_t>(renderWorld.Viewport.Width) : 1u,
@@ -1692,6 +1693,8 @@ namespace Extrinsic::Graphics
                 .SurfaceOpaqueCount = surfaceOpaque.CountBuffer,
                 .LinesIndexedArgs = lines.IndexedArgsBuffer,
                 .LinesCount = lines.CountBuffer,
+                .LineQuadsNonIndexedArgs = lineQuads.NonIndexedArgsBuffer,
+                .LineQuadsCount = lineQuads.CountBuffer,
                 .PointsNonIndexedArgs = points.NonIndexedArgsBuffer,
                 .PointsCount = points.CountBuffer,
                 // GRAPHICS-073 Slice B — when `ShadowSystem` has lazily
@@ -2944,7 +2947,7 @@ namespace Extrinsic::Graphics
                 "shaders/forward/line.vert.spv");
             desc.FragmentShaderPath = Core::Filesystem::GetShaderPath(
                 "shaders/forward/line.frag.spv");
-            desc.PrimitiveTopology = RHI::Topology::LineList;
+            desc.PrimitiveTopology = RHI::Topology::TriangleList;
             desc.Rasterizer.Culling = RHI::CullMode::None;
             desc.Rasterizer.Winding = RHI::FrontFace::CounterClockwise;
             desc.Rasterizer.Fill = RHI::FillMode::Solid;

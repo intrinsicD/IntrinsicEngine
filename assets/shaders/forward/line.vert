@@ -39,11 +39,36 @@ void main() {
     const GpuEntityConfig cfg = entityConfigs.Data[inst.ConfigSlot];
 
     PackedVertexRef vertices = PackedVertexRef(geo.VertexBufferBDA);
-    // The culling indirect command supplies firstIndex + vertexOffset, so
-    // gl_VertexIndex is already in managed-buffer vertex units.
-    const PackedVertex pv = vertices.Data[uint(gl_VertexIndex)];
+    GpuUIntBufferRef indices = GpuUIntBufferRef(geo.IndexBufferBDA);
 
-    gl_Position = scene.CameraViewProj * dyn.Model * vec4(pv.px, pv.py, pv.pz, 1.0);
+    const uint vertexIndex = uint(gl_VertexIndex);
+    const uint segmentIndex = vertexIndex / 6u;
+    const uint vertexInQuad = vertexIndex % 6u;
+    const uint cornerIndex = uint[6](0u, 1u, 2u, 0u, 2u, 3u)[vertexInQuad];
+    const uint lineIndexBase = segmentIndex * 2u;
+    const uint endpointA = indices.Data[lineIndexBase] + geo.VertexOffset;
+    const uint endpointB = indices.Data[lineIndexBase + 1u] + geo.VertexOffset;
+    const PackedVertex a = vertices.Data[endpointA];
+    const PackedVertex b = vertices.Data[endpointB];
 
-    vColor = (cfg.ColorSourceMode == 1u) ? cfg.UniformColor : vec4(1.0);
+    const vec4 clipA = scene.CameraViewProj * dyn.Model * vec4(a.px, a.py, a.pz, 1.0);
+    const vec4 clipB = scene.CameraViewProj * dyn.Model * vec4(b.px, b.py, b.pz, 1.0);
+    const bool useEnd = cornerIndex >= 2u;
+    const float side = (cornerIndex == 0u || cornerIndex == 3u) ? -1.0 : 1.0;
+    const vec4 centerClip = useEnd ? clipB : clipA;
+
+    const vec2 ndcA = clipA.xy / max(abs(clipA.w), 1.0e-6);
+    const vec2 ndcB = clipB.xy / max(abs(clipB.w), 1.0e-6);
+    const vec2 direction = ndcB - ndcA;
+    const float directionLength = length(direction);
+    const vec2 tangent = directionLength > 1.0e-6 ? direction / directionLength : vec2(1.0, 0.0);
+    const vec2 normal = vec2(-tangent.y, tangent.x);
+    const vec2 viewport = max(vec2(scene.CameraViewportWidth, scene.CameraViewportHeight), vec2(1.0));
+    const float halfWidthPx = 0.5;
+    const vec2 clipOffset = normal * side * vec2((2.0 * halfWidthPx) / viewport.x,
+                                                 (2.0 * halfWidthPx) / viewport.y) * centerClip.w;
+
+    gl_Position = centerClip + vec4(clipOffset, 0.0, 0.0);
+
+    vColor = (cfg.ColorSourceMode == GpuColorSource_UniformColor) ? cfg.UniformColor : vec4(1.0);
 }

@@ -145,6 +145,8 @@ namespace Extrinsic::Graphics
         SurfaceOpaqueCount,
         LinesIndexedArgs,
         LinesCount,
+        LineQuadsNonIndexedArgs,
+        LineQuadsCount,
         PointsNonIndexedArgs,
         PointsCount,
         PickingReadback,
@@ -307,6 +309,8 @@ namespace Extrinsic::Graphics
         RHI::BufferHandle SurfaceOpaqueCount{};
         RHI::BufferHandle LinesIndexedArgs{};
         RHI::BufferHandle LinesCount{};
+        RHI::BufferHandle LineQuadsNonIndexedArgs{};
+        RHI::BufferHandle LineQuadsCount{};
         RHI::BufferHandle PointsNonIndexedArgs{};
         RHI::BufferHandle PointsCount{};
         // GRAPHICS-073 Slice B — optional `ShadowSystem`-owned atlas. When

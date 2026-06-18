@@ -1,7 +1,7 @@
 ---
 id: GRAPHICS-092
 theme: none
-depends_on: [GRAPHICS-093]
+depends_on: []
 ---
 # GRAPHICS-092 — Group per-domain params in `GpuEntityConfig` and add line-width residency
 
@@ -44,11 +44,11 @@ depends_on: [GRAPHICS-093]
   `forward/line.vert` emits a native 1px line list with no width expansion. (The
   legacy retained line path and the overlay-packet `LineWidth` are separate and
   out of scope.)
-- Blocker for Slice B: `GRAPHICS-093` owns the draw-topology decision needed before
-  shader-expanded thick lines can land. The current forward line pass consumes an
-  indexed `LineList` cull bucket through `DrawIndexedIndirectCount()`, which cannot
-  synthesize the six triangle vertices needed for a screen-space quad from the vertex
-  shader alone.
+- `GRAPHICS-093` retired the draw-topology blocker for Slice B: retained forward
+  lines now consume the non-indexed `LineQuads` bucket through `DrawIndirectCount()`
+  and `Topology::TriangleList`, while edge-id selection keeps the indexed `Lines`
+  bucket. Slice B can now focus on `RenderEdges::WidthSource` population and
+  `GpuEntityConfig::Line.LineWidth` / `Line.LineWidthBDA` consumption.
 - One entity can be surface+line+point simultaneously (`RenderFlags` bits in
   `gpu_scene.glsl`), so per-domain params must be **grouped sub-blocks, not a union** —
   point and line params can be live at the same time.
@@ -147,6 +147,6 @@ python3 tools/agents/check_task_policy.py --root . --strict
     (including new defaulted `LineWidth`/`LineWidthBDA`), C++ + GLSL mirror +
     `static_assert`; mechanical reader updates. Behavior-preserving. Closes
     `Scaffolded → CPUContracted`.
-  - **Slice B.** After `GRAPHICS-093`, line-width residency population (extraction/sync) +
-    `forward/line.vert` quad expansion + CPU parity tests + `gpu;vulkan` line-width
-    smoke. Closes `Operational`.
+  - **Slice B.** Line-width residency population (extraction/sync) +
+    `forward/line.vert` width consumption on the `LineQuads` topology + CPU parity
+    tests + `gpu;vulkan` line-width smoke. Closes `Operational`.
