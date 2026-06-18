@@ -180,8 +180,10 @@ python3 tools/agents/check_task_policy.py --root . --strict
       domain); the scalar-buffer residency and colormap-pixel checks emit precise
       host diagnostics. The fixture self-skips on non-Vulkan hosts via
       `BootstrapDefaultSandboxAppEngine`.
-    - Status: authored and compile-targeted under `ci-vulkan`; the `Operational`
-      pixel-proof still needs a `gpu;vulkan` run on a Vulkan-capable host. This
-      session's cloud environment has no Vulkan driver, so the smoke is verified
-      only to skip deterministically here — it is not yet recorded as
-      `Operational`. The task remains in backlog until that host run lands.
+    - Status: authored; compiles and links cleanly under `ci-vulkan` and skips
+      deterministically on this non-Vulkan host (both verified 2026-06-18 via
+      `IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests`; the test reports
+      `***Skipped` with no GLFW/promoted-Vulkan device). The `Operational`
+      pixel-proof still needs a `gpu;vulkan` run on a Vulkan-capable host — this
+      cloud session has no Vulkan driver — so the task stays in backlog and is
+      not yet recorded as `Operational`.
