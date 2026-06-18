@@ -116,8 +116,14 @@ split; narratives live in the retirement log.
   (done, 2026-06-18, `CPUContracted`):
   migrated the profiling/telemetry unit test to promoted
   `Extrinsic.Core.Telemetry` and `Extrinsic.Core.Hash`, renamed it to
-  `tests/unit/core/Test.CoreProfiling.cpp`; remaining Core deletion blockers
-  are 37 tests and legacy-internal subtree ordering.
+  `tests/unit/core/Test.CoreProfiling.cpp`; `LEGACY-022` later reduced the
+  remaining Core test-consumer set to 35 files.
+- [LEGACY-022 — Migrate CoreFrameGraph test to promoted Core](../../done/LEGACY-022-core-framegraph-test-promoted.md)
+  (done, 2026-06-18, `CPUContracted`):
+  migrated the Core frame-graph unit test and type-token helper to promoted
+  `Extrinsic.Core.FrameGraph`, `Extrinsic.Core.Hash`, and
+  `Extrinsic.Core.Tasks`, renamed them to `Test.CoreFrameGraph.*`; remaining
+  Core deletion blockers are 35 tests and legacy-internal subtree ordering.
 - [LEGACY-018 — Retire legacy Interface panel-registration test](../../done/LEGACY-018-retire-interface-panel-registration-test.md)
   (done, 2026-06-18, `CPUContracted`):
   retired legacy-only `tests/contract/ui/Test_PanelRegistration.cpp`;

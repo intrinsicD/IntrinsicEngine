@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "Test_FrameGraphTypeTokenHelper.hpp"
+#include "Test.CoreFrameGraphTypeTokenHelper.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -10,10 +10,12 @@
 #include <vector>
 #include <mutex>
 
-import Core;
+import Extrinsic.Core.FrameGraph;
+import Extrinsic.Core.Hash;
+import Extrinsic.Core.Tasks;
 
-using namespace Core;
-using Core::Hash::operator""_id;
+using namespace Extrinsic::Core;
+using Extrinsic::Core::Hash::operator""_id;
 
 // -------------------------------------------------------------------------
 // Dummy component types for dependency declarations
@@ -69,9 +71,7 @@ TEST(CoreFrameGraph, LinearChain)
     // Input writes Velocity.
     // Physics reads Velocity, writes Transform.
     // RenderPrep reads Transform.
-
-    Memory::ScopeStack scope(1024 * 64);
-    FrameGraph graph(scope);
+    FrameGraph graph;
     std::vector<std::string> log;
 
     graph.AddPass("Input",
@@ -97,7 +97,7 @@ TEST(CoreFrameGraph, LinearChain)
     EXPECT_EQ(layers[2].size(), 1u);
 
     // Execute (single-task layers run inline, no scheduler needed).
-    graph.Execute();
+    EXPECT_TRUE(graph.Execute().has_value()) << "Execute failed";
 
     ASSERT_EQ(log.size(), 3u);
     ExpectOrder(log, "Input", "Physics");
@@ -112,9 +112,7 @@ TEST(CoreFrameGraph, WriteAfterWrite)
     // Input writes Velocity first. AI writes Velocity second.
     // Physics reads Velocity → depends on AI (last writer).
     // Expected: Input → AI → Physics
-
-    Memory::ScopeStack scope(1024 * 64);
-    FrameGraph graph(scope);
+    FrameGraph graph;
     std::vector<std::string> log;
 
     graph.AddPass("Input",
@@ -132,7 +130,7 @@ TEST(CoreFrameGraph, WriteAfterWrite)
     auto result = graph.Compile();
     ASSERT_TRUE(result.has_value());
 
-    graph.Execute();
+    EXPECT_TRUE(graph.Execute().has_value()) << "Execute failed";
 
     ASSERT_EQ(log.size(), 3u);
     ExpectOrder(log, "Input", "AI");
@@ -148,9 +146,7 @@ TEST(CoreFrameGraph, WriteAfterRead)
     // RenderPrep reads Transform.
     // AudioPrep reads Transform.
     // PostProcess writes Transform (must wait for both readers).
-
-    Memory::ScopeStack scope(1024 * 64);
-    FrameGraph graph(scope);
+    FrameGraph graph;
     std::vector<std::string> log;
     std::mutex logMutex;
     auto pushLog = [&](const char* name)
@@ -190,7 +186,7 @@ TEST(CoreFrameGraph, WriteAfterRead)
 
     // Execute with scheduler for deterministic ordering assertions.
     Tasks::Scheduler::Initialize(1);
-    graph.Execute();
+    EXPECT_TRUE(graph.Execute().has_value()) << "Execute failed";
     Tasks::Scheduler::Shutdown();
 
     ASSERT_EQ(log.size(), 4u);
@@ -208,9 +204,7 @@ TEST(CoreFrameGraph, ParallelReaders)
     // Physics writes Transform.
     // Three independent systems read Transform.
     // They should all be in the same execution layer.
-
-    Memory::ScopeStack scope(1024 * 64);
-    FrameGraph graph(scope);
+    FrameGraph graph;
     std::atomic<int> counter{0};
 
     graph.AddPass("Physics",
@@ -238,7 +232,7 @@ TEST(CoreFrameGraph, ParallelReaders)
     EXPECT_EQ(layers[1].size(), 3u);  // All readers parallel
 
     Tasks::Scheduler::Initialize(4);
-    graph.Execute();
+    EXPECT_TRUE(graph.Execute().has_value()) << "Execute failed";
     Tasks::Scheduler::Shutdown();
 
     EXPECT_EQ(counter.load(), 1111);
@@ -259,9 +253,7 @@ TEST(CoreFrameGraph, DiamondDependency)
     // Physics reads Velocity, writes Transform.
     // AI reads Velocity, writes Health.
     // RenderPrep reads Transform and Health.
-
-    Memory::ScopeStack scope(1024 * 64);
-    FrameGraph graph(scope);
+    FrameGraph graph;
     std::vector<std::string> log;
     std::mutex logMutex;
     auto pushLog = [&](const char* name)
@@ -291,7 +283,7 @@ TEST(CoreFrameGraph, DiamondDependency)
 
     // Ordering/layer contract does not require concurrent execution.
     Tasks::Scheduler::Initialize(1);
-    graph.Execute();
+    EXPECT_TRUE(graph.Execute().has_value()) << "Execute failed";
     Tasks::Scheduler::Shutdown();
 
     ASSERT_EQ(log.size(), 4u);
@@ -314,9 +306,7 @@ TEST(CoreFrameGraph, ReadyQueueExecutionBypassesCoarseLayerBarrier)
     // FastConsumer depends only on FastBranch. Under old coarse layer barriers,
     // FastConsumer would wait for SlowBranch to finish. With dependency-ready
     // execution it should run as soon as FastBranch completes.
-
-    Memory::ScopeStack scope(1024 * 64);
-    FrameGraph graph(scope);
+    FrameGraph graph;
 
     std::atomic<bool> slowFinished{false};
     std::atomic<bool> fastConsumerRanBeforeSlowFinished{false};
@@ -357,7 +347,7 @@ TEST(CoreFrameGraph, ReadyQueueExecutionBypassesCoarseLayerBarrier)
     EXPECT_EQ(layers[2].size(), 2u);
 
     Tasks::Scheduler::Initialize(2);
-    graph.Execute();
+    EXPECT_TRUE(graph.Execute().has_value()) << "Execute failed";
     Tasks::Scheduler::Shutdown();
 
     EXPECT_TRUE(fastConsumerRanBeforeSlowFinished.load(std::memory_order_acquire));
@@ -370,9 +360,7 @@ TEST(CoreFrameGraph, LabelOrdering)
 {
     // GPU_Physics signals "PhysicsDone".
     // Renderer waits for "PhysicsDone".
-
-    Memory::ScopeStack scope(1024 * 64);
-    FrameGraph graph(scope);
+    FrameGraph graph;
 
     bool gpuRecorded = false;
     bool renderStarted = false;
@@ -394,7 +382,7 @@ TEST(CoreFrameGraph, LabelOrdering)
     const auto& layers = graph.GetExecutionLayers();
     ASSERT_EQ(layers.size(), 2u);
 
-    graph.Execute();
+    EXPECT_TRUE(graph.Execute().has_value()) << "Execute failed";
 
     EXPECT_TRUE(gpuRecorded);
     EXPECT_TRUE(renderStarted);
@@ -405,8 +393,7 @@ TEST(CoreFrameGraph, LabelOrdering)
 // =========================================================================
 TEST(CoreFrameGraph, MixedLabelsAndResources)
 {
-    Memory::ScopeStack scope(1024 * 64);
-    FrameGraph graph(scope);
+    FrameGraph graph;
     std::vector<std::string> log;
     std::mutex logMutex;
     auto pushLog = [&](const char* name)
@@ -449,7 +436,7 @@ TEST(CoreFrameGraph, MixedLabelsAndResources)
 
     // Validate dependency semantics deterministically in single-worker mode.
     Tasks::Scheduler::Initialize(1);
-    graph.Execute();
+    EXPECT_TRUE(graph.Execute().has_value()) << "Execute failed";
     Tasks::Scheduler::Shutdown();
 
     const auto& layers = graph.GetExecutionLayers();
@@ -470,17 +457,16 @@ TEST(CoreFrameGraph, MixedLabelsAndResources)
 // =========================================================================
 TEST(CoreFrameGraph, EmptyGraph)
 {
-    Memory::ScopeStack scope(1024);
-    FrameGraph graph(scope);
+    FrameGraph graph;
 
     auto result = graph.Compile();
     ASSERT_TRUE(result.has_value());
 
-    EXPECT_EQ(graph.GetPassCount(), 0u);
+    EXPECT_EQ(graph.PassCount(), 0u);
     EXPECT_TRUE(graph.GetExecutionLayers().empty());
 
     // Execute on empty graph should be a no-op.
-    graph.Execute();
+    EXPECT_TRUE(graph.Execute().has_value()) << "Execute failed";
 }
 
 // =========================================================================
@@ -488,8 +474,7 @@ TEST(CoreFrameGraph, EmptyGraph)
 // =========================================================================
 TEST(CoreFrameGraph, SinglePass)
 {
-    Memory::ScopeStack scope(1024 * 16);
-    FrameGraph graph(scope);
+    FrameGraph graph;
     bool ran = false;
 
     graph.AddPass("OnlyPass",
@@ -499,10 +484,10 @@ TEST(CoreFrameGraph, SinglePass)
     auto result = graph.Compile();
     ASSERT_TRUE(result.has_value());
 
-    EXPECT_EQ(graph.GetPassCount(), 1u);
+    EXPECT_EQ(graph.PassCount(), 1u);
     EXPECT_EQ(graph.GetExecutionLayers().size(), 1u);
 
-    graph.Execute();
+    EXPECT_TRUE(graph.Execute().has_value()) << "Execute failed";
     EXPECT_TRUE(ran);
 }
 
@@ -511,12 +496,10 @@ TEST(CoreFrameGraph, SinglePass)
 // =========================================================================
 TEST(CoreFrameGraph, MultiFrameReset)
 {
-    Memory::ScopeStack scope(1024 * 64);
-    FrameGraph graph(scope);
+    FrameGraph graph;
 
     for (int frame = 0; frame < 3; ++frame)
     {
-        scope.Reset();
         graph.Reset();
 
         int counter = 0;
@@ -532,7 +515,7 @@ TEST(CoreFrameGraph, MultiFrameReset)
         auto result = graph.Compile();
         ASSERT_TRUE(result.has_value()) << "Frame " << frame;
 
-        graph.Execute();
+        EXPECT_TRUE(graph.Execute().has_value()) << "Execute failed";
 
         EXPECT_EQ(counter, 11) << "Frame " << frame;
     }
@@ -545,9 +528,7 @@ TEST(CoreFrameGraph, ReadWriteSameType)
 {
     // A single pass reads and writes Transform (e.g., in-place smoothing).
     // Another pass reads Transform afterward.
-
-    Memory::ScopeStack scope(1024 * 64);
-    FrameGraph graph(scope);
+    FrameGraph graph;
     std::vector<std::string> log;
 
     graph.AddPass("Smooth",
@@ -561,7 +542,7 @@ TEST(CoreFrameGraph, ReadWriteSameType)
     auto result = graph.Compile();
     ASSERT_TRUE(result.has_value());
 
-    graph.Execute();
+    EXPECT_TRUE(graph.Execute().has_value()) << "Execute failed";
 
     ASSERT_EQ(log.size(), 2u);
     ExpectOrder(log, "Smooth", "Render");
@@ -574,9 +555,7 @@ TEST(CoreFrameGraph, IndependentPassesParallelize)
 {
     // Three passes touching entirely different resources.
     // All should be in the same layer.
-
-    Memory::ScopeStack scope(1024 * 64);
-    FrameGraph graph(scope);
+    FrameGraph graph;
 
     graph.AddPass("PhysicsUpdate",
         [](FrameGraphBuilder& b) { b.Write<Transform>(); },
@@ -603,8 +582,7 @@ TEST(CoreFrameGraph, IndependentPassesParallelize)
 // =========================================================================
 TEST(CoreFrameGraph, PassNameIntrospection)
 {
-    Memory::ScopeStack scope(1024 * 64);
-    FrameGraph graph(scope);
+    FrameGraph graph;
 
     graph.AddPass("Physics",
         [](FrameGraphBuilder& b) { b.Write<Transform>(); },
@@ -614,9 +592,9 @@ TEST(CoreFrameGraph, PassNameIntrospection)
         [](FrameGraphBuilder& b) { b.Read<Transform>(); },
         []() {});
 
-    EXPECT_EQ(graph.GetPassName(0), "Physics");
-    EXPECT_EQ(graph.GetPassName(1), "Rendering");
-    EXPECT_EQ(graph.GetPassCount(), 2u);
+    EXPECT_EQ(graph.PassName(0), "Physics");
+    EXPECT_EQ(graph.PassName(1), "Rendering");
+    EXPECT_EQ(graph.PassCount(), 2u);
 }
 
 // =========================================================================
@@ -628,9 +606,7 @@ TEST(CoreFrameGraph, ParallelExecutionStress)
     // Verifies that parallel dispatch + WaitForAll actually completes all work.
 
     constexpr uint32_t kReaderCount = 64;
-
-    Memory::ScopeStack scope(1024 * 256);
-    FrameGraph graph(scope);
+    FrameGraph graph;
     std::atomic<uint32_t> counter{0};
 
     graph.AddPass("Producer",
@@ -653,7 +629,7 @@ TEST(CoreFrameGraph, ParallelExecutionStress)
     EXPECT_EQ(layers[1].size(), kReaderCount);
 
     Tasks::Scheduler::Initialize(4);
-    graph.Execute();
+    EXPECT_TRUE(graph.Execute().has_value()) << "Execute failed";
     Tasks::Scheduler::Shutdown();
 
     EXPECT_EQ(counter.load(), kReaderCount + 1);
@@ -672,9 +648,7 @@ TEST(CoreFrameGraph, ReadyQueueExecutionDoesNotWaitForSlowSiblingLayerBarrier)
     // in the next layer. A legacy "execute full layer, then advance" strategy
     // would delay FastB until SlowSibling finishes. The ready-queue runtime path
     // should instead run FastB as soon as FastA completes.
-
-    Memory::ScopeStack scope(1024 * 64);
-    FrameGraph graph(scope);
+    FrameGraph graph;
 
     std::atomic<uint64_t> slowFinishNs{0};
     std::atomic<uint64_t> fastBRunNs{0};
@@ -717,7 +691,7 @@ TEST(CoreFrameGraph, ReadyQueueExecutionDoesNotWaitForSlowSiblingLayerBarrier)
     EXPECT_EQ(layers[2].size(), 1u); // FastB
 
     Tasks::Scheduler::Initialize(4);
-    graph.Execute();
+    EXPECT_TRUE(graph.Execute().has_value()) << "Execute failed";
     Tasks::Scheduler::Shutdown();
 
     const uint64_t slowDone = slowFinishNs.load(std::memory_order_acquire);
@@ -749,9 +723,7 @@ TEST(CoreFrameGraph, RealisticFrame)
     //   Physics < Animation (RAW on Transform)
     //   Collision < RenderPrep (RAW on Health)
     //   Physics < RenderPrep (RAW on Transform)
-
-    Memory::ScopeStack scope(1024 * 64);
-    FrameGraph graph(scope);
+    FrameGraph graph;
     std::vector<std::string> log;
     std::mutex logMutex;
     auto pushLog = [&](const char* name)
@@ -789,7 +761,7 @@ TEST(CoreFrameGraph, RealisticFrame)
 
     // This test validates dependency ordering and layers, not throughput.
     Tasks::Scheduler::Initialize(1);
-    graph.Execute();
+    EXPECT_TRUE(graph.Execute().has_value()) << "Execute failed";
     Tasks::Scheduler::Shutdown();
 
     ASSERT_EQ(log.size(), 6u);
@@ -827,9 +799,7 @@ TEST(CoreFrameGraph, NoCycleFromSequentialRegistration)
     //   A: reads Velocity, writes Transform
     //   B: reads Transform, writes Velocity
     // Result: A → B (RAW on Transform) + A → B (WAR on Velocity). No cycle.
-
-    Memory::ScopeStack scope(1024 * 64);
-    FrameGraph graph(scope);
+    FrameGraph graph;
     std::vector<std::string> log;
 
     graph.AddPass("A",
@@ -847,7 +817,7 @@ TEST(CoreFrameGraph, NoCycleFromSequentialRegistration)
     const auto& layers = graph.GetExecutionLayers();
     ASSERT_EQ(layers.size(), 2u);
 
-    graph.Execute();
+    EXPECT_TRUE(graph.Execute().has_value()) << "Execute failed";
     ASSERT_EQ(log.size(), 2u);
     ExpectOrder(log, "A", "B");
 }
@@ -858,8 +828,7 @@ TEST(CoreFrameGraph, NoCycleFromSequentialRegistration)
 TEST(CoreFrameGraph, ErrorRecovery_ResetAfterFailedCompile)
 {
     // After a failed compile (cycle), Reset + rebuild with valid graph should work.
-    Memory::ScopeStack scope(1024 * 64);
-    FrameGraph graph(scope);
+    FrameGraph graph;
 
     // First: build a VALID graph, compile, execute.
     graph.AddPass("Valid",
@@ -868,10 +837,9 @@ TEST(CoreFrameGraph, ErrorRecovery_ResetAfterFailedCompile)
 
     auto r1 = graph.Compile();
     ASSERT_TRUE(r1.has_value());
-    graph.Execute();
+    EXPECT_TRUE(graph.Execute().has_value()) << "Execute failed";
 
     // Reset and rebuild with different (valid) graph.
-    scope.Reset();
     graph.Reset();
 
     bool ran = false;
@@ -881,7 +849,7 @@ TEST(CoreFrameGraph, ErrorRecovery_ResetAfterFailedCompile)
 
     auto r2 = graph.Compile();
     ASSERT_TRUE(r2.has_value());
-    graph.Execute();
+    EXPECT_TRUE(graph.Execute().has_value()) << "Execute failed";
 
     EXPECT_TRUE(ran);
 }
@@ -894,14 +862,11 @@ TEST(CoreFrameGraph, ReadyQueueNestedDispatchStressHighWorkerCount)
     constexpr uint32_t kBranchCount = 96;
     constexpr uint32_t kIterations = 48;
     const unsigned workerCount = std::min<unsigned>(16u, std::max(2u, std::thread::hardware_concurrency()));
-
-    Memory::ScopeStack scope(1024 * 512);
-    FrameGraph graph(scope);
+    FrameGraph graph;
     Tasks::Scheduler::Initialize(workerCount);
 
     for (uint32_t iteration = 0; iteration < kIterations; ++iteration)
     {
-        scope.Reset();
         graph.Reset();
 
         std::atomic<uint32_t> executed{0};
@@ -938,7 +903,7 @@ TEST(CoreFrameGraph, ReadyQueueNestedDispatchStressHighWorkerCount)
         auto result = graph.Compile();
         ASSERT_TRUE(result.has_value()) << "Compile failed on iteration " << iteration;
 
-        graph.Execute();
+        EXPECT_TRUE(graph.Execute().has_value()) << "Execute failed";
 
         EXPECT_EQ(executed.load(std::memory_order_relaxed), 1u + 2u * kBranchCount)
             << "Each pass must execute exactly once on iteration " << iteration;

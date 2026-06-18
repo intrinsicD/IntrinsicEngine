@@ -186,8 +186,6 @@ set(_core_test_files
     Test_BoundedHeap.cpp
     Test_CoreMemory.cpp
     Test_CoreCommands.cpp
-    Test_CoreFrameGraph.cpp
-    Test_FrameGraphTypeTokenHelper.cpp
     Test_DAGScheduler.cpp
     Test_FeatureRegistry.cpp
     Test_SystemFeatureCatalog.cpp
@@ -509,6 +507,8 @@ set(_core_wrapper_unit_test_files
     Test.Core.ErrorLegacy.cpp
     Test.Core.FrameClock.cpp
     Test.Core.Filesystem.cpp
+    Test.CoreFrameGraph.cpp
+    Test.CoreFrameGraphTypeTokenHelper.cpp
     Test.Core.GraphCompiler.cpp
     Test.Core.HandleLease.cpp
     Test.CoreHash.cpp

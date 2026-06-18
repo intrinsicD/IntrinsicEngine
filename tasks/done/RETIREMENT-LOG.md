@@ -9,6 +9,19 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`LEGACY-022`](LEGACY-022-core-framegraph-test-promoted.md) — Migrate
+CoreFrameGraph test to promoted Core — retired on 2026-06-18 at maturity
+`CPUContracted`. `tests/unit/core/Test.CoreFrameGraph.cpp` and
+`tests/unit/core/Test.CoreFrameGraphTypeTokenHelper.cpp` now import promoted
+`Extrinsic.Core.FrameGraph`, `Extrinsic.Core.Hash`, and
+`Extrinsic.Core.Tasks` instead of the bare legacy aggregate `Core` module. The
+test uses promoted `FrameGraph` construction/accessors and checks
+`FrameGraph::Execute()` results. The focused core targets and `CoreFrameGraph`
+CTest filter passed. `LEGACY-005` remains blocked by 35 remaining test
+consumers and 133 legacy-internal consumers; `LEGACY-012` owns the remaining
+test cleanup.
+
+Backlog
 [`LEGACY-021`](LEGACY-021-core-profiling-test-promoted.md) — Migrate profiling
 test to promoted Core — retired on 2026-06-18 at maturity `CPUContracted`.
 `tests/unit/core/Test.CoreProfiling.cpp` now imports promoted
