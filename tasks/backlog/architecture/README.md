@@ -189,6 +189,12 @@ split; narratives live in the retirement log.
   explicit retirement decision; remaining Core deletion blockers are 24 tests,
   remaining ECS external blockers are 22 tests, and remaining Runtime external
   blockers are 18 tests.
+- [LEGACY-033 — Retire legacy RuntimeEngineConfig test](../../done/LEGACY-033-retire-runtime-engine-config-test.md)
+  (done, 2026-06-18, `CPUContracted`):
+  retired legacy `tests/unit/runtime/Test_RuntimeEngineConfig.cpp` coverage
+  because its old scalar validation fields do not map to promoted
+  `Extrinsic.Core.Config.Engine`; remaining Runtime external blockers are 17
+  tests.
 - [LEGACY-018 — Retire legacy Interface panel-registration test](../../done/LEGACY-018-retire-interface-panel-registration-test.md)
   (done, 2026-06-18, `CPUContracted`):
   retired legacy-only `tests/contract/ui/Test_PanelRegistration.cpp`;

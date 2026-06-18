@@ -822,7 +822,6 @@ if(TARGET ExtrinsicRuntime AND NOT INTRINSIC_HEADLESS_NO_GLFW)
         Test_Importers.cpp
         Test_RenderPassContracts.cpp
         Test_RuntimeFrameLoop.cpp
-        Test_RuntimeEngineConfig.cpp
         Test_MaintenanceLane.cpp
         Test_ShaderHotReload.cpp
         Test_CoreAssets.cpp

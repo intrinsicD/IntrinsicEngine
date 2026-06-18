@@ -37,7 +37,8 @@ depends_on: [LEGACY-011]
   retired duplicate legacy entity-command compatibility coverage, and
   `LEGACY-031` retired legacy ECS frame-graph systems compatibility coverage,
   and `LEGACY-032` retired legacy runtime system-bundle compatibility coverage,
-  so this task is now the external cleanup owner for the remaining Core gate as
+  and `LEGACY-033` retired legacy runtime engine-config validation coverage, so
+  this task is now the external cleanup owner for the remaining Core gate as
   well as the other subtree gates.
 - `LEGACY-018` retired the only external `LEGACY-001` test consumer,
   `tests/contract/ui/Test_PanelRegistration.cpp`, because `Interface::GUI`

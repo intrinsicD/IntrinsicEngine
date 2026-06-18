@@ -78,7 +78,7 @@ As of `LEGACY-002` (2026-06-06), every remaining `src/legacy/<Subsystem>/` subtr
 - [`LEGACY-012`](../../tasks/backlog/architecture/LEGACY-012-migrate-legacy-consumer-tests.md) —
   migrates or retires tests and other non-legacy consumers that still import
   bare legacy module names after promoted feature owners exist. Retired slices
-  through `LEGACY-032` are reflected in
+  through `LEGACY-033` are reflected in
   [`legacy-removal-audit.md`](legacy-removal-audit.md), which remains the
   current consumer-count snapshot.
 - [`LEGACY-018`](../../tasks/done/LEGACY-018-retire-interface-panel-registration-test.md)

@@ -57,7 +57,7 @@ Consumer counts are distinct files matched outside the doomed subtree.
 | `ECS/` ([LEGACY-006](../../tasks/backlog/architecture/LEGACY-006-delete-src-legacy-ecs.md)) | 29 | 37 | 22 | 22 tests, 0 promoted-src |
 | `Graphics/` ([LEGACY-008](../../tasks/backlog/architecture/LEGACY-008-delete-src-legacy-graphics.md)) | 168 | 22 | 39 | 39 tests, 0 promoted-src |
 | `RHI/` ([LEGACY-009](../../tasks/backlog/architecture/LEGACY-009-delete-src-legacy-rhi.md)) | 54 | 83 | 18 | 18 tests, 0 promoted-src |
-| `Runtime/` ([LEGACY-010](../../tasks/backlog/architecture/LEGACY-010-delete-src-legacy-runtime.md)) | 29 | 0 | 18 | 18 tests, 0 promoted-src |
+| `Runtime/` ([LEGACY-010](../../tasks/backlog/architecture/LEGACY-010-delete-src-legacy-runtime.md)) | 29 | 0 | 17 | 17 tests, 0 promoted-src |
 
 "Files" includes each subtree's `CMakeLists.txt`.
 
@@ -75,7 +75,7 @@ Consumer counts are distinct files matched outside the doomed subtree.
   `Interface::GUI` API; `LEGACY-001` remains blocked only by six
   legacy-internal Graphics/Runtime consumers.
 - **`Runtime/` has zero legacy-internal consumers** — nothing else in
-  `src/legacy/` imports the doomed `Runtime.*` modules. Once its 18 test
+  `src/legacy/` imports the doomed `Runtime.*` modules. Once its 17 test
   consumers migrate, `LEGACY-010` becomes a pure mechanical deletion.
 
 ## Promoted-engine-code blocker status
@@ -187,6 +187,12 @@ tests own the named lifecycle-system contracts, and the old global
 reduces the remaining Core test-consumer set to 24 files, the ECS external
 test-consumer set to 22 files, and the Runtime external test-consumer set to 18
 files.
+`LEGACY-033` retired the legacy `Runtime.Engine` / `Runtime.FrameLoop`
+engine-config validation test because the old scalar validation fields do not
+map to the promoted `Extrinsic.Core.Config.Engine` value-type surface; promoted
+config defaults and runtime device/reference-scene selection remain covered by
+promoted tests. This reduces the Runtime external test-consumer set to 17
+files.
 
 **`LEGACY-013` clears only the promoted-src subset of the `LEGACY-005`
 gate.** The
@@ -235,7 +241,7 @@ Removal is gated by consumer migration only. The safe path:
    ([`LEGACY-012`](../../tasks/backlog/architecture/LEGACY-012-migrate-legacy-consumer-tests.md)).
    This is required for every subtree that still has external consumers,
    including `Runtime` — even the subtree with zero legacy-internal consumers
-   still has 18 test consumers, so no gate exits clean until its
+   still has 17 test consumers, so no gate exits clean until its
    `LEGACY-012`-owned tests migrate or retire. `Interface/` already has zero
    external test consumers after `LEGACY-018`; it remains blocked by six
    legacy-internal Graphics/Runtime consumers until subtree ordering removes or

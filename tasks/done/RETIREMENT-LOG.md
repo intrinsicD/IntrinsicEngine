@@ -9,6 +9,16 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`LEGACY-033`](LEGACY-033-retire-runtime-engine-config-test.md) — Retire legacy
+RuntimeEngineConfig test — retired on 2026-06-18 at maturity `CPUContracted`.
+Legacy `tests/unit/runtime/Test_RuntimeEngineConfig.cpp` coverage was removed
+instead of migrated because its `Runtime::EngineConfig` scalar validation fields
+do not map to the promoted `Extrinsic.Core.Config.Engine` value-type surface.
+Promoted config defaults and runtime engine/device-selection behavior remain
+covered by promoted core/runtime tests. `LEGACY-010` remains blocked by 17
+remaining test consumers; `LEGACY-012` owns the remaining test cleanup.
+
+Backlog
 [`LEGACY-032`](LEGACY-032-resolve-runtime-system-bundles-test.md) — Resolve
 legacy `Runtime.SystemBundles` test migration — retired on 2026-06-18 at
 maturity `CPUContracted`. Legacy
