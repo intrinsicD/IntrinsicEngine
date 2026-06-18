@@ -7,8 +7,8 @@ module;
 #include <span>
 
 module Geometry.EPA;
-import Core.Memory;
-import Core.Logging;
+import Extrinsic.Core.Memory;
+import Extrinsic.Core.Logging;
 
 // NOTE: EPA is implemented as an exported inline template in `Geometry.EPA.cppm`.
 // This implementation partition is intentionally empty.

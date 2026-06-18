@@ -13,7 +13,7 @@ export module Geometry.EPA;
 import Geometry.GJK;
 import Geometry.Support;
 import Geometry.Primitives;
-import Core.Memory;
+import Extrinsic.Core.Memory;
 
 export namespace Geometry::Internal
 {
@@ -94,17 +94,17 @@ export namespace Geometry::Internal
         const ShapeA& a,
         const ShapeB& b,
         const Simplex& gjkSimplex,
-        Core::Memory::LinearArena& scratch)
+        Extrinsic::Core::Memory::LinearArena& scratch)
     {
         constexpr int MAX_ITER = Config::EPA_MAX_ITERATIONS;
 
-        using Vec3Vec = std::vector<glm::vec3, Core::Memory::ArenaAllocator<glm::vec3>>;
-        using FaceVec = std::vector<Detail::PolytopeFace, Core::Memory::ArenaAllocator<Detail::PolytopeFace>>;
-        using EdgeVec = std::vector<Detail::Edge, Core::Memory::ArenaAllocator<Detail::Edge>>;
+        using Vec3Vec = std::vector<glm::vec3, Extrinsic::Core::Memory::ArenaAllocator<glm::vec3>>;
+        using FaceVec = std::vector<Detail::PolytopeFace, Extrinsic::Core::Memory::ArenaAllocator<Detail::PolytopeFace>>;
+        using EdgeVec = std::vector<Detail::Edge, Extrinsic::Core::Memory::ArenaAllocator<Detail::Edge>>;
 
-        Core::Memory::ArenaAllocator<glm::vec3> vec3Alloc(scratch);
-        Core::Memory::ArenaAllocator<Detail::PolytopeFace> faceAlloc(scratch);
-        Core::Memory::ArenaAllocator<Detail::Edge> edgeAlloc(scratch);
+        Extrinsic::Core::Memory::ArenaAllocator<glm::vec3> vec3Alloc(scratch);
+        Extrinsic::Core::Memory::ArenaAllocator<Detail::PolytopeFace> faceAlloc(scratch);
+        Extrinsic::Core::Memory::ArenaAllocator<Detail::Edge> edgeAlloc(scratch);
 
         if (gjkSimplex.Size != 4) return std::nullopt;
 

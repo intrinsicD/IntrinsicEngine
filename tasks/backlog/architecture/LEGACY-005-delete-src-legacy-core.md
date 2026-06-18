@@ -38,13 +38,12 @@ depends_on: []
   unconditional).
 - Layering allowlist (`tools/repo/layering_allowlist.yaml`) carries
   grandfathered rows keyed under `src/legacy/Core/`; drop only those.
-- Prerequisite (today, 2026-06-06): the consumer-grep gate FAILS heavily —
-  promoted code still imports bare legacy `Core.*` modules (for example
-  `src/runtime/Runtime.AssetGeometryIO.cpp` imports `Core.Error`, and several
-  `src/geometry/*` units import bare `Core.*`), in addition to every other
-  legacy subtree. Because Core is the foundation, this subtree retires **last**;
-  promotion is blocked until all promoted and legacy consumers migrate to
-  `Extrinsic.Core`.
+- Prerequisite update (2026-06-18): `LEGACY-013` cleared the promoted-src bare
+  `Core.*` import subset by moving `src/geometry/**` and
+  `src/runtime/Runtime.AssetGeometryIO.cpp` to promoted `Extrinsic.Core.*`
+  modules and removing the promoted geometry link to `IntrinsicCore`. The
+  broader consumer-grep gate still fails on legacy-internal consumers and 44
+  tests, so Core remains the foundation subtree and retires **last**.
 
 ## Required changes
 - [ ] (Prerequisite, verified before promotion to `tasks/active/`) Run the
@@ -128,4 +127,6 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 - The consumer-grep gate in Verification must exit 0 before this task is
   promoted to `tasks/active/`. Legacy `Core` is the foundation subtree every
   other legacy module imports, so this deletion sequences last in the
-  `LEGACY-001..010` series.
+  `LEGACY-001..010` series. `LEGACY-013` cleared promoted-src consumers; tests
+  remain owned by `LEGACY-012`, and legacy-internal consumers retire through
+  subtree ordering.

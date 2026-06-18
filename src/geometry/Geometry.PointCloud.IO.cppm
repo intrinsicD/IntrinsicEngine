@@ -6,7 +6,7 @@ module;
 export module Geometry.PointCloud.IO;
 
 import Geometry.PointCloud;
-import Core.Error;
+import Extrinsic.Core.Error;
 
 export namespace Geometry::PointCloudIO
 {
@@ -18,9 +18,9 @@ export namespace Geometry::PointCloudIO
         std::string BasePath;         // Directory containing the file (for relative refs)
     };
 
-    Core::Expected<PointCloudIOResult> LoadXYZ(std::string_view absolute_path);
-    Core::Expected<PointCloudIOResult> LoadPCD(std::string_view absolute_path);
-    Core::Expected<PointCloudIOResult> LoadPLY(std::string_view absolute_path);
+    Extrinsic::Core::Expected<PointCloudIOResult> LoadXYZ(std::string_view absolute_path);
+    Extrinsic::Core::Expected<PointCloudIOResult> LoadPCD(std::string_view absolute_path);
+    Extrinsic::Core::Expected<PointCloudIOResult> LoadPLY(std::string_view absolute_path);
 
     enum class PointCloudIOWriteStatus
     {

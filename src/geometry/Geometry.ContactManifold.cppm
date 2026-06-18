@@ -10,8 +10,8 @@ import Geometry.Primitives;
 import Geometry.GJK; // Should contain GJK_EPA logic in full version
 import Geometry.EPA;
 import Geometry.Support;
-import Core.Memory;
-import Core.Logging;
+import Extrinsic.Core.Memory;
+import Extrinsic.Core.Logging;
 
 export namespace Geometry
 {
@@ -109,7 +109,7 @@ export namespace Geometry
         // --- Fallback ---
 
         template <typename A, typename B>
-        std::optional<ContactManifold> Contact_Fallback(const A& a, const B& b, Core::Memory::LinearArena& scratch)
+        std::optional<ContactManifold> Contact_Fallback(const A& a, const B& b, Extrinsic::Core::Memory::LinearArena& scratch)
         {
             // Use GJK_Intersection to get the simplex
             auto simplexOpt = Internal::GJK_Intersection(a, b, scratch);
@@ -136,7 +136,7 @@ export namespace Geometry
 
                 // Fallback if EPA fails (e.g. numerical instability or degenerate simplex)
                 // Use heuristic center-diff
-                Core::Log::Warn("Physics: GJK hit but EPA failed. Using heuristic fallback.");
+                Extrinsic::Core::Log::Warn("Physics: GJK hit but EPA failed. Using heuristic fallback.");
 
                 ContactManifold m{};
                 glm::vec3 dir = CenterOf(b) - CenterOf(a);
@@ -154,7 +154,7 @@ export namespace Geometry
         template <typename A, typename B>
         std::optional<ContactManifold> Contact_Fallback(const A& a, const B& b)
         {
-            Core::Memory::LinearArena scratch(64 * 1024);
+            Extrinsic::Core::Memory::LinearArena scratch(64 * 1024);
             return Contact_Fallback(a, b, scratch);
         }
     }
@@ -187,7 +187,7 @@ export namespace Geometry
 
     // Scratch-aware dispatcher overload (preferred for hot paths)
     template <ConvexShape A, ConvexShape B>
-    [[nodiscard]] std::optional<ContactManifold> ComputeContact(const A& a, const B& b, Core::Memory::LinearArena& scratch)
+    [[nodiscard]] std::optional<ContactManifold> ComputeContact(const A& a, const B& b, Extrinsic::Core::Memory::LinearArena& scratch)
     {
         if constexpr (requires { Internal::Contact_Analytic(a, b); })
         {

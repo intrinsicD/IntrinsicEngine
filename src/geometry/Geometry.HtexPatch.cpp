@@ -15,7 +15,7 @@ module Geometry.HtexPatch;
 import Extrinsic.Core.Telemetry;
 import Geometry.HalfedgeMesh;
 import Geometry.Properties;
-import Core.Logging;
+import Extrinsic.Core.Logging;
 
 namespace Geometry::HtexPatch
 {

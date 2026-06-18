@@ -13,7 +13,7 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/norm.hpp>
 
-import Core;
+import Extrinsic.Core.Memory;
 import Geometry;
 
 using namespace Geometry;
@@ -218,7 +218,7 @@ TEST(ContactManifold, Convention_Fallback_SphereOBB_BothOrders)
     Sphere s{glm::vec3(0, 1.4f, 0), 0.5f};
     OBB obb{glm::vec3(0, 0, 0), glm::vec3(2, 1, 2), glm::quat(1, 0, 0, 0)};
 
-    Core::Memory::LinearArena scratch(256 * 1024);
+    Extrinsic::Core::Memory::LinearArena scratch(256 * 1024);
     auto sphereFirst = ComputeContact(s, obb, scratch);
     ASSERT_TRUE(sphereFirst.has_value());
     ExpectNormalPointsAToB(s, obb, *sphereFirst);
@@ -237,7 +237,7 @@ TEST(ContactManifold, Convention_Fallback_CapsuleOBB_BothOrders)
     Capsule cap{glm::vec3(1.8f, -0.5f, 0), glm::vec3(1.8f, 0.5f, 0), 0.5f};
     OBB obb{glm::vec3(0, 0, 0), glm::vec3(1.5f, 1.5f, 1.5f), glm::quat(1, 0, 0, 0)};
 
-    Core::Memory::LinearArena scratch(256 * 1024);
+    Extrinsic::Core::Memory::LinearArena scratch(256 * 1024);
     auto capFirst = ComputeContact(cap, obb, scratch);
     ASSERT_TRUE(capFirst.has_value());
     ExpectNormalPointsAToB(cap, obb, *capFirst);
@@ -254,7 +254,7 @@ TEST(ContactManifold, Convention_Fallback_SphereCapsule_BothOrders)
     Sphere s{glm::vec3(0.8f, 0, 0), 0.5f};
     Capsule cap{glm::vec3(0, -1, 0), glm::vec3(0, 1, 0), 0.5f};
 
-    Core::Memory::LinearArena scratch(256 * 1024);
+    Extrinsic::Core::Memory::LinearArena scratch(256 * 1024);
     auto sphereFirst = ComputeContact(s, cap, scratch);
     ASSERT_TRUE(sphereFirst.has_value());
     ExpectNormalPointsAToB(s, cap, *sphereFirst);
@@ -297,7 +297,7 @@ TEST(ContactManifold, ConvexHullSphere_Fallback)
     };
     Sphere s{glm::vec3(0.5f, 0.5f, 0.5f), 0.1f};
 
-    Core::Memory::LinearArena scratch(64 * 1024);
+    Extrinsic::Core::Memory::LinearArena scratch(64 * 1024);
     auto contact = ComputeContact(hull, s, scratch);
 
     // Hull fully contains the sphere — contact expected
@@ -310,7 +310,7 @@ TEST(ContactManifold, OBBCapsule_Fallback)
     OBB obb{glm::vec3(0, 0, 0), glm::vec3(2, 2, 2), glm::quat(1, 0, 0, 0)};
     Capsule cap{glm::vec3(0, 0, 0), glm::vec3(0, 1, 0), 0.5f};
 
-    Core::Memory::LinearArena scratch(64 * 1024);
+    Extrinsic::Core::Memory::LinearArena scratch(64 * 1024);
     auto contact = ComputeContact(obb, cap, scratch);
 
     ASSERT_TRUE(contact.has_value());

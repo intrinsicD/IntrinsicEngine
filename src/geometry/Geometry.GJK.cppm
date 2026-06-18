@@ -11,7 +11,7 @@ export module Geometry.GJK;
 
 import Geometry.Primitives;
 import Geometry.Support;
-import Core.Memory;
+import Extrinsic.Core.Memory;
 
 export namespace Geometry::Internal
 {
@@ -170,7 +170,7 @@ export namespace Geometry::Internal
     // =========================================================================
 
     template <typename A, typename B>
-    bool GJK_Boolean(const A& a, const B& b, Core::Memory::LinearArena& /*scratch*/, GJKDiagnostics& diag)
+    bool GJK_Boolean(const A& a, const B& b, Extrinsic::Core::Memory::LinearArena& /*scratch*/, GJKDiagnostics& diag)
     {
         // Currently allocation-free; scratch is plumbed for consistency with EPA.
         diag = {};
@@ -260,14 +260,14 @@ export namespace Geometry::Internal
     }
 
     template <typename A, typename B>
-    bool GJK_Boolean(const A& a, const B& b, Core::Memory::LinearArena& scratch)
+    bool GJK_Boolean(const A& a, const B& b, Extrinsic::Core::Memory::LinearArena& scratch)
     {
         GJKDiagnostics diag;
         return GJK_Boolean(a, b, scratch, diag);
     }
 
     template <typename A, typename B>
-    std::optional<Simplex> GJK_Intersection(const A& a, const B& b, Core::Memory::LinearArena& /*scratch*/, GJKDiagnostics& diag)
+    std::optional<Simplex> GJK_Intersection(const A& a, const B& b, Extrinsic::Core::Memory::LinearArena& /*scratch*/, GJKDiagnostics& diag)
     {
         diag = {};
 
@@ -341,7 +341,7 @@ export namespace Geometry::Internal
     }
 
     template <typename A, typename B>
-    std::optional<Simplex> GJK_Intersection(const A& a, const B& b, Core::Memory::LinearArena& scratch)
+    std::optional<Simplex> GJK_Intersection(const A& a, const B& b, Extrinsic::Core::Memory::LinearArena& scratch)
     {
         GJKDiagnostics diag;
         return GJK_Intersection(a, b, scratch, diag);
@@ -351,14 +351,14 @@ export namespace Geometry::Internal
     template <typename A, typename B>
     bool GJK_Boolean(const A& a, const B& b)
     {
-        Core::Memory::LinearArena scratch(8 * 1024);
+        Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
         return GJK_Boolean(a, b, scratch);
     }
 
     template <typename A, typename B>
     std::optional<Simplex> GJK_Intersection(const A& a, const B& b)
     {
-        Core::Memory::LinearArena scratch(8 * 1024);
+        Extrinsic::Core::Memory::LinearArena scratch(8 * 1024);
         return GJK_Intersection(a, b, scratch);
     }
 }

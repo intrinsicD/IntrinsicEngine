@@ -9,6 +9,18 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`LEGACY-013`](LEGACY-013-promoted-core-import-migration.md) — Migrate
+promoted Core imports off legacy modules — retired on 2026-06-18 at maturity
+`CPUContracted`. Promoted geometry/runtime now import `Extrinsic.Core.*`
+instead of bare legacy `Core.*`, promoted geometry no longer links
+`IntrinsicCore`, and the promoted-src bare legacy import grep is clean. Four
+directly affected geometry tests now consume promoted Core memory/error types;
+`LEGACY-005` remains blocked by 44 remaining test consumers and 133
+legacy-internal consumers. `LEGACY-012` owns the remaining test cleanup, while
+legacy-internal consumers retire through the Runtime-first to Core-last subtree
+deletion order.
+
+Backlog
 [`LEGACY-011`](LEGACY-011-src-legacy-feature-reimplementation-map.md) —
 Value-gated legacy feature reimplementation map — retired on 2026-06-18 at
 maturity `Scaffolded`. Every retained/deferred legacy feature candidate now has

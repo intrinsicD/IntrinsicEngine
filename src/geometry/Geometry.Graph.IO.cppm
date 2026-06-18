@@ -6,7 +6,7 @@ module;
 export module Geometry.Graph.IO;
 
 import Geometry.Graph;
-import Core.Error;
+import Extrinsic.Core.Error;
 
 export namespace Geometry::GraphIO
 {
@@ -18,8 +18,8 @@ export namespace Geometry::GraphIO
         std::string BasePath;         // Directory containing the file (for relative refs)
     };
 
-    Core::Expected<GraphIOResult> LoadTGF(std::string_view absolute_path);
-    Core::Expected<GraphIOResult> LoadEdgeList(std::string_view absolute_path);
+    Extrinsic::Core::Expected<GraphIOResult> LoadTGF(std::string_view absolute_path);
+    Extrinsic::Core::Expected<GraphIOResult> LoadEdgeList(std::string_view absolute_path);
 
     enum class GraphIOWriteStatus
     {

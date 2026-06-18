@@ -6,7 +6,7 @@ module;
 export module Geometry.HalfedgeMesh.IO;
 
 import Geometry.Properties;
-import Core.Error;
+import Extrinsic.Core.Error;
 
 export namespace Geometry::MeshIO
 {
@@ -24,10 +24,10 @@ export namespace Geometry::MeshIO
         std::string BasePath;              // Directory containing the file (for relative refs)
     };
 
-    Core::Expected<MeshIOResult> LoadOBJ(std::string_view absolute_path);
-    Core::Expected<MeshIOResult> LoadOFF(std::string_view absolute_path);
-    Core::Expected<MeshIOResult> LoadPLY(std::string_view absolute_path);
-    Core::Expected<MeshIOResult> LoadSTL(std::string_view absolute_path);
+    Extrinsic::Core::Expected<MeshIOResult> LoadOBJ(std::string_view absolute_path);
+    Extrinsic::Core::Expected<MeshIOResult> LoadOFF(std::string_view absolute_path);
+    Extrinsic::Core::Expected<MeshIOResult> LoadPLY(std::string_view absolute_path);
+    Extrinsic::Core::Expected<MeshIOResult> LoadSTL(std::string_view absolute_path);
     // and other missing formats for meshes only. Complete models or scenes will be handled differently?
 
     enum class MeshIOWriteStatus

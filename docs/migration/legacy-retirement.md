@@ -51,7 +51,10 @@ As of `LEGACY-002` (2026-06-06), every remaining `src/legacy/<Subsystem>/` subtr
 
 - [`LEGACY-003`](../../tasks/done/LEGACY-003-delete-src-legacy-apps.md) (done 2026-06-07) — `src/legacy/Apps/` legacy Sandbox binary retired as a pure leaf consumer after `ExtrinsicSandbox` became canonical.
 - [`LEGACY-007`](../../tasks/done/LEGACY-007-delete-src-legacy-editorui.md) (done 2026-06-07) — `src/legacy/EditorUI/` retired after promoted `SandboxEditorUi` coverage replaced the legacy editor surface; UI-006 has since restored the Frame Graph diagnostics panel against renderer-owned stats.
-- [`LEGACY-005`](../../tasks/backlog/architecture/LEGACY-005-delete-src-legacy-core.md) — `src/legacy/Core/` (foundation; still imported by promoted `geometry`/`runtime`, so it retires last).
+- [`LEGACY-005`](../../tasks/backlog/architecture/LEGACY-005-delete-src-legacy-core.md) — `src/legacy/Core/` (foundation; retires last).
+  `LEGACY-013` cleared the promoted-src bare `Core.*` import subset; remaining
+  blockers are `LEGACY-012` test consumers and legacy-internal consumers that
+  retire through subtree ordering.
 - [`LEGACY-006`](../../tasks/backlog/architecture/LEGACY-006-delete-src-legacy-ecs.md) — `src/legacy/ECS/`.
 - [`LEGACY-008`](../../tasks/backlog/architecture/LEGACY-008-delete-src-legacy-graphics.md) — `src/legacy/Graphics/` (largest subtree; gated on the GRAPHICS-033 + GRAPHICS-070..076 + GRAPHICS-081 chain — now retired — plus migration of the remaining legacy consumers).
 - [`LEGACY-009`](../../tasks/backlog/architecture/LEGACY-009-delete-src-legacy-rhi.md) — `src/legacy/RHI/`.

@@ -18,7 +18,7 @@ module;
 module Geometry.HalfedgeMesh.Utils;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
-import Core.Logging;
+import Extrinsic.Core.Logging;
 
 namespace Geometry::MeshUtils
 {
@@ -211,7 +211,7 @@ namespace Geometry::MeshUtils
         if (positions.empty()) return -1;
         if (aux.size() < positions.size())
         {
-            Core::Log::Error("GenerateUVs: aux span smaller than positions.");
+            Extrinsic::Core::Log::Error("GenerateUVs: aux span smaller than positions.");
             return -1;
         }
         // 1. Calculate AABB
@@ -684,7 +684,7 @@ namespace Geometry::MeshUtils
         const bool hasAux = aux.empty() ? false : (aux.size() == positions.size());
         if (!aux.empty() && !hasAux)
         {
-            Core::Log::Warn("BuildHalfedgeMeshFromIndexedTriangles: aux vertex count ({}) does not match positions ({})",
+            Extrinsic::Core::Log::Warn("BuildHalfedgeMeshFromIndexedTriangles: aux vertex count ({}) does not match positions ({})",
                             aux.size(), positions.size());
             return std::nullopt;
         }
@@ -759,7 +759,7 @@ namespace Geometry::MeshUtils
             const uint32_t i2 = indices[i + 2];
             if (i0 >= remap.size() || i1 >= remap.size() || i2 >= remap.size())
             {
-                Core::Log::Warn("BuildHalfedgeMeshFromIndexedTriangles: triangle {} has out-of-range indices ({}, {}, {})",
+                Extrinsic::Core::Log::Warn("BuildHalfedgeMeshFromIndexedTriangles: triangle {} has out-of-range indices ({}, {}, {})",
                                 i / 3u, i0, i1, i2);
                 return std::nullopt;
             }
@@ -783,7 +783,7 @@ namespace Geometry::MeshUtils
             }
             if (!face)
             {
-                Core::Log::Warn("BuildHalfedgeMeshFromIndexedTriangles: failed to insert triangle {} after welding", i / 3u);
+                Extrinsic::Core::Log::Warn("BuildHalfedgeMeshFromIndexedTriangles: failed to insert triangle {} after welding", i / 3u);
                 return std::nullopt;
             }
         }

@@ -27,7 +27,7 @@ module;
 module Geometry.HalfedgeMesh.IO;
 
 import Geometry.Properties;
-import Core.Error;
+import Extrinsic.Core.Error;
 
 namespace Geometry::MeshIO
 {
@@ -41,16 +41,16 @@ namespace Geometry::MeshIO
         using Geometry::IOText::TextFileError;
         using Geometry::IOText::Trim;
 
-        [[nodiscard]] Core::ErrorCode ToCoreError(TextFileError error)
+        [[nodiscard]] Extrinsic::Core::ErrorCode ToCoreError(TextFileError error)
         {
             switch (error)
             {
             case TextFileError::FileNotFound:
-                return Core::ErrorCode::FileNotFound;
+                return Extrinsic::Core::ErrorCode::FileNotFound;
             case TextFileError::FileReadError:
-                return Core::ErrorCode::FileReadError;
+                return Extrinsic::Core::ErrorCode::FileReadError;
             }
-            return Core::ErrorCode::Unknown;
+            return Extrinsic::Core::ErrorCode::Unknown;
         }
 
         [[nodiscard]] std::optional<int> ResolveOBJIndex(std::string_view token, std::size_t valueCount)
@@ -189,9 +189,9 @@ namespace Geometry::MeshIO
             }
         }
 
-        [[nodiscard]] Core::Expected<MeshIOResult> InvalidMeshFormat()
+        [[nodiscard]] Extrinsic::Core::Expected<MeshIOResult> InvalidMeshFormat()
         {
-            return Core::Err<MeshIOResult>(Core::ErrorCode::InvalidFormat);
+            return Extrinsic::Core::Err<MeshIOResult>(Extrinsic::Core::ErrorCode::InvalidFormat);
         }
 
         [[nodiscard]] bool HasDuplicateFaceIndices(std::span<const std::uint32_t> indices)
@@ -543,7 +543,7 @@ namespace Geometry::MeshIO
             return std::nullopt;
         }
 
-        [[nodiscard]] Core::Expected<MeshIOResult> ParseAsciiPLY(std::string_view text,
+        [[nodiscard]] Extrinsic::Core::Expected<MeshIOResult> ParseAsciiPLY(std::string_view text,
                                                                 std::size_t cursor,
                                                                 const std::vector<PlyElement>& elements,
                                                                 std::string_view absolute_path)
@@ -778,7 +778,7 @@ namespace Geometry::MeshIO
             return result;
         }
 
-        [[nodiscard]] Core::Expected<MeshIOResult> ParseBinaryPLY(std::span<const std::byte> body,
+        [[nodiscard]] Extrinsic::Core::Expected<MeshIOResult> ParseBinaryPLY(std::span<const std::byte> body,
                                                                  const std::vector<PlyElement>& elements,
                                                                  bool bigEndian,
                                                                  std::string_view absolute_path)
@@ -1186,7 +1186,7 @@ namespace Geometry::MeshIO
             return data.size() >= 84;
         }
 
-        [[nodiscard]] Core::Expected<MeshIOResult> ParseBinarySTL(std::span<const std::byte> data,
+        [[nodiscard]] Extrinsic::Core::Expected<MeshIOResult> ParseBinarySTL(std::span<const std::byte> data,
                                                                   std::string_view absolute_path)
         {
             if (data.size() < 84)
@@ -1254,12 +1254,12 @@ namespace Geometry::MeshIO
         }
     }
 
-    Core::Expected<MeshIOResult> LoadOBJ(std::string_view absolute_path)
+    Extrinsic::Core::Expected<MeshIOResult> LoadOBJ(std::string_view absolute_path)
     {
         auto text = ReadTextFile(absolute_path);
         if (!text)
         {
-            return Core::Err<MeshIOResult>(ToCoreError(text.error()));
+            return Extrinsic::Core::Err<MeshIOResult>(ToCoreError(text.error()));
         }
 
         std::vector<glm::vec3> vertices;
@@ -1533,12 +1533,12 @@ namespace Geometry::MeshIO
         return result;
     }
 
-    Core::Expected<MeshIOResult> LoadOFF(std::string_view absolute_path)
+    Extrinsic::Core::Expected<MeshIOResult> LoadOFF(std::string_view absolute_path)
     {
         auto text = ReadTextFile(absolute_path);
         if (!text)
         {
-            return Core::Err<MeshIOResult>(ToCoreError(text.error()));
+            return Extrinsic::Core::Err<MeshIOResult>(ToCoreError(text.error()));
         }
 
         std::size_t cursor = 0;
@@ -1739,12 +1739,12 @@ namespace Geometry::MeshIO
         return result;
     }
 
-    Core::Expected<MeshIOResult> LoadPLY(std::string_view absolute_path)
+    Extrinsic::Core::Expected<MeshIOResult> LoadPLY(std::string_view absolute_path)
     {
         auto text = ReadTextFile(absolute_path);
         if (!text)
         {
-            return Core::Err<MeshIOResult>(ToCoreError(text.error()));
+            return Extrinsic::Core::Err<MeshIOResult>(ToCoreError(text.error()));
         }
 
         std::size_t cursor = 0;
@@ -1873,12 +1873,12 @@ namespace Geometry::MeshIO
         return ParseBinaryPLY(body, elements, format == PlyFormat::BinaryBigEndian, absolute_path);
     }
 
-    Core::Expected<MeshIOResult> LoadSTL(std::string_view absolute_path)
+    Extrinsic::Core::Expected<MeshIOResult> LoadSTL(std::string_view absolute_path)
     {
         auto text = ReadTextFile(absolute_path);
         if (!text)
         {
-            return Core::Err<MeshIOResult>(ToCoreError(text.error()));
+            return Extrinsic::Core::Err<MeshIOResult>(ToCoreError(text.error()));
         }
 
         const std::span<const std::byte> bytes(

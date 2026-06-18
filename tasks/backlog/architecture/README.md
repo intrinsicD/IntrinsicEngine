@@ -71,6 +71,13 @@ split; narratives live in the retirement log.
   feature candidate gained a named done-task decision or explicit future
   trigger. Remaining legacy-retirement blockers are consumer-grep cleanup,
   the promoted-src Core import migration, and mechanical subtree ordering.
+- [LEGACY-013 — Migrate promoted Core imports off legacy modules](../../done/LEGACY-013-promoted-core-import-migration.md)
+  (done, 2026-06-18, `CPUContracted`):
+  moved promoted geometry/runtime imports from bare legacy `Core.*` modules to
+  `Extrinsic.Core.*` and removed the `IntrinsicCore` link from promoted
+  geometry. Four directly affected geometry tests now consume promoted Core
+  types; remaining Core deletion blockers are 44 tests and legacy-internal
+  subtree ordering.
 - [CORE-002 — Command and feature catalog contract](../../done/CORE-002-command-feature-catalog-contract.md)
   (done, 2026-06-09, `CPUContracted` / explicit retirement decision):
   resolves remaining legacy `Core.Commands`, `Core.FeatureRegistry`, and

@@ -53,7 +53,7 @@ Consumer counts are distinct files matched outside the doomed subtree.
 |---|---|---|---|---|
 | `Interface/` ([LEGACY-001](../../tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md)) | 4 | 6 | 1 | 1 test (`tests/contract/ui/Test_PanelRegistration.cpp`) |
 | `Asset/` ([LEGACY-004](../../tasks/backlog/architecture/LEGACY-004-delete-src-legacy-asset.md)) | 6 | 50 | 10 | 10 tests, 0 promoted-src |
-| `Core/` ([LEGACY-005](../../tasks/backlog/architecture/LEGACY-005-delete-src-legacy-core.md)) | 40 | 133 | 63 | **15 promoted-src** + 48 tests |
+| `Core/` ([LEGACY-005](../../tasks/backlog/architecture/LEGACY-005-delete-src-legacy-core.md)) | 40 | 133 | 44 | 44 tests, 0 promoted-src |
 | `ECS/` ([LEGACY-006](../../tasks/backlog/architecture/LEGACY-006-delete-src-legacy-ecs.md)) | 29 | 37 | 25 | 25 tests, 0 promoted-src |
 | `Graphics/` ([LEGACY-008](../../tasks/backlog/architecture/LEGACY-008-delete-src-legacy-graphics.md)) | 168 | 22 | 39 | 39 tests, 0 promoted-src |
 | `RHI/` ([LEGACY-009](../../tasks/backlog/architecture/LEGACY-009-delete-src-legacy-rhi.md)) | 54 | 83 | 18 | 18 tests, 0 promoted-src |
@@ -73,10 +73,11 @@ Consumer counts are distinct files matched outside the doomed subtree.
   `src/legacy/` imports the doomed `Runtime.*` modules. Once its 19 test
   consumers migrate, `LEGACY-010` becomes a pure mechanical deletion.
 
-## The single promoted-engine-code blocker
+## Promoted-engine-code blocker status
 
-The only legacy modules still imported by **promoted, non-test engine code** are
-legacy `Core.*` modules, imported by 15 files:
+`LEGACY-013` cleared the only legacy modules that were still imported by
+**promoted, non-test engine code**: legacy `Core.*` modules in 15 promoted
+geometry/runtime files:
 
 - `src/geometry/` — 14 files import `Core.Memory`, `Core.Logging`, `Core.Error`,
   `Core.Handle`, and `Core.ResourcePool`.
@@ -89,20 +90,26 @@ git grep -nE '^\s*(export\s+)?import\s+(Core|ECS|Graphics|RHI|Runtime|Asset|Inte
     -- 'src/**' ':!src/legacy/**' | grep -vE 'import\s+Extrinsic'
 ```
 
-Promoted replacements already exist for all of these:
+Promoted replacements are now in use for all of these:
 `Extrinsic.Core.Error`, `Extrinsic.Core.Logging`, `Extrinsic.Core.Memory`,
 `Extrinsic.Core.ResourcePool`, and `Extrinsic.Core.StrongHandle`. Note that
 legacy `Core.Handle` (source of `Core::StrongHandle`) maps to the promoted
 `Extrinsic.Core.StrongHandle` rather than a same-named module, so this migration
-is a small semantic change, not a pure module rename.
+was a small semantic change, not a pure module rename. `src/geometry/CMakeLists.txt`
+also no longer links `IntrinsicCore`.
+
+The same checkpoint migrated four geometry tests directly coupled to those
+promoted geometry API surfaces (`Test_GJK.cpp`, `Test_ContactManifold.cpp`,
+`Test_RuntimeGeometry.cpp`, and `Test.GeometryIO.cpp`) from legacy `Core.*`
+types to promoted `Extrinsic.Core.*` types, reducing the remaining Core test
+consumer set for `LEGACY-012` from 48 files to 44 files.
 
 **This clears only the promoted-src subset of the `LEGACY-005` gate.** The
 `LEGACY-005` consumer-grep searches every consumer of legacy `Core.*` outside
-`src/legacy/Core/**`, which the table above counts as 133 legacy-internal + 63
-external (15 promoted-src + 48 test) files. Migrating the 15 promoted-src files
-removes only the 15 promoted-src matches; `LEGACY-005` stays blocked by its 48
-test consumers (`LEGACY-012`) and by all 133 legacy-internal consumers until the
-subtrees above Core have been deleted. This is why the `LEGACY-005` row in
+`src/legacy/Core/**`, which the table above now counts as 133 legacy-internal +
+44 test files. `LEGACY-005` stays blocked by its 44 test consumers
+(`LEGACY-012`) and by all 133 legacy-internal consumers until the subtrees above
+Core have been deleted. This is why the `LEGACY-005` row in
 `legacy-retirement.md` says Core "retires last".
 
 ## Legacy-internal deletion order
@@ -135,12 +142,10 @@ their legacy-internal imports before the upstream subtrees are removed.
 
 Removal is gated by consumer migration only. The safe path:
 
-1. **Migrate the 15 promoted-src files off legacy `Core.*`** to the
-   `Extrinsic.Core.*` modules above. This is the only blocker that touches
-   promoted engine code, but it clears only the promoted-src subset of the
-   `LEGACY-005` gate (see above) — it does not, on its own, unblock `LEGACY-005`.
-   (Owned by the `LEGACY-005` prerequisite / a focused geometry-core migration
-   slice.)
+1. **Done by `LEGACY-013`: migrate the 15 promoted-src files off legacy
+   `Core.*`** to the `Extrinsic.Core.*` modules above. This cleared only the
+   promoted-src subset of the `LEGACY-005` gate (see above) and did not, on its
+   own, unblock `LEGACY-005`.
 2. **Migrate or retire the test consumers** for every subtree
    ([`LEGACY-012`](../../tasks/backlog/architecture/LEGACY-012-migrate-legacy-consumer-tests.md)).
    This is required for *every* subtree gate, including `Runtime` — even the
@@ -156,7 +161,6 @@ Removal is gated by consumer migration only. The safe path:
    test consumers have migrated.
 
 In short: **all of `src/legacy/` is reimplemented or value-gated and is
-slated for removal** — the work that remains is consumer migration (one small
-geometry/runtime Core migration that clears only the promoted-src subset of the
-Core gate, plus the `LEGACY-012` test sweep), after which the tree deletes
-mechanically in the Runtime-first → Core-last order above.
+slated for removal** — the work that remains is consumer migration
+(`LEGACY-012` for tests) plus mechanical deletion in the Runtime-first →
+Core-last order above.

@@ -19,7 +19,7 @@ module Geometry.Graph.IO;
 
 import Geometry.Graph;
 import Geometry.Properties;
-import Core.Error;
+import Extrinsic.Core.Error;
 
 namespace Geometry::GraphIO
 {
@@ -33,16 +33,16 @@ namespace Geometry::GraphIO
         using Geometry::IOText::TextFileError;
         using Geometry::IOText::Trim;
 
-        [[nodiscard]] Core::ErrorCode ToCoreError(TextFileError error)
+        [[nodiscard]] Extrinsic::Core::ErrorCode ToCoreError(TextFileError error)
         {
             switch (error)
             {
             case TextFileError::FileNotFound:
-                return Core::ErrorCode::FileNotFound;
+                return Extrinsic::Core::ErrorCode::FileNotFound;
             case TextFileError::FileReadError:
-                return Core::ErrorCode::FileReadError;
+                return Extrinsic::Core::ErrorCode::FileReadError;
             }
-            return Core::ErrorCode::Unknown;
+            return Extrinsic::Core::ErrorCode::Unknown;
         }
 
         [[nodiscard]] std::string JoinTokens(const std::vector<std::string_view>& tokens, std::size_t first)
@@ -59,9 +59,9 @@ namespace Geometry::GraphIO
             return joined;
         }
 
-        [[nodiscard]] Core::Expected<GraphIOResult> InvalidGraphFormat()
+        [[nodiscard]] Extrinsic::Core::Expected<GraphIOResult> InvalidGraphFormat()
         {
-            return Core::Err<GraphIOResult>(Core::ErrorCode::InvalidFormat);
+            return Extrinsic::Core::Err<GraphIOResult>(Extrinsic::Core::ErrorCode::InvalidFormat);
         }
 
         [[nodiscard]] bool IsFinite(const glm::vec3& value)
@@ -77,12 +77,12 @@ namespace Geometry::GraphIO
         }
     }
 
-    Core::Expected<GraphIOResult> LoadTGF(std::string_view absolute_path)
+    Extrinsic::Core::Expected<GraphIOResult> LoadTGF(std::string_view absolute_path)
     {
         auto text = ReadTextFile(absolute_path);
         if (!text)
         {
-            return Core::Err<GraphIOResult>(ToCoreError(text.error()));
+            return Extrinsic::Core::Err<GraphIOResult>(ToCoreError(text.error()));
         }
 
         GraphIOResult result;
@@ -209,12 +209,12 @@ namespace Geometry::GraphIO
         return result;
     }
 
-    Core::Expected<GraphIOResult> LoadEdgeList(std::string_view absolute_path)
+    Extrinsic::Core::Expected<GraphIOResult> LoadEdgeList(std::string_view absolute_path)
     {
         auto text = ReadTextFile(absolute_path);
         if (!text)
         {
-            return Core::Err<GraphIOResult>(ToCoreError(text.error()));
+            return Extrinsic::Core::Err<GraphIOResult>(ToCoreError(text.error()));
         }
 
         GraphIOResult result;

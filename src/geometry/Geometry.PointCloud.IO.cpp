@@ -25,7 +25,7 @@ module Geometry.PointCloud.IO;
 
 import Geometry.PointCloud;
 import Geometry.Properties;
-import Core.Error;
+import Extrinsic.Core.Error;
 
 namespace Geometry::PointCloudIO
 {
@@ -48,19 +48,19 @@ namespace Geometry::PointCloudIO
             return info;
         }
 
-        [[nodiscard]] Core::Expected<std::string> ReadTextFile(std::string_view path)
+        [[nodiscard]] Extrinsic::Core::Expected<std::string> ReadTextFile(std::string_view path)
         {
             std::ifstream file(std::string(path), std::ios::binary);
             if (!file)
             {
-                return Core::Err<std::string>(Core::ErrorCode::FileNotFound);
+                return Extrinsic::Core::Err<std::string>(Extrinsic::Core::ErrorCode::FileNotFound);
             }
 
             std::ostringstream buffer;
             buffer << file.rdbuf();
             if (!file.good() && !file.eof())
             {
-                return Core::Err<std::string>(Core::ErrorCode::FileReadError);
+                return Extrinsic::Core::Err<std::string>(Extrinsic::Core::ErrorCode::FileReadError);
             }
             return buffer.str();
         }
@@ -260,9 +260,9 @@ namespace Geometry::PointCloudIO
             }
         }
 
-        [[nodiscard]] Core::Expected<PointCloudIOResult> InvalidPointCloudFormat()
+        [[nodiscard]] Extrinsic::Core::Expected<PointCloudIOResult> InvalidPointCloudFormat()
         {
-            return Core::Err<PointCloudIOResult>(Core::ErrorCode::InvalidFormat);
+            return Extrinsic::Core::Err<PointCloudIOResult>(Extrinsic::Core::ErrorCode::InvalidFormat);
         }
 
         void ApplyPathInfo(PointCloudIOResult& result, std::string_view path)
@@ -447,7 +447,7 @@ namespace Geometry::PointCloudIO
             return T{};
         }
 
-        [[nodiscard]] Core::Expected<PointCloudIOResult> ParseAsciiPLYPointCloud(std::string_view text,
+        [[nodiscard]] Extrinsic::Core::Expected<PointCloudIOResult> ParseAsciiPLYPointCloud(std::string_view text,
                                                                                 std::size_t cursor,
                                                                                 const std::vector<PlyElement>& elements,
                                                                                 std::string_view absolute_path)
@@ -582,7 +582,7 @@ namespace Geometry::PointCloudIO
             return result;
         }
 
-        [[nodiscard]] Core::Expected<PointCloudIOResult> ParseBinaryPLYPointCloud(std::span<const std::byte> body,
+        [[nodiscard]] Extrinsic::Core::Expected<PointCloudIOResult> ParseBinaryPLYPointCloud(std::span<const std::byte> body,
                                                                                  const std::vector<PlyElement>& elements,
                                                                                  bool bigEndian,
                                                                                  std::string_view absolute_path)
@@ -1112,12 +1112,12 @@ namespace Geometry::PointCloudIO
         }
     }
 
-    Core::Expected<PointCloudIOResult> LoadXYZ(std::string_view absolute_path)
+    Extrinsic::Core::Expected<PointCloudIOResult> LoadXYZ(std::string_view absolute_path)
     {
         auto text = ReadTextFile(absolute_path);
         if (!text)
         {
-            return Core::Err<PointCloudIOResult>(text.error());
+            return Extrinsic::Core::Err<PointCloudIOResult>(text.error());
         }
 
         PointCloudIOResult result;
@@ -1222,12 +1222,12 @@ namespace Geometry::PointCloudIO
         return result;
     }
 
-    Core::Expected<PointCloudIOResult> LoadPCD(std::string_view absolute_path)
+    Extrinsic::Core::Expected<PointCloudIOResult> LoadPCD(std::string_view absolute_path)
     {
         auto text = ReadTextFile(absolute_path);
         if (!text)
         {
-            return Core::Err<PointCloudIOResult>(text.error());
+            return Extrinsic::Core::Err<PointCloudIOResult>(text.error());
         }
 
         std::size_t cursor = 0;
@@ -1467,12 +1467,12 @@ namespace Geometry::PointCloudIO
         return result;
     }
 
-    Core::Expected<PointCloudIOResult> LoadPLY(std::string_view absolute_path)
+    Extrinsic::Core::Expected<PointCloudIOResult> LoadPLY(std::string_view absolute_path)
     {
         auto text = ReadTextFile(absolute_path);
         if (!text)
         {
-            return Core::Err<PointCloudIOResult>(text.error());
+            return Extrinsic::Core::Err<PointCloudIOResult>(text.error());
         }
 
         std::size_t cursor = 0;

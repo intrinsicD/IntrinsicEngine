@@ -5,7 +5,7 @@
 #include <glm/gtx/string_cast.hpp>
 #include <random>
 
-import Core;
+import Extrinsic.Core.Memory;
 import Geometry;
 
 using namespace Geometry;
@@ -348,16 +348,15 @@ TEST(Physics_Contact, EPA_UsesScratchArena_Smoke)
     // Shift B so it overlaps A with a clear interior intersection.
     for (glm::vec3& v : b.Vertices) v += glm::vec3(0.15f, 0.15f, 0.15f);
 
-    Core::Memory::LinearArena scratch(256 * 1024);
+    Extrinsic::Core::Memory::LinearArena scratch(256 * 1024);
     scratch.Reset();
 
-    const std::size_t beforeUsed = scratch.GetUsed();
+    const std::size_t beforeUsed = scratch.Used();
 
     auto contact = Geometry::ComputeContact(a, b, scratch);
 
     ASSERT_TRUE(contact.has_value())
         << "GJK/EPA fallback did not report contact. If this flakes, it indicates a GJK degeneracy case.";
 
-    EXPECT_GT(scratch.GetUsed(), beforeUsed) << "Expected EPA to consume scratch arena memory";
+    EXPECT_GT(scratch.Used(), beforeUsed) << "Expected EPA to consume scratch arena memory";
 }
-

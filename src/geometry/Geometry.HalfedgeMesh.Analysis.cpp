@@ -12,7 +12,7 @@ module;
 
 module Geometry.HalfedgeMesh.Analysis;
 
-import Core.Logging;
+import Extrinsic.Core.Logging;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Utils;
 import Geometry.Properties;
@@ -174,7 +174,7 @@ namespace Geometry::MeshAnalysis
         if (!result.ProblemVertex.IsValid() || !result.ProblemEdge.IsValid() || !result.ProblemHalfedge.IsValid() || !result.ProblemFace.IsValid() ||
             !result.VertexIssueMask.IsValid() || !result.EdgeIssueMask.IsValid() || !result.HalfedgeIssueMask.IsValid() || !result.FaceIssueMask.IsValid())
         {
-            Core::Log::Warn("MeshAnalysis::Analyze: failed to create one or more analysis marker properties due to a type collision.");
+            Extrinsic::Core::Log::Warn("MeshAnalysis::Analyze: failed to create one or more analysis marker properties due to a type collision.");
             return std::nullopt;
         }
 

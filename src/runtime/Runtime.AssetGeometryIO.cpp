@@ -8,7 +8,6 @@ module Extrinsic.Runtime.AssetGeometryIO;
 import Extrinsic.Asset.GeometryIOBridge;
 import Extrinsic.Asset.ImportRouter;
 import Extrinsic.Core.Error;
-import Core.Error;
 import Geometry.Graph.IO;
 import Geometry.HalfedgeMesh.IO;
 import Geometry.PointCloud.IO;
@@ -19,126 +18,64 @@ namespace Extrinsic::Runtime
     {
         namespace Assets = Extrinsic::Assets;
 
-        [[nodiscard]] Core::ErrorCode MapGeometryError(
-            const ::Core::ErrorCode error) noexcept
-        {
-            using LegacyErrorCode = ::Core::ErrorCode;
-            switch (error)
-            {
-            case LegacyErrorCode::Success:
-                return Core::ErrorCode::Success;
-            case LegacyErrorCode::OutOfMemory:
-                return Core::ErrorCode::OutOfMemory;
-            case LegacyErrorCode::ResourceNotFound:
-                return Core::ErrorCode::ResourceNotFound;
-            case LegacyErrorCode::ResourceBusy:
-                return Core::ErrorCode::ResourceBusy;
-            case LegacyErrorCode::ResourceCorrupted:
-                return Core::ErrorCode::ResourceCorrupted;
-            case LegacyErrorCode::FileNotFound:
-                return Core::ErrorCode::FileNotFound;
-            case LegacyErrorCode::FileReadError:
-                return Core::ErrorCode::FileReadError;
-            case LegacyErrorCode::FileWriteError:
-                return Core::ErrorCode::FileWriteError;
-            case LegacyErrorCode::InvalidPath:
-                return Core::ErrorCode::InvalidPath;
-            case LegacyErrorCode::PermissionDenied:
-                return Core::ErrorCode::PermissionDenied;
-            case LegacyErrorCode::InvalidArgument:
-                return Core::ErrorCode::InvalidArgument;
-            case LegacyErrorCode::InvalidState:
-                return Core::ErrorCode::InvalidState;
-            case LegacyErrorCode::InvalidFormat:
-                return Core::ErrorCode::InvalidFormat;
-            case LegacyErrorCode::OutOfRange:
-                return Core::ErrorCode::OutOfRange;
-            case LegacyErrorCode::TypeMismatch:
-                return Core::ErrorCode::TypeMismatch;
-            case LegacyErrorCode::AssetNotLoaded:
-                return Core::ErrorCode::AssetNotLoaded;
-            case LegacyErrorCode::AssetLoadFailed:
-                return Core::ErrorCode::AssetLoadFailed;
-            case LegacyErrorCode::AssetTypeMismatch:
-                return Core::ErrorCode::AssetTypeMismatch;
-            case LegacyErrorCode::ThreadViolation:
-                return Core::ErrorCode::ThreadViolation;
-            case LegacyErrorCode::DeadlockDetected:
-                return Core::ErrorCode::DeadlockDetected;
-            default:
-                return Core::ErrorCode::Unknown;
-            }
-        }
-
-        template <class T>
-        [[nodiscard]] Core::Expected<T> PromoteGeometryExpected(
-            ::Core::Expected<T> value)
-        {
-            if (!value.has_value())
-            {
-                return Core::Err<T>(MapGeometryError(value.error()));
-            }
-            return std::move(*value);
-        }
-
-        [[nodiscard]] Core::Result MapMeshWriteStatus(
+        [[nodiscard]] Extrinsic::Core::Result MapMeshWriteStatus(
             const Geometry::MeshIO::MeshIOWriteStatus status) noexcept
         {
             using Geometry::MeshIO::MeshIOWriteStatus;
             switch (status)
             {
             case MeshIOWriteStatus::Success:
-                return Core::Ok();
+                return Extrinsic::Core::Ok();
             case MeshIOWriteStatus::EmptyMesh:
-                return Core::Err(Core::ErrorCode::AssetInvalidData);
+                return Extrinsic::Core::Err(Extrinsic::Core::ErrorCode::AssetInvalidData);
             case MeshIOWriteStatus::InvalidFace:
-                return Core::Err(Core::ErrorCode::InvalidFormat);
+                return Extrinsic::Core::Err(Extrinsic::Core::ErrorCode::InvalidFormat);
             case MeshIOWriteStatus::InvalidPath:
-                return Core::Err(Core::ErrorCode::InvalidPath);
+                return Extrinsic::Core::Err(Extrinsic::Core::ErrorCode::InvalidPath);
             case MeshIOWriteStatus::FileWriteError:
-                return Core::Err(Core::ErrorCode::FileWriteError);
+                return Extrinsic::Core::Err(Extrinsic::Core::ErrorCode::FileWriteError);
             }
-            return Core::Err(Core::ErrorCode::Unknown);
+            return Extrinsic::Core::Err(Extrinsic::Core::ErrorCode::Unknown);
         }
 
-        [[nodiscard]] Core::Result MapPointCloudWriteStatus(
+        [[nodiscard]] Extrinsic::Core::Result MapPointCloudWriteStatus(
             const Geometry::PointCloudIO::PointCloudIOWriteStatus status) noexcept
         {
             using Geometry::PointCloudIO::PointCloudIOWriteStatus;
             switch (status)
             {
             case PointCloudIOWriteStatus::Success:
-                return Core::Ok();
+                return Extrinsic::Core::Ok();
             case PointCloudIOWriteStatus::EmptyCloud:
-                return Core::Err(Core::ErrorCode::AssetInvalidData);
+                return Extrinsic::Core::Err(Extrinsic::Core::ErrorCode::AssetInvalidData);
             case PointCloudIOWriteStatus::InvalidPath:
-                return Core::Err(Core::ErrorCode::InvalidPath);
+                return Extrinsic::Core::Err(Extrinsic::Core::ErrorCode::InvalidPath);
             case PointCloudIOWriteStatus::FileWriteError:
-                return Core::Err(Core::ErrorCode::FileWriteError);
+                return Extrinsic::Core::Err(Extrinsic::Core::ErrorCode::FileWriteError);
             }
-            return Core::Err(Core::ErrorCode::Unknown);
+            return Extrinsic::Core::Err(Extrinsic::Core::ErrorCode::Unknown);
         }
 
-        [[nodiscard]] Core::Result MapGraphWriteStatus(
+        [[nodiscard]] Extrinsic::Core::Result MapGraphWriteStatus(
             const Geometry::GraphIO::GraphIOWriteStatus status) noexcept
         {
             using Geometry::GraphIO::GraphIOWriteStatus;
             switch (status)
             {
             case GraphIOWriteStatus::Success:
-                return Core::Ok();
+                return Extrinsic::Core::Ok();
             case GraphIOWriteStatus::InvalidPath:
-                return Core::Err(Core::ErrorCode::InvalidPath);
+                return Extrinsic::Core::Err(Extrinsic::Core::ErrorCode::InvalidPath);
             case GraphIOWriteStatus::EmptyGraph:
-                return Core::Err(Core::ErrorCode::AssetInvalidData);
+                return Extrinsic::Core::Err(Extrinsic::Core::ErrorCode::AssetInvalidData);
             case GraphIOWriteStatus::FileWriteError:
-                return Core::Err(Core::ErrorCode::FileWriteError);
+                return Extrinsic::Core::Err(Extrinsic::Core::ErrorCode::FileWriteError);
             }
-            return Core::Err(Core::ErrorCode::Unknown);
+            return Extrinsic::Core::Err(Extrinsic::Core::ErrorCode::Unknown);
         }
 
         template <class Loader>
-        [[nodiscard]] Core::Result RegisterMeshImporter(
+        [[nodiscard]] Extrinsic::Core::Result RegisterMeshImporter(
             Assets::AssetGeometryIOBridge& bridge,
             const Assets::AssetFileFormat format,
             Loader&& loader)
@@ -148,15 +85,15 @@ namespace Extrinsic::Runtime
                 Assets::AssetPayloadKind::Mesh,
                 [loader = std::forward<Loader>(loader)](
                     const Assets::AssetGeometryIORequest& request)
-                    -> Core::Expected<Geometry::MeshIO::MeshIOResult>
+                    -> Extrinsic::Core::Expected<Geometry::MeshIO::MeshIOResult>
                 {
-                    return PromoteGeometryExpected(loader(request.Path));
+                    return loader(request.Path);
                 },
                 "Geometry::MeshIO::MeshIOResult");
         }
 
         template <class Loader>
-        [[nodiscard]] Core::Result RegisterPointCloudImporter(
+        [[nodiscard]] Extrinsic::Core::Result RegisterPointCloudImporter(
             Assets::AssetGeometryIOBridge& bridge,
             const Assets::AssetFileFormat format,
             Loader&& loader)
@@ -166,15 +103,15 @@ namespace Extrinsic::Runtime
                 Assets::AssetPayloadKind::PointCloud,
                 [loader = std::forward<Loader>(loader)](
                     const Assets::AssetGeometryIORequest& request)
-                    -> Core::Expected<Geometry::PointCloudIO::PointCloudIOResult>
+                    -> Extrinsic::Core::Expected<Geometry::PointCloudIO::PointCloudIOResult>
                 {
-                    return PromoteGeometryExpected(loader(request.Path));
+                    return loader(request.Path);
                 },
                 "Geometry::PointCloudIO::PointCloudIOResult");
         }
 
         template <class Loader>
-        [[nodiscard]] Core::Result RegisterGraphImporter(
+        [[nodiscard]] Extrinsic::Core::Result RegisterGraphImporter(
             Assets::AssetGeometryIOBridge& bridge,
             const Assets::AssetFileFormat format,
             Loader&& loader)
@@ -184,14 +121,14 @@ namespace Extrinsic::Runtime
                 Assets::AssetPayloadKind::Graph,
                 [loader = std::forward<Loader>(loader)](
                     const Assets::AssetGeometryIORequest& request)
-                    -> Core::Expected<Geometry::GraphIO::GraphIOResult>
+                    -> Extrinsic::Core::Expected<Geometry::GraphIO::GraphIOResult>
                 {
-                    return PromoteGeometryExpected(loader(request.Path));
+                    return loader(request.Path);
                 },
                 "Geometry::GraphIO::GraphIOResult");
         }
 
-        [[nodiscard]] Core::Result RegisterMeshExporter(
+        [[nodiscard]] Extrinsic::Core::Result RegisterMeshExporter(
             Assets::AssetGeometryIOBridge& bridge,
             const Assets::AssetFileFormat format,
             Geometry::MeshIO::MeshIOWriteStatus (*writer)(
@@ -202,13 +139,13 @@ namespace Extrinsic::Runtime
                 format,
                 Assets::AssetPayloadKind::Mesh,
                 [writer](const Assets::AssetGeometryIORequest& request,
-                         const Geometry::MeshIO::MeshIOResult& mesh) -> Core::Result
+                         const Geometry::MeshIO::MeshIOResult& mesh) -> Extrinsic::Core::Result
                 {
                     return MapMeshWriteStatus(writer(request.Path, mesh));
                 });
         }
 
-        [[nodiscard]] Core::Result RegisterPointCloudExporter(
+        [[nodiscard]] Extrinsic::Core::Result RegisterPointCloudExporter(
             Assets::AssetGeometryIOBridge& bridge,
             const Assets::AssetFileFormat format,
             Geometry::PointCloudIO::PointCloudIOWriteStatus (*writer)(
@@ -219,13 +156,13 @@ namespace Extrinsic::Runtime
                 format,
                 Assets::AssetPayloadKind::PointCloud,
                 [writer](const Assets::AssetGeometryIORequest& request,
-                         const Geometry::PointCloudIO::PointCloudIOResult& cloud) -> Core::Result
+                         const Geometry::PointCloudIO::PointCloudIOResult& cloud) -> Extrinsic::Core::Result
                 {
                     return MapPointCloudWriteStatus(writer(request.Path, cloud));
                 });
         }
 
-        [[nodiscard]] Core::Result RegisterGraphExporter(
+        [[nodiscard]] Extrinsic::Core::Result RegisterGraphExporter(
             Assets::AssetGeometryIOBridge& bridge,
             const Assets::AssetFileFormat format,
             Geometry::GraphIO::GraphIOWriteStatus (*writer)(
@@ -236,13 +173,13 @@ namespace Extrinsic::Runtime
                 format,
                 Assets::AssetPayloadKind::Graph,
                 [writer](const Assets::AssetGeometryIORequest& request,
-                         const Geometry::GraphIO::GraphIOResult& graph) -> Core::Result
+                         const Geometry::GraphIO::GraphIOResult& graph) -> Extrinsic::Core::Result
                 {
                     return MapGraphWriteStatus(writer(request.Path, graph));
                 });
         }
 
-        [[nodiscard]] Core::Result Combine(Core::Result lhs, const Core::Result& rhs)
+        [[nodiscard]] Extrinsic::Core::Result Combine(Extrinsic::Core::Result lhs, const Extrinsic::Core::Result& rhs)
         {
             if (!lhs.has_value())
             {
@@ -252,7 +189,7 @@ namespace Extrinsic::Runtime
         }
     }
 
-    Core::Result RegisterPromotedGeometryIOCallbacks(
+    Extrinsic::Core::Result RegisterPromotedGeometryIOCallbacks(
         Assets::AssetGeometryIOBridge& bridge)
     {
         auto result = RegisterMeshImporter(bridge, Assets::AssetFileFormat::OBJ, Geometry::MeshIO::LoadOBJ);
