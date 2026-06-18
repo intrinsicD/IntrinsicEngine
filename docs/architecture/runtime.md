@@ -56,8 +56,12 @@ an explicit camera transition. `FocusCameraOnEntities(...)` focuses any object
 set; `FocusCameraOnSelection(...)` focuses the current `SelectionController`
 selection. Phase 4 of `RunFrame` invokes the selection wrapper on the `F`
 ("focus") key edge for the `Main` slot, suppressed while Dear ImGui owns the
-keyboard. The per-controller framing distance math is unchanged and remains owned
-by the controllers (`Extrinsic.Runtime.CameraControllers`).
+keyboard. It runs *after* the pre-render transform/bounds flush
+(`FlushPreRenderTransformState`, BUG-024) so it reads `World::Bounds` already
+refreshed for this frame's transform edits, then rebuilds the render camera so
+the reframed view reaches extraction the same frame. The per-controller framing
+distance math is unchanged and remains owned by the controllers
+(`Extrinsic.Runtime.CameraControllers`).
 
 Operational promotion is gated on `RHI::IDevice::IsOperational()` and renderer
 resource rebuild success. Vulkan-specific diagnostics are recorded by the Vulkan

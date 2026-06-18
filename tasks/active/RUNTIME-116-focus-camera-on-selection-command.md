@@ -10,12 +10,16 @@ maturity_target: CPUContracted
 - Status: in-progress (implementation complete and verified on branch; retire to
   `tasks/done/` on merge).
 - Owner/agent: Claude on `claude/wizardly-archimedes-f611ix`.
-- Branch: `claude/wizardly-archimedes-f611ix`. PR: TBD.
+- Branch: `claude/wizardly-archimedes-f611ix`. PR: #983.
 - Verification run 2026-06-18: `cmake --preset ci` + `cmake --build --preset ci
   --target IntrinsicTests` built with zero errors; the new
   `Test.RuntimeCameraFocusCommand.cpp` (13 cases) passed; the default CPU gate
   was green — `100% tests passed, 0 tests failed out of 2894`. Layering,
   test-layout, task-policy, doc-links, and docs-sync structural checks all pass.
+- PR #983 review fix: moved the `F`-key gather to *after*
+  `FlushPreRenderTransformState` so it reads refreshed `World::Bounds` (a Phase-3
+  transform edit otherwise left the camera framing the stale position/extent),
+  rebuilding the render camera on success. Re-verified by rebuild + CPU gate.
 
 ## Goal
 - Add a reusable runtime command that repositions the active camera so a chosen
@@ -54,6 +58,12 @@ maturity_target: CPUContracted
   - ECS `Components::Culling::World::Bounds { Geometry::OBB WorldBoundingOBB;
     Geometry::Sphere WorldBoundingSphere; }`, kept current by the
     `BoundsPropagation` system and set on import by `AttachGeometryBounds`.
+- Frame ordering: `World::Bounds` is only guaranteed current for the frame after
+  `Engine::RunFrame` runs `FlushPreRenderTransformState(*m_Scene)` (BUG-024:
+  TransformHierarchy → BoundsPropagation → RenderSync), which applies transform
+  edits made during `OnVariableTick` / the ImGui editor hook / the gizmo drag.
+  The `F`-key gather must therefore run *after* that flush, otherwise pressing
+  `F` right after moving a selected entity frames its stale position/extent.
   - `Platform::Input::Context::IsKeyJustPressed(Key::F)` (F = 70; no existing
     binding — verified no conflict).
 - Aggregation semantics (multi-select): treat each selected entity's world
@@ -79,11 +89,13 @@ maturity_target: CPUContracted
 - [x] Add `src/runtime/Cameras/Runtime.CameraFocusCommand.cpp` with the
       implementations (radius clamped to a small minimum, non-finite guarded).
 - [x] Register both files in `src/runtime/CMakeLists.txt` (CXX_MODULES + PRIVATE).
-- [x] Wire the `F` key in `src/runtime/Runtime.Engine.cpp` `RunFrame` Phase 4:
-      inside the `m_Config.Camera.Enabled` controller block, before
-      `controller->GetView(...)`, on
-      `!imguiCapturesKeyboard && window.GetInput().IsKeyJustPressed(Platform::Input::Key::F)`
-      call `FocusCameraOnSelection(m_CameraControllers, m_SelectionController, *m_Scene)`.
+- [x] Wire the `F` key in `src/runtime/Runtime.Engine.cpp` `RunFrame` Phase 4,
+      **after** `FlushPreRenderTransformState(*m_Scene)` so the gather reads
+      refreshed `World::Bounds` (BUG-024 ordering), on
+      `m_Config.Camera.Enabled && !imguiCapturesKeyboard && IsKeyJustPressed(Key::F)`:
+      call `FocusCameraOnSelection(m_CameraControllers, m_SelectionController, *m_Scene)`
+      and, on success, rebuild `renderInput.Camera` from the Main controller so the
+      reframed camera reaches the gizmo packets and render extraction the same frame.
 - [x] Import the new module in `Runtime.Engine.cpp`.
 
 ## Tests
