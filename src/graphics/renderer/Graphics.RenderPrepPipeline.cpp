@@ -92,7 +92,8 @@ namespace Extrinsic::Graphics
             inputs.VisualizationSync->Sync(inputs.VisualizationSyncRecords,
                                            *inputs.Materials,
                                            *inputs.Colormaps,
-                                           *inputs.World);
+                                           *inputs.World,
+                                           inputs.VisualizationPropertyBufferAddresses);
             RecordStep(result, inputs, RenderPrepStep::VisualizationSync);
         }
 

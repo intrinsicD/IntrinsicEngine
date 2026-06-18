@@ -69,9 +69,12 @@ void main() {
     const GpuEntityConfig cfg = entityConfigs.Data[inst.ConfigSlot];
 
     PackedVertexRef vertices = PackedVertexRef(geo.VertexBufferBDA);
-    const uint sourceVertexIndex = uint(gl_VertexIndex) / 6u;
-    const uint vertexInQuad = uint(gl_VertexIndex) % 6u;
-    const PackedVertex pv = vertices.Data[sourceVertexIndex];
+    const uint firstPointQuadVertex = geo.PointFirstVertex * 6u;
+    const uint vertexIndex = uint(gl_VertexIndex) - firstPointQuadVertex;
+    const uint sourceVertexIndex = vertexIndex / 6u;
+    const uint vertexInQuad = vertexIndex % 6u;
+    const uint globalVertexIndex = geo.PointFirstVertex + sourceVertexIndex;
+    const PackedVertex pv = vertices.Data[globalVertexIndex];
 
     const uint cornerIndex = uint[6](0u, 1u, 2u, 0u, 2u, 3u)[vertexInQuad];
     const vec2 localOffset = vec2[4](

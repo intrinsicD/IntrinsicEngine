@@ -253,6 +253,11 @@ namespace Extrinsic::Graphics
         {
             return false;
         }
+        if (m_ColormapSystem && m_TextureManager && m_SamplerManager &&
+            !m_ColormapSystem->IsInitialized())
+        {
+            m_ColormapSystem->Initialize(device, *m_TextureManager, *m_SamplerManager);
+        }
 
         m_GpuWorld->SetMaterialBuffer(
             m_MaterialSystem->GetBuffer(),

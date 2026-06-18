@@ -22,6 +22,7 @@ import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.ColormapSystem;
 import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.Graphics.Component.Material;
 import Extrinsic.Graphics.Component.GpuSceneSlot;
 import Extrinsic.Graphics.Component.RenderGeometry;
@@ -94,6 +95,70 @@ namespace Extrinsic::Graphics
             case Domain::Edge:   return 2u;
             }
             return 0u;
+        }
+
+        static VisualizationAttributeDomain ToAttributeDomain(
+            Components::VisualizationConfig::Domain d) noexcept
+        {
+            using Domain = Components::VisualizationConfig::Domain;
+            switch (d)
+            {
+            case Domain::Vertex: return VisualizationAttributeDomain::Vertex;
+            case Domain::Face:   return VisualizationAttributeDomain::Face;
+            case Domain::Edge:   return VisualizationAttributeDomain::Edge;
+            }
+            return VisualizationAttributeDomain::Vertex;
+        }
+
+        static VisualizationAttributeDomain ToColorAttributeDomain(
+            Components::VisualizationConfig::ColorSource source) noexcept
+        {
+            using ColorSource = Components::VisualizationConfig::ColorSource;
+            switch (source)
+            {
+            case ColorSource::PerVertexBuffer:
+                return VisualizationAttributeDomain::Vertex;
+            case ColorSource::PerEdgeBuffer:
+                return VisualizationAttributeDomain::Edge;
+            case ColorSource::PerFaceBuffer:
+                return VisualizationAttributeDomain::Face;
+            default:
+                return VisualizationAttributeDomain::Vertex;
+            }
+        }
+
+        [[nodiscard]] static bool IsDefaultWhiteUniform(
+            const Components::VisualizationConfig& cfg) noexcept
+        {
+            return cfg.Source == Components::VisualizationConfig::ColorSource::UniformColor &&
+                   cfg.Color == glm::vec4{1.0f, 1.0f, 1.0f, 1.0f};
+        }
+
+        template <typename TypePredicate>
+        [[nodiscard]] static const VisualizationPropertyBufferAddress*
+        FindPropertyBufferAddress(
+            std::span<const VisualizationPropertyBufferAddress> addresses,
+            const std::string_view explicitKey,
+            const std::string_view fallbackKey,
+            const VisualizationAttributeDomain domain,
+            TypePredicate typeMatches) noexcept
+        {
+            const std::string_view key =
+                explicitKey.empty() ? fallbackKey : explicitKey;
+            if (key.empty())
+            {
+                return nullptr;
+            }
+
+            for (const VisualizationPropertyBufferAddress& address : addresses)
+            {
+                if (address.SourceKey == key && address.Domain == domain &&
+                    typeMatches(address.ValueType))
+                {
+                    return &address;
+                }
+            }
+            return nullptr;
         }
 
         /// Build MaterialParams for the ScalarField override.
@@ -206,18 +271,18 @@ namespace Extrinsic::Graphics
         }
 
         RHI::GpuEntityConfig BuildEntityConfig(
-            const Components::VisualizationConfig* visCfg,
-            const Components::RenderEdges* edges,
-            const Components::RenderPoints* points,
+            const VisualizationSyncRecord& record,
             const Components::GpuSceneSlot&        gpuSlot,
-            ColormapSystem&                        colormapSys) const
+            ColormapSystem&                        colormapSys,
+            std::span<const VisualizationPropertyBufferAddress> propertyBufferAddresses) const
         {
+            const Components::VisualizationConfig* visCfg = record.Visualization;
             RHI::GpuEntityConfig cfg{};
             cfg.ColorSourceMode = kMode_Material;
             cfg.VisualizationAlpha = 1.f;
             cfg.UniformColor = {1.f, 1.f, 1.f, 1.f};
-            ApplyLineRenderConfig(cfg, edges);
-            ApplyPointRenderConfig(cfg, points);
+            ApplyLineRenderConfig(cfg, record.Edges);
+            ApplyPointRenderConfig(cfg, record.Points);
 
             if (Device)
             {
@@ -231,10 +296,10 @@ namespace Extrinsic::Graphics
                 };
 
                 setBda("normals", cfg.VertexNormalBDA);
-                if (points != nullptr)
+                if (record.Points != nullptr)
                 {
                     if (const auto* sizeName =
-                            std::get_if<std::string>(&points->SizeSource);
+                            std::get_if<std::string>(&record.Points->SizeSource);
                         sizeName != nullptr)
                     {
                         setBda(*sizeName, cfg.Point.PointSizeBDA);
@@ -244,10 +309,10 @@ namespace Extrinsic::Graphics
                         setBda("sizes", cfg.Point.PointSizeBDA);
                     }
                 }
-                if (edges != nullptr)
+                if (record.Edges != nullptr)
                 {
                     if (const auto* widthName =
-                            std::get_if<std::string>(&edges->WidthSource);
+                            std::get_if<std::string>(&record.Edges->WidthSource);
                         widthName != nullptr)
                     {
                         setBda(*widthName, cfg.Line.LineWidthBDA);
@@ -282,6 +347,17 @@ namespace Extrinsic::Graphics
                 }
             };
 
+            auto setAddressAndCount = [&](const VisualizationPropertyBufferAddress* address,
+                                          std::uint64_t& outBda)
+            {
+                if (address == nullptr || address->BufferBDA == 0u)
+                {
+                    return;
+                }
+                outBda = address->BufferBDA;
+                cfg.ElementCount = address->ElementCount;
+            };
+
             const auto source = visCfg->Source;
             if (source == Components::VisualizationConfig::ColorSource::UniformColor)
             {
@@ -292,6 +368,21 @@ namespace Extrinsic::Graphics
             {
                 cfg.ColorSourceMode = kMode_ScalarField;
                 setBdaAndCount(visCfg->ScalarFieldName, cfg.ScalarBDA);
+                if (cfg.ScalarBDA == 0u)
+                {
+                    const VisualizationPropertyBufferAddress* address =
+                        FindPropertyBufferAddress(
+                            propertyBufferAddresses,
+                            record.ScalarPropertyBufferSourceKey,
+                            visCfg->ScalarFieldName,
+                            ToAttributeDomain(visCfg->ScalarDomain),
+                            [](const VisualizationValueType candidate)
+                            {
+                                return candidate == VisualizationValueType::ScalarFloat ||
+                                       candidate == VisualizationValueType::ScalarDouble;
+                            });
+                    setAddressAndCount(address, cfg.ScalarBDA);
+                }
             }
             else if (source == Components::VisualizationConfig::ColorSource::PerVertexBuffer ||
                      source == Components::VisualizationConfig::ColorSource::PerEdgeBuffer ||
@@ -299,6 +390,21 @@ namespace Extrinsic::Graphics
             {
                 cfg.ColorSourceMode = kMode_PerElementRgba;
                 setBdaAndCount(visCfg->ColorBufferName, cfg.ColorBDA);
+                if (cfg.ColorBDA == 0u)
+                {
+                    const VisualizationPropertyBufferAddress* address =
+                        FindPropertyBufferAddress(
+                            propertyBufferAddresses,
+                            record.ColorPropertyBufferSourceKey,
+                            visCfg->ColorBufferName,
+                            ToColorAttributeDomain(source),
+                            [](const VisualizationValueType candidate)
+                            {
+                                return candidate == VisualizationValueType::Rgba8 ||
+                                       candidate == VisualizationValueType::RgbaFloat4;
+                            });
+                    setAddressAndCount(address, cfg.ColorBDA);
+                }
             }
 
             return cfg;
@@ -352,7 +458,8 @@ namespace Extrinsic::Graphics
     void VisualizationSyncSystem::Sync(std::span<VisualizationSyncRecord> records,
                                        MaterialSystem& matSys,
                                        ColormapSystem& colormapSys,
-                                       GpuWorld&       gpuWorld)
+                                       GpuWorld&       gpuWorld,
+                                       std::span<const VisualizationPropertyBufferAddress> propertyBufferAddresses)
     {
         using namespace Components;
         using ColorSource = VisualizationConfig::ColorSource;
@@ -363,21 +470,28 @@ namespace Extrinsic::Graphics
         // ---- Pass 1: extracted records with MaterialInstance + GpuSceneSlot -------
         for (VisualizationSyncRecord& record : records)
         {
-            liveKeys.push_back(record.StableId);
-            if (!record.Material || !record.GpuSlot)
+            if (record.Material != nullptr)
             {
-                m_Impl->ReleaseOverrideLease(record.StableId);
+                liveKeys.push_back(record.StableId);
+            }
+            if (!record.GpuSlot)
+            {
+                if (record.Material != nullptr)
+                {
+                    m_Impl->ReleaseOverrideLease(record.StableId);
+                }
                 continue;
             }
 
-            auto& matInst = *record.Material;
             const auto& gpuSlot = *record.GpuSlot;
+            MaterialInstance* const matInst = record.Material;
 
             // Apply TintOverride to the BASE material if set.
-            if (matInst.TintOverride.has_value() && matInst.Lease.IsValid())
+            if (matInst != nullptr &&
+                matInst->TintOverride.has_value() && matInst->Lease.IsValid())
             {
-                matSys.Patch(matInst.Lease.GetHandle(),
-                    [tint = *matInst.TintOverride](MaterialParams& p)
+                matSys.Patch(matInst->Lease.GetHandle(),
+                    [tint = *matInst->TintOverride](MaterialParams& p)
                     {
                         p.BaseColorFactor = tint;
                     });
@@ -385,19 +499,35 @@ namespace Extrinsic::Graphics
 
             const auto* visCfg = record.Visualization;
 
-            if (gpuSlot.HasInstance())
+            if (matInst == nullptr &&
+                (visCfg == nullptr || visCfg->Source == ColorSource::Material ||
+                 Impl::IsDefaultWhiteUniform(*visCfg)))
+            {
+                continue;
+            }
+
+            const GpuInstanceHandle targetInstance =
+                record.TargetInstance.IsValid()
+                    ? record.TargetInstance
+                    : (gpuSlot.HasInstance() ? gpuSlot.ToInstanceHandle() : GpuInstanceHandle{});
+            if (targetInstance.IsValid())
             {
                 gpuWorld.SetEntityConfig(
-                    gpuSlot.ToInstanceHandle(),
-                    m_Impl->BuildEntityConfig(
-                        visCfg, record.Edges, record.Points, gpuSlot, colormapSys));
+                    targetInstance,
+                    m_Impl->BuildEntityConfig(record, gpuSlot, colormapSys,
+                                              propertyBufferAddresses));
+            }
+
+            if (matInst == nullptr)
+            {
+                continue;
             }
 
             if (!visCfg || visCfg->Source == ColorSource::Material)
             {
                 // No sci-vis override — use the base material slot directly.
-                if (matInst.Lease.IsValid())
-                    matInst.EffectiveSlot = matSys.GetMaterialSlot(matInst.Lease.GetHandle());
+                if (matInst->Lease.IsValid())
+                    matInst->EffectiveSlot = matSys.GetMaterialSlot(matInst->Lease.GetHandle());
                 m_Impl->ReleaseOverrideLease(record.StableId);
                 continue;
             }
@@ -429,7 +559,7 @@ namespace Extrinsic::Graphics
             assert(lease.IsValid());
             matSys.SetParams(lease.GetHandle(), overrideParams);
 
-            matInst.EffectiveSlot = matSys.GetMaterialSlot(lease.GetHandle());
+            matInst->EffectiveSlot = matSys.GetMaterialSlot(lease.GetHandle());
         }
 
         // ---- Pass 2: release stale override leases -----------------------

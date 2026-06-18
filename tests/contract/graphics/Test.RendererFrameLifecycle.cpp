@@ -1387,6 +1387,7 @@ TEST(RendererFrameLifecycle, ForwardPointSphereImpostorsWriteCorrectedDepth)
     const std::string pointVertex = ReadShaderSource("forward/point.vert");
     const std::string pointFragment = ReadShaderSource("forward/point.frag");
     const std::string cullShader = ReadShaderSource("culling/instance_cull.comp");
+    const std::string activeCullShader = ReadShaderSource("instance_cull.comp");
 
     EXPECT_NE(pointVertex.find("/ 6u"), std::string::npos);
     EXPECT_NE(pointVertex.find("ResolvePointSizePx"), std::string::npos);
@@ -1404,6 +1405,8 @@ TEST(RendererFrameLifecycle, ForwardPointSphereImpostorsWriteCorrectedDepth)
     EXPECT_NE(pointFragment.find("gl_FragDepth = depth"), std::string::npos);
     EXPECT_NE(cullShader.find("geo.PointVertexCount * 6u"), std::string::npos);
     EXPECT_NE(cullShader.find("geo.PointFirstVertex * 6u"), std::string::npos);
+    EXPECT_NE(activeCullShader.find("buckets.LineQuads"), std::string::npos);
+    EXPECT_NE(activeCullShader.find("(geo.LineIndexCount / 2u) * 6u"), std::string::npos);
 }
 
 TEST(RendererFrameLifecycle, ForwardLinePointShadersUseSharedVisualizationColorHelpers)

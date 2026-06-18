@@ -15,6 +15,7 @@ import Extrinsic.RHI.PipelineManager;
 import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.ColormapSystem;
 import Extrinsic.Graphics.VisualizationSyncSystem;
+import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.Graphics.TransformSyncSystem;
 import Extrinsic.Graphics.LightSystem;
 import Extrinsic.Graphics.GpuWorld;
@@ -70,6 +71,7 @@ namespace Extrinsic::Graphics
         CullingSystem* Culling = nullptr;
 
         std::span<VisualizationSyncRecord> VisualizationSyncRecords{};
+        std::span<const VisualizationPropertyBufferAddress> VisualizationPropertyBufferAddresses{};
         std::span<const TransformSyncRecord> TransformSyncRecords{};
         std::span<const LightSnapshot> LightSnapshots{};
 

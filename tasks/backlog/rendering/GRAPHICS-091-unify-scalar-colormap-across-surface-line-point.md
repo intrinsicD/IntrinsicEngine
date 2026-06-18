@@ -100,7 +100,7 @@ depends_on: []
 - [x] Run focused shader compile coverage for the shared helper's promoted surface
       consumers (`forward/default_debug_surface.*`, `deferred/gbuffer.*`).
 - [x] Extend shader-compile coverage once line/point stages call the shared helper.
-- [ ] Add opt-in `gpu;vulkan` smoke proving a scalar-field colormap renders on a line set
+- [x] Add opt-in `gpu;vulkan` smoke proving a scalar-field colormap renders on a line set
       and a point set (sampled pixel matches the colormap), mirroring the surface
       scalar-field path; skip / fail-closed without promoted Vulkan.
 - [x] Preserve the default CPU gate and existing `GraphicsVisualizationPackets` /
@@ -124,7 +124,7 @@ depends_on: []
 - [x] No `vis_colors_baked` buffer or CPU scalar→color bake for line/point is introduced;
       resolution is GPU-side from the property/colormap BDAs.
 - [x] Default CPU gate stays green.
-- [ ] The new `gpu;vulkan` smoke passes on a Vulkan-capable host or skips
+- [x] The new `gpu;vulkan` smoke passes on a Vulkan-capable host or skips
       deterministically.
 - [x] Layering preserved: graphics consumes snapshots/BDAs/colormap LUT only; no live
       ECS/`AssetService`/runtime ownership added.
@@ -180,10 +180,9 @@ python3 tools/agents/check_task_policy.py --root . --strict
       domain); the scalar-buffer residency and colormap-pixel checks emit precise
       host diagnostics. The fixture self-skips on non-Vulkan hosts via
       `BootstrapDefaultSandboxAppEngine`.
-    - Status: authored; compiles and links cleanly under `ci-vulkan` and skips
-      deterministically on this non-Vulkan host (both verified 2026-06-18 via
-      `IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests`; the test reports
-      `***Skipped` with no GLFW/promoted-Vulkan device). The `Operational`
-      pixel-proof still needs a `gpu;vulkan` run on a Vulkan-capable host — this
-      cloud session has no Vulkan driver — so the task stays in backlog and is
-      not yet recorded as `Operational`.
+    - Status: operational pixel proof verified on a Vulkan-capable host
+      2026-06-18 via `IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests` and
+      `ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan'
+      -R 'ReferenceTriangleMeshConfiguredLineWidthAndPointDrawLanesPresent|ReferenceTriangleScalarFieldColormapResolvesOnLineAndPointLanes'
+      --timeout 120`. The task stays open only for the separate surface parity
+      acceptance item.

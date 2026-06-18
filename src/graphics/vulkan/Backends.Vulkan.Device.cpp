@@ -98,13 +98,15 @@ namespace
         bool RuntimeDescriptorArraySupported = false;
         bool SampledImageArrayNonUniformIndexingSupported = false;
         bool DrawIndirectCountSupported = false;
+        bool DrawIndirectFirstInstanceSupported = false;
 
         [[nodiscard]] bool AllRequiredSupported() const noexcept
         {
             return DescriptorIndexingSupported && TimelineSemaphoreSupported && DynamicRenderingSupported &&
                    BufferDeviceAddressSupported && Synchronization2Supported && ScalarBlockLayoutSupported &&
                    ShaderInt64Supported && GeometryShaderSupported && RuntimeDescriptorArraySupported &&
-                   SampledImageArrayNonUniformIndexingSupported && DrawIndirectCountSupported;
+                   SampledImageArrayNonUniformIndexingSupported && DrawIndirectCountSupported &&
+                   DrawIndirectFirstInstanceSupported;
         }
     };
 
@@ -329,6 +331,8 @@ namespace
         probe.ScalarBlockLayoutSupported = features12.scalarBlockLayout == VK_TRUE;
         probe.ShaderInt64Supported = features2.features.shaderInt64 == VK_TRUE;
         probe.GeometryShaderSupported = features2.features.geometryShader == VK_TRUE;
+        probe.DrawIndirectFirstInstanceSupported =
+            features2.features.drawIndirectFirstInstance == VK_TRUE;
         probe.RuntimeDescriptorArraySupported = features12.runtimeDescriptorArray == VK_TRUE;
         probe.SampledImageArrayNonUniformIndexingSupported =
             features12.shaderSampledImageArrayNonUniformIndexing == VK_TRUE;
@@ -491,6 +495,7 @@ namespace
                 *outSamplerAnisotropySupported = true;
         }
         enabledFeatures.features.shaderInt64 = VK_TRUE;
+        enabledFeatures.features.drawIndirectFirstInstance = VK_TRUE;
         // Selection/picking fragment shaders use gl_PrimitiveID, which glslang
         // emits with SPIR-V Capability Geometry even though no geometry stage is
         // present. Enable the feature up front so pipeline bring-up fails at

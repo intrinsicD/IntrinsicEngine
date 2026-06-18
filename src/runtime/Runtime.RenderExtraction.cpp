@@ -57,6 +57,7 @@ import Extrinsic.Runtime.ProceduralGeometryPacker;
 import Extrinsic.Runtime.RenderWorldPool;
 import Extrinsic.Runtime.SpatialDebugAdapters;
 import Extrinsic.Runtime.VisualizationAdapters;
+import Geometry.Properties;
 
 namespace Extrinsic::Runtime
 {
@@ -325,6 +326,35 @@ namespace Extrinsic::Runtime
             }
         }
 
+        [[nodiscard]] const Geometry::PropertySet* PropertySetForMeshVisualizationDomain(
+            const ECS::Components::GeometrySources::ConstSourceView& view,
+            const Graphics::Components::VisualizationConfig::Domain domain) noexcept
+        {
+            namespace GS = ECS::Components::GeometrySources;
+            using Domain = Graphics::Components::VisualizationConfig::Domain;
+            if (view.ActiveDomain != GS::Domain::Mesh)
+            {
+                return nullptr;
+            }
+
+            switch (domain)
+            {
+            case Domain::Vertex:
+                return view.VertexSource != nullptr
+                    ? &view.VertexSource->Properties
+                    : nullptr;
+            case Domain::Edge:
+                return view.EdgeSource != nullptr
+                    ? &view.EdgeSource->Properties
+                    : nullptr;
+            case Domain::Face:
+                return view.FaceSource != nullptr
+                    ? &view.FaceSource->Properties
+                    : nullptr;
+            }
+            return nullptr;
+        }
+
         [[nodiscard]] std::string BuildVisualizationPropertySourceKey(
             const std::uint32_t stableId,
             const std::string_view lane,
@@ -458,6 +488,56 @@ namespace Extrinsic::Runtime
                 break;
             }
             return options;
+        }
+
+        void AppendMeshScalarVisualizationPropertyBuffer(
+            const std::uint32_t stableId,
+            const ECS::Components::GeometrySources::ConstSourceView& view,
+            const Graphics::Components::VisualizationConfig* visualization,
+            VisualizationAdapterBatch& batch,
+            RuntimeRenderExtractionStats& stats)
+        {
+            if (!IsScalarVisualizationSource(visualization) ||
+                visualization->ScalarFieldName.empty())
+            {
+                return;
+            }
+
+            const Geometry::PropertySet* properties =
+                PropertySetForMeshVisualizationDomain(
+                    view, visualization->ScalarDomain);
+            if (properties == nullptr)
+            {
+                return;
+            }
+
+            PropertyScalarAdapter adapter{Geometry::ConstPropertySet{*properties}};
+            VisualizationAdapterStats perAdapter{};
+            VisualizationAdapterOptions options{};
+            options.SourceName = visualization->ScalarFieldName;
+            options.OutputName = visualization->ScalarFieldName;
+            options.Domain = ToVisualizationAttributeDomain(
+                visualization->ScalarDomain);
+            options.AutoRange = visualization->Scalar.AutoRange;
+            options.RangeMin = visualization->Scalar.RangeMin;
+            options.RangeMax = visualization->Scalar.RangeMax;
+            options.Colormap = visualization->Scalar.Map;
+            options.PropertyBufferSourceKey =
+                BuildVisualizationPropertySourceKey(
+                    stableId, "scalar", visualization->ScalarFieldName);
+            adapter.Append(batch, options, perAdapter);
+
+            stats.VisualizationAdapterPacketAppendCount += perAdapter.PacketAppendCount;
+            stats.VisualizationAdapterMissingSourceCount += perAdapter.MissingSourceCount;
+            stats.VisualizationAdapterUnsupportedSourceTypeCount += perAdapter.UnsupportedSourceTypeCount;
+            stats.VisualizationAdapterEmptySourceCount += perAdapter.EmptySourceCount;
+            stats.VisualizationAdapterInvalidBufferCount +=
+                perAdapter.InvalidBufferCount + perAdapter.InvalidResourceCount;
+            stats.VisualizationAdapterInvalidRangeCount += perAdapter.InvalidRangeCount;
+            stats.VisualizationAdapterNonFiniteValueCount += perAdapter.NonFiniteValueCount;
+            stats.VisualizationAdapterElementCountOverflowCount += perAdapter.ElementCountOverflowCount;
+            stats.VisualizationAdapterManualRangeCount += perAdapter.ManualRangeCount;
+            stats.VisualizationAdapterFlatAutoRangeExpandedCount += perAdapter.FlatAutoRangeExpandedCount;
         }
 
         [[nodiscard]] std::uint32_t BuildRenderFlags(const entt::registry& registry, entt::entity entity)
@@ -1884,10 +1964,13 @@ namespace Extrinsic::Runtime
             // releases any lingering views).
             bool meshDirtyThisFrame = false;
             bool meshViewsResident = false;
+            std::optional<ECS::Components::GeometrySources::ConstSourceView>
+                sourceViewThisFrame{};
             if (sourceEligible)
             {
                 namespace GS = ECS::Components::GeometrySources;
                 const auto view = GS::BuildConstView(registry, entity);
+                sourceViewThisFrame = view;
                 ApplyProgressivePresentationBindings(registry,
                                                      entity,
                                                      view,
@@ -2134,14 +2217,72 @@ namespace Extrinsic::Runtime
                 sidecar->GpuSlot.ClearSourceAsset();
             }
 
+            const auto* visualization =
+                sidecar->HasVisualization ? &sidecar->Visualization : nullptr;
+            const auto* renderEdges =
+                registry.try_get<Graphics::Components::RenderEdges>(entity);
+            const auto* renderPoints =
+                registry.try_get<Graphics::Components::RenderPoints>(entity);
+            std::string scalarPropertyBufferSourceKey{};
+            std::string colorPropertyBufferSourceKey{};
+            if (IsScalarVisualizationSource(visualization) &&
+                !visualization->ScalarFieldName.empty())
+            {
+                scalarPropertyBufferSourceKey =
+                    BuildVisualizationPropertySourceKey(
+                        stableId, "scalar", visualization->ScalarFieldName);
+            }
+            if (IsColorBufferVisualizationSource(visualization) &&
+                !visualization->ColorBufferName.empty())
+            {
+                colorPropertyBufferSourceKey =
+                    BuildVisualizationPropertySourceKey(
+                        stableId, "color", visualization->ColorBufferName);
+            }
             m_Visualizations.push_back(Graphics::VisualizationSyncRecord{
                 .StableId = stableId,
                 .Material = &sidecar->Material,
                 .GpuSlot = &sidecar->GpuSlot,
-                .Visualization = sidecar->HasVisualization ? &sidecar->Visualization : nullptr,
-                .Edges = registry.try_get<Graphics::Components::RenderEdges>(entity),
-                .Points = registry.try_get<Graphics::Components::RenderPoints>(entity),
+                .Visualization = visualization,
+                .Edges = renderEdges,
+                .Points = renderPoints,
+                .ScalarPropertyBufferSourceKey = scalarPropertyBufferSourceKey,
+                .ColorPropertyBufferSourceKey = colorPropertyBufferSourceKey,
             });
+            if (renderEdges != nullptr && sidecar->MeshEdgeViewInstance.IsValid())
+            {
+                m_Visualizations.push_back(Graphics::VisualizationSyncRecord{
+                    .StableId = stableId,
+                    .GpuSlot = &sidecar->GpuSlot,
+                    .Visualization = visualization,
+                    .Edges = renderEdges,
+                    .TargetInstance = sidecar->MeshEdgeViewInstance,
+                    .ScalarPropertyBufferSourceKey = scalarPropertyBufferSourceKey,
+                    .ColorPropertyBufferSourceKey = colorPropertyBufferSourceKey,
+                });
+            }
+            if (renderPoints != nullptr && sidecar->MeshVertexViewInstance.IsValid())
+            {
+                m_Visualizations.push_back(Graphics::VisualizationSyncRecord{
+                    .StableId = stableId,
+                    .GpuSlot = &sidecar->GpuSlot,
+                    .Visualization = visualization,
+                    .Points = renderPoints,
+                    .TargetInstance = sidecar->MeshVertexViewInstance,
+                    .ScalarPropertyBufferSourceKey = scalarPropertyBufferSourceKey,
+                    .ColorPropertyBufferSourceKey = colorPropertyBufferSourceKey,
+                });
+            }
+            if (sourceViewThisFrame.has_value() &&
+                !m_VisualizationState->Bindings.contains(stableId))
+            {
+                AppendMeshScalarVisualizationPropertyBuffer(
+                    stableId,
+                    *sourceViewThisFrame,
+                    visualization,
+                    m_VisualizationState->Batch,
+                    stats);
+            }
             AppendVisualizationAdapters(stableId, *sidecar, stats);
 
             const bool primaryRenderableSubmitted =

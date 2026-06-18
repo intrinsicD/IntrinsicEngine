@@ -20,3 +20,10 @@ sessions:
     events_count: 2
     claims_touched: []
     open_threads: 0
+  - id: "2026-06-18_001"
+    date: "2026-06-18"
+    summary: "Diagnosed and fixed GRAPHICS-091 sandbox UI-enabled line/point colormap rendering; Vulkan and CPU gates passed."
+    turn_count: 1
+    events_count: 2
+    claims_touched: []
+    open_threads: 1

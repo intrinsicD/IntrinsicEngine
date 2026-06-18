@@ -1535,8 +1535,10 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleMeshConfiguredLineWidthA
     device.ReadBuffer(readbackBuffer, bytes.data(), readbackSize, 0u);
 
     std::uint32_t lineCullCount = 0u;
+    std::uint32_t lineQuadCullCount = 0u;
     std::uint32_t pointCullCount = 0u;
     Extrinsic::RHI::GpuDrawIndexedCommand firstLineCmd{};
+    Extrinsic::RHI::GpuDrawCommand firstLineQuadCmd{};
     Extrinsic::RHI::GpuDrawCommand firstPointCmd{};
     const GpuSceneInputSummary sceneInputs = SummarizeGpuSceneInputs(device, renderer);
     Extrinsic::RHI::GpuEntityConfig firstLineConfig{};
@@ -1556,6 +1558,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleMeshConfiguredLineWidthA
     {
         const auto& lineBucket = renderer.GetCullingSystem().GetBucket(
             Extrinsic::RHI::GpuDrawBucketKind::Lines);
+        const auto& lineQuadBucket = renderer.GetCullingSystem().GetBucket(
+            Extrinsic::RHI::GpuDrawBucketKind::LineQuads);
         const auto& pointBucket = renderer.GetCullingSystem().GetBucket(
             Extrinsic::RHI::GpuDrawBucketKind::Points);
         if (lineBucket.CountBuffer.IsValid())
@@ -1565,6 +1569,17 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleMeshConfiguredLineWidthA
         if (lineBucket.IndexedArgsBuffer.IsValid())
         {
             device.ReadBuffer(lineBucket.IndexedArgsBuffer, &firstLineCmd, sizeof(firstLineCmd), 0u);
+        }
+        if (lineQuadBucket.CountBuffer.IsValid())
+        {
+            device.ReadBuffer(lineQuadBucket.CountBuffer, &lineQuadCullCount, sizeof(lineQuadCullCount), 0u);
+        }
+        if (lineQuadBucket.NonIndexedArgsBuffer.IsValid())
+        {
+            device.ReadBuffer(lineQuadBucket.NonIndexedArgsBuffer,
+                              &firstLineQuadCmd,
+                              sizeof(firstLineQuadCmd),
+                              0u);
         }
         if (pointBucket.CountBuffer.IsValid())
         {
@@ -1605,6 +1620,12 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleMeshConfiguredLineWidthA
         << "ReferenceTriangle mesh edge lane did not expose a readable first line config.";
     EXPECT_FLOAT_EQ(firstLineConfig.Line.LineWidth, kReferenceTriangleLineWidthSmokePx);
     EXPECT_EQ(firstLineConfig.Line.LineWidthBDA, 0u);
+    EXPECT_GE(lineQuadCullCount, 1u)
+        << "ReferenceTriangle mesh edge lane did not emit the non-indexed line-quad draw consumed by LinePass."
+        << " lineQuadCmd={vertexCount=" << firstLineQuadCmd.VertexCount
+        << ", instanceCount=" << firstLineQuadCmd.InstanceCount
+        << ", firstVertex=" << firstLineQuadCmd.FirstVertex
+        << ", firstInstance=" << firstLineQuadCmd.FirstInstance << "}";
     EXPECT_GE(pointCullCount, 1u)
         << "ReferenceTriangle mesh point lane did not emit a point draw command."
         << " pointCmd={vertexCount=" << firstPointCmd.VertexCount
@@ -1633,6 +1654,11 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleMeshConfiguredLineWidthA
         << ", firstIndex=" << firstLineCmd.FirstIndex
         << ", vertexOffset=" << firstLineCmd.VertexOffset
         << ", firstInstance=" << firstLineCmd.FirstInstance << "}"
+        << " lineQuadCullCount=" << lineQuadCullCount
+        << " lineQuadCmd={vertexCount=" << firstLineQuadCmd.VertexCount
+        << ", instanceCount=" << firstLineQuadCmd.InstanceCount
+        << ", firstVertex=" << firstLineQuadCmd.FirstVertex
+        << ", firstInstance=" << firstLineQuadCmd.FirstInstance << "}"
         << " pointCullCount=" << pointCullCount
         << " pointCmd={vertexCount=" << firstPointCmd.VertexCount
         << ", instanceCount=" << firstPointCmd.InstanceCount

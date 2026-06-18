@@ -3,6 +3,7 @@ module;
 #include <cstdint>
 #include <memory>
 #include <span>
+#include <string>
 
 export module Extrinsic.Graphics.VisualizationSyncSystem;
 
@@ -10,6 +11,7 @@ import Extrinsic.RHI.Device;
 import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.ColormapSystem;
 import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.Graphics.Component.GpuSceneSlot;
 import Extrinsic.Graphics.Component.Material;
 import Extrinsic.Graphics.Component.RenderGeometry;
@@ -68,6 +70,9 @@ export namespace Extrinsic::Graphics
         const Components::VisualizationConfig* Visualization{nullptr};
         const Components::RenderEdges* Edges{nullptr};
         const Components::RenderPoints* Points{nullptr};
+        GpuInstanceHandle TargetInstance{};
+        std::string ScalarPropertyBufferSourceKey{};
+        std::string ColorPropertyBufferSourceKey{};
     };
 
     class VisualizationSyncSystem
@@ -107,7 +112,8 @@ export namespace Extrinsic::Graphics
         void Sync(std::span<VisualizationSyncRecord> records,
                   MaterialSystem& matSys,
                   ColormapSystem& colormapSys,
-                  GpuWorld& gpuWorld);
+                  GpuWorld& gpuWorld,
+                  std::span<const VisualizationPropertyBufferAddress> propertyBufferAddresses = {});
 
         // -----------------------------------------------------------------
         // Diagnostics

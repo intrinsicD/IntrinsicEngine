@@ -1,0 +1,56 @@
+session:
+  id: "2026-06-18_001"
+  date: "2026-06-18"
+  started: "2026-06-18T22:48"
+  last_turn: "2026-06-18T22:48"
+  turn_count: 1
+  summary: "Diagnosed and fixed GRAPHICS-091 sandbox UI-enabled line/point colormap rendering; Vulkan and CPU gates passed."
+
+events_logged:
+  - turn: 1
+    type: decision
+    id: "N27"
+    routing: direct
+    provenance: ai-executed
+    summary: "Fixed active cull LineQuads, sidecar visualization BDA propagation, line/point shader indexing, colormap alpha, cold colormap init, and Vulkan firstInstance feature gating."
+  - turn: 1
+    type: experiment
+    id: "N28"
+    routing: direct
+    provenance: ai-executed
+    summary: "Focused CPU, Vulkan smoke, full IntrinsicTests build, full CPU CTest, and strict structural checks passed."
+
+ai_actions:
+  - turn: 1
+    action: "Patched shaders, runtime extraction, renderer visualization sync, render prep inputs, renderer address publication, Vulkan feature gating, task status, and regression tests."
+    provenance: ai-executed
+    files_changed:
+      - "assets/shaders/common/gpu_scene.glsl"
+      - "assets/shaders/forward/line.vert"
+      - "assets/shaders/forward/point.vert"
+      - "assets/shaders/instance_cull.comp"
+      - "src/runtime/Runtime.RenderExtraction.cpp"
+      - "src/graphics/renderer/Graphics.VisualizationSyncSystem.cpp"
+      - "src/graphics/renderer/Graphics.VisualizationSyncSystem.cppm"
+      - "src/graphics/renderer/Graphics.RenderPrepPipeline.cpp"
+      - "src/graphics/renderer/Graphics.RenderPrepPipeline.cppm"
+      - "src/graphics/renderer/Graphics.Renderer.cpp"
+      - "src/graphics/renderer/Graphics.RenderSubsystemRegistry.cpp"
+      - "src/graphics/vulkan/Backends.Vulkan.Device.cpp"
+      - "tests/contract/graphics/Test.MinimalTriangleAcceptance.cpp"
+      - "tests/contract/graphics/Test.RendererFrameLifecycle.cpp"
+      - "tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp"
+      - "tasks/backlog/rendering/GRAPHICS-091-unify-scalar-colormap-across-surface-line-point.md"
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: "User reported sandbox app line rendering failed when enabled via UI, while the triangle test with surface, lines, and points enabled worked."
+  - turn: 1
+    excerpt: "Diagnosis found the UI command path was healthy; failures were in active cull output, sidecar visualization config/BDA propagation, and blended colormap alpha."
+
+open_threads:
+  - "GRAPHICS-091 surface visualization parity checkbox remains open; this turn proved line/point Vulkan operational behavior and surface visibility, not bitwise surface parity."
+
+ai_suggestions_pending: []

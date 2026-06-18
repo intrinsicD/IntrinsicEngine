@@ -400,6 +400,7 @@ vec4 GpuResolveVisualizationColorWithColormap(GpuEntityConfig cfg,
 
     const float t = GpuVisualizationNormalizedScalar(cfg, scalarValue);
     vec4 color = texture(colormapLut, vec2(t, 0.5));
+    color.a = 1.0;
     color = GpuVisualizationApplyIsolines(cfg, t, color);
     color.a *= cfg.VisualizationAlpha;
     return color;

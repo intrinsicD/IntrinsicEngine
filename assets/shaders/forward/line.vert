@@ -43,13 +43,16 @@ void main() {
     PackedVertexRef vertices = PackedVertexRef(geo.VertexBufferBDA);
     GpuUIntBufferRef indices = GpuUIntBufferRef(geo.IndexBufferBDA);
 
-    const uint vertexIndex = uint(gl_VertexIndex);
+    const uint firstLineQuadVertex = (geo.LineFirstIndex / 2u) * 6u;
+    const uint vertexIndex = uint(gl_VertexIndex) - firstLineQuadVertex;
     const uint segmentIndex = vertexIndex / 6u;
     const uint vertexInQuad = vertexIndex % 6u;
     const uint cornerIndex = uint[6](0u, 1u, 2u, 0u, 2u, 3u)[vertexInQuad];
-    const uint lineIndexBase = segmentIndex * 2u;
-    const uint endpointA = indices.Data[lineIndexBase] + geo.VertexOffset;
-    const uint endpointB = indices.Data[lineIndexBase + 1u] + geo.VertexOffset;
+    const uint lineIndexBase = geo.LineFirstIndex + segmentIndex * 2u;
+    const uint localEndpointA = indices.Data[lineIndexBase];
+    const uint localEndpointB = indices.Data[lineIndexBase + 1u];
+    const uint endpointA = localEndpointA + geo.VertexOffset;
+    const uint endpointB = localEndpointB + geo.VertexOffset;
     const PackedVertex a = vertices.Data[endpointA];
     const PackedVertex b = vertices.Data[endpointB];
 
@@ -77,7 +80,7 @@ void main() {
     gl_Position = centerClip + vec4(clipOffset, 0.0, 0.0);
 
     const uint elementId = cfg.VisDomain == GpuVisualizationDomain_Vertex
-        ? (useEnd ? endpointB : endpointA)
+        ? (useEnd ? localEndpointB : localEndpointA)
         : segmentIndex;
     vConfigSlot = inst.ConfigSlot;
     vVisualizationScalar = GpuVisualizationReadScalar(cfg, elementId, cfg.ScalarRangeMin);

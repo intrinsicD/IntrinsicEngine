@@ -503,7 +503,9 @@ per-frame RHI transients before barrier submission, preserves attachment access
 bits through RHI/Vulkan Sync2 mappings, records synchronous staging uploads on a
 dedicated one-shot command buffer instead of the per-frame graphics command
 buffer, enables the `drawIndirectCount` feature required by the default command
-shape, and declares dynamic-rendering scopes for every default-recipe draw pass.
+shape, enables `drawIndirectFirstInstance` because cull buckets use
+`firstInstance` as the canonical `GpuScene` slot consumed by `gl_InstanceIndex`,
+and declares dynamic-rendering scopes for every default-recipe draw pass.
 CPU contracts pin the two classes that allowed the fault to escape:
 `FrameRecipeContract.DefaultRecipeDoesNotDepthTransitionColorResources` and
 `FrameRecipeContract.DefaultRecipeDrawPassesDeclareRenderPassAttachments`. The

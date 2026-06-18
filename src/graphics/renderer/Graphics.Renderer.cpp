@@ -334,6 +334,7 @@ namespace Extrinsic::Graphics
         {
             std::vector<VisualizationSyncRecord>           VisualizationSyncRecords;
             std::vector<VisualizationPropertyBufferUploadDescriptor> VisualizationPropertyBuffers;
+            std::vector<VisualizationPropertyBufferAddress> VisualizationPropertyBufferAddresses;
             std::vector<std::vector<std::byte>>             VisualizationPropertyBufferPayloads;
             std::vector<VisualizationAttributeBufferPacket> VisualizationAttributeBuffers;
             std::vector<ScalarAttributePacket>              VisualizationScalars;
@@ -361,6 +362,7 @@ namespace Extrinsic::Graphics
             {
                 VisualizationSyncRecords.clear();
                 VisualizationPropertyBuffers.clear();
+                VisualizationPropertyBufferAddresses.clear();
                 VisualizationPropertyBufferPayloads.clear();
                 VisualizationAttributeBuffers.clear();
                 VisualizationScalars.clear();
@@ -1027,6 +1029,7 @@ namespace Extrinsic::Graphics
             auto& m_LightSnapshots = storage.LightSnapshots;
             auto& m_VisualizationSyncRecords = storage.VisualizationSyncRecords;
             auto& m_VisualizationPropertyBuffers = storage.VisualizationPropertyBuffers;
+            auto& m_VisualizationPropertyBufferAddresses = storage.VisualizationPropertyBufferAddresses;
             auto& m_VisualizationPropertyBufferPayloads = storage.VisualizationPropertyBufferPayloads;
             auto& m_VisualizationAttributeBuffers = storage.VisualizationAttributeBuffers;
             auto& m_VisualizationScalars = storage.VisualizationScalars;
@@ -1085,6 +1088,9 @@ namespace Extrinsic::Graphics
                 m_VisualizationPropertyBufferDiagnostics =
                     m_VisualizationPropertyBufferResidency->Update(
                         m_VisualizationPropertyBuffers);
+                const std::span<const VisualizationPropertyBufferAddress> addresses =
+                    m_VisualizationPropertyBufferResidency->GetLastAddresses();
+                m_VisualizationPropertyBufferAddresses.assign(addresses.begin(), addresses.end());
 
                 auto findAddress = [this](
                     const std::string_view explicitKey,
@@ -1226,6 +1232,7 @@ namespace Extrinsic::Graphics
             }
             else
             {
+                m_VisualizationPropertyBufferAddresses.clear();
                 m_VisualizationPropertyBufferDiagnostics =
                     ValidateVisualizationPropertyBufferUploads(
                         m_VisualizationPropertyBuffers);
@@ -1580,6 +1587,9 @@ namespace Extrinsic::Graphics
                 .World = m_Subsystems.GpuWorldSystem() ? &*m_Subsystems.GpuWorldSystem() : nullptr,
                 .Culling = m_Subsystems.CullingSystemRegistry() ? &*m_Subsystems.CullingSystemRegistry() : nullptr,
                 .VisualizationSyncRecords = std::span<VisualizationSyncRecord>{activeSnapshot->VisualizationSyncRecords},
+                .VisualizationPropertyBufferAddresses =
+                    std::span<const VisualizationPropertyBufferAddress>{
+                        activeSnapshot->VisualizationPropertyBufferAddresses},
                 .TransformSyncRecords = std::span<const TransformSyncRecord>{activeSnapshot->TransformSyncRecords},
                 .LightSnapshots = std::span<const LightSnapshot>{activeSnapshot->LightSnapshots},
                 .EnsureClusterLightResources = [this, &renderWorld]

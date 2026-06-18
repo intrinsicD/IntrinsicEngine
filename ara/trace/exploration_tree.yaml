@@ -478,3 +478,54 @@ tree:
       passed. Root hygiene remained warning-only with pre-existing ara/ and
       imgui.ini entries.
     status: resolved
+  - id: N27
+    type: decision
+    title: "Fix GRAPHICS-091 line and point colormap rendering"
+    provenance: ai-executed
+    timestamp: "2026-06-18T22:48"
+    choice: >
+      Fixed the sandbox UI-enabled line/point visualization path by emitting
+      the active cull shader's LineQuads bucket, addressing line/point shader
+      local-element indexing for property buffers, propagating visualization
+      property-buffer addresses to mesh edge/vertex sidecar configs, initializing
+      colormaps after promoted Vulkan cold rebuild, forcing colormap LUT alpha
+      to visualization alpha for blended line/point passes, and requiring
+      drawIndirectFirstInstance for the promoted Vulkan backend.
+    alternatives:
+      - "Treat the sandbox editor UI toggle as the root cause."
+      - "Patch only the inactive culling/instance_cull.comp shader copy."
+      - "Disable line/point depth testing to hide the symptom."
+    evidence:
+      - "assets/shaders/instance_cull.comp"
+      - "assets/shaders/forward/line.vert"
+      - "assets/shaders/forward/point.vert"
+      - "assets/shaders/common/gpu_scene.glsl"
+      - "src/runtime/Runtime.RenderExtraction.cpp"
+      - "src/graphics/renderer/Graphics.VisualizationSyncSystem.cpp"
+      - "src/graphics/vulkan/Backends.Vulkan.Device.cpp"
+      - "tasks/backlog/rendering/GRAPHICS-091-unify-scalar-colormap-across-surface-line-point.md"
+    status: resolved
+  - id: N28
+    type: experiment
+    title: "GRAPHICS-091 line and point verification"
+    provenance: ai-executed
+    timestamp: "2026-06-18T22:48"
+    also_depends_on: [N27]
+    evidence:
+      - "cmake --build --preset ci --target IntrinsicGraphicsContractTests IntrinsicRuntimeGraphicsCpuTests"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' -R 'GraphicsMinimalAcceptance|RuntimeRenderExtraction|SandboxEditorUi|RuntimeSandboxAcceptance|RendererFrameLifecycle' -E 'NOT_BUILT' --timeout 60"
+      - "cmake --build --preset ci-vulkan --target IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests"
+      - "ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' -R 'ReferenceTriangleMeshConfiguredLineWidthAndPointDrawLanesPresent|ReferenceTriangleScalarFieldColormapResolvesOnLineAndPointLanes' --timeout 120"
+      - "ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' -R 'ImportedOffOriginObjTriangleAutoFramesAtCenter' --timeout 120"
+      - "cmake --build --preset ci --target IntrinsicTests"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+      - "python3 tools/repo/check_test_layout.py --root . --strict"
+      - "python3 tools/docs/check_doc_links.py --root ."
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+    result: >
+      Focused CPU build passed, focused CPU tests passed 90/90, Vulkan sandbox
+      line/point draw-lane and scalar-colormap pixel smokes passed 2/2, imported
+      surface visibility smoke passed, full IntrinsicTests build passed, default
+      CPU-supported CTest passed 2948/2948, and strict structural checks passed.
+    status: resolved

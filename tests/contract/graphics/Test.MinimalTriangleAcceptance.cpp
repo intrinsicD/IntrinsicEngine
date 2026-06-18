@@ -20,6 +20,7 @@ import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.Pass.Culling;
 import Extrinsic.Graphics.Pass.Deferred.GBuffers;
 import Extrinsic.Graphics.TransformSyncSystem;
+import Extrinsic.Graphics.VisualizationPackets;
 import Extrinsic.Graphics.VisualizationSyncSystem;
 import Extrinsic.RHI.BufferManager;
 import Extrinsic.RHI.CommandContext;
@@ -448,6 +449,122 @@ TEST(GraphicsMinimalAcceptance, VisualizationSyncWritesEquivalentLinePointColorS
     expectColorConfig(surfaceInstance);
     expectColorConfig(lineInstance);
     expectColorConfig(pointInstance);
+
+    visSync.Shutdown();
+    matSys.Shutdown();
+    world.Shutdown();
+}
+
+TEST(GraphicsMinimalAcceptance, VisualizationSyncWritesPropertyBufferConfigToTargetSidecarInstances)
+{
+    MockDevice device;
+    RHI::BufferManager bufferMgr{device};
+
+    Graphics::GpuWorld world;
+    Graphics::GpuWorld::InitDesc worldInit{};
+    worldInit.MaxInstances = 8;
+    worldInit.MaxGeometryRecords = 1;
+    worldInit.MaxLights = 1;
+    worldInit.VertexBufferBytes = 1024;
+    worldInit.IndexBufferBytes = 1024;
+    ASSERT_TRUE(world.Initialize(device, bufferMgr, worldInit));
+
+    Graphics::MaterialSystem matSys;
+    matSys.Initialize(device, bufferMgr);
+
+    Graphics::VisualizationSyncSystem visSync;
+    visSync.Initialize(matSys, device);
+
+    Graphics::ColormapSystem colorSys;
+
+    const auto surfaceInstance = world.AllocateInstance(61u);
+    const auto lineInstance = world.AllocateInstance(62u);
+    const auto pointInstance = world.AllocateInstance(63u);
+    ASSERT_TRUE(surfaceInstance.IsValid());
+    ASSERT_TRUE(lineInstance.IsValid());
+    ASSERT_TRUE(pointInstance.IsValid());
+
+    Graphics::Components::GpuSceneSlot parentSlot{};
+    parentSlot.SetInstanceHandle(surfaceInstance);
+
+    Graphics::Components::MaterialInstance surfaceMaterial{};
+    Graphics::Components::RenderEdges edges{};
+    edges.WidthSource = 7.5f;
+    Graphics::Components::RenderPoints points{};
+    points.SizeSource = 9.25f;
+    points.Type = Graphics::Components::RenderPoints::RenderType::Sphere;
+
+    Graphics::Components::VisualizationConfig scalarVis{};
+    scalarVis.Source =
+        Graphics::Components::VisualizationConfig::ColorSource::ScalarField;
+    scalarVis.ScalarFieldName = "curvature";
+    scalarVis.Scalar.RangeMin = -1.0f;
+    scalarVis.Scalar.RangeMax = 3.0f;
+    scalarVis.ScalarDomain =
+        Graphics::Components::VisualizationConfig::Domain::Vertex;
+
+    constexpr std::uint64_t kScalarBda = 0x9000'1000ull;
+    constexpr std::uint32_t kElementCount = 12u;
+    const std::array<Graphics::VisualizationPropertyBufferAddress, 1> addresses{{
+        Graphics::VisualizationPropertyBufferAddress{
+            .SourceKey = "61:scalar:curvature",
+            .Domain = Graphics::VisualizationAttributeDomain::Vertex,
+            .ValueType = Graphics::VisualizationValueType::ScalarFloat,
+            .ElementCount = kElementCount,
+            .StrideBytes = sizeof(float),
+            .BufferBDA = kScalarBda,
+        },
+    }};
+
+    std::array<Graphics::VisualizationSyncRecord, 3> records{{
+        Graphics::VisualizationSyncRecord{
+            .StableId = 61u,
+            .Material = &surfaceMaterial,
+            .GpuSlot = &parentSlot,
+            .Visualization = &scalarVis,
+            .ScalarPropertyBufferSourceKey = "61:scalar:curvature",
+        },
+        Graphics::VisualizationSyncRecord{
+            .StableId = 61u,
+            .GpuSlot = &parentSlot,
+            .Visualization = &scalarVis,
+            .Edges = &edges,
+            .TargetInstance = lineInstance,
+            .ScalarPropertyBufferSourceKey = "61:scalar:curvature",
+        },
+        Graphics::VisualizationSyncRecord{
+            .StableId = 61u,
+            .GpuSlot = &parentSlot,
+            .Visualization = &scalarVis,
+            .Points = &points,
+            .TargetInstance = pointInstance,
+            .ScalarPropertyBufferSourceKey = "61:scalar:curvature",
+        },
+    }};
+
+    visSync.Sync(records, matSys, colorSys, world, addresses);
+
+    const auto expectScalar = [&](const Graphics::GpuInstanceHandle instance)
+    {
+        const RHI::GpuEntityConfig config = world.GetEntityConfigForTest(instance);
+        EXPECT_EQ(config.ColorSourceMode, kColorSourceScalarField);
+        EXPECT_EQ(config.ScalarBDA, kScalarBda);
+        EXPECT_EQ(config.ElementCount, kElementCount);
+        EXPECT_FLOAT_EQ(config.ScalarRangeMin, -1.0f);
+        EXPECT_FLOAT_EQ(config.ScalarRangeMax, 3.0f);
+    };
+    expectScalar(surfaceInstance);
+    expectScalar(lineInstance);
+    expectScalar(pointInstance);
+
+    const RHI::GpuEntityConfig lineConfig = world.GetEntityConfigForTest(lineInstance);
+    EXPECT_FLOAT_EQ(lineConfig.Line.LineWidth, 7.5f);
+
+    const RHI::GpuEntityConfig pointConfig = world.GetEntityConfigForTest(pointInstance);
+    EXPECT_FLOAT_EQ(pointConfig.Point.PointSize, 9.25f);
+    EXPECT_EQ(pointConfig.Point.PointMode, 1u);
+
+    EXPECT_EQ(visSync.GetOverrideLeaseCount(), 1u);
 
     visSync.Shutdown();
     matSys.Shutdown();
