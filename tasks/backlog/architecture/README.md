@@ -110,8 +110,14 @@ split; narratives live in the retirement log.
   migrated the full scheduler/counter-event unit test to promoted
   `Extrinsic.Core.Tasks` and promoted telemetry stats, renamed it to
   `tests/unit/core/Test.CoreTasks.cpp`, and removed the smaller
-  legacy-suffixed wrapper test; remaining Core deletion blockers are 38 tests
-  and legacy-internal subtree ordering.
+  legacy-suffixed wrapper test; `LEGACY-021` later reduced the remaining Core
+  test-consumer set to 37 files.
+- [LEGACY-021 — Migrate profiling test to promoted Core](../../done/LEGACY-021-core-profiling-test-promoted.md)
+  (done, 2026-06-18, `CPUContracted`):
+  migrated the profiling/telemetry unit test to promoted
+  `Extrinsic.Core.Telemetry` and `Extrinsic.Core.Hash`, renamed it to
+  `tests/unit/core/Test.CoreProfiling.cpp`; remaining Core deletion blockers
+  are 37 tests and legacy-internal subtree ordering.
 - [LEGACY-018 — Retire legacy Interface panel-registration test](../../done/LEGACY-018-retire-interface-panel-registration-test.md)
   (done, 2026-06-18, `CPUContracted`):
   retired legacy-only `tests/contract/ui/Test_PanelRegistration.cpp`;

@@ -192,7 +192,6 @@ set(_core_test_files
     Test_FeatureRegistry.cpp
     Test_SystemFeatureCatalog.cpp
     Test_InplaceFunction.cpp
-    Test_Profiling.cpp
     Test.CoreError.cpp
     Test.LogRingBuffer.cpp
 )
@@ -516,6 +515,7 @@ set(_core_wrapper_unit_test_files
     Test.Core.LockFreeQueue.cpp
     Test.Core.Logging.cpp
     Test.Core.MemoryLegacy.cpp
+    Test.CoreProfiling.cpp
     Test.Core.ResourcePool.cpp
     Test.CoreStrongHandle.cpp
     Test.Core.TaskGraphLegacy.cpp

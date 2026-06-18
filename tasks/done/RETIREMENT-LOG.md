@@ -9,6 +9,17 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`LEGACY-021`](LEGACY-021-core-profiling-test-promoted.md) — Migrate profiling
+test to promoted Core — retired on 2026-06-18 at maturity `CPUContracted`.
+`tests/unit/core/Test.CoreProfiling.cpp` now imports promoted
+`Extrinsic.Core.Telemetry` and `Extrinsic.Core.Hash` instead of bare legacy
+`Core.Telemetry` / `Core.Hash`, preserving `ScopedTimer`, `TelemetrySystem`,
+`TimingCategory`, and present-timing coverage with the `Test.<Name>.cpp`
+convention. The focused core targets and profiling/telemetry CTest filter
+passed. `LEGACY-005` remains blocked by 37 remaining test consumers and 133
+legacy-internal consumers; `LEGACY-012` owns the remaining test cleanup.
+
+Backlog
 [`LEGACY-020`](LEGACY-020-core-tasks-test-promoted.md) — Migrate CoreTasks test
 to promoted Core — retired on 2026-06-18 at maturity `CPUContracted`. The full
 `tests/unit/core/Test_CoreTasks.cpp` scheduler, coroutine, `CounterEvent`,

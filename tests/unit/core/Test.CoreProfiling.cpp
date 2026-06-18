@@ -1,5 +1,5 @@
 // =============================================================================
-// Test_Profiling — Contract tests for Core.Profiling / Core.Telemetry.
+// Test.CoreProfiling — Contract tests for Core.Profiling / Core.Telemetry.
 //
 // Covers: ScopedTimer RAII timing, TelemetrySystem sample recording,
 //         category aggregation, and nested timer correctness.
@@ -11,11 +11,11 @@
 #include <thread>
 #include <chrono>
 
-import Core.Telemetry;
-import Core.Hash;
+import Extrinsic.Core.Telemetry;
+import Extrinsic.Core.Hash;
 
-using namespace Core::Telemetry;
-using namespace Core::Hash;
+using namespace Extrinsic::Core::Telemetry;
+using namespace Extrinsic::Core::Hash;
 
 // Helper: sleep for at least N milliseconds (allows timing assertions).
 static void BusyWaitMs(int ms)
