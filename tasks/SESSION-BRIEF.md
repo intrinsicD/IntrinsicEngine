@@ -36,6 +36,8 @@ the authoritative open/unblocked view.
 - unblocked: `GEOM-023` — Sparse non-symmetric iterative solver seam (BiCGSTAB) (tasks/backlog/geometry/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md)
 - blocked by `GEOM-020`: `GEOM-024` — Sparse symmetric generalized eigensolver seam (tasks/backlog/geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
 - unblocked: `GRAPHICS-089` — Generated-UV texture sampling Vulkan smoke (tasks/backlog/rendering/GRAPHICS-089-generated-uv-texture-sampling-vulkan-smoke.md)
+- unblocked: `GRAPHICS-091` — Unify scalar-field / colormap visualization across surface, line, and point passes (tasks/backlog/rendering/GRAPHICS-091-unify-scalar-colormap-across-surface-line-point.md)
+- unblocked: `GRAPHICS-092` — Group per-domain params in `GpuEntityConfig` and add line-width residency (tasks/backlog/rendering/GRAPHICS-092-group-per-domain-params-and-line-width-residency.md)
 - blocked by `GEOM-020`: `METHOD-002` — Signed Heat Method reference backend (tasks/backlog/methods/METHOD-002-signed-heat-method-reference-backend.md)
 - blocked by `GEOM-023`: `METHOD-003` — Closest Point Method PDE solver reference backend (tasks/backlog/methods/METHOD-003-closest-point-method-pde-reference-backend.md)
 - unblocked: `METHOD-004` — Walk on Spheres / Walk on Stars PDE solver reference backend (tasks/backlog/methods/METHOD-004-walk-on-spheres-reference-backend.md)
