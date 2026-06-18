@@ -9,6 +9,17 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`LEGACY-035`](LEGACY-035-resolve-legacy-rhi-deferred-destruction-tests.md) —
+Resolve legacy RHI deferred-destruction tests — retired on 2026-06-18 at
+maturity `CPUContracted`. The Vulkan `SafeDestroy*` cases split out of the
+legacy runtime maintenance-lane test were retired as legacy RHI implementation
+detail: promoted Vulkan keeps deferred deletion behind private backend-local
+`DeferDelete` / frame-slot queues and does not expose legacy timeline-value or
+unconditional-flush semantics through promoted `RHI::IDevice`. `LEGACY-009`
+remains blocked by 17 test consumers and 83 legacy-internal consumers; no new
+legacy RHI test consumer was added.
+
+Backlog
 [`LEGACY-034`](LEGACY-034-resolve-runtime-frame-loop-maintenance-tests.md) —
 Resolve legacy runtime frame-loop and maintenance tests — retired on 2026-06-18
 at maturity `CPUContracted`. Legacy

@@ -200,6 +200,10 @@ mapping retained CPU/null lifecycle ordering to promoted
 the legacy feature-catalog rollback mode, and splitting Vulkan deferred
 destruction to `LEGACY-035`. This reduces the remaining Core test-consumer set
 to 22 files, Graphics to 38 files, RHI to 17 files, and Runtime to 15 files.
+`LEGACY-035` retired that split Vulkan deferred-destruction coverage as legacy
+RHI implementation detail because promoted Vulkan keeps deferred deletion
+backend-private. It changes no consumer counts; the remaining RHI external
+test-consumer set stays 17 files.
 
 **`LEGACY-013` clears only the promoted-src subset of the `LEGACY-005`
 gate.** The

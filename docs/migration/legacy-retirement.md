@@ -81,9 +81,11 @@ As of `LEGACY-002` (2026-06-06), every remaining `src/legacy/<Subsystem>/` subtr
   through `LEGACY-034` are reflected in
   [`legacy-removal-audit.md`](legacy-removal-audit.md), which remains the
   current consumer-count snapshot.
-- [`LEGACY-035`](../../tasks/backlog/architecture/LEGACY-035-resolve-legacy-rhi-deferred-destruction-tests.md) —
-  resolves the Vulkan deferred-destruction coverage split out of the retired
-  legacy runtime maintenance-lane test.
+- [`LEGACY-035`](../../tasks/done/LEGACY-035-resolve-legacy-rhi-deferred-destruction-tests.md)
+  (done 2026-06-18) — retired the Vulkan deferred-destruction coverage split
+  out of the legacy runtime maintenance-lane test as legacy RHI implementation
+  detail; future promoted Vulkan deletion behavior requires a fresh
+  value-gated graphics task.
 - [`LEGACY-018`](../../tasks/done/LEGACY-018-retire-interface-panel-registration-test.md)
   (done 2026-06-18) — retired the legacy-only `Interface::GUI`
   panel-registration test. `LEGACY-001` now has zero external test consumers and

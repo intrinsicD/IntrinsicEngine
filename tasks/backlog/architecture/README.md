@@ -13,9 +13,6 @@ map.
 - [LEGACY-012 — Migrate legacy consumer tests to promoted coverage](LEGACY-012-migrate-legacy-consumer-tests.md):
   migrates or retires tests and non-legacy consumers that still import bare
   legacy module names after their promoted feature owners exist.
-- [LEGACY-035 — Resolve legacy RHI deferred-destruction tests](LEGACY-035-resolve-legacy-rhi-deferred-destruction-tests.md):
-  resolves the backend-facing Vulkan `SafeDestroy*` coverage split out of the
-  retired runtime maintenance-lane compatibility test.
 - [LEGACY-001 — Delete `src/legacy/Interface/`](LEGACY-001-delete-src-legacy-interface.md):
   first concrete deletion under `ARCH-004`. Backlog until the consumer-grep
   prerequisite passes; promotion to `tasks/active/` is gated by `ARCH-004`.
@@ -208,6 +205,12 @@ split; narratives live in the retirement log.
   blockers are 22 tests, remaining Graphics external blockers are 38 tests,
   remaining RHI external blockers are 17 tests, and remaining Runtime external
   blockers are 15 tests.
+- [LEGACY-035 — Resolve legacy RHI deferred-destruction tests](../../done/LEGACY-035-resolve-legacy-rhi-deferred-destruction-tests.md)
+  (done, 2026-06-18, `CPUContracted`):
+  retired the old `MaintenanceLaneGpuTest` insertion-order, real-buffer
+  deferred-destroy, and multi-frame retirement assertions as legacy RHI
+  implementation details because promoted Vulkan keeps deferred deletion
+  backend-private; remaining RHI external blockers stay at 17 tests.
 - [LEGACY-018 — Retire legacy Interface panel-registration test](../../done/LEGACY-018-retire-interface-panel-registration-test.md)
   (done, 2026-06-18, `CPUContracted`):
   retired legacy-only `tests/contract/ui/Test_PanelRegistration.cpp`;

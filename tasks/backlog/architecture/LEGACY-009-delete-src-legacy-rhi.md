@@ -49,9 +49,11 @@ depends_on: []
   scene-instance convenience APIs, and CUDA no longer represent unnamed
   blockers for this deletion. Future CUDA work must open a new opt-in
   method/backend task with a concrete workload.
-- `LEGACY-035` owns the retained-vs-retired decision for the Vulkan
-  deferred-destruction checks formerly embedded in the legacy runtime
-  maintenance-lane test.
+- `LEGACY-035` retired the Vulkan deferred-destruction checks formerly embedded
+  in the legacy runtime maintenance-lane test as legacy RHI implementation
+  detail. A future promoted Vulkan deletion contract requires a fresh
+  value-gated graphics task; it is no longer an unnamed blocker for this
+  deletion.
 
 ## Required changes
 - [ ] (Prerequisite, verified before promotion to `tasks/active/`) Run the
