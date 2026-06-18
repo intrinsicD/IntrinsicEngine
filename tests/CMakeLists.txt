@@ -188,7 +188,6 @@ set(_core_test_files
     Test_CoreTasks.cpp
     Test_CoreHandle.cpp
     Test_CoreCommands.cpp
-    Test_CoreHash.cpp
     Test_CoreFrameGraph.cpp
     Test_FrameGraphTypeTokenHelper.cpp
     Test_DAGScheduler.cpp
@@ -515,7 +514,7 @@ set(_core_wrapper_unit_test_files
     Test.Core.Filesystem.cpp
     Test.Core.GraphCompiler.cpp
     Test.Core.HandleLease.cpp
-    Test.Core.HashLegacy.cpp
+    Test.CoreHash.cpp
     Test.Core.LockFreeQueue.cpp
     Test.Core.Logging.cpp
     Test.Core.MemoryLegacy.cpp

@@ -90,7 +90,7 @@ python3 tools/docs/check_doc_links.py --root . --strict
 | `tests/Core/Test.Core.GraphInterfaces.cpp` | `tests/contract/runtime/Test.CoreGraphInterfaces.cpp` | API/interface contract guarantees. |
 | `tests/Core/Test.Core.GraphStress.cpp` | `tests/integration/runtime/Test.CoreGraphStress.cpp` | Stress/scenario-level behavior; integration scope. |
 | `tests/Core/Test.Core.HandleLease.cpp` | `tests/unit/core/Test.Core.HandleLease.cpp` | Handle lease primitive behavior; unit scope. |
-| `tests/Core/Test.Core.Hash.cpp` | `tests/unit/core/Test.Core.HashLegacy.cpp` | Hash behavior parity; unit scope. |
+| `tests/Core/Test.Core.Hash.cpp` | `tests/unit/core/Test.CoreHash.cpp` | Hash behavior parity; unit scope; renamed by `LEGACY-017` after duplicate legacy coverage retired. |
 | `tests/Core/Test.Core.LockFreeQueue.cpp` | `tests/unit/core/Test.Core.LockFreeQueue.cpp` | Lock-free container semantics; unit scope. |
 | `tests/Core/Test.Core.Logging.cpp` | `tests/unit/core/Test.Core.Logging.cpp` | Logging primitive behavior; unit scope. |
 | `tests/Core/Test.Core.Memory.cpp` | `tests/unit/core/Test.Core.MemoryLegacy.cpp` | Memory primitive behavior parity; unit scope. |
@@ -156,4 +156,3 @@ python3 tools/docs/check_doc_links.py --root . --strict
 - Commit reference: pending current workspace/PR.
 - Verification closure: HARDEN-052 populated the offline dependency cache and reran the post-relocation gate; `cmake --build --preset ci --target IntrinsicTests` passed and `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60` passed with `100% tests passed, 0 tests failed out of 1432`.
 - Follow-up: runtime/GPU opt-in evidence remains tracked by HARDEN-051/final hardening audit, not by this mechanical taxonomy source-move task.
-

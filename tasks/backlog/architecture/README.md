@@ -91,8 +91,14 @@ split; narratives live in the retirement log.
 - [LEGACY-016 — Migrate LogRingBuffer test to promoted Core](../../done/LEGACY-016-log-ring-buffer-test-promoted.md)
   (done, 2026-06-18, `CPUContracted`):
   migrated the LogRingBuffer unit test to `Extrinsic.Core.Logging` and renamed
-  it to `tests/unit/core/Test.LogRingBuffer.cpp`; remaining Core deletion
-  blockers are 41 tests and legacy-internal subtree ordering.
+  it to `tests/unit/core/Test.LogRingBuffer.cpp`; `LEGACY-017` later reduced
+  the remaining Core test-consumer set to 40 files.
+- [LEGACY-017 — Retire duplicate legacy CoreHash test](../../done/LEGACY-017-core-hash-test-promoted.md)
+  (done, 2026-06-18, `CPUContracted`):
+  retired duplicate legacy `Test_CoreHash.cpp` coverage in favor of promoted
+  `Extrinsic.Core.Hash` coverage now named `tests/unit/core/Test.CoreHash.cpp`;
+  remaining Core deletion blockers are 40 tests and legacy-internal subtree
+  ordering.
 - [CORE-002 — Command and feature catalog contract](../../done/CORE-002-command-feature-catalog-contract.md)
   (done, 2026-06-09, `CPUContracted` / explicit retirement decision):
   resolves remaining legacy `Core.Commands`, `Core.FeatureRegistry`, and

@@ -9,6 +9,16 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`LEGACY-017`](LEGACY-017-core-hash-test-promoted.md) — Retire duplicate legacy
+CoreHash test — retired on 2026-06-18 at maturity `CPUContracted`. Duplicate
+legacy `tests/unit/core/Test_CoreHash.cpp` coverage was deleted in favor of the
+existing promoted `Extrinsic.Core.Hash` coverage, now named
+`tests/unit/core/Test.CoreHash.cpp` with the `Test.<Name>.cpp` convention. The
+affected core targets and `CoreHash` CTest filter passed. `LEGACY-005` remains
+blocked by 40 remaining test consumers and 133 legacy-internal consumers;
+`LEGACY-012` owns the remaining test cleanup.
+
+Backlog
 [`LEGACY-016`](LEGACY-016-log-ring-buffer-test-promoted.md) — Migrate
 LogRingBuffer test to promoted Core — retired on 2026-06-18 at maturity
 `CPUContracted`. `tests/unit/core/Test.LogRingBuffer.cpp` now imports promoted
