@@ -24,11 +24,9 @@ without requiring them to read every file.
 
 ## Legacy Parity Follow-Ups
 
-These are opened by
-[`LEGACY-011`](../architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md)
-as focused blockers for legacy graphics/RHI retirement. They are not part of
-the modernization feature DAG; select them when retiring legacy behavior is the
-priority.
+These were opened by `LEGACY-011` as focused blockers for legacy graphics/RHI
+retirement. They are not part of the modernization feature DAG; select them
+when retiring legacy behavior is the priority.
 
 ## Dependency DAG
 

@@ -54,8 +54,7 @@ No backlog UI implementation tasks are currently queued.
 - UI-007 is a retired promoted EditorUI follow-up that exposes drag/drop import
   status and payload hints while runtime/platform own events, decoding,
   `AssetService`, and ECS materialization.
-- UI-008 is a retired value-gated workflow child from
-  [`LEGACY-011`](../architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md);
+- UI-008 is a retired value-gated workflow child from `LEGACY-011`;
   it consumes `RUNTIME-102`
   for command history / dirty-state source of truth. The
   `PLATFORM-006`

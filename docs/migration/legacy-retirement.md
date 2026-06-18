@@ -8,14 +8,14 @@
 
 - New feature work should target canonical layers, not `src/legacy/`, unless needed for compatibility.
 - Any temporary cross-layer exception inside `src/legacy/` must be tracked in a current task under `tasks/active/` with a removal task ID.
-- Layering allowlist rows must point at an open removal owner. As of `HARDEN-069`, `src/legacy/Interface/**` rows point at [`LEGACY-001`](../../tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md), and the remaining legacy subtree rows point at [`LEGACY-002`](../../tasks/done/LEGACY-002-seed-src-legacy-retirement-backlog.md). `LEGACY-002` has now seeded the per-subtree deletion tasks (`LEGACY-003`..`LEGACY-010`); rebinding each subtree's allowlist rows from the `LEGACY-002` umbrella owner to its specific per-subtree task is a metadata-only follow-up (`LEGACY-002` itself does not modify the allowlist, so it remains the open umbrella owner until that rebinding lands).
+- Layering allowlist rows must point at an open removal owner. As of `HARDEN-082`, `src/legacy/Interface/**` rows point at [`LEGACY-001`](../../tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md), and the remaining legacy subtree rows point at their specific per-subtree deletion tasks (`LEGACY-004`..`LEGACY-006`, `LEGACY-008`..`LEGACY-010`).
 - Promotion work from `src/legacy/` must keep mechanical path moves separate from semantic refactors.
-- Semantic reimplementation blockers are tracked in
-  [`LEGACY-011`](../../tasks/backlog/architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md)
-  and its child tasks. `LEGACY-011` is value-gated: candidates are retained only
-  when they are necessary or improve the current promoted architecture; otherwise
-  they are deferred or retired. The per-subtree `LEGACY-*` deletion tasks remain
-  mechanical and should not grow feature work.
+- Semantic reimplementation blockers were retired by
+  [`LEGACY-011`](../../tasks/done/LEGACY-011-src-legacy-feature-reimplementation-map.md)
+  and its child tasks: candidates were retained only when necessary or when they
+  improved the current promoted architecture; otherwise they were deferred or
+  retired. The per-subtree `LEGACY-*` deletion tasks remain mechanical and
+  should not grow feature work.
 - The current per-subtree gate state — which subtrees are blocked only by test
   consumers vs. by promoted engine code — is captured in the dated
   [`legacy-removal-audit.md`](legacy-removal-audit.md) snapshot.
@@ -60,10 +60,12 @@ As of `LEGACY-002` (2026-06-06), every remaining `src/legacy/<Subsystem>/` subtr
   prerequisites are consumer-grep/subtree ordering and any independently named
   Vulkan operational evidence.
 - [`LEGACY-010`](../../tasks/backlog/architecture/LEGACY-010-delete-src-legacy-runtime.md) — `src/legacy/Runtime/`.
-- [`LEGACY-011`](../../tasks/backlog/architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md) —
-  value-gated feature-reimplementation map for remaining candidates that must
-  be retained, deferred, or retired before the open deletion tasks become pure
-  consumer-grep gates.
+- [`LEGACY-011`](../../tasks/done/LEGACY-011-src-legacy-feature-reimplementation-map.md)
+  (done 2026-06-18) — value-gated feature-reimplementation map retired after
+  every remaining candidate gained a retained/deferred/retired outcome. Open
+  deletion tasks are now blocked by consumer-grep cleanup, promoted-src Core
+  import cleanup, and mechanical subtree ordering rather than unnamed feature
+  gaps.
 - [`CORE-002`](../../tasks/done/CORE-002-command-feature-catalog-contract.md)
   is retired: legacy command/feature catalogs are not promoted as a global
   service. Retained dependency-free core utility/telemetry seams use

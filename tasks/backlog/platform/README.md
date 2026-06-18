@@ -28,9 +28,7 @@ contributes to **Theme F — Architecture/runtime/UI foundation seeds** by
 keeping the platform port/backend split honest and discoverable. New
 dependency edges out of `platform` are forbidden by `AGENTS.md` §2/§4 and must
 not be introduced under cover of any task in this directory.
-Retired `PLATFORM-006` is also a child of the
-[`LEGACY-011`](../architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md)
-legacy feature map.
+Retired `PLATFORM-006` is also a child of the `LEGACY-011` legacy feature map.
 
 ## Promotion checklist
 

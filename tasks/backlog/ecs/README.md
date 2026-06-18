@@ -42,8 +42,7 @@ No open ECS backlog tasks.
   the existing ECS contracts from HARDEN-060..068 and move only non-trivial
   non-template bodies plus implementation-only includes/imports.
 - HARDEN-081 retired the final named ECS compatibility decision gate from
-  [`LEGACY-011`](../architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md)
-  while keeping `ecs -> core` only.
+  `LEGACY-011` while keeping `ecs -> core` only.
 - Forbidden across all members: physics-world handles, runtime sidecars,
   graphics handles, RHI handles, or live `AssetService` traffic in canonical
   ECS components.

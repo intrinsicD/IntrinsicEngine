@@ -31,9 +31,9 @@ claim that legacy retirement is complete.
 
 ## Value-Gated Feature Ownership
 
-The detailed matrix below records subsystem state. The active task map for the
+The detailed matrix below records subsystem state. The retired task map for the
 remaining legacy feature candidates is
-[`LEGACY-011`](../../tasks/backlog/architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md);
+[`LEGACY-011`](../../tasks/done/LEGACY-011-src-legacy-feature-reimplementation-map.md);
 the child tasks keep value-gated decisions and semantic reimplementation
 separate from mechanical `LEGACY-*` subtree deletion. A candidate is not
 implemented only because legacy had it: each owner must compare current

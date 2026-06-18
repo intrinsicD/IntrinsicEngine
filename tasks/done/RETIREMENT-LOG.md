@@ -8,6 +8,16 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+Backlog
+[`LEGACY-011`](LEGACY-011-src-legacy-feature-reimplementation-map.md) —
+Value-gated legacy feature reimplementation map — retired on 2026-06-18 at
+maturity `Scaffolded`. Every retained/deferred legacy feature candidate now has
+a named done-task decision or an explicit future trigger, keeping semantic
+reimplementation separate from the mechanical per-subtree deletion tasks.
+Remaining legacy retirement work is consumer-grep cleanup in `LEGACY-012`,
+the promoted-src Core import migration called out by the migration audit, and
+mechanical Runtime-first to Core-last subtree deletion ordering.
+
 Active
 [`UI-018`](UI-018-sandbox-menu-first-ui.md) — Sandbox menu-first UI defaults —
 retired on 2026-06-17 at maturity `CPUContracted`. The sandbox editor now

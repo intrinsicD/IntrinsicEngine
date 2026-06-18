@@ -10,7 +10,7 @@ This is a current-state snapshot. It does not delete any source and does not
 change the per-subtree deletion gates; it reports what each gate currently says
 and partitions the remaining blockers. The authoritative program lives in
 [`legacy-retirement.md`](legacy-retirement.md), the value-gated feature map in
-[`LEGACY-011`](../../tasks/backlog/architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md),
+[`LEGACY-011`](../../tasks/done/LEGACY-011-src-legacy-feature-reimplementation-map.md),
 and the per-subtree executing tasks under `tasks/backlog/architecture/LEGACY-*.md`.
 
 ## Method
@@ -32,14 +32,14 @@ with `git grep`.
 ## Feature reimplementation status (LEGACY-011)
 
 At the **feature** level there is no remaining blocker: every legacy feature
-candidate in the [`LEGACY-011`](../../tasks/backlog/architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md)
+candidate in the [`LEGACY-011`](../../tasks/done/LEGACY-011-src-legacy-feature-reimplementation-map.md)
 triage has a resolved outcome. The child tasks that build or explicitly retire a
 promoted replacement are done — `CORE-002`, `ASSETIO-002`, `ASSETIO-003`,
 `ASSETIO-004`, `HARDEN-081`, `RUNTIME-099`, `RUNTIME-100`, `RUNTIME-101`,
-`RUNTIME-103`, `GRAPHICS-084`, `GRAPHICS-084C`, `GRAPHICS-085`, `GRAPHICS-086`.
-The still-open child tasks (`PLATFORM-006`, `RUNTIME-102`, `RUNTIME-104`,
-`UI-008`) are "retain current behavior / defer" decisions, not missing features
-that gate any subtree deletion.
+`RUNTIME-102`, `RUNTIME-103`, `RUNTIME-104`, `PLATFORM-006`, `GRAPHICS-084`,
+`GRAPHICS-084C`, `GRAPHICS-085`, `GRAPHICS-086`, and `UI-008`.
+The retained/deferred outcomes in those tasks are decisions, not missing
+features that gate any subtree deletion.
 
 Consistent with `LEGACY-011`'s own acceptance criterion, the remaining
 deletion blockers are therefore **purely mechanical consumer migration**, not

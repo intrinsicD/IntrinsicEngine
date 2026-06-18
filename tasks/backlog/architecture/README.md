@@ -10,10 +10,6 @@ map.
 
 ## Tasks
 
-- [LEGACY-011 — Value-gated legacy feature reimplementation map](LEGACY-011-src-legacy-feature-reimplementation-map.md):
-  cross-domain child-task map that compares current promoted behavior,
-  improvement, and retain/defer/retire decisions before the remaining
-  `src/legacy/` subtree deletion tasks become purely mechanical.
 - [LEGACY-012 — Migrate legacy consumer tests to promoted coverage](LEGACY-012-migrate-legacy-consumer-tests.md):
   migrates or retires tests and non-legacy consumers that still import bare
   legacy module names after their promoted feature owners exist.
@@ -36,12 +32,9 @@ backlog until its gate exits 0.
 - [LEGACY-008 — Delete `src/legacy/Graphics/`](LEGACY-008-delete-src-legacy-graphics.md) (168 files → `src/graphics/*`).
 - [LEGACY-009 — Delete `src/legacy/RHI/`](LEGACY-009-delete-src-legacy-rhi.md) (54 files → `src/graphics/rhi/`).
 - [LEGACY-010 — Delete `src/legacy/Runtime/`](LEGACY-010-delete-src-legacy-runtime.md) (29 files → `src/runtime/`).
-- [LEGACY-011 — Value-gated legacy feature reimplementation map](LEGACY-011-src-legacy-feature-reimplementation-map.md):
-  child-task inventory for retained/deferred feature candidates that block the
-  remaining deletion tasks from becoming pure consumer-grep/mechanical removals.
 - [LEGACY-012 — Migrate legacy consumer tests to promoted coverage](LEGACY-012-migrate-legacy-consumer-tests.md):
   cleanup task for tests and non-legacy consumers that keep the deletion
-  consumer-grep gates red after semantic replacements land.
+  consumer-grep gates red after `LEGACY-011` retired the semantic feature map.
 
 Ordering hint — deletion is **consumer-leaves first, foundation last**: a
 subtree can only be mechanically deleted once no other subtree (and no promoted
@@ -72,6 +65,12 @@ root must update the relevant `docs/architecture/*` doc set in the same PR per
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [LEGACY-011 — Value-gated legacy feature reimplementation map](../../done/LEGACY-011-src-legacy-feature-reimplementation-map.md)
+  (done, 2026-06-18, `Scaffolded` planning map):
+  closes the cross-domain child-task map after every retained/deferred legacy
+  feature candidate gained a named done-task decision or explicit future
+  trigger. Remaining legacy-retirement blockers are consumer-grep cleanup,
+  the promoted-src Core import migration, and mechanical subtree ordering.
 - [CORE-002 — Command and feature catalog contract](../../done/CORE-002-command-feature-catalog-contract.md)
   (done, 2026-06-09, `CPUContracted` / explicit retirement decision):
   resolves remaining legacy `Core.Commands`, `Core.FeatureRegistry`, and

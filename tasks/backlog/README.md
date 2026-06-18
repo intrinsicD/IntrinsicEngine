@@ -110,12 +110,10 @@ wiring. Active `INFRA-001` now tracks only final deprecation cleanup and
 warm-cache CI timing evidence.
 
 Open members:
-- [`architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md`](architecture/LEGACY-011-src-legacy-feature-reimplementation-map.md) —
-  value-gated cross-domain map for remaining legacy feature candidates before
-  mechanical `src/legacy/` subtree deletion.
 - [`architecture/LEGACY-012-migrate-legacy-consumer-tests.md`](architecture/LEGACY-012-migrate-legacy-consumer-tests.md) —
   follow-up for tests and non-legacy consumers that still import bare legacy
-  module names after promoted equivalents exist.
+  module names after promoted equivalents exist; `LEGACY-011` retired the
+  feature-level value-gated map, so this is now unblocked by feature decisions.
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`ui/RORG-031-ui-integration.md`](ui/RORG-031-ui-integration.md).
 - [`platform/PLATFORM-004-alternative-platform-backend-onboarding.md`](platform/PLATFORM-004-alternative-platform-backend-onboarding.md) (planning-only seed).
