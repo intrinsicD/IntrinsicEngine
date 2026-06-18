@@ -93,7 +93,7 @@ python3 tools/docs/check_doc_links.py --root . --strict
 | `tests/Core/Test.Core.Hash.cpp` | `tests/unit/core/Test.CoreHash.cpp` | Hash behavior parity; unit scope; renamed by `LEGACY-017` after duplicate legacy coverage retired. |
 | `tests/Core/Test.Core.LockFreeQueue.cpp` | `tests/unit/core/Test.Core.LockFreeQueue.cpp` | Lock-free container semantics; unit scope. |
 | `tests/Core/Test.Core.Logging.cpp` | `tests/unit/core/Test.Core.Logging.cpp` | Logging primitive behavior; unit scope. |
-| `tests/Core/Test.Core.Memory.cpp` | `tests/unit/core/Test.Core.MemoryLegacy.cpp` | Memory primitive behavior parity; unit scope. |
+| `tests/Core/Test.Core.Memory.cpp` | `tests/unit/core/Test.CoreMemory.cpp` | Memory primitive behavior parity; unit scope; renamed by `LEGACY-027` after full legacy memory coverage migrated to promoted Core. |
 | `tests/Core/Test.Core.Process.cpp` | `tests/integration/runtime/Test.CoreProcess.cpp` | Process/runtime seam behavior; integration scope. |
 | `tests/Core/Test.Core.ResourcePool.cpp` | `tests/unit/core/Test.Core.ResourcePool.cpp` | Resource-pool primitive invariants; unit scope. |
 | `tests/Core/Test.Core.StrongHandle.cpp` | `tests/unit/core/Test.CoreStrongHandle.cpp` | Strong-handle parity checks; unit scope; renamed by `LEGACY-019` after duplicate legacy-suffixed coverage retired. |

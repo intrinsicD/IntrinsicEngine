@@ -184,7 +184,6 @@ endfunction()
 # --- Core tests (pure algorithmic, no GPU, no ECS) ---
 set(_core_test_files
     Test_BoundedHeap.cpp
-    Test_CoreMemory.cpp
     Test.CoreError.cpp
     Test.LogRingBuffer.cpp
 )
@@ -509,7 +508,7 @@ set(_core_wrapper_unit_test_files
     Test.CoreHash.cpp
     Test.Core.LockFreeQueue.cpp
     Test.Core.Logging.cpp
-    Test.Core.MemoryLegacy.cpp
+    Test.CoreMemory.cpp
     Test.CoreProfiling.cpp
     Test.Core.ResourcePool.cpp
     Test.CoreStrongHandle.cpp

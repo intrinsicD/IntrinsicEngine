@@ -9,6 +9,19 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`LEGACY-027`](LEGACY-027-core-memory-test-promoted.md) — Migrate CoreMemory
+test to promoted Core — retired on 2026-06-18 at maturity `CPUContracted`.
+Retained memory allocator coverage from
+`tests/unit/core/Test_CoreMemory.cpp` now imports promoted
+`Extrinsic.Core.Memory`, `Extrinsic.Core.Error`, and
+`Extrinsic.Core.Telemetry` as `tests/unit/core/Test.CoreMemory.cpp`. The
+smaller `Test.Core.MemoryLegacy.cpp` parity file was folded into the expanded
+promoted test, and the legacy-linked core aggregate no longer builds the old
+memory consumer. `LEGACY-005` remains blocked by 29 remaining test consumers
+and 133 legacy-internal consumers; `LEGACY-012` owns the remaining test
+cleanup.
+
+Backlog
 [`LEGACY-026`](LEGACY-026-retire-core-dagscheduler-test.md) — Retire legacy
 Core.DAGScheduler test — retired on 2026-06-18 at maturity `CPUContracted`.
 `tests/unit/core/Test_DAGScheduler.cpp` was removed because it only exercised

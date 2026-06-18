@@ -144,8 +144,15 @@ split; narratives live in the retirement log.
   (done, 2026-06-18, `CPUContracted`):
   retired legacy `tests/unit/core/Test_DAGScheduler.cpp` compatibility coverage
   because promoted `Extrinsic.Core.Dag.Scheduler` and graph-compiler tests own
-  the retained DAG scheduling contract; remaining Core deletion blockers are 30
-  tests and legacy-internal subtree ordering.
+  the retained DAG scheduling contract; `LEGACY-027` later reduced the
+  remaining Core test-consumer set to 29 files.
+- [LEGACY-027 — Migrate CoreMemory test to promoted Core](../../done/LEGACY-027-core-memory-test-promoted.md)
+  (done, 2026-06-18, `CPUContracted`):
+  migrated retained memory allocator coverage from
+  `tests/unit/core/Test_CoreMemory.cpp` to promoted
+  `tests/unit/core/Test.CoreMemory.cpp` and removed the smaller
+  `Test.Core.MemoryLegacy.cpp` parity file; remaining Core deletion blockers
+  are 29 tests and legacy-internal subtree ordering.
 - [LEGACY-018 — Retire legacy Interface panel-registration test](../../done/LEGACY-018-retire-interface-panel-registration-test.md)
   (done, 2026-06-18, `CPUContracted`):
   retired legacy-only `tests/contract/ui/Test_PanelRegistration.cpp`;
