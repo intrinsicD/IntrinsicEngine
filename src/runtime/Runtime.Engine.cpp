@@ -58,6 +58,7 @@ import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.AssetModelTextureIO;
 import Extrinsic.Runtime.CameraControllers;
+import Extrinsic.Runtime.CameraFocusCommand;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.GizmoInteraction;
 import Extrinsic.Runtime.ImGuiAdapter;
@@ -2103,6 +2104,22 @@ namespace Extrinsic::Runtime
                 const Platform::IWindow& window = *m_Window;
                 if (!imguiCapturesInput)
                     controller->Update(window.GetInput(), frameDt);
+
+                // RUNTIME-116: `F` (focus) reframes the Main camera on the
+                // current selection so the selected object(s) are centered and
+                // fully visible. Edge-triggered and suppressed while Dear ImGui
+                // owns the keyboard (e.g. typing in a field). Run before GetView
+                // so the new framing is reflected this same frame; the focus
+                // marks an explicit camera transition consumed just below.
+                if (!imguiCapturesKeyboard &&
+                    window.GetInput().IsKeyJustPressed(Platform::Input::Key::F))
+                {
+                    FocusCameraOnSelection(m_CameraControllers,
+                                           m_SelectionController,
+                                           *m_Scene,
+                                           CameraControllerSlot::Main);
+                }
+
                 renderInput.Camera = controller->GetView(viewport);
                 renderInput.Camera.ExplicitCameraTransition =
                     m_CameraControllers.ConsumeCameraTransition(CameraControllerSlot::Main);
