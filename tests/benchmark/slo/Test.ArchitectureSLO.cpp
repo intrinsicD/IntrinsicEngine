@@ -3,13 +3,16 @@
 #include <algorithm>
 #include <atomic>
 #include <coroutine>
+#include <cstddef>
 #include <cstdint>
 #include <thread>
 #include <vector>
 
-import Core;
+import Extrinsic.Core.FrameGraph;
+import Extrinsic.Core.Tasks;
+import Extrinsic.Core.Tasks.CounterEvent;
 
-using namespace Core;
+using namespace Extrinsic::Core;
 
 namespace
 {
@@ -39,11 +42,26 @@ namespace
 
     uint64_t Percentile(std::vector<uint64_t> values, double p)
     {
-        if (values.empty()) return 0;
+        if (values.empty())
+            return 0;
+
         std::sort(values.begin(), values.end());
-        const auto idx = static_cast<size_t>(
+        const auto index = static_cast<size_t>(
             std::clamp(p, 0.0, 1.0) * static_cast<double>(values.size() - 1));
-        return values[idx];
+        return values[index];
+    }
+
+    void AddNoOpFrameGraphPasses(FrameGraph& graph)
+    {
+        for (uint32_t i = 0; i < kNodeCount; ++i)
+        {
+            graph.AddPass("NoOp",
+                [](FrameGraphBuilder& builder)
+                {
+                    builder.Read<uint32_t>();
+                },
+                []() {});
+        }
     }
 }
 
@@ -52,18 +70,8 @@ TEST(ArchitectureSLO, FrameGraphP95P99BudgetsAt2000Nodes)
     if (kSanitizerBuild)
         GTEST_SKIP() << "Architecture SLO thresholds are calibrated for non-sanitized builds.";
 
-    Memory::ScopeStack scope(1024 * 512);
-    FrameGraph graph(scope);
-
-    for (uint32_t i = 0; i < kNodeCount; ++i)
-    {
-        graph.AddPass("NoOp",
-            [](FrameGraphBuilder& b)
-            {
-                b.Read<uint32_t>();
-            },
-            []() {});
-    }
+    FrameGraph graph;
+    AddNoOpFrameGraphPasses(graph);
 
     Tasks::Scheduler::Initialize(8);
 
@@ -79,27 +87,18 @@ TEST(ArchitectureSLO, FrameGraphP95P99BudgetsAt2000Nodes)
         auto compile = graph.Compile();
         ASSERT_TRUE(compile.has_value());
 
-        graph.Execute();
+        auto execute = graph.Execute();
+        ASSERT_TRUE(execute.has_value());
 
         if (frame >= kWarmupFrames)
         {
-            compileNs.push_back(graph.GetLastCompileTimeNs());
-            executeNs.push_back(graph.GetLastExecuteTimeNs());
-            criticalNs.push_back(graph.GetLastCriticalPathTimeNs());
+            compileNs.push_back(graph.LastCompileTimeNs());
+            executeNs.push_back(graph.LastExecuteTimeNs());
+            criticalNs.push_back(graph.LastCriticalPathTimeNs());
         }
 
         graph.Reset();
-        scope.Reset();
-
-        for (uint32_t i = 0; i < kNodeCount; ++i)
-        {
-            graph.AddPass("NoOp",
-                [](FrameGraphBuilder& b)
-                {
-                    b.Read<uint32_t>();
-                },
-                []() {});
-        }
+        AddNoOpFrameGraphPasses(graph);
     }
 
     Tasks::Scheduler::Shutdown();
@@ -134,11 +133,12 @@ TEST(ArchitectureSLO, TaskSchedulerContentionAndWakeLatencyBudgets)
 
     for (int t = 0; t < kDispatchThreads; ++t)
     {
-        dispatchers.emplace_back([&executed] {
+        dispatchers.emplace_back([&executed]
+        {
             for (int i = 0; i < kTasksPerThread; ++i)
             {
-                Tasks::Scheduler::Dispatch([&executed] {
-                    // Keep this tiny to maintain a saturated queue with frequent steals/contention.
+                Tasks::Scheduler::Dispatch([&executed]
+                {
                     executed.fetch_add(1, std::memory_order_relaxed);
                 });
             }
@@ -154,7 +154,6 @@ TEST(ArchitectureSLO, TaskSchedulerContentionAndWakeLatencyBudgets)
     for (int i = 0; i < kWaiterCount; ++i)
         Tasks::Scheduler::Dispatch(WaitOnCounterAndBump(&event, &resumedWaiters));
 
-    // Block without spin until at least one coroutine has parked.
     Tasks::Scheduler::ParkCountAtomic().wait(0, std::memory_order_acquire);
     event.Signal();
 
@@ -166,7 +165,6 @@ TEST(ArchitectureSLO, TaskSchedulerContentionAndWakeLatencyBudgets)
               static_cast<uint64_t>(kDispatchThreads * kTasksPerThread));
     EXPECT_EQ(resumedWaiters.load(std::memory_order_relaxed), static_cast<uint64_t>(kWaiterCount));
 
-    // SLO gates from docs/ARCHITECTURE_SLOS.md section 2.
     constexpr double kStealRatioMin = 0.20;
     constexpr double kStealRatioMax = 0.65;
     constexpr uint64_t kQueueContentionP95Ceiling = 4'096;

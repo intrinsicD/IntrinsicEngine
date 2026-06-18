@@ -151,8 +151,14 @@ split; narratives live in the retirement log.
   migrated retained memory allocator coverage from
   `tests/unit/core/Test_CoreMemory.cpp` to promoted
   `tests/unit/core/Test.CoreMemory.cpp` and removed the smaller
-  `Test.Core.MemoryLegacy.cpp` parity file; remaining Core deletion blockers
-  are 29 tests and legacy-internal subtree ordering.
+  `Test.Core.MemoryLegacy.cpp` parity file; `LEGACY-028` later reduced the
+  remaining Core test-consumer set to 28 files.
+- [LEGACY-028 — Migrate ArchitectureSLO test to promoted Core](../../done/LEGACY-028-architecture-slo-test-promoted.md)
+  (done, 2026-06-18, `CPUContracted`):
+  migrated the architecture SLO benchmark test from
+  `tests/benchmark/slo/Test_ArchitectureSLO.cpp` to promoted
+  `tests/benchmark/slo/Test.ArchitectureSLO.cpp`; remaining Core deletion
+  blockers are 28 tests and legacy-internal subtree ordering.
 - [LEGACY-018 — Retire legacy Interface panel-registration test](../../done/LEGACY-018-retire-interface-panel-registration-test.md)
   (done, 2026-06-18, `CPUContracted`):
   retired legacy-only `tests/contract/ui/Test_PanelRegistration.cpp`;

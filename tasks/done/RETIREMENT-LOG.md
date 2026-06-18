@@ -9,6 +9,17 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`LEGACY-028`](LEGACY-028-architecture-slo-test-promoted.md) — Migrate
+ArchitectureSLO test to promoted Core — retired on 2026-06-18 at maturity
+`CPUContracted`. The benchmark/SLO test now imports promoted
+`Extrinsic.Core.FrameGraph`, `Extrinsic.Core.Tasks`, and
+`Extrinsic.Core.Tasks.CounterEvent` as
+`tests/benchmark/slo/Test.ArchitectureSLO.cpp`; thresholds, warmup counts, and
+measured workload sizes were left unchanged. `LEGACY-005` remains blocked by 28
+remaining test consumers and 133 legacy-internal consumers; `LEGACY-012` owns
+the remaining test cleanup.
+
+Backlog
 [`LEGACY-027`](LEGACY-027-core-memory-test-promoted.md) — Migrate CoreMemory
 test to promoted Core — retired on 2026-06-18 at maturity `CPUContracted`.
 Retained memory allocator coverage from

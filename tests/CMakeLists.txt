@@ -324,7 +324,7 @@ endif()
 
 # --- Benchmark/SLO checks ---
 set(_benchmark_test_files
-    Test_ArchitectureSLO.cpp
+    Test.ArchitectureSLO.cpp
     Test_Benchmark.cpp
 )
 intrinsic_resolve_test_sources(_benchmark_test_sources
@@ -334,7 +334,7 @@ intrinsic_resolve_test_sources(_benchmark_test_sources
 intrinsic_test_object_lib(BenchmarkTestObjs
     SOURCES
         ${_benchmark_test_sources}
-    DEPS IntrinsicCore EnTT::EnTT
+    DEPS IntrinsicCore ExtrinsicCore EnTT::EnTT
 )
 
 # --- Physics method reference tests (CPU-only; methods/ package, no runtime/ECS) ---
@@ -1025,7 +1025,7 @@ endif()
 # --- Benchmark and SLO checks ---
 intrinsic_test_executable(IntrinsicBenchmarkTests
     OBJECTS  BenchmarkTestObjs
-    LINK_LIBS IntrinsicCore
+    LINK_LIBS IntrinsicCore ExtrinsicCore
     LABELS benchmark slo slow
 )
 

@@ -220,7 +220,7 @@ verifiable on its own.
     `Test.RuntimeStreamingExecutor.cpp`, `Test.RuntimeRenderExtraction.cpp`.
   - [x] the runtime asset/IO executable hosting `Test_IORegistry.cpp` and
     `Test.AssetLoadPipeline.cpp` (real-glTF parse paths).
-  - [x] the `tests/benchmark/slo/Test_ArchitectureSLO.cpp` 2,000-node FrameGraph
+  - [x] the `tests/benchmark/slo/Test.ArchitectureSLO.cpp` 2,000-node FrameGraph
     and scheduler-contention SLOs.
 - [x] Do not retag pure CPU contract tests as `slow`.
 - [x] Update `tests/README.md` to document the `slow` and `flaky-quarantine`
