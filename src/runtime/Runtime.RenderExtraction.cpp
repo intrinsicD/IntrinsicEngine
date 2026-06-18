@@ -1537,8 +1537,8 @@ namespace Extrinsic::Runtime
             cfg.UniformColor = {0.02f, 0.02f, 0.02f, 1.0f};
             if (!isEdge)
             {
-                cfg.PointSize = UniformPointSizeOrDefault(points);
-                cfg.PointMode = ToRenderPointMode(points->Type);
+                cfg.Point.PointSize = UniformPointSizeOrDefault(points);
+                cfg.Point.PointMode = ToRenderPointMode(points->Type);
             }
             renderer.GetGpuWorld().SetEntityConfig(instance, cfg);
             m_Transforms.push_back(Graphics::TransformSyncRecord{

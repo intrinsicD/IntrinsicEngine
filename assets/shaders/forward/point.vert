@@ -60,7 +60,7 @@ void main() {
     const vec4 viewCenter4 = scene.CameraView * worldPos;
     const vec4 centerClip = scene.CameraViewProj * dyn.Model * localPos;
 
-    const float pointSizePx = clamp(cfg.PointSize, 0.5, 32.0);
+    const float pointSizePx = clamp(cfg.Point.PointSize, 0.5, 32.0);
     const float radiusPx = pointSizePx * 0.5;
     const float viewportWidth = max(scene.CameraViewportWidth, 1.0);
     const float viewportHeight = max(scene.CameraViewportHeight, 1.0);
@@ -69,7 +69,7 @@ void main() {
         centerClip.w;
 
     gl_Position = centerClip + vec4(clipOffset, 0.0, 0.0);
-    vPointMode = cfg.PointMode;
+    vPointMode = cfg.Point.PointMode;
     vDiscUV = localOffset;
     vViewCenter = viewCenter4.xyz;
 

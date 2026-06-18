@@ -116,12 +116,22 @@ struct GpuGeometryRecord {
     uint _pad1;
 };
 
+struct GpuEntityPointConfig {
+    float PointSize;
+    uint PointMode;
+    uint64_t PointSizeBDA;
+};
+
+struct GpuEntityLineConfig {
+    float LineWidth;
+    uint _pad0;
+    uint64_t LineWidthBDA;
+};
+
 struct GpuEntityConfig {
     uint64_t VertexNormalBDA;
     uint64_t ScalarBDA;
     uint64_t ColorBDA;
-    uint64_t PointSizeBDA;
-
     float ScalarRangeMin;
     float ScalarRangeMax;
     uint ColormapID;
@@ -131,14 +141,13 @@ struct GpuEntityConfig {
     float IsolineWidth;
     float VisualizationAlpha;
     uint VisDomain;
-
-    vec4 IsolineColor;
-
-    float PointSize;
-    uint PointMode;
     uint ColorSourceMode;
     uint ElementCount;
 
+    vec4 IsolineColor;
+
+    GpuEntityPointConfig Point;
+    GpuEntityLineConfig Line;
     vec4 UniformColor;
 };
 

@@ -4479,8 +4479,8 @@ TEST(SandboxEditorUi, PlatformDropEventImportsObjMeshSelectsItAndEnablesRenderCo
     const auto config = engine.GetRenderer()
                             .GetGpuWorld()
                             .GetEntityConfigForTest(sidecar->MeshVertexViewInstance);
-    EXPECT_EQ(config.PointMode, 1u);
-    EXPECT_FLOAT_EQ(config.PointSize, 10.0f);
+    EXPECT_EQ(config.Point.PointMode, 1u);
+    EXPECT_FLOAT_EQ(config.Point.PointSize, 10.0f);
 
     extraction.Shutdown(engine.GetRenderer());
     ui.Detach();

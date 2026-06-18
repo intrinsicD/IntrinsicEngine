@@ -1,5 +1,6 @@
 module;
 
+#include <cstddef>
 #include <cstdint>
 #include <glm/glm.hpp>
 
@@ -172,12 +173,34 @@ export namespace Extrinsic::RHI
     };
     static_assert(sizeof(GpuInstanceDynamic) == 128);
 
+    struct GpuEntityPointConfig
+    {
+        float PointSize = 1.f;
+        std::uint32_t PointMode = 0;
+        std::uint64_t PointSizeBDA = 0;
+    };
+    static_assert(sizeof(GpuEntityPointConfig) == 16);
+    static_assert(alignof(GpuEntityPointConfig) == 8);
+    static_assert(offsetof(GpuEntityPointConfig, PointSize) == 0);
+    static_assert(offsetof(GpuEntityPointConfig, PointMode) == 4);
+    static_assert(offsetof(GpuEntityPointConfig, PointSizeBDA) == 8);
+
+    struct GpuEntityLineConfig
+    {
+        float LineWidth = 1.f;
+        std::uint32_t _pad0 = 0;
+        std::uint64_t LineWidthBDA = 0;
+    };
+    static_assert(sizeof(GpuEntityLineConfig) == 16);
+    static_assert(alignof(GpuEntityLineConfig) == 8);
+    static_assert(offsetof(GpuEntityLineConfig, LineWidth) == 0);
+    static_assert(offsetof(GpuEntityLineConfig, LineWidthBDA) == 8);
+
     struct alignas(16) GpuEntityConfig
     {
         std::uint64_t VertexNormalBDA = 0;
         std::uint64_t ScalarBDA       = 0;
         std::uint64_t ColorBDA        = 0;
-        std::uint64_t PointSizeBDA    = 0;
         float ScalarRangeMin = 0.f;
         float ScalarRangeMax = 1.f;
         std::uint32_t ColormapID = 0;
@@ -186,16 +209,24 @@ export namespace Extrinsic::RHI
         float IsolineWidth = 0.f;
         float VisualizationAlpha = 1.f;
         std::uint32_t VisDomain = 0;
-        alignas(16) glm::vec4 IsolineColor{0.f, 0.f, 0.f, 1.f};
-        float PointSize = 1.f;
-        std::uint32_t PointMode = 0;
         std::uint32_t ColorSourceMode = 0;
         std::uint32_t ElementCount = 0;
+        alignas(16) glm::vec4 IsolineColor{0.f, 0.f, 0.f, 1.f};
+        GpuEntityPointConfig Point{};
+        GpuEntityLineConfig Line{};
         alignas(16) glm::vec4 UniformColor{1.f};
     };
     // Matches assets/shaders/common/gpu_scene.glsl (scalar block layout):
-    // 8-byte BDAs + packed scalar/vector fields, total 112 bytes.
-    static_assert(sizeof(GpuEntityConfig) == 112);
+    // 8-byte BDAs + packed scalar/vector fields, total 128 bytes.
+    static_assert(sizeof(GpuEntityConfig) == 128);
+    static_assert(offsetof(GpuEntityConfig, VertexNormalBDA) == 0);
+    static_assert(offsetof(GpuEntityConfig, ScalarBDA) == 8);
+    static_assert(offsetof(GpuEntityConfig, ColorBDA) == 16);
+    static_assert(offsetof(GpuEntityConfig, ScalarRangeMin) == 24);
+    static_assert(offsetof(GpuEntityConfig, IsolineColor) == 64);
+    static_assert(offsetof(GpuEntityConfig, Point) == 80);
+    static_assert(offsetof(GpuEntityConfig, Line) == 96);
+    static_assert(offsetof(GpuEntityConfig, UniformColor) == 112);
 
     struct alignas(16) GpuBounds
     {

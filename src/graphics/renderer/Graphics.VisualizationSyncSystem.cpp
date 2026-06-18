@@ -181,12 +181,12 @@ namespace Extrinsic::Graphics
             if (points == nullptr)
                 return;
 
-            cfg.PointMode = ToPointMode(points->Type);
+            cfg.Point.PointMode = ToPointMode(points->Type);
             if (const auto* uniform =
                     std::get_if<float>(&points->SizeSource);
                 uniform != nullptr)
             {
-                cfg.PointSize = *uniform;
+                cfg.Point.PointSize = *uniform;
             }
         }
 
@@ -249,7 +249,7 @@ namespace Extrinsic::Graphics
             }
 
             setBdaAndCount("normals", cfg.VertexNormalBDA);
-            setBdaAndCount("sizes", cfg.PointSizeBDA);
+            setBdaAndCount("sizes", cfg.Point.PointSizeBDA);
             return cfg;
         }
     };

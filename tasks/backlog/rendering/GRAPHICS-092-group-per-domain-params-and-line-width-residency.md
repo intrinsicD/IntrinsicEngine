@@ -28,12 +28,15 @@ depends_on: []
   `assets/shaders/common/gpu_scene.glsl`, and the modern forward line vertex shader
   `assets/shaders/forward/line.vert`. Runtime/graphics extraction populates the
   config (`Runtime.RenderExtraction`, `Graphics.VisualizationSyncSystem`).
-- Current state (verified 2026-06-18): `GpuEntityConfig` (`RHI.Types.cppm:175-198`,
-  112 bytes, `static_assert(sizeof == 112)` plus GLSL scalar-block parity) flat-mixes
-  point-only fields (`PointSize`, `PointMode`, `PointSizeBDA`) into the otherwise
-  domain-agnostic config, and has **no** line-width field. Point size has full
-  residency: uniform `RenderPoints::SizeSource` → `cfg.PointSize`, per-point buffer →
-  `cfg.PointSizeBDA`, consumed by `forward/point.vert` quad expansion.
+- Current state after Slice A (verified 2026-06-18): `GpuEntityConfig`
+  (`RHI.Types.cppm`, 128 bytes, `static_assert(sizeof == 128)` plus offset
+  assertions) keeps shared visualization/color fields in the parent config and
+  stores domain-specific settings in `cfg.Point` and `cfg.Line`. Point size has
+  full residency: uniform `RenderPoints::SizeSource` → `cfg.Point.PointSize`,
+  per-point buffer → `cfg.Point.PointSizeBDA`, consumed by `forward/point.vert`
+  quad expansion. `cfg.Line.LineWidth` / `cfg.Line.LineWidthBDA` now exist with
+  deterministic defaults; population from `RenderEdges::WidthSource` and line
+  quad expansion remain open for Slice B.
 - Line-width gap: `RenderEdges::WidthSource`
   (`Graphics.Component.RenderGeometry.cppm:84`, `variant<float,string>`) is authored,
   serialized (`Runtime.SceneSerialization`), and editor-driven (`SandboxEditorUi`),
@@ -54,30 +57,30 @@ depends_on: []
   No hard dependency edge.
 
 ## Required changes
-- [ ] Regroup `GpuEntityConfig` per-domain fields into named sub-blocks in
+- [x] Regroup `GpuEntityConfig` per-domain fields into named sub-blocks in
       `RHI.Types.cppm`: a point block (`PointMode`, `PointSize`, `PointSizeBDA`) and a
       line block (`LineWidth`, `LineWidthBDA`); keep shared fields (attribute BDAs,
       scalar/colormap/isoline, `ColorSourceMode`, `ElementCount`, `UniformColor`)
       shared. Preserve shared-field semantics.
-- [ ] Add `LineWidth` (float, default `1.0`) and `LineWidthBDA` (per-edge width
+- [x] Add `LineWidth` (float, default `1.0`) and `LineWidthBDA` (per-edge width
       buffer) to the line block.
-- [ ] Mirror the new layout in `assets/shaders/common/gpu_scene.glsl` (byte-identical
+- [x] Mirror the new layout in `assets/shaders/common/gpu_scene.glsl` (byte-identical
       scalar block) and update the `static_assert(sizeof(GpuEntityConfig) == …)`.
 - [ ] Populate line-width residency in extraction/sync at parity with point size:
-      uniform `RenderEdges::WidthSource` (float) → `cfg.LineWidth`; named per-edge
-      buffer → `cfg.LineWidthBDA` (`Runtime.RenderExtraction` and/or
+      uniform `RenderEdges::WidthSource` (float) → `cfg.Line.LineWidth`; named per-edge
+      buffer → `cfg.Line.LineWidthBDA` (`Runtime.RenderExtraction` and/or
       `Graphics.VisualizationSyncSystem`, mirroring `PointSize`/`PointSizeBDA`).
 - [ ] Consume line width in `assets/shaders/forward/line.vert`: expand the segment to
       a screen-space quad (mirroring `forward/point.vert` size expansion) so uniform
       and per-edge widths render; keep a deterministic default when no width is set.
-- [ ] Update `forward/point.*` and any other readers to the regrouped field names
+- [x] Update `forward/point.*` and any other readers to the regrouped field names
       (mechanical, behavior-preserving).
 
 ## Tests
 - [ ] CPU/null `contract;graphics` (or `contract;runtime`) coverage asserting
-      extraction/sync writes `cfg.LineWidth`/`cfg.LineWidthBDA` from
+      extraction/sync writes `cfg.Line.LineWidth`/`cfg.Line.LineWidthBDA` from
       `RenderEdges::WidthSource` at parity with `PointSize`/`PointSizeBDA`.
-- [ ] A layout/parity check (the updated `static_assert` plus a GLSL-compile check)
+- [x] A layout/parity check (the updated `static_assert` plus a GLSL-compile check)
       confirming C++ and shader `GpuEntityConfig` stay in sync after regrouping.
 - [ ] Opt-in `gpu;vulkan` smoke proving a thick / per-edge line renders with the
       configured width on the modern forward line path; skip/fail-closed without
@@ -86,11 +89,11 @@ depends_on: []
       (behavior-preserving for points and surfaces).
 
 ## Docs
-- [ ] Update `src/graphics/renderer/README.md` and/or
+- [x] Update `src/graphics/renderer/README.md` and/or
       `docs/architecture/graphics.md` / `docs/architecture/rendering-target-architecture.md`
       to document the regrouped `GpuEntityConfig` (shared vs per-domain sub-blocks) and
       line-width residency at parity with point size.
-- [ ] Update `tasks/backlog/rendering/README.md`, cross-link `GRAPHICS-091`, and
+- [x] Update `tasks/backlog/rendering/README.md`, cross-link `GRAPHICS-091`, and
       regenerate `tasks/SESSION-BRIEF.md`.
 
 ## Acceptance criteria

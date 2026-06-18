@@ -284,7 +284,7 @@ Concretely:
   because mode 1 computes the front sphere surface in view space and writes
   corrected `gl_FragDepth` so impostor spheres intersect and occlude retained
   surfaces instead of using flat billboard depth. The forward point shader
-  consumes `GpuEntityConfig::PointSize` and `PointMode`: mode 0 draws flat
+  consumes `GpuEntityConfig::Point.PointSize` and `Point.PointMode`: mode 0 draws flat
   circles, mode 1 draws depth-corrected impostor spheres, and mode 2 currently
   uses a neutral fallback normal until a dedicated point/surfel normal-buffer
   residency path lands. The retained point UV slot is not used for normal
@@ -1149,8 +1149,11 @@ Concretely:
   `VisualizationSyncRecord`) instead of querying live ECS registries. Runtime is
   responsible for building those records from ECS/assets/geometry state,
   including optional retained-point render settings (`RenderPoints`) that
-  `VisualizationSyncSystem` copies into `GpuEntityConfig::PointSize` and
-  `PointMode`.
+  `VisualizationSyncSystem` copies into `GpuEntityConfig::Point.PointSize` and
+  `Point.PointMode`. Domain-specific point and line settings live in
+  `GpuEntityConfig::Point` and `GpuEntityConfig::Line`; line-width residency is
+  stored as `Line.LineWidth` / `Line.LineWidthBDA` and is consumed by the
+  follow-up `GRAPHICS-092` line-expansion slice.
 - `IRenderer::SubmitRuntimeSnapshots(..., storageSlot)` is the promoted handoff
   from runtime to graphics. The renderer copies snapshot records into retained
   storage keyed by the runtime `RenderWorldPool` slot before

@@ -291,8 +291,8 @@ TEST(MeshPrimitiveViewExtraction, EnableVertexViewUploadsSeparatePointRenderable
     EXPECT_NE(view->MeshVertexViewGeometry, view->MeshGeometry);
     EXPECT_EQ(gpuWorld.GetInstanceGeometry(view->MeshVertexViewInstance), view->MeshVertexViewGeometry);
     const auto config = gpuWorld.GetEntityConfigForTest(view->MeshVertexViewInstance);
-    EXPECT_FLOAT_EQ(config.PointSize, 9.0f);
-    EXPECT_EQ(config.PointMode, 0u);
+    EXPECT_FLOAT_EQ(config.Point.PointSize, 9.0f);
+    EXPECT_EQ(config.Point.PointMode, 0u);
     EXPECT_EQ(config.ColorSourceMode, 1u);
     EXPECT_FLOAT_EQ(config.UniformColor.r, 0.02f);
     EXPECT_FLOAT_EQ(config.UniformColor.g, 0.02f);
@@ -333,8 +333,8 @@ TEST(MeshPrimitiveViewExtraction, VertexViewConfigUpdateReusesGeometry)
 
     auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
     auto config = gpuWorld.GetEntityConfigForTest(firstInstance);
-    EXPECT_FLOAT_EQ(config.PointSize, 9.0f);
-    EXPECT_EQ(config.PointMode, 0u);
+    EXPECT_FLOAT_EQ(config.Point.PointSize, 9.0f);
+    EXPECT_EQ(config.Point.PointMode, 0u);
 
     EnableVertexView(
         scene,
@@ -354,8 +354,8 @@ TEST(MeshPrimitiveViewExtraction, VertexViewConfigUpdateReusesGeometry)
     EXPECT_EQ(view->MeshVertexViewGeometry, firstGeometry);
     EXPECT_EQ(view->MeshVertexViewInstance, firstInstance);
     config = gpuWorld.GetEntityConfigForTest(firstInstance);
-    EXPECT_FLOAT_EQ(config.PointSize, 12.0f);
-    EXPECT_EQ(config.PointMode, 2u);
+    EXPECT_FLOAT_EQ(config.Point.PointSize, 12.0f);
+    EXPECT_EQ(config.Point.PointMode, 2u);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();
@@ -442,8 +442,8 @@ TEST(MeshPrimitiveViewExtraction, EdgeAndPointComponentsDoNotRequireRenderSurfac
               view->MeshVertexViewGeometry);
     const auto config =
         gpuWorld.GetEntityConfigForTest(view->MeshVertexViewInstance);
-    EXPECT_EQ(config.PointMode, 0u);
-    EXPECT_FLOAT_EQ(config.PointSize, 8.0f);
+    EXPECT_EQ(config.Point.PointMode, 0u);
+    EXPECT_FLOAT_EQ(config.Point.PointSize, 8.0f);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();

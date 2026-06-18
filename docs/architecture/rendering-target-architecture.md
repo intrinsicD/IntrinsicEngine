@@ -152,7 +152,7 @@ This allows geometry-processing operators to recompute normals and upload only t
 Two persistent SSBOs per entity slot (default max: 100 000 slots), indexed by the same slot ID. See §5.1 for the full struct definitions.
 
 - **`GpuInstanceData[]`** (set=2, binding=0, 96 bytes/entity) — Model transform, EntityID, MaterialSlot, RenderFlags, vertex/index counts and offsets. Updated frequently (every frame for moving entities).
-- **`GpuEntityConfig[]`** (set=2, binding=1, 96 bytes/entity) — BDA attribute pointers (normals, scalars, colors, point sizes), visualization config (colormap, scalar range, isoline params), point rendering config. Updated rarely (on vis config change).
+- **`GpuEntityConfig[]`** (set=2, binding=1, 128 bytes/entity) — BDA attribute pointers (normals, scalars, colors), visualization config (colormap, scalar range, isoline params), shared color-source state, plus named point/line domain config blocks. Updated rarely (on vis config change).
 
 The cull shader reads `GpuInstanceData` (transform + counts) to generate indirect draw commands. Fragment shaders read both SSBOs via the shared `SlotIndex` push constant.
 
@@ -446,13 +446,24 @@ struct GpuInstanceData {
 Visualization parameters and BDA attribute pointers. Updated only when the user changes visualization settings, an algorithm writes new properties, or attribute SSBOs are re-uploaded.
 
 ```glsl
-// std430 — 96 bytes per entity
+// scalar block layout — 128 bytes per entity
+struct GpuEntityPointConfig {
+    float    PointSize;         // uniform point size in pixels
+    uint     PointMode;         // FlatDisc=0, ImpostorSphere=1, Surfel=2
+    uint64_t PointSizeBDA;      // float[] per-point sizes (0 = uniform)
+};
+
+struct GpuEntityLineConfig {
+    float    LineWidth;         // uniform line width in pixels
+    uint     _pad0;
+    uint64_t LineWidthBDA;      // float[] per-edge widths (0 = uniform)
+};
+
 struct GpuEntityConfig {
     // ---- Per-vertex attribute BDA pointers (0 = absent) ----
-    uint64_t VertexNormalPtr;   // vec3[] normals for smooth shading
-    uint64_t ScalarPropPtr;     // float[] per-vertex, per-face, or per-edge scalar values
-    uint64_t ColorPropPtr;      // vec3[] or vec4[] per-vertex/face/edge colors
-    uint64_t PointSizePtr;      // float[] per-point sizes (PointPass only, 0 = uniform)
+    uint64_t VertexNormalBDA;   // vec3[] normals for smooth shading
+    uint64_t ScalarBDA;         // float[] per-vertex, per-face, or per-edge scalar values
+    uint64_t ColorBDA;          // vec3[] or vec4[] per-vertex/face/edge colors
 
     // ---- Visualization config ----
     float  ScalarRangeMin;
@@ -464,16 +475,16 @@ struct GpuEntityConfig {
     float  IsolineWidth;        // scalar-space width (fraction of one iso-interval)
     float  VisualizationAlpha;  // uniform alpha for color overlay (1.0 = opaque)
     uint   VisDomain;           // 0=vertex, 1=face, 2=edge
+    uint   ColorSourceMode;
+    uint   ElementCount;
 
     vec4   IsolineColor;        // RGBA
 
-    // ---- PointPass config ----
-    float  PointSize;
-    uint   PointMode;           // FlatDisc=0, Surfel=1, ImpostorSphere=2, GaussianSplat=3
-    uint   _pad0;
-    uint   _pad1;
+    GpuEntityPointConfig Point;
+    GpuEntityLineConfig  Line;
+    vec4                 UniformColor;
 };
-// sizeof(GpuEntityConfig) = 96 bytes
+// sizeof(GpuEntityConfig) = 128 bytes
 ```
 
 **Why split?** Transform changes (camera orbit, animation) touch `GpuInstanceData` every frame for affected entities. Visualization config changes (user adjusts scalar range, switches colormap) are rare — typically once per user interaction. Separating them avoids uploading 96 bytes of unchanged visualization data on every transform update, and avoids dirtying the config SSBO on every frame. The cull shader reads only `GpuInstanceData` (transform + counts); fragment shaders read both.
@@ -555,7 +566,7 @@ Point clouds render in the **ForwardPass** (PointPass sub-pass), after deferred 
 | `ImpostorSphere`| Billboard with per-fragment sphere depth correction | `point_sphere.vert/frag` | ✅ |
 | `GaussianSplat` | Oriented anisotropic splat, view-dependent color | `point_splat.vert/frag` | **[DEFERRED — §13.8]** |
 
-Point size is per-entity (`GpuEntityConfig.PointSize`) or per-point (`GpuEntityConfig.PointSizePtr[point_id]`). UI sliders write to `Point::Component` which propagates to `GpuEntityConfig` on the next dirty sync.
+Point size is per-entity (`GpuEntityConfig.Point.PointSize`) or per-point (`GpuEntityConfig.Point.PointSizeBDA[point_id]`). UI sliders write to `Point::Component` which propagates to `GpuEntityConfig` on the next dirty sync. Line width has the same storage venue under `GpuEntityConfig.Line`, with population and screen-space quad expansion owned by the remaining `GRAPHICS-092` slice.
 
 ---
 
@@ -840,7 +851,7 @@ SceneManager (CPU, authoritative)
 |---|----------|
 | §13.1 | **Free-list allocator** with deferred compaction on fragmentation threshold. In-place overwrite for same-count edits, reallocation for larger. |
 | §13.3 | **Derivative-based TBN** computed in fragment shader from `dFdx/dFdy(worldPos, uv)`. No tangent vertex attribute. Falls back to vertex normal SSBO or geometric derivative when UVs absent. |
-| §13.7 | **Per-entity GPU data** fully specified in §5.1. Split into `GpuInstanceData` (96 bytes, frequent updates) + `GpuEntityConfig` (96 bytes, rare updates). BDA pointers for vertex normals, scalar props, color props, per-point sizes live in `GpuEntityConfig`. |
+| §13.7 | **Per-entity GPU data** fully specified in §5.1. Split into `GpuInstanceData` (96 bytes, frequent updates) + `GpuEntityConfig` (128 bytes, rare updates). BDA pointers for vertex normals, scalar props, color props, per-point sizes, and per-line widths live in `GpuEntityConfig`. |
 | §13.9 | **Option B (SSBO + BDA)** for all geometry types and all domains. Vertex-domain = vertex shader fetch → varying interpolation. Face-domain = fragment shader `gl_PrimitiveID` → flat. Edge-domain = vertex shader on line primitives. |
 | §13.12 | `DebugDraw` remains per-frame transient. Overlay entities for persistent multi-frame content. |
 | §13.13 | `GBuf_EntityId` is always written by `GBufferPass`. Used by `SelectionOutlinePass`. Eliminates redundant picking-buffer entity channel. |

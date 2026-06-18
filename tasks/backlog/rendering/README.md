@@ -799,11 +799,12 @@ Open post-acceptance rendering leaves:
   (shared "venue", color/colormap side).
 - [GRAPHICS-092 — Group per-domain params in `GpuEntityConfig` and add line-width residency](GRAPHICS-092-group-per-domain-params-and-line-width-residency.md):
   unblocked; structural sibling of `GRAPHICS-091`. Groups the flat-mixed point-only
-  fields (`PointMode`/`PointSize`/`PointSizeBDA`) into named per-domain sub-blocks and
-  adds line-width residency (`RenderEdges::WidthSource` → `cfg.LineWidth`/`LineWidthBDA`
-  + `forward/line.vert` quad expansion) at parity with point size, keeping the shared
-  `GpuEntityConfig` venue and C++↔GLSL layout `static_assert` intact. Target
-  `Operational` on Vulkan-capable hosts.
+  fields (`PointMode`/`PointSize`/`PointSizeBDA`) into named per-domain sub-blocks.
+  Slice A has landed the 128-byte `GpuEntityConfig` layout with `Point` and `Line`
+  sub-blocks and defaulted `Line.LineWidth` / `Line.LineWidthBDA`; Slice B remains
+  open for `RenderEdges::WidthSource` population and `forward/line.vert`
+  screen-space quad expansion at parity with point size. Target `Operational` on
+  Vulkan-capable hosts.
 
 Cross-layer Theme A leaves retired for the full working sandbox path:
 - [`RUNTIME-085` — `GeometrySources` mesh residency bridge](../../done/RUNTIME-085-geometrysources-mesh-residency.md) (retired 2026-05-28 at `CPUContracted`; Slices A–C landed the mesh packer, extraction wiring, and dirty-domain reupload/retire ordering).

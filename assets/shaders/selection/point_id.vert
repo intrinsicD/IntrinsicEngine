@@ -21,7 +21,7 @@
 // larger configured point size. `forward/point.vert` already publishes the
 // clamped configured point size, so picking must match for the
 // visible point to be hittable. This shader therefore reads
-// `GpuEntityConfig::PointSize` through `scene.EntityConfigBDA` indexed by
+// `GpuEntityConfig::Point.PointSize` through `scene.EntityConfigBDA` indexed by
 // `inst.ConfigSlot` (the same chain `forward/point.vert` uses) and writes
 // the same `gl_PointSize` value.
 //
@@ -67,6 +67,6 @@ void main() {
     gl_Position = scene.CameraViewProj * dyn.Model * vec4(v.Position, 1.0);
     // Match `forward/point.vert`'s point-size publication so the picking
     // footprint covers the same pixels the visible point covers.
-    gl_PointSize = clamp(cfg.PointSize, 0.5, 32.0);
+    gl_PointSize = clamp(cfg.Point.PointSize, 0.5, 32.0);
     fragEntityID = inst.EntityID;
 }

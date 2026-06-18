@@ -108,8 +108,8 @@ BUG-028 added flat-circle, surface-aligned-circle, and impostor-sphere point
 rendering for mesh vertices. RUNTIME-106 moves the authoritative control surface
 to the promoted render components: `RenderPoints::Type` selects flat, sphere, or
 surfel rendering, and a uniform float `RenderPoints::SizeSource` is forwarded to
-the retained point-sidecar `GpuEntityConfig::PointSize` every frame, including
-clean reuse frames. The same component vocabulary applies to mesh vertices,
+the retained point-sidecar `GpuEntityConfig::Point.PointSize` every frame,
+including clean reuse frames. The same component vocabulary applies to mesh vertices,
 graph nodes, and point-cloud points. Older primitive-view editor/engine command
 surfaces are compatibility shims that translate to `RenderEdges` /
 `RenderPoints`; extraction no longer consumes `MeshPrimitiveViewSettings` as a
@@ -716,7 +716,7 @@ size upload that is not implemented here and fails closed into
 `PointCloudGeometryFailedPack` rather than uploading mis-sized geometry. The
 runtime extraction record also forwards the retained `RenderPoints` component
 to graphics synchronization so a uniform point size and render type are copied into
-`GpuEntityConfig::PointSize` / `PointMode` for retained point passes. Clean
+`GpuEntityConfig::Point.PointSize` / `Point.PointMode` for retained point passes. Clean
 re-extractions hit `PointCloudGeometryReuseHits`; dirty re-extractions
 (`DirtyVertexPositions` / `DirtyVertexAttributes` / `GpuDirty` any-of tag set on
 the entity — a cloud has no edge/face topology) repack, upload a fresh handle,
@@ -768,8 +768,8 @@ the requested independent retained lanes over one mesh data source, with no ECS
 storage of graphics handles and no mesh-topology traversal pushed into
 `src/graphics/*`. The edge and vertex lanes submit a neutral dark overlay
 `GpuEntityConfig::UniformColor` so they remain visible over the default white
-reference surface. The vertex lane writes `GpuEntityConfig::PointSize` from a
-uniform screen-space pixel `RenderPoints::SizeSource` and `PointMode` from
+reference surface. The vertex lane writes `GpuEntityConfig::Point.PointSize` from a
+uniform screen-space pixel `RenderPoints::SizeSource` and `Point.PointMode` from
 `RenderPoints::Type` on every submitted frame so flat, surfel, and
 impostor-sphere changes apply without forcing a geometry reupload.
 
