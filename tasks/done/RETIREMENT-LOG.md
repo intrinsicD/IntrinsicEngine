@@ -9,6 +9,18 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`LEGACY-026`](LEGACY-026-retire-core-dagscheduler-test.md) — Retire legacy
+Core.DAGScheduler test — retired on 2026-06-18 at maturity `CPUContracted`.
+`tests/unit/core/Test_DAGScheduler.cpp` was removed because it only exercised
+the old `Core::DAGScheduler` compatibility API; promoted
+`Extrinsic.Core.Dag.Scheduler`, graph-compiler, and task-graph tests cover the
+retained scheduling contract, including explicit dependencies, resource
+hazards, weak reads, duplicate-access handling, reset behavior, deterministic
+compiles, diagnostics, and stress cases. `LEGACY-005` remains blocked by 30
+remaining test consumers and 133 legacy-internal consumers; `LEGACY-012` owns
+the remaining test cleanup.
+
+Backlog
 [`LEGACY-025`](LEGACY-025-retire-core-inplace-function-test.md) — Retire
 legacy Core.InplaceFunction test — retired on 2026-06-18 at maturity
 `CPUContracted`. `tests/unit/core/Test_InplaceFunction.cpp` was removed because

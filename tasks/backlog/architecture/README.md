@@ -139,7 +139,13 @@ split; narratives live in the retirement log.
   (done, 2026-06-18, `CPUContracted`):
   retired legacy-only `tests/unit/core/Test_InplaceFunction.cpp` because
   `Core.InplaceFunction` has no promoted `Extrinsic.Core` endpoint; remaining
-  Core deletion blockers are 31 tests and legacy-internal subtree ordering.
+  `LEGACY-026` later reduced the remaining Core test-consumer set to 30 files.
+- [LEGACY-026 — Retire legacy Core.DAGScheduler test](../../done/LEGACY-026-retire-core-dagscheduler-test.md)
+  (done, 2026-06-18, `CPUContracted`):
+  retired legacy `tests/unit/core/Test_DAGScheduler.cpp` compatibility coverage
+  because promoted `Extrinsic.Core.Dag.Scheduler` and graph-compiler tests own
+  the retained DAG scheduling contract; remaining Core deletion blockers are 30
+  tests and legacy-internal subtree ordering.
 - [LEGACY-018 — Retire legacy Interface panel-registration test](../../done/LEGACY-018-retire-interface-panel-registration-test.md)
   (done, 2026-06-18, `CPUContracted`):
   retired legacy-only `tests/contract/ui/Test_PanelRegistration.cpp`;

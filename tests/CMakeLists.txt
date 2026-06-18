@@ -185,7 +185,6 @@ endfunction()
 set(_core_test_files
     Test_BoundedHeap.cpp
     Test_CoreMemory.cpp
-    Test_DAGScheduler.cpp
     Test.CoreError.cpp
     Test.LogRingBuffer.cpp
 )
