@@ -52,8 +52,8 @@ Consumer counts are distinct files matched outside the doomed subtree.
 | Subtree (task) | Files | Legacy-internal consumers | External consumers | External breakdown |
 |---|---|---|---|---|
 | `Interface/` ([LEGACY-001](../../tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md)) | 4 | 6 | 0 | none |
-| `Asset/` ([LEGACY-004](../../tasks/backlog/architecture/LEGACY-004-delete-src-legacy-asset.md)) | 6 | 50 | 9 | 9 tests, 0 promoted-src |
-| `Core/` ([LEGACY-005](../../tasks/backlog/architecture/LEGACY-005-delete-src-legacy-core.md)) | 40 | 133 | 21 | 21 tests, 0 promoted-src |
+| `Asset/` ([LEGACY-004](../../tasks/backlog/architecture/LEGACY-004-delete-src-legacy-asset.md)) | 6 | 50 | 8 | 8 tests, 0 promoted-src |
+| `Core/` ([LEGACY-005](../../tasks/backlog/architecture/LEGACY-005-delete-src-legacy-core.md)) | 40 | 133 | 20 | 20 tests, 0 promoted-src |
 | `ECS/` ([LEGACY-006](../../tasks/backlog/architecture/LEGACY-006-delete-src-legacy-ecs.md)) | 29 | 37 | 19 | 19 tests, 0 promoted-src |
 | `Graphics/` ([LEGACY-008](../../tasks/backlog/architecture/LEGACY-008-delete-src-legacy-graphics.md)) | 168 | 22 | 37 | 37 tests, 0 promoted-src |
 | `RHI/` ([LEGACY-009](../../tasks/backlog/architecture/LEGACY-009-delete-src-legacy-rhi.md)) | 54 | 83 | 16 | 16 tests, 0 promoted-src |
@@ -226,12 +226,19 @@ test because promoted primitive selection is represented by
 caching, and editor selection models rather than mutable per-entity
 vertex/edge/face sets. This reduces the remaining ECS external test-consumer
 set to 19 files and Runtime to 11 files.
+`LEGACY-040` retired the legacy `Asset.Manager` loader-safety and error-path
+compatibility test because promoted asset ownership is split across
+`Extrinsic.Asset.Service`, `Asset.Registry`, `Asset.PayloadStore`, and
+`Asset.LoadPipeline`, whose retained captured-loader, reload, wrong-type read,
+dead-handle, failed-load, and event-ordering contracts are already covered by
+promoted tests. This reduces the remaining Asset external test-consumer set to
+8 files and Core to 20 files.
 
 **`LEGACY-013` clears only the promoted-src subset of the `LEGACY-005`
 gate.** The
 `LEGACY-005` consumer-grep searches every consumer of legacy `Core.*` outside
 `src/legacy/Core/**`, which the table above now counts as 133 legacy-internal +
-21 test files. `LEGACY-005` stays blocked by its 21 test consumers
+20 test files. `LEGACY-005` stays blocked by its 20 test consumers
 (`LEGACY-012`) and by all 133 legacy-internal consumers until the subtrees above
 Core have been deleted. This is why the `LEGACY-005` row in
 `legacy-retirement.md` says Core "retires last".

@@ -124,6 +124,18 @@ points. The old dependency-heavy service constructor that imports legacy
 `Asset.Pipeline`, `Graphics`, `RHI`, `Core.IOBackend`, and
 `Runtime.SceneManager` is not a promoted endpoint.
 
+### Legacy AssetManager Safety/Error API Retirement
+
+`LEGACY-040` retires the legacy `Asset.Manager` loader-safety and error-path
+compatibility test. Promoted asset ownership is split across
+`Extrinsic.Asset.Service`, `Asset.Registry`, `Asset.PayloadStore`, and
+`Asset.LoadPipeline`; retained behavior is covered by promoted tests for
+captured loader reload, reload failure preserving the prior payload, wrong-type
+reads, dead-handle errors, failed-load cleanup, load-state transitions, and
+event ordering. The old `Core::Assets::AssetLoaderFunc`, pointer-returning
+`AssetManager::GetRaw`/`AcquireLease` surface, and null-pointer loader failure
+shape are not promoted as compatibility APIs.
+
 ### Legacy Runtime Selection Module Retirement
 
 `LEGACY-038` retires the legacy `Runtime.Selection` /

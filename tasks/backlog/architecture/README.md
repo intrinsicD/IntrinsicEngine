@@ -238,6 +238,13 @@ split; narratives live in the retirement log.
   engine-owned refined-pick caching, and editor selection models rather than
   mutable per-entity sub-element sets; remaining ECS external blockers are 19
   tests and remaining Runtime external blockers are 11 tests.
+- [LEGACY-040 — Retire legacy Asset.Manager safety test](../../done/LEGACY-040-retire-legacy-asset-manager-safety-test.md)
+  (done, 2026-06-18, `CPUContracted`):
+  retired legacy `tests/unit/assets/Test_CoreAssetSafety.cpp` because its
+  `Asset.Manager` loader-safety and pointer-returning error-path compatibility
+  surface is replaced by promoted `AssetService`, `AssetRegistry`,
+  `AssetPayloadStore`, and `AssetLoadPipeline` contracts; remaining external
+  blockers are 8 Asset tests and 20 Core tests.
 - [LEGACY-018 — Retire legacy Interface panel-registration test](../../done/LEGACY-018-retire-interface-panel-registration-test.md)
   (done, 2026-06-18, `CPUContracted`):
   retired legacy-only `tests/contract/ui/Test_PanelRegistration.cpp`;

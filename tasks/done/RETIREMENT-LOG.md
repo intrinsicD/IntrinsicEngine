@@ -9,6 +9,22 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`LEGACY-040`](LEGACY-040-retire-legacy-asset-manager-safety-test.md) —
+Retire legacy Asset.Manager safety test — retired on 2026-06-18 at maturity
+`CPUContracted`. Legacy `tests/unit/assets/Test_CoreAssetSafety.cpp` was
+removed because it verified the old `Core::Assets::AssetManager`
+loader-safety/error-path compatibility surface: copyable loader constraints,
+pointer-returning `GetRaw` / `AcquireLease` errors, and null pointer load
+failures. Promoted asset ownership is split across `Extrinsic.Asset.Service`,
+`Asset.Registry`, `Asset.PayloadStore`, and `Asset.LoadPipeline`, whose tests
+already cover retained captured-loader reload, reload failure preservation,
+wrong-type reads, dead-handle errors, failed-load cleanup, load-state
+transitions, and event ordering. `LEGACY-004` remains blocked by 8 remaining
+test consumers and 50 legacy-internal consumers; `LEGACY-005` remains blocked
+by 20 remaining test consumers and 133 legacy-internal consumers; `LEGACY-012`
+owns the remaining test cleanup.
+
+Backlog
 [`LEGACY-039`](LEGACY-039-retire-legacy-element-selection-test.md) — Retire
 legacy element-selection test — retired on 2026-06-18 at maturity
 `CPUContracted`. Legacy
