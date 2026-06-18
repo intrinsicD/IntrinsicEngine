@@ -133,8 +133,13 @@ split; narratives live in the retirement log.
   (done, 2026-06-18, `CPUContracted`):
   retired legacy-only `tests/unit/core/Test_FeatureRegistry.cpp` and
   `tests/unit/core/Test_SystemFeatureCatalog.cpp` after `CORE-002` decided not
-  to promote the global feature catalog shape; remaining Core deletion blockers
-  are 32 tests and legacy-internal subtree ordering.
+  to promote the global feature catalog shape; `LEGACY-025` later reduced the
+  remaining Core test-consumer set to 31 files.
+- [LEGACY-025 — Retire legacy Core.InplaceFunction test](../../done/LEGACY-025-retire-core-inplace-function-test.md)
+  (done, 2026-06-18, `CPUContracted`):
+  retired legacy-only `tests/unit/core/Test_InplaceFunction.cpp` because
+  `Core.InplaceFunction` has no promoted `Extrinsic.Core` endpoint; remaining
+  Core deletion blockers are 31 tests and legacy-internal subtree ordering.
 - [LEGACY-018 — Retire legacy Interface panel-registration test](../../done/LEGACY-018-retire-interface-panel-registration-test.md)
   (done, 2026-06-18, `CPUContracted`):
   retired legacy-only `tests/contract/ui/Test_PanelRegistration.cpp`;

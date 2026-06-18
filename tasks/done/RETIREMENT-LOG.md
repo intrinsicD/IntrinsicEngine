@@ -9,6 +9,16 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`LEGACY-025`](LEGACY-025-retire-core-inplace-function-test.md) — Retire
+legacy Core.InplaceFunction test — retired on 2026-06-18 at maturity
+`CPUContracted`. `tests/unit/core/Test_InplaceFunction.cpp` was removed because
+`Core.InplaceFunction` has no promoted `Extrinsic.Core` endpoint and is
+recorded in the parity matrix as legacy-only cleanup. Remaining legacy
+runtime/graphics/RHI consumers are owned by their subtree cleanup tasks.
+`LEGACY-005` remains blocked by 31 remaining test consumers and 133
+legacy-internal consumers; `LEGACY-012` owns the remaining test cleanup.
+
+Backlog
 [`LEGACY-024`](LEGACY-024-retire-core-feature-catalog-tests.md) — Retire
 legacy Core feature-catalog tests — retired on 2026-06-18 at maturity
 `CPUContracted`. `tests/unit/core/Test_FeatureRegistry.cpp` and

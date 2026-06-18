@@ -53,7 +53,7 @@ Consumer counts are distinct files matched outside the doomed subtree.
 |---|---|---|---|---|
 | `Interface/` ([LEGACY-001](../../tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md)) | 4 | 6 | 0 | none |
 | `Asset/` ([LEGACY-004](../../tasks/backlog/architecture/LEGACY-004-delete-src-legacy-asset.md)) | 6 | 50 | 10 | 10 tests, 0 promoted-src |
-| `Core/` ([LEGACY-005](../../tasks/backlog/architecture/LEGACY-005-delete-src-legacy-core.md)) | 40 | 133 | 32 | 32 tests, 0 promoted-src |
+| `Core/` ([LEGACY-005](../../tasks/backlog/architecture/LEGACY-005-delete-src-legacy-core.md)) | 40 | 133 | 31 | 31 tests, 0 promoted-src |
 | `ECS/` ([LEGACY-006](../../tasks/backlog/architecture/LEGACY-006-delete-src-legacy-ecs.md)) | 29 | 37 | 25 | 25 tests, 0 promoted-src |
 | `Graphics/` ([LEGACY-008](../../tasks/backlog/architecture/LEGACY-008-delete-src-legacy-graphics.md)) | 168 | 22 | 39 | 39 tests, 0 promoted-src |
 | `RHI/` ([LEGACY-009](../../tasks/backlog/architecture/LEGACY-009-delete-src-legacy-rhi.md)) | 54 | 83 | 18 | 18 tests, 0 promoted-src |
@@ -148,12 +148,16 @@ the remaining Core test-consumer set to 35 files.
 `Core.SystemFeatureCatalog` unit tests because `CORE-002` does not promote the
 global feature catalog shape, reducing the remaining Core test-consumer set to
 32 files.
+`LEGACY-025` retired the legacy-only `Core.InplaceFunction` unit test because
+the parity matrix records that utility as legacy-only cleanup rather than a
+promoted `Extrinsic.Core` endpoint, reducing the remaining Core test-consumer
+set to 31 files.
 
 **`LEGACY-013` clears only the promoted-src subset of the `LEGACY-005`
 gate.** The
 `LEGACY-005` consumer-grep searches every consumer of legacy `Core.*` outside
 `src/legacy/Core/**`, which the table above now counts as 133 legacy-internal +
-32 test files. `LEGACY-005` stays blocked by its 32 test consumers
+31 test files. `LEGACY-005` stays blocked by its 31 test consumers
 (`LEGACY-012`) and by all 133 legacy-internal consumers until the subtrees above
 Core have been deleted. This is why the `LEGACY-005` row in
 `legacy-retirement.md` says Core "retires last".
