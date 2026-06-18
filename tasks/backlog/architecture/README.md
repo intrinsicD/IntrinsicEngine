@@ -13,6 +13,9 @@ map.
 - [LEGACY-012 — Migrate legacy consumer tests to promoted coverage](LEGACY-012-migrate-legacy-consumer-tests.md):
   migrates or retires tests and non-legacy consumers that still import bare
   legacy module names after their promoted feature owners exist.
+- [LEGACY-034 — Resolve legacy runtime frame-loop and maintenance tests](LEGACY-034-resolve-runtime-frame-loop-maintenance-tests.md):
+  plans the retained-vs-retired coverage map for the two remaining direct
+  legacy `Runtime.FrameLoop` / `Runtime.ResourceMaintenance` test consumers.
 - [LEGACY-001 — Delete `src/legacy/Interface/`](LEGACY-001-delete-src-legacy-interface.md):
   first concrete deletion under `ARCH-004`. Backlog until the consumer-grep
   prerequisite passes; promotion to `tasks/active/` is gated by `ARCH-004`.
