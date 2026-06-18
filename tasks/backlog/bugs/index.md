@@ -5,7 +5,7 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- No active BUG issues are currently tracked.
+- Opened 2026-06-18: [`BUG-046` — Flaky `CoreTaskGraph.MainThreadReadyQueueUsesPriorityAndCostOrdering`](BUG-046-flaky-coretaskgraph-mainthread-ready-queue-ordering.md). The main-thread ready-queue priority/cost ordering test (`tests/unit/core/Test.Core.TaskGraphLegacy.cpp:541`) relies on a fixed `40ms` `WorkerBlocker` sleep to batch the three `MainThreadOnly` passes; under full-suite CPU load that timing assumption breaks and the passes can dispatch in arrival order instead of the expected `[HighHeavyMain, HighMain, LowMain]` priority+cost order. Observed during GRAPHICS-091 verification (1 failure in a full default CPU gate run; 5/5 green on isolated re-runs). Fix plan: replace the wall-clock sleep with a deterministic latch so the ordered-batch precondition holds without timing, and confirm the production drain orders a simultaneously-ready batch by priority then cost.
 
 ---
 

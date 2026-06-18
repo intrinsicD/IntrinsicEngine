@@ -24,6 +24,10 @@ the authoritative open/unblocked view.
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RORG-031F` — UI integration backlog seed (tasks/backlog/ui/RORG-031-ui-integration.md)
 
+## Theme G — Active bugs
+
+- unblocked: `BUG-046` — Flaky `CoreTaskGraph.MainThreadReadyQueueUsesPriorityAndCostOrdering` (timing-dependent ready-queue batching) (tasks/backlog/bugs/BUG-046-flaky-coretaskgraph-mainthread-ready-queue-ordering.md)
+
 ## Unthemed
 
 - unblocked: `GEOM-013` — Feature-preserving dual contouring (tasks/backlog/geometry/GEOM-013-feature-preserving-dual-contouring.md)
