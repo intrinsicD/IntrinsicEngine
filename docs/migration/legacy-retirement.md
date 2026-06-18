@@ -16,6 +16,9 @@
   when they are necessary or improve the current promoted architecture; otherwise
   they are deferred or retired. The per-subtree `LEGACY-*` deletion tasks remain
   mechanical and should not grow feature work.
+- The current per-subtree gate state — which subtrees are blocked only by test
+  consumers vs. by promoted engine code — is captured in the dated
+  [`legacy-removal-audit.md`](legacy-removal-audit.md) snapshot.
 
 ## Exit criteria
 
