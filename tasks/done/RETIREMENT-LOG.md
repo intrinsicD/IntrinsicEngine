@@ -9,6 +9,18 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`LEGACY-019`](LEGACY-019-strong-handle-test-promoted.md) — Migrate
+StrongHandle test to promoted Core — retired on 2026-06-18 at maturity
+`CPUContracted`. The full `tests/unit/core/Test_CoreHandle.cpp` coverage now
+imports promoted `Extrinsic.Core.StrongHandle` as
+`tests/unit/core/Test.CoreStrongHandle.cpp` and uses the exported
+`StrongHandleHash` for unordered containers. The smaller legacy-suffixed
+promoted wrapper test was removed as duplicate coverage. The focused core
+targets and `StrongHandle` CTest filter passed. `LEGACY-005` remains blocked by
+39 remaining test consumers and 133 legacy-internal consumers; `LEGACY-012`
+owns the remaining test cleanup.
+
+Backlog
 [`LEGACY-018`](LEGACY-018-retire-interface-panel-registration-test.md) —
 Retire legacy Interface panel-registration test — retired on 2026-06-18 at
 maturity `CPUContracted`. The legacy-only

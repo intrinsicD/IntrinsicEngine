@@ -97,8 +97,14 @@ split; narratives live in the retirement log.
   (done, 2026-06-18, `CPUContracted`):
   retired duplicate legacy `Test_CoreHash.cpp` coverage in favor of promoted
   `Extrinsic.Core.Hash` coverage now named `tests/unit/core/Test.CoreHash.cpp`;
-  remaining Core deletion blockers are 40 tests and legacy-internal subtree
-  ordering.
+  `LEGACY-019` later reduced the remaining Core test-consumer set to 39 files.
+- [LEGACY-019 — Migrate StrongHandle test to promoted Core](../../done/LEGACY-019-strong-handle-test-promoted.md)
+  (done, 2026-06-18, `CPUContracted`):
+  migrated the full strong-handle unit test to promoted
+  `Extrinsic.Core.StrongHandle`, renamed it to
+  `tests/unit/core/Test.CoreStrongHandle.cpp`, and removed the smaller
+  legacy-suffixed wrapper test; remaining Core deletion blockers are 39 tests
+  and legacy-internal subtree ordering.
 - [LEGACY-018 — Retire legacy Interface panel-registration test](../../done/LEGACY-018-retire-interface-panel-registration-test.md)
   (done, 2026-06-18, `CPUContracted`):
   retired legacy-only `tests/contract/ui/Test_PanelRegistration.cpp`;

@@ -1,17 +1,20 @@
 #include <gtest/gtest.h>
+#include <cstdint>
+#include <limits>
+#include <string>
 #include <unordered_set>
 #include <unordered_map>
 
-import Core;
+import Extrinsic.Core.StrongHandle;
 
 // Define test tag types for StrongHandle
 struct GeometryTag {};
 struct TextureTag {};
 struct MaterialTag {};
 
-using GeometryHandle = Core::StrongHandle<GeometryTag>;
-using TextureHandle = Core::StrongHandle<TextureTag>;
-using MaterialHandle = Core::StrongHandle<MaterialTag>;
+using GeometryHandle = Extrinsic::Core::StrongHandle<GeometryTag>;
+using TextureHandle = Extrinsic::Core::StrongHandle<TextureTag>;
+using MaterialHandle = Extrinsic::Core::StrongHandle<MaterialTag>;
 
 // -----------------------------------------------------------------------------
 // Basic Functionality
@@ -22,7 +25,7 @@ TEST(StrongHandle, DefaultConstructor_Invalid)
     GeometryHandle h;
     EXPECT_FALSE(h.IsValid());
     EXPECT_FALSE(static_cast<bool>(h));
-    EXPECT_EQ(h.Index, GeometryHandle::INVALID_INDEX);
+    EXPECT_EQ(h.Index, Extrinsic::Core::INVALID_HANDLE_INDEX);
     EXPECT_EQ(h.Generation, 0u);
 }
 
@@ -107,7 +110,7 @@ TEST(StrongHandle, TypeSafety_DifferentTagsAreDistinctTypes)
 
 TEST(StrongHandle, Hashable_UnorderedSet)
 {
-    std::unordered_set<GeometryHandle> handleSet;
+    std::unordered_set<GeometryHandle, Extrinsic::Core::StrongHandleHash<GeometryTag>> handleSet;
 
     GeometryHandle h1(1, 1);
     GeometryHandle h2(2, 1);
@@ -127,7 +130,7 @@ TEST(StrongHandle, Hashable_UnorderedSet)
 
 TEST(StrongHandle, Hashable_UnorderedMap)
 {
-    std::unordered_map<TextureHandle, std::string> textureNames;
+    std::unordered_map<TextureHandle, std::string, Extrinsic::Core::StrongHandleHash<TextureTag>> textureNames;
 
     TextureHandle t1(0, 1);
     TextureHandle t2(1, 1);
@@ -146,7 +149,7 @@ TEST(StrongHandle, Hashable_UnorderedMap)
 
 TEST(StrongHandle, Hash_DifferentValuesProduceDifferentHashes)
 {
-    std::hash<GeometryHandle> hasher;
+    Extrinsic::Core::StrongHandleHash<GeometryTag> hasher;
 
     GeometryHandle h1(1, 1);
     GeometryHandle h2(2, 1);
@@ -175,8 +178,8 @@ TEST(StrongHandle, MaxGeneration)
 
 TEST(StrongHandle, MaxValidIndex)
 {
-    // INVALID_INDEX is max uint32, so max-1 should be valid
-    GeometryHandle h(GeometryHandle::INVALID_INDEX - 1, 0);
+    // INVALID_HANDLE_INDEX is max uint32, so max-1 should be valid
+    GeometryHandle h(Extrinsic::Core::INVALID_HANDLE_INDEX - 1, 0);
     EXPECT_TRUE(h.IsValid());
 }
 
@@ -205,4 +208,3 @@ TEST(StrongHandle, ConstexprValueConstruction)
     static_assert(h.Generation == 50);
     EXPECT_TRUE(h.IsValid());
 }
-

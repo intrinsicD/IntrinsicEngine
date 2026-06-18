@@ -186,7 +186,6 @@ set(_core_test_files
     Test_BoundedHeap.cpp
     Test_CoreMemory.cpp
     Test_CoreTasks.cpp
-    Test_CoreHandle.cpp
     Test_CoreCommands.cpp
     Test_CoreFrameGraph.cpp
     Test_FrameGraphTypeTokenHelper.cpp
@@ -519,7 +518,7 @@ set(_core_wrapper_unit_test_files
     Test.Core.Logging.cpp
     Test.Core.MemoryLegacy.cpp
     Test.Core.ResourcePool.cpp
-    Test.Core.StrongHandleLegacy.cpp
+    Test.CoreStrongHandle.cpp
     Test.Core.TaskGraphLegacy.cpp
     Test.Core.TasksLegacy.cpp
 )

@@ -96,7 +96,7 @@ python3 tools/docs/check_doc_links.py --root . --strict
 | `tests/Core/Test.Core.Memory.cpp` | `tests/unit/core/Test.Core.MemoryLegacy.cpp` | Memory primitive behavior parity; unit scope. |
 | `tests/Core/Test.Core.Process.cpp` | `tests/integration/runtime/Test.CoreProcess.cpp` | Process/runtime seam behavior; integration scope. |
 | `tests/Core/Test.Core.ResourcePool.cpp` | `tests/unit/core/Test.Core.ResourcePool.cpp` | Resource-pool primitive invariants; unit scope. |
-| `tests/Core/Test.Core.StrongHandle.cpp` | `tests/unit/core/Test.Core.StrongHandleLegacy.cpp` | Strong-handle parity checks; unit scope. |
+| `tests/Core/Test.Core.StrongHandle.cpp` | `tests/unit/core/Test.CoreStrongHandle.cpp` | Strong-handle parity checks; unit scope; renamed by `LEGACY-019` after duplicate legacy-suffixed coverage retired. |
 | `tests/Core/Test.Core.TaskGraph.cpp` | `tests/unit/core/Test.Core.TaskGraphLegacy.cpp` | Task graph primitive semantics; unit scope. |
 | `tests/Core/Test.Core.Tasks.cpp` | `tests/unit/core/Test.Core.TasksLegacy.cpp` | Task utility behavior; unit scope. |
 | `tests/ECS/Test.ECS.Scene.Registry.cpp` | `tests/unit/ecs/Test.ECS.SceneRegistry.cpp` | ECS registry data behavior; unit scope. |
