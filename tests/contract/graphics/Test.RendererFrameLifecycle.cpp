@@ -1396,6 +1396,31 @@ TEST(RendererFrameLifecycle, ForwardPointSphereImpostorsWriteCorrectedDepth)
     EXPECT_NE(cullShader.find("geo.PointFirstVertex * 6u"), std::string::npos);
 }
 
+TEST(RendererFrameLifecycle, ForwardLinePointShadersUseSharedVisualizationColorHelpers)
+{
+    const std::string lineVertex = ReadShaderSource("forward/line.vert");
+    const std::string lineFragment = ReadShaderSource("forward/line.frag");
+    const std::string pointVertex = ReadShaderSource("forward/point.vert");
+
+    EXPECT_NE(pointVertex.find("ResolvePointVisualizationColor"), std::string::npos);
+    EXPECT_NE(pointVertex.find("GpuVisualizationReadScalar"), std::string::npos);
+    EXPECT_NE(pointVertex.find("GpuVisualizationReadColor"), std::string::npos);
+    EXPECT_NE(pointVertex.find("GpuResolveVisualizationColorWithColormap"),
+              std::string::npos);
+    EXPECT_NE(pointVertex.find("GpuResolveVisualizationColorFallback"),
+              std::string::npos);
+
+    EXPECT_NE(lineVertex.find("vVisualizationScalar"), std::string::npos);
+    EXPECT_NE(lineVertex.find("vVisualizationColor"), std::string::npos);
+    EXPECT_NE(lineVertex.find("GpuVisualizationDomain_Vertex"), std::string::npos);
+    EXPECT_NE(lineVertex.find("GpuVisualizationReadScalar"), std::string::npos);
+    EXPECT_NE(lineVertex.find("GpuVisualizationReadColor"), std::string::npos);
+    EXPECT_NE(lineFragment.find("GpuResolveVisualizationColorWithColormap"),
+              std::string::npos);
+    EXPECT_NE(lineFragment.find("GpuResolveVisualizationColorFallback"),
+              std::string::npos);
+}
+
 // ---------------------------------------------------------------------------
 // GRAPHICS-073 Slice A — default-recipe depth-only shadow pipeline lease +
 // republish. The CPU/null contract here is the byte-identical descriptor

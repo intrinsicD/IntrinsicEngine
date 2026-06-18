@@ -27,7 +27,7 @@ depends_on: []
   with the GpuScene shader contract in `assets/shaders/common/gpu_scene.glsl`.
   `runtime` owns the visualization config + extraction; graphics consumes snapshots,
   BDAs, and the colormap LUT only.
-- Current asymmetry (verified 2026-06-18):
+- Current state after Slice B (verified 2026-06-18):
   - Surface after Slice A: the promoted forward and deferred surface shader
     pairs (`assets/shaders/forward/default_debug_surface.*` and
     `assets/shaders/deferred/gbuffer.*`) consume `GpuEntityConfig` through the
@@ -35,16 +35,17 @@ depends_on: []
     uniform, scalar-field, and per-element RGBA color sources. Vertex-domain
     scalar/color values are forwarded as interpolants; face-domain values are
     read in the fragment shader by `gl_PrimitiveID`.
-  - Line/point: `assets/shaders/forward/line.vert` and `forward/point.vert`
-    resolve `vColor` to only `cfg.UniformColor` (when `ColorSourceMode == 1`) or
-    white; `forward/line.frag`/`forward/point.frag` consume that pre-resolved
-    `vColor`. They never read the colormap, the scalar buffer, or per-element RGBA
-    buffers. Net: `ScalarField` and per-element RGBA visualization now have a
-    promoted surface consumer; lines/points still fall back to uniform/white.
+  - Line/point after Slice B: `assets/shaders/forward/point.vert` resolves one
+    scalar/color element per retained source point through the same helper.
+    `assets/shaders/forward/line.vert` forwards endpoint or segment
+    scalar/color values and `forward/line.frag` resolves scalar colormaps
+    per-fragment so vertex-domain values interpolate along the segment while
+    edge-domain values remain flat per segment.
 - `VisualizationSyncSystem` already writes the colormap fields into
   `GpuEntityConfig` for line/point records (`BuildEntityConfig`) and builds a
-  SciVis override material, but the consuming branch is missing in the line/point
-  shaders, so those writes are currently dead for the line/point domains.
+  SciVis override material. Slice B made those `GpuEntityConfig` scalar/color
+  fields live for retained line and point shaders under CPU/null coverage; the
+  opt-in Vulkan pixel smoke remains open for Slice C.
 - Stale documentation (corrected by Slice A): the `Graphics.VisualizationSyncSystem`
   module header (`src/graphics/renderer/Graphics.VisualizationSyncSystem.cppm`
   ~lines 36-41 before this slice) described a "CPU-baking path for Line and Point
@@ -77,53 +78,55 @@ depends_on: []
 - [x] Wire `forward/default_debug_surface.*` and `deferred/gbuffer.*` to call the
       shared helper so promoted surface rendering has a real GpuScene color-source
       consumer before line/point parity work.
-- [ ] Extend `forward/point.vert`/`forward/point.frag` to resolve `ScalarField` and
+- [x] Extend `forward/point.vert`/`forward/point.frag` to resolve `ScalarField` and
       per-element RGBA via the shared helper (per-point scalar/color from the GpuScene
       element buffer), not just `UniformColor`/white.
-- [ ] Extend `forward/line.vert`/`forward/line.frag` similarly, interpolating the
+- [x] Extend `forward/line.vert`/`forward/line.frag` similarly, interpolating the
       scalar across the segment and applying the colormap per-fragment.
-- [ ] Ensure `GpuEntityConfig` / the GpuScene table exposes the per-element
+- [x] Ensure `GpuEntityConfig` / the GpuScene table exposes the per-element
       scalar/color buffer pointer(s) and element-index basis needed by line/point;
       extend the contract only if the existing surface fields are insufficient, and
       keep the push-constant budget unchanged.
-- [ ] Make `VisualizationSyncSystem` populate the line/point color-source config
+- [x] Make `VisualizationSyncSystem` populate the line/point color-source config
       (mode + scalar/color BDA) so the previously-dead colormap writes become live for
       the line/point domains; keep surface behavior unchanged.
 - [x] Correct the stale `vis_colors_baked` CPU-bake description in
       `Graphics.VisualizationSyncSystem.cppm` to reflect GPU-side resolution.
 
 ## Tests
-- [ ] Add/extend CPU/null `contract;graphics` coverage asserting `VisualizationSyncSystem`
+- [x] Add/extend CPU/null `contract;graphics` coverage asserting `VisualizationSyncSystem`
       writes equivalent color-source config (mode, colormap id, range, scalar/color BDA)
       for surface, line, and point records given the same `VisualizationConfig`.
 - [x] Run focused shader compile coverage for the shared helper's promoted surface
       consumers (`forward/default_debug_surface.*`, `deferred/gbuffer.*`).
-- [ ] Extend shader-compile coverage once line/point stages call the shared helper.
+- [x] Extend shader-compile coverage once line/point stages call the shared helper.
 - [ ] Add opt-in `gpu;vulkan` smoke proving a scalar-field colormap renders on a line set
       and a point set (sampled pixel matches the colormap), mirroring the surface
       scalar-field path; skip / fail-closed without promoted Vulkan.
-- [ ] Preserve the default CPU gate and existing `GraphicsVisualizationPackets` /
+- [x] Preserve the default CPU gate and existing `GraphicsVisualizationPackets` /
       `VisualizationSyncSystem` coverage.
 
 ## Docs
 - [x] Update `src/graphics/renderer/README.md` to state that promoted surface
       scalar-field/per-element color resolution is shared through
       `common/gpu_scene.glsl`.
-- [ ] Update docs again when line/point parity lands so the shared surface/line/point
+- [x] Update docs again when line/point parity lands so the shared surface/line/point
       claim is factual.
-- [ ] Remove/replace the `vis_colors_baked` references and record the unified
+- [x] Remove/replace the `vis_colors_baked` references and record the unified
       GPU-resolution contract.
-- [ ] Update `tasks/backlog/rendering/README.md` and regenerate `tasks/SESSION-BRIEF.md`.
+- [x] Update `tasks/backlog/rendering/README.md` and regenerate `tasks/SESSION-BRIEF.md`.
 
 ## Acceptance criteria
-- [ ] The same `VisualizationConfig` (a `ScalarField` with a colormap, and a per-element
-      RGBA buffer) produces equivalent colour on surface, line, and point renderables.
+- [x] The same `VisualizationConfig` (a `ScalarField` with a colormap, and a per-element
+      RGBA buffer) produces equivalent colour config on surface, line, and point
+      renderables under CPU/null coverage; Vulkan pixel proof remains Slice C.
 - [ ] Surface visualization output is unchanged (parity) after the shared-helper refactor.
-- [ ] No `vis_colors_baked` buffer or CPU scalar→color bake for line/point is introduced;
+- [x] No `vis_colors_baked` buffer or CPU scalar→color bake for line/point is introduced;
       resolution is GPU-side from the property/colormap BDAs.
-- [ ] Default CPU gate stays green; the new `gpu;vulkan` smoke passes on a Vulkan-capable
-      host or skips deterministically.
-- [ ] Layering preserved: graphics consumes snapshots/BDAs/colormap LUT only; no live
+- [x] Default CPU gate stays green.
+- [ ] The new `gpu;vulkan` smoke passes on a Vulkan-capable host or skips
+      deterministically.
+- [x] Layering preserved: graphics consumes snapshots/BDAs/colormap LUT only; no live
       ECS/`AssetService`/runtime ownership added.
 
 ## Verification
@@ -161,7 +164,8 @@ python3 tools/agents/check_task_policy.py --root . --strict
     forward/deferred surface color-source wiring. Preserves the CPU gate and
     creates the factual surface baseline. Defers line/point wiring.
   - **Slice B.** Line/point shader resolution + `VisualizationSyncSystem` wiring +
-    CPU `contract;graphics` parity tests + stale-doc correction. Closes
-    `Scaffolded → CPUContracted`.
+    CPU `contract;graphics` parity tests + stale-doc correction. Landed under
+    CPU/null coverage and closes `Scaffolded → CPUContracted`; `Operational` is
+    owned by GRAPHICS-091 Slice C.
   - **Slice C.** Opt-in `gpu;vulkan` smoke for line/point scalar-field colormap.
     Closes `Operational`.

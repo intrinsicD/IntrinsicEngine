@@ -46,6 +46,8 @@ namespace
     }};
 
     constexpr std::array<std::uint32_t, 3> kTriangleIndices{{0u, 1u, 2u}};
+    constexpr std::uint32_t kColorSourceScalarField = 2u;
+    constexpr std::uint32_t kColorSourcePerElementRgba = 3u;
 
     std::span<const std::byte> VertexBytes()
     {
@@ -309,6 +311,143 @@ TEST(GraphicsMinimalAcceptance, VisualizationSyncWritesLineWidthConfig)
     config = world.GetEntityConfigForTest(instance);
     EXPECT_FLOAT_EQ(config.Line.LineWidth, 3.5f);
     EXPECT_EQ(config.Line.LineWidthBDA, 0u);
+
+    visSync.Shutdown();
+    matSys.Shutdown();
+    world.Shutdown();
+}
+
+TEST(GraphicsMinimalAcceptance, VisualizationSyncWritesEquivalentLinePointColorSourceConfig)
+{
+    MockDevice device;
+    RHI::BufferManager bufferMgr{device};
+
+    Graphics::GpuWorld world;
+    Graphics::GpuWorld::InitDesc worldInit{};
+    worldInit.MaxInstances = 8;
+    worldInit.MaxGeometryRecords = 1;
+    worldInit.MaxLights = 1;
+    worldInit.VertexBufferBytes = 1024;
+    worldInit.IndexBufferBytes = 1024;
+    ASSERT_TRUE(world.Initialize(device, bufferMgr, worldInit));
+
+    Graphics::MaterialSystem matSys;
+    matSys.Initialize(device, bufferMgr);
+
+    Graphics::VisualizationSyncSystem visSync;
+    visSync.Initialize(matSys, device);
+
+    Graphics::ColormapSystem colorSys;
+
+    const RHI::BufferHandle scalarBuffer{91u, 1u};
+    const RHI::BufferHandle colorBuffer{92u, 1u};
+    constexpr std::uint32_t kElementCount = 7u;
+
+    const auto surfaceInstance = world.AllocateInstance(51u);
+    const auto lineInstance = world.AllocateInstance(52u);
+    const auto pointInstance = world.AllocateInstance(53u);
+    ASSERT_TRUE(surfaceInstance.IsValid());
+    ASSERT_TRUE(lineInstance.IsValid());
+    ASSERT_TRUE(pointInstance.IsValid());
+
+    Graphics::Components::GpuSceneSlot surfaceSlot{};
+    Graphics::Components::GpuSceneSlot lineSlot{};
+    Graphics::Components::GpuSceneSlot pointSlot{};
+    surfaceSlot.SetInstanceHandle(surfaceInstance);
+    lineSlot.SetInstanceHandle(lineInstance);
+    pointSlot.SetInstanceHandle(pointInstance);
+    for (auto* slot : {&surfaceSlot, &lineSlot, &pointSlot})
+    {
+        slot->Upsert("curvature", scalarBuffer, kElementCount, sizeof(float));
+        slot->Upsert("colors", colorBuffer, kElementCount, sizeof(glm::vec4));
+    }
+
+    Graphics::Components::MaterialInstance surfaceMaterial{};
+    Graphics::Components::MaterialInstance lineMaterial{};
+    Graphics::Components::MaterialInstance pointMaterial{};
+    Graphics::Components::RenderEdges edges{};
+    Graphics::Components::RenderPoints points{};
+
+    Graphics::Components::VisualizationConfig scalarVis{};
+    scalarVis.Source =
+        Graphics::Components::VisualizationConfig::ColorSource::ScalarField;
+    scalarVis.ScalarFieldName = "curvature";
+    scalarVis.Scalar.RangeMin = -2.0f;
+    scalarVis.Scalar.RangeMax = 5.0f;
+    scalarVis.Scalar.BinCount = 4u;
+    scalarVis.Scalar.Isolines.Num = 3u;
+    scalarVis.Scalar.Isolines.Width = 2.25f;
+    scalarVis.Scalar.Isolines.Color = {0.2f, 0.3f, 0.4f, 0.8f};
+    scalarVis.ScalarDomain =
+        Graphics::Components::VisualizationConfig::Domain::Vertex;
+
+    std::array<Graphics::VisualizationSyncRecord, 3> records{{
+        Graphics::VisualizationSyncRecord{
+            .StableId = 51u,
+            .Material = &surfaceMaterial,
+            .GpuSlot = &surfaceSlot,
+            .Visualization = &scalarVis,
+        },
+        Graphics::VisualizationSyncRecord{
+            .StableId = 52u,
+            .Material = &lineMaterial,
+            .GpuSlot = &lineSlot,
+            .Visualization = &scalarVis,
+            .Edges = &edges,
+        },
+        Graphics::VisualizationSyncRecord{
+            .StableId = 53u,
+            .Material = &pointMaterial,
+            .GpuSlot = &pointSlot,
+            .Visualization = &scalarVis,
+            .Points = &points,
+        },
+    }};
+
+    visSync.Sync(records, matSys, colorSys, world);
+
+    const auto expectScalarConfig = [&](const Graphics::GpuInstanceHandle instance)
+    {
+        const RHI::GpuEntityConfig config = world.GetEntityConfigForTest(instance);
+        EXPECT_EQ(config.ColorSourceMode, kColorSourceScalarField);
+        EXPECT_EQ(config.ScalarBDA, device.GetBufferDeviceAddress(scalarBuffer));
+        EXPECT_EQ(config.ColorBDA, 0u);
+        EXPECT_EQ(config.ElementCount, kElementCount);
+        EXPECT_EQ(config.ColormapID, colorSys.GetBindlessIndex(scalarVis.Scalar.Map));
+        EXPECT_FLOAT_EQ(config.ScalarRangeMin, -2.0f);
+        EXPECT_FLOAT_EQ(config.ScalarRangeMax, 5.0f);
+        EXPECT_EQ(config.BinCount, 4u);
+        EXPECT_FLOAT_EQ(config.IsolineCount, 3.0f);
+        EXPECT_FLOAT_EQ(config.IsolineWidth, 2.25f);
+        EXPECT_EQ(config.VisDomain, 0u);
+    };
+    expectScalarConfig(surfaceInstance);
+    expectScalarConfig(lineInstance);
+    expectScalarConfig(pointInstance);
+
+    Graphics::Components::VisualizationConfig colorVis = scalarVis;
+    colorVis.Source =
+        Graphics::Components::VisualizationConfig::ColorSource::PerVertexBuffer;
+    colorVis.ColorBufferName = "colors";
+    for (auto& record : records)
+    {
+        record.Visualization = &colorVis;
+    }
+
+    visSync.Sync(records, matSys, colorSys, world);
+
+    const auto expectColorConfig = [&](const Graphics::GpuInstanceHandle instance)
+    {
+        const RHI::GpuEntityConfig config = world.GetEntityConfigForTest(instance);
+        EXPECT_EQ(config.ColorSourceMode, kColorSourcePerElementRgba);
+        EXPECT_EQ(config.ScalarBDA, 0u);
+        EXPECT_EQ(config.ColorBDA, device.GetBufferDeviceAddress(colorBuffer));
+        EXPECT_EQ(config.ElementCount, kElementCount);
+        EXPECT_EQ(config.VisDomain, 0u);
+    };
+    expectColorConfig(surfaceInstance);
+    expectColorConfig(lineInstance);
+    expectColorConfig(pointInstance);
 
     visSync.Shutdown();
     matSys.Shutdown();

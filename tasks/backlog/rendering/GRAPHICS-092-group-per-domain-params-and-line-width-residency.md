@@ -32,9 +32,9 @@ depends_on: []
   (`RHI.Types.cppm`, 128 bytes, `static_assert(sizeof == 128)` plus offset
   assertions) keeps shared visualization/color fields in the parent config and
   stores domain-specific settings in `cfg.Point` and `cfg.Line`. Point size has
-  full residency: uniform `RenderPoints::SizeSource` → `cfg.Point.PointSize`,
-  per-point buffer → `cfg.Point.PointSizeBDA`, consumed by `forward/point.vert`
-  quad expansion. `RenderEdges::WidthSource` now populates
+  uniform shader consumption via `cfg.Point.PointSize`; named per-point size
+  buffers can populate `cfg.Point.PointSizeBDA`, with retained point shader
+  consumption tracked by `GRAPHICS-094`. `RenderEdges::WidthSource` now populates
   `cfg.Line.LineWidth` for uniform widths and `cfg.Line.LineWidthBDA` for named
   per-edge width buffers, and `forward/line.vert` consumes that config while
   expanding retained `LineQuads`.

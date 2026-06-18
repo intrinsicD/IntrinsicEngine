@@ -22,7 +22,9 @@ struct PackedVertex {
 };
 layout(buffer_reference, scalar) readonly buffer PackedVertexRef { PackedVertex Data[]; };
 
-layout(location = 0) out vec4 vColor;
+layout(location = 0) flat out uint vConfigSlot;
+layout(location = 1) out float vVisualizationScalar;
+layout(location = 2) out vec4 vVisualizationColor;
 
 void main() {
     const uint instanceSlot = gl_InstanceIndex;
@@ -74,5 +76,10 @@ void main() {
 
     gl_Position = centerClip + vec4(clipOffset, 0.0, 0.0);
 
-    vColor = (cfg.ColorSourceMode == GpuColorSource_UniformColor) ? cfg.UniformColor : vec4(1.0);
+    const uint elementId = cfg.VisDomain == GpuVisualizationDomain_Vertex
+        ? (useEnd ? endpointB : endpointA)
+        : segmentIndex;
+    vConfigSlot = inst.ConfigSlot;
+    vVisualizationScalar = GpuVisualizationReadScalar(cfg, elementId, cfg.ScalarRangeMin);
+    vVisualizationColor = GpuVisualizationReadColor(cfg, elementId, vec4(1.0));
 }

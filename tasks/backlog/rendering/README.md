@@ -792,9 +792,10 @@ Open post-acceptance rendering leaves:
 - [GRAPHICS-091 — Unify scalar-field / colormap visualization across surface, line, and point passes](GRAPHICS-091-unify-scalar-colormap-across-surface-line-point.md):
   unblocked; Slice A has landed the shared `common/gpu_scene.glsl`
   visualization color resolver and promoted surface consumers in
-  `forward/default_debug_surface.*` and `deferred/gbuffer.*`. Remaining slices bring
-  `forward/line.*` and `forward/point.*` to scalar-field / per-element-color parity;
-  they still resolve uniform/white only today. Target `Operational` on
+  `forward/default_debug_surface.*` and `deferred/gbuffer.*`. Slice B has
+  landed CPU/null retained line/point scalar-field and per-element-color shader
+  consumption through the same helper. The remaining open slice is the opt-in
+  `gpu;vulkan` line/point colormap pixel smoke. Target `Operational` on
   Vulkan-capable hosts. Sibling of `GRAPHICS-092` (shared "venue",
   color/colormap side).
 - [GRAPHICS-092 — Group per-domain params in `GpuEntityConfig` and add line-width residency](GRAPHICS-092-group-per-domain-params-and-line-width-residency.md):
@@ -805,6 +806,12 @@ Open post-acceptance rendering leaves:
   landed CPU/null line-width residency and `forward/line.vert` consumption on the
   `LineQuads` topology. The remaining open slice is the opt-in `gpu;vulkan`
   operational line-width smoke on Vulkan-capable hosts.
+- [GRAPHICS-094 — Consume per-point size BDA in retained point shader](GRAPHICS-094-retained-point-size-bda-consumption.md):
+  unblocked follow-up from the `GRAPHICS-092` factual-doc audit. Named
+  `RenderPoints::SizeSource` buffers can populate `Point.PointSizeBDA`, but the
+  retained point shader still consumes uniform `Point.PointSize`; target
+  `CPUContracted` shader consumption without changing point color, line width, or
+  legacy point paths.
 - [GRAPHICS-093 — Define forward-line quad topology for retained GpuScene lines (done)](../../done/GRAPHICS-093-forward-line-quad-topology.md):
   retired 2026-06-18 at `CPUContracted`; appended the non-indexed `LineQuads`
   bucket, switched retained `LinePass` to `DrawIndirectCount()` / `TriangleList`,

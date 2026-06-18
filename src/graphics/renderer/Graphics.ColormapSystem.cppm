@@ -21,9 +21,9 @@ import Extrinsic.RHI.Transfer;
 // and registers each in the bindless descriptor heap.  Shaders sample the LUT at the
 // normalised scalar value t ∈ [0,1] to obtain the mapped colour.
 //
-// Also provides a CPU-side SampleCpu() path so that
-// VisualizationSyncSystem can bake scalar→RGBA colours for line
-// and point pass without additional GPU readbacks.
+// Also provides a CPU-side SampleCpu() path for tests/tools that need a
+// reference colourmap lookup. Retained surface, line, and point renderables
+// resolve scalar fields on the GPU through common/gpu_scene.glsl.
 //
 // Lifetime contract:
 //   Initialize() before Sync() or any query.
@@ -78,7 +78,7 @@ export namespace Extrinsic::Graphics
         [[nodiscard]] RHI::BindlessIndex GetBindlessIndex(Colormap::Type t) const noexcept;
 
         // -----------------------------------------------------------------
-        // CPU sampling — for baking line/point colours
+        // CPU sampling — reference lookup for tests/tools.
         // -----------------------------------------------------------------
 
         /// Sample the colourmap at normalised scalar value t ∈ [0,1].
@@ -99,4 +99,3 @@ export namespace Extrinsic::Graphics
         std::unique_ptr<Impl> m_Impl;
     };
 }
-

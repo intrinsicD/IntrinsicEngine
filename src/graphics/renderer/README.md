@@ -284,16 +284,22 @@ Concretely:
   vertices in the cull shader and the point vertex shader reconstructs a
   camera-facing billboard from `gl_VertexIndex / 6`; the
   selection point-id pass uses the separate `SelectionPoints` bucket so picking
-  continues to draw the unexpanded point-id shader path. Both forward pipelines
+  continues to draw the unexpanded point-id shader path. Retained line and
+  point visualization colors use the shared `common/gpu_scene.glsl` resolver:
+  points resolve one scalar/color element per source point, while lines forward
+  endpoint or segment values and resolve scalar colormaps in the fragment
+  shader. Both forward pipelines
   load `SceneDepth`, append into `SceneColorHDR`, enable alpha blending, use
   `CullMode::None`, and carry the canonical `GpuScenePushConstants` block. The
   line pipeline disables depth writes; the point pipeline enables depth writes
   because mode 1 computes the front sphere surface in view space and writes
   corrected `gl_FragDepth` so impostor spheres intersect and occlude retained
   surfaces instead of using flat billboard depth. The forward point shader
-  consumes `GpuEntityConfig::Point.PointSize` and `Point.PointMode`: mode 0 draws flat
-  circles, mode 1 draws depth-corrected impostor spheres, and mode 2 currently
-  uses a neutral fallback normal until a dedicated point/surfel normal-buffer
+  consumes uniform `GpuEntityConfig::Point.PointSize` and `Point.PointMode`;
+  named `Point.PointSizeBDA` residency is populated by sync/extraction but
+  shader consumption is tracked by `GRAPHICS-094`. Mode 0 draws flat circles,
+  mode 1 draws depth-corrected impostor spheres, and mode 2 currently uses a
+  neutral fallback normal until a dedicated point/surfel normal-buffer
   residency path lands. The retained point UV slot is not used for normal
   encoding. Transient debug-point expansion remains owned by
   GRAPHICS-077 and must not route through the retained `Points` cull bucket.
@@ -1161,7 +1167,10 @@ Concretely:
   and line settings live in `GpuEntityConfig::Point` and
   `GpuEntityConfig::Line`; line-width residency is stored as `Line.LineWidth` /
   `Line.LineWidthBDA` and consumed by the retained forward line shader's
-  screen-space quad expansion.
+  screen-space quad expansion. The same sync step writes scalar/color
+  visualization config (`ColorSourceMode`, colormap metadata, and scalar/color
+  BDAs) for surface, line, and point records; retained line/point shaders
+  consume those fields on the GPU.
 - `IRenderer::SubmitRuntimeSnapshots(..., storageSlot)` is the promoted handoff
   from runtime to graphics. The renderer copies snapshot records into retained
   storage keyed by the runtime `RenderWorldPool` slot before
@@ -1384,14 +1393,16 @@ Concretely:
   deterministically instead of sampling an in-flight upload. The synchronous
   `IDevice::WriteTexture()` helper remains only as the guarded backend
   fail-closed baseline, not a renderer/runtime upload path.
-- Promoted surface visualization resolves material, uniform, scalar-field, and
+- Promoted visualization resolves material, uniform, scalar-field, and
   per-element RGBA color sources through `GpuEntityConfig` and the shared
-  `assets/shaders/common/gpu_scene.glsl` helper in both
-  `forward/default_debug_surface.*` and `deferred/gbuffer.*`. Vertex-domain
-  scalar/color values are forwarded as interpolants; face-domain values are
-  read in the fragment shader by `gl_PrimitiveID`. Line and point colormap
-  parity remains the later `GRAPHICS-091` slice and must reuse the same GPU-side
-  BDA resolver instead of introducing a CPU-baked color buffer.
+  `assets/shaders/common/gpu_scene.glsl` helper in the promoted surface
+  shaders (`forward/default_debug_surface.*`, `deferred/gbuffer.*`) and the
+  retained line/point forward shaders. Surface vertex-domain scalar/color
+  values are forwarded as interpolants and face-domain values are read in the
+  fragment shader by `gl_PrimitiveID`; retained points resolve one per-point
+  element in the vertex shader; retained lines interpolate vertex-domain values
+  along the segment and use a flat segment ID for edge-domain values. No
+  CPU-baked line/point color buffer is introduced.
 - `Graphics.FrameRecipe` imports explicit cull bucket resources for surface,
   line, and point lanes. `LinePass` consumes
   `Cull.LineQuads.NonIndexedArgs` / `Cull.LineQuads.Count`; the indexed
