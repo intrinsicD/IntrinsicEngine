@@ -819,7 +819,6 @@ if(TARGET ExtrinsicRuntime AND NOT INTRINSIC_HEADLESS_NO_GLFW)
         Test_Importers.cpp
         Test_RenderPassContracts.cpp
         Test_ShaderHotReload.cpp
-        Test_CoreAssets.cpp
     )
     intrinsic_resolve_test_sources(_runtime_test_sources
         SEARCH_DIRS

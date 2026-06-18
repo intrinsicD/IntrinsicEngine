@@ -245,6 +245,13 @@ split; narratives live in the retirement log.
   surface is replaced by promoted `AssetService`, `AssetRegistry`,
   `AssetPayloadStore`, and `AssetLoadPipeline` contracts; remaining external
   blockers are 8 Asset tests and 20 Core tests.
+- [LEGACY-041 — Retire legacy Asset.Manager core test](../../done/LEGACY-041-retire-legacy-asset-manager-core-test.md)
+  (done, 2026-06-18, `CPUContracted`):
+  retired legacy `tests/unit/assets/Test_CoreAssets.cpp` because its
+  async/cache/lease/clear/TryGetFast manager compatibility surface is replaced
+  by promoted asset service, registry, payload-store, load-pipeline, event-bus,
+  and runtime handoff contracts; remaining external blockers are 7 Asset tests,
+  19 Core tests, 36 Graphics tests, and 15 RHI tests.
 - [LEGACY-018 — Retire legacy Interface panel-registration test](../../done/LEGACY-018-retire-interface-panel-registration-test.md)
   (done, 2026-06-18, `CPUContracted`):
   retired legacy-only `tests/contract/ui/Test_PanelRegistration.cpp`;

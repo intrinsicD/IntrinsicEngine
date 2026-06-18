@@ -9,6 +9,23 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`LEGACY-041`](LEGACY-041-retire-legacy-asset-manager-core-test.md) — Retire
+legacy Asset.Manager core test — retired on 2026-06-18 at maturity
+`CPUContracted`. Legacy `tests/unit/assets/Test_CoreAssets.cpp` was removed
+because it verified the old `Core::Assets::AssetManager`
+async/cache/lease/clear/TryGetFast compatibility surface, including a
+compile-only dependency on legacy `Graphics::Material`. Promoted asset
+ownership uses `Extrinsic.Asset.Service`, `Asset.Registry`,
+`Asset.PayloadStore`, `Asset.LoadPipeline`, `Asset.EventBus`, and runtime-owned
+asset-to-graphics handoff contracts rather than the old pointer-returning
+manager/lease API. `LEGACY-004` remains blocked by 7 remaining test consumers
+and 50 legacy-internal consumers; `LEGACY-005` remains blocked by 19 remaining
+test consumers and 133 legacy-internal consumers; `LEGACY-008` remains blocked
+by 36 remaining test consumers and 22 legacy-internal consumers; `LEGACY-009`
+remains blocked by 15 remaining test consumers and 83 legacy-internal
+consumers; `LEGACY-012` owns the remaining test cleanup.
+
+Backlog
 [`LEGACY-040`](LEGACY-040-retire-legacy-asset-manager-safety-test.md) —
 Retire legacy Asset.Manager safety test — retired on 2026-06-18 at maturity
 `CPUContracted`. Legacy `tests/unit/assets/Test_CoreAssetSafety.cpp` was

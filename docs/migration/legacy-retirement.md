@@ -78,7 +78,7 @@ As of `LEGACY-002` (2026-06-06), every remaining `src/legacy/<Subsystem>/` subtr
 - [`LEGACY-012`](../../tasks/backlog/architecture/LEGACY-012-migrate-legacy-consumer-tests.md) —
   migrates or retires tests and other non-legacy consumers that still import
   bare legacy module names after promoted feature owners exist. Retired slices
-  through `LEGACY-040` are reflected in
+  through `LEGACY-041` are reflected in
   [`legacy-removal-audit.md`](legacy-removal-audit.md), which remains the
   current consumer-count snapshot.
 - [`LEGACY-035`](../../tasks/done/LEGACY-035-resolve-legacy-rhi-deferred-destruction-tests.md)
@@ -112,6 +112,11 @@ As of `LEGACY-002` (2026-06-06), every remaining `src/legacy/<Subsystem>/` subtr
   across `Extrinsic.Asset.Service`, `Asset.Registry`, `Asset.PayloadStore`, and
   `Asset.LoadPipeline`, whose retained captured-loader, reload, wrong-type read,
   dead-handle, failed-load, and event-ordering contracts are already covered.
+- [`LEGACY-041`](../../tasks/done/LEGACY-041-retire-legacy-asset-manager-core-test.md)
+  (done 2026-06-18) — retired the broader legacy `Asset.Manager`
+  async/cache/lease/clear compatibility test; promoted asset ownership uses
+  registry/payload tickets, load-state transitions, event fanout, typed reads,
+  and runtime-owned GPU handoff rather than the old manager/lease API.
 - [`LEGACY-018`](../../tasks/done/LEGACY-018-retire-interface-panel-registration-test.md)
   (done 2026-06-18) — retired the legacy-only `Interface::GUI`
   panel-registration test. `LEGACY-001` now has zero external test consumers and

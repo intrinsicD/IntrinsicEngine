@@ -41,7 +41,7 @@ depends_on: []
 - Prerequisite update (2026-06-18): the consumer-grep gate FAILS — legacy
   `RHI`/`RHI.*` modules are still imported by `src/legacy/Graphics/`,
   `src/legacy/Asset/`, `src/legacy/Runtime/`, `src/legacy/Interface/`, and
-  16 legacy compatibility tests after `LEGACY-037`. Promotion is blocked until
+  15 legacy compatibility tests after `LEGACY-041`. Promotion is blocked until
   those migrate to promoted APIs or retire with their owning legacy subtrees
   (typically alongside `LEGACY-008`, `LEGACY-010`, and `LEGACY-012`).
 - `GRAPHICS-086` retired the semantic RHI/CUDA parity audit: legacy
