@@ -791,6 +791,13 @@ Open post-acceptance rendering leaves:
   generated mesh texture slots and graph property-buffer presentation are
   consumed by the promoted renderer without graphics importing live
   runtime/ECS/asset ownership.
+- [GRAPHICS-091 — Unify scalar-field / colormap visualization across surface, line, and point passes](GRAPHICS-091-unify-scalar-colormap-across-surface-line-point.md):
+  unblocked; brings the modern GpuScene forward line/point passes to colormap /
+  per-element-color parity with the surface pass through one shared
+  `common/gpu_scene.glsl` resolution path. Today only the surface frag applies the
+  scalar→colormap; `forward/line.*` and `forward/point.*` resolve uniform/white only.
+  Also corrects the stale `vis_colors_baked` CPU-bake description (no such bake
+  exists). Target `Operational` on Vulkan-capable hosts.
 
 Cross-layer Theme A leaves retired for the full working sandbox path:
 - [`RUNTIME-085` — `GeometrySources` mesh residency bridge](../../done/RUNTIME-085-geometrysources-mesh-residency.md) (retired 2026-05-28 at `CPUContracted`; Slices A–C landed the mesh packer, extraction wiring, and dirty-domain reupload/retire ordering).
