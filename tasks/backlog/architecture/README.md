@@ -211,6 +211,12 @@ split; narratives live in the retirement log.
   deferred-destroy, and multi-frame retirement assertions as legacy RHI
   implementation details because promoted Vulkan keeps deferred deletion
   backend-private; remaining RHI external blockers stay at 17 tests.
+- [LEGACY-036 — Retire legacy EventBus test](../../done/LEGACY-036-retire-legacy-event-bus-test.md)
+  (done, 2026-06-18, `CPUContracted`):
+  retired legacy `tests/unit/core/Test_EventBus.cpp` because promoted ECS owns
+  event payloads but not the old scene dispatcher, while promoted runtime owns
+  selection mutation through `SelectionController`; remaining ECS external
+  blockers are 21 tests and remaining Runtime external blockers are 14 tests.
 - [LEGACY-018 — Retire legacy Interface panel-registration test](../../done/LEGACY-018-retire-interface-panel-registration-test.md)
   (done, 2026-06-18, `CPUContracted`):
   retired legacy-only `tests/contract/ui/Test_PanelRegistration.cpp`;

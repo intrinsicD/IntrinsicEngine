@@ -38,7 +38,9 @@ depends_on: [LEGACY-011]
   frame-graph systems compatibility coverage, `LEGACY-032` retired legacy
   runtime system-bundle compatibility coverage, `LEGACY-033` retired legacy
   runtime engine-config validation coverage, and `LEGACY-034` retired legacy
-  runtime frame-loop and maintenance-lane coverage. This task is now the
+  runtime frame-loop and maintenance-lane coverage, `LEGACY-035` retired legacy
+  RHI deferred-destruction compatibility coverage, and `LEGACY-036` retired
+  legacy EventBus dispatcher compatibility coverage. This task is now the
   external cleanup owner for the remaining Core gate as
   well as the other subtree gates.
 - `LEGACY-018` retired the only external `LEGACY-001` test consumer,

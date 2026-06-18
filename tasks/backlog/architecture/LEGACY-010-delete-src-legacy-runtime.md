@@ -47,12 +47,12 @@ depends_on: []
 - Layering allowlist (`tools/repo/layering_allowlist.yaml`) carries
   grandfathered rows keyed under `src/legacy/Runtime/`; drop only those.
 - Prerequisite update (2026-06-18): the consumer-grep gate FAILS — legacy
-  `Runtime.*` modules are still imported by 15 tests after `LEGACY-034`
-  retired the legacy runtime frame-loop and maintenance-lane compatibility
-  tests. No tests import legacy `Runtime.FrameLoop` or
-  `Runtime.ResourceMaintenance` anymore. The legacy Sandbox consumer retired
-  under `LEGACY-003`, and the legacy EditorUI consumer retired under
-  `LEGACY-007`; remaining consumers must migrate to `Extrinsic.Runtime.*`.
+  `Runtime.*` modules are still imported by 14 tests after `LEGACY-036`
+  retired the legacy EventBus dispatcher compatibility test. No tests import
+  legacy `Runtime.FrameLoop` or `Runtime.ResourceMaintenance` anymore. The
+  legacy Sandbox consumer retired under `LEGACY-003`, and the legacy EditorUI
+  consumer retired under `LEGACY-007`; remaining consumers must migrate to
+  `Extrinsic.Runtime.*`.
 
 ## Required changes
 - [ ] (Prerequisite, verified before promotion to `tasks/active/`) Run the

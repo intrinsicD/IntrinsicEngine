@@ -54,10 +54,10 @@ Consumer counts are distinct files matched outside the doomed subtree.
 | `Interface/` ([LEGACY-001](../../tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md)) | 4 | 6 | 0 | none |
 | `Asset/` ([LEGACY-004](../../tasks/backlog/architecture/LEGACY-004-delete-src-legacy-asset.md)) | 6 | 50 | 10 | 10 tests, 0 promoted-src |
 | `Core/` ([LEGACY-005](../../tasks/backlog/architecture/LEGACY-005-delete-src-legacy-core.md)) | 40 | 133 | 22 | 22 tests, 0 promoted-src |
-| `ECS/` ([LEGACY-006](../../tasks/backlog/architecture/LEGACY-006-delete-src-legacy-ecs.md)) | 29 | 37 | 22 | 22 tests, 0 promoted-src |
+| `ECS/` ([LEGACY-006](../../tasks/backlog/architecture/LEGACY-006-delete-src-legacy-ecs.md)) | 29 | 37 | 21 | 21 tests, 0 promoted-src |
 | `Graphics/` ([LEGACY-008](../../tasks/backlog/architecture/LEGACY-008-delete-src-legacy-graphics.md)) | 168 | 22 | 38 | 38 tests, 0 promoted-src |
 | `RHI/` ([LEGACY-009](../../tasks/backlog/architecture/LEGACY-009-delete-src-legacy-rhi.md)) | 54 | 83 | 17 | 17 tests, 0 promoted-src |
-| `Runtime/` ([LEGACY-010](../../tasks/backlog/architecture/LEGACY-010-delete-src-legacy-runtime.md)) | 29 | 0 | 15 | 15 tests, 0 promoted-src |
+| `Runtime/` ([LEGACY-010](../../tasks/backlog/architecture/LEGACY-010-delete-src-legacy-runtime.md)) | 29 | 0 | 14 | 14 tests, 0 promoted-src |
 
 "Files" includes each subtree's `CMakeLists.txt`.
 
@@ -75,7 +75,7 @@ Consumer counts are distinct files matched outside the doomed subtree.
   `Interface::GUI` API; `LEGACY-001` remains blocked only by six
   legacy-internal Graphics/Runtime consumers.
 - **`Runtime/` has zero legacy-internal consumers** — nothing else in
-  `src/legacy/` imports the doomed `Runtime.*` modules. Once its 15 test
+  `src/legacy/` imports the doomed `Runtime.*` modules. Once its 14 test
   consumers migrate, `LEGACY-010` becomes a pure mechanical deletion.
 
 ## Promoted-engine-code blocker status
@@ -204,6 +204,11 @@ to 22 files, Graphics to 38 files, RHI to 17 files, and Runtime to 15 files.
 RHI implementation detail because promoted Vulkan keeps deferred deletion
 backend-private. It changes no consumer counts; the remaining RHI external
 test-consumer set stays 17 files.
+`LEGACY-036` retired the legacy `ECS::Scene::GetDispatcher()` EventBus
+compatibility test because promoted ECS owns event payload types only and
+promoted runtime owns selection mutation through `SelectionController`. This
+reduces the remaining ECS external test-consumer set to 21 files and Runtime to
+14 files.
 
 **`LEGACY-013` clears only the promoted-src subset of the `LEGACY-005`
 gate.** The
@@ -252,7 +257,7 @@ Removal is gated by consumer migration only. The safe path:
    ([`LEGACY-012`](../../tasks/backlog/architecture/LEGACY-012-migrate-legacy-consumer-tests.md)).
    This is required for every subtree that still has external consumers,
    including `Runtime` — even the subtree with zero legacy-internal consumers
-   still has 15 test consumers, so no gate exits clean until its
+   still has 14 test consumers, so no gate exits clean until its
    `LEGACY-012`-owned tests migrate or retire. `Interface/` already has zero
    external test consumers after `LEGACY-018`; it remains blocked by six
    legacy-internal Graphics/Runtime consumers until subtree ordering removes or

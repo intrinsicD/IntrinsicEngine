@@ -9,6 +9,19 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`LEGACY-036`](LEGACY-036-retire-legacy-event-bus-test.md) — Retire legacy
+EventBus test — retired on 2026-06-18 at maturity `CPUContracted`. Legacy
+`tests/unit/core/Test_EventBus.cpp` was removed instead of migrated because the
+promoted ECS layer owns CPU-only event payloads, not the old
+`ECS::Scene::GetDispatcher()` delivery surface, while promoted runtime owns
+selection/hover mutation through `SelectionController`. Legacy
+`GpuPickCompleted` and `GeometryUploadFailed` stay runtime/graphics-owned
+diagnostics rather than ECS events. `LEGACY-006` remains blocked by 21
+remaining test consumers and 37 legacy-internal consumers; `LEGACY-010` remains
+blocked by 14 remaining test consumers; `LEGACY-012` owns the remaining test
+cleanup.
+
+Backlog
 [`LEGACY-035`](LEGACY-035-resolve-legacy-rhi-deferred-destruction-tests.md) —
 Resolve legacy RHI deferred-destruction tests — retired on 2026-06-18 at
 maturity `CPUContracted`. The Vulkan `SafeDestroy*` cases split out of the

@@ -810,7 +810,6 @@ if(TARGET ExtrinsicRuntime AND NOT INTRINSIC_HEADLESS_NO_GLFW)
         Test_ColorMapping.cpp
         Test_PropertyEnumerator.cpp
         Test_IsolineExtractor.cpp
-        Test_EventBus.cpp
         Test_HeadlessAppSmoke.cpp
         Test_SelectionGizmoRegression.cpp
         Test_RenderUpdateIntegration.cpp
