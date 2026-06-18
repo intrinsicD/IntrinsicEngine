@@ -36,6 +36,7 @@ depends_on: [LEGACY-011]
   coverage while preserving promoted telemetry assertions, and `LEGACY-030`
   retired duplicate legacy entity-command compatibility coverage, and
   `LEGACY-031` retired legacy ECS frame-graph systems compatibility coverage,
+  and `LEGACY-032` retired legacy runtime system-bundle compatibility coverage,
   so this task is now the external cleanup owner for the remaining Core gate as
   well as the other subtree gates.
 - `LEGACY-018` retired the only external `LEGACY-001` test consumer,

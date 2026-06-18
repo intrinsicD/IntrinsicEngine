@@ -13,9 +13,6 @@ map.
 - [LEGACY-012 — Migrate legacy consumer tests to promoted coverage](LEGACY-012-migrate-legacy-consumer-tests.md):
   migrates or retires tests and non-legacy consumers that still import bare
   legacy module names after their promoted feature owners exist.
-- [LEGACY-032 — Resolve legacy `Runtime.SystemBundles` test migration](LEGACY-032-resolve-runtime-system-bundles-test.md):
-  plans the retained-vs-retired coverage map for the remaining legacy runtime
-  system-bundle unit test before it can be deleted or migrated.
 - [LEGACY-001 — Delete `src/legacy/Interface/`](LEGACY-001-delete-src-legacy-interface.md):
   first concrete deletion under `ARCH-004`. Backlog until the consumer-grep
   prerequisite passes; promotion to `tasks/active/` is gated by `ARCH-004`.
@@ -183,6 +180,15 @@ split; narratives live in the retirement log.
   while legacy `AxisRotator` stays sample-only behavior; remaining Core
   deletion blockers are 25 tests and remaining ECS external blockers are 23
   tests.
+- [LEGACY-032 — Resolve legacy `Runtime.SystemBundles` test migration](../../done/LEGACY-032-resolve-runtime-system-bundles-test.md)
+  (done, 2026-06-18, `CPUContracted`):
+  retired legacy `tests/unit/runtime/Test_RuntimeSystemBundles.cpp` coverage
+  after mapping retained fixed-step ECS activation to
+  `Test.RuntimeEcsSystemBundle.cpp`, graphics lifecycle names to existing
+  graphics/runtime contracts, and the old global feature-catalog ordering to an
+  explicit retirement decision; remaining Core deletion blockers are 24 tests,
+  remaining ECS external blockers are 22 tests, and remaining Runtime external
+  blockers are 18 tests.
 - [LEGACY-018 — Retire legacy Interface panel-registration test](../../done/LEGACY-018-retire-interface-panel-registration-test.md)
   (done, 2026-06-18, `CPUContracted`):
   retired legacy-only `tests/contract/ui/Test_PanelRegistration.cpp`;

@@ -9,6 +9,20 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`LEGACY-032`](LEGACY-032-resolve-runtime-system-bundles-test.md) — Resolve
+legacy `Runtime.SystemBundles` test migration — retired on 2026-06-18 at
+maturity `CPUContracted`. Legacy
+`tests/unit/runtime/Test_RuntimeSystemBundles.cpp` coverage was removed instead
+of migrated after its assertions were mapped: retained fixed-step ECS activation
+is covered by `Extrinsic.Runtime.EcsSystemBundle`, named graphics lifecycle
+contracts are covered by existing graphics/runtime tests, and the old global
+`Core.SystemFeatureCatalog` ordering/toggle behavior is not promoted.
+`LEGACY-005` remains blocked by 24 remaining test consumers and 133
+legacy-internal consumers; `LEGACY-006` remains blocked by 22 remaining test
+consumers and 37 legacy-internal consumers; `LEGACY-010` remains blocked by 18
+remaining test consumers; `LEGACY-012` owns the remaining test cleanup.
+
+Backlog
 [`LEGACY-031`](LEGACY-031-retire-ecs-framegraph-systems-test.md) — Retire
 legacy ECS frame-graph systems test — retired on 2026-06-18 at maturity
 `CPUContracted`. Legacy `tests/unit/ecs/Test_FrameGraphSystems.cpp` coverage was

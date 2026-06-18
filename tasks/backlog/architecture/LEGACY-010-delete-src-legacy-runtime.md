@@ -46,11 +46,12 @@ depends_on: []
   `if(NOT INTRINSIC_HEADLESS_NO_GLFW)` (~L277; `# needs Asset`).
 - Layering allowlist (`tools/repo/layering_allowlist.yaml`) carries
   grandfathered rows keyed under `src/legacy/Runtime/`; drop only those.
-- Prerequisite (today, 2026-06-07): the consumer-grep gate FAILS — legacy
-  `Runtime.*` modules are still imported by integration tests and remaining
-  legacy subtrees. The legacy Sandbox consumer retired under `LEGACY-003`, and
-  the legacy EditorUI consumer retired under `LEGACY-007`; remaining consumers
-  must migrate to `Extrinsic.Runtime.*`.
+- Prerequisite update (2026-06-18): the consumer-grep gate FAILS — legacy
+  `Runtime.*` modules are still imported by 18 tests after `LEGACY-032`
+  retired the legacy `Runtime.SystemBundles` compatibility test. The legacy
+  Sandbox consumer retired under `LEGACY-003`, and the legacy EditorUI consumer
+  retired under `LEGACY-007`; remaining consumers must migrate to
+  `Extrinsic.Runtime.*`.
 
 ## Required changes
 - [ ] (Prerequisite, verified before promotion to `tasks/active/`) Run the

@@ -20,7 +20,6 @@ the authoritative open/unblocked view.
 - unblocked: `LEGACY-009` — Delete `src/legacy/RHI/` (tasks/backlog/architecture/LEGACY-009-delete-src-legacy-rhi.md)
 - unblocked: `LEGACY-010` — Delete `src/legacy/Runtime/` (tasks/backlog/architecture/LEGACY-010-delete-src-legacy-runtime.md)
 - unblocked: `LEGACY-012` — Migrate legacy consumer tests to promoted coverage (tasks/backlog/architecture/LEGACY-012-migrate-legacy-consumer-tests.md)
-- blocked by `LEGACY-012`: `LEGACY-032` — Resolve legacy `Runtime.SystemBundles` test migration (tasks/backlog/architecture/LEGACY-032-resolve-runtime-system-bundles-test.md)
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RORG-031F` — UI integration backlog seed (tasks/backlog/ui/RORG-031-ui-integration.md)
