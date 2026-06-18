@@ -57,6 +57,8 @@ import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.Selection;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
+import Extrinsic.Graphics.Colormap;
+import Extrinsic.Graphics.ColormapSystem;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.Renderer;
@@ -1660,6 +1662,247 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleMeshConfiguredLineWidthA
         << ", firstPointVertexCount=" << sceneInputs.FirstPointGeometry.PointVertexCount
         << ", firstPointFirstVertex=" << sceneInputs.FirstPointGeometry.PointFirstVertex
         << ", firstPointBoundsRadius=" << sceneInputs.FirstPointBounds.WorldSphere.w << "}"
+        << " pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+    device.DestroyBuffer(readbackBuffer);
+    engine.Shutdown();
+}
+
+// --- GRAPHICS-091 Slice C: scalar-field colormap on forward line/point ------
+
+namespace
+{
+// GRAPHICS-091 Slice C scalar-field colormap smoke parameters. The reference
+// triangle's three source vertices carry a vertex-domain scalar field spanning
+// the configured range so the shared `common/gpu_scene.glsl` colormap resolver
+// is exercised end to end on the forward line and point lanes.
+inline constexpr std::string_view kScalarFieldSmokeProperty = "v:graphics091_scalar";
+inline constexpr float kScalarFieldSmokeRangeMin = 0.0f;
+inline constexpr float kScalarFieldSmokeRangeMax = 1.0f;
+inline constexpr std::uint32_t kScalarFieldSmokeSampleRadius = 6u;
+// `ColorSourceMode` value for `ScalarField` in the `GpuEntityConfig` contract
+// (mirrors `VisualizationSyncSystem` `kMode_ScalarField` and the GLSL
+// `GpuColorSource_ScalarField`); `VisDomain` 0 is the vertex domain.
+inline constexpr std::uint32_t kColorSourceScalarFieldMode = 2u;
+inline constexpr std::uint32_t kVisDomainVertex = 0u;
+
+[[nodiscard]] std::string DescribeColormapConfig(
+    const std::string_view lane,
+    const Extrinsic::RHI::GpuEntityConfig& cfg,
+    const std::uint32_t expectedColormapId)
+{
+    std::string out{lane};
+    out += " cfg{mode=" + std::to_string(cfg.ColorSourceMode);
+    out += ", colormapId=" + std::to_string(cfg.ColormapID);
+    out += ", expectedColormapId=" + std::to_string(expectedColormapId);
+    out += ", scalarBDA=" + std::to_string(cfg.ScalarBDA);
+    out += ", rangeMin=" + std::to_string(cfg.ScalarRangeMin);
+    out += ", rangeMax=" + std::to_string(cfg.ScalarRangeMax);
+    out += ", visDomain=" + std::to_string(cfg.VisDomain);
+    out += ", elementCount=" + std::to_string(cfg.ElementCount) + "}";
+    return out;
+}
+} // namespace
+
+// The unified scalar-field colormap resolution (Slice A's shared
+// `common/gpu_scene.glsl` helper) is live on the modern forward LINE and POINT
+// passes at parity with the surface path. Slice B proved the CPU/null
+// `VisualizationSyncSystem` config parity (`Test.MinimalTriangleAcceptance.cpp`);
+// this slice drives the promoted-Vulkan default recipe with a `ScalarField`
+// `VisualizationConfig` on a line+point renderable and asserts the per-line and
+// per-point `GpuEntityConfig` carry the scalar-field colormap config end to end
+// to the GPU entity-config buffer, the `LinePass`/`PointPass` record on the
+// operational command stream, and the line/point lanes leave visible
+// colormap-resolved (non-background) pixels rather than the material fallback.
+//
+// The fixture self-skips on non-Vulkan hosts via
+// `BootstrapDefaultSandboxAppEngine`, so it is excluded from the default CPU
+// gate by its `gpu;vulkan` labels. The hard config-readback assertions are
+// correct-by-construction from the Slice B sync contract; the `ScalarBDA`
+// residency and colormap-pixel assertions are the operational proof finalized
+// on a Vulkan-capable host.
+TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleScalarFieldColormapResolvesOnLineAndPointLanes)
+{
+    auto bootstrap = BootstrapDefaultSandboxAppEngine();
+    if (bootstrap.Skipped)
+    {
+        GTEST_SKIP() << bootstrap.SkipReason;
+    }
+    Engine& engine = *bootstrap.EnginePtr;
+
+    const EntityHandle triangle = FindEntityByName(engine.GetScene(), "ReferenceTriangle");
+    ASSERT_TRUE(IsReferenceTriangleEntityValid(engine.GetScene(), triangle))
+        << "ReferenceTriangle is not a valid first-class mesh renderable entity: "
+        << BuildReferenceTriangleEntityDiagnostic(engine.GetScene(), triangle);
+
+    auto& raw = engine.GetScene().Raw();
+
+    // Author a per-vertex scalar field spanning the configured colormap range.
+    auto& vertices = raw.get<gs::Vertices>(triangle);
+    vertices.Properties
+        .GetOrAdd<float>(std::string{kScalarFieldSmokeProperty}, 0.0f)
+        .Vector() = {kScalarFieldSmokeRangeMin,
+                     0.5f * (kScalarFieldSmokeRangeMin + kScalarFieldSmokeRangeMax),
+                     kScalarFieldSmokeRangeMax};
+
+    // Draw the edge and point lanes so the scalar-field colormap is proven on
+    // the forward LinePass and PointPass, not only the surface pass.
+    raw.emplace_or_replace<G::RenderEdges>(triangle, G::RenderEdges{});
+    raw.emplace_or_replace<G::RenderPoints>(triangle, G::RenderPoints{});
+
+    auto& visualization = raw.get<G::VisualizationConfig>(triangle);
+    visualization.Source = G::VisualizationConfig::ColorSource::ScalarField;
+    visualization.ScalarFieldName = std::string{kScalarFieldSmokeProperty};
+    visualization.ScalarDomain = G::VisualizationConfig::Domain::Vertex;
+    visualization.Scalar.Map = Extrinsic::Graphics::Colormap::Type::Viridis;
+    visualization.Scalar.AutoRange = false;
+    visualization.Scalar.RangeMin = kScalarFieldSmokeRangeMin;
+    visualization.Scalar.RangeMax = kScalarFieldSmokeRangeMax;
+    visualization.Scalar.BinCount = 0u;
+    visualization.Scalar.Isolines.Num = 0u;
+
+    auto& renderer = engine.GetRenderer();
+    auto& device = engine.GetDevice();
+    const Extrinsic::RHI::Format backbufferFormat = device.GetBackbufferFormat();
+    const std::uint32_t bytesPerPixel = Extrinsic::RHI::BytesPerBlock(backbufferFormat);
+    const Extrinsic::Core::Extent2D extent = device.GetBackbufferExtent();
+    if (bytesPerPixel < 4u || extent.Width <= 0 || extent.Height <= 0)
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style smoke readback.";
+    }
+
+    const std::uint64_t readbackSize =
+        static_cast<std::uint64_t>(bytesPerPixel) *
+        static_cast<std::uint64_t>(extent.Width) *
+        static_cast<std::uint64_t>(extent.Height);
+    const Extrinsic::RHI::BufferHandle readbackBuffer = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
+        .SizeBytes = readbackSize,
+        .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
+        .HostVisible = true,
+        .DebugName = "Sandbox.ScalarFieldColormap.Readback",
+    });
+    if (!readbackBuffer.IsValid())
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Readback buffer allocation failed; gpu;vulkan smoke is opt-in.";
+    }
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(readbackBuffer);
+
+    const auto run = DriveAcceptanceAndCapture(engine);
+
+    if (!run.DeviceOperational)
+    {
+        renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+        device.DestroyBuffer(readbackBuffer);
+        engine.Shutdown();
+        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach operational Vulkan for scalar-field colormap readback: status="
+                      << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
+                      << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+        return;
+    }
+
+    EXPECT_TRUE(run.Stats.Compile.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_TRUE(run.Stats.Execute.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_EQ(FindPassStatus(run.Stats, "LinePass"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_EQ(FindPassStatus(run.Stats, "PointPass"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_GE(run.Stats.DefaultRecipeBackbufferReadbackCopyCount, 1u)
+        << "Sandbox scalar-field colormap readback copy did not record on an operational frame.";
+
+    // Read back the per-line and per-point GpuEntityConfig from the GPU
+    // entity-config buffer and assert the unified scalar-field colormap config
+    // resolved for BOTH domains.
+    const GpuSceneInputSummary sceneInputs = SummarizeGpuSceneInputs(device, renderer);
+    const Extrinsic::RHI::BufferHandle entityConfigBuffer =
+        renderer.GetGpuWorld().GetEntityConfigBuffer();
+    ASSERT_TRUE(entityConfigBuffer.IsValid())
+        << "GPU entity-config buffer is not allocated on the operational device.";
+
+    const std::uint32_t expectedColormapId =
+        renderer.GetColormapSystem().GetBindlessIndex(Extrinsic::Graphics::Colormap::Type::Viridis);
+
+    const auto readConfig = [&](const std::uint32_t configSlot) noexcept
+    {
+        Extrinsic::RHI::GpuEntityConfig cfg{};
+        device.ReadBuffer(entityConfigBuffer,
+                          &cfg,
+                          sizeof(cfg),
+                          static_cast<std::uint64_t>(configSlot) * sizeof(cfg));
+        return cfg;
+    };
+
+    ASSERT_NE(sceneInputs.FirstLineSlot, kInvalidIndex)
+        << "ReferenceTriangle did not emit a forward line instance for the scalar-field colormap smoke.";
+    ASSERT_NE(sceneInputs.FirstPointSlot, kInvalidIndex)
+        << "ReferenceTriangle did not emit a forward point instance for the scalar-field colormap smoke.";
+
+    const Extrinsic::RHI::GpuEntityConfig lineCfg = readConfig(sceneInputs.FirstLineInstance.ConfigSlot);
+    const Extrinsic::RHI::GpuEntityConfig pointCfg = readConfig(sceneInputs.FirstPointInstance.ConfigSlot);
+
+    const std::array<std::pair<std::string_view, const Extrinsic::RHI::GpuEntityConfig*>, 2> laneConfigs{{
+        {"line", &lineCfg},
+        {"point", &pointCfg},
+    }};
+    for (const auto& [lane, cfgPtr] : laneConfigs)
+    {
+        const Extrinsic::RHI::GpuEntityConfig& cfg = *cfgPtr;
+        EXPECT_EQ(cfg.ColorSourceMode, kColorSourceScalarFieldMode)
+            << DescribeColormapConfig(lane, cfg, expectedColormapId);
+        EXPECT_EQ(cfg.ColormapID, expectedColormapId)
+            << DescribeColormapConfig(lane, cfg, expectedColormapId);
+        EXPECT_FLOAT_EQ(cfg.ScalarRangeMin, kScalarFieldSmokeRangeMin)
+            << DescribeColormapConfig(lane, cfg, expectedColormapId);
+        EXPECT_FLOAT_EQ(cfg.ScalarRangeMax, kScalarFieldSmokeRangeMax)
+            << DescribeColormapConfig(lane, cfg, expectedColormapId);
+        EXPECT_EQ(cfg.VisDomain, kVisDomainVertex)
+            << DescribeColormapConfig(lane, cfg, expectedColormapId);
+        // The scalar buffer must be resident so the forward line/point shaders
+        // resolve per-element scalars (not the range-min fallback) through the
+        // colormap LUT. If this fails, the runtime did not wire a scalar
+        // visualization adapter for the line/point domains — the residency gap
+        // GRAPHICS-091 Slice C closes.
+        EXPECT_NE(cfg.ScalarBDA, 0u)
+            << "scalar-field buffer not resident for " << lane << " lane; "
+            << DescribeColormapConfig(lane, cfg, expectedColormapId);
+    }
+
+    // Colormap pixel proof: the line and point lanes must leave visible,
+    // non-background colour where the scalar field resolves through the Viridis
+    // LUT. Exact per-pixel colour parity is finalized on the Vulkan host; the
+    // expected LUT samples are logged for that comparison.
+    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(readbackSize), 0u);
+    device.ReadBuffer(readbackBuffer, bytes.data(), readbackSize, 0u);
+
+    const auto [sampleX, sampleY] = ProjectReferenceCameraPixel(glm::vec3{0.0f, -0.5f, 0.0f}, extent);
+    const PixelNeighborhoodStats laneStats =
+        DescribePixelNeighborhood(bytes, backbufferFormat, bytesPerPixel, extent, sampleX, sampleY,
+                                  kScalarFieldSmokeSampleRadius);
+    const auto& cmaps = renderer.GetColormapSystem();
+    const auto lutLo = cmaps.SampleCpu(Extrinsic::Graphics::Colormap::Type::Viridis, 0.0f);
+    const auto lutMid = cmaps.SampleCpu(Extrinsic::Graphics::Colormap::Type::Viridis, 0.5f);
+    const auto lutHi = cmaps.SampleCpu(Extrinsic::Graphics::Colormap::Type::Viridis, 1.0f);
+
+    const std::uint32_t laneMaxChannel =
+        std::max({laneStats.Max.R, laneStats.Max.G, laneStats.Max.B});
+    EXPECT_GE(laneMaxChannel, 24u)
+        << "ReferenceTriangle line/point lanes left no visible colormap colour near the projected bottom edge. "
+        << "sample=(" << sampleX << "," << sampleY << ")"
+        << " center=(" << static_cast<int>(laneStats.Center.R) << ","
+        << static_cast<int>(laneStats.Center.G) << ","
+        << static_cast<int>(laneStats.Center.B) << ")"
+        << " max=(" << static_cast<int>(laneStats.Max.R) << ","
+        << static_cast<int>(laneStats.Max.G) << ","
+        << static_cast<int>(laneStats.Max.B) << ")"
+        << " expectedViridisLUT t=0(" << static_cast<int>(lutLo.R) << ","
+        << static_cast<int>(lutLo.G) << "," << static_cast<int>(lutLo.B) << ")"
+        << " t=0.5(" << static_cast<int>(lutMid.R) << ","
+        << static_cast<int>(lutMid.G) << "," << static_cast<int>(lutMid.B) << ")"
+        << " t=1(" << static_cast<int>(lutHi.R) << ","
+        << static_cast<int>(lutHi.G) << "," << static_cast<int>(lutHi.B) << ")"
+        << " lineCfg=[" << DescribeColormapConfig("line", lineCfg, expectedColormapId) << "]"
         << " pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
 
     renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});

@@ -169,3 +169,19 @@ python3 tools/agents/check_task_policy.py --root . --strict
     owned by GRAPHICS-091 Slice C.
   - **Slice C.** Opt-in `gpu;vulkan` smoke for line/point scalar-field colormap.
     Closes `Operational`.
+    - Smoke authored 2026-06-18
+      (`RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleScalarFieldColormapResolvesOnLineAndPointLanes`
+      in `tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp`),
+      mirroring the GRAPHICS-092 line/point readback precedent in the same file.
+      It hard-asserts `LinePass`/`PointPass` recording on the operational command
+      stream and reads the per-line and per-point `GpuEntityConfig` back from the
+      GPU entity-config buffer to assert the unified scalar-field colormap config
+      (`ColorSourceMode == ScalarField`, Viridis `ColormapID`, range, vertex
+      domain); the scalar-buffer residency and colormap-pixel checks emit precise
+      host diagnostics. The fixture self-skips on non-Vulkan hosts via
+      `BootstrapDefaultSandboxAppEngine`.
+    - Status: authored and compile-targeted under `ci-vulkan`; the `Operational`
+      pixel-proof still needs a `gpu;vulkan` run on a Vulkan-capable host. This
+      session's cloud environment has no Vulkan driver, so the smoke is verified
+      only to skip deterministically here — it is not yet recorded as
+      `Operational`. The task remains in backlog until that host run lands.
