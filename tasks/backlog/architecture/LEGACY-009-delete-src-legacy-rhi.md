@@ -38,17 +38,20 @@ depends_on: []
   `if(NOT INTRINSIC_HEADLESS_NO_GLFW)` (~L272).
 - Layering allowlist (`tools/repo/layering_allowlist.yaml`) carries
   grandfathered rows keyed under `src/legacy/RHI/`; drop only those.
-- Prerequisite (today, 2026-06-11): the consumer-grep gate FAILS — legacy
+- Prerequisite update (2026-06-18): the consumer-grep gate FAILS — legacy
   `RHI`/`RHI.*` modules are still imported by `src/legacy/Graphics/`,
   `src/legacy/Asset/`, `src/legacy/Runtime/`, `src/legacy/Interface/`, and
-  legacy compatibility tests. Promotion is blocked until those migrate to
-  promoted APIs or retire with their owning legacy subtrees (typically alongside
-  `LEGACY-008`, `LEGACY-010`, and `LEGACY-012`).
+  17 legacy compatibility tests after `LEGACY-034`. Promotion is blocked until
+  those migrate to promoted APIs or retire with their owning legacy subtrees
+  (typically alongside `LEGACY-008`, `LEGACY-010`, and `LEGACY-012`).
 - `GRAPHICS-086` retired the semantic RHI/CUDA parity audit: legacy
   command helpers, persistent descriptors, swapchain/image ownership,
   scene-instance convenience APIs, and CUDA no longer represent unnamed
   blockers for this deletion. Future CUDA work must open a new opt-in
   method/backend task with a concrete workload.
+- `LEGACY-035` owns the retained-vs-retired decision for the Vulkan
+  deferred-destruction checks formerly embedded in the legacy runtime
+  maintenance-lane test.
 
 ## Required changes
 - [ ] (Prerequisite, verified before promotion to `tasks/active/`) Run the

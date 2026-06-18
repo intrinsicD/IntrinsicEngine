@@ -821,8 +821,6 @@ if(TARGET ExtrinsicRuntime AND NOT INTRINSIC_HEADLESS_NO_GLFW)
         Test_ImporterUtils.cpp
         Test_Importers.cpp
         Test_RenderPassContracts.cpp
-        Test_RuntimeFrameLoop.cpp
-        Test_MaintenanceLane.cpp
         Test_ShaderHotReload.cpp
         Test_CoreAssets.cpp
         Test_CoreAssetSafety.cpp
@@ -965,11 +963,6 @@ if(TARGET RuntimeTestObjs)
 
     intrinsic_grouped_test(IntrinsicRuntimeTests.AssetPipelineHeadlessGrouped IntrinsicRuntimeTests
         FILTER "AssetPipelineHeadlessTest.*"
-        LABELS integration runtime headless graphics gpu vulkan slow
-    )
-
-    intrinsic_grouped_test(IntrinsicRuntimeTests.MaintenanceLaneGpuGrouped IntrinsicRuntimeTests
-        FILTER "MaintenanceLaneGpuTest.*"
         LABELS integration runtime headless graphics gpu vulkan slow
     )
 

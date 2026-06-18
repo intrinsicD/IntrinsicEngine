@@ -19,26 +19,27 @@ depends_on: [LEGACY-011]
 - Current consumer-grep gates in the open `LEGACY-*` deletion tasks include `tests/**`, and several tests still import legacy module names such as `Runtime.*`, `Graphics.*`, `RHI.*`, `Core.*`, `Asset.*`, `ECS`, or `Interface`.
 - This task should run after the relevant semantic replacement task retires; for example, migrate legacy runtime orchestration tests after `RUNTIME-099`, asset ingest tests after `RUNTIME-101`, and RHI/CUDA tests after `GRAPHICS-086`.
 - `LEGACY-013` cleared the promoted-src bare `Core.*` imports. The remaining
-  external `LEGACY-005` consumers are 27 tests after the four directly affected
+  external `LEGACY-005` consumers are 22 tests after the four directly affected
   geometry API tests migrated to promoted Core types and `LEGACY-014` removed an
   unused RuntimeGraph import, and after `LEGACY-015` migrated CoreError to
   promoted Core, `LEGACY-016` migrated LogRingBuffer to promoted Core,
   `LEGACY-017` retired duplicate legacy CoreHash coverage, `LEGACY-019`
   migrated StrongHandle to promoted Core, `LEGACY-020` migrated CoreTasks to
-  promoted Core, and `LEGACY-021` migrated profiling/telemetry to promoted
-  Core, `LEGACY-022` migrated Core frame-graph coverage to promoted Core, and
-  `LEGACY-023` retired legacy-only Core.Commands coverage, and `LEGACY-024`
-  retired legacy-only feature-catalog coverage, and `LEGACY-025` retired
-  legacy-only InplaceFunction coverage, and `LEGACY-026` retired legacy
-  Core.DAGScheduler compatibility coverage, and `LEGACY-027` migrated
-  CoreMemory coverage to promoted Core, and `LEGACY-028` migrated Architecture
-  SLO coverage to promoted Core, and `LEGACY-029` retired legacy Core.Benchmark
-  coverage while preserving promoted telemetry assertions, and `LEGACY-030`
-  retired duplicate legacy entity-command compatibility coverage, and
-  `LEGACY-031` retired legacy ECS frame-graph systems compatibility coverage,
-  and `LEGACY-032` retired legacy runtime system-bundle compatibility coverage,
-  and `LEGACY-033` retired legacy runtime engine-config validation coverage, so
-  this task is now the external cleanup owner for the remaining Core gate as
+  promoted Core, `LEGACY-021` migrated profiling/telemetry to promoted Core,
+  `LEGACY-022` migrated Core frame-graph coverage to promoted Core,
+  `LEGACY-023` retired legacy-only Core.Commands coverage, `LEGACY-024`
+  retired legacy-only feature-catalog coverage, `LEGACY-025` retired
+  legacy-only InplaceFunction coverage, `LEGACY-026` retired legacy
+  Core.DAGScheduler compatibility coverage, `LEGACY-027` migrated CoreMemory
+  coverage to promoted Core, `LEGACY-028` migrated Architecture SLO coverage to
+  promoted Core, `LEGACY-029` retired legacy Core.Benchmark coverage while
+  preserving promoted telemetry assertions, `LEGACY-030` retired duplicate
+  legacy entity-command compatibility coverage, `LEGACY-031` retired legacy ECS
+  frame-graph systems compatibility coverage, `LEGACY-032` retired legacy
+  runtime system-bundle compatibility coverage, `LEGACY-033` retired legacy
+  runtime engine-config validation coverage, and `LEGACY-034` retired legacy
+  runtime frame-loop and maintenance-lane coverage. This task is now the
+  external cleanup owner for the remaining Core gate as
   well as the other subtree gates.
 - `LEGACY-018` retired the only external `LEGACY-001` test consumer,
   `tests/contract/ui/Test_PanelRegistration.cpp`, because `Interface::GUI`

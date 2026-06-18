@@ -9,6 +9,23 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`LEGACY-034`](LEGACY-034-resolve-runtime-frame-loop-maintenance-tests.md) —
+Resolve legacy runtime frame-loop and maintenance tests — retired on 2026-06-18
+at maturity `CPUContracted`. Legacy
+`tests/unit/runtime/Test_RuntimeFrameLoop.cpp` and
+`tests/unit/runtime/Test_MaintenanceLane.cpp` were removed after retained
+CPU/null frame-loop, platform, render-frame, maintenance, operational
+transition, and shutdown ordering mapped to promoted
+`Extrinsic.Core.FrameLoop` / `Extrinsic.Runtime.Engine` contracts. The legacy
+feature-catalog rollback mode remains retired, and the backend-facing Vulkan
+deferred-destruction checks were split to `LEGACY-035`. `LEGACY-005` remains
+blocked by 22 remaining test consumers and 133 legacy-internal consumers;
+`LEGACY-008` remains blocked by 38 remaining test consumers and 22
+legacy-internal consumers; `LEGACY-009` remains blocked by 17 remaining test
+consumers and 83 legacy-internal consumers; `LEGACY-010` remains blocked by 15
+remaining test consumers; `LEGACY-012` owns the remaining test cleanup.
+
+Backlog
 [`LEGACY-033`](LEGACY-033-retire-runtime-engine-config-test.md) — Retire legacy
 RuntimeEngineConfig test — retired on 2026-06-18 at maturity `CPUContracted`.
 Legacy `tests/unit/runtime/Test_RuntimeEngineConfig.cpp` coverage was removed

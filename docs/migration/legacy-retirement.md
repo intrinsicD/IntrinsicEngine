@@ -78,9 +78,12 @@ As of `LEGACY-002` (2026-06-06), every remaining `src/legacy/<Subsystem>/` subtr
 - [`LEGACY-012`](../../tasks/backlog/architecture/LEGACY-012-migrate-legacy-consumer-tests.md) —
   migrates or retires tests and other non-legacy consumers that still import
   bare legacy module names after promoted feature owners exist. Retired slices
-  through `LEGACY-033` are reflected in
+  through `LEGACY-034` are reflected in
   [`legacy-removal-audit.md`](legacy-removal-audit.md), which remains the
   current consumer-count snapshot.
+- [`LEGACY-035`](../../tasks/backlog/architecture/LEGACY-035-resolve-legacy-rhi-deferred-destruction-tests.md) —
+  resolves the Vulkan deferred-destruction coverage split out of the retired
+  legacy runtime maintenance-lane test.
 - [`LEGACY-018`](../../tasks/done/LEGACY-018-retire-interface-panel-registration-test.md)
   (done 2026-06-18) — retired the legacy-only `Interface::GUI`
   panel-registration test. `LEGACY-001` now has zero external test consumers and
