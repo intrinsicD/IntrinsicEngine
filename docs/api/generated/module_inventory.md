@@ -21,7 +21,7 @@ Root scanned: `src`
 | `legacy` | 181 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 35 |
+| `runtime` | 36 |
 
 ## Modules
 
@@ -484,6 +484,7 @@ Root scanned: `src`
 | `Extrinsic.Platform.Backend.GlfwVulkanSurface` | `src/platform/backends/glfw/Platform.Backend.GlfwVulkanSurface.cppm` | `platform` |
 | `Extrinsic.Platform.Backend.Null` | `src/platform/backends/null/Platform.Backend.Null.cppm` | `platform` |
 | `Extrinsic.Runtime.CameraControllers` | `src/runtime/Cameras/Runtime.CameraControllers.cppm` | `runtime` |
+| `Extrinsic.Runtime.CameraFocusCommand` | `src/runtime/Cameras/Runtime.CameraFocusCommand.cppm` | `runtime` |
 | `Extrinsic.Runtime.SandboxEditorUi` | `src/runtime/Editor/Runtime.SandboxEditorUi.cppm` | `runtime` |
 | `Extrinsic.Runtime.GizmoInteraction` | `src/runtime/Gizmos/Runtime.GizmoInteraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.ImGuiAdapter` | `src/runtime/ImGui/Runtime.ImGuiAdapter.cppm` | `runtime` |
@@ -519,4 +520,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugAdapters` | `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **491**
+Total modules: **492**

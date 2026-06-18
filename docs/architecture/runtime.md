@@ -27,7 +27,9 @@ The frame order is:
 1. poll platform events and handle minimized/resize skip paths;
 2. fixed-step simulation and CPU `FrameGraph` execution;
 3. ImGui begin-frame, variable application tick, and ImGui end-frame;
-4. build `Graphics::RenderFrameInput` and drain one coalesced selection pick;
+4. build `Graphics::RenderFrameInput`, update the active camera controller,
+   apply the `F`-key focus-on-selection command, and drain one coalesced
+   selection pick;
 5. execute the render-frame contract: begin frame, runtime render extraction,
    renderer world extraction, prepare, execute, and end frame;
 6. present the completed frame;
@@ -41,6 +43,25 @@ The internal `RuntimeFrameContext` record carries the data that must survive
 between those phases: frame delta, fixed-step interpolation alpha, render frame
 index, render input, extraction stats, and the acquired render-world pool slot.
 It is intentionally not exported as public runtime API.
+
+### Camera focus command
+
+`Extrinsic.Runtime.CameraFocusCommand` is a reusable, deterministic command that
+reframes a camera controller so a chosen set of objects is centered and fully
+visible. It aggregates the world bounding spheres of the target entities into a
+`CameraFocusTarget` — the center of mass (mean of the per-entity centers) and the
+largest enclosing extent `max_i(|C − Cᵢ| + Rᵢ)`, so every target is contained —
+then routes it to a controller slot via `ICameraController::Focus(...)` and marks
+an explicit camera transition. `FocusCameraOnEntities(...)` focuses any object
+set; `FocusCameraOnSelection(...)` focuses the current `SelectionController`
+selection. Phase 4 of `RunFrame` invokes the selection wrapper on the `F`
+("focus") key edge for the `Main` slot, suppressed while Dear ImGui owns the
+keyboard. It runs *after* the pre-render transform/bounds flush
+(`FlushPreRenderTransformState`, BUG-024) so it reads `World::Bounds` already
+refreshed for this frame's transform edits, then rebuilds the render camera so
+the reframed view reaches extraction the same frame. The per-controller framing
+distance math is unchanged and remains owned by the controllers
+(`Extrinsic.Runtime.CameraControllers`).
 
 Operational promotion is gated on `RHI::IDevice::IsOperational()` and renderer
 resource rebuild success. Vulkan-specific diagnostics are recorded by the Vulkan
