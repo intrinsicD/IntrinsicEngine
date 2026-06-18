@@ -42,8 +42,9 @@ depends_on: []
   `Core.*` import subset by moving `src/geometry/**` and
   `src/runtime/Runtime.AssetGeometryIO.cpp` to promoted `Extrinsic.Core.*`
   modules and removing the promoted geometry link to `IntrinsicCore`. The
-  broader consumer-grep gate still fails on legacy-internal consumers and 44
-  tests, so Core remains the foundation subtree and retires **last**.
+  broader consumer-grep gate still fails on legacy-internal consumers and 43
+  tests after `LEGACY-014`, so Core remains the foundation subtree and retires
+  **last**.
 
 ## Required changes
 - [ ] (Prerequisite, verified before promotion to `tasks/active/`) Run the

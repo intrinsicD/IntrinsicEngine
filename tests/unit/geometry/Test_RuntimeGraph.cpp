@@ -8,7 +8,6 @@
 
 #include <glm/glm.hpp>
 
-import Core;
 import Geometry;
 
 TEST(RuntimeGraph, AddEdge_FindEdge)

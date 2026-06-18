@@ -9,6 +9,14 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`LEGACY-014`](LEGACY-014-runtimegraph-core-test-import.md) — Remove unused
+RuntimeGraph legacy Core test import — retired on 2026-06-18 at maturity
+`CPUContracted`. `tests/unit/geometry/Test_RuntimeGraph.cpp` no longer imports
+bare legacy `Core`; the focused geometry target and `RuntimeGraph` CTest filter
+passed. `LEGACY-005` remains blocked by 43 remaining test consumers and 133
+legacy-internal consumers; `LEGACY-012` owns the remaining test cleanup.
+
+Backlog
 [`LEGACY-013`](LEGACY-013-promoted-core-import-migration.md) — Migrate
 promoted Core imports off legacy modules — retired on 2026-06-18 at maturity
 `CPUContracted`. Promoted geometry/runtime now import `Extrinsic.Core.*`

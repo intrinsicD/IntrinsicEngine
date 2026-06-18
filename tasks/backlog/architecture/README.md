@@ -39,10 +39,10 @@ backlog until its gate exits 0.
 Ordering hint — deletion is **consumer-leaves first, foundation last**: a
 subtree can only be mechanically deleted once no other subtree (and no promoted
 module) still imports it. `Apps` (`LEGACY-003`) and `EditorUI`
-(`LEGACY-007`) are retired; suggested remaining order after `LEGACY-001`:
-`Runtime` (`LEGACY-010`) → `Graphics` (`LEGACY-008`) → `Asset` (`LEGACY-004`) → `RHI`
-(`LEGACY-009`) → `ECS` (`LEGACY-006`) → `Core` (`LEGACY-005`, the foundation,
-still imported by promoted `geometry`/`runtime`, so it retires last). The
+(`LEGACY-007`) are retired; suggested remaining order is
+`Runtime` (`LEGACY-010`) → `Graphics` (`LEGACY-008`) →
+`Interface`/`ECS`/`Asset` (`LEGACY-001`/`LEGACY-006`/`LEGACY-004`) → `RHI`
+(`LEGACY-009`) → `Core` (`LEGACY-005`, the foundation, so it retires last). The
 `sequencing` table in
 [`docs/migration/legacy-retirement.md`](../../../docs/migration/legacy-retirement.md)
 tracks the per-subtree prerequisite checklists.
@@ -76,8 +76,13 @@ split; narratives live in the retirement log.
   moved promoted geometry/runtime imports from bare legacy `Core.*` modules to
   `Extrinsic.Core.*` and removed the `IntrinsicCore` link from promoted
   geometry. Four directly affected geometry tests now consume promoted Core
-  types; remaining Core deletion blockers are 44 tests and legacy-internal
-  subtree ordering.
+  types; `LEGACY-014` later reduced the remaining Core test-consumer set to 43
+  files.
+- [LEGACY-014 — Remove unused RuntimeGraph legacy Core test import](../../done/LEGACY-014-runtimegraph-core-test-import.md)
+  (done, 2026-06-18, `CPUContracted`):
+  removed the unused bare `Core` import from
+  `tests/unit/geometry/Test_RuntimeGraph.cpp`; remaining Core deletion blockers
+  are 43 tests and legacy-internal subtree ordering.
 - [CORE-002 — Command and feature catalog contract](../../done/CORE-002-command-feature-catalog-contract.md)
   (done, 2026-06-09, `CPUContracted` / explicit retirement decision):
   resolves remaining legacy `Core.Commands`, `Core.FeatureRegistry`, and
