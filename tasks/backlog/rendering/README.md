@@ -797,7 +797,15 @@ Open post-acceptance rendering leaves:
   `common/gpu_scene.glsl` resolution path. Today only the surface frag applies the
   scalar→colormap; `forward/line.*` and `forward/point.*` resolve uniform/white only.
   Also corrects the stale `vis_colors_baked` CPU-bake description (no such bake
-  exists). Target `Operational` on Vulkan-capable hosts.
+  exists). Target `Operational` on Vulkan-capable hosts. Sibling of `GRAPHICS-092`
+  (shared "venue", color/colormap side).
+- [GRAPHICS-092 — Group per-domain params in `GpuEntityConfig` and add line-width residency](GRAPHICS-092-group-per-domain-params-and-line-width-residency.md):
+  unblocked; structural sibling of `GRAPHICS-091`. Groups the flat-mixed point-only
+  fields (`PointMode`/`PointSize`/`PointSizeBDA`) into named per-domain sub-blocks and
+  adds line-width residency (`RenderEdges::WidthSource` → `cfg.LineWidth`/`LineWidthBDA`
+  + `forward/line.vert` quad expansion) at parity with point size, keeping the shared
+  `GpuEntityConfig` venue and C++↔GLSL layout `static_assert` intact. Target
+  `Operational` on Vulkan-capable hosts.
 
 Cross-layer Theme A leaves retired for the full working sandbox path:
 - [`RUNTIME-085` — `GeometrySources` mesh residency bridge](../../done/RUNTIME-085-geometrysources-mesh-residency.md) (retired 2026-05-28 at `CPUContracted`; Slices A–C landed the mesh packer, extraction wiring, and dirty-domain reupload/retire ordering).

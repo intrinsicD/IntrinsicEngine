@@ -60,6 +60,11 @@ depends_on: []
   colormap interpolation/binning is correct along line segments; points carry a
   single per-point scalar (flat). The per-element scalar/color buffer is addressed
   by element id via the GpuScene BDA, exactly as the surface path does.
+- Sibling: `GRAPHICS-092` unifies the *structural* side of the same venue (grouping
+  per-domain params in `GpuEntityConfig` and adding line-width residency). Both tasks
+  touch `assets/shaders/common/gpu_scene.glsl` and `forward/line.vert`; coordinate
+  ordering (land `GRAPHICS-092` Slice A config grouping first, or rebase) to avoid
+  `GpuEntityConfig` layout churn. No hard dependency edge.
 
 ## Required changes
 - [ ] Add a shared color-resolution helper to `assets/shaders/common/gpu_scene.glsl`
