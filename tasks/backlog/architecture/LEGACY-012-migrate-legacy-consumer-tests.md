@@ -41,8 +41,9 @@ depends_on: [LEGACY-011]
   runtime frame-loop and maintenance-lane coverage, `LEGACY-035` retired legacy
   RHI deferred-destruction compatibility coverage, and `LEGACY-036` retired
   legacy EventBus dispatcher compatibility coverage, and `LEGACY-037` retired
-  legacy `AssetIngestService` constructor-shape compatibility coverage. This
-  task is now the external cleanup owner for the remaining Core gate as
+  legacy `AssetIngestService` constructor-shape compatibility coverage, and
+  `LEGACY-038` retired legacy runtime selection mode/module compatibility
+  coverage. This task is now the external cleanup owner for the remaining Core gate as
   well as the other subtree gates.
 - `LEGACY-018` retired the only external `LEGACY-001` test consumer,
   `tests/contract/ui/Test_PanelRegistration.cpp`, because `Interface::GUI`

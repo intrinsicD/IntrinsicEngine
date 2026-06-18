@@ -846,19 +846,6 @@ if(TARGET ExtrinsicRuntime AND NOT INTRINSIC_HEADLESS_NO_GLFW)
         DEPS ExtrinsicRuntime nlohmann_json::nlohmann_json EnTT::EnTT glm::glm IntrinsicRHI IntrinsicGraphics IntrinsicRuntime
     )
 
-    set(_runtime_selection_contract_test_files
-        Test.RuntimeSelectionModes.cpp
-    )
-    intrinsic_resolve_test_sources(_runtime_selection_contract_test_sources
-        SEARCH_DIRS contract/runtime
-        FILES ${_runtime_selection_contract_test_files}
-    )
-    intrinsic_test_object_lib(RuntimeSelectionContractTestObjs
-        SOURCES
-            ${_runtime_selection_contract_test_sources}
-        DEPS IntrinsicRuntime IntrinsicECS IntrinsicGraphics EnTT::EnTT glm::glm
-    )
-
     set(_runtime_integration_test_files
         Test.AssetLoadPipeline.cpp
         Test.AssetService.cpp
@@ -898,15 +885,9 @@ intrinsic_test_object_lib(TestSupportObjs
 if(TARGET RuntimeTestObjs)
     # --- Full suite link target (build-only; category targets own CTest registration) ---
     intrinsic_test_executable(IntrinsicTests
-        OBJECTS  CoreTestObjs ECSTestObjs ContractBuildTestObjs BenchmarkTestObjs GeometryTestObjs RuntimeTestObjs RuntimeSelectionContractTestObjs
+        OBJECTS  CoreTestObjs ECSTestObjs ContractBuildTestObjs BenchmarkTestObjs GeometryTestObjs RuntimeTestObjs
         LINK_LIBS IntrinsicRuntime
         NO_DISCOVER
-    )
-
-    intrinsic_test_executable(IntrinsicRuntimeSelectionContractTests
-        OBJECTS RuntimeSelectionContractTestObjs
-        LINK_LIBS IntrinsicRuntime IntrinsicECS IntrinsicGraphics
-        LABELS contract runtime ecs
     )
 
     # --- Runtime/headless coverage ---

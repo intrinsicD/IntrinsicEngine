@@ -150,6 +150,73 @@ TEST(SelectionController, ToggleModeRemovesSelectedEntity)
     EXPECT_EQ(controller.SelectedCount(), 0u);
 }
 
+TEST(SelectionController, ReplaceThenAddModesBuildMultiSelection)
+{
+    Registry           registry;
+    SelectionController controller;
+    const EntityHandle a = MakeSelectable(registry);
+    const EntityHandle b = MakeSelectable(registry);
+    const EntityHandle c = MakeSelectable(registry);
+    const EntityHandle d = MakeSelectable(registry);
+
+    controller.RequestClickPick(0u, 0u);
+    controller.ConsumePendingPick();
+    controller.ConsumeHit(registry, StableId(b));
+    controller.RequestClickPick(0u, 0u, SelectionPickMode::Add);
+    controller.ConsumePendingPick();
+    controller.ConsumeHit(registry, StableId(c));
+    controller.RequestClickPick(0u, 0u, SelectionPickMode::Add);
+    controller.ConsumePendingPick();
+    controller.ConsumeHit(registry, StableId(d));
+
+    EXPECT_FALSE(controller.IsSelected(a));
+    EXPECT_TRUE(controller.IsSelected(b));
+    EXPECT_TRUE(controller.IsSelected(c));
+    EXPECT_TRUE(controller.IsSelected(d));
+    EXPECT_FALSE(HasSelectedTag(registry, a));
+    EXPECT_TRUE(HasSelectedTag(registry, b));
+    EXPECT_TRUE(HasSelectedTag(registry, c));
+    EXPECT_TRUE(HasSelectedTag(registry, d));
+
+    const auto ids = controller.SelectedStableIds();
+    ASSERT_EQ(ids.size(), 3u);
+    EXPECT_EQ(ids[0], StableId(b));
+    EXPECT_EQ(ids[1], StableId(c));
+    EXPECT_EQ(ids[2], StableId(d));
+}
+
+TEST(SelectionController, ToggleModeAddsAndRemovesFromMultiSelection)
+{
+    Registry           registry;
+    SelectionController controller;
+    const EntityHandle a = MakeSelectable(registry);
+    const EntityHandle b = MakeSelectable(registry);
+
+    controller.RequestClickPick(0u, 0u);
+    controller.ConsumePendingPick();
+    controller.ConsumeHit(registry, StableId(a));
+    controller.RequestClickPick(0u, 0u, SelectionPickMode::Toggle);
+    controller.ConsumePendingPick();
+    controller.ConsumeHit(registry, StableId(b));
+
+    ASSERT_TRUE(controller.IsSelected(a));
+    ASSERT_TRUE(controller.IsSelected(b));
+    ASSERT_EQ(controller.SelectedCount(), 2u);
+
+    controller.RequestClickPick(0u, 0u, SelectionPickMode::Toggle);
+    controller.ConsumePendingPick();
+    controller.ConsumeHit(registry, StableId(a));
+
+    EXPECT_FALSE(controller.IsSelected(a));
+    EXPECT_TRUE(controller.IsSelected(b));
+    EXPECT_FALSE(HasSelectedTag(registry, a));
+    EXPECT_TRUE(HasSelectedTag(registry, b));
+
+    const auto ids = controller.SelectedStableIds();
+    ASSERT_EQ(ids.size(), 1u);
+    EXPECT_EQ(ids[0], StableId(b));
+}
+
 // --- hover --------------------------------------------------------------
 
 TEST(SelectionController, HoverHitSetsHoverWithoutChangingSelection)

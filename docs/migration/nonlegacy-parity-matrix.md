@@ -124,6 +124,15 @@ points. The old dependency-heavy service constructor that imports legacy
 `Asset.Pipeline`, `Graphics`, `RHI`, `Core.IOBackend`, and
 `Runtime.SceneManager` is not a promoted endpoint.
 
+### Legacy Runtime Selection Module Retirement
+
+`LEGACY-038` retires the legacy `Runtime.Selection` /
+`Runtime.SelectionModule` mode compatibility test. Retained click-mode behavior
+for replace, add, toggle, background, and multi-selection cases is covered by
+promoted `Extrinsic.Runtime.SelectionController` contract tests. The old raw
+selected-entity-list helper (`GetSelectedEntities`) is not promoted; promoted
+runtime consumers use stable-id snapshots and explicit selection queries.
+
 ## Legacy graphics IO ownership inventory (`GRAPHICS-019`)
 
 `GRAPHICS-019` records the owner split for legacy graphics import/export/model

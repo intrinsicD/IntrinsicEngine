@@ -225,6 +225,12 @@ split; narratives live in the retirement log.
   `Extrinsic.Runtime.AssetIngestStateMachine` plus asset/runtime handoff
   contracts. Remaining external blockers are 9 Asset tests, 21 Core tests, 37
   Graphics tests, 16 RHI tests, and 13 Runtime tests.
+- [LEGACY-038 — Retire legacy runtime selection modes test](../../done/LEGACY-038-retire-runtime-selection-modes-test.md)
+  (done, 2026-06-18, `CPUContracted`):
+  retired legacy `tests/contract/runtime/Test.RuntimeSelectionModes.cpp` after
+  preserving retained add/toggle/replace/background multi-selection behavior in
+  promoted `SelectionController` tests; remaining ECS external blockers are 20
+  tests and remaining Runtime external blockers are 12 tests.
 - [LEGACY-018 — Retire legacy Interface panel-registration test](../../done/LEGACY-018-retire-interface-panel-registration-test.md)
   (done, 2026-06-18, `CPUContracted`):
   retired legacy-only `tests/contract/ui/Test_PanelRegistration.cpp`;

@@ -9,6 +9,19 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`LEGACY-038`](LEGACY-038-retire-runtime-selection-modes-test.md) — Retire
+legacy runtime selection modes test — retired on 2026-06-18 at maturity
+`CPUContracted`. Legacy
+`tests/contract/runtime/Test.RuntimeSelectionModes.cpp` was removed after the
+retained add/toggle/replace/background multi-selection behavior was covered by
+promoted `Extrinsic.Runtime.SelectionController` tests. The old
+`Runtime.SelectionModule::GetSelectedEntities` raw-entity helper is not a
+promoted endpoint; promoted consumers use stable-id snapshots and explicit
+selection queries. `LEGACY-006` remains blocked by 20 remaining test consumers
+and 37 legacy-internal consumers; `LEGACY-010` remains blocked by 12 remaining
+test consumers; `LEGACY-012` owns the remaining test cleanup.
+
+Backlog
 [`LEGACY-037`](LEGACY-037-retire-legacy-asset-ingest-service-test.md) —
 Retire legacy AssetIngestService test — retired on 2026-06-18 at maturity
 `CPUContracted`. Legacy
