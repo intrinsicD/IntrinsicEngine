@@ -128,8 +128,13 @@ split; narratives live in the retirement log.
   (done, 2026-06-18, `CPUContracted`):
   retired legacy-only `tests/unit/core/Test_CoreCommands.cpp` after `CORE-002`
   and `RUNTIME-102` assigned promoted command-history ownership to runtime;
-  remaining Core deletion blockers are 34 tests and legacy-internal subtree
-  ordering.
+  `LEGACY-024` later reduced the remaining Core test-consumer set to 32 files.
+- [LEGACY-024 — Retire legacy Core feature-catalog tests](../../done/LEGACY-024-retire-core-feature-catalog-tests.md)
+  (done, 2026-06-18, `CPUContracted`):
+  retired legacy-only `tests/unit/core/Test_FeatureRegistry.cpp` and
+  `tests/unit/core/Test_SystemFeatureCatalog.cpp` after `CORE-002` decided not
+  to promote the global feature catalog shape; remaining Core deletion blockers
+  are 32 tests and legacy-internal subtree ordering.
 - [LEGACY-018 — Retire legacy Interface panel-registration test](../../done/LEGACY-018-retire-interface-panel-registration-test.md)
   (done, 2026-06-18, `CPUContracted`):
   retired legacy-only `tests/contract/ui/Test_PanelRegistration.cpp`;

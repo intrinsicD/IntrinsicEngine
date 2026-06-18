@@ -9,6 +9,17 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`LEGACY-024`](LEGACY-024-retire-core-feature-catalog-tests.md) — Retire
+legacy Core feature-catalog tests — retired on 2026-06-18 at maturity
+`CPUContracted`. `tests/unit/core/Test_FeatureRegistry.cpp` and
+`tests/unit/core/Test_SystemFeatureCatalog.cpp` were removed because
+`CORE-002` retired the global feature catalog shape instead of promoting it
+under `src/core`. Runtime/graphics/app legacy feature-registry consumers remain
+owned by their subtree cleanup tasks. `LEGACY-005` remains blocked by 32
+remaining test consumers and 133 legacy-internal consumers; `LEGACY-012` owns
+the remaining test cleanup.
+
+Backlog
 [`LEGACY-023`](LEGACY-023-retire-core-commands-test.md) — Retire legacy
 Core.Commands test — retired on 2026-06-18 at maturity `CPUContracted`.
 `tests/unit/core/Test_CoreCommands.cpp` was removed because `CORE-002` retired

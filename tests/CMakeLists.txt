@@ -186,8 +186,6 @@ set(_core_test_files
     Test_BoundedHeap.cpp
     Test_CoreMemory.cpp
     Test_DAGScheduler.cpp
-    Test_FeatureRegistry.cpp
-    Test_SystemFeatureCatalog.cpp
     Test_InplaceFunction.cpp
     Test.CoreError.cpp
     Test.LogRingBuffer.cpp
