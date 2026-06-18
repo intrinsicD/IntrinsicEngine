@@ -165,6 +165,13 @@ split; narratives live in the retirement log.
   `Core.Benchmark::BenchmarkRunner` while moving promoted pass-timing telemetry
   assertions to `tests/unit/core/Test.CoreProfiling.cpp`; remaining Core
   deletion blockers are 27 tests and legacy-internal subtree ordering.
+- [LEGACY-030 — Retire legacy ECS entity-command test](../../done/LEGACY-030-retire-ecs-entity-commands-test.md)
+  (done, 2026-06-18, `CPUContracted`):
+  retired duplicate legacy `tests/unit/ecs/Test_EntityCommands.cpp` coverage
+  because promoted `Test.EditorCommandHistory.cpp` and ECS scene/hierarchy
+  tests own the retained undo/redo, lifecycle, and hierarchy contracts;
+  remaining Core deletion blockers are 26 tests and remaining ECS external
+  blockers are 24 tests.
 - [LEGACY-018 — Retire legacy Interface panel-registration test](../../done/LEGACY-018-retire-interface-panel-registration-test.md)
   (done, 2026-06-18, `CPUContracted`):
   retired legacy-only `tests/contract/ui/Test_PanelRegistration.cpp`;

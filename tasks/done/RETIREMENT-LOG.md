@@ -9,6 +9,18 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`LEGACY-030`](LEGACY-030-retire-ecs-entity-commands-test.md) — Retire legacy
+ECS entity-command test — retired on 2026-06-18 at maturity `CPUContracted`.
+Duplicate legacy `tests/unit/ecs/Test_EntityCommands.cpp` coverage was removed
+instead of migrated because promoted `Extrinsic.Runtime.EditorCommandHistory`
+contract tests cover undo/redo and hierarchy delete planning, while promoted
+ECS scene/bootstrap/hierarchy tests cover typed lifecycle and hierarchy
+mutation. `LEGACY-005` remains blocked by 26 remaining test consumers and 133
+legacy-internal consumers; `LEGACY-006` remains blocked by 24 remaining test
+consumers and 37 legacy-internal consumers; `LEGACY-012` owns the remaining
+test cleanup.
+
+Backlog
 [`LEGACY-029`](LEGACY-029-retire-core-benchmark-test.md) — Retire legacy
 Core.Benchmark test — retired on 2026-06-18 at maturity `CPUContracted`.
 Legacy-only `tests/benchmark/Test_Benchmark.cpp` coverage for

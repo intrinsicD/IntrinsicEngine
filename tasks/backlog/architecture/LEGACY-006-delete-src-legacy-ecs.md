@@ -38,10 +38,12 @@ depends_on: []
   unconditional).
 - Layering allowlist (`tools/repo/layering_allowlist.yaml`) carries
   grandfathered rows keyed under `src/legacy/ECS/`; drop only those.
-- Prerequisite (today, 2026-06-07): the consumer-grep gate FAILS — legacy `ECS`
-  is still imported by other legacy subtrees (`Graphics`, `Runtime`). The
-  legacy Sandbox consumer retired under `LEGACY-003`; remaining consumers must
-  migrate to `Extrinsic.ECS` before promotion.
+- Prerequisite update (2026-06-18): the consumer-grep gate FAILS — legacy
+  `ECS` is still imported by other legacy subtrees (`Graphics`, `Runtime`) and
+  by 24 tests after `LEGACY-030` retired duplicate legacy entity-command
+  compatibility coverage. The legacy Sandbox consumer retired under
+  `LEGACY-003`; remaining consumers must migrate to `Extrinsic.ECS` or retire
+  under `LEGACY-012` before promotion.
 
 ## Required changes
 - [ ] (Prerequisite, verified before promotion to `tasks/active/`) Run the
@@ -123,4 +125,5 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
   and `HARDEN-081`; see `docs/migration/nonlegacy-parity-matrix.md`).
 - The consumer-grep gate in Verification must exit 0 before this task is
   promoted to `tasks/active/`; today the remaining consumers live in
-  `src/legacy/Graphics/` and `src/legacy/Runtime/`.
+  `src/legacy/Graphics/`, `src/legacy/Runtime/`, and compatibility tests owned
+  by `LEGACY-012`.
