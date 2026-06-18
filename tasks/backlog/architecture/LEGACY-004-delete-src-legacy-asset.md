@@ -39,11 +39,13 @@ depends_on: []
   `if(NOT INTRINSIC_HEADLESS_NO_GLFW)` (~L273; `# needs Core + RHI`).
 - Layering allowlist (`tools/repo/layering_allowlist.yaml`) carries
   grandfathered rows keyed under `src/legacy/Asset/`; drop only those.
-- Prerequisite (today, 2026-06-07): the consumer-grep gate FAILS — legacy
-  `Asset.*` modules are still imported by `src/legacy/Graphics/` and
-  `src/legacy/Runtime/` (`Runtime.AssetIngestService`). The legacy Sandbox
-  consumer retired under `LEGACY-003`; remaining consumers must migrate to
-  `src/assets/` before promotion.
+- Prerequisite update (2026-06-18): the consumer-grep gate FAILS — legacy
+  `Asset.*` modules are still imported by `src/legacy/Graphics/`,
+  `src/legacy/Runtime/` (`Runtime.AssetIngestService`), and 9 tests after
+  `LEGACY-037` retired the legacy `AssetIngestService` constructor-shape test.
+  The legacy Sandbox consumer retired under `LEGACY-003`; remaining consumers
+  must migrate to `src/assets/` or retire with their owning legacy subtrees
+  before promotion.
 
 ## Required changes
 - [ ] (Prerequisite, verified before promotion to `tasks/active/`) Run the
@@ -124,6 +126,7 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
   `src/assets/` (see `docs/migration/nonlegacy-parity-matrix.md` for the
   feature-by-feature map).
 - The consumer-grep gate in Verification must exit 0 before this task is
-  promoted to `tasks/active/`; today the remaining consumers live in
-  `src/legacy/Graphics/` and `src/legacy/Runtime/`, so this deletion lands
-  with or after `LEGACY-008`/`LEGACY-010`.
+  promoted to `tasks/active/`; today the remaining legacy-internal consumers
+  live in `src/legacy/Graphics/` and `src/legacy/Runtime/`, so this deletion
+  lands with or after `LEGACY-008`/`LEGACY-010`, while the 9 remaining test
+  consumers are owned by `LEGACY-012`.

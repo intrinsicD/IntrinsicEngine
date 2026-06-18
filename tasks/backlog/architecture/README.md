@@ -217,6 +217,14 @@ split; narratives live in the retirement log.
   event payloads but not the old scene dispatcher, while promoted runtime owns
   selection mutation through `SelectionController`; remaining ECS external
   blockers are 21 tests and remaining Runtime external blockers are 14 tests.
+- [LEGACY-037 — Retire legacy AssetIngestService test](../../done/LEGACY-037-retire-legacy-asset-ingest-service-test.md)
+  (done, 2026-06-18, `CPUContracted`):
+  retired legacy `tests/unit/assets/Test_AssetIngestService.cpp` because the
+  old dependency-heavy `Runtime.AssetIngestService` constructor surface is not
+  a promoted endpoint; promoted ingest ownership is the
+  `Extrinsic.Runtime.AssetIngestStateMachine` plus asset/runtime handoff
+  contracts. Remaining external blockers are 9 Asset tests, 21 Core tests, 37
+  Graphics tests, 16 RHI tests, and 13 Runtime tests.
 - [LEGACY-018 — Retire legacy Interface panel-registration test](../../done/LEGACY-018-retire-interface-panel-registration-test.md)
   (done, 2026-06-18, `CPUContracted`):
   retired legacy-only `tests/contract/ui/Test_PanelRegistration.cpp`;

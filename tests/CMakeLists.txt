@@ -783,7 +783,6 @@ if(TARGET ExtrinsicRuntime AND NOT INTRINSIC_HEADLESS_NO_GLFW)
         Test_RuntimeCulling.cpp
         Test_GraphicsBackend.cpp
         Test_AssetPipeline.cpp
-        Test_AssetIngestService.cpp
         Test_SceneManager.cpp
         Test_RenderOrchestrator.cpp
         Test_HeadlessEngine.cpp

@@ -52,12 +52,12 @@ Consumer counts are distinct files matched outside the doomed subtree.
 | Subtree (task) | Files | Legacy-internal consumers | External consumers | External breakdown |
 |---|---|---|---|---|
 | `Interface/` ([LEGACY-001](../../tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md)) | 4 | 6 | 0 | none |
-| `Asset/` ([LEGACY-004](../../tasks/backlog/architecture/LEGACY-004-delete-src-legacy-asset.md)) | 6 | 50 | 10 | 10 tests, 0 promoted-src |
-| `Core/` ([LEGACY-005](../../tasks/backlog/architecture/LEGACY-005-delete-src-legacy-core.md)) | 40 | 133 | 22 | 22 tests, 0 promoted-src |
+| `Asset/` ([LEGACY-004](../../tasks/backlog/architecture/LEGACY-004-delete-src-legacy-asset.md)) | 6 | 50 | 9 | 9 tests, 0 promoted-src |
+| `Core/` ([LEGACY-005](../../tasks/backlog/architecture/LEGACY-005-delete-src-legacy-core.md)) | 40 | 133 | 21 | 21 tests, 0 promoted-src |
 | `ECS/` ([LEGACY-006](../../tasks/backlog/architecture/LEGACY-006-delete-src-legacy-ecs.md)) | 29 | 37 | 21 | 21 tests, 0 promoted-src |
-| `Graphics/` ([LEGACY-008](../../tasks/backlog/architecture/LEGACY-008-delete-src-legacy-graphics.md)) | 168 | 22 | 38 | 38 tests, 0 promoted-src |
-| `RHI/` ([LEGACY-009](../../tasks/backlog/architecture/LEGACY-009-delete-src-legacy-rhi.md)) | 54 | 83 | 17 | 17 tests, 0 promoted-src |
-| `Runtime/` ([LEGACY-010](../../tasks/backlog/architecture/LEGACY-010-delete-src-legacy-runtime.md)) | 29 | 0 | 14 | 14 tests, 0 promoted-src |
+| `Graphics/` ([LEGACY-008](../../tasks/backlog/architecture/LEGACY-008-delete-src-legacy-graphics.md)) | 168 | 22 | 37 | 37 tests, 0 promoted-src |
+| `RHI/` ([LEGACY-009](../../tasks/backlog/architecture/LEGACY-009-delete-src-legacy-rhi.md)) | 54 | 83 | 16 | 16 tests, 0 promoted-src |
+| `Runtime/` ([LEGACY-010](../../tasks/backlog/architecture/LEGACY-010-delete-src-legacy-runtime.md)) | 29 | 0 | 13 | 13 tests, 0 promoted-src |
 
 "Files" includes each subtree's `CMakeLists.txt`.
 
@@ -75,7 +75,7 @@ Consumer counts are distinct files matched outside the doomed subtree.
   `Interface::GUI` API; `LEGACY-001` remains blocked only by six
   legacy-internal Graphics/Runtime consumers.
 - **`Runtime/` has zero legacy-internal consumers** — nothing else in
-  `src/legacy/` imports the doomed `Runtime.*` modules. Once its 14 test
+  `src/legacy/` imports the doomed `Runtime.*` modules. Once its 13 test
   consumers migrate, `LEGACY-010` becomes a pure mechanical deletion.
 
 ## Promoted-engine-code blocker status
@@ -209,12 +209,18 @@ compatibility test because promoted ECS owns event payload types only and
 promoted runtime owns selection mutation through `SelectionController`. This
 reduces the remaining ECS external test-consumer set to 21 files and Runtime to
 14 files.
+`LEGACY-037` retired the legacy `Runtime.AssetIngestService` constructor-shape
+compatibility test because promoted ingest ownership is the
+`Extrinsic.Runtime.AssetIngestStateMachine` plus asset/runtime handoff
+contracts rather than the old dependency-heavy service constructor. This
+reduces the remaining Asset external test-consumer set to 9 files, Core to 21
+files, Graphics to 37 files, RHI to 16 files, and Runtime to 13 files.
 
 **`LEGACY-013` clears only the promoted-src subset of the `LEGACY-005`
 gate.** The
 `LEGACY-005` consumer-grep searches every consumer of legacy `Core.*` outside
 `src/legacy/Core/**`, which the table above now counts as 133 legacy-internal +
-22 test files. `LEGACY-005` stays blocked by its 22 test consumers
+21 test files. `LEGACY-005` stays blocked by its 21 test consumers
 (`LEGACY-012`) and by all 133 legacy-internal consumers until the subtrees above
 Core have been deleted. This is why the `LEGACY-005` row in
 `legacy-retirement.md` says Core "retires last".
@@ -257,7 +263,7 @@ Removal is gated by consumer migration only. The safe path:
    ([`LEGACY-012`](../../tasks/backlog/architecture/LEGACY-012-migrate-legacy-consumer-tests.md)).
    This is required for every subtree that still has external consumers,
    including `Runtime` — even the subtree with zero legacy-internal consumers
-   still has 14 test consumers, so no gate exits clean until its
+   still has 13 test consumers, so no gate exits clean until its
    `LEGACY-012`-owned tests migrate or retire. `Interface/` already has zero
    external test consumers after `LEGACY-018`; it remains blocked by six
    legacy-internal Graphics/Runtime consumers until subtree ordering removes or

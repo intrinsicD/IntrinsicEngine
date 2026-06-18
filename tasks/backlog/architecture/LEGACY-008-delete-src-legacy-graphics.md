@@ -43,8 +43,8 @@ depends_on: []
   grandfathered rows keyed under `src/legacy/Graphics/`; drop only those.
 - Prerequisite update (2026-06-18): the consumer-grep gate FAILS — legacy
   `Graphics`/`Graphics.*` modules are still imported by `src/legacy/Runtime/`
-  and by 38 tests after `LEGACY-034` retired the legacy runtime frame-loop and
-  maintenance-lane test consumers. The legacy Sandbox consumer retired under
+  and by 37 tests after `LEGACY-037` retired the legacy `AssetIngestService`
+  constructor-shape test consumer. The legacy Sandbox consumer retired under
   `LEGACY-003`, and the legacy EditorUI consumer retired under `LEGACY-007`. Per
   [`docs/migration/legacy-retirement.md`](../../../docs/migration/legacy-retirement.md),
   this subtree's retirement is gated on the

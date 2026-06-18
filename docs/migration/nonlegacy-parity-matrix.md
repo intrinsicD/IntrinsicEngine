@@ -114,6 +114,16 @@ their payload tests; promoted runtime owns selection and hover mutation through
 surface, legacy `Runtime.Selection` helper API, and legacy GPU pick/upload
 events are not promoted.
 
+### Legacy AssetIngestService Constructor Retirement
+
+`LEGACY-037` retires the legacy `Runtime.AssetIngestService` constructor-shape
+compatibility test. Promoted asset ingest ownership is the
+`Extrinsic.Runtime.AssetIngestStateMachine` plus promoted asset import bridges,
+runtime model-scene/texture handoffs, and `Engine` import/reimport entry
+points. The old dependency-heavy service constructor that imports legacy
+`Asset.Pipeline`, `Graphics`, `RHI`, `Core.IOBackend`, and
+`Runtime.SceneManager` is not a promoted endpoint.
+
 ## Legacy graphics IO ownership inventory (`GRAPHICS-019`)
 
 `GRAPHICS-019` records the owner split for legacy graphics import/export/model

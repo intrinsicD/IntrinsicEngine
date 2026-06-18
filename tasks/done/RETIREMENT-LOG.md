@@ -9,6 +9,23 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`LEGACY-037`](LEGACY-037-retire-legacy-asset-ingest-service-test.md) —
+Retire legacy AssetIngestService test — retired on 2026-06-18 at maturity
+`CPUContracted`. Legacy
+`tests/unit/assets/Test_AssetIngestService.cpp` was removed instead of migrated
+because it verified only the old dependency-heavy
+`Runtime.AssetIngestService` constructor and copy/move trait shape. Promoted
+asset ingest behavior is owned by `Extrinsic.Runtime.AssetIngestStateMachine`,
+promoted asset import bridges, and runtime model/texture handoffs from
+`RUNTIME-101` and related asset/runtime tasks. `LEGACY-004` remains blocked by
+9 remaining test consumers and 50 legacy-internal consumers; `LEGACY-005`
+remains blocked by 21 remaining test consumers and 133 legacy-internal
+consumers; `LEGACY-008` remains blocked by 37 remaining test consumers and 22
+legacy-internal consumers; `LEGACY-009` remains blocked by 16 remaining test
+consumers and 83 legacy-internal consumers; `LEGACY-010` remains blocked by 13
+remaining test consumers; `LEGACY-012` owns the remaining test cleanup.
+
+Backlog
 [`LEGACY-036`](LEGACY-036-retire-legacy-event-bus-test.md) — Retire legacy
 EventBus test — retired on 2026-06-18 at maturity `CPUContracted`. Legacy
 `tests/unit/core/Test_EventBus.cpp` was removed instead of migrated because the
