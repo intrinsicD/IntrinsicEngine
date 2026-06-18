@@ -1389,6 +1389,16 @@ TEST(RendererFrameLifecycle, ForwardPointSphereImpostorsWriteCorrectedDepth)
     const std::string cullShader = ReadShaderSource("culling/instance_cull.comp");
 
     EXPECT_NE(pointVertex.find("/ 6u"), std::string::npos);
+    EXPECT_NE(pointVertex.find("ResolvePointSizePx"), std::string::npos);
+    EXPECT_NE(pointVertex.find("float pointSizePx = cfg.Point.PointSize"),
+              std::string::npos);
+    EXPECT_NE(pointVertex.find("cfg.Point.PointSizeBDA != uint64_t(0)"),
+              std::string::npos);
+    EXPECT_NE(pointVertex.find(
+                  "GpuFloatBufferRef(cfg.Point.PointSizeBDA).Data[pointElementId]"),
+              std::string::npos);
+    EXPECT_NE(pointVertex.find("clamp(pointSizePx, 0.5, 32.0)"),
+              std::string::npos);
     EXPECT_NE(pointVertex.find("vDiscUV"), std::string::npos);
     EXPECT_NE(pointFragment.find("surfaceViewPos"), std::string::npos);
     EXPECT_NE(pointFragment.find("gl_FragDepth = depth"), std::string::npos);

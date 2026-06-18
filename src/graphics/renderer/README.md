@@ -295,11 +295,10 @@ Concretely:
   because mode 1 computes the front sphere surface in view space and writes
   corrected `gl_FragDepth` so impostor spheres intersect and occlude retained
   surfaces instead of using flat billboard depth. The forward point shader
-  consumes uniform `GpuEntityConfig::Point.PointSize` and `Point.PointMode`;
-  named `Point.PointSizeBDA` residency is populated by sync/extraction but
-  shader consumption is tracked by `GRAPHICS-094`. Mode 0 draws flat circles,
-  mode 1 draws depth-corrected impostor spheres, and mode 2 currently uses a
-  neutral fallback normal until a dedicated point/surfel normal-buffer
+  consumes `GpuEntityConfig::Point.PointSize` / `Point.PointSizeBDA` for
+  uniform or named per-point pixel sizes, plus `Point.PointMode`. Mode 0 draws
+  flat circles, mode 1 draws depth-corrected impostor spheres, and mode 2
+  currently uses a neutral fallback normal until a dedicated point/surfel normal-buffer
   residency path lands. The retained point UV slot is not used for normal
   encoding. Transient debug-point expansion remains owned by
   GRAPHICS-077 and must not route through the retained `Points` cull bucket.

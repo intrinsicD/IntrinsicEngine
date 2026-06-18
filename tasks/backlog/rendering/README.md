@@ -806,18 +806,17 @@ Open post-acceptance rendering leaves:
   landed CPU/null line-width residency and `forward/line.vert` consumption on the
   `LineQuads` topology. The remaining open slice is the opt-in `gpu;vulkan`
   operational line-width smoke on Vulkan-capable hosts.
-- [GRAPHICS-094 — Consume per-point size BDA in retained point shader](GRAPHICS-094-retained-point-size-bda-consumption.md):
-  unblocked follow-up from the `GRAPHICS-092` factual-doc audit. Named
-  `RenderPoints::SizeSource` buffers can populate `Point.PointSizeBDA`, but the
-  retained point shader still consumes uniform `Point.PointSize`; target
-  `CPUContracted` shader consumption without changing point color, line width, or
-  legacy point paths.
 - [GRAPHICS-093 — Define forward-line quad topology for retained GpuScene lines (done)](../../done/GRAPHICS-093-forward-line-quad-topology.md):
   retired 2026-06-18 at `CPUContracted`; appended the non-indexed `LineQuads`
   bucket, switched retained `LinePass` to `DrawIndirectCount()` / `TriangleList`,
   and preserved the indexed `Lines` bucket for edge-id selection. CPU/null dynamic
   line-width consumption is now covered by `GRAPHICS-092`; Vulkan operational proof
   remains there.
+- [GRAPHICS-094 — Consume per-point size BDA in retained point shader (done)](../../done/GRAPHICS-094-retained-point-size-bda-consumption.md):
+  retired 2026-06-18 at `CPUContracted`; the retained forward point shader now
+  consumes `Point.PointSizeBDA[sourceVertexIndex]` when present and falls back to
+  uniform `Point.PointSize`, without changing point color, line width, or legacy
+  point paths.
 
 Cross-layer Theme A leaves retired for the full working sandbox path:
 - [`RUNTIME-085` — `GeometrySources` mesh residency bridge](../../done/RUNTIME-085-geometrysources-mesh-residency.md) (retired 2026-05-28 at `CPUContracted`; Slices A–C landed the mesh packer, extraction wiring, and dirty-domain reupload/retire ordering).

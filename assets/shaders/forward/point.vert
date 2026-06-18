@@ -46,6 +46,14 @@ vec4 ResolvePointVisualizationColor(GpuEntityConfig cfg, uint pointElementId) {
         : GpuResolveVisualizationColorFallback(cfg, elementColor, vec4(1.0));
 }
 
+float ResolvePointSizePx(GpuEntityConfig cfg, uint pointElementId) {
+    float pointSizePx = cfg.Point.PointSize;
+    if (cfg.Point.PointSizeBDA != uint64_t(0)) {
+        pointSizePx = GpuFloatBufferRef(cfg.Point.PointSizeBDA).Data[pointElementId];
+    }
+    return clamp(pointSizePx, 0.5, 32.0);
+}
+
 void main() {
     const uint instanceSlot = gl_InstanceIndex;
     const GpuSceneTable scene = GpuSceneTableRef(pc.SceneTableBDA).Value;
@@ -77,7 +85,7 @@ void main() {
     const vec4 viewCenter4 = scene.CameraView * worldPos;
     const vec4 centerClip = scene.CameraViewProj * dyn.Model * localPos;
 
-    const float pointSizePx = clamp(cfg.Point.PointSize, 0.5, 32.0);
+    const float pointSizePx = ResolvePointSizePx(cfg, sourceVertexIndex);
     const float radiusPx = pointSizePx * 0.5;
     const float viewportWidth = max(scene.CameraViewportWidth, 1.0);
     const float viewportHeight = max(scene.CameraViewportHeight, 1.0);

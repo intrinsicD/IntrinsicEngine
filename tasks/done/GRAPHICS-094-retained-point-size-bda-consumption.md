@@ -5,6 +5,17 @@ depends_on: []
 ---
 # GRAPHICS-094 — Consume per-point size BDA in retained point shader
 
+## Completion
+- Completed: 2026-06-18. Commit/PR: this retirement commit.
+- Maturity: `CPUContracted`; no `Operational` follow-up is owed.
+- Fix summary: `assets/shaders/forward/point.vert` now resolves retained point
+  pixel size from `Point.PointSizeBDA[sourceVertexIndex]` when the BDA is
+  populated and otherwise falls back to uniform `Point.PointSize`, with the
+  existing clamp applied to both paths.
+- Evidence: focused `glslc` compile for `assets/shaders/forward/point.vert`,
+  focused point/visualization/entity-config CTest coverage, default CPU CTest
+  gate, and strict layering/test-layout/docs/task checks.
+
 ## Goal
 - Make named `RenderPoints::SizeSource` buffers fully live on the retained
   GpuScene point path by having `assets/shaders/forward/point.vert` consume
@@ -31,32 +42,32 @@ depends_on: []
   `PointFirstVertex * 6u` first-vertex offset.
 
 ## Required changes
-- [ ] Update `assets/shaders/forward/point.vert` to read
+- [x] Update `assets/shaders/forward/point.vert` to read
       `GpuFloatBufferRef(cfg.Point.PointSizeBDA).Data[sourceVertexIndex]` when
       the BDA is non-zero, with the same deterministic clamp used by uniform
       point size.
-- [ ] Preserve uniform-size behavior and point modes.
-- [ ] Keep the `GpuEntityConfig` C++/GLSL layout unchanged.
+- [x] Preserve uniform-size behavior and point modes.
+- [x] Keep the `GpuEntityConfig` C++/GLSL layout unchanged.
 
 ## Tests
-- [ ] Add or extend CPU/null shader-source or config coverage asserting the
+- [x] Add or extend CPU/null shader-source or config coverage asserting the
       retained point shader consumes `PointSizeBDA` and still falls back to
       uniform `PointSize`.
-- [ ] Compile `assets/shaders/forward/point.vert` with `glslc`.
-- [ ] Preserve the default CPU-supported CTest gate.
+- [x] Compile `assets/shaders/forward/point.vert` with `glslc`.
+- [x] Preserve the default CPU-supported CTest gate.
 
 ## Docs
-- [ ] Update renderer/architecture docs to state that per-point size BDA is
+- [x] Update renderer/architecture docs to state that per-point size BDA is
       consumed by the retained forward point shader.
-- [ ] Update `tasks/backlog/rendering/README.md` and regenerate
+- [x] Update `tasks/backlog/rendering/README.md` and regenerate
       `tasks/SESSION-BRIEF.md`.
 
 ## Acceptance criteria
-- [ ] Uniform point-size rendering is unchanged.
-- [ ] Named per-point size buffers in `GpuSceneSlot` affect retained point
+- [x] Uniform point-size rendering is unchanged.
+- [x] Named per-point size buffers in `GpuSceneSlot` affect retained point
       billboard diameter through `Point.PointSizeBDA`.
-- [ ] No new graphics imports of runtime/ECS/assets or legacy shader paths.
-- [ ] Default CPU gate stays green.
+- [x] No new graphics imports of runtime/ECS/assets or legacy shader paths.
+- [x] Default CPU gate stays green.
 
 ## Verification
 ```bash

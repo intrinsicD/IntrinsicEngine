@@ -9,6 +9,18 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`GRAPHICS-094`](GRAPHICS-094-retained-point-size-bda-consumption.md) —
+Consume per-point size BDA in retained point shader — retired on 2026-06-18
+at maturity `CPUContracted`. The retained forward point shader now resolves
+pixel size from `GpuEntityConfig::Point.PointSizeBDA[sourceVertexIndex]` when
+that BDA is populated, otherwise falling back to uniform
+`GpuEntityConfig::Point.PointSize`, with the existing clamp applied to both
+paths. The slice added shader-source contract coverage, preserved the
+`GpuEntityConfig` layout, updated renderer/architecture docs, and leaves no
+required `Operational` follow-up unless future visual point-size readback smoke
+coverage is explicitly opened.
+
+Backlog
 [`LEGACY-042`](LEGACY-042-retire-legacy-asset-pipeline-test.md) — Retire
 legacy Asset.Pipeline test — retired on 2026-06-18 at maturity
 `CPUContracted`. Legacy `tests/unit/assets/Test_AssetPipeline.cpp` and the
