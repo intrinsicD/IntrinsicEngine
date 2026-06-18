@@ -43,7 +43,7 @@ Retirement runs as a tracked program. Targets are deleted in the order below, ea
 
 | # | Subtree | Size | Promoted owner | Prerequisite checklist | Executing task |
 |---|---|---|---|---|---|
-| 1 | `src/legacy/Interface/` | 3 files | `src/platform/` (window/input ports), `src/app/Sandbox/` (UI shell entry) | (a) consumer-grep gate in `LEGACY-001` Verification exits 0 with `OK: no external consumers ...` (the gate inverts `git grep`'s match-exits-0 default and excludes `src/legacy/Interface/**` from the search); the gate still fails across remaining legacy graphics/editor/runtime consumers and `tests/contract/ui/`; (b) remaining legacy modules build without it, or are fenced behind a build flag; (c) layering allowlist row count drops by exactly the count of removed rows. | [`LEGACY-001`](../../tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md) |
+| 1 | `src/legacy/Interface/` | 4 files | `src/platform/` (window/input ports), `src/app/Sandbox/` (UI shell entry) | (a) consumer-grep gate in `LEGACY-001` Verification exits 0 with `OK: no external consumers ...` (the gate inverts `git grep`'s match-exits-0 default and excludes `src/legacy/Interface/**` from the search); the gate still fails across remaining legacy Graphics/Runtime consumers. `LEGACY-018` retired the external `tests/contract/ui/` consumer; (b) remaining legacy modules build without it, or are fenced behind a build flag; (c) layering allowlist row count drops by exactly the count of removed rows. | [`LEGACY-001`](../../tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md) |
 | 2 | `src/legacy/Asset/` | 5 files | `src/assets/` | (a) legacy `Runtime/AssetIngestService` and remaining legacy graphics/runtime consumers migrate off the legacy asset surface; (b) parity matrix `assets` row no longer lists legacy `Asset.Manager` / `Asset.Pipeline` / `Asset.Errors` as live; (c) consumer grep clean. | [`LEGACY-004`](../../tasks/backlog/architecture/LEGACY-004-delete-src-legacy-asset.md) |
 | 3 | `src/legacy/EditorUI/` | 8 files | `src/runtime/Editor/` + `src/app/Sandbox/` attachment | Done 2026-06-07: promoted `SandboxEditorUi` shell/domain windows, geometry-processing discovery, file/scene command surfaces, and the `LEGACY-003` Sandbox-retirement prerequisite were in place; consumer grep exited clean before deletion. Follow-up UI-006 later restored Frame Graph diagnostics against renderer-owned stats. | [`LEGACY-007`](../../tasks/done/LEGACY-007-delete-src-legacy-editorui.md) |
 
@@ -78,7 +78,11 @@ As of `LEGACY-002` (2026-06-06), every remaining `src/legacy/<Subsystem>/` subtr
 - [`LEGACY-012`](../../tasks/backlog/architecture/LEGACY-012-migrate-legacy-consumer-tests.md) —
   migrates or retires tests and other non-legacy consumers that still import
   bare legacy module names after promoted feature owners exist.
+- [`LEGACY-018`](../../tasks/done/LEGACY-018-retire-interface-panel-registration-test.md)
+  (done 2026-06-18) — retired the legacy-only `Interface::GUI`
+  panel-registration test. `LEGACY-001` now has zero external test consumers and
+  remains blocked by legacy-internal Graphics/Runtime consumers.
 
-Deletion order is consumer-leaves first, foundation last (see the "Legacy retirement" section of [`tasks/backlog/architecture/README.md`](../../tasks/backlog/architecture/README.md) for the full ordering rationale). Current `find -type f` subtree sizes (including each `CMakeLists.txt`): `Graphics` 168, `RHI` 54, `Core` 40, `ECS` 29, `Runtime` 29, `Asset` 6.
+Deletion order is consumer-leaves first, foundation last (see the "Legacy retirement" section of [`tasks/backlog/architecture/README.md`](../../tasks/backlog/architecture/README.md) for the full ordering rationale). Current `find -type f` subtree sizes (including each `CMakeLists.txt`): `Graphics` 168, `RHI` 54, `Core` 40, `ECS` 29, `Runtime` 29, `Asset` 6, `Interface` 4.
 
 Process rule: a sequencing row is satisfied only when its prerequisite checklist is fully checked off by the agent promoting the executing task. Bypassing the checklist is forbidden by [`AGENTS.md`](../../AGENTS.md) §13.

@@ -9,6 +9,17 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`LEGACY-018`](LEGACY-018-retire-interface-panel-registration-test.md) —
+Retire legacy Interface panel-registration test — retired on 2026-06-18 at
+maturity `CPUContracted`. The legacy-only
+`tests/contract/ui/Test_PanelRegistration.cpp` consumer was removed from the
+runtime test source list instead of migrated because `Interface::GUI` panel
+registration is not a promoted endpoint; current promoted UI/app coverage lives
+in `SandboxEditorUi` contract tests and the app-to-runtime-only dependency
+test. `LEGACY-001` now has zero external test consumers and remains blocked by
+six legacy-internal Graphics/Runtime files.
+
+Backlog
 [`LEGACY-017`](LEGACY-017-core-hash-test-promoted.md) — Retire duplicate legacy
 CoreHash test — retired on 2026-06-18 at maturity `CPUContracted`. Duplicate
 legacy `tests/unit/core/Test_CoreHash.cpp` coverage was deleted in favor of the

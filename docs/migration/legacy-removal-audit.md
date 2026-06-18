@@ -51,7 +51,7 @@ Consumer counts are distinct files matched outside the doomed subtree.
 
 | Subtree (task) | Files | Legacy-internal consumers | External consumers | External breakdown |
 |---|---|---|---|---|
-| `Interface/` ([LEGACY-001](../../tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md)) | 4 | 6 | 1 | 1 test (`tests/contract/ui/Test_PanelRegistration.cpp`) |
+| `Interface/` ([LEGACY-001](../../tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md)) | 4 | 6 | 0 | none |
 | `Asset/` ([LEGACY-004](../../tasks/backlog/architecture/LEGACY-004-delete-src-legacy-asset.md)) | 6 | 50 | 10 | 10 tests, 0 promoted-src |
 | `Core/` ([LEGACY-005](../../tasks/backlog/architecture/LEGACY-005-delete-src-legacy-core.md)) | 40 | 133 | 40 | 40 tests, 0 promoted-src |
 | `ECS/` ([LEGACY-006](../../tasks/backlog/architecture/LEGACY-006-delete-src-legacy-ecs.md)) | 29 | 37 | 25 | 25 tests, 0 promoted-src |
@@ -66,9 +66,14 @@ Consumer counts are distinct files matched outside the doomed subtree.
 - **No subtree is removable in isolation today.** Every subtree still has either
   legacy-internal consumers (which gate deletion ordering) or external test
   consumers (which gate the grep).
-- **Tests are the dominant blocker.** For six of the seven subtrees, *every*
-  external consumer is a test file. These are exactly the consumers owned by
+- **Tests are the dominant blocker.** For the six subtrees that still have
+  external consumers, *every* external consumer is a test file. These are
+  exactly the consumers owned by
   [`LEGACY-012`](../../tasks/backlog/architecture/LEGACY-012-migrate-legacy-consumer-tests.md).
+- **`Interface/` now has zero external test consumers.** `LEGACY-018` retired
+  the legacy-only panel-registration test instead of migrating the unpromoted
+  `Interface::GUI` API; `LEGACY-001` remains blocked only by six
+  legacy-internal Graphics/Runtime consumers.
 - **`Runtime/` has zero legacy-internal consumers** — nothing else in
   `src/legacy/` imports the doomed `Runtime.*` modules. Once its 19 test
   consumers migrate, `LEGACY-010` becomes a pure mechanical deletion.
@@ -115,8 +120,14 @@ the set to 41 files.
 `LEGACY-017` retired the duplicate legacy CoreHash test in favor of the
 existing promoted `Extrinsic.Core.Hash` coverage and renamed that promoted test
 to `Test.CoreHash.cpp`, reducing the set to 40 files.
+`LEGACY-018` retired the only external `Interface` test consumer,
+`tests/contract/ui/Test_PanelRegistration.cpp`; current promoted UI behavior is
+covered by `Extrinsic.Runtime.SandboxEditorUi` contract tests and the
+app-to-runtime dependency proof rather than by a promoted `Interface::GUI`
+registration endpoint.
 
-**This clears only the promoted-src subset of the `LEGACY-005` gate.** The
+**The Core migration sequence above clears only the promoted-src subset of the
+`LEGACY-005` gate.** The
 `LEGACY-005` consumer-grep searches every consumer of legacy `Core.*` outside
 `src/legacy/Core/**`, which the table above now counts as 133 legacy-internal +
 40 test files. `LEGACY-005` stays blocked by its 40 test consumers
@@ -158,13 +169,15 @@ Removal is gated by consumer migration only. The safe path:
    `Core.*`** to the `Extrinsic.Core.*` modules above. This cleared only the
    promoted-src subset of the `LEGACY-005` gate (see above) and did not, on its
    own, unblock `LEGACY-005`.
-2. **Migrate or retire the test consumers** for every subtree
+2. **Migrate or retire the remaining test consumers**
    ([`LEGACY-012`](../../tasks/backlog/architecture/LEGACY-012-migrate-legacy-consumer-tests.md)).
-   This is required for *every* subtree gate, including `Runtime` — even the
-   subtree with zero legacy-internal consumers still has 19 test consumers, so no
-   gate exits clean until `LEGACY-012` lands. After this, the external consumer
-   count for `Interface/`, `Asset/`, `ECS/`, `Graphics/`, `RHI/`, and `Runtime/`
-   drops to zero.
+   This is required for every subtree that still has external consumers,
+   including `Runtime` — even the subtree with zero legacy-internal consumers
+   still has 19 test consumers, so no gate exits clean until its
+   `LEGACY-012`-owned tests migrate or retire. `Interface/` already has zero
+   external test consumers after `LEGACY-018`; it remains blocked by six
+   legacy-internal Graphics/Runtime consumers until subtree ordering removes or
+   fences them.
 3. **Delete the subtrees consumers-first**, following the legacy-internal order
    above: `Runtime` (`LEGACY-010`) → `Graphics` (`LEGACY-008`) →
    `Interface`/`ECS`/`Asset` (`LEGACY-001`/`LEGACY-006`/`LEGACY-004`) → `RHI`

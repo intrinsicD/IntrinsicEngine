@@ -26,6 +26,11 @@ depends_on: [LEGACY-011]
   `LEGACY-017` retired duplicate legacy CoreHash coverage, so this task is now
   the external cleanup owner for the remaining Core gate as well as the other
   subtree gates.
+- `LEGACY-018` retired the only external `LEGACY-001` test consumer,
+  `tests/contract/ui/Test_PanelRegistration.cpp`, because `Interface::GUI`
+  panel registration is not a promoted endpoint. `LEGACY-001` now has zero
+  external test consumers and remains blocked only by six legacy-internal
+  Graphics/Runtime consumers.
 
 ## Value gate
 - Current state: tests still keep legacy subtree deletion gates red even when promoted equivalents may already exist; promoted source no longer imports bare legacy module names after `LEGACY-013`.

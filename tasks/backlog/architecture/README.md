@@ -99,6 +99,11 @@ split; narratives live in the retirement log.
   `Extrinsic.Core.Hash` coverage now named `tests/unit/core/Test.CoreHash.cpp`;
   remaining Core deletion blockers are 40 tests and legacy-internal subtree
   ordering.
+- [LEGACY-018 — Retire legacy Interface panel-registration test](../../done/LEGACY-018-retire-interface-panel-registration-test.md)
+  (done, 2026-06-18, `CPUContracted`):
+  retired legacy-only `tests/contract/ui/Test_PanelRegistration.cpp`;
+  `LEGACY-001` now has zero external test consumers and remains blocked by six
+  legacy-internal Graphics/Runtime files.
 - [CORE-002 — Command and feature catalog contract](../../done/CORE-002-command-feature-catalog-contract.md)
   (done, 2026-06-09, `CPUContracted` / explicit retirement decision):
   resolves remaining legacy `Core.Commands`, `Core.FeatureRegistry`, and
