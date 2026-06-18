@@ -19,16 +19,17 @@ depends_on: [LEGACY-011]
 - Current consumer-grep gates in the open `LEGACY-*` deletion tasks include `tests/**`, and several tests still import legacy module names such as `Runtime.*`, `Graphics.*`, `RHI.*`, `Core.*`, `Asset.*`, `ECS`, or `Interface`.
 - This task should run after the relevant semantic replacement task retires; for example, migrate legacy runtime orchestration tests after `RUNTIME-099`, asset ingest tests after `RUNTIME-101`, and RHI/CUDA tests after `GRAPHICS-086`.
 - `LEGACY-013` cleared the promoted-src bare `Core.*` imports. The remaining
-  external `LEGACY-005` consumers are 35 tests after the four directly affected
+  external `LEGACY-005` consumers are 34 tests after the four directly affected
   geometry API tests migrated to promoted Core types and `LEGACY-014` removed an
   unused RuntimeGraph import, and after `LEGACY-015` migrated CoreError to
   promoted Core, `LEGACY-016` migrated LogRingBuffer to promoted Core,
   `LEGACY-017` retired duplicate legacy CoreHash coverage, `LEGACY-019`
   migrated StrongHandle to promoted Core, `LEGACY-020` migrated CoreTasks to
   promoted Core, and `LEGACY-021` migrated profiling/telemetry to promoted
-  Core, and `LEGACY-022` migrated Core frame-graph coverage to promoted Core,
-  so this task is now the external cleanup owner for the remaining Core gate as
-  well as the other subtree gates.
+  Core, `LEGACY-022` migrated Core frame-graph coverage to promoted Core, and
+  `LEGACY-023` retired legacy-only Core.Commands coverage, so this task is now
+  the external cleanup owner for the remaining Core gate as well as the other
+  subtree gates.
 - `LEGACY-018` retired the only external `LEGACY-001` test consumer,
   `tests/contract/ui/Test_PanelRegistration.cpp`, because `Interface::GUI`
   panel registration is not a promoted endpoint. `LEGACY-001` now has zero

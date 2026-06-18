@@ -185,7 +185,6 @@ endfunction()
 set(_core_test_files
     Test_BoundedHeap.cpp
     Test_CoreMemory.cpp
-    Test_CoreCommands.cpp
     Test_DAGScheduler.cpp
     Test_FeatureRegistry.cpp
     Test_SystemFeatureCatalog.cpp

@@ -9,6 +9,16 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`LEGACY-023`](LEGACY-023-retire-core-commands-test.md) — Retire legacy
+Core.Commands test — retired on 2026-06-18 at maturity `CPUContracted`.
+`tests/unit/core/Test_CoreCommands.cpp` was removed because `CORE-002` retired
+the legacy global core command service and `RUNTIME-102` owns the promoted
+runtime/editor command-history endpoint. Promoted coverage remains in
+`tests/contract/runtime/Test.EditorCommandHistory.cpp` and related runtime UI
+tests. `LEGACY-005` remains blocked by 34 remaining test consumers and 133
+legacy-internal consumers; `LEGACY-012` owns the remaining test cleanup.
+
+Backlog
 [`LEGACY-022`](LEGACY-022-core-framegraph-test-promoted.md) — Migrate
 CoreFrameGraph test to promoted Core — retired on 2026-06-18 at maturity
 `CPUContracted`. `tests/unit/core/Test.CoreFrameGraph.cpp` and
