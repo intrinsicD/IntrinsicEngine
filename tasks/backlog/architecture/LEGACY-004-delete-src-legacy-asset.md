@@ -41,8 +41,8 @@ depends_on: []
   grandfathered rows keyed under `src/legacy/Asset/`; drop only those.
 - Prerequisite update (2026-06-18): the consumer-grep gate FAILS — legacy
   `Asset.*` modules are still imported by `src/legacy/Graphics/`,
-  `src/legacy/Runtime/` (`Runtime.AssetIngestService`), and 7 tests after
-  `LEGACY-041` retired the legacy `Asset.Manager` async/cache/lease/clear
+  `src/legacy/Runtime/` (`Runtime.AssetIngestService`), and 6 tests after
+  `LEGACY-042` retired the legacy `Asset.Pipeline` transfer-token
   compatibility test.
   The legacy Sandbox consumer retired under `LEGACY-003`; remaining consumers
   must migrate to `src/assets/` or retire with their owning legacy subtrees
@@ -129,5 +129,5 @@ ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarant
 - The consumer-grep gate in Verification must exit 0 before this task is
   promoted to `tasks/active/`; today the remaining legacy-internal consumers
   live in `src/legacy/Graphics/` and `src/legacy/Runtime/`, so this deletion
-  lands with or after `LEGACY-008`/`LEGACY-010`, while the 7 remaining test
+  lands with or after `LEGACY-008`/`LEGACY-010`, while the 6 remaining test
   consumers are owned by `LEGACY-012`.

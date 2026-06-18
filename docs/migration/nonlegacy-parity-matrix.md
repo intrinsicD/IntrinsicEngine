@@ -145,6 +145,15 @@ runtime-owned texture/model GPU handoff. The old `AssetLease` pin-count API,
 semantics, and compile-only ownership check against legacy `Graphics::Material`
 are not promoted as asset-layer endpoints.
 
+`LEGACY-042` retires the legacy `Asset.Pipeline` transfer-token compatibility
+test. Retained promoted behavior is represented by `AssetLoadPipeline` staged
+CPU/GPU state transitions and fence completion, `AssetService` event flushing,
+`Graphics.GpuAssetCache` texture/buffer residency requests, and
+`Extrinsic.Runtime.AssetModelTextureHandoff` / `AssetModelSceneHandoff` wiring.
+The old `Runtime::AssetPipeline` main-thread task queue, loaded-material list,
+`RHI::TransferToken` polling, and direct `AssetManager` finalization surface are
+not promoted as compatibility APIs.
+
 ### Legacy Runtime Selection Module Retirement
 
 `LEGACY-038` retires the legacy `Runtime.Selection` /

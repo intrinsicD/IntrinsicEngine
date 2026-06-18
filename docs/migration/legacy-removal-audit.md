@@ -52,11 +52,11 @@ Consumer counts are distinct files matched outside the doomed subtree.
 | Subtree (task) | Files | Legacy-internal consumers | External consumers | External breakdown |
 |---|---|---|---|---|
 | `Interface/` ([LEGACY-001](../../tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md)) | 4 | 6 | 0 | none |
-| `Asset/` ([LEGACY-004](../../tasks/backlog/architecture/LEGACY-004-delete-src-legacy-asset.md)) | 6 | 50 | 7 | 7 tests, 0 promoted-src |
-| `Core/` ([LEGACY-005](../../tasks/backlog/architecture/LEGACY-005-delete-src-legacy-core.md)) | 40 | 133 | 19 | 19 tests, 0 promoted-src |
+| `Asset/` ([LEGACY-004](../../tasks/backlog/architecture/LEGACY-004-delete-src-legacy-asset.md)) | 6 | 50 | 6 | 6 tests, 0 promoted-src |
+| `Core/` ([LEGACY-005](../../tasks/backlog/architecture/LEGACY-005-delete-src-legacy-core.md)) | 40 | 133 | 18 | 18 tests, 0 promoted-src |
 | `ECS/` ([LEGACY-006](../../tasks/backlog/architecture/LEGACY-006-delete-src-legacy-ecs.md)) | 29 | 37 | 19 | 19 tests, 0 promoted-src |
 | `Graphics/` ([LEGACY-008](../../tasks/backlog/architecture/LEGACY-008-delete-src-legacy-graphics.md)) | 168 | 22 | 36 | 36 tests, 0 promoted-src |
-| `RHI/` ([LEGACY-009](../../tasks/backlog/architecture/LEGACY-009-delete-src-legacy-rhi.md)) | 54 | 83 | 15 | 15 tests, 0 promoted-src |
+| `RHI/` ([LEGACY-009](../../tasks/backlog/architecture/LEGACY-009-delete-src-legacy-rhi.md)) | 54 | 83 | 14 | 14 tests, 0 promoted-src |
 | `Runtime/` ([LEGACY-010](../../tasks/backlog/architecture/LEGACY-010-delete-src-legacy-runtime.md)) | 29 | 0 | 11 | 11 tests, 0 promoted-src |
 
 "Files" includes each subtree's `CMakeLists.txt`.
@@ -239,12 +239,18 @@ tickets, load-state transitions, event fanout, typed reads, and runtime-owned
 GPU handoff rather than the old pointer-returning manager/lease surface. This
 reduces the remaining Asset external test-consumer set to 7 files, Core to 19
 files, Graphics to 36 files, and RHI to 15 files.
+`LEGACY-042` retired the legacy `Asset.Pipeline` transfer-token compatibility
+test because promoted asset streaming is split across `Asset.LoadPipeline`,
+`AssetService`, `Graphics.GpuAssetCache`, and runtime model/texture handoffs
+rather than the old `Runtime::AssetPipeline` queue and material list API. This
+reduces the remaining Asset external test-consumer set to 6 files, Core to 18
+files, and RHI to 14 files.
 
 **`LEGACY-013` clears only the promoted-src subset of the `LEGACY-005`
 gate.** The
 `LEGACY-005` consumer-grep searches every consumer of legacy `Core.*` outside
 `src/legacy/Core/**`, which the table above now counts as 133 legacy-internal +
-19 test files. `LEGACY-005` stays blocked by its 19 test consumers
+18 test files. `LEGACY-005` stays blocked by its 18 test consumers
 (`LEGACY-012`) and by all 133 legacy-internal consumers until the subtrees above
 Core have been deleted. This is why the `LEGACY-005` row in
 `legacy-retirement.md` says Core "retires last".

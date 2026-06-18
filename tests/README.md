@@ -137,8 +137,7 @@ fixtures also have grouped entries, including
 `IntrinsicRuntimeTests.GraphicsBackendHeadlessGrouped`,
 `IntrinsicRuntimeTests.HeadlessAppSmokeGrouped`,
 `IntrinsicRuntimeTests.SceneManagerGpuHooksGrouped`,
-`IntrinsicRuntimeTests.GeometryReuseGrouped`,
-and `IntrinsicRuntimeTests.AssetPipelineHeadlessGrouped`. These entries let
+and `IntrinsicRuntimeTests.GeometryReuseGrouped`. These entries let
 shared per-process fixtures amortize setup cost in nightly/opt-in runs. They
 are additive: individual `gtest_discover_tests` cases must remain registered
 for focused filtering and diagnostics.

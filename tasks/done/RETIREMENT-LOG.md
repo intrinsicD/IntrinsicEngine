@@ -9,6 +9,22 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`LEGACY-042`](LEGACY-042-retire-legacy-asset-pipeline-test.md) — Retire
+legacy Asset.Pipeline test — retired on 2026-06-18 at maturity
+`CPUContracted`. Legacy `tests/unit/assets/Test_AssetPipeline.cpp` and the
+dedicated `IntrinsicRuntimeTests.AssetPipelineHeadlessGrouped` CTest were
+removed because they verified the old `Runtime::AssetPipeline`
+main-thread-queue, material-list, `RHI::TransferToken` polling, and direct
+`AssetManager` finalization surface. Promoted asset streaming/upload ownership
+is split across `Extrinsic.Asset.LoadPipeline`, `AssetService`,
+`Graphics.GpuAssetCache`, and runtime model/texture handoffs. `LEGACY-004`
+remains blocked by 6 remaining test consumers and 50 legacy-internal consumers;
+`LEGACY-005` remains blocked by 18 remaining test consumers and 133
+legacy-internal consumers; `LEGACY-009` remains blocked by 14 remaining test
+consumers and 83 legacy-internal consumers; `LEGACY-012` owns the remaining
+test cleanup.
+
+Backlog
 [`LEGACY-041`](LEGACY-041-retire-legacy-asset-manager-core-test.md) — Retire
 legacy Asset.Manager core test — retired on 2026-06-18 at maturity
 `CPUContracted`. Legacy `tests/unit/assets/Test_CoreAssets.cpp` was removed

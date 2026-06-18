@@ -19,7 +19,7 @@ depends_on: [LEGACY-011]
 - Current consumer-grep gates in the open `LEGACY-*` deletion tasks include `tests/**`, and several tests still import legacy module names such as `Runtime.*`, `Graphics.*`, `RHI.*`, `Core.*`, `Asset.*`, `ECS`, or `Interface`.
 - This task should run after the relevant semantic replacement task retires; for example, migrate legacy runtime orchestration tests after `RUNTIME-099`, asset ingest tests after `RUNTIME-101`, and RHI/CUDA tests after `GRAPHICS-086`.
 - `LEGACY-013` cleared the promoted-src bare `Core.*` imports. The remaining
-  external `LEGACY-005` consumers are 19 tests after the four directly affected
+  external `LEGACY-005` consumers are 18 tests after the four directly affected
   geometry API tests migrated to promoted Core types and `LEGACY-014` removed an
   unused RuntimeGraph import, and after `LEGACY-015` migrated CoreError to
   promoted Core, `LEGACY-016` migrated LogRingBuffer to promoted Core,
@@ -45,8 +45,9 @@ depends_on: [LEGACY-011]
   retired legacy runtime selection mode/module compatibility coverage,
   `LEGACY-039` retired legacy element-selection compatibility coverage,
   `LEGACY-040` retired legacy `Asset.Manager` loader-safety/error-path
-  compatibility coverage, and `LEGACY-041` retired legacy `Asset.Manager`
-  async/cache/lease/clear compatibility coverage. This
+  compatibility coverage, `LEGACY-041` retired legacy `Asset.Manager`
+  async/cache/lease/clear compatibility coverage, and `LEGACY-042` retired
+  legacy `Asset.Pipeline` transfer-token compatibility coverage. This
   task is now the external cleanup owner for the remaining Core gate as well as
   the other subtree gates.
 - `LEGACY-018` retired the only external `LEGACY-001` test consumer,

@@ -252,6 +252,13 @@ split; narratives live in the retirement log.
   by promoted asset service, registry, payload-store, load-pipeline, event-bus,
   and runtime handoff contracts; remaining external blockers are 7 Asset tests,
   19 Core tests, 36 Graphics tests, and 15 RHI tests.
+- [LEGACY-042 — Retire legacy Asset.Pipeline test](../../done/LEGACY-042-retire-legacy-asset-pipeline-test.md)
+  (done, 2026-06-18, `CPUContracted`):
+  retired legacy `tests/unit/assets/Test_AssetPipeline.cpp` and its grouped
+  `AssetPipelineHeadless` CTest because promoted streaming/upload ownership is
+  split across `AssetLoadPipeline`, `AssetService`, `GpuAssetCache`, and
+  runtime model/texture handoffs; remaining external blockers are 6 Asset
+  tests, 18 Core tests, and 14 RHI tests.
 - [LEGACY-018 — Retire legacy Interface panel-registration test](../../done/LEGACY-018-retire-interface-panel-registration-test.md)
   (done, 2026-06-18, `CPUContracted`):
   retired legacy-only `tests/contract/ui/Test_PanelRegistration.cpp`;
