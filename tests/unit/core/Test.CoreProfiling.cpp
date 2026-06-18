@@ -8,8 +8,12 @@
 // =============================================================================
 
 #include <gtest/gtest.h>
-#include <thread>
 #include <chrono>
+#include <cstdint>
+#include <string>
+#include <thread>
+#include <utility>
+#include <vector>
 
 import Extrinsic.Core.Telemetry;
 import Extrinsic.Core.Hash;
@@ -303,4 +307,71 @@ TEST(TelemetryPresentTiming, PresentTimingsResetEachFrame)
     EXPECT_EQ(stats.FenceWaitTimeNs, 0u);
     EXPECT_EQ(stats.AcquireTimeNs, 0u);
     EXPECT_EQ(stats.PresentTimeNs, 0u);
+}
+
+TEST(Profiling_TelemetrySystem, SetAndGetPassGpuTimings)
+{
+    auto& telemetry = TelemetrySystem::Get();
+    telemetry.BeginFrame();
+
+    std::vector<PassTimingEntry> entries;
+    entries.push_back({"SurfacePass", 500'000, 0});
+    entries.push_back({"LinePass", 200'000, 0});
+    telemetry.SetPassGpuTimings(std::move(entries));
+
+    const auto& timings = telemetry.GetPassTimings();
+    ASSERT_EQ(timings.size(), 2u);
+    EXPECT_EQ(timings[0].Name, "SurfacePass");
+    EXPECT_EQ(timings[0].GpuTimeNs, 500'000u);
+    EXPECT_EQ(timings[1].Name, "LinePass");
+    EXPECT_EQ(timings[1].GpuTimeNs, 200'000u);
+
+    telemetry.EndFrame();
+}
+
+TEST(Profiling_TelemetrySystem, MergePassCpuTimings)
+{
+    auto& telemetry = TelemetrySystem::Get();
+    telemetry.BeginFrame();
+
+    std::vector<PassTimingEntry> gpuEntries;
+    gpuEntries.push_back({"SurfacePass", 500'000, 0});
+    gpuEntries.push_back({"LinePass", 200'000, 0});
+    telemetry.SetPassGpuTimings(std::move(gpuEntries));
+
+    std::vector<std::pair<std::string, uint64_t>> cpuTimings;
+    cpuTimings.emplace_back("SurfacePass", 300'000);
+    cpuTimings.emplace_back("LinePass", 150'000);
+    cpuTimings.emplace_back("NewPass", 100'000);
+    telemetry.MergePassCpuTimings(cpuTimings);
+
+    const auto& timings = telemetry.GetPassTimings();
+    ASSERT_GE(timings.size(), 3u);
+
+    const auto findTiming = [&](const std::string& name) -> const PassTimingEntry*
+    {
+        for (const auto& timing : timings)
+        {
+            if (timing.Name == name)
+                return &timing;
+        }
+        return nullptr;
+    };
+
+    const auto* surface = findTiming("SurfacePass");
+    ASSERT_NE(surface, nullptr);
+    EXPECT_EQ(surface->GpuTimeNs, 500'000u);
+    EXPECT_EQ(surface->CpuTimeNs, 300'000u);
+
+    const auto* line = findTiming("LinePass");
+    ASSERT_NE(line, nullptr);
+    EXPECT_EQ(line->GpuTimeNs, 200'000u);
+    EXPECT_EQ(line->CpuTimeNs, 150'000u);
+
+    const auto* newPass = findTiming("NewPass");
+    ASSERT_NE(newPass, nullptr);
+    EXPECT_EQ(newPass->GpuTimeNs, 0u);
+    EXPECT_EQ(newPass->CpuTimeNs, 100'000u);
+
+    telemetry.EndFrame();
 }

@@ -1,3 +1,4 @@
 # Benchmark Tests
 
-Benchmark tests provide lightweight correctness/smoke checks for benchmark harness behavior and SLO-oriented test gates.
+Benchmark tests provide SLO-oriented test gates. Benchmark smoke harnesses and
+manifest-backed workloads live under `benchmarks/`.

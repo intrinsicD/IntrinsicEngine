@@ -9,6 +9,17 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`LEGACY-029`](LEGACY-029-retire-core-benchmark-test.md) — Retire legacy
+Core.Benchmark test — retired on 2026-06-18 at maturity `CPUContracted`.
+Legacy-only `tests/benchmark/Test_Benchmark.cpp` coverage for
+`Core.Benchmark::BenchmarkRunner` was removed rather than promoted; its retained
+pass-timing telemetry assertions now live in promoted
+`tests/unit/core/Test.CoreProfiling.cpp`. Benchmark manifests, runner JSON, SLO
+thresholds, and baselines were not changed. `LEGACY-005` remains blocked by 27
+remaining test consumers and 133 legacy-internal consumers; `LEGACY-012` owns
+the remaining test cleanup.
+
+Backlog
 [`LEGACY-028`](LEGACY-028-architecture-slo-test-promoted.md) — Migrate
 ArchitectureSLO test to promoted Core — retired on 2026-06-18 at maturity
 `CPUContracted`. The benchmark/SLO test now imports promoted

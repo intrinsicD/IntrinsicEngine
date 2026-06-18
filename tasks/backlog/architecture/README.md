@@ -157,8 +157,14 @@ split; narratives live in the retirement log.
   (done, 2026-06-18, `CPUContracted`):
   migrated the architecture SLO benchmark test from
   `tests/benchmark/slo/Test_ArchitectureSLO.cpp` to promoted
-  `tests/benchmark/slo/Test.ArchitectureSLO.cpp`; remaining Core deletion
-  blockers are 28 tests and legacy-internal subtree ordering.
+  `tests/benchmark/slo/Test.ArchitectureSLO.cpp`; `LEGACY-029` later reduced
+  the remaining Core test-consumer set to 27 files.
+- [LEGACY-029 — Retire legacy Core.Benchmark test](../../done/LEGACY-029-retire-core-benchmark-test.md)
+  (done, 2026-06-18, `CPUContracted`):
+  retired legacy-only `tests/benchmark/Test_Benchmark.cpp` coverage for
+  `Core.Benchmark::BenchmarkRunner` while moving promoted pass-timing telemetry
+  assertions to `tests/unit/core/Test.CoreProfiling.cpp`; remaining Core
+  deletion blockers are 27 tests and legacy-internal subtree ordering.
 - [LEGACY-018 — Retire legacy Interface panel-registration test](../../done/LEGACY-018-retire-interface-panel-registration-test.md)
   (done, 2026-06-18, `CPUContracted`):
   retired legacy-only `tests/contract/ui/Test_PanelRegistration.cpp`;
