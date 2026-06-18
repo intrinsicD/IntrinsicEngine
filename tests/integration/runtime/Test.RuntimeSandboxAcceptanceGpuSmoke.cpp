@@ -1674,13 +1674,19 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleMeshConfiguredLineWidthA
 namespace
 {
 // GRAPHICS-091 Slice C scalar-field colormap smoke parameters. The reference
-// triangle's three source vertices carry a vertex-domain scalar field spanning
-// the configured range so the shared `common/gpu_scene.glsl` colormap resolver
-// is exercised end to end on the forward line and point lanes.
+// triangle's source vertices carry a uniform vertex-domain scalar at the range
+// maximum so the shared `common/gpu_scene.glsl` colormap resolver paints one
+// predictable colour (the LUT maximum) on every forward line and point fragment,
+// independent of interpolation or the exact sampled pixel.
 inline constexpr std::string_view kScalarFieldSmokeProperty = "v:graphics091_scalar";
 inline constexpr float kScalarFieldSmokeRangeMin = 0.0f;
 inline constexpr float kScalarFieldSmokeRangeMax = 1.0f;
-inline constexpr std::uint32_t kScalarFieldSmokeSampleRadius = 6u;
+inline constexpr float kScalarFieldSmokeLineWidthPx = 8.0f;
+inline constexpr float kScalarFieldSmokePointSizePx = 12.0f;
+inline constexpr std::uint32_t kScalarFieldSmokeSampleRadius = 8u;
+// Minimum RGB distance from the background clear for a sampled neighborhood
+// pixel to count as a drawn line/point fragment.
+inline constexpr int kScalarFieldSmokeMinForeground = 60;
 // `ColorSourceMode` value for `ScalarField` in the `GpuEntityConfig` contract
 // (mirrors `VisualizationSyncSystem` `kMode_ScalarField` and the GLSL
 // `GpuColorSource_ScalarField`); `VisDomain` 0 is the vertex domain.
@@ -1703,6 +1709,96 @@ inline constexpr std::uint32_t kVisDomainVertex = 0u;
     out += ", elementCount=" + std::to_string(cfg.ElementCount) + "}";
     return out;
 }
+
+[[nodiscard]] std::string PixelText(const RgbaPixel p)
+{
+    return "(" + std::to_string(static_cast<int>(p.R)) + "," +
+           std::to_string(static_cast<int>(p.G)) + "," +
+           std::to_string(static_cast<int>(p.B)) + ")";
+}
+
+[[nodiscard]] bool IsSrgbBackbuffer(const Extrinsic::RHI::Format format) noexcept
+{
+    return format == Extrinsic::RHI::Format::RGBA8_SRGB ||
+           format == Extrinsic::RHI::Format::BGRA8_SRGB;
+}
+
+[[nodiscard]] std::uint8_t SrgbByteToLinearByte(const std::uint8_t srgb) noexcept
+{
+    const float s = static_cast<float>(srgb) / 255.0f;
+    const float linear = (s <= 0.04045f) ? (s / 12.92f)
+                                         : std::pow((s + 0.055f) / 1.055f, 2.4f);
+    const float clamped = std::clamp(linear, 0.0f, 1.0f);
+    return static_cast<std::uint8_t>(clamped * 255.0f + 0.5f);
+}
+
+// Bring a sampled backbuffer pixel into the colormap LUT's linear space so it can
+// be compared against ColormapSystem::SampleCpu (which returns linear LUT bytes).
+[[nodiscard]] RgbaPixel ToLinearPixel(const Extrinsic::RHI::Format format,
+                                      const RgbaPixel px) noexcept
+{
+    if (!IsSrgbBackbuffer(format))
+    {
+        return px;
+    }
+    return RgbaPixel{
+        .R = SrgbByteToLinearByte(px.R),
+        .G = SrgbByteToLinearByte(px.G),
+        .B = SrgbByteToLinearByte(px.B),
+        .A = px.A,
+    };
+}
+
+struct ForegroundSample
+{
+    RgbaPixel Pixel{};
+    int BackgroundDistance{0};
+};
+
+// Return the neighborhood pixel furthest from the background clear (the most
+// strongly drawn fragment), so the colormap comparison targets the actual
+// line/point draw rather than a background or partially-covered edge texel.
+[[nodiscard]] ForegroundSample FindMostForegroundPixel(
+    const std::vector<std::uint8_t>& bytes,
+    const Extrinsic::RHI::Format format,
+    const std::uint32_t bytesPerPixel,
+    const Extrinsic::Core::Extent2D extent,
+    const std::uint32_t centerX,
+    const std::uint32_t centerY,
+    const std::uint32_t radius,
+    const RgbaPixel background)
+{
+    ForegroundSample best{};
+    best.Pixel = ReadPixel(bytes, format, bytesPerPixel, extent, centerX, centerY);
+    best.BackgroundDistance = RgbDistance(best.Pixel, background);
+    if (extent.Width == 0u || extent.Height == 0u)
+    {
+        return best;
+    }
+
+    const auto minX = static_cast<std::uint32_t>(
+        std::max<int>(0, static_cast<int>(centerX) - static_cast<int>(radius)));
+    const auto minY = static_cast<std::uint32_t>(
+        std::max<int>(0, static_cast<int>(centerY) - static_cast<int>(radius)));
+    const auto maxX = static_cast<std::uint32_t>(
+        std::min<int>(static_cast<int>(extent.Width) - 1, static_cast<int>(centerX) + static_cast<int>(radius)));
+    const auto maxY = static_cast<std::uint32_t>(
+        std::min<int>(static_cast<int>(extent.Height) - 1, static_cast<int>(centerY) + static_cast<int>(radius)));
+    for (std::uint32_t y = minY; y <= maxY; ++y)
+    {
+        for (std::uint32_t x = minX; x <= maxX; ++x)
+        {
+            const RgbaPixel px = ReadPixel(bytes, format, bytesPerPixel, extent, x, y);
+            const int d = RgbDistance(px, background);
+            if (d > best.BackgroundDistance)
+            {
+                best.BackgroundDistance = d;
+                best.Pixel = px;
+            }
+        }
+    }
+    return best;
+}
 } // namespace
 
 // The unified scalar-field colormap resolution (Slice A's shared
@@ -1713,8 +1809,10 @@ inline constexpr std::uint32_t kVisDomainVertex = 0u;
 // `VisualizationConfig` on a line+point renderable and asserts the per-line and
 // per-point `GpuEntityConfig` carry the scalar-field colormap config end to end
 // to the GPU entity-config buffer, the `LinePass`/`PointPass` record on the
-// operational command stream, and the line/point lanes leave visible
-// colormap-resolved (non-background) pixels rather than the material fallback.
+// operational command stream, and — with the surface lane removed so only the
+// line/point draws contribute pixels — each lane's strongest sampled fragment
+// resolves closer to the expected Viridis colormap colour than to the
+// white/material fallback a colormap-ignoring shader would emit.
 //
 // The fixture self-skips on non-Vulkan hosts via
 // `BootstrapDefaultSandboxAppEngine`, so it is excluded from the default CPU
@@ -1738,18 +1836,26 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleScalarFieldColormapResol
 
     auto& raw = engine.GetScene().Raw();
 
-    // Author a per-vertex scalar field spanning the configured colormap range.
+    // Author a uniform per-vertex scalar at the colormap range maximum: the whole
+    // line/point geometry then resolves to one predictable colour (the LUT
+    // maximum), so the sampled pixel proof does not depend on the exact
+    // interpolated scalar at a sample location.
     auto& vertices = raw.get<gs::Vertices>(triangle);
     vertices.Properties
         .GetOrAdd<float>(std::string{kScalarFieldSmokeProperty}, 0.0f)
-        .Vector() = {kScalarFieldSmokeRangeMin,
-                     0.5f * (kScalarFieldSmokeRangeMin + kScalarFieldSmokeRangeMax),
+        .Vector() = {kScalarFieldSmokeRangeMax,
+                     kScalarFieldSmokeRangeMax,
                      kScalarFieldSmokeRangeMax};
 
-    // Draw the edge and point lanes so the scalar-field colormap is proven on
-    // the forward LinePass and PointPass, not only the surface pass.
-    raw.emplace_or_replace<G::RenderEdges>(triangle, G::RenderEdges{});
-    raw.emplace_or_replace<G::RenderPoints>(triangle, G::RenderPoints{});
+    // Draw the edge and point lanes with sampleable width/size so the scalar-field
+    // colormap is proven on the forward LinePass and PointPass, not only the
+    // surface pass.
+    G::RenderEdges edges{};
+    edges.WidthSource = kScalarFieldSmokeLineWidthPx;
+    raw.emplace_or_replace<G::RenderEdges>(triangle, edges);
+    G::RenderPoints points{};
+    points.SizeSource = kScalarFieldSmokePointSizePx;
+    raw.emplace_or_replace<G::RenderPoints>(triangle, points);
 
     auto& visualization = raw.get<G::VisualizationConfig>(triangle);
     visualization.Source = G::VisualizationConfig::ColorSource::ScalarField;
@@ -1761,6 +1867,14 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleScalarFieldColormapResol
     visualization.Scalar.RangeMax = kScalarFieldSmokeRangeMax;
     visualization.Scalar.BinCount = 0u;
     visualization.Scalar.Isolines.Num = 0u;
+
+    // Isolate the line and point lanes: remove the surface lane so the sampled
+    // pixels can only come from the forward LinePass/PointPass draws. Surface,
+    // line, and point of one entity share a GpuEntityConfig, so a retained
+    // scalar-coloured surface fill would otherwise paint the same colormap colour
+    // over the sampled neighborhood and the proof could not attribute the colour
+    // to the line/point path.
+    raw.remove<G::RenderSurface>(triangle);
 
     auto& renderer = engine.GetRenderer();
     auto& device = engine.GetDevice();
@@ -1869,41 +1983,58 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleScalarFieldColormapResol
             << DescribeColormapConfig(lane, cfg, expectedColormapId);
     }
 
-    // Colormap pixel proof: the line and point lanes must leave visible,
-    // non-background colour where the scalar field resolves through the Viridis
-    // LUT. Exact per-pixel colour parity is finalized on the Vulkan host; the
-    // expected LUT samples are logged for that comparison.
+    // Colormap pixel proof with the line/point lanes isolated (surface removed).
+    // Each lane's strongest fragment must resolve to the Viridis LUT maximum
+    // colour and sit closer to it than to the white/material colour a
+    // colormap-ignoring shader would emit. A bare "something was drawn" threshold
+    // is intentionally avoided — it would also pass for the fallback colour.
     std::vector<std::uint8_t> bytes(static_cast<std::size_t>(readbackSize), 0u);
     device.ReadBuffer(readbackBuffer, bytes.data(), readbackSize, 0u);
 
-    const auto [sampleX, sampleY] = ProjectReferenceCameraPixel(glm::vec3{0.0f, -0.5f, 0.0f}, extent);
-    const PixelNeighborhoodStats laneStats =
-        DescribePixelNeighborhood(bytes, backbufferFormat, bytesPerPixel, extent, sampleX, sampleY,
-                                  kScalarFieldSmokeSampleRadius);
-    const auto& cmaps = renderer.GetColormapSystem();
-    const auto lutLo = cmaps.SampleCpu(Extrinsic::Graphics::Colormap::Type::Viridis, 0.0f);
-    const auto lutMid = cmaps.SampleCpu(Extrinsic::Graphics::Colormap::Type::Viridis, 0.5f);
-    const auto lutHi = cmaps.SampleCpu(Extrinsic::Graphics::Colormap::Type::Viridis, 1.0f);
+    const RgbaPixel background = ReadPixel(
+        bytes, backbufferFormat, bytesPerPixel, extent,
+        static_cast<std::uint32_t>((extent.Width * 15) / 16),
+        static_cast<std::uint32_t>((extent.Height * 15) / 16));
+    // The ScalarField fallback colour, when a shader ignores the colormap, is the
+    // base colour vec4(1.0) (gpu_scene.glsl GpuResolveVisualizationColorFallback,
+    // consumed by forward/line.frag and forward/point.*).
+    const RgbaPixel fallbackColor{255u, 255u, 255u, 255u};
+    // Uniform scalar at RangeMax -> normalized t = 1 -> Viridis LUT maximum.
+    const auto lutMax = renderer.GetColormapSystem().SampleCpu(
+        Extrinsic::Graphics::Colormap::Type::Viridis, 1.0f);
+    const RgbaPixel expectedColormap{
+        .R = lutMax.R, .G = lutMax.G, .B = lutMax.B, .A = 255u};
 
-    const std::uint32_t laneMaxChannel =
-        std::max({laneStats.Max.R, laneStats.Max.G, laneStats.Max.B});
-    EXPECT_GE(laneMaxChannel, 24u)
-        << "ReferenceTriangle line/point lanes left no visible colormap colour near the projected bottom edge. "
-        << "sample=(" << sampleX << "," << sampleY << ")"
-        << " center=(" << static_cast<int>(laneStats.Center.R) << ","
-        << static_cast<int>(laneStats.Center.G) << ","
-        << static_cast<int>(laneStats.Center.B) << ")"
-        << " max=(" << static_cast<int>(laneStats.Max.R) << ","
-        << static_cast<int>(laneStats.Max.G) << ","
-        << static_cast<int>(laneStats.Max.B) << ")"
-        << " expectedViridisLUT t=0(" << static_cast<int>(lutLo.R) << ","
-        << static_cast<int>(lutLo.G) << "," << static_cast<int>(lutLo.B) << ")"
-        << " t=0.5(" << static_cast<int>(lutMid.R) << ","
-        << static_cast<int>(lutMid.G) << "," << static_cast<int>(lutMid.B) << ")"
-        << " t=1(" << static_cast<int>(lutHi.R) << ","
-        << static_cast<int>(lutHi.G) << "," << static_cast<int>(lutHi.B) << ")"
-        << " lineCfg=[" << DescribeColormapConfig("line", lineCfg, expectedColormapId) << "]"
-        << " pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+    const auto expectColormapLane = [&](const std::string_view lane,
+                                        const glm::vec3 worldSample)
+    {
+        const auto [px, py] = ProjectReferenceCameraPixel(worldSample, extent);
+        const ForegroundSample fg = FindMostForegroundPixel(
+            bytes, backbufferFormat, bytesPerPixel, extent, px, py,
+            kScalarFieldSmokeSampleRadius, background);
+        const RgbaPixel lit = ToLinearPixel(backbufferFormat, fg.Pixel);
+        const int toColormap = RgbDistance(lit, expectedColormap);
+        const int toFallback = RgbDistance(lit, fallbackColor);
+        const Extrinsic::RHI::GpuEntityConfig& cfg = (lane == "line") ? lineCfg : pointCfg;
+
+        EXPECT_GE(fg.BackgroundDistance, kScalarFieldSmokeMinForeground)
+            << lane << " lane left no drawn fragment near (" << px << "," << py
+            << "); cannot prove the colormap path. background=" << PixelText(background)
+            << " strongest=" << PixelText(fg.Pixel)
+            << " pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+        EXPECT_LT(toColormap, toFallback)
+            << lane << " lane fragment is closer to the white/material fallback than to the expected "
+            << "Viridis colormap colour — the line/point colormap path did not resolve on the GPU. "
+            << "strongest(linearized)=" << PixelText(lit)
+            << " expectedViridis=" << PixelText(expectedColormap)
+            << " fallback=" << PixelText(fallbackColor)
+            << " toColormap=" << toColormap << " toFallback=" << toFallback
+            << " backbufferFormat=" << static_cast<int>(backbufferFormat)
+            << " cfg=[" << DescribeColormapConfig(lane, cfg, expectedColormapId) << "]";
+    };
+
+    expectColormapLane("line", glm::vec3{0.0f, -0.5f, 0.0f});  // bottom-edge midpoint (v0-v1)
+    expectColormapLane("point", glm::vec3{0.0f, 0.5f, 0.0f});  // apex vertex v2 (point impostor)
 
     renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
     device.DestroyBuffer(readbackBuffer);
