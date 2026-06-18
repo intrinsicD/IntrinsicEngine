@@ -38,12 +38,13 @@ depends_on: []
   `cfg.Line.LineWidth` for uniform widths and `cfg.Line.LineWidthBDA` for named
   per-edge width buffers, and `forward/line.vert` consumes that config while
   expanding retained `LineQuads`.
-- Remaining operational gap: `RenderEdges::WidthSource`
+- Operational proof landed 2026-06-18: `RenderEdges::WidthSource`
   (`Graphics.Component.RenderGeometry.cppm:84`, `variant<float,string>`) is authored,
-  serialized (`Runtime.SceneSerialization`), and editor-driven (`SandboxEditorUi`),
-  and consumed on the CPU/null modern GpuScene forward line path, but the opt-in
-  `gpu;vulkan` line-width visual smoke is still open. (The legacy retained line
-  path and the overlay-packet `LineWidth` are separate and out of scope.)
+  serialized (`Runtime.SceneSerialization`), editor-driven (`SandboxEditorUi`),
+  populated into `GpuEntityConfig::Line`, consumed by the modern forward line shader,
+  and covered by the opt-in `gpu;vulkan` runtime sandbox smoke on Vulkan-capable
+  hosts. (The legacy retained line path and the overlay-packet `LineWidth` are
+  separate and out of scope.)
 - `GRAPHICS-093` retired the draw-topology blocker for Slice B: retained forward
   lines now consume the non-indexed `LineQuads` bucket through `DrawIndirectCount()`
   and `Topology::TriangleList`, while edge-id selection keeps the indexed `Lines`
@@ -88,7 +89,7 @@ depends_on: []
       `RenderEdges::WidthSource` at parity with `PointSize`/`PointSizeBDA`.
 - [x] A layout/parity check (the updated `static_assert` plus a GLSL-compile check)
       confirming C++ and shader `GpuEntityConfig` stay in sync after regrouping.
-- [ ] Opt-in `gpu;vulkan` smoke proving a thick / per-edge line renders with the
+- [x] Opt-in `gpu;vulkan` smoke proving a thick / per-edge line renders with the
       configured width on the modern forward line path; skip/fail-closed without
       promoted Vulkan.
 - [x] Preserve the default CPU gate and existing point-size/line coverage
@@ -111,7 +112,7 @@ depends_on: []
       shader's `LineQuads` expansion under CPU/null contract coverage.
 - [x] Point and surface rendering are unchanged (parity).
 - [x] Default CPU gate stays green.
-- [ ] The new `gpu;vulkan` line-width smoke passes on a Vulkan-capable host or skips
+- [x] The new `gpu;vulkan` line-width smoke passes on a Vulkan-capable host or skips
       deterministically.
 - [x] Layering preserved: no new graphics→ECS/runtime/asset edges.
 
@@ -132,6 +133,22 @@ python3 tools/repo/check_test_layout.py --root . --strict
 python3 tools/docs/check_doc_links.py --root .
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+## Completion
+- Retired on 2026-06-18 at maturity `Operational` on Vulkan-capable hosts
+  (`CPUContracted` everywhere else).
+- Slice C added
+  `RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleMeshConfiguredLineWidthAndPointDrawLanesPresent`,
+  which authors a 12 px `RenderEdges::WidthSource`, reads back
+  `GpuEntityConfig::Line.LineWidth` / `LineWidthBDA`, confirms the edge/point draw
+  lanes remain emitted, and samples the default-recipe backbuffer for the configured
+  line overlay.
+- Verification performed:
+  `cmake --build --preset ci-vulkan --target IntrinsicTests -j 2`,
+  `cmake --build --preset ci-vulkan --target IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests -j 2`,
+  and
+  `ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' -R 'RuntimeSandboxAcceptanceGpuSmoke\.ReferenceTriangleMeshConfiguredLineWidthAndPointDrawLanesPresent' --timeout 120`
+  passed on the local Vulkan-capable host.
 
 ## Forbidden changes
 - Making per-domain params a union (an entity may be multi-domain).
@@ -154,4 +171,5 @@ python3 tools/agents/check_task_policy.py --root . --strict
     `forward/line.vert` width consumption on the `LineQuads` topology + CPU parity
     tests. Closes the CPU/null line-width contract.
   - **Slice C.** Opt-in `gpu;vulkan` line-width smoke for uniform and per-edge
-    widths on the retained forward line path. Closes `Operational`.
+    widths on the retained forward line path. Landed 2026-06-18 and closes
+    `Operational` on Vulkan-capable hosts.

@@ -798,20 +798,19 @@ Open post-acceptance rendering leaves:
   `gpu;vulkan` line/point colormap pixel smoke. Target `Operational` on
   Vulkan-capable hosts. Sibling of `GRAPHICS-092` (shared "venue",
   color/colormap side).
-- [GRAPHICS-092 — Group per-domain params in `GpuEntityConfig` and add line-width residency](GRAPHICS-092-group-per-domain-params-and-line-width-residency.md):
-  unblocked; structural sibling of `GRAPHICS-091`. Groups the flat-mixed point-only
-  fields (`PointMode`/`PointSize`/`PointSizeBDA`) into named per-domain sub-blocks.
-  Slice A has landed the 128-byte `GpuEntityConfig` layout with `Point` and `Line`
-  sub-blocks and defaulted `Line.LineWidth` / `Line.LineWidthBDA`; Slice B has
-  landed CPU/null line-width residency and `forward/line.vert` consumption on the
-  `LineQuads` topology. The remaining open slice is the opt-in `gpu;vulkan`
-  operational line-width smoke on Vulkan-capable hosts.
+- [GRAPHICS-092 — Group per-domain params in `GpuEntityConfig` and add line-width residency](../../done/GRAPHICS-092-group-per-domain-params-and-line-width-residency.md):
+  retired 2026-06-18 at `Operational` on Vulkan-capable hosts. The task grouped
+  point and line fields into `GpuEntityConfig` sub-blocks, added
+  `Line.LineWidth` / `Line.LineWidthBDA` residency from
+  `RenderEdges::WidthSource`, consumed widths in `forward/line.vert` on the
+  `LineQuads` topology, and added an opt-in runtime sandbox `gpu;vulkan`
+  configured-line-width smoke.
 - [GRAPHICS-093 — Define forward-line quad topology for retained GpuScene lines (done)](../../done/GRAPHICS-093-forward-line-quad-topology.md):
   retired 2026-06-18 at `CPUContracted`; appended the non-indexed `LineQuads`
   bucket, switched retained `LinePass` to `DrawIndirectCount()` / `TriangleList`,
   and preserved the indexed `Lines` bucket for edge-id selection. CPU/null dynamic
-  line-width consumption is now covered by `GRAPHICS-092`; Vulkan operational proof
-  remains there.
+  line-width consumption and Vulkan operational proof are now covered by
+  `GRAPHICS-092`.
 - [GRAPHICS-094 — Consume per-point size BDA in retained point shader (done)](../../done/GRAPHICS-094-retained-point-size-bda-consumption.md):
   retired 2026-06-18 at `CPUContracted`; the retained forward point shader now
   consumes `Point.PointSizeBDA[sourceVertexIndex]` when present and falls back to

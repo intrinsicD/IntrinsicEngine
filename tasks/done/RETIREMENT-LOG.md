@@ -9,6 +9,20 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`GRAPHICS-092`](GRAPHICS-092-group-per-domain-params-and-line-width-residency.md) —
+Group per-domain params in `GpuEntityConfig` and add line-width residency —
+retired on 2026-06-18 at maturity `Operational` on Vulkan-capable hosts
+(`CPUContracted` elsewhere). `GpuEntityConfig` now groups point and line
+domain-specific settings into named sub-blocks while preserving shared
+visualization fields; `RenderEdges::WidthSource` populates
+`Line.LineWidth` / `Line.LineWidthBDA`; and the retained forward line shader
+consumes those values while expanding the non-indexed `LineQuads` topology.
+The final slice added an opt-in runtime sandbox `gpu;vulkan` smoke that authors
+a 12 px reference-triangle line width, reads back the GPU config, confirms the
+edge/point draw lanes remain emitted, and samples the default-recipe
+backbuffer for the configured line overlay.
+
+Backlog
 [`GRAPHICS-094`](GRAPHICS-094-retained-point-size-bda-consumption.md) —
 Consume per-point size BDA in retained point shader — retired on 2026-06-18
 at maturity `CPUContracted`. The retained forward point shader now resolves
@@ -1954,7 +1968,7 @@ endpoint retired); they are preserved here verbatim for traceability.
   retained forward lines now have a backend-portable non-indexed `LineQuads`
   topology (`DrawIndirectCount()` / `TriangleList`) while edge-id selection keeps
   the indexed `Lines` bucket. Dynamic line-width residency and Vulkan operational
-  proof remain owned by `GRAPHICS-092`.
+  proof are retired by `GRAPHICS-092`.
 - **GRAPHICS-033B ⇐ GRAPHICS-033A (done).** Diagnostics counters and the
   `VulkanRequestedButNotOperational` startup breadcrumb depend on the
   status / reason enums and the reconciliation matrix wiring.

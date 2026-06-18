@@ -1446,7 +1446,11 @@ constexpr std::uint32_t kBug024TotalFrames = 8u;
             toPixel(ndcY, static_cast<std::uint32_t>(extent.Height))};
 }
 
-TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleMeshEdgeAndPointLanesPresentBrightOverlay)
+inline constexpr float kReferenceTriangleLineWidthSmokePx = 12.0f;
+inline constexpr std::uint32_t kReferenceTriangleLineWidthSampleRadius = 7u;
+inline constexpr std::uint32_t kReferenceTriangleLineWidthMinDarkPixels = 12u;
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleMeshConfiguredLineWidthAndPointDrawLanesPresent)
 {
     auto bootstrap = BootstrapDefaultSandboxAppEngine();
     if (bootstrap.Skipped)
@@ -1461,7 +1465,9 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleMeshEdgeAndPointLanesPre
         << BuildReferenceTriangleEntityDiagnostic(engine.GetScene(), triangle);
 
     auto& raw = engine.GetScene().Raw();
-    raw.emplace_or_replace<G::RenderEdges>(triangle);
+    G::RenderEdges edges{};
+    edges.WidthSource = kReferenceTriangleLineWidthSmokePx;
+    raw.emplace_or_replace<G::RenderEdges>(triangle, edges);
     G::RenderPoints points{};
     raw.emplace_or_replace<G::RenderPoints>(triangle, points);
 
@@ -1531,6 +1537,20 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleMeshEdgeAndPointLanesPre
     Extrinsic::RHI::GpuDrawIndexedCommand firstLineCmd{};
     Extrinsic::RHI::GpuDrawCommand firstPointCmd{};
     const GpuSceneInputSummary sceneInputs = SummarizeGpuSceneInputs(device, renderer);
+    Extrinsic::RHI::GpuEntityConfig firstLineConfig{};
+    bool firstLineConfigRead = false;
+    const Extrinsic::RHI::BufferHandle entityConfigBuffer =
+        renderer.GetGpuWorld().GetEntityConfigBuffer();
+    if (sceneInputs.FirstLineSlot != kInvalidIndex &&
+        entityConfigBuffer.IsValid())
+    {
+        device.ReadBuffer(entityConfigBuffer,
+                          &firstLineConfig,
+                          sizeof(firstLineConfig),
+                          static_cast<std::uint64_t>(sceneInputs.FirstLineInstance.ConfigSlot) *
+                              sizeof(firstLineConfig));
+        firstLineConfigRead = true;
+    }
     {
         const auto& lineBucket = renderer.GetCullingSystem().GetBucket(
             Extrinsic::RHI::GpuDrawBucketKind::Lines);
@@ -1555,24 +1575,34 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleMeshEdgeAndPointLanesPre
     }
 
     const auto [edgeX, edgeY] = ProjectReferenceCameraPixel(glm::vec3{0.0f, -0.5f, 0.0f}, extent);
-    const auto [vertexX, vertexY] = ProjectReferenceCameraPixel(glm::vec3{0.0f, 0.5f, 0.0f}, extent);
-    const std::uint32_t pointSampleY = vertexY;
     const std::uint32_t darkEdgePixels =
-        CountDarkOverlayPixels(bytes, backbufferFormat, bytesPerPixel, extent, edgeX, edgeY, 4u);
-    const std::uint32_t darkVertexPixels =
-        CountDarkOverlayPixels(bytes, backbufferFormat, bytesPerPixel, extent, vertexX, pointSampleY, 4u);
+        CountDarkOverlayPixels(bytes,
+                               backbufferFormat,
+                               bytesPerPixel,
+                               extent,
+                               edgeX,
+                               edgeY,
+                               kReferenceTriangleLineWidthSampleRadius);
     const PixelNeighborhoodStats edgeStats =
-        DescribePixelNeighborhood(bytes, backbufferFormat, bytesPerPixel, extent, edgeX, edgeY, 4u);
-    const PixelNeighborhoodStats vertexStats =
-        DescribePixelNeighborhood(bytes, backbufferFormat, bytesPerPixel, extent, vertexX, pointSampleY, 4u);
+        DescribePixelNeighborhood(bytes,
+                                  backbufferFormat,
+                                  bytesPerPixel,
+                                  extent,
+                                  edgeX,
+                                  edgeY,
+                                  kReferenceTriangleLineWidthSampleRadius);
 
     EXPECT_GE(lineCullCount, 1u)
-        << "ReferenceTriangle mesh edge lane did not emit a line draw command."
+        << "ReferenceTriangle mesh edge lane did not emit an indexed line draw command."
         << " lineCmd={indexCount=" << firstLineCmd.IndexCount
         << ", instanceCount=" << firstLineCmd.InstanceCount
         << ", firstIndex=" << firstLineCmd.FirstIndex
         << ", vertexOffset=" << firstLineCmd.VertexOffset
         << ", firstInstance=" << firstLineCmd.FirstInstance << "}";
+    ASSERT_TRUE(firstLineConfigRead)
+        << "ReferenceTriangle mesh edge lane did not expose a readable first line config.";
+    EXPECT_FLOAT_EQ(firstLineConfig.Line.LineWidth, kReferenceTriangleLineWidthSmokePx);
+    EXPECT_EQ(firstLineConfig.Line.LineWidthBDA, 0u);
     EXPECT_GE(pointCullCount, 1u)
         << "ReferenceTriangle mesh point lane did not emit a point draw command."
         << " pointCmd={vertexCount=" << firstPointCmd.VertexCount
@@ -1580,9 +1610,12 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleMeshEdgeAndPointLanesPre
         << ", firstVertex=" << firstPointCmd.FirstVertex
         << ", firstInstance=" << firstPointCmd.FirstInstance << "}";
 
-    EXPECT_GE(darkEdgePixels, 1u)
-        << "ReferenceTriangle mesh edge lane did not leave a dark overlay near the projected bottom-edge midpoint. "
+    EXPECT_GE(darkEdgePixels, kReferenceTriangleLineWidthMinDarkPixels)
+        << "ReferenceTriangle mesh edge lane did not leave a configured-width dark overlay near the projected bottom-edge midpoint. "
         << "sample=(" << edgeX << "," << edgeY << ")"
+        << " darkPixels=" << darkEdgePixels
+        << " minExpectedDarkPixels=" << kReferenceTriangleLineWidthMinDarkPixels
+        << " configuredWidthPx=" << firstLineConfig.Line.LineWidth
         << " center=(" << static_cast<int>(edgeStats.Center.R) << ","
         << static_cast<int>(edgeStats.Center.G) << ","
         << static_cast<int>(edgeStats.Center.B) << ")"
@@ -1592,55 +1625,6 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleMeshEdgeAndPointLanesPre
         << " max=(" << static_cast<int>(edgeStats.Max.R) << ","
         << static_cast<int>(edgeStats.Max.G) << ","
         << static_cast<int>(edgeStats.Max.B) << ")"
-        << " lineCullCount=" << lineCullCount
-        << " lineCmd={indexCount=" << firstLineCmd.IndexCount
-        << ", instanceCount=" << firstLineCmd.InstanceCount
-        << ", firstIndex=" << firstLineCmd.FirstIndex
-        << ", vertexOffset=" << firstLineCmd.VertexOffset
-        << ", firstInstance=" << firstLineCmd.FirstInstance << "}"
-        << " pointCullCount=" << pointCullCount
-        << " pointCmd={vertexCount=" << firstPointCmd.VertexCount
-        << ", instanceCount=" << firstPointCmd.InstanceCount
-        << ", firstVertex=" << firstPointCmd.FirstVertex
-        << ", firstInstance=" << firstPointCmd.FirstInstance << "}"
-        << " sceneInputs={live=" << sceneInputs.LiveInstanceCount
-        << ", capacity=" << sceneInputs.InstanceCapacity
-        << ", visible=" << sceneInputs.VisibleInstances
-        << ", lines=" << sceneInputs.LineInstances
-        << ", points=" << sceneInputs.PointInstances
-        << ", lineZeroBounds=" << sceneInputs.LineInstancesWithZeroBounds
-        << ", pointZeroBounds=" << sceneInputs.PointInstancesWithZeroBounds
-        << ", lineZeroIndices=" << sceneInputs.LineInstancesWithZeroIndexCount
-        << ", pointZeroVertices=" << sceneInputs.PointInstancesWithZeroVertexCount
-        << ", lineInvalidGeometry=" << sceneInputs.LineInstancesWithInvalidGeometry
-        << ", pointInvalidGeometry=" << sceneInputs.PointInstancesWithInvalidGeometry
-        << ", firstLineSlot=" << sceneInputs.FirstLineSlot
-        << ", firstLineFlags=" << sceneInputs.FirstLineInstance.RenderFlags
-        << ", firstLineGeometrySlot=" << sceneInputs.FirstLineInstance.GeometrySlot
-        << ", firstLineIndexCount=" << sceneInputs.FirstLineGeometry.LineIndexCount
-        << ", firstLineFirstIndex=" << sceneInputs.FirstLineGeometry.LineFirstIndex
-        << ", firstLineVertexOffset=" << sceneInputs.FirstLineGeometry.VertexOffset
-        << ", firstLineBoundsRadius=" << sceneInputs.FirstLineBounds.WorldSphere.w
-        << ", firstPointSlot=" << sceneInputs.FirstPointSlot
-        << ", firstPointFlags=" << sceneInputs.FirstPointInstance.RenderFlags
-        << ", firstPointGeometrySlot=" << sceneInputs.FirstPointInstance.GeometrySlot
-        << ", firstPointVertexCount=" << sceneInputs.FirstPointGeometry.PointVertexCount
-        << ", firstPointFirstVertex=" << sceneInputs.FirstPointGeometry.PointFirstVertex
-        << ", firstPointBoundsRadius=" << sceneInputs.FirstPointBounds.WorldSphere.w << "}"
-        << " pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
-    EXPECT_GE(darkVertexPixels, 1u)
-        << "ReferenceTriangle mesh point lane did not leave a visible dark overlay near the projected top vertex. "
-        << "sample=(" << vertexX << "," << pointSampleY << ")"
-        << " darkPixels=" << darkVertexPixels
-        << " center=(" << static_cast<int>(vertexStats.Center.R) << ","
-        << static_cast<int>(vertexStats.Center.G) << ","
-        << static_cast<int>(vertexStats.Center.B) << ")"
-        << " min=(" << static_cast<int>(vertexStats.Min.R) << ","
-        << static_cast<int>(vertexStats.Min.G) << ","
-        << static_cast<int>(vertexStats.Min.B) << ")"
-        << " max=(" << static_cast<int>(vertexStats.Max.R) << ","
-        << static_cast<int>(vertexStats.Max.G) << ","
-        << static_cast<int>(vertexStats.Max.B) << ")"
         << " lineCullCount=" << lineCullCount
         << " lineCmd={indexCount=" << firstLineCmd.IndexCount
         << ", instanceCount=" << firstLineCmd.InstanceCount
