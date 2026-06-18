@@ -9,6 +9,16 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`LEGACY-015`](LEGACY-015-core-error-test-promoted.md) — Migrate CoreError test
+to promoted Core — retired on 2026-06-18 at maturity `CPUContracted`.
+`tests/unit/core/Test.CoreError.cpp` now imports promoted
+`Extrinsic.Core.Error` instead of bare legacy `Core.Error`, and the touched
+independent test uses the `Test.<Name>.cpp` naming convention. The focused core
+target and `CoreError` CTest filter passed. `LEGACY-005` remains blocked by 42
+remaining test consumers and 133 legacy-internal consumers; `LEGACY-012` owns
+the remaining test cleanup.
+
+Backlog
 [`LEGACY-014`](LEGACY-014-runtimegraph-core-test-import.md) — Remove unused
 RuntimeGraph legacy Core test import — retired on 2026-06-18 at maturity
 `CPUContracted`. `tests/unit/geometry/Test_RuntimeGraph.cpp` no longer imports

@@ -196,7 +196,7 @@ set(_core_test_files
     Test_SystemFeatureCatalog.cpp
     Test_InplaceFunction.cpp
     Test_Profiling.cpp
-    Test_CoreError.cpp
+    Test.CoreError.cpp
     Test_LogRingBuffer.cpp
 )
 intrinsic_resolve_test_sources(_core_test_sources
@@ -206,7 +206,7 @@ intrinsic_resolve_test_sources(_core_test_sources
 intrinsic_test_object_lib(CoreTestObjs
     SOURCES
         ${_core_test_sources}
-    DEPS IntrinsicCore EnTT::EnTT
+    DEPS IntrinsicCore ExtrinsicCore EnTT::EnTT
 )
 
 # --- ECS tests (FrameGraph system integration) ---

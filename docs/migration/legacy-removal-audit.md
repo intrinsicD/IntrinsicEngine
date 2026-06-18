@@ -53,7 +53,7 @@ Consumer counts are distinct files matched outside the doomed subtree.
 |---|---|---|---|---|
 | `Interface/` ([LEGACY-001](../../tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md)) | 4 | 6 | 1 | 1 test (`tests/contract/ui/Test_PanelRegistration.cpp`) |
 | `Asset/` ([LEGACY-004](../../tasks/backlog/architecture/LEGACY-004-delete-src-legacy-asset.md)) | 6 | 50 | 10 | 10 tests, 0 promoted-src |
-| `Core/` ([LEGACY-005](../../tasks/backlog/architecture/LEGACY-005-delete-src-legacy-core.md)) | 40 | 133 | 43 | 43 tests, 0 promoted-src |
+| `Core/` ([LEGACY-005](../../tasks/backlog/architecture/LEGACY-005-delete-src-legacy-core.md)) | 40 | 133 | 42 | 42 tests, 0 promoted-src |
 | `ECS/` ([LEGACY-006](../../tasks/backlog/architecture/LEGACY-006-delete-src-legacy-ecs.md)) | 29 | 37 | 25 | 25 tests, 0 promoted-src |
 | `Graphics/` ([LEGACY-008](../../tasks/backlog/architecture/LEGACY-008-delete-src-legacy-graphics.md)) | 168 | 22 | 39 | 39 tests, 0 promoted-src |
 | `RHI/` ([LEGACY-009](../../tasks/backlog/architecture/LEGACY-009-delete-src-legacy-rhi.md)) | 54 | 83 | 18 | 18 tests, 0 promoted-src |
@@ -106,11 +106,14 @@ consumer set for `LEGACY-012` from 48 files to 44 files.
 `LEGACY-014` then removed an unused bare `Core` import from
 `Test_RuntimeGraph.cpp`, reducing the remaining Core test-consumer set to 43
 files.
+`LEGACY-015` migrated the CoreError unit test to promoted
+`Extrinsic.Core.Error` and renamed it to `Test.CoreError.cpp`, reducing the set
+to 42 files.
 
 **This clears only the promoted-src subset of the `LEGACY-005` gate.** The
 `LEGACY-005` consumer-grep searches every consumer of legacy `Core.*` outside
 `src/legacy/Core/**`, which the table above now counts as 133 legacy-internal +
-43 test files. `LEGACY-005` stays blocked by its 43 test consumers
+42 test files. `LEGACY-005` stays blocked by its 42 test consumers
 (`LEGACY-012`) and by all 133 legacy-internal consumers until the subtrees above
 Core have been deleted. This is why the `LEGACY-005` row in
 `legacy-retirement.md` says Core "retires last".

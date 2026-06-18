@@ -1,5 +1,5 @@
 // =============================================================================
-// Test_CoreError — Contract tests for Core.Error.
+// Test.CoreError — Contract tests for Extrinsic.Core.Error.
 //
 // Covers: ErrorCode enum, ErrorCodeToString, Expected<T> type alias,
 //         Ok/Err helpers, Unit/Result void-success type, and monadic chaining.
@@ -8,11 +8,12 @@
 // =============================================================================
 
 #include <gtest/gtest.h>
+#include <cstdint>
 #include <string>
 
-import Core.Error;
+import Extrinsic.Core.Error;
 
-using namespace Core;
+using namespace Extrinsic::Core;
 
 // ---------------------------------------------------------------------------
 // ErrorCode: all defined codes have non-empty string representations.
@@ -20,14 +21,14 @@ using namespace Core;
 TEST(CoreError, ErrorCodeToStringCoversAllCodes)
 {
     // Spot-check representative codes from each category.
-    EXPECT_EQ(ErrorCodeToString(ErrorCode::Success), "Success");
-    EXPECT_EQ(ErrorCodeToString(ErrorCode::OutOfMemory), "OutOfMemory");
-    EXPECT_EQ(ErrorCodeToString(ErrorCode::FileNotFound), "FileNotFound");
-    EXPECT_EQ(ErrorCodeToString(ErrorCode::InvalidArgument), "InvalidArgument");
-    EXPECT_EQ(ErrorCodeToString(ErrorCode::DeviceLost), "DeviceLost");
-    EXPECT_EQ(ErrorCodeToString(ErrorCode::AssetNotLoaded), "AssetNotLoaded");
-    EXPECT_EQ(ErrorCodeToString(ErrorCode::ThreadViolation), "ThreadViolation");
-    EXPECT_EQ(ErrorCodeToString(ErrorCode::Unknown), "Unknown");
+    EXPECT_EQ(Error::ToString(ErrorCode::Success), "Success");
+    EXPECT_EQ(Error::ToString(ErrorCode::OutOfMemory), "OutOfMemory");
+    EXPECT_EQ(Error::ToString(ErrorCode::FileNotFound), "FileNotFound");
+    EXPECT_EQ(Error::ToString(ErrorCode::InvalidArgument), "InvalidArgument");
+    EXPECT_EQ(Error::ToString(ErrorCode::DeviceLost), "DeviceLost");
+    EXPECT_EQ(Error::ToString(ErrorCode::AssetNotLoaded), "AssetNotLoaded");
+    EXPECT_EQ(Error::ToString(ErrorCode::ThreadViolation), "ThreadViolation");
+    EXPECT_EQ(Error::ToString(ErrorCode::Unknown), "Unknown");
 }
 
 // ---------------------------------------------------------------------------
@@ -36,7 +37,7 @@ TEST(CoreError, ErrorCodeToStringCoversAllCodes)
 TEST(CoreError, UnknownCodeMapsToUnknown)
 {
     const auto code = static_cast<ErrorCode>(12345);
-    EXPECT_EQ(ErrorCodeToString(code), "Unknown");
+    EXPECT_EQ(Error::ToString(code), "Unknown");
 }
 
 // ---------------------------------------------------------------------------

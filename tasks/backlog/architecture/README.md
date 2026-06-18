@@ -81,8 +81,13 @@ split; narratives live in the retirement log.
 - [LEGACY-014 — Remove unused RuntimeGraph legacy Core test import](../../done/LEGACY-014-runtimegraph-core-test-import.md)
   (done, 2026-06-18, `CPUContracted`):
   removed the unused bare `Core` import from
-  `tests/unit/geometry/Test_RuntimeGraph.cpp`; remaining Core deletion blockers
-  are 43 tests and legacy-internal subtree ordering.
+  `tests/unit/geometry/Test_RuntimeGraph.cpp`; `LEGACY-015` later reduced the
+  remaining Core test-consumer set to 42 files.
+- [LEGACY-015 — Migrate CoreError test to promoted Core](../../done/LEGACY-015-core-error-test-promoted.md)
+  (done, 2026-06-18, `CPUContracted`):
+  migrated the CoreError unit test to `Extrinsic.Core.Error` and renamed it to
+  `tests/unit/core/Test.CoreError.cpp`; remaining Core deletion blockers are 42
+  tests and legacy-internal subtree ordering.
 - [CORE-002 — Command and feature catalog contract](../../done/CORE-002-command-feature-catalog-contract.md)
   (done, 2026-06-09, `CPUContracted` / explicit retirement decision):
   resolves remaining legacy `Core.Commands`, `Core.FeatureRegistry`, and
