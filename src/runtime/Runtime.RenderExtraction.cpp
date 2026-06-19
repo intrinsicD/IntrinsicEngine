@@ -1,7 +1,9 @@
 module;
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <memory>
@@ -47,6 +49,7 @@ import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.RHI.Types;
 import Extrinsic.Runtime.GraphGeometryPacker;
+import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.MeshGeometryPacker;
 import Extrinsic.Runtime.PointCloudGeometryPacker;
 import Extrinsic.Runtime.ProgressivePresentationExtraction;
@@ -105,6 +108,9 @@ namespace Extrinsic::Runtime
             .HasMeshResidency = it->second.MeshGeometry.IsValid(),
             .GraphGeometry = it->second.GraphGeometry,
             .HasGraphResidency = it->second.GraphGeometry.IsValid(),
+            .GraphPointLaneInstance = it->second.GraphPointLaneInstance,
+            .HasGraphPointLaneInstance =
+                it->second.GraphPointLaneInstance.IsValid(),
             .PointCloudGeometry = it->second.PointCloudGeometry,
             .HasPointCloudResidency = it->second.PointCloudGeometry.IsValid(),
             .MeshEdgeViewInstance = it->second.MeshEdgeViewInstance,
@@ -117,6 +123,92 @@ namespace Extrinsic::Runtime
             .MaterialSlot = it->second.Material.EffectiveSlot,
             .HasMaterialLease = it->second.Material.Lease.IsValid(),
         };
+    }
+
+    std::optional<RenderExtractionCache::GpuRenderableAvailabilityView>
+    RenderExtractionCache::FindGpuRenderableAvailability(
+        const std::uint32_t stableEntityId) const noexcept
+    {
+        const auto it = m_Renderables.find(stableEntityId);
+        if (it == m_Renderables.end())
+            return std::nullopt;
+
+        const auto& renderable = it->second;
+        GpuRenderableAvailabilityView view{};
+        view.StableEntityId = stableEntityId;
+        view.HasRenderable = true;
+        view.HasSourceAsset = renderable.GpuSlot.HasSourceAsset();
+        view.GeometrySlot = renderable.GpuSlot.GeometrySlot;
+        view.GeometryGeneration = renderable.GpuSlot.GeometryGeneration;
+        view.NamedBufferCount =
+            static_cast<std::uint32_t>(renderable.GpuSlot.NamedBufferEntries.size());
+        view.HasPositionsBuffer = renderable.GpuSlot.FindEntry("positions") != nullptr;
+        view.HasNormalsBuffer = renderable.GpuSlot.FindEntry("normals") != nullptr;
+        view.HasEdgesBuffer = renderable.GpuSlot.FindEntry("edges") != nullptr;
+        view.HasColorsBuffer = renderable.GpuSlot.FindEntry("colors") != nullptr;
+        view.HasScalarsBuffer = renderable.GpuSlot.FindEntry("scalars") != nullptr;
+        view.HasSizesBuffer = renderable.GpuSlot.FindEntry("sizes") != nullptr;
+
+        view.Surface.Lane = GeometryRenderLane::Surface;
+        const bool hasNonSurfaceLaneGeometry =
+            renderable.GraphGeometry.IsValid() ||
+            renderable.PointCloudGeometry.IsValid() ||
+            renderable.MeshEdgeViewGeometry.IsValid() ||
+            renderable.MeshVertexViewGeometry.IsValid();
+        if (renderable.MeshGeometry.IsValid())
+        {
+            view.Surface.Instance = renderable.Instance;
+            view.Surface.Geometry = renderable.MeshGeometry;
+        }
+        else if (!hasNonSurfaceLaneGeometry &&
+                 (renderable.ProceduralKey.has_value() ||
+                  renderable.GpuSlot.HasSourceAsset()) &&
+                 renderable.Geometry.IsValid())
+        {
+            view.Surface.Instance = renderable.Instance;
+            view.Surface.Geometry = renderable.Geometry;
+        }
+        view.Surface.HasInstance = view.Surface.Instance.IsValid();
+        view.Surface.HasGeometry = view.Surface.Geometry.IsValid();
+
+        view.Edges.Lane = GeometryRenderLane::Edges;
+        if (renderable.MeshEdgeViewGeometry.IsValid())
+        {
+            view.Edges.Instance = renderable.MeshEdgeViewInstance;
+            view.Edges.Geometry = renderable.MeshEdgeViewGeometry;
+        }
+        else if (renderable.GraphGeometry.IsValid() &&
+                 renderable.GraphPackedLines)
+        {
+            view.Edges.Instance = renderable.Instance;
+            view.Edges.Geometry = renderable.GraphGeometry;
+        }
+        view.Edges.HasInstance = view.Edges.Instance.IsValid();
+        view.Edges.HasGeometry = view.Edges.Geometry.IsValid();
+
+        view.Points.Lane = GeometryRenderLane::Points;
+        if (renderable.MeshVertexViewGeometry.IsValid())
+        {
+            view.Points.Instance = renderable.MeshVertexViewInstance;
+            view.Points.Geometry = renderable.MeshVertexViewGeometry;
+        }
+        else if (renderable.GraphGeometry.IsValid() &&
+                 renderable.GraphPackedPoints)
+        {
+            view.Points.Instance = renderable.GraphPointLaneInstance.IsValid()
+                ? renderable.GraphPointLaneInstance
+                : renderable.Instance;
+            view.Points.Geometry = renderable.GraphGeometry;
+        }
+        else if (renderable.PointCloudGeometry.IsValid())
+        {
+            view.Points.Instance = renderable.Instance;
+            view.Points.Geometry = renderable.PointCloudGeometry;
+        }
+        view.Points.HasInstance = view.Points.Instance.IsValid();
+        view.Points.HasGeometry = view.Points.Geometry.IsValid();
+
+        return view;
     }
 
     const ProceduralGeometryCache& RenderExtractionCache::GetProceduralGeometryCacheForTest() const noexcept
@@ -332,7 +424,9 @@ namespace Extrinsic::Runtime
         {
             namespace GS = ECS::Components::GeometrySources;
             using Domain = Graphics::Components::VisualizationConfig::Domain;
-            if (view.ActiveDomain != GS::Domain::Mesh)
+            const GS::SourceAvailability sources =
+                GS::BuildSourceAvailability(view);
+            if (sources.ProvenanceDomain != GS::Domain::Mesh)
             {
                 return nullptr;
             }
@@ -553,6 +647,40 @@ namespace Extrinsic::Runtime
             return flags;
         }
 
+        enum class VisualizationLane : std::uint8_t
+        {
+            Surface,
+            Edges,
+            Points,
+        };
+
+        [[nodiscard]] const Graphics::Components::VisualizationConfig*
+        ResolveVisualizationForLane(
+            const Graphics::Components::VisualizationConfig* fallback,
+            const Graphics::Components::VisualizationLaneOverrides* overrides,
+            const VisualizationLane lane) noexcept
+        {
+            if (overrides != nullptr)
+            {
+                switch (lane)
+                {
+                case VisualizationLane::Surface:
+                    if (overrides->Surface.has_value())
+                        return &*overrides->Surface;
+                    break;
+                case VisualizationLane::Edges:
+                    if (overrides->Edges.has_value())
+                        return &*overrides->Edges;
+                    break;
+                case VisualizationLane::Points:
+                    if (overrides->Points.has_value())
+                        return &*overrides->Points;
+                    break;
+                }
+            }
+            return fallback;
+        }
+
         [[nodiscard]] std::uint32_t ToRenderPointMode(
             const Graphics::Components::RenderPoints::RenderType type) noexcept
         {
@@ -578,6 +706,39 @@ namespace Extrinsic::Runtime
             }
             const auto* uniform = std::get_if<float>(&points->SizeSource);
             return uniform != nullptr ? *uniform : 1.0f;
+        }
+
+        [[nodiscard]] RHI::GpuEntityConfig BuildImmediateLaneConfig(
+            const Graphics::Components::VisualizationConfig* visualization,
+            const Graphics::Components::RenderEdges* edges,
+            const Graphics::Components::RenderPoints* points) noexcept
+        {
+            namespace G = Graphics::Components;
+            RHI::GpuEntityConfig cfg{};
+            cfg.ColorSourceMode = 1u;
+            cfg.VisualizationAlpha = 1.0f;
+            cfg.UniformColor = {0.02f, 0.02f, 0.02f, 1.0f};
+            if (visualization != nullptr &&
+                visualization->Source ==
+                    G::VisualizationConfig::ColorSource::UniformColor)
+            {
+                cfg.UniformColor = visualization->Color;
+            }
+            if (edges != nullptr)
+            {
+                if (const auto* uniform =
+                        std::get_if<float>(&edges->WidthSource);
+                    uniform != nullptr)
+                {
+                    cfg.Line.LineWidth = *uniform;
+                }
+            }
+            if (points != nullptr)
+            {
+                cfg.Point.PointSize = UniformPointSizeOrDefault(points);
+                cfg.Point.PointMode = ToRenderPointMode(points->Type);
+            }
+            return cfg;
         }
 
         [[nodiscard]] glm::vec3 TranslationOf(const glm::mat4& model) noexcept
@@ -694,7 +855,9 @@ namespace Extrinsic::Runtime
             using namespace ECS::Components::GeometrySources;
 
             MeshTexcoordFallbackDiagnostics diagnostics{};
-            if (view.ActiveDomain != Domain::Mesh || view.VertexSource == nullptr)
+            const SourceAvailability sources = BuildSourceAvailability(view);
+            if (sources.ProvenanceDomain != Domain::Mesh ||
+                view.VertexSource == nullptr)
             {
                 return diagnostics;
             }
@@ -1218,6 +1381,7 @@ namespace Extrinsic::Runtime
                 return;
             }
             EnqueueGraphRetire(sidecar.GraphGeometry);
+            ReleaseGraphPointLaneInstance(sidecar, renderer, stats);
             renderer.GetGpuWorld().SetInstanceGeometry(sidecar.Instance, Graphics::GpuGeometryHandle{});
             sidecar.GraphGeometry = {};
             sidecar.GraphPackedLines = false;
@@ -1303,6 +1467,41 @@ namespace Extrinsic::Runtime
         sidecar.GpuSlot.ClearSourceAsset();
         renderer.GetGpuWorld().SetInstanceGeometry(sidecar.Instance, handle);
         return true;
+    }
+
+    bool RenderExtractionCache::EnsureGraphPointLaneInstance(RenderableSidecar& sidecar,
+                                                             const std::uint32_t stableId,
+                                                             Graphics::IRenderer& renderer,
+                                                             RuntimeRenderExtractionStats& stats)
+    {
+        if (!sidecar.GraphGeometry.IsValid())
+            return false;
+
+        if (!sidecar.GraphPointLaneInstance.IsValid())
+        {
+            sidecar.GraphPointLaneInstance =
+                renderer.GetGpuWorld().AllocateInstance(stableId);
+            if (!sidecar.GraphPointLaneInstance.IsValid())
+                return false;
+            ++stats.AllocatedInstanceCount;
+        }
+        renderer.GetGpuWorld().SetInstanceGeometry(
+            sidecar.GraphPointLaneInstance,
+            sidecar.GraphGeometry);
+        return true;
+    }
+
+    void RenderExtractionCache::ReleaseGraphPointLaneInstance(
+        RenderableSidecar& sidecar,
+        Graphics::IRenderer& renderer,
+        RuntimeRenderExtractionStats& stats)
+    {
+        if (!sidecar.GraphPointLaneInstance.IsValid())
+            return;
+
+        renderer.GetGpuWorld().FreeInstance(sidecar.GraphPointLaneInstance);
+        sidecar.GraphPointLaneInstance = {};
+        ++stats.FreedInstanceCount;
     }
 
     bool RenderExtractionCache::BindPointCloudGeometry(entt::registry& registry,
@@ -1576,6 +1775,7 @@ namespace Extrinsic::Runtime
         bool desired,
         const Graphics::Components::RenderEdges* edges,
         const Graphics::Components::RenderPoints* points,
+        const Graphics::Components::VisualizationConfig* visualization,
         bool meshDirty,
         Graphics::IRenderer& renderer,
         RuntimeRenderExtractionStats& stats)
@@ -1612,27 +1812,8 @@ namespace Extrinsic::Runtime
             const std::uint32_t laneFlag = isEdge
                 ? (RHI::GpuRender_Line | RHI::GpuRender_Unlit)
                 : (RHI::GpuRender_Point | RHI::GpuRender_Unlit);
-            RHI::GpuEntityConfig cfg{};
-            cfg.ColorSourceMode = 1u;
-            cfg.VisualizationAlpha = 1.0f;
-            cfg.UniformColor = {0.02f, 0.02f, 0.02f, 1.0f};
-            if (isEdge)
-            {
-                if (edges != nullptr)
-                {
-                    if (const auto* uniform =
-                            std::get_if<float>(&edges->WidthSource);
-                        uniform != nullptr)
-                    {
-                        cfg.Line.LineWidth = *uniform;
-                    }
-                }
-            }
-            else
-            {
-                cfg.Point.PointSize = UniformPointSizeOrDefault(points);
-                cfg.Point.PointMode = ToRenderPointMode(points->Type);
-            }
+            const RHI::GpuEntityConfig cfg =
+                BuildImmediateLaneConfig(visualization, edges, points);
             renderer.GetGpuWorld().SetEntityConfig(instance, cfg);
             m_Transforms.push_back(Graphics::TransformSyncRecord{
                 .StableId = stableId,
@@ -1815,6 +1996,7 @@ namespace Extrinsic::Runtime
                 EnqueueGraphRetire(it->second.GraphGeometry);
                 ++stats.GraphGeometryReleases;
             }
+            ReleaseGraphPointLaneInstance(it->second, renderer, stats);
             if (it->second.PointCloudGeometry.IsValid())
             {
                 // RUNTIME-087 — same deferred-retire window for the
@@ -1914,6 +2096,16 @@ namespace Extrinsic::Runtime
             {
                 sidecar->HasVisualization = false;
             }
+            if (const auto* visualizationOverrides =
+                    registry.try_get<Graphics::Components::VisualizationLaneOverrides>(entity))
+            {
+                sidecar->VisualizationOverrides = *visualizationOverrides;
+                sidecar->HasVisualizationOverrides = true;
+            }
+            else
+            {
+                sidecar->HasVisualizationOverrides = false;
+            }
 
             const ECS::Components::ProceduralGeometryRef* proceduralRef =
                 registry.try_get<ECS::Components::ProceduralGeometryRef>(entity);
@@ -1939,14 +2131,13 @@ namespace Extrinsic::Runtime
                 }
             }
 
-            // RUNTIME-085 Slice B / RUNTIME-086 Slice B — runtime-authored
-            // `GeometrySources` residency. The mesh and graph bridges run only
-            // when the entity has stated no procedural intent and no asset
-            // source at all; both are treated as declared alternatives the
-            // residency bridges must not race against. Domain detection uses
-            // the same `BuildConstView` path the rest of the engine uses, and
-            // the resolved `ActiveDomain` selects exactly one bridge (mesh and
-            // graph domains are mutually exclusive per entity).
+            // Runtime-authored `GeometrySources` residency. The bridges run
+            // only when the entity has stated no procedural intent and no
+            // asset source at all; both are treated as declared alternatives
+            // the residency bridges must not race against. Source availability
+            // separates provenance from exact-domain detection so a mesh can
+            // still expose its vertex/edge lanes when the full surface source
+            // set is incomplete.
             const bool sourceEligible = !proceduralBound
                 && proceduralRef == nullptr
                 && assetSource == nullptr;
@@ -1964,12 +2155,28 @@ namespace Extrinsic::Runtime
             // releases any lingering views).
             bool meshDirtyThisFrame = false;
             bool meshViewsResident = false;
+            bool meshSurfaceLaneReadyThisFrame = false;
+            bool graphLaneReadyThisFrame = false;
             std::optional<ECS::Components::GeometrySources::ConstSourceView>
                 sourceViewThisFrame{};
             if (sourceEligible)
             {
                 namespace GS = ECS::Components::GeometrySources;
-                const auto view = GS::BuildConstView(registry, entity);
+                const GeometryEntityAvailability availability =
+                    BuildGeometryAvailability(registry, entity);
+                const auto& view = availability.SourceView;
+                const GeometryRenderLaneAvailability surfaceLane =
+                    ResolveRenderLaneAvailability(availability, GeometryRenderLane::Surface);
+                const GeometryRenderLaneAvailability edgeLane =
+                    ResolveRenderLaneAvailability(availability, GeometryRenderLane::Edges);
+                const GeometryRenderLaneAvailability pointLane =
+                    ResolveRenderLaneAvailability(availability, GeometryRenderLane::Points);
+                meshSurfaceLaneReadyThisFrame =
+                    availability.Sources.ProvenanceDomain == GS::Domain::Mesh &&
+                    surfaceLane.Ready();
+                graphLaneReadyThisFrame =
+                    availability.Sources.ProvenanceDomain == GS::Domain::Graph &&
+                    (edgeLane.Ready() || pointLane.Ready());
                 sourceViewThisFrame = view;
                 ApplyProgressivePresentationBindings(registry,
                                                      entity,
@@ -1978,20 +2185,34 @@ namespace Extrinsic::Runtime
                                                      renderer,
                                                      gpuAssets,
                                                      stats);
-                if (view.ActiveDomain == GS::Domain::Mesh)
+                if (availability.Sources.ProvenanceDomain == GS::Domain::Mesh)
                 {
                     namespace D = ECS::Components::DirtyTags;
                     namespace G = Graphics::Components;
                     meshDomainThisFrame = true;
-                    const bool wantsSurface =
-                        registry.all_of<G::RenderSurface>(entity);
-                    const bool wantsEdges =
-                        registry.all_of<G::RenderEdges>(entity);
+                    const bool wantsSurface = surfaceLane.Requested;
+                    const bool wantsEdges = edgeLane.Requested;
                     const auto* edgeHint =
                         registry.try_get<G::RenderEdges>(entity);
                     const auto* pointHint =
                         registry.try_get<G::RenderPoints>(entity);
-                    const bool wantsPoints = pointHint != nullptr;
+                    const auto* baseVisualization =
+                        sidecar->HasVisualization ? &sidecar->Visualization : nullptr;
+                    const auto* visualizationOverrides =
+                        sidecar->HasVisualizationOverrides
+                            ? &sidecar->VisualizationOverrides
+                            : nullptr;
+                    const auto* edgeVisualization =
+                        ResolveVisualizationForLane(
+                            baseVisualization,
+                            visualizationOverrides,
+                            VisualizationLane::Edges);
+                    const auto* pointVisualization =
+                        ResolveVisualizationForLane(
+                            baseVisualization,
+                            visualizationOverrides,
+                            VisualizationLane::Points);
+                    const bool wantsPoints = pointLane.Requested;
                     // Snapshot the mesh dirty state before BindMeshGeometry
                     // may drain the tags; all mesh render lanes key their
                     // reupload off the same coalesced signal.
@@ -2030,6 +2251,7 @@ namespace Extrinsic::Runtime
                                                        wantsEdges,
                                                        edgeHint,
                                                        nullptr,
+                                                       edgeVisualization,
                                                        meshDirtyThisFrame,
                                                        renderer,
                                                        stats);
@@ -2044,6 +2266,7 @@ namespace Extrinsic::Runtime
                                                        wantsPoints,
                                                        nullptr,
                                                        pointHint,
+                                                       pointVisualization,
                                                        meshDirtyThisFrame,
                                                        renderer,
                                                        stats);
@@ -2069,7 +2292,7 @@ namespace Extrinsic::Runtime
                                                  stats);
                     }
                 }
-                else if (view.ActiveDomain == GS::Domain::Graph)
+                else if (availability.Sources.ProvenanceDomain == GS::Domain::Graph)
                 {
                     graphDomainThisFrame = true;
                     graphBoundThisFrame = BindGraphGeometry(registry,
@@ -2079,11 +2302,10 @@ namespace Extrinsic::Runtime
                                                             renderer,
                                                             stats);
                 }
-                else if (view.ActiveDomain == GS::Domain::PointCloud)
+                else if (availability.Sources.ProvenanceDomain == GS::Domain::PointCloud)
                 {
                     pointCloudDomainThisFrame = true;
-                    pointCloudResidencyDesiredThisFrame =
-                        registry.all_of<Graphics::Components::RenderPoints>(entity);
+                    pointCloudResidencyDesiredThisFrame = pointLane.Ready();
                     if (pointCloudResidencyDesiredThisFrame)
                     {
                         // A point cloud is only renderable through the
@@ -2096,8 +2318,7 @@ namespace Extrinsic::Runtime
                                                                           renderer,
                                                                           stats);
                     }
-                    else if (registry.any_of<Graphics::Components::RenderSurface,
-                                             Graphics::Components::RenderEdges>(entity))
+                    else if (surfaceLane.Requested || edgeLane.Requested)
                     {
                         // Unsupported point-cloud lanes fail closed with a
                         // deterministic diagnostic instead of silently keeping
@@ -2125,7 +2346,7 @@ namespace Extrinsic::Runtime
             const bool stillMeshAttached =
                 sourceEligible &&
                 meshDomainThisFrame &&
-                registry.all_of<Graphics::Components::RenderSurface>(entity);
+                meshSurfaceLaneReadyThisFrame;
             if (!stillMeshAttached && sidecar->MeshGeometry.IsValid())
             {
                 EnqueueMeshRetire(sidecar->MeshGeometry);
@@ -2152,10 +2373,14 @@ namespace Extrinsic::Runtime
             // topology, or flips to mesh domain. A transient pack failure on a
             // still-graph-domain entity does NOT release (old residency stays
             // bound), matching the dirty-reupload fail-closed contract.
-            const bool stillGraphAttached = sourceEligible && graphDomainThisFrame;
+            const bool stillGraphAttached =
+                sourceEligible &&
+                graphDomainThisFrame &&
+                graphLaneReadyThisFrame;
             if (!stillGraphAttached && sidecar->GraphGeometry.IsValid())
             {
                 EnqueueGraphRetire(sidecar->GraphGeometry);
+                ReleaseGraphPointLaneInstance(*sidecar, renderer, stats);
                 if (!proceduralBound && !meshBoundThisFrame && !pointCloudBoundThisFrame)
                 {
                     renderer.GetGpuWorld().SetInstanceGeometry(sidecar->Instance,
@@ -2219,46 +2444,130 @@ namespace Extrinsic::Runtime
 
             const auto* visualization =
                 sidecar->HasVisualization ? &sidecar->Visualization : nullptr;
+            const auto* visualizationOverrides =
+                sidecar->HasVisualizationOverrides
+                    ? &sidecar->VisualizationOverrides
+                    : nullptr;
+            const auto* surfaceVisualization =
+                ResolveVisualizationForLane(
+                    visualization,
+                    visualizationOverrides,
+                    VisualizationLane::Surface);
+            const auto* edgeVisualization =
+                ResolveVisualizationForLane(
+                    visualization,
+                    visualizationOverrides,
+                    VisualizationLane::Edges);
+            const auto* pointVisualization =
+                ResolveVisualizationForLane(
+                    visualization,
+                    visualizationOverrides,
+                    VisualizationLane::Points);
             const auto* renderEdges =
                 registry.try_get<Graphics::Components::RenderEdges>(entity);
             const auto* renderPoints =
                 registry.try_get<Graphics::Components::RenderPoints>(entity);
-            std::string scalarPropertyBufferSourceKey{};
-            std::string colorPropertyBufferSourceKey{};
-            if (IsScalarVisualizationSource(visualization) &&
-                !visualization->ScalarFieldName.empty())
+            const auto scalarKeyFor =
+                [stableId](const Graphics::Components::VisualizationConfig* config)
+                {
+                    if (IsScalarVisualizationSource(config) &&
+                        !config->ScalarFieldName.empty())
+                    {
+                        return BuildVisualizationPropertySourceKey(
+                            stableId,
+                            "scalar",
+                            config->ScalarFieldName);
+                    }
+                    return std::string{};
+                };
+            const auto colorKeyFor =
+                [stableId](const Graphics::Components::VisualizationConfig* config)
+                {
+                    if (IsColorBufferVisualizationSource(config) &&
+                        !config->ColorBufferName.empty())
+                    {
+                        return BuildVisualizationPropertySourceKey(
+                            stableId,
+                            "color",
+                            config->ColorBufferName);
+                    }
+                    return std::string{};
+                };
+            const bool splitGraphPointLane =
+                graphDomainThisFrame &&
+                graphBoundThisFrame &&
+                renderEdges != nullptr &&
+                renderPoints != nullptr &&
+                EnsureGraphPointLaneInstance(
+                    *sidecar,
+                    stableId,
+                    renderer,
+                    stats);
+            if (!splitGraphPointLane)
             {
-                scalarPropertyBufferSourceKey =
-                    BuildVisualizationPropertySourceKey(
-                        stableId, "scalar", visualization->ScalarFieldName);
+                ReleaseGraphPointLaneInstance(*sidecar, renderer, stats);
             }
-            if (IsColorBufferVisualizationSource(visualization) &&
-                !visualization->ColorBufferName.empty())
+
+            const Graphics::Components::VisualizationConfig* primaryVisualization =
+                visualization;
+            const Graphics::Components::RenderEdges* primaryEdges = renderEdges;
+            const Graphics::Components::RenderPoints* primaryPoints = renderPoints;
+            if (meshDomainThisFrame)
             {
-                colorPropertyBufferSourceKey =
-                    BuildVisualizationPropertySourceKey(
-                        stableId, "color", visualization->ColorBufferName);
+                primaryVisualization = surfaceVisualization;
+                primaryEdges = nullptr;
+                primaryPoints = nullptr;
+            }
+            else if (graphDomainThisFrame)
+            {
+                if (renderEdges != nullptr)
+                {
+                    primaryVisualization = edgeVisualization;
+                    primaryPoints = nullptr;
+                }
+                else if (renderPoints != nullptr)
+                {
+                    primaryVisualization = pointVisualization;
+                    primaryEdges = nullptr;
+                }
+            }
+            else if (pointCloudDomainThisFrame)
+            {
+                primaryVisualization = pointVisualization;
+                primaryEdges = nullptr;
             }
             m_Visualizations.push_back(Graphics::VisualizationSyncRecord{
                 .StableId = stableId,
                 .Material = &sidecar->Material,
                 .GpuSlot = &sidecar->GpuSlot,
-                .Visualization = visualization,
-                .Edges = renderEdges,
-                .Points = renderPoints,
-                .ScalarPropertyBufferSourceKey = scalarPropertyBufferSourceKey,
-                .ColorPropertyBufferSourceKey = colorPropertyBufferSourceKey,
+                .Visualization = primaryVisualization,
+                .Edges = primaryEdges,
+                .Points = primaryPoints,
+                .ScalarPropertyBufferSourceKey = scalarKeyFor(primaryVisualization),
+                .ColorPropertyBufferSourceKey = colorKeyFor(primaryVisualization),
             });
+            if (splitGraphPointLane)
+            {
+                m_Visualizations.push_back(Graphics::VisualizationSyncRecord{
+                    .StableId = stableId,
+                    .GpuSlot = &sidecar->GpuSlot,
+                    .Visualization = pointVisualization,
+                    .Points = renderPoints,
+                    .TargetInstance = sidecar->GraphPointLaneInstance,
+                    .ScalarPropertyBufferSourceKey = scalarKeyFor(pointVisualization),
+                    .ColorPropertyBufferSourceKey = colorKeyFor(pointVisualization),
+                });
+            }
             if (renderEdges != nullptr && sidecar->MeshEdgeViewInstance.IsValid())
             {
                 m_Visualizations.push_back(Graphics::VisualizationSyncRecord{
                     .StableId = stableId,
                     .GpuSlot = &sidecar->GpuSlot,
-                    .Visualization = visualization,
+                    .Visualization = edgeVisualization,
                     .Edges = renderEdges,
                     .TargetInstance = sidecar->MeshEdgeViewInstance,
-                    .ScalarPropertyBufferSourceKey = scalarPropertyBufferSourceKey,
-                    .ColorPropertyBufferSourceKey = colorPropertyBufferSourceKey,
+                    .ScalarPropertyBufferSourceKey = scalarKeyFor(edgeVisualization),
+                    .ColorPropertyBufferSourceKey = colorKeyFor(edgeVisualization),
                 });
             }
             if (renderPoints != nullptr && sidecar->MeshVertexViewInstance.IsValid())
@@ -2266,22 +2575,34 @@ namespace Extrinsic::Runtime
                 m_Visualizations.push_back(Graphics::VisualizationSyncRecord{
                     .StableId = stableId,
                     .GpuSlot = &sidecar->GpuSlot,
-                    .Visualization = visualization,
+                    .Visualization = pointVisualization,
                     .Points = renderPoints,
                     .TargetInstance = sidecar->MeshVertexViewInstance,
-                    .ScalarPropertyBufferSourceKey = scalarPropertyBufferSourceKey,
-                    .ColorPropertyBufferSourceKey = colorPropertyBufferSourceKey,
+                    .ScalarPropertyBufferSourceKey = scalarKeyFor(pointVisualization),
+                    .ColorPropertyBufferSourceKey = colorKeyFor(pointVisualization),
                 });
             }
             if (sourceViewThisFrame.has_value() &&
                 !m_VisualizationState->Bindings.contains(stableId))
             {
-                AppendMeshScalarVisualizationPropertyBuffer(
-                    stableId,
-                    *sourceViewThisFrame,
-                    visualization,
-                    m_VisualizationState->Batch,
-                    stats);
+                const std::array<const Graphics::Components::VisualizationConfig*, 3u>
+                    configs{surfaceVisualization, edgeVisualization, pointVisualization};
+                for (std::size_t i = 0u; i < configs.size(); ++i)
+                {
+                    bool alreadyAppended = false;
+                    for (std::size_t j = 0u; j < i; ++j)
+                    {
+                        alreadyAppended = alreadyAppended || configs[j] == configs[i];
+                    }
+                    if (alreadyAppended)
+                        continue;
+                    AppendMeshScalarVisualizationPropertyBuffer(
+                        stableId,
+                        *sourceViewThisFrame,
+                        configs[i],
+                        m_VisualizationState->Batch,
+                        stats);
+                }
             }
             AppendVisualizationAdapters(stableId, *sidecar, stats);
 
@@ -2299,6 +2620,35 @@ namespace Extrinsic::Runtime
                     renderFlags &= ~(RHI::GpuRender_Line | RHI::GpuRender_Point);
                     renderFlags &= ~RHI::GpuRender_Unlit;
                 }
+                if (graphDomainThisFrame)
+                {
+                    renderFlags &= ~(RHI::GpuRender_Surface |
+                                     RHI::GpuRender_Line |
+                                     RHI::GpuRender_Point);
+                    renderFlags &= ~RHI::GpuRender_Unlit;
+                    if (renderEdges != nullptr)
+                        renderFlags |= RHI::GpuRender_Line | RHI::GpuRender_Unlit;
+                    else if (renderPoints != nullptr)
+                        renderFlags |= RHI::GpuRender_Point | RHI::GpuRender_Unlit;
+                }
+                if (graphDomainThisFrame && graphBoundThisFrame)
+                {
+                    renderer.GetGpuWorld().SetEntityConfig(
+                        sidecar->Instance,
+                        BuildImmediateLaneConfig(
+                            primaryVisualization,
+                            primaryEdges,
+                            primaryPoints));
+                }
+                if (pointCloudDomainThisFrame && pointCloudBoundThisFrame)
+                {
+                    renderer.GetGpuWorld().SetEntityConfig(
+                        sidecar->Instance,
+                        BuildImmediateLaneConfig(
+                            pointVisualization,
+                            nullptr,
+                            renderPoints));
+                }
                 m_Transforms.push_back(Graphics::TransformSyncRecord{
                     .StableId = stableId,
                     .Instance = sidecar->Instance,
@@ -2308,6 +2658,27 @@ namespace Extrinsic::Runtime
                     .MaterialSlot = sidecar->Material.EffectiveSlot,
                     .HasMaterialSlot = true,
                 });
+                if (splitGraphPointLane)
+                {
+                    renderer.GetGpuWorld().SetEntityConfig(
+                        sidecar->GraphPointLaneInstance,
+                        BuildImmediateLaneConfig(
+                            pointVisualization,
+                            nullptr,
+                            renderPoints));
+                    m_Transforms.push_back(Graphics::TransformSyncRecord{
+                        .StableId = stableId,
+                        .Instance = sidecar->GraphPointLaneInstance,
+                        .Model = world.Matrix,
+                        .RenderFlags = RHI::GpuRender_Visible |
+                                       RHI::GpuRender_Opaque |
+                                       RHI::GpuRender_Point |
+                                       RHI::GpuRender_Unlit,
+                        .Bounds = ExtractBounds(registry, entity, world.Matrix),
+                        .MaterialSlot = sidecar->Material.EffectiveSlot,
+                        .HasMaterialSlot = true,
+                    });
+                }
             }
         }
 
@@ -2644,6 +3015,7 @@ namespace Extrinsic::Runtime
                 renderer.GetGpuWorld().FreeGeometry(sidecar.GraphGeometry);
                 ++stats.GraphGeometryReleases;
             }
+            ReleaseGraphPointLaneInstance(sidecar, renderer, stats);
             if (sidecar.PointCloudGeometry.IsValid())
             {
                 renderer.GetGpuWorld().FreeGeometry(sidecar.PointCloudGeometry);

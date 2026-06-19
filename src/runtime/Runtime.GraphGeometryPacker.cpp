@@ -66,7 +66,8 @@ namespace Extrinsic::Runtime
 
         using namespace ECS::Components::GeometrySources;
 
-        if (view.ActiveDomain != Domain::Graph)
+        const SourceAvailability availability = BuildSourceAvailability(view);
+        if (availability.ProvenanceDomain != Domain::Graph)
         {
             return Failure(GraphPackStatus::WrongDomain, outBuffer);
         }

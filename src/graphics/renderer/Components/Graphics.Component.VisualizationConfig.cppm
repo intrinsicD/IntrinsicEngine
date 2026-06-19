@@ -2,6 +2,7 @@ module;
 
 #include <cstdint>
 #include <glm/glm.hpp>
+#include <optional>
 #include <string>
 
 export module Extrinsic.Graphics.Component.VisualizationConfig;
@@ -93,5 +94,19 @@ export namespace Extrinsic::Graphics::Components
         /// Used when Source is PerVertex/Edge/FaceBuffer.
         /// e.g. "colors", "edge_colors", "face_colors".
         std::string ColorBufferName;
+    };
+
+    struct VisualizationLaneOverrides
+    {
+        std::optional<VisualizationConfig> Surface{};
+        std::optional<VisualizationConfig> Edges{};
+        std::optional<VisualizationConfig> Points{};
+
+        [[nodiscard]] bool Empty() const noexcept
+        {
+            return !Surface.has_value() &&
+                   !Edges.has_value() &&
+                   !Points.has_value();
+        }
     };
 }

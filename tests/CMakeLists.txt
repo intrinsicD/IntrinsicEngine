@@ -283,6 +283,7 @@ if(TARGET ExtrinsicRuntime)
         Test.GizmoInteractionEngineWiring.cpp
         Test.GraphGeometryExtraction.cpp
         Test.GraphGeometryPacker.cpp
+        Test.GeometryAvailability.cpp
         Test.PointCloudGeometryExtraction.cpp
         Test.PointCloudGeometryPacker.cpp
         Test.PrimitiveSelectionRefinement.cpp

@@ -6,20 +6,21 @@ maturity_target: CPUContracted
 ---
 # RUNTIME-116 — Focus-camera-on-selection command (F key)
 
-## Status
-- Status: in-progress (implementation complete and verified on branch; retire to
-  `tasks/done/` on merge).
+## Completion
+- Retired on 2026-06-19 at maturity `CPUContracted`.
 - Owner/agent: Claude on `claude/wizardly-archimedes-f611ix`.
-- Branch: `claude/wizardly-archimedes-f611ix`. PR: #983.
-- Verification run 2026-06-18: `cmake --preset ci` + `cmake --build --preset ci
-  --target IntrinsicTests` built with zero errors; the new
-  `Test.RuntimeCameraFocusCommand.cpp` (13 cases) passed; the default CPU gate
-  was green — `100% tests passed, 0 tests failed out of 2894`. Layering,
-  test-layout, task-policy, doc-links, and docs-sync structural checks all pass.
-- PR #983 review fix: moved the `F`-key gather to *after*
-  `FlushPreRenderTransformState` so it reads refreshed `World::Bounds` (a Phase-3
-  transform edit otherwise left the camera framing the stale position/extent),
-  rebuilding the render camera on success. Re-verified by rebuild + CPU gate.
+- Branch/PR: `claude/wizardly-archimedes-f611ix`, PR #983, merge commit
+  `eab66e0d`.
+- Summary: runtime now owns `Extrinsic.Runtime.CameraFocusCommand`, which
+  computes deterministic camera focus targets from world bounding spheres or ECS
+  entity bounds, applies them through `CameraControllerRegistry`, and exposes
+  `FocusCameraOnSelection` for the active selection. `Engine::RunFrame` binds the
+  command to `F` after `FlushPreRenderTransformState`, so focus reads refreshed
+  `World::Bounds` and rebuilds the render camera on success in the same frame.
+- Evidence: verification on 2026-06-18 built `IntrinsicTests`, passed the new
+  13-case `Test.RuntimeCameraFocusCommand.cpp`, passed the default CPU gate
+  (`2894/2894` tests), and passed layering, test-layout, task-policy,
+  doc-links, and docs-sync structural checks.
 
 ## Goal
 - Add a reusable runtime command that repositions the active camera so a chosen
@@ -112,7 +113,7 @@ maturity_target: CPUContracted
 - [x] Regenerate `tasks/SESSION-BRIEF.md` (task opened/retired).
 - [x] Add a brief note of the reusable focus command + `F` binding to
       `docs/architecture/runtime.md` where camera/input composition is described.
-- [ ] On completion: add a `## Completion` block, move this file to
+- [x] On completion: add a `## Completion` block, move this file to
       `tasks/done/`, and append a narrative to `tasks/done/RETIREMENT-LOG.md`.
 
 ## Acceptance criteria

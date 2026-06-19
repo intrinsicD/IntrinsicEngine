@@ -2,6 +2,7 @@ module;
 
 #include <algorithm>
 #include <cstdint>
+#include <string>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -43,6 +44,7 @@ import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.RHI.Types;
 import Extrinsic.Runtime.GraphGeometryPacker;
+export import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.MeshGeometryPacker;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.PointCloudGeometryPacker;
@@ -482,6 +484,8 @@ export namespace Extrinsic::Runtime
             // `MeshGeometry` so the two domain bridges never alias.
             Graphics::GpuGeometryHandle GraphGeometry{};
             bool HasGraphResidency = false;
+            Graphics::GpuInstanceHandle GraphPointLaneInstance{};
+            bool HasGraphPointLaneInstance = false;
             // RUNTIME-087 — runtime-authored point-cloud-source residency. The
             // single handle the cache owns and frees on retirement for a
             // point-cloud-domain entity (point positions as the vertex buffer);
@@ -507,6 +511,37 @@ export namespace Extrinsic::Runtime
 
         [[nodiscard]] std::optional<RenderableSidecarView> FindRenderableSidecarForTest(
             std::uint32_t stableEntityId) const noexcept;
+
+        struct GpuRenderLaneAvailability
+        {
+            GeometryRenderLane Lane{GeometryRenderLane::Surface};
+            bool HasInstance{false};
+            bool HasGeometry{false};
+            Graphics::GpuInstanceHandle Instance{};
+            Graphics::GpuGeometryHandle Geometry{};
+        };
+
+        struct GpuRenderableAvailabilityView
+        {
+            std::uint32_t StableEntityId{0};
+            bool HasRenderable{false};
+            bool HasSourceAsset{false};
+            std::uint32_t GeometrySlot{0};
+            std::uint32_t GeometryGeneration{0};
+            std::uint32_t NamedBufferCount{0};
+            bool HasPositionsBuffer{false};
+            bool HasNormalsBuffer{false};
+            bool HasEdgesBuffer{false};
+            bool HasColorsBuffer{false};
+            bool HasScalarsBuffer{false};
+            bool HasSizesBuffer{false};
+            GpuRenderLaneAvailability Surface{};
+            GpuRenderLaneAvailability Edges{};
+            GpuRenderLaneAvailability Points{};
+        };
+
+        [[nodiscard]] std::optional<GpuRenderableAvailabilityView>
+            FindGpuRenderableAvailability(std::uint32_t stableEntityId) const noexcept;
 
         [[nodiscard]] const ProceduralGeometryCache& GetProceduralGeometryCacheForTest() const noexcept;
 
@@ -574,6 +609,8 @@ export namespace Extrinsic::Runtime
             Graphics::Components::MaterialInstance Material{};
             Graphics::Components::VisualizationConfig Visualization{};
             bool HasVisualization{false};
+            Graphics::Components::VisualizationLaneOverrides VisualizationOverrides{};
+            bool HasVisualizationOverrides{false};
             Graphics::GpuGeometryHandle Geometry{};
             std::optional<ProceduralGeometryKey> ProceduralKey{};
             // RUNTIME-085 Slice B — owned mesh-source residency handle.
@@ -595,6 +632,7 @@ export namespace Extrinsic::Runtime
             // draw no lines until an unrelated dirty tag forced a repack.
             bool GraphPackedLines{false};
             bool GraphPackedPoints{false};
+            Graphics::GpuInstanceHandle GraphPointLaneInstance{};
             // RUNTIME-087 Slice B — owned point-cloud-source residency handle.
             // Mesh, graph, and point-cloud domains are mutually exclusive per
             // entity, but the handles are tracked separately so an entity that
@@ -661,6 +699,13 @@ export namespace Extrinsic::Runtime
                                              RenderableSidecar& sidecar,
                                              Graphics::IRenderer& renderer,
                                              RuntimeRenderExtractionStats& stats);
+        [[nodiscard]] bool EnsureGraphPointLaneInstance(RenderableSidecar& sidecar,
+                                                        std::uint32_t stableId,
+                                                        Graphics::IRenderer& renderer,
+                                                        RuntimeRenderExtractionStats& stats);
+        void ReleaseGraphPointLaneInstance(RenderableSidecar& sidecar,
+                                           Graphics::IRenderer& renderer,
+                                           RuntimeRenderExtractionStats& stats);
         [[nodiscard]] bool BindPointCloudGeometry(entt::registry& registry,
                                                   entt::entity entity,
                                                   const ECS::Components::GeometrySources::ConstSourceView& view,
@@ -684,11 +729,12 @@ export namespace Extrinsic::Runtime
                                         const RHI::GpuBounds& bounds,
                                         std::uint32_t stableId,
                                         bool desired,
-                                        const Graphics::Components::RenderEdges* edges,
-                                        const Graphics::Components::RenderPoints* points,
-                                        bool meshDirty,
-                                        Graphics::IRenderer& renderer,
-                                        RuntimeRenderExtractionStats& stats);
+            const Graphics::Components::RenderEdges* edges,
+            const Graphics::Components::RenderPoints* points,
+            const Graphics::Components::VisualizationConfig* visualization,
+            bool meshDirty,
+            Graphics::IRenderer& renderer,
+            RuntimeRenderExtractionStats& stats);
 
         // RUNTIME-088 Slice B — release one mesh primitive view sidecar: enqueue
         // its geometry handle for deferred retire, free its instance, reset the

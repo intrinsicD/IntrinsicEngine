@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <limits>
 #include <string>
+#include <utility>
 
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
@@ -168,6 +169,31 @@ TEST(ECSGeometrySourcesPopulate, PopulateFromMeshYieldsMeshDomain)
     EXPECT_EQ(view.FacesAlive(), static_cast<std::size_t>(2));
 }
 
+TEST(ECSGeometrySourcesPopulate, MeshAvailabilitySeparatesProvenanceFromSourceCapabilities)
+{
+    Registry scene;
+    auto& raw = scene.Raw();
+    const EntityHandle entity = scene.Create();
+
+    auto mesh = MakeQuadMesh();
+    GeometrySources::PopulateFromMesh(raw, entity, mesh);
+
+    const auto view = GeometrySources::BuildConstView(raw, entity);
+    const auto availability = GeometrySources::BuildSourceAvailability(view);
+
+    EXPECT_EQ(availability.ExactDomain, GeometrySources::Domain::Mesh);
+    EXPECT_EQ(availability.ProvenanceDomain, GeometrySources::Domain::Mesh);
+    EXPECT_TRUE(availability.HasMeshProvenance());
+    EXPECT_TRUE(availability.Has(GeometrySources::SourceCapability::VertexPoints));
+    EXPECT_TRUE(availability.Has(GeometrySources::SourceCapability::Edges));
+    EXPECT_TRUE(availability.Has(GeometrySources::SourceCapability::Halfedges));
+    EXPECT_TRUE(availability.Has(GeometrySources::SourceCapability::Faces));
+    EXPECT_FALSE(availability.Has(GeometrySources::SourceCapability::NodePoints));
+    EXPECT_TRUE(availability.HasPointSource());
+    EXPECT_EQ(availability.VertexPointCount, static_cast<std::size_t>(4));
+    EXPECT_EQ(availability.FaceCount, static_cast<std::size_t>(2));
+}
+
 // =============================================================================
 // PopulateFromGraph
 // =============================================================================
@@ -242,6 +268,35 @@ TEST(ECSGeometrySourcesPopulate, PopulateFromGraphYieldsGraphDomain)
     EXPECT_EQ(view.ActiveDomain, GeometrySources::Domain::Graph);
     EXPECT_EQ(view.NodesAlive(), static_cast<std::size_t>(2));
     EXPECT_EQ(view.EdgesAlive(), static_cast<std::size_t>(1));
+}
+
+TEST(ECSGeometrySourcesPopulate, GraphAvailabilityReportsNodesAndEdgesWithoutHalfedgeSource)
+{
+    Registry scene;
+    auto& raw = scene.Raw();
+    const EntityHandle entity = scene.Create();
+
+    Geometry::Graph::Graph graph;
+    const auto v0 = graph.AddVertex({0.0f, 0.0f, 0.0f});
+    const auto v1 = graph.AddVertex({1.0f, 0.0f, 0.0f});
+    (void)graph.AddEdge(v0, v1);
+
+    GeometrySources::PopulateFromGraph(raw, entity, graph);
+
+    const auto view = GeometrySources::BuildConstView(raw, entity);
+    const auto availability = GeometrySources::BuildSourceAvailability(view);
+
+    EXPECT_EQ(availability.ExactDomain, GeometrySources::Domain::Graph);
+    EXPECT_EQ(availability.ProvenanceDomain, GeometrySources::Domain::Graph);
+    EXPECT_TRUE(availability.HasGraphProvenance());
+    EXPECT_TRUE(availability.Has(GeometrySources::SourceCapability::NodePoints));
+    EXPECT_TRUE(availability.Has(GeometrySources::SourceCapability::Edges));
+    EXPECT_FALSE(availability.Has(GeometrySources::SourceCapability::VertexPoints));
+    EXPECT_FALSE(availability.Has(GeometrySources::SourceCapability::Halfedges));
+    EXPECT_FALSE(availability.Has(GeometrySources::SourceCapability::Faces));
+    EXPECT_TRUE(availability.HasPointSource());
+    EXPECT_EQ(availability.NodePointCount, static_cast<std::size_t>(2));
+    EXPECT_EQ(availability.EdgeCount, static_cast<std::size_t>(1));
 }
 
 // =============================================================================
@@ -331,6 +386,68 @@ TEST(ECSGeometrySourcesPopulate, PopulateFromCloudYieldsPointCloudDomain)
     EXPECT_TRUE(view.Valid());
     EXPECT_EQ(view.ActiveDomain, GeometrySources::Domain::PointCloud);
     EXPECT_EQ(view.VerticesAlive(), static_cast<std::size_t>(2));
+}
+
+TEST(ECSGeometrySourcesPopulate, PointCloudAvailabilityReportsVertexPointSource)
+{
+    Registry scene;
+    auto& raw = scene.Raw();
+    const EntityHandle entity = scene.Create();
+
+    Geometry::PointCloud::Cloud cloud;
+    (void)cloud.AddPoint({0.0f, 0.0f, 0.0f});
+    (void)cloud.AddPoint({1.0f, 0.0f, 0.0f});
+
+    GeometrySources::PopulateFromCloud(raw, entity, cloud);
+
+    const auto view = GeometrySources::BuildConstView(raw, entity);
+    const auto availability = GeometrySources::BuildSourceAvailability(view);
+
+    EXPECT_EQ(availability.ExactDomain, GeometrySources::Domain::PointCloud);
+    EXPECT_EQ(availability.ProvenanceDomain, GeometrySources::Domain::PointCloud);
+    EXPECT_TRUE(availability.HasPointCloudProvenance());
+    EXPECT_TRUE(availability.Has(GeometrySources::SourceCapability::VertexPoints));
+    EXPECT_FALSE(availability.Has(GeometrySources::SourceCapability::NodePoints));
+    EXPECT_FALSE(availability.Has(GeometrySources::SourceCapability::Edges));
+    EXPECT_TRUE(availability.HasPointSource());
+    EXPECT_EQ(availability.VertexPointCount, static_cast<std::size_t>(2));
+    EXPECT_EQ(availability.PointCount(), static_cast<std::size_t>(2));
+}
+
+TEST(ECSGeometrySourcesPopulate, PartialMeshMarkedEntityKeepsMeshProvenanceWithoutMissingSources)
+{
+    Registry scene;
+    auto& raw = scene.Raw();
+    const EntityHandle entity = scene.Create();
+
+    GeometrySources::Vertices vertices{};
+    vertices.Properties.GetOrAdd<glm::vec3>(
+        std::string{PropertyNames::kPosition},
+        glm::vec3{})
+        .Vector()
+        .resize(3u, glm::vec3{1.0f, 0.0f, 0.0f});
+    GeometrySources::Faces faces{};
+    faces.Properties.GetOrAdd<std::uint32_t>(
+        std::string{PropertyNames::kFaceHalfedge},
+        kInvalidIndex)
+        .Vector()
+        .resize(1u, kInvalidIndex);
+
+    raw.emplace<GeometrySources::Vertices>(entity, std::move(vertices));
+    raw.emplace<GeometrySources::Faces>(entity, std::move(faces));
+    raw.emplace<GeometrySources::HasMeshTopology>(entity);
+
+    const auto view = GeometrySources::BuildConstView(raw, entity);
+    const auto availability = GeometrySources::BuildSourceAvailability(view);
+
+    EXPECT_EQ(view.ActiveDomain, GeometrySources::Domain::Unknown);
+    EXPECT_EQ(availability.ExactDomain, GeometrySources::Domain::Unknown);
+    EXPECT_EQ(availability.ProvenanceDomain, GeometrySources::Domain::Mesh);
+    EXPECT_TRUE(availability.HasMeshProvenance());
+    EXPECT_TRUE(availability.Has(GeometrySources::SourceCapability::VertexPoints));
+    EXPECT_TRUE(availability.Has(GeometrySources::SourceCapability::Faces));
+    EXPECT_FALSE(availability.Has(GeometrySources::SourceCapability::Edges));
+    EXPECT_FALSE(availability.Has(GeometrySources::SourceCapability::Halfedges));
 }
 
 // =============================================================================

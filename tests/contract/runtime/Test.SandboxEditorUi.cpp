@@ -1511,7 +1511,7 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
     EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
         graphCaps.Domains,
         Domain::GraphEdges));
-    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+    EXPECT_FALSE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
         graphCaps.Domains,
         Domain::GraphHalfedges));
     EXPECT_FALSE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
@@ -1801,11 +1801,9 @@ TEST(SandboxEditorUi, VisualizationModelEnumeratesPromotedGeometryProperties)
     Runtime::SandboxEditorContext context = MakeContext(registry, selection);
     context.VisualizationCommandsAvailable = true;
 
-    const Runtime::SandboxEditorDomainWindowModel meshModel =
-        Runtime::BuildSandboxEditorDomainWindowModel(
-            context,
-            Runtime::SandboxEditorDomainWindowKind::Mesh);
-    const auto& properties = meshModel.Visualization.Properties;
+    const Runtime::SandboxEditorPanelFrame meshFrame =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+    const auto& properties = meshFrame.Visualization.Properties;
 
     EXPECT_EQ(FindVisualizationProperty(properties, Domain::MeshVertices, "v:position"),
               nullptr);
@@ -1863,15 +1861,13 @@ TEST(SandboxEditorUi, VisualizationModelEnumeratesPromotedGeometryProperties)
     graphNodes.Properties.GetOrAdd<float>("v:centrality", 0.0f)
         .Vector() = {0.0f, 1.0f, 2.0f};
     ASSERT_TRUE(selection.SetSelectedEntity(registry, graph));
-    const Runtime::SandboxEditorDomainWindowModel graphModel =
-        Runtime::BuildSandboxEditorDomainWindowModel(
-            context,
-            Runtime::SandboxEditorDomainWindowKind::Graph);
-    EXPECT_NE(FindVisualizationProperty(graphModel.Visualization.Properties,
+    const Runtime::SandboxEditorPanelFrame graphFrame =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+    EXPECT_NE(FindVisualizationProperty(graphFrame.Visualization.Properties,
                                         Domain::GraphVertices,
                                         "v:centrality"),
               nullptr);
-    EXPECT_EQ(FindVisualizationProperty(graphModel.Visualization.Properties,
+    EXPECT_EQ(FindVisualizationProperty(graphFrame.Visualization.Properties,
                                         Domain::GraphEdges,
                                         std::string{GS::PropertyNames::kEdgeV0}),
               nullptr);
@@ -2650,6 +2646,92 @@ TEST(SandboxEditorUi, DomainWindowModelsReportSelectedMeshGraphAndPointCloudStat
               Runtime::SandboxEditorGeometryProcessingDomain::PointCloudPoints);
 }
 
+TEST(SandboxEditorUi, DomainVisualizationTargetsFollowLaneSourcePresence)
+{
+    using Target = Runtime::SandboxEditorVisualizationTarget;
+    using Domain = Runtime::SandboxEditorVisualizationPropertyDomain;
+
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
+    AddTriangleMeshSource(registry, mesh);
+    registry.Raw().emplace<G::RenderPoints>(mesh);
+    auto& meshVertices = registry.Raw().get<GS::Vertices>(mesh);
+    meshVertices.Properties.GetOrAdd<float>("v:temperature", 0.0f)
+        .Vector() = {0.0f, 0.5f, 1.0f};
+
+    const ECS::EntityHandle graph = MakeSelectable(registry, "Graph");
+    AddGraphSource(registry, graph);
+    auto& graphNodes = registry.Raw().get<GS::Nodes>(graph);
+    graphNodes.Properties.GetOrAdd<float>("v:weight", 0.0f)
+        .Vector() = {1.0f, 2.0f, 3.0f};
+
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.VisualizationCommandsAvailable = true;
+
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    const Runtime::SandboxEditorDomainWindowModel meshPointModel =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::PointCloud);
+    EXPECT_EQ(meshPointModel.SelectedDomain, GS::Domain::Mesh);
+    EXPECT_FALSE(meshPointModel.DomainMatches);
+    EXPECT_TRUE(meshPointModel.VisualizationTargetAvailable);
+    EXPECT_EQ(meshPointModel.VisualizationTarget, Target::Points);
+    EXPECT_EQ(meshPointModel.Visualization.Target, Target::Points);
+    EXPECT_TRUE(meshPointModel.Visualization.TargetAvailable);
+    EXPECT_NE(FindVisualizationProperty(meshPointModel.Visualization.Properties,
+                                        Domain::MeshVertices,
+                                        "v:temperature"),
+              nullptr);
+
+    const ECS::EntityHandle wireMesh = MakeSelectable(registry, "Wire Mesh");
+    AddTriangleMeshSource(registry, wireMesh);
+    registry.Raw().remove<GS::Edges>(wireMesh);
+    registry.Raw().emplace<G::RenderEdges>(wireMesh);
+    auto& wireFaces = registry.Raw().get<GS::Faces>(wireMesh);
+    wireFaces.Properties.GetOrAdd<float>("f:temperature", 0.0f)
+        .Vector() = {1.0f};
+
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, wireMesh));
+    const Runtime::SandboxEditorDomainWindowModel wireMeshEdgeModel =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::Graph);
+    EXPECT_EQ(wireMeshEdgeModel.SelectedDomain, GS::Domain::Unknown);
+    EXPECT_FALSE(wireMeshEdgeModel.DomainMatches);
+    EXPECT_TRUE(wireMeshEdgeModel.VisualizationTargetAvailable);
+    EXPECT_EQ(wireMeshEdgeModel.VisualizationTarget, Target::Edges);
+
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, graph));
+    const Runtime::SandboxEditorDomainWindowModel graphPointModel =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::PointCloud);
+    EXPECT_EQ(graphPointModel.SelectedDomain, GS::Domain::Graph);
+    EXPECT_FALSE(graphPointModel.DomainMatches);
+    EXPECT_TRUE(graphPointModel.VisualizationTargetAvailable);
+    EXPECT_EQ(graphPointModel.VisualizationTarget, Target::Points);
+    EXPECT_EQ(graphPointModel.Visualization.Target, Target::Points);
+    EXPECT_NE(FindVisualizationProperty(graphPointModel.Visualization.Properties,
+                                        Domain::GraphVertices,
+                                        "v:weight"),
+              nullptr);
+
+    const Runtime::SandboxEditorDomainWindowModel graphEdgeModel =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::Graph);
+    EXPECT_TRUE(graphEdgeModel.DomainMatches);
+    EXPECT_TRUE(graphEdgeModel.VisualizationTargetAvailable);
+    EXPECT_EQ(graphEdgeModel.VisualizationTarget, Target::Edges);
+    EXPECT_EQ(graphEdgeModel.Visualization.Target, Target::Edges);
+    EXPECT_STREQ(Runtime::DebugNameForSandboxEditorVisualizationTarget(
+                     graphEdgeModel.VisualizationTarget),
+                 "Edges");
+}
+
 TEST(SandboxEditorUi, RenderHintCommandEditsDomainComponentsAndHistory)
 {
     ECS::Scene::Registry registry;
@@ -3094,6 +3176,7 @@ TEST(SandboxEditorUi, PrimitiveViewCommandTranslatesToRenderHintComponents)
 {
     ECS::Scene::Registry registry;
     Runtime::SelectionController selection;
+    auto& raw = registry.Raw();
     const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
     AddTriangleMeshSource(registry, mesh);
     ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
@@ -3118,9 +3201,9 @@ TEST(SandboxEditorUi, PrimitiveViewCommandTranslatesToRenderHintComponents)
                       .VertexPointRadiusPx = 11.0f,
                   }),
               Runtime::SandboxEditorCommandStatus::Applied);
-    ASSERT_TRUE(registry.Raw().all_of<G::RenderEdges>(mesh));
-    ASSERT_TRUE(registry.Raw().all_of<G::RenderPoints>(mesh));
-    const G::RenderPoints& points = registry.Raw().get<G::RenderPoints>(mesh);
+    ASSERT_TRUE(raw.all_of<G::RenderEdges>(mesh));
+    ASSERT_TRUE(raw.all_of<G::RenderPoints>(mesh));
+    const G::RenderPoints& points = raw.get<G::RenderPoints>(mesh);
     EXPECT_EQ(points.Type, G::RenderPoints::RenderType::Surfel);
     ASSERT_NE(std::get_if<float>(&points.SizeSource), nullptr);
     EXPECT_FLOAT_EQ(*std::get_if<float>(&points.SizeSource), 11.0f);
@@ -3133,7 +3216,7 @@ TEST(SandboxEditorUi, PrimitiveViewCommandTranslatesToRenderHintComponents)
                       .VertexPointRadiusPx = 0.0f,
                   }),
               Runtime::SandboxEditorCommandStatus::InvalidProcessingParameters);
-    EXPECT_TRUE(registry.Raw().all_of<G::RenderPoints>(mesh));
+    EXPECT_TRUE(raw.all_of<G::RenderPoints>(mesh));
 
     EXPECT_EQ(Runtime::ApplySandboxEditorPrimitiveViewCommand(
                   context,
@@ -3145,13 +3228,53 @@ TEST(SandboxEditorUi, PrimitiveViewCommandTranslatesToRenderHintComponents)
                       .EnableVertexView = false,
                   }),
               Runtime::SandboxEditorCommandStatus::Applied);
-    EXPECT_FALSE(registry.Raw().all_of<G::RenderEdges>(mesh));
-    EXPECT_FALSE(registry.Raw().all_of<G::RenderPoints>(mesh));
+    EXPECT_FALSE(raw.all_of<G::RenderEdges>(mesh));
+    EXPECT_FALSE(raw.all_of<G::RenderPoints>(mesh));
 
     EXPECT_EQ(Runtime::ApplySandboxEditorPrimitiveViewCommand(
                   context,
                   Runtime::SandboxEditorPrimitiveViewCommand{}),
               Runtime::SandboxEditorCommandStatus::NoChange);
+
+    const ECS::EntityHandle vertexOnlyMesh =
+        MakeSelectable(registry, "Vertex Only Mesh");
+    raw.emplace<GS::HasMeshTopology>(vertexOnlyMesh);
+    auto& vertexOnlySource = raw.emplace<GS::Vertices>(vertexOnlyMesh);
+    SetPositions(vertexOnlySource, {
+        {0.0f, 0.0f, 0.0f},
+        {1.0f, 0.0f, 0.0f},
+    });
+    const std::uint32_t vertexOnlyStableId =
+        Runtime::SelectionController::ToStableEntityId(vertexOnlyMesh);
+    EXPECT_EQ(Runtime::ApplySandboxEditorPrimitiveViewCommand(
+                  context,
+                  Runtime::SandboxEditorPrimitiveViewCommand{
+                      .StableEntityId = vertexOnlyStableId,
+                      .SetVertexView = true,
+                      .EnableVertexView = true,
+                      .SetVertexRenderMode = true,
+                      .VertexRenderMode =
+                          Runtime::MeshVertexViewRenderMode::FlatCircle,
+                      .SetVertexPointRadius = true,
+                      .VertexPointRadiusPx = 7.0f,
+                  }),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    ASSERT_TRUE(raw.all_of<G::RenderPoints>(vertexOnlyMesh));
+    EXPECT_FALSE(raw.all_of<G::RenderEdges>(vertexOnlyMesh));
+    const G::RenderPoints& vertexOnlyPoints =
+        raw.get<G::RenderPoints>(vertexOnlyMesh);
+    EXPECT_EQ(vertexOnlyPoints.Type, G::RenderPoints::RenderType::Flat);
+    ASSERT_NE(std::get_if<float>(&vertexOnlyPoints.SizeSource), nullptr);
+    EXPECT_FLOAT_EQ(*std::get_if<float>(&vertexOnlyPoints.SizeSource), 7.0f);
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorPrimitiveViewCommand(
+                  context,
+                  Runtime::SandboxEditorPrimitiveViewCommand{
+                      .StableEntityId = vertexOnlyStableId,
+                      .SetEdgeView = true,
+                      .EnableEdgeView = true,
+                  }),
+              Runtime::SandboxEditorCommandStatus::UnsupportedGeometryDomain);
 
     const ECS::EntityHandle cloud = MakeSelectable(registry, "Cloud");
     AddPointCloudSource(registry, cloud, 2u);
@@ -3299,6 +3422,54 @@ TEST(SandboxEditorUi, VisualizationConfigCommandRoutesThroughSelectedEntity)
                   scalar),
               Runtime::SandboxEditorCommandStatus::NoChange);
 
+    const Runtime::SandboxEditorVisualizationConfigCommand uniform{
+        .StableEntityId = stableId,
+        .EnableConfig = true,
+        .Source = G::VisualizationConfig::ColorSource::UniformColor,
+        .Color = glm::vec4{0.125f, 0.5f, 0.875f, 1.0f},
+        .ScalarFieldName = "curvature",
+        .ScalarDomain = G::VisualizationConfig::Domain::Face,
+        .ScalarAutoRange = false,
+        .ScalarRangeMin = -1.0f,
+        .ScalarRangeMax = 2.0f,
+        .ScalarBinCount = 4u,
+        .IsolineCount = 8u,
+    };
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationConfigCommand(
+                  context,
+                  uniform),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    ASSERT_TRUE(registry.Raw().all_of<G::VisualizationConfig>(mesh));
+    const auto& uniformConfig = registry.Raw().get<G::VisualizationConfig>(mesh);
+    EXPECT_EQ(uniformConfig.Source,
+              G::VisualizationConfig::ColorSource::UniformColor);
+    EXPECT_FLOAT_EQ(uniformConfig.Color.x, 0.125f);
+    EXPECT_FLOAT_EQ(uniformConfig.Color.y, 0.5f);
+    EXPECT_FLOAT_EQ(uniformConfig.Color.z, 0.875f);
+    EXPECT_FLOAT_EQ(uniformConfig.Color.w, 1.0f);
+    EXPECT_EQ(uniformConfig.ScalarFieldName, "curvature");
+    EXPECT_EQ(uniformConfig.ScalarDomain, G::VisualizationConfig::Domain::Face);
+    EXPECT_FALSE(uniformConfig.Scalar.AutoRange);
+    EXPECT_FLOAT_EQ(uniformConfig.Scalar.RangeMin, -1.0f);
+    EXPECT_FLOAT_EQ(uniformConfig.Scalar.RangeMax, 2.0f);
+    EXPECT_EQ(uniformConfig.Scalar.BinCount, 4u);
+    EXPECT_EQ(uniformConfig.Scalar.Isolines.Num, 8u);
+
+    frame = Runtime::BuildSandboxEditorPanelFrame(context);
+    ASSERT_TRUE(frame.Visualization.Visualization.HasConfig);
+    EXPECT_EQ(frame.Visualization.Visualization.Source,
+              G::VisualizationConfig::ColorSource::UniformColor);
+    EXPECT_FLOAT_EQ(frame.Visualization.Visualization.Color.x, 0.125f);
+    EXPECT_FLOAT_EQ(frame.Visualization.Visualization.Color.y, 0.5f);
+    EXPECT_FLOAT_EQ(frame.Visualization.Visualization.Color.z, 0.875f);
+    EXPECT_FLOAT_EQ(frame.Visualization.Visualization.Color.w, 1.0f);
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationConfigCommand(
+                  context,
+                  uniform),
+              Runtime::SandboxEditorCommandStatus::NoChange);
+
     EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationConfigCommand(
                   context,
                   Runtime::SandboxEditorVisualizationConfigCommand{
@@ -3314,6 +3485,87 @@ TEST(SandboxEditorUi, VisualizationConfigCommandRoutesThroughSelectedEntity)
                   unavailable,
                   scalar),
               Runtime::SandboxEditorCommandStatus::MissingVisualizationCommands);
+}
+
+TEST(SandboxEditorUi, VisualizationConfigCommandTargetsPointLaneOverride)
+{
+    using Target = Runtime::SandboxEditorVisualizationTarget;
+
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "VisualMesh");
+    AddTriangleMeshSource(registry, mesh);
+    registry.Raw().emplace<G::RenderPoints>(mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+
+    G::VisualizationConfig base{};
+    base.Source = G::VisualizationConfig::ColorSource::UniformColor;
+    base.Color = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f};
+    registry.Raw().emplace<G::VisualizationConfig>(mesh, base);
+
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    context.VisualizationCommandsAvailable = true;
+
+    const Runtime::SandboxEditorVisualizationConfigCommand pointUniform{
+        .StableEntityId = stableId,
+        .Target = Target::Points,
+        .EnableConfig = true,
+        .Source = G::VisualizationConfig::ColorSource::UniformColor,
+        .Color = glm::vec4{0.0f, 0.8f, 0.2f, 1.0f},
+    };
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationConfigCommand(
+                  context,
+                  pointUniform),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    const auto& defaultConfig = registry.Raw().get<G::VisualizationConfig>(mesh);
+    EXPECT_EQ(defaultConfig.Color, glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+    ASSERT_TRUE(registry.Raw().all_of<G::VisualizationLaneOverrides>(mesh));
+    const auto& overrides =
+        registry.Raw().get<G::VisualizationLaneOverrides>(mesh);
+    ASSERT_TRUE(overrides.Points.has_value());
+    EXPECT_EQ(overrides.Points->Source,
+              G::VisualizationConfig::ColorSource::UniformColor);
+    EXPECT_EQ(overrides.Points->Color, glm::vec4(0.0f, 0.8f, 0.2f, 1.0f));
+    EXPECT_FALSE(overrides.Surface.has_value());
+    EXPECT_FALSE(overrides.Edges.has_value());
+
+    const Runtime::SandboxEditorDomainWindowModel pointModel =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::PointCloud);
+    ASSERT_TRUE(pointModel.Visualization.Visualization.HasConfig);
+    EXPECT_EQ(pointModel.Visualization.Visualization.Color,
+              glm::vec4(0.0f, 0.8f, 0.2f, 1.0f));
+    EXPECT_EQ(pointModel.Visualization.Target, Target::Points);
+
+    EXPECT_EQ(history.Undo().Status,
+              Runtime::EditorCommandHistoryStatus::Undone);
+    EXPECT_FALSE(registry.Raw().all_of<G::VisualizationLaneOverrides>(mesh));
+    EXPECT_EQ(registry.Raw().get<G::VisualizationConfig>(mesh).Color,
+              glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+
+    EXPECT_EQ(history.Redo().Status,
+              Runtime::EditorCommandHistoryStatus::Redone);
+    ASSERT_TRUE(registry.Raw().all_of<G::VisualizationLaneOverrides>(mesh));
+    EXPECT_TRUE(registry.Raw()
+                    .get<G::VisualizationLaneOverrides>(mesh)
+                    .Points.has_value());
+
+    EXPECT_EQ(Runtime::ApplySandboxEditorVisualizationConfigCommand(
+                  context,
+                  Runtime::SandboxEditorVisualizationConfigCommand{
+                      .StableEntityId = stableId,
+                      .Target = Target::Points,
+                      .EnableConfig = false,
+                  }),
+              Runtime::SandboxEditorCommandStatus::Applied);
+    EXPECT_FALSE(registry.Raw().all_of<G::VisualizationLaneOverrides>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<G::VisualizationConfig>(mesh));
 }
 
 TEST(SandboxEditorUi, VisualizationAdapterBindingCommandRoutesThroughRuntimeSurface)

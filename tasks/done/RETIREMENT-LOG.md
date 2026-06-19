@@ -8,6 +8,76 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+Active
+[`UI-020`](UI-020-visualization-lane-uniform-color.md) — Visualization lane
+uniform color controls — retired on 2026-06-19 at maturity `CPUContracted`.
+The sandbox visualization command/model seam now distinguishes the selected
+entity's default visualization config from optional surface, edge, and point
+lane overrides. Domain visualization windows target their render lanes by
+source-row presence instead of only by the mutually exclusive active domain, so
+mesh vertices and graph nodes rendered as points can take an independent
+uniform color. Runtime extraction resolves those lane overrides for mesh
+surface/edge/vertex sidecars, graph line/point instances, and point-cloud
+points; scene JSON persists the optional lane descriptors as CPU-only data.
+Focused evidence passed the `IntrinsicRuntimeContractTests` build and 93/93
+CPU/null contract tests across `SandboxEditorUi`,
+`MeshPrimitiveViewExtraction`, `GraphGeometryExtraction`, and
+`RuntimeSceneSerialization`.
+
+Active
+[`UI-019`](UI-019-visualization-uniform-color-edit.md) — Visualization uniform
+color edit widget — retired on 2026-06-19 at maturity `CPUContracted`. Mesh,
+graph, point-cloud, and top-level geometry visualization UI windows now expose
+an ImGui `ColorEdit4` control when the selected entity's
+`VisualizationConfig::ColorSource` is `UniformColor`. The edit path reuses the
+runtime-owned visualization config command, preserves the rest of the config
+payload when switching/editing uniform color, and does not add renderer/RHI/
+asset ownership to UI. Focused evidence passed the
+`IntrinsicRuntimeContractTests` build and all 51 `SandboxEditorUi` CPU/null
+contract tests.
+
+Backlog
+[`GRAPHICS-089`](GRAPHICS-089-generated-uv-texture-sampling-vulkan-smoke.md) —
+Generated-UV texture sampling Vulkan smoke — retired on 2026-06-19 at maturity
+`Operational` on Vulkan-capable hosts. The opt-in runtime sandbox
+`gpu;vulkan` smoke now imports an OBJ that omitted authored `vt` coordinates,
+waits for the promoted Vulkan default recipe to become operational, uploads a
+generated albedo texture through `Runtime.AssetModelTextureHandoff` and
+`Graphics.GpuAssetCache`, binds it through the progressive material texture
+path, and asserts the rendered surface samples that generated texture using
+ASSETIO-008 generated `v:texcoord` values rather than default zero UVs or
+shader-side UV fabrication. Final evidence passed `ci-vulkan` configure,
+`cmake --build --preset ci-vulkan --target IntrinsicTests`, the targeted
+`gpu;vulkan` CTest, and the default CPU-supported CTest gate.
+
+Backlog
+[`GRAPHICS-091`](GRAPHICS-091-unify-scalar-colormap-across-surface-line-point.md) —
+Unify scalar-field / colormap visualization across surface, line, and point
+passes — retired on 2026-06-19 at maturity `Operational` on Vulkan-capable
+hosts (`CPUContracted` elsewhere). Promoted surface, line, and point shaders now
+share `common/gpu_scene.glsl` visualization color resolution for material,
+uniform, scalar-field, and per-element RGBA modes. `VisualizationSyncSystem`
+writes matching `GpuEntityConfig` scalar/color contracts for surface, line, and
+point, the opt-in runtime sandbox `gpu;vulkan` smoke proves line/point
+scalar-field colormap pixels, and final CPU/non-GPU retirement evidence reran
+the forward/deferred surface pipeline survival checks plus the shared helper
+shader check.
+
+Previously-active
+[`RUNTIME-116`](RUNTIME-116-focus-camera-on-selection-command.md) —
+Focus-camera-on-selection command (F key) — retired on 2026-06-19 at maturity
+`CPUContracted`. Runtime now owns `Extrinsic.Runtime.CameraFocusCommand`, a
+deterministic command surface that aggregates selected entities' refreshed
+`World::Bounds` into a center-of-mass focus sphere, applies it through
+`CameraControllerRegistry`, and marks the camera transition. `Engine::RunFrame`
+binds the command to `F` after `FlushPreRenderTransformState`, suppresses it
+while ImGui owns the keyboard, and rebuilds the render camera on success so the
+same frame sees the reframed camera. PR #983 merged the command, the post-flush
+review fix, runtime architecture docs, module inventory refresh, and the 13-case
+`contract;runtime` `Test.RuntimeCameraFocusCommand.cpp` suite. No `Operational`
+follow-up is owed; the thin key binding composes already-operational input and
+camera-controller paths, and the reusable command closes at `CPUContracted`.
+
 Backlog
 [`GRAPHICS-092`](GRAPHICS-092-group-per-domain-params-and-line-width-residency.md) —
 Group per-domain params in `GpuEntityConfig` and add line-width residency —
@@ -1981,3 +2051,38 @@ endpoint retired); they are preserved here verbatim for traceability.
   The opt-in `gpu;vulkan` visible-triangle smoke composed all three
   prior children and runs only on hosts with Vulkan + GLFW; its bootstrap
   fixture is retired and the default-recipe fixture is canonical.
+
+[`HARDEN-083`](HARDEN-083-geometry-source-availability-contract.md) —
+geometry source availability and provenance contract retired to `tasks/done/`
+on 2026-06-19 at `CPUContracted`. `GeometrySources` now reports exact active
+domain, source provenance, and available vertex/node, edge, halfedge, and face
+CPU sources separately; topology markers can explain provenance without
+pretending missing property sets exist.
+
+[`RUNTIME-117`](RUNTIME-117-geometry-availability-render-lane-resolver.md) —
+geometry availability and render-lane resolver retired to `tasks/done/` on
+2026-06-19 at `CPUContracted`. Runtime now owns the standard resolver over ECS
+source availability plus `RenderSurface`, `RenderEdges`, and `RenderPoints`,
+including property-domain support, element counts, and lane diagnostics.
+
+[`RUNTIME-118`](RUNTIME-118-geometry-availability-consumer-migration.md) —
+geometry availability consumer migration retired to `tasks/done/` on
+2026-06-19 at `CPUContracted`. Runtime packers, extraction, progressive
+property resolution, selected bake validation, and primitive-selection
+refinement now consume the availability/provenance model instead of using exact
+`ActiveDomain` as the common capability gate.
+
+[`RUNTIME-119`](RUNTIME-119-gpu-renderable-availability-snapshot.md) — GPU
+renderable availability snapshot retired to `tasks/done/` on 2026-06-19 at
+`CPUContracted`. `RenderExtractionCache` exposes a read-only
+`GpuRenderableAvailabilityView` keyed by stable entity id, with independent
+surface, edge, and point lane residency plus canonical named-buffer facts while
+ECS remains free of GPU handles and renderer sidecars.
+
+[`UI-021`](UI-021-sandbox-editor-geometry-availability-migration.md) —
+sandbox editor geometry availability migration retired to `tasks/done/` on
+2026-06-19 at `CPUContracted`. `Runtime.SandboxEditorUi` now consumes
+`Extrinsic.Runtime.GeometryAvailability` for domain windows, visualization
+targets, property catalogs, primitive-view commands, render hints, K-Means
+affordances, and mesh UV/bake diagnostics while preserving source provenance
+labels.

@@ -862,8 +862,15 @@ namespace Extrinsic::Runtime
         }
 
         const GS::ConstSourceView view = GS::BuildConstView(scene.Raw(), entity);
-        if (view.ActiveDomain != GS::Domain::Mesh)
+        const GS::SourceAvailability availability =
+            GS::BuildSourceAvailability(view);
+        if (availability.ProvenanceDomain != GS::Domain::Mesh ||
+            !availability.Has(GS::SourceCapability::VertexPoints) ||
+            !availability.Has(GS::SourceCapability::Halfedges) ||
+            !availability.Has(GS::SourceCapability::Faces))
+        {
             return FailureBuild(SelectedMeshTextureBakeStatus::NonMeshSelection);
+        }
 
         SelectedMeshTextureBakeStatus domainStatus =
             SelectedMeshTextureBakeStatus::Success;

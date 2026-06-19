@@ -105,6 +105,48 @@ export namespace Extrinsic::ECS::Components::GeometrySources
         Unknown
     };
 
+    enum class SourceCapability : std::uint32_t
+    {
+        None = 0u,
+        VertexPoints = 1u << 0u,
+        NodePoints = 1u << 1u,
+        Edges = 1u << 2u,
+        Halfedges = 1u << 3u,
+        Faces = 1u << 4u,
+    };
+
+    [[nodiscard]] constexpr SourceCapability operator|(
+        const SourceCapability lhs,
+        const SourceCapability rhs) noexcept
+    {
+        return static_cast<SourceCapability>(
+            static_cast<std::uint32_t>(lhs) |
+            static_cast<std::uint32_t>(rhs));
+    }
+
+    [[nodiscard]] constexpr SourceCapability operator&(
+        const SourceCapability lhs,
+        const SourceCapability rhs) noexcept
+    {
+        return static_cast<SourceCapability>(
+            static_cast<std::uint32_t>(lhs) &
+            static_cast<std::uint32_t>(rhs));
+    }
+
+    constexpr SourceCapability& operator|=(SourceCapability& lhs,
+                                           const SourceCapability rhs) noexcept
+    {
+        lhs = lhs | rhs;
+        return lhs;
+    }
+
+    [[nodiscard]] constexpr bool HasAnySourceCapability(
+        const SourceCapability capabilities,
+        const SourceCapability query) noexcept
+    {
+        return static_cast<std::uint32_t>(capabilities & query) != 0u;
+    }
+
     [[nodiscard]] inline std::size_t AliveCount(std::size_t total, std::size_t deleted) noexcept
     {
         return total > deleted ? (total - deleted) : 0;
@@ -138,6 +180,8 @@ export namespace Extrinsic::ECS::Components::GeometrySources
     struct ConstSourceView
     {
         Domain ActiveDomain{Domain::None};
+        bool HasMeshTopologyMarker{false};
+        bool HasGraphTopologyMarker{false};
 
         const Vertices* VertexSource{nullptr};
         const Edges* EdgeSource{nullptr};
@@ -179,6 +223,8 @@ export namespace Extrinsic::ECS::Components::GeometrySources
     struct MutableSourceView
     {
         Domain ActiveDomain{Domain::None};
+        bool HasMeshTopologyMarker{false};
+        bool HasGraphTopologyMarker{false};
 
         Vertices* VertexSource{nullptr};
         Edges* EdgeSource{nullptr};
@@ -192,11 +238,61 @@ export namespace Extrinsic::ECS::Components::GeometrySources
         }
     };
 
+    struct SourceAvailability
+    {
+        Domain ExactDomain{Domain::None};
+        Domain ProvenanceDomain{Domain::None};
+        SourceCapability Capabilities{SourceCapability::None};
+
+        std::size_t VertexPointCount{0};
+        std::size_t NodePointCount{0};
+        std::size_t EdgeCount{0};
+        std::size_t HalfedgeCount{0};
+        std::size_t FaceCount{0};
+
+        [[nodiscard]] bool Has(SourceCapability query) const noexcept
+        {
+            return HasAnySourceCapability(Capabilities, query);
+        }
+
+        [[nodiscard]] bool HasPointSource() const noexcept
+        {
+            return Has(SourceCapability::VertexPoints) ||
+                   Has(SourceCapability::NodePoints);
+        }
+
+        [[nodiscard]] std::size_t PointCount() const noexcept
+        {
+            return VertexPointCount + NodePointCount;
+        }
+
+        [[nodiscard]] bool HasMeshProvenance() const noexcept
+        {
+            return ProvenanceDomain == Domain::Mesh;
+        }
+
+        [[nodiscard]] bool HasGraphProvenance() const noexcept
+        {
+            return ProvenanceDomain == Domain::Graph;
+        }
+
+        [[nodiscard]] bool HasPointCloudProvenance() const noexcept
+        {
+            return ProvenanceDomain == Domain::PointCloud;
+        }
+    };
+
     [[nodiscard]] Domain DetectDomain(bool hasVertices,
                                       bool hasEdges,
                                       bool hasHalfedges,
                                       bool hasFaces,
                                       bool hasNodes) noexcept;
+
+    [[nodiscard]] SourceAvailability BuildSourceAvailability(
+        const ConstSourceView& view) noexcept;
+
+    [[nodiscard]] SourceAvailability BuildSourceAvailability(
+        const MutableSourceView& view) noexcept;
 
     [[nodiscard]] ConstSourceView BuildConstView(const entt::registry& registry,
                                                  entt::entity entity);

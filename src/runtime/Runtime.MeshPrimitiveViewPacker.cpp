@@ -121,7 +121,8 @@ namespace Extrinsic::Runtime
         {
             using namespace ECS::Components::GeometrySources;
 
-            if (view.ActiveDomain != Domain::Mesh)
+            const SourceAvailability availability = BuildSourceAvailability(view);
+            if (availability.ProvenanceDomain != Domain::Mesh)
             {
                 status = MeshPrimitiveViewStatus::WrongDomain;
                 return nullptr;

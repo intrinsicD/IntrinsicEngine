@@ -302,6 +302,54 @@ TEST(ProgressiveRenderData, PropertyPickerOrdersCompatibleOptionsFirstAndExplain
     EXPECT_EQ(missing.Status, Runtime::ProgressivePropertyResolutionStatus::MissingProperty);
 }
 
+TEST(ProgressiveRenderData, PartialMeshProvenanceUsesAvailableSourceProperties)
+{
+    ECS::Scene::Registry scene;
+    const ECS::EntityHandle entity = ECS::Scene::CreateDefault(scene, "partial mesh");
+    auto& raw = scene.Raw();
+
+    auto& vertices = raw.emplace<GS::Vertices>(entity);
+    SetPositions(vertices, {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}});
+    vertices.Properties.GetOrAdd<float>("v:heat", 0.0f).Vector() = {1.0f, 2.0f, 3.0f};
+
+    auto& faces = raw.emplace<GS::Faces>(entity);
+    SetFaces(faces);
+    faces.Properties.GetOrAdd<float>("f:heat", 0.0f).Vector() = {4.0f};
+    raw.emplace<GS::HasMeshTopology>(entity);
+
+    const auto view = GS::BuildConstView(raw, entity);
+    ASSERT_EQ(view.ActiveDomain, GS::Domain::Unknown);
+
+    const auto vertex = Runtime::ResolvePropertyBinding(
+        view,
+        Runtime::ProgressivePropertyBindingDescriptor{
+            .Domain = Runtime::ProgressiveGeometryDomain::MeshVertex,
+            .PropertyName = "v:heat",
+            .ExpectedValueKind = Runtime::ProgressivePropertyValueKind::ScalarFloat,
+            .ExpectedElementCount = 3u,
+        });
+    EXPECT_TRUE(vertex.Compatible());
+
+    const auto face = Runtime::ResolvePropertyBinding(
+        view,
+        Runtime::ProgressivePropertyBindingDescriptor{
+            .Domain = Runtime::ProgressiveGeometryDomain::MeshFace,
+            .PropertyName = "f:heat",
+            .ExpectedValueKind = Runtime::ProgressivePropertyValueKind::ScalarFloat,
+            .ExpectedElementCount = 1u,
+        });
+    EXPECT_TRUE(face.Compatible());
+
+    const auto halfedge = Runtime::ResolvePropertyBinding(
+        view,
+        Runtime::ProgressivePropertyBindingDescriptor{
+            .Domain = Runtime::ProgressiveGeometryDomain::MeshHalfedge,
+            .PropertyName = "h:to_vertex",
+            .ExpectedValueKind = Runtime::ProgressivePropertyValueKind::UInt32,
+        });
+    EXPECT_EQ(halfedge.Status, Runtime::ProgressivePropertyResolutionStatus::DomainUnavailable);
+}
+
 TEST(ProgressiveRenderData, SceneSerializationPersistsBindingsButDropsTransientReadiness)
 {
     ECS::Scene::Registry source;

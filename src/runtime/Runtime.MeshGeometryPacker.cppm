@@ -50,7 +50,7 @@ export namespace Extrinsic::Runtime
     enum class MeshPackStatus : std::uint8_t
     {
         Success,
-        WrongDomain,                // `ConstSourceView::ActiveDomain != Domain::Mesh`.
+        WrongDomain,                // Source provenance is not `Domain::Mesh`.
         MissingPositions,           // `v:position` absent / wrong-typed on `Vertices`.
         MissingHalfedgeTopology,    // `Halfedges` PropertySet absent, or `h:to_vertex` / `h:next` absent / wrong-typed.
         MissingFaceTopology,        // `Faces` PropertySet absent, or `f:halfedge` absent / wrong-typed.

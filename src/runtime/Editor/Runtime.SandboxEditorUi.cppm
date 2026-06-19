@@ -156,6 +156,14 @@ export namespace Extrinsic::Runtime
         ColorBuffer,
     };
 
+    enum class SandboxEditorVisualizationTarget : std::uint8_t
+    {
+        Entity,
+        Surface,
+        Edges,
+        Points,
+    };
+
     [[nodiscard]] const char* DebugNameForSandboxEditorVisualizationPropertyDomain(
         SandboxEditorVisualizationPropertyDomain domain) noexcept;
 
@@ -164,6 +172,9 @@ export namespace Extrinsic::Runtime
 
     [[nodiscard]] const char* DebugNameForSandboxEditorVisualizationPropertyPreset(
         SandboxEditorVisualizationPropertyPreset preset) noexcept;
+
+    [[nodiscard]] const char* DebugNameForSandboxEditorVisualizationTarget(
+        SandboxEditorVisualizationTarget target) noexcept;
 
     enum class SandboxEditorGeometryProcessingDomain : std::uint32_t
     {
@@ -1041,6 +1052,9 @@ export namespace Extrinsic::Runtime
     {
         bool GeometryDomainControlsAvailable{false};
         bool AdapterBindingControlsAvailable{false};
+        bool TargetAvailable{false};
+        SandboxEditorVisualizationTarget Target{
+            SandboxEditorVisualizationTarget::Entity};
         bool HasSelectedEntity{false};
         std::uint32_t SelectedStableId{0u};
         ECS::Components::GeometrySources::Domain SelectedDomain{
@@ -1078,6 +1092,9 @@ export namespace Extrinsic::Runtime
         bool HasPrimitiveViewSettings{false};
         SandboxEditorPrimitiveViewSettings PrimitiveView{};
         bool VisualizationControlsAvailable{false};
+        bool VisualizationTargetAvailable{false};
+        SandboxEditorVisualizationTarget VisualizationTarget{
+            SandboxEditorVisualizationTarget::Entity};
         SandboxEditorVisualizationModel Visualization{};
         SandboxEditorPropertyCatalogModel PropertyCatalog{};
         SandboxEditorBoundRenderStateModel BoundState{};
@@ -1207,6 +1224,8 @@ export namespace Extrinsic::Runtime
     struct SandboxEditorVisualizationConfigCommand
     {
         std::uint32_t StableEntityId{0u};
+        SandboxEditorVisualizationTarget Target{
+            SandboxEditorVisualizationTarget::Entity};
         bool EnableConfig{true};
         Graphics::Components::VisualizationConfig::ColorSource Source{
             Graphics::Components::VisualizationConfig::ColorSource::UniformColor};
@@ -1225,6 +1244,8 @@ export namespace Extrinsic::Runtime
     struct SandboxEditorVisualizationPropertyCommand
     {
         std::uint32_t StableEntityId{0u};
+        SandboxEditorVisualizationTarget Target{
+            SandboxEditorVisualizationTarget::Entity};
         SandboxEditorVisualizationPropertyDomain Domain{
             SandboxEditorVisualizationPropertyDomain::MeshVertices};
         SandboxEditorVisualizationPropertyPreset Preset{

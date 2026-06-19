@@ -127,6 +127,22 @@ TEST(PointCloudGeometryExtraction, CloudUploadsOnceAndBindsInstanceGeometry)
     EXPECT_FALSE(view->HasSourceAsset);
     EXPECT_EQ(gpuWorld.GetInstanceGeometry(view->Instance), view->Geometry);
 
+    const auto gpuAvailability = extraction.FindGpuRenderableAvailability(stableId);
+    ASSERT_TRUE(gpuAvailability.has_value());
+    EXPECT_TRUE(gpuAvailability->HasRenderable);
+    EXPECT_FALSE(gpuAvailability->Surface.HasInstance);
+    EXPECT_FALSE(gpuAvailability->Surface.HasGeometry);
+    EXPECT_FALSE(gpuAvailability->Edges.HasInstance);
+    EXPECT_FALSE(gpuAvailability->Edges.HasGeometry);
+    EXPECT_TRUE(gpuAvailability->Points.HasInstance);
+    EXPECT_TRUE(gpuAvailability->Points.HasGeometry);
+    EXPECT_EQ(gpuAvailability->Points.Instance, view->Instance);
+    EXPECT_EQ(gpuAvailability->Points.Geometry, view->PointCloudGeometry);
+    EXPECT_EQ(gpuAvailability->NamedBufferCount, 0u);
+    EXPECT_FALSE(gpuAvailability->HasPositionsBuffer);
+    EXPECT_FALSE(gpuAvailability->HasEdgesBuffer);
+    EXPECT_FALSE(gpuAvailability->HasSizesBuffer);
+
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();
 }
@@ -567,6 +583,13 @@ TEST(PointCloudGeometryExtraction, LosingPointHintReleasesPointCloudResidency)
     EXPECT_FALSE(view->HasPointCloudResidency);
     EXPECT_FALSE(gpuWorld.GetInstanceGeometry(view->Instance).IsValid());
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
+
+    const auto gpuAvailability = extraction.FindGpuRenderableAvailability(
+        Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
+    ASSERT_TRUE(gpuAvailability.has_value());
+    EXPECT_FALSE(gpuAvailability->Surface.HasGeometry);
+    EXPECT_FALSE(gpuAvailability->Edges.HasGeometry);
+    EXPECT_FALSE(gpuAvailability->Points.HasGeometry);
 
     constexpr std::uint32_t framesInFlight = 2u;
     constexpr std::uint64_t baseFrame = 600u;

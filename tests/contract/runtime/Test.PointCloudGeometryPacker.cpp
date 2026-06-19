@@ -117,10 +117,7 @@ TEST(PointCloudGeometryPacker, DoesNotEncodeNormalsIntoUv)
 
 TEST(PointCloudGeometryPacker, WrongDomainFailsClosed)
 {
-    CloudScratch c{};
-    SetPositions(c.VertexSource, {{0.0f, 0.0f, 0.0f}});
-    ConstSourceView view = c.View();
-    view.ActiveDomain = Domain::Mesh;
+    ConstSourceView view{};
 
     PointCloudPackBuffer buffer{};
     const PointCloudPackResult result = PackCloud(view, buffer);

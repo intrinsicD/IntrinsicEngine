@@ -13,6 +13,7 @@ module;
 module Extrinsic.Runtime.ProgressiveRenderData;
 
 import Extrinsic.ECS.Components.GeometrySources;
+import Extrinsic.Runtime.GeometryAvailability;
 import Geometry.Properties;
 
 namespace Extrinsic::Runtime
@@ -320,22 +321,23 @@ namespace Extrinsic::Runtime
         const GS::ConstSourceView& view,
         const ProgressiveGeometryDomain domain) noexcept
     {
+        const GeometryEntityAvailability availability = BuildGeometryAvailability(view);
         switch (domain)
         {
         case ProgressiveGeometryDomain::MeshVertex:
-            return view.ActiveDomain == GS::Domain::Mesh && view.VertexSource ? &view.VertexSource->Properties : nullptr;
+            return ResolveGeometryPropertySet(availability, GeometryElementDomain::MeshVertex);
         case ProgressiveGeometryDomain::MeshEdge:
-            return view.ActiveDomain == GS::Domain::Mesh && view.EdgeSource ? &view.EdgeSource->Properties : nullptr;
+            return ResolveGeometryPropertySet(availability, GeometryElementDomain::MeshEdge);
         case ProgressiveGeometryDomain::MeshHalfedge:
-            return view.ActiveDomain == GS::Domain::Mesh && view.HalfedgeSource ? &view.HalfedgeSource->Properties : nullptr;
+            return ResolveGeometryPropertySet(availability, GeometryElementDomain::MeshHalfedge);
         case ProgressiveGeometryDomain::MeshFace:
-            return view.ActiveDomain == GS::Domain::Mesh && view.FaceSource ? &view.FaceSource->Properties : nullptr;
+            return ResolveGeometryPropertySet(availability, GeometryElementDomain::MeshFace);
         case ProgressiveGeometryDomain::GraphVertex:
-            return view.ActiveDomain == GS::Domain::Graph && view.NodeSource ? &view.NodeSource->Properties : nullptr;
+            return ResolveGeometryPropertySet(availability, GeometryElementDomain::GraphNode);
         case ProgressiveGeometryDomain::GraphEdge:
-            return view.ActiveDomain == GS::Domain::Graph && view.EdgeSource ? &view.EdgeSource->Properties : nullptr;
+            return ResolveGeometryPropertySet(availability, GeometryElementDomain::GraphEdge);
         case ProgressiveGeometryDomain::Point:
-            return view.ActiveDomain == GS::Domain::PointCloud && view.VertexSource ? &view.VertexSource->Properties : nullptr;
+            return ResolveGeometryPropertySet(availability, GeometryElementDomain::PointCloudPoint);
         case ProgressiveGeometryDomain::MeshSurface:
         case ProgressiveGeometryDomain::Unknown:
             return nullptr;

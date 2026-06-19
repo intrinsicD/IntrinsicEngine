@@ -76,7 +76,7 @@ export namespace Extrinsic::Runtime
     enum class MeshPrimitiveViewStatus : std::uint8_t
     {
         Success,
-        WrongDomain,         // `ConstSourceView::ActiveDomain != Domain::Mesh`.
+        WrongDomain,         // Source provenance is not `Domain::Mesh`.
         MissingPositions,    // `Vertices` PropertySet absent, or `v:position` absent / wrong-typed.
         EmptyMesh,           // No vertex positions.
         MissingEdgeTopology, // Edge view requested but `Edges` / `e:v0` / `e:v1` absent / wrong-typed.

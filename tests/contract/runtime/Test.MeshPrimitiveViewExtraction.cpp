@@ -15,9 +15,11 @@ import Extrinsic.ECS.Component.Transform.WorldMatrix;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.RenderGeometry;
+import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.StableEntityLookup;
@@ -168,6 +170,22 @@ namespace
         {
             AttachTriangleMeshWithoutEdges(scene, entity);
         }
+        return entity;
+    }
+
+    EntityHandle MakeMeshVertexOnlyRenderable(Registry& scene)
+    {
+        namespace E = Extrinsic::ECS::Components;
+        const EntityHandle entity = scene.Create();
+        auto& raw = scene.Raw();
+        raw.emplace<E::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
+        raw.emplace<gs::HasMeshTopology>(entity);
+        auto& vertices = raw.emplace<gs::Vertices>(entity);
+        SetPositions(vertices, {
+            {0.0f, 0.0f, 0.0f},
+            {1.0f, 0.0f, 0.0f},
+            {0.0f, 1.0f, 0.0f},
+        });
         return entity;
     }
 
@@ -357,6 +375,53 @@ TEST(MeshPrimitiveViewExtraction, EnableVertexViewUploadsSeparatePointRenderable
     engine.Shutdown();
 }
 
+TEST(MeshPrimitiveViewExtraction, MeshVertexPointLaneDoesNotRequireSurfaceTopology)
+{
+    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.Initialize();
+
+    auto& scene = engine.GetScene();
+    const EntityHandle entity = MakeMeshVertexOnlyRenderable(scene);
+    const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    EnableVertexView(scene, entity);
+
+    const auto stats = extraction.ExtractAndSubmit(scene,
+                                                   engine.GetRenderer(),
+                                                   &engine.GetGpuAssetCache());
+
+    EXPECT_EQ(stats.MeshGeometryUploads, 0u);
+    EXPECT_EQ(stats.MeshVertexViewUploads, 1u);
+    EXPECT_EQ(stats.MeshVertexViewFailedPack, 0u);
+    EXPECT_EQ(stats.MeshVertexViewMissingPositions, 0u);
+    EXPECT_EQ(stats.MeshEdgeViewUploads, 0u);
+
+    auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
+    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
+
+    const auto view = extraction.FindRenderableSidecarForTest(stableId);
+    ASSERT_TRUE(view.has_value());
+    EXPECT_FALSE(view->HasMeshResidency);
+    EXPECT_FALSE(view->HasMeshEdgeView);
+    ASSERT_TRUE(view->HasMeshVertexView);
+    EXPECT_TRUE(view->MeshVertexViewInstance.IsValid());
+    EXPECT_TRUE(view->MeshVertexViewGeometry.IsValid());
+    EXPECT_EQ(gpuWorld.GetInstanceGeometry(view->MeshVertexViewInstance),
+              view->MeshVertexViewGeometry);
+
+    const auto gpuAvailability = extraction.FindGpuRenderableAvailability(stableId);
+    ASSERT_TRUE(gpuAvailability.has_value());
+    EXPECT_FALSE(gpuAvailability->Surface.HasGeometry);
+    EXPECT_FALSE(gpuAvailability->Edges.HasGeometry);
+    EXPECT_TRUE(gpuAvailability->Points.HasInstance);
+    EXPECT_TRUE(gpuAvailability->Points.HasGeometry);
+    EXPECT_EQ(gpuAvailability->Points.Geometry, view->MeshVertexViewGeometry);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
 TEST(MeshPrimitiveViewExtraction, VertexViewConfigUpdateReusesGeometry)
 {
     Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
@@ -451,6 +516,25 @@ TEST(MeshPrimitiveViewExtraction, EnableBothViewsAllocatesThreeIndependentRender
     EXPECT_NE(view->MeshEdgeViewGeometry, view->MeshVertexViewGeometry);
     EXPECT_NE(view->MeshEdgeViewInstance, view->MeshVertexViewInstance);
 
+    const auto gpuAvailability = extraction.FindGpuRenderableAvailability(stableId);
+    ASSERT_TRUE(gpuAvailability.has_value());
+    EXPECT_TRUE(gpuAvailability->HasRenderable);
+    EXPECT_EQ(gpuAvailability->Surface.Lane, Extrinsic::Runtime::GeometryRenderLane::Surface);
+    EXPECT_EQ(gpuAvailability->Edges.Lane, Extrinsic::Runtime::GeometryRenderLane::Edges);
+    EXPECT_EQ(gpuAvailability->Points.Lane, Extrinsic::Runtime::GeometryRenderLane::Points);
+    EXPECT_TRUE(gpuAvailability->Surface.HasInstance);
+    EXPECT_TRUE(gpuAvailability->Surface.HasGeometry);
+    EXPECT_TRUE(gpuAvailability->Edges.HasInstance);
+    EXPECT_TRUE(gpuAvailability->Edges.HasGeometry);
+    EXPECT_TRUE(gpuAvailability->Points.HasInstance);
+    EXPECT_TRUE(gpuAvailability->Points.HasGeometry);
+    EXPECT_EQ(gpuAvailability->Surface.Instance, view->Instance);
+    EXPECT_EQ(gpuAvailability->Surface.Geometry, view->MeshGeometry);
+    EXPECT_EQ(gpuAvailability->Edges.Instance, view->MeshEdgeViewInstance);
+    EXPECT_EQ(gpuAvailability->Edges.Geometry, view->MeshEdgeViewGeometry);
+    EXPECT_EQ(gpuAvailability->Points.Instance, view->MeshVertexViewInstance);
+    EXPECT_EQ(gpuAvailability->Points.Geometry, view->MeshVertexViewGeometry);
+
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();
 }
@@ -498,6 +582,64 @@ TEST(MeshPrimitiveViewExtraction, EdgeAndPointComponentsDoNotRequireRenderSurfac
         gpuWorld.GetEntityConfigForTest(view->MeshVertexViewInstance);
     EXPECT_EQ(config.Point.PointMode, 0u);
     EXPECT_FLOAT_EQ(config.Point.PointSize, 8.0f);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
+TEST(MeshPrimitiveViewExtraction, LaneOverridesColorEdgeAndVertexViewsIndependently)
+{
+    namespace G = Extrinsic::Graphics::Components;
+
+    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.Initialize();
+
+    auto& scene = engine.GetScene();
+    const EntityHandle entity = MakeMeshRenderable(scene);
+    EnableEdgeView(scene, entity, 3.0f);
+    EnableVertexView(
+        scene,
+        entity,
+        G::RenderPoints::RenderType::Flat,
+        9.0f);
+
+    auto& raw = scene.Raw();
+    G::VisualizationConfig base{};
+    base.Source = G::VisualizationConfig::ColorSource::UniformColor;
+    base.Color = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f};
+    raw.emplace<G::VisualizationConfig>(entity, base);
+
+    G::VisualizationLaneOverrides overrides{};
+    overrides.Edges = base;
+    overrides.Edges->Color = glm::vec4{0.0f, 0.0f, 1.0f, 1.0f};
+    overrides.Points = base;
+    overrides.Points->Color = glm::vec4{0.0f, 0.75f, 0.25f, 1.0f};
+    raw.emplace<G::VisualizationLaneOverrides>(entity, overrides);
+
+    const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    const auto stats = extraction.ExtractAndSubmit(scene,
+                                                   engine.GetRenderer(),
+                                                   &engine.GetGpuAssetCache());
+    EXPECT_EQ(stats.MeshEdgeViewUploads, 1u);
+    EXPECT_EQ(stats.MeshVertexViewUploads, 1u);
+
+    auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
+    const auto view = extraction.FindRenderableSidecarForTest(stableId);
+    ASSERT_TRUE(view.has_value());
+    ASSERT_TRUE(view->HasMeshEdgeView);
+    ASSERT_TRUE(view->HasMeshVertexView);
+
+    const auto edgeConfig =
+        gpuWorld.GetEntityConfigForTest(view->MeshEdgeViewInstance);
+    EXPECT_EQ(edgeConfig.UniformColor, glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
+    EXPECT_FLOAT_EQ(edgeConfig.Line.LineWidth, 3.0f);
+
+    const auto pointConfig =
+        gpuWorld.GetEntityConfigForTest(view->MeshVertexViewInstance);
+    EXPECT_EQ(pointConfig.UniformColor, glm::vec4(0.0f, 0.75f, 0.25f, 1.0f));
+    EXPECT_EQ(pointConfig.Point.PointMode, 0u);
+    EXPECT_FLOAT_EQ(pointConfig.Point.PointSize, 9.0f);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();

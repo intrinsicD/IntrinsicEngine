@@ -220,6 +220,11 @@ namespace
         visualization.Scalar.Isolines.Width = 2.25f;
         visualization.ScalarDomain = G::VisualizationConfig::Domain::Face;
         visualization.ColorBufferName = "v:kmeans_color";
+        G::VisualizationLaneOverrides overrides{};
+        overrides.Points = visualization;
+        overrides.Points->Source = G::VisualizationConfig::ColorSource::UniformColor;
+        overrides.Points->Color = glm::vec4{0.0f, 0.75f, 0.25f, 1.0f};
+        raw.emplace<G::VisualizationLaneOverrides>(entity, std::move(overrides));
         raw.emplace<G::VisualizationConfig>(entity, std::move(visualization));
         return entity;
     }
@@ -379,6 +384,15 @@ TEST(RuntimeSceneSerialization, SaveLoadRoundTripPreservesPromotedSandboxSceneDa
     EXPECT_FLOAT_EQ(visualization.Scalar.Isolines.Width, 2.25f);
     EXPECT_EQ(visualization.ScalarDomain, G::VisualizationConfig::Domain::Face);
     EXPECT_EQ(visualization.ColorBufferName, "v:kmeans_color");
+    ASSERT_TRUE(raw.all_of<G::VisualizationLaneOverrides>(loadedMesh));
+    const auto& overrides = raw.get<G::VisualizationLaneOverrides>(loadedMesh);
+    ASSERT_TRUE(overrides.Points.has_value());
+    EXPECT_EQ(overrides.Points->Source,
+              G::VisualizationConfig::ColorSource::UniformColor);
+    EXPECT_EQ(overrides.Points->Color,
+              glm::vec4(0.0f, 0.75f, 0.25f, 1.0f));
+    EXPECT_FALSE(overrides.Surface.has_value());
+    EXPECT_FALSE(overrides.Edges.has_value());
 
     const GS::ConstSourceView graphView = GS::BuildConstView(raw, loadedGraph);
     ASSERT_EQ(graphView.ActiveDomain, GS::Domain::Graph);

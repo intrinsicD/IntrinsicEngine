@@ -24,6 +24,9 @@ namespace Extrinsic::Runtime
 {
     using ECS::Components::GeometrySources::ConstSourceView;
     using ECS::Components::GeometrySources::Domain;
+    using ECS::Components::GeometrySources::BuildSourceAvailability;
+    using ECS::Components::GeometrySources::SourceAvailability;
+    using ECS::Components::GeometrySources::SourceCapability;
     using Extrinsic::Graphics::SelectionPrimitiveDomain;
     namespace pn = ECS::Components::GeometrySources::PropertyNames;
 
@@ -653,11 +656,28 @@ namespace Extrinsic::Runtime
             return Reject(view, request, PrimitiveRefineStatus::StaleEntity);
         }
 
-        switch (view.ActiveDomain)
+        const SourceAvailability availability = BuildSourceAvailability(view);
+        switch (availability.ProvenanceDomain)
         {
-            case Domain::Mesh:       return RefineMesh(view, request);
-            case Domain::Graph:      return RefineGraph(view, request);
-            case Domain::PointCloud: return RefinePointCloud(view, request);
+            case Domain::Mesh:
+                if (availability.Has(SourceCapability::VertexPoints) &&
+                    availability.Has(SourceCapability::Halfedges) &&
+                    availability.Has(SourceCapability::Faces))
+                {
+                    return RefineMesh(view, request);
+                }
+                return Reject(view, request, PrimitiveRefineStatus::UnsupportedDomain);
+            case Domain::Graph:
+                if (availability.Has(SourceCapability::NodePoints) &&
+                    availability.Has(SourceCapability::Edges))
+                {
+                    return RefineGraph(view, request);
+                }
+                return Reject(view, request, PrimitiveRefineStatus::UnsupportedDomain);
+            case Domain::PointCloud:
+                if (availability.Has(SourceCapability::VertexPoints))
+                    return RefinePointCloud(view, request);
+                return Reject(view, request, PrimitiveRefineStatus::UnsupportedDomain);
             case Domain::None:
             case Domain::Unknown:
             default:

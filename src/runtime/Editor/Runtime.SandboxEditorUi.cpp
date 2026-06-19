@@ -46,6 +46,7 @@ import Extrinsic.Runtime.CameraControllers;
 import Extrinsic.Runtime.DerivedJobGraph;
 import Extrinsic.Runtime.EditorCommandHistory;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.GeometryAvailability;
 import Extrinsic.Runtime.ImGuiAdapter;
 import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
@@ -516,6 +517,195 @@ namespace Extrinsic::Runtime
             return config;
         }
 
+        [[nodiscard]] const std::optional<G::VisualizationConfig>*
+        LaneOverrideForTarget(const G::VisualizationLaneOverrides& overrides,
+                              const SandboxEditorVisualizationTarget target) noexcept
+        {
+            switch (target)
+            {
+            case SandboxEditorVisualizationTarget::Surface:
+                return &overrides.Surface;
+            case SandboxEditorVisualizationTarget::Edges:
+                return &overrides.Edges;
+            case SandboxEditorVisualizationTarget::Points:
+                return &overrides.Points;
+            case SandboxEditorVisualizationTarget::Entity:
+                break;
+            }
+            return nullptr;
+        }
+
+        [[nodiscard]] std::optional<G::VisualizationConfig>*
+        MutableLaneOverrideForTarget(G::VisualizationLaneOverrides& overrides,
+                                     const SandboxEditorVisualizationTarget target) noexcept
+        {
+            switch (target)
+            {
+            case SandboxEditorVisualizationTarget::Surface:
+                return &overrides.Surface;
+            case SandboxEditorVisualizationTarget::Edges:
+                return &overrides.Edges;
+            case SandboxEditorVisualizationTarget::Points:
+                return &overrides.Points;
+            case SandboxEditorVisualizationTarget::Entity:
+                break;
+            }
+            return nullptr;
+        }
+
+        [[nodiscard]] std::optional<G::VisualizationConfig>
+        StoredVisualizationConfigForTarget(
+            const entt::registry& raw,
+            const ECS::EntityHandle entity,
+            const SandboxEditorVisualizationTarget target)
+        {
+            if (target == SandboxEditorVisualizationTarget::Entity)
+            {
+                if (const auto* config = raw.try_get<G::VisualizationConfig>(entity))
+                    return *config;
+                return std::nullopt;
+            }
+
+            const auto* overrides =
+                raw.try_get<G::VisualizationLaneOverrides>(entity);
+            if (overrides == nullptr)
+                return std::nullopt;
+
+            const std::optional<G::VisualizationConfig>* lane =
+                LaneOverrideForTarget(*overrides, target);
+            return lane != nullptr ? *lane : std::nullopt;
+        }
+
+        [[nodiscard]] std::optional<G::VisualizationConfig>
+        EffectiveVisualizationConfigForTarget(
+            const entt::registry& raw,
+            const ECS::EntityHandle entity,
+            const SandboxEditorVisualizationTarget target)
+        {
+            if (std::optional<G::VisualizationConfig> stored =
+                    StoredVisualizationConfigForTarget(raw, entity, target);
+                stored.has_value())
+            {
+                return stored;
+            }
+            if (target == SandboxEditorVisualizationTarget::Entity)
+                return std::nullopt;
+            return StoredVisualizationConfigForTarget(
+                raw,
+                entity,
+                SandboxEditorVisualizationTarget::Entity);
+        }
+
+        [[nodiscard]] SandboxEditorVisualizationConfigModel
+        BuildVisualizationConfigModelForTarget(
+            const entt::registry& raw,
+            const ECS::EntityHandle entity,
+            const SandboxEditorVisualizationTarget target)
+        {
+            const std::optional<G::VisualizationConfig> config =
+                EffectiveVisualizationConfigForTarget(raw, entity, target);
+            return config.has_value()
+                ? FromVisualizationConfig(*config)
+                : SandboxEditorVisualizationConfigModel{};
+        }
+
+        [[nodiscard]] EditorCommandHistoryStatus ApplyVisualizationConfigTarget(
+            ECS::Scene::Registry* scene,
+            const std::uint32_t stableEntityId,
+            const SandboxEditorVisualizationTarget target,
+            const std::optional<G::VisualizationConfig>& config)
+        {
+            if (scene == nullptr)
+                return EditorCommandHistoryStatus::MissingScene;
+
+            entt::registry& raw = scene->Raw();
+            const ECS::EntityHandle entity =
+                SelectionController::ToEntityHandle(stableEntityId);
+            if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
+                return EditorCommandHistoryStatus::StaleEntity;
+
+            if (target == SandboxEditorVisualizationTarget::Entity)
+            {
+                if (config.has_value())
+                    raw.emplace_or_replace<G::VisualizationConfig>(entity, *config);
+                else
+                    raw.remove<G::VisualizationConfig>(entity);
+                return EditorCommandHistoryStatus::Applied;
+            }
+
+            if (!config.has_value() &&
+                !raw.all_of<G::VisualizationLaneOverrides>(entity))
+            {
+                return EditorCommandHistoryStatus::Applied;
+            }
+
+            auto& overrides =
+                raw.get_or_emplace<G::VisualizationLaneOverrides>(entity);
+            std::optional<G::VisualizationConfig>* lane =
+                MutableLaneOverrideForTarget(overrides, target);
+            if (lane == nullptr)
+                return EditorCommandHistoryStatus::UnsupportedOperation;
+
+            *lane = config;
+            if (overrides.Empty())
+                raw.remove<G::VisualizationLaneOverrides>(entity);
+            return EditorCommandHistoryStatus::Applied;
+        }
+
+        [[nodiscard]] EditorCommandRecord MakeVisualizationConfigTargetCommand(
+            ECS::Scene::Registry* scene,
+            const std::uint32_t stableEntityId,
+            const SandboxEditorVisualizationTarget target,
+            std::optional<G::VisualizationConfig> before,
+            std::optional<G::VisualizationConfig> after,
+            std::string label)
+        {
+            return EditorCommandRecord{
+                .Label = std::move(label),
+                .Redo = [scene, stableEntityId, target, after]()
+                {
+                    return ApplyVisualizationConfigTarget(
+                        scene,
+                        stableEntityId,
+                        target,
+                        after);
+                },
+                .Undo = [scene, stableEntityId, target, before]()
+                {
+                    return ApplyVisualizationConfigTarget(
+                        scene,
+                        stableEntityId,
+                        target,
+                        before);
+                },
+                .Dirtying = true,
+            };
+        }
+
+        [[nodiscard]] SandboxEditorVisualizationConfigCommand
+        MakeUniformVisualizationConfigCommandFromModel(
+            const std::uint32_t stableEntityId,
+            const SandboxEditorVisualizationConfigModel& model,
+            const SandboxEditorVisualizationTarget target,
+            const glm::vec4 color)
+        {
+            return SandboxEditorVisualizationConfigCommand{
+                .StableEntityId = stableEntityId,
+                .Target = target,
+                .EnableConfig = true,
+                .Source = G::VisualizationConfig::ColorSource::UniformColor,
+                .Color = color,
+                .ScalarFieldName = model.ScalarFieldName,
+                .ScalarDomain = model.ScalarDomain,
+                .ColorBufferName = model.ColorBufferName,
+                .ScalarAutoRange = model.ScalarAutoRange,
+                .ScalarRangeMin = model.ScalarRangeMin,
+                .ScalarRangeMax = model.ScalarRangeMax,
+                .ScalarBinCount = model.ScalarBinCount,
+                .IsolineCount = model.IsolineCount,
+            };
+        }
+
         [[nodiscard]] bool SameVisualizationConfig(
             const G::VisualizationConfig& lhs,
             const G::VisualizationConfig& rhs) noexcept
@@ -651,45 +841,124 @@ namespace Extrinsic::Runtime
             return G::VisualizationConfig::ColorSource::PerVertexBuffer;
         }
 
-        [[nodiscard]] const Geometry::PropertySet* PropertySetForVisualizationDomain(
-            const GS::ConstSourceView& view,
+        [[nodiscard]] GeometryElementDomain ToGeometryElementDomain(
             const SandboxEditorVisualizationPropertyDomain domain) noexcept
         {
             using Domain = SandboxEditorVisualizationPropertyDomain;
             switch (domain)
             {
             case Domain::MeshVertices:
-                return view.ActiveDomain == GS::Domain::Mesh &&
-                               view.VertexSource != nullptr
-                           ? &view.VertexSource->Properties
-                           : nullptr;
+                return GeometryElementDomain::MeshVertex;
             case Domain::MeshEdges:
-                return view.ActiveDomain == GS::Domain::Mesh &&
-                               view.EdgeSource != nullptr
-                           ? &view.EdgeSource->Properties
-                           : nullptr;
+                return GeometryElementDomain::MeshEdge;
             case Domain::MeshFaces:
-                return view.ActiveDomain == GS::Domain::Mesh &&
-                               view.FaceSource != nullptr
-                           ? &view.FaceSource->Properties
-                           : nullptr;
+                return GeometryElementDomain::MeshFace;
             case Domain::GraphVertices:
-                return view.ActiveDomain == GS::Domain::Graph &&
-                               view.NodeSource != nullptr
-                           ? &view.NodeSource->Properties
-                           : nullptr;
+                return GeometryElementDomain::GraphNode;
             case Domain::GraphEdges:
-                return view.ActiveDomain == GS::Domain::Graph &&
-                               view.EdgeSource != nullptr
-                           ? &view.EdgeSource->Properties
-                           : nullptr;
+                return GeometryElementDomain::GraphEdge;
             case Domain::PointCloudPoints:
-                return view.ActiveDomain == GS::Domain::PointCloud &&
-                               view.VertexSource != nullptr
-                           ? &view.VertexSource->Properties
-                           : nullptr;
+                return GeometryElementDomain::PointCloudPoint;
             }
-            return nullptr;
+            return GeometryElementDomain::Unknown;
+        }
+
+        [[nodiscard]] const Geometry::PropertySet* PropertySetForVisualizationDomain(
+            const GeometryEntityAvailability& availability,
+            const SandboxEditorVisualizationPropertyDomain domain) noexcept
+        {
+            return ResolveGeometryPropertySet(
+                availability,
+                ToGeometryElementDomain(domain));
+        }
+
+        void AppendVisualizationPropertiesForDomain(
+            std::vector<SandboxEditorVisualizationPropertyInfo>& out,
+            const Geometry::PropertySet& properties,
+            SandboxEditorVisualizationPropertyDomain domain);
+
+        [[nodiscard]] SandboxEditorVisualizationTarget
+        VisualizationTargetForWindowKind(
+            const SandboxEditorDomainWindowKind kind) noexcept
+        {
+            switch (kind)
+            {
+            case SandboxEditorDomainWindowKind::Mesh:
+                return SandboxEditorVisualizationTarget::Surface;
+            case SandboxEditorDomainWindowKind::Graph:
+                return SandboxEditorVisualizationTarget::Edges;
+            case SandboxEditorDomainWindowKind::PointCloud:
+                return SandboxEditorVisualizationTarget::Points;
+            }
+            return SandboxEditorVisualizationTarget::Entity;
+        }
+
+        [[nodiscard]] bool VisualizationTargetAvailableForView(
+            const GeometryEntityAvailability& availability,
+            const SandboxEditorVisualizationTarget target) noexcept
+        {
+            switch (target)
+            {
+            case SandboxEditorVisualizationTarget::Entity:
+                return availability.HasGeometry();
+            case SandboxEditorVisualizationTarget::Surface:
+                return ResolveRenderLaneAvailability(
+                    availability,
+                    GeometryRenderLane::Surface).Ready();
+            case SandboxEditorVisualizationTarget::Edges:
+                return ResolveRenderLaneAvailability(
+                    availability,
+                    GeometryRenderLane::Edges).Ready();
+            case SandboxEditorVisualizationTarget::Points:
+                return ResolveRenderLaneAvailability(
+                    availability,
+                    GeometryRenderLane::Points).Ready();
+            }
+            return false;
+        }
+
+        void AppendVisualizationPropertiesForTarget(
+            std::vector<SandboxEditorVisualizationPropertyInfo>& out,
+            const GeometryEntityAvailability& availability,
+            const SandboxEditorVisualizationTarget target)
+        {
+            const auto append =
+                [&](const SandboxEditorVisualizationPropertyDomain domain)
+                {
+                    if (const Geometry::PropertySet* properties =
+                            PropertySetForVisualizationDomain(availability, domain))
+                    {
+                        AppendVisualizationPropertiesForDomain(
+                            out,
+                            *properties,
+                            domain);
+                    }
+                };
+
+            switch (target)
+            {
+            case SandboxEditorVisualizationTarget::Entity:
+                append(SandboxEditorVisualizationPropertyDomain::MeshVertices);
+                append(SandboxEditorVisualizationPropertyDomain::MeshEdges);
+                append(SandboxEditorVisualizationPropertyDomain::MeshFaces);
+                append(SandboxEditorVisualizationPropertyDomain::GraphVertices);
+                append(SandboxEditorVisualizationPropertyDomain::GraphEdges);
+                append(SandboxEditorVisualizationPropertyDomain::PointCloudPoints);
+                break;
+            case SandboxEditorVisualizationTarget::Surface:
+                append(SandboxEditorVisualizationPropertyDomain::MeshVertices);
+                append(SandboxEditorVisualizationPropertyDomain::MeshFaces);
+                break;
+            case SandboxEditorVisualizationTarget::Edges:
+                append(SandboxEditorVisualizationPropertyDomain::MeshEdges);
+                append(SandboxEditorVisualizationPropertyDomain::GraphEdges);
+                break;
+            case SandboxEditorVisualizationTarget::Points:
+                append(SandboxEditorVisualizationPropertyDomain::MeshVertices);
+                append(SandboxEditorVisualizationPropertyDomain::GraphVertices);
+                append(SandboxEditorVisualizationPropertyDomain::PointCloudPoints);
+                break;
+            }
         }
 
         void AppendVisualizationPropertiesForDomain(
@@ -740,40 +1009,13 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] std::vector<SandboxEditorVisualizationPropertyInfo>
-        BuildVisualizationProperties(const GS::ConstSourceView& view)
+        BuildVisualizationProperties(const GeometryEntityAvailability& availability)
         {
             std::vector<SandboxEditorVisualizationPropertyInfo> out{};
-            const auto append =
-                [&](const SandboxEditorVisualizationPropertyDomain domain)
-                {
-                    if (const Geometry::PropertySet* properties =
-                            PropertySetForVisualizationDomain(view, domain))
-                    {
-                        AppendVisualizationPropertiesForDomain(
-                            out,
-                            *properties,
-                            domain);
-                    }
-                };
-
-            switch (view.ActiveDomain)
-            {
-            case GS::Domain::Mesh:
-                append(SandboxEditorVisualizationPropertyDomain::MeshVertices);
-                append(SandboxEditorVisualizationPropertyDomain::MeshEdges);
-                append(SandboxEditorVisualizationPropertyDomain::MeshFaces);
-                break;
-            case GS::Domain::Graph:
-                append(SandboxEditorVisualizationPropertyDomain::GraphVertices);
-                append(SandboxEditorVisualizationPropertyDomain::GraphEdges);
-                break;
-            case GS::Domain::PointCloud:
-                append(SandboxEditorVisualizationPropertyDomain::PointCloudPoints);
-                break;
-            case GS::Domain::None:
-            case GS::Domain::Unknown:
-                break;
-            }
+            AppendVisualizationPropertiesForTarget(
+                out,
+                availability,
+                SandboxEditorVisualizationTarget::Entity);
             return out;
         }
 
@@ -790,47 +1032,40 @@ namespace Extrinsic::Runtime
             std::string message);
 
         [[nodiscard]] const Geometry::PropertySet* PropertySetForCatalogDomain(
-            const GS::ConstSourceView& view,
+            const GeometryEntityAvailability& availability,
             const SandboxEditorPropertyCatalogDomain domain) noexcept
         {
             using Domain = SandboxEditorPropertyCatalogDomain;
             switch (domain)
             {
             case Domain::MeshVertices:
-                return view.ActiveDomain == GS::Domain::Mesh &&
-                               view.VertexSource != nullptr
-                           ? &view.VertexSource->Properties
-                           : nullptr;
+                return ResolveGeometryPropertySet(
+                    availability,
+                    GeometryElementDomain::MeshVertex);
             case Domain::MeshEdges:
-                return view.ActiveDomain == GS::Domain::Mesh &&
-                               view.EdgeSource != nullptr
-                           ? &view.EdgeSource->Properties
-                           : nullptr;
+                return ResolveGeometryPropertySet(
+                    availability,
+                    GeometryElementDomain::MeshEdge);
             case Domain::MeshHalfedges:
-                return view.ActiveDomain == GS::Domain::Mesh &&
-                               view.HalfedgeSource != nullptr
-                           ? &view.HalfedgeSource->Properties
-                           : nullptr;
+                return ResolveGeometryPropertySet(
+                    availability,
+                    GeometryElementDomain::MeshHalfedge);
             case Domain::MeshFaces:
-                return view.ActiveDomain == GS::Domain::Mesh &&
-                               view.FaceSource != nullptr
-                           ? &view.FaceSource->Properties
-                           : nullptr;
+                return ResolveGeometryPropertySet(
+                    availability,
+                    GeometryElementDomain::MeshFace);
             case Domain::GraphVertices:
-                return view.ActiveDomain == GS::Domain::Graph &&
-                               view.NodeSource != nullptr
-                           ? &view.NodeSource->Properties
-                           : nullptr;
+                return ResolveGeometryPropertySet(
+                    availability,
+                    GeometryElementDomain::GraphNode);
             case Domain::GraphEdges:
-                return view.ActiveDomain == GS::Domain::Graph &&
-                               view.EdgeSource != nullptr
-                           ? &view.EdgeSource->Properties
-                           : nullptr;
+                return ResolveGeometryPropertySet(
+                    availability,
+                    GeometryElementDomain::GraphEdge);
             case Domain::PointCloudPoints:
-                return view.ActiveDomain == GS::Domain::PointCloud &&
-                               view.VertexSource != nullptr
-                           ? &view.VertexSource->Properties
-                           : nullptr;
+                return ResolveGeometryPropertySet(
+                    availability,
+                    GeometryElementDomain::PointCloudPoint);
             }
             return nullptr;
         }
@@ -1112,11 +1347,13 @@ namespace Extrinsic::Runtime
             const PrimitiveSelectionResult* primitive,
             const std::uint32_t selectedStableId)
         {
+            const GeometryEntityAvailability availability =
+                BuildGeometryAvailability(view);
             const auto append =
                 [&](const SandboxEditorPropertyCatalogDomain domain)
                 {
                     const Geometry::PropertySet* properties =
-                        PropertySetForCatalogDomain(view, domain);
+                        PropertySetForCatalogDomain(availability, domain);
                     if (properties == nullptr)
                         return;
                     AppendPropertyCatalogRowsForDomain(
@@ -1129,25 +1366,13 @@ namespace Extrinsic::Runtime
                             selectedStableId));
                 };
 
-            switch (view.ActiveDomain)
-            {
-            case GS::Domain::Mesh:
-                append(SandboxEditorPropertyCatalogDomain::MeshVertices);
-                append(SandboxEditorPropertyCatalogDomain::MeshEdges);
-                append(SandboxEditorPropertyCatalogDomain::MeshHalfedges);
-                append(SandboxEditorPropertyCatalogDomain::MeshFaces);
-                break;
-            case GS::Domain::Graph:
-                append(SandboxEditorPropertyCatalogDomain::GraphVertices);
-                append(SandboxEditorPropertyCatalogDomain::GraphEdges);
-                break;
-            case GS::Domain::PointCloud:
-                append(SandboxEditorPropertyCatalogDomain::PointCloudPoints);
-                break;
-            case GS::Domain::None:
-            case GS::Domain::Unknown:
-                break;
-            }
+            append(SandboxEditorPropertyCatalogDomain::MeshVertices);
+            append(SandboxEditorPropertyCatalogDomain::MeshEdges);
+            append(SandboxEditorPropertyCatalogDomain::MeshHalfedges);
+            append(SandboxEditorPropertyCatalogDomain::MeshFaces);
+            append(SandboxEditorPropertyCatalogDomain::GraphVertices);
+            append(SandboxEditorPropertyCatalogDomain::GraphEdges);
+            append(SandboxEditorPropertyCatalogDomain::PointCloudPoints);
         }
 
         [[nodiscard]] SandboxEditorPropertyBindingTargetModel
@@ -1158,8 +1383,10 @@ namespace Extrinsic::Runtime
             ProgressiveGeometryDomain domain = slot.Property.Domain;
             if (domain == ProgressiveGeometryDomain::Unknown)
             {
+                const GS::SourceAvailability availability =
+                    GS::BuildSourceAvailability(view);
                 domain = DefaultDomainForProgressiveSlot(
-                    view.ActiveDomain,
+                    availability.ProvenanceDomain,
                     slot.Lane,
                     slot.Semantic);
             }
@@ -1417,7 +1644,7 @@ namespace Extrinsic::Runtime
 
         [[nodiscard]] bool RenderHintCommandMatchesDomain(
             const SandboxEditorRenderHintCommand& command,
-            const GS::Domain domain) noexcept
+            const GeometryEntityAvailability& availability) noexcept
         {
             const bool editsSurface = command.SetSurface;
             const bool editsEdges =
@@ -1427,19 +1654,39 @@ namespace Extrinsic::Runtime
                 command.SetPointRenderType ||
                 command.SetUniformPointSize;
 
-            switch (domain)
-            {
-            case GS::Domain::Mesh:
-                return editsSurface || editsEdges || editsPoints;
-            case GS::Domain::Graph:
-                return !editsSurface && (editsEdges || editsPoints);
-            case GS::Domain::PointCloud:
-                return !editsSurface && !editsEdges && editsPoints;
-            case GS::Domain::None:
-            case GS::Domain::Unknown:
+            if (!editsSurface && !editsEdges && !editsPoints)
                 return false;
+
+            if (editsSurface &&
+                availability.Sources.ProvenanceDomain != GS::Domain::Mesh)
+                return false;
+
+            if (editsSurface &&
+                (!availability.Sources.Has(GS::SourceCapability::VertexPoints) ||
+                 !availability.Sources.Has(GS::SourceCapability::Halfedges) ||
+                 !availability.Sources.Has(GS::SourceCapability::Faces)))
+                return false;
+
+            if (editsEdges)
+            {
+                if (availability.Sources.ProvenanceDomain == GS::Domain::PointCloud ||
+                    !availability.Sources.HasPointSource())
+                    return false;
+
+                const bool hasExplicitEdges =
+                    availability.Sources.Has(GS::SourceCapability::Edges);
+                const bool hasMeshWireTopology =
+                    availability.Sources.ProvenanceDomain == GS::Domain::Mesh &&
+                    availability.Sources.Has(GS::SourceCapability::Halfedges) &&
+                    availability.Sources.Has(GS::SourceCapability::Faces);
+                if (!hasExplicitEdges && !hasMeshWireTopology)
+                    return false;
             }
-            return false;
+
+            if (editsPoints && !availability.Sources.HasPointSource())
+                return false;
+
+            return true;
         }
 
         [[nodiscard]] SandboxEditorRenderHintState ApplyRenderHintCommandToState(
@@ -1921,14 +2168,6 @@ namespace Extrinsic::Runtime
             SandboxEditorGeometryProcessingDomain::MeshHalfedges |
             SandboxEditorGeometryProcessingDomain::MeshFaces;
 
-        constexpr SandboxEditorGeometryProcessingDomain kGraphTopologyDomains =
-            SandboxEditorGeometryProcessingDomain::GraphVertices |
-            SandboxEditorGeometryProcessingDomain::GraphEdges |
-            SandboxEditorGeometryProcessingDomain::GraphHalfedges;
-
-        constexpr SandboxEditorGeometryProcessingDomain kPointCloudDomains =
-            SandboxEditorGeometryProcessingDomain::PointCloudPoints;
-
         [[nodiscard]] constexpr bool IsSurfaceTopologyAlgorithm(
             const SandboxEditorGeometryProcessingAlgorithm algorithm) noexcept
         {
@@ -1960,19 +2199,53 @@ namespace Extrinsic::Runtime
         [[nodiscard]] SandboxEditorGeometryProcessingDomain
         DomainsForSourceView(const GS::ConstSourceView& view) noexcept
         {
-            switch (view.ActiveDomain)
+            const GeometryEntityAvailability availability =
+                BuildGeometryAvailability(view);
+            SandboxEditorGeometryProcessingDomain domains =
+                SandboxEditorGeometryProcessingDomain::None;
+
+            if (availability.Sources.ProvenanceDomain == GS::Domain::Mesh)
             {
-            case GS::Domain::Mesh:
-                return kMeshTopologyDomains;
-            case GS::Domain::Graph:
-                return kGraphTopologyDomains;
-            case GS::Domain::PointCloud:
-                return kPointCloudDomains;
-            case GS::Domain::None:
-            case GS::Domain::Unknown:
-                return SandboxEditorGeometryProcessingDomain::None;
+                if (SupportsGeometryElementDomain(
+                        availability,
+                        GeometryElementDomain::MeshVertex))
+                    domains |= SandboxEditorGeometryProcessingDomain::MeshVertices;
+                if (SupportsGeometryElementDomain(
+                        availability,
+                        GeometryElementDomain::MeshEdge))
+                    domains |= SandboxEditorGeometryProcessingDomain::MeshEdges;
+                if (SupportsGeometryElementDomain(
+                        availability,
+                        GeometryElementDomain::MeshHalfedge))
+                    domains |= SandboxEditorGeometryProcessingDomain::MeshHalfedges;
+                if (SupportsGeometryElementDomain(
+                        availability,
+                        GeometryElementDomain::MeshFace))
+                    domains |= SandboxEditorGeometryProcessingDomain::MeshFaces;
             }
-            return SandboxEditorGeometryProcessingDomain::None;
+            else if (availability.Sources.ProvenanceDomain == GS::Domain::Graph)
+            {
+                if (SupportsGeometryElementDomain(
+                        availability,
+                        GeometryElementDomain::GraphNode))
+                    domains |= SandboxEditorGeometryProcessingDomain::GraphVertices;
+                if (SupportsGeometryElementDomain(
+                        availability,
+                        GeometryElementDomain::GraphEdge))
+                    domains |= SandboxEditorGeometryProcessingDomain::GraphEdges;
+                if (availability.Sources.Has(
+                        GS::SourceCapability::Halfedges))
+                    domains |= SandboxEditorGeometryProcessingDomain::GraphHalfedges;
+            }
+            else if (availability.Sources.ProvenanceDomain == GS::Domain::PointCloud)
+            {
+                if (SupportsGeometryElementDomain(
+                        availability,
+                        GeometryElementDomain::PointCloudPoint))
+                    domains |= SandboxEditorGeometryProcessingDomain::PointCloudPoints;
+            }
+
+            return domains;
         }
 
         [[nodiscard]] SandboxEditorDiagnostic MakeDiagnostic(
@@ -2131,7 +2404,9 @@ namespace Extrinsic::Runtime
                 return ProgressiveEntityShape::Composition;
             }
 
-            switch (view.ActiveDomain)
+            const GS::SourceAvailability availability =
+                GS::BuildSourceAvailability(view);
+            switch (availability.ProvenanceDomain)
             {
             case GS::Domain::Mesh:
                 return ProgressiveEntityShape::MeshLeaf;
@@ -2190,8 +2465,10 @@ namespace Extrinsic::Runtime
             ProgressiveGeometryDomain domain = extractedSlot.Property.Domain;
             if (domain == ProgressiveGeometryDomain::Unknown)
             {
+                const GS::SourceAvailability availability =
+                    GS::BuildSourceAvailability(view);
                 domain = DefaultDomainForProgressiveSlot(
-                    view.ActiveDomain,
+                    availability.ProvenanceDomain,
                     extractedSlot.Lane,
                     extractedSlot.Semantic);
             }
@@ -2673,7 +2950,9 @@ namespace Extrinsic::Runtime
             const GS::ConstSourceView& view)
         {
             MeshSoupFromGeometrySourcesResult result{};
-            if (view.ActiveDomain != GS::Domain::Mesh ||
+            const GS::SourceAvailability availability =
+                GS::BuildSourceAvailability(view);
+            if (availability.ProvenanceDomain != GS::Domain::Mesh ||
                 view.VertexSource == nullptr ||
                 view.HalfedgeSource == nullptr ||
                 view.FaceSource == nullptr)
@@ -2907,7 +3186,13 @@ namespace Extrinsic::Runtime
         {
             SandboxEditorUvDiagnosticsModel model{};
             model.HasSelectedEntity = true;
-            model.IsMesh = view.ActiveDomain == GS::Domain::Mesh;
+            const GS::SourceAvailability availability =
+                GS::BuildSourceAvailability(view);
+            model.IsMesh =
+                availability.ProvenanceDomain == GS::Domain::Mesh &&
+                availability.Has(GS::SourceCapability::VertexPoints) &&
+                availability.Has(GS::SourceCapability::Halfedges) &&
+                availability.Has(GS::SourceCapability::Faces);
             if (!model.IsMesh)
             {
                 model.Provenance = "unavailable";
@@ -2971,7 +3256,13 @@ namespace Extrinsic::Runtime
             SandboxEditorTextureBakeControlsModel model{};
             model.HasSelectedEntity = true;
             model.SelectedStableId = stableEntityId;
-            model.IsMesh = view.ActiveDomain == GS::Domain::Mesh;
+            const GS::SourceAvailability availability =
+                GS::BuildSourceAvailability(view);
+            model.IsMesh =
+                availability.ProvenanceDomain == GS::Domain::Mesh &&
+                availability.Has(GS::SourceCapability::VertexPoints) &&
+                availability.Has(GS::SourceCapability::Halfedges) &&
+                availability.Has(GS::SourceCapability::Faces);
             model.HasRuntimeBakeCommand = context.AssetService != nullptr;
             model.Uv = BuildUvDiagnosticsModel(view);
 
@@ -3064,18 +3355,20 @@ namespace Extrinsic::Runtime
             const GS::MutableSourceView& view,
             const SandboxEditorGeometryProcessingDomain domain) noexcept
         {
+            const GS::SourceAvailability sources =
+                GS::BuildSourceAvailability(view);
             using Domain = SandboxEditorGeometryProcessingDomain;
             switch (domain)
             {
             case Domain::MeshVertices:
-                return view.ActiveDomain == GS::Domain::Mesh &&
-                       view.VertexSource != nullptr;
+                return sources.ProvenanceDomain == GS::Domain::Mesh &&
+                       sources.Has(GS::SourceCapability::VertexPoints);
             case Domain::GraphVertices:
-                return view.ActiveDomain == GS::Domain::Graph &&
-                       view.NodeSource != nullptr;
+                return sources.ProvenanceDomain == GS::Domain::Graph &&
+                       sources.Has(GS::SourceCapability::NodePoints);
             case Domain::PointCloudPoints:
-                return view.ActiveDomain == GS::Domain::PointCloud &&
-                       view.VertexSource != nullptr;
+                return sources.ProvenanceDomain == GS::Domain::PointCloud &&
+                       sources.Has(GS::SourceCapability::VertexPoints);
             case Domain::None:
             case Domain::MeshEdges:
             case Domain::MeshHalfedges:
@@ -3753,13 +4046,16 @@ namespace Extrinsic::Runtime
         }
 
         [[nodiscard]] SandboxEditorVisualizationModel BuildVisualizationModel(
-            const SandboxEditorContext& context)
+            const SandboxEditorContext& context,
+            const SandboxEditorVisualizationTarget target =
+                SandboxEditorVisualizationTarget::Entity)
         {
             SandboxEditorVisualizationModel model{};
             model.GeometryDomainControlsAvailable = context.VisualizationCommandsAvailable;
             model.AdapterBindingControlsAvailable =
                 context.VisualizationCommandsAvailable &&
                 context.VisualizationAdapterBindings.Available();
+            model.Target = target;
             if (!context.VisualizationCommandsAvailable)
             {
                 AddDiagnostic(model.Diagnostics,
@@ -3791,8 +4087,23 @@ namespace Extrinsic::Runtime
                 SelectionController::ToStableEntityId(*selected);
             const GS::ConstSourceView sourceView =
                 GS::BuildConstView(raw, *selected);
+            const GeometryEntityAvailability availability =
+                BuildGeometryAvailability(raw, *selected);
             model.SelectedDomain = sourceView.ActiveDomain;
-            model.Properties = BuildVisualizationProperties(sourceView);
+            model.TargetAvailable =
+                VisualizationTargetAvailableForView(availability, target);
+            model.Properties =
+                target == SandboxEditorVisualizationTarget::Entity
+                    ? BuildVisualizationProperties(availability)
+                    : [&availability, target]()
+                      {
+                          std::vector<SandboxEditorVisualizationPropertyInfo> out{};
+                          AppendVisualizationPropertiesForTarget(
+                              out,
+                              availability,
+                              target);
+                          return out;
+                      }();
 
             if (const auto* binding =
                     raw.try_get<ECSC::SpatialDebugBinding>(*selected);
@@ -3801,13 +4112,8 @@ namespace Extrinsic::Runtime
                 model.SpatialDebug = FromSpatialDebugBinding(*binding);
             }
 
-            if (const auto* visualization =
-                    raw.try_get<G::VisualizationConfig>(*selected);
-                visualization != nullptr)
-            {
-                model.Visualization =
-                    FromVisualizationConfig(*visualization);
-            }
+            model.Visualization =
+                BuildVisualizationConfigModelForTarget(raw, *selected, target);
             if (model.AdapterBindingControlsAvailable)
             {
                 const std::optional<RenderExtractionCache::VisualizationAdapterBinding>
@@ -5051,6 +5357,7 @@ namespace Extrinsic::Runtime
             const std::vector<SandboxEditorVisualizationPropertyInfo>& properties,
             const SandboxEditorContext& context,
             const std::uint32_t selectedStableId,
+            const SandboxEditorVisualizationTarget target,
             const bool canEditVisualization)
         {
             ImGui::SeparatorText("Properties");
@@ -5086,6 +5393,7 @@ namespace Extrinsic::Runtime
                             context,
                             SandboxEditorVisualizationPropertyCommand{
                                 .StableEntityId = selectedStableId,
+                                .Target = target,
                                 .Domain = property.Domain,
                                 .Preset =
                                     SandboxEditorVisualizationPropertyPreset::Scalar,
@@ -5104,6 +5412,7 @@ namespace Extrinsic::Runtime
                             context,
                             SandboxEditorVisualizationPropertyCommand{
                                 .StableEntityId = selectedStableId,
+                                .Target = target,
                                 .Domain = property.Domain,
                                 .Preset =
                                     SandboxEditorVisualizationPropertyPreset::Isoline,
@@ -5124,6 +5433,7 @@ namespace Extrinsic::Runtime
                             context,
                             SandboxEditorVisualizationPropertyCommand{
                                 .StableEntityId = selectedStableId,
+                                .Target = target,
                                 .Domain = property.Domain,
                                 .Preset =
                                     SandboxEditorVisualizationPropertyPreset::ColorBuffer,
@@ -5141,6 +5451,34 @@ namespace Extrinsic::Runtime
 
             if (!canEditVisualization)
                 ImGui::EndDisabled();
+        }
+
+        void DrawUniformVisualizationColorEdit(
+            const SandboxEditorVisualizationConfigModel& visualization,
+            const SandboxEditorContext& context,
+            const std::uint32_t selectedStableId,
+            const SandboxEditorVisualizationTarget target,
+            const bool canEditVisualization)
+        {
+            if (!visualization.HasConfig ||
+                visualization.Source != G::VisualizationConfig::ColorSource::UniformColor)
+            {
+                return;
+            }
+
+            glm::vec4 color = visualization.Color;
+            if (ImGui::ColorEdit4("Color##uniform-visualization-color",
+                                  &color.x) &&
+                canEditVisualization)
+            {
+                (void)ApplySandboxEditorVisualizationConfigCommand(
+                    context,
+                    MakeUniformVisualizationConfigCommandFromModel(
+                        selectedStableId,
+                        visualization,
+                        target,
+                        color));
+            }
         }
 
         void DrawDomainRenderWindow(const SandboxEditorDomainWindowModel& model,
@@ -5202,7 +5540,7 @@ namespace Extrinsic::Runtime
             }
 
             const bool canEditVisualization =
-                DomainWindowReady(model) &&
+                model.VisualizationTargetAvailable &&
                 model.VisualizationControlsAvailable;
             if (!canEditVisualization)
                 ImGui::BeginDisabled();
@@ -5231,11 +5569,11 @@ namespace Extrinsic::Runtime
             {
                 (void)ApplySandboxEditorVisualizationConfigCommand(
                     context,
-                    SandboxEditorVisualizationConfigCommand{
-                        .StableEntityId = model.SelectedStableId,
-                        .EnableConfig = true,
-                        .Source = G::VisualizationConfig::ColorSource::UniformColor,
-                    });
+                    MakeUniformVisualizationConfigCommandFromModel(
+                        model.SelectedStableId,
+                        visualization.Visualization,
+                        model.VisualizationTarget,
+                        visualization.Visualization.Color));
             }
             ImGui::SameLine();
             if (ImGui::Button("Clear vis") && canEditVisualization)
@@ -5244,9 +5582,17 @@ namespace Extrinsic::Runtime
                     context,
                     SandboxEditorVisualizationConfigCommand{
                         .StableEntityId = model.SelectedStableId,
+                        .Target = model.VisualizationTarget,
                         .EnableConfig = false,
                     });
             }
+
+            DrawUniformVisualizationColorEdit(
+                visualization.Visualization,
+                context,
+                model.SelectedStableId,
+                model.VisualizationTarget,
+                canEditVisualization);
 
             if (!canEditVisualization)
                 ImGui::EndDisabled();
@@ -5255,6 +5601,7 @@ namespace Extrinsic::Runtime
                 visualization.Properties,
                 context,
                 model.SelectedStableId,
+                model.VisualizationTarget,
                 canEditVisualization);
         }
 
@@ -6422,12 +6769,11 @@ namespace Extrinsic::Runtime
                         {
                             (void)ApplySandboxEditorVisualizationConfigCommand(
                                 *context,
-                                SandboxEditorVisualizationConfigCommand{
-                                    .StableEntityId =
-                                        frame.Visualization.SelectedStableId,
-                                    .EnableConfig = true,
-                                        .Source = G::VisualizationConfig::ColorSource::UniformColor,
-                                    });
+                                MakeUniformVisualizationConfigCommandFromModel(
+                                    frame.Visualization.SelectedStableId,
+                                    frame.Visualization.Visualization,
+                                    SandboxEditorVisualizationTarget::Entity,
+                                    frame.Visualization.Visualization.Color));
                         }
                         ImGui::SameLine();
                         if (ImGui::Button("Clear vis"))
@@ -6437,13 +6783,22 @@ namespace Extrinsic::Runtime
                                 SandboxEditorVisualizationConfigCommand{
                                     .StableEntityId =
                                         frame.Visualization.SelectedStableId,
+                                    .Target =
+                                        SandboxEditorVisualizationTarget::Entity,
                                     .EnableConfig = false,
                                 });
                         }
+                        DrawUniformVisualizationColorEdit(
+                            frame.Visualization.Visualization,
+                            *context,
+                            frame.Visualization.SelectedStableId,
+                            SandboxEditorVisualizationTarget::Entity,
+                            true);
                         DrawVisualizationPropertyPresets(
                             frame.Visualization.Properties,
                             *context,
                             frame.Visualization.SelectedStableId,
+                            SandboxEditorVisualizationTarget::Entity,
                             true);
                     }
                 }
@@ -6744,6 +7099,24 @@ namespace Extrinsic::Runtime
         return "Unknown";
     }
 
+    const char* DebugNameForSandboxEditorVisualizationTarget(
+        const SandboxEditorVisualizationTarget target) noexcept
+    {
+        using Target = SandboxEditorVisualizationTarget;
+        switch (target)
+        {
+        case Target::Entity:
+            return "Entity";
+        case Target::Surface:
+            return "Surface";
+        case Target::Edges:
+            return "Edges";
+        case Target::Points:
+            return "Points";
+        }
+        return "Unknown";
+    }
+
     const char* DebugNameForSandboxEditorPropertyCatalogDomain(
         const SandboxEditorPropertyCatalogDomain domain) noexcept
     {
@@ -6872,9 +7245,20 @@ namespace Extrinsic::Runtime
             return capabilities;
 
         const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
+        const GeometryEntityAvailability availability =
+            BuildGeometryAvailability(view);
         capabilities.Domains = DomainsForSourceView(view);
         capabilities.HasEditableSurfaceMesh =
-            view.ActiveDomain == GS::Domain::Mesh && view.Valid();
+            availability.Sources.ProvenanceDomain == GS::Domain::Mesh &&
+            SupportsGeometryElementDomain(
+                availability,
+                GeometryElementDomain::MeshVertex) &&
+            SupportsGeometryElementDomain(
+                availability,
+                GeometryElementDomain::MeshHalfedge) &&
+            SupportsGeometryElementDomain(
+                availability,
+                GeometryElementDomain::MeshFace);
         return capabilities;
     }
 
@@ -7104,6 +7488,7 @@ namespace Extrinsic::Runtime
         SandboxEditorDomainWindowModel model{};
         model.Kind = kind;
         model.ExpectedDomain = ExpectedDomainForWindowKind(kind);
+        model.VisualizationTarget = VisualizationTargetForWindowKind(kind);
         model.VisualizationControlsAvailable =
             context.VisualizationCommandsAvailable;
 
@@ -7141,8 +7526,16 @@ namespace Extrinsic::Runtime
         model.SelectedEntity = BuildEntityRow(raw, *selected);
         model.SelectedStableId = SelectionController::ToStableEntityId(*selected);
         model.RenderHints = BuildRenderHintModel(raw, *selected);
-        model.SelectedDomain = GS::BuildConstView(raw, *selected).ActiveDomain;
+        const GS::ConstSourceView sourceView =
+            GS::BuildConstView(raw, *selected);
+        const GeometryEntityAvailability availability =
+            BuildGeometryAvailability(raw, *selected);
+        model.SelectedDomain = sourceView.ActiveDomain;
         model.DomainMatches = model.SelectedDomain == model.ExpectedDomain;
+        model.VisualizationTargetAvailable =
+            VisualizationTargetAvailableForView(
+                availability,
+                model.VisualizationTarget);
         model.PropertyCatalog =
             BuildPropertyCatalogModel(context, raw, *selected);
         const SandboxEditorGeometryDomainModel geometry =
@@ -7190,7 +7583,8 @@ namespace Extrinsic::Runtime
         }
         else
         {
-            model.Visualization = BuildVisualizationModel(context);
+            model.Visualization =
+                BuildVisualizationModel(context, model.VisualizationTarget);
             AppendDiagnostics(model.Diagnostics, model.Visualization.Diagnostics);
         }
 
@@ -7524,9 +7918,30 @@ namespace Extrinsic::Runtime
         if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
             return SandboxEditorCommandStatus::StaleEntity;
 
-        const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
-        if (view.ActiveDomain != GS::Domain::Mesh)
+        const GeometryEntityAvailability availability =
+            BuildGeometryAvailability(raw, entity);
+        if (availability.Sources.ProvenanceDomain != GS::Domain::Mesh)
             return SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+        if ((command.SetVertexView && command.EnableVertexView) ||
+            command.SetVertexRenderMode ||
+            command.SetVertexPointRadius)
+        {
+            if (!availability.Sources.Has(GS::SourceCapability::VertexPoints))
+                return SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+        }
+        if (command.SetEdgeView && command.EnableEdgeView)
+        {
+            const bool hasExplicitEdges =
+                availability.Sources.Has(GS::SourceCapability::Edges);
+            const bool hasMeshWireTopology =
+                availability.Sources.Has(GS::SourceCapability::Halfedges) &&
+                availability.Sources.Has(GS::SourceCapability::Faces);
+            if (!availability.Sources.Has(GS::SourceCapability::VertexPoints) ||
+                (!hasExplicitEdges && !hasMeshWireTopology))
+            {
+                return SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+            }
+        }
 
         const SandboxEditorRenderHintState before =
             ReadRenderHintState(raw, entity);
@@ -7612,8 +8027,9 @@ namespace Extrinsic::Runtime
         if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
             return SandboxEditorCommandStatus::StaleEntity;
 
-        const GS::Domain domain = GS::BuildConstView(raw, entity).ActiveDomain;
-        if (!RenderHintCommandMatchesDomain(command, domain))
+        const GeometryEntityAvailability availability =
+            BuildGeometryAvailability(raw, entity);
+        if (!RenderHintCommandMatchesDomain(command, availability))
             return SandboxEditorCommandStatus::UnsupportedGeometryDomain;
 
         const SandboxEditorRenderHintState before =
@@ -7725,11 +8141,10 @@ namespace Extrinsic::Runtime
         if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
             return SandboxEditorCommandStatus::StaleEntity;
 
-        const auto* current = raw.try_get<G::VisualizationConfig>(entity);
         const std::optional<G::VisualizationConfig> before =
-            current != nullptr
-                ? std::optional<G::VisualizationConfig>{*current}
-                : std::nullopt;
+            StoredVisualizationConfigForTarget(raw, entity, command.Target);
+        const std::optional<G::VisualizationConfig> effectiveBefore =
+            EffectiveVisualizationConfigForTarget(raw, entity, command.Target);
         const std::optional<G::VisualizationConfig> after =
             command.EnableConfig
                 ? std::optional<G::VisualizationConfig>{ToVisualizationConfig(command)}
@@ -7744,27 +8159,43 @@ namespace Extrinsic::Runtime
         {
             return SandboxEditorCommandStatus::NoChange;
         }
+        else if (!before.has_value() &&
+                 effectiveBefore.has_value() &&
+                 SameVisualizationConfig(*effectiveBefore, *after))
+        {
+            return SandboxEditorCommandStatus::NoChange;
+        }
 
         if (context.CommandHistory != nullptr)
         {
+            const EditorCommandRecord record =
+                command.Target == SandboxEditorVisualizationTarget::Entity
+                    ? MakeVisualizationConfigCommand(
+                          EditorVisualizationConfigCommand{
+                              .Scene = context.Scene,
+                              .StableEntityId = command.StableEntityId,
+                              .Before = before,
+                              .After = after,
+                              .Label = "Change Visualization",
+                          })
+                    : MakeVisualizationConfigTargetCommand(
+                          context.Scene,
+                          command.StableEntityId,
+                          command.Target,
+                          before,
+                          after,
+                          "Change Visualization");
             const EditorCommandHistoryResult result =
-                context.CommandHistory->Execute(
-                    MakeVisualizationConfigCommand(
-                        EditorVisualizationConfigCommand{
-                            .Scene = context.Scene,
-                            .StableEntityId = command.StableEntityId,
-                            .Before = before,
-                            .After = after,
-                            .Label = "Change Visualization",
-                        }));
+                context.CommandHistory->Execute(record);
             return ToSandboxEditorCommandStatus(result.Status);
         }
 
-        if (after.has_value())
-            raw.emplace_or_replace<G::VisualizationConfig>(entity, *after);
-        else
-            raw.remove<G::VisualizationConfig>(entity);
-        return SandboxEditorCommandStatus::Applied;
+        return ToSandboxEditorCommandStatus(
+            ApplyVisualizationConfigTarget(
+                context.Scene,
+                command.StableEntityId,
+                command.Target,
+                after));
     }
 
     SandboxEditorCommandStatus ApplySandboxEditorVisualizationPropertyCommand(
@@ -7785,8 +8216,10 @@ namespace Extrinsic::Runtime
             return SandboxEditorCommandStatus::InvalidVisualizationProperty;
 
         const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
+        const GeometryEntityAvailability availability =
+            BuildGeometryAvailability(view);
         const Geometry::PropertySet* properties =
-            PropertySetForVisualizationDomain(view, command.Domain);
+            PropertySetForVisualizationDomain(availability, command.Domain);
         if (properties == nullptr)
             return SandboxEditorCommandStatus::UnsupportedGeometryDomain;
 
@@ -7813,6 +8246,7 @@ namespace Extrinsic::Runtime
 
         SandboxEditorVisualizationConfigCommand configCommand{
             .StableEntityId = command.StableEntityId,
+            .Target = command.Target,
             .EnableConfig = true,
             .ScalarFieldName = command.PropertyName,
             .ScalarDomain = ToVisualizationConfigDomain(command.Domain),
@@ -7873,7 +8307,9 @@ namespace Extrinsic::Runtime
         if (entity == ECS::InvalidEntityHandle || !raw.valid(entity))
             return SandboxEditorCommandStatus::StaleEntity;
 
-        if (GS::BuildConstView(raw, entity).ActiveDomain == GS::Domain::None)
+        const GeometryEntityAvailability availability =
+            BuildGeometryAvailability(raw, entity);
+        if (!availability.HasGeometry())
             return SandboxEditorCommandStatus::UnsupportedGeometryDomain;
 
         const std::optional<RenderExtractionCache::VisualizationAdapterBinding>

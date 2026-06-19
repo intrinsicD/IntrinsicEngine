@@ -29,7 +29,9 @@ plain data; systems are stateless functions that operate on components.
   `PropertySet` components (`Vertices`, `Edges`, `Halfedges`, `Faces`,
   `Nodes`) plus canonical `PropertyNames` keys, domain markers
   (`HasMeshTopology`, `HasGraphTopology`), and `BuildConstView`/
-  `BuildMutableView` domain detection.
+  `BuildMutableView` exact-domain detection. Use `BuildSourceAvailability`
+  for CPU source capability queries that keep provenance separate from source
+  presence.
 - `Extrinsic.ECS.Components.GeometrySourcesPopulate` — promoted
   `PopulateFromMesh` / `PopulateFromGraph` / `PopulateFromCloud` helpers
   that copy a `Geometry::HalfedgeMesh::Mesh`, `Geometry::Graph::Graph`,

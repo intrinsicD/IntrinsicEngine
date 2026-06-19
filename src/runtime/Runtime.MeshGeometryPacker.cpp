@@ -174,7 +174,8 @@ namespace Extrinsic::Runtime
 
         using namespace ECS::Components::GeometrySources;
 
-        if (view.ActiveDomain != Domain::Mesh)
+        const SourceAvailability availability = BuildSourceAvailability(view);
+        if (availability.ProvenanceDomain != Domain::Mesh)
         {
             return Failure(MeshPackStatus::WrongDomain, outBuffer);
         }
@@ -339,7 +340,8 @@ namespace Extrinsic::Runtime
         // Validation mirrors `PackMesh` so the two stay in lockstep; only the
         // topology needed to reproduce the surface triangle order is read
         // (positions are needed for the `targetV < vertexCount` ring check).
-        if (view.ActiveDomain != Domain::Mesh)
+        const SourceAvailability availability = BuildSourceAvailability(view);
+        if (availability.ProvenanceDomain != Domain::Mesh)
         {
             return MeshPackStatus::WrongDomain;
         }

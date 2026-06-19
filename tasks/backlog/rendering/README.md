@@ -773,31 +773,31 @@ Cross-layer Theme B′ leaves outside `rendering/`:
 - [`runtime/RUNTIME-084` — Gizmo interaction](../../done/RUNTIME-084-gizmo-interaction.md) (retired 2026-06-06 at `CPUContracted`).
 - [`runtime/RUNTIME-090` — Dear ImGui platform/renderer adapter](../../done/RUNTIME-090-imgui-platform-renderer-adapter.md) (retired 2026-06-02 at `CPUContracted`; Slice A standalone adapter module plus Slice B `Engine` frame-loop wiring landed).
 
-Open post-acceptance rendering leaves:
+Post-acceptance rendering leaves:
 - [GRAPHICS-088 — Resolved UV rendering and bake texture residency](../../done/GRAPHICS-088-resolved-uv-rendering-and-bake-residency.md):
   retired CPU-contracted resolved-UV renderer/material/generic generated-bake
   descriptor contract. Surface materials, generated textures, UV debug
   inspection, and UV-backed fragment bakes now use the canonical texture-
   coordinate channel without graphics-side UV generation.
-- [GRAPHICS-089 — Generated-UV texture sampling Vulkan smoke](GRAPHICS-089-generated-uv-texture-sampling-vulkan-smoke.md):
-  unblocked after `ASSETIO-008`; owns the opt-in `gpu;vulkan` proof that an
-  imported mesh that originally lacked authored UVs renders through generated
-  UVs and an uploaded generated texture binding supplied by runtime
-  materialization.
+- [GRAPHICS-089 — Generated-UV texture sampling Vulkan smoke](../../done/GRAPHICS-089-generated-uv-texture-sampling-vulkan-smoke.md):
+  retired 2026-06-19 at `Operational` on Vulkan-capable hosts. The opt-in
+  runtime sandbox `gpu;vulkan` smoke now imports a mesh that originally lacked
+  authored UVs, verifies ASSETIO-008 generated `v:texcoord` materialization,
+  uploads a generated albedo texture through `GpuAssetCache`, binds it through
+  the material texture path, and samples the generated texture through the
+  resolved UV channel.
 - [GRAPHICS-090 — Progressive render-data operational smoke](../../done/GRAPHICS-090-progressive-render-data-operational-smoke.md):
   retired 2026-06-16 at `Operational`; opt-in `gpu;vulkan` coverage now proves
   generated mesh texture slots and graph property-buffer presentation are
   consumed by the promoted renderer without graphics importing live
   runtime/ECS/asset ownership.
-- [GRAPHICS-091 — Unify scalar-field / colormap visualization across surface, line, and point passes](GRAPHICS-091-unify-scalar-colormap-across-surface-line-point.md):
-  unblocked; Slice A has landed the shared `common/gpu_scene.glsl`
-  visualization color resolver and promoted surface consumers in
-  `forward/default_debug_surface.*` and `deferred/gbuffer.*`. Slice B has
-  landed CPU/null retained line/point scalar-field and per-element-color shader
-  consumption through the same helper. The remaining open slice is the opt-in
-  `gpu;vulkan` line/point colormap pixel smoke. Target `Operational` on
-  Vulkan-capable hosts. Sibling of `GRAPHICS-092` (shared "venue",
-  color/colormap side).
+- [GRAPHICS-091 — Unify scalar-field / colormap visualization across surface, line, and point passes](../../done/GRAPHICS-091-unify-scalar-colormap-across-surface-line-point.md):
+  retired 2026-06-19 at `Operational` on Vulkan-capable hosts
+  (`CPUContracted` elsewhere). The promoted surface, line, and point shader
+  paths now share `common/gpu_scene.glsl` visualization color resolution for
+  material, uniform, scalar-field, and per-element RGBA modes; CPU/null coverage
+  proves matching surface/line/point config, and the opt-in runtime sandbox
+  `gpu;vulkan` smoke proves line/point scalar-field colormap pixels.
 - [GRAPHICS-092 — Group per-domain params in `GpuEntityConfig` and add line-width residency](../../done/GRAPHICS-092-group-per-domain-params-and-line-width-residency.md):
   retired 2026-06-18 at `Operational` on Vulkan-capable hosts. The task grouped
   point and line fields into `GpuEntityConfig` sub-blocks, added

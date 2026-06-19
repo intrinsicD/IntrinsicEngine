@@ -5,6 +5,26 @@ depends_on: []
 ---
 # GRAPHICS-091 — Unify scalar-field / colormap visualization across surface, line, and point passes
 
+## Completion
+- Retired on 2026-06-19 at maturity `Operational` on Vulkan-capable hosts
+  (`CPUContracted` elsewhere).
+- Implementation commit: Slice A/B/C changes landed across mainline commits
+  `9db31790`, `061d4465`, `2196d463`, and `ad29ac28`.
+- Task-state commit: this retirement commit moves the task to `tasks/done/`
+  and redirects the rendering backlog README entry.
+- Summary: promoted surface, line, and point shaders now resolve visualization
+  material/uniform/scalar-field/per-element RGBA color through the shared
+  `assets/shaders/common/gpu_scene.glsl` helper; `VisualizationSyncSystem`
+  writes matching `GpuEntityConfig` scalar/color contracts for surface, line,
+  and point; and the opt-in runtime sandbox `gpu;vulkan` smoke proves line and
+  point scalar-field colormap output on a Vulkan-capable host.
+- Final retirement evidence on 2026-06-19: `cmake --build --preset ci --target
+  IntrinsicTests` and
+  `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine'
+  -R 'GraphicsMinimalAcceptance|RendererFrameLifecycle\.(ForwardSurfacePipelineSurvivesOperationalRebuild|DeferredGBufferPipelineSurvivesOperationalRebuild|ForwardLinePointShadersUseSharedVisualizationColorHelpers)|GraphicsMaterialSystem|GraphicsVisualizationPackets|Colormap'
+  --timeout 60` passed 29/29 tests, including the surface forward/deferred
+  pipeline survival checks and the shared visualization helper shader check.
+
 ## Goal
 - Bring the modern GpuScene forward line and point passes to colormap/visualization
   parity with the surface pass, so every `VisualizationConfig::ColorSource` mode
@@ -44,8 +64,8 @@ depends_on: []
 - `VisualizationSyncSystem` already writes the colormap fields into
   `GpuEntityConfig` for line/point records (`BuildEntityConfig`) and builds a
   SciVis override material. Slice B made those `GpuEntityConfig` scalar/color
-  fields live for retained line and point shaders under CPU/null coverage; the
-  opt-in Vulkan pixel smoke remains open for Slice C.
+  fields live for retained line and point shaders under CPU/null coverage; Slice
+  C added the opt-in Vulkan line/point colormap pixel smoke.
 - Stale documentation (corrected by Slice A): the `Graphics.VisualizationSyncSystem`
   module header (`src/graphics/renderer/Graphics.VisualizationSyncSystem.cppm`
   ~lines 36-41 before this slice) described a "CPU-baking path for Line and Point
@@ -120,7 +140,9 @@ depends_on: []
 - [x] The same `VisualizationConfig` (a `ScalarField` with a colormap, and a per-element
       RGBA buffer) produces equivalent colour config on surface, line, and point
       renderables under CPU/null coverage; Vulkan pixel proof remains Slice C.
-- [ ] Surface visualization output is unchanged (parity) after the shared-helper refactor.
+- [x] Surface visualization output is unchanged (parity) after the shared-helper refactor;
+      final retirement evidence reran the forward and deferred surface pipeline survival
+      checks plus the shared visualization helper shader check.
 - [x] No `vis_colors_baked` buffer or CPU scalar→color bake for line/point is introduced;
       resolution is GPU-side from the property/colormap BDAs.
 - [x] Default CPU gate stays green.
@@ -184,5 +206,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
       2026-06-18 via `IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests` and
       `ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan'
       -R 'ReferenceTriangleMeshConfiguredLineWidthAndPointDrawLanesPresent|ReferenceTriangleScalarFieldColormapResolvesOnLineAndPointLanes'
-      --timeout 120`. The task stays open only for the separate surface parity
-      acceptance item.
+      --timeout 120`.
+    - Final retirement evidence on 2026-06-19 reran CPU/non-GPU surface
+      forward/deferred pipeline survival and shared-helper shader checks; all
+      acceptance items are closed.

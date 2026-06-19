@@ -11,7 +11,6 @@ map.
 ## Tasks
 
 - [RORG-031F — UI integration backlog seed](RORG-031-ui-integration.md).
-No backlog UI implementation tasks are currently queued.
 
 ## Convergence
 
@@ -80,6 +79,20 @@ No backlog UI implementation tasks are currently queued.
 - UI-018 retired the sandbox startup organization follow-up: the editor now
   starts menu-first, with top-level panels available from `View` and all
   sandbox/domain windows closed until explicitly opened.
+- UI-019 retired the visualization uniform-color edit follow-up: mesh, graph,
+  point-cloud, and top-level geometry visualization windows show an ImGui color
+  edit widget when `VisualizationConfig::ColorSource::UniformColor` is active,
+  with edits routed through the existing runtime visualization command seam.
+- UI-020 retired the visualization lane-color follow-up: mesh, graph, and
+  point-cloud domain visualization windows now target surface, edge, and point
+  render lanes by source-row presence, with optional lane overrides letting mesh
+  vertices and graph nodes use point-lane uniform colors independently of edge
+  and surface visualization.
+- UI-021 retired the migration that removed the remaining UI-local
+  availability policy from `Runtime.SandboxEditorUi`: domain windows,
+  visualization controls, property catalogs, and processing affordances now
+  consume the runtime resolver from `RUNTIME-117`, while preserving provenance
+  labels for mesh/graph/point-cloud origins.
 - UI work that depends on renderer overlays/handoff coordinates with the
   retired `GRAPHICS-024`
   parity matrix, the `RUNTIME-104` decision not to retain a persistent
@@ -126,3 +139,17 @@ split; narratives live in the retirement log.
   (done, 2026-06-17, `CPUContracted`): sandbox startup now shows only the
   main menu bar; top-level panels open from `View`, while domain windows remain
   closed until opened from the PointCloud/Graph/Mesh menus.
+- [UI-019 — Visualization uniform color edit widget](../../done/UI-019-visualization-uniform-color-edit.md)
+  (done, 2026-06-19, `CPUContracted`): selected mesh, graph, point-cloud, and
+  top-level geometry visualization windows expose an ImGui color edit widget
+  for active uniform-color visualization configs without UI owning renderer or
+  asset state.
+- [UI-020 — Visualization lane uniform color controls](../../done/UI-020-visualization-lane-uniform-color.md)
+  (done, 2026-06-19, `CPUContracted`): domain visualization windows target
+  surface, edge, and point render lanes by source-row presence, and optional
+  lane overrides let mesh vertices and graph nodes use independent uniform
+  point-lane colors.
+- [UI-021 — Sandbox editor geometry availability migration](../../done/UI-021-sandbox-editor-geometry-availability-migration.md)
+  (done, 2026-06-19, `CPUContracted`): domain windows, visualization targets,
+  property catalogs, primitive-view commands, render hints, K-Means affordances,
+  and mesh UV/bake diagnostics now consume the runtime availability resolver.

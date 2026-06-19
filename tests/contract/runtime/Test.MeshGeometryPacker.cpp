@@ -469,10 +469,12 @@ TEST(MeshGeometryPackerTest, ScratchBufferIsReusedWithoutAccumulation)
 
 TEST(MeshGeometryPackerTest, WrongDomainIsRejected)
 {
-    const MeshScratch mesh = BuildSingleTriangle();
+    Nodes nodes{};
+    ConstSourceView view{};
+    view.NodeSource = &nodes;
     MeshPackBuffer scratch;
 
-    const MeshPackResult result = PackMesh(mesh.View(Domain::Graph), scratch);
+    const MeshPackResult result = PackMesh(view, scratch);
 
     EXPECT_EQ(result.Status, MeshPackStatus::WrongDomain);
     EXPECT_FALSE(result.Upload.has_value());
@@ -484,7 +486,7 @@ TEST(MeshGeometryPackerTest, MissingVertexSourceIsRejected)
 {
     MeshPackBuffer scratch;
     ConstSourceView view{};
-    view.ActiveDomain = Domain::Mesh;
+    view.HasMeshTopologyMarker = true;
     view.VertexSource = nullptr;
 
     const MeshPackResult result = PackMesh(view, scratch);
@@ -512,6 +514,20 @@ TEST(MeshGeometryPackerTest, MissingHalfedgeTopologyIsRejected)
     MeshPackBuffer scratch;
 
     const MeshPackResult result = PackMesh(mesh.View(), scratch);
+    EXPECT_EQ(result.Status, MeshPackStatus::MissingHalfedgeTopology);
+    EXPECT_FALSE(result.Upload.has_value());
+}
+
+TEST(MeshGeometryPackerTest, MeshMarkerWithoutHalfedgesReportsMissingHalfedgeTopology)
+{
+    Vertices vertices{};
+    SetPositions(vertices, {{0.0f, 0.0f, 0.0f}});
+    ConstSourceView view{};
+    view.VertexSource = &vertices;
+    view.HasMeshTopologyMarker = true;
+    MeshPackBuffer scratch;
+
+    const MeshPackResult result = PackMesh(view, scratch);
     EXPECT_EQ(result.Status, MeshPackStatus::MissingHalfedgeTopology);
     EXPECT_FALSE(result.Upload.has_value());
 }

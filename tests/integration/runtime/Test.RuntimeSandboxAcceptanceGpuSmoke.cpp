@@ -23,6 +23,7 @@
 #include <array>
 #include <chrono>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -43,9 +44,12 @@
 #include "OperationalCounterStability.hpp"
 
 import Extrinsic.Asset.ImportRouter;
+import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Asset.Registry;
+import Extrinsic.Asset.Service;
 import Extrinsic.Backends.Vulkan;
 import Extrinsic.Core.Config.Engine;
+import Extrinsic.Core.Error;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Component.Culling.Local;
 import Extrinsic.ECS.Component.Culling.World;
@@ -61,6 +65,7 @@ import Extrinsic.Graphics.Colormap;
 import Extrinsic.Graphics.ColormapSystem;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
+import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Platform.Backend.Glfw;
 import Extrinsic.RHI.Descriptors;
@@ -68,6 +73,7 @@ import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.TextureUpload;
 import Extrinsic.RHI.Types;
+import Extrinsic.Runtime.AssetModelTextureHandoff;
 import Extrinsic.Runtime.Engine;
 import Extrinsic.Runtime.ProgressivePresentationExtraction;
 import Extrinsic.Runtime.ProgressiveRenderData;
@@ -195,6 +201,160 @@ void SetTexcoords(Geometry::PropertySet& props, const std::vector<glm::vec2>& te
     auto uv = props.GetOrAdd<glm::vec2>("v:texcoord", glm::vec2(0.0f));
     uv.Vector() = texcoords;
 }
+
+[[nodiscard]] Assets::AssetTexture2DPayload MakeGeneratedUvSmokeAlbedoPayload()
+{
+    Assets::AssetTexture2DPayload payload{};
+    payload.Metadata.Width = 4u;
+    payload.Metadata.Height = 4u;
+    payload.Metadata.Components =
+        Assets::ComponentCountFor(Assets::AssetTexturePixelFormat::Rgba8Unorm);
+    payload.Metadata.PixelFormat = Assets::AssetTexturePixelFormat::Rgba8Unorm;
+    payload.Metadata.ColorSpace = Assets::AssetTextureColorSpace::SRGB;
+    payload.Metadata.SourceKind = Assets::AssetTextureSourceKind::Generated;
+    payload.Metadata.SourceFormat = Assets::AssetFileFormat::Unknown;
+    payload.Metadata.SourcePath = "generated://graphics-089/generated-uv-albedo";
+    payload.Metadata.DebugName = "graphics-089-generated-uv-albedo";
+
+    payload.PixelBytes.reserve(
+        static_cast<std::size_t>(payload.Metadata.Width) *
+        static_cast<std::size_t>(payload.Metadata.Height) *
+        static_cast<std::size_t>(payload.Metadata.Components));
+    for (std::uint32_t y = 0u; y < payload.Metadata.Height; ++y)
+    {
+        for (std::uint32_t x = 0u; x < payload.Metadata.Width; ++x)
+        {
+            const bool zeroUvTexel = (x == 0u && y == 0u);
+            payload.PixelBytes.push_back(zeroUvTexel ? std::byte{0x00} : std::byte{0xF8});
+            payload.PixelBytes.push_back(std::byte{0x00});
+            payload.PixelBytes.push_back(zeroUvTexel ? std::byte{0x00} : std::byte{0xF8});
+            payload.PixelBytes.push_back(std::byte{0xFF});
+        }
+    }
+    return payload;
+}
+
+[[nodiscard]] RT::ProgressivePresentationBindings MakeGeneratedAlbedoPresentationBindings(
+    const Assets::AssetId generatedAlbedo)
+{
+    RT::ProgressiveSlotBinding albedo{};
+    albedo.Semantic = RT::ProgressiveSlotSemantic::Albedo;
+    albedo.SourceKind = RT::ProgressiveSlotSourceKind::GeneratedTextureAsset;
+    albedo.GeneratedTexture = generatedAlbedo;
+    albedo.GeneratedPolicy =
+        RT::ProgressiveGeneratedOutputPolicy::DeterministicChildAsset;
+    albedo.Provenance =
+        RT::ProgressiveGeneratedOutputProvenance::GeneratedTextureAsset;
+    albedo.Readiness = RT::ProgressiveReadinessState::Ready;
+
+    return RT::ProgressivePresentationBindings{
+        .Shape = RT::ProgressiveEntityShape::MeshLeaf,
+        .Lanes = {
+            RT::ProgressiveRenderLaneBinding{
+                .Lane = RT::ProgressiveRenderLane::Surface,
+                .PresentationKey = "graphics089.generated.surface",
+            },
+        },
+        .Presentations = {
+            RT::ProgressivePresentationBinding{
+                .Key = "graphics089.generated.surface",
+                .Kind = RT::ProgressivePresentationKind::SurfaceMaterial,
+                .Slots = {albedo},
+            },
+        },
+        .BindingGeneration = 1u,
+    };
+}
+
+[[nodiscard]] Extrinsic::RHI::SamplerDesc GeneratedUvSmokeSamplerDesc() noexcept
+{
+    return Extrinsic::RHI::SamplerDesc{
+        .MagFilter = Extrinsic::RHI::FilterMode::Nearest,
+        .MinFilter = Extrinsic::RHI::FilterMode::Nearest,
+        .MipFilter = Extrinsic::RHI::MipmapMode::Nearest,
+        .AddressU = Extrinsic::RHI::AddressMode::ClampToEdge,
+        .AddressV = Extrinsic::RHI::AddressMode::ClampToEdge,
+        .AddressW = Extrinsic::RHI::AddressMode::ClampToEdge,
+        .DebugName = "Graphics089.GeneratedAlbedoSampler",
+    };
+}
+
+class GeneratedUvTextureSmokeApp final : public IApplication
+{
+public:
+    void SetGeneratedTexture(const Assets::AssetId generatedTexture) noexcept
+    {
+        m_GeneratedTexture = generatedTexture;
+    }
+
+    void OnInitialize(Engine& engine) override
+    {
+        m_EditorUi.Attach(engine);
+    }
+
+    void OnSimTick(Engine&, double) override {}
+
+    void OnVariableTick(Engine& engine, double, double) override
+    {
+        ++Frames;
+
+        if (!UploadRequested &&
+            m_GeneratedTexture.IsValid() &&
+            engine.GetDevice().IsOperational())
+        {
+            UploadRequested = true;
+            RT::AssetModelTextureHandoffOptions uploadOptions{};
+            uploadOptions.TextureSamplerDesc = GeneratedUvSmokeSamplerDesc();
+            auto upload = RT::RequestTextureAssetUpload(engine.GetAssetService(),
+                                                        engine.GetGpuAssetCache(),
+                                                        m_GeneratedTexture,
+                                                        uploadOptions);
+            if (!upload.has_value())
+            {
+                UploadError = upload.error();
+                engine.RequestExit();
+                return;
+            }
+        }
+
+        if (m_GeneratedTexture.IsValid() &&
+            engine.GetGpuAssetCache().GetState(m_GeneratedTexture) ==
+                Extrinsic::Graphics::GpuAssetState::Ready)
+        {
+            TextureReadyObserved = true;
+            ++FramesAfterTextureReady;
+            if (FramesAfterTextureReady >= 3u)
+            {
+                engine.RequestExit();
+                return;
+            }
+        }
+
+        if (Frames >= kMaxFrames)
+        {
+            TimedOut = true;
+            engine.RequestExit();
+        }
+    }
+
+    void OnShutdown(Engine&) override
+    {
+        m_EditorUi.Detach();
+    }
+
+    bool UploadRequested{false};
+    bool TextureReadyObserved{false};
+    bool TimedOut{false};
+    std::optional<Extrinsic::Core::ErrorCode> UploadError{};
+    std::uint32_t Frames{0u};
+    std::uint32_t FramesAfterTextureReady{0u};
+
+private:
+    static constexpr std::uint32_t kMaxFrames = 48u;
+
+    Extrinsic::Runtime::SandboxEditorUi m_EditorUi{};
+    Assets::AssetId m_GeneratedTexture{};
+};
 
 EntityHandle MakeMesh(Registry& scene,
                       std::string name = "AcceptanceMesh",
@@ -2446,6 +2606,216 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedOffOriginObjTriangleAutoFramesAtC
         << " mesh reuse=" << ex.MeshGeometryReuseHits
         << " nearest background distance=" << nearestBackgroundDistance
         << " pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+    device.DestroyBuffer(readbackBuffer);
+    engine.Shutdown();
+}
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke, ImportedObjWithoutAuthoredUvsSamplesGeneratedAlbedoTexture)
+{
+    auto app = std::make_unique<GeneratedUvTextureSmokeApp>();
+    auto* appPtr = app.get();
+    auto bootstrap = BootstrapDefaultSandboxAppEngineWithApp(std::move(app));
+    if (bootstrap.Skipped)
+    {
+        GTEST_SKIP() << bootstrap.SkipReason;
+    }
+    Engine& engine = *bootstrap.EnginePtr;
+
+    SetEntityPosition(engine.GetScene(),
+                      FindEntityByName(engine.GetScene(), "ReferenceTriangle"),
+                      glm::vec3{4.0f, 0.0f, 0.0f});
+
+    TempObjFile obj{
+        "intrinsic_generated_uv_texture_triangle",
+        "v 7.25 -0.75 0\n"
+        "v 8.75 -0.75 0\n"
+        "v 8 0.75 0\n"
+        "f 1 2 3\n",
+    };
+
+    auto imported = engine.ImportAssetFromPath(
+        Extrinsic::Runtime::RuntimeAssetImportRequest{
+            .Path = obj.Path.string(),
+            .PayloadKind = Assets::AssetPayloadKind::Mesh,
+        });
+    ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
+    EXPECT_EQ(imported->PayloadKind, Assets::AssetPayloadKind::Mesh);
+    EXPECT_EQ(imported->PrimitiveEntitiesCreated, 1u);
+
+    const EntityHandle importedEntity =
+        FindEntityByName(engine.GetScene(), obj.Path.filename().string());
+    ASSERT_NE(importedEntity, Extrinsic::ECS::InvalidEntityHandle);
+    ASSERT_TRUE(engine.GetScene().IsValid(importedEntity));
+
+    auto& raw = engine.GetScene().Raw();
+    ASSERT_TRUE((raw.all_of<G::RenderSurface,
+                            G::VisualizationConfig,
+                            gs::Vertices,
+                            gs::Edges,
+                            gs::Halfedges,
+                            gs::Faces>(importedEntity)));
+    const gs::ConstSourceView initialView = gs::BuildConstView(raw, importedEntity);
+    ASSERT_TRUE(initialView.Valid());
+    ASSERT_NE(initialView.VertexSource, nullptr);
+    EXPECT_FALSE(initialView.VertexSource->Properties.Get<glm::vec2>("v:texcoord"))
+        << "The GRAPHICS-089 smoke OBJ must omit authored texture coordinates.";
+
+    const Assets::AssetTexture2DPayload payload =
+        MakeGeneratedUvSmokeAlbedoPayload();
+    const std::string generatedTexturePath =
+        obj.Path.string() + ".graphics089-generated-albedo.texture";
+    auto generatedTexture =
+        engine.GetAssetService().Load<Assets::AssetTexture2DPayload>(
+            generatedTexturePath,
+            [payload](std::string_view,
+                      Assets::AssetId) -> Extrinsic::Core::Expected<Assets::AssetTexture2DPayload>
+            {
+                return payload;
+            });
+    ASSERT_TRUE(generatedTexture.has_value())
+        << static_cast<int>(generatedTexture.error());
+    appPtr->SetGeneratedTexture(*generatedTexture);
+
+    raw.emplace_or_replace<RT::ProgressivePresentationBindings>(
+        importedEntity,
+        MakeGeneratedAlbedoPresentationBindings(*generatedTexture));
+    auto& visualization = raw.get<G::VisualizationConfig>(importedEntity);
+    visualization.Source = G::VisualizationConfig::ColorSource::Material;
+
+    auto& renderer = engine.GetRenderer();
+    auto& device = engine.GetDevice();
+    const Extrinsic::RHI::Format backbufferFormat = device.GetBackbufferFormat();
+    const std::uint32_t bytesPerPixel = Extrinsic::RHI::BytesPerBlock(backbufferFormat);
+    const Extrinsic::Core::Extent2D extent = device.GetBackbufferExtent();
+    if (bytesPerPixel < 4u || extent.Width <= 0 || extent.Height <= 0)
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style smoke readback.";
+    }
+
+    const std::uint64_t readbackSize =
+        static_cast<std::uint64_t>(bytesPerPixel) *
+        static_cast<std::uint64_t>(extent.Width) *
+        static_cast<std::uint64_t>(extent.Height);
+    const Extrinsic::RHI::BufferHandle readbackBuffer = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
+        .SizeBytes = readbackSize,
+        .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
+        .HostVisible = true,
+        .DebugName = "Sandbox.GeneratedUvTexture.Readback",
+    });
+    if (!readbackBuffer.IsValid())
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Readback buffer allocation failed; gpu;vulkan smoke is opt-in.";
+    }
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(readbackBuffer);
+
+    const auto run = DriveAcceptanceAndCapture(engine);
+
+    if (!run.DeviceOperational)
+    {
+        renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+        device.DestroyBuffer(readbackBuffer);
+        engine.Shutdown();
+        ADD_FAILURE() << "Generated-UV texture smoke did not reach operational Vulkan: status="
+                      << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
+                      << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+        return;
+    }
+
+    ASSERT_TRUE(appPtr->UploadRequested)
+        << "Generated texture upload was never requested after promoted Vulkan became operational.";
+    ASSERT_FALSE(appPtr->UploadError.has_value())
+        << "Generated texture upload failed after promoted Vulkan became operational: "
+        << static_cast<int>(*appPtr->UploadError);
+    EXPECT_TRUE(appPtr->TextureReadyObserved)
+        << "Generated texture upload did not reach ready GPU residency within the bounded smoke run.";
+    EXPECT_FALSE(appPtr->TimedOut)
+        << "Generated-UV texture smoke timed out after " << appPtr->Frames << " frames.";
+
+    const gs::ConstSourceView resolvedView = gs::BuildConstView(raw, importedEntity);
+    ASSERT_TRUE(resolvedView.Valid());
+    ASSERT_NE(resolvedView.VertexSource, nullptr);
+    const auto resolvedTexcoords =
+        resolvedView.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
+    ASSERT_TRUE(resolvedTexcoords);
+    ASSERT_EQ(resolvedTexcoords.Vector().size(), 3u);
+
+    bool sawNonZeroTexcoord = false;
+    for (const glm::vec2 uv : resolvedTexcoords.Vector())
+    {
+        EXPECT_TRUE(std::isfinite(uv.x));
+        EXPECT_TRUE(std::isfinite(uv.y));
+        sawNonZeroTexcoord = sawNonZeroTexcoord ||
+            std::abs(uv.x) > 1.0e-6f ||
+            std::abs(uv.y) > 1.0e-6f;
+    }
+    EXPECT_TRUE(sawNonZeroTexcoord)
+        << "ASSETIO-008 did not publish non-zero generated UVs for the imported OBJ.";
+
+    EXPECT_EQ(engine.GetGpuAssetCache().GetState(*generatedTexture),
+              Extrinsic::Graphics::GpuAssetState::Ready)
+        << "Generated albedo texture never reached ready GPU residency.";
+
+    const auto& ex = engine.GetLastRenderExtractionStats();
+    EXPECT_GE(ex.MeshGeometryUploads + ex.MeshGeometryReuseHits, 1u)
+        << "Imported OBJ did not remain resident on the mesh extraction lane.";
+    EXPECT_EQ(ex.MeshGeometryMissingTexcoords, 0u)
+        << "Mesh extraction fell back to default zero UVs instead of ASSETIO-008 generated UVs.";
+    EXPECT_EQ(ex.MeshGeometryNonFiniteTexcoords, 0u);
+    EXPECT_GE(ex.ProgressivePresentationEntityCount, 1u);
+    EXPECT_GE(ex.ProgressiveReadyTextureSlotCount, 1u);
+    EXPECT_GE(ex.ProgressiveMaterialTextureBindingResolveCount, 1u)
+        << "Generated texture slot did not resolve through the material texture binding path.";
+    EXPECT_EQ(ex.ProgressiveMaterialTextureBindingResolveFailureCount, 0u);
+
+    const auto materialDiagnostics =
+        renderer.GetMaterialSystem().GetDiagnostics();
+    EXPECT_GE(materialDiagnostics.TextureAssetResolveCount, 1u);
+    EXPECT_EQ(materialDiagnostics.TextureAssetFallbackResolveCount, 0u)
+        << "Generated texture binding resolved through fallback instead of the uploaded texture.";
+
+    EXPECT_TRUE(run.Stats.Compile.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_TRUE(run.Stats.Execute.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_EQ(FindPassStatus(run.Stats, "SurfacePass"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_EQ(FindPassStatus(run.Stats, "Present"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_GE(run.Stats.DefaultRecipeBackbufferReadbackCopyCount, 1u)
+        << "Generated-UV texture smoke did not record a backbuffer readback copy.";
+
+    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(readbackSize), 0u);
+    device.ReadBuffer(readbackBuffer, bytes.data(), readbackSize, 0u);
+
+    const std::uint32_t centerX = static_cast<std::uint32_t>(extent.Width / 2);
+    const std::uint32_t centerY = static_cast<std::uint32_t>(extent.Height / 2);
+    const RgbaPixel background = ReadPixel(
+        bytes, backbufferFormat, bytesPerPixel, extent,
+        static_cast<std::uint32_t>((extent.Width * 15) / 16),
+        static_cast<std::uint32_t>((extent.Height * 15) / 16));
+    const ForegroundSample foreground = FindMostForegroundPixel(
+        bytes, backbufferFormat, bytesPerPixel, extent, centerX, centerY,
+        16u, background);
+    const int redBlue =
+        static_cast<int>(foreground.Pixel.R) + static_cast<int>(foreground.Pixel.B);
+    const int green = static_cast<int>(foreground.Pixel.G);
+
+    EXPECT_GE(foreground.BackgroundDistance, 48)
+        << "Imported OBJ did not contribute a distinguishable center-region pixel. "
+        << "background=" << PixelText(background)
+        << " foreground=" << PixelText(foreground.Pixel)
+        << " pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+    EXPECT_GT(redBlue, green * 2 + 48)
+        << "Imported OBJ center-region pixel is not magenta-hued; generated albedo texture "
+        << "was not sampled through the material path. foreground="
+        << PixelText(foreground.Pixel)
+        << " background=" << PixelText(background);
+    EXPECT_GT(redBlue, 80)
+        << "Imported OBJ sampled the generated texture's zero-UV texel or no texture at all. "
+        << "foreground=" << PixelText(foreground.Pixel)
+        << " background=" << PixelText(background);
 
     renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
     device.DestroyBuffer(readbackBuffer);

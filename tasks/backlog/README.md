@@ -109,6 +109,12 @@ repository dependency path is vcpkg manifest mode with CI/local binary-cache
 wiring. Active `INFRA-001` now tracks only final deprecation cleanup and
 warm-cache CI timing evidence.
 
+The geometry availability chain (`HARDEN-083`, `RUNTIME-117`, `RUNTIME-118`,
+`RUNTIME-119`, and `UI-021`) is retired to `tasks/done`; ECS, runtime
+extraction, progressive helpers, GPU availability inspection, and the sandbox
+editor now share the promoted source/provenance and render-lane availability
+contracts.
+
 Open members:
 - [`architecture/LEGACY-012-migrate-legacy-consumer-tests.md`](architecture/LEGACY-012-migrate-legacy-consumer-tests.md) —
   follow-up for tests and non-legacy consumers that still import bare legacy

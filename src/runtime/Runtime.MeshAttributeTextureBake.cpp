@@ -1105,7 +1105,8 @@ namespace Extrinsic::Runtime
             using namespace ECS::Components::GeometrySources;
 
             MeshAttributeTextureBakeDiagnostics diagnostics = MakeDiagnostics(request);
-            if (view.ActiveDomain != Domain::Mesh)
+            const SourceAvailability availability = BuildSourceAvailability(view);
+            if (availability.ProvenanceDomain != Domain::Mesh)
             {
                 return Failure(MeshAttributeTextureBakeStatus::WrongDomain, diagnostics);
             }

@@ -11,7 +11,7 @@ map.
 
 ## Tasks
 
-No open ECS backlog tasks.
+No open ECS backlog tasks are currently queued here.
 
 ## Convergence
 
@@ -43,6 +43,10 @@ No open ECS backlog tasks.
   non-template bodies plus implementation-only includes/imports.
 - HARDEN-081 retired the final named ECS compatibility decision gate from
   `LEGACY-011` while keeping `ecs -> core` only.
+- HARDEN-083 retired the promoted `GeometrySources` CPU source-availability
+  contract: it separates underlying provenance from available vertex/node,
+  edge, halfedge, and face source data so runtime/UI consumers do not treat
+  exact `ActiveDomain` as the only capability query.
 - Forbidden across all members: physics-world handles, runtime sidecars,
   graphics handles, RHI handles, or live `AssetService` traffic in canonical
   ECS components.
@@ -66,3 +70,6 @@ split; narratives live in the retirement log.
   retired remaining legacy `NameTag`, `AxisRotator`, DEC wrapper, and
   feature-token compatibility gaps without moving runtime/graphics ownership
   into ECS.
+- [HARDEN-083 — Geometry source availability and provenance contract](../../done/HARDEN-083-geometry-source-availability-contract.md)
+  (done, 2026-06-19, `CPUContracted`): `GeometrySources` now reports CPU
+  source capabilities separately from exact active domain and provenance.

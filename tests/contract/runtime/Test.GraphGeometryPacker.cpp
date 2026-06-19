@@ -143,11 +143,23 @@ TEST(GraphGeometryPacker, EmptyEdgeSetIsValidForLineLane)
     EXPECT_TRUE(result.Upload->LineIndices.empty());
 }
 
-TEST(GraphGeometryPacker, WrongDomainFailsClosed)
+TEST(GraphGeometryPacker, GraphSourcesPackEvenWhenExactDomainIsUnknown)
 {
     GraphScratch g = BuildTwoNodeOneEdge();
     ConstSourceView view = g.View();
-    view.ActiveDomain = Domain::Mesh;
+    view.ActiveDomain = Domain::Unknown;
+
+    GraphPackBuffer buffer{};
+    const GraphPackResult result = PackGraph(view, true, true, buffer);
+    ASSERT_EQ(result.Status, GraphPackStatus::Success);
+    ASSERT_TRUE(result.Upload.has_value());
+    EXPECT_EQ(result.Upload->VertexCount, 2u);
+    EXPECT_EQ(result.Upload->LineIndices.size(), 2u);
+}
+
+TEST(GraphGeometryPacker, WrongDomainFailsClosed)
+{
+    ConstSourceView view{};
 
     GraphPackBuffer buffer{};
     const GraphPackResult result = PackGraph(view, true, true, buffer);

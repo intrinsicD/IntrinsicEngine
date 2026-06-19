@@ -243,11 +243,31 @@ TEST(MeshPrimitiveViewPacker, EdgeViewWithZeroEdgesIsValid)
     EXPECT_TRUE(result.Upload->LineIndices.empty());
 }
 
+TEST(MeshPrimitiveViewPacker, MeshMarkerVertexViewDoesNotRequireSurfaceTopology)
+{
+    MeshScratch m{};
+    SetPositions(m.VertexSource, {{0.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}});
+    ConstSourceView view{};
+    view.VertexSource = &m.VertexSource;
+    view.HasMeshTopologyMarker = true;
+
+    MeshPrimitiveViewBuffer buffer{};
+    const MeshPrimitiveViewResult pointResult = PackMeshVertexView(view, buffer);
+    ASSERT_EQ(pointResult.Status, MeshPrimitiveViewStatus::Success);
+    ASSERT_TRUE(pointResult.Upload.has_value());
+    EXPECT_EQ(pointResult.Upload->VertexCount, 2u);
+    EXPECT_TRUE(pointResult.Upload->LineIndices.empty());
+
+    const MeshPrimitiveViewResult edgeResult = PackMeshEdgeView(view, buffer);
+    EXPECT_EQ(edgeResult.Status, MeshPrimitiveViewStatus::MissingEdgeTopology);
+    EXPECT_FALSE(edgeResult.Upload.has_value());
+}
+
 TEST(MeshPrimitiveViewPacker, WrongDomainFailsClosed)
 {
     MeshScratch m = BuildTriangle();
-    ConstSourceView view = m.View();
-    view.ActiveDomain = Domain::Graph;
+    ConstSourceView view{};
+    view.VertexSource = &m.VertexSource;
 
     MeshPrimitiveViewBuffer buffer{};
     EXPECT_EQ(PackMeshEdgeView(view, buffer).Status, MeshPrimitiveViewStatus::WrongDomain);

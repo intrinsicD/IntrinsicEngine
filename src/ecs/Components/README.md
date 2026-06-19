@@ -178,6 +178,17 @@ Canonical key constants live in
 `kHalfedgeNext`, `kHalfedgeFace`, `kFaceHalfedge`); read sites must
 prefer these constants over inline string literals.
 
+`BuildConstView` / `BuildMutableView` keep the exact-domain classifier in
+`ActiveDomain`: a full mesh, graph, or point cloud resolves to one mutually
+exclusive domain, while partial or mixed source sets resolve to `Unknown`.
+Use `BuildSourceAvailability` when a consumer needs to know which CPU sources
+are actually present. The availability contract reports provenance (`Mesh`,
+`Graph`, `PointCloud`, `Unknown`) separately from capabilities
+(`VertexPoints`, `NodePoints`, `Edges`, `Halfedges`, `Faces`), so a mesh can
+satisfy point/edge consumers without pretending to be a point cloud or graph,
+and graph entities populated without a `Halfedges` property set do not
+advertise halfedge-source availability.
+
 Each populate helper drops the entity's prior `GeometrySources`
 components (`Vertices`/`Edges`/`Halfedges`/`Faces`/`Nodes`) and
 topology markers (`HasMeshTopology`/`HasGraphTopology`) before

@@ -17,6 +17,7 @@ import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.GpuSceneSlot;
 import Extrinsic.Graphics.Component.RenderGeometry;
+import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.Engine;
@@ -204,8 +205,8 @@ TEST(GraphGeometryExtraction, PointGraphUploadsOnceAndBindsInstanceGeometry)
     auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
 
-    const auto view =
-        extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
+    const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
+    const auto view = extraction.FindRenderableSidecarForTest(stableId);
     ASSERT_TRUE(view.has_value());
     EXPECT_TRUE(view->HasGraphResidency);
     EXPECT_EQ(gpuWorld.GetInstanceGeometry(view->Instance), view->GraphGeometry);
@@ -227,21 +228,94 @@ TEST(GraphGeometryExtraction, LineAndPointGraphUploadsSingleHandleForBothLanes)
                                                     engine.GetRenderer(),
                                                     &engine.GetGpuAssetCache());
 
-    // Canonical single-renderable-instance contract: both lanes share one
-    // upload / one handle bound to the single instance.
+    // Both lanes share one upload / one geometry handle, but line and point
+    // lanes use separate instances so their visualization configs can diverge.
     EXPECT_EQ(stats.GraphGeometryUploads, 1u);
     EXPECT_EQ(stats.GraphGeometryFailedPack, 0u);
 
     auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
-    EXPECT_EQ(gpuWorld.GetLiveInstanceCount(), 1u);
+    EXPECT_EQ(gpuWorld.GetLiveInstanceCount(), 2u);
     EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 1u);
 
-    const auto view =
-        extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
+    const auto stableId = Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
+    const auto view = extraction.FindRenderableSidecarForTest(stableId);
     ASSERT_TRUE(view.has_value());
     EXPECT_TRUE(view->HasGraphResidency);
     EXPECT_EQ(view->GraphGeometry, view->Geometry);
     EXPECT_EQ(gpuWorld.GetInstanceGeometry(view->Instance), view->GraphGeometry);
+    EXPECT_TRUE(view->HasGraphPointLaneInstance);
+    EXPECT_EQ(gpuWorld.GetInstanceGeometry(view->GraphPointLaneInstance),
+              view->GraphGeometry);
+
+    const auto gpuAvailability = extraction.FindGpuRenderableAvailability(stableId);
+    ASSERT_TRUE(gpuAvailability.has_value());
+    EXPECT_TRUE(gpuAvailability->HasRenderable);
+    EXPECT_FALSE(gpuAvailability->Surface.HasInstance);
+    EXPECT_FALSE(gpuAvailability->Surface.HasGeometry);
+    EXPECT_TRUE(gpuAvailability->Edges.HasInstance);
+    EXPECT_TRUE(gpuAvailability->Edges.HasGeometry);
+    EXPECT_TRUE(gpuAvailability->Points.HasInstance);
+    EXPECT_TRUE(gpuAvailability->Points.HasGeometry);
+    EXPECT_EQ(gpuAvailability->Edges.Instance, view->Instance);
+    EXPECT_EQ(gpuAvailability->Edges.Geometry, view->GraphGeometry);
+    EXPECT_EQ(gpuAvailability->Points.Instance, view->GraphPointLaneInstance);
+    EXPECT_EQ(gpuAvailability->Points.Geometry, view->GraphGeometry);
+    EXPECT_EQ(gpuAvailability->NamedBufferCount, 0u);
+    EXPECT_FALSE(gpuAvailability->HasPositionsBuffer);
+    EXPECT_FALSE(gpuAvailability->HasEdgesBuffer);
+    EXPECT_FALSE(gpuAvailability->HasSizesBuffer);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
+
+TEST(GraphGeometryExtraction, LaneOverridesColorLineAndPointLanesIndependently)
+{
+    namespace G = Extrinsic::Graphics::Components;
+
+    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.Initialize();
+
+    auto& scene = engine.GetScene();
+    const EntityHandle entity = MakeLineAndPointGraphRenderable(scene);
+    auto& raw = scene.Raw();
+
+    G::VisualizationConfig base{};
+    base.Source = G::VisualizationConfig::ColorSource::UniformColor;
+    base.Color = glm::vec4{1.0f, 0.0f, 0.0f, 1.0f};
+    raw.emplace<G::VisualizationConfig>(entity, base);
+
+    G::VisualizationLaneOverrides overrides{};
+    overrides.Edges = base;
+    overrides.Edges->Color = glm::vec4{0.0f, 0.0f, 1.0f, 1.0f};
+    overrides.Points = base;
+    overrides.Points->Color = glm::vec4{0.0f, 0.75f, 0.25f, 1.0f};
+    raw.emplace<G::VisualizationLaneOverrides>(entity, overrides);
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    const auto stats = extraction.ExtractAndSubmit(scene,
+                                                   engine.GetRenderer(),
+                                                   &engine.GetGpuAssetCache());
+
+    EXPECT_EQ(stats.GraphGeometryUploads, 1u);
+    EXPECT_EQ(stats.AllocatedInstanceCount, 2u);
+    EXPECT_EQ(stats.SubmittedTransformCount, 2u);
+    EXPECT_EQ(stats.SubmittedVisualizationCount, 2u);
+
+    auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
+    const auto view =
+        extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
+    ASSERT_TRUE(view.has_value());
+    EXPECT_TRUE(view->HasGraphPointLaneInstance);
+    EXPECT_EQ(gpuWorld.GetInstanceGeometry(view->GraphPointLaneInstance),
+              view->GraphGeometry);
+
+    const auto lineConfig = gpuWorld.GetEntityConfigForTest(view->Instance);
+    EXPECT_EQ(lineConfig.UniformColor, glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
+
+    const auto pointConfig =
+        gpuWorld.GetEntityConfigForTest(view->GraphPointLaneInstance);
+    EXPECT_EQ(pointConfig.UniformColor, glm::vec4(0.0f, 0.75f, 0.25f, 1.0f));
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();
@@ -758,6 +832,16 @@ TEST(GraphGeometryExtraction, LosingLineHintRepacksGraphWithoutDirtyTag)
     ASSERT_TRUE(secondView.has_value());
     EXPECT_TRUE(secondView->HasGraphResidency);
     EXPECT_NE(secondView->GraphGeometry, firstHandle);
+    EXPECT_FALSE(secondView->HasGraphPointLaneInstance);
+
+    const auto gpuAvailability = extraction.FindGpuRenderableAvailability(stableId);
+    ASSERT_TRUE(gpuAvailability.has_value());
+    EXPECT_FALSE(gpuAvailability->Surface.HasGeometry);
+    EXPECT_FALSE(gpuAvailability->Edges.HasGeometry);
+    EXPECT_TRUE(gpuAvailability->Points.HasInstance);
+    EXPECT_TRUE(gpuAvailability->Points.HasGeometry);
+    EXPECT_EQ(gpuAvailability->Points.Instance, secondView->Instance);
+    EXPECT_EQ(gpuAvailability->Points.Geometry, secondView->GraphGeometry);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();

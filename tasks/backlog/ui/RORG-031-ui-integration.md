@@ -59,6 +59,19 @@ depends_on: []
 - Sandbox startup organization — retired as `UI-018`; the first sandbox UI
   frame is menu-first, with all top-level and domain windows closed until the
   user opens them from the main menu bar.
+- Uniform visualization color editing — retired as `UI-019`; mesh, graph,
+  point-cloud, and top-level geometry visualization windows now show an ImGui
+  color edit widget when the selected entity uses
+  `VisualizationConfig::ColorSource::UniformColor`, with edits routed through
+  the runtime-owned visualization config command seam.
+- Visualization lane uniform color editing — retired as `UI-020`; surface,
+  edge, and point render lanes can use independent uniform colors where the
+  selected entity provides the required source data.
+- Geometry availability migration — retired as `UI-021`; editor windows,
+  property catalogs, render hints, primitive-view commands, and processing
+  affordances now consume the `RUNTIME-117` resolver so they ask for the data
+  or render lane they need while keeping mesh/graph/point-cloud provenance
+  visible.
 
 ## Child tasks (open when the trigger fires)
 - **UI-009 — IME and multi-window editor support.** Trigger: an alternative
@@ -72,11 +85,11 @@ depends_on: []
   visualization controls to arbitrary scalar/color/vector arrays.
 - **UI-012 — Sample/debug scene workflows.** Trigger: the `LEGACY-011` value
   gate re-evaluates in favor of a runtime-owned scene-authoring command.
-
 Each child cites this seed in its Context and declares which deferred
 workflow it resolves; IDs continue from `UI-014` for new children because
 `UI-001..008`, `UI-013`, `UI-014`, `UI-015`, `UI-016`, `UI-017`, and
-`UI-018` are taken while `UI-009..012` remain named triggers.
+`UI-018`, `UI-019`, `UI-020`, and `UI-021` are retired while `UI-009..012`
+remain named triggers.
 
 ## Required changes
 - [ ] Keep the current-state inventory and deferred-workflow list above

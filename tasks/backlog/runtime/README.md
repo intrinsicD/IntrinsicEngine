@@ -7,9 +7,10 @@ another backlog directory.
 
 ## Runtime backlog tasks
 
-No open runtime backlog tasks are currently queued here for the progressive
-render-data pipeline. `RUNTIME-111` through `RUNTIME-115` are retired;
-additional runtime follow-ups should open as value-gated tasks with a concrete
+No open runtime-specific backlog tasks are currently queued here.
+
+`RUNTIME-111` through `RUNTIME-115` are retired; additional progressive
+render-data follow-ups should open as value-gated tasks with a concrete
 consumer.
 
 ### Runtime adapter umbrellas (clarified by Q tasks; producer modules)
@@ -52,6 +53,19 @@ split; narratives live in the retirement log.
   (done, 2026-06-15, `CPUContracted`): generic runtime CPU mesh-attribute
   texture bakes now cover resolved-UV vertex/face scalar, label, vector2,
   vector3/normal, and RGBA outputs with stable generated texture keys.
+- [RUNTIME-119 — GPU renderable availability snapshot](../../done/RUNTIME-119-gpu-renderable-availability-snapshot.md)
+  (done, 2026-06-19, `CPUContracted`): `RenderExtractionCache` now exposes a
+  read-only GPU availability view keyed by stable entity id, with independent
+  surface, edge, and point lane residency plus named-buffer facts.
+- [RUNTIME-118 — Geometry availability consumer migration](../../done/RUNTIME-118-geometry-availability-consumer-migration.md)
+  (done, 2026-06-19, `CPUContracted`): runtime packers, extraction,
+  progressive property resolution, selected bake validation, and primitive
+  refinement now consume source/provenance availability instead of using exact
+  `ActiveDomain` as the common capability gate.
+- [RUNTIME-117 — Geometry availability and render-lane resolver](../../done/RUNTIME-117-geometry-availability-render-lane-resolver.md)
+  (done, 2026-06-19, `CPUContracted`): runtime now owns the standard resolver
+  over ECS source availability plus `RenderSurface`, `RenderEdges`, and
+  `RenderPoints`.
 - [RUNTIME-115 — Selected mesh bake command surface](../../done/RUNTIME-115-selected-mesh-bake-command-surface.md)
   (done, 2026-06-17, `CPUContracted`): selected mesh property texture bakes
   now route through a runtime-owned command surface with validation, generated

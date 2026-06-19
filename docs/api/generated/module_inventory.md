@@ -21,7 +21,7 @@ Root scanned: `src`
 | `legacy` | 181 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 36 |
+| `runtime` | 37 |
 
 ## Modules
 
@@ -498,6 +498,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.EcsSystemBundle` | `src/runtime/Runtime.EcsSystemBundle.cppm` | `runtime` |
 | `Extrinsic.Runtime.EditorCommandHistory` | `src/runtime/Runtime.EditorCommandHistory.cppm` | `runtime` |
 | `Extrinsic.Runtime.Engine` | `src/runtime/Runtime.Engine.cppm` | `runtime` |
+| `Extrinsic.Runtime.GeometryAvailability` | `src/runtime/Runtime.GeometryAvailability.cppm` | `runtime` |
 | `Extrinsic.Runtime.GraphGeometryPacker` | `src/runtime/Runtime.GraphGeometryPacker.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshAttributeTextureBake` | `src/runtime/Runtime.MeshAttributeTextureBake.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshGeometryPacker` | `src/runtime/Runtime.MeshGeometryPacker.cppm` | `runtime` |
@@ -520,4 +521,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugAdapters` | `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **492**
+Total modules: **493**

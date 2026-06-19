@@ -4,6 +4,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -688,10 +689,9 @@ namespace Extrinsic::Runtime
             };
         }
 
-        [[nodiscard]] bool ApplyVisualizationConfigFromJson(
-            entt::registry& raw,
-            const ECS::EntityHandle entity,
-            const json& value)
+        [[nodiscard]] bool ReadVisualizationConfigFromJson(
+            const json& value,
+            G::VisualizationConfig& config)
         {
             if (!value.is_object() ||
                 !value.contains("source") ||
@@ -700,7 +700,6 @@ namespace Extrinsic::Runtime
                 return false;
             }
 
-            G::VisualizationConfig config{};
             if (!TryVisualizationColorSourceFromString(value["source"].get<std::string>(),
                                                        config.Source))
             {
@@ -812,7 +811,68 @@ namespace Extrinsic::Runtime
                 }
             }
 
+            return true;
+        }
+
+        [[nodiscard]] bool ApplyVisualizationConfigFromJson(
+            entt::registry& raw,
+            const ECS::EntityHandle entity,
+            const json& value)
+        {
+            G::VisualizationConfig config{};
+            if (!ReadVisualizationConfigFromJson(value, config))
+                return false;
+
             raw.emplace_or_replace<G::VisualizationConfig>(entity, std::move(config));
+            return true;
+        }
+
+        [[nodiscard]] json VisualizationLaneOverridesToJson(
+            const G::VisualizationLaneOverrides& overrides)
+        {
+            json lanes = json::object();
+            if (overrides.Surface.has_value())
+                lanes["surface"] = VisualizationConfigToJson(*overrides.Surface);
+            if (overrides.Edges.has_value())
+                lanes["edges"] = VisualizationConfigToJson(*overrides.Edges);
+            if (overrides.Points.has_value())
+                lanes["points"] = VisualizationConfigToJson(*overrides.Points);
+            return lanes;
+        }
+
+        [[nodiscard]] bool ApplyVisualizationLaneOverridesFromJson(
+            entt::registry& raw,
+            const ECS::EntityHandle entity,
+            const json& value)
+        {
+            if (!value.is_object())
+                return false;
+
+            G::VisualizationLaneOverrides overrides{};
+            const auto readLane =
+                [&value](const char* key,
+                         std::optional<G::VisualizationConfig>& out)
+                {
+                    if (!value.contains(key))
+                        return true;
+                    G::VisualizationConfig config{};
+                    if (!ReadVisualizationConfigFromJson(value[key], config))
+                        return false;
+                    out = std::move(config);
+                    return true;
+                };
+
+            if (!readLane("surface", overrides.Surface) ||
+                !readLane("edges", overrides.Edges) ||
+                !readLane("points", overrides.Points))
+            {
+                return false;
+            }
+
+            if (!overrides.Empty())
+                raw.emplace_or_replace<G::VisualizationLaneOverrides>(
+                    entity,
+                    std::move(overrides));
             return true;
         }
 
@@ -852,6 +912,14 @@ namespace Extrinsic::Runtime
             if (const auto* visualization = raw.try_get<G::VisualizationConfig>(entity))
             {
                 render["visualization"] = VisualizationConfigToJson(*visualization);
+                hasAny = true;
+            }
+            if (const auto* overrides =
+                    raw.try_get<G::VisualizationLaneOverrides>(entity);
+                overrides != nullptr && !overrides->Empty())
+            {
+                render["visualizationLanes"] =
+                    VisualizationLaneOverridesToJson(*overrides);
                 hasAny = true;
             }
 
@@ -939,6 +1007,17 @@ namespace Extrinsic::Runtime
                 if (!ApplyVisualizationConfigFromJson(raw,
                                                       entity,
                                                       render["visualization"]))
+                {
+                    return false;
+                }
+                hasAny = true;
+            }
+            if (render.contains("visualizationLanes"))
+            {
+                if (!ApplyVisualizationLaneOverridesFromJson(
+                        raw,
+                        entity,
+                        render["visualizationLanes"]))
                 {
                     return false;
                 }

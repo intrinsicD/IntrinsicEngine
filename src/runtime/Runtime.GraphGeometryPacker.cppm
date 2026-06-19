@@ -44,7 +44,7 @@ export namespace Extrinsic::Runtime
     enum class GraphPackStatus : std::uint8_t
     {
         Success,
-        WrongDomain,         // `ConstSourceView::ActiveDomain != Domain::Graph`.
+        WrongDomain,         // Source provenance is not `Domain::Graph`.
         NoRenderLane,        // Neither line nor point lane requested.
         MissingNodes,        // `Nodes` PropertySet absent, or `v:position` absent / wrong-typed.
         EmptyGraph,          // No node positions.

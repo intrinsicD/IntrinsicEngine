@@ -62,7 +62,8 @@ namespace Extrinsic::Runtime
 
         using namespace ECS::Components::GeometrySources;
 
-        if (view.ActiveDomain != Domain::PointCloud)
+        const SourceAvailability availability = BuildSourceAvailability(view);
+        if (availability.ProvenanceDomain != Domain::PointCloud)
         {
             return Failure(PointCloudPackStatus::WrongDomain, outBuffer);
         }

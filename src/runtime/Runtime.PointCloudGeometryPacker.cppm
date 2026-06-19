@@ -42,7 +42,7 @@ export namespace Extrinsic::Runtime
     enum class PointCloudPackStatus : std::uint8_t
     {
         Success,
-        WrongDomain,       // `ConstSourceView::ActiveDomain != Domain::PointCloud`.
+        WrongDomain,       // Source provenance is not `Domain::PointCloud`.
         MissingPositions,  // `Vertices` PropertySet absent, or `v:position` absent / wrong-typed.
         EmptyCloud,        // No point positions.
         NonFinitePosition, // `v:position` contains NaN / infinity.

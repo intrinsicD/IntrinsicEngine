@@ -22,6 +22,7 @@ target_sources(${target_name}
         Runtime.EcsSystemBundle.cppm
         Runtime.EditorCommandHistory.cppm
         Runtime.Engine.cppm
+        Runtime.GeometryAvailability.cppm
         Runtime.PhysicsBridge.cppm
         Runtime.SceneSerialization.cppm
         Cameras/Runtime.CameraControllers.cppm
@@ -59,6 +60,7 @@ target_sources(${target_name}
         Runtime.EcsSystemBundle.cpp
         Runtime.EditorCommandHistory.cpp
         Runtime.Engine.cpp
+        Runtime.GeometryAvailability.cpp
         Runtime.PhysicsBridge.cpp
         Runtime.SceneSerialization.cpp
         Cameras/Runtime.CameraControllers.cpp

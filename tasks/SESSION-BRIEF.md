@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- `RUNTIME-116` — Focus-camera-on-selection command (F key) (tasks/active/RUNTIME-116-focus-camera-on-selection-command.md)
+- none
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 
@@ -38,8 +38,6 @@ the authoritative open/unblocked view.
 - unblocked: `GEOM-020` — Sparse direct factorization solver seam (LDLT/LLT) (tasks/backlog/geometry/GEOM-020-sparse-direct-factorization-seam.md)
 - unblocked: `GEOM-023` — Sparse non-symmetric iterative solver seam (BiCGSTAB) (tasks/backlog/geometry/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md)
 - blocked by `GEOM-020`: `GEOM-024` — Sparse symmetric generalized eigensolver seam (tasks/backlog/geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
-- unblocked: `GRAPHICS-089` — Generated-UV texture sampling Vulkan smoke (tasks/backlog/rendering/GRAPHICS-089-generated-uv-texture-sampling-vulkan-smoke.md)
-- unblocked: `GRAPHICS-091` — Unify scalar-field / colormap visualization across surface, line, and point passes (tasks/backlog/rendering/GRAPHICS-091-unify-scalar-colormap-across-surface-line-point.md)
 - blocked by `GEOM-020`: `METHOD-002` — Signed Heat Method reference backend (tasks/backlog/methods/METHOD-002-signed-heat-method-reference-backend.md)
 - blocked by `GEOM-023`: `METHOD-003` — Closest Point Method PDE solver reference backend (tasks/backlog/methods/METHOD-003-closest-point-method-pde-reference-backend.md)
 - unblocked: `METHOD-004` — Walk on Spheres / Walk on Stars PDE solver reference backend (tasks/backlog/methods/METHOD-004-walk-on-spheres-reference-backend.md)
