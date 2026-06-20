@@ -773,3 +773,25 @@ tree:
       generated-inventory, doc-link, whitespace, and current-diff debug-probe
       checks passed.
     status: resolved
+  - id: N39
+    type: decision
+    title: "Commit normals recompute and renderer sync slice"
+    provenance: ai-executed
+    timestamp: "2026-06-21T01:32"
+    also_depends_on: [N31, N33, N35, N37, N38]
+    choice: >
+      Committed the complete staged GEOM-026 mesh normal recompute slice plus
+      UI-022 editor integration and BUG-047/048/049 shader/runtime/renderer
+      follow-up fixes as `843e4fb3 Add mesh normal recompute and renderer
+      sync`.
+    alternatives:
+      - "Leave the verified implementation uncommitted."
+      - "Split the already-staged multi-task slice into several commits after verification."
+    evidence:
+      - "git commit 843e4fb3"
+      - "tasks/backlog/geometry/GEOM-026-cross-domain-vertex-normal-recompute.md"
+      - "tasks/backlog/ui/UI-022-sandbox-editor-vertex-normal-recompute.md"
+      - "tasks/backlog/bugs/BUG-047-surface-normal-texture-overrides-vertex-normals.md"
+      - "tasks/backlog/bugs/BUG-048-direct-mesh-postprocess-overwrites-recomputed-normals.md"
+      - "tasks/backlog/bugs/BUG-049-gpuworld-geometry-rebind-upload-barriers.md"
+    status: resolved

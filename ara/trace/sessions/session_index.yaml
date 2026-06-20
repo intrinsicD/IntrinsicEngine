@@ -36,8 +36,8 @@ sessions:
     open_threads: 2
   - id: "2026-06-21_001"
     date: "2026-06-21"
-    summary: "Diagnosed and fixed BUG-048 and BUG-049 so editor-recomputed vertex normals survive runtime post-process and replacement GpuWorld data is synchronized before renderer consumers."
-    turn_count: 2
-    events_count: 4
+    summary: "Diagnosed, fixed, verified, and committed the GEOM-026 mesh normal recompute slice with UI-022 integration and BUG-047/048/049 shader/runtime/renderer fixes."
+    turn_count: 3
+    events_count: 5
     claims_touched: []
     open_threads: 2

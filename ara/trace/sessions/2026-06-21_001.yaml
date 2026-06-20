@@ -2,9 +2,9 @@ session:
   id: "2026-06-21_001"
   date: "2026-06-21"
   started: "2026-06-21T00:39"
-  last_turn: "2026-06-21T01:09"
-  turn_count: 2
-  summary: "Diagnosed and fixed BUG-048 and BUG-049 so editor-recomputed vertex normals survive runtime post-process and replacement GpuWorld data is synchronized before renderer consumers."
+  last_turn: "2026-06-21T01:32"
+  turn_count: 3
+  summary: "Diagnosed, fixed, verified, and committed the GEOM-026 mesh normal recompute slice with UI-022 integration and BUG-047/048/049 shader/runtime/renderer fixes."
 
 events_logged:
   - turn: 1
@@ -31,6 +31,12 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Replacement geometry rebind regression passed and proved one-shot barriers; focused extraction coverage, full 3740-test CPU gate, and structural/docs checks passed."
+  - turn: 3
+    type: decision
+    id: "N39"
+    routing: direct
+    provenance: ai-executed
+    summary: "Committed the verified GEOM-026/UI-022/BUG-047/048/049 slice as `843e4fb3 Add mesh normal recompute and renderer sync`."
 
 ai_actions:
   - turn: 1
@@ -55,6 +61,11 @@ ai_actions:
       - "tasks/backlog/bugs/index.md"
       - "docs/api/generated/module_inventory.md"
       - "tasks/SESSION-BRIEF.md"
+  - turn: 3
+    action: "Staged all current changes and created commit `843e4fb3 Add mesh normal recompute and renderer sync`."
+    provenance: ai-executed
+    files_changed:
+      - "git commit 843e4fb3"
 
 claims_touched: []
 
@@ -71,6 +82,8 @@ key_context:
     excerpt: "End-to-end tracing found the UI command, dirty tag, runtime extraction, geometry rebind, `GpuWorld::SetInstanceGeometry`, render-prep order, and per-frame culling dispatch were already active; the missing piece was explicit GPU visibility for direct buffer writes before the next consumers."
   - turn: 2
     excerpt: "The final contract remains deferred and frame-loop owned: UI computes CPU normals and stamps `DirtyVertexAttributes`; runtime extraction uploads/rebinds; renderer submits upload-to-read barriers before culling consumes the new buffers."
+  - turn: 3
+    excerpt: "User requested committing all changes accordingly, with GEOM-026 as the referenced task context."
 
 open_threads:
   - "UI-022 graph and point-cloud normal windows remain pending until geometry-owned recompute modules exist for those domains."

@@ -89,3 +89,8 @@ entries:
       - "Routed BUG-049 diagnosis/fix as a direct journey decision because renderer, GpuWorld, test, task, and generated inventory artifacts now depend on one-shot upload barrier ownership."
       - "Recorded replacement-geometry barrier regression, focused extraction tests, full 3740-test CPU gate, and structural/docs checks as direct experiment evidence."
       - "Did not stage a new claim; the turn resolved a concrete synchronization gap while preserving the established deferred UI dirty-tag contract."
+  - turn: "2026-06-21_001#3"
+    notes:
+      - "Routed the commit as a direct journey decision because the verified multi-task slice is now artifact-committed as `843e4fb3`."
+      - "Did not stage or crystallize claims; the turn was commit publication rather than a new technical assertion."
+      - "Kept open threads unchanged: graph/point-cloud normal modules and tangent-space normal-map support remain future work."
