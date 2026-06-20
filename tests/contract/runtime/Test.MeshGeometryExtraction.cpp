@@ -1036,6 +1036,8 @@ TEST_P(MeshGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
         D::MarkGpuDirty(raw, entity);
     else if (param == "DirtyVertexPositions")
         D::MarkVertexPositionsDirty(raw, entity);
+    else if (param == "DirtyVertexAttributes")
+        D::MarkVertexAttributesDirty(raw, entity);
     else if (param == "DirtyFaceTopology")
         D::MarkFaceTopologyDirty(raw, entity);
     else if (param == "DirtyEdgeTopology")
@@ -1069,6 +1071,7 @@ TEST_P(MeshGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
     // reuse path with no reupload.
     EXPECT_FALSE((raw.any_of<D::GpuDirty,
                               D::DirtyVertexPositions,
+                              D::DirtyVertexAttributes,
                               D::DirtyFaceTopology,
                               D::DirtyEdgeTopology>(entity)));
 
@@ -1100,6 +1103,7 @@ INSTANTIATE_TEST_SUITE_P(AllDirtyDomains,
                           MeshGeometryExtractionDirtyTag,
                           ::testing::Values("GpuDirty",
                                             "DirtyVertexPositions",
+                                            "DirtyVertexAttributes",
                                             "DirtyFaceTopology",
                                             "DirtyEdgeTopology"));
 
@@ -1125,6 +1129,7 @@ TEST(MeshGeometryExtraction, MultipleDirtyTagsCoalesceIntoSingleReupload)
     // reupload count must remain 1 regardless of how many tags fire.
     D::MarkGpuDirty(raw, entity);
     D::MarkVertexPositionsDirty(raw, entity);
+    D::MarkVertexAttributesDirty(raw, entity);
     D::MarkFaceTopologyDirty(raw, entity);
     D::MarkEdgeTopologyDirty(raw, entity);
 
@@ -1137,6 +1142,7 @@ TEST(MeshGeometryExtraction, MultipleDirtyTagsCoalesceIntoSingleReupload)
 
     EXPECT_FALSE((raw.any_of<D::GpuDirty,
                               D::DirtyVertexPositions,
+                              D::DirtyVertexAttributes,
                               D::DirtyFaceTopology,
                               D::DirtyEdgeTopology>(entity)));
 

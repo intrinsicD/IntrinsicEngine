@@ -23,10 +23,14 @@ the authoritative open/unblocked view.
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RORG-031F` — UI integration backlog seed (tasks/backlog/ui/RORG-031-ui-integration.md)
+- blocked by `GEOM-026`: `UI-022` — Sandbox EditorUI vertex-normal recompute windows (tasks/backlog/ui/UI-022-sandbox-editor-vertex-normal-recompute.md)
 
 ## Theme G — Active bugs
 
 - unblocked: `BUG-046` — Flaky `CoreTaskGraph.MainThreadReadyQueueUsesPriorityAndCostOrdering` (timing-dependent ready-queue batching) (tasks/backlog/bugs/BUG-046-flaky-coretaskgraph-mainthread-ready-queue-ordering.md)
+- unblocked: `BUG-047` — Surface normal texture overrides vertex-normal shading (tasks/backlog/bugs/BUG-047-surface-normal-texture-overrides-vertex-normals.md)
+- unblocked: `BUG-048` — Direct mesh post-process overwrites recomputed normals (tasks/backlog/bugs/BUG-048-direct-mesh-postprocess-overwrites-recomputed-normals.md)
+- unblocked: `BUG-049` — GpuWorld geometry rebind lacks upload-to-read barriers (tasks/backlog/bugs/BUG-049-gpuworld-geometry-rebind-upload-barriers.md)
 
 ## Unthemed
 
@@ -38,6 +42,7 @@ the authoritative open/unblocked view.
 - unblocked: `GEOM-020` — Sparse direct factorization solver seam (LDLT/LLT) (tasks/backlog/geometry/GEOM-020-sparse-direct-factorization-seam.md)
 - unblocked: `GEOM-023` — Sparse non-symmetric iterative solver seam (BiCGSTAB) (tasks/backlog/geometry/GEOM-023-sparse-nonsymmetric-iterative-solver-seam.md)
 - blocked by `GEOM-020`: `GEOM-024` — Sparse symmetric generalized eigensolver seam (tasks/backlog/geometry/GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
+- unblocked: `GEOM-026` — Cross-domain vertex normal recomputation contracts (tasks/backlog/geometry/GEOM-026-cross-domain-vertex-normal-recompute.md)
 - blocked by `GEOM-020`: `METHOD-002` — Signed Heat Method reference backend (tasks/backlog/methods/METHOD-002-signed-heat-method-reference-backend.md)
 - blocked by `GEOM-023`: `METHOD-003` — Closest Point Method PDE solver reference backend (tasks/backlog/methods/METHOD-003-closest-point-method-pde-reference-backend.md)
 - unblocked: `METHOD-004` — Walk on Spheres / Walk on Stars PDE solver reference backend (tasks/backlog/methods/METHOD-004-walk-on-spheres-reference-backend.md)

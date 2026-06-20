@@ -64,3 +64,28 @@ entries:
       - "Routed GRAPHICS-091 diagnosis/fix and verification as direct journey facts because the turn produced concrete code, task-state movement, and backend test evidence."
       - "Did not stage the root-cause summary as a new claim; the code changes and Vulkan smoke passing are sufficient forensic bindings in N27/N28."
       - "Kept the surface parity task item open because this turn proved line/point operational behavior and surface visibility, not bitwise surface parity."
+  - turn: "2026-06-20_001#1"
+    notes:
+      - "Routed UI-022 plan refinement as a direct journey decision because the task artifact now depends on the chosen menu path and dirty-tag synchronization contract."
+      - "Recorded task-policy validation as a direct experiment-like event."
+      - "Did not stage or crystallize claims; this turn produced task planning and implementation guidance rather than a settled research claim."
+  - turn: "2026-06-20_001#2"
+    notes:
+      - "Routed UI-022 mesh implementation as a direct journey decision because the code and task artifacts now depend on the mesh-first normal recompute contract."
+      - "Recorded focused build, CTest, and structural/docs checks as direct experiment evidence."
+      - "Did not stage or crystallize claims; graph and point-cloud normal windows remain explicit open implementation work pending geometry modules."
+  - turn: "2026-06-20_001#3"
+    notes:
+      - "Routed BUG-047 as a direct journey decision because shader, test, docs, and task artifacts now depend on current surface shading using packed vertex-normal attributes."
+      - "Recorded shader builds, focused renderer contract, end-to-end normal recompute/extraction tests, and structural/docs checks as direct experiment evidence."
+      - "Did not stage a new claim; tangent-space normal-map support remains an explicit open thread rather than a settled promoted path."
+  - turn: "2026-06-21_001#1"
+    notes:
+      - "Routed BUG-048 diagnosis/fix as a direct journey decision because runtime, test, docs, and task artifacts now depend on preserving count-matched current mesh normals through deferred direct mesh post-process apply."
+      - "Recorded the failing-then-passing repro, focused adjacent tests, structural checks, aggregate build, and default CPU-supported CTest gate as direct experiment evidence."
+      - "Did not stage a new claim; the turn produced a committed engineering fix and verification for a concrete runtime race while leaving tangent-space normal maps and non-mesh normal domains as open threads."
+  - turn: "2026-06-21_001#2"
+    notes:
+      - "Routed BUG-049 diagnosis/fix as a direct journey decision because renderer, GpuWorld, test, task, and generated inventory artifacts now depend on one-shot upload barrier ownership."
+      - "Recorded replacement-geometry barrier regression, focused extraction tests, full 3740-test CPU gate, and structural/docs checks as direct experiment evidence."
+      - "Did not stage a new claim; the turn resolved a concrete synchronization gap while preserving the established deferred UI dirty-tag contract."

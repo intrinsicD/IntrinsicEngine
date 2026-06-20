@@ -15,7 +15,7 @@
 //
 // Reads the material slot from the per-instance index forwarded by the vertex
 // shader, samples supported material textures through resolved UVs, and uses
-// the packed vertex normal as the default lighting normal. Slot 0 carries the
+// the packed vertex normal as the lighting normal. Slot 0 carries the
 // recorded `Material.DefaultDebugSurface` params (`MaterialFlags::Unlit`,
 // purple `BaseColorFactor`) so any invalid material handle resolves to a
 // visible missing-material surface.
@@ -86,18 +86,10 @@ void main() {
             visualizationColor,
             baseColor);
 
-    vec3 sampledNormal = vec3(0.0, 0.0, 1.0);
     const float vertexNormalLen = length(fragWorldNormal);
-    if (vertexNormalLen > 1.0e-6) {
-        sampledNormal = fragWorldNormal / vertexNormalLen;
-    }
-    if (IsValidTextureID(mat.NormalID)) {
-        vec3 normalTex = texture(globalTextures[nonuniformEXT(mat.NormalID)], fragUv).xyz * 2.0 - 1.0;
-        float normalTexLen = length(normalTex);
-        if (normalTexLen > 1.0e-6) {
-            sampledNormal = normalTex / normalTexLen;
-        }
-    }
+    const vec3 sampledNormal = (vertexNormalLen > 1.0e-6)
+        ? (fragWorldNormal / vertexNormalLen)
+        : vec3(0.0, 0.0, 1.0);
 
     if ((mat.Flags & GpuMaterialFlag_Unlit) != 0u ||
         mat.MaterialTypeID == GpuMaterialType_DefaultDebugSurface) {

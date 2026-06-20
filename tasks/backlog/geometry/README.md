@@ -23,6 +23,9 @@ map.
 - [GEOM-024 — Sparse symmetric generalized eigensolver seam](GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
   (gates `methods/METHOD-006` variant B; depends on `GEOM-020`; promote when
   METHOD-006 is the next-priority method).
+- [GEOM-026 — Cross-domain vertex normal recomputation contracts](GEOM-026-cross-domain-vertex-normal-recompute.md)
+  (gates `ui/UI-022`; adds geometry-owned CPU normal recomputation for mesh,
+  graph, and point-cloud vertex domains under their domain-owned normal modules).
 - [RORG-031E — Geometry and method-readiness backlog seed](RORG-031-geometry-method-readiness.md).
 
 ## Convergence
@@ -53,6 +56,13 @@ map.
   audit, excluding `Geometry.MeshSoup` which is owned by GEOM-021.
 - GEOM-012 ensures mesh, graph, and point-cloud algorithms can share compatible
   property storage through explicit borrowed views instead of accidental copies.
+- GEOM-026 turns vertex normal recomputation into a geometry-owned CPU contract
+  shared by the sandbox editor UI: `Geometry.HalfedgeMesh.Vertices.Normals`
+  handles selectable face-normal averaging schemes,
+  `Geometry.Graph.Vertex.Normals` handles edge-connectivity neighborhoods, and
+  `Geometry.PointCloud.Normals` replaces the old `Geometry.NormalEstimation`
+  point-cloud module with KDTree/default and supplied-index normal-generation
+  overloads that return the written normal property.
 - GEOM-013 and GEOM-014 are seeded by the geometry paper survey
   [`docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md`](../../../docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md).
   Each lists explicit algorithm variants with a marked default (Manifold DC

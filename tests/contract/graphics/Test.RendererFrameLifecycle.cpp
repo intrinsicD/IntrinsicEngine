@@ -1269,12 +1269,21 @@ TEST(RendererFrameLifecycle, ForwardSurfacePipelineSurvivesOperationalRebuild)
 {
     const std::string surfaceVertex = ReadShaderSource("forward/default_debug_surface.vert");
     const std::string surfaceFragment = ReadShaderSource("forward/default_debug_surface.frag");
+    const std::string defaultGBufferFragment =
+        ReadShaderSource("deferred/default_debug_gbuffer.frag");
+    const std::string promotedGBufferFragment =
+        ReadShaderSource("deferred/gbuffer.frag");
 
     EXPECT_NE(surfaceVertex.find("fragUv = v.UV"), std::string::npos);
     EXPECT_NE(surfaceVertex.find("fragWorldNormal"), std::string::npos);
     EXPECT_NE(surfaceFragment.find("mat.AlbedoID"), std::string::npos);
-    EXPECT_NE(surfaceFragment.find("mat.NormalID"), std::string::npos);
     EXPECT_NE(surfaceFragment.find("fragWorldNormal"), std::string::npos);
+    EXPECT_EQ(surfaceFragment.find("mat.NormalID"), std::string::npos);
+    EXPECT_EQ(surfaceFragment.find("normalTex"), std::string::npos);
+    EXPECT_EQ(defaultGBufferFragment.find("mat.NormalID"), std::string::npos);
+    EXPECT_EQ(defaultGBufferFragment.find("normalTex"), std::string::npos);
+    EXPECT_EQ(promotedGBufferFragment.find("mat.NormalID"), std::string::npos);
+    EXPECT_EQ(promotedGBufferFragment.find("normalTex"), std::string::npos);
     EXPECT_NE(surfaceFragment.find("GpuMaterialType_DefaultDebugUVs"), std::string::npos);
     EXPECT_NE(surfaceFragment.find("DebugUvChecker(fragUv)"), std::string::npos);
     EXPECT_NE(surfaceFragment.find("normalShade"), std::string::npos);

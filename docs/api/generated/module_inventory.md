@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 12 |
 | `core` | 39 |
 | `ecs` | 28 |
-| `geometry` | 87 |
+| `geometry` | 88 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 62 |
@@ -147,6 +147,7 @@ Root scanned: `src`
 | `Geometry.Subdivision` | `src/geometry/Geometry.HalfedgeMesh.Subdivision.cppm` | `geometry` |
 | `Geometry.HalfedgeMesh.Utils` | `src/geometry/Geometry.HalfedgeMesh.Utils.cppm` | `geometry` |
 | `Geometry.VectorHeatMethod` | `src/geometry/Geometry.HalfedgeMesh.VectorHeatMethod.cppm` | `geometry` |
+| `Geometry.HalfedgeMesh.Vertices.Normals` | `src/geometry/Geometry.HalfedgeMesh.Vertices.Normals.cppm` | `geometry` |
 | `Geometry.HalfedgeMesh` | `src/geometry/Geometry.HalfedgeMesh.cppm` | `geometry` |
 | `Geometry.Handle` | `src/geometry/Geometry.Handle.cppm` | `geometry` |
 | `Geometry.HtexPatch` | `src/geometry/Geometry.HtexPatch.cppm` | `geometry` |
@@ -521,4 +522,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugAdapters` | `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **493**
+Total modules: **494**

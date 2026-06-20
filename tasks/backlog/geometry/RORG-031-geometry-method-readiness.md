@@ -27,7 +27,8 @@ depends_on: []
   (parameterization diagnostics), `GEOM-019` (harmonic/Tutte, gated on
   GEOM-018 + GEOM-020), `GEOM-020` (sparse LDLT/LLT seam), `GEOM-023`
   (non-symmetric BiCGSTAB seam), `GEOM-024` (generalized eigensolver seam,
-  gated on GEOM-020).
+  gated on GEOM-020), `GEOM-026` (cross-domain vertex normal recomputation,
+  gates `UI-022`).
 - Retired children/foundations: `GEOM-005..012`, `GEOM-015`, `GEOM-021`,
   `GEOM-022`, `GEOIO-002` (narratives in the retirement log; index in the
   category README).
@@ -61,7 +62,7 @@ depends_on: []
 
 ## Verification
 ```bash
-for t in GEOM-013 GEOM-014 GEOM-016 GEOM-017 GEOM-018 GEOM-019 GEOM-020 GEOM-023 GEOM-024; do
+for t in GEOM-013 GEOM-014 GEOM-016 GEOM-017 GEOM-018 GEOM-019 GEOM-020 GEOM-023 GEOM-024 GEOM-026; do
   ls tasks/backlog/geometry/${t}-*.md >/dev/null || { echo "missing ${t}"; exit 1; }
 done
 python3 tools/agents/validate_tasks.py --root tasks --strict

@@ -38,10 +38,11 @@ import Extrinsic.Runtime.ProgressivePresentationExtraction;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
-import Extrinsic.Runtime.SceneSerialization;
-import Extrinsic.Runtime.SelectedMeshTextureBake;
-import Extrinsic.Runtime.SelectionController;
-import Geometry.UvAtlas;
+    import Extrinsic.Runtime.SceneSerialization;
+    import Extrinsic.Runtime.SelectedMeshTextureBake;
+    import Extrinsic.Runtime.SelectionController;
+    import Geometry.HalfedgeMesh.Vertices.Normals;
+    import Geometry.UvAtlas;
 
 namespace Extrinsic::Runtime::Detail
 {
@@ -262,6 +263,18 @@ export namespace Extrinsic::Runtime
             SandboxEditorGeometryProcessingDomain::None};
     };
 
+    struct SandboxEditorGeometryProcessingMenuItem
+    {
+        SandboxEditorGeometryProcessingDomain Domain{
+            SandboxEditorGeometryProcessingDomain::None};
+        const char* Label{""};
+        bool HasNormalsMethod{false};
+    };
+
+    [[nodiscard]] std::vector<SandboxEditorGeometryProcessingMenuItem>
+    GetSandboxEditorGeometryProcessingMenuItems(
+        SandboxEditorDomainWindowKind kind);
+
     [[nodiscard]] SandboxEditorGeometryProcessingDomain
     GetSandboxEditorSupportedGeometryProcessingDomains(
         SandboxEditorGeometryProcessingAlgorithm algorithm) noexcept;
@@ -317,6 +330,43 @@ export namespace Extrinsic::Runtime
         bool Converged{false};
         float Inertia{0.0f};
         std::uint32_t MaxDistanceIndex{0u};
+        Core::ErrorCode Error{Core::ErrorCode::Success};
+        std::string Message{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == SandboxEditorCommandStatus::Applied;
+        }
+    };
+
+    struct SandboxEditorMeshVertexNormalsCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        Geometry::HalfedgeMesh::VertexNormals::AveragingMode Weighting{
+            Geometry::HalfedgeMesh::VertexNormals::AveragingMode::AreaWeighted};
+        glm::vec3 FallbackNormal{0.0f, 1.0f, 0.0f};
+        double DegenerateNormalLengthEpsilon{1.0e-12};
+    };
+
+    struct SandboxEditorMeshVertexNormalsResult
+    {
+        SandboxEditorCommandStatus Status{SandboxEditorCommandStatus::NoChange};
+        Geometry::HalfedgeMesh::VertexNormals::RecomputeStatus NormalStatus{
+            Geometry::HalfedgeMesh::VertexNormals::RecomputeStatus::Success};
+        Geometry::HalfedgeMesh::VertexNormals::AveragingMode Weighting{
+            Geometry::HalfedgeMesh::VertexNormals::AveragingMode::AreaWeighted};
+        std::size_t VertexSlotCount{0};
+        std::size_t WrittenCount{0};
+        std::size_t ValidNormalVertexCount{0};
+        std::size_t ProcessedFaceCount{0};
+        std::size_t DegenerateFaceCount{0};
+        std::size_t NonFiniteFaceCount{0};
+        std::size_t InvalidTopologyFaceCount{0};
+        std::size_t DegenerateCornerCount{0};
+        std::size_t FallbackVertexCount{0};
+        std::size_t SkippedDeletedFaceCount{0};
+        std::size_t SkippedDeletedVertexCount{0};
+        bool FallbackNormalWasRepaired{false};
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::string Message{};
 
@@ -1072,7 +1122,10 @@ export namespace Extrinsic::Runtime
         SandboxEditorGeometryProcessingCapabilities Capabilities{};
         std::vector<SandboxEditorGeometryProcessingEntry> Entries{};
         std::vector<SandboxEditorGeometryProcessingDomain> KMeansDomains{};
+        bool MeshVertexNormalsAvailable{false};
         std::optional<SandboxEditorKMeansResult> LastKMeansResult{};
+        std::optional<SandboxEditorMeshVertexNormalsResult>
+            LastMeshVertexNormalsResult{};
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
@@ -1142,6 +1195,8 @@ export namespace Extrinsic::Runtime
         const SandboxEditorFileImportResult* LastAssetImportResult{nullptr};
         const SandboxEditorSceneFileResult* LastSceneFileResult{nullptr};
         const SandboxEditorKMeansResult* LastKMeansResult{nullptr};
+        const SandboxEditorMeshVertexNormalsResult*
+            LastMeshVertexNormalsResult{nullptr};
         const Graphics::RenderGraphFrameStats* RenderGraphStats{nullptr};
         bool ImGuiAdapterAvailable{false};
         bool AssetImportCommandsAvailable{false};
@@ -1440,6 +1495,11 @@ export namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const SandboxEditorKMeansCommand& command);
 
+    SandboxEditorMeshVertexNormalsResult
+    ApplySandboxEditorMeshVertexNormalsCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorMeshVertexNormalsCommand& command);
+
     void DrawSandboxEditorPanelFrame(const SandboxEditorPanelFrame& frame);
 
     class SandboxEditorUi
@@ -1476,12 +1536,16 @@ export namespace Extrinsic::Runtime
         std::optional<SandboxEditorFileImportResult> m_LastImportResult{};
         std::optional<SandboxEditorSceneFileResult> m_LastSceneFileResult{};
         std::optional<SandboxEditorKMeansResult> m_LastKMeansResult{};
+        std::optional<SandboxEditorMeshVertexNormalsResult>
+            m_LastMeshVertexNormalsResult{};
         SandboxEditorGeometryProcessingDomain m_KMeansDomain{
             SandboxEditorGeometryProcessingDomain::None};
         std::int32_t m_KMeansClusterCount{8};
         std::int32_t m_KMeansMaxIterations{32};
         std::int32_t m_KMeansSeed{42};
         bool m_KMeansUseHierarchicalInitialization{true};
+        std::int32_t m_MeshVertexNormalsWeighting{1};
+        glm::vec3 m_MeshVertexNormalsFallback{0.0f, 1.0f, 0.0f};
         std::int32_t m_TextureBakeSourceIndex{0};
         std::int32_t m_TextureBakeTargetSemanticIndex{0};
         std::int32_t m_TextureBakeEncoderIndex{0};

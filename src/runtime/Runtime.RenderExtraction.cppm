@@ -120,8 +120,9 @@ export namespace Extrinsic::Runtime
         // entity on the first frame the mesh is packed and uploaded;
         // subsequent clean frames hit `ReuseHits`; subsequent dirty
         // frames hit `Reuploads` after Slice C drains the dirty-domain
-        // tags (`DirtyVertexPositions`, `DirtyFaceTopology`,
-        // `DirtyEdgeTopology`, `GpuDirty`) and repacks the mesh.
+        // tags (`DirtyVertexPositions`, `DirtyVertexAttributes`,
+        // `DirtyFaceTopology`, `DirtyEdgeTopology`, `GpuDirty`) and repacks the
+        // mesh.
         // `FailedPack` aggregates non-input-shape pack rejections
         // (`DegenerateAllFaces`, `EmptyMesh`, `NonFinitePosition`,
         // `MissingHalfedgeTopology`, `MissingFaceTopology`, `WrongDomain`);

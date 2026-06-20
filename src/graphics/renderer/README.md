@@ -247,9 +247,11 @@ Concretely:
   early-return on `!m_Pipeline.IsValid()` while the executor still
   reported `Recorded`). The forward shader pair forwards the packed surface
   UV channel plus the packed vertex normal; it samples
-  `MaterialParams::AlbedoID` / `NormalID` through the bindless texture set when
-  those IDs are valid, otherwise it falls back to `BaseColorFactor` and the
-  transformed vertex normal. The fragment stage is still a debug Lambert-style
+  `MaterialParams::AlbedoID` through the bindless texture set when that ID is
+  valid, otherwise it falls back to `BaseColorFactor`. The shading normal
+  comes from the transformed packed vertex normal; `NormalID` is intentionally
+  ignored until a tangent-space normal-map path is promoted. The fragment stage
+  is still a debug Lambert-style
   surface shader, not full PBR lighting; metallic/roughness/emissive texture
   evaluation remains future surface-shading work. The legacy
   `assets/shaders/surface.vert/frag` pair predates
@@ -1431,10 +1433,11 @@ Concretely:
   magenta-and-black checkerboard fallback texture (RGBA8_UNORM, alpha
   0xFF, nearest filter, clamp-to-edge) exists for missing/pending texture
   assets and is observable through `TextureAssetFallbackResolveCount`.
-  Surface shaders sample `MaterialParams::AlbedoID` for base color and
-  `MaterialParams::NormalID` for the retained surface/GBuffer normal path only
-  when those bindless IDs are valid; invalid IDs fall back to
-  `BaseColorFactor` and the packed vertex normal. Metallic/roughness factors
+  Surface shaders sample `MaterialParams::AlbedoID` for base color when the
+  bindless ID is valid; invalid IDs fall back to `BaseColorFactor`. The
+  retained surface and GBuffer normal paths use the packed vertex normal and
+  intentionally ignore `MaterialParams::NormalID` until a tangent-space
+  normal-map path is promoted. Metallic/roughness factors
   are carried in `MaterialParams` and the deferred GBuffer metadata, but full
   PBR texture/factor lighting is not implemented in the current default
   forward shader.

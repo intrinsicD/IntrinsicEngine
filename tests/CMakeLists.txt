@@ -426,6 +426,7 @@ set(_geometry_test_files
     Test_Boolean.cpp
     Test_MeshBoundary.cpp
     Test_GeometryAttributePropagation.cpp
+    Test.HalfedgeMeshVertexNormals.cpp
     Test_HalfedgeMeshPropertyAccess.cpp
     Test_HalfedgeMeshTopology.cpp
     Test_HtexPatch.cpp

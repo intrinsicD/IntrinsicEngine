@@ -529,3 +529,247 @@ tree:
       surface visibility smoke passed, full IntrinsicTests build passed, default
       CPU-supported CTest passed 2948/2948, and strict structural checks passed.
     status: resolved
+  - id: N29
+    type: decision
+    title: "Plan UI-022 normals menu and deferred GPU sync"
+    provenance: ai-executed
+    timestamp: "2026-06-20T22:49"
+    choice: >
+      Updated UI-022 so vertex normal recomputation is exposed as
+      `Mesh > Processing > Vertices > Normals` with matching graph and
+      point-cloud leaf names, uses canonical `v:normal`, and follows the
+      runtime dirty-tag contract: publish CPU normals, stamp
+      `DirtyVertexAttributes`, and let render extraction/main-loop residency
+      repack and upload on the next extraction opportunity.
+    alternatives:
+      - "Directly update renderer/RHI buffers from the editor command."
+      - "Launch a separate GPU update task after recomputation."
+      - "Compensate for missing mesh attribute dirty consumption by unconditionally stamping `GpuDirty` in UI."
+    evidence:
+      - "tasks/backlog/ui/UI-022-sandbox-editor-vertex-normal-recompute.md"
+      - "src/ecs/Components/ECS.Component.DirtyTags.cppm"
+      - "src/runtime/Runtime.MeshGeometryPacker.cppm"
+      - "src/runtime/Runtime.RenderExtraction.cpp"
+    status: resolved
+  - id: N30
+    type: experiment
+    title: "UI-022 task-plan validation"
+    provenance: ai-executed
+    timestamp: "2026-06-20T22:49"
+    also_depends_on: [N29]
+    evidence:
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+    result: >
+      Strict task policy validated 477 task files with zero findings and no
+      maturity follow-up findings after the UI-022 plan refinement.
+    status: resolved
+  - id: N31
+    type: decision
+    title: "Implement UI-022 mesh vertex normal recompute"
+    provenance: ai-executed
+    timestamp: "2026-06-20T23:29"
+    also_depends_on: [N29]
+    choice: >
+      Implemented the mesh-first editor path `Mesh > Processing > Vertices >
+      Normals` by adding SandboxEditor mesh normal command/result DTOs, ImGui
+      controls for all four halfedge weighting modes, fail-closed publication
+      to canonical `v:normal`, editor-history dirty marking, and deferred
+      `DirtyVertexAttributes` GPU synchronization through render extraction.
+    alternatives:
+      - "Use direct renderer/RHI updates from the UI command."
+      - "Stamp broad `GpuDirty` after normal recomputation."
+      - "Expose graph and point-cloud normal windows before geometry-owned domain modules exist."
+    evidence:
+      - "src/runtime/Editor/Runtime.SandboxEditorUi.cppm"
+      - "src/runtime/Editor/Runtime.SandboxEditorUi.cpp"
+      - "src/runtime/Runtime.RenderExtraction.cpp"
+      - "src/runtime/Runtime.RenderExtraction.cppm"
+      - "tests/contract/runtime/Test.SandboxEditorUi.cpp"
+      - "tests/contract/runtime/Test.MeshGeometryExtraction.cpp"
+      - "src/runtime/README.md"
+      - "tasks/backlog/ui/UI-022-sandbox-editor-vertex-normal-recompute.md"
+    status: resolved
+  - id: N32
+    type: experiment
+    title: "UI-022 mesh normals verification"
+    provenance: ai-executed
+    timestamp: "2026-06-20T23:29"
+    also_depends_on: [N31]
+    evidence:
+      - "cmake --build --preset ci --target IntrinsicGeometryTests IntrinsicRuntimeContractTests -j 4"
+      - "cmake --build --preset ci --target IntrinsicRuntimeContractTests -j 4"
+      - "ctest --test-dir build/ci --output-on-failure -R 'HalfedgeMeshVertexNormals|SandboxEditorUi\\.(GeometryProcessing|MeshVertexNormals)|MeshGeometryExtraction\\.MultipleDirtyTagsCoalesceIntoSingleReupload|MeshGeometryExtractionDirtyTag' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+      - "python3 tools/repo/check_test_layout.py --root . --strict"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md --check"
+      - "python3 tools/docs/check_doc_links.py --root ."
+      - "python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main"
+      - "git diff --check"
+      - "python3 tools/repo/check_root_hygiene.py --root ."
+    result: >
+      Focused geometry/runtime targets built; focused CTest passed 18/18 tests,
+      including all halfedge normal tests, mesh normal editor command tests,
+      and all mesh dirty-domain reupload variants including
+      `DirtyVertexAttributes`. Strict layering, test-layout, task-policy,
+      module-inventory, doc-link, docs-sync, and whitespace checks passed. Root
+      hygiene remained warning-only with pre-existing ara/ and imgui.ini
+      entries.
+    status: resolved
+  - id: N33
+    type: decision
+    title: "BUG-047 shade surfaces from vertex normal attributes"
+    provenance: ai-executed
+    timestamp: "2026-06-20T23:59"
+    also_depends_on: [N31]
+    choice: >
+      Diagnosed the incorrect shading path and changed promoted surface/GBuffer
+      shaders to use the transformed packed vertex-normal attribute for current
+      lighting while leaving generated normal-texture assets and material
+      `NormalID` bindings as data-only state until a tangent-space normal-map
+      path is promoted.
+    alternatives:
+      - "Delete the runtime normal texture bake and binding path."
+      - "Treat generated object/world normal textures as tangent-space normal maps in fragment shaders."
+      - "Bypass the dirty-tag extraction path and update renderer buffers directly from the editor command."
+    evidence:
+      - "assets/shaders/forward/default_debug_surface.frag"
+      - "assets/shaders/deferred/default_debug_gbuffer.frag"
+      - "assets/shaders/deferred/gbuffer.frag"
+      - "assets/shaders/surface.frag"
+      - "assets/shaders/surface_gbuffer.frag"
+      - "tests/contract/graphics/Test.RendererFrameLifecycle.cpp"
+      - "tasks/backlog/bugs/BUG-047-surface-normal-texture-overrides-vertex-normals.md"
+    status: resolved
+  - id: N34
+    type: experiment
+    title: "BUG-047 shader normal path verification"
+    provenance: ai-executed
+    timestamp: "2026-06-20T23:59"
+    also_depends_on: [N33]
+    evidence:
+      - "cmake --build --preset ci --target ExtrinsicSandbox_Shaders IntrinsicGraphicsContractTests -j 4"
+      - "cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests -j 4"
+      - "ctest --test-dir build/ci --output-on-failure -R 'RendererFrameLifecycle.ForwardSurfacePipelineSurvivesOperationalRebuild' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "cmake --build --preset ci --target IntrinsicGeometryTests IntrinsicRuntimeContractTests IntrinsicGraphicsContractCpuTests -j 4"
+      - "ctest --test-dir build/ci --output-on-failure -R 'HalfedgeMeshVertexNormals|SandboxEditorUi.MeshVertexNormalsCommandPublishesCanonicalNormalsForAllWeightings|MeshGeometryExtraction.MaterialTextureBindingsResolveOntoExtractionMaterialSidecar|MeshGeometryExtraction.MultipleDirtyTagsCoalesceIntoSingleReupload|DirtyVertexAttributes|MaterialSubstitutionContract.DefaultDebugSurfaceUsesEqualsAuthoredDefaultPlusFallbacks|RendererFrameLifecycle.ForwardSurfacePipelineSurvivesOperationalRebuild' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+      - "python3 tools/repo/check_test_layout.py --root . --strict"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/docs/check_doc_links.py --root ."
+      - "python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main"
+      - "python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md --check"
+      - "git diff --check"
+    result: >
+      Shader SPIR-V and graphics CPU contract targets built. Focused renderer
+      shader contract passed after rebuilding the owning CPU graphics binary.
+      Focused end-to-end geometry/runtime/graphics CTest passed 16/16 tests,
+      covering halfedge normal recompute, editor normal publication, mesh
+      `DirtyVertexAttributes` reupload, material normal binding preservation,
+      and shader absence of normal-texture sampling. Strict layering,
+      test-layout, task-policy, doc-link, module-inventory, docs-sync, and
+      whitespace checks passed.
+    status: resolved
+  - id: N35
+    type: decision
+    title: "BUG-048 preserve recomputed normals through direct mesh post-process"
+    provenance: ai-executed
+    timestamp: "2026-06-21T00:39"
+    also_depends_on: [N31, N33]
+    choice: >
+      Diagnosed the delayed shading update as a direct mesh import race: the
+      queued `Runtime.DirectMeshPostProcess` main-thread apply path re-populated
+      the same ECS mesh after the editor normal command and restored imported
+      `v:normal` data. Runtime now snapshots current mesh `v:normal` before
+      post-process re-population and restores it when the materialized mesh has
+      the same normal slot count, while keeping generated normal texture
+      registration and dirty extraction/GPU upload unchanged.
+    alternatives:
+      - "Update renderer/RHI buffers directly from the editor normal command."
+      - "Cancel queued direct mesh post-process work after any editor geometry edit."
+      - "Skip all post-process geometry re-population and only register generated textures."
+    evidence:
+      - "src/runtime/Runtime.Engine.cpp"
+      - "tests/contract/runtime/Test.SandboxEditorUi.cpp"
+      - "src/runtime/README.md"
+      - "tasks/backlog/bugs/BUG-048-direct-mesh-postprocess-overwrites-recomputed-normals.md"
+    status: resolved
+  - id: N36
+    type: experiment
+    title: "BUG-048 direct post-process normal preservation verification"
+    provenance: ai-executed
+    timestamp: "2026-06-21T00:39"
+    also_depends_on: [N35]
+    evidence:
+      - "ctest --test-dir build/ci --output-on-failure -R 'SandboxEditorUi.MeshVertexNormalsCommandSurvivesPendingDirectMeshPostProcess' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "ctest --test-dir build/ci --output-on-failure -R 'SandboxEditorUi.MeshVertexNormalsCommand(PublishesCanonicalNormalsForAllWeightings|SurvivesPendingDirectMeshPostProcess|FailsClosedForInvalidTargets)' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "ctest --test-dir build/ci --output-on-failure -R 'AssetImportFormatCoverage.DirectObjImport(BakesGeneratedNormalTextureFromAuthoredVertexNormals|ComputesAndBakesGeneratedNormalTextureWhenMissingNormals|ComputesVertexNormalsWhenMissing)' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "ctest --test-dir build/ci --output-on-failure -R 'MeshGeometryExtraction.*DirtyVertexAttributes|RendererFrameLifecycle.ForwardSurfacePipelineSurvivesOperationalRebuild' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+      - "python3 tools/repo/check_test_layout.py --root . --strict"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/docs/check_doc_links.py --root ."
+      - "git diff --check"
+      - "cmake --build --preset ci --target IntrinsicTests -j 4"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+    result: >
+      New regression first failed by observing imported `(1,0,0)` normals after
+      `engine.Run()`. After the runtime fix, the repro passed and preserved
+      recomputed `(0,0,1)` normals while still requiring generated normal
+      texture binding readiness. Adjacent focused CTest sets all passed, strict
+      layering/test-layout/task-policy/doc-link/whitespace checks passed,
+      `IntrinsicTests` built, and the default CPU-supported CTest gate passed
+      2979/2979 tests.
+    status: resolved
+  - id: N37
+    type: decision
+    title: "BUG-049 submit GpuWorld upload barriers before consumers"
+    provenance: ai-executed
+    timestamp: "2026-06-21T01:09"
+    also_depends_on: [N31, N33, N35]
+    choice: >
+      Diagnosed the remaining delayed normal-shading update as missing
+      synchronization for direct `GpuWorld` buffer writes, not as a UI command
+      scheduling delay. `GpuWorld` now tracks one-shot pending upload barriers
+      for scene, instance, entity-config, geometry-record, bounds, light, and
+      managed vertex/index writes, and the renderer submits them before the
+      culling pass that normally starts consumption of those buffers.
+    alternatives:
+      - "Update renderer/RHI buffers directly from the editor normal command."
+      - "Force camera/culling invalidation after every editor normal recompute."
+      - "Expand the framegraph resource model for managed vertex/index buffers in this bug slice."
+    evidence:
+      - "src/graphics/renderer/Graphics.GpuWorld.cppm"
+      - "src/graphics/renderer/Graphics.GpuWorld.cpp"
+      - "src/graphics/renderer/Graphics.Renderer.cpp"
+      - "tests/integration/graphics/Test.GpuWorldAndCulling.cpp"
+      - "tasks/backlog/bugs/BUG-049-gpuworld-geometry-rebind-upload-barriers.md"
+    status: resolved
+  - id: N38
+    type: experiment
+    title: "BUG-049 upload barrier verification"
+    provenance: ai-executed
+    timestamp: "2026-06-21T01:09"
+    also_depends_on: [N37]
+    evidence:
+      - "cmake --build --preset ci --target IntrinsicTests -- -j$(nproc)"
+      - "ctest --test-dir build/ci --output-on-failure -R \"GraphicsGpuWorld\\.GeometryRebindSubmitsUploadBarriersBeforeNextConsumers|RendererFrameLifecycle\\.UsesDeviceFrameLifecycleBackbufferAndCommandContext|MeshGeometryExtraction\\.DirtyTagTriggersReupload.*DirtyVertexAttributes\" --timeout 60"
+      - "ctest --test-dir build/ci --output-on-failure -R \"DirtyVertexAttributes|MeshGeometryExtraction\\.MultipleDirtyTagsCoalesceIntoSingleReupload|MeshGeometryExtraction\\.RepeatedExtractionReusesMeshHandleWithoutReupload\" --timeout 60"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+      - "python3 tools/repo/check_test_layout.py --root . --strict"
+      - "python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main"
+      - "python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md --check"
+      - "python3 tools/docs/check_doc_links.py --root ."
+      - "git diff --check"
+    result: >
+      Added a regression proving replacement geometry upload plus instance
+      rebind emits one-shot upload-to-read barriers for the managed vertex
+      buffer, managed index buffer, geometry-record buffer, and instance-static
+      buffer. `IntrinsicTests` built successfully; focused barrier and runtime
+      extraction coverage passed; the default CPU-supported CTest gate passed
+      3740/3740 tests; strict task-policy, layering, test-layout, docs-sync,
+      generated-inventory, doc-link, whitespace, and current-diff debug-probe
+      checks passed.
+    status: resolved

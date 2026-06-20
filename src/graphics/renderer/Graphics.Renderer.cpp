@@ -5909,6 +5909,7 @@ namespace Extrinsic::Graphics
                 return RenderCommandPassStatus::SkippedUnavailable;
             }
 
+            m_Subsystems.GpuWorldSystem()->SubmitPendingUploadBarriers(cmd);
             m_Subsystems.CullingSystemRegistry()->ResetCounters(cmd);
             m_Subsystems.CullingSystemRegistry()->DispatchCull(cmd, camera, *m_Subsystems.GpuWorldSystem());
             return RenderCommandPassStatus::Recorded;

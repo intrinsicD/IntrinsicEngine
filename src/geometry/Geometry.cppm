@@ -20,6 +20,7 @@ export import Geometry.GJK;
 export import Geometry.EPA;
 export import Geometry.Handle;
 export import Geometry.HalfedgeMesh.Utils;
+export import Geometry.HalfedgeMesh.Vertices.Normals;
 export import Geometry.SpatialQueries;
 export import Geometry.Octree;
 export import Geometry.KDTree;

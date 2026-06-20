@@ -93,8 +93,9 @@ renderables.
   missing asset is visually obvious in development builds and observable
   through `TextureAssetFallbackResolveCount`. Semantic neutral defaults are the
   shader invalid-ID path, not a hidden per-slot fallback texture: surfaces use
-  `BaseColorFactor` when `AlbedoID` is invalid and the packed vertex normal
-  when `NormalID` is invalid. Metallic/roughness/emissive texture evaluation is
+  `BaseColorFactor` when `AlbedoID` is invalid and always use the packed
+  vertex normal for shading until a tangent-space normal-map path is promoted.
+  Metallic/roughness/emissive texture evaluation is
   not part of the current default forward surface shader. Visualization and
   Htex/UV bake
   atlas references do **not** use this fallback: per `GRAPHICS-014Q`

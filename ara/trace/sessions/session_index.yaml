@@ -27,3 +27,17 @@ sessions:
     events_count: 2
     claims_touched: []
     open_threads: 1
+  - id: "2026-06-20_001"
+    date: "2026-06-20"
+    summary: "Implemented UI-022 mesh vertex-normal recompute and fixed BUG-047 so current surface shading uses packed vertex-normal attributes."
+    turn_count: 3
+    events_count: 6
+    claims_touched: []
+    open_threads: 2
+  - id: "2026-06-21_001"
+    date: "2026-06-21"
+    summary: "Diagnosed and fixed BUG-048 and BUG-049 so editor-recomputed vertex normals survive runtime post-process and replacement GpuWorld data is synchronized before renderer consumers."
+    turn_count: 2
+    events_count: 4
+    claims_touched: []
+    open_threads: 2

@@ -83,15 +83,6 @@ void main() {
 
     // Read PBR factors from material SSBO.
     MaterialData mat = materials.Materials[fragMaterialSlot];
-    if (IsValidSurfaceTextureID(mat.NormalID))
-    {
-        vec3 normalTex = texture(globalTextures[nonuniformEXT(mat.NormalID)], fragTexCoord).xyz * 2.0 - 1.0;
-        float normalTexLen = length(normalTex);
-        if (normalTexLen > 1e-6)
-        {
-            norm = normalTex / normalTexLen;
-        }
-    }
 
     // Write G-buffer with real material properties.
     outNormal   = vec4(norm, 0.0);

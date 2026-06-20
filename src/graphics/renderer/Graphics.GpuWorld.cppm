@@ -13,6 +13,7 @@ export module Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Core.StrongHandle;
 import Extrinsic.Graphics.Component.GpuSceneSlot;
 import Extrinsic.RHI.BufferManager;
+import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Device;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Types;
@@ -187,6 +188,7 @@ export namespace Extrinsic::Graphics
         void ClearClusterLightTable();
 
         void SyncFrame();
+        void SubmitPendingUploadBarriers(RHI::ICommandContext& cmd);
 
         [[nodiscard]] CompactionPlan PlanManagedBufferCompaction() const;
         [[nodiscard]] CompactionPlan PlanManagedBufferCompaction(const CompactionPlanDesc& desc) const;

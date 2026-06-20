@@ -80,6 +80,7 @@ import Extrinsic.Asset.ModelTexturePayload;
 import Extrinsic.Asset.Registry;
 import Extrinsic.Asset.Service;
 import Extrinsic.ECS.Component.DirtyTags;
+import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Components.GeometrySourcesPopulate;
 import Extrinsic.ECS.Component.Culling.Local;
 import Extrinsic.ECS.Component.Culling.World;
@@ -745,6 +746,58 @@ namespace Extrinsic::Runtime
             ECS::Components::DirtyTags::MarkEdgeTopologyDirty(raw, entity);
         }
 
+        [[nodiscard]] std::vector<glm::vec3> SnapshotCurrentMeshVertexNormals(
+            const entt::registry& raw,
+            const ECS::EntityHandle entity)
+        {
+            namespace GS = ECS::Components::GeometrySources;
+
+            const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
+            if (!view.Valid() || view.ActiveDomain != GS::Domain::Mesh ||
+                view.VertexSource == nullptr)
+            {
+                return {};
+            }
+
+            const auto normals =
+                view.VertexSource->Properties.Get<glm::vec3>(GS::PropertyNames::kNormal);
+            if (!normals)
+            {
+                return {};
+            }
+
+            return std::vector<glm::vec3>(
+                normals.Vector().begin(),
+                normals.Vector().end());
+        }
+
+        [[nodiscard]] bool RestoreMeshVertexNormalsIfCompatible(
+            entt::registry& raw,
+            const ECS::EntityHandle entity,
+            const std::vector<glm::vec3>& normals)
+        {
+            if (normals.empty())
+            {
+                return false;
+            }
+
+            namespace GS = ECS::Components::GeometrySources;
+            auto* vertices = raw.try_get<GS::Vertices>(entity);
+            if (vertices == nullptr)
+            {
+                return false;
+            }
+
+            auto target = vertices->Properties.Get<glm::vec3>(GS::PropertyNames::kNormal);
+            if (!target || target.Vector().size() != normals.size())
+            {
+                return false;
+            }
+
+            target.Vector() = normals;
+            return true;
+        }
+
         void QueueDirectMeshPostProcess(
             StreamingExecutor* streamingExecutor,
             Assets::AssetService& assetService,
@@ -823,12 +876,18 @@ namespace Extrinsic::Runtime
                         }
 
                         auto& raw = scene.Raw();
+                        const std::vector<glm::vec3> currentNormals =
+                            SnapshotCurrentMeshVertexNormals(raw, state->Entity);
                         Geometry::HalfedgeMesh::Mesh mesh =
                             std::move(state->Materialized->Mesh);
                         ECS::Components::GeometrySources::PopulateFromMesh(
                             raw,
                             state->Entity,
                             mesh);
+                        (void)RestoreMeshVertexNormalsIfCompatible(
+                            raw,
+                            state->Entity,
+                            currentNormals);
                         MarkMeshGeometryDirty(raw, state->Entity);
 
                         if (state->GeneratedNormalTexture.has_value())

@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <span>
+#include <vector>
 
 #include <gtest/gtest.h>
 #include <glm/glm.hpp>
@@ -39,6 +40,24 @@ namespace
     std::span<const std::byte> VertexBytes()
     {
         return std::as_bytes(std::span<const PackedVertex>{kTriangleVerts});
+    }
+
+    [[nodiscard]] bool HasBufferBarrier(
+        const std::vector<Tests::MockCommandContext::BufferBarrierRecord>& barriers,
+        const RHI::BufferHandle buffer,
+        const RHI::MemoryAccess before,
+        const RHI::MemoryAccess after)
+    {
+        for (const auto& barrier : barriers)
+        {
+            if (barrier.Buffer == buffer &&
+                barrier.Before == before &&
+                barrier.After == after)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 }
 
@@ -115,6 +134,78 @@ TEST(GraphicsGpuWorld, Smoke_AllocateUploadSyncShutdown)
 
     world.Shutdown();
     EXPECT_FALSE(world.IsInitialized());
+}
+
+TEST(GraphicsGpuWorld, GeometryRebindSubmitsUploadBarriersBeforeNextConsumers)
+{
+    MockDevice device;
+    RHI::BufferManager bufferMgr{device};
+    Graphics::GpuWorld world;
+
+    Graphics::GpuWorld::InitDesc init{};
+    init.MaxInstances = 8;
+    init.MaxGeometryRecords = 8;
+    init.MaxLights = 1;
+    init.VertexBufferBytes = 1ull << 20;
+    init.IndexBufferBytes = 1ull << 20;
+    ASSERT_TRUE(world.Initialize(device, bufferMgr, init));
+
+    const auto instance = world.AllocateInstance(42u);
+    ASSERT_TRUE(instance.IsValid());
+
+    const auto geometry0 = world.UploadGeometry({
+        .PackedVertexBytes = VertexBytes(),
+        .SurfaceIndices = std::span<const std::uint32_t>{kTriangleIndices},
+        .LineIndices = {},
+        .VertexCount = static_cast<std::uint32_t>(kTriangleVerts.size()),
+        .LocalBounds = {},
+        .DebugName = "initial-tri",
+    });
+    ASSERT_TRUE(geometry0.IsValid());
+    world.SetInstanceGeometry(instance, geometry0);
+    world.SetInstanceRenderFlags(instance, RHI::GpuRender_Surface | RHI::GpuRender_Visible);
+    world.SetInstanceTransform(instance, glm::mat4{1.0f}, glm::mat4{1.0f});
+    world.SyncFrame();
+    world.SubmitPendingUploadBarriers(device.CommandContext);
+
+    device.CommandContext.BufferBarrierCalls.clear();
+    const auto geometry1 = world.UploadGeometry({
+        .PackedVertexBytes = VertexBytes(),
+        .SurfaceIndices = std::span<const std::uint32_t>{kTriangleIndices},
+        .LineIndices = {},
+        .VertexCount = static_cast<std::uint32_t>(kTriangleVerts.size()),
+        .LocalBounds = {},
+        .DebugName = "replacement-tri",
+    });
+    ASSERT_TRUE(geometry1.IsValid());
+    world.SetInstanceGeometry(instance, geometry1);
+    world.SyncFrame();
+
+    world.SubmitPendingUploadBarriers(device.CommandContext);
+
+    const auto& barriers = device.CommandContext.BufferBarrierCalls;
+    EXPECT_TRUE(HasBufferBarrier(barriers,
+                                 world.GetManagedVertexBuffer(),
+                                 RHI::MemoryAccess::TransferWrite,
+                                 RHI::MemoryAccess::ShaderRead));
+    EXPECT_TRUE(HasBufferBarrier(barriers,
+                                 world.GetManagedIndexBuffer(),
+                                 RHI::MemoryAccess::TransferWrite,
+                                 RHI::MemoryAccess::IndexRead | RHI::MemoryAccess::ShaderRead));
+    EXPECT_TRUE(HasBufferBarrier(barriers,
+                                 world.GetGeometryRecordBuffer(),
+                                 RHI::MemoryAccess::TransferWrite,
+                                 RHI::MemoryAccess::ShaderRead));
+    EXPECT_TRUE(HasBufferBarrier(barriers,
+                                 world.GetInstanceStaticBuffer(),
+                                 RHI::MemoryAccess::TransferWrite,
+                                 RHI::MemoryAccess::ShaderRead));
+
+    device.CommandContext.BufferBarrierCalls.clear();
+    world.SubmitPendingUploadBarriers(device.CommandContext);
+    EXPECT_TRUE(device.CommandContext.BufferBarrierCalls.empty());
+
+    world.Shutdown();
 }
 
 TEST(GraphicsCullingSystem, Smoke_InitializeBucketsAndDispatchPath)

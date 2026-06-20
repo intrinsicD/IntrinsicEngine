@@ -59,6 +59,18 @@ Existing LSCM quality fields in `Geometry.Parameterization` are now populated
 from this shared evaluator, so future harmonic/Tutte, ARAP, atlas, and
 map-storage work can compare against the same metric vocabulary.
 
+### Halfedge Vertex Normal Recompute
+
+`Geometry.HalfedgeMesh.Vertices.Normals` owns the geometry-layer CPU contract
+for publishing count-matched `glm::vec3` vertex normals back to a
+`HalfedgeMesh::Mesh` vertex property, defaulting to `v:normal`. The contract
+returns the written `VertexProperty<glm::vec3>` plus deterministic status and
+diagnostic counts. The selectable averaging modes are uniform face normals,
+area-weighted face normals, angle-weighted face normals, and Max-style
+sine/reciprocal-edge weighting. Degenerate faces, invalid topology, non-finite
+face input, deleted slots, fallback writes, and repaired fallback normals are
+reported through the result record.
+
 ### UV atlas backend contract
 
 `Geometry.UvAtlas` owns the backend-neutral UV atlas contract for generated

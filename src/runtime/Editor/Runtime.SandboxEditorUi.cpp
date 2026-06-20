@@ -57,6 +57,8 @@ import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.SelectionController;
+import Geometry.HalfedgeMesh;
+import Geometry.HalfedgeMesh.Vertices.Normals;
 import Geometry.KMeans;
 import Geometry.Mesh.Conversion;
 import Geometry.MeshSoup;
@@ -74,6 +76,7 @@ namespace Extrinsic::Runtime
         namespace G = Extrinsic::Graphics::Components;
         namespace A = Extrinsic::Assets;
         namespace GK = Geometry::KMeans;
+        namespace GN = Geometry::HalfedgeMesh::VertexNormals;
 
         inline constexpr std::array<A::AssetPayloadKind, 6> kImportPayloadKinds{{
             A::AssetPayloadKind::Unknown,
@@ -104,6 +107,14 @@ namespace Extrinsic::Runtime
             MeshAttributeTextureBakeEncoder::Vector3,
         }};
 
+        inline constexpr std::array<GN::AveragingMode, 4>
+            kMeshVertexNormalWeightings{{
+                GN::AveragingMode::UniformFace,
+                GN::AveragingMode::AreaWeighted,
+                GN::AveragingMode::AngleWeighted,
+                GN::AveragingMode::MaxWeighted,
+            }};
+
         [[nodiscard]] const char* DebugNameForTextureBakeEncoder(
             const MeshAttributeTextureBakeEncoder encoder) noexcept
         {
@@ -129,6 +140,13 @@ namespace Extrinsic::Runtime
             std::int32_t* MaxIterations{nullptr};
             std::int32_t* Seed{nullptr};
             bool* UseHierarchicalInitialization{nullptr};
+        };
+
+        struct MeshVertexNormalsUiState
+        {
+            std::optional<SandboxEditorMeshVertexNormalsResult>* LastResult{nullptr};
+            std::int32_t* Weighting{nullptr};
+            glm::vec3* FallbackNormal{nullptr};
         };
 
         struct TextureBakeUiState
@@ -3531,6 +3549,224 @@ namespace Extrinsic::Runtime
             return message;
         }
 
+        struct MeshForVertexNormalsResult
+        {
+            Geometry::HalfedgeMesh::Mesh Mesh{};
+            SandboxEditorCommandStatus Status{
+                SandboxEditorCommandStatus::NoChange};
+            Core::ErrorCode Error{Core::ErrorCode::Success};
+            std::string Diagnostic{};
+
+            [[nodiscard]] bool Succeeded() const noexcept
+            {
+                return Status == SandboxEditorCommandStatus::Applied;
+            }
+        };
+
+        [[nodiscard]] MeshForVertexNormalsResult
+        BuildHalfedgeMeshForVertexNormalRecompute(const GS::MutableSourceView& view)
+        {
+            MeshForVertexNormalsResult result{};
+            const GS::SourceAvailability availability =
+                GS::BuildSourceAvailability(view);
+            if (availability.ProvenanceDomain != GS::Domain::Mesh ||
+                view.VertexSource == nullptr ||
+                view.HalfedgeSource == nullptr ||
+                view.FaceSource == nullptr)
+            {
+                result.Status = SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Diagnostic =
+                    "Mesh vertex normals require selected mesh GeometrySources.";
+                return result;
+            }
+
+            const auto positions =
+                view.VertexSource->Properties.Get<glm::vec3>(
+                    GS::PropertyNames::kPosition);
+            if (!positions || positions.Vector().empty() ||
+                positions.Vector().size() != view.VertexSource->Properties.Size())
+            {
+                result.Status =
+                    SandboxEditorCommandStatus::InvalidProcessingParameters;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Diagnostic =
+                    "selected mesh requires count-matched v:position for normal recompute";
+                return result;
+            }
+            if (positions.Vector().size() >
+                static_cast<std::size_t>(
+                    std::numeric_limits<Geometry::PropertyIndex>::max()))
+            {
+                result.Status =
+                    SandboxEditorCommandStatus::InvalidProcessingParameters;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Diagnostic =
+                    "selected mesh has too many vertices for normal recompute";
+                return result;
+            }
+
+            const auto toVertices =
+                view.HalfedgeSource->Properties.Get<std::uint32_t>(
+                    GS::PropertyNames::kHalfedgeToVertex);
+            const auto nextHalfedges =
+                view.HalfedgeSource->Properties.Get<std::uint32_t>(
+                    GS::PropertyNames::kHalfedgeNext);
+            const auto halfedgeFaces =
+                view.HalfedgeSource->Properties.Get<std::uint32_t>(
+                    GS::PropertyNames::kHalfedgeFace);
+            const auto faceHalfedges =
+                view.FaceSource->Properties.Get<std::uint32_t>(
+                    GS::PropertyNames::kFaceHalfedge);
+            if (!toVertices || !nextHalfedges || !halfedgeFaces ||
+                !faceHalfedges ||
+                toVertices.Vector().size() != nextHalfedges.Vector().size() ||
+                toVertices.Vector().size() != halfedgeFaces.Vector().size() ||
+                faceHalfedges.Vector().size() !=
+                    view.FaceSource->Properties.Size())
+            {
+                result.Status =
+                    SandboxEditorCommandStatus::InvalidProcessingParameters;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Diagnostic =
+                    "selected mesh has invalid halfedge/face topology for normal recompute";
+                return result;
+            }
+
+            result.Mesh.Reserve(positions.Vector().size(),
+                                view.EdgeSource != nullptr
+                                    ? view.EdgeSource->Properties.Size()
+                                    : 0u,
+                                faceHalfedges.Vector().size());
+            for (const glm::vec3 position : positions.Vector())
+                (void)result.Mesh.AddVertex(position);
+
+            std::vector<std::uint32_t> ring{};
+            ring.reserve(8u);
+            std::vector<Geometry::VertexHandle> faceVertices{};
+            faceVertices.reserve(8u);
+            for (std::size_t faceIndex = 0u;
+                 faceIndex < faceHalfedges.Vector().size();
+                 ++faceIndex)
+            {
+                const MeshFaceRingStatus status = BuildMeshFaceRing(
+                    faceHalfedges.Vector(),
+                    halfedgeFaces.Vector(),
+                    nextHalfedges.Vector(),
+                    toVertices.Vector(),
+                    faceIndex,
+                    static_cast<std::uint32_t>(positions.Vector().size()),
+                    ring);
+                if (status == MeshFaceRingStatus::Invalid)
+                {
+                    result.Status =
+                        SandboxEditorCommandStatus::InvalidProcessingParameters;
+                    result.Error = Core::ErrorCode::InvalidArgument;
+                    result.Diagnostic =
+                        "selected mesh topology is not valid for normal recompute";
+                    return result;
+                }
+                if (status == MeshFaceRingStatus::Skip)
+                    continue;
+
+                faceVertices.clear();
+                for (const std::uint32_t vertex : ring)
+                {
+                    faceVertices.push_back(
+                        Geometry::VertexHandle{
+                            static_cast<Geometry::PropertyIndex>(vertex)});
+                }
+                if (!result.Mesh.AddFace(faceVertices).has_value())
+                {
+                    result.Status =
+                        SandboxEditorCommandStatus::InvalidProcessingParameters;
+                    result.Error = Core::ErrorCode::InvalidArgument;
+                    result.Diagnostic =
+                        "selected mesh face ring could not be reconstructed for normal recompute";
+                    return result;
+                }
+            }
+
+            result.Status = SandboxEditorCommandStatus::Applied;
+            return result;
+        }
+
+        [[nodiscard]] SandboxEditorMeshVertexNormalsResult MakeMeshNormalsResult(
+            const SandboxEditorCommandStatus status,
+            const GN::RecomputeStatus normalStatus,
+            const GN::AveragingMode weighting,
+            const Core::ErrorCode error,
+            std::string message)
+        {
+            return SandboxEditorMeshVertexNormalsResult{
+                .Status = status,
+                .NormalStatus = normalStatus,
+                .Weighting = weighting,
+                .Error = error,
+                .Message = std::move(message),
+            };
+        }
+
+        void CopyMeshNormalCounters(const GN::Result& source,
+                                    SandboxEditorMeshVertexNormalsResult& target)
+        {
+            target.NormalStatus = source.Status;
+            target.Weighting = source.Weighting;
+            target.VertexSlotCount = source.VertexSlotCount;
+            target.WrittenCount = source.WrittenCount;
+            target.ValidNormalVertexCount = source.ValidNormalVertexCount;
+            target.ProcessedFaceCount = source.ProcessedFaceCount;
+            target.DegenerateFaceCount = source.DegenerateFaceCount;
+            target.NonFiniteFaceCount = source.NonFiniteFaceCount;
+            target.InvalidTopologyFaceCount = source.InvalidTopologyFaceCount;
+            target.DegenerateCornerCount = source.DegenerateCornerCount;
+            target.FallbackVertexCount = source.FallbackVertexCount;
+            target.SkippedDeletedFaceCount = source.SkippedDeletedFaceCount;
+            target.SkippedDeletedVertexCount = source.SkippedDeletedVertexCount;
+            target.FallbackNormalWasRepaired =
+                source.FallbackNormalWasRepaired;
+        }
+
+        [[nodiscard]] bool PublishMeshVertexNormals(
+            GS::MutableSourceView& view,
+            const GN::Result& result)
+        {
+            if (view.VertexSource == nullptr || !result.Normals.IsValid())
+                return false;
+
+            Geometry::PropertySet& properties = view.VertexSource->Properties;
+            if (properties.Exists(GS::PropertyNames::kNormal) &&
+                !properties.Get<glm::vec3>(GS::PropertyNames::kNormal))
+            {
+                return false;
+            }
+
+            auto normals = properties.GetOrAdd<glm::vec3>(
+                std::string{GS::PropertyNames::kNormal},
+                glm::vec3{0.0f, 1.0f, 0.0f});
+            if (!normals ||
+                normals.Vector().size() != result.Normals.Vector().size())
+            {
+                return false;
+            }
+
+            normals.Vector() = result.Normals.Vector();
+            return true;
+        }
+
+        [[nodiscard]] std::string BuildMeshNormalsSuccessMessage(
+            const SandboxEditorMeshVertexNormalsResult& result)
+        {
+            std::string message = "Mesh vertex normals recomputed (weighting=";
+            message += std::string(GN::DebugName(result.Weighting));
+            message += ", written=";
+            message += std::to_string(result.WrittenCount);
+            message += ", fallback=";
+            message += std::to_string(result.FallbackVertexCount);
+            message += ").";
+            return message;
+        }
+
         [[nodiscard]] SandboxEditorGeometryProcessingModel BuildGeometryProcessingModel(
             const SandboxEditorContext& context)
         {
@@ -3569,6 +3805,11 @@ namespace Extrinsic::Runtime
                 ResolveSandboxEditorGeometryProcessingEntries(model.Capabilities);
             model.KMeansDomains =
                 GetAvailableSandboxEditorKMeansDomains(*context.Scene, *selected);
+            model.MeshVertexNormalsAvailable =
+                model.Capabilities.HasEditableSurfaceMesh &&
+                HasAnySandboxEditorGeometryProcessingDomain(
+                    model.Capabilities.Domains,
+                    SandboxEditorGeometryProcessingDomain::MeshVertices);
             if (context.LastKMeansResult != nullptr)
             {
                 model.LastKMeansResult = *context.LastKMeansResult;
@@ -3580,6 +3821,20 @@ namespace Extrinsic::Runtime
                         context.LastKMeansResult->Message.empty()
                             ? "Last K-Means command failed."
                             : context.LastKMeansResult->Message);
+                }
+            }
+            if (context.LastMeshVertexNormalsResult != nullptr)
+            {
+                model.LastMeshVertexNormalsResult =
+                    *context.LastMeshVertexNormalsResult;
+                if (!context.LastMeshVertexNormalsResult->Succeeded())
+                {
+                    AddDiagnostic(
+                        model.Diagnostics,
+                        SandboxEditorDiagnosticCode::GeometryProcessingFailed,
+                        context.LastMeshVertexNormalsResult->Message.empty()
+                            ? "Last mesh vertex-normal command failed."
+                            : context.LastMeshVertexNormalsResult->Message);
                 }
             }
             if (!model.Capabilities.HasAny())
@@ -4507,10 +4762,34 @@ namespace Extrinsic::Runtime
                     "Selection details",
                     nullptr,
                     &(*domainWindowOpen)[DomainWindowSlotIndex(kind, DomainWindowSection::Selection)]);
-                ImGui::MenuItem(
-                    "Processing",
-                    nullptr,
-                    &(*domainWindowOpen)[DomainWindowSlotIndex(kind, DomainWindowSection::Processing)]);
+                if (ImGui::BeginMenu("Processing"))
+                {
+                    bool& processingOpen =
+                        (*domainWindowOpen)[DomainWindowSlotIndex(
+                            kind,
+                            DomainWindowSection::Processing)];
+                    const std::vector<SandboxEditorGeometryProcessingMenuItem>
+                        menuItems =
+                            GetSandboxEditorGeometryProcessingMenuItems(kind);
+                    for (const SandboxEditorGeometryProcessingMenuItem& item :
+                         menuItems)
+                    {
+                        if (item.HasNormalsMethod)
+                        {
+                            if (ImGui::BeginMenu(item.Label))
+                            {
+                                if (ImGui::MenuItem("Normals"))
+                                    processingOpen = true;
+                                ImGui::EndMenu();
+                            }
+                        }
+                        else if (ImGui::MenuItem(item.Label))
+                        {
+                            processingOpen = true;
+                        }
+                    }
+                    ImGui::EndMenu();
+                }
             }
             else
             {
@@ -4518,7 +4797,8 @@ namespace Extrinsic::Runtime
                 (void)ImGui::MenuItem("Properties", nullptr, false, false);
                 (void)ImGui::MenuItem("Visualization", nullptr, false, false);
                 (void)ImGui::MenuItem("Selection details", nullptr, false, false);
-                (void)ImGui::MenuItem("Processing", nullptr, false, false);
+                if (ImGui::BeginMenu("Processing", false))
+                    ImGui::EndMenu();
             }
 
             if (!menuEnabled)
@@ -5795,10 +6075,141 @@ namespace Extrinsic::Runtime
             DrawKMeansResultStatus(result);
         }
 
+        [[nodiscard]] GN::AveragingMode MeshVertexNormalWeightingFromIndex(
+            const std::int32_t index) noexcept
+        {
+            const std::int32_t clamped = std::clamp(
+                index,
+                0,
+                static_cast<std::int32_t>(
+                    kMeshVertexNormalWeightings.size() - 1u));
+            return kMeshVertexNormalWeightings[static_cast<std::size_t>(clamped)];
+        }
+
+        void DrawMeshVertexNormalsResultStatus(
+            const std::optional<SandboxEditorMeshVertexNormalsResult>& lastResult)
+        {
+            if (!lastResult.has_value())
+            {
+                ImGui::TextDisabled("Last normals run: none");
+                return;
+            }
+
+            const SandboxEditorMeshVertexNormalsResult& result = *lastResult;
+            ImGui::Text("Last normals run: %s",
+                        DebugNameForSandboxEditorCommandStatus(result.Status));
+            ImGui::Text("Geometry status: %s",
+                        std::string(GN::DebugName(result.NormalStatus)).c_str());
+            ImGui::Text("Weighting: %s",
+                        std::string(GN::DebugName(result.Weighting)).c_str());
+            if (result.Succeeded())
+            {
+                ImGui::Text("Written: %zu / %zu  valid: %zu  fallback: %zu",
+                            result.WrittenCount,
+                            result.VertexSlotCount,
+                            result.ValidNormalVertexCount,
+                            result.FallbackVertexCount);
+                ImGui::Text("Faces: processed=%zu  degenerate=%zu  nonfinite=%zu  invalid=%zu",
+                            result.ProcessedFaceCount,
+                            result.DegenerateFaceCount,
+                            result.NonFiniteFaceCount,
+                            result.InvalidTopologyFaceCount);
+                ImGui::Text("Corners: degenerate=%zu  deleted faces=%zu  deleted vertices=%zu",
+                            result.DegenerateCornerCount,
+                            result.SkippedDeletedFaceCount,
+                            result.SkippedDeletedVertexCount);
+                ImGui::Text("Fallback repaired: %s",
+                            result.FallbackNormalWasRepaired ? "yes" : "no");
+            }
+            if (!result.Message.empty())
+                ImGui::TextWrapped("%s", result.Message.c_str());
+        }
+
+        void DrawMeshVertexNormalsControls(
+            const SandboxEditorDomainWindowModel& model,
+            const SandboxEditorContext& context,
+            const SandboxEditorGeometryProcessingModel& processing,
+            MeshVertexNormalsUiState* normalsState)
+        {
+            ImGui::SeparatorText("Normals");
+            if (!processing.MeshVertexNormalsAvailable)
+            {
+                ImGui::TextDisabled("Mesh vertex normals are unavailable for this selection.");
+                return;
+            }
+            if (normalsState == nullptr ||
+                normalsState->LastResult == nullptr ||
+                normalsState->Weighting == nullptr ||
+                normalsState->FallbackNormal == nullptr)
+            {
+                ImGui::TextDisabled("Mesh vertex-normal controls are not bound.");
+                return;
+            }
+
+            *normalsState->Weighting = std::clamp(
+                *normalsState->Weighting,
+                0,
+                static_cast<std::int32_t>(
+                    kMeshVertexNormalWeightings.size() - 1u));
+            const GN::AveragingMode currentWeighting =
+                MeshVertexNormalWeightingFromIndex(*normalsState->Weighting);
+            if (ImGui::BeginCombo(
+                    "Weighting",
+                    std::string(GN::DebugName(currentWeighting)).c_str()))
+            {
+                for (std::size_t i = 0u;
+                     i < kMeshVertexNormalWeightings.size();
+                     ++i)
+                {
+                    const bool selected =
+                        *normalsState->Weighting ==
+                        static_cast<std::int32_t>(i);
+                    if (ImGui::Selectable(
+                            std::string(
+                                GN::DebugName(kMeshVertexNormalWeightings[i]))
+                                .c_str(),
+                            selected))
+                    {
+                        *normalsState->Weighting =
+                            static_cast<std::int32_t>(i);
+                    }
+                    if (selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+            ImGui::DragFloat3(
+                "Fallback normal",
+                &normalsState->FallbackNormal->x,
+                0.01f,
+                -1.0f,
+                1.0f);
+
+            if (ImGui::Button("Recompute"))
+            {
+                *normalsState->LastResult =
+                    ApplySandboxEditorMeshVertexNormalsCommand(
+                        context,
+                        SandboxEditorMeshVertexNormalsCommand{
+                            .StableEntityId = model.SelectedStableId,
+                            .Weighting = MeshVertexNormalWeightingFromIndex(
+                                *normalsState->Weighting),
+                            .FallbackNormal = *normalsState->FallbackNormal,
+                        });
+            }
+
+            const std::optional<SandboxEditorMeshVertexNormalsResult>& result =
+                normalsState->LastResult->has_value()
+                    ? *normalsState->LastResult
+                    : processing.LastMeshVertexNormalsResult;
+            DrawMeshVertexNormalsResultStatus(result);
+        }
+
         void DrawDomainProcessingWindow(
             const SandboxEditorDomainWindowModel& model,
             const SandboxEditorContext& context,
-            KMeansUiState* kmeansState)
+            KMeansUiState* kmeansState,
+            MeshVertexNormalsUiState* normalsState)
         {
             DrawDomainWindowHeader(model);
             ImGui::SeparatorText("Processing capabilities");
@@ -5850,6 +6261,11 @@ namespace Extrinsic::Runtime
                 }
             }
             DrawKMeansExecutionControls(model, context, processing, kmeansState);
+            DrawMeshVertexNormalsControls(
+                model,
+                context,
+                processing,
+                normalsState);
         }
 
         void DrawOneDomainWindow(
@@ -5858,6 +6274,7 @@ namespace Extrinsic::Runtime
             const DomainWindowSection section,
             std::array<bool, 15>& domainWindowOpen,
             KMeansUiState* kmeansState,
+            MeshVertexNormalsUiState* normalsState,
             TextureBakeUiState* textureBakeState)
         {
             const std::size_t slot = DomainWindowSlotIndex(kind, section);
@@ -5884,7 +6301,11 @@ namespace Extrinsic::Runtime
                     DrawDomainSelectionWindow(model);
                     break;
                 case DomainWindowSection::Processing:
-                    DrawDomainProcessingWindow(model, context, kmeansState);
+                    DrawDomainProcessingWindow(
+                        model,
+                        context,
+                        kmeansState,
+                        normalsState);
                     break;
                 case DomainWindowSection::Count:
                     break;
@@ -5897,6 +6318,7 @@ namespace Extrinsic::Runtime
             const SandboxEditorContext* context,
             std::array<bool, 15>* domainWindowOpen,
             KMeansUiState* kmeansState,
+            MeshVertexNormalsUiState* normalsState,
             TextureBakeUiState* textureBakeState)
         {
             if (context == nullptr || domainWindowOpen == nullptr)
@@ -5924,6 +6346,7 @@ namespace Extrinsic::Runtime
                         section,
                         *domainWindowOpen,
                         kmeansState,
+                        normalsState,
                         textureBakeState);
                 }
             }
@@ -5941,10 +6364,16 @@ namespace Extrinsic::Runtime
                 panelWindowOpen,
             std::array<bool, 15>* domainWindowOpen,
             KMeansUiState* kmeansState,
+            MeshVertexNormalsUiState* normalsState,
             TextureBakeUiState* textureBakeState)
         {
             DrawMainMenuBar(panelWindowOpen, domainWindowOpen);
-            DrawDomainWindows(context, domainWindowOpen, kmeansState, textureBakeState);
+            DrawDomainWindows(
+                context,
+                domainWindowOpen,
+                kmeansState,
+                normalsState,
+                textureBakeState);
 
             if (BeginPanelWindow(panelWindowOpen,
                                  SandboxEditorPanelWindowKind::Shell,
@@ -7185,6 +7614,35 @@ namespace Extrinsic::Runtime
         return "Unknown";
     }
 
+    std::vector<SandboxEditorGeometryProcessingMenuItem>
+    GetSandboxEditorGeometryProcessingMenuItems(
+        const SandboxEditorDomainWindowKind kind)
+    {
+        using Domain = SandboxEditorGeometryProcessingDomain;
+        switch (kind)
+        {
+        case SandboxEditorDomainWindowKind::Mesh:
+            return {
+                {.Domain = Domain::MeshVertices,
+                 .Label = "Vertices",
+                 .HasNormalsMethod = true},
+                {.Domain = Domain::MeshEdges, .Label = "Edges"},
+                {.Domain = Domain::MeshFaces, .Label = "Faces"},
+            };
+        case SandboxEditorDomainWindowKind::Graph:
+            return {
+                {.Domain = Domain::GraphVertices, .Label = "Vertices"},
+                {.Domain = Domain::GraphEdges, .Label = "Edges"},
+                {.Domain = Domain::GraphHalfedges, .Label = "Halfedges"},
+            };
+        case SandboxEditorDomainWindowKind::PointCloud:
+            return {
+                {.Domain = Domain::PointCloudPoints, .Label = "Vertices"},
+            };
+        }
+        return {};
+    }
+
     SandboxEditorGeometryProcessingDomain
     GetSandboxEditorSupportedGeometryProcessingDomains(
         const SandboxEditorGeometryProcessingAlgorithm algorithm) noexcept
@@ -7203,7 +7661,7 @@ namespace Extrinsic::Runtime
         case SandboxEditorGeometryProcessingAlgorithm::Repair:
             return kMeshTopologyDomains;
         case SandboxEditorGeometryProcessingAlgorithm::NormalEstimation:
-            return Domain::PointCloudPoints;
+            return Domain::MeshVertices | Domain::PointCloudPoints;
         case SandboxEditorGeometryProcessingAlgorithm::ShortestPath:
             return Domain::MeshVertices | Domain::GraphVertices;
         case SandboxEditorGeometryProcessingAlgorithm::ConvexHull:
@@ -7402,7 +7860,7 @@ namespace Extrinsic::Runtime
         case SandboxEditorGeometryProcessingAlgorithm::Repair:
             return "Repair";
         case SandboxEditorGeometryProcessingAlgorithm::NormalEstimation:
-            return "Normal Estimation";
+            return "Normals";
         case SandboxEditorGeometryProcessingAlgorithm::ShortestPath:
             return "Shortest Path";
         case SandboxEditorGeometryProcessingAlgorithm::ConvexHull:
@@ -8856,9 +9314,107 @@ namespace Extrinsic::Runtime
         return result;
     }
 
+    SandboxEditorMeshVertexNormalsResult
+    ApplySandboxEditorMeshVertexNormalsCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorMeshVertexNormalsCommand& command)
+    {
+        if (context.Scene == nullptr)
+        {
+            return MakeMeshNormalsResult(
+                SandboxEditorCommandStatus::MissingScene,
+                GN::RecomputeStatus::EmptyMesh,
+                command.Weighting,
+                Core::ErrorCode::InvalidState,
+                "Scene registry is unavailable for mesh vertex-normal recompute.");
+        }
+        if (!std::isfinite(command.DegenerateNormalLengthEpsilon) ||
+            command.DegenerateNormalLengthEpsilon <= 0.0)
+        {
+            return MakeMeshNormalsResult(
+                SandboxEditorCommandStatus::InvalidProcessingParameters,
+                GN::RecomputeStatus::InvalidOutputProperty,
+                command.Weighting,
+                Core::ErrorCode::InvalidArgument,
+                "Mesh vertex-normal recompute requires a positive finite degeneracy epsilon.");
+        }
+
+        entt::registry& raw = context.Scene->Raw();
+        const std::optional<ECS::EntityHandle> entity =
+            ResolveStableEntity(raw, command.StableEntityId);
+        if (!entity.has_value())
+        {
+            return MakeMeshNormalsResult(
+                SandboxEditorCommandStatus::StaleEntity,
+                GN::RecomputeStatus::EmptyMesh,
+                command.Weighting,
+                Core::ErrorCode::ResourceNotFound,
+                "Mesh vertex-normal target entity is stale or no longer live.");
+        }
+
+        GS::MutableSourceView view = GS::BuildMutableView(raw, *entity);
+        const MeshForVertexNormalsResult source =
+            BuildHalfedgeMeshForVertexNormalRecompute(view);
+        if (!source.Succeeded())
+        {
+            return MakeMeshNormalsResult(
+                source.Status,
+                GN::RecomputeStatus::EmptyMesh,
+                command.Weighting,
+                source.Error,
+                source.Diagnostic);
+        }
+
+        Geometry::HalfedgeMesh::Mesh mesh = source.Mesh;
+        GN::Params params{};
+        params.Weighting = command.Weighting;
+        params.OutputProperty = GN::kDefaultOutputProperty;
+        params.FallbackNormal = command.FallbackNormal;
+        params.DegenerateNormalLengthEpsilon =
+            command.DegenerateNormalLengthEpsilon;
+        params.SkipDeleted = true;
+
+        const GN::Result normalResult = GN::Recompute(mesh, params);
+        SandboxEditorMeshVertexNormalsResult result{
+            .Status = normalResult.Status == GN::RecomputeStatus::Success
+                ? SandboxEditorCommandStatus::Applied
+                : SandboxEditorCommandStatus::GeometryProcessingFailed,
+            .NormalStatus = normalResult.Status,
+            .Weighting = normalResult.Weighting,
+            .Error = normalResult.Status == GN::RecomputeStatus::Success
+                ? Core::ErrorCode::Success
+                : Core::ErrorCode::Unknown,
+        };
+        CopyMeshNormalCounters(normalResult, result);
+        if (normalResult.Status != GN::RecomputeStatus::Success)
+        {
+            result.Message = "Geometry.HalfedgeMesh.Vertices.Normals failed with ";
+            result.Message += std::string(GN::DebugName(normalResult.Status));
+            result.Message += ".";
+            return result;
+        }
+
+        if (!PublishMeshVertexNormals(view, normalResult))
+        {
+            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.NormalStatus = GN::RecomputeStatus::PropertyTypeConflict;
+            result.Error = Core::ErrorCode::TypeMismatch;
+            result.Message =
+                "Mesh vertex-normal publication failed because v:normal has an incompatible type or size.";
+            return result;
+        }
+
+        Dirty::MarkVertexAttributesDirty(raw, *entity);
+        if (context.CommandHistory != nullptr)
+            (void)context.CommandHistory->MarkDirty("Recompute mesh vertex normals");
+        result.Message = BuildMeshNormalsSuccessMessage(result);
+        return result;
+    }
+
     void DrawSandboxEditorPanelFrame(const SandboxEditorPanelFrame& frame)
     {
         DrawPanelFrame(frame,
+                       nullptr,
                        nullptr,
                        nullptr,
                        nullptr,
@@ -8907,6 +9463,9 @@ namespace Extrinsic::Runtime
                     context.LastAssetImportResult = &*m_LastImportResult;
                 if (m_LastKMeansResult.has_value())
                     context.LastKMeansResult = &*m_LastKMeansResult;
+                if (m_LastMeshVertexNormalsResult.has_value())
+                    context.LastMeshVertexNormalsResult =
+                        &*m_LastMeshVertexNormalsResult;
                 m_LastFrame = BuildSandboxEditorPanelFrame(context);
                 KMeansUiState kmeansState{
                     .LastResult = &m_LastKMeansResult,
@@ -8916,6 +9475,11 @@ namespace Extrinsic::Runtime
                     .Seed = &m_KMeansSeed,
                     .UseHierarchicalInitialization =
                         &m_KMeansUseHierarchicalInitialization,
+                };
+                MeshVertexNormalsUiState normalsState{
+                    .LastResult = &m_LastMeshVertexNormalsResult,
+                    .Weighting = &m_MeshVertexNormalsWeighting,
+                    .FallbackNormal = &m_MeshVertexNormalsFallback,
                 };
                 TextureBakeUiState textureBakeState{
                     .SourceIndex = &m_TextureBakeSourceIndex,
@@ -8940,6 +9504,7 @@ namespace Extrinsic::Runtime
                     &m_PanelWindowOpen,
                     &m_DomainWindowOpen,
                     &kmeansState,
+                    &normalsState,
                     &textureBakeState);
             });
     }

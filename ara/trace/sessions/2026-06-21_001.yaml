@@ -1,0 +1,79 @@
+session:
+  id: "2026-06-21_001"
+  date: "2026-06-21"
+  started: "2026-06-21T00:39"
+  last_turn: "2026-06-21T01:09"
+  turn_count: 2
+  summary: "Diagnosed and fixed BUG-048 and BUG-049 so editor-recomputed vertex normals survive runtime post-process and replacement GpuWorld data is synchronized before renderer consumers."
+
+events_logged:
+  - turn: 1
+    type: decision
+    id: "N35"
+    routing: direct
+    provenance: ai-executed
+    summary: "Preserve count-matched current mesh `v:normal` across deferred direct mesh post-process re-population instead of directly updating renderer/RHI buffers from the editor command."
+  - turn: 1
+    type: experiment
+    id: "N36"
+    routing: direct
+    provenance: ai-executed
+    summary: "Repro first failed with imported normals restored after `engine.Run()`; after the fix, focused tests and the 2979-test CPU gate passed."
+  - turn: 2
+    type: decision
+    id: "N37"
+    routing: direct
+    provenance: ai-executed
+    summary: "Treat remaining delayed normal shading as missing `GpuWorld` direct upload-to-read barriers, then submit one-shot barriers before culling rather than updating renderer buffers directly from the UI."
+  - turn: 2
+    type: experiment
+    id: "N38"
+    routing: direct
+    provenance: ai-executed
+    summary: "Replacement geometry rebind regression passed and proved one-shot barriers; focused extraction coverage, full 3740-test CPU gate, and structural/docs checks passed."
+
+ai_actions:
+  - turn: 1
+    action: "Added BUG-048 regression coverage, patched `QueueDirectMeshPostProcess` to snapshot/restore compatible current mesh normals, documented the behavior, opened the BUG-048 task record, and regenerated `tasks/SESSION-BRIEF.md`."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Runtime.Engine.cpp"
+      - "tests/contract/runtime/Test.SandboxEditorUi.cpp"
+      - "src/runtime/README.md"
+      - "tasks/backlog/bugs/BUG-048-direct-mesh-postprocess-overwrites-recomputed-normals.md"
+      - "tasks/backlog/bugs/index.md"
+      - "tasks/SESSION-BRIEF.md"
+  - turn: 2
+    action: "Added `GpuWorld::SubmitPendingUploadBarriers`, tracked one-shot pending upload barriers for direct `GpuWorld` writes, submitted them from the renderer culling route, added a replacement geometry rebind regression, opened BUG-049, and regenerated module inventory/session brief."
+    provenance: ai-executed
+    files_changed:
+      - "src/graphics/renderer/Graphics.GpuWorld.cppm"
+      - "src/graphics/renderer/Graphics.GpuWorld.cpp"
+      - "src/graphics/renderer/Graphics.Renderer.cpp"
+      - "tests/integration/graphics/Test.GpuWorldAndCulling.cpp"
+      - "tasks/backlog/bugs/BUG-049-gpuworld-geometry-rebind-upload-barriers.md"
+      - "tasks/backlog/bugs/index.md"
+      - "docs/api/generated/module_inventory.md"
+      - "tasks/SESSION-BRIEF.md"
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: "User reported that recomputed normals still took extremely long to appear in shading and requested end-to-end debugging."
+  - turn: 1
+    excerpt: "The focused repro imported an OBJ with wrong authored normals, recomputed canonical triangle normals immediately, then let the queued direct mesh post-process finish; before the fix, post-process restored the wrong imported normals."
+  - turn: 1
+    excerpt: "The chosen synchronization policy remains deferred: editor normal recompute stamps `DirtyVertexAttributes`, render extraction/GPU upload consumes that tag on the next extraction opportunity, and post-process no longer overwrites the CPU-authoritative normals."
+  - turn: 2
+    excerpt: "User reported that shading only appeared to adopt recomputed normals after rotating the camera far enough and expected a scheduled GPU update no later than the next frame."
+  - turn: 2
+    excerpt: "End-to-end tracing found the UI command, dirty tag, runtime extraction, geometry rebind, `GpuWorld::SetInstanceGeometry`, render-prep order, and per-frame culling dispatch were already active; the missing piece was explicit GPU visibility for direct buffer writes before the next consumers."
+  - turn: 2
+    excerpt: "The final contract remains deferred and frame-loop owned: UI computes CPU normals and stamps `DirtyVertexAttributes`; runtime extraction uploads/rebinds; renderer submits upload-to-read barriers before culling consumes the new buffers."
+
+open_threads:
+  - "UI-022 graph and point-cloud normal windows remain pending until geometry-owned recompute modules exist for those domains."
+  - "Tangent-space authored normal-map support remains pending; current promoted surface shaders intentionally ignore `NormalID` for shading."
+
+ai_suggestions_pending: []

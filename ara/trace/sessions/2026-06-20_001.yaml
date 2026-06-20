@@ -1,0 +1,102 @@
+session:
+  id: "2026-06-20_001"
+  date: "2026-06-20"
+  started: "2026-06-20T22:49"
+  last_turn: "2026-06-20T23:59"
+  turn_count: 3
+  summary: "Implemented UI-022 mesh vertex-normal recompute and fixed BUG-047 so current surface shading uses packed vertex-normal attributes."
+
+events_logged:
+  - turn: 1
+    type: decision
+    id: "N29"
+    routing: direct
+    provenance: ai-executed
+    summary: "Set the normals UI leaf to `Mesh > Processing > Vertices > Normals` and chose CPU `v:normal` publication plus deferred `DirtyVertexAttributes` extraction sync."
+  - turn: 1
+    type: experiment
+    id: "N30"
+    routing: direct
+    provenance: ai-executed
+    summary: "Strict task policy passed after the UI-022 plan update."
+  - turn: 2
+    type: decision
+    id: "N31"
+    routing: direct
+    provenance: ai-executed
+    summary: "Implemented the mesh `Processing > Vertices > Normals` command/UI, publishing canonical `v:normal` and stamping `DirtyVertexAttributes`."
+  - turn: 2
+    type: experiment
+    id: "N32"
+    routing: direct
+    provenance: ai-executed
+    summary: "Focused build, CTest, and structural/docs checks passed for the mesh normal recompute slice."
+  - turn: 3
+    type: decision
+    id: "N33"
+    routing: direct
+    provenance: ai-executed
+    summary: "Changed promoted surface/GBuffer shaders to shade from transformed packed vertex normals and ignore `NormalID` normal textures for now."
+  - turn: 3
+    type: experiment
+    id: "N34"
+    routing: direct
+    provenance: ai-executed
+    summary: "Shader builds, focused renderer contract, end-to-end normal recompute/extraction tests, and structural/docs checks passed for BUG-047."
+
+ai_actions:
+  - turn: 1
+    action: "Updated the UI-022 backlog task with the normals menu path, mesh window plan, canonical output property, diagnostics, and deferred GPU synchronization contract."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/backlog/ui/UI-022-sandbox-editor-vertex-normal-recompute.md"
+  - turn: 2
+    action: "Implemented UI-022 mesh vertex-normal recompute through SandboxEditorUi command/model/ImGui controls and extended mesh extraction to consume DirtyVertexAttributes for deferred GPU reupload."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Editor/Runtime.SandboxEditorUi.cppm"
+      - "src/runtime/Editor/Runtime.SandboxEditorUi.cpp"
+      - "src/runtime/Runtime.RenderExtraction.cpp"
+      - "src/runtime/Runtime.RenderExtraction.cppm"
+      - "tests/contract/runtime/Test.SandboxEditorUi.cpp"
+      - "tests/contract/runtime/Test.MeshGeometryExtraction.cpp"
+      - "src/runtime/README.md"
+      - "tasks/backlog/ui/UI-022-sandbox-editor-vertex-normal-recompute.md"
+  - turn: 3
+    action: "Removed normal-texture override sampling from current surface fragment shaders, updated graphics docs, added BUG-047, and extended the graphics contract test to assert promoted shaders do not sample `NormalID`."
+    provenance: ai-executed
+    files_changed:
+      - "assets/shaders/forward/default_debug_surface.frag"
+      - "assets/shaders/deferred/default_debug_gbuffer.frag"
+      - "assets/shaders/deferred/gbuffer.frag"
+      - "assets/shaders/surface.frag"
+      - "assets/shaders/surface_gbuffer.frag"
+      - "tests/contract/graphics/Test.RendererFrameLifecycle.cpp"
+      - "docs/architecture/graphics.md"
+      - "src/graphics/assets/README.md"
+      - "src/graphics/renderer/README.md"
+      - "tasks/backlog/bugs/BUG-047-surface-normal-texture-overrides-vertex-normals.md"
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: "User requested the normals method UI under Mesh -> Processing -> Vertices -> Normals and asked whether GPU data should be updated directly, deferred by dirty state, or scheduled."
+  - turn: 1
+    excerpt: "Code inspection found DirtyVertexAttributes is the promoted vertex-attribute dirty tag and MeshGeometryPacker consumes `v:normal`; mesh extraction currently needs to consume that tag for normal-only GPU refresh."
+  - turn: 2
+    excerpt: "The available geometry-owned domain module for this slice is `Geometry.HalfedgeMesh.Vertices.Normals`; graph and point-cloud normal command windows were left pending."
+  - turn: 2
+    excerpt: "Verification passed 18 focused CTest cases covering halfedge normal recompute, SandboxEditor mesh normal command behavior, and mesh DirtyVertexAttributes reupload."
+  - turn: 3
+    excerpt: "User reported incorrect shading and requested shader use of normal attributes instead of texture baking for now."
+  - turn: 3
+    excerpt: "Diagnosis found promoted surface shaders sampled `MaterialParams::NormalID` as `texture * 2 - 1`, which is inappropriate for the current generated mesh-normal bakes without a tangent-space normal-map path."
+  - turn: 3
+    excerpt: "Verification passed 16 focused CTest cases across halfedge normal recompute, editor publication, mesh DirtyVertexAttributes reupload, material binding preservation, and shader-source assertions."
+
+open_threads:
+  - "UI-022 graph and point-cloud normal windows remain pending until geometry-owned recompute modules exist for those domains."
+  - "Tangent-space authored normal-map support remains pending; current promoted surface shaders intentionally ignore `NormalID` for shading."
+
+ai_suggestions_pending: []

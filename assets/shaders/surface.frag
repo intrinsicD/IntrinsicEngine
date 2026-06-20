@@ -91,15 +91,6 @@ void main() {
     float nLen = length(fragNormal);
     vec3 norm = (nLen > 1e-6) ? (fragNormal / nLen) : vec3(0.0, 0.0, 1.0);
     MaterialData mat = materials.Materials[fragMaterialSlot];
-    if (IsValidSurfaceTextureID(mat.NormalID))
-    {
-        vec3 normalTex = texture(globalTextures[nonuniformEXT(mat.NormalID)], fragTexCoord).xyz * 2.0 - 1.0;
-        float normalTexLen = length(normalTex);
-        if (normalTexLen > 1e-6)
-        {
-            norm = normalTex / normalTexLen;
-        }
-    }
     float diff = max(dot(norm, lightDir), 0.0);
     vec3 diffuse = diff * lColor;
 

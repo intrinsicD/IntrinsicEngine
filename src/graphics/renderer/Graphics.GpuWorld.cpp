@@ -13,6 +13,7 @@ module;
 
 module Extrinsic.Graphics.GpuWorld;
 
+import Extrinsic.RHI.CommandContext;
 import Extrinsic.RHI.Descriptors;
 
 namespace Extrinsic::Graphics
@@ -190,16 +191,17 @@ namespace Extrinsic::Graphics
         };
 
         template <class T>
-        void FlushDirtyRuns(RHI::IDevice& device,
+        [[nodiscard]] bool FlushDirtyRuns(RHI::IDevice& device,
                             RHI::BufferHandle dst,
                             std::vector<T>& cpu,
                             std::vector<bool>& dirty)
         {
             if (!dst.IsValid() || cpu.empty() || cpu.size() != dirty.size())
             {
-                return;
+                return false;
             }
 
+            bool flushed = false;
             std::size_t i = 0;
             while (i < dirty.size())
             {
@@ -221,7 +223,9 @@ namespace Extrinsic::Graphics
                                    cpu.data() + begin,
                                    static_cast<std::uint64_t>(count * sizeof(T)),
                                    static_cast<std::uint64_t>(begin * sizeof(T)));
+                flushed = true;
             }
+            return flushed;
         }
 
         [[nodiscard]] float FragmentationRatio(std::uint64_t fragmented, std::uint64_t usedHighWater) noexcept
@@ -261,6 +265,15 @@ namespace Extrinsic::Graphics
         std::vector<bool> DirtyBounds;
         bool DirtyLights = false;
         bool DirtySceneTable = true;
+        bool PendingSceneTableUploadBarrier = false;
+        bool PendingInstanceStaticUploadBarrier = false;
+        bool PendingInstanceDynamicUploadBarrier = false;
+        bool PendingEntityConfigUploadBarrier = false;
+        bool PendingGeometryRecordUploadBarrier = false;
+        bool PendingBoundsUploadBarrier = false;
+        bool PendingLightsUploadBarrier = false;
+        bool PendingManagedVertexUploadBarrier = false;
+        bool PendingManagedIndexUploadBarrier = false;
         std::uint64_t FrameIndex = 0;
         std::uint32_t VertexOverflowCount = 0;
         std::uint32_t IndexOverflowCount = 0;
@@ -523,6 +536,7 @@ namespace Extrinsic::Graphics
                                     allocation.VertexBytes.data(),
                                     static_cast<std::uint64_t>(allocation.VertexBytes.size()),
                                     allocation.VertexByteOffset);
+                PendingManagedVertexUploadBarrier = true;
             }
             if (!allocation.SurfaceIndices.empty())
             {
@@ -530,6 +544,7 @@ namespace Extrinsic::Graphics
                                     allocation.SurfaceIndices.data(),
                                     allocation.SurfaceIndexByteCount,
                                     allocation.IndexByteOffset);
+                PendingManagedIndexUploadBarrier = true;
             }
             if (!allocation.LineIndices.empty())
             {
@@ -537,6 +552,7 @@ namespace Extrinsic::Graphics
                                     allocation.LineIndices.data(),
                                     allocation.LineIndexByteCount,
                                     allocation.IndexByteOffset + allocation.SurfaceIndexByteCount);
+                PendingManagedIndexUploadBarrier = true;
             }
         }
     };
@@ -758,6 +774,7 @@ namespace Extrinsic::Graphics
                                             desc.PackedVertexBytes.data(),
                                             vbSize,
                                             vbOffset);
+                m_Impl->PendingManagedVertexUploadBarrier = true;
             }
             if (surfSize > 0)
             {
@@ -765,6 +782,7 @@ namespace Extrinsic::Graphics
                                             desc.SurfaceIndices.data(),
                                             surfSize,
                                             surfOffset);
+                m_Impl->PendingManagedIndexUploadBarrier = true;
             }
             if (lineSize > 0)
             {
@@ -772,6 +790,7 @@ namespace Extrinsic::Graphics
                                             desc.LineIndices.data(),
                                             lineSize,
                                             lineOffset);
+                m_Impl->PendingManagedIndexUploadBarrier = true;
             }
         }
 
@@ -1144,26 +1163,36 @@ namespace Extrinsic::Graphics
             return;
         }
 
-        FlushDirtyRuns(*m_Impl->Device,
-                       GetInstanceStaticBuffer(),
-                       m_Impl->InstanceStaticCpu,
-                       m_Impl->DirtyInstanceStatic);
-        FlushDirtyRuns(*m_Impl->Device,
-                       GetInstanceDynamicBuffer(),
-                       m_Impl->InstanceDynamicCpu,
-                       m_Impl->DirtyInstanceDynamic);
-        FlushDirtyRuns(*m_Impl->Device,
-                       GetEntityConfigBuffer(),
-                       m_Impl->EntityConfigCpu,
-                       m_Impl->DirtyEntityConfig);
-        FlushDirtyRuns(*m_Impl->Device,
-                       GetGeometryRecordBuffer(),
-                       m_Impl->GeometryRecordsCpu,
-                       m_Impl->DirtyGeometryRecord);
-        FlushDirtyRuns(*m_Impl->Device,
-                       GetBoundsBuffer(),
-                       m_Impl->BoundsCpu,
-                       m_Impl->DirtyBounds);
+        m_Impl->PendingInstanceStaticUploadBarrier =
+            FlushDirtyRuns(*m_Impl->Device,
+                           GetInstanceStaticBuffer(),
+                           m_Impl->InstanceStaticCpu,
+                           m_Impl->DirtyInstanceStatic) ||
+            m_Impl->PendingInstanceStaticUploadBarrier;
+        m_Impl->PendingInstanceDynamicUploadBarrier =
+            FlushDirtyRuns(*m_Impl->Device,
+                           GetInstanceDynamicBuffer(),
+                           m_Impl->InstanceDynamicCpu,
+                           m_Impl->DirtyInstanceDynamic) ||
+            m_Impl->PendingInstanceDynamicUploadBarrier;
+        m_Impl->PendingEntityConfigUploadBarrier =
+            FlushDirtyRuns(*m_Impl->Device,
+                           GetEntityConfigBuffer(),
+                           m_Impl->EntityConfigCpu,
+                           m_Impl->DirtyEntityConfig) ||
+            m_Impl->PendingEntityConfigUploadBarrier;
+        m_Impl->PendingGeometryRecordUploadBarrier =
+            FlushDirtyRuns(*m_Impl->Device,
+                           GetGeometryRecordBuffer(),
+                           m_Impl->GeometryRecordsCpu,
+                           m_Impl->DirtyGeometryRecord) ||
+            m_Impl->PendingGeometryRecordUploadBarrier;
+        m_Impl->PendingBoundsUploadBarrier =
+            FlushDirtyRuns(*m_Impl->Device,
+                           GetBoundsBuffer(),
+                           m_Impl->BoundsCpu,
+                           m_Impl->DirtyBounds) ||
+            m_Impl->PendingBoundsUploadBarrier;
 
         if (m_Impl->DirtyLights && GetLightBuffer().IsValid())
         {
@@ -1173,6 +1202,7 @@ namespace Extrinsic::Graphics
                                             m_Impl->LightsCpu.data(),
                                             static_cast<std::uint64_t>(m_Impl->LightsCpu.size() * sizeof(RHI::GpuLight)),
                                             0);
+                m_Impl->PendingLightsUploadBarrier = true;
             }
             m_Impl->DirtyLights = false;
         }
@@ -1183,8 +1213,36 @@ namespace Extrinsic::Graphics
                                         &m_Impl->SceneTableCpu,
                                         sizeof(RHI::GpuSceneTable),
                                         0);
+            m_Impl->PendingSceneTableUploadBarrier = true;
             m_Impl->DirtySceneTable = false;
         }
+    }
+
+    void GpuWorld::SubmitPendingUploadBarriers(RHI::ICommandContext& cmd)
+    {
+        const auto submit = [&cmd](const RHI::BufferHandle buffer,
+                                   bool& pending,
+                                   const RHI::MemoryAccess after)
+        {
+            if (!pending || !buffer.IsValid())
+            {
+                return;
+            }
+            cmd.BufferBarrier(buffer, RHI::MemoryAccess::TransferWrite, after);
+            pending = false;
+        };
+
+        submit(GetSceneTableBuffer(), m_Impl->PendingSceneTableUploadBarrier, RHI::MemoryAccess::ShaderRead);
+        submit(GetInstanceStaticBuffer(), m_Impl->PendingInstanceStaticUploadBarrier, RHI::MemoryAccess::ShaderRead);
+        submit(GetInstanceDynamicBuffer(), m_Impl->PendingInstanceDynamicUploadBarrier, RHI::MemoryAccess::ShaderRead);
+        submit(GetEntityConfigBuffer(), m_Impl->PendingEntityConfigUploadBarrier, RHI::MemoryAccess::ShaderRead);
+        submit(GetGeometryRecordBuffer(), m_Impl->PendingGeometryRecordUploadBarrier, RHI::MemoryAccess::ShaderRead);
+        submit(GetBoundsBuffer(), m_Impl->PendingBoundsUploadBarrier, RHI::MemoryAccess::ShaderRead);
+        submit(GetLightBuffer(), m_Impl->PendingLightsUploadBarrier, RHI::MemoryAccess::ShaderRead);
+        submit(GetManagedVertexBuffer(), m_Impl->PendingManagedVertexUploadBarrier, RHI::MemoryAccess::ShaderRead);
+        submit(GetManagedIndexBuffer(),
+               m_Impl->PendingManagedIndexUploadBarrier,
+               RHI::MemoryAccess::IndexRead | RHI::MemoryAccess::ShaderRead);
     }
 
     RHI::BufferHandle GpuWorld::GetSceneTableBuffer() const noexcept { return m_Impl->SceneTableLease.GetHandle(); }

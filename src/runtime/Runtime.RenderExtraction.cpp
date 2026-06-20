@@ -1217,6 +1217,7 @@ namespace Extrinsic::Runtime
         namespace D = ECS::Components::DirtyTags;
         const bool dirty = registry.any_of<D::GpuDirty,
                                             D::DirtyVertexPositions,
+                                            D::DirtyVertexAttributes,
                                             D::DirtyFaceTopology,
                                             D::DirtyEdgeTopology>(entity);
         const bool hadResidency = sidecar.MeshGeometry.IsValid();
@@ -1329,6 +1330,7 @@ namespace Extrinsic::Runtime
         {
             registry.remove<D::GpuDirty,
                             D::DirtyVertexPositions,
+                            D::DirtyVertexAttributes,
                             D::DirtyFaceTopology,
                             D::DirtyEdgeTopology>(entity);
         }
@@ -2218,6 +2220,7 @@ namespace Extrinsic::Runtime
                     // reupload off the same coalesced signal.
                     meshDirtyThisFrame = registry.any_of<D::GpuDirty,
                                                          D::DirtyVertexPositions,
+                                                         D::DirtyVertexAttributes,
                                                          D::DirtyFaceTopology,
                                                          D::DirtyEdgeTopology>(entity);
                     if (wantsSurface)
@@ -2276,6 +2279,7 @@ namespace Extrinsic::Runtime
                         {
                             registry.remove<D::GpuDirty,
                                             D::DirtyVertexPositions,
+                                            D::DirtyVertexAttributes,
                                             D::DirtyFaceTopology,
                                             D::DirtyEdgeTopology>(entity);
                         }

@@ -13,8 +13,7 @@
 // from `GpuScenePushConstants::SceneTableBDA -> scene.MaterialBDA` and
 // writes three GBuffer color attachments matching the recipe's deferred
 // resource declarations:
-//   - location 0 -> SceneNormal (RGBA16F): packed vertex normal by default,
-//     overridden by a bound normal texture when present.
+//   - location 0 -> SceneNormal (RGBA16F): packed vertex normal.
 //   - location 1 -> Albedo (RGBA8): material BaseColorFactor multiplied by a
 //     bound albedo texture when present.
 //   - location 2 -> Material0 (RGBA16F): metallic/roughness packed plus
@@ -59,13 +58,6 @@ void main() {
     const float vertexNormalLen = length(fragWorldNormal);
     if (vertexNormalLen > 1.0e-6) {
         n = fragWorldNormal / vertexNormalLen;
-    }
-    if (IsValidTextureID(mat.NormalID)) {
-        vec3 normalTex = texture(globalTextures[nonuniformEXT(mat.NormalID)], fragUv).xyz * 2.0 - 1.0;
-        float normalTexLen = length(normalTex);
-        if (normalTexLen > 1.0e-6) {
-            n = normalTex / normalTexLen;
-        }
     }
 
     vec4 baseColor = mat.BaseColorFactor;

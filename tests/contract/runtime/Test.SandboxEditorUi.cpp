@@ -10,6 +10,7 @@
 #include <limits>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -49,6 +50,7 @@ import Extrinsic.ECS.Hierarchy.Mutation;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
+import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.ImGuiOverlaySystem;
 import Extrinsic.Graphics.RenderGraph;
@@ -69,6 +71,7 @@ import Extrinsic.Runtime.SandboxEditorUi;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
+import Geometry.HalfedgeMesh.Vertices.Normals;
 import Geometry.Properties;
 import Geometry.UvAtlas;
 
@@ -84,6 +87,7 @@ namespace G = Extrinsic::Graphics::Components;
 namespace Graphics = Extrinsic::Graphics;
 namespace Plat = Extrinsic::Platform;
 namespace PN = Extrinsic::ECS::Components::GeometrySources::PropertyNames;
+namespace GN = Geometry::HalfedgeMesh::VertexNormals;
 
 namespace
 {
@@ -645,6 +649,29 @@ namespace
     {
         return MeshHasVertexProperty(engine, entity, "v:texcoord") &&
             MeshHasVertexProperty(engine, entity, "v:normal");
+    }
+
+    void ExpectMeshVertexNormalsNear(
+        Runtime::Engine& engine,
+        const ECS::EntityHandle entity,
+        const std::span<const glm::vec3> expected)
+    {
+        ASSERT_TRUE(engine.GetScene().IsValid(entity));
+        auto& raw = engine.GetScene().Raw();
+        const GS::ConstSourceView view = GS::BuildConstView(raw, entity);
+        ASSERT_TRUE(view.Valid());
+        ASSERT_EQ(view.ActiveDomain, GS::Domain::Mesh);
+        ASSERT_NE(view.VertexSource, nullptr);
+
+        const auto normals = view.VertexSource->Properties.Get<glm::vec3>(PN::kNormal);
+        ASSERT_TRUE(normals);
+        ASSERT_EQ(normals.Vector().size(), expected.size());
+        for (std::size_t i = 0; i < expected.size(); ++i)
+        {
+            EXPECT_NEAR(normals.Vector()[i].x, expected[i].x, 1.0e-5f) << i;
+            EXPECT_NEAR(normals.Vector()[i].y, expected[i].y, 1.0e-5f) << i;
+            EXPECT_NEAR(normals.Vector()[i].z, expected[i].z, 1.0e-5f) << i;
+        }
     }
 
     struct TmpFile
@@ -1421,6 +1448,19 @@ TEST(SandboxEditorUi, GeometryProcessingSupportedDomainsMatchPromotedEditorContr
         kmeans,
         Domain::MeshEdges));
 
+    const Domain normals =
+        Runtime::GetSandboxEditorSupportedGeometryProcessingDomains(
+            Algorithm::NormalEstimation);
+    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        normals,
+        Domain::MeshVertices));
+    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        normals,
+        Domain::PointCloudPoints));
+    EXPECT_FALSE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        normals,
+        Domain::MeshEdges));
+
     const Domain smoothing =
         Runtime::GetSandboxEditorSupportedGeometryProcessingDomains(
             Algorithm::Smoothing);
@@ -1454,12 +1494,52 @@ TEST(SandboxEditorUi, GeometryProcessingSupportedDomainsMatchPromotedEditorContr
                  "Vector Heat Method");
 }
 
+TEST(SandboxEditorUi, GeometryProcessingMenusExposeDomainElementSubmenus)
+{
+    using Domain = Runtime::SandboxEditorGeometryProcessingDomain;
+
+    const std::vector<Runtime::SandboxEditorGeometryProcessingMenuItem> mesh =
+        Runtime::GetSandboxEditorGeometryProcessingMenuItems(
+            Runtime::SandboxEditorDomainWindowKind::Mesh);
+    ASSERT_EQ(mesh.size(), 3u);
+    EXPECT_EQ(mesh[0].Domain, Domain::MeshVertices);
+    EXPECT_STREQ(mesh[0].Label, "Vertices");
+    EXPECT_TRUE(mesh[0].HasNormalsMethod);
+    EXPECT_EQ(mesh[1].Domain, Domain::MeshEdges);
+    EXPECT_STREQ(mesh[1].Label, "Edges");
+    EXPECT_FALSE(mesh[1].HasNormalsMethod);
+    EXPECT_EQ(mesh[2].Domain, Domain::MeshFaces);
+    EXPECT_STREQ(mesh[2].Label, "Faces");
+    EXPECT_FALSE(mesh[2].HasNormalsMethod);
+
+    const std::vector<Runtime::SandboxEditorGeometryProcessingMenuItem> graph =
+        Runtime::GetSandboxEditorGeometryProcessingMenuItems(
+            Runtime::SandboxEditorDomainWindowKind::Graph);
+    ASSERT_EQ(graph.size(), 3u);
+    EXPECT_EQ(graph[0].Domain, Domain::GraphVertices);
+    EXPECT_STREQ(graph[0].Label, "Vertices");
+    EXPECT_FALSE(graph[0].HasNormalsMethod);
+    EXPECT_EQ(graph[1].Domain, Domain::GraphEdges);
+    EXPECT_STREQ(graph[1].Label, "Edges");
+    EXPECT_EQ(graph[2].Domain, Domain::GraphHalfedges);
+    EXPECT_STREQ(graph[2].Label, "Halfedges");
+
+    const std::vector<Runtime::SandboxEditorGeometryProcessingMenuItem> cloud =
+        Runtime::GetSandboxEditorGeometryProcessingMenuItems(
+            Runtime::SandboxEditorDomainWindowKind::PointCloud);
+    ASSERT_EQ(cloud.size(), 1u);
+    EXPECT_EQ(cloud[0].Domain, Domain::PointCloudPoints);
+    EXPECT_STREQ(cloud[0].Label, "Vertices");
+    EXPECT_FALSE(cloud[0].HasNormalsMethod);
+}
+
 TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntries)
 {
     using Algorithm = Runtime::SandboxEditorGeometryProcessingAlgorithm;
     using Domain = Runtime::SandboxEditorGeometryProcessingDomain;
 
     ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
 
     const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
     AddTriangleMeshSource(registry, mesh);
@@ -1485,20 +1565,28 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
 
     const std::vector<Runtime::SandboxEditorGeometryProcessingEntry> meshEntries =
         Runtime::ResolveSandboxEditorGeometryProcessingEntries(meshCaps);
-    ASSERT_EQ(meshEntries.size(), 11u);
+    ASSERT_EQ(meshEntries.size(), 12u);
     EXPECT_EQ(meshEntries[0].Algorithm, Algorithm::KMeans);
-    EXPECT_EQ(meshEntries[1].Algorithm, Algorithm::ShortestPath);
-    EXPECT_EQ(meshEntries[2].Algorithm, Algorithm::VectorHeat);
-    EXPECT_EQ(meshEntries[3].Algorithm, Algorithm::Parameterization);
-    EXPECT_EQ(meshEntries[4].Algorithm, Algorithm::ConvexHull);
-    EXPECT_EQ(meshEntries[5].Algorithm, Algorithm::BooleanCSG);
-    EXPECT_EQ(meshEntries[6].Algorithm, Algorithm::Remeshing);
-    EXPECT_EQ(meshEntries[10].Algorithm, Algorithm::Repair);
+    EXPECT_EQ(meshEntries[1].Algorithm, Algorithm::NormalEstimation);
+    EXPECT_EQ(meshEntries[2].Algorithm, Algorithm::ShortestPath);
+    EXPECT_EQ(meshEntries[3].Algorithm, Algorithm::VectorHeat);
+    EXPECT_EQ(meshEntries[4].Algorithm, Algorithm::Parameterization);
+    EXPECT_EQ(meshEntries[5].Algorithm, Algorithm::ConvexHull);
+    EXPECT_EQ(meshEntries[6].Algorithm, Algorithm::BooleanCSG);
+    EXPECT_EQ(meshEntries[7].Algorithm, Algorithm::Remeshing);
+    EXPECT_EQ(meshEntries[11].Algorithm, Algorithm::Repair);
 
     const std::vector<Domain> meshKMeans =
         Runtime::GetAvailableSandboxEditorKMeansDomains(registry, mesh);
     ASSERT_EQ(meshKMeans.size(), 1u);
     EXPECT_EQ(meshKMeans[0], Domain::MeshVertices);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    const Runtime::SandboxEditorDomainWindowModel meshModel =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::Mesh);
+    EXPECT_TRUE(meshModel.Processing.MeshVertexNormalsAvailable);
 
     const ECS::EntityHandle graph = MakeSelectable(registry, "Graph");
     AddGraphSource(registry, graph);
@@ -1653,6 +1741,242 @@ TEST(SandboxEditorUi, KMeansCommandPublishesMeshGraphAndPointCloudProperties)
     ASSERT_TRUE(model.Processing.LastKMeansResult.has_value());
     EXPECT_TRUE(model.Processing.LastKMeansResult->Succeeded());
     EXPECT_EQ(model.Processing.LastKMeansResult->LabelCount, 4u);
+}
+
+TEST(SandboxEditorUi, MeshVertexNormalsCommandPublishesCanonicalNormalsForAllWeightings)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "NormalMesh");
+    AddTriangleMeshSource(registry, mesh);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+
+    constexpr std::array<GN::AveragingMode, 4> kWeightings{{
+        GN::AveragingMode::UniformFace,
+        GN::AveragingMode::AreaWeighted,
+        GN::AveragingMode::AngleWeighted,
+        GN::AveragingMode::MaxWeighted,
+    }};
+
+    Runtime::SandboxEditorMeshVertexNormalsResult lastResult{};
+    for (const GN::AveragingMode weighting : kWeightings)
+    {
+        registry.Raw().remove<Dirty::GpuDirty,
+                              Dirty::DirtyVertexPositions,
+                              Dirty::DirtyVertexAttributes,
+                              Dirty::DirtyFaceTopology,
+                              Dirty::DirtyEdgeTopology>(mesh);
+
+        lastResult = Runtime::ApplySandboxEditorMeshVertexNormalsCommand(
+            context,
+            Runtime::SandboxEditorMeshVertexNormalsCommand{
+                .StableEntityId = stableId,
+                .Weighting = weighting,
+            });
+
+        ASSERT_TRUE(lastResult.Succeeded())
+            << lastResult.Message;
+        EXPECT_EQ(lastResult.NormalStatus, GN::RecomputeStatus::Success);
+        EXPECT_EQ(lastResult.Weighting, weighting);
+        EXPECT_EQ(lastResult.VertexSlotCount, 3u);
+        EXPECT_EQ(lastResult.WrittenCount, 3u);
+        EXPECT_EQ(lastResult.ProcessedFaceCount, 1u);
+        EXPECT_EQ(lastResult.FallbackVertexCount, 0u);
+        EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+        EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(mesh));
+        EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
+        EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
+        EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyEdgeTopology>(mesh));
+
+        auto normals = registry.Raw()
+                           .get<GS::Vertices>(mesh)
+                           .Properties.Get<glm::vec3>(PN::kNormal);
+        ASSERT_TRUE(normals);
+        ASSERT_EQ(normals.Vector().size(), 3u);
+        for (const glm::vec3 normal : normals.Vector())
+        {
+            EXPECT_NEAR(normal.x, 0.0f, 1.0e-5f);
+            EXPECT_NEAR(normal.y, 0.0f, 1.0e-5f);
+            EXPECT_NEAR(normal.z, 1.0f, 1.0e-5f);
+        }
+    }
+
+    EXPECT_TRUE(history.IsDirty());
+    context.LastMeshVertexNormalsResult = &lastResult;
+    const Runtime::SandboxEditorDomainWindowModel model =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::Mesh);
+    ASSERT_TRUE(model.Processing.MeshVertexNormalsAvailable);
+    ASSERT_TRUE(model.Processing.LastMeshVertexNormalsResult.has_value());
+    EXPECT_TRUE(model.Processing.LastMeshVertexNormalsResult->Succeeded());
+    EXPECT_EQ(model.Processing.LastMeshVertexNormalsResult->WrittenCount, 3u);
+}
+
+TEST(SandboxEditorUi, MeshVertexNormalsCommandSurvivesPendingDirectMeshPostProcess)
+{
+    TmpFile meshFile(
+        "runtime_mesh_normals_postprocess_race.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "vt 0 0\n"
+        "vt 1 0\n"
+        "vt 0 1\n"
+        "vn 1 0 0\n"
+        "vn 1 0 0\n"
+        "vn 1 0 0\n"
+        "f 1/1/1 2/2/2 3/3/3\n");
+
+    std::optional<std::uint32_t> stableId{};
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<WaitForConditionApplication>(
+            [&stableId](Runtime::Engine& runningEngine)
+            {
+                if (!stableId.has_value())
+                    return false;
+                const std::optional<Graphics::MaterialTextureAssetBindings> bindings =
+                    runningEngine.GetMaterialTextureAssetBindingsForTest(*stableId);
+                return bindings.has_value() && bindings->Normal.IsValid();
+            },
+            128u));
+    engine.Initialize();
+
+    auto imported = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+        .Path = meshFile.Path.string(),
+        .PayloadKind = Assets::AssetPayloadKind::Mesh,
+    });
+    ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
+
+    const std::optional<ECS::EntityHandle> meshEntity =
+        FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
+    ASSERT_TRUE(meshEntity.has_value());
+    stableId = Runtime::SelectionController::ToStableEntityId(*meshEntity);
+
+    ExpectMeshVertexNormalsNear(
+        engine,
+        *meshEntity,
+        std::array{
+            glm::vec3{1.0f, 0.0f, 0.0f},
+            glm::vec3{1.0f, 0.0f, 0.0f},
+            glm::vec3{1.0f, 0.0f, 0.0f},
+        });
+
+    Runtime::SandboxEditorContext context =
+        MakeContext(engine.GetScene(), engine.GetSelectionController());
+    const Runtime::SandboxEditorMeshVertexNormalsResult recomputed =
+        Runtime::ApplySandboxEditorMeshVertexNormalsCommand(
+            context,
+            Runtime::SandboxEditorMeshVertexNormalsCommand{
+                .StableEntityId = *stableId,
+                .Weighting = GN::AveragingMode::AreaWeighted,
+            });
+    ASSERT_TRUE(recomputed.Succeeded()) << recomputed.Message;
+    ExpectMeshVertexNormalsNear(
+        engine,
+        *meshEntity,
+        std::array{
+            glm::vec3{0.0f, 0.0f, 1.0f},
+            glm::vec3{0.0f, 0.0f, 1.0f},
+            glm::vec3{0.0f, 0.0f, 1.0f},
+        });
+
+    engine.Run();
+
+    const std::optional<Graphics::MaterialTextureAssetBindings> bindings =
+        engine.GetMaterialTextureAssetBindingsForTest(*stableId);
+    ASSERT_TRUE(bindings.has_value());
+    ASSERT_TRUE(bindings->Normal.IsValid());
+    ExpectMeshVertexNormalsNear(
+        engine,
+        *meshEntity,
+        std::array{
+            glm::vec3{0.0f, 0.0f, 1.0f},
+            glm::vec3{0.0f, 0.0f, 1.0f},
+            glm::vec3{0.0f, 0.0f, 1.0f},
+        });
+
+    engine.Shutdown();
+}
+
+TEST(SandboxEditorUi, MeshVertexNormalsCommandFailsClosedForInvalidTargets)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+
+    const Runtime::SandboxEditorMeshVertexNormalsCommand validShape{
+        .StableEntityId = 1u,
+    };
+
+    const Runtime::SandboxEditorMeshVertexNormalsResult missingScene =
+        Runtime::ApplySandboxEditorMeshVertexNormalsCommand(
+            Runtime::SandboxEditorContext{},
+            validShape);
+    EXPECT_EQ(missingScene.Status,
+              Runtime::SandboxEditorCommandStatus::MissingScene);
+    EXPECT_EQ(missingScene.Error, Core::ErrorCode::InvalidState);
+
+    const Runtime::SandboxEditorMeshVertexNormalsResult stale =
+        Runtime::ApplySandboxEditorMeshVertexNormalsCommand(
+            context,
+            Runtime::SandboxEditorMeshVertexNormalsCommand{
+                .StableEntityId = std::numeric_limits<std::uint32_t>::max(),
+            });
+    EXPECT_EQ(stale.Status, Runtime::SandboxEditorCommandStatus::StaleEntity);
+    EXPECT_EQ(stale.Error, Core::ErrorCode::ResourceNotFound);
+
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "Cloud");
+    AddPointCloudSource(registry, cloud, 3u);
+    const Runtime::SandboxEditorMeshVertexNormalsResult wrongDomain =
+        Runtime::ApplySandboxEditorMeshVertexNormalsCommand(
+            context,
+            Runtime::SandboxEditorMeshVertexNormalsCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(cloud),
+            });
+    EXPECT_EQ(wrongDomain.Status,
+              Runtime::SandboxEditorCommandStatus::UnsupportedGeometryDomain);
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(cloud));
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "TypeConflictMesh");
+    AddTriangleMeshSource(registry, mesh);
+    const auto conflictingNormals = registry.Raw()
+                                        .get<GS::Vertices>(mesh)
+                                        .Properties.GetOrAdd<float>(
+                                            std::string{PN::kNormal},
+                                            0.0f);
+    ASSERT_TRUE(conflictingNormals);
+    const Runtime::SandboxEditorMeshVertexNormalsResult conflict =
+        Runtime::ApplySandboxEditorMeshVertexNormalsCommand(
+            context,
+            Runtime::SandboxEditorMeshVertexNormalsCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(mesh),
+            });
+    EXPECT_EQ(conflict.Status,
+              Runtime::SandboxEditorCommandStatus::GeometryProcessingFailed);
+    EXPECT_EQ(conflict.NormalStatus, GN::RecomputeStatus::PropertyTypeConflict);
+    EXPECT_EQ(conflict.Error, Core::ErrorCode::TypeMismatch);
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+    context.LastMeshVertexNormalsResult = &conflict;
+    const Runtime::SandboxEditorDomainWindowModel model =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::Mesh);
+    EXPECT_TRUE(HasDiagnostic(
+        model.Processing.Diagnostics,
+        Runtime::SandboxEditorDiagnosticCode::GeometryProcessingFailed));
 }
 
 TEST(SandboxEditorUi, KMeansCommandFailsClosedForInvalidTargetsAndInputs)

@@ -75,14 +75,10 @@ void main() {
             visualizationColor,
             baseColor);
 
-    vec3 n = normalize(vWorldNormal);
-    if (IsValidTextureID(mat.NormalID)) {
-        vec3 normalTex = texture(globalTextures[nonuniformEXT(mat.NormalID)], vUv).xyz * 2.0 - 1.0;
-        float normalTexLength = length(normalTex);
-        if (normalTexLength > 1.0e-6) {
-            n = normalTex / normalTexLength;
-        }
-    }
+    const float normalLength = length(vWorldNormal);
+    vec3 n = (normalLength > 1.0e-6)
+        ? (vWorldNormal / normalLength)
+        : vec3(0.0, 0.0, 1.0);
     GBuf_Normal = vec4(n, 0.0);
     GBuf_Albedo = baseColor;
     GBuf_Material = vec4(mat.RoughnessFactor, mat.MetallicFactor, float(cfg.ColorSourceMode), 0.0);
