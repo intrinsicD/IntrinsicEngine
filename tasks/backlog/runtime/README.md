@@ -26,6 +26,25 @@ Storage model is fixed by
 [`ADR-0022`](../../../docs/adr/0022-vertex-storage-soa-per-channel-streaming.md):
 uniform SoA with per-channel streaming.
 
+### CPU↔GPU transfer foundation — readback leg (Theme B)
+
+The forward (CPU→GPU) transfer/binding/scheduling spine already exists: the
+RUNTIME-120..124 vertex-attribute series, RUNTIME-112's `DerivedJobRegistry`
+(`StreamingExecutor`-backed, explicit dependencies + follow-up scheduling, done),
+and GRAPHICS-084 (visualization property buffers + dimension-match, done). The
+async GPU→CPU readback transport is added by the rendering tasks
+GRAPHICS-095/096/097/098 (see the rendering DAG). The runtime-side gap is the
+readback *leg*:
+
+- `RUNTIME-126` — GPU readback jobs and result→property write-back in the
+  derived-job graph. Adds a readback job kind (driving GRAPHICS-096
+  `DownloadBuffer`) and a readback→property write-back binding (dimension-checked
+  via GRAPHICS-095), so algorithms chain follow-ups on GPU-computed results
+  ("compute → read back → derive color/vector-field → re-upload → visible") using
+  the existing `SubmitFollowUp`/`DependsOn` edges. Depends on GRAPHICS-096/098;
+  composes RUNTIME-112. Recorded in
+  [`ADR-0023`](../../../docs/adr/0023-cpu-gpu-transfer-foundation.md).
+
 `RUNTIME-111` through `RUNTIME-115` are retired; additional progressive
 render-data follow-ups should open as value-gated tasks with a concrete
 consumer.
