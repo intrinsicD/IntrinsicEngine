@@ -59,43 +59,43 @@ maturity_target: CPUContracted
   so a normal-only edit re-uploads only the normal stream.
 
 ## Required changes
-- [ ] Add `src/runtime/Runtime.VertexAttributeBinding.cppm` exporting
+- [x] Add `src/runtime/Runtime.VertexAttributeBinding.cppm` exporting
       `Extrinsic::Runtime` channel/source/status enums, `VertexAttributeBinding`
       descriptor, `AttributeBindResult` diagnostics, and `DebugNameFor*` helpers.
-- [ ] Add `src/runtime/Runtime.VertexAttributeBinding.cpp` with the resolver
+- [x] Add `src/runtime/Runtime.VertexAttributeBinding.cpp` with the resolver
       bodies: whole-property fail-closed handling (empty name / missing / type
       mismatch / count mismatch) plus per-element finite/degeneracy fallback,
       optional vec3 renormalization, and `unpackUnorm4x8`-compatible color
       packing.
-- [ ] Register both files in `src/runtime/CMakeLists.txt`.
-- [ ] Route `Runtime.MeshGeometryPacker` normal and texcoord reads through
+- [x] Register both files in `src/runtime/CMakeLists.txt`.
+- [x] Route `Runtime.MeshGeometryPacker` normal and texcoord reads through
       `ResolveVec3Channel` / `ResolveVec2Channel`, preserving the existing
       normalize-or-`+Z` and finite-or-zero behavior; keep `v:position`
       hard-fail validation inline.
 
 ## Tests
-- [ ] Add `tests/contract/runtime/Test.VertexAttributeBinding.cpp` covering:
+- [x] Add `tests/contract/runtime/Test.VertexAttributeBinding.cpp` covering:
       missing property, type mismatch, count mismatch, empty binding,
       `AllowFallback=false` non-population, per-element non-finite fallback,
       vec3 renormalization + degenerate fallback, and color packing round-trip.
-- [ ] Register the new test in `tests/CMakeLists.txt` runtime contract list.
-- [ ] Keep `Test.MeshGeometryPacker.cpp` passing unchanged (behavior preserved).
+- [x] Register the new test in `tests/CMakeLists.txt` runtime contract list.
+- [x] Keep `Test.MeshGeometryPacker.cpp` passing unchanged (behavior preserved).
 
 ## Docs
-- [ ] Add a short "Vertex attribute binding" subsection to `src/runtime/README.md`
+- [x] Add a short "Vertex attribute binding" subsection to `src/runtime/README.md`
       describing the resolver, its fail-closed contract, and how it differs from
       `VisualizationConfig`.
-- [ ] Regenerate `docs/api/generated/module_inventory.md`.
-- [ ] List RUNTIME-120..124 in `tasks/backlog/runtime/README.md`.
+- [x] Regenerate `docs/api/generated/module_inventory.md`.
+- [x] List RUNTIME-120..124 in `tasks/backlog/runtime/README.md`.
 
 ## Acceptance criteria
-- [ ] The resolver is reusable across geometry kinds (imports `Geometry.Properties`
+- [x] The resolver is reusable across geometry kinds (imports `Geometry.Properties`
       only, no ECS/GPU dependency) and is exercised by the mesh packer.
-- [ ] Every fail-closed branch returns a precise `AttributeBindStatus` and
+- [x] Every fail-closed branch returns a precise `AttributeBindStatus` and
       populates `AttributeBindResult` counters.
-- [ ] Mesh packer output is byte-identical for fixtures with/without
+- [x] Mesh packer output is byte-identical for fixtures with/without
       `v:normal` and `v:texcoord` (behavior preserved).
-- [ ] Focused runtime contract tests and structural checks pass.
+- [x] Focused runtime contract tests and structural checks pass.
 
 ## Verification
 ```bash
