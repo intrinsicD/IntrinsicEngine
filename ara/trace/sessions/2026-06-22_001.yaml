@@ -1,0 +1,53 @@
+session:
+  id: "2026-06-22_001"
+  date: "2026-06-22"
+  started: "2026-06-22T00:33"
+  last_turn: "2026-06-22T00:33"
+  turn_count: 1
+  summary: "Implemented, verified, committed, and retired GRAPHICS-095 as the CPU-pure RHI buffer transfer math helper."
+
+events_logged:
+  - turn: 1
+    type: decision
+    id: "N40"
+    routing: direct
+    provenance: ai-executed
+    summary: "Selected GRAPHICS-095 from the rendering backlog, implemented `Extrinsic.RHI.BufferTransfer`, retired the task at CPUContracted, and unlocked GRAPHICS-096."
+  - turn: 1
+    type: experiment
+    id: "N41"
+    routing: direct
+    provenance: ai-executed
+    summary: "Focused BufferTransfer tests passed 14/14; full default CPU-supported CTest passed 3012/3012; strict structural/docs checks passed."
+
+ai_actions:
+  - turn: 1
+    action: "Added the RHI BufferTransfer module, CMake wiring, focused unit graphics tests, RHI README/module inventory updates, task retirement records, and committed the slice."
+    provenance: ai-executed
+    files_changed:
+      - "src/graphics/rhi/RHI.BufferTransfer.cppm"
+      - "src/graphics/rhi/RHI.BufferTransfer.cpp"
+      - "src/graphics/rhi/CMakeLists.txt"
+      - "src/graphics/rhi/README.md"
+      - "tests/contract/graphics/Test.BufferTransfer.cpp"
+      - "tests/CMakeLists.txt"
+      - "docs/api/generated/module_inventory.md"
+      - "tasks/done/GRAPHICS-095-buffer-transfer-math-helper.md"
+      - "tasks/done/RETIREMENT-LOG.md"
+      - "tasks/backlog/rendering/README.md"
+      - "tasks/SESSION-BRIEF.md"
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: "User requested the agentic workflow for the next task from `backlog/rendering`: identify, plan thoroughly, implement, and commit."
+  - turn: 1
+    excerpt: "`tasks/SESSION-BRIEF.md` identified GRAPHICS-095 as the next unblocked Theme B rendering modernization task before implementation."
+  - turn: 1
+    excerpt: "GRAPHICS-095 closes at CPUContracted because it is intentionally backend-neutral math/validation; GPU readback and high-level transfer consumers remain GRAPHICS-096, GRAPHICS-098, and RUNTIME-126."
+
+open_threads:
+  - "GRAPHICS-096 is now the next unblocked rendering transfer task and owns async GPU-to-CPU buffer readback ring operational behavior."
+
+ai_suggestions_pending: []

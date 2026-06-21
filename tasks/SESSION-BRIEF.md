@@ -12,8 +12,7 @@ the authoritative open/unblocked view.
 
 ## Theme B — Rendering modernization
 
-- unblocked: `GRAPHICS-095` — CPU-testable buffer transfer math and validation helper (tasks/backlog/rendering/GRAPHICS-095-buffer-transfer-math-helper.md)
-- blocked by `GRAPHICS-095`: `GRAPHICS-096` — Async GPU→CPU buffer readback ring on ITransferQueue (tasks/backlog/rendering/GRAPHICS-096-async-buffer-readback-ring.md)
+- unblocked: `GRAPHICS-096` — Async GPU→CPU buffer readback ring on ITransferQueue (tasks/backlog/rendering/GRAPHICS-096-async-buffer-readback-ring.md)
 - blocked by `GRAPHICS-096`: `GRAPHICS-097` — Async GPU→CPU texture readback through the readback ring (tasks/backlog/rendering/GRAPHICS-097-async-texture-readback.md)
 - blocked by `GRAPHICS-096`: `GRAPHICS-098` — High-level GpuTransfer facade with correct barrier brackets (tasks/backlog/rendering/GRAPHICS-098-gpu-transfer-facade.md)
 - unblocked: `RUNTIME-120` — Reusable vertex attribute binding resolver (tasks/backlog/runtime/RUNTIME-120-vertex-attribute-binding-resolver.md)

@@ -988,7 +988,7 @@ TAA + reconstructor seam (GRAPHICS-040):
 - [GRAPHICS-040C (done)](../../done/GRAPHICS-040C-aa-recipe-selection-and-integration.md) — AA recipe selection + post-chain integration (`Operational`, 2026-06-05). Depends on 040B (done), GRAPHICS-013A/075 (done).
 - GRAPHICS-040D (vendor reconstructor backends) — **not opened**: per GRAPHICS-040 decision 5/10 there is one child per vendor, opened only when that vendor SDK is actually integrated.
 
-### CPU↔GPU transfer foundation (GRAPHICS-095..098, open)
+### CPU↔GPU transfer foundation (GRAPHICS-095 done; GRAPHICS-096..098 open)
 
 Backend-neutral foundation that makes CPU→GPU and GPU→CPU data transfer
 repeatable, validated, fast, and robust for algorithm and user code. Recorded in
@@ -997,10 +997,11 @@ gap is the absence of any non-stalling GPU→CPU readback path (today only the
 test-only `IDevice::ReadBuffer` `WaitIdle` helper plus bespoke per-feature
 drains exist). Pick the earliest unblocked leaf.
 
-- [GRAPHICS-095 — CPU-testable buffer transfer math and validation helper](GRAPHICS-095-buffer-transfer-math-helper.md):
-  base layer, `depends_on: []`, target `CPUContracted`. Adds
+- [GRAPHICS-095 — CPU-testable buffer transfer math and validation helper](../../done/GRAPHICS-095-buffer-transfer-math-helper.md):
+  completed base layer, target `CPUContracted`. Adds
   `Extrinsic.RHI.BufferTransfer` (sub-range validation, alignment, partial-write
-  planning) mirroring `RHI::TextureUpload`. CPU-only; no backend.
+  planning, and typed dimension matching) mirroring `RHI::TextureUpload`.
+  CPU-only; no backend.
 - [GRAPHICS-096 — Async GPU→CPU buffer readback ring on `ITransferQueue`](GRAPHICS-096-async-buffer-readback-ring.md)
   (**headline**): depends on GRAPHICS-095, target `Operational` on Vulkan.
   `DownloadBuffer(...)` → `ReadbackToken` + `ReadbackSink`, recycled host-visible

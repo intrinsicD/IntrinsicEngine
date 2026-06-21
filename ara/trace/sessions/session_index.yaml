@@ -41,3 +41,10 @@ sessions:
     events_count: 5
     claims_touched: []
     open_threads: 2
+  - id: "2026-06-22_001"
+    date: "2026-06-22"
+    summary: "Implemented, verified, committed, and retired GRAPHICS-095 as the CPU-pure RHI buffer transfer math helper."
+    turn_count: 1
+    events_count: 2
+    claims_touched: []
+    open_threads: 1

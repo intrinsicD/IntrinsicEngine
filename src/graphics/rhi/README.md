@@ -7,6 +7,7 @@ This directory contains the `RHI` module/files.
 - `CMakeLists.txt`
 - `RHI.CommandContext.cppm`
 - `RHI.CommandContext.cpp` (out-of-line vtable key function + defaulted-virtual bodies)
+- `RHI.BufferTransfer.cppm` / `.cpp`
 - `RHI.Device.cppm`
 - `RHI.FrameHandle.cppm`
 - `RHI.QueueAffinity.cppm`
@@ -65,6 +66,12 @@ This directory contains the `RHI` module/files.
   per-format byte/block helpers, Vulkan-safe subresource offset alignment, and
   the layer-major / mip-minor `TextureUploadLayout` used by future batched
   transfer submissions.
+- `RHI.BufferTransfer.cppm` owns backend-neutral buffer transfer math:
+  strict sub-range validation against `BufferDesc`, division-based
+  non-power-of-two alignment helpers, partial-write copy-region planning with
+  optional coalescing, and property-agnostic element-count/component-size/stride
+  dimension matching. It is CPU-only and is the shared validation primitive for
+  upload, readback, and future property-to-buffer-range binding layers.
 
 ## Pipeline reload contracts
 

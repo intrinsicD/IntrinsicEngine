@@ -627,6 +627,19 @@ intrinsic_test_object_lib(GraphicsRhiCpuUnitTestObjs
     DEPS ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform
 )
 
+set(_graphics_buffer_transfer_test_files
+    Test.BufferTransfer.cpp
+)
+intrinsic_resolve_test_sources(_graphics_buffer_transfer_test_sources
+    SEARCH_DIRS contract/graphics
+    FILES ${_graphics_buffer_transfer_test_files}
+)
+intrinsic_test_object_lib(GraphicsBufferTransferTestObjs
+    SOURCES
+        ${_graphics_buffer_transfer_test_sources}
+    DEPS ExtrinsicRHI ExtrinsicCore
+)
+
 set(_graphics_renderer_cpu_unit_test_files
     Test.Graphics.ColormapSystem.cpp
     Test.Graphics.DebugViewSystem.cpp
@@ -1087,6 +1100,12 @@ intrinsic_test_executable(IntrinsicGraphicsAssetsUnitTests
 intrinsic_test_executable(IntrinsicGraphicsRhiCpuUnitTests
     OBJECTS GraphicsRhiCpuUnitTestObjs
     LINK_LIBS ExtrinsicRHI ExtrinsicCore ExtrinsicPlatform
+    LABELS unit graphics
+)
+
+intrinsic_test_executable(IntrinsicGraphicsBufferTransferTests
+    OBJECTS GraphicsBufferTransferTestObjs
+    LINK_LIBS ExtrinsicRHI ExtrinsicCore
     LABELS unit graphics
 )
 

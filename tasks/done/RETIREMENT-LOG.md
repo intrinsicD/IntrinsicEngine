@@ -9,6 +9,19 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`GRAPHICS-095`](GRAPHICS-095-buffer-transfer-math-helper.md) — CPU-testable
+buffer transfer math and validation helper — retired on 2026-06-22 at maturity
+`CPUContracted`. `Extrinsic.RHI.BufferTransfer` now provides CPU-pure buffer
+sub-range validation, non-power-of-two alignment helpers, destination dirty
+range planning with optional coalescing and source-offset packing, and a
+property-agnostic typed dimension/range validator for downstream property
+binding. The module imports only `core` and RHI descriptors, has no backend or
+device surface, is listed in the RHI README and generated module inventory, and
+is covered by a 14-case `unit;graphics` BufferTransfer test suite. Operational
+GPU readback/upload use remains owned by GRAPHICS-096, GRAPHICS-098, and
+RUNTIME-126.
+
+Active
 [`UI-020`](UI-020-visualization-lane-uniform-color.md) — Visualization lane
 uniform color controls — retired on 2026-06-19 at maturity `CPUContracted`.
 The sandbox visualization command/model seam now distinguishes the selected

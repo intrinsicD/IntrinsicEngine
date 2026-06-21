@@ -795,3 +795,49 @@ tree:
       - "tasks/backlog/bugs/BUG-048-direct-mesh-postprocess-overwrites-recomputed-normals.md"
       - "tasks/backlog/bugs/BUG-049-gpuworld-geometry-rebind-upload-barriers.md"
     status: resolved
+  - id: N40
+    type: decision
+    title: "Retire GRAPHICS-095 at CPUContracted"
+    provenance: ai-executed
+    timestamp: "2026-06-22T00:33"
+    choice: >
+      Selected the next unblocked rendering backlog task, implemented the
+      CPU-pure `Extrinsic.RHI.BufferTransfer` helper, and retired GRAPHICS-095
+      at `CPUContracted` maturity with GRAPHICS-096 now unlocked as the next
+      rendering transfer task.
+    alternatives:
+      - "Skip GRAPHICS-095 and start the async readback ring without a shared buffer-range contract."
+      - "Fold backend transfer/readback behavior into the CPU math helper slice."
+    evidence:
+      - "this commit"
+      - "tasks/done/GRAPHICS-095-buffer-transfer-math-helper.md"
+      - "src/graphics/rhi/RHI.BufferTransfer.cppm"
+      - "src/graphics/rhi/RHI.BufferTransfer.cpp"
+      - "tests/contract/graphics/Test.BufferTransfer.cpp"
+    status: resolved
+  - id: N41
+    type: experiment
+    title: "GRAPHICS-095 verification"
+    provenance: ai-executed
+    timestamp: "2026-06-22T00:33"
+    also_depends_on: [N40]
+    evidence:
+      - "cmake --preset ci"
+      - "cmake --build --preset ci --target IntrinsicGraphicsBufferTransferTests"
+      - "ctest --test-dir build/ci --output-on-failure -R 'BufferTransfer' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "cmake --build --preset ci --target IntrinsicTests"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md --check"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+      - "python3 tools/repo/check_test_layout.py --root . --strict"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/docs/check_doc_links.py --root ."
+      - "python3 tools/docs/check_docs_sync.py --root . --files <changed-files>"
+      - "git diff --cached --check"
+    result: >
+      Configure passed, the focused BufferTransfer target built, focused CTest
+      passed 14/14 tests, `IntrinsicTests` built, and the default CPU-supported
+      CTest gate passed 3012/3012 tests. Strict inventory, layering,
+      test-layout, task-policy, doc-link, docs-sync, and staged whitespace
+      checks passed.
+    status: resolved

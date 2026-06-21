@@ -5,6 +5,7 @@ target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         RHI.BufferView.cppm
+        RHI.BufferTransfer.cppm
         RHI.Descriptors.cppm
         RHI.Handles.cppm
         RHI.QueueAffinity.cppm
@@ -25,6 +26,7 @@ target_sources(${target_name}
         RHI.PipelineRegistry.cppm
         PRIVATE
         RHI.CommandContext.cpp
+        RHI.BufferTransfer.cpp
         RHI.Device.cpp
         RHI.BufferManager.cpp
         RHI.TextureManager.cpp

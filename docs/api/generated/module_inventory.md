@@ -16,7 +16,7 @@ Root scanned: `src`
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 62 |
-| `graphics/rhi` | 19 |
+| `graphics/rhi` | 20 |
 | `graphics/vulkan` | 13 |
 | `legacy` | 181 |
 | `physics` | 1 |
@@ -268,6 +268,7 @@ Root scanned: `src`
 | `Extrinsic.Graphics.Pass.VisualizationOverlay` | `src/graphics/renderer/Passes/Pass.VisualizationOverlay.cppm` | `graphics/renderer` |
 | `Extrinsic.RHI.Bindless` | `src/graphics/rhi/RHI.Bindless.cppm` | `graphics/rhi` |
 | `Extrinsic.RHI.BufferManager` | `src/graphics/rhi/RHI.BufferManager.cppm` | `graphics/rhi` |
+| `Extrinsic.RHI.BufferTransfer` | `src/graphics/rhi/RHI.BufferTransfer.cppm` | `graphics/rhi` |
 | `Extrinsic.RHI.BufferView` | `src/graphics/rhi/RHI.BufferView.cppm` | `graphics/rhi` |
 | `Extrinsic.RHI.CommandContext` | `src/graphics/rhi/RHI.CommandContext.cppm` | `graphics/rhi` |
 | `Extrinsic.RHI.Descriptors` | `src/graphics/rhi/RHI.Descriptors.cppm` | `graphics/rhi` |
@@ -525,4 +526,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugAdapters` | `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **497**
+Total modules: **498**
