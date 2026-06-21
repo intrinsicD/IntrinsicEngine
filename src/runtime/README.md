@@ -645,6 +645,25 @@ other non-`Success` status (`MissingHalfedgeTopology`, `MissingFaceTopology`,
 into `MeshGeometryFailedPack`. A failed pack does not bind stale geometry,
 leaves the slot's source-asset sentinel cleared, and does not allocate a
 `GpuGeometryHandle`.
+
+#### Vertex attribute binding (`RUNTIME-120`)
+
+`Extrinsic.Runtime.VertexAttributeBinding` is the reusable, GPU-agnostic helper
+that maps a named geometry property to a logical vertex channel (position /
+normal / texcoord / color / tangent / custom) with fail-closed diagnostics. A
+`VertexAttributeBinding` names the source property, its element type, a fallback
+value, and per-channel policy (renormalize vec3, allow fallback); the
+`ResolveVec3Channel` / `ResolveVec2Channel` / `ResolveColorChannelPackedUnorm8`
+entry points return an `AttributeBindResult` carrying a precise
+`AttributeBindStatus` (`Bound` / `EmptyBinding` / `PropertyMissing` /
+`TypeMismatch` / `CountMismatch`) plus source/fallback/non-finite counters. The
+mesh packer resolves its normal and texcoord channels through this helper, so
+the normalize-or-`+Z` and finite-or-zero behavior is centralized rather than
+inlined per packer. This is the structural vertex stream and is distinct from
+the graphics-layer `VisualizationConfig` sci-vis colormap overlays. Later slices
+(`RUNTIME-121`–`124`) add a color vertex channel, a declarative vertex layout,
+an editor "bind any property as normals/colors" control, and per-channel partial
+uploads on top of this resolver.
 A dirty-reupload pack failure releases the prior residency (fail-closed: the
 stale upload is queued for the deferred-retire window, the instance is detached,
 and `MeshGeometryReleases` increments) so invalid source data does not keep

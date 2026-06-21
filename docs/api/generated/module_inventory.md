@@ -21,7 +21,7 @@ Root scanned: `src`
 | `legacy` | 181 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 37 |
+| `runtime` | 38 |
 
 ## Modules
 
@@ -519,7 +519,8 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SelectionController` | `src/runtime/Runtime.SelectionController.cppm` | `runtime` |
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
+| `Extrinsic.Runtime.VertexAttributeBinding` | `src/runtime/Runtime.VertexAttributeBinding.cppm` | `runtime` |
 | `Extrinsic.Runtime.SpatialDebugAdapters` | `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **494**
+Total modules: **495**

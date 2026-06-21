@@ -7,6 +7,7 @@ module;
 #include <limits>
 #include <optional>
 #include <span>
+#include <string_view>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -15,6 +16,7 @@ module Extrinsic.Runtime.MeshGeometryPacker;
 
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.Runtime.VertexAttributeBinding;
 import Geometry.Properties;
 
 namespace Extrinsic::Runtime
@@ -33,21 +35,6 @@ namespace Extrinsic::Runtime
         [[nodiscard]] bool IsFinite(const glm::vec3& p) noexcept
         {
             return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z);
-        }
-
-        [[nodiscard]] bool IsFinite(const glm::vec2& p) noexcept
-        {
-            return std::isfinite(p.x) && std::isfinite(p.y);
-        }
-
-        [[nodiscard]] glm::vec3 NormalizeOrDefaultNormal(const glm::vec3 normal) noexcept
-        {
-            if (!IsFinite(normal))
-            {
-                return glm::vec3{0.0f, 0.0f, 1.0f};
-            }
-            const float len = glm::length(normal);
-            return len > 1.0e-6f ? normal / len : glm::vec3{0.0f, 0.0f, 1.0f};
         }
 
         // Outcome of walking one face slot's halfedge ring.
@@ -249,14 +236,35 @@ namespace Extrinsic::Runtime
 
         const std::uint32_t vertexCountU32 = static_cast<std::uint32_t>(vertexCount);
 
-        const auto texcoordProp =
-            view.VertexSource->Properties.Get<glm::vec2>("v:texcoord");
-        const bool hasCountMatchedTexcoords =
-            texcoordProp && texcoordProp.Vector().size() == vertexCount;
-        const auto normalProp =
-            view.VertexSource->Properties.Get<glm::vec3>(PropertyNames::kNormal);
-        const bool hasCountMatchedNormals =
-            normalProp && normalProp.Vector().size() == vertexCount;
+        // Resolve the normal and texcoord vertex channels through the reusable
+        // attribute-binding resolver (RUNTIME-120). Behavior matches the prior
+        // inline logic: missing / count-mismatched normals fall back to +Z and
+        // are renormalized per element; missing / count-mismatched texcoords
+        // fall back to zero, and non-finite texcoords are repaired per element.
+        // Position keeps its hard-fail `NonFinitePosition` validation inline.
+        std::vector<glm::vec3> normals(vertexCount);
+        std::vector<glm::vec2> texcoords(vertexCount);
+
+        const VertexAttributeBinding normalBinding{
+            .Channel = VertexChannel::Normal,
+            .SourceType = AttributeSourceType::Vec3,
+            .SourceProperty = PropertyNames::kNormal,
+            .AllowFallback = true,
+            .Normalize = true,
+            .Fallback = glm::vec4{0.0f, 0.0f, 1.0f, 0.0f},
+        };
+        const VertexAttributeBinding texcoordBinding{
+            .Channel = VertexChannel::Texcoord,
+            .SourceType = AttributeSourceType::Vec2,
+            .SourceProperty = std::string_view{"v:texcoord"},
+            .AllowFallback = true,
+            .Normalize = false,
+            .Fallback = glm::vec4{0.0f, 0.0f, 0.0f, 0.0f},
+        };
+        (void)ResolveVec3Channel(
+            view.VertexSource->Properties, normalBinding, vertexCountU32, normals);
+        (void)ResolveVec2Channel(
+            view.VertexSource->Properties, texcoordBinding, vertexCountU32, texcoords);
 
         for (std::size_t f = 0; f < faceCount; ++f)
         {
@@ -298,18 +306,8 @@ namespace Extrinsic::Runtime
             {
                 return Failure(MeshPackStatus::NonFinitePosition, outBuffer);
             }
-            glm::vec2 uv{0.0f, 0.0f};
-            if (hasCountMatchedTexcoords)
-            {
-                const glm::vec2 sourceUv = texcoordProp.Vector()[i];
-                if (IsFinite(sourceUv))
-                {
-                    uv = sourceUv;
-                }
-            }
-            const glm::vec3 n = hasCountMatchedNormals
-                ? NormalizeOrDefaultNormal(normalProp.Vector()[i])
-                : glm::vec3{0.0f, 0.0f, 1.0f};
+            const glm::vec2 uv = texcoords[i];
+            const glm::vec3 n = normals[i];
             vData[i] = MeshVertex{p.x, p.y, p.z, uv.x, uv.y, n.x, n.y, n.z};
             minP = glm::min(minP, p);
             maxP = glm::max(maxP, p);
