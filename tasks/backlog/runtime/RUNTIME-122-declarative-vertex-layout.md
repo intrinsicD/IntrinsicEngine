@@ -46,6 +46,9 @@ maturity_target: Operational
 - Property naming: ECS `GeometrySources` packers use `v:position` for all kinds;
   the `v:point` alias only appears in the geometry-library graph container. This
   task keeps the ECS contract on `v:position`.
+- Storage model is fixed by ADR-0022: uniform SoA with per-channel streaming; the
+  AoS fast lane is deferred to RUNTIME-125 (profile-gated). See
+  `docs/adr/0022-vertex-storage-soa-per-channel-streaming.md`.
 
 ## Slice plan
 - **Slice A — RUNTIME-122 (CPU substrate, this slice's first commit).** Add a CPU

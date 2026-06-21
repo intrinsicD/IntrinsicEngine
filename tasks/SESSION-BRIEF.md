@@ -16,6 +16,7 @@ the authoritative open/unblocked view.
 - blocked by `RUNTIME-120`: `RUNTIME-121` — Per-vertex color channel through the geometry vertex stream (tasks/backlog/runtime/RUNTIME-121-vertex-color-channel-upload.md)
 - blocked by `RUNTIME-120`: `RUNTIME-122` — SoA vertex channel storage and packer unification (tasks/backlog/runtime/RUNTIME-122-declarative-vertex-layout.md)
 - blocked by `RUNTIME-122`: `RUNTIME-124` — Per-channel dirty tracking and partial GPU uploads (tasks/backlog/runtime/RUNTIME-124-per-channel-partial-uploads.md)
+- blocked by `RUNTIME-122`: `RUNTIME-125` — Optional AoS fast lane for static geometry (profile-gated) (tasks/backlog/runtime/RUNTIME-125-aos-static-fast-lane.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 

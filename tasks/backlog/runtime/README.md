@@ -20,6 +20,11 @@ as normals/colors. This series fixes that incrementally.
 - `RUNTIME-122` — Declarative vertex layout descriptor + packer unification.
 - `RUNTIME-123` — Editor "bind any property as normals / colors".
 - `RUNTIME-124` — Per-channel dirty tracking and partial GPU uploads.
+- `RUNTIME-125` — Optional AoS fast lane for static geometry (profile-gated).
+
+Storage model is fixed by
+[`ADR-0022`](../../../docs/adr/0022-vertex-storage-soa-per-channel-streaming.md):
+uniform SoA with per-channel streaming.
 
 `RUNTIME-111` through `RUNTIME-115` are retired; additional progressive
 render-data follow-ups should open as value-gated tasks with a concrete
