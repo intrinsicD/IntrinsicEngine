@@ -65,11 +65,14 @@ maturity_target: Operational
   from its own BDA. Requires a Vulkan-capable host; cite a `gpu;vulkan` smoke.
 
 ## Required changes
-- [ ] Add a CPU `VertexLayout` descriptor (ordered channels, source types,
-      per-channel element size/offset, stride) and a `VertexChannelStreams`
-      builder that fills each channel via the RUNTIME-120 resolver.
-- [ ] Add `InterleaveToAoS(...)` and route mesh / graph / point-cloud packers
-      through the layout core; keep emitted bytes byte-identical (Slice A).
+- [x] Add a CPU `VertexLayout` descriptor (ordered channels, per-channel element
+      size/offset, stride) and a `VertexChannelStreams` SoA container with typed
+      channel setters (`Extrinsic.Runtime.VertexChannelStreams`) (Slice A).
+- [x] Add `InterleaveToAoS(...)` reproducing the current `MeshVertex` /
+      `GraphVertex` / `PointCloudVertex` byte layouts, proven byte-identical by
+      contract tests (Slice A).
+- [ ] Route mesh / graph / point-cloud packers to build `VertexChannelStreams`
+      via the RUNTIME-120 resolver and upload per channel (Slice B).
 - [ ] Add per-channel byte sub-ranges + BDAs to `ManagedGeometryAllocation` and
       `RHI::GpuGeometryRecord`; write channels separately in
       `GpuWorld::UploadGeometry` (Slice B).
@@ -77,9 +80,10 @@ maturity_target: Operational
       shaders to read each channel from its own BDA (Slice B).
 
 ## Tests
-- [ ] Slice A: per-kind contract tests prove `InterleaveToAoS` output is
-      byte-identical to the current packers for shared fixtures.
-- [ ] Slice A: a layout round-trip test (channel → offset/stride math).
+- [x] Slice A: `tests/contract/runtime/Test.VertexChannelStreams.cpp` proves
+      `InterleaveToAoS` reproduces the `MeshVertex` byte layout and the
+      position+uv (line/point) stride, plus zero-fill and count-mismatch cases.
+- [x] Slice A: layout round-trip test (channel → offset/stride math).
 - [ ] Slice B: opt-in `gpu;vulkan` smoke proving SoA fetch renders correctly.
 
 ## Docs

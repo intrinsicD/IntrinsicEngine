@@ -664,6 +664,17 @@ the graphics-layer `VisualizationConfig` sci-vis colormap overlays. Later slices
 (`RUNTIME-121`–`124`) add a color vertex channel, a declarative vertex layout,
 an editor "bind any property as normals/colors" control, and per-channel partial
 uploads on top of this resolver.
+
+`Extrinsic.Runtime.VertexChannelStreams` is the CPU Structure-of-Arrays
+substrate for that work (ADR-0022): a `VertexLayout` (ordered channels, offsets,
+stride) plus per-channel SoA byte buffers, with `InterleaveToAoS` reproducing the
+current interleaved `MeshVertex` / `GraphVertex` / `PointCloudVertex` bytes so the
+existing GpuScene shaders are unaffected. Per ADR-0022 the engine commits to
+uniform SoA storage with per-channel dirty streaming (one vertex layout, one
+shader fetch path); the AoS fast lane for static geometry is deferred to the
+profile-gated `RUNTIME-125`. `RUNTIME-122` Slice B uploads these streams per
+channel and switches the shaders to SoA fetch; `RUNTIME-124` streams a single
+changed channel via `WriteBuffer(channelBDA, …, offset)`.
 A dirty-reupload pack failure releases the prior residency (fail-closed: the
 stale upload is queued for the deferred-retire window, the instance is detached,
 and `MeshGeometryReleases` increments) so invalid source data does not keep
