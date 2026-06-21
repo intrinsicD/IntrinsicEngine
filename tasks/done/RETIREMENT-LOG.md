@@ -9,6 +9,24 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`GRAPHICS-096`](GRAPHICS-096-async-buffer-readback-ring.md) — Async GPU-to-CPU
+buffer readback ring on `ITransferQueue` — retired on 2026-06-22 at maturity
+`Operational` on Vulkan-capable hosts (`CPUContracted` elsewhere).
+`Extrinsic.RHI.TransferQueue` now exposes `ReadbackToken`, `ReadbackSink`,
+`DownloadBuffer(...)`, readback completion polling, and transfer diagnostics for
+queued/completed/dropped downloads, staged bytes, and ring high-water. Null and
+non-operational Vulkan fallback queues fail closed with dropped-readback
+diagnostics, while the live Vulkan queue validates ranges through
+`Extrinsic.RHI.BufferTransfer`, copies device buffers into recycled mapped
+host-visible staging slots on the transfer timeline, and delivers sink bytes
+only from `CollectCompleted()`. CPU evidence covers Null fail-closed behavior,
+mock drain delivery, out-of-range rejection, and drain-gated completion; opt-in
+`gpu;vulkan` evidence covers a device-local buffer round-trip through the ring
+without routing through the legacy blocking `IDevice::ReadBuffer()` helper.
+Texture readback remains owned by GRAPHICS-097, and high-level barrier/facade
+ergonomics remain owned by GRAPHICS-098.
+
+Active
 [`GRAPHICS-095`](GRAPHICS-095-buffer-transfer-math-helper.md) — CPU-testable
 buffer transfer math and validation helper — retired on 2026-06-22 at maturity
 `CPUContracted`. `Extrinsic.RHI.BufferTransfer` now provides CPU-pure buffer

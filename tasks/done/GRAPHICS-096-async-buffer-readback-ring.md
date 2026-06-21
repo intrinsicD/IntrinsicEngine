@@ -58,53 +58,69 @@ maturity_target: Operational
   `CollectCompleted()`. Add an opt-in `gpu;vulkan` smoke that round-trips a
   device-computed buffer to the CPU through the ring with no `WaitIdle`.
 
+## Execution plan
+- Keep the public RHI change append-only on `ITransferQueue`: existing upload,
+  poll, and drain slots stay in their current order; new readback virtuals get
+  fail-closed defaults.
+- Model readback delivery with `ReadbackSink` carrying an optional fixed-size
+  destination span plus an optional drain-time callback. Delivery is attempted
+  only after range validation and only once per accepted token.
+- Use `RHI::ValidateBufferRange(...)` for CPU mock and Vulkan source-region
+  validation, with invalid requests returning invalid tokens and incrementing
+  dropped diagnostics.
+- Reuse the Vulkan transfer timeline for readback tokens. The ring allocates or
+  reuses mapped host-visible `TRANSFER_DST` buffers, records `src -> staging`
+  copies, and copies bytes to the sink from `CollectCompleted()`.
+- Keep legacy `IDevice::ReadBuffer` untouched; the new smoke exercises
+  `IDevice::GetTransferQueue().DownloadBuffer(...)` directly.
+
 ## Required changes
-- [ ] Extend `src/graphics/rhi/RHI.TransferQueue.cppm`: `ReadbackToken`,
+- [x] Extend `src/graphics/rhi/RHI.TransferQueue.cppm`: `ReadbackToken`,
       `ReadbackSink`, `DownloadBuffer(BufferHandle src, std::uint64_t size,
       std::uint64_t offset, ReadbackSink sink)` returning a `ReadbackToken`, an
       `IsComplete(ReadbackToken)` poll, and the documented thread-safety /
       no-blocking invariants matching the upload virtuals. Append new virtuals
       after existing ones to avoid vtable-slot churn.
-- [ ] Validate the requested `(offset, size)` against the source `BufferDesc`
+- [x] Validate the requested `(offset, size)` against the source `BufferDesc`
       through `RHI::BufferTransfer` (GRAPHICS-095); reject out-of-range with an
       invalid token + a dropped-readback counter.
-- [ ] Null device / CPU mock: fail-closed `DownloadBuffer` returning an invalid
+- [x] Null device / CPU mock: fail-closed `DownloadBuffer` returning an invalid
       token; CPU mock used by tests delivers staged bytes on `CollectCompleted()`.
-- [ ] Vulkan backend (`src/graphics/vulkan/`): host-visible readback staging
+- [x] Vulkan backend (`src/graphics/vulkan/`): host-visible readback staging
       ring, device→host copy recording, transfer-timeline fence, drain-time
       copy-out, ring reuse + high-water tracking.
-- [ ] Add transfer diagnostics counters (downloads queued/completed/dropped,
+- [x] Add transfer diagnostics counters (downloads queued/completed/dropped,
       bytes staged, ring high-water) exposed through the existing transfer
       diagnostics surface.
 
 ## Tests
-- [ ] CPU contract `tests/contract/graphics/Test.TransferQueueReadback.cpp`
+- [x] CPU contract `tests/contract/graphics/Test.TransferQueueReadback.cpp`
       (labels `contract;graphics`): invalid token on Null device; mock-queue
       drain delivers correct bytes through the sink exactly once on
       `CollectCompleted()`; out-of-range request is dropped with the counter
       incremented; `IsComplete` transitions only after the drain.
-- [ ] Opt-in `gpu;vulkan` smoke
+- [x] Opt-in `gpu;vulkan` smoke
       `tests/integration/graphics/Test.BufferReadbackGpuSmoke.cpp`
       (labels `gpu;vulkan;graphics`): a device-local buffer written/computed on
       the GPU is read back through the ring and matches expected bytes, with no
       `WaitIdle` on the caller path.
-- [ ] Default CPU gate stays green.
+- [x] Default CPU gate stays green.
 
 ## Docs
-- [ ] Update `src/graphics/rhi/README.md` and `src/graphics/vulkan/README.md`.
-- [ ] Add a "GPU→CPU readback ring" section to `docs/architecture/graphics.md`
+- [x] Update `src/graphics/rhi/README.md` and `src/graphics/vulkan/README.md`.
+- [x] Add a "GPU→CPU readback ring" section to `docs/architecture/graphics.md`
       alongside the existing readback-drain description.
-- [ ] Refresh `docs/api/generated/module_inventory.md` for the surface change.
-- [ ] Cross-link ADR-0023.
+- [x] Refresh `docs/api/generated/module_inventory.md` for the surface change.
+- [x] Cross-link ADR-0023.
 
 ## Acceptance criteria
-- [ ] `DownloadBuffer` exists with the documented no-blocking / thread-safety
+- [x] `DownloadBuffer` exists with the documented no-blocking / thread-safety
       contract; the Null device fail-closes; the CPU mock delivers via the sink
       on drain.
-- [ ] No caller thread blocks on a GPU fence; the only fence wait remains inside
+- [x] No caller thread blocks on a GPU fence; the only fence wait remains inside
       `CollectCompleted()`.
-- [ ] Region validation is routed through GRAPHICS-095; out-of-range fails closed.
-- [ ] Default-gate contract tests pass; the opt-in `gpu;vulkan` smoke is cited as
+- [x] Region validation is routed through GRAPHICS-095; out-of-range fails closed.
+- [x] Default-gate contract tests pass; the opt-in `gpu;vulkan` smoke is cited as
       run for `Operational`.
 
 ## Verification
@@ -119,6 +135,17 @@ cmake --build --preset ci-vulkan --target IntrinsicTests
 ctest --test-dir build/ci-vulkan --output-on-failure -R 'BufferReadbackGpuSmoke' -L 'gpu' -L 'vulkan' --timeout 120
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+## Completion note
+- PR/commit: this retirement commit.
+- 2026-06-22: Implemented and retired in the local `GRAPHICS-096` commit.
+  Focused evidence: clean `ci` configure plus
+  `cmake --build --preset ci --target IntrinsicGraphicsContractTests -- -j16`,
+  `ctest --test-dir build/ci --output-on-failure -R 'TransferQueueReadback' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`,
+  `cmake --preset ci-vulkan`,
+  `cmake --build --preset ci-vulkan --target IntrinsicGraphicsVulkanSmokeTests -- -j16`,
+  and
+  `ctest --test-dir build/ci-vulkan --output-on-failure -R 'BufferReadbackGpuSmoke' -L 'gpu' -L 'vulkan' --timeout 120`.
 
 ## Forbidden changes
 - Blocking any caller thread on a GPU fence inside `DownloadBuffer`.

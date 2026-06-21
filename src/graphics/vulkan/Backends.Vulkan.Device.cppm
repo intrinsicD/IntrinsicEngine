@@ -195,8 +195,29 @@ namespace Extrinsic::Backends::Vulkan
                 return {};
             }
 
+            [[nodiscard]] RHI::ReadbackToken DownloadBuffer(RHI::BufferHandle,
+                                                            std::uint64_t,
+                                                            std::uint64_t,
+                                                            RHI::ReadbackSink) override
+            {
+                m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
+                Core::Log::Warn("[VulkanDevice] Fallback transfer queue rejected buffer readback; device is non-operational");
+                return {};
+            }
+
             [[nodiscard]] bool IsComplete(RHI::TransferToken token) const override { return !token.IsValid(); }
+            [[nodiscard]] bool IsComplete(RHI::ReadbackToken token) const override { return !token.IsValid(); }
             void CollectCompleted() override {}
+
+            [[nodiscard]] RHI::TransferQueueDiagnostics GetDiagnostics() const noexcept override
+            {
+                return RHI::TransferQueueDiagnostics{
+                    .DownloadsDropped = m_DownloadsDropped.load(std::memory_order_relaxed),
+                };
+            }
+
+        private:
+            std::atomic<std::uint64_t> m_DownloadsDropped{0};
         };
 
         struct PendingQueueSubmitBatch

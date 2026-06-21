@@ -6,6 +6,7 @@ module;
 #include <memory>
 #include <mutex>
 #include <span>
+#include <vector>
 
 #include "Vulkan.hpp"
 
@@ -102,20 +103,52 @@ namespace Extrinsic::Backends::Vulkan
                                                         uint32_t arrayLayer) override;
         [[nodiscard]] RHI::TransferToken UploadTextureFullChain(RHI::TextureHandle dst,
                                                                 std::span<const std::byte> src) override;
+        [[nodiscard]] RHI::ReadbackToken DownloadBuffer(RHI::BufferHandle src,
+                                                        uint64_t size,
+                                                        uint64_t offset,
+                                                        RHI::ReadbackSink sink) override;
         [[nodiscard]] bool IsComplete(RHI::TransferToken token) const override;
+        [[nodiscard]] bool IsComplete(RHI::ReadbackToken token) const override;
         void CollectCompleted() override;
+        [[nodiscard]] RHI::TransferQueueDiagnostics GetDiagnostics() const noexcept override;
 
         friend class VulkanDevice;
 
     private:
         [[nodiscard]] VkCommandBuffer Begin();
         [[nodiscard]] RHI::TransferToken Submit(VkCommandBuffer cmd);
+        [[nodiscard]] RHI::ReadbackToken SubmitReadback(VkCommandBuffer cmd,
+                                                        size_t slotIndex,
+                                                        uint64_t sizeBytes,
+                                                        RHI::ReadbackSink sink);
         void RetireCompletedCommandBuffers(uint64_t completedValue);
+        [[nodiscard]] size_t AcquireReadbackSlot(uint64_t sizeBytes);
+        void ReleaseReadbackSlot(size_t slotIndex, uint64_t retireValue);
+        void DrainCompletedReadbacks(uint64_t completedValue);
+        void DestroyReadbackSlots();
 
         struct RetiredCommandBuffer
         {
             VkCommandBuffer CommandBuffer = VK_NULL_HANDLE;
             uint64_t RetireValue = 0;
+        };
+
+        struct ReadbackSlot
+        {
+            VkBuffer Buffer = VK_NULL_HANDLE;
+            VmaAllocation Allocation = VK_NULL_HANDLE;
+            void* MappedPtr = nullptr;
+            uint64_t SizeBytes = 0;
+            uint64_t RetireValue = 0;
+            bool InUse = false;
+        };
+
+        struct PendingReadback
+        {
+            RHI::ReadbackToken Token{};
+            size_t SlotIndex = 0;
+            uint64_t SizeBytes = 0;
+            RHI::ReadbackSink Sink{};
         };
 
         VkDevice      m_Device        = VK_NULL_HANDLE;
@@ -128,9 +161,17 @@ namespace Extrinsic::Backends::Vulkan
         std::unique_ptr<StagingBelt> m_Belt;
         mutable std::mutex m_Mutex;
         std::deque<RetiredCommandBuffer> m_InFlightCommandBuffers;
+        std::vector<ReadbackSlot> m_ReadbackSlots;
+        std::deque<PendingReadback> m_PendingReadbacks;
+        uint64_t m_ReadbackRingBytes = 0;
+        std::atomic<uint64_t> m_CompletedReadbackTicket{0};
+        std::atomic<uint64_t> m_DownloadsQueued{0};
+        std::atomic<uint64_t> m_DownloadsCompleted{0};
+        std::atomic<uint64_t> m_DownloadsDropped{0};
+        std::atomic<uint64_t> m_ReadbackBytesStaged{0};
+        std::atomic<uint64_t> m_ReadbackRingHighWaterBytes{0};
 
         Core::ResourcePool<VulkanBuffer, RHI::BufferHandle,   kMaxFramesInFlight>* m_Buffers = nullptr;
         Core::ResourcePool<VulkanImage,  RHI::TextureHandle,  kMaxFramesInFlight>* m_Images  = nullptr;
     };
 }
-

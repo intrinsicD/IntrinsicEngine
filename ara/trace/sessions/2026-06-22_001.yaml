@@ -2,9 +2,9 @@ session:
   id: "2026-06-22_001"
   date: "2026-06-22"
   started: "2026-06-22T00:33"
-  last_turn: "2026-06-22T00:33"
-  turn_count: 1
-  summary: "Implemented, verified, committed, and retired GRAPHICS-095 as the CPU-pure RHI buffer transfer math helper."
+  last_turn: "2026-06-22T01:23"
+  turn_count: 2
+  summary: "Implemented, verified, committed, and retired GRAPHICS-095 and GRAPHICS-096 for the RHI buffer transfer/readback foundation."
 
 events_logged:
   - turn: 1
@@ -19,6 +19,18 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Focused BufferTransfer tests passed 14/14; full default CPU-supported CTest passed 3012/3012; strict structural/docs checks passed."
+  - turn: 2
+    type: decision
+    id: "N42"
+    routing: direct
+    provenance: ai-executed
+    summary: "Selected GRAPHICS-096 from the rendering backlog, implemented the async ITransferQueue buffer readback ring, retired the task at Operational on Vulkan-capable hosts, and kept texture readback/barrier facade as follow-ups."
+  - turn: 2
+    type: experiment
+    id: "N43"
+    routing: direct
+    provenance: ai-executed
+    summary: "Focused TransferQueueReadback tests passed 3/3; Vulkan BufferReadbackGpuSmoke passed 1/1; default CPU-supported CTest passed 2966/2966; strict structural/docs checks passed."
 
 ai_actions:
   - turn: 1
@@ -36,6 +48,27 @@ ai_actions:
       - "tasks/done/RETIREMENT-LOG.md"
       - "tasks/backlog/rendering/README.md"
       - "tasks/SESSION-BRIEF.md"
+  - turn: 2
+    action: "Added RHI readback tokens/sinks/diagnostics, Null fail-closed handling, Vulkan staging-ring readback delivery, CPU and Vulkan smoke tests, docs updates, task retirement records, and committed the slice."
+    provenance: ai-executed
+    files_changed:
+      - "src/graphics/rhi/RHI.TransferQueue.cppm"
+      - "src/graphics/renderer/Backends/Null/Backends.Null.Transfer.cpp"
+      - "src/graphics/vulkan/Backends.Vulkan.Transfer.cppm"
+      - "src/graphics/vulkan/Backends.Vulkan.Transfer.cpp"
+      - "src/graphics/vulkan/Backends.Vulkan.Device.cppm"
+      - "src/graphics/vulkan/Backends.Vulkan.Device.cpp"
+      - "src/graphics/vulkan/Backends.Vulkan.Memory.cppm"
+      - "tests/contract/graphics/Test.TransferQueueReadback.cpp"
+      - "tests/integration/graphics/Test.BufferReadbackGpuSmoke.cpp"
+      - "tests/CMakeLists.txt"
+      - "docs/architecture/graphics.md"
+      - "src/graphics/rhi/README.md"
+      - "src/graphics/vulkan/README.md"
+      - "tasks/done/GRAPHICS-096-async-buffer-readback-ring.md"
+      - "tasks/done/RETIREMENT-LOG.md"
+      - "tasks/backlog/rendering/README.md"
+      - "tasks/SESSION-BRIEF.md"
 
 claims_touched: []
 
@@ -46,8 +79,12 @@ key_context:
     excerpt: "`tasks/SESSION-BRIEF.md` identified GRAPHICS-095 as the next unblocked Theme B rendering modernization task before implementation."
   - turn: 1
     excerpt: "GRAPHICS-095 closes at CPUContracted because it is intentionally backend-neutral math/validation; GPU readback and high-level transfer consumers remain GRAPHICS-096, GRAPHICS-098, and RUNTIME-126."
+  - turn: 2
+    excerpt: "`tasks/SESSION-BRIEF.md` identified GRAPHICS-096 as the next unblocked Theme B rendering transfer task after GRAPHICS-095 retired."
+  - turn: 2
+    excerpt: "GRAPHICS-096 closes at Operational on Vulkan-capable hosts because both the CPU contract tests and opt-in `gpu;vulkan` buffer-readback smoke passed."
 
 open_threads:
-  - "GRAPHICS-096 is now the next unblocked rendering transfer task and owns async GPU-to-CPU buffer readback ring operational behavior."
+  - "GRAPHICS-097 owns texture readback and GRAPHICS-098 owns the higher-level transfer/barrier facade after the buffer readback ring retirement."
 
 ai_suggestions_pending: []

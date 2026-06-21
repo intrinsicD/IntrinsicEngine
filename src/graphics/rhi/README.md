@@ -53,7 +53,7 @@ This directory contains the `RHI` module/files.
   `vkQueueSubmit2` timeline waits/signals without exposing native handles
   through RHI.
 
-## Transfer uploads
+## Transfer uploads and readbacks
 
 - `RHI.TransferQueue.cppm` declares `ITransferQueue`, the async upload seam used
   by runtime/streaming paths. Buffer uploads and single-subresource texture
@@ -62,6 +62,14 @@ This directory contains the `RHI` module/files.
   texture uploads; callers must pack bytes according to
   `ComputeFullChainUploadLayout()` and backends fail closed with an invalid
   `TransferToken` when metadata or byte counts are unsupported.
+- `ITransferQueue::DownloadBuffer(BufferHandle, size, offset, ReadbackSink)` is
+  the GRAPHICS-096 GPU-to-CPU buffer readback seam from
+  [ADR-0023](../../../docs/adr/0023-cpu-gpu-transfer-foundation.md). It returns a
+  `ReadbackToken`, validates the requested sub-range through
+  `RHI.BufferTransfer`, and never blocks the caller thread on a GPU fence. Bytes
+  are delivered from `CollectCompleted()` through `ReadbackSink` (fixed-size
+  destination span and/or drain-time callback). Null/fallback backends fail
+  closed with invalid tokens and dropped-readback diagnostics.
 - `RHI.TextureUpload.cppm` owns backend-neutral texture upload math:
   per-format byte/block helpers, Vulkan-safe subresource offset alignment, and
   the layer-major / mip-minor `TextureUploadLayout` used by future batched

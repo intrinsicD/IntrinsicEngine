@@ -3701,6 +3701,7 @@ RHI::BufferHandle VulkanDevice::CreateBuffer(const RHI::BufferDesc& desc)
     }
 
     VulkanBuffer buf{};
+    buf.Usage       = bci.usage;
     buf.SizeBytes   = desc.SizeBytes;
     buf.HostVisible = desc.HostVisible;
     buf.HasBDA      = RHI::HasUsage(desc.Usage, RHI::BufferUsage::Storage);

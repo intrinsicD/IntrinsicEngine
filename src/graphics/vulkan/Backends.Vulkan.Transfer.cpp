@@ -8,6 +8,7 @@ module;
 #include <memory>
 #include <mutex>
 #include <span>
+#include <utility>
 #include <vector>
 
 #ifndef GLFW_INCLUDE_NONE
@@ -20,6 +21,7 @@ module Extrinsic.Backends.Vulkan;
 
 import :Transfer;
 import Extrinsic.Core.Logging;
+import Extrinsic.RHI.BufferTransfer;
 import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.TextureUpload;
 
@@ -89,6 +91,7 @@ VulkanTransferQueue::~VulkanTransferQueue()
     if (m_Queue != VK_NULL_HANDLE)
         vkQueueWaitIdle(m_Queue);
     RetireCompletedCommandBuffers(std::numeric_limits<std::uint64_t>::max());
+    DestroyReadbackSlots();
     if (m_CmdPool   != VK_NULL_HANDLE) vkDestroyCommandPool(m_Device, m_CmdPool, nullptr);
     if (m_Timeline  != VK_NULL_HANDLE) vkDestroySemaphore(m_Device, m_Timeline, nullptr);
 }
@@ -169,26 +172,27 @@ RHI::TransferToken VulkanTransferQueue::Submit(VkCommandBuffer cmd)
         return {};
     }
 
-    const uint64_t ticket = m_NextTicket.fetch_add(1, std::memory_order_relaxed);
-
     VkCommandBufferSubmitInfo cmdInfo{};
     cmdInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
     cmdInfo.commandBuffer = cmd;
-    VkSemaphoreSubmitInfo sigInfo{};
-    sigInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-    sigInfo.semaphore = m_Timeline;
-    sigInfo.value     = ticket;
-    sigInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT;
-
-    VkSubmitInfo2 submit{};
-    submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-    submit.commandBufferInfoCount   = 1;
-    submit.pCommandBufferInfos      = &cmdInfo;
-    submit.signalSemaphoreInfoCount = 1;
-    submit.pSignalSemaphoreInfos    = &sigInfo;
 
     {
         std::scoped_lock lock{m_Mutex};
+        const uint64_t ticket = m_NextTicket.fetch_add(1, std::memory_order_relaxed);
+
+        VkSemaphoreSubmitInfo sigInfo{};
+        sigInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+        sigInfo.semaphore = m_Timeline;
+        sigInfo.value     = ticket;
+        sigInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT;
+
+        VkSubmitInfo2 submit{};
+        submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+        submit.commandBufferInfoCount   = 1;
+        submit.pCommandBufferInfos      = &cmdInfo;
+        submit.signalSemaphoreInfoCount = 1;
+        submit.pSignalSemaphoreInfos    = &sigInfo;
+
         result = vkQueueSubmit2(m_Queue, 1, &submit, VK_NULL_HANDLE);
         if (result != VK_SUCCESS)
         {
@@ -199,9 +203,75 @@ RHI::TransferToken VulkanTransferQueue::Submit(VkCommandBuffer cmd)
         m_InFlightCommandBuffers.push_back(RetiredCommandBuffer{.CommandBuffer = cmd,
                                                                 .RetireValue = ticket});
         m_Belt->Retire(ticket);
+        return RHI::TransferToken{ticket};
+    }
+    return {};
+}
+
+RHI::ReadbackToken VulkanTransferQueue::SubmitReadback(VkCommandBuffer cmd,
+                                                       size_t slotIndex,
+                                                       uint64_t sizeBytes,
+                                                       RHI::ReadbackSink sink)
+{
+    if (!IsValid() || cmd == VK_NULL_HANDLE)
+    {
+        Core::Log::Warn("[VulkanTransferQueue] Cannot submit readback command buffer; service or command buffer is invalid");
+        if (cmd != VK_NULL_HANDLE && m_Device != VK_NULL_HANDLE && m_CmdPool != VK_NULL_HANDLE)
+            vkFreeCommandBuffers(m_Device, m_CmdPool, 1u, &cmd);
+        return {};
     }
 
-    return RHI::TransferToken{ticket};
+    VkResult result = vkEndCommandBuffer(cmd);
+    if (result != VK_SUCCESS)
+    {
+        Core::Log::Error("[VulkanTransferQueue] vkEndCommandBuffer failed; readback skipped");
+        vkFreeCommandBuffers(m_Device, m_CmdPool, 1, &cmd);
+        return {};
+    }
+
+    VkCommandBufferSubmitInfo cmdInfo{};
+    cmdInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+    cmdInfo.commandBuffer = cmd;
+
+    {
+        std::scoped_lock lock{m_Mutex};
+        const uint64_t ticket = m_NextTicket.fetch_add(1, std::memory_order_relaxed);
+
+        VkSemaphoreSubmitInfo sigInfo{};
+        sigInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+        sigInfo.semaphore = m_Timeline;
+        sigInfo.value = ticket;
+        sigInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT;
+
+        VkSubmitInfo2 submit{};
+        submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+        submit.commandBufferInfoCount = 1;
+        submit.pCommandBufferInfos = &cmdInfo;
+        submit.signalSemaphoreInfoCount = 1;
+        submit.pSignalSemaphoreInfos = &sigInfo;
+
+        result = vkQueueSubmit2(m_Queue, 1, &submit, VK_NULL_HANDLE);
+        if (result != VK_SUCCESS)
+        {
+            Core::Log::Error("[VulkanTransferQueue] vkQueueSubmit2 failed; readback skipped");
+            vkFreeCommandBuffers(m_Device, m_CmdPool, 1, &cmd);
+            return {};
+        }
+
+        const RHI::ReadbackToken token{ticket};
+        m_InFlightCommandBuffers.push_back(RetiredCommandBuffer{.CommandBuffer = cmd,
+                                                                .RetireValue = ticket});
+        if (slotIndex < m_ReadbackSlots.size())
+            m_ReadbackSlots[slotIndex].RetireValue = ticket;
+        m_PendingReadbacks.push_back(PendingReadback{
+            .Token = token,
+            .SlotIndex = slotIndex,
+            .SizeBytes = sizeBytes,
+            .Sink = std::move(sink),
+        });
+        return token;
+    }
+    return {};
 }
 
 void VulkanTransferQueue::RetireCompletedCommandBuffers(const uint64_t completedValue)
@@ -218,6 +288,162 @@ void VulkanTransferQueue::RetireCompletedCommandBuffers(const uint64_t completed
             vkFreeCommandBuffers(m_Device, m_CmdPool, 1u, &cmd);
         m_InFlightCommandBuffers.pop_front();
     }
+}
+
+size_t VulkanTransferQueue::AcquireReadbackSlot(uint64_t sizeBytes)
+{
+    if (sizeBytes == 0u || sizeBytes > static_cast<uint64_t>(std::numeric_limits<size_t>::max()))
+        return std::numeric_limits<size_t>::max();
+
+    std::scoped_lock lock{m_Mutex};
+    for (size_t index = 0; index < m_ReadbackSlots.size(); ++index)
+    {
+        ReadbackSlot& slot = m_ReadbackSlots[index];
+        if (!slot.InUse && slot.Buffer != VK_NULL_HANDLE && slot.SizeBytes >= sizeBytes)
+        {
+            slot.InUse = true;
+            slot.RetireValue = 0u;
+            return index;
+        }
+    }
+
+    if (sizeBytes > std::numeric_limits<uint64_t>::max() - m_ReadbackRingBytes)
+    {
+        Core::Log::Warn("[VulkanTransferQueue] Readback staging allocation rejected; ring size would overflow");
+        return std::numeric_limits<size_t>::max();
+    }
+
+    VkBufferCreateInfo bufferCI{};
+    bufferCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferCI.size = sizeBytes;
+    bufferCI.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+
+    VmaAllocationCreateInfo allocationCI{};
+    allocationCI.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+    allocationCI.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT
+                       | VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
+
+    ReadbackSlot slot{};
+    VmaAllocationInfo info{};
+    const VkResult result = vmaCreateBuffer(m_Vma,
+                                            &bufferCI,
+                                            &allocationCI,
+                                            &slot.Buffer,
+                                            &slot.Allocation,
+                                            &info);
+    if (result != VK_SUCCESS || slot.Buffer == VK_NULL_HANDLE ||
+        slot.Allocation == VK_NULL_HANDLE || info.pMappedData == nullptr)
+    {
+        Core::Log::Error("[VulkanTransferQueue] Failed to allocate readback staging buffer");
+        if (slot.Buffer != VK_NULL_HANDLE && slot.Allocation != VK_NULL_HANDLE)
+            vmaDestroyBuffer(m_Vma, slot.Buffer, slot.Allocation);
+        return std::numeric_limits<size_t>::max();
+    }
+
+    slot.MappedPtr = info.pMappedData;
+    slot.SizeBytes = sizeBytes;
+    slot.InUse = true;
+    m_ReadbackSlots.push_back(slot);
+    m_ReadbackRingBytes += sizeBytes;
+
+    uint64_t highWater = m_ReadbackRingHighWaterBytes.load(std::memory_order_relaxed);
+    while (highWater < m_ReadbackRingBytes &&
+           !m_ReadbackRingHighWaterBytes.compare_exchange_weak(highWater,
+                                                               m_ReadbackRingBytes,
+                                                               std::memory_order_relaxed,
+                                                               std::memory_order_relaxed))
+    {
+    }
+
+    return m_ReadbackSlots.size() - 1u;
+}
+
+void VulkanTransferQueue::ReleaseReadbackSlot(size_t slotIndex, uint64_t retireValue)
+{
+    std::scoped_lock lock{m_Mutex};
+    if (slotIndex >= m_ReadbackSlots.size())
+        return;
+    ReadbackSlot& slot = m_ReadbackSlots[slotIndex];
+    slot.InUse = false;
+    slot.RetireValue = retireValue;
+}
+
+void VulkanTransferQueue::DrainCompletedReadbacks(uint64_t completedValue)
+{
+    struct ReadyReadback
+    {
+        RHI::ReadbackToken Token{};
+        RHI::ReadbackSink Sink{};
+        std::vector<std::byte> Bytes{};
+    };
+
+    std::vector<ReadyReadback> ready;
+    {
+        std::scoped_lock lock{m_Mutex};
+        auto it = m_PendingReadbacks.begin();
+        while (it != m_PendingReadbacks.end())
+        {
+            if (!it->Token.IsValid() || it->Token.Value > completedValue)
+            {
+                ++it;
+                continue;
+            }
+
+            std::vector<std::byte> bytes(static_cast<size_t>(it->SizeBytes));
+            if (it->SlotIndex < m_ReadbackSlots.size())
+            {
+                ReadbackSlot& slot = m_ReadbackSlots[it->SlotIndex];
+                if (slot.Allocation != VK_NULL_HANDLE)
+                {
+                    const VkResult invalidateResult =
+                        vmaInvalidateAllocation(m_Vma, slot.Allocation, 0, it->SizeBytes);
+                    if (invalidateResult != VK_SUCCESS)
+                    {
+                        Core::Log::Warn("[VulkanTransferQueue] readback vmaInvalidateAllocation reported VkResult={}; bytes may reflect stale CPU cache on non-coherent memory.",
+                                        static_cast<int>(invalidateResult));
+                    }
+                }
+                if (slot.MappedPtr != nullptr && !bytes.empty())
+                    std::memcpy(bytes.data(), slot.MappedPtr, bytes.size());
+                slot.InUse = false;
+                slot.RetireValue = it->Token.Value;
+            }
+
+            ready.push_back(ReadyReadback{
+                .Token = it->Token,
+                .Sink = std::move(it->Sink),
+                .Bytes = std::move(bytes),
+            });
+            it = m_PendingReadbacks.erase(it);
+        }
+    }
+
+    for (ReadyReadback& readback : ready)
+    {
+        readback.Sink.Deliver(std::span<const std::byte>{readback.Bytes});
+        uint64_t completed = m_CompletedReadbackTicket.load(std::memory_order_acquire);
+        while (completed < readback.Token.Value &&
+               !m_CompletedReadbackTicket.compare_exchange_weak(completed,
+                                                                 readback.Token.Value,
+                                                                 std::memory_order_release,
+                                                                 std::memory_order_acquire))
+        {
+        }
+        m_DownloadsCompleted.fetch_add(1u, std::memory_order_relaxed);
+    }
+}
+
+void VulkanTransferQueue::DestroyReadbackSlots()
+{
+    std::scoped_lock lock{m_Mutex};
+    m_PendingReadbacks.clear();
+    for (ReadbackSlot& slot : m_ReadbackSlots)
+    {
+        if (slot.Buffer != VK_NULL_HANDLE && slot.Allocation != VK_NULL_HANDLE)
+            vmaDestroyBuffer(m_Vma, slot.Buffer, slot.Allocation);
+    }
+    m_ReadbackSlots.clear();
+    m_ReadbackRingBytes = 0u;
 }
 
 RHI::TransferToken VulkanTransferQueue::UploadBuffer(RHI::BufferHandle dst,
@@ -530,6 +756,135 @@ RHI::TransferToken VulkanTransferQueue::UploadTextureFullChain(RHI::TextureHandl
     return token;
 }
 
+RHI::ReadbackToken VulkanTransferQueue::DownloadBuffer(RHI::BufferHandle src,
+                                                       uint64_t size,
+                                                       uint64_t offset,
+                                                       RHI::ReadbackSink sink)
+{
+    [[maybe_unused]] Extrinsic::Core::Telemetry::ScopedTimer timer{"VulkanTransferQueue::DownloadBuffer", Extrinsic::Core::Telemetry::HashString("VulkanTransferQueue::DownloadBuffer")};
+    if (!IsValid())
+    {
+        Core::Log::Warn("[VulkanTransferQueue] DownloadBuffer rejected; transfer service is invalid");
+        m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
+        return {};
+    }
+    if (!m_Buffers)
+    {
+        Core::Log::Warn("[VulkanTransferQueue] DownloadBuffer rejected; buffer pool is unavailable");
+        m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
+        return {};
+    }
+    if (!sink.IsValidForSize(size))
+    {
+        Core::Log::Warn("[VulkanTransferQueue] DownloadBuffer rejected; readback sink is invalid for the requested size");
+        m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
+        return {};
+    }
+
+    VulkanBuffer* buf = m_Buffers->GetIfValid(src);
+    if (!buf || buf->Buffer == VK_NULL_HANDLE)
+    {
+        Core::Log::Warn("[VulkanTransferQueue] DownloadBuffer rejected; source buffer handle is invalid");
+        m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
+        return {};
+    }
+    if ((buf->Usage & VK_BUFFER_USAGE_TRANSFER_SRC_BIT) == 0)
+    {
+        Core::Log::Warn("[VulkanTransferQueue] DownloadBuffer rejected; source buffer lacks transfer-src usage");
+        m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
+        return {};
+    }
+
+    const RHI::BufferDesc sourceDesc{
+        .SizeBytes = buf->SizeBytes,
+        .Usage = RHI::BufferUsage::TransferSrc,
+        .HostVisible = buf->HostVisible,
+        .DebugName = "VulkanTransferQueue.DownloadBuffer.Source",
+    };
+    const auto range = RHI::ValidateBufferRange(sourceDesc,
+                                                RHI::BufferRange{
+                                                    .OffsetBytes = offset,
+                                                    .SizeBytes = size,
+                                                });
+    if (!range.has_value())
+    {
+        Core::Log::Warn("[VulkanTransferQueue] DownloadBuffer rejected; readback range is invalid");
+        m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
+        return {};
+    }
+    if (range->SizeBytes > static_cast<uint64_t>(std::numeric_limits<size_t>::max()))
+    {
+        Core::Log::Warn("[VulkanTransferQueue] DownloadBuffer rejected; requested readback is too large for this host");
+        m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
+        return {};
+    }
+
+    const size_t slotIndex = AcquireReadbackSlot(range->SizeBytes);
+    if (slotIndex == std::numeric_limits<size_t>::max())
+    {
+        Core::Log::Warn("[VulkanTransferQueue] DownloadBuffer rejected; readback staging allocation failed");
+        m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
+        return {};
+    }
+
+    VkCommandBuffer cmd = Begin();
+    if (cmd == VK_NULL_HANDLE)
+    {
+        ReleaseReadbackSlot(slotIndex, 0u);
+        m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
+        return {};
+    }
+
+    VkBufferMemoryBarrier2 beforeCopy{};
+    beforeCopy.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+    beforeCopy.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    beforeCopy.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
+    beforeCopy.dstStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+    beforeCopy.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
+    beforeCopy.buffer = buf->Buffer;
+    beforeCopy.offset = range->OffsetBytes;
+    beforeCopy.size = range->SizeBytes;
+
+    VkDependencyInfo dependency{};
+    dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+    dependency.bufferMemoryBarrierCount = 1u;
+    dependency.pBufferMemoryBarriers = &beforeCopy;
+    vkCmdPipelineBarrier2(cmd, &dependency);
+
+    VkBufferCopy copy{};
+    copy.srcOffset = range->OffsetBytes;
+    copy.dstOffset = 0u;
+    copy.size = range->SizeBytes;
+    {
+        std::scoped_lock lock{m_Mutex};
+        if (slotIndex >= m_ReadbackSlots.size() || m_ReadbackSlots[slotIndex].Buffer == VK_NULL_HANDLE)
+        {
+            Core::Log::Warn("[VulkanTransferQueue] DownloadBuffer rejected; readback staging slot became invalid");
+            if (slotIndex < m_ReadbackSlots.size())
+                m_ReadbackSlots[slotIndex].InUse = false;
+            vkFreeCommandBuffers(m_Device, m_CmdPool, 1u, &cmd);
+            m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
+            return {};
+        }
+        vkCmdCopyBuffer(cmd, buf->Buffer, m_ReadbackSlots[slotIndex].Buffer, 1u, &copy);
+    }
+
+    const RHI::ReadbackToken token = SubmitReadback(cmd,
+                                                    slotIndex,
+                                                    range->SizeBytes,
+                                                    std::move(sink));
+    if (!token.IsValid())
+    {
+        ReleaseReadbackSlot(slotIndex, 0u);
+        m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
+        return {};
+    }
+
+    m_DownloadsQueued.fetch_add(1u, std::memory_order_relaxed);
+    m_ReadbackBytesStaged.fetch_add(range->SizeBytes, std::memory_order_relaxed);
+    return token;
+}
+
 bool VulkanTransferQueue::IsComplete(RHI::TransferToken token) const
 {
     if (!token.IsValid())
@@ -537,6 +892,13 @@ bool VulkanTransferQueue::IsComplete(RHI::TransferToken token) const
     if (!IsValid())
         return false;
     return token.Value <= QueryCompletedValue();
+}
+
+bool VulkanTransferQueue::IsComplete(RHI::ReadbackToken token) const
+{
+    if (!token.IsValid())
+        return true;
+    return token.Value <= m_CompletedReadbackTicket.load(std::memory_order_acquire);
 }
 
 void VulkanTransferQueue::CollectCompleted()
@@ -550,8 +912,19 @@ void VulkanTransferQueue::CollectCompleted()
 
     const uint64_t done = QueryCompletedValue();
     RetireCompletedCommandBuffers(done);
+    DrainCompletedReadbacks(done);
     m_Belt->GarbageCollect(done);
 }
 
-} // namespace Extrinsic::Backends::Vulkan
+RHI::TransferQueueDiagnostics VulkanTransferQueue::GetDiagnostics() const noexcept
+{
+    return RHI::TransferQueueDiagnostics{
+        .DownloadsQueued = m_DownloadsQueued.load(std::memory_order_relaxed),
+        .DownloadsCompleted = m_DownloadsCompleted.load(std::memory_order_relaxed),
+        .DownloadsDropped = m_DownloadsDropped.load(std::memory_order_relaxed),
+        .ReadbackBytesStaged = m_ReadbackBytesStaged.load(std::memory_order_relaxed),
+        .ReadbackRingHighWaterBytes = m_ReadbackRingHighWaterBytes.load(std::memory_order_relaxed),
+    };
+}
 
+} // namespace Extrinsic::Backends::Vulkan

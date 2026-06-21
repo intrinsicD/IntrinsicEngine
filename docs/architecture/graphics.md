@@ -35,6 +35,31 @@ Graphics is organized into explicit sublayers:
 - `RHI::SamplerDesc` owns backend-neutral filtering, addressing, LOD, comparison, anisotropy, and `SamplerBorderColor` state. The default border color is opaque black for compatibility with earlier sampler creation paths; backends translate it internally (for example Vulkan maps it to `VkBorderColor`) without exposing API-native types through RHI or renderer code.
 - The promoted Vulkan backend defines the same `IDevice` lifecycle/resource surface behind the RHI seam, selected only when both `RenderConfig::EnablePromotedVulkanDevice == true` and `INTRINSIC_RUNTIME_ENABLE_PROMOTED_VULKAN=ON` are set; otherwise `GraphicsBackend::Vulkan` falls back to the Null device. See [ADR-0004 — Vulkan backend bring-up and fail-closed fallback](../adr/0004-vulkan-backend-bringup-and-fallback.md) for the full bring-up sequence, `IsOperational()` predicate, diagnostics snapshots, fail-closed status taxonomy, rate-limited breadcrumb policy, and the `GRAPHICS-018Q` follow-up resolutions (texture upload, sampler anisotropy, fallback reason taxonomy, per-call vs frame-loop breadcrumbs).
 
+## GPU-to-CPU Readback Ring
+
+- `RHI::ITransferQueue::DownloadBuffer(...)` is the reusable buffer readback
+  seam introduced by GRAPHICS-096 and specified by
+  [ADR-0023](../adr/0023-cpu-gpu-transfer-foundation.md). It mirrors async
+  uploads: callers receive a `ReadbackToken`, no caller thread waits on a GPU
+  fence, and delivery happens through `ReadbackSink` during the render-thread
+  `CollectCompleted()` drain.
+- The RHI contract is buffer-only. Texture readback remains a separate follow-up
+  and high-level resource barrier orchestration remains outside this seam. Range
+  validation routes through `RHI.BufferTransfer`, invalid requests fail closed,
+  and Null/non-operational backends expose dropped-readback diagnostics instead
+  of silently ignoring downloads.
+- Vulkan implements the first operational backend with a recycled mapped
+  host-visible readback staging ring on the transfer timeline. The ring copies
+  device-local buffer bytes into staging with `vkCmdCopyBuffer`, invalidates the
+  VMA allocation on drain, copies bytes into the sink, and only then marks the
+  `ReadbackToken` complete. `IDevice::ReadBuffer()` remains a legacy blocking
+  smoke helper and is not the new readback path.
+- Renderer-owned drains such as `Picking.Readback` and the post-process
+  histogram still own their higher-level request/result policy. They may adopt
+  the transfer-queue readback ring when their framegraph barrier and ownership
+  needs are explicit, but graphics/rhi and graphics/vulkan do not import
+  renderer, runtime, ECS, or asset-service knowledge to support the ring.
+
 ## Vulkan operational readiness and runtime fallback
 
 See [ADR-0005 — Vulkan operational readiness gate and runtime reconciliation](../adr/0005-vulkan-operational-readiness-gate.md) for the 9-step ordered gate, the `EvaluateVulkanOperationalStatus(...)` single-source-of-truth evaluator, the `VulkanOperationalStatusCode`/`VulkanOperationalReason` taxonomy, the runtime reconciliation truth table, the `VulkanOperationalDiagnosticsSnapshot` surface, the validation-layer policy, the required-vs-optional capability split, and the rules for transient operational drops.
@@ -124,6 +149,7 @@ The decision-record content this document previously inlined has been extracted 
 - [ADR-0016 — Texture residency, fallback, and asset cache policy](../adr/0016-texture-residency-and-asset-cache-policy.md)
 - [ADR-0017 — Default debug surface material (slot 0)](../adr/0017-default-debug-surface-material.md)
 - [ADR-0018 — Missing-material fallback substitution and diagnostics](../adr/0018-missing-material-fallback-substitution.md)
+- [ADR-0023 — CPU/GPU transfer foundation](../adr/0023-cpu-gpu-transfer-foundation.md)
 
 The handoff inventory that the GRAPHICS-017Q clarification paragraph previously embedded (legacy `Graphics.TransformGizmo` / `Graphics.Interaction` features awaiting promoted-implementation tasks) lives in [`docs/migration/nonlegacy-parity-matrix.md`](../migration/nonlegacy-parity-matrix.md); ADR-0006 cross-links it rather than duplicating it (no new migration doc was authored).
 

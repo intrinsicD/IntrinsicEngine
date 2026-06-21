@@ -97,6 +97,16 @@ available through the Vulkan 1.2/1.3 feature chain.
   destination stage/access scopes must remain transfer-queue-valid; shader-stage
   visibility is established later by graphics/renderer-side use barriers rather
   than by naming fragment/compute stages on a transfer-only command buffer.
+  GRAPHICS-096 adds the [ADR-0023](../../../docs/adr/0023-cpu-gpu-transfer-foundation.md)
+  buffer readback half of the same transfer seam: `DownloadBuffer(...)` validates
+  the source range, copies into a recycled mapped host-visible `TRANSFER_DST`
+  staging slot, signals the transfer timeline, and delivers bytes to the
+  `ReadbackSink` only from `CollectCompleted()`. `IsComplete(ReadbackToken)`
+  reports delivery completion, not just queue signal completion, and
+  `TransferQueueDiagnostics` exposes queued/completed/dropped downloads, staged
+  bytes, and readback-ring high-water bytes. The legacy
+  `VulkanDevice::ReadBuffer()` helper remains for old opt-in smokes and is not
+  used by this ring.
 - `VulkanDevice::CreatePipeline()` now has a guarded concrete Vulkan path once
   bootstrap has produced a logical device and global pipeline layout. It reads
   SPIR-V shader files from `RHI::PipelineDesc`, creates shader modules, and builds

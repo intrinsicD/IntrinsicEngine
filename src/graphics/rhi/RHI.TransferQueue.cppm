@@ -1,8 +1,12 @@
 module;
 
+#include <compare>
+#include <cstring>
 #include <cstdint>
-#include <span>
 #include <cstddef>
+#include <functional>
+#include <span>
+#include <utility>
 
 export module Extrinsic.RHI.TransferQueue;
 
@@ -28,18 +32,71 @@ import Extrinsic.RHI.Transfer;
 //     (e.g. asset loader thread).  Data is copied into a staging
 //     buffer on the caller thread; the GPU submission happens
 //     asynchronously on the transfer queue.
+//   DownloadBuffer — safe to call from any thread. Backends copy the requested
+//     device range into backend-owned staging and deliver bytes later through a
+//     ReadbackSink from CollectCompleted().
 //   IsComplete — safe from any thread (atomic read).
 //   CollectCompleted — render thread only, once per frame, after
 //     EndFrame().  This is the only call that waits on GPU state.
 //
 // Invariant (matches src/ async-upload guarantee):
 //   No caller thread ever blocks on a GPU fence inside
-//   UploadBuffer / UploadTexture / UploadTextureFullChain.  Fence waiting happens
-//   exclusively inside CollectCompleted() on the render thread.
+//   UploadBuffer / UploadTexture / UploadTextureFullChain / DownloadBuffer.
+//   Fence waiting happens exclusively inside CollectCompleted() on the render
+//   thread.
 // ============================================================
 
 export namespace Extrinsic::RHI
 {
+    struct ReadbackToken
+    {
+        std::uint64_t Value = 0;
+
+        [[nodiscard]] bool IsValid() const noexcept { return Value != 0; }
+        [[nodiscard]] explicit operator bool() const noexcept { return IsValid(); }
+        [[nodiscard]] auto operator<=>(const ReadbackToken&) const noexcept = default;
+    };
+
+    using ReadbackCallback = std::function<void(std::span<const std::byte>)>;
+
+    struct ReadbackSink
+    {
+        std::span<std::byte> Destination{};
+        ReadbackCallback Callback{};
+
+        [[nodiscard]] static ReadbackSink CopyTo(std::span<std::byte> destination)
+        {
+            return ReadbackSink{.Destination = destination};
+        }
+
+        [[nodiscard]] static ReadbackSink Invoke(ReadbackCallback callback)
+        {
+            return ReadbackSink{.Callback = std::move(callback)};
+        }
+
+        [[nodiscard]] bool IsValidForSize(std::uint64_t sizeBytes) const noexcept
+        {
+            return Callback || Destination.size_bytes() == static_cast<std::size_t>(sizeBytes);
+        }
+
+        void Deliver(std::span<const std::byte> bytes) const
+        {
+            if (!Destination.empty() && Destination.size_bytes() == bytes.size_bytes())
+                std::memcpy(Destination.data(), bytes.data(), bytes.size_bytes());
+            if (Callback)
+                Callback(bytes);
+        }
+    };
+
+    struct TransferQueueDiagnostics
+    {
+        std::uint64_t DownloadsQueued = 0;
+        std::uint64_t DownloadsCompleted = 0;
+        std::uint64_t DownloadsDropped = 0;
+        std::uint64_t ReadbackBytesStaged = 0;
+        std::uint64_t ReadbackRingHighWaterBytes = 0;
+    };
+
     class ITransferQueue
     {
     public:
@@ -98,6 +155,35 @@ export namespace Extrinsic::RHI
         /// IsComplete() and CollectCompleted().
         [[nodiscard]] virtual TransferToken UploadTextureFullChain(TextureHandle              dst,
                                                                    std::span<const std::byte> src) = 0;
+
+        // ---- Buffer readbacks ----------------------------------------
+
+        /// Non-blocking: queues a GPU transfer from `src` at `offset` into
+        /// backend-owned host-visible staging. The requested bytes are delivered
+        /// to `sink` from CollectCompleted() after the transfer timeline reports
+        /// completion. `src` must have BufferUsage::TransferSrc support.
+        [[nodiscard]] virtual ReadbackToken DownloadBuffer(BufferHandle src,
+                                                           std::uint64_t size,
+                                                           std::uint64_t offset,
+                                                           ReadbackSink sink)
+        {
+            (void)src;
+            (void)size;
+            (void)offset;
+            (void)sink;
+            return {};
+        }
+
+        /// Returns true when the GPU has finished the readback associated with
+        /// `token`. Safe to call from any thread.
+        [[nodiscard]] virtual bool IsComplete(ReadbackToken token) const
+        {
+            return !token.IsValid();
+        }
+
+        [[nodiscard]] virtual TransferQueueDiagnostics GetDiagnostics() const noexcept
+        {
+            return {};
+        }
     };
 }
-

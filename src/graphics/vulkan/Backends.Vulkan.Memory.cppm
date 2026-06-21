@@ -15,6 +15,7 @@ namespace Extrinsic::Backends::Vulkan
         VkBuffer      Buffer       = VK_NULL_HANDLE;
         VmaAllocation Allocation   = VK_NULL_HANDLE;
         void*         MappedPtr    = nullptr;
+        VkBufferUsageFlags Usage   = 0;
         uint64_t      SizeBytes    = 0;
         bool          HostVisible  = false;
         bool          HostCoherent = false;
@@ -44,4 +45,3 @@ namespace Extrinsic::Backends::Vulkan
         VkSampler Sampler = VK_NULL_HANDLE;
     };
 }
-

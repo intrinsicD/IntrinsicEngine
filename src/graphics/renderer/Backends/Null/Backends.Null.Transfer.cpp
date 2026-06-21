@@ -50,9 +50,23 @@ namespace Extrinsic::Backends::Null
             return {};
         }
 
+        [[nodiscard]] RHI::ReadbackToken DownloadBuffer(RHI::BufferHandle,
+                                                        std::uint64_t,
+                                                        std::uint64_t,
+                                                        RHI::ReadbackSink) override
+        {
+            m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
+            return {};
+        }
+
         [[nodiscard]] bool IsComplete(RHI::TransferToken token) const override
         {
             return token.Value <= m_Next.load(std::memory_order_relaxed);
+        }
+
+        [[nodiscard]] bool IsComplete(RHI::ReadbackToken token) const override
+        {
+            return !token.IsValid();
         }
 
         void CollectCompleted() override
@@ -60,8 +74,16 @@ namespace Extrinsic::Backends::Null
             [[maybe_unused]] Extrinsic::Core::Telemetry::ScopedTimer timer{"NullTransferQueue::CollectCompleted", Extrinsic::Core::Telemetry::HashString("NullTransferQueue::CollectCompleted")};
         }
 
+        [[nodiscard]] RHI::TransferQueueDiagnostics GetDiagnostics() const noexcept override
+        {
+            return RHI::TransferQueueDiagnostics{
+                .DownloadsDropped = m_DownloadsDropped.load(std::memory_order_relaxed),
+            };
+        }
+
     private:
         std::atomic<std::uint64_t> m_Next{0};
+        std::atomic<std::uint64_t> m_DownloadsDropped{0};
     };
 
     std::unique_ptr<RHI::ITransferQueue> CreateNullTransferQueue()

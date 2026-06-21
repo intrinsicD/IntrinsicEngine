@@ -988,7 +988,7 @@ TAA + reconstructor seam (GRAPHICS-040):
 - [GRAPHICS-040C (done)](../../done/GRAPHICS-040C-aa-recipe-selection-and-integration.md) — AA recipe selection + post-chain integration (`Operational`, 2026-06-05). Depends on 040B (done), GRAPHICS-013A/075 (done).
 - GRAPHICS-040D (vendor reconstructor backends) — **not opened**: per GRAPHICS-040 decision 5/10 there is one child per vendor, opened only when that vendor SDK is actually integrated.
 
-### CPU↔GPU transfer foundation (GRAPHICS-095 done; GRAPHICS-096..098 open)
+### CPU↔GPU transfer foundation (GRAPHICS-095/096 done; GRAPHICS-097..098 open)
 
 Backend-neutral foundation that makes CPU→GPU and GPU→CPU data transfer
 repeatable, validated, fast, and robust for algorithm and user code. Recorded in
@@ -1002,11 +1002,11 @@ drains exist). Pick the earliest unblocked leaf.
   `Extrinsic.RHI.BufferTransfer` (sub-range validation, alignment, partial-write
   planning, and typed dimension matching) mirroring `RHI::TextureUpload`.
   CPU-only; no backend.
-- [GRAPHICS-096 — Async GPU→CPU buffer readback ring on `ITransferQueue`](GRAPHICS-096-async-buffer-readback-ring.md)
-  (**headline**): depends on GRAPHICS-095, target `Operational` on Vulkan.
-  `DownloadBuffer(...)` → `ReadbackToken` + `ReadbackSink`, recycled host-visible
-  readback ring, delivery on the `CollectCompleted()` drain (no caller-thread
-  fence wait). Slice A CPU contract / Slice B Vulkan ring + `gpu;vulkan` smoke.
+- [GRAPHICS-096 — Async GPU→CPU buffer readback ring on `ITransferQueue`](../../done/GRAPHICS-096-async-buffer-readback-ring.md):
+  completed transfer-queue readback base layer, target `Operational` on Vulkan.
+  `DownloadBuffer(...)` returns `ReadbackToken` + `ReadbackSink`, uses a recycled
+  host-visible readback ring, and delivers on the `CollectCompleted()` drain
+  without caller-thread fence waits.
 - [GRAPHICS-097 — Async GPU→CPU texture readback through the readback ring](GRAPHICS-097-async-texture-readback.md):
   depends on GRAPHICS-096, target `Operational` on Vulkan. `DownloadTexture(...)`
   reusing `RHI::TextureUpload` subresource layout in reverse.
