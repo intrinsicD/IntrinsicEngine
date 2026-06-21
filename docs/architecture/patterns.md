@@ -88,7 +88,7 @@ if (x && y && z) tempPos.emplace_back(*x, *y, *z);
 **Canonical examples:**
 - `Geometry.Simplification.cppm` — `SimplificationParams { TargetFaces, MaxError, PreserveBoundary }`, returns `std::optional<SimplificationResult>`.
 - `Geometry.CatmullClark.cppm` — `SubdivisionParams`, produces new mesh via `const Mesh& input, Mesh& output`.
-- `Geometry.NormalEstimation.cppm` — `EstimationParams` with octree config, borrows point positions as `std::span<const glm::vec3>`.
+- `Geometry.PointCloud.Normals.cppm` — `Params` with KDTree/Octree index options, borrows point positions as `std::span<const glm::vec3>`, and offers property-writing recompute overloads.
 - `Geometry.MarchingCubes.cppm` — `Extract(DenseGrid)` reads a named scalar property, returns indexed triangle soup.
 - `Geometry.ConvexHullBuilder.cppm` — `ConvexHullParams`, returns `ConvexHull` struct (V-Rep + H-Rep).
 

@@ -8,7 +8,7 @@ maturity_target: CPUContracted
 
 ## Goal
 - Add a Sandbox EditorUI method window under `Mesh > Processing > Vertices > Normals` that recomputes normals for the selected mesh entity and publishes the result to canonical `v:normal` data.
-- Extend the same menu/API pattern to `Graph > Processing > Vertices > Normals` and `PointCloud > Processing > Vertices > Normals` after geometry-owned graph and point-cloud normal modules exist.
+- Extend the same menu/API pattern to `Graph > Processing > Vertices > Normals` and `PointCloud > Processing > Vertices > Normals` by consuming the retired geometry-owned graph and point-cloud normal modules.
 
 ## Non-goals
 - No geometry kernel implementation; `GEOM-026` owns mesh, graph, and point-cloud normal recomputation.
@@ -22,8 +22,8 @@ maturity_target: CPUContracted
 - Status: backlog.
 - Owning subsystem/layer: `src/runtime/Editor/Runtime.SandboxEditorUi.*`; runtime may compose ECS `GeometrySources`, geometry algorithms, and editor command/history seams, while geometry owns the algorithms.
 - The current editor menu shape has domain menus with a `Processing` submenu and element entries (`Vertices`, `Edges`, `Faces`, `Halfedges`). This task turns each vertex entry into the first method-bearing submenu leaf named `Normals`; the opened window owns the action button label (`Recompute`), not the menu leaf.
-- `SandboxEditorGeometryProcessingAlgorithm::NormalEstimation` advertises point-cloud discovery from the existing promoted surface and now advertises mesh vertex discovery for the halfedge-mesh recompute slice. Graph and point-cloud command windows remain gated until their dedicated `GEOM-026` modules exist.
-- `GEOM-026` is expected to expose domain-owned geometry modules:
+- `SandboxEditorGeometryProcessingAlgorithm::NormalEstimation` advertises point-cloud discovery from the existing promoted surface and now advertises mesh vertex discovery for the halfedge-mesh recompute slice. Graph and point-cloud command windows should now consume the retired `GEOM-026` modules rather than remain feature-gated on missing geometry kernels.
+- Retired `GEOM-026` exposes domain-owned geometry modules:
   `Geometry.HalfedgeMesh.Vertices.Normals`,
   `Geometry.Graph.Vertex.Normals`, and
   `Geometry.PointCloud.Normals`. Runtime should call those modules by domain
@@ -33,7 +33,7 @@ maturity_target: CPUContracted
 - GPU synchronization follows the promoted dirty-tag contract: the editor command publishes CPU `v:normal`, stamps `DirtyVertexAttributes`, and render extraction/main-loop residency repacks and uploads the affected geometry on the next extraction opportunity. The UI command must not directly call renderer/RHI upload APIs or launch a GPU update task. If mesh extraction does not currently include `DirtyVertexAttributes` in its mesh-residency dirty set, extend that consumer-side dirty set rather than compensating with a UI-authored `GpuDirty` broad tag.
 
 ## UI plan
-- `Mesh > Processing > Vertices > Normals` opens a mesh vertex-normal window for the selected mesh entity. The first implementation slice may land mesh only; graph and point-cloud windows follow the same leaf name once their `GEOM-026` modules are available.
+- `Mesh > Processing > Vertices > Normals` opens a mesh vertex-normal window for the selected mesh entity. Graph and point-cloud windows follow the same leaf name and consume the retired `GEOM-026` graph/point-cloud modules.
 - The mesh window exposes the method controls needed by `Geometry.HalfedgeMesh.Vertices.Normals`: averaging mode (`UniformFace`, `AreaWeighted`, `AngleWeighted`, `MaxWeighted`), fallback normal, epsilon/degeneracy tolerance if surfaced by the runtime DTO, and a fixed canonical output target of `v:normal`.
 - The primary command is a single `Recompute` button. It is enabled only for a live selected mesh entity with writable mesh `GeometrySources`; unsupported domains show deterministic diagnostics rather than hidden failure.
 - The result panel reports the geometry-module counters without requiring a graphics backend: status, written vertex count, valid normal count, processed face count, degenerate/non-finite/invalid-topology face counts, degenerate corner count, fallback count, skipped deleted slots, and fallback-repair state.
@@ -52,7 +52,7 @@ maturity_target: CPUContracted
 ## Tests
 - [x] Extend `tests/contract/runtime/Test.SandboxEditorUi.cpp` so menu contract coverage proves `Normals` appears under the mesh vertex processing submenu only for this slice.
 - [x] Add command tests proving mesh recomputation writes finite count-matched `v:normal` values to the mesh vertex `GeometrySources` property set for all mesh weighting modes.
-- [ ] Add graph and point-cloud command tests once their geometry-owned recompute modules are available.
+- [ ] Add graph and point-cloud command tests that consume the retired geometry-owned recompute modules.
 - [x] Add tests for selected-entity/domain validation and typed `v:normal` publication conflicts.
 - [x] Add tests proving dirty tags and editor dirty state are updated after a successful recompute, and that mesh normal recompute relies on `DirtyVertexAttributes`-driven deferred extraction rather than direct renderer/RHI calls.
 - [ ] Keep existing K-Means and processing capability tests passing.
@@ -67,7 +67,7 @@ maturity_target: CPUContracted
 - [x] The mesh UI path is discoverable as `Mesh > Processing > Vertices > Normals`.
 - [x] The mesh command calls geometry-owned normal recomputation and publishes `v:normal` without UI-owned algorithms.
 - [x] Mesh settings expose the face-normal averaging scheme and fallback normal.
-- [ ] Graph and point-cloud normal windows/commands are added after their geometry-owned modules exist.
+- [ ] Graph and point-cloud normal windows/commands consume the retired geometry-owned modules.
 - [x] Failure cases report deterministic command statuses/diagnostics and do not mutate unrelated properties.
 - [x] Focused runtime contract tests and structural checks pass.
 

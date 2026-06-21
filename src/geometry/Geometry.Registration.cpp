@@ -37,7 +37,7 @@ namespace Geometry::Registration
 
         // 3x3 symmetric eigendecomposition (Cardano's method).
         // Eigenvalues sorted descending, eigenvectors orthonormalized.
-        // Same algorithm used throughout the geometry kernel (PCA, NormalEstimation).
+        // Same algorithm used throughout the geometry kernel (PCA, PointCloud.Normals).
         struct SymEigen3Result
         {
             double Values[3]{};        // sorted descending

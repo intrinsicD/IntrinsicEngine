@@ -12,9 +12,9 @@ map.
 
 - [RORG-031F — UI integration backlog seed](RORG-031-ui-integration.md).
 - [UI-022 — Sandbox EditorUI vertex-normal recompute windows](UI-022-sandbox-editor-vertex-normal-recompute.md)
-  (depends on `GEOM-026`; adds the first method window under
+  (depends on retired `GEOM-026`; adds the first method window under
   `Mesh > Processing > Vertices`, with graph/point-cloud normal windows
-  deferred until their geometry-owned recompute modules exist).
+  consuming the geometry-owned recompute modules).
 
 ## Convergence
 
@@ -100,8 +100,7 @@ map.
 - UI-022 is the opened follow-up from the vertex-processing menu request: the
   mesh `Processing > Vertices` submenu gains a `Normals` method window backed
   by `Geometry.HalfedgeMesh.Vertices.Normals`; graph and point-cloud windows
-  remain future work until `GEOM-026` supplies geometry-owned recomputation
-  contracts for those domains.
+  now consume retired `GEOM-026` recomputation contracts for those domains.
 - UI work that depends on renderer overlays/handoff coordinates with the
   retired `GRAPHICS-024`
   parity matrix, the `RUNTIME-104` decision not to retain a persistent

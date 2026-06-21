@@ -123,8 +123,8 @@ Open members:
 - [`geometry/RORG-031-geometry-method-readiness.md`](geometry/RORG-031-geometry-method-readiness.md).
 - [`ui/RORG-031-ui-integration.md`](ui/RORG-031-ui-integration.md).
 - [`ui/UI-022-sandbox-editor-vertex-normal-recompute.md`](ui/UI-022-sandbox-editor-vertex-normal-recompute.md) —
-  blocked by `GEOM-026`; adds the first method window under each vertex
-  processing submenu.
+  unblocked by retired `GEOM-026`; adds the first method window under each
+  vertex processing submenu.
 - [`platform/PLATFORM-004-alternative-platform-backend-onboarding.md`](platform/PLATFORM-004-alternative-platform-backend-onboarding.md) (planning-only seed).
 
 ### Theme G — Active bugs
@@ -167,12 +167,13 @@ are preserved in the retirement log.
 - **GRAPHICS-035..058 ⇐ Theme A.** Theme A's visible-geometry foundation is
   complete; rendering modernization leaves are now gated by their individual
   task dependencies and the rendering DAG.
-- **UI-022 ⇐ GEOM-026.** The editor normal-recompute windows must consume a
-  geometry-owned CPU contract: mesh normals from face-normal averaging schemes,
-  graph normals from connectivity, and point-cloud normals from KDTree
-  neighborhoods or supplied spatial indexes, each exposed from its domain-owned
-  normal module and returning the written normal property. Do not promote
-  `UI-022` before `GEOM-026` retires.
+- **UI-022 ⇐ retired GEOM-026.** The editor normal-recompute windows must
+  consume the retired geometry-owned CPU contract: mesh normals from face-normal
+  averaging schemes, graph normals from connectivity, and point-cloud normals
+  from KDTree neighborhoods or supplied spatial indexes, each exposed from its
+  domain-owned normal module and returning the written normal property. This
+  dependency is satisfied; `UI-022` is now eligible for promotion when it is the
+  next UI task.
 
 ## Promotion checklist
 

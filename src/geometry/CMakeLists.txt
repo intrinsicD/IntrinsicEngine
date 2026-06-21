@@ -21,6 +21,7 @@ target_sources(${target_name}
         Geometry.Graph.IO.cppm
         Geometry.Graph.ShortestPath.cppm
         Geometry.Graph.Utils.cppm
+        Geometry.Graph.Vertex.Normals.cppm
         Geometry.Graph.cppm
         Geometry.Grid.cppm
         Geometry.HalfedgeMesh.AdaptiveRemeshing.cppm
@@ -57,7 +58,6 @@ target_sources(${target_name}
         Geometry.Mesh.Conversion.cppm
         Geometry.MeshSoup.cppm
         Geometry.MeshOperator.cppm
-        Geometry.NormalEstimation.cppm
         Geometry.OBB.cppm
         Geometry.Octree.cppm
         Geometry.Overlap.cppm
@@ -66,6 +66,7 @@ target_sources(${target_name}
         Geometry.Plane.cppm
         Geometry.PointCloud.Conversion.cppm
         Geometry.PointCloud.IO.cppm
+        Geometry.PointCloud.Normals.cppm
         Geometry.PointCloud.Utils.cppm
         Geometry.PointCloud.cppm
         Geometry.Primitives.cppm
@@ -106,6 +107,7 @@ target_sources(${target_name}
         Geometry.Graph.IO.cpp
         Geometry.Graph.ShortestPath.cpp
         Geometry.Graph.Utils.cpp
+        Geometry.Graph.Vertex.Normals.cpp
         Geometry.Graph.cpp
         Geometry.Grid.cpp
         Geometry.HalfedgeMesh.AdaptiveRemeshing.cpp
@@ -137,7 +139,6 @@ target_sources(${target_name}
         Geometry.MarchingCubes.cpp
         Geometry.Mesh.Conversion.cpp
         Geometry.MeshSoup.cpp
-        Geometry.NormalEstimation.cpp
         Geometry.OBB.cpp
         Geometry.Octree.cpp
         Geometry.Overlap.cpp
@@ -146,6 +147,7 @@ target_sources(${target_name}
         Geometry.Plane.cpp
         Geometry.PointCloud.Conversion.cpp
         Geometry.PointCloud.IO.cpp
+        Geometry.PointCloud.Normals.cpp
         Geometry.PointCloud.Utils.cpp
         Geometry.PointCloud.cpp
         Geometry.Properties.cpp

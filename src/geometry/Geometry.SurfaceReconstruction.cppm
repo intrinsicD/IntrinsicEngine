@@ -21,7 +21,7 @@ export namespace Geometry::SurfaceReconstruction
     //
     //   1. Build a spatial index (Octree) over the input points.
     //   2. Estimate surface normals if not provided (PCA + MST orientation,
-    //      via the Geometry.NormalEstimation module).
+    //      via the Geometry.PointCloud.Normals module).
     //   3. Construct a regular 3D grid covering the point cloud bounding box
     //      (with configurable padding).
     //   4. For each grid vertex, compute a signed distance to the implicit
@@ -70,7 +70,7 @@ export namespace Geometry::SurfaceReconstruction
         float BoundingBoxPadding{0.1f};
 
         // If true, estimate normals from the point cloud using PCA + MST
-        // orientation (Geometry.NormalEstimation). If false, the caller must
+        // orientation (Geometry.PointCloud.Normals). If false, the caller must
         // provide pre-computed normals.
         bool EstimateNormals{true};
 

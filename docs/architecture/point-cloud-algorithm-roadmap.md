@@ -17,7 +17,9 @@ The current promoted geometry layer already provides useful point-cloud foundati
 
 - `Geometry.PointCloud` owns the `Geometry::PointCloud::Cloud` container with canonical `v:point` positions and optional normal/color/radius attributes.
 - `Geometry.PointCloud.Utils` includes statistics, voxel downsampling, random subsampling, radius estimation, bilateral filtering, outlier-score estimation, and kernel-density estimation.
-- `Geometry.NormalEstimation` provides PCA normal estimation with MST orientation.
+- `Geometry.PointCloud.Normals` provides KDTree-backed PCA normal estimation,
+  MST orientation, supplied-index overloads, and property-writing `v:normal`
+  recompute contracts.
 - `Geometry.PCA`, `Geometry.KMeans`, `Geometry.KDTree`, and `Geometry.Octree` provide reusable numerical/spatial building blocks.
 - `Geometry.Registration` provides point-to-point and point-to-plane ICP over borrowed point spans.
 - `Geometry.SurfaceReconstruction` provides Hoppe-style implicit reconstruction through Marching Cubes.
@@ -83,7 +85,7 @@ Primary home: generic descriptor/correspondence records in `src/geometry`; paper
 Required structures and dependencies:
 
 - `Geometry.PointCloud` / domain views from `GEOM-012` for borrowed point and normal spans.
-- `Geometry.NormalEstimation` for normal prerequisites and normal-confidence diagnostics.
+- `Geometry.PointCloud.Normals` for normal prerequisites and normal-confidence diagnostics.
 - `Geometry.KDTree` / `Geometry.Octree` for local support neighborhoods.
 - `Geometry.Linalg` covariance/eigen helpers from `GEOM-008` for keypoint saliency and local reference frames.
 - `Geometry.Registration` for ICP refinement after coarse alignment.
@@ -149,7 +151,7 @@ Primary home: `src/geometry` for classical generic smoothing/orientation kernels
 Dependencies:
 
 - Pack 1 density/outlier diagnostics.
-- `Geometry.NormalEstimation`, `Geometry.KDTree`, and `Geometry.Linalg`.
+- `Geometry.PointCloud.Normals`, `Geometry.KDTree`, and `Geometry.Linalg`.
 
 Correctness and benchmarks:
 
@@ -223,4 +225,3 @@ The first two implementation packs are:
 2. [`GEOM-017`](../../tasks/backlog/geometry/GEOM-017-point-cloud-descriptors-registration-seams.md) — keypoints, descriptors, matching, and coarse registration seams. This unlocks robust/global registration and reconstruction work without prematurely importing paper-specific TEASER/CPD assumptions into `src/geometry`.
 
 Later packs should not begin until their prerequisites are either retired to `tasks/done/` or recorded as explicit out-of-scope assumptions in the candidate task file.
-

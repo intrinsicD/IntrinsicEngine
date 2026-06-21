@@ -1149,7 +1149,7 @@ Entity
  ├── ECS::Components::GeometrySources::Vertices    ← AUTHORITATIVE for all vertex data
  │    └── Properties: shared_ptr<PropertySet>     (co-owned by MeshView when active)
  │         "v:position"   vec3[]    — positions (canonical)
- │         "v:normal"     vec3[]    — normals (written by NormalEstimation or loader)
+ │         "v:normal"     vec3[]    — normals (written by geometry normal recompute modules or loader)
  │         "v:color"      vec3[]    — vertex colors (written by colorizing algorithms)
  │         "v:geodesic"   float[]   — geodesic distance (written by HeatMethod)
  │         "v:cluster_id" int[]     — cluster labels (written by KMeans)
@@ -1298,7 +1298,7 @@ The existing `Visualization::Config::VertexColors.PropertyName` (etc.) is the se
 ```
 Geometry (menu)
   ├─ Normals
-  │   └─ Estimate Normals          ← NormalEstimationModule
+  │   └─ Estimate Normals          ← Geometry normal recompute modules
   ├─ Smoothing
   │   └─ Laplacian Smooth          ← SmoothingModule
   ├─ Simplification

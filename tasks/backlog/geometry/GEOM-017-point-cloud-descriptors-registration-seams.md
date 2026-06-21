@@ -55,7 +55,7 @@ depends_on: [GEOM-008]
 ```bash
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests
-ctest --test-dir build/ci --output-on-failure -R 'PointCloud|Registration|NormalEstimation|LinearAlgebra' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+ctest --test-dir build/ci --output-on-failure -R 'PointCloud|Registration|PointCloudNormals|LinearAlgebra' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
 python3 tools/repo/generate_module_inventory.py --root src --out docs/api/generated/module_inventory.md
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/repo/check_test_layout.py --root . --strict
@@ -72,4 +72,3 @@ python3 tools/agents/check_task_policy.py --root . --strict
 ## Maturity
 - Target: `CPUContracted` (generic CPU seams; the reference correctness oracle for later method packages).
 - No `Operational` follow-up is owed; this task has no backend seam.
-

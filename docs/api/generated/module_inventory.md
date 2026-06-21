@@ -12,7 +12,7 @@ Root scanned: `src`
 | `assets` | 12 |
 | `core` | 39 |
 | `ecs` | 28 |
-| `geometry` | 88 |
+| `geometry` | 89 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 62 |
@@ -125,6 +125,7 @@ Root scanned: `src`
 | `Geometry.Graph.IO` | `src/geometry/Geometry.Graph.IO.cppm` | `geometry` |
 | `Geometry.Graph.ShortestPath` | `src/geometry/Geometry.Graph.ShortestPath.cppm` | `geometry` |
 | `Geometry.Graph.Utils` | `src/geometry/Geometry.Graph.Utils.cppm` | `geometry` |
+| `Geometry.Graph.Vertex.Normals` | `src/geometry/Geometry.Graph.Vertex.Normals.cppm` | `geometry` |
 | `Geometry.Graph` | `src/geometry/Geometry.Graph.cppm` | `geometry` |
 | `Geometry.Grid` | `src/geometry/Geometry.Grid.cppm` | `geometry` |
 | `Geometry.HalfedgeMesh.AdaptiveRemeshing` | `src/geometry/Geometry.HalfedgeMesh.AdaptiveRemeshing.cppm` | `geometry` |
@@ -162,7 +163,6 @@ Root scanned: `src`
 | `Geometry.Mesh.Conversion` | `src/geometry/Geometry.Mesh.Conversion.cppm` | `geometry` |
 | `Geometry.MeshOperator` | `src/geometry/Geometry.MeshOperator.cppm` | `geometry` |
 | `Geometry.MeshSoup` | `src/geometry/Geometry.MeshSoup.cppm` | `geometry` |
-| `Geometry.NormalEstimation` | `src/geometry/Geometry.NormalEstimation.cppm` | `geometry` |
 | `Geometry.OBB` | `src/geometry/Geometry.OBB.cppm` | `geometry` |
 | `Geometry.Octree` | `src/geometry/Geometry.Octree.cppm` | `geometry` |
 | `Geometry.Overlap` | `src/geometry/Geometry.Overlap.cppm` | `geometry` |
@@ -172,6 +172,7 @@ Root scanned: `src`
 | `Geometry.PointCloud.Conversion` | `src/geometry/Geometry.PointCloud.Conversion.cppm` | `geometry` |
 | `Geometry.PointCloud.Fwd` | `src/geometry/Geometry.PointCloud.Fwd.cppm` | `geometry` |
 | `Geometry.PointCloud.IO` | `src/geometry/Geometry.PointCloud.IO.cppm` | `geometry` |
+| `Geometry.PointCloud.Normals` | `src/geometry/Geometry.PointCloud.Normals.cppm` | `geometry` |
 | `Geometry.PointCloud.Utils` | `src/geometry/Geometry.PointCloud.Utils.cppm` | `geometry` |
 | `Geometry.PointCloud` | `src/geometry/Geometry.PointCloud.cppm` | `geometry` |
 | `Geometry.Primitives` | `src/geometry/Geometry.Primitives.cppm` | `geometry` |
@@ -524,4 +525,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugAdapters` | `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **496**
+Total modules: **497**

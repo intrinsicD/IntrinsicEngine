@@ -428,6 +428,7 @@ set(_geometry_test_files
     Test_Boolean.cpp
     Test_MeshBoundary.cpp
     Test_GeometryAttributePropagation.cpp
+    Test.GraphVertexNormals.cpp
     Test.HalfedgeMeshVertexNormals.cpp
     Test_HalfedgeMeshPropertyAccess.cpp
     Test_HalfedgeMeshTopology.cpp
@@ -452,7 +453,7 @@ set(_geometry_test_files
     Test_ShortestPath.cpp
     Test_Subdivision.cpp
     Test_Smoothing.cpp
-    Test_NormalEstimation.cpp
+    Test.PointCloudNormals.cpp
     Test_Registration.cpp
     Test_PointCloudRobustness.cpp
     Test.IntersectionClassification.cpp

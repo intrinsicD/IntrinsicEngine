@@ -76,7 +76,7 @@ Default recommendation: **A**.
 
 ### Closest-point oracle adapters
 - [ ] Add adapter `Geometry::ClosestPointPDE::OracleFromHalfedgeMesh` using existing `Geometry.BVH`.
-- [ ] Add adapter `Geometry::ClosestPointPDE::OracleFromPointCloud` using `Geometry.KDTree` + `Geometry.NormalEstimation`.
+- [ ] Add adapter `Geometry::ClosestPointPDE::OracleFromPointCloud` using `Geometry.KDTree` + `Geometry.PointCloud.Normals`.
 - [ ] Add adapter `Geometry::ClosestPointPDE::OracleFromSDF` using `Geometry.SDF` gradient.
 
 ## Tests

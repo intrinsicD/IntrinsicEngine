@@ -2086,3 +2086,12 @@ sandbox editor geometry availability migration retired to `tasks/done/` on
 targets, property catalogs, primitive-view commands, render hints, K-Means
 affordances, and mesh UV/bake diagnostics while preserving source provenance
 labels.
+
+[`GEOM-026`](GEOM-026-cross-domain-vertex-normal-recompute.md) — cross-domain
+vertex normal recomputation contracts retired to `tasks/done/` on 2026-06-21
+at `CPUContracted`. Geometry now exposes domain-owned CPU normal recompute
+modules for halfedge meshes, graphs, and point clouds:
+`Geometry.HalfedgeMesh.Vertices.Normals`, `Geometry.Graph.Vertex.Normals`, and
+`Geometry.PointCloud.Normals`. The old `Geometry.NormalEstimation` module is
+removed in favor of KDTree/default and supplied-index point-cloud recompute
+overloads that write canonical `v:normal` property data with diagnostics.

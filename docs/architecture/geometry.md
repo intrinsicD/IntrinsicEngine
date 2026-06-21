@@ -71,6 +71,34 @@ sine/reciprocal-edge weighting. Degenerate faces, invalid topology, non-finite
 face input, deleted slots, fallback writes, and repaired fallback normals are
 reported through the result record.
 
+### Graph Vertex Normal Recompute
+
+`Geometry.Graph.Vertex.Normals` owns the graph-domain CPU contract for
+publishing count-matched `glm::vec3` node normals back to a graph vertex
+property, defaulting to `v:normal`. Graph normals are inherently ambiguous
+without a surface, so the first contract uses incident-edge neighborhoods and
+PCA local frames, orients normals toward the configured fallback direction, and
+reports isolated vertices, degree-one vertices, collinear neighborhoods,
+duplicate positions, non-finite positions, invalid edges, deleted slots, and
+fallback writes. The module exposes both a `Graph::Graph` overload returning a
+`VertexProperty<glm::vec3>` and a raw `Vertices`/topology-property overload
+returning a `Property<glm::vec3>` for borrowed property-set callers.
+
+### Point-Cloud Normal Recompute
+
+`Geometry.PointCloud.Normals` replaces the former `Geometry.NormalEstimation`
+module. It owns point-cloud PCA normal estimation and property-writing
+recompute contracts, defaulting to canonical `v:normal` so mesh, graph, and
+point-cloud domain views share the same editor/runtime publication target. The
+default path builds a `Geometry.KDTree` over finite points and performs
+deterministic KNN or radius neighborhood queries; overloads accept caller-owned
+`Geometry.KDTree` and `Geometry.Octree` instances when an index already exists.
+The span estimator is kept for geometry algorithms such as surface
+reconstruction, while `PointCloud::Cloud` and raw `Vertices` overloads write or
+get the output property and return the written normal handle with diagnostics
+for non-finite input, too-few neighbors, collinear or duplicate neighborhoods,
+fallback writes, orientation flips, and spatial-query work.
+
 ### UV atlas backend contract
 
 `Geometry.UvAtlas` owns the backend-neutral UV atlas contract for generated

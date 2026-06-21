@@ -16,7 +16,7 @@ module Geometry.SurfaceReconstruction;
 
 import Geometry.Grid;
 import Geometry.MarchingCubes;
-import Geometry.NormalEstimation;
+import Geometry.PointCloud.Normals;
 import Geometry.HalfedgeMesh;
 import Geometry.AABB;
 import Geometry.Octree;
@@ -176,13 +176,11 @@ namespace Geometry::SurfaceReconstruction
         }
         else
         {
-            NormalEstimation::EstimationParams neParams;
+            PointCloud::Normals::Params neParams;
             neParams.KNeighbors = params.NormalKNeighbors;
-            neParams.OrientNormals = true;
-            neParams.OctreeMaxPerNode = params.OctreeMaxPerNode;
-            neParams.OctreeMaxDepth = params.OctreeMaxDepth;
+            neParams.Orientation = PointCloud::Normals::OrientationMode::MinimumSpanningTree;
 
-            auto neResult = NormalEstimation::EstimateNormals(points, neParams);
+            auto neResult = PointCloud::Normals::Estimate(points, neParams);
             if (!neResult.has_value())
                 return std::nullopt;
 
