@@ -21,6 +21,7 @@ the authoritative open/unblocked view.
 - blocked by `RUNTIME-120`: `RUNTIME-122` — SoA vertex channel storage and packer unification (tasks/backlog/runtime/RUNTIME-122-declarative-vertex-layout.md)
 - blocked by `RUNTIME-122`: `RUNTIME-124` — Per-channel dirty tracking and partial GPU uploads (tasks/backlog/runtime/RUNTIME-124-per-channel-partial-uploads.md)
 - blocked by `RUNTIME-122`: `RUNTIME-125` — Optional AoS fast lane for static geometry (profile-gated) (tasks/backlog/runtime/RUNTIME-125-aos-static-fast-lane.md)
+- blocked by `GRAPHICS-096`: `RUNTIME-126` — GPU readback jobs and result→property write-back in the derived-job graph (tasks/backlog/runtime/RUNTIME-126-gpu-readback-jobs-and-property-writeback.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 

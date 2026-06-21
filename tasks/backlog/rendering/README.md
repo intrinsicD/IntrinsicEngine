@@ -1014,6 +1014,14 @@ drains exist). Pick the earliest unblocked leaf.
   barrier / readback-with-barrier helpers over the foundation; centralizes the
   `TransferWrite → ShaderRead` / `TransferRead` brackets BUG-049 got wrong.
 
+Cross-layer leaf outside `rendering/`:
+- [`runtime/RUNTIME-126` — GPU readback jobs and result→property write-back](../runtime/RUNTIME-126-gpu-readback-jobs-and-property-writeback.md):
+  depends on GRAPHICS-096/098; wires the async readback into the existing
+  `DerivedJobRegistry` (RUNTIME-112) so algorithms chain follow-ups on GPU
+  results. The forward (CPU→GPU) binding/scheduling spine already exists
+  (RUNTIME-120..124, RUNTIME-112, GRAPHICS-084); ADR-0023 reuses it rather than
+  duplicating it.
+
 ## Agent selection rules
 
 When picking the next rendering task to promote to active:

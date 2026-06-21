@@ -8,15 +8,19 @@ maturity_target: CPUContracted
 
 ## Goal
 - Add a backend-neutral, CPU-pure `RHI::BufferTransfer` module that provides
-  sub-range validation, offset/size alignment, and partial-write region planning
-  for buffer transfers, mirroring the existing `RHI::TextureUpload` math module,
-  so every upload/readback call site shares one fail-closed buffer-range
-  contract instead of re-deriving it.
+  sub-range validation, offset/size alignment, partial-write region planning, and
+  **typed/dimension-match validation** for buffer transfers, mirroring the
+  existing `RHI::TextureUpload` math module, so every upload/readback/binding call
+  site shares one fail-closed buffer-range contract — including the single
+  "do the dimensions match this range?" check that the property↔buffer-range
+  binding layer (RUNTIME-126) depends on — instead of re-deriving it.
 
 ## Non-goals
 - No new device/queue surface and no backend code (that is GRAPHICS-096+).
 - No change to `IDevice::WriteBuffer` / `ReadBuffer` signatures or behavior.
 - No per-channel vertex layout decisions (owned by RUNTIME-122 / ADR-0022).
+- No knowledge of geometry property names/types (that is RUNTIME-126); this
+  module works purely in (elementCount, componentBytes, offset, size, stride).
 
 ## Context
 - Owning subsystem/layer: `src/graphics/rhi/` (`graphics/rhi -> core` only).
@@ -28,9 +32,14 @@ maturity_target: CPUContracted
   `ReadBuffer` document "offset + size must fit within SizeBytes"
   (`RHI.Device.cppm:135-163`) but expose no shared validator; `BufferManager::View`
   separately clamps ranges (`RHI.BufferManager.cppm:117-119`).
-- ADR-0023 makes this the base layer for the readback ring (GRAPHICS-096) and
-  ADR-0022 / RUNTIME-124's per-channel partial writes both need the same
-  "is this (offset,size) legal and how is it aligned?" contract.
+- ADR-0023 makes this the base layer for the readback ring (GRAPHICS-096),
+  ADR-0022 / RUNTIME-124's per-channel partial writes, and the RUNTIME-126
+  property↔buffer-range binding — all three need the same "is this (offset,size)
+  legal, how is it aligned, and do the dimensions match?" contract.
+- GRAPHICS-084 already proved the dimension-match rule for the visualization path
+  (`ExpectedVisualizationValueStride` + `ElementCount × stride == bytes` in
+  `Graphics.VisualizationPackets.cpp`); this task lifts the *math* of that rule
+  into a reusable, property-agnostic primitive so RUNTIME-126 can generalize it.
 
 ## Required changes
 - [ ] Add `src/graphics/rhi/RHI.BufferTransfer.cppm` (module
@@ -40,6 +49,13 @@ maturity_target: CPUContracted
       turns a set of dirty (offset,size) sub-ranges into validated, optionally
       coalesced copy regions. Return `Core::Expected` / explicit status, never
       silent truncation.
+- [ ] Add a typed/dimension-match validator: given an element count and a
+      per-element component size in bytes (the source shape) and a target region
+      (offset, size, optional stride), confirm the source exactly fills/fits the
+      region (`elementCount × componentBytes` vs region size, stride honored) and
+      fail closed on mismatch. This is the property-agnostic "dimensions match"
+      primitive RUNTIME-126 builds on; it must not reference any property or
+      `ValueType` enum.
 - [ ] Keep non-trivial bodies in a matching `.cpp` implementation unit per
       AGENTS.md §5; register both via `intrinsic_add_module_library` /
       `FILE_SET CXX_MODULES`.
@@ -48,8 +64,10 @@ maturity_target: CPUContracted
 ## Tests
 - [ ] CPU contract test `tests/contract/graphics/Test.BufferTransfer.cpp`
       (labels `unit;graphics`): valid/invalid sub-ranges, overflow at the
-      `SizeBytes` boundary, alignment rounding, and partial-write region
-      planning (including coalescing and rejection of out-of-range regions).
+      `SizeBytes` boundary, alignment rounding, partial-write region planning
+      (including coalescing and rejection of out-of-range regions), and
+      dimension-match validation (exact fill, fit-within, stride honored, and
+      fail-closed on element-count / component-size mismatch).
 - [ ] Default CPU gate stays green.
 
 ## Docs
