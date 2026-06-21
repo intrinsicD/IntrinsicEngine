@@ -94,10 +94,19 @@ introduced** — `Core.Dag` and `StreamingExecutor` are reused.
    textures, reusing `RHI::TextureUpload` layout in reverse.)
 
 3. **`Graphics::GpuTransfer` imperative facade (GRAPHICS-098).** The low-level
-   "do it now on this command context" primitive: upload-CPU-range-to-device with
-   the `TransferWrite → ShaderRead` barrier bracket, and read-device-to-CPU over
-   the GRAPHICS-096 ring with the `TransferRead` bracket. Centralizes the barrier
-   bracketing BUG-049 got wrong; composes existing seams, no new RHI surface.
+   transfer primitive, with **completion-gated** barrier emission. Because
+   `ITransferQueue::UploadBuffer` is async (the destination is shader-readable
+   only after the `TransferToken` completes — the same signal `GpuAssetCache`
+   gates on), the facade must not record the upload→read barrier eagerly. It
+   exposes: an **async upload** that returns an `UploadTicket{TransferToken}` and
+   emits the one-shot `TransferWrite → ShaderRead` barrier only after the token
+   completes at the post-`CollectCompleted` drain (`IsReady(ticket)` gates
+   consumers, no thread blocks); an **in-command copy** that brackets
+   `CopyBuffer` + barrier immediately on the supplied `ICommandContext` (correct
+   because both are ordered on one command timeline); and a readback helper over
+   the GRAPHICS-096 ring with the `TransferRead` bracket. This closes both the
+   omitted-barrier (BUG-049) and the barrier-before-the-copy-landed holes;
+   composes existing seams, no new RHI surface.
 
 4. **Property↔buffer-range binding — reuse + close the readback gap.** The
    forward (CPU property → GPU buffer) binding already exists and must be reused,
@@ -119,10 +128,17 @@ introduced** — `Core.Dag` and `StreamingExecutor` are reused.
    / `DerivedJobOutput` / `DerivedJobApplyContext`), backed by
    `StreamingExecutor` and `Core.Dag`, already provides deferred execution,
    explicit dependencies, follow-up scheduling, and stale/cancel/failure
-   diagnostics. RUNTIME-126 adds (a) a **readback job kind** that drives a
-   GRAPHICS-096 `DownloadBuffer` and lands its result via the existing
-   main-thread apply phase, and (b) the readback→property write-back binding from
-   item 4, so an algorithm can **chain follow-ups on a GPU-computed result**
+   diagnostics. One timing gap must be closed: the registry applies a job's
+   result immediately after its `Execute` worker returns, but a GRAPHICS-096
+   readback lands later through `CollectCompleted()`. RUNTIME-126 therefore adds a
+   non-blocking **`WaitingForReadback` park/resume seam** (symmetric to the
+   existing `WaitingForGpuUpload` state) so a readback job parks until its token
+   completes at the frame drain and only then resumes to apply — never applying
+   before the bytes exist and never blocking on a fence. On top of that it adds
+   (a) a **readback job kind** that drives a GRAPHICS-096 `DownloadBuffer` and
+   lands its result via the resumed apply phase, and (b) the readback→property
+   write-back binding from item 4, so an algorithm can **chain follow-ups on a
+   GPU-computed result**
    (e.g. "compute on GPU → read back → derive a color/vector-field property →
    re-upload → make visible") using the same `SubmitFollowUp`/`DependsOn` edges
    that derived geometry jobs already use. The editor "I edited normals →
@@ -192,12 +208,17 @@ layer enforces only dimensional compatibility.
 - GRAPHICS-096/097: CPU/null contract tests for fail-closed tokens, mock-drain
   delivery, and diagnostics; opt-in `gpu;vulkan` smoke round-trips a
   device-computed buffer/texture to the CPU through the ring with no `WaitIdle`.
-- GRAPHICS-098: CPU contract tests prove the barrier brackets against a recording
-  mock context; operational evidence reuses the GRAPHICS-096 smoke.
-- RUNTIME-126: CPU contract tests prove the readback→property write-back binds a
-  GPU buffer range to a matching CPU property and fails closed on dimension
-  mismatch; that a readback job runs through the existing `DerivedJobRegistry`
-  apply phase; and that a `SubmitFollowUp`/`DependsOn` chain ("GPU compute → read
-  back → derive color/vector-field property → re-upload") composes against mock
-  graphics/executor seams. Operational evidence reuses the GRAPHICS-096 /
-  visualization `gpu;vulkan` smokes.
+- GRAPHICS-098: CPU contract tests prove the async upload emits no barrier while
+  its mock token is incomplete and emits exactly one `TransferWrite → ShaderRead`
+  barrier (with `IsReady` flipping true) only after completion + drain, that the
+  in-command-copy path brackets immediately, and that readback records
+  `TransferRead`; operational evidence reuses the GRAPHICS-096 smoke.
+- RUNTIME-126: CPU contract tests prove a readback job parks in
+  `WaitingForReadback` and does not apply while its mock token is incomplete, then
+  resumes and writes the property exactly once after the drain (apply never
+  precedes the bytes, no fence wait); that the readback→property write-back fails
+  closed on dimension mismatch; and that a `SubmitFollowUp`/`DependsOn` chain
+  ("GPU compute → read back → derive color/vector-field property → re-upload")
+  stays un-ready until the readback applies, against mock graphics/executor seams.
+  Operational evidence reuses the GRAPHICS-096 / visualization `gpu;vulkan`
+  smokes.

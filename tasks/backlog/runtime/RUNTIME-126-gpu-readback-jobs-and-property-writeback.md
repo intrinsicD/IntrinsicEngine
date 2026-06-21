@@ -47,43 +47,78 @@ maturity_target: Operational
   GRAPHICS-098 the imperative `GpuTransfer` facade; this task wires those into a
   derived-job kind plus the readback→property write-back binding, validated by
   GRAPHICS-095's property-agnostic dimension-match primitive.
+- **Timing gap to close (the core design problem).** `DerivedJobRegistry` runs
+  `DerivedJobDesc::Execute` on a `StreamingExecutor` worker and then runs
+  `ApplyOnMainThread` as soon as that worker returns
+  (`StreamingExecutor::ApplyMainThreadResults` finalizes immediately after apply).
+  A GRAPHICS-096 readback result, however, arrives **later**, through the transfer
+  queue's `CollectCompleted()` drain. So the current submission path has no
+  non-blocking place to wait for the readback token/sink before
+  `DerivedJobApplyContext` writes the property — an implementation would be forced
+  either to block on the GPU fence (forbidden) or to apply before the bytes exist.
+  This task must add an explicit, non-blocking **park/resume seam**: a job that
+  issued a readback parks in a "waiting for readback" state and only resumes to
+  its apply phase once the token reports complete and the sink has delivered. The
+  engine already has the symmetric precedent — `StreamingTaskState::WaitingForGpuUpload`
+  — so the natural shape is a `WaitingForReadback` resume state alongside it,
+  polled at the frame drain after `CollectCompleted()`.
 - ADR-0023 records the layering and the reuse-not-reinvent decision.
 
 ## Slice plan
-- **Slice A (CPU contract).** Add the readback→property write-back binding
+- **Slice A (park/resume seam + CPU contract).** Add the non-blocking
+  `WaitingForReadback` park/resume state (symmetric to `WaitingForGpuUpload`) so a
+  readback job parks after issuing the download and resumes to apply only when the
+  token completes at the frame drain; add the readback→property write-back binding
   (validate a GPU buffer range against a target property via GRAPHICS-095; write
-  bytes into the property on apply) and a readback `DerivedJobDesc` kind that
-  delivers a GRAPHICS-096 readback result through the existing main-thread apply
-  phase. Prove against a mock transfer queue / mock graphics seams. Preserves the
-  default CPU gate.
+  bytes into the property on resume/apply) and the readback `DerivedJobDesc` kind.
+  Prove against a mock transfer queue (token completion controllable) / mock
+  graphics seams. Preserves the default CPU gate.
 - **Slice B (operational evidence).** Reuse the GRAPHICS-096 (and/or
   visualization) `gpu;vulkan` smoke to prove a device-computed buffer is read
   back, written into a CPU property, and a chained follow-up re-uploads a derived
   property that the renderer consumes.
 
 ## Required changes
+- [ ] Add a non-blocking readback park/resume seam. Issuing a readback must
+      transition the task into a `WaitingForReadback` state (symmetric to the
+      existing `StreamingTaskState::WaitingForGpuUpload`) that holds the
+      GRAPHICS-096 `ReadbackToken` / sink; a per-frame poll after the transfer
+      queue's `CollectCompleted()` resumes the task to its apply phase only once
+      the token reports complete. The apply phase must never run before the bytes
+      exist, and no caller/worker thread may block on a GPU fence. Recommended
+      home: extend `StreamingExecutor` (RUNTIME-112) with the resume state so the
+      seam is reusable; `DerivedJobRegistry` consumes it. (Touching the RUNTIME-112
+      modules is expected and in-scope for this task.)
 - [ ] Add a readback→property write-back binding (runtime, backend-neutral):
       given a source GPU buffer range and a target `PropertyRegistry` property,
       validate dimensional compatibility through `RHI::BufferTransfer`
-      (GRAPHICS-095) and write the readback bytes into the property; fail closed
-      with precise diagnostics on mismatch.
+      (GRAPHICS-095) and write the readback bytes into the property on resume;
+      fail closed with precise diagnostics on mismatch.
 - [ ] Add a readback `DerivedJobDesc` kind / submission path that issues a
-      GRAPHICS-096 `DownloadBuffer` (or GRAPHICS-098 facade readback) and lands
-      the result via `DerivedJobApplyContext` on the main-thread apply phase,
+      GRAPHICS-096 `DownloadBuffer` (or GRAPHICS-098 facade readback), parks via
+      the seam above, and lands the result via `DerivedJobApplyContext` on resume,
       reusing the existing dependency / follow-up / stale-cancel machinery.
 - [ ] Ensure chaining works end to end: a follow-up job (`SubmitFollowUp` /
-      `DependsOn`) can consume the written-back property to derive and re-upload a
-      color / vector-field property through the existing forward binding.
+      `DependsOn`) does not become ready until the readback job has resumed and
+      applied, so it can consume the written-back property to derive and re-upload
+      a color / vector-field property through the existing forward binding.
 - [ ] Add readback-job diagnostics counters to the derived-job snapshot
-      (readbacks issued/completed/failed/stale).
+      (readbacks issued/waiting/completed/failed/stale).
 
 ## Tests
 - [ ] CPU contract `tests/contract/runtime/Test.GpuReadbackJob.cpp`
-      (labels `contract;runtime`): readback→property write-back binds a matching
-      range and fails closed on dimension mismatch; a readback job delivers its
-      result through the apply phase against a mock transfer queue; a
-      `SubmitFollowUp` chain ("readback → derive color/vector-field → re-upload")
-      executes in dependency order; stale/cancel paths are diagnosed.
+      (labels `contract;runtime`):
+      - a readback job with an **incomplete** mock token parks in
+        `WaitingForReadback` and its `ApplyOnMainThread` does **not** run; after
+        the mock token is marked complete and the drain runs, the job resumes and
+        writes the property exactly once (proves apply never precedes the bytes
+        and never blocks);
+      - readback→property write-back binds a matching range and fails closed on
+        dimension mismatch;
+      - a `SubmitFollowUp` chain ("readback → derive color/vector-field →
+        re-upload") stays un-ready until the readback resumes, then executes in
+        dependency order;
+      - stale/cancel of a parked readback job is diagnosed and does not apply.
 - [ ] Default CPU gate stays green; existing `DerivedJobRegistry` and
       `VertexAttributeBinding` tests remain green (no forward-path behavior change).
 
@@ -94,9 +129,13 @@ maturity_target: Operational
 - [ ] Cross-link ADR-0023 and RUNTIME-112 / GRAPHICS-096 / GRAPHICS-098.
 
 ## Acceptance criteria
+- [ ] A readback job parks in `WaitingForReadback` and resumes to its apply phase
+      only after the GRAPHICS-096 token completes at the frame drain — the
+      property is never written before the bytes exist and no thread blocks on a
+      GPU fence.
 - [ ] An algorithm can submit a readback job whose GPU result is written into a
-      CPU property (dimension-checked, fail-closed) without blocking a caller
-      thread, and can chain follow-up derive+upload jobs on that result.
+      CPU property (dimension-checked, fail-closed), and can chain follow-up
+      derive+upload jobs that stay un-ready until the readback has applied.
 - [ ] No new scheduler/task-graph is introduced; the work composes
       `DerivedJobRegistry` + `StreamingExecutor` + GRAPHICS-096/098.
 - [ ] Default-gate contract tests pass; the opt-in `gpu;vulkan` round-trip is
@@ -116,7 +155,9 @@ python3 tools/agents/check_task_policy.py --root . --strict
 ## Forbidden changes
 - Introducing a new scheduler/task-graph/executor instead of reusing
   `DerivedJobRegistry` / `StreamingExecutor` / `Core.Dag`.
-- Blocking a caller thread on a GPU fence (readback rides the GRAPHICS-096 drain).
+- Running a readback job's apply phase before its token has completed, or
+  blocking a caller/worker thread on a GPU fence to bridge the timing gap (the
+  park/resume seam is mandatory).
 - Duplicating the forward property→channel binding (reuse RUNTIME-120/123/084).
 - Adding Vulkan/RHI-specific knowledge to runtime beyond the graphics public API.
 
