@@ -25,6 +25,7 @@ This index tracks long-lived architecture decisions for IntrinsicEngine.
 19. [0019 — Physics layer ownership and ECS integration](0019-physics-layer-ownership-and-ecs-integration.md)
 20. [0020 — vcpkg manifest dependency management](0020-vcpkg-manifest-dependency-management.md)
 21. [0021 — Progressive entity render-data pipeline](0021-progressive-entity-render-data-pipeline.md)
+22. [0022 — Vertex storage: uniform SoA with per-channel streaming](0022-vertex-storage-soa-per-channel-streaming.md)
 
 ## Conventions
 

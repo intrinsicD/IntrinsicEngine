@@ -43,6 +43,8 @@ target_sources(${target_name}
         Runtime.SelectionController.cppm
         Runtime.StableEntityLookup.cppm
         Runtime.StreamingExecutor.cppm
+        Runtime.VertexAttributeBinding.cppm
+        Runtime.VertexChannelStreams.cppm
         SpatialDebug/Runtime.SpatialDebugAdapters.cppm
         Visualization/Runtime.VisualizationAdapters.cppm
         PRIVATE
@@ -81,6 +83,8 @@ target_sources(${target_name}
         Runtime.SelectionController.cpp
         Runtime.StableEntityLookup.cpp
         Runtime.StreamingExecutor.cpp
+        Runtime.VertexAttributeBinding.cpp
+        Runtime.VertexChannelStreams.cpp
         SpatialDebug/Runtime.SpatialDebugAdapters.cpp
         Visualization/Runtime.VisualizationAdapters.cpp
 )

@@ -10,6 +10,14 @@ the authoritative open/unblocked view.
 
 - none
 
+## Theme B — Rendering modernization
+
+- unblocked: `RUNTIME-120` — Reusable vertex attribute binding resolver (tasks/backlog/runtime/RUNTIME-120-vertex-attribute-binding-resolver.md)
+- blocked by `RUNTIME-120`: `RUNTIME-121` — Per-vertex color channel through the geometry vertex stream (tasks/backlog/runtime/RUNTIME-121-vertex-color-channel-upload.md)
+- blocked by `RUNTIME-120`: `RUNTIME-122` — SoA vertex channel storage and packer unification (tasks/backlog/runtime/RUNTIME-122-declarative-vertex-layout.md)
+- blocked by `RUNTIME-122`: `RUNTIME-124` — Per-channel dirty tracking and partial GPU uploads (tasks/backlog/runtime/RUNTIME-124-per-channel-partial-uploads.md)
+- blocked by `RUNTIME-122`: `RUNTIME-125` — Optional AoS fast lane for static geometry (profile-gated) (tasks/backlog/runtime/RUNTIME-125-aos-static-fast-lane.md)
+
 ## Theme F — Architecture/runtime/UI foundation seeds
 
 - unblocked: `LEGACY-001` — Delete `src/legacy/Interface/` (tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md)
@@ -23,6 +31,7 @@ the authoritative open/unblocked view.
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RORG-031F` — UI integration backlog seed (tasks/backlog/ui/RORG-031-ui-integration.md)
+- blocked by `RUNTIME-120`: `RUNTIME-123` — Editor "bind any property as normals / colors" (tasks/backlog/runtime/RUNTIME-123-editor-bind-property-as-channel.md)
 - blocked by `GEOM-026`: `UI-022` — Sandbox EditorUI vertex-normal recompute windows (tasks/backlog/ui/UI-022-sandbox-editor-vertex-normal-recompute.md)
 
 ## Theme G — Active bugs

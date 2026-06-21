@@ -7,7 +7,24 @@ another backlog directory.
 
 ## Runtime backlog tasks
 
-No open runtime-specific backlog tasks are currently queued here.
+### CPU→GPU vertex-attribute overhaul (Theme B)
+
+A reusable, flexible, fast CPU→GPU vertex-attribute pipeline. Today each
+geometry kind has its own packer with inlined property names and a fixed AoS
+vertex struct, no vertex color channel, and no way to bind an arbitrary property
+as normals/colors. This series fixes that incrementally.
+
+- `RUNTIME-120` — Reusable vertex attribute binding resolver (lead; carries the
+  full slice plan and owns Slice 1).
+- `RUNTIME-121` — Per-vertex color channel through the geometry vertex stream.
+- `RUNTIME-122` — Declarative vertex layout descriptor + packer unification.
+- `RUNTIME-123` — Editor "bind any property as normals / colors".
+- `RUNTIME-124` — Per-channel dirty tracking and partial GPU uploads.
+- `RUNTIME-125` — Optional AoS fast lane for static geometry (profile-gated).
+
+Storage model is fixed by
+[`ADR-0022`](../../../docs/adr/0022-vertex-storage-soa-per-channel-streaming.md):
+uniform SoA with per-channel streaming.
 
 `RUNTIME-111` through `RUNTIME-115` are retired; additional progressive
 render-data follow-ups should open as value-gated tasks with a concrete
