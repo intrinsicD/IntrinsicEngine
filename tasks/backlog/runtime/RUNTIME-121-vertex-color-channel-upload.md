@@ -16,6 +16,9 @@ maturity_target: Operational
 - No colormap / scalar-field changes (owned by the `VisualizationConfig` path).
 - No declarative vertex layout descriptor (owned by RUNTIME-122).
 - No editor UI for choosing the color source property (owned by RUNTIME-123).
+- This slice adds the mesh color channel. Per-point / per-node color for point
+  clouds and graphs rides on the RUNTIME-122 SoA layout (their 20-byte AoS
+  structs have no color field today) and is a RUNTIME-122 follow-up, not here.
 
 ## Context
 - Owning subsystem/layer: `src/runtime` (packer + extraction) and

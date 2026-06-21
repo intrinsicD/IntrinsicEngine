@@ -14,7 +14,7 @@ the authoritative open/unblocked view.
 
 - unblocked: `RUNTIME-120` — Reusable vertex attribute binding resolver (tasks/backlog/runtime/RUNTIME-120-vertex-attribute-binding-resolver.md)
 - blocked by `RUNTIME-120`: `RUNTIME-121` — Per-vertex color channel through the geometry vertex stream (tasks/backlog/runtime/RUNTIME-121-vertex-color-channel-upload.md)
-- blocked by `RUNTIME-120`: `RUNTIME-122` — Declarative vertex layout descriptor and packer unification (tasks/backlog/runtime/RUNTIME-122-declarative-vertex-layout.md)
+- blocked by `RUNTIME-120`: `RUNTIME-122` — SoA vertex channel storage and packer unification (tasks/backlog/runtime/RUNTIME-122-declarative-vertex-layout.md)
 - blocked by `RUNTIME-122`: `RUNTIME-124` — Per-channel dirty tracking and partial GPU uploads (tasks/backlog/runtime/RUNTIME-124-per-channel-partial-uploads.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds

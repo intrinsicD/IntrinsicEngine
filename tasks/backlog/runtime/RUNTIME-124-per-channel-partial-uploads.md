@@ -9,7 +9,7 @@ maturity_target: Operational
 ## Goal
 - Re-upload only the changed vertex channel(s) when geometry attributes change,
   instead of re-packing and re-uploading the entire vertex buffer on every
-  `DirtyVertexAttributes` tag.
+  `DirtyVertexAttributes` tag — for meshes, graphs, and point clouds.
 
 ## Non-goals
 - No topology (index) streaming changes.
@@ -19,16 +19,28 @@ maturity_target: Operational
 ## Context
 - Owning subsystem/layer: `src/runtime` extraction and `src/graphics/renderer`
   `GpuWorld`.
-- Today any attribute dirty tag triggers a full `PackMesh` + full vertex-buffer
-  upload (`Runtime.MeshGeometryPacker.cpp`), so a normal-only edit re-uploads
-  positions and texcoords too. With the RUNTIME-122 declarative layout, channel
-  sub-ranges/offsets are known, enabling per-channel partial writes.
+- Today any attribute dirty tag triggers a full re-pack + full vertex-buffer
+  upload through `GpuWorld::UploadGeometry` (`Runtime.MeshGeometryPacker.cpp`,
+  and identically for the graph/point-cloud packers), so a normal-only or
+  color-only edit re-uploads positions and texcoords too.
+- **Depends on RUNTIME-122 SoA storage.** With AoS, a channel's bytes are
+  scattered one-per-stride and cannot be written as a contiguous range; partial
+  streaming only becomes possible once RUNTIME-122 stores each channel as its own
+  contiguous sub-range with a per-channel BDA.
+- The device primitive already exists: `RHI::IDevice::WriteBuffer(handle, data,
+  size, offset)` supports arbitrary sub-range writes
+  (`RHI.Device.cppm:136-137`). The gap is upload-side: `GpuWorld` writes the
+  whole vertex block and tracks a single per-buffer
+  `PendingManagedVertexUploadBarrier` (`Graphics.GpuWorld.cpp:268-276`,
+  `1221-1246`) — this task adds per-channel writes and per-channel barrier
+  tracking.
 
 ## Required changes
 - [ ] Track which channels changed (per-channel dirty bits) at the extraction
-      boundary.
-- [ ] Add a `GpuWorld` partial-upload path writing only the changed channel's
-      bytes (and its upload->read barrier) for a resident geometry.
+      boundary, for all three geometry kinds.
+- [ ] Add a `GpuWorld` partial-upload path that writes only the changed channel's
+      contiguous SoA sub-range via `WriteBuffer(channelBDA, data, size, offset)`
+      and records a per-channel upload->read barrier for a resident geometry.
 - [ ] Fall back to full upload when topology/vertex count changed.
 
 ## Tests
