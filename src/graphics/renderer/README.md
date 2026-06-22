@@ -57,6 +57,7 @@ implementation.
 
 - `Extrinsic.Graphics.RenderFrameInput`
 - `Extrinsic.Graphics.RenderWorld`
+- `Extrinsic.Graphics.GpuTransfer`
 - `Extrinsic.Graphics.RuntimeRenderSnapshotBatch` (declared by `Extrinsic.Graphics.Renderer`)
 - `Extrinsic.Graphics.GpuWorld`
 - `Extrinsic.Graphics.Material`
@@ -1394,6 +1395,29 @@ Concretely:
   deterministically instead of sampling an in-flight upload. The synchronous
   `IDevice::WriteTexture()` helper remains only as the guarded backend
   fail-closed baseline, not a renderer/runtime upload path.
+- `Graphics.GpuTransfer` is the recommended facade for algorithm/user
+  buffer-transfer helpers introduced by
+  [ADR-0023](../../../docs/adr/0023-cpu-gpu-transfer-foundation.md). It composes
+  existing RHI seams only: `RHI::ITransferQueue`, `RHI::ICommandContext`, and
+  `RHI.BufferTransfer` range validation. Async uploads return a
+  `GpuTransferUploadTicket` immediately after `UploadBuffer()` accepts the
+  staging copy; the destination is not considered shader-readable until the
+  owner has called `ITransferQueue::CollectCompleted()` and then
+  `GpuTransfer::DrainCompleted(cmd)`, where the facade observes
+  `TransferToken` completion and emits exactly one
+  `BufferBarrier(TransferWrite -> readyAccess)`. This closes the
+  [BUG-049](../../../tasks/backlog/bugs/BUG-049-gpuworld-geometry-rebind-upload-barriers.md)
+  barrier class for caller-owned transfers without changing `GpuWorld`'s
+  existing one-shot managed-upload barriers.
+- `Graphics.GpuTransfer::UploadInCommand(...)` is the opt-in same-command
+  variant for staging buffers that are already valid on the supplied command
+  timeline. It validates source/destination ranges and records `CopyBuffer`
+  followed immediately by the destination `TransferWrite -> readyAccess`
+  barrier. `ScheduleReadback(...)` validates the `TransferSrc` source range,
+  records the source `sourceAccess -> TransferRead` bracket, and submits
+  `DownloadBuffer()` through the GRAPHICS-096 readback ring; callers observe
+  facade `GpuTransferReadbackTicket` delivery after the post-queue drain rather
+  than handling raw readback tokens.
 - Promoted visualization resolves material, uniform, scalar-field, and
   per-element RGBA color sources through `GpuEntityConfig` and the shared
   `assets/shaders/common/gpu_scene.glsl` helper in the promoted surface

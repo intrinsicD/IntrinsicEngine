@@ -954,3 +954,65 @@ tree:
       PR-contract helpers exited successfully, and staged whitespace checks
       passed.
     status: resolved
+  - id: N46
+    type: decision
+    title: "Retire GRAPHICS-098 at Operational"
+    provenance: ai-executed
+    timestamp: "2026-06-22T02:29"
+    also_depends_on: [N44, N45]
+    choice: >
+      Selected GRAPHICS-098 as the next unblocked rendering backlog task,
+      implemented `Extrinsic.Graphics.GpuTransfer` as the high-level barrier
+      facade over existing RHI transfer seams, retired the task at
+      `Operational` maturity on Vulkan-capable hosts, and unblocked the
+      runtime-owned `RUNTIME-126` readback job/write-back slice.
+    alternatives:
+      - "Leave algorithm/user transfers to open-code upload/readback barriers at call sites."
+      - "Record async upload-ready barriers eagerly before transfer-token completion."
+      - "Add a new RHI surface instead of composing the existing transfer queue and command context seams."
+    evidence:
+      - "this commit"
+      - "tasks/done/GRAPHICS-098-gpu-transfer-facade.md"
+      - "src/graphics/renderer/Graphics.GpuTransfer.cppm"
+      - "src/graphics/renderer/Graphics.GpuTransfer.cpp"
+      - "tests/contract/graphics/Test.GpuTransferFacade.cpp"
+      - "tests/integration/graphics/Test.GpuTransferFacadeGpuSmoke.cpp"
+    status: resolved
+  - id: N47
+    type: experiment
+    title: "GRAPHICS-098 verification"
+    provenance: ai-executed
+    timestamp: "2026-06-22T02:29"
+    also_depends_on: [N46]
+    evidence:
+      - "cmake --preset ci"
+      - "cmake --build --preset ci --target IntrinsicGraphicsContractTests -j 16"
+      - "ctest --test-dir build/ci --output-on-failure -R 'GpuTransferFacade' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "cmake --build --preset ci --target IntrinsicGraphicsVulkanSmokeTests -j 16"
+      - "ctest --test-dir build/ci --output-on-failure -R 'GpuTransferFacadeGpuSmoke' -L 'gpu' -L 'vulkan' --timeout 120"
+      - "cmake --build --preset ci --target IntrinsicTests -j 16"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "cmake --preset ci-vulkan"
+      - "cmake --build --preset ci-vulkan --target IntrinsicGraphicsVulkanSmokeTests -j 16"
+      - "ctest --test-dir build/ci-vulkan --output-on-failure -R 'GpuTransferFacadeGpuSmoke' -L 'gpu' -L 'vulkan' --timeout 120"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/docs/check_doc_links.py --root ."
+      - "python3 tools/repo/check_layering.py --root src --strict"
+      - "python3 tools/repo/check_test_layout.py --root . --strict"
+      - "python3 tools/repo/check_root_hygiene.py --root ."
+      - "python3 tools/repo/check_pr_contract.py"
+      - "python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main"
+      - "python3 tools/agents/validate_tasks.py --root tasks --strict"
+      - "git diff --check"
+    result: >
+      Clean `ci` configure passed, focused graphics contract target built,
+      focused GpuTransferFacade CTest passed 4/4, the `ci` Vulkan smoke target
+      built, GpuTransferFacadeGpuSmoke passed 1/1 in `build/ci`,
+      `IntrinsicTests` built, the default CPU-supported CTest gate passed
+      3022/3022 tests, `ci-vulkan` configure and Vulkan smoke target build
+      passed, GpuTransferFacadeGpuSmoke passed 1/1 in `build/ci-vulkan`,
+      strict task-policy/doc-link/layering/test-layout/task-validation/
+      docs-sync checks passed, root-hygiene and PR-contract helpers exited
+      successfully, and whitespace checks passed. Root hygiene still reports
+      pre-existing warning-mode `ara/` and `imgui.ini` entries.
+    status: resolved

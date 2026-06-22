@@ -988,14 +988,13 @@ TAA + reconstructor seam (GRAPHICS-040):
 - [GRAPHICS-040C (done)](../../done/GRAPHICS-040C-aa-recipe-selection-and-integration.md) — AA recipe selection + post-chain integration (`Operational`, 2026-06-05). Depends on 040B (done), GRAPHICS-013A/075 (done).
 - GRAPHICS-040D (vendor reconstructor backends) — **not opened**: per GRAPHICS-040 decision 5/10 there is one child per vendor, opened only when that vendor SDK is actually integrated.
 
-### CPU↔GPU transfer foundation (GRAPHICS-095..097 done; GRAPHICS-098 open)
+### CPU↔GPU transfer foundation (GRAPHICS-095..098 done)
 
 Backend-neutral foundation that makes CPU→GPU and GPU→CPU data transfer
 repeatable, validated, fast, and robust for algorithm and user code. Recorded in
 [ADR-0023](../../../docs/adr/0023-cpu-gpu-transfer-foundation.md). The headline
-gap is now ergonomic, centralized barrier bracketing around the non-stalling
-upload/readback seams, so callers stop open-coding `TransferWrite → ShaderRead`
-and `TransferRead` layout/access transitions. Pick the earliest unblocked leaf.
+transfer seams are complete; the remaining cross-layer consumer is the
+runtime-owned readback job/write-back integration listed below.
 
 - [GRAPHICS-095 — CPU-testable buffer transfer math and validation helper](../../done/GRAPHICS-095-buffer-transfer-math-helper.md):
   completed base layer, target `CPUContracted`. Adds
@@ -1012,10 +1011,11 @@ and `TransferRead` layout/access transitions. Pick the earliest unblocked leaf.
   Vulkan. `DownloadTexture(...)` reuses `RHI::TextureUpload` subresource layout
   in reverse, stages a mip/layer through the GRAPHICS-096 readback ring, and
   leaves source layout transitions caller-owned.
-- [GRAPHICS-098 — High-level `GpuTransfer` facade with correct barrier brackets](GRAPHICS-098-gpu-transfer-facade.md):
-  depends on GRAPHICS-096, target `Operational` on Vulkan. Ergonomic upload-with-
-  barrier / readback-with-barrier helpers over the foundation; centralizes the
-  `TransferWrite → ShaderRead` / `TransferRead` brackets BUG-049 got wrong.
+- [GRAPHICS-098 — High-level `GpuTransfer` facade with correct barrier brackets](../../done/GRAPHICS-098-gpu-transfer-facade.md):
+  completed ergonomic upload-with-barrier / readback-with-barrier helpers over
+  the foundation, target `Operational` on Vulkan. Centralizes the
+  `TransferWrite → ShaderRead` / `TransferRead` brackets BUG-049 got wrong and
+  emits async upload-ready barriers only after transfer-token completion.
 
 Cross-layer leaf outside `rendering/`:
 - [`runtime/RUNTIME-126` — GPU readback jobs and result→property write-back](../runtime/RUNTIME-126-gpu-readback-jobs-and-property-writeback.md):

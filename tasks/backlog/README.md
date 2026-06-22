@@ -59,13 +59,16 @@ and the remaining runtime children became independently tracked tasks.
 ### Theme B — Rendering modernization (P1)
 
 Promote the post-reorganization renderer toward 2026-era features without
-breaking the foundation. The umbrella roadmap (`GRAPHICS-035`) and all
+breaking the foundation. The umbrella roadmap (`GRAPHICS-035`), all
 `GRAPHICS-036..058` planning/implementation leaves (pipelined frames, async
 compute, HZB occlusion, clustered lights, TAA, and the further modernization
-seams) are retired — see [`rendering/README.md`](rendering/README.md) and the
-retirement log. Theme B currently has **no open members**; new
-implementation children should be opened under `rendering/` per the rendering
-DAG when picked up.
+seams), and the CPU/GPU transfer foundation (`GRAPHICS-095..098`) are retired —
+see [`rendering/README.md`](rendering/README.md) and the retirement log. The
+runtime backlog still carries open Theme B leaves, including the vertex
+attribute series (`RUNTIME-120..125`) and
+[`RUNTIME-126`](runtime/RUNTIME-126-gpu-readback-jobs-and-property-writeback.md),
+which wires the transfer facade/readback ring into the runtime derived-job
+graph.
 
 ### Theme C — Physics readiness (P1)
 

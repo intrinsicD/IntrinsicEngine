@@ -14,6 +14,7 @@ target_sources(${target_name}
         Graphics.Renderer.cppm
         Graphics.RenderFrameInput.cppm
         Graphics.RenderWorld.cppm
+        Graphics.GpuTransfer.cppm
         Graphics.GpuWorld.cppm
         Graphics.Material.cppm
         Graphics.MaterialSystem.cppm
@@ -48,6 +49,7 @@ target_sources(${target_name}
         Graphics.FrameRecipe.cpp
         Graphics.TransientDebugUploadHelper.cpp
         Graphics.VisualizationOverlayUploadHelper.cpp
+        Graphics.GpuTransfer.cpp
         Graphics.GpuWorld.cpp
         Graphics.MaterialSystem.cpp
         Graphics.ColormapSystem.cpp

@@ -2,9 +2,9 @@ session:
   id: "2026-06-22_001"
   date: "2026-06-22"
   started: "2026-06-22T00:33"
-  last_turn: "2026-06-22T02:03"
-  turn_count: 3
-  summary: "Implemented, verified, committed, and retired GRAPHICS-095, GRAPHICS-096, and GRAPHICS-097 for the RHI transfer/readback foundation."
+  last_turn: "2026-06-22T02:29"
+  turn_count: 4
+  summary: "Implemented, verified, committed, and retired GRAPHICS-095 through GRAPHICS-098 for the CPU/GPU transfer foundation."
 
 events_logged:
   - turn: 1
@@ -43,6 +43,18 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Focused TextureReadback tests passed 3/3; Vulkan TextureReadbackGpuSmoke passed 1/1 in both ci and ci-vulkan; default CPU-supported CTest passed 3018/3018; strict structural/docs checks passed."
+  - turn: 4
+    type: decision
+    id: "N46"
+    routing: direct
+    provenance: ai-executed
+    summary: "Selected GRAPHICS-098 from the rendering backlog, implemented the Graphics.GpuTransfer facade, retired the task at Operational, and unblocked RUNTIME-126."
+  - turn: 4
+    type: experiment
+    id: "N47"
+    routing: direct
+    provenance: ai-executed
+    summary: "Focused GpuTransferFacade tests passed 4/4; Vulkan GpuTransferFacadeGpuSmoke passed 1/1 in both ci and ci-vulkan; default CPU-supported CTest passed 3022/3022; strict structural/docs checks passed."
 
 ai_actions:
   - turn: 1
@@ -100,6 +112,24 @@ ai_actions:
       - "tasks/done/RETIREMENT-LOG.md"
       - "tasks/backlog/rendering/README.md"
       - "tasks/SESSION-BRIEF.md"
+  - turn: 4
+    action: "Added the Graphics.GpuTransfer facade, CMake wiring, CPU contract tests, Vulkan smoke test, renderer/architecture docs, module inventory refresh, backlog/task retirement records, and committed the slice."
+    provenance: ai-executed
+    files_changed:
+      - "src/graphics/renderer/Graphics.GpuTransfer.cppm"
+      - "src/graphics/renderer/Graphics.GpuTransfer.cpp"
+      - "src/graphics/renderer/CMakeLists.txt"
+      - "src/graphics/renderer/README.md"
+      - "tests/contract/graphics/Test.GpuTransferFacade.cpp"
+      - "tests/integration/graphics/Test.GpuTransferFacadeGpuSmoke.cpp"
+      - "tests/CMakeLists.txt"
+      - "docs/architecture/graphics.md"
+      - "docs/api/generated/module_inventory.md"
+      - "tasks/done/GRAPHICS-098-gpu-transfer-facade.md"
+      - "tasks/done/RETIREMENT-LOG.md"
+      - "tasks/backlog/rendering/README.md"
+      - "tasks/backlog/README.md"
+      - "tasks/SESSION-BRIEF.md"
 
 claims_touched: []
 
@@ -118,8 +148,12 @@ key_context:
     excerpt: "`tasks/SESSION-BRIEF.md` identified GRAPHICS-097 as the next unblocked Theme B rendering transfer task after GRAPHICS-096 retired."
   - turn: 3
     excerpt: "GRAPHICS-097 closes at Operational on Vulkan-capable hosts because CPU contract tests plus opt-in `gpu;vulkan` texture-readback smokes passed in both `ci` and `ci-vulkan` trees."
+  - turn: 4
+    excerpt: "`tasks/SESSION-BRIEF.md` identified GRAPHICS-098 as the next unblocked Theme B rendering transfer task after GRAPHICS-097 retired."
+  - turn: 4
+    excerpt: "GRAPHICS-098 closes at Operational on Vulkan-capable hosts because CPU contract tests plus opt-in `gpu;vulkan` GpuTransferFacade smokes passed in both `ci` and `ci-vulkan` trees."
 
 open_threads:
-  - "GRAPHICS-098 owns the higher-level transfer/barrier facade after texture readback retirement."
+  - "RUNTIME-126 owns GPU readback jobs and result-to-property write-back now that the rendering transfer foundation is retired."
 
 ai_suggestions_pending: []

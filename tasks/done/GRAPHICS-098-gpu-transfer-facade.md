@@ -81,8 +81,35 @@ maturity_target: Operational
   Vulkan-capable host, asserting the upload barrier is observed only after the
   token completed.
 
+## Execution plan
+- Promote this task as one reviewable graphics-layer slice. Add the new
+  `Extrinsic.Graphics.GpuTransfer` module under `src/graphics/renderer/` and
+  keep all non-trivial bookkeeping in the `.cpp` implementation unit.
+- Model the facade as a render-thread-owned helper over an injected
+  `RHI::ITransferQueue`; callers still own the once-per-frame transfer queue
+  `CollectCompleted()` call, then call `GpuTransfer::DrainCompleted(cmd)` to
+  emit completed-upload barriers.
+- For async uploads, accept a caller-owned destination buffer plus its
+  `RHI::BufferDesc`, validate the destination range through
+  `RHI::ValidateBufferRange`, require `TransferDst`, enqueue
+  `ITransferQueue::UploadBuffer`, and return an `UploadTicket`. Do not record a
+  barrier at schedule time; `DrainCompleted()` records exactly one
+  `BufferBarrier(TransferWrite -> readyAccess)` after `IsComplete(token)`.
+- For in-command uploads, validate source and destination ranges plus
+  `TransferSrc`/`TransferDst`, then record `CopyBuffer` followed by the same
+  destination barrier on the supplied command context.
+- For readbacks, validate the source range plus `TransferSrc`, record
+  `BufferBarrier(sourceAccess -> TransferRead)` on the supplied command context,
+  enqueue `DownloadBuffer`, and track a facade `ReadbackTicket` so diagnostics
+  count delivery after the queue drain without exposing the raw readback token
+  to consumers.
+- Add CPU contract tests with a controllable mock transfer queue and recording
+  command context. Cover no-eager-barrier async readiness, in-command immediate
+  bracketing, readback delivery, invalid-range fail-closed behavior, and
+  diagnostics.
+
 ## Required changes
-- [ ] Add `Graphics.GpuTransfer.cppm` (+ `.cpp`) with:
+- [x] Add `Graphics.GpuTransfer.cppm` (+ `.cpp`) with:
       an async upload helper `ScheduleUpload(...)` that allocates/uses a
       device-local buffer, issues `ITransferQueue::UploadBuffer`, and returns an
       `UploadTicket{ TransferToken, BufferHandle, pending-barrier state }` —
@@ -91,21 +118,21 @@ maturity_target: Operational
       `ICommandContext`; and a readback helper that submits a GRAPHICS-096
       `DownloadBuffer` with the `TransferRead` bracket and surfaces the result
       through a sink/future.
-- [ ] Add a per-frame `DrainCompleted(ICommandContext&)` (or equivalent) step
+- [x] Add a per-frame `DrainCompleted(ICommandContext&)` (or equivalent) step
       that, after the transfer queue's `CollectCompleted`, finds tickets whose
       `TransferToken` `IsComplete`, records their one-shot
       `TransferWrite → ShaderRead` barrier, and marks them ready — so the barrier
       is emitted on a real completion, never eagerly. Expose `IsReady(ticket)` /
       `IsComplete(token)` for consumers to gate binding without blocking.
-- [ ] Validate ranges through `RHI::BufferTransfer` (GRAPHICS-095); fail closed.
-- [ ] Add transfer diagnostics counters (uploads scheduled/ready, readbacks
+- [x] Validate ranges through `RHI::BufferTransfer` (GRAPHICS-095); fail closed.
+- [x] Add transfer diagnostics counters (uploads scheduled/ready, readbacks
       issued/delivered, barriers emitted, pending high-water) on a
       `GpuTransferDiagnostics` snapshot.
-- [ ] Keep non-trivial bodies in the `.cpp`; no new dependency edges beyond
+- [x] Keep non-trivial bodies in the `.cpp`; no new dependency edges beyond
       `graphics/rhi` + existing graphics seams.
 
 ## Tests
-- [ ] CPU contract `tests/contract/graphics/Test.GpuTransferFacade.cpp`
+- [x] CPU contract `tests/contract/graphics/Test.GpuTransferFacade.cpp`
       (labels `contract;graphics`):
       - async `ScheduleUpload` records **no** barrier while the mock token is
         incomplete and `IsReady` is false; after the token is marked complete and
@@ -116,34 +143,68 @@ maturity_target: Operational
       - the readback helper drives the mock ring and delivers bytes once with the
         `TransferRead` bracket;
       - invalid ranges fail closed; diagnostics counters increment as specified.
-- [ ] Default CPU gate stays green.
+- [x] Opt-in `gpu;vulkan` smoke
+      `tests/integration/graphics/Test.GpuTransferFacadeGpuSmoke.cpp`: a
+      device-local buffer upload/readback round-trips through the facade without
+      `WaitIdle`, and the upload-ready barrier is emitted only after token
+      completion.
+- [x] Default CPU gate stays green.
 
 ## Docs
-- [ ] Update `src/graphics/renderer/README.md` with the facade and its barrier
+- [x] Update `src/graphics/renderer/README.md` with the facade and its barrier
       contract; note it as the recommended path for algorithm/user transfers.
-- [ ] Refresh `docs/api/generated/module_inventory.md`.
-- [ ] Cross-link ADR-0023 and BUG-049.
+- [x] Refresh `docs/api/generated/module_inventory.md`.
+- [x] Cross-link ADR-0023 and BUG-049.
 
 ## Acceptance criteria
-- [ ] The async upload path emits the `TransferWrite → ShaderRead` barrier only
+- [x] The async upload path emits the `TransferWrite → ShaderRead` barrier only
       after the `TransferToken` completes (never eagerly), exactly once per
       ticket; `IsReady(ticket)` is false until then and no caller thread blocks.
-- [ ] The in-command-copy path emits `CopyBuffer` + the barrier on the same
+- [x] The in-command-copy path emits `CopyBuffer` + the barrier on the same
       command timeline; the readback path always records the `TransferRead`
       bracket — both proven by the recording-mock contract test.
-- [ ] Range validation is routed through GRAPHICS-095 and fails closed.
-- [ ] Default-gate contract tests pass; operational evidence cites the reused
-      GRAPHICS-096 `gpu;vulkan` round-trip.
+- [x] Range validation is routed through GRAPHICS-095 and fails closed.
+- [x] Default-gate contract tests pass; operational evidence cites the
+      `GpuTransferFacadeGpuSmoke` `gpu;vulkan` round-trip through the facade.
 
 ## Verification
 ```bash
 cmake --preset ci
 cmake --build --preset ci --target IntrinsicTests -- -j16
 ctest --test-dir build/ci --output-on-failure -R 'GpuTransferFacade' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+cmake --build --preset ci --target IntrinsicGraphicsVulkanSmokeTests -- -j16
+ctest --test-dir build/ci --output-on-failure -R 'GpuTransferFacadeGpuSmoke' -L 'gpu' -L 'vulkan' --timeout 120
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+cmake --preset ci-vulkan
+cmake --build --preset ci-vulkan --target IntrinsicGraphicsVulkanSmokeTests -- -j16
+ctest --test-dir build/ci-vulkan --output-on-failure -R 'GpuTransferFacadeGpuSmoke' -L 'gpu' -L 'vulkan' --timeout 120
 python3 tools/repo/check_layering.py --root src --strict
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
+
+## Completion notes
+- PR/commit: this retirement commit.
+- Completed on 2026-06-22 at maturity `Operational` on the local
+  Vulkan-capable host.
+- Implemented `Extrinsic.Graphics.GpuTransfer` as a graphics-layer facade over
+  `RHI::ITransferQueue`, with async upload tickets whose
+  `TransferWrite -> ShaderRead` barrier is emitted only by
+  `DrainCompleted(...)` after the transfer token completes, an in-command
+  copy path that records copy plus barrier on one timeline, and a readback path
+  that records the caller-owned `TransferRead` bracket before using the
+  readback ring.
+- Focused and broad evidence:
+  `cmake --preset ci`,
+  `cmake --build --preset ci --target IntrinsicGraphicsContractTests -j 16`,
+  `ctest --test-dir build/ci --output-on-failure -R 'GpuTransferFacade' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`,
+  `cmake --build --preset ci --target IntrinsicGraphicsVulkanSmokeTests -j 16`,
+  `ctest --test-dir build/ci --output-on-failure -R 'GpuTransferFacadeGpuSmoke' -L 'gpu' -L 'vulkan' --timeout 120`,
+  `cmake --build --preset ci --target IntrinsicTests -j 16`,
+  `ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60`,
+  `cmake --preset ci-vulkan`,
+  `cmake --build --preset ci-vulkan --target IntrinsicGraphicsVulkanSmokeTests -j 16`,
+  and
+  `ctest --test-dir build/ci-vulkan --output-on-failure -R 'GpuTransferFacadeGpuSmoke' -L 'gpu' -L 'vulkan' --timeout 120`.
 
 ## Forbidden changes
 - Introducing a new RHI surface (compose existing seams only).

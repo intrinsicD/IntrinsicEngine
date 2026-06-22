@@ -561,6 +561,7 @@ endif()
 if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQUAL "Glfw")
     set(_graphics_vulkan_smoke_test_files
         Test.BufferReadbackGpuSmoke.cpp
+        Test.GpuTransferFacadeGpuSmoke.cpp
         Test.TextureReadbackGpuSmoke.cpp
         Test.DefaultRecipeSurfaceGpuSmoke.cpp
         Test.HzbOcclusionConservatismGpuSmoke.cpp
@@ -682,6 +683,7 @@ intrinsic_test_object_lib(GraphicsAssetsUnitTestObjs
 )
 
 set(_graphics_contract_test_files
+    Test.GpuTransferFacade.cpp
     Test.MinimalTriangleAcceptance.cpp
     Test.RHI.CommandContextBarriers.cpp
     Test.RendererRhiBoundary.cpp

@@ -109,3 +109,8 @@ entries:
       - "Routed GRAPHICS-097 implementation, retirement, verification, and commit as direct journey facts because the turn produced committed engineering/task evidence."
       - "Did not stage or crystallize claims; async texture readback is a concrete RHI/Vulkan implementation outcome with direct verification bindings."
       - "Updated the rendering transfer open thread from GRAPHICS-097/GRAPHICS-098 to GRAPHICS-098 after texture readback retired."
+  - turn: "2026-06-22_001#4"
+    notes:
+      - "Routed GRAPHICS-098 implementation, retirement, verification, and commit as direct journey facts because the turn produced committed engineering/task evidence."
+      - "Did not stage or crystallize claims; the high-level GpuTransfer facade is a concrete graphics/RHI composition outcome with direct CPU and Vulkan verification bindings."
+      - "Updated the transfer-foundation open thread from GRAPHICS-098 to RUNTIME-126 after the generated session brief showed the runtime readback job slice unblocked."

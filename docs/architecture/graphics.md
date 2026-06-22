@@ -63,6 +63,15 @@ Graphics is organized into explicit sublayers:
   the transfer-queue readback ring when their framegraph barrier and ownership
   needs are explicit, but graphics/rhi and graphics/vulkan do not import
   renderer, runtime, ECS, or asset-service knowledge to support the ring.
+- `Extrinsic.Graphics.GpuTransfer` is the graphics-layer facade over the
+  ADR-0023 transfer foundation. It validates buffer ranges through
+  `RHI.BufferTransfer`, schedules async uploads through `ITransferQueue`, emits
+  `TransferWrite -> ShaderRead` only from its post-`CollectCompleted()` drain
+  after the upload token completes, and wraps readbacks with the required
+  `TransferRead` bracket. It is for algorithm/user-owned transfers; `GpuWorld`
+  retains its existing managed geometry upload barriers. This prevents the
+  BUG-049 missing/eager-barrier class from recurring without adding a new RHI
+  surface.
 
 ## Vulkan operational readiness and runtime fallback
 

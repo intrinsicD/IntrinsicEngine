@@ -9,6 +9,22 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`GRAPHICS-098`](GRAPHICS-098-gpu-transfer-facade.md) — High-level
+`GpuTransfer` facade with correct barrier brackets — retired on 2026-06-22 at
+maturity `Operational` on Vulkan-capable hosts (`CPUContracted` elsewhere).
+`Extrinsic.Graphics.GpuTransfer` now composes existing RHI seams without adding
+new RHI surface: async uploads return facade tickets over `TransferToken`s and
+emit their one-shot `TransferWrite -> ShaderRead` ready barrier only from
+`DrainCompleted(...)` after completion; the in-command path records
+`CopyBuffer` plus the ready barrier on one submitted timeline; readbacks record
+the caller-owned `TransferRead` bracket before entering the GRAPHICS-096
+readback ring. CPU contract evidence covers completion-gated barriers,
+same-timeline copies, readback delivery, fail-closed range validation through
+GRAPHICS-095, and diagnostics. Promoted Vulkan evidence covers a device-local
+upload/readback round-trip through the facade without `WaitIdle`. Runtime-owned
+GPU readback jobs and property write-back remain tracked by `RUNTIME-126`.
+
+Active
 [`GRAPHICS-097`](GRAPHICS-097-async-texture-readback.md) — Async GPU-to-CPU
 texture readback through the readback ring on `ITransferQueue` — retired on
 2026-06-22 at maturity `Operational` on Vulkan-capable hosts
