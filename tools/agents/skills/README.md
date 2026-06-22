@@ -1,9 +1,10 @@
 # IntrinsicEngine Agent Skills
 
-This folder contains nine [Agent Skills](https://agentskills.io). Six of them
+This folder contains twelve [Agent Skills](https://agentskills.io). Six of them
 wrap the IntrinsicEngine `AGENTS.md` contract and the procedure docs under
-`docs/agent/`; three add cross-cutting workflow disciplines (diagnosis,
-zoom-out, handoff) that don't have a single source doc under `docs/agent/`.
+`docs/agent/`; three add IntrinsicEngine-specific cross-cutting workflow
+disciplines (diagnosis, zoom-out, handoff) that don't have a single source doc
+under `docs/agent/`; three are imported third-party productivity skills.
 The skills are designed to load *progressively*: only the metadata (~100 tokens
 per skill) sits in context by default, with full content loaded only when the
 skill's trigger description matches the current task.
@@ -26,7 +27,7 @@ Packaging the same content as Agent Skills gives three additional benefits:
    Gemini CLI, and any other harness that supports the `agentskills.io`
    standard.
 
-## The nine skills
+## The skills
 
 ### Source-doc mirrors (six)
 
@@ -55,9 +56,23 @@ authoritative for these.
 | `intrinsicengine-zoom-out` | One-shot layer-cake map of an unfamiliar file using the engine's domain vocabulary (`core`/`geometry`/`assets`/`ecs`/`physics`/`graphics/*`/`runtime`/`app`/`methods`) and `.cppm` module surfaces. | "zoom out", "where does this fit", "give me the layer map" |
 | `intrinsicengine-handoff` | Compact the current conversation into a handoff document for the next agent. Saves to `$TMPDIR`, never into the repo (no in-tree planning docs). | "handoff", "compact this", end-of-session summarization |
 
+### Imported productivity skills (three)
+
+These skills are imported from
+[`mattpocock/skills`](https://github.com/mattpocock/skills) productivity
+skills at commit `6eeb81b5fcfeeb5bd531dd47ab2f9f2bbea27461`. They are
+MIT-licensed; see [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md).
+
+| Skill | Purpose | Triggers on |
+| --- | --- | --- |
+| `teach` | Stateful teaching workspace for lessons, resources, glossary, learning records, and mission-grounded instruction. Includes a local guardrail so teaching files are not created at the IntrinsicEngine repo root unless explicitly intended. | User asks to be taught a topic or concept over one or more sessions |
+| `grilling` | Relentless one-question-at-a-time interview for stress-testing a plan or design, exploring code first when the answer is discoverable. | "grill", "stress-test this plan", "interview me about this design" |
+| `grill-me` | Short alias that starts a `grilling` session. | "grill me" |
+
 ## Authority chain (important)
 
-These skills are **mirrors**, not replacements. The authority chain is:
+The IntrinsicEngine workflow skills are **mirrors**, not replacements. Their
+authority chain is:
 
 1. `AGENTS.md` in the repo — authoritative.
 2. `docs/agent/*.md` in the repo — expanded source procedures, authoritative
@@ -68,9 +83,14 @@ These skills are **mirrors**, not replacements. The authority chain is:
 If a skill body and a source doc disagree, the source doc wins. Resync the
 skill (see "Keeping in sync" below).
 
+For imported productivity skills, upstream content is the source material, but
+the IntrinsicEngine `AGENTS.md` contract still wins on repository hygiene,
+task workflow, verification, and commit behavior.
+
 ## Anatomy of each skill
 
-Every skill follows the standard `agentskills.io` layout:
+Every IntrinsicEngine workflow skill follows the standard `agentskills.io`
+layout:
 
 ```
 intrinsicengine-<name>/
@@ -81,6 +101,8 @@ intrinsicengine-<name>/
 
 The `SKILL.md` body is a routing layer with checklist summaries and pointers;
 the `references/` files are the verbatim source procedure for deep reads.
+Imported productivity skills may use standalone companion files instead of a
+`references/` directory when that is how the upstream skill is structured.
 
 ## Installation
 
@@ -88,18 +110,18 @@ the `references/` files are the verbatim source procedure for deep reads.
 
 ```bash
 # User-level (available across all projects)
-cp -r intrinsicengine-* ~/.claude/skills/
+cp -r intrinsicengine-* teach grilling grill-me ~/.claude/skills/
 
 # Or project-level (only this repo)
 mkdir -p .claude/skills
-cp -r intrinsicengine-* .claude/skills/
+cp -r intrinsicengine-* teach grilling grill-me .claude/skills/
 ```
 
 ### Codex
 
 ```bash
 mkdir -p ~/.codex/skills
-cp -r intrinsicengine-* ~/.codex/skills/
+cp -r intrinsicengine-* teach grilling grill-me ~/.codex/skills/
 ```
 
 ### Cursor / Windsurf / Gemini CLI / others
@@ -117,10 +139,12 @@ Drop this whole directory into the IntrinsicEngine repo at `.claude/skills/`
 session in the repo automatically gets the skills, and the skills travel with
 the codebase.
 
-## Keeping in sync with `docs/agent/`
+## Keeping in sync
 
-The `references/` files in each skill are **copies** of the source docs. When
-the source docs change, the skill references must update too.
+The `references/` files in each IntrinsicEngine workflow skill are **copies** of
+the source docs. When the source docs change, the skill references must update
+too. Imported third-party productivity skills are not generated from
+`docs/agent/*`.
 
 A trivial resync script:
 
@@ -171,6 +195,7 @@ drift automatically.
 | Skill body needs better triggering | Edit the skill's `SKILL.md` `description` field (and run a triggering eval if you have one set up). |
 | Routing between skills changed | Edit the `## Routing` or `## References` section in the relevant `SKILL.md` bodies. |
 | Pure typo in source doc | Edit the source doc, then resync. |
+| Third-party productivity skill update | Update the imported skill files manually from upstream, preserve local guardrails, and keep `THIRD_PARTY_LICENSES.md` provenance current. Do not add them to `sync_skills.py`; that tool only mirrors IntrinsicEngine canonical docs. |
 
 ## Pairing with non-IntrinsicEngine skills
 
@@ -182,10 +207,12 @@ add complementary knowledge (modern C++ templates, sanitizer setup, etc.).
 
 **Skills to avoid pairing with** in this codebase:
 
-- Workflow-opinionated skills that prescribe a brainstorm → plan →
+- Broad workflow-opinionated skill bundles that prescribe a brainstorm → plan →
   subagent-driven-development pipeline (e.g. `obra/superpowers` as a whole).
   They assume there's no upstream spec; IntrinsicEngine task files *are* the
-  spec, so these create two competing sources of truth.
+  spec, so these create two competing sources of truth. Small interactive
+  helpers such as `grilling` are acceptable only when they support, rather than
+  replace, the task workflow.
 - "Senior C++ developer" skills with their own preferred CMake/test/commit
   workflow — they'll fight `AGENTS.md` §5–§7.
 

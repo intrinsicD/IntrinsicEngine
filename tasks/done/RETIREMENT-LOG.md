@@ -9,6 +9,21 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`PROC-009`](PROC-009-import-productivity-skills.md) — Import productivity
+skills into repo skill surface — retired on 2026-06-22. The repo-local skill
+surface now includes the third-party `teach`, `grilling`, and `grill-me`
+productivity skills imported from `mattpocock/skills` commit
+`6eeb81b5fcfeeb5bd531dd47ab2f9f2bbea27461`; `.claude/skills` and
+`.codex/skills` see them through their existing symlinks to
+`tools/agents/skills`. The import preserved the upstream MIT license notice in
+`tools/agents/skills/THIRD_PARTY_LICENSES.md`, documents the skills as
+standalone manual imports rather than generated `docs/agent/*` mirrors, and
+adds a local `teach` guardrail so learning-workspace files are not created at
+the IntrinsicEngine repo root without an explicit workspace. The existing
+`sync_skills.py --check` gate remains scoped to IntrinsicEngine canonical-doc
+mirrors and passed after the import.
+
+Active
 [`GRAPHICS-098`](GRAPHICS-098-gpu-transfer-facade.md) — High-level
 `GpuTransfer` facade with correct barrier brackets — retired on 2026-06-22 at
 maturity `Operational` on Vulkan-capable hosts (`CPUContracted` elsewhere).
