@@ -2,9 +2,9 @@ session:
   id: "2026-06-22_001"
   date: "2026-06-22"
   started: "2026-06-22T00:33"
-  last_turn: "2026-06-22T02:29"
-  turn_count: 4
-  summary: "Implemented, verified, committed, and retired GRAPHICS-095 through GRAPHICS-098 for the CPU/GPU transfer foundation."
+  last_turn: "2026-06-22T02:48"
+  turn_count: 5
+  summary: "Implemented, verified, committed, and retired GRAPHICS-095 through GRAPHICS-098 for the CPU/GPU transfer foundation, then imported third-party productivity skills through PROC-009."
 
 events_logged:
   - turn: 1
@@ -55,6 +55,18 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Focused GpuTransferFacade tests passed 4/4; Vulkan GpuTransferFacadeGpuSmoke passed 1/1 in both ci and ci-vulkan; default CPU-supported CTest passed 3022/3022; strict structural/docs checks passed."
+  - turn: 5
+    type: decision
+    id: "N48"
+    routing: direct
+    provenance: ai-executed
+    summary: "Opened and retired PROC-009 by importing the user-requested teach, grilling, and grill-me skills into tools/agents/skills with MIT provenance and a teach repo-root guardrail."
+  - turn: 5
+    type: experiment
+    id: "N49"
+    routing: direct
+    provenance: ai-executed
+    summary: "Skill mirror sync, strict task checks, doc links, root hygiene, PR contract, docs-sync, whitespace checks, and direct .claude/.codex skill visibility checks passed."
 
 ai_actions:
   - turn: 1
@@ -130,6 +142,23 @@ ai_actions:
       - "tasks/backlog/rendering/README.md"
       - "tasks/backlog/README.md"
       - "tasks/SESSION-BRIEF.md"
+  - turn: 5
+    action: "Imported the third-party productivity skills, recorded MIT provenance, documented repo-surface availability, added process task retirement records, regenerated the session brief, verified the process checks, and committed the slice."
+    provenance: ai-executed
+    files_changed:
+      - "tools/agents/skills/teach/SKILL.md"
+      - "tools/agents/skills/teach/GLOSSARY-FORMAT.md"
+      - "tools/agents/skills/teach/LEARNING-RECORD-FORMAT.md"
+      - "tools/agents/skills/teach/MISSION-FORMAT.md"
+      - "tools/agents/skills/teach/RESOURCES-FORMAT.md"
+      - "tools/agents/skills/grilling/SKILL.md"
+      - "tools/agents/skills/grill-me/SKILL.md"
+      - "tools/agents/skills/THIRD_PARTY_LICENSES.md"
+      - "tools/agents/skills/README.md"
+      - "tasks/done/PROC-009-import-productivity-skills.md"
+      - "tasks/done/RETIREMENT-LOG.md"
+      - "tasks/backlog/process/README.md"
+      - "tasks/backlog/README.md"
 
 claims_touched: []
 
@@ -152,6 +181,12 @@ key_context:
     excerpt: "`tasks/SESSION-BRIEF.md` identified GRAPHICS-098 as the next unblocked Theme B rendering transfer task after GRAPHICS-097 retired."
   - turn: 4
     excerpt: "GRAPHICS-098 closes at Operational on Vulkan-capable hosts because CPU contract tests plus opt-in `gpu;vulkan` GpuTransferFacade smokes passed in both `ci` and `ci-vulkan` trees."
+  - turn: 5
+    excerpt: "User requested adding three `mattpocock/skills` productivity skills and making them part of the repo workflow like other skills."
+  - turn: 5
+    excerpt: "`.claude/skills` and `.codex/skills` resolve to `tools/agents/skills`, so one committed import covers both agent skill surfaces."
+  - turn: 5
+    excerpt: "`sync_skills.py` remains scoped to generated IntrinsicEngine canonical-doc mirrors; third-party productivity skills are manually maintained imports."
 
 open_threads:
   - "RUNTIME-126 owns GPU readback jobs and result-to-property write-back now that the rendering transfer foundation is retired."

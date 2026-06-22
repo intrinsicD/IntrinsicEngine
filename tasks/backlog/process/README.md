@@ -34,6 +34,8 @@ No open process backlog tasks.
 - `PROC-006` owns surfacing lapsed audit cadences.
 - `PROC-008` (done 2026-06-10) extended the state/history split and link guard to the
   per-category READMEs (follow-up opened by `PROC-003`).
+- `PROC-009` (done 2026-06-22) imported the third-party `teach`,
+  `grilling`, and `grill-me` productivity skills into the repo skill surface.
 - `PROC-007` owns deduplicating contract restatements out of the onboarding
   prompt and giving loop mode explicit defaults and a checkpoint rule;
   `PROC-004` owns the prompt's reading-order change — the two prompt-touching
@@ -60,3 +62,7 @@ split; narratives live in the retirement log.
   history-marked retired sections and extended
   `check_task_state_links.py` to enforce it, with the rendering DAG
   exempted explicitly.
+- [PROC-009 - Import productivity skills into repo skill surface](../../done/PROC-009-import-productivity-skills.md)
+  (done, 2026-06-22): imported `teach`, `grilling`, and `grill-me` from
+  `mattpocock/skills`, preserved the MIT license/provenance, and documented
+  their non-generated maintenance model.

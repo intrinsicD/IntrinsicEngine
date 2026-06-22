@@ -1016,3 +1016,54 @@ tree:
       successfully, and whitespace checks passed. Root hygiene still reports
       pre-existing warning-mode `ara/` and `imgui.ini` entries.
     status: resolved
+  - id: N48
+    type: decision
+    title: "Retire PROC-009 productivity skill import"
+    provenance: ai-executed
+    timestamp: "2026-06-22T02:48"
+    choice: >
+      Opened and retired PROC-009 to import the user-requested `teach`,
+      `grilling`, and `grill-me` productivity skills from `mattpocock/skills`
+      into `tools/agents/skills`, preserving MIT license provenance and adding
+      a repo-root guardrail for `teach`.
+    alternatives:
+      - "Install the skills only in a user-level Codex/Claude skill directory instead of committing them to the repo."
+      - "Add third-party skills to sync_skills.py as generated IntrinsicEngine mirrors."
+      - "Import teach without a root-hygiene guardrail."
+    evidence:
+      - "this commit"
+      - "https://github.com/mattpocock/skills/tree/main/skills/productivity/teach"
+      - "https://github.com/mattpocock/skills/tree/main/skills/productivity/grilling"
+      - "https://github.com/mattpocock/skills/tree/main/skills/productivity/grill-me"
+      - "tools/agents/skills/teach/SKILL.md"
+      - "tools/agents/skills/grilling/SKILL.md"
+      - "tools/agents/skills/grill-me/SKILL.md"
+      - "tools/agents/skills/THIRD_PARTY_LICENSES.md"
+      - "tasks/done/PROC-009-import-productivity-skills.md"
+    status: resolved
+  - id: N49
+    type: experiment
+    title: "PROC-009 verification"
+    provenance: ai-executed
+    timestamp: "2026-06-22T02:48"
+    also_depends_on: [N48]
+    evidence:
+      - "python3 tools/agents/sync_skills.py --check"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/agents/validate_tasks.py --root tasks --strict"
+      - "python3 tools/docs/check_doc_links.py --root ."
+      - "python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main"
+      - "python3 tools/repo/check_root_hygiene.py --root ."
+      - "python3 tools/repo/check_pr_contract.py"
+      - "git diff --check"
+      - "git diff --cached --check"
+      - "Symlink visibility check for .claude/skills and .codex/skills"
+    result: >
+      Skill mirror sync, strict task policy, strict task validation, doc links,
+      root hygiene, PR contract, docs-sync, whitespace checks, and direct
+      `.claude/skills` plus `.codex/skills` symlink visibility checks exited
+      successfully. Root hygiene still reports pre-existing warning-mode `ara/`
+      and `imgui.ini` entries. Docs-sync and PR-contract diff helpers reported
+      no changed files relative to their base view, so explicit skill/process
+      checks were the meaningful verification for this staged slice.
+    status: resolved

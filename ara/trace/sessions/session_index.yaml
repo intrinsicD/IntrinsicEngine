@@ -43,8 +43,8 @@ sessions:
     open_threads: 2
   - id: "2026-06-22_001"
     date: "2026-06-22"
-    summary: "Implemented, verified, committed, and retired GRAPHICS-095 through GRAPHICS-098 for the CPU/GPU transfer foundation."
-    turn_count: 4
-    events_count: 8
+    summary: "Implemented, verified, committed, and retired GRAPHICS-095 through GRAPHICS-098 for the CPU/GPU transfer foundation, then imported third-party productivity skills through PROC-009."
+    turn_count: 5
+    events_count: 10
     claims_touched: []
     open_threads: 1
