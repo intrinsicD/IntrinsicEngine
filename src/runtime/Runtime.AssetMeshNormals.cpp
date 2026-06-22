@@ -272,21 +272,6 @@ namespace Extrinsic::Runtime
             return ComputeAreaWeightedVertexNormals(positions, faces);
         }
 
-        [[nodiscard]] std::vector<glm::vec3> ResolveAuthoredVertexNormals(
-            const Geometry::MeshIO::MeshIOResult& meshPayload,
-            const std::size_t vertexCount)
-        {
-            const auto explicitNormals =
-                meshPayload.Vertices.Get<glm::vec3>(kNormalProperty);
-            if (explicitNormals &&
-                explicitNormals.Vector().size() == vertexCount)
-            {
-                return explicitNormals.Vector();
-            }
-
-            return {};
-        }
-
         [[nodiscard]] bool IsFinite(const glm::vec2 value) noexcept
         {
             return std::isfinite(value.x) && std::isfinite(value.y);
@@ -796,7 +781,7 @@ namespace Extrinsic::Runtime
             source->Mesh,
             identityVertexXrefs,
             source->OriginalFaceForTriangle,
-            ResolveAuthoredVertexNormals(meshPayload, positions.Vector().size()),
+            ResolveVertexNormals(meshPayload, positions.Vector(), faces.Vector()),
             options.AllowDisconnectedRenderableFallback);
     }
 

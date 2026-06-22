@@ -312,7 +312,7 @@ TEST(RuntimeAssetModelSceneHandoff, MaterializeModelSceneCreatesMeshEntityAndUpl
     EXPECT_EQ(diagnostics.MaterialTextureBindingFailures, 0u);
 }
 
-TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstQueuesUvNormalAndBakeJobs)
+TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstPublishesNormalsAndQueuesUvAndBakeJobs)
 {
     SceneHandoffFixture fx;
     Runtime::StreamingExecutor streaming{};
@@ -347,20 +347,25 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstQueuesUvNormalAnd
     EXPECT_EQ(diagnostics.ProgressiveRawPrimitiveEntitiesPublished, 1u);
     EXPECT_EQ(diagnostics.ProgressivePresentationBindingsCreated, 1u);
     EXPECT_EQ(diagnostics.ProgressiveUvAtlasJobsQueued, 1u);
-    EXPECT_EQ(diagnostics.ProgressiveNormalJobsQueued, 1u);
+    EXPECT_EQ(diagnostics.ProgressiveNormalJobsQueued, 0u);
     EXPECT_EQ(diagnostics.ProgressiveTextureBakeJobsQueued, 2u);
 
     const ECS::EntityHandle entity = state->Record.Primitives[0].Entity;
     ASSERT_TRUE(fx.Scene.IsValid(entity));
     ASSERT_TRUE(fx.Scene.Raw().all_of<Runtime::ProgressivePresentationBindings>(entity));
     const auto jobSnapshot = jobs.SnapshotEntity(Runtime::StableEntityLookup::ToRenderId(entity));
-    ASSERT_EQ(jobSnapshot.Entries.size(), 4u);
+    ASSERT_EQ(jobSnapshot.Entries.size(), 3u);
     EXPECT_EQ(jobSnapshot.Entries[0].Name, "generate mesh uv atlas");
-    EXPECT_EQ(jobSnapshot.Entries[1].Name, "compute mesh vertex normals");
-    EXPECT_EQ(jobSnapshot.Entries[2].Name, "bake normal texture");
-    EXPECT_EQ(jobSnapshot.Entries[3].Name, "bake albedo texture");
-    EXPECT_EQ(jobSnapshot.Entries[2].Dependencies.size(), 2u);
-    EXPECT_EQ(jobSnapshot.Entries[3].Dependencies.size(), 1u);
+    EXPECT_EQ(jobSnapshot.Entries[1].Name, "bake normal texture");
+    EXPECT_EQ(jobSnapshot.Entries[2].Name, "bake albedo texture");
+    EXPECT_EQ(jobSnapshot.Entries[1].Dependencies.size(), 1u);
+    EXPECT_EQ(jobSnapshot.Entries[2].Dependencies.size(), 1u);
+
+    const auto* initialVertices =
+        fx.Scene.Raw().try_get<ECS::Components::GeometrySources::Vertices>(entity);
+    ASSERT_NE(initialVertices, nullptr);
+    EXPECT_TRUE(initialVertices->Properties.Exists("v:normal"));
+    EXPECT_FALSE(initialVertices->Properties.Exists("v:texcoord"));
 
     jobs.Pump(2u);
     jobs.DrainCompletions();
@@ -373,7 +378,7 @@ TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstQueuesUvNormalAnd
     ASSERT_NE(vertices, nullptr);
     EXPECT_TRUE(vertices->Properties.Exists("v:texcoord"));
     EXPECT_TRUE(vertices->Properties.Exists("v:normal"));
-    EXPECT_EQ(jobs.SnapshotEntity(Runtime::StableEntityLookup::ToRenderId(entity)).Entries[2].Status,
+    EXPECT_EQ(jobs.SnapshotEntity(Runtime::StableEntityLookup::ToRenderId(entity)).Entries[1].Status,
               Runtime::DerivedJobStatus::Complete);
 
     auto& bindings =

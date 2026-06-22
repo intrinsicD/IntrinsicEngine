@@ -1172,7 +1172,10 @@ Concretely:
   screen-space quad expansion. The same sync step writes scalar/color
   visualization config (`ColorSourceMode`, colormap metadata, and scalar/color
   BDAs) for surface, line, and point records; retained line/point shaders
-  consume those fields on the GPU.
+  consume those fields on the GPU. For per-element color buffers,
+  `VisualizationSyncSystem` derives `GpuEntityConfig::VisDomain` from
+  `PerVertexBuffer` / `PerEdgeBuffer` / `PerFaceBuffer` so shader lookup uses
+  the selected element domain.
 - `IRenderer::SubmitRuntimeSnapshots(..., storageSlot)` is the promoted handoff
   from runtime to graphics. The renderer copies snapshot records into retained
   storage keyed by the runtime `RenderWorldPool` slot before

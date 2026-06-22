@@ -695,7 +695,14 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesVertexNormalsWhenM
 
     meshEntity = FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
     ASSERT_TRUE(meshEntity.has_value());
-    ExpectMeshLacksVertexProperty(engine.GetScene(), *meshEntity, "v:normal");
+    ExpectMeshVertexNormals(
+        engine.GetScene(),
+        *meshEntity,
+        {
+            {0.0f, 0.0f, 1.0f},
+            {0.0f, 0.0f, 1.0f},
+            {0.0f, 0.0f, 1.0f},
+        });
     ExpectMeshLacksVertexProperty(engine.GetScene(), *meshEntity, "v:texcoord");
     EXPECT_FALSE(HasGeneratedNormalTextureBinding(engine, *meshEntity));
 
@@ -751,7 +758,14 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportComputesAndBakesGeneratedN
 
     meshEntity = FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
     ASSERT_TRUE(meshEntity.has_value());
-    ExpectMeshLacksVertexProperty(engine.GetScene(), *meshEntity, "v:normal");
+    ExpectMeshVertexNormals(
+        engine.GetScene(),
+        *meshEntity,
+        {
+            {0.0f, 0.0f, 1.0f},
+            {0.0f, 0.0f, 1.0f},
+            {0.0f, 0.0f, 1.0f},
+        });
     EXPECT_FALSE(HasGeneratedNormalTextureBinding(engine, *meshEntity));
 
     engine.Run();

@@ -165,6 +165,59 @@ namespace
         };
     }
 
+    void AttachTriangleMeshSources(ECS::Scene::Registry& scene,
+                                   entt::entity entity)
+    {
+        namespace GS = ECS::Components::GeometrySources;
+        namespace PN = ECS::Components::GeometrySources::PropertyNames;
+
+        auto& raw = scene.Raw();
+        auto& vertices = raw.emplace_or_replace<GS::Vertices>(entity);
+        vertices.Properties.Resize(3u);
+        vertices.Properties.GetOrAdd<glm::vec3>(
+            std::string{PN::kPosition},
+            glm::vec3{0.0f}).Vector() = {
+            {0.0f, 0.0f, 0.0f},
+            {1.0f, 0.0f, 0.0f},
+            {0.0f, 1.0f, 0.0f},
+        };
+        vertices.Properties.GetOrAdd<glm::vec3>(
+            std::string{PN::kNormal},
+            glm::vec3{0.0f, 0.0f, 1.0f}).Vector() = {
+            {0.0f, 0.0f, 1.0f},
+            {0.0f, 0.0f, 1.0f},
+            {0.0f, 0.0f, 1.0f},
+        };
+        vertices.Properties.GetOrAdd<glm::vec4>(
+            "v:color",
+            glm::vec4{1.0f}).Vector() = {
+            {1.0f, 0.0f, 0.0f, 1.0f},
+            {0.0f, 1.0f, 0.0f, 1.0f},
+            {0.0f, 0.0f, 1.0f, 1.0f},
+        };
+
+        raw.emplace_or_replace<GS::Edges>(entity).Properties.Resize(3u);
+
+        auto& halfedges = raw.emplace_or_replace<GS::Halfedges>(entity);
+        halfedges.Properties.Resize(3u);
+        halfedges.Properties.GetOrAdd<std::uint32_t>(
+            std::string{PN::kHalfedgeToVertex},
+            0u).Vector() = {0u, 1u, 2u};
+        halfedges.Properties.GetOrAdd<std::uint32_t>(
+            std::string{PN::kHalfedgeNext},
+            0u).Vector() = {1u, 2u, 0u};
+        halfedges.Properties.GetOrAdd<std::uint32_t>(
+            std::string{PN::kHalfedgeFace},
+            0u).Vector() = {0u, 0u, 0u};
+
+        auto& faces = raw.emplace_or_replace<GS::Faces>(entity);
+        faces.Properties.Resize(1u);
+        faces.Properties.GetOrAdd<std::uint32_t>(
+            std::string{PN::kFaceHalfedge},
+            0u).Vector() = {0u};
+        raw.emplace_or_replace<GS::HasMeshTopology>(entity);
+    }
+
     [[nodiscard]] Geometry::PropertySet MakeScalarProperties()
     {
         Geometry::PropertySet properties;
@@ -239,6 +292,20 @@ namespace
         registry.emplace<ECS::Components::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
         registry.emplace<Graphics::Components::RenderPoints>(entity);
         AttachPointCloudSources(scene, entity);
+    }
+
+    void ConfigureMeshColorVisualization(ECS::Scene::Registry& scene,
+                                         entt::entity entity,
+                                         const std::string& propertyName)
+    {
+        auto& registry = scene.Raw();
+        registry.emplace<ECS::Components::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
+        registry.emplace<Graphics::Components::RenderSurface>(entity);
+        AttachTriangleMeshSources(scene, entity);
+
+        auto& visualization = registry.emplace<Graphics::Components::VisualizationConfig>(entity);
+        visualization.Source = Graphics::Components::VisualizationConfig::ColorSource::PerVertexBuffer;
+        visualization.ColorBufferName = propertyName;
     }
 }
 
@@ -610,6 +677,68 @@ TEST(RuntimeRenderExtraction, VisualizationPropertyBufferKeysAreStableIdScoped)
     EXPECT_EQ(world.Visualization.PropertyBufferDiagnostics.InputBufferCount, 2u);
     EXPECT_EQ(world.Visualization.PropertyBufferDiagnostics.UploadedBufferCount, 2u);
     EXPECT_FALSE(world.Visualization.Diagnostics.HasErrors);
+}
+
+TEST(RuntimeRenderExtraction, MeshColorVisualizationPropertyBufferUploadsFromGeometrySources)
+{
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+
+    const auto entity = scene.Create();
+    ConfigureMeshColorVisualization(scene, entity, "v:color");
+
+    const auto stats = fixture.Extract(scene);
+    const Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
+
+    EXPECT_EQ(stats.MeshGeometryUploads, 1u);
+    EXPECT_EQ(stats.VisualizationAdapterPacketAppendCount, 1u);
+    EXPECT_EQ(stats.VisualizationColorPacketCount, 1u);
+    EXPECT_EQ(stats.VisualizationAdapterMissingSourceCount, 0u);
+    EXPECT_EQ(stats.VisualizationAdapterUnsupportedSourceTypeCount, 0u);
+
+    ASSERT_EQ(world.Visualization.Colors.size(), 1u);
+    const Graphics::ColorAttributePacket& packet = world.Visualization.Colors.front();
+    EXPECT_EQ(packet.Name, "v:color");
+    EXPECT_EQ(packet.SourceBufferKey,
+              std::to_string(StableId(entity)) + ":color:v:color");
+    EXPECT_EQ(packet.Domain, Graphics::VisualizationAttributeDomain::Vertex);
+    EXPECT_EQ(packet.ElementCount, 3u);
+    EXPECT_NE(packet.ColorBufferBDA, 0u);
+    EXPECT_EQ(world.Visualization.PropertyBufferDiagnostics.InputBufferCount, 1u);
+    EXPECT_EQ(world.Visualization.PropertyBufferDiagnostics.UploadedBufferCount, 1u);
+    EXPECT_EQ(world.Visualization.Diagnostics.InputPacketCount, 1u);
+    EXPECT_EQ(world.Visualization.Diagnostics.AcceptedPacketCount, 1u);
+    EXPECT_FALSE(world.Visualization.Diagnostics.HasErrors);
+    EXPECT_TRUE(world.Visualization.HasVisualizationPackets);
+}
+
+TEST(RuntimeRenderExtraction, MeshColorVisualizationPropertyBufferFailsClosed)
+{
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+
+    const auto missing = scene.Create();
+    ConfigureMeshColorVisualization(scene, missing, "missing:color");
+
+    const auto wrongType = scene.Create();
+    ConfigureMeshColorVisualization(scene, wrongType, "v:bad_color");
+    auto& vertices =
+        scene.Raw().get<ECS::Components::GeometrySources::Vertices>(wrongType);
+    vertices.Properties.GetOrAdd<float>("v:bad_color", 0.0f).Vector() =
+        {0.0f, 1.0f, 2.0f};
+
+    const auto stats = fixture.Extract(scene);
+    const Graphics::RenderWorld world = fixture.Renderer->ExtractRenderWorld({});
+
+    EXPECT_EQ(stats.MeshGeometryUploads, 2u);
+    EXPECT_EQ(stats.VisualizationAdapterPacketAppendCount, 0u);
+    EXPECT_EQ(stats.VisualizationColorPacketCount, 0u);
+    EXPECT_EQ(stats.VisualizationAdapterMissingSourceCount, 1u);
+    EXPECT_EQ(stats.VisualizationAdapterUnsupportedSourceTypeCount, 1u);
+    EXPECT_TRUE(world.Visualization.Colors.empty());
+    EXPECT_EQ(world.Visualization.PropertyBufferDiagnostics.InputBufferCount, 0u);
+    EXPECT_EQ(world.Visualization.Diagnostics.InputPacketCount, 0u);
+    EXPECT_FALSE(world.Visualization.HasVisualizationPackets);
 }
 
 TEST(RuntimeRenderExtraction, VisualizationNonScalarAdapterBindingsReachRenderWorld)

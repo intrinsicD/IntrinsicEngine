@@ -418,6 +418,26 @@ namespace Extrinsic::Runtime
             }
         }
 
+        [[nodiscard]] Graphics::Components::VisualizationConfig::Domain ToColorBufferConfigDomain(
+            const Graphics::Components::VisualizationConfig::ColorSource source) noexcept
+        {
+            using ColorSource = Graphics::Components::VisualizationConfig::ColorSource;
+            using Domain = Graphics::Components::VisualizationConfig::Domain;
+            switch (source)
+            {
+            case ColorSource::PerEdgeBuffer:
+                return Domain::Edge;
+            case ColorSource::PerFaceBuffer:
+                return Domain::Face;
+            case ColorSource::PerVertexBuffer:
+            case ColorSource::Material:
+            case ColorSource::UniformColor:
+            case ColorSource::ScalarField:
+                return Domain::Vertex;
+            }
+            return Domain::Vertex;
+        }
+
         [[nodiscard]] const Geometry::PropertySet* PropertySetForMeshVisualizationDomain(
             const ECS::Components::GeometrySources::ConstSourceView& view,
             const Graphics::Components::VisualizationConfig::Domain domain) noexcept
@@ -632,6 +652,50 @@ namespace Extrinsic::Runtime
             stats.VisualizationAdapterElementCountOverflowCount += perAdapter.ElementCountOverflowCount;
             stats.VisualizationAdapterManualRangeCount += perAdapter.ManualRangeCount;
             stats.VisualizationAdapterFlatAutoRangeExpandedCount += perAdapter.FlatAutoRangeExpandedCount;
+        }
+
+        void AppendMeshColorVisualizationPropertyBuffer(
+            const std::uint32_t stableId,
+            const ECS::Components::GeometrySources::ConstSourceView& view,
+            const Graphics::Components::VisualizationConfig* visualization,
+            VisualizationAdapterBatch& batch,
+            RuntimeRenderExtractionStats& stats)
+        {
+            if (!IsColorBufferVisualizationSource(visualization) ||
+                visualization->ColorBufferName.empty())
+            {
+                return;
+            }
+
+            const Geometry::PropertySet* properties =
+                PropertySetForMeshVisualizationDomain(
+                    view,
+                    ToColorBufferConfigDomain(visualization->Source));
+            if (properties == nullptr)
+            {
+                return;
+            }
+
+            KMeansLabelAdapter adapter{Geometry::ConstPropertySet{*properties}};
+            VisualizationAdapterStats perAdapter{};
+            VisualizationAdapterOptions options{};
+            options.SourceName = visualization->ColorBufferName;
+            options.OutputName = visualization->ColorBufferName;
+            options.Domain = ToColorBufferDomain(visualization->Source);
+            options.PropertyBufferSourceKey =
+                BuildVisualizationPropertySourceKey(
+                    stableId, "color", visualization->ColorBufferName);
+            adapter.Append(batch, options, perAdapter);
+
+            stats.VisualizationAdapterPacketAppendCount += perAdapter.PacketAppendCount;
+            stats.VisualizationAdapterMissingSourceCount += perAdapter.MissingSourceCount;
+            stats.VisualizationAdapterUnsupportedSourceTypeCount += perAdapter.UnsupportedSourceTypeCount;
+            stats.VisualizationAdapterEmptySourceCount += perAdapter.EmptySourceCount;
+            stats.VisualizationAdapterInvalidBufferCount +=
+                perAdapter.InvalidBufferCount + perAdapter.InvalidResourceCount;
+            stats.VisualizationAdapterInvalidRangeCount += perAdapter.InvalidRangeCount;
+            stats.VisualizationAdapterNonFiniteValueCount += perAdapter.NonFiniteValueCount;
+            stats.VisualizationAdapterElementCountOverflowCount += perAdapter.ElementCountOverflowCount;
         }
 
         [[nodiscard]] std::uint32_t BuildRenderFlags(const entt::registry& registry, entt::entity entity)
@@ -2601,6 +2665,12 @@ namespace Extrinsic::Runtime
                     if (alreadyAppended)
                         continue;
                     AppendMeshScalarVisualizationPropertyBuffer(
+                        stableId,
+                        *sourceViewThisFrame,
+                        configs[i],
+                        m_VisualizationState->Batch,
+                        stats);
+                    AppendMeshColorVisualizationPropertyBuffer(
                         stableId,
                         *sourceViewThisFrame,
                         configs[i],

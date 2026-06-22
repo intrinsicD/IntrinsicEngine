@@ -17,6 +17,10 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Verified / Closed
 
+- Closed 2026-06-22: [`BUG-051` — Mesh color visualization lacks automatic property-buffer extraction](../../done/BUG-051-mesh-color-visualization-property-buffer.md). Runtime extraction now auto-emits mesh `glm::vec4` color property-buffer packets from mesh `GeometrySources` for per-element color-buffer visualizations, and graphics sync forwards the selected vertex/face/edge domain into `GpuEntityConfig::VisDomain`.
+
+- Closed 2026-06-22: [`BUG-050` — Direct mesh first upload lacks computed normals](../../done/BUG-050-direct-mesh-first-upload-normals.md). Geometry-only runtime mesh materialization now publishes explicit or area-weighted fallback `v:normal` data before the first ECS/render extraction upload for direct mesh imports and progressive raw model-scene primitives.
+
 - Closed 2026-06-16: [`BUG-044` — Runtime mesh import blocks on derived post-processing](../../done/BUG-044-runtime-import-postprocess-queue.md). Direct mesh import now publishes decoded raw geometry before derived missing-normal, UV-atlas, and generated-texture work. The derived work runs through `Runtime.StreamingExecutor`, applies back to the same entity, stamps geometry dirty tags, and registers the generated normal material binding after the deferred result is ready.
 
 - Closed 2026-06-14: [`BUG-043` — Dropped OBJ without UVs loads but is invisible](../../done/BUG-043-dropped-obj-missing-uvs-invisible.md). Runtime mesh materialization now preserves authored `v:texcoord`; after `ASSETIO-008`, missing or invalid source UVs are replaced by generated xatlas-backed atlas UVs before ECS population and generated texture bakes. Direct OBJ imports without `vt` lines upload surface geometry under CPU/null extraction instead of reporting `MeshGeometryMissingTexcoords`.

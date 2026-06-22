@@ -426,29 +426,52 @@ TEST(GraphicsMinimalAcceptance, VisualizationSyncWritesEquivalentLinePointColorS
     expectScalarConfig(lineInstance);
     expectScalarConfig(pointInstance);
 
-    Graphics::Components::VisualizationConfig colorVis = scalarVis;
-    colorVis.Source =
-        Graphics::Components::VisualizationConfig::ColorSource::PerVertexBuffer;
-    colorVis.ColorBufferName = "colors";
-    for (auto& record : records)
+    struct ColorDomainCase
     {
-        record.Visualization = &colorVis;
-    }
-
-    visSync.Sync(records, matSys, colorSys, world);
-
-    const auto expectColorConfig = [&](const Graphics::GpuInstanceHandle instance)
-    {
-        const RHI::GpuEntityConfig config = world.GetEntityConfigForTest(instance);
-        EXPECT_EQ(config.ColorSourceMode, kColorSourcePerElementRgba);
-        EXPECT_EQ(config.ScalarBDA, 0u);
-        EXPECT_EQ(config.ColorBDA, device.GetBufferDeviceAddress(colorBuffer));
-        EXPECT_EQ(config.ElementCount, kElementCount);
-        EXPECT_EQ(config.VisDomain, 0u);
+        Graphics::Components::VisualizationConfig::ColorSource Source;
+        std::uint32_t ExpectedVisDomain;
     };
-    expectColorConfig(surfaceInstance);
-    expectColorConfig(lineInstance);
-    expectColorConfig(pointInstance);
+
+    const std::array<ColorDomainCase, 3> colorDomainCases{{
+        {
+            Graphics::Components::VisualizationConfig::ColorSource::PerVertexBuffer,
+            0u,
+        },
+        {
+            Graphics::Components::VisualizationConfig::ColorSource::PerFaceBuffer,
+            1u,
+        },
+        {
+            Graphics::Components::VisualizationConfig::ColorSource::PerEdgeBuffer,
+            2u,
+        },
+    }};
+
+    for (const ColorDomainCase& domainCase : colorDomainCases)
+    {
+        Graphics::Components::VisualizationConfig colorVis = scalarVis;
+        colorVis.Source = domainCase.Source;
+        colorVis.ColorBufferName = "colors";
+        for (auto& record : records)
+        {
+            record.Visualization = &colorVis;
+        }
+
+        visSync.Sync(records, matSys, colorSys, world);
+
+        const auto expectColorConfig = [&](const Graphics::GpuInstanceHandle instance)
+        {
+            const RHI::GpuEntityConfig config = world.GetEntityConfigForTest(instance);
+            EXPECT_EQ(config.ColorSourceMode, kColorSourcePerElementRgba);
+            EXPECT_EQ(config.ScalarBDA, 0u);
+            EXPECT_EQ(config.ColorBDA, device.GetBufferDeviceAddress(colorBuffer));
+            EXPECT_EQ(config.ElementCount, kElementCount);
+            EXPECT_EQ(config.VisDomain, domainCase.ExpectedVisDomain);
+        };
+        expectColorConfig(surfaceInstance);
+        expectColorConfig(lineInstance);
+        expectColorConfig(pointInstance);
+    }
 
     visSync.Shutdown();
     matSys.Shutdown();

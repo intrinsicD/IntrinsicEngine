@@ -9,6 +9,31 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`BUG-051`](BUG-051-mesh-color-visualization-property-buffer.md) — Mesh color
+visualization lacks automatic property-buffer extraction — retired on
+2026-06-22 at maturity `CPUContracted`. Runtime render extraction now
+auto-emits mesh `glm::vec4` color property-buffer packets from mesh
+`GeometrySources` for per-vertex/per-edge/per-face color-buffer
+visualizations, including `v:color`, without requiring an explicit adapter
+binding. Missing and unsupported color sources fail closed through adapter
+diagnostics, and `VisualizationSyncSystem` now forwards the selected
+per-element color-buffer domain into `GpuEntityConfig::VisDomain` so shader
+lookup uses the configured vertex/face/edge domain. The structural vertex-color
+stream and declarative SoA migration remain owned by RUNTIME-121/RUNTIME-122.
+
+Active
+[`BUG-050`](BUG-050-direct-mesh-first-upload-normals.md) — Direct mesh first
+upload lacks computed normals — retired on 2026-06-22 at maturity
+`CPUContracted`. The geometry-only runtime mesh materialization helper now
+writes explicit or deterministic area-weighted fallback `v:normal` values
+before ECS `GeometrySources` publication, so direct mesh imports and
+progressive raw model-scene primitives carry count-matched normals on their
+first upload. Authored normals remain authoritative, deferred UV/texture-bake
+post-processing still applies back to the same entity through dirty extraction,
+and generated normal texture bindings remain data-only until the promoted
+texture path consumes them.
+
+Active
 [`PROC-009`](PROC-009-import-productivity-skills.md) — Import productivity
 skills into repo skill surface — retired on 2026-06-22. The repo-local skill
 surface now includes the third-party `teach`, `grilling`, and `grill-me`

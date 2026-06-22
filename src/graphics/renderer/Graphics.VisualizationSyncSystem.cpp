@@ -97,6 +97,31 @@ namespace Extrinsic::Graphics
             return 0u;
         }
 
+        static std::uint32_t ToVisDomain(Components::VisualizationConfig::ColorSource source) noexcept
+        {
+            using ColorSource = Components::VisualizationConfig::ColorSource;
+            switch (source)
+            {
+            case ColorSource::PerVertexBuffer: return 0u;
+            case ColorSource::PerFaceBuffer:   return 1u;
+            case ColorSource::PerEdgeBuffer:   return 2u;
+            case ColorSource::Material:
+            case ColorSource::UniformColor:
+            case ColorSource::ScalarField:
+                return 0u;
+            }
+            return 0u;
+        }
+
+        static bool IsColorBufferSource(
+            const Components::VisualizationConfig::ColorSource source) noexcept
+        {
+            using ColorSource = Components::VisualizationConfig::ColorSource;
+            return source == ColorSource::PerVertexBuffer ||
+                   source == ColorSource::PerEdgeBuffer ||
+                   source == ColorSource::PerFaceBuffer;
+        }
+
         static VisualizationAttributeDomain ToAttributeDomain(
             Components::VisualizationConfig::Domain d) noexcept
         {
@@ -331,7 +356,9 @@ namespace Extrinsic::Graphics
             cfg.IsolineWidth = visCfg->Scalar.Isolines.Width;
             cfg.IsolineColor = visCfg->Scalar.Isolines.Color;
             cfg.VisualizationAlpha = 1.f;
-            cfg.VisDomain = ToVisDomain(visCfg->ScalarDomain);
+            cfg.VisDomain = IsColorBufferSource(visCfg->Source)
+                ? ToVisDomain(visCfg->Source)
+                : ToVisDomain(visCfg->ScalarDomain);
 
             if (!Device)
                 return cfg;
