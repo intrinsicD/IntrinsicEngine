@@ -2,9 +2,9 @@ session:
   id: "2026-06-22_001"
   date: "2026-06-22"
   started: "2026-06-22T00:33"
-  last_turn: "2026-06-22T02:48"
-  turn_count: 5
-  summary: "Implemented, verified, committed, and retired GRAPHICS-095 through GRAPHICS-098 for the CPU/GPU transfer foundation, then imported third-party productivity skills through PROC-009."
+  last_turn: "2026-06-22T03:33"
+  turn_count: 6
+  summary: "Implemented, verified, committed, and retired GRAPHICS-095 through GRAPHICS-098 for the CPU/GPU transfer foundation, imported third-party productivity skills through PROC-009, and fixed BUG-050/BUG-051 mesh normal/color visualization wiring."
 
 events_logged:
   - turn: 1
@@ -67,6 +67,18 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Skill mirror sync, strict task checks, doc links, root hygiene, PR contract, docs-sync, whitespace checks, and direct .claude/.codex skill visibility checks passed."
+  - turn: 6
+    type: decision
+    id: "N50"
+    routing: direct
+    provenance: ai-executed
+    summary: "Analyzed graphics normal/color wiring gaps, implemented first-publication mesh normals and automatic mesh color visualization property-buffer extraction, retired BUG-050/BUG-051, and committed 3fb6d978."
+  - turn: 6
+    type: experiment
+    id: "N51"
+    routing: direct
+    provenance: ai-executed
+    summary: "Focused normal/color regressions passed, the corrected full default CPU-supported CTest rerun passed 4980/4980, and structural/task/docs checks passed."
 
 ai_actions:
   - turn: 1
@@ -159,6 +171,23 @@ ai_actions:
       - "tasks/done/RETIREMENT-LOG.md"
       - "tasks/backlog/process/README.md"
       - "tasks/backlog/README.md"
+  - turn: 6
+    action: "Implemented first-publication mesh normals, automatic mesh color visualization property-buffer extraction, per-element color-buffer domain sync, focused regressions, docs/task retirement records, and committed the slice."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Runtime.AssetMeshNormals.cpp"
+      - "src/runtime/Runtime.RenderExtraction.cpp"
+      - "src/graphics/renderer/Graphics.VisualizationSyncSystem.cpp"
+      - "tests/contract/runtime/Test.AssetImportFormatCoverage.cpp"
+      - "tests/contract/runtime/Test.AssetModelSceneHandoff.cpp"
+      - "tests/integration/runtime/Test.RuntimeRenderExtraction.cpp"
+      - "tests/contract/graphics/Test.MinimalTriangleAcceptance.cpp"
+      - "src/runtime/README.md"
+      - "src/graphics/renderer/README.md"
+      - "tasks/done/BUG-050-direct-mesh-first-upload-normals.md"
+      - "tasks/done/BUG-051-mesh-color-visualization-property-buffer.md"
+      - "tasks/done/RETIREMENT-LOG.md"
+      - "tasks/backlog/bugs/index.md"
 
 claims_touched: []
 
@@ -187,8 +216,15 @@ key_context:
     excerpt: "`.claude/skills` and `.codex/skills` resolve to `tools/agents/skills`, so one committed import covers both agent skill surfaces."
   - turn: 5
     excerpt: "`sync_skills.py` remains scoped to generated IntrinsicEngine canonical-doc mirrors; third-party productivity skills are manually maintained imports."
+  - turn: 6
+    excerpt: "User requested agentic analysis of whether new graphics tasks are wired for updated vertex normals, loading-time normals, shading, and vertex colors; implementation should create tasks if gaps exist and commit the result."
+  - turn: 6
+    excerpt: "Analysis found current mesh normal recompute/shading paths were wired, but direct/progressive geometry-only publication lacked computed normals before first upload and mesh `glm::vec4` color visualizations lacked automatic property-buffer extraction."
+  - turn: 6
+    excerpt: "RUNTIME-121/RUNTIME-122/RUNTIME-123 remain the broader structural vertex-color stream, declarative vertex layout, and bind-any-property UI follow-ups; this slice intentionally closed only the immediate BUG-050/BUG-051 wiring gaps."
 
 open_threads:
   - "RUNTIME-126 owns GPU readback jobs and result-to-property write-back now that the rendering transfer foundation is retired."
+  - "RUNTIME-121/RUNTIME-122/RUNTIME-123 remain open for structural vertex-color channels, declarative SoA vertex layout, and editor bind-property-as-channel UI beyond the automatic visualization-buffer fix."
 
 ai_suggestions_pending: []

@@ -1067,3 +1067,65 @@ tree:
       no changed files relative to their base view, so explicit skill/process
       checks were the meaningful verification for this staged slice.
     status: resolved
+  - id: N50
+    type: decision
+    title: "Retire BUG-050 and BUG-051 graphics wiring fixes"
+    provenance: ai-executed
+    timestamp: "2026-06-22T03:33"
+    choice: >
+      Analyzed the new graphics normal/color workflows, identified two wiring
+      gaps, implemented first-publication mesh normals and automatic mesh color
+      visualization property-buffer extraction, retired BUG-050 and BUG-051 at
+      `CPUContracted`, and committed the slice as 3fb6d978.
+    alternatives:
+      - "Leave direct no-normal imports dependent on deferred post-process before first shaded upload."
+      - "Require explicit visualization adapter bindings for mesh `glm::vec4` color properties."
+      - "Fold the broader structural vertex-color stream and declarative SoA migration into this bug slice."
+    evidence:
+      - "3fb6d978"
+      - "tasks/done/BUG-050-direct-mesh-first-upload-normals.md"
+      - "tasks/done/BUG-051-mesh-color-visualization-property-buffer.md"
+      - "src/runtime/Runtime.AssetMeshNormals.cpp"
+      - "src/runtime/Runtime.RenderExtraction.cpp"
+      - "src/graphics/renderer/Graphics.VisualizationSyncSystem.cpp"
+      - "tests/contract/runtime/Test.AssetImportFormatCoverage.cpp"
+      - "tests/integration/runtime/Test.RuntimeRenderExtraction.cpp"
+    status: resolved
+  - id: N51
+    type: experiment
+    title: "BUG-050 and BUG-051 verification"
+    provenance: ai-executed
+    timestamp: "2026-06-22T03:33"
+    also_depends_on: [N50]
+    evidence:
+      - "cmake --preset ci"
+      - "cmake --build --preset ci --target IntrinsicRuntimeContractTests IntrinsicRuntimeIntegrationTests -- -j4"
+      - "cmake --build --preset ci --target IntrinsicRuntimeGraphicsCpuTests -- -j4"
+      - "cmake --build --preset ci --target IntrinsicGraphicsContractCpuTests -- -j4"
+      - "ctest --test-dir build/ci --output-on-failure -R 'RuntimeAssetImportFormatCoverage\\.DirectObjImport(PreservesVertexNormalsInGeometrySources|ComputesVertexNormalsWhenMissing|ComputesAndBakesGeneratedNormalTextureWhenMissingNormals)' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "ctest --test-dir build/ci --output-on-failure -R 'RuntimeAssetModelSceneHandoff\\.ProgressiveRawGeometryFirstPublishesNormalsAndQueuesUvAndBakeJobs' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "ctest --test-dir build/ci --output-on-failure -R 'RuntimeRenderExtraction\\.MeshColorVisualizationPropertyBuffer' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "ctest --test-dir build/ci --output-on-failure -R 'GraphicsMinimalAcceptance\\.VisualizationSyncWritesEquivalentLinePointColorSourceConfig' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "cmake --build --preset ci --target IntrinsicTests -- -j4"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+      - "python3 tools/repo/check_test_layout.py --root . --strict"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/docs/check_doc_links.py --root ."
+      - "python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main"
+      - "python3 tools/repo/check_root_hygiene.py --root ."
+      - "python3 tools/repo/check_pr_contract.py"
+      - "git diff --check"
+      - "git diff --cached --check"
+    result: >
+      Clean `ci` configure passed. Focused runtime and graphics build targets
+      passed. Direct import normal tests passed 3/3, progressive model-scene
+      first-publication normal coverage passed 1/1, mesh color visualization
+      extraction tests passed 2/2, and the graphics color-buffer domain sync
+      contract passed 1/1. The first broad CPU gate exposed one obsolete
+      progressive-normal-job test expectation; after updating that contract,
+      the default CPU-supported CTest rerun passed 4980/4980. Strict layering,
+      test-layout, task-policy, doc-link, docs-sync, root-hygiene, PR-contract,
+      and whitespace checks exited successfully. Root hygiene still reports
+      pre-existing warning-mode `ara/` and `imgui.ini` entries.
+    status: resolved

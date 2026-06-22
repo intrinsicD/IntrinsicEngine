@@ -43,8 +43,8 @@ sessions:
     open_threads: 2
   - id: "2026-06-22_001"
     date: "2026-06-22"
-    summary: "Implemented, verified, committed, and retired GRAPHICS-095 through GRAPHICS-098 for the CPU/GPU transfer foundation, then imported third-party productivity skills through PROC-009."
-    turn_count: 5
-    events_count: 10
+    summary: "Implemented, verified, committed, and retired GRAPHICS-095 through GRAPHICS-098 for the CPU/GPU transfer foundation, imported third-party productivity skills through PROC-009, and fixed BUG-050/BUG-051 mesh normal/color visualization wiring."
+    turn_count: 6
+    events_count: 12
     claims_touched: []
-    open_threads: 1
+    open_threads: 2
