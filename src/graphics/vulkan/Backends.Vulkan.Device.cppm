@@ -205,6 +205,17 @@ namespace Extrinsic::Backends::Vulkan
                 return {};
             }
 
+            [[nodiscard]] RHI::ReadbackToken DownloadTexture(RHI::TextureHandle,
+                                                             RHI::TextureLayout,
+                                                             std::uint32_t,
+                                                             std::uint32_t,
+                                                             RHI::ReadbackSink) override
+            {
+                m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
+                Core::Log::Warn("[VulkanDevice] Fallback transfer queue rejected texture readback; device is non-operational");
+                return {};
+            }
+
             [[nodiscard]] bool IsComplete(RHI::TransferToken token) const override { return !token.IsValid(); }
             [[nodiscard]] bool IsComplete(RHI::ReadbackToken token) const override { return !token.IsValid(); }
             void CollectCompleted() override {}

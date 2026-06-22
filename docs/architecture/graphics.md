@@ -39,21 +39,25 @@ Graphics is organized into explicit sublayers:
 
 - `RHI::ITransferQueue::DownloadBuffer(...)` is the reusable buffer readback
   seam introduced by GRAPHICS-096 and specified by
-  [ADR-0023](../adr/0023-cpu-gpu-transfer-foundation.md). It mirrors async
-  uploads: callers receive a `ReadbackToken`, no caller thread waits on a GPU
-  fence, and delivery happens through `ReadbackSink` during the render-thread
-  `CollectCompleted()` drain.
-- The RHI contract is buffer-only. Texture readback remains a separate follow-up
-  and high-level resource barrier orchestration remains outside this seam. Range
-  validation routes through `RHI.BufferTransfer`, invalid requests fail closed,
-  and Null/non-operational backends expose dropped-readback diagnostics instead
-  of silently ignoring downloads.
+  [ADR-0023](../adr/0023-cpu-gpu-transfer-foundation.md). `DownloadTexture(...)`
+  is the GRAPHICS-097 texture-subresource readback seam over the same
+  `ReadbackToken` / `ReadbackSink` / `CollectCompleted()` contract. Both mirror
+  async uploads: no caller thread waits on a GPU fence, and bytes are delivered
+  only from the render-thread drain.
+- Buffer range validation routes through `RHI.BufferTransfer`; texture readback
+  reuses `RHI.TextureUpload`'s packed-subresource math in reverse and currently
+  accepts color `Tex2D` arrays and six-face cubemaps. Callers own source layout
+  transitions and must pass `TextureLayout::TransferSrc`; unsupported formats,
+  depth-stencil textures, invalid sinks, missing `TransferSrc` usage, and
+  out-of-range subresources fail closed. Null/non-operational backends expose
+  dropped-readback diagnostics instead of silently ignoring downloads.
 - Vulkan implements the first operational backend with a recycled mapped
   host-visible readback staging ring on the transfer timeline. The ring copies
-  device-local buffer bytes into staging with `vkCmdCopyBuffer`, invalidates the
-  VMA allocation on drain, copies bytes into the sink, and only then marks the
-  `ReadbackToken` complete. `IDevice::ReadBuffer()` remains a legacy blocking
-  smoke helper and is not the new readback path.
+  device-local buffer bytes with `vkCmdCopyBuffer` and texture subresources with
+  `vkCmdCopyImageToBuffer`, invalidates the VMA allocation on drain, copies bytes
+  into the sink, and only then marks the `ReadbackToken` complete.
+  `IDevice::ReadBuffer()` remains a legacy blocking smoke helper and is not the
+  new readback path.
 - Renderer-owned drains such as `Picking.Readback` and the post-process
   histogram still own their higher-level request/result policy. They may adopt
   the transfer-queue readback ring when their framegraph barrier and ownership

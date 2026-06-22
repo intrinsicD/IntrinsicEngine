@@ -70,6 +70,15 @@ This directory contains the `RHI` module/files.
   are delivered from `CollectCompleted()` through `ReadbackSink` (fixed-size
   destination span and/or drain-time callback). Null/fallback backends fail
   closed with invalid tokens and dropped-readback diagnostics.
+- `ITransferQueue::DownloadTexture(TextureHandle, TextureLayout, mip, layer,
+  ReadbackSink)` is the GRAPHICS-097 texture readback seam over the same
+  readback token/sink/drain contract. Callers must transition the source
+  subresource into `TextureLayout::TransferSrc` before calling and own any
+  after-readback transition. The RHI validation shape reuses
+  `RHI.TextureUpload`'s packed-subresource layout in reverse: supported color
+  `Tex2D` arrays and six-face cubemaps deliver exactly one mip/layer byte span,
+  while depth-stencil, unsupported formats, invalid layouts, invalid sinks, and
+  out-of-range subresources fail closed with dropped-readback diagnostics.
 - `RHI.TextureUpload.cppm` owns backend-neutral texture upload math:
   per-format byte/block helpers, Vulkan-safe subresource offset alignment, and
   the layer-major / mip-minor `TextureUploadLayout` used by future batched

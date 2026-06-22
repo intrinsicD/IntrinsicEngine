@@ -9,6 +9,27 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Active
+[`GRAPHICS-097`](GRAPHICS-097-async-texture-readback.md) — Async GPU-to-CPU
+texture readback through the readback ring on `ITransferQueue` — retired on
+2026-06-22 at maturity `Operational` on Vulkan-capable hosts
+(`CPUContracted` elsewhere). `Extrinsic.RHI.TransferQueue` now exposes
+`DownloadTexture(TextureHandle, TextureLayout, mip, layer, ReadbackSink)` as an
+append-only non-blocking readback virtual over the GRAPHICS-096
+`ReadbackToken`/`ReadbackSink` drain. Null and non-operational Vulkan fallback
+queues fail closed with dropped-readback diagnostics. The live Vulkan queue
+validates color `Tex2D` arrays and six-face cubemaps through
+`Extrinsic.RHI.TextureUpload`, rejects depth-stencil/unsupported formats,
+invalid sinks, missing `TransferSrc` usage, out-of-range subresources, and
+non-`TransferSrc` source layouts, records `vkCmdCopyImageToBuffer` into a
+recycled mapped readback slot without auto-transitioning the source texture,
+and delivers exactly the requested mip/layer bytes from `CollectCompleted()`.
+CPU evidence covers Null fail-closed behavior, mock subresource delivery, and
+bad-format/subresource/layout drops; opt-in `gpu;vulkan` evidence covers a
+multi-mip 2D-array texture upload, caller-owned `ShaderReadOnly -> TransferSrc`
+barrier, mip/layer readback, and caller-owned transition back without using
+`WaitIdle`. High-level barrier/facade ergonomics remain owned by GRAPHICS-098.
+
+Active
 [`GRAPHICS-096`](GRAPHICS-096-async-buffer-readback-ring.md) — Async GPU-to-CPU
 buffer readback ring on `ITransferQueue` — retired on 2026-06-22 at maturity
 `Operational` on Vulkan-capable hosts (`CPUContracted` elsewhere).

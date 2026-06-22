@@ -2,9 +2,9 @@ session:
   id: "2026-06-22_001"
   date: "2026-06-22"
   started: "2026-06-22T00:33"
-  last_turn: "2026-06-22T01:23"
-  turn_count: 2
-  summary: "Implemented, verified, committed, and retired GRAPHICS-095 and GRAPHICS-096 for the RHI buffer transfer/readback foundation."
+  last_turn: "2026-06-22T02:03"
+  turn_count: 3
+  summary: "Implemented, verified, committed, and retired GRAPHICS-095, GRAPHICS-096, and GRAPHICS-097 for the RHI transfer/readback foundation."
 
 events_logged:
   - turn: 1
@@ -31,6 +31,18 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Focused TransferQueueReadback tests passed 3/3; Vulkan BufferReadbackGpuSmoke passed 1/1; default CPU-supported CTest passed 2966/2966; strict structural/docs checks passed."
+  - turn: 3
+    type: decision
+    id: "N44"
+    routing: direct
+    provenance: ai-executed
+    summary: "Selected GRAPHICS-097 from the rendering backlog, implemented async ITransferQueue texture readback through the GRAPHICS-096 ring, retired the task at Operational, and committed b7f75153."
+  - turn: 3
+    type: experiment
+    id: "N45"
+    routing: direct
+    provenance: ai-executed
+    summary: "Focused TextureReadback tests passed 3/3; Vulkan TextureReadbackGpuSmoke passed 1/1 in both ci and ci-vulkan; default CPU-supported CTest passed 3018/3018; strict structural/docs checks passed."
 
 ai_actions:
   - turn: 1
@@ -69,6 +81,25 @@ ai_actions:
       - "tasks/done/RETIREMENT-LOG.md"
       - "tasks/backlog/rendering/README.md"
       - "tasks/SESSION-BRIEF.md"
+  - turn: 3
+    action: "Added the RHI texture readback virtual, Null/fallback fail-closed handling, Vulkan image-to-buffer readback through mapped ring slots, CPU and Vulkan smoke tests, docs updates, task retirement records, and committed the slice."
+    provenance: ai-executed
+    files_changed:
+      - "src/graphics/rhi/RHI.TransferQueue.cppm"
+      - "src/graphics/renderer/Backends/Null/Backends.Null.Transfer.cpp"
+      - "src/graphics/vulkan/Backends.Vulkan.Transfer.cppm"
+      - "src/graphics/vulkan/Backends.Vulkan.Transfer.cpp"
+      - "src/graphics/vulkan/Backends.Vulkan.Device.cppm"
+      - "tests/contract/graphics/Test.TextureReadback.cpp"
+      - "tests/integration/graphics/Test.TextureReadbackGpuSmoke.cpp"
+      - "tests/CMakeLists.txt"
+      - "docs/architecture/graphics.md"
+      - "src/graphics/rhi/README.md"
+      - "src/graphics/vulkan/README.md"
+      - "tasks/done/GRAPHICS-097-async-texture-readback.md"
+      - "tasks/done/RETIREMENT-LOG.md"
+      - "tasks/backlog/rendering/README.md"
+      - "tasks/SESSION-BRIEF.md"
 
 claims_touched: []
 
@@ -83,8 +114,12 @@ key_context:
     excerpt: "`tasks/SESSION-BRIEF.md` identified GRAPHICS-096 as the next unblocked Theme B rendering transfer task after GRAPHICS-095 retired."
   - turn: 2
     excerpt: "GRAPHICS-096 closes at Operational on Vulkan-capable hosts because both the CPU contract tests and opt-in `gpu;vulkan` buffer-readback smoke passed."
+  - turn: 3
+    excerpt: "`tasks/SESSION-BRIEF.md` identified GRAPHICS-097 as the next unblocked Theme B rendering transfer task after GRAPHICS-096 retired."
+  - turn: 3
+    excerpt: "GRAPHICS-097 closes at Operational on Vulkan-capable hosts because CPU contract tests plus opt-in `gpu;vulkan` texture-readback smokes passed in both `ci` and `ci-vulkan` trees."
 
 open_threads:
-  - "GRAPHICS-097 owns texture readback and GRAPHICS-098 owns the higher-level transfer/barrier facade after the buffer readback ring retirement."
+  - "GRAPHICS-098 owns the higher-level transfer/barrier facade after texture readback retirement."
 
 ai_suggestions_pending: []

@@ -10,6 +10,7 @@ module;
 
 export module Extrinsic.RHI.TransferQueue;
 
+import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Transfer;
 
@@ -32,18 +33,18 @@ import Extrinsic.RHI.Transfer;
 //     (e.g. asset loader thread).  Data is copied into a staging
 //     buffer on the caller thread; the GPU submission happens
 //     asynchronously on the transfer queue.
-//   DownloadBuffer — safe to call from any thread. Backends copy the requested
-//     device range into backend-owned staging and deliver bytes later through a
-//     ReadbackSink from CollectCompleted().
+//   DownloadBuffer / DownloadTexture — safe to call from any thread. Backends
+//     copy the requested device range/subresource into backend-owned staging
+//     and deliver bytes later through a ReadbackSink from CollectCompleted().
 //   IsComplete — safe from any thread (atomic read).
 //   CollectCompleted — render thread only, once per frame, after
 //     EndFrame().  This is the only call that waits on GPU state.
 //
 // Invariant (matches src/ async-upload guarantee):
 //   No caller thread ever blocks on a GPU fence inside
-//   UploadBuffer / UploadTexture / UploadTextureFullChain / DownloadBuffer.
-//   Fence waiting happens exclusively inside CollectCompleted() on the render
-//   thread.
+//   UploadBuffer / UploadTexture / UploadTextureFullChain / DownloadBuffer /
+//   DownloadTexture. Fence waiting happens exclusively inside CollectCompleted()
+//   on the render thread.
 // ============================================================
 
 export namespace Extrinsic::RHI
@@ -170,6 +171,26 @@ export namespace Extrinsic::RHI
             (void)src;
             (void)size;
             (void)offset;
+            (void)sink;
+            return {};
+        }
+
+        /// Non-blocking: queues a GPU transfer from one color texture
+        /// subresource into backend-owned host-visible staging. The source
+        /// texture must already be in `srcLayout` and this method does not
+        /// transition it; callers own before/after layout barriers. Accepted
+        /// subresources are delivered to `sink` from CollectCompleted() after
+        /// the transfer timeline reports completion.
+        [[nodiscard]] virtual ReadbackToken DownloadTexture(TextureHandle src,
+                                                            TextureLayout srcLayout,
+                                                            std::uint32_t mipLevel,
+                                                            std::uint32_t arrayLayer,
+                                                            ReadbackSink sink)
+        {
+            (void)src;
+            (void)srcLayout;
+            (void)mipLevel;
+            (void)arrayLayer;
             (void)sink;
             return {};
         }

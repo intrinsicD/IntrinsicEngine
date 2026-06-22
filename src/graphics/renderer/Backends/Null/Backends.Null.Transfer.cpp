@@ -7,6 +7,7 @@ module;
 module Extrinsic.Backends.Null;
 
 import Extrinsic.Core.Telemetry;
+import Extrinsic.RHI.Descriptors;
 import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.Transfer;
 import Extrinsic.RHI.TransferQueue;
@@ -54,6 +55,16 @@ namespace Extrinsic::Backends::Null
                                                         std::uint64_t,
                                                         std::uint64_t,
                                                         RHI::ReadbackSink) override
+        {
+            m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
+            return {};
+        }
+
+        [[nodiscard]] RHI::ReadbackToken DownloadTexture(RHI::TextureHandle,
+                                                         RHI::TextureLayout,
+                                                         std::uint32_t,
+                                                         std::uint32_t,
+                                                         RHI::ReadbackSink) override
         {
             m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
             return {};

@@ -885,6 +885,154 @@ RHI::ReadbackToken VulkanTransferQueue::DownloadBuffer(RHI::BufferHandle src,
     return token;
 }
 
+RHI::ReadbackToken VulkanTransferQueue::DownloadTexture(RHI::TextureHandle src,
+                                                        RHI::TextureLayout srcLayout,
+                                                        uint32_t mipLevel,
+                                                        uint32_t arrayLayer,
+                                                        RHI::ReadbackSink sink)
+{
+    [[maybe_unused]] Extrinsic::Core::Telemetry::ScopedTimer timer{"VulkanTransferQueue::DownloadTexture", Extrinsic::Core::Telemetry::HashString("VulkanTransferQueue::DownloadTexture")};
+    const auto drop = [this](const char* message) -> RHI::ReadbackToken
+    {
+        Core::Log::Warn("{}", message);
+        m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
+        return {};
+    };
+
+    if (!IsValid())
+        return drop("[VulkanTransferQueue] DownloadTexture rejected; transfer service is invalid");
+    if (!m_Images)
+        return drop("[VulkanTransferQueue] DownloadTexture rejected; image pool is unavailable");
+    if (srcLayout != RHI::TextureLayout::TransferSrc)
+        return drop("[VulkanTransferQueue] DownloadTexture rejected; source layout must be TransferSrc");
+
+    VulkanImage* img = m_Images->GetIfValid(src);
+    if (!img || img->Image == VK_NULL_HANDLE)
+        return drop("[VulkanTransferQueue] DownloadTexture rejected; source texture handle is invalid");
+    if ((img->Usage & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) == 0)
+        return drop("[VulkanTransferQueue] DownloadTexture rejected; source texture lacks transfer-src usage");
+    const VkImageLayout vkSrcLayout = ToVkImageLayout(srcLayout);
+    if (img->CurrentLayout != vkSrcLayout)
+        return drop("[VulkanTransferQueue] DownloadTexture rejected; tracked source layout is not TransferSrc");
+    if (mipLevel >= img->MipLevels || arrayLayer >= img->ArrayLayers)
+        return drop("[VulkanTransferQueue] DownloadTexture rejected; mip level or array layer is out of range");
+    if (RHI::IsDepthStencilFormat(img->RhiFormat) || !RHI::IsUploadableFormat(img->RhiFormat))
+        return drop("[VulkanTransferQueue] DownloadTexture rejected; source format is not a supported color readback format");
+
+    const bool supported2DArray = img->Dimension == RHI::TextureDimension::Tex2D && img->Depth == 1u;
+    const bool supportedCube = img->Dimension == RHI::TextureDimension::TexCube &&
+                               img->Depth == 1u &&
+                               img->ArrayLayers == 6u;
+    if (!supported2DArray && !supportedCube)
+        return drop("[VulkanTransferQueue] DownloadTexture rejected; only 2D color texture arrays and six-face cubemaps are supported by this slice");
+
+    RHI::TextureDesc desc{};
+    desc.Width = img->Width;
+    desc.Height = img->Height;
+    desc.DepthOrArrayLayers = img->ArrayLayers;
+    desc.MipLevels = img->MipLevels;
+    desc.Fmt = img->RhiFormat;
+    desc.Dimension = img->Dimension;
+    desc.Usage = RHI::TextureUsage::TransferSrc;
+
+    auto layoutOr = RHI::ComputeFullChainUploadLayout(desc);
+    if (!layoutOr.has_value())
+        return drop("[VulkanTransferQueue] DownloadTexture rejected; texture layout computation failed");
+
+    const RHI::TextureUploadSubresource* selected = nullptr;
+    for (const RHI::TextureUploadSubresource& sub : layoutOr->Subresources)
+    {
+        if (sub.MipLevel == mipLevel && sub.ArrayLayer == arrayLayer)
+        {
+            selected = &sub;
+            break;
+        }
+    }
+    if (selected == nullptr || selected->SizeBytes == 0u)
+        return drop("[VulkanTransferQueue] DownloadTexture rejected; requested subresource is not present in the layout");
+    if (selected->SizeBytes > static_cast<uint64_t>(std::numeric_limits<size_t>::max()))
+        return drop("[VulkanTransferQueue] DownloadTexture rejected; requested subresource is too large for this host");
+    if (!sink.IsValidForSize(selected->SizeBytes))
+        return drop("[VulkanTransferQueue] DownloadTexture rejected; readback sink is invalid for the requested subresource size");
+
+    const size_t slotIndex = AcquireReadbackSlot(selected->SizeBytes);
+    if (slotIndex == std::numeric_limits<size_t>::max())
+        return drop("[VulkanTransferQueue] DownloadTexture rejected; readback staging allocation failed");
+
+    VkCommandBuffer cmd = Begin();
+    if (cmd == VK_NULL_HANDLE)
+    {
+        ReleaseReadbackSlot(slotIndex, 0u);
+        m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
+        return {};
+    }
+
+    const VkImageAspectFlags aspectMask = AspectFromFormat(img->Format);
+
+    VkImageMemoryBarrier2 beforeCopy{};
+    beforeCopy.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+    beforeCopy.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    beforeCopy.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
+    beforeCopy.dstStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+    beforeCopy.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
+    beforeCopy.oldLayout = vkSrcLayout;
+    beforeCopy.newLayout = vkSrcLayout;
+    beforeCopy.image = img->Image;
+    beforeCopy.subresourceRange = VkImageSubresourceRange{.aspectMask = aspectMask,
+                                                          .baseMipLevel = mipLevel,
+                                                          .levelCount = 1u,
+                                                          .baseArrayLayer = arrayLayer,
+                                                          .layerCount = 1u};
+    VkDependencyInfo dependency{};
+    dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+    dependency.imageMemoryBarrierCount = 1u;
+    dependency.pImageMemoryBarriers = &beforeCopy;
+    vkCmdPipelineBarrier2(cmd, &dependency);
+
+    VkBufferImageCopy copy{};
+    copy.bufferOffset = 0u;
+    copy.imageSubresource = VkImageSubresourceLayers{.aspectMask = aspectMask,
+                                                     .mipLevel = mipLevel,
+                                                     .baseArrayLayer = arrayLayer,
+                                                     .layerCount = 1u};
+    copy.imageExtent = VkExtent3D{.width = selected->Width,
+                                  .height = selected->Height,
+                                  .depth = selected->Depth};
+    {
+        std::scoped_lock lock{m_Mutex};
+        if (slotIndex >= m_ReadbackSlots.size() || m_ReadbackSlots[slotIndex].Buffer == VK_NULL_HANDLE)
+        {
+            Core::Log::Warn("[VulkanTransferQueue] DownloadTexture rejected; readback staging slot became invalid");
+            if (slotIndex < m_ReadbackSlots.size())
+                m_ReadbackSlots[slotIndex].InUse = false;
+            vkFreeCommandBuffers(m_Device, m_CmdPool, 1u, &cmd);
+            m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
+            return {};
+        }
+        vkCmdCopyImageToBuffer(cmd,
+                               img->Image,
+                               vkSrcLayout,
+                               m_ReadbackSlots[slotIndex].Buffer,
+                               1u,
+                               &copy);
+    }
+
+    const RHI::ReadbackToken token = SubmitReadback(cmd,
+                                                    slotIndex,
+                                                    selected->SizeBytes,
+                                                    std::move(sink));
+    if (!token.IsValid())
+    {
+        ReleaseReadbackSlot(slotIndex, 0u);
+        m_DownloadsDropped.fetch_add(1u, std::memory_order_relaxed);
+        return {};
+    }
+
+    m_DownloadsQueued.fetch_add(1u, std::memory_order_relaxed);
+    m_ReadbackBytesStaged.fetch_add(selected->SizeBytes, std::memory_order_relaxed);
+    return token;
+}
+
 bool VulkanTransferQueue::IsComplete(RHI::TransferToken token) const
 {
     if (!token.IsValid())

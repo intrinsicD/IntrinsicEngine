@@ -988,14 +988,14 @@ TAA + reconstructor seam (GRAPHICS-040):
 - [GRAPHICS-040C (done)](../../done/GRAPHICS-040C-aa-recipe-selection-and-integration.md) — AA recipe selection + post-chain integration (`Operational`, 2026-06-05). Depends on 040B (done), GRAPHICS-013A/075 (done).
 - GRAPHICS-040D (vendor reconstructor backends) — **not opened**: per GRAPHICS-040 decision 5/10 there is one child per vendor, opened only when that vendor SDK is actually integrated.
 
-### CPU↔GPU transfer foundation (GRAPHICS-095/096 done; GRAPHICS-097..098 open)
+### CPU↔GPU transfer foundation (GRAPHICS-095..097 done; GRAPHICS-098 open)
 
 Backend-neutral foundation that makes CPU→GPU and GPU→CPU data transfer
 repeatable, validated, fast, and robust for algorithm and user code. Recorded in
 [ADR-0023](../../../docs/adr/0023-cpu-gpu-transfer-foundation.md). The headline
-gap is the absence of any non-stalling GPU→CPU readback path (today only the
-test-only `IDevice::ReadBuffer` `WaitIdle` helper plus bespoke per-feature
-drains exist). Pick the earliest unblocked leaf.
+gap is now ergonomic, centralized barrier bracketing around the non-stalling
+upload/readback seams, so callers stop open-coding `TransferWrite → ShaderRead`
+and `TransferRead` layout/access transitions. Pick the earliest unblocked leaf.
 
 - [GRAPHICS-095 — CPU-testable buffer transfer math and validation helper](../../done/GRAPHICS-095-buffer-transfer-math-helper.md):
   completed base layer, target `CPUContracted`. Adds
@@ -1007,9 +1007,11 @@ drains exist). Pick the earliest unblocked leaf.
   `DownloadBuffer(...)` returns `ReadbackToken` + `ReadbackSink`, uses a recycled
   host-visible readback ring, and delivers on the `CollectCompleted()` drain
   without caller-thread fence waits.
-- [GRAPHICS-097 — Async GPU→CPU texture readback through the readback ring](GRAPHICS-097-async-texture-readback.md):
-  depends on GRAPHICS-096, target `Operational` on Vulkan. `DownloadTexture(...)`
-  reusing `RHI::TextureUpload` subresource layout in reverse.
+- [GRAPHICS-097 — Async GPU→CPU texture readback through the readback ring](../../done/GRAPHICS-097-async-texture-readback.md):
+  completed transfer-queue texture readback layer, target `Operational` on
+  Vulkan. `DownloadTexture(...)` reuses `RHI::TextureUpload` subresource layout
+  in reverse, stages a mip/layer through the GRAPHICS-096 readback ring, and
+  leaves source layout transitions caller-owned.
 - [GRAPHICS-098 — High-level `GpuTransfer` facade with correct barrier brackets](GRAPHICS-098-gpu-transfer-facade.md):
   depends on GRAPHICS-096, target `Operational` on Vulkan. Ergonomic upload-with-
   barrier / readback-with-barrier helpers over the foundation; centralizes the

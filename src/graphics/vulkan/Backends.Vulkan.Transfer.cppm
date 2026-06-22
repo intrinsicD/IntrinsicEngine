@@ -14,6 +14,7 @@ export module Extrinsic.Backends.Vulkan:Transfer;
 
 export import Extrinsic.Core.ResourcePool;
 export import Extrinsic.Core.Telemetry;
+export import Extrinsic.RHI.Descriptors;
 export import Extrinsic.RHI.Handles;
 export import Extrinsic.RHI.Transfer;
 export import Extrinsic.RHI.TransferQueue;
@@ -107,6 +108,11 @@ namespace Extrinsic::Backends::Vulkan
                                                         uint64_t size,
                                                         uint64_t offset,
                                                         RHI::ReadbackSink sink) override;
+        [[nodiscard]] RHI::ReadbackToken DownloadTexture(RHI::TextureHandle src,
+                                                         RHI::TextureLayout srcLayout,
+                                                         uint32_t mipLevel,
+                                                         uint32_t arrayLayer,
+                                                         RHI::ReadbackSink sink) override;
         [[nodiscard]] bool IsComplete(RHI::TransferToken token) const override;
         [[nodiscard]] bool IsComplete(RHI::ReadbackToken token) const override;
         void CollectCompleted() override;

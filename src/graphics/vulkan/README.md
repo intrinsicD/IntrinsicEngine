@@ -97,11 +97,15 @@ available through the Vulkan 1.2/1.3 feature chain.
   destination stage/access scopes must remain transfer-queue-valid; shader-stage
   visibility is established later by graphics/renderer-side use barriers rather
   than by naming fragment/compute stages on a transfer-only command buffer.
-  GRAPHICS-096 adds the [ADR-0023](../../../docs/adr/0023-cpu-gpu-transfer-foundation.md)
-  buffer readback half of the same transfer seam: `DownloadBuffer(...)` validates
-  the source range, copies into a recycled mapped host-visible `TRANSFER_DST`
-  staging slot, signals the transfer timeline, and delivers bytes to the
-  `ReadbackSink` only from `CollectCompleted()`. `IsComplete(ReadbackToken)`
+  GRAPHICS-096/097 add the
+  [ADR-0023](../../../docs/adr/0023-cpu-gpu-transfer-foundation.md) readback half
+  of the same transfer seam: `DownloadBuffer(...)` validates the source range,
+  and `DownloadTexture(...)` validates a color `Tex2D`/cubemap mip-layer
+  subresource using `RHI.TextureUpload` layout math. Both copy into a recycled
+  mapped host-visible `TRANSFER_DST` staging slot, signal the transfer timeline,
+  and deliver bytes to the `ReadbackSink` only from `CollectCompleted()`.
+  `DownloadTexture(...)` requires caller-owned `TextureLayout::TransferSrc`
+  state and records no automatic source layout transition. `IsComplete(ReadbackToken)`
   reports delivery completion, not just queue signal completion, and
   `TransferQueueDiagnostics` exposes queued/completed/dropped downloads, staged
   bytes, and readback-ring high-water bytes. The legacy
@@ -333,8 +337,10 @@ available through the Vulkan 1.2/1.3 feature chain.
   the live transfer queue once guarded live prerequisites are ready and adds an
   opt-in `gpu;vulkan` smoke for a 2D multi-mip full-chain upload. Slice B extends
   the same batched transfer path to six-face cubemaps and expands the opt-in smoke
-  to cover 2D array and cubemap full-chain uploads. 3D batching remains deferred;
-  the existing single-subresource `WriteTexture()` /
+  to cover 2D array and cubemap full-chain uploads. GRAPHICS-097 reuses that
+  packed-subresource layout in reverse for `DownloadTexture(...)`, staging a
+  single mip/layer at readback slot offset zero through `vkCmdCopyImageToBuffer`.
+  3D batching remains deferred; the existing single-subresource `WriteTexture()` /
   one-`UploadTexture()` paths remain the fail-closed correctness baseline.
   Pipeline creation now builds
   SPIR-V-backed compute or dynamic-rendering graphics pipelines once guarded
@@ -664,7 +670,7 @@ device-lost transition. Counters are process-monotonic across
 | `Backends.Vulkan.Staging.cpp` | §5 `StagingBelt` — host-visible ring-buffer for async uploads |
 | `Backends.Vulkan.Profiler.cpp` | §6 `VulkanProfiler` — `IProfiler` backed by `VkQueryPool` timestamps |
 | `Backends.Vulkan.Bindless.cpp` | §7 `VulkanBindlessHeap` — `IBindlessHeap` with `PARTIALLY_BOUND` descriptor array |
-| `Backends.Vulkan.Transfer.cpp` | §8 `VulkanTransferQueue` — `ITransferQueue` via timeline semaphore + `StagingBelt` |
+| `Backends.Vulkan.Transfer.cpp` | §8 `VulkanTransferQueue` — `ITransferQueue` via timeline semaphore, `StagingBelt`, and mapped readback slots |
 | `Backends.Vulkan.CommandContext.cpp` | §9 `VulkanCommandContext` — `ICommandContext` (one per frame-in-flight slot), with fail-closed unbound/non-recording command skips and diagnostics. |
 | `Backends.Vulkan.OperationalStatus.cpp` | §10 `EvaluateVulkanOperationalStatus()` — pure CPU evaluator of the 9-step operational gate consumed by `VulkanDevice::IsOperational()` (GRAPHICS-033A). |
 | `Backends.Vulkan.Device.cpp` | §11 `VulkanDevice` implementations + §12 `CreateVulkanDevice()` factory |

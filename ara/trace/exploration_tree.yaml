@@ -894,3 +894,63 @@ tree:
       CPU-supported CTest gate passed 2966/2966 tests, and staged whitespace
       checks passed.
     status: resolved
+  - id: N44
+    type: decision
+    title: "Retire GRAPHICS-097 at Operational"
+    provenance: ai-executed
+    timestamp: "2026-06-22T02:03"
+    also_depends_on: [N42, N43]
+    choice: >
+      Selected GRAPHICS-097 as the next unblocked rendering backlog task,
+      extended `RHI::ITransferQueue` with async texture-subresource readback,
+      implemented the promoted Vulkan `vkCmdCopyImageToBuffer` path through the
+      existing readback ring, kept Null/fallback backends fail-closed, and
+      retired GRAPHICS-097 at `Operational` maturity on Vulkan-capable hosts in
+      commit `b7f75153`.
+    alternatives:
+      - "Leave texture readback to ad hoc pass-local drains."
+      - "Add a CPU-only contract without a promoted Vulkan smoke proof."
+      - "Fold the higher-level transfer/barrier facade into the texture readback slice."
+    evidence:
+      - "commit b7f75153"
+      - "tasks/done/GRAPHICS-097-async-texture-readback.md"
+      - "src/graphics/rhi/RHI.TransferQueue.cppm"
+      - "src/graphics/vulkan/Backends.Vulkan.Transfer.cpp"
+      - "tests/contract/graphics/Test.TextureReadback.cpp"
+      - "tests/integration/graphics/Test.TextureReadbackGpuSmoke.cpp"
+    status: resolved
+  - id: N45
+    type: experiment
+    title: "GRAPHICS-097 verification"
+    provenance: ai-executed
+    timestamp: "2026-06-22T02:03"
+    also_depends_on: [N44]
+    evidence:
+      - "cmake --preset ci"
+      - "cmake --build --preset ci --target IntrinsicGraphicsContractTests -j 16"
+      - "ctest --test-dir build/ci --output-on-failure -R 'TextureReadback' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "cmake --build --preset ci --target IntrinsicGraphicsVulkanSmokeTests -j 16"
+      - "ctest --test-dir build/ci --output-on-failure -R 'TextureReadbackGpuSmoke' -L 'gpu' -L 'vulkan' --timeout 120"
+      - "cmake --build --preset ci --target IntrinsicTests -j 16"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "cmake --preset ci-vulkan"
+      - "cmake --build --preset ci-vulkan --target IntrinsicGraphicsVulkanSmokeTests -j 16"
+      - "ctest --test-dir build/ci-vulkan --output-on-failure -R 'TextureReadbackGpuSmoke' -L 'gpu' -L 'vulkan' --timeout 120"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/docs/check_doc_links.py --root ."
+      - "python3 tools/repo/check_layering.py --root src --strict"
+      - "python3 tools/repo/check_test_layout.py --root . --strict"
+      - "python3 tools/repo/check_root_hygiene.py --root ."
+      - "python3 tools/repo/check_pr_contract.py"
+      - "git diff --cached --check"
+    result: >
+      Clean `ci` configure passed, focused graphics contract build passed,
+      focused TextureReadback CTest passed 3/3, the `ci` Vulkan smoke target
+      built, TextureReadbackGpuSmoke passed 1/1 in `build/ci`, `IntrinsicTests`
+      built, the default CPU-supported CTest gate passed 3018/3018 tests,
+      `ci-vulkan` configure and Vulkan smoke target build passed,
+      TextureReadbackGpuSmoke passed 1/1 in `build/ci-vulkan`, strict
+      task-policy/doc-link/layering/test-layout checks passed, root-hygiene and
+      PR-contract helpers exited successfully, and staged whitespace checks
+      passed.
+    status: resolved
