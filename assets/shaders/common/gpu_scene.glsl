@@ -105,6 +105,8 @@ struct GpuInstanceDynamic {
 struct GpuGeometryRecord {
     uint64_t VertexBufferBDA;
     uint64_t IndexBufferBDA;
+    uint64_t TexcoordBufferBDA;
+    uint64_t NormalBufferBDA;
 
     uint VertexOffset;
     uint VertexCount;
@@ -120,8 +122,7 @@ struct GpuGeometryRecord {
 
     uint BufferID;
     uint Flags;
-    uint _pad0;
-    uint _pad1;
+    uint64_t ColorBufferBDA;
 };
 
 struct GpuEntityPointConfig {
@@ -284,6 +285,20 @@ layout(buffer_reference, scalar) readonly buffer GpuUIntBufferRef {
 layout(buffer_reference, scalar) readonly buffer GpuBoundsRef {
     GpuBounds Data[];
 };
+
+vec2 GpuReadPackedVec2(uint64_t bda, uint elementId)
+{
+    GpuFloatBufferRef values = GpuFloatBufferRef(bda);
+    const uint base = elementId * 2u;
+    return vec2(values.Data[base], values.Data[base + 1u]);
+}
+
+vec3 GpuReadPackedVec3(uint64_t bda, uint elementId)
+{
+    GpuFloatBufferRef values = GpuFloatBufferRef(bda);
+    const uint base = elementId * 3u;
+    return vec3(values.Data[base], values.Data[base + 1u], values.Data[base + 2u]);
+}
 
 
 layout(buffer_reference, scalar) readonly buffer GpuMaterialSlotRef {

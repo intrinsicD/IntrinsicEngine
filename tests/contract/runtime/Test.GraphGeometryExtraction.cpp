@@ -861,11 +861,9 @@ namespace
     }
 }
 
-// RUNTIME-086 Slice C — dirty-domain reupload coverage. Each graph-relevant
-// dirty tag and the coarse `GpuDirty` must individually trigger a repack +
-// upload, queue the old handle for deferred retire, surface the change as
-// `GraphGeometryReuploads` + `GraphGeometryReleases`, and drain the tag(s) so
-// subsequent clean ticks return to the `GraphGeometryReuseHits` path.
+// Graph dirty-domain coverage. Coarse GPU/topology tags still require a full
+// replacement upload, while vertex-channel tags use the in-place partial
+// channel upload path and keep the existing resident handle.
 class GraphGeometryExtractionDirtyTag
     : public ::testing::TestWithParam<const char*>
 {
@@ -902,34 +900,54 @@ TEST_P(GraphGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
         D::MarkVertexPositionsDirty(raw, entity);
     else if (param == "DirtyVertexAttributes")
         D::MarkVertexAttributesDirty(raw, entity);
+    else if (param == "DirtyVertexTexcoords")
+        D::MarkVertexTexcoordsDirty(raw, entity);
+    else if (param == "DirtyVertexNormals")
+        D::MarkVertexNormalsDirty(raw, entity);
+    else if (param == "DirtyVertexColors")
+        D::MarkVertexColorsDirty(raw, entity);
     else if (param == "DirtyEdgeTopology")
         D::MarkEdgeTopologyDirty(raw, entity);
     else
         FAIL() << "Unhandled dirty-tag parameterization: " << param;
+
+    const bool fullUploadExpected =
+        param == "GpuDirty" || param == "DirtyEdgeTopology";
 
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
                                         &engine.GetGpuAssetCache());
     EXPECT_EQ(stats.GraphGeometryUploads, 0u);
     EXPECT_EQ(stats.GraphGeometryReuploads, 1u);
+    EXPECT_EQ(stats.GraphGeometryPartialUploads, fullUploadExpected ? 0u : 1u);
     EXPECT_EQ(stats.GraphGeometryReuseHits, 0u);
-    EXPECT_EQ(stats.GraphGeometryReleases, 1u);
+    EXPECT_EQ(stats.GraphGeometryReleases, fullUploadExpected ? 1u : 0u);
     EXPECT_EQ(stats.GraphGeometryFreeRetires, 0u);
 
     const auto secondView =
         extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(secondView.has_value());
     EXPECT_TRUE(secondView->HasGraphResidency);
-    EXPECT_NE(secondView->GraphGeometry, firstHandle);
+    if (fullUploadExpected)
+    {
+        EXPECT_NE(secondView->GraphGeometry, firstHandle);
+    }
+    else
+    {
+        EXPECT_EQ(secondView->GraphGeometry, firstHandle);
+    }
     EXPECT_EQ(secondView->Geometry, secondView->GraphGeometry);
 
     auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
-    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 2u);
+    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), fullUploadExpected ? 2u : 1u);
     EXPECT_EQ(gpuWorld.GetInstanceGeometry(secondView->Instance), secondView->GraphGeometry);
 
     EXPECT_FALSE((raw.any_of<D::GpuDirty,
                              D::DirtyVertexPositions,
                              D::DirtyVertexAttributes,
+                             D::DirtyVertexTexcoords,
+                             D::DirtyVertexNormals,
+                             D::DirtyVertexColors,
                              D::DirtyEdgeTopology>(entity)));
 
     stats = extraction.ExtractAndSubmit(scene,
@@ -949,7 +967,7 @@ TEST_P(GraphGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
                                         &engine.GetGpuAssetCache());
-    EXPECT_EQ(stats.GraphGeometryFreeRetires, 1u);
+    EXPECT_EQ(stats.GraphGeometryFreeRetires, fullUploadExpected ? 1u : 0u);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();
@@ -960,6 +978,9 @@ INSTANTIATE_TEST_SUITE_P(AllDirtyDomains,
                          ::testing::Values("GpuDirty",
                                            "DirtyVertexPositions",
                                            "DirtyVertexAttributes",
+                                           "DirtyVertexTexcoords",
+                                           "DirtyVertexNormals",
+                                           "DirtyVertexColors",
                                            "DirtyEdgeTopology"));
 
 // RUNTIME-087 follow-up — a dirty-reupload pack failure on a graph entity that

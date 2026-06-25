@@ -62,13 +62,14 @@ Promote the post-reorganization renderer toward 2026-era features without
 breaking the foundation. The umbrella roadmap (`GRAPHICS-035`), all
 `GRAPHICS-036..058` planning/implementation leaves (pipelined frames, async
 compute, HZB occlusion, clustered lights, TAA, and the further modernization
-seams), and the CPU/GPU transfer foundation (`GRAPHICS-095..098`) are retired —
-see [`rendering/README.md`](rendering/README.md) and the retirement log. The
-runtime backlog still carries open Theme B leaves, including the vertex
-attribute series (`RUNTIME-120..125`) and
-[`RUNTIME-126`](runtime/RUNTIME-126-gpu-readback-jobs-and-property-writeback.md),
-which wires the transfer facade/readback ring into the runtime derived-job
-graph.
+seams), the CPU/GPU transfer foundation (`GRAPHICS-095..098`), and the
+contract-first renderer/snapshot/recipe architecture sequence
+(`GRAPHICS-099..103`, `RUNTIME-127`, `UI-023`) are retired — see
+[`rendering/README.md`](rendering/README.md) and the retirement log. The current
+open Theme B leaf is the remaining profile-gated vertex attribute follow-up
+(`RUNTIME-125`). The runtime GPU readback job/write-back leg (`RUNTIME-126`) is
+retired with the transfer facade/readback ring wired into the runtime
+derived-job graph.
 
 ### Theme C — Physics readiness (P1)
 

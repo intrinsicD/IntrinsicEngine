@@ -6,6 +6,7 @@ module;
 #include <limits>
 #include <optional>
 #include <span>
+#include <string_view>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -14,6 +15,9 @@ module Extrinsic.Runtime.GraphGeometryPacker;
 
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.Runtime.VertexAttributeBinding;
+import Extrinsic.Runtime.VertexChannelBindings;
+import Extrinsic.Runtime.VertexChannelStreams;
 import Geometry.Properties;
 
 namespace Extrinsic::Runtime
@@ -53,6 +57,8 @@ namespace Extrinsic::Runtime
     void GraphPackBuffer::Clear() noexcept
     {
         VertexBytes.clear();
+        Channels = {};
+        PackedColors.clear();
         LineIndices.clear();
     }
 
@@ -60,6 +66,16 @@ namespace Extrinsic::Runtime
         const ECS::Components::GeometrySources::ConstSourceView& view,
         const bool wantLines,
         const bool wantPoints,
+        GraphPackBuffer& outBuffer)
+    {
+        return PackGraph(view, wantLines, wantPoints, nullptr, outBuffer);
+    }
+
+    GraphPackResult PackGraph(
+        const ECS::Components::GeometrySources::ConstSourceView& view,
+        const bool wantLines,
+        const bool wantPoints,
+        const VertexChannelBindingSet* channelBindings,
         GraphPackBuffer& outBuffer)
     {
         outBuffer.Clear();
@@ -130,6 +146,7 @@ namespace Extrinsic::Runtime
 
         outBuffer.VertexBytes.resize(sizeof(GraphVertex) * nodeCount);
         auto* vData = reinterpret_cast<GraphVertex*>(outBuffer.VertexBytes.data());
+        const auto nodeCountU32 = static_cast<std::uint32_t>(nodeCount);
 
         constexpr float kInf = std::numeric_limits<float>::infinity();
         glm::vec3 minP{+kInf, +kInf, +kInf};
@@ -147,13 +164,88 @@ namespace Extrinsic::Runtime
             maxP = glm::max(maxP, p);
         }
 
+        std::vector<glm::vec2> texcoords(nodeCount, glm::vec2{0.0f, 0.0f});
+        outBuffer.Channels.SetVertexCount(nodeCountU32);
+        SetChannelVec3(
+            outBuffer.Channels,
+            VertexChannel::Position,
+            std::span<const glm::vec3>{positions.data(), positions.size()});
+        SetChannelVec2(
+            outBuffer.Channels,
+            VertexChannel::Texcoord,
+            std::span<const glm::vec2>{texcoords.data(), texcoords.size()});
+        if (channelBindings != nullptr && IsVertexChannelBindingEnabled(channelBindings->Normal))
+        {
+            std::vector<glm::vec3> normals(nodeCount);
+            const VertexAttributeBinding normalBinding{
+                .Channel = VertexChannel::Normal,
+                .SourceType = channelBindings->Normal.SourceType,
+                .SourceProperty = std::string_view{channelBindings->Normal.SourceProperty},
+                .AllowFallback = false,
+                .Normalize = true,
+                .Fallback = glm::vec4{0.0f, 0.0f, 1.0f, 0.0f},
+            };
+            const AttributeBindResult normalResult =
+                ResolveVec3Channel(
+                    view.NodeSource->Properties,
+                    normalBinding,
+                    nodeCountU32,
+                    normals);
+            if (normalResult.Ok())
+            {
+                SetChannelVec3(
+                    outBuffer.Channels,
+                    VertexChannel::Normal,
+                    std::span<const glm::vec3>{normals.data(), normals.size()});
+            }
+        }
+        if (channelBindings != nullptr && IsVertexChannelBindingEnabled(channelBindings->Color))
+        {
+            outBuffer.PackedColors.resize(nodeCount);
+            const VertexAttributeBinding colorBinding{
+                .Channel = VertexChannel::Color,
+                .SourceType = channelBindings->Color.SourceType,
+                .SourceProperty = std::string_view{channelBindings->Color.SourceProperty},
+                .AllowFallback = false,
+                .Normalize = false,
+                .Fallback = glm::vec4{1.0f, 1.0f, 1.0f, 1.0f},
+            };
+            const AttributeBindResult colorResult =
+                ResolveColorChannelPackedUnorm8(
+                    view.NodeSource->Properties,
+                    colorBinding,
+                    nodeCountU32,
+                    outBuffer.PackedColors);
+            if (colorResult.Ok())
+            {
+                SetChannelPackedUnorm8(
+                    outBuffer.Channels,
+                    VertexChannel::Color,
+                    std::span<const std::uint32_t>{outBuffer.PackedColors});
+            }
+            else
+            {
+                outBuffer.PackedColors.clear();
+            }
+        }
+
+        const auto channelBytes = [&outBuffer](const VertexChannel channel) -> std::span<const std::byte> {
+            const VertexChannelStreams::Stream* stream = outBuffer.Channels.Find(channel);
+            return stream != nullptr ? std::span<const std::byte>{stream->Bytes}
+                                     : std::span<const std::byte>{};
+        };
+
         Extrinsic::Graphics::GpuWorld::GeometryUploadDesc desc{};
         desc.PackedVertexBytes = std::span<const std::byte>{outBuffer.VertexBytes};
+        desc.PositionBytes = channelBytes(VertexChannel::Position);
+        desc.TexcoordBytes = channelBytes(VertexChannel::Texcoord);
+        desc.NormalBytes = channelBytes(VertexChannel::Normal);
+        desc.PackedVertexColors = std::span<const std::uint32_t>{outBuffer.PackedColors};
         desc.SurfaceIndices = {};
         desc.LineIndices = wantLines
             ? std::span<const std::uint32_t>{outBuffer.LineIndices}
             : std::span<const std::uint32_t>{};
-        desc.VertexCount = static_cast<std::uint32_t>(nodeCount);
+        desc.VertexCount = nodeCountU32;
 
         const glm::vec3 center = 0.5f * (minP + maxP);
         const float radius = 0.5f * glm::length(maxP - minP);

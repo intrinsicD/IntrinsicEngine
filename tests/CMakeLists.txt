@@ -261,6 +261,7 @@ intrinsic_test_object_lib(EcsContractTestObjs
 if(TARGET ExtrinsicRuntime)
     set(_runtime_contract_test_files
         Test.GpuAssetCacheFallbackBootstrap.cpp
+        Test.GpuReadbackJob.cpp
         Test.AssetGeometryIO.cpp
         Test.AssetIngestStateMachine.cpp
         Test.AssetImportFormatCoverage.cpp
@@ -279,6 +280,7 @@ if(TARGET ExtrinsicRuntime)
         Test.MeshPrimitiveViewExtraction.cpp
         Test.ProgressivePresentationExtraction.cpp
         Test.ProgressiveRenderData.cpp
+        Test.RenderArtifactPublication.cpp
         Test.GizmoInteraction.cpp
         Test.GizmoInteractionEngineWiring.cpp
         Test.GraphGeometryExtraction.cpp
@@ -722,6 +724,7 @@ endif()
 
 set(_graphics_contract_cpu_test_files
     Test.CrossQueueTimeline.cpp
+    Test.CurrentRendererContractAdapter.cpp
     Test.CullingPassContracts.cpp
     Test.DefaultRecipeBackbufferReadback.cpp
     Test.DebugViewContract.cpp
@@ -744,11 +747,14 @@ set(_graphics_contract_cpu_test_files
     Test.RHIResourceSlotRecycling.cpp
     Test.ReconstructionContract.cpp
     Test.RenderCommandRouter.cpp
+    Test.RenderingContract.cpp
+    Test.RenderRecipeConfig.cpp
     Test.RenderPrepPipeline.cpp
     Test.RenderSubsystemRegistry.cpp
     Test.RendererFrameLifecycle.cpp
     Test.RenderWorldContract.cpp
     Test.RenderGraphValidation.cpp
+    Test.SharedRenderRecipeExecution.cpp
     Test.SelectionPassContracts.cpp
     Test.SelectionSystemContracts.cpp
     Test.SurfacePassContracts.cpp
@@ -875,6 +881,7 @@ if(TARGET ExtrinsicRuntime AND NOT INTRINSIC_HEADLESS_NO_GLFW)
         Test.CoreGraphStress.cpp
         Test.CoreProcess.cpp
         Test.RuntimeFrameLoopContract.cpp
+        Test.GpuReadbackJobGpuSmoke.cpp
         Test.RuntimeEngineLayering.cpp
         Test.RuntimeStreamingExecutor.cpp
         Test.GpuWorldAndCulling.cpp

@@ -6,6 +6,18 @@ maturity_target: CPUContracted
 ---
 # RUNTIME-120 — Reusable vertex attribute binding resolver
 
+## Completion
+- Retired on 2026-06-24 at maturity `CPUContracted`.
+- Owner/agent: Codex.
+- Branch/PR: local `main`; PR not opened.
+- Summary: `Extrinsic.Runtime.VertexAttributeBinding` now provides the
+  CPU-only, GPU-agnostic property-to-vertex-channel resolver used by the mesh
+  packer for normal and texcoord reads, with fail-closed diagnostics and
+  behavior-preserving packing.
+- Evidence: The task was previously implemented with all Required changes,
+  Tests, Docs, and Acceptance criteria checked. This hygiene slice only moves
+  the completed task to `tasks/done/` and regenerates the session brief.
+
 ## Goal
 - Add a reusable, CPU-tested runtime helper that resolves a named geometry
   property to a logical GPU vertex channel (position / normal / texcoord /
@@ -15,8 +27,8 @@ maturity_target: CPUContracted
 ## Non-goals
 - No new GPU vertex layout, no shader changes, no color vertex channel upload
   (owned by RUNTIME-121).
-- No declarative `VertexLayout` descriptor and no unification of the three
-  packers (owned by RUNTIME-122).
+- No GPU SoA storage/shader-fetch migration and no unification of the three
+  packers on that path (owned by RUNTIME-122).
 - No editor UI to choose arbitrary property sources (owned by RUNTIME-123).
 - No per-channel dirty-range / partial upload (owned by RUNTIME-124).
 - No change to position validation policy (position keeps its hard-fail
@@ -49,10 +61,10 @@ maturity_target: CPUContracted
 - **Slice 2 — RUNTIME-121.** Carry a per-vertex color channel (`v:color`) through
   the mesh upload via the resolver and wire `PtrVertexAttr` from it. Operational
   on Vulkan-capable hosts.
-- **Slice 3 — RUNTIME-122.** Introduce a declarative `VertexLayout` descriptor
-  (AoS interleave + SoA BDA offsets), unify the three packers on it, and unify
-  property naming (`v:position` everywhere; document the `v:point` graph alias
-  migration).
+- **Slice 3 — RUNTIME-122.** Use the completed CPU `VertexChannelStreams`
+  substrate as the input contract for the remaining GPU SoA storage and shader
+  fetch migration. The earlier CPU layout/interleave substrate is complete; the
+  open task now tracks the GPU-side work only.
 - **Slice 4 — RUNTIME-123.** Sandbox EditorUI "bind any feasible property as
   normals / colors" control built on the resolver.
 - **Slice 5 — RUNTIME-124.** Per-channel dirty tracking and partial GPU uploads

@@ -60,6 +60,7 @@ import Extrinsic.Runtime.ProceduralGeometryPacker;
 import Extrinsic.Runtime.RenderWorldPool;
 import Extrinsic.Runtime.SpatialDebugAdapters;
 import Extrinsic.Runtime.VisualizationAdapters;
+import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.Properties;
 
 namespace Extrinsic::Runtime
@@ -836,6 +837,99 @@ namespace Extrinsic::Runtime
             return bounds;
         }
 
+        struct GeometryDirtyPlan
+        {
+            bool Dirty = false;
+            bool RequiresFullUpload = false;
+            bool MeshPrimitiveViewDirty = false;
+            Graphics::GpuWorld::GeometryChannelUpdateMask Channels{};
+        };
+
+        [[nodiscard]] GeometryDirtyPlan BuildMeshGeometryDirtyPlan(
+            const entt::registry& registry,
+            const entt::entity entity)
+        {
+            namespace D = ECS::Components::DirtyTags;
+            GeometryDirtyPlan plan{};
+            const bool vertexAttributes =
+                registry.any_of<D::DirtyVertexAttributes>(entity);
+
+            plan.Channels.Position =
+                registry.any_of<D::DirtyVertexPositions>(entity);
+            plan.Channels.Texcoord =
+                vertexAttributes ||
+                registry.any_of<D::DirtyVertexTexcoords>(entity);
+            plan.Channels.Normal =
+                vertexAttributes ||
+                registry.any_of<D::DirtyVertexNormals>(entity);
+            plan.Channels.Color =
+                vertexAttributes ||
+                registry.any_of<D::DirtyVertexColors>(entity);
+
+            plan.RequiresFullUpload =
+                registry.any_of<D::GpuDirty,
+                                D::DirtyFaceTopology,
+                                D::DirtyEdgeTopology>(entity);
+            plan.Dirty = plan.RequiresFullUpload || plan.Channels.Any();
+            plan.MeshPrimitiveViewDirty =
+                plan.RequiresFullUpload || plan.Channels.Position;
+            return plan;
+        }
+
+        [[nodiscard]] GeometryDirtyPlan BuildGraphGeometryDirtyPlan(
+            const entt::registry& registry,
+            const entt::entity entity)
+        {
+            namespace D = ECS::Components::DirtyTags;
+            GeometryDirtyPlan plan{};
+            const bool vertexAttributes =
+                registry.any_of<D::DirtyVertexAttributes>(entity);
+
+            plan.Channels.Position =
+                registry.any_of<D::DirtyVertexPositions>(entity);
+            plan.Channels.Texcoord =
+                vertexAttributes ||
+                registry.any_of<D::DirtyVertexTexcoords>(entity);
+            plan.Channels.Normal =
+                vertexAttributes ||
+                registry.any_of<D::DirtyVertexNormals>(entity);
+            plan.Channels.Color =
+                vertexAttributes ||
+                registry.any_of<D::DirtyVertexColors>(entity);
+
+            plan.RequiresFullUpload =
+                registry.any_of<D::GpuDirty,
+                                D::DirtyEdgeTopology>(entity);
+            plan.Dirty = plan.RequiresFullUpload || plan.Channels.Any();
+            return plan;
+        }
+
+        [[nodiscard]] GeometryDirtyPlan BuildPointCloudGeometryDirtyPlan(
+            const entt::registry& registry,
+            const entt::entity entity)
+        {
+            namespace D = ECS::Components::DirtyTags;
+            GeometryDirtyPlan plan{};
+            const bool vertexAttributes =
+                registry.any_of<D::DirtyVertexAttributes>(entity);
+
+            plan.Channels.Position =
+                registry.any_of<D::DirtyVertexPositions>(entity);
+            plan.Channels.Texcoord =
+                vertexAttributes ||
+                registry.any_of<D::DirtyVertexTexcoords>(entity);
+            plan.Channels.Normal =
+                vertexAttributes ||
+                registry.any_of<D::DirtyVertexNormals>(entity);
+            plan.Channels.Color =
+                vertexAttributes ||
+                registry.any_of<D::DirtyVertexColors>(entity);
+
+            plan.RequiresFullUpload = registry.any_of<D::GpuDirty>(entity);
+            plan.Dirty = plan.RequiresFullUpload || plan.Channels.Any();
+            return plan;
+        }
+
         [[nodiscard]] Graphics::LightSnapshot MakeDirectionalLight(const ECS::Components::Lights::DirectionalLight& light,
                                                                    const glm::mat4& model)
         {
@@ -1279,11 +1373,8 @@ namespace Extrinsic::Runtime
                                                   RuntimeRenderExtractionStats& stats)
     {
         namespace D = ECS::Components::DirtyTags;
-        const bool dirty = registry.any_of<D::GpuDirty,
-                                            D::DirtyVertexPositions,
-                                            D::DirtyVertexAttributes,
-                                            D::DirtyFaceTopology,
-                                            D::DirtyEdgeTopology>(entity);
+        const GeometryDirtyPlan dirtyPlan = BuildMeshGeometryDirtyPlan(registry, entity);
+        const bool dirty = dirtyPlan.Dirty;
         const bool hadResidency = sidecar.MeshGeometry.IsValid();
 
         // Fail-closed release for a dirty-reupload pack/upload failure. When the
@@ -1325,7 +1416,8 @@ namespace Extrinsic::Runtime
 
         const MeshTexcoordFallbackDiagnostics texcoordFallback =
             DiagnoseMeshTexcoordFallback(view);
-        MeshPackResult packResult = PackMesh(view, m_MeshPack);
+        const auto* channelBindings = registry.try_get<VertexChannelBindingSet>(entity);
+        MeshPackResult packResult = PackMesh(view, channelBindings, m_MeshPack);
         if (packResult.Status != MeshPackStatus::Success)
         {
             switch (packResult.Status)
@@ -1359,6 +1451,33 @@ namespace Extrinsic::Runtime
         if (texcoordFallback.NonFinite)
         {
             ++stats.MeshGeometryNonFiniteTexcoords;
+        }
+
+        if (hadResidency && dirty && !dirtyPlan.RequiresFullUpload)
+        {
+            const Graphics::GpuWorld::GeometryChannelUpdateResult update =
+                renderer.GetGpuWorld().UpdateGeometryChannels(
+                    sidecar.MeshGeometry,
+                    *packResult.Upload,
+                    dirtyPlan.Channels);
+            if (update.Succeeded())
+            {
+                ++stats.MeshGeometryReuploads;
+                ++stats.MeshGeometryPartialUploads;
+                registry.remove<D::GpuDirty,
+                                D::DirtyVertexPositions,
+                                D::DirtyVertexAttributes,
+                                D::DirtyVertexTexcoords,
+                                D::DirtyVertexNormals,
+                                D::DirtyVertexColors,
+                                D::DirtyFaceTopology,
+                                D::DirtyEdgeTopology>(entity);
+                sidecar.Geometry = sidecar.MeshGeometry;
+                sidecar.GpuSlot.SetGeometryHandle(sidecar.MeshGeometry);
+                sidecar.GpuSlot.ClearSourceAsset();
+                renderer.GetGpuWorld().SetInstanceGeometry(sidecar.Instance, sidecar.MeshGeometry);
+                return true;
+            }
         }
 
         const Graphics::GpuGeometryHandle handle =
@@ -1395,6 +1514,9 @@ namespace Extrinsic::Runtime
             registry.remove<D::GpuDirty,
                             D::DirtyVertexPositions,
                             D::DirtyVertexAttributes,
+                            D::DirtyVertexTexcoords,
+                            D::DirtyVertexNormals,
+                            D::DirtyVertexColors,
                             D::DirtyFaceTopology,
                             D::DirtyEdgeTopology>(entity);
         }
@@ -1423,10 +1545,8 @@ namespace Extrinsic::Runtime
         const bool wantLines = registry.all_of<G::RenderEdges>(entity);
         const bool wantPoints = registry.all_of<G::RenderPoints>(entity);
 
-        const bool dirty = registry.any_of<D::GpuDirty,
-                                            D::DirtyVertexPositions,
-                                            D::DirtyVertexAttributes,
-                                            D::DirtyEdgeTopology>(entity);
+        const GeometryDirtyPlan dirtyPlan = BuildGraphGeometryDirtyPlan(registry, entity);
+        const bool dirty = dirtyPlan.Dirty;
         const bool hadResidency = sidecar.GraphGeometry.IsValid();
         // A change in requested render lanes repacks: the cached upload was
         // packed for a specific lane mask, and the line lane in particular
@@ -1468,7 +1588,8 @@ namespace Extrinsic::Runtime
             return true;
         }
 
-        GraphPackResult packResult = PackGraph(view, wantLines, wantPoints, m_GraphPack);
+        const auto* channelBindings = registry.try_get<VertexChannelBindingSet>(entity);
+        GraphPackResult packResult = PackGraph(view, wantLines, wantPoints, channelBindings, m_GraphPack);
         if (packResult.Status != GraphPackStatus::Success)
         {
             switch (packResult.Status)
@@ -1491,6 +1612,32 @@ namespace Extrinsic::Runtime
             // later frame can recover the input.
             releaseStaleResidency();
             return false;
+        }
+
+        if (hadResidency && dirty && !dirtyPlan.RequiresFullUpload && !lanesChanged)
+        {
+            const Graphics::GpuWorld::GeometryChannelUpdateResult update =
+                renderer.GetGpuWorld().UpdateGeometryChannels(
+                    sidecar.GraphGeometry,
+                    *packResult.Upload,
+                    dirtyPlan.Channels);
+            if (update.Succeeded())
+            {
+                ++stats.GraphGeometryReuploads;
+                ++stats.GraphGeometryPartialUploads;
+                registry.remove<D::GpuDirty,
+                                D::DirtyVertexPositions,
+                                D::DirtyVertexAttributes,
+                                D::DirtyVertexTexcoords,
+                                D::DirtyVertexNormals,
+                                D::DirtyVertexColors,
+                                D::DirtyEdgeTopology>(entity);
+                sidecar.Geometry = sidecar.GraphGeometry;
+                sidecar.GpuSlot.SetGeometryHandle(sidecar.GraphGeometry);
+                sidecar.GpuSlot.ClearSourceAsset();
+                renderer.GetGpuWorld().SetInstanceGeometry(sidecar.Instance, sidecar.GraphGeometry);
+                return true;
+            }
         }
 
         const Graphics::GpuGeometryHandle handle =
@@ -1522,6 +1669,9 @@ namespace Extrinsic::Runtime
             registry.remove<D::GpuDirty,
                             D::DirtyVertexPositions,
                             D::DirtyVertexAttributes,
+                            D::DirtyVertexTexcoords,
+                            D::DirtyVertexNormals,
+                            D::DirtyVertexColors,
                             D::DirtyEdgeTopology>(entity);
         }
 
@@ -1616,9 +1766,8 @@ namespace Extrinsic::Runtime
             return false;
         }
 
-        const bool dirty = registry.any_of<D::GpuDirty,
-                                            D::DirtyVertexPositions,
-                                            D::DirtyVertexAttributes>(entity);
+        const GeometryDirtyPlan dirtyPlan = BuildPointCloudGeometryDirtyPlan(registry, entity);
+        const bool dirty = dirtyPlan.Dirty;
         const bool hadResidency = sidecar.PointCloudGeometry.IsValid();
 
         // Reuse path: clean point-cloud entity with a cached upload. Mirrors
@@ -1633,7 +1782,8 @@ namespace Extrinsic::Runtime
             return true;
         }
 
-        PointCloudPackResult packResult = PackCloud(view, m_PointCloudPack);
+        const auto* channelBindings = registry.try_get<VertexChannelBindingSet>(entity);
+        PointCloudPackResult packResult = PackCloud(view, channelBindings, m_PointCloudPack);
         if (packResult.Status != PointCloudPackStatus::Success)
         {
             switch (packResult.Status)
@@ -1655,6 +1805,31 @@ namespace Extrinsic::Runtime
             // later frame can recover the input.
             releaseStaleResidency();
             return false;
+        }
+
+        if (hadResidency && dirty && !dirtyPlan.RequiresFullUpload)
+        {
+            const Graphics::GpuWorld::GeometryChannelUpdateResult update =
+                renderer.GetGpuWorld().UpdateGeometryChannels(
+                    sidecar.PointCloudGeometry,
+                    *packResult.Upload,
+                    dirtyPlan.Channels);
+            if (update.Succeeded())
+            {
+                ++stats.PointCloudGeometryReuploads;
+                ++stats.PointCloudGeometryPartialUploads;
+                registry.remove<D::GpuDirty,
+                                D::DirtyVertexPositions,
+                                D::DirtyVertexAttributes,
+                                D::DirtyVertexTexcoords,
+                                D::DirtyVertexNormals,
+                                D::DirtyVertexColors>(entity);
+                sidecar.Geometry = sidecar.PointCloudGeometry;
+                sidecar.GpuSlot.SetGeometryHandle(sidecar.PointCloudGeometry);
+                sidecar.GpuSlot.ClearSourceAsset();
+                renderer.GetGpuWorld().SetInstanceGeometry(sidecar.Instance, sidecar.PointCloudGeometry);
+                return true;
+            }
         }
 
         const Graphics::GpuGeometryHandle handle =
@@ -1685,7 +1860,10 @@ namespace Extrinsic::Runtime
         {
             registry.remove<D::GpuDirty,
                             D::DirtyVertexPositions,
-                            D::DirtyVertexAttributes>(entity);
+                            D::DirtyVertexAttributes,
+                            D::DirtyVertexTexcoords,
+                            D::DirtyVertexNormals,
+                            D::DirtyVertexColors>(entity);
         }
 
         sidecar.PointCloudGeometry = handle;
@@ -2280,13 +2458,11 @@ namespace Extrinsic::Runtime
                             VisualizationLane::Points);
                     const bool wantsPoints = pointLane.Requested;
                     // Snapshot the mesh dirty state before BindMeshGeometry
-                    // may drain the tags; all mesh render lanes key their
-                    // reupload off the same coalesced signal.
-                    meshDirtyThisFrame = registry.any_of<D::GpuDirty,
-                                                         D::DirtyVertexPositions,
-                                                         D::DirtyVertexAttributes,
-                                                         D::DirtyFaceTopology,
-                                                         D::DirtyEdgeTopology>(entity);
+                    // may drain the tags. Primitive edge/point views only pack
+                    // position/topology-derived streams, so normal/color-only
+                    // channel dirtiness does not reupload those sidecars.
+                    meshDirtyThisFrame =
+                        BuildMeshGeometryDirtyPlan(registry, entity).MeshPrimitiveViewDirty;
                     if (wantsSurface)
                     {
                         meshBoundThisFrame = BindMeshGeometry(registry,
@@ -2344,6 +2520,9 @@ namespace Extrinsic::Runtime
                             registry.remove<D::GpuDirty,
                                             D::DirtyVertexPositions,
                                             D::DirtyVertexAttributes,
+                                            D::DirtyVertexTexcoords,
+                                            D::DirtyVertexNormals,
+                                            D::DirtyVertexColors,
                                             D::DirtyFaceTopology,
                                             D::DirtyEdgeTopology>(entity);
                         }

@@ -11,6 +11,7 @@ module;
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -101,11 +102,14 @@ import Extrinsic.Graphics.VisualizationOverlayUploadHelper;
 import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.CameraSnapshots;
+import Extrinsic.Graphics.CurrentRendererContractAdapter;
 import Extrinsic.Graphics.FrameRecipe;
 import Extrinsic.Graphics.RenderGraph;
 import Extrinsic.Graphics.RenderCommandRouter;
 import Extrinsic.Graphics.RenderSubsystemRegistry;
 import Extrinsic.Graphics.RenderPrepPipeline;
+import Extrinsic.Graphics.RenderingContract;
+import Extrinsic.Graphics.SharedRenderRecipeExecution;
 import Extrinsic.Core.Config.Render;
 import Extrinsic.Core.Dag.Scheduler;
 import Extrinsic.Core.Geometry2D;
@@ -140,6 +144,316 @@ namespace Extrinsic::Graphics
         constexpr std::uint32_t kFrameSampledDescriptorSlotDebugView = 1u;
         constexpr std::uint32_t kFrameSampledDescriptorSlotPresent = 2u;
         constexpr std::uint32_t kFrameSampledDescriptorSlotSelectionOutline = 3u;
+
+        [[nodiscard]] bool IsContractOutputDiagnostic(
+            const RenderingContractDiagnosticCode code) noexcept
+        {
+            switch (code)
+            {
+            case RenderingContractDiagnosticCode::MissingRendererOutput:
+            case RenderingContractDiagnosticCode::UnsupportedOutput:
+            case RenderingContractDiagnosticCode::UnsupportedReadbackRequest:
+            case RenderingContractDiagnosticCode::UndeclaredArtifactOutput:
+                return true;
+            case RenderingContractDiagnosticCode::None:
+            case RenderingContractDiagnosticCode::EmptyRendererId:
+            case RenderingContractDiagnosticCode::UnknownRendererPurpose:
+            case RenderingContractDiagnosticCode::MissingSupportedSnapshotScope:
+            case RenderingContractDiagnosticCode::MissingSupportedSnapshotKind:
+            case RenderingContractDiagnosticCode::MissingUpdateMode:
+            case RenderingContractDiagnosticCode::EmptySnapshotId:
+            case RenderingContractDiagnosticCode::SnapshotRendererMismatch:
+            case RenderingContractDiagnosticCode::UnsupportedSnapshotScope:
+            case RenderingContractDiagnosticCode::UnsupportedSnapshotKind:
+            case RenderingContractDiagnosticCode::InvalidSnapshotState:
+            case RenderingContractDiagnosticCode::StaleSnapshot:
+            case RenderingContractDiagnosticCode::MissingSnapshotData:
+            case RenderingContractDiagnosticCode::DegradedSnapshot:
+            case RenderingContractDiagnosticCode::EmptyBindingRole:
+            case RenderingContractDiagnosticCode::MissingRequiredBinding:
+            case RenderingContractDiagnosticCode::UnsupportedBindingCapability:
+            case RenderingContractDiagnosticCode::EmptyRecipeId:
+            case RenderingContractDiagnosticCode::UnknownRecipeSlot:
+            case RenderingContractDiagnosticCode::UnsupportedRecipeCapability:
+            case RenderingContractDiagnosticCode::DisallowedRecipeBinding:
+            case RenderingContractDiagnosticCode::EmptyViewRecipeId:
+            case RenderingContractDiagnosticCode::InvalidViewport:
+            case RenderingContractDiagnosticCode::InvalidRenderScale:
+            case RenderingContractDiagnosticCode::EmptyArtifactId:
+            case RenderingContractDiagnosticCode::ArtifactRendererMismatch:
+            case RenderingContractDiagnosticCode::ArtifactSnapshotMissing:
+            case RenderingContractDiagnosticCode::ArtifactViewRecipeMissing:
+                return false;
+            }
+            return false;
+        }
+
+        [[nodiscard]] bool IsSharedUnsupportedDiagnostic(
+            const SharedRecipeDiagnosticCode code) noexcept
+        {
+            switch (code)
+            {
+            case SharedRecipeDiagnosticCode::UnsupportedProduct:
+            case SharedRecipeDiagnosticCode::MissingRendererCapability:
+            case SharedRecipeDiagnosticCode::ProductNotProduced:
+                return true;
+            case SharedRecipeDiagnosticCode::None:
+            case SharedRecipeDiagnosticCode::EmptyVisibilityInput:
+            case SharedRecipeDiagnosticCode::EmptyLightingInput:
+            case SharedRecipeDiagnosticCode::InvalidRenderable:
+            case SharedRecipeDiagnosticCode::MissingGeometry:
+            case SharedRecipeDiagnosticCode::MissingInstance:
+            case SharedRecipeDiagnosticCode::NonFiniteBounds:
+            case SharedRecipeDiagnosticCode::NotVisible:
+            case SharedRecipeDiagnosticCode::UnsupportedRenderDomain:
+            case SharedRecipeDiagnosticCode::StaleInput:
+            case SharedRecipeDiagnosticCode::DegradedOutput:
+            case SharedRecipeDiagnosticCode::InvalidLight:
+            case SharedRecipeDiagnosticCode::UnsupportedLight:
+            case SharedRecipeDiagnosticCode::MissingEnvironment:
+            case SharedRecipeDiagnosticCode::FallbackUsed:
+                return false;
+            }
+            return false;
+        }
+
+        [[nodiscard]] bool IsSharedDegradedFallbackDiagnostic(
+            const SharedRecipeDiagnosticCode code) noexcept
+        {
+            switch (code)
+            {
+            case SharedRecipeDiagnosticCode::EmptyVisibilityInput:
+            case SharedRecipeDiagnosticCode::EmptyLightingInput:
+            case SharedRecipeDiagnosticCode::StaleInput:
+            case SharedRecipeDiagnosticCode::DegradedOutput:
+            case SharedRecipeDiagnosticCode::MissingEnvironment:
+            case SharedRecipeDiagnosticCode::FallbackUsed:
+                return true;
+            case SharedRecipeDiagnosticCode::None:
+            case SharedRecipeDiagnosticCode::InvalidRenderable:
+            case SharedRecipeDiagnosticCode::MissingGeometry:
+            case SharedRecipeDiagnosticCode::MissingInstance:
+            case SharedRecipeDiagnosticCode::NonFiniteBounds:
+            case SharedRecipeDiagnosticCode::NotVisible:
+            case SharedRecipeDiagnosticCode::UnsupportedRenderDomain:
+            case SharedRecipeDiagnosticCode::UnsupportedProduct:
+            case SharedRecipeDiagnosticCode::InvalidLight:
+            case SharedRecipeDiagnosticCode::UnsupportedLight:
+            case SharedRecipeDiagnosticCode::MissingRendererCapability:
+            case SharedRecipeDiagnosticCode::ProductNotProduced:
+                return false;
+            }
+            return false;
+        }
+
+        void AppendContractDiagnostics(RenderGraphContractIntegrationStats& stats,
+                                       const RenderingContractValidationResult& result)
+        {
+            for (const RenderingContractDiagnostic& diagnostic : result.Diagnostics)
+            {
+                std::string message{ToString(diagnostic.Code)};
+                if (!diagnostic.Subject.empty())
+                {
+                    message += ": ";
+                    message += diagnostic.Subject;
+                }
+                if (!diagnostic.Message.empty())
+                {
+                    message += " - ";
+                    message += diagnostic.Message;
+                }
+                stats.Diagnostics.push_back(std::move(message));
+                if (IsContractOutputDiagnostic(diagnostic.Code))
+                {
+                    ++stats.MissingOutputDiagnosticCount;
+                }
+            }
+        }
+
+        void AppendSharedDiagnostics(RenderGraphContractIntegrationStats& stats,
+                                     const std::vector<SharedRecipeDiagnostic>& diagnostics)
+        {
+            for (const SharedRecipeDiagnostic& diagnostic : diagnostics)
+            {
+                std::string message{ToString(diagnostic.Code)};
+                if (!diagnostic.Subject.empty())
+                {
+                    message += ": ";
+                    message += diagnostic.Subject;
+                }
+                if (!diagnostic.Message.empty())
+                {
+                    message += " - ";
+                    message += diagnostic.Message;
+                }
+                stats.Diagnostics.push_back(std::move(message));
+                if (IsSharedUnsupportedDiagnostic(diagnostic.Code))
+                {
+                    ++stats.UnsupportedProductDiagnosticCount;
+                }
+                if (IsSharedDegradedFallbackDiagnostic(diagnostic.Code))
+                {
+                    ++stats.DegradedFallbackDiagnosticCount;
+                }
+            }
+        }
+
+        [[nodiscard]] RenderArtifactMetadata MakeDeclaredOutputArtifact(
+            const CurrentRendererContract& contract,
+            const ViewOutputDescriptor& output)
+        {
+            return RenderArtifactMetadata{
+                .ArtifactId = contract.ViewOutput.RecipeId + "." + output.Name,
+                .RendererId = contract.Renderer.Id,
+                .SnapshotId = contract.Snapshot.Id,
+                .ViewOutputRecipeId = contract.ViewOutput.RecipeId,
+                .SourceRevisions = contract.Snapshot.SourceRevisions,
+                .Status = RenderArtifactStatus::Declared,
+                .Lifetime = RenderArtifactLifetime::Transient,
+                .Purpose = output.Name,
+            };
+        }
+
+        [[nodiscard]] std::vector<SharedRecipeProductKind> MergeSharedProducts(
+            const VisibilityRecipeExecutionResult& visibility,
+            const LightingRecipeExecutionResult& lighting)
+        {
+            std::vector<SharedRecipeProductKind> products = visibility.Products;
+            products.insert(products.end(), lighting.Products.begin(), lighting.Products.end());
+            return products;
+        }
+
+        [[nodiscard]] SharedRecipeRendererProductDeclaration MakeCurrentRendererSharedProductDeclaration(
+            const RendererDescriptor& renderer)
+        {
+            return SharedRecipeRendererProductDeclaration{
+                .Renderer = renderer,
+                .ConsumedProducts = {
+                    SharedRecipeProductKind::VisibleItemSet,
+                    SharedRecipeProductKind::GroupingKeys,
+                    SharedRecipeProductKind::BatchGroups,
+                    SharedRecipeProductKind::InstanceGroups,
+                    SharedRecipeProductKind::LodSelections,
+                    SharedRecipeProductKind::SpatialPartitions,
+                    SharedRecipeProductKind::LightSet,
+                    SharedRecipeProductKind::EnvironmentMap,
+                    SharedRecipeProductKind::ShadowIntent,
+                    SharedRecipeProductKind::Fallbacks,
+                },
+            };
+        }
+
+        void PopulateCurrentRendererContractIntegrationStats(
+            RenderGraphFrameStats& frameStats,
+            const RenderWorld& renderWorld,
+            const std::uint64_t frameIndex,
+            const bool readbackRequested)
+        {
+            RenderGraphContractIntegrationStats stats{};
+            const CurrentRendererContract contract = MakeCurrentRendererContract(
+                renderWorld,
+                CurrentRendererSnapshotOptions{.FrameIndex = frameIndex},
+                CurrentRendererOutputOptions{.ReadbackRequested = readbackRequested});
+            const VisibilityRecipeExecutionResult visibility =
+                ExecuteVisibilityRecipe(renderWorld, contract.Snapshot);
+            const LightingRecipeExecutionResult lighting =
+                ExecuteLightingRecipe(renderWorld, contract.Snapshot);
+            const std::vector<SharedRecipeProductKind> products =
+                MergeSharedProducts(visibility, lighting);
+            const SharedRecipeCompatibilityResult sharedCompatibility =
+                CheckSharedRecipeCompatibility(
+                    MakeCurrentRendererSharedProductDeclaration(contract.Renderer),
+                    std::span<const SharedRecipeProductKind>{products.data(), products.size()});
+
+            stats.Evaluated = true;
+            stats.ContractCompatible = IsCompatible(contract.Diagnostics);
+            stats.SharedProductsCompatible = sharedCompatibility.Compatible();
+            stats.ArtifactMetadataValid = true;
+            stats.RendererId = contract.Renderer.Id;
+            stats.SnapshotId = contract.Snapshot.Id;
+            stats.RecipeId = contract.Recipe.RecipeId;
+            stats.ViewOutputRecipeId = contract.ViewOutput.RecipeId;
+            stats.SnapshotSourceRevisionCount =
+                static_cast<std::uint32_t>(contract.Snapshot.SourceRevisions.size());
+            stats.BindingIntentCount =
+                static_cast<std::uint32_t>(contract.Bindings.Intents.size());
+            stats.RecipeSlotCount =
+                static_cast<std::uint32_t>(contract.Recipe.Slots.size());
+            stats.ViewOutputCount =
+                static_cast<std::uint32_t>(contract.ViewOutput.Outputs.size());
+            stats.VisibilityProductCount =
+                static_cast<std::uint32_t>(visibility.Products.size());
+            stats.VisibilityVisibleItemCount =
+                static_cast<std::uint32_t>(visibility.VisibleItems.size());
+            stats.VisibilityRejectedItemCount =
+                static_cast<std::uint32_t>(visibility.RejectedItems.size());
+            stats.LightingProductCount =
+                static_cast<std::uint32_t>(lighting.Products.size());
+            stats.LightingResolvedLightCount =
+                static_cast<std::uint32_t>(lighting.Lights.size());
+            stats.LightingIntentCount =
+                static_cast<std::uint32_t>(lighting.Intents.size());
+
+            AppendContractDiagnostics(stats, contract.Diagnostics);
+            AppendSharedDiagnostics(stats, visibility.Diagnostics);
+            AppendSharedDiagnostics(stats, lighting.Diagnostics);
+            AppendSharedDiagnostics(stats, sharedCompatibility.Diagnostics);
+
+            for (const ViewOutputDescriptor& output : contract.ViewOutput.Outputs)
+            {
+                RenderArtifactMetadata artifact =
+                    MakeDeclaredOutputArtifact(contract, output);
+                const RenderingContractValidationResult artifactValidation =
+                    ValidateRenderArtifactMetadata(contract.Renderer,
+                                                   contract.ViewOutput,
+                                                   artifact);
+                if (!IsCompatible(artifactValidation))
+                {
+                    stats.ArtifactMetadataValid = false;
+                    stats.ArtifactPublicationFailureDiagnosticCount +=
+                        CountBySeverity(artifactValidation,
+                                        RenderingContractDiagnosticSeverity::Error);
+                    AppendContractDiagnostics(stats, artifactValidation);
+                }
+                stats.DeclaredArtifacts.push_back(std::move(artifact));
+            }
+            stats.DeclaredArtifactCount =
+                static_cast<std::uint32_t>(stats.DeclaredArtifacts.size());
+            frameStats.Contract = std::move(stats);
+        }
+
+        void FinalizeCurrentRendererContractIntegrationStats(RenderGraphFrameStats& stats)
+        {
+            if (!stats.Contract.Evaluated)
+            {
+                return;
+            }
+
+            const bool frameProducedOutputs =
+                stats.Execute.Succeeded && stats.Execute.DeviceOperational;
+            for (RenderArtifactMetadata& artifact : stats.Contract.DeclaredArtifacts)
+            {
+                if (!frameProducedOutputs)
+                {
+                    artifact.Status = RenderArtifactStatus::Failed;
+                    artifact.Diagnostics.push_back(
+                        "render graph did not produce this declared output");
+                    ++stats.Contract.ArtifactPublicationFailureDiagnosticCount;
+                    continue;
+                }
+                if (artifact.Purpose == "readback" &&
+                    stats.DefaultRecipeBackbufferReadbackCopyCount == 0u)
+                {
+                    artifact.Status = RenderArtifactStatus::Missing;
+                    artifact.Diagnostics.push_back(
+                        "readback output was declared but no backbuffer copy recorded");
+                    ++stats.Contract.MissingOutputDiagnosticCount;
+                    continue;
+                }
+                artifact.Status = RenderArtifactStatus::Available;
+                artifact.Lifetime = RenderArtifactLifetime::Transient;
+            }
+        }
 
         [[nodiscard]] constexpr bool IsReconstructionAAMode(const FrameRecipeAAMode mode) noexcept
         {
@@ -1630,6 +1944,20 @@ namespace Extrinsic::Graphics
                 Core::Log::Error("[Graphics] RenderGraph Execute() failed: device missing");
                 return;
             }
+            PopulateCurrentRendererContractIntegrationStats(
+                m_LastRenderGraphStats,
+                renderWorld,
+                frame.FrameIndex,
+                m_DefaultRecipeReadbackBuffer.IsValid());
+            if (!m_LastRenderGraphStats.Contract.ContractCompatible ||
+                !m_LastRenderGraphStats.Contract.SharedProductsCompatible ||
+                !m_LastRenderGraphStats.Contract.ArtifactMetadataValid)
+            {
+                m_LastRenderGraphStats.Diagnostic =
+                    "RenderGraph contract compatibility failed.";
+                Core::Log::Error("[Graphics] RenderGraph contract compatibility failed");
+                return;
+            }
             m_RenderGraph.Reset();
             const auto& surfaceOpaque = m_Subsystems.CullingSystemRegistry()->GetBucket(RHI::GpuDrawBucketKind::SurfaceOpaque);
             const auto& lines = m_Subsystems.CullingSystemRegistry()->GetBucket(RHI::GpuDrawBucketKind::Lines);
@@ -2347,6 +2675,7 @@ namespace Extrinsic::Graphics
                 m_LastRenderGraphStats.Diagnostic = "RenderGraph execute failed.";
                 Core::Log::Error("[Graphics] RenderGraph Execute() failed: error={}",
                                  static_cast<int>(executeResult.error()));
+                FinalizeCurrentRendererContractIntegrationStats(m_LastRenderGraphStats);
                 return;
             }
             if (asyncComputeSubmitPlanAccepted)
@@ -2354,6 +2683,7 @@ namespace Extrinsic::Graphics
                 ++m_LastRenderGraphStats.AsyncComputeUtilizedFrames;
             }
             m_LastRenderGraphStats.Execute.Succeeded = true;
+            FinalizeCurrentRendererContractIntegrationStats(m_LastRenderGraphStats);
             if (m_HZBSystem.has_value() && m_LastRenderGraphStats.HZBBuildRecordedFrames > 0u)
             {
                 m_HZBSystem->AdvanceFrame();

@@ -465,6 +465,7 @@ namespace Extrinsic::Runtime
             case StreamingTaskState::Pending:
             case StreamingTaskState::Ready:
             case StreamingTaskState::Running:
+            case StreamingTaskState::WaitingForReadback:
                 return true;
             case StreamingTaskState::WaitingForMainThreadApply:
             case StreamingTaskState::WaitingForGpuUpload:

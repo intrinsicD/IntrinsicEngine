@@ -20,6 +20,13 @@ depends_on: []
 - Diagnosis found promoted forward/GBuffer surface fragment shaders sampled `MaterialParams::NormalID` as `texture * 2 - 1`. That is correct only for tangent-space normal maps, but the current generated normal bake encodes mesh `v:normal` data without a promoted tangent-space transform.
 - Runtime may still create and bind generated normal texture assets as data-only state; this bug only changes current shader consumption so lighting uses packed vertex normals.
 
+## Completion
+- Completed: 2026-06-21. Commit/PR: `843e4fb3`.
+- Audit: 2026-06-22 backlog audit confirmed this task was already fixed and
+  superseded as an open backlog bug. Promoted forward and GBuffer shader
+  contracts assert absence of `mat.NormalID` / `normalTex` sampling for current
+  surface normals, and focused renderer lifecycle coverage still passes.
+
 ## Required changes
 - [x] Remove normal-texture override logic from promoted forward and deferred surface shaders.
 - [x] Remove the same override from the older surface shader pair so raw shader paths stay consistent.

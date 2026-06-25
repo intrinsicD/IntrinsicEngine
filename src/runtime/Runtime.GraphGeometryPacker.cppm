@@ -9,6 +9,8 @@ export module Extrinsic.Runtime.GraphGeometryPacker;
 
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.Runtime.VertexChannelBindings;
+import Extrinsic.Runtime.VertexChannelStreams;
 
 export namespace Extrinsic::Runtime
 {
@@ -33,6 +35,8 @@ export namespace Extrinsic::Runtime
     struct GraphPackBuffer
     {
         std::vector<std::byte> VertexBytes;
+        VertexChannelStreams Channels;
+        std::vector<std::uint32_t> PackedColors;
         std::vector<std::uint32_t> LineIndices;
 
         void Clear() noexcept;
@@ -86,5 +90,11 @@ export namespace Extrinsic::Runtime
         const ECS::Components::GeometrySources::ConstSourceView& view,
         bool wantLines,
         bool wantPoints,
+        GraphPackBuffer& outBuffer);
+    [[nodiscard]] GraphPackResult PackGraph(
+        const ECS::Components::GeometrySources::ConstSourceView& view,
+        bool wantLines,
+        bool wantPoints,
+        const VertexChannelBindingSet* channelBindings,
         GraphPackBuffer& outBuffer);
 }

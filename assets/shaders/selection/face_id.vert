@@ -23,16 +23,6 @@
 
 #include "../common/gpu_scene.glsl"
 
-struct SurfaceVertex {
-    vec3 Position;
-    vec2 UV;
-    vec3 Normal;
-};
-
-layout(buffer_reference, scalar) readonly buffer SurfaceVertexRef {
-    SurfaceVertex Data[];
-};
-
 layout(push_constant, scalar) uniform ScenePC {
     uint64_t SceneTableBDA;
     uint FrameIndex;
@@ -50,9 +40,11 @@ void main() {
     const GpuGeometryRecord geo = GpuGeometryRecordRef(scene.GeometryRecordBDA).Data[inst.GeometrySlot];
 
     // The culling indirect command supplies firstIndex + vertexOffset, so
-    // gl_VertexIndex is already in managed-buffer vertex units.
-    const SurfaceVertex v = SurfaceVertexRef(geo.VertexBufferBDA).Data[gl_VertexIndex];
+    // gl_VertexIndex is already in managed-buffer vertex units. Channel BDAs
+    // point at this geometry's first element, so fetch with the local index.
+    const uint localVertexIndex = uint(gl_VertexIndex) - geo.VertexOffset;
+    const vec3 localPosition = GpuReadPackedVec3(geo.VertexBufferBDA, localVertexIndex);
 
-    gl_Position = scene.CameraViewProj * dyn.Model * vec4(v.Position, 1.0);
+    gl_Position = scene.CameraViewProj * dyn.Model * vec4(localPosition, 1.0);
     fragEntityID = inst.EntityID;
 }

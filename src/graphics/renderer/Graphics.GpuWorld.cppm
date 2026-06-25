@@ -145,11 +145,50 @@ export namespace Extrinsic::Graphics
         struct GeometryUploadDesc
         {
             std::span<const std::byte> PackedVertexBytes;
+            std::span<const std::byte> PositionBytes;
+            std::span<const std::byte> TexcoordBytes;
+            std::span<const std::byte> NormalBytes;
             std::span<const std::uint32_t> SurfaceIndices;
             std::span<const std::uint32_t> LineIndices;
             std::uint32_t VertexCount = 0;
             RHI::GpuBounds LocalBounds{};
             const char* DebugName = nullptr;
+            std::span<const std::uint32_t> PackedVertexColors;
+        };
+
+        struct GeometryChannelUpdateMask
+        {
+            bool Position = false;
+            bool Texcoord = false;
+            bool Normal = false;
+            bool Color = false;
+
+            [[nodiscard]] bool Any() const noexcept
+            {
+                return Position || Texcoord || Normal || Color;
+            }
+        };
+
+        enum class GeometryChannelUpdateStatus : std::uint8_t
+        {
+            Updated,
+            NoChannels,
+            FullUploadRequired,
+            InvalidHandle,
+            InvalidInput,
+        };
+
+        struct GeometryChannelUpdateResult
+        {
+            GeometryChannelUpdateStatus Status = GeometryChannelUpdateStatus::NoChannels;
+            GeometryChannelUpdateMask UploadedChannels{};
+            bool GeometryRecordUpdated = false;
+
+            [[nodiscard]] bool Succeeded() const noexcept
+            {
+                return Status == GeometryChannelUpdateStatus::Updated ||
+                       Status == GeometryChannelUpdateStatus::NoChannels;
+            }
         };
 
         GpuWorld();
@@ -169,6 +208,10 @@ export namespace Extrinsic::Graphics
         void FreeInstance(GpuInstanceHandle instance);
 
         [[nodiscard]] GpuGeometryHandle UploadGeometry(const GeometryUploadDesc& desc);
+        [[nodiscard]] GeometryChannelUpdateResult UpdateGeometryChannels(
+            GpuGeometryHandle geometry,
+            const GeometryUploadDesc& desc,
+            GeometryChannelUpdateMask channels);
         void FreeGeometry(GpuGeometryHandle geometry);
 
         void SetInstanceGeometry(GpuInstanceHandle instance, GpuGeometryHandle geometry);

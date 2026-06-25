@@ -914,7 +914,58 @@ uint32_t TaskGraph::AddPassInternal(std::string_view name,
                 state.Dispatched[i].store(0u, std::memory_order_release);
             }
             std::function<void(std::uint32_t)> onTaskFinished;
-            std::function<void(std::uint32_t)> scheduleTask;
+            std::function<void(const std::vector<std::uint32_t>&)> scheduleReadyBatch;
+
+            scheduleReadyBatch = [&](const std::vector<std::uint32_t>& passIndices)
+            {
+                std::vector<std::uint32_t> workerPasses{};
+                std::vector<ExecutionState::MainThreadReadyEntry> mainThreadPasses{};
+                workerPasses.reserve(passIndices.size());
+                mainThreadPasses.reserve(passIndices.size());
+
+                for (const auto passIndex : passIndices)
+                {
+                    if (passIndex >= m_Impl->Passes.size())
+                        continue;
+
+                    if (state.Dispatched[passIndex].exchange(1u, std::memory_order_acq_rel) == 1u)
+                        continue;
+
+                    state.Done.Add();
+
+                    const auto& options = m_Impl->Passes[passIndex].Options;
+                    const bool canRunOnWorker = options.AllowParallel && !options.MainThreadOnly && canUseWorkers;
+                    if (canRunOnWorker)
+                    {
+                        workerPasses.push_back(passIndex);
+                    }
+                    else
+                    {
+                        mainThreadPasses.push_back(ExecutionState::MainThreadReadyEntry{
+                            .Priority = static_cast<std::uint8_t>(options.Priority),
+                            .EstimatedCost = options.EstimatedCost,
+                            .InsertionOrder = state.NextInsertionOrder.fetch_add(1u, std::memory_order_relaxed),
+                            .PassIndex = passIndex,
+                        });
+                    }
+                }
+
+                if (!mainThreadPasses.empty())
+                {
+                    std::scoped_lock lock(state.MainThreadQueueMutex);
+                    for (const auto& entry : mainThreadPasses)
+                        state.MainThreadQueue.push(entry);
+                }
+
+                for (const auto passIndex : workerPasses)
+                {
+                    Tasks::Scheduler::Dispatch([this, passIndex, &onTaskFinished]()
+                    {
+                        ExecutePass(passIndex);
+                        onTaskFinished(passIndex);
+                    });
+                }
+            };
 
             onTaskFinished = [&](const std::uint32_t passIndex)
             {
@@ -924,55 +975,26 @@ uint32_t TaskGraph::AddPassInternal(std::string_view name,
                     return;
                 }
 
-                const auto& successors = m_Impl->Successors[passIndex];
-                for (const auto successor : successors)
+                std::vector<std::uint32_t> readySuccessors{};
+                readySuccessors.reserve(m_Impl->Successors[passIndex].size());
+                for (const auto successor : m_Impl->Successors[passIndex])
                 {
                     if (state.RemainingDeps[successor].fetch_sub(1u, std::memory_order_acq_rel) == 1u)
-                        scheduleTask(successor);
+                        readySuccessors.push_back(successor);
                 }
 
+                scheduleReadyBatch(readySuccessors);
                 state.Done.Signal();
             };
 
-            scheduleTask = [&](const std::uint32_t passIndex)
-            {
-                if (passIndex >= m_Impl->Passes.size())
-                    return;
-
-                if (state.Dispatched[passIndex].exchange(1u, std::memory_order_acq_rel) == 1u)
-                    return;
-
-                state.Done.Add();
-
-                const auto& options = m_Impl->Passes[passIndex].Options;
-                const bool canRunOnWorker = options.AllowParallel && !options.MainThreadOnly && canUseWorkers;
-                if (canRunOnWorker)
-                {
-                    Tasks::Scheduler::Dispatch([this, passIndex, &onTaskFinished]()
-                    {
-                        ExecutePass(passIndex);
-                        onTaskFinished(passIndex);
-                    });
-                }
-                else
-                {
-                    {
-                        std::scoped_lock lock(state.MainThreadQueueMutex);
-                        state.MainThreadQueue.push(ExecutionState::MainThreadReadyEntry{
-                            .Priority = static_cast<std::uint8_t>(options.Priority),
-                            .EstimatedCost = options.EstimatedCost,
-                            .InsertionOrder = state.NextInsertionOrder.fetch_add(1u, std::memory_order_relaxed),
-                            .PassIndex = passIndex,
-                        });
-                    }
-                }
-            };
-
+            std::vector<std::uint32_t> initialReady{};
+            initialReady.reserve(m_Impl->Passes.size());
             for (std::uint32_t i = 0; i < m_Impl->Passes.size(); ++i)
             {
                 if (m_Impl->InitialInDegree[i] == 0u)
-                    scheduleTask(i);
+                    initialReady.push_back(i);
             }
+            scheduleReadyBatch(initialReady);
 
             while (!state.Done.IsReady())
             {

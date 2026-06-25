@@ -124,3 +124,531 @@ entries:
       - "Routed BUG-050/BUG-051 implementation, retirement, verification, and commit as direct journey facts because the turn produced committed engineering/task evidence."
       - "Did not stage or crystallize claims; first-publication normals and mesh color visualization buffers are concrete runtime/graphics wiring outcomes with direct regression and full-gate evidence."
       - "Recorded the old progressive-normal-job expectation as corrected test-contract drift rather than a dead end because the implementation intentionally strengthens raw publication semantics."
+  - turn: "2026-06-22_001#7"
+    notes:
+      - "Routed the BUG backlog audit as direct journey facts because it moved stale completed task artifacts and left one active bug based on code inspection."
+      - "Did not stage or crystallize claims; validity status is captured in task locations, bug index, and session brief rather than in research logic."
+      - "Kept BUG-046 open despite a passing focused run because the root timing-dependent sleep remains in the test source."
+  - turn: "2026-06-22_001#8"
+    notes:
+      - "Routed the user's renderer identity answer as a direct decision because it selects the top-level design direction for future rendering tasks."
+      - "Did not stage a claim; this is a user-owned product/architecture preference rather than an empirical assertion."
+      - "Kept the grilling thread open and will ask one concrete follow-up question at a time."
+  - turn: "2026-06-22_001#9"
+    notes:
+      - "Routed the user's truth-source answer as a direct decision because it constrains future viewport/result-lens task design."
+      - "Did not stage a claim; this is a user-owned design preference, not an empirical assertion."
+      - "Next grilling branch should resolve whether results mutate canonical properties or remain attached derived channels."
+  - turn: "2026-06-22_001#10"
+    notes:
+      - "Routed the user's computation-output answer as a direct decision because it constrains future result-channel, property-targeting, and promote/apply task design."
+      - "Did not stage a claim; this is a user-owned engine behavior preference, not an empirical assertion."
+      - "Next grilling branch should resolve how many lenses/results can be visible at once and how conflicts are presented."
+  - turn: "2026-06-22_001#11"
+    notes:
+      - "Routed the user's result-lens cardinality answer as a direct decision because it constrains viewport state, render-domain binding, and comparison-mode task design."
+      - "Did not stage a claim; this is a user-owned rendering UX/architecture preference, not an empirical assertion."
+      - "Next grilling branch should resolve the typed data-channel contract that makes normals, colors, scalars, and diagnostics bindable without name-only conventions."
+  - turn: "2026-06-22_001#12"
+    notes:
+      - "Routed the user's typed channel descriptor answer as a direct decision because it constrains asset import, geometry property metadata, renderer binding, and shader/lens compatibility checks."
+      - "Did not stage a claim; this is a user-owned engine data-contract preference, not an empirical assertion."
+      - "Next grilling branch should resolve what the engine does when a requested channel is absent or invalid, especially generated normals for imported meshes."
+  - turn: "2026-06-22_001#13"
+    notes:
+      - "Routed the user's configurable fallback-generation answer as a direct decision because it constrains entity archetypes, asset import, renderable mesh defaults, and missing-channel recovery."
+      - "Did not stage a claim; this is a user-owned architecture/product behavior preference, not an empirical assertion."
+      - "Next grilling branch should resolve the precedence and scope rules for loadable configurations when engine defaults, project settings, asset profiles, archetypes, and per-operation overrides disagree."
+  - turn: "2026-06-22_001#14"
+    notes:
+      - "Routed the user's configuration-complexity concern as a direct open question rather than a decision because the turn asks for tradeoff evaluation."
+      - "Recorded the preset-first/progressive-disclosure response as pending AI guidance rather than a crystallized claim because the user has not affirmed it yet."
+      - "Next grilling branch should resolve the minimum viable configuration surface before accepting layered precedence complexity."
+  - turn: "2026-06-22_001#15"
+    notes:
+      - "Resolved N60 and routed the user's affirmation as N61 because the user explicitly accepted the preset-first/progressive-disclosure guardrail."
+      - "Routed file-source-of-truth plus UI-editable configs as N62 because the user explicitly chose that authoring model."
+      - "Cleared the pending AI suggestion after user affirmation; next grilling branch should narrow configuration precedence to the minimum viable set."
+  - turn: "2026-06-22_001#16"
+    notes:
+      - "Routed the user's minimum viable precedence answer as a direct decision because it constrains the initial configuration implementation surface."
+      - "Did not stage a claim; this is a user-owned architecture scope decision, not an empirical assertion."
+      - "Next grilling branch should resolve whether config changes automatically recompute existing generated data or only mark it stale."
+  - turn: "2026-06-22_001#17"
+    notes:
+      - "Routed the user's config-change invalidation answer as a direct decision because it constrains generated-channel provenance, stale diagnostics, and regeneration commands."
+      - "Did not stage a claim; this is a user-owned workflow and data-lifecycle preference, not an empirical assertion."
+      - "Next grilling branch should resolve how stale generated data appears in the viewport and whether rendering can continue with stale-but-valid channels."
+  - turn: "2026-06-22_001#18"
+    notes:
+      - "Routed the user's stale-data UI answer as a direct decision because it constrains property/channel inspector affordances, status color tokens, tooltips, and per-channel update commands."
+      - "Did not stage a claim; this is a user-owned UX/data-lifecycle preference, not an empirical assertion."
+      - "Next grilling branch should resolve the broader channel/property status taxonomy beyond stale, including missing, invalid, generated, computing, and conflict states."
+  - turn: "2026-06-22_001#19"
+    notes:
+      - "Routed the user's shared status enum answer as a direct decision because it constrains UI, renderer, import, and diagnostics status handling."
+      - "Did not stage a claim; this is a user-owned data-model and UX preference, not an empirical assertion."
+      - "Next grilling branch should resolve whether status colors affect the primary viewport render or only inspector badges and explicit status overlays."
+  - turn: "2026-06-22_001#20"
+    notes:
+      - "Routed the user's status-rendering boundary answer as a direct decision because it constrains viewport composition, overlay behavior, and lens failure semantics."
+      - "Did not stage a claim; this is a user-owned rendering UX/data-trust preference, not an empirical assertion."
+      - "Next grilling branch should resolve whether presentation modes are hardcoded renderer modes or file-backed/UI-editable viewport recipes."
+  - turn: "2026-06-22_001#21"
+    notes:
+      - "Routed the user's viewport recipe answer as a direct decision because it constrains presentation-mode configuration, UI editing, built-in presets, and agentic-AI patchability."
+      - "Did not stage a claim; this is a user-owned rendering architecture/workflow preference, not an empirical assertion."
+      - "Next grilling branch should resolve guardrails for agent-authored config and recipe changes."
+  - turn: "2026-06-22_001#22"
+    notes:
+      - "Routed the user's agent-authored edit guardrail answer as a direct decision because it constrains config promotion workflow, schema validation, preview rendering, and active-config replacement."
+      - "Did not stage a claim; this is a user-owned agentic workflow and rendering validation preference, not an empirical assertion."
+      - "Next grilling branch should resolve concrete preview validity criteria."
+  - turn: "2026-06-22_001#23"
+    notes:
+      - "Routed the user's preview-validity affirmation as a direct decision because it constrains schema validation, dry-run binding, headless preview rendering, metadata output, and promotion gating."
+      - "Did not stage a claim; this is a user-owned validation workflow preference, not an empirical assertion."
+      - "Next grilling branch should resolve whether preview validation is synchronous, asynchronous, cached, or a combination."
+  - turn: "2026-06-22_001#24"
+    notes:
+      - "Routed the user's preview-execution answer as a direct decision because it constrains UI feedback timing, async validation jobs, activation blocking, and preview cache keys."
+      - "Did not stage a claim; this is a user-owned workflow/runtime behavior preference, not an empirical assertion."
+      - "Next grilling branch should resolve what scene/entity targets preview validation renders against."
+  - turn: "2026-06-22_001#25"
+    notes:
+      - "Routed the user's preview-target answer as a direct decision because it constrains validation scene selection, canonical fixtures, and agent-authored recipe coverage."
+      - "Did not stage a claim; this is a user-owned validation workflow preference, not an empirical assertion."
+      - "Next grilling branch should resolve how preview failures affect activation scope and whether current-context success can permit scoped overrides despite fixture failures."
+  - turn: "2026-06-22_001#26"
+    notes:
+      - "Routed the user's preview-failure activation answer as a direct decision because it constrains global activation, scoped overrides, session previews, and diagnostic requirements."
+      - "Did not stage a claim; this is a user-owned validation/promotion workflow preference, not an empirical assertion."
+      - "Next grilling branch should resolve the machine-readable diagnostic report contract that agents, UI, and tests consume."
+  - turn: "2026-06-22_001#27"
+    notes:
+      - "Routed the user's machine-readable diagnostics answer as a direct decision because it constrains validation report schemas, UI rendering, tests, and agentic remediation."
+      - "Did not stage a claim; this is a user-owned diagnostic/reporting contract preference, not an empirical assertion."
+      - "Next grilling branch should resolve provenance requirements for every generated or derived channel/result."
+  - turn: "2026-06-22_001#28"
+    notes:
+      - "Routed the user's generated/derived provenance answer as a direct decision because it constrains stale detection, regeneration, comparison, promotion, and agent explanation."
+      - "Did not stage a claim; this is a user-owned data-contract preference, not an empirical assertion."
+      - "Next grilling branch should resolve explicit promote/apply-to-canonical semantics."
+  - turn: "2026-06-22_001#29"
+    notes:
+      - "Routed the user's promote/apply answer as a direct decision because it constrains canonical mutation, undo, revisioning, source preservation, and dependent stale marking."
+      - "Did not stage a claim; this is a user-owned data-lifecycle preference, not an empirical assertion."
+      - "Next grilling branch should resolve which generated/derived/preview data is persisted in the project versus treated as cache or session state."
+  - turn: "2026-06-22_001#30"
+    notes:
+      - "Routed the user's persistence-boundary answer as a direct decision because it constrains project serialization, cache/session state, reproducibility, and result lifecycle."
+      - "Did not stage a claim; this is a user-owned project data-lifecycle preference, not an empirical assertion."
+      - "Next grilling branch should resolve project-load reconciliation for persisted generated data, current configs, and missing cache/session artifacts."
+  - turn: "2026-06-22_001#31"
+    notes:
+      - "Routed the user's project-load reconciliation answer as a direct decision because it constrains project loading, provenance validation, stale/conflict/invalid status, and auto-update regeneration gates."
+      - "Did not stage a claim; this is a user-owned project loading and data-lifecycle preference, not an empirical assertion."
+      - "Next grilling branch should resolve explicit lifecycle states and cleanup semantics for generated/derived channels/results."
+  - turn: "2026-06-22_001#32"
+    notes:
+      - "Routed the user's lifecycle-state answer as a direct decision because it constrains saved result ownership, cleanup, tombstones, and cache removal."
+      - "Did not stage a claim; this is a user-owned data-lifecycle preference, not an empirical assertion."
+      - "Next grilling branch should resolve ownership boundaries: renderer consumes resolved snapshots while runtime/project systems own config, recipes, provenance, and lifecycle."
+  - turn: "2026-06-22_001#33"
+    notes:
+      - "Routed the user's render snapshot ownership answer as a direct decision because it constrains renderer/runtime layering, project config ownership, and snapshot contents."
+      - "Did not stage a claim; this is a user-owned architecture/layering preference, not an empirical assertion."
+      - "Next grilling branch should resolve immutable snapshot update cadence, atomic publication, and failure behavior."
+  - turn: "2026-06-22_001#34"
+    notes:
+      - "Routed the user's snapshot update answer as a direct decision because it constrains dirty propagation, frame-boundary publication, async work status, and snapshot build failure behavior."
+      - "Did not stage a claim; this is a user-owned runtime/rendering architecture preference, not an empirical assertion."
+      - "Next grilling branch should resolve whether snapshot builds may invoke fallback generation directly or must schedule generation jobs and publish status first."
+  - turn: "2026-06-22_001#35"
+    notes:
+      - "Routed the user's fallback generation split as a direct decision because it constrains snapshot build behavior, async generation jobs, and generated-channel metadata requirements."
+      - "Did not stage a claim; this is a user-owned runtime/data-flow preference, not an empirical assertion."
+      - "Next grilling branch should resolve async job completion, cancellation, stale-result discard, and dirty snapshot publication semantics."
+  - turn: "2026-06-22_001#36"
+    notes:
+      - "Routed the user's async outcome transparency refinement as a direct decision because it constrains diagnostics, UI explanations, job cancellation/debounce reporting, and non-publication semantics."
+      - "Did not stage a claim; this is a user-owned observability and workflow preference, not an empirical assertion."
+      - "Next grilling branch should resolve diagnostic retention, surfacing level, and whether pending/failed generation blocks selected render lenses."
+  - turn: "2026-06-22_001#37"
+    notes:
+      - "Routed the user's async outcome UI surfacing affirmation as a direct decision because it constrains where compact status, diagnostics history, notifications, and next actions appear."
+      - "Did not stage a claim; this is a user-owned UX and diagnostics workflow preference, not an empirical assertion."
+      - "Next grilling branch should resolve fail-closed versus fallback behavior when a selected render lens depends on pending, missing, stale, or failed generated data."
+  - turn: "2026-06-22_001#38"
+    notes:
+      - "Routed the user's selected-lens fail-closed affirmation as a direct decision because it constrains viewport resilience, stale-data opt-in, pending status, and invalid-data fallback behavior."
+      - "Did not stage a claim; this is a user-owned rendering UX and data-trust preference, not an empirical assertion."
+      - "Next grilling branch should resolve render lens channel binding semantics, including defaults, overrides, and multi-channel dependency behavior."
+  - turn: "2026-06-22_001#39"
+    notes:
+      - "Routed the user's typed render-lens input-slot affirmation as a direct decision because it constrains lens recipe schema, channel resolver behavior, diagnostics, and multi-channel failure boundaries."
+      - "Did not stage a claim; this is a user-owned rendering data-binding contract preference, not an empirical assertion."
+      - "Next grilling branch should resolve ambiguity handling and persistence scope for user binding overrides."
+  - turn: "2026-06-22_001#40"
+    notes:
+      - "Routed the user's ambiguous binding resolution affirmation as a direct decision because it constrains deterministic resolver ranking, ambiguity diagnostics, and override persistence scope."
+      - "Did not stage a claim; this is a user-owned binding workflow preference, not an empirical assertion."
+      - "Next grilling branch should resolve how shader/material presentation interacts with research lenses, including normals and vertex colors."
+  - turn: "2026-06-22_001#41"
+    notes:
+      - "Routed the user's lens/material boundary affirmation as a direct decision because it constrains research-channel truth ownership, shader responsibilities, and snapshot binding consumption."
+      - "Did not stage a claim; this is a user-owned rendering architecture preference, not an empirical assertion."
+      - "Next grilling branch should resolve active normal-channel policy for surface shading versus explicit normal visualization lenses."
+  - turn: "2026-06-22_001#42"
+    notes:
+      - "Routed the user's active-normal policy affirmation as a direct decision because it constrains surface-shading input binding, authored/generated/derived normal priority, and separation from normal-vector visualization."
+      - "Did not stage a claim; this is a user-owned rendering data-binding policy, not an empirical assertion."
+      - "Next grilling branch should resolve vertex/color channel semantics for visualization versus material/base-color presentation."
+  - turn: "2026-06-22_001#43"
+    notes:
+      - "Routed the user's color-channel/base-color separation affirmation as a direct decision because it constrains color role metadata, color-space handling, research visualization bindings, and material base_color policy."
+      - "Did not stage a claim; this is a user-owned rendering data-binding policy, not an empirical assertion."
+      - "Next grilling branch should resolve domain conversion and interpolation semantics for per-vertex, per-corner, and per-face channels."
+  - turn: "2026-06-22_001#44"
+    notes:
+      - "Routed the user's explicit channel-domain affirmation as a direct decision because it constrains recipe domain declarations, interpolation/expansion semantics, and provenance-tracked derived conversion channels."
+      - "Did not stage a claim; this is a user-owned rendering data-domain policy, not an empirical assertion."
+      - "Next grilling branch should resolve GPU upload/update semantics for changed resolved snapshot channels."
+  - turn: "2026-06-22_001#45"
+    notes:
+      - "Routed the user's GPU-ready snapshot generation affirmation as a direct decision because it constrains upload planning, revision comparison, active GPU-state immutability, and upload failure diagnostics."
+      - "Did not stage a claim; this is a user-owned runtime/graphics data-flow policy, not an empirical assertion."
+      - "Next grilling branch should resolve GPU resource lifetime, cache retention, and eviction across snapshot generations."
+  - turn: "2026-06-23_001#1"
+    notes:
+      - "Started a new calendar-day session and routed the user's GPU resource lifetime affirmation as a direct decision because it constrains snapshot-generation leases, cache eviction, pending/preview leases, and eviction diagnostics."
+      - "Did not stage a claim; this is a user-owned runtime/graphics resource-lifetime policy, not an empirical assertion."
+      - "Next grilling branch should resolve renderer pass composition and scheduling for base geometry, overlays, lenses, diagnostics, and previews."
+  - turn: "2026-06-23_001#2"
+    notes:
+      - "Routed the user's pass-graph composition affirmation as a direct decision because it constrains viewport recipe compilation, pass ordering, lens pass dependencies, overlay/diagnostic scheduling, and preview/headless parity."
+      - "Did not stage a claim; this is a user-owned renderer architecture policy, not an empirical assertion."
+      - "Next grilling branch should resolve whether render passes may produce persistent project data or only transient visual outputs and diagnostics."
+  - turn: "2026-06-23_001#3"
+    notes:
+      - "Routed the user's render-pass purity affirmation as a direct decision because it constrains frame-pass side effects, persistent result creation, readback/write-back ownership, and user-visible outcome reporting."
+      - "Did not stage a claim; this is a user-owned runtime/renderer side-effect policy, not an empirical assertion."
+      - "Next grilling branch should resolve explicit readback/write-back job semantics, validation, and publication targets."
+  - turn: "2026-06-23_001#4"
+    notes:
+      - "Routed the user's readback/write-back publication affirmation as a direct decision because it constrains default derived-candidate output, target overrides, canonical promotion, overwrite validation, and failed/partial publication behavior."
+      - "Did not stage a claim; this is a user-owned runtime/project data-publication policy, not an empirical assertion."
+      - "Next grilling branch should resolve validation stages, partial-result semantics, and retry/cancel behavior for readback/write-back jobs."
+  - turn: "2026-06-23_001#5"
+    notes:
+      - "Routed the user's readback/write-back job state affirmation as a direct decision because it constrains job lifecycle states, partial-safe candidate publication, retry attempt grouping, and cancellation diagnostics."
+      - "Did not stage a claim; this is a user-owned runtime job-lifecycle policy, not an empirical assertion."
+      - "Next grilling branch should resolve scheduling priorities and fairness between rendering, previews, generation jobs, uploads, and readbacks."
+  - turn: "2026-06-23_001#6"
+    notes:
+      - "Routed the user's scheduling priority affirmation as a direct decision because it constrains interactive rendering priority, visible snapshot/upload work, user-triggered jobs, background work, bounded queues, fairness, cancellation/debounce, and diagnostics."
+      - "Did not stage a claim; this is a user-owned runtime scheduling policy, not an empirical assertion."
+      - "Next grilling branch should resolve executor ownership boundaries between runtime scheduling, graphics upload, method jobs, and UI status."
+  - turn: "2026-06-23_001#7"
+    notes:
+      - "Routed the user's executor ownership affirmation as a direct decision because it constrains runtime scheduler ownership, graphics upload execution, method job contracts, UI/editor intent/status responsibilities, and shared job/diagnostic registry truth."
+      - "Did not stage a claim; this is a user-owned runtime/subsystem ownership policy, not an empirical assertion."
+      - "Next grilling branch should resolve shared job/diagnostic registry schema, retention, and query behavior."
+  - turn: "2026-06-23_001#8"
+    notes:
+      - "Routed the user's shared job/diagnostic registry affirmation as a direct decision because it constrains registry fields, project-affecting persistence, session/cache retention, eviction policy, and shared query truth."
+      - "Did not stage a claim; this is a user-owned diagnostics data-retention policy, not an empirical assertion."
+      - "Next grilling branch should resolve query/filter views and UI interaction patterns for registry entries."
+  - turn: "2026-06-23_001#9"
+    notes:
+      - "Routed the user's registry query/action affirmation as a direct decision because it constrains typed filters, saved views, UI badges/panels, structured reports for agents/tests, and stable entry actions."
+      - "Did not stage a claim; this is a user-owned diagnostics interaction policy, not an empirical assertion."
+      - "Next grilling branch should resolve diagnostic severity, blocking semantics, and action-required escalation."
+  - turn: "2026-06-23_001#10"
+    notes:
+      - "Routed the user's diagnostic severity/blocking affirmation as a direct decision because it constrains severity taxonomy, activation/publication blocking, affected-scope isolation, fatal snapshot replacement behavior, and required next-action metadata."
+      - "Did not stage a claim; this is a user-owned diagnostics policy, not an empirical assertion."
+      - "Next grilling branch should resolve how diagnostic actions are authorized, executed, previewed, and audited."
+  - turn: "2026-06-23_001#11"
+    notes:
+      - "Routed the user's diagnostic action authorization affirmation as a direct decision because it constrains typed runtime commands, safe/mutating action split, confirmation, preview/dry-run, audit entries, registry events, and undo metadata."
+      - "Did not stage a claim; this is a user-owned command execution and audit policy, not an empirical assertion."
+      - "Next grilling branch should resolve undo/redo history scope for rendering, project data, config, recipe, and publication actions."
+  - turn: "2026-06-23_001#12"
+    notes:
+      - "Routed the user's undo/redo scope affirmation as a direct decision because it constrains which rendering actions create reversible project-state transactions versus diagnostics/re-run paths."
+      - "Did not stage a claim; this is a user-owned project mutation/history policy, not an empirical assertion."
+      - "Next grilling branch should resolve serialization, display, and validation of undo/redo history across sessions."
+  - turn: "2026-06-23_001#13"
+    notes:
+      - "Routed the user's persisted undo/redo history affirmation as a direct decision because it constrains reload validation, disabled conflicting entries, and shared history access for users, tests, and agents."
+      - "Did not stage a claim; this is a user-owned project history persistence policy, not an empirical assertion."
+      - "Next grilling branch should resolve how adjacent rendering edits are grouped, coalesced, named, and exposed as transactions."
+  - turn: "2026-06-23_001#14"
+    notes:
+      - "Routed the user's transaction grouping affirmation as a direct decision because it constrains edit-scope coalescing, async publication undoability, dependent effects, high-impact action boundaries, and transaction labels."
+      - "Did not stage a claim; this is a user-owned project history interaction policy, not an empirical assertion."
+      - "Next grilling branch should resolve undo/redo conflict behavior when external edits, reload validation, or async completions invalidate a transaction."
+  - turn: "2026-06-23_001#15"
+    notes:
+      - "Routed the user's undo/redo conflict affirmation as a direct decision because it constrains runtime command preflight, atomic application, disabled conflict diagnostics, superseded job handling, stale dependent results, and GPU cache invalidation."
+      - "Did not stage a claim; this is a user-owned runtime/project-history conflict policy, not an empirical assertion."
+      - "Next grilling branch should resolve the boundary between append-only audit history and reversible undo/redo history."
+  - turn: "2026-06-23_001#16"
+    notes:
+      - "Routed the user's audit-versus-undo affirmation as a direct decision because it constrains append-only command/diagnostic accountability, the reversible transaction subset, cross-references to jobs/artifacts/outcomes, compensating transactions, and unified timeline presentation."
+      - "Did not stage a claim; this is a user-owned project audit/history policy, not an empirical assertion."
+      - "Next grilling branch should resolve on-disk schema versioning, migration, and validation for persisted rendering configuration and history documents."
+  - turn: "2026-06-23_001#17"
+    notes:
+      - "Routed the user's persisted rendering document versioning affirmation as a direct decision because it constrains schema metadata, compatibility checks, staged load/migration/activation, fail-closed capability handling, audited revision creation, and migration fixtures."
+      - "Did not stage a claim; this is a user-owned project persistence and migration policy, not an empirical assertion."
+      - "Next grilling branch should resolve source-of-truth boundaries between authored project files, generated artifacts, caches, and portable reproducibility bundles."
+  - turn: "2026-06-23_001#18"
+    notes:
+      - "Routed the user's authored-versus-generated source-of-truth affirmation as a direct decision because it constrains authored project data, content-addressed derived artifacts, dependency hashes, regeneration, stale diagnostics, pinned artifact status, and explicit promotion."
+      - "Did not stage a claim; this is a user-owned project data provenance policy, not an empirical assertion."
+      - "Next grilling branch should resolve portable reproducibility bundle contents, validation, and replay behavior."
+  - turn: "2026-06-23_001#19"
+    notes:
+      - "Routed the user's reproducibility bundle affirmation as a direct decision because it constrains bundle contents, import validation, regeneration fallback, degraded reproducibility reporting, and replay transparency."
+      - "Did not stage a claim; this is a user-owned project portability and reproducibility policy, not an empirical assertion."
+      - "Next grilling branch should resolve activation validation gates for configs, recipes, bundles, and agent-authored rendering edits."
+  - turn: "2026-06-23_001#20"
+    notes:
+      - "Routed the user's fast-validation affirmation as a direct decision because it constrains activation gates, synchronous versus background validation tiers, caching, affected-slice checks, bounded previews, failure behavior, and user-visible pending diagnostics."
+      - "Did not stage a claim; this is a user-owned runtime/editor validation policy, not an empirical assertion."
+      - "Next grilling branch should resolve latency budgets, progress reporting, and cancellation/debounce behavior for validation work."
+  - turn: "2026-06-23_001#21"
+    notes:
+      - "Routed the user's no-fixed-budget correction as a direct user-revised decision because it explicitly rejects latency-budget framing and reframes validation performance as a design/implementation responsibility."
+      - "Did not stage a claim; this is a user-owned validation policy correction, not an empirical assertion."
+      - "Next grilling branch should resolve concrete fast-validation design mechanisms: dependency graphs, hashing, cache keys, affected-slice execution, cancellation, debounce, and visible progress."
+  - turn: "2026-06-23_001#22"
+    notes:
+      - "Routed the user's fast-validation mechanism affirmation as a direct decision because it constrains dependency-graph execution, hashing/cache keys, affected-slice compilation, snapshot reuse, preview piggybacking, parallelism, debounce, cancellation, active-view priority, and explicit validation states."
+      - "Did not stage a claim; this is a user-owned validation architecture policy, not an empirical assertion."
+      - "Next grilling branch should resolve the edit-risk classifier that decides low-risk activation, high-impact approval, and degraded-state acceptance."
+  - turn: "2026-06-23_001#23"
+    notes:
+      - "Routed the user's activation risk classifier affirmation as a direct decision because it constrains low-risk/high-impact edit categories, loadable policy ownership, approval routing, and queryable explanations for users, agents, and tests."
+      - "Did not stage a claim; this is a user-owned activation policy, not an empirical assertion."
+      - "Next grilling branch should resolve the approval interaction for high-impact edits and how degraded or unchecked activation can be explicitly accepted."
+  - turn: "2026-06-23_001#24"
+    notes:
+      - "Routed the user's high-impact approval affirmation as a direct decision because it constrains explicit approval, scoped degraded overrides, rollback availability, and agent self-approval limits."
+      - "Routed the user's changeability reminder as a direct decision because it reframes subsequent rendering architecture choices around extension seams, low coupling, explicit contracts, and easy code evolution."
+      - "Did not stage claims; both entries are user-owned design priorities, not empirical assertions."
+      - "Next grilling branch should resolve renderer/runtime extension seams and module boundaries that preserve changeability."
+  - turn: "2026-06-23_001#25"
+    notes:
+      - "Routed the user's extension-seam affirmation as a direct decision because it constrains app/UI/runtime/graphics ownership, snapshot/pass-graph consumption, and feature-entry seams."
+      - "Routed the user's autonomous agent quality-evidence request as a direct open question because it starts a new branch without yet deciding the evidence model."
+      - "Did not stage claims; these are user-owned architecture direction and design inquiry entries."
+      - "Next grilling branch should resolve what evidence is necessary and sufficient for agents to judge implementation quality autonomously before human review."
+  - turn: "2026-06-23_001#26"
+    notes:
+      - "Routed the user's evidence-bundle affirmation as a direct decision because it constrains autonomous agent success criteria across task acceptance, tests, structural checks, rendering previews, method parity/benchmarks, docs sync, and self-review."
+      - "Routed the user's future-change skill requirement as a direct decision because it constrains agent planning and self-review workflows around extension seams, coupling, policy placement, tests, diagnostics, and maintainability."
+      - "Did not stage claims; both are user-owned process and workflow decisions."
+      - "Next grilling branch should resolve the concrete prompts, outputs, and skip conditions for a changeability-planning skill."
+  - turn: "2026-06-23_001#27"
+    notes:
+      - "Routed the user's future-change plan affirmation as a direct decision because it constrains required planning prompts, self-review fields, intentional non-generalization, and applicability limits."
+      - "Did not stage a claim; this is a user-owned agent workflow contract, not an empirical assertion."
+      - "Next grilling branch should resolve a machine-readable implementation evidence report format agents can produce and tools can validate."
+  - turn: "2026-06-23_001#28"
+    notes:
+      - "Routed the user's implementation evidence report affirmation as a direct decision because it constrains report schema fields, tool/reviewer comparability, skipped-check accounting, risk disclosure, and self-review evidence."
+      - "Did not stage a claim; this is a user-owned agent evidence/reporting workflow decision, not an empirical assertion."
+      - "Next grilling branch should resolve which evidence-report omissions or failures block task completion versus warn for human review."
+  - turn: "2026-06-23_001#29"
+    notes:
+      - "Routed the user's evidence-report strictness affirmation as a direct decision because it constrains required evidence, blocking failures, warning-only residual risks, skipped-check justification, and follow-up task requirements."
+      - "Did not stage a claim; this is a user-owned workflow validation policy, not an empirical assertion."
+      - "Next grilling branch should resolve where evidence reports live, how they are generated, and how retention avoids repo noise while preserving useful review history."
+  - turn: "2026-06-23_001#30"
+    notes:
+      - "Routed the user's evidence-report storage/generation affirmation as a direct decision because it constrains report paths, generated artifact policy, durable summaries, large artifact references, tool/CI validation, and trivial skip reasons."
+      - "Did not stage a claim; this is a user-owned agent evidence workflow decision, not an empirical assertion."
+      - "Next grilling branch should resolve how agents choose relevant verification scope for evidence reports without over- or under-testing."
+  - turn: "2026-06-23_001#31"
+    notes:
+      - "Routed the user's open-ended continuation instruction as a direct decision because it removes the arbitrary question cap and keeps the design interview open until concrete rendering process contracts are covered."
+      - "Did not stage a claim; this is a user-owned interview scope and process decision, not an empirical assertion."
+      - "Next grilling branch should move from policy-level rendering decisions into concrete frame pipeline ownership and phase boundaries."
+  - turn: "2026-06-23_001#32"
+    notes:
+      - "Routed the user's canonical frame-pipeline affirmation as a direct decision because it constrains phase ordering, runtime orchestration, graphics snapshot consumption, backend execution, and no-live-ECS/assets/UI boundaries."
+      - "Did not stage a claim; this is a user-owned rendering architecture decision, not an empirical assertion."
+      - "Next grilling branch should resolve the concrete immutable render snapshot contract passed from runtime to renderer."
+  - turn: "2026-06-23_001#33"
+    notes:
+      - "Routed the user's snapshot-contract affirmation with extensibility caveat as a direct user-revised decision because it accepts the immutable snapshot contract while strengthening the generality and future-extension requirement."
+      - "Did not stage a claim; this is a user-owned rendering architecture contract decision, not an empirical assertion."
+      - "Next grilling branch should resolve how snapshot extensibility is governed so generality does not become untyped coupling."
+  - turn: "2026-06-23_001#34"
+    notes:
+      - "Routed the user's renderer-input clarification as a direct pivot because it revises the previous global-snapshot framing: renderers may declare different input shapes and full-scene snapshots are optional."
+      - "Did not stage a claim; this is a user-owned rendering architecture correction, not an empirical assertion."
+      - "Next grilling branch should resolve the renderer-specific input contract registry and how runtime adapts ECS/project data without leaking live ownership into lower graphics layers."
+  - turn: "2026-06-24_001#1"
+    notes:
+      - "Routed the user's renderer-contract visibility uncertainty as a direct open question because the user has not yet decided whether contracts are public, renderer-internal, or hybrid."
+      - "Did not stage a claim; this is an unresolved architecture design question, not an empirical assertion."
+      - "Recommended next branch should resolve a hybrid design: public capability/request metadata for runtime/UI/agents/tests, private renderer acquisition/packing details for implementation freedom."
+  - turn: "2026-06-24_001#2"
+    notes:
+      - "Routed the user's snapshot-boundary follow-up as a direct open question because it challenges whether snapshots should be the primary dependency-separation mechanism rather than an optional renderer input shape."
+      - "Did not stage a claim; this is an unresolved architecture design question, not an empirical assertion."
+      - "Recommended next branch should distinguish one global full-scene snapshot from scoped immutable prepared views that act as renderer-specific dependency boundaries."
+  - turn: "2026-06-24_001#3"
+    notes:
+      - "Routed the user's scoped-snapshot affirmation as a direct decision because it resolves N131: snapshots/prepared views are the renderer dependency boundary, but they are scoped to the renderer/workflow instead of requiring a universal full-scene shape."
+      - "Did not stage a claim; this is a user-owned rendering architecture decision, not an empirical assertion."
+      - "Next grilling branch should resolve the public metadata envelope every scoped prepared snapshot exposes for validation, UI, agents, tests, and reproducibility while leaving payload layout renderer-specific."
+  - turn: "2026-06-24_001#4"
+    notes:
+      - "Routed the user's public-envelope affirmation as a direct decision because it resolves N130's visibility concern with a split: public metadata envelope, renderer-private payload."
+      - "Did not stage a claim; this is a user-owned rendering architecture decision, not an empirical assertion."
+      - "Next grilling branch should distinguish renderer capability/request declarations from per-snapshot envelopes so runtime can decide which prepared view to build."
+  - turn: "2026-06-24_001#5"
+    notes:
+      - "Routed the user's descriptor/envelope split affirmation as a direct decision because it separates renderer-level capabilities from concrete prepared-input instance metadata."
+      - "Did not stage a claim; this is a user-owned rendering architecture decision, not an empirical assertion."
+      - "Next grilling branch should resolve how materials, shaders, and channel bindings are declared in descriptors and concretized in scoped snapshot envelopes."
+  - turn: "2026-06-24_001#6"
+    notes:
+      - "Routed the user's material/shader/channel binding affirmation as a direct decision because it establishes public binding intents while preserving renderer-private payload freedom."
+      - "Did not stage a claim; this is a user-owned rendering architecture decision, not an empirical assertion."
+      - "Next grilling branch should resolve the render-graph/RHI split so renderer-private execution freedom still produces inspectable passes, resources, barriers, diagnostics, and outputs."
+  - turn: "2026-06-24_001#7"
+    notes:
+      - "Routed the BUG-046 work as a direct experiment because this turn produced code changes plus empirical verification rather than a new interpretive claim."
+      - "Did not stage a claim; the actionable result is already committed to task records and verified by CTest evidence."
+      - "Removed the BUG-046 open thread from today's session record because the task was retired at CPUContracted maturity."
+  - turn: "2026-06-24_001#8"
+    notes:
+      - "Routed the user's renderer/snapshot/render-graph clarification as a direct user-revised decision because it adjusts the prior split: renderers use the engine render graph substrate rather than isolated private graph systems."
+      - "Did not stage a claim; this is a user-owned rendering architecture decision, not an empirical assertion."
+      - "Next grilling branch should resolve what the engine render graph contract exposes and how much of a renderer's frame recipe is file-backed, inspectable, or private implementation."
+  - turn: "2026-06-24_001#9"
+    notes:
+      - "Routed the user's recipe mutability answer as a direct decision because it defines the boundary between fixed renderer algorithm and loadable optional recipe configuration."
+      - "Did not stage a claim; this is a user-owned rendering architecture decision, not an empirical assertion."
+      - "Next grilling branch should resolve how renderers declare supported optional recipe slots and how validation rejects unsupported or unsafe recipe data."
+  - turn: "2026-06-24_001#10"
+    notes:
+      - "Routed the user's extension-slot affirmation as a direct decision because it closes the loadable recipe validation rule: only renderer-declared slots are configurable."
+      - "Did not stage a claim; this is a user-owned rendering architecture decision, not an empirical assertion."
+      - "Next grilling branch should move to visibility, batching, and scene partitioning because renderer/snapshot/recipe boundaries are now sufficiently covered for that dependency."
+  - turn: "2026-06-24_001#11"
+    notes:
+      - "Routed the user's visibility/batching correction as a direct user-revised decision because it supersedes the AI recommendation that each renderer independently own the strategy."
+      - "Did not stage a claim; this is a user-owned rendering architecture decision, not an empirical assertion."
+      - "Next grilling branch should resolve the concrete output contract of the shared visibility/grouping recipe so renderers can consume it without losing renderer-specific freedom."
+  - turn: "2026-06-24_001#12"
+    notes:
+      - "Routed the user's visibility-output affirmation as a direct decision because it defines renderer-neutral products from the shared visibility/grouping recipe."
+      - "Did not stage a claim; this is a user-owned rendering architecture decision, not an empirical assertion."
+      - "Next grilling branch should resolve lighting and environment ownership using the same distinction between authored data, shared recipes, renderer compatibility, and renderer-specific interpretation."
+  - turn: "2026-06-24_001#13"
+    notes:
+      - "Routed the user's lighting/environment affirmation as a direct decision because it applies the shared configurable recipe pattern to lighting data and renderer-specific interpretation."
+      - "Did not stage a claim; this is a user-owned rendering architecture decision, not an empirical assertion."
+      - "Next grilling branch should resolve view and output-target semantics, including interactive and headless rendering, before implementation slicing."
+  - turn: "2026-06-24_001#14"
+    notes:
+      - "Routed the user's view/output affirmation as a direct decision because it makes interactive and headless targets part of the same shared recipe model."
+      - "Did not stage a claim; this is a user-owned rendering architecture decision, not an empirical assertion."
+      - "Next grilling branch should resolve how declared render outputs become transient artifacts, cached generated artifacts, or published project data before implementation slicing."
+  - turn: "2026-06-24_001#15"
+    notes:
+      - "Routed the user's render-output publication affirmation as a direct decision because it closes the output lifecycle branch: render outputs are artifacts first and project mutation is explicit."
+      - "Did not stage a claim; this is a user-owned rendering architecture decision, not an empirical assertion."
+      - "Next grilling branch should move from architecture decisions to task slicing and decide the first implementation milestone."
+  - turn: "2026-06-24_001#16"
+    notes:
+      - "Routed the user's contract-first implementation affirmation as a direct decision because it selects the first milestone strategy for the accepted rendering architecture."
+      - "Did not stage a claim; this is a user-owned implementation-order decision, not an empirical assertion."
+      - "Next grilling branch should decide the exact task split: one narrow contract foundation task plus follow-up tasks for current renderer adaptation, loadable configs, UI, shared recipe execution, and Vulkan integration."
+  - turn: "2026-06-24_001#17"
+    notes:
+      - "Routed the user's first-task-slice affirmation as a direct decision because it fixes the initial implementation scope: CPU-only contracts and tests only."
+      - "Did not stage a claim; this is a user-owned implementation slicing decision, not an empirical assertion."
+      - "Next grilling branch should decide whether to stop questioning and create the task files now, or first confirm the follow-up task sequence."
+  - turn: "2026-06-24_001#18"
+    notes:
+      - "Routed task file creation as a direct decision because the accepted architecture is now task-backed by active `GRAPHICS-099` and explicit follow-ups."
+      - "Routed task validation as a direct experiment because it produced concrete tool evidence for the new task pack."
+      - "Closed the grilling task-creation thread; implementation can now start from `GRAPHICS-099` when requested."
+  - turn: "2026-06-24_001#19"
+    notes:
+      - "Routed the agentic planning review as a direct experiment because the turn combined validator runs with semantic inspection of task files."
+      - "Did not crystallize a claim; the contradictions/stale-task findings are AI review conclusions awaiting user triage or artifact edits."
+      - "Added an open cleanup thread covering stale `RUNTIME-120`/`RUNTIME-122` lifecycle state, `RUNTIME-126` wording around blocked `RUNTIME-123`, GRAPHICS maturity wording, UI-023 dependency scope, and stale UI-022 runtime documentation."
+  - turn: "2026-06-24_001#20"
+    notes:
+      - "Staged the recommended execution order as O05 because it is an AI-suggested process recommendation, not yet user-affirmed or committed to task edits."
+      - "Did not create a direct decision node; the user asked for guidance, not to execute the ordering."
+      - "No crystallization signal fired for O05 in this turn."
+  - turn: "2026-06-24_001#21"
+    notes:
+      - "Routed the task-only hygiene slice as a direct experiment because the turn produced concrete task/docs edits plus validator evidence."
+      - "Did not stage a new claim; the cleanup decisions are encoded directly in task frontmatter/text and generated session brief state."
+      - "Closed the task-plan cleanup open thread; remaining implementation can start from `GRAPHICS-099`, with `RUNTIME-121`, `RUNTIME-126`, and the rendering follow-up chain visible in the regenerated brief."
+  - turn: "2026-06-24_001#22"
+    notes:
+      - "Routed the GRAPHICS-099 implementation as a direct experiment because it produced module/test/docs/task edits plus full build and CTest evidence."
+      - "Did not stage a new claim; the contract endpoint is committed through the retired task record, module inventory, and passing verification."
+      - "Updated open rendering thread from active GRAPHICS-099 to unblocked follow-ups GRAPHICS-100 and GRAPHICS-101."
+  - turn: "2026-06-24_001#23"
+    notes:
+      - "Routed the multi-task renderer/snapshot/recipe implementation loop as a direct experiment because it produced code, task retirements, docs, module inventory, CPU verification, and opt-in Vulkan smoke evidence."
+      - "Marked staged observation O05 as committed by artifact execution because the requested ordered chain was implemented and retired through GRAPHICS-103."
+      - "Closed the open rendering follow-up thread; remaining open threads are outside the completed renderer/snapshot/recipe chain."
+  - turn: "2026-06-24_001#24"
+    notes:
+      - "Routed the remaining-runtime-task review as a direct experiment because it inspected task files, session-brief state, shader/current-path evidence, and task validators."
+      - "Did not stage a new architecture claim; the outcome is a task validity verdict plus concrete stale-wording findings."
+      - "Kept the runtime queue open, with RUNTIME-121/RUNTIME-126 unblocked and a hygiene caveat for RUNTIME-121/top-level backlog wording before implementation."
+  - turn: "2026-06-24_001#25"
+    notes:
+      - "Routed the runtime task hygiene edit as a direct experiment because it materially updated task dependencies/text and regenerated/validated the session brief."
+      - "Did not stage a new claim; the user's clarification is encoded directly in RUNTIME-123's dependency and scope."
+      - "Closed the hygiene caveat from turn 24; runtime implementation can proceed from RUNTIME-121 or RUNTIME-126."
+  - turn: "2026-06-24_001#26"
+    notes:
+      - "Routed the prompt preparation as a direct decision because it selects an execution order and guardrails for future runtime task implementation."
+      - "Did not stage a new claim; the prompt is an operational handoff artifact grounded in the current session brief."
+      - "The next implementation run should start with RUNTIME-121 unless the user explicitly chooses the independent RUNTIME-126 branch first."
+  - turn: "2026-06-24_001#27"
+    notes:
+      - "Routed the RUNTIME-121 implementation attempt as a direct experiment because it produced code/docs/tests plus concrete `ci` and `ci-vulkan` verification results."
+      - "Routed the active-shader mismatch as a dead-end node because the Vulkan smoke refuted the hypothesis that editing `deferred/gbuffer.*` alone covers the operational default-recipe deferred GpuScene path."
+      - "Did not crystallize a general claim; RUNTIME-121 remains open and the next turn should either retarget the active `forward/default_debug_surface.vert` + `deferred/default_debug_gbuffer.frag` pair or explicitly rewire the renderer pipeline before rerunning the Vulkan smoke."
+  - turn: "2026-06-24_001#28"
+    notes:
+      - "Routed the completed RUNTIME-121..124 multi-task loop as a direct experiment because it produced code, docs, tests, task retirements, session-brief regeneration, CPU verification, and opt-in Vulkan smoke evidence."
+      - "Routed the RUNTIME-125 gate as a direct decision because the task-local benchmark prerequisite was inspected and found unsatisfied; no AoS shader/storage work was started."
+      - "Updated open threads to close stale RUNTIME-121 state and leave only the RUNTIME-125 benchmark gate plus independent RUNTIME-126 branch."
+  - turn: "2026-06-25_001#1"
+    notes:
+      - "Routed the RUNTIME-126 implementation attempt as a direct experiment because it produced code, tests, docs, generated inventory, and concrete focused/GPU/default-gate verification results."
+      - "Staged the MeshPrimitiveViewExtraction dirty-update diagnosis as O06 because it is an inferred post-RUNTIME-124 contract constraint that still needs task/test adjudication."
+      - "Left RUNTIME-126 open because the user's loop rules require stopping after a failed verification gate rather than retiring or proceeding to another task."
+  - turn: "2026-06-25_001#2"
+    notes:
+      - "Routed the RUNTIME-126 retirement pass as a direct experiment because it fixed the diagnosed gate, reran focused and full verification, moved the task to done, and refreshed task indexes."
+      - "Crystallized O06 to K02 via artifact commitment because the mesh primitive-view contract test now encodes the post-RUNTIME-124 in-place surface update semantics."
+      - "Routed the RUNTIME-125 stop as a direct decision because the task-local benchmark gate was re-inspected and remained unsatisfied; no AoS shader/storage work was started."
+  - turn: "2026-06-25_001#3"
+    notes:
+      - "Routed the RUNTIME-125 metadata audit as a direct experiment because it inspected the session-brief generator, task front-matter schema, exact task file, and benchmark directories."
+      - "Did not stage a new claim; the important result is a concrete process fact that the benchmark gate is task-local text rather than a `depends_on` edge."
+      - "Kept the open RUNTIME-125 thread blocked on benchmark/profile evidence and noted that an explicit prerequisite task would be needed for the generated session brief to show the blocker."
+  - turn: "2026-06-25_001#4"
+    notes:
+      - "Routed the goal-level block as a direct decision because the same RUNTIME-125 benchmark gate recurred after all other runtime Theme B tasks were retired and no permitted implementation path remained."
+      - "Did not create a prerequisite benchmark task because the user's loop rules said to stop at RUNTIME-125 when the benchmark gate is unsatisfied, and opening new benchmark work needs an explicit scope decision."
+      - "Kept one open thread naming the external condition required to resume: benchmark/profile evidence or a user-approved prerequisite benchmark task."

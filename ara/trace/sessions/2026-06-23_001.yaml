@@ -1,0 +1,585 @@
+session:
+  id: "2026-06-23_001"
+  date: "2026-06-23"
+  started: "2026-06-23T00:22"
+  last_turn: "2026-06-23T23:41"
+  turn_count: 34
+  summary: "Continued rendering-design grilling by accepting lease-based GPU resource lifetime/eviction semantics, declarative renderer pass-graph composition, project-data-pure render passes, derived-candidate readback/write-back publication, readback job state/attempt semantics, bounded fair scheduling priorities, runtime-owned executor policy with subsystem contracts, shared job/diagnostic registry retention, typed registry query/actions, scoped diagnostic severity/blocking semantics, audited runtime diagnostic actions, undo/redo scope for rendering mutations, persisted reload-validated undo/redo history, transaction grouping/coalescing/naming, undo/redo conflict handling for async jobs and newer revisions, the audit-log versus undo-history boundary, explicit schema versioning/migration/validation for persisted rendering documents, source-of-truth boundaries for authored files versus generated artifacts/caches, portable reproducibility bundle contents/validation/replay behavior, fast tiered activation validation, design-driven validation optimization without fixed latency budgets, concrete fast-validation mechanisms, loadable low-risk/high-impact activation classification, high-impact approval/degraded-state policy, the overarching changeability goal, renderer/runtime extension seams, autonomous agent quality-evidence bundles, changeability-aware planning/self-review skills, required future-change plan/self-review contents, structured implementation evidence reports, blocking/warning rules for evidence-report validation, task-linked implementation evidence report storage/generation, an open-ended continuation mandate for remaining concrete rendering process decisions, canonical frame pipeline phase ownership, a general extensible immutable render snapshot contract, and a pivot toward renderer-specific input contracts where full-scene snapshots are optional."
+
+events_logged:
+  - turn: 1
+    type: decision
+    id: "N93"
+    routing: direct
+    provenance: user
+    summary: "User accepted lease-based GPU resource lifetime: active GPU-ready snapshots pin resources, pending/previews/diagnostics get temporary leases, cache eviction is budget/LRU-driven, and eviction diagnostics explain preview misses or re-uploads."
+  - turn: 2
+    type: decision
+    id: "N94"
+    routing: direct
+    provenance: user
+    summary: "User accepted compiling active viewport recipes into declarative render pass graphs where base geometry runs first, research lenses add explicit pass nodes, overlays/diagnostics run late, and previews/headless validation reuse the same graph."
+  - turn: 3
+    type: decision
+    id: "N95"
+    routing: direct
+    provenance: user
+    summary: "User accepted project-data-pure render passes by default, with persistent results, readbacks, screenshot metrics, and channel/property write-backs requiring explicit runtime jobs with provenance, lifecycle, validation, and visible outcome reporting."
+  - turn: 4
+    type: decision
+    id: "N96"
+    routing: direct
+    provenance: user
+    summary: "User accepted readback/write-back jobs publishing new derived candidate results by default, with explicit target selection or undoable promotion for canonical writes and no project-data publication for failed or partial readbacks."
+  - turn: 5
+    type: decision
+    id: "N97"
+    routing: direct
+    provenance: user
+    summary: "User accepted a readback/write-back job state machine with attempt-level diagnostics, temporary partial artifacts unless partial-safe output is declared, and cancellation that stops publication while preserving concise diagnostics."
+  - turn: 6
+    type: decision
+    id: "N98"
+    routing: direct
+    provenance: user
+    summary: "User accepted non-blocking interactive rendering as highest priority, visible snapshot/upload work next, user-triggered jobs ahead of background work, and bounded fair queues with cancellation/debounce plus diagnostics for delayed or skipped work."
+  - turn: 7
+    type: decision
+    id: "N99"
+    routing: direct
+    provenance: user
+    summary: "User accepted runtime-owned central scheduling policy, graphics-owned backend upload execution behind upload plans, methods-owned pure job contracts, UI-owned intent/status/cancel/promotion, and a shared machine-readable job/diagnostic registry."
+  - turn: 8
+    type: decision
+    id: "N100"
+    routing: direct
+    provenance: user
+    summary: "User accepted a shared job/diagnostic registry storing job identity, ownership, priority, state, attempts, revisions, outcomes, diagnostics, artifacts, affected targets, actions, timestamps, cancellation/debounce reasons, and tiered retention for active, project-affecting, preview/cache-only, and old non-project entries."
+  - turn: 9
+    type: decision
+    id: "N101"
+    routing: direct
+    provenance: user
+    summary: "User accepted querying the job/diagnostic registry through typed filters and saved views, exposing compact UI badges/diagnostics panels, structured reports for agents/tests, and stable per-entry actions or no-action explanations."
+  - turn: 10
+    type: decision
+    id: "N102"
+    routing: direct
+    provenance: user
+    summary: "User accepted diagnostic severities info/warning/action_required/error/fatal, with scoped blocking rules and required blocked-scope plus next-action details for every blocking diagnostic."
+  - turn: 11
+    type: decision
+    id: "N103"
+    routing: direct
+    provenance: user
+    summary: "User accepted diagnostic actions as typed runtime commands, with safe actions running immediately, mutating actions requiring preconditions and audit, explicit confirmation for high-impact mutations, preview/dry-run where feasible, and registry events recording actor, inputs, result, artifacts, diagnostics, and undo availability."
+  - turn: 12
+    type: decision
+    id: "N104"
+    routing: direct
+    provenance: user
+    summary: "User accepted undo/redo for rendering-related project-state mutations, while excluding transient rendering/cache/scheduler effects and requiring revision references, affected dependencies, stale marks, and inverse action availability."
+  - turn: 13
+    type: decision
+    id: "N105"
+    routing: direct
+    provenance: user
+    summary: "User accepted persisted undo/redo history for project-affecting transactions, reload validation against current revisions, disabled diagnostics for stale/conflicting entries, and shared query access for agents/tests."
+  - turn: 14
+    type: decision
+    id: "N106"
+    routing: direct
+    provenance: user
+    summary: "User accepted transaction-based undo history where continuous UI edits coalesce by edit scope, diagnostics-only cancelled/debounced work creates no undo entry, async jobs become undoable only on project-data publication, dependent effects stay inside the parent transaction, and high-impact actions stay separate unless batched."
+  - turn: 15
+    type: decision
+    id: "N107"
+    routing: direct
+    provenance: user
+    summary: "User accepted undo/redo as runtime commands with revision preflight validation, atomic snapshot publication on valid matches, disabled action-required diagnostics on conflicts, superseded-job cancellation/obsolete marking, dependent-result rollback only inside the transaction, stale marking otherwise, and GPU cache/preview invalidation instead of direct undo."
+  - turn: 16
+    type: decision
+    id: "N108"
+    routing: direct
+    provenance: user
+    summary: "User accepted an append-only audit log for all runtime commands and meaningful diagnostics, with undo/redo as the reversible project-state subset, audit entries referencing related transactions/jobs/artifacts/diagnostics/actors/outcomes, compensating transactions instead of audit undo, and a unified UI timeline with undoable and disabled-reason badges."
+  - turn: 17
+    type: decision
+    id: "N109"
+    routing: direct
+    provenance: user
+    summary: "User accepted explicit schema versions, compatibility ranges, stable IDs, revision/content hashes, load-time parse/schema/migration-plan/dry-run/activation stages, closed failure for unsupported required capabilities, revisioned audited migrations, UI/agent migration preview/apply choices, and golden migration fixtures."
+  - turn: 18
+    type: decision
+    id: "N110"
+    routing: direct
+    provenance: user
+    summary: "User accepted authored project files as source of truth, with generated derived data stored as content-addressed artifacts/caches carrying dependency hashes, generator config revisions, provenance, and validation status; missing entries regenerate, stale entries remain diagnostic-only, and portable pinned artifacts stay derived unless explicitly promoted."
+  - turn: 19
+    type: decision
+    id: "N111"
+    routing: direct
+    provenance: user
+    summary: "User accepted portable reproducibility bundles containing authored project files, selected pinned derived artifacts, generator configs, schema versions, engine/build compatibility metadata, dependency hashes, validation reports, and replay manifests, with import validation before activation and explicit UI/agent reporting of trusted, regenerated, skipped, and failed items."
+  - turn: 20
+    type: decision
+    id: "N112"
+    routing: direct
+    provenance: user
+    summary: "User accepted mandatory but fast tiered activation validation, with cheap synchronous schema/capability/dependency/provenance/cache checks, incremental affected-slice render/fallback validation, cached or tightly budgeted preview/image-health checks, background deeper validation for low-risk edits, bounded preview or approval for high-impact changes, and previous active snapshots preserved on failure."
+  - turn: 21
+    type: decision
+    id: "N113"
+    routing: direct
+    provenance: user-revised
+    summary: "User corrected the validation framing: required validation should not use fixed latency budgets as the primary contract, but should be made as fast as possible through design and implementation choices such as incremental dependency tracking, caching, affected-slice checks, cancellation, debounce, background continuation, and responsive diagnostics."
+  - turn: 22
+    type: decision
+    id: "N114"
+    routing: direct
+    provenance: user
+    summary: "User accepted dependency-graph driven incremental validation with hashed inputs, compatibility-aware cache keys, skipped unchanged checks, affected-node render-graph compilation, snapshot reuse, preview piggybacking, parallel independent checks, edit debounce, obsolete-job cancellation, active-view prioritization, and explicit valid/pending/stale/failed/skipped/superseded status."
+  - turn: 23
+    type: decision
+    id: "N115"
+    routing: direct
+    provenance: user
+    summary: "User accepted a declarative loadable activation risk classifier, with low-risk non-destructive viewport/UI recipe, temporary lens, cache refresh, and additive derived-artifact edits, high-impact canonical activation, migration, generator policy, shader/material ownership, overwrite, delete/archive/tombstone, stale acceptance, bundle activation, and agent-authored render-graph/publication edits, plus queryable explanations for UI, agents, and tests."
+  - turn: 24
+    type: decision
+    id: "N116"
+    routing: direct
+    provenance: user
+    summary: "User accepted explicit approval for high-impact rendering activation and degraded/unchecked states, including risk explanation, affected authored data, stale/generated dependencies, preview result, undo availability, fallback path, scoped temporary override metadata, visible status, rollback to previous active snapshot, and no silent self-approval for agent-authored changes."
+  - turn: 24
+    type: decision
+    id: "N117"
+    routing: direct
+    provenance: user
+    summary: "User reminded that the main engine goal is a codebase that is easy to change, extend, and improve constantly, so rendering architecture should prioritize clear boundaries, composable seams, loadable policies, explicit contracts, diagnostics, focused tests, and low coupling over configurability that spreads complexity."
+  - turn: 25
+    type: decision
+    id: "N118"
+    routing: direct
+    provenance: user
+    summary: "User accepted narrow renderer/runtime extension seams: app stays thin, UI owns intent/status, runtime orchestrates, graphics consumes immutable snapshots and explicit pass graphs, and new render features enter through recipe nodes, validation rules, channel bindings, or pass implementations behind existing contracts."
+  - turn: 25
+    type: question
+    id: "N119"
+    routing: direct
+    provenance: user
+    summary: "User opened a new design branch for how agents can autonomously know they did good work implementing a method or working with the engine, beyond eventual human acceptance."
+  - turn: 26
+    type: decision
+    id: "N120"
+    routing: direct
+    provenance: user
+    summary: "User accepted evidence bundles for autonomous agent quality judgment, including scoped acceptance criteria, relevant tests, structural/layering/import checks, rendering validation or preview artifacts, method/performance benchmark and parity evidence where applicable, docs/task sync, self-review, unverified-risk reporting, and machine-readable diagnostics/validation reports."
+  - turn: 26
+    type: decision
+    id: "N121"
+    routing: direct
+    provenance: user
+    summary: "User required skills for planning tasks with respect to future change and for self-reviewing completed work with respect to future change, asking where applicable about extension seams, boundaries, narrow contracts, hard-coded policy, coupling, tests, diagnostics, and whether the engine remains easy to extend."
+  - turn: 27
+    type: decision
+    id: "N122"
+    routing: direct
+    provenance: user
+    summary: "User accepted requiring a future-change plan before non-trivial applicable tasks, covering owning layer/seam, expected variation points, placement rationale, stable contracts, avoided coupling, loadable/configurable versus hard-coded choices, tests/diagnostics, intentional non-generalization, and a matching self-review that says whether implementation preserved or damaged future changeability."
+  - turn: 28
+    type: decision
+    id: "N123"
+    routing: direct
+    provenance: user
+    summary: "User accepted structured implementation evidence reports for non-trivial completed tasks, containing task ID, touched layers/modules, extension seam, future-change plan reference, acceptance criteria results, command outcomes with logs/artifacts, public contract changes, diagnostics/previews, benchmark/parity results where relevant, docs/task sync, residual risks, skipped checks with reasons, and self-review answers."
+  - turn: 29
+    type: decision
+    id: "N124"
+    routing: direct
+    provenance: user
+    summary: "User accepted blocking evidence-report validation for missing required fields, unaddressed acceptance criteria, failed relevant tests/checks, layering/docs/task policy violations, public contract changes without tests/docs, rendering changes without preview/validation evidence, method/performance claims without parity/benchmark evidence, and skipped required checks without reasons, while warning for scoped residual risks, intentionally skipped non-relevant checks, quarantined flaky tests, and follow-up-tracked future-change concerns."
+  - turn: 30
+    type: decision
+    id: "N125"
+    routing: direct
+    provenance: user
+    summary: "User accepted generated task-linked implementation evidence reports, with durable summaries in task files or retirement logs, machine-readable reports at tasks/evidence/<TASK-ID>/report.yaml for completed non-trivial tasks, large artifacts referenced by path/hash, schema/policy comparison by tools/CI, and explicit not-applicable reasons for tiny trivial skips."
+  - turn: 31
+    type: decision
+    id: "N126"
+    routing: direct
+    provenance: user
+    summary: "User removed the arbitrary five-question cap and directed rendering-design grilling to continue with as many one-at-a-time questions as necessary until the remaining rendering process is clearly covered."
+  - turn: 32
+    type: decision
+    id: "N127"
+    routing: direct
+    provenance: user
+    summary: "User accepted canonical frame pipeline phases and ownership: app/UI submit intent through runtime commands; runtime resolves project state, extracts immutable render snapshots, orchestrates validation/scheduling/outcome publication; lower layers execute fallback/validation work; graphics assets/renderer build GPU-ready snapshots, upload plans, and pass graphs; graphics backends execute uploads/passes through RHI/Vulkan; UI displays runtime diagnostics and explicit job outcomes."
+  - turn: 33
+    type: decision
+    id: "N128"
+    routing: direct
+    provenance: user-revised
+    summary: "User accepted the runtime-to-renderer immutable render snapshot contract, revised to emphasize a general extensible versioned value object with stable core identity/view/renderable/channel/resource/validation fields and first-class typed extension capacity for future research lenses, material models, geometry domains, diagnostics, and backend capabilities."
+  - turn: 34
+    type: pivot
+    id: "N129"
+    routing: direct
+    provenance: user-revised
+    summary: "User clarified that a renderer uses engine seams to produce an image, different renderer families may need different input shapes or no full-scene snapshot, selected-object editing workflows should consume only a small editing context, and runtime should adapt ECS/project data to each renderer-specific input contract."
+
+ai_actions:
+  - turn: 1
+    action: "Recorded the user's acceptance of GPU resource leases, cache retention, eviction, and diagnostics across snapshot generations."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 2
+    action: "Recorded the user's acceptance of declarative render pass graph composition from viewport recipes."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 3
+    action: "Recorded the user's acceptance that render passes are project-data pure by default and persistent outputs require explicit runtime jobs."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 4
+    action: "Recorded the user's acceptance of derived-candidate defaults and explicit validated overwrite requirements for readback/write-back jobs."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 5
+    action: "Recorded the user's acceptance of readback/write-back job state, retry attempt, partial-result, and cancellation semantics."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 6
+    action: "Recorded the user's acceptance of rendering/job scheduling priorities, bounded queues, fairness, cancellation/debounce, and delay diagnostics."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 7
+    action: "Recorded the user's acceptance of runtime-owned scheduler policy, subsystem execution contracts, UI/editor intent ownership, and shared job/diagnostic registry truth."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 8
+    action: "Recorded the user's acceptance of shared job/diagnostic registry fields and tiered retention policy."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 9
+    action: "Recorded the user's acceptance of typed registry filters, saved views, shared structured reports, and stable registry actions."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 10
+    action: "Recorded the user's acceptance of diagnostic severity levels and scoped blocking semantics."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 11
+    action: "Recorded the user's acceptance of audited runtime command execution for diagnostic actions."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 12
+    action: "Recorded the user's acceptance of undo/redo scope for rendering-related project-state mutations."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 13
+    action: "Recorded the user's acceptance of persisted and reload-validated undo/redo transaction history."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 14
+    action: "Recorded the user's acceptance of transaction grouping, coalescing, and naming for rendering undo/redo history."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 15
+    action: "Recorded the user's acceptance of undo/redo conflict handling for async jobs and newer revisions."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 16
+    action: "Recorded the user's acceptance of the audit-log versus undo-history boundary and unified timeline presentation."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 17
+    action: "Recorded the user's acceptance of explicit on-disk schema versioning, migration planning, validation, and activation for persisted rendering documents."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 18
+    action: "Recorded the user's acceptance of authored files as source of truth over generated artifacts, caches, and pinned reproducibility data."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 19
+    action: "Recorded the user's acceptance of portable reproducibility bundle contents, validation, degraded replay behavior, and UI/agent reporting."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 20
+    action: "Recorded the user's acceptance of fast tiered activation validation for configs, recipes, bundles, and agent-authored rendering edits."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 21
+    action: "Recorded the user's correction that validation speed is a design/implementation concern rather than a fixed latency-budget policy."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 22
+    action: "Recorded the user's acceptance of concrete dependency-aware fast-validation mechanisms."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 23
+    action: "Recorded the user's acceptance of a loadable low-risk versus high-impact activation classifier."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 24
+    action: "Recorded the user's acceptance of high-impact approval/degraded-state policy and the overarching goal that rendering architecture should keep the engine easy to change."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 25
+    action: "Recorded the user's acceptance of renderer/runtime extension seams and opened the autonomous agent quality-evidence design branch."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 26
+    action: "Recorded the user's acceptance of autonomous agent evidence bundles and changeability-aware planning/self-review skills."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 27
+    action: "Recorded the user's acceptance of concrete future-change planning questions and matching self-review output."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 28
+    action: "Recorded the user's acceptance of structured machine-readable implementation evidence reports."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 29
+    action: "Recorded the user's acceptance of blocking versus warning rules for implementation evidence-report validation."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 30
+    action: "Recorded the user's acceptance of task-linked generated implementation evidence report storage and generation."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 31
+    action: "Recorded the user's instruction to continue rendering-design grilling until the concrete rendering process is covered."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 32
+    action: "Recorded the user's acceptance of canonical frame pipeline phases and owner boundaries."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 33
+    action: "Recorded the user's revised acceptance of a general and extensible immutable render snapshot contract."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 34
+    action: "Recorded the user's pivot from one canonical render snapshot shape to renderer-specific input contracts with optional full-scene snapshots."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-23_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: "User accepted lease-based GPU resource lifetime and eviction across immutable GPU-ready snapshot generations."
+  - turn: 2
+    excerpt: "User accepted declarative render pipeline recipes compiled from viewport recipes, with base geometry first, research lens pass nodes, late overlays/diagnostics, and shared preview/headless pass graph semantics."
+  - turn: 3
+    excerpt: "User accepted that render passes produce transient outputs, preview artifacts, and diagnostics only; persistent results, readbacks, metrics, and channel/property write-backs must be explicit runtime jobs."
+  - turn: 4
+    excerpt: "User accepted that readback/write-back jobs default to derived candidate results, direct overwrites require descriptor/revision/preview validation and explicit confirmation, and failed or partial readbacks publish no project data."
+  - turn: 5
+    excerpt: "User accepted a readback/write-back state machine with partial-safe-only candidate publication, retries as attempts under one job ID, and cancellation that stops publication while retaining diagnostics."
+  - turn: 6
+    excerpt: "User accepted scheduling priorities where interactive rendering is highest priority, visible snapshot/upload work precedes user-triggered jobs, background work is lowest, and bounded fair queues report delay/cancel/skip diagnostics."
+  - turn: 7
+    excerpt: "User accepted runtime as central scheduler owner, graphics/methods as execution backends behind contracts, UI/editor as intent/status/cancel/promotion owner, and one job/diagnostic registry as shared truth."
+  - turn: 8
+    excerpt: "User accepted a shared job/diagnostic registry containing stable job metadata, attempts, revisions, diagnostics, artifacts, affected targets, actions, timestamps, and cancel/debounce reasons, with project-affecting entries persisted and preview/cache-only entries bounded."
+  - turn: 9
+    excerpt: "User accepted typed filters/saved views for registry queries, compact UI badges plus diagnostics panel, structured reports for agents/tests, and stable actions such as cancel, retry, inspect artifacts, re-run validation, publish, promote/apply, discard, or explain no action."
+  - turn: 10
+    excerpt: "User accepted info/warning/action_required/error/fatal diagnostics with scoped blocking behavior and required blocked-scope plus next-action metadata for blocking diagnostics."
+  - turn: 11
+    excerpt: "User accepted executing diagnostic actions as typed runtime commands with preconditions, audit entries, explicit confirmation for high-impact mutations, preview/dry-run where feasible, and registry events carrying actor/result/undo metadata."
+  - turn: 12
+    excerpt: "User accepted undo/redo for config activation, recipe edits, binding promotion, publication, canonical promotion, deletion/archive/tombstone, stale-data acceptance, and target overwrite, with transient rendering/cache/scheduler behavior represented by diagnostics and re-run paths."
+  - turn: 13
+    excerpt: "User accepted persisting only project-affecting undoable transactions, validating them against current revisions on load, leaving stale/conflicting entries visible but disabled with diagnostics, and exposing the same history to agents/tests."
+  - turn: 14
+    excerpt: "User accepted transaction-based undo history with coalesced continuous UI edit scopes, no undo entries for cancelled/debounced diagnostics-only work, undo entries for async jobs only after project-data publication, dependent effects inside parent transactions, and stable verb-target transaction names."
+  - turn: 15
+    excerpt: "User accepted runtime-command undo/redo with revision preflight validation, atomic snapshot publication when valid, disabled conflict diagnostics when invalid, superseded active job cancellation/obsolete marking, dependent rollback only inside the transaction, and GPU cache/preview invalidation."
+  - turn: 16
+    excerpt: "User accepted append-only audit logging for every runtime command and meaningful diagnostic, with undo/redo as the reversible project-state subset, compensating transactions instead of audit undo, and one UI timeline with undoable and disabled-reason badges."
+  - turn: 17
+    excerpt: "User accepted schema-versioned persisted rendering documents with compatibility ranges, stable IDs, hashes, staged load validation and migration preview, fail-closed unsupported capabilities, audited revisioned migrations, and golden migration fixtures."
+  - turn: 18
+    excerpt: "User accepted authored files as source of truth, generated derived data in content-addressed artifact/cache storage with dependency hashes and validation status, regeneration for missing entries, diagnostic-only stale entries, and pinned portable artifacts remaining derived unless promoted."
+  - turn: 19
+    excerpt: "User accepted portable bundles with authored files, pinned derived artifacts, generator configs, schema/engine/build metadata, hashes, validation reports, replay manifests, pre-activation import validation, regeneration fallback, degraded reproducibility diagnostics, and explicit trusted/regenerated/skipped/failed reporting."
+  - turn: 20
+    excerpt: "User accepted that activation validation remains mandatory but should be fast: cheap checks synchronous, affected-slice and cached validation preferred, deeper validation backgrounded for low-risk edits, high-impact changes gated by bounded preview or approval, and failed validation keeps the previous active snapshot."
+  - turn: 21
+    excerpt: "User corrected that validation should be a design and implementation problem, not a fixed budget problem: no numeric budgets, just as fast as possible without waiting on avoidable or unrelated work."
+  - turn: 22
+    excerpt: "User accepted dependency-graph driven incremental validation with hashed inputs, compatibility-aware cached results, affected-node compilation, snapshot reuse, preview piggybacking, parallel checks, debounce, cancellation, active-view priority, and explicit validation status states."
+  - turn: 23
+    excerpt: "User accepted a declarative loadable classifier for low-risk versus high-impact rendering activation, with queryable explanations for UI, agents, and tests."
+  - turn: 24
+    excerpt: "User accepted explicit high-impact/degraded activation approval and reminded that the primary engine goal is code that stays easy to change, extend, and improve constantly."
+  - turn: 25
+    excerpt: "User accepted extension seams that keep app/UI/runtime/graphics boundaries clear and asked to identify autonomous evidence that agents did good work before human review."
+  - turn: 26
+    excerpt: "User accepted evidence bundles and required changeability-aware planning and self-review skills, applied wherever future-change analysis is meaningful."
+  - turn: 27
+    excerpt: "User accepted the concrete future-change plan and matching self-review requirements for non-trivial applicable tasks."
+  - turn: 28
+    excerpt: "User accepted structured machine-readable implementation evidence reports for non-trivial completed tasks."
+  - turn: 29
+    excerpt: "User accepted evidence-report validation that blocks missing required evidence and failed required checks while warning for documented residual risks, non-relevant skips, quarantined flaky tests, and follow-up-tracked future-change concerns."
+  - turn: 30
+    excerpt: "User accepted generated task-linked evidence reports with durable task summaries, predictable machine-readable report paths, referenced large artifacts, tool/CI validation, and explicit trivial-skip reasons."
+  - turn: 31
+    excerpt: "User directed the grilling to continue with as many questions as necessary until the remaining rendering process is clearly covered."
+  - turn: 32
+    excerpt: "User accepted a fixed canonical frame pipeline with runtime-owned orchestration, immutable render snapshots, graphics-owned GPU/pass execution, and no graphics pull from live ECS/assets/UI."
+  - turn: 33
+    excerpt: "User accepted the render snapshot contract but required it to be as general as possible and extensible when necessary."
+  - turn: 34
+    excerpt: "User clarified that renderer input shape should depend on the renderer, full-scene snapshots should be optional, and selected-object editing should not require whole-scene snapshots."
+
+open_threads:
+  - "RUNTIME-126 owns GPU readback jobs and result-to-property write-back now that the rendering transfer foundation is retired."
+  - "RUNTIME-121/RUNTIME-122/RUNTIME-123 remain open for structural vertex-color channels, declarative SoA vertex layout, and editor bind-property-as-channel UI beyond the automatic visualization-buffer fix."
+  - "BUG-046 remains the only active Theme G bug and still needs deterministic ready-queue batching coverage."
+  - "Rendering-design grilling is open: next decisions need to define renderer-specific input contract registration, material/shader/channel binding, render-graph/RHI split, visibility/batching/lighting, view/headless behavior, and implementation slicing."
+
+ai_suggestions_pending: []

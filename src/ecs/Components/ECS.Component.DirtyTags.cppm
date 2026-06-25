@@ -12,10 +12,19 @@ export namespace Extrinsic::ECS::Components::DirtyTags
     }; // full geometry re-upload
     struct DirtyVertexPositions
     {
-    }; // positions changed, re-upload vertex buffer
+    }; // position channel changed
     struct DirtyVertexAttributes
     {
-    }; // colors/normals changed, re-upload attrib buffer
+    }; // broad legacy vertex attribute change (texcoord/normal/color)
+    struct DirtyVertexTexcoords
+    {
+    }; // texcoord channel changed
+    struct DirtyVertexNormals
+    {
+    }; // normal channel changed
+    struct DirtyVertexColors
+    {
+    }; // color channel changed
     struct DirtyEdgeTopology
     {
     }; // edge connectivity changed
@@ -31,7 +40,8 @@ export namespace Extrinsic::ECS::Components::DirtyTags
     // Each helper emplace_or_replace's the corresponding tag on `entity` so
     // calls are idempotent and safe against entities that already carry the
     // tag. The fine-grained domain tags (`DirtyVertexPositions`,
-    // `DirtyVertexAttributes`, `DirtyEdgeTopology`, `DirtyFaceTopology`) are
+    // `DirtyVertexAttributes`, `DirtyVertexTexcoords`, `DirtyVertexNormals`,
+    // `DirtyVertexColors`, `DirtyEdgeTopology`, `DirtyFaceTopology`) are
     // independent partial-upload markers and do not implicitly stamp
     // `GpuDirty`; the coarse `MarkGpuDirty` is reserved for callers that want
     // a full geometry re-upload signal.
@@ -49,6 +59,21 @@ export namespace Extrinsic::ECS::Components::DirtyTags
     inline void MarkVertexAttributesDirty(entt::registry& registry, entt::entity entity)
     {
         registry.emplace_or_replace<DirtyVertexAttributes>(entity);
+    }
+
+    inline void MarkVertexTexcoordsDirty(entt::registry& registry, entt::entity entity)
+    {
+        registry.emplace_or_replace<DirtyVertexTexcoords>(entity);
+    }
+
+    inline void MarkVertexNormalsDirty(entt::registry& registry, entt::entity entity)
+    {
+        registry.emplace_or_replace<DirtyVertexNormals>(entity);
+    }
+
+    inline void MarkVertexColorsDirty(entt::registry& registry, entt::entity entity)
+    {
+        registry.emplace_or_replace<DirtyVertexColors>(entity);
     }
 
     inline void MarkEdgeTopologyDirty(entt::registry& registry, entt::entity entity)

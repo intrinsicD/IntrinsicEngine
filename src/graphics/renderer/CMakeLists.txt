@@ -7,9 +7,13 @@ target_sources(${target_name}
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Graphics.CameraSnapshots.cppm
         Graphics.Colormap.cppm
+        Graphics.CurrentRendererContractAdapter.cppm
         Graphics.FrameRecipe.cppm
+        Graphics.RenderRecipeConfig.cppm
         Graphics.RenderCommandRouter.cppm
         Graphics.RenderPrepPipeline.cppm
+        Graphics.RenderingContract.cppm
+        Graphics.SharedRenderRecipeExecution.cppm
         Graphics.RenderSubsystemRegistry.cppm
         Graphics.Renderer.cppm
         Graphics.RenderFrameInput.cppm
@@ -42,8 +46,12 @@ target_sources(${target_name}
         Graphics.VisualizationOverlayUploadHelper.cppm
         PRIVATE
         Graphics.CameraSnapshots.cpp
+        Graphics.CurrentRendererContractAdapter.cpp
+        Graphics.RenderRecipeConfig.cpp
         Graphics.RenderCommandRouter.cpp
         Graphics.RenderPrepPipeline.cpp
+        Graphics.RenderingContract.cpp
+        Graphics.SharedRenderRecipeExecution.cpp
         Graphics.RenderSubsystemRegistry.cpp
         Graphics.Renderer.cpp
         Graphics.FrameRecipe.cpp
@@ -85,6 +93,7 @@ target_link_libraries(${target_name}
         ExtrinsicGraphicsRenderGraph
         PRIVATE
         glm::glm
+        nlohmann_json::nlohmann_json
 )
 
 add_subdirectory(Components)

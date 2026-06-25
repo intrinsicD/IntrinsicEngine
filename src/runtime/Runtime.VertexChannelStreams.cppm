@@ -16,10 +16,9 @@ export namespace Extrinsic::Runtime
 {
     // CPU Structure-of-Arrays vertex storage substrate (ADR-0022). Each channel
     // is held as its own contiguous byte buffer so that a single attribute can be
-    // uploaded/streamed independently (RUNTIME-122 Slice B / RUNTIME-124). For
-    // compatibility with the current interleaved GpuScene vertex shaders, the
-    // streams can be interleaved into the existing AoS vertex byte layout via
-    // `InterleaveToAoS`. This module is GPU-agnostic.
+    // uploaded/streamed independently (RUNTIME-122 / RUNTIME-124). The
+    // `InterleaveToAoS` helper remains as a CPU compatibility oracle for legacy
+    // packed vertex layouts and tests. This module is GPU-agnostic.
 
     // One channel's placement within an interleaved AoS vertex.
     struct VertexChannelLayout

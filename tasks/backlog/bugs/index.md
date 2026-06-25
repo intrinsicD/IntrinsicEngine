@@ -5,17 +5,19 @@ Each entry includes the observed repro, the likely affected symbols, and a fix p
 
 ## Active Issues
 
-- Opened 2026-06-21: [`BUG-049` — GpuWorld geometry rebind lacks upload-to-read barriers](BUG-049-gpuworld-geometry-rebind-upload-barriers.md). Runtime extraction already reuploaded dirty mesh vertex attributes and rebound the `GpuWorld` instance, but the direct `IDevice::WriteBuffer` path for scene/instance/geometry/managed buffers had no owned upload-to-read barrier before the next culling/depth/surface consumers. Fix plan: track one-shot pending upload barriers inside `GpuWorld`, submit them before culling, and pin geometry replacement/rebind coverage.
-
-- Opened 2026-06-21: [`BUG-048` — Direct mesh post-process overwrites recomputed normals](BUG-048-direct-mesh-postprocess-overwrites-recomputed-normals.md). Direct mesh import queued `Runtime.DirectMeshPostProcess`, whose main-thread apply path re-populated ECS mesh geometry after editor normal recompute and restored the imported/materialized `v:normal` values. Fix plan: preserve count-matched current mesh `v:normal` across post-process re-population, keep generated normal texture registration intact, and continue relying on dirty extraction/GPU upload for the next-frame refresh.
-
-- Opened 2026-06-20: [`BUG-047` — Surface normal texture overrides vertex-normal shading](BUG-047-surface-normal-texture-overrides-vertex-normals.md). Promoted surface fragment shaders sampled `MaterialParams::NormalID` as `texture * 2 - 1`, but current generated normal textures are baked from mesh `v:normal` without a promoted tangent-space transform. Temporary fix plan: keep generated texture/material binding state data-only, make forward and GBuffer surface shaders shade from packed vertex-normal attributes, and pin the shader contract until a tangent-space normal-map path is promoted.
-
-- Opened 2026-06-18: [`BUG-046` — Flaky `CoreTaskGraph.MainThreadReadyQueueUsesPriorityAndCostOrdering`](BUG-046-flaky-coretaskgraph-mainthread-ready-queue-ordering.md). The main-thread ready-queue priority/cost ordering test (`tests/unit/core/Test.Core.TaskGraphLegacy.cpp:541`) relies on a fixed `40ms` `WorkerBlocker` sleep to batch the three `MainThreadOnly` passes; under full-suite CPU load that timing assumption breaks and the passes can dispatch in arrival order instead of the expected `[HighHeavyMain, HighMain, LowMain]` priority+cost order. Observed during GRAPHICS-091 verification (1 failure in a full default CPU gate run; 5/5 green on isolated re-runs). Fix plan: replace the wall-clock sleep with a deterministic latch so the ordered-batch precondition holds without timing, and confirm the production drain orders a simultaneously-ready batch by priority then cost.
+- None currently tracked.
 
 ---
 
 ## Verified / Closed
+
+- Closed 2026-06-24: [`BUG-046` — Flaky `CoreTaskGraph.MainThreadReadyQueueUsesPriorityAndCostOrdering`](../../done/BUG-046-flaky-coretaskgraph-mainthread-ready-queue-ordering.md). `TaskGraph::Execute()` now batches simultaneously-ready main-thread successors under one ready-queue lock before the executor can drain them, so priority/cost ordering is applied to the full batch. The regression no longer relies on the fixed `40ms` `WorkerBlocker` sleep, preserved the `[HighHeavyMain, HighMain, LowMain]` assertions, passed 50/50 under `--repeat until-fail`, and the default CPU-supported gate passed 3024/3024.
+
+- Closed 2026-06-21 (retired from backlog 2026-06-22): [`BUG-049` — GpuWorld geometry rebind lacks upload-to-read barriers](../../done/BUG-049-gpuworld-geometry-rebind-upload-barriers.md). `GpuWorld` now tracks one-shot pending upload barriers for direct buffer writes, renderer drains them before consumers, and focused geometry-rebind plus dirty-extraction coverage passed during the 2026-06-22 backlog audit.
+
+- Closed 2026-06-21 (retired from backlog 2026-06-22): [`BUG-048` — Direct mesh post-process overwrites recomputed normals](../../done/BUG-048-direct-mesh-postprocess-overwrites-recomputed-normals.md). Direct mesh post-process apply now preserves count-matched current `v:normal` values so editor-authored normals survive deferred materialization, with focused sandbox editor regressions passing during the 2026-06-22 backlog audit.
+
+- Closed 2026-06-21 (retired from backlog 2026-06-22): [`BUG-047` — Surface normal texture overrides vertex-normal shading](../../done/BUG-047-surface-normal-texture-overrides-vertex-normals.md). Promoted surface shader contracts now use packed vertex normals for current shading and assert absence of `mat.NormalID` / `normalTex` sampling; focused renderer lifecycle coverage passed during the 2026-06-22 backlog audit.
 
 - Closed 2026-06-22: [`BUG-051` — Mesh color visualization lacks automatic property-buffer extraction](../../done/BUG-051-mesh-color-visualization-property-buffer.md). Runtime extraction now auto-emits mesh `glm::vec4` color property-buffer packets from mesh `GeometrySources` for per-element color-buffer visualizations, and graphics sync forwards the selected vertex/face/edge domain into `GpuEntityConfig::VisDomain`.
 

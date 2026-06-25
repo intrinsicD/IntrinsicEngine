@@ -1,6 +1,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <cstdio>
 #include <span>
 #include <vector>
@@ -36,10 +37,48 @@ namespace
     }};
 
     constexpr std::array<std::uint32_t, 3> kTriangleIndices{{0u, 1u, 2u}};
+    constexpr std::array<std::uint32_t, 3> kTriangleColors{{
+        0xFF0000FFu,
+        0xFF00FF00u,
+        0xFFFF0000u,
+    }};
 
     std::span<const std::byte> VertexBytes()
     {
         return std::as_bytes(std::span<const PackedVertex>{kTriangleVerts});
+    }
+
+    [[nodiscard]] std::vector<std::byte> ExpectedTriangleSoaVertexBytes(
+        const bool includeColors)
+    {
+        constexpr std::uint64_t kPositionBytes =
+            static_cast<std::uint64_t>(kTriangleVerts.size()) * sizeof(float) * 3u;
+        constexpr std::uint64_t kTexcoordBytes =
+            static_cast<std::uint64_t>(kTriangleVerts.size()) * sizeof(float) * 2u;
+        constexpr std::uint64_t kColorBytes =
+            static_cast<std::uint64_t>(kTriangleColors.size()) * sizeof(std::uint32_t);
+
+        std::vector<std::byte> out(
+            static_cast<std::size_t>(kPositionBytes + kTexcoordBytes +
+                                     (includeColors ? kColorBytes : 0u)));
+        std::byte* cursor = out.data();
+        for (const PackedVertex& v : kTriangleVerts)
+        {
+            const float position[3] = {v.Px, v.Py, v.Pz};
+            std::memcpy(cursor, position, sizeof(position));
+            cursor += sizeof(position);
+        }
+        for (const PackedVertex& v : kTriangleVerts)
+        {
+            const float texcoord[2] = {v.U, v.V};
+            std::memcpy(cursor, texcoord, sizeof(texcoord));
+            cursor += sizeof(texcoord);
+        }
+        if (includeColors)
+        {
+            std::memcpy(cursor, kTriangleColors.data(), kColorBytes);
+        }
+        return out;
     }
 
     [[nodiscard]] bool HasBufferBarrier(
@@ -61,7 +100,7 @@ namespace
     }
 }
 
-static_assert(sizeof(RHI::GpuGeometryRecord) == 64);
+static_assert(sizeof(RHI::GpuGeometryRecord) == 80);
 static_assert(sizeof(RHI::GpuInstanceStatic) == 32);
 static_assert(sizeof(RHI::GpuInstanceDynamic) == 128);
 static_assert(sizeof(RHI::GpuEntityPointConfig) == 16);
@@ -155,11 +194,15 @@ TEST(GraphicsGpuWorld, GeometryRebindSubmitsUploadBarriersBeforeNextConsumers)
 
     const auto geometry0 = world.UploadGeometry({
         .PackedVertexBytes = VertexBytes(),
+        .PositionBytes = {},
+        .TexcoordBytes = {},
+        .NormalBytes = {},
         .SurfaceIndices = std::span<const std::uint32_t>{kTriangleIndices},
         .LineIndices = {},
         .VertexCount = static_cast<std::uint32_t>(kTriangleVerts.size()),
         .LocalBounds = {},
         .DebugName = "initial-tri",
+        .PackedVertexColors = {},
     });
     ASSERT_TRUE(geometry0.IsValid());
     world.SetInstanceGeometry(instance, geometry0);
@@ -171,11 +214,15 @@ TEST(GraphicsGpuWorld, GeometryRebindSubmitsUploadBarriersBeforeNextConsumers)
     device.CommandContext.BufferBarrierCalls.clear();
     const auto geometry1 = world.UploadGeometry({
         .PackedVertexBytes = VertexBytes(),
+        .PositionBytes = {},
+        .TexcoordBytes = {},
+        .NormalBytes = {},
         .SurfaceIndices = std::span<const std::uint32_t>{kTriangleIndices},
         .LineIndices = {},
         .VertexCount = static_cast<std::uint32_t>(kTriangleVerts.size()),
         .LocalBounds = {},
         .DebugName = "replacement-tri",
+        .PackedVertexColors = {},
     });
     ASSERT_TRUE(geometry1.IsValid());
     world.SetInstanceGeometry(instance, geometry1);
@@ -204,6 +251,96 @@ TEST(GraphicsGpuWorld, GeometryRebindSubmitsUploadBarriersBeforeNextConsumers)
     device.CommandContext.BufferBarrierCalls.clear();
     world.SubmitPendingUploadBarriers(device.CommandContext);
     EXPECT_TRUE(device.CommandContext.BufferBarrierCalls.empty());
+
+    world.Shutdown();
+}
+
+TEST(GraphicsGpuWorld, GeometryUploadPublishesOptionalVertexColorStreamBda)
+{
+    MockDevice device;
+    RHI::BufferManager bufferMgr{device};
+    Graphics::GpuWorld world;
+
+    Graphics::GpuWorld::InitDesc init{};
+    init.MaxInstances = 8;
+    init.MaxGeometryRecords = 8;
+    init.MaxLights = 1;
+    init.VertexBufferBytes = 1ull << 20;
+    init.IndexBufferBytes = 1ull << 20;
+    ASSERT_TRUE(world.Initialize(device, bufferMgr, init));
+
+    const auto geometry = world.UploadGeometry({
+        .PackedVertexBytes = VertexBytes(),
+        .PositionBytes = {},
+        .TexcoordBytes = {},
+        .NormalBytes = {},
+        .SurfaceIndices = std::span<const std::uint32_t>{kTriangleIndices},
+        .LineIndices = {},
+        .VertexCount = static_cast<std::uint32_t>(kTriangleVerts.size()),
+        .LocalBounds = {},
+        .DebugName = "colored-tri",
+        .PackedVertexColors = std::span<const std::uint32_t>{kTriangleColors},
+    });
+    ASSERT_TRUE(geometry.IsValid());
+
+    const RHI::BufferHandle vertexBuffer = world.GetManagedVertexBuffer();
+    constexpr std::uint64_t colorOffset =
+        static_cast<std::uint64_t>(kTriangleVerts.size()) * sizeof(float) * 5u;
+    const std::vector<std::byte> expectedVertexBytes =
+        ExpectedTriangleSoaVertexBytes(/*includeColors=*/true);
+    bool foundVertexWrite = false;
+    for (const auto& write : device.BufferWrites)
+    {
+        if (write.Handle != vertexBuffer)
+        {
+            continue;
+        }
+        foundVertexWrite = true;
+        ASSERT_EQ(write.Offset, 0u);
+        ASSERT_EQ(write.Data.size(), expectedVertexBytes.size());
+        EXPECT_EQ(std::memcmp(write.Data.data(),
+                              expectedVertexBytes.data(),
+                              expectedVertexBytes.size()),
+                  0);
+    }
+    EXPECT_TRUE(foundVertexWrite);
+
+    world.SyncFrame();
+
+    const RHI::BufferHandle geometryBuffer = world.GetGeometryRecordBuffer();
+    bool foundRecord = false;
+    for (const auto& write : device.BufferWrites)
+    {
+        if (write.Handle != geometryBuffer ||
+            write.Data.size() % sizeof(RHI::GpuGeometryRecord) != 0u)
+        {
+            continue;
+        }
+
+        const auto records = std::span<const RHI::GpuGeometryRecord>{
+            reinterpret_cast<const RHI::GpuGeometryRecord*>(write.Data.data()),
+            write.Data.size() / sizeof(RHI::GpuGeometryRecord),
+        };
+        const std::uint64_t firstSlot = write.Offset / sizeof(RHI::GpuGeometryRecord);
+        for (std::size_t i = 0; i < records.size(); ++i)
+        {
+            if (firstSlot + i != geometry.Index)
+            {
+                continue;
+            }
+            foundRecord = true;
+            EXPECT_EQ(records[i].VertexBufferBDA,
+                      device.GetBufferDeviceAddress(vertexBuffer));
+            EXPECT_EQ(records[i].TexcoordBufferBDA,
+                      device.GetBufferDeviceAddress(vertexBuffer) +
+                          static_cast<std::uint64_t>(kTriangleVerts.size()) * sizeof(float) * 3u);
+            EXPECT_EQ(records[i].NormalBufferBDA, 0u);
+            EXPECT_EQ(records[i].ColorBufferBDA,
+                      device.GetBufferDeviceAddress(vertexBuffer) + colorOffset);
+            EXPECT_EQ(records[i].VertexOffset, 0u);
+        }
+    }
+    EXPECT_TRUE(foundRecord);
 
     world.Shutdown();
 }
@@ -335,21 +472,29 @@ TEST(GraphicsGpuWorld, GeometryUpload_UsesVertexUnitsForOffsets)
 
     const auto tri0 = world.UploadGeometry({
         .PackedVertexBytes = VertexBytes(),
+        .PositionBytes = {},
+        .TexcoordBytes = {},
+        .NormalBytes = {},
         .SurfaceIndices = std::span<const std::uint32_t>{kTriangleIndices},
         .LineIndices = {},
         .VertexCount = static_cast<std::uint32_t>(kTriangleVerts.size()),
         .LocalBounds = {},
-        .DebugName = "tri0"
+        .DebugName = "tri0",
+        .PackedVertexColors = {},
     });
     ASSERT_TRUE(tri0.IsValid());
 
     const auto tri1 = world.UploadGeometry({
         .PackedVertexBytes = VertexBytes(),
+        .PositionBytes = {},
+        .TexcoordBytes = {},
+        .NormalBytes = {},
         .SurfaceIndices = std::span<const std::uint32_t>{kTriangleIndices},
         .LineIndices = {},
         .VertexCount = static_cast<std::uint32_t>(kTriangleVerts.size()),
         .LocalBounds = {},
-        .DebugName = "tri1"
+        .DebugName = "tri1",
+        .PackedVertexColors = {},
     });
     ASSERT_TRUE(tri1.IsValid());
 
@@ -417,11 +562,15 @@ TEST(GraphicsGpuWorld, FreeGeometry_InvalidatesLiveInstanceGeometrySlots)
 
     const auto geometry = world.UploadGeometry({
         .PackedVertexBytes = VertexBytes(),
+        .PositionBytes = {},
+        .TexcoordBytes = {},
+        .NormalBytes = {},
         .SurfaceIndices = std::span<const std::uint32_t>{kTriangleIndices},
         .LineIndices = {},
         .VertexCount = static_cast<std::uint32_t>(kTriangleVerts.size()),
         .LocalBounds = {},
-        .DebugName = "tri-free"
+        .DebugName = "tri-free",
+        .PackedVertexColors = {},
     });
     ASSERT_TRUE(geometry.IsValid());
 

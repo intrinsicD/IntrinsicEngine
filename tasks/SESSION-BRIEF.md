@@ -12,12 +12,7 @@ the authoritative open/unblocked view.
 
 ## Theme B — Rendering modernization
 
-- unblocked: `RUNTIME-120` — Reusable vertex attribute binding resolver (tasks/backlog/runtime/RUNTIME-120-vertex-attribute-binding-resolver.md)
-- blocked by `RUNTIME-120`: `RUNTIME-121` — Per-vertex color channel through the geometry vertex stream (tasks/backlog/runtime/RUNTIME-121-vertex-color-channel-upload.md)
-- blocked by `RUNTIME-120`: `RUNTIME-122` — SoA vertex channel storage and packer unification (tasks/backlog/runtime/RUNTIME-122-declarative-vertex-layout.md)
-- blocked by `RUNTIME-122`: `RUNTIME-124` — Per-channel dirty tracking and partial GPU uploads (tasks/backlog/runtime/RUNTIME-124-per-channel-partial-uploads.md)
-- blocked by `RUNTIME-122`: `RUNTIME-125` — Optional AoS fast lane for static geometry (profile-gated) (tasks/backlog/runtime/RUNTIME-125-aos-static-fast-lane.md)
-- unblocked: `RUNTIME-126` — GPU readback jobs and result→property write-back in the derived-job graph (tasks/backlog/runtime/RUNTIME-126-gpu-readback-jobs-and-property-writeback.md)
+- unblocked: `RUNTIME-125` — Optional AoS fast lane for static geometry (profile-gated) (tasks/backlog/runtime/RUNTIME-125-aos-static-fast-lane.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 
@@ -32,15 +27,7 @@ the authoritative open/unblocked view.
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RORG-031F` — UI integration backlog seed (tasks/backlog/ui/RORG-031-ui-integration.md)
-- blocked by `RUNTIME-120`: `RUNTIME-123` — Editor "bind any property as normals / colors" (tasks/backlog/runtime/RUNTIME-123-editor-bind-property-as-channel.md)
 - unblocked: `UI-022` — Sandbox EditorUI vertex-normal recompute windows (tasks/backlog/ui/UI-022-sandbox-editor-vertex-normal-recompute.md)
-
-## Theme G — Active bugs
-
-- unblocked: `BUG-046` — Flaky `CoreTaskGraph.MainThreadReadyQueueUsesPriorityAndCostOrdering` (timing-dependent ready-queue batching) (tasks/backlog/bugs/BUG-046-flaky-coretaskgraph-mainthread-ready-queue-ordering.md)
-- unblocked: `BUG-047` — Surface normal texture overrides vertex-normal shading (tasks/backlog/bugs/BUG-047-surface-normal-texture-overrides-vertex-normals.md)
-- unblocked: `BUG-048` — Direct mesh post-process overwrites recomputed normals (tasks/backlog/bugs/BUG-048-direct-mesh-postprocess-overwrites-recomputed-normals.md)
-- unblocked: `BUG-049` — GpuWorld geometry rebind lacks upload-to-read barriers (tasks/backlog/bugs/BUG-049-gpuworld-geometry-rebind-upload-barriers.md)
 
 ## Unthemed
 

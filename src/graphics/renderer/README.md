@@ -9,6 +9,10 @@ and renderer/render-graph orchestration.
 ### Renderer and graph
 
 - `Extrinsic.Graphics.Renderer`
+- `Extrinsic.Graphics.RenderingContract`
+- `Extrinsic.Graphics.CurrentRendererContractAdapter`
+- `Extrinsic.Graphics.RenderRecipeConfig`
+- `Extrinsic.Graphics.SharedRenderRecipeExecution`
 - `Extrinsic.Graphics.FrameRecipe`
 - `Extrinsic.Graphics.RenderCommandRouter`
 - `Extrinsic.Graphics.RenderPrepPipeline`
@@ -52,6 +56,144 @@ is not consulted by the published bool. A failed recipe build or a failed
 `Compile()` publishes `false` so the backend's operational gate cannot
 inherit a stale-clean state. Non-Vulkan backends inherit the default no-op
 implementation.
+
+`Extrinsic.Graphics.RenderingContract` is the CPU-only public contract vocabulary
+for the renderer/snapshot/recipe architecture introduced by `GRAPHICS-099`.
+It defines renderer descriptors, scoped snapshot envelopes, renderer-independent
+binding intents and binding sets, shared recipe slot descriptors, view/output
+recipes, render artifact metadata, deterministic diagnostics, and fail-closed
+validation helpers. The module intentionally imports no runtime, ECS, platform,
+live asset-service, shader, Vulkan, or backend device types; it is a contract
+surface for tests and future adapters before any current renderer behavior is
+rewired. `GRAPHICS-100` is the first task allowed to adapt the current renderer
+path to populate and consume these contracts, `GRAPHICS-101` owns loadable file
+schemas and activation validation, `GRAPHICS-102` owns shared visibility and
+lighting recipe execution, `RUNTIME-127` owns runtime artifact publication and
+apply semantics, and `GRAPHICS-103` integrates the current renderer path with
+contract-aware render-graph and Vulkan smoke evidence.
+
+`Extrinsic.Graphics.CurrentRendererContractAdapter` is the `GRAPHICS-100`
+CPU/null adapter for the current promoted renderer path. It builds the default
+current renderer descriptor, snapshot envelopes from immutable `RenderFrameInput`
+or `RenderWorld` values, binding intents for existing geometry/material/camera,
+normal/color/texture, visibility, lighting, picking, debug, and visualization
+lanes, the default fixed-frame recipe descriptor, and a view/output recipe that
+mirrors the current window/offscreen behavior. It validates those pieces through
+`Extrinsic.Graphics.RenderingContract` but remains data-only: it does not import
+runtime, ECS, platform, live asset services, Vulkan, backend devices, shaders, or
+command-recording paths, and it does not change rendered output.
+
+`Extrinsic.Graphics.RenderRecipeConfig` is the `GRAPHICS-101` CPU-only loader and
+dry-run validator for file-backed renderer recipe configuration. It accepts JSON
+documents with:
+
+```json
+{
+  "schema": "intrinsic.graphics.render-recipe-config",
+  "version": 1,
+  "rendererId": "extrinsic.graphics.current-renderer",
+  "recipe": {
+    "recipeId": "current-renderer.user-preview",
+    "fixedCoreName": "Extrinsic.Graphics.FrameRecipe.Default",
+    "slots": [
+      {
+        "name": "lighting",
+        "schemaId": "intrinsic.graphics.lighting/user-preview/v1",
+        "defaults": "human-readable defaults summary",
+        "requiredCapabilities": ["LightingRecipe"],
+        "allowedBindingRoles": ["light-snapshots", "material-table"],
+        "usedBindingRoles": ["light-snapshots"],
+        "validationRules": ["declared-slot-only"],
+        "fallbackPolicy": "Degrade"
+      }
+    ]
+  },
+  "viewOutput": {
+    "recipeId": "current-renderer.preview-output",
+    "view": "Preview",
+    "viewport": {"width": 640, "height": 360},
+    "renderScale": 1.0,
+    "target": "OffscreenTexture",
+    "captureRequested": true,
+    "readbackRequested": true,
+    "mode": "Headless",
+    "outputs": [
+      {"name": "color", "kind": "Color", "format": "RGBA8_UNORM", "required": true}
+    ]
+  },
+  "bindingOverrides": [
+    {
+      "semanticName": "light-snapshots",
+      "slot": "lighting",
+      "sourceDomain": "Scene",
+      "sourceIdentity": "RenderWorld.Lights.UserPreview",
+      "sourceRevision": "config-revision",
+      "valueType": "Buffer",
+      "valueFormat": "LightSnapshot",
+      "fallbackPolicy": "Degrade"
+    }
+  ]
+}
+```
+
+The loader overlays this document on a caller-supplied
+`RenderRecipeConfigContext` containing the renderer descriptor, base fixed-core
+recipe, base view/output recipe, and base binding set. Config files may edit
+only renderer-declared extension slots. The fixed core name must match the base
+recipe, fixed-core slots cannot be declared, required bindings cannot be
+overridden, binding overrides must target roles allowed by a declared extension
+slot, and config-authored binding domains are limited to CPU/source data domains
+(`MeshVertex`, `MeshFace`, `GraphNode`, `GraphEdge`, `PointCloudPoint`, or
+`Scene`). Runtime-owned, generated, unknown, pass-graph, shader, and backend
+state are rejected before activation.
+
+`PreviewRenderRecipeConfig(...)` and `LoadRenderRecipeConfigFile(...)` return a
+`RenderRecipeConfigLoadResult` whose preview contains copied
+`RenderRecipeDescriptor`, `ViewOutputRecipeDescriptor`, and `BindingSet` values;
+the supplied context is never mutated. Diagnostics use
+`RenderRecipeConfigState` to distinguish `Invalid`, `Unsupported`, `Stale`,
+`Degraded`, and `FallbackApplied` states. Errors fail closed; degraded and
+fallback-applied states remain usable only when the underlying rendering
+contract validation reports no errors.
+
+`Extrinsic.Graphics.SharedRenderRecipeExecution` is the `GRAPHICS-102`
+CPU-tested, renderer-neutral execution layer for shared visibility/grouping and
+lighting/environment recipe products. It consumes immutable `RenderWorld` data
+and scoped `SnapshotEnvelope` metadata, then produces data products only:
+visible item sets, rejected-item diagnostics, grouping keys, batch and instance
+groups, LOD selections, spatial partitions, optional acceleration-structure
+build requests, resolved lights, emissive geometry identities, environment map,
+probe, volume, tag, quality, intent, debug, and fallback products. The optional
+acceleration-structure output is a build request descriptor only; this module
+does not allocate backend resources, record command buffers, create Vulkan
+objects, or mutate project data.
+
+Shared recipe diagnostics are deterministic and fail closed for invalid or
+unsupported products. Renderers declare consumed products through
+`SharedRecipeRendererProductDeclaration`; `CheckSharedRecipeCompatibility(...)`
+compares those declarations against produced product sets and renderer
+capabilities such as `VisibilityRecipe` and `LightingRecipe`. Missing
+capabilities or missing products are reported as structured diagnostics before a
+backend-specific frame recipe is allowed to interpret the shared outputs.
+
+`Extrinsic.Graphics.Renderer::ExecuteFrame()` evaluates the current renderer
+contract before the default frame recipe is built. The `RenderGraphFrameStats`
+contract block records descriptor/snapshot/recipe/view-output ids, shared
+visibility and lighting product counts, compatibility diagnostics, and
+`RenderArtifactMetadata` declarations for each view/output. The renderer fails
+closed on incompatible contract metadata, unsupported shared products, or invalid
+artifact declarations. Degraded-but-supported fallback products, such as default
+lighting/environment fallbacks, remain diagnostics and do not block the frame.
+
+After render-graph execution, declared output artifacts are finalized as
+available, missing, or failed based on the backend execution and readback
+counters. Graphics only emits artifact metadata; runtime publication remains in
+`Extrinsic.Runtime.RenderArtifactPublication`, where callers register, publish,
+or apply artifacts through runtime-owned commands. The opt-in Vulkan smoke path
+asserts that the promoted Vulkan default recipe produces a declared color/readback
+artifact and can register the color artifact through the runtime registry without
+introducing runtime, ECS, platform, live asset-service, or `Vk*` dependencies
+into graphics public contracts.
 
 ### Scene and sync systems
 
@@ -279,13 +421,15 @@ Concretely:
   `shaders/forward/point.vert.spv` + `shaders/forward/point.frag.spv` with
   `Topology::TriangleList`. The retained `LineQuads` cull bucket expands one
   line segment to six vertices and `forward/line.vert` fetches the two endpoint
-  indices from `GpuGeometryRecord::IndexBufferBDA` before emitting a
-  screen-space quad whose pixel width comes from `GpuEntityConfig::Line`
-  (`LineWidth` or explicit `LineWidthBDA[segment]`); the indexed `Lines`
-  bucket remains available for edge-id
+  indices from `GpuGeometryRecord::IndexBufferBDA`, then reads endpoint
+  positions from `GpuGeometryRecord::VertexBufferBDA` as the retained position
+  channel before emitting a screen-space quad whose pixel width comes from
+  `GpuEntityConfig::Line` (`LineWidth` or explicit `LineWidthBDA[segment]`);
+  the indexed `Lines` bucket remains available for edge-id
   selection. The retained `Points` cull bucket expands one source point to six
   vertices in the cull shader and the point vertex shader reconstructs a
-  camera-facing billboard from `gl_VertexIndex / 6`; the
+  camera-facing billboard by reading the retained position channel and deriving
+  the source point from `gl_VertexIndex / 6`; the
   selection point-id pass uses the separate `SelectionPoints` bucket so picking
   continues to draw the unexpanded point-id shader path. Retained line and
   point visualization colors use the shared `common/gpu_scene.glsl` resolver:
@@ -1409,7 +1553,7 @@ Concretely:
   `GpuTransfer::DrainCompleted(cmd)`, where the facade observes
   `TransferToken` completion and emits exactly one
   `BufferBarrier(TransferWrite -> readyAccess)`. This closes the
-  [BUG-049](../../../tasks/backlog/bugs/BUG-049-gpuworld-geometry-rebind-upload-barriers.md)
+  [BUG-049](../../../tasks/done/BUG-049-gpuworld-geometry-rebind-upload-barriers.md)
   barrier class for caller-owned transfers without changing `GpuWorld`'s
   existing one-shot managed-upload barriers.
 - `Graphics.GpuTransfer::UploadInCommand(...)` is the opt-in same-command
@@ -1424,13 +1568,31 @@ Concretely:
 - Promoted visualization resolves material, uniform, scalar-field, and
   per-element RGBA color sources through `GpuEntityConfig` and the shared
   `assets/shaders/common/gpu_scene.glsl` helper in the promoted surface
-  shaders (`forward/default_debug_surface.*`, `deferred/gbuffer.*`) and the
-  retained line/point forward shaders. Surface vertex-domain scalar/color
-  values are forwarded as interpolants and face-domain values are read in the
-  fragment shader by `gl_PrimitiveID`; retained points resolve one per-point
-  element in the vertex shader; retained lines interpolate vertex-domain values
-  along the segment and use a flat segment ID for edge-domain values. No
-  CPU-baked line/point color buffer is introduced.
+  shaders (`forward/default_debug_surface.*` plus the deferred
+  `default_debug_gbuffer.frag`) and the retained line/point forward shaders.
+  Surface vertex-domain scalar/color values are forwarded as interpolants and
+  face-domain values are read in the fragment shader by `gl_PrimitiveID`;
+  retained points resolve one per-point element in the vertex shader; retained
+  lines interpolate vertex-domain values along the segment and use a flat
+  segment ID for edge-domain values. No CPU-baked line/point color buffer is
+  introduced.
+- Runtime-authored mesh `v:color` uses a separate structural vertex-color path:
+  `MeshGeometryPacker` resolves count-matched `v:color` into packed unorm8
+  colors, `GpuWorld::GeometryUploadDesc` carries per-channel vertex spans, and
+  `GpuWorld` stores position/texcoord/normal/color as separate sub-ranges in the
+  managed vertex buffer. Active GpuScene shaders fetch the corresponding
+  `GpuGeometryRecord::VertexBufferBDA`, `TexcoordBufferBDA`,
+  `NormalBufferBDA`, and `ColorBufferBDA` values; missing optional color keeps
+  material/texture base-color shading.
+- `GpuWorld::UpdateGeometryChannels(...)` is the partial-upload surface for
+  runtime-authored SoA geometry. It validates that vertex/index counts still
+  match the resident allocation, writes only requested channel sub-ranges
+  (position, texcoord, normal, color) via `WriteBuffer(..., offset)`, and falls
+  back to caller-side full `UploadGeometry(...)` replacement when a channel
+  would need new storage.
+  Pending channel writes are tracked by channel internally, then emitted as the
+  managed vertex-buffer upload-to-shader-read barrier during
+  `SubmitPendingUploadBarriers(...)`.
 - `Graphics.FrameRecipe` imports explicit cull bucket resources for surface,
   line, and point lanes. `LinePass` consumes
   `Cull.LineQuads.NonIndexedArgs` / `Cull.LineQuads.Count`; the indexed
@@ -1998,7 +2160,9 @@ Concretely:
 - `GpuWorld` owns retained GPU-scene pools and exposes generation-checked
   lifetime diagnostics for instance/geometry slots, deferred reuse windows,
   retained-buffer pressure, overflow, stale handles, invalid handles, and
-  null-device mode.
+  null-device mode. Geometry uploads carry per-channel position/texcoord/normal
+  spans plus an optional packed unorm8 color stream; `GpuGeometryRecord`
+  publishes the retained channel BDAs for active GpuScene shaders.
 - Per
   [`GRAPHICS-028`](../../../tasks/done/GRAPHICS-028-ecs-renderable-residency-bridge.md),
   renderable ECS residency is a runtime-owned bridge. `Runtime.RenderExtraction`

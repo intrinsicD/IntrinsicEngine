@@ -1,0 +1,98 @@
+session:
+  id: "2026-06-25_001"
+  date: "2026-06-25"
+  started: "2026-06-25T00:05"
+  last_turn: "2026-06-25T01:22"
+  turn_count: 4
+  summary: "Started and retired the independent RUNTIME-126 branch: implemented GPU readback jobs through the runtime derived-job graph, fixed the stale mesh primitive-view dirty-update contract, passed focused CPU/integration, opt-in GPU smoke, full default CPU gate, and structural validation, then marked the runtime Theme B goal blocked at RUNTIME-125 because its benchmark/profile gate remains unsatisfied."
+
+events_logged:
+  - turn: 1
+    type: experiment
+    id: "N160"
+    routing: direct
+    provenance: ai-executed
+    summary: "Implemented the RUNTIME-126 readback-job path with parked streaming readbacks, derived-job readback diagnostics/resume, typed property write-back, focused tests, and GPU smoke evidence; did not retire because the default CPU gate failed in `MeshPrimitiveViewExtraction.VertexPositionDirtyRepacksBothViews`."
+  - turn: 1
+    type: observation
+    id: "O06"
+    routing: staged
+    provenance: ai-suggested
+    summary: "After RUNTIME-124, vertex-position-only mesh dirtiness updates the surface geometry in place while mesh primitive edge/vertex views still repack, so the old full-surface-retire expectation is stale."
+  - turn: 2
+    type: experiment
+    id: "N161"
+    routing: direct
+    provenance: ai-executed
+    summary: "Fixed the stale mesh primitive-view dirty-position expectation, reran RUNTIME-126 focused CPU/integration/GPU smoke checks, passed the full default CPU gate, retired RUNTIME-126, regenerated the session brief, and passed structural validators."
+  - turn: 2
+    type: decision
+    id: "N162"
+    routing: direct
+    provenance: ai-executed
+    summary: "Stopped before RUNTIME-125 AoS storage/shader work because no benchmark manifest/result/baseline proves the required SoA vertex-fetch bottleneck gate."
+  - turn: 2
+    type: constraint
+    id: "K02"
+    routing: crystallized
+    provenance: ai-suggested
+    summary: "Crystallized O06 via artifact commitment: vertex-position-only mesh dirtiness may update the surface in place while primitive edge/vertex sidecars repack."
+  - turn: 3
+    type: experiment
+    id: "N163"
+    routing: direct
+    provenance: ai-executed
+    summary: "Audited RUNTIME-125 gate metadata and reconfirmed that no checked-in benchmark manifest/result/baseline satisfies its SoA vertex-fetch bottleneck prerequisite; the session brief lists it unblocked only because blockers are derived from `depends_on` front matter."
+  - turn: 4
+    type: decision
+    id: "N164"
+    routing: direct
+    provenance: ai-executed
+    summary: "Marked the persisted runtime Theme B goal blocked: RUNTIME-125 is the only remaining task, its benchmark/profile gate still lacks evidence, and AoS engine storage/shader work remains forbidden until that gate is satisfied."
+
+ai_actions:
+  - turn: 1
+    action: "Added RUNTIME-126 runtime modules/tests/docs and ran focused CPU, integration, GPU smoke, IntrinsicTests build, and default CPU gate verification before stopping on the diagnosed gate failure."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Runtime.StreamingExecutor.cppm"
+      - "src/runtime/Runtime.StreamingExecutor.cpp"
+      - "src/runtime/Runtime.DerivedJobGraph.cppm"
+      - "src/runtime/Runtime.DerivedJobGraph.cpp"
+      - "src/runtime/Runtime.GpuReadbackJob.cppm"
+      - "src/runtime/Runtime.GpuReadbackJob.cpp"
+      - "tests/contract/runtime/Test.GpuReadbackJob.cpp"
+      - "tests/integration/runtime/Test.RuntimeStreamingExecutor.cpp"
+      - "tests/integration/runtime/Test.GpuReadbackJobGpuSmoke.cpp"
+      - "src/runtime/README.md"
+      - "docs/api/generated/module_inventory.md"
+  - turn: 2
+    action: "Updated the mesh primitive-view dirty-position contract, retired RUNTIME-126, regenerated the session brief, and inspected RUNTIME-125's benchmark gate."
+    provenance: ai-executed
+    files_changed:
+      - "tests/contract/runtime/Test.MeshPrimitiveViewExtraction.cpp"
+      - "tasks/done/RUNTIME-126-gpu-readback-jobs-and-property-writeback.md"
+      - "tasks/done/RETIREMENT-LOG.md"
+      - "tasks/backlog/README.md"
+      - "tasks/backlog/runtime/README.md"
+      - "tasks/backlog/rendering/README.md"
+      - "tasks/SESSION-BRIEF.md"
+  - turn: 3
+    action: "Re-read RUNTIME-125, the generated session brief, task front-matter rules, and benchmark directories; stopped without code/task implementation because the profile gate remains unsatisfied."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-25_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 4
+    action: "Re-read the remaining RUNTIME-125 task state and benchmark runner/schema layout, confirmed no permitted benchmark evidence path is present, and marked the persisted goal blocked per the repeated-blocker rule."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-25_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+
+open_threads:
+  - "Runtime Theme B goal is blocked at RUNTIME-125 until benchmark/profile evidence exists or the user opens an explicit benchmark prerequisite task."

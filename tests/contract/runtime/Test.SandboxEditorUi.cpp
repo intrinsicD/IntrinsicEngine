@@ -52,8 +52,12 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.Component.RenderGeometry;
+import Extrinsic.Graphics.CurrentRendererContractAdapter;
 import Extrinsic.Graphics.ImGuiOverlaySystem;
+import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderGraph;
+import Extrinsic.Graphics.RenderRecipeConfig;
+import Extrinsic.Graphics.RenderingContract;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Platform.Window;
 import Extrinsic.Runtime.AssetIngestStateMachine;
@@ -66,11 +70,14 @@ import Extrinsic.Runtime.MeshAttributeTextureBake;
 import Extrinsic.Runtime.MeshPrimitiveViewPacker;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
+import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.SandboxEditorUi;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
+import Extrinsic.Runtime.VertexAttributeBinding;
+import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.HalfedgeMesh.Vertices.Normals;
 import Geometry.Properties;
 import Geometry.UvAtlas;
@@ -133,6 +140,176 @@ namespace
                 return true;
         }
         return false;
+    }
+
+    [[nodiscard]] Graphics::RenderRecipeConfigContext
+    MakeRenderRecipeConfigContext()
+    {
+        Graphics::RenderFrameInput input{};
+        input.Viewport = Core::Extent2D{.Width = 1280u, .Height = 720u};
+        input.Camera.Valid = true;
+        return Graphics::RenderRecipeConfigContext{
+            .Renderer = Graphics::MakeCurrentRendererDescriptor(),
+            .BaseRecipe = Graphics::MakeCurrentRendererRecipeDescriptor(),
+            .BaseViewOutput =
+                Graphics::MakeCurrentRendererViewOutputRecipe(input),
+            .BaseBindings = Graphics::MakeCurrentRendererBindingSet(),
+        };
+    }
+
+    [[nodiscard]] std::string ValidSandboxRenderRecipeConfig()
+    {
+        return std::string{R"json({
+  "schema": ")json"} + std::string{Graphics::kRenderRecipeConfigSchemaId} +
+               R"json(",
+  "version": 1,
+  "rendererId": ")json" +
+               std::string{Graphics::kCurrentRendererContractId} + R"json(",
+  "revision": "sandbox-ui-test",
+  "recipe": {
+    "recipeId": "current-renderer.user-preview",
+    "fixedCoreName": "Extrinsic.Graphics.FrameRecipe.Default",
+    "slots": [
+      {
+        "name": "lighting",
+        "schemaId": "intrinsic.graphics.lighting/sandbox-preview/v1",
+        "defaults": "sandbox lighting defaults",
+        "requiredCapabilities": ["LightingRecipe"],
+        "allowedBindingRoles": ["light-snapshots", "material-table"],
+        "usedBindingRoles": ["light-snapshots"],
+        "validationRules": ["declared-slot-only"],
+        "fallbackPolicy": "Degrade"
+      }
+    ]
+  },
+  "viewOutput": {
+    "recipeId": "current-renderer.preview-output",
+    "view": "Preview",
+    "viewport": {"width": 640, "height": 360},
+    "renderScale": 1.0,
+    "target": "OffscreenTexture",
+    "captureRequested": true,
+    "readbackRequested": true,
+    "mode": "Headless",
+    "outputs": [
+      {"name": "color", "kind": "Color", "format": "RGBA8_UNORM", "required": true},
+      {"name": "readback", "kind": "ReadbackBuffer", "format": "Host-visible buffer", "required": false}
+    ]
+  },
+  "bindingOverrides": [
+    {
+      "semanticName": "light-snapshots",
+      "slot": "lighting",
+      "sourceDomain": "Scene",
+      "sourceIdentity": "RenderWorld.Lights.SandboxPreview",
+      "sourceRevision": "sandbox-revision",
+      "valueType": "Buffer",
+      "valueFormat": "LightSnapshot",
+      "fallbackPolicy": "Degrade"
+    }
+  ]
+})json";
+    }
+
+    [[nodiscard]] Runtime::SandboxEditorContext MakeRenderRecipeEditorContext(
+        Graphics::RenderRecipeConfigContext& recipeContext,
+        Runtime::SandboxEditorRenderRecipeEditorState& editorState,
+        Runtime::RenderArtifactRegistry* artifacts = nullptr,
+        const bool commandsAvailable = true)
+    {
+        return Runtime::SandboxEditorContext{
+            .RenderRecipeContext = &recipeContext,
+            .RenderRecipeEditorState = &editorState,
+            .RenderArtifacts = artifacts,
+            .ImGuiAdapterAvailable = true,
+            .RenderRecipeCommandsAvailable = commandsAvailable,
+        };
+    }
+
+    [[nodiscard]] Runtime::RenderArtifactDeclaration
+    MakeSandboxRenderArtifact(std::string artifactId)
+    {
+        return Runtime::RenderArtifactDeclaration{
+            .Metadata =
+                Graphics::RenderArtifactMetadata{
+                    .ArtifactId = std::move(artifactId),
+                    .RendererId =
+                        std::string{Graphics::kCurrentRendererContractId},
+                    .SnapshotId = "sandbox-snapshot",
+                    .ViewOutputRecipeId =
+                        std::string{Graphics::kCurrentRendererDefaultViewRecipeId},
+                    .SourceRevisions = {"scene:1"},
+                    .Status = Graphics::RenderArtifactStatus::Available,
+                    .Lifetime = Graphics::RenderArtifactLifetime::Cached,
+                    .Purpose = "color",
+                },
+            .Kind =
+                Runtime::RenderArtifactPublicationKind::CandidateProjectResult,
+            .PayloadUri = "memory://sandbox-render-artifact",
+            .ProducerLabel = "sandbox editor test",
+        };
+    }
+
+    [[nodiscard]] const Runtime::SandboxEditorRenderRecipeSlotModel*
+    FindRecipeSlotRow(
+        const Runtime::SandboxEditorRenderRecipeEditorModel& model,
+        const std::string_view name)
+    {
+        const auto it = std::find_if(
+            model.Slots.begin(),
+            model.Slots.end(),
+            [name](const Runtime::SandboxEditorRenderRecipeSlotModel& slot)
+            {
+                return slot.StableName == name;
+            });
+        return it == model.Slots.end() ? nullptr : &*it;
+    }
+
+    [[nodiscard]] const Runtime::SandboxEditorRenderRecipeBindingOverrideModel*
+    FindRecipeBindingRow(
+        const Runtime::SandboxEditorRenderRecipeEditorModel& model,
+        const std::string_view name)
+    {
+        const auto it = std::find_if(
+            model.BindingOverrides.begin(),
+            model.BindingOverrides.end(),
+            [name](
+                const Runtime::SandboxEditorRenderRecipeBindingOverrideModel&
+                    binding)
+            {
+                return binding.SemanticName == name;
+            });
+        return it == model.BindingOverrides.end() ? nullptr : &*it;
+    }
+
+    [[nodiscard]] const Runtime::SandboxEditorRenderRecipeOutputModel*
+    FindRecipeOutputRow(
+        const Runtime::SandboxEditorRenderRecipeEditorModel& model,
+        const std::string_view name)
+    {
+        const auto it = std::find_if(
+            model.Outputs.begin(),
+            model.Outputs.end(),
+            [name](const Runtime::SandboxEditorRenderRecipeOutputModel& output)
+            {
+                return output.Name == name;
+            });
+        return it == model.Outputs.end() ? nullptr : &*it;
+    }
+
+    [[nodiscard]] const Runtime::SandboxEditorRenderArtifactRow*
+    FindRenderArtifactRow(
+        const Runtime::SandboxEditorRenderRecipeEditorModel& model,
+        const std::string_view artifactId)
+    {
+        const auto it = std::find_if(
+            model.Artifacts.begin(),
+            model.Artifacts.end(),
+            [artifactId](const Runtime::SandboxEditorRenderArtifactRow& row)
+            {
+                return row.ArtifactId == artifactId;
+            });
+        return it == model.Artifacts.end() ? nullptr : &*it;
     }
 
     [[nodiscard]] ECS::EntityHandle MakeSelectable(
@@ -252,6 +429,44 @@ namespace
                 return &row;
         }
         return nullptr;
+    }
+
+    [[nodiscard]] const Runtime::SandboxEditorVertexChannelBindingTargetModel*
+    FindVertexChannelTarget(
+        const Runtime::SandboxEditorPropertyCatalogModel& catalog,
+        const Runtime::VertexChannel channel)
+    {
+        for (const Runtime::SandboxEditorVertexChannelBindingTargetModel& target :
+             catalog.VertexChannelTargets)
+        {
+            if (target.Channel == channel)
+                return &target;
+        }
+        return nullptr;
+    }
+
+    void SetVec3Property(Geometry::PropertySet& properties,
+                         const std::string& name,
+                         const std::vector<glm::vec3>& values)
+    {
+        auto prop = properties.GetOrAdd<glm::vec3>(name, glm::vec3{0.0f});
+        prop.Vector() = values;
+    }
+
+    void SetVec4Property(Geometry::PropertySet& properties,
+                         const std::string& name,
+                         const std::vector<glm::vec4>& values)
+    {
+        auto prop = properties.GetOrAdd<glm::vec4>(name, glm::vec4{1.0f});
+        prop.Vector() = values;
+    }
+
+    void SetFloatProperty(Geometry::PropertySet& properties,
+                          const std::string& name,
+                          const std::vector<float>& values)
+    {
+        auto prop = properties.GetOrAdd<float>(name, 0.0f);
+        prop.Vector() = values;
     }
 
     [[nodiscard]] const Runtime::SandboxEditorBoundRenderStateRow* FindBoundRow(
@@ -1743,6 +1958,199 @@ TEST(SandboxEditorUi, KMeansCommandPublishesMeshGraphAndPointCloudProperties)
     EXPECT_EQ(model.Processing.LastKMeansResult->LabelCount, 4u);
 }
 
+TEST(SandboxEditorUi, VertexChannelBindingCommandRebindsNormalsForMeshGraphAndPointCloud)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+
+    const auto exercise =
+        [&](const ECS::EntityHandle entity,
+            const Runtime::SandboxEditorDomainWindowKind windowKind,
+            const Runtime::SandboxEditorPropertyCatalogDomain catalogDomain,
+            Geometry::PropertySet& properties,
+            const std::size_t expectedCount)
+        {
+            SetVec3Property(
+                properties,
+                "v:custom_normal",
+                std::vector<glm::vec3>(expectedCount, glm::vec3{1.0f, 0.0f, 0.0f}));
+            SetFloatProperty(
+                properties,
+                "v:temperature",
+                std::vector<float>(expectedCount, 0.5f));
+
+            ASSERT_TRUE(selection.SetSelectedEntity(registry, entity));
+            Runtime::SandboxEditorPanelFrame frame =
+                Runtime::BuildSandboxEditorPanelFrame(context);
+            const auto* normalTarget = FindVertexChannelTarget(
+                frame.Inspector.PropertyCatalog,
+                Runtime::VertexChannel::Normal);
+            ASSERT_NE(normalTarget, nullptr);
+            ASSERT_EQ(frame.Inspector.PropertyCatalog.SelectedStableId,
+                      Runtime::SelectionController::ToStableEntityId(entity));
+
+            const auto customOption = std::find_if(
+                normalTarget->Options.begin(),
+                normalTarget->Options.end(),
+                [catalogDomain](const Runtime::SandboxEditorVertexChannelBindingOptionModel& option)
+                {
+                    return option.Domain == catalogDomain &&
+                           option.PropertyName == "v:custom_normal";
+                });
+            ASSERT_NE(customOption, normalTarget->Options.end());
+            EXPECT_TRUE(customOption->Compatible);
+            EXPECT_EQ(customOption->ElementCount, expectedCount);
+
+            registry.Raw().remove<Dirty::DirtyVertexAttributes,
+                                  Dirty::DirtyVertexNormals>(entity);
+            const Runtime::SandboxEditorCommandStatus status =
+                Runtime::ApplySandboxEditorVertexChannelBindingCommand(
+                    context,
+                    Runtime::SandboxEditorVertexChannelBindingCommand{
+                        .StableEntityId =
+                            Runtime::SelectionController::ToStableEntityId(entity),
+                        .Channel = Runtime::VertexChannel::Normal,
+                        .EnableBinding = true,
+                        .PropertyName = "v:custom_normal",
+                    });
+            EXPECT_EQ(status, Runtime::SandboxEditorCommandStatus::Applied);
+
+            const auto* bindings =
+                registry.Raw().try_get<Runtime::VertexChannelBindingSet>(entity);
+            ASSERT_NE(bindings, nullptr);
+            EXPECT_TRUE(bindings->Normal.Enabled);
+            EXPECT_EQ(bindings->Normal.SourceType,
+                      Runtime::AttributeSourceType::Vec3);
+            EXPECT_EQ(bindings->Normal.SourceProperty, "v:custom_normal");
+            EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(entity));
+            EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(entity));
+
+            const Runtime::SandboxEditorCommandStatus invalid =
+                Runtime::ApplySandboxEditorVertexChannelBindingCommand(
+                    context,
+                    Runtime::SandboxEditorVertexChannelBindingCommand{
+                        .StableEntityId =
+                            Runtime::SelectionController::ToStableEntityId(entity),
+                        .Channel = Runtime::VertexChannel::Normal,
+                        .EnableBinding = true,
+                        .PropertyName = "v:temperature",
+                    });
+            EXPECT_EQ(invalid,
+                      Runtime::SandboxEditorCommandStatus::InvalidVertexChannelBinding);
+
+            const Runtime::SandboxEditorDomainWindowModel model =
+                Runtime::BuildSandboxEditorDomainWindowModel(context, windowKind);
+            const auto* domainTarget = FindVertexChannelTarget(
+                model.PropertyCatalog,
+                Runtime::VertexChannel::Normal);
+            ASSERT_NE(domainTarget, nullptr);
+            EXPECT_TRUE(domainTarget->HasBinding);
+            EXPECT_EQ(domainTarget->Binding.SourceProperty, "v:custom_normal");
+        };
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "Mesh");
+    AddTriangleMeshSource(registry, mesh);
+    exercise(mesh,
+             Runtime::SandboxEditorDomainWindowKind::Mesh,
+             Runtime::SandboxEditorPropertyCatalogDomain::MeshVertices,
+             registry.Raw().get<GS::Vertices>(mesh).Properties,
+             3u);
+
+    const ECS::EntityHandle graph = MakeSelectable(registry, "Graph");
+    AddGraphSource(registry, graph);
+    exercise(graph,
+             Runtime::SandboxEditorDomainWindowKind::Graph,
+             Runtime::SandboxEditorPropertyCatalogDomain::GraphVertices,
+             registry.Raw().get<GS::Nodes>(graph).Properties,
+             3u);
+
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "Cloud");
+    AddPointCloudSource(registry, cloud, 3u);
+    SetPositions(registry.Raw().get<GS::Vertices>(cloud),
+                 {
+                     {0.0f, 0.0f, 0.0f},
+                     {1.0f, 0.0f, 0.0f},
+                     {0.0f, 1.0f, 0.0f},
+                 });
+    exercise(cloud,
+             Runtime::SandboxEditorDomainWindowKind::PointCloud,
+             Runtime::SandboxEditorPropertyCatalogDomain::PointCloudPoints,
+             registry.Raw().get<GS::Vertices>(cloud).Properties,
+             3u);
+}
+
+TEST(SandboxEditorUi, VertexChannelBindingCommandBindsColorAndDisablesCleanly)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+
+    const ECS::EntityHandle mesh = MakeSelectable(registry, "ColorMesh");
+    AddTriangleMeshSource(registry, mesh);
+    auto& properties = registry.Raw().get<GS::Vertices>(mesh).Properties;
+    SetVec4Property(properties,
+                    "v:paint",
+                    {
+                        {1.0f, 0.0f, 0.0f, 1.0f},
+                        {0.0f, 1.0f, 0.0f, 1.0f},
+                        {0.0f, 0.0f, 1.0f, 1.0f},
+                    });
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, mesh));
+
+    Runtime::SandboxEditorPanelFrame frame =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+    const auto* colorTarget = FindVertexChannelTarget(
+        frame.Inspector.PropertyCatalog,
+        Runtime::VertexChannel::Color);
+    ASSERT_NE(colorTarget, nullptr);
+    const auto paintOption = std::find_if(
+        colorTarget->Options.begin(),
+        colorTarget->Options.end(),
+        [](const Runtime::SandboxEditorVertexChannelBindingOptionModel& option)
+        {
+            return option.PropertyName == "v:paint";
+        });
+    ASSERT_NE(paintOption, colorTarget->Options.end());
+    EXPECT_TRUE(paintOption->Compatible);
+
+    const std::uint32_t stableId =
+        Runtime::SelectionController::ToStableEntityId(mesh);
+    EXPECT_EQ(
+        Runtime::ApplySandboxEditorVertexChannelBindingCommand(
+            context,
+            Runtime::SandboxEditorVertexChannelBindingCommand{
+                .StableEntityId = stableId,
+                .Channel = Runtime::VertexChannel::Color,
+                .EnableBinding = true,
+                .PropertyName = "v:paint",
+            }),
+        Runtime::SandboxEditorCommandStatus::Applied);
+    const auto* bindings =
+        registry.Raw().try_get<Runtime::VertexChannelBindingSet>(mesh);
+    ASSERT_NE(bindings, nullptr);
+    EXPECT_TRUE(bindings->Color.Enabled);
+    EXPECT_EQ(bindings->Color.SourceType, Runtime::AttributeSourceType::Vec4);
+    EXPECT_EQ(bindings->Color.SourceProperty, "v:paint");
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexColors>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+
+    registry.Raw().remove<Dirty::DirtyVertexColors>(mesh);
+
+    EXPECT_EQ(
+        Runtime::ApplySandboxEditorVertexChannelBindingCommand(
+            context,
+            Runtime::SandboxEditorVertexChannelBindingCommand{
+                .StableEntityId = stableId,
+                .Channel = Runtime::VertexChannel::Color,
+                .EnableBinding = false,
+            }),
+        Runtime::SandboxEditorCommandStatus::Applied);
+    EXPECT_FALSE(registry.Raw().all_of<Runtime::VertexChannelBindingSet>(mesh));
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexColors>(mesh));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+}
+
 TEST(SandboxEditorUi, MeshVertexNormalsCommandPublishesCanonicalNormalsForAllWeightings)
 {
     ECS::Scene::Registry registry;
@@ -1771,6 +2179,9 @@ TEST(SandboxEditorUi, MeshVertexNormalsCommandPublishesCanonicalNormalsForAllWei
         registry.Raw().remove<Dirty::GpuDirty,
                               Dirty::DirtyVertexPositions,
                               Dirty::DirtyVertexAttributes,
+                              Dirty::DirtyVertexTexcoords,
+                              Dirty::DirtyVertexNormals,
+                              Dirty::DirtyVertexColors,
                               Dirty::DirtyFaceTopology,
                               Dirty::DirtyEdgeTopology>(mesh);
 
@@ -1789,7 +2200,10 @@ TEST(SandboxEditorUi, MeshVertexNormalsCommandPublishesCanonicalNormalsForAllWei
         EXPECT_EQ(lastResult.WrittenCount, 3u);
         EXPECT_EQ(lastResult.ProcessedFaceCount, 1u);
         EXPECT_EQ(lastResult.FallbackVertexCount, 0u);
-        EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+        EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(mesh));
+        EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(mesh));
+        EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexTexcoords>(mesh));
+        EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexColors>(mesh));
         EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(mesh));
         EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexPositions>(mesh));
         EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyFaceTopology>(mesh));
@@ -5228,6 +5642,289 @@ TEST(SandboxEditorUi, PlatformCloseEventStopsEngineRunState)
     EXPECT_FALSE(engine.IsRunning());
 
     engine.Shutdown();
+}
+
+TEST(SandboxEditorUi, RenderRecipeEditorModelListsDeclaredRecipeControls)
+{
+    Graphics::RenderRecipeConfigContext recipeContext =
+        MakeRenderRecipeConfigContext();
+    Runtime::SandboxEditorRenderRecipeEditorState editorState{};
+    Runtime::RenderArtifactRegistry artifacts;
+    ASSERT_TRUE(artifacts.RegisterArtifact(
+                            MakeSandboxRenderArtifact("sandbox-artifact"))
+                    .Succeeded());
+
+    Runtime::SandboxEditorContext context = MakeRenderRecipeEditorContext(
+        recipeContext,
+        editorState,
+        &artifacts);
+    const Runtime::SandboxEditorPanelFrame frame =
+        Runtime::BuildSandboxEditorPanelFrame(context);
+    const Runtime::SandboxEditorRenderRecipeEditorModel& model =
+        frame.RenderRecipe;
+
+    ASSERT_TRUE(model.Available);
+    EXPECT_EQ(model.RendererId, Graphics::kCurrentRendererContractId);
+    EXPECT_EQ(model.ActiveRecipeId, Graphics::kCurrentRendererDefaultRecipeId);
+    EXPECT_FALSE(model.CanValidate);
+    EXPECT_FALSE(model.CanPreview);
+    EXPECT_FALSE(model.CanActivate);
+
+    const Runtime::SandboxEditorRenderRecipeSlotModel* fixedCore =
+        FindRecipeSlotRow(model, "default-frame-core");
+    ASSERT_NE(fixedCore, nullptr);
+    EXPECT_TRUE(fixedCore->DeclaredByRenderer);
+    EXPECT_FALSE(fixedCore->Editable);
+    EXPECT_EQ(fixedCore->Kind, Graphics::RecipeSlotKind::FixedCore);
+
+    const Runtime::SandboxEditorRenderRecipeSlotModel* lighting =
+        FindRecipeSlotRow(model, "lighting");
+    ASSERT_NE(lighting, nullptr);
+    EXPECT_TRUE(lighting->DeclaredByRenderer);
+    EXPECT_TRUE(lighting->Editable);
+    EXPECT_EQ(lighting->Kind, Graphics::RecipeSlotKind::Extension);
+
+    const Runtime::SandboxEditorRenderRecipeBindingOverrideModel* material =
+        FindRecipeBindingRow(model, "material-table");
+    ASSERT_NE(material, nullptr);
+    EXPECT_TRUE(material->Required);
+    EXPECT_FALSE(material->Editable);
+
+    const Runtime::SandboxEditorRenderRecipeBindingOverrideModel* lights =
+        FindRecipeBindingRow(model, "light-snapshots");
+    ASSERT_NE(lights, nullptr);
+    EXPECT_FALSE(lights->Required);
+    EXPECT_TRUE(lights->Editable);
+    EXPECT_EQ(lights->Slot, "lighting");
+
+    ASSERT_NE(FindRecipeOutputRow(model, "color"), nullptr);
+
+    const Runtime::SandboxEditorRenderArtifactRow* artifact =
+        FindRenderArtifactRow(model, "sandbox-artifact");
+    ASSERT_NE(artifact, nullptr);
+    EXPECT_TRUE(artifact->CanPublish);
+    EXPECT_FALSE(artifact->CanApply);
+    EXPECT_EQ(artifact->Status,
+              Runtime::RenderArtifactUiStatus::Unpublished);
+}
+
+TEST(SandboxEditorUi, RenderRecipeEditorDraftValidationPreviewActivationAndCancel)
+{
+    Graphics::RenderRecipeConfigContext recipeContext =
+        MakeRenderRecipeConfigContext();
+    Runtime::SandboxEditorRenderRecipeEditorState editorState{};
+    Runtime::SandboxEditorContext context = MakeRenderRecipeEditorContext(
+        recipeContext,
+        editorState);
+    const std::string validDocument = ValidSandboxRenderRecipeConfig();
+
+    Runtime::SandboxEditorRenderRecipeCommandResult result =
+        Runtime::ApplySandboxEditorRenderRecipeCommand(
+            context,
+            Runtime::SandboxEditorRenderRecipeCommand{
+                .Kind = Runtime::SandboxEditorRenderRecipeCommandKind::UpdateDraft,
+                .Document = validDocument,
+                .SourceId = "valid-preview.json",
+                .Debounced = true,
+            });
+    ASSERT_TRUE(result.Succeeded());
+    EXPECT_EQ(result.Status,
+              Runtime::SandboxEditorRenderRecipeCommandStatus::Debounced);
+    EXPECT_EQ(editorState.DraftState,
+              Runtime::SandboxEditorRenderRecipeDraftState::Debounced);
+    EXPECT_EQ(editorState.DraftRevision, 1u);
+
+    result = Runtime::ApplySandboxEditorRenderRecipeCommand(
+        context,
+        Runtime::SandboxEditorRenderRecipeCommand{
+            .Kind = Runtime::SandboxEditorRenderRecipeCommandKind::ValidateDraft,
+            .Document = "{not valid json",
+            .SourceId = "invalid-preview.json",
+        });
+    EXPECT_FALSE(result.Succeeded());
+    EXPECT_EQ(result.Status,
+              Runtime::SandboxEditorRenderRecipeCommandStatus::ValidationFailed);
+    EXPECT_EQ(editorState.DraftState,
+              Runtime::SandboxEditorRenderRecipeDraftState::Rejected);
+    EXPECT_FALSE(result.RecipeDiagnostics.empty());
+
+    result = Runtime::ApplySandboxEditorRenderRecipeCommand(
+        context,
+        Runtime::SandboxEditorRenderRecipeCommand{
+            .Kind = Runtime::SandboxEditorRenderRecipeCommandKind::PreviewDraft,
+            .Document = std::string{R"json({
+  "schema": ")json"} + std::string{Graphics::kRenderRecipeConfigSchemaId} +
+                        R"json(",
+  "version": 1,
+  "rendererId": ")json" +
+                        std::string{Graphics::kCurrentRendererContractId} +
+                        R"json(",
+  "recipe": {"slots": [{"name": "ray-traced-gi"}]}
+})json",
+            .SourceId = "unsupported-preview.json",
+        });
+    EXPECT_FALSE(result.Succeeded());
+    EXPECT_EQ(result.Status,
+              Runtime::SandboxEditorRenderRecipeCommandStatus::PreviewFailed);
+    EXPECT_EQ(editorState.DraftState,
+              Runtime::SandboxEditorRenderRecipeDraftState::Rejected);
+
+    result = Runtime::ApplySandboxEditorRenderRecipeCommand(
+        context,
+        Runtime::SandboxEditorRenderRecipeCommand{
+            .Kind = Runtime::SandboxEditorRenderRecipeCommandKind::PreviewDraft,
+            .Document = validDocument,
+            .SourceId = "valid-preview.json",
+        });
+    ASSERT_TRUE(result.Succeeded());
+    EXPECT_EQ(result.Status,
+              Runtime::SandboxEditorRenderRecipeCommandStatus::Previewed);
+    EXPECT_EQ(editorState.DraftState,
+              Runtime::SandboxEditorRenderRecipeDraftState::Previewed);
+    ASSERT_TRUE(editorState.HasLastPreview);
+    EXPECT_TRUE(Graphics::IsConfigUsable(editorState.LastPreview));
+
+    Runtime::SandboxEditorRenderRecipeEditorModel model =
+        Runtime::BuildSandboxEditorRenderRecipeEditorModel(context);
+    EXPECT_TRUE(model.CanActivate);
+    EXPECT_EQ(model.DraftRecipeId, "current-renderer.user-preview");
+
+    result = Runtime::ApplySandboxEditorRenderRecipeCommand(
+        context,
+        Runtime::SandboxEditorRenderRecipeCommand{
+            .Kind =
+                Runtime::SandboxEditorRenderRecipeCommandKind::ActivatePreview,
+        });
+    ASSERT_TRUE(result.Succeeded());
+    EXPECT_EQ(result.Status,
+              Runtime::SandboxEditorRenderRecipeCommandStatus::Activated);
+    EXPECT_EQ(editorState.DraftState,
+              Runtime::SandboxEditorRenderRecipeDraftState::Activated);
+    EXPECT_TRUE(editorState.HasActiveOverride);
+    EXPECT_EQ(editorState.ActiveRevision, 1u);
+
+    model = Runtime::BuildSandboxEditorRenderRecipeEditorModel(context);
+    EXPECT_EQ(model.ActiveRecipeId, "current-renderer.user-preview");
+
+    result = Runtime::ApplySandboxEditorRenderRecipeCommand(
+        context,
+        Runtime::SandboxEditorRenderRecipeCommand{
+            .Kind = Runtime::SandboxEditorRenderRecipeCommandKind::CancelDraft,
+        });
+    ASSERT_TRUE(result.Succeeded());
+    EXPECT_EQ(result.Status,
+              Runtime::SandboxEditorRenderRecipeCommandStatus::Canceled);
+    EXPECT_EQ(editorState.DraftState,
+              Runtime::SandboxEditorRenderRecipeDraftState::Canceled);
+    EXPECT_TRUE(editorState.DraftDocument.empty());
+    EXPECT_FALSE(editorState.HasLastPreview);
+
+    model = Runtime::BuildSandboxEditorRenderRecipeEditorModel(context);
+    EXPECT_FALSE(model.CanCancel);
+}
+
+TEST(SandboxEditorUi, RenderRecipeEditorUnchangedDraftIsNoOp)
+{
+    Graphics::RenderRecipeConfigContext recipeContext =
+        MakeRenderRecipeConfigContext();
+    Runtime::SandboxEditorRenderRecipeEditorState editorState{};
+    Runtime::SandboxEditorContext context = MakeRenderRecipeEditorContext(
+        recipeContext,
+        editorState);
+    const std::string validDocument = ValidSandboxRenderRecipeConfig();
+
+    Runtime::SandboxEditorRenderRecipeCommandResult result =
+        Runtime::ApplySandboxEditorRenderRecipeCommand(
+            context,
+            Runtime::SandboxEditorRenderRecipeCommand{
+                .Kind = Runtime::SandboxEditorRenderRecipeCommandKind::UpdateDraft,
+                .Document = validDocument,
+                .SourceId = "stable-draft.json",
+            });
+    ASSERT_TRUE(result.Succeeded());
+    EXPECT_EQ(result.Status,
+              Runtime::SandboxEditorRenderRecipeCommandStatus::DraftUpdated);
+    EXPECT_EQ(editorState.DraftRevision, 1u);
+
+    result = Runtime::ApplySandboxEditorRenderRecipeCommand(
+        context,
+        Runtime::SandboxEditorRenderRecipeCommand{
+            .Kind = Runtime::SandboxEditorRenderRecipeCommandKind::UpdateDraft,
+            .Document = validDocument,
+            .SourceId = "stable-draft.json",
+        });
+    EXPECT_TRUE(result.Succeeded());
+    EXPECT_EQ(result.Status,
+              Runtime::SandboxEditorRenderRecipeCommandStatus::NoChange);
+    EXPECT_EQ(editorState.DraftRevision, 1u);
+}
+
+TEST(SandboxEditorUi, RenderRecipeEditorArtifactPublishAndApplyUseRegistry)
+{
+    Graphics::RenderRecipeConfigContext recipeContext =
+        MakeRenderRecipeConfigContext();
+    Runtime::SandboxEditorRenderRecipeEditorState editorState{};
+    Runtime::RenderArtifactRegistry artifacts;
+    ASSERT_TRUE(artifacts.RegisterArtifact(
+                            MakeSandboxRenderArtifact("sandbox-candidate"))
+                    .Succeeded());
+    Runtime::SandboxEditorContext context = MakeRenderRecipeEditorContext(
+        recipeContext,
+        editorState,
+        &artifacts);
+
+    Runtime::SandboxEditorRenderRecipeCommandResult result =
+        Runtime::ApplySandboxEditorRenderRecipeCommand(
+            context,
+            Runtime::SandboxEditorRenderRecipeCommand{
+                .Kind =
+                    Runtime::SandboxEditorRenderRecipeCommandKind::PublishArtifact,
+                .ArtifactId = "sandbox-candidate",
+                .Provenance = "sandbox editor test",
+            });
+    ASSERT_TRUE(result.Succeeded());
+    EXPECT_EQ(result.Status,
+              Runtime::SandboxEditorRenderRecipeCommandStatus::Published);
+    EXPECT_EQ(result.ArtifactState,
+              Runtime::RenderArtifactPublicationState::Published);
+
+    Runtime::SandboxEditorRenderRecipeEditorModel model =
+        Runtime::BuildSandboxEditorRenderRecipeEditorModel(context);
+    const Runtime::SandboxEditorRenderArtifactRow* artifact =
+        FindRenderArtifactRow(model, "sandbox-candidate");
+    ASSERT_NE(artifact, nullptr);
+    EXPECT_FALSE(artifact->CanPublish);
+    EXPECT_TRUE(artifact->CanApply);
+
+    result = Runtime::ApplySandboxEditorRenderRecipeCommand(
+        context,
+        Runtime::SandboxEditorRenderRecipeCommand{
+            .Kind =
+                Runtime::SandboxEditorRenderRecipeCommandKind::ApplyArtifact,
+            .ArtifactId = "sandbox-candidate",
+            .Provenance = "sandbox editor test",
+            .ProjectTarget = "scene.preview.accepted",
+        });
+    ASSERT_TRUE(result.Succeeded());
+    EXPECT_EQ(result.Status,
+              Runtime::SandboxEditorRenderRecipeCommandStatus::Applied);
+    EXPECT_TRUE(result.ProjectMutationAuthorized);
+    EXPECT_EQ(result.ArtifactState,
+              Runtime::RenderArtifactPublicationState::Applied);
+
+    Runtime::SandboxEditorContext missingRegistry =
+        MakeRenderRecipeEditorContext(recipeContext, editorState, nullptr);
+    result = Runtime::ApplySandboxEditorRenderRecipeCommand(
+        missingRegistry,
+        Runtime::SandboxEditorRenderRecipeCommand{
+            .Kind =
+                Runtime::SandboxEditorRenderRecipeCommandKind::PublishArtifact,
+            .ArtifactId = "sandbox-candidate",
+            .Provenance = "sandbox editor test",
+        });
+    EXPECT_FALSE(result.Succeeded());
+    EXPECT_EQ(result.Status,
+              Runtime::SandboxEditorRenderRecipeCommandStatus::MissingArtifactRegistry);
 }
 
 TEST(SandboxEditorUi, EngineAttachmentRegistersEditorCallback)

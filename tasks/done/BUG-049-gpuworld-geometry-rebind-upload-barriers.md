@@ -20,6 +20,13 @@ depends_on: []
 - The gap was downstream: `GpuWorld::UploadGeometry` and `GpuWorld::SyncFrame` write device buffers through `IDevice::WriteBuffer`, while the renderer's next culling/depth/surface passes read the scene-table, instance, geometry-record, managed vertex, and managed index buffers without an explicit upload-to-read barrier owned by that direct-write path.
 - Owner: `src/graphics/renderer`; runtime remains responsible only for dirty tagging and render extraction.
 
+## Completion
+- Completed: 2026-06-21. Commit/PR: `843e4fb3`.
+- Audit: 2026-06-22 backlog audit confirmed this task was already fixed and
+  superseded as an open backlog bug. `GpuWorld` tracks one-shot pending upload
+  barriers for direct buffer writes, `Renderer` drains them before consumers,
+  and focused geometry-rebind plus dirty-extraction coverage still passes.
+
 ## Required changes
 - [x] Track one-shot pending upload barriers for `GpuWorld` direct buffer writes.
 - [x] Submit pending `TransferWrite -> ShaderRead` barriers for scene-table, instance, entity-config, geometry-record, bounds, lights, and managed vertex buffers before culling.

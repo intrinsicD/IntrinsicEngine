@@ -38,6 +38,8 @@ layout(location = 2) in vec3 fragWorldNormal;
 layout(location = 3) flat in uint fragConfigSlot;
 layout(location = 4) in float fragVisualizationScalar;
 layout(location = 5) in vec4 fragVisualizationColor;
+layout(location = 6) in vec4 fragVertexColor;
+layout(location = 7) flat in uint fragHasVertexColor;
 
 layout(location = 0) out vec4 outColor;
 
@@ -64,6 +66,9 @@ void main() {
     vec4 baseColor = mat.BaseColorFactor;
     if (IsValidTextureID(mat.AlbedoID)) {
         baseColor *= texture(globalTextures[nonuniformEXT(mat.AlbedoID)], fragUv);
+    }
+    if (fragHasVertexColor != 0u) {
+        baseColor = fragVertexColor;
     }
     const GpuEntityConfig cfg = GpuEntityConfigRef(scene.EntityConfigBDA).Data[fragConfigSlot];
     float visualizationScalar = fragVisualizationScalar;

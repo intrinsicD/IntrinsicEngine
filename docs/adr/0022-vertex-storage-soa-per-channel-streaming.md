@@ -7,13 +7,14 @@
 
 ## Context
 
-The managed GPU geometry path stores vertices interleaved (AoS): `GpuWorld`
-keeps one contiguous `VertexByteOffset` / `VertexByteCount` / `VertexStride`
-block per geometry (`src/graphics/renderer/Graphics.GpuWorld.cpp`), and the
-active GpuScene vertex shader (`assets/shaders/deferred/gbuffer.vert`) reads a
-packed `PackedVertex { px,py,pz,u,v,nx,ny,nz }` struct via the geometry record's
-single `VertexBufferBDA`. The dormant `surface.vert` push-constant SoA path is
-unused.
+Before RUNTIME-122, the managed GPU geometry path stored vertices interleaved
+(AoS): `GpuWorld` kept one contiguous `VertexByteOffset` / `VertexByteCount` /
+`VertexStride` block per geometry, and the active GpuScene vertex shaders read
+packed vertex structs through the geometry record's single `VertexBufferBDA`.
+RUNTIME-122 applied this ADR to the retained GpuWorld path: managed geometry now
+stores position, texcoord, normal, and optional packed-color channels as
+separate sub-ranges and publishes one BDA per channel. The dormant `surface.vert`
+push-constant SoA path remains unused by the default recipe.
 
 Two requirements pushed on this layout:
 
@@ -82,7 +83,8 @@ on the critical path.
 
 ## Validation
 
-- RUNTIME-122 Slice A: CPU contract tests prove the SoA channel substrate
-  reproduces current AoS bytes exactly (CPU gate).
-- RUNTIME-122 Slice B / RUNTIME-124: opt-in `gpu;vulkan` smoke proves SoA fetch
-  and per-channel partial uploads render correctly on a Vulkan-capable host.
+- RUNTIME-122: CPU contract tests prove packers publish channel streams and
+  `GpuWorld` records channel BDAs; opt-in `gpu;vulkan` smoke proves active
+  GpuScene shaders fetch those channels on a Vulkan-capable host.
+- RUNTIME-124: per-channel dirty tracking and partial uploads must add their own
+  CPU/null contract coverage plus opt-in `gpu;vulkan` proof.

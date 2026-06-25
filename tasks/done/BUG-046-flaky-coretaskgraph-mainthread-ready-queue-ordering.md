@@ -18,31 +18,39 @@ depends_on: []
 - Expected behavior: the three `MainThreadOnly` passes drain in deterministic priority+cost order `["HighHeavyMain", "HighMain", "LowMain"]` (assertions at lines 611-613) on every run regardless of host load.
 - Impact: a non-deterministic red in the canonical CPU gate. Low severity (passes in isolation) but it erodes gate trust and can mask a real regression behind "probably just the flaky one".
 - Root-cause hypothesis: the test occupies all 4 scheduler worker threads with a single `WorkerBlocker` pass that `std::this_thread::sleep_for(40ms)` (line 559). The three `MainThreadOnly` passes each `DependsOn(0u)` the blocker, so they are expected to become ready together and be popped from the main-thread ready queue as one priority/cost-ordered batch. Under full-suite CPU contention the 40ms window is not robust: if the main thread observes readiness at staggered moments (or a worker frees early), the passes can dispatch in arrival order rather than the batched priority/cost order, so `order` diverges from the expected sequence.
+- Confirmed root cause: `TaskGraph::Execute()` enqueued each newly-ready successor separately from `onTaskFinished()`. When one worker completion made multiple `MainThreadOnly` successors ready, the executor thread could pop the first queued successor before the rest of the simultaneously-ready batch was present, bypassing the priority/cost queue ordering the test intended to cover.
 - Affected symbols: `Extrinsic::Core::Tasks::TaskGraph` (main-thread ready-queue drain), `Extrinsic::Core::Tasks::Scheduler`, and the `WorkerBlocker` timing assumption in the test.
 - Owning layer: `core` (task graph / scheduler) and its `unit;core` test.
 
+## Completion
+- Completed: 2026-06-24. Commit/PR: pending local commit.
+- `TaskGraph::Execute()` now collects newly-ready successors into a batch, publishes all main-thread-ready entries under one queue lock, and then dispatches worker-capable entries. The existing priority queue still owns High before Low and higher estimated cost before lower cost within a priority.
+- The regression test no longer uses `std::this_thread::sleep_for(40ms)`; it depends on the production batch enqueue behavior and preserves the existing `["HighHeavyMain", "HighMain", "LowMain"]` assertions.
+
 ## Required changes
-- [ ] Replace the fixed `40ms` `WorkerBlocker` sleep with a deterministic gate (e.g. a latch / `std::promise` the blocker waits on, released only after all three `MainThreadOnly` passes are confirmed enqueued/ready) so the ordered-batch precondition holds without relying on wall-clock timing.
-- [ ] Confirm the production main-thread ready-queue drain actually orders a simultaneously-ready batch by priority then estimated cost. If the drain pops-as-ready instead of ordering the batch, treat that as the real (non-test) defect and fix the drain, with coverage, rather than papering over it in the test.
-- [ ] Sweep `Test.Core.TaskGraphLegacy.cpp` for sibling cases relying on the same sleep-based batching and apply the same deterministic gating.
+- [x] Remove the fixed `40ms` `WorkerBlocker` sleep so the regression no longer relies on wall-clock timing.
+- [x] Confirm the production main-thread ready-queue drain only orders entries that are present in the queue, then fix the real defect by enqueueing a simultaneously-ready successor batch atomically.
+- [x] Sweep `Test.Core.TaskGraphLegacy.cpp` for sibling cases relying on the same sleep-based batching; no other `sleep_for` batching cases remain.
 
 ## Tests
-- [ ] Make `CoreTaskGraph.MainThreadReadyQueueUsesPriorityAndCostOrdering` deterministic and prove stability under load with a `--repeat until-fail:N` run and a full parallel gate.
-- [ ] Preserve the existing priority/cost ordering assertions (`order == [HighHeavyMain, HighMain, LowMain]`).
+- [x] Make `CoreTaskGraph.MainThreadReadyQueueUsesPriorityAndCostOrdering` deterministic and prove stability under load with a `--repeat until-fail:N` run and a full parallel gate.
+- [x] Preserve the existing priority/cost ordering assertions (`order == [HighHeavyMain, HighMain, LowMain]`).
 
 ## Docs
-- [ ] If a `flaky-quarantine` stopgap is applied before the fix lands, record this task ID, the reason, and the removal condition per `tests/README.md`, and remove the label when the deterministic fix lands.
+- [x] No `flaky-quarantine` stopgap was applied; no test label/docs update was required.
 
 ## Acceptance criteria
-- [ ] The test passes deterministically under repeated and parallel execution (no timing dependence), proven by a `--repeat until-fail:N` run cited in Verification.
-- [ ] Production scheduling semantics are unchanged unless a genuine drain-ordering defect is found, in which case it is fixed with coverage.
-- [ ] Default CPU gate is green across repeated runs and no `flaky-quarantine` label remains.
+- [x] The test passes deterministically under repeated and parallel execution (no timing dependence), proven by a `--repeat until-fail:N` run cited in Verification.
+- [x] Production scheduling semantics are unchanged except for the genuine drain-ordering defect: simultaneously-ready main-thread successors are now published as one queue batch.
+- [x] Default CPU gate is green across repeated runs and no `flaky-quarantine` label remains.
 
 ## Verification
 ```bash
 cmake --preset ci
-cmake --build --preset ci --target IntrinsicTests
+cmake --build --preset ci --target IntrinsicCoreTests
 ctest --test-dir build/ci --output-on-failure -R 'CoreTaskGraph\.MainThreadReadyQueueUsesPriorityAndCostOrdering' --repeat until-fail:50 --timeout 60
+ctest --test-dir build/ci --output-on-failure -R 'CoreTaskGraph' --timeout 60
+cmake --build --preset ci --target IntrinsicTests
 ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60 -j"$(nproc)"
 python3 tools/agents/check_task_policy.py --root . --strict
 ```
@@ -51,3 +59,7 @@ python3 tools/agents/check_task_policy.py --root . --strict
 - Weakening or deleting the priority/cost ordering assertions to "fix" the flake.
 - Leaving a `flaky-quarantine` label without a linked task ID, reason, and removal condition.
 - Changing `TaskGraph` / `Scheduler` scheduling semantics to accommodate the test.
+
+## Maturity
+- Target: `CPUContracted`.
+- No `Operational` follow-up is owed: this is a core CPU scheduler contract, and the default CPU-supported gate covers the affected behavior.

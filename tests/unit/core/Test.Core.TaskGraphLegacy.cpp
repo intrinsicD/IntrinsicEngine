@@ -2,12 +2,10 @@
 
 #include <cstddef>
 #include <algorithm>
-#include <chrono>
 #include <cstdint>
 #include <mutex>
 #include <string>
 #include <string_view>
-#include <thread>
 #include <vector>
 
 import Extrinsic.Core.Dag.TaskGraph;
@@ -540,8 +538,6 @@ TEST(CoreTaskGraph, ResetClearsStatsResourcesAndLabelsAcrossEpochs)
 
 TEST(CoreTaskGraph, MainThreadReadyQueueUsesPriorityAndCostOrdering)
 {
-    using namespace std::chrono_literals;
-
     TaskGraph graph(QueueDomain::Cpu);
     Tasks::Scheduler::Initialize(4);
 
@@ -554,10 +550,7 @@ TEST(CoreTaskGraph, MainThreadReadyQueueUsesPriorityAndCostOrdering)
     graph.AddPass("WorkerBlocker",
         blockerOptions,
         []([[maybe_unused]] TaskGraphBuilder& b) {},
-        []()
-        {
-            std::this_thread::sleep_for(40ms);
-        });
+        []() {});
 
     TaskGraphPassOptions lowMain{};
     lowMain.MainThreadOnly = true;

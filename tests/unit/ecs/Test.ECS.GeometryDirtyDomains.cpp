@@ -20,6 +20,9 @@ TEST(ECSGeometryDirtyDomains, MarkVertexPositionsDirtyStampsOnlyThatTag)
 
     EXPECT_TRUE(raw.all_of<DirtyTags::DirtyVertexPositions>(entity));
     EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexAttributes>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexTexcoords>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexNormals>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexColors>(entity));
     EXPECT_FALSE(raw.all_of<DirtyTags::DirtyEdgeTopology>(entity));
     EXPECT_FALSE(raw.all_of<DirtyTags::DirtyFaceTopology>(entity));
     EXPECT_FALSE(raw.all_of<DirtyTags::GpuDirty>(entity));
@@ -35,6 +38,63 @@ TEST(ECSGeometryDirtyDomains, MarkVertexAttributesDirtyStampsOnlyThatTag)
 
     EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexPositions>(entity));
     EXPECT_TRUE(raw.all_of<DirtyTags::DirtyVertexAttributes>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexTexcoords>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexNormals>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexColors>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyEdgeTopology>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyFaceTopology>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::GpuDirty>(entity));
+}
+
+TEST(ECSGeometryDirtyDomains, MarkVertexTexcoordsDirtyStampsOnlyThatTag)
+{
+    Registry scene;
+    auto& raw = scene.Raw();
+    const EntityHandle entity = scene.Create();
+
+    DirtyTags::MarkVertexTexcoordsDirty(raw, entity);
+
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexPositions>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexAttributes>(entity));
+    EXPECT_TRUE(raw.all_of<DirtyTags::DirtyVertexTexcoords>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexNormals>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexColors>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyEdgeTopology>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyFaceTopology>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::GpuDirty>(entity));
+}
+
+TEST(ECSGeometryDirtyDomains, MarkVertexNormalsDirtyStampsOnlyThatTag)
+{
+    Registry scene;
+    auto& raw = scene.Raw();
+    const EntityHandle entity = scene.Create();
+
+    DirtyTags::MarkVertexNormalsDirty(raw, entity);
+
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexPositions>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexAttributes>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexTexcoords>(entity));
+    EXPECT_TRUE(raw.all_of<DirtyTags::DirtyVertexNormals>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexColors>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyEdgeTopology>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyFaceTopology>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::GpuDirty>(entity));
+}
+
+TEST(ECSGeometryDirtyDomains, MarkVertexColorsDirtyStampsOnlyThatTag)
+{
+    Registry scene;
+    auto& raw = scene.Raw();
+    const EntityHandle entity = scene.Create();
+
+    DirtyTags::MarkVertexColorsDirty(raw, entity);
+
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexPositions>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexAttributes>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexTexcoords>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexNormals>(entity));
+    EXPECT_TRUE(raw.all_of<DirtyTags::DirtyVertexColors>(entity));
     EXPECT_FALSE(raw.all_of<DirtyTags::DirtyEdgeTopology>(entity));
     EXPECT_FALSE(raw.all_of<DirtyTags::DirtyFaceTopology>(entity));
     EXPECT_FALSE(raw.all_of<DirtyTags::GpuDirty>(entity));
@@ -50,6 +110,9 @@ TEST(ECSGeometryDirtyDomains, MarkEdgeTopologyDirtyStampsOnlyThatTag)
 
     EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexPositions>(entity));
     EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexAttributes>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexTexcoords>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexNormals>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexColors>(entity));
     EXPECT_TRUE(raw.all_of<DirtyTags::DirtyEdgeTopology>(entity));
     EXPECT_FALSE(raw.all_of<DirtyTags::DirtyFaceTopology>(entity));
     EXPECT_FALSE(raw.all_of<DirtyTags::GpuDirty>(entity));
@@ -65,6 +128,9 @@ TEST(ECSGeometryDirtyDomains, MarkFaceTopologyDirtyStampsOnlyThatTag)
 
     EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexPositions>(entity));
     EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexAttributes>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexTexcoords>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexNormals>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexColors>(entity));
     EXPECT_FALSE(raw.all_of<DirtyTags::DirtyEdgeTopology>(entity));
     EXPECT_TRUE(raw.all_of<DirtyTags::DirtyFaceTopology>(entity));
     EXPECT_FALSE(raw.all_of<DirtyTags::GpuDirty>(entity));
@@ -80,6 +146,9 @@ TEST(ECSGeometryDirtyDomains, MarkGpuDirtyStampsOnlyThatTag)
 
     EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexPositions>(entity));
     EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexAttributes>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexTexcoords>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexNormals>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexColors>(entity));
     EXPECT_FALSE(raw.all_of<DirtyTags::DirtyEdgeTopology>(entity));
     EXPECT_FALSE(raw.all_of<DirtyTags::DirtyFaceTopology>(entity));
     EXPECT_TRUE(raw.all_of<DirtyTags::GpuDirty>(entity));
@@ -108,12 +177,18 @@ TEST(ECSGeometryDirtyDomains, DirtyDomainsCoexistIndependentlyOnSameEntity)
 
     DirtyTags::MarkVertexPositionsDirty(raw, entity);
     DirtyTags::MarkVertexAttributesDirty(raw, entity);
+    DirtyTags::MarkVertexTexcoordsDirty(raw, entity);
+    DirtyTags::MarkVertexNormalsDirty(raw, entity);
+    DirtyTags::MarkVertexColorsDirty(raw, entity);
     DirtyTags::MarkEdgeTopologyDirty(raw, entity);
     DirtyTags::MarkFaceTopologyDirty(raw, entity);
     DirtyTags::MarkGpuDirty(raw, entity);
 
     EXPECT_TRUE(raw.all_of<DirtyTags::DirtyVertexPositions>(entity));
     EXPECT_TRUE(raw.all_of<DirtyTags::DirtyVertexAttributes>(entity));
+    EXPECT_TRUE(raw.all_of<DirtyTags::DirtyVertexTexcoords>(entity));
+    EXPECT_TRUE(raw.all_of<DirtyTags::DirtyVertexNormals>(entity));
+    EXPECT_TRUE(raw.all_of<DirtyTags::DirtyVertexColors>(entity));
     EXPECT_TRUE(raw.all_of<DirtyTags::DirtyEdgeTopology>(entity));
     EXPECT_TRUE(raw.all_of<DirtyTags::DirtyFaceTopology>(entity));
     EXPECT_TRUE(raw.all_of<DirtyTags::GpuDirty>(entity));
@@ -142,18 +217,22 @@ TEST(ECSGeometryDirtyDomains, ConsumerCanDrainTagsAfterStamping)
     const EntityHandle entity = scene.Create();
 
     DirtyTags::MarkVertexPositionsDirty(raw, entity);
+    DirtyTags::MarkVertexNormalsDirty(raw, entity);
     DirtyTags::MarkGpuDirty(raw, entity);
 
     ASSERT_TRUE(raw.all_of<DirtyTags::DirtyVertexPositions>(entity));
+    ASSERT_TRUE(raw.all_of<DirtyTags::DirtyVertexNormals>(entity));
     ASSERT_TRUE(raw.all_of<DirtyTags::GpuDirty>(entity));
 
     // Mirror the runtime-side drain: remove tags after observation. ECS
     // helpers never own this step; the drain pattern matches
     // `Runtime.RenderExtraction::ExtractAndSubmit` for `DirtyTransform`.
-    raw.remove<DirtyTags::DirtyVertexPositions>(entity);
+    raw.remove<DirtyTags::DirtyVertexPositions,
+               DirtyTags::DirtyVertexNormals>(entity);
     raw.remove<DirtyTags::GpuDirty>(entity);
 
     EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexPositions>(entity));
+    EXPECT_FALSE(raw.all_of<DirtyTags::DirtyVertexNormals>(entity));
     EXPECT_FALSE(raw.all_of<DirtyTags::GpuDirty>(entity));
 
     // Re-stamping after a drain is supported and idempotent.

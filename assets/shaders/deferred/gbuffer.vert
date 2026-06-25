@@ -21,21 +21,6 @@ layout(push_constant, scalar) uniform ScenePC {
     uint _pad0;
 } pc;
 
-struct PackedVertex {
-    float px;
-    float py;
-    float pz;
-    float u;
-    float v;
-    float nx;
-    float ny;
-    float nz;
-};
-
-layout(buffer_reference, scalar) readonly buffer PackedVertexRef {
-    PackedVertex Data[];
-};
-
 layout(location = 0) out vec3 vWorldNormal;
 layout(location = 1) out vec2 vUv;
 layout(location = 2) flat out uint vInstanceSlot;
@@ -57,31 +42,35 @@ void main() {
     const GpuGeometryRecord geo = geometryRecords.Data[inst.GeometrySlot];
     const GpuEntityConfig cfg = entityConfigs.Data[inst.ConfigSlot];
 
-    PackedVertexRef vertices = PackedVertexRef(geo.VertexBufferBDA);
     // The culling indirect command supplies firstIndex + vertexOffset, so
-    // gl_VertexIndex is already in managed-buffer vertex units.
+    // gl_VertexIndex is already in managed-buffer vertex units. Channel BDAs
+    // point at this geometry's first element, so fetch with the local index.
     const uint vertexIndex = uint(gl_VertexIndex);
-    const PackedVertex pv = vertices.Data[vertexIndex];
+    const uint localVertexIndex = vertexIndex - geo.VertexOffset;
 
-    vec3 localPos = vec3(pv.px, pv.py, pv.pz);
+    vec3 localPos = GpuReadPackedVec3(geo.VertexBufferBDA, localVertexIndex);
     vec4 worldPos = dyn.Model * vec4(localPos, 1.0);
 
     gl_Position = camera.proj * camera.view * worldPos;
 
-    vec3 localNormal = vec3(pv.nx, pv.ny, pv.nz);
+    vec3 localNormal = geo.NormalBufferBDA != uint64_t(0)
+        ? GpuReadPackedVec3(geo.NormalBufferBDA, localVertexIndex)
+        : vec3(0.0, 0.0, 1.0);
     const float localNormalLength = length(localNormal);
     localNormal = (localNormalLength > 1.0e-6) ? (localNormal / localNormalLength) : vec3(0.0, 0.0, 1.0);
     const mat3 normalMatrix = transpose(inverse(mat3(dyn.Model)));
     vec3 worldNormal = normalMatrix * localNormal;
     const float worldNormalLength = length(worldNormal);
     vWorldNormal = (worldNormalLength > 1.0e-6) ? (worldNormal / worldNormalLength) : vec3(0.0, 0.0, 1.0);
-    vUv = vec2(pv.u, pv.v);
+    vUv = geo.TexcoordBufferBDA != uint64_t(0)
+        ? GpuReadPackedVec2(geo.TexcoordBufferBDA, localVertexIndex)
+        : vec2(0.0);
     vInstanceSlot = instanceSlot;
     vEntityId = inst.EntityID;
     vVisualizationScalar = cfg.VisDomain == GpuVisualizationDomain_Vertex
-        ? GpuVisualizationReadScalar(cfg, vertexIndex, cfg.ScalarRangeMin)
+        ? GpuVisualizationReadScalar(cfg, localVertexIndex, cfg.ScalarRangeMin)
         : cfg.ScalarRangeMin;
     vVisualizationColor = cfg.VisDomain == GpuVisualizationDomain_Vertex
-        ? GpuVisualizationReadColor(cfg, vertexIndex, vec4(1.0))
+        ? GpuVisualizationReadColor(cfg, localVertexIndex, vec4(1.0))
         : vec4(1.0);
 }

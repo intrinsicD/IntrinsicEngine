@@ -101,6 +101,10 @@ map.
   mesh `Processing > Vertices` submenu gains a `Normals` method window backed
   by `Geometry.HalfedgeMesh.Vertices.Normals`; graph and point-cloud windows
   now consume retired `GEOM-026` recomputation contracts for those domains.
+- UI-023 retired the render recipe editing follow-up: sandbox UI now inspects
+  renderer descriptors, optional recipe slots, binding overrides, view/output
+  recipes, validation/preview status, artifact lifetime/status, and activation
+  outcomes without UI owning renderer state.
 - UI work that depends on renderer overlays/handoff coordinates with the
   retired `GRAPHICS-024`
   parity matrix, the `RUNTIME-104` decision not to retain a persistent
@@ -161,3 +165,8 @@ split; narratives live in the retirement log.
   (done, 2026-06-19, `CPUContracted`): domain windows, visualization targets,
   property catalogs, primitive-view commands, render hints, K-Means affordances,
   and mesh UV/bake diagnostics now consume the runtime availability resolver.
+- [UI-023 — Sandbox render recipe editing UI](../../done/UI-023-render-recipe-ui-editing.md)
+  (done, 2026-06-24, `CPUContracted`): render recipe editor models and ImGui
+  rows expose declared renderer slots, binding overrides, view/output recipes,
+  validation/preview/activation state, and artifact publish/apply commands
+  through runtime-owned seams without UI owning renderer state.

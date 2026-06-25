@@ -25,6 +25,7 @@ export namespace Extrinsic::Runtime
         Running,
         WaitingForMainThreadApply,
         WaitingForGpuUpload,
+        WaitingForReadback,
         Complete,
         Failed,
         Cancelled
@@ -41,7 +42,16 @@ export namespace Extrinsic::Runtime
         std::uint64_t ByteSize = 0;
     };
 
-    using StreamingTaskValue = std::variant<Core::Unit, StreamingCpuPayloadReady, StreamingGpuUploadRequest>;
+    struct StreamingReadbackRequest
+    {
+        std::uint64_t PayloadToken = 0;
+        std::uint64_t ByteSize = 0;
+    };
+
+    using StreamingTaskValue = std::variant<Core::Unit,
+                                            StreamingCpuPayloadReady,
+                                            StreamingGpuUploadRequest,
+                                            StreamingReadbackRequest>;
     using StreamingResult = std::expected<StreamingTaskValue, Core::ErrorCode>;
 
     struct StreamingTaskDesc
@@ -69,6 +79,7 @@ export namespace Extrinsic::Runtime
         void Cancel(StreamingTaskHandle handle);
         void PumpBackground(std::uint32_t maxLaunches);
         void DrainCompletions();
+        [[nodiscard]] bool ResumeReadback(StreamingTaskHandle handle);
         void ApplyMainThreadResults();
         void ShutdownAndDrain();
 

@@ -18,6 +18,7 @@
 
 import Extrinsic.Core.Filesystem.PathResolver;
 import Extrinsic.Graphics.CameraSnapshots;
+import Extrinsic.Graphics.CurrentRendererContractAdapter;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.FrameRecipe;
 import Extrinsic.Graphics.HZB;
@@ -546,6 +547,74 @@ TEST(RendererFrameLifecycle, UsesDeviceFrameLifecycleBackbufferAndCommandContext
     EXPECT_EQ(completedFrame, 1u);
     EXPECT_EQ(device.EndFrameCount, 1);
     EXPECT_EQ(device.PresentCount, 0) << "Runtime remains responsible for presentation.";
+
+    renderer->Shutdown();
+}
+
+TEST(RendererFrameLifecycle, RenderGraphReportsCurrentRendererContractAndDeclaredArtifacts)
+{
+    Extrinsic::Tests::MockDevice device;
+    device.BackbufferHandle = Extrinsic::RHI::TextureHandle{77u, 3u};
+
+    std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer =
+        Extrinsic::Graphics::CreateRenderer();
+    renderer->Initialize(device);
+
+    Extrinsic::RHI::FrameHandle frame{};
+    ASSERT_TRUE(renderer->BeginFrame(frame));
+
+    const Extrinsic::Graphics::RenderFrameInput input{
+        .Viewport = {.Width = 320, .Height = 240},
+    };
+    Extrinsic::Graphics::RenderWorld world = renderer->ExtractRenderWorld(input);
+    renderer->PrepareFrame(world);
+    renderer->ExecuteFrame(frame, world);
+
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats =
+        renderer->GetLastRenderGraphStats();
+    ASSERT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    ASSERT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+
+    const Extrinsic::Graphics::RenderGraphContractIntegrationStats& contract =
+        stats.Contract;
+    EXPECT_TRUE(contract.Evaluated);
+    EXPECT_TRUE(contract.ContractCompatible);
+    EXPECT_TRUE(contract.SharedProductsCompatible);
+    EXPECT_TRUE(contract.ArtifactMetadataValid);
+    EXPECT_EQ(contract.RendererId,
+              std::string{Extrinsic::Graphics::kCurrentRendererContractId});
+    EXPECT_EQ(contract.SnapshotId,
+              std::string{Extrinsic::Graphics::kCurrentRendererDefaultSnapshotId});
+    EXPECT_EQ(contract.RecipeId,
+              std::string{Extrinsic::Graphics::kCurrentRendererDefaultRecipeId});
+    EXPECT_EQ(contract.ViewOutputRecipeId,
+              std::string{Extrinsic::Graphics::kCurrentRendererDefaultViewRecipeId});
+    EXPECT_GE(contract.SnapshotSourceRevisionCount, 1u);
+    EXPECT_GE(contract.BindingIntentCount, 1u);
+    EXPECT_GE(contract.RecipeSlotCount, 1u);
+    EXPECT_GE(contract.ViewOutputCount, 2u);
+    EXPECT_GE(contract.VisibilityProductCount, 1u);
+    EXPECT_GE(contract.LightingProductCount, 1u);
+    EXPECT_GE(contract.LightingResolvedLightCount, 1u);
+    EXPECT_EQ(contract.UnsupportedProductDiagnosticCount, 0u);
+    EXPECT_EQ(contract.MissingOutputDiagnosticCount, 0u);
+    EXPECT_GE(contract.DegradedFallbackDiagnosticCount, 1u);
+    EXPECT_EQ(contract.ArtifactPublicationFailureDiagnosticCount, 0u);
+
+    const auto color = std::ranges::find_if(
+        contract.DeclaredArtifacts,
+        [](const Extrinsic::Graphics::RenderArtifactMetadata& artifact)
+        {
+            return artifact.Purpose == "color";
+        });
+    ASSERT_NE(color, contract.DeclaredArtifacts.end());
+    EXPECT_EQ(color->RendererId, contract.RendererId);
+    EXPECT_EQ(color->SnapshotId, contract.SnapshotId);
+    EXPECT_EQ(color->ViewOutputRecipeId, contract.ViewOutputRecipeId);
+    EXPECT_FALSE(color->SourceRevisions.empty());
+    EXPECT_EQ(color->Status, Extrinsic::Graphics::RenderArtifactStatus::Available);
+    EXPECT_EQ(Extrinsic::Graphics::ClassifyRenderArtifactLifecycle(*color),
+              Extrinsic::Graphics::RenderArtifactLifecycleClass::TransientAvailable);
 
     renderer->Shutdown();
 }
@@ -1274,7 +1343,10 @@ TEST(RendererFrameLifecycle, ForwardSurfacePipelineSurvivesOperationalRebuild)
     const std::string promotedGBufferFragment =
         ReadShaderSource("deferred/gbuffer.frag");
 
-    EXPECT_NE(surfaceVertex.find("fragUv = v.UV"), std::string::npos);
+    EXPECT_NE(surfaceVertex.find("localVertexIndex = vertexIndex - geo.VertexOffset"), std::string::npos);
+    EXPECT_NE(surfaceVertex.find("GpuReadPackedVec2(geo.TexcoordBufferBDA, localVertexIndex)"), std::string::npos);
+    EXPECT_NE(surfaceVertex.find("GpuReadPackedVec3(geo.NormalBufferBDA, localVertexIndex)"), std::string::npos);
+    EXPECT_NE(surfaceVertex.find("fragUv = localUv"), std::string::npos);
     EXPECT_NE(surfaceVertex.find("fragWorldNormal"), std::string::npos);
     EXPECT_NE(surfaceFragment.find("mat.AlbedoID"), std::string::npos);
     EXPECT_NE(surfaceFragment.find("fragWorldNormal"), std::string::npos);

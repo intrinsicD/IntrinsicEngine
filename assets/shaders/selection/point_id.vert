@@ -34,15 +34,6 @@
 
 #include "../common/gpu_scene.glsl"
 
-struct ProceduralVertex {
-    vec3 Position;
-    vec2 UV;
-};
-
-layout(buffer_reference, scalar) readonly buffer ProceduralVertexRef {
-    ProceduralVertex Data[];
-};
-
 layout(push_constant, scalar) uniform ScenePC {
     uint64_t SceneTableBDA;
     uint FrameIndex;
@@ -61,10 +52,12 @@ void main() {
     const GpuEntityConfig cfg = GpuEntityConfigRef(scene.EntityConfigBDA).Data[inst.ConfigSlot];
 
     // The culling indirect command supplies firstVertex, so gl_VertexIndex is
-    // already in managed-buffer vertex units.
-    const ProceduralVertex v = ProceduralVertexRef(geo.VertexBufferBDA).Data[gl_VertexIndex];
+    // already in managed-buffer vertex units. Channel BDAs point at this
+    // geometry's first element, so fetch with the local point index.
+    const uint localVertexIndex = uint(gl_VertexIndex) - geo.PointFirstVertex;
+    const vec3 localPosition = GpuReadPackedVec3(geo.VertexBufferBDA, localVertexIndex);
 
-    gl_Position = scene.CameraViewProj * dyn.Model * vec4(v.Position, 1.0);
+    gl_Position = scene.CameraViewProj * dyn.Model * vec4(localPosition, 1.0);
     // Match `forward/point.vert`'s point-size publication so the picking
     // footprint covers the same pixels the visible point covers.
     gl_PointSize = clamp(cfg.Point.PointSize, 0.5, 32.0);

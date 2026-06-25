@@ -13,15 +13,6 @@ layout(push_constant, scalar) uniform ScenePC {
     uint _pad0;
 } pc;
 
-struct PackedVertex {
-    float px;
-    float py;
-    float pz;
-    float u;
-    float v;
-};
-layout(buffer_reference, scalar) readonly buffer PackedVertexRef { PackedVertex Data[]; };
-
 layout(location = 0) flat out uint vConfigSlot;
 layout(location = 1) out float vVisualizationScalar;
 layout(location = 2) out vec4 vVisualizationColor;
@@ -40,7 +31,6 @@ void main() {
     const GpuGeometryRecord geo = geometryRecords.Data[inst.GeometrySlot];
     const GpuEntityConfig cfg = entityConfigs.Data[inst.ConfigSlot];
 
-    PackedVertexRef vertices = PackedVertexRef(geo.VertexBufferBDA);
     GpuUIntBufferRef indices = GpuUIntBufferRef(geo.IndexBufferBDA);
 
     const uint firstLineQuadVertex = (geo.LineFirstIndex / 2u) * 6u;
@@ -51,13 +41,11 @@ void main() {
     const uint lineIndexBase = geo.LineFirstIndex + segmentIndex * 2u;
     const uint localEndpointA = indices.Data[lineIndexBase];
     const uint localEndpointB = indices.Data[lineIndexBase + 1u];
-    const uint endpointA = localEndpointA + geo.VertexOffset;
-    const uint endpointB = localEndpointB + geo.VertexOffset;
-    const PackedVertex a = vertices.Data[endpointA];
-    const PackedVertex b = vertices.Data[endpointB];
+    const vec3 a = GpuReadPackedVec3(geo.VertexBufferBDA, localEndpointA);
+    const vec3 b = GpuReadPackedVec3(geo.VertexBufferBDA, localEndpointB);
 
-    const vec4 clipA = scene.CameraViewProj * dyn.Model * vec4(a.px, a.py, a.pz, 1.0);
-    const vec4 clipB = scene.CameraViewProj * dyn.Model * vec4(b.px, b.py, b.pz, 1.0);
+    const vec4 clipA = scene.CameraViewProj * dyn.Model * vec4(a, 1.0);
+    const vec4 clipB = scene.CameraViewProj * dyn.Model * vec4(b, 1.0);
     const bool useEnd = cornerIndex >= 2u;
     const float side = (cornerIndex == 0u || cornerIndex == 3u) ? -1.0 : 1.0;
     const vec4 centerClip = useEnd ? clipB : clipA;

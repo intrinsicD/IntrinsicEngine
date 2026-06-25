@@ -53,6 +53,7 @@ import Extrinsic.Core.Error;
 import Extrinsic.Core.Geometry2D;
 import Extrinsic.ECS.Component.Culling.Local;
 import Extrinsic.ECS.Component.Culling.World;
+import Extrinsic.ECS.Component.DirtyTags;
 import Extrinsic.ECS.Component.MetaData;
 import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Component.Transform;
@@ -883,8 +884,14 @@ struct GpuSceneInputSummary
     std::uint32_t GeometryCapacity{0u};
     std::uint32_t LiveInstanceCount{0u};
     std::uint32_t VisibleInstances{0u};
+    std::uint32_t SurfaceInstances{0u};
+    std::uint32_t SurfaceInstancesWithColorBuffer{0u};
+    std::uint32_t SurfaceInstancesWithSoaChannels{0u};
+    std::uint32_t SurfaceInstancesWithInvalidGeometry{0u};
     std::uint32_t LineInstances{0u};
     std::uint32_t PointInstances{0u};
+    std::uint32_t LineInstancesWithPositionBuffer{0u};
+    std::uint32_t PointInstancesWithPositionBuffer{0u};
     std::uint32_t LineInstancesWithZeroBounds{0u};
     std::uint32_t PointInstancesWithZeroBounds{0u};
     std::uint32_t LineInstancesWithZeroIndexCount{0u};
@@ -946,15 +953,36 @@ struct GpuSceneInputSummary
         ++summary.VisibleInstances;
         const bool hasLine = (inst.RenderFlags & Extrinsic::RHI::GpuRender_Line) != 0u;
         const bool hasPoint = (inst.RenderFlags & Extrinsic::RHI::GpuRender_Point) != 0u;
-        if (!hasLine && !hasPoint)
-            continue;
-
+        const bool hasSurface = (inst.RenderFlags & Extrinsic::RHI::GpuRender_Surface) != 0u;
         const bool validGeometry =
             inst.GeometrySlot != Extrinsic::RHI::GpuInstanceStatic::InvalidGeometrySlot &&
             inst.GeometrySlot < geometries.size();
         const auto& slotBounds = bounds[slot];
         const auto geometry = validGeometry ? geometries[inst.GeometrySlot]
                                             : Extrinsic::RHI::GpuGeometryRecord{};
+
+        if (hasSurface)
+        {
+            ++summary.SurfaceInstances;
+            if (!validGeometry)
+            {
+                ++summary.SurfaceInstancesWithInvalidGeometry;
+            }
+            else if (geometry.ColorBufferBDA != 0u)
+            {
+                ++summary.SurfaceInstancesWithColorBuffer;
+            }
+            if (validGeometry &&
+                geometry.VertexBufferBDA != 0u &&
+                geometry.TexcoordBufferBDA != 0u &&
+                geometry.NormalBufferBDA != 0u)
+            {
+                ++summary.SurfaceInstancesWithSoaChannels;
+            }
+        }
+
+        if (!hasLine && !hasPoint)
+            continue;
 
         if (hasLine)
         {
@@ -965,6 +993,8 @@ struct GpuSceneInputSummary
                 ++summary.LineInstancesWithZeroBounds;
             if (validGeometry && geometry.LineIndexCount == 0u)
                 ++summary.LineInstancesWithZeroIndexCount;
+            if (validGeometry && geometry.VertexBufferBDA != 0u)
+                ++summary.LineInstancesWithPositionBuffer;
             if (summary.FirstLineSlot == kInvalidIndex)
             {
                 summary.FirstLineSlot = slot;
@@ -983,6 +1013,8 @@ struct GpuSceneInputSummary
                 ++summary.PointInstancesWithZeroBounds;
             if (validGeometry && geometry.PointVertexCount == 0u)
                 ++summary.PointInstancesWithZeroVertexCount;
+            if (validGeometry && geometry.VertexBufferBDA != 0u)
+                ++summary.PointInstancesWithPositionBuffer;
             if (summary.FirstPointSlot == kInvalidIndex)
             {
                 summary.FirstPointSlot = slot;
@@ -1572,6 +1604,323 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ExtrinsicSandboxDefaultConfigPresentsRefe
     engine.Shutdown();
 }
 
+TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleVertexColorStreamShadesDeferredSurface)
+{
+    auto bootstrap = BootstrapDefaultSandboxAppEngine();
+    if (bootstrap.Skipped)
+    {
+        GTEST_SKIP() << bootstrap.SkipReason;
+    }
+    Engine& engine = *bootstrap.EnginePtr;
+
+    const EntityHandle triangle = FindEntityByName(engine.GetScene(), "ReferenceTriangle");
+    ASSERT_TRUE(IsReferenceTriangleEntityValid(engine.GetScene(), triangle))
+        << "ReferenceTriangle is not a valid first-class mesh renderable entity: "
+        << BuildReferenceTriangleEntityDiagnostic(engine.GetScene(), triangle);
+
+    auto& raw = engine.GetScene().Raw();
+    auto& vertices = raw.get<gs::Vertices>(triangle);
+    vertices.Properties
+        .GetOrAdd<glm::vec4>("v:color", glm::vec4{1.0f})
+        .Vector() = {
+            glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
+            glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
+            glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
+        };
+    raw.get<G::VisualizationConfig>(triangle).Source =
+        G::VisualizationConfig::ColorSource::Material;
+
+    auto& renderer = engine.GetRenderer();
+    auto& device = engine.GetDevice();
+    const Extrinsic::RHI::Format backbufferFormat = device.GetBackbufferFormat();
+    const std::uint32_t bytesPerPixel = Extrinsic::RHI::BytesPerBlock(backbufferFormat);
+    const Extrinsic::Core::Extent2D extent = device.GetBackbufferExtent();
+    if (bytesPerPixel < 4u || extent.Width <= 0 || extent.Height <= 0)
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style smoke readback.";
+    }
+
+    const std::uint64_t readbackSize =
+        static_cast<std::uint64_t>(bytesPerPixel) *
+        static_cast<std::uint64_t>(extent.Width) *
+        static_cast<std::uint64_t>(extent.Height);
+    const Extrinsic::RHI::BufferHandle readbackBuffer = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
+        .SizeBytes = readbackSize,
+        .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
+        .HostVisible = true,
+        .DebugName = "Sandbox.ReferenceTriangleVertexColor.Readback",
+    });
+    if (!readbackBuffer.IsValid())
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Readback buffer allocation failed; gpu;vulkan smoke is opt-in.";
+    }
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(readbackBuffer);
+
+    const auto run = DriveAcceptanceAndCapture(engine);
+
+    if (!run.DeviceOperational)
+    {
+        renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+        device.DestroyBuffer(readbackBuffer);
+        engine.Shutdown();
+        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach operational Vulkan for vertex-color readback: status="
+                      << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
+                      << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+        return;
+    }
+
+    const auto& ex = engine.GetLastRenderExtractionStats();
+    EXPECT_GE(ex.MeshGeometryUploads + ex.MeshGeometryReuseHits, 1u)
+        << "ReferenceTriangle did not remain resident on the mesh extraction lane.";
+
+    EXPECT_TRUE(run.Stats.Compile.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_TRUE(run.Stats.Execute.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_EQ(FindPassStatus(run.Stats, "DepthPrepass"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_EQ(FindPassStatus(run.Stats, "SurfacePass"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_EQ(FindPassStatus(run.Stats, "Present"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_GE(run.Stats.DefaultRecipeBackbufferReadbackCopyCount, 1u)
+        << "Vertex-color readback triplet did not record on an operational frame.";
+
+    const GpuSceneInputSummary gpuScene = SummarizeGpuSceneInputs(device, renderer);
+    EXPECT_GE(gpuScene.SurfaceInstances, 1u);
+    EXPECT_EQ(gpuScene.SurfaceInstancesWithInvalidGeometry, 0u);
+    EXPECT_GE(gpuScene.SurfaceInstancesWithSoaChannels, 1u)
+        << "No visible surface instance published position, texcoord, and normal channel BDAs.";
+    EXPECT_GE(gpuScene.SurfaceInstancesWithColorBuffer, 1u)
+        << "No visible surface instance published a GpuGeometryRecord::ColorBufferBDA.";
+
+    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(readbackSize), 0u);
+    device.ReadBuffer(readbackBuffer, bytes.data(), readbackSize, 0u);
+
+    const std::uint32_t centerX = static_cast<std::uint32_t>(extent.Width / 2);
+    const std::uint32_t centerY = static_cast<std::uint32_t>(extent.Height / 2);
+    const RgbaPixel center =
+        ReadPixel(bytes, backbufferFormat, bytesPerPixel, extent, centerX, centerY);
+    const RgbaPixel background = ReadPixel(
+        bytes, backbufferFormat, bytesPerPixel, extent,
+        centerX,
+        static_cast<std::uint32_t>((extent.Height * 7) / 8));
+    const RgbaPixel authoredRed{.R = 255u, .G = 0u, .B = 0u, .A = 255u};
+    const RgbaPixel materialWhite{.R = 255u, .G = 255u, .B = 255u, .A = 255u};
+
+    const int redDominance =
+        static_cast<int>(center.R) -
+        static_cast<int>(std::max(center.G, center.B));
+    EXPECT_GT(RgbDistance(center, background), 48)
+        << "The vertex-colored ReferenceTriangle did not contribute a distinguishable center pixel. "
+        << "center=(" << static_cast<int>(center.R) << ","
+        << static_cast<int>(center.G) << ","
+        << static_cast<int>(center.B) << ") background=("
+        << static_cast<int>(background.R) << ","
+        << static_cast<int>(background.G) << ","
+        << static_cast<int>(background.B) << ")"
+        << " pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+    EXPECT_GT(redDominance, 48)
+        << "The center pixel was not red-dominant after binding v:color. center=("
+        << static_cast<int>(center.R) << ","
+        << static_cast<int>(center.G) << ","
+        << static_cast<int>(center.B) << ") redDominance=" << redDominance
+        << " surface instances with color BDA="
+        << gpuScene.SurfaceInstancesWithColorBuffer;
+    EXPECT_LT(RgbDistance(center, authoredRed), RgbDistance(center, materialWhite))
+        << "The center pixel is closer to the white/material fallback than to the authored red vertex color. center=("
+        << static_cast<int>(center.R) << ","
+        << static_cast<int>(center.G) << ","
+        << static_cast<int>(center.B) << ")";
+
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+    device.DestroyBuffer(readbackBuffer);
+    engine.Shutdown();
+}
+
+namespace
+{
+class PartialVertexColorMutationApp final : public IApplication
+{
+public:
+    PartialVertexColorMutationApp(const std::uint32_t mutateFrame,
+                                  const std::uint32_t targetFrames) noexcept
+        : m_MutateFrame(mutateFrame)
+        , m_TargetFrames(targetFrames)
+    {
+    }
+
+    void OnInitialize(Engine& engine) override
+    {
+        m_EditorUi.Attach(engine);
+    }
+
+    void OnSimTick(Engine&, double) override {}
+
+    void OnVariableTick(Engine& engine, double, double) override
+    {
+        ++m_Frames;
+        if (m_Frames == m_MutateFrame)
+        {
+            Registry& scene = engine.GetScene();
+            const EntityHandle triangle = FindEntityByName(scene, "ReferenceTriangle");
+            if (IsReferenceTriangleEntityValid(scene, triangle))
+            {
+                auto& raw = scene.Raw();
+                auto& vertices = raw.get<gs::Vertices>(triangle);
+                vertices.Properties
+                    .GetOrAdd<glm::vec4>("v:color", glm::vec4{1.0f})
+                    .Vector() = {
+                        glm::vec4{0.0f, 1.0f, 0.0f, 1.0f},
+                        glm::vec4{0.0f, 1.0f, 0.0f, 1.0f},
+                        glm::vec4{0.0f, 1.0f, 0.0f, 1.0f},
+                    };
+                Extrinsic::ECS::Components::DirtyTags::MarkVertexColorsDirty(
+                    raw,
+                    triangle);
+                m_Mutated = true;
+            }
+        }
+
+        if (m_Frames >= m_TargetFrames)
+        {
+            engine.RequestExit();
+        }
+    }
+
+    void OnShutdown(Engine&) override
+    {
+        m_EditorUi.Detach();
+    }
+
+    [[nodiscard]] bool Mutated() const noexcept { return m_Mutated; }
+
+private:
+    Extrinsic::Runtime::SandboxEditorUi m_EditorUi{};
+    std::uint32_t m_MutateFrame{1u};
+    std::uint32_t m_TargetFrames{1u};
+    std::uint32_t m_Frames{0u};
+    bool m_Mutated{false};
+};
+} // namespace
+
+TEST(RuntimeSandboxAcceptanceGpuSmoke, VertexColorDirtyChannelPartiallyUploadsAndShadesDeferredSurface)
+{
+    auto app = std::make_unique<PartialVertexColorMutationApp>(
+        /*mutateFrame=*/kTargetFrames,
+        /*targetFrames=*/kTargetFrames);
+    const PartialVertexColorMutationApp* appView = app.get();
+    auto bootstrap = BootstrapDefaultSandboxAppEngineWithApp(std::move(app));
+    if (bootstrap.Skipped)
+    {
+        GTEST_SKIP() << bootstrap.SkipReason;
+    }
+    Engine& engine = *bootstrap.EnginePtr;
+
+    const EntityHandle triangle = FindEntityByName(engine.GetScene(), "ReferenceTriangle");
+    ASSERT_TRUE(IsReferenceTriangleEntityValid(engine.GetScene(), triangle))
+        << "ReferenceTriangle is not a valid first-class mesh renderable entity: "
+        << BuildReferenceTriangleEntityDiagnostic(engine.GetScene(), triangle);
+
+    auto& raw = engine.GetScene().Raw();
+    auto& vertices = raw.get<gs::Vertices>(triangle);
+    vertices.Properties
+        .GetOrAdd<glm::vec4>("v:color", glm::vec4{1.0f})
+        .Vector() = {
+            glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
+            glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
+            glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
+        };
+    raw.get<G::VisualizationConfig>(triangle).Source =
+        G::VisualizationConfig::ColorSource::Material;
+
+    auto& renderer = engine.GetRenderer();
+    auto& device = engine.GetDevice();
+    const Extrinsic::RHI::Format backbufferFormat = device.GetBackbufferFormat();
+    const std::uint32_t bytesPerPixel = Extrinsic::RHI::BytesPerBlock(backbufferFormat);
+    const Extrinsic::Core::Extent2D extent = device.GetBackbufferExtent();
+    if (bytesPerPixel < 4u || extent.Width <= 0 || extent.Height <= 0)
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Backbuffer format or extent cannot support rgba-style smoke readback.";
+    }
+
+    const std::uint64_t readbackSize =
+        static_cast<std::uint64_t>(bytesPerPixel) *
+        static_cast<std::uint64_t>(extent.Width) *
+        static_cast<std::uint64_t>(extent.Height);
+    const Extrinsic::RHI::BufferHandle readbackBuffer = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
+        .SizeBytes = readbackSize,
+        .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
+        .HostVisible = true,
+        .DebugName = "Sandbox.ReferenceTriangleVertexColorPartial.Readback",
+    });
+    if (!readbackBuffer.IsValid())
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Readback buffer allocation failed; gpu;vulkan smoke is opt-in.";
+    }
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(readbackBuffer);
+
+    const auto run = DriveAcceptanceAndCapture(engine);
+
+    if (!run.DeviceOperational)
+    {
+        renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+        device.DestroyBuffer(readbackBuffer);
+        engine.Shutdown();
+        ADD_FAILURE() << "ExtrinsicSandbox default config did not reach operational Vulkan for partial vertex-color readback: status="
+                      << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
+                      << ". pass statuses=[" << BuildPassStatusSummary(run.Stats) << "]";
+        return;
+    }
+
+    ASSERT_TRUE(appView->Mutated())
+        << "Partial vertex-color smoke did not run its final-frame mutation.";
+
+    const auto& ex = engine.GetLastRenderExtractionStats();
+    EXPECT_EQ(ex.MeshGeometryReuploads, 1u);
+    EXPECT_EQ(ex.MeshGeometryPartialUploads, 1u);
+    EXPECT_EQ(ex.MeshGeometryReleases, 0u);
+
+    EXPECT_TRUE(run.Stats.Compile.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_TRUE(run.Stats.Execute.Succeeded) << run.Stats.Diagnostic;
+    EXPECT_EQ(FindPassStatus(run.Stats, "SurfacePass"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_EQ(FindPassStatus(run.Stats, "Present"), RenderCommandPassStatus::Recorded)
+        << BuildPassStatusSummary(run.Stats);
+    EXPECT_GE(run.Stats.DefaultRecipeBackbufferReadbackCopyCount, 1u)
+        << "Partial vertex-color readback did not record on an operational frame.";
+
+    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(readbackSize), 0u);
+    device.ReadBuffer(readbackBuffer, bytes.data(), readbackSize, 0u);
+
+    const std::uint32_t centerX = static_cast<std::uint32_t>(extent.Width / 2);
+    const std::uint32_t centerY = static_cast<std::uint32_t>(extent.Height / 2);
+    const RgbaPixel center =
+        ReadPixel(bytes, backbufferFormat, bytesPerPixel, extent, centerX, centerY);
+    const RgbaPixel authoredGreen{.R = 0u, .G = 255u, .B = 0u, .A = 255u};
+    const RgbaPixel authoredRed{.R = 255u, .G = 0u, .B = 0u, .A = 255u};
+
+    const int greenDominance =
+        static_cast<int>(center.G) -
+        static_cast<int>(std::max(center.R, center.B));
+    EXPECT_GT(greenDominance, 48)
+        << "The center pixel was not green-dominant after a DirtyVertexColors partial upload. center=("
+        << static_cast<int>(center.R) << ","
+        << static_cast<int>(center.G) << ","
+        << static_cast<int>(center.B) << ") greenDominance=" << greenDominance;
+    EXPECT_LT(RgbDistance(center, authoredGreen), RgbDistance(center, authoredRed))
+        << "The final center pixel is closer to the pre-mutation red stream than to the green partial update. center=("
+        << static_cast<int>(center.R) << ","
+        << static_cast<int>(center.G) << ","
+        << static_cast<int>(center.B) << ")";
+
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+    device.DestroyBuffer(readbackBuffer);
+    engine.Shutdown();
+}
+
 // --- BUG-024B: inspector transform edit shifts rendered pixels --------------
 
 namespace
@@ -1632,6 +1981,12 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleMeshConfiguredLineWidthA
     raw.emplace_or_replace<G::RenderEdges>(triangle, edges);
     G::RenderPoints points{};
     raw.emplace_or_replace<G::RenderPoints>(triangle, points);
+    G::VisualizationLaneOverrides laneOverrides{};
+    G::VisualizationConfig darkEdgeVisualization{};
+    darkEdgeVisualization.Source = G::VisualizationConfig::ColorSource::UniformColor;
+    darkEdgeVisualization.Color = glm::vec4{0.02f, 0.02f, 0.02f, 1.0f};
+    laneOverrides.Edges = darkEdgeVisualization;
+    raw.emplace_or_replace<G::VisualizationLaneOverrides>(triangle, std::move(laneOverrides));
 
     auto& renderer = engine.GetRenderer();
     auto& device = engine.GetDevice();
@@ -1792,6 +2147,10 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleMeshConfiguredLineWidthA
         << ", instanceCount=" << firstPointCmd.InstanceCount
         << ", firstVertex=" << firstPointCmd.FirstVertex
         << ", firstInstance=" << firstPointCmd.FirstInstance << "}";
+    EXPECT_GE(sceneInputs.LineInstancesWithPositionBuffer, 1u)
+        << "ReferenceTriangle mesh edge lane did not publish a position channel BDA.";
+    EXPECT_GE(sceneInputs.PointInstancesWithPositionBuffer, 1u)
+        << "ReferenceTriangle mesh vertex lane did not publish a position channel BDA.";
 
     EXPECT_GE(darkEdgePixels, kReferenceTriangleLineWidthMinDarkPixels)
         << "ReferenceTriangle mesh edge lane did not leave a configured-width dark overlay near the projected bottom-edge midpoint. "
@@ -1829,6 +2188,8 @@ TEST(RuntimeSandboxAcceptanceGpuSmoke, ReferenceTriangleMeshConfiguredLineWidthA
         << ", visible=" << sceneInputs.VisibleInstances
         << ", lines=" << sceneInputs.LineInstances
         << ", points=" << sceneInputs.PointInstances
+        << ", linePositionBuffers=" << sceneInputs.LineInstancesWithPositionBuffer
+        << ", pointPositionBuffers=" << sceneInputs.PointInstancesWithPositionBuffer
         << ", lineZeroBounds=" << sceneInputs.LineInstancesWithZeroBounds
         << ", pointZeroBounds=" << sceneInputs.PointInstancesWithZeroBounds
         << ", lineZeroIndices=" << sceneInputs.LineInstancesWithZeroIndexCount

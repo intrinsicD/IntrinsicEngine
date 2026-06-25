@@ -5,19 +5,6 @@
 
 #include "common/gpu_scene.glsl"
 
-// Runtime surface geometry uploads vertices as vec3 position + vec2 uv +
-// vec3 normal (32-byte scalar layout). Match the forward default-debug-surface
-// shader so depth prepass and surface pass rasterize identical positions.
-struct SurfaceVertex {
-    vec3 Position;
-    vec2 UV;
-    vec3 Normal;
-};
-
-layout(buffer_reference, scalar) readonly buffer SurfaceVertexRef {
-    SurfaceVertex Data[];
-};
-
 layout(push_constant, scalar) uniform ScenePC {
     uint64_t SceneTableBDA;
     uint FrameIndex;
@@ -40,8 +27,10 @@ void main()
     const GpuInstanceDynamic dyn = GpuInstanceDynamicRef(scene.InstanceDynamicBDA).Data[instanceSlot];
     const GpuGeometryRecord geo = GpuGeometryRecordRef(scene.GeometryRecordBDA).Data[inst.GeometrySlot];
     // The culling indirect command supplies firstIndex + vertexOffset, so
-    // gl_VertexIndex is already in managed-buffer vertex units.
-    const vec3 localPosition = SurfaceVertexRef(geo.VertexBufferBDA).Data[gl_VertexIndex].Position;
+    // gl_VertexIndex is already in managed-buffer vertex units. Channel BDAs
+    // point at this geometry's first element, so fetch with the local index.
+    const uint localVertexIndex = uint(gl_VertexIndex) - geo.VertexOffset;
+    const vec3 localPosition = GpuReadPackedVec3(geo.VertexBufferBDA, localVertexIndex);
 
     gl_Position = scene.CameraViewProj * dyn.Model * vec4(localPosition, 1.0);
 }

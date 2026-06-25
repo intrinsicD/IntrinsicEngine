@@ -94,10 +94,22 @@ export namespace Extrinsic::Runtime
         std::uint32_t EstimatedCost{1u};
         std::uint64_t CancellationGeneration{0u};
         bool HasPreviousOutput{false};
+        bool IsReadbackJob{false};
+        std::uint64_t ReadbackByteSize{0u};
         std::vector<DerivedJobDependency> DependsOn{};
         std::move_only_function<DerivedJobWorkerResult()> Execute{};
+        std::move_only_function<bool()> IsReadbackReady{};
         std::move_only_function<DerivedJobApplyValidation()> ValidateOnMainThread{};
         std::move_only_function<Core::Result(DerivedJobApplyContext&)> ApplyOnMainThread{};
+    };
+
+    struct DerivedJobReadbackDiagnostics
+    {
+        std::uint64_t Issued{0u};
+        std::uint64_t Waiting{0u};
+        std::uint64_t Completed{0u};
+        std::uint64_t Failed{0u};
+        std::uint64_t StaleOrCancelled{0u};
     };
 
     struct DerivedJobSnapshot
@@ -108,6 +120,8 @@ export namespace Extrinsic::Runtime
         ProgressiveJobDomain RequestedJobDomain{ProgressiveJobDomain::Cpu};
         ProgressiveJobDomain ResolvedJobDomain{ProgressiveJobDomain::Cpu};
         DerivedJobStatus Status{DerivedJobStatus::Queued};
+        StreamingTaskState ExecutionState{StreamingTaskState::Pending};
+        bool IsReadbackJob{false};
         std::vector<DerivedJobDependency> Dependencies{};
         float NormalizedProgress{0.0f};
         bool ProgressDeterminate{true};
@@ -120,6 +134,7 @@ export namespace Extrinsic::Runtime
     struct DerivedJobQueueSnapshot
     {
         std::vector<DerivedJobSnapshot> Entries{};
+        DerivedJobReadbackDiagnostics Readbacks{};
     };
 
     [[nodiscard]] std::string_view ToString(DerivedJobStatus value) noexcept;
@@ -144,6 +159,7 @@ export namespace Extrinsic::Runtime
         std::uint32_t CancelForEntity(std::uint32_t entityId);
         void Pump(std::uint32_t maxLaunches);
         void DrainCompletions();
+        void DrainReadbacks();
         void ApplyMainThreadResults();
 
         [[nodiscard]] DerivedJobStatus GetStatus(DerivedJobHandle handle) const;

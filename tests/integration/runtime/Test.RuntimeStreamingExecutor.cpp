@@ -294,6 +294,99 @@ TEST(RuntimeStreamingExecutor, CpuPayloadResultEnqueuesMainThreadApplyCallback)
     EXPECT_EQ(executor.GetState(handle), StreamingTaskState::Complete);
 }
 
+TEST(RuntimeStreamingExecutor, ReadbackRequestParksUntilExplicitResume)
+{
+    StreamingExecutor executor{};
+
+    std::atomic<bool> readbackApplied = false;
+    const auto handle = executor.Submit(StreamingTaskDesc{
+        .Name = "ReadbackRequest",
+        .Execute = []()
+        {
+            return StreamingResult{StreamingReadbackRequest{
+                .PayloadToken = 91,
+                .ByteSize = 512,
+            }};
+        },
+        .ApplyOnMainThread = [&readbackApplied](StreamingResult&& result)
+        {
+            if (result.has_value() && std::holds_alternative<StreamingReadbackRequest>(*result))
+            {
+                readbackApplied.store(true, std::memory_order_release);
+            }
+        },
+    });
+
+    executor.PumpBackground(1);
+    executor.DrainCompletions();
+    EXPECT_EQ(executor.GetState(handle), StreamingTaskState::WaitingForReadback);
+
+    executor.ApplyMainThreadResults();
+    EXPECT_FALSE(readbackApplied.load(std::memory_order_acquire));
+    EXPECT_EQ(executor.GetState(handle), StreamingTaskState::WaitingForReadback);
+
+    EXPECT_TRUE(executor.ResumeReadback(handle));
+    EXPECT_EQ(executor.GetState(handle), StreamingTaskState::WaitingForMainThreadApply);
+
+    executor.ApplyMainThreadResults();
+    EXPECT_TRUE(readbackApplied.load(std::memory_order_acquire));
+    EXPECT_EQ(executor.GetState(handle), StreamingTaskState::Complete);
+    EXPECT_FALSE(executor.ResumeReadback(handle));
+}
+
+TEST(RuntimeStreamingExecutor, ReadbackDependencyReleasesOnlyAfterApplyCompletes)
+{
+    StreamingExecutor executor{};
+
+    std::vector<int> order{};
+    const auto readback = executor.Submit(StreamingTaskDesc{
+        .Name = "ReadbackDependencyRoot",
+        .Execute = []()
+        {
+            return StreamingResult{StreamingReadbackRequest{
+                .PayloadToken = 92,
+                .ByteSize = 128,
+            }};
+        },
+        .ApplyOnMainThread = [&order](StreamingResult&&)
+        {
+            order.push_back(1);
+        },
+    });
+
+    const auto dependent = executor.Submit(StreamingTaskDesc{
+        .Name = "ReadbackDependent",
+        .DependsOn = {readback},
+        .Execute = [&order]()
+        {
+            order.push_back(2);
+            return StreamingResult{};
+        },
+    });
+
+    executor.PumpBackground(1);
+    executor.DrainCompletions();
+    EXPECT_EQ(executor.GetState(readback), StreamingTaskState::WaitingForReadback);
+    EXPECT_EQ(executor.GetState(dependent), StreamingTaskState::Pending);
+
+    executor.PumpBackground(1);
+    executor.DrainCompletions();
+    EXPECT_EQ(order.size(), 0u);
+    EXPECT_EQ(executor.GetState(dependent), StreamingTaskState::Pending);
+
+    EXPECT_TRUE(executor.ResumeReadback(readback));
+    executor.ApplyMainThreadResults();
+    ASSERT_EQ(order.size(), 1u);
+    EXPECT_EQ(order[0], 1);
+
+    executor.PumpBackground(1);
+    executor.DrainCompletions();
+    ASSERT_EQ(order.size(), 2u);
+    EXPECT_EQ(order[1], 2);
+    EXPECT_EQ(executor.GetState(readback), StreamingTaskState::Complete);
+    EXPECT_EQ(executor.GetState(dependent), StreamingTaskState::Complete);
+}
+
 TEST(RuntimeStreamingExecutor, CancelledUploadRequestSkipsUploadApplyCallback)
 {
     StreamingExecutor executor{};

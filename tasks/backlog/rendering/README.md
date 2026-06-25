@@ -1018,12 +1018,58 @@ runtime-owned readback job/write-back integration listed below.
   emits async upload-ready barriers only after transfer-token completion.
 
 Cross-layer leaf outside `rendering/`:
-- [`runtime/RUNTIME-126` — GPU readback jobs and result→property write-back](../runtime/RUNTIME-126-gpu-readback-jobs-and-property-writeback.md):
-  depends on GRAPHICS-096/098; wires the async readback into the existing
-  `DerivedJobRegistry` (RUNTIME-112) so algorithms chain follow-ups on GPU
-  results. The forward (CPU→GPU) binding/scheduling spine already exists
-  (RUNTIME-120..124, RUNTIME-112, GRAPHICS-084); ADR-0023 reuses it rather than
-  duplicating it.
+- [RUNTIME-126 — GPU readback jobs and result→property write-back](../../done/RUNTIME-126-gpu-readback-jobs-and-property-writeback.md):
+  retired runtime consumer of GRAPHICS-096/098. It wires async readback into
+  the existing `DerivedJobRegistry` (RUNTIME-112) so algorithms chain follow-ups
+  on GPU results through the same forward (CPU→GPU) binding/scheduling spine
+  (RUNTIME-120..124, RUNTIME-112, GRAPHICS-084) recorded in ADR-0023.
+
+### Renderer/snapshot/recipe contract architecture (GRAPHICS-099..103)
+
+Contract-first implementation sequence for the accepted renderer architecture:
+runtime pairs a renderer with a compatible scoped snapshot and shared
+view/output recipe; renderers consume the engine render graph and fixed
+frame-recipe core; optional recipe parts are loadable only through declared
+extension slots; shared visibility/grouping and lighting/environment recipes
+produce renderer-neutral products; render outputs become runtime-owned artifacts
+before any explicit publish/apply.
+
+- [GRAPHICS-099 — Rendering contract foundation](../../done/GRAPHICS-099-rendering-contract-foundation.md):
+  completed CPU-only foundation. Adds `Extrinsic.Graphics.RenderingContract`
+  with renderer descriptors, scoped snapshot envelopes, binding intents, shared
+  recipe descriptors, view/output recipes, render artifact metadata, validation
+  helpers, and contract tests without changing Vulkan output or current renderer
+  behavior.
+- [GRAPHICS-100 — Minimal current-renderer contract adapter](../../done/GRAPHICS-100-current-renderer-contract-adapter.md):
+  completed CPU-only adapter. It adapts the current renderer path to
+  populate/consume the contracts minimally while preserving behavior through
+  `Extrinsic.Graphics.CurrentRendererContractAdapter`.
+- [GRAPHICS-101 — Loadable rendering recipe config schema and validation](../../done/GRAPHICS-101-loadable-render-recipe-configs.md):
+  completed CPU-only config loader. Adds `Extrinsic.Graphics.RenderRecipeConfig`
+  with a versioned JSON schema, file loader, dry-run preview API, and
+  fail-closed diagnostics for optional recipe configuration constrained to
+  renderer-declared extension slots.
+- [GRAPHICS-102 — Shared visibility and lighting recipe execution](../../done/GRAPHICS-102-shared-visibility-lighting-recipe-execution.md):
+  completed CPU-only shared recipe execution. Adds
+  `Extrinsic.Graphics.SharedRenderRecipeExecution` for renderer-neutral
+  visibility/grouping and lighting/environment products, compatibility checks,
+  and deterministic diagnostics without backend command buffers or project
+  mutation.
+- [GRAPHICS-103 — Vulkan render-graph contract integration](../../done/GRAPHICS-103-vulkan-rendergraph-contract-integration.md):
+  completed operational Vulkan/render-graph proof. The current renderer now
+  evaluates contract metadata in the frame lifecycle, fail-closes before graph
+  execution on incompatibility, reports shared-recipe/artifact diagnostics, and
+  proves declared output artifact production through opt-in Vulkan smoke
+  coverage.
+
+Cross-layer leaves outside `rendering/`:
+- [`runtime/RUNTIME-127` — Render artifact publication and apply semantics](../../done/RUNTIME-127-render-artifact-publication.md):
+  completed CPU-only runtime artifact registry, lifecycle/status vocabulary, and
+  explicit provenance-carrying publish/apply commands for candidate renderer
+  outputs.
+- [`ui/UI-023` — Sandbox render recipe editing UI](../../done/UI-023-render-recipe-ui-editing.md):
+  completed CPU-only recipe inspection/editing and artifact lifetime/status
+  controls through runtime-owned commands without UI owning renderer state.
 
 ## Agent selection rules
 

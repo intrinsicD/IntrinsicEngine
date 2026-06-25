@@ -145,22 +145,23 @@ TEST(RenderPassContract_GpuScene, GpuGeometryRecordLayoutMatchesShader)
 {
     using Record = Extrinsic::RHI::GpuGeometryRecord;
 
-    EXPECT_EQ(sizeof(Record), 64u);
+    EXPECT_EQ(sizeof(Record), 80u);
     EXPECT_EQ(alignof(Record), 16u);
     EXPECT_EQ(offsetof(Record, VertexBufferBDA), 0u);
     EXPECT_EQ(offsetof(Record, IndexBufferBDA), 8u);
-    EXPECT_EQ(offsetof(Record, VertexOffset), 16u);
-    EXPECT_EQ(offsetof(Record, VertexCount), 20u);
-    EXPECT_EQ(offsetof(Record, SurfaceFirstIndex), 24u);
-    EXPECT_EQ(offsetof(Record, SurfaceIndexCount), 28u);
-    EXPECT_EQ(offsetof(Record, LineFirstIndex), 32u);
-    EXPECT_EQ(offsetof(Record, LineIndexCount), 36u);
-    EXPECT_EQ(offsetof(Record, PointFirstVertex), 40u);
-    EXPECT_EQ(offsetof(Record, PointVertexCount), 44u);
-    EXPECT_EQ(offsetof(Record, BufferID), 48u);
-    EXPECT_EQ(offsetof(Record, Flags), 52u);
-    EXPECT_EQ(offsetof(Record, _pad0), 56u);
-    EXPECT_EQ(offsetof(Record, _pad1), 60u);
+    EXPECT_EQ(offsetof(Record, TexcoordBufferBDA), 16u);
+    EXPECT_EQ(offsetof(Record, NormalBufferBDA), 24u);
+    EXPECT_EQ(offsetof(Record, VertexOffset), 32u);
+    EXPECT_EQ(offsetof(Record, VertexCount), 36u);
+    EXPECT_EQ(offsetof(Record, SurfaceFirstIndex), 40u);
+    EXPECT_EQ(offsetof(Record, SurfaceIndexCount), 44u);
+    EXPECT_EQ(offsetof(Record, LineFirstIndex), 48u);
+    EXPECT_EQ(offsetof(Record, LineIndexCount), 52u);
+    EXPECT_EQ(offsetof(Record, PointFirstVertex), 56u);
+    EXPECT_EQ(offsetof(Record, PointVertexCount), 60u);
+    EXPECT_EQ(offsetof(Record, BufferID), 64u);
+    EXPECT_EQ(offsetof(Record, Flags), 68u);
+    EXPECT_EQ(offsetof(Record, ColorBufferBDA), 72u);
 }
 
 TEST(RenderPassContract_Surface, CullWorkgroupSizeIs64)

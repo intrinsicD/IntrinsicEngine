@@ -15,6 +15,8 @@ module Extrinsic.Runtime.MeshPrimitiveViewPacker;
 
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.Runtime.VertexAttributeBinding;
+import Extrinsic.Runtime.VertexChannelStreams;
 import Geometry.Properties;
 
 namespace Extrinsic::Runtime
@@ -182,6 +184,31 @@ namespace Extrinsic::Runtime
             return true;
         }
 
+        void PopulateChannelStreams(const std::vector<glm::vec3>& positions,
+                                    MeshPrimitiveViewBuffer& outBuffer)
+        {
+            const auto vertexCountU32 = static_cast<std::uint32_t>(positions.size());
+            std::vector<glm::vec2> texcoords(positions.size(), glm::vec2{0.0f, 0.0f});
+            outBuffer.Channels.SetVertexCount(vertexCountU32);
+            SetChannelVec3(
+                outBuffer.Channels,
+                VertexChannel::Position,
+                std::span<const glm::vec3>{positions.data(), positions.size()});
+            SetChannelVec2(
+                outBuffer.Channels,
+                VertexChannel::Texcoord,
+                std::span<const glm::vec2>{texcoords.data(), texcoords.size()});
+        }
+
+        [[nodiscard]] std::span<const std::byte> ChannelBytes(
+            const MeshPrimitiveViewBuffer& outBuffer,
+            const VertexChannel channel) noexcept
+        {
+            const VertexChannelStreams::Stream* stream = outBuffer.Channels.Find(channel);
+            return stream != nullptr ? std::span<const std::byte>{stream->Bytes}
+                                     : std::span<const std::byte>{};
+        }
+
         enum class SurfaceWireEdgeOutcome : std::uint8_t
         {
             Emitted,
@@ -311,6 +338,7 @@ namespace Extrinsic::Runtime
     void MeshPrimitiveViewBuffer::Clear() noexcept
     {
         VertexBytes.clear();
+        Channels = {};
         LineIndices.clear();
     }
 
@@ -396,9 +424,12 @@ namespace Extrinsic::Runtime
         {
             return Failure(status, outBuffer);
         }
+        PopulateChannelStreams(*positions, outBuffer);
 
         Extrinsic::Graphics::GpuWorld::GeometryUploadDesc desc{};
         desc.PackedVertexBytes = std::span<const std::byte>{outBuffer.VertexBytes};
+        desc.PositionBytes = ChannelBytes(outBuffer, VertexChannel::Position);
+        desc.TexcoordBytes = ChannelBytes(outBuffer, VertexChannel::Texcoord);
         desc.SurfaceIndices = {};
         desc.LineIndices = std::span<const std::uint32_t>{outBuffer.LineIndices};
         desc.VertexCount = vertexCountU32;
@@ -427,9 +458,12 @@ namespace Extrinsic::Runtime
         {
             return Failure(status, outBuffer);
         }
+        PopulateChannelStreams(*positions, outBuffer);
 
         Extrinsic::Graphics::GpuWorld::GeometryUploadDesc desc{};
         desc.PackedVertexBytes = std::span<const std::byte>{outBuffer.VertexBytes};
+        desc.PositionBytes = ChannelBytes(outBuffer, VertexChannel::Position);
+        desc.TexcoordBytes = ChannelBytes(outBuffer, VertexChannel::Texcoord);
         desc.SurfaceIndices = {};
         desc.LineIndices = {};
         desc.VertexCount = static_cast<std::uint32_t>(positions->size());

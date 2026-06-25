@@ -1,0 +1,594 @@
+session:
+  id: "2026-06-24_001"
+  date: "2026-06-24"
+  started: "2026-06-24T00:05"
+  last_turn: "2026-06-24T23:59"
+  turn_count: 28
+  summary: "Continued rendering-design grilling by opening the renderer input contract visibility question, refining it into whether snapshots are the dependency boundary, accepting scoped immutable prepared snapshots as renderer-specific input boundaries, accepting public metadata envelopes for renderer-private snapshot payloads, separating renderer descriptors from per-snapshot envelopes, accepting renderer-independent binding intents for material/shader/channel bindings, fixing/retiring BUG-046 TaskGraph main-thread ready-queue flakiness, accepting runtime renderer/snapshot pairing with renderer-owned frame recipes over the engine render graph, fixing renderer frame-recipe cores while making optional recipe parts loadable, constraining loadable recipe parts to declared renderer extension slots, making visibility/culling/batching/grouping a shared configurable recipe usable by all renderers, accepting renderer-neutral visibility/grouping recipe outputs, accepting lighting/environment as a shared configurable recipe layer, accepting shared view/output recipes for interactive and headless rendering, accepting runtime-owned render artifacts with explicit publish/apply semantics, choosing contract-first implementation before renderer behavior changes, making the first task a CPU-only rendering contract foundation, creating/validating the contract-first rendering task pack, reviewing that plan for stale lifecycle state and semantic contradictions, staging a recommended execution order, completing the requested task-only hygiene cleanup, implementing/retiring GRAPHICS-099, implementing/retiring the remaining renderer/snapshot/recipe chain through GRAPHICS-103, reviewing the remaining runtime task queue for validity, applying the runtime task hygiene retargeting, preparing the runtime multi-task loop prompt, implementing/retiring RUNTIME-121 through RUNTIME-124, and stopping before RUNTIME-125 because its benchmark/profile gate lacks baseline evidence."
+
+events_logged:
+  - turn: 1
+    type: question
+    id: "N130"
+    routing: direct
+    provenance: user
+    summary: "User accepted the renderer-specific input-contract direction in principle but asked whether contracts should be publicly exposed or internal to each renderer, and how to allow renderers with different low-level access needs to get the engine data they require."
+  - turn: 2
+    type: question
+    id: "N131"
+    routing: direct
+    provenance: user
+    summary: "User questioned whether the snapshot is the right solution for renderer dependency boundaries, asking whether the snapshot should solve the live-dependency problem while still allowing renderer-specific needs."
+  - turn: 3
+    type: decision
+    id: "N132"
+    routing: direct
+    provenance: user
+    summary: "User accepted that snapshot should mean any scoped immutable prepared renderer input, including full-scene views, selected-entity editing views, entity sets, streaming chunks, offline/path-tracing packages, and generated benchmark descriptions, with runtime/adapters preparing the view and renderers consuming it as the dependency boundary."
+  - turn: 4
+    type: decision
+    id: "N133"
+    routing: direct
+    provenance: user
+    summary: "User accepted that every scoped renderer snapshot should expose a small public envelope for identity, kind, scope, producer/consumer, source revisions, dependency hashes, required data/capabilities, validation/stale/missing/generated/degraded state, lifetime/cache/lease policy, output artifacts, diagnostics, and replay/export compatibility while keeping renderer-specific payload layouts private."
+  - turn: 5
+    type: decision
+    id: "N134"
+    routing: direct
+    provenance: user
+    summary: "User accepted separating renderer descriptors from snapshot envelopes: descriptors declare renderer identity, purpose, supported scopes, update modes, data/capability needs, outputs, and fallback policy; snapshot envelopes describe concrete prepared input instances with scope, source revisions, dependency hashes, validation, lifetime, diagnostics, and replay/export metadata."
+  - turn: 6
+    type: decision
+    id: "N135"
+    routing: direct
+    provenance: user
+    summary: "User accepted renderer-independent binding intents for material/shader/channel bindings: public descriptor/envelope metadata declares semantic role, source domain, source identity/revision, value type/format, required/optional status, fallback policy, color space, units/range, and consumer role/pass/lens while renderer-private payloads resolve those intents into internal shader/material/resource layouts."
+  - turn: 7
+    type: experiment
+    id: "N136"
+    routing: direct
+    provenance: ai-executed
+    summary: "Diagnosed BUG-046 as per-successor main-thread queue enqueue interleaving, fixed TaskGraph to batch simultaneously-ready main-thread successors under one queue lock, removed the 40ms sleep from the regression, and verified the focused repeat run plus full CPU-supported gate."
+  - turn: 8
+    type: decision
+    id: "N137"
+    routing: direct
+    provenance: user-revised
+    summary: "User clarified that runtime should pair renderer and compatible snapshot, then each renderer should consume its specific snapshot kind plus the engine render graph substrate and use its frame recipe to produce one or more images/artifacts."
+  - turn: 9
+    type: decision
+    id: "N138"
+    routing: direct
+    provenance: user
+    summary: "User decided renderer frame recipes should have predefined fixed cores, while optional recipe parts are loadable configuration; only per-frame/job data varies through snapshots and binding intents."
+  - turn: 10
+    type: decision
+    id: "N139"
+    routing: direct
+    provenance: user
+    summary: "User accepted constraining loadable optional recipe parts to renderer-declared extension slots with schemas, defaults, capability requirements, allowed data bindings, validation rules, diagnostics, and fallback behavior; invalid or unknown slots fail before activation."
+  - turn: 11
+    type: decision
+    id: "N140"
+    routing: direct
+    provenance: user-revised
+    summary: "User revised visibility ownership: visibility, culling, batching, draw grouping, and dispatch grouping should be a shared configurable recipe usable by all renderers, with renderers consuming the resulting products or intents through the engine render graph and their own frame recipes."
+  - turn: 12
+    type: decision
+    id: "N141"
+    routing: direct
+    provenance: user
+    summary: "User accepted renderer-neutral visibility/grouping outputs: visible item sets, rejected item diagnostics, grouping keys, batch/instance groups, LOD selections, spatial partitions, ordering hints, and optional acceleration-structure build requests, with renderers mapping those products into their own frame recipes."
+  - turn: 13
+    type: decision
+    id: "N142"
+    routing: direct
+    provenance: user
+    summary: "User accepted lighting and environment as a shared configurable recipe layer that resolves authored lights, emissive geometry, environment maps, probes, volumes, tags, quality/toggle settings, shadow/probe/GI intents, debug modes, and fallbacks into renderer-neutral products or intents consumed by compatible renderers."
+  - turn: 14
+    type: decision
+    id: "N143"
+    routing: direct
+    provenance: user
+    summary: "User accepted shared view/output recipes: view parameters, target types, formats, render scale, capture/readback needs, and interactive/headless behavior are declared in loadable recipes; runtime pairs renderer, compatible snapshot, and view/output recipe, and compatible renderers produce declared outputs."
+  - turn: 15
+    type: decision
+    id: "N144"
+    routing: direct
+    provenance: user
+    summary: "User accepted that declared renderer outputs first become runtime-owned render artifacts with renderer/snapshot/view-output/source-revision/status/diagnostic/lifetime metadata; recipes declare artifact lifetime/purpose, and project data changes require explicit publish/apply or declared recipe targets with provenance, undo/audit, and UI status."
+  - turn: 16
+    type: decision
+    id: "N145"
+    routing: direct
+    provenance: user
+    summary: "User accepted contract-first implementation: add renderer descriptors, snapshot envelopes, binding intents, shared recipe descriptors, view/output recipes, render artifact metadata, and tests before changing Vulkan output; adapt the current renderer path minimally, then split loadable configs, UI, shared recipe execution, and deeper Vulkan integration into later tasks."
+  - turn: 17
+    type: decision
+    id: "N146"
+    routing: direct
+    provenance: user
+    summary: "User accepted the exact first task slice: CPU-only public rendering contract foundation with renderer descriptors, snapshot envelopes, binding intents, recipe descriptors, view/output recipes, render artifact metadata, validation helpers, and tests; no loadable files, UI, Vulkan changes, or current-renderer rewiring."
+  - turn: 18
+    type: decision
+    id: "N147"
+    routing: direct
+    provenance: ai-executed
+    summary: "Created the task-backed implementation plan: active `GRAPHICS-099` for CPU-only rendering contract foundation plus backlog follow-ups `GRAPHICS-100`, `GRAPHICS-101`, `GRAPHICS-102`, `GRAPHICS-103`, `RUNTIME-127`, and `UI-023`; updated backlog indices and regenerated `tasks/SESSION-BRIEF.md`."
+  - turn: 18
+    type: experiment
+    id: "N148"
+    routing: direct
+    provenance: ai-executed
+    summary: "Validated the rendering task pack: regenerated session brief, `validate_tasks.py --root tasks --strict` passed with 501 files and zero findings, strict task policy/maturity follow-up checks passed, and doc-link check found no broken links."
+  - turn: 19
+    type: experiment
+    id: "N149"
+    routing: direct
+    provenance: ai-executed
+    summary: "Reviewed the active/rendering/runtime/UI task plan with task validators and semantic inspection; mechanical checks passed, while cleanup findings remain around stale RUNTIME-120/RUNTIME-122 lifecycle state, RUNTIME-126/RUNTIME-123 dependency wording, GRAPHICS-099/100 maturity wording, UI-023/RUNTIME-127 dependency scope, and stale UI-022 runtime README wording."
+  - turn: 20
+    type: observation
+    id: "O05"
+    routing: staged
+    provenance: ai-suggested
+    summary: "Recommended execution order: task-plan hygiene, GRAPHICS-099, GRAPHICS-100/101, RUNTIME-127, GRAPHICS-102, UI-023, then GRAPHICS-103 operational proof."
+  - turn: 21
+    type: experiment
+    id: "N150"
+    routing: direct
+    provenance: ai-executed
+    summary: "Completed the task-only hygiene slice: retired RUNTIME-120, re-scoped/renamed RUNTIME-122, fixed RUNTIME-126/RUNTIME-123 wording, aligned GRAPHICS-099/100 maturity, made UI-023 depend on RUNTIME-127, updated stale RUNTIME-121/UI-022 runtime wording, regenerated the session brief, and passed task/doc validators."
+  - turn: 22
+    type: experiment
+    id: "N151"
+    routing: direct
+    provenance: ai-executed
+    summary: "Implemented and retired GRAPHICS-099 at CPUContracted with the CPU-only RenderingContract module, contract tests, docs, regenerated module inventory/session brief, full IntrinsicTests build, full default CPU CTest gate, and structural validators."
+  - turn: 23
+    type: experiment
+    id: "N152"
+    routing: direct
+    provenance: ai-executed
+    summary: "Implemented and retired the ordered post-GRAPHICS-099 chain: GRAPHICS-100, GRAPHICS-101, RUNTIME-127, GRAPHICS-102, UI-023, and GRAPHICS-103, including CPU contract tests, runtime/UI docs, module inventory/session brief refreshes, full CPU verification, and opt-in Vulkan smoke evidence for declared artifact production."
+  - turn: 24
+    type: experiment
+    id: "N153"
+    routing: direct
+    provenance: ai-executed
+    summary: "Reviewed the remaining RUNTIME tasks after retiring the renderer/snapshot/recipe chain; validators and session brief show RUNTIME-121 and RUNTIME-126 open/unblocked, RUNTIME-122/123/124/125 open but dependency-gated, with stale wording in RUNTIME-121 and top-level backlog README."
+  - turn: 25
+    type: experiment
+    id: "N154"
+    routing: direct
+    provenance: ai-executed
+    summary: "Applied the requested runtime task hygiene: retargeted RUNTIME-121 to the active deferred GpuScene path, moved RUNTIME-123 behind RUNTIME-122 for mesh/graph/point-cloud property binding, fixed stale Theme B backlog wording, regenerated the session brief, and passed task/doc validators."
+  - turn: 26
+    type: decision
+    id: "N155"
+    routing: direct
+    provenance: ai-executed
+    summary: "Prepared a reusable multi-task loop prompt for the remaining runtime task queue, starting with RUNTIME-121 while treating RUNTIME-126 as an independent unblocked branch and requiring re-read, verification, retirement, and session-brief regeneration per task."
+  - turn: 27
+    type: experiment
+    id: "N156"
+    routing: direct
+    provenance: ai-executed
+    summary: "Attempted RUNTIME-121 by adding a packed `v:color` upload stream, `GpuGeometryRecord::ColorBufferBDA`, CPU contracts, docs, and a Vulkan smoke. `ci` build and focused CPU tests passed, but the `ci-vulkan` vertex-color smoke failed with a white center pixel despite a non-zero color BDA."
+  - turn: 27
+    type: dead_end
+    id: "N157"
+    routing: direct
+    provenance: ai-executed
+    summary: "Diagnosed the failed RUNTIME-121 smoke as a shader target mismatch: the active default-recipe deferred GBuffer pipeline uses `forward/default_debug_surface.vert` plus `deferred/default_debug_gbuffer.frag`, while the attempted color fetch landed in unreferenced `deferred/gbuffer.*`."
+  - turn: 28
+    type: experiment
+    id: "N158"
+    routing: direct
+    provenance: ai-executed
+    summary: "Implemented and retired RUNTIME-121 through RUNTIME-124 one task at a time; RUNTIME-124 added per-channel dirty tags, runtime partial-upload planning, `GpuWorld::UpdateGeometryChannels`, CPU contracts, docs/task retirement, and a passing promoted Vulkan partial-color-upload smoke."
+  - turn: 28
+    type: decision
+    id: "N159"
+    routing: direct
+    provenance: ai-executed
+    summary: "Stopped before RUNTIME-125 shader/storage work because no checked-in benchmark manifest, result JSON, baseline, or report satisfies the task's SoA vertex-fetch bottleneck gate."
+
+ai_actions:
+  - turn: 1
+    action: "Recorded the user's open question about renderer input contract visibility and prepared a recommendation."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 2
+    action: "Recorded the user's follow-up question about whether snapshots should be the renderer dependency boundary."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 3
+    action: "Recorded the user's acceptance of scoped prepared snapshots as renderer dependency boundaries."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 4
+    action: "Recorded the user's acceptance of public metadata envelopes for scoped renderer snapshots with renderer-private payloads."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 5
+    action: "Recorded the user's acceptance of separate renderer descriptors and per-snapshot envelopes."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 6
+    action: "Recorded the user's acceptance of renderer-independent binding intents for scoped snapshot material/shader/channel bindings."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 7
+    action: "Fixed and retired BUG-046: batched TaskGraph main-thread ready successors, removed the timing-dependent regression sleep, ran focused repeat and CPU gate verification, and updated task records."
+    provenance: ai-executed
+    files_changed:
+      - "src/core/Core.Dag.TaskGraph.cpp"
+      - "tests/unit/core/Test.Core.TaskGraphLegacy.cpp"
+      - "tasks/done/BUG-046-flaky-coretaskgraph-mainthread-ready-queue-ordering.md"
+      - "tasks/backlog/bugs/index.md"
+      - "tasks/done/RETIREMENT-LOG.md"
+      - "tasks/SESSION-BRIEF.md"
+  - turn: 8
+    action: "Recorded the user's renderer/snapshot/render-graph/frame-recipe boundary clarification."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 9
+    action: "Recorded the user's frame-recipe mutability boundary: fixed renderer core plus loadable optional recipe parts."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 10
+    action: "Recorded the user's acceptance of renderer-declared extension-slot constraints for loadable recipe options."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 11
+    action: "Recorded the user's correction that visibility, culling, batching, and draw/dispatch grouping should be a shared configurable recipe usable by all renderers."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 12
+    action: "Recorded the user's acceptance of renderer-neutral visibility/grouping recipe outputs."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 13
+    action: "Recorded the user's acceptance of lighting/environment as a shared configurable recipe layer."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 14
+    action: "Recorded the user's acceptance of shared view/output recipes for interactive and headless rendering targets."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 15
+    action: "Recorded the user's acceptance of runtime-owned render artifacts and explicit publish/apply semantics for render outputs."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 16
+    action: "Recorded the user's acceptance of contract-first rendering architecture implementation."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 17
+    action: "Recorded the user's acceptance of the CPU-only rendering contract foundation as the first task slice."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 18
+    action: "Created active and backlog task files for the contract-first rendering architecture, updated backlog indices, regenerated the session brief, and ran task/doc validation."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/active/GRAPHICS-099-rendering-contract-foundation.md"
+      - "tasks/backlog/rendering/GRAPHICS-100-current-renderer-contract-adapter.md"
+      - "tasks/backlog/rendering/GRAPHICS-101-loadable-render-recipe-configs.md"
+      - "tasks/backlog/rendering/GRAPHICS-102-shared-visibility-lighting-recipe-execution.md"
+      - "tasks/backlog/rendering/GRAPHICS-103-vulkan-rendergraph-contract-integration.md"
+      - "tasks/backlog/runtime/RUNTIME-127-render-artifact-publication.md"
+      - "tasks/backlog/ui/UI-023-render-recipe-ui-editing.md"
+      - "tasks/backlog/README.md"
+      - "tasks/backlog/rendering/README.md"
+      - "tasks/backlog/runtime/README.md"
+      - "tasks/backlog/ui/README.md"
+      - "tasks/SESSION-BRIEF.md"
+  - turn: 19
+    action: "Reviewed active GRAPHICS, rendering, runtime, and UI task plans for contradictions and stale state; ran task policy, task validation, doc-link, and session-brief checks."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 20
+    action: "Recommended the next execution order and prompt style for driving the agentic workflow."
+    provenance: ai-executed
+    files_changed:
+      - "ara/staging/observations.yaml"
+      - "ara/trace/sessions/2026-06-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 21
+    action: "Completed the requested task-only hygiene cleanup and validated the task/doc state."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/done/RUNTIME-120-vertex-attribute-binding-resolver.md"
+      - "tasks/backlog/runtime/RUNTIME-121-vertex-color-channel-upload.md"
+      - "tasks/backlog/runtime/RUNTIME-122-gpu-soa-vertex-channel-storage-and-shader-fetch.md"
+      - "tasks/backlog/runtime/RUNTIME-126-gpu-readback-jobs-and-property-writeback.md"
+      - "tasks/active/GRAPHICS-099-rendering-contract-foundation.md"
+      - "tasks/backlog/ui/UI-023-render-recipe-ui-editing.md"
+      - "tasks/backlog/ui/UI-022-sandbox-editor-vertex-normal-recompute.md"
+      - "src/runtime/README.md"
+      - "tasks/backlog/README.md"
+      - "tasks/backlog/rendering/README.md"
+      - "tasks/backlog/runtime/README.md"
+      - "tasks/backlog/ui/README.md"
+      - "tasks/done/RETIREMENT-LOG.md"
+      - "tasks/SESSION-BRIEF.md"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 22
+    action: "Implemented and retired GRAPHICS-099 as a CPU-only rendering contract foundation."
+    provenance: ai-executed
+    files_changed:
+      - "src/graphics/renderer/Graphics.RenderingContract.cppm"
+      - "src/graphics/renderer/Graphics.RenderingContract.cpp"
+      - "src/graphics/renderer/CMakeLists.txt"
+      - "tests/contract/graphics/Test.RenderingContract.cpp"
+      - "tests/CMakeLists.txt"
+      - "src/graphics/renderer/README.md"
+      - "docs/api/generated/module_inventory.md"
+      - "tasks/done/GRAPHICS-099-rendering-contract-foundation.md"
+      - "tasks/backlog/rendering/README.md"
+      - "tasks/done/RETIREMENT-LOG.md"
+      - "tasks/SESSION-BRIEF.md"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 23
+    action: "Implemented and retired the remaining renderer/snapshot/recipe task chain from GRAPHICS-100 through GRAPHICS-103."
+    provenance: ai-executed
+    files_changed:
+      - "src/graphics/renderer/Graphics.CurrentRendererContractAdapter.cppm"
+      - "src/graphics/renderer/Graphics.CurrentRendererContractAdapter.cpp"
+      - "src/graphics/renderer/Graphics.RenderRecipeConfig.cppm"
+      - "src/graphics/renderer/Graphics.RenderRecipeConfig.cpp"
+      - "src/graphics/renderer/Graphics.SharedRenderRecipeExecution.cppm"
+      - "src/graphics/renderer/Graphics.SharedRenderRecipeExecution.cpp"
+      - "src/graphics/renderer/Graphics.Renderer.cppm"
+      - "src/graphics/renderer/Graphics.Renderer.cpp"
+      - "src/runtime/Runtime.RenderArtifactPublication.cppm"
+      - "src/runtime/Runtime.RenderArtifactPublication.cpp"
+      - "src/runtime/Editor/Runtime.SandboxEditorUi.cppm"
+      - "src/runtime/Editor/Runtime.SandboxEditorUi.cpp"
+      - "tests/contract/graphics/Test.CurrentRendererContractAdapter.cpp"
+      - "tests/contract/graphics/Test.RenderRecipeConfig.cpp"
+      - "tests/contract/graphics/Test.SharedRenderRecipeExecution.cpp"
+      - "tests/contract/runtime/Test.RenderArtifactPublication.cpp"
+      - "tests/contract/runtime/Test.SandboxEditorUi.cpp"
+      - "tests/integration/graphics/Test.DefaultRecipeSurfaceGpuSmoke.cpp"
+      - "src/graphics/renderer/README.md"
+      - "src/runtime/README.md"
+      - "docs/api/generated/module_inventory.md"
+      - "tasks/done/GRAPHICS-100-current-renderer-contract-adapter.md"
+      - "tasks/done/GRAPHICS-101-loadable-render-recipe-configs.md"
+      - "tasks/done/RUNTIME-127-render-artifact-publication.md"
+      - "tasks/done/GRAPHICS-102-shared-visibility-lighting-recipe-execution.md"
+      - "tasks/done/UI-023-render-recipe-ui-editing.md"
+      - "tasks/done/GRAPHICS-103-vulkan-rendergraph-contract-integration.md"
+      - "tasks/backlog/rendering/README.md"
+      - "tasks/backlog/runtime/README.md"
+      - "tasks/backlog/ui/README.md"
+      - "tasks/done/RETIREMENT-LOG.md"
+      - "tasks/SESSION-BRIEF.md"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 24
+    action: "Reviewed remaining runtime task validity after the renderer/snapshot/recipe chain retired."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 25
+    action: "Retargeted remaining runtime task wording and dependencies."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/backlog/runtime/RUNTIME-121-vertex-color-channel-upload.md"
+      - "tasks/backlog/runtime/RUNTIME-123-editor-bind-property-as-channel.md"
+      - "tasks/backlog/README.md"
+      - "tasks/SESSION-BRIEF.md"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 26
+    action: "Prepared the remaining runtime multi-task loop prompt."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 27
+    action: "Attempted RUNTIME-121 and diagnosed the failed Vulkan smoke."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Runtime.MeshGeometryPacker.cppm"
+      - "src/runtime/Runtime.MeshGeometryPacker.cpp"
+      - "src/graphics/renderer/Graphics.GpuWorld.cppm"
+      - "src/graphics/renderer/Graphics.GpuWorld.cpp"
+      - "src/graphics/rhi/RHI.Types.cppm"
+      - "assets/shaders/common/gpu_scene.glsl"
+      - "assets/shaders/deferred/gbuffer.vert"
+      - "assets/shaders/deferred/gbuffer.frag"
+      - "tests/contract/runtime/Test.MeshGeometryPacker.cpp"
+      - "tests/integration/graphics/Test.GpuWorldAndCulling.cpp"
+      - "tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp"
+      - "src/graphics/renderer/README.md"
+      - "src/runtime/README.md"
+      - "docs/api/generated/module_inventory.md"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 28
+    action: "Completed the runtime vertex-channel task loop through RUNTIME-124 and stopped at the RUNTIME-125 benchmark gate."
+    provenance: ai-executed
+    files_changed:
+      - "src/ecs/Components/ECS.Component.DirtyTags.cppm"
+      - "src/graphics/renderer/Graphics.GpuWorld.cppm"
+      - "src/graphics/renderer/Graphics.GpuWorld.cpp"
+      - "src/graphics/renderer/README.md"
+      - "src/runtime/Runtime.RenderExtraction.cppm"
+      - "src/runtime/Runtime.RenderExtraction.cpp"
+      - "src/runtime/Editor/Runtime.SandboxEditorUi.cpp"
+      - "src/runtime/README.md"
+      - "tests/unit/ecs/Test.ECS.GeometryDirtyDomains.cpp"
+      - "tests/contract/graphics/Test.GpuWorldLifetimeContract.cpp"
+      - "tests/contract/runtime/Test.MeshGeometryExtraction.cpp"
+      - "tests/contract/runtime/Test.GraphGeometryExtraction.cpp"
+      - "tests/contract/runtime/Test.PointCloudGeometryExtraction.cpp"
+      - "tests/contract/runtime/Test.SandboxEditorUi.cpp"
+      - "tests/integration/runtime/Test.RuntimeRenderExtraction.cpp"
+      - "tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp"
+      - "docs/api/generated/module_inventory.md"
+      - "tasks/SESSION-BRIEF.md"
+      - "tasks/backlog/README.md"
+      - "tasks/backlog/runtime/README.md"
+      - "tasks/done/RETIREMENT-LOG.md"
+      - "tasks/done/RUNTIME-124-per-channel-partial-uploads.md"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-24_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+
+claims_touched: []
+
+key_context:
+  - turn: 1
+    excerpt: "User asked whether renderer input contracts should be exposed or internal, because different renderers may need different levels of low-level engine access."
+  - turn: 2
+    excerpt: "User asked whether the snapshot should solve the renderer dependency problem and might be the right solution."
+  - turn: 3
+    excerpt: "User accepted that snapshot should mean any scoped immutable prepared renderer input, not necessarily a full-scene copy."
+  - turn: 4
+    excerpt: "User accepted that scoped renderer snapshots need a small public envelope even when their payloads remain renderer-specific."
+  - turn: 5
+    excerpt: "User accepted separating renderer-level capability/request descriptors from per-snapshot metadata envelopes."
+  - turn: 6
+    excerpt: "User accepted using renderer-independent binding intents so runtime can validate material/shader/channel bindings while renderers keep their private payload layouts."
+  - turn: 7
+    excerpt: "User asked to use the agentic workflow to fix the BUG task in backlog/bugs; the remaining active bug was BUG-046, the flaky CoreTaskGraph main-thread ready-queue ordering test."
+  - turn: 8
+    excerpt: "User clarified that runtime pairs renderer and snapshot, while each renderer uses a specific snapshot kind and the engine render graph to run its frame recipe and produce images."
+  - turn: 9
+    excerpt: "User decided that optional recipe parts should be loadable, while the rest of each renderer recipe is predefined and fixed; only data varies."
+  - turn: 10
+    excerpt: "User accepted that loadable optional recipe parts may only configure renderer-declared extension slots and must fail validation on unknown or unsafe changes."
+  - turn: 11
+    excerpt: "User corrected that visibility/culling/batching/grouping should be its own configurable recipe usable by all renderers."
+  - turn: 12
+    excerpt: "User accepted that the shared visibility/grouping recipe outputs renderer-neutral products and not final backend command buffers."
+  - turn: 13
+    excerpt: "User accepted lighting and environment as a shared configurable recipe layer interpreted by compatible renderers."
+  - turn: 14
+    excerpt: "User accepted shared view/output recipes for window, offscreen, file, preview, picking, metric/readback, multi-output, interactive, and headless rendering targets."
+  - turn: 15
+    excerpt: "User accepted that render outputs are runtime-owned artifacts first and only explicit publish/apply semantics mutate project data."
+  - turn: 16
+    excerpt: "User accepted that the first implementation milestone should be contract-first rather than renderer-behavior-first."
+  - turn: 17
+    excerpt: "User accepted that the first concrete task should be only the CPU-only public rendering contract foundation, with behavior rewiring split into follow-up tasks."
+  - turn: 18
+    excerpt: "User asked to stop the grilling loop and create task files; active `GRAPHICS-099` plus six backlog follow-ups now track the accepted contract-first rendering plan."
+  - turn: 19
+    excerpt: "User asked to use the agentic workflow to analyze active/rendering GRAPHICS tasks plus RUNTIME and UI, asking whether there were contradictions or stale tasks and what the planning verdict should be."
+  - turn: 20
+    excerpt: "User asked what order to do the work in and how to prompt Codex, including whether to use docs/agent/prompt/prompt.md or a different prompt."
+  - turn: 21
+    excerpt: "User asked for a task-only hygiene slice before implementation: retire/reclassify RUNTIME-120, split RUNTIME-122, fix RUNTIME-126 wording, align GRAPHICS maturity, decide UI-023/RUNTIME-127 dependency, update UI-022 runtime README wording, regenerate session brief, and run validators."
+  - turn: 22
+    excerpt: "User asked to use the IntrinsicEngine agentic workflow and implement GRAPHICS-099 only, keeping the slice CPU-only and contract-focused with tests/docs, refreshed inventories if module surfaces change, and listed verification."
+  - turn: 23
+    excerpt: "User asked to use the IntrinsicEngine agentic workflow and multi-task loop to implement the remaining renderer/snapshot/recipe chain one task at a time, starting with GRAPHICS-100 and stopping on verification failure."
+  - turn: 24
+    excerpt: "User asked whether the remaining RUNTIME tasks are still valid/open or now obsolete after the renderer/snapshot/recipe chain retired."
+  - turn: 25
+    excerpt: "User requested a task/docs hygiene edit: retarget RUNTIME-121 to the active deferred GpuScene path, make RUNTIME-123 all mesh/graph/point-cloud by correcting its dependency, and fix the stale top-level Theme B line."
+  - turn: 26
+    excerpt: "User asked to create a prompt to work on the remaining RUNTIME tasks using multi-task loop mode."
+  - turn: 27
+    excerpt: "User asked to use the IntrinsicEngine multi-task loop to implement remaining runtime Theme B tasks one at a time, starting with RUNTIME-121 and stopping on verification failure."
+  - turn: 28
+    excerpt: "After RUNTIME-124 retirement, the regenerated session brief listed RUNTIME-125 and RUNTIME-126 as unblocked, but RUNTIME-125's own task file forbids shader/storage work until a baseline benchmark proves uniform SoA vertex fetch is the bottleneck."
+
+open_threads:
+  - "RUNTIME-125 remains benchmark/profile-gated: no checked-in baseline proves uniform SoA vertex fetch is the representative static-geometry bottleneck, so AoS storage/shader work must not start."
+  - "RUNTIME-126 remains an independent unblocked branch for GPU readback jobs and result-to-property write-back."
+
+ai_suggestions_pending: []

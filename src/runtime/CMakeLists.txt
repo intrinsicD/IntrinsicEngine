@@ -18,11 +18,13 @@ target_sources(${target_name}
         Runtime.MeshAttributeTextureBake.cppm
         Runtime.ProgressivePresentationExtraction.cppm
         Runtime.ProgressiveRenderData.cppm
+        Runtime.RenderArtifactPublication.cppm
         Runtime.SelectedMeshTextureBake.cppm
         Runtime.EcsSystemBundle.cppm
         Runtime.EditorCommandHistory.cppm
         Runtime.Engine.cppm
         Runtime.GeometryAvailability.cppm
+        Runtime.GpuReadbackJob.cppm
         Runtime.PhysicsBridge.cppm
         Runtime.SceneSerialization.cppm
         Cameras/Runtime.CameraControllers.cppm
@@ -44,6 +46,7 @@ target_sources(${target_name}
         Runtime.StableEntityLookup.cppm
         Runtime.StreamingExecutor.cppm
         Runtime.VertexAttributeBinding.cppm
+        Runtime.VertexChannelBindings.cppm
         Runtime.VertexChannelStreams.cppm
         SpatialDebug/Runtime.SpatialDebugAdapters.cppm
         Visualization/Runtime.VisualizationAdapters.cppm
@@ -58,11 +61,13 @@ target_sources(${target_name}
         Runtime.MeshAttributeTextureBake.cpp
         Runtime.ProgressivePresentationExtraction.cpp
         Runtime.ProgressiveRenderData.cpp
+        Runtime.RenderArtifactPublication.cpp
         Runtime.SelectedMeshTextureBake.cpp
         Runtime.EcsSystemBundle.cpp
         Runtime.EditorCommandHistory.cpp
         Runtime.Engine.cpp
         Runtime.GeometryAvailability.cpp
+        Runtime.GpuReadbackJob.cpp
         Runtime.PhysicsBridge.cpp
         Runtime.SceneSerialization.cpp
         Cameras/Runtime.CameraControllers.cpp

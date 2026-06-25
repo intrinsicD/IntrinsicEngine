@@ -16,15 +16,6 @@ layout(push_constant, scalar) uniform ScenePC {
     uint _pad0;
 } pc;
 
-struct PackedVertex {
-    float px;
-    float py;
-    float pz;
-    float u;
-    float v;
-};
-layout(buffer_reference, scalar) readonly buffer PackedVertexRef { PackedVertex Data[]; };
-
 layout(location = 0) out vec4 vColor;
 layout(location = 1) flat out uint vPointMode;
 layout(location = 2) out vec3 vViewNormal;
@@ -68,13 +59,11 @@ void main() {
     const GpuGeometryRecord geo = geometryRecords.Data[inst.GeometrySlot];
     const GpuEntityConfig cfg = entityConfigs.Data[inst.ConfigSlot];
 
-    PackedVertexRef vertices = PackedVertexRef(geo.VertexBufferBDA);
     const uint firstPointQuadVertex = geo.PointFirstVertex * 6u;
     const uint vertexIndex = uint(gl_VertexIndex) - firstPointQuadVertex;
     const uint sourceVertexIndex = vertexIndex / 6u;
     const uint vertexInQuad = vertexIndex % 6u;
-    const uint globalVertexIndex = geo.PointFirstVertex + sourceVertexIndex;
-    const PackedVertex pv = vertices.Data[globalVertexIndex];
+    const vec3 pointPosition = GpuReadPackedVec3(geo.VertexBufferBDA, sourceVertexIndex);
 
     const uint cornerIndex = uint[6](0u, 1u, 2u, 0u, 2u, 3u)[vertexInQuad];
     const vec2 localOffset = vec2[4](
@@ -83,7 +72,7 @@ void main() {
         vec2( 1.0,  1.0),
         vec2(-1.0,  1.0))[cornerIndex];
 
-    const vec4 localPos = vec4(pv.px, pv.py, pv.pz, 1.0);
+    const vec4 localPos = vec4(pointPosition, 1.0);
     const vec4 worldPos = dyn.Model * localPos;
     const vec4 viewCenter4 = scene.CameraView * worldPos;
     const vec4 centerClip = scene.CameraViewProj * dyn.Model * localPos;

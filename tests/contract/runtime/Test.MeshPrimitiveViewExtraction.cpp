@@ -715,8 +715,11 @@ TEST(MeshPrimitiveViewExtraction, VertexPositionDirtyRepacksBothViews)
     D::MarkVertexPositionsDirty(raw, entity);
 
     stats = extraction.ExtractAndSubmit(scene, engine.GetRenderer(), &engine.GetGpuAssetCache());
-    // Surface + both views repack on the shared dirty signal.
+    // The surface updates its resident SoA position channel in place, while
+    // the derived edge/vertex view geometry still repacks on position edits.
     EXPECT_EQ(stats.MeshGeometryReuploads, 1u);
+    EXPECT_EQ(stats.MeshGeometryPartialUploads, 1u);
+    EXPECT_EQ(stats.MeshGeometryReleases, 0u);
     EXPECT_EQ(stats.MeshEdgeViewReuploads, 1u);
     EXPECT_EQ(stats.MeshVertexViewReuploads, 1u);
     EXPECT_EQ(stats.MeshEdgeViewReleases, 1u);
@@ -730,8 +733,8 @@ TEST(MeshPrimitiveViewExtraction, VertexPositionDirtyRepacksBothViews)
     EXPECT_NE(secondView->MeshVertexViewGeometry, firstVertex);
 
     auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
-    // Old surface/edge/vertex (queued) + new surface/edge/vertex (live) = 6.
-    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 6u);
+    // Resident surface + old edge/vertex (queued) + new edge/vertex (live).
+    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 5u);
 
     // The dirty tags drained, so a clean frame returns the views to reuse.
     stats = extraction.ExtractAndSubmit(scene, engine.GetRenderer(), &engine.GetGpuAssetCache());
@@ -746,7 +749,7 @@ TEST(MeshPrimitiveViewExtraction, VertexPositionDirtyRepacksBothViews)
 
     stats = extraction.ExtractAndSubmit(scene, engine.GetRenderer(), &engine.GetGpuAssetCache());
     EXPECT_EQ(stats.MeshPrimitiveViewFreeRetires, 2u);
-    EXPECT_EQ(stats.MeshGeometryFreeRetires, 1u);
+    EXPECT_EQ(stats.MeshGeometryFreeRetires, 0u);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();

@@ -14,12 +14,6 @@ geometry kind has its own packer with inlined property names and a fixed AoS
 vertex struct, no vertex color channel, and no way to bind an arbitrary property
 as normals/colors. This series fixes that incrementally.
 
-- `RUNTIME-120` — Reusable vertex attribute binding resolver (lead; carries the
-  full slice plan and owns Slice 1).
-- `RUNTIME-121` — Per-vertex color channel through the geometry vertex stream.
-- `RUNTIME-122` — Declarative vertex layout descriptor + packer unification.
-- `RUNTIME-123` — Editor "bind any property as normals / colors".
-- `RUNTIME-124` — Per-channel dirty tracking and partial GPU uploads.
 - `RUNTIME-125` — Optional AoS fast lane for static geometry (profile-gated).
 
 Storage model is fixed by
@@ -28,26 +22,33 @@ uniform SoA with per-channel streaming.
 
 ### CPU↔GPU transfer foundation — readback leg (Theme B)
 
-The forward (CPU→GPU) transfer/binding/scheduling spine already exists: the
-RUNTIME-120..124 vertex-attribute series, RUNTIME-112's `DerivedJobRegistry`
-(`StreamingExecutor`-backed, explicit dependencies + follow-up scheduling, done),
-and GRAPHICS-084 (visualization property buffers + dimension-match, done). The
-async GPU→CPU readback transport is added by the rendering tasks
-GRAPHICS-095/096/097/098 (see the rendering DAG). The runtime-side gap is the
-readback *leg*:
-
-- `RUNTIME-126` — GPU readback jobs and result→property write-back in the
-  derived-job graph. Adds a readback job kind (driving GRAPHICS-096
-  `DownloadBuffer`) and a readback→property write-back binding (dimension-checked
-  via GRAPHICS-095), so algorithms chain follow-ups on GPU-computed results
-  ("compute → read back → derive color/vector-field → re-upload → visible") using
-  the existing `SubmitFollowUp`/`DependsOn` edges. Depends on GRAPHICS-096/098;
-  composes RUNTIME-112. Recorded in
-  [`ADR-0023`](../../../docs/adr/0023-cpu-gpu-transfer-foundation.md).
+The forward (CPU→GPU) transfer/binding/scheduling spine and runtime readback leg
+are retired: RUNTIME-120's vertex-attribute resolver, RUNTIME-121's structural
+mesh vertex-color upload path, RUNTIME-112's `DerivedJobRegistry`,
+GRAPHICS-084's visualization property buffers, RUNTIME-124's per-channel
+partial uploads, GRAPHICS-095/096/097/098's GPU transfer foundation, and
+RUNTIME-126's readback job/write-back path now compose the current promoted
+foundation. RUNTIME-126 adds a readback job kind (driving GRAPHICS-096
+`DownloadBuffer`) and a readback-to-property write-back binding
+(dimension-checked via GRAPHICS-095), so algorithms can chain follow-ups on
+GPU-computed results ("compute -> read back -> derive color/vector-field ->
+re-upload -> visible") using the existing `SubmitFollowUp`/`DependsOn` edges.
+This foundation is recorded in
+[`ADR-0023`](../../../docs/adr/0023-cpu-gpu-transfer-foundation.md).
 
 `RUNTIME-111` through `RUNTIME-115` are retired; additional progressive
 render-data follow-ups should open as value-gated tasks with a concrete
 consumer.
+
+### Render output artifact publication (Theme B)
+
+Renderer outputs become runtime-owned artifacts before any project data changes.
+This keeps output lifetime, diagnostics, provenance, and publish/apply behavior
+observable to UI, agents, tests, and reproducibility tooling.
+
+`RUNTIME-127` is retired; runtime now has a render artifact registry, lifecycle
+states, UI-facing status vocabulary, and explicit provenance-carrying
+publish/apply commands for candidate renderer outputs.
 
 ### Runtime adapter umbrellas (clarified by Q tasks; producer modules)
 
@@ -69,10 +70,9 @@ Some rendering backlog tasks are runtime-owned for extraction/wiring even
 though they may be filed under another task queue. Runtime reviewers must treat
 these as runtime work when scheduling and review:
 
-- No open runtime-owned rendering tasks are currently queued here. `GRAPHICS-084`
-  retired the runtime-adapter/property-selection side of visualization
-  property-buffer residency; `GRAPHICS-084C` retired the opt-in Vulkan smoke
-  evidence.
+- `RUNTIME-127` is retired. `GRAPHICS-084` retired the runtime-adapter/property-
+  selection side of visualization property-buffer residency; `GRAPHICS-084C`
+  retired the opt-in Vulkan smoke evidence.
 
 ## Related docs
 
@@ -85,10 +85,51 @@ these as runtime work when scheduling and review:
 Retired entries moved here verbatim by the PROC-008 state/history
 split; narratives live in the retirement log.
 
+- [RUNTIME-127 — Render artifact publication and apply semantics](../../done/RUNTIME-127-render-artifact-publication.md)
+  (done, 2026-06-24, `CPUContracted`): runtime now has a render artifact
+  registry, lifecycle states, UI-facing status vocabulary, and explicit
+  provenance-carrying publish/apply commands for candidate renderer outputs.
 - [RUNTIME-109 — Extensible mesh attribute texture bake pipeline](../../done/RUNTIME-109-extensible-mesh-attribute-texture-bakes.md)
   (done, 2026-06-15, `CPUContracted`): generic runtime CPU mesh-attribute
   texture bakes now cover resolved-UV vertex/face scalar, label, vector2,
   vector3/normal, and RGBA outputs with stable generated texture keys.
+- [RUNTIME-120 — Reusable vertex attribute binding resolver](../../done/RUNTIME-120-vertex-attribute-binding-resolver.md)
+  (done, 2026-06-24, `CPUContracted`): runtime now has a CPU-only
+  property-to-vertex-channel resolver with fail-closed diagnostics, and the mesh
+  packer routes normal and texcoord reads through it without behavior change.
+- [RUNTIME-121 — Per-vertex color channel through the geometry vertex stream](../../done/RUNTIME-121-vertex-color-channel-upload.md)
+  (done, 2026-06-24, `Operational`): mesh `GeometrySources` now resolve
+  count-matched `v:color` into packed unorm8 upload data, publish it through
+  `GpuGeometryRecord::ColorBufferBDA`, consume it in the active default-recipe
+  GpuScene surface/GBuffer shader path, and prove the path with CPU contracts,
+  dirty-reupload coverage, and an opt-in `gpu;vulkan` smoke.
+- [RUNTIME-122 — GPU SoA vertex channel storage and shader fetch](../../done/RUNTIME-122-gpu-soa-vertex-channel-storage-and-shader-fetch.md)
+  (done, 2026-06-24, `Operational`): runtime mesh, graph, point-cloud, and mesh
+  primitive-view packers now emit explicit channel streams; graphics stores
+  position, texcoord, normal, and color data as managed SoA channel ranges,
+  publishes per-channel BDAs through `GpuGeometryRecord`, and the active
+  GpuScene surface, depth, selection, line, and point shaders fetch through the
+  channel BDAs. Focused CPU coverage, the default CPU gate, structural
+  validators, and opt-in `gpu;vulkan` surface plus line/point smokes passed.
+- [RUNTIME-123 — Editor "bind any property as normals / colors"](../../done/RUNTIME-123-editor-bind-property-as-channel.md)
+  (done, 2026-06-24, `CPUContracted`): runtime now has a
+  `VertexChannelBindingSet` ECS descriptor consumed by mesh, graph, and
+  point-cloud packers; the Sandbox Editor property catalog exposes normal/color
+  binding targets, validates candidate properties through the
+  `VertexAttributeBinding` resolver, persists per-entity bindings, and stamps
+  `DirtyVertexAttributes` without direct renderer/RHI upload calls.
+- [RUNTIME-124 — Per-channel dirty tracking and partial GPU uploads](../../done/RUNTIME-124-per-channel-partial-uploads.md)
+  (done, 2026-06-24, `Operational`): ECS exposes fine-grained vertex-channel
+  dirty tags for positions, texcoords, normals, and colors; runtime extraction
+  maps resident mesh, graph, and point-cloud edits to `GpuWorld` channel update
+  masks; graphics writes only changed SoA channel ranges and preserves full
+  uploads for topology, vertex-count, and storage-layout changes.
+- [RUNTIME-126 — GPU readback jobs and result→property write-back in the derived-job graph](../../done/RUNTIME-126-gpu-readback-jobs-and-property-writeback.md)
+  (done, 2026-06-25, `Operational`): runtime readback jobs now park in
+  `WaitingForReadback`, resume through `DerivedJobRegistry::DrainReadbacks()`
+  after transfer delivery, write dimension-checked bytes into typed geometry
+  properties, expose readback diagnostics, and keep follow-up jobs pending until
+  write-back apply completes.
 - [RUNTIME-119 — GPU renderable availability snapshot](../../done/RUNTIME-119-gpu-renderable-availability-snapshot.md)
   (done, 2026-06-19, `CPUContracted`): `RenderExtractionCache` now exposes a
   read-only GPU availability view keyed by stable entity id, with independent

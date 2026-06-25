@@ -9,10 +9,11 @@
 // Pairs with `forward/default_debug_surface.vert` so the deferred GBuffer
 // pipeline reuses the same GpuScene-aware vertex stage as the forward
 // default-debug-surface pipeline. The vertex shader forwards
-// `fragMaterialSlot` at location 0; this fragment reads the material slot
-// from `GpuScenePushConstants::SceneTableBDA -> scene.MaterialBDA` and
-// writes three GBuffer color attachments matching the recipe's deferred
-// resource declarations:
+// `fragMaterialSlot` at location 0 and an optional packed vertex color at
+// locations 6/7; this fragment reads the material slot from
+// `GpuScenePushConstants::SceneTableBDA -> scene.MaterialBDA` and writes three
+// GBuffer color attachments matching the recipe's deferred resource
+// declarations:
 //   - location 0 -> SceneNormal (RGBA16F): packed vertex normal.
 //   - location 1 -> Albedo (RGBA8): material BaseColorFactor multiplied by a
 //     bound albedo texture when present.
@@ -41,6 +42,8 @@ layout(push_constant, scalar) uniform ScenePC {
 layout(location = 0) flat in uint fragMaterialSlot;
 layout(location = 1) in vec2 fragUv;
 layout(location = 2) in vec3 fragWorldNormal;
+layout(location = 6) in vec4 fragVertexColor;
+layout(location = 7) flat in uint fragHasVertexColor;
 
 layout(location = 0) out vec4 SceneNormal;
 layout(location = 1) out vec4 Albedo;
@@ -63,6 +66,9 @@ void main() {
     vec4 baseColor = mat.BaseColorFactor;
     if (IsValidTextureID(mat.AlbedoID)) {
         baseColor *= texture(globalTextures[nonuniformEXT(mat.AlbedoID)], fragUv);
+    }
+    if (fragHasVertexColor != 0u) {
+        baseColor = fragVertexColor;
     }
 
     SceneNormal = vec4(n, 0.0);

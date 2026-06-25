@@ -12,6 +12,8 @@
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Runtime.GraphGeometryPacker;
+import Extrinsic.Runtime.VertexAttributeBinding;
+import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.Properties;
 
 using Extrinsic::ECS::Components::GeometrySources::ConstSourceView;
@@ -61,6 +63,22 @@ namespace
         p1.Vector() = v1;
     }
 
+    void SetNodeVec3Property(Nodes& n,
+                             const std::string& name,
+                             const std::vector<glm::vec3>& values)
+    {
+        auto prop = n.Properties.GetOrAdd<glm::vec3>(name, glm::vec3(0.0f));
+        prop.Vector() = values;
+    }
+
+    void SetNodeVec4Property(Nodes& n,
+                             const std::string& name,
+                             const std::vector<glm::vec4>& values)
+    {
+        auto prop = n.Properties.GetOrAdd<glm::vec4>(name, glm::vec4(1.0f));
+        prop.Vector() = values;
+    }
+
     // Two nodes joined by one edge.
     GraphScratch BuildTwoNodeOneEdge()
     {
@@ -91,6 +109,9 @@ TEST(GraphGeometryPacker, PointAndLineLanesPackNodesAndEdges)
     ASSERT_TRUE(result.Upload.has_value());
     EXPECT_EQ(result.Upload->VertexCount, 2u);
     EXPECT_TRUE(result.Upload->SurfaceIndices.empty());
+    EXPECT_EQ(result.Upload->PositionBytes.size_bytes(), sizeof(glm::vec3) * 2u);
+    EXPECT_EQ(result.Upload->TexcoordBytes.size_bytes(), sizeof(glm::vec2) * 2u);
+    EXPECT_TRUE(result.Upload->NormalBytes.empty());
     ASSERT_EQ(result.Upload->LineIndices.size(), 2u);
     EXPECT_EQ(result.Upload->LineIndices[0], 0u);
     EXPECT_EQ(result.Upload->LineIndices[1], 1u);
@@ -101,6 +122,11 @@ TEST(GraphGeometryPacker, PointAndLineLanesPackNodesAndEdges)
     EXPECT_FLOAT_EQ(v1.Px, 1.0f);
     EXPECT_FLOAT_EQ(v0.U, 0.0f);
     EXPECT_FLOAT_EQ(v0.V, 0.0f);
+
+    ASSERT_EQ(result.Upload->PositionBytes.size_bytes(), sizeof(glm::vec3) * 2u);
+    const auto* positions = reinterpret_cast<const glm::vec3*>(result.Upload->PositionBytes.data());
+    EXPECT_FLOAT_EQ(positions[0].x, 0.0f);
+    EXPECT_FLOAT_EQ(positions[1].x, 1.0f);
 }
 
 TEST(GraphGeometryPacker, PointOnlyLaneProducesNoLineIndices)
@@ -233,6 +259,45 @@ TEST(GraphGeometryPacker, NonFiniteNodePositionFailsClosed)
     GraphPackBuffer buffer{};
     const GraphPackResult result = PackGraph(g.View(), true, true, buffer);
     EXPECT_EQ(result.Status, GraphPackStatus::NonFinitePosition);
+}
+
+TEST(GraphGeometryPacker, ChannelBindingsPublishNormalAndColorStreams)
+{
+    GraphScratch g = BuildTwoNodeOneEdge();
+    SetNodeVec3Property(g.NodeSource, "v:custom_normal", {
+        {1.0f, 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f},
+    });
+    SetNodeVec4Property(g.NodeSource, "v:paint", {
+        {1.0f, 0.0f, 0.0f, 1.0f},
+        {0.0f, 1.0f, 0.0f, 1.0f},
+    });
+    Extrinsic::Runtime::VertexChannelBindingSet bindings{};
+    bindings.Normal = Extrinsic::Runtime::VertexChannelSourceBinding{
+        .Enabled = true,
+        .SourceType = Extrinsic::Runtime::AttributeSourceType::Vec3,
+        .SourceProperty = "v:custom_normal",
+    };
+    bindings.Color = Extrinsic::Runtime::VertexChannelSourceBinding{
+        .Enabled = true,
+        .SourceType = Extrinsic::Runtime::AttributeSourceType::Vec4,
+        .SourceProperty = "v:paint",
+    };
+
+    GraphPackBuffer buffer{};
+    const GraphPackResult result =
+        PackGraph(g.View(), /*wantLines=*/true, /*wantPoints=*/true, &bindings, buffer);
+
+    ASSERT_EQ(result.Status, GraphPackStatus::Success);
+    ASSERT_TRUE(result.Upload.has_value());
+    ASSERT_EQ(result.Upload->NormalBytes.size_bytes(), sizeof(glm::vec3) * 2u);
+    const auto* normals =
+        reinterpret_cast<const glm::vec3*>(result.Upload->NormalBytes.data());
+    EXPECT_FLOAT_EQ(normals[0].x, 1.0f);
+    EXPECT_FLOAT_EQ(normals[1].y, 1.0f);
+    ASSERT_EQ(result.Upload->PackedVertexColors.size(), 2u);
+    EXPECT_EQ(result.Upload->PackedVertexColors[0], 0xFF0000FFu);
+    EXPECT_EQ(result.Upload->PackedVertexColors[1], 0xFF00FF00u);
 }
 
 TEST(GraphGeometryPacker, LocalSphereCoversNodeBounds)

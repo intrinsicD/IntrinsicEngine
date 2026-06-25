@@ -9,6 +9,8 @@ export module Extrinsic.Runtime.MeshGeometryPacker;
 
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.Runtime.VertexChannelBindings;
+import Extrinsic.Runtime.VertexChannelStreams;
 
 export namespace Extrinsic::Runtime
 {
@@ -39,6 +41,8 @@ export namespace Extrinsic::Runtime
     struct MeshPackBuffer
     {
         std::vector<std::byte> VertexBytes;
+        VertexChannelStreams Channels;
+        std::vector<std::uint32_t> PackedColors;
         std::vector<std::uint32_t> SurfaceIndices;
 
         void Clear() noexcept;
@@ -91,6 +95,10 @@ export namespace Extrinsic::Runtime
     // indices index directly into the source `Vertices` PropertySet, with
     // `MeshVertex::U/V` populated only from `v:texcoord` and `MeshVertex::N*`
     // populated from `v:normal` when present or the +Z default otherwise.
+    // Count-matched `v:color` vec4/vec3 properties are resolved through
+    // `ResolveColorChannelPackedUnorm8` into the optional packed color stream;
+    // missing, type-mismatched, or count-mismatched colors leave the stream
+    // empty so material shading remains the fallback.
     // `LocalSphere` is
     // filled from the local AABB center and half-diagonal so downstream
     // culling/transform sync has a deterministic non-empty local bound even
@@ -99,13 +107,18 @@ export namespace Extrinsic::Runtime
     // them with the per-frame world transform via `ExtractBounds` (see
     // `Runtime.RenderExtraction`).
     //
-    // `outBuffer` is cleared on entry. The returned `Upload.PackedVertexBytes`
-    // and `Upload.SurfaceIndices` view into `outBuffer`; callers must hand the
-    // descriptor to `GpuWorld::UploadGeometry` (or copy out) before reusing
-    // `outBuffer` for another pack call. Returning a failure status leaves
-    // `outBuffer` cleared and `Upload` empty.
+    // `outBuffer` is cleared on entry. The returned `Upload.PackedVertexBytes`,
+    // `Upload.PositionBytes`, `Upload.TexcoordBytes`, `Upload.NormalBytes`,
+    // `Upload.PackedVertexColors`, and `Upload.SurfaceIndices` view into
+    // `outBuffer`; callers must hand the descriptor to `GpuWorld::UploadGeometry`
+    // (or copy out) before reusing `outBuffer` for another pack call. Returning
+    // a failure status leaves `outBuffer` cleared and `Upload` empty.
     [[nodiscard]] MeshPackResult PackMesh(
         const ECS::Components::GeometrySources::ConstSourceView& view,
+        MeshPackBuffer& outBuffer);
+    [[nodiscard]] MeshPackResult PackMesh(
+        const ECS::Components::GeometrySources::ConstSourceView& view,
+        const VertexChannelBindingSet* channelBindings,
         MeshPackBuffer& outBuffer);
 
     // Build the inverse of the GPU surface picking payload: for every surface

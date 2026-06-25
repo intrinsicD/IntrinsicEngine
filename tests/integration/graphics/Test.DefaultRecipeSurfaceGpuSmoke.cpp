@@ -30,6 +30,7 @@ import Extrinsic.RHI.Handles;
 import Extrinsic.RHI.QueueAffinity;
 import Extrinsic.RHI.TextureUpload;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.RenderArtifactPublication;
 
 namespace
 {
@@ -299,6 +300,20 @@ struct DefaultRecipeRunCapture
         [passName](const auto& pass) { return pass.Name == passName; });
 }
 
+[[nodiscard]] const Extrinsic::Graphics::RenderArtifactMetadata* FindDeclaredArtifact(
+    const Extrinsic::Graphics::RenderGraphFrameStats& stats,
+    const std::string_view purpose) noexcept
+{
+    const auto found = std::find_if(
+        stats.Contract.DeclaredArtifacts.begin(),
+        stats.Contract.DeclaredArtifacts.end(),
+        [purpose](const Extrinsic::Graphics::RenderArtifactMetadata& artifact)
+        {
+            return artifact.Purpose == purpose;
+        });
+    return found != stats.Contract.DeclaredArtifacts.end() ? &*found : nullptr;
+}
+
 [[nodiscard]] std::string BuildPassStatusSummary(
     const Extrinsic::Graphics::RenderGraphFrameStats& stats)
 {
@@ -534,6 +549,116 @@ TEST(DefaultRecipeSurfaceGpuSmoke, ReferenceTriangleDebugViewReadbackMatchesMini
         << ", initFailure " << run.Before.InitFailure << " -> " << run.After.InitFailure
         << ", validationError " << run.Before.ValidationError << " -> " << run.After.ValidationError
         << ", gateFailure " << run.Before.OperationalGateFailure << " -> " << run.After.OperationalGateFailure;
+
+    ExpectMinimalHarnessReadbackSamples(device,
+                                        readbackBuffer,
+                                        readbackSize,
+                                        bytesPerPixel,
+                                        backbufferFormat,
+                                        stats);
+
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+    device.DestroyBuffer(readbackBuffer);
+
+    engine.Shutdown();
+}
+
+TEST(DefaultRecipeSurfaceGpuSmoke, VulkanRenderContractPublishesDeclaredArtifactMetadata)
+{
+    auto bootstrap = BootstrapEngineForDefaultRecipe(
+        4u, "Intrinsic Vulkan render-contract artifact smoke");
+    if (bootstrap.Skipped)
+    {
+        GTEST_SKIP() << bootstrap.SkipReason;
+    }
+    Engine& engine = *bootstrap.EnginePtr;
+
+    const auto warmup = DriveDefaultRecipeAndCapture(engine);
+    if (!warmup.DeviceOperational)
+    {
+        engine.Shutdown();
+        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip during render-contract warmup: status="
+                      << ToString(warmup.Status.Code) << " reason=" << ToString(warmup.Status.Reason)
+                      << ". Host capability checks passed, so this is a GRAPHICS-103 regression, not a skip condition.";
+        return;
+    }
+
+    auto& renderer = engine.GetRenderer();
+    auto& device   = engine.GetDevice();
+    const Extrinsic::RHI::Format backbufferFormat = device.GetBackbufferFormat();
+    const std::uint32_t bytesPerPixel = Extrinsic::RHI::BytesPerBlock(backbufferFormat);
+    if (bytesPerPixel == 0u)
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Backbuffer format has no host-uploadable layout on this host; render-contract smoke skipped.";
+    }
+
+    const std::uint64_t readbackSize =
+        static_cast<std::uint64_t>(bytesPerPixel) *
+        static_cast<std::uint64_t>(Readback::kFramebufferWidth) *
+        static_cast<std::uint64_t>(Readback::kFramebufferHeight);
+    Extrinsic::RHI::BufferHandle readbackBuffer = device.CreateBuffer(Extrinsic::RHI::BufferDesc{
+        .SizeBytes = readbackSize,
+        .Usage = Extrinsic::RHI::BufferUsage::TransferDst,
+        .HostVisible = true,
+        .DebugName = "DefaultRecipe.RenderContractReadback",
+    });
+    if (!readbackBuffer.IsValid())
+    {
+        engine.Shutdown();
+        GTEST_SKIP() << "Readback buffer allocation failed; gpu;vulkan smoke is opt-in.";
+    }
+    renderer.SetDefaultRecipeBackbufferReadbackBuffer(readbackBuffer);
+
+    const auto run = DriveDefaultRecipeDebugViewFrameAndCapture(engine, true);
+
+    if (!run.DeviceOperational)
+    {
+        renderer.SetDefaultRecipeBackbufferReadbackBuffer(Extrinsic::RHI::BufferHandle{});
+        device.DestroyBuffer(readbackBuffer);
+        engine.Shutdown();
+        ADD_FAILURE() << "Promoted Vulkan operational gate did not flip after running the render-contract smoke: status="
+                      << ToString(run.Status.Code) << " reason=" << ToString(run.Status.Reason)
+                      << ". Host capability checks passed, so this is a GRAPHICS-103 regression, not a skip condition.";
+        return;
+    }
+
+    const auto& stats = run.Stats;
+    EXPECT_TRUE(stats.Compile.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.Succeeded) << stats.Diagnostic;
+    EXPECT_TRUE(stats.Execute.DeviceOperational);
+    EXPECT_TRUE(stats.Contract.Evaluated);
+    EXPECT_TRUE(stats.Contract.ContractCompatible);
+    EXPECT_TRUE(stats.Contract.SharedProductsCompatible);
+    EXPECT_TRUE(stats.Contract.ArtifactMetadataValid);
+    EXPECT_EQ(stats.Contract.UnsupportedProductDiagnosticCount, 0u);
+    EXPECT_EQ(stats.Contract.MissingOutputDiagnosticCount, 0u);
+    EXPECT_EQ(stats.Contract.ArtifactPublicationFailureDiagnosticCount, 0u);
+    EXPECT_GE(stats.DefaultRecipeBackbufferReadbackCopyCount, 1u);
+
+    const Extrinsic::Graphics::RenderArtifactMetadata* colorArtifact =
+        FindDeclaredArtifact(stats, "color");
+    ASSERT_NE(colorArtifact, nullptr);
+    EXPECT_EQ(colorArtifact->Status, Extrinsic::Graphics::RenderArtifactStatus::Available);
+    EXPECT_FALSE(colorArtifact->SourceRevisions.empty());
+
+    const Extrinsic::Graphics::RenderArtifactMetadata* readbackArtifact =
+        FindDeclaredArtifact(stats, "readback");
+    ASSERT_NE(readbackArtifact, nullptr);
+    EXPECT_EQ(readbackArtifact->Status, Extrinsic::Graphics::RenderArtifactStatus::Available);
+
+    Extrinsic::Runtime::RenderArtifactRegistry registry;
+    const Extrinsic::Runtime::RenderArtifactOperationResult registered =
+        registry.RegisterArtifact(Extrinsic::Runtime::RenderArtifactDeclaration{
+            .Metadata = *colorArtifact,
+            .Kind = Extrinsic::Runtime::RenderArtifactPublicationKind::PreviewOnly,
+            .PayloadUri = "memory://vulkan/default-recipe/color",
+            .ProducerLabel = "DefaultRecipeSurfaceGpuSmoke",
+        });
+    ASSERT_TRUE(registered.Succeeded());
+    EXPECT_EQ(registered.Status,
+              Extrinsic::Runtime::RenderArtifactOperationStatus::Registered);
+    EXPECT_EQ(registry.Size(), 1u);
 
     ExpectMinimalHarnessReadbackSamples(device,
                                         readbackBuffer,

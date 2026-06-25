@@ -17,6 +17,8 @@ module Extrinsic.Runtime.MeshGeometryPacker;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Runtime.VertexAttributeBinding;
+import Extrinsic.Runtime.VertexChannelBindings;
+import Extrinsic.Runtime.VertexChannelStreams;
 import Geometry.Properties;
 
 namespace Extrinsic::Runtime
@@ -150,11 +152,21 @@ namespace Extrinsic::Runtime
     void MeshPackBuffer::Clear() noexcept
     {
         VertexBytes.clear();
+        Channels = {};
+        PackedColors.clear();
         SurfaceIndices.clear();
     }
 
     MeshPackResult PackMesh(
         const ECS::Components::GeometrySources::ConstSourceView& view,
+        MeshPackBuffer& outBuffer)
+    {
+        return PackMesh(view, nullptr, outBuffer);
+    }
+
+    MeshPackResult PackMesh(
+        const ECS::Components::GeometrySources::ConstSourceView& view,
+        const VertexChannelBindingSet* channelBindings,
         MeshPackBuffer& outBuffer)
     {
         outBuffer.Clear();
@@ -245,10 +257,16 @@ namespace Extrinsic::Runtime
         std::vector<glm::vec3> normals(vertexCount);
         std::vector<glm::vec2> texcoords(vertexCount);
 
+        const VertexChannelSourceBinding* normalOverride =
+            (channelBindings != nullptr && IsVertexChannelBindingEnabled(channelBindings->Normal))
+                ? &channelBindings->Normal
+                : nullptr;
         const VertexAttributeBinding normalBinding{
             .Channel = VertexChannel::Normal,
-            .SourceType = AttributeSourceType::Vec3,
-            .SourceProperty = PropertyNames::kNormal,
+            .SourceType = normalOverride != nullptr ? normalOverride->SourceType : AttributeSourceType::Vec3,
+            .SourceProperty = normalOverride != nullptr
+                ? std::string_view{normalOverride->SourceProperty}
+                : std::string_view{PropertyNames::kNormal},
             .AllowFallback = true,
             .Normalize = true,
             .Fallback = glm::vec4{0.0f, 0.0f, 1.0f, 0.0f},
@@ -265,6 +283,68 @@ namespace Extrinsic::Runtime
             view.VertexSource->Properties, normalBinding, vertexCountU32, normals);
         (void)ResolveVec2Channel(
             view.VertexSource->Properties, texcoordBinding, vertexCountU32, texcoords);
+
+        const auto resolveColors = [&]() {
+            if (channelBindings != nullptr && IsVertexChannelBindingEnabled(channelBindings->Color))
+            {
+                outBuffer.PackedColors.resize(vertexCount);
+                const VertexAttributeBinding colorBinding{
+                    .Channel = VertexChannel::Color,
+                    .SourceType = channelBindings->Color.SourceType,
+                    .SourceProperty = std::string_view{channelBindings->Color.SourceProperty},
+                    .AllowFallback = false,
+                    .Normalize = false,
+                    .Fallback = glm::vec4{1.0f, 1.0f, 1.0f, 1.0f},
+                };
+                const AttributeBindResult colorResult =
+                    ResolveColorChannelPackedUnorm8(
+                        view.VertexSource->Properties,
+                        colorBinding,
+                        vertexCountU32,
+                        outBuffer.PackedColors);
+                if (!colorResult.Ok())
+                {
+                    outBuffer.PackedColors.clear();
+                }
+                return;
+            }
+
+            const std::string_view colorName{"v:color"};
+            AttributeSourceType colorSourceType = AttributeSourceType::Vec4;
+            if (view.VertexSource->Properties.Get<glm::vec4>(colorName))
+            {
+                colorSourceType = AttributeSourceType::Vec4;
+            }
+            else if (view.VertexSource->Properties.Get<glm::vec3>(colorName))
+            {
+                colorSourceType = AttributeSourceType::Vec3;
+            }
+            else
+            {
+                return;
+            }
+
+            outBuffer.PackedColors.resize(vertexCount);
+            const VertexAttributeBinding colorBinding{
+                .Channel = VertexChannel::Color,
+                .SourceType = colorSourceType,
+                .SourceProperty = colorName,
+                .AllowFallback = false,
+                .Normalize = false,
+                .Fallback = glm::vec4{1.0f, 1.0f, 1.0f, 1.0f},
+            };
+            const AttributeBindResult colorResult =
+                ResolveColorChannelPackedUnorm8(
+                    view.VertexSource->Properties,
+                    colorBinding,
+                    vertexCountU32,
+                    outBuffer.PackedColors);
+            if (!colorResult.Ok())
+            {
+                outBuffer.PackedColors.clear();
+            }
+        };
+        resolveColors();
 
         for (std::size_t f = 0; f < faceCount; ++f)
         {
@@ -313,8 +393,39 @@ namespace Extrinsic::Runtime
             maxP = glm::max(maxP, p);
         }
 
+        outBuffer.Channels.SetVertexCount(vertexCountU32);
+        SetChannelVec3(
+            outBuffer.Channels,
+            VertexChannel::Position,
+            std::span<const glm::vec3>{positions.data(), positions.size()});
+        SetChannelVec2(
+            outBuffer.Channels,
+            VertexChannel::Texcoord,
+            std::span<const glm::vec2>{texcoords.data(), texcoords.size()});
+        SetChannelVec3(
+            outBuffer.Channels,
+            VertexChannel::Normal,
+            std::span<const glm::vec3>{normals.data(), normals.size()});
+        if (!outBuffer.PackedColors.empty())
+        {
+            SetChannelPackedUnorm8(
+                outBuffer.Channels,
+                VertexChannel::Color,
+                std::span<const std::uint32_t>{outBuffer.PackedColors});
+        }
+
+        const auto channelBytes = [&outBuffer](const VertexChannel channel) -> std::span<const std::byte> {
+            const VertexChannelStreams::Stream* stream = outBuffer.Channels.Find(channel);
+            return stream != nullptr ? std::span<const std::byte>{stream->Bytes}
+                                     : std::span<const std::byte>{};
+        };
+
         Extrinsic::Graphics::GpuWorld::GeometryUploadDesc desc{};
         desc.PackedVertexBytes = std::span<const std::byte>{outBuffer.VertexBytes};
+        desc.PositionBytes = channelBytes(VertexChannel::Position);
+        desc.TexcoordBytes = channelBytes(VertexChannel::Texcoord);
+        desc.NormalBytes = channelBytes(VertexChannel::Normal);
+        desc.PackedVertexColors = std::span<const std::uint32_t>{outBuffer.PackedColors};
         desc.SurfaceIndices = std::span<const std::uint32_t>{outBuffer.SurfaceIndices};
         desc.LineIndices = {};
         desc.VertexCount = static_cast<std::uint32_t>(vertexCount);

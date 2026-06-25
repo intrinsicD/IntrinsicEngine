@@ -13,6 +13,8 @@
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Runtime.MeshGeometryPacker;
+import Extrinsic.Runtime.VertexAttributeBinding;
+import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.Properties;
 
 using Extrinsic::ECS::Components::GeometrySources::ConstSourceView;
@@ -70,6 +72,28 @@ namespace
     {
         auto texcoord = v.Properties.GetOrAdd<glm::vec2>("v:texcoord", glm::vec2(0.0f));
         texcoord.Vector() = texcoords;
+    }
+
+    void SetColors(Vertices& v, const std::vector<glm::vec4>& colors)
+    {
+        auto color = v.Properties.GetOrAdd<glm::vec4>("v:color", glm::vec4(1.0f));
+        color.Vector() = colors;
+    }
+
+    void SetVec3Property(Vertices& v,
+                         const std::string& name,
+                         const std::vector<glm::vec3>& values)
+    {
+        auto prop = v.Properties.GetOrAdd<glm::vec3>(name, glm::vec3(0.0f));
+        prop.Vector() = values;
+    }
+
+    void SetVec4Property(Vertices& v,
+                         const std::string& name,
+                         const std::vector<glm::vec4>& values)
+    {
+        auto prop = v.Properties.GetOrAdd<glm::vec4>(name, glm::vec4(1.0f));
+        prop.Vector() = values;
     }
 
     void RemoveTexcoords(Vertices& v)
@@ -179,6 +203,9 @@ TEST(MeshGeometryPackerTest, SingleTriangleProducesThreeIndices)
     EXPECT_EQ(result.Upload->SurfaceIndices.size(), 3u);
     EXPECT_EQ(result.Upload->LineIndices.size(), 0u);
     EXPECT_EQ(result.Upload->PackedVertexBytes.size_bytes(), sizeof(MeshVertex) * 3u);
+    EXPECT_EQ(result.Upload->PositionBytes.size_bytes(), sizeof(glm::vec3) * 3u);
+    EXPECT_EQ(result.Upload->TexcoordBytes.size_bytes(), sizeof(glm::vec2) * 3u);
+    EXPECT_EQ(result.Upload->NormalBytes.size_bytes(), sizeof(glm::vec3) * 3u);
     ASSERT_NE(result.Upload->DebugName, nullptr);
     EXPECT_STREQ(result.Upload->DebugName, "Runtime.Mesh");
 
@@ -208,6 +235,13 @@ TEST(MeshGeometryPackerTest, SingleTriangleVertexBytesMatchPositions)
     EXPECT_FLOAT_EQ(verts[0].Nx, 0.0f);
     EXPECT_FLOAT_EQ(verts[0].Ny, 0.0f);
     EXPECT_FLOAT_EQ(verts[0].Nz, 1.0f);
+
+    ASSERT_EQ(result.Upload->PositionBytes.size_bytes(), sizeof(glm::vec3) * 3u);
+    const auto* positions = reinterpret_cast<const glm::vec3*>(result.Upload->PositionBytes.data());
+    EXPECT_FLOAT_EQ(positions[0].x, 0.0f);
+    EXPECT_FLOAT_EQ(positions[0].y, 0.0f);
+    EXPECT_FLOAT_EQ(positions[1].x, 1.0f);
+    EXPECT_FLOAT_EQ(positions[2].y, 1.0f);
 }
 
 TEST(MeshGeometryPackerTest, MissingTexcoordsUseDefaultUvsEvenWhenNormalsExist)
@@ -300,6 +334,93 @@ TEST(MeshGeometryPackerTest, PacksVertexNormalsWithoutUsingUvFields)
     EXPECT_FLOAT_EQ(verts[2].Nx, 0.0f);
     EXPECT_FLOAT_EQ(verts[2].Ny, 0.0f);
     EXPECT_FLOAT_EQ(verts[2].Nz, 1.0f);
+}
+
+TEST(MeshGeometryPackerTest, CountMatchedVertexColorsProducePackedColorStream)
+{
+    MeshScratch mesh = BuildSingleTriangle();
+    SetColors(mesh.VertexSource, {
+        {1.0f, 0.0f, 0.0f, 1.0f},
+        {0.0f, 1.0f, 0.0f, 1.0f},
+        {0.0f, 0.0f, 1.0f, 1.0f},
+    });
+    MeshPackBuffer scratch;
+
+    const MeshPackResult result = PackMesh(mesh.View(), scratch);
+
+    ASSERT_EQ(result.Status, MeshPackStatus::Success);
+    ASSERT_TRUE(result.Upload.has_value());
+    ASSERT_EQ(result.Upload->PackedVertexColors.size(), 3u);
+    EXPECT_EQ(result.Upload->PackedVertexColors[0], 0xFF0000FFu);
+    EXPECT_EQ(result.Upload->PackedVertexColors[1], 0xFF00FF00u);
+    EXPECT_EQ(result.Upload->PackedVertexColors[2], 0xFFFF0000u);
+    const auto* colorStream = scratch.Channels.Find(Extrinsic::Runtime::VertexChannel::Color);
+    ASSERT_NE(colorStream, nullptr);
+    EXPECT_EQ(colorStream->Bytes.size(), sizeof(std::uint32_t) * 3u);
+}
+
+TEST(MeshGeometryPackerTest, ExplicitVertexChannelBindingsOverrideNormalsAndColors)
+{
+    MeshScratch mesh = BuildSingleTriangle();
+    SetNormals(mesh.VertexSource, {
+        {0.0f, 0.0f, 1.0f},
+        {0.0f, 0.0f, 1.0f},
+        {0.0f, 0.0f, 1.0f},
+    });
+    SetVec3Property(mesh.VertexSource, "v:custom_normal", {
+        {1.0f, 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f},
+        {0.0f, 0.0f, 1.0f},
+    });
+    SetVec4Property(mesh.VertexSource, "v:paint", {
+        {1.0f, 0.0f, 0.0f, 1.0f},
+        {0.0f, 1.0f, 0.0f, 1.0f},
+        {0.0f, 0.0f, 1.0f, 1.0f},
+    });
+    Extrinsic::Runtime::VertexChannelBindingSet bindings{};
+    bindings.Normal = Extrinsic::Runtime::VertexChannelSourceBinding{
+        .Enabled = true,
+        .SourceType = Extrinsic::Runtime::AttributeSourceType::Vec3,
+        .SourceProperty = "v:custom_normal",
+    };
+    bindings.Color = Extrinsic::Runtime::VertexChannelSourceBinding{
+        .Enabled = true,
+        .SourceType = Extrinsic::Runtime::AttributeSourceType::Vec4,
+        .SourceProperty = "v:paint",
+    };
+
+    MeshPackBuffer scratch;
+    const MeshPackResult result = PackMesh(mesh.View(), &bindings, scratch);
+
+    ASSERT_EQ(result.Status, MeshPackStatus::Success);
+    ASSERT_TRUE(result.Upload.has_value());
+    const auto* verts =
+        reinterpret_cast<const MeshVertex*>(result.Upload->PackedVertexBytes.data());
+    EXPECT_FLOAT_EQ(verts[0].Nx, 1.0f);
+    EXPECT_FLOAT_EQ(verts[1].Ny, 1.0f);
+    EXPECT_FLOAT_EQ(verts[2].Nz, 1.0f);
+    ASSERT_EQ(result.Upload->NormalBytes.size_bytes(), sizeof(glm::vec3) * 3u);
+    const auto* normalBytes =
+        reinterpret_cast<const glm::vec3*>(result.Upload->NormalBytes.data());
+    EXPECT_FLOAT_EQ(normalBytes[0].x, 1.0f);
+    EXPECT_FLOAT_EQ(normalBytes[1].y, 1.0f);
+    ASSERT_EQ(result.Upload->PackedVertexColors.size(), 3u);
+    EXPECT_EQ(result.Upload->PackedVertexColors[0], 0xFF0000FFu);
+    EXPECT_EQ(result.Upload->PackedVertexColors[1], 0xFF00FF00u);
+    EXPECT_EQ(result.Upload->PackedVertexColors[2], 0xFFFF0000u);
+}
+
+TEST(MeshGeometryPackerTest, MissingVertexColorsLeavePackedColorStreamEmpty)
+{
+    const MeshScratch mesh = BuildSingleTriangle();
+    MeshPackBuffer scratch;
+
+    const MeshPackResult result = PackMesh(mesh.View(), scratch);
+
+    ASSERT_EQ(result.Status, MeshPackStatus::Success);
+    ASSERT_TRUE(result.Upload.has_value());
+    EXPECT_TRUE(result.Upload->PackedVertexColors.empty());
+    EXPECT_TRUE(scratch.PackedColors.empty());
 }
 
 TEST(MeshGeometryPackerTest, InvalidVertexNormalFallsBackWithoutChangingUv)

@@ -20,6 +20,13 @@ depends_on: []
 - Impact: direct mesh imports queue `Runtime.DirectMeshPostProcess`; its main-thread apply path called `PopulateFromMesh` again after the user edit, restoring the import/materialization normals and delaying visible corrected shading until another edit.
 - Owner: `src/runtime`; the fix preserves the ECS geometry source as the CPU authority and keeps GPU refresh deferred through the existing dirty/extraction path.
 
+## Completion
+- Completed: 2026-06-21. Commit/PR: `843e4fb3`.
+- Audit: 2026-06-22 backlog audit confirmed this task was already fixed and
+  superseded as an open backlog bug. The pending direct mesh post-process path
+  preserves count-matched current `v:normal` data, and focused sandbox editor
+  normal recompute coverage still passes.
+
 ## Required changes
 - [x] Add a focused runtime repro that recomputes normals before a pending direct mesh post-process applies.
 - [x] Preserve count-matched current mesh `v:normal` values across direct mesh post-process re-population.

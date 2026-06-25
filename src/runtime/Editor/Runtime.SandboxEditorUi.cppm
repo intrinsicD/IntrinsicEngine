@@ -26,6 +26,8 @@ import Extrinsic.ECS.Component.StableId;
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
+import Extrinsic.Graphics.RenderRecipeConfig;
+import Extrinsic.Graphics.RenderingContract;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
@@ -38,6 +40,9 @@ import Extrinsic.Runtime.ProgressivePresentationExtraction;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.RenderArtifactPublication;
+import Extrinsic.Runtime.VertexAttributeBinding;
+import Extrinsic.Runtime.VertexChannelBindings;
     import Extrinsic.Runtime.SceneSerialization;
     import Extrinsic.Runtime.SelectedMeshTextureBake;
     import Extrinsic.Runtime.SelectionController;
@@ -46,7 +51,7 @@ import Extrinsic.Runtime.RenderExtraction;
 
 namespace Extrinsic::Runtime::Detail
 {
-    inline constexpr std::size_t kSandboxEditorPanelWindowCount = 9u;
+    inline constexpr std::size_t kSandboxEditorPanelWindowCount = 10u;
 }
 
 export namespace Extrinsic::Runtime
@@ -64,7 +69,9 @@ export namespace Extrinsic::Runtime
         UnsupportedGeometryDomain,
         CameraRenderCommandsUnavailable,
         VisualizationCommandsUnavailable,
+        RenderRecipeCommandsUnavailable,
         InvalidVisualizationProperty,
+        InvalidVertexChannelBinding,
         GeometryProcessingFailed,
         RenderGraphStatsUnavailable,
         EditorCommandHistoryUnavailable,
@@ -90,6 +97,7 @@ export namespace Extrinsic::Runtime
         MissingTransform,
         UnsupportedGeometryDomain,
         InvalidVisualizationProperty,
+        InvalidVertexChannelBinding,
         InvalidProcessingParameters,
         GeometryProcessingFailed,
     };
@@ -522,6 +530,30 @@ export namespace Extrinsic::Runtime
         std::vector<SandboxEditorProgressivePropertyOptionModel> Options{};
     };
 
+    struct SandboxEditorVertexChannelBindingOptionModel
+    {
+        std::string PropertyName{};
+        SandboxEditorPropertyCatalogDomain Domain{
+            SandboxEditorPropertyCatalogDomain::MeshVertices};
+        SandboxEditorPropertyCatalogValueKind ValueKind{
+            SandboxEditorPropertyCatalogValueKind::Unknown};
+        AttributeSourceType SourceType{AttributeSourceType::Vec3};
+        std::size_t ElementCount{0u};
+        AttributeBindResult Resolver{};
+        bool Compatible{false};
+        std::string DisabledReason{};
+    };
+
+    struct SandboxEditorVertexChannelBindingTargetModel
+    {
+        VertexChannel Channel{VertexChannel::Normal};
+        bool HasBinding{false};
+        VertexChannelSourceBinding Binding{};
+        AttributeBindResult Resolver{};
+        std::string Diagnostic{};
+        std::vector<SandboxEditorVertexChannelBindingOptionModel> Options{};
+    };
+
     struct SandboxEditorPropertyCatalogModel
     {
         bool HasSelectedEntity{false};
@@ -530,6 +562,7 @@ export namespace Extrinsic::Runtime
             ECS::Components::GeometrySources::Domain::None};
         std::vector<SandboxEditorPropertyCatalogRow> Rows{};
         std::vector<SandboxEditorPropertyBindingTargetModel> BindingTargets{};
+        std::vector<SandboxEditorVertexChannelBindingTargetModel> VertexChannelTargets{};
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
@@ -988,6 +1021,205 @@ export namespace Extrinsic::Runtime
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
+    enum class SandboxEditorRenderRecipeDraftState : std::uint8_t
+    {
+        InactiveDraft = 0,
+        Debounced,
+        Validated,
+        Rejected,
+        Previewed,
+        Activated,
+        Canceled,
+    };
+
+    enum class SandboxEditorRenderRecipeCommandKind : std::uint8_t
+    {
+        UpdateDraft = 0,
+        ValidateDraft,
+        PreviewDraft,
+        ActivatePreview,
+        CancelDraft,
+        PublishArtifact,
+        ApplyArtifact,
+    };
+
+    enum class SandboxEditorRenderRecipeCommandStatus : std::uint8_t
+    {
+        NoChange = 0,
+        DraftUpdated,
+        Debounced,
+        Validated,
+        ValidationFailed,
+        Previewed,
+        PreviewFailed,
+        Activated,
+        Canceled,
+        Published,
+        Applied,
+        MissingRecipeContext,
+        MissingEditorState,
+        MissingArtifactRegistry,
+        ArtifactCommandFailed,
+    };
+
+    [[nodiscard]] const char* DebugNameForSandboxEditorRenderRecipeDraftState(
+        SandboxEditorRenderRecipeDraftState state) noexcept;
+
+    [[nodiscard]] const char* DebugNameForSandboxEditorRenderRecipeCommandKind(
+        SandboxEditorRenderRecipeCommandKind kind) noexcept;
+
+    [[nodiscard]] const char* DebugNameForSandboxEditorRenderRecipeCommandStatus(
+        SandboxEditorRenderRecipeCommandStatus status) noexcept;
+
+    struct SandboxEditorRenderRecipeSlotModel
+    {
+        std::string StableName{};
+        Graphics::RecipeSlotKind Kind{Graphics::RecipeSlotKind::Extension};
+        std::string SchemaId{};
+        std::string Defaults{};
+        std::vector<std::string> RequiredCapabilities{};
+        std::vector<std::string> AllowedBindingRoles{};
+        std::vector<std::string> UsedBindingRoles{};
+        bool DeclaredByRenderer{false};
+        bool Editable{false};
+        std::string DisabledReason{};
+    };
+
+    struct SandboxEditorRenderRecipeBindingOverrideModel
+    {
+        std::string SemanticName{};
+        std::string Slot{};
+        std::string SourceDomain{};
+        std::string SourceIdentity{};
+        std::string SourceRevision{};
+        std::string ValueType{};
+        std::string ValueFormat{};
+        bool Required{false};
+        bool Editable{false};
+        std::string DisabledReason{};
+    };
+
+    struct SandboxEditorRenderRecipeOutputModel
+    {
+        std::string Name{};
+        std::string Kind{};
+        std::string Format{};
+        bool Required{false};
+    };
+
+    struct SandboxEditorRenderArtifactRow
+    {
+        std::string ArtifactId{};
+        std::string Purpose{};
+        RenderArtifactPublicationKind Kind{
+            RenderArtifactPublicationKind::TransientFrame};
+        RenderArtifactUiStatus Status{RenderArtifactPublicationState::Unknown};
+        std::string PayloadUri{};
+        std::string ProducerLabel{};
+        bool CanPublish{false};
+        bool CanApply{false};
+        std::string DisabledReason{};
+    };
+
+    struct SandboxEditorRenderRecipeEditorModel
+    {
+        bool Available{false};
+        std::string RendererId{};
+        std::string ActiveRecipeId{};
+        std::string ActiveViewOutputRecipeId{};
+        std::string DraftRecipeId{};
+        std::string DraftSourceId{};
+        SandboxEditorRenderRecipeDraftState DraftState{
+            SandboxEditorRenderRecipeDraftState::InactiveDraft};
+        Graphics::RenderRecipeConfigState ValidationState{
+            Graphics::RenderRecipeConfigState::Invalid};
+        std::uint64_t DraftRevision{0u};
+        std::uint64_t ActiveRevision{0u};
+        std::uint32_t ParsedSlotCount{0u};
+        std::uint32_t ParsedBindingOverrideCount{0u};
+        std::string ViewKind{};
+        std::string OutputTarget{};
+        std::string InteractionMode{};
+        std::uint32_t ViewportWidth{0u};
+        std::uint32_t ViewportHeight{0u};
+        float RenderScale{1.0f};
+        bool CaptureRequested{false};
+        bool ReadbackRequested{false};
+        bool CanValidate{false};
+        bool CanPreview{false};
+        bool CanActivate{false};
+        bool CanCancel{false};
+        std::vector<SandboxEditorRenderRecipeSlotModel> Slots{};
+        std::vector<SandboxEditorRenderRecipeBindingOverrideModel> BindingOverrides{};
+        std::vector<SandboxEditorRenderRecipeOutputModel> Outputs{};
+        std::vector<SandboxEditorRenderArtifactRow> Artifacts{};
+        std::vector<SandboxEditorDiagnostic> Diagnostics{};
+        std::vector<Graphics::RenderRecipeConfigDiagnostic> RecipeDiagnostics{};
+    };
+
+    struct SandboxEditorRenderRecipeEditorState
+    {
+        std::string DraftDocument{};
+        std::string DraftSourceId{"sandbox-render-recipe-draft.json"};
+        Graphics::RenderRecipeConfigLoadResult LastPreview{};
+        bool HasLastPreview{false};
+        Graphics::RenderRecipeDescriptor ActiveRecipe{};
+        Graphics::ViewOutputRecipeDescriptor ActiveViewOutput{};
+        Graphics::BindingSet ActiveBindings{};
+        bool HasActiveOverride{false};
+        SandboxEditorRenderRecipeDraftState DraftState{
+            SandboxEditorRenderRecipeDraftState::InactiveDraft};
+        std::uint64_t DraftRevision{0u};
+        std::uint64_t ActiveRevision{0u};
+    };
+
+    struct SandboxEditorRenderRecipeCommand
+    {
+        SandboxEditorRenderRecipeCommandKind Kind{
+            SandboxEditorRenderRecipeCommandKind::UpdateDraft};
+        std::string Document{};
+        std::string SourceId{"sandbox-render-recipe-draft.json"};
+        bool Debounced{false};
+        std::string ArtifactId{};
+        std::string Provenance{"sandbox-editor"};
+        std::string TargetUri{};
+        std::string ProjectTarget{};
+        std::string Label{};
+        std::string UndoLabel{};
+    };
+
+    struct SandboxEditorRenderRecipeCommandResult
+    {
+        SandboxEditorRenderRecipeCommandStatus Status{
+            SandboxEditorRenderRecipeCommandStatus::NoChange};
+        SandboxEditorRenderRecipeDraftState DraftState{
+            SandboxEditorRenderRecipeDraftState::InactiveDraft};
+        Graphics::RenderRecipeConfigState ValidationState{
+            Graphics::RenderRecipeConfigState::Invalid};
+        RenderArtifactOperationStatus ArtifactStatus{
+            RenderArtifactOperationStatus::InvalidRequest};
+        RenderArtifactPublicationState ArtifactState{
+            RenderArtifactPublicationState::Unknown};
+        std::string ArtifactId{};
+        std::uint64_t Revision{0u};
+        bool ProjectMutationAuthorized{false};
+        std::vector<Graphics::RenderRecipeConfigDiagnostic> RecipeDiagnostics{};
+        std::vector<RenderArtifactDiagnostic> ArtifactDiagnostics{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == SandboxEditorRenderRecipeCommandStatus::NoChange ||
+                   Status == SandboxEditorRenderRecipeCommandStatus::DraftUpdated ||
+                   Status == SandboxEditorRenderRecipeCommandStatus::Debounced ||
+                   Status == SandboxEditorRenderRecipeCommandStatus::Validated ||
+                   Status == SandboxEditorRenderRecipeCommandStatus::Previewed ||
+                   Status == SandboxEditorRenderRecipeCommandStatus::Activated ||
+                   Status == SandboxEditorRenderRecipeCommandStatus::Canceled ||
+                   Status == SandboxEditorRenderRecipeCommandStatus::Published ||
+                   Status == SandboxEditorRenderRecipeCommandStatus::Applied;
+        }
+    };
+
     struct SandboxEditorPrimitiveViewSettings
     {
         bool EnableEdgeView{false};
@@ -1167,6 +1399,7 @@ export namespace Extrinsic::Runtime
         SandboxEditorFileImportModel        FileImport{};
         SandboxEditorAssetImportQueueModel  AssetImportQueue{};
         SandboxEditorRenderGraphModel       RenderGraph{};
+        SandboxEditorRenderRecipeEditorModel RenderRecipe{};
         SandboxEditorCameraRenderModel      CameraRender{};
         SandboxEditorVisualizationModel     Visualization{};
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
@@ -1198,11 +1431,15 @@ export namespace Extrinsic::Runtime
         const SandboxEditorMeshVertexNormalsResult*
             LastMeshVertexNormalsResult{nullptr};
         const Graphics::RenderGraphFrameStats* RenderGraphStats{nullptr};
+        const Graphics::RenderRecipeConfigContext* RenderRecipeContext{nullptr};
+        SandboxEditorRenderRecipeEditorState* RenderRecipeEditorState{nullptr};
+        RenderArtifactRegistry* RenderArtifacts{nullptr};
         bool ImGuiAdapterAvailable{false};
         bool AssetImportCommandsAvailable{false};
         bool SceneFileCommandsAvailable{false};
         bool CameraRenderCommandsAvailable{false};
         bool VisualizationCommandsAvailable{false};
+        bool RenderRecipeCommandsAvailable{false};
     };
 
     struct SandboxEditorTransformEditCommand
@@ -1322,6 +1559,14 @@ export namespace Extrinsic::Runtime
         RenderExtractionCache::VisualizationAdapterBindingKind Kind{
             RenderExtractionCache::VisualizationAdapterBindingKind::Scalar};
         VisualizationAdapterOptions Options{};
+    };
+
+    struct SandboxEditorVertexChannelBindingCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        VertexChannel Channel{VertexChannel::Normal};
+        bool EnableBinding{true};
+        std::string PropertyName{};
     };
 
     struct SandboxEditorProgressiveSlotDefaultCommand
@@ -1475,6 +1720,10 @@ export namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const SandboxEditorVisualizationAdapterBindingCommand& command);
 
+    SandboxEditorCommandStatus ApplySandboxEditorVertexChannelBindingCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorVertexChannelBindingCommand& command);
+
     SandboxEditorCommandStatus ApplySandboxEditorProgressiveSlotDefaultCommand(
         const SandboxEditorContext& context,
         const SandboxEditorProgressiveSlotDefaultCommand& command);
@@ -1499,6 +1748,15 @@ export namespace Extrinsic::Runtime
     ApplySandboxEditorMeshVertexNormalsCommand(
         const SandboxEditorContext& context,
         const SandboxEditorMeshVertexNormalsCommand& command);
+
+    [[nodiscard]] SandboxEditorRenderRecipeEditorModel
+    BuildSandboxEditorRenderRecipeEditorModel(
+        const SandboxEditorContext& context);
+
+    SandboxEditorRenderRecipeCommandResult
+    ApplySandboxEditorRenderRecipeCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorRenderRecipeCommand& command);
 
     void DrawSandboxEditorPanelFrame(const SandboxEditorPanelFrame& frame);
 
@@ -1538,6 +1796,10 @@ export namespace Extrinsic::Runtime
         std::optional<SandboxEditorKMeansResult> m_LastKMeansResult{};
         std::optional<SandboxEditorMeshVertexNormalsResult>
             m_LastMeshVertexNormalsResult{};
+        Graphics::RenderRecipeConfigContext m_RenderRecipeContext{};
+        SandboxEditorRenderRecipeEditorState m_RenderRecipeState{};
+        RenderArtifactRegistry m_RenderArtifactRegistry{};
+        std::array<char, 8192> m_RenderRecipeDraftBuffer{};
         SandboxEditorGeometryProcessingDomain m_KMeansDomain{
             SandboxEditorGeometryProcessingDomain::None};
         std::int32_t m_KMeansClusterCount{8};

@@ -101,11 +101,14 @@ All geometry buffers are owned and managed by `BufferManager`. `GpuWorld::Global
 
 | Buffer type | Content | Layout |
 |-------------|---------|--------|
-| **Managed Surface Vertex Buffer(s)** | `vec3 position`, `vec2 uv`, `vec3 normal` per surface vertex in the current promoted implementation | interleaved: `[x,y,z, u,v, nx,ny,nz]` -> 32 bytes/vertex |
-| **Managed Retained Primitive Vertex Buffer(s)** | `vec3 position`, neutral `vec2 uv` for retained line/point lanes | interleaved: `[x,y,z, u,v]` -> 20 bytes/vertex |
+| **Managed Vertex Channel Buffer(s)** | per-geometry `vec3 position`, optional `vec2 uv`, optional `vec3 normal`, optional packed-unorm8 color | SoA sub-ranges published through `GpuGeometryRecord::{VertexBufferBDA, TexcoordBufferBDA, NormalBufferBDA, ColorBufferBDA}` |
 | **Managed Index Buffer(s)** | `uint32_t` triangle indices (reused for edge pairs) | flat uint32 array |
 
-**Target invariant:** Tangents, per-vertex scalars, per-vertex colors, and all other per-vertex attributes are not stored in vertex buffers. Normals are the current promoted-surface exception until dedicated normal-buffer residency replaces the interim lane. These attributes otherwise come from:
+**Target invariant:** Retained geometry uses per-channel vertex streams rather
+than a single interleaved vertex struct. Tangents, per-vertex scalars, and
+non-structural visualization attributes are not part of the retained vertex
+channel set unless a runtime binding explicitly promotes them. These attributes
+otherwise come from:
 - **Material textures** (albedo, normal map, metallic-roughness) — sampled by UV.
 - **Per-entity attribute SSBOs** (normals, visualization scalars/colors) — addressed by BDA pointer stored in `GpuEntityConfig`, indexed by `vertex_id` / `face_id` / `edge_id`.
 

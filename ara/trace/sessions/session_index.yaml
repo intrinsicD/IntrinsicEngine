@@ -43,8 +43,29 @@ sessions:
     open_threads: 2
   - id: "2026-06-22_001"
     date: "2026-06-22"
-    summary: "Implemented, verified, committed, and retired GRAPHICS-095 through GRAPHICS-098 for the CPU/GPU transfer foundation, imported third-party productivity skills through PROC-009, and fixed BUG-050/BUG-051 mesh normal/color visualization wiring."
-    turn_count: 6
-    events_count: 12
+    summary: "Implemented, verified, committed, and retired GRAPHICS-095 through GRAPHICS-098 for the CPU/GPU transfer foundation, imported third-party productivity skills, audited stale BUG backlog tasks, and progressed rendering-design grilling through configurable data/channel policies, recipes, preview validation, diagnostics, provenance, lifecycle, renderer snapshot ownership, atomic snapshot publication, fallback generation scheduling, explicit async job outcome reporting, async outcome UI surfacing, selected-lens fail-closed behavior, typed render-lens input binding, scoped binding ambiguity resolution, research-lens shader/material ownership, surface-shading normal-channel policy, color-channel/base-color separation, explicit channel-domain rendering/conversion, and GPU-ready snapshot upload generations."
+    turn_count: 45
+    events_count: 53
+    claims_touched: []
+    open_threads: 4
+  - id: "2026-06-23_001"
+    date: "2026-06-23"
+    summary: "Continued rendering-design grilling by accepting lease-based GPU resource lifetime/eviction semantics, declarative renderer pass-graph composition, project-data-pure render passes, derived-candidate readback/write-back publication, readback job state/attempt semantics, bounded fair scheduling priorities, runtime-owned executor policy with subsystem contracts, shared job/diagnostic registry retention, typed registry query/actions, scoped diagnostic severity/blocking semantics, audited runtime diagnostic actions, undo/redo scope for rendering mutations, persisted reload-validated undo/redo history, transaction grouping/coalescing/naming, undo/redo conflict handling for async jobs and newer revisions, the audit-log versus undo-history boundary, explicit schema versioning/migration/validation for persisted rendering documents, source-of-truth boundaries for authored files versus generated artifacts/caches, portable reproducibility bundle contents/validation/replay behavior, fast tiered activation validation, design-driven validation optimization without fixed latency budgets, concrete fast-validation mechanisms, loadable low-risk/high-impact activation classification, high-impact approval/degraded-state policy, the overarching changeability goal, renderer/runtime extension seams, autonomous agent quality-evidence bundles, changeability-aware planning/self-review skills, required future-change plan/self-review contents, structured implementation evidence reports, blocking/warning rules for evidence-report validation, task-linked implementation evidence report storage/generation, an open-ended continuation mandate for remaining concrete rendering process decisions, canonical frame pipeline phase ownership, a general extensible immutable render snapshot contract, and a pivot toward renderer-specific input contracts where full-scene snapshots are optional."
+    turn_count: 34
+    events_count: 37
+    claims_touched: []
+    open_threads: 4
+  - id: "2026-06-24_001"
+    date: "2026-06-24"
+    summary: "Continued rendering-design grilling by opening the renderer input contract visibility question, refining it into whether snapshots are the dependency boundary, accepting scoped immutable prepared snapshots as renderer-specific input boundaries, accepting public metadata envelopes for renderer-private snapshot payloads, separating renderer descriptors from per-snapshot envelopes, accepting renderer-independent binding intents for material/shader/channel bindings, fixing/retiring BUG-046 TaskGraph main-thread ready-queue flakiness, accepting runtime renderer/snapshot pairing with renderer-owned frame recipes over the engine render graph, fixing renderer frame-recipe cores while making optional recipe parts loadable, constraining loadable recipe parts to declared renderer extension slots, making visibility/culling/batching/grouping a shared configurable recipe usable by all renderers, accepting renderer-neutral visibility/grouping recipe outputs, accepting lighting/environment as a shared configurable recipe layer, accepting shared view/output recipes for interactive and headless rendering, accepting runtime-owned render artifacts with explicit publish/apply semantics, choosing contract-first implementation before renderer behavior changes, making the first task a CPU-only rendering contract foundation, creating/validating the contract-first rendering task pack, reviewing that plan for stale lifecycle state and semantic contradictions, staging a recommended execution order, completing the requested task-only hygiene cleanup, implementing/retiring GRAPHICS-099, implementing/retiring the remaining renderer/snapshot/recipe chain through GRAPHICS-103, reviewing the remaining runtime task queue for validity, applying the runtime task hygiene retargeting, preparing the runtime multi-task loop prompt, implementing/retiring RUNTIME-121 through RUNTIME-124, and stopping before RUNTIME-125 because its benchmark/profile gate lacks baseline evidence."
+    turn_count: 28
+    events_count: 31
     claims_touched: []
     open_threads: 2
+  - id: "2026-06-25_001"
+    date: "2026-06-25"
+    summary: "Implemented and retired RUNTIME-126 with the runtime GPU readback job/write-back path, fixed the stale mesh primitive-view dirty-position contract, passed focused CPU/integration, opt-in GPU smoke, full default CPU gate, and structural validation, then marked the runtime Theme B goal blocked at RUNTIME-125 because its benchmark/profile gate remains unsatisfied."
+    turn_count: 4
+    events_count: 7
+    claims_touched: []
+    open_threads: 1

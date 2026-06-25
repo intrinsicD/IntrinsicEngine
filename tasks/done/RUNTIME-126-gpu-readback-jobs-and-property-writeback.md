@@ -6,6 +6,21 @@ maturity_target: Operational
 ---
 # RUNTIME-126 — GPU readback jobs and result→property write-back in the derived-job graph
 
+## Completion
+- Retired on 2026-06-25 at maturity `Operational`.
+- Owner/agent: Codex.
+- Branch/PR: local `main`; PR not opened.
+- Summary: runtime readback jobs now park through `StreamingExecutor` in
+  `WaitingForReadback`, resume through `DerivedJobRegistry::DrainReadbacks()`,
+  write dimension-checked GPU readback bytes into typed geometry properties,
+  and keep dependent follow-up jobs pending until the write-back apply completes.
+- Evidence: focused `GpuReadbackJob` / `DerivedJob` /
+  `VertexAttributeBinding` CPU tests, explicit readback streaming integration
+  tests, the default `ci` `IntrinsicTests` build, the full CPU-supported CTest
+  gate, structural validators, and the opt-in `gpu;vulkan`
+  `GpuReadbackJobGpuSmoke.VulkanTransferReadbackWritesPropertyAndFollowUpUploadsDerivedColor`
+  round-trip passed.
+
 ## Goal
 - Close the GPU→CPU leg of the transfer foundation at the runtime scheduling
   layer: add a **readback job kind** to the existing `DerivedJobRegistry` that
@@ -21,8 +36,9 @@ maturity_target: Operational
 - No new scheduler, task graph, or executor: reuse `DerivedJobRegistry`
   (RUNTIME-112), `StreamingExecutor`, and `Core.Dag`.
 - No new forward (CPU→GPU) binding: reuse RUNTIME-120's `VertexAttributeBinding`
-  resolver, RUNTIME-123's editor binding, and GRAPHICS-084's visualization
-  property buffers. This task adds only the reverse (readback) direction.
+  resolver and GRAPHICS-084's visualization property buffers. `RUNTIME-123`
+  remains an editor binding UI follow-up and is not a dependency of this
+  readback leg. This task adds only the reverse (readback) direction.
 - No per-attribute *upload* streaming changes (owned by RUNTIME-122/124).
 - No async readback transport changes (owned by GRAPHICS-096/097); this task
   consumes that transport.
@@ -39,9 +55,11 @@ maturity_target: Operational
   with a main-thread apply phase; none read back from the GPU.
 - The forward direction is covered: RUNTIME-120 `VertexAttributeBinding` (done)
   binds any feasible typed, count-matched property to a vertex channel;
-  RUNTIME-123 exposes the editor "bind any property as normals/colors";
   GRAPHICS-084 (done) binds properties to scalar/color/vector-field visualization
   buffers and already enforces the `ElementCount × stride == bytes` rule.
+  Editor-authored arbitrary channel binding remains owned by `RUNTIME-123` and
+  is intentionally not required for a backend-neutral readback→property
+  write-back job.
 - The missing piece is the readback leg: GRAPHICS-096 adds the async
   `DownloadBuffer` ring (no caller-thread fence wait, drain-time delivery) and
   GRAPHICS-098 the imperative `GpuTransfer` facade; this task wires those into a
@@ -79,7 +97,7 @@ maturity_target: Operational
   property that the renderer consumes.
 
 ## Required changes
-- [ ] Add a non-blocking readback park/resume seam. Issuing a readback must
+- [x] Add a non-blocking readback park/resume seam. Issuing a readback must
       transition the task into a `WaitingForReadback` state (symmetric to the
       existing `StreamingTaskState::WaitingForGpuUpload`) that holds the
       GRAPHICS-096 `ReadbackToken` / sink; a per-frame poll after the transfer
@@ -89,24 +107,24 @@ maturity_target: Operational
       home: extend `StreamingExecutor` (RUNTIME-112) with the resume state so the
       seam is reusable; `DerivedJobRegistry` consumes it. (Touching the RUNTIME-112
       modules is expected and in-scope for this task.)
-- [ ] Add a readback→property write-back binding (runtime, backend-neutral):
+- [x] Add a readback→property write-back binding (runtime, backend-neutral):
       given a source GPU buffer range and a target `PropertyRegistry` property,
       validate dimensional compatibility through `RHI::BufferTransfer`
       (GRAPHICS-095) and write the readback bytes into the property on resume;
       fail closed with precise diagnostics on mismatch.
-- [ ] Add a readback `DerivedJobDesc` kind / submission path that issues a
+- [x] Add a readback `DerivedJobDesc` kind / submission path that issues a
       GRAPHICS-096 `DownloadBuffer` (or GRAPHICS-098 facade readback), parks via
       the seam above, and lands the result via `DerivedJobApplyContext` on resume,
       reusing the existing dependency / follow-up / stale-cancel machinery.
-- [ ] Ensure chaining works end to end: a follow-up job (`SubmitFollowUp` /
+- [x] Ensure chaining works end to end: a follow-up job (`SubmitFollowUp` /
       `DependsOn`) does not become ready until the readback job has resumed and
       applied, so it can consume the written-back property to derive and re-upload
       a color / vector-field property through the existing forward binding.
-- [ ] Add readback-job diagnostics counters to the derived-job snapshot
+- [x] Add readback-job diagnostics counters to the derived-job snapshot
       (readbacks issued/waiting/completed/failed/stale).
 
 ## Tests
-- [ ] CPU contract `tests/contract/runtime/Test.GpuReadbackJob.cpp`
+- [x] CPU contract `tests/contract/runtime/Test.GpuReadbackJob.cpp`
       (labels `contract;runtime`):
       - a readback job with an **incomplete** mock token parks in
         `WaitingForReadback` and its `ApplyOnMainThread` does **not** run; after
@@ -119,26 +137,26 @@ maturity_target: Operational
         re-upload") stays un-ready until the readback resumes, then executes in
         dependency order;
       - stale/cancel of a parked readback job is diagnosed and does not apply.
-- [ ] Default CPU gate stays green; existing `DerivedJobRegistry` and
+- [x] Default CPU gate stays green; existing `DerivedJobRegistry` and
       `VertexAttributeBinding` tests remain green (no forward-path behavior change).
 
 ## Docs
-- [ ] Update `src/runtime/README.md` (derived-job / transfer section) describing
+- [x] Update `src/runtime/README.md` (derived-job / transfer section) describing
       the readback job kind and the readback→property write-back binding.
-- [ ] Regenerate `docs/api/generated/module_inventory.md`.
-- [ ] Cross-link ADR-0023 and RUNTIME-112 / GRAPHICS-096 / GRAPHICS-098.
+- [x] Regenerate `docs/api/generated/module_inventory.md`.
+- [x] Cross-link ADR-0023 and RUNTIME-112 / GRAPHICS-096 / GRAPHICS-098.
 
 ## Acceptance criteria
-- [ ] A readback job parks in `WaitingForReadback` and resumes to its apply phase
+- [x] A readback job parks in `WaitingForReadback` and resumes to its apply phase
       only after the GRAPHICS-096 token completes at the frame drain — the
       property is never written before the bytes exist and no thread blocks on a
       GPU fence.
-- [ ] An algorithm can submit a readback job whose GPU result is written into a
+- [x] An algorithm can submit a readback job whose GPU result is written into a
       CPU property (dimension-checked, fail-closed), and can chain follow-up
       derive+upload jobs that stay un-ready until the readback has applied.
-- [ ] No new scheduler/task-graph is introduced; the work composes
+- [x] No new scheduler/task-graph is introduced; the work composes
       `DerivedJobRegistry` + `StreamingExecutor` + GRAPHICS-096/098.
-- [ ] Default-gate contract tests pass; the opt-in `gpu;vulkan` round-trip is
+- [x] Default-gate contract tests pass; the opt-in `gpu;vulkan` round-trip is
       cited as run for `Operational`.
 
 ## Verification
@@ -152,13 +170,28 @@ python3 tools/agents/check_task_policy.py --root . --strict
 # Operational: cite a ci-vulkan gpu;vulkan readback round-trip run here.
 ```
 
+Completed 2026-06-25:
+
+```bash
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicRuntimeContractTests -- -j16
+ctest --test-dir build/ci --output-on-failure -R '^MeshPrimitiveViewExtraction.VertexPositionDirtyRepacksBothViews$' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+ctest --test-dir build/ci --output-on-failure -R 'GpuReadbackJob|DerivedJob|VertexAttributeBinding' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+ctest --test-dir build/ci --output-on-failure -R 'RuntimeStreamingExecutor.Readback' --timeout 60
+ctest --test-dir build/ci --output-on-failure -R 'GpuReadbackJobGpuSmoke' --timeout 120
+ctest --test-dir build/ci --output-on-failure -R 'RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleVertexColorStreamShadesDeferredSurface' --timeout 180
+cmake --build --preset ci --target IntrinsicTests -- -j16
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+```
+
 ## Forbidden changes
 - Introducing a new scheduler/task-graph/executor instead of reusing
   `DerivedJobRegistry` / `StreamingExecutor` / `Core.Dag`.
 - Running a readback job's apply phase before its token has completed, or
   blocking a caller/worker thread on a GPU fence to bridge the timing gap (the
   park/resume seam is mandatory).
-- Duplicating the forward property→channel binding (reuse RUNTIME-120/123/084).
+- Duplicating the forward property→channel binding (reuse RUNTIME-120 and
+  GRAPHICS-084; keep the RUNTIME-123 editor binding UI separate).
 - Adding Vulkan/RHI-specific knowledge to runtime beyond the graphics public API.
 
 ## Maturity

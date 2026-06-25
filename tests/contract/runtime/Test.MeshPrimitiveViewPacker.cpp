@@ -139,6 +139,16 @@ namespace
         std::memcpy(&v, buffer.VertexBytes.data() + i * sizeof(MeshPrimitiveVertex), sizeof(MeshPrimitiveVertex));
         return v;
     }
+
+    void ExpectPositionTexcoordChannels(
+        const Extrinsic::Graphics::GpuWorld::GeometryUploadDesc& upload,
+        const std::size_t vertexCount)
+    {
+        EXPECT_EQ(upload.PositionBytes.size_bytes(), sizeof(glm::vec3) * vertexCount);
+        EXPECT_EQ(upload.TexcoordBytes.size_bytes(), sizeof(glm::vec2) * vertexCount);
+        EXPECT_TRUE(upload.NormalBytes.empty());
+        EXPECT_TRUE(upload.PackedVertexColors.empty());
+    }
 }
 
 TEST(MeshPrimitiveViewSettingsTest, AnyEnabledReflectsFlags)
@@ -158,6 +168,7 @@ TEST(MeshPrimitiveViewPacker, EdgeViewPacksVerticesAndLineIndices)
     ASSERT_EQ(result.Status, MeshPrimitiveViewStatus::Success);
     ASSERT_TRUE(result.Upload.has_value());
     EXPECT_EQ(result.Upload->VertexCount, 3u);
+    ExpectPositionTexcoordChannels(*result.Upload, 3u);
     EXPECT_TRUE(result.Upload->SurfaceIndices.empty());
     ASSERT_EQ(result.Upload->LineIndices.size(), 6u);
     EXPECT_EQ(result.Upload->LineIndices[0], 0u);
@@ -180,6 +191,7 @@ TEST(MeshPrimitiveViewPacker, VertexViewPacksPointsWithoutIndices)
     ASSERT_EQ(result.Status, MeshPrimitiveViewStatus::Success);
     ASSERT_TRUE(result.Upload.has_value());
     EXPECT_EQ(result.Upload->VertexCount, 3u);
+    ExpectPositionTexcoordChannels(*result.Upload, 3u);
     EXPECT_TRUE(result.Upload->SurfaceIndices.empty());
     EXPECT_TRUE(result.Upload->LineIndices.empty());
 

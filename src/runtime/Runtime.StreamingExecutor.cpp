@@ -40,6 +40,11 @@ namespace Extrinsic::Runtime
         {
             return result.has_value() && std::holds_alternative<StreamingGpuUploadRequest>(*result);
         }
+
+        [[nodiscard]] bool IsReadbackRequest(const StreamingResult& result)
+        {
+            return result.has_value() && std::holds_alternative<StreamingReadbackRequest>(*result);
+        }
     }
 
     struct StreamingExecutor::Impl
@@ -340,16 +345,45 @@ namespace Extrinsic::Runtime
 
             if (task.Desc.ApplyOnMainThread)
             {
-                task.State = IsUploadRequest(*task.Result)
-                    ? StreamingTaskState::WaitingForGpuUpload
-                    : StreamingTaskState::WaitingForMainThreadApply;
-                m_Impl->ReadyForApply.push_back(completion.Index);
+                if (IsReadbackRequest(*task.Result))
+                {
+                    task.State = StreamingTaskState::WaitingForReadback;
+                }
+                else
+                {
+                    task.State = IsUploadRequest(*task.Result)
+                        ? StreamingTaskState::WaitingForGpuUpload
+                        : StreamingTaskState::WaitingForMainThreadApply;
+                    m_Impl->ReadyForApply.push_back(completion.Index);
+                }
             }
             else
             {
                 m_Impl->FinalizeTaskLocked(completion.Index);
             }
         }
+    }
+
+    bool StreamingExecutor::ResumeReadback(const StreamingTaskHandle handle)
+    {
+        std::scoped_lock lock(m_Impl->Mutex);
+        const auto index = m_Impl->Resolve(handle);
+        if (!index.has_value())
+        {
+            return false;
+        }
+
+        auto& task = m_Impl->Tasks[*index];
+        if (task.State != StreamingTaskState::WaitingForReadback ||
+            !task.Result.has_value() ||
+            !IsReadbackRequest(*task.Result))
+        {
+            return false;
+        }
+
+        task.State = StreamingTaskState::WaitingForMainThreadApply;
+        m_Impl->ReadyForApply.push_back(*index);
+        return true;
     }
 
     void StreamingExecutor::ApplyMainThreadResults()

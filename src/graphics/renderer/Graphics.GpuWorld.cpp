@@ -21,6 +21,11 @@ namespace Extrinsic::Graphics
     namespace
     {
         constexpr std::uint32_t kInvalidSlot = 0xFFFF'FFFFu;
+        constexpr std::uint32_t kManagedVertexBlockAlignment = 16u;
+        constexpr std::uint32_t kPositionElementBytes = sizeof(float) * 3u;
+        constexpr std::uint32_t kTexcoordElementBytes = sizeof(float) * 2u;
+        constexpr std::uint32_t kNormalElementBytes = sizeof(float) * 3u;
+        constexpr std::uint32_t kColorElementBytes = sizeof(std::uint32_t);
 
         [[nodiscard]] std::uint64_t AlignUp(const std::uint64_t value, const std::uint32_t alignment) noexcept
         {
@@ -50,11 +55,19 @@ namespace Extrinsic::Graphics
             std::uint32_t Generation = 0;
             std::uint64_t VertexByteOffset = 0;
             std::uint64_t VertexByteCount = 0;
+            std::uint64_t PositionByteOffset = 0;
+            std::uint64_t PositionByteCount = 0;
+            std::uint64_t TexcoordByteOffset = 0;
+            std::uint64_t TexcoordByteCount = 0;
+            std::uint64_t NormalByteOffset = 0;
+            std::uint64_t NormalByteCount = 0;
+            std::uint64_t ColorByteOffset = 0;
+            std::uint64_t ColorByteCount = 0;
             std::uint64_t IndexByteOffset = 0;
             std::uint64_t SurfaceIndexByteCount = 0;
             std::uint64_t LineIndexByteCount = 0;
             std::uint32_t VertexCount = 0;
-            std::uint32_t VertexStride = 0;
+            std::uint32_t VertexElementOffset = 0;
             std::vector<std::byte> VertexBytes;
             std::vector<std::uint32_t> SurfaceIndices;
             std::vector<std::uint32_t> LineIndices;
@@ -236,6 +249,153 @@ namespace Extrinsic::Graphics
             }
             return static_cast<float>(static_cast<double>(fragmented) / static_cast<double>(usedHighWater));
         }
+
+        [[nodiscard]] bool ChannelSizeMatches(const std::span<const std::byte> bytes,
+                                               const std::uint32_t vertexCount,
+                                               const std::uint32_t elemSize) noexcept
+        {
+            return bytes.size_bytes() ==
+                static_cast<std::uint64_t>(vertexCount) * static_cast<std::uint64_t>(elemSize);
+        }
+
+        [[nodiscard]] std::vector<std::byte> DeinterleaveChannel(
+            const std::span<const std::byte> packed,
+            const std::uint32_t vertexCount,
+            const std::uint32_t stride,
+            const std::uint32_t channelOffset,
+            const std::uint32_t elemSize)
+        {
+            std::vector<std::byte> out(
+                static_cast<std::size_t>(vertexCount) * static_cast<std::size_t>(elemSize));
+            for (std::uint32_t v = 0; v < vertexCount; ++v)
+            {
+                std::memcpy(out.data() + static_cast<std::size_t>(v) * elemSize,
+                            packed.data() + static_cast<std::size_t>(v) * stride + channelOffset,
+                            elemSize);
+            }
+            return out;
+        }
+
+        [[nodiscard]] std::uint64_t AppendChannelBytes(
+            std::vector<std::byte>& dst,
+            const std::span<const std::byte> src,
+            std::uint64_t cursor,
+            std::uint64_t& outByteOffset,
+            std::uint64_t& outByteCount)
+        {
+            outByteOffset = 0u;
+            outByteCount = src.size_bytes();
+            if (src.empty())
+            {
+                return cursor;
+            }
+
+            const std::uint64_t offset = AlignUp(cursor, alignof(float));
+            outByteOffset = offset;
+            const std::uint64_t end = offset + outByteCount;
+            dst.resize(static_cast<std::size_t>(end));
+            std::memcpy(dst.data() + static_cast<std::ptrdiff_t>(offset),
+                        src.data(),
+                        static_cast<std::size_t>(outByteCount));
+            return end;
+        }
+
+        struct UploadChannelBytes
+        {
+            std::vector<std::byte> Position;
+            std::vector<std::byte> Texcoord;
+            std::vector<std::byte> Normal;
+            std::vector<std::byte> Color;
+            bool Valid = true;
+        };
+
+        void AssignBytes(std::vector<std::byte>& dst, const std::span<const std::byte> src)
+        {
+            dst.assign(src.begin(), src.end());
+        }
+
+        [[nodiscard]] UploadChannelBytes BuildUploadChannelBytes(
+            const GpuWorld::GeometryUploadDesc& desc)
+        {
+            UploadChannelBytes out{};
+
+            std::span<const std::byte> positionBytes = desc.PositionBytes;
+            std::span<const std::byte> texcoordBytes = desc.TexcoordBytes;
+            std::span<const std::byte> normalBytes = desc.NormalBytes;
+
+            const std::uint64_t packedVertexSize = desc.PackedVertexBytes.size_bytes();
+            if (desc.VertexCount > 0u && !desc.PackedVertexBytes.empty())
+            {
+                if ((packedVertexSize % desc.VertexCount) != 0u)
+                {
+                    out.Valid = false;
+                    return out;
+                }
+                const std::uint32_t legacyStride =
+                    static_cast<std::uint32_t>(packedVertexSize / desc.VertexCount);
+                if (positionBytes.empty() && legacyStride >= kPositionElementBytes)
+                {
+                    out.Position = DeinterleaveChannel(
+                        desc.PackedVertexBytes,
+                        desc.VertexCount,
+                        legacyStride,
+                        0u,
+                        kPositionElementBytes);
+                    positionBytes = std::span<const std::byte>{out.Position};
+                }
+                if (texcoordBytes.empty() &&
+                    legacyStride >= kPositionElementBytes + kTexcoordElementBytes)
+                {
+                    out.Texcoord = DeinterleaveChannel(
+                        desc.PackedVertexBytes,
+                        desc.VertexCount,
+                        legacyStride,
+                        kPositionElementBytes,
+                        kTexcoordElementBytes);
+                    texcoordBytes = std::span<const std::byte>{out.Texcoord};
+                }
+                if (normalBytes.empty() &&
+                    legacyStride >= kPositionElementBytes + kTexcoordElementBytes + kNormalElementBytes)
+                {
+                    out.Normal = DeinterleaveChannel(
+                        desc.PackedVertexBytes,
+                        desc.VertexCount,
+                        legacyStride,
+                        kPositionElementBytes + kTexcoordElementBytes,
+                        kNormalElementBytes);
+                    normalBytes = std::span<const std::byte>{out.Normal};
+                }
+            }
+
+            if (out.Position.empty())
+            {
+                AssignBytes(out.Position, positionBytes);
+            }
+            if (out.Texcoord.empty())
+            {
+                AssignBytes(out.Texcoord, texcoordBytes);
+            }
+            if (out.Normal.empty())
+            {
+                AssignBytes(out.Normal, normalBytes);
+            }
+            if (!desc.PackedVertexColors.empty())
+            {
+                AssignBytes(out.Color, std::as_bytes(desc.PackedVertexColors));
+            }
+
+            out.Valid =
+                (desc.VertexCount == 0u ||
+                 (!out.Position.empty() &&
+                  ChannelSizeMatches(out.Position, desc.VertexCount, kPositionElementBytes))) &&
+                (out.Texcoord.empty() ||
+                 ChannelSizeMatches(out.Texcoord, desc.VertexCount, kTexcoordElementBytes)) &&
+                (out.Normal.empty() ||
+                 ChannelSizeMatches(out.Normal, desc.VertexCount, kNormalElementBytes)) &&
+                (out.Color.empty() ||
+                 ChannelSizeMatches(out.Color, desc.VertexCount, kColorElementBytes));
+            return out;
+        }
     }
 
     struct GpuWorld::Impl
@@ -273,6 +433,7 @@ namespace Extrinsic::Graphics
         bool PendingBoundsUploadBarrier = false;
         bool PendingLightsUploadBarrier = false;
         bool PendingManagedVertexUploadBarrier = false;
+        GpuWorld::GeometryChannelUpdateMask PendingManagedVertexChannelUploadBarriers{};
         bool PendingManagedIndexUploadBarrier = false;
         std::uint64_t FrameIndex = 0;
         std::uint32_t VertexOverflowCount = 0;
@@ -283,6 +444,7 @@ namespace Extrinsic::Graphics
         std::uint32_t StaleCompactionRelocationCount = 0;
 
         std::uint64_t VertexBumpOffset = 0;
+        std::uint32_t VertexElementBumpOffset = 0;
         std::uint64_t IndexBumpOffset  = 0;
 
         RHI::BufferManager::BufferLease InstanceStaticLease;
@@ -489,9 +651,7 @@ namespace Extrinsic::Graphics
 
         [[nodiscard]] std::uint32_t VertexOffsetUnits(const ManagedGeometryAllocation& allocation) const noexcept
         {
-            return allocation.VertexStride > 0u
-                ? static_cast<std::uint32_t>(allocation.VertexByteOffset / allocation.VertexStride)
-                : 0u;
+            return allocation.VertexElementOffset;
         }
 
         [[nodiscard]] std::uint32_t SurfaceFirstIndex(const ManagedGeometryAllocation& allocation) const noexcept
@@ -509,8 +669,18 @@ namespace Extrinsic::Graphics
             auto& allocation = GeometryAllocations[slot];
             auto& rec = GeometryRecordsCpu[slot];
             rec = {};
-            rec.VertexBufferBDA = Device ? Device->GetBufferDeviceAddress(ManagedVertexLease.GetHandle()) : 0;
+            const std::uint64_t vertexBaseBda =
+                Device ? Device->GetBufferDeviceAddress(ManagedVertexLease.GetHandle()) : 0;
+            rec.VertexBufferBDA = allocation.PositionByteCount > 0u
+                ? vertexBaseBda + allocation.VertexByteOffset + allocation.PositionByteOffset
+                : 0u;
             rec.IndexBufferBDA = Device ? Device->GetBufferDeviceAddress(ManagedIndexLease.GetHandle()) : 0;
+            rec.TexcoordBufferBDA = allocation.TexcoordByteCount > 0u
+                ? vertexBaseBda + allocation.VertexByteOffset + allocation.TexcoordByteOffset
+                : 0u;
+            rec.NormalBufferBDA = allocation.NormalByteCount > 0u
+                ? vertexBaseBda + allocation.VertexByteOffset + allocation.NormalByteOffset
+                : 0u;
             const std::uint32_t vertexOffset = VertexOffsetUnits(allocation);
             rec.VertexOffset = vertexOffset;
             rec.VertexCount = allocation.VertexCount;
@@ -520,6 +690,9 @@ namespace Extrinsic::Graphics
             rec.LineIndexCount = static_cast<std::uint32_t>(allocation.LineIndices.size());
             rec.PointFirstVertex = vertexOffset;
             rec.PointVertexCount = allocation.VertexCount;
+            rec.ColorBufferBDA = allocation.ColorByteCount > 0u
+                ? vertexBaseBda + allocation.VertexByteOffset + allocation.ColorByteOffset
+                : 0u;
             DirtyGeometryRecord[slot] = true;
         }
 
@@ -664,7 +837,11 @@ namespace Extrinsic::Graphics
         m_Impl->DirtyBounds.clear();
 
         m_Impl->VertexBumpOffset = 0;
+        m_Impl->VertexElementBumpOffset = 0;
         m_Impl->IndexBumpOffset = 0;
+        m_Impl->PendingManagedVertexUploadBarrier = false;
+        m_Impl->PendingManagedVertexChannelUploadBarriers = {};
+        m_Impl->PendingManagedIndexUploadBarrier = false;
         m_Impl->FrameIndex = 0;
         m_Impl->VertexOverflowCount = 0;
         m_Impl->IndexOverflowCount = 0;
@@ -739,22 +916,127 @@ namespace Extrinsic::Graphics
             return {};
         }
 
-        const std::uint64_t vbSize = desc.PackedVertexBytes.size_bytes();
+        std::vector<std::byte> deinterleavedPositions;
+        std::vector<std::byte> deinterleavedTexcoords;
+        std::vector<std::byte> deinterleavedNormals;
+
+        std::span<const std::byte> positionBytes = desc.PositionBytes;
+        std::span<const std::byte> texcoordBytes = desc.TexcoordBytes;
+        std::span<const std::byte> normalBytes = desc.NormalBytes;
+
+        const std::uint64_t packedVertexSize = desc.PackedVertexBytes.size_bytes();
+        if (desc.VertexCount > 0u && !desc.PackedVertexBytes.empty())
+        {
+            assert((packedVertexSize % desc.VertexCount) == 0u);
+            const std::uint32_t legacyStride =
+                static_cast<std::uint32_t>(packedVertexSize / desc.VertexCount);
+            if (positionBytes.empty() && legacyStride >= kPositionElementBytes)
+            {
+                deinterleavedPositions = DeinterleaveChannel(
+                    desc.PackedVertexBytes,
+                    desc.VertexCount,
+                    legacyStride,
+                    0u,
+                    kPositionElementBytes);
+                positionBytes = std::span<const std::byte>{deinterleavedPositions};
+            }
+            if (texcoordBytes.empty() &&
+                legacyStride >= kPositionElementBytes + kTexcoordElementBytes)
+            {
+                deinterleavedTexcoords = DeinterleaveChannel(
+                    desc.PackedVertexBytes,
+                    desc.VertexCount,
+                    legacyStride,
+                    kPositionElementBytes,
+                    kTexcoordElementBytes);
+                texcoordBytes = std::span<const std::byte>{deinterleavedTexcoords};
+            }
+            if (normalBytes.empty() &&
+                legacyStride >= kPositionElementBytes + kTexcoordElementBytes + kNormalElementBytes)
+            {
+                deinterleavedNormals = DeinterleaveChannel(
+                    desc.PackedVertexBytes,
+                    desc.VertexCount,
+                    legacyStride,
+                    kPositionElementBytes + kTexcoordElementBytes,
+                    kNormalElementBytes);
+                normalBytes = std::span<const std::byte>{deinterleavedNormals};
+            }
+        }
+
         const std::uint64_t surfSize = desc.SurfaceIndices.size_bytes();
         const std::uint64_t lineSize = desc.LineIndices.size_bytes();
 
-        const std::uint32_t vertexStride =
-            (desc.VertexCount > 0u) ? static_cast<std::uint32_t>(vbSize / desc.VertexCount) : 0u;
-        assert(desc.VertexCount == 0u || (vbSize % desc.VertexCount) == 0u);
+        if (desc.VertexCount > 0u &&
+            (positionBytes.empty() ||
+             !ChannelSizeMatches(positionBytes, desc.VertexCount, kPositionElementBytes) ||
+             (!texcoordBytes.empty() &&
+              !ChannelSizeMatches(texcoordBytes, desc.VertexCount, kTexcoordElementBytes)) ||
+             (!normalBytes.empty() &&
+              !ChannelSizeMatches(normalBytes, desc.VertexCount, kNormalElementBytes))))
+        {
+            m_Impl->GeometrySlots.Free(h, m_Impl->FrameIndex);
+            return {};
+        }
+        if (!desc.PackedVertexColors.empty() &&
+            desc.PackedVertexColors.size() != static_cast<std::size_t>(desc.VertexCount))
+        {
+            m_Impl->GeometrySlots.Free(h, m_Impl->FrameIndex);
+            return {};
+        }
 
-        const std::uint64_t vbOffset = AlignUp(m_Impl->VertexBumpOffset, vertexStride);
+        std::vector<std::byte> managedVertexBytes;
+        std::uint64_t cursor = 0u;
+        std::uint64_t positionOffset = 0u;
+        std::uint64_t texcoordOffset = 0u;
+        std::uint64_t normalOffset = 0u;
+        std::uint64_t colorOffset = 0u;
+        std::uint64_t positionByteCount = 0u;
+        std::uint64_t texcoordByteCount = 0u;
+        std::uint64_t normalByteCount = 0u;
+        std::uint64_t colorByteCount = 0u;
+        cursor = AppendChannelBytes(
+            managedVertexBytes,
+            positionBytes,
+            cursor,
+            positionOffset,
+            positionByteCount);
+        cursor = AppendChannelBytes(
+            managedVertexBytes,
+            texcoordBytes,
+            cursor,
+            texcoordOffset,
+            texcoordByteCount);
+        cursor = AppendChannelBytes(
+            managedVertexBytes,
+            normalBytes,
+            cursor,
+            normalOffset,
+            normalByteCount);
+        if (!desc.PackedVertexColors.empty())
+        {
+            const std::uint64_t colorSize =
+                static_cast<std::uint64_t>(desc.PackedVertexColors.size()) * kColorElementBytes;
+            const std::uint64_t alignedColorOffset = AlignUp(cursor, alignof(std::uint32_t));
+            colorOffset = alignedColorOffset;
+            const std::uint64_t end = alignedColorOffset + colorSize;
+            managedVertexBytes.resize(static_cast<std::size_t>(end));
+            std::memcpy(managedVertexBytes.data() + static_cast<std::ptrdiff_t>(alignedColorOffset),
+                        desc.PackedVertexColors.data(),
+                        static_cast<std::size_t>(colorSize));
+            cursor = end;
+            colorByteCount = colorSize;
+        }
+        const std::uint64_t managedVertexSize = cursor;
+
+        const std::uint64_t vbOffset = AlignUp(m_Impl->VertexBumpOffset, kManagedVertexBlockAlignment);
         const std::uint64_t surfOffset = m_Impl->IndexBumpOffset;
         const std::uint64_t lineOffset = surfOffset + surfSize;
 
-        if (vbOffset + vbSize > m_Impl->Desc.VertexBufferBytes ||
+        if (vbOffset + managedVertexSize > m_Impl->Desc.VertexBufferBytes ||
             lineOffset + lineSize > m_Impl->Desc.IndexBufferBytes)
         {
-            if (vbOffset + vbSize > m_Impl->Desc.VertexBufferBytes)
+            if (vbOffset + managedVertexSize > m_Impl->Desc.VertexBufferBytes)
             {
                 ++m_Impl->VertexOverflowCount;
             }
@@ -768,11 +1050,11 @@ namespace Extrinsic::Graphics
 
         if (m_Impl->Device->IsOperational())
         {
-            if (vbSize > 0)
+            if (managedVertexSize > 0)
             {
                 m_Impl->Device->WriteBuffer(GetManagedVertexBuffer(),
-                                            desc.PackedVertexBytes.data(),
-                                            vbSize,
+                                            managedVertexBytes.data(),
+                                            managedVertexSize,
                                             vbOffset);
                 m_Impl->PendingManagedVertexUploadBarrier = true;
             }
@@ -794,28 +1076,239 @@ namespace Extrinsic::Graphics
             }
         }
 
-        assert(vertexStride == 0u || (vbOffset % vertexStride) == 0u);
-
         auto& allocation = m_Impl->GeometryAllocations[h.Index];
         allocation = {};
         allocation.Live = true;
         allocation.Generation = h.Generation;
         allocation.VertexByteOffset = vbOffset;
-        allocation.VertexByteCount = vbSize;
+        allocation.VertexByteCount = managedVertexSize;
+        allocation.PositionByteOffset = positionOffset;
+        allocation.PositionByteCount = positionByteCount;
+        allocation.TexcoordByteOffset = texcoordOffset;
+        allocation.TexcoordByteCount = texcoordByteCount;
+        allocation.NormalByteOffset = normalOffset;
+        allocation.NormalByteCount = normalByteCount;
+        allocation.ColorByteOffset = colorOffset;
+        allocation.ColorByteCount = colorByteCount;
         allocation.IndexByteOffset = surfOffset;
         allocation.SurfaceIndexByteCount = surfSize;
         allocation.LineIndexByteCount = lineSize;
         allocation.VertexCount = desc.VertexCount;
-        allocation.VertexStride = vertexStride;
-        allocation.VertexBytes.assign(desc.PackedVertexBytes.begin(), desc.PackedVertexBytes.end());
+        allocation.VertexElementOffset = m_Impl->VertexElementBumpOffset;
+        allocation.VertexBytes = std::move(managedVertexBytes);
         allocation.SurfaceIndices.assign(desc.SurfaceIndices.begin(), desc.SurfaceIndices.end());
         allocation.LineIndices.assign(desc.LineIndices.begin(), desc.LineIndices.end());
 
         m_Impl->RewriteGeometryRecord(h.Index);
 
-        m_Impl->VertexBumpOffset = vbOffset + vbSize;
+        m_Impl->VertexBumpOffset = vbOffset + managedVertexSize;
+        m_Impl->VertexElementBumpOffset += desc.VertexCount;
         m_Impl->IndexBumpOffset = lineOffset + lineSize;
         return h;
+    }
+
+    GpuWorld::GeometryChannelUpdateResult GpuWorld::UpdateGeometryChannels(
+        const GpuGeometryHandle geometry,
+        const GeometryUploadDesc& desc,
+        const GeometryChannelUpdateMask channels)
+    {
+        GeometryChannelUpdateResult result{};
+        if (!channels.Any())
+        {
+            result.Status = GeometryChannelUpdateStatus::NoChannels;
+            return result;
+        }
+        if (!m_Impl->GeometrySlots.ResolveForUse(geometry) ||
+            geometry.Index >= m_Impl->GeometryAllocations.size())
+        {
+            result.Status = GeometryChannelUpdateStatus::InvalidHandle;
+            return result;
+        }
+
+        auto& allocation = m_Impl->GeometryAllocations[geometry.Index];
+        if (!allocation.Live || allocation.Generation != geometry.Generation)
+        {
+            result.Status = GeometryChannelUpdateStatus::InvalidHandle;
+            return result;
+        }
+
+        const std::uint64_t surfSize = desc.SurfaceIndices.size_bytes();
+        const std::uint64_t lineSize = desc.LineIndices.size_bytes();
+        if (desc.VertexCount != allocation.VertexCount ||
+            surfSize != allocation.SurfaceIndexByteCount ||
+            lineSize != allocation.LineIndexByteCount)
+        {
+            result.Status = GeometryChannelUpdateStatus::FullUploadRequired;
+            return result;
+        }
+
+        const UploadChannelBytes upload = BuildUploadChannelBytes(desc);
+        if (!upload.Valid)
+        {
+            result.Status = GeometryChannelUpdateStatus::InvalidInput;
+            return result;
+        }
+
+        bool wroteAnyChannel = false;
+        bool rewroteRecord = false;
+        bool requiresFullUpload = false;
+
+        const auto requiredChannelCanUpdate =
+            [](const bool requested,
+               const std::span<const std::byte> bytes,
+               const std::uint64_t byteCount) noexcept
+        {
+            return !requested ||
+                (!bytes.empty() && byteCount != 0u && bytes.size_bytes() == byteCount);
+        };
+        const auto optionalChannelCanUpdate =
+            [](const bool requested,
+               const std::span<const std::byte> bytes,
+               const std::uint64_t byteCount) noexcept
+        {
+            return !requested ||
+                bytes.empty() ||
+                (byteCount != 0u && bytes.size_bytes() == byteCount);
+        };
+
+        if (!requiredChannelCanUpdate(channels.Position,
+                                      std::span<const std::byte>{upload.Position},
+                                      allocation.PositionByteCount) ||
+            !optionalChannelCanUpdate(channels.Texcoord,
+                                      std::span<const std::byte>{upload.Texcoord},
+                                      allocation.TexcoordByteCount) ||
+            !optionalChannelCanUpdate(channels.Normal,
+                                      std::span<const std::byte>{upload.Normal},
+                                      allocation.NormalByteCount) ||
+            !optionalChannelCanUpdate(channels.Color,
+                                      std::span<const std::byte>{upload.Color},
+                                      allocation.ColorByteCount))
+        {
+            result.Status = GeometryChannelUpdateStatus::FullUploadRequired;
+            return result;
+        }
+
+        const auto writeRequiredChannel =
+            [&](const bool requested,
+                const std::span<const std::byte> bytes,
+                const std::uint64_t byteOffset,
+                const std::uint64_t byteCount,
+                bool& uploadedFlag)
+        {
+            if (!requested)
+            {
+                return;
+            }
+            if (bytes.empty() || byteCount == 0u || bytes.size_bytes() != byteCount)
+            {
+                requiresFullUpload = true;
+                return;
+            }
+            std::memcpy(allocation.VertexBytes.data() +
+                            static_cast<std::ptrdiff_t>(byteOffset),
+                        bytes.data(),
+                        static_cast<std::size_t>(byteCount));
+            if (m_Impl->Device != nullptr && m_Impl->Device->IsOperational())
+            {
+                m_Impl->Device->WriteBuffer(GetManagedVertexBuffer(),
+                                            bytes.data(),
+                                            byteCount,
+                                            allocation.VertexByteOffset + byteOffset);
+                uploadedFlag = true;
+                wroteAnyChannel = true;
+            }
+        };
+
+        const auto writeOptionalChannel =
+            [&](const bool requested,
+                const std::span<const std::byte> bytes,
+                const std::uint64_t byteOffset,
+                std::uint64_t& byteCount,
+                bool& uploadedFlag)
+        {
+            if (!requested)
+            {
+                return;
+            }
+            if (bytes.empty())
+            {
+                if (byteCount != 0u)
+                {
+                    byteCount = 0u;
+                    rewroteRecord = true;
+                }
+                return;
+            }
+            if (byteCount == 0u || bytes.size_bytes() != byteCount)
+            {
+                requiresFullUpload = true;
+                return;
+            }
+            std::memcpy(allocation.VertexBytes.data() +
+                            static_cast<std::ptrdiff_t>(byteOffset),
+                        bytes.data(),
+                        static_cast<std::size_t>(byteCount));
+            if (m_Impl->Device != nullptr && m_Impl->Device->IsOperational())
+            {
+                m_Impl->Device->WriteBuffer(GetManagedVertexBuffer(),
+                                            bytes.data(),
+                                            byteCount,
+                                            allocation.VertexByteOffset + byteOffset);
+                uploadedFlag = true;
+                wroteAnyChannel = true;
+            }
+        };
+
+        writeRequiredChannel(channels.Position,
+                             std::span<const std::byte>{upload.Position},
+                             allocation.PositionByteOffset,
+                             allocation.PositionByteCount,
+                             result.UploadedChannels.Position);
+        writeOptionalChannel(channels.Texcoord,
+                             std::span<const std::byte>{upload.Texcoord},
+                             allocation.TexcoordByteOffset,
+                             allocation.TexcoordByteCount,
+                             result.UploadedChannels.Texcoord);
+        writeOptionalChannel(channels.Normal,
+                             std::span<const std::byte>{upload.Normal},
+                             allocation.NormalByteOffset,
+                             allocation.NormalByteCount,
+                             result.UploadedChannels.Normal);
+        writeOptionalChannel(channels.Color,
+                             std::span<const std::byte>{upload.Color},
+                             allocation.ColorByteOffset,
+                             allocation.ColorByteCount,
+                             result.UploadedChannels.Color);
+
+        if (requiresFullUpload)
+        {
+            result.Status = GeometryChannelUpdateStatus::FullUploadRequired;
+            result.UploadedChannels = {};
+            return result;
+        }
+
+        if (rewroteRecord)
+        {
+            m_Impl->RewriteGeometryRecord(geometry.Index);
+            result.GeometryRecordUpdated = true;
+        }
+        if (wroteAnyChannel)
+        {
+            m_Impl->PendingManagedVertexChannelUploadBarriers.Position =
+                m_Impl->PendingManagedVertexChannelUploadBarriers.Position ||
+                result.UploadedChannels.Position;
+            m_Impl->PendingManagedVertexChannelUploadBarriers.Texcoord =
+                m_Impl->PendingManagedVertexChannelUploadBarriers.Texcoord ||
+                result.UploadedChannels.Texcoord;
+            m_Impl->PendingManagedVertexChannelUploadBarriers.Normal =
+                m_Impl->PendingManagedVertexChannelUploadBarriers.Normal ||
+                result.UploadedChannels.Normal;
+            m_Impl->PendingManagedVertexChannelUploadBarriers.Color =
+                m_Impl->PendingManagedVertexChannelUploadBarriers.Color ||
+                result.UploadedChannels.Color;
+        }
+        result.Status = GeometryChannelUpdateStatus::Updated;
+        return result;
     }
 
     void GpuWorld::FreeGeometry(GpuGeometryHandle geometry)
@@ -1035,7 +1528,7 @@ namespace Extrinsic::Graphics
             const std::uint64_t oldVertexOffset = allocation.VertexByteOffset;
             const std::uint64_t oldIndexOffset = allocation.IndexByteOffset;
             const std::uint64_t oldLineOffset = oldIndexOffset + allocation.SurfaceIndexByteCount;
-            const std::uint64_t newVertexOffset = AlignUp(nextVertexOffset, allocation.VertexStride);
+            const std::uint64_t newVertexOffset = AlignUp(nextVertexOffset, kManagedVertexBlockAlignment);
             const std::uint64_t newIndexOffset = nextIndexOffset;
             const std::uint64_t newLineOffset = newIndexOffset + allocation.SurfaceIndexByteCount;
 
@@ -1058,12 +1551,8 @@ namespace Extrinsic::Graphics
                     .OldIndexByteOffset = oldIndexOffset,
                     .NewIndexByteOffset = newIndexOffset,
                     .IndexByteCount = allocation.IndexByteCount(),
-                    .OldVertexOffset = allocation.VertexStride > 0u
-                        ? static_cast<std::uint32_t>(oldVertexOffset / allocation.VertexStride)
-                        : 0u,
-                    .NewVertexOffset = allocation.VertexStride > 0u
-                        ? static_cast<std::uint32_t>(newVertexOffset / allocation.VertexStride)
-                        : 0u,
+                    .OldVertexOffset = allocation.VertexElementOffset,
+                    .NewVertexOffset = allocation.VertexElementOffset,
                     .OldSurfaceFirstIndex = static_cast<std::uint32_t>(oldIndexOffset / sizeof(std::uint32_t)),
                     .NewSurfaceFirstIndex = static_cast<std::uint32_t>(newIndexOffset / sizeof(std::uint32_t)),
                     .OldLineFirstIndex = static_cast<std::uint32_t>(oldLineOffset / sizeof(std::uint32_t)),
@@ -1239,7 +1728,11 @@ namespace Extrinsic::Graphics
         submit(GetGeometryRecordBuffer(), m_Impl->PendingGeometryRecordUploadBarrier, RHI::MemoryAccess::ShaderRead);
         submit(GetBoundsBuffer(), m_Impl->PendingBoundsUploadBarrier, RHI::MemoryAccess::ShaderRead);
         submit(GetLightBuffer(), m_Impl->PendingLightsUploadBarrier, RHI::MemoryAccess::ShaderRead);
+        m_Impl->PendingManagedVertexUploadBarrier =
+            m_Impl->PendingManagedVertexUploadBarrier ||
+            m_Impl->PendingManagedVertexChannelUploadBarriers.Any();
         submit(GetManagedVertexBuffer(), m_Impl->PendingManagedVertexUploadBarrier, RHI::MemoryAccess::ShaderRead);
+        m_Impl->PendingManagedVertexChannelUploadBarriers = {};
         submit(GetManagedIndexBuffer(),
                m_Impl->PendingManagedIndexUploadBarrier,
                RHI::MemoryAccess::IndexRead | RHI::MemoryAccess::ShaderRead);

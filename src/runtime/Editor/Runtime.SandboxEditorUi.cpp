@@ -11,6 +11,7 @@ module;
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -40,6 +41,10 @@ import Extrinsic.ECS.Components.Selection;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.CameraSnapshots;
+import Extrinsic.Graphics.CurrentRendererContractAdapter;
+import Extrinsic.Graphics.RenderFrameInput;
+import Extrinsic.Graphics.RenderRecipeConfig;
+import Extrinsic.Graphics.RenderingContract;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.CameraControllers;
@@ -54,9 +59,12 @@ import Extrinsic.Runtime.ProgressivePresentationExtraction;
 import Extrinsic.Runtime.ProgressiveRenderData;
 import Extrinsic.Runtime.PrimitiveSelectionRefinement;
 import Extrinsic.Runtime.RenderExtraction;
+import Extrinsic.Runtime.RenderArtifactPublication;
 import Extrinsic.Runtime.SceneSerialization;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.SelectionController;
+import Extrinsic.Runtime.VertexAttributeBinding;
+import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Vertices.Normals;
 import Geometry.KMeans;
@@ -182,6 +190,7 @@ namespace Extrinsic::Runtime
             FileScene,
             FileImport,
             FrameGraph,
+            RenderRecipe,
             CameraRender,
             GeometryVisualization,
             Count,
@@ -201,6 +210,7 @@ namespace Extrinsic::Runtime
                 SandboxEditorPanelWindowKind::FileScene,
                 SandboxEditorPanelWindowKind::FileImport,
                 SandboxEditorPanelWindowKind::FrameGraph,
+                SandboxEditorPanelWindowKind::RenderRecipe,
                 SandboxEditorPanelWindowKind::CameraRender,
                 SandboxEditorPanelWindowKind::GeometryVisualization,
             }};
@@ -224,6 +234,8 @@ namespace Extrinsic::Runtime
                 return "File / Import";
             case SandboxEditorPanelWindowKind::FrameGraph:
                 return "Frame Graph";
+            case SandboxEditorPanelWindowKind::RenderRecipe:
+                return "Render Recipes";
             case SandboxEditorPanelWindowKind::CameraRender:
                 return "Camera / Render";
             case SandboxEditorPanelWindowKind::GeometryVisualization:
@@ -1454,6 +1466,372 @@ namespace Extrinsic::Runtime
             return model;
         }
 
+        [[nodiscard]] std::optional<SandboxEditorPropertyCatalogDomain>
+        VertexChannelCatalogDomainForView(
+            const GS::ConstSourceView& view) noexcept
+        {
+            const GS::SourceAvailability availability =
+                GS::BuildSourceAvailability(view);
+            using Domain = SandboxEditorPropertyCatalogDomain;
+            switch (availability.ProvenanceDomain)
+            {
+            case GS::Domain::Mesh:
+                return Domain::MeshVertices;
+            case GS::Domain::Graph:
+                return Domain::GraphVertices;
+            case GS::Domain::PointCloud:
+                return Domain::PointCloudPoints;
+            case GS::Domain::None:
+            case GS::Domain::Unknown:
+                break;
+            }
+            return std::nullopt;
+        }
+
+        [[nodiscard]] const Geometry::PropertySet*
+        VertexChannelPropertySetForView(
+            const GS::ConstSourceView& view,
+            const SandboxEditorPropertyCatalogDomain domain) noexcept
+        {
+            const GeometryEntityAvailability availability =
+                BuildGeometryAvailability(view);
+            return PropertySetForCatalogDomain(availability, domain);
+        }
+
+        [[nodiscard]] std::optional<AttributeSourceType>
+        ToAttributeSourceType(
+            const SandboxEditorPropertyCatalogValueKind kind) noexcept
+        {
+            using Kind = SandboxEditorPropertyCatalogValueKind;
+            switch (kind)
+            {
+            case Kind::ScalarFloat:
+                return AttributeSourceType::Float32;
+            case Kind::Vec2:
+                return AttributeSourceType::Vec2;
+            case Kind::Vec3:
+                return AttributeSourceType::Vec3;
+            case Kind::Vec4:
+                return AttributeSourceType::Vec4;
+            case Kind::ScalarDouble:
+            case Kind::UInt32:
+            case Kind::Unknown:
+                break;
+            }
+            return std::nullopt;
+        }
+
+        [[nodiscard]] bool SourceTypeAllowedForVertexChannel(
+            const VertexChannel channel,
+            const AttributeSourceType type) noexcept
+        {
+            switch (channel)
+            {
+            case VertexChannel::Normal:
+                return type == AttributeSourceType::Vec3;
+            case VertexChannel::Color:
+                return type == AttributeSourceType::Vec3 ||
+                       type == AttributeSourceType::Vec4;
+            case VertexChannel::Position:
+            case VertexChannel::Texcoord:
+            case VertexChannel::Tangent:
+            case VertexChannel::Custom:
+                break;
+            }
+            return false;
+        }
+
+        [[nodiscard]] const char* VertexChannelExpectedTypeText(
+            const VertexChannel channel) noexcept
+        {
+            switch (channel)
+            {
+            case VertexChannel::Normal:
+                return "requires vec3";
+            case VertexChannel::Color:
+                return "requires vec3 or vec4";
+            case VertexChannel::Position:
+            case VertexChannel::Texcoord:
+            case VertexChannel::Tangent:
+            case VertexChannel::Custom:
+                break;
+            }
+            return "unsupported vertex channel";
+        }
+
+        [[nodiscard]] AttributeBindResult EvaluateVertexChannelBinding(
+            const Geometry::PropertySet& properties,
+            const VertexChannel channel,
+            const std::string_view propertyName,
+            const AttributeSourceType sourceType,
+            const std::size_t elementCount)
+        {
+            if (propertyName.empty())
+            {
+                return AttributeBindResult{
+                    .Status = AttributeBindStatus::EmptyBinding,
+                    .FullyPopulated = false,
+                };
+            }
+            if (elementCount > std::numeric_limits<std::uint32_t>::max())
+            {
+                return AttributeBindResult{
+                    .Status = AttributeBindStatus::CountMismatch,
+                    .FullyPopulated = false,
+                };
+            }
+            if (!SourceTypeAllowedForVertexChannel(channel, sourceType))
+            {
+                return AttributeBindResult{
+                    .Status = AttributeBindStatus::TypeMismatch,
+                    .FullyPopulated = false,
+                };
+            }
+
+            const std::uint32_t count =
+                static_cast<std::uint32_t>(elementCount);
+            const VertexAttributeBinding binding{
+                .Channel = channel,
+                .SourceType = sourceType,
+                .SourceProperty = propertyName,
+                .AllowFallback = false,
+                .Normalize = channel == VertexChannel::Normal,
+                .Fallback = channel == VertexChannel::Normal
+                    ? glm::vec4{0.0f, 0.0f, 1.0f, 0.0f}
+                    : glm::vec4{1.0f, 1.0f, 1.0f, 1.0f},
+            };
+
+            if (channel == VertexChannel::Normal)
+            {
+                std::vector<glm::vec3> scratch(elementCount);
+                return ResolveVec3Channel(properties, binding, count, scratch);
+            }
+            if (channel == VertexChannel::Color)
+            {
+                std::vector<std::uint32_t> scratch(elementCount);
+                return ResolveColorChannelPackedUnorm8(
+                    properties,
+                    binding,
+                    count,
+                    scratch);
+            }
+            return AttributeBindResult{
+                .Status = AttributeBindStatus::TypeMismatch,
+                .FullyPopulated = false,
+            };
+        }
+
+        [[nodiscard]] std::string BuildVertexChannelResolverDiagnostic(
+            const AttributeBindResult& resolver)
+        {
+            std::string diagnostic =
+                std::string(DebugNameForAttributeBindStatus(resolver.Status));
+            diagnostic += " source=";
+            diagnostic += std::to_string(resolver.SourceCount);
+            diagnostic += " fallback=";
+            diagnostic += std::to_string(resolver.FallbackCount);
+            diagnostic += " nonFinite=";
+            diagnostic += std::to_string(resolver.NonFiniteCount);
+            return diagnostic;
+        }
+
+        [[nodiscard]] const VertexChannelSourceBinding*
+        FindVertexChannelBinding(
+            const VertexChannelBindingSet* bindings,
+            const VertexChannel channel) noexcept
+        {
+            if (bindings == nullptr)
+                return nullptr;
+            switch (channel)
+            {
+            case VertexChannel::Normal:
+                return &bindings->Normal;
+            case VertexChannel::Color:
+                return &bindings->Color;
+            case VertexChannel::Position:
+            case VertexChannel::Texcoord:
+            case VertexChannel::Tangent:
+            case VertexChannel::Custom:
+                break;
+            }
+            return nullptr;
+        }
+
+        [[nodiscard]] VertexChannelSourceBinding*
+        FindMutableVertexChannelBinding(
+            VertexChannelBindingSet& bindings,
+            const VertexChannel channel) noexcept
+        {
+            switch (channel)
+            {
+            case VertexChannel::Normal:
+                return &bindings.Normal;
+            case VertexChannel::Color:
+                return &bindings.Color;
+            case VertexChannel::Position:
+            case VertexChannel::Texcoord:
+            case VertexChannel::Tangent:
+            case VertexChannel::Custom:
+                break;
+            }
+            return nullptr;
+        }
+
+        [[nodiscard]] bool AnyVertexChannelBindingEnabled(
+            const VertexChannelBindingSet& bindings) noexcept
+        {
+            return IsVertexChannelBindingEnabled(bindings.Normal) ||
+                   IsVertexChannelBindingEnabled(bindings.Color);
+        }
+
+        [[nodiscard]] bool SameVertexChannelSourceBinding(
+            const VertexChannelSourceBinding& lhs,
+            const VertexChannelSourceBinding& rhs) noexcept
+        {
+            return lhs.Enabled == rhs.Enabled &&
+                   lhs.SourceType == rhs.SourceType &&
+                   lhs.SourceProperty == rhs.SourceProperty;
+        }
+
+        void MarkVertexChannelDirty(entt::registry& raw,
+                                    const entt::entity entity,
+                                    const VertexChannel channel)
+        {
+            switch (channel)
+            {
+            case VertexChannel::Position:
+                Dirty::MarkVertexPositionsDirty(raw, entity);
+                break;
+            case VertexChannel::Texcoord:
+                Dirty::MarkVertexTexcoordsDirty(raw, entity);
+                break;
+            case VertexChannel::Normal:
+                Dirty::MarkVertexNormalsDirty(raw, entity);
+                break;
+            case VertexChannel::Color:
+                Dirty::MarkVertexColorsDirty(raw, entity);
+                break;
+            case VertexChannel::Tangent:
+            case VertexChannel::Custom:
+                Dirty::MarkVertexAttributesDirty(raw, entity);
+                break;
+            }
+        }
+
+        [[nodiscard]] SandboxEditorVertexChannelBindingTargetModel
+        BuildVertexChannelBindingTargetModel(
+            const entt::registry& raw,
+            const ECS::EntityHandle entity,
+            const GS::ConstSourceView& view,
+            const std::vector<SandboxEditorPropertyCatalogRow>& rows,
+            const SandboxEditorPropertyCatalogDomain domain,
+            const VertexChannel channel)
+        {
+            SandboxEditorVertexChannelBindingTargetModel model{
+                .Channel = channel,
+            };
+
+            const Geometry::PropertySet* properties =
+                VertexChannelPropertySetForView(view, domain);
+            if (properties == nullptr)
+                return model;
+
+            const std::size_t expectedCount = properties->Size();
+            const auto* bindings = raw.try_get<VertexChannelBindingSet>(entity);
+            if (const VertexChannelSourceBinding* binding =
+                    FindVertexChannelBinding(bindings, channel);
+                binding != nullptr && IsVertexChannelBindingEnabled(*binding))
+            {
+                model.HasBinding = true;
+                model.Binding = *binding;
+                model.Resolver = EvaluateVertexChannelBinding(
+                    *properties,
+                    channel,
+                    binding->SourceProperty,
+                    binding->SourceType,
+                    expectedCount);
+                model.Diagnostic =
+                    BuildVertexChannelResolverDiagnostic(model.Resolver);
+            }
+
+            for (const SandboxEditorPropertyCatalogRow& row : rows)
+            {
+                if (row.Domain != domain || !row.Supported)
+                    continue;
+
+                SandboxEditorVertexChannelBindingOptionModel option{
+                    .PropertyName = row.Name,
+                    .Domain = row.Domain,
+                    .ValueKind = row.ValueKind,
+                    .ElementCount = row.ElementCount,
+                };
+                const std::optional<AttributeSourceType> sourceType =
+                    ToAttributeSourceType(row.ValueKind);
+                if (!sourceType.has_value())
+                {
+                    option.Resolver = AttributeBindResult{
+                        .Status = AttributeBindStatus::TypeMismatch,
+                        .FullyPopulated = false,
+                    };
+                    option.Compatible = false;
+                    option.DisabledReason =
+                        VertexChannelExpectedTypeText(channel);
+                    model.Options.push_back(std::move(option));
+                    continue;
+                }
+
+                option.SourceType = *sourceType;
+                option.Resolver = EvaluateVertexChannelBinding(
+                    *properties,
+                    channel,
+                    row.Name,
+                    *sourceType,
+                    expectedCount);
+                option.Compatible =
+                    SourceTypeAllowedForVertexChannel(channel, *sourceType) &&
+                    option.Resolver.Ok();
+                if (!option.Compatible)
+                {
+                    option.DisabledReason =
+                        !SourceTypeAllowedForVertexChannel(channel, *sourceType)
+                            ? VertexChannelExpectedTypeText(channel)
+                            : BuildVertexChannelResolverDiagnostic(
+                                  option.Resolver);
+                }
+                model.Options.push_back(std::move(option));
+            }
+            return model;
+        }
+
+        void AppendVertexChannelBindingTargets(
+            SandboxEditorPropertyCatalogModel& model,
+            const entt::registry& raw,
+            const ECS::EntityHandle entity,
+            const GS::ConstSourceView& view)
+        {
+            const std::optional<SandboxEditorPropertyCatalogDomain> domain =
+                VertexChannelCatalogDomainForView(view);
+            if (!domain.has_value())
+                return;
+
+            model.VertexChannelTargets.push_back(
+                BuildVertexChannelBindingTargetModel(
+                    raw,
+                    entity,
+                    view,
+                    model.Rows,
+                    *domain,
+                    VertexChannel::Normal));
+            model.VertexChannelTargets.push_back(
+                BuildVertexChannelBindingTargetModel(
+                    raw,
+                    entity,
+                    view,
+                    model.Rows,
+                    *domain,
+                    VertexChannel::Color));
+        }
+
         [[nodiscard]] SandboxEditorPropertyCatalogModel BuildPropertyCatalogModel(
             const SandboxEditorContext& context,
             const entt::registry& raw,
@@ -1489,6 +1867,8 @@ namespace Extrinsic::Runtime
                     model.BindingTargets.push_back(
                         BuildPropertyBindingTargetModel(view, slot));
             }
+
+            AppendVertexChannelBindingTargets(model, raw, entity, view);
 
             if (!view.Valid() && model.Rows.empty())
             {
@@ -4996,6 +5376,92 @@ namespace Extrinsic::Runtime
             }
         }
 
+        void DrawVertexChannelBindingTargets(
+            const SandboxEditorPropertyCatalogModel& catalog,
+            const SandboxEditorContext* context)
+        {
+            if (catalog.VertexChannelTargets.empty())
+                return;
+
+            ImGui::SeparatorText("Vertex channels");
+            const bool commandsAvailable =
+                context != nullptr && context->Scene != nullptr;
+            for (std::size_t i = 0u; i < catalog.VertexChannelTargets.size(); ++i)
+            {
+                const SandboxEditorVertexChannelBindingTargetModel& target =
+                    catalog.VertexChannelTargets[i];
+                ImGui::PushID(static_cast<int>(i));
+
+                const char* channelName =
+                    DebugNameForVertexChannel(target.Channel);
+                const std::string currentLabel =
+                    target.HasBinding ? target.Binding.SourceProperty
+                                      : std::string{"Default"};
+                ImGui::Text("%s", channelName);
+                ImGui::SameLine();
+
+                if (!commandsAvailable)
+                    ImGui::BeginDisabled();
+                if (ImGui::BeginCombo("##VertexChannelBinding",
+                                      currentLabel.c_str()))
+                {
+                    if (ImGui::Selectable("Default", !target.HasBinding) &&
+                        commandsAvailable)
+                    {
+                        (void)ApplySandboxEditorVertexChannelBindingCommand(
+                            *context,
+                            SandboxEditorVertexChannelBindingCommand{
+                                .StableEntityId = catalog.SelectedStableId,
+                                .Channel = target.Channel,
+                                .EnableBinding = false,
+                            });
+                    }
+
+                    for (const SandboxEditorVertexChannelBindingOptionModel& option :
+                         target.Options)
+                    {
+                        const bool selected =
+                            target.HasBinding &&
+                            target.Binding.SourceProperty == option.PropertyName;
+                        if (!option.Compatible)
+                            ImGui::BeginDisabled();
+                        const std::string label =
+                            option.PropertyName + " (" +
+                            DebugNameForSandboxEditorPropertyCatalogValueKind(
+                                option.ValueKind) +
+                            ", " + std::to_string(option.ElementCount) + ")";
+                        if (ImGui::Selectable(label.c_str(), selected) &&
+                            option.Compatible &&
+                            commandsAvailable)
+                        {
+                            (void)ApplySandboxEditorVertexChannelBindingCommand(
+                                *context,
+                                SandboxEditorVertexChannelBindingCommand{
+                                    .StableEntityId = catalog.SelectedStableId,
+                                    .Channel = target.Channel,
+                                    .EnableBinding = true,
+                                    .PropertyName = option.PropertyName,
+                                });
+                        }
+                        if (!option.Compatible)
+                        {
+                            ImGui::EndDisabled();
+                            ImGui::SameLine();
+                            ImGui::TextDisabled("%s",
+                                                option.DisabledReason.c_str());
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+                if (!commandsAvailable)
+                    ImGui::EndDisabled();
+
+                if (target.HasBinding && !target.Diagnostic.empty())
+                    ImGui::TextDisabled("%s", target.Diagnostic.c_str());
+                ImGui::PopID();
+            }
+        }
+
         void DrawBoundRenderStateRows(
             const SandboxEditorBoundRenderStateModel& bound)
         {
@@ -5378,6 +5844,7 @@ namespace Extrinsic::Runtime
             DrawTextureBakeControls(model.TextureBake, context, textureBakeState);
             DrawPropertyCatalogRows(model.PropertyCatalog);
             DrawPropertyBindingTargets(model.PropertyCatalog);
+            DrawVertexChannelBindingTargets(model.PropertyCatalog, context);
             DrawDiagnostics(model.PropertyCatalog.Diagnostics);
         }
 
@@ -6352,11 +6819,380 @@ namespace Extrinsic::Runtime
             }
         }
 
+        void DrawRenderRecipeEditor(
+            const SandboxEditorRenderRecipeEditorModel& model,
+            const SandboxEditorContext* context,
+            std::array<char, 8192>* draftBuffer)
+        {
+            if (!model.Available)
+            {
+                ImGui::TextDisabled("Render recipe editor is unavailable.");
+                DrawDiagnostics(model.Diagnostics);
+                return;
+            }
+
+            ImGui::Text("Renderer: %s", model.RendererId.c_str());
+            ImGui::Text("Active recipe: %s", model.ActiveRecipeId.c_str());
+            ImGui::Text("View/output: %s / %s / %s",
+                        model.ActiveViewOutputRecipeId.c_str(),
+                        model.ViewKind.c_str(),
+                        model.OutputTarget.c_str());
+            ImGui::Text("Draft: %s revision=%llu active=%llu",
+                        DebugNameForSandboxEditorRenderRecipeDraftState(
+                            model.DraftState),
+                        static_cast<unsigned long long>(model.DraftRevision),
+                        static_cast<unsigned long long>(model.ActiveRevision));
+            ImGui::Text("Validation: %s parsed slots=%u bindings=%u",
+                        std::string(Graphics::ToString(model.ValidationState)).c_str(),
+                        model.ParsedSlotCount,
+                        model.ParsedBindingOverrideCount);
+
+            const bool commandsAvailable =
+                context != nullptr &&
+                context->RenderRecipeContext != nullptr &&
+                context->RenderRecipeEditorState != nullptr &&
+                context->RenderRecipeCommandsAvailable;
+
+            if (draftBuffer != nullptr)
+            {
+                SandboxEditorRenderRecipeEditorState* state =
+                    context != nullptr ? context->RenderRecipeEditorState : nullptr;
+                if (state != nullptr &&
+                    !state->DraftDocument.empty() &&
+                    draftBuffer->front() == '\0')
+                {
+                    const std::size_t copyCount =
+                        std::min(state->DraftDocument.size(),
+                                 draftBuffer->size() - 1u);
+                    std::copy_n(state->DraftDocument.data(),
+                                copyCount,
+                                draftBuffer->data());
+                    (*draftBuffer)[copyCount] = '\0';
+                }
+                if (state != nullptr &&
+                    state->DraftDocument.empty() &&
+                    state->DraftState ==
+                        SandboxEditorRenderRecipeDraftState::Canceled)
+                {
+                    draftBuffer->fill('\0');
+                }
+
+                ImGui::InputTextMultiline("Draft JSON",
+                                          draftBuffer->data(),
+                                          draftBuffer->size(),
+                                          ImVec2(-1.0f, 180.0f));
+            }
+            else
+            {
+                ImGui::TextDisabled("Draft buffer unavailable.");
+            }
+
+            const auto draftText = [draftBuffer]() -> std::string
+            {
+                return draftBuffer != nullptr
+                    ? std::string{draftBuffer->data()}
+                    : std::string{};
+            };
+
+            if (!commandsAvailable)
+                ImGui::BeginDisabled();
+
+            if (ImGui::Button("Update Draft"))
+            {
+                (void)ApplySandboxEditorRenderRecipeCommand(
+                    *context,
+                    SandboxEditorRenderRecipeCommand{
+                        .Kind = SandboxEditorRenderRecipeCommandKind::UpdateDraft,
+                        .Document = draftText(),
+                        .SourceId = "sandbox-editor",
+                    });
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Debounce"))
+            {
+                (void)ApplySandboxEditorRenderRecipeCommand(
+                    *context,
+                    SandboxEditorRenderRecipeCommand{
+                        .Kind = SandboxEditorRenderRecipeCommandKind::UpdateDraft,
+                        .Document = draftText(),
+                        .SourceId = "sandbox-editor",
+                        .Debounced = true,
+                    });
+            }
+            ImGui::SameLine();
+            if (!model.CanValidate)
+                ImGui::BeginDisabled();
+            if (ImGui::Button("Validate"))
+            {
+                (void)ApplySandboxEditorRenderRecipeCommand(
+                    *context,
+                    SandboxEditorRenderRecipeCommand{
+                        .Kind = SandboxEditorRenderRecipeCommandKind::ValidateDraft,
+                        .Document = draftText(),
+                        .SourceId = "sandbox-editor",
+                    });
+            }
+            if (!model.CanValidate)
+                ImGui::EndDisabled();
+
+            ImGui::SameLine();
+            if (!model.CanPreview)
+                ImGui::BeginDisabled();
+            if (ImGui::Button("Preview"))
+            {
+                (void)ApplySandboxEditorRenderRecipeCommand(
+                    *context,
+                    SandboxEditorRenderRecipeCommand{
+                        .Kind = SandboxEditorRenderRecipeCommandKind::PreviewDraft,
+                        .Document = draftText(),
+                        .SourceId = "sandbox-editor",
+                    });
+            }
+            if (!model.CanPreview)
+                ImGui::EndDisabled();
+
+            ImGui::SameLine();
+            if (!model.CanActivate)
+                ImGui::BeginDisabled();
+            if (ImGui::Button("Activate Preview"))
+            {
+                (void)ApplySandboxEditorRenderRecipeCommand(
+                    *context,
+                    SandboxEditorRenderRecipeCommand{
+                        .Kind = SandboxEditorRenderRecipeCommandKind::ActivatePreview,
+                    });
+            }
+            if (!model.CanActivate)
+                ImGui::EndDisabled();
+
+            ImGui::SameLine();
+            if (!model.CanCancel)
+                ImGui::BeginDisabled();
+            if (ImGui::Button("Cancel"))
+            {
+                (void)ApplySandboxEditorRenderRecipeCommand(
+                    *context,
+                    SandboxEditorRenderRecipeCommand{
+                        .Kind = SandboxEditorRenderRecipeCommandKind::CancelDraft,
+                    });
+            }
+            if (!model.CanCancel)
+                ImGui::EndDisabled();
+
+            if (!commandsAvailable)
+                ImGui::EndDisabled();
+
+            constexpr ImGuiTableFlags tableFlags =
+                ImGuiTableFlags_Borders |
+                ImGuiTableFlags_RowBg |
+                ImGuiTableFlags_Resizable |
+                ImGuiTableFlags_SizingStretchProp;
+
+            if (ImGui::CollapsingHeader("Recipe Slots",
+                                        ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                const auto slotKindName = [](const Graphics::RecipeSlotKind kind)
+                {
+                    switch (kind)
+                    {
+                    case Graphics::RecipeSlotKind::FixedCore:
+                        return "FixedCore";
+                    case Graphics::RecipeSlotKind::Extension:
+                        return "Extension";
+                    }
+                    return "Unknown";
+                };
+                if (ImGui::BeginTable("RenderRecipeSlots", 5, tableFlags))
+                {
+                    ImGui::TableSetupColumn("Name");
+                    ImGui::TableSetupColumn("Kind");
+                    ImGui::TableSetupColumn("Schema");
+                    ImGui::TableSetupColumn("Editable");
+                    ImGui::TableSetupColumn("Reason");
+                    ImGui::TableHeadersRow();
+                    for (const SandboxEditorRenderRecipeSlotModel& slot :
+                         model.Slots)
+                    {
+                        ImGui::TableNextRow();
+                        ImGui::TableSetColumnIndex(0);
+                        ImGui::TextUnformatted(slot.StableName.c_str());
+                        ImGui::TableSetColumnIndex(1);
+                        ImGui::TextUnformatted(
+                            slotKindName(slot.Kind));
+                        ImGui::TableSetColumnIndex(2);
+                        ImGui::TextUnformatted(slot.SchemaId.c_str());
+                        ImGui::TableSetColumnIndex(3);
+                        ImGui::TextUnformatted(slot.Editable ? "yes" : "no");
+                        ImGui::TableSetColumnIndex(4);
+                        ImGui::TextWrapped("%s",
+                                           slot.DisabledReason.c_str());
+                    }
+                    ImGui::EndTable();
+                }
+            }
+
+            if (ImGui::CollapsingHeader("Binding Overrides",
+                                        ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                if (ImGui::BeginTable("RenderRecipeBindings", 7, tableFlags))
+                {
+                    ImGui::TableSetupColumn("Semantic");
+                    ImGui::TableSetupColumn("Slot");
+                    ImGui::TableSetupColumn("Domain");
+                    ImGui::TableSetupColumn("Source");
+                    ImGui::TableSetupColumn("Type");
+                    ImGui::TableSetupColumn("Editable");
+                    ImGui::TableSetupColumn("Reason");
+                    ImGui::TableHeadersRow();
+                    for (const SandboxEditorRenderRecipeBindingOverrideModel& binding :
+                         model.BindingOverrides)
+                    {
+                        ImGui::TableNextRow();
+                        ImGui::TableSetColumnIndex(0);
+                        ImGui::TextUnformatted(binding.SemanticName.c_str());
+                        ImGui::TableSetColumnIndex(1);
+                        ImGui::TextUnformatted(binding.Slot.c_str());
+                        ImGui::TableSetColumnIndex(2);
+                        ImGui::TextUnformatted(binding.SourceDomain.c_str());
+                        ImGui::TableSetColumnIndex(3);
+                        ImGui::TextUnformatted(binding.SourceIdentity.c_str());
+                        ImGui::TableSetColumnIndex(4);
+                        ImGui::Text("%s / %s",
+                                    binding.ValueType.c_str(),
+                                    binding.ValueFormat.c_str());
+                        ImGui::TableSetColumnIndex(5);
+                        ImGui::TextUnformatted(binding.Editable ? "yes" : "no");
+                        ImGui::TableSetColumnIndex(6);
+                        ImGui::TextWrapped("%s",
+                                           binding.DisabledReason.c_str());
+                    }
+                    ImGui::EndTable();
+                }
+            }
+
+            if (ImGui::CollapsingHeader("Outputs"))
+            {
+                if (ImGui::BeginTable("RenderRecipeOutputs", 4, tableFlags))
+                {
+                    ImGui::TableSetupColumn("Name");
+                    ImGui::TableSetupColumn("Kind");
+                    ImGui::TableSetupColumn("Format");
+                    ImGui::TableSetupColumn("Required");
+                    ImGui::TableHeadersRow();
+                    for (const SandboxEditorRenderRecipeOutputModel& output :
+                         model.Outputs)
+                    {
+                        ImGui::TableNextRow();
+                        ImGui::TableSetColumnIndex(0);
+                        ImGui::TextUnformatted(output.Name.c_str());
+                        ImGui::TableSetColumnIndex(1);
+                        ImGui::TextUnformatted(output.Kind.c_str());
+                        ImGui::TableSetColumnIndex(2);
+                        ImGui::TextUnformatted(output.Format.c_str());
+                        ImGui::TableSetColumnIndex(3);
+                        ImGui::TextUnformatted(output.Required ? "yes" : "no");
+                    }
+                    ImGui::EndTable();
+                }
+            }
+
+            if (ImGui::CollapsingHeader("Artifacts"))
+            {
+                if (model.Artifacts.empty())
+                {
+                    ImGui::TextDisabled("No render artifacts declared.");
+                }
+                if (ImGui::BeginTable("RenderRecipeArtifacts", 7, tableFlags))
+                {
+                    ImGui::TableSetupColumn("Artifact");
+                    ImGui::TableSetupColumn("Purpose");
+                    ImGui::TableSetupColumn("Kind");
+                    ImGui::TableSetupColumn("Status");
+                    ImGui::TableSetupColumn("Payload");
+                    ImGui::TableSetupColumn("Publish");
+                    ImGui::TableSetupColumn("Apply");
+                    ImGui::TableHeadersRow();
+                    for (const SandboxEditorRenderArtifactRow& artifact :
+                         model.Artifacts)
+                    {
+                        ImGui::PushID(artifact.ArtifactId.c_str());
+                        ImGui::TableNextRow();
+                        ImGui::TableSetColumnIndex(0);
+                        ImGui::TextUnformatted(artifact.ArtifactId.c_str());
+                        ImGui::TableSetColumnIndex(1);
+                        ImGui::TextUnformatted(artifact.Purpose.c_str());
+                        ImGui::TableSetColumnIndex(2);
+                        ImGui::TextUnformatted(
+                            std::string(ToString(artifact.Kind)).c_str());
+                        ImGui::TableSetColumnIndex(3);
+                        ImGui::TextUnformatted(
+                            std::string(ToString(artifact.Status)).c_str());
+                        ImGui::TableSetColumnIndex(4);
+                        ImGui::TextUnformatted(artifact.PayloadUri.c_str());
+                        ImGui::TableSetColumnIndex(5);
+                        const bool publishAvailable =
+                            commandsAvailable &&
+                            context->RenderArtifacts != nullptr &&
+                            artifact.CanPublish;
+                        if (!publishAvailable)
+                            ImGui::BeginDisabled();
+                        if (ImGui::Button("Publish"))
+                        {
+                            (void)ApplySandboxEditorRenderRecipeCommand(
+                                *context,
+                                SandboxEditorRenderRecipeCommand{
+                                    .Kind = SandboxEditorRenderRecipeCommandKind::PublishArtifact,
+                                    .ArtifactId = artifact.ArtifactId,
+                                    .Provenance = "sandbox-editor",
+                                });
+                        }
+                        if (!publishAvailable)
+                            ImGui::EndDisabled();
+                        ImGui::TableSetColumnIndex(6);
+                        const bool applyAvailable =
+                            commandsAvailable &&
+                            context->RenderArtifacts != nullptr &&
+                            artifact.CanApply;
+                        if (!applyAvailable)
+                            ImGui::BeginDisabled();
+                        if (ImGui::Button("Apply"))
+                        {
+                            (void)ApplySandboxEditorRenderRecipeCommand(
+                                *context,
+                                SandboxEditorRenderRecipeCommand{
+                                    .Kind = SandboxEditorRenderRecipeCommandKind::ApplyArtifact,
+                                    .ArtifactId = artifact.ArtifactId,
+                                    .Provenance = "sandbox-editor",
+                                    .ProjectTarget = "sandbox-render-recipe-artifact",
+                                });
+                        }
+                        if (!applyAvailable)
+                            ImGui::EndDisabled();
+                        ImGui::PopID();
+                    }
+                    ImGui::EndTable();
+                }
+            }
+
+            DrawDiagnostics(model.Diagnostics);
+            for (const Graphics::RenderRecipeConfigDiagnostic& diagnostic :
+                 model.RecipeDiagnostics)
+            {
+                ImGui::TextDisabled("%s/%s: %s",
+                                    std::string(Graphics::ToString(
+                                        diagnostic.State)).c_str(),
+                                    std::string(Graphics::ToString(
+                                        diagnostic.Code)).c_str(),
+                                    diagnostic.Message.c_str());
+            }
+        }
+
         void DrawPanelFrame(
             const SandboxEditorPanelFrame& frame,
             const SandboxEditorContext* context,
             std::array<char, 1024>* importPathBuffer,
             std::array<char, 1024>* scenePathBuffer,
+            std::array<char, 8192>* renderRecipeDraftBuffer,
             A::AssetPayloadKind* importPayloadKind,
             std::optional<SandboxEditorFileImportResult>* lastImportResult,
             std::optional<SandboxEditorSceneFileResult>* lastSceneFileResult,
@@ -7056,6 +7892,16 @@ namespace Extrinsic::Runtime
             }
 
             if (BeginPanelWindow(panelWindowOpen,
+                                 SandboxEditorPanelWindowKind::RenderRecipe,
+                                 ImVec2(0.0f, 0.0f)))
+            {
+                DrawRenderRecipeEditor(frame.RenderRecipe,
+                                       context,
+                                       renderRecipeDraftBuffer);
+                ImGui::End();
+            }
+
+            if (BeginPanelWindow(panelWindowOpen,
                                  SandboxEditorPanelWindowKind::CameraRender,
                                  ImVec2(0.0f, 0.0f)))
             {
@@ -7264,8 +8110,12 @@ namespace Extrinsic::Runtime
             return "CameraRenderCommandsUnavailable";
         case SandboxEditorDiagnosticCode::VisualizationCommandsUnavailable:
             return "VisualizationCommandsUnavailable";
+        case SandboxEditorDiagnosticCode::RenderRecipeCommandsUnavailable:
+            return "RenderRecipeCommandsUnavailable";
         case SandboxEditorDiagnosticCode::InvalidVisualizationProperty:
             return "InvalidVisualizationProperty";
+        case SandboxEditorDiagnosticCode::InvalidVertexChannelBinding:
+            return "InvalidVertexChannelBinding";
         case SandboxEditorDiagnosticCode::GeometryProcessingFailed:
             return "GeometryProcessingFailed";
         case SandboxEditorDiagnosticCode::RenderGraphStatsUnavailable:
@@ -7317,10 +8167,100 @@ namespace Extrinsic::Runtime
             return "UnsupportedGeometryDomain";
         case SandboxEditorCommandStatus::InvalidVisualizationProperty:
             return "InvalidVisualizationProperty";
+        case SandboxEditorCommandStatus::InvalidVertexChannelBinding:
+            return "InvalidVertexChannelBinding";
         case SandboxEditorCommandStatus::InvalidProcessingParameters:
             return "InvalidProcessingParameters";
         case SandboxEditorCommandStatus::GeometryProcessingFailed:
             return "GeometryProcessingFailed";
+        }
+        return "Unknown";
+    }
+
+    const char* DebugNameForSandboxEditorRenderRecipeDraftState(
+        const SandboxEditorRenderRecipeDraftState state) noexcept
+    {
+        using State = SandboxEditorRenderRecipeDraftState;
+        switch (state)
+        {
+        case State::InactiveDraft:
+            return "InactiveDraft";
+        case State::Debounced:
+            return "Debounced";
+        case State::Validated:
+            return "Validated";
+        case State::Rejected:
+            return "Rejected";
+        case State::Previewed:
+            return "Previewed";
+        case State::Activated:
+            return "Activated";
+        case State::Canceled:
+            return "Canceled";
+        }
+        return "Unknown";
+    }
+
+    const char* DebugNameForSandboxEditorRenderRecipeCommandKind(
+        const SandboxEditorRenderRecipeCommandKind kind) noexcept
+    {
+        using Kind = SandboxEditorRenderRecipeCommandKind;
+        switch (kind)
+        {
+        case Kind::UpdateDraft:
+            return "UpdateDraft";
+        case Kind::ValidateDraft:
+            return "ValidateDraft";
+        case Kind::PreviewDraft:
+            return "PreviewDraft";
+        case Kind::ActivatePreview:
+            return "ActivatePreview";
+        case Kind::CancelDraft:
+            return "CancelDraft";
+        case Kind::PublishArtifact:
+            return "PublishArtifact";
+        case Kind::ApplyArtifact:
+            return "ApplyArtifact";
+        }
+        return "Unknown";
+    }
+
+    const char* DebugNameForSandboxEditorRenderRecipeCommandStatus(
+        const SandboxEditorRenderRecipeCommandStatus status) noexcept
+    {
+        using Status = SandboxEditorRenderRecipeCommandStatus;
+        switch (status)
+        {
+        case Status::NoChange:
+            return "NoChange";
+        case Status::DraftUpdated:
+            return "DraftUpdated";
+        case Status::Debounced:
+            return "Debounced";
+        case Status::Validated:
+            return "Validated";
+        case Status::ValidationFailed:
+            return "ValidationFailed";
+        case Status::Previewed:
+            return "Previewed";
+        case Status::PreviewFailed:
+            return "PreviewFailed";
+        case Status::Activated:
+            return "Activated";
+        case Status::Canceled:
+            return "Canceled";
+        case Status::Published:
+            return "Published";
+        case Status::Applied:
+            return "Applied";
+        case Status::MissingRecipeContext:
+            return "MissingRecipeContext";
+        case Status::MissingEditorState:
+            return "MissingEditorState";
+        case Status::MissingArtifactRegistry:
+            return "MissingArtifactRegistry";
+        case Status::ArtifactCommandFailed:
+            return "ArtifactCommandFailed";
         }
         return "Unknown";
     }
@@ -7814,6 +8754,578 @@ namespace Extrinsic::Runtime
         return result;
     }
 
+    namespace
+    {
+        [[nodiscard]] const Graphics::RecipeExtensionSlotDescriptor*
+        FindRecipeSlot(const Graphics::RenderRecipeDescriptor& recipe,
+                       const std::string_view stableName) noexcept
+        {
+            const auto it = std::find_if(
+                recipe.Slots.begin(),
+                recipe.Slots.end(),
+                [stableName](const Graphics::RecipeExtensionSlotDescriptor& slot)
+                {
+                    return slot.StableName == stableName;
+                });
+            return it == recipe.Slots.end() ? nullptr : &*it;
+        }
+
+        [[nodiscard]] bool RendererDeclaresSlot(
+            const Graphics::RendererDescriptor& renderer,
+            const std::string_view stableName) noexcept
+        {
+            return std::find(renderer.DeclaredRecipeSlots.begin(),
+                             renderer.DeclaredRecipeSlots.end(),
+                             stableName) != renderer.DeclaredRecipeSlots.end();
+        }
+
+        [[nodiscard]] const char* DebugNameForBindingSourceDomain(
+            const Graphics::BindingSourceDomain domain) noexcept
+        {
+            using Domain = Graphics::BindingSourceDomain;
+            switch (domain)
+            {
+            case Domain::Unknown: return "Unknown";
+            case Domain::MeshVertex: return "MeshVertex";
+            case Domain::MeshFace: return "MeshFace";
+            case Domain::GraphNode: return "GraphNode";
+            case Domain::GraphEdge: return "GraphEdge";
+            case Domain::PointCloudPoint: return "PointCloudPoint";
+            case Domain::Scene: return "Scene";
+            case Domain::Generated: return "Generated";
+            case Domain::Runtime: return "Runtime";
+            }
+            return "Unknown";
+        }
+
+        [[nodiscard]] const char* DebugNameForBindingValueType(
+            const Graphics::BindingValueType type) noexcept
+        {
+            using Type = Graphics::BindingValueType;
+            switch (type)
+            {
+            case Type::Unknown: return "Unknown";
+            case Type::Float: return "Float";
+            case Type::UInt: return "UInt";
+            case Type::Vec2: return "Vec2";
+            case Type::Vec3: return "Vec3";
+            case Type::Vec4: return "Vec4";
+            case Type::Mat4: return "Mat4";
+            case Type::Texture2D: return "Texture2D";
+            case Type::Buffer: return "Buffer";
+            case Type::AccelerationStructure: return "AccelerationStructure";
+            }
+            return "Unknown";
+        }
+
+        [[nodiscard]] const char* DebugNameForViewKind(
+            const Graphics::ViewKind view) noexcept
+        {
+            using View = Graphics::ViewKind;
+            switch (view)
+            {
+            case View::Camera: return "Camera";
+            case View::NonCamera: return "NonCamera";
+            case View::Picking: return "Picking";
+            case View::Metrics: return "Metrics";
+            case View::Preview: return "Preview";
+            }
+            return "Unknown";
+        }
+
+        [[nodiscard]] const char* DebugNameForOutputTargetKind(
+            const Graphics::OutputTargetKind target) noexcept
+        {
+            using Target = Graphics::OutputTargetKind;
+            switch (target)
+            {
+            case Target::Window: return "Window";
+            case Target::OffscreenTexture: return "OffscreenTexture";
+            case Target::File: return "File";
+            case Target::ReadbackBuffer: return "ReadbackBuffer";
+            case Target::PublishedArtifact: return "PublishedArtifact";
+            }
+            return "Unknown";
+        }
+
+        [[nodiscard]] const char* DebugNameForInteractionMode(
+            const Graphics::InteractionMode mode) noexcept
+        {
+            switch (mode)
+            {
+            case Graphics::InteractionMode::Interactive:
+                return "Interactive";
+            case Graphics::InteractionMode::Headless:
+                return "Headless";
+            }
+            return "Unknown";
+        }
+
+        [[nodiscard]] std::vector<std::string> CapabilityNames(
+            const std::vector<Graphics::RendererCapability>& capabilities)
+        {
+            std::vector<std::string> names{};
+            names.reserve(capabilities.size());
+            for (const Graphics::RendererCapability capability : capabilities)
+            {
+                names.emplace_back(Graphics::ToString(capability));
+            }
+            return names;
+        }
+
+        [[nodiscard]] SandboxEditorRenderRecipeSlotModel BuildRenderRecipeSlotRow(
+            const Graphics::RendererDescriptor& renderer,
+            const Graphics::RecipeExtensionSlotDescriptor& slot)
+        {
+            const bool declared = RendererDeclaresSlot(renderer, slot.StableName);
+            const bool editable =
+                declared && slot.Kind == Graphics::RecipeSlotKind::Extension;
+            std::string disabledReason{};
+            if (!declared)
+                disabledReason = "not declared by renderer";
+            else if (slot.Kind == Graphics::RecipeSlotKind::FixedCore)
+                disabledReason = "fixed renderer core";
+
+            return SandboxEditorRenderRecipeSlotModel{
+                .StableName = slot.StableName,
+                .Kind = slot.Kind,
+                .SchemaId = slot.SchemaId,
+                .Defaults = slot.Defaults,
+                .RequiredCapabilities = CapabilityNames(slot.RequiredCapabilities),
+                .AllowedBindingRoles = slot.AllowedBindingRoles,
+                .UsedBindingRoles = slot.UsedBindingRoles,
+                .DeclaredByRenderer = declared,
+                .Editable = editable,
+                .DisabledReason = std::move(disabledReason),
+            };
+        }
+
+        [[nodiscard]] SandboxEditorRenderRecipeBindingOverrideModel
+        BuildRenderRecipeBindingRow(const Graphics::BindingIntent& intent)
+        {
+            const bool required =
+                intent.Requirement == Graphics::BindingRequirement::Required;
+            return SandboxEditorRenderRecipeBindingOverrideModel{
+                .SemanticName = intent.SemanticName,
+                .Slot = intent.ConsumerRole,
+                .SourceDomain = DebugNameForBindingSourceDomain(intent.SourceDomain),
+                .SourceIdentity = intent.SourceIdentity,
+                .SourceRevision = intent.SourceRevision,
+                .ValueType = DebugNameForBindingValueType(intent.ValueType),
+                .ValueFormat = intent.ValueFormat,
+                .Required = required,
+                .Editable = !required,
+                .DisabledReason = required ? "required binding" : "",
+            };
+        }
+
+        [[nodiscard]] SandboxEditorRenderRecipeOutputModel BuildRenderRecipeOutputRow(
+            const Graphics::ViewOutputDescriptor& output)
+        {
+            return SandboxEditorRenderRecipeOutputModel{
+                .Name = output.Name,
+                .Kind = std::string{Graphics::ToString(output.Kind)},
+                .Format = output.Format,
+                .Required = output.Required,
+            };
+        }
+
+        [[nodiscard]] SandboxEditorRenderArtifactRow BuildRenderArtifactRow(
+            const RenderArtifactRecord& record)
+        {
+            const RenderArtifactUiStatus status = ToUiStatus(record);
+            const bool canPublish =
+                status == RenderArtifactPublicationState::Unpublished;
+            const bool canApply =
+                status == RenderArtifactPublicationState::Published &&
+                record.Kind == RenderArtifactPublicationKind::CandidateProjectResult;
+            std::string disabledReason{};
+            if (!canPublish && !canApply)
+            {
+                disabledReason = std::string{"state:"} +
+                                 std::string{ToString(status)};
+            }
+            return SandboxEditorRenderArtifactRow{
+                .ArtifactId = record.Metadata.ArtifactId,
+                .Purpose = record.Metadata.Purpose,
+                .Kind = record.Kind,
+                .Status = status,
+                .PayloadUri = record.PayloadUri,
+                .ProducerLabel = record.ProducerLabel,
+                .CanPublish = canPublish,
+                .CanApply = canApply,
+                .DisabledReason = std::move(disabledReason),
+            };
+        }
+
+        [[nodiscard]] SandboxEditorRenderRecipeCommandResult
+        MakeRenderRecipeCommandResult(
+            const SandboxEditorRenderRecipeCommandStatus status,
+            const SandboxEditorRenderRecipeEditorState* state)
+        {
+            SandboxEditorRenderRecipeCommandResult result{
+                .Status = status,
+            };
+            if (state != nullptr)
+            {
+                result.DraftState = state->DraftState;
+                if (state->HasLastPreview)
+                {
+                    result.ValidationState = state->LastPreview.State;
+                    result.RecipeDiagnostics = state->LastPreview.Diagnostics;
+                }
+            }
+            return result;
+        }
+
+        [[nodiscard]] SandboxEditorRenderRecipeCommandResult
+        MakeRenderRecipeArtifactResult(
+            const RenderArtifactOperationResult& operation,
+            const SandboxEditorRenderRecipeCommandStatus successStatus)
+        {
+            return SandboxEditorRenderRecipeCommandResult{
+                .Status = operation.Succeeded()
+                    ? successStatus
+                    : SandboxEditorRenderRecipeCommandStatus::ArtifactCommandFailed,
+                .ArtifactStatus = operation.Status,
+                .ArtifactState = operation.State,
+                .ArtifactId = operation.ArtifactId,
+                .Revision = operation.Revision,
+                .ProjectMutationAuthorized = operation.ProjectMutationAuthorized,
+                .ArtifactDiagnostics = operation.Diagnostics,
+            };
+        }
+    }
+
+    SandboxEditorRenderRecipeEditorModel
+    BuildSandboxEditorRenderRecipeEditorModel(const SandboxEditorContext& context)
+    {
+        SandboxEditorRenderRecipeEditorModel model{};
+        if (context.RenderRecipeContext == nullptr)
+        {
+            AddDiagnostic(model.Diagnostics,
+                          SandboxEditorDiagnosticCode::RenderRecipeCommandsUnavailable,
+                          "Render recipe context is unavailable.");
+            return model;
+        }
+
+        model.Available = true;
+        const Graphics::RenderRecipeConfigContext& recipeContext =
+            *context.RenderRecipeContext;
+        const SandboxEditorRenderRecipeEditorState* state =
+            context.RenderRecipeEditorState;
+
+        const bool useActiveOverride =
+            state != nullptr && state->HasActiveOverride;
+        const Graphics::RenderRecipeDescriptor& recipe =
+            useActiveOverride ? state->ActiveRecipe : recipeContext.BaseRecipe;
+        const Graphics::ViewOutputRecipeDescriptor& viewOutput =
+            useActiveOverride ? state->ActiveViewOutput : recipeContext.BaseViewOutput;
+        const Graphics::BindingSet& bindings =
+            useActiveOverride ? state->ActiveBindings : recipeContext.BaseBindings;
+
+        model.RendererId = recipeContext.Renderer.Id;
+        model.ActiveRecipeId = recipe.RecipeId;
+        model.ActiveViewOutputRecipeId = viewOutput.RecipeId;
+        model.ViewKind = DebugNameForViewKind(viewOutput.View);
+        model.OutputTarget = DebugNameForOutputTargetKind(viewOutput.Target);
+        model.InteractionMode = DebugNameForInteractionMode(viewOutput.Mode);
+        model.ViewportWidth = viewOutput.ViewportWidth;
+        model.ViewportHeight = viewOutput.ViewportHeight;
+        model.RenderScale = viewOutput.RenderScale;
+        model.CaptureRequested = viewOutput.CaptureRequested;
+        model.ReadbackRequested = viewOutput.ReadbackRequested;
+
+        if (state != nullptr)
+        {
+            model.DraftSourceId = state->DraftSourceId;
+            model.DraftState = state->DraftState;
+            model.DraftRevision = state->DraftRevision;
+            model.ActiveRevision = state->ActiveRevision;
+            if (state->HasLastPreview)
+            {
+                model.ValidationState = state->LastPreview.State;
+                model.DraftRecipeId = state->LastPreview.Preview.Recipe.RecipeId;
+                model.ParsedSlotCount =
+                    state->LastPreview.Preview.ParsedSlotCount;
+                model.ParsedBindingOverrideCount =
+                    state->LastPreview.Preview.ParsedBindingOverrideCount;
+                model.RecipeDiagnostics = state->LastPreview.Diagnostics;
+            }
+        }
+
+        if (!context.RenderRecipeCommandsAvailable)
+        {
+            AddDiagnostic(model.Diagnostics,
+                          SandboxEditorDiagnosticCode::RenderRecipeCommandsUnavailable,
+                          "Render recipe command seams are unavailable.");
+        }
+
+        model.CanValidate =
+            context.RenderRecipeCommandsAvailable &&
+            state != nullptr &&
+            !state->DraftDocument.empty();
+        model.CanPreview = model.CanValidate;
+        model.CanActivate =
+            context.RenderRecipeCommandsAvailable &&
+            state != nullptr &&
+            state->HasLastPreview &&
+            Graphics::IsConfigUsable(state->LastPreview);
+        model.CanCancel =
+            context.RenderRecipeCommandsAvailable &&
+            state != nullptr &&
+            state->DraftState != SandboxEditorRenderRecipeDraftState::InactiveDraft &&
+            state->DraftState != SandboxEditorRenderRecipeDraftState::Canceled;
+
+        model.Slots.reserve(recipeContext.Renderer.DeclaredRecipeSlots.size() +
+                            recipe.Slots.size());
+        for (const std::string& slotName : recipeContext.Renderer.DeclaredRecipeSlots)
+        {
+            if (const Graphics::RecipeExtensionSlotDescriptor* slot =
+                    FindRecipeSlot(recipe, slotName);
+                slot != nullptr)
+            {
+                model.Slots.push_back(
+                    BuildRenderRecipeSlotRow(recipeContext.Renderer, *slot));
+            }
+            else
+            {
+                model.Slots.push_back(SandboxEditorRenderRecipeSlotModel{
+                    .StableName = slotName,
+                    .DeclaredByRenderer = true,
+                    .Editable = true,
+                });
+            }
+        }
+        for (const Graphics::RecipeExtensionSlotDescriptor& slot : recipe.Slots)
+        {
+            if (!RendererDeclaresSlot(recipeContext.Renderer, slot.StableName))
+            {
+                model.Slots.push_back(
+                    BuildRenderRecipeSlotRow(recipeContext.Renderer, slot));
+            }
+        }
+
+        model.BindingOverrides.reserve(bindings.Intents.size());
+        for (const Graphics::BindingIntent& intent : bindings.Intents)
+        {
+            model.BindingOverrides.push_back(BuildRenderRecipeBindingRow(intent));
+        }
+
+        model.Outputs.reserve(viewOutput.Outputs.size());
+        for (const Graphics::ViewOutputDescriptor& output : viewOutput.Outputs)
+        {
+            model.Outputs.push_back(BuildRenderRecipeOutputRow(output));
+        }
+
+        if (context.RenderArtifacts != nullptr)
+        {
+            std::vector<RenderArtifactRecord> artifacts =
+                context.RenderArtifacts->Snapshot();
+            std::sort(artifacts.begin(),
+                      artifacts.end(),
+                      [](const RenderArtifactRecord& lhs,
+                         const RenderArtifactRecord& rhs)
+                      {
+                          return lhs.Metadata.ArtifactId <
+                                 rhs.Metadata.ArtifactId;
+                      });
+            model.Artifacts.reserve(artifacts.size());
+            for (const RenderArtifactRecord& artifact : artifacts)
+            {
+                model.Artifacts.push_back(BuildRenderArtifactRow(artifact));
+            }
+        }
+        return model;
+    }
+
+    SandboxEditorRenderRecipeCommandResult
+    ApplySandboxEditorRenderRecipeCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorRenderRecipeCommand& command)
+    {
+        SandboxEditorRenderRecipeEditorState* state =
+            context.RenderRecipeEditorState;
+        if (state == nullptr)
+        {
+            return SandboxEditorRenderRecipeCommandResult{
+                .Status = SandboxEditorRenderRecipeCommandStatus::MissingEditorState,
+            };
+        }
+
+        using Kind = SandboxEditorRenderRecipeCommandKind;
+        switch (command.Kind)
+        {
+        case Kind::UpdateDraft:
+        {
+            if (state->DraftDocument == command.Document &&
+                state->DraftSourceId == command.SourceId &&
+                !command.Debounced)
+            {
+                return MakeRenderRecipeCommandResult(
+                    SandboxEditorRenderRecipeCommandStatus::NoChange,
+                    state);
+            }
+            state->DraftDocument = command.Document;
+            if (!command.SourceId.empty())
+                state->DraftSourceId = command.SourceId;
+            state->HasLastPreview = false;
+            ++state->DraftRevision;
+            state->DraftState = command.Debounced
+                ? SandboxEditorRenderRecipeDraftState::Debounced
+                : SandboxEditorRenderRecipeDraftState::InactiveDraft;
+            return MakeRenderRecipeCommandResult(
+                command.Debounced
+                    ? SandboxEditorRenderRecipeCommandStatus::Debounced
+                    : SandboxEditorRenderRecipeCommandStatus::DraftUpdated,
+                state);
+        }
+        case Kind::ValidateDraft:
+        case Kind::PreviewDraft:
+        {
+            if (context.RenderRecipeContext == nullptr)
+            {
+                return MakeRenderRecipeCommandResult(
+                    SandboxEditorRenderRecipeCommandStatus::MissingRecipeContext,
+                    state);
+            }
+            if (!command.Document.empty())
+            {
+                state->DraftDocument = command.Document;
+                ++state->DraftRevision;
+            }
+            if (!command.SourceId.empty())
+                state->DraftSourceId = command.SourceId;
+
+            state->LastPreview = Graphics::PreviewRenderRecipeConfig(
+                state->DraftDocument,
+                *context.RenderRecipeContext,
+                Graphics::RenderRecipeConfigParseOptions{
+                    .SourceId = state->DraftSourceId,
+                });
+            state->HasLastPreview = true;
+            const bool usable = Graphics::IsConfigUsable(state->LastPreview);
+            if (usable)
+            {
+                state->DraftState = command.Kind == Kind::ValidateDraft
+                    ? SandboxEditorRenderRecipeDraftState::Validated
+                    : SandboxEditorRenderRecipeDraftState::Previewed;
+                return MakeRenderRecipeCommandResult(
+                    command.Kind == Kind::ValidateDraft
+                        ? SandboxEditorRenderRecipeCommandStatus::Validated
+                        : SandboxEditorRenderRecipeCommandStatus::Previewed,
+                    state);
+            }
+
+            state->DraftState = SandboxEditorRenderRecipeDraftState::Rejected;
+            return MakeRenderRecipeCommandResult(
+                command.Kind == Kind::ValidateDraft
+                    ? SandboxEditorRenderRecipeCommandStatus::ValidationFailed
+                    : SandboxEditorRenderRecipeCommandStatus::PreviewFailed,
+                state);
+        }
+        case Kind::ActivatePreview:
+        {
+            if (!state->HasLastPreview ||
+                !Graphics::IsConfigUsable(state->LastPreview))
+            {
+                return MakeRenderRecipeCommandResult(
+                    SandboxEditorRenderRecipeCommandStatus::PreviewFailed,
+                    state);
+            }
+            state->ActiveRecipe = state->LastPreview.Preview.Recipe;
+            state->ActiveViewOutput = state->LastPreview.Preview.ViewOutput;
+            state->ActiveBindings = state->LastPreview.Preview.Bindings;
+            state->HasActiveOverride = true;
+            state->DraftState = SandboxEditorRenderRecipeDraftState::Activated;
+            ++state->ActiveRevision;
+            return MakeRenderRecipeCommandResult(
+                SandboxEditorRenderRecipeCommandStatus::Activated,
+                state);
+        }
+        case Kind::CancelDraft:
+        {
+            if (state->DraftDocument.empty() &&
+                !state->HasLastPreview &&
+                (state->DraftState ==
+                     SandboxEditorRenderRecipeDraftState::InactiveDraft ||
+                 state->DraftState ==
+                     SandboxEditorRenderRecipeDraftState::Canceled))
+            {
+                return MakeRenderRecipeCommandResult(
+                    SandboxEditorRenderRecipeCommandStatus::NoChange,
+                    state);
+            }
+            state->DraftDocument.clear();
+            state->HasLastPreview = false;
+            state->DraftState = SandboxEditorRenderRecipeDraftState::Canceled;
+            ++state->DraftRevision;
+            return MakeRenderRecipeCommandResult(
+                SandboxEditorRenderRecipeCommandStatus::Canceled,
+                state);
+        }
+        case Kind::PublishArtifact:
+        {
+            if (context.RenderArtifacts == nullptr)
+            {
+                return SandboxEditorRenderRecipeCommandResult{
+                    .Status = SandboxEditorRenderRecipeCommandStatus::MissingArtifactRegistry,
+                };
+            }
+            const std::string targetUri = command.TargetUri.empty()
+                ? "sandbox://render-artifacts/" + command.ArtifactId
+                : command.TargetUri;
+            RenderArtifactOperationResult operation =
+                context.RenderArtifacts->PublishArtifact(
+                    RenderArtifactPublishCommand{
+                        .ArtifactId = command.ArtifactId,
+                        .Provenance = command.Provenance,
+                        .TargetUri = targetUri,
+                        .Label = command.Label.empty()
+                            ? std::string{"Publish Render Artifact"}
+                            : command.Label,
+                        .UndoLabel = command.UndoLabel.empty()
+                            ? std::string{"Unpublish Render Artifact"}
+                            : command.UndoLabel,
+                    });
+            return MakeRenderRecipeArtifactResult(
+                operation,
+                SandboxEditorRenderRecipeCommandStatus::Published);
+        }
+        case Kind::ApplyArtifact:
+        {
+            if (context.RenderArtifacts == nullptr)
+            {
+                return SandboxEditorRenderRecipeCommandResult{
+                    .Status = SandboxEditorRenderRecipeCommandStatus::MissingArtifactRegistry,
+                };
+            }
+            RenderArtifactOperationResult operation =
+                context.RenderArtifacts->ApplyArtifact(
+                    RenderArtifactApplyCommand{
+                        .ArtifactId = command.ArtifactId,
+                        .Provenance = command.Provenance,
+                        .ProjectTarget = command.ProjectTarget.empty()
+                            ? std::string{"sandbox-render-recipe-artifact"}
+                            : command.ProjectTarget,
+                        .Label = command.Label.empty()
+                            ? std::string{"Apply Render Artifact"}
+                            : command.Label,
+                        .UndoLabel = command.UndoLabel.empty()
+                            ? std::string{"Revert Render Artifact Apply"}
+                            : command.UndoLabel,
+                    });
+            return MakeRenderRecipeArtifactResult(
+                operation,
+                SandboxEditorRenderRecipeCommandStatus::Applied);
+        }
+        }
+
+        return MakeRenderRecipeCommandResult(
+            SandboxEditorRenderRecipeCommandStatus::NoChange,
+            state);
+    }
+
     const char* DebugNameForSandboxEditorGeometryProcessingDomain(
         const SandboxEditorGeometryProcessingDomain domain) noexcept
     {
@@ -7934,6 +9446,7 @@ namespace Extrinsic::Runtime
         frame.FileImport = BuildFileImportModel(context);
         frame.AssetImportQueue = BuildAssetImportQueueModel(context);
         frame.RenderGraph = BuildRenderGraphModel(context);
+        frame.RenderRecipe = BuildSandboxEditorRenderRecipeEditorModel(context);
         frame.CameraRender = BuildCameraRenderModel(context);
         frame.Visualization = BuildVisualizationModel(context);
         return frame;
@@ -8793,6 +10306,105 @@ namespace Extrinsic::Runtime
         return SandboxEditorCommandStatus::Applied;
     }
 
+    SandboxEditorCommandStatus ApplySandboxEditorVertexChannelBindingCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorVertexChannelBindingCommand& command)
+    {
+        if (context.Scene == nullptr)
+            return SandboxEditorCommandStatus::MissingScene;
+        if (command.Channel != VertexChannel::Normal &&
+            command.Channel != VertexChannel::Color)
+        {
+            return SandboxEditorCommandStatus::InvalidVertexChannelBinding;
+        }
+
+        entt::registry& raw = context.Scene->Raw();
+        const std::optional<ECS::EntityHandle> entity =
+            ResolveStableEntity(raw, command.StableEntityId);
+        if (!entity.has_value())
+            return SandboxEditorCommandStatus::StaleEntity;
+
+        const GS::ConstSourceView view = GS::BuildConstView(raw, *entity);
+        const std::optional<SandboxEditorPropertyCatalogDomain> domain =
+            VertexChannelCatalogDomainForView(view);
+        if (!domain.has_value())
+            return SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+
+        const Geometry::PropertySet* properties =
+            VertexChannelPropertySetForView(view, *domain);
+        if (properties == nullptr)
+            return SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+
+        const auto* current = raw.try_get<VertexChannelBindingSet>(*entity);
+        VertexChannelBindingSet after = current != nullptr
+            ? *current
+            : VertexChannelBindingSet{};
+        VertexChannelSourceBinding* target =
+            FindMutableVertexChannelBinding(after, command.Channel);
+        if (target == nullptr)
+            return SandboxEditorCommandStatus::InvalidVertexChannelBinding;
+
+        if (!command.EnableBinding)
+        {
+            if (current == nullptr || !IsVertexChannelBindingEnabled(*target))
+                return SandboxEditorCommandStatus::NoChange;
+
+            *target = {};
+            ++after.BindingGeneration;
+            if (AnyVertexChannelBindingEnabled(after))
+                raw.emplace_or_replace<VertexChannelBindingSet>(*entity, after);
+            else
+                raw.remove<VertexChannelBindingSet>(*entity);
+
+            MarkVertexChannelDirty(raw, *entity, command.Channel);
+            if (context.CommandHistory != nullptr)
+                (void)context.CommandHistory->MarkDirty(
+                    "Change vertex channel binding");
+            return SandboxEditorCommandStatus::Applied;
+        }
+
+        if (command.PropertyName.empty())
+            return SandboxEditorCommandStatus::InvalidVertexChannelBinding;
+
+        const SandboxEditorPropertyCatalogValueKind valueKind =
+            ToPropertyCatalogValueKind(
+                DetectPropertyValueKind(*properties, command.PropertyName));
+        const std::optional<AttributeSourceType> sourceType =
+            ToAttributeSourceType(valueKind);
+        if (!sourceType.has_value())
+            return SandboxEditorCommandStatus::InvalidVertexChannelBinding;
+
+        const AttributeBindResult resolver =
+            EvaluateVertexChannelBinding(
+                *properties,
+                command.Channel,
+                command.PropertyName,
+                *sourceType,
+                properties->Size());
+        if (!resolver.Ok())
+            return SandboxEditorCommandStatus::InvalidVertexChannelBinding;
+
+        const VertexChannelSourceBinding next{
+            .Enabled = true,
+            .SourceType = *sourceType,
+            .SourceProperty = command.PropertyName,
+        };
+        if (current != nullptr &&
+            SameVertexChannelSourceBinding(*target, next))
+        {
+            return SandboxEditorCommandStatus::NoChange;
+        }
+
+        *target = next;
+        ++after.BindingGeneration;
+        raw.emplace_or_replace<VertexChannelBindingSet>(*entity, after);
+        MarkVertexChannelDirty(raw, *entity, command.Channel);
+        if (context.CommandHistory != nullptr)
+            (void)context.CommandHistory->MarkDirty(
+                "Change vertex channel binding");
+        return SandboxEditorCommandStatus::Applied;
+    }
+
     SandboxEditorCommandStatus ApplySandboxEditorProgressiveSlotDefaultCommand(
         const SandboxEditorContext& context,
         const SandboxEditorProgressiveSlotDefaultCommand& command)
@@ -9404,7 +11016,7 @@ namespace Extrinsic::Runtime
             return result;
         }
 
-        Dirty::MarkVertexAttributesDirty(raw, *entity);
+        Dirty::MarkVertexNormalsDirty(raw, *entity);
         if (context.CommandHistory != nullptr)
             (void)context.CommandHistory->MarkDirty("Recompute mesh vertex normals");
         result.Message = BuildMeshNormalsSuccessMessage(result);
@@ -9414,6 +11026,7 @@ namespace Extrinsic::Runtime
     void DrawSandboxEditorPanelFrame(const SandboxEditorPanelFrame& frame)
     {
         DrawPanelFrame(frame,
+                       nullptr,
                        nullptr,
                        nullptr,
                        nullptr,
@@ -9466,6 +11079,26 @@ namespace Extrinsic::Runtime
                 if (m_LastMeshVertexNormalsResult.has_value())
                     context.LastMeshVertexNormalsResult =
                         &*m_LastMeshVertexNormalsResult;
+                const Core::Extent2D viewport =
+                    context.CameraViewport.Width != 0u &&
+                            context.CameraViewport.Height != 0u
+                        ? context.CameraViewport
+                        : Core::Extent2D{.Width = 1280u, .Height = 720u};
+                const Graphics::RenderFrameInput recipeInput{
+                    .Viewport = viewport,
+                    .Camera = Graphics::CameraViewInput{.Valid = true},
+                };
+                m_RenderRecipeContext = Graphics::RenderRecipeConfigContext{
+                    .Renderer = Graphics::MakeCurrentRendererDescriptor(),
+                    .BaseRecipe = Graphics::MakeCurrentRendererRecipeDescriptor(),
+                    .BaseViewOutput =
+                        Graphics::MakeCurrentRendererViewOutputRecipe(recipeInput),
+                    .BaseBindings = Graphics::MakeCurrentRendererBindingSet(),
+                };
+                context.RenderRecipeContext = &m_RenderRecipeContext;
+                context.RenderRecipeEditorState = &m_RenderRecipeState;
+                context.RenderArtifacts = &m_RenderArtifactRegistry;
+                context.RenderRecipeCommandsAvailable = true;
                 m_LastFrame = BuildSandboxEditorPanelFrame(context);
                 KMeansUiState kmeansState{
                     .LastResult = &m_LastKMeansResult,
@@ -9498,6 +11131,7 @@ namespace Extrinsic::Runtime
                     &context,
                     &m_ImportPathBuffer,
                     &m_ScenePathBuffer,
+                    &m_RenderRecipeDraftBuffer,
                     &m_ImportPayloadKind,
                     &m_LastImportResult,
                     &m_LastSceneFileResult,

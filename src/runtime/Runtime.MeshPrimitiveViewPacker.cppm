@@ -9,6 +9,7 @@ export module Extrinsic.Runtime.MeshPrimitiveViewPacker;
 
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.Runtime.VertexChannelStreams;
 
 export namespace Extrinsic::Runtime
 {
@@ -65,6 +66,7 @@ export namespace Extrinsic::Runtime
     struct MeshPrimitiveViewBuffer
     {
         std::vector<std::byte> VertexBytes;
+        VertexChannelStreams Channels;
         std::vector<std::uint32_t> LineIndices;
 
         void Clear() noexcept;

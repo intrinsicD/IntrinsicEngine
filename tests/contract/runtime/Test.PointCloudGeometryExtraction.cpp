@@ -693,13 +693,11 @@ namespace
     }
 }
 
-// RUNTIME-087 — dirty-domain reupload coverage. Each cloud-relevant dirty tag
-// and the coarse `GpuDirty` must individually trigger a repack + upload, queue
-// the old handle for deferred retire, surface the change as
-// `PointCloudGeometryReuploads` + `PointCloudGeometryReleases`, and drain the
-// tag(s) so subsequent clean ticks return to the `PointCloudGeometryReuseHits`
-// path. A point cloud has no edge/face topology, so only the vertex-domain and
-// coarse tags are exercised.
+// Point-cloud dirty-domain coverage. Coarse GPU dirtiness still requires a full
+// replacement upload, while vertex-channel tags use the in-place partial
+// channel upload path and keep the existing resident handle. A point cloud has
+// no edge/face topology, so only the vertex-domain and coarse tags are
+// exercised.
 class PointCloudGeometryExtractionDirtyTag
     : public ::testing::TestWithParam<const char*>
 {
@@ -736,32 +734,51 @@ TEST_P(PointCloudGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
         D::MarkVertexPositionsDirty(raw, entity);
     else if (param == "DirtyVertexAttributes")
         D::MarkVertexAttributesDirty(raw, entity);
+    else if (param == "DirtyVertexTexcoords")
+        D::MarkVertexTexcoordsDirty(raw, entity);
+    else if (param == "DirtyVertexNormals")
+        D::MarkVertexNormalsDirty(raw, entity);
+    else if (param == "DirtyVertexColors")
+        D::MarkVertexColorsDirty(raw, entity);
     else
         FAIL() << "Unhandled dirty-tag parameterization: " << param;
+
+    const bool fullUploadExpected = param == "GpuDirty";
 
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
                                         &engine.GetGpuAssetCache());
     EXPECT_EQ(stats.PointCloudGeometryUploads, 0u);
     EXPECT_EQ(stats.PointCloudGeometryReuploads, 1u);
+    EXPECT_EQ(stats.PointCloudGeometryPartialUploads, fullUploadExpected ? 0u : 1u);
     EXPECT_EQ(stats.PointCloudGeometryReuseHits, 0u);
-    EXPECT_EQ(stats.PointCloudGeometryReleases, 1u);
+    EXPECT_EQ(stats.PointCloudGeometryReleases, fullUploadExpected ? 1u : 0u);
     EXPECT_EQ(stats.PointCloudGeometryFreeRetires, 0u);
 
     const auto secondView =
         extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(secondView.has_value());
     EXPECT_TRUE(secondView->HasPointCloudResidency);
-    EXPECT_NE(secondView->PointCloudGeometry, firstHandle);
+    if (fullUploadExpected)
+    {
+        EXPECT_NE(secondView->PointCloudGeometry, firstHandle);
+    }
+    else
+    {
+        EXPECT_EQ(secondView->PointCloudGeometry, firstHandle);
+    }
     EXPECT_EQ(secondView->Geometry, secondView->PointCloudGeometry);
 
     auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
-    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 2u);
+    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), fullUploadExpected ? 2u : 1u);
     EXPECT_EQ(gpuWorld.GetInstanceGeometry(secondView->Instance), secondView->PointCloudGeometry);
 
     EXPECT_FALSE((raw.any_of<D::GpuDirty,
                              D::DirtyVertexPositions,
-                             D::DirtyVertexAttributes>(entity)));
+                             D::DirtyVertexAttributes,
+                             D::DirtyVertexTexcoords,
+                             D::DirtyVertexNormals,
+                             D::DirtyVertexColors>(entity)));
 
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
@@ -780,7 +797,7 @@ TEST_P(PointCloudGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
     stats = extraction.ExtractAndSubmit(scene,
                                         engine.GetRenderer(),
                                         &engine.GetGpuAssetCache());
-    EXPECT_EQ(stats.PointCloudGeometryFreeRetires, 1u);
+    EXPECT_EQ(stats.PointCloudGeometryFreeRetires, fullUploadExpected ? 1u : 0u);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();
@@ -790,7 +807,64 @@ INSTANTIATE_TEST_SUITE_P(AllDirtyDomains,
                          PointCloudGeometryExtractionDirtyTag,
                          ::testing::Values("GpuDirty",
                                            "DirtyVertexPositions",
-                                           "DirtyVertexAttributes"));
+                                           "DirtyVertexAttributes",
+                                           "DirtyVertexTexcoords",
+                                           "DirtyVertexNormals",
+                                           "DirtyVertexColors"));
+
+TEST(PointCloudGeometryExtraction, VertexCountChangeFallsBackToFullUpload)
+{
+    namespace D = Extrinsic::ECS::Components::DirtyTags;
+
+    Extrinsic::Runtime::Engine engine(HeadlessConfig(), std::make_unique<StubApplication>());
+    engine.Initialize();
+
+    auto& scene = engine.GetScene();
+    auto& raw = scene.Raw();
+    const EntityHandle entity = MakePointCloudRenderable(scene);
+
+    Extrinsic::Runtime::RenderExtractionCache extraction;
+    auto stats = extraction.ExtractAndSubmit(scene,
+                                             engine.GetRenderer(),
+                                             &engine.GetGpuAssetCache());
+    ASSERT_EQ(stats.PointCloudGeometryUploads, 1u);
+
+    const auto stableId =
+        Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
+    const auto firstView = extraction.FindRenderableSidecarForTest(stableId);
+    ASSERT_TRUE(firstView.has_value());
+    const auto firstHandle = firstView->PointCloudGeometry;
+    ASSERT_TRUE(firstHandle.IsValid());
+
+    auto& vertices = raw.get<gs::Vertices>(entity);
+    SetPositions(vertices, {
+        {0.0f, 0.0f, 0.0f},
+        {1.0f, 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f},
+        {0.0f, 0.0f, 1.0f},
+    });
+    D::MarkVertexPositionsDirty(raw, entity);
+
+    stats = extraction.ExtractAndSubmit(scene,
+                                        engine.GetRenderer(),
+                                        &engine.GetGpuAssetCache());
+    EXPECT_EQ(stats.PointCloudGeometryUploads, 0u);
+    EXPECT_EQ(stats.PointCloudGeometryReuploads, 1u);
+    EXPECT_EQ(stats.PointCloudGeometryPartialUploads, 0u);
+    EXPECT_EQ(stats.PointCloudGeometryReleases, 1u);
+
+    const auto secondView = extraction.FindRenderableSidecarForTest(stableId);
+    ASSERT_TRUE(secondView.has_value());
+    EXPECT_TRUE(secondView->HasPointCloudResidency);
+    EXPECT_NE(secondView->PointCloudGeometry, firstHandle);
+    EXPECT_EQ(secondView->Geometry, secondView->PointCloudGeometry);
+    EXPECT_FALSE(raw.any_of<D::DirtyVertexPositions>(entity));
+
+    EXPECT_EQ(engine.GetRenderer().GetGpuWorld().GetLiveGeometryCount(), 2u);
+
+    extraction.Shutdown(engine.GetRenderer());
+    engine.Shutdown();
+}
 
 // RUNTIME-087 follow-up — a dirty-reupload pack failure on a cloud that already
 // has a valid upload must release the stale residency (fail-closed) so invalid

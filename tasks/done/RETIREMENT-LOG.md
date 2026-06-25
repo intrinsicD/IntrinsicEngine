@@ -8,6 +8,44 @@ so blocks moved from the old active-README history work verbatim.
 
 ## Retired task narratives
 
+Backlog
+[`BUG-046`](BUG-046-flaky-coretaskgraph-mainthread-ready-queue-ordering.md) —
+Flaky `CoreTaskGraph.MainThreadReadyQueueUsesPriorityAndCostOrdering` — retired
+on 2026-06-24 at maturity `CPUContracted`. `TaskGraph::Execute()` now collects
+newly-ready successors into a batch and publishes all main-thread-ready entries
+under one queue lock before dispatch can drain them, preserving priority/cost
+ordering for simultaneously-ready main-thread work. The regression no longer
+uses the fixed `40ms` sleep and the focused repeat run plus default CPU gate
+passed.
+
+Backlog
+[`BUG-049`](BUG-049-gpuworld-geometry-rebind-upload-barriers.md) — GpuWorld
+geometry rebind lacks upload-to-read barriers — retired from stale backlog on
+2026-06-22 at maturity `CPUContracted`; implementation landed in `843e4fb3`.
+The audit confirmed `GpuWorld` tracks one-shot pending upload barriers for
+direct `IDevice::WriteBuffer` paths, `Renderer` drains them before culling and
+draw consumers, and the focused geometry-rebind plus dirty-extraction coverage
+still passes. The task was already complete but remained listed under active
+bugs.
+
+Backlog
+[`BUG-048`](BUG-048-direct-mesh-postprocess-overwrites-recomputed-normals.md) —
+Direct mesh post-process overwrites recomputed normals — retired from stale
+backlog on 2026-06-22 at maturity `CPUContracted`; implementation landed in
+`843e4fb3`. The audit confirmed direct mesh post-process apply preserves
+count-matched current `v:normal` data so editor-authored normals survive
+deferred materialization, while generated normal texture registration remains
+intact. Focused sandbox editor normal recompute regressions still pass.
+
+Backlog
+[`BUG-047`](BUG-047-surface-normal-texture-overrides-vertex-normals.md) —
+Surface normal texture overrides vertex-normal shading — retired from stale
+backlog on 2026-06-22 at maturity `CPUContracted`; implementation landed in
+`843e4fb3`. The audit confirmed promoted forward/GBuffer shader contracts use
+packed vertex normals for current surface shading and assert absence of
+`mat.NormalID` / `normalTex` sampling. Tangent-space normal-map support remains
+out of scope for this temporary attribute-normal policy.
+
 Active
 [`BUG-051`](BUG-051-mesh-color-visualization-property-buffer.md) — Mesh color
 visualization lacks automatic property-buffer extraction — retired on
@@ -19,7 +57,7 @@ binding. Missing and unsupported color sources fail closed through adapter
 diagnostics, and `VisualizationSyncSystem` now forwards the selected
 per-element color-buffer domain into `GpuEntityConfig::VisDomain` so shader
 lookup uses the configured vertex/face/edge domain. The structural vertex-color
-stream and declarative SoA migration remain owned by RUNTIME-121/RUNTIME-122.
+stream and GPU SoA migration remain owned by RUNTIME-121/RUNTIME-122.
 
 Active
 [`BUG-050`](BUG-050-direct-mesh-first-upload-normals.md) — Direct mesh first
@@ -2203,3 +2241,165 @@ modules for halfedge meshes, graphs, and point clouds:
 `Geometry.PointCloud.Normals`. The old `Geometry.NormalEstimation` module is
 removed in favor of KDTree/default and supplied-index point-cloud recompute
 overloads that write canonical `v:normal` property data with diagnostics.
+
+[`RUNTIME-120`](RUNTIME-120-vertex-attribute-binding-resolver.md) — reusable
+vertex attribute binding resolver retired to `tasks/done/` on 2026-06-24 at
+`CPUContracted`. Runtime now has the GPU-agnostic
+`Extrinsic.Runtime.VertexAttributeBinding` resolver for count-matched property
+to vertex-channel binding, and the mesh packer routes normal and texcoord reads
+through it without changing existing packed output. Follow-up vertex-channel
+work remains tracked by `RUNTIME-121` through `RUNTIME-125`.
+
+[`GRAPHICS-099`](GRAPHICS-099-rendering-contract-foundation.md) — rendering
+contract foundation retired to `tasks/done/` on 2026-06-24 at
+`CPUContracted`. Graphics now exposes
+`Extrinsic.Graphics.RenderingContract`, a CPU-only public contract vocabulary
+for renderer descriptors, scoped snapshot envelopes, binding intents, shared
+recipe slots, view/output recipes, render artifact metadata, deterministic
+diagnostics, and fail-closed validation helpers. Current renderer execution,
+Vulkan, shaders, runtime integration, UI, and loadable-file behavior remain
+unchanged; follow-up implementation stays split across `GRAPHICS-100`,
+`GRAPHICS-101`, `GRAPHICS-102`, `RUNTIME-127`, `UI-023`, and `GRAPHICS-103`.
+
+[`GRAPHICS-100`](GRAPHICS-100-current-renderer-contract-adapter.md) — minimal
+current-renderer contract adapter retired to `tasks/done/` on 2026-06-24 at
+`CPUContracted`. Graphics now exposes
+`Extrinsic.Graphics.CurrentRendererContractAdapter`, a data-only adapter that
+populates the current promoted renderer descriptor, immutable frame/snapshot
+envelopes from `RenderFrameInput` or `RenderWorld`, binding intents for current
+material/normal/color/texture/visualization lanes, a default frame-recipe
+descriptor, view/output metadata, and deterministic compatibility diagnostics.
+Renderer execution, Vulkan, shaders, runtime extraction, UI, and loadable
+recipe behavior remain unchanged; operational proof stays owned by
+`GRAPHICS-103`.
+
+[`GRAPHICS-101`](GRAPHICS-101-loadable-render-recipe-configs.md) — loadable
+rendering recipe config schema and validation retired to `tasks/done/` on
+2026-06-24 at `CPUContracted`. Graphics now exposes
+`Extrinsic.Graphics.RenderRecipeConfig`, a CPU-only versioned JSON loader and
+dry-run preview API that overlays optional recipe config onto caller-provided
+renderer contract values. It produces `RenderRecipeDescriptor`,
+`ViewOutputRecipeDescriptor`, and `BindingSet` copies without mutating active
+renderer state, rejects undeclared slots, unsupported capabilities, unsafe
+binding domains, invalid defaults, required-binding overrides, and fixed-core
+replacement attempts, and reports distinct invalid/unsupported/stale/degraded/
+fallback-applied states. Runtime activation, UI editing, shared recipe
+execution, Vulkan, shaders, and backend behavior remain deferred to
+`RUNTIME-127`, `UI-023`, `GRAPHICS-102`, and `GRAPHICS-103`.
+
+[`RUNTIME-127`](RUNTIME-127-render-artifact-publication.md) — render artifact
+publication and apply semantics retired to `tasks/done/` on 2026-06-24 at
+`CPUContracted`. Runtime now exposes
+`Extrinsic.Runtime.RenderArtifactPublication`, a CPU-only registry and command
+surface for renderer-produced artifacts keyed by renderer, snapshot,
+view/output recipe, source revisions, and output purpose. It records lifecycle
+kinds, UI-facing unpublished/stale/canceled/failed/superseded/published/applied
+states, diagnostics, provenance, undo metadata, and audit entries. Publish and
+apply are explicit and provenance-gated; apply is limited to candidate project
+results and authorizes caller-owned mutation without letting the registry,
+graphics, or renderers mutate project data implicitly. UI editing remains owned
+by `UI-023`, and image-producing Vulkan/render-graph proof remains owned by
+`GRAPHICS-103`.
+
+[`GRAPHICS-102`](GRAPHICS-102-shared-visibility-lighting-recipe-execution.md) —
+shared visibility and lighting recipe execution retired to `tasks/done/` on
+2026-06-24 at `CPUContracted`. Graphics now exposes
+`Extrinsic.Graphics.SharedRenderRecipeExecution`, a CPU-only shared recipe
+executor over immutable `RenderWorld` data and scoped `SnapshotEnvelope`
+metadata. It produces renderer-neutral visibility/grouping products
+(visible items, rejected diagnostics, grouping keys, batch and instance groups,
+LOD selections, spatial partitions, and optional acceleration-structure build
+requests) plus lighting/environment products (resolved lights, emissive
+geometry identities, environment/probe/volume/tag/quality outputs, intents,
+debug modes, and fallbacks). Renderer compatibility checks report missing
+capabilities or missing produced products deterministically. Backend command
+buffers, Vulkan resources, project mutation, UI activation, and operational
+render-graph proof remain owned by `GRAPHICS-103` and `UI-023`.
+
+[`UI-023`](UI-023-render-recipe-ui-editing.md) — sandbox render recipe editing
+UI retired to `tasks/done/` on 2026-06-24 at `CPUContracted`.
+`Extrinsic.Runtime.SandboxEditorUi` now exposes data-only render recipe editor
+models, draft/validation/preview/activation command DTOs, and artifact
+publish/apply command routing through runtime-owned state. The attached ImGui
+panel lists current renderer descriptors, declared recipe slots, binding
+overrides, view/output recipe data, draft diagnostics, preview/activation
+state, and render artifact lifecycle rows without UI owning renderer state or
+mutating graphics/backend resources directly.
+
+[`GRAPHICS-103`](GRAPHICS-103-vulkan-rendergraph-contract-integration.md) —
+Vulkan render-graph contract integration retired to `tasks/done/` on
+2026-06-24 at `Operational`. The current renderer now evaluates the
+contract-first descriptor, scoped snapshot, binding intent, shared recipe,
+view/output, and declared artifact metadata path during frame execution,
+fail-closes before render-graph execution on incompatibility, records
+unsupported-product, missing-output, degraded-fallback, and artifact diagnostics,
+and finalizes declared artifact availability from render-graph execution and
+readback outcomes. Opt-in Vulkan smoke coverage proves a declared output
+artifact can produce non-empty readback-backed evidence through the contract
+path while runtime publication remains runtime-owned.
+
+[`RUNTIME-121`](RUNTIME-121-vertex-color-channel-upload.md) — per-vertex mesh
+color channel upload retired to `tasks/done/` on 2026-06-24 at `Operational`.
+Runtime mesh packing now resolves count-matched `v:color` through the reusable
+vertex-attribute resolver into packed unorm8 color data, graphics uploads that
+optional stream beside the current mesh vertex bytes, `GpuGeometryRecord`
+publishes `ColorBufferBDA`, and the active default-recipe GpuScene shader path
+fetches/interpolates the stream for surface/GBuffer shading. CPU coverage proves
+present/absent packer behavior, GpuWorld BDA publication, and
+`DirtyVertexAttributes` structural color-stream reupload; the opt-in
+`gpu;vulkan` runtime sandbox smoke proves the active deferred path shades a
+mesh from `v:color`. Dormant `surface.vert`/`PtrVertexAttr` was deliberately not
+used; RUNTIME-122 owns the later GPU SoA migration.
+
+[`RUNTIME-122`](RUNTIME-122-gpu-soa-vertex-channel-storage-and-shader-fetch.md)
+— GPU SoA vertex channel storage and shader fetch retired to `tasks/done/` on
+2026-06-24 at `Operational`. Runtime mesh, graph, point-cloud, and mesh
+primitive-view packers now emit explicit per-channel vertex streams; graphics
+stores position, texcoord, normal, and color data as contiguous managed SoA
+channel ranges, publishes per-channel BDAs through `GpuGeometryRecord`, and
+keeps stable element offsets for draw/culling metadata. The active default
+GpuScene surface, depth, selection, line, and point vertex shaders now fetch
+from channel BDAs instead of interleaved vertex structs. Focused CPU
+packer/GpuWorld/shader-contract coverage, the full CPU-supported CTest gate,
+structural validators, and opt-in `gpu;vulkan` runtime sandbox surface plus
+line/point smokes passed.
+
+[`RUNTIME-123`](RUNTIME-123-editor-bind-property-as-channel.md) — editor
+"bind any property as normals / colors" retired to `tasks/done/` on
+2026-06-24 at `CPUContracted`. Runtime now has a
+`VertexChannelBindingSet` ECS descriptor consumed by mesh, graph, and
+point-cloud packers. The Sandbox Editor property catalog exposes normal/color
+binding targets, validates candidate properties through the
+`VertexAttributeBinding` resolver, persists per-entity bindings, and stamps
+`DirtyVertexAttributes` without direct renderer/RHI upload calls. Focused
+SandboxEditorUi, mesh/graph/point-cloud packer, and mesh extraction coverage,
+the full CPU-supported CTest gate, structural validators, and regenerated
+module inventory passed.
+
+[`RUNTIME-124`](RUNTIME-124-per-channel-partial-uploads.md) — per-channel dirty
+tracking and partial GPU uploads retired to `tasks/done/` on 2026-06-24 at
+`Operational`. ECS now has fine-grained vertex-channel dirty tags for
+positions, texcoords, normals, and colors, while the legacy broad
+`DirtyVertexAttributes` path still maps to all non-position attribute streams.
+Runtime extraction plans resident mesh, graph, and point-cloud updates as
+channel masks and calls `GpuWorld::UpdateGeometryChannels` instead of releasing
+and re-uploading geometry when topology, vertex count, and storage layout are
+unchanged. Graphics writes only the changed contiguous SoA channel sub-ranges,
+coalesces upload barriers for the managed vertex buffer, and reports
+full-upload fallbacks for count/storage mismatches. Focused CPU extraction,
+GpuWorld, dirty-tag, editor-command, and render-extraction tests passed, and an
+opt-in `gpu;vulkan` runtime sandbox smoke proves a vertex-color mutation shades
+through the active deferred GpuScene path without a full geometry rebind.
+
+[`RUNTIME-126`](RUNTIME-126-gpu-readback-jobs-and-property-writeback.md) — GPU
+readback jobs and result→property write-back retired to `tasks/done/` on
+2026-06-25 at `Operational`. `StreamingExecutor` now has a
+`WaitingForReadback` park/resume state, `DerivedJobRegistry` exposes readback
+job diagnostics and `DrainReadbacks()` resume semantics, and
+`Extrinsic.Runtime.GpuReadbackJob` schedules transfer-facade readbacks that
+write dimension-checked byte payloads into typed geometry properties on the
+main-thread apply phase. Dependent follow-up jobs remain blocked until the
+readback job has resumed and applied, preserving existing `SubmitFollowUp` /
+`DependsOn` ordering. Focused CPU readback/derived-job/binding tests, explicit
+readback streaming integration tests, the full CPU-supported CTest gate, and an
+opt-in `gpu;vulkan` readback round-trip smoke passed.

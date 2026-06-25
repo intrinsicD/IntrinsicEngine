@@ -43,3 +43,25 @@ observations:
     promoted_to: "logic/solution/architecture.md:A03"
     crystallized_via: verbal-affirmation
     stale: false
+  - id: O05
+    timestamp: "2026-06-24T12:46"
+    provenance: ai-suggested
+    content: "Recommended next order: first land task-plan hygiene for stale lifecycle/dependency wording, then implement GRAPHICS-099, then GRAPHICS-100 and GRAPHICS-101 in parallel order, then RUNTIME-127, then GRAPHICS-102, then UI-023 after its runtime dependency is clear, then GRAPHICS-103 as the first Vulkan operational proof."
+    context: "User asked how to proceed after the agentic review of GRAPHICS, rendering, runtime, and UI tasks."
+    potential_type: architecture
+    bound_to: [N149]
+    promoted: true
+    promoted_to: "trace/exploration_tree.yaml:N152"
+    crystallized_via: artifact-commitment
+    stale: false
+  - id: O06
+    timestamp: "2026-06-25T00:35"
+    provenance: ai-suggested
+    content: "After RUNTIME-124, vertex-position-only mesh dirtiness can keep the existing surface geometry handle through `GpuWorld::UpdateGeometryChannels`, so surface deferred-retire/free accounting should not be expected unless a full upload trigger is present; mesh primitive edge/vertex view sidecars still repack on position dirtiness."
+    context: "Diagnosis of the CPU gate failure in `MeshPrimitiveViewExtraction.VertexPositionDirtyRepacksBothViews` during the RUNTIME-126 readback-job implementation loop."
+    potential_type: constraint
+    bound_to: [N158, N160]
+    promoted: true
+    promoted_to: "logic/solution/constraints.md:K02"
+    crystallized_via: artifact-commitment
+    stale: false

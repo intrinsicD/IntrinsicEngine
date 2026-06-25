@@ -90,8 +90,11 @@ namespace Extrinsic::Runtime
             bool HasWorkerOutput{false};
             bool HasPreviousOutput{false};
             bool PreviousOutputRetained{false};
+            bool IsReadbackJob{false};
+            std::uint64_t ReadbackByteSize{0u};
             std::string Diagnostic{};
             std::move_only_function<DerivedJobWorkerResult()> Execute{};
+            std::move_only_function<bool()> IsReadbackReady{};
             std::move_only_function<DerivedJobApplyValidation()> ValidateOnMainThread{};
             std::move_only_function<Core::Result(DerivedJobApplyContext&)> ApplyOnMainThread{};
         };
@@ -152,6 +155,7 @@ namespace Extrinsic::Runtime
                 return DerivedJobStatus::Running;
             case StreamingTaskState::WaitingForMainThreadApply:
             case StreamingTaskState::WaitingForGpuUpload:
+            case StreamingTaskState::WaitingForReadback:
                 return DerivedJobStatus::Applying;
             case StreamingTaskState::Complete:
                 return record.Status == DerivedJobStatus::Queued
@@ -163,6 +167,63 @@ namespace Extrinsic::Runtime
                 return DerivedJobStatus::Cancelled;
             }
             return record.Status;
+        }
+
+        [[nodiscard]] StreamingTaskState ExecutionStateLocked(const Record& record) const
+        {
+            if (Executor == nullptr || !record.Streaming.IsValid())
+            {
+                switch (record.Status)
+                {
+                case DerivedJobStatus::Complete:
+                    return StreamingTaskState::Complete;
+                case DerivedJobStatus::Failed:
+                    return StreamingTaskState::Failed;
+                case DerivedJobStatus::Cancelled:
+                case DerivedJobStatus::StaleDiscarded:
+                    return StreamingTaskState::Cancelled;
+                case DerivedJobStatus::Blocked:
+                case DerivedJobStatus::Queued:
+                case DerivedJobStatus::Running:
+                case DerivedJobStatus::Applying:
+                    return StreamingTaskState::Pending;
+                }
+            }
+            return Executor->GetState(record.Streaming);
+        }
+
+        [[nodiscard]] DerivedJobReadbackDiagnostics BuildReadbackDiagnosticsLocked() const
+        {
+            DerivedJobReadbackDiagnostics diagnostics{};
+            for (const Record& record : Records)
+            {
+                if (!record.IsReadbackJob)
+                {
+                    continue;
+                }
+
+                ++diagnostics.Issued;
+                const DerivedJobStatus status = SnapshotStatusLocked(record);
+                const StreamingTaskState execution = ExecutionStateLocked(record);
+                if (execution == StreamingTaskState::WaitingForReadback)
+                {
+                    ++diagnostics.Waiting;
+                }
+                if (status == DerivedJobStatus::Complete)
+                {
+                    ++diagnostics.Completed;
+                }
+                else if (status == DerivedJobStatus::Failed)
+                {
+                    ++diagnostics.Failed;
+                }
+                else if (status == DerivedJobStatus::Cancelled ||
+                         status == DerivedJobStatus::StaleDiscarded)
+                {
+                    ++diagnostics.StaleOrCancelled;
+                }
+            }
+            return diagnostics;
         }
 
         [[nodiscard]] DerivedJobSnapshot BuildSnapshotLocked(
@@ -191,6 +252,8 @@ namespace Extrinsic::Runtime
                 .RequestedJobDomain = record.RequestedDomain,
                 .ResolvedJobDomain = record.ResolvedDomain,
                 .Status = status,
+                .ExecutionState = ExecutionStateLocked(record),
+                .IsReadbackJob = record.IsReadbackJob,
                 .Dependencies = record.Dependencies,
                 .NormalizedProgress = record.Output.NormalizedProgress,
                 .ProgressDeterminate = record.Output.ProgressDeterminate,
@@ -274,7 +337,10 @@ namespace Extrinsic::Runtime
             record.SubmittedAt = std::chrono::steady_clock::now();
             record.HasPreviousOutput = desc.HasPreviousOutput;
             record.PreviousOutputRetained = desc.HasPreviousOutput;
+            record.IsReadbackJob = desc.IsReadbackJob;
+            record.ReadbackByteSize = desc.ReadbackByteSize;
             record.Execute = std::move(desc.Execute);
+            record.IsReadbackReady = std::move(desc.IsReadbackReady);
             record.ValidateOnMainThread = std::move(desc.ValidateOnMainThread);
             record.ApplyOnMainThread = std::move(desc.ApplyOnMainThread);
             handle = DerivedJobHandle{index, record.Generation};
@@ -293,6 +359,23 @@ namespace Extrinsic::Runtime
                 record.Status = DerivedJobStatus::Failed;
                 record.PreviousOutputRetained = record.HasPreviousOutput;
                 record.Diagnostic = "progressive derived job has no worker callback";
+                m_Impl->Records.push_back(std::move(record));
+                return handle;
+            }
+
+            if (record.IsReadbackJob && !record.IsReadbackReady)
+            {
+                record.Status = DerivedJobStatus::Failed;
+                record.PreviousOutputRetained = record.HasPreviousOutput;
+                record.Diagnostic = "progressive readback job has no readiness callback";
+                m_Impl->Records.push_back(std::move(record));
+                return handle;
+            }
+            if (record.IsReadbackJob && !record.ApplyOnMainThread)
+            {
+                record.Status = DerivedJobStatus::Failed;
+                record.PreviousOutputRetained = record.HasPreviousOutput;
+                record.Diagnostic = "progressive readback job has no apply callback";
                 m_Impl->Records.push_back(std::move(record));
                 return handle;
             }
@@ -379,6 +462,13 @@ namespace Extrinsic::Runtime
                 record.Output = std::move(*worker);
                 record.HasWorkerOutput = true;
                 record.Diagnostic = record.Output.Diagnostic;
+                if (record.IsReadbackJob)
+                {
+                    return StreamingResult{StreamingReadbackRequest{
+                        .PayloadToken = record.Output.PayloadToken,
+                        .ByteSize = record.ReadbackByteSize,
+                    }};
+                }
                 return StreamingResult{StreamingCpuPayloadReady{
                     .PayloadToken = record.Output.PayloadToken,
                 }};
@@ -604,6 +694,51 @@ namespace Extrinsic::Runtime
         }
     }
 
+    void DerivedJobRegistry::DrainReadbacks()
+    {
+        if (m_Impl == nullptr || m_Impl->Executor == nullptr)
+        {
+            return;
+        }
+
+        std::vector<StreamingTaskHandle> ready{};
+        {
+            std::scoped_lock lock(m_Impl->Mutex);
+            for (Impl::Record& record : m_Impl->Records)
+            {
+                if (!record.IsReadbackJob ||
+                    IsTerminal(record.Status) ||
+                    !record.Streaming.IsValid())
+                {
+                    continue;
+                }
+
+                if (m_Impl->Executor->GetState(record.Streaming) != StreamingTaskState::WaitingForReadback)
+                {
+                    continue;
+                }
+
+                if (!record.IsReadbackReady)
+                {
+                    record.Status = DerivedJobStatus::Failed;
+                    record.PreviousOutputRetained = record.HasPreviousOutput;
+                    record.Diagnostic = "readback job lost readiness callback";
+                    continue;
+                }
+
+                if (record.IsReadbackReady())
+                {
+                    ready.push_back(record.Streaming);
+                }
+            }
+        }
+
+        for (const StreamingTaskHandle handle : ready)
+        {
+            (void)m_Impl->Executor->ResumeReadback(handle);
+        }
+    }
+
     void DerivedJobRegistry::ApplyMainThreadResults()
     {
         if (m_Impl != nullptr && m_Impl->Executor != nullptr)
@@ -654,6 +789,7 @@ namespace Extrinsic::Runtime
         }
 
         std::scoped_lock lock(m_Impl->Mutex);
+        snapshot.Readbacks = m_Impl->BuildReadbackDiagnosticsLocked();
         snapshot.Entries.reserve(m_Impl->Records.size());
         for (std::uint32_t index = 0; index < m_Impl->Records.size(); ++index)
         {
@@ -675,6 +811,7 @@ namespace Extrinsic::Runtime
         }
 
         std::scoped_lock lock(m_Impl->Mutex);
+        snapshot.Readbacks = m_Impl->BuildReadbackDiagnosticsLocked();
         for (std::uint32_t index = 0; index < m_Impl->Records.size(); ++index)
         {
             const auto& record = m_Impl->Records[index];

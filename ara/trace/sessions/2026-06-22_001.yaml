@@ -2,9 +2,9 @@ session:
   id: "2026-06-22_001"
   date: "2026-06-22"
   started: "2026-06-22T00:33"
-  last_turn: "2026-06-22T03:33"
-  turn_count: 6
-  summary: "Implemented, verified, committed, and retired GRAPHICS-095 through GRAPHICS-098 for the CPU/GPU transfer foundation, imported third-party productivity skills through PROC-009, and fixed BUG-050/BUG-051 mesh normal/color visualization wiring."
+  last_turn: "2026-06-22T20:47"
+  turn_count: 45
+  summary: "Implemented, verified, committed, and retired GRAPHICS-095 through GRAPHICS-098 for the CPU/GPU transfer foundation, imported third-party productivity skills, audited stale BUG backlog tasks, and progressed rendering-design grilling through configurable data/channel policies, recipes, preview validation, diagnostics, provenance, lifecycle, renderer snapshot ownership, atomic snapshot publication, fallback generation scheduling, explicit async job outcome reporting, async outcome UI surfacing, selected-lens fail-closed behavior, typed render-lens input binding, scoped binding ambiguity resolution, research-lens shader/material ownership, surface-shading normal-channel policy, color-channel/base-color separation, explicit channel-domain rendering/conversion, and GPU-ready snapshot upload generations."
 
 events_logged:
   - turn: 1
@@ -79,6 +79,252 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Focused normal/color regressions passed, the corrected full default CPU-supported CTest rerun passed 4980/4980, and structural/task/docs checks passed."
+  - turn: 7
+    type: decision
+    id: "N52"
+    routing: direct
+    provenance: ai-executed
+    summary: "Audited active BUG backlog validity, retired stale completed BUG-047/048/049 to done, and left BUG-046 open because the timing-dependent sleep remains in the test source."
+  - turn: 7
+    type: experiment
+    id: "N53"
+    routing: direct
+    provenance: ai-executed
+    summary: "Focused BUG-047/048/049 regressions passed, BUG-046 focused test passed but remains structurally flaky, and task/doc validation passed."
+  - turn: 8
+    type: decision
+    id: "N54"
+    routing: direct
+    provenance: user
+    summary: "User chose research/geometry viewport as the renderer's primary identity, with game/editor and offline/preview rendering radiating from that core as research needs arise."
+  - turn: 9
+    type: decision
+    id: "N55"
+    routing: direct
+    provenance: user
+    summary: "User chose authoring data truth plus selected computation/result lens as the viewport truth source; final material rendering remains secondary unless research needs it."
+  - turn: 10
+    type: decision
+    id: "N56"
+    routing: direct
+    provenance: user
+    summary: "User chose derived result channels as the default computation output, with an explicit selected target property/channel override when intentional."
+  - turn: 11
+    type: decision
+    id: "N57"
+    routing: direct
+    provenance: user
+    summary: "User accepted one primary result lens per render domain with explicit comparison modes such as split, side-by-side, or diff."
+  - turn: 12
+    type: decision
+    id: "N58"
+    routing: direct
+    provenance: user
+    summary: "User accepted typed geometry-channel descriptors as the authoritative binding contract, with import-time name inference as compatibility fallback."
+  - turn: 13
+    type: decision
+    id: "N59"
+    routing: direct
+    provenance: user
+    summary: "User chose loadable configuration policies for missing required data fallback generation, including default entity components and renderable mesh normal-generation schemes."
+  - turn: 14
+    type: question
+    id: "N60"
+    routing: direct
+    provenance: user
+    summary: "User raised the open design-risk question of whether loadable configuration policies are too cumbersome or the right power level for a research engine."
+  - turn: 15
+    type: decision
+    id: "N61"
+    routing: direct
+    provenance: user
+    summary: "User affirmed the preset-first, progressively disclosed configuration guardrail for loadable fallback/entity/renderable policies."
+  - turn: 15
+    type: decision
+    id: "N62"
+    routing: direct
+    provenance: user
+    summary: "User chose configuration files as the source of truth with structured Sandbox UI editing and inspection."
+  - turn: 16
+    type: decision
+    id: "N63"
+    routing: direct
+    provenance: user
+    summary: "User accepted three effective configuration precedence layers to start: engine preset, project config, and operation override, with profiles/templates referenced explicitly."
+  - turn: 17
+    type: decision
+    id: "N64"
+    routing: direct
+    provenance: user
+    summary: "User chose stale-by-default handling for generated data affected by config changes, with explicit update actions and optional config-controlled auto-update."
+  - turn: 18
+    type: decision
+    id: "N65"
+    routing: direct
+    provenance: user
+    summary: "User chose UI marking for stale data using a reference stale color and tooltip explaining why it is stale and can be individually updated."
+  - turn: 19
+    type: decision
+    id: "N66"
+    routing: direct
+    provenance: user
+    summary: "User accepted a shared channel/property status enum covering valid, generated, stale, missing, invalid, computing, and conflict states with canonical UI treatment."
+  - turn: 20
+    type: decision
+    id: "N67"
+    routing: direct
+    provenance: user
+    summary: "User accepted keeping status colors out of the primary data render by default, using badges/tooltips/optional overlays while failing closed for missing or invalid lens inputs."
+  - turn: 21
+    type: decision
+    id: "N68"
+    routing: direct
+    provenance: user
+    summary: "User accepted file-backed UI-editable viewport recipes with built-in presets, especially because agentic AI can inspect, diff, validate, and patch them deterministically."
+  - turn: 22
+    type: decision
+    id: "N69"
+    routing: direct
+    provenance: user
+    summary: "User required agent-authored config and recipe edits to validate and produce a valid rendered preview before overriding active configs."
+  - turn: 23
+    type: decision
+    id: "N70"
+    routing: direct
+    provenance: user
+    summary: "User accepted schema validation, dry-run binding, and headless non-empty render with preview metadata as the validity gate for config/recipe promotion."
+  - turn: 24
+    type: decision
+    id: "N71"
+    routing: direct
+    provenance: user
+    summary: "User accepted synchronous schema/dry-run checks, asynchronous headless preview rendering, and preview-result caching by candidate and scene/backend revision."
+  - turn: 25
+    type: decision
+    id: "N72"
+    routing: direct
+    provenance: user
+    summary: "User accepted previewing user edits against the selected scene/entity first and validating built-ins or agent-authored changes against canonical fixture coverage."
+  - turn: 26
+    type: decision
+    id: "N73"
+    routing: direct
+    provenance: user
+    summary: "User accepted project-wide activation only when all required preview targets pass; current-context-only success may allow limited scoped overrides with fixture failure diagnostics."
+  - turn: 27
+    type: decision
+    id: "N74"
+    routing: direct
+    provenance: user
+    summary: "User accepted machine-readable validation and preview diagnostic reports as the shared truth for UI, tests, and agents."
+  - turn: 28
+    type: decision
+    id: "N75"
+    routing: direct
+    provenance: user
+    summary: "User accepted full provenance requirements for every generated or derived channel/result, including source revisions, inputs, methods, config rules, backend, parameters, diagnostics, and lineage."
+  - turn: 29
+    type: decision
+    id: "N76"
+    routing: direct
+    provenance: user
+    summary: "User accepted promote/apply-to-canonical as an explicit undoable transaction with descriptor validation, source preservation, new canonical revision, provenance, and dependent stale marking."
+  - turn: 30
+    type: decision
+    id: "N77"
+    routing: direct
+    provenance: user
+    summary: "User accepted saving policy-generated data and explicitly published/pinned/attached results as project data, while keeping previews, validation artifacts, viewport caches, and temporary scoped overrides as cache/session data unless promoted."
+  - turn: 31
+    type: decision
+    id: "N78"
+    routing: direct
+    provenance: user
+    summary: "User accepted loading saved project data first, validating generated-data provenance against current configs/source revisions, marking stale/conflict/invalid as needed, and regenerating on open only through explicit auto_update with passing diagnostics."
+  - turn: 32
+    type: decision
+    id: "N79"
+    routing: direct
+    provenance: user
+    summary: "User accepted lifecycle states separate from health status for generated/derived channels/results, including candidate, published, pinned, attached, promoted, archived, and deleted/tombstone with tombstone-first deletion for depended-on saved results."
+  - turn: 33
+    type: decision
+    id: "N80"
+    routing: direct
+    provenance: user
+    summary: "User accepted renderer consumption of resolved immutable render snapshots only, with runtime/project/editor systems owning configs, recipes, provenance, lifecycle, stale detection, and project state."
+  - turn: 34
+    type: decision
+    id: "N81"
+    routing: direct
+    provenance: user
+    summary: "User accepted dirty-driven immutable render snapshots published atomically at frame boundaries, keeping the last valid snapshot on build failure while async work appears through status and diagnostics."
+  - turn: 35
+    type: decision
+    id: "N82"
+    routing: direct
+    provenance: user
+    summary: "User accepted splitting fallback generation between cheap deterministic inline snapshot work and expensive/method-backed async jobs, with both entering the same provenance/status/lifecycle pipeline."
+  - turn: 36
+    type: decision
+    id: "N83"
+    routing: direct
+    provenance: user
+    summary: "User required async generation job completions, stale results, cancellations, debounces, unpublished results, and not-updated outcomes to leave explicit diagnostics and user-visible explanations."
+  - turn: 37
+    type: decision
+    id: "N84"
+    routing: direct
+    provenance: user
+    summary: "User accepted compact status badges for affected entities/channels/lenses, full diagnostics/history details from the machine-readable report, and non-blocking notifications for user-triggered unpublished async outcomes."
+  - turn: 38
+    type: decision
+    id: "N85"
+    routing: direct
+    provenance: user
+    summary: "User accepted fail-closed behavior for selected render lenses with unavailable generated data while preserving base geometry, last valid snapshots, explicit stale-data opt-in, and clear unavailable/computing/status markings."
+  - turn: 39
+    type: decision
+    id: "N86"
+    routing: direct
+    provenance: user
+    summary: "User accepted render lenses declaring typed input slots with semantic roles, domains, value types, required/optional flags, default binding rules, optional overrides, and resolver diagnostics."
+  - turn: 40
+    type: decision
+    id: "N87"
+    routing: direct
+    provenance: user
+    summary: "User accepted deterministic candidate ranking for ambiguous lens bindings, ambiguity diagnostics when ranking is insufficient, and session-default binding overrides with explicit promotion to recipe or project config."
+  - turn: 41
+    type: decision
+    id: "N88"
+    routing: direct
+    provenance: user
+    summary: "User accepted that research lenses own data selection and visualization intent, while materials/shaders only implement presentation from resolved snapshot bindings."
+  - turn: 42
+    type: decision
+    id: "N89"
+    routing: direct
+    provenance: user
+    summary: "User accepted treating surface shading as a lens with a required normal input slot, resolved by override/recipe/authored/generated/explicit-derived policy while keeping normal-vector visualization separate."
+  - turn: 43
+    type: decision
+    id: "N90"
+    routing: direct
+    provenance: user
+    summary: "User accepted typed color channels with role/color-space metadata, research vertex-color visualization independent from material/base-color shading, and policy-gated vertex-color use as material color."
+  - turn: 44
+    type: decision
+    id: "N91"
+    routing: direct
+    provenance: user
+    summary: "User accepted explicit vertex/corner/face channel-domain handling, recipe-declared interpolation or expansion rules, and derived conversion channels instead of silent shader resampling."
+  - turn: 45
+    type: decision
+    id: "N92"
+    routing: direct
+    provenance: user
+    summary: "User accepted revision-based graphics upload plans from resolved render snapshots, producing GPU-ready snapshot generations while preserving the previous GPU-ready state until uploads complete."
 
 ai_actions:
   - turn: 1
@@ -188,6 +434,321 @@ ai_actions:
       - "tasks/done/BUG-051-mesh-color-visualization-property-buffer.md"
       - "tasks/done/RETIREMENT-LOG.md"
       - "tasks/backlog/bugs/index.md"
+  - turn: 7
+    action: "Audited active BUG backlog files, moved stale completed BUG-047/048/049 to done, updated bug index, retirement log, session brief, and the moved-task README link, and ran focused plus task/docs validation."
+    provenance: ai-executed
+    files_changed:
+      - "tasks/done/BUG-047-surface-normal-texture-overrides-vertex-normals.md"
+      - "tasks/done/BUG-048-direct-mesh-postprocess-overwrites-recomputed-normals.md"
+      - "tasks/done/BUG-049-gpuworld-geometry-rebind-upload-barriers.md"
+      - "tasks/backlog/bugs/index.md"
+      - "tasks/done/RETIREMENT-LOG.md"
+      - "tasks/SESSION-BRIEF.md"
+      - "src/graphics/renderer/README.md"
+  - turn: 8
+    action: "Started rendering-design grilling from Sandbox.cppm and recorded the user's chosen renderer identity as research/geometry viewport first."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 9
+    action: "Recorded the user's viewport truth-source decision as authoring data plus active result lens."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 10
+    action: "Recorded the user's computation result-channel decision as default derived output with explicit target override."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 11
+    action: "Recorded the user's result-lens cardinality decision as one primary lens per render domain with explicit comparison modes."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 12
+    action: "Recorded the user's typed geometry-channel descriptor decision."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 13
+    action: "Recorded the user's configurable fallback-generation decision for missing required entity/renderable data."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 14
+    action: "Recorded the user's configuration-complexity risk question and prepared a recommendation to keep loadable policies preset-first and progressively disclosed."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 15
+    action: "Recorded the user's affirmation of preset-first configuration guardrails and file-backed UI-editable configuration authoring."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 16
+    action: "Recorded the user's acceptance of the three-layer minimum viable configuration precedence model."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 17
+    action: "Recorded the user's stale-by-default generated-data invalidation decision with optional auto-update."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 18
+    action: "Recorded the user's stale-data UI marking decision with reference color, tooltip, and individual update affordance."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 19
+    action: "Recorded the user's acceptance of a shared channel/property status enum for UI, renderer, import, and diagnostics."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 20
+    action: "Recorded the user's decision that status colors should appear through UI badges/tooltips/explicit overlays rather than contaminating the primary active-lens render."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 21
+    action: "Recorded the user's acceptance of file-backed UI-editable viewport recipes and their value for agentic AI workflows."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 22
+    action: "Recorded the user's validation-plus-preview gate for agent-authored config and viewport recipe edits before active config replacement."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 23
+    action: "Recorded the user's acceptance of concrete preview validity criteria for config and viewport recipe promotion."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 24
+    action: "Recorded the user's acceptance of combined synchronous/asynchronous cached preview validation execution."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 25
+    action: "Recorded the user's acceptance of current-context and canonical-fixture preview target policy."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 26
+    action: "Recorded the user's acceptance of preview failure and activation scope semantics."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 27
+    action: "Recorded the user's acceptance of machine-readable validation and preview diagnostic reports."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 28
+    action: "Recorded the user's acceptance of full provenance requirements for generated and derived channels/results."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 29
+    action: "Recorded the user's acceptance of explicit undoable promote/apply-to-canonical transaction semantics."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 30
+    action: "Recorded the user's acceptance of persistence boundaries for policy-generated data, explicit derived results, preview artifacts, caches, and temporary scoped overrides."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 31
+    action: "Recorded the user's acceptance of project-load reconciliation semantics for saved generated data, current configs, source revisions, and auto-update."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 32
+    action: "Recorded the user's acceptance of lifecycle states and cleanup semantics for generated and derived channels/results."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 33
+    action: "Recorded the user's acceptance of renderer/runtime ownership boundaries around immutable resolved render snapshots."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 34
+    action: "Recorded the user's acceptance of dirty-driven atomic render snapshot publication and failure handling."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 35
+    action: "Recorded the user's acceptance of splitting fallback generation between cheap inline snapshot generation and asynchronous generation jobs."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 36
+    action: "Recorded the user's refinement that every unpublished, stale, cancelled, debounced, or not-updated async generation outcome must be explicitly diagnosable."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 37
+    action: "Recorded the user's acceptance of compact badges, diagnostics/history panel details, and non-blocking notifications for async generation outcomes."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 38
+    action: "Recorded the user's acceptance of selected render lenses failing closed for pending, missing, stale, failed, or invalid generated data while preserving base viewport rendering."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 39
+    action: "Recorded the user's acceptance of typed render-lens input slots and descriptor/provenance/status-based binding diagnostics."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 40
+    action: "Recorded the user's acceptance of deterministic ambiguity resolution and scoped user override persistence for render-lens input bindings."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 41
+    action: "Recorded the user's acceptance of the boundary where research lenses own channel truth and visualization intent while shaders/materials consume resolved snapshot bindings."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 42
+    action: "Recorded the user's acceptance of surface-shading normal input resolution policy and separation from normal-vector visualization lenses."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 43
+    action: "Recorded the user's acceptance of typed color-channel semantics and separation between research color visualization and material/base-color shading."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 44
+    action: "Recorded the user's acceptance of explicit element-domain rendering semantics and provenance-tracked derived conversion channels."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 45
+    action: "Recorded the user's acceptance of revision-based GPU upload planning and GPU-ready snapshot generations for changed resolved channels."
+    provenance: ai-executed
+    files_changed:
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-22_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
 
 claims_touched: []
 
@@ -222,9 +783,91 @@ key_context:
     excerpt: "Analysis found current mesh normal recompute/shading paths were wired, but direct/progressive geometry-only publication lacked computed normals before first upload and mesh `glm::vec4` color visualizations lacked automatic property-buffer extraction."
   - turn: 6
     excerpt: "RUNTIME-121/RUNTIME-122/RUNTIME-123 remain the broader structural vertex-color stream, declarative vertex layout, and bind-any-property UI follow-ups; this slice intentionally closed only the immediate BUG-050/BUG-051 wiring gaps."
+  - turn: 7
+    excerpt: "User requested an agentic workflow audit of whether BUG tasks in the backlog are still valid or superseded."
+  - turn: 7
+    excerpt: "BUG-047/048/049 task bodies were already complete and code/tests confirmed the fixes; they were stale backlog entries. BUG-046 still has the `std::this_thread::sleep_for(40ms)` `WorkerBlocker` root cause and remains active."
+  - turn: 8
+    excerpt: "User affirmed the renderer identity: research/geometry viewport first, radiating into game/editor and offline/preview directions when research requires it."
+  - turn: 9
+    excerpt: "User affirmed the viewport should use authoring data truth and active computation/result truth together, not material/render truth as the primary default."
+  - turn: 10
+    excerpt: "User affirmed computation outputs should default to new derived channels/properties, while allowing an explicitly selected existing target property/channel."
+  - turn: 11
+    excerpt: "User affirmed one primary active result lens per render domain, with comparison handled by explicit split/side-by-side/diff modes."
+  - turn: 12
+    excerpt: "User affirmed typed geometry-channel descriptors as the binding contract, with import-time name inference only as compatibility fallback."
+  - turn: 13
+    excerpt: "User directed that required missing data should be fallback generated according to loadable configurations, such as default entity component sets and default renderable mesh normal-generation schemes."
+  - turn: 14
+    excerpt: "User asked whether configurable loadable policy layers are too complicated/cumbersome or the right power level for a research-oriented engine."
+  - turn: 15
+    excerpt: "User affirmed preset-first progressive disclosure as the right way and chose configuration files as source of truth with UI editing."
+  - turn: 16
+    excerpt: "User affirmed starting with engine preset, project config, and operation override as the effective configuration precedence layers."
+  - turn: 17
+    excerpt: "User affirmed affected generated data should be marked stale on config changes, explicit user update should be available, and configs may opt into auto-update with a boolean."
+  - turn: 18
+    excerpt: "User directed stale data should be marked in the UI using a reference stale color, likely orange, with a tooltip explaining why it is stale and can be individually updated."
+  - turn: 19
+    excerpt: "User affirmed using a standardized channel/property status enum rather than one-off stale flags."
+  - turn: 20
+    excerpt: "User affirmed status colors should not contaminate primary rendered geometry by default; use UI badges/tooltips/explicit overlays and fail closed for missing or invalid selected-lens data."
+  - turn: 21
+    excerpt: "User affirmed file-backed UI-editable viewport recipes as a good idea, especially for agentic AI workflows."
+  - turn: 22
+    excerpt: "User directed that agents should validate config/recipe edits and test if they produce a valid image preview before overriding active configs."
+  - turn: 23
+    excerpt: "User accepted schema validation, dry-run binding, and headless rendered preview metadata as the valid-preview criteria before config/recipe activation."
+  - turn: 24
+    excerpt: "User accepted combining synchronous schema/dry-run checks with asynchronous headless preview rendering and cache reuse."
+  - turn: 25
+    excerpt: "User accepted previewing selected scene/entity first for user edits and canonical fixtures for built-in presets or agent-authored recipe/config changes."
+  - turn: 26
+    excerpt: "User accepted that project-wide activation requires all required preview targets to pass, while current-context-only success may allow a limited scoped override with diagnostics."
+  - turn: 27
+    excerpt: "User accepted machine-readable validation and preview diagnostics with stable IDs, affected targets, artifact refs, suggested actions, and activation scope."
+  - turn: 28
+    excerpt: "User accepted requiring source revisions, input channel revisions, method/config identities, backend, parameters, diagnostics, status, and lineage on every generated or derived channel/result."
+  - turn: 29
+    excerpt: "User accepted making promote/apply to canonical an explicit undoable transaction with validation, source preservation, canonical revisioning, provenance, and dependent stale marking."
+  - turn: 30
+    excerpt: "User accepted saving policy-generated data and explicitly published/pinned/attached results as project data, while treating previews, validation artifacts, viewport caches, and temporary scoped overrides as cache/session data unless promoted."
+  - turn: 31
+    excerpt: "User accepted validating saved generated data against current configs and source revisions on project open, marking stale/conflict/invalid as appropriate, and only regenerating on open through explicit auto_update with passing diagnostics."
+  - turn: 32
+    excerpt: "User accepted explicit lifecycle states separate from health status for generated/derived channels/results, including tombstone-first deletion for saved depended-on results and physical removal for cache-only previews."
+  - turn: 33
+    excerpt: "User accepted that renderer consumes resolved immutable render snapshots only, while runtime/project/editor systems own config, recipe, provenance, lifecycle, stale detection, and project state."
+  - turn: 34
+    excerpt: "User accepted dirty-driven immutable snapshots published atomically at frame boundaries, with renderer retaining the last valid snapshot on build failure and async work represented via status/diagnostics."
+  - turn: 35
+    excerpt: "User accepted splitting snapshot fallback generation by cost/determinism: cheap deterministic generation can happen inline, expensive or method-backed generation becomes an async job, and both paths must publish provenance/status/lifecycle metadata."
+  - turn: 36
+    excerpt: "User accepted revision-checked async job publication but emphasized it must always be clear what happened when a result is stale, unpublished, not updated, cancelled, or debounced."
+  - turn: 37
+    excerpt: "User accepted surfacing async outcomes through compact status badges, a diagnostics/history detail panel, and non-blocking notifications for user-triggered non-publication outcomes."
+  - turn: 38
+    excerpt: "User accepted failing closed only at the selected render lens when generated data is pending, missing, stale, failed, or invalid, while preserving base geometry and explicit stale-data opt-in."
+  - turn: 39
+    excerpt: "User accepted binding render lenses through typed input slots resolved from descriptors plus provenance/status, with diagnostics for ambiguity, missing inputs, stale bindings, and incompatible domains."
+  - turn: 40
+    excerpt: "User accepted resolving ambiguous lens bindings by deterministic ranking, failing unresolved ambiguity with diagnostics, and persisting user selections as session overrides unless explicitly promoted to recipes or project config."
+  - turn: 41
+    excerpt: "User accepted that lenses own data selection and visualization intent, while materials/shaders implement presentation from resolved snapshot bindings and do not decide research-channel truth."
+  - turn: 42
+    excerpt: "User accepted resolving surface-shading normals as a required lens input with explicit override, recipe, authored, generated fallback, and explicit-derived priority, while normal-vector visualization remains separate."
+  - turn: 43
+    excerpt: "User accepted typed color channels with declared role/color space, research vertex-color visualization independent from material base_color, and policy-gated vertex-color use for material shading."
+  - turn: 44
+    excerpt: "User accepted keeping vertex/corner/face domains explicit, declaring interpolation/expansion in recipes, and creating derived conversion channels with provenance/status instead of silently resampling in shaders."
+  - turn: 45
+    excerpt: "User accepted runtime-owned upload plans from next render snapshots, revision-based changed-resource uploads, GPU-ready snapshot generations, previous GPU-ready state retention, and diagnostics on failed uploads."
 
 open_threads:
   - "RUNTIME-126 owns GPU readback jobs and result-to-property write-back now that the rendering transfer foundation is retired."
   - "RUNTIME-121/RUNTIME-122/RUNTIME-123 remain open for structural vertex-color channels, declarative SoA vertex layout, and editor bind-property-as-channel UI beyond the automatic visualization-buffer fix."
+  - "BUG-046 remains the only active Theme G bug and still needs deterministic ready-queue batching coverage."
+  - "Rendering-design grilling is open: next decisions need to define GPU resource lifetime, caching, and eviction across snapshot generations."
 
 ai_suggestions_pending: []

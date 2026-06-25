@@ -15,13 +15,13 @@ Root scanned: `src`
 | `geometry` | 89 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
-| `graphics/renderer` | 63 |
+| `graphics/renderer` | 67 |
 | `graphics/rhi` | 20 |
 | `graphics/vulkan` | 13 |
 | `legacy` | 181 |
 | `physics` | 1 |
 | `platform` | 5 |
-| `runtime` | 39 |
+| `runtime` | 42 |
 
 ## Modules
 
@@ -213,6 +213,7 @@ Root scanned: `src`
 | `Extrinsic.Graphics.Colormap` | `src/graphics/renderer/Graphics.Colormap.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.ColormapSystem` | `src/graphics/renderer/Graphics.ColormapSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.CullingSystem` | `src/graphics/renderer/Graphics.CullingSystem.cppm` | `graphics/renderer` |
+| `Extrinsic.Graphics.CurrentRendererContractAdapter` | `src/graphics/renderer/Graphics.CurrentRendererContractAdapter.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.DebugViewSystem` | `src/graphics/renderer/Graphics.DebugViewSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.DeferredSystem` | `src/graphics/renderer/Graphics.DeferredSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.ForwardSystem` | `src/graphics/renderer/Graphics.ForwardSystem.cppm` | `graphics/renderer` |
@@ -232,11 +233,14 @@ Root scanned: `src`
 | `Extrinsic.Graphics.RenderCommandRouter` | `src/graphics/renderer/Graphics.RenderCommandRouter.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.RenderFrameInput` | `src/graphics/renderer/Graphics.RenderFrameInput.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.RenderPrepPipeline` | `src/graphics/renderer/Graphics.RenderPrepPipeline.cppm` | `graphics/renderer` |
+| `Extrinsic.Graphics.RenderRecipeConfig` | `src/graphics/renderer/Graphics.RenderRecipeConfig.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.RenderSubsystemRegistry` | `src/graphics/renderer/Graphics.RenderSubsystemRegistry.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.RenderWorld` | `src/graphics/renderer/Graphics.RenderWorld.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.Renderer` | `src/graphics/renderer/Graphics.Renderer.cppm` | `graphics/renderer` |
+| `Extrinsic.Graphics.RenderingContract` | `src/graphics/renderer/Graphics.RenderingContract.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.SelectionSystem` | `src/graphics/renderer/Graphics.SelectionSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.ShadowSystem` | `src/graphics/renderer/Graphics.ShadowSystem.cppm` | `graphics/renderer` |
+| `Extrinsic.Graphics.SharedRenderRecipeExecution` | `src/graphics/renderer/Graphics.SharedRenderRecipeExecution.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.SpatialDebugVisualizers` | `src/graphics/renderer/Graphics.SpatialDebugVisualizers.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.TransformSyncSystem` | `src/graphics/renderer/Graphics.TransformSyncSystem.cppm` | `graphics/renderer` |
 | `Extrinsic.Graphics.TransientDebugUploadHelper` | `src/graphics/renderer/Graphics.TransientDebugUploadHelper.cppm` | `graphics/renderer` |
@@ -503,6 +507,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.EditorCommandHistory` | `src/runtime/Runtime.EditorCommandHistory.cppm` | `runtime` |
 | `Extrinsic.Runtime.Engine` | `src/runtime/Runtime.Engine.cppm` | `runtime` |
 | `Extrinsic.Runtime.GeometryAvailability` | `src/runtime/Runtime.GeometryAvailability.cppm` | `runtime` |
+| `Extrinsic.Runtime.GpuReadbackJob` | `src/runtime/Runtime.GpuReadbackJob.cppm` | `runtime` |
 | `Extrinsic.Runtime.GraphGeometryPacker` | `src/runtime/Runtime.GraphGeometryPacker.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshAttributeTextureBake` | `src/runtime/Runtime.MeshAttributeTextureBake.cppm` | `runtime` |
 | `Extrinsic.Runtime.MeshGeometryPacker` | `src/runtime/Runtime.MeshGeometryPacker.cppm` | `runtime` |
@@ -515,6 +520,7 @@ Root scanned: `src`
 | `Extrinsic.Runtime.ProgressivePresentationExtraction` | `src/runtime/Runtime.ProgressivePresentationExtraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.ProgressiveRenderData` | `src/runtime/Runtime.ProgressiveRenderData.cppm` | `runtime` |
 | `Extrinsic.Runtime.ReferenceScene` | `src/runtime/Runtime.ReferenceScene.cppm` | `runtime` |
+| `Extrinsic.Runtime.RenderArtifactPublication` | `src/runtime/Runtime.RenderArtifactPublication.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderExtraction` | `src/runtime/Runtime.RenderExtraction.cppm` | `runtime` |
 | `Extrinsic.Runtime.RenderWorldPool` | `src/runtime/Runtime.RenderWorldPool.cppm` | `runtime` |
 | `Extrinsic.Runtime.SceneSerialization` | `src/runtime/Runtime.SceneSerialization.cppm` | `runtime` |
@@ -523,8 +529,9 @@ Root scanned: `src`
 | `Extrinsic.Runtime.StableEntityLookup` | `src/runtime/Runtime.StableEntityLookup.cppm` | `runtime` |
 | `Extrinsic.Runtime.StreamingExecutor` | `src/runtime/Runtime.StreamingExecutor.cppm` | `runtime` |
 | `Extrinsic.Runtime.VertexAttributeBinding` | `src/runtime/Runtime.VertexAttributeBinding.cppm` | `runtime` |
+| `Extrinsic.Runtime.VertexChannelBindings` | `src/runtime/Runtime.VertexChannelBindings.cppm` | `runtime` |
 | `Extrinsic.Runtime.VertexChannelStreams` | `src/runtime/Runtime.VertexChannelStreams.cppm` | `runtime` |
 | `Extrinsic.Runtime.SpatialDebugAdapters` | `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **499**
+Total modules: **506**

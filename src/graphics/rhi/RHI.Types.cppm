@@ -141,6 +141,8 @@ export namespace Extrinsic::RHI
     {
         std::uint64_t VertexBufferBDA = 0;
         std::uint64_t IndexBufferBDA  = 0;
+        std::uint64_t TexcoordBufferBDA = 0;
+        std::uint64_t NormalBufferBDA = 0;
         std::uint32_t VertexOffset = 0;
         std::uint32_t VertexCount  = 0;
         std::uint32_t SurfaceFirstIndex = 0;
@@ -151,10 +153,9 @@ export namespace Extrinsic::RHI
         std::uint32_t PointVertexCount = 0;
         std::uint32_t BufferID = 0;
         std::uint32_t Flags = 0;
-        std::uint32_t _pad0 = 0;
-        std::uint32_t _pad1 = 0;
+        std::uint64_t ColorBufferBDA = 0;
     };
-    static_assert(sizeof(GpuGeometryRecord) == 64);
+    static_assert(sizeof(GpuGeometryRecord) == 80);
 
     struct alignas(16) GpuInstanceStatic
     {

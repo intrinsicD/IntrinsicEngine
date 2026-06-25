@@ -12,6 +12,8 @@
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.GpuWorld;
 import Extrinsic.Runtime.PointCloudGeometryPacker;
+import Extrinsic.Runtime.VertexAttributeBinding;
+import Extrinsic.Runtime.VertexChannelBindings;
 import Geometry.Properties;
 
 using Extrinsic::ECS::Components::GeometrySources::ConstSourceView;
@@ -54,6 +56,22 @@ namespace
         normal.Vector() = normals;
     }
 
+    void SetVec3Property(Vertices& v,
+                         const std::string& name,
+                         const std::vector<glm::vec3>& values)
+    {
+        auto prop = v.Properties.GetOrAdd<glm::vec3>(name, glm::vec3(0.0f));
+        prop.Vector() = values;
+    }
+
+    void SetVec4Property(Vertices& v,
+                         const std::string& name,
+                         const std::vector<glm::vec4>& values)
+    {
+        auto prop = v.Properties.GetOrAdd<glm::vec4>(name, glm::vec4(1.0f));
+        prop.Vector() = values;
+    }
+
     [[nodiscard]] PointCloudVertex ReadVertex(const PointCloudPackBuffer& buffer, std::size_t i)
     {
         PointCloudVertex v{};
@@ -79,6 +97,9 @@ TEST(PointCloudGeometryPacker, PacksPositionsWithoutIndices)
     EXPECT_EQ(result.Upload->VertexCount, 3u);
     EXPECT_TRUE(result.Upload->SurfaceIndices.empty());
     EXPECT_TRUE(result.Upload->LineIndices.empty());
+    EXPECT_EQ(result.Upload->PositionBytes.size_bytes(), sizeof(glm::vec3) * 3u);
+    EXPECT_EQ(result.Upload->TexcoordBytes.size_bytes(), sizeof(glm::vec2) * 3u);
+    EXPECT_TRUE(result.Upload->NormalBytes.empty());
 
     const PointCloudVertex v0 = ReadVertex(buffer, 0);
     const PointCloudVertex v1 = ReadVertex(buffer, 1);
@@ -86,6 +107,11 @@ TEST(PointCloudGeometryPacker, PacksPositionsWithoutIndices)
     EXPECT_FLOAT_EQ(v1.Px, 1.0f);
     EXPECT_FLOAT_EQ(v0.U, 0.0f);
     EXPECT_FLOAT_EQ(v0.V, 0.0f);
+
+    ASSERT_EQ(result.Upload->PositionBytes.size_bytes(), sizeof(glm::vec3) * 3u);
+    const auto* positions = reinterpret_cast<const glm::vec3*>(result.Upload->PositionBytes.data());
+    EXPECT_FLOAT_EQ(positions[0].x, 0.0f);
+    EXPECT_FLOAT_EQ(positions[1].x, 1.0f);
 }
 
 TEST(PointCloudGeometryPacker, DoesNotEncodeNormalsIntoUv)
@@ -159,6 +185,48 @@ TEST(PointCloudGeometryPacker, NonFinitePositionFailsClosed)
     const PointCloudPackResult result = PackCloud(c.View(), buffer);
     EXPECT_EQ(result.Status, PointCloudPackStatus::NonFinitePosition);
     EXPECT_FALSE(result.Upload.has_value());
+}
+
+TEST(PointCloudGeometryPacker, ChannelBindingsPublishNormalAndColorStreams)
+{
+    CloudScratch c{};
+    SetPositions(c.VertexSource, {
+        {0.0f, 0.0f, 0.0f},
+        {1.0f, 0.0f, 0.0f},
+    });
+    SetVec3Property(c.VertexSource, "v:custom_normal", {
+        {1.0f, 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f},
+    });
+    SetVec4Property(c.VertexSource, "v:paint", {
+        {1.0f, 0.0f, 0.0f, 1.0f},
+        {0.0f, 1.0f, 0.0f, 1.0f},
+    });
+    Extrinsic::Runtime::VertexChannelBindingSet bindings{};
+    bindings.Normal = Extrinsic::Runtime::VertexChannelSourceBinding{
+        .Enabled = true,
+        .SourceType = Extrinsic::Runtime::AttributeSourceType::Vec3,
+        .SourceProperty = "v:custom_normal",
+    };
+    bindings.Color = Extrinsic::Runtime::VertexChannelSourceBinding{
+        .Enabled = true,
+        .SourceType = Extrinsic::Runtime::AttributeSourceType::Vec4,
+        .SourceProperty = "v:paint",
+    };
+
+    PointCloudPackBuffer buffer{};
+    const PointCloudPackResult result = PackCloud(c.View(), &bindings, buffer);
+
+    ASSERT_EQ(result.Status, PointCloudPackStatus::Success);
+    ASSERT_TRUE(result.Upload.has_value());
+    ASSERT_EQ(result.Upload->NormalBytes.size_bytes(), sizeof(glm::vec3) * 2u);
+    const auto* normals =
+        reinterpret_cast<const glm::vec3*>(result.Upload->NormalBytes.data());
+    EXPECT_FLOAT_EQ(normals[0].x, 1.0f);
+    EXPECT_FLOAT_EQ(normals[1].y, 1.0f);
+    ASSERT_EQ(result.Upload->PackedVertexColors.size(), 2u);
+    EXPECT_EQ(result.Upload->PackedVertexColors[0], 0xFF0000FFu);
+    EXPECT_EQ(result.Upload->PackedVertexColors[1], 0xFF00FF00u);
 }
 
 TEST(PointCloudGeometryPacker, LocalSphereCoversPointBounds)

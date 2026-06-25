@@ -1129,3 +1129,2673 @@ tree:
       and whitespace checks exited successfully. Root hygiene still reports
       pre-existing warning-mode `ara/` and `imgui.ini` entries.
     status: resolved
+  - id: N52
+    type: decision
+    title: "Audit active BUG backlog validity"
+    provenance: ai-executed
+    timestamp: "2026-06-22T08:40"
+    choice: >
+      Audited the Theme G BUG backlog and retired BUG-047, BUG-048, and BUG-049
+      from stale backlog state because their code fixes and regression tests are
+      present; left BUG-046 open because its timing-dependent `WorkerBlocker`
+      test still uses a fixed `sleep_for(40ms)` gate.
+    alternatives:
+      - "Leave completed BUG-047/048/049 files under active bug backlog."
+      - "Close BUG-046 based only on a passing focused run despite the sleep-based test still existing."
+    evidence:
+      - "tasks/backlog/bugs/index.md"
+      - "tasks/done/BUG-047-surface-normal-texture-overrides-vertex-normals.md"
+      - "tasks/done/BUG-048-direct-mesh-postprocess-overwrites-recomputed-normals.md"
+      - "tasks/done/BUG-049-gpuworld-geometry-rebind-upload-barriers.md"
+      - "tasks/backlog/bugs/BUG-046-flaky-coretaskgraph-mainthread-ready-queue-ordering.md"
+      - "tasks/SESSION-BRIEF.md"
+    status: resolved
+  - id: N53
+    type: experiment
+    title: "BUG backlog audit verification"
+    provenance: ai-executed
+    timestamp: "2026-06-22T08:40"
+    also_depends_on: [N52]
+    evidence:
+      - "ctest --test-dir build/ci --output-on-failure -R 'RendererFrameLifecycle\\.(ForwardSurfacePipelineSurvivesOperationalRebuild|ForwardSurfaceShadersUseVertexNormals)' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "ctest --test-dir build/ci --output-on-failure -R 'SandboxEditorUi\\.MeshVertexNormalsCommand(SurvivesPendingDirectMeshPostProcess|PublishesCanonicalNormalsForAllWeightings|FailsClosedForInvalidTargets)' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "ctest --test-dir build/ci --output-on-failure -R 'GraphicsGpuWorld\\.GeometryRebindSubmitsUploadBarriersBeforeNextConsumers' --timeout 120"
+      - "ctest --test-dir build/ci --output-on-failure -R 'CoreTaskGraph\\.MainThreadReadyQueueUsesPriorityAndCostOrdering' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/agents/validate_tasks.py --root tasks --strict"
+      - "python3 tools/docs/check_doc_links.py --root ."
+      - "python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main"
+      - "python3 tools/repo/check_root_hygiene.py --root ."
+      - "python3 tools/repo/check_pr_contract.py"
+      - "git diff --check"
+    result: >
+      BUG-047 renderer lifecycle shader contract passed 1/1; BUG-048 sandbox
+      editor normal recompute regressions passed 6/6; BUG-049 exact geometry
+      rebind barrier regression passed 1/1; BUG-046 focused test passed 2/2
+      but remains valid because the fixed sleep-based batching assumption still
+      exists. Strict task policy, task validation, doc links, docs-sync,
+      root-hygiene, PR-contract, and whitespace checks exited successfully.
+      Root hygiene still reports pre-existing warning-mode `ara/` and
+      `imgui.ini` entries.
+    status: resolved
+  - id: N54
+    type: decision
+    title: "Set renderer identity as research viewport first"
+    provenance: user
+    timestamp: "2026-06-22T08:45"
+    choice: >
+      The engine's rendering identity should be a research/geometry viewport
+      first: robust inspection of meshes, graphs, point clouds, fields,
+      selections, derived properties, debug overlays, and progressive results.
+      Game/editor rendering and offline/preview rendering radiate from that
+      core only when research directions need them.
+    alternatives:
+      - "Make the renderer primarily a game/editor renderer."
+      - "Make the renderer primarily an offline/preview renderer."
+      - "Treat all three identities as equal from the start."
+    evidence:
+      - "User answer on 2026-06-22: yes, research/geometry viewport first, radiating into game/editor and offline paths when research goes there."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N55
+    type: decision
+    title: "Set viewport truth source to authoring data plus result lens"
+    provenance: user
+    timestamp: "2026-06-22T08:47"
+    choice: >
+      The default sandbox viewport should show current authoring data truth
+      (`GeometrySources`, scene data, method outputs attached to entities) and
+      the currently selected computation/result lens. Material/final-shaded
+      rendering is secondary to data legibility unless a research direction
+      explicitly needs that mode.
+    alternatives:
+      - "Prioritize final material/render truth by default."
+      - "Let active computation results override the object without preserving a visible authoring-data baseline."
+    evidence:
+      - "User answer on 2026-06-22: yes it should be 1 and 3."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N56
+    type: decision
+    title: "Default computations to derived channels with explicit target override"
+    provenance: user
+    timestamp: "2026-06-22T08:53"
+    choice: >
+      Computation outputs should default to creating named derived result
+      channels/properties rather than mutating canonical geometry. If the user
+      explicitly selects an existing target property/channel, the computation
+      may write there through an intentional operation. With no selected target,
+      the engine creates a new derived channel/result.
+    alternatives:
+      - "Always mutate canonical properties in place."
+      - "Always create derived channels and never allow direct target selection."
+      - "Require every computation to choose a target before running."
+    evidence:
+      - "User answer on 2026-06-22: yes it should be 3; maybe allow selecting a target property/channel, otherwise create a new derived one."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N57
+    type: decision
+    title: "Use one primary result lens per render domain"
+    provenance: user
+    timestamp: "2026-06-22T09:11"
+    choice: >
+      The viewport should expose one primary active computation lens/result per
+      render domain, such as surface color, normals/vectors, scalar overlay, or
+      selection/diagnostics. Comparison should be explicit through modes such as
+      split view, side-by-side view, or diff, rather than arbitrary stacked
+      result overlays.
+    alternatives:
+      - "Allow arbitrary numbers of active result lenses at once."
+      - "Allow exactly one global active lens for the entire viewport."
+      - "Disallow comparison modes and only show the current lens."
+    evidence:
+      - "User answer on 2026-06-22: yes your recommendation to question 4 is good."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N58
+    type: decision
+    title: "Use typed descriptors as the geometry-channel contract"
+    provenance: user
+    timestamp: "2026-06-22T09:40"
+    choice: >
+      Geometry channels should be bound through typed descriptors as the
+      authoritative contract, with import-time name inference used only as a
+      compatibility fallback. Descriptors should carry at least domain, value
+      type, semantic role, coordinate space when relevant, provenance, and
+      revision, so viewport lenses and shaders bind by compatibility rather
+      than raw string names.
+    alternatives:
+      - "Bind channels by raw names only."
+      - "Ignore imported names entirely and require all assets to provide complete typed metadata."
+      - "Let renderer-specific bindings define channel meaning without geometry-level descriptors."
+    evidence:
+      - "User answer on 2026-06-22: ok yes."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N59
+    type: decision
+    title: "Generate missing required data from loadable configuration policies"
+    provenance: user
+    timestamp: "2026-06-22T09:46"
+    choice: >
+      Missing data required by an entity archetype, renderable mesh contract, lens,
+      or shader should be generated by loadable configuration policy rather than
+      hardcoded renderer behavior. Default entity configurations define which
+      components new entities receive; default renderable mesh configurations can
+      require normals and specify the fallback generation scheme, such as a
+      selected normal weighting mode, when loaded or created data does not supply
+      them. Users can override the generation scheme by changing the loadable
+      configuration.
+    alternatives:
+      - "Hardcode per-semantic fallback behavior in renderer/runtime code."
+      - "Fail closed whenever required data is missing."
+      - "Always generate missing channels with a single engine-wide algorithm."
+    evidence:
+      - "User answer on 2026-06-22: required data should be fallback generated if missing, with the scheme overloadable by changing loadable configuration."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N60
+    type: question
+    title: "Balance loadable configuration power against usability"
+    provenance: user
+    timestamp: "2026-06-22T09:52"
+    description: >
+      User asked whether configurable fallback/entity/renderable policies risk
+      becoming too complicated and cumbersome, or whether they are the right
+      level of power for a research-oriented engine.
+    status: resolved
+  - id: N61
+    type: decision
+    title: "Keep loadable policies preset-first and progressively disclosed"
+    provenance: user
+    timestamp: "2026-06-22T09:56"
+    choice: >
+      Loadable fallback/entity/renderable policies should be powerful but
+      preset-first: built-in defaults handle the common path, advanced overrides
+      are explicit, schema validation catches bad configs early, and generated
+      data exposes provenance without forcing users to reason about every policy
+      layer during routine work.
+    alternatives:
+      - "Expose all configuration layers constantly in the default workflow."
+      - "Remove loadable policy configurability to avoid complexity."
+      - "Keep policies configurable but hide provenance and validation details."
+    evidence:
+      - "User answer on 2026-06-22: ok yes, this is the right way."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N62
+    type: decision
+    title: "Use files as configuration source of truth with UI editing"
+    provenance: user
+    timestamp: "2026-06-22T09:56"
+    choice: >
+      Loadable configurations should use files as the source of truth for
+      reproducible, version-controlled project state, while the Sandbox provides
+      structured UI editing and inspection for common configuration changes.
+    alternatives:
+      - "Use only hand-authored files with no UI editing."
+      - "Use UI-owned assets as the source of truth."
+      - "Hardcode defaults without loadable project configuration files."
+    evidence:
+      - "User answer on 2026-06-22: files as source of truth and UI editable."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N63
+    type: decision
+    title: "Start with three effective configuration precedence layers"
+    provenance: user
+    timestamp: "2026-06-22T09:58"
+    choice: >
+      The minimum viable loadable configuration precedence should start with
+      three effective layers: engine preset, project config, and operation
+      override. Asset import profiles, entity archetypes/templates, and
+      per-entity overrides remain available as explicit named config files
+      referenced by project config or an operation override, rather than always
+      participating as hidden precedence layers.
+    alternatives:
+      - "Implement every possible precedence layer as an always-active stack immediately."
+      - "Use only engine defaults plus ad hoc operation overrides."
+      - "Let asset, entity, and project settings compete without a fixed precedence model."
+    evidence:
+      - "User answer on 2026-06-22: yes, this is how we should start."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N64
+    type: decision
+    title: "Mark affected generated data stale on config changes by default"
+    provenance: user
+    timestamp: "2026-06-22T10:01"
+    choice: >
+      When a configuration file changes, existing generated data that depends on
+      the old configuration revision should be marked stale if affected. Users
+      can explicitly update selected or all affected generated data. A config
+      may additionally expose an explicit auto-update boolean; when enabled,
+      affected generated data can be regenerated automatically according to the
+      new policy.
+    alternatives:
+      - "Always silently regenerate all affected generated data on config change."
+      - "Never support automatic regeneration, even as an explicit opt-in."
+      - "Leave generated data unchanged without stale diagnostics."
+    evidence:
+      - "User answer on 2026-06-22: mark existing data as stale if affected and allow explicit update; maybe add an explicit auto update boolean."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N65
+    type: decision
+    title: "Mark stale data in UI with reference stale color and tooltip"
+    provenance: user
+    timestamp: "2026-06-22T10:04"
+    choice: >
+      Stale generated data should be visibly marked in the UI with a reference
+      stale color, likely orange, and provide a tooltip explaining why the data
+      is stale and that it can be individually updated. The stale affordance
+      should support per-channel/property update actions rather than requiring
+      a global refresh.
+    alternatives:
+      - "Hide stale state unless the user opens diagnostics."
+      - "Stop rendering stale-but-valid data entirely."
+      - "Only offer global regenerate-all behavior."
+    evidence:
+      - "User answer on 2026-06-22: mark in the UI stale data using a reference stale color and provide a tooltip explaining why it is stale and can be individually updated."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N66
+    type: decision
+    title: "Use shared status enum for channels and properties"
+    provenance: user
+    timestamp: "2026-06-22T10:06"
+    choice: >
+      Channels and properties should expose a standardized status enum, not
+      only a stale flag. The initial shared model should cover states such as
+      valid, generated, stale, missing, invalid, computing, and conflict, with
+      canonical UI color/icon treatment, tooltip contract, and allowed actions
+      per status.
+    alternatives:
+      - "Use ad hoc boolean flags per panel or subsystem."
+      - "Track only stale versus non-stale."
+      - "Let renderer, UI, import, and diagnostics invent independent status models."
+    evidence:
+      - "User answer on 2026-06-22: yes. good idea."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N67
+    type: decision
+    title: "Keep status colors out of primary data render by default"
+    provenance: user
+    timestamp: "2026-06-22T10:08"
+    choice: >
+      Channel/property status colors should not affect the primary rendered
+      geometry by default. Geometry should render according to the active lens,
+      while status appears in badges, property rows, tooltips, and optional
+      explicit status overlay modes. If required data is missing or invalid for
+      the selected lens, that lens fails closed with a diagnostic fallback.
+      Stale-but-valid data can still render while being clearly marked in UI.
+    alternatives:
+      - "Tint primary geometry directly with status colors by default."
+      - "Hide stale-but-valid data from rendering."
+      - "Ignore status in the viewport and show it only in logs."
+    evidence:
+      - "User answer on 2026-06-22: yes. good approach. use this."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N68
+    type: decision
+    title: "Use file-backed UI-editable viewport recipes"
+    provenance: user
+    timestamp: "2026-06-22T12:38"
+    choice: >
+      Viewport presentation modes should be file-backed, UI-editable viewport
+      recipes with built-in presets rather than only hardcoded renderer modes.
+      Recipes define base pass, active lens slots, overlays, status overlay
+      policy, comparison mode, and required channel contracts. File-backed
+      recipes are especially valuable for agentic AI because they can be
+      inspected, diffed, validated, and patched deterministically.
+    alternatives:
+      - "Keep viewport presentation modes as hardcoded renderer modes only."
+      - "Make recipes UI-owned state without file source of truth."
+      - "Expose only ad hoc per-session viewport settings."
+    evidence:
+      - "User answer on 2026-06-22: ok, sounds like a good idea, especially when working with agentic AI."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N69
+    type: decision
+    title: "Gate agent-authored config changes through validation and preview"
+    provenance: user
+    timestamp: "2026-06-22T12:46"
+    choice: >
+      Agent-authored configuration and viewport recipe edits should be allowed
+      as candidate file patches, but agents must validate their edits and test
+      whether they produce a valid rendered preview before overriding current
+      active configs. Promotion to active configuration should require schema
+      validation and preview-image validation rather than silent replacement.
+    alternatives:
+      - "Allow agents to rewrite active configs directly without preview."
+      - "Disallow agent-authored config and recipe edits entirely."
+      - "Require only schema validation without rendered preview evidence."
+    evidence:
+      - "User answer on 2026-06-22: the agent should validate edits and test if they produce a valid image preview before overriding active configs."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N70
+    type: decision
+    title: "Require schema dry-run and headless render for valid previews"
+    provenance: user
+    timestamp: "2026-06-22T12:48"
+    choice: >
+      A config or viewport recipe preview is valid only when schema validation,
+      dry-run binding, and headless rendering all pass. The preview image must
+      be non-empty, use the requested recipe, bind all required channels, avoid
+      unexpected diagnostic fallbacks, and emit metadata listing active recipe,
+      scene/entity, channels, statuses, and warnings. Visual/golden comparison
+      should be reserved for tests or locked presets, not every ad hoc user edit.
+    alternatives:
+      - "Treat schema validation alone as sufficient preview validity."
+      - "Require golden-image comparison for every ad hoc config edit."
+      - "Allow active config promotion without a rendered preview artifact."
+    evidence:
+      - "User answer on 2026-06-22: yes exactly, use your recommendation."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N71
+    type: decision
+    title: "Run preview validation with synchronous checks async render and cache"
+    provenance: user
+    timestamp: "2026-06-22T12:50"
+    choice: >
+      Preview validation should combine synchronous and asynchronous work.
+      Schema validation and dry-run binding run synchronously for immediate
+      feedback. Headless preview rendering runs asynchronously as a candidate
+      validation job, and activation stays blocked until it passes. Preview
+      results should be cached by config hash, recipe hash, scene/entity
+      revision, and renderer/backend identity.
+    alternatives:
+      - "Run all preview validation synchronously on the UI path."
+      - "Run all validation asynchronously, including cheap schema errors."
+      - "Do not cache preview validation results."
+    evidence:
+      - "User answer on 2026-06-22: yes combine them as you said."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N72
+    type: decision
+    title: "Preview against current context and canonical fixtures"
+    provenance: user
+    timestamp: "2026-06-22T12:52"
+    choice: >
+      Preview validation should render the selected scene/entity first for user
+      edits, because that is the immediate context being changed. Built-in
+      presets and agent-authored recipe/config changes should also run small
+      canonical fixtures covering authored normals, missing normals, vertex
+      colors, scalar fields, topology/edges, status cases, and missing/invalid
+      channel cases.
+    alternatives:
+      - "Preview only the currently selected scene/entity."
+      - "Run the full canonical fixture suite for every ad hoc user edit."
+      - "Preview only synthetic fixtures and ignore the user's active context."
+    evidence:
+      - "User answer on 2026-06-22: ok good idea."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N73
+    type: decision
+    title: "Scope activation by preview target success"
+    provenance: user
+    timestamp: "2026-06-22T12:54"
+    choice: >
+      Shared or project-wide activation of a config/recipe candidate requires
+      all required preview targets to pass. If the selected scene/entity passes
+      but canonical fixtures fail, the candidate may only be used as a scoped
+      operation override or temporary session preview, clearly marked as limited
+      and accompanied by diagnostics explaining which fixture failed.
+    alternatives:
+      - "Allow project-wide activation when only the selected context passes."
+      - "Reject all use of a candidate when any canonical fixture fails."
+      - "Ignore fixture diagnostics after a current-context preview succeeds."
+    evidence:
+      - "User answer on 2026-06-22: yes ok."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N74
+    type: decision
+    title: "Use machine-readable validation and preview diagnostic reports"
+    provenance: user
+    timestamp: "2026-06-22T12:55"
+    choice: >
+      Validation and preview diagnostics should be machine-readable first, with
+      UI views rendered from the same structured report. Reports should cover
+      schema validation, dry-run binding, preview rendering, and activation
+      decisions, including stable diagnostic IDs, severity, affected
+      file/rule/entity/channel, status, suggested actions, preview artifact
+      paths/hashes, and whether activation is allowed globally, scoped only, or
+      blocked.
+    alternatives:
+      - "Render diagnostics as UI text only."
+      - "Maintain separate diagnostic systems for agents, UI, and tests."
+      - "Report only pass/fail without stable IDs or affected targets."
+    evidence:
+      - "User answer on 2026-06-22: yes please."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N75
+    type: decision
+    title: "Require full provenance for generated and derived channels"
+    provenance: user
+    timestamp: "2026-06-22T12:57"
+    choice: >
+      Every generated or derived channel/result should carry source
+      entity/geometry revision, input channels and revisions, operation or
+      method ID, config/recipe rule IDs and revisions, algorithm/backend
+      identity, parameters, creation time, status, diagnostics report ID, and
+      parent/result lineage when derived from another result.
+    alternatives:
+      - "Track only the channel name and current status."
+      - "Store provenance only in logs rather than on the channel/result."
+      - "Infer provenance later from surrounding project state."
+    evidence:
+      - "User answer on 2026-06-22: yes."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N76
+    type: decision
+    title: "Make promote apply to canonical an explicit undoable transaction"
+    provenance: user
+    timestamp: "2026-06-22T12:59"
+    choice: >
+      Promoting or applying a derived/generated channel to canonical data should
+      be an explicit undoable transaction. It must validate descriptor
+      compatibility, require a valid or stale-but-accepted source, snapshot the
+      previous canonical channel, write a new canonical revision, preserve the
+      source derived channel by default, record promotion provenance, and mark
+      dependent generated data stale if their inputs changed.
+    alternatives:
+      - "Silently replace canonical data when a result looks useful."
+      - "Discard the source derived channel after promotion by default."
+      - "Promote without descriptor validation or stale-dependent invalidation."
+    evidence:
+      - "User answer on 2026-06-22: yes lets make it like that."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N77
+    type: decision
+    title: "Persist policy generated data and explicit published results only"
+    provenance: user
+    timestamp: "2026-06-22T13:01"
+    choice: >
+      Generated data created by load/import/entity-creation policy should be
+      saved as project data with full provenance because it affects
+      reproducibility. Derived computation results should be saved only when
+      explicitly published, pinned, or attached to an entity. Preview images,
+      validation artifacts, viewport-only caches, and temporary scoped
+      overrides should remain cache/session data unless explicitly promoted or
+      saved.
+    alternatives:
+      - "Save every temporary preview and validation artifact into the project."
+      - "Treat policy-generated data as cache-only even when it affects rendering."
+      - "Automatically save every computation result whether or not it is published."
+    evidence:
+      - "User answer on 2026-06-22: yes, as you recommended."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N78
+    type: decision
+    title: "Validate saved generated data on project load before regeneration"
+    provenance: user
+    timestamp: "2026-06-22T13:02"
+    choice: >
+      When opening a project, the engine should load saved project data first,
+      then validate generated-data provenance against current configuration
+      files and source revisions. Matching data is marked valid. Data with
+      changed configs or source revisions is marked stale and exposes update
+      actions. If the generating rule/config is missing, mark conflict or
+      invalid depending on whether the data remains structurally usable. Do not
+      regenerate on open unless the rule has explicit auto_update enabled and
+      regeneration preview/diagnostics pass.
+    alternatives:
+      - "Regenerate all generated data automatically on every project open."
+      - "Trust saved generated data without checking current configs or source revisions."
+      - "Discard generated data when the original generating rule is missing."
+    evidence:
+      - "User answer on 2026-06-22: yes exactly."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N79
+    type: decision
+    title: "Use lifecycle states separate from channel health status"
+    provenance: user
+    timestamp: "2026-06-22T13:04"
+    choice: >
+      Generated and derived channels/results should have explicit lifecycle
+      states separate from health status. Health status describes usability;
+      lifecycle describes ownership and persistence, including candidate,
+      published, pinned, attached, promoted, archived, and deleted/tombstone.
+      Deleting a saved result should archive/tombstone first when anything
+      depends on it, while cache-only previews can be physically removed.
+    alternatives:
+      - "Use only health status for ownership and cleanup behavior."
+      - "Physically delete saved results even when provenance chains depend on them."
+      - "Persist every candidate and preview as permanent project data."
+    evidence:
+      - "User answer on 2026-06-22: ok."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N80
+    type: decision
+    title: "Keep renderer on resolved immutable render snapshots"
+    provenance: user
+    timestamp: "2026-06-22T13:06"
+    choice: >
+      The renderer should consume already-resolved immutable render snapshots
+      rather than resolving configs, recipes, provenance, lifecycle, or project
+      state itself. Runtime/project/editor systems own config loading, recipe
+      selection, provenance, lifecycle, stale detection, and entity/project
+      state. They compile that state into snapshots containing the active
+      recipe, renderable entities, typed channel bindings, status metadata, and
+      diagnostics.
+    alternatives:
+      - "Let graphics/renderer resolve project configs and recipes directly."
+      - "Let renderer inspect live ECS/project state during rendering."
+      - "Push provenance and lifecycle decisions into graphics subsystems."
+    evidence:
+      - "User answer on 2026-06-22: yes, ok."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N81
+    type: decision
+    title: "Publish dirty driven render snapshots atomically at frame boundaries"
+    provenance: user
+    timestamp: "2026-06-22T13:08"
+    choice: >
+      Render snapshots should update through dirty-driven immutable snapshot
+      builds that publish atomically at frame boundaries. Runtime/editor builds
+      the next snapshot from current project state while the renderer keeps
+      drawing the last valid snapshot until a complete replacement is ready.
+      Cheap changes can rebuild immediately; expensive generated data or
+      preview work runs asynchronously and appears as computing or stale status
+      until resolved. If snapshot build fails, keep the previous snapshot and
+      emit machine-readable diagnostics.
+    alternatives:
+      - "Mutate the active render snapshot in place while the renderer consumes it."
+      - "Block rendering whenever generated data or preview work is pending."
+      - "Replace the current snapshot with a partial failed snapshot."
+    evidence:
+      - "User answer on 2026-06-22: yes please."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N82
+    type: decision
+    title: "Split fallback generation between cheap inline work and async jobs"
+    provenance: user
+    timestamp: "2026-06-22T13:10"
+    choice: >
+      Snapshot building may synchronously perform cheap deterministic fallback
+      generation required for immediate renderability, such as simple
+      policy-approved normal generation on small inputs. Expensive or
+      method-backed generation should be scheduled as a job; the snapshot
+      publishes with computing or generated-pending status and diagnostics until
+      the generated data is ready. All generated channels, whether inline or
+      async, must enter the same provenance/status/lifecycle pipeline before
+      rendering as real data.
+    alternatives:
+      - "Never generate during snapshot build; always schedule jobs."
+      - "Allow snapshot build to block on all fallback generation regardless of cost."
+      - "Let inline fallback data bypass provenance/status/lifecycle tracking."
+    evidence:
+      - "User answer on 2026-06-22: yes."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N83
+    type: decision
+    title: "Require explicit diagnostics for unpublished async outcomes"
+    provenance: user
+    timestamp: "2026-06-22T13:14"
+    choice: >
+      When an async generation job completes, it must compare captured
+      input/config/recipe revisions with current project state. Current results
+      can attach or publish generated channels, mark affected entities dirty,
+      and publish through the next snapshot. Results whose inputs changed must
+      not overwrite current state; they become stale-orphan/candidate outputs
+      or cache-discarded artifacts according to lifecycle policy. Cancelled,
+      debounced, stale, discarded, unpublished, or not-updated jobs must all
+      leave explicit machine-readable diagnostics and user-visible explanations
+      so it is always clear what happened and why.
+    alternatives:
+      - "Let stale or superseded async jobs disappear without diagnostics."
+      - "Overwrite current data with completed async results even when inputs changed."
+      - "Expose only successful publications and hide cancellations/debounces."
+    evidence:
+      - "User answer on 2026-06-22: yes, with emphasis on clarity for unpublished, not-updated, cancelled, or debounced outcomes."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N84
+    type: decision
+    title: "Surface async outcomes through badges and diagnostics history"
+    provenance: user
+    timestamp: "2026-06-22T14:17"
+    choice: >
+      Async generation outcomes should be visible without turning the viewport
+      into a log window. Affected entities, channels, and active lenses should
+      show compact status badges. Full details should live in a diagnostics or
+      history panel backed by the same machine-readable report. User-triggered
+      jobs that are cancelled, debounced, stale, discarded, unpublished, or not
+      updated should also produce short non-blocking notifications. The detail
+      view should expose the requested action, captured revisions, current
+      revisions, outcome, reason, affected data, artifact or result location
+      when present, and next actions such as re-run, publish as derived,
+      inspect, or discard.
+    alternatives:
+      - "Show every async generation event directly in the viewport."
+      - "Only show failed jobs and hide successful publications or debounces."
+      - "Store machine-readable diagnostics without a compact UI affordance."
+    evidence:
+      - "User answer on 2026-06-22: yes."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N85
+    type: decision
+    title: "Fail closed unavailable selected render lenses"
+    provenance: user
+    timestamp: "2026-06-22T15:36"
+    choice: >
+      If a selected render lens depends on generated data that is pending,
+      missing, stale, or failed, the lens should fail closed without taking down
+      the whole viewport. The renderer should keep drawing base geometry and
+      the last valid snapshot. The affected lens should render as unavailable
+      with clear badges or overlays and actions. Stale but structurally valid
+      data may be used only through an explicit per-lens or per-session "use
+      stale data" toggle, visibly marked as stale. Pending data should show
+      computing status and keep the last valid lens result when one exists;
+      otherwise it should be unavailable. Failed or invalid data must not be
+      silently replaced with unrelated data.
+    alternatives:
+      - "Block the whole viewport whenever a selected lens has pending or failed generated data."
+      - "Silently substitute unrelated fallback data for failed or invalid lens data."
+      - "Always render stale data without explicit user opt-in."
+    evidence:
+      - "User answer on 2026-06-22: yes."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N86
+    type: decision
+    title: "Bind render lenses through typed input slots"
+    provenance: user
+    timestamp: "2026-06-22T18:32"
+    choice: >
+      Render lenses should declare typed input slots rather than hardcoded
+      channel names. Each slot should define accepted semantic roles, element
+      domain, value type, required or optional status, a default binding rule,
+      and an optional user override. The resolver should bind from the active
+      entity or geometry snapshot using descriptors plus provenance/status, and
+      it should emit diagnostics for ambiguity, missing required inputs, stale
+      bindings, and incompatible domains. Multi-channel lenses should fail only
+      the dependent output path, not unrelated lens features.
+    alternatives:
+      - "Bind lens inputs by hardcoded channel names."
+      - "Let lenses inspect arbitrary project data directly."
+      - "Fail the entire lens when one optional or unrelated input path cannot bind."
+    evidence:
+      - "User answer on 2026-06-22: ok yes."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N87
+    type: decision
+    title: "Resolve ambiguous lens bindings with scoped overrides"
+    provenance: user
+    timestamp: "2026-06-22T18:50"
+    choice: >
+      If a render-lens input slot has multiple compatible channel candidates,
+      the resolver should use deterministic ranking first: explicit user
+      override, then recipe binding, then project policy default, then
+      semantic-role/domain/type match with newest valid non-stale canonical
+      data preferred over generated or derived candidates. If ambiguity
+      remains, the slot should fail with an ambiguity diagnostic and ask the
+      user to choose. User choices should persist as scoped overrides:
+      session-only by default, with explicit promotion into the viewport recipe
+      or project config when the user wants the choice saved.
+    alternatives:
+      - "Pick an arbitrary compatible candidate when ambiguity remains."
+      - "Always persist ambiguity resolutions globally."
+      - "Require every binding to be manually selected even when deterministic ranking is sufficient."
+    evidence:
+      - "User answer on 2026-06-22: yes."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N88
+    type: decision
+    title: "Separate research lens truth from shader presentation"
+    provenance: user
+    timestamp: "2026-06-22T19:34"
+    choice: >
+      Research lenses should own data selection and visualization intent, while
+      materials and shaders own only presentation implementation. A vertex-color
+      lens binds a typed color channel and visualization recipe, then the
+      renderer maps that resolved binding to the appropriate shader path.
+      Normals follow the same boundary: a lens may bind and display normal
+      vectors, while surface shading consumes the active normal channel selected
+      by policy or explicit override. Materials must not decide which research
+      channel is truth; they consume resolved snapshot bindings.
+    alternatives:
+      - "Let materials decide which research channel is authoritative."
+      - "Hardcode research channel selection directly in shader variants."
+      - "Conflate viewport visualization recipes with canonical material definitions."
+    evidence:
+      - "User answer on 2026-06-22: ok."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N89
+    type: decision
+    title: "Select surface-shading normals through lens policy"
+    provenance: user
+    timestamp: "2026-06-22T19:56"
+    choice: >
+      Surface shading should be treated as a lens with a required normal input
+      slot. The normal binding should resolve by policy: explicit user override
+      first, then recipe binding, then canonical authored normals, then valid
+      generated fallback normals, then derived normals only if explicitly
+      allowed. If no compatible normal channel binds, the shading lens should
+      fail closed and the mesh should remain visible in unlit or base geometry
+      mode with diagnostics. Normal-vector visualization is a separate lens
+      that can bind any compatible normal-like channel without changing the
+      surface-shading normal.
+    alternatives:
+      - "Let normal-vector visualization change the surface-shading normal implicitly."
+      - "Prefer derived normals over authored normals without explicit opt-in."
+      - "Hide the whole mesh when no normal channel is available for shading."
+    evidence:
+      - "User answer on 2026-06-22: yes."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N90
+    type: decision
+    title: "Separate color visualization from material base color"
+    provenance: user
+    timestamp: "2026-06-22T20:28"
+    choice: >
+      Color data should be represented as typed channels with declared role and
+      color space. A vertex-color research lens may bind any compatible
+      per-vertex, per-corner, or per-face color channel and visualize it
+      directly or through a recipe. Material/base-color shading should consume
+      a separate resolved base_color input slot: explicit override, recipe
+      binding, authored material color or texture, then an allowed vertex-color
+      channel only if policy says vertex colors may drive material color. This
+      prevents research color fields from silently becoming material truth.
+    alternatives:
+      - "Let any available vertex-color channel automatically become material base color."
+      - "Treat research color visualization and material base color as the same binding."
+      - "Ignore color space and channel role when binding color data."
+    evidence:
+      - "User answer on 2026-06-22: yes."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N91
+    type: decision
+    title: "Keep render channel domains explicit"
+    provenance: user
+    timestamp: "2026-06-22T20:42"
+    choice: >
+      Rendered channels must keep their element domain explicit. Viewport
+      recipes declare accepted source domains and interpolation or expansion
+      rules: per-vertex values interpolate smoothly, per-corner values preserve
+      seams, and per-face values render flat per primitive. If a lens needs a
+      different domain, the engine should create an explicit derived conversion
+      channel with provenance and status rather than silently resampling in the
+      shader. Unsupported domain mismatches fail only the affected lens path
+      with diagnostics.
+    alternatives:
+      - "Silently resample channels in shaders whenever the requested domain differs."
+      - "Treat per-vertex, per-corner, and per-face channels as interchangeable."
+      - "Fail the whole viewport when one lens has an unsupported domain mismatch."
+    evidence:
+      - "User answer on 2026-06-22: yes."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N92
+    type: decision
+    title: "Publish changed channels through GPU-ready snapshot generations"
+    provenance: user
+    timestamp: "2026-06-22T20:47"
+    choice: >
+      Runtime should own a graphics upload plan derived from the next resolved
+      render snapshot. The snapshot records stable channel/resource identities
+      and revisions. Graphics compares those revisions to resident GPU
+      resources and uploads only changed buffers or textures. Upload completion
+      produces a new GPU-ready snapshot generation. Until that generation is
+      ready, the renderer keeps drawing the previous GPU-ready snapshot and
+      marks affected lenses as computing or stale. Failed uploads must not
+      mutate active GPU state; they emit diagnostics and leave the previous
+      resources live.
+    alternatives:
+      - "Mutate active GPU resources in place while the renderer consumes them."
+      - "Re-upload every resource for every snapshot regardless of revisions."
+      - "Replace the active GPU snapshot before uploads and validation complete."
+    evidence:
+      - "User answer on 2026-06-22: yes."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N93
+    type: decision
+    title: "Lease GPU resources across snapshot generations"
+    provenance: user
+    timestamp: "2026-06-23T00:22"
+    choice: >
+      GPU resources should be retained by snapshot-generation leases. Resources
+      referenced by the active GPU-ready snapshot are pinned. Recently replaced
+      resources may stay in a cache for reuse subject to memory budget and LRU
+      eviction. Resources referenced by pending uploads, previews, or
+      diagnostics artifacts get temporary leases. Deleting or archiving project
+      data releases project ownership, but GPU memory is freed only when no
+      active, pending, or cache lease remains. Eviction should produce explicit
+      diagnostics when it affects preview reuse or causes a re-upload.
+    alternatives:
+      - "Free GPU resources immediately when project data is deleted or superseded."
+      - "Keep all historical GPU resources indefinitely."
+      - "Evict resources silently even when this causes preview misses or re-uploads."
+    evidence:
+      - "User answer on 2026-06-23: yes."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N94
+    type: decision
+    title: "Compile viewport recipes into declarative render pass graphs"
+    provenance: user
+    timestamp: "2026-06-23T00:26"
+    choice: >
+      Renderer pass composition should use a declarative render pipeline recipe
+      compiled from the active viewport recipe. The base geometry pass runs
+      first when valid. Research lenses contribute pass nodes with explicit
+      inputs, dependencies, outputs, and fail-closed behavior. Overlays and
+      diagnostics are late passes that can render even when a lens fails.
+      Preview and headless validation use the same compiled pass graph with a
+      different target and stricter diagnostics capture. The renderer executes
+      the compiled graph; runtime/editor owns recipe selection and graph
+      compilation.
+    alternatives:
+      - "Hardcode pass ordering directly in renderer code."
+      - "Let overlays and diagnostics depend on all research lenses succeeding."
+      - "Use a separate preview renderer with different pass semantics."
+    evidence:
+      - "User answer on 2026-06-23: yes."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N95
+    type: decision
+    title: "Keep render passes project-data pure by default"
+    provenance: user
+    timestamp: "2026-06-23T00:37"
+    choice: >
+      Render passes should be pure with respect to project data by default.
+      They consume resolved snapshot inputs and produce transient frame outputs,
+      preview artifacts, and diagnostics. Persistent results, readbacks,
+      screenshot-derived metrics, and channel or property write-backs must be
+      explicit runtime jobs with provenance, lifecycle, validation, and
+      user-visible outcome reporting. A render pass may request such a job, but
+      it must not silently mutate project data during rendering.
+    alternatives:
+      - "Allow render passes to write project data directly during rendering."
+      - "Hide readback or write-back side effects behind normal frame execution."
+      - "Treat screenshots, metrics, or generated channels as persistent project data without lifecycle/provenance."
+    evidence:
+      - "User answer on 2026-06-23: yes."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N96
+    type: decision
+    title: "Publish readback write-backs as derived candidates by default"
+    provenance: user
+    timestamp: "2026-06-23T00:51"
+    choice: >
+      Render/readback jobs that write data back into the project should default
+      to a new derived result or channel with full provenance and candidate
+      lifecycle. The user may explicitly choose a target property or channel
+      before running, or promote/apply the candidate afterward through the
+      undoable canonical transaction. Direct overwrite requires descriptor
+      compatibility, revision checks, preview or validation success, and
+      explicit confirmation. Failed or partial readbacks should publish no
+      project data, only diagnostics and temporary artifacts.
+    alternatives:
+      - "Overwrite the selected target channel by default."
+      - "Publish partial or failed readbacks as project data."
+      - "Allow direct overwrite without descriptor/revision validation and explicit confirmation."
+    evidence:
+      - "User answer on 2026-06-23: yes."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N97
+    type: decision
+    title: "Use state-machine attempts for readback write-back jobs"
+    provenance: user
+    timestamp: "2026-06-23T06:33"
+    choice: >
+      Readback/write-back jobs should use a state machine: queued, running,
+      readback-complete, validating, candidate-ready, published, cancelled, and
+      failed. Partial results remain temporary artifacts unless the job type
+      explicitly declares partial-safe output; partial-safe candidates must
+      include diagnostics marking missing regions or samples. Retries create a
+      new attempt under the same job ID with attempt-level diagnostics.
+      Cancellation stops publication, preserves a concise diagnostic trail, and
+      may keep temporary artifacts only when useful for inspection.
+    alternatives:
+      - "Publish partial readbacks as project data by default."
+      - "Treat retries as unrelated jobs with no shared job identity."
+      - "Cancel jobs silently without diagnostics or inspection artifacts."
+    evidence:
+      - "User answer on 2026-06-23: yes."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N98
+    type: decision
+    title: "Prioritize interactive rendering with bounded fair queues"
+    provenance: user
+    timestamp: "2026-06-23T07:29"
+    choice: >
+      Interactive rendering should remain highest priority and non-blocking.
+      Snapshot builds and small uploads needed for the visible viewport come
+      next. User-triggered previews, generation jobs, and readbacks run after
+      visible-viewport work and ahead of background auto-update jobs. Background
+      validation and cache warming are lowest priority. Work queues should be
+      bounded, cancellable, and debounced for superseded work. Scheduling should
+      preserve per-project fairness so one heavy method cannot starve UI work,
+      and diagnostics should explain when work is delayed, deprioritized,
+      cancelled, or skipped.
+    alternatives:
+      - "Use a single unbounded FIFO queue for all rendering and background work."
+      - "Let background auto-update jobs compete equally with visible viewport rendering."
+      - "Allow heavy method jobs to starve interactive UI and diagnostics."
+    evidence:
+      - "User answer on 2026-06-23: yes."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N99
+    type: decision
+    title: "Centralize executor policy in runtime with subsystem contracts"
+    provenance: user
+    timestamp: "2026-06-23T09:38"
+    choice: >
+      Runtime should own the central job scheduler and priority policy.
+      Graphics owns backend-specific upload and transfer execution behind
+      runtime-submitted upload plans. Methods own pure compute kernels and jobs
+      behind declared job contracts, not UI or renderer mutation. UI/editor
+      owns user intent, status presentation, cancellation requests, and
+      promotion actions, but does not run jobs directly. All job state changes
+      should flow through one machine-readable job/diagnostic registry so
+      agents, tests, and UI observe the same truth.
+    alternatives:
+      - "Let each subsystem run its own unrelated scheduler and status model."
+      - "Let UI execute jobs directly."
+      - "Let methods or graphics mutate renderer/UI/project state outside runtime contracts."
+    evidence:
+      - "User answer on 2026-06-23: yes."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N100
+    type: decision
+    title: "Store shared job diagnostics with tiered retention"
+    provenance: user
+    timestamp: "2026-06-23T09:50"
+    choice: >
+      The shared job/diagnostic registry should store stable job IDs, job type,
+      owner subsystem, priority, state, attempts, captured input revisions,
+      current outcome, diagnostics, produced artifacts, affected entities,
+      channels and lenses, available user actions, timestamps, and cancellation
+      or debounce reasons. Active and recent jobs should remain in memory for
+      fast UI queries. Project-affecting jobs and diagnostics should persist
+      with project metadata. Preview and cache-only jobs should remain as
+      bounded session/cache history. Old non-project entries may be evicted by
+      policy, but enough summary diagnostics must remain to explain why a
+      visible result changed or disappeared.
+    alternatives:
+      - "Keep only current job state and discard historical diagnostics."
+      - "Persist every preview/cache-only job permanently in the project."
+      - "Let UI, tests, and agents query separate status sources."
+    evidence:
+      - "User answer on 2026-06-23: yes."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N101
+    type: decision
+    title: "Query job diagnostics through typed filters and stable actions"
+    provenance: user
+    timestamp: "2026-06-23T09:52"
+    choice: >
+      Users and agents should query the job/diagnostic registry through typed
+      filters and saved views, including severity, state, owner subsystem,
+      affected entity/channel/lens, job type, source config or recipe, artifact
+      availability, and action-required status. UI should render compact
+      badges and a diagnostics panel. Agents and tests should consume the same
+      registry through structured reports. Every entry should expose stable
+      actions such as cancel, retry, inspect artifacts, re-run validation,
+      publish candidate, promote/apply, discard, or explain why no action is
+      available.
+    alternatives:
+      - "Expose diagnostics only as unstructured log text."
+      - "Give UI, tests, and agents separate registry views with divergent truth."
+      - "Omit stable actions from diagnostic entries."
+    evidence:
+      - "User answer on 2026-06-23: yes."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N102
+    type: decision
+    title: "Use scoped diagnostic severities for blocking behavior"
+    provenance: user
+    timestamp: "2026-06-23T11:43"
+    choice: >
+      Diagnostics should use severity levels info, warning, action_required,
+      error, and fatal. Info and warning diagnostics never block by themselves.
+      Action_required blocks only the specific activation or publication path
+      until the user chooses an action. Error blocks the affected job, lens,
+      channel, or publish target but not unrelated viewport work. Fatal blocks
+      the whole operation or active snapshot replacement and keeps the previous
+      valid state. Every blocking diagnostic must name the blocked scope and
+      the available next action.
+    alternatives:
+      - "Use unscoped blocking diagnostics that halt unrelated viewport work."
+      - "Let warnings block activation or publication by default."
+      - "Emit blocking diagnostics without naming the blocked scope or next action."
+    evidence:
+      - "User answer on 2026-06-23: yes."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N103
+    type: decision
+    title: "Execute diagnostic actions as audited runtime commands"
+    provenance: user
+    timestamp: "2026-06-23T11:44"
+    choice: >
+      Diagnostic actions should execute as typed commands routed through
+      runtime. Safe actions such as inspect, explain, filter, and re-run
+      validation may run immediately. Mutating actions require precondition
+      checks and an audit entry. Publication, promotion, overwrite, config
+      activation, deletion, and stale-data acceptance require explicit
+      confirmation. Any action that changes rendering or project state should
+      support preview or dry-run when feasible. Every action should produce a
+      registry event with actor, inputs, result, artifacts, diagnostics, and
+      undo availability.
+    alternatives:
+      - "Let diagnostics mutate project/rendering state directly without runtime routing."
+      - "Run mutating actions without precondition checks, confirmation, or audit entries."
+      - "Record action success/failure only as unstructured UI text."
+    evidence:
+      - "User answer on 2026-06-23: yes."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N104
+    type: decision
+    title: "Scope undo/redo to project-state rendering mutations"
+    provenance: user
+    timestamp: "2026-06-23T11:53"
+    choice: >
+      Undo/redo should cover rendering-related project-state mutations,
+      including config activation, recipe edits, binding override promotion,
+      channel publication, promote/apply to canonical, deletion/archive/
+      tombstone, stale-data acceptance, and target overwrite. It should not
+      undo transient rendering, cache eviction, or background job scheduling
+      directly; those are represented by diagnostics and can be re-run. Each
+      undoable transaction should store previous revision references, affected
+      dependencies, generated-data stale marks, and inverse action
+      availability.
+    alternatives:
+      - "Make all rendering/cache/scheduler events undoable."
+      - "Omit undo for canonical publication and target overwrite."
+      - "Record undo actions without revision references or dependency stale marks."
+    evidence:
+      - "User answer on 2026-06-23: yes ok."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N105
+    type: decision
+    title: "Persist undo history as validated project transactions"
+    provenance: user
+    timestamp: "2026-06-23T12:00"
+    choice: >
+      Persist only project-affecting undoable transactions with revision
+      references, action type, actor, timestamp, affected entities, channels,
+      configs, recipes, dependency stale marks, and inverse command metadata.
+      On project load, validate each undo entry against current revisions;
+      valid entries remain available, while stale or conflicting entries stay
+      visible but disabled with diagnostics. Session-only overrides and
+      transient preview/cache actions do not persist unless promoted. Agents
+      and tests query the same history to explain what changed and whether
+      undo is still possible.
+    alternatives:
+      - "Persist every transient preview, cache, and scheduler action in undo history."
+      - "Discard undo history on project reload."
+      - "Silently drop stale or conflicting undo entries during load."
+      - "Keep undo history as UI-only state unavailable to agents and tests."
+    evidence:
+      - "User answer on 2026-06-23: yes."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N106
+    type: decision
+    title: "Group rendering undo history as named transactions"
+    provenance: user
+    timestamp: "2026-06-23T12:02"
+    choice: >
+      Undo history should be transaction-based. Continuous UI edits coalesce
+      while an explicit edit scope is open, then commit as one named
+      transaction; cancelled or debounced edits create diagnostics or audit
+      entries but no undo entry. Async jobs create undo entries only when they
+      publish or promote project data, not when scheduled. Auto-generated
+      fallback data, stale marks, and dependency updates are dependent effects
+      inside the parent transaction. High-impact actions such as publish,
+      overwrite, activate config, delete, or accept stale data stay separate
+      unless the user invokes a named batch action. Transaction names should be
+      stable verb-target labels with affected counts and expandable details.
+    alternatives:
+      - "Create one undo entry per small UI input event."
+      - "Create undo entries for async job scheduling even when no project data changes."
+      - "Implicitly merge high-impact actions into adjacent edits."
+      - "Expose opaque unnamed undo entries without affected-target details."
+    evidence:
+      - "User answer on 2026-06-23: yes."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N107
+    type: decision
+    title: "Resolve undo conflicts through runtime preflight diagnostics"
+    provenance: user
+    timestamp: "2026-06-23T12:03"
+    choice: >
+      Undo and redo should run as runtime commands with preflight validation. If
+      a transaction's referenced revisions still match, apply it atomically and
+      publish a new resolved snapshot. If newer revisions conflict, keep the
+      undo entry visible but disabled with an action-required diagnostic
+      explaining the conflict and possible repair path. Active jobs whose
+      inputs are superseded are cancelled or marked obsolete with diagnostics.
+      Already published dependent results are rolled back only if they are part
+      of the transaction, or marked stale otherwise. GPU caches and previews
+      are invalidated, not directly undone.
+    alternatives:
+      - "Apply undo/redo without revision preflight validation."
+      - "Silently hide or discard conflicting undo entries."
+      - "Let active jobs continue silently after their inputs are superseded."
+      - "Try to directly undo GPU caches and previews as project state."
+    evidence:
+      - "User answer on 2026-06-23: ok yes."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N108
+    type: decision
+    title: "Separate append-only audit log from reversible undo history"
+    provenance: user
+    timestamp: "2026-06-23T12:05"
+    choice: >
+      The audit log is append-only and records every runtime command and
+      meaningful diagnostic, including transient preview/cache events,
+      cancellation, debounce, validation failures, publication attempts, and
+      disabled undo conflicts. Undo/redo history is the reversible subset:
+      project-state transactions with inverse command metadata. Audit entries
+      can reference undo transaction IDs, job IDs, artifacts, diagnostics,
+      actors, timestamps, and validation outcomes. Audit entries are not
+      undone; they can only be followed by compensating transactions. The UI
+      should show one timeline with undoable badges, disabled-reason badges,
+      and expandable audit details.
+    alternatives:
+      - "Make the audit log reversible and subject to undo."
+      - "Record only undoable transactions and omit transient diagnostics from history."
+      - "Keep audit log and undo history as disconnected UI views."
+      - "Silently remove audit entries after compensating actions."
+    evidence:
+      - "User answer on 2026-06-23: yes ok."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N109
+    type: decision
+    title: "Version and migrate persisted rendering documents explicitly"
+    provenance: user
+    timestamp: "2026-06-23T16:10"
+    choice: >
+      Every persisted rendering document should carry a schema version, engine
+      compatibility range, stable IDs, and revision or content hashes. Loading
+      runs parse, schema validation, migration planning, dry-run preview, and
+      then activation. Unknown forward-compatible fields are preserved where
+      possible, while unsupported required capabilities fail closed with
+      diagnostics. Migrations create new revisions and audit entries rather
+      than silently mutating source files. UI and agents can preview and apply
+      migrations or keep the previous active snapshot. Tests use golden configs
+      and migration fixtures.
+    alternatives:
+      - "Mutate persisted rendering documents silently during load."
+      - "Load unsupported required capabilities with best-effort defaults."
+      - "Drop unknown fields during migration."
+      - "Treat migration behavior as untested UI-only behavior."
+    evidence:
+      - "User answer on 2026-06-23: yes ok."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N110
+    type: decision
+    title: "Keep authored project files as truth over derived artifacts"
+    provenance: user
+    timestamp: "2026-06-23T18:27"
+    choice: >
+      Authored files are the source of truth: configs, recipes, explicit
+      channels and properties, undo history, and audit logs. Generated derived
+      data lives in a content-addressed artifact/cache store with dependency
+      hashes, generator config revisions, provenance, and validation status.
+      Missing cache entries are regenerated; stale entries stay visible with
+      diagnostics but are not consumed as current truth. Portable projects may
+      optionally pin selected generated artifacts for reproducibility, but
+      pinned artifacts remain derived unless explicitly promoted into authored
+      project data.
+    alternatives:
+      - "Treat generated cache entries as authoritative project state."
+      - "Consume stale derived artifacts as current truth when regeneration is expensive."
+      - "Make all portable pinned artifacts authored data automatically."
+      - "Omit provenance and validation status from generated artifacts."
+    evidence:
+      - "User answer on 2026-06-23: yes."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N111
+    type: decision
+    title: "Validate portable reproducibility bundles before activation"
+    provenance: user
+    timestamp: "2026-06-23T18:35"
+    choice: >
+      Portable reproducibility bundles should contain authored project files,
+      selected pinned derived artifacts, generator configs, schema versions,
+      engine and build compatibility metadata, dependency hashes, validation
+      reports, and a replay manifest. Import validates hashes, schemas,
+      required capabilities, artifact provenance, and replay expectations
+      before activation. If pinned artifacts are missing or invalid, the bundle
+      can regenerate them when generators are available; otherwise it loads
+      authored truth and reports degraded reproducibility. UI and agents should
+      show exactly what was trusted, regenerated, skipped, or failed.
+    alternatives:
+      - "Activate imported bundles before validating hashes, schemas, and capabilities."
+      - "Treat invalid pinned artifacts as authored truth."
+      - "Fail the entire project load when pinned artifacts are missing but authored truth is usable."
+      - "Hide which bundle artifacts were trusted, regenerated, skipped, or failed."
+    evidence:
+      - "User answer on 2026-06-23: yes."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N112
+    type: decision
+    title: "Use fast tiered validation before rendering activation"
+    provenance: user
+    timestamp: "2026-06-23T20:35"
+    choice: >
+      Activation validation is required before configs, recipes, bundles, or
+      agent-authored rendering edits become active, but it must be as fast as
+      possible. Use a tiered gate: cheap schema, capability, dependency,
+      provenance, and cached artifact checks run synchronously; incremental
+      render-graph compilation and fallback-generation dry runs run only for
+      affected slices; headless preview and image-health checks reuse cached
+      results when hashes match and run with tight budgets when needed. Low-risk
+      edits may activate after the fast gate, with deeper validation continuing
+      in the background and clear pending/pass/fail diagnostics. High-impact
+      changes still require bounded preview validation or explicit approval.
+      Failed validation keeps the previous active snapshot and reports exact
+      repair actions without making the user wait on unrelated checks.
+    alternatives:
+      - "Run every possible validation stage synchronously before any activation."
+      - "Skip validation entirely for low-risk or agent-authored edits."
+      - "Let slow validation block unrelated UI and viewport work."
+      - "Hide pending background validation status after fast activation."
+    evidence:
+      - "User answer on 2026-06-23: yes, but validation should not take long."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N113
+    type: decision
+    title: "Optimize validation by design instead of fixed latency budgets"
+    provenance: user-revised
+    timestamp: "2026-06-23T20:41"
+    also_depends_on: [N112]
+    choice: >
+      Validation speed should be treated as a design and implementation
+      problem, not as a fixed latency-budget policy. The engine should not bake
+      hard numeric wait budgets into the rendering validation model. Validation
+      remains required, but it should be made as fast as possible through
+      incremental dependency tracking, cached results, selective affected-slice
+      checks, cancellation, debounce, background continuation, and responsive
+      progress diagnostics. The user should not wait on avoidable or unrelated
+      work.
+    alternatives:
+      - "Define fixed millisecond budgets as the primary validation contract."
+      - "Let required validation run slowly as long as it eventually completes."
+      - "Skip validation to avoid wait time."
+      - "Block activation on unrelated validation work."
+    evidence:
+      - "User answer on 2026-06-23: well it should be a design and implementation problem, not a budget problem. no budget just as fast as possible."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N114
+    type: decision
+    title: "Make validation fast with dependency-aware caching and scheduling"
+    provenance: user
+    timestamp: "2026-06-23T20:43"
+    also_depends_on: [N113]
+    choice: >
+      Validation should be dependency-graph driven and incremental. Every
+      validation input should be hashed, validation results should be cached by
+      input, config, and engine compatibility keys, unchanged checks should be
+      skipped, only affected render-graph nodes should be compiled, active and
+      pending snapshots should be reused, preview checks should piggyback on
+      existing viewport or headless renders when possible, independent checks
+      should run in parallel, rapid edits should debounce, obsolete validation
+      jobs should cancel, and checks that affect the active view should be
+      prioritized. Status must remain explicit: valid, pending deeper
+      validation, stale, failed, skipped, or superseded.
+    alternatives:
+      - "Re-run all validation checks from scratch after every edit."
+      - "Use cache keys that ignore engine/config compatibility."
+      - "Compile the entire render graph when only one node changed."
+      - "Hide skipped, stale, pending, or superseded validation states."
+    evidence:
+      - "User answer on 2026-06-23: yes."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N115
+    type: decision
+    title: "Classify activation risk through loadable policy"
+    provenance: user
+    timestamp: "2026-06-23T21:05"
+    choice: >
+      Rendering activation risk should be classified by a declarative classifier
+      in loadable configuration. Low-risk edits include non-destructive
+      viewport/UI recipe changes, temporary lens changes, cache refreshes, and
+      additive derived artifacts that do not overwrite authored data or
+      canonical config. High-impact edits include canonical config activation,
+      schema migration, generator policy changes, shader/material ownership
+      changes, asset/channel overwrite, delete/archive/tombstone, accepting
+      stale data, imported bundle activation, and agent-authored edits touching
+      render graph execution or publication paths. The classifier should
+      explain its decision and be queryable by UI, agents, and tests.
+    alternatives:
+      - "Hard-code activation risk categories in UI code."
+      - "Treat every edit as high-impact and approval-gated."
+      - "Treat all validated edits as low-risk regardless of authored data changes."
+      - "Classify risk without exposing the reason to UI, agents, or tests."
+    evidence:
+      - "User answer on 2026-06-23: ok..."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N116
+    type: decision
+    title: "Require explicit approval for high-impact and degraded activation"
+    provenance: user
+    timestamp: "2026-06-23T21:15"
+    choice: >
+      High-impact rendering activation should require an explicit approval
+      command after validation explains the risk, affected authored data,
+      stale or generated dependencies, preview result, undo availability, and
+      fallback path. Degraded or unchecked activation is allowed only as an
+      explicit temporary override with scope, reason, actor, expiry or
+      revalidation trigger, and visible status badge. The previous active
+      snapshot remains available for rollback. Agent-authored high-impact
+      changes require the same approval path and cannot silently self-approve.
+    alternatives:
+      - "Allow high-impact activation immediately after validation without explicit approval."
+      - "Allow degraded or unchecked activation as an implicit hidden state."
+      - "Let agent-authored high-impact edits self-approve."
+      - "Discard the previous active snapshot after degraded activation."
+    evidence:
+      - "User answer on 2026-06-23: ok sounds good."
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N117
+    type: decision
+    title: "Optimize engine architecture for continuous change"
+    provenance: user
+    timestamp: "2026-06-23T21:15"
+    choice: >
+      The main goal for the engine codebase is to be easy to change so the
+      engine can be extended and improved constantly. Rendering architecture
+      should therefore prefer clear module boundaries, small composable seams,
+      loadable policies over hard-coded behavior, explicit contracts,
+      observable validation and diagnostics, focused tests, and minimal
+      coupling between app, runtime, graphics, assets, methods, and UI.
+      Configurability is valuable only when it keeps extension cheap and
+      understandable rather than spreading complexity across the codebase.
+    alternatives:
+      - "Maximize configurability even if it makes code harder to evolve."
+      - "Centralize rendering behavior in large hard-coded UI/runtime paths."
+      - "Optimize only current feature behavior without preserving extension seams."
+      - "Treat changeability as secondary to short-term implementation speed."
+    evidence:
+      - "User reminder on 2026-06-23: my main goal is to have a code base for this engine that is easy to change, so we can extend and improve it constantly."
+      - "AGENTS.md"
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N118
+    type: decision
+    title: "Preserve changeability through narrow renderer extension seams"
+    provenance: user
+    timestamp: "2026-06-23T21:19"
+    also_depends_on: [N117]
+    choice: >
+      Primary rendering extension seams should keep app thin, UI limited to
+      intent/status, runtime responsible for orchestration, and reusable
+      rendering contracts in narrow modules for render recipes, validation
+      policy, risk policy, pass graph compilation, snapshot construction, GPU
+      upload planning, and diagnostic/action registries. Graphics should
+      consume immutable snapshots and explicit pass graphs rather than live
+      editor or project state. New render features should usually enter by
+      adding a recipe node, validation rule, channel binding, or pass
+      implementation behind an existing contract instead of editing a central
+      renderer switchboard.
+    alternatives:
+      - "Let app or UI own rendering behavior directly."
+      - "Let graphics consume live editor/project state."
+      - "Add new features by expanding a central renderer switchboard."
+      - "Blur runtime orchestration with reusable graphics contracts."
+    evidence:
+      - "User answer on 2026-06-23: yes. correct."
+      - "AGENTS.md"
+      - "src/app/Sandbox/Sandbox.cppm"
+    status: resolved
+  - id: N119
+    type: question
+    title: "Define autonomous agent evidence of good engine work"
+    provenance: user
+    timestamp: "2026-06-23T21:19"
+    description: >
+      The design needs ways for agents to know autonomously, as best as
+      possible, that they did a good job implementing a method or working with
+      the engine. Human review and acceptance remains meaningful, but the
+      engine should expose stronger self-assessment evidence before that point.
+    evidence:
+      - "User direction on 2026-06-23: we also need to think about how agents will know that they did a good job."
+      - "AGENTS.md"
+    status: open
+  - id: N120
+    type: decision
+    title: "Use evidence bundles for autonomous agent quality judgment"
+    provenance: user
+    timestamp: "2026-06-23T21:31"
+    also_depends_on: [N119]
+    choice: >
+      Agents should judge whether an engine or method implementation is
+      probably good using an evidence bundle rather than a single pass/fail.
+      The bundle should include scoped task acceptance criteria, passing
+      relevant tests, structural checks, layering/import checks, validation or
+      preview artifacts when rendering is touched, benchmark and parity evidence
+      when performance or methods are touched, docs/task sync, and a self-review
+      explaining risks and what was not verified. The engine should expose
+      machine-readable diagnostics and validation reports so agents can compare
+      expected behavior, actual behavior, and unresolved risk without relying
+      on informal confidence.
+    alternatives:
+      - "Let agents rely primarily on human acceptance or informal confidence."
+      - "Treat one passing test command as sufficient evidence for all changes."
+      - "Omit self-review and unverified-risk reporting."
+      - "Keep diagnostics and validation reports human-only rather than machine-readable."
+    evidence:
+      - "User answer on 2026-06-23: yes like you said."
+      - "AGENTS.md"
+    status: resolved
+  - id: N121
+    type: decision
+    title: "Add changeability-aware planning and self-review skills"
+    provenance: user
+    timestamp: "2026-06-23T21:31"
+    also_depends_on: [N117, N120]
+    choice: >
+      Agent workflow should include skills that plan tasks with respect to
+      future change and later self-review the completed work with respect to
+      future change. These skills should ask, where applicable, whether the
+      slice uses the right extension seam, preserves module boundaries, keeps
+      contracts narrow, avoids hard-coded policy, limits coupling, adds the
+      right tests and diagnostics, and leaves the engine easier to extend.
+      Some task areas will not allow meaningful future-change analysis, but for
+      everything else agents should use this planning and review lens.
+    alternatives:
+      - "Consider future changeability only informally during human review."
+      - "Ask future-change questions only before implementation, not during self-review."
+      - "Apply changeability checks even where they are meaningless or misleading."
+      - "Prioritize local completion over preserving extension seams."
+    evidence:
+      - "User direction on 2026-06-23: there should be skills which allow the agent to plan the task w.r.t future change and also for the self review where it is asked again w.r.t. future change."
+      - "AGENTS.md"
+    status: resolved
+  - id: N122
+    type: decision
+    title: "Require future-change plan and matching self-review"
+    provenance: user
+    timestamp: "2026-06-23T21:33"
+    also_depends_on: [N121]
+    choice: >
+      For every non-trivial task where future-change analysis applies, the
+      changeability-planning skill should require a short future-change plan
+      before implementation starts. The plan should name the owning layer and
+      extension seam, expected future variation points, why the change belongs
+      there, what contracts stay stable, what coupling is avoided, what should
+      remain loadable or configurable versus hard-coded, what tests and
+      diagnostics will protect future edits, and what is intentionally not
+      generalized. The matching self-review should revisit each point and state
+      whether the implementation preserved or damaged future changeability.
+    alternatives:
+      - "Ask only generic planning questions without future-change specificity."
+      - "Require future-change analysis for trivial or inapplicable tasks."
+      - "Skip the matching self-review after implementation."
+      - "Generalize every possible variation point preemptively."
+    evidence:
+      - "User answer on 2026-06-23: yes, good."
+      - "AGENTS.md"
+    status: resolved
+  - id: N123
+    type: decision
+    title: "Emit structured implementation evidence reports"
+    provenance: user
+    timestamp: "2026-06-23T21:38"
+    also_depends_on: [N120, N122]
+    choice: >
+      Each non-trivial completed task should emit a small structured evidence
+      report with task ID, touched layers and modules, intended extension seam,
+      future-change plan reference, acceptance criteria results, commands run
+      with pass/fail and relevant logs or artifacts, changed public contracts,
+      diagnostics or preview artifacts, benchmark and parity results if
+      relevant, docs/task sync status, known residual risks, skipped checks
+      with reasons, and self-review answers. Tools, agents, and reviewers
+      should be able to compare the report against the task file and repository
+      policy.
+    alternatives:
+      - "Keep implementation evidence only in free-form final messages."
+      - "Omit skipped checks and residual risks from the report."
+      - "Leave future-change plan and self-review references out of evidence."
+      - "Make the report useful only to humans, not tools and agents."
+    evidence:
+      - "User answer on 2026-06-23: yes good."
+      - "AGENTS.md"
+    status: resolved
+  - id: N124
+    type: decision
+    title: "Block completion on missing required implementation evidence"
+    provenance: user
+    timestamp: "2026-06-23T21:40"
+    also_depends_on: [N123]
+    choice: >
+      Evidence-report validation should block task completion when required
+      fields are missing, task acceptance criteria are unaddressed, relevant
+      tests or structural checks fail, layering, docs, or task policy is
+      violated, public contract changes lack tests or docs, rendering changes
+      lack validation or preview evidence, method or performance claims lack
+      parity or benchmark evidence, or skipped required checks have no reason.
+      It should warn but allow completion for explicitly scoped residual risks,
+      intentionally skipped non-relevant checks, known flaky quarantined tests,
+      or future-change concerns that are documented with a follow-up task.
+    alternatives:
+      - "Never block completion based on evidence-report validation."
+      - "Block completion for every warning, including scoped residual risks."
+      - "Allow skipped required checks without reasons."
+      - "Allow method, performance, or rendering claims without supporting evidence."
+    evidence:
+      - "User answer on 2026-06-23: yes, ok."
+      - "AGENTS.md"
+    status: resolved
+  - id: N125
+    type: decision
+    title: "Store implementation evidence as task-linked generated reports"
+    provenance: user
+    timestamp: "2026-06-23T21:45"
+    also_depends_on: [N123, N124]
+    choice: >
+      Implementation evidence reports should be generated as task-linked
+      artifacts rather than hand-written prose. A durable summary should stay in
+      the task file or retirement log, while the machine-readable report should
+      live at a predictable tasks/evidence/<TASK-ID>/report.yaml path for
+      completed non-trivial tasks. Large logs, screenshots, benchmark JSON, or
+      preview images should be referenced by path or artifact hash rather than
+      embedded. CI and tools validate the report schema and compare it against
+      the task file, touched paths, commands run, and repository policy. Tiny
+      trivial changes may skip the report only with an explicit not-applicable
+      reason.
+    alternatives:
+      - "Keep implementation evidence only as hand-written prose in final messages."
+      - "Embed large logs, screenshots, benchmark payloads, or preview images directly in the report."
+      - "Store reports in ad hoc locations unrelated to task IDs."
+      - "Allow trivial-report skips without an explicit reason."
+    evidence:
+      - "User answer on 2026-06-23: yes."
+      - "AGENTS.md"
+    status: resolved
+  - id: N126
+    type: decision
+    title: "Continue rendering grilling until the concrete process is covered"
+    provenance: user
+    timestamp: "2026-06-23T21:50"
+    also_depends_on: [N118, N125]
+    choice: >
+      Rendering-design grilling should continue for as many one-at-a-time
+      questions as necessary until the remaining rendering process is clearly
+      covered. The interview should not stop after an arbitrary question cap if
+      core rendering seams remain unresolved, and should now move from policy
+      and agent-evidence decisions into concrete rendering process contracts.
+    alternatives:
+      - "Stop after a fixed five-question cap even if rendering seams remain unresolved."
+      - "Jump directly into implementation without covering the remaining renderer process."
+      - "Ask multiple rendering questions at once."
+    evidence:
+      - "User direction on 2026-06-23: ok then lets continue and cover the rest as well. (as many questions as necessary, until everything is clearly covered)."
+      - "AGENTS.md"
+    status: resolved
+  - id: N127
+    type: decision
+    title: "Define canonical frame pipeline phases and owners"
+    provenance: user
+    timestamp: "2026-06-23T21:55"
+    also_depends_on: [N94, N99, N118, N126]
+    choice: >
+      The canonical frame pipeline should use fixed phases: collect intents,
+      resolve project state, extract an immutable render world, validate and
+      complete the snapshot, build a GPU-ready snapshot, upload and lease
+      resources, compile the pass graph, execute render passes, and
+      present/capture/report outcomes. App/UI express intent through runtime
+      commands; runtime owns project-state resolution, snapshot extraction,
+      validation orchestration, scheduling, and outcome publication; lower
+      layers execute fallback generation and validation kernels; graphics
+      assets and renderer convert immutable snapshot handles into upload plans,
+      GPU-resource requirements, and pass graphs; graphics backends execute
+      uploads and passes through RHI/Vulkan contracts; UI displays runtime
+      diagnostics and explicit job outcomes. Graphics must never pull from live
+      ECS, live assets, or UI state.
+    alternatives:
+      - "Let graphics pull directly from live ECS, assets, or UI state during rendering."
+      - "Let render passes mutate project data implicitly without explicit jobs."
+      - "Make graphics own project-state resolution and runtime command semantics."
+      - "Leave frame phases implicit and backend-specific."
+    evidence:
+      - "User answer on 2026-06-23: ok yes."
+      - "AGENTS.md"
+    status: resolved
+  - id: N128
+    type: decision
+    title: "Make render snapshots general and extensible"
+    provenance: user-revised
+    timestamp: "2026-06-23T22:00"
+    also_depends_on: [N118, N127]
+    choice: >
+      The runtime-to-renderer immutable render snapshot should be a compact,
+      versioned, renderer-facing value object that is as general and extensible
+      as practical without exposing live ECS, live asset services, or UI state.
+      Its stable core should include snapshot identity, revisions and hashes,
+      view definitions, renderables, attribute/channel bindings,
+      lighting/environment descriptors, resolved pass recipe inputs, logical
+      GPU-resource requirements, and validation/diagnostic state. Extensibility
+      should be a first-class part of the snapshot shape so future research
+      lenses, material models, geometry domains, diagnostic overlays, and
+      backend capabilities can add typed data without rewriting the whole
+      runtime-renderer contract. The renderer may cache GPU-ready data keyed by
+      snapshot/generation hashes, but must treat the snapshot as read-only and
+      return diagnostics/outcomes instead of mutating project state.
+    alternatives:
+      - "Make render snapshots a narrow closed struct optimized only for current surface meshes."
+      - "Expose live ECS, live asset services, or UI objects to gain flexibility."
+      - "Use arbitrary untyped maps for all data without a stable core contract."
+      - "Let renderer-side caches mutate the authoritative snapshot."
+    evidence:
+      - "User answer on 2026-06-23: yes but it should be as general as possible and extensible if necessary."
+      - "AGENTS.md"
+    status: resolved
+  - id: N129
+    type: pivot
+    title: "Shift from one canonical snapshot to renderer-specific input contracts"
+    provenance: user-revised
+    timestamp: "2026-06-23T23:41"
+    also_depends_on: [N127, N128]
+    from: "A renderer-facing immutable render snapshot as the canonical shape for rendering input."
+    to: >
+      A renderer uses engine seams to produce an image, and different renderers
+      may require different input shapes or no full-scene snapshot at all.
+      Realtime scientific visualization, offline path tracing, massive-scene
+      clustered/tiled rendering, and selected-object editing workflows should be
+      free to declare their own renderer-specific input contracts, update
+      scopes, and data access patterns. Full-scene snapshots become one
+      implementation strategy for renderers that need them, while selected
+      object or workflow-local renderers may consume a much smaller editing
+      context. ECS remains the flexible authoring/composition model, with
+      runtime responsible for adapting ECS/project data to each renderer's
+      declared contract.
+    trigger: >
+      User clarified that the snapshot shape depends on the renderer and that
+      an editing workflow on one selected object should not require a whole-scene
+      snapshot.
+    status: resolved
+  - id: N130
+    type: question
+    title: "Decide renderer input contract visibility"
+    provenance: user
+    timestamp: "2026-06-24T00:05"
+    also_depends_on: [N129]
+    description: >
+      Should renderer input contracts be exposed as public, introspectable engine
+      declarations, kept internal to each renderer, or split into a public
+      capability/request surface plus renderer-private implementation details?
+      The user wants the engine to make it possible for each renderer to get
+      what it needs, including low-level access for some state-of-the-art
+      renderer approaches, while avoiding unnecessary ceremony for simpler
+      renderers.
+    status: resolved
+  - id: N131
+    type: question
+    title: "Clarify whether snapshots are the renderer dependency boundary"
+    provenance: user
+    timestamp: "2026-06-24T00:28"
+    also_depends_on: [N129, N130]
+    description: >
+      Is the snapshot itself the right solution for avoiding unwanted renderer
+      dependencies on live ECS/assets/runtime state? The user questioned whether
+      the prior hybrid contract concern was mostly a dependency issue and
+      suggested that snapshots may already solve it, while still leaving open
+      what "snapshot" should mean for renderer-specific inputs.
+    status: resolved
+  - id: N132
+    type: decision
+    title: "Use scoped prepared snapshots as renderer dependency boundaries"
+    provenance: user
+    timestamp: "2026-06-24T00:44"
+    also_depends_on: [N129, N131]
+    choice: >
+      "Snapshot" should mean any scoped immutable prepared renderer input, not
+      necessarily a full-scene copy. A snapshot can be a full-scene render view,
+      selected-entity editing view, entity-set view, tile or streaming chunk,
+      offline export package, path-tracing scene package, or generated benchmark
+      scene description. Runtime or a runtime-level adapter prepares this view
+      from ECS/assets/geometry/config/project state, and the renderer consumes
+      the prepared input as its dependency boundary. Renderer internals remain
+      free after that boundary, but promoted graphics/renderers should not reach
+      back into live ECS, live assets, or UI state.
+    alternatives:
+      - "Require every renderer to consume one universal full-scene snapshot."
+      - "Let graphics/renderers freely pull live ECS, assets, or UI state for flexibility."
+      - "Treat snapshots as optional only, with no common dependency-boundary role."
+      - "Make selected-object editing workflows build whole-scene snapshots even when unnecessary."
+    evidence:
+      - "User answer on 2026-06-24: ok yes."
+      - "AGENTS.md"
+    status: resolved
+  - id: N133
+    type: decision
+    title: "Expose public envelopes for scoped renderer snapshots"
+    provenance: user
+    timestamp: "2026-06-24T00:45"
+    also_depends_on: [N130, N132]
+    choice: >
+      Every scoped renderer snapshot should expose a small public envelope even
+      when its payload layout remains renderer-specific and private. The
+      envelope should include snapshot identity, kind, scope, producer,
+      consumer renderer, source project/config/entity revisions, dependency
+      hashes, required data categories, required capabilities, validation state,
+      stale/missing/generated/degraded flags, lifetime and cache/lease policy,
+      output artifacts, diagnostics channel, and replay/export compatibility
+      metadata. This gives the engine, UI, agents, tests, and reproducibility
+      tooling a stable way to inspect and validate prepared renderer inputs
+      without forcing all renderers into one payload shape.
+    alternatives:
+      - "Keep scoped renderer snapshots completely invisible to engine/UI/agents/tests."
+      - "Force every renderer to use the same public payload layout."
+      - "Expose live ECS/assets/runtime handles through the public envelope."
+      - "Let renderer-private payloads skip validation, provenance, and replay metadata."
+    evidence:
+      - "User answer on 2026-06-24: yes."
+      - "AGENTS.md"
+    status: resolved
+  - id: N134
+    type: decision
+    title: "Separate renderer descriptors from snapshot envelopes"
+    provenance: user
+    timestamp: "2026-06-24T00:53"
+    also_depends_on: [N132, N133]
+    choice: >
+      Renderer capability/request declarations should be separate from scoped
+      snapshot envelopes. A renderer descriptor declares the renderer's stable
+      identity, purpose, supported scopes, update modes, required and optional
+      data categories, capabilities, output artifacts, and fallback policy.
+      A snapshot envelope describes one concrete prepared input instance for a
+      frame, job, view, or workflow, including scope, source revisions,
+      dependency hashes, validation state, lifetime, diagnostics, and
+      replay/export metadata. Runtime can use descriptors to decide whether a
+      renderer can run before preparing a snapshot, then validate the specific
+      snapshot after preparation.
+    alternatives:
+      - "Merge renderer-level capability declarations and per-snapshot metadata into one record."
+      - "Prepare snapshots before knowing whether a renderer can consume the needed data."
+      - "Let renderers hide their supported scopes, update modes, outputs, and fallback policy."
+      - "Treat a valid renderer descriptor as proof that every prepared snapshot is valid."
+    evidence:
+      - "User answer on 2026-06-24: yes ok."
+      - "AGENTS.md"
+    status: resolved
+  - id: N135
+    type: decision
+    title: "Use binding intents for snapshot material and channel bindings"
+    provenance: user
+    timestamp: "2026-06-24T00:55"
+    also_depends_on: [N133, N134]
+    choice: >
+      Materials, shaders, and geometry/property channels should bind through
+      renderer-independent binding intents or binding sets exposed in public
+      descriptor/envelope metadata, while renderer-private payloads resolve
+      those intents into shader records, material slots, descriptor tables,
+      shader binding table entries, texture or sampler handles, buffer-device
+      address tables, or other renderer-specific representations. A binding
+      intent names semantic role, source domain, source identity and revision,
+      value type and format, required or optional status, fallback policy, color
+      space, units or range, and consumer role, pass, or lens. Runtime validates
+      availability, provenance, staleness, ambiguity, and fallback behavior;
+      renderers adapt valid intents to their internal layout. Surface raster,
+      scientific visualization, path tracing, and editor previews may interpret
+      the same binding intent differently without changing the public contract.
+    alternatives:
+      - "Bind materials, shaders, and channels by raw names only."
+      - "Let shader variants privately decide what each geometry channel means."
+      - "Force every renderer to share one universal material and shader binding layout."
+      - "Make runtime construct backend-specific descriptor tables or shader binding records directly."
+    evidence:
+      - "User answer on 2026-06-24: yes ok."
+      - "AGENTS.md"
+    status: resolved
+  - id: N136
+    type: experiment
+    title: "Resolve BUG-046 TaskGraph main-thread batch flake"
+    provenance: ai-executed
+    timestamp: "2026-06-24T01:04"
+    description: >
+      Diagnosed and fixed BUG-046 by changing TaskGraph execution to enqueue
+      simultaneously-ready main-thread successors as one ready-queue batch,
+      then removed the timing-dependent 40ms sleep from the regression.
+    evidence:
+      - "src/core/Core.Dag.TaskGraph.cpp"
+      - "tests/unit/core/Test.Core.TaskGraphLegacy.cpp"
+      - "ctest --test-dir build/ci --output-on-failure -R 'CoreTaskGraph\\.MainThreadReadyQueueUsesPriorityAndCostOrdering' --repeat until-fail:50 --timeout 60"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60 -j\"$(nproc)\""
+    result: >
+      Focused repeat run passed 50/50; surrounding CoreTaskGraph tests passed
+      23/23; default CPU-supported gate passed 3024/3024. BUG-046 was retired
+      at CPUContracted maturity.
+    status: resolved
+  - id: N137
+    type: decision
+    title: "Pair renderers with snapshots and the engine render graph"
+    provenance: user-revised
+    timestamp: "2026-06-24T10:23"
+    also_depends_on: [N132, N134, N135]
+    choice: >
+      Runtime should pair a selected renderer with a compatible scoped snapshot.
+      Each renderer can take a specific kind of snapshot and the engine's render
+      graph substrate, then execute the renderer's frame recipe to produce one
+      or more images or render artifacts. The engine render graph is shared
+      infrastructure for declaring passes, resources, dependencies, barriers,
+      diagnostics, and execution handoff; the renderer owns the algorithmic
+      recipe that maps its snapshot and binding intents onto that graph. Runtime
+      should not author renderer-specific frame algorithms, and RHI/backend code
+      should execute finalized graph work without needing renderer-level
+      semantics such as materials, lenses, or geometry channels.
+    alternatives:
+      - "Make runtime author each renderer's frame recipe and pass ordering."
+      - "Let every renderer bypass the engine render graph with a private execution planner."
+      - "Force one universal frame recipe for all renderers and snapshot kinds."
+      - "Expose material, lens, and geometry-channel semantics directly to RHI/backend execution code."
+    evidence:
+      - "User answer on 2026-06-24: runtime should pair renderer and snapshot; each renderer can take a specific snapshot kind and the render graph from the engine, then do what is necessary as a frame recipe to produce images."
+      - "AGENTS.md"
+    status: resolved
+  - id: N138
+    type: decision
+    title: "Keep frame recipe cores fixed with loadable optional parts"
+    provenance: user
+    timestamp: "2026-06-24T10:26"
+    also_depends_on: [N137]
+    choice: >
+      A renderer frame recipe should have a predefined fixed core owned by the
+      renderer, while optional recipe parts are loadable configuration. The
+      fixed core defines the renderer's required frame structure, required
+      graph nodes, and mandatory output behavior. Loadable recipe data may
+      enable, disable, select, or configure optional features, passes, overlays,
+      outputs, diagnostics, and tunables that the renderer explicitly supports.
+      The per-frame or per-job data itself varies through the paired snapshot
+      and its binding intents. This keeps renderer behavior predictable and
+      testable while still allowing users and agents to configure optional
+      presentation and workflow features without editing renderer code.
+    alternatives:
+      - "Make the entire renderer frame recipe arbitrary loadable data."
+      - "Make all renderer behavior fixed so users cannot configure optional features."
+      - "Let loadable recipes redefine mandatory pass structure and output contracts."
+      - "Treat data variation and algorithm variation as the same recipe mechanism."
+    evidence:
+      - "User answer on 2026-06-24: a recipe can contain optional things; these should be loadable; the rest is predefined and fixed; only the data may vary."
+      - "AGENTS.md"
+    status: resolved
+  - id: N139
+    type: decision
+    title: "Constrain loadable recipes to declared optional slots"
+    provenance: user
+    timestamp: "2026-06-24T10:29"
+    also_depends_on: [N137, N138]
+    choice: >
+      Loadable optional frame-recipe parts should be constrained to extension
+      slots declared by the renderer descriptor. Each slot should have a stable
+      name, schema, defaults, capability requirements, allowed data bindings,
+      validation rules, diagnostics, and fallback behavior. A loadable recipe
+      may only enable, disable, select, or configure declared slots. Unknown
+      slots, invalid values, unsupported capabilities, unsafe data bindings, or
+      attempts to rewrite the renderer's fixed core should fail validation
+      before activation.
+    alternatives:
+      - "Allow loadable recipes to add arbitrary pass graph nodes."
+      - "Silently ignore unknown recipe slots or invalid options."
+      - "Let recipe files override mandatory renderer pass structure."
+      - "Require renderer code changes for every optional feature toggle."
+    evidence:
+      - "User answer on 2026-06-24: yes."
+      - "AGENTS.md"
+    status: resolved
+  - id: N140
+    type: decision
+    title: "Make visibility and grouping a shared configurable recipe"
+    provenance: user-revised
+    timestamp: "2026-06-24T10:31"
+    also_depends_on: [N137, N138, N139]
+    choice: >
+      Visibility, culling, batching, draw grouping, and dispatch grouping should
+      be a shared configurable recipe usable by all renderers rather than a
+      private strategy owned independently by each renderer. The engine should
+      provide reusable visibility and grouping recipe infrastructure over scoped
+      snapshot data, with loadable configuration selecting supported policies,
+      keys, filters, levels of detail, partitions, and grouping rules. Renderers
+      consume the resulting visibility/grouping products or intents through the
+      engine render graph and their own frame recipes, while preserving renderer
+      freedom for final algorithm-specific interpretation.
+    alternatives:
+      - "Make every renderer own independent visibility, culling, batching, and grouping policy."
+      - "Hardcode one engine-wide visibility strategy with no loadable configuration."
+      - "Let runtime produce backend-specific draw or dispatch command streams directly."
+      - "Force renderers to accept visibility products they do not support instead of declaring compatibility."
+    evidence:
+      - "User answer on 2026-06-24: this should be its own configurable recipe, usable by all renderers."
+      - "AGENTS.md"
+    status: resolved
+  - id: N141
+    type: decision
+    title: "Output renderer-neutral visibility and grouping products"
+    provenance: user
+    timestamp: "2026-06-24T11:46"
+    also_depends_on: [N140]
+    choice: >
+      The shared visibility and grouping recipe should output renderer-neutral
+      products rather than final backend command buffers. Outputs should include
+      visible item sets, rejected item diagnostics, grouping keys, batch groups,
+      instance groups, LOD selections, spatial partitions, ordering hints, and
+      optional acceleration-structure build requests. Each renderer consumes
+      these products through its compatible snapshot, binding intents, and frame
+      recipe, then maps them to its own render graph passes and backend work.
+    alternatives:
+      - "Output finalized backend command buffers from the shared recipe."
+      - "Output only a flat visible list without diagnostics, grouping keys, or LOD decisions."
+      - "Make visibility products renderer-specific so other renderers cannot reuse them."
+      - "Let renderers infer rejected or degraded items without explicit diagnostics."
+    evidence:
+      - "User answer on 2026-06-24: yes."
+      - "AGENTS.md"
+    status: resolved
+  - id: N142
+    type: decision
+    title: "Make lighting and environment a shared configurable recipe"
+    provenance: user
+    timestamp: "2026-06-24T11:55"
+    also_depends_on: [N137, N138, N139, N141]
+    choice: >
+      Lighting and environment should be a shared configurable recipe layer.
+      Authored scene data provides lights, emissive geometry, environment maps,
+      probes, volumes, tags, and related source references. The shared recipe
+      resolves which lighting/environment data participates, quality settings,
+      toggles, shadow intents, probe intents, global-illumination intents,
+      debug modes, and fallback behavior into renderer-neutral lighting and
+      environment products or intents. Renderers declare compatibility and
+      interpret those products through their own frame recipes: raster renderers
+      may build shadow maps or probe resources, path tracers may sample lights
+      directly, and scientific visualization renderers may use simple headlight,
+      ambient, or unlit modes.
+    alternatives:
+      - "Make every renderer independently decide which scene lights and environment data participate."
+      - "Hardcode one lighting model for all renderers."
+      - "Let lighting recipe data override renderer fixed frame-recipe cores."
+      - "Treat missing or unsupported lighting data as implicit renderer behavior without explicit diagnostics."
+    evidence:
+      - "User answer on 2026-06-24: yes."
+      - "AGENTS.md"
+    status: resolved
+  - id: N143
+    type: decision
+    title: "Use shared view and output recipes"
+    provenance: user
+    timestamp: "2026-06-24T11:58"
+    also_depends_on: [N132, N137, N138, N139]
+    choice: >
+      Views and output targets should be expressed through a shared configurable
+      view/output recipe. A view declares camera and projection data, or
+      non-camera view parameters, viewport size, render scale, color and depth
+      formats, target type, capture or readback needs, and interactive or
+      headless behavior. Targets can include a window surface, offscreen
+      texture, screenshot file, dataset image, preview thumbnail,
+      selection/picking buffer, metric/readback artifact, or multi-output
+      bundle. Runtime pairs renderer, compatible scoped snapshot, and
+      view/output recipe; the renderer produces the declared outputs when its
+      descriptor says it is compatible.
+    alternatives:
+      - "Make view and output target behavior renderer-private only."
+      - "Hardcode interactive window rendering as the primary output contract."
+      - "Treat headless rendering as a separate special path instead of the same recipe model."
+      - "Let renderers emit undeclared outputs without recipe metadata or runtime publication."
+    evidence:
+      - "User answer on 2026-06-24: yes."
+      - "AGENTS.md"
+    status: resolved
+  - id: N144
+    type: decision
+    title: "Publish declared render outputs as runtime artifacts first"
+    provenance: user
+    timestamp: "2026-06-24T12:01"
+    also_depends_on: [N117, N118, N143]
+    choice: >
+      Every declared renderer output should first become a runtime-owned render
+      artifact with metadata: renderer identity, snapshot identity, view/output
+      recipe, source revisions, status, diagnostics, and lifetime. The
+      view/output recipe declares whether the artifact is transient, cached,
+      saved to file, preview-only, dataset or batch output, readback or metric
+      artifact, or a candidate project result. Render outputs should not mutate
+      project data implicitly. Project data changes require an explicit
+      publish/apply action or a declared recipe target, with provenance,
+      undo/audit integration, and clear UI status.
+    alternatives:
+      - "Let renderers mutate project data directly when producing outputs."
+      - "Treat all render outputs as transient with no metadata or lifecycle."
+      - "Persist every output by default even when it is only a preview or diagnostic."
+      - "Let recipes publish outputs without provenance, undo/audit, or UI status."
+    evidence:
+      - "User answer on 2026-06-24: yes."
+      - "AGENTS.md"
+    status: resolved
+  - id: N145
+    type: decision
+    title: "Implement the rendering architecture contract-first"
+    provenance: user
+    timestamp: "2026-06-24T12:03"
+    also_depends_on: [N132, N133, N134, N135, N137, N138, N139, N140, N141, N142, N143, N144]
+    choice: >
+      The first implementation milestone should be contract-first rather than
+      renderer-behavior-first. Start with a small foundation slice that adds
+      public contracts and tests without changing Vulkan output yet: renderer
+      descriptors, scoped snapshot envelopes, binding intents, shared recipe
+      descriptors, view/output recipes, and render artifact metadata. Then
+      adapt the current renderer path to populate and consume these contracts
+      minimally. Loadable configurations, UI editing, shared visibility and
+      lighting recipe execution, and deeper Vulkan integration should follow as
+      separate tasks.
+    alternatives:
+      - "Start by rewriting Vulkan behavior before stable public contracts exist."
+      - "Implement loadable recipe files and UI editing before the contract model is tested."
+      - "Bundle descriptors, snapshots, recipes, UI, visibility, lighting, and Vulkan changes into one large task."
+      - "Leave the architecture as design notes only without task-backed contract slices."
+    evidence:
+      - "User answer on 2026-06-24: yes, exactly."
+      - "AGENTS.md"
+    status: resolved
+  - id: N146
+    type: decision
+    title: "Make the first task a CPU-only rendering contract foundation"
+    provenance: user
+    timestamp: "2026-06-24T12:08"
+    also_depends_on: [N145]
+    choice: >
+      The first concrete implementation task should be only the CPU-only public
+      rendering contract foundation, with no runtime behavior change beyond
+      tests. It should cover renderer descriptors, scoped snapshot envelopes,
+      binding intents, recipe descriptors, view/output recipes, render artifact
+      metadata, validation helpers, and unit/contract tests. It should not add
+      loadable recipe files, UI editing, Vulkan changes, or current renderer
+      rewiring. Follow-up tasks should separately cover minimal current-renderer
+      adaptation, loadable config schema and validation, UI editing, shared
+      visibility and lighting recipe execution, and Vulkan/render-graph
+      integration.
+    alternatives:
+      - "Start the first task by changing current renderer behavior."
+      - "Include loadable files, UI, Vulkan, and renderer rewiring in the foundation task."
+      - "Skip tests until later behavior tasks."
+      - "Leave follow-up tasks implicit instead of tracking them separately."
+    evidence:
+      - "User answer on 2026-06-24: yes."
+      - "AGENTS.md"
+    status: resolved
+  - id: N147
+    type: decision
+    title: "Open contract-first rendering task pack"
+    provenance: ai-executed
+    timestamp: "2026-06-24T12:08"
+    also_depends_on: [N145, N146]
+    choice: >
+      Created the task-backed implementation plan for the accepted
+      renderer/snapshot/recipe architecture. Opened `GRAPHICS-099` as the active
+      CPU-only public rendering contract foundation, with follow-up backlog
+      tasks for minimal current-renderer adaptation (`GRAPHICS-100`), loadable
+      recipe schemas and validation (`GRAPHICS-101`), shared
+      visibility/lighting execution (`GRAPHICS-102`), Vulkan/render-graph
+      contract integration (`GRAPHICS-103`), runtime render artifact
+      publication (`RUNTIME-127`), and sandbox recipe UI editing (`UI-023`).
+      Updated the rendering, runtime, UI, and top-level backlog indices, then
+      regenerated `tasks/SESSION-BRIEF.md`.
+    alternatives:
+      - "Leave the accepted architecture only in the ARA trace without task files."
+      - "Open one broad implementation task combining contracts, configs, UI, runtime, and Vulkan."
+      - "Start implementation before task policy can see the active first slice."
+    evidence:
+      - "tasks/active/GRAPHICS-099-rendering-contract-foundation.md"
+      - "tasks/backlog/rendering/GRAPHICS-100-current-renderer-contract-adapter.md"
+      - "tasks/backlog/rendering/GRAPHICS-101-loadable-render-recipe-configs.md"
+      - "tasks/backlog/rendering/GRAPHICS-102-shared-visibility-lighting-recipe-execution.md"
+      - "tasks/backlog/rendering/GRAPHICS-103-vulkan-rendergraph-contract-integration.md"
+      - "tasks/backlog/runtime/RUNTIME-127-render-artifact-publication.md"
+      - "tasks/backlog/ui/UI-023-render-recipe-ui-editing.md"
+      - "tasks/SESSION-BRIEF.md"
+    status: resolved
+  - id: N148
+    type: experiment
+    title: "Rendering task pack validation"
+    provenance: ai-executed
+    timestamp: "2026-06-24T12:08"
+    also_depends_on: [N147]
+    evidence:
+      - "python3 tools/agents/generate_session_brief.py"
+      - "python3 tools/agents/validate_tasks.py --root tasks --strict"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/docs/check_doc_links.py --root ."
+    result: >
+      Session brief regenerated with `GRAPHICS-099` active. Task validator
+      checked 501 task files with zero findings. Strict task policy and maturity
+      follow-up checks passed with zero findings. Documentation link checker
+      scanned 2067 relative links and found no broken links.
+    status: resolved
+  - id: N149
+    type: experiment
+    title: "Agentic review of rendering runtime UI task plan"
+    provenance: ai-executed
+    timestamp: "2026-06-24T12:29"
+    also_depends_on: [N147, N148]
+    evidence:
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/agents/validate_tasks.py --root tasks --strict"
+      - "python3 tools/docs/check_doc_links.py --root ."
+      - "python3 tools/agents/generate_session_brief.py --check"
+      - "tasks/active/GRAPHICS-099-rendering-contract-foundation.md"
+      - "tasks/backlog/rendering/GRAPHICS-100-current-renderer-contract-adapter.md"
+      - "tasks/backlog/ui/UI-023-render-recipe-ui-editing.md"
+      - "tasks/backlog/runtime/RUNTIME-120-vertex-attribute-binding-resolver.md"
+      - "tasks/backlog/runtime/RUNTIME-122-gpu-soa-vertex-channel-storage-and-shader-fetch.md"
+      - "src/runtime/README.md"
+    result: >
+      Mechanical task and documentation checks passed, but the semantic planning
+      review found cleanup items: `RUNTIME-120` appears completed but still lives
+      in backlog and blocks downstream tasks; `RUNTIME-122` has Slice A completed
+      while remaining a mixed-slice backlog task; `GRAPHICS-099` says
+      `Operational` is owned by `GRAPHICS-100` while `GRAPHICS-100` targets
+      `CPUContracted` and hands `Operational` to `GRAPHICS-103`; `UI-023`
+      includes artifact lifetime and unpublished status language without
+      depending on `RUNTIME-127`; and `src/runtime/README.md` still says graph
+      and point-cloud normal windows await future geometry modules even though
+      retired `GEOM-026` provides those modules. The review also found
+      `RUNTIME-126` is listed unblocked while its text says it reuses
+      `RUNTIME-123`, which is still blocked and unimplemented.
+    status: resolved
+  - id: N150
+    type: experiment
+    title: "Task-only hygiene cleanup for rendering runtime UI plan"
+    provenance: ai-executed
+    timestamp: "2026-06-24T13:00"
+    also_depends_on: [N149]
+    evidence:
+      - "tasks/done/RUNTIME-120-vertex-attribute-binding-resolver.md"
+      - "tasks/backlog/runtime/RUNTIME-121-vertex-color-channel-upload.md"
+      - "tasks/backlog/runtime/RUNTIME-122-gpu-soa-vertex-channel-storage-and-shader-fetch.md"
+      - "tasks/backlog/runtime/RUNTIME-126-gpu-readback-jobs-and-property-writeback.md"
+      - "tasks/active/GRAPHICS-099-rendering-contract-foundation.md"
+      - "tasks/backlog/rendering/GRAPHICS-100-current-renderer-contract-adapter.md"
+      - "tasks/backlog/ui/UI-023-render-recipe-ui-editing.md"
+      - "tasks/backlog/ui/UI-022-sandbox-editor-vertex-normal-recompute.md"
+      - "src/runtime/README.md"
+      - "tasks/SESSION-BRIEF.md"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/agents/validate_tasks.py --root tasks --strict"
+      - "python3 tools/agents/check_task_state_links.py --root . --strict"
+      - "python3 tools/docs/check_doc_links.py --root ."
+      - "python3 tools/agents/generate_session_brief.py --check"
+      - "python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main"
+    result: >
+      Completed the requested task-only hygiene slice. `RUNTIME-120` moved to
+      done at `CPUContracted`; `RUNTIME-122` was renamed/re-scoped to track only
+      remaining GPU SoA storage/shader fetch work, with stale `RUNTIME-121` and
+      runtime README wording corrected; `RUNTIME-126` no longer depends
+      textually on `RUNTIME-123`; `GRAPHICS-099`/`GRAPHICS-100` maturity wording
+      now points operational proof to `GRAPHICS-103`; `UI-023` depends on
+      `RUNTIME-127`; stale `UI-022` graph/point-cloud runtime README wording now
+      references the retired GEOM-026 modules. Session brief regenerated. Strict
+      task policy, task validation, task-state links, doc links, session-brief
+      check, and docs-sync check all passed.
+    status: resolved
+  - id: N151
+    type: experiment
+    title: "Implement GRAPHICS-099 rendering contract foundation"
+    provenance: ai-executed
+    timestamp: "2026-06-24T13:23"
+    also_depends_on: [N147, N150]
+    evidence:
+      - "src/graphics/renderer/Graphics.RenderingContract.cppm"
+      - "src/graphics/renderer/Graphics.RenderingContract.cpp"
+      - "tests/contract/graphics/Test.RenderingContract.cpp"
+      - "src/graphics/renderer/README.md"
+      - "docs/api/generated/module_inventory.md"
+      - "tasks/done/GRAPHICS-099-rendering-contract-foundation.md"
+      - "tasks/SESSION-BRIEF.md"
+      - "cmake --preset ci"
+      - "cmake --build --preset ci --target IntrinsicTests -- -j16"
+      - "ctest --test-dir build/ci --output-on-failure -R 'RenderingContract|RendererDescriptor|SnapshotEnvelope|BindingIntent|ViewOutputRecipe|RenderArtifact' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+      - "python3 tools/repo/check_test_layout.py --root . --strict"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/docs/check_doc_links.py --root ."
+    result: >
+      Implemented and retired `GRAPHICS-099` at `CPUContracted`. Added the
+      CPU-only `Extrinsic.Graphics.RenderingContract` module with renderer
+      descriptors, scoped snapshot envelopes, binding intents/sets, recipe
+      slots, view/output recipes, render artifact metadata, lifecycle
+      classification, deterministic diagnostics, and fail-closed validators.
+      Added CPU graphics contract tests for valid compatibility and invalid
+      descriptor, snapshot, binding, recipe-slot, view/output, and artifact
+      output cases. Updated renderer docs, rendering backlog state, module
+      inventory, retirement log, and session brief. Full `IntrinsicTests` build
+      and the default CPU-supported CTest gate passed with 3031 tests and zero
+      failures; structural task/docs/layering/test-layout checks passed.
+    status: resolved
+  - id: N152
+    type: experiment
+    title: "Implement remaining renderer snapshot recipe task chain"
+    provenance: ai-executed
+    timestamp: "2026-06-24T15:50"
+    also_depends_on: [N151]
+    evidence:
+      - "tasks/done/GRAPHICS-100-current-renderer-contract-adapter.md"
+      - "tasks/done/GRAPHICS-101-loadable-render-recipe-configs.md"
+      - "tasks/done/RUNTIME-127-render-artifact-publication.md"
+      - "tasks/done/GRAPHICS-102-shared-visibility-lighting-recipe-execution.md"
+      - "tasks/done/UI-023-render-recipe-ui-editing.md"
+      - "tasks/done/GRAPHICS-103-vulkan-rendergraph-contract-integration.md"
+      - "src/graphics/renderer/Graphics.CurrentRendererContractAdapter.cppm"
+      - "src/graphics/renderer/Graphics.RenderRecipeConfig.cppm"
+      - "src/graphics/renderer/Graphics.SharedRenderRecipeExecution.cppm"
+      - "src/runtime/Runtime.RenderArtifactPublication.cppm"
+      - "src/runtime/Editor/Runtime.SandboxEditorUi.cppm"
+      - "src/graphics/renderer/Graphics.Renderer.cppm"
+      - "tasks/SESSION-BRIEF.md"
+      - "cmake --preset ci"
+      - "cmake --build --preset ci --target IntrinsicTests -- -j16"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "cmake --preset ci-vulkan"
+      - "cmake --build --preset ci-vulkan --target IntrinsicGraphicsVulkanSmokeTests -- -j16"
+      - "ctest --test-dir build/ci-vulkan --output-on-failure -R 'RenderContract|RenderArtifact|Vulkan' -L 'gpu' -L 'vulkan' --timeout 120"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/agents/validate_tasks.py --root tasks --strict"
+      - "python3 tools/docs/check_doc_links.py --root ."
+      - "python3 tools/agents/check_task_state_links.py --root ."
+    result: >
+      Implemented and retired the ordered post-`GRAPHICS-099` chain:
+      `GRAPHICS-100`, `GRAPHICS-101`, `RUNTIME-127`, `GRAPHICS-102`,
+      `UI-023`, and `GRAPHICS-103`. The chain now has a CPU-tested
+      current-renderer contract adapter, loadable recipe config validation,
+      runtime render artifact publication/apply semantics, shared visibility
+      and lighting recipe execution, sandbox recipe editing UI command models,
+      and an operational Vulkan/render-graph contract proof with declared
+      artifact metadata. The regenerated session brief has no active tasks and
+      no remaining requested chain tasks.
+    status: resolved
+  - id: N153
+    type: experiment
+    title: "Review remaining runtime task validity after renderer chain"
+    provenance: ai-executed
+    timestamp: "2026-06-24T16:05"
+    also_depends_on: [N152]
+    evidence:
+      - "tasks/SESSION-BRIEF.md"
+      - "tasks/backlog/runtime/RUNTIME-121-vertex-color-channel-upload.md"
+      - "tasks/backlog/runtime/RUNTIME-122-gpu-soa-vertex-channel-storage-and-shader-fetch.md"
+      - "tasks/backlog/runtime/RUNTIME-123-editor-bind-property-as-channel.md"
+      - "tasks/backlog/runtime/RUNTIME-124-per-channel-partial-uploads.md"
+      - "tasks/backlog/runtime/RUNTIME-125-aos-static-fast-lane.md"
+      - "tasks/backlog/runtime/RUNTIME-126-gpu-readback-jobs-and-property-writeback.md"
+      - "tasks/backlog/runtime/README.md"
+      - "tasks/backlog/README.md"
+      - "assets/shaders/deferred/gbuffer.vert"
+      - "assets/shaders/surface.vert"
+      - "python3 tools/agents/generate_session_brief.py --check"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/agents/validate_tasks.py --root tasks --strict"
+    result: >
+      Remaining runtime tasks are not made obsolete by the retired
+      renderer/snapshot/recipe chain. `RUNTIME-121` and `RUNTIME-126` are open
+      and unblocked; `RUNTIME-122`, `RUNTIME-123`, `RUNTIME-124`, and
+      `RUNTIME-125` remain open behind their recorded dependencies. Semantic
+      review found hygiene caveats: `RUNTIME-121` still names dormant
+      `surface.vert`/`PtrVertexAttr` despite the active deferred GpuScene path
+      using `deferred/gbuffer.vert` and `GpuGeometryRecord::VertexBufferBDA`;
+      `RUNTIME-123` should clarify whether its CPU editor binding scope is
+      mesh-first after `RUNTIME-121` or all geometry kinds after `RUNTIME-122`;
+      `RUNTIME-125` remains valid only as a benchmark/profile-gated optional
+      optimization. The top-level backlog README still says the now-retired
+      GRAPHICS-099..103/RUNTIME-127/UI-023 chain is current open Theme B work,
+      which is stale wording to clean up.
+    status: resolved
+  - id: N154
+    type: experiment
+    title: "Runtime task hygiene retargeting"
+    provenance: ai-executed
+    timestamp: "2026-06-24T16:18"
+    also_depends_on: [N153]
+    evidence:
+      - "tasks/backlog/runtime/RUNTIME-121-vertex-color-channel-upload.md"
+      - "tasks/backlog/runtime/RUNTIME-123-editor-bind-property-as-channel.md"
+      - "tasks/backlog/README.md"
+      - "tasks/SESSION-BRIEF.md"
+      - "python3 tools/agents/generate_session_brief.py"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/agents/validate_tasks.py --root tasks --strict"
+      - "python3 tools/agents/check_task_state_links.py --root ."
+      - "python3 tools/docs/check_doc_links.py --root ."
+      - "python3 tools/agents/generate_session_brief.py --check"
+      - "git diff --check"
+    result: >
+      Completed the requested task/docs hygiene edit. `RUNTIME-121` now targets
+      the active deferred GpuScene `gbuffer.*`/`GpuGeometryRecord` path instead
+      of dormant `surface.vert`/`PtrVertexAttr`. `RUNTIME-123` now depends on
+      `RUNTIME-122` and explicitly covers mesh, graph, and point-cloud binding
+      where dimensions, value type, and element count match. The top-level Theme
+      B backlog summary now treats the contract-first renderer/snapshot/recipe
+      chain as retired and lists only `RUNTIME-121..125` plus `RUNTIME-126` as
+      open Theme B leaves. Session brief regeneration moved `RUNTIME-123` behind
+      `RUNTIME-122`; task/doc validators passed.
+    status: resolved
+  - id: N155
+    type: decision
+    title: "Prepare runtime multi-task loop prompt"
+    provenance: ai-executed
+    timestamp: "2026-06-24T16:25"
+    also_depends_on: [N154]
+    choice: >
+      Prepared a reusable prompt for executing the remaining runtime task queue
+      with the IntrinsicEngine multi-task loop. The prompt starts with
+      `RUNTIME-121`, treats `RUNTIME-126` as an independent unblocked branch,
+      gates `RUNTIME-122`, `RUNTIME-123`, `RUNTIME-124`, and `RUNTIME-125` by
+      regenerated `tasks/SESSION-BRIEF.md`, and forces one-task-at-a-time
+      implementation, verification, retirement, and session-brief refresh.
+    alternatives:
+      - "Ask the agent to batch all runtime tasks in one implementation pass."
+      - "Start with RUNTIME-126 and ignore the vertex-attribute dependency chain."
+      - "Skip task retirement and session-brief regeneration between tasks."
+    evidence:
+      - "tasks/SESSION-BRIEF.md"
+      - "tasks/backlog/runtime/README.md"
+    status: resolved
+  - id: N156
+    type: experiment
+    title: "RUNTIME-121 vertex color implementation attempt"
+    provenance: ai-executed
+    timestamp: "2026-06-24T21:25"
+    also_depends_on: [N154, N155]
+    evidence:
+      - "src/runtime/Runtime.MeshGeometryPacker.cppm"
+      - "src/runtime/Runtime.MeshGeometryPacker.cpp"
+      - "src/graphics/renderer/Graphics.GpuWorld.cppm"
+      - "src/graphics/renderer/Graphics.GpuWorld.cpp"
+      - "src/graphics/rhi/RHI.Types.cppm"
+      - "assets/shaders/common/gpu_scene.glsl"
+      - "assets/shaders/deferred/gbuffer.vert"
+      - "assets/shaders/deferred/gbuffer.frag"
+      - "tests/contract/runtime/Test.MeshGeometryPacker.cpp"
+      - "tests/integration/graphics/Test.GpuWorldAndCulling.cpp"
+      - "tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp"
+      - "cmake --preset ci"
+      - "cmake --build --preset ci --target IntrinsicTests -- -j16"
+      - "ctest --test-dir build/ci --output-on-failure -R 'MeshGeometryPacker|GpuWorld' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "cmake --preset ci-vulkan"
+      - "cmake --build --preset ci-vulkan --target IntrinsicRuntimeSandboxAcceptanceGpuSmokeTests -- -j16"
+      - "ctest --test-dir build/ci-vulkan --output-on-failure -R 'RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleVertexColorStreamShadesDeferredSurface' -L 'gpu' -L 'vulkan' --timeout 120"
+    result: >
+      Added a mesh `v:color` packed-unorm8 upload stream, published it through
+      `GpuGeometryRecord::ColorBufferBDA`, updated CPU contracts, and added an
+      opt-in Vulkan smoke. Configure/build passed in `ci`; focused CPU
+      `MeshGeometryPacker|GpuWorld` tests passed 42/42. The `ci-vulkan`
+      targeted smoke executable built, but
+      `ReferenceTriangleVertexColorStreamShadesDeferredSurface` failed: the
+      visible surface instance reported `ColorBufferBDA != 0`, while the sampled
+      center pixel remained white `(245,245,245)` rather than red-dominant.
+    status: unresolved
+  - id: N157
+    type: dead_end
+    title: "RUNTIME-121 shader target mismatch"
+    provenance: ai-executed
+    timestamp: "2026-06-24T21:25"
+    also_depends_on: [N156]
+    hypothesis: >
+      Adding vertex-color fetch to `assets/shaders/deferred/gbuffer.*` would
+      cover the operational default-recipe deferred GpuScene surface path.
+    failure_mode: >
+      The operational default-recipe deferred GBuffer pipeline is built by
+      `BuildDeferredGBufferPipelineDesc()` from
+      `shaders/forward/default_debug_surface.vert.spv` and
+      `shaders/deferred/default_debug_gbuffer.frag.spv`, not from
+      `assets/shaders/deferred/gbuffer.*`. The color upload and geometry-record
+      BDA are present, but the active shader pair does not fetch or apply the
+      color stream, so the frame remains on material/white shading.
+    lesson: >
+      RUNTIME-121 must wire `ColorBufferBDA` into the currently active
+      default-debug GpuScene surface/GBuffer shader pair or retarget the
+      renderer pipeline before the Vulkan smoke can prove visibility; dormant
+      or unreferenced shader edits are insufficient even when CPU upload
+      contracts pass.
+    status: unresolved
+  - id: N158
+    type: experiment
+    title: "Runtime vertex-channel Theme B loop through RUNTIME-124"
+    provenance: ai-executed
+    timestamp: "2026-06-24T23:59"
+    also_depends_on: [N155, N156, N157]
+    evidence:
+      - "tasks/done/RUNTIME-121-vertex-color-channel-upload.md"
+      - "tasks/done/RUNTIME-122-gpu-soa-vertex-channel-storage-and-shader-fetch.md"
+      - "tasks/done/RUNTIME-123-editor-bind-property-as-channel.md"
+      - "tasks/done/RUNTIME-124-per-channel-partial-uploads.md"
+      - "src/graphics/renderer/Graphics.GpuWorld.cpp"
+      - "src/graphics/renderer/Graphics.GpuWorld.cppm"
+      - "src/runtime/Runtime.RenderExtraction.cpp"
+      - "src/runtime/Runtime.RenderExtraction.cppm"
+      - "src/ecs/Components/ECS.Component.DirtyTags.cppm"
+      - "tests/contract/graphics/Test.GpuWorldLifetimeContract.cpp"
+      - "tests/contract/runtime/Test.MeshGeometryExtraction.cpp"
+      - "tests/contract/runtime/Test.GraphGeometryExtraction.cpp"
+      - "tests/contract/runtime/Test.PointCloudGeometryExtraction.cpp"
+      - "tests/integration/runtime/Test.RuntimeRenderExtraction.cpp"
+      - "tests/integration/runtime/Test.RuntimeSandboxAcceptanceGpuSmoke.cpp"
+      - "cmake --build --preset ci --target IntrinsicTests"
+      - "ctest --test-dir build/ci --output-on-failure -R 'MeshGeometryExtraction|GraphGeometryExtraction|PointCloudGeometryExtraction|GpuWorld|ECSGeometryDirtyDomains|SandboxEditorUi|RuntimeRenderExtraction' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "cmake --preset ci-vulkan"
+      - "cmake --build --preset ci-vulkan --target IntrinsicTests"
+      - "ctest --test-dir build/ci-vulkan --output-on-failure -R 'RuntimeSandboxAcceptanceGpuSmoke.VertexColorDirtyChannelPartiallyUploadsAndShadesDeferredSurface' -L 'gpu' -L 'vulkan' --timeout 120"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/docs/check_doc_links.py --root ."
+    result: >
+      Completed and retired RUNTIME-121, RUNTIME-122, RUNTIME-123, and
+      RUNTIME-124 one task at a time. The final RUNTIME-124 slice added
+      per-channel vertex dirty tags, runtime partial-upload planning for mesh,
+      graph, and point-cloud geometry, a `GpuWorld::UpdateGeometryChannels`
+      channel-update API over contiguous SoA sub-ranges, focused CPU coverage,
+      docs/task retirement, regenerated module inventory/session brief, and an
+      opt-in promoted Vulkan smoke proving a vertex-color mutation shades
+      through the active deferred GpuScene path without a full geometry rebind.
+    status: resolved
+  - id: N159
+    type: decision
+    title: "Stop before RUNTIME-125 shader/storage work"
+    provenance: ai-executed
+    timestamp: "2026-06-24T23:59"
+    also_depends_on: [N158]
+    choice: >
+      Do not start RUNTIME-125 implementation because its task-local benchmark
+      gate is unsatisfied: no checked-in benchmark manifest, result JSON,
+      baseline, or report proves uniform SoA vertex fetch is the bottleneck for
+      representative static geometry.
+    alternatives:
+      - "Implement the AoS storage lane and shader variants without benchmark evidence."
+      - "Start the independent RUNTIME-126 branch in the same loop after encountering the profile gate."
+    evidence:
+      - "tasks/backlog/runtime/RUNTIME-125-aos-static-fast-lane.md"
+      - "tasks/SESSION-BRIEF.md"
+      - "rg -n 'RUNTIME-125|AoS|SoA|vertex-fetch|vertex fetch|static fast lane|fast lane' benchmarks docs/benchmarking docs/adr tasks"
+      - "find benchmarks -maxdepth 3 -type f"
+    status: resolved
+  - id: N160
+    type: experiment
+    title: "RUNTIME-126 readback jobs blocked by CPU gate"
+    provenance: ai-executed
+    timestamp: "2026-06-25T00:35"
+    also_depends_on: [N158, N159]
+    evidence:
+      - "src/runtime/Runtime.StreamingExecutor.cppm"
+      - "src/runtime/Runtime.StreamingExecutor.cpp"
+      - "src/runtime/Runtime.DerivedJobGraph.cppm"
+      - "src/runtime/Runtime.DerivedJobGraph.cpp"
+      - "src/runtime/Runtime.GpuReadbackJob.cppm"
+      - "src/runtime/Runtime.GpuReadbackJob.cpp"
+      - "tests/contract/runtime/Test.GpuReadbackJob.cpp"
+      - "tests/integration/runtime/Test.RuntimeStreamingExecutor.cpp"
+      - "tests/integration/runtime/Test.GpuReadbackJobGpuSmoke.cpp"
+      - "cmake --build --preset ci --target IntrinsicRuntimeContractTests"
+      - "ctest --test-dir build/ci --output-on-failure -R 'GpuReadbackJob|RuntimeDerivedJobGraph|VertexAttributeBinding' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "cmake --build --preset ci --target IntrinsicRuntimeIntegrationTests"
+      - "ctest --test-dir build/ci --output-on-failure -R 'RuntimeStreamingExecutor.Readback' --timeout 60"
+      - "ctest --test-dir build/ci --output-on-failure -R 'GpuReadbackJobGpuSmoke' --timeout 120"
+      - "ctest --test-dir build/ci --output-on-failure -R 'RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleVertexColorStreamShadesDeferredSurface' --timeout 180"
+      - "cmake --build --preset ci --target IntrinsicTests"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "ctest --test-dir build/ci --output-on-failure -R '^MeshPrimitiveViewExtraction.VertexPositionDirtyRepacksBothViews$' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+    result: >
+      Implemented the RUNTIME-126 readback-job path: streaming tasks can park
+      in `WaitingForReadback`, the derived-job registry can resume delivered
+      readbacks, `Extrinsic.Runtime.GpuReadbackJob` schedules GPU transfer
+      readbacks and applies typed byte payloads back into geometry properties,
+      and focused CPU/integration plus opt-in GPU smoke coverage passed. The
+      task was not retired because the required default CPU gate failed in
+      `MeshPrimitiveViewExtraction.VertexPositionDirtyRepacksBothViews`.
+      Isolated diagnosis reproduced the failure and found the assertion expects
+      vertex-position dirtiness to enqueue/free an old surface geometry handle,
+      while the RUNTIME-124 partial-update path updates the surface channels
+      in place and only the edge/vertex primitive-view sidecars reupload.
+    status: resolved
+  - id: N161
+    type: experiment
+    title: "RUNTIME-126 retired after gate fix"
+    provenance: ai-executed
+    timestamp: "2026-06-25T01:20"
+    also_depends_on: [N160]
+    evidence:
+      - "tests/contract/runtime/Test.MeshPrimitiveViewExtraction.cpp"
+      - "tasks/done/RUNTIME-126-gpu-readback-jobs-and-property-writeback.md"
+      - "tasks/done/RETIREMENT-LOG.md"
+      - "tasks/SESSION-BRIEF.md"
+      - "cmake --preset ci"
+      - "cmake --build --preset ci --target IntrinsicRuntimeContractTests -- -j16"
+      - "ctest --test-dir build/ci --output-on-failure -R '^MeshPrimitiveViewExtraction.VertexPositionDirtyRepacksBothViews$' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "ctest --test-dir build/ci --output-on-failure -R 'GpuReadbackJob|DerivedJob|VertexAttributeBinding' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "ctest --test-dir build/ci --output-on-failure -R 'RuntimeStreamingExecutor.Readback' --timeout 60"
+      - "ctest --test-dir build/ci --output-on-failure -R 'GpuReadbackJobGpuSmoke' --timeout 120"
+      - "ctest --test-dir build/ci --output-on-failure -R 'RuntimeSandboxAcceptanceGpuSmoke.ReferenceTriangleVertexColorStreamShadesDeferredSurface' --timeout 180"
+      - "cmake --build --preset ci --target IntrinsicTests -- -j16"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "python3 tools/agents/check_task_policy.py --root . --strict"
+      - "python3 tools/agents/validate_tasks.py --root tasks --strict"
+      - "python3 tools/docs/check_doc_links.py --root ."
+      - "python3 tools/repo/check_layering.py --root src --strict"
+      - "python3 tools/repo/check_test_layout.py --root . --strict"
+      - "python3 tools/repo/check_root_hygiene.py --root ."
+      - "python3 tools/repo/check_pr_contract.py"
+      - "python3 tools/docs/check_docs_sync.py --root . --diff-mode --base-ref origin/main"
+    result: >
+      Updated the stale mesh primitive-view dirty-position contract to expect
+      an in-place surface channel update plus edge/vertex view repacks, rebuilt
+      and reran the focused failure, reran RUNTIME-126 focused CPU/integration
+      and opt-in GPU smoke checks, passed the full default CPU-supported CTest
+      gate with 3087/3087 tests, moved RUNTIME-126 to `tasks/done`, updated
+      backlog indexes and the retirement log, and regenerated the session
+      brief. RUNTIME-126 is now retired at `Operational`.
+    status: resolved
+  - id: N162
+    type: decision
+    title: "Stop at RUNTIME-125 benchmark gate"
+    provenance: ai-executed
+    timestamp: "2026-06-25T01:20"
+    also_depends_on: [N159, N161]
+    choice: >
+      Do not start RUNTIME-125 AoS storage or shader work because the task's
+      required benchmark/profile gate is still unsatisfied after re-reading the
+      regenerated session brief and task file.
+    alternatives:
+      - "Implement the AoS fast lane without benchmark evidence."
+      - "Treat RUNTIME-126 retirement as sufficient and mark the whole runtime Theme B objective complete."
+    evidence:
+      - "tasks/SESSION-BRIEF.md"
+      - "tasks/backlog/runtime/RUNTIME-125-aos-static-fast-lane.md"
+      - "rg -n 'RUNTIME-126|AoS|static fast lane|vertex-fetch|vertex fetch|RUNTIME-125' benchmarks docs/benchmarking docs/adr tasks"
+      - "find benchmarks -maxdepth 3 -type f"
+    status: resolved
+  - id: N163
+    type: experiment
+    title: "RUNTIME-125 gate metadata audit"
+    provenance: ai-executed
+    timestamp: "2026-06-25T01:21"
+    also_depends_on: [N162]
+    evidence:
+      - "tasks/SESSION-BRIEF.md"
+      - "tasks/backlog/runtime/RUNTIME-125-aos-static-fast-lane.md"
+      - "tools/agents/generate_session_brief.py"
+      - "tools/agents/validate_tasks.py"
+      - "tasks/templates/task.md"
+      - "rg -n 'RUNTIME-125|AoS|SoA|vertex-fetch|vertex fetch|static fast lane|fast lane|vertex_fetch|VertexFetch|vertex_fetch_bound|bottleneck' benchmarks docs/benchmarking docs/adr tasks src/graphics src/runtime tests"
+      - "find benchmarks docs/benchmarking -maxdepth 4 -type f"
+    result: >
+      Reconfirmed that RUNTIME-125 is the only remaining open Theme B task and
+      that no checked-in benchmark manifest/result/baseline demonstrates the
+      required uniform-SoA vertex-fetch bottleneck. The generated session brief
+      lists RUNTIME-125 as unblocked because the generator derives blockers
+      only from `depends_on` front matter; the benchmark gate is currently
+      encoded only in the task body as a non-goal/acceptance prerequisite.
+      No AoS storage, shader, or runtime promotion work was started.
+    status: resolved
+  - id: N164
+    type: decision
+    title: "Mark runtime Theme B goal blocked at RUNTIME-125"
+    provenance: ai-executed
+    timestamp: "2026-06-25T01:22"
+    also_depends_on: [N162, N163]
+    choice: >
+      Mark the persisted runtime Theme B implementation goal blocked because
+      RUNTIME-125 is the only remaining runtime Theme B task, its benchmark
+      gate still lacks evidence after repeated audits, and the user rule
+      forbids starting AoS engine storage/shader work before that gate is
+      satisfied.
+    alternatives:
+      - "Leave the persisted goal active while continuing to report the same benchmark blocker."
+      - "Create an unrequested prerequisite benchmark task to encode the gate as a `depends_on` edge."
+      - "Start RUNTIME-125 AoS engine implementation without benchmark/profile evidence."
+    evidence:
+      - "tasks/SESSION-BRIEF.md"
+      - "tasks/backlog/runtime/RUNTIME-125-aos-static-fast-lane.md"
+      - "benchmarks/README.md"
+      - "benchmarks/CMakeLists.txt"
+      - "benchmarks/runners/BenchmarkSmokeRunner.cpp"
+      - "benchmarks/rendering/README.md"
+      - "tools/benchmark/validate_benchmark_manifests.py"
+      - "tools/benchmark/validate_benchmark_results.py"
+      - "update_goal(status=blocked)"
+    status: resolved

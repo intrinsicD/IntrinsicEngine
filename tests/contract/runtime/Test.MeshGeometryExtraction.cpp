@@ -996,11 +996,9 @@ namespace
     }
 }
 
-// RUNTIME-085 Slice C — dirty-domain reupload coverage. Each fine-grained
-// dirty tag and the coarse `GpuDirty` must individually trigger a repack +
-// upload, queue the old handle for deferred retire, surface the change as
-// `MeshGeometryReuploads` + `MeshGeometryReleases`, and drain the tag(s) so
-// subsequent clean ticks return to the `MeshGeometryReuseHits` path.
+// Mesh dirty-domain coverage. Coarse GPU/topology tags still require a full
+// replacement upload, while vertex-channel tags use the in-place partial
+// channel upload path and keep the existing resident handle.
 class MeshGeometryExtractionDirtyTag
     : public ::testing::TestWithParam<const char*>
 {
@@ -1038,6 +1036,12 @@ TEST_P(MeshGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
         D::MarkVertexPositionsDirty(raw, entity);
     else if (param == "DirtyVertexAttributes")
         D::MarkVertexAttributesDirty(raw, entity);
+    else if (param == "DirtyVertexTexcoords")
+        D::MarkVertexTexcoordsDirty(raw, entity);
+    else if (param == "DirtyVertexNormals")
+        D::MarkVertexNormalsDirty(raw, entity);
+    else if (param == "DirtyVertexColors")
+        D::MarkVertexColorsDirty(raw, entity);
     else if (param == "DirtyFaceTopology")
         D::MarkFaceTopologyDirty(raw, entity);
     else if (param == "DirtyEdgeTopology")
@@ -1045,26 +1049,37 @@ TEST_P(MeshGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
     else
         FAIL() << "Unhandled dirty-tag parameterization: " << param;
 
+    const bool fullUploadExpected =
+        param == "GpuDirty" ||
+        param == "DirtyFaceTopology" ||
+        param == "DirtyEdgeTopology";
+
     stats = extraction.ExtractAndSubmit(scene,
                                          engine.GetRenderer(),
                                          &engine.GetGpuAssetCache());
     EXPECT_EQ(stats.MeshGeometryUploads, 0u);
     EXPECT_EQ(stats.MeshGeometryReuploads, 1u);
+    EXPECT_EQ(stats.MeshGeometryPartialUploads, fullUploadExpected ? 0u : 1u);
     EXPECT_EQ(stats.MeshGeometryReuseHits, 0u);
-    EXPECT_EQ(stats.MeshGeometryReleases, 1u);
+    EXPECT_EQ(stats.MeshGeometryReleases, fullUploadExpected ? 1u : 0u);
     EXPECT_EQ(stats.MeshGeometryFreeRetires, 0u);
 
     const auto secondView =
         extraction.FindRenderableSidecarForTest(Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity));
     ASSERT_TRUE(secondView.has_value());
     EXPECT_TRUE(secondView->HasMeshResidency);
-    EXPECT_NE(secondView->MeshGeometry, firstHandle);
+    if (fullUploadExpected)
+    {
+        EXPECT_NE(secondView->MeshGeometry, firstHandle);
+    }
+    else
+    {
+        EXPECT_EQ(secondView->MeshGeometry, firstHandle);
+    }
     EXPECT_EQ(secondView->Geometry, secondView->MeshGeometry);
 
     auto& gpuWorld = engine.GetRenderer().GetGpuWorld();
-    // Both the old (queued) and the new (live) handle are alive until
-    // the deferred-retire window fires.
-    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), 2u);
+    EXPECT_EQ(gpuWorld.GetLiveGeometryCount(), fullUploadExpected ? 2u : 1u);
     EXPECT_EQ(gpuWorld.GetInstanceGeometry(secondView->Instance), secondView->MeshGeometry);
 
     // The dirty tag has been drained, so a third tick returns to the
@@ -1072,6 +1087,9 @@ TEST_P(MeshGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
     EXPECT_FALSE((raw.any_of<D::GpuDirty,
                               D::DirtyVertexPositions,
                               D::DirtyVertexAttributes,
+                              D::DirtyVertexTexcoords,
+                              D::DirtyVertexNormals,
+                              D::DirtyVertexColors,
                               D::DirtyFaceTopology,
                               D::DirtyEdgeTopology>(entity)));
 
@@ -1093,7 +1111,7 @@ TEST_P(MeshGeometryExtractionDirtyTag, DirtyTagTriggersReupload)
     stats = extraction.ExtractAndSubmit(scene,
                                          engine.GetRenderer(),
                                          &engine.GetGpuAssetCache());
-    EXPECT_EQ(stats.MeshGeometryFreeRetires, 1u);
+    EXPECT_EQ(stats.MeshGeometryFreeRetires, fullUploadExpected ? 1u : 0u);
 
     extraction.Shutdown(engine.GetRenderer());
     engine.Shutdown();
@@ -1104,6 +1122,9 @@ INSTANTIATE_TEST_SUITE_P(AllDirtyDomains,
                           ::testing::Values("GpuDirty",
                                             "DirtyVertexPositions",
                                             "DirtyVertexAttributes",
+                                            "DirtyVertexTexcoords",
+                                            "DirtyVertexNormals",
+                                            "DirtyVertexColors",
                                             "DirtyFaceTopology",
                                             "DirtyEdgeTopology"));
 
@@ -1130,6 +1151,9 @@ TEST(MeshGeometryExtraction, MultipleDirtyTagsCoalesceIntoSingleReupload)
     D::MarkGpuDirty(raw, entity);
     D::MarkVertexPositionsDirty(raw, entity);
     D::MarkVertexAttributesDirty(raw, entity);
+    D::MarkVertexTexcoordsDirty(raw, entity);
+    D::MarkVertexNormalsDirty(raw, entity);
+    D::MarkVertexColorsDirty(raw, entity);
     D::MarkFaceTopologyDirty(raw, entity);
     D::MarkEdgeTopologyDirty(raw, entity);
 
@@ -1143,6 +1167,9 @@ TEST(MeshGeometryExtraction, MultipleDirtyTagsCoalesceIntoSingleReupload)
     EXPECT_FALSE((raw.any_of<D::GpuDirty,
                               D::DirtyVertexPositions,
                               D::DirtyVertexAttributes,
+                              D::DirtyVertexTexcoords,
+                              D::DirtyVertexNormals,
+                              D::DirtyVertexColors,
                               D::DirtyFaceTopology,
                               D::DirtyEdgeTopology>(entity)));
 

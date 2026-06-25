@@ -141,6 +141,38 @@ namespace
         return Extrinsic::Runtime::StableEntityLookup::ToRenderId(entity);
     }
 
+    [[nodiscard]] std::uint64_t FindLatestGeometryColorBda(
+        const Tests::MockDevice& device,
+        const RHI::BufferHandle geometryBuffer,
+        const std::uint32_t geometrySlot)
+    {
+        for (auto it = device.BufferWrites.rbegin(); it != device.BufferWrites.rend(); ++it)
+        {
+            if (it->Handle != geometryBuffer ||
+                it->Data.size() % sizeof(RHI::GpuGeometryRecord) != 0u)
+            {
+                continue;
+            }
+
+            const std::uint64_t firstSlot =
+                it->Offset / sizeof(RHI::GpuGeometryRecord);
+            const std::uint64_t count =
+                static_cast<std::uint64_t>(it->Data.size() / sizeof(RHI::GpuGeometryRecord));
+            if (geometrySlot < firstSlot || geometrySlot >= firstSlot + count)
+            {
+                continue;
+            }
+
+            const auto records = std::span<const RHI::GpuGeometryRecord>{
+                reinterpret_cast<const RHI::GpuGeometryRecord*>(it->Data.data()),
+                static_cast<std::size_t>(count),
+            };
+            return records[static_cast<std::size_t>(geometrySlot - firstSlot)].ColorBufferBDA;
+        }
+
+        return 0u;
+    }
+
     void AttachProceduralTriangle(ECS::Scene::Registry& scene,
                                   entt::entity entity)
     {
@@ -710,6 +742,84 @@ TEST(RuntimeRenderExtraction, MeshColorVisualizationPropertyBufferUploadsFromGeo
     EXPECT_EQ(world.Visualization.Diagnostics.AcceptedPacketCount, 1u);
     EXPECT_FALSE(world.Visualization.Diagnostics.HasErrors);
     EXPECT_TRUE(world.Visualization.HasVisualizationPackets);
+}
+
+TEST(RuntimeRenderExtraction, MeshVertexColorDirtyChannelPartiallyUploadsStructuralColorStream)
+{
+    RendererFixture fixture;
+    ECS::Scene::Registry scene;
+    auto& registry = scene.Raw();
+
+    const auto entity = scene.Create();
+    registry.emplace<ECS::Components::Transform::WorldMatrix>(entity).Matrix = glm::mat4{1.f};
+    registry.emplace<Graphics::Components::RenderSurface>(entity);
+    AttachTriangleMeshSources(scene, entity);
+
+    auto stats = fixture.Extract(scene);
+    EXPECT_EQ(stats.MeshGeometryUploads, 1u);
+    EXPECT_EQ(stats.MeshGeometryReuploads, 0u);
+    fixture.Renderer->GetGpuWorld().SyncFrame();
+
+    const auto firstSidecar =
+        fixture.Extraction.FindRenderableSidecarForTest(StableId(entity));
+    ASSERT_TRUE(firstSidecar.has_value());
+    ASSERT_TRUE(firstSidecar->HasMeshResidency);
+    const Graphics::GpuGeometryHandle firstHandle = firstSidecar->MeshGeometry;
+    const std::uint32_t firstSlot = firstSidecar->GeometrySlot;
+
+    const RHI::BufferHandle geometryBuffer =
+        fixture.Renderer->GetGpuWorld().GetGeometryRecordBuffer();
+    const std::uint64_t firstColorBda =
+        FindLatestGeometryColorBda(fixture.Device, geometryBuffer, firstSidecar->GeometrySlot);
+    EXPECT_NE(firstColorBda, 0u);
+
+    auto& vertices =
+        registry.get<ECS::Components::GeometrySources::Vertices>(entity);
+    auto colors = vertices.Properties.Get<glm::vec4>("v:color");
+    ASSERT_TRUE(colors.IsValid());
+    colors.Vector() = {
+        {0.0f, 1.0f, 1.0f, 1.0f},
+        {1.0f, 0.0f, 1.0f, 1.0f},
+        {1.0f, 1.0f, 0.0f, 1.0f},
+    };
+    ECS::Components::DirtyTags::MarkVertexColorsDirty(registry, entity);
+    fixture.Device.BufferWrites.clear();
+
+    stats = fixture.Extract(scene);
+    EXPECT_EQ(stats.MeshGeometryUploads, 0u);
+    EXPECT_EQ(stats.MeshGeometryReuploads, 1u);
+    EXPECT_EQ(stats.MeshGeometryPartialUploads, 1u);
+    EXPECT_EQ(stats.MeshGeometryReleases, 0u);
+    EXPECT_FALSE(registry.any_of<ECS::Components::DirtyTags::DirtyVertexColors>(entity));
+    const RHI::BufferHandle managedVertexBuffer =
+        fixture.Renderer->GetGpuWorld().GetManagedVertexBuffer();
+    std::size_t managedVertexWriteCount = 0u;
+    std::uint64_t managedVertexWriteBytes = 0u;
+    for (const auto& write : fixture.Device.BufferWrites)
+    {
+        if (write.Handle != managedVertexBuffer)
+        {
+            continue;
+        }
+        ++managedVertexWriteCount;
+        managedVertexWriteBytes += static_cast<std::uint64_t>(write.Data.size());
+    }
+    EXPECT_EQ(managedVertexWriteCount, 1u);
+    EXPECT_EQ(managedVertexWriteBytes, 3u * sizeof(std::uint32_t));
+    fixture.Renderer->GetGpuWorld().SyncFrame();
+
+    const auto secondSidecar =
+        fixture.Extraction.FindRenderableSidecarForTest(StableId(entity));
+    ASSERT_TRUE(secondSidecar.has_value());
+    ASSERT_TRUE(secondSidecar->HasMeshResidency);
+    EXPECT_EQ(secondSidecar->MeshGeometry, firstHandle);
+    EXPECT_EQ(secondSidecar->GeometrySlot, firstSlot);
+    EXPECT_EQ(secondSidecar->Geometry, secondSidecar->MeshGeometry);
+    const std::uint64_t secondColorBda =
+        FindLatestGeometryColorBda(fixture.Device, geometryBuffer, secondSidecar->GeometrySlot);
+    EXPECT_EQ(secondColorBda, 0u)
+        << "partial color updates keep the geometry record BDA stable";
+    EXPECT_NE(firstColorBda, 0u);
 }
 
 TEST(RuntimeRenderExtraction, MeshColorVisualizationPropertyBufferFailsClosed)

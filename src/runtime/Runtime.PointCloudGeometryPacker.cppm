@@ -9,6 +9,8 @@ export module Extrinsic.Runtime.PointCloudGeometryPacker;
 
 import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.Graphics.GpuWorld;
+import Extrinsic.Runtime.VertexChannelBindings;
+import Extrinsic.Runtime.VertexChannelStreams;
 
 export namespace Extrinsic::Runtime
 {
@@ -33,6 +35,8 @@ export namespace Extrinsic::Runtime
     struct PointCloudPackBuffer
     {
         std::vector<std::byte> VertexBytes;
+        VertexChannelStreams Channels;
+        std::vector<std::uint32_t> PackedColors;
 
         void Clear() noexcept;
     };
@@ -76,5 +80,9 @@ export namespace Extrinsic::Runtime
     // cleared and `Upload` empty.
     [[nodiscard]] PointCloudPackResult PackCloud(
         const ECS::Components::GeometrySources::ConstSourceView& view,
+        PointCloudPackBuffer& outBuffer);
+    [[nodiscard]] PointCloudPackResult PackCloud(
+        const ECS::Components::GeometrySources::ConstSourceView& view,
+        const VertexChannelBindingSet* channelBindings,
         PointCloudPackBuffer& outBuffer);
 }

@@ -38,6 +38,7 @@ import Extrinsic.Graphics.RenderFrameInput;
 import Extrinsic.Graphics.RenderWorld;
 import Extrinsic.Graphics.FrameRecipe;
 import Extrinsic.Graphics.RenderGraph;
+export import Extrinsic.Graphics.RenderingContract;
 export import Extrinsic.Graphics.RenderCommandRouter;
 export import Extrinsic.Graphics.RenderPrepPipeline;
 export import Extrinsic.Graphics.RenderSubsystemRegistry;
@@ -116,11 +117,41 @@ namespace Extrinsic::Graphics
         std::vector<RenderGraphCommandPassStats> Passes{};
     };
 
+    export struct RenderGraphContractIntegrationStats
+    {
+        bool Evaluated = false;
+        bool ContractCompatible = false;
+        bool SharedProductsCompatible = false;
+        bool ArtifactMetadataValid = false;
+        std::string RendererId{};
+        std::string SnapshotId{};
+        std::string RecipeId{};
+        std::string ViewOutputRecipeId{};
+        std::uint32_t SnapshotSourceRevisionCount = 0;
+        std::uint32_t BindingIntentCount = 0;
+        std::uint32_t RecipeSlotCount = 0;
+        std::uint32_t ViewOutputCount = 0;
+        std::uint32_t DeclaredArtifactCount = 0;
+        std::uint32_t VisibilityProductCount = 0;
+        std::uint32_t VisibilityVisibleItemCount = 0;
+        std::uint32_t VisibilityRejectedItemCount = 0;
+        std::uint32_t LightingProductCount = 0;
+        std::uint32_t LightingResolvedLightCount = 0;
+        std::uint32_t LightingIntentCount = 0;
+        std::uint32_t UnsupportedProductDiagnosticCount = 0;
+        std::uint32_t MissingOutputDiagnosticCount = 0;
+        std::uint32_t DegradedFallbackDiagnosticCount = 0;
+        std::uint32_t ArtifactPublicationFailureDiagnosticCount = 0;
+        std::vector<RenderArtifactMetadata> DeclaredArtifacts{};
+        std::vector<std::string> Diagnostics{};
+    };
+
     export struct RenderGraphFrameStats
     {
         RenderGraphCompileStats Compile{};
         RenderGraphExecuteStats Execute{};
         RenderGraphCommandRecordStats CommandRecords{};
+        RenderGraphContractIntegrationStats Contract{};
         std::string DebugDump{};
         std::string Diagnostic{};
         std::string LifecycleDiagnostic{};

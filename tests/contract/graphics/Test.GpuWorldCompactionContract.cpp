@@ -25,21 +25,61 @@ namespace
     }};
 
     constexpr std::array<std::uint32_t, 3> kTriangleIndices{{0u, 1u, 2u}};
+    constexpr std::uint64_t kManagedVertexBlockAlignment = 16u;
+
+    [[nodiscard]] constexpr std::uint64_t AlignUp(
+        const std::uint64_t value,
+        const std::uint64_t alignment) noexcept
+    {
+        const std::uint64_t remainder = value % alignment;
+        return remainder == 0u ? value : value + alignment - remainder;
+    }
 
     [[nodiscard]] std::span<const std::byte> VertexBytes()
     {
         return std::as_bytes(std::span<const PackedVertex>{kTriangleVerts});
     }
 
+    [[nodiscard]] std::uint64_t TriangleVertexByteCount()
+    {
+        return VertexBytes().size_bytes();
+    }
+
+    [[nodiscard]] std::uint64_t TriangleVertexOffset(const std::uint32_t allocationIndex)
+    {
+        std::uint64_t offset = 0u;
+        for (std::uint32_t i = 0u; i < allocationIndex; ++i)
+        {
+            offset = AlignUp(offset + TriangleVertexByteCount(), kManagedVertexBlockAlignment);
+        }
+        return offset;
+    }
+
+    [[nodiscard]] std::uint64_t SingleFreedMiddleVertexFragmentation()
+    {
+        const std::uint64_t thirdEnd = TriangleVertexOffset(2u) + TriangleVertexByteCount();
+        const std::uint64_t liveBytes = TriangleVertexByteCount() * 2u;
+        return thirdEnd - liveBytes;
+    }
+
+    [[nodiscard]] std::uint64_t TwoLiveCompactedVertexHighWater()
+    {
+        return TriangleVertexOffset(1u) + TriangleVertexByteCount();
+    }
+
     [[nodiscard]] Extrinsic::Graphics::GpuWorld::GeometryUploadDesc TriangleUpload()
     {
         return Extrinsic::Graphics::GpuWorld::GeometryUploadDesc{
             .PackedVertexBytes = VertexBytes(),
+            .PositionBytes = {},
+            .TexcoordBytes = {},
+            .NormalBytes = {},
             .SurfaceIndices = std::span<const std::uint32_t>{kTriangleIndices},
             .LineIndices = {},
             .VertexCount = static_cast<std::uint32_t>(kTriangleVerts.size()),
             .LocalBounds = {},
             .DebugName = "compaction-contract-triangle",
+            .PackedVertexColors = {},
         };
     }
 
@@ -81,7 +121,7 @@ TEST(GpuWorldCompactionContract, PlanReportsFragmentationAndBlocksWhileFreesAreP
     EXPECT_TRUE(blocked.Enabled);
     EXPECT_TRUE(blocked.BlockedByPendingFrees);
     EXPECT_FALSE(blocked.ShouldCompact);
-    EXPECT_EQ(blocked.Vertex.FragmentedBytes, VertexBytes().size_bytes());
+    EXPECT_EQ(blocked.Vertex.FragmentedBytes, SingleFreedMiddleVertexFragmentation());
     EXPECT_EQ(blocked.Index.FragmentedBytes, std::span<const std::uint32_t>{kTriangleIndices}.size_bytes());
 
     fixture.World.SyncFrame();
@@ -90,8 +130,8 @@ TEST(GpuWorldCompactionContract, PlanReportsFragmentationAndBlocksWhileFreesAreP
     ASSERT_TRUE(plan.ShouldCompact);
     ASSERT_EQ(plan.Relocations.size(), 1u);
     EXPECT_EQ(plan.Relocations[0].Geometry, c);
-    EXPECT_EQ(plan.Relocations[0].OldVertexByteOffset, VertexBytes().size_bytes() * 2u);
-    EXPECT_EQ(plan.Relocations[0].NewVertexByteOffset, VertexBytes().size_bytes());
+    EXPECT_EQ(plan.Relocations[0].OldVertexByteOffset, TriangleVertexOffset(2u));
+    EXPECT_EQ(plan.Relocations[0].NewVertexByteOffset, TriangleVertexOffset(1u));
     EXPECT_GT(plan.BytesToMove, 0u);
 }
 
@@ -109,7 +149,7 @@ TEST(GpuWorldCompactionContract, ApplyRelocationCompactsManagedBufferDiagnostics
     fixture.World.SyncFrame();
 
     const auto managedBefore = fixture.World.GetManagedBufferDiagnostics();
-    ASSERT_EQ(managedBefore.Vertex.FragmentedBytes, VertexBytes().size_bytes());
+    ASSERT_EQ(managedBefore.Vertex.FragmentedBytes, SingleFreedMiddleVertexFragmentation());
     ASSERT_EQ(managedBefore.CompactionCount, 0u);
 
     const auto plan = fixture.World.PlanManagedBufferCompaction();
@@ -125,9 +165,10 @@ TEST(GpuWorldCompactionContract, ApplyRelocationCompactsManagedBufferDiagnostics
 
     const auto after = fixture.World.GetDiagnostics();
     const auto managedAfter = fixture.World.GetManagedBufferDiagnostics();
-    EXPECT_EQ(after.VertexBytesUsed, managedBefore.Vertex.LiveBytes);
+    EXPECT_EQ(after.VertexBytesUsed, TwoLiveCompactedVertexHighWater());
     EXPECT_EQ(after.IndexBytesUsed, managedBefore.Index.LiveBytes);
-    EXPECT_EQ(managedAfter.Vertex.FragmentedBytes, 0u);
+    EXPECT_EQ(managedAfter.Vertex.FragmentedBytes,
+              TwoLiveCompactedVertexHighWater() - managedBefore.Vertex.LiveBytes);
     EXPECT_EQ(managedAfter.Index.FragmentedBytes, 0u);
     EXPECT_EQ(managedAfter.CompactionCount, 1u);
     EXPECT_EQ(managedAfter.CompactionBytesMoved, plan.BytesToMove);
@@ -203,4 +244,3 @@ TEST(GpuWorldCompactionContract, StaleRelocationPlanIsRejectedWithoutMutation)
     EXPECT_EQ(managedAfter.CompactionCount, 0u);
     EXPECT_EQ(managedAfter.StaleRelocationCount, 1u);
 }
-

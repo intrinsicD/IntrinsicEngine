@@ -118,11 +118,10 @@ export namespace Extrinsic::Runtime
         // RUNTIME-085 Slices B/C — runtime-authored mesh `GeometrySources`
         // residency counters. `Uploads` is incremented exactly once per
         // entity on the first frame the mesh is packed and uploaded;
-        // subsequent clean frames hit `ReuseHits`; subsequent dirty
-        // frames hit `Reuploads` after Slice C drains the dirty-domain
-        // tags (`DirtyVertexPositions`, `DirtyVertexAttributes`,
-        // `DirtyFaceTopology`, `DirtyEdgeTopology`, `GpuDirty`) and repacks the
-        // mesh.
+        // subsequent clean frames hit `ReuseHits`; vertex-channel dirty
+        // frames hit `Reuploads` plus `PartialUploads` after only the changed
+        // SoA channel is re-written, while topology/coarse GPU dirty frames
+        // fall back to full pack-and-replace reuploads.
         // `FailedPack` aggregates non-input-shape pack rejections
         // (`DegenerateAllFaces`, `EmptyMesh`, `NonFinitePosition`,
         // `MissingHalfedgeTopology`, `MissingFaceTopology`, `WrongDomain`);
@@ -131,14 +130,15 @@ export namespace Extrinsic::Runtime
         // structural authoring bugs in mesh sources.
         // `Releases` is incremented per release-initiated event: entity
         // destruction, eligibility flip away from mesh, or dirty
-        // reupload superseding an older handle; the actual free runs
-        // through the `framesInFlight` deferred-retire window driven by
-        // `TickMeshGeometry`, which surfaces `FreeRetires` as a per-frame
-        // delta on the next `ExtractAndSubmit` (mirroring
-        // `ProceduralGeometryFreeRetires`).
+        // full reupload superseding an older handle; partial channel uploads
+        // keep the resident handle. The actual free runs through the
+        // `framesInFlight` deferred-retire window driven by `TickMeshGeometry`,
+        // which surfaces `FreeRetires` as a per-frame delta on the next
+        // `ExtractAndSubmit` (mirroring `ProceduralGeometryFreeRetires`).
         std::uint32_t MeshGeometryUploads{0};
         std::uint32_t MeshGeometryReuseHits{0};
         std::uint32_t MeshGeometryReuploads{0};
+        std::uint32_t MeshGeometryPartialUploads{0};
         std::uint32_t MeshGeometryFailedPack{0};
         std::uint32_t MeshGeometryMissingPositions{0};
         std::uint32_t MeshGeometryInvalidTopology{0};
@@ -153,24 +153,26 @@ export namespace Extrinsic::Runtime
         // positions (shared vertex buffer) plus optional `(e:v0, e:v1)` line
         // indices into one `GpuGeometryHandle`. `Uploads` is incremented once
         // per entity on the first frame the graph is packed and uploaded;
-        // clean frames hit `ReuseHits`; dirty frames hit `Reuploads` after the
-        // graph dirty-domain tags (`DirtyVertexPositions`,
-        // `DirtyVertexAttributes`, `DirtyEdgeTopology`, `GpuDirty`) are drained
-        // and the graph is repacked. `MissingNodes` aggregates the two
+        // clean frames hit `ReuseHits`; vertex-channel dirty frames hit
+        // `Reuploads` plus `PartialUploads` and keep the resident handle;
+        // edge-topology/coarse GPU dirty frames fall back to full
+        // pack-and-replace reuploads. `MissingNodes` aggregates the two
         // node-shape pack rejections (`MissingNodes`, `EmptyGraph`) and
         // `InvalidEdges` the out-of-range edge endpoint rejection because those
         // are the likeliest structural authoring bugs in graph sources; every
         // other non-`Success` status (`WrongDomain`, `NoRenderLane`,
         // `MissingEdgeTopology`, `NonFinitePosition`) folds into `FailedPack`.
         // `Releases` is incremented per release-initiated event (entity
-        // destruction, eligibility flip away from graph, or dirty reupload
-        // superseding an older handle); the actual free runs through the
+        // destruction, eligibility flip away from graph, or full dirty
+        // reupload superseding an older handle); partial channel uploads keep
+        // the resident handle. The actual free runs through the
         // `framesInFlight` deferred-retire window driven by `TickGraphGeometry`,
         // which surfaces `FreeRetires` as a per-frame delta on the next
         // `ExtractAndSubmit` (mirroring `MeshGeometryFreeRetires`).
         std::uint32_t GraphGeometryUploads{0};
         std::uint32_t GraphGeometryReuseHits{0};
         std::uint32_t GraphGeometryReuploads{0};
+        std::uint32_t GraphGeometryPartialUploads{0};
         std::uint32_t GraphGeometryFailedPack{0};
         std::uint32_t GraphGeometryMissingNodes{0};
         std::uint32_t GraphGeometryInvalidEdges{0};
@@ -183,9 +185,9 @@ export namespace Extrinsic::Runtime
         // rows into one `GpuGeometryHandle` (positions only — no index buffer,
         // no line lane). `Uploads` is incremented once per entity on the first
         // frame the cloud is packed and uploaded; clean frames hit `ReuseHits`;
-        // dirty frames hit `Reuploads` after the cloud dirty-domain tags
-        // (`DirtyVertexPositions`, `DirtyVertexAttributes`, `GpuDirty`) are
-        // drained and the cloud is repacked. `MissingPositions` aggregates the
+        // vertex-channel dirty frames hit `Reuploads` plus `PartialUploads` and
+        // keep the resident handle; coarse GPU dirty frames fall back to full
+        // pack-and-replace reuploads. `MissingPositions` aggregates the
         // two position-shape pack rejections (`MissingPositions`, `EmptyCloud`)
         // and `InvalidPoints` the non-finite-position rejection because those
         // are the likeliest structural authoring bugs in cloud sources; every
@@ -194,15 +196,16 @@ export namespace Extrinsic::Runtime
         // `RenderPoints::SizeSource` buffer variant — only a uniform float
         // point size is supported in this slice) folds into `FailedPack`.
         // `Releases` is incremented per release-initiated event (entity
-        // destruction, eligibility flip away from point-cloud, or dirty
-        // reupload superseding an older handle); the actual free runs through
-        // the `framesInFlight` deferred-retire window driven by
-        // `TickPointCloudGeometry`, which surfaces `FreeRetires` as a per-frame
-        // delta on the next `ExtractAndSubmit` (mirroring
-        // `GraphGeometryFreeRetires`).
+        // destruction, eligibility flip away from point-cloud, or full dirty
+        // reupload superseding an older handle); partial channel uploads keep
+        // the resident handle. The actual free runs through the `framesInFlight`
+        // deferred-retire window driven by `TickPointCloudGeometry`, which
+        // surfaces `FreeRetires` as a per-frame delta on the next
+        // `ExtractAndSubmit` (mirroring `GraphGeometryFreeRetires`).
         std::uint32_t PointCloudGeometryUploads{0};
         std::uint32_t PointCloudGeometryReuseHits{0};
         std::uint32_t PointCloudGeometryReuploads{0};
+        std::uint32_t PointCloudGeometryPartialUploads{0};
         std::uint32_t PointCloudGeometryFailedPack{0};
         std::uint32_t PointCloudGeometryMissingPositions{0};
         std::uint32_t PointCloudGeometryInvalidPoints{0};
@@ -219,10 +222,10 @@ export namespace Extrinsic::Runtime
         // sidecars do not require `RenderSurface`; surface, edge, and point
         // lanes compose independently. Each view is a single-owner residency
         // stream: `Uploads` once on the frame a view is first created,
-        // `ReuseHits` on clean frames, `Reuploads` when the mesh source is
-        // dirty, `Releases` per release-initiated event (component removed,
-        // entity flips away from mesh, dirty reupload superseding an older
-        // handle, entity destruction, or shutdown). The
+        // `ReuseHits` on clean frames, `Reuploads` when position/topology
+        // mesh-source data changes, `Releases` per release-initiated event
+        // (component removed, entity flips away from mesh, full dirty reupload
+        // superseding an older handle, entity destruction, or shutdown). The
         // edge view folds `MissingPositions`/`EmptyMesh` into
         // `MissingPositions`, reports `MissingEdgeTopology` and out-of-range
         // endpoints in their own counters, and folds every other rejection into
@@ -393,7 +396,7 @@ export namespace Extrinsic::Runtime
         // RUNTIME-085 Slice C — drives the deferred-retire window of the
         // runtime-owned mesh-residency retire queue, mirroring
         // `TickProceduralGeometry`. Handles enqueued by entity destruction,
-        // eligibility flip, or dirty reupload are freed via
+        // eligibility flip, or full dirty reupload are freed via
         // `GpuWorld::FreeGeometry` once `framesInFlight` ticks have elapsed
         // since the release tick. Subsequent `ExtractAndSubmit` calls surface
         // the per-tick delta as `MeshGeometryFreeRetires`.
@@ -404,7 +407,7 @@ export namespace Extrinsic::Runtime
         // RUNTIME-086 Slices B/C — drives the deferred-retire window of the
         // runtime-owned graph-residency retire queue, mirroring
         // `TickMeshGeometry`. Handles enqueued by entity destruction,
-        // eligibility flip, or dirty reupload are freed via
+        // eligibility flip, or full dirty reupload are freed via
         // `GpuWorld::FreeGeometry` once `framesInFlight` ticks have elapsed
         // since the release tick. Subsequent `ExtractAndSubmit` calls surface
         // the per-tick delta as `GraphGeometryFreeRetires`.
@@ -414,9 +417,9 @@ export namespace Extrinsic::Runtime
 
         // RUNTIME-087 — drives the deferred-retire window of the runtime-owned
         // point-cloud-residency retire queue, mirroring `TickGraphGeometry`.
-        // Handles enqueued by entity destruction, eligibility flip, or dirty
-        // reupload are freed via `GpuWorld::FreeGeometry` once `framesInFlight`
-        // ticks have elapsed since the release tick. Subsequent
+        // Handles enqueued by entity destruction, eligibility flip, or full
+        // dirty reupload are freed via `GpuWorld::FreeGeometry` once
+        // `framesInFlight` ticks have elapsed since the release tick. Subsequent
         // `ExtractAndSubmit` calls surface the per-tick delta as
         // `PointCloudGeometryFreeRetires`.
         void TickPointCloudGeometry(std::uint64_t currentFrame,
