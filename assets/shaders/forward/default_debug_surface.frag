@@ -40,6 +40,7 @@ layout(location = 4) in float fragVisualizationScalar;
 layout(location = 5) in vec4 fragVisualizationColor;
 layout(location = 6) in vec4 fragVertexColor;
 layout(location = 7) flat in uint fragHasVertexColor;
+layout(location = 8) flat in uint fragInstanceSlot;
 
 layout(location = 0) out vec4 outColor;
 
@@ -53,6 +54,45 @@ vec3 DebugUvChecker(vec2 uv) {
     vec3 low = vec3(wrapped, 0.25);
     vec3 high = vec3(1.0 - wrapped.x, 1.0 - wrapped.y, 1.0);
     return mix(low, high, checker);
+}
+
+vec3 ResolveSurfaceNormal(
+    GpuSceneTable scene,
+    GpuMaterialSlot mat,
+    uint instanceSlot,
+    vec3 vertexWorldNormal,
+    vec2 uv)
+{
+    const float vertexNormalLen = length(vertexWorldNormal);
+    vec3 n = (vertexNormalLen > 1.0e-6)
+        ? (vertexWorldNormal / vertexNormalLen)
+        : vec3(0.0, 0.0, 1.0);
+
+    if ((mat.Flags & GpuMaterialFlag_ObjectSpaceNormalMap) == 0u ||
+        !IsValidTextureID(mat.NormalID)) {
+        return n;
+    }
+
+    const vec4 normalSample = texture(globalTextures[nonuniformEXT(mat.NormalID)], uv);
+    if (normalSample.a <= 1.0e-6) {
+        return n;
+    }
+
+    vec3 objectNormal = normalSample.rgb * 2.0 - vec3(1.0);
+    const float objectNormalLen = length(objectNormal);
+    if (objectNormalLen <= 1.0e-6) {
+        return n;
+    }
+    objectNormal /= objectNormalLen;
+
+    const GpuInstanceDynamic dyn =
+        GpuInstanceDynamicRef(scene.InstanceDynamicBDA).Data[instanceSlot];
+    const mat3 normalMatrix = transpose(inverse(mat3(dyn.Model)));
+    const vec3 worldNormal = normalMatrix * objectNormal;
+    const float worldNormalLen = length(worldNormal);
+    return (worldNormalLen > 1.0e-6)
+        ? (worldNormal / worldNormalLen)
+        : n;
 }
 
 void main() {
@@ -91,10 +131,8 @@ void main() {
             visualizationColor,
             baseColor);
 
-    const float vertexNormalLen = length(fragWorldNormal);
-    const vec3 sampledNormal = (vertexNormalLen > 1.0e-6)
-        ? (fragWorldNormal / vertexNormalLen)
-        : vec3(0.0, 0.0, 1.0);
+    const vec3 sampledNormal =
+        ResolveSurfaceNormal(scene, mat, fragInstanceSlot, fragWorldNormal, fragUv);
 
     if ((mat.Flags & GpuMaterialFlag_Unlit) != 0u ||
         mat.MaterialTypeID == GpuMaterialType_DefaultDebugSurface) {

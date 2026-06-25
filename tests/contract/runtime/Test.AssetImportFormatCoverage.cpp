@@ -34,6 +34,7 @@ import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.GpuAssetCache;
+import Extrinsic.Graphics.Material;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.Engine;
@@ -318,6 +319,8 @@ namespace
         ASSERT_TRUE(binding.has_value());
         EXPECT_FALSE(binding->Albedo.IsValid());
         ASSERT_TRUE(binding->Normal.IsValid());
+        EXPECT_EQ(binding->NormalSpace,
+                  Graphics::MaterialNormalTextureSpace::ObjectSpaceNormal);
 
         auto boundPath = engine.GetAssetService().GetPath(binding->Normal);
         ASSERT_TRUE(boundPath.has_value()) << static_cast<int>(boundPath.error());

@@ -20,6 +20,14 @@ Graphics-owned bridge between `Assets::AssetId` and GPU resources.
   a `TextureLease`, queues transfer work, publishes a bindless index when a
   sampler is available, and transitions to `Ready` after `Tick()` observes the
   transfer token complete.
+- `GpuProducedTextureRequest` owns graphics-produced texture residency for
+  generated outputs such as object-space normal bakes. The caller supplies the
+  generated `AssetId`, output `TextureDesc`, and sampler policy; the cache
+  allocates the cache-owned texture/bindless view immediately, keeps the entry
+  pending while GPU commands are in flight, and promotes it to `Ready` only when
+  `Tick(currentFrame, ...)` reaches the recorded ready frame. The texture
+  descriptor must include `Sampled | ColorTarget`; the future dilation path may
+  add `Storage` but the cache does not infer that usage.
 - KTX/KTX2 is not a current promoted residency path. `Asset.ImportRouter`
   recognizes the extensions, but `Asset.ModelTexturePayload` and
   `Runtime.AssetModelTextureIO` reject KTX/KTX2 with
@@ -43,8 +51,11 @@ Graphics-owned bridge between `Assets::AssetId` and GPU resources.
 - `MaterialSystem::ResolveTextureAssetBindings()` consumes data-only
   `MaterialTextureAssetBindings` (`AssetId` slots) and resolves them through the
   cache into `MaterialParams` bindless indices, using the fallback texture for
-  missing/pending/failed assets when available. Runtime owns producer sidecars;
-  graphics only consumes IDs and cache views.
+  missing/pending/failed assets when available. Object-space normal-map
+  bindings set the shader-visible material flag only when the requested normal
+  asset resolves to a real ready texture; tangent-space or fallback normal
+  bindings keep vertex-normal shading. Runtime owns producer sidecars; graphics
+  only consumes IDs, normal-space metadata, and cache views.
 
 ## Asset-backed geometry residency boundary
 
@@ -93,8 +104,11 @@ renderables.
   missing asset is visually obvious in development builds and observable
   through `TextureAssetFallbackResolveCount`. Semantic neutral defaults are the
   shader invalid-ID path, not a hidden per-slot fallback texture: surfaces use
-  `BaseColorFactor` when `AlbedoID` is invalid and always use the packed
-  vertex normal for shading until a tangent-space normal-map path is promoted.
+  `BaseColorFactor` when `AlbedoID` is invalid and use the packed vertex normal
+  when `NormalID` is invalid, pending/fallback, or not explicitly flagged as an
+  object-space normal map. Ready object-space generated normal textures are
+  consumed only through `MaterialFlags::ObjectSpaceNormalMap`; tangent-space
+  normal-map support remains future work.
   Metallic/roughness/emissive texture evaluation is
   not part of the current default forward surface shader. Visualization and
   Htex/UV bake

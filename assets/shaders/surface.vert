@@ -77,6 +77,9 @@ layout(location = 3) out vec4 fragVertexColor;
 layout(location = 4) out vec3 fragObjectPos;
 layout(location = 5) out vec3 fragWorldPos;
 layout(location = 6) flat out uint fragMaterialSlot;
+layout(location = 7) flat out vec3 fragNormalMatrix0;
+layout(location = 8) flat out vec3 fragNormalMatrix1;
+layout(location = 9) flat out vec3 fragNormalMatrix2;
 
 void main() {
     PosBuf  pBuf = PosBuf(push.PtrPositions);
@@ -104,6 +107,9 @@ void main() {
 
     // Correct normal transform under non-uniform scale / shear.
     mat3 normalMatrix = transpose(inverse(mat3(inst.Model)));
+    fragNormalMatrix0 = normalMatrix[0];
+    fragNormalMatrix1 = normalMatrix[1];
+    fragNormalMatrix2 = normalMatrix[2];
     vec3 transformedNorm = normalMatrix * inNorm;
     float nLen = length(transformedNorm);
     if (nLen > 1e-6) {

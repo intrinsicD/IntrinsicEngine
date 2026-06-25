@@ -141,6 +141,24 @@ export namespace Extrinsic::Graphics
         RHI::SamplerHandle Sampler{};
     };
 
+    struct GpuProducedTextureRequest
+    {
+        Assets::AssetId Id{};
+        RHI::TextureDesc Desc{};
+        RHI::SamplerDesc SamplerDesc{};
+        RHI::SamplerHandle Sampler{};
+        std::uint64_t ReadyFrame = 0;
+        bool HasReadyFrame = false;
+    };
+
+    struct GpuProducedTexturePendingView
+    {
+        RHI::TextureHandle Texture{};
+        RHI::BindlessIndex BindlessIdx = RHI::kInvalidBindlessIndex;
+        RHI::SamplerHandle Sampler{};
+        std::uint64_t Generation = 0;
+    };
+
     struct GpuTextureFallbackDesc
     {
         std::span<const std::byte> Bytes{};
@@ -189,6 +207,10 @@ export namespace Extrinsic::Graphics
         //   InvalidArgument   — Id is not valid.
         Core::Result RequestUpload(const GpuBufferRequest&  req);
         Core::Result RequestUpload(const GpuTextureRequest& req);
+        [[nodiscard]] Core::Expected<GpuProducedTexturePendingView>
+            BeginGpuProducedTexture(const GpuProducedTextureRequest& req);
+        Core::Result SetGpuProducedTextureReadyFrame(Assets::AssetId id,
+                                                     std::uint64_t readyFrame);
         Core::Result InitializeFallbackTexture(const GpuTextureFallbackDesc& desc = {});
 
         // Force CpuPending (no GPU work yet).  Idempotent for an entry that

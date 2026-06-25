@@ -296,9 +296,72 @@ TEST(GraphicsMaterialSystem, GeneratedTextureAssetBindingsUseStandardMaterialSlo
     EXPECT_EQ(params.NormalID, normalView->BindlessIdx);
     EXPECT_EQ(params.MetallicRoughnessID, RHI::kInvalidBindlessIndex);
     EXPECT_EQ(params.EmissiveID, RHI::kInvalidBindlessIndex);
+    EXPECT_FALSE(Graphics::HasFlag(
+        params.Flags,
+        Graphics::MaterialFlags::ObjectSpaceNormalMap));
     EXPECT_EQ(materials.GetDiagnostics().TextureAssetResolveCount, 2u);
     EXPECT_EQ(materials.GetDiagnostics().TextureAssetFallbackResolveCount, 0u);
     EXPECT_EQ(materials.GetDiagnostics().TextureAssetResolveFailureCount, 0u);
+
+    material.Reset();
+    materials.Shutdown();
+}
+
+TEST(GraphicsMaterialSystem, ObjectSpaceNormalBindingsSetExplicitMaterialFlag)
+{
+    MockDevice device;
+    RHI::BufferManager buffers{device};
+    RHI::TextureManager textures{device, device.Bindless};
+    RHI::SamplerManager samplers{device};
+    Graphics::GpuAssetCache assets{buffers, textures, samplers, device.TransferQueue};
+    Graphics::MaterialSystem materials;
+    materials.Initialize(device, buffers);
+
+    const auto normalAsset = MakeAssetId(203u);
+    ASSERT_TRUE(assets.RequestUpload(Graphics::GpuTextureRequest{
+        .Id = normalAsset,
+        .Bytes = std::span{ZeroBytes64},
+        .Desc = AnyTextureDesc(),
+        .SamplerDesc = AnySamplerDesc(),
+    }).has_value());
+    assets.Tick(0, 2);
+    const auto normalView = assets.GetView(normalAsset);
+    ASSERT_TRUE(normalView.has_value());
+
+    auto material = materials.CreateInstance(
+        materials.FindType(Graphics::kMaterialTypeName_StandardPBR),
+        {});
+    ASSERT_TRUE(material.IsValid());
+
+    ASSERT_TRUE(materials.ResolveTextureAssetBindings(
+        material.GetHandle(),
+        Graphics::MaterialTextureAssetBindings{
+            .Normal = normalAsset,
+            .NormalSpace =
+                Graphics::MaterialNormalTextureSpace::ObjectSpaceNormal,
+        },
+        assets).has_value());
+
+    Graphics::MaterialParams params = materials.GetParams(material.GetHandle());
+    EXPECT_EQ(params.NormalID, normalView->BindlessIdx);
+    EXPECT_TRUE(Graphics::HasFlag(
+        params.Flags,
+        Graphics::MaterialFlags::ObjectSpaceNormalMap));
+
+    ASSERT_TRUE(materials.ResolveTextureAssetBindings(
+        material.GetHandle(),
+        Graphics::MaterialTextureAssetBindings{
+            .Normal = normalAsset,
+            .NormalSpace =
+                Graphics::MaterialNormalTextureSpace::TangentSpaceNormal,
+        },
+        assets).has_value());
+
+    params = materials.GetParams(material.GetHandle());
+    EXPECT_EQ(params.NormalID, normalView->BindlessIdx);
+    EXPECT_FALSE(Graphics::HasFlag(
+        params.Flags,
+        Graphics::MaterialFlags::ObjectSpaceNormalMap));
 
     material.Reset();
     materials.Shutdown();

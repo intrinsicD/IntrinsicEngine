@@ -132,6 +132,25 @@ namespace
         };
     }
 
+    RHI::TextureDesc AnyProducedTextureDesc()
+    {
+        return RHI::TextureDesc{
+            .Width  = 16,
+            .Height = 16,
+            .MipLevels = 1,
+            .Fmt = RHI::Format::RGBA8_UNORM,
+            .Usage = RHI::TextureUsage::Sampled | RHI::TextureUsage::ColorTarget,
+            .DebugName = "test-produced-texture",
+        };
+    }
+
+    [[nodiscard]] bool HasTextureUsage(const RHI::TextureUsage flags,
+                                       const RHI::TextureUsage bit) noexcept
+    {
+        return (static_cast<std::uint32_t>(flags) &
+                static_cast<std::uint32_t>(bit)) != 0u;
+    }
+
     RHI::SamplerHandle AnySampler() { return RHI::SamplerHandle{42u, 1u}; }
 
     RHI::SamplerDesc AnySamplerDesc()
@@ -593,4 +612,155 @@ TEST(GpuAssetCache, NonOperationalBackendReportsDeterministicFallbackMiss)
     EXPECT_FALSE(resolved.has_value());
     EXPECT_EQ(resolved.error(), Core::ErrorCode::ResourceNotFound);
     EXPECT_EQ(cache.GetDiagnostics().FallbackMisses, 1u);
+}
+
+TEST(GpuAssetCache, GpuProducedTexturePromotesOnlyAfterReadyFrame)
+{
+    CacheFixture fx;
+    const auto id = MakeAssetId(20);
+
+    auto pending = fx.Cache.BeginGpuProducedTexture(Graphics::GpuProducedTextureRequest{
+        .Id = id,
+        .Desc = AnyProducedTextureDesc(),
+        .SamplerDesc = AnySamplerDesc(),
+        .ReadyFrame = 5u,
+        .HasReadyFrame = true,
+    });
+    ASSERT_TRUE(pending.has_value()) << static_cast<int>(pending.error());
+
+    EXPECT_EQ(fx.Cache.GetState(id), Graphics::GpuAssetState::GpuUploading);
+    EXPECT_TRUE(pending->Texture.IsValid());
+    EXPECT_NE(pending->BindlessIdx, RHI::kInvalidBindlessIndex);
+    EXPECT_TRUE(pending->Sampler.IsValid());
+    EXPECT_EQ(fx.Transfer.Issued.size(), 0u)
+        << "GPU-produced textures are written by renderer commands, not upload transfers.";
+    ASSERT_FALSE(fx.Device.CreatedTextureDescs.empty());
+    EXPECT_TRUE(HasTextureUsage(fx.Device.CreatedTextureDescs.back().Usage,
+                                RHI::TextureUsage::ColorTarget));
+
+    fx.Cache.Tick(4u, 2u);
+    EXPECT_EQ(fx.Cache.GetState(id), Graphics::GpuAssetState::GpuUploading);
+    EXPECT_FALSE(fx.Cache.GetView(id).has_value());
+
+    fx.Cache.Tick(5u, 2u);
+    EXPECT_EQ(fx.Cache.GetState(id), Graphics::GpuAssetState::Ready);
+
+    auto view = fx.Cache.GetView(id);
+    ASSERT_TRUE(view.has_value());
+    EXPECT_EQ(view->Kind, Graphics::GpuAssetKind::Texture);
+    EXPECT_EQ(view->Texture, pending->Texture);
+    EXPECT_EQ(view->BindlessIdx, pending->BindlessIdx);
+    EXPECT_EQ(view->Sampler, pending->Sampler);
+    EXPECT_EQ(view->Generation, pending->Generation);
+}
+
+TEST(GpuAssetCache, GpuProducedTextureReadyFrameCanBeSetAfterRecording)
+{
+    CacheFixture fx;
+    const auto id = MakeAssetId(21);
+
+    ASSERT_TRUE(fx.Cache.BeginGpuProducedTexture(Graphics::GpuProducedTextureRequest{
+        .Id = id,
+        .Desc = AnyProducedTextureDesc(),
+        .SamplerDesc = AnySamplerDesc(),
+    }).has_value());
+
+    fx.Cache.Tick(100u, 2u);
+    EXPECT_EQ(fx.Cache.GetState(id), Graphics::GpuAssetState::GpuUploading)
+        << "A produced texture without a ready frame stays pending.";
+
+    ASSERT_TRUE(fx.Cache.SetGpuProducedTextureReadyFrame(id, 102u).has_value());
+    fx.Cache.Tick(101u, 2u);
+    EXPECT_EQ(fx.Cache.GetState(id), Graphics::GpuAssetState::GpuUploading);
+    fx.Cache.Tick(102u, 2u);
+    EXPECT_EQ(fx.Cache.GetState(id), Graphics::GpuAssetState::Ready);
+}
+
+TEST(GpuAssetCache, GpuProducedTextureRequiresSampledColorTargetUsage)
+{
+    CacheFixture fx;
+    auto missingSampled = AnyProducedTextureDesc();
+    missingSampled.Usage = RHI::TextureUsage::ColorTarget;
+    auto missingColorTarget = AnyProducedTextureDesc();
+    missingColorTarget.Usage = RHI::TextureUsage::Sampled;
+
+    auto first = fx.Cache.BeginGpuProducedTexture(Graphics::GpuProducedTextureRequest{
+        .Id = MakeAssetId(22),
+        .Desc = missingSampled,
+        .SamplerDesc = AnySamplerDesc(),
+    });
+    ASSERT_FALSE(first.has_value());
+    EXPECT_EQ(first.error(), Core::ErrorCode::InvalidArgument);
+
+    auto second = fx.Cache.BeginGpuProducedTexture(Graphics::GpuProducedTextureRequest{
+        .Id = MakeAssetId(23),
+        .Desc = missingColorTarget,
+        .SamplerDesc = AnySamplerDesc(),
+    });
+    ASSERT_FALSE(second.has_value());
+    EXPECT_EQ(second.error(), Core::ErrorCode::InvalidArgument);
+    EXPECT_EQ(fx.Cache.TrackedCount(), 0u);
+}
+
+TEST(GpuAssetCache, GpuProducedTextureReloadKeepsPreviousViewUntilReady)
+{
+    CacheFixture fx;
+    const auto id = MakeAssetId(24);
+
+    auto firstPending = fx.Cache.BeginGpuProducedTexture(Graphics::GpuProducedTextureRequest{
+        .Id = id,
+        .Desc = AnyProducedTextureDesc(),
+        .SamplerDesc = AnySamplerDesc(),
+        .ReadyFrame = 0u,
+        .HasReadyFrame = true,
+    });
+    ASSERT_TRUE(firstPending.has_value());
+    fx.Cache.Tick(0u, 2u);
+    auto first = fx.Cache.GetView(id);
+    ASSERT_TRUE(first.has_value());
+
+    auto secondPending = fx.Cache.BeginGpuProducedTexture(Graphics::GpuProducedTextureRequest{
+        .Id = id,
+        .Desc = AnyProducedTextureDesc(),
+        .SamplerDesc = AnySamplerDesc(),
+        .ReadyFrame = 3u,
+        .HasReadyFrame = true,
+    });
+    ASSERT_TRUE(secondPending.has_value());
+    EXPECT_EQ(fx.Cache.GetState(id), Graphics::GpuAssetState::GpuUploading);
+
+    auto during = fx.Cache.GetView(id);
+    ASSERT_TRUE(during.has_value());
+    EXPECT_EQ(during->Texture, first->Texture);
+    EXPECT_EQ(during->Generation, first->Generation);
+
+    fx.Cache.Tick(2u, 2u);
+    during = fx.Cache.GetView(id);
+    ASSERT_TRUE(during.has_value());
+    EXPECT_EQ(during->Texture, first->Texture);
+
+    fx.Cache.Tick(3u, 2u);
+    auto second = fx.Cache.GetView(id);
+    ASSERT_TRUE(second.has_value());
+    EXPECT_EQ(second->Texture, secondPending->Texture);
+    EXPECT_GT(second->Generation, first->Generation);
+    EXPECT_EQ(fx.Cache.PendingRetireCount(), 1u);
+}
+
+TEST(GpuAssetCache, GpuProducedTextureRejectsReadyFrameForTransferUpload)
+{
+    CacheFixture fx;
+    fx.Transfer.AlwaysComplete = false;
+    const auto id = MakeAssetId(25);
+
+    ASSERT_TRUE(fx.Cache.RequestUpload(Graphics::GpuTextureRequest{
+        .Id = id,
+        .Bytes = std::span{ZeroBytes64},
+        .Desc = AnyTextureDesc(),
+        .SamplerDesc = AnySamplerDesc(),
+    }).has_value());
+
+    auto readyFrame = fx.Cache.SetGpuProducedTextureReadyFrame(id, 1u);
+    ASSERT_FALSE(readyFrame.has_value());
+    EXPECT_EQ(readyFrame.error(), Core::ErrorCode::InvalidState);
 }

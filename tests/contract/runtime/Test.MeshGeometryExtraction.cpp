@@ -255,6 +255,9 @@ TEST(MeshGeometryExtraction, MaterialTextureBindingsResolveOntoExtractionMateria
     const Extrinsic::Graphics::MaterialParams params =
         renderer->GetMaterialSystem().GetParams(sidecar->MaterialHandle);
     EXPECT_NE(params.NormalID, Extrinsic::RHI::kInvalidBindlessIndex);
+    EXPECT_FALSE(Extrinsic::Graphics::HasFlag(
+        params.Flags,
+        Extrinsic::Graphics::MaterialFlags::ObjectSpaceNormalMap));
 
     extraction.Shutdown(*renderer);
     renderer->Shutdown();
@@ -274,6 +277,14 @@ TEST(MeshGeometryExtraction, ProgressivePresentationBindingsAreConsumedDuringExt
             .Desc = TestTextureDesc(),
             .SamplerDesc = TestSamplerDesc(),
         }).has_value());
+    const Extrinsic::Assets::AssetId generatedNormalAsset{123u, 1u};
+    ASSERT_TRUE(cache.RequestUpload(Extrinsic::Graphics::GpuTextureRequest{
+        .Id = generatedNormalAsset,
+        .Bytes = std::span{ZeroTextureBytes},
+        .Desc = TestTextureDesc(),
+        .SamplerDesc = TestSamplerDesc(),
+    }).has_value());
+    cache.Tick(0u, 2u);
 
     std::unique_ptr<Extrinsic::Graphics::IRenderer> renderer =
         Extrinsic::Graphics::CreateRenderer();
@@ -291,7 +302,7 @@ TEST(MeshGeometryExtraction, ProgressivePresentationBindingsAreConsumedDuringExt
     R::ProgressiveSlotBinding normal{};
     normal.Semantic = R::ProgressiveSlotSemantic::Normal;
     normal.SourceKind = R::ProgressiveSlotSourceKind::GeneratedTextureAsset;
-    normal.GeneratedTexture = Extrinsic::Assets::AssetId{123u, 1u};
+    normal.GeneratedTexture = generatedNormalAsset;
     normal.Readiness = R::ProgressiveReadinessState::Ready;
 
     scene.Raw().emplace_or_replace<R::ProgressivePresentationBindings>(
@@ -327,6 +338,9 @@ TEST(MeshGeometryExtraction, ProgressivePresentationBindingsAreConsumedDuringExt
     const Extrinsic::Graphics::MaterialParams params =
         renderer->GetMaterialSystem().GetParams(sidecar->MaterialHandle);
     EXPECT_NE(params.NormalID, Extrinsic::RHI::kInvalidBindlessIndex);
+    EXPECT_TRUE(Extrinsic::Graphics::HasFlag(
+        params.Flags,
+        Extrinsic::Graphics::MaterialFlags::ObjectSpaceNormalMap));
 
     extraction.Shutdown(*renderer);
     renderer->Shutdown();

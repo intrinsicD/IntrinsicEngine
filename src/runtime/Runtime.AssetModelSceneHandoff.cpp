@@ -296,6 +296,8 @@ namespace Extrinsic::Runtime
                 ResolveTextureReference(material.BaseColorTexture, embeddedTextureAssets);
             const Assets::AssetId authoredNormal =
                 ResolveTextureReference(material.NormalTexture, embeddedTextureAssets);
+            const bool usesGeneratedNormal =
+                !authoredNormal.IsValid() && generatedTextureAssets.Normal.IsValid();
             return Graphics::MaterialTextureAssetBindings{
                 .Albedo = authoredAlbedo.IsValid() ? authoredAlbedo : generatedTextureAssets.Albedo,
                 .Normal = authoredNormal.IsValid() ? authoredNormal : generatedTextureAssets.Normal,
@@ -303,6 +305,9 @@ namespace Extrinsic::Runtime
                     material.MetallicRoughnessTexture,
                     embeddedTextureAssets),
                 .Emissive = {},
+                .NormalSpace = usesGeneratedNormal
+                    ? Graphics::MaterialNormalTextureSpace::ObjectSpaceNormal
+                    : Graphics::MaterialNormalTextureSpace::TangentSpaceNormal,
             };
         }
 

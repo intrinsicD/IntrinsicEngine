@@ -40,14 +40,52 @@ bool IsValidTextureID(uint id) {
     return id != 0u && id != 0xFFFFFFFFu;
 }
 
+vec3 ResolveSurfaceNormal(
+    GpuMaterialSlot mat,
+    GpuInstanceDynamic dyn,
+    vec3 vertexWorldNormal,
+    vec2 uv)
+{
+    const float normalLength = length(vertexWorldNormal);
+    vec3 n = (normalLength > 1.0e-6)
+        ? (vertexWorldNormal / normalLength)
+        : vec3(0.0, 0.0, 1.0);
+
+    if ((mat.Flags & GpuMaterialFlag_ObjectSpaceNormalMap) == 0u ||
+        !IsValidTextureID(mat.NormalID)) {
+        return n;
+    }
+
+    const vec4 normalSample = texture(globalTextures[nonuniformEXT(mat.NormalID)], uv);
+    if (normalSample.a <= 1.0e-6) {
+        return n;
+    }
+
+    vec3 objectNormal = normalSample.rgb * 2.0 - vec3(1.0);
+    const float objectNormalLength = length(objectNormal);
+    if (objectNormalLength <= 1.0e-6) {
+        return n;
+    }
+    objectNormal /= objectNormalLength;
+
+    const mat3 normalMatrix = transpose(inverse(mat3(dyn.Model)));
+    const vec3 worldNormal = normalMatrix * objectNormal;
+    const float worldNormalLength = length(worldNormal);
+    return (worldNormalLength > 1.0e-6)
+        ? (worldNormal / worldNormalLength)
+        : n;
+}
+
 void main() {
     const GpuSceneTable scene = GpuSceneTableRef(pc.SceneTableBDA).Value;
 
     GpuInstanceStaticRef instanceStatic = GpuInstanceStaticRef(scene.InstanceStaticBDA);
+    GpuInstanceDynamicRef instanceDynamic = GpuInstanceDynamicRef(scene.InstanceDynamicBDA);
     GpuEntityConfigRef entityConfigs = GpuEntityConfigRef(scene.EntityConfigBDA);
     GpuMaterialSlotRef materials = GpuMaterialSlotRef(scene.MaterialBDA);
 
     const GpuInstanceStatic inst = instanceStatic.Data[vInstanceSlot];
+    const GpuInstanceDynamic dyn = instanceDynamic.Data[vInstanceSlot];
     const GpuEntityConfig cfg = entityConfigs.Data[inst.ConfigSlot];
     const GpuMaterialSlot mat = materials.Data[inst.MaterialSlot];
 
@@ -75,10 +113,7 @@ void main() {
             visualizationColor,
             baseColor);
 
-    const float normalLength = length(vWorldNormal);
-    vec3 n = (normalLength > 1.0e-6)
-        ? (vWorldNormal / normalLength)
-        : vec3(0.0, 0.0, 1.0);
+    const vec3 n = ResolveSurfaceNormal(mat, dyn, vWorldNormal, vUv);
     GBuf_Normal = vec4(n, 0.0);
     GBuf_Albedo = baseColor;
     GBuf_Material = vec4(mat.RoughnessFactor, mat.MetallicFactor, float(cfg.ColorSourceMode), 0.0);

@@ -173,6 +173,7 @@ export namespace Extrinsic::Graphics
         DoubleSided   = 1 << 2,  // disable backface culling
         Unlit         = 1 << 3,  // skip lighting entirely
         EmissiveOnly  = 1 << 4,  // treat EmissiveID as the colour source
+        ObjectSpaceNormalMap = 1 << 5, // NormalID decodes as object-space normal data
     };
 
     [[nodiscard]] constexpr MaterialFlags operator|(MaterialFlags a, MaterialFlags b) noexcept
@@ -250,11 +251,19 @@ export namespace Extrinsic::Graphics
         glm::vec4 CustomData[4]{};
     };
 
+    enum class MaterialNormalTextureSpace : std::uint32_t
+    {
+        TangentSpaceNormal = 0,
+        ObjectSpaceNormal = 1,
+    };
+
     struct MaterialTextureAssetBindings
     {
         Assets::AssetId Albedo{};
         Assets::AssetId Normal{};
         Assets::AssetId MetallicRoughness{};
         Assets::AssetId Emissive{};
+        MaterialNormalTextureSpace NormalSpace{
+            MaterialNormalTextureSpace::TangentSpaceNormal};
     };
 }

@@ -26,6 +26,7 @@ import Extrinsic.ECS.Components.GeometrySources;
 import Extrinsic.ECS.Scene.Handle;
 import Extrinsic.ECS.Scene.Registry;
 import Extrinsic.Graphics.GpuAssetCache;
+import Extrinsic.Graphics.Material;
 import Extrinsic.Graphics.MaterialSystem;
 import Extrinsic.Graphics.Renderer;
 import Extrinsic.Graphics.Component.RenderGeometry;
@@ -584,6 +585,8 @@ TEST(RuntimeAssetModelSceneHandoff, MissingTexcoordsReceiveGeneratedAtlasBeforeG
     ASSERT_EQ(state->Record.Materials.size(), 1u);
     EXPECT_TRUE(state->Record.Materials[0].TextureBindings.Albedo.IsValid());
     EXPECT_TRUE(state->Record.Materials[0].TextureBindings.Normal.IsValid());
+    EXPECT_EQ(state->Record.Materials[0].TextureBindings.NormalSpace,
+              Graphics::MaterialNormalTextureSpace::ObjectSpaceNormal);
     EXPECT_EQ(diagnostics.GeneratedTextureAssetsCreated, 2u);
     EXPECT_EQ(diagnostics.GeneratedTextureUploadRequests, 2u);
     EXPECT_EQ(diagnostics.GeneratedTextureBakeFailures, 0u);

@@ -1221,6 +1221,11 @@ namespace Extrinsic::Runtime
                 return true;
             case ProgressiveSlotSemantic::Normal:
                 bindings.Normal = slot.TextureAsset;
+                bindings.NormalSpace =
+                    (slot.SourceKind == ProgressiveSlotSourceKind::GeneratedTextureAsset ||
+                     slot.SourceKind == ProgressiveSlotSourceKind::PropertyBake)
+                        ? Graphics::MaterialNormalTextureSpace::ObjectSpaceNormal
+                        : Graphics::MaterialNormalTextureSpace::TangentSpaceNormal;
                 return true;
             case ProgressiveSlotSemantic::Roughness:
             case ProgressiveSlotSemantic::Metallic:

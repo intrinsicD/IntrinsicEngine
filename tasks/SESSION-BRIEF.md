@@ -8,7 +8,7 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
-- none
+- `GRAPHICS-104` — GPU Object-Space Normal Texture Bake (tasks/active/GRAPHICS-104-gpu-object-space-normal-texture-bake.md)
 
 ## Theme B — Rendering modernization
 

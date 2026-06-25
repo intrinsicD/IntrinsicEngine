@@ -734,6 +734,8 @@ namespace Extrinsic::Runtime
                     .Normal = *texture,
                     .MetallicRoughness = {},
                     .Emissive = {},
+                    .NormalSpace =
+                        Graphics::MaterialNormalTextureSpace::ObjectSpaceNormal,
                 });
 
             return result;

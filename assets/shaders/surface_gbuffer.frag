@@ -20,6 +20,9 @@ layout(location = 3) in vec4 fragVertexColor;
 layout(location = 4) in vec3 fragObjectPos;
 layout(location = 5) in vec3 fragWorldPos;
 layout(location = 6) flat in uint fragMaterialSlot;
+layout(location = 7) flat in vec3 fragNormalMatrix0;
+layout(location = 8) flat in vec3 fragNormalMatrix1;
+layout(location = 9) flat in vec3 fragNormalMatrix2;
 
 // G-buffer MRT outputs.
 layout(location = 0) out vec4 outNormal;    // SceneNormal
@@ -74,15 +77,44 @@ layout(std430, set = 3, binding = 0) readonly buffer MaterialBuffer {
 
 #include "surface_color_resolve.glsl"
 
-void main() {
-    // Epsilon-guarded renormalization.
-    float nLen = length(fragNormal);
-    vec3 norm = (nLen > 1e-6) ? (fragNormal / nLen) : vec3(0.0, 0.0, 1.0);
+const uint MaterialFlag_ObjectSpaceNormalMap = 1u << 5;
 
+vec3 ResolveSurfaceNormal(MaterialData mat, vec3 vertexWorldNormal, vec2 uv)
+{
+    float nLen = length(vertexWorldNormal);
+    vec3 n = (nLen > 1e-6) ? (vertexWorldNormal / nLen) : vec3(0.0, 0.0, 1.0);
+    if ((mat.Flags & MaterialFlag_ObjectSpaceNormalMap) == 0u ||
+        !IsValidSurfaceTextureID(mat.NormalID))
+    {
+        return n;
+    }
+
+    vec4 normalSample = texture(globalTextures[nonuniformEXT(mat.NormalID)], uv);
+    if (normalSample.a <= 1.0e-6)
+    {
+        return n;
+    }
+
+    vec3 objectNormal = normalSample.rgb * 2.0 - vec3(1.0);
+    float objectNormalLen = length(objectNormal);
+    if (objectNormalLen <= 1.0e-6)
+    {
+        return n;
+    }
+    objectNormal /= objectNormalLen;
+
+    mat3 normalMatrix = mat3(fragNormalMatrix0, fragNormalMatrix1, fragNormalMatrix2);
+    vec3 worldNormal = normalMatrix * objectNormal;
+    float worldNormalLen = length(worldNormal);
+    return (worldNormalLen > 1.0e-6) ? (worldNormal / worldNormalLen) : n;
+}
+
+void main() {
     vec4 baseColor = ResolveSurfaceBaseColor();
 
     // Read PBR factors from material SSBO.
     MaterialData mat = materials.Materials[fragMaterialSlot];
+    vec3 norm = ResolveSurfaceNormal(mat, fragNormal, fragTexCoord);
 
     // Write G-buffer with real material properties.
     outNormal   = vec4(norm, 0.0);

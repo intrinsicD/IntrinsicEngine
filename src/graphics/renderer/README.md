@@ -204,6 +204,7 @@ into graphics public contracts.
 - `Extrinsic.Graphics.GpuWorld`
 - `Extrinsic.Graphics.Material`
 - `Extrinsic.Graphics.MaterialSystem`
+- `Extrinsic.Graphics.ObjectSpaceNormalTextureBake`
 - `Extrinsic.Graphics.ColormapSystem`
 - `Extrinsic.Graphics.VisualizationPackets`
 - `Extrinsic.Graphics.VisualizationSyncSystem`
@@ -392,9 +393,13 @@ Concretely:
   UV channel plus the packed vertex normal; it samples
   `MaterialParams::AlbedoID` through the bindless texture set when that ID is
   valid, otherwise it falls back to `BaseColorFactor`. The shading normal
-  comes from the transformed packed vertex normal; `NormalID` is intentionally
-  ignored until a tangent-space normal-map path is promoted. The fragment stage
-  is still a debug Lambert-style
+  comes from the transformed packed vertex normal unless
+  `MaterialFlags::ObjectSpaceNormalMap` is set and `NormalID` resolves to a
+  real texture. In that case the shader decodes RGB as an object-space normal,
+  transforms it by the model normal matrix, normalizes it, and falls back to the
+  vertex normal for uncovered alpha-zero texels. Tangent-space normal maps are
+  still reserved for a future path and are not inferred from `NormalID` alone.
+  The fragment stage is still a debug Lambert-style
   surface shader, not full PBR lighting; metallic/roughness/emissive texture
   evaluation remains future surface-shading work. The legacy
   `assets/shaders/surface.vert/frag` pair predates
@@ -1623,17 +1628,21 @@ Concretely:
   0xFF, nearest filter, clamp-to-edge) exists for missing/pending texture
   assets and is observable through `TextureAssetFallbackResolveCount`.
   Surface shaders sample `MaterialParams::AlbedoID` for base color when the
-  bindless ID is valid; invalid IDs fall back to `BaseColorFactor`. The
-  retained surface and GBuffer normal paths use the packed vertex normal and
-  intentionally ignore `MaterialParams::NormalID` until a tangent-space
-  normal-map path is promoted. Metallic/roughness factors
+  bindless ID is valid; invalid IDs fall back to `BaseColorFactor`. Retained
+  forward and promoted GBuffer shaders consume `MaterialParams::NormalID` only
+  when `MaterialFlags::ObjectSpaceNormalMap` is set by
+  `MaterialSystem::ResolveTextureAssetBindings()`. That flagged path decodes
+  object-space normal RGB, transforms through the model normal matrix, and
+  otherwise preserves vertex-normal shading. Tangent-space authored normal maps
+  remain reserved for a future material path. Metallic/roughness factors
   are carried in `MaterialParams` and the deferred GBuffer metadata, but full
   PBR texture/factor lighting is not implemented in the current default
   forward shader.
-  Runtime-generated vertex-property textures are therefore consumed through the
-  same albedo/normal material slots as authored texture assets; graphics never
+  Runtime-generated vertex-property textures are still consumed through the same
+  albedo/normal material slots as authored texture assets; graphics never
   imports `AssetService` or knows whether a bindless index came from an
-  authored file, embedded image, or generated CPU bake. Visualization
+  authored file, embedded image, CPU bake, or GPU-produced generated texture.
+  Visualization
   and Htex/UV bake atlas references do not use the magenta fallback: per
   `GRAPHICS-014Q`, deferred-residency atlas descriptors are dropped from
   `RenderWorld::Visualization` and counted in
@@ -1669,6 +1678,21 @@ Concretely:
   If `InitializeFallbackTexture()` fails, `FallbackTextureReady = false`
   and `GetViewOrFallback()` returns `GpuAssetFallbackReason::Unavailable`,
   letting material code fall back to factor-only shading deterministically.
+- `Extrinsic.Graphics.ObjectSpaceNormalTextureBake` owns the graphics-side
+  object-space normal bake contract introduced by `GRAPHICS-104`. The
+  backend-neutral helpers validate finite atlas UVs, count-matched finite
+  normals, triangle indices, the `ObjectSpaceNormal` mode, and resolution clamp
+  policy; `TangentSpaceNormal` is reserved and rejected. The GPU recorder binds
+  a caller-provided pipeline, index buffer, texcoord/normal BDAs, and output
+  texture; it sets viewport and scissor to the exact target texture extent,
+  clears to encoded `+Z` with alpha `0`, rasterizes UV triangles by mapping UV
+  to clip space, writes normalized object-space normals with alpha `1`, and
+  transitions to the requested final texture layout. The bake shader uses the
+  same vertical orientation as the CPU texel-center sampling contract so a
+  point addressed by mesh UV samples the same baked texel on Vulkan. Runtime
+  job scheduling, stale-key rejection, generated-normal import replacement,
+  and GPU dilation padding remain open parts of `GRAPHICS-104`; this graphics
+  surface does not import ECS, runtime, live `AssetService`, or Vulkan handles.
 - Per `GRAPHICS-018Q`, the four remaining Vulkan integration follow-ups
   to the `GRAPHICS-018` guarded backend bring-up resolve as follows.
   Texture upload policy keeps the guarded synchronous staging-buffer

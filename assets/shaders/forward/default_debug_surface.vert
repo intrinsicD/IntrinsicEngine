@@ -35,6 +35,7 @@ layout(location = 4) out float fragVisualizationScalar;
 layout(location = 5) out vec4 fragVisualizationColor;
 layout(location = 6) out vec4 fragVertexColor;
 layout(location = 7) flat out uint fragHasVertexColor;
+layout(location = 8) flat out uint fragInstanceSlot;
 
 void main() {
     const GpuSceneTable scene = GpuSceneTableRef(pc.SceneTableBDA).Value;
@@ -59,6 +60,7 @@ void main() {
 
     gl_Position = scene.CameraViewProj * dyn.Model * vec4(localPosition, 1.0);
     fragMaterialSlot = inst.MaterialSlot;
+    fragInstanceSlot = gl_InstanceIndex;
     fragUv = localUv;
     fragConfigSlot = inst.ConfigSlot;
     fragVisualizationScalar = cfg.VisDomain == GpuVisualizationDomain_Vertex

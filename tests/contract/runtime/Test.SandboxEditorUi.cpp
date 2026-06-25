@@ -2309,6 +2309,8 @@ TEST(SandboxEditorUi, MeshVertexNormalsCommandSurvivesPendingDirectMeshPostProce
         engine.GetMaterialTextureAssetBindingsForTest(*stableId);
     ASSERT_TRUE(bindings.has_value());
     ASSERT_TRUE(bindings->Normal.IsValid());
+    EXPECT_EQ(bindings->NormalSpace,
+              Graphics::MaterialNormalTextureSpace::ObjectSpaceNormal);
     ExpectMeshVertexNormalsNear(
         engine,
         *meshEntity,

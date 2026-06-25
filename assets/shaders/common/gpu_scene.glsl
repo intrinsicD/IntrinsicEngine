@@ -27,6 +27,7 @@ const uint GpuMaterialType_SciVis = 1u;
 const uint GpuMaterialType_DefaultDebugSurface = 2u;
 const uint GpuMaterialType_DefaultDebugUVs = 3u;
 const uint GpuMaterialFlag_Unlit = 1u << 3;
+const uint GpuMaterialFlag_ObjectSpaceNormalMap = 1u << 5;
 const uint GpuColorSource_Material = 0u;
 const uint GpuColorSource_UniformColor = 1u;
 const uint GpuColorSource_ScalarField = 2u;

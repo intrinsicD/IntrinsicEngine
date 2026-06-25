@@ -568,6 +568,7 @@ if(TARGET ExtrinsicBackendsVulkan AND INTRINSIC_PLATFORM_BACKEND_SELECTED STREQU
         Test.DefaultRecipeSurfaceGpuSmoke.cpp
         Test.HzbOcclusionConservatismGpuSmoke.cpp
         Test.ImGuiSurfaceGpuSmoke.cpp
+        Test.ObjectSpaceNormalTextureBakeGpuSmoke.cpp
         Test.TransientDebugSurfaceGpuSmoke.cpp
         Test.VisualizationOverlaySurfaceGpuSmoke.cpp
         Test.VulkanBootstrapSmoke.cpp
@@ -687,6 +688,7 @@ intrinsic_test_object_lib(GraphicsAssetsUnitTestObjs
 set(_graphics_contract_test_files
     Test.GpuTransferFacade.cpp
     Test.MinimalTriangleAcceptance.cpp
+    Test.ObjectSpaceNormalTextureBake.cpp
     Test.RHI.CommandContextBarriers.cpp
     Test.RendererRhiBoundary.cpp
     Test.TextureReadback.cpp

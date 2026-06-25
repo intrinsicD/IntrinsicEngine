@@ -74,6 +74,16 @@ namespace Extrinsic::Graphics
         return nullptr;
     }
 
+    [[nodiscard]] MaterialFlags SetFlagEnabled(
+        const MaterialFlags flags,
+        const MaterialFlags bit,
+        const bool enabled) noexcept
+    {
+        const std::uint32_t raw = static_cast<std::uint32_t>(flags);
+        const std::uint32_t mask = static_cast<std::uint32_t>(bit);
+        return static_cast<MaterialFlags>(enabled ? (raw | mask) : (raw & ~mask));
+    }
+
     // -----------------------------------------------------------------
     // Registered type record
     // -----------------------------------------------------------------
@@ -504,6 +514,8 @@ namespace Extrinsic::Graphics
 
         MaterialParams params = meta->Params;
         bool anyFailure = false;
+        bool normalTextureRequested = false;
+        bool normalResolvedWithoutFallback = false;
 
         for (const Binding& binding : requested)
         {
@@ -516,6 +528,11 @@ namespace Extrinsic::Graphics
                 anyFailure = true;
                 ++m_Impl->Diagnostics.TextureAssetResolveFailureCount;
                 continue;
+            }
+
+            if (binding.Semantic == MaterialTextureSemantic::Normal)
+            {
+                normalTextureRequested = true;
             }
 
             ++m_Impl->Diagnostics.TextureAssetResolveCount;
@@ -534,6 +551,20 @@ namespace Extrinsic::Graphics
                 ++m_Impl->Diagnostics.TextureAssetFallbackResolveCount;
 
             *target = resolved->View.BindlessIdx;
+            if (binding.Semantic == MaterialTextureSemantic::Normal &&
+                !resolved->UsedFallback)
+            {
+                normalResolvedWithoutFallback = true;
+            }
+        }
+
+        if (normalTextureRequested)
+        {
+            params.Flags = SetFlagEnabled(
+                params.Flags,
+                MaterialFlags::ObjectSpaceNormalMap,
+                normalResolvedWithoutFallback &&
+                    bindings.NormalSpace == MaterialNormalTextureSpace::ObjectSpaceNormal);
         }
 
         SetParams(handle, params);

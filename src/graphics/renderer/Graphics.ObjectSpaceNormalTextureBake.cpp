@@ -1,0 +1,413 @@
+module;
+
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <glm/glm.hpp>
+#include <glm/geometric.hpp>
+#include <span>
+#include <string>
+#include <utility>
+
+module Extrinsic.Graphics.ObjectSpaceNormalTextureBake;
+
+import Extrinsic.RHI.Types;
+
+namespace Extrinsic::Graphics
+{
+    namespace
+    {
+        [[nodiscard]] bool IsFinite(const glm::vec2 value) noexcept
+        {
+            return std::isfinite(value.x) && std::isfinite(value.y);
+        }
+
+        [[nodiscard]] bool IsFinite(const glm::vec3 value) noexcept
+        {
+            return std::isfinite(value.x) &&
+                   std::isfinite(value.y) &&
+                   std::isfinite(value.z);
+        }
+
+        [[nodiscard]] float Cross2(const glm::vec2 a, const glm::vec2 b) noexcept
+        {
+            return a.x * b.y - a.y * b.x;
+        }
+
+        [[nodiscard]] bool IsAtlasUv(const glm::vec2 uv, const float epsilon) noexcept
+        {
+            return uv.x >= -epsilon && uv.y >= -epsilon &&
+                   uv.x <= 1.0f + epsilon && uv.y <= 1.0f + epsilon;
+        }
+
+        [[nodiscard]] glm::vec3 Barycentric(
+            const glm::vec2 a,
+            const glm::vec2 b,
+            const glm::vec2 c,
+            const glm::vec2 p) noexcept
+        {
+            const float denominator =
+                ((b.y - c.y) * (a.x - c.x)) +
+                ((c.x - b.x) * (a.y - c.y));
+            if (std::abs(denominator) <= 0.0f)
+            {
+                return glm::vec3{-1.0f};
+            }
+
+            const float w0 =
+                (((b.y - c.y) * (p.x - c.x)) +
+                 ((c.x - b.x) * (p.y - c.y))) / denominator;
+            const float w1 =
+                (((c.y - a.y) * (p.x - c.x)) +
+                 ((a.x - c.x) * (p.y - c.y))) / denominator;
+            return glm::vec3{w0, w1, 1.0f - w0 - w1};
+        }
+
+        [[nodiscard]] bool ContainsBarycentric(
+            const glm::vec3 barycentric,
+            const float epsilon) noexcept
+        {
+            return barycentric.x >= -epsilon &&
+                   barycentric.y >= -epsilon &&
+                   barycentric.z >= -epsilon &&
+                   barycentric.x <= 1.0f + epsilon &&
+                   barycentric.y <= 1.0f + epsilon &&
+                   barycentric.z <= 1.0f + epsilon;
+        }
+
+        [[nodiscard]] glm::vec3 NormalizeOrFallback(
+            const glm::vec3 normal,
+            const float epsilon) noexcept
+        {
+            const float length = glm::length(normal);
+            if (!std::isfinite(length) || length <= epsilon)
+            {
+                return glm::vec3{0.0f, 0.0f, 1.0f};
+            }
+            return normal / length;
+        }
+    }
+
+    const char* DebugNameForObjectSpaceNormalTextureBakeStatus(
+        const ObjectSpaceNormalTextureBakeStatus status) noexcept
+    {
+        switch (status)
+        {
+        case ObjectSpaceNormalTextureBakeStatus::Success:
+            return "Success";
+        case ObjectSpaceNormalTextureBakeStatus::UnsupportedNormalTextureSpace:
+            return "UnsupportedNormalTextureSpace";
+        case ObjectSpaceNormalTextureBakeStatus::EmptyInput:
+            return "EmptyInput";
+        case ObjectSpaceNormalTextureBakeStatus::InvalidTriangleIndex:
+            return "InvalidTriangleIndex";
+        case ObjectSpaceNormalTextureBakeStatus::NonFiniteTexcoord:
+            return "NonFiniteTexcoord";
+        case ObjectSpaceNormalTextureBakeStatus::NonAtlasTexcoord:
+            return "NonAtlasTexcoord";
+        case ObjectSpaceNormalTextureBakeStatus::NonFiniteNormal:
+            return "NonFiniteNormal";
+        case ObjectSpaceNormalTextureBakeStatus::DegenerateNormal:
+            return "DegenerateNormal";
+        case ObjectSpaceNormalTextureBakeStatus::DegenerateUvTriangle:
+            return "DegenerateUvTriangle";
+        case ObjectSpaceNormalTextureBakeStatus::NoContainingTriangle:
+            return "NoContainingTriangle";
+        }
+        return "Unknown";
+    }
+
+    ObjectSpaceNormalTextureBakeResolvedOptions
+    ResolveObjectSpaceNormalTextureBakeOptions(
+        const ObjectSpaceNormalTextureBakeOptions& options) noexcept
+    {
+        ObjectSpaceNormalTextureBakeResolvedOptions resolved{};
+        const auto resolveExtent = [](const std::uint32_t requested) noexcept
+        {
+            const std::uint32_t extent =
+                requested == 0u ? kObjectSpaceNormalBakeDefaultExtent : requested;
+            return std::clamp(extent,
+                              kObjectSpaceNormalBakeMinExtent,
+                              kObjectSpaceNormalBakeMaxExtent);
+        };
+
+        resolved.Width = resolveExtent(options.Width);
+        resolved.Height = resolveExtent(options.Height);
+        resolved.PaddingTexels =
+            std::min(options.PaddingTexels, kObjectSpaceNormalBakeMaxPaddingTexels);
+        resolved.AtlasUvEpsilon =
+            std::isfinite(options.AtlasUvEpsilon) && options.AtlasUvEpsilon >= 0.0f
+                ? options.AtlasUvEpsilon
+                : 1.0e-4f;
+        resolved.DegenerateUvAreaEpsilon =
+            std::isfinite(options.DegenerateUvAreaEpsilon) &&
+                    options.DegenerateUvAreaEpsilon > 0.0f
+                ? options.DegenerateUvAreaEpsilon
+                : 1.0e-10f;
+        resolved.DegenerateNormalLengthEpsilon =
+            std::isfinite(options.DegenerateNormalLengthEpsilon) &&
+                    options.DegenerateNormalLengthEpsilon > 0.0f
+                ? options.DegenerateNormalLengthEpsilon
+                : 1.0e-6f;
+        resolved.Space = options.Space;
+        return resolved;
+    }
+
+    ObjectSpaceNormalTextureBakeValidation
+    ValidateObjectSpaceNormalTextureBakeInput(
+        const std::span<const ObjectSpaceNormalTextureBakeVertex> vertices,
+        const std::span<const ObjectSpaceNormalTextureBakeTriangle> triangles,
+        const ObjectSpaceNormalTextureBakeOptions& options)
+    {
+        ObjectSpaceNormalTextureBakeValidation out{};
+        out.Diagnostics.Options = ResolveObjectSpaceNormalTextureBakeOptions(options);
+        out.Diagnostics.VertexCount = static_cast<std::uint32_t>(vertices.size());
+        out.Diagnostics.TriangleCount = static_cast<std::uint32_t>(triangles.size());
+
+        if (out.Diagnostics.Options.Space != NormalTextureSpace::ObjectSpaceNormal)
+        {
+            out.Status =
+                ObjectSpaceNormalTextureBakeStatus::UnsupportedNormalTextureSpace;
+            return out;
+        }
+
+        if (vertices.empty() || triangles.empty())
+        {
+            out.Status = ObjectSpaceNormalTextureBakeStatus::EmptyInput;
+            return out;
+        }
+
+        for (std::size_t index = 0; index < vertices.size(); ++index)
+        {
+            const ObjectSpaceNormalTextureBakeVertex& vertex = vertices[index];
+            if (!IsFinite(vertex.Uv))
+            {
+                out.Status = ObjectSpaceNormalTextureBakeStatus::NonFiniteTexcoord;
+                out.Diagnostics.FirstFailureIndex = static_cast<std::uint32_t>(index);
+                return out;
+            }
+            if (!IsAtlasUv(vertex.Uv, out.Diagnostics.Options.AtlasUvEpsilon))
+            {
+                out.Status = ObjectSpaceNormalTextureBakeStatus::NonAtlasTexcoord;
+                out.Diagnostics.FirstFailureIndex = static_cast<std::uint32_t>(index);
+                return out;
+            }
+            if (!IsFinite(vertex.Normal))
+            {
+                out.Status = ObjectSpaceNormalTextureBakeStatus::NonFiniteNormal;
+                out.Diagnostics.FirstFailureIndex = static_cast<std::uint32_t>(index);
+                return out;
+            }
+            if (glm::length(vertex.Normal) <=
+                out.Diagnostics.Options.DegenerateNormalLengthEpsilon)
+            {
+                out.Status = ObjectSpaceNormalTextureBakeStatus::DegenerateNormal;
+                out.Diagnostics.FirstFailureIndex = static_cast<std::uint32_t>(index);
+                return out;
+            }
+        }
+
+        for (std::size_t index = 0; index < triangles.size(); ++index)
+        {
+            const ObjectSpaceNormalTextureBakeTriangle tri = triangles[index];
+            if (tri.A >= vertices.size() ||
+                tri.B >= vertices.size() ||
+                tri.C >= vertices.size())
+            {
+                out.Status = ObjectSpaceNormalTextureBakeStatus::InvalidTriangleIndex;
+                out.Diagnostics.FirstFailureIndex = static_cast<std::uint32_t>(index);
+                return out;
+            }
+
+            const glm::vec2 a = vertices[tri.A].Uv;
+            const glm::vec2 b = vertices[tri.B].Uv;
+            const glm::vec2 c = vertices[tri.C].Uv;
+            const float area2 = std::abs(Cross2(b - a, c - a));
+            if (area2 <= out.Diagnostics.Options.DegenerateUvAreaEpsilon)
+            {
+                ++out.Diagnostics.DegenerateUvTriangleCount;
+                out.Status = ObjectSpaceNormalTextureBakeStatus::DegenerateUvTriangle;
+                out.Diagnostics.FirstFailureIndex = static_cast<std::uint32_t>(index);
+                return out;
+            }
+        }
+
+        out.Status = ObjectSpaceNormalTextureBakeStatus::Success;
+        return out;
+    }
+
+    glm::vec4 EncodeObjectSpaceNormalToRgba(const glm::vec3& normal) noexcept
+    {
+        const glm::vec3 n = NormalizeOrFallback(normal, 1.0e-6f);
+        return glm::vec4{(n * 0.5f) + glm::vec3{0.5f}, 1.0f};
+    }
+
+    glm::vec2 UvForObjectSpaceNormalBakeTexelCenter(
+        const std::uint32_t x,
+        const std::uint32_t y,
+        const ObjectSpaceNormalTextureBakeResolvedOptions& options) noexcept
+    {
+        const float width = static_cast<float>(std::max(options.Width, 1u));
+        const float height = static_cast<float>(std::max(options.Height, 1u));
+        return glm::vec2{
+            (static_cast<float>(x) + 0.5f) / width,
+            (static_cast<float>(y) + 0.5f) / height,
+        };
+    }
+
+    ObjectSpaceNormalTextureBakeSample
+    SampleObjectSpaceNormalTextureBakeAtUv(
+        const std::span<const ObjectSpaceNormalTextureBakeVertex> vertices,
+        const std::span<const ObjectSpaceNormalTextureBakeTriangle> triangles,
+        const glm::vec2& uv,
+        const ObjectSpaceNormalTextureBakeOptions& options)
+    {
+        ObjectSpaceNormalTextureBakeSample sample{};
+        sample.Uv = uv;
+
+        const ObjectSpaceNormalTextureBakeValidation validation =
+            ValidateObjectSpaceNormalTextureBakeInput(vertices, triangles, options);
+        if (!validation.Succeeded())
+        {
+            sample.Status = validation.Status;
+            return sample;
+        }
+
+        const ObjectSpaceNormalTextureBakeResolvedOptions resolved =
+            validation.Diagnostics.Options;
+        if (!IsFinite(uv))
+        {
+            sample.Status = ObjectSpaceNormalTextureBakeStatus::NonFiniteTexcoord;
+            return sample;
+        }
+        if (!IsAtlasUv(uv, resolved.AtlasUvEpsilon))
+        {
+            sample.Status = ObjectSpaceNormalTextureBakeStatus::NonAtlasTexcoord;
+            return sample;
+        }
+
+        for (std::size_t index = 0; index < triangles.size(); ++index)
+        {
+            const ObjectSpaceNormalTextureBakeTriangle tri = triangles[index];
+            const glm::vec2 a = vertices[tri.A].Uv;
+            const glm::vec2 b = vertices[tri.B].Uv;
+            const glm::vec2 c = vertices[tri.C].Uv;
+            const glm::vec3 bary = Barycentric(a, b, c, uv);
+            if (!ContainsBarycentric(bary, resolved.AtlasUvEpsilon))
+            {
+                continue;
+            }
+
+            const glm::vec3 normal =
+                (bary.x * vertices[tri.A].Normal) +
+                (bary.y * vertices[tri.B].Normal) +
+                (bary.z * vertices[tri.C].Normal);
+            const float normalLength = glm::length(normal);
+            if (!std::isfinite(normalLength) ||
+                normalLength <= resolved.DegenerateNormalLengthEpsilon)
+            {
+                sample.Status =
+                    ObjectSpaceNormalTextureBakeStatus::DegenerateNormal;
+                sample.Barycentric = bary;
+                sample.TriangleIndex = static_cast<std::uint32_t>(index);
+                return sample;
+            }
+
+            sample.Status = ObjectSpaceNormalTextureBakeStatus::Success;
+            sample.Barycentric = bary;
+            sample.ObjectNormal = normal / normalLength;
+            sample.EncodedRgba = EncodeObjectSpaceNormalToRgba(sample.ObjectNormal);
+            sample.TriangleIndex = static_cast<std::uint32_t>(index);
+            return sample;
+        }
+
+        sample.Status = ObjectSpaceNormalTextureBakeStatus::NoContainingTriangle;
+        return sample;
+    }
+
+    RHI::PipelineDesc MakeObjectSpaceNormalTextureBakePipelineDesc(
+        std::string vertexShaderPath,
+        std::string fragmentShaderPath,
+        const RHI::Format colorFormat)
+    {
+        RHI::PipelineDesc desc{};
+        desc.VertexShaderPath = std::move(vertexShaderPath);
+        desc.FragmentShaderPath = std::move(fragmentShaderPath);
+        desc.Rasterizer.Culling = RHI::CullMode::None;
+        desc.DepthStencil.DepthTestEnable = false;
+        desc.DepthStencil.DepthWriteEnable = false;
+        desc.ColorTargetCount = 1u;
+        desc.ColorTargetFormats[0] = colorFormat;
+        desc.PushConstantSize =
+            static_cast<std::uint32_t>(
+                sizeof(ObjectSpaceNormalTextureBakeGpuPushConstants));
+        desc.DebugName = "ObjectSpaceNormalTextureBake";
+        return desc;
+    }
+
+    Core::Result RecordObjectSpaceNormalTextureBake(
+        RHI::ICommandContext& cmd,
+        const ObjectSpaceNormalTextureBakeGpuRecordDesc& desc)
+    {
+        if (!desc.Pipeline.IsValid() ||
+            !desc.OutputTexture.IsValid() ||
+            !desc.IndexBuffer.IsValid() ||
+            desc.TexcoordBDA == 0u ||
+            desc.NormalBDA == 0u ||
+            desc.IndexCount == 0u ||
+            desc.Width == 0u ||
+            desc.Height == 0u)
+        {
+            return Core::Err(Core::ErrorCode::InvalidArgument);
+        }
+
+        const ObjectSpaceNormalTextureBakeGpuPushConstants push{
+            .TexcoordBDA = desc.TexcoordBDA,
+            .NormalBDA = desc.NormalBDA,
+        };
+
+        cmd.TextureBarrier(desc.OutputTexture,
+                           desc.InitialLayout,
+                           RHI::TextureLayout::ColorAttachment);
+
+        const std::array<RHI::ColorAttachment, 1u> colorAttachments{{
+            RHI::ColorAttachment{
+                .Target = desc.OutputTexture,
+                .Load = RHI::LoadOp::Clear,
+                .Store = RHI::StoreOp::Store,
+                .ClearR = 0.5f,
+                .ClearG = 0.5f,
+                .ClearB = 1.0f,
+                .ClearA = 0.0f,
+            },
+        }};
+
+        cmd.BeginRenderPass(RHI::RenderPassDesc{
+            .ColorTargets = std::span<const RHI::ColorAttachment>{
+                colorAttachments},
+        });
+        cmd.SetViewport(0.0f,
+                        0.0f,
+                        static_cast<float>(desc.Width),
+                        static_cast<float>(desc.Height),
+                        0.0f,
+                        1.0f);
+        cmd.SetScissor(0, 0, desc.Width, desc.Height);
+        cmd.BindPipeline(desc.Pipeline);
+        cmd.BindIndexBuffer(desc.IndexBuffer, 0u, RHI::IndexType::Uint32);
+        cmd.PushConstants(
+            &push,
+            static_cast<std::uint32_t>(
+                sizeof(ObjectSpaceNormalTextureBakeGpuPushConstants)),
+            0u);
+        cmd.DrawIndexed(desc.IndexCount, 1u, 0u, 0, 0u);
+        cmd.EndRenderPass();
+
+        cmd.TextureBarrier(desc.OutputTexture,
+                           RHI::TextureLayout::ColorAttachment,
+                           desc.FinalLayout);
+        return Core::Ok();
+    }
+}

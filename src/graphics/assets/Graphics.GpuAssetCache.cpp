@@ -32,6 +32,20 @@ namespace Extrinsic::Graphics
             return error == Core::ErrorCode::DeviceNotOperational;
         }
 
+        [[nodiscard]] bool HasTextureUsage(const RHI::TextureUsage flags,
+                                           const RHI::TextureUsage bit) noexcept
+        {
+            return (static_cast<std::uint32_t>(flags) &
+                    static_cast<std::uint32_t>(bit)) != 0u;
+        }
+
+        enum class PendingCompletionKind : std::uint8_t
+        {
+            None,
+            TransferToken,
+            FrameNumber,
+        };
+
         struct Slot
         {
             // Visible to GetView() once state == Ready.  Empty before then
@@ -53,6 +67,8 @@ namespace Extrinsic::Graphics
             RHI::BindlessIndex                PendingBindless = RHI::kInvalidBindlessIndex;
             std::uint64_t                     PendingGeneration = 0;
             RHI::TransferToken                InFlight{};
+            std::uint64_t                     PendingReadyFrame = 0;
+            PendingCompletionKind             CompletionKind = PendingCompletionKind::None;
 
             GpuAssetState State = GpuAssetState::NotRequested;
             GpuAssetKind  Kind  = GpuAssetKind::Buffer;
@@ -127,6 +143,24 @@ namespace Extrinsic::Graphics
             slot.PendingSamplerHandle = {};
             slot.PendingGeneration = 0;
             slot.InFlight          = {};
+            slot.PendingReadyFrame = 0;
+            slot.CompletionKind    = PendingCompletionKind::None;
+        }
+
+        [[nodiscard]] bool IsPendingComplete(const Slot& slot,
+                                             const RHI::ITransferQueue& transfer,
+                                             const std::uint64_t currentFrame) noexcept
+        {
+            switch (slot.CompletionKind)
+            {
+            case PendingCompletionKind::TransferToken:
+                return transfer.IsComplete(slot.InFlight);
+            case PendingCompletionKind::FrameNumber:
+                return currentFrame >= slot.PendingReadyFrame;
+            case PendingCompletionKind::None:
+                return false;
+            }
+            return false;
         }
 
         [[nodiscard]] Core::Expected<RHI::SamplerManager::SamplerLease> CreateSamplerLease(
@@ -225,6 +259,8 @@ namespace Extrinsic::Graphics
         slot.PendingBindless   = RHI::kInvalidBindlessIndex;
         slot.PendingGeneration = m_Impl->NextGeneration++;
         slot.InFlight          = token;
+        slot.PendingReadyFrame = 0;
+        slot.CompletionKind    = PendingCompletionKind::TransferToken;
         slot.State             = GpuAssetState::GpuUploading;
         return Core::Ok();
     }
@@ -299,7 +335,123 @@ namespace Extrinsic::Graphics
         slot.PendingBindless      = bindless;
         slot.PendingGeneration    = m_Impl->NextGeneration++;
         slot.InFlight             = token;
+        slot.PendingReadyFrame    = 0;
+        slot.CompletionKind       = PendingCompletionKind::TransferToken;
         slot.State                = GpuAssetState::GpuUploading;
+        return Core::Ok();
+    }
+
+    Core::Expected<GpuProducedTexturePendingView>
+    GpuAssetCache::BeginGpuProducedTexture(const GpuProducedTextureRequest& req)
+    {
+        if (!req.Id.IsValid())
+            return Core::Err<GpuProducedTexturePendingView>(Core::ErrorCode::InvalidArgument);
+        if (!HasTextureUsage(req.Desc.Usage, RHI::TextureUsage::Sampled) ||
+            !HasTextureUsage(req.Desc.Usage, RHI::TextureUsage::ColorTarget))
+        {
+            return Core::Err<GpuProducedTexturePendingView>(Core::ErrorCode::InvalidArgument);
+        }
+
+        std::lock_guard guard(m_Impl->Mutex);
+        ++m_Impl->Diagnostics.UploadRequests;
+        ++m_Impl->Diagnostics.TextureUploadRequests;
+
+        Slot& slot = m_Impl->Slots[req.Id];
+
+        if (slot.State == GpuAssetState::GpuUploading)
+            return Core::Err<GpuProducedTexturePendingView>(Core::ErrorCode::ResourceBusy);
+
+        slot.Kind = GpuAssetKind::Texture;
+
+        RHI::SamplerManager::SamplerLease samplerLease{};
+        RHI::SamplerHandle sampler = req.Sampler;
+        if (!sampler.IsValid() && m_Impl->Samplers != nullptr)
+        {
+            auto samplerOr = m_Impl->CreateSamplerLease(req.SamplerDesc);
+            if (!samplerOr.has_value())
+            {
+                ++m_Impl->Diagnostics.UploadFailures;
+                if (IsUploadDeferral(samplerOr.error()))
+                {
+                    ++m_Impl->Diagnostics.UploadDeferrals;
+                    return Core::Err<GpuProducedTexturePendingView>(samplerOr.error());
+                }
+
+                m_Impl->RetirePending(slot);
+                slot.State = GpuAssetState::Failed;
+                return Core::Err<GpuProducedTexturePendingView>(samplerOr.error());
+            }
+            samplerLease = std::move(*samplerOr);
+            sampler = samplerLease.GetHandle();
+        }
+
+        auto leaseOr = m_Impl->Textures.Create(req.Desc, sampler);
+        if (!leaseOr.has_value())
+        {
+            ++m_Impl->Diagnostics.UploadFailures;
+            if (IsUploadDeferral(leaseOr.error()))
+            {
+                ++m_Impl->Diagnostics.UploadDeferrals;
+                return Core::Err<GpuProducedTexturePendingView>(leaseOr.error());
+            }
+
+            m_Impl->RetirePending(slot);
+            slot.State = GpuAssetState::Failed;
+            ++m_Impl->Diagnostics.TextureCreateFailures;
+            return Core::Err<GpuProducedTexturePendingView>(leaseOr.error());
+        }
+
+        const RHI::TextureHandle handle = leaseOr->GetHandle();
+        const RHI::BindlessIndex bindless = m_Impl->Textures.GetBindlessIndex(handle);
+        const std::uint64_t generation = m_Impl->NextGeneration++;
+
+        m_Impl->RetirePending(slot);
+
+        slot.PendingTexture       = std::move(*leaseOr);
+        slot.PendingSampler       = std::move(samplerLease);
+        slot.PendingSamplerHandle = sampler;
+        slot.PendingBuffer        = {};
+        slot.PendingBindless      = bindless;
+        slot.PendingGeneration    = generation;
+        slot.InFlight             = {};
+        slot.PendingReadyFrame    = req.ReadyFrame;
+        slot.CompletionKind       = req.HasReadyFrame
+            ? PendingCompletionKind::FrameNumber
+            : PendingCompletionKind::None;
+        slot.State                = GpuAssetState::GpuUploading;
+
+        return GpuProducedTexturePendingView{
+            .Texture = handle,
+            .BindlessIdx = bindless,
+            .Sampler = sampler,
+            .Generation = generation,
+        };
+    }
+
+    Core::Result GpuAssetCache::SetGpuProducedTextureReadyFrame(
+        const Assets::AssetId id,
+        const std::uint64_t readyFrame)
+    {
+        if (!id.IsValid())
+            return Core::Err(Core::ErrorCode::InvalidArgument);
+
+        std::lock_guard guard(m_Impl->Mutex);
+        auto it = m_Impl->Slots.find(id);
+        if (it == m_Impl->Slots.end())
+            return Core::Err(Core::ErrorCode::ResourceNotFound);
+
+        Slot& slot = it->second;
+        if (slot.State != GpuAssetState::GpuUploading ||
+            slot.Kind != GpuAssetKind::Texture ||
+            !slot.PendingTexture.IsValid() ||
+            slot.CompletionKind == PendingCompletionKind::TransferToken)
+        {
+            return Core::Err(Core::ErrorCode::InvalidState);
+        }
+
+        slot.PendingReadyFrame = readyFrame;
+        slot.InFlight = {};
+        slot.CompletionKind = PendingCompletionKind::FrameNumber;
         return Core::Ok();
     }
 
@@ -400,7 +552,7 @@ namespace Extrinsic::Graphics
             Slot& slot = entry.second;
             if (slot.State != GpuAssetState::GpuUploading)
                 continue;
-            if (!m_Impl->Transfer.IsComplete(slot.InFlight))
+            if (!m_Impl->IsPendingComplete(slot, m_Impl->Transfer, currentFrame))
                 continue;
 
             // Move old current (if any) to retire queue first.
@@ -416,6 +568,8 @@ namespace Extrinsic::Graphics
             slot.PendingSamplerHandle = {};
             slot.PendingGeneration    = 0;
             slot.InFlight             = {};
+            slot.PendingReadyFrame     = 0;
+            slot.CompletionKind        = PendingCompletionKind::None;
             slot.State                = GpuAssetState::Ready;
         }
 
