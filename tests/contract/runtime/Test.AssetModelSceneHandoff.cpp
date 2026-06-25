@@ -313,6 +313,69 @@ TEST(RuntimeAssetModelSceneHandoff, MaterializeModelSceneCreatesMeshEntityAndUpl
     EXPECT_EQ(diagnostics.MaterialTextureBindingFailures, 0u);
 }
 
+TEST(RuntimeAssetModelSceneHandoff, MaterialLessPrimitiveBindsNeutralLitDefaultMaterial)
+{
+    SceneHandoffFixture fx;
+    TmpFile modelFile("asset_model_scene_handoff_materialless.gltf");
+
+    // A plain mesh import (e.g. OBJ/PLY/STL) with no authored material: the
+    // primitive references no material index.
+    Assets::AssetModelScenePayload payload{};
+    payload.SourcePath = "/models/materialless.gltf";
+    payload.GeometryPayloads.push_back(Assets::AssetGeometryPayload::Make(
+        Assets::AssetPayloadKind::Mesh,
+        MakeTriangleMeshPayload(
+            /*includeTexcoords*/ true,
+            /*includeVertexColor*/ false,
+            /*includeNormals*/ true),
+        "Geometry::MeshIO::MeshIOResult"));
+    payload.Primitives.push_back(Assets::AssetModelPrimitivePayload{
+        .Name = "Triangle",
+        .GeometryKind = Assets::AssetPayloadKind::Mesh,
+        .GeometryPayloadIndex = 0u,
+        .MaterialIndex = Assets::kInvalidAssetModelIndex,
+        .VertexCount = 3u,
+        .IndexCount = 3u,
+    });
+
+    auto model = LoadModel(fx.Service, modelFile.Path.string(), std::move(payload));
+    ASSERT_TRUE(model.has_value()) << static_cast<int>(model.error());
+
+    Runtime::AssetModelSceneHandoffDiagnostics diagnostics{};
+    auto state = Runtime::MaterializeModelSceneAsset(
+        fx.Service,
+        fx.Cache,
+        fx.Scene,
+        fx.Materials,
+        *model,
+        {},
+        &diagnostics);
+    ASSERT_TRUE(state.has_value()) << static_cast<int>(state.error());
+
+    EXPECT_TRUE(state->Record.Materials.empty());
+    ASSERT_EQ(state->Record.Primitives.size(), 1u);
+    const auto& primitive = state->Record.Primitives[0];
+
+    // The material-less primitive must NOT fall back to the unlit
+    // DefaultDebugSurface (slot 0); it binds the handoff's neutral lit
+    // StandardPBR default so the mesh shades using its vertex normals.
+    EXPECT_TRUE(primitive.HasMaterialSlot);
+    EXPECT_NE(primitive.MaterialSlot, Graphics::kDefaultMaterialSlotIndex);
+
+    ASSERT_TRUE(state->HasDefaultLitMaterial);
+    EXPECT_EQ(primitive.MaterialSlot, state->DefaultLitMaterialSlot);
+    EXPECT_EQ(diagnostics.DefaultLitMaterialInstancesCreated, 1u);
+    EXPECT_EQ(diagnostics.MaterialLessPrimitivesAssignedDefaultLit, 1u);
+
+    // The default material is lit (no Unlit flag) with neutral base color.
+    const Graphics::MaterialParams params =
+        fx.Materials.GetParams(state->DefaultLitMaterialLease.GetHandle());
+    EXPECT_FALSE(Graphics::HasFlag(params.Flags, Graphics::MaterialFlags::Unlit));
+    EXPECT_GT(params.BaseColorFactor.r, 0.0f);
+    EXPECT_GT(params.BaseColorFactor.g, 0.0f);
+    EXPECT_GT(params.BaseColorFactor.b, 0.0f);
+}
+
 TEST(RuntimeAssetModelSceneHandoff, ProgressiveRawGeometryFirstPublishesNormalsAndQueuesUvAndBakeJobs)
 {
     SceneHandoffFixture fx;

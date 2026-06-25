@@ -287,6 +287,61 @@ namespace Extrinsic::Runtime
             return params;
         }
 
+        // Neutral lit defaults bound to imported primitives that carry no
+        // authored material. StandardPBR (TypeID 0) is lit by default, so the
+        // mesh shades using its vertex normals instead of taking the unlit
+        // DefaultDebugSurface short-circuit. Slot 0 stays reserved for genuine
+        // missing/invalid bindings (GRAPHICS-031).
+        [[nodiscard]] Graphics::MaterialParams BuildDefaultLitMaterialParams() noexcept
+        {
+            Graphics::MaterialParams params{};
+            params.BaseColorFactor = glm::vec4(0.8f, 0.8f, 0.8f, 1.0f);
+            params.MetallicFactor = 0.0f;
+            params.RoughnessFactor = 1.0f;
+            params.Flags = Graphics::MaterialFlags::None;
+            return params;
+        }
+
+        // Lazily create the handoff-scoped default lit material. Returns true
+        // when a valid lit slot is available in `state`. Failures are non-fatal:
+        // the caller keeps the previous slot-0 fallback so import never fails on
+        // this path.
+        [[nodiscard]] bool EnsureDefaultLitMaterial(
+            Graphics::MaterialSystem& materials,
+            AssetModelSceneHandoffState& state,
+            AssetModelSceneHandoffDiagnostics* diagnostics)
+        {
+            if (state.HasDefaultLitMaterial)
+            {
+                return true;
+            }
+
+            const Graphics::MaterialTypeHandle standardType =
+                materials.FindType(Graphics::kMaterialTypeName_StandardPBR);
+            if (!standardType.IsValid())
+            {
+                return false;
+            }
+
+            auto lease = materials.CreateInstance(
+                standardType,
+                BuildDefaultLitMaterialParams());
+            if (!lease.IsValid())
+            {
+                return false;
+            }
+
+            state.DefaultLitMaterialSlot = materials.GetMaterialSlot(lease.GetHandle());
+            state.DefaultLitMaterialLease = std::move(lease);
+            state.HasDefaultLitMaterial = true;
+            if (diagnostics != nullptr)
+            {
+                ++diagnostics->MaterialInstancesCreated;
+                ++diagnostics->DefaultLitMaterialInstancesCreated;
+            }
+            return true;
+        }
+
         [[nodiscard]] Graphics::MaterialTextureAssetBindings BuildTextureBindings(
             const Assets::AssetModelMaterialPayload& material,
             const std::vector<Assets::AssetId>& embeddedTextureAssets,
@@ -1482,6 +1537,18 @@ namespace Extrinsic::Runtime
                     state.Record.Materials[primitive.MaterialIndex];
                 materialSlot = material.MaterialSlot;
                 hasMaterialSlot = material.HasMaterialSlot;
+            }
+            else if (EnsureDefaultLitMaterial(materials, state, diagnostics))
+            {
+                // No authored material for this primitive: bind a neutral lit
+                // default so the mesh shades, rather than the unlit slot-0
+                // DefaultDebugSurface fallback.
+                materialSlot = state.DefaultLitMaterialSlot;
+                hasMaterialSlot = true;
+                if (diagnostics != nullptr)
+                {
+                    ++diagnostics->MaterialLessPrimitivesAssignedDefaultLit;
+                }
             }
 
             state.Record.Primitives.push_back(AssetModelScenePrimitiveRecord{
