@@ -652,3 +652,8 @@ entries:
       - "Routed the goal-level block as a direct decision because the same RUNTIME-125 benchmark gate recurred after all other runtime Theme B tasks were retired and no permitted implementation path remained."
       - "Did not create a prerequisite benchmark task because the user's loop rules said to stop at RUNTIME-125 when the benchmark gate is unsatisfied, and opening new benchmark work needs an explicit scope decision."
       - "Kept one open thread naming the external condition required to resume: benchmark/profile evidence or a user-approved prerequisite benchmark task."
+  - turn: "2026-06-25_001#5"
+    notes:
+      - "Routed the user-requested commit as a direct experiment because it produced concrete git state: commit `6443f4bb` and a clean status before this epilogue."
+      - "Recorded the commit after it happened rather than staging a prior claim about it."
+      - "Committed the epilogue separately so the user's request for all changes to be committed remains true after research-manager writes."
