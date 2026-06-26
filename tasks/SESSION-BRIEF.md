@@ -13,12 +13,19 @@ the authoritative open/unblocked view.
 
 ## Theme B — Rendering modernization
 
+- unblocked: `DOCS-004` — Promote frame-graph.md from stub and document the recipe-config lane (tasks/backlog/rendering/DOCS-004-frame-graph-doc-recipe-config-lane.md)
 - blocked by `GRAPHICS-104`: `GRAPHICS-105` — Unified mesh shading-model + per-attribute source authority (tasks/backlog/GRAPHICS-105-unified-mesh-shading-and-attribute-source-authority.md)
+- unblocked: `GRAPHICS-106` — Fail-closed IRenderer frame-recipe override seam (tasks/backlog/rendering/GRAPHICS-106-frame-recipe-override-seam.md)
+- blocked by `GRAPHICS-106`: `GRAPHICS-107` — Reconcile the FrameRecipe vs RenderRecipe vocabularies (tasks/backlog/rendering/GRAPHICS-107-reconcile-framerecipe-renderrecipe-vocabulary.md)
 - unblocked: `RUNTIME-125` — Optional AoS fast lane for static geometry (profile-gated) (tasks/backlog/runtime/RUNTIME-125-aos-static-fast-lane.md)
 - blocked by `GRAPHICS-104`: `RUNTIME-129` — Schedule GPU object-space normal bake jobs after import (tasks/backlog/RUNTIME-129-schedule-gpu-normal-bake-after-import.md)
+- blocked by `GRAPHICS-106`: `RUNTIME-130` — Route recipe activation through runtime + load default recipe at init (tasks/backlog/rendering/RUNTIME-130-route-recipe-activation-and-load-default-recipe.md)
 
 ## Theme F — Architecture/runtime/UI foundation seeds
 
+- unblocked: `CORE-003` — Give EngineConfig the file/preview/diagnostics config lane (tasks/backlog/runtime/CORE-003-engine-config-file-lane.md)
+- unblocked: `DOCS-003` — Reconcile algorithm-variant-dispatch.md with reality and define the backend-seam template (tasks/backlog/geometry/DOCS-003-reconcile-algorithm-variant-dispatch-doc.md)
+- blocked by `DOCS-003`: `GEOM-027` — Shared CPU/GPU backend seam + fix the KMeans phantom GPU exemplar (tasks/backlog/geometry/GEOM-027-shared-cpu-gpu-backend-seam-kmeans-exemplar.md)
 - unblocked: `LEGACY-001` — Delete `src/legacy/Interface/` (tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md)
 - unblocked: `LEGACY-004` — Delete `src/legacy/Asset/` (tasks/backlog/architecture/LEGACY-004-delete-src-legacy-asset.md)
 - unblocked: `LEGACY-005` — Delete `src/legacy/Core/` (tasks/backlog/architecture/LEGACY-005-delete-src-legacy-core.md)
@@ -30,7 +37,15 @@ the authoritative open/unblocked view.
 - unblocked: `PLATFORM-004` — Alternative-platform backend onboarding policy (planning seed) (tasks/backlog/platform/PLATFORM-004-alternative-platform-backend-onboarding.md)
 - unblocked: `RORG-031E` — Geometry and method-readiness backlog seed (tasks/backlog/geometry/RORG-031-geometry-method-readiness.md)
 - unblocked: `RORG-031F` — UI integration backlog seed (tasks/backlog/ui/RORG-031-ui-integration.md)
+- blocked by `CORE-003`: `RUNTIME-131` — Agent/CLI config-control facade on the Engine (tasks/backlog/runtime/RUNTIME-131-agent-cli-config-control-facade.md)
+- unblocked: `RUNTIME-132` — Lift single-use RunFrame hook adapters out of the RunFrame body (tasks/backlog/runtime/RUNTIME-132-lift-runframe-hook-adapters.md)
 - unblocked: `UI-022` — Sandbox EditorUI vertex-normal recompute windows (tasks/backlog/ui/UI-022-sandbox-editor-vertex-normal-recompute.md)
+
+## Theme H — Agentic workflow hardening
+
+- unblocked: `DOCS-005` — Add a minimal-feature floor + config-entry artifact to the feature-module playbook (tasks/backlog/process/DOCS-005-feature-module-playbook-minimal-floor.md)
+- unblocked: `PROC-010` — Encode P1/P3/P5 research-engine invariants in AGENTS.md + review checklist (tasks/backlog/process/PROC-010-encode-research-engine-invariants-in-contract.md)
+- blocked by `DOCS-003`: `PROC-011` — Route the contract to the architecture index + add backend/config authoring checks (tasks/backlog/process/PROC-011-route-contract-to-architecture-index-and-author-checks.md)
 
 ## Unthemed
 
