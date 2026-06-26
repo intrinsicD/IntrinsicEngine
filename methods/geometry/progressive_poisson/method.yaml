@@ -1,7 +1,7 @@
 id: geometry.progressive_poisson
 name: Progressive Poisson-Disk Sampling via Phase-Parallel Spatial Hashing
 domain: geometry
-status: proposed
+status: reference
 paper:
   title: "GPU-Accelerated Progressive Poisson Disk Sampling via Phase-Parallel Spatial Hashing"
   authors: "Unpublished working draft (intrinsicD); author list finalized at submission"
@@ -24,11 +24,9 @@ metrics:
 backends:
   - cpu_reference
 correctness_tests:
-  - "TODO: tests/ correctness cases land with METHOD-012 (CPU reference)"
-  - "tests/README.md"
+  - "../../../tests/unit/geometry/Test.ProgressivePoissonReference.cpp"
 benchmarks:
-  - "TODO: benchmarks/ smoke manifest + runner land with METHOD-012"
-  - "benchmarks/README.md"
+  - "../../../benchmarks/geometry/manifests/progressive_poisson_reference_smoke.yaml"
 known_limitations:
   - "Subsampling, not generation: output is a reordered subset of the input; quality is bounded by input density (cannot exceed the densest achievable Poisson set the input supports)."
   - "Splat-radius semantics are introduction-level (OPEN_DECISIONS OD1): for a finer rendered prefix an earlier point's radius over-estimates true spacing (conservative); a partial finest level under-estimates it."

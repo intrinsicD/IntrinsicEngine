@@ -16,32 +16,33 @@ depends_on: []
 
 ## Context
 - Status: active (in-progress). Owner: unassigned. Branch: `claude/gpu-accelerated-pointcloud-mesh-test-57hjjk`. Next verification step: implement the CPU reference under `methods/geometry/progressive_poisson/` (scaffold already present) and run `ctest --test-dir build/ci -R 'ProgressivePoisson'` + `validate_method_manifests.py --strict`.
+- Verification status (2026-06-26): CPU reference + smoke benchmark compiled and run standalone with clang++-20 `-std=c++23` — Poisson guarantee holds at every level boundary in 2D and 3D (checked vs independent brute-force min-distance), determinism and all edge cases pass, and the smoke workload reports quality_error_l2=0 (Poisson ratio 1.00008). CMake wiring (`IntrinsicGeometryMethodTests`, `IntrinsicBenchmarkSmoke`) is in place but the full `cmake --preset ci` + `ctest` gate was not run in this environment (no vcpkg/clang-20 build tree); it must go green in CI before retirement.
 - Owning subsystem/layer: `methods` (hermetic package; method packages import only public method APIs + declared geometry types, no ECS/runtime/graphics/platform/app — see `AGENTS.md` §2/§6 and the `methods/_template` + `methods/physics/particle_spring_reference` exemplar).
 - Reference source: the sibling repo `GPU-Accelerated-Progressive-Poisson-Disk-Sampling-via-Phase-Parallel-Spatial-Hashing` (`code/progressive_poisson.h` defines the contract: `SamplerConfig{dimension, grid_width, max_levels, hash_load_factor, radius_alpha, randomize_grid_origin, grid_origin_seed, shuffle_within_levels, shuffle_seed}` → `ProgressivePoissonResult{order, level_offsets, splat_radii, base_radius}`). The CUDA `.cu` is the optimized parallel form; the CPU reference must reproduce the same accept/order semantics serially. Honor the splat-radius semantics caveat recorded in that repo's `OPEN_DECISIONS.md` (OD1: introduction-level radii).
 - Must follow the method workflow: intake → CPU reference → correctness tests → benchmark harness (this task), with optimized/GPU backends in follow-ups.
 
 ## Required changes
-- [ ] Scaffold `methods/geometry/progressive_poisson/` from `methods/_template/` with `method.yaml` (`id: geometry.progressive_poisson`, domain `geometry`, status `reference`, backends `[cpu_reference]`, inputs/outputs/metrics/known_limitations populated), `paper.md` (citation, core claim, formulation, inputs/outputs, degenerate cases, implementation notes incl. the splat-radius caveat), and `README.md`.
-- [ ] Implement the CPU reference in `include/` + `src/` as pure free functions: config/result structs mirroring `progressive_poisson.h`, a serial multi-level grid/hash accept pass (radius `r_L = base_radius / 2^L`, `radius_alpha` default `sqrt(d)/2`), per-level grid-origin randomization, optional within-level shuffle, and per-point introduction-level splat radii. Support 2D and 3D inputs (SoA positions).
-- [ ] Report deterministic output for fixed `(points, config)` and expose diagnostics: accepted count, per-level counts, measured min-distance per level, and the actual `base_radius`.
-- [ ] Define degenerate handling for empty/one-point inputs, duplicate/coincident points, non-finite coordinates, `dimension` not in `{2,3}`, and `radius_alpha` outside `(0,1)` (falls back to default).
+- [x] Scaffold `methods/geometry/progressive_poisson/` from `methods/_template/` with `method.yaml` (`id: geometry.progressive_poisson`, domain `geometry`, status `reference`, backends `[cpu_reference]`, inputs/outputs/metrics/known_limitations populated), `paper.md` (citation, core claim, formulation, inputs/outputs, degenerate cases, implementation notes incl. the splat-radius caveat), and `README.md`.
+- [x] Implement the CPU reference in `include/` + `src/` as pure free functions: config/result structs mirroring `progressive_poisson.h`, a serial multi-level grid/hash accept pass (radius `r_L = base_radius / 2^L`, `radius_alpha` default `sqrt(d)/2`), per-level grid-origin randomization, optional within-level shuffle, and per-point introduction-level splat radii. Support 2D and 3D inputs (SoA positions).
+- [x] Report deterministic output for fixed `(points, config)` and expose diagnostics: accepted count, per-level counts, measured min-distance per level, and the actual `base_radius`.
+- [x] Define degenerate handling for empty/one-point inputs, duplicate/coincident points, non-finite coordinates, `dimension` not in `{2,3}`, and `radius_alpha` outside `(0,1)` (falls back to default).
 
 ## Tests
-- [ ] Add `unit;geometry` correctness tests asserting the Poisson guarantee: for every prefix ending at a level boundary, measured `min_dist >= r_L` (ratio `>= 1`); and that `order`/`level_offsets`/`splat_radii` lengths and invariants hold.
-- [ ] Add a determinism/regression test: identical `(points, config, seeds)` reproduce identical `order` and `level_offsets`; changing `shuffle_seed` only permutes within levels and preserves the guarantee.
-- [ ] Add edge-case tests for empty/one-point/duplicate/non-finite inputs and invalid `dimension`/`radius_alpha`.
-- [ ] Add a benchmark manifest + smoke runner under `benchmarks/geometry/` (metrics `runtime_ms`, plus a quality metric such as min-distance ratio or NN-CV), distinguishing smoke from heavy, with no performance-win claims.
+- [x] Add `unit;geometry` correctness tests asserting the Poisson guarantee: for every prefix ending at a level boundary, measured `min_dist >= r_L` (ratio `>= 1`); and that `order`/`level_offsets`/`splat_radii` lengths and invariants hold.
+- [x] Add a determinism/regression test: identical `(points, config, seeds)` reproduce identical `order` and `level_offsets`; changing `shuffle_seed` only permutes within levels and preserves the guarantee.
+- [x] Add edge-case tests for empty/one-point/duplicate/non-finite inputs and invalid `dimension`/`radius_alpha`.
+- [x] Add a benchmark manifest + smoke runner under `benchmarks/geometry/` (metrics `runtime_ms`, plus a quality metric such as min-distance ratio or NN-CV), distinguishing smoke from heavy, with no performance-win claims.
 
 ## Docs
-- [ ] Populate `methods/geometry/progressive_poisson/paper.md` and `README.md` (backend status: `cpu_reference`; known limitations incl. "subsampling, not generation" and the splat-radius semantics).
-- [ ] Add the method to `docs/methods/index.md`.
-- [ ] Validate the manifest with `tools/agents/validate_method_manifests.py --strict`.
+- [x] Populate `methods/geometry/progressive_poisson/paper.md` and `README.md` (backend status: `cpu_reference`; known limitations incl. "subsampling, not generation" and the splat-radius semantics).
+- [x] Add the method to `docs/methods/index.md`.
+- [x] Validate the manifest with `tools/agents/validate_method_manifests.py --strict`.
 
 ## Acceptance criteria
-- [ ] A hermetic CPU reference method package exists, builds via its tests/benchmarks, and produces a progressive ordering whose every level-boundary prefix satisfies the Poisson-disk guarantee.
-- [ ] Output is deterministic for fixed inputs/seeds; diagnostics report per-level counts and measured spacing.
+- [x] A hermetic CPU reference method package exists, builds via its tests/benchmarks, and produces a progressive ordering whose every level-boundary prefix satisfies the Poisson-disk guarantee.
+- [x] Output is deterministic for fixed inputs/seeds; diagnostics report per-level counts and measured spacing.
 - [ ] Correctness, determinism, and edge-case tests pass on the default CPU gate; a CPU smoke benchmark exists without perf claims.
-- [ ] `method.yaml` validates strict; the method imports no ECS/runtime/graphics/platform/app code.
+- [x] `method.yaml` validates strict; the method imports no ECS/runtime/graphics/platform/app code.
 
 ## Verification
 ```bash
