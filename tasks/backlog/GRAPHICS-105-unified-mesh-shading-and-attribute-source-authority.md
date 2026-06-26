@@ -100,3 +100,98 @@ ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' --time
 - **Slice C (CPUContracted).** Mesh-only gating in extraction (point cloud/graph reject `Texture` source), with contract tests across domains.
 - **Slice D (CPUContracted).** Editor UI per-attribute source selector for meshes, disabled for non-mesh domains; command contract tests.
 - **Slice E (Operational).** End-to-end Vulkan wiring + opt-in `gpu;vulkan` smoke proving the normal `Texture` source uses vertex normals before `Ready` and the baked texture after. Generalize remaining channels (albedo/metallic-roughness/emissive/generic) as thin follow-ons here or in a named follow-up.
+
+## Implementation design (data-driven, single receiver)
+
+The principle: **data controls which lane is active; one shader receiver reads
+that data; runtime only *populates* the data (no per-frame material synthesis).**
+Three data inputs, one receiver, zero override-material creation.
+
+### Data (the only things that decide a lane)
+- **Material slot** (`GpuMaterialSlot`, `RHI.Types.cppm:460-482`) — the single
+  surface authority. Spend the reserved 16B padding (`_pad0.._pad3`, lines
+  474-477) on:
+  - `uint ShadingModel` — `0 = Lit`, `1 = Unlit`. The **only** lit/unlit
+    authority. Replaces the `MaterialFlags::Unlit` bit and the
+    `MaterialTypeID == DefaultDebugSurface` shader branch.
+  - `uint ChannelSourceBits` — 2 bits per `VertexChannel`
+    (`0 = VertexAttribute`, `1 = Texture`); V1 uses the Normal field, others
+    reserved. Mirrored in `gpu_scene.glsl` (`GpuMaterialSlot`, lines 165-180)
+    and written by `MaterialSystem::PackSlot` (`Graphics.MaterialSystem.cpp:157-172`)
+    — no new upload path, `SetParams`/`SyncGpuBuffer` already carry it.
+- **Entity visualization config** (`GpuEntityConfig`, `gpu_scene.glsl:141`,
+  `ColorSourceMode` at 154; set by `GpuWorld::SetEntityConfig`,
+  `Graphics.GpuWorld.cppm:222`) — the **scivis data overlay** (scalar field /
+  per-element color). Already read by the shader
+  (`GpuVisualizationReadColor` / `GpuResolveVisualizationColorFallback`,
+  `gpu_scene.glsl:355,392`). Stays as pure data; **no override material**.
+- **Vertex attribute BDA buffers** (`GpuGeometryRecord`: Position/Normal/
+  Texcoord/Color, `RHI.Types.cppm:140-157`) — always present, the attribute lane.
+
+### Receiver (one shader, fixed resolution order)
+The unified surface frag (forward `default_debug_surface.frag` + deferred
+`gbuffer.frag`) resolves, in order:
+1. `baseColor` = material PBR (`BaseColorFactor` / albedo per Color source).
+2. **overlay**: if `GpuEntityConfig.ColorSourceMode != None`, replace `baseColor`
+   with the scivis color (existing helpers) — data-viz modes are intentionally
+   unlit and say so via the config, not via a synthesized material.
+3. `N` = vertex normal; if `ChannelSource(Normal) == Texture` and the normal
+   texture is `Ready`, sample+decode; else vertex normal (existing
+   `ResolveSurfaceNormal` fallback shape).
+4. **shade**: `ShadingModel == Unlit` (or an unlit overlay) → `outColor =
+   baseColor`; else `lighting(N, baseColor)`. Remove the
+   `MaterialTypeID == DefaultDebugSurface` branch (`default_debug_surface.frag:137-138`).
+
+### Producers (populate data in one place each)
+- One shared `ResolveImportedMeshMaterial` helper assigns a real base material
+  for **every** mesh import route (folds in RUNTIME-128's `EnsureDefaultLitMaterial`
+  and the `3485151` direct-import fix): lit `StandardPBR` by default, `Unlit`
+  only when the asset says so (`KHR_materials_unlit`).
+- Per-channel source defaults chosen at import (Normal = VertexAttribute unless
+  an authored/baked normal texture exists).
+- Graph/PointCloud imports assign a material too (no `UniformColor` unlit
+  default) and never set a `Texture` channel source.
+
+## Cleanup — removal inventory (the old wrong implementation)
+
+Delete/collapse, with the single data path replacing each:
+
+- [ ] **Import-as-UniformColor default** — `ImportedGeometryVisualization()` /
+  `ImportedMeshVisualization()` (`Runtime.Engine.cpp:292-310`, callers at
+  1088/1156/1208). Replace with `ResolveImportedMeshMaterial`. This removes the
+  `3485151` workaround by subsumption.
+- [ ] **Override-material synthesis** in `VisualizationSyncSystem` for
+  `UniformColor` (`BuildUniformColorParams` setting `Unlit`,
+  `Graphics.VisualizationSyncSystem.cpp:229-239`) and the per-entity
+  `EnsureOverrideLease`/`OverrideLeases`/`EffectiveSlot`-per-frame machinery
+  (lines 56-86, 553-589). The scivis data path (`GpuEntityConfig`) already
+  exists; the synthesized SciVis material is redundant.
+- [ ] **Scivis override materials** — `BuildScalarFieldParams`/`BuildPerElementParams`
+  (`:189-227`, `:242-250`). KEEP the visualization *capability* via
+  `GpuEntityConfig` data; remove the material synthesis. (Design decision below.)
+- [ ] **Dual lit/unlit shader branch** — drop `MaterialTypeID == DefaultDebugSurface`
+  from the unlit test (`default_debug_surface.frag:137-138`); lit/unlit = `ShadingModel`.
+- [ ] **`MaterialFlags::Unlit` as the authority** — migrate its 4 writers
+  (`MaterialSystem.cpp:327`; `VisualizationSyncSystem.cpp:195,234,245`) to
+  `ShadingModel`; retire the flag bit (or keep as a deprecated alias for one slice).
+
+### Keep (intentional, not part of the bug)
+- **Slot 0 `DefaultDebugSurface`** (`MaterialSystem.cpp:313-338`) as the genuine
+  *invalid-material-handle* indicator only — its unlit purple is correct for a
+  true error. RUNTIME-128 already moved *missing-material* off this slot.
+- **Scivis visualization** (scalar field / per-element color, colormaps) — a
+  first-class research feature; only its *delivery mechanism* changes (data, not
+  synthesized material).
+
+### Key design decision (scope of the collapse)
+- **Recommended:** fully collapse `VisualizationSyncSystem` override-material
+  synthesis into the existing `GpuEntityConfig` data path read by the one shader
+  receiver — best matches "data controls the lane, one receiver, no runtime
+  trashing," and removes per-entity override leases + per-frame `EffectiveSlot`
+  rewrites entirely.
+- **Smaller alternative:** keep override-material synthesis for scivis only, and
+  just stop using `UniformColor` as the import default. Less code churn, but
+  leaves two appearance-delivery mechanisms. Prefer the collapse unless the
+  scivis override path has behavior the data path can't yet express (verify the
+  `GpuEntityConfig` shader helpers cover scalar isolines/binning + per-edge/face
+  before deleting `Build*Params`).
