@@ -474,8 +474,11 @@ export namespace Extrinsic::RHI
         // Occupies the former _pad0 word; layout/offset unchanged.
         std::uint32_t ShadingModel        = 0;
 
+        // Per-channel attribute source, 2 bits per Graphics::MaterialChannel
+        // (0 = VertexAttribute, 1 = Texture). Occupies the former _pad1 word.
+        std::uint32_t ChannelSourceBits   = 0;
+
         // Padding to align CustomData to byte 64
-        std::uint32_t _pad1 = 0;
         std::uint32_t _pad2 = 0;
         std::uint32_t _pad3 = 0;
 

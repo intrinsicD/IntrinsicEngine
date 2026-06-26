@@ -33,6 +33,11 @@ const uint GpuMaterialFlag_ObjectSpaceNormalMap = 1u << 5;
 // remaining writers migrate to ShadingModel.
 const uint GpuShadingModel_Lit = 0u;
 const uint GpuShadingModel_Unlit = 1u;
+// Per-channel attribute source (GpuMaterialSlot.ChannelSourceBits) + channel
+// slot indices. V1 uses the Normal channel; others reserved (GRAPHICS-105).
+const uint GpuAttributeSource_VertexAttribute = 0u;
+const uint GpuAttributeSource_Texture = 1u;
+const uint GpuMaterialChannel_Normal = 0u;
 const uint GpuColorSource_Material = 0u;
 const uint GpuColorSource_UniformColor = 1u;
 const uint GpuColorSource_ScalarField = 2u;
@@ -178,11 +183,17 @@ struct GpuMaterialSlot {
     uint MaterialTypeID;
     uint Flags;
     uint ShadingModel;
-    uint _pad1;
+    uint ChannelSourceBits;
     uint _pad2;
     uint _pad3;
     vec4 CustomData[4];
 };
+
+// Per-channel attribute source decode (2 bits per channel).
+// 0 = vertex attribute, 1 = texture.
+uint GpuMaterialChannelSource(GpuMaterialSlot mat, uint channel) {
+    return (mat.ChannelSourceBits >> (channel * 2u)) & 0x3u;
+}
 
 struct GpuLight {
     vec4 Position_Range;

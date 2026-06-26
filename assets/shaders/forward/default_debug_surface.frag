@@ -68,8 +68,13 @@ vec3 ResolveSurfaceNormal(
         ? (vertexWorldNormal / vertexNormalLen)
         : vec3(0.0, 0.0, 1.0);
 
-    if ((mat.Flags & GpuMaterialFlag_ObjectSpaceNormalMap) == 0u ||
-        !IsValidTextureID(mat.NormalID)) {
+    // The Normal channel samples the baked object-space normal texture when
+    // the material's per-channel source selects Texture (GRAPHICS-105). The
+    // legacy ObjectSpaceNormalMap flag is honored as a transitional alias.
+    const bool normalFromTexture =
+        GpuMaterialChannelSource(mat, GpuMaterialChannel_Normal) == GpuAttributeSource_Texture ||
+        (mat.Flags & GpuMaterialFlag_ObjectSpaceNormalMap) != 0u;
+    if (!normalFromTexture || !IsValidTextureID(mat.NormalID)) {
         return n;
     }
 

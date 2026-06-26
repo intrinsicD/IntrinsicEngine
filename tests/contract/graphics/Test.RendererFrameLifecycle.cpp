@@ -1366,6 +1366,10 @@ TEST(RendererFrameLifecycle, ForwardSurfacePipelineSurvivesOperationalRebuild)
     EXPECT_NE(surfaceFragment.find("GpuShadingModel_Unlit"), std::string::npos);
     EXPECT_NE(surfaceFragment.find("mat.ShadingModel"), std::string::npos);
     EXPECT_EQ(surfaceFragment.find("GpuMaterialType_DefaultDebugSurface"), std::string::npos);
+    // GRAPHICS-105 Slice B: the Normal channel's attribute-vs-texture choice is
+    // data-driven via the material's per-channel source, in both promoted paths.
+    EXPECT_NE(surfaceFragment.find("GpuMaterialChannelSource"), std::string::npos);
+    EXPECT_NE(promotedGBufferFragment.find("GpuMaterialChannelSource"), std::string::npos);
 
     Extrinsic::Tests::MockDevice device;
     device.Operational = true;
