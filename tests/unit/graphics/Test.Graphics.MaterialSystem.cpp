@@ -347,6 +347,10 @@ TEST(GraphicsMaterialSystem, ObjectSpaceNormalBindingsSetExplicitMaterialFlag)
     EXPECT_TRUE(Graphics::HasFlag(
         params.Flags,
         Graphics::MaterialFlags::ObjectSpaceNormalMap));
+    // The per-channel source authority mirrors the legacy flag: Normal = Texture.
+    EXPECT_EQ(Graphics::GetChannelSource(
+                  params.ChannelSourceBits, Graphics::MaterialChannel::Normal),
+              Graphics::AttributeSource::Texture);
 
     ASSERT_TRUE(materials.ResolveTextureAssetBindings(
         material.GetHandle(),
@@ -362,6 +366,46 @@ TEST(GraphicsMaterialSystem, ObjectSpaceNormalBindingsSetExplicitMaterialFlag)
     EXPECT_FALSE(Graphics::HasFlag(
         params.Flags,
         Graphics::MaterialFlags::ObjectSpaceNormalMap));
+    // Tangent-space normal map is not the object-space texture lane: Normal
+    // reverts to the vertex attribute source.
+    EXPECT_EQ(Graphics::GetChannelSource(
+                  params.ChannelSourceBits, Graphics::MaterialChannel::Normal),
+              Graphics::AttributeSource::VertexAttribute);
+
+    material.Reset();
+    materials.Shutdown();
+}
+
+TEST(GraphicsMaterialSystem, ChannelSourceBitsDefaultToVertexAttributeAndRoundTrip)
+{
+    MockDevice device;
+    RHI::BufferManager buffers{device};
+    Graphics::MaterialSystem materials;
+    materials.Initialize(device, buffers);
+
+    auto material = materials.CreateInstance(
+        materials.FindType(Graphics::kMaterialTypeName_StandardPBR), {});
+    ASSERT_TRUE(material.IsValid());
+
+    // Default: every channel sources from the vertex attribute.
+    EXPECT_EQ(materials.GetParams(material.GetHandle()).ChannelSourceBits, 0u);
+    EXPECT_EQ(Graphics::GetChannelSource(0u, Graphics::MaterialChannel::Normal),
+              Graphics::AttributeSource::VertexAttribute);
+
+    // Switching one channel leaves the others untouched.
+    Graphics::MaterialParams params{};
+    params.ChannelSourceBits = Graphics::SetChannelSource(
+        params.ChannelSourceBits,
+        Graphics::MaterialChannel::Normal,
+        Graphics::AttributeSource::Texture);
+    materials.SetParams(material.GetHandle(), params);
+
+    const std::uint32_t bits =
+        materials.GetParams(material.GetHandle()).ChannelSourceBits;
+    EXPECT_EQ(Graphics::GetChannelSource(bits, Graphics::MaterialChannel::Normal),
+              Graphics::AttributeSource::Texture);
+    EXPECT_EQ(Graphics::GetChannelSource(bits, Graphics::MaterialChannel::Color),
+              Graphics::AttributeSource::VertexAttribute);
 
     material.Reset();
     materials.Shutdown();
@@ -485,6 +529,35 @@ TEST(GraphicsMaterialSystem, DefaultSlotCarriesDefaultDebugSurfaceParams)
     EXPECT_FLOAT_EQ(params.BaseColorFactor.z, Graphics::kDefaultDebugSurfaceBaseColor[2]);
     EXPECT_FLOAT_EQ(params.BaseColorFactor.w, Graphics::kDefaultDebugSurfaceBaseColor[3]);
     EXPECT_TRUE(Graphics::HasFlag(params.Flags, Graphics::MaterialFlags::Unlit));
+    // ShadingModel is the single lit/unlit authority; slot 0 is explicitly Unlit.
+    EXPECT_EQ(params.Shading, Graphics::ShadingModel::Unlit);
+
+    materials.Shutdown();
+}
+
+TEST(GraphicsMaterialSystem, ShadingModelDefaultsToLitAndRoundTrips)
+{
+    MockDevice device;
+    RHI::BufferManager buffers{device};
+    Graphics::MaterialSystem materials;
+    materials.Initialize(device, buffers);
+
+    const Graphics::MaterialTypeHandle standard =
+        materials.FindType(Graphics::kMaterialTypeName_StandardPBR);
+    ASSERT_TRUE(standard.IsValid());
+
+    auto material = materials.CreateInstance(standard, Graphics::MaterialParams{});
+    ASSERT_TRUE(material.IsValid());
+
+    // A freshly created material is Lit by default — never unlit as a fallback.
+    EXPECT_EQ(materials.GetParams(material.GetHandle()).Shading,
+              Graphics::ShadingModel::Lit);
+
+    Graphics::MaterialParams unlit{};
+    unlit.Shading = Graphics::ShadingModel::Unlit;
+    materials.SetParams(material.GetHandle(), unlit);
+    EXPECT_EQ(materials.GetParams(material.GetHandle()).Shading,
+              Graphics::ShadingModel::Unlit);
 
     materials.Shutdown();
 }

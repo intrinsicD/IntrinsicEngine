@@ -167,6 +167,8 @@ namespace Extrinsic::Graphics
             slot.EmissiveID            = p.EmissiveID;
             slot.MaterialTypeID        = typeID;
             slot.Flags                 = static_cast<std::uint32_t>(p.Flags);
+            slot.ShadingModel          = static_cast<std::uint32_t>(p.Shading);
+            slot.ChannelSourceBits     = p.ChannelSourceBits;
             for (int i = 0; i < 4; ++i)
                 slot.CustomData[i] = p.CustomData[i];
         }
@@ -325,6 +327,7 @@ namespace Extrinsic::Graphics
             kDefaultDebugSurfaceBaseColor[3],
         };
         defaultParams.Flags = MaterialFlags::Unlit;
+        defaultParams.Shading = ShadingModel::Unlit;
 
         m_Impl->Meta.emplace_back();
         InstanceMeta& defaultMeta    = m_Impl->Meta.back();
@@ -560,11 +563,20 @@ namespace Extrinsic::Graphics
 
         if (normalTextureRequested)
         {
+            const bool useObjectSpaceNormalTexture =
+                normalResolvedWithoutFallback &&
+                bindings.NormalSpace == MaterialNormalTextureSpace::ObjectSpaceNormal;
             params.Flags = SetFlagEnabled(
                 params.Flags,
                 MaterialFlags::ObjectSpaceNormalMap,
-                normalResolvedWithoutFallback &&
-                    bindings.NormalSpace == MaterialNormalTextureSpace::ObjectSpaceNormal);
+                useObjectSpaceNormalTexture);
+            // Mirror the legacy flag onto the per-channel source authority so
+            // the Normal channel's source is data-driven (GRAPHICS-105).
+            params.ChannelSourceBits = SetChannelSource(
+                params.ChannelSourceBits,
+                MaterialChannel::Normal,
+                useObjectSpaceNormalTexture ? AttributeSource::Texture
+                                            : AttributeSource::VertexAttribute);
         }
 
         SetParams(handle, params);

@@ -72,6 +72,8 @@ export namespace Extrinsic::Runtime
         std::uint64_t LastUvAtlasWidth{0};
         std::uint64_t LastUvAtlasHeight{0};
         std::uint64_t MaterialInstancesCreated{0};
+        std::uint64_t DefaultLitMaterialInstancesCreated{0};
+        std::uint64_t MaterialLessPrimitivesAssignedDefaultLit{0};
         std::uint64_t MaterialTextureBindingsResolved{0};
         std::uint64_t MaterialTextureBindingFailures{0};
         std::uint64_t MaterialTextureBindingUploadDeferrals{0};
@@ -116,6 +118,14 @@ export namespace Extrinsic::Runtime
     {
         AssetModelSceneHandoffRecord Record{};
         std::vector<Graphics::MaterialSystem::MaterialLease> MaterialLeases{};
+
+        // Lazily-created neutral lit StandardPBR material bound to imported
+        // primitives that carry no authored material, so they shade instead of
+        // falling back to the unlit DefaultDebugSurface (slot 0). Slot 0 stays
+        // reserved for genuine missing/invalid bindings (GRAPHICS-031).
+        Graphics::MaterialSystem::MaterialLease DefaultLitMaterialLease{};
+        std::uint32_t DefaultLitMaterialSlot{Graphics::kDefaultMaterialSlotIndex};
+        bool HasDefaultLitMaterial{false};
     };
 
     [[nodiscard]] std::string BuildEmbeddedTextureAssetPath(

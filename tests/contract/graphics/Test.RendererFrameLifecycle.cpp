@@ -1360,6 +1360,16 @@ TEST(RendererFrameLifecycle, ForwardSurfacePipelineSurvivesOperationalRebuild)
     EXPECT_NE(surfaceFragment.find("GpuMaterialType_DefaultDebugUVs"), std::string::npos);
     EXPECT_NE(surfaceFragment.find("DebugUvChecker(fragUv)"), std::string::npos);
     EXPECT_NE(surfaceFragment.find("normalShade"), std::string::npos);
+    // GRAPHICS-105: lit/unlit is decided by the material ShadingModel, not by the
+    // DefaultDebugSurface material type. The type-branch must be gone from the
+    // unlit gate (the only remaining type-branch is the DebugUVs checker).
+    EXPECT_NE(surfaceFragment.find("GpuShadingModel_Unlit"), std::string::npos);
+    EXPECT_NE(surfaceFragment.find("mat.ShadingModel"), std::string::npos);
+    EXPECT_EQ(surfaceFragment.find("GpuMaterialType_DefaultDebugSurface"), std::string::npos);
+    // GRAPHICS-105 Slice B: the Normal channel's attribute-vs-texture choice is
+    // data-driven via the material's per-channel source, in both promoted paths.
+    EXPECT_NE(surfaceFragment.find("GpuMaterialChannelSource"), std::string::npos);
+    EXPECT_NE(promotedGBufferFragment.find("GpuMaterialChannelSource"), std::string::npos);
 
     Extrinsic::Tests::MockDevice device;
     device.Operational = true;

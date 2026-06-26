@@ -188,6 +188,54 @@ export namespace Extrinsic::Graphics
     }
 
     // -----------------------------------------------------------------
+    // ShadingModel — the single authority for whether lighting runs.
+    // Stored in GpuMaterialSlot::ShadingModel. `Unlit` is an explicit
+    // opt-in (e.g. glTF KHR_materials_unlit, scivis overlays), never a
+    // missing-data fallback. The legacy MaterialFlags::Unlit bit is kept
+    // as a transitional alias until its writers migrate here.
+    // -----------------------------------------------------------------
+    enum class ShadingModel : std::uint32_t
+    {
+        Lit   = 0,
+        Unlit = 1,
+    };
+
+    // -----------------------------------------------------------------
+    // Per-channel attribute source — whether the shader sources a mesh
+    // channel from the vertex attribute or from a material texture.
+    // Packed 2 bits per channel into GpuMaterialSlot::ChannelSourceBits.
+    // V1 wires the Normal channel; the others reserve their slots.
+    // -----------------------------------------------------------------
+    enum class AttributeSource : std::uint32_t
+    {
+        VertexAttribute = 0,
+        Texture         = 1,
+    };
+
+    enum class MaterialChannel : std::uint32_t
+    {
+        Normal            = 0,
+        Color             = 1,
+        MetallicRoughness = 2,
+        Emissive          = 3,
+    };
+
+    [[nodiscard]] constexpr std::uint32_t SetChannelSource(
+        std::uint32_t bits, MaterialChannel channel, AttributeSource source) noexcept
+    {
+        const std::uint32_t shift = static_cast<std::uint32_t>(channel) * 2u;
+        return (bits & ~(0x3u << shift))
+             | (static_cast<std::uint32_t>(source) << shift);
+    }
+
+    [[nodiscard]] constexpr AttributeSource GetChannelSource(
+        std::uint32_t bits, MaterialChannel channel) noexcept
+    {
+        const std::uint32_t shift = static_cast<std::uint32_t>(channel) * 2u;
+        return static_cast<AttributeSource>((bits >> shift) & 0x3u);
+    }
+
+    // -----------------------------------------------------------------
     // CustomParamDesc
     // -----------------------------------------------------------------
     // Describes one of the four vec4 custom data slots for editor
@@ -246,6 +294,15 @@ export namespace Extrinsic::Graphics
         RHI::BindlessIndex MetallicRoughnessID = RHI::kInvalidBindlessIndex;
         RHI::BindlessIndex EmissiveID          = RHI::kInvalidBindlessIndex;
         MaterialFlags Flags = MaterialFlags::None;
+
+        // Single lit/unlit authority. Defaults to Lit so every material
+        // shades unless it explicitly opts out.
+        ShadingModel  Shading = ShadingModel::Lit;
+
+        // Per-channel attribute source (2 bits per MaterialChannel). Defaults
+        // to all VertexAttribute (0), so behavior is unchanged unless a channel
+        // is explicitly switched to Texture. Use Set/GetChannelSource.
+        std::uint32_t ChannelSourceBits = 0;
 
         // Custom data — maps directly to GpuMaterialSlot::CustomData[0..3]
         glm::vec4 CustomData[4]{};

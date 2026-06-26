@@ -1,0 +1,89 @@
+---
+id: RUNTIME-129
+theme: B
+depends_on:
+  - GRAPHICS-104
+maturity_target: Operational
+---
+# RUNTIME-129 — Schedule GPU object-space normal bake jobs after import
+
+## Goal
+- After a mesh is imported and its vertex normals are resolved, schedule an asynchronous GPU object-space normal-texture bake, and once the GPU result is `Ready` swap the material's normal binding to the generated texture; until then keep rendering with the vertex-normal attribute.
+
+## Non-goals
+- The graphics-owned RHI bake pass, shaders, and `GpuAssetCache` GPU-produced texture residency — owned by GRAPHICS-104 (this task consumes them).
+- Tangent-space normal-map baking or MikkTSpace tangents.
+- GPU porting of scalar/label/vector/face/selected-mesh attribute bakes.
+- A CPU fallback for GPU bake failure on a non-operational backend (fail closed; keep the existing vertex-normal shading).
+- Changing default material assignment (RUNTIME-128) or vertex-normal computation (`ResolveVertexNormals`).
+
+## Context
+- Owner/layer: `runtime` for job orchestration, generated `AssetId` selection, stale-generation keys, render-thread submission timing, and material-binding swap; `graphics` owns the bake command recorder (`Extrinsic.Graphics.ObjectSpaceNormalTextureBake`, `RecordObjectSpaceNormalTextureBake(...)` at `src/graphics/renderer/Graphics.ObjectSpaceNormalTextureBake.cppm:168`) and the cache residency path (`GpuAssetCache::BeginGpuProducedTexture(...)` / `SetGpuProducedTextureReadyFrame(...)`).
+- Current state: all bake requests are hardcoded to CPU — `Runtime.SelectedMeshTextureBake.cpp:1028` and the import/normal path in `Runtime.AssetModelSceneHandoff.cpp` set `RequestedJobDomain = ProgressiveJobDomain::Cpu`. The derived-job graph fail-closes any non-CPU domain: `IsUnsupportedJobDomain(domain) { return domain != ProgressiveJobDomain::Cpu; }` (`Runtime.DerivedJobGraph.cpp:36-47`, rejection at `:348-355`). `ProgressiveJobDomain` already reserves `GpuCompute`/`GpuGraphics`/`Auto` (`Runtime.ProgressiveRenderData.cppm:122`).
+- The shader fallback already exists: forward/deferred sample the object-space normal texture only when the material flag is set and `NormalID` is valid, otherwise use the vertex-normal attribute (`ResolveSurfaceNormal`). So "use texture when ready, else attribute" needs no shader work — only the runtime swap of the `Normal` binding once the cache entry is `Ready`.
+- Architectural crux (open design decision — see questions below): a GPU graphics bake cannot run on the existing background streaming `Execute` callback (that lane is CPU). It must record commands and submit on the render thread, and promote via the GPU-completion fence already wired into `GpuAssetCache`.
+- Requires an operational Vulkan device for `Operational`; `IDevice::IsOperational()` is false under the default Null backend, so on non-operational hosts this path must no-op deterministically and leave vertex-normal shading in place.
+
+### Open questions (non-blocking — defaults chosen; revisit before Slice C)
+- **GPU job lane.** Default: keep `DerivedJobGraph` CPU-only and add a separate runtime-owned render-thread GPU bake queue that reuses the same stale-key/generation bookkeeping, rather than teaching `DerivedJobGraph.Execute` to run render-thread work. Rationale: avoids forcing a background `move_only_function` lane to marshal render-thread submission. Alternative: extend `DerivedJobGraph` with a `GpuGraphics` domain whose completion is fence-driven.
+- **Bake trigger scope.** Default: schedule a bake only for primitives that currently receive a generated object-space normal (i.e. the cases the CPU path bakes today), not for every imported mesh with authored tangent-space normals.
+- **Content-key reuse.** Default: key completed bakes by resolved geometry/UV/normal content hash where available, with an entity-scoped generated `AssetId` fallback when no stable key exists (mirrors GRAPHICS-104 line 52).
+
+## Required changes
+- [ ] Add a runtime render-thread GPU bake submission step that drains queued object-space normal bake requests, calls the graphics-owned bake API to record/submit, and registers the GPU-produced texture with `GpuAssetCache` for fence-driven `Ready` promotion. Gate the whole step on `RHI::IDevice::IsOperational()`; no-op deterministically otherwise.
+- [ ] Schedule a GPU bake request (instead of the CPU hardcode) for imported primitives that take the generated object-space normal path, recording stale keys for entity, geometry/UV/normal generation, resolution, padding, and normal-map type.
+- [ ] On bake completion (`GpuAssetCache` entry `Ready`), swap the material's `Normal` binding to the generated `AssetId` and set the `ObjectSpaceNormalMap` material flag; discard stale completions whose recorded keys no longer match.
+- [ ] Lift or bypass the `IsUnsupportedJobDomain` CPU-only gate for the chosen GPU lane without regressing CPU job fail-closed behavior for unimplemented domains.
+- [ ] Retain the CPU generated-normal path only as legacy compatibility behind the operational check until the GPU path is proven, then route import/enrichment through the GPU path.
+
+## Tests
+- [ ] CPU/null contract: scheduling a GPU bake on a non-operational backend no-ops deterministically, emits a diagnostic, and leaves the vertex-normal binding (and no `ObjectSpaceNormalMap` flag) in place.
+- [ ] CPU/null contract: stale-key lifecycle — a completion whose recorded generation/resolution keys no longer match is discarded and does not mutate the material binding.
+- [ ] CPU/null contract: generated `AssetId` selection and content-key reuse return the same id for identical resolved geometry/UV/normal inputs.
+- [ ] Opt-in `gpu;vulkan` smoke on a Vulkan-capable host: an imported mesh schedules a bake, the cache entry promotes to `Ready`, the material `Normal` binding swaps to the generated texture, and selected texels match expected encoded object-space normals.
+
+## Docs
+- [ ] Update `src/runtime/README.md` for GPU bake scheduling, the render-thread submission step, stale-key lifecycle, and the non-operational no-op contract.
+- [ ] Update `src/graphics/renderer/README.md` / `src/graphics/assets/README.md` only if the consumed graphics bake API surface changes.
+- [ ] Regenerate `docs/api/generated/module_inventory.md` if any `.cppm` module surfaces are added or changed.
+
+## Acceptance criteria
+- [ ] Imported meshes that take the generated object-space normal path schedule a GPU bake after normal resolution and continue rendering with vertex normals until it completes.
+- [ ] On completion the material binds the GPU-resident generated texture and sets the object-space normal flag; stale completions are discarded.
+- [ ] Non-operational graphics backends run no CPU fallback and keep vertex-normal shading with a deterministic diagnostic.
+- [ ] No layering violations (graphics-owned bake stays free of live ECS/runtime/AssetService knowledge; `Vk*` types do not cross RHI/renderer/runtime APIs).
+- [ ] `Operational` cited by an actually-run `gpu;vulkan` smoke; CPU contract gate green for the orchestration logic.
+
+## Verification
+```bash
+python3 tools/agents/check_task_policy.py --root . --strict
+python3 tools/agents/validate_tasks.py --root .
+python3 tools/repo/check_layering.py --root src --strict
+python3 tools/repo/check_test_layout.py --root . --strict
+cmake --preset ci
+cmake --build --preset ci --target IntrinsicTests
+ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60
+# Operational (Vulkan-capable host only):
+cmake --preset ci-vulkan
+cmake --build --preset ci-vulkan --target IntrinsicTests
+ctest --test-dir build/ci-vulkan --output-on-failure -L 'gpu' -L 'vulkan' --timeout 120
+```
+
+## Forbidden changes
+- Adding a CPU bake fallback for GPU bake failure or non-operational backends.
+- Blocking asset import on GPU bake completion.
+- Passing `Vk*` types through RHI/renderer/runtime/cache public APIs.
+- Adding live ECS/runtime/AssetService knowledge to graphics-owned bake modules.
+- Treating ordinary glTF tangent-space normal textures as object-space normal maps.
+- Mixing this orchestration with unrelated renderer/runtime/asset features.
+
+## Maturity
+- Target: `Operational` on Vulkan-capable hosts; `CPUContracted` for the scheduling/stale-key/fail-closed orchestration contract on CPU/null.
+- Slice A (CPUContracted): scheduling decision, generated-`AssetId`/content-key selection, stale-key lifecycle, non-operational no-op — all CPU/null testable with bake submission stubbed behind the operational check.
+- Slice B (CPUContracted): render-thread GPU submission step + cache registration wired behind `IsOperational()`, plus the material-binding swap-on-`Ready` logic; CPU contract proves the swap given a faked `Ready` promotion.
+- Slice C (Operational): real Vulkan submission + `gpu;vulkan` smoke proving an actual baked texture promotes and binds; route import/enrichment off the CPU legacy path.
+
+## Slice plan
+- **Slice A (this owns the scheduling contract).** Replace the CPU-domain hardcode with a GPU bake request + stale-key record for generated-normal primitives; add generated-`AssetId`/content-key selection and the non-operational no-op. Preserves CPU gate. Defers all render-thread submission to Slice B.
+- **Slice B.** Add the runtime render-thread GPU bake drain calling the graphics bake API + `GpuAssetCache` registration, and the material `Normal`-binding swap on `Ready` with stale-completion discard. CPU contract fakes the `Ready` promotion.
+- **Slice C.** Operational Vulkan submission + opt-in `gpu;vulkan` smoke; switch import/enrichment generated-normal use cases off the CPU legacy path. Cites an actually-run Vulkan smoke.
