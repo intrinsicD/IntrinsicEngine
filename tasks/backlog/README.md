@@ -71,6 +71,18 @@ open Theme B leaf is the remaining profile-gated vertex attribute follow-up
 retired with the transfer facade/readback ring wired into the runtime
 derived-job graph.
 
+The research-control-surface recipe/config seam (see Theme H `PROC-010` for the
+proposed framing) opens new Theme B leaves that close the gap where an activated
+`RenderRecipeConfig` preview cannot yet reach the live frame:
+[`rendering/GRAPHICS-106-frame-recipe-override-seam.md`](rendering/GRAPHICS-106-frame-recipe-override-seam.md)
+(fail-closed renderer override seam),
+[`rendering/RUNTIME-130-route-recipe-activation-and-load-default-recipe.md`](rendering/RUNTIME-130-route-recipe-activation-and-load-default-recipe.md)
+(route activation + load a default recipe at init),
+[`rendering/GRAPHICS-107-reconcile-framerecipe-renderrecipe-vocabulary.md`](rendering/GRAPHICS-107-reconcile-framerecipe-renderrecipe-vocabulary.md)
+(reconcile the `FrameRecipe`/`RenderRecipe` vocabularies), and
+[`rendering/DOCS-004-frame-graph-doc-recipe-config-lane.md`](rendering/DOCS-004-frame-graph-doc-recipe-config-lane.md)
+(promote `frame-graph.md` + document the recipe-config lane).
+
 ### Theme C — Physics readiness (P1)
 
 Define physics layer ownership before any solver code lands; then implement
@@ -130,6 +142,20 @@ Open members:
   unblocked by retired `GEOM-026`; adds the first method window under each
   vertex processing submenu.
 - [`platform/PLATFORM-004-alternative-platform-backend-onboarding.md`](platform/PLATFORM-004-alternative-platform-backend-onboarding.md) (planning-only seed).
+- [`runtime/CORE-003-engine-config-file-lane.md`](runtime/CORE-003-engine-config-file-lane.md) —
+  give `EngineConfig` the file/preview/diagnostics lane `RenderRecipeConfig`
+  already proves (config lane first-class; foundation for the agent/CLI lane).
+- [`runtime/RUNTIME-131-agent-cli-config-control-facade.md`](runtime/RUNTIME-131-agent-cli-config-control-facade.md) —
+  agent/CLI config-control facade on the `Engine`, equal to the UI (depends on
+  `CORE-003`, `GRAPHICS-106`).
+- [`runtime/RUNTIME-132-lift-runframe-hook-adapters.md`](runtime/RUNTIME-132-lift-runframe-hook-adapters.md) —
+  behavior-preserving readability lift of the inline `RunFrame` hook adapters.
+- [`geometry/DOCS-003-reconcile-algorithm-variant-dispatch-doc.md`](geometry/DOCS-003-reconcile-algorithm-variant-dispatch-doc.md) —
+  reconcile `algorithm-variant-dispatch.md` with live code and define the shared
+  CPU/GPU backend-seam template.
+- [`geometry/GEOM-027-shared-cpu-gpu-backend-seam-kmeans-exemplar.md`](geometry/GEOM-027-shared-cpu-gpu-backend-seam-kmeans-exemplar.md) —
+  establish the shared backend seam and fix the `Geometry.KMeans` phantom GPU as
+  the worked exemplar (depends on `DOCS-003`).
 
 ### Theme G — Active bugs
 
@@ -158,8 +184,22 @@ code. `PROC-001` (mirror sync gate), `PROC-002` (ID uniqueness), `PROC-005`
 and `PROC-006` (audit cadence visibility) are retired — see
 [`process/README.md`](process/README.md) and the retirement log.
 
-Theme H currently has **no open members**: `PROC-001..009` are all
-retired. New workflow-hardening findings open under `process/`.
+`PROC-001..009` are all retired. The current open Theme H members encode the
+research-engine design principles into the contract so they become enforceable
+invariants rather than descriptive prose:
+
+- [`process/PROC-010-encode-research-engine-invariants-in-contract.md`](process/PROC-010-encode-research-engine-invariants-in-contract.md) —
+  promote P1 (research-pragmatism / structs-over-ceremony), P3 (config lane
+  first-class + agent-controllable), and P5 (recipe-driven frames + readable main
+  loop) into always-on `AGENTS.md` §5 invariants + per-PR checklist rows. Carries
+  the proposed contract wording **for owner review** (and the optional
+  "Theme I — Research control surface" convergence theme).
+- [`process/PROC-011-route-contract-to-architecture-index-and-author-checks.md`](process/PROC-011-route-contract-to-architecture-index-and-author-checks.md) —
+  route the contract to the canonical architecture index and add backend-axis +
+  config-lane authoring checks (depends on `DOCS-003`).
+- [`process/DOCS-005-feature-module-playbook-minimal-floor.md`](process/DOCS-005-feature-module-playbook-minimal-floor.md) —
+  add a minimal-feature floor + config/command artifact to the feature-module
+  playbook so trivial research probes are not forced through full ceremony.
 
 ## Cross-domain dependency anchors
 
