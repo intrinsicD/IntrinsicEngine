@@ -299,6 +299,16 @@ namespace Extrinsic::Runtime
             return visualization;
         }
 
+        [[nodiscard]] Graphics::Components::VisualizationConfig
+            ImportedMeshVisualization() noexcept
+        {
+            Graphics::Components::VisualizationConfig visualization =
+                ImportedGeometryVisualization();
+            visualization.Source =
+                Graphics::Components::VisualizationConfig::ColorSource::Material;
+            return visualization;
+        }
+
         struct DecodedMeshImport
         {
             Geometry::MeshIO::MeshIOResult Payload{};
@@ -1075,7 +1085,7 @@ namespace Extrinsic::Runtime
                             });
                         raw.emplace<Graphics::Components::VisualizationConfig>(
                             entity,
-                            ImportedGeometryVisualization());
+                            ImportedMeshVisualization());
                         const std::optional<GeometryImportBounds> bounds =
                             BoundsFromHalfedgeMesh(*rawMesh);
                         if (bounds.has_value())

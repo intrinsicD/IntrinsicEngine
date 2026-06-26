@@ -2,9 +2,9 @@ session:
   id: "2026-06-25_001"
   date: "2026-06-25"
   started: "2026-06-25T00:05"
-  last_turn: "2026-06-25T01:23"
-  turn_count: 5
-  summary: "Started and retired the independent RUNTIME-126 branch: implemented GPU readback jobs through the runtime derived-job graph, fixed the stale mesh primitive-view dirty-update contract, passed focused CPU/integration, opt-in GPU smoke, full default CPU gate, and structural validation, marked the runtime Theme B goal blocked at RUNTIME-125 because its benchmark/profile gate remains unsatisfied, and committed the accumulated work."
+  last_turn: "2026-06-25T23:50"
+  turn_count: 7
+  summary: "Started and retired the independent RUNTIME-126 branch, marked the runtime Theme B goal blocked at RUNTIME-125 because its benchmark/profile gate remains unsatisfied, committed the accumulated work, then diagnosed direct OBJ generated-normal shading, fixed the CPU normal texture bake texel-center mismatch, and fixed direct mesh import's unlit visualization override."
 
 events_logged:
   - turn: 1
@@ -55,6 +55,18 @@ events_logged:
     routing: direct
     provenance: ai-executed
     summary: "Committed the accumulated rendering/runtime/task/docs/test/ARA work as `6443f4bb Retire rendering and runtime Theme B tasks`, then confirmed the tree was clean before the ARA epilogue entry."
+  - turn: 6
+    type: experiment
+    id: "N166"
+    routing: direct
+    provenance: ai-executed
+    summary: "Diagnosed the direct OBJ generated-normal path, fixed the runtime CPU bake to sample texel centers in normalized UV space, added a regression, passed focused import/bake coverage and the full default CPU gate."
+  - turn: 7
+    type: experiment
+    id: "N167"
+    routing: direct
+    provenance: ai-executed
+    summary: "Confirmed direct OBJ meshes were defaulting to `UniformColor`, which VisualizationSync resolves as an unlit override; changed direct mesh import to material-driven shading, added an extraction regression, passed focused import/bake/visualization coverage, GPU normal-bake smoke, and the full CPU gate."
 
 ai_actions:
   - turn: 1
@@ -107,6 +119,27 @@ ai_actions:
       - "ara/trace/sessions/2026-06-25_001.yaml"
       - "ara/trace/sessions/session_index.yaml"
       - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 6
+    action: "Patched runtime mesh attribute texture rasterization to evaluate barycentrics at texel centers in normalized UV space, added a texel-center normal-bake regression, and ran focused plus full CPU-supported verification."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Runtime.MeshAttributeTextureBake.cpp"
+      - "tests/contract/runtime/Test.MeshAttributeTextureBake.cpp"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-25_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
+  - turn: 7
+    action: "Patched direct mesh import to use material-driven visualization, added a runtime/extraction regression for imported OBJ material slot resolution, and ran focused, Vulkan smoke, and full CPU-supported verification."
+    provenance: ai-executed
+    files_changed:
+      - "src/runtime/Runtime.Engine.cpp"
+      - "tests/contract/runtime/Test.AssetImportFormatCoverage.cpp"
+      - "ara/trace/exploration_tree.yaml"
+      - "ara/trace/sessions/2026-06-25_001.yaml"
+      - "ara/trace/sessions/session_index.yaml"
+      - "ara/trace/pm_reasoning_log.yaml"
 
 open_threads:
   - "Runtime Theme B goal is blocked at RUNTIME-125 until benchmark/profile evidence exists or the user opens an explicit benchmark prerequisite task."
+  - "GPU object-space normal baking has contract/Vulkan smoke coverage, but direct OBJ generated normal textures still use the runtime CPU compatibility bake until GRAPHICS-104 replaces runtime orchestration with the GPU bake path."

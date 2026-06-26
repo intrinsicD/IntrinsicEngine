@@ -3818,3 +3818,65 @@ tree:
       follow-up status check showed `main` ahead of `origin/main` by one commit
       with no remaining dirty files before this ARA epilogue entry.
     status: resolved
+  - id: N166
+    type: experiment
+    title: "Diagnose direct OBJ generated normal shading"
+    provenance: ai-executed
+    timestamp: "2026-06-25T23:25"
+    evidence:
+      - "src/runtime/Runtime.Engine.cpp"
+      - "src/runtime/Runtime.AssetMeshNormals.cpp"
+      - "src/runtime/Runtime.MeshAttributeTextureBake.cpp"
+      - "tests/contract/runtime/Test.MeshAttributeTextureBake.cpp"
+      - "tests/contract/runtime/Test.AssetImportFormatCoverage.cpp"
+      - "assets/shaders/surface.frag"
+      - "assets/shaders/surface_gbuffer.frag"
+      - "assets/shaders/forward/default_debug_surface.frag"
+      - "assets/shaders/deferred/gbuffer.frag"
+      - "cmake --build --preset ci --target IntrinsicTests"
+      - "ctest --test-dir build/ci --output-on-failure -R 'RuntimeMeshAttributeTextureBake|RuntimeAssetImportFormatCoverage\\.DirectObjImport|ObjectSpaceNormalTextureBake|GeometryIO_MeshIO\\.LoadsOBJ' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "python3 tools/repo/check_layering.py --root src --strict"
+      - "python3 tools/repo/check_test_layout.py --root . --strict"
+    result: >
+      Confirmed direct OBJ import publishes explicit or synthesized `v:normal`
+      geometry immediately, then queues UV/materialization and generated normal
+      texture baking as asynchronous runtime work. The generated direct normal
+      texture still uses the runtime CPU compatibility baker, explaining the
+      visible delay before a normal texture binding appears. Fixed the CPU
+      baker to rasterize in normalized UV space at texel centers instead of
+      pixel-corner samples on a `(width - 1)` grid, aligning it with shader
+      sampling and the graphics object-space normal bake contract. Added a
+      regression asserting texel-center normal encoding. Focused import/bake
+      tests passed 36/36; the full default CPU-supported gate passed 3102/3102.
+    status: resolved
+  - id: N167
+    type: experiment
+    title: "Fix direct OBJ unlit import shading"
+    provenance: ai-executed
+    timestamp: "2026-06-25T23:50"
+    also_depends_on: [N166]
+    evidence:
+      - "src/runtime/Runtime.Engine.cpp"
+      - "tests/contract/runtime/Test.AssetImportFormatCoverage.cpp"
+      - "assets/shaders/forward/default_debug_surface.vert"
+      - "assets/shaders/forward/default_debug_surface.frag"
+      - "assets/shaders/deferred/default_debug_gbuffer.frag"
+      - "src/graphics/renderer/Graphics.VisualizationSyncSystem.cpp"
+      - "ctest --test-dir build/ci --output-on-failure -R 'RuntimeAssetImportFormatCoverage\\.DirectObjImportDefaultsToMaterialDrivenShading' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "cmake --build --preset ci --target IntrinsicTests"
+      - "ctest --test-dir build/ci --output-on-failure -R 'RuntimeAssetImportFormatCoverage\\.DirectObjImport|RuntimeMeshAttributeTextureBake|ObjectSpaceNormalTextureBake|GraphicsMinimalAcceptance\\.VisualizationSync' -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+      - "ctest --test-dir build/ci --output-on-failure -R 'ObjectSpaceNormalTextureBakeGpuSmoke|VulkanBakeMatchesCpuContractAtSelectedTexels' --timeout 120"
+      - "ctest --test-dir build/ci --output-on-failure -LE 'gpu|vulkan|slow|flaky-quarantine' --timeout 60"
+    result: >
+      Confirmed the loaded OBJ normals were not the visible failure: direct
+      mesh import stamped `VisualizationConfig::ColorSource::UniformColor`,
+      and `VisualizationSyncSystem` intentionally turns that source into an
+      unlit override material slot. Added a failing runtime/extraction
+      regression proving direct OBJ imports must resolve to the base material
+      slot without visualization override leases, then changed direct mesh
+      import to stamp `ColorSource::Material` while leaving graph/point-cloud
+      default flat coloring unchanged. The focused import/bake/visualization
+      suite passed 30/30, the object-space normal Vulkan bake smoke passed
+      1/1, and the default CPU-supported gate passed 3103/3103.
+    status: resolved

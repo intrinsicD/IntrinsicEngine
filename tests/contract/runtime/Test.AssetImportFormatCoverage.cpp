@@ -35,9 +35,12 @@ import Extrinsic.Graphics.Component.RenderGeometry;
 import Extrinsic.Graphics.Component.VisualizationConfig;
 import Extrinsic.Graphics.GpuAssetCache;
 import Extrinsic.Graphics.Material;
+import Extrinsic.Graphics.Renderer;
+import Extrinsic.Graphics.VisualizationSyncSystem;
 import Extrinsic.Runtime.AssetIngestStateMachine;
 import Extrinsic.Runtime.AssetModelSceneHandoff;
 import Extrinsic.Runtime.Engine;
+import Extrinsic.Runtime.RenderExtraction;
 import Extrinsic.Runtime.StableEntityLookup;
 import Geometry.HalfedgeMesh.IO;
 
@@ -393,6 +396,39 @@ namespace
             HasGeneratedNormalTextureBinding(engine, entity);
     }
 
+    void ExpectMaterialDrivenImportedSurface(
+        Runtime::Engine& engine,
+        const ECS::EntityHandle entity)
+    {
+        auto& raw = engine.GetScene().Raw();
+        ASSERT_TRUE(raw.all_of<G::VisualizationConfig>(entity));
+        const G::VisualizationConfig& visualization =
+            raw.get<G::VisualizationConfig>(entity);
+        EXPECT_EQ(visualization.Source, G::VisualizationConfig::ColorSource::Material);
+
+        Runtime::RenderExtractionCache extraction;
+        const Runtime::RuntimeRenderExtractionStats stats =
+            extraction.ExtractAndSubmit(
+                engine.GetScene(),
+                engine.GetRenderer(),
+                &engine.GetGpuAssetCache());
+        EXPECT_EQ(stats.MeshGeometryUploads, 1u);
+
+        const auto sidecar = extraction.FindRenderableSidecarForTest(
+            Runtime::StableEntityLookup::ToRenderId(entity));
+        ASSERT_TRUE(sidecar.has_value());
+        ASSERT_TRUE(sidecar->HasMaterialLease);
+        const std::uint32_t baseSlot =
+            engine.GetRenderer().GetMaterialSystem().GetMaterialSlot(
+                sidecar->MaterialHandle);
+        EXPECT_EQ(sidecar->MaterialSlot, baseSlot);
+        EXPECT_EQ(
+            engine.GetRenderer().GetVisualizationSyncSystem().GetOverrideLeaseCount(),
+            0u);
+
+        extraction.Shutdown(engine.GetRenderer());
+    }
+
 }
 
 TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesVertexNormalsInGeometrySources)
@@ -456,6 +492,37 @@ TEST(RuntimeAssetImportFormatCoverage, DirectObjImportPreservesVertexNormalsInGe
             {0.0f, 0.0f, -1.0f},
         });
     ExpectGeneratedNormalTextureBinding(engine, *meshEntity, meshFile.Path.string());
+
+    engine.Shutdown();
+}
+
+TEST(RuntimeAssetImportFormatCoverage, DirectObjImportDefaultsToMaterialDrivenShading)
+{
+    TempAssetFile meshFile(
+        "assetio041_material_shading.obj",
+        "v 0 0 0\n"
+        "v 1 0 0\n"
+        "v 0 1 0\n"
+        "vn 0 0 1\n"
+        "vn 0 0 1\n"
+        "vn 0 0 1\n"
+        "f 1//1 2//2 3//3\n");
+
+    Runtime::Engine engine(
+        HeadlessConfig(),
+        std::make_unique<OneFrameApplication>());
+    engine.Initialize();
+
+    auto imported = engine.ImportAssetFromPath(Runtime::RuntimeAssetImportRequest{
+        .Path = meshFile.Path.string(),
+        .PayloadKind = Assets::AssetPayloadKind::Mesh,
+    });
+    ASSERT_TRUE(imported.has_value()) << static_cast<int>(imported.error());
+
+    const std::optional<ECS::EntityHandle> meshEntity =
+        FindFirstEntityWithDomain(engine.GetScene(), GS::Domain::Mesh);
+    ASSERT_TRUE(meshEntity.has_value());
+    ExpectMaterialDrivenImportedSurface(engine, *meshEntity);
 
     engine.Shutdown();
 }

@@ -64,8 +64,8 @@ sessions:
     open_threads: 2
   - id: "2026-06-25_001"
     date: "2026-06-25"
-    summary: "Implemented and retired RUNTIME-126 with the runtime GPU readback job/write-back path, fixed the stale mesh primitive-view dirty-position contract, passed focused CPU/integration, opt-in GPU smoke, full default CPU gate, and structural validation, marked the runtime Theme B goal blocked at RUNTIME-125 because its benchmark/profile gate remains unsatisfied, and committed the accumulated work."
-    turn_count: 5
-    events_count: 8
+    summary: "Implemented and retired RUNTIME-126 with the runtime GPU readback job/write-back path, marked the runtime Theme B goal blocked at RUNTIME-125 because its benchmark/profile gate remains unsatisfied, committed the accumulated work, then diagnosed and fixed direct OBJ generated-normal bake texel-center sampling plus direct mesh import's unlit visualization override."
+    turn_count: 7
+    events_count: 10
     claims_touched: []
-    open_threads: 1
+    open_threads: 2
