@@ -1,0 +1,37 @@
+id: geometry.progressive_poisson
+name: Progressive Poisson-Disk Sampling via Phase-Parallel Spatial Hashing
+domain: geometry
+status: proposed
+paper:
+  title: "GPU-Accelerated Progressive Poisson Disk Sampling via Phase-Parallel Spatial Hashing"
+  authors: "Unpublished working draft (intrinsicD); author list finalized at submission"
+  year: 2026
+  doi: "n/a — unpublished working draft"
+  url: "https://github.com/intrinsicD/GPU-Accelerated-Progressive-Poisson-Disk-Sampling-via-Phase-Parallel-Spatial-Hashing"
+inputs:
+  - "Unordered point set in R^d (d in {2,3}), SoA positions (x,y[,z])"
+  - "SamplerConfig knobs: grid_width, max_levels, hash_load_factor, radius_alpha, randomize_grid_origin, grid_origin_seed, shuffle_within_levels, shuffle_seed"
+outputs:
+  - "Progressive ordering: order[i] indexes the accepted input point at rank i"
+  - "level_offsets: first rank of each hierarchy level (back() = accepted count M)"
+  - "splat_radii: per-point introduction-level nearest-neighbor spacing"
+  - "base_radius: Poisson radius at level 0 (r_L = base_radius / 2^L)"
+metrics:
+  - "poisson_disk_ratio_min"
+  - "nn_distance_cv"
+  - "coverage_fraction"
+  - "runtime_ms"
+backends:
+  - cpu_reference
+correctness_tests:
+  - "TODO: tests/ correctness cases land with METHOD-012 (CPU reference)"
+  - "tests/README.md"
+benchmarks:
+  - "TODO: benchmarks/ smoke manifest + runner land with METHOD-012"
+  - "benchmarks/README.md"
+known_limitations:
+  - "Subsampling, not generation: output is a reordered subset of the input; quality is bounded by input density (cannot exceed the densest achievable Poisson set the input supports)."
+  - "Splat-radius semantics are introduction-level (OPEN_DECISIONS OD1): for a finer rendered prefix an earlier point's radius over-estimates true spacing (conservative); a partial finest level under-estimates it."
+  - "Spectral metrics (2D power spectrum / RAPS) are defined for 2D instantiations only; 3D evaluation uses dimension-agnostic metrics (RDF, NN statistics)."
+  - "Degenerate inputs (empty/one-point, coincident/duplicate points, non-finite coordinates, dimension not in {2,3}) must fail closed with explicit diagnostics."
+  - "GPU (Vulkan compute) backend and CPU/GPU parity are out of scope for the reference; tracked by METHOD-013."

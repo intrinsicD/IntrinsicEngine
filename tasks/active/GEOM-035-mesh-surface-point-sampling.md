@@ -15,7 +15,7 @@ depends_on: []
 - No mesh repair, remeshing, or normal re-estimation beyond interpolating existing per-vertex normals.
 
 ## Context
-- Status: backlog.
+- Status: active (in-progress). Owner: unassigned. Branch: `claude/gpu-accelerated-pointcloud-mesh-test-57hjjk`. Next verification step: implement the surface-sampling API and run the default CPU gate (`ctest --test-dir build/ci -R 'SurfaceSampling|PointCloud' -LE 'gpu|vulkan|slow|flaky-quarantine'`).
 - Owning subsystem/layer: `geometry` (`geometry -> core` only) plus `benchmarks/geometry` using public geometry APIs only.
 - Today the engine has `Geometry::HalfedgeMesh::Mesh` with triangle views (`Geometry.HalfedgeMesh.Utils` `TryGetTriangleFaceView`, `TriangleArea`) and `Geometry::PointCloud::Cloud` (`Geometry.PointCloud`), but there is **no** routine to sample points uniformly on triangle surfaces — only full-mesh vertex conversion (`Geometry.PointCloud.Conversion`, `Geometry.Mesh.Conversion`). The GPU Poisson method needs a dense surface cloud as input, so this is the missing mesh→cloud preprocessing primitive.
 - Follow `GEOM-005` API/numeric policy and `GEOM-007` robust-predicate/tolerance policy for degenerate triangles; mirror the diagnostics/determinism style of `GEOM-016`.
@@ -34,7 +34,7 @@ depends_on: []
 - [ ] Add or update a `benchmark;geometry` smoke manifest/runner under `benchmarks/geometry/` for surface sampling (smoke/quality evidence only, no perf claims), introducing no new CTest labels unless `tests/README.md` and `tests/CMakeLists.txt` are updated in the same change.
 
 ## Docs
-- [ ] Update [`docs/architecture/geometry.md`](../../../docs/architecture/geometry.md) (and the point-cloud algorithm roadmap if scope shifts) with the surface-sampling contract and diagnostics.
+- [ ] Update [`docs/architecture/geometry.md`](../../docs/architecture/geometry.md) (and the point-cloud algorithm roadmap if scope shifts) with the surface-sampling contract and diagnostics.
 - [ ] Update `benchmarks/geometry/README.md` or manifests if a new benchmark ID is introduced.
 - [ ] Regenerate `docs/api/generated/module_inventory.md` if module surfaces change.
 

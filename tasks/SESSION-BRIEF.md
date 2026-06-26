@@ -8,7 +8,9 @@ the authoritative open/unblocked view.
 
 ## Active tasks
 
+- `GEOM-035` — Triangle-mesh surface point sampling (tasks/active/GEOM-035-mesh-surface-point-sampling.md)
 - `GRAPHICS-104` — GPU Object-Space Normal Texture Bake (tasks/active/GRAPHICS-104-gpu-object-space-normal-texture-bake.md)
+- `METHOD-012` — Progressive Poisson-disk sampling: paper intake + CPU reference backend (tasks/active/METHOD-012-progressive-poisson-disk-cpu-reference.md)
 - `RUNTIME-128` — Default lit material for material-less imported primitives (tasks/active/RUNTIME-128-default-lit-material-for-materialless-imports.md)
 
 ## Theme B — Rendering modernization
@@ -65,7 +67,6 @@ the authoritative open/unblocked view.
 - unblocked: `GEOM-032` — Bool property access contract (tasks/backlog/geometry/GEOM-032-bool-property-access-contract.md)
 - blocked by `GEOM-027`: `GEOM-033` — Erased property metadata catalog (tasks/backlog/geometry/GEOM-033-erased-property-metadata-catalog.md)
 - blocked by `GEOM-027`: `GEOM-034` — Geometry property API documentation audit (tasks/backlog/geometry/GEOM-034-geometry-property-api-doc-audit.md)
-- unblocked: `GEOM-035` — Triangle-mesh surface point sampling (tasks/backlog/geometry/GEOM-035-mesh-surface-point-sampling.md)
 - unblocked: `GEOM-036` — Blue-noise / sampling quality-metrics module (tasks/backlog/geometry/GEOM-036-sampling-quality-metrics.md)
 - unblocked: `GRAPHICS-108` — Reusable Vulkan compute parallel primitives (scan + compaction) (tasks/backlog/rendering/GRAPHICS-108-vulkan-compute-parallel-primitives.md)
 - unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)
@@ -75,7 +76,6 @@ the authoritative open/unblocked view.
 - unblocked: `METHOD-005` — Robust mesh boolean reference backend (tasks/backlog/methods/METHOD-005-robust-mesh-boolean-reference-backend.md)
 - blocked by `GEOM-024`: `METHOD-006` — Cross-field / frame-field design reference backend (tasks/backlog/methods/METHOD-006-cross-field-design-reference-backend.md)
 - unblocked: `METHOD-007` — Constrained Delaunay tetrahedralization reference backend (tasks/backlog/methods/METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md)
-- unblocked: `METHOD-012` — Progressive Poisson-disk sampling: paper intake + CPU reference backend (tasks/backlog/methods/METHOD-012-progressive-poisson-disk-cpu-reference.md)
 - blocked by `METHOD-012`: `METHOD-013` — Progressive Poisson-disk sampling: GPU (Vulkan compute) backend + parity (tasks/backlog/methods/METHOD-013-progressive-poisson-disk-gpu-backend.md)
 - unblocked: `METHODS-001` — Pin signed heat as methods-pipeline pathfinder (tasks/backlog/methods/METHODS-001-signed-heat-pathfinder.md)
 - blocked by `GEOM-036`: `RUNTIME-133` — Method result & figure data-export seam (CSV/JSON) (tasks/backlog/runtime/RUNTIME-133-method-figure-data-export.md)
