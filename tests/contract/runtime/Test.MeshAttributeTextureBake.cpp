@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -7,6 +8,7 @@
 #include <vector>
 
 #include <glm/glm.hpp>
+#include <glm/geometric.hpp>
 #include <gtest/gtest.h>
 
 import Extrinsic.ECS.Components.GeometrySources;
@@ -87,6 +89,22 @@ namespace
         const std::size_t index)
     {
         return static_cast<std::uint8_t>(bytes[index]);
+    }
+
+    [[nodiscard]] std::size_t PixelOffset(
+        const std::uint32_t x,
+        const std::uint32_t y,
+        const std::uint32_t width,
+        const std::uint32_t components)
+    {
+        return (static_cast<std::size_t>(y) * width + x) * components;
+    }
+
+    [[nodiscard]] std::uint8_t EncodeUnormByte(const float value) noexcept
+    {
+        const float scaled = std::clamp(value, 0.0f, 1.0f) * 255.0f;
+        return static_cast<std::uint8_t>(
+            static_cast<std::uint32_t>(std::round(scaled)));
     }
 }
 
@@ -203,8 +221,44 @@ TEST(RuntimeMeshAttributeTextureBake, BakesGenericVertexScalarLinearTexturePaylo
     EXPECT_EQ(result.Payload.Metadata.PixelFormat, Assets::AssetTexturePixelFormat::R8Unorm);
     EXPECT_EQ(result.Payload.Metadata.Components, 1u);
     ASSERT_EQ(result.Payload.PixelBytes.size(), 4u * 4u);
-    EXPECT_EQ(ByteAt(result.Payload.PixelBytes, 0u), 0u);
-    EXPECT_EQ(ByteAt(result.Payload.PixelBytes, 3u), 255u);
+    EXPECT_EQ(ByteAt(result.Payload.PixelBytes, 0u), 32u);
+    EXPECT_EQ(ByteAt(result.Payload.PixelBytes, 3u), 223u);
+}
+
+TEST(RuntimeMeshAttributeTextureBake, BakesVertexNormalTextureAtTexelCenters)
+{
+    MeshBakeScratch mesh = MakeTexturedTriangle();
+    auto normals = mesh.VertexSource.Properties.GetOrAdd<glm::vec3>("v:normal", glm::vec3{0.0f});
+    normals.Vector() = {
+        {1.0f, 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f},
+        {0.0f, 0.0f, 1.0f},
+    };
+
+    Runtime::MeshAttributeTextureBakeOptions options{};
+    options.Width = 16u;
+    options.Height = 16u;
+
+    const Runtime::MeshAttributeTextureBakeResult result =
+        Runtime::BakeMeshVertexNormalTexture(mesh.View(), options);
+
+    ASSERT_EQ(result.Status, Runtime::MeshAttributeTextureBakeStatus::Success);
+    ASSERT_EQ(result.Payload.PixelBytes.size(), 16u * 16u * 4u);
+
+    const glm::vec3 centerBarycentric{
+        1.0f - (0.5f / 16.0f) - (0.5f / 16.0f),
+        0.5f / 16.0f,
+        0.5f / 16.0f,
+    };
+    const glm::vec3 expectedNormal = glm::normalize(centerBarycentric);
+    const std::size_t offset = PixelOffset(0u, 0u, 16u, 4u);
+    EXPECT_EQ(ByteAt(result.Payload.PixelBytes, offset + 0u),
+              EncodeUnormByte(expectedNormal.x * 0.5f + 0.5f));
+    EXPECT_EQ(ByteAt(result.Payload.PixelBytes, offset + 1u),
+              EncodeUnormByte(expectedNormal.y * 0.5f + 0.5f));
+    EXPECT_EQ(ByteAt(result.Payload.PixelBytes, offset + 2u),
+              EncodeUnormByte(expectedNormal.z * 0.5f + 0.5f));
+    EXPECT_EQ(ByteAt(result.Payload.PixelBytes, offset + 3u), 255u);
 }
 
 TEST(RuntimeMeshAttributeTextureBake, BakesGenericVertexVec2TexturePayload)

@@ -941,14 +941,7 @@ namespace Extrinsic::Runtime
                     return MeshAttributeTextureBakeStatus::NonFiniteTexcoord;
                 }
 
-                const glm::vec2 pA{uvA.x * static_cast<float>(width - 1u),
-                                   uvA.y * static_cast<float>(height - 1u)};
-                const glm::vec2 pB{uvB.x * static_cast<float>(width - 1u),
-                                   uvB.y * static_cast<float>(height - 1u)};
-                const glm::vec2 pC{uvC.x * static_cast<float>(width - 1u),
-                                   uvC.y * static_cast<float>(height - 1u)};
-
-                const float area = EdgeFunction(pA, pB, pC);
+                const float area = EdgeFunction(uvA, uvB, uvC);
                 if (std::abs(area) <= 1.0e-6f || !std::isfinite(area))
                 {
                     ++diagnostics.DegenerateUvTriangleCount;
@@ -956,28 +949,45 @@ namespace Extrinsic::Runtime
                 }
                 sawNondegenerateTriangle = true;
 
-                const float minXf = std::floor(std::min({pA.x, pB.x, pC.x}));
-                const float maxXf = std::ceil(std::max({pA.x, pB.x, pC.x}));
-                const float minYf = std::floor(std::min({pA.y, pB.y, pC.y}));
-                const float maxYf = std::ceil(std::max({pA.y, pB.y, pC.y}));
+                const auto minPixel = [](const float minUv,
+                                         const std::uint32_t extent) noexcept
+                {
+                    const float raw =
+                        std::floor(minUv * static_cast<float>(extent));
+                    return static_cast<std::uint32_t>(
+                        std::clamp(raw, 0.0f, static_cast<float>(extent - 1u)));
+                };
+                const auto maxPixel = [](const float maxUv,
+                                         const std::uint32_t extent) noexcept
+                {
+                    const float raw =
+                        std::ceil(maxUv * static_cast<float>(extent)) - 1.0f;
+                    return static_cast<std::uint32_t>(
+                        std::clamp(raw, 0.0f, static_cast<float>(extent - 1u)));
+                };
 
-                const std::uint32_t minX = static_cast<std::uint32_t>(
-                    std::clamp(minXf, 0.0f, static_cast<float>(width - 1u)));
-                const std::uint32_t maxX = static_cast<std::uint32_t>(
-                    std::clamp(maxXf, 0.0f, static_cast<float>(width - 1u)));
-                const std::uint32_t minY = static_cast<std::uint32_t>(
-                    std::clamp(minYf, 0.0f, static_cast<float>(height - 1u)));
-                const std::uint32_t maxY = static_cast<std::uint32_t>(
-                    std::clamp(maxYf, 0.0f, static_cast<float>(height - 1u)));
+                const std::uint32_t minX =
+                    minPixel(std::min({uvA.x, uvB.x, uvC.x}), width);
+                const std::uint32_t maxX =
+                    maxPixel(std::max({uvA.x, uvB.x, uvC.x}), width);
+                const std::uint32_t minY =
+                    minPixel(std::min({uvA.y, uvB.y, uvC.y}), height);
+                const std::uint32_t maxY =
+                    maxPixel(std::max({uvA.y, uvB.y, uvC.y}), height);
 
                 for (std::uint32_t y = minY; y <= maxY; ++y)
                 {
                     for (std::uint32_t x = minX; x <= maxX; ++x)
                     {
-                        const glm::vec2 p{static_cast<float>(x), static_cast<float>(y)};
-                        const float w0 = EdgeFunction(pB, pC, p) / area;
-                        const float w1 = EdgeFunction(pC, pA, p) / area;
-                        const float w2 = EdgeFunction(pA, pB, p) / area;
+                        const glm::vec2 p{
+                            (static_cast<float>(x) + 0.5f) /
+                                static_cast<float>(width),
+                            (static_cast<float>(y) + 0.5f) /
+                                static_cast<float>(height),
+                        };
+                        const float w0 = EdgeFunction(uvB, uvC, p) / area;
+                        const float w1 = EdgeFunction(uvC, uvA, p) / area;
+                        const float w2 = EdgeFunction(uvA, uvB, p) / area;
                         constexpr float kEpsilon = -1.0e-5f;
                         if (w0 < kEpsilon || w1 < kEpsilon || w2 < kEpsilon)
                         {

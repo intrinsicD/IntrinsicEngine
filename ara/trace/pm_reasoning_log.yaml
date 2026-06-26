@@ -657,3 +657,13 @@ entries:
       - "Routed the user-requested commit as a direct experiment because it produced concrete git state: commit `6443f4bb` and a clean status before this epilogue."
       - "Recorded the commit after it happened rather than staging a prior claim about it."
       - "Committed the epilogue separately so the user's request for all changes to be committed remains true after research-manager writes."
+  - turn: "2026-06-25_001#6"
+    notes:
+      - "Routed the direct OBJ shading diagnosis as a direct experiment because it produced code/test changes and concrete focused plus full-gate verification."
+      - "Did not stage a new claim: the texel-center sampling contract is now artifact-backed by the runtime bake implementation and regression test."
+      - "Kept the CPU-vs-GPU generated-normal bake delay as an open thread tied to GRAPHICS-104 rather than inventing a new task in this epilogue."
+  - turn: "2026-06-25_001#7"
+    notes:
+      - "Routed the imported OBJ unlit-material diagnosis as a direct experiment because it produced a failing regression, a scoped runtime import fix, focused verification, Vulkan bake smoke evidence, and the full CPU gate."
+      - "Did not stage a new claim: the material-driven direct mesh import behavior is now encoded in `Test.AssetImportFormatCoverage` and `Runtime.Engine.cpp`."
+      - "Updated the open generated-normal thread to distinguish the verified GPU bake implementation from the still-CPU direct OBJ orchestration path."
