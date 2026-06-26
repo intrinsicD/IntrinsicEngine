@@ -299,6 +299,7 @@ namespace Extrinsic::Runtime
             params.MetallicFactor = 0.0f;
             params.RoughnessFactor = 1.0f;
             params.Flags = Graphics::MaterialFlags::None;
+            params.Shading = Graphics::ShadingModel::Lit;
             return params;
         }
 

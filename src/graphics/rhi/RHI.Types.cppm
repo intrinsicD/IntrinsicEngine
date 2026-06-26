@@ -470,8 +470,11 @@ export namespace Extrinsic::RHI
         std::uint32_t MaterialTypeID      = 0;   // registered type index
         std::uint32_t Flags               = 0;   // MaterialFlags bitmask
 
+        // Single lit/unlit authority: 0 = Lit, 1 = Unlit (Graphics::ShadingModel).
+        // Occupies the former _pad0 word; layout/offset unchanged.
+        std::uint32_t ShadingModel        = 0;
+
         // Padding to align CustomData to byte 64
-        std::uint32_t _pad0 = 0;
         std::uint32_t _pad1 = 0;
         std::uint32_t _pad2 = 0;
         std::uint32_t _pad3 = 0;

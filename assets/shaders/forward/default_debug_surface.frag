@@ -134,8 +134,10 @@ void main() {
     const vec3 sampledNormal =
         ResolveSurfaceNormal(scene, mat, fragInstanceSlot, fragWorldNormal, fragUv);
 
-    if ((mat.Flags & GpuMaterialFlag_Unlit) != 0u ||
-        mat.MaterialTypeID == GpuMaterialType_DefaultDebugSurface) {
+    // ShadingModel is the single lit/unlit authority; the legacy Unlit flag
+    // is honored as a transitional alias until its writers migrate (GRAPHICS-105).
+    if (mat.ShadingModel == GpuShadingModel_Unlit ||
+        (mat.Flags & GpuMaterialFlag_Unlit) != 0u) {
         outColor = baseColor;
         return;
     }

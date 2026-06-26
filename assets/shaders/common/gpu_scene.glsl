@@ -28,6 +28,11 @@ const uint GpuMaterialType_DefaultDebugSurface = 2u;
 const uint GpuMaterialType_DefaultDebugUVs = 3u;
 const uint GpuMaterialFlag_Unlit = 1u << 3;
 const uint GpuMaterialFlag_ObjectSpaceNormalMap = 1u << 5;
+// Single lit/unlit authority (GpuMaterialSlot.ShadingModel). The legacy
+// GpuMaterialFlag_Unlit bit is honored as a transitional alias until its
+// remaining writers migrate to ShadingModel.
+const uint GpuShadingModel_Lit = 0u;
+const uint GpuShadingModel_Unlit = 1u;
 const uint GpuColorSource_Material = 0u;
 const uint GpuColorSource_UniformColor = 1u;
 const uint GpuColorSource_ScalarField = 2u;
@@ -172,7 +177,7 @@ struct GpuMaterialSlot {
     uint EmissiveID;
     uint MaterialTypeID;
     uint Flags;
-    uint _pad0;
+    uint ShadingModel;
     uint _pad1;
     uint _pad2;
     uint _pad3;

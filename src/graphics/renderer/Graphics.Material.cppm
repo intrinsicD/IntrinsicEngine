@@ -188,6 +188,19 @@ export namespace Extrinsic::Graphics
     }
 
     // -----------------------------------------------------------------
+    // ShadingModel — the single authority for whether lighting runs.
+    // Stored in GpuMaterialSlot::ShadingModel. `Unlit` is an explicit
+    // opt-in (e.g. glTF KHR_materials_unlit, scivis overlays), never a
+    // missing-data fallback. The legacy MaterialFlags::Unlit bit is kept
+    // as a transitional alias until its writers migrate here.
+    // -----------------------------------------------------------------
+    enum class ShadingModel : std::uint32_t
+    {
+        Lit   = 0,
+        Unlit = 1,
+    };
+
+    // -----------------------------------------------------------------
     // CustomParamDesc
     // -----------------------------------------------------------------
     // Describes one of the four vec4 custom data slots for editor
@@ -246,6 +259,10 @@ export namespace Extrinsic::Graphics
         RHI::BindlessIndex MetallicRoughnessID = RHI::kInvalidBindlessIndex;
         RHI::BindlessIndex EmissiveID          = RHI::kInvalidBindlessIndex;
         MaterialFlags Flags = MaterialFlags::None;
+
+        // Single lit/unlit authority. Defaults to Lit so every material
+        // shades unless it explicitly opts out.
+        ShadingModel  Shading = ShadingModel::Lit;
 
         // Custom data — maps directly to GpuMaterialSlot::CustomData[0..3]
         glm::vec4 CustomData[4]{};

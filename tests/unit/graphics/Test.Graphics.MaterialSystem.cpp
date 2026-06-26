@@ -485,6 +485,35 @@ TEST(GraphicsMaterialSystem, DefaultSlotCarriesDefaultDebugSurfaceParams)
     EXPECT_FLOAT_EQ(params.BaseColorFactor.z, Graphics::kDefaultDebugSurfaceBaseColor[2]);
     EXPECT_FLOAT_EQ(params.BaseColorFactor.w, Graphics::kDefaultDebugSurfaceBaseColor[3]);
     EXPECT_TRUE(Graphics::HasFlag(params.Flags, Graphics::MaterialFlags::Unlit));
+    // ShadingModel is the single lit/unlit authority; slot 0 is explicitly Unlit.
+    EXPECT_EQ(params.Shading, Graphics::ShadingModel::Unlit);
+
+    materials.Shutdown();
+}
+
+TEST(GraphicsMaterialSystem, ShadingModelDefaultsToLitAndRoundTrips)
+{
+    MockDevice device;
+    RHI::BufferManager buffers{device};
+    Graphics::MaterialSystem materials;
+    materials.Initialize(device, buffers);
+
+    const Graphics::MaterialTypeHandle standard =
+        materials.FindType(Graphics::kMaterialTypeName_StandardPBR);
+    ASSERT_TRUE(standard.IsValid());
+
+    auto material = materials.CreateInstance(standard, Graphics::MaterialParams{});
+    ASSERT_TRUE(material.IsValid());
+
+    // A freshly created material is Lit by default — never unlit as a fallback.
+    EXPECT_EQ(materials.GetParams(material.GetHandle()).Shading,
+              Graphics::ShadingModel::Lit);
+
+    Graphics::MaterialParams unlit{};
+    unlit.Shading = Graphics::ShadingModel::Unlit;
+    materials.SetParams(material.GetHandle(), unlit);
+    EXPECT_EQ(materials.GetParams(material.GetHandle()).Shading,
+              Graphics::ShadingModel::Unlit);
 
     materials.Shutdown();
 }

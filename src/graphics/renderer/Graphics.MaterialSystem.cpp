@@ -167,6 +167,7 @@ namespace Extrinsic::Graphics
             slot.EmissiveID            = p.EmissiveID;
             slot.MaterialTypeID        = typeID;
             slot.Flags                 = static_cast<std::uint32_t>(p.Flags);
+            slot.ShadingModel          = static_cast<std::uint32_t>(p.Shading);
             for (int i = 0; i < 4; ++i)
                 slot.CustomData[i] = p.CustomData[i];
         }
@@ -325,6 +326,7 @@ namespace Extrinsic::Graphics
             kDefaultDebugSurfaceBaseColor[3],
         };
         defaultParams.Flags = MaterialFlags::Unlit;
+        defaultParams.Shading = ShadingModel::Unlit;
 
         m_Impl->Meta.emplace_back();
         InstanceMeta& defaultMeta    = m_Impl->Meta.back();
