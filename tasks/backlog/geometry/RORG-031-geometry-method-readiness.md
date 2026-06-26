@@ -23,11 +23,11 @@ depends_on: []
   methods/paper integration; `geometry -> core` only.
 - Open children (all under `tasks/backlog/geometry/`): `GEOM-013` (dual
   contouring), `GEOM-014` (FA-QEM simplification), `GEOM-016` (point-cloud
-  filtering/density), `GEOM-017` (descriptors/registration seams), `GEOM-018`
-  (parameterization diagnostics), `GEOM-019` (harmonic/Tutte, gated on
-  GEOM-018 + GEOM-020), `GEOM-020` (sparse LDLT/LLT seam), `GEOM-023`
-  (non-symmetric BiCGSTAB seam), `GEOM-024` (generalized eigensolver seam,
-  gated on GEOM-020).
+  filtering/density), `GEOM-017` (descriptors/registration seams), `GEOM-019`
+  (harmonic/Tutte, gated on GEOM-020), `GEOM-020` (sparse LDLT/LLT seam),
+  `GEOM-023` (non-symmetric BiCGSTAB seam), `GEOM-024` (generalized
+  eigensolver seam, gated on GEOM-020), and `GEOM-027` through `GEOM-034`
+  (property-system API cleanup and docs synchronization).
 - Retired children/foundations: `GEOM-005..012`, `GEOM-015`, `GEOM-021`,
   `GEOM-022`, `GEOM-025`, `GEOM-026`, `GEOIO-002` (narratives in the retirement log; index in the
   category README).
@@ -61,7 +61,7 @@ depends_on: []
 
 ## Verification
 ```bash
-for t in GEOM-013 GEOM-014 GEOM-016 GEOM-017 GEOM-018 GEOM-019 GEOM-020 GEOM-023 GEOM-024; do
+for t in GEOM-013 GEOM-014 GEOM-016 GEOM-017 GEOM-019 GEOM-020 GEOM-023 GEOM-024 GEOM-027 GEOM-028 GEOM-029 GEOM-030 GEOM-031 GEOM-032 GEOM-033 GEOM-034; do
   ls tasks/backlog/geometry/${t}-*.md >/dev/null || { echo "missing ${t}"; exit 1; }
 done
 python3 tools/agents/validate_tasks.py --root tasks --strict

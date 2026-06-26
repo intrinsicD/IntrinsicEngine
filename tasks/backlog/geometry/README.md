@@ -23,6 +23,18 @@ map.
 - [GEOM-024 — Sparse symmetric generalized eigensolver seam](GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
   (gates `methods/METHOD-006` variant B; depends on `GEOM-020`; promote when
   METHOD-006 is the next-priority method).
+- [GEOM-027 — Property name lifetime contract](GEOM-027-property-name-lifetime-contract.md).
+- [GEOM-028 — Property registry handle safety](GEOM-028-property-registry-handle-safety.md).
+- [GEOM-029 — Const property set validity contract](GEOM-029-const-property-set-validity-contract.md).
+- [GEOM-030 — Property set const lookup migration](GEOM-030-property-set-const-lookup-migration.md)
+  (depends on `GEOM-029`).
+- [GEOM-031 — Property set naming normalization](GEOM-031-property-set-naming-normalization.md).
+- [GEOM-032 — Bool property access contract](GEOM-032-bool-property-access-contract.md).
+- [GEOM-033 — Erased property metadata catalog](GEOM-033-erased-property-metadata-catalog.md)
+  (depends on `GEOM-027`, `GEOM-030`, and `GEOM-032`).
+- [GEOM-034 — Geometry property API documentation audit](GEOM-034-geometry-property-api-doc-audit.md)
+  (depends on the property-system refactor sequence `GEOM-027` through
+  `GEOM-033`).
 - [RORG-031E — Geometry and method-readiness backlog seed](RORG-031-geometry-method-readiness.md).
 
 ## Convergence
@@ -60,6 +72,12 @@ map.
   `Geometry.PointCloud.Normals` replaces the old `Geometry.NormalEstimation`
   point-cloud module with KDTree/default and supplied-index normal-generation
   overloads that return the written normal property.
+- GEOM-027 through GEOM-034 isolate the `Geometry.Properties` cleanup found by
+  the property-system review: name lifetimes, registry handle safety,
+  `ConstPropertySet` validity, const-correct lookup, naming normalization,
+  `bool` proxy-storage behavior, erased metadata descriptors, and the final
+  architecture-doc audit. Keep these as separate slices so public API changes,
+  behavior changes, and docs synchronization stay reviewable.
 - GEOM-013 and GEOM-014 are seeded by the geometry paper survey
   [`docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md`](../../../docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md).
   Each lists explicit algorithm variants with a marked default (Manifold DC
