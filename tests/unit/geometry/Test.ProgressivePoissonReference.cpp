@@ -5,6 +5,8 @@
 
 #include <gtest/gtest.h>
 
+#include <glm/glm.hpp>
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -16,51 +18,32 @@ namespace ppr = Intrinsic::Methods::Geometry::ProgressivePoissonReference;
 
 namespace
 {
-    struct Cloud
-    {
-        std::vector<float> X, Y, Z;
-    };
-
-    Cloud UniformCube(std::uint32_t n, std::uint32_t seed, int dim)
+    // A point set is just a span of glm::vec3 — the same type any vec3 property
+    // buffer (positions, normals, a `v:foo` property) exposes. No container type
+    // is required by the method.
+    std::vector<glm::vec3> UniformCube(std::uint32_t n, std::uint32_t seed, int dim)
     {
         std::mt19937 rng(seed);
         std::uniform_real_distribution<float> d(0.0f, 1.0f);
-        Cloud c;
-        c.X.resize(n);
-        c.Y.resize(n);
-        c.Z.resize(n);
+        std::vector<glm::vec3> pts(n);
         for (std::uint32_t i = 0; i < n; ++i)
-        {
-            c.X[i] = d(rng);
-            c.Y[i] = d(rng);
-            c.Z[i] = (dim == 3) ? d(rng) : 0.0f;
-        }
-        return c;
-    }
-
-    ppr::PointSet View(const Cloud& c, int dim)
-    {
-        ppr::PointSet p;
-        p.X = c.X;
-        p.Y = c.Y;
-        if (dim == 3)
-            p.Z = c.Z;
-        return p;
+            pts[i] = glm::vec3{d(rng), d(rng), (dim == 3) ? d(rng) : 0.0f};
+        return pts;
     }
 
     // Independent O(k^2) ground truth — the reference must never disagree.
-    float BruteMinDistance(const Cloud& c, const std::vector<std::uint32_t>& order,
+    float BruteMinDistance(const std::vector<glm::vec3>& pts, const std::vector<std::uint32_t>& order,
                            std::uint32_t count, int dim)
     {
         float best = std::numeric_limits<float>::max();
         for (std::uint32_t a = 0; a < count; ++a)
             for (std::uint32_t b = a + 1; b < count; ++b)
             {
-                const std::uint32_t i = order[a];
-                const std::uint32_t j = order[b];
-                const float ex = c.X[i] - c.X[j];
-                const float ey = c.Y[i] - c.Y[j];
-                const float ez = (dim == 3) ? (c.Z[i] - c.Z[j]) : 0.0f;
+                const glm::vec3& pi = pts[order[a]];
+                const glm::vec3& pj = pts[order[b]];
+                const float ex = pi.x - pj.x;
+                const float ey = pi.y - pj.y;
+                const float ez = (dim == 3) ? (pi.z - pj.z) : 0.0f;
                 best = std::min(best, std::sqrt(ex * ex + ey * ey + ez * ez));
             }
         return best;
@@ -74,11 +57,11 @@ class ProgressivePoissonReferenceDim : public ::testing::TestWithParam<int>
 TEST_P(ProgressivePoissonReferenceDim, PoissonGuaranteeHoldsAtEveryLevelBoundary)
 {
     const int dim = GetParam();
-    const Cloud cloud = UniformCube(20000, 42, dim);
+    const std::vector<glm::vec3> cloud = UniformCube(20000, 42, dim);
     ppr::Config cfg;
     cfg.Dimension = static_cast<std::uint32_t>(dim);
 
-    const ppr::Result r = ppr::Compute(View(cloud, dim), cfg);
+    const ppr::Result r = ppr::Compute(cloud, cfg);
 
     ASSERT_EQ(r.Diag.Code, ppr::ValidationCode::Valid);
     ASSERT_FALSE(r.LevelOffsets.empty());
@@ -112,17 +95,17 @@ TEST_P(ProgressivePoissonReferenceDim, PoissonGuaranteeHoldsAtEveryLevelBoundary
 TEST_P(ProgressivePoissonReferenceDim, MinPairwiseHelperMatchesBruteForce)
 {
     const int dim = GetParam();
-    const Cloud cloud = UniformCube(8000, 11, dim);
+    const std::vector<glm::vec3> cloud = UniformCube(8000, 11, dim);
     ppr::Config cfg;
     cfg.Dimension = static_cast<std::uint32_t>(dim);
-    const ppr::Result r = ppr::Compute(View(cloud, dim), cfg);
+    const ppr::Result r = ppr::Compute(cloud, cfg);
     ASSERT_GE(r.LevelOffsets.size(), 2u);
 
     // For the level-0 prefix, the helper (search radius r_0) must detect any
     // pair closer than r_0; since the guarantee holds it should report >= r_0.
     const std::uint32_t le = r.LevelOffsets[1];
     const float r0 = r.Diag.LevelRadii[0];
-    const float helper = ppr::MinPairwiseDistance(View(cloud, dim), r.Order, le,
+    const float helper = ppr::MinPairwiseDistance(cloud, r.Order, le,
                                                   static_cast<std::uint32_t>(dim), r0);
     const float brute = BruteMinDistance(cloud, r.Order, le, dim);
     EXPECT_GE(brute, r0 * 0.9999f);
@@ -134,10 +117,10 @@ INSTANTIATE_TEST_SUITE_P(Dimensions, ProgressivePoissonReferenceDim, ::testing::
 
 TEST(ProgressivePoissonReference, DeterministicForFixedSeeds)
 {
-    const Cloud cloud = UniformCube(5000, 7, 3);
+    const std::vector<glm::vec3> cloud = UniformCube(5000, 7, 3);
     ppr::Config cfg;
-    const ppr::Result a = ppr::Compute(View(cloud, 3), cfg);
-    const ppr::Result b = ppr::Compute(View(cloud, 3), cfg);
+    const ppr::Result a = ppr::Compute(cloud, cfg);
+    const ppr::Result b = ppr::Compute(cloud, cfg);
     EXPECT_EQ(a.Order, b.Order);
     EXPECT_EQ(a.LevelOffsets, b.LevelOffsets);
     EXPECT_EQ(a.SplatRadii, b.SplatRadii);
@@ -145,13 +128,13 @@ TEST(ProgressivePoissonReference, DeterministicForFixedSeeds)
 
 TEST(ProgressivePoissonReference, ShuffleSeedPermutesWithinLevelButKeepsBoundaries)
 {
-    const Cloud cloud = UniformCube(5000, 7, 3);
+    const std::vector<glm::vec3> cloud = UniformCube(5000, 7, 3);
     ppr::Config cfg;
     ppr::Config cfg2 = cfg;
     cfg2.ShuffleSeed = cfg.ShuffleSeed ^ 0x00abcdefu;
 
-    const ppr::Result a = ppr::Compute(View(cloud, 3), cfg);
-    const ppr::Result b = ppr::Compute(View(cloud, 3), cfg2);
+    const ppr::Result a = ppr::Compute(cloud, cfg);
+    const ppr::Result b = ppr::Compute(cloud, cfg2);
 
     // Same accepted set and level boundaries; only intra-level order changes.
     EXPECT_EQ(a.LevelOffsets, b.LevelOffsets);
@@ -161,7 +144,7 @@ TEST(ProgressivePoissonReference, ShuffleSeedPermutesWithinLevelButKeepsBoundari
 TEST(ProgressivePoissonReference, EmptyInputIsValidAndEmpty)
 {
     ppr::Config cfg;
-    const ppr::Result r = ppr::Compute(ppr::PointSet{}, cfg);
+    const ppr::Result r = ppr::Compute(std::span<const glm::vec3>{}, cfg);
     EXPECT_EQ(r.Diag.Code, ppr::ValidationCode::Valid);
     EXPECT_TRUE(r.Order.empty());
     ASSERT_EQ(r.LevelOffsets.size(), 1u);
@@ -170,52 +153,52 @@ TEST(ProgressivePoissonReference, EmptyInputIsValidAndEmpty)
 
 TEST(ProgressivePoissonReference, CoincidentPointsAcceptExactlyOne)
 {
-    std::vector<float> x(16, 0.5f), y(16, 0.5f), z(16, 0.5f);
-    ppr::PointSet p;
-    p.X = x;
-    p.Y = y;
-    p.Z = z;
-    const ppr::Result r = ppr::Compute(p, ppr::Config{});
+    const std::vector<glm::vec3> pts(16, glm::vec3{0.5f, 0.5f, 0.5f});
+    const ppr::Result r = ppr::Compute(pts, ppr::Config{});
     EXPECT_EQ(r.Order.size(), 1u);
     EXPECT_EQ(r.Diag.AcceptedCount, 1u);
 }
 
 TEST(ProgressivePoissonReference, NonFiniteInputFailsClosed)
 {
-    std::vector<float> x{0.0f, std::nanf("")}, y{0.0f, 1.0f}, z{0.0f, 1.0f};
-    ppr::PointSet p;
-    p.X = x;
-    p.Y = y;
-    p.Z = z;
-    const ppr::Result r = ppr::Compute(p, ppr::Config{});
+    const std::vector<glm::vec3> pts{glm::vec3{0.0f, 0.0f, 0.0f},
+                                     glm::vec3{std::nanf(""), 1.0f, 1.0f}};
+    const ppr::Result r = ppr::Compute(pts, ppr::Config{});
     EXPECT_EQ(r.Diag.Code, ppr::ValidationCode::NonFiniteInput);
     EXPECT_TRUE(r.Order.empty());
 }
 
 TEST(ProgressivePoissonReference, InvalidDimensionFailsClosed)
 {
-    std::vector<float> x{0.0f}, y{0.0f}, z{0.0f};
-    ppr::PointSet p;
-    p.X = x;
-    p.Y = y;
-    p.Z = z;
+    const std::vector<glm::vec3> pts{glm::vec3{0.0f, 0.0f, 0.0f}};
     ppr::Config cfg;
     cfg.Dimension = 4;
-    const ppr::Result r = ppr::Compute(p, cfg);
+    const ppr::Result r = ppr::Compute(pts, cfg);
     EXPECT_EQ(r.Diag.Code, ppr::ValidationCode::InvalidDimension);
+}
+
+TEST(ProgressivePoissonReference, TwoDimensionalIgnoresZComponent)
+{
+    // Same x,y but wildly different z: in 2D the result must not depend on z.
+    std::vector<glm::vec3> a = UniformCube(2000, 5, 2);
+    std::vector<glm::vec3> b = a;
+    for (std::size_t i = 0; i < b.size(); ++i)
+        b[i].z = static_cast<float>(i) * 13.0f; // noise on the ignored axis
+    ppr::Config cfg;
+    cfg.Dimension = 2;
+    const ppr::Result ra = ppr::Compute(a, cfg);
+    const ppr::Result rb = ppr::Compute(b, cfg);
+    EXPECT_EQ(ra.Order, rb.Order);
+    EXPECT_EQ(ra.LevelOffsets, rb.LevelOffsets);
 }
 
 TEST(ProgressivePoissonReference, ZeroGridWidthAndLevelsAreClamped)
 {
-    std::vector<float> x{0.0f, 1.0f}, y{0.0f, 1.0f}, z{0.0f, 1.0f};
-    ppr::PointSet p;
-    p.X = x;
-    p.Y = y;
-    p.Z = z;
+    const std::vector<glm::vec3> pts{glm::vec3{0.0f, 0.0f, 0.0f}, glm::vec3{1.0f, 1.0f, 1.0f}};
     ppr::Config cfg;
     cfg.GridWidth = 0;
     cfg.MaxLevels = 0;
-    const ppr::Result r = ppr::Compute(p, cfg);
+    const ppr::Result r = ppr::Compute(pts, cfg);
     EXPECT_TRUE(r.Diag.ClampedGridWidth);
     EXPECT_TRUE(r.Diag.ClampedMaxLevels);
     EXPECT_EQ(r.Diag.Code, ppr::ValidationCode::Valid);
@@ -223,11 +206,11 @@ TEST(ProgressivePoissonReference, ZeroGridWidthAndLevelsAreClamped)
 
 TEST(ProgressivePoissonReference, AlphaOutOfRangeDefaultsToSqrtDOverTwo)
 {
-    const Cloud cloud = UniformCube(1000, 3, 2);
+    const std::vector<glm::vec3> cloud = UniformCube(1000, 3, 2);
     ppr::Config cfg;
     cfg.Dimension = 2;
     cfg.RadiusAlpha = -1.0f; // out of (0,1)
-    const ppr::Result r = ppr::Compute(View(cloud, 2), cfg);
+    const ppr::Result r = ppr::Compute(cloud, cfg);
     EXPECT_TRUE(r.Diag.AlphaDefaulted);
     EXPECT_NEAR(r.Diag.UsedAlpha, 0.5f * 1.41421356f, 1e-5f);
 }

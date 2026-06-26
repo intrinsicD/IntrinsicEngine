@@ -9,8 +9,8 @@ paper:
   doi: "n/a — unpublished working draft"
   url: "https://github.com/intrinsicD/GPU-Accelerated-Progressive-Poisson-Disk-Sampling-via-Phase-Parallel-Spatial-Hashing"
 inputs:
-  - "Unordered point set in R^d (d in {2,3}), SoA positions (x,y[,z])"
-  - "SamplerConfig knobs: grid_width, max_levels, hash_load_factor, radius_alpha, randomize_grid_origin, grid_origin_seed, shuffle_within_levels, shuffle_seed"
+  - "std::span<const glm::vec3> of points (any contiguous vec3 property buffer; not a specific container). z is ignored when Config.Dimension == 2"
+  - "Config knobs: dimension, grid_width, max_levels, hash_load_factor, radius_alpha, randomize_grid_origin, grid_origin_seed, shuffle_within_levels, shuffle_seed"
 outputs:
   - "Progressive ordering: order[i] indexes the accepted input point at rank i"
   - "level_offsets: first rank of each hierarchy level (back() = accepted count M)"

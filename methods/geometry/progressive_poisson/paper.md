@@ -44,10 +44,11 @@ cutoff — `draw(0, k)` — with no octree traversal or LOD data structures.
 
 ## Inputs and outputs
 
-- **Inputs:** SoA positions `points_x, points_y[, points_z]` (`N` each; `z` may be
-  null for `d=2`); `SamplerConfig { dimension, grid_width, max_levels,
-  hash_load_factor, radius_alpha, randomize_grid_origin, grid_origin_seed,
-  shuffle_within_levels, shuffle_seed }`.
+- **Inputs:** a plain span of points `std::span<const glm::vec3>` — any contiguous
+  `vec3` property buffer (positions, normals, an arbitrary `v:foo` property), not a
+  specific container; `z` is ignored when `Config.Dimension == 2`. Plus
+  `Config { dimension, grid_width, max_levels, hash_load_factor, radius_alpha,
+  randomize_grid_origin, grid_origin_seed, shuffle_within_levels, shuffle_seed }`.
 - **Outputs:** `ProgressivePoissonResult { order, level_offsets, splat_radii,
   base_radius }` plus reference diagnostics (accepted count, per-level counts,
   measured per-level minimum distance).
@@ -70,7 +71,8 @@ cutoff — `draw(0, k)` — with no octree traversal or LOD data structures.
 
 - **Engine layering.** Hermetic method package: import only public method APIs and
   declared geometry types; no ECS/runtime/graphics/platform/app. The CPU reference is
-  pure free functions over SoA spans (mirrors `methods/physics/particle_spring_reference`).
+  pure free functions over a `std::span<const glm::vec3>` (the implementation
+  deinterleaves into SoA internally for cache-friendly hashing).
 - **Reference first.** METHOD-012 implements the serial CPU reference and is the
   canonical truth; the CUDA `.cu` is the parallel form, not the contract. Reproduce
   accept/order semantics serially, then METHOD-013 ports the phase-parallel hashing

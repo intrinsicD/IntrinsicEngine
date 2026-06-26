@@ -384,20 +384,20 @@ namespace Intrinsic::Methods::Geometry::ProgressivePoissonReference
             return result;
         }
 
-        [[nodiscard]] bool AllFinite(std::span<const float> v)
+        [[nodiscard]] bool AllFinite(std::span<const glm::vec3> v, bool use3d)
         {
-            for (const float x : v)
-                if (!std::isfinite(x))
+            for (const glm::vec3& p : v)
+                if (!std::isfinite(p.x) || !std::isfinite(p.y) || (use3d && !std::isfinite(p.z)))
                     return false;
             return true;
         }
     } // namespace
 
-    Result Compute(const PointSet& points, const Config& configIn)
+    Result Compute(std::span<const glm::vec3> points, const Config& configIn)
     {
         Config cfg = configIn;
         Diagnostics diag;
-        diag.InputCount = static_cast<std::uint32_t>(points.X.size());
+        diag.InputCount = static_cast<std::uint32_t>(points.size());
 
         Result invalid;
         invalid.LevelOffsets.push_back(0);
@@ -408,15 +408,8 @@ namespace Intrinsic::Methods::Geometry::ProgressivePoissonReference
             invalid.Diag.Code = ValidationCode::InvalidDimension;
             return invalid;
         }
-        const bool has3d = cfg.Dimension == 3;
-        if (points.Y.size() != points.X.size() ||
-            (has3d && points.Z.size() != points.X.size()) ||
-            (!has3d && !points.Z.empty() && points.Z.size() != points.X.size()))
-        {
-            invalid.Diag.Code = ValidationCode::DimensionMismatch;
-            return invalid;
-        }
-        if (!AllFinite(points.X) || !AllFinite(points.Y) || (has3d && !AllFinite(points.Z)))
+        const bool use3d = cfg.Dimension == 3;
+        if (!AllFinite(points, use3d))
         {
             invalid.Diag.Code = ValidationCode::NonFiniteInput;
             return invalid;
@@ -434,13 +427,23 @@ namespace Intrinsic::Methods::Geometry::ProgressivePoissonReference
         }
         diag.AlphaDefaulted = !(cfg.RadiusAlpha > 0.0f && cfg.RadiusAlpha < 1.0f);
 
-        const auto n = static_cast<std::uint32_t>(points.X.size());
-        if (cfg.Dimension == 3)
-            return ComputeImpl<3>(points.X.data(), points.Y.data(), points.Z.data(), n, cfg, diag);
-        return ComputeImpl<2>(points.X.data(), points.Y.data(), nullptr, n, cfg, diag);
+        // Deinterleave once into cache-friendly SoA for the hashing passes.
+        const auto n = static_cast<std::uint32_t>(points.size());
+        std::vector<float> px(n), py(n), pz(n, 0.0f);
+        for (std::uint32_t i = 0; i < n; ++i)
+        {
+            px[i] = points[i].x;
+            py[i] = points[i].y;
+            if (use3d)
+                pz[i] = points[i].z;
+        }
+
+        if (use3d)
+            return ComputeImpl<3>(px.data(), py.data(), pz.data(), n, cfg, diag);
+        return ComputeImpl<2>(px.data(), py.data(), nullptr, n, cfg, diag);
     }
 
-    float MinPairwiseDistance(const PointSet& points, std::span<const std::uint32_t> order,
+    float MinPairwiseDistance(std::span<const glm::vec3> points, std::span<const std::uint32_t> order,
                               std::uint32_t count, std::uint32_t dimension, float radius)
     {
         const float sentinel = std::numeric_limits<float>::max();
@@ -448,16 +451,15 @@ namespace Intrinsic::Methods::Geometry::ProgressivePoissonReference
             return sentinel;
         const int dim = (dimension == 3) ? 3 : 2;
         const float invCell = 1.0f / radius;
-        const float* px = points.X.data();
-        const float* py = points.Y.data();
-        const float* pz = (dim == 3 && !points.Z.empty()) ? points.Z.data() : nullptr;
+        auto px = [&](std::uint32_t i) { return points[i].x; };
+        auto py = [&](std::uint32_t i) { return points[i].y; };
+        auto pz = [&](std::uint32_t i) { return (dim == 3) ? points[i].z : 0.0f; };
 
         CellMap map;
         for (std::uint32_t r = 0; r < count; ++r)
         {
             const std::uint32_t idx = order[r];
-            const float qz = pz ? pz[idx] : 0.0f;
-            const CellCoord c = PointCell(px[idx], py[idx], qz, invCell, 0, 0, 0, dim);
+            const CellCoord c = PointCell(px(idx), py(idx), pz(idx), invCell, 0, 0, 0, dim);
             map[PackCell(c.X, c.Y, c.Z, dim)].push_back(idx);
         }
 
@@ -467,9 +469,9 @@ namespace Intrinsic::Methods::Geometry::ProgressivePoissonReference
         for (std::uint32_t r = 0; r < count; ++r)
         {
             const std::uint32_t idx = order[r];
-            const float qx = px[idx];
-            const float qy = py[idx];
-            const float qz = pz ? pz[idx] : 0.0f;
+            const float qx = px(idx);
+            const float qy = py(idx);
+            const float qz = pz(idx);
             const CellCoord c = PointCell(qx, qy, qz, invCell, 0, 0, 0, dim);
             for (int dz = zlo; dz <= zhi; ++dz)
                 for (int dy = -1; dy <= 1; ++dy)
@@ -482,9 +484,9 @@ namespace Intrinsic::Methods::Geometry::ProgressivePoissonReference
                         {
                             if (nidx == idx)
                                 continue;
-                            const float ex = px[nidx] - qx;
-                            const float ey = py[nidx] - qy;
-                            const float ez = pz ? (pz[nidx] - qz) : 0.0f;
+                            const float ex = px(nidx) - qx;
+                            const float ey = py(nidx) - qy;
+                            const float ez = pz(nidx) - qz;
                             const float d2 = ex * ex + ey * ey + ez * ez;
                             best = std::min(best, d2);
                         }

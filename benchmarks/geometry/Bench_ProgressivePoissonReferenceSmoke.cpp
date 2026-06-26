@@ -15,6 +15,8 @@
 #include <random>
 #include <vector>
 
+#include <glm/glm.hpp>
+
 namespace Intrinsic::Bench::Geometry
 {
     namespace
@@ -26,38 +28,21 @@ namespace Intrinsic::Bench::Geometry
 
         namespace ppr = ::Intrinsic::Methods::Geometry::ProgressivePoissonReference;
 
-        struct Cloud
-        {
-            std::vector<float> X, Y, Z;
-        };
-
-        [[nodiscard]] Cloud MakeUniformCube()
+        [[nodiscard]] std::vector<glm::vec3> MakeUniformCube()
         {
             std::mt19937 rng(kSeed);
             std::uniform_real_distribution<float> d(0.0f, 1.0f);
-            Cloud c;
-            c.X.resize(kPointCount);
-            c.Y.resize(kPointCount);
-            c.Z.resize(kPointCount);
+            std::vector<glm::vec3> pts(kPointCount);
             for (std::uint32_t i = 0; i < kPointCount; ++i)
-            {
-                c.X[i] = d(rng);
-                c.Y[i] = d(rng);
-                c.Z[i] = d(rng);
-            }
-            return c;
+                pts[i] = glm::vec3{d(rng), d(rng), d(rng)};
+            return pts;
         }
 
-        [[nodiscard]] ProgressivePoissonReferenceSmokeMetrics RunWorkload(const Cloud& cloud)
+        [[nodiscard]] ProgressivePoissonReferenceSmokeMetrics RunWorkload(const std::vector<glm::vec3>& cloud)
         {
-            ppr::PointSet view;
-            view.X = cloud.X;
-            view.Y = cloud.Y;
-            view.Z = cloud.Z;
-
             ppr::Config cfg;
             cfg.Dimension = 3;
-            const ppr::Result r = ppr::Compute(view, cfg);
+            const ppr::Result r = ppr::Compute(cloud, cfg);
 
             ProgressivePoissonReferenceSmokeMetrics m{};
             m.AcceptedCount = r.Diag.AcceptedCount;
@@ -88,7 +73,7 @@ namespace Intrinsic::Bench::Geometry
 
     ProgressivePoissonReferenceSmokeMetrics RunProgressivePoissonReferenceSmoke()
     {
-        const Cloud cloud = MakeUniformCube();
+        const std::vector<glm::vec3> cloud = MakeUniformCube();
 
         for (int i = 0; i < kWarmupIterations; ++i)
             (void)RunWorkload(cloud);

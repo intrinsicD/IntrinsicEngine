@@ -23,7 +23,7 @@ depends_on: []
 
 ## Required changes
 - [x] Scaffold `methods/geometry/progressive_poisson/` from `methods/_template/` with `method.yaml` (`id: geometry.progressive_poisson`, domain `geometry`, status `reference`, backends `[cpu_reference]`, inputs/outputs/metrics/known_limitations populated), `paper.md` (citation, core claim, formulation, inputs/outputs, degenerate cases, implementation notes incl. the splat-radius caveat), and `README.md`.
-- [x] Implement the CPU reference in `include/` + `src/` as pure free functions: config/result structs mirroring `progressive_poisson.h`, a serial multi-level grid/hash accept pass (radius `r_L = base_radius / 2^L`, `radius_alpha` default `sqrt(d)/2`), per-level grid-origin randomization, optional within-level shuffle, and per-point introduction-level splat radii. Support 2D and 3D inputs (SoA positions).
+- [x] Implement the CPU reference in `include/` + `src/` as pure free functions: config/result structs mirroring `progressive_poisson.h`, a serial multi-level grid/hash accept pass (radius `r_L = base_radius / 2^L`, `radius_alpha` default `sqrt(d)/2`), per-level grid-origin randomization, optional within-level shuffle, and per-point introduction-level splat radii. Support 2D and 3D inputs; the public entry takes `std::span<const glm::vec3>` (z ignored when Dimension==2), not a container.
 - [x] Report deterministic output for fixed `(points, config)` and expose diagnostics: accepted count, per-level counts, measured min-distance per level, and the actual `base_radius`.
 - [x] Define degenerate handling for empty/one-point inputs, duplicate/coincident points, non-finite coordinates, `dimension` not in `{2,3}`, and `radius_alpha` outside `(0,1)` (falls back to default).
 
