@@ -1,0 +1,28 @@
+# METHOD-012 — progressive Poisson-disk CPU reference smoke manifest.
+#
+# Stable benchmark contract for the workload defined by
+# benchmarks/geometry/Bench_ProgressivePoissonReferenceSmoke.cpp and emitted by
+# the IntrinsicBenchmarkSmoke runner. The benchmark_id must match the value
+# embedded in the runner output JSON (kProgressivePoissonReferenceSmokeBenchmarkId).
+#
+# Quality, not speed, is the gate: quality_error_l2 = max(0, 1 - min Poisson-disk
+# ratio) is 0 exactly when every level boundary satisfies the guarantee. No
+# performance-win claim is made.
+
+benchmark_id: geometry.progressive_poisson.smoke
+method: geometry.progressive_poisson
+dataset: builtin.uniform_cube.4096
+params:
+  intent: smoke
+  point_count: 4096
+  dimension: 3
+  grid_width: 4
+  max_levels: 16
+  warmup_iterations: 1
+  measured_iterations: 8
+metrics:
+  - runtime_ms
+  - quality_error_l2
+thresholds:
+  smoke_runtime_ms_max: 250
+  quality_error_l2_max: 1.0e-6

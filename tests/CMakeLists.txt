@@ -476,6 +476,27 @@ intrinsic_test_object_lib(GeometryTestObjs
     DEPS IntrinsicCore IntrinsicGeometry
 )
 
+# --- Geometry method reference tests (CPU-only; methods/ package, no runtime/ECS) ---
+# METHOD-012 geometry.progressive_poisson CPU reference. The method package is
+# hermetic standard C++, so the object lib compiles its source directly and does
+# not link the geometry module.
+set(_geometry_method_test_files
+    Test.ProgressivePoissonReference.cpp
+)
+intrinsic_resolve_test_sources(_geometry_method_test_sources
+    SEARCH_DIRS unit/geometry
+    FILES ${_geometry_method_test_files}
+)
+intrinsic_test_object_lib(GeometryMethodTestObjs
+    SOURCES
+        ${_geometry_method_test_sources}
+        ${CMAKE_SOURCE_DIR}/methods/geometry/progressive_poisson/src/ProgressivePoissonReference.cpp
+    DEPS IntrinsicCore
+)
+target_include_directories(GeometryMethodTestObjs PRIVATE
+    ${CMAKE_SOURCE_DIR}/methods/geometry/progressive_poisson/include
+)
+
 # --- Relocated HARDEN-041 wrapper sources: assets/core/ecs/graphics/runtime taxonomy ---
 set(_asset_unit_test_files
     Test.Asset.EventBus.cpp
@@ -1026,6 +1047,13 @@ intrinsic_test_executable(IntrinsicPhysicsMethodTests
     OBJECTS PhysicsMethodTestObjs
     LINK_LIBS IntrinsicCore ExtrinsicPhysics
     LABELS unit physics
+)
+
+# --- Geometry method reference tests (CPU-only) ---
+intrinsic_test_executable(IntrinsicGeometryMethodTests
+    OBJECTS GeometryMethodTestObjs
+    LINK_LIBS IntrinsicCore
+    LABELS unit geometry
 )
 
 # --- Physics world tests (CPU-only) ---

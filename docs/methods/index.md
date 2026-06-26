@@ -37,3 +37,20 @@ This index is the canonical entry point for method/paper implementation document
   and [`METHOD-011`](../../tasks/done/METHOD-011-sph-fluid-reference-backend.md).
   Each remains CPU-reference-first; GPU backends require later parity-proven
   tasks.
+
+## Geometry Methods
+
+- [`geometry.progressive_poisson`](../../methods/geometry/progressive_poisson/)
+  is the deterministic CPU reference backend for progressive Poisson-disk
+  subsampling via phase-parallel spatial hashing: given an unordered point set
+  in R^d (d in {2,3}) it computes a progressive ordering of an accepted subset
+  such that every prefix `[0,k)` is a Poisson-disk sampling at its hierarchy
+  level. It is delivered by
+  [`METHOD-012`](../../tasks/active/METHOD-012-progressive-poisson-disk-cpu-reference.md)
+  at `CPUContracted`; correctness lives in
+  [`Test.ProgressivePoissonReference.cpp`](../../tests/unit/geometry/Test.ProgressivePoissonReference.cpp)
+  and the smoke benchmark in
+  [`progressive_poisson_reference_smoke.yaml`](../../benchmarks/geometry/manifests/progressive_poisson_reference_smoke.yaml).
+  The Vulkan-compute GPU backend and CPU/GPU parity are the parity-proven
+  follow-up
+  [`METHOD-013`](../../tasks/backlog/methods/METHOD-013-progressive-poisson-disk-gpu-backend.md).

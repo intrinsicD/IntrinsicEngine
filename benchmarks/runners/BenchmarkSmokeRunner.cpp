@@ -14,6 +14,7 @@
 // with the previous scaffold's CMake/CI wiring.
 
 #include "../geometry/Bench.GeometrySmoke.hpp"
+#include "../geometry/Bench.ProgressivePoissonReferenceSmoke.hpp"
 #include "../physics/Bench.ParticleSpringReferenceSmoke.hpp"
 #include "../physics/Bench.RigidBodyReferenceSmoke.hpp"
 #include "../physics/Bench.SphFluidReferenceSmoke.hpp"
@@ -134,6 +135,41 @@ namespace
             << "}\n";
 
         return EmittedBenchmark{kParameterizationDiagnosticsSmokeBenchmarkId, out.str(), metrics.Succeeded};
+    }
+
+    auto EmitProgressivePoissonReferenceSmoke(const std::string& commit) -> EmittedBenchmark
+    {
+        using namespace Intrinsic::Bench::Geometry;
+
+        const auto metrics = RunProgressivePoissonReferenceSmoke();
+
+        std::ostringstream out;
+        out.setf(std::ios::fixed);
+        out.precision(6);
+        out << "{\n"
+            << "  \"benchmark_id\": \"" << EscapeJson(kProgressivePoissonReferenceSmokeBenchmarkId) << "\",\n"
+            << "  \"method\": \""       << EscapeJson(kProgressivePoissonReferenceSmokeMethod)      << "\",\n"
+            << "  \"backend\": \"cpu_reference\",\n"
+            << "  \"dataset\": \""      << EscapeJson(kProgressivePoissonReferenceSmokeDataset)     << "\",\n"
+            << "  \"commit\": \""       << EscapeJson(commit)                                       << "\",\n"
+            << "  \"metrics\": {\n"
+            << "    \"runtime_ms\": "       << metrics.RuntimeMilliseconds << ",\n"
+            << "    \"quality_error_l2\": " << metrics.QualityErrorL2 << "\n"
+            << "  },\n"
+            << "  \"diagnostics\": {\n"
+            << "    \"runner\": \"IntrinsicBenchmarkSmoke\",\n"
+            << "    \"mode\": \"smoke\",\n"
+            << "    \"warmup_iterations\": 1,\n"
+            << "    \"measured_iterations\": 8,\n"
+            << "    \"poisson_ratio_min\": "  << metrics.PoissonRatioMin << ",\n"
+            << "    \"coverage_fraction\": "  << metrics.CoverageFraction << ",\n"
+            << "    \"accepted_count\": "     << metrics.AcceptedCount << ",\n"
+            << "    \"level_count\": "        << metrics.LevelCount << "\n"
+            << "  },\n"
+            << "  \"status\": \"" << (metrics.Succeeded ? "passed" : "failed") << "\"\n"
+            << "}\n";
+
+        return EmittedBenchmark{kProgressivePoissonReferenceSmokeBenchmarkId, out.str(), metrics.Succeeded};
     }
 
     auto EmitRigidBodyReferenceSmoke(const std::string& commit) -> EmittedBenchmark
@@ -305,6 +341,7 @@ auto main(int argc, char** argv) -> int
     std::vector<EmittedBenchmark> emitted;
     emitted.push_back(EmitHalfedgeSmoke(commit));
     emitted.push_back(EmitParameterizationDiagnosticsSmoke(commit));
+    emitted.push_back(EmitProgressivePoissonReferenceSmoke(commit));
     emitted.push_back(EmitRigidBodyReferenceSmoke(commit));
     emitted.push_back(EmitParticleSpringReferenceSmoke(commit));
     emitted.push_back(EmitXpbdClothReferenceSmoke(commit));
