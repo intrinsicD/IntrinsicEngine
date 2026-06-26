@@ -92,7 +92,7 @@ TEST_P(ProgressivePoissonReferenceDim, PoissonGuaranteeHoldsAtEveryLevelBoundary
     }
 }
 
-TEST_P(ProgressivePoissonReferenceDim, MinPairwiseHelperMatchesBruteForce)
+TEST_P(ProgressivePoissonReferenceDim, MinPairwiseHelperEqualsBruteForce)
 {
     const int dim = GetParam();
     const std::vector<glm::vec3> cloud = UniformCube(8000, 11, dim);
@@ -101,16 +101,42 @@ TEST_P(ProgressivePoissonReferenceDim, MinPairwiseHelperMatchesBruteForce)
     const ppr::Result r = ppr::Compute(cloud, cfg);
     ASSERT_GE(r.LevelOffsets.size(), 2u);
 
-    // For the level-0 prefix, the helper (search radius r_0) must detect any
-    // pair closer than r_0; since the guarantee holds it should report >= r_0.
+    // The helper is the exact measured minimum pairwise distance — it must agree
+    // with the O(n^2) ground truth at the (sparse) level-0 prefix, not merely
+    // report "no neighbor within one cell".
     const std::uint32_t le = r.LevelOffsets[1];
-    const float r0 = r.Diag.LevelRadii[0];
-    const float helper = ppr::MinPairwiseDistance(cloud, r.Order, le,
-                                                  static_cast<std::uint32_t>(dim), r0);
+    const float helper = ppr::MinPairwiseDistance(cloud, r.Order, le, static_cast<std::uint32_t>(dim));
     const float brute = BruteMinDistance(cloud, r.Order, le, dim);
-    EXPECT_GE(brute, r0 * 0.9999f);
-    if (helper != std::numeric_limits<float>::max())
-        EXPECT_GE(helper, r0 * 0.9999f);
+    ASSERT_NE(helper, std::numeric_limits<float>::max());
+    EXPECT_NEAR(helper, brute, brute * 1e-5f);
+}
+
+TEST(ProgressivePoissonReference, MinPairwiseFindsPairsBeyondAdjacentCells)
+{
+    // The exact scenario from the review: two points 3 apart. A naive 3^d search
+    // at any sub-3 cell size would miss them and report "no finite spacing"; the
+    // shell search must return the true distance 3.
+    const std::vector<glm::vec3> pts{glm::vec3{0.0f, 0.0f, 0.0f}, glm::vec3{3.0f, 0.0f, 0.0f}};
+    const std::vector<std::uint32_t> order{0u, 1u};
+    const float d3 = ppr::MinPairwiseDistance(pts, order, 2u, 3u);
+    EXPECT_NEAR(d3, 3.0f, 1e-5f);
+    const float d2 = ppr::MinPairwiseDistance(pts, order, 2u, 2u);
+    EXPECT_NEAR(d2, 3.0f, 1e-5f);
+
+    // A wider, very sparse set: nearest pair is the 1.0 gap among far-flung points.
+    const std::vector<glm::vec3> sparse{
+        glm::vec3{0.0f, 0.0f, 0.0f}, glm::vec3{50.0f, 0.0f, 0.0f},
+        glm::vec3{50.0f, 1.0f, 0.0f}, glm::vec3{0.0f, 80.0f, 0.0f}};
+    const std::vector<std::uint32_t> sorder{0u, 1u, 2u, 3u};
+    const float ds = ppr::MinPairwiseDistance(sparse, sorder, 4u, 2u);
+    EXPECT_NEAR(ds, 1.0f, 1e-5f);
+
+    // Fewer than two points -> sentinel; coincident points -> 0.
+    EXPECT_EQ(ppr::MinPairwiseDistance(pts, std::span<const std::uint32_t>{order.data(), 1u}, 1u, 2u),
+              std::numeric_limits<float>::max());
+    const std::vector<glm::vec3> dup(3, glm::vec3{2.0f, 2.0f, 2.0f});
+    const std::vector<std::uint32_t> dorder{0u, 1u, 2u};
+    EXPECT_EQ(ppr::MinPairwiseDistance(dup, dorder, 3u, 3u), 0.0f);
 }
 
 INSTANTIATE_TEST_SUITE_P(Dimensions, ProgressivePoissonReferenceDim, ::testing::Values(2, 3));

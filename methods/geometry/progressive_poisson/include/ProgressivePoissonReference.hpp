@@ -84,12 +84,15 @@ namespace Intrinsic::Methods::Geometry::ProgressivePoissonReference
     /// caller owns `points`; the result references it only by index.
     [[nodiscard]] Result Compute(std::span<const glm::vec3> points, const Config& config);
 
-    /// Convenience: measured minimum pairwise distance over the prefix
-    /// `order[0..count)`, using a uniform spatial hash at cell size `radius`.
-    /// Returns a large sentinel when fewer than two points are present.
+    /// Exact measured minimum pairwise distance over the prefix `order[0..count)`.
+    /// Builds a uniform grid sized to ~1 point/cell from the prefix's own bounding
+    /// box and runs an expanding-shell nearest-neighbor search, so the result is
+    /// correct for any separation (it is NOT limited to adjacent cells). Runs in
+    /// O(count) expected time — no brute force. Returns
+    /// `std::numeric_limits<float>::max()` when fewer than two points are present,
+    /// and 0 when all points are coincident.
     [[nodiscard]] float MinPairwiseDistance(std::span<const glm::vec3> points,
                                             std::span<const std::uint32_t> order,
                                             std::uint32_t count,
-                                            std::uint32_t dimension,
-                                            float radius);
+                                            std::uint32_t dimension);
 }
