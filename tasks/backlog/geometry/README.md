@@ -37,6 +37,37 @@ map.
   `GEOM-033`).
 - [RORG-031E — Geometry and method-readiness backlog seed](RORG-031-geometry-method-readiness.md).
 
+### bcg_code_base geometry-processing port gaps (seeded 2026-06-26)
+
+Confirmed feature gaps from the `bcg_code_base` → IntrinsicEngine port-gap
+review (features already present or better in IntrinsicEngine were excluded).
+Grouped by cluster; each is `geometry -> core` only and targets `CPUContracted`.
+
+- [GEOM-037 — SO(3) rotation primitives (Lie machinery)](GEOM-037-so3-rotation-primitives.md)
+  (foundation for `GEOM-038`).
+- [GEOM-038 — Rotation averaging: SO(3) means and medians](GEOM-038-rotation-averaging-means-medians.md)
+  (depends on `GEOM-037`).
+- [GEOM-039 — Accelerated mesh closest-face query and consumer adoption](GEOM-039-accelerated-mesh-closest-face-query.md).
+- [GEOM-040 — Mesh curvature tensor and principal directions](GEOM-040-curvature-tensor-principal-directions.md).
+- [GEOM-041 — FEM Laplacian mass/stiffness variants and edge-weight modes](GEOM-041-fem-laplacian-mass-stiffness-variants.md).
+- [GEOM-042 — Mesh normal-based bilateral denoiser](GEOM-042-mesh-normal-bilateral-denoiser.md).
+- [GEOM-043 — Remeshing surface reprojection and error-bounded adaptive sizing](GEOM-043-remeshing-reprojection-error-bounded-sizing.md)
+  (depends on `GEOM-039`, `GEOM-040`).
+- [GEOM-044 — Sqrt-3 (Kobbelt) subdivision and Loop feature/crease masks](GEOM-044-subdivision-sqrt3-loop-feature-masks.md).
+- [GEOM-045 — First-class mesh geometric-quantity accessors](GEOM-045-first-class-mesh-quantity-accessors.md).
+- [GEOM-046 — Mesh topology utilities (components, dual, triangulate, adjacency)](GEOM-046-mesh-topology-utilities.md).
+- [GEOM-047 — Graph and point-cloud query / sampling utilities](GEOM-047-graph-pointcloud-query-noise-utilities.md).
+- [GEOM-048 — Statistics accumulators and robust estimation kernels](GEOM-048-statistics-robust-estimation-kernels.md).
+- [GEOM-049 — Numeric/linear-algebra utilities (RPCA, Eigen map adapters)](GEOM-049-numeric-linalg-utilities.md).
+- [GEOM-050 — Primitive and curve utilities (Bezier, triangle metrics, sphere fit, AABB)](GEOM-050-primitive-curve-utilities.md).
+- [GEOM-051 — Property system enhancements (live iterator, upload metadata)](GEOM-051-property-system-enhancements.md)
+  (depends on `GEOM-033`).
+- [GEOIO-003 — Mesh and point-cloud IO breadth (OFF writer, point-cloud readers)](GEOIO-003-mesh-pointcloud-io-breadth.md).
+
+The indexed decrease-key heap that backs Dijkstra is a `core` container filed
+under the runtime backlog as `CORE-004`; the paired editor/runtime integration
+tasks are `UI-024`/`UI-025`/`UI-026` and `RUNTIME-135`.
+
 ## Convergence
 
 - The foundational tasks from the

@@ -7,6 +7,19 @@ another backlog directory.
 
 ## Runtime backlog tasks
 
+### bcg geometry-processing port integration (seeded 2026-06-26)
+
+Core/runtime work paired with the `bcg_code_base` geometry port gaps tracked in
+[`tasks/backlog/geometry/README.md`](../geometry/README.md). The core container
+lives here because `geometry` may not own a `core` container; the SpatialDebug
+consumer lives here because `runtime` owns composition over `geometry`.
+
+- [CORE-004 — Indexed decrease-key min-heap container and Dijkstra adoption](CORE-004-indexed-decrease-key-heap.md)
+  (`core` container; adopted by `Geometry.Graph.ShortestPath`).
+- [RUNTIME-135 — SpatialDebug closest-face picking via accelerated mesh query](RUNTIME-135-spatialdebug-closest-face-picking.md)
+  (depends on `GEOM-039`). Editor method windows for the ported algorithms are
+  `UI-024`/`UI-025`/`UI-026` under the UI backlog.
+
 ### CPU→GPU vertex-attribute overhaul (Theme B)
 
 A reusable, flexible, fast CPU→GPU vertex-attribute pipeline. Today each
