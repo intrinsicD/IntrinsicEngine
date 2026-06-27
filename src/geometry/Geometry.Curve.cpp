@@ -14,7 +14,20 @@ namespace Geometry
     {
         [[nodiscard]] bool ValidParam(std::span<const glm::vec3> controlPoints, float t)
         {
-            return !controlPoints.empty() && std::isfinite(t) && t >= 0.0f && t <= 1.0f;
+            if (controlPoints.empty() || !std::isfinite(t) || t < 0.0f || t > 1.0f)
+            {
+                return false;
+            }
+            // Fail closed on any non-finite control-point coordinate rather than
+            // propagating NaN/Inf through evaluation.
+            for (const glm::vec3& p : controlPoints)
+            {
+                if (!std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z))
+                {
+                    return false;
+                }
+            }
+            return true;
         }
     }
 

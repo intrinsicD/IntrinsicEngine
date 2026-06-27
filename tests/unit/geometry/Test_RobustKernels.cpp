@@ -110,6 +110,13 @@ TEST(GeometryRobust, FailClosedOnBadInputs)
         EXPECT_FALSE(Weight(k, nan, 1.0).has_value());        // non-finite residual
         EXPECT_FALSE(Weight(k, 1.0, inf).has_value());        // non-finite scale
         EXPECT_FALSE(Rho(k, inf, 1.0).has_value());
+
+        // Tiny (denormal) positive scale: residual/scale overflows -> fail
+        // closed, never inf (module contract). Regression for the overflow report.
+        const double tiny = std::numeric_limits<double>::denorm_min();
+        EXPECT_FALSE(Rho(k, 1.0, tiny).has_value());
+        EXPECT_FALSE(Psi(k, 1.0, tiny).has_value());
+        EXPECT_FALSE(Weight(k, 1.0, tiny).has_value());
     }
 }
 

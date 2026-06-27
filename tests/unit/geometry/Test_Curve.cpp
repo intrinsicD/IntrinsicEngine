@@ -89,4 +89,14 @@ TEST(GeometryCurve, FailClosedOnBadInput)
     EXPECT_FALSE(Geometry::EvaluateBezier(ctrl, std::numeric_limits<float>::quiet_NaN()).has_value());
     EXPECT_FALSE(Geometry::EvaluateBezierBernstein(empty, 0.5f).has_value());
     EXPECT_FALSE(Geometry::EvaluateBezierDerivative(empty, 0.5f).has_value());
+
+    // Non-finite control-point coordinates fail closed (no NaN/Inf propagation).
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    const float inf = std::numeric_limits<float>::infinity();
+    const std::vector<glm::vec3> badNan{{0.0f, 0.0f, 0.0f}, {nan, 1.0f, 2.0f}};
+    const std::vector<glm::vec3> badInf{{0.0f, inf, 0.0f}, {1.0f, 1.0f, 1.0f}};
+    EXPECT_FALSE(Geometry::EvaluateBezier(badNan, 0.5f).has_value());
+    EXPECT_FALSE(Geometry::EvaluateBezierBernstein(badNan, 0.5f).has_value());
+    EXPECT_FALSE(Geometry::EvaluateBezierDerivative(badNan, 0.5f).has_value());
+    EXPECT_FALSE(Geometry::EvaluateBezier(badInf, 0.5f).has_value());
 }

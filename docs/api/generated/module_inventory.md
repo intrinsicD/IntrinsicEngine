@@ -10,9 +10,9 @@ Root scanned: `src`
 |---|---:|
 | `app` | 1 |
 | `assets` | 12 |
-| `core` | 39 |
+| `core` | 40 |
 | `ecs` | 28 |
-| `geometry` | 89 |
+| `geometry` | 95 |
 | `graphics/assets` | 1 |
 | `graphics/framegraph` | 7 |
 | `graphics/renderer` | 68 |
@@ -63,6 +63,7 @@ Root scanned: `src`
 | `Extrinsic.Core.HandleLease` | `src/core/Core.HandleLease.cppm` | `core` |
 | `Extrinsic.Core.Hash` | `src/core/Core.Hash.cppm` | `core` |
 | `Extrinsic.Core.IOBackend` | `src/core/Core.IOBackend.cppm` | `core` |
+| `Extrinsic.Core.IndexedHeap` | `src/core/Core.IndexedHeap.cppm` | `core` |
 | `Extrinsic.Core.LockFreeQueue` | `src/core/Core.LockFreeQueue.cppm` | `core` |
 | `Extrinsic.Core.Logging` | `src/core/Core.Logging.cppm` | `core` |
 | `Extrinsic.Core.Memory:Common` | `src/core/Core.Memory.Common.cppm` | `core` |
@@ -115,6 +116,7 @@ Root scanned: `src`
 | `Geometry.Containment` | `src/geometry/Geometry.Containment.cppm` | `geometry` |
 | `Geometry.ConvexHull` | `src/geometry/Geometry.ConvexHull.cppm` | `geometry` |
 | `Geometry.ConvexHullBuilder` | `src/geometry/Geometry.ConvexHullBuilder.cppm` | `geometry` |
+| `Geometry.Curve` | `src/geometry/Geometry.Curve.cppm` | `geometry` |
 | `Geometry.Cylinder` | `src/geometry/Geometry.Cylinder.cppm` | `geometry` |
 | `Geometry.DomainViews` | `src/geometry/Geometry.DomainViews.cppm` | `geometry` |
 | `Geometry.EPA` | `src/geometry/Geometry.EPA.cppm` | `geometry` |
@@ -161,6 +163,7 @@ Root scanned: `src`
 | `Geometry.LinearSolver` | `src/geometry/Geometry.LinearSolver.cppm` | `geometry` |
 | `Geometry.MarchingCubes` | `src/geometry/Geometry.MarchingCubes.cppm` | `geometry` |
 | `Geometry.Mesh.Conversion` | `src/geometry/Geometry.Mesh.Conversion.cppm` | `geometry` |
+| `Geometry.MeshClosestFace` | `src/geometry/Geometry.MeshClosestFace.cppm` | `geometry` |
 | `Geometry.MeshOperator` | `src/geometry/Geometry.MeshOperator.cppm` | `geometry` |
 | `Geometry.MeshSoup` | `src/geometry/Geometry.MeshSoup.cppm` | `geometry` |
 | `Geometry.OBB` | `src/geometry/Geometry.OBB.cppm` | `geometry` |
@@ -182,7 +185,10 @@ Root scanned: `src`
 | `Geometry.Ray` | `src/geometry/Geometry.Ray.cppm` | `geometry` |
 | `Geometry.Raycast` | `src/geometry/Geometry.Raycast.cppm` | `geometry` |
 | `Geometry.Registration` | `src/geometry/Geometry.Registration.cppm` | `geometry` |
+| `Geometry.Robust` | `src/geometry/Geometry.Robust.cppm` | `geometry` |
 | `Geometry.RobustPredicates` | `src/geometry/Geometry.RobustPredicates.cppm` | `geometry` |
+| `Geometry.Rotation` | `src/geometry/Geometry.Rotation.cppm` | `geometry` |
+| `Geometry.RotationAveraging` | `src/geometry/Geometry.RotationAveraging.cppm` | `geometry` |
 | `Geometry.SDF` | `src/geometry/Geometry.SDF.cppm` | `geometry` |
 | `Geometry.SDFContact` | `src/geometry/Geometry.SDFContact.cppm` | `geometry` |
 | `Geometry.Segment` | `src/geometry/Geometry.Segment.cppm` | `geometry` |
@@ -190,6 +196,7 @@ Root scanned: `src`
 | `Geometry.SpatialQueries` | `src/geometry/Geometry.SpatialQueries.cppm` | `geometry` |
 | `Geometry.Sphere.Sampling` | `src/geometry/Geometry.Sphere.Sampling.cppm` | `geometry` |
 | `Geometry.Sphere` | `src/geometry/Geometry.Sphere.cppm` | `geometry` |
+| `Geometry.Statistics` | `src/geometry/Geometry.Statistics.cppm` | `geometry` |
 | `Geometry.Support` | `src/geometry/Geometry.Support.cppm` | `geometry` |
 | `Geometry.SurfaceReconstruction` | `src/geometry/Geometry.SurfaceReconstruction.cppm` | `geometry` |
 | `Geometry.Triangle` | `src/geometry/Geometry.Triangle.cppm` | `geometry` |
@@ -535,4 +542,4 @@ Root scanned: `src`
 | `Extrinsic.Runtime.SpatialDebugAdapters` | `src/runtime/SpatialDebug/Runtime.SpatialDebugAdapters.cppm` | `runtime` |
 | `Extrinsic.Runtime.VisualizationAdapters` | `src/runtime/Visualization/Runtime.VisualizationAdapters.cppm` | `runtime` |
 
-Total modules: **507**
+Total modules: **514**
