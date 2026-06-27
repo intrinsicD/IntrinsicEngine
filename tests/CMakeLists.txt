@@ -404,6 +404,7 @@ endif()
 # --- Geometry tests (DEC, mesh algorithms, graphs — no GPU, no ECS) ---
 set(_geometry_test_files
     Test_MeshQuantities.cpp
+    Test_MeshClosestFace.cpp
     Test_RuntimeGeometry.cpp
     Test.GeometryIO.cpp
     Test_RuntimeGraph.cpp
