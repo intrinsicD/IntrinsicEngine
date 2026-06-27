@@ -13,7 +13,11 @@ map.
 
 ## Tasks
 
-No open process backlog tasks.
+- [PROC-012 — Resolve duplicate GEOM-027 task ID](PROC-012-resolve-duplicate-geom-027-id.md)
+  (renumber the unrelated control-surface/KMeans backend-seam task to
+  `GEOM-052`, keeping `GEOM-027` as the property-name-lifetime contract the
+  property sequence depends on; clears the strict task-policy duplicate-ID
+  finding. Aligns with the `PROC-002` ID-uniqueness rule).
 
 ## Convergence
 

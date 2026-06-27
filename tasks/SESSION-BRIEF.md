@@ -99,6 +99,7 @@ the authoritative open/unblocked view.
 - unblocked: `METHOD-007` — Constrained Delaunay tetrahedralization reference backend (tasks/backlog/methods/METHOD-007-constrained-delaunay-tetrahedralization-reference-backend.md)
 - blocked by `METHOD-012`: `METHOD-013` — Progressive Poisson-disk sampling: GPU (Vulkan compute) backend + parity (tasks/backlog/methods/METHOD-013-progressive-poisson-disk-gpu-backend.md)
 - unblocked: `METHODS-001` — Pin signed heat as methods-pipeline pathfinder (tasks/backlog/methods/METHODS-001-signed-heat-pathfinder.md)
+- unblocked: `PROC-012` — Resolve duplicate GEOM-027 task ID (tasks/backlog/process/PROC-012-resolve-duplicate-geom-027-id.md)
 - blocked by `GEOM-036`: `RUNTIME-133` — Method result & figure data-export seam (CSV/JSON) (tasks/backlog/runtime/RUNTIME-133-method-figure-data-export.md)
 - blocked by `METHOD-012`: `RUNTIME-134` — Interactive progressive-Poisson sampling playground in the Sandbox (tasks/backlog/ui/RUNTIME-134-progressive-poisson-interactive-playground.md)
 
