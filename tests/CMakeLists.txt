@@ -184,6 +184,7 @@ endfunction()
 # --- Core tests (pure algorithmic, no GPU, no ECS) ---
 set(_core_test_files
     Test_BoundedHeap.cpp
+    Test_IndexedHeap.cpp
     Test.CoreError.cpp
     Test.LogRingBuffer.cpp
 )
