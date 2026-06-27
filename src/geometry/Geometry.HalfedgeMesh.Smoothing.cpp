@@ -679,10 +679,15 @@ namespace Geometry::Smoothing
                     }
 
                     const glm::dvec3 step = delta / static_cast<double>(count);
-                    // Fail closed: never write a non-finite position.
-                    if (IsFiniteVec(step))
+                    // Fail closed: never write a non-finite position. The step
+                    // can be finite in double precision yet push the coordinate
+                    // past the float storage range, so validate the candidate
+                    // *after* narrowing to glm::vec3; on overflow the vertex is
+                    // left at its (finite) current position.
+                    const glm::dvec3 candidate = xi + step;
+                    if (IsFiniteVec(candidate) && IsFiniteVec(glm::vec3(candidate)))
                     {
-                        newPos[i] = xi + step;
+                        newPos[i] = candidate;
                     }
                 }
 

@@ -937,6 +937,46 @@ TEST(Smoothing, DenoiseBilateralFailsClosedOnNonFiniteSigma)
     ExpectPositionsUnchanged(mesh, before);
 }
 
+TEST(Smoothing, DenoiseBilateralExtremeCoordinatesStayFinite)
+{
+    // Coordinates near the float limit: the Stage 2 step can be finite in double
+    // precision yet push xi + step past the float range. The narrowing write must
+    // never store Inf/NaN (fail-closed/no-Inf contract). Build a creased patch,
+    // translate it close to FLT_MAX on every axis, add proportional noise.
+    const float base = 3.0e38f;
+    auto mesh = MakeCreaseGrid(10, 1.0e36f, 0.7f);
+    DeterministicNoise noise(0xACE0FBA5EULL);
+    for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+    {
+        Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
+        if (mesh.IsDeleted(v)) continue;
+        glm::vec3 p = mesh.Position(v);
+        p += glm::vec3(base, base, base);
+        p += 1.0e35f * glm::vec3(static_cast<float>(noise.Next()),
+                                 static_cast<float>(noise.Next()),
+                                 static_cast<float>(noise.Next()));
+        mesh.Position(v) = p;
+    }
+
+    Geometry::Smoothing::BilateralDenoiseParams params;
+    params.NormalIterations = 5;
+    params.VertexIterations = 15;
+    params.PreserveBoundary = false; // let interior + edge vertices all move
+
+    auto result = Geometry::Smoothing::DenoiseBilateral(mesh, params);
+    ASSERT_EQ(result.Status, Geometry::Smoothing::DenoiseStatus::Success);
+
+    for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+    {
+        Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
+        if (mesh.IsDeleted(v)) continue;
+        glm::vec3 p = mesh.Position(v);
+        EXPECT_TRUE(std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z))
+            << "vertex " << i << " became non-finite: (" << p.x << ", " << p.y
+            << ", " << p.z << ")";
+    }
+}
+
 TEST(Smoothing, DenoiseBilateralPreservesBoundary)
 {
     auto mesh = MakeCreaseGrid(8, 0.4f, 0.6f);
