@@ -1435,3 +1435,173 @@ TEST(DEC_StiffnessModes, FailClosedOnNonFinitePositions)
         for (double v : w.Diagonal) EXPECT_TRUE(std::isfinite(v)) << "mode " << static_cast<int>(mode);
     }
 }
+
+// =============================================================================
+// GEOM-041 Slice 3 — mass modes (Sum / Barycentric / Voronoi / Galerkin)
+// =============================================================================
+
+namespace
+{
+    using Geometry::DEC::MassMode;
+
+    double TotalFaceArea(const Geometry::HalfedgeMesh::Mesh& mesh)
+    {
+        double total = 0.0;
+        for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
+        {
+            Geometry::FaceHandle f{static_cast<Geometry::PropertyIndex>(fi)};
+            if (mesh.IsDeleted(f)) continue;
+            total += Geometry::MeshUtils::FaceArea(mesh, f);
+        }
+        return total;
+    }
+
+    // Quadratic form xᵀ M x for a CSR matrix.
+    double QuadForm(const Geometry::DEC::SparseMatrix& M, const std::vector<double>& x)
+    {
+        double s = 0.0;
+        for (std::size_t i = 0; i < M.Rows; ++i)
+            for (std::size_t k = M.RowOffsets[i]; k < M.RowOffsets[i + 1]; ++k)
+                s += x[i] * M.Values[k] * x[M.ColIndices[k]];
+        return s;
+    }
+}
+
+TEST(DEC_MassModes, VoronoiVariantReproducesDefault)
+{
+    auto mesh = MakeIcosahedron();
+    auto def = Geometry::DEC::BuildHodgeStar0(mesh);
+    auto vor = Geometry::DEC::BuildHodgeStar0(mesh, MassMode::Voronoi);
+    ASSERT_EQ(def.Size, vor.Size);
+    for (std::size_t i = 0; i < def.Size; ++i)
+        EXPECT_DOUBLE_EQ(def.Diagonal[i], vor.Diagonal[i]);
+
+    // Default BuildOperators path is also unchanged for {Cotan, Voronoi}.
+    auto opsDefault = Geometry::DEC::BuildOperators(mesh);
+    auto opsConfig = Geometry::DEC::BuildOperators(
+        mesh, EdgeWeightConfig{EdgeWeightMode::Cotan, 0.0, 1.0, MassMode::Voronoi});
+    for (std::size_t i = 0; i < opsDefault.Hodge0.Size; ++i)
+        EXPECT_DOUBLE_EQ(opsDefault.Hodge0.Diagonal[i], opsConfig.Hodge0.Diagonal[i]);
+    EXPECT_TRUE(opsConfig.ConsistentMass.IsEmpty());
+}
+
+TEST(DEC_MassModes, AllLumpedModesPartitionTotalArea)
+{
+    auto mesh = MakeIcosahedron();
+    const double total = TotalFaceArea(mesh);
+    for (MassMode mode : {MassMode::Sum, MassMode::Barycentric, MassMode::Voronoi})
+    {
+        auto m = Geometry::DEC::BuildHodgeStar0(mesh, mode);
+        double sum = 0.0;
+        for (double v : m.Diagonal) sum += v;
+        EXPECT_NEAR(sum, total, 1e-5) << "mode " << static_cast<int>(mode);
+    }
+}
+
+TEST(DEC_MassModes, BarycentricIsOneThirdIncidentArea)
+{
+    auto mesh = MakeIcosahedron();
+    auto bary = Geometry::DEC::BuildHodgeStar0(mesh, MassMode::Barycentric);
+    std::vector<double> expected(mesh.VerticesSize(), 0.0);
+    for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
+    {
+        Geometry::FaceHandle f{static_cast<Geometry::PropertyIndex>(fi)};
+        if (mesh.IsDeleted(f)) continue;
+        const double third = Geometry::MeshUtils::FaceArea(mesh, f) / 3.0;
+        for (auto v : mesh.VerticesAroundFace(f)) expected[v.Index] += third;
+    }
+    for (std::size_t i = 0; i < bary.Size; ++i)
+        EXPECT_NEAR(bary.Diagonal[i], expected[i], 1e-6);
+}
+
+TEST(DEC_MassModes, GalerkinRowSumsEqualLumpedSum)
+{
+    auto mesh = MakeIcosahedron();
+    auto M = Geometry::DEC::BuildConsistentMass(mesh);
+    auto sum = Geometry::DEC::BuildHodgeStar0(mesh, MassMode::Sum);
+    ASSERT_EQ(M.Rows, sum.Size);
+    for (std::size_t i = 0; i < M.Rows; ++i)
+    {
+        double rs = 0.0;
+        for (std::size_t k = M.RowOffsets[i]; k < M.RowOffsets[i + 1]; ++k)
+            rs += M.Values[k];
+        EXPECT_NEAR(rs, sum.Diagonal[i], 1e-12) << "row " << i;
+    }
+    // Total consistent mass equals the surface area.
+    double total = 0.0;
+    for (double v : M.Values) total += v;
+    EXPECT_NEAR(total, TotalFaceArea(mesh), 1e-5);
+}
+
+TEST(DEC_MassModes, GalerkinConsistentMassIsSymmetricSPD)
+{
+    auto mesh = MakeIcosahedron();
+    auto M = Geometry::DEC::BuildConsistentMass(mesh);
+
+    // Symmetry + positive diagonal.
+    for (std::size_t i = 0; i < M.Rows; ++i)
+    {
+        for (std::size_t k = M.RowOffsets[i]; k < M.RowOffsets[i + 1]; ++k)
+        {
+            const std::size_t j = M.ColIndices[k];
+            double mji = 0.0;
+            for (std::size_t m = M.RowOffsets[j]; m < M.RowOffsets[j + 1]; ++m)
+                if (M.ColIndices[m] == i) { mji = M.Values[m]; break; }
+            EXPECT_NEAR(M.Values[k], mji, 1e-12);
+            if (i == j) EXPECT_GT(M.Values[k], 0.0);
+        }
+    }
+
+    // Positive-definite evidence: xᵀ M x > 0 for several nonzero vectors.
+    const std::size_t n = M.Rows;
+    std::vector<double> e0(n, 0.0); e0[0] = 1.0;
+    std::vector<double> ones(n, 1.0);
+    std::vector<double> alt(n), ramp(n);
+    for (std::size_t i = 0; i < n; ++i) { alt[i] = (i % 2 == 0) ? 1.0 : -1.0; ramp[i] = static_cast<double>(i) - 0.5 * n; }
+    for (const auto* x : {&e0, &ones, &alt, &ramp})
+        EXPECT_GT(QuadForm(M, *x), 0.0);
+}
+
+TEST(DEC_MassModes, GalerkinOperatorsPopulateConsistentAndLumped)
+{
+    auto mesh = MakeIcosahedron();
+    auto ops = Geometry::DEC::BuildOperators(
+        mesh, EdgeWeightConfig{EdgeWeightMode::Cotan, 0.0, 1.0, MassMode::Galerkin});
+    EXPECT_FALSE(ops.ConsistentMass.IsEmpty());
+    EXPECT_EQ(ops.ConsistentMass.Rows, mesh.VerticesSize());
+    // The diagonal Hodge0 is the row-sum lump of the consistent mass.
+    for (std::size_t i = 0; i < ops.ConsistentMass.Rows; ++i)
+    {
+        double rs = 0.0;
+        for (std::size_t k = ops.ConsistentMass.RowOffsets[i]; k < ops.ConsistentMass.RowOffsets[i + 1]; ++k)
+            rs += ops.ConsistentMass.Values[k];
+        EXPECT_NEAR(ops.Hodge0.Diagonal[i], rs, 1e-12);
+    }
+}
+
+TEST(DEC_MassModes, FailClosedOnEmptyAndNonFinite)
+{
+    Geometry::HalfedgeMesh::Mesh empty;
+    auto Me = Geometry::DEC::BuildConsistentMass(empty);
+    EXPECT_EQ(Me.Rows, 0u);
+
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+    auto v1 = mesh.AddVertex({1.0f, 0.0f, 0.0f});
+    auto v2 = mesh.AddVertex({nan, 1.0f, 0.0f});
+    auto v3 = mesh.AddVertex({0.0f, -1.0f, 0.0f});
+    (void)mesh.AddTriangle(v0, v1, v2); // poisoned face -> skipped
+    (void)mesh.AddTriangle(v0, v3, v1); // finite face -> contributes
+
+    auto M = Geometry::DEC::BuildConsistentMass(mesh);
+    for (double v : M.Values) EXPECT_TRUE(std::isfinite(v));
+    // The new mass paths fail closed on non-finite faces (the poisoned triangle
+    // is skipped). Voronoi is the pre-existing shared mixed-Voronoi path and is
+    // out of GEOM-041 scope here.
+    for (MassMode mode : {MassMode::Sum, MassMode::Barycentric, MassMode::Galerkin})
+    {
+        auto m = Geometry::DEC::BuildHodgeStar0(mesh, mode);
+        for (double v : m.Diagonal) EXPECT_TRUE(std::isfinite(v)) << "mode " << static_cast<int>(mode);
+    }
+}

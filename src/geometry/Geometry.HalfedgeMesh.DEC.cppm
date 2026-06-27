@@ -52,6 +52,33 @@ export namespace Geometry::DEC
         ModifiedNormal = 4,
     };
 
+    // -------------------------------------------------------------------------
+    // MassMode — selects the vertex-mass (⋆0 / Hodge0) lumping scheme
+    // -------------------------------------------------------------------------
+    //
+    // The mass matrix is the FEM/DEC inner product on 0-forms (vertex scalars).
+    // Lumped (diagonal) variants are cheap and unconditionally invertible; the
+    // consistent (Galerkin) variant is the exact linear-FEM mass matrix.
+
+    enum class MassMode : std::uint8_t
+    {
+        // Lumped mass via row-sum lumping of the consistent (Galerkin) mass
+        // matrix: m_i = Σ_j M_ij = (1/3) Σ_{f∋i} A_f. Diagonal, SPD.
+        Sum = 0,
+
+        // Barycentric lumped mass: each vertex receives one third of each
+        // incident triangle's area, m_i = (1/3) Σ_{f∋i} A_f. Diagonal.
+        Barycentric = 1,
+
+        // Mixed-Voronoi area (Meyer et al., 2003) — the existing default.
+        Voronoi = 2,
+
+        // Full consistent (Galerkin) mass matrix: per triangle of area A,
+        // (A/12)·[[2,1,1],[1,2,1],[1,1,2]]. Non-diagonal, symmetric, SPD; stored
+        // in DECOperators::ConsistentMass, with the row-sum lump in Hodge0.
+        Galerkin = 3,
+    };
+
     // Configuration for non-default edge weighting schemes.
     struct EdgeWeightConfig
     {
@@ -65,6 +92,10 @@ export namespace Geometry::DEC
         // 1 reproduces the plain |n_i · n_j| factor; larger values sharpen the
         // feature attenuation. Ignored by every other mode.
         double FeatureExponent{1.0};
+
+        // Vertex-mass (Hodge0) lumping scheme. Default Voronoi reproduces the
+        // previous mixed-Voronoi Hodge0 exactly.
+        MassMode Mass{MassMode::Voronoi};
     };
     // -------------------------------------------------------------------------
     // SparseMatrix — Compressed Sparse Row (CSR) representation
@@ -130,9 +161,14 @@ export namespace Geometry::DEC
         SparseMatrix D1;  // #F × #E — curl on 1-forms
 
         // Hodge stars (diagonal)
-        DiagonalMatrix Hodge0;  // #V — Voronoi vertex areas (barycentric or mixed)
+        DiagonalMatrix Hodge0;  // #V — vertex mass: Voronoi/Barycentric/Sum lump
         DiagonalMatrix Hodge1;  // #E — cotan weights: (cot α + cot β) / 2
         DiagonalMatrix Hodge2;  // #F — inverse triangle area: 1 / A_f
+
+        // Consistent (Galerkin) mass matrix — populated only when MassMode is
+        // Galerkin; empty otherwise. #V × #V, symmetric, SPD. When present, the
+        // diagonal Hodge0 holds its row-sum (lumped) form.
+        SparseMatrix ConsistentMass;
 
         // Laplace-Beltrami (weak form): L = d0ᵀ ⋆1 d0
         // This is the #V × #V symmetric negative-semidefinite cotan Laplacian.
@@ -168,6 +204,19 @@ export namespace Geometry::DEC
     //   - For obtuse triangles at vertex i: A_f / 2.
     //   - For obtuse triangles not at vertex i: A_f / 4.
     [[nodiscard]] DiagonalMatrix BuildHodgeStar0(const HalfedgeMesh::Mesh& mesh);
+
+    // Mass-mode variant of ⋆0. Returns the diagonal lumped vertex mass for the
+    // selected MassMode (Sum / Barycentric / Voronoi). For MassMode::Galerkin it
+    // returns the row-sum lump of the consistent mass matrix (see
+    // BuildConsistentMass). Voronoi reproduces the unparameterized BuildHodgeStar0
+    // exactly. Degenerate / non-finite faces fail closed (contribute 0).
+    [[nodiscard]] DiagonalMatrix BuildHodgeStar0(const HalfedgeMesh::Mesh& mesh,
+                                                  MassMode mode);
+
+    // Full consistent (Galerkin) mass matrix M (#V × #V), symmetric and SPD:
+    // each triangle of area A contributes (A/12)·[[2,1,1],[1,2,1],[1,1,2]] to its
+    // three vertices. Degenerate / non-finite triangles fail closed (skipped).
+    [[nodiscard]] SparseMatrix BuildConsistentMass(const HalfedgeMesh::Mesh& mesh);
 
     // Build the Hodge star ⋆1: diagonal matrix of cotan weights per edge.
     //   ⋆1[e] = (cot α_e + cot β_e) / 2

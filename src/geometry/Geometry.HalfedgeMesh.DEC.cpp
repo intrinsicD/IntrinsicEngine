@@ -1,9 +1,11 @@
 module;
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
+#include <map>
 #include <numeric>
 #include <span>
 #include <vector>
@@ -215,6 +217,126 @@ namespace Geometry::DEC
         DiagonalMatrix hodge0;
         hodge0.Size = areas.size();
         hodge0.Diagonal = std::move(areas);
+        return hodge0;
+    }
+
+    // -------------------------------------------------------------------------
+    // BuildConsistentMass — full Galerkin (consistent) mass matrix
+    // -------------------------------------------------------------------------
+    // Per triangle of area A, the linear-FEM mass matrix is
+    //   (A/12) * [[2,1,1],[1,2,1],[1,1,2]]
+    // assembled over all triangles. Symmetric and SPD. Degenerate / non-finite
+    // triangles are skipped (fail closed) — area <= tol or NaN area drops out.
+
+    SparseMatrix BuildConsistentMass(const HalfedgeMesh::Mesh& mesh)
+    {
+        const std::size_t nV = mesh.VerticesSize();
+        std::vector<std::map<std::size_t, double>> rows(nV);
+
+        for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
+        {
+            FaceHandle fh{static_cast<PropertyIndex>(fi)};
+            MeshUtils::TriangleFaceView tri{};
+            if (!MeshUtils::TryGetTriangleFaceView(mesh, fh, tri))
+            {
+                continue;
+            }
+            const double area = TriangleArea(tri.P0, tri.P1, tri.P2);
+            if (!(area > 1e-12)) // rejects zero-area and non-finite (NaN) areas
+            {
+                continue;
+            }
+            const std::array<std::size_t, 3> idx{tri.V0.Index, tri.V1.Index, tri.V2.Index};
+            const double off = area / 12.0;   // M_ij, i != j
+            const double diag = area / 6.0;   // M_ii = 2 * A/12
+            for (std::size_t a = 0; a < 3; ++a)
+            {
+                for (std::size_t b = 0; b < 3; ++b)
+                {
+                    rows[idx[a]][idx[b]] += (a == b) ? diag : off;
+                }
+            }
+        }
+
+        SparseMatrix M;
+        M.Rows = nV;
+        M.Cols = nV;
+        M.RowOffsets.resize(nV + 1);
+        M.RowOffsets[0] = 0;
+        for (std::size_t i = 0; i < nV; ++i)
+        {
+            M.RowOffsets[i + 1] = M.RowOffsets[i] + rows[i].size();
+        }
+        const std::size_t nnz = M.RowOffsets[nV];
+        M.ColIndices.resize(nnz);
+        M.Values.resize(nnz);
+        for (std::size_t i = 0; i < nV; ++i)
+        {
+            std::size_t k = M.RowOffsets[i];
+            for (const auto& [col, val] : rows[i]) // std::map keeps columns sorted
+            {
+                M.ColIndices[k] = col;
+                M.Values[k] = val;
+                ++k;
+            }
+        }
+        return M;
+    }
+
+    // -------------------------------------------------------------------------
+    // BuildHodgeStar0 — mass-mode variant
+    // -------------------------------------------------------------------------
+
+    DiagonalMatrix BuildHodgeStar0(const HalfedgeMesh::Mesh& mesh, MassMode mode)
+    {
+        if (mode == MassMode::Voronoi)
+        {
+            return BuildHodgeStar0(mesh); // byte-identical to the default path
+        }
+
+        const std::size_t nV = mesh.VerticesSize();
+
+        if (mode == MassMode::Sum || mode == MassMode::Galerkin)
+        {
+            // Lumped mass = row-sum of the consistent (Galerkin) mass matrix.
+            const SparseMatrix M = BuildConsistentMass(mesh);
+            DiagonalMatrix hodge0;
+            hodge0.Size = nV;
+            hodge0.Diagonal.assign(nV, 0.0);
+            for (std::size_t i = 0; i < nV; ++i)
+            {
+                double sum = 0.0;
+                for (std::size_t k = M.RowOffsets[i]; k < M.RowOffsets[i + 1]; ++k)
+                {
+                    sum += M.Values[k];
+                }
+                hodge0.Diagonal[i] = sum;
+            }
+            return hodge0;
+        }
+
+        // Barycentric: each vertex receives one third of each incident triangle.
+        DiagonalMatrix hodge0;
+        hodge0.Size = nV;
+        hodge0.Diagonal.assign(nV, 0.0);
+        for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
+        {
+            FaceHandle fh{static_cast<PropertyIndex>(fi)};
+            MeshUtils::TriangleFaceView tri{};
+            if (!MeshUtils::TryGetTriangleFaceView(mesh, fh, tri))
+            {
+                continue;
+            }
+            const double area = TriangleArea(tri.P0, tri.P1, tri.P2);
+            if (!(area > 1e-12))
+            {
+                continue;
+            }
+            const double third = area / 3.0;
+            hodge0.Diagonal[tri.V0.Index] += third;
+            hodge0.Diagonal[tri.V1.Index] += third;
+            hodge0.Diagonal[tri.V2.Index] += third;
+        }
         return hodge0;
     }
 
@@ -515,24 +637,38 @@ namespace Geometry::DEC
     DECOperators BuildOperators(const HalfedgeMesh::Mesh& mesh,
                                  const EdgeWeightConfig& config)
     {
-        if (config.Mode == EdgeWeightMode::Cotan)
+        // Fully-default config reproduces the unparameterized operators exactly.
+        if (config.Mode == EdgeWeightMode::Cotan && config.Mass == MassMode::Voronoi)
         {
             return BuildOperators(mesh);
         }
 
         DECOperators ops;
 
-        // Topology-only operators are weight-independent
+        // Topology-only operators are weight-independent.
         ops.D0 = BuildExteriorDerivative0(mesh);
         ops.D1 = BuildExteriorDerivative1(mesh);
-
-        // Area-based Hodge stars are metric-dependent but not edge-weight-dependent
-        ops.Hodge0 = BuildHodgeStar0(mesh);
         ops.Hodge2 = BuildHodgeStar2(mesh);
 
-        // Weight-dependent operators
-        ops.Hodge1 = BuildHodgeStar1(mesh, config);
-        ops.Laplacian = BuildLaplacian(mesh, config);
+        // Stiffness (edge-weight-dependent) operators.
+        if (config.Mode == EdgeWeightMode::Cotan)
+        {
+            ops.Hodge1 = BuildHodgeStar1(mesh);
+            ops.Laplacian = BuildLaplacian(mesh);
+        }
+        else
+        {
+            ops.Hodge1 = BuildHodgeStar1(mesh, config);
+            ops.Laplacian = BuildLaplacian(mesh, config);
+        }
+
+        // Mass (Hodge0) operators. Galerkin additionally populates the consistent
+        // mass matrix and lumps its row-sums into the diagonal Hodge0.
+        if (config.Mass == MassMode::Galerkin)
+        {
+            ops.ConsistentMass = BuildConsistentMass(mesh);
+        }
+        ops.Hodge0 = BuildHodgeStar0(mesh, config.Mass);
 
         return ops;
     }
@@ -635,7 +771,7 @@ namespace Geometry::DEC
     LaplacianCache BuildLaplacianCache(const HalfedgeMesh::Mesh& mesh,
                                         const EdgeWeightConfig& config)
     {
-        if (config.Mode == EdgeWeightMode::Cotan)
+        if (config.Mode == EdgeWeightMode::Cotan && config.Mass == MassMode::Voronoi)
         {
             return BuildLaplacianCache(mesh);
         }

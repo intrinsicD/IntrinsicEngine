@@ -94,6 +94,21 @@ as `MeshUtils::ClampedHalfedgeCotan` (`h:clamped_cotan`): the Heron/metric form
 the per-edge cotan weight is the average of the two halfedge cotans. Boundary
 halfedges and degenerate / non-finite triangles fail closed to zero.
 
+The vertex-mass matrix `⋆0`/`Hodge0` is selectable via `MassMode`:
+
+- `Voronoi` (default) — mixed-Voronoi area (Meyer et al., 2003); reproduces the
+  previous `Hodge0` exactly.
+- `Barycentric` — one third of each incident triangle area, `m_i = (1/3) Σ A_f`.
+- `Sum` — lumped mass via row-sum lumping of the consistent (Galerkin) mass
+  matrix; equals `Barycentric` for linear triangles.
+- `Galerkin` — the full consistent mass matrix `(A/12)·[[2,1,1],[1,2,1],[1,1,2]]`
+  per triangle, exposed as `DECOperators::ConsistentMass` (symmetric, SPD), with
+  its row-sum lump in the diagonal `Hodge0`.
+
+All lumped modes partition the surface area; degenerate / non-finite faces fail
+closed (are skipped). `BuildConsistentMass` and the mass-mode `BuildHodgeStar0`
+are deterministic.
+
 ### Parameterization diagnostics
 
 `Geometry.Parameterization.Diagnostics` is the shared CPU diagnostics surface for
