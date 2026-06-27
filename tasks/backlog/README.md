@@ -153,7 +153,7 @@ Open members:
 - [`geometry/DOCS-003-reconcile-algorithm-variant-dispatch-doc.md`](geometry/DOCS-003-reconcile-algorithm-variant-dispatch-doc.md) —
   reconcile `algorithm-variant-dispatch.md` with live code and define the shared
   CPU/GPU backend-seam template.
-- [`geometry/GEOM-027-shared-cpu-gpu-backend-seam-kmeans-exemplar.md`](geometry/GEOM-027-shared-cpu-gpu-backend-seam-kmeans-exemplar.md) —
+- [`geometry/GEOM-052-shared-cpu-gpu-backend-seam-kmeans-exemplar.md`](geometry/GEOM-052-shared-cpu-gpu-backend-seam-kmeans-exemplar.md) —
   establish the shared backend seam and fix the `Geometry.KMeans` phantom GPU as
   the worked exemplar (depends on `DOCS-003`).
 

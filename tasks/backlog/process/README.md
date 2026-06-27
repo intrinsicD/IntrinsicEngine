@@ -15,6 +15,11 @@ map.
 
 No open process backlog tasks.
 
+`PROC-012` (resolve the duplicate `GEOM-027` ID by renumbering the
+control-surface/KMeans backend-seam task to `GEOM-052`) is retired to
+[`tasks/done/`](../../done/PROC-012-resolve-duplicate-geom-027-id.md); see the
+retirement log.
+
 ## Convergence
 
 - These tasks anchor **Theme H — Agentic workflow hardening**.

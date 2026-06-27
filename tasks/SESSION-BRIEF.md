@@ -27,7 +27,7 @@ the authoritative open/unblocked view.
 
 - unblocked: `CORE-003` — Give EngineConfig the file/preview/diagnostics config lane (tasks/backlog/runtime/CORE-003-engine-config-file-lane.md)
 - unblocked: `DOCS-003` — Reconcile algorithm-variant-dispatch.md with reality and define the backend-seam template (tasks/backlog/geometry/DOCS-003-reconcile-algorithm-variant-dispatch-doc.md)
-- blocked by `DOCS-003`: `GEOM-027` — Shared CPU/GPU backend seam + fix the KMeans phantom GPU exemplar (tasks/backlog/geometry/GEOM-027-shared-cpu-gpu-backend-seam-kmeans-exemplar.md)
+- blocked by `DOCS-003`: `GEOM-052` — Shared CPU/GPU backend seam + fix the KMeans phantom GPU exemplar (tasks/backlog/geometry/GEOM-052-shared-cpu-gpu-backend-seam-kmeans-exemplar.md)
 - unblocked: `LEGACY-001` — Delete `src/legacy/Interface/` (tasks/backlog/architecture/LEGACY-001-delete-src-legacy-interface.md)
 - unblocked: `LEGACY-004` — Delete `src/legacy/Asset/` (tasks/backlog/architecture/LEGACY-004-delete-src-legacy-asset.md)
 - unblocked: `LEGACY-005` — Delete `src/legacy/Core/` (tasks/backlog/architecture/LEGACY-005-delete-src-legacy-core.md)
@@ -41,7 +41,11 @@ the authoritative open/unblocked view.
 - unblocked: `RORG-031F` — UI integration backlog seed (tasks/backlog/ui/RORG-031-ui-integration.md)
 - blocked by `CORE-003`: `RUNTIME-131` — Agent/CLI config-control facade on the Engine (tasks/backlog/runtime/RUNTIME-131-agent-cli-config-control-facade.md)
 - unblocked: `RUNTIME-132` — Lift single-use RunFrame hook adapters out of the RunFrame body (tasks/backlog/runtime/RUNTIME-132-lift-runframe-hook-adapters.md)
+- blocked by `GEOM-039`: `RUNTIME-135` — SpatialDebug closest-face picking via accelerated mesh query (tasks/backlog/runtime/RUNTIME-135-spatialdebug-closest-face-picking.md)
 - unblocked: `UI-022` — Sandbox EditorUI vertex-normal recompute windows (tasks/backlog/ui/UI-022-sandbox-editor-vertex-normal-recompute.md)
+- blocked by `GEOM-042`: `UI-024` — Sandbox EditorUI mesh denoising window (tasks/backlog/ui/UI-024-editor-mesh-denoise-window.md)
+- blocked by `GEOM-043`: `UI-025` — Sandbox EditorUI remeshing and subdivision windows (tasks/backlog/ui/UI-025-editor-remesh-subdivide-windows.md)
+- blocked by `GEOM-040`: `UI-026` — Sandbox EditorUI curvature analysis window and principal-direction field (tasks/backlog/ui/UI-026-editor-curvature-analysis-window.md)
 
 ## Theme H — Agentic workflow hardening
 
@@ -51,6 +55,8 @@ the authoritative open/unblocked view.
 
 ## Unthemed
 
+- unblocked: `CORE-004` — Indexed decrease-key min-heap container and Dijkstra adoption (tasks/backlog/runtime/CORE-004-indexed-decrease-key-heap.md)
+- unblocked: `GEOIO-003` — Mesh and point-cloud IO breadth — OFF writer and point-cloud readers (tasks/backlog/geometry/GEOIO-003-mesh-pointcloud-io-breadth.md)
 - unblocked: `GEOM-013` — Feature-preserving dual contouring (tasks/backlog/geometry/GEOM-013-feature-preserving-dual-contouring.md)
 - unblocked: `GEOM-014` — Feature-aware quadric error mesh simplification (tasks/backlog/geometry/GEOM-014-feature-aware-quadric-error-simplification.md)
 - unblocked: `GEOM-016` — Point-cloud filtering and density diagnostics contracts (tasks/backlog/geometry/GEOM-016-point-cloud-filtering-density-contracts.md)
@@ -68,6 +74,21 @@ the authoritative open/unblocked view.
 - blocked by `GEOM-027`: `GEOM-033` — Erased property metadata catalog (tasks/backlog/geometry/GEOM-033-erased-property-metadata-catalog.md)
 - blocked by `GEOM-027`: `GEOM-034` — Geometry property API documentation audit (tasks/backlog/geometry/GEOM-034-geometry-property-api-doc-audit.md)
 - unblocked: `GEOM-036` — Blue-noise / sampling quality-metrics module (tasks/backlog/geometry/GEOM-036-sampling-quality-metrics.md)
+- unblocked: `GEOM-037` — SO(3) rotation primitives (Lie machinery) (tasks/backlog/geometry/GEOM-037-so3-rotation-primitives.md)
+- blocked by `GEOM-037`: `GEOM-038` — Rotation averaging — SO(3) means and medians (tasks/backlog/geometry/GEOM-038-rotation-averaging-means-medians.md)
+- unblocked: `GEOM-039` — Accelerated mesh closest-face query and consumer adoption (tasks/backlog/geometry/GEOM-039-accelerated-mesh-closest-face-query.md)
+- unblocked: `GEOM-040` — Mesh curvature tensor and principal directions (tasks/backlog/geometry/GEOM-040-curvature-tensor-principal-directions.md)
+- unblocked: `GEOM-041` — FEM Laplacian mass/stiffness variants and edge-weight modes (tasks/backlog/geometry/GEOM-041-fem-laplacian-mass-stiffness-variants.md)
+- unblocked: `GEOM-042` — Mesh normal-based bilateral denoiser (tasks/backlog/geometry/GEOM-042-mesh-normal-bilateral-denoiser.md)
+- blocked by `GEOM-039`: `GEOM-043` — Remeshing surface reprojection and error-bounded adaptive sizing (tasks/backlog/geometry/GEOM-043-remeshing-reprojection-error-bounded-sizing.md)
+- unblocked: `GEOM-044` — Sqrt-3 (Kobbelt) subdivision and Loop feature/crease masks (tasks/backlog/geometry/GEOM-044-subdivision-sqrt3-loop-feature-masks.md)
+- unblocked: `GEOM-045` — First-class mesh geometric-quantity accessors (tasks/backlog/geometry/GEOM-045-first-class-mesh-quantity-accessors.md)
+- unblocked: `GEOM-046` — Mesh topology utilities — components, dual, triangulate, adjacency (tasks/backlog/geometry/GEOM-046-mesh-topology-utilities.md)
+- unblocked: `GEOM-047` — Graph and point-cloud query / sampling utilities (tasks/backlog/geometry/GEOM-047-graph-pointcloud-query-noise-utilities.md)
+- unblocked: `GEOM-048` — Statistics accumulators and robust estimation kernels (tasks/backlog/geometry/GEOM-048-statistics-robust-estimation-kernels.md)
+- unblocked: `GEOM-049` — Numeric / linear-algebra utilities: RPCA and Eigen map adapters (tasks/backlog/geometry/GEOM-049-numeric-linalg-utilities.md)
+- unblocked: `GEOM-050` — Primitive and curve utilities — Bezier, triangle metrics, sphere fit, AABB cubify (tasks/backlog/geometry/GEOM-050-primitive-curve-utilities.md)
+- blocked by `GEOM-033`: `GEOM-051` — Property system enhancements — live-element iterator and upload metadata (tasks/backlog/geometry/GEOM-051-property-system-enhancements.md)
 - unblocked: `GRAPHICS-108` — Reusable Vulkan compute parallel primitives (scan + compaction) (tasks/backlog/rendering/GRAPHICS-108-vulkan-compute-parallel-primitives.md)
 - unblocked: `GRAPHICS-109` — Offscreen frame capture to PNG (headless figure renders) (tasks/backlog/rendering/GRAPHICS-109-offscreen-frame-capture-png.md)
 - blocked by `GEOM-020`: `METHOD-002` — Signed Heat Method reference backend (tasks/backlog/methods/METHOD-002-signed-heat-method-reference-backend.md)
