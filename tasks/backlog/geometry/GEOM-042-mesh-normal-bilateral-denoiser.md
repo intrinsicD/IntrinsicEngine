@@ -67,10 +67,37 @@ maturity_target: CPUContracted
       per-face normal field computation with spatial + range weights and its
       params/result structs, plus tests for clean-mesh near-identity and
       determinism.
-- [ ] Slice B — Stage 2 (vertex update) + orchestrator: add the
+- [x] Slice B — Stage 2 (vertex update) + orchestrator: add the
       normal-projection vertex integration, the two-stage `DenoiseBilateral`
       entry point, noise-reduction and feature-preservation tests, and
       fail-closed coverage. Slice B closes the task at `CPUContracted`.
+
+> Progress: both slices landed on `Geometry::Smoothing`. Slice A added
+> `BilateralDenoiseParams` / `DenoiseStatus` / `BilateralDenoiseResult`,
+> `DebugName`, and `FilterFaceNormals` (Stage 1 bilateral face-normal filter:
+> double-buffered, area+spatial+range weighted over the edge-adjacent 1-ring and
+> the face itself; auto sigma selection). Slice B added `DenoiseBilateral`, the
+> Sun et al. 2007 normal-projection vertex update
+> (`x_i += (1/|F(i)|) Σ_f n_f (n_f·(c_f − x_i))`, filtered normals fixed,
+> centroids recomputed per iteration, boundary pinned), and move/pin
+> diagnostics. Fail-closed via a shared `PrepareDenoise` (InvalidParams on
+> non-finite sigma/epsilon, EmptyMesh, NonFiniteInput, NonManifoldInput via
+> `Mesh::IsManifold`, DegenerateGeometry when no usable faces) leaving the mesh
+> untouched. Covered in `tests/unit/geometry/Test_Smoothing.cpp` (unit;geometry):
+> flat near-identity, clean-mesh near-identity, deterministic noise reduction,
+> crease feature-preservation vs uniform Laplacian, determinism, and every
+> fail-closed status. Module-level inventory unchanged (symbols extend the
+> existing `Geometry.Smoothing` module).
+>
+> Verification note: the clang-20 `ci` preset build / CTest could not run in
+> this session because the vcpkg provider (`microsoft/vcpkg`) is outside the
+> session GitHub egress scope (proxy 403) and no system glm/gtest/eigen exist.
+> Verified via the repo structural checks (layering, test-layout, task-policy,
+> doc-links, inventory) and a standalone clang-20 numeric harness replicating
+> the exact Stage 1 + Stage 2 arithmetic (flat near-identity exact;
+> deterministic; RMS noise reduction ~0.91 across seeds; crease error ~10× lower
+> than uniform Laplacian). The full CPU gate still needs to run in a
+> vcpkg-provisioned environment before merge.
 
 ## Required changes
 

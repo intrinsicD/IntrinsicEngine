@@ -617,4 +617,147 @@ namespace Geometry::Smoothing
         return result;
     }
 
+    // =========================================================================
+    // Bilateral denoiser — Stage 2 vertex update + orchestrator
+    // =========================================================================
+
+    namespace
+    {
+        // Stage 2 (Sun et al. 2007 / Ohtake normal-projection update). The
+        // filtered face normals are held fixed; only the incident-face centroids
+        // are recomputed each iteration as positions move. Jacobi-style: all new
+        // positions are computed against the previous iteration's state, then
+        // written back, so the update is order-independent and deterministic.
+        void UpdateVertexPositions(HalfedgeMesh::Mesh& mesh,
+                                   const std::vector<FaceData>& faces,
+                                   const std::vector<glm::dvec3>& filteredNormals,
+                                   const std::size_t iterations,
+                                   const bool preserveBoundary)
+        {
+            const std::size_t nV = mesh.VerticesSize();
+            std::vector<glm::dvec3> newPos(nV, glm::dvec3(0.0));
+
+            for (std::size_t iter = 0; iter < iterations; ++iter)
+            {
+                for (std::size_t i = 0; i < nV; ++i)
+                {
+                    const VertexHandle v{static_cast<PropertyIndex>(i)};
+                    const glm::dvec3 xi = glm::dvec3(mesh.Position(v));
+                    newPos[i] = xi;
+
+                    if (mesh.IsDeleted(v) || mesh.IsIsolated(v))
+                    {
+                        continue;
+                    }
+                    if (preserveBoundary && mesh.IsBoundary(v))
+                    {
+                        continue;
+                    }
+
+                    glm::dvec3 delta(0.0);
+                    std::size_t count = 0;
+                    for (const FaceHandle f : mesh.FacesAroundVertex(v))
+                    {
+                        if (!f.IsValid())
+                        {
+                            continue;
+                        }
+                        const std::size_t fi = f.Index;
+                        if (fi >= faces.size() || !faces[fi].Usable)
+                        {
+                            continue;
+                        }
+                        const glm::dvec3 nf = filteredNormals[fi];
+                        const glm::dvec3 cf = FaceCentroid(mesh, f); // current positions
+                        delta += nf * glm::dot(nf, cf - xi);
+                        ++count;
+                    }
+
+                    if (count == 0)
+                    {
+                        continue;
+                    }
+
+                    const glm::dvec3 step = delta / static_cast<double>(count);
+                    // Fail closed: never write a non-finite position.
+                    if (IsFiniteVec(step))
+                    {
+                        newPos[i] = xi + step;
+                    }
+                }
+
+                for (std::size_t i = 0; i < nV; ++i)
+                {
+                    const VertexHandle v{static_cast<PropertyIndex>(i)};
+                    if (mesh.IsDeleted(v))
+                    {
+                        continue;
+                    }
+                    mesh.Position(v) = glm::vec3(newPos[i]);
+                }
+            }
+        }
+    } // namespace
+
+    BilateralDenoiseResult DenoiseBilateral(HalfedgeMesh::Mesh& mesh,
+                                            const BilateralDenoiseParams& params)
+    {
+        BilateralDenoiseResult result;
+        result.VertexCount = mesh.VertexCount();
+
+        const double epsilon = ResolveEpsilon(params);
+        std::vector<FaceData> faces;
+        result.Status = PrepareDenoise(mesh, params, epsilon, faces, result);
+        if (result.Status != DenoiseStatus::Success)
+        {
+            return result; // mesh left unmodified
+        }
+
+        double sigmaSpatial = 0.0;
+        double sigmaRange = 0.0;
+        ResolveSigmas(mesh, faces, params, sigmaSpatial, sigmaRange);
+        result.SigmaSpatialUsed = sigmaSpatial;
+        result.SigmaRangeUsed = sigmaRange;
+
+        // Stage 1 — filter the face-normal field.
+        std::vector<glm::dvec3> filtered;
+        FilterFaceNormalsCore(mesh, faces, params.NormalIterations,
+                              sigmaSpatial, sigmaRange, epsilon, filtered);
+        result.NormalIterationsPerformed = params.NormalIterations;
+
+        // Capture originals for move accounting.
+        const std::size_t nV = mesh.VerticesSize();
+        std::vector<glm::vec3> original(nV);
+        for (std::size_t i = 0; i < nV; ++i)
+        {
+            original[i] = mesh.Position(VertexHandle{static_cast<PropertyIndex>(i)});
+        }
+
+        // Stage 2 — move vertices to agree with the filtered normals.
+        UpdateVertexPositions(mesh, faces, filtered, params.VertexIterations,
+                              params.PreserveBoundary);
+        result.VertexIterationsPerformed = params.VertexIterations;
+
+        // Diagnostics: pinned boundary vertices and vertices actually displaced.
+        for (std::size_t i = 0; i < nV; ++i)
+        {
+            const VertexHandle v{static_cast<PropertyIndex>(i)};
+            if (mesh.IsDeleted(v))
+            {
+                continue;
+            }
+            if (params.PreserveBoundary && mesh.IsBoundary(v))
+            {
+                ++result.PinnedBoundaryVertexCount;
+            }
+            const glm::vec3 p = mesh.Position(v);
+            if (p.x != original[i].x || p.y != original[i].y || p.z != original[i].z)
+            {
+                ++result.MovedVertexCount;
+            }
+        }
+
+        return result;
+    }
+
 } // namespace Geometry::Smoothing

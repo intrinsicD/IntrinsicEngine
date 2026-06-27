@@ -296,4 +296,13 @@ export namespace Geometry::Smoothing
         const BilateralDenoiseParams& params,
         std::vector<glm::vec3>& filteredFaceNormals);
 
+    // Two-stage feature-preserving denoiser, applied in place: runs Stage 1
+    // (FilterFaceNormals) then Stage 2 (normal-projection vertex update,
+    // x_i += (1/|F(i)|) Σ_f n_f (n_f · (c_f − x_i)) over VertexIterations,
+    // boundary vertices pinned when PreserveBoundary). Topology is preserved.
+    // Fail-closed: on any non-Success status the mesh is left unmodified and no
+    // NaN/Inf is written (see DenoiseStatus / BilateralDenoiseParams).
+    [[nodiscard]] BilateralDenoiseResult DenoiseBilateral(
+        HalfedgeMesh::Mesh& mesh, const BilateralDenoiseParams& params);
+
 } // namespace Geometry::Smoothing
