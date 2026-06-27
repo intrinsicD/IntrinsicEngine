@@ -76,6 +76,7 @@ target_sources(${target_name}
         Geometry.Ray.cppm
         Geometry.Raycast.cppm
         Geometry.Registration.cppm
+        Geometry.Robust.cppm
         Geometry.RobustPredicates.cppm
         Geometry.SDF.cppm
         Geometry.SDFContact.cppm
@@ -156,6 +157,7 @@ target_sources(${target_name}
         Geometry.Queries.cpp
         Geometry.Raycast.cpp
         Geometry.Registration.cpp
+        Geometry.Robust.cpp
         Geometry.RobustPredicates.cpp
         Geometry.SDF.cpp
         Geometry.Segment.cpp
