@@ -446,6 +446,7 @@ set(_geometry_test_files
     Test_HtexPatch.cpp
     Test_Validation.cpp
     Test_Curvature.cpp
+    Test.CurvatureTensor.cpp
     Test_Raycast.cpp
     Test_GeometryQueries.cpp
     Test_PcaPrimitives.cpp

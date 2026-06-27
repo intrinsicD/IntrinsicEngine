@@ -33,6 +33,13 @@
   names while sharing the common implementation.
 - Optional Spectra or SuiteSparse/CHOLMOD seams are deferred until CPU reference
   parity and benchmark manifests justify a second backend.
+- `Geometry.PCA` exports the closed-form symmetric 3×3 eigensolver
+  `Geometry::PCA::SymmetricEigen3` (and its `Geometry::PCA::Eigen3` result). It is
+  the single shared solver behind both `ToPCA` and the curvature-tensor
+  decomposition; consumers that need signed eigenvalues (the curvature tensor is
+  not PSD) read them off the matrix via the Rayleigh quotient, because
+  `SymmetricEigen3` clamps its returned eigenvalues non-negative for the
+  covariance use case. No public Eigen types appear on the `Geometry.PCA` surface.
 
 ## API style, diagnostics, and numeric policy
 
@@ -41,6 +48,66 @@ New or materially changed geometry APIs must follow the
 module/file/namespace alignment, public state and mutability, count terminology,
 failure reporting, deterministic diagnostics, numeric tolerances, and the current
 `Geometry.LinearSolver` narrow-module decision.
+
+### Curvature tensor and principal directions
+
+`Geometry.Curvature` estimates per-vertex discrete curvature on triangle meshes.
+Scalar magnitudes (`v:mean_curvature` H, `v:gaussian_curvature` K,
+`v:max_principal_curvature` κ₁, `v:min_principal_curvature` κ₂, and
+`v:mean_curvature_normal`) follow the Meyer et al. (2003) operators and are
+unchanged.
+
+`ComputeCurvatureTensor` adds the per-vertex curvature tensor and principal
+directions following Taubin (1995): each 1-ring edge contributes
+`w_ij · κ_ij · T_ij T_ijᵀ` (area-derived weights summing to one, directional
+curvature `κ_ij = 2 nᵢ·(x_j − x_i)/‖x_j − x_i‖²`, tangent direction `T_ij`), and the
+accumulated symmetric tensor is decomposed with the shared
+`Geometry::PCA::SymmetricEigen3`. The eigenvector aligned with the vertex normal
+is discarded; the two tangent eigenvectors are published as the unit fields
+`v:principal_dir1` (κ₁/max direction) and `v:principal_dir2` (κ₂/min direction),
+with κ₁ = 3λ_a − λ_b and κ₂ = 3λ_b − λ_a recovered from the signed tensor
+eigenvalues and aligned to their owning direction. `ComputeCurvature` additionally
+publishes the two direction fields while leaving every scalar output bit-for-bit
+intact. Flat 1-rings, boundary (open) vertices, and zero-area 1-rings fail closed
+with the zero-vector sentinel and keep their scalar-derived principal curvatures;
+empty / no-face meshes return `nullopt`.
+
+### Discrete Laplacian edge-weight modes
+
+`Geometry.DEC` assembles the stiffness (edge-weight) matrix `⋆1` and the weak
+Laplacian `L = d0ᵀ ⋆1 d0` under a selectable `EdgeWeightMode`:
+
+- `Cotan` (default) — `(cot α + cot β)/2`, the standard DEC weights.
+- `HeatKernel` — `exp(−‖p_i − p_j‖²/4t)`, always positive, distance-adaptive.
+- `Graph` — `w = 1`, the combinatorial Laplacian (topology only).
+- `Fujiwara` — `w = 1/‖p_i − p_j‖`, inverse-distance; fails closed on
+  zero-length / non-finite edges.
+- `ModifiedNormal` — `(cot α + cot β)/2 · |n_i · n_j|^p` (feature exponent `p`,
+  default 1), down-weighting edges across sharp dihedral features. The cotan
+  term uses the clamped per-halfedge cotan so slivers cannot inject unbounded
+  weights.
+
+Every mode is symmetric with zero row sums and is validated by `AnalyzeLaplacian`.
+`Geometry.HalfedgeMesh.Utils` publishes the standalone clamped per-halfedge cotan
+as `MeshUtils::ClampedHalfedgeCotan` (`h:clamped_cotan`): the Heron/metric form
+`cot = (a² + b² − c²)/(4·Area)` with magnitude clamped to `kHalfedgeCotanClamp`;
+the per-edge cotan weight is the average of the two halfedge cotans. Boundary
+halfedges and degenerate / non-finite triangles fail closed to zero.
+
+The vertex-mass matrix `⋆0`/`Hodge0` is selectable via `MassMode`:
+
+- `Voronoi` (default) — mixed-Voronoi area (Meyer et al., 2003); reproduces the
+  previous `Hodge0` exactly.
+- `Barycentric` — one third of each incident triangle area, `m_i = (1/3) Σ A_f`.
+- `Sum` — lumped mass via row-sum lumping of the consistent (Galerkin) mass
+  matrix; equals `Barycentric` for linear triangles.
+- `Galerkin` — the full consistent mass matrix `(A/12)·[[2,1,1],[1,2,1],[1,1,2]]`
+  per triangle, exposed as `DECOperators::ConsistentMass` (symmetric, SPD), with
+  its row-sum lump in the diagonal `Hodge0`.
+
+All lumped modes partition the surface area; degenerate / non-finite faces fail
+closed (are skipped). `BuildConsistentMass` and the mass-mode `BuildHodgeStar0`
+are deterministic.
 
 ### Parameterization diagnostics
 

@@ -47,6 +47,25 @@ export namespace Geometry::Curvature
         // This is the Laplace-Beltrami of the position function, divided by 2.
         // Its magnitude is |H|, its direction is the surface normal (for smooth surfaces).
         VertexProperty<glm::vec3> MeanCurvatureNormalProperty{};
+
+        // Unit tangent principal-curvature directions from the Taubin tensor.
+        // PrincipalDir1 is the direction of the maximum principal curvature (κ₁),
+        // PrincipalDir2 the direction of the minimum (κ₂). Published as
+        // v:principal_dir1 / v:principal_dir2. Degenerate / boundary / flat
+        // vertices receive the zero sentinel (see ComputeCurvatureTensor).
+        VertexProperty<glm::vec3> PrincipalDir1Property{};
+        VertexProperty<glm::vec3> PrincipalDir2Property{};
+    };
+
+    // Result of the per-vertex curvature-tensor (Taubin) estimation: the two
+    // principal directions and the tensor-recovered principal curvatures,
+    // aligned so PrincipalDir1Property is the direction of MaxPrincipalCurvatureProperty.
+    struct CurvatureTensorResult
+    {
+        VertexProperty<glm::vec3> PrincipalDir1Property{};      // v:principal_dir1 (κ₁ direction)
+        VertexProperty<glm::vec3> PrincipalDir2Property{};      // v:principal_dir2 (κ₂ direction)
+        VertexProperty<double> MaxPrincipalCurvatureProperty{}; // v:max_principal_curvature (κ₁)
+        VertexProperty<double> MinPrincipalCurvatureProperty{}; // v:min_principal_curvature (κ₂)
     };
 
     // Result of per-vertex scalar curvature computation
@@ -109,5 +128,27 @@ export namespace Geometry::Curvature
     // Note: H² - K < 0 can occur due to numerical error on coarse meshes.
     // We clamp to zero in that case.
     [[nodiscard]] CurvatureField ComputeCurvature(HalfedgeMesh::Mesh& mesh);
+
+    // -------------------------------------------------------------------------
+    // Compute the per-vertex curvature tensor and principal directions (Taubin)
+    // -------------------------------------------------------------------------
+    //
+    // Estimates the per-vertex 3×3 curvature tensor following Taubin, "Estimating
+    // the tensor of curvature of a surface from a polyhedral approximation"
+    // (ICCV 1995): for each 1-ring edge (i,j) it accumulates
+    //   M_i = Σ_j w_ij κ_ij T_ij T_ijᵀ,   Σ_j w_ij = 1,
+    // with directional curvature κ_ij = 2 nᵢ·(x_j − x_i) / ‖x_j − x_i‖², tangent
+    // direction T_ij = normalize((I − nᵢnᵢᵀ)(x_j − x_i)), and area-derived weights.
+    // M_i is eigen-decomposed with Geometry::PCA::SymmetricEigen3; the eigenvector
+    // aligned with nᵢ is discarded and the two tangent eigenvectors become the
+    // principal directions, with κ₁ = 3λ_a − λ_b and κ₂ = 3λ_b − λ_a recovered per
+    // Taubin and aligned to the direction each came from.
+    //
+    // Fail-closed (GEOM-005/GEOM-007): flat 1-rings, boundary (open) vertices, and
+    // zero-area 1-rings receive the zero sentinel direction and keep their
+    // scalar-derived (H/K) principal curvatures; no NaN/Inf is ever written.
+    // Returns nullopt for empty meshes or meshes with no faces.
+    [[nodiscard]] std::optional<CurvatureTensorResult> ComputeCurvatureTensor(
+        HalfedgeMesh::Mesh& mesh);
 
 } // namespace Geometry::Curvature

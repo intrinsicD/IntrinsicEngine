@@ -31,10 +31,20 @@ maturity_target: CPUContracted
 
 ## Slice plan
 
-- [ ] Slice 1 — Stiffness modes: extend `EdgeWeightMode` with `Graph`, `Fujiwara`, `ModifiedNormal`; wire each into stiffness assembly; row-sum and symmetry tests pass.
-- [ ] Slice 2 — Standalone clamped per-halfedge cotan accessor in `Geometry.HalfedgeMesh.Utils` (Heron/metric form, magnitude clamping) returning a `HalfedgeProperty<double>`; parity test against `EdgeCotanWeight`.
-- [ ] Slice 3 — Mass modes: add the mass-mode enum (`Sum`/lumped, `Barycentric`, `Voronoi`, `Galerkin`) and consistent (Galerkin) mass assembly alongside the existing diagonal `Hodge0`; SPD + row-sum-equals-lumped tests pass.
-- [ ] Slice 4 — Diagnostics & docs: confirm `AnalyzeLaplacian` covers all modes, update DEC docs, finalize fail-closed diagnostics.
+- [x] Slice 1 — Stiffness modes: extend `EdgeWeightMode` with `Graph`, `Fujiwara`, `ModifiedNormal`; wire each into stiffness assembly; row-sum and symmetry tests pass.
+- [x] Slice 2 — Standalone clamped per-halfedge cotan accessor in `Geometry.HalfedgeMesh.Utils` (Heron/metric form, magnitude clamping) returning a `HalfedgeProperty<double>`; parity test against `EdgeCotanWeight`.
+- [x] Slice 3 — Mass modes: add the mass-mode enum (`Sum`/lumped, `Barycentric`, `Voronoi`, `Galerkin`) and consistent (Galerkin) mass assembly alongside the existing diagonal `Hodge0`; SPD + row-sum-equals-lumped tests pass.
+- [x] Slice 4 — Diagnostics & docs: confirm `AnalyzeLaplacian` covers all modes, update DEC docs, finalize fail-closed diagnostics.
+
+> Progress: all four slices landed. Stiffness modes (Graph/Fujiwara/ModifiedNormal)
+> + clamped halfedge-cotan accessor; mass modes (Sum/Barycentric/Voronoi/Galerkin)
+> with the consistent Galerkin mass matrix on `DECOperators::ConsistentMass` and
+> its row-sum lump in `Hodge0`. Default `{Cotan, Voronoi}` reproduces prior
+> operators byte-for-byte. Covered by row-sum/symmetry, weight/area parity, SPD,
+> clamp-engages, and fail-closed tests in `tests/unit/geometry/Test_DEC.cpp`.
+> Note: the pre-existing shared mixed-Voronoi path (`ComputeMixedVoronoiAreas`) is
+> not NaN-hardened; that is out of scope for this task (it is the existing default,
+> shared with Curvature/Smoothing).
 
 ## Required changes
 

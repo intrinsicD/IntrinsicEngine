@@ -1,6 +1,8 @@
 module;
 
 #include <algorithm>
+#include <cmath>
+#include <limits>
 #include <span>
 #include <glm/glm.hpp>
 
@@ -13,18 +15,11 @@ namespace Geometry::PCADetail
     {
         return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
     }
+}
 
-    struct Eigen3
-    {
-        glm::dvec3 Eigenvalues{0.0};
-        glm::dvec3 Eigenvectors[3]{
-            glm::dvec3{1.0, 0.0, 0.0},
-            glm::dvec3{0.0, 1.0, 0.0},
-            glm::dvec3{0.0, 0.0, 1.0},
-        };
-    };
-
-    [[nodiscard]] inline Eigen3 SymmetricEigen3(
+namespace Geometry::PCA
+{
+    Eigen3 SymmetricEigen3(
         double a00, double a01, double a02,
         double a11, double a12, double a22)
     {
@@ -188,7 +183,7 @@ namespace Geometry
         }
 
         const double invCount = 1.0 / static_cast<double>(count);
-        const auto eigen = PCADetail::SymmetricEigen3(
+        const auto eigen = PCA::SymmetricEigen3(
             c00 * invCount, c01 * invCount, c02 * invCount,
             c11 * invCount, c12 * invCount, c22 * invCount);
 

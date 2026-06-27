@@ -26,6 +26,15 @@ namespace Geometry::MeshUtils
     {
         constexpr float kTexcoordEpsilon = 1.0e-6f;
 
+        // Fail-closed guard: corner positions carrying NaN/Inf must not be
+        // accumulated into geometric quantities, or they poison downstream
+        // curvature/mass computations. Callers treat a non-finite corner as a
+        // degenerate face and return the zero sentinel.
+        [[nodiscard]] bool IsFinite(const glm::dvec3& p) noexcept
+        {
+            return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z);
+        }
+
         struct QuantizedPositionKey
         {
             std::int64_t X{0};
@@ -365,6 +374,59 @@ namespace Geometry::MeshUtils
         return cotSum / 2.0;
     }
 
+    HalfedgeProperty<double> ClampedHalfedgeCotan(HalfedgeMesh::Mesh& mesh, double maxMagnitude)
+    {
+        HalfedgeProperty<double> cot(mesh.HalfedgeProperties().GetOrAdd<double>("h:clamped_cotan", 0.0));
+
+        const double bound = (std::isfinite(maxMagnitude) && maxMagnitude > 0.0)
+                                 ? maxMagnitude
+                                 : kHalfedgeCotanClamp;
+
+        const std::size_t nH = mesh.HalfedgesSize();
+        for (std::size_t hi = 0; hi < nH; ++hi)
+        {
+            HalfedgeHandle h{static_cast<PropertyIndex>(hi)};
+            cot[h] = 0.0;
+            if (mesh.IsDeleted(h) || mesh.IsBoundary(h))
+            {
+                continue; // boundary/deleted halfedges have no apex triangle
+            }
+
+            // Apex angle of h's triangle is opposite h's edge (from->to).
+            const VertexHandle vFrom = mesh.FromVertex(h);
+            const VertexHandle vTo = mesh.ToVertex(h);
+            const VertexHandle vApex = mesh.ToVertex(mesh.NextHalfedge(h));
+            const glm::dvec3 pFrom(mesh.Position(vFrom));
+            const glm::dvec3 pTo(mesh.Position(vTo));
+            const glm::dvec3 pApex(mesh.Position(vApex));
+            if (!(std::isfinite(pFrom.x) && std::isfinite(pFrom.y) && std::isfinite(pFrom.z) &&
+                  std::isfinite(pTo.x) && std::isfinite(pTo.y) && std::isfinite(pTo.z) &&
+                  std::isfinite(pApex.x) && std::isfinite(pApex.y) && std::isfinite(pApex.z)))
+            {
+                continue; // fail closed on non-finite positions
+            }
+
+            // Heron/metric form: cot(apex) = (a² + b² − c²) / (4·Area),
+            // c = |to − from| (opposite the apex), a/b the apex-adjacent sides.
+            const glm::dvec3 toApex = pApex - pTo;
+            const glm::dvec3 fromApex = pApex - pFrom;
+            const double cSq = glm::dot(pTo - pFrom, pTo - pFrom);
+            const double aSq = glm::dot(toApex, toApex);
+            const double bSq = glm::dot(fromApex, fromApex);
+            const double area = 0.5 * glm::length(glm::cross(pFrom - pApex, pTo - pApex));
+            if (area <= 1e-12)
+            {
+                continue; // degenerate / zero-area triangle fails closed to 0
+            }
+
+            double value = (aSq + bSq - cSq) / (4.0 * area);
+            value = std::clamp(value, -bound, bound);
+            cot[h] = value;
+        }
+
+        return cot;
+    }
+
     glm::vec3 FaceNormal(const HalfedgeMesh::Mesh& mesh, FaceHandle f)
     {
         HalfedgeHandle h0 = mesh.Halfedge(f);
@@ -392,6 +454,10 @@ namespace Geometry::MeshUtils
         for (const VertexHandle v : mesh.VerticesAroundFace(f))
         {
             const glm::dvec3 p(mesh.Position(v));
+            if (!IsFinite(p))
+            {
+                return glm::dvec3(0.0); // fail closed on non-finite corner positions
+            }
             if (count == 0)
             {
                 first = p;
@@ -413,7 +479,72 @@ namespace Geometry::MeshUtils
 
     double FaceArea(const HalfedgeMesh::Mesh& mesh, FaceHandle f)
     {
-        return glm::length(FaceAreaVector(mesh, f));
+        if (!mesh.IsValid(f) || mesh.IsDeleted(f))
+        {
+            return 0.0;
+        }
+        // Pass 1: Newell oriented (signed) area vector — exact shoelace area for
+        // any *planar* polygon, including concave ones (signed fan triangles
+        // cancel the over-counted concavity) — plus the absolute triangle-fan
+        // sum, which is the true surface area for a *non-planar* (folded) polygon
+        // whose Newell components would otherwise cancel.
+        glm::dvec3 first(0.0);
+        glm::dvec3 prev(0.0);
+        glm::dvec3 accum(0.0);
+        double fanAbs = 0.0;
+        std::size_t count = 0;
+        for (const VertexHandle v : mesh.VerticesAroundFace(f))
+        {
+            const glm::dvec3 p(mesh.Position(v));
+            if (!IsFinite(p))
+            {
+                return 0.0; // fail closed on non-finite corner positions
+            }
+            if (count == 0)
+            {
+                first = p;
+            }
+            else
+            {
+                accum += glm::cross(prev, p);
+                if (count >= 2)
+                {
+                    fanAbs += 0.5 * glm::length(glm::cross(prev - first, p - first));
+                }
+            }
+            prev = p;
+            ++count;
+        }
+        if (count < 3)
+        {
+            return 0.0;
+        }
+        accum += glm::cross(prev, first); // close the loop
+        const glm::dvec3 areaVec = accum * 0.5;
+        const double newellMag = glm::length(areaVec);
+
+        // Decide planarity from the per-vertex deviation off the Newell plane,
+        // normalized by the polygon's radius so the test is scale-invariant
+        // (robust to float-stored positions far from the origin). Planar faces
+        // use the exact Newell area; only genuinely non-planar faces fall back
+        // to the fan surface-area approximation.
+        if (newellMag > 1e-12)
+        {
+            const glm::dvec3 n = areaVec / newellMag;
+            double maxDev = 0.0;
+            double radius = 0.0;
+            for (const VertexHandle v : mesh.VerticesAroundFace(f))
+            {
+                const glm::dvec3 d = glm::dvec3(mesh.Position(v)) - first;
+                maxDev = std::max(maxDev, std::abs(glm::dot(d, n)));
+                radius = std::max(radius, glm::length(d));
+            }
+            if (radius <= 1e-12 || maxDev <= 1.0e-4 * radius)
+            {
+                return newellMag; // planar (incl. concave) -> exact shoelace area
+            }
+        }
+        return fanAbs; // non-planar -> fan surface-area approximation
     }
 
     glm::dvec3 FaceCentroid(const HalfedgeMesh::Mesh& mesh, FaceHandle f)
@@ -426,7 +557,12 @@ namespace Geometry::MeshUtils
         std::size_t count = 0;
         for (const VertexHandle v : mesh.VerticesAroundFace(f))
         {
-            sum += glm::dvec3(mesh.Position(v));
+            const glm::dvec3 p(mesh.Position(v));
+            if (!IsFinite(p))
+            {
+                return glm::dvec3(0.0); // fail closed on non-finite corner positions
+            }
+            sum += p;
             ++count;
         }
         if (count == 0)

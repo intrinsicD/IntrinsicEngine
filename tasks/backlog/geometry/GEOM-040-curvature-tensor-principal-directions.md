@@ -28,8 +28,15 @@ maturity_target: CPUContracted
 - Adaptive remeshing already consumes the scalar curvature outputs; those consumers must keep compiling and producing identical results.
 
 ## Slice plan
-- [ ] Slice 1 — Promote the symmetric 3×3 eigensolver: export `Geometry::PCA::SymmetricEigen3` (and its `Eigen3` result struct) from `Geometry.PCA.cppm`, moving the existing implementation out of the anonymous/detail scope without changing its numerics, and rewire `ToPCA` to call the exported symbol. No behavioral change to PCA.
-- [ ] Slice 2 — Taubin tensor estimation: add `ComputeCurvatureTensor` and tensor→direction decomposition in `Geometry.Curvature`, publishing `v:principal_dir1` / `v:principal_dir2` and aligning κ₁/κ₂ magnitudes to their owning directions; extend `ComputeCurvature` to populate the new fields. Fail-closed on degenerate 1-rings and boundary vertices.
+- [x] Slice 1 — Promote the symmetric 3×3 eigensolver: export `Geometry::PCA::SymmetricEigen3` (and its `Eigen3` result struct) from `Geometry.PCA.cppm`, moving the existing implementation out of the anonymous/detail scope without changing its numerics, and rewire `ToPCA` to call the exported symbol. No behavioral change to PCA.
+- [x] Slice 2 — Taubin tensor estimation: add `ComputeCurvatureTensor` and tensor→direction decomposition in `Geometry.Curvature`, publishing `v:principal_dir1` / `v:principal_dir2` and aligning κ₁/κ₂ magnitudes to their owning directions; extend `ComputeCurvature` to populate the new fields. Fail-closed on degenerate 1-rings and boundary vertices.
+
+> Implementation note: the shared `Geometry::PCA::SymmetricEigen3` clamps its
+> returned eigenvalues to non-negative (a PSD-covariance assumption). The
+> curvature tensor is not PSD, so Slice 2 reuses the solver's eigenVECTORS and
+> recovers the signed tangent eigenvalues from the tensor via the Rayleigh
+> quotient `λ = vᵀ M v`. This keeps PCA numerics untouched while giving correct
+> negative curvatures.
 
 ## Required changes
 - [ ] In `src/geometry/Geometry.PCA.cppm`: export the symmetric eigensolver result struct and function as `Geometry::PCA::Eigen3` and `[[nodiscard]] Eigen3 SymmetricEigen3(const glm::dmat3& symmetricCovariance)` (or the existing six-component signature, preserved exactly). Keep the body in `src/geometry/Geometry.PCA.cpp`; only the small struct and the declaration live in the `.cppm`.
