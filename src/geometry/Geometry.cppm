@@ -9,6 +9,7 @@ export import Geometry.Ellipsoid;
 export import Geometry.PCA;
 export import Geometry.Statistics;
 export import Geometry.Robust;
+export import Geometry.Rotation;
 export import Geometry.Curve;
 export import Geometry.Segment;
 export import Geometry.Triangle;
