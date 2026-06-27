@@ -63,7 +63,7 @@ maturity_target: CPUContracted
 
 ## Slice plan
 
-- [ ] Slice A — Stage 1 (face-normal bilateral filtering): add the filtered
+- [x] Slice A — Stage 1 (face-normal bilateral filtering): add the filtered
       per-face normal field computation with spatial + range weights and its
       params/result structs, plus tests for clean-mesh near-identity and
       determinism.

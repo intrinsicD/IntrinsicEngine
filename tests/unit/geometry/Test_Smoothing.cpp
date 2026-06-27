@@ -3,8 +3,12 @@
 // implicit Laplacian, boundary preservation, and degenerate input.
 
 #include <gtest/gtest.h>
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <vector>
 
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
@@ -469,4 +473,150 @@ TEST(Smoothing, ImplicitMultipleIterationsSmootherThanOne)
 
     // mesh2 (3 iterations) should be smoother than mesh1 (1 iteration)
     EXPECT_LE(edgeLengthVariance(mesh2), edgeLengthVariance(mesh1));
+}
+
+// =============================================================================
+// Bilateral denoiser — Stage 1 (face-normal bilateral filtering)
+// =============================================================================
+
+namespace
+{
+    // Deterministic Gaussian-ish noise via a fixed-seed LCG (no <random> so the
+    // sequence is identical across platforms/runs).
+    struct DeterministicNoise
+    {
+        std::uint64_t state;
+        explicit DeterministicNoise(std::uint64_t seed) : state(seed) {}
+        // Returns a value in [-1, 1].
+        double Next()
+        {
+            state = state * 6364136223846793005ULL + 1442695040888963407ULL;
+            // Use the high bits; map to [-1, 1].
+            const std::uint32_t hi = static_cast<std::uint32_t>(state >> 33);
+            return (static_cast<double>(hi) / 2147483647.0) - 1.0;
+        }
+    };
+
+    // Reference unit face normal from the canonical Newell area vector.
+    glm::dvec3 RawFaceNormal(const Geometry::HalfedgeMesh::Mesh& mesh,
+                             Geometry::FaceHandle f)
+    {
+        const glm::dvec3 a = Geometry::MeshUtils::FaceAreaVector(mesh, f);
+        const double len = glm::length(a);
+        return len > 0.0 ? a / len : glm::dvec3(0.0);
+    }
+}
+
+TEST(Smoothing, FilterFaceNormalsFlatMeshIsIdentity)
+{
+    auto mesh = MakeSubdividedTriangle(); // planar, all faces share one normal
+
+    Geometry::Smoothing::BilateralDenoiseParams params;
+    params.NormalIterations = 8;
+
+    std::vector<glm::vec3> filtered;
+    auto result = Geometry::Smoothing::FilterFaceNormals(mesh, params, filtered);
+    ASSERT_EQ(result.Status, Geometry::Smoothing::DenoiseStatus::Success);
+    ASSERT_EQ(filtered.size(), mesh.FacesSize());
+    EXPECT_EQ(result.ProcessedFaceCount, mesh.FaceCount());
+
+    for (std::size_t i = 0; i < mesh.FacesSize(); ++i)
+    {
+        Geometry::FaceHandle f{static_cast<Geometry::PropertyIndex>(i)};
+        if (mesh.IsDeleted(f)) continue;
+        glm::dvec3 raw = RawFaceNormal(mesh, f);
+        glm::dvec3 got = glm::dvec3(filtered[i]);
+        EXPECT_GT(glm::dot(raw, got), 1.0 - 1e-6)
+            << "Filtered normal on a flat mesh must equal the raw face normal";
+    }
+}
+
+TEST(Smoothing, FilterFaceNormalsCleanMeshNearIdentity)
+{
+    // A smooth (subdivided) closed mesh: filtered normals stay very close to the
+    // raw face normals — bilateral filtering should not distort a clean surface.
+    auto mesh = MakeDenseMesh();
+
+    Geometry::Smoothing::BilateralDenoiseParams params;
+    params.NormalIterations = 3;
+
+    std::vector<glm::vec3> filtered;
+    auto result = Geometry::Smoothing::FilterFaceNormals(mesh, params, filtered);
+    ASSERT_EQ(result.Status, Geometry::Smoothing::DenoiseStatus::Success);
+
+    double minDot = 1.0;
+    for (std::size_t i = 0; i < mesh.FacesSize(); ++i)
+    {
+        Geometry::FaceHandle f{static_cast<Geometry::PropertyIndex>(i)};
+        if (mesh.IsDeleted(f)) continue;
+        glm::dvec3 raw = RawFaceNormal(mesh, f);
+        glm::dvec3 got = glm::dvec3(filtered[i]);
+        minDot = std::min(minDot, glm::dot(raw, got));
+    }
+    // Every filtered normal stays within a small angle of the original.
+    EXPECT_GT(minDot, 0.9) << "Clean-surface normals drifted too far";
+}
+
+TEST(Smoothing, FilterFaceNormalsIsDeterministic)
+{
+    auto makeNoisy = []()
+    {
+        auto mesh = MakeDenseMesh();
+        DeterministicNoise noise(0x9E3779B97F4A7C15ULL);
+        for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+        {
+            Geometry::VertexHandle vh{static_cast<Geometry::PropertyIndex>(i)};
+            if (mesh.IsDeleted(vh)) continue;
+            glm::vec3 d{static_cast<float>(noise.Next()),
+                        static_cast<float>(noise.Next()),
+                        static_cast<float>(noise.Next())};
+            mesh.Position(vh) = mesh.Position(vh) + 0.03f * d;
+        }
+        return mesh;
+    };
+
+    auto meshA = makeNoisy();
+    auto meshB = makeNoisy();
+
+    Geometry::Smoothing::BilateralDenoiseParams params;
+    params.NormalIterations = 5;
+
+    std::vector<glm::vec3> a, b;
+    auto ra = Geometry::Smoothing::FilterFaceNormals(meshA, params, a);
+    auto rb = Geometry::Smoothing::FilterFaceNormals(meshB, params, b);
+    ASSERT_EQ(ra.Status, Geometry::Smoothing::DenoiseStatus::Success);
+    ASSERT_EQ(rb.Status, Geometry::Smoothing::DenoiseStatus::Success);
+    ASSERT_EQ(a.size(), b.size());
+
+    for (std::size_t i = 0; i < a.size(); ++i)
+    {
+        EXPECT_EQ(a[i].x, b[i].x);
+        EXPECT_EQ(a[i].y, b[i].y);
+        EXPECT_EQ(a[i].z, b[i].z);
+    }
+    EXPECT_EQ(ra.ProcessedFaceCount, rb.ProcessedFaceCount);
+    EXPECT_EQ(ra.SigmaSpatialUsed, rb.SigmaSpatialUsed);
+    EXPECT_EQ(ra.SigmaRangeUsed, rb.SigmaRangeUsed);
+}
+
+TEST(Smoothing, FilterFaceNormalsFailsClosedOnEmptyMesh)
+{
+    Geometry::HalfedgeMesh::Mesh mesh;
+    Geometry::Smoothing::BilateralDenoiseParams params;
+
+    std::vector<glm::vec3> filtered;
+    auto result = Geometry::Smoothing::FilterFaceNormals(mesh, params, filtered);
+    EXPECT_EQ(result.Status, Geometry::Smoothing::DenoiseStatus::EmptyMesh);
+    EXPECT_TRUE(filtered.empty());
+}
+
+TEST(Smoothing, FilterFaceNormalsFailsClosedOnNonFiniteSigma)
+{
+    auto mesh = MakeDenseMesh();
+    Geometry::Smoothing::BilateralDenoiseParams params;
+    params.SigmaSpatial = std::numeric_limits<double>::quiet_NaN();
+
+    std::vector<glm::vec3> filtered;
+    auto result = Geometry::Smoothing::FilterFaceNormals(mesh, params, filtered);
+    EXPECT_EQ(result.Status, Geometry::Smoothing::DenoiseStatus::InvalidParams);
 }
