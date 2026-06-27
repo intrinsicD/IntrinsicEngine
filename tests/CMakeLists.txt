@@ -184,6 +184,7 @@ endfunction()
 # --- Core tests (pure algorithmic, no GPU, no ECS) ---
 set(_core_test_files
     Test_BoundedHeap.cpp
+    Test_IndexedHeap.cpp
     Test.CoreError.cpp
     Test.LogRingBuffer.cpp
 )
@@ -403,6 +404,14 @@ endif()
 
 # --- Geometry tests (DEC, mesh algorithms, graphs — no GPU, no ECS) ---
 set(_geometry_test_files
+    Test_Statistics.cpp
+    Test_RobustKernels.cpp
+    Test_Curve.cpp
+    Test_Rotation.cpp
+    Test_RotationAveraging.cpp
+    Test_MeshQuantities.cpp
+    Test_MeshClosestFace.cpp
+    Test_LinalgEigenMap.cpp
     Test_RuntimeGeometry.cpp
     Test.GeometryIO.cpp
     Test_RuntimeGraph.cpp

@@ -12,6 +12,7 @@ target_sources(${target_name}
         Geometry.Containment.cppm
         Geometry.ConvexHull.cppm
         Geometry.ConvexHullBuilder.cppm
+        Geometry.Curve.cppm
         Geometry.Cylinder.cppm
         Geometry.DomainViews.cppm
         Geometry.EPA.cppm
@@ -56,6 +57,7 @@ target_sources(${target_name}
         Geometry.LinearSolver.cppm
         Geometry.MarchingCubes.cppm
         Geometry.Mesh.Conversion.cppm
+        Geometry.MeshClosestFace.cppm
         Geometry.MeshSoup.cppm
         Geometry.MeshOperator.cppm
         Geometry.OBB.cppm
@@ -76,7 +78,10 @@ target_sources(${target_name}
         Geometry.Ray.cppm
         Geometry.Raycast.cppm
         Geometry.Registration.cppm
+        Geometry.Robust.cppm
         Geometry.RobustPredicates.cppm
+        Geometry.Rotation.cppm
+        Geometry.RotationAveraging.cppm
         Geometry.SDF.cppm
         Geometry.SDFContact.cppm
         Geometry.Segment.cppm
@@ -84,6 +89,7 @@ target_sources(${target_name}
         Geometry.SpatialQueries.cppm
         Geometry.Sphere.Sampling.cppm
         Geometry.Sphere.cppm
+        Geometry.Statistics.cppm
         Geometry.Support.cppm
         Geometry.SurfaceReconstruction.cppm
         Geometry.Triangle.cppm
@@ -98,6 +104,7 @@ target_sources(${target_name}
         Geometry.Containment.cpp
         Geometry.ConvexHull.cpp
         Geometry.ConvexHullBuilder.cpp
+        Geometry.Curve.cpp
         Geometry.Cylinder.cpp
         Geometry.DomainViews.cpp
         Geometry.Ellipsoid.cpp
@@ -138,6 +145,7 @@ target_sources(${target_name}
         Geometry.Linalg.cpp
         Geometry.MarchingCubes.cpp
         Geometry.Mesh.Conversion.cpp
+        Geometry.MeshClosestFace.cpp
         Geometry.MeshSoup.cpp
         Geometry.OBB.cpp
         Geometry.Octree.cpp
@@ -155,11 +163,15 @@ target_sources(${target_name}
         Geometry.Queries.cpp
         Geometry.Raycast.cpp
         Geometry.Registration.cpp
+        Geometry.Robust.cpp
         Geometry.RobustPredicates.cpp
+        Geometry.Rotation.cpp
+        Geometry.RotationAveraging.cpp
         Geometry.SDF.cpp
         Geometry.Segment.cpp
         Geometry.Sphere.Sampling.cpp
         Geometry.Sphere.cpp
+        Geometry.Statistics.cpp
         Geometry.Support.cpp
         Geometry.Sparse.cpp
         Geometry.SurfaceReconstruction.cpp

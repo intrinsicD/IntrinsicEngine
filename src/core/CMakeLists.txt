@@ -5,6 +5,7 @@ target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Core.BoundedHeap.cppm
+        Core.IndexedHeap.cppm
         Core.Config.Window.cppm
         Core.Config.Render.cppm
         Core.Config.Simulation.cppm
