@@ -9,6 +9,17 @@ so blocks moved from the old active-README history work verbatim.
 ## Retired task narratives
 
 Backlog
+[`PROC-012`](PROC-012-resolve-duplicate-geom-027-id.md) — Resolve duplicate
+`GEOM-027` task ID — retired on 2026-06-27 at maturity `Retired`. Two files
+declared `id: GEOM-027`: the canonical property-name-lifetime contract (depended
+on by `GEOM-033`/`GEOM-034`) and an unrelated research-control-surface /
+shared-CPU-GPU backend-seam KMeans-exemplar task seeded by `9ed14b4`. The latter
+was renumbered to `GEOM-052` (file rename via `git mv`, front-matter `id:`,
+title, and every inbound reference in `tasks/backlog/README.md`, `PROC-010`,
+`METHOD-013`, and `DOCS-003`), leaving `GEOM-027` bound to the property sequence
+so its dependency graph is intact. `tools/agents/check_task_policy.py --root .
+--strict` now reports 0 findings (was 1), and `check_doc_links.py` reports no
+broken links.
 [`BUG-046`](BUG-046-flaky-coretaskgraph-mainthread-ready-queue-ordering.md) —
 Flaky `CoreTaskGraph.MainThreadReadyQueueUsesPriorityAndCostOrdering` — retired
 on 2026-06-24 at maturity `CPUContracted`. `TaskGraph::Execute()` now collects

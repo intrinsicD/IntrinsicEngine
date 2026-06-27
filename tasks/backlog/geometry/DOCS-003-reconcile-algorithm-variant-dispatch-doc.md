@@ -10,10 +10,10 @@ maturity_target: CPUContracted
 - Make `docs/architecture/algorithm-variant-dispatch.md` describe the *real*
   Strategy×Backend seam (CPU-only free function + GPU-capable device overload +
   honest `ActualBackend` diagnostic) as the canonical target template, so the
-  contract can cite it and `GEOM-027` can implement against it (P4).
+  contract can cite it and `GEOM-052` can implement against it (P4).
 
 ## Non-goals
-- Implementing any backend code (that is `GEOM-027`).
+- Implementing any backend code (that is `GEOM-052`).
 - Inventing a global backend-preference map (premature with one dispatch family).
 - Promoting unimplemented strategy tables as if they ship.
 
@@ -39,7 +39,7 @@ maturity_target: CPUContracted
 - [ ] Add a short config/agent-lane backend-selection note: a dispatch family's
       `Backend` field is the supported override read from config (per `CORE-003`),
       not a hardcoded constant.
-- [ ] Either label the doc explicitly as the TARGET template, or (once `GEOM-027`
+- [ ] Either label the doc explicitly as the TARGET template, or (once `GEOM-052`
       makes it true) reclassify it canonical in `docs/architecture/index.md`.
 
 ## Tests
@@ -70,4 +70,4 @@ python3 tools/agents/sync_skills.py --write && git diff --quiet -- tools/agents/
 
 ## Maturity
 - Docs-only reconcile. No engine maturity level applies; the implementation gate
-  is owned by `GEOM-027`.
+  is owned by `GEOM-052`.

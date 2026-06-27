@@ -34,7 +34,7 @@ depends_on: []
   `tools/agents/sync_skills.py --write`.
 - Optionally proposes a new convergence theme so the backlog map reflects the
   research-control-surface direction (see the wording section); the substantive
-  tasks (`GRAPHICS-106`, `RUNTIME-130`, `CORE-003`, `RUNTIME-131`, `GEOM-027`,
+  tasks (`GRAPHICS-106`, `RUNTIME-130`, `CORE-003`, `RUNTIME-131`, `GEOM-052`,
   `GRAPHICS-107`, `RUNTIME-132`, `DOCS-003`, `DOCS-004`) are currently filed under
   existing themes B/F and can be re-homed under it on approval.
 
@@ -83,7 +83,7 @@ depends_on: []
 > Make the engine fully controllable as research software: a first-class config
 > lane (config files + agents/CLI + UI as co-equal surfaces), recipe-driven frame
 > composition wired end-to-end, and CPU/GPU backend hooks present by convention.
-> Members: `GRAPHICS-106`, `RUNTIME-130`, `CORE-003`, `RUNTIME-131`, `GEOM-027`,
+> Members: `GRAPHICS-106`, `RUNTIME-130`, `CORE-003`, `RUNTIME-131`, `GEOM-052`,
 > `GRAPHICS-107`, `RUNTIME-132`, `DOCS-003`, `DOCS-004`.
 
 If approved, add `"I": "Research control surface"` to `THEME_NAMES` in

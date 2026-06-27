@@ -1,10 +1,10 @@
 ---
-id: GEOM-027
+id: GEOM-052
 theme: F
 depends_on: [DOCS-003]
 maturity_target: CPUContracted
 ---
-# GEOM-027 — Shared CPU/GPU backend seam + fix the KMeans phantom GPU exemplar
+# GEOM-052 — Shared CPU/GPU backend seam + fix the KMeans phantom GPU exemplar
 
 ## Goal
 - Establish the reusable Strategy×Backend seam so a new data-parallel algorithm
