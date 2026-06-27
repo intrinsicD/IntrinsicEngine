@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <limits>
 #include <numeric>
 #include <vector>
 #include <glm/glm.hpp>
@@ -88,4 +89,52 @@ TEST(GeometryMeshQuantities, FailClosedOnInvalidFace)
     EXPECT_EQ(MU::FaceArea(mesh, bogus), 0.0);
     EXPECT_EQ(glm::length(MU::FaceAreaVector(mesh, bogus)), 0.0);
     EXPECT_EQ(glm::length(MU::FaceCentroid(mesh, bogus)), 0.0);
+}
+
+TEST(GeometryMeshQuantities, NonPlanarQuadAreaUsesTriangleFan)
+{
+    // A folded quad: corners (0,0,0),(1,0,0),(1,1,1),(0,1,0). The two fan
+    // triangles each have a known area; the oriented Newell vector would
+    // partially cancel and underreport, so FaceArea must use the fan sum.
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+    const auto v1 = mesh.AddVertex({1.0f, 0.0f, 0.0f});
+    const auto v2 = mesh.AddVertex({1.0f, 1.0f, 1.0f});
+    const auto v3 = mesh.AddVertex({0.0f, 1.0f, 0.0f});
+    const auto f = mesh.AddQuad(v0, v1, v2, v3);
+    ASSERT_TRUE(f.has_value());
+
+    // Fan = tri(v0,v1,v2) + tri(v0,v2,v3).
+    const glm::dvec3 p0{0.0, 0.0, 0.0}, p1{1.0, 0.0, 0.0}, p2{1.0, 1.0, 1.0}, p3{0.0, 1.0, 0.0};
+    const double expected =
+        0.5 * glm::length(glm::cross(p1 - p0, p2 - p0)) +
+        0.5 * glm::length(glm::cross(p2 - p0, p3 - p0));
+
+    const double area = MU::FaceArea(mesh, *f);
+    EXPECT_NEAR(area, expected, 1e-9);
+    // The folded quad's true area must strictly exceed the cancelled Newell magnitude.
+    EXPECT_GT(area, glm::length(MU::FaceAreaVector(mesh, *f)) + 1e-6);
+}
+
+TEST(GeometryMeshQuantities, FailClosedOnNonFiniteCorner)
+{
+    // A triangle with a NaN corner must not propagate non-finite values into
+    // area / area-vector / centroid / barycentric mass.
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    const auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+    const auto v1 = mesh.AddVertex({1.0f, 0.0f, 0.0f});
+    const auto v2 = mesh.AddVertex({nan, 1.0f, 0.0f});
+    const auto f = mesh.AddTriangle(v0, v1, v2);
+    ASSERT_TRUE(f.has_value());
+
+    EXPECT_EQ(MU::FaceArea(mesh, *f), 0.0);
+    EXPECT_EQ(glm::length(MU::FaceAreaVector(mesh, *f)), 0.0);
+    EXPECT_EQ(glm::length(MU::FaceCentroid(mesh, *f)), 0.0);
+
+    const std::vector<double> bary = MU::ComputeBarycentricVertexAreas(mesh);
+    for (const double a : bary)
+    {
+        EXPECT_TRUE(std::isfinite(a));
+    }
 }

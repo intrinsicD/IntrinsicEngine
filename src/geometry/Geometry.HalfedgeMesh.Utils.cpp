@@ -26,6 +26,15 @@ namespace Geometry::MeshUtils
     {
         constexpr float kTexcoordEpsilon = 1.0e-6f;
 
+        // Fail-closed guard: corner positions carrying NaN/Inf must not be
+        // accumulated into geometric quantities, or they poison downstream
+        // curvature/mass computations. Callers treat a non-finite corner as a
+        // degenerate face and return the zero sentinel.
+        [[nodiscard]] bool IsFinite(const glm::dvec3& p) noexcept
+        {
+            return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z);
+        }
+
         struct QuantizedPositionKey
         {
             std::int64_t X{0};
@@ -392,6 +401,10 @@ namespace Geometry::MeshUtils
         for (const VertexHandle v : mesh.VerticesAroundFace(f))
         {
             const glm::dvec3 p(mesh.Position(v));
+            if (!IsFinite(p))
+            {
+                return glm::dvec3(0.0); // fail closed on non-finite corner positions
+            }
             if (count == 0)
             {
                 first = p;
@@ -413,7 +426,42 @@ namespace Geometry::MeshUtils
 
     double FaceArea(const HalfedgeMesh::Mesh& mesh, FaceHandle f)
     {
-        return glm::length(FaceAreaVector(mesh, f));
+        if (!mesh.IsValid(f) || mesh.IsDeleted(f))
+        {
+            return 0.0;
+        }
+        // Triangle-fan area: sum the true areas of the fan triangles
+        // (first, v_i, v_{i+1}). For a planar face this equals the Newell
+        // |FaceAreaVector|, but for a non-planar polygon (e.g. a folded quad,
+        // which AddQuad does not forbid) the oriented Newell components cancel
+        // and underreport the surface area, so the fan sum is the correct mass.
+        glm::dvec3 first(0.0);
+        glm::dvec3 prev(0.0);
+        double area = 0.0;
+        std::size_t count = 0;
+        for (const VertexHandle v : mesh.VerticesAroundFace(f))
+        {
+            const glm::dvec3 p(mesh.Position(v));
+            if (!IsFinite(p))
+            {
+                return 0.0; // fail closed on non-finite corner positions
+            }
+            if (count == 0)
+            {
+                first = p;
+            }
+            else if (count >= 2)
+            {
+                area += 0.5 * glm::length(glm::cross(prev - first, p - first));
+            }
+            prev = p;
+            ++count;
+        }
+        if (count < 3)
+        {
+            return 0.0;
+        }
+        return area;
     }
 
     glm::dvec3 FaceCentroid(const HalfedgeMesh::Mesh& mesh, FaceHandle f)
@@ -426,7 +474,12 @@ namespace Geometry::MeshUtils
         std::size_t count = 0;
         for (const VertexHandle v : mesh.VerticesAroundFace(f))
         {
-            sum += glm::dvec3(mesh.Position(v));
+            const glm::dvec3 p(mesh.Position(v));
+            if (!IsFinite(p))
+            {
+                return glm::dvec3(0.0); // fail closed on non-finite corner positions
+            }
+            sum += p;
             ++count;
         }
         if (count == 0)
