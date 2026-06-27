@@ -10,6 +10,7 @@ export import Geometry.PCA;
 export import Geometry.Statistics;
 export import Geometry.Robust;
 export import Geometry.Rotation;
+export import Geometry.RotationAveraging;
 export import Geometry.Curve;
 export import Geometry.Segment;
 export import Geometry.Triangle;

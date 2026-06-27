@@ -408,6 +408,7 @@ set(_geometry_test_files
     Test_RobustKernels.cpp
     Test_Curve.cpp
     Test_Rotation.cpp
+    Test_RotationAveraging.cpp
     Test_RuntimeGeometry.cpp
     Test.GeometryIO.cpp
     Test_RuntimeGraph.cpp

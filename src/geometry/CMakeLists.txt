@@ -80,6 +80,7 @@ target_sources(${target_name}
         Geometry.Robust.cppm
         Geometry.RobustPredicates.cppm
         Geometry.Rotation.cppm
+        Geometry.RotationAveraging.cppm
         Geometry.SDF.cppm
         Geometry.SDFContact.cppm
         Geometry.Segment.cppm
@@ -163,6 +164,7 @@ target_sources(${target_name}
         Geometry.Robust.cpp
         Geometry.RobustPredicates.cpp
         Geometry.Rotation.cpp
+        Geometry.RotationAveraging.cpp
         Geometry.SDF.cpp
         Geometry.Segment.cpp
         Geometry.Sphere.Sampling.cpp
