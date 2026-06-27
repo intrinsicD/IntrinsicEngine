@@ -378,6 +378,97 @@ namespace Geometry::MeshUtils
         return glm::cross(b - a, c - a);
     }
 
+    glm::dvec3 FaceAreaVector(const HalfedgeMesh::Mesh& mesh, FaceHandle f)
+    {
+        if (!mesh.IsValid(f) || mesh.IsDeleted(f))
+        {
+            return glm::dvec3(0.0);
+        }
+        // Newell's method: A = 1/2 sum_i (v_i x v_{i+1}); works for polygons.
+        glm::dvec3 first(0.0);
+        glm::dvec3 prev(0.0);
+        glm::dvec3 accum(0.0);
+        std::size_t count = 0;
+        for (const VertexHandle v : mesh.VerticesAroundFace(f))
+        {
+            const glm::dvec3 p(mesh.Position(v));
+            if (count == 0)
+            {
+                first = p;
+            }
+            else
+            {
+                accum += glm::cross(prev, p);
+            }
+            prev = p;
+            ++count;
+        }
+        if (count < 3)
+        {
+            return glm::dvec3(0.0);
+        }
+        accum += glm::cross(prev, first); // close the loop
+        return accum * 0.5;
+    }
+
+    double FaceArea(const HalfedgeMesh::Mesh& mesh, FaceHandle f)
+    {
+        return glm::length(FaceAreaVector(mesh, f));
+    }
+
+    glm::dvec3 FaceCentroid(const HalfedgeMesh::Mesh& mesh, FaceHandle f)
+    {
+        if (!mesh.IsValid(f) || mesh.IsDeleted(f))
+        {
+            return glm::dvec3(0.0);
+        }
+        glm::dvec3 sum(0.0);
+        std::size_t count = 0;
+        for (const VertexHandle v : mesh.VerticesAroundFace(f))
+        {
+            sum += glm::dvec3(mesh.Position(v));
+            ++count;
+        }
+        if (count == 0)
+        {
+            return glm::dvec3(0.0);
+        }
+        return sum / static_cast<double>(count);
+    }
+
+    std::vector<double> ComputeBarycentricVertexAreas(const HalfedgeMesh::Mesh& mesh)
+    {
+        std::vector<double> areas(mesh.VerticesSize(), 0.0);
+        for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
+        {
+            const FaceHandle f{static_cast<PropertyIndex>(fi)};
+            if (mesh.IsDeleted(f))
+            {
+                continue;
+            }
+            // Count the face degree, then distribute area/degree to each corner.
+            std::size_t degree = 0;
+            for (const VertexHandle v : mesh.VerticesAroundFace(f))
+            {
+                (void)v;
+                ++degree;
+            }
+            if (degree == 0)
+            {
+                continue;
+            }
+            const double share = FaceArea(mesh, f) / static_cast<double>(degree);
+            for (const VertexHandle v : mesh.VerticesAroundFace(f))
+            {
+                if (v.Index < areas.size())
+                {
+                    areas[v.Index] += share;
+                }
+            }
+        }
+        return areas;
+    }
+
     glm::vec3 VertexNormal(const HalfedgeMesh::Mesh& mesh, VertexHandle v)
     {
         glm::vec3 n(0.0f);
