@@ -72,6 +72,28 @@ intact. Flat 1-rings, boundary (open) vertices, and zero-area 1-rings fail close
 with the zero-vector sentinel and keep their scalar-derived principal curvatures;
 empty / no-face meshes return `nullopt`.
 
+### Discrete Laplacian edge-weight modes
+
+`Geometry.DEC` assembles the stiffness (edge-weight) matrix `⋆1` and the weak
+Laplacian `L = d0ᵀ ⋆1 d0` under a selectable `EdgeWeightMode`:
+
+- `Cotan` (default) — `(cot α + cot β)/2`, the standard DEC weights.
+- `HeatKernel` — `exp(−‖p_i − p_j‖²/4t)`, always positive, distance-adaptive.
+- `Graph` — `w = 1`, the combinatorial Laplacian (topology only).
+- `Fujiwara` — `w = 1/‖p_i − p_j‖`, inverse-distance; fails closed on
+  zero-length / non-finite edges.
+- `ModifiedNormal` — `(cot α + cot β)/2 · |n_i · n_j|^p` (feature exponent `p`,
+  default 1), down-weighting edges across sharp dihedral features. The cotan
+  term uses the clamped per-halfedge cotan so slivers cannot inject unbounded
+  weights.
+
+Every mode is symmetric with zero row sums and is validated by `AnalyzeLaplacian`.
+`Geometry.HalfedgeMesh.Utils` publishes the standalone clamped per-halfedge cotan
+as `MeshUtils::ClampedHalfedgeCotan` (`h:clamped_cotan`): the Heron/metric form
+`cot = (a² + b² − c²)/(4·Area)` with magnitude clamped to `kHalfedgeCotanClamp`;
+the per-edge cotan weight is the average of the two halfedge cotans. Boundary
+halfedges and degenerate / non-finite triangles fail closed to zero.
+
 ### Parameterization diagnostics
 
 `Geometry.Parameterization.Diagnostics` is the shared CPU diagnostics surface for

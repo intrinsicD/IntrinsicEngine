@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <cmath>
+#include <limits>
 #include <numeric>
 #include <vector>
 
@@ -1255,4 +1256,182 @@ TEST(DEC_HeatKernel, SolveCGShiftedWithHeatKernel)
     EXPECT_LT(result.ResidualNorm, 1e-6);
     // Solution should be positive at vertex 0 (heat source)
     EXPECT_GT(x[0], 0.0);
+}
+
+// =============================================================================
+// GEOM-041 — FEM stiffness modes and clamped per-halfedge cotan
+// =============================================================================
+
+namespace
+{
+    using Geometry::DEC::EdgeWeightMode;
+    using Geometry::DEC::EdgeWeightConfig;
+
+    // Max |L[i,j] - L[j,i]| and max |row sum| computed directly from CSR.
+    void StiffnessStructure(const Geometry::DEC::SparseMatrix& L,
+                            double& maxRowSum, double& maxAsym)
+    {
+        maxRowSum = 0.0;
+        maxAsym = 0.0;
+        for (std::size_t i = 0; i < L.Rows; ++i)
+        {
+            double rs = 0.0;
+            for (std::size_t k = L.RowOffsets[i]; k < L.RowOffsets[i + 1]; ++k)
+            {
+                rs += L.Values[k];
+                const std::size_t j = L.ColIndices[k];
+                // Find L[j,i].
+                double lji = 0.0;
+                for (std::size_t m = L.RowOffsets[j]; m < L.RowOffsets[j + 1]; ++m)
+                {
+                    if (L.ColIndices[m] == i) { lji = L.Values[m]; break; }
+                }
+                maxAsym = std::max(maxAsym, std::abs(L.Values[k] - lji));
+            }
+            maxRowSum = std::max(maxRowSum, std::abs(rs));
+        }
+    }
+}
+
+TEST(DEC_StiffnessModes, RowSumsZeroAndSymmetricForEveryMode)
+{
+    auto mesh = MakeIcosahedron();
+    const EdgeWeightMode modes[] = {
+        EdgeWeightMode::Graph, EdgeWeightMode::Cotan,
+        EdgeWeightMode::Fujiwara, EdgeWeightMode::ModifiedNormal};
+
+    for (EdgeWeightMode mode : modes)
+    {
+        EdgeWeightConfig config{mode};
+        auto L = Geometry::DEC::BuildLaplacian(mesh, config);
+        double maxRowSum = 0.0, maxAsym = 0.0;
+        StiffnessStructure(L, maxRowSum, maxAsym);
+        EXPECT_LT(maxRowSum, 1e-9) << "mode " << static_cast<int>(mode);
+        EXPECT_LT(maxAsym, 1e-9) << "mode " << static_cast<int>(mode);
+
+        auto diag = Geometry::DEC::AnalyzeLaplacian(L, 1e-9);
+        EXPECT_TRUE(diag.IsSymmetric) << "mode " << static_cast<int>(mode);
+        EXPECT_TRUE(diag.HasZeroRowSums) << "mode " << static_cast<int>(mode);
+    }
+}
+
+TEST(DEC_StiffnessModes, GraphWeightsAreUnitPerEdge)
+{
+    auto mesh = MakeTetrahedron();
+    auto w = Geometry::DEC::BuildHodgeStar1(mesh, EdgeWeightConfig{EdgeWeightMode::Graph});
+    for (std::size_t ei = 0; ei < mesh.EdgesSize(); ++ei)
+    {
+        Geometry::EdgeHandle e{static_cast<Geometry::PropertyIndex>(ei)};
+        if (mesh.IsDeleted(e)) continue;
+        EXPECT_DOUBLE_EQ(w.Diagonal[ei], 1.0);
+    }
+}
+
+TEST(DEC_StiffnessModes, FujiwaraWeightsMatchInverseLength)
+{
+    auto mesh = MakeTetrahedron();
+    auto w = Geometry::DEC::BuildHodgeStar1(mesh, EdgeWeightConfig{EdgeWeightMode::Fujiwara});
+    for (std::size_t ei = 0; ei < mesh.EdgesSize(); ++ei)
+    {
+        Geometry::EdgeHandle e{static_cast<Geometry::PropertyIndex>(ei)};
+        if (mesh.IsDeleted(e)) continue;
+        Geometry::HalfedgeHandle h0{static_cast<Geometry::PropertyIndex>(2u * ei)};
+        const glm::dvec3 a = glm::dvec3(mesh.Position(mesh.FromVertex(h0)));
+        const glm::dvec3 b = glm::dvec3(mesh.Position(mesh.ToVertex(h0)));
+        const double len = glm::length(b - a);
+        EXPECT_NEAR(w.Diagonal[ei], 1.0 / len, 1e-12);
+    }
+}
+
+TEST(DEC_StiffnessModes, ModifiedNormalEqualsCotanTimesNormalDot)
+{
+    // On a closed convex mesh, ModifiedNormal weight = cotan weight * |n_i·n_j|.
+    auto mesh = MakeIcosahedron();
+    auto cot = Geometry::DEC::BuildHodgeStar1(mesh); // Cotan Hodge star
+    auto mod = Geometry::DEC::BuildHodgeStar1(mesh, EdgeWeightConfig{EdgeWeightMode::ModifiedNormal});
+
+    namespace MU = Geometry::MeshUtils;
+    for (std::size_t ei = 0; ei < mesh.EdgesSize(); ++ei)
+    {
+        Geometry::EdgeHandle e{static_cast<Geometry::PropertyIndex>(ei)};
+        if (mesh.IsDeleted(e)) continue;
+        Geometry::HalfedgeHandle h0{static_cast<Geometry::PropertyIndex>(2u * ei)};
+        const glm::vec3 ni = glm::normalize(MU::VertexNormal(mesh, mesh.FromVertex(h0)));
+        const glm::vec3 nj = glm::normalize(MU::VertexNormal(mesh, mesh.ToVertex(h0)));
+        const double expected = cot.Diagonal[ei] * std::abs(glm::dot(glm::dvec3(ni), glm::dvec3(nj)));
+        EXPECT_NEAR(mod.Diagonal[ei], expected, 1e-6) << "edge " << ei;
+    }
+}
+
+TEST(DEC_ClampedHalfedgeCotan, MatchesEdgeCotanWeight)
+{
+    namespace MU = Geometry::MeshUtils;
+    auto mesh = MakeIcosahedron();
+    auto cot = MU::ClampedHalfedgeCotan(mesh);
+    for (std::size_t ei = 0; ei < mesh.EdgesSize(); ++ei)
+    {
+        Geometry::EdgeHandle e{static_cast<Geometry::PropertyIndex>(ei)};
+        if (mesh.IsDeleted(e)) continue;
+        Geometry::HalfedgeHandle h0{static_cast<Geometry::PropertyIndex>(2u * ei)};
+        Geometry::HalfedgeHandle h1 = mesh.OppositeHalfedge(h0);
+        const double recovered = 0.5 * (cot[h0] + cot[h1]);
+        // Heron/metric form vs the geometric Cotan() agree up to float-position
+        // rounding (positions are stored as float).
+        EXPECT_NEAR(recovered, MU::EdgeCotanWeight(mesh, e), 1e-6) << "edge " << ei;
+    }
+}
+
+TEST(DEC_ClampedHalfedgeCotan, ClampEngagesOnSliver)
+{
+    namespace MU = Geometry::MeshUtils;
+    // Needle triangle: a near-zero apex angle gives a huge cotangent.
+    Geometry::HalfedgeMesh::Mesh mesh;
+    auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+    auto v1 = mesh.AddVertex({1.0f, 0.0f, 0.0f});
+    auto v2 = mesh.AddVertex({0.5f, 1.0e-5f, 0.0f});
+    ASSERT_TRUE(mesh.AddTriangle(v0, v1, v2).has_value());
+
+    const double bound = 100.0;
+    auto cot = MU::ClampedHalfedgeCotan(mesh, bound);
+    double maxAbs = 0.0;
+    for (std::size_t hi = 0; hi < mesh.HalfedgesSize(); ++hi)
+    {
+        Geometry::HalfedgeHandle h{static_cast<Geometry::PropertyIndex>(hi)};
+        maxAbs = std::max(maxAbs, std::abs(cot[h]));
+        EXPECT_LE(std::abs(cot[h]), bound + 1e-9);
+        EXPECT_TRUE(std::isfinite(cot[h]));
+    }
+    EXPECT_NEAR(maxAbs, bound, 1e-9) << "sliver apex cotan must hit the clamp";
+}
+
+TEST(DEC_StiffnessModes, FailClosedOnEmptyMesh)
+{
+    Geometry::HalfedgeMesh::Mesh mesh;
+    for (EdgeWeightMode mode : {EdgeWeightMode::Graph, EdgeWeightMode::Fujiwara,
+                                EdgeWeightMode::ModifiedNormal})
+    {
+        auto L = Geometry::DEC::BuildLaplacian(mesh, EdgeWeightConfig{mode});
+        EXPECT_EQ(L.Rows, 0u);
+        for (double v : L.Values) EXPECT_TRUE(std::isfinite(v));
+    }
+}
+
+TEST(DEC_StiffnessModes, FailClosedOnNonFinitePositions)
+{
+    // A NaN vertex must not inject NaN into any mode's stiffness operator.
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+    auto v1 = mesh.AddVertex({1.0f, 0.0f, 0.0f});
+    auto v2 = mesh.AddVertex({nan, 1.0f, 0.0f});
+    auto v3 = mesh.AddVertex({0.0f, -1.0f, 0.0f});
+    (void)mesh.AddTriangle(v0, v1, v2);
+    (void)mesh.AddTriangle(v0, v3, v1);
+
+    for (EdgeWeightMode mode : {EdgeWeightMode::Graph, EdgeWeightMode::Fujiwara,
+                                EdgeWeightMode::ModifiedNormal})
+    {
+        auto w = Geometry::DEC::BuildHodgeStar1(mesh, EdgeWeightConfig{mode});
+        for (double v : w.Diagonal) EXPECT_TRUE(std::isfinite(v)) << "mode " << static_cast<int>(mode);
+    }
 }

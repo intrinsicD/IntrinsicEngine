@@ -36,6 +36,20 @@ export namespace Geometry::DEC
         //   t → ∞: weights approach 1 (uniform weighting)
         // When TimeParam == 0, t is set automatically to mean edge length².
         HeatKernel = 1,
+
+        // w = 1 — combinatorial (graph) Laplacian. Topology only; ignores the
+        // embedding. Always positive, symmetric, zero row sums.
+        Graph = 2,
+
+        // w = 1 / ‖p_i − p_j‖ — Fujiwara inverse-distance weights. Always
+        // positive; fails closed (weight 0) on zero-length / non-finite edges.
+        Fujiwara = 3,
+
+        // w = (cot α_ij + cot β_ij)/2 · |n(v_i) · n(v_j)| — feature-aware cotan.
+        // Down-weights edges across sharp dihedral features (where the endpoint
+        // normals disagree). Uses the clamped per-halfedge cotan for the cotan
+        // term so slivers cannot inject unbounded weights.
+        ModifiedNormal = 4,
     };
 
     // Configuration for non-default edge weighting schemes.
@@ -46,6 +60,11 @@ export namespace Geometry::DEC
         // Time parameter for HeatKernel mode.
         // If <= 0 (default), automatically set to mean squared edge length.
         double TimeParam{0.0};
+
+        // ModifiedNormal feature exponent applied to |n_i · n_j| (>= 0).
+        // 1 reproduces the plain |n_i · n_j| factor; larger values sharpen the
+        // feature attenuation. Ignored by every other mode.
+        double FeatureExponent{1.0};
     };
     // -------------------------------------------------------------------------
     // SparseMatrix — Compressed Sparse Row (CSR) representation

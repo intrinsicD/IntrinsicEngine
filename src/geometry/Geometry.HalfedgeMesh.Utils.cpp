@@ -374,6 +374,59 @@ namespace Geometry::MeshUtils
         return cotSum / 2.0;
     }
 
+    HalfedgeProperty<double> ClampedHalfedgeCotan(HalfedgeMesh::Mesh& mesh, double maxMagnitude)
+    {
+        HalfedgeProperty<double> cot(mesh.HalfedgeProperties().GetOrAdd<double>("h:clamped_cotan", 0.0));
+
+        const double bound = (std::isfinite(maxMagnitude) && maxMagnitude > 0.0)
+                                 ? maxMagnitude
+                                 : kHalfedgeCotanClamp;
+
+        const std::size_t nH = mesh.HalfedgesSize();
+        for (std::size_t hi = 0; hi < nH; ++hi)
+        {
+            HalfedgeHandle h{static_cast<PropertyIndex>(hi)};
+            cot[h] = 0.0;
+            if (mesh.IsDeleted(h) || mesh.IsBoundary(h))
+            {
+                continue; // boundary/deleted halfedges have no apex triangle
+            }
+
+            // Apex angle of h's triangle is opposite h's edge (from->to).
+            const VertexHandle vFrom = mesh.FromVertex(h);
+            const VertexHandle vTo = mesh.ToVertex(h);
+            const VertexHandle vApex = mesh.ToVertex(mesh.NextHalfedge(h));
+            const glm::dvec3 pFrom(mesh.Position(vFrom));
+            const glm::dvec3 pTo(mesh.Position(vTo));
+            const glm::dvec3 pApex(mesh.Position(vApex));
+            if (!(std::isfinite(pFrom.x) && std::isfinite(pFrom.y) && std::isfinite(pFrom.z) &&
+                  std::isfinite(pTo.x) && std::isfinite(pTo.y) && std::isfinite(pTo.z) &&
+                  std::isfinite(pApex.x) && std::isfinite(pApex.y) && std::isfinite(pApex.z)))
+            {
+                continue; // fail closed on non-finite positions
+            }
+
+            // Heron/metric form: cot(apex) = (a² + b² − c²) / (4·Area),
+            // c = |to − from| (opposite the apex), a/b the apex-adjacent sides.
+            const glm::dvec3 toApex = pApex - pTo;
+            const glm::dvec3 fromApex = pApex - pFrom;
+            const double cSq = glm::dot(pTo - pFrom, pTo - pFrom);
+            const double aSq = glm::dot(toApex, toApex);
+            const double bSq = glm::dot(fromApex, fromApex);
+            const double area = 0.5 * glm::length(glm::cross(pFrom - pApex, pTo - pApex));
+            if (area <= 1e-12)
+            {
+                continue; // degenerate / zero-area triangle fails closed to 0
+            }
+
+            double value = (aSq + bSq - cSq) / (4.0 * area);
+            value = std::clamp(value, -bound, bound);
+            cot[h] = value;
+        }
+
+        return cot;
+    }
+
     glm::vec3 FaceNormal(const HalfedgeMesh::Mesh& mesh, FaceHandle f)
     {
         HalfedgeHandle h0 = mesh.Halfedge(f);

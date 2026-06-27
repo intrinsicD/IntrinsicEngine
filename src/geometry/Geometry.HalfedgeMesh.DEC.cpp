@@ -23,6 +23,47 @@ namespace Geometry::DEC
     using MeshUtils::EdgeCotanWeight;
     using MeshUtils::TriangleArea;
     using MeshUtils::ComputeMixedVoronoiAreas;
+    using MeshUtils::VertexNormal;
+
+    namespace
+    {
+        // Clamped cotangent of the apex angle opposite halfedge h (the angle in
+        // h's triangle facing h's edge), Heron/metric form. Boundary/deleted
+        // halfedges and degenerate/non-finite triangles fail closed to 0. This
+        // mirrors MeshUtils::ClampedHalfedgeCotan but stays const-friendly for the
+        // assembly path (which does not mutate the mesh / publish properties).
+        [[nodiscard]] double ClampedApexCotan(const HalfedgeMesh::Mesh& mesh,
+                                              HalfedgeHandle h, double bound)
+        {
+            if (mesh.IsDeleted(h) || mesh.IsBoundary(h))
+                return 0.0;
+            const glm::dvec3 pFrom(mesh.Position(mesh.FromVertex(h)));
+            const glm::dvec3 pTo(mesh.Position(mesh.ToVertex(h)));
+            const glm::dvec3 pApex(mesh.Position(mesh.ToVertex(mesh.NextHalfedge(h))));
+            const auto finite = [](const glm::dvec3& p) {
+                return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z);
+            };
+            if (!finite(pFrom) || !finite(pTo) || !finite(pApex))
+                return 0.0;
+            const double cSq = glm::dot(pTo - pFrom, pTo - pFrom);
+            const double aSq = glm::dot(pApex - pTo, pApex - pTo);
+            const double bSq = glm::dot(pApex - pFrom, pApex - pFrom);
+            const double area = 0.5 * glm::length(glm::cross(pFrom - pApex, pTo - pApex));
+            if (area <= 1e-12)
+                return 0.0;
+            return std::clamp((aSq + bSq - cSq) / (4.0 * area), -bound, bound);
+        }
+
+        // Clamped (cot α + cot β)/2 edge weight built from the two halfedge apex
+        // cotans — the feature-aware ModifiedNormal cotan term.
+        [[nodiscard]] double ClampedEdgeCotanWeight(const HalfedgeMesh::Mesh& mesh,
+                                                    EdgeHandle e, double bound)
+        {
+            const HalfedgeHandle h0{static_cast<PropertyIndex>(2u * e.Index)};
+            const HalfedgeHandle h1 = mesh.OppositeHalfedge(h0);
+            return 0.5 * (ClampedApexCotan(mesh, h0, bound) + ClampedApexCotan(mesh, h1, bound));
+        }
+    }
 
     // -------------------------------------------------------------------------
     // BuildExteriorDerivative0
@@ -225,7 +266,7 @@ namespace Geometry::DEC
         hodge1.Size = nE;
         hodge1.Diagonal.assign(nE, 0.0);
 
-        // Compute automatic time parameter if needed.
+        // Compute automatic time parameter if needed (HeatKernel only).
         double timeParam = config.TimeParam;
         if (config.Mode == EdgeWeightMode::HeatKernel && timeParam <= 0.0)
         {
@@ -248,7 +289,9 @@ namespace Geometry::DEC
             timeParam = (edgeCount > 0) ? (sumLenSq / static_cast<double>(edgeCount)) : 1.0;
         }
 
-        // Assemble weights per edge
+        const double featureExp = std::max(0.0, config.FeatureExponent);
+
+        // Assemble weights per edge per mode (all fail closed to 0).
         for (std::size_t ei = 0; ei < nE; ++ei)
         {
             EdgeHandle eh{static_cast<PropertyIndex>(ei)};
@@ -256,13 +299,54 @@ namespace Geometry::DEC
                 continue;
 
             HalfedgeHandle h0{static_cast<PropertyIndex>(2u * ei)};
-            auto p0 = glm::dvec3(mesh.Position(mesh.FromVertex(h0)));
-            auto p1 = glm::dvec3(mesh.Position(mesh.ToVertex(h0)));
-            auto d = p1 - p0;
-            double distSq = glm::dot(d, d);
+            const glm::dvec3 p0 = glm::dvec3(mesh.Position(mesh.FromVertex(h0)));
+            const glm::dvec3 p1 = glm::dvec3(mesh.Position(mesh.ToVertex(h0)));
+            const glm::dvec3 d = p1 - p0;
+            const double distSq = glm::dot(d, d);
 
-            // w_ij = exp(-||p_i - p_j||² / (4t))
-            hodge1.Diagonal[ei] = std::exp(-distSq / (4.0 * timeParam));
+            double w = 0.0;
+            switch (config.Mode)
+            {
+            case EdgeWeightMode::HeatKernel:
+                // w_ij = exp(-||p_i - p_j||² / (4t))
+                w = std::exp(-distSq / (4.0 * timeParam));
+                break;
+            case EdgeWeightMode::Graph:
+                // w_ij = 1 (combinatorial)
+                w = 1.0;
+                break;
+            case EdgeWeightMode::Fujiwara:
+            {
+                // w_ij = 1 / ||p_i - p_j||, fail closed on degenerate length.
+                const double len = std::sqrt(distSq);
+                w = (std::isfinite(len) && len > 1e-12) ? (1.0 / len) : 0.0;
+                break;
+            }
+            case EdgeWeightMode::ModifiedNormal:
+            {
+                // w_ij = (cot α + cot β)/2 · |n_i · n_j|^featureExp
+                const double cotw = ClampedEdgeCotanWeight(mesh, eh, MeshUtils::kHalfedgeCotanClamp);
+                const glm::dvec3 ni = glm::dvec3(VertexNormal(mesh, mesh.FromVertex(h0)));
+                const glm::dvec3 nj = glm::dvec3(VertexNormal(mesh, mesh.ToVertex(h0)));
+                const double li = glm::length(ni);
+                const double lj = glm::length(nj);
+                double feature = 0.0;
+                if (li > 1e-12 && lj > 1e-12)
+                {
+                    const double dotN = std::abs(glm::dot(ni / li, nj / lj));
+                    feature = (featureExp == 1.0) ? dotN : std::pow(dotN, featureExp);
+                }
+                w = cotw * feature;
+                break;
+            }
+            case EdgeWeightMode::Cotan:
+            default:
+                // Cotan handled by the early return above; defensive no-op.
+                w = 0.0;
+                break;
+            }
+
+            hodge1.Diagonal[ei] = std::isfinite(w) ? w : 0.0;
         }
 
         return hodge1;

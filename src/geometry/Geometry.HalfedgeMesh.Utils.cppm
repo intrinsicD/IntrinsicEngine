@@ -77,6 +77,22 @@ export namespace Geometry::MeshUtils
     /// Boundary edges contribute only their single incident angle.
     double EdgeCotanWeight(const HalfedgeMesh::Mesh& mesh, EdgeHandle e);
 
+    /// Policy clamp bound for the per-halfedge cotangent: |cot| is limited to
+    /// this magnitude so near-degenerate (sliver) triangles cannot inject
+    /// unbounded weights into FEM/DEC operators.
+    inline constexpr double kHalfedgeCotanClamp = 1.0e4;
+
+    /// Standalone clamped per-halfedge cotangent, published as `h:clamped_cotan`.
+    /// For each interior halfedge h it computes the cotangent of the angle
+    /// opposite h's edge (the apex angle of h's triangle) using the Heron/metric
+    /// form cot = (a² + b² − c²) / (4·Area), with the magnitude clamped to
+    /// `maxMagnitude`. Boundary halfedges and degenerate (zero-area / non-finite)
+    /// triangles fail closed to 0. The per-edge cotan weight is recovered as the
+    /// average of the two halfedge cotans: EdgeCotanWeight(e) =
+    /// (cot(h0) + cot(h1)) / 2.
+    [[nodiscard]] HalfedgeProperty<double> ClampedHalfedgeCotan(
+        HalfedgeMesh::Mesh& mesh, double maxMagnitude = kHalfedgeCotanClamp);
+
     /// Unnormalized face normal (cross product of two edge vectors).
     /// Magnitude equals twice the face area.
     glm::vec3 FaceNormal(const HalfedgeMesh::Mesh& mesh, FaceHandle f);

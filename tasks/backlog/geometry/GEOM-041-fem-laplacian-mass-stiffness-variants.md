@@ -31,10 +31,16 @@ maturity_target: CPUContracted
 
 ## Slice plan
 
-- [ ] Slice 1 — Stiffness modes: extend `EdgeWeightMode` with `Graph`, `Fujiwara`, `ModifiedNormal`; wire each into stiffness assembly; row-sum and symmetry tests pass.
-- [ ] Slice 2 — Standalone clamped per-halfedge cotan accessor in `Geometry.HalfedgeMesh.Utils` (Heron/metric form, magnitude clamping) returning a `HalfedgeProperty<double>`; parity test against `EdgeCotanWeight`.
+- [x] Slice 1 — Stiffness modes: extend `EdgeWeightMode` with `Graph`, `Fujiwara`, `ModifiedNormal`; wire each into stiffness assembly; row-sum and symmetry tests pass.
+- [x] Slice 2 — Standalone clamped per-halfedge cotan accessor in `Geometry.HalfedgeMesh.Utils` (Heron/metric form, magnitude clamping) returning a `HalfedgeProperty<double>`; parity test against `EdgeCotanWeight`.
 - [ ] Slice 3 — Mass modes: add the mass-mode enum (`Sum`/lumped, `Barycentric`, `Voronoi`, `Galerkin`) and consistent (Galerkin) mass assembly alongside the existing diagonal `Hodge0`; SPD + row-sum-equals-lumped tests pass.
 - [ ] Slice 4 — Diagnostics & docs: confirm `AnalyzeLaplacian` covers all modes, update DEC docs, finalize fail-closed diagnostics.
+
+> Progress: Slices 1-2 landed (stiffness modes + clamped halfedge-cotan accessor)
+> with row-sum/symmetry, weight-parity, clamp-engages, and fail-closed tests in
+> `tests/unit/geometry/Test_DEC.cpp`. Slices 3-4 (mass-mode family incl. the
+> Galerkin consistent mass matrix on `DECOperators`, plus final diagnostics
+> coverage) remain open.
 
 ## Required changes
 
