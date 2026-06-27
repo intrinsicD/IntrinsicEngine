@@ -261,6 +261,43 @@ TEST(CurvatureTensor, Saddle_OppositeSignsAxisAligned)
 }
 
 // =============================================================================
+// Fail-closed: a single non-finite corner on a CLOSED mesh must not poison the
+// finite interior neighbours via a NaN vertex normal.
+// =============================================================================
+
+TEST(CurvatureTensor, NonFiniteCornerOnClosedMeshFailsClosed)
+{
+    // Regular tetrahedron with one NaN vertex. Every other vertex is incident
+    // to a face containing the bad vertex, so each gets a NaN VertexNormal; the
+    // tensor path must fail closed rather than publish NaN directions/curvatures.
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    const auto v0 = mesh.AddVertex({1.0f, 1.0f, 1.0f});
+    const auto v1 = mesh.AddVertex({1.0f, -1.0f, -1.0f});
+    const auto v2 = mesh.AddVertex({-1.0f, 1.0f, -1.0f});
+    const auto v3 = mesh.AddVertex({nan, -1.0f, 1.0f}); // poisoned corner
+    (void)mesh.AddTriangle(v0, v2, v1);
+    (void)mesh.AddTriangle(v0, v3, v2);
+    (void)mesh.AddTriangle(v0, v1, v3);
+    (void)mesh.AddTriangle(v1, v2, v3);
+
+    auto result = Curv::ComputeCurvatureTensor(mesh);
+    ASSERT_TRUE(result.has_value());
+
+    for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+    {
+        VertexHandle vh{static_cast<PropertyIndex>(i)};
+        if (mesh.IsDeleted(vh)) continue;
+        const glm::vec3 d1 = result->PrincipalDir1Property[vh];
+        const glm::vec3 d2 = result->PrincipalDir2Property[vh];
+        EXPECT_TRUE(std::isfinite(d1.x) && std::isfinite(d1.y) && std::isfinite(d1.z));
+        EXPECT_TRUE(std::isfinite(d2.x) && std::isfinite(d2.y) && std::isfinite(d2.z));
+        EXPECT_TRUE(std::isfinite(result->MaxPrincipalCurvatureProperty[vh]));
+        EXPECT_TRUE(std::isfinite(result->MinPrincipalCurvatureProperty[vh]));
+    }
+}
+
+// =============================================================================
 // Determinism: identical output across repeated runs.
 // =============================================================================
 

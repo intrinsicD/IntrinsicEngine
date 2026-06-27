@@ -57,9 +57,13 @@ namespace Geometry::Curvature
 
                 const glm::dvec3 normal = glm::dvec3(VertexNormal(mesh, vh));
                 const double nLen = glm::length(normal);
-                if (nLen <= kTiny) continue;
+                // A NaN/Inf normal (e.g. an interior vertex incident to a face
+                // with a non-finite corner) makes nLen non-finite; `nLen <= kTiny`
+                // would be false, so check finiteness explicitly and fail closed.
+                if (!std::isfinite(nLen) || nLen <= kTiny) continue;
                 const glm::dvec3 n = normal / nLen;
                 const glm::dvec3 xi = glm::dvec3(mesh.Position(vh));
+                if (!std::isfinite(xi.x) || !std::isfinite(xi.y) || !std::isfinite(xi.z)) continue;
 
                 // Accumulate M = Σ_j w_ij κ_ij T_ij T_ijᵀ (upper triangle).
                 double m00 = 0.0, m01 = 0.0, m02 = 0.0, m11 = 0.0, m12 = 0.0, m22 = 0.0;
@@ -69,7 +73,10 @@ namespace Geometry::Curvature
                     const VertexHandle vj = mesh.ToVertex(h);
                     const glm::dvec3 d = glm::dvec3(mesh.Position(vj)) - xi;
                     const double dd = glm::dot(d, d);
-                    if (dd <= kTiny) continue;
+                    // `!(dd > kTiny)` also rejects a non-finite neighbour (NaN
+                    // fails the comparison), so a single bad corner cannot poison
+                    // a finite neighbour's tensor.
+                    if (!(dd > kTiny)) continue;
 
                     // Area-derived weight: sum of the areas of the two faces
                     // incident to this edge (one for a boundary edge — but the
@@ -163,6 +170,13 @@ namespace Geometry::Curvature
                 const double d2Len = glm::length(d2);
                 if (d2Len <= kTiny) continue;
                 d2 /= d2Len;
+
+                // Final fail-closed guard: never publish a non-finite result.
+                const auto vecFinite = [](const glm::dvec3& v) {
+                    return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
+                };
+                if (!vecFinite(d1) || !vecFinite(d2) || !std::isfinite(k1) || !std::isfinite(k2))
+                    continue;
 
                 out[i].Dir1 = d1;
                 out[i].Dir2 = d2;

@@ -483,14 +483,15 @@ namespace Geometry::MeshUtils
         {
             return 0.0;
         }
-        // Triangle-fan area: sum the true areas of the fan triangles
-        // (first, v_i, v_{i+1}). For a planar face this equals the Newell
-        // |FaceAreaVector|, but for a non-planar polygon (e.g. a folded quad,
-        // which AddQuad does not forbid) the oriented Newell components cancel
-        // and underreport the surface area, so the fan sum is the correct mass.
+        // Pass 1: Newell oriented (signed) area vector — exact shoelace area for
+        // any *planar* polygon, including concave ones (signed fan triangles
+        // cancel the over-counted concavity) — plus the absolute triangle-fan
+        // sum, which is the true surface area for a *non-planar* (folded) polygon
+        // whose Newell components would otherwise cancel.
         glm::dvec3 first(0.0);
         glm::dvec3 prev(0.0);
-        double area = 0.0;
+        glm::dvec3 accum(0.0);
+        double fanAbs = 0.0;
         std::size_t count = 0;
         for (const VertexHandle v : mesh.VerticesAroundFace(f))
         {
@@ -503,9 +504,13 @@ namespace Geometry::MeshUtils
             {
                 first = p;
             }
-            else if (count >= 2)
+            else
             {
-                area += 0.5 * glm::length(glm::cross(prev - first, p - first));
+                accum += glm::cross(prev, p);
+                if (count >= 2)
+                {
+                    fanAbs += 0.5 * glm::length(glm::cross(prev - first, p - first));
+                }
             }
             prev = p;
             ++count;
@@ -514,7 +519,32 @@ namespace Geometry::MeshUtils
         {
             return 0.0;
         }
-        return area;
+        accum += glm::cross(prev, first); // close the loop
+        const glm::dvec3 areaVec = accum * 0.5;
+        const double newellMag = glm::length(areaVec);
+
+        // Decide planarity from the per-vertex deviation off the Newell plane,
+        // normalized by the polygon's radius so the test is scale-invariant
+        // (robust to float-stored positions far from the origin). Planar faces
+        // use the exact Newell area; only genuinely non-planar faces fall back
+        // to the fan surface-area approximation.
+        if (newellMag > 1e-12)
+        {
+            const glm::dvec3 n = areaVec / newellMag;
+            double maxDev = 0.0;
+            double radius = 0.0;
+            for (const VertexHandle v : mesh.VerticesAroundFace(f))
+            {
+                const glm::dvec3 d = glm::dvec3(mesh.Position(v)) - first;
+                maxDev = std::max(maxDev, std::abs(glm::dot(d, n)));
+                radius = std::max(radius, glm::length(d));
+            }
+            if (radius <= 1e-12 || maxDev <= 1.0e-4 * radius)
+            {
+                return newellMag; // planar (incl. concave) -> exact shoelace area
+            }
+        }
+        return fanAbs; // non-planar -> fan surface-area approximation
     }
 
     glm::dvec3 FaceCentroid(const HalfedgeMesh::Mesh& mesh, FaceHandle f)

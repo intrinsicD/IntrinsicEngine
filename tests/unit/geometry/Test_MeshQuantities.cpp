@@ -116,6 +116,37 @@ TEST(GeometryMeshQuantities, NonPlanarQuadAreaUsesTriangleFan)
     EXPECT_GT(area, glm::length(MU::FaceAreaVector(mesh, *f)) + 1e-6);
 }
 
+TEST(GeometryMeshQuantities, PlanarConcavePolygonUsesShoelaceArea)
+{
+    // Concave (reflex at D) planar quad. Its true (shoelace) area is 1.5, but a
+    // naive absolute triangle-fan from A overcounts (2.5) because fan triangles
+    // span the concavity. FaceArea must report the exact planar area.
+    Geometry::HalfedgeMesh::Mesh mesh;
+    const auto vA = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+    const auto vB = mesh.AddVertex({2.0f, 1.0f, 0.0f});
+    const auto vC = mesh.AddVertex({0.0f, 2.0f, 0.0f});
+    const auto vD = mesh.AddVertex({0.5f, 1.0f, 0.0f});
+    const Geometry::VertexHandle loop[] = {vA, vB, vC, vD};
+    const auto f = mesh.AddFace(loop);
+    ASSERT_TRUE(f.has_value());
+
+    // Shoelace area of the loop (planar, z = 0).
+    const glm::dvec2 p[] = {{0, 0}, {2, 1}, {0, 2}, {0.5, 1}};
+    double twice = 0.0;
+    for (int i = 0; i < 4; ++i)
+    {
+        const glm::dvec2& a = p[i];
+        const glm::dvec2& b = p[(i + 1) % 4];
+        twice += a.x * b.y - b.x * a.y;
+    }
+    const double shoelace = std::abs(twice) * 0.5;
+    ASSERT_NEAR(shoelace, 1.5, 1e-12);
+
+    EXPECT_NEAR(MU::FaceArea(mesh, *f), shoelace, 1e-9);
+    // Planar area must equal the Newell magnitude exactly (no fan overcount).
+    EXPECT_NEAR(MU::FaceArea(mesh, *f), glm::length(MU::FaceAreaVector(mesh, *f)), 1e-9);
+}
+
 TEST(GeometryMeshQuantities, FailClosedOnNonFiniteCorner)
 {
     // A triangle with a NaN corner must not propagate non-finite values into
