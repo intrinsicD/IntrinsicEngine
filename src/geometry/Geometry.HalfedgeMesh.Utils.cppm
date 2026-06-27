@@ -81,6 +81,27 @@ export namespace Geometry::MeshUtils
     /// Magnitude equals twice the face area.
     glm::vec3 FaceNormal(const HalfedgeMesh::Mesh& mesh, FaceHandle f);
 
+    /// Oriented vector area of a (possibly polygonal) face via Newell's method:
+    ///   A = 1/2 Σ_i (v_i × v_{i+1}).
+    /// The magnitude is the face area; the direction is the face normal.
+    /// Returns the zero vector for a deleted/invalid/degenerate face.
+    glm::dvec3 FaceAreaVector(const HalfedgeMesh::Mesh& mesh, FaceHandle f);
+
+    /// Scalar area of a (possibly polygonal) face (= length of FaceAreaVector).
+    /// Returns 0.0 for a deleted/invalid/degenerate face.
+    double FaceArea(const HalfedgeMesh::Mesh& mesh, FaceHandle f);
+
+    /// Centroid of a face's own corner positions (average of the face vertices).
+    /// Distinct from ComputeOneRingCentroid, which averages 1-ring neighbours.
+    /// Returns (0,0,0) for a deleted/invalid/empty face.
+    glm::dvec3 FaceCentroid(const HalfedgeMesh::Mesh& mesh, FaceHandle f);
+
+    /// Lumped ("barycentric") vertex areas: each vertex receives FaceArea/degree
+    /// from every incident face (= Σ incident FaceArea / 3 for a triangle mesh).
+    /// Cheaper alternative to the mixed-Voronoi area. Indexed by vertex storage
+    /// index; deleted vertices receive 0.
+    std::vector<double> ComputeBarycentricVertexAreas(const HalfedgeMesh::Mesh& mesh);
+
     /// Area-weighted vertex normal with safety iteration limit.
     /// Falls back to (0, 1, 0) for degenerate configurations.
     glm::vec3 VertexNormal(const HalfedgeMesh::Mesh& mesh, VertexHandle v);

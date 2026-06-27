@@ -64,6 +64,7 @@ export import Geometry.ImplicitPlaneField;
 export import Geometry.MarchingCubes;
 export import Geometry.Mesh.Conversion;
 export import Geometry.MeshSoup;
+export import Geometry.MeshClosestFace;
 export import Geometry.HalfedgeMesh.Repair;
 export import Geometry.HalfedgeMesh.Boundary;
 export import Geometry.HalfedgeMesh.Quality;

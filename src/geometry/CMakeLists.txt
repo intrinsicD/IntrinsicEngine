@@ -57,6 +57,7 @@ target_sources(${target_name}
         Geometry.LinearSolver.cppm
         Geometry.MarchingCubes.cppm
         Geometry.Mesh.Conversion.cppm
+        Geometry.MeshClosestFace.cppm
         Geometry.MeshSoup.cppm
         Geometry.MeshOperator.cppm
         Geometry.OBB.cppm
@@ -144,6 +145,7 @@ target_sources(${target_name}
         Geometry.Linalg.cpp
         Geometry.MarchingCubes.cpp
         Geometry.Mesh.Conversion.cpp
+        Geometry.MeshClosestFace.cpp
         Geometry.MeshSoup.cpp
         Geometry.OBB.cpp
         Geometry.Octree.cpp
