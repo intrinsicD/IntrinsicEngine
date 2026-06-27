@@ -84,6 +84,7 @@ target_sources(${target_name}
         Geometry.SpatialQueries.cppm
         Geometry.Sphere.Sampling.cppm
         Geometry.Sphere.cppm
+        Geometry.Statistics.cppm
         Geometry.Support.cppm
         Geometry.SurfaceReconstruction.cppm
         Geometry.Triangle.cppm
@@ -160,6 +161,7 @@ target_sources(${target_name}
         Geometry.Segment.cpp
         Geometry.Sphere.Sampling.cpp
         Geometry.Sphere.cpp
+        Geometry.Statistics.cpp
         Geometry.Support.cpp
         Geometry.Sparse.cpp
         Geometry.SurfaceReconstruction.cpp
