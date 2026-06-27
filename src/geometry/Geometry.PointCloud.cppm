@@ -20,6 +20,8 @@ export namespace Geometry::PointCloud
     class Cloud
     {
     public:
+        using LivePointRange = LiveElementRange<VertexHandle>;
+
         Cloud();
         Cloud(PropertySet &Vertices, size_t &DeletedVertices);
 
@@ -60,6 +62,15 @@ export namespace Geometry::PointCloud
         [[nodiscard]] bool IsDeleted(VertexHandle v) const { return m_VDeleted[v]; }
 
         [[nodiscard]] bool IsValid(VertexHandle v) const { return v.IsValid() && v.Index < VerticesSize(); }
+
+        [[nodiscard]] LivePointRange LivePoints() const
+        {
+            const std::size_t offset = m_IsSubmeshView ? m_VertexRange.Offset : 0u;
+            return LivePointRange(offset, VerticesSize(), [this](VertexHandle v)
+            {
+                return v.Index >= m_Vertices.Size() || IsDeleted(v);
+            });
+        }
 
         void Reserve(std::size_t n) { m_Vertices.Reserve(n); }
 

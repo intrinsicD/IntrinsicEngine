@@ -416,6 +416,8 @@ set(_geometry_test_files
     Test.GeometryIO.cpp
     Test_RuntimeGraph.cpp
     Test_RuntimeGraphKNN.cpp
+    Test.GraphQueries.cpp
+    Test.GeometryProperties.cpp
     Test_KDTree.cpp
     Test_Octree.cpp
     Test_BVH.cpp
@@ -443,6 +445,7 @@ set(_geometry_test_files
     Test.HalfedgeMeshVertexNormals.cpp
     Test_HalfedgeMeshPropertyAccess.cpp
     Test_HalfedgeMeshTopology.cpp
+    Test.MeshTopologyUtilities.cpp
     Test_HtexPatch.cpp
     Test_Validation.cpp
     Test_Curvature.cpp

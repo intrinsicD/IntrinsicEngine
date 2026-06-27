@@ -17,47 +17,52 @@ depends_on: []
 - No broad namespace, module, or file moves.
 
 ## Context
+- Status: done.
+- Owner/agent: Codex.
+- Completed: 2026-06-28.
+- Commit: this commit (`Migrate geometry property and topology utilities`).
+- Maturity: `CPUContracted`.
 - Owning subsystem/layer: `geometry` (`geometry -> core` only).
 - `Geometry.Properties` exposes `PropertySet::Shrink_to_fit()`, which conflicts
   with the promoted geometry API style documented in
-  [`docs/architecture/geometry-api-style.md`](../../../docs/architecture/geometry-api-style.md).
+  [`docs/architecture/geometry-api-style.md`](../../docs/architecture/geometry-api-style.md).
 - The inconsistency is already recorded in the 2026-05-12 geometry gap
   analysis; this task isolates the compatibility cleanup from behavior changes.
 
 ## Required changes
-- [ ] Add `PropertySet::ShrinkToFit()` as the canonical public spelling.
-- [ ] Keep `PropertySet::Shrink_to_fit()` as a temporary compatibility wrapper
+- [x] Add `PropertySet::ShrinkToFit()` as the canonical public spelling.
+- [x] Keep `PropertySet::Shrink_to_fit()` as a temporary compatibility wrapper
       unless the audit proves there are no in-repo or documented compatibility
       obligations.
-- [ ] Migrate in-repo call sites and docs to `ShrinkToFit()`.
-- [ ] Keep storage compaction behavior unchanged and covered by existing tests.
-- [ ] If the compatibility wrapper remains, leave a clear source comment naming
+- [x] Migrate in-repo call sites and docs to `ShrinkToFit()`.
+- [x] Keep storage compaction behavior unchanged and covered by existing tests.
+- [x] If the compatibility wrapper remains, leave a clear source comment naming
       this task and the condition for later removal.
 
 ## Tests
-- [ ] Add or update `unit;geometry` coverage that calls `ShrinkToFit()`.
-- [ ] Keep or add coverage proving property values survive shrink-to-fit for
+- [x] Add or update `unit;geometry` coverage that calls `ShrinkToFit()`.
+- [x] Keep or add coverage proving property values survive shrink-to-fit for
       multiple property types.
-- [ ] Build `IntrinsicTests` with the `ci` preset to catch exported module
+- [x] Build `IntrinsicTests` with the `ci` preset to catch exported module
       signature or call-site issues.
 
 ## Docs
-- [ ] Update
-      [`docs/architecture/geometry-api-style.md`](../../../docs/architecture/geometry-api-style.md)
+- [x] Update
+      [`docs/architecture/geometry-api-style.md`](../../docs/architecture/geometry-api-style.md)
       only if it needs a property-specific compatibility note.
-- [ ] Update
-      [`docs/architecture/geometry.md`](../../../docs/architecture/geometry.md)
+- [x] Update
+      [`docs/architecture/geometry.md`](../../docs/architecture/geometry.md)
       if it names the shrink-to-fit API.
-- [ ] Regenerate
-      [`docs/api/generated/module_inventory.md`](../../../docs/api/generated/module_inventory.md)
+- [x] Regenerate
+      [`docs/api/generated/module_inventory.md`](../../docs/api/generated/module_inventory.md)
       because this changes the exported module surface.
 
 ## Acceptance criteria
-- [ ] `ShrinkToFit()` is the canonical spelling used by new code and docs.
-- [ ] Any remaining `Shrink_to_fit()` wrapper is clearly marked as
+- [x] `ShrinkToFit()` is the canonical spelling used by new code and docs.
+- [x] Any remaining `Shrink_to_fit()` wrapper is clearly marked as
       compatibility debt, not the preferred API.
-- [ ] Property compaction behavior is unchanged.
-- [ ] The change preserves `geometry -> core` layering.
+- [x] Property compaction behavior is unchanged.
+- [x] The change preserves `geometry -> core` layering.
 
 ## Verification
 ```bash

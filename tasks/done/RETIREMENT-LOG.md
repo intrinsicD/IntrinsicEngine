@@ -2414,3 +2414,56 @@ readback job has resumed and applied, preserving existing `SubmitFollowUp` /
 `DependsOn` ordering. Focused CPU readback/derived-job/binding tests, explicit
 readback streaming integration tests, the full CPU-supported CTest gate, and an
 opt-in `gpu;vulkan` readback round-trip smoke passed.
+
+[`GEOM-027`](GEOM-027-property-name-lifetime-contract.md),
+[`GEOM-028`](GEOM-028-property-registry-handle-safety.md),
+[`GEOM-029`](GEOM-029-const-property-set-validity-contract.md),
+[`GEOM-030`](GEOM-030-property-set-const-lookup-migration.md),
+[`GEOM-031`](GEOM-031-property-set-naming-normalization.md),
+[`GEOM-032`](GEOM-032-bool-property-access-contract.md),
+[`GEOM-033`](GEOM-033-erased-property-metadata-catalog.md), and
+[`GEOM-051`](GEOM-051-property-system-enhancements.md) — geometry property
+system migration blockers retired to `tasks/done/` on 2026-06-28 at
+`CPUContracted`. `Geometry.Properties` now uses a single borrowed
+`std::string_view` name contract, fail-closed handle validity, const-correct
+property lookup, canonical `ShrinkToFit`, non-bool contiguous span/data access,
+bool proxy-safe indexed access, erased property descriptors, and reusable live
+element ranges across mesh, graph, point-cloud, and const domain views. Focused
+property tests cover names, copied handles, invalid handles, const lookup,
+descriptor metadata, bool access, and live ranges.
+
+[`GEOM-043`](GEOM-043-remeshing-reprojection-error-bounded-sizing.md) —
+remeshing reprojection and error-bounded sizing retired to `tasks/done/` on
+2026-06-28 at `CPUContracted`. Adaptive remeshing now exposes a reference
+projector backed by closest-face queries, error-bounded Taubin-style sizing,
+and uniform-remeshing projection options for split/move operations. Focused CPU
+tests prove projection to a frozen reference surface and the error-bounded
+sizing path on representative meshes.
+
+[`GEOM-044`](GEOM-044-subdivision-sqrt3-loop-feature-masks.md) — subdivision
+utility migration retired to `tasks/done/` on 2026-06-28 at `CPUContracted`.
+Loop subdivision now preserves optional feature-edge masks through crease
+stencils and tag propagation, and the new
+`Geometry.HalfedgeMesh.SubdivisionSqrt3` module adds triangle-centered Sqrt(3)
+subdivision. Focused CPU tests cover the single-triangle Sqrt(3) split and Loop
+feature-mask propagation.
+
+[`GEOM-046`](GEOM-046-mesh-topology-utilities.md) — mesh topology utilities
+retired to `tasks/done/` on 2026-06-28 at `CPUContracted`. `HalfedgeMesh` now
+has polygon-face triangulation, removal safety, Delaunay predicates/flips,
+explicit edge-length cache publication, connected-component labeling and split
+helpers, largest-component retention, dual/triangle-adjacency construction, and
+deterministic nearest-face queries. Focused CPU tests cover triangulation,
+component labels/splits, adjacency, nearest-face ordering, and the canonical
+`e:length` cache.
+
+[`GEOM-047`](GEOM-047-graph-pointcloud-query-noise-utilities.md) — graph and
+point-cloud query/noise utilities retired to `tasks/done/` on 2026-06-28 at
+`CPUContracted`. Graph utilities now publish and validate canonical `e:length`
+edge caches, run closest/K/radius edge queries through deterministic BVH-backed
+candidate search, support one-ring constrained closest-edge lookup, and apply
+seeded Gaussian graph noise scaled by bounding-box diagonal. Point-cloud
+utilities now apply seeded Gaussian noise scaled by average spacing and
+fail-close on degenerate nonzero-noise requests. Focused CPU tests cover cache
+publication, query ordering against brute force, one-ring search, deterministic
+noise, identity cases, and degenerate diagnostics.

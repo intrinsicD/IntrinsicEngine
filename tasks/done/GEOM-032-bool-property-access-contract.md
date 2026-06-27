@@ -17,6 +17,11 @@ depends_on: []
 - No broad rewrite of algorithms that do not use `bool` properties.
 
 ## Context
+- Status: done.
+- Owner/agent: Codex.
+- Completed: 2026-06-28.
+- Commit: this commit (`Migrate geometry property and topology utilities`).
+- Maturity: `CPUContracted`.
 - Owning subsystem/layer: `geometry` (`geometry -> core` only).
 - `std::vector<bool>` has proxy-reference semantics and does not provide the
   same contiguous pointer/span behavior as ordinary `std::vector<T>`.
@@ -27,44 +32,44 @@ depends_on: []
   safe bool reads and writes.
 
 ## Required changes
-- [ ] Audit every `bool` specialization or `if constexpr` path in
+- [x] Audit every `bool` specialization or `if constexpr` path in
       `Geometry.Properties`.
-- [ ] Define which operations are supported for `bool` properties: scalar
+- [x] Define which operations are supported for `bool` properties: scalar
       get/set, resize, clear, vector access, span access, and raw data access.
-- [ ] Keep raw pointer/span access unavailable or explicitly fail-closed for
+- [x] Keep raw pointer/span access unavailable or explicitly fail-closed for
       `bool` storage.
-- [ ] Add narrowly named bool-safe accessors only if existing scalar access is
+- [x] Add narrowly named bool-safe accessors only if existing scalar access is
       insufficient for callers.
-- [ ] Avoid duplicating a separate boolean property container unless the audit
+- [x] Avoid duplicating a separate boolean property container unless the audit
       proves the standard proxy storage cannot satisfy existing use cases.
 
 ## Tests
-- [ ] Add `unit;geometry` tests for creating, resizing, reading, and writing
+- [x] Add `unit;geometry` tests for creating, resizing, reading, and writing
       `bool` properties.
-- [ ] Add tests proving raw pointer/span access is unavailable or returns the
+- [x] Add tests proving raw pointer/span access is unavailable or returns the
       documented fail-closed value for `bool`.
-- [ ] Add tests proving ordinary non-bool property span/data access still works.
-- [ ] Add compile-time coverage where practical so unsupported bool span/data
+- [x] Add tests proving ordinary non-bool property span/data access still works.
+- [x] Add compile-time coverage where practical so unsupported bool span/data
       APIs fail in the intended way.
 
 ## Docs
-- [ ] Update
-      [`docs/architecture/geometry-api-style.md`](../../../docs/architecture/geometry-api-style.md)
+- [x] Update
+      [`docs/architecture/geometry-api-style.md`](../../docs/architecture/geometry-api-style.md)
       with the bool property caveat and supported operation table.
-- [ ] Update
-      [`docs/architecture/geometry.md`](../../../docs/architecture/geometry.md)
+- [x] Update
+      [`docs/architecture/geometry.md`](../../docs/architecture/geometry.md)
       if property-storage docs describe contiguous data access.
-- [ ] Regenerate
-      [`docs/api/generated/module_inventory.md`](../../../docs/api/generated/module_inventory.md)
+- [x] Regenerate
+      [`docs/api/generated/module_inventory.md`](../../docs/api/generated/module_inventory.md)
       if exported signatures change.
 
 ## Acceptance criteria
-- [ ] `bool` property behavior is deterministic, documented, and covered by
+- [x] `bool` property behavior is deterministic, documented, and covered by
       focused tests.
-- [ ] Callers cannot receive a misleading raw `bool*` or contiguous
+- [x] Callers cannot receive a misleading raw `bool*` or contiguous
       `std::span<bool>` from proxy storage.
-- [ ] Non-bool property access remains unchanged.
-- [ ] The change preserves `geometry -> core` layering.
+- [x] Non-bool property access remains unchanged.
+- [x] The change preserves `geometry -> core` layering.
 
 ## Verification
 ```bash

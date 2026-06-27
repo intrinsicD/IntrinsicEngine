@@ -16,6 +16,11 @@ depends_on: []
 - No renderer/runtime/ECS/assets/platform/app integration.
 
 ## Context
+- Status: done.
+- Owner/agent: Codex.
+- Completed: 2026-06-28.
+- Commit: this commit (`Migrate geometry property and topology utilities`).
+- Maturity: `CPUContracted`.
 - Owning subsystem/layer: `geometry` (`geometry -> core` only).
 - `PropertyStorageBase::Name()` and `PropertyStorage<T>::Name()` return
   `std::string_view`, while `PropertyBuffer<T>::Name()`,
@@ -27,46 +32,46 @@ depends_on: []
   property-name storage or add a new registry.
 
 ## Required changes
-- [ ] Audit every exported name accessor in
+- [x] Audit every exported name accessor in
       `src/geometry/Geometry.Properties.cppm` and the matching implementation
       unit.
-- [ ] Pick one public contract for property names, preferring
+- [x] Pick one public contract for property names, preferring
       `std::string_view` unless the audit proves an owning reference is
       required.
-- [ ] Update `PropertyBuffer<T>`, `ConstPropertyBuffer<T>`, `Property<T>`, and
+- [x] Update `PropertyBuffer<T>`, `ConstPropertyBuffer<T>`, `Property<T>`, and
       `ConstProperty<T>` name accessors to match that contract.
-- [ ] Update geometry call sites only where the signature change requires it;
+- [x] Update geometry call sites only where the signature change requires it;
       do not opportunistically rewrite unrelated property code.
-- [ ] Fix the stale closing namespace comment in
+- [x] Fix the stale closing namespace comment in
       `Geometry.Properties.cppm` as a same-file mechanical cleanup.
 
 ## Tests
-- [ ] Add or update `unit;geometry` coverage that instantiates
+- [x] Add or update `unit;geometry` coverage that instantiates
       `Property<T>::Name()` and `ConstProperty<T>::Name()` for at least one
       scalar property and one vector-valued property.
-- [ ] Add a regression check that a copied property handle still reports the
+- [x] Add a regression check that a copied property handle still reports the
       same name while the owning `PropertySet` remains alive.
-- [ ] Build `IntrinsicTests` with the `ci` preset to force C++ module
+- [x] Build `IntrinsicTests` with the `ci` preset to force C++ module
       instantiation of the changed exported templates.
 
 ## Docs
-- [ ] Update
-      [`docs/architecture/geometry-api-style.md`](../../../docs/architecture/geometry-api-style.md)
+- [x] Update
+      [`docs/architecture/geometry-api-style.md`](../../docs/architecture/geometry-api-style.md)
       with the final property-name lifetime rule.
-- [ ] Update
-      [`docs/architecture/geometry.md`](../../../docs/architecture/geometry.md)
+- [x] Update
+      [`docs/architecture/geometry.md`](../../docs/architecture/geometry.md)
       if its property-storage section mentions name ownership or lifetimes.
-- [ ] Regenerate
-      [`docs/api/generated/module_inventory.md`](../../../docs/api/generated/module_inventory.md)
+- [x] Regenerate
+      [`docs/api/generated/module_inventory.md`](../../docs/api/generated/module_inventory.md)
       because this changes the exported module surface.
 
 ## Acceptance criteria
-- [ ] No exported `Geometry.Properties` wrapper returns a reference to a
+- [x] No exported `Geometry.Properties` wrapper returns a reference to a
       `std::string_view` result.
-- [ ] The property-name lifetime contract is documented in architecture docs.
-- [ ] Existing property call sites still compile without duplicating name
+- [x] The property-name lifetime contract is documented in architecture docs.
+- [x] Existing property call sites still compile without duplicating name
       storage.
-- [ ] The change preserves `geometry -> core` layering.
+- [x] The change preserves `geometry -> core` layering.
 
 ## Verification
 ```bash

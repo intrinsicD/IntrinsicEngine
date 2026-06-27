@@ -1,7 +1,6 @@
 module;
 
 #include <algorithm>
-#include <array>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
@@ -19,8 +18,7 @@ import Geometry.Properties;
 import Geometry.HalfedgeMesh;
 import Geometry.Curvature;
 import Geometry.HalfedgeMesh.Utils;
-import Geometry.KDTree;
-import Geometry.AABB;
+import Geometry.MeshClosestFace;
 
 namespace Geometry::AdaptiveRemeshing
 {
@@ -28,140 +26,47 @@ namespace Geometry::AdaptiveRemeshing
     using MeshUtils::MeanEdgeLength;
     using MeshUtils::EqualizeValenceByEdgeFlip;
 
-    namespace
+    bool ReferenceProjector::Build(const HalfedgeMesh::Mesh& mesh,
+                                   const ReferenceProjectionParams& params)
     {
-        struct ReferenceProjector
+        Enabled = false;
+        m_MaxDistanceSq = 0.0f;
+
+        if (!m_Index.Build(mesh)) return false;
+
+        const double maxDist = params.MaxReferenceProjectionDistance;
+        m_MaxDistanceSq = (std::isfinite(maxDist) && maxDist > 0.0)
+            ? static_cast<float>(maxDist * maxDist)
+            : 0.0f;
+        Enabled = true;
+        static_cast<void>(params.ReferenceProjectionK);
+        return true;
+    }
+
+    ReferenceProjectionResult ReferenceProjector::Project(const glm::vec3 point) const
+    {
+        ReferenceProjectionResult projected{};
+        projected.Point = point;
+        if (!Enabled) return projected;
+
+        const MeshClosestFaceResult nearest = m_Index.Query(point);
+        if (!nearest.Found) return projected;
+        if (m_MaxDistanceSq > 0.0f && nearest.SquaredDistance > m_MaxDistanceSq)
         {
-            bool Enabled{false};
-            bool ProjectSplitVertices{true};
-            bool ProjectAfterSmoothing{true};
-            std::uint32_t K{16};
-            float MaxDistanceSq{0.0f};
-            std::vector<std::array<glm::vec3, 3>> Triangles{};
-            KDTree Tree{};
+            return projected;
+        }
 
-            [[nodiscard]] static glm::vec3 ClosestPointOnTriangle(
-                const glm::vec3& p,
-                const glm::vec3& a,
-                const glm::vec3& b,
-                const glm::vec3& c)
-            {
-                const glm::vec3 ab = b - a;
-                const glm::vec3 ac = c - a;
-                const glm::vec3 ap = p - a;
-                const float d1 = glm::dot(ab, ap);
-                const float d2 = glm::dot(ac, ap);
-                if (d1 <= 0.0f && d2 <= 0.0f) return a;
+        projected.Found = true;
+        projected.Point = nearest.Point;
+        projected.Face = nearest.Face;
+        projected.Distance = std::sqrt(std::max(nearest.SquaredDistance, 0.0f));
+        return projected;
+    }
 
-                const glm::vec3 bp = p - b;
-                const float d3 = glm::dot(ab, bp);
-                const float d4 = glm::dot(ac, bp);
-                if (d3 >= 0.0f && d4 <= d3) return b;
-
-                const float vc = d1 * d4 - d3 * d2;
-                if (vc <= 0.0f && d1 >= 0.0f && d3 <= 0.0f)
-                {
-                    const float v = d1 / (d1 - d3);
-                    return a + v * ab;
-                }
-
-                const glm::vec3 cp = p - c;
-                const float d5 = glm::dot(ab, cp);
-                const float d6 = glm::dot(ac, cp);
-                if (d6 >= 0.0f && d5 <= d6) return c;
-
-                const float vb = d5 * d2 - d1 * d6;
-                if (vb <= 0.0f && d2 >= 0.0f && d6 <= 0.0f)
-                {
-                    const float w = d2 / (d2 - d6);
-                    return a + w * ac;
-                }
-
-                const float va = d3 * d6 - d5 * d4;
-                if (va <= 0.0f && (d4 - d3) >= 0.0f && (d5 - d6) >= 0.0f)
-                {
-                    const float w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
-                    return b + w * (c - b);
-                }
-
-                const float denom = 1.0f / (va + vb + vc);
-                const float v = vb * denom;
-                const float w = vc * denom;
-                return a + ab * v + ac * w;
-            }
-
-            [[nodiscard]] glm::vec3 Project(const glm::vec3& point) const
-            {
-                if (!Enabled || Triangles.empty()) return point;
-
-                std::vector<KDTree::ElementIndex> candidates;
-                const auto knn = Tree.QueryKNN(point, std::max<std::uint32_t>(K, 1u), candidates);
-                if (!knn.has_value() || candidates.empty()) return point;
-
-                float bestDistSq = std::numeric_limits<float>::max();
-                glm::vec3 best = point;
-
-                for (const KDTree::ElementIndex idx : candidates)
-                {
-                    if (idx >= Triangles.size()) continue;
-                    const auto& tri = Triangles[idx];
-                    const glm::vec3 q = ClosestPointOnTriangle(point, tri[0], tri[1], tri[2]);
-                    const glm::vec3 d = q - point;
-                    const float distSq = glm::dot(d, d);
-                    if (distSq < bestDistSq)
-                    {
-                        bestDistSq = distSq;
-                        best = q;
-                    }
-                }
-
-                if (MaxDistanceSq > 0.0f && bestDistSq > MaxDistanceSq) return point;
-                return best;
-            }
-
-            [[nodiscard]] bool Build(const HalfedgeMesh::Mesh& mesh, const AdaptiveRemeshingParams& params)
-            {
-                Enabled = false;
-                Triangles.clear();
-                ProjectSplitVertices = params.ProjectSplitVertices;
-                ProjectAfterSmoothing = params.ProjectAfterSmoothing;
-
-                if (!params.EnableReferenceProjection) return false;
-
-                std::vector<AABB> triAabbs;
-                triAabbs.reserve(mesh.FaceCount());
-                Triangles.reserve(mesh.FaceCount());
-
-                for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
-                {
-                    FaceHandle f{static_cast<PropertyIndex>(fi)};
-                    MeshUtils::TriangleFaceView tri{};
-                    if (!MeshUtils::TryGetTriangleFaceView(mesh, f, tri)) continue;
-
-                    Triangles.push_back({tri.P0, tri.P1, tri.P2});
-                    triAabbs.push_back(AABB{
-                        .Min = glm::min(tri.P0, glm::min(tri.P1, tri.P2)),
-                        .Max = glm::max(tri.P0, glm::max(tri.P1, tri.P2))});
-                }
-
-                if (Triangles.empty()) return false;
-
-                KDTreeBuildParams buildParams{};
-                buildParams.LeafSize = 16;
-                buildParams.MaxDepth = 32;
-                buildParams.MinSplitExtent = 1.0e-6f;
-                if (!Tree.Build(std::move(triAabbs), buildParams).has_value()) return false;
-
-                K = static_cast<std::uint32_t>(std::max<std::size_t>(params.ReferenceProjectionK, 1u));
-                const double maxDist = params.MaxReferenceProjectionDistance;
-                MaxDistanceSq = (std::isfinite(maxDist) && maxDist > 0.0)
-                    ? static_cast<float>(maxDist * maxDist)
-                    : 0.0f;
-
-                Enabled = true;
-                return true;
-            }
-        };
+    glm::vec3 ReferenceProjector::ProjectPoint(const glm::vec3 point) const
+    {
+        const ReferenceProjectionResult projected = Project(point);
+        return projected.Found ? projected.Point : point;
     }
 
     // Per-edge local target = average of endpoint sizing fields
@@ -179,7 +84,7 @@ namespace Geometry::AdaptiveRemeshing
     static void ComputeSizingField(
         HalfedgeMesh::Mesh& mesh,
         double baseLength,
-        double alpha,
+        const AdaptiveRemeshingParams& params,
         double minLen,
         double maxLen,
         bool preserveBoundary,
@@ -187,7 +92,13 @@ namespace Geometry::AdaptiveRemeshing
     {
         sizing.resize(mesh.VerticesSize(), baseLength);
 
-        if (alpha < 1e-12)
+        const double alpha = params.CurvatureAdaptation;
+        const bool useErrorBoundedTaubin =
+            params.Sizing == SizingLaw::ErrorBoundedTaubin
+            && std::isfinite(params.ApproximationError)
+            && params.ApproximationError > 0.0;
+
+        if (!useErrorBoundedTaubin && alpha < 1e-12)
         {
             std::fill(sizing.begin(), sizing.end(), std::clamp(baseLength, minLen, maxLen));
             return;
@@ -208,8 +119,29 @@ namespace Geometry::AdaptiveRemeshing
                 continue;
             }
 
-            const double absH = std::abs(curvField.MeanCurvatureProperty[vh]);
-            const double target = baseLength / (1.0 + alpha * absH);
+            double target = baseLength;
+            if (useErrorBoundedTaubin)
+            {
+                const double kMax = std::abs(curvField.MaxPrincipalCurvatureProperty[vh]);
+                const double kMin = std::abs(curvField.MinPrincipalCurvatureProperty[vh]);
+                const double k = std::max(kMax, kMin);
+                if (std::isfinite(k) && k > 1.0e-12)
+                {
+                    const double e = params.ApproximationError;
+                    const double radius = 1.0 / k;
+                    const double radicand = 6.0 * e * radius - 3.0 * e * e;
+                    target = radicand > 0.0 ? std::sqrt(radicand) : maxLen;
+                }
+                else
+                {
+                    target = maxLen;
+                }
+            }
+            else
+            {
+                const double absH = std::abs(curvField.MeanCurvatureProperty[vh]);
+                target = baseLength / (1.0 + alpha * absH);
+            }
             sizing[vi] = std::clamp(target, minLen, maxLen);
         }
     }
@@ -257,7 +189,7 @@ namespace Geometry::AdaptiveRemeshing
             glm::vec3 mid = 0.5f * (mesh.Position(mesh.FromVertex(h)) + mesh.Position(mesh.ToVertex(h)));
             if (projector != nullptr && projector->Enabled && projector->ProjectSplitVertices)
             {
-                mid = projector->Project(mid);
+                mid = projector->ProjectPoint(mid);
             }
 
             const std::size_t oldSize = sizing.size();
@@ -364,7 +296,7 @@ namespace Geometry::AdaptiveRemeshing
             VertexHandle v{static_cast<PropertyIndex>(vi)};
             if (!mesh.IsValid(v) || mesh.IsDeleted(v) || mesh.IsIsolated(v)) continue;
             if (preserveBoundary && mesh.IsBoundary(v)) continue;
-            mesh.Position(v) = projector.Project(mesh.Position(v));
+            mesh.Position(v) = projector.ProjectPoint(mesh.Position(v));
         }
     }
 
@@ -387,7 +319,15 @@ namespace Geometry::AdaptiveRemeshing
         std::vector<double> sizing;
 
         ReferenceProjector projector{};
-        static_cast<void>(projector.Build(mesh, params));
+        projector.ProjectSplitVertices = params.ProjectSplitVertices;
+        projector.ProjectAfterSmoothing = params.ProjectAfterSmoothing;
+        if (params.EnableReferenceProjection)
+        {
+            ReferenceProjectionParams projectionParams{};
+            projectionParams.ReferenceProjectionK = params.ReferenceProjectionK;
+            projectionParams.MaxReferenceProjectionDistance = params.MaxReferenceProjectionDistance;
+            static_cast<void>(projector.Build(mesh, projectionParams));
+        }
 
         const std::size_t initialVertices = mesh.VertexCount();
         const std::size_t initialEdges = mesh.EdgeCount();
@@ -404,7 +344,7 @@ namespace Geometry::AdaptiveRemeshing
 
         for (std::size_t iter = 0; iter < params.Iterations; ++iter)
         {
-            ComputeSizingField(mesh, baseLength, params.CurvatureAdaptation, minLen, maxLen,
+            ComputeSizingField(mesh, baseLength, params, minLen, maxLen,
                 params.PreserveBoundary, sizing);
 
             std::size_t remainingOps = params.MaxOpsPerIteration;

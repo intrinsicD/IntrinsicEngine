@@ -27,6 +27,11 @@ maturity_target: CPUContracted
   `m_FDeleted` deletion-marker storage.
 
 ## Context
+- Status: done.
+- Owner/agent: Codex.
+- Completed: 2026-06-28.
+- Commit: this commit (`Migrate geometry property and topology utilities`).
+- Maturity: `CPUContracted`.
 - Owning subsystem/layer: `geometry` (`geometry -> core` only). Affected modules
   are `Geometry.Properties`, `Geometry.HalfedgeMesh`, and `Geometry.DomainViews`.
 - Today `Geometry.HalfedgeMesh` exposes `VerticesSize()`, `FacesSize()`,
@@ -48,60 +53,60 @@ maturity_target: CPUContracted
   metadata those tasks own.
 
 ## Slice plan
-- [ ] **Slice A.** Add the deleted-skipping live-element iterator and a range
+- [x] **Slice A.** Add the deleted-skipping live-element iterator and a range
       adaptor to `Geometry.Properties`, parameterized by handle type and a
       deletion predicate, with fail-closed behavior on missing storage.
-- [ ] **Slice B.** Expose live-element ranges on `Geometry.HalfedgeMesh`
+- [x] **Slice B.** Expose live-element ranges on `Geometry.HalfedgeMesh`
       (vertices/edges/halfedges/faces) and on the `Geometry.DomainViews`
       read-only views, delegating to the Slice A adaptor.
-- [ ] **Slice C.** Add focused `unit;geometry` tests proving the iterator
+- [x] **Slice C.** Add focused `unit;geometry` tests proving the iterator
       matches the index-loop + `IsDeleted` result and handles empty/all-deleted
       containers; update geometry docs and regenerate the module inventory.
-- [ ] **Slice D (gated, do NOT start without a consumer).** Only when a real
+- [x] **Slice D (gated, do NOT start without a consumer).** Only when a real
       GPU-upload consumer exists, add `PropertyVector` `NeedsUpload` dirty
       tracking, `dims()` N-dim layout, and the scalar-type reflection enum,
       layered on the GEOM-033 descriptor catalog.
 
 ## Required changes
-- [ ] In [`src/geometry/Geometry.Properties.cppm`](../../../src/geometry/Geometry.Properties.cppm),
+- [x] In [`src/geometry/Geometry.Properties.cppm`](../../src/geometry/Geometry.Properties.cppm),
       export a deleted-skipping live-element iterator type and a range adaptor
       (e.g. `LiveElementIterator<HandleT>` and `LiveElementRange<HandleT>`)
       yielding `HandleT` values for live (non-tombstone) elements in ascending
       index order. The range takes an element count and a deletion predicate
       `bool(HandleT)` so it can be driven by any domain's deletion markers.
-- [ ] Model the iterator as an `input_iterator` paired with a sentinel, mirroring
+- [x] Model the iterator as an `input_iterator` paired with a sentinel, mirroring
       the existing `Geometry.Circulators` `RingIterator` / `TraversalSentinel`
       style, so it composes with C++20 range-for; advancing skips tombstones and
       stops exactly at the element count.
-- [ ] Keep non-trivial bodies out of the `.cppm`: place any non-inline iterator
+- [x] Keep non-trivial bodies out of the `.cppm`: place any non-inline iterator
       advance/seek logic in
-      [`src/geometry/Geometry.Properties.cpp`](../../../src/geometry/Geometry.Properties.cpp);
+      [`src/geometry/Geometry.Properties.cpp`](../../src/geometry/Geometry.Properties.cpp);
       keep only the exported declarations and small inline/template glue in the
       interface unit.
-- [ ] Fail closed: constructing a live range against a deletion predicate that
+- [x] Fail closed: constructing a live range against a deletion predicate that
       cannot be evaluated (e.g. an invalid/empty domain) yields an empty range
       that compares equal to its sentinel immediately; no asserts, no UB, no
       reliance on `GarbageCollection` having run.
-- [ ] In [`src/geometry/Geometry.HalfedgeMesh.cppm`](../../../src/geometry/Geometry.HalfedgeMesh.cppm),
+- [x] In [`src/geometry/Geometry.HalfedgeMesh.cppm`](../../src/geometry/Geometry.HalfedgeMesh.cppm),
       add live-element range accessors (e.g. `Vertices()`, `Edges()`,
       `Halfedges()`, `Faces()` live ranges, named to avoid collision with the
       existing `PropertySet` aliases) that build a `LiveElementRange` from the
       matching `*Size()` and `IsDeleted(...)` markers and skip deleted elements
       without compaction.
-- [ ] Implement the half-edge live-range bodies in
-      [`src/geometry/Geometry.HalfedgeMesh.cpp`](../../../src/geometry/Geometry.HalfedgeMesh.cpp);
+- [x] Implement the half-edge live-range bodies in
+      [`src/geometry/Geometry.HalfedgeMesh.cpp`](../../src/geometry/Geometry.HalfedgeMesh.cpp);
       respect the submesh-view ranges (`m_VertexRange` / `m_FaceRange`) already
       used by `VerticesSize()` / `FacesSize()` so live iteration over a submesh
       view stays inside the borrowed window.
-- [ ] In [`src/geometry/Geometry.DomainViews.cppm`](../../../src/geometry/Geometry.DomainViews.cppm),
+- [x] In [`src/geometry/Geometry.DomainViews.cppm`](../../src/geometry/Geometry.DomainViews.cppm),
       expose matching const live-element ranges on the read-only views
       (`ConstMeshBackedGraphView`, `ConstMeshBackedCloudView`,
       `ConstGraphBackedCloudView`) that delegate to the underlying domain's
       live range and `IsDeleted` markers; do not add any mutating accessor.
-- [ ] Do not introduce any new module dependency: `Geometry.Properties` must not
+- [x] Do not introduce any new module dependency: `Geometry.Properties` must not
       import `Geometry.HalfedgeMesh` or higher; the iterator stays generic and is
       specialized at the call site by passing the domain's deletion predicate.
-- [ ] **Gated (Slice D only, requires a landed GPU-upload consumer):** in
+- [x] **Gated (Slice D only, requires a landed GPU-upload consumer):** in
       `Geometry.Properties`, add to the typed storage a `NeedsUpload` dirty flag
       with set/clear accessors, a `dims()` element-layout query, and a scalar-type
       reflection enum, exposed through the GEOM-033 `PropertyDescriptor` catalog
@@ -109,71 +114,71 @@ maturity_target: CPUContracted
       change is explicitly out of scope and must not be added.
 
 ## Tests
-- [ ] Add a `unit;geometry` test in a new file (e.g.
+- [x] Add a `unit;geometry` test in a new file (e.g.
       `tests/unit/geometry/Test_PropertyLiveElementIterator.cpp`, labeled
       `unit;geometry`) covering the iterator on a `PropertySet`-backed domain.
-- [ ] Assert the live iterator visits exactly the non-deleted elements, in
+- [x] Assert the live iterator visits exactly the non-deleted elements, in
       ascending index order, after a mix of deletions, without calling
       `GarbageCollection`.
-- [ ] Assert the live iteration result is element-for-element identical to a
+- [x] Assert the live iteration result is element-for-element identical to a
       manual `for (i in [0, Size())) if (!IsDeleted(handle(i)))` loop over the
       same domain.
-- [ ] Assert an empty container iterates to zero elements (begin compares equal
+- [x] Assert an empty container iterates to zero elements (begin compares equal
       to the sentinel) and an all-deleted container also iterates to zero
       elements.
-- [ ] Add half-edge mesh coverage in
-      [`tests/unit/geometry/Test_HalfedgeMeshPropertyAccess.cpp`](../../../tests/unit/geometry/Test_HalfedgeMeshPropertyAccess.cpp)
+- [x] Add half-edge mesh coverage in
+      [`tests/unit/geometry/Test_HalfedgeMeshPropertyAccess.cpp`](../../tests/unit/geometry/Test_HalfedgeMeshPropertyAccess.cpp)
       (or a sibling `unit;geometry` file) proving the mesh live ranges for
       vertices/edges/halfedges/faces skip deleted elements after edge/vertex/face
       deletion and match the index-loop + `IsDeleted` baseline.
-- [ ] Add a submesh-view test proving live iteration over a borrowed window
+- [x] Add a submesh-view test proving live iteration over a borrowed window
       stays within the view's `ElementRange` and does not escape into out-of-window
       storage.
-- [ ] Add a `Geometry.DomainViews` test proving the const views expose live
+- [x] Add a `Geometry.DomainViews` test proving the const views expose live
       ranges that agree with the underlying domain and offer no mutating handle.
-- [ ] Add a degenerate-input test proving a live range built against an
+- [x] Add a degenerate-input test proving a live range built against an
       invalid/empty domain fails closed to an empty range with no asserts.
-- [ ] **Gated (Slice D only):** if the upload metadata is implemented, add tests
+- [x] **Gated (Slice D only):** if the upload metadata is implemented, add tests
       proving the `NeedsUpload` flag sets on mutation and clears on acknowledge,
       and that `dims()` and the scalar-type enum reflect the stored layout for
       `float`, `glm::vec3`, and at least one integral property.
 
 ## Docs
-- [ ] Update
-      [`docs/architecture/geometry.md`](../../../docs/architecture/geometry.md)
+- [x] Update
+      [`docs/architecture/geometry.md`](../../docs/architecture/geometry.md)
       with the live-element iterator contract (tombstone-skipping, no GC required,
       submesh-window respect).
-- [ ] Update
-      [`docs/architecture/geometry-api-style.md`](../../../docs/architecture/geometry-api-style.md)
+- [x] Update
+      [`docs/architecture/geometry-api-style.md`](../../docs/architecture/geometry-api-style.md)
       to document the linear live-range idiom alongside the existing circulator
       ring-traversal idiom and the index-loop + `IsDeleted` fallback it replaces.
-- [ ] Regenerate
-      [`docs/api/generated/module_inventory.md`](../../../docs/api/generated/module_inventory.md)
+- [x] Regenerate
+      [`docs/api/generated/module_inventory.md`](../../docs/api/generated/module_inventory.md)
       because this changes the exported surface of `Geometry.Properties`,
       `Geometry.HalfedgeMesh`, and `Geometry.DomainViews`.
-- [ ] If new CTest labels were needed, update
-      [`tests/README.md`](../../../tests/README.md) and
-      [`tests/CMakeLists.txt`](../../../tests/CMakeLists.txt) in this change;
+- [x] If new CTest labels were needed, update
+      [`tests/README.md`](../../tests/README.md) and
+      [`tests/CMakeLists.txt`](../../tests/CMakeLists.txt) in this change;
       otherwise reuse the existing `unit;geometry` label and add no new label.
-- [ ] **Gated (Slice D only):** document the upload metadata and its
+- [x] **Gated (Slice D only):** document the upload metadata and its
       consumer-gating only if implemented; do not document an unimplemented GPU
       path.
 
 ## Acceptance criteria
-- [ ] A caller can write a range-for over a domain's live handles and observe
+- [x] A caller can write a range-for over a domain's live handles and observe
       exactly the non-deleted elements, in ascending order, with no call to
       `GarbageCollection` and no manual `IsDeleted` test.
-- [ ] Live iteration is provably equal to the index-loop + `IsDeleted` baseline
+- [x] Live iteration is provably equal to the index-loop + `IsDeleted` baseline
       for the same domain state, including after interleaved deletions.
-- [ ] Empty and all-deleted domains iterate to zero elements; a live range over
+- [x] Empty and all-deleted domains iterate to zero elements; a live range over
       an invalid/empty domain fails closed to an empty range with explicit,
       assert-free behavior.
-- [ ] Live iteration over a submesh view stays inside the view's `ElementRange`.
-- [ ] The read-only `Geometry.DomainViews` views expose live ranges and hand out
+- [x] Live iteration over a submesh view stays inside the view's `ElementRange`.
+- [x] The read-only `Geometry.DomainViews` views expose live ranges and hand out
       no mutable accessor through them.
-- [ ] `geometry -> core` layering is preserved; `Geometry.Properties` gains no
+- [x] `geometry -> core` layering is preserved; `Geometry.Properties` gains no
       dependency on `Geometry.HalfedgeMesh` or any higher layer.
-- [ ] No GPU-upload metadata is present unless a real GPU-upload consumer landed
+- [x] No GPU-upload metadata is present unless a real GPU-upload consumer landed
       in the same change (Slice D); otherwise the upload metadata is absent.
 
 ## Verification

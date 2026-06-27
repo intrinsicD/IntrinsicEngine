@@ -23,15 +23,6 @@ map.
 - [GEOM-024 — Sparse symmetric generalized eigensolver seam](GEOM-024-sparse-symmetric-generalized-eigensolver-seam.md)
   (gates `methods/METHOD-006` variant B; depends on `GEOM-020`; promote when
   METHOD-006 is the next-priority method).
-- [GEOM-027 — Property name lifetime contract](GEOM-027-property-name-lifetime-contract.md).
-- [GEOM-028 — Property registry handle safety](GEOM-028-property-registry-handle-safety.md).
-- [GEOM-029 — Const property set validity contract](GEOM-029-const-property-set-validity-contract.md).
-- [GEOM-030 — Property set const lookup migration](GEOM-030-property-set-const-lookup-migration.md)
-  (depends on `GEOM-029`).
-- [GEOM-031 — Property set naming normalization](GEOM-031-property-set-naming-normalization.md).
-- [GEOM-032 — Bool property access contract](GEOM-032-bool-property-access-contract.md).
-- [GEOM-033 — Erased property metadata catalog](GEOM-033-erased-property-metadata-catalog.md)
-  (depends on `GEOM-027`, `GEOM-030`, and `GEOM-032`).
 - [GEOM-034 — Geometry property API documentation audit](GEOM-034-geometry-property-api-doc-audit.md)
   (depends on the property-system refactor sequence `GEOM-027` through
   `GEOM-033`).
@@ -51,17 +42,10 @@ Grouped by cluster; each is `geometry -> core` only and targets `CPUContracted`.
 - [GEOM-040 — Mesh curvature tensor and principal directions](GEOM-040-curvature-tensor-principal-directions.md).
 - [GEOM-041 — FEM Laplacian mass/stiffness variants and edge-weight modes](GEOM-041-fem-laplacian-mass-stiffness-variants.md).
 - [GEOM-042 — Mesh normal-based bilateral denoiser](GEOM-042-mesh-normal-bilateral-denoiser.md).
-- [GEOM-043 — Remeshing surface reprojection and error-bounded adaptive sizing](GEOM-043-remeshing-reprojection-error-bounded-sizing.md)
-  (depends on `GEOM-039`, `GEOM-040`).
-- [GEOM-044 — Sqrt-3 (Kobbelt) subdivision and Loop feature/crease masks](GEOM-044-subdivision-sqrt3-loop-feature-masks.md).
 - [GEOM-045 — First-class mesh geometric-quantity accessors](GEOM-045-first-class-mesh-quantity-accessors.md).
-- [GEOM-046 — Mesh topology utilities (components, dual, triangulate, adjacency)](GEOM-046-mesh-topology-utilities.md).
-- [GEOM-047 — Graph and point-cloud query / sampling utilities](GEOM-047-graph-pointcloud-query-noise-utilities.md).
 - [GEOM-048 — Statistics accumulators and robust estimation kernels](GEOM-048-statistics-robust-estimation-kernels.md).
 - [GEOM-049 — Numeric/linear-algebra utilities (RPCA, Eigen map adapters)](GEOM-049-numeric-linalg-utilities.md).
 - [GEOM-050 — Primitive and curve utilities (Bezier, triangle metrics, sphere fit, AABB)](GEOM-050-primitive-curve-utilities.md).
-- [GEOM-051 — Property system enhancements (live iterator, upload metadata)](GEOM-051-property-system-enhancements.md)
-  (depends on `GEOM-033`).
 - [GEOIO-003 — Mesh and point-cloud IO breadth (OFF writer, point-cloud readers)](GEOIO-003-mesh-pointcloud-io-breadth.md).
 
 The indexed decrease-key heap that backs Dijkstra is a `core` container filed
@@ -103,12 +87,12 @@ tasks are `UI-024`/`UI-025`/`UI-026` and `RUNTIME-135`.
   `Geometry.PointCloud.Normals` replaces the old `Geometry.NormalEstimation`
   point-cloud module with KDTree/default and supplied-index normal-generation
   overloads that return the written normal property.
-- GEOM-027 through GEOM-034 isolate the `Geometry.Properties` cleanup found by
-  the property-system review: name lifetimes, registry handle safety,
-  `ConstPropertySet` validity, const-correct lookup, naming normalization,
-  `bool` proxy-storage behavior, erased metadata descriptors, and the final
-  architecture-doc audit. Keep these as separate slices so public API changes,
-  behavior changes, and docs synchronization stay reviewable.
+- Retired GEOM-027 through GEOM-033 and GEOM-051 completed the
+  `Geometry.Properties` cleanup found by the property-system review: name
+  lifetimes, registry handle safety, `ConstPropertySet` validity,
+  const-correct lookup, naming normalization, `bool` proxy-storage behavior,
+  erased metadata descriptors, and live iterator/upload metadata seams. GEOM-034
+  remains the separate architecture-documentation audit follow-up.
 - GEOM-013 and GEOM-014 are seeded by the geometry paper survey
   [`docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md`](../../../docs/reviews/2026-05-15-arxiv-geometry-paper-survey.md).
   Each lists explicit algorithm variants with a marked default (Manifold DC
@@ -140,6 +124,18 @@ split; narratives live in the retirement log.
 - [GEOM-022 — Remaining geometry module implementation splits](../../done/GEOM-022-remaining-geometry-module-implementation-splits.md).
 - [GEOM-025 — UV atlas backend contract and xatlas default](../../done/GEOM-025-uv-atlas-backend-xatlas.md) (done).
 - [GEOM-026 — Cross-domain vertex normal recomputation contracts](../../done/GEOM-026-cross-domain-vertex-normal-recompute.md) (done).
+- [GEOM-027 — Property name lifetime contract](../../done/GEOM-027-property-name-lifetime-contract.md) (done).
+- [GEOM-028 — Property registry handle safety](../../done/GEOM-028-property-registry-handle-safety.md) (done).
+- [GEOM-029 — Const property set validity contract](../../done/GEOM-029-const-property-set-validity-contract.md) (done).
+- [GEOM-030 — Property set const lookup migration](../../done/GEOM-030-property-set-const-lookup-migration.md) (done).
+- [GEOM-031 — Property set naming normalization](../../done/GEOM-031-property-set-naming-normalization.md) (done).
+- [GEOM-032 — Bool property access contract](../../done/GEOM-032-bool-property-access-contract.md) (done).
+- [GEOM-033 — Erased property metadata catalog](../../done/GEOM-033-erased-property-metadata-catalog.md) (done).
+- [GEOM-043 — Remeshing surface reprojection and error-bounded adaptive sizing](../../done/GEOM-043-remeshing-reprojection-error-bounded-sizing.md) (done).
+- [GEOM-044 — Sqrt-3 subdivision and Loop feature/crease masks](../../done/GEOM-044-subdivision-sqrt3-loop-feature-masks.md) (done).
+- [GEOM-046 — Mesh topology utilities](../../done/GEOM-046-mesh-topology-utilities.md) (done).
+- [GEOM-047 — Graph and point-cloud query/noise utilities](../../done/GEOM-047-graph-pointcloud-query-noise-utilities.md) (done).
+- [GEOM-051 — Property system enhancements](../../done/GEOM-051-property-system-enhancements.md) (done).
 - GEOIO-002 is retired in [`tasks/done`](../../done/GEOIO-002-geometry-io-parity-hardening.md)
   and contributed to **Theme E — Geometry IO completion** as the upstream gate
   for retired [`ASSETIO-001`](../../done/ASSETIO-001-asset-model-texture-ingest-ownership.md)

@@ -53,6 +53,25 @@ record should name the deviation and include a removal or normalization follow-u
   necessary. Those conversions should return diagnostics rather than silently
   dropping data.
 
+## Property API contract
+
+Geometry properties expose names as `std::string_view` borrowed from the owning
+property storage. Property handles may copy the view cheaply, but callers must
+not retain it past the lifetime of the owning `PropertySet`/domain object.
+
+Mutable property lookup returns `Property<T>`; const lookup returns
+`ConstProperty<T>` and never grants mutable access through a const domain view.
+Default-constructed and failed lookups are invalid handles that report empty
+storage and no typed span. Public algorithms should test property validity
+before reading or writing optional channels.
+
+Typed scalar and vector properties expose contiguous `Data()`/`Span()` access
+when their storage is valid. `bool` properties intentionally do not expose a
+typed span because `std::vector<bool>` uses proxy references; use indexed
+`Get()`/`Set()` for boolean channels such as feature masks. Erased property
+inspection goes through descriptors that report the stable name, value kind,
+type metadata, and element count without exposing writable erased storage.
+
 ## Naming and count terminology
 
 - Prefer `PascalCase` for public functions and methods, matching the dominant

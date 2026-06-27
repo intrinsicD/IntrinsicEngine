@@ -6,6 +6,7 @@ module;
 #include <cstdint>
 #include <limits>
 #include <numbers>
+#include <optional>
 #include <span>
 #include <unordered_map>
 #include <vector>
@@ -18,6 +19,7 @@ module;
 module Geometry.HalfedgeMesh.Utils;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
+import Geometry.MeshClosestFace;
 import Extrinsic.Core.Logging;
 
 namespace Geometry::MeshUtils
@@ -1214,6 +1216,119 @@ namespace Geometry::MeshUtils
 
         // Tie-break: prefer the lower rotation count for absolute determinism
         return (dotHigh > dotLow) ? candidateHigh : candidateLow;
+    }
+
+    std::optional<HalfedgeMesh::Mesh> Dual(const HalfedgeMesh::Mesh& mesh)
+    {
+        if (mesh.IsEmpty() || mesh.FaceCount() == 0) return std::nullopt;
+        for (std::size_t ei = 0; ei < mesh.EdgesSize(); ++ei)
+        {
+            const EdgeHandle e{static_cast<PropertyIndex>(ei)};
+            if (!mesh.IsDeleted(e) && mesh.IsBoundary(e)) return std::nullopt;
+        }
+
+        HalfedgeMesh::Mesh dual;
+        std::vector<VertexHandle> faceVertices(mesh.FacesSize(), VertexHandle{});
+        for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
+        {
+            const FaceHandle f{static_cast<PropertyIndex>(fi)};
+            if (mesh.IsDeleted(f)) continue;
+            const glm::vec3 centroid = glm::vec3(FaceCentroid(mesh, f));
+            if (!std::isfinite(centroid.x) || !std::isfinite(centroid.y) || !std::isfinite(centroid.z))
+            {
+                return std::nullopt;
+            }
+            faceVertices[fi] = dual.AddVertex(centroid);
+        }
+
+        for (std::size_t vi = 0; vi < mesh.VerticesSize(); ++vi)
+        {
+            const VertexHandle v{static_cast<PropertyIndex>(vi)};
+            if (mesh.IsDeleted(v) || mesh.IsIsolated(v)) continue;
+            if (mesh.IsBoundary(v)) return std::nullopt;
+
+            std::vector<VertexHandle> dualFace;
+            for (const FaceHandle f : mesh.FacesAroundVertex(v))
+            {
+                if (!f.IsValid() || mesh.IsDeleted(f)) continue;
+                dualFace.push_back(faceVertices[f.Index]);
+            }
+            if (dualFace.size() < 3) return std::nullopt;
+
+            if (!dual.AddFace(dualFace).has_value())
+            {
+                std::reverse(dualFace.begin(), dualFace.end());
+                if (!dual.AddFace(dualFace).has_value()) return std::nullopt;
+            }
+        }
+
+        return dual;
+    }
+
+    namespace
+    {
+        [[nodiscard]] std::uint32_t AdjacentOppositeVertexIndex(
+            const HalfedgeMesh::Mesh& mesh,
+            const HalfedgeHandle edgeHalfedge,
+            const VertexHandle edgeA,
+            const VertexHandle edgeB,
+            const VertexHandle boundaryFallback)
+        {
+            const HalfedgeHandle opposite = mesh.OppositeHalfedge(edgeHalfedge);
+            const FaceHandle adjacent = mesh.Face(opposite);
+            if (!adjacent.IsValid() || mesh.IsDeleted(adjacent) || mesh.Valence(adjacent) != 3)
+            {
+                return boundaryFallback.Index;
+            }
+
+            for (const VertexHandle candidate : mesh.VerticesAroundFace(adjacent))
+            {
+                if (candidate != edgeA && candidate != edgeB)
+                {
+                    return candidate.Index;
+                }
+            }
+            return boundaryFallback.Index;
+        }
+    }
+
+    std::optional<std::vector<std::uint32_t>> BuildTriangleAdjacencyIndices(
+        const HalfedgeMesh::Mesh& mesh)
+    {
+        if (mesh.IsEmpty() || mesh.FaceCount() == 0) return std::nullopt;
+
+        std::vector<std::uint32_t> indices;
+        indices.reserve(mesh.FaceCount() * 6u);
+        for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
+        {
+            const FaceHandle f{static_cast<PropertyIndex>(fi)};
+            if (mesh.IsDeleted(f)) continue;
+
+            const HalfedgeHandle h0 = mesh.Halfedge(f);
+            const HalfedgeHandle h1 = mesh.NextHalfedge(h0);
+            const HalfedgeHandle h2 = mesh.NextHalfedge(h1);
+            if (mesh.NextHalfedge(h2) != h0) return std::nullopt;
+
+            const VertexHandle va = mesh.ToVertex(h0);
+            const VertexHandle vb = mesh.ToVertex(h1);
+            const VertexHandle vc = mesh.ToVertex(h2);
+
+            indices.push_back(va.Index);
+            indices.push_back(AdjacentOppositeVertexIndex(mesh, h1, va, vb, vc));
+            indices.push_back(vb.Index);
+            indices.push_back(AdjacentOppositeVertexIndex(mesh, h2, vb, vc, va));
+            indices.push_back(vc.Index);
+            indices.push_back(AdjacentOppositeVertexIndex(mesh, h0, vc, va, vb));
+        }
+
+        return indices.empty() ? std::nullopt : std::optional{std::move(indices)};
+    }
+
+    MeshClosestFaceResult NearestFace(const HalfedgeMesh::Mesh& mesh, const glm::vec3 point)
+    {
+        MeshClosestFaceIndex index;
+        if (!index.Build(mesh)) return {};
+        return index.Query(point);
     }
 
     // --- Edge Loop: vertex-walking algorithm ---

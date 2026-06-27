@@ -210,6 +210,10 @@ export namespace Geometry::DomainViews
 
         [[nodiscard]] bool HasGarbage() const noexcept { return m_Graph.HasGarbage(); }
 
+        [[nodiscard]] Graph::Graph::LiveVertexRange LiveVertices() const { return m_Graph.LiveVertices(); }
+        [[nodiscard]] Graph::Graph::LiveHalfedgeRange LiveHalfedges() const { return m_Graph.LiveHalfedges(); }
+        [[nodiscard]] Graph::Graph::LiveEdgeRange LiveEdges() const { return m_Graph.LiveEdges(); }
+
         [[nodiscard]] glm::vec3 VertexPosition(VertexHandle v) const { return m_Graph.VertexPosition(v); }
 
         [[nodiscard]] ConstPropertySet VertexProperties()   const noexcept { return m_Graph.VertexProperties(); }
@@ -251,6 +255,7 @@ export namespace Geometry::DomainViews
         [[nodiscard]] bool IsValid(VertexHandle v)   const          { return m_Cloud.IsValid(v); }
         [[nodiscard]] bool IsDeleted(VertexHandle v) const          { return m_Cloud.IsDeleted(v); }
         [[nodiscard]] bool HasGarbage()              const noexcept { return m_Cloud.HasGarbage(); }
+        [[nodiscard]] PointCloud::Cloud::LivePointRange LivePoints() const { return m_Cloud.LivePoints(); }
 
         [[nodiscard]] const glm::vec3&           Position(VertexHandle v) const { return m_Cloud.Position(v); }
         [[nodiscard]] std::span<const glm::vec3> Positions()             const { return m_Cloud.Positions(); }
@@ -300,6 +305,7 @@ export namespace Geometry::DomainViews
         [[nodiscard]] bool IsValid(VertexHandle v)   const          { return m_Cloud.IsValid(v); }
         [[nodiscard]] bool IsDeleted(VertexHandle v) const          { return m_Cloud.IsDeleted(v); }
         [[nodiscard]] bool HasGarbage()              const noexcept { return m_Cloud.HasGarbage(); }
+        [[nodiscard]] PointCloud::Cloud::LivePointRange LivePoints() const { return m_Cloud.LivePoints(); }
 
         [[nodiscard]] const glm::vec3&           Position(VertexHandle v) const { return m_Cloud.Position(v); }
         [[nodiscard]] std::span<const glm::vec3> Positions()             const { return m_Cloud.Positions(); }

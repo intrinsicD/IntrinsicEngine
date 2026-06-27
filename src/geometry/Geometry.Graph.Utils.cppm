@@ -2,6 +2,7 @@ module;
 
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <span>
 #include <vector>
@@ -117,6 +118,84 @@ export namespace Geometry::Graph
         bool CountCollinearOverlap{false};
     };
 
+    enum class EdgeLengthStatus : std::uint8_t
+    {
+        Success,
+        EmptyGraph,
+        InsufficientOutput,
+        InvalidEdge,
+        NonFinitePosition,
+        ZeroLengthEdge
+    };
+
+    struct EdgeLengthParams
+    {
+        float MinLength{1.0e-12F};
+        bool RejectZeroLengthEdges{true};
+    };
+
+    struct EdgeLengthResult
+    {
+        EdgeLengthStatus Status{EdgeLengthStatus::Success};
+        std::size_t EdgeCount{0};
+        std::size_t FilledCount{0};
+        EdgeHandle FirstFailedEdge{};
+        float MinLength{std::numeric_limits<float>::infinity()};
+        float MaxLength{0.0F};
+    };
+
+    enum class EdgeQueryStatus : std::uint8_t
+    {
+        Success,
+        EmptyGraph,
+        InvalidQueryPoint,
+        InvalidParameters,
+        InvalidSeedVertex,
+        NoCandidates,
+        NonFinitePosition,
+        ZeroLengthEdge
+    };
+
+    struct ClosestEdgeQueryResult
+    {
+        EdgeQueryStatus Status{EdgeQueryStatus::NoCandidates};
+        EdgeHandle Edge{};
+        glm::vec3 ClosestPoint{0.0F};
+        float SquaredDistance{std::numeric_limits<float>::infinity()};
+        float SegmentT{0.0F};
+    };
+
+    struct EdgeQuerySetResult
+    {
+        EdgeQueryStatus Status{EdgeQueryStatus::NoCandidates};
+        std::vector<ClosestEdgeQueryResult> Edges{};
+    };
+
+    struct GraphGaussianNoiseParams
+    {
+        float StdDevFraction{0.0F};
+        std::uint64_t Seed{0};
+    };
+
+    enum class GaussianNoiseStatus : std::uint8_t
+    {
+        Success,
+        EmptyInput,
+        InvalidParameters,
+        NonFinitePosition,
+        DegenerateScale
+    };
+
+    struct GaussianNoiseResult
+    {
+        GaussianNoiseStatus Status{GaussianNoiseStatus::Success};
+        std::size_t ElementCount{0};
+        std::size_t DisplacedCount{0};
+        float Scale{0.0F};
+        glm::vec3 MeanDisplacement{0.0F};
+        float MaxDisplacement{0.0F};
+    };
+
     // A lightweight halfedge-based graph (no faces), designed for DOD-friendly algorithms.
     // Storage is via PropertySets, so user-defined properties are supported on vertices/halfedges/edges.
     // Rebuilds `graph` from a point set using an undirected k-nearest-neighbor construction.
@@ -149,4 +228,23 @@ export namespace Geometry::Graph
     // Returns std::nullopt for degenerate input (insufficient positions or non-finite coordinates).
     [[nodiscard]] std::optional<std::size_t> CountEdgeCrossings(
         const Graph& graph, std::span<const glm::vec2> positions, const EdgeCrossingParams& params = {});
+
+    // Fills a dense edge-length span indexed by EdgeHandle::Index.
+    // The operation fails closed by default on zero-length or non-finite edges.
+    [[nodiscard]] EdgeLengthResult FillEdgeLengths(
+        const Graph& graph, std::span<float> outLengths, const EdgeLengthParams& params = {});
+
+    // Publishes cached edge lengths in the conventional "e:length" property.
+    [[nodiscard]] EdgeLengthResult EnsureEdgeLengths(Graph& graph, const EdgeLengthParams& params = {});
+
+    [[nodiscard]] ClosestEdgeQueryResult ClosestEdge(const Graph& graph, glm::vec3 point);
+
+    [[nodiscard]] EdgeQuerySetResult KClosestEdges(const Graph& graph, glm::vec3 point, std::size_t k);
+
+    [[nodiscard]] EdgeQuerySetResult EdgesWithinRadius(const Graph& graph, glm::vec3 point, float radius);
+
+    [[nodiscard]] ClosestEdgeQueryResult ClosestEdgeWithinOneRing(
+        const Graph& graph, VertexHandle seedVertex, glm::vec3 point);
+
+    [[nodiscard]] GaussianNoiseResult ApplyGaussianNoise(Graph& graph, const GraphGaussianNoiseParams& params = {});
 }

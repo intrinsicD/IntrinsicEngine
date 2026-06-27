@@ -21,6 +21,10 @@ export namespace Geometry::Graph
     class Graph
     {
     public:
+        using LiveVertexRange = LiveElementRange<VertexHandle>;
+        using LiveHalfedgeRange = LiveElementRange<HalfedgeHandle>;
+        using LiveEdgeRange = LiveElementRange<EdgeHandle>;
+
         Graph();
         Graph(PropertySet& Vertices, PropertySet& Halfedges, PropertySet& Edges,
               std::size_t &deletedVertices, std::size_t &deletedEdges);
@@ -74,6 +78,33 @@ export namespace Geometry::Graph
         [[nodiscard]] bool IsValid(VertexHandle v) const { return v.IsValid() && v.Index < VerticesSize(); }
         [[nodiscard]] bool IsValid(EdgeHandle e) const { return e.IsValid() && e.Index < EdgesSize(); }
         [[nodiscard]] bool IsValid(HalfedgeHandle h) const { return h.IsValid() && h.Index < HalfedgesSize(); }
+
+        [[nodiscard]] LiveVertexRange LiveVertices() const
+        {
+            const std::size_t offset = m_IsSubmeshView ? m_VertexRange.Offset : 0u;
+            return LiveVertexRange(offset, VerticesSize(), [this](VertexHandle v)
+            {
+                return v.Index >= m_Vertices.Size() || IsDeleted(v);
+            });
+        }
+
+        [[nodiscard]] LiveHalfedgeRange LiveHalfedges() const
+        {
+            const std::size_t offset = m_IsSubmeshView ? m_EdgeRange.Offset * 2u : 0u;
+            return LiveHalfedgeRange(offset, HalfedgesSize(), [this](HalfedgeHandle h)
+            {
+                return h.Index >= m_Halfedges.Size() || IsDeleted(h);
+            });
+        }
+
+        [[nodiscard]] LiveEdgeRange LiveEdges() const
+        {
+            const std::size_t offset = m_IsSubmeshView ? m_EdgeRange.Offset : 0u;
+            return LiveEdgeRange(offset, EdgesSize(), [this](EdgeHandle e)
+            {
+                return e.Index >= m_Edges.Size() || IsDeleted(e);
+            });
+        }
 
         // Connectivity
         [[nodiscard]] HalfedgeHandle Halfedge(VertexHandle v) const;

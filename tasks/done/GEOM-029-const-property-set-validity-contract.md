@@ -17,6 +17,11 @@ depends_on: []
 - No renderer/runtime/ECS/assets/platform/app integration.
 
 ## Context
+- Status: done.
+- Owner/agent: Codex.
+- Completed: 2026-06-28.
+- Commit: this commit (`Migrate geometry property and topology utilities`).
+- Maturity: `CPUContracted`.
 - Owning subsystem/layer: `geometry` (`geometry -> core` only).
 - `ConstPropertySet` has a default constructor that leaves its borrowed
   `PropertySet` pointer null, but its methods assume a valid source.
@@ -26,44 +31,44 @@ depends_on: []
   inventing a parallel optional wrapper.
 
 ## Required changes
-- [ ] Add an explicit validity query to `ConstPropertySet` such as `IsValid()`
+- [x] Add an explicit validity query to `ConstPropertySet` such as `IsValid()`
       and `explicit operator bool()`.
-- [ ] Define behavior for invalid/default `ConstPropertySet` methods:
+- [x] Define behavior for invalid/default `ConstPropertySet` methods:
       `Size()`, `Empty()`, `Contains()`, `Get()`, and `Names()`.
-- [ ] Prefer safe empty-view semantics for lookup-style calls unless the audit
+- [x] Prefer safe empty-view semantics for lookup-style calls unless the audit
       proves a debug assertion is required for an invariant-only method.
-- [ ] Audit default `ConstPropertySet` members in geometry APIs, including UV
+- [x] Audit default `ConstPropertySet` members in geometry APIs, including UV
       atlas inputs, and keep their intended optional semantics intact.
-- [ ] Avoid duplicating property set storage or adding ownership to
+- [x] Avoid duplicating property set storage or adding ownership to
       `ConstPropertySet`.
 
 ## Tests
-- [ ] Add `unit;geometry` tests for default-constructed `ConstPropertySet`.
-- [ ] Add tests for a valid borrowed `ConstPropertySet` over an empty
+- [x] Add `unit;geometry` tests for default-constructed `ConstPropertySet`.
+- [x] Add tests for a valid borrowed `ConstPropertySet` over an empty
       `PropertySet`.
-- [ ] Add tests for a valid borrowed `ConstPropertySet` with at least one
+- [x] Add tests for a valid borrowed `ConstPropertySet` with at least one
       property and typed const lookup.
-- [ ] Add tests that copied `ConstPropertySet` views keep the same validity
+- [x] Add tests that copied `ConstPropertySet` views keep the same validity
       behavior as their source view.
 
 ## Docs
-- [ ] Update
-      [`docs/architecture/geometry-api-style.md`](../../../docs/architecture/geometry-api-style.md)
+- [x] Update
+      [`docs/architecture/geometry-api-style.md`](../../docs/architecture/geometry-api-style.md)
       with the default/invalid borrowed-view rule for property APIs.
-- [ ] Update
-      [`docs/architecture/geometry.md`](../../../docs/architecture/geometry.md)
+- [x] Update
+      [`docs/architecture/geometry.md`](../../docs/architecture/geometry.md)
       where it describes property sharing or borrowed domain views.
-- [ ] Regenerate
-      [`docs/api/generated/module_inventory.md`](../../../docs/api/generated/module_inventory.md)
+- [x] Regenerate
+      [`docs/api/generated/module_inventory.md`](../../docs/api/generated/module_inventory.md)
       if exported signatures change.
 
 ## Acceptance criteria
-- [ ] Default `ConstPropertySet` behavior is explicit, documented, and covered
+- [x] Default `ConstPropertySet` behavior is explicit, documented, and covered
       by tests.
-- [ ] Optional const property inputs can be represented without null
+- [x] Optional const property inputs can be represented without null
       dereference risk.
-- [ ] Valid borrowed const property views preserve existing read behavior.
-- [ ] The change preserves `geometry -> core` layering.
+- [x] Valid borrowed const property views preserve existing read behavior.
+- [x] The change preserves `geometry -> core` layering.
 
 ## Verification
 ```bash

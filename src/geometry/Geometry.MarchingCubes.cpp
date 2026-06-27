@@ -460,7 +460,7 @@ namespace Geometry::MarchingCubes
     // Internal helper: shared gradient computation using DenseGrid + property.
     static glm::vec3 ComputeGradientDense(
         const Grid::DenseGrid& grid,
-        const Property<float>& scalar,
+        const ConstProperty<float>& scalar,
         std::size_t x, std::size_t y, std::size_t z)
     {
         const auto& dims = grid.Dimensions();

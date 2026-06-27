@@ -559,5 +559,6 @@ TEST(GraphicsMaterialSystem, ShadingModelDefaultsToLitAndRoundTrips)
     EXPECT_EQ(materials.GetParams(material.GetHandle()).Shading,
               Graphics::ShadingModel::Unlit);
 
+    material.Reset();
     materials.Shutdown();
 }

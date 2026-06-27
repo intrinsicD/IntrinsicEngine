@@ -55,6 +55,7 @@ export import Geometry.Curvature;
 export import Geometry.Smoothing;
 export import Geometry.Simplification;
 export import Geometry.Subdivision;
+export import Geometry.HalfedgeMesh.SubdivisionSqrt3;
 export import Geometry.Remeshing;
 export import Geometry.Geodesic;
 export import Geometry.Graph.ShortestPath;

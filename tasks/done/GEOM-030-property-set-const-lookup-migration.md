@@ -17,6 +17,11 @@ depends_on: [GEOM-029]
 - No renderer/runtime/ECS/assets/platform/app ownership changes.
 
 ## Context
+- Status: done.
+- Owner/agent: Codex.
+- Completed: 2026-06-28.
+- Commit: this commit (`Migrate geometry property and topology utilities`).
+- Maturity: `CPUContracted`.
 - Owning subsystem/layer: `geometry` (`geometry -> core` only).
 - `PropertySet::Get<T>(std::string_view) const` currently forwards through
   `const_cast` and returns mutable `Property<T>`.
@@ -35,46 +40,46 @@ depends_on: [GEOM-029]
   compatibility shim introduced during the migration.
 
 ## Required changes
-- [ ] Audit all `PropertySet::Get<T>` use on const objects, including domain
+- [x] Audit all `PropertySet::Get<T>` use on const objects, including domain
       views, UV atlas inputs, normal recompute paths, runtime readback helpers,
       and tests.
-- [ ] Provide a const lookup path that returns `ConstProperty<T>` or an
+- [x] Provide a const lookup path that returns `ConstProperty<T>` or an
       equivalent read-only handle.
-- [ ] Update read-only call sites to use the const handle without copying
+- [x] Update read-only call sites to use the const handle without copying
       property storage.
-- [ ] Keep mutating call sites on non-const `PropertySet` and make their
+- [x] Keep mutating call sites on non-const `PropertySet` and make their
       mutability explicit.
-- [ ] Delete the `const_cast` path from `Geometry.Properties.cppm` once all
+- [x] Delete the `const_cast` path from `Geometry.Properties.cppm` once all
       in-repo callers compile.
 
 ## Tests
-- [ ] Add `unit;geometry` tests proving a `const PropertySet&` cannot produce a
+- [x] Add `unit;geometry` tests proving a `const PropertySet&` cannot produce a
       mutable `Property<T>` through the public API.
-- [ ] Add tests that `ConstProperty<T>` lookup preserves read access to names,
+- [x] Add tests that `ConstProperty<T>` lookup preserves read access to names,
       size, spans or values supported by the property type.
-- [ ] Update affected geometry tests so read-only algorithms use const property
+- [x] Update affected geometry tests so read-only algorithms use const property
       handles.
-- [ ] Build `IntrinsicTests` with the `ci` preset to catch source breakage in
+- [x] Build `IntrinsicTests` with the `ci` preset to catch source breakage in
       all module importers.
 
 ## Docs
-- [ ] Update
-      [`docs/architecture/geometry-api-style.md`](../../../docs/architecture/geometry-api-style.md)
+- [x] Update
+      [`docs/architecture/geometry-api-style.md`](../../docs/architecture/geometry-api-style.md)
       with the `Property` vs `ConstProperty` rule.
-- [ ] Update
-      [`docs/architecture/geometry.md`](../../../docs/architecture/geometry.md)
+- [x] Update
+      [`docs/architecture/geometry.md`](../../docs/architecture/geometry.md)
       where borrowed domain views or property sharing describe mutation.
-- [ ] Regenerate
-      [`docs/api/generated/module_inventory.md`](../../../docs/api/generated/module_inventory.md)
+- [x] Regenerate
+      [`docs/api/generated/module_inventory.md`](../../docs/api/generated/module_inventory.md)
       because this changes the exported module surface.
 
 ## Acceptance criteria
-- [ ] No `const_cast` is used to implement public const property lookup.
-- [ ] Const property views provide read access without copying property
+- [x] No `const_cast` is used to implement public const property lookup.
+- [x] Const property views provide read access without copying property
       storage.
-- [ ] Mutating property access remains available only through non-const property
+- [x] Mutating property access remains available only through non-const property
       owners or explicitly mutable borrowed views.
-- [ ] The change preserves `geometry -> core` layering.
+- [x] The change preserves `geometry -> core` layering.
 
 ## Verification
 ```bash

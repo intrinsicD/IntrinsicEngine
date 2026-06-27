@@ -15,6 +15,7 @@ module Geometry.Remeshing;
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Utils;
+import Geometry.HalfedgeMesh.AdaptiveRemeshing;
 
 namespace Geometry::Remeshing
 {
@@ -25,7 +26,27 @@ namespace Geometry::Remeshing
     // =========================================================================
     // Step 1: Split long edges
     // =========================================================================
-    static std::size_t SplitLongEdges(HalfedgeMesh::Mesh& mesh, double maxLenSq, bool /*preserveBoundary*/)
+    static void ProjectVerticesToReference(
+        HalfedgeMesh::Mesh& mesh,
+        const AdaptiveRemeshing::ReferenceProjector* projector,
+        const bool preserveBoundary)
+    {
+        if (projector == nullptr || !projector->Enabled) return;
+
+        for (std::size_t vi = 0; vi < mesh.VerticesSize(); ++vi)
+        {
+            VertexHandle v{static_cast<PropertyIndex>(vi)};
+            if (!mesh.IsValid(v) || mesh.IsDeleted(v) || mesh.IsIsolated(v)) continue;
+            if (preserveBoundary && mesh.IsBoundary(v)) continue;
+            mesh.Position(v) = projector->ProjectPoint(mesh.Position(v));
+        }
+    }
+
+    static std::size_t SplitLongEdges(
+        HalfedgeMesh::Mesh& mesh,
+        double maxLenSq,
+        bool /*preserveBoundary*/,
+        const AdaptiveRemeshing::ReferenceProjector* projector)
     {
         std::size_t splitCount = 0;
         // Collect edges to split (don't iterate while modifying)
@@ -46,6 +67,10 @@ namespace Geometry::Remeshing
             HalfedgeHandle h{static_cast<PropertyIndex>(2u * e.Index)};
             glm::vec3 mid = 0.5f * (mesh.Position(mesh.FromVertex(h)) +
                                      mesh.Position(mesh.ToVertex(h)));
+            if (projector != nullptr && projector->Enabled)
+            {
+                mid = projector->ProjectPoint(mid);
+            }
             (void)mesh.Split(e, mid);
             ++splitCount;
         }
@@ -150,21 +175,38 @@ namespace Geometry::Remeshing
         double minLenSq = minLen * minLen;
 
         RemeshingResult result;
+        AdaptiveRemeshing::ReferenceProjector projector{};
+        if (params.ProjectToSurface)
+        {
+            AdaptiveRemeshing::ReferenceProjectionParams projectionParams{};
+            projectionParams.ReferenceProjectionK = params.ReferenceProjectionK;
+            projectionParams.MaxReferenceProjectionDistance = params.MaxReferenceProjectionDistance;
+            static_cast<void>(projector.Build(mesh, projectionParams));
+        }
 
         for (std::size_t iter = 0; iter < params.Iterations; ++iter)
         {
             // Step 1: Split long edges
-            result.SplitCount += SplitLongEdges(mesh, maxLenSq, params.PreserveBoundary);
+            result.SplitCount += SplitLongEdges(mesh, maxLenSq, params.PreserveBoundary,
+                                                params.ProjectToSurface ? &projector : nullptr);
+            ProjectVerticesToReference(mesh, params.ProjectToSurface ? &projector : nullptr,
+                                       params.PreserveBoundary);
 
             // Step 2: Collapse short edges
             result.CollapseCount += CollapseShortEdges(mesh, minLenSq, maxLenSq,
                                                        params.PreserveBoundary);
+            ProjectVerticesToReference(mesh, params.ProjectToSurface ? &projector : nullptr,
+                                       params.PreserveBoundary);
 
             // Step 3: Equalize valence
             result.FlipCount += EqualizeValenceByEdgeFlip(mesh, params.PreserveBoundary);
+            ProjectVerticesToReference(mesh, params.ProjectToSurface ? &projector : nullptr,
+                                       params.PreserveBoundary);
 
             // Step 4: Tangential smoothing
             MeshUtils::TangentialSmooth(mesh, params.Lambda, params.PreserveBoundary);
+            ProjectVerticesToReference(mesh, params.ProjectToSurface ? &projector : nullptr,
+                                       params.PreserveBoundary);
 
             result.IterationsPerformed = iter + 1;
         }

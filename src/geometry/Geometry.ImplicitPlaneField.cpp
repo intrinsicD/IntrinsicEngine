@@ -435,42 +435,42 @@ namespace Geometry::Implicit
                 BuildNodeRecursive(ctx, field, baseChild + child, depth + 1u);
         }
 
-        [[nodiscard]] std::optional<NodeProperty<glm::vec3>> ClosestPointProperty(const PlaneField& field)
+        [[nodiscard]] std::optional<ConstNodeProperty<glm::vec3>> ClosestPointProperty(const PlaneField& field)
         {
             auto prop = field.Hierarchy().GetNodeProperty<glm::vec3>(std::string(kClosestPointProperty));
             if (!prop) return std::nullopt;
             return prop;
         }
 
-        [[nodiscard]] std::optional<NodeProperty<glm::vec3>> NormalProperty(const PlaneField& field)
+        [[nodiscard]] std::optional<ConstNodeProperty<glm::vec3>> NormalProperty(const PlaneField& field)
         {
             auto prop = field.Hierarchy().GetNodeProperty<glm::vec3>(std::string(kNormalProperty));
             if (!prop) return std::nullopt;
             return prop;
         }
 
-        [[nodiscard]] std::optional<NodeProperty<float>> SignedDistanceProperty(const PlaneField& field)
+        [[nodiscard]] std::optional<ConstNodeProperty<float>> SignedDistanceProperty(const PlaneField& field)
         {
             auto prop = field.Hierarchy().GetNodeProperty<float>(std::string(kSignedDistanceProperty));
             if (!prop) return std::nullopt;
             return prop;
         }
 
-        [[nodiscard]] std::optional<NodeProperty<float>> MaxPlaneErrorPropertyHandle(const PlaneField& field)
+        [[nodiscard]] std::optional<ConstNodeProperty<float>> MaxPlaneErrorPropertyHandle(const PlaneField& field)
         {
             auto prop = field.Hierarchy().GetNodeProperty<float>(std::string(kMaxPlaneErrorProperty));
             if (!prop) return std::nullopt;
             return prop;
         }
 
-        [[nodiscard]] std::optional<NodeProperty<float>> SupportRadiusPropertyHandle(const PlaneField& field)
+        [[nodiscard]] std::optional<ConstNodeProperty<float>> SupportRadiusPropertyHandle(const PlaneField& field)
         {
             auto prop = field.Hierarchy().GetNodeProperty<float>(std::string(kSupportRadiusProperty));
             if (!prop) return std::nullopt;
             return prop;
         }
 
-        [[nodiscard]] std::optional<NodeProperty<std::uint32_t>> FlagsProperty(const PlaneField& field)
+        [[nodiscard]] std::optional<ConstNodeProperty<std::uint32_t>> FlagsProperty(const PlaneField& field)
         {
             auto prop = field.Hierarchy().GetNodeProperty<std::uint32_t>(std::string(kFlagsProperty));
             if (!prop) return std::nullopt;

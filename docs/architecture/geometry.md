@@ -49,6 +49,65 @@ module/file/namespace alignment, public state and mutability, count terminology,
 failure reporting, deterministic diagnostics, numeric tolerances, and the current
 `Geometry.LinearSolver` narrow-module decision.
 
+### Property-system contracts
+
+`Geometry.Properties` exposes property names as `std::string_view` borrows tied to
+the owning property registry, so callers can inspect names without copying while
+the property remains alive. Const property-set lookups return read-only property
+handles and default-constructed `ConstPropertySet` values behave as safe empty
+views. `PropertySet::Descriptors()` reports erased property metadata including
+name, value kind, element count, and mutability so runtime/editor inspection can
+enumerate geometry attributes without RTTI. `LiveElementRange` is the shared
+handle iteration helper behind mesh, graph, point-cloud, and const domain-view
+live-element accessors.
+
+### Remeshing, subdivision, and mesh topology utilities
+
+`Geometry.HalfedgeMesh.AdaptiveRemeshing` exposes `ReferenceProjector`, a
+frozen-surface nearest-face projector backed by `Geometry.MeshClosestFace`, and
+supports both mean-curvature sizing and `SizingLaw::ErrorBoundedTaubin`.
+Reference projection is also available to uniform remeshing through
+`Geometry.Remeshing::RemeshingParams::ProjectToSurface` and related projection
+limits.
+
+`Geometry.Subdivision` implements Loop subdivision with optional feature-edge
+preservation from a caller-selected boolean edge property, defaulting to
+`e:feature`. Feature split edges remain tagged on output. `Geometry.SubdivisionSqrt3`
+adds Kobbelt sqrt(3) subdivision for triangle meshes, including centroid split,
+old-vertex relaxation, original interior-edge flips, and boundary handling.
+
+`Geometry.HalfedgeMesh::Mesh` publishes core topology helpers for polygon
+`Triangulate`, conservative `IsRemovalOk`, intrinsic `IsDelaunay`, conditional
+`DelaunayFlip`, direct `EdgeLength`, and `UpdateEdgeLengths`. `UpdateEdgeLengths`
+recomputes the canonical `e:length` `double` edge property; the cache is not
+automatically invalidated, so callers that mutate topology or positions must
+refresh it before consuming the property. `Geometry.MeshRepair` provides
+deterministic connected-component labels (`v:component`, `f:component`),
+component splitting, and keep-largest-component cleanup. `Geometry.HalfedgeMesh.Utils`
+provides dual construction, triangle-adjacency index buffers with boundary edges
+encoded by the triangle's own opposite vertex, and `NearestFace`, which delegates
+to the accelerated `Geometry.MeshClosestFace` query.
+
+### Graph and point-cloud query/noise utilities
+
+`Geometry.Graph.Utils` publishes the graph-side `e:length` `float` cache through
+`EnsureEdgeLengths` and the non-caching `FillEdgeLengths`. Both fail closed on
+empty graphs, invalid edges, non-finite endpoints, zero-length edges, or
+undersized caller buffers. Edge spatial queries (`ClosestEdge`, `KClosestEdges`,
+`EdgesWithinRadius`, and `ClosestEdgeWithinOneRing`) use
+`Geometry.Queries::ClosestPointSegment` for exact segment distance and a
+`Geometry.BVH` over edge segment AABBs for candidate enumeration; returned sets
+are ordered by squared distance with ascending edge handle tie-breaks.
+
+Graph and point-cloud Gaussian augmentation is deterministic and true-Gaussian:
+each element seeds its own RNG from `(Seed, element index)` and draws independent
+per-component normal samples. Graph displacement standard deviation is
+`StdDevFraction * vertex-AABB diagonal`; point-cloud displacement standard
+deviation is `StdDevFraction * ComputeStatistics(...).AverageSpacing`. A zero
+fraction is an identity operation, while empty input, non-finite positions,
+negative/non-finite fractions, and non-zero requests with degenerate scale report
+explicit status values.
+
 ### Curvature tensor and principal directions
 
 `Geometry.Curvature` estimates per-vertex discrete curvature on triangle meshes.

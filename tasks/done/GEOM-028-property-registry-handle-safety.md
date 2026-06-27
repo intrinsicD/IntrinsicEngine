@@ -17,6 +17,11 @@ depends_on: []
 - No renderer/runtime/ECS/assets/platform/app integration.
 
 ## Context
+- Status: done.
+- Owner/agent: Codex.
+- Completed: 2026-06-28.
+- Commit: this commit (`Migrate geometry property and topology utilities`).
+- Maturity: `CPUContracted`.
 - Owning subsystem/layer: `geometry` (`geometry -> core` only).
 - The implementation-side registry lookup currently indexes storage directly
   from `PropertyId`, so invalid IDs can turn into undefined behavior before the
@@ -27,43 +32,43 @@ depends_on: []
   do not introduce a second handle system.
 
 ## Required changes
-- [ ] Audit `PropertyRegistry::Storage`, typed `Storage<T>`, remove, contains,
+- [x] Audit `PropertyRegistry::Storage`, typed `Storage<T>`, remove, contains,
       and property enumeration paths for unchecked `PropertyId` indexing.
-- [ ] Add one shared internal validity check for registry IDs so invalid-handle
+- [x] Add one shared internal validity check for registry IDs so invalid-handle
       behavior is not duplicated across methods.
-- [ ] Define deterministic behavior for invalid IDs, removed IDs, and
+- [x] Define deterministic behavior for invalid IDs, removed IDs, and
       wrong-type IDs; prefer null/invalid property handles for lookup-style APIs.
-- [ ] Preserve existing behavior for valid mutable and const property handles.
-- [ ] Keep diagnostics local to geometry; do not add runtime logging or global
+- [x] Preserve existing behavior for valid mutable and const property handles.
+- [x] Keep diagnostics local to geometry; do not add runtime logging or global
       error sinks.
 
 ## Tests
-- [ ] Add `unit;geometry` tests for invalid `PropertyId` lookup.
-- [ ] Add tests for lookup after removal or storage compaction, whichever paths
+- [x] Add `unit;geometry` tests for invalid `PropertyId` lookup.
+- [x] Add tests for lookup after removal or storage compaction, whichever paths
       exist in the implementation.
-- [ ] Add tests proving wrong-type typed lookup fails without corrupting or
+- [x] Add tests proving wrong-type typed lookup fails without corrupting or
       mutating the property set.
-- [ ] Add tests that valid IDs still retrieve the expected property after
+- [x] Add tests that valid IDs still retrieve the expected property after
       adding several unrelated properties.
 
 ## Docs
-- [ ] Update
-      [`docs/architecture/geometry-api-style.md`](../../../docs/architecture/geometry-api-style.md)
+- [x] Update
+      [`docs/architecture/geometry-api-style.md`](../../docs/architecture/geometry-api-style.md)
       with the invalid-handle behavior expected of property APIs.
-- [ ] Update
-      [`docs/architecture/geometry.md`](../../../docs/architecture/geometry.md)
+- [x] Update
+      [`docs/architecture/geometry.md`](../../docs/architecture/geometry.md)
       if it documents property handle or borrowed-view validity.
-- [ ] Regenerate
-      [`docs/api/generated/module_inventory.md`](../../../docs/api/generated/module_inventory.md)
+- [x] Regenerate
+      [`docs/api/generated/module_inventory.md`](../../docs/api/generated/module_inventory.md)
       only if the exported module surface changes.
 
 ## Acceptance criteria
-- [ ] Invalid, removed, and wrong-type property handles fail closed in focused
+- [x] Invalid, removed, and wrong-type property handles fail closed in focused
       tests.
-- [ ] The implementation has one clear validity helper or equivalent local
+- [x] The implementation has one clear validity helper or equivalent local
       path, not repeated ad hoc bounds checks.
-- [ ] Valid property lookup behavior remains source-compatible.
-- [ ] The change preserves `geometry -> core` layering.
+- [x] Valid property lookup behavior remains source-compatible.
+- [x] The change preserves `geometry -> core` layering.
 
 ## Verification
 ```bash

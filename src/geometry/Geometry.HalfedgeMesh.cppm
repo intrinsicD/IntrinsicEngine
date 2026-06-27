@@ -29,6 +29,10 @@ export namespace Geometry::HalfedgeMesh
         using FacesAroundVertexRange = Circulators::FacesAroundVertexRange<Mesh>;
         using BoundaryHalfedgesRange = Circulators::BoundaryHalfedgesRange<Mesh>;
         using BoundaryVerticesRange = Circulators::BoundaryVerticesRange<Mesh>;
+        using LiveVertexRange = LiveElementRange<VertexHandle>;
+        using LiveHalfedgeRange = LiveElementRange<HalfedgeHandle>;
+        using LiveEdgeRange = LiveElementRange<EdgeHandle>;
+        using LiveFaceRange = LiveElementRange<FaceHandle>;
 
         Mesh();
         Mesh(PropertySet& vertices, PropertySet& halfedges, PropertySet& edges, PropertySet& faces, size_t &deletedVertices, size_t &deletedEdges, size_t &deletedFaces) noexcept;
@@ -124,6 +128,42 @@ export namespace Geometry::HalfedgeMesh
         [[nodiscard]] bool IsDeleted(HalfedgeHandle h) const { return m_EDeleted[Edge(h)]; }
         [[nodiscard]] bool IsDeleted(EdgeHandle e) const { return m_EDeleted[e]; }
         [[nodiscard]] bool IsDeleted(FaceHandle f) const { return m_FDeleted[f]; }
+
+        [[nodiscard]] LiveVertexRange LiveVertices() const
+        {
+            const std::size_t offset = m_IsSubmeshView ? m_VertexRange.Offset : 0u;
+            return LiveVertexRange(offset, VerticesSize(), [this](VertexHandle v)
+            {
+                return v.Index >= m_Vertices.Size() || IsDeleted(v);
+            });
+        }
+
+        [[nodiscard]] LiveHalfedgeRange LiveHalfedges() const
+        {
+            const std::size_t offset = m_IsSubmeshView ? m_EdgeRange.Offset * 2u : 0u;
+            return LiveHalfedgeRange(offset, HalfedgesSize(), [this](HalfedgeHandle h)
+            {
+                return h.Index >= m_Halfedges.Size() || IsDeleted(h);
+            });
+        }
+
+        [[nodiscard]] LiveEdgeRange LiveEdges() const
+        {
+            const std::size_t offset = m_IsSubmeshView ? m_EdgeRange.Offset : 0u;
+            return LiveEdgeRange(offset, EdgesSize(), [this](EdgeHandle e)
+            {
+                return e.Index >= m_Edges.Size() || IsDeleted(e);
+            });
+        }
+
+        [[nodiscard]] LiveFaceRange LiveFaces() const
+        {
+            const std::size_t offset = m_IsSubmeshView ? m_FaceRange.Offset : 0u;
+            return LiveFaceRange(offset, FacesSize(), [this](FaceHandle f)
+            {
+                return f.Index >= m_Faces.Size() || IsDeleted(f);
+            });
+        }
 
         // Connectivity access
         [[nodiscard]] HalfedgeHandle Halfedge(VertexHandle v) const { return m_VConn[v].Halfedge; }
@@ -244,6 +284,27 @@ export namespace Geometry::HalfedgeMesh
 
         // Check whether flipping edge e is topologically valid.
         [[nodiscard]] bool IsFlipOk(EdgeHandle e) const;
+
+        // Fan-triangulate a polygonal face in-place. Triangles are emitted as
+        // (v0, vi, vi+1). Returns the number of triangles emitted, or nullopt
+        // if the face is invalid, deleted, or cannot be rebuilt.
+        [[nodiscard]] std::optional<std::size_t> Triangulate(FaceHandle f);
+
+        // Conservative vertex-removal predicate used by cleanup utilities.
+        [[nodiscard]] bool IsRemovalOk(VertexHandle v) const;
+
+        // Intrinsic in-circle/Delaunay test for an interior triangle edge.
+        // Boundary/non-triangle/degenerate edges fail closed to true.
+        [[nodiscard]] bool IsDelaunay(EdgeHandle e) const;
+
+        // Flip an interior edge only when IsDelaunay(e) is false.
+        [[nodiscard]] bool DelaunayFlip(EdgeHandle e);
+
+        // Edge length accessor for the canonical e:length property surface.
+        [[nodiscard]] double EdgeLength(EdgeHandle e) const;
+
+        // Recomputes and publishes the canonical per-edge length cache.
+        [[nodiscard]] EdgeProperty<double> UpdateEdgeLengths(std::string_view name = "e:length");
 
         [[nodiscard]] bool HasGarbage() const noexcept { return m_DeletedVertices > 0u || m_DeletedEdges > 0u || m_DeletedFaces > 0u; }
 

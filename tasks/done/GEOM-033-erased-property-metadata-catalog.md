@@ -17,6 +17,11 @@ depends_on: [GEOM-027, GEOM-030, GEOM-032]
 - No new dependency from `src/geometry` to higher layers.
 
 ## Context
+- Status: done.
+- Owner/agent: Codex.
+- Completed: 2026-06-28.
+- Commit: this commit (`Migrate geometry property and topology utilities`).
+- Maturity: `CPUContracted`.
 - Owning subsystem/layer: `geometry` (`geometry -> core` only).
 - `PropertySet::Properties()` currently exposes names only, which is enough for
   simple enumeration but not enough for runtime/UI binding, debug inspectors, or
@@ -35,49 +40,49 @@ depends_on: [GEOM-027, GEOM-030, GEOM-032]
   consume the catalog in their own scopes.
 
 ## Required changes
-- [ ] Define an exported descriptor record, such as `PropertyDescriptor`, with
+- [x] Define an exported descriptor record, such as `PropertyDescriptor`, with
       only metadata `Geometry.Properties` can state truthfully today.
-- [ ] Include property name, erased value identity or kind, element count,
+- [x] Include property name, erased value identity or kind, element count,
       mutability/read-only view context, and whether contiguous span/data access
       is supported.
-- [ ] Reuse existing typed storage and type-erasure helpers; do not introduce a
+- [x] Reuse existing typed storage and type-erasure helpers; do not introduce a
       second registry or duplicate per-property metadata state.
-- [ ] Add descriptor enumeration on `PropertySet` and `ConstPropertySet` or an
+- [x] Add descriptor enumeration on `PropertySet` and `ConstPropertySet` or an
       equivalent borrowed const catalog path.
-- [ ] Keep typed lookup as the authority for reading/writing values; descriptors
+- [x] Keep typed lookup as the authority for reading/writing values; descriptors
       are for inspection and binding decisions only.
 
 ## Tests
-- [ ] Add `unit;geometry` tests for descriptor enumeration on an empty property
+- [x] Add `unit;geometry` tests for descriptor enumeration on an empty property
       set.
-- [ ] Add descriptor tests for at least `float`, `glm::vec3`, and `bool`
+- [x] Add descriptor tests for at least `float`, `glm::vec3`, and `bool`
       properties.
-- [ ] Add tests proving descriptor enumeration through a const view cannot hand
+- [x] Add tests proving descriptor enumeration through a const view cannot hand
       out mutable storage.
-- [ ] Add tests that descriptor counts and names stay stable after adding
+- [x] Add tests that descriptor counts and names stay stable after adding
       multiple properties.
 
 ## Docs
-- [ ] Update
-      [`docs/architecture/geometry-api-style.md`](../../../docs/architecture/geometry-api-style.md)
+- [x] Update
+      [`docs/architecture/geometry-api-style.md`](../../docs/architecture/geometry-api-style.md)
       with the descriptor/canonical typed-access relationship.
-- [ ] Update
-      [`docs/architecture/geometry.md`](../../../docs/architecture/geometry.md)
+- [x] Update
+      [`docs/architecture/geometry.md`](../../docs/architecture/geometry.md)
       with the property catalog contract.
-- [ ] Update higher-layer architecture docs only to point at the geometry-owned
+- [x] Update higher-layer architecture docs only to point at the geometry-owned
       catalog contract; do not document unimplemented runtime/UI bindings here.
-- [ ] Regenerate
-      [`docs/api/generated/module_inventory.md`](../../../docs/api/generated/module_inventory.md)
+- [x] Regenerate
+      [`docs/api/generated/module_inventory.md`](../../docs/api/generated/module_inventory.md)
       because this changes the exported module surface.
 
 ## Acceptance criteria
-- [ ] Callers can enumerate property descriptors without knowing the concrete
+- [x] Callers can enumerate property descriptors without knowing the concrete
       value type at compile time.
-- [ ] Descriptors expose enough information to decide whether typed lookup,
+- [x] Descriptors expose enough information to decide whether typed lookup,
       const lookup, or contiguous span/data access is legal.
-- [ ] Descriptor enumeration does not duplicate storage state and does not
+- [x] Descriptor enumeration does not duplicate storage state and does not
       weaken const-correctness.
-- [ ] The change preserves `geometry -> core` layering.
+- [x] The change preserves `geometry -> core` layering.
 
 ## Verification
 ```bash

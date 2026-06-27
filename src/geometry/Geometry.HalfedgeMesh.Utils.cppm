@@ -10,6 +10,7 @@ export module Geometry.HalfedgeMesh.Utils;
 
 import Geometry.Properties;
 import Geometry.HalfedgeMesh;
+import Geometry.MeshClosestFace;
 
 export namespace Geometry::MeshUtils
 {
@@ -202,6 +203,20 @@ export namespace Geometry::MeshUtils
         std::vector<uint32_t>& indices,
         std::vector<glm::vec4>* aux = nullptr,
         std::vector<uint32_t>* triangleFaceIds = nullptr);
+
+    // --- Topology utility surfaces ---
+
+    [[nodiscard]] std::optional<HalfedgeMesh::Mesh> Dual(const HalfedgeMesh::Mesh& mesh);
+
+    // Builds a GL_TRIANGLES_ADJACENCY-style index buffer: six indices per
+    // triangle. Boundary edges encode adjacency with the triangle's own
+    // opposite vertex so the buffer remains deterministic and finite.
+    [[nodiscard]] std::optional<std::vector<std::uint32_t>> BuildTriangleAdjacencyIndices(
+        const HalfedgeMesh::Mesh& mesh);
+
+    [[nodiscard]] MeshClosestFaceResult NearestFace(
+        const HalfedgeMesh::Mesh& mesh,
+        glm::vec3 point);
 
     // --- Edge Loop / Edge Ring selection ---
 

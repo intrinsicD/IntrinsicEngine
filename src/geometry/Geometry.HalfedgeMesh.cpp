@@ -2,8 +2,13 @@ module;
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <cstddef>
 #include <memory>
+#include <numbers>
+#include <optional>
+#include <string>
+#include <string_view>
 #include <vector>
 #include <span>
 
@@ -774,10 +779,10 @@ namespace Geometry::HalfedgeMesh
 
     void Mesh::FreeMemory()
     {
-        m_Vertices.Shrink_to_fit();
-        m_Halfedges.Shrink_to_fit();
-        m_Edges.Shrink_to_fit();
-        m_Faces.Shrink_to_fit();
+        m_Vertices.ShrinkToFit();
+        m_Halfedges.ShrinkToFit();
+        m_Edges.ShrinkToFit();
+        m_Faces.ShrinkToFit();
     }
 
     void Mesh::Reserve(std::size_t nVertices, std::size_t nEdges, std::size_t nFaces)
@@ -1080,13 +1085,13 @@ namespace Geometry::HalfedgeMesh
         m_Faces.Remove(fmap);
 
         m_Vertices.Resize(nv);
-        m_Vertices.Shrink_to_fit();
+        m_Vertices.ShrinkToFit();
         m_Halfedges.Resize(nh);
-        m_Halfedges.Shrink_to_fit();
+        m_Halfedges.ShrinkToFit();
         m_Edges.Resize(ne);
-        m_Edges.Shrink_to_fit();
+        m_Edges.ShrinkToFit();
         m_Faces.Resize(nf);
-        m_Faces.Shrink_to_fit();
+        m_Faces.ShrinkToFit();
 
         m_DeletedVertices = m_DeletedEdges = m_DeletedFaces = 0;
     }
@@ -1215,6 +1220,100 @@ namespace Geometry::HalfedgeMesh
         if (Valence(va) <= 3 || Valence(vb) <= 3) return false;
 
         return true;
+    }
+
+    std::optional<std::size_t> Mesh::Triangulate(FaceHandle f)
+    {
+        if (!f.IsValid() || !IsValid(f) || IsDeleted(f)) return std::nullopt;
+
+        std::vector<VertexHandle> vertices;
+        for (const VertexHandle v : VerticesAroundFace(f))
+        {
+            if (!v.IsValid() || !IsValid(v) || IsDeleted(v)) return std::nullopt;
+            vertices.push_back(v);
+        }
+
+        if (vertices.size() < 3) return std::nullopt;
+        if (vertices.size() == 3) return 1u;
+
+        DeleteFace(f);
+        std::size_t emitted = 0;
+        for (std::size_t i = 1; i + 1 < vertices.size(); ++i)
+        {
+            if (!AddTriangle(vertices[0], vertices[i], vertices[i + 1]).has_value())
+            {
+                return std::nullopt;
+            }
+            ++emitted;
+        }
+        return emitted;
+    }
+
+    bool Mesh::IsRemovalOk(VertexHandle v) const
+    {
+        if (!v.IsValid() || !IsValid(v) || IsDeleted(v) || IsIsolated(v)) return false;
+        if (IsBoundary(v)) return false;
+        return Valence(v) >= 3;
+    }
+
+    namespace
+    {
+        [[nodiscard]] double SafeAngle(const glm::vec3 a, const glm::vec3 b, const glm::vec3 c)
+        {
+            const glm::vec3 u = a - b;
+            const glm::vec3 v = c - b;
+            const double lu = glm::length(u);
+            const double lv = glm::length(v);
+            if (lu <= 1.0e-12 || lv <= 1.0e-12) return 0.0;
+            const double cosine = std::clamp(static_cast<double>(glm::dot(u, v)) / (lu * lv), -1.0, 1.0);
+            return std::acos(cosine);
+        }
+    }
+
+    bool Mesh::IsDelaunay(EdgeHandle e) const
+    {
+        if (!e.IsValid() || !IsValid(e) || IsDeleted(e) || IsBoundary(e)) return true;
+
+        const HalfedgeHandle h0 = Halfedge(e, 0);
+        const HalfedgeHandle h1 = Halfedge(e, 1);
+        if (IsBoundary(h0) || IsBoundary(h1)) return true;
+
+        const FaceHandle f0 = Face(h0);
+        const FaceHandle f1 = Face(h1);
+        if (!f0.IsValid() || !f1.IsValid() || Valence(f0) != 3 || Valence(f1) != 3) return true;
+
+        const VertexHandle a = FromVertex(h0);
+        const VertexHandle b = ToVertex(h0);
+        const VertexHandle c = ToVertex(NextHalfedge(h0));
+        const VertexHandle d = ToVertex(NextHalfedge(h1));
+        const double angleC = SafeAngle(Position(a), Position(c), Position(b));
+        const double angleD = SafeAngle(Position(a), Position(d), Position(b));
+        return angleC + angleD <= std::numbers::pi + 1.0e-10;
+    }
+
+    bool Mesh::DelaunayFlip(EdgeHandle e)
+    {
+        if (IsDelaunay(e)) return false;
+        return Flip(e);
+    }
+
+    double Mesh::EdgeLength(EdgeHandle e) const
+    {
+        if (!e.IsValid() || !IsValid(e) || IsDeleted(e)) return 0.0;
+        const HalfedgeHandle h = Halfedge(e, 0);
+        const glm::vec3 d = Position(FromVertex(h)) - Position(ToVertex(h));
+        const double length = glm::length(d);
+        return std::isfinite(length) ? length : 0.0;
+    }
+
+    EdgeProperty<double> Mesh::UpdateEdgeLengths(std::string_view name)
+    {
+        EdgeProperty<double> lengths(m_Edges.GetOrAdd<double>(std::string{name}, 0.0));
+        for (const EdgeHandle edge : LiveEdges())
+        {
+            lengths[edge] = EdgeLength(edge);
+        }
+        return lengths;
     }
 
     // =========================================================================

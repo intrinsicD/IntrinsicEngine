@@ -168,7 +168,7 @@ export namespace Geometry::Grid
         }
 
         template <class T>
-        [[nodiscard]] Property<T> GetProperty(std::string_view name) const
+        [[nodiscard]] ConstProperty<T> GetProperty(std::string_view name) const
         {
             return m_Cells.Get<T>(name);
         }
@@ -332,7 +332,7 @@ export namespace Geometry::Grid
         }
 
         template <class T>
-        [[nodiscard]] Property<T> GetProperty(std::string_view name) const
+        [[nodiscard]] ConstProperty<T> GetProperty(std::string_view name) const
         {
             return m_Cells.Get<T>(name);
         }
