@@ -245,6 +245,18 @@ namespace Geometry::Linalg
         return ConstEigenDenseMap(values.data(), static_cast<Eigen::Index>(rows), static_cast<Eigen::Index>(cols));
     }
 
+    EigenDenseMap MapVec3Array(std::span<glm::dvec3> values)
+    {
+        return EigenDenseMap(reinterpret_cast<double*>(values.data()),
+                             static_cast<Eigen::Index>(values.size()), 3);
+    }
+
+    ConstEigenDenseMap MapVec3Array(std::span<const glm::dvec3> values)
+    {
+        return ConstEigenDenseMap(reinterpret_cast<const double*>(values.data()),
+                                  static_cast<Eigen::Index>(values.size()), 3);
+    }
+
     SVDResult ComputeSVD(const DenseMatrix& matrix, double tolerance)
     {
         SVDResult result;

@@ -139,6 +139,13 @@ export namespace Geometry::Linalg
                                                        std::size_t rows,
                                                        std::size_t cols);
 
+    // View a contiguous array of glm::dvec3 as an N x 3 row-major Eigen matrix
+    // without copying (glm::dvec3 is three tightly-packed doubles). The caller
+    // owns the storage and must keep it alive for the lifetime of the map. An
+    // empty span yields a 0 x 3 map.
+    [[nodiscard]] EigenDenseMap MapVec3Array(std::span<glm::dvec3> values);
+    [[nodiscard]] ConstEigenDenseMap MapVec3Array(std::span<const glm::dvec3> values);
+
     [[nodiscard]] SVDResult ComputeSVD(const DenseMatrix& matrix, double tolerance = 1e-12);
     [[nodiscard]] QRResult ComputeQR(const DenseMatrix& matrix, double tolerance = 1e-12);
     [[nodiscard]] SymmetricEigenResult ComputeSymmetricEigen(const DenseMatrix& matrix, double tolerance = 1e-12);
