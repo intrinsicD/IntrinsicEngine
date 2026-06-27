@@ -406,6 +406,7 @@ endif()
 set(_geometry_test_files
     Test_Statistics.cpp
     Test_RobustKernels.cpp
+    Test_Curve.cpp
     Test_RuntimeGeometry.cpp
     Test.GeometryIO.cpp
     Test_RuntimeGraph.cpp

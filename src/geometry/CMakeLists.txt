@@ -12,6 +12,7 @@ target_sources(${target_name}
         Geometry.Containment.cppm
         Geometry.ConvexHull.cppm
         Geometry.ConvexHullBuilder.cppm
+        Geometry.Curve.cppm
         Geometry.Cylinder.cppm
         Geometry.DomainViews.cppm
         Geometry.EPA.cppm
@@ -100,6 +101,7 @@ target_sources(${target_name}
         Geometry.Containment.cpp
         Geometry.ConvexHull.cpp
         Geometry.ConvexHullBuilder.cpp
+        Geometry.Curve.cpp
         Geometry.Cylinder.cpp
         Geometry.DomainViews.cpp
         Geometry.Ellipsoid.cpp
