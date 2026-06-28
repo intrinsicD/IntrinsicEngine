@@ -2618,3 +2618,16 @@ contract tests cover agent/CLI control without UI frames, boot-only rejection,
 invalid-hot-file preservation, and editor/agent preview parity; the default
 CPU-supported gate is green. This satisfies the `RUNTIME-131` dependency for
 `RUNTIME-134`.
+
+[`UI-022`](UI-022-sandbox-editor-vertex-normal-recompute.md) — Sandbox
+EditorUI vertex-normal recompute windows retired to `tasks/done/` on
+2026-06-28 at `CPUContracted`. Mesh, graph, and point-cloud
+`Processing > Vertices > Normals` windows now route through runtime-owned
+command/result DTOs that call `Geometry.HalfedgeMesh.Vertices.Normals`,
+`Geometry.Graph.Vertex.Normals`, and `Geometry.PointCloud.Normals` rather than
+UI-owned algorithms. Successful commands publish count-matched canonical
+`v:normal`, stamp `DirtyVertexNormals`, and mark editor history dirty; invalid
+targets, invalid settings, and typed `v:normal` conflicts fail closed without
+touching unrelated properties or renderer/RHI state. Focused geometry,
+runtime-editor, and dirty-tag extraction tests passed, and K-Means processing
+capability coverage remains green.

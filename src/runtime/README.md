@@ -103,25 +103,29 @@ renderer, RHI, file IO, or scene persistence mutation itself. Draft states are
 explicit across inactive, debounced, validated, rejected, previewed, activated,
 and canceled outcomes, so stale or invalid recipes fail closed in the UI model.
 
-### Sandbox Editor Mesh Vertex Normals
+### Sandbox Editor Vertex Normals
 
-`UI-022` adds the first normal-recompute editor command as the mesh vertex
-path `Mesh > Processing > Vertices > Normals`. The Sandbox EditorUI surface
-exports `SandboxEditorMeshVertexNormalsCommand`,
-`SandboxEditorMeshVertexNormalsResult`, and
-`ApplySandboxEditorMeshVertexNormalsCommand(...)`. The command validates a live
-selected mesh `GeometrySources` entity, rebuilds the geometry-owned halfedge
-mesh contract, calls `Geometry.HalfedgeMesh.Vertices.Normals`, and publishes
-count-matched `glm::vec3` normals to canonical `v:normal`. Successful
-publication stamps `DirtyVertexAttributes` and marks editor history dirty; it
-does not call renderer/RHI upload APIs or stamp broad `GpuDirty`. Mesh
-residency extraction consumes the dirty attribute tag and performs the deferred
-GPU reupload on the next extraction opportunity. If a direct mesh import's
-deferred materialization applies after the edit, runtime preserves
+`UI-022` adds normal-recompute editor commands at
+`Mesh > Processing > Vertices > Normals`,
+`Graph > Processing > Vertices > Normals`, and
+`PointCloud > Processing > Vertices > Normals`. The Sandbox EditorUI surface
+exports per-domain command/result pairs:
+`SandboxEditorMeshVertexNormalsCommand`,
+`SandboxEditorGraphVertexNormalsCommand`, and
+`SandboxEditorPointCloudVertexNormalsCommand`, with matching
+`ApplySandboxEditor*VertexNormalsCommand(...)` helpers. The commands validate a
+live selected `GeometrySources` entity, call the domain-owned geometry modules
+from `GEOM-026` (`Geometry.HalfedgeMesh.Vertices.Normals`,
+`Geometry.Graph.Vertex.Normals`, or `Geometry.PointCloud.Normals`), and publish
+count-matched `glm::vec3` normals to canonical `v:normal` only after the
+geometry result succeeds. Successful publication stamps the precise
+`DirtyVertexNormals` tag and marks editor history dirty; it does not call
+renderer/RHI upload APIs or stamp broad `GpuDirty`. Mesh, graph, and
+point-cloud residency extraction consume that dirty tag and perform deferred
+normal-channel reupload on the next extraction opportunity. If a direct mesh
+import's deferred materialization applies after an edit, runtime preserves
 count-matched current `v:normal` values so editor-authored normals remain the
-CPU authority. The remaining graph and point-cloud normal windows are UI-022
-work that consumes the already-retired `Geometry.Graph.Vertex.Normals` and
-`Geometry.PointCloud.Normals` modules from `GEOM-026`.
+CPU authority.
 
 ### Sandbox Editor Vertex Channel Bindings
 

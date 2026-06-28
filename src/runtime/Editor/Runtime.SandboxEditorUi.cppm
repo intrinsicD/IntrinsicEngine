@@ -46,7 +46,9 @@ import Extrinsic.Runtime.VertexChannelBindings;
     import Extrinsic.Runtime.SceneSerialization;
     import Extrinsic.Runtime.SelectedMeshTextureBake;
     import Extrinsic.Runtime.SelectionController;
+    import Geometry.Graph.Vertex.Normals;
     import Geometry.HalfedgeMesh.Vertices.Normals;
+    import Geometry.PointCloud.Normals;
     import Geometry.UvAtlas;
 
 namespace Extrinsic::Runtime::Detail
@@ -374,6 +376,96 @@ export namespace Extrinsic::Runtime
         std::size_t FallbackVertexCount{0};
         std::size_t SkippedDeletedFaceCount{0};
         std::size_t SkippedDeletedVertexCount{0};
+        bool FallbackNormalWasRepaired{false};
+        Core::ErrorCode Error{Core::ErrorCode::Success};
+        std::string Message{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == SandboxEditorCommandStatus::Applied;
+        }
+    };
+
+    struct SandboxEditorGraphVertexNormalsCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        glm::vec3 FallbackNormal{0.0f, 0.0f, 1.0f};
+        double DegenerateNormalLengthEpsilon{1.0e-12};
+        double CollinearEigenvalueRatioEpsilon{1.0e-5};
+        bool OrientTowardFallback{true};
+    };
+
+    struct SandboxEditorGraphVertexNormalsResult
+    {
+        SandboxEditorCommandStatus Status{SandboxEditorCommandStatus::NoChange};
+        Geometry::Graph::VertexNormals::RecomputeStatus NormalStatus{
+            Geometry::Graph::VertexNormals::RecomputeStatus::Success};
+        bool OrientTowardFallback{true};
+        std::size_t VertexSlotCount{0};
+        std::size_t EdgeSlotCount{0};
+        std::size_t WrittenCount{0};
+        std::size_t ValidNormalVertexCount{0};
+        std::size_t FallbackVertexCount{0};
+        std::size_t IsolatedVertexCount{0};
+        std::size_t DegreeOneVertexCount{0};
+        std::size_t CollinearNeighborhoodCount{0};
+        std::size_t DuplicatePositionCount{0};
+        std::size_t NonFinitePositionCount{0};
+        std::size_t InvalidEdgeCount{0};
+        std::size_t SkippedDeletedVertexCount{0};
+        std::size_t SkippedDeletedEdgeCount{0};
+        bool FallbackNormalWasRepaired{false};
+        Core::ErrorCode Error{Core::ErrorCode::Success};
+        std::string Message{};
+
+        [[nodiscard]] bool Succeeded() const noexcept
+        {
+            return Status == SandboxEditorCommandStatus::Applied;
+        }
+    };
+
+    struct SandboxEditorPointCloudVertexNormalsCommand
+    {
+        std::uint32_t StableEntityId{0u};
+        std::uint32_t KNeighbors{15u};
+        std::uint32_t MinimumNeighbors{2u};
+        bool UseRadiusSearch{false};
+        float Radius{0.0f};
+        Geometry::PointCloud::Normals::OrientationMode Orientation{
+            Geometry::PointCloud::Normals::OrientationMode::MinimumSpanningTree};
+        glm::vec3 FallbackNormal{0.0f, 0.0f, 1.0f};
+        double DegenerateNormalLengthEpsilon{1.0e-12};
+        double CollinearEigenvalueRatioEpsilon{1.0e-5};
+    };
+
+    struct SandboxEditorPointCloudVertexNormalsResult
+    {
+        SandboxEditorCommandStatus Status{SandboxEditorCommandStatus::NoChange};
+        Geometry::PointCloud::Normals::RecomputeStatus NormalStatus{
+            Geometry::PointCloud::Normals::RecomputeStatus::Success};
+        Geometry::PointCloud::Normals::NeighborhoodBackend Backend{
+            Geometry::PointCloud::Normals::NeighborhoodBackend::KDTree};
+        Geometry::PointCloud::Normals::OrientationMode Orientation{
+            Geometry::PointCloud::Normals::OrientationMode::MinimumSpanningTree};
+        std::uint32_t KNeighbors{15u};
+        std::uint32_t MinimumNeighbors{2u};
+        bool UseRadiusSearch{false};
+        float Radius{0.0f};
+        std::size_t PointSlotCount{0};
+        std::size_t FinitePointCount{0};
+        std::size_t WrittenCount{0};
+        std::size_t ValidNormalPointCount{0};
+        std::size_t FallbackPointCount{0};
+        std::size_t DegenerateNeighborhoodCount{0};
+        std::size_t TooFewNeighborCount{0};
+        std::size_t CollinearNeighborhoodCount{0};
+        std::size_t DuplicatePositionCount{0};
+        std::size_t NonFinitePointCount{0};
+        std::size_t SkippedDeletedPointCount{0};
+        std::size_t SpatialQueryFailureCount{0};
+        std::size_t FlippedOrientationCount{0};
+        std::size_t KNNVisitedNodeCount{0};
+        std::size_t KNNDistanceEvaluationCount{0};
         bool FallbackNormalWasRepaired{false};
         Core::ErrorCode Error{Core::ErrorCode::Success};
         std::string Message{};
@@ -1356,9 +1448,15 @@ export namespace Extrinsic::Runtime
         std::vector<SandboxEditorGeometryProcessingEntry> Entries{};
         std::vector<SandboxEditorGeometryProcessingDomain> KMeansDomains{};
         bool MeshVertexNormalsAvailable{false};
+        bool GraphVertexNormalsAvailable{false};
+        bool PointCloudVertexNormalsAvailable{false};
         std::optional<SandboxEditorKMeansResult> LastKMeansResult{};
         std::optional<SandboxEditorMeshVertexNormalsResult>
             LastMeshVertexNormalsResult{};
+        std::optional<SandboxEditorGraphVertexNormalsResult>
+            LastGraphVertexNormalsResult{};
+        std::optional<SandboxEditorPointCloudVertexNormalsResult>
+            LastPointCloudVertexNormalsResult{};
         std::vector<SandboxEditorDiagnostic> Diagnostics{};
     };
 
@@ -1431,6 +1529,10 @@ export namespace Extrinsic::Runtime
         const SandboxEditorKMeansResult* LastKMeansResult{nullptr};
         const SandboxEditorMeshVertexNormalsResult*
             LastMeshVertexNormalsResult{nullptr};
+        const SandboxEditorGraphVertexNormalsResult*
+            LastGraphVertexNormalsResult{nullptr};
+        const SandboxEditorPointCloudVertexNormalsResult*
+            LastPointCloudVertexNormalsResult{nullptr};
         const Graphics::RenderGraphFrameStats* RenderGraphStats{nullptr};
         const Graphics::RenderRecipeConfigContext* RenderRecipeContext{nullptr};
         SandboxEditorRenderRecipeEditorState* RenderRecipeEditorState{nullptr};
@@ -1758,6 +1860,16 @@ export namespace Extrinsic::Runtime
         const SandboxEditorContext& context,
         const SandboxEditorMeshVertexNormalsCommand& command);
 
+    SandboxEditorGraphVertexNormalsResult
+    ApplySandboxEditorGraphVertexNormalsCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorGraphVertexNormalsCommand& command);
+
+    SandboxEditorPointCloudVertexNormalsResult
+    ApplySandboxEditorPointCloudVertexNormalsCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorPointCloudVertexNormalsCommand& command);
+
     [[nodiscard]] SandboxEditorRenderRecipeEditorModel
     BuildSandboxEditorRenderRecipeEditorModel(
         const SandboxEditorContext& context);
@@ -1805,6 +1917,10 @@ export namespace Extrinsic::Runtime
         std::optional<SandboxEditorKMeansResult> m_LastKMeansResult{};
         std::optional<SandboxEditorMeshVertexNormalsResult>
             m_LastMeshVertexNormalsResult{};
+        std::optional<SandboxEditorGraphVertexNormalsResult>
+            m_LastGraphVertexNormalsResult{};
+        std::optional<SandboxEditorPointCloudVertexNormalsResult>
+            m_LastPointCloudVertexNormalsResult{};
         Graphics::RenderRecipeConfigContext m_RenderRecipeContext{};
         SandboxEditorRenderRecipeEditorState m_RenderRecipeState{};
         RenderArtifactRegistry m_RenderArtifactRegistry{};
@@ -1817,6 +1933,14 @@ export namespace Extrinsic::Runtime
         bool m_KMeansUseHierarchicalInitialization{true};
         std::int32_t m_MeshVertexNormalsWeighting{1};
         glm::vec3 m_MeshVertexNormalsFallback{0.0f, 1.0f, 0.0f};
+        glm::vec3 m_GraphVertexNormalsFallback{0.0f, 0.0f, 1.0f};
+        bool m_GraphVertexNormalsOrientTowardFallback{true};
+        std::int32_t m_PointCloudVertexNormalsK{15};
+        std::int32_t m_PointCloudVertexNormalsMinimumNeighbors{2};
+        bool m_PointCloudVertexNormalsUseRadius{false};
+        float m_PointCloudVertexNormalsRadius{0.0f};
+        std::int32_t m_PointCloudVertexNormalsOrientation{1};
+        glm::vec3 m_PointCloudVertexNormalsFallback{0.0f, 0.0f, 1.0f};
         std::int32_t m_TextureBakeSourceIndex{0};
         std::int32_t m_TextureBakeTargetSemanticIndex{0};
         std::int32_t m_TextureBakeEncoderIndex{0};

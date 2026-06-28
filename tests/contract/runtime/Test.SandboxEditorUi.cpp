@@ -78,7 +78,9 @@ import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
+import Geometry.Graph.Vertex.Normals;
 import Geometry.HalfedgeMesh.Vertices.Normals;
+import Geometry.PointCloud.Normals;
 import Geometry.Properties;
 import Geometry.UvAtlas;
 
@@ -95,6 +97,8 @@ namespace Graphics = Extrinsic::Graphics;
 namespace Plat = Extrinsic::Platform;
 namespace PN = Extrinsic::ECS::Components::GeometrySources::PropertyNames;
 namespace GN = Geometry::HalfedgeMesh::VertexNormals;
+namespace GVN = Geometry::Graph::VertexNormals;
+namespace PCN = Geometry::PointCloud::Normals;
 
 namespace
 {
@@ -676,6 +680,25 @@ namespace
         raw.emplace<G::RenderPoints>(entity);
     }
 
+    void AddPlanarCycleGraphSource(ECS::Scene::Registry& registry,
+                                   const ECS::EntityHandle entity)
+    {
+        auto& raw = registry.Raw();
+        auto& nodes = raw.emplace<GS::Nodes>(entity);
+        SetNodePositions(nodes,
+                         {
+                             {0.0f, 0.0f, 0.0f},
+                             {1.0f, 0.0f, 0.0f},
+                             {1.0f, 1.0f, 0.0f},
+                             {0.0f, 1.0f, 0.0f},
+                         });
+        auto& edges = raw.emplace<GS::Edges>(entity);
+        SetEdges(edges, {0u, 1u, 2u, 3u}, {1u, 2u, 3u, 0u});
+        raw.emplace<GS::HasGraphTopology>(entity);
+        raw.emplace<G::RenderEdges>(entity);
+        raw.emplace<G::RenderPoints>(entity);
+    }
+
     [[nodiscard]] std::string ReadRepositoryTextFile(
         const std::filesystem::path& relativePath)
     {
@@ -898,6 +921,15 @@ namespace
             EXPECT_NEAR(normals.Vector()[i].y, expected[i].y, 1.0e-5f) << i;
             EXPECT_NEAR(normals.Vector()[i].z, expected[i].z, 1.0e-5f) << i;
         }
+    }
+
+    void ExpectFiniteUnitNormal(const glm::vec3 normal,
+                                const float epsilon = 1.0e-4f)
+    {
+        EXPECT_TRUE(std::isfinite(normal.x));
+        EXPECT_TRUE(std::isfinite(normal.y));
+        EXPECT_TRUE(std::isfinite(normal.z));
+        EXPECT_NEAR(glm::length(normal), 1.0f, epsilon);
     }
 
     struct TmpFile
@@ -1682,6 +1714,9 @@ TEST(SandboxEditorUi, GeometryProcessingSupportedDomainsMatchPromotedEditorContr
         Domain::MeshVertices));
     EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
         normals,
+        Domain::GraphVertices));
+    EXPECT_TRUE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
+        normals,
         Domain::PointCloudPoints));
     EXPECT_FALSE(Runtime::HasAnySandboxEditorGeometryProcessingDomain(
         normals,
@@ -1744,11 +1779,13 @@ TEST(SandboxEditorUi, GeometryProcessingMenusExposeDomainElementSubmenus)
     ASSERT_EQ(graph.size(), 3u);
     EXPECT_EQ(graph[0].Domain, Domain::GraphVertices);
     EXPECT_STREQ(graph[0].Label, "Vertices");
-    EXPECT_FALSE(graph[0].HasNormalsMethod);
+    EXPECT_TRUE(graph[0].HasNormalsMethod);
     EXPECT_EQ(graph[1].Domain, Domain::GraphEdges);
     EXPECT_STREQ(graph[1].Label, "Edges");
+    EXPECT_FALSE(graph[1].HasNormalsMethod);
     EXPECT_EQ(graph[2].Domain, Domain::GraphHalfedges);
     EXPECT_STREQ(graph[2].Label, "Halfedges");
+    EXPECT_FALSE(graph[2].HasNormalsMethod);
 
     const std::vector<Runtime::SandboxEditorGeometryProcessingMenuItem> cloud =
         Runtime::GetSandboxEditorGeometryProcessingMenuItems(
@@ -1756,7 +1793,7 @@ TEST(SandboxEditorUi, GeometryProcessingMenusExposeDomainElementSubmenus)
     ASSERT_EQ(cloud.size(), 1u);
     EXPECT_EQ(cloud[0].Domain, Domain::PointCloudPoints);
     EXPECT_STREQ(cloud[0].Label, "Vertices");
-    EXPECT_FALSE(cloud[0].HasNormalsMethod);
+    EXPECT_TRUE(cloud[0].HasNormalsMethod);
 }
 
 TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntries)
@@ -1813,6 +1850,8 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
             context,
             Runtime::SandboxEditorDomainWindowKind::Mesh);
     EXPECT_TRUE(meshModel.Processing.MeshVertexNormalsAvailable);
+    EXPECT_FALSE(meshModel.Processing.GraphVertexNormalsAvailable);
+    EXPECT_FALSE(meshModel.Processing.PointCloudVertexNormalsAvailable);
 
     const ECS::EntityHandle graph = MakeSelectable(registry, "Graph");
     AddGraphSource(registry, graph);
@@ -1833,13 +1872,22 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
         Domain::MeshVertices));
     const std::vector<Runtime::SandboxEditorGeometryProcessingEntry> graphEntries =
         Runtime::ResolveSandboxEditorGeometryProcessingEntries(registry, graph);
-    ASSERT_EQ(graphEntries.size(), 2u);
+    ASSERT_EQ(graphEntries.size(), 3u);
     EXPECT_EQ(graphEntries[0].Algorithm, Algorithm::KMeans);
-    EXPECT_EQ(graphEntries[1].Algorithm, Algorithm::ShortestPath);
+    EXPECT_EQ(graphEntries[1].Algorithm, Algorithm::NormalEstimation);
+    EXPECT_EQ(graphEntries[2].Algorithm, Algorithm::ShortestPath);
     const std::vector<Domain> graphKMeans =
         Runtime::GetAvailableSandboxEditorKMeansDomains(registry, graph);
     ASSERT_EQ(graphKMeans.size(), 1u);
     EXPECT_EQ(graphKMeans[0], Domain::GraphVertices);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, graph));
+    const Runtime::SandboxEditorDomainWindowModel graphModel =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::Graph);
+    EXPECT_FALSE(graphModel.Processing.MeshVertexNormalsAvailable);
+    EXPECT_TRUE(graphModel.Processing.GraphVertexNormalsAvailable);
+    EXPECT_FALSE(graphModel.Processing.PointCloudVertexNormalsAvailable);
 
     const ECS::EntityHandle cloud = MakeSelectable(registry, "Cloud");
     AddPointCloudSource(registry, cloud, 5u);
@@ -1863,6 +1911,14 @@ TEST(SandboxEditorUi, GeometrySourcesReportProcessingCapabilitiesAndStableEntrie
         Runtime::GetAvailableSandboxEditorKMeansDomains(registry, cloud);
     ASSERT_EQ(cloudKMeans.size(), 1u);
     EXPECT_EQ(cloudKMeans[0], Domain::PointCloudPoints);
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
+    const Runtime::SandboxEditorDomainWindowModel cloudModel =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::PointCloud);
+    EXPECT_FALSE(cloudModel.Processing.MeshVertexNormalsAvailable);
+    EXPECT_FALSE(cloudModel.Processing.GraphVertexNormalsAvailable);
+    EXPECT_TRUE(cloudModel.Processing.PointCloudVertexNormalsAvailable);
 
     const ECS::EntityHandle empty = MakeSelectable(registry, "Empty");
     const Runtime::SandboxEditorGeometryProcessingCapabilities emptyCaps =
@@ -2404,6 +2460,277 @@ TEST(SandboxEditorUi, MeshVertexNormalsCommandFailsClosedForInvalidTargets)
     EXPECT_TRUE(HasDiagnostic(
         model.Processing.Diagnostics,
         Runtime::SandboxEditorDiagnosticCode::GeometryProcessingFailed));
+}
+
+TEST(SandboxEditorUi, GraphAndPointCloudVertexNormalsCommandsPublishCanonicalNormals)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::EditorCommandHistory history;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+    context.CommandHistory = &history;
+
+    const ECS::EntityHandle graph = MakeSelectable(registry, "NormalGraph");
+    AddPlanarCycleGraphSource(registry, graph);
+    const std::uint32_t graphStableId =
+        Runtime::SelectionController::ToStableEntityId(graph);
+
+    const Runtime::SandboxEditorGraphVertexNormalsResult graphResult =
+        Runtime::ApplySandboxEditorGraphVertexNormalsCommand(
+            context,
+            Runtime::SandboxEditorGraphVertexNormalsCommand{
+                .StableEntityId = graphStableId,
+                .FallbackNormal = glm::vec3{0.0f, 0.0f, 1.0f},
+                .OrientTowardFallback = true,
+            });
+
+    ASSERT_TRUE(graphResult.Succeeded()) << graphResult.Message;
+    EXPECT_EQ(graphResult.NormalStatus, GVN::RecomputeStatus::Success);
+    EXPECT_EQ(graphResult.VertexSlotCount, 4u);
+    EXPECT_EQ(graphResult.EdgeSlotCount, 4u);
+    EXPECT_EQ(graphResult.WrittenCount, 4u);
+    EXPECT_EQ(graphResult.ValidNormalVertexCount, 4u);
+    EXPECT_EQ(graphResult.InvalidEdgeCount, 0u);
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(graph));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(graph));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(graph));
+
+    auto graphNormals = registry.Raw()
+                            .get<GS::Nodes>(graph)
+                            .Properties.Get<glm::vec3>(PN::kNormal);
+    ASSERT_TRUE(graphNormals);
+    ASSERT_EQ(graphNormals.Vector().size(), 4u);
+    for (const glm::vec3 normal : graphNormals.Vector())
+    {
+        ExpectFiniteUnitNormal(normal);
+        EXPECT_GT(normal.z, 0.9f);
+    }
+
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, graph));
+    context.LastGraphVertexNormalsResult = &graphResult;
+    const Runtime::SandboxEditorDomainWindowModel graphModel =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::Graph);
+    ASSERT_TRUE(graphModel.Processing.GraphVertexNormalsAvailable);
+    ASSERT_TRUE(graphModel.Processing.LastGraphVertexNormalsResult.has_value());
+    EXPECT_TRUE(
+        graphModel.Processing.LastGraphVertexNormalsResult->Succeeded());
+    EXPECT_EQ(
+        graphModel.Processing.LastGraphVertexNormalsResult->WrittenCount,
+        4u);
+
+    const ECS::EntityHandle cloud = MakeSelectable(registry, "NormalCloud");
+    AddPointCloudSource(registry, cloud, 9u);
+    SetPositions(registry.Raw().get<GS::Vertices>(cloud),
+                 {
+                     {-1.0f, -1.0f, 0.0f},
+                     {0.0f, -1.0f, 0.0f},
+                     {1.0f, -1.0f, 0.0f},
+                     {-1.0f, 0.0f, 0.0f},
+                     {0.0f, 0.0f, 0.0f},
+                     {1.0f, 0.0f, 0.0f},
+                     {-1.0f, 1.0f, 0.0f},
+                     {0.0f, 1.0f, 0.0f},
+                     {1.0f, 1.0f, 0.0f},
+                 });
+    auto deletedPoints = registry.Raw()
+                             .get<GS::Vertices>(cloud)
+                             .Properties.GetOrAdd<bool>("p:deleted", false);
+    ASSERT_EQ(deletedPoints.Vector().size(), 9u);
+    deletedPoints.Vector()[8] = true;
+    const std::uint32_t cloudStableId =
+        Runtime::SelectionController::ToStableEntityId(cloud);
+
+    const Runtime::SandboxEditorPointCloudVertexNormalsResult cloudResult =
+        Runtime::ApplySandboxEditorPointCloudVertexNormalsCommand(
+            context,
+            Runtime::SandboxEditorPointCloudVertexNormalsCommand{
+                .StableEntityId = cloudStableId,
+                .KNeighbors = 4u,
+                .MinimumNeighbors = 2u,
+                .UseRadiusSearch = false,
+                .Orientation = PCN::OrientationMode::MinimumSpanningTree,
+                .FallbackNormal = glm::vec3{0.0f, 0.0f, 1.0f},
+            });
+
+    ASSERT_TRUE(cloudResult.Succeeded()) << cloudResult.Message;
+    EXPECT_EQ(cloudResult.NormalStatus, PCN::RecomputeStatus::Success);
+    EXPECT_EQ(cloudResult.Backend, PCN::NeighborhoodBackend::KDTree);
+    EXPECT_EQ(cloudResult.PointSlotCount, 9u);
+    EXPECT_EQ(cloudResult.WrittenCount, 8u);
+    EXPECT_EQ(cloudResult.SkippedDeletedPointCount, 1u);
+    EXPECT_EQ(cloudResult.KNeighbors, 4u);
+    EXPECT_EQ(cloudResult.MinimumNeighbors, 2u);
+    EXPECT_TRUE(registry.Raw().all_of<Dirty::DirtyVertexNormals>(cloud));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::DirtyVertexAttributes>(cloud));
+    EXPECT_FALSE(registry.Raw().all_of<Dirty::GpuDirty>(cloud));
+
+    auto cloudNormals = registry.Raw()
+                            .get<GS::Vertices>(cloud)
+                            .Properties.Get<glm::vec3>(PN::kNormal);
+    ASSERT_TRUE(cloudNormals);
+    ASSERT_EQ(cloudNormals.Vector().size(), 9u);
+    for (const glm::vec3 normal : cloudNormals.Vector())
+    {
+        ExpectFiniteUnitNormal(normal);
+        EXPECT_GT(normal.z, 0.5f);
+    }
+
+    ASSERT_TRUE(selection.SetSelectedEntity(registry, cloud));
+    context.LastGraphVertexNormalsResult = nullptr;
+    context.LastPointCloudVertexNormalsResult = &cloudResult;
+    const Runtime::SandboxEditorDomainWindowModel cloudModel =
+        Runtime::BuildSandboxEditorDomainWindowModel(
+            context,
+            Runtime::SandboxEditorDomainWindowKind::PointCloud);
+    ASSERT_TRUE(cloudModel.Processing.PointCloudVertexNormalsAvailable);
+    ASSERT_TRUE(
+        cloudModel.Processing.LastPointCloudVertexNormalsResult.has_value());
+    EXPECT_TRUE(
+        cloudModel.Processing.LastPointCloudVertexNormalsResult->Succeeded());
+    EXPECT_EQ(
+        cloudModel.Processing.LastPointCloudVertexNormalsResult->WrittenCount,
+        8u);
+    EXPECT_EQ(cloudModel.Processing.LastPointCloudVertexNormalsResult
+                  ->SkippedDeletedPointCount,
+              1u);
+    EXPECT_TRUE(history.IsDirty());
+}
+
+TEST(SandboxEditorUi, GraphAndPointCloudVertexNormalsCommandsFailClosedForInvalidTargets)
+{
+    ECS::Scene::Registry registry;
+    Runtime::SelectionController selection;
+    Runtime::SandboxEditorContext context = MakeContext(registry, selection);
+
+    const Runtime::SandboxEditorGraphVertexNormalsResult missingGraphScene =
+        Runtime::ApplySandboxEditorGraphVertexNormalsCommand(
+            Runtime::SandboxEditorContext{},
+            Runtime::SandboxEditorGraphVertexNormalsCommand{
+                .StableEntityId = 1u,
+            });
+    EXPECT_EQ(missingGraphScene.Status,
+              Runtime::SandboxEditorCommandStatus::MissingScene);
+    EXPECT_EQ(missingGraphScene.Error, Core::ErrorCode::InvalidState);
+
+    const ECS::EntityHandle cloudWrongDomain =
+        MakeSelectable(registry, "CloudWrongDomain");
+    AddPointCloudSource(registry, cloudWrongDomain, 3u);
+    SetPositions(registry.Raw().get<GS::Vertices>(cloudWrongDomain),
+                 {
+                     {0.0f, 0.0f, 0.0f},
+                     {1.0f, 0.0f, 0.0f},
+                     {0.0f, 1.0f, 0.0f},
+                 });
+    const Runtime::SandboxEditorGraphVertexNormalsResult graphWrongDomain =
+        Runtime::ApplySandboxEditorGraphVertexNormalsCommand(
+            context,
+            Runtime::SandboxEditorGraphVertexNormalsCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(
+                        cloudWrongDomain),
+            });
+    EXPECT_EQ(graphWrongDomain.Status,
+              Runtime::SandboxEditorCommandStatus::UnsupportedGeometryDomain);
+    EXPECT_FALSE(
+        registry.Raw().all_of<Dirty::DirtyVertexNormals>(cloudWrongDomain));
+
+    const Runtime::SandboxEditorPointCloudVertexNormalsResult invalidPointParams =
+        Runtime::ApplySandboxEditorPointCloudVertexNormalsCommand(
+            context,
+            Runtime::SandboxEditorPointCloudVertexNormalsCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(
+                        cloudWrongDomain),
+                .KNeighbors = 0u,
+            });
+    EXPECT_EQ(invalidPointParams.Status,
+              Runtime::SandboxEditorCommandStatus::InvalidProcessingParameters);
+    EXPECT_FALSE(registry.Raw().get<GS::Vertices>(cloudWrongDomain)
+                     .Properties.Exists(PN::kNormal));
+
+    const ECS::EntityHandle graphConflict =
+        MakeSelectable(registry, "GraphConflict");
+    AddPlanarCycleGraphSource(registry, graphConflict);
+    auto graphConflictNormals = registry.Raw()
+                                    .get<GS::Nodes>(graphConflict)
+                                    .Properties.GetOrAdd<float>(
+                                        std::string{PN::kNormal},
+                                        0.0f);
+    ASSERT_TRUE(graphConflictNormals);
+    const Runtime::SandboxEditorGraphVertexNormalsResult graphConflictResult =
+        Runtime::ApplySandboxEditorGraphVertexNormalsCommand(
+            context,
+            Runtime::SandboxEditorGraphVertexNormalsCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(
+                        graphConflict),
+            });
+    EXPECT_EQ(graphConflictResult.Status,
+              Runtime::SandboxEditorCommandStatus::GeometryProcessingFailed);
+    EXPECT_EQ(graphConflictResult.NormalStatus,
+              GVN::RecomputeStatus::PropertyTypeConflict);
+    EXPECT_EQ(graphConflictResult.Error, Core::ErrorCode::TypeMismatch);
+    EXPECT_FALSE(
+        registry.Raw().all_of<Dirty::DirtyVertexNormals>(graphConflict));
+    EXPECT_TRUE(registry.Raw()
+                    .get<GS::Nodes>(graphConflict)
+                    .Properties.Get<float>(PN::kNormal));
+
+    const ECS::EntityHandle meshWrongDomain =
+        MakeSelectable(registry, "MeshWrongDomain");
+    AddTriangleMeshSource(registry, meshWrongDomain);
+    const Runtime::SandboxEditorPointCloudVertexNormalsResult pointWrongDomain =
+        Runtime::ApplySandboxEditorPointCloudVertexNormalsCommand(
+            context,
+            Runtime::SandboxEditorPointCloudVertexNormalsCommand{
+                .StableEntityId =
+                    Runtime::SelectionController::ToStableEntityId(
+                        meshWrongDomain),
+            });
+    EXPECT_EQ(pointWrongDomain.Status,
+              Runtime::SandboxEditorCommandStatus::UnsupportedGeometryDomain);
+    EXPECT_FALSE(
+        registry.Raw().all_of<Dirty::DirtyVertexNormals>(meshWrongDomain));
+
+    const ECS::EntityHandle cloudConflict =
+        MakeSelectable(registry, "CloudConflict");
+    AddPointCloudSource(registry, cloudConflict, 4u);
+    SetPositions(registry.Raw().get<GS::Vertices>(cloudConflict),
+                 {
+                     {0.0f, 0.0f, 0.0f},
+                     {1.0f, 0.0f, 0.0f},
+                     {0.0f, 1.0f, 0.0f},
+                     {1.0f, 1.0f, 0.0f},
+                 });
+    auto pointConflictNormals = registry.Raw()
+                                    .get<GS::Vertices>(cloudConflict)
+                                    .Properties.GetOrAdd<float>(
+                                        std::string{PN::kNormal},
+                                        0.0f);
+    ASSERT_TRUE(pointConflictNormals);
+    const Runtime::SandboxEditorPointCloudVertexNormalsResult
+        pointConflictResult =
+            Runtime::ApplySandboxEditorPointCloudVertexNormalsCommand(
+                context,
+                Runtime::SandboxEditorPointCloudVertexNormalsCommand{
+                    .StableEntityId =
+                        Runtime::SelectionController::ToStableEntityId(
+                            cloudConflict),
+                    .KNeighbors = 3u,
+                    .MinimumNeighbors = 2u,
+                });
+    EXPECT_EQ(pointConflictResult.Status,
+              Runtime::SandboxEditorCommandStatus::GeometryProcessingFailed);
+    EXPECT_EQ(pointConflictResult.NormalStatus,
+              PCN::RecomputeStatus::PropertyTypeConflict);
+    EXPECT_EQ(pointConflictResult.Error, Core::ErrorCode::TypeMismatch);
+    EXPECT_FALSE(
+        registry.Raw().all_of<Dirty::DirtyVertexNormals>(cloudConflict));
+    EXPECT_TRUE(registry.Raw()
+                    .get<GS::Vertices>(cloudConflict)
+                    .Properties.Get<float>(PN::kNormal));
 }
 
 TEST(SandboxEditorUi, KMeansCommandFailsClosedForInvalidTargetsAndInputs)

@@ -65,11 +65,15 @@ import Extrinsic.Runtime.SelectedMeshTextureBake;
 import Extrinsic.Runtime.SelectionController;
 import Extrinsic.Runtime.VertexAttributeBinding;
 import Extrinsic.Runtime.VertexChannelBindings;
+import Geometry.Graph;
+import Geometry.Graph.Vertex.Normals;
 import Geometry.HalfedgeMesh;
 import Geometry.HalfedgeMesh.Vertices.Normals;
 import Geometry.KMeans;
 import Geometry.Mesh.Conversion;
 import Geometry.MeshSoup;
+import Geometry.PointCloud;
+import Geometry.PointCloud.Normals;
 import Geometry.Properties;
 import Geometry.UvAtlas;
 
@@ -85,6 +89,8 @@ namespace Extrinsic::Runtime
         namespace A = Extrinsic::Assets;
         namespace GK = Geometry::KMeans;
         namespace GN = Geometry::HalfedgeMesh::VertexNormals;
+        namespace GraphNormals = Geometry::Graph::VertexNormals;
+        namespace PointNormals = Geometry::PointCloud::Normals;
 
         inline constexpr std::array<A::AssetPayloadKind, 6> kImportPayloadKinds{{
             A::AssetPayloadKind::Unknown,
@@ -123,6 +129,12 @@ namespace Extrinsic::Runtime
                 GN::AveragingMode::MaxWeighted,
             }};
 
+        inline constexpr std::array<PointNormals::OrientationMode, 2>
+            kPointCloudNormalOrientations{{
+                PointNormals::OrientationMode::None,
+                PointNormals::OrientationMode::MinimumSpanningTree,
+            }};
+
         [[nodiscard]] const char* DebugNameForTextureBakeEncoder(
             const MeshAttributeTextureBakeEncoder encoder) noexcept
         {
@@ -154,6 +166,24 @@ namespace Extrinsic::Runtime
         {
             std::optional<SandboxEditorMeshVertexNormalsResult>* LastResult{nullptr};
             std::int32_t* Weighting{nullptr};
+            glm::vec3* FallbackNormal{nullptr};
+        };
+
+        struct GraphVertexNormalsUiState
+        {
+            std::optional<SandboxEditorGraphVertexNormalsResult>* LastResult{nullptr};
+            glm::vec3* FallbackNormal{nullptr};
+            bool* OrientTowardFallback{nullptr};
+        };
+
+        struct PointCloudVertexNormalsUiState
+        {
+            std::optional<SandboxEditorPointCloudVertexNormalsResult>* LastResult{nullptr};
+            std::int32_t* KNeighbors{nullptr};
+            std::int32_t* MinimumNeighbors{nullptr};
+            bool* UseRadiusSearch{nullptr};
+            float* Radius{nullptr};
+            std::int32_t* Orientation{nullptr};
             glm::vec3* FallbackNormal{nullptr};
         };
 
@@ -4134,6 +4164,28 @@ namespace Extrinsic::Runtime
             return true;
         }
 
+        [[nodiscard]] bool PublishCanonicalVec3Normals(
+            Geometry::PropertySet& properties,
+            const std::vector<glm::vec3>& normals)
+        {
+            if (normals.empty() || normals.size() != properties.Size())
+                return false;
+            if (properties.Exists(GS::PropertyNames::kNormal) &&
+                !properties.Get<glm::vec3>(GS::PropertyNames::kNormal))
+            {
+                return false;
+            }
+
+            auto target = properties.GetOrAdd<glm::vec3>(
+                std::string{GS::PropertyNames::kNormal},
+                glm::vec3{0.0f, 0.0f, 1.0f});
+            if (!target || target.Vector().size() != normals.size())
+                return false;
+
+            target.Vector() = normals;
+            return true;
+        }
+
         [[nodiscard]] std::string BuildMeshNormalsSuccessMessage(
             const SandboxEditorMeshVertexNormalsResult& result)
         {
@@ -4143,6 +4195,260 @@ namespace Extrinsic::Runtime
             message += std::to_string(result.WrittenCount);
             message += ", fallback=";
             message += std::to_string(result.FallbackVertexCount);
+            message += ").";
+            return message;
+        }
+
+        [[nodiscard]] bool IsPositiveFinite(const double value) noexcept
+        {
+            return std::isfinite(value) && value > 0.0;
+        }
+
+        [[nodiscard]] SandboxEditorGraphVertexNormalsResult MakeGraphNormalsResult(
+            const SandboxEditorCommandStatus status,
+            const GraphNormals::RecomputeStatus normalStatus,
+            const bool orientTowardFallback,
+            const Core::ErrorCode error,
+            std::string message)
+        {
+            return SandboxEditorGraphVertexNormalsResult{
+                .Status = status,
+                .NormalStatus = normalStatus,
+                .OrientTowardFallback = orientTowardFallback,
+                .Error = error,
+                .Message = std::move(message),
+            };
+        }
+
+        void CopyGraphNormalCounters(
+            const GraphNormals::Diagnostics& source,
+            SandboxEditorGraphVertexNormalsResult& target)
+        {
+            target.VertexSlotCount = source.VertexSlotCount;
+            target.EdgeSlotCount = source.EdgeSlotCount;
+            target.WrittenCount = source.WrittenCount;
+            target.ValidNormalVertexCount = source.ValidNormalVertexCount;
+            target.FallbackVertexCount = source.FallbackVertexCount;
+            target.IsolatedVertexCount = source.IsolatedVertexCount;
+            target.DegreeOneVertexCount = source.DegreeOneVertexCount;
+            target.CollinearNeighborhoodCount =
+                source.CollinearNeighborhoodCount;
+            target.DuplicatePositionCount = source.DuplicatePositionCount;
+            target.NonFinitePositionCount = source.NonFinitePositionCount;
+            target.InvalidEdgeCount = source.InvalidEdgeCount;
+            target.SkippedDeletedVertexCount =
+                source.SkippedDeletedVertexCount;
+            target.SkippedDeletedEdgeCount = source.SkippedDeletedEdgeCount;
+            target.FallbackNormalWasRepaired =
+                source.FallbackNormalWasRepaired;
+        }
+
+        [[nodiscard]] Core::ErrorCode ErrorForGraphNormalStatus(
+            const GraphNormals::RecomputeStatus status) noexcept
+        {
+            using Status = GraphNormals::RecomputeStatus;
+            switch (status)
+            {
+            case Status::Success:
+                return Core::ErrorCode::Success;
+            case Status::PropertyTypeConflict:
+                return Core::ErrorCode::TypeMismatch;
+            case Status::EmptyGraph:
+            case Status::InvalidPositionProperty:
+            case Status::InvalidTopologyProperty:
+            case Status::InvalidOutputProperty:
+            case Status::CountMismatch:
+                return Core::ErrorCode::InvalidArgument;
+            }
+            return Core::ErrorCode::Unknown;
+        }
+
+        struct GraphForVertexNormalsResult
+        {
+            Geometry::Halfedges Halfedges{};
+            std::size_t EdgeSlotCount{0};
+            SandboxEditorCommandStatus Status{
+                SandboxEditorCommandStatus::NoChange};
+            Core::ErrorCode Error{Core::ErrorCode::Success};
+            std::string Diagnostic{};
+
+            [[nodiscard]] bool Succeeded() const noexcept
+            {
+                return Status == SandboxEditorCommandStatus::Applied;
+            }
+        };
+
+        [[nodiscard]] GraphForVertexNormalsResult
+        BuildGraphConnectivityForVertexNormalRecompute(
+            const GS::MutableSourceView& view)
+        {
+            GraphForVertexNormalsResult result{};
+            const GS::SourceAvailability availability =
+                GS::BuildSourceAvailability(view);
+            if (availability.ProvenanceDomain != GS::Domain::Graph ||
+                view.NodeSource == nullptr ||
+                view.EdgeSource == nullptr)
+            {
+                result.Status =
+                    SandboxEditorCommandStatus::UnsupportedGeometryDomain;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Diagnostic =
+                    "Graph vertex normals require selected graph GeometrySources.";
+                return result;
+            }
+
+            const auto edgeV0 =
+                view.EdgeSource->Properties.Get<std::uint32_t>(
+                    GS::PropertyNames::kEdgeV0);
+            const auto edgeV1 =
+                view.EdgeSource->Properties.Get<std::uint32_t>(
+                    GS::PropertyNames::kEdgeV1);
+            const std::size_t edgeSlotCount =
+                view.EdgeSource->Properties.Size();
+            if (!edgeV0 || !edgeV1 ||
+                edgeV0.Vector().size() != edgeSlotCount ||
+                edgeV1.Vector().size() != edgeSlotCount)
+            {
+                result.Status =
+                    SandboxEditorCommandStatus::InvalidProcessingParameters;
+                result.Error = Core::ErrorCode::InvalidArgument;
+                result.Diagnostic =
+                    "selected graph requires count-matched edge endpoint properties for normal recompute";
+                return result;
+            }
+
+            result.Halfedges.Resize(edgeSlotCount * 2u);
+            auto connectivity =
+                result.Halfedges.GetOrAdd<Geometry::Graph::HalfedgeConnectivity>(
+                    "h:connectivity",
+                    {});
+            if (!connectivity ||
+                connectivity.Vector().size() != edgeSlotCount * 2u)
+            {
+                result.Status =
+                    SandboxEditorCommandStatus::GeometryProcessingFailed;
+                result.Error = Core::ErrorCode::Unknown;
+                result.Diagnostic =
+                    "graph normal recompute could not build halfedge connectivity scratch storage";
+                return result;
+            }
+
+            for (std::size_t edgeIndex = 0u;
+                 edgeIndex < edgeSlotCount;
+                 ++edgeIndex)
+            {
+                const std::size_t h0 = edgeIndex * 2u;
+                const std::size_t h1 = h0 + 1u;
+                connectivity.Vector()[h0].Vertex =
+                    Geometry::VertexHandle{
+                        static_cast<Geometry::PropertyIndex>(
+                            edgeV1.Vector()[edgeIndex])};
+                connectivity.Vector()[h1].Vertex =
+                    Geometry::VertexHandle{
+                        static_cast<Geometry::PropertyIndex>(
+                            edgeV0.Vector()[edgeIndex])};
+            }
+
+            result.EdgeSlotCount = edgeSlotCount;
+            result.Status = SandboxEditorCommandStatus::Applied;
+            return result;
+        }
+
+        [[nodiscard]] std::string BuildGraphNormalsSuccessMessage(
+            const SandboxEditorGraphVertexNormalsResult& result)
+        {
+            std::string message = "Graph vertex normals recomputed (written=";
+            message += std::to_string(result.WrittenCount);
+            message += ", fallback=";
+            message += std::to_string(result.FallbackVertexCount);
+            message += ", invalidEdges=";
+            message += std::to_string(result.InvalidEdgeCount);
+            message += ").";
+            return message;
+        }
+
+        [[nodiscard]] SandboxEditorPointCloudVertexNormalsResult
+        MakePointCloudNormalsResult(
+            const SandboxEditorCommandStatus status,
+            const PointNormals::RecomputeStatus normalStatus,
+            const SandboxEditorPointCloudVertexNormalsCommand& command,
+            const Core::ErrorCode error,
+            std::string message)
+        {
+            return SandboxEditorPointCloudVertexNormalsResult{
+                .Status = status,
+                .NormalStatus = normalStatus,
+                .Orientation = command.Orientation,
+                .KNeighbors = command.KNeighbors,
+                .MinimumNeighbors = command.MinimumNeighbors,
+                .UseRadiusSearch = command.UseRadiusSearch,
+                .Radius = command.Radius,
+                .Error = error,
+                .Message = std::move(message),
+            };
+        }
+
+        void CopyPointCloudNormalCounters(
+            const PointNormals::Diagnostics& source,
+            SandboxEditorPointCloudVertexNormalsResult& target)
+        {
+            target.PointSlotCount = source.PointSlotCount;
+            target.FinitePointCount = source.FinitePointCount;
+            target.WrittenCount = source.WrittenCount;
+            target.ValidNormalPointCount = source.ValidNormalPointCount;
+            target.FallbackPointCount = source.FallbackPointCount;
+            target.DegenerateNeighborhoodCount =
+                source.DegenerateNeighborhoodCount;
+            target.TooFewNeighborCount = source.TooFewNeighborCount;
+            target.CollinearNeighborhoodCount =
+                source.CollinearNeighborhoodCount;
+            target.DuplicatePositionCount = source.DuplicatePositionCount;
+            target.NonFinitePointCount = source.NonFinitePointCount;
+            target.SkippedDeletedPointCount =
+                source.SkippedDeletedPointCount;
+            target.SpatialQueryFailureCount =
+                source.SpatialQueryFailureCount;
+            target.FlippedOrientationCount = source.FlippedOrientationCount;
+            target.KNNVisitedNodeCount = source.KNNVisitedNodeCount;
+            target.KNNDistanceEvaluationCount =
+                source.KNNDistanceEvaluationCount;
+            target.FallbackNormalWasRepaired =
+                source.FallbackNormalWasRepaired;
+        }
+
+        [[nodiscard]] Core::ErrorCode ErrorForPointCloudNormalStatus(
+            const PointNormals::RecomputeStatus status) noexcept
+        {
+            using Status = PointNormals::RecomputeStatus;
+            switch (status)
+            {
+            case Status::Success:
+                return Core::ErrorCode::Success;
+            case Status::PropertyTypeConflict:
+                return Core::ErrorCode::TypeMismatch;
+            case Status::EmptyInput:
+            case Status::TooFewFinitePoints:
+            case Status::InvalidPositionProperty:
+            case Status::InvalidOutputProperty:
+            case Status::CountMismatch:
+                return Core::ErrorCode::InvalidArgument;
+            case Status::SpatialIndexBuildFailed:
+            case Status::SpatialIndexQueryFailed:
+                return Core::ErrorCode::Unknown;
+            }
+            return Core::ErrorCode::Unknown;
+        }
+
+        [[nodiscard]] std::string BuildPointCloudNormalsSuccessMessage(
+            const SandboxEditorPointCloudVertexNormalsResult& result)
+        {
+            std::string message =
+                "Point-cloud vertex normals recomputed (backend=";
+            message += std::string(PointNormals::DebugName(result.Backend));
+            message += ", written=";
+            message += std::to_string(result.WrittenCount);
+            message += ", fallback=";
+            message += std::to_string(result.FallbackPointCount);
             message += ").";
             return message;
         }
@@ -4190,6 +4496,14 @@ namespace Extrinsic::Runtime
                 HasAnySandboxEditorGeometryProcessingDomain(
                     model.Capabilities.Domains,
                     SandboxEditorGeometryProcessingDomain::MeshVertices);
+            model.GraphVertexNormalsAvailable =
+                HasAnySandboxEditorGeometryProcessingDomain(
+                    model.Capabilities.Domains,
+                    SandboxEditorGeometryProcessingDomain::GraphVertices);
+            model.PointCloudVertexNormalsAvailable =
+                HasAnySandboxEditorGeometryProcessingDomain(
+                    model.Capabilities.Domains,
+                    SandboxEditorGeometryProcessingDomain::PointCloudPoints);
             if (context.LastKMeansResult != nullptr)
             {
                 model.LastKMeansResult = *context.LastKMeansResult;
@@ -4215,6 +4529,34 @@ namespace Extrinsic::Runtime
                         context.LastMeshVertexNormalsResult->Message.empty()
                             ? "Last mesh vertex-normal command failed."
                             : context.LastMeshVertexNormalsResult->Message);
+                }
+            }
+            if (context.LastGraphVertexNormalsResult != nullptr)
+            {
+                model.LastGraphVertexNormalsResult =
+                    *context.LastGraphVertexNormalsResult;
+                if (!context.LastGraphVertexNormalsResult->Succeeded())
+                {
+                    AddDiagnostic(
+                        model.Diagnostics,
+                        SandboxEditorDiagnosticCode::GeometryProcessingFailed,
+                        context.LastGraphVertexNormalsResult->Message.empty()
+                            ? "Last graph vertex-normal command failed."
+                            : context.LastGraphVertexNormalsResult->Message);
+                }
+            }
+            if (context.LastPointCloudVertexNormalsResult != nullptr)
+            {
+                model.LastPointCloudVertexNormalsResult =
+                    *context.LastPointCloudVertexNormalsResult;
+                if (!context.LastPointCloudVertexNormalsResult->Succeeded())
+                {
+                    AddDiagnostic(
+                        model.Diagnostics,
+                        SandboxEditorDiagnosticCode::GeometryProcessingFailed,
+                        context.LastPointCloudVertexNormalsResult->Message.empty()
+                            ? "Last point-cloud vertex-normal command failed."
+                            : context.LastPointCloudVertexNormalsResult->Message);
                 }
             }
             if (!model.Capabilities.HasAny())
@@ -6688,11 +7030,279 @@ namespace Extrinsic::Runtime
             DrawMeshVertexNormalsResultStatus(result);
         }
 
+        void DrawGraphVertexNormalsResultStatus(
+            const std::optional<SandboxEditorGraphVertexNormalsResult>& lastResult)
+        {
+            if (!lastResult.has_value())
+            {
+                ImGui::TextDisabled("Last normals run: none");
+                return;
+            }
+
+            const SandboxEditorGraphVertexNormalsResult& result = *lastResult;
+            ImGui::Text("Last normals run: %s",
+                        DebugNameForSandboxEditorCommandStatus(result.Status));
+            ImGui::Text("Geometry status: %s",
+                        std::string(GraphNormals::DebugName(result.NormalStatus)).c_str());
+            if (result.Succeeded())
+            {
+                ImGui::Text("Written: %zu / %zu  valid: %zu  fallback: %zu",
+                            result.WrittenCount,
+                            result.VertexSlotCount,
+                            result.ValidNormalVertexCount,
+                            result.FallbackVertexCount);
+                ImGui::Text("Edges: %zu  invalid=%zu  deleted=%zu",
+                            result.EdgeSlotCount,
+                            result.InvalidEdgeCount,
+                            result.SkippedDeletedEdgeCount);
+                ImGui::Text("Neighborhoods: isolated=%zu  degree1=%zu  collinear=%zu",
+                            result.IsolatedVertexCount,
+                            result.DegreeOneVertexCount,
+                            result.CollinearNeighborhoodCount);
+                ImGui::Text("Positions: duplicate=%zu  nonfinite=%zu",
+                            result.DuplicatePositionCount,
+                            result.NonFinitePositionCount);
+                ImGui::Text("Fallback repaired: %s",
+                            result.FallbackNormalWasRepaired ? "yes" : "no");
+            }
+            if (!result.Message.empty())
+                ImGui::TextWrapped("%s", result.Message.c_str());
+        }
+
+        void DrawGraphVertexNormalsControls(
+            const SandboxEditorDomainWindowModel& model,
+            const SandboxEditorContext& context,
+            const SandboxEditorGeometryProcessingModel& processing,
+            GraphVertexNormalsUiState* normalsState)
+        {
+            ImGui::SeparatorText("Normals");
+            if (!processing.GraphVertexNormalsAvailable)
+            {
+                ImGui::TextDisabled("Graph vertex normals are unavailable for this selection.");
+                return;
+            }
+            if (normalsState == nullptr ||
+                normalsState->LastResult == nullptr ||
+                normalsState->FallbackNormal == nullptr ||
+                normalsState->OrientTowardFallback == nullptr)
+            {
+                ImGui::TextDisabled("Graph vertex-normal controls are not bound.");
+                return;
+            }
+
+            ImGui::DragFloat3(
+                "Fallback normal",
+                &normalsState->FallbackNormal->x,
+                0.01f,
+                -1.0f,
+                1.0f);
+            ImGui::Checkbox("Orient toward fallback",
+                            normalsState->OrientTowardFallback);
+
+            if (ImGui::Button("Recompute"))
+            {
+                *normalsState->LastResult =
+                    ApplySandboxEditorGraphVertexNormalsCommand(
+                        context,
+                        SandboxEditorGraphVertexNormalsCommand{
+                            .StableEntityId = model.SelectedStableId,
+                            .FallbackNormal = *normalsState->FallbackNormal,
+                            .OrientTowardFallback =
+                                *normalsState->OrientTowardFallback,
+                        });
+            }
+
+            const std::optional<SandboxEditorGraphVertexNormalsResult>& result =
+                normalsState->LastResult->has_value()
+                    ? *normalsState->LastResult
+                    : processing.LastGraphVertexNormalsResult;
+            DrawGraphVertexNormalsResultStatus(result);
+        }
+
+        [[nodiscard]] PointNormals::OrientationMode
+        PointCloudNormalOrientationFromIndex(const std::int32_t index) noexcept
+        {
+            const std::int32_t clamped = std::clamp(
+                index,
+                0,
+                static_cast<std::int32_t>(
+                    kPointCloudNormalOrientations.size() - 1u));
+            return kPointCloudNormalOrientations[
+                static_cast<std::size_t>(clamped)];
+        }
+
+        void DrawPointCloudVertexNormalsResultStatus(
+            const std::optional<SandboxEditorPointCloudVertexNormalsResult>& lastResult)
+        {
+            if (!lastResult.has_value())
+            {
+                ImGui::TextDisabled("Last normals run: none");
+                return;
+            }
+
+            const SandboxEditorPointCloudVertexNormalsResult& result =
+                *lastResult;
+            ImGui::Text("Last normals run: %s",
+                        DebugNameForSandboxEditorCommandStatus(result.Status));
+            ImGui::Text("Geometry status: %s",
+                        std::string(PointNormals::DebugName(result.NormalStatus)).c_str());
+            ImGui::Text("Backend: %s  orientation: %s",
+                        std::string(PointNormals::DebugName(result.Backend)).c_str(),
+                        std::string(PointNormals::DebugName(result.Orientation)).c_str());
+            if (result.Succeeded())
+            {
+                ImGui::Text("Written: %zu / %zu  finite: %zu  valid: %zu",
+                            result.WrittenCount,
+                            result.PointSlotCount,
+                            result.FinitePointCount,
+                            result.ValidNormalPointCount);
+                ImGui::Text("Fallback: %zu  tooFew=%zu  degenerate=%zu  collinear=%zu",
+                            result.FallbackPointCount,
+                            result.TooFewNeighborCount,
+                            result.DegenerateNeighborhoodCount,
+                            result.CollinearNeighborhoodCount);
+                ImGui::Text("Positions: duplicate=%zu  nonfinite=%zu  deleted=%zu",
+                            result.DuplicatePositionCount,
+                            result.NonFinitePointCount,
+                            result.SkippedDeletedPointCount);
+                ImGui::Text("Queries: failures=%zu  visited=%zu  distances=%zu",
+                            result.SpatialQueryFailureCount,
+                            result.KNNVisitedNodeCount,
+                            result.KNNDistanceEvaluationCount);
+                ImGui::Text("Flipped: %zu  fallback repaired: %s",
+                            result.FlippedOrientationCount,
+                            result.FallbackNormalWasRepaired ? "yes" : "no");
+            }
+            if (!result.Message.empty())
+                ImGui::TextWrapped("%s", result.Message.c_str());
+        }
+
+        void DrawPointCloudVertexNormalsControls(
+            const SandboxEditorDomainWindowModel& model,
+            const SandboxEditorContext& context,
+            const SandboxEditorGeometryProcessingModel& processing,
+            PointCloudVertexNormalsUiState* normalsState)
+        {
+            ImGui::SeparatorText("Normals");
+            if (!processing.PointCloudVertexNormalsAvailable)
+            {
+                ImGui::TextDisabled("Point-cloud vertex normals are unavailable for this selection.");
+                return;
+            }
+            if (normalsState == nullptr ||
+                normalsState->LastResult == nullptr ||
+                normalsState->KNeighbors == nullptr ||
+                normalsState->MinimumNeighbors == nullptr ||
+                normalsState->UseRadiusSearch == nullptr ||
+                normalsState->Radius == nullptr ||
+                normalsState->Orientation == nullptr ||
+                normalsState->FallbackNormal == nullptr)
+            {
+                ImGui::TextDisabled("Point-cloud vertex-normal controls are not bound.");
+                return;
+            }
+
+            *normalsState->KNeighbors =
+                std::clamp(*normalsState->KNeighbors, 1, 512);
+            *normalsState->MinimumNeighbors =
+                std::clamp(*normalsState->MinimumNeighbors, 1, 512);
+            *normalsState->Orientation = std::clamp(
+                *normalsState->Orientation,
+                0,
+                static_cast<std::int32_t>(
+                    kPointCloudNormalOrientations.size() - 1u));
+            ImGui::DragInt("K", normalsState->KNeighbors, 1.0f, 1, 512);
+            ImGui::DragInt(
+                "Minimum neighbors",
+                normalsState->MinimumNeighbors,
+                1.0f,
+                1,
+                512);
+            ImGui::Checkbox("Use radius", normalsState->UseRadiusSearch);
+            if (*normalsState->UseRadiusSearch)
+            {
+                *normalsState->Radius =
+                    std::max(*normalsState->Radius, 0.001f);
+                ImGui::DragFloat(
+                    "Radius",
+                    normalsState->Radius,
+                    0.01f,
+                    0.001f,
+                    1000.0f);
+            }
+
+            const PointNormals::OrientationMode orientation =
+                PointCloudNormalOrientationFromIndex(
+                    *normalsState->Orientation);
+            if (ImGui::BeginCombo(
+                    "Orientation",
+                    std::string(PointNormals::DebugName(orientation)).c_str()))
+            {
+                for (std::size_t i = 0u;
+                     i < kPointCloudNormalOrientations.size();
+                     ++i)
+                {
+                    const bool selected =
+                        *normalsState->Orientation ==
+                        static_cast<std::int32_t>(i);
+                    if (ImGui::Selectable(
+                            std::string(
+                                PointNormals::DebugName(
+                                    kPointCloudNormalOrientations[i]))
+                                .c_str(),
+                            selected))
+                    {
+                        *normalsState->Orientation =
+                            static_cast<std::int32_t>(i);
+                    }
+                    if (selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+            ImGui::DragFloat3(
+                "Fallback normal",
+                &normalsState->FallbackNormal->x,
+                0.01f,
+                -1.0f,
+                1.0f);
+
+            if (ImGui::Button("Recompute"))
+            {
+                *normalsState->LastResult =
+                    ApplySandboxEditorPointCloudVertexNormalsCommand(
+                        context,
+                        SandboxEditorPointCloudVertexNormalsCommand{
+                            .StableEntityId = model.SelectedStableId,
+                            .KNeighbors = static_cast<std::uint32_t>(
+                                *normalsState->KNeighbors),
+                            .MinimumNeighbors = static_cast<std::uint32_t>(
+                                *normalsState->MinimumNeighbors),
+                            .UseRadiusSearch =
+                                *normalsState->UseRadiusSearch,
+                            .Radius = *normalsState->Radius,
+                            .Orientation =
+                                PointCloudNormalOrientationFromIndex(
+                                    *normalsState->Orientation),
+                            .FallbackNormal =
+                                *normalsState->FallbackNormal,
+                        });
+            }
+
+            const std::optional<SandboxEditorPointCloudVertexNormalsResult>&
+                result = normalsState->LastResult->has_value()
+                    ? *normalsState->LastResult
+                    : processing.LastPointCloudVertexNormalsResult;
+            DrawPointCloudVertexNormalsResultStatus(result);
+        }
+
         void DrawDomainProcessingWindow(
             const SandboxEditorDomainWindowModel& model,
             const SandboxEditorContext& context,
             KMeansUiState* kmeansState,
-            MeshVertexNormalsUiState* normalsState)
+            MeshVertexNormalsUiState* meshNormalsState,
+            GraphVertexNormalsUiState* graphNormalsState,
+            PointCloudVertexNormalsUiState* pointCloudNormalsState)
         {
             DrawDomainWindowHeader(model);
             ImGui::SeparatorText("Processing capabilities");
@@ -6744,11 +7354,30 @@ namespace Extrinsic::Runtime
                 }
             }
             DrawKMeansExecutionControls(model, context, processing, kmeansState);
-            DrawMeshVertexNormalsControls(
-                model,
-                context,
-                processing,
-                normalsState);
+            switch (model.Kind)
+            {
+            case SandboxEditorDomainWindowKind::Mesh:
+                DrawMeshVertexNormalsControls(
+                    model,
+                    context,
+                    processing,
+                    meshNormalsState);
+                break;
+            case SandboxEditorDomainWindowKind::Graph:
+                DrawGraphVertexNormalsControls(
+                    model,
+                    context,
+                    processing,
+                    graphNormalsState);
+                break;
+            case SandboxEditorDomainWindowKind::PointCloud:
+                DrawPointCloudVertexNormalsControls(
+                    model,
+                    context,
+                    processing,
+                    pointCloudNormalsState);
+                break;
+            }
         }
 
         void DrawOneDomainWindow(
@@ -6758,6 +7387,8 @@ namespace Extrinsic::Runtime
             std::array<bool, 15>& domainWindowOpen,
             KMeansUiState* kmeansState,
             MeshVertexNormalsUiState* normalsState,
+            GraphVertexNormalsUiState* graphNormalsState,
+            PointCloudVertexNormalsUiState* pointCloudNormalsState,
             TextureBakeUiState* textureBakeState)
         {
             const std::size_t slot = DomainWindowSlotIndex(kind, section);
@@ -6788,7 +7419,9 @@ namespace Extrinsic::Runtime
                         model,
                         context,
                         kmeansState,
-                        normalsState);
+                        normalsState,
+                        graphNormalsState,
+                        pointCloudNormalsState);
                     break;
                 case DomainWindowSection::Count:
                     break;
@@ -6802,6 +7435,8 @@ namespace Extrinsic::Runtime
             std::array<bool, 15>* domainWindowOpen,
             KMeansUiState* kmeansState,
             MeshVertexNormalsUiState* normalsState,
+            GraphVertexNormalsUiState* graphNormalsState,
+            PointCloudVertexNormalsUiState* pointCloudNormalsState,
             TextureBakeUiState* textureBakeState)
         {
             if (context == nullptr || domainWindowOpen == nullptr)
@@ -6827,11 +7462,13 @@ namespace Extrinsic::Runtime
                         *context,
                         kind,
                         section,
-                        *domainWindowOpen,
-                        kmeansState,
-                        normalsState,
-                        textureBakeState);
-                }
+                    *domainWindowOpen,
+                    kmeansState,
+                    normalsState,
+                    graphNormalsState,
+                    pointCloudNormalsState,
+                    textureBakeState);
+            }
             }
         }
 
@@ -7217,6 +7854,8 @@ namespace Extrinsic::Runtime
             std::array<bool, 15>* domainWindowOpen,
             KMeansUiState* kmeansState,
             MeshVertexNormalsUiState* normalsState,
+            GraphVertexNormalsUiState* graphNormalsState,
+            PointCloudVertexNormalsUiState* pointCloudNormalsState,
             TextureBakeUiState* textureBakeState)
         {
             DrawMainMenuBar(panelWindowOpen, domainWindowOpen);
@@ -7225,6 +7864,8 @@ namespace Extrinsic::Runtime
                 domainWindowOpen,
                 kmeansState,
                 normalsState,
+                graphNormalsState,
+                pointCloudNormalsState,
                 textureBakeState);
 
             if (BeginPanelWindow(panelWindowOpen,
@@ -8589,13 +9230,17 @@ namespace Extrinsic::Runtime
             };
         case SandboxEditorDomainWindowKind::Graph:
             return {
-                {.Domain = Domain::GraphVertices, .Label = "Vertices"},
+                {.Domain = Domain::GraphVertices,
+                 .Label = "Vertices",
+                 .HasNormalsMethod = true},
                 {.Domain = Domain::GraphEdges, .Label = "Edges"},
                 {.Domain = Domain::GraphHalfedges, .Label = "Halfedges"},
             };
         case SandboxEditorDomainWindowKind::PointCloud:
             return {
-                {.Domain = Domain::PointCloudPoints, .Label = "Vertices"},
+                {.Domain = Domain::PointCloudPoints,
+                 .Label = "Vertices",
+                 .HasNormalsMethod = true},
             };
         }
         return {};
@@ -8619,7 +9264,9 @@ namespace Extrinsic::Runtime
         case SandboxEditorGeometryProcessingAlgorithm::Repair:
             return kMeshTopologyDomains;
         case SandboxEditorGeometryProcessingAlgorithm::NormalEstimation:
-            return Domain::MeshVertices | Domain::PointCloudPoints;
+            return Domain::MeshVertices |
+                   Domain::GraphVertices |
+                   Domain::PointCloudPoints;
         case SandboxEditorGeometryProcessingAlgorithm::ShortestPath:
             return Domain::MeshVertices | Domain::GraphVertices;
         case SandboxEditorGeometryProcessingAlgorithm::ConvexHull:
@@ -11061,9 +11708,252 @@ namespace Extrinsic::Runtime
         return result;
     }
 
+    SandboxEditorGraphVertexNormalsResult
+    ApplySandboxEditorGraphVertexNormalsCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorGraphVertexNormalsCommand& command)
+    {
+        if (context.Scene == nullptr)
+        {
+            return MakeGraphNormalsResult(
+                SandboxEditorCommandStatus::MissingScene,
+                GraphNormals::RecomputeStatus::EmptyGraph,
+                command.OrientTowardFallback,
+                Core::ErrorCode::InvalidState,
+                "Scene registry is unavailable for graph vertex-normal recompute.");
+        }
+        if (!IsPositiveFinite(command.DegenerateNormalLengthEpsilon) ||
+            !IsPositiveFinite(command.CollinearEigenvalueRatioEpsilon))
+        {
+            return MakeGraphNormalsResult(
+                SandboxEditorCommandStatus::InvalidProcessingParameters,
+                GraphNormals::RecomputeStatus::InvalidOutputProperty,
+                command.OrientTowardFallback,
+                Core::ErrorCode::InvalidArgument,
+                "Graph vertex-normal recompute requires positive finite degeneracy and collinearity epsilons.");
+        }
+
+        entt::registry& raw = context.Scene->Raw();
+        const std::optional<ECS::EntityHandle> entity =
+            ResolveStableEntity(raw, command.StableEntityId);
+        if (!entity.has_value())
+        {
+            return MakeGraphNormalsResult(
+                SandboxEditorCommandStatus::StaleEntity,
+                GraphNormals::RecomputeStatus::EmptyGraph,
+                command.OrientTowardFallback,
+                Core::ErrorCode::ResourceNotFound,
+                "Graph vertex-normal target entity is stale or no longer live.");
+        }
+
+        GS::MutableSourceView view = GS::BuildMutableView(raw, *entity);
+        const GraphForVertexNormalsResult source =
+            BuildGraphConnectivityForVertexNormalRecompute(view);
+        if (!source.Succeeded())
+        {
+            return MakeGraphNormalsResult(
+                source.Status,
+                GraphNormals::RecomputeStatus::InvalidTopologyProperty,
+                command.OrientTowardFallback,
+                source.Error,
+                source.Diagnostic);
+        }
+
+        Geometry::Vertices scratchNodes = view.NodeSource->Properties;
+        GraphNormals::Params params{};
+        params.PositionProperty = GS::PropertyNames::kPosition;
+        params.OutputProperty = GraphNormals::kDefaultOutputProperty;
+        params.FallbackNormal = command.FallbackNormal;
+        params.DegenerateNormalLengthEpsilon =
+            command.DegenerateNormalLengthEpsilon;
+        params.CollinearEigenvalueRatioEpsilon =
+            command.CollinearEigenvalueRatioEpsilon;
+        params.SkipDeleted = true;
+        params.OrientTowardFallback = command.OrientTowardFallback;
+
+        const GraphNormals::PropertySetResult normalResult =
+            GraphNormals::Recompute(
+                scratchNodes,
+                Geometry::ConstPropertySet(scratchNodes)
+                    .Get<glm::vec3>(GS::PropertyNames::kPosition),
+                Geometry::ConstPropertySet(source.Halfedges)
+                    .Get<Geometry::Graph::HalfedgeConnectivity>(
+                        "h:connectivity"),
+                source.EdgeSlotCount,
+                params,
+                Geometry::ConstPropertySet(scratchNodes).Get<bool>(
+                    "v:deleted"),
+                Geometry::ConstPropertySet(view.EdgeSource->Properties)
+                    .Get<bool>("e:deleted"));
+
+        SandboxEditorGraphVertexNormalsResult result{
+            .Status = normalResult.Status ==
+                    GraphNormals::RecomputeStatus::Success
+                ? SandboxEditorCommandStatus::Applied
+                : SandboxEditorCommandStatus::GeometryProcessingFailed,
+            .NormalStatus = normalResult.Status,
+            .OrientTowardFallback = command.OrientTowardFallback,
+            .Error = ErrorForGraphNormalStatus(normalResult.Status),
+        };
+        CopyGraphNormalCounters(normalResult.Diagnostics, result);
+        if (normalResult.Status != GraphNormals::RecomputeStatus::Success)
+        {
+            result.Message = "Geometry.Graph.Vertex.Normals failed with ";
+            result.Message +=
+                std::string(GraphNormals::DebugName(normalResult.Status));
+            result.Message += ".";
+            return result;
+        }
+
+        if (!normalResult.Normals.IsValid() ||
+            !PublishCanonicalVec3Normals(
+                view.NodeSource->Properties,
+                normalResult.Normals.Vector()))
+        {
+            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.NormalStatus =
+                GraphNormals::RecomputeStatus::PropertyTypeConflict;
+            result.Error = Core::ErrorCode::TypeMismatch;
+            result.Message =
+                "Graph vertex-normal publication failed because v:normal has an incompatible type or size.";
+            return result;
+        }
+
+        Dirty::MarkVertexNormalsDirty(raw, *entity);
+        if (context.CommandHistory != nullptr)
+            (void)context.CommandHistory->MarkDirty(
+                "Recompute graph vertex normals");
+        result.Message = BuildGraphNormalsSuccessMessage(result);
+        return result;
+    }
+
+    SandboxEditorPointCloudVertexNormalsResult
+    ApplySandboxEditorPointCloudVertexNormalsCommand(
+        const SandboxEditorContext& context,
+        const SandboxEditorPointCloudVertexNormalsCommand& command)
+    {
+        if (context.Scene == nullptr)
+        {
+            return MakePointCloudNormalsResult(
+                SandboxEditorCommandStatus::MissingScene,
+                PointNormals::RecomputeStatus::EmptyInput,
+                command,
+                Core::ErrorCode::InvalidState,
+                "Scene registry is unavailable for point-cloud vertex-normal recompute.");
+        }
+        if (command.KNeighbors == 0u ||
+            command.MinimumNeighbors == 0u ||
+            !IsPositiveFinite(command.DegenerateNormalLengthEpsilon) ||
+            !IsPositiveFinite(command.CollinearEigenvalueRatioEpsilon) ||
+            (command.UseRadiusSearch &&
+             (!std::isfinite(command.Radius) || command.Radius <= 0.0f)))
+        {
+            return MakePointCloudNormalsResult(
+                SandboxEditorCommandStatus::InvalidProcessingParameters,
+                PointNormals::RecomputeStatus::InvalidOutputProperty,
+                command,
+                Core::ErrorCode::InvalidArgument,
+                "Point-cloud vertex-normal recompute requires positive finite neighborhood settings.");
+        }
+
+        entt::registry& raw = context.Scene->Raw();
+        const std::optional<ECS::EntityHandle> entity =
+            ResolveStableEntity(raw, command.StableEntityId);
+        if (!entity.has_value())
+        {
+            return MakePointCloudNormalsResult(
+                SandboxEditorCommandStatus::StaleEntity,
+                PointNormals::RecomputeStatus::EmptyInput,
+                command,
+                Core::ErrorCode::ResourceNotFound,
+                "Point-cloud vertex-normal target entity is stale or no longer live.");
+        }
+
+        GS::MutableSourceView view = GS::BuildMutableView(raw, *entity);
+        const GS::SourceAvailability availability =
+            GS::BuildSourceAvailability(view);
+        if (availability.ProvenanceDomain != GS::Domain::PointCloud ||
+            view.VertexSource == nullptr)
+        {
+            return MakePointCloudNormalsResult(
+                SandboxEditorCommandStatus::UnsupportedGeometryDomain,
+                PointNormals::RecomputeStatus::EmptyInput,
+                command,
+                Core::ErrorCode::InvalidArgument,
+                "Point-cloud vertex normals require selected point-cloud GeometrySources.");
+        }
+
+        Geometry::Vertices scratchPoints = view.VertexSource->Properties;
+        Geometry::PointCloud::Cloud scratchCloud{scratchPoints};
+        PointNormals::Params params{};
+        params.PositionProperty = GS::PropertyNames::kPosition;
+        params.OutputProperty = PointNormals::kDefaultOutputProperty;
+        params.KNeighbors = command.KNeighbors;
+        params.MinimumNeighbors = command.MinimumNeighbors;
+        params.UseRadiusSearch = command.UseRadiusSearch;
+        params.Radius = command.Radius;
+        params.Orientation = command.Orientation;
+        params.FallbackNormal = command.FallbackNormal;
+        params.DegenerateNormalLengthEpsilon =
+            command.DegenerateNormalLengthEpsilon;
+        params.CollinearEigenvalueRatioEpsilon =
+            command.CollinearEigenvalueRatioEpsilon;
+        params.SkipDeleted = true;
+
+        const PointNormals::Result normalResult =
+            PointNormals::Recompute(scratchCloud, params);
+
+        SandboxEditorPointCloudVertexNormalsResult result{
+            .Status = normalResult.Status ==
+                    PointNormals::RecomputeStatus::Success
+                ? SandboxEditorCommandStatus::Applied
+                : SandboxEditorCommandStatus::GeometryProcessingFailed,
+            .NormalStatus = normalResult.Status,
+            .Backend = normalResult.Backend,
+            .Orientation = command.Orientation,
+            .KNeighbors = command.KNeighbors,
+            .MinimumNeighbors = command.MinimumNeighbors,
+            .UseRadiusSearch = command.UseRadiusSearch,
+            .Radius = command.Radius,
+            .Error = ErrorForPointCloudNormalStatus(normalResult.Status),
+        };
+        CopyPointCloudNormalCounters(normalResult.Diagnostics, result);
+        if (normalResult.Status != PointNormals::RecomputeStatus::Success)
+        {
+            result.Message = "Geometry.PointCloud.Normals failed with ";
+            result.Message +=
+                std::string(PointNormals::DebugName(normalResult.Status));
+            result.Message += ".";
+            return result;
+        }
+
+        if (!normalResult.Normals.IsValid() ||
+            !PublishCanonicalVec3Normals(
+                view.VertexSource->Properties,
+                normalResult.Normals.Vector()))
+        {
+            result.Status = SandboxEditorCommandStatus::GeometryProcessingFailed;
+            result.NormalStatus =
+                PointNormals::RecomputeStatus::PropertyTypeConflict;
+            result.Error = Core::ErrorCode::TypeMismatch;
+            result.Message =
+                "Point-cloud vertex-normal publication failed because v:normal has an incompatible type or size.";
+            return result;
+        }
+
+        Dirty::MarkVertexNormalsDirty(raw, *entity);
+        if (context.CommandHistory != nullptr)
+            (void)context.CommandHistory->MarkDirty(
+                "Recompute point-cloud vertex normals");
+        result.Message = BuildPointCloudNormalsSuccessMessage(result);
+        return result;
+    }
+
     void DrawSandboxEditorPanelFrame(const SandboxEditorPanelFrame& frame)
     {
         DrawPanelFrame(frame,
+                       nullptr,
+                       nullptr,
                        nullptr,
                        nullptr,
                        nullptr,
@@ -11117,6 +12007,12 @@ namespace Extrinsic::Runtime
                 if (m_LastMeshVertexNormalsResult.has_value())
                     context.LastMeshVertexNormalsResult =
                         &*m_LastMeshVertexNormalsResult;
+                if (m_LastGraphVertexNormalsResult.has_value())
+                    context.LastGraphVertexNormalsResult =
+                        &*m_LastGraphVertexNormalsResult;
+                if (m_LastPointCloudVertexNormalsResult.has_value())
+                    context.LastPointCloudVertexNormalsResult =
+                        &*m_LastPointCloudVertexNormalsResult;
                 const Core::Extent2D viewport =
                     context.CameraViewport.Width != 0u &&
                             context.CameraViewport.Height != 0u
@@ -11152,6 +12048,23 @@ namespace Extrinsic::Runtime
                     .Weighting = &m_MeshVertexNormalsWeighting,
                     .FallbackNormal = &m_MeshVertexNormalsFallback,
                 };
+                GraphVertexNormalsUiState graphNormalsState{
+                    .LastResult = &m_LastGraphVertexNormalsResult,
+                    .FallbackNormal = &m_GraphVertexNormalsFallback,
+                    .OrientTowardFallback =
+                        &m_GraphVertexNormalsOrientTowardFallback,
+                };
+                PointCloudVertexNormalsUiState pointCloudNormalsState{
+                    .LastResult = &m_LastPointCloudVertexNormalsResult,
+                    .KNeighbors = &m_PointCloudVertexNormalsK,
+                    .MinimumNeighbors =
+                        &m_PointCloudVertexNormalsMinimumNeighbors,
+                    .UseRadiusSearch =
+                        &m_PointCloudVertexNormalsUseRadius,
+                    .Radius = &m_PointCloudVertexNormalsRadius,
+                    .Orientation = &m_PointCloudVertexNormalsOrientation,
+                    .FallbackNormal = &m_PointCloudVertexNormalsFallback,
+                };
                 TextureBakeUiState textureBakeState{
                     .SourceIndex = &m_TextureBakeSourceIndex,
                     .TargetSemanticIndex = &m_TextureBakeTargetSemanticIndex,
@@ -11177,6 +12090,8 @@ namespace Extrinsic::Runtime
                     &m_DomainWindowOpen,
                     &kmeansState,
                     &normalsState,
+                    &graphNormalsState,
+                    &pointCloudNormalsState,
                     &textureBakeState);
             });
     }
